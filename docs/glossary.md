@@ -37,7 +37,7 @@ A Data Object representing an arbitrary sequence of bytes.
 
 A collection of transactions submitted simultaneously by a Peer.
 
-Unlike traditional Blockchains, a Block in Convex does *not* contain a hash of the previous block. Blocks can therefore be handled in parallel and re-ordered by the higher level Consensus Algorithm.
+Unlike Blockchains, a Block in Convex does *not* contain a hash of the previous block. Blocks can therefore be handled in parallel and re-ordered by the higher level Consensus Algorithm.
 
 A Block must be digitally signed by the proposing Peer to be valid for inclusion in consensus.
 
@@ -61,12 +61,13 @@ A network of Peers, maintaining a consistent global state and executing state tr
 
 ## Convex Lisp
 
-A simple programming language based on Lisp, that is available by default as part of the CVM.
+A programming language based on Lisp, that is available by default as part of the CVM.
 
-All programming languages represent trade-offs. Convex Lisp prioritises features that are believed to be well suited to the development of decentralised economic systems. This include:
+All programming languages represent trade-offs. Convex Lisp prioritises features that are believed to be well suited to the development of decentralised economic systems. This includes:
 
-* Emphasis on functional programming to reduce error and improve logocal clarity
+* Emphasis on functional programming to reduce error and improve logical clarity
 * Use of immutable data structures
+* Actor-based model enabling trusted autonomous execution of code
 
 ## CRDT
 
