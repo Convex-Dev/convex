@@ -1,0 +1,37 @@
+package convex.generators;
+
+import com.pholser.junit.quickcheck.generator.GenerationStatus;
+import com.pholser.junit.quickcheck.generator.Generator;
+import com.pholser.junit.quickcheck.random.SourceOfRandomness;
+
+import convex.core.data.ACollection;
+
+/**
+ * Generator for arbitrary collections
+ */
+public class CollectionGen extends Generator<ACollection<?>> {
+	@SuppressWarnings("rawtypes")
+	private static final Class cls = (Class) ACollection.class;
+
+	@SuppressWarnings("unchecked")
+	public CollectionGen() {
+		super(cls);
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public ACollection<Object> generate(SourceOfRandomness r, GenerationStatus status) {
+		int type = r.nextInt(3);
+		switch (type) {
+		case 0:
+			return gen().make(VectorGen.class).generate(r, status);
+		case 1:
+			return gen().make(ListGen.class).generate(r, status);
+		case 2:
+			return gen().make(SetGen.class).generate(r, status);
+
+		default:
+			throw new Error("Unexpected type: " + type);
+		}
+	}
+}

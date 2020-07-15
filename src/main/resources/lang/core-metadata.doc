@@ -1,0 +1,944 @@
+;; file for core documentation
+;; read in as raw forms and added to metadata for each core symbol
+{
+	accept 
+	{
+	 :doc {:description "Accepts funds up to the amount of *offer* from *caller*. Amount must cast to long. If successful, the amount will be added immediately to *balance*"
+         :examples [{:code "(accept *offer*)"}]
+         :type :function
+         :signature [{:params [amount]}]}
+	}
+ 
+  actor?
+	{
+	 :doc {:description "Tests if the given address refers to an Actor. Argument must be coercable to Address"
+         :examples [{:code "(actor? \"1Ba377262D7637068C8a84b732e30d3Ff62bA891\")"}]
+         :type :function
+         :signature [{:params [address]}]}
+	}
+ 
+ 	address 
+	{
+	 :doc {:description "Casts the argument to an Address. Handles hex Strings, Addresses and 20-byte blobs. "
+         :examples [{:code "(address \"1Ba377262D7637068C8a84b732e30d3Ff62bA891\")"}]
+         :type :function
+         :signature [{:params [a]}]}
+	}
+ 
+ 	address?
+	{
+	 :doc {:description "Tests is the argument is an Address."
+         :examples [{:code "(address :foo)"}]
+         :type :function
+         :signature [{:params [a]}]}
+	}
+ 
+  apply
+	{
+	 :doc {:description "Applies the function f to the specified arguments, after flattening the last argument."
+         :examples [{:code "(apply + 1 2 3 [4 5 6])"}]
+         :type :function
+         :signature [{:params [f & more-args]}]}
+	}
+ 
+  assert
+	{
+	 :doc {:description "Checks each test in turn, and raises an ASSERT error if any are not truthy."
+         :examples [{:code "(assert (= owner *caller*))"}]
+         :type :function
+         :signature [{:params [& tests]}]}
+	}
+ 
+  assoc
+	{
+	 :doc {:description "Adds entries into an associative data structure, taking each two arguments as key/value pairs."
+         :examples [{:code "(assoc {1 2} 3 4)"}]
+         :type :function
+         :signature [{:params [m & kvs]}]}
+	}
+ 
+  balance
+	{
+	 :doc {:description "Returns the coin balance of the specified account, which must cast to Address."
+         :examples [{:code "(balance *caller*)"}]
+         :type :function
+         :signature [{:params [address]}]}
+	}
+ 
+  blob
+	{
+	 :doc {:description "Casts the argument to a Blob. Handles Addresses, Hashes, existing blobs, and hex Strings"
+         :examples [{:code "(blob \"1234abcd\")"}]
+         :type :function
+         :signature [{:params [address]}]}
+	}
+ 
+   blob?
+	{
+	 :doc {:description "Tests if the argument is a blob."
+         :examples [{:code "(blob? some-val)"}]
+         :type :function
+         :signature [{:params [a]}]}
+	}
+ 
+  boolean
+	{
+	 :doc {:description "Casts any value to a Boolean. Returns true if the value is truthy, false otherwise."
+         :examples [{:code "(boolean 123)"}]
+         :type :function
+         :signature [{:params [a]}]}
+	}
+ 
+  boolean?
+	{
+	 :doc {:description "Tests if the argument is a boolean (either true or false)."
+         :examples [{:code "(boolean? false)"}]
+         :type :function
+         :signature [{:params [a]}]}
+	}
+ 
+  byte
+	{
+	 :doc {:description "Casts a value to a Byte. Discards high bits of larger integer types."
+         :examples [{:code "(byte 1234)"}]
+         :type :function
+         :signature [{:params [a]}]}
+	}
+ 
+  call*
+	{
+	 :doc {:description "Calls an Actor function. address must cast to Address. offer must cast to Long. (symbol fn-name) must identify an exported function in the target Actor. args must be valid arguments for the called function."
+         :examples [{:code "(call* some-actor 1000 'actor-fn arg1 arg2)"}]
+         :type :function
+         :signature [{:params [address offer fn-name & args]}]}
+	}
+ 
+  call
+	{
+	 :doc {:description "Calls an Actor function. address must be valid. offer is optional, if provided must cast to Long. call-form must be a valid expression calling an exported function in the Actor."
+         :examples [{:code "(call some-contract 1000 (contract-fn arg1 arg2))"}]
+         :type :macro
+         :signature [{:params [address call-form]}
+                     {:params [address offer call-form]}]}
+	}
+ 
+  char
+	{
+	 :doc {:description "Casts a value to a Char. Discards high bits of larger integer types."
+         :examples [{:code "(char 97)"}]
+         :type :function
+         :signature [{:params [a]}]}
+	}
+ 
+  coll?
+	{
+	 :doc {:description "Tests if the argument is a Collection. Collections include maps, vectors, lists, sets."
+         :examples [{:code "(coll? [1 2 3])"}]
+         :type :function
+         :signature [{:params [a]}]}
+	}
+ 
+  compile
+	{
+	 :doc {:description "Compiles a form, returning an op."
+         :examples [{:code "(compile '(fn [x] (* x 2)))"}]
+         :type :function
+         :signature [{:params [form]}]}
+	}
+ 
+  concat
+	{
+	 :doc {:description "Concatenates sequential objects, returning a new sequential object of the same type as the first non-nil argument. Nil is treated as an empty sequence."
+         :examples [{:code "(concat [1 2] [3 4])"}]
+         :type :function
+         :signature [{:params [& seqs]}]}
+	}
+ 
+  conj
+	{
+	 :doc {:description "Adds elements to a data structure, in the natural mode of addition for the datat structure."
+         :examples [{:code "(conj [1 2] 3)"}]
+         :type :function
+         :signature [{:params [coll & elems]}]}
+	}
+ 
+  cons
+	{
+	 :doc {:description "Constructs a list, by pre-pending the leading arguments to the last argument. The last argument must be coercable to a sequence."
+         :examples [{:code "(cons 1 2 '(3 4))"}]
+         :type :function
+         :signature [{:params [& args]}]}
+	}
+ 
+  contains-key?
+	{
+	 :doc {:description "Tests if the given asccoiative data structure contains the given key."
+         :examples [{:code "(contains-key? {:foo 1 :bar 2} :foo)"}]
+         :type :function
+         :signature [{:params [coll key]}]}
+	}
+ 
+
+ 
+  count
+	{
+	 :doc {:description "Counts the number of elements in the given collection"
+         :examples [{:code "(count [1 2 3])"}]
+         :type :function
+         :signature [{:params [coll]}]}
+	}
+ 
+  dec
+	{
+	 :doc {:description "Decrements the given number by 1"
+         :examples [{:code "(dec 10)"}]
+         :type :function
+         :signature [{:params [num]}]}
+	}
+ 
+  deploy
+	{
+	 :doc {:description "Deploys a smart contract. The first argument must be a Actor generator function, which will be called with the given arguments. Returns the new contract address if successful."
+         :examples [{:code "(deploy my-actor-fn 1 2 3)"}]
+         :type :function
+         :signature [{:params [init-fn & args]}]}
+	}
+ 
+  deploy-once
+	{
+	 :doc {:description "Deploys an Actor if only if it has not already been deoplyed with the same arguments. The first argument must be a Actor generator function, which will be called with the given arguments. Returns the address of the existing or new Actor if successful."
+         :examples [{:code "(deploy my-actor-fn 1 2 3)"}]
+         :type :function
+         :signature [{:params [init-fn & args]}]}
+	}
+ 
+  disj
+	{
+	 :doc {:description "Removes a key from a set."
+         :examples [{:code "(disj #{1 2 3} 1)"}]
+         :type :function
+         :signature [{:params [coll key]}]}
+	}
+ 
+  dissoc
+	{
+	 :doc {:description "Removes entries with the specified key(s) from a map. Returns the same map unchanged if the key is not present."
+         :examples [{:code "(dissoc {1 2 3 4} 3)"}]
+         :type :function
+         :signature [{:params [coll & keys]}]}
+	}
+ 
+
+  double
+ 	{
+	 :doc {:description "Casts a numerical value to a Double."
+         :examples [{:code "(double 3)"}]
+         :type :function
+         :signature [{:params [a]}]}
+	}
+  
+  empty
+ 	{
+	 :doc {:description "Returns an empty collection of the same type as the argument. (empty nil) returns nil."
+         :examples [{:code "(empty [1 2 3])"}]
+         :type :function
+         :signature [{:params [coll]}]}
+	}
+  
+  empty?
+ 	{
+	 :doc {:description "Checks if the argument is an empty collection. nil is considered empty. "
+         :examples [{:code "(empty? [])"}]
+         :type :function
+         :signature [{:params [coll]}]}
+	}
+  
+  eval
+ 	{
+	 :doc {:description "Compiles and evaluates a form in the current context."
+         :examples [{:code "(eval '(+ 1 2))"}]
+         :type :function
+         :signature [{:params [form]}]}
+	}
+  
+  exp
+ 	{
+	 :doc {:description "Returns e raised to the power of the given numerical argument."
+         :examples [{:code "(exp 1.0)"}]
+         :type :function
+         :signature [{:params [x]}]}
+	}
+  
+  expand
+ 	{
+	 :doc {:description "Expands the given form, including expansion of any macros. Uses the specified expander if provided, *initial-expander* otherwise."
+         :examples [{:code "(expand '(if a :truthy :falsey))"}]
+         :type :function
+         :signature [{:params [form]}
+                     {:params [form expander]}]}
+	}
+  
+  expander
+ 	{
+	 :doc {:description "Creates an expander from the given function."
+         :examples [{:code "(expander (fn [form ex] (quote form)))"}]
+         :type :function
+         :signature [{:params [fn]}]}
+	}
+  
+  export
+ 	{
+	 :doc {:description "Exports symbols from the current smart contract. Exported symbols may be called by external parties. It is advised to carefully audit the security of usages of this function."
+         :examples [{:code "(export some-safe-function)"}]
+         :type :macro
+         :signature [{:params [& symbols]}]}
+	}
+  
+  exports?
+ 	{
+	 :doc {:description "Tests if a specified smart contract exports a given symbol name."
+         :examples [{:code "(exports? contract-address 'function-name)"}]
+         :type :function
+         :signature [{:params [& symbols]}]}
+	}
+  
+  fail
+ 	{
+	 :doc {:description "Causes execution to fail at the current position. Error type defaults to ASSERT if not specified. Error message defaults to nil if not specified."
+         :examples [{:code "(export some-safe-function)"}]
+         :type :function
+         :signature [{:params []}
+                     {:params [error-type]
+                      :params [error-type message]}]}
+	}
+  
+  fetch
+ 	{
+	 :doc {:description "Fetches the object with the given Object ID from immutable storage. Returns nil if not found"
+         :examples [{:code "(fetch object-hash-id)"}]
+         :type :function
+         :signature [{:params [id]}]}
+	}
+  
+  first
+ 	{
+	 :doc {:description "Returns the first element from a collection."
+         :examples [{:code "(first [1 2 3])"}]
+         :type :function
+         :signature [{:params [coll]}]}
+	}
+  
+  fn?
+ 	{
+	 :doc {:description "Tests if the argument is a function. Some arguments may be castable to functions but are not functions themselves, e.g. maps and vectors."
+         :examples [{:code "(fn? count)"}]
+         :type :function
+         :signature [{:params [a]}]}
+	}
+  
+  get
+ 	{
+	 :doc {:description "Gets an element from a collection at the specified index value. Works on all collection types including maps, sets and sequences. Nil is treated as an empty collection. If the index is not present, returns not-found value (or nil if not-found is not provided)."
+         :examples [{:code "(get {:foo 10 :bar 15} :foo)"}]
+         :type :function
+         :signature [{:params [coll key]}
+                     {:params [coll key not-found]}]}
+	}
+  
+  get-holding
+ 	{
+	 :doc {:description "Gets the holding value for a specified owner account address. Owner account must exist. Holding will be null by default."
+         :examples [{:code "(get-holding *caller*)"}]
+         :type :function
+         :signature [{:params [owner]}]}
+	}
+  
+  get-in
+ 	{
+	 :doc {:description "Gets an element by sucessively looking up keys in a collection according to the logic of get. Returns not-found if any lookup does not find the appropriate key."
+         :examples [{:code "(get-in [[1 2] [3 4]] [1 1])"}]
+         :type :function
+         :signature [{:params [coll keys]}
+                     {:params [coll keys not-found]}]}
+	}
+  
+  halt
+ 	{
+	 :doc {:description "Completes execution in the current context with the specified result, or null if not provided. Does not roll back any state changes made. If the currently executing context is smart contract, the result will be used as the return value from the smart contract."
+         :examples [{:code "(halt :we-are-finished-here)"}]
+         :type :function
+         :signature [{:params []}
+                     {:params [result]}]}
+	}
+  
+  hash
+  {
+	 :doc {:description "Calculates the Hash of a given value."
+         :examples [{:code "(hash [1 2 3])"}]
+         :type :function
+         :signature [{:params [value]}]}
+	}
+  
+  hash?
+  {
+	 :doc {:description "Tests if the given value is a Hash."
+         :examples [{:code "(hash? (hash *state*))"}]
+         :type :function
+         :signature [{:params [a]}]}
+	}
+  
+  hash-map
+  {
+	 :doc {:description "Constructs a hash map with the given keys and values."
+         :examples [{:code "(hash-map 1 2 3 4)"}]
+         :type :function
+         :signature [{:params [& kvs]}]}
+	}
+  
+  hash-set
+  {
+	 :doc {:description "Constructs a hash set with the given values."
+         :examples [{:code "(hash-set 1 2 3)"}]
+         :type :function
+         :signature [{:params [& values]}]}
+	}
+  
+  if
+  {
+	 :doc {:description "Calculates the test value, then returns the result of the true branch or false branch accordingly. The code in the other branch is not evaluated."
+         :examples [{:code "(if true :true-value :false-value)"}]
+         :type :macro
+         :signature [
+                    {:params [test true-exp]}
+                    {:params [test true-exp false-exp]} 
+                    ] 
+         }
+	}
+  
+  inc
+	{
+	 :doc {:description "Increments the given number by 1"
+         :examples [{:code "(inc 10)"}]
+         :type :function
+         :signature [{:params [num]}]}
+	}
+ 
+  int
+	{
+	 :doc {:description "Casts the given argument to a 32-bit signed Int."
+         :examples [{:code "(int 10)"}]
+         :type :function
+         :signature [{:params [num]}]}
+	}
+  
+  into
+	{
+	 :doc {:description "Adds elements to a collection, in a collection-defined manner as with conj."
+         :examples [{:code "(into {} [[1 2] [3 4]])"}]
+         :type :function
+         :signature [{:params [coll elements]}]}
+	}
+ 
+  keys
+	{
+	 :doc {:description "Returns a collection of keys in the given map."
+         :examples [{:code "(keys {:foo 1 :bar 2})"}]
+         :type :function
+         :signature [{:params [m]}]}
+	}
+ 
+  keyword
+	{
+	 :doc {:description "Coerces the argument to a keyword."
+         :examples [{:code "(keyword \"foo\")"}]
+         :type :function
+         :signature [{:params [name]}]}
+	}
+ 
+ 
+  keyword?
+	{
+	 :doc {:description "Tests if the argument is a Keyword."
+         :examples [{:code "(keyword? :foo)"}]
+         :type :function
+         :signature [{:params [a]}]}
+	}
+ 
+  last
+	{
+	 :doc {:description "Returns the last element of a collection, in collection-defined order. Collection argument must be coercible to a sequence."
+         :examples [{:code "(last [1 2 3])"}]
+         :type :function
+         :signature [{:params [coll]}]}
+	}
+ 
+  let
+  {
+	 :doc {:description "Binds local variables according to symbol / expression pairs in a binding vectors, then execute following expressions in an implicit do block."
+         :examples [{:code "(let [x 10] (* x x))"}]
+         :type :special
+         :signature [{:params [bindings & exps]}] 
+         }
+	}
+ 
+  list
+	{
+	 :doc {:description "Creates a list containing the given arguments as elements."
+         :examples [{:code "(list 1 2 3)"}]
+         :type :function
+         :signature [{:params [& elements]}]}
+	}
+ 
+  list?
+	{
+	 :doc {:description "Tests if the argument is a List."
+         :examples [{:code "(list? :foo)"}]
+         :type :function
+         :signature [{:params [a]}]}
+	}
+ 
+  long
+  {
+	 :doc {:description "Casts the given argument to a 64-bit signed Long."
+         :examples [{:code "(long 10)"}]
+         :type :function
+         :signature [{:params [num]}]}
+	}
+  
+   
+  long?
+	{
+	 :doc {:description "Tests if the argument is a Long."
+         :examples [{:code "(long? 1234)"}]
+         :type :function
+         :signature [{:params [a]}]}
+	}
+ 
+  lookup
+  {
+    :doc {:description "Looks up the value of a symbol in the current execution environment. Name may be a symbol, keyword or String."
+          :examples [{:code "(lookup 'count)"}]
+          :type :function
+          :signature [{:params [name]}]}
+  }
+  
+  lookup-syntax
+  {
+    :doc {:description "Looks up the Syntax Object for a symbol in the current execution environment. Name may be a symbol, keyword or String."
+          :examples [{:code "(lookup-syntax 'count)"}]
+          :type :function
+          :signature [{:params [name]}]}
+  }
+  
+  macro
+  {
+    :doc {:description "Creates a macro expansion procedure."
+          :examples [{:code "(macro [x] '(or x y))"}]
+          :type :macro
+          :signature [{:params [params & body]}]}
+  }
+  
+  map
+  {
+    :doc {:description "Applies a function to each element of a data structure in sequence, and returns a vector of results. Additional collection may be provided to call a function with higher arity."
+          :examples [{:code "(map inc [1 2 3])"}]
+          :type :function
+          :signature [{:params [f coll]}
+                      {:params [f coll1 coll2 & more-colls ]}]}
+  }
+  
+  map?
+  {
+    :doc {:description "Tests if an object is a map data structure."
+          :examples [{:code "(map? {1 2})"}]
+          :type :function
+          :signature [{:params [coll]}]}
+  }
+  
+  meta
+  {
+    :doc {:description "Returns metadata for a Syntax Object. Returns nil if the argument is not a Syntax Object."
+          :examples [{:code "(meta (syntax 'foo {:bar 1}))"}]
+          :type :function
+          :signature [{:params [syntax]}]}
+  }
+ 
+  name
+  {
+    :doc {:description "Gets the String name of an object. Valid names can come from Strings, Keywords or Symbols."
+          :examples [{:code "(name :foo)"}]
+          :type :function
+          :signature [{:params [named-object]}]}
+  }
+  
+  NaN
+  {:doc {:description "Not-a-Number double value, as defined by IEEE 754, and implemented on the JVM"
+          :examples [{:code "(double? NaN)"}]
+          :type :value}
+  }
+
+  next
+  {
+    :doc {:description "Returns the elements of a sequential data structure after the first, or null if no more elements remain."
+          :examples [{:code "(next [1 2 3])"}]
+          :type :function
+          :signature [{:params [coll]}]}
+  }
+  
+  nil?
+  {
+    :doc {:description "Tests if the argument is nil."
+          :examples [{:code "(nil? nil)"}]
+          :type :function
+          :signature [{:params [a]}]}
+  }
+  
+  not
+  {
+    :doc {:description "Inverts a truth value. Returns false for truthy input and true for falsey input."
+          :examples [{:code "(not true)"}]
+          :type :function
+          :signature [{:params [b]}]}
+  }
+  
+  nth
+  {
+    :doc {:description "Gets the nth element of a sequential collection. Collection must be coercible to a sequence, and the index must be a valid long between 0 (inclusive) and the count of the collection (exclusive)."
+          :examples [{:code "(nth [1 2 3] 2)"}]
+          :type :function
+          :signature [{:params [coll index]}]}
+  }
+  
+  number?
+  {
+    :doc {:description "Returns true if the argument is a numeric value, false otherwise."
+          :examples [{:code "(number? 2.3)"}]
+          :type :function
+          :signature [{:params [a]}]}
+  }
+  
+  pow
+  {
+    :doc {:description "Returns the first argument raised to the power of the second argument. Uses double precision maths."
+          :examples [{:code "(pow 2 3)"}]
+          :type :function
+          :signature [{:params [x y]}]}
+  }
+  
+  recur
+  {
+    :doc {:description "Escapes from the currently executing code and recurs at the level of the next loop or function body."
+          :examples [{:code "(recur acc (dec i))"}]
+          :type :special
+          :signature [{:params [x y]}]}
+  }
+  
+  reduce
+  {
+    :doc {:description "Reduces over a sequential collection, calling the function with the accumulated value and each element."
+          :examples [{:code "(recur acc (dec i))"}]
+          :type :function
+          :signature [{:params [f init coll]}]}
+  }
+  
+  return
+  {
+    :doc {:description "Escapes from the currently executing code and returns the specified value from the current function."
+          :examples [{:code "(return :finished)"}]
+          :type :special
+          :signature [{:params [val]}]}
+  }
+  
+  rollback
+  {
+    :doc {:description "Escapes from the currently executing smart contract. Rolls back any state changes. Returns the given value."
+          :examples [{:code "(rollback :aborted)"}]
+          :type :special
+          :signature [{:params [val]}]}
+  }
+  
+  schedule
+  {
+    :doc {:description "Schedules code for future execution under this account. Expands and compiles code now, but does not execute until the specified timestamp."
+          :examples [{:code "(schedule (+ *timestamp* 1000) (transfer my-friend 1000000))"}]
+          :type :macro
+          :signature [{:params [timestamp code]}]}
+  }
+  
+  schedule*
+  {
+    :doc {:description "Schedules a form for future execution under this account. Expands and compiles form now, but does not execute until the specified timestamp."
+          :examples [{:code "(schedule* (+ *timestamp* 1000) '(transfer my-friend 1000000))"}]
+          :type :macro
+          :signature [{:params [timestamp code]}]}
+  }
+  
+  second
+  {
+    :doc {:description "Retuens the second element of a sequential collection."
+          :examples [{:code "(second [1 2 3])"}]
+          :type :function
+          :signature [{:params [coll]}]}
+  }
+  
+  set
+  {
+    :doc {:description "Coerces any collection to a Set."
+          :examples [{:code "(set [1 2 3])"}]
+          :type :function
+          :signature [{:params [coll]}]}
+  }
+  
+  set-holding
+ 	{
+	 :doc {:description "Sets the holding value for a specified owner account address. Owner account must exist. Returns the new holding value."
+         :examples [{:code "(set-holding *caller* 1000)"}]
+         :type :function
+         :signature [{:params [owner value]}]}
+	}
+  
+  set?
+  {
+    :doc {:description "Tests if the agument is a Set."
+          :examples [{:code "(set? #{1 2 3})"}]
+          :type :function
+          :signature [{:params [a]}]}
+  }
+  
+  short
+  {
+    :doc {:description "Coerces the argument to a short signed Int16."
+          :examples [{:code "(short 32767)"}]
+          :type :function
+          :signature [{:params [a]}]}
+  }
+  
+  sqrt
+  {
+    :doc {:description "Computes the square root of a numbeic agument. Uses double precision maths. May return NaN for neagitive values."
+          :examples [{:code "(sqrt 16.0)"}]
+          :type :function
+          :signature [{:params [x]}]}
+  }
+  
+  stake
+  {
+    :doc {:description "Sets the stake on a given peer. Peer must exist, and funds must be available to set the stake to the specified level."
+          :examples [{:code "(stake trusted-peer-address 7000000000)"}]
+          :type :function
+          :signature [{:params [address amount]}]}
+  }
+  
+  store
+  {
+    :doc {:description "Stores a value in immutable storage, and returns its hash ID."
+          :examples [{:code "(store [1 2 3 4])"}]
+          :type :function
+          :signature [{:params [value]}]}
+  }
+  
+  str
+  {
+    :doc {:description "Coerces values to Strings and concatenates them."
+          :examples [{:code "(str \"Hello \" name)"}]
+          :type :function
+          :signature [{:params [& args]}]}
+  }
+  
+  str?
+  {
+    :doc {:description "Tests if the argument is a String."
+          :examples [{:code "(str? name)"}]
+          :type :function
+          :signature [{:params [a]}]}
+  }
+  
+  symbol
+  {
+    :doc {:description "Coerces a named value to a Symbol. Supports Symbols, Keywords and short Strings."
+          :examples [{:code "(symbol :foo)"}]
+          :type :function
+          :signature [{:params [name]}]}
+  }
+  
+  str?
+  {
+    :doc {:description "Tests if the argument is a Symbol."
+          :examples [{:code "(symbol? 'bar)"}]
+          :type :function
+          :signature [{:params [a]}]}
+  }
+  
+  symbol?
+  {
+    :doc {:description "Tests if the argument is a Symbol."
+          :examples [{:code "(symbol? 'foo)"}]
+          :type :function
+          :signature [{:params [a]}]}
+  }
+  
+  syntax
+  {
+    :doc {:description "Wraps a value as a Syntax Object, if it is not already a Syntax Object. If metadata is provided, merge the metadata into the resulting Syntax Object."
+          :examples [{:code "(syntax 'bar)"}]
+          :type :function
+          :signature [{:params [value]}
+                      {:params [value meta]}]}
+  }
+  
+  syntax?
+  {
+    :doc {:description "Tests if the argument is a Syntax Object."
+          :examples [{:code "(syntax? form)"}]
+          :type :function
+          :signature [{:params [a]}]}
+  }
+  
+  transfer
+  {
+    :doc {:description "Transfers the specified amoung of coins to the target-address."
+          :examples [{:code "(transfer my-friend-address 12345678)"}]
+          :type :function
+          :signature [{:params [address amount]}]}
+  }
+  
+  unsyntax
+  {
+    :doc {:description "Unwraps a value from a syntax object. If the argument is not a Syntax Object, returns it unchanged."
+          :examples [{:code "(unsyntax form)"}]
+          :type :function
+          :signature [{:params [form]}]}
+  }
+  
+  values
+  {
+    :doc {:description "Gets the values from a map data structure."
+          :examples [{:code "(values {1 2 3 4})"}]
+          :type :function
+          :signature [{:params [m]}]}
+  }
+  
+  vec
+  {
+    :doc {:description "Coerces the argument to a Vector. Arguement must be coercible to a sequence."
+          :examples [{:code "(vec #{1 2 3 4})"}]
+          :type :function
+          :signature [{:params [coll]}]}
+  }
+  
+  vector
+  {
+    :doc {:description "Creates a Vector with the given elements."
+          :examples [{:code "(vector 1 2 3)"}]
+          :type :function
+          :signature [{:params [& elements]}]}
+  }
+  
+  vector?
+  {
+    :doc {:description "Tests if the argument is a Vector."
+          :examples [{:code "(vector? [1 2 3])"}]
+          :type :function
+          :signature [{:params [a]}]}
+  }
+  
+  zero?
+  {
+    :doc {:description "Tests if the argument has the numeric value zero. Returns false for any non-numeric values."
+          :examples [{:code "(zero? 0.1)"}]
+          :type :function
+          :signature [{:params [x]}]}
+  }
+  
+  *initial-expander*
+  {
+     :doc {:description "The initial expander used to expand forms."
+           :examples [{:code "(expand '(if 1 2 3) *initial-expander*)"}]
+           :type :expander
+           :signature [{:params [form cont]}]}
+  }
+  
+  < 
+  {
+     :doc {:description "Tests if numeric arguments are in strict increasing order. Reads as 'less-than'."
+           :examples [{:code "(< 1 2 3)"}]
+           :type :function
+           :signature [{:params [& xs]}]}
+  }
+  
+  >
+  {
+     :doc {:description "Tests if numeric arguments are in strict decreasing order. Reads as 'greater-than'."
+           :examples [{:code "(> 3 2 1)"}]
+           :type :function
+           :signature [{:params [& xs]}]}
+  }
+  
+  <= 
+  {
+     :doc {:description "Tests if numeric arguments are in increasing order. Reads as 'less-than-or-equal'."
+           :examples [{:code "(<= 1 1 3)"}]
+           :type :function
+           :signature [{:params [& xs]}]}
+  }
+  
+  >=
+  {
+     :doc {:description "Tests if numeric arguments are in decreasing order. Reads as 'greater-than-or-equal'."
+           :examples [{:code "(>= 3 2 2)"}]
+           :type :function
+           :signature [{:params [& xs]}]}
+  }
+  
+  ==
+  {
+     :doc {:description "Tests if arguments are equal in numerical value."
+           :examples [{:code "(== 2 2.0)"}]
+           :type :function
+           :signature [{:params [& xs]}]}
+  }
+  
+  =
+  {
+     :doc {:description "Tests if arguments are equal in value."
+           :examples [{:code "(= :foo :foo)"}]
+           :type :function
+           :signature [{:params [& vals]}]}
+  }
+  
+  +
+  {
+     :doc {:description "Adds numeric arguments."
+           :examples [{:code "(+ 1 2 3)"}]
+           :type :function
+           :signature [{:params [& xs]}]}
+  }
+  
+  -
+  {
+     :doc {:description "Subtracts numerical arguments from the first argument. Negates a single argument."
+           :examples [{:code "(- 10 7)"}]
+           :type :function
+           :signature [{:params [x]}
+                       {:params [x y & more]}]}
+  }
+  
+  *
+  {
+     :doc {:description "Multiplies numeric arguments."
+           :examples [{:code "(* 1 2 3 4 5)"}]
+           :type :function
+           :signature [{:params [& xs]}]}
+  }
+  
+  /
+  {
+	 :doc {:description "Double precision point divide. With a single argument, returns the reciprocal of a number. With multiple arguments, divides the first argiment by the others in order."
+         :examples [{:code "(/ 10 3)"}]
+         :type :function
+         :signature [{:params [divisor]}
+                     {:params [numerator divisor]}
+                     {:params [numerator divisor & more]}]}
+	}
+  
+}

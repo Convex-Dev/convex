@@ -1,0 +1,170 @@
+;; Core definitions
+;; executed at the end of core language bootstrap
+
+(def defmacro 
+  ^{:doc {:description "Defines a macro in the current environment."
+          :examples [{:code "(defmacro foo [x] '(if (good? x) x (fix x)))"}]
+          :type :macro
+          :signature [{:params [a]}]}
+   }
+  (macro [name params body] 
+     (let [mac '(macro ~params ~body)
+           mac (syntax mac (meta params))]
+       '(def ~name ~mac))))
+
+(def defexpander 
+  ^{:doc {:description "Defines an expander in the current environment."
+           :examples [{:code "(defexpander expand-once [x e] (e x (fn [x e] x)))"}]
+           :type :macro
+           :signature [{:params [a]}]}
+   }
+  (macro [name params body] 
+         '(def ~name (expander (fn ~params ~body)))))
+ 
+(defmacro defn 
+  ^{:doc {:description "Defines a function in the current environment."
+         :examples [{:code "(defn my-square [x] (* x x))"}]
+         :type :macro	 
+         :signature [{:params [name params & body]}]}
+	}
+  [name params & body] 
+  (let [fnform (cons 'fn params body)
+       fnform (syntax fnform (meta params))] 
+    '(def ~name ~fnform)))
+
+(defmacro doc
+  ^{:doc {:description "Returns the documentation for a given definition."
+         :examples [{:code "(doc count)"}]
+         :type :macro	 
+         :signature [{:params [sym]}]}
+	}
+  [sym]
+  '(:doc (meta (lookup-syntax (quote ~sym)))))
+
+(defmacro or 
+  ^{:doc {:description "Executes expressions in sequence, returning the first truthy value, or the last value if all were falsey. Does not evaluate later expressions, so can be used to short circuit execution. Returns nil with no expressions present."
+         :examples [{:code "(or nil 1)"}]
+         :type :macro	 
+         :signature [{:params [& exprs]}]}
+	}
+  [& exprs]
+  (let [exprs (unsyntax exprs)
+        n (count exprs)] 
+    (cond 
+      (== n 0) nil
+      (== n 1) (first exprs)
+      :else '(let [v# ~(first exprs)]
+               (if v# v# ~(cons 'or (next exprs)))))))
+
+(defmacro and 
+  ^{:doc {:description "Executes expressions in sequence, returning the first falsey value, or the last value if all were truthy. Does not evaluate later expressions, so can be used to short circuit execution. Returns true with no expressions present."
+         :examples [{:code "(and 1 2)"}]
+         :type :macro	 
+         :signature [{:params [& exprs]}]}
+	}
+  [& exprs]
+  (let [exprs (unsyntax exprs)
+        n (count exprs)] 
+    (cond 
+      (== n 0) true
+      (== n 1) (first exprs)
+      :else '(let [v# ~(first exprs)]
+               (if v# ~(cons 'and (next exprs)) v#)))))
+
+
+(defmacro when 
+  ^{:doc {:description "Executes body expressions in an implicit do block if af and only if the test expression evaluates to a truthy value."
+         :examples [{:code "(when (some-condition) (rollback :this-went-wrong))"}]
+         :type :macro	 
+         :signature [{:params [test & body]}]}
+	}
+  [test & body] 
+  '(cond ~test ~(cons 'do body)))
+
+(defmacro when-not 
+   ^{:doc {:description "Executes body expressions in an implicit do block if af and only if the test expression evaluates to a falsey value."
+         :examples [{:code "(when-not (some-condition) (return :some-result))"}]
+         :type :macro	 
+         :signature [{:params [test & body]}]}
+	}
+  [test & body] 
+  '(cond ~test nil ~(cons 'do body)))
+
+(defn mapcat 
+  ^{:doc {:description "Maps a funcion across the given collections, then concatenates the results."
+         :examples [{:code "(mapcat vector [:foo :bar :baz] [1 2 3])"}]
+         :type :function
+         :signature [{:params [test & body]}]}
+	}
+  [f coll & more] 
+  (apply concat (empty coll) (apply map f coll more)))
+
+(defn identity 
+  ^{:doc {:description "Identity function - returns the argument unchanged."
+         :examples [{:code "(identity :foo)"}]
+         :type :function	 
+         :signature [{:params [a]}]}
+	}
+  [a] 
+  a)
+
+(defn max 
+  ^{:doc {:description "Returns the numerical maximum of the given values."
+         :examples [{:code "(max 1 2 3)"}]
+         :type :function	 
+         :signature [{:params [fst & vals]}]}
+	}
+  [fst & vals]
+  (let [n (count vals)]
+    (loop [max fst i 0]
+      (if (>= i n) 
+        max
+        (let [v (nth vals i)]
+          (recur (if (> v max) v max) (inc i)))))))
+
+(defn min 
+  ^{:doc {:description "Returns the numerical minimum of the given values."
+         :examples [{:code "(min 1 2 3)"}]
+         :type :function	 
+         :signature [{:params [fst & vals]}]}
+	}
+  [fst & vals]
+  (let [n (count vals)]
+    (loop [min fst i 0]
+      (if (>= i n) 
+        min
+        (let [v (nth vals i)]
+          (recur (if (< v min) v min) (inc i)))))))
+
+(defn mapv 
+  ^{:doc {:description "Maps a function over the given collections as with map, and returns the resturn as a vector."
+          :examples [{:code "(mapv inc '(1 2 3))"}]
+          :type :function	 
+          :signature [{:params [f & colls] }]}
+    }
+  [f & colls] 
+  (vec (apply map f colls)))
+
+(defmacro call 
+   ^{:doc {:description "Calls a smart contract function. If offer is specified, offers this amount of coins."
+          :examples [{:code "(call smart-contract (some-function 1 2 3))"}]
+          :type :macro	 
+          :signature [{:params [addr funcall] }
+                      {:params [addr offer funcall]}]}
+    }
+  [addr & more] 
+  (let [more (unsyntax more)]
+	  (if (empty? more) (fail 64 "Insufficient arguments to call")) ;; TODO remove magic number
+	  (let [n (count more)
+	        fnargs (last more)
+	        fnlist (cons (list 'quote (symbol (first fnargs))) (next fnargs))]
+	    (cond
+	      (== n 1) (cons 'call* addr 0 fnlist)
+	      (== n 2) (cons 'call* addr (first more) fnlist)))))
+
+(def *exports* 
+  ^{:doc {:description "A set of functions that are exported by the current smart contract. Exported functions may be called by any acount: suitable precautions should be applied."
+          :examples [{:code "(assert (set? *exports*))"}]
+          :type :value}
+   }
+  #{})

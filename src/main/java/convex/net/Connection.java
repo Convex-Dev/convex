@@ -1,0 +1,578 @@
+package convex.net;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.net.StandardSocketOptions;
+import java.nio.ByteBuffer;
+import java.nio.channels.ByteChannel;
+import java.nio.channels.CancelledKeyException;
+import java.nio.channels.Channel;
+import java.nio.channels.ClosedChannelException;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.SocketChannel;
+import java.util.Iterator;
+import java.util.Set;
+import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import convex.core.crypto.Hash;
+import convex.core.data.AVector;
+import convex.core.data.Address;
+import convex.core.data.Format;
+import convex.core.data.IRefContainer;
+import convex.core.data.IRefFunction;
+import convex.core.data.Ref;
+import convex.core.data.SignedData;
+import convex.core.data.Vectors;
+import convex.core.exceptions.BadFormatException;
+import convex.core.store.AStore;
+import convex.core.store.Stores;
+import convex.core.transactions.ATransaction;
+import convex.core.util.Counters;
+import convex.core.util.Utils;
+
+/**
+ * <p>Class representing Connections to a Peer.</p>
+ * 
+ * <p>Sent messages are sent asynchronously via the shared client selector.</p>
+ * 
+ * <p>Received messages are read by the shared client selector, converted into Message instances, 
+ * and passed to a Consumer for handling.</p>
+ * 
+ * <p>A Connection "owns" the ByteChannel associated with this Peer connection</p>
+ */
+@SuppressWarnings("unused")
+public class Connection {
+
+	final ByteChannel channel;
+	
+	/**
+	 * Counter for IDs of messages sent via this Connection
+	 */
+	private long idCounter = 1;
+	
+	/**
+	 * Store to use for this connection. Required for responding to incoming messages.
+	 */
+	private final AStore store;
+
+
+	private static final Logger log = Logger.getLogger(Connection.class.getName());
+
+	// Log level for send events
+	private static final Level LEVEL = Level.FINE;
+
+	
+	/**
+	 * Pre-allocated direct buffer for message sending TODO: is one per connection
+	 * OK? Users should synchronise on this briefly while building message.
+	 */
+	private final ByteBuffer frameBuf = ByteBuffer.allocateDirect(Format.MAX_ENCODING_LENGTH + 20);
+
+	private final MessageReceiver receiver;
+	private final MessageSender sender;
+
+	private Connection(ByteChannel clientChannel, Consumer<Message> receiveAction, AStore store) {
+		this.channel = clientChannel;
+		receiver = new MessageReceiver(receiveAction, this);
+		sender = new MessageSender(clientChannel);
+		this.store=store;
+	}
+
+	/**
+	 * Create a PeerConnection using an existing channel. Does not perform any connection 
+	 * initialisation: channel should already be connected.
+	 * 
+	 * @param channel
+	 * @param receiveAction Consumer to be called when a Message is received
+	 * @param store Store to use when receiving messages.
+	 * @return New Connection instance
+	 * @throws IOException
+	 */
+	public static Connection create(ByteChannel channel, Consumer<Message> receiveAction, AStore store) throws IOException {
+		return new Connection(channel, receiveAction, store);
+	}
+	
+	/**
+	 * Create a PeerConnection by connecting to a remote address
+	 * 
+	 * @param receiveAction
+	 * @return New Connection instance
+	 * @throws IOException
+	 */
+	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store)
+			throws IOException {
+		if (store==null) throw new Error("Connection requires a store");
+		SocketChannel clientChannel = SocketChannel.open(hostAddress);
+		clientChannel.configureBlocking(false);
+
+		while (!clientChannel.finishConnect()) {
+			try {
+				Thread.sleep(100);
+			} catch (InterruptedException e) {
+				throw new Error(e);
+			}
+		}
+		// clientChannel.setOption(StandardSocketOptions.SO_KEEPALIVE,true);
+		// clientChannel.setOption(StandardSocketOptions.TCP_NODELAY,true);
+
+		Connection pc = create(clientChannel, receiveAction, store);
+		pc.startClientListening();
+		log.log(LEVEL, "Connect succeeded for host: " + hostAddress);
+		return pc;
+	}
+
+	public long getReceivedCount() {
+		return receiver.getReceivedCount();
+	}
+
+	/**
+	 * Returns the remote SocketAddress associated with this connection, or null if
+	 * not available
+	 * 
+	 * @return An InetSocketAddress if associated, otherwise null
+	 * @throws IOException
+	 */
+	public InetSocketAddress getRemoteAddress() {
+		if (!(channel instanceof SocketChannel)) return null;
+		try {
+			return (InetSocketAddress) ((SocketChannel) channel).getRemoteAddress();
+		} catch (Exception e) {
+			// anything fails, we have no address
+			return null;
+		}
+	}
+
+	/**
+	 * Returns the local SocketAddress associated with this connection, or null if
+	 * not available
+	 * 
+	 * @return A SocketAddress if associated, otherwise null
+	 * @throws IOException
+	 */
+	public InetSocketAddress getLocalAddress() {
+		if (!(channel instanceof SocketChannel)) return null;
+		try {
+			return (InetSocketAddress) ((SocketChannel) channel).getLocalAddress();
+		} catch (Exception e) {
+			// anything fails, we have no address
+			return null;
+		}
+
+	}
+
+	/**
+	 * Sends a DATA Message on this connection.
+	 * 
+	 * @param value Any data object, which will be encoded and sent as a single cell
+	 * @return true if buffered successfully, false otherwise (not sent)
+	 * @throws IOException
+	 */
+	public boolean sendData(Object value) throws IOException {
+		log.log(LEVEL, "Sending data: " + Utils.toString(value));
+		ByteBuffer buf = Format.encodedBuffer(value);
+		return sendBuffer(MessageType.DATA, buf);
+	}
+
+	/**
+	 * Sends a DATA Message on this connection.
+	 * 
+	 * @param value Any data object
+	 * @return true if buffered successfully, false otherwise (not sent)
+	 * @throws IOException
+	 */
+	public boolean sendMissingData(Hash value) throws IOException {
+		log.info("Requested missing data for hash: "+value.toHexString()+" with store "+Stores.current());
+		return sendObject(MessageType.MISSING_DATA, value);
+	}
+
+	/**
+	 * Sends a QUERY Message on this connection.
+	 * 
+	 * @param form A data object representing the query form
+	 * @return The ID of the message sent
+	 * @throws IOException
+	 */
+	public long sendQuery(Object form) throws IOException {
+		return sendQuery(form, null);
+	}
+
+	/**
+	 * Sends a QUERY Message on this connection.
+	 * 
+	 * Uses the configured CLIENT_STORE to store the query, so that any missing data requests from the server
+	 * can be honoured.
+	 * 
+	 * @param form    A data object representing the query form
+	 * @param address The address with which to run the query
+	 * @return The ID of the message sent, or -1 if send buffer is full.
+	 * @throws IOException
+	 */
+	public long sendQuery(Object form, Address address) throws IOException {
+		AStore temp=Stores.current();
+		try {
+			long id = idCounter++;
+			AVector<Object> v = Vectors.of(id, form, address);
+			sendObject(MessageType.QUERY, v);
+			return id;
+		} finally {
+			Stores.setCurrent(temp);
+		}
+
+	}
+
+	/**
+	 * Sends a transaction if possible, returning the message ID (greater than zero)
+	 * if successful. 
+	 * 
+	 * Uses the configured CLIENT_STORE to store the transaction, so that any missing data requests from the server
+	 * can be honoured.
+	 * 
+	 * Returns -1 if the message could not be sent because of a full buffer.
+	 * 
+	 * @param signed
+	 * @return Message ID of the transaction request, or -1 if send buffer is full.
+	 * @throws IOException In the event of an IO error, e.g. closed connection
+	 */
+	public long sendTransaction(SignedData<ATransaction> signed) throws IOException {
+		AStore temp=Stores.current();
+		try {
+			Stores.setCurrent(store);
+			long id = idCounter++;
+			AVector<Object> v = Vectors.of(id, signed);
+			boolean sent = sendObject(MessageType.TRANSACT, v);
+			return (sent) ? id : -1;
+		} finally {
+			Stores.setCurrent(temp);
+		}
+	}
+
+	/**
+	 * Sends a RESULT Message on this connection.
+	 * 
+	 * @param result Any data object
+	 * @return True if buffered for sending successfully, false otherwise
+	 * @throws IOException
+	 */
+	public boolean sendResult(Long id, Object result) throws IOException {
+		AVector<Object> value = Vectors.of(id, result, null);
+		return sendObject(MessageType.RESULT, value);
+	}
+
+	/**
+	 * Sends a RESULT Message on this connection.
+	 * 
+	 * @param result Any data object
+	 * @return True if buffered for sending successfully, false otherwise
+	 * @throws IOException
+	 */
+	public boolean sendResult(Long id, Object result, Byte errorCode) throws IOException {
+		AVector<Object> value = Vectors.of(id, result, errorCode);
+		return sendObject(MessageType.RESULT, value);
+	}
+
+	private IRefFunction sender() {
+		return sendAll;
+	}
+
+	private final IRefFunction sendAll = (r -> {
+		// TODO: halt conditions to prevent sending the whole universe
+		Object o = r.getValue();
+		// send children first
+		if (o instanceof IRefContainer) {
+			IRefContainer rc = (IRefContainer) o;
+			rc.updateRefs(sender());
+		}
+
+		if (!Format.isEmbedded(o)) {
+			try {
+				sendData(o);
+			} catch (IOException e) {
+				throw Utils.sneakyThrow(e);
+			}
+		}
+
+		return r;
+	});
+
+	/**
+	 * Sends a message over this connection
+	 * 
+	 * @return true if message buffered successfully, false if failed
+	 */
+	public boolean sendMessage(Message msg) throws IOException {
+		return sendObject(msg.getType(), msg.getPayload());
+	}
+
+	/**
+	 * Sends a payload for the given message type. Should be called on the thread that 
+	 * responds to missing data messages from the destination.
+	 * 
+	 * @param type Type of message
+	 * @param payload Payload value for message
+	 * @return
+	 * @throws IOException
+	 */
+	public boolean sendObject(MessageType type, Object payload) throws IOException {
+		Counters.sendCount++;
+
+		// Need to ensure message is persisted at least, so we can respond to missing data messages
+		// using the current threat store
+		Object sendVal = payload;
+		Ref.createPersisted(sendVal, r -> {
+			try {
+				boolean sent = sendData(r.getValue());
+			} catch (IOException e) {
+				throw Utils.sneakyThrow(e);
+			}
+		});
+		
+		ByteBuffer buf = Format.encodedBuffer(sendVal);
+		log.log(Level.INFO, () -> "Sending message: " + type + " :: " + payload + " to " + getRemoteAddress() + " format: "
+				+ Format.encodedBlob(payload).toHexString());
+		boolean sent = sendBuffer(type, buf);
+		return sent;
+	}
+
+	/**
+	 * Sends a message with the given message type and data buffer.
+	 * 
+	 * @param type MessageType value
+	 * @param buf  Buffer containing raw wire data for the message
+	 * @return true if message sent, false otherwise
+	 * @throws IOException
+	 */
+	private boolean sendBuffer(MessageType type, ByteBuffer buf) throws IOException {
+		int dataLength = buf.remaining();
+
+		// Total length field is message code + encoded object length
+		int messageLength = dataLength + 1;
+		boolean sent;
+		int headerLength;
+
+		// synchronize in case we are sending messages from different threads
+		// This is OK but need to avoid corrupted messages.
+		synchronized (frameBuf) {
+			// ensure frameBuf is clear and ready for writing
+			frameBuf.clear();
+
+			// write message header
+			Format.writeMessageLength(frameBuf, messageLength);
+			frameBuf.put(type.getMessageCode());
+			headerLength = frameBuf.position();
+
+			// now write message
+			frameBuf.put(buf);
+			frameBuf.flip(); // ensure frameBuf is ready to write to channel
+
+			sent = sender.bufferMessage(frameBuf);
+		}
+
+		if (sent) {
+			if (channel instanceof SocketChannel) {
+				SocketChannel chan = (SocketChannel) channel;
+				// register interest in both reads and writes
+				try {
+					chan.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_READ, this);
+				} catch (CancelledKeyException e) {
+					// ignore. Must have got cancelled elsewhere?
+				}
+				// wake up selector
+				selector.wakeup();
+			}
+
+			log.log(LEVEL, () -> "Sent message " + type + " of length: " + dataLength + " PC: "
+					+ System.identityHashCode(this));
+		} else {
+			log.log(LEVEL, () -> "Failed to send message " + type + " of length: " + dataLength + " PC: "
+					+ System.identityHashCode(this));
+		}
+		return sent;
+	}
+
+	public synchronized void close() {
+		if (channel != null) {
+			try {
+				channel.close();
+			} catch (IOException e) {
+				// TODO OK to ignore?
+			}
+		}
+	}
+
+	/**
+	 * Checks if this connection is closed (i.e. the underlying channel is closed)
+	 * 
+	 * @return true if the channel is closed, false otherwise.
+	 */
+	public boolean isClosed() {
+		return !channel.isOpen();
+	}
+
+	/**
+	 * Starts listening for received events with this given peer connection.
+	 * PeerConnection must have a selectable SocketChannel associated
+	 * 
+	 * @param peer
+	 */
+	public void startClientListening() throws IOException {
+		SocketChannel chan = (SocketChannel) channel;
+		chan.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE, this);
+
+		// start running selector loop after we register for reading!
+		ensureSelectorLoop();
+
+		// seems to be needed to ensure selector sees new connection?
+		selector.wakeup();
+	}
+
+	private static final Selector selector;
+
+	static {
+		try {
+			selector = Selector.open();
+		} catch (IOException e) {
+			throw new Error(e);
+		}
+	}
+
+	public void wakeUp() {
+		selector.wakeup();
+	}
+
+	private static Thread loopThread;
+
+	private static void ensureSelectorLoop() {
+		// double checked initialisation
+		if (loopThread == null) {
+			synchronized (Connection.class) {
+				if (loopThread == null) {
+					loopThread = new Thread(selectorLoop, "PeerConnection NIO client selector loop");
+					// make this a daemon thread so it shuts down if everything else exits
+					loopThread.setDaemon(true);
+					loopThread.start();
+				}
+			}
+		}
+	}
+
+	private static Runnable selectorLoop = new Runnable() {
+		@Override
+		public void run() {
+			
+			log.info("Client selector loop started");
+			while (true) {
+				try {
+					selector.select(1000);
+					Set<SelectionKey> keys = selector.selectedKeys();
+					Iterator<SelectionKey> it = keys.iterator();
+					while (it.hasNext()) {
+						final SelectionKey key = it.next();
+						it.remove(); // always remove key from selection set
+
+						// log.finest("PeerConnection key received: "+key);
+						if (!key.isValid()) {
+							continue;
+						}
+
+						try {
+							if (key.isReadable()) {
+								selectRead(key);
+							} else if (key.isWritable()) {
+								selectWrite(key);
+							}
+						} catch (ClosedChannelException e) {
+							// channel was closed, just lose the key?
+							log.log(LEVEL, "Unexpected ChannelClosedException, cancelling key: " + e.getMessage());
+							key.cancel();
+						} catch (IOException e) {
+							log.warning("Unexpected IOException, cancelling key: " + e.getMessage());
+							e.printStackTrace();
+							key.cancel();
+						}
+					}
+				} catch (Throwable t) {
+					log.severe("Uncaught error in PeerConnection client selector loop: " + t);
+					t.printStackTrace();
+				}
+			}
+		}
+	};
+
+	/**
+	 * Handles channel reads from a SelectionKey for the client listener
+	 * 
+	 * @param key
+	 * @throws IOException
+	 */
+	protected static void selectRead(SelectionKey key) throws IOException {
+		Connection conn = (Connection) key.attachment();
+		if (conn == null) throw new Error("No PeerConnection specified");
+		
+		try {
+			int n = conn.handleChannelRecieve();
+			// log.finest("Received bytes: " + n);
+		} catch (ClosedChannelException e) {
+			log.info("Remote server channel closed from: " + conn.getRemoteAddress());
+			key.cancel();
+		} catch (BadFormatException e) {
+			log.info("Cancelled connection: Bad data format from: " + conn.getRemoteAddress() + " " + e.getMessage());
+			key.cancel();
+		} 
+	}
+
+	/**
+	 * Handles receipt of bytes from the channel on this Connection.
+	 * 
+	 * Will switch the current store to the Connection-specific store if required.
+	 * 
+	 * @return The number of bytes read from channel
+	 * @throws IOException
+	 * @throws BadFormatException
+	 */
+	public int handleChannelRecieve() throws IOException, BadFormatException {
+		AStore tempStore=Stores.current();
+		try {
+			// set the current store for handling incoming messages
+			Stores.setCurrent(store);
+			return receiver.receiveFromChannel(channel);
+		} finally {
+			Stores.setCurrent(tempStore);
+		}
+	}
+
+	/**
+	 * Handles writes to the channel.
+	 * 
+	 * @param key
+	 */
+	public static void selectWrite(SelectionKey key) {
+		try {
+			Connection pc = (Connection) key.attachment();
+			boolean moreBytes = pc.sender.maybeSendBytes();
+
+			if (moreBytes) {
+				// we want to continue writing
+			} else {
+				// deregister interest in writing
+				key.interestOps(key.interestOps() & ~SelectionKey.OP_WRITE);
+			}
+		} catch (IOException e) {
+			// TODO: figure out cases here. Probably channel closed?
+			log.warning(e.getMessage());
+			key.cancel();
+		}
+	}
+
+	public boolean sendBytes() throws IOException {
+		return sender.maybeSendBytes();
+	}
+
+	@Override
+	public String toString() {
+		return "PeerConnection: " + channel;
+	}
+}

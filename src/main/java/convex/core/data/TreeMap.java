@@ -1,0 +1,808 @@
+package convex.core.data;
+
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+
+import convex.core.crypto.Hash;
+import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.InvalidDataException;
+import convex.core.util.Bits;
+import convex.core.util.MergeFunction;
+import convex.core.util.Utils;
+
+/**
+ * Persistent Map for large maps requiring tree structure.
+ * 
+ * Internally implemented as a radix tree, indexed by key hash. Uses an array of
+ * child Maps, with a bitmap mask indicating which hex digits are present, i.e.
+ * have non-empty children.
+ *
+ * @param <K>
+ * @param <V>
+ */
+public class TreeMap<K, V> extends AHashMap<K, V> {
+	/**
+	 * Child maps, one for each present bit in the mask, max 16
+	 */
+	private final Ref<AHashMap<K, V>>[] children;
+
+	/**
+	 * Shift position of this treemap node in number of hex digits
+	 */
+	private final int shift;
+
+	/**
+	 * Mask indicating which hex digits are present in the child array e.g. 0x0001
+	 * indicates all children are in the '0' digit. e.g. 0xFFFF indicates there are
+	 * children for every digit.
+	 */
+	private final short mask;
+
+	private TreeMap(Ref<AHashMap<K, V>>[] blocks, int shift, short mask, long count) {
+		super(count);
+		this.children = blocks;
+		this.shift = shift;
+		this.mask = mask;
+	}
+
+	/**
+	 * Computes the total count from an array of Refs to maps Ignores null Refs in
+	 * child array
+	 * 
+	 * @param children
+	 * @return The total count of all child maps
+	 */
+	private static <K, V> long computeCount(Ref<AHashMap<K, V>>[] children) {
+		long n = 0;
+		for (Ref<AHashMap<K, V>> cref : children) {
+			if (cref == null) continue;
+			AMap<K, V> m = cref.getValue();
+			n += m.count();
+		}
+		return n;
+	}
+
+	@SuppressWarnings("unchecked")
+	public static <K, V> TreeMap<K, V> create(MapEntry<K, V>[] newEntries, int shift) {
+		int n = newEntries.length;
+		if (n <= ListMap.MAX_LIST_MAP_SIZE) {
+			throw new IllegalArgumentException(
+					"Insufficient distinct entries for TreeMap construction: " + newEntries.length);
+		}
+
+		// construct full child array
+		Ref<AHashMap<K, V>>[] children = new Ref[16];
+		for (int i = 0; i < n; i++) {
+			MapEntry<K, V> e = newEntries[i];
+			int ix = e.getKeyHash().getHexDigit(shift);
+			Ref<AHashMap<K, V>> ref = children[ix];
+			if (ref == null) {
+				children[ix] = Ref.create(ListMap.create(e));
+			} else {
+				children[ix] = Ref.create(ref.getValue().assocEntry(e, shift + 1));
+			}
+		}
+		return (TreeMap<K, V>) createFull(children, shift);
+	}
+
+	/**
+	 * Creates a Tree map given child refs for each digit
+	 * 
+	 * @param children An array of children, may refer to nulls or empty maps which
+	 *                 will be filtered out
+	 * @return
+	 */
+	private static <K, V> AHashMap<K, V> createFull(Ref<AHashMap<K, V>>[] children, int shift, long count) {
+		if (children.length != 16) throw new IllegalArgumentException("16 children required!");
+		Ref<AHashMap<K, V>>[] newChildren = Utils.filterArray(children, a -> {
+			if (a == null) return false;
+			AMap<K, V> m = a.getValue();
+			return ((m != null) && !m.isEmpty());
+		});
+
+		if (children != newChildren) {
+			return create(newChildren, shift, Utils.computeMask(children, newChildren), count);
+		} else {
+			return create(children, shift, (short) 0xFFFF, count);
+		}
+	}
+
+	private static <K, V> AHashMap<K, V> createFull(Ref<AHashMap<K, V>>[] newChildren, int shift) {
+		return createFull(newChildren, shift, computeCount(newChildren));
+	}
+
+	/**
+	 * Creates a Map with the specified child map Refs. Removes empty maps passed as
+	 * children.
+	 * 
+	 * Returns a ListMap for small maps.
+	 * 
+	 * @param children Array of Refs to child maps for each bit in mask
+	 * @param shift    Shift position (hex digit of key hashes for this map)
+	 * @param mask     Mask specifying the hex digits included in the child array at
+	 *                 this shift position
+	 * @return A new map as specified @
+	 */
+	@SuppressWarnings("unchecked")
+	private static <K, V> AHashMap<K, V> create(Ref<AHashMap<K, V>>[] children, int shift, short mask, long count) {
+		int cLen = children.length;
+		if (Integer.bitCount(mask & 0xFFFF) != cLen) {
+			throw new IllegalArgumentException(
+					"Invalid child array length " + cLen + " for bit mask " + Utils.toHexString(mask));
+		}
+
+		// compress small counts to ListMap
+		if (count <= ListMap.MAX_LIST_MAP_SIZE) {
+			MapEntry<K, V>[] entries = new MapEntry[Utils.checkedInt(count)];
+			int ix = 0;
+			for (Ref<AHashMap<K, V>> childRef : children) {
+				AMap<K, V> child = childRef.getValue();
+				long cc = child.count();
+				for (long i = 0; i < cc; i++) {
+					entries[ix++] = child.entryAt(i);
+				}
+			}
+			assert (ix == count);
+			return ListMap.create(entries);
+		}
+		int sel = (1 << cLen) - 1;
+		short newMask = mask;
+		for (int i = 0; i < cLen; i++) {
+			AMap<K, V> child = children[i].getValue();
+			if (child.isEmpty()) {
+				newMask = (short) (newMask & ~(1 << digitForIndex(i, mask))); // remove from mask
+				sel = sel & ~(1 << i); // remove from selection
+			}
+		}
+		if (mask != newMask) {
+			return new TreeMap<K, V>(Utils.filterSmallArray(children, sel), shift, newMask, count);
+		}
+		return new TreeMap<K, V>(children, shift, mask, count);
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public boolean containsKey(Object key) {
+		return containsKeyRef((Ref<K>) Ref.create(key));
+	}
+
+	@Override
+	public MapEntry<K, V> getEntry(K k) {
+		return getKeyRefEntry(Ref.create(k));
+	}
+
+	@Override
+	public MapEntry<K, V> getKeyRefEntry(Ref<K> ref) {
+		int digit = Utils.extractDigit(ref.getHash(), shift);
+		int i = Bits.indexForDigit(digit, mask);
+		if (i < 0) return null; // -1 case indicates not found
+		return children[i].getValue().getKeyRefEntry(ref);
+	}
+
+	@Override
+	public boolean containsValue(Object value) {
+		for (Ref<AHashMap<K, V>> b : children) {
+			if (b.getValue().containsValue(value)) return true;
+		}
+		return false;
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public V get(Object key) {
+		MapEntry<K, V> me = getKeyRefEntry((Ref<K>) Ref.create(key));
+		if (me == null) return null;
+		return me.getValue();
+	}
+
+	@Override
+	public MapEntry<K, V> entryAt(long i) {
+		long pos = i;
+		for (Ref<AHashMap<K, V>> c : children) {
+			AHashMap<K, V> child = c.getValue();
+			long cc = child.count();
+			if (pos < cc) return child.entryAt(pos);
+			pos -= cc;
+		}
+		throw new IndexOutOfBoundsException("Entry index: " + i);
+	}
+
+	@Override
+	protected MapEntry<K, V> getEntryByHash(Hash hash) {
+		int digit = Utils.extractDigit(hash, shift);
+		int i = Bits.indexForDigit(digit, mask);
+		if (i < 0) return null; // not present
+		return children[i].getValue().getEntryByHash(hash);
+	}
+
+	@Override
+	public AHashMap<K, V> dissoc(K key) {
+		return dissocRef((Ref<K>) Ref.create(key));
+	}
+
+	@Override
+	@SuppressWarnings("unchecked")
+	public AHashMap<K, V> dissocRef(Ref<K> keyRef) {
+		int digit = Utils.extractDigit(keyRef.getHash(), shift);
+		int i = Bits.indexForDigit(digit, mask);
+		if (i < 0) return this; // not present
+
+		// dissoc entry from child
+		AHashMap<K, V> child = children[i].getValue();
+		AHashMap<K, V> newChild = child.dissocRef(keyRef);
+		if (child == newChild) return this; // no removal, no change
+
+		if (count - 1 == ListMap.MAX_LIST_MAP_SIZE) {
+			// reduce to a ListMap
+			HashSet<Entry<K, V>> eset = entrySet();
+			boolean removed = eset.removeIf(e -> Utils.equals(((MapEntry<K, V>) e).getKeyRef(), keyRef));
+			if (!removed) throw new Error("Expected to remove at least one entry!");
+			return ListMap.create(eset.toArray((MapEntry<K, V>[]) ListMap.EMPTY_ENTRIES));
+		} else {
+			// replace child
+			if (newChild.isEmpty()) return dissocChild(i);
+			return replaceChild(i, Ref.create(newChild));
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private AHashMap<K, V> dissocChild(int i) {
+		int bsize = children.length;
+		AHashMap<K, V> child = children[i].getValue();
+		Ref<AHashMap<K, V>>[] newBlocks = (Ref<AHashMap<K, V>>[]) new Ref<?>[bsize - 1];
+		System.arraycopy(children, 0, newBlocks, 0, i);
+		System.arraycopy(children, i + 1, newBlocks, i, bsize - i - 1);
+		short newMask = (short) (mask & (~(1 << digitForIndex(i, mask))));
+		long newCount = count - child.count();
+		return create(newBlocks, shift, newMask, newCount);
+	}
+
+	@SuppressWarnings("unchecked")
+	private TreeMap<K, V> insertChild(int digit, Ref<AHashMap<K, V>> newChild) {
+		int bsize = children.length;
+		int i = Bits.positionForDigit(digit, mask);
+		short newMask = (short) (mask | (1 << digit));
+		if (mask == newMask) throw new Error("Digit already present!");
+
+		Ref<AHashMap<K, V>>[] newChildren = (Ref<AHashMap<K, V>>[]) new Ref<?>[bsize + 1];
+		System.arraycopy(children, 0, newChildren, 0, i);
+		System.arraycopy(children, i, newChildren, i + 1, bsize - i);
+		newChildren[i] = newChild;
+		long newCount = count + newChild.getValue().count();
+		return (TreeMap<K, V>) create(newChildren, shift, newMask, newCount);
+	}
+
+	/**
+	 * Replaces the child ref at a given index position. Will return the same
+	 * TreeMap if no change
+	 * 
+	 * @param i
+	 * @param newChild
+	 * @return @
+	 */
+	private TreeMap<K, V> replaceChild(int i, Ref<AHashMap<K, V>> newChild) {
+		if (children[i] == newChild) return this;
+		AHashMap<K, V> oldChild = children[i].getValue();
+		Ref<AHashMap<K, V>>[] newChildren = children.clone();
+		newChildren[i] = newChild;
+		long newCount = count + newChild.getValue().count() - oldChild.count();
+		return (TreeMap<K, V>) create(newChildren, shift, mask, newCount);
+	}
+
+	public static int digitForIndex(int index, short mask) {
+		// scan mask for specified index
+		int found = 0;
+		for (int i = 0; i < 16; i++) {
+			if ((mask & (1 << i)) != 0) {
+				if (found++ == index) return i;
+			}
+		}
+		throw new IllegalArgumentException("Index " + index + " not available in mask map: " + Utils.toHexString(mask));
+	}
+
+	@Override
+	public TreeMap<K, V> assoc(K key, V value) {
+		Ref<K> keyRef = Ref.create(key);
+		return assocRef(keyRef, value, shift);
+	}
+
+	@Override
+	public TreeMap<K, V> assocRef(Ref<K> keyRef, V value) {
+		return assocRef(keyRef, value, shift);
+	}
+
+	@Override
+	protected TreeMap<K, V> assocRef(Ref<K> keyRef, V value, int shift) {
+		if (this.shift != shift) {
+			throw new Error("Invalid shift!");
+		}
+		int digit = Utils.extractDigit(keyRef.getHash(), shift);
+		int i = Bits.indexForDigit(digit, mask);
+		if (i < 0) {
+			// location not present, need to insert new child
+			AHashMap<K, V> newChild = ListMap.create(MapEntry.createRef(keyRef, Ref.create(value)));
+			return insertChild(digit, Ref.create(newChild));
+		} else {
+			// child exists, so assoc in new ref at lower shift level
+			AHashMap<K, V> child = children[i].getValue();
+			AHashMap<K, V> newChild = child.assocRef(keyRef, value, shift + 1);
+			return replaceChild(i, Ref.create(newChild));
+		}
+	}
+
+	@Override
+	public AHashMap<K, V> assocEntry(MapEntry<K, V> e) {
+		assert (this.shift == 0); // should never call this on a different shift
+		return assocEntry(e, 0);
+	}
+
+	@Override
+	public TreeMap<K, V> assocEntry(MapEntry<K, V> e, int shift) {
+		assert (this.shift == shift); // should always be correct shift
+		Ref<K> keyRef = e.getKeyRef();
+		int digit = Utils.extractDigit(keyRef.getHash(), shift);
+		int i = Bits.indexForDigit(digit, mask);
+		if (i < 0) {
+			// location not present
+			AHashMap<K, V> newChild = ListMap.create(e);
+			return insertChild(digit, Ref.create(newChild));
+		} else {
+			// location needs update
+			AHashMap<K, V> child = children[i].getValue();
+			AHashMap<K, V> newChild = child.assocEntry(e, shift + 1);
+			if (child == newChild) return this;
+			return replaceChild(i, Ref.create(newChild));
+		}
+	}
+
+	@Override
+	public Set<K> keySet() {
+		int len = size();
+		HashSet<K> h = new HashSet<K>(len);
+		accumulateKeySet(h);
+		return h;
+	}
+
+	@Override
+	protected void accumulateKeySet(HashSet<K> h) {
+		for (Ref<AHashMap<K, V>> mr : children) {
+			mr.getValue().accumulateKeySet(h);
+		}
+	}
+
+	@Override
+	protected void accumulateValues(ArrayList<V> al) {
+		for (Ref<AHashMap<K, V>> mr : children) {
+			mr.getValue().accumulateValues(al);
+		}
+	}
+
+	@Override
+	public HashSet<Entry<K, V>> entrySet() {
+		int len = size();
+		HashSet<Map.Entry<K, V>> h = new HashSet<Map.Entry<K, V>>(len);
+		accumulateEntrySet(h);
+		return h;
+	}
+
+	@Override
+	protected void accumulateEntrySet(HashSet<Entry<K, V>> h) {
+		for (Ref<AHashMap<K, V>> mr : children) {
+			mr.getValue().accumulateEntrySet(h);
+		}
+	}
+
+	@Override
+	public ByteBuffer write(ByteBuffer bb) {
+		bb = bb.put(Tag.MAP);
+		return writeRaw(bb);
+	}
+
+	@Override
+	public ByteBuffer writeRaw(ByteBuffer bb) {
+		int ilength = children.length;
+		bb = Format.writeVLCLong(bb, count);
+		bb = bb.put((byte) shift);
+		bb = bb.putShort(mask);
+
+		for (int i = 0; i < ilength; i++) {
+			bb = children[i].write(bb);
+		}
+		return bb;
+	}
+
+	@Override
+	public int estimatedEncodingSize() {
+		// allow space for tag, shift byte byte, 2 byte mask, 33 bytes per child ref
+		return 4 + 33 * children.length;
+	}
+
+	/**
+	 * Reads a ListMap from the provided ByteBuffer Assumes the header byte is
+	 * already read.
+	 * 
+	 * @param bb
+	 * @param count
+	 * @return TreeMap instance as read from ByteBuffer
+	 * @throws BadFormatException
+	 */
+	@SuppressWarnings("unchecked")
+	public static <K, V> TreeMap<K, V> read(ByteBuffer bb, long count) throws BadFormatException {
+		int shift = bb.get();
+		short mask = bb.getShort();
+
+		int ilength = Integer.bitCount(mask & 0xFFFF);
+		Ref<AHashMap<K, V>>[] blocks = (Ref<AHashMap<K, V>>[]) new Ref<?>[ilength];
+
+		for (int i = 0; i < ilength; i++) {
+			// need to be defensive to detect possible bad formats
+			Object o = Format.read(bb);
+			if (!(o instanceof Ref)) throw new BadFormatException("Expected item Ref but got: " + o);
+			Ref<AHashMap<K, V>> ref = (Ref<AHashMap<K, V>>) o;
+			blocks[i] = ref;
+		}
+		// create directly, we have all values
+		TreeMap<K, V> result = new TreeMap<K, V>(blocks, shift, mask, count);
+		if (!result.isValidStructure()) throw new BadFormatException("Problem with TreeMap invariants");
+		return result;
+	}
+
+	@Override
+	public void forEach(BiConsumer<? super K, ? super V> action) {
+		for (Ref<AHashMap<K, V>> sub : children) {
+			sub.getValue().forEach(action);
+		}
+	}
+
+	@Override
+	public boolean isCanonical() {
+		if (count <= ListMap.MAX_LIST_MAP_SIZE) return false;
+		return true;
+	}
+
+	@Override
+	public int getRefCount() {
+		return children.length;
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public <R> Ref<R> getRef(int i) {
+		return (Ref<R>) children[i];
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public <R extends IRefContainer> R updateRefs(IRefFunction func) {
+		int n = children.length;
+		if (n == 0) return (R) this;
+		Ref<AHashMap<K, V>>[] newChildren = children;
+		for (int i = 0; i < n; i++) {
+			Ref<AHashMap<K, V>> child = children[i];
+			Ref<AHashMap<K, V>> newChild = (Ref<AHashMap<K, V>>) func.apply(child);
+			if (child != newChild) {
+				if (children == newChildren) {
+					newChildren = children.clone();
+				}
+				newChildren[i] = newChild;
+			}
+		}
+		if (newChildren == children) return (R) this;
+		// Note: we assume no key hashes have changed, so sturcture is the same
+		return (R) new TreeMap<>(newChildren, shift, mask, count);
+	}
+
+	@Override
+	public AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func) {
+		return mergeWith(b, func, this.shift);
+	}
+
+	@Override
+	protected AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func, int shift) {
+		if ((b instanceof TreeMap)) {
+			TreeMap<K, V> bt = (TreeMap<K, V>) b;
+			if (this.shift != bt.shift) throw new Error("Misaligned shifts!");
+			return mergeWith(bt, func, shift);
+		}
+		if ((b instanceof ListMap)) return mergeWith((ListMap<K, V>) b, func, shift);
+		throw new Error("Unrecognised map type: " + b.getClass());
+	}
+
+	@SuppressWarnings("unchecked")
+	private AHashMap<K, V> mergeWith(TreeMap<K, V> b, MergeFunction<V> func, int shift) {
+		// assume two TreeMaps with identical prefix and shift
+		assert (b.shift == shift);
+		int fullMask = mask | b.mask;
+		// We are going to build full child list only if needed
+		Ref<AHashMap<K, V>>[] newChildren = null;
+		for (int digit = 0; digit < 16; digit++) {
+			int bitMask = 1 << digit;
+			if ((fullMask & bitMask) == 0) continue; // nothing to merge at this index
+			AHashMap<K, V> ac = childForDigit(digit).getValue();
+			AHashMap<K, V> bc = b.childForDigit(digit).getValue();
+			AHashMap<K, V> rc = ac.mergeWith(bc, func, shift + 1);
+			if (ac != rc) {
+				if (newChildren == null) {
+					newChildren = (Ref<AHashMap<K, V>>[]) new Ref<?>[16];
+					for (int ii = 0; ii < digit; ii++) { // copy existing children up to this point
+						int chi = Bits.indexForDigit(ii, mask);
+						if (chi >= 0) newChildren[ii] = children[chi];
+					}
+				}
+			}
+			if (newChildren != null) newChildren[digit] = Ref.create(rc);
+		}
+		if (newChildren == null) return this;
+		return createFull(newChildren, shift);
+	}
+
+	@SuppressWarnings("unchecked")
+	private AHashMap<K, V> mergeWith(ListMap<K, V> b, MergeFunction<V> func, int shift) {
+		Ref<AHashMap<K, V>>[] newChildren = null;
+		int ix = 0;
+		for (int i = 0; i < 16; i++) {
+			int imask = (1 << i); // mask for this digit
+			if ((mask & imask) == 0) continue;
+			Ref<AHashMap<K, V>> cref = children[ix++];
+			AHashMap<K, V> child = cref.getValue();
+			ListMap<K, V> bSubset = b.filterHexDigits(shift, imask); // filter only relevant elements in b
+			AHashMap<K, V> newChild = child.mergeWith(bSubset, func, shift + 1);
+			if (child != newChild) {
+				if (newChildren == null) {
+					newChildren = (Ref<AHashMap<K, V>>[]) new Ref<?>[16];
+					for (int ii = 0; ii < children.length; ii++) { // copy existing children
+						int chi = digitForIndex(ii, mask);
+						newChildren[chi] = children[ii];
+					}
+				}
+			}
+			if (newChildren != null) newChildren[i] = Ref.create(newChild);
+		}
+		assert (ix == children.length);
+		// if any new children created, create a new Map, else use this
+		AHashMap<K, V> result = (newChildren == null) ? this : createFull(newChildren, shift);
+
+		ListMap<K, V> extras = b.filterHexDigits(shift, ~mask);
+		int en = extras.size();
+		for (int i = 0; i < en; i++) {
+			MapEntry<K, V> e = extras.entryAt(i);
+			V value = func.merge(null, e.getValue());
+			if (value != null) {
+				// include only new keys where function result is not null. Re-use existing
+				// entry if possible.
+				result = result.assocEntry(e.withValue(value), shift);
+			}
+		}
+		return result;
+	}
+
+	@Override
+	public AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func) {
+		if ((b instanceof TreeMap)) {
+			TreeMap<K, V> bt = (TreeMap<K, V>) b;
+			// this is OK, top levels should both have shift 0 and be aligned down the tree.
+			if (this.shift != bt.shift) throw new Error("Misaligned shifts!");
+			return mergeDifferences(bt, func);
+		} else {
+			// must be ListMap
+			return mergeDifferences((ListMap<K, V>) b, func);
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private AHashMap<K, V> mergeDifferences(TreeMap<K, V> b, MergeFunction<V> func) {
+		// assume two treemaps with identical prefix and shift
+		if (this.equals(b)) return this; // no differences to merge
+		int fullMask = mask | b.mask;
+		Ref<AHashMap<K, V>>[] newChildren = null; // going to build new full child list if needed
+		for (int i = 0; i < 16; i++) {
+			int bitMask = 1 << i;
+			if ((fullMask & bitMask) == 0) continue; // nothing to merge at this index
+			Ref<AHashMap<K, V>> aref = childForDigit(i);
+			Ref<AHashMap<K, V>> bref = b.childForDigit(i);
+			if (aref.equalsValue(bref)) continue; // identical children, no differences
+			AHashMap<K, V> ac = aref.getValue();
+			AHashMap<K, V> bc = bref.getValue();
+			AHashMap<K, V> newChild = ac.mergeDifferences(bc, func);
+			if (newChild != ac) {
+				if (newChildren == null) {
+					newChildren = (Ref<AHashMap<K, V>>[]) new Ref<?>[16];
+					for (int ii = 0; ii < 16; ii++) { // copy existing children
+						int chi = Bits.indexForDigit(ii, mask);
+						if (chi >= 0) newChildren[ii] = children[chi];
+					}
+				}
+			}
+			if (newChildren != null) newChildren[i] = (newChild == bc) ? bref : Ref.create(newChild);
+		}
+		if (newChildren == null) return this;
+		return createFull(newChildren, shift);
+	}
+
+	@SuppressWarnings("unchecked")
+	private AHashMap<K, V> mergeDifferences(ListMap<K, V> b, MergeFunction<V> func) {
+		Ref<AHashMap<K, V>>[] newChildren = null;
+		int ix = 0;
+		for (int i = 0; i < 16; i++) {
+			int imask = (1 << i); // mask for this digit
+			if ((mask & imask) == 0) continue;
+			Ref<AHashMap<K, V>> cref = children[ix++];
+			AHashMap<K, V> child = cref.getValue();
+			ListMap<K, V> bSubset = b.filterHexDigits(shift, imask); // filter only relevant elements in b
+			AHashMap<K, V> newChild = child.mergeDifferences(bSubset, func);
+			if (child != newChild) {
+				if (newChildren == null) {
+					newChildren = (Ref<AHashMap<K, V>>[]) new Ref<?>[16];
+					for (int ii = 0; ii < children.length; ii++) { // copy existing children
+						int chi = digitForIndex(ii, mask);
+						newChildren[chi] = children[ii];
+					}
+				}
+			}
+			if (newChildren != null) newChildren[i] = Ref.create(newChild);
+		}
+		assert (ix == children.length);
+		AHashMap<K, V> result = (newChildren == null) ? this : createFull(newChildren, shift);
+
+		ListMap<K, V> extras = b.filterHexDigits(shift, ~mask);
+		int en = extras.size();
+		for (int i = 0; i < en; i++) {
+			MapEntry<K, V> e = extras.entryAt(i);
+			V value = func.merge(null, e.getValue());
+			if (value != null) {
+				// include only new keys where function result is not null. Re-use existing
+				// entry if possible.
+				result = result.assocEntry(e.withValue(value), shift);
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * Gets the Ref for the child at the given digit, or an empty map if not found
+	 * 
+	 * @param digit The hex digit to query at this TreeMap's shift position
+	 * @return The child map for this digit, or an empty map if the child does not
+	 *         exist
+	 */
+	private Ref<AHashMap<K, V>> childForDigit(int digit) {
+		int ix = Bits.indexForDigit(digit, mask);
+		if (ix < 0) return Maps.emptyRef();
+		return children[ix];
+	}
+
+	@Override
+	public <R> R reduceValues(BiFunction<? super R, ? super V, ? extends R> func, R initial) {
+		int n = children.length;
+		R result = initial;
+		for (int i = 0; i < n; i++) {
+			result = children[i].getValue().reduceValues(func, result);
+		}
+		return result;
+	}
+
+	@Override
+	public <R> R reduceEntries(BiFunction<? super R, MapEntry<K, V>, ? extends R> func, R initial) {
+		int n = children.length;
+		R result = initial;
+		for (int i = 0; i < n; i++) {
+			result = children[i].getValue().reduceEntries(func, result);
+		}
+		return result;
+	}
+
+	@Override
+	public boolean equalsKeys(AMap<K, V> a) {
+		if (a instanceof TreeMap) return equalsKeys((TreeMap<K, V>) a);
+		return false;
+	}
+
+	boolean equalsKeys(TreeMap<K, V> a) {
+		if (this == a) return true;
+		if (this.count != a.count) return false;
+		if (this.mask != a.mask) return false;
+		int n = children.length;
+		for (int i = 0; i < n; i++) {
+			if (!children[i].getValue().equalsKeys(a.children[i].getValue())) return false;
+		}
+		return true;
+	}
+
+	@Override
+	public boolean equals(AMap<K, V> a) {
+		if (!(a instanceof TreeMap)) return false;
+		return equals((TreeMap<K, V>) a);
+	}
+
+	boolean equals(TreeMap<K, V> b) {
+		if (this == b) return true;
+		long n = count;
+		if (n != b.count) return false;
+		if (mask != b.mask) return false;
+		if (shift != b.shift) return false;
+
+		// Fall back to comparing hashes. Probably most efficient in general.
+		if (getHash().equals(b.getHash())) return true;
+		return false;
+	}
+
+	@Override
+	public AHashMap<K, V> mapEntries(Function<MapEntry<K, V>, MapEntry<K, V>> func) {
+		int n = children.length;
+		if (n == 0) return this;
+		Ref<AHashMap<K, V>>[] newChildren = children;
+		for (int i = 0; i < n; i++) {
+			AHashMap<K, V> child = children[i].getValue();
+			AHashMap<K, V> newChild = child.mapEntries(func);
+			if (child != newChild) {
+				if (children == newChildren) {
+					newChildren = children.clone();
+				}
+				newChildren[i] = Ref.create(newChild);
+			}
+		}
+		if (newChildren == children) return this;
+
+		// Note: creation should remove any empty children. Need to recompute count
+		// since
+		// entries may have been removed.
+		return create(newChildren, shift, mask, computeCount(newChildren));
+	}
+
+	@Override
+	public void validate() throws InvalidDataException {
+		super.validate();
+		validateWithPrefix("");
+		long cc = computeCount(children);
+		if (count != cc)
+			throw new InvalidDataException("Bad child count, expected " + count + " but children had: " + cc, this);
+	}
+
+	@Override
+	protected void validateWithPrefix(String prefix) throws InvalidDataException {
+		if (mask == 0) throw new InvalidDataException("TreeMap must have children!", this);
+		if (shift != prefix.length()) {
+			throw new InvalidDataException("Invalid prefix [" + prefix + "] for TreeMap with shift=" + shift, this);
+		}
+		int bsize = children.length;
+
+		for (int i = 0; i < bsize; i++) {
+			if (children[i] == null)
+				throw new InvalidDataException("Null child ref at " + prefix + Utils.toHexChar(digitForIndex(i, mask)),
+						this);
+			Object o = children[i].getValue();
+			if (!(o instanceof AMap)) {
+				throw new InvalidDataException(
+						"Expected map child at " + prefix + Utils.toHexChar(digitForIndex(i, mask)), this);
+			}
+			@SuppressWarnings("unchecked")
+			AHashMap<K, V> child = (AHashMap<K, V>) o;
+			if (child.isEmpty())
+				throw new InvalidDataException("Empty child at " + prefix + Utils.toHexChar(digitForIndex(i, mask)),
+						this);
+			int d = digitForIndex(i, mask);
+			child.validateWithPrefix(prefix + Utils.toHexChar(d));
+		}
+	}
+
+	private boolean isValidStructure() {
+		if (count <= ListMap.MAX_LIST_MAP_SIZE) return false;
+		if (children.length != Integer.bitCount(mask & 0xFFFF)) return false;
+		for (int i = 0; i < children.length; i++) {
+			if (children[i] == null) return false;
+		}
+		return true;
+	}
+
+	@Override
+	public void validateCell() throws InvalidDataException {
+		if (!isValidStructure()) throw new InvalidDataException("Bad structure", this);
+	}
+
+}

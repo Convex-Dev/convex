@@ -1,0 +1,528 @@
+package convex.core;
+
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.logging.Logger;
+
+import convex.core.data.ABlob;
+import convex.core.data.AHashMap;
+import convex.core.data.AMap;
+import convex.core.data.ARecord;
+import convex.core.data.ASet;
+import convex.core.data.AVector;
+import convex.core.data.AccountStatus;
+import convex.core.data.Address;
+import convex.core.data.Amount;
+import convex.core.data.BlobMap;
+import convex.core.data.BlobMaps;
+import convex.core.data.Format;
+import convex.core.data.Keyword;
+import convex.core.data.Keywords;
+import convex.core.data.LongBlob;
+import convex.core.data.MapEntry;
+import convex.core.data.PeerStatus;
+import convex.core.data.Sets;
+import convex.core.data.SignedData;
+import convex.core.data.Symbol;
+import convex.core.data.Syntax;
+import convex.core.data.Tag;
+import convex.core.data.Vectors;
+import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.BadSignatureException;
+import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.AOp;
+import convex.core.lang.Context;
+import convex.core.lang.Symbols;
+import convex.core.lang.impl.RecordFormat;
+import convex.core.transactions.ATransaction;
+import convex.core.util.Counters;
+
+/**
+ * Class representing the immutable state of the CVM
+ * 
+ * State transitions are represented by blocks of transactions, according to the logic: s[n+1] = s[n].applyBlock(b[n])
+ * 
+ * State contains the following elements - Map of AccountStatus for every
+ * Address - Map of PeerStatus for every Peer Address - Global values - Schedule
+ * data structure
+ *
+ * "State. You're doing it wrong" - Rich Hickey
+ *
+ */
+public class State extends ARecord {
+	private static final Keyword[] STATE_KEYS = new Keyword[] { Keywords.ACCOUNTS, Keywords.PEERS, Keywords.STORE,
+			Keywords.GLOBALS, Keywords.SCHEDULE };
+
+	private static final RecordFormat FORMAT = RecordFormat.of(STATE_KEYS);
+
+	public static final State EMPTY = create(BlobMaps.empty(), BlobMaps.empty(), Sets.empty(), Init.INITIAL_GLOBALS,
+			BlobMaps.empty());
+
+	private static final Logger log = Logger.getLogger(State.class.getName());
+
+	private final BlobMap<Address, AccountStatus> accounts;
+	private final BlobMap<Address, PeerStatus> peers;
+	private final ASet<Object> store;
+	private final AHashMap<Symbol, Object> globals;
+	private final BlobMap<ABlob, AVector<Object>> schedule;
+
+	private State(BlobMap<Address, AccountStatus> accounts, BlobMap<Address, PeerStatus> peers, ASet<Object> store,
+			AHashMap<Symbol, Object> globals, BlobMap<ABlob, AVector<Object>> schedule) {
+		super(FORMAT);
+		this.accounts = accounts;
+		this.peers = peers;
+		this.globals = globals;
+		this.store = store;
+		this.schedule = schedule;
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public <V> V get(Keyword k) {
+		if (Keywords.ACCOUNTS.equals(k)) return (V) accounts;
+		if (Keywords.PEERS.equals(k)) return (V) peers;
+		if (Keywords.STORE.equals(k)) return (V) store;
+		if (Keywords.GLOBALS.equals(k)) return (V) globals;
+		if (Keywords.SCHEDULE.equals(k)) return (V) schedule;
+		return null;
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	protected State updateAll(Object[] newVals) {
+		BlobMap<Address, AccountStatus> accounts = (BlobMap<Address, AccountStatus>) newVals[0];
+		BlobMap<Address, PeerStatus> peers = (BlobMap<Address, PeerStatus>) newVals[1];
+		ASet<Object> store = (ASet<Object>) newVals[2];
+		AHashMap<Symbol, Object> globals = (AHashMap<Symbol, Object>) newVals[3];
+		BlobMap<ABlob, AVector<Object>> schedule = (BlobMap<ABlob, AVector<Object>>) newVals[4];
+		if ((this.accounts == accounts) && (this.peers == peers) && (this.store == store) && (this.globals == globals)
+				&& (this.schedule == schedule)) {
+			return this;
+		}
+		return new State(accounts, peers, store, globals, schedule);
+	}
+
+	public static State create(BlobMap<Address, AccountStatus> accounts, BlobMap<Address, PeerStatus> peers,
+			ASet<Object> store, AHashMap<Symbol, Object> globals, BlobMap<ABlob, AVector<Object>> schedule) {
+		return new State(accounts, peers, store, globals, schedule);
+	}
+
+	@Override
+	public ByteBuffer write(ByteBuffer bb) {
+		bb = bb.put(Tag.STATE);
+		return writeRaw(bb);
+	}
+
+	@Override
+	public ByteBuffer writeRaw(ByteBuffer bb) {
+		bb = accounts.write(bb);
+		bb = peers.write(bb);
+		bb = store.write(bb);
+		bb = globals.write(bb);
+		bb = schedule.write(bb);
+		return bb;
+	}
+
+	/**
+	 * Reads a State from a ByteBuffer encoding. Assumes tag byte already read.
+	 * 
+	 * @param bb
+	 * @return The State read
+	 * @throws BadFormatException If a State could not be read
+	 */
+	public static State read(ByteBuffer bb) throws BadFormatException {
+		try {
+			BlobMap<Address, AccountStatus> accounts = Format.read(bb);
+			BlobMap<Address, PeerStatus> peers = Format.read(bb);
+			ASet<Object> store = Format.read(bb);
+			AHashMap<Symbol, Object> globals = Format.read(bb);
+			BlobMap<ABlob, AVector<Object>> schedule = Format.read(bb);
+			return create(accounts, peers, store, globals, schedule);
+		} catch (ClassCastException ex) {
+			throw new BadFormatException("Can't read state", ex);
+		}
+	}
+
+	public BlobMap<Address, AccountStatus> getAccounts() {
+		return accounts;
+	}
+
+	public ASet<Object> getStore() {
+		return store;
+	}
+
+	public long getFees() {
+		Long fees = (Long) globals.get(Symbols.FEES);
+		if (fees == null) return 0L;
+		return fees;
+	}
+
+	/**
+	 * Gets the map of Peers for this State
+	 * 
+	 * @return A map of addresses to PeerStatus records
+	 */
+	public BlobMap<Address, PeerStatus> getPeers() {
+		return peers;
+	}
+
+	public Amount getBalance(Address address) {
+		AccountStatus acc = getAccounts().get(address);
+		if (acc == null) return Amount.ZERO;
+		return acc.getBalance();
+	}
+
+	public State withBalance(Address address, Amount newBalance) {
+		AccountStatus acc = getAccounts().get(address);
+		if (acc == null) {
+			throw new Error("No account for " + address);
+		} else {
+			acc = acc.withBalance(newBalance);
+		}
+		return putAccount(address, acc);
+	}
+
+	/**
+	 * Block level state transition function
+	 * 
+	 * Updates the state by applying a given block of transactions
+	 * 
+	 * @param block
+	 * @return The BlockResult from applying the given Block to this State
+	 * @throws BadSignatureException If any transaction is not signed correctly
+	 */
+	public BlockResult applyBlock(Block block) throws BadSignatureException {
+		Counters.applyBlock++;
+		State state = applyTimeUpdates(block);
+		return state.applyTransactions(block);
+	}
+
+	private State applyTimeUpdates(Block b) {
+		State state = this;
+		long ts = (Long) state.globals.get(Symbols.TIMESTAMP);
+		long bts = b.getTimeStamp();
+		if (bts > ts) {
+			state = state.withGlobal(Symbols.TIMESTAMP, bts);
+		}
+
+		state = state.applyScheduledTransactions(b);
+
+		return state;
+	}
+
+	@SuppressWarnings("unchecked")
+	private State applyScheduledTransactions(Block b) {
+		long tcount = 0;
+		BlobMap<ABlob, AVector<Object>> sched = this.schedule;
+		long timestamp = this.getTimeStamp();
+
+		// ArrayList to accumulate the transactions to apply. Null until we need it
+		ArrayList<Object> al = null;
+
+		// walk schedule entries to determine how many there are
+		// and remove from the current schedule
+		// we should optimise this later
+		while (tcount < Constants.MAX_SCHEDULED_TRANSACTIONS_PER_BLOCK) {
+			if (sched.isEmpty()) break;
+			MapEntry<ABlob, AVector<Object>> me = sched.entryAt(0);
+			ABlob key = me.getKey();
+			long time = key.longValue();
+			if (time > timestamp) break; // exit if we are still in the future
+			AVector<Object> trans = me.getValue();
+			long numScheduled = trans.count(); // number scheduled at this schedule timestamp
+			long take = Math.min(numScheduled, Constants.MAX_SCHEDULED_TRANSACTIONS_PER_BLOCK - tcount);
+
+			// add scheduled transactions to arraylist
+			if (al == null) al = new ArrayList<>();
+			for (long i = 0; i < take; i++) {
+				al.add(trans.get(i));
+			}
+			// remove schedule entries taken. Delete key if no more entries remaining
+			trans = trans.subVector(take, numScheduled - take);
+			if (trans.isEmpty()) sched = sched.dissoc(key);
+			tcount += take;
+		}
+		if (tcount == 0) return this; // nothing to do if no transactions to execute
+
+		// update state with amended schedule
+		State state = this.withSchedule(sched);
+
+		// now apply the transactions!
+		int n = al.size();
+		log.info("Applying " + n + " scheduled transactions");
+		for (int i = 0; i < n; i++) {
+			AVector<Object> st = (AVector<Object>) al.get(i);
+			Address origin = (Address) st.get(0);
+			AOp<?> op = (AOp<?>) st.get(1);
+			Context<?> ctx;
+			try {
+				// TODO juice refund
+				ctx = Context.createInitial(state, origin, Constants.MAX_TRANSACTION_JUICE);
+				ctx = ctx.run(op);
+				if (ctx.isExceptional()) {
+					// TODO: what to do here? probably ignore
+					// we maybe need to think about reporting scheduled results?
+					log.info("Scheduled transaction error: " + ctx.getValue());
+				} else {
+					state = ctx.getState();
+					log.info("Scheduled transaction succeeded");
+				}
+			} catch (Exception e) {
+				log.info("Scheduled transaction failed");
+				e.printStackTrace();
+			}
+
+		}
+
+		return state;
+	}
+
+	private State withSchedule(BlobMap<ABlob, AVector<Object>> newSchedule) {
+		if (schedule == newSchedule) return this;
+		return new State(accounts, peers, store, globals, newSchedule);
+	}
+
+	private State withGlobals(AHashMap<Symbol, Object> newGlobals) {
+		if (newGlobals == globals) return this;
+		return new State(accounts, peers, store, newGlobals, schedule);
+	}
+
+	private BlockResult applyTransactions(Block block) throws BadSignatureException {
+		State state = this;
+		int blockLength = block.length();
+		Object[] results = new Object[blockLength];
+
+		AVector<SignedData<ATransaction>> transactions = block.getTransactions();
+		for (int i = 0; i < blockLength; i++) {
+			SignedData<? extends ATransaction> signed = transactions.get(i);
+
+			ATransaction t = signed.getValue(); // validates signature if necessary
+			Address origin = signed.getAddress();
+			Context<?> ctx = t.applyTransaction(origin, state);
+			
+			results[i] = ctx.getValue();
+			state = ctx.getState();
+		}
+		
+		// TODO: changes for complete block?
+		return BlockResult.create(state, results);
+	}
+
+	@Override
+	public int estimatedEncodingSize() {
+		// TODO size this
+		return 150;
+	}
+
+	@Override
+	public boolean isCanonical() {
+		// TODO fix?
+		if (!accounts.isCanonical()) return false;
+		if (!peers.isCanonical()) return false;
+		if (!store.isCanonical()) return false;
+		if (!globals.isCanonical()) return false;
+		return true;
+	}
+
+	/**
+	 * Computes the weighted stake for each peer. Adds a single entry for the null
+	 * key, containing the total stake
+	 * 
+	 * @return @
+	 */
+	public HashMap<Address, Double> computeStakes() {
+		HashMap<Address, Double> hm = new HashMap<>(peers.size());
+		Double totalStake = peers.reduceEntries((acc, e) -> {
+			double stake = (double) (e.getValue().getTotalStake());
+			hm.put(e.getKey(), stake);
+			return stake + acc;
+		}, 0.0);
+		hm.put(null, totalStake);
+		return hm;
+	}
+
+	public State withAccounts(BlobMap<Address, AccountStatus> newAccounts) {
+		if (newAccounts == accounts) return this;
+		return create(newAccounts, peers, store, globals, schedule);
+	}
+
+	/**
+	 * Returns this state after updating the given account
+	 * 
+	 * @param address
+	 * @param accountStatus
+	 * @return @
+	 */
+	public State putAccount(Address address, AccountStatus accountStatus) {
+		BlobMap<Address, AccountStatus> newAccounts = accounts.assoc(address, accountStatus);
+		return withAccounts(newAccounts);
+	}
+
+	/**
+	 * Gets the AccountStatus for a given account, or null if not found.
+	 * 
+	 * @param target
+	 * @return The AccountStatus for the given account, or null.
+	 */
+	public AccountStatus getAccount(Address target) {
+		return getAccounts().get(target);
+	}
+
+	/**
+	 * Gets the environment for a given account, or null if not found.
+	 * 
+	 * @param addr Address of account to obtain
+	 * @return The environment of the given account, or null if not found.
+	 */
+	public AMap<Symbol, Syntax> getEnvironment(Address addr) {
+		AccountStatus as = getAccount(addr);
+		if (as == null) return null;
+		return as.getEnvironment();
+	}
+
+	public State withStore(ASet<Object> newStore) {
+		if (store == newStore) return this;
+		return create(accounts, peers, newStore, globals, schedule);
+	}
+
+	public State withPeers(BlobMap<Address, PeerStatus> newPeers) {
+		if (peers == newPeers) return this;
+		return create(accounts, newPeers, store, globals, schedule);
+	}
+
+	public State store(Object a) {
+		ASet<Object> newStore = store.include(a);
+		return withStore(newStore);
+	}
+
+	@Override
+	public byte getRecordTag() {
+		return Tag.STATE;
+	}
+
+	@Override
+	protected String ednTag() {
+		return "#state";
+	}
+
+	/**
+	 * Deploys the specified Actor environment in the current state.
+	 * 
+	 * Returns the updated state, or null if the Actor already exists.
+	 * 
+	 * @param address
+	 * @param actorArgs
+	 * @param environment
+	 * @return The updated state with the Actor deployed.
+	 */
+	public State delpyActor(Address address, AVector<Object> actorArgs, AHashMap<Symbol, Syntax> environment) {
+		AccountStatus as = accounts.get(address);
+		if (as != null) return null;
+		as = AccountStatus.createActor(0, Amount.ZERO, actorArgs, environment);
+		BlobMap<Address, AccountStatus> newAccounts = accounts.assoc(address, as);
+		return withAccounts(newAccounts);
+	}
+
+	/**
+	 * Compute the total funds existing within this state.
+	 * 
+	 * Should be constant! 1,000,000,000,000,000,000 in full deployment mode
+	 * 
+	 * @return The total value of all funds
+	 */
+	public long computeTotalFunds() {
+		long total = accounts.reduceValues((Long t, AccountStatus as) -> t + as.getBalance().getValue(), 0L);
+		total += peers.reduceValues((Long t, PeerStatus ps) -> t + ps.getTotalStake(), 0L);
+		total += getFees();
+		return total;
+	}
+
+	@Override
+	public void validate() throws InvalidDataException {
+		super.validate();
+	}
+
+	@Override
+	public void validateCell() throws InvalidDataException {
+		accounts.validateCell();
+		peers.validateCell();
+		store.validateCell();
+		globals.validateCell();
+	}
+
+	/**
+	 * Gets the current global timestamp from this state.
+	 * 
+	 * @return The timestamp from this state.
+	 */
+	public long getTimeStamp() {
+		return (long) globals.get(Symbols.TIMESTAMP);
+	}
+
+	public long getJuicePrice() {
+		return (long) globals.get(Symbols.JUICE_PRICE);
+	}
+
+	/**
+	 * Schedules an operation with the given timestamp and Op in this state
+	 * 
+	 * @param v
+	 * @return The updated State
+	 */
+	public State scheduleOp(long time, Address address, AOp<?> op) {
+		AVector<Object> v = Vectors.of(address, op);
+
+		LongBlob key = LongBlob.create(time);
+		AVector<Object> list = schedule.get(key);
+		if (list == null) {
+			list = Vectors.of(v);
+		} else {
+			list = list.append(v);
+		}
+		BlobMap<ABlob, AVector<Object>> newSchedule = schedule.assoc(key, list);
+
+		return this.withSchedule(newSchedule);
+	}
+
+	/**
+	 * Gets the current schedule data structure for this state
+	 * 
+	 * @return The schedule data structure.
+	 */
+	public BlobMap<ABlob, AVector<Object>> getSchedule() {
+		return schedule;
+	}
+
+	@SuppressWarnings("unchecked")
+	public <R> R getGlobal(Symbol sym) {
+		return (R) globals.get(sym);
+	}
+
+	public State withGlobal(Symbol sym, Object value) {
+		return this.withGlobals(globals.assoc(sym, value));
+	}
+
+	/**
+	 * Gets the PeerStatus record for the given Address, or null if it does not
+	 * exist
+	 * 
+	 * @param peerAddress Address of Peer to check
+	 * @return PeerStatus
+	 */
+	public PeerStatus getPeer(Address peerAddress) {
+		return getPeers().get(peerAddress);
+	}
+
+	/**
+	 * Updates the specified peer status
+	 * 
+	 * @param peerAddress
+	 * @param updatedPeer
+	 * @return Updated state
+	 */
+	public State withPeer(Address peerAddress, PeerStatus updatedPeer) {
+		return withPeers(peers.assoc(peerAddress, updatedPeer));
+	}
+
+}

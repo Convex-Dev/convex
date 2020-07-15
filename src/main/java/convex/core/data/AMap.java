@@ -1,0 +1,280 @@
+package convex.core.data;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+
+import convex.core.crypto.Hash;
+import convex.core.lang.RT;
+import convex.core.util.Errors;
+import convex.core.util.Utils;
+
+/**
+ * Abstract base class for maps.
+ * 
+ * Maps are Smart Data Structures that represent an immutable mapping of keys to
+ * values.
+ * 
+ * Ordering of map entries (as seen through iterators etc.) depends on map type.
+ * 
+ * @param <K> Type of keys
+ * @param <V> Type of values
+ */
+public abstract class AMap<K, V> extends ADataStructure<MapEntry<K, V>>
+		implements Map<K, V>, IGet<V>, IRefContainer {
+
+	protected long count;
+
+	protected AMap(long count) {
+		this.count = count;
+	}
+
+	@Override
+	public final long count() {
+		return count;
+	}
+
+	@Override
+	public int size() {
+		return (int) (Math.min(count(), Integer.MAX_VALUE));
+	}
+
+	@Override
+	public boolean isEmpty() {
+		return count == 0L;
+	}
+
+	/**
+	 * Gets the values from this map, in map-determined order
+	 */
+	@Override
+	public AVector<V> values() {
+		int len = size();
+		ArrayList<V> al = new ArrayList<V>(len);
+		accumulateValues(al);
+		return Vectors.create(al);
+	}
+
+	/**
+	 * Associates the given key with the specified value.
+	 * 
+	 * @param key
+	 * @param value
+	 * @return An updated map with the new association
+	 */
+	public abstract AMap<K, V> assoc(K key, V value);
+
+	/**
+	 * Dissociates a key from this map, returning an updated map if the key was
+	 * removed, or the same unchanged map if the key is not present.
+	 * 
+	 * @param key Key to remove.
+	 * @return Updated map
+	 */
+	public abstract AMap<K, V> dissoc(K key);
+
+	public final boolean containsKeyRef(Ref<K> ref) {
+		return getKeyRefEntry(ref) != null;
+	}
+
+	/**
+	 * Get an entry given a Ref to the key value. This is more efficient than
+	 * directly looking up using the key for some map types, and should be preferred
+	 * if the caller already has a Ref available.
+	 * 
+	 * @param ref
+	 * @return MapEntry for the given key ref
+	 */
+	public abstract MapEntry<K, V> getKeyRefEntry(Ref<K> ref);
+
+	/**
+	 * Accumulate all entries from this map in the given HashSet.
+	 * 
+	 * @param h
+	 */
+	protected abstract void accumulateEntrySet(HashSet<Entry<K, V>> h);
+
+	/**
+	 * Accumulate all keys from this map in the given HashSet.
+	 * 
+	 * @param h
+	 */
+	protected abstract void accumulateKeySet(HashSet<K> h);
+
+	/**
+	 * Accumulate all values from this map in the given ArrayList.
+	 * 
+	 * @param h
+	 */
+	protected abstract void accumulateValues(ArrayList<V> al);
+
+	@Override
+	public final V put(K key, V value) {
+		throw new UnsupportedOperationException(Errors.immutable(this));
+	}
+
+	@Override
+	public final V remove(Object key) {
+		throw new UnsupportedOperationException(Errors.immutable(this));
+	}
+
+	@Override
+	public final void putAll(Map<? extends K, ? extends V> m) {
+		throw new UnsupportedOperationException(Errors.immutable(this));
+	}
+
+	@Override
+	public final void clear() {
+		throw new UnsupportedOperationException(Errors.immutable(this));
+	}
+
+	@Override
+	public abstract void forEach(BiConsumer<? super K, ? super V> action);
+
+	@Override
+	public void ednString(StringBuilder sb) {
+		sb.append('{');
+		this.forEach((k, v) -> {
+			String ks = Utils.ednString(k);
+			sb.append(ks);
+			sb.append(' ');
+			String vs = Utils.ednString(v);
+			sb.append(vs);
+			sb.append(',');
+			if (ks.length() + vs.length() > 100) sb.append('\n');
+		});
+		if (count() > 0) sb.setLength(sb.length() - 1); // delete trailing comma
+		sb.append('}');
+	}
+
+	/**
+	 * Associate the given map entry into the map
+	 * 
+	 * @param e A map entry
+	 * @return The updated map
+	 */
+	public abstract AMap<K, V> assocEntry(MapEntry<K, V> e);
+
+	/**
+	 * Gets the entry in this map at a specified index, according to the
+	 * map-specific order.
+	 * 
+	 * @param i
+	 * @return MapEntry at the specified index.
+	 * @throws IndexOutOfBoundsException If this index is not valid
+	 */
+	public abstract MapEntry<K, V> entryAt(long i);
+
+	/**
+	 * Gets the MapEntry for the given key
+	 * 
+	 * @param k
+	 * @return The map entry, or null if the key is not found
+	 */
+	public abstract MapEntry<K, V> getEntry(K k);
+
+	/**
+	 * Gets the value at a specified key, or returns the fallback value if not found
+	 * 
+	 * @param key
+	 * @param notFound Fallback value to return if key is not present
+	 * @return Value for the specified key, or the notFound value.
+	 */
+	@SuppressWarnings("unchecked")
+	public final V get(Object key, Object notFound) {
+		MapEntry<K, V> me = getEntry((K) key);
+		if (me == null) {
+			return (V) notFound;
+		} else {
+			return me.getValue();
+		}
+	}
+
+	/**
+	 * Reduce over all values in this map
+	 * 
+	 * @param <R>     Type of reduction return value
+	 * @param func    A function taking the reduction value and a map value
+	 * @param initial Initial reduction value
+	 * @return The final reduction value
+	 */
+	public abstract <R> R reduceValues(BiFunction<? super R, ? super V, ? extends R> func, R initial);
+
+	/**
+	 * Reduce over all map entries in this map
+	 * 
+	 * @param <R>     Type of reduction return value
+	 * @param func    A function taking the reduction value and a map entry
+	 * @param initial Initial reduction value
+	 * @return The final reduction value
+	 */
+	public abstract <R> R reduceEntries(BiFunction<? super R, MapEntry<K, V>, ? extends R> func, R initial);
+
+	/**
+	 * Returns true if this map has exactly the same keys as the other map
+	 * 
+	 * @param map
+	 * @return true if maps have the same keys, false otherwise
+	 */
+	public abstract boolean equalsKeys(AMap<K, V> map);
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public final boolean equals(Object a) {
+		if (!(a instanceof AMap)) return false;
+		return equals((AMap<K, V>) a);
+	}
+
+	/**
+	 * Checks this map for equality with another map. In general, maps should be
+	 * considered equal if they have the same canonical representation, i.e. the
+	 * same hash value.
+	 * 
+	 * Subclasses may override this this they have a more efficient equals
+	 * implementation or a more specific definition of equality.
+	 * 
+	 * @param a
+	 * @return true if maps are equal, false otherwise.
+	 */
+	public boolean equals(AMap<K, V> a) {
+		if (this == a) return true; // important optimisation for e.g. hashmap equality
+		if (a == null) return false;
+		if (!(a.getClass() == this.getClass())) return false;
+		if (this.count() != a.count()) return false;
+		return getHash().equals(a.getHash());
+	}
+
+	/**
+	 * Gets the map entry with the specified hash
+	 * 
+	 * @param hash
+	 * @return The specified MapEntry, or null if not found.
+	 */
+	protected abstract MapEntry<K, V> getEntryByHash(Hash hash);
+
+	/**
+	 * Adds a new map entry to this map. The argument must be a valid map entry or
+	 * length 2 vector.
+	 * 
+	 * @param x An object that can be cast to a MapEntry
+	 * @return Updated map with the specified entry added, or null if the argument
+	 *         is not a valid map entry
+	 */
+	@SuppressWarnings("unchecked")
+	public <R> ADataStructure<R> conj(R x) {
+		MapEntry<K, V> me = RT.toMapEntry(x);
+		if (me == null) return null;
+		return (ADataStructure<R>) assocEntry(me);
+	}
+
+	/**
+	 * Gets a vector of all map entries.
+	 * 
+	 * @return Vector map entries, in map-defined order.
+	 */
+	public AVector<MapEntry<K, V>> entryVector() {
+		return reduceEntries((acc, e) -> acc.conj(e), Vectors.empty());
+	}
+}

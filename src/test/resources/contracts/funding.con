@@ -1,0 +1,42 @@
+;; Testing contract for fund transfers via offer / accept
+(fn [] 
+  
+  ;; function that accepts quarter of all funds offered
+  (defn accept-quarter [] 
+    (accept (* 0.25 *offer*)))
+  
+  ;; function that accepts half all funds offered
+  (defn accept-all [] 
+    (accept *offer*))
+  
+  ;; function that accepts funds then rolls back
+  (defn accept-rollback [] 
+    (accept *offer*)
+    (rollback :foo))
+  
+  ;; function that accepts funds repeatedly
+  ;; Note: *offer* should be reduced to zero by first accept.
+  (defn accept-repeat [] 
+    (accept *offer*)
+    (assert (== 0 *offer*))
+    (accept *offer*)
+    (accept *offer*)
+    *offer*)
+  
+  ;; function that accepts nothing
+  (defn accept-zero [] 
+    (accept 0))
+  
+    ;; function that accepts offer, and forwards to self
+  (defn accept-forward [] 
+    (let [amt *offer*]
+      (accept amt)
+      (call *address* amt (accept-all)))) 
+  
+  ;; function that accepts nothing, but returns the offered value
+  (defn echo-offer [] 
+    *offer*)
+  
+  (export accept-quarter accept-all accept-rollback accept-forward accept-repeat accept-zero echo-offer)
+  
+  )

@@ -1,0 +1,10 @@
+(fn [] 
+  (def registry {*address* {:name "Registry Contract"}})
+  
+  (defn register [data]
+    (def registry (assoc registry *caller* data)))
+    
+  (defn lookup [addr]
+    (get registry (address addr)))
+    
+  (export register lookup))

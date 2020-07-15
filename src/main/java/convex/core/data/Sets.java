@@ -1,0 +1,46 @@
+package convex.core.data;
+
+import java.util.Collection;
+
+import convex.core.lang.RT;
+import convex.core.util.Utils;
+
+public class Sets {
+
+	@SuppressWarnings("unchecked")
+	public static <T> Set<T> empty() {
+		return (Set<T>) Set.EMPTY;
+	}
+
+	@SafeVarargs
+	public static <T> ASet<T> of(T... elements) {
+		return Set.create(elements);
+	}
+
+	@SuppressWarnings("unchecked")
+	public static <T> ASet<T> create(Object source) {
+		if (source instanceof ADataStructure) return create((ADataStructure<T>) source);
+		if (source instanceof Collection) {
+			T[] elements = (T[]) ((Collection<T>) source).toArray();
+			return Set.create(elements);
+		}
+		throw new Error("Unexpected type!" + Utils.getClass(source));
+	}
+
+	/**
+	 * Creates a set of all the elements in the goven data structure
+	 * 
+	 * @param <T>
+	 * @param source
+	 * @return A Set
+	 */
+	public static <T> ASet<T> create(ADataStructure<T> source) {
+		if (source instanceof ASet) return (ASet<T>) source;
+		if (source instanceof ASequence) return Set.create((ASequence<T>) source);
+		if (source instanceof AMap) {
+			ASequence<T> seq = RT.sequence(source); // should always be non-null
+			Set.create(seq);
+		}
+		throw new IllegalArgumentException("Unexpected type!" + Utils.getClass(source));
+	}
+}

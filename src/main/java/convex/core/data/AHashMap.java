@@ -1,0 +1,129 @@
+package convex.core.data;
+
+import java.util.function.Function;
+import java.util.function.Predicate;
+
+import convex.core.exceptions.InvalidDataException;
+import convex.core.util.MergeFunction;
+
+public abstract class AHashMap<K, V> extends AMap<K, V> {
+
+	protected AHashMap(long count) {
+		super(count);
+	}
+
+	@Override
+	public AHashMap<K, V> empty() {
+		return Maps.empty();
+	}
+
+	/**
+	 * Dissoc given a Ref to the key value.
+	 */
+	public abstract AHashMap<K, V> dissocRef(Ref<K> key);
+
+	public abstract AHashMap<K, V> assocRef(Ref<K> keyRef, V value);
+
+	@Override
+	public abstract AHashMap<K, V> assoc(K key, V value);
+
+	@Override
+	public abstract AHashMap<K, V> dissoc(K key);
+
+	protected abstract AHashMap<K, V> assocRef(Ref<K> keyRef, V value, int shift);
+
+	public abstract AHashMap<K, V> assocEntry(MapEntry<K, V> e);
+
+	protected abstract AHashMap<K, V> assocEntry(MapEntry<K, V> e, int shift);
+
+	/**
+	 * Merge another map into this map. Replaces existing entries if they are
+	 * different
+	 */
+	public AHashMap<K, V> merge(AHashMap<K, V> m) {
+		AHashMap<K, V> result = this;
+		long n = m.count();
+		for (int i = 0; i < n; i++) {
+			result = result.assocEntry(m.entryAt(i));
+		}
+		return result;
+	}
+
+	/**
+	 * Merge this map with another map, using the given function for each key that
+	 * is present in either map and has a different value
+	 * 
+	 * The function is passed null for missing values in either map, and must return
+	 * type V.
+	 * 
+	 * If the function returns null, the entry is removed.
+	 * 
+	 * Returns the same map if no changes occurred.
+	 * 
+	 * @param b    Other map to merge with
+	 * @param func Merge function, returning a new value for each key
+	 * @return A merged map, or this map if no changes occurred
+	 */
+	public abstract AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func);
+
+	/**
+	 * Merge this map with another map, using the given function for each key that
+	 * is present in either map. The function is applied to the corresponding values
+	 * with the same key.
+	 * 
+	 * The function is passed null for missing values in either map, and must return
+	 * type V.
+	 * 
+	 * If the function returns null, the entry is removed.
+	 * 
+	 * Returns the same map if no changes occurred.
+	 * 
+	 * PERF WARNING: This method's contract requires calling the function on all
+	 * values in both sets, which will cause a full data structure traversal. If the
+	 * function will only return one or other of the compared values consider using
+	 * mergeDifferences instead.
+	 * 
+	 * @param b    Other map to merge with
+	 * @param func Merge function, returning a new value for each key
+	 * @return A merged map, or this map if no changes occurred
+	 */
+	public abstract AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func);
+
+	protected abstract AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func, int shift);
+
+	/**
+	 * Filters all values in this map with the given predicate.
+	 * 
+	 * @param pred A predicate specifying which elements to retain.
+	 * @return The updated map containing those entries where the predicate returned
+	 *         true.
+	 */
+	public AHashMap<K, V> filterValues(Predicate<V> pred) {
+		// TODO make more efficient?
+		return mergeWith(this, (a, b) -> pred.test(a) ? a : null);
+	}
+
+	/**
+	 * Maps a function over all entries in this Map to produce updated entries.
+	 * 
+	 * May not change keys, but may return null to remove an entry.
+	 * 
+	 * @param func A function that maps old map entries to updated map entries.
+	 * @return The updated Map, or this Map if no changes
+	 */
+	public abstract AHashMap<K, V> mapEntries(Function<MapEntry<K, V>, MapEntry<K, V>> func);
+
+	/**
+	 * Validates the map with a given hex prefix. This is necessary to ensure that
+	 * child maps are valid, in particular have the correct shift level and that all
+	 * key hashes start with the correct prefix of hex characters.
+	 * 
+	 * TODO: consider faster way of passing prefix than hex string, probably a
+	 * byte[] stack.
+	 * 
+	 * @param string
+	 * @throws InvalidDataException
+	 */
+	protected abstract void validateWithPrefix(String string) throws InvalidDataException;
+
+}

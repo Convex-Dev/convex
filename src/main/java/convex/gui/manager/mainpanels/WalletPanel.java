@@ -1,0 +1,59 @@
+package convex.gui.manager.mainpanels;
+
+import java.awt.BorderLayout;
+
+import javax.swing.DefaultListModel;
+import javax.swing.JButton;
+import javax.swing.JPanel;
+import javax.swing.ListModel;
+
+import convex.core.Init;
+import convex.core.crypto.AKeyPair;
+import convex.core.crypto.WalletEntry;
+import convex.gui.components.ActionPanel;
+import convex.gui.components.ScrollyList;
+import convex.gui.components.WalletComponent;
+
+@SuppressWarnings("serial")
+public class WalletPanel extends JPanel {
+
+	public static final WalletEntry HERO = WalletEntry.create(Init.HERO_KP);
+
+	private static DefaultListModel<WalletEntry> listModel = new DefaultListModel<>();;
+	ScrollyList<WalletEntry> walletList;
+
+	public void addWalletEntry(WalletEntry we) {
+		listModel.addElement(we);
+	}
+
+	/**
+	 * Create the panel.
+	 */
+	public WalletPanel() {
+		setLayout(new BorderLayout(0, 0));
+
+		JPanel toolBar = new ActionPanel();
+		add(toolBar, BorderLayout.SOUTH);
+
+		// new wallet button
+		JButton btnNew = new JButton("New");
+		toolBar.add(btnNew);
+		btnNew.addActionListener(e -> {
+			listModel.addElement(WalletEntry.create(AKeyPair.generate()));
+		});
+
+		// inital list
+		addWalletEntry(HERO);
+		addWalletEntry(WalletEntry.create(Init.VILLAIN_KP));
+		addWalletEntry(WalletEntry.create(Init.KEYPAIRS[0]));
+
+		// create and add ScrollyList
+		walletList = new ScrollyList<WalletEntry>(listModel, we -> new WalletComponent(we));
+		add(walletList, BorderLayout.CENTER);
+	}
+
+	public static ListModel<WalletEntry> getListModel() {
+		return listModel;
+	}
+
+}
