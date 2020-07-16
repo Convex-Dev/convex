@@ -424,7 +424,7 @@ public class Server implements Closeable {
 			} catch (MissingDataException e) {
 				// Shouldn't happen if beliefs are persisted
 				// e.printStackTrace();
-				throw new Error("Missing data in belief update!", e);
+				throw new Error("Missing data in belief update: "+e.getMissingHash().toHexString(), e);
 			} catch (BadSignatureException e) {
 				// Shouldn't happen if Beliefs are already validated
 				// e.printStackTrace();
@@ -461,6 +461,8 @@ public class Server implements Closeable {
 	}
 
 	private void processData(Message m) {
+		log.info(()->"Processing DATA of type: "+Utils.getClassName(m.getPayload()));
+		
 		// TODO: be smarter about this? hold a per-client queue for a while?
 		Ref<?> r=Ref.create(m.getPayload()).persistShallow();
 		maybeProcessPartial(r.getHash());
@@ -552,7 +554,7 @@ public class Server implements Closeable {
 						// Try belief update
 						maybeUpdateBelief();
 					} catch (Throwable e) {
-						log.severe("Unexpected exception in server manager loop: "+e.getMessage());
+						log.severe("Unexpected exception in server update loop: "+e.getMessage());
 						e.printStackTrace();
 					}
 				}

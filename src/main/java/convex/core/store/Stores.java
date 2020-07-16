@@ -9,7 +9,7 @@ public class Stores {
 	/**
 	 * Default store to use in client applications
 	 */
-	public static final AStore CLIENT_STORE = EtchStore.createTemp();
+	public static final AStore CLIENT_STORE = EtchStore.createTemp("client-db");
 	
 	/**
 	 * Default store to use in server applications

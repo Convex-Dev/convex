@@ -66,7 +66,21 @@ public class EtchStore extends AStore {
 	}
 
 	/**
-	 * Create an Etch store using a new temporary file.
+	 * Create an Etch store using a new temporary file with the given prefix
+	 * 
+	 * @return New EtchStore instance
+	 */
+	public static EtchStore createTemp(String prefix) {
+		try {
+			Etch etch = Etch.createTempEtch(prefix);
+			return new EtchStore(etch);
+		} catch (IOException e) {
+			throw Utils.sneakyThrow(e);
+		}
+	}
+	
+	/**
+	 * Create an Etch store using a new temporary file with a generated prefix
 	 * 
 	 * @return New EtchStore instance
 	 */

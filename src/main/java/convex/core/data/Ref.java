@@ -454,7 +454,8 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 */
 	@SuppressWarnings("unchecked")
 	public <R> Ref<R> persistShallow() {
-		return (Ref<R>) Stores.current().storeRef(this, null);
+		AStore store=Stores.current();
+		return (Ref<R>) store.storeRef(this, null);
 	}
 	
 	/**

@@ -63,7 +63,7 @@ public class Connection {
 	private static final Logger log = Logger.getLogger(Connection.class.getName());
 
 	// Log level for send events
-	private static final Level LEVEL = Level.FINE;
+	private static final Level LEVEL = Level.INFO;
 
 	
 	/**
@@ -324,7 +324,8 @@ public class Connection {
 		Object sendVal = payload;
 		Ref.createPersisted(sendVal, r -> {
 			try {
-				boolean sent = sendData(r.getValue());
+				Object data=r.getValue();
+				boolean sent = sendData(data);
 			} catch (IOException e) {
 				throw Utils.sneakyThrow(e);
 			}
@@ -384,10 +385,10 @@ public class Connection {
 				selector.wakeup();
 			}
 
-			log.log(LEVEL, () -> "Sent message " + type + " of length: " + dataLength + " PC: "
+			log.log(LEVEL, () -> "Sent message " + type + " of length: " + dataLength + " Connection ID: "
 					+ System.identityHashCode(this));
 		} else {
-			log.log(LEVEL, () -> "Failed to send message " + type + " of length: " + dataLength + " PC: "
+			log.log(LEVEL, () -> "Failed to send message " + type + " of length: " + dataLength + " Connection ID: "
 					+ System.identityHashCode(this));
 		}
 		return sent;

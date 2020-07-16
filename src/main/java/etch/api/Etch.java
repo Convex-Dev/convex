@@ -127,9 +127,20 @@ public class Etch {
 	 * @throws IOException
 	 */	
 	public static Etch createTempEtch() throws IOException {
-		File data = File.createTempFile("etch-"+tempIndex+"-", null);
-		data.deleteOnExit();
+		Etch newEtch =  createTempEtch("etch-"+tempIndex);
 		tempIndex++;
+		return newEtch;
+	}
+	
+	/**
+	 * Create an Etch instance using a temporary file with a specific file prefix.
+	 * @param temporary file prefix to use
+	 * @return The new Etch instance
+	 * @throws IOException
+	 */	
+	public static Etch createTempEtch(String prefix) throws IOException {
+		File data = File.createTempFile(prefix+"-", null);
+		data.deleteOnExit();
 		return new Etch(data);
 	}
 	
