@@ -227,14 +227,15 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 * starting from lowest levels.
 	 * 
 	 * @param value
-	 * @return @
+	 * @return Persisted Ref
 	 */
-	public static <T> Ref<T> createPersisted(T value, Consumer<Ref<T>> noveltyHandler) {
+	@SuppressWarnings("unchecked")
+	public static <T> Ref<T> createPersisted(T value, Consumer<Ref<ACell>> noveltyHandler) {
 		if (Format.isEmbedded(value)) {
 			return RefDirect.create(value, null, Ref.EMBEDDED);
 		}
-		Ref<T> ref = RefDirect.create(value, null, Ref.UNKNOWN);
-		return Stores.current().persistRef(ref, noveltyHandler);
+		Ref<ACell> ref = RefDirect.create((ACell)value, null, Ref.UNKNOWN);
+		return (Ref<T>) Stores.current().persistRef(ref, noveltyHandler);
 	}
 
 	/**
@@ -328,11 +329,12 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 * @return the persisted Ref @ If the Ref's value does not exist or has been
 	 *         garbage collected before being persisted
 	 */
-	public Ref<T> persist(Consumer<Ref<T>> noveltyHandler) {
+	@SuppressWarnings("unchecked")
+	public Ref<T> persist(Consumer<Ref<ACell>> noveltyHandler) {
 		int status = getStatus();
 		if (status >= PERSISTED) return this; // already persisted in some form. Might be EMBEDDED
 		AStore store=Stores.current();
-		return store.persistRef(this, noveltyHandler);
+		return (Ref<T>) store.persistRef((Ref<ACell>)this, noveltyHandler);
 	}
 
 	/**
@@ -455,7 +457,7 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	@SuppressWarnings("unchecked")
 	public <R> Ref<R> persistShallow() {
 		AStore store=Stores.current();
-		return (Ref<R>) store.storeRef(this, null);
+		return (Ref<R>) store.storeRef((Ref<ACell>)this, null);
 	}
 	
 	/**

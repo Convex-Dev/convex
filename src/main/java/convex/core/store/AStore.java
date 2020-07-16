@@ -3,6 +3,7 @@ package convex.core.store;
 import java.util.function.Consumer;
 
 import convex.core.crypto.Hash;
+import convex.core.data.ACell;
 import convex.core.data.Ref;
 
 /**
@@ -25,7 +26,7 @@ public abstract class AStore {
 	 *            minimum to present risk of MissingDataException.
 	 * @return The persisted Ref, of status PERSISTED at mimimum
 	 */
-	public abstract <T> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<T>> noveltyHandler);
+	public abstract Ref<ACell> persistRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler);
 
 	/**
 	 * Stores a @Ref in long term storage as defined by this store implementation.
@@ -38,7 +39,7 @@ public abstract class AStore {
 	 *            minimum to present risk of MissingDataException.
 	 * @return The persisted Ref, of status STORED at minimum
 	 */
-	public abstract <T> Ref<T> storeRef(Ref<T> ref, Consumer<Ref<T>> noveltyHandler);
+	public abstract Ref<ACell> storeRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler);
 
 	/**
 	 * Gets the stored Ref for a given hash value, or null if not found.

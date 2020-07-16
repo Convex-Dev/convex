@@ -35,8 +35,8 @@ import convex.core.util.Utils;
 public class Format {
 
 	// Encoding constants
-	private static final int EMBEDDED_STRING_MAX_LENGTH = 32; // max UTF-16 length of embedded string
-	private static final int EMBEDDED_BLOB_MAX_LENGTH = 32;
+	public static final int EMBEDDED_STRING_MAX_LENGTH = 32; // max UTF-16 length of embedded string
+	public static final int EMBEDDED_BLOB_MAX_LENGTH = 32;
 	public static final int MAX_ENCODING_LENGTH = 0x1FFF; // max length that can be VLC encoded in 2 bytes
 	public static final int MAX_VLC_LONG_LENGTH = 10; // 70 bits
 
@@ -729,7 +729,8 @@ public class Format {
 			if (o instanceof Character) return true;
 			if (o instanceof Boolean) return true;
 			// TODO: think about encodings and string lengths?
-			if (o instanceof String) return ((String) o).length() <= EMBEDDED_STRING_MAX_LENGTH;
+			if (o instanceof String) return true;
+			// if (o instanceof String) return ((String) o).length() <= EMBEDDED_STRING_MAX_LENGTH;
 		}
 		return false;
 	}

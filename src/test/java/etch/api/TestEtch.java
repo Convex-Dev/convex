@@ -1,17 +1,21 @@
 package etch.api;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.Hash;
+import convex.core.data.ACell;
+import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Format;
-import convex.core.data.Keywords;
+import convex.core.data.Ref;
+import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
-import convex.core.util.Utils;
 
 public class TestEtch {
 	private static final int ITERATIONS = 3;
@@ -20,44 +24,18 @@ public class TestEtch {
 	public void testTempStore() throws IOException {
 		Etch etch = Etch.createTempEtch();
 
-		Blob b = Format.encodedBlob(Keywords.STORE);
-		Hash h = b.getHash();
+		AVector<Integer> v=Vectors.of(1,2,3);
+		Hash h = v.getHash();
+		Ref<ACell> r=Ref.create(v);
 
 		assertNull(etch.read(h));
-		etch.write(h, b);
-		assertEquals(b, etch.read(h));
-	}
-
-	/**
-	 * Test creating synthetic keys that all collide down to the lowest level
-	 * 
-	 * @throws IOException
-	 */
-	@Test
-	public void testAdjacentWritesStore() throws IOException {
-		Etch etch = Etch.createTempEtch();
-
-		byte[] bs = new byte[32];
-		for (int i = 0; i < 1000; i++) {
-			Utils.writeInt(i, bs, 28);
-			Hash key = Hash.wrap(bs);
-
-			etch.write(key, key.toBlob());
-		}
-
-		for (int ii = 0; ii < ITERATIONS; ii++) {
-			for (int i = 0; i < 1000; i++) {
-				Utils.writeInt(i, bs, 28);
-				Hash key = Hash.wrap(bs);
-				if (i == 105) {
-					Utils.writeInt(i, bs, 28);
-				}
-				Blob b = etch.read(key); // should be blob of length 32
-				assertNotNull(b);
-				b.getBytes(bs, 0);
-				assertEquals(i, Utils.readInt(bs, 28));
-			}
-		}
+		
+		// write the Ref
+		Ref<ACell> r2=etch.write(h, r);
+		
+		assertEquals(v.getEncoding(), etch.read(h));
+		
+		assertEquals(h,r2.getHash());
 	}
 
 	@Test
@@ -66,22 +44,25 @@ public class TestEtch {
 		int COUNT = 1000;
 		for (int i = 0; i < COUNT; i++) {
 			Long a = (long) i;
-			Hash key = Hash.compute(a);
+			AVector<Long> v=Vectors.of(a);
+			Hash key = v.getHash();
 
-			etch.write(key, Format.encodedBlob(a));
+			etch.write(key, Ref.create(v));
 
 			Blob b = etch.read(key);
-			assertNotNull(b, "Blob not found for value: " + i);
+			assertEquals(b,v.getEncoding());
+			assertNotNull(b, "Blob not found for vector value: " + v);
 		}
 
 		for (int ii = 0; ii < ITERATIONS; ii++) {
 			for (int i = 0; i < COUNT; i++) {
 				Long a = (long) i;
-				Hash key = Hash.compute(a);
+				AVector<Long> v=Vectors.of(a);
+				Hash key = v.getHash();
 				Blob b = etch.read(key);
 
-				assertNotNull(b, "Blob not found for value: " + i);
-				assertEquals(a, Format.read(b));
+				assertNotNull(b, "Blob not found for vector value: " + v);
+				assertEquals(v, Format.read(b));
 			}
 		}
 	}

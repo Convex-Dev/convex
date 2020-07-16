@@ -13,6 +13,7 @@ import java.util.function.Consumer;
 import org.junit.Test;
 
 import convex.core.crypto.Hash;
+import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.Blob;
 import convex.core.data.Maps;
@@ -87,13 +88,13 @@ public class EtchStoreTest {
 	@Test
 	public void testNoveltyHandler() {
 		AStore oldStore = Stores.current();
-		ArrayList<Ref<Object>> al = new ArrayList<>();
+		ArrayList<Ref<ACell>> al = new ArrayList<>();
 		try {
 			Stores.setCurrent(es);
 			Object data = Samples.INT_VECTOR_10;
 
 			// handler that records added refs
-			Consumer<Ref<Object>> handler = r -> al.add(r);
+			Consumer<Ref<ACell>> handler = r -> al.add(r);
 
 			Ref<Object> dataRef = Ref.create(data);
 			Hash dataHash = dataRef.getHash();

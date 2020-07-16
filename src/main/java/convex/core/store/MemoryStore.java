@@ -5,6 +5,7 @@ import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 import convex.core.crypto.Hash;
+import convex.core.data.ACell;
 import convex.core.data.IRefContainer;
 import convex.core.data.Ref;
 import convex.core.util.Utils;
@@ -33,17 +34,17 @@ public class MemoryStore extends AStore {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <T> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<T>> noveltyHandler) {
+	public Ref<ACell> persistRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler) {
 
 		// check store for existing ref first. Return this is we have it
 		Hash hash = ref.getHash();
-		Ref<T> existing = refForHash(hash);
+		Ref<ACell> existing = refForHash(hash);
 		if ((existing != null)&&(existing.getStatus()>=Ref.PERSISTED)) return existing;
 
 		// Convert to direct Ref. Don't want to store a soft ref!
 		ref = ref.toDirect();
 
-		T o = ref.getValue();
+		ACell o = ref.getValue();
 		if (o instanceof IRefContainer) {
 			// need to do recursive persistence
 			o = ((IRefContainer) o).updateRefs(r -> {
@@ -51,7 +52,7 @@ public class MemoryStore extends AStore {
 			});
 		}
 		ref=ref.withValue(o);
-		final T oTemp=o;
+		final ACell oTemp=o;
 		log.log(Stores.PERSIST_LEVEL,()->"Persisting ref "+hash.toHexString()+" of class "+Utils.getClassName(oTemp)+" with store "+this);
 
 		
@@ -63,11 +64,11 @@ public class MemoryStore extends AStore {
 	}
 
 	@Override
-	public <T> Ref<T> storeRef(Ref<T> ref, Consumer<Ref<T>> noveltyHandler) {
+	public Ref<ACell> storeRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler) {
 
 		// check store for existing ref first. Return this is we have it
 		Hash hash = ref.getHash();
-		Ref<T> existing = refForHash(hash);
+		Ref<ACell> existing = refForHash(hash);
 		if (existing != null) return existing; // already stored, so quick return
 
 		// Convert to direct Ref. Don't want to store a soft ref!
