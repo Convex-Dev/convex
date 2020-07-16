@@ -87,7 +87,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 			if (!validateName(name)) throw new BadFormatException("Invalid keyword name: " + name);
 			Keyword k = new Keyword(name);
 			// re-use the created array as the Blob for this Keyword
-			k.attachBlob(Blob.wrap(data));
+			k.attachEncoding(Blob.wrap(data));
 			return k;
 		} catch (BufferUnderflowException e) {
 			throw new BadFormatException("Buffer underflow", e);

@@ -230,6 +230,16 @@ public class Hash extends AArrayBlob {
 	public static Hash wrap(byte[] hashBytes) {
 		return new Hash(hashBytes);
 	}
+	
+    /**
+     * Wraps the specified blob data as a Hash, sharing the underlying byte array.
+     * @param data Blob data of correct size for a Hash
+     * @return
+     */
+	public static Hash wrap(AArrayBlob data) {
+		if (data instanceof Hash) return (Hash)data;
+		return wrap(data.getInternalArray(),data.getOffset(),Utils.toInt(data.length()));
+	}
 
 	/**
 	 * Wraps the specified bytes as a Data object Warning: underlying bytes are used
@@ -361,4 +371,5 @@ public class Hash extends AArrayBlob {
 	public void validateCell() throws InvalidDataException {
 		if (length != LENGTH) throw new InvalidDataException("Address length must be 32 bytes = 256 bits", this);
 	}
+
 }

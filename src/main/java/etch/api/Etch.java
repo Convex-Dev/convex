@@ -12,10 +12,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.logging.Logger;
 
+import convex.core.crypto.Hash;
 import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
+import convex.core.data.Format;
 import convex.core.data.Ref;
+import convex.core.data.RefSoft;
+import convex.core.exceptions.BadFormatException;
 import convex.core.util.Counters;
 import convex.core.util.Utils;
 
@@ -526,17 +530,30 @@ public class Etch {
 	 * @return Blob containing the data, or null if not found
 	 * @throws IOException
 	 */
-	public synchronized Blob read(AArrayBlob key) throws IOException {
+	public synchronized Ref<ACell> read(AArrayBlob key) throws IOException {
 		Counters.etchRead++;
 		
 		long pointer=seekPosition(key);
 		if (pointer<0) return null; // not found
 		
-		MappedByteBuffer mbb=seekMap(pointer+KEY_SIZE+LABEL_SIZE); // skip over key
+		// seek to correct position, skipping over key
+		MappedByteBuffer mbb=seekMap(pointer+KEY_SIZE); 
+		byte status=mbb.get();
+		
 		short length=mbb.getShort(); // get data length
 		byte[] bs=new byte[length];
 		mbb.get(bs);
-		return Blob.wrap(bs);
+		Blob data= Blob.wrap(bs);
+		try {
+			Hash hash=Hash.wrap(key);
+			ACell cell=Format.read(data);
+			data.attachHash(hash);
+			cell.attachEncoding(data);
+			RefSoft<ACell> ref=RefSoft.create(cell, hash, status);
+			return ref;
+		} catch (BadFormatException e) {
+			throw new Error("Bad format in etch store: "+data.toHexString());
+		}
 	}
 
 	/**

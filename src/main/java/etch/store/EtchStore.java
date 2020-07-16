@@ -7,13 +7,9 @@ import java.util.logging.Logger;
 
 import convex.core.crypto.Hash;
 import convex.core.data.ACell;
-import convex.core.data.Blob;
-import convex.core.data.Format;
 import convex.core.data.IRefContainer;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
-import convex.core.data.RefSoft;
-import convex.core.exceptions.BadFormatException;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
@@ -93,31 +89,15 @@ public class EtchStore extends AStore {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public <T> Ref<T> refForHash(Hash hash) {
-		Blob b;
 		try {
-			b = etch.read(hash);
-			if (b == null) return null;
-
-			// construct the actual object
-			T o = Format.read(b);
-
-			// we can be a bit clever, and re-use the hash / loaded data blob.
-			if (o instanceof ACell) {
-				b.attachHash(hash);
-				((ACell) o).attachBlob(b);
-			}
-
-			// create a soft ref. Safe because we know we can always fetch from storage
-			// again if evicted.
-			// minimum status of PERSISTED, TODO: higher statuses
-			Ref<T> ref = RefSoft.create(o, hash, Ref.PERSISTED);
-			return ref;
+			Ref<ACell> existing = etch.read(hash);
+			if (existing == null) return null;
+			return (Ref<T>) existing;
 		} catch (IOException e) {
 			throw new Error("IO exception from Etch", e);
-		} catch (BadFormatException e) {
-			throw new Error("Data format exception from Etch", e);
 		}
 	}
 
@@ -151,7 +131,9 @@ public class EtchStore extends AStore {
 
 		Ref<ACell> result;
 		try {
-			result=etch.write(hash, ref.withMinimumStatus(Ref.PERSISTED));
+			// ensure status is PERSISTED when we write to store
+			ref=ref.withMinimumStatus(Ref.PERSISTED);
+			result=etch.write(hash, ref);
 		} catch (IOException e) {
 			throw new Error("IO exception from Etch", e);
 		}

@@ -52,7 +52,7 @@ public abstract class ACell implements ICell, IWriteable {
 	 * 
 	 * @param data
 	 */
-	public void attachBlob(Blob data) {
+	public void attachEncoding(Blob data) {
 		if (this.binaryBlob!=null) return;
 		this.binaryBlob=data;
 	}

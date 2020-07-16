@@ -546,7 +546,7 @@ public class Format {
 				// cache the Blob in this data object, to avoid need to re-serialise
 				// SECURITY: should be OK, since we have just successfully read from canonical
 				// format?
-				((ACell) result).attachBlob(blob);
+				((ACell) result).attachEncoding(blob);
 			}
 			return result;
 		}

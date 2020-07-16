@@ -71,7 +71,7 @@ public class Blobs {
 			result = (T) Blob.read(source, len);
 		}
 		// we can attach original blob as source at this point
-		result.attachBlob(source);
+		result.attachEncoding(source);
 		return result;
 	}
 
