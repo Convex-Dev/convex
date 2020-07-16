@@ -333,10 +333,6 @@ public class Etch {
 		}
 	}
 
-	private Ref<ACell> updateInPlace(long slotValue, Ref<ACell> value) {
-		// TODO Check status
-		return value;
-	}
 
 	/**
 	 * Finds the start digit of a chain, stepping backwards from the given digit
@@ -593,6 +589,27 @@ public class Etch {
 		writeSlot(indexPosition, digit, newDataPointer);
 		return value.withMinimumStatus(Ref.STORED);
 	}
+	
+    /**
+     * Updates a Ref in place at the specified position. Assumes data not changed.
+     * @param position Data position in storage file
+     * @param value
+     * @return
+     * @throws IOException 
+     */
+	private Ref<ACell> updateInPlace(long position, Ref<ACell> value) throws IOException {
+		// Seek to status location
+		MappedByteBuffer mbb=seekMap(position+KEY_SIZE);
+		byte currentStatus=mbb.get();
+		byte targetStatus=(byte)value.getStatus();
+		if (currentStatus<targetStatus) {
+			mbb=seekMap(position+KEY_SIZE);
+			mbb.put(targetStatus);
+			return value;
+		} else {
+			return value.withMinimumStatus(currentStatus);
+		}
+	}
 
 	/**
 	 * Writes a slot value to an index block.
@@ -687,8 +704,8 @@ public class Etch {
 		// append key
 		mbb.put(key.getInternalArray(),key.getOffset(),KEY_SIZE);
 		
-		// append label
-		mbb.put((byte)Ref.STORED);
+		// append status label
+		mbb.put((byte)(Math.max(value.getStatus(),Ref.STORED)));
 		
 		Blob valueData=value.getValue().getEncoding();
 		

@@ -27,7 +27,7 @@ public class Stores {
 	/**
 	 * Logging level for store persistence. 
 	 */
-	public static final Level PERSIST_LEVEL = Level.INFO;
+	public static final Level PERSIST_LOG_LEVEL = Level.FINE;
 	
 
 	/**

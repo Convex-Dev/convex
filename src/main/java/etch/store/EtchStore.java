@@ -147,7 +147,7 @@ public class EtchStore extends AStore {
 			if (o!=newObject) ref=ref.withValue(newObject);
 		}
 		
-		log.log(Stores.PERSIST_LEVEL,()->"EtchStore.persistRef: Persisting ref "+hash.toHexString()+" of class "+Utils.getClassName(o)+" with store "+this);
+		log.log(Stores.PERSIST_LOG_LEVEL,()->"EtchStore.persistRef: Persisting ref "+hash.toHexString()+" of class "+Utils.getClassName(o)+" with store "+this);
 
 		Ref<ACell> result;
 		try {

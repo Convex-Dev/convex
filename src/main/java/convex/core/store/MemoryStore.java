@@ -53,7 +53,7 @@ public class MemoryStore extends AStore {
 		}
 		ref=ref.withValue(o);
 		final ACell oTemp=o;
-		log.log(Stores.PERSIST_LEVEL,()->"Persisting ref "+hash.toHexString()+" of class "+Utils.getClassName(oTemp)+" with store "+this);
+		log.log(Stores.PERSIST_LOG_LEVEL,()->"Persisting ref "+hash.toHexString()+" of class "+Utils.getClassName(oTemp)+" with store "+this);
 
 		
 		hashRefs.put(hash, ref);
