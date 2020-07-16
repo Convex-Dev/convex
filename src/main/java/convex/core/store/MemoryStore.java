@@ -38,7 +38,7 @@ public class MemoryStore extends AStore {
 		// check store for existing ref first. Return this is we have it
 		Hash hash = ref.getHash();
 		Ref<T> existing = refForHash(hash);
-		if (existing != null) return existing;
+		if ((existing != null)&&(existing.getStatus()>=Ref.PERSISTED)) return existing;
 
 		// Convert to direct Ref. Don't want to store a soft ref!
 		ref = ref.toDirect();
@@ -68,14 +68,15 @@ public class MemoryStore extends AStore {
 		// check store for existing ref first. Return this is we have it
 		Hash hash = ref.getHash();
 		Ref<T> existing = refForHash(hash);
-		if (existing != null) return existing;
+		if (existing != null) return existing; // already stored, so quick return
 
 		// Convert to direct Ref. Don't want to store a soft ref!
 		ref = ref.toDirect();
+		ref=ref.withMinimumStatus(Ref.STORED);
 
 		hashRefs.put(hash, ref);
 
 		if (noveltyHandler != null) noveltyHandler.accept(ref);
-		return ref.withMinimumStatus(Ref.STORED);
+		return ref;
 	}
 }
