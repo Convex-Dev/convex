@@ -73,6 +73,11 @@ public class EtchStoreTest {
 			Ref<Blob> initialRef = Ref.create(value);
 			assertEquals(Ref.UNKNOWN, initialRef.getStatus());
 			assertNull(Stores.current().refForHash(hash));
+			
+			// shallow persistence first
+			Ref<Blob> refShallow=initialRef.persistShallow();
+			assertEquals(Ref.STORED, refShallow.getStatus());
+			
 			Ref<Blob> ref = initialRef.persist();
 			assertEquals(Ref.PERSISTED, ref.getStatus());
 			assertTrue(ref.isPersisted());

@@ -334,8 +334,8 @@ public class Etch {
 	}
 
 	private Ref<ACell> updateInPlace(long slotValue, Ref<ACell> value) {
-		// TODO Auto-generated method stub
-		return null;
+		// TODO Check status
+		return value;
 	}
 
 	/**
