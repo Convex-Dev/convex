@@ -31,6 +31,37 @@ public class MemoryStore extends AStore {
 		Ref<T> ref = (Ref<T>) hashRefs.get(hash);
 		return ref;
 	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public Ref<ACell> announceRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler) {
+
+		// check store for existing ref first. Return this is we have it
+		Hash hash = ref.getHash();
+		Ref<ACell> existing = refForHash(hash);
+		if ((existing != null)&&(existing.getStatus()>=Ref.ANNOUNCED)) return existing;
+
+		// Convert to direct Ref. Don't want to store a soft ref!
+		ref = ref.toDirect();
+
+		ACell o = ref.getValue();
+		if (o instanceof IRefContainer) {
+			// need to do recursive persistence
+			o = ((IRefContainer) o).updateRefs(r -> {
+				return announceRef(r,noveltyHandler);
+			});
+		}
+		ref=ref.withValue(o);
+		final ACell oTemp=o;
+		log.log(Stores.PERSIST_LOG_LEVEL,()->"Announcing ref "+hash.toHexString()+" of class "+Utils.getClassName(oTemp)+" with store "+this);
+
+		ref=ref.withMinimumStatus(Ref.ANNOUNCED);
+		hashRefs.put(hash, ref);
+
+		if (noveltyHandler != null) noveltyHandler.accept(ref);
+
+		return ref;
+	}
 
 	@SuppressWarnings("unchecked")
 	@Override

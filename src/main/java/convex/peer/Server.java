@@ -341,7 +341,7 @@ public class Server implements Closeable {
 		if (belief == initialBelief) return false;
 
 		// At this point we know something updated our belief, so we want to rebroadcast belief to network
-		Ref.createPersisted(belief, r -> {
+		Ref.createAnnounced(belief, r -> {
 			Object o = r.getValue();
 			Message msg = Message.createData(o);
 			manager.broadcast(msg);

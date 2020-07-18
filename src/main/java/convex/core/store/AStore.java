@@ -14,6 +14,20 @@ import convex.core.data.Ref;
  *
  */
 public abstract class AStore {
+	
+	/**
+	 * Announces a @Ref in long term storage as defined by this store implementation.
+	 * Ensures all nested Refs are also ANNOUNCED.
+	 * 
+	 * If the persisted Ref represents novelty (i.e. not previously persisted) Will
+	 * call the provided noveltyHandler
+	 * 
+	 * @param ref A Ref to the given object. Should be either DIRECT or STORED at
+	 *            minimum to present risk of MissingDataException.
+	 * @return The persisted Ref, of status ANNOUNCED at minimum
+	 */
+	public abstract Ref<ACell> announceRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler);
+	
 
 	/**
 	 * Persists a @Ref in long term storage as defined by this store implementation.
@@ -24,7 +38,7 @@ public abstract class AStore {
 	 * 
 	 * @param ref A Ref to the given object. Should be either DIRECT or STORED at
 	 *            minimum to present risk of MissingDataException.
-	 * @return The persisted Ref, of status PERSISTED at mimimum
+	 * @return The persisted Ref, of status PERSISTED at minimum
 	 */
 	public abstract Ref<ACell> persistRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler);
 

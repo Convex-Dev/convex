@@ -86,6 +86,18 @@ public class Belief extends ARecord {
 	public static Belief initial() {
 		return create(Maps.empty());
 	}
+	
+	/**
+	 * Create a Belief with a single order signed by the given key pair, using initial timestamp.
+	 * @param kp Peer Key pair with which to sign the order.
+	 * @param order Order of blocks that the Peer is proposing
+	 * @return new Belief representing the isolated belief of a single Peer.
+	 */
+	public static Belief create(AKeyPair kp, Order order) {
+		AHashMap<Address, SignedData<Order>> orders=Maps.of(kp.getAddress(),kp.signData(order));
+		return create(orders);
+	}
+
 
 	private static Belief create(AHashMap<Address, SignedData<Order>> orders, long timestamp) {
 		return new Belief(orders, timestamp);

@@ -100,16 +100,25 @@ public class EtchStore extends AStore {
 			throw new Error("IO exception from Etch", e);
 		}
 	}
-
-	@SuppressWarnings("unchecked")
+	
 	@Override
 	public Ref<ACell> persistRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler) {
+		return persistRef(ref,noveltyHandler,Ref.PERSISTED);
+	}
+	
+	@Override
+	public Ref<ACell> announceRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler) {
+		return persistRef(ref,noveltyHandler,Ref.ANNOUNCED);
+	}
+
+	@SuppressWarnings("unchecked")
+	public Ref<ACell> persistRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus) {
 		// check store for existing ref first. Return this is we have it
+		if (ref.isEmbedded()) return ref;
 		Hash hash = ref.getHash();
 		Ref<ACell> existing = refForHash(hash);
 		if (existing != null) {
-			if (existing.getStatus()>=Ref.PERSISTED) return existing;
-			// TODO: think about need to boost level?
+			if (existing.getStatus()>=requiredStatus) return existing;
 		}
 
 		ACell o = ref.getValue();
@@ -117,7 +126,7 @@ public class EtchStore extends AStore {
 			// Function to update Refs
 			IRefFunction func=r -> {
 				// Go via persist, since needs to check if Ref should be persisted at all
-				return r.persist(noveltyHandler);
+				return persistRef(r,noveltyHandler,requiredStatus);
 			};
 			
 			// need to do recursive persistence
@@ -127,12 +136,12 @@ public class EtchStore extends AStore {
 			if (o!=newObject) ref=ref.withValue(newObject);
 		}
 		
-		log.log(Stores.PERSIST_LOG_LEVEL,()->"EtchStore.persistRef: Persisting ref "+hash.toHexString()+" of class "+Utils.getClassName(o)+" with store "+this);
+		log.log(Stores.PERSIST_LOG_LEVEL,()->"Etch storing at status="+requiredStatus+" ref "+hash.toHexString()+" of class "+Utils.getClassName(o)+" with store "+this);
 
 		Ref<ACell> result;
 		try {
 			// ensure status is PERSISTED when we write to store
-			ref=ref.withMinimumStatus(Ref.PERSISTED);
+			ref=ref.withMinimumStatus(requiredStatus);
 			result=etch.write(hash, ref);
 		} catch (IOException e) {
 			throw new Error("IO exception from Etch", e);

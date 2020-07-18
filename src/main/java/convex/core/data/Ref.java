@@ -237,6 +237,24 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 		Ref<ACell> ref = RefDirect.create((ACell)value, null, Ref.UNKNOWN);
 		return (Ref<T>) Stores.current().persistRef(ref, noveltyHandler);
 	}
+	
+	/**
+	 * Creates an ANNOUNCED Ref with the given value in the current store.
+	 * 
+	 * Novelty handler is called for all new Refs that are persisted (recursively),
+	 * starting from lowest levels.
+	 * 
+	 * @param value
+	 * @return Persisted Ref
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T> Ref<T> createAnnounced(T value, Consumer<Ref<ACell>> noveltyHandler) {
+		if (Format.isEmbedded(value)) {
+			return RefDirect.create(value, null, Ref.EMBEDDED);
+		}
+		Ref<ACell> ref = RefDirect.create((ACell)value, null, Ref.UNKNOWN);
+		return (Ref<T>) Stores.current().announceRef(ref, noveltyHandler);
+	}
 
 	/**
 	 * Creates a Ref using a specific Hash. Fetches the actual value lazily for the
@@ -316,7 +334,7 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	public boolean isCanonical() {
 		return false;
 	}
-
+	
 	/**
 	 * Persists this Ref in the current store if not embedded and not already
 	 * persisted.
@@ -324,10 +342,11 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 * This may convert the Ref from a direct reference to a soft reference.
 	 * 
 	 * If the persisted Ref represents novelty, will trigger the specified novelty
-	 * handler
+	 * handler 
 	 * 
-	 * @return the persisted Ref @ If the Ref's value does not exist or has been
-	 *         garbage collected before being persisted
+	 * @return the persisted Ref 
+	 * @throws MissingDataException If the Ref's value does not exist or has been
+	 *         garbage collected before being persisted 
 	 */
 	@SuppressWarnings("unchecked")
 	public Ref<T> persist(Consumer<Ref<ACell>> noveltyHandler) {
@@ -335,6 +354,53 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 		if (status >= PERSISTED) return this; // already persisted in some form. Might be EMBEDDED
 		AStore store=Stores.current();
 		return (Ref<T>) store.persistRef((Ref<ACell>)this, noveltyHandler);
+	}
+	
+	/**
+	 * Persists this Ref in the current store if not embedded and not already
+	 * persisted. Resulting status will be PERSISTED or higher.
+	 * 
+	 * This may convert the Ref from a direct reference to a soft reference.
+	 * 
+	 * @throws MissingDataException if the Ref cannot be fully persisted.
+	 * @return the persisted Ref
+	 */
+	public Ref<T> persist() {
+		return persist(null);
+	}
+	
+	/**
+	 * Persists this Ref in the current store if not embedded and not already
+	 * persisted.
+	 * 
+	 * This may convert the Ref from a direct reference to a soft reference.
+	 * 
+	 * If the persisted Ref represents novelty, will trigger the specified novelty
+	 * handler 
+	 * 
+	 * @return the persisted Ref 
+	 * @throws MissingDataException If the Ref's value does not exist or has been
+	 *         garbage collected before being persisted 
+	 */
+	@SuppressWarnings("unchecked")
+	public Ref<T> announce(Consumer<Ref<ACell>> noveltyHandler) {
+		int status = getStatus();
+		if (status >= ANNOUNCED) return this; // already announced. Might be EMBEDDED
+		AStore store=Stores.current();
+		return (Ref<T>) store.announceRef((Ref<ACell>)this, noveltyHandler);
+	}
+	
+	/**
+	 * Persists this Ref in the current store if not embedded and not already
+	 * persisted. Resulting status will be PERSISTED or higher.
+	 * 
+	 * This may convert the Ref from a direct reference to a soft reference.
+	 * 
+	 * @throws MissingDataException if the Ref cannot be fully persisted.
+	 * @return the persisted Ref
+	 */
+	public Ref<T> announce() {
+		return announce(null);
 	}
 
 	/**
@@ -367,18 +433,7 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 		}
 	}
 
-	/**
-	 * Persists this Ref in the current store if not embedded and not already
-	 * persisted. Resulting status will be PERSISTED or higher.
-	 * 
-	 * This may convert the Ref from a direct reference to a soft reference.
-	 * 
-	 * @throws MissingDataException if the Ref cannot be fully persisted.
-	 * @return the persisted Ref
-	 */
-	public Ref<T> persist() {
-		return persist(null);
-	}
+
 
 	/**
 	 * Updates an array of Refs with the given function.
@@ -458,6 +513,20 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	public <R> Ref<R> persistShallow() {
 		AStore store=Stores.current();
 		return (Ref<R>) store.storeRef((Ref<ACell>)this, null);
+	}
+	
+	/**
+	 * Persists a Ref shallowly in the current store.
+	 * 
+	 * Status will be updated STORED or higher. Novelty handler will be called exactly once if and only if
+	 * the ref was not previously stored.
+	 * 
+	 * @return Ref with status of STORED or above
+	 */
+	@SuppressWarnings("unchecked")
+	public <R> Ref<R> persistShallow(Consumer<Ref<ACell>> noveltyHandler) {
+		AStore store=Stores.current();
+		return (Ref<R>) store.storeRef((Ref<ACell>)this, noveltyHandler);
 	}
 	
 	/**
