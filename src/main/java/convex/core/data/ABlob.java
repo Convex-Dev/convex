@@ -20,7 +20,7 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	/**
 	 * Cached hash of the Blob data
 	 */
-	protected Hash storedHash = null;
+	protected Hash contentHash = null;
 
 	/**
 	 * Copies the bytes from this blob to a given destination
@@ -101,10 +101,10 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	 * @return The Hash
 	 */
 	public final Hash getContentHash() {
-		if (storedHash == null) {
-			storedHash = computeHash(Hash.getDigest());
+		if (contentHash == null) {
+			contentHash = computeHash(Hash.getDigest());
 		}
-		return storedHash;
+		return contentHash;
 	}
 
 	/**

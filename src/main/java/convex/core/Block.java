@@ -58,13 +58,14 @@ public class Block extends ARecord {
 	public <V> V get(Keyword k) {
 		if (Keywords.TIMESTAMP.equals(k)) return (V) ((Long) timestamp);
 		if (Keywords.TRANSACTIONS.equals(k)) return (V) transactions;
+		if (Keywords.PEER.equals(k)) return (V) peer;
 		return null;
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	protected Block updateAll(Object[] newVals) {
-		Long newTimestamp = (Long) newVals[0];		
+		long newTimestamp = (Long) newVals[0];		
 		AVector<SignedData<ATransaction>> newTransactions = (AVector<SignedData<ATransaction>>) newVals[1];
 		Address newPeer = (Address) newVals[2];
 		if ((this.transactions == newTransactions) && (this.timestamp == newTimestamp) && (peer==newPeer)) {

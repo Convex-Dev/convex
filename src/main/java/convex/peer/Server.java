@@ -21,8 +21,10 @@ import convex.core.ErrorCodes;
 import convex.core.Peer;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Hash;
+import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
+import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Ref;
@@ -60,7 +62,7 @@ import convex.net.NIOServer;
 public class Server implements Closeable {
 	public static final int DEFAULT_PORT = 18888;
 
-	private static final int RECEIVE_QUEUE_SIZE = 100;
+	private static final int RECEIVE_QUEUE_SIZE = 256;
 
 	// Pause for each iteration of manager loop.
 	private static final long MANAGER_PAUSE = 10L;
@@ -73,6 +75,7 @@ public class Server implements Closeable {
 	private static final Logger log = Logger.getLogger(Server.class.getName());
 	private static final Level LEVEL_BELIEF = Level.FINER;
 	private static final Level LEVEL_SERVER = Level.FINER;
+	private static final Level LEVEL_PARTIAL = Level.WARNING;
 	// private static final Level LEVEL_MESSAGE = Level.FINER;
 
 	private BlockingQueue<Message> receiveQueue = new ArrayBlockingQueue<Message>(RECEIVE_QUEUE_SIZE);
@@ -216,13 +219,14 @@ public class Server implements Closeable {
 			}
 		} catch (MissingDataException e) {
 			Hash missingHash = e.getMissingHash();
+			log.log(LEVEL_PARTIAL,"Missing data: " + missingHash.toHexString() + " in message of type " + type);
 			try {
 				registerPartialMessage(missingHash,m);
 				m.getPeerConnection().sendMissingData(missingHash);
+				log.log(LEVEL_PARTIAL,()->"Requested missing data "+missingHash.toHexString()+ " for partial message");
 			} catch (IOException ex) {
-				// TODO: OK to ignore?
+				log.log(Level.WARNING,()->"Exception while requesting missing data: "+ex.getMessage());
 			}
-			log.warning("Missing data: " + missingHash.toHexString() + " in message of type " + type);
 		} catch (BadFormatException|ClassCastException|NullPointerException e) {
 			log.warning("Error processing client message: " + e);
 		}
@@ -240,12 +244,12 @@ public class Server implements Closeable {
 		Hash h = m.getPayload();
 		if (h==null) throw new BadFormatException("Hash required for missing data message");
 		
-		Ref<?> r = Stores.current().refForHash(h);
+		Ref<?> r = store.refForHash(h);
 		if (r != null) {
 			try {
 				Object data=r.getValue();
 				m.getPeerConnection().sendData(data);
-				log.info(() -> "Sent missing data for hash: " + h.toHexString());
+				log.info(() -> "Sent missing data for hash: " + h.toHexString() + " with type "+Utils.getClassName(data));
 			} catch (IOException e) {
 				log.info(() -> "Unable to deliver missing data for " + h.toHexString() + " due to: "+e.getMessage());
 			}
@@ -280,18 +284,24 @@ public class Server implements Closeable {
 	 * If so, process the message again.
 	 * 
 	 * @param hash
+	 * @return true if the data request resulted in a re-queued message, false otherwise
 	 */
-	private void maybeProcessPartial(Hash hash) {
+	private boolean maybeProcessPartial(Hash hash) {
 		Message m;
 		synchronized (partialMessages) {
 			m=partialMessages.get(hash);
-			if (m!=null) partialMessages.remove(hash);
+			
+			if (m!=null) {
+				log.log(LEVEL_PARTIAL,()->"Attempting to re-queue partial message due to received hash: "+hash.toHexString());
+				if (receiveQueue.offer(m)) {
+					partialMessages.remove(hash);
+					return true;
+				} else {
+					log.log(Level.WARNING,()->"Queue full for message with received hash: "+hash.toHexString());
+				}
+			}
 		}
-		
-		// TODO: queue?
-		if (m!=null) {
-			processMessage(m);
-		}
+		return false;
  	}
 
 	/**
@@ -301,6 +311,7 @@ public class Server implements Closeable {
 	 */
 	private void registerPartialMessage(Hash missingHash, Message m) {
 		synchronized (partialMessages) {
+			log.log(LEVEL_PARTIAL,()->"Registering partial message with missing hash: "+missingHash);
 			partialMessages.put(missingHash,m);
 		}
 	}
@@ -337,15 +348,18 @@ public class Server implements Closeable {
 
 		// Need to check if belief changed from initial state
 		// It is possible that incoming beliefs don't change current belief.
-		Belief belief = peer.getBelief();
+		final Belief belief = peer.getBelief();
 		if (belief == initialBelief) return false;
 
 		// At this point we know something updated our belief, so we want to rebroadcast belief to network
-		Ref.createAnnounced(belief, r -> {
+		Consumer<Ref<ACell>> noveltyHandler= r -> {
 			Object o = r.getValue();
+			if (o==belief) return; // skip sending data for belief cell itself, will be BELIEF payload
 			Message msg = Message.createData(o);
 			manager.broadcast(msg);
-		});
+		};
+		
+		Ref.createAnnounced(belief, noveltyHandler);
 		SignedData<Belief> sb = peer.getSignedBelief();
 		Message msg = Message.createBelief(sb);
 		manager.broadcast(msg);
@@ -461,10 +475,16 @@ public class Server implements Closeable {
 	}
 
 	private void processData(Message m) {
-		log.info(()->"Processing DATA of type: "+Utils.getClassName(m.getPayload()));
+		Object payload=m.getPayload();
 		
 		// TODO: be smarter about this? hold a per-client queue for a while?
-		Ref<?> r=Ref.create(m.getPayload()).persistShallow();
+		Ref<?> r=Ref.create(payload).persistShallow();
+		r=r.persistShallow();
+		Hash payloadHash=r.getHash();
+
+		log.info(()->"Processing DATA of type: "+Utils.getClassName(payload)+ " with hash: "+payloadHash.toHexString() +" and encoding: "+Format.encodedBlob(payload).toHexString());
+
+		// if our data satisfies a missing data object, need to process it
 		maybeProcessPartial(r.getHash());
 	}
 

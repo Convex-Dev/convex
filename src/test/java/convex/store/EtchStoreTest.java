@@ -114,6 +114,8 @@ public class EtchStoreTest {
 			ATransaction t1=Invoke.create(0, Lists.of(Symbols.PLUS, Symbols.STAR_BALANCE, 1000L));
 			ATransaction t2=Transfer.create(1, Init.VILLAIN,1000000);
 			Block b=Block.of(Utils.getCurrentTimestamp(),kp.signData(t1),kp.signData(t2));
+			Blob blockEncoding=b.getEncoding();
+			Hash blockHash=blockEncoding.getContentHash();
 			Order ord=Order.create().propose(b);
 			
 			Belief belief=Belief.create(kp,ord);
@@ -171,6 +173,15 @@ public class EtchStoreTest {
 			Ref<Belief> arb3=srb.persistShallow(noveltyHandler);
 			assertEquals(0L,counter.get()); // Nothing new persisted
 			assertEquals(Ref.ANNOUNCED,arb3.getStatus());
+			
+			// test block hash encoding
+			assertEquals(blockHash,ord.getChildRefs()[0].getHash());
+			Ref<Block> blockRef=store.refForHash(blockHash);
+			assertEquals(blockHash,blockRef.getHash());
+			
+			// Recover Belief from store
+			Belief recb=(Belief) store.refForHash(belief.getHash()).getValue();
+			assertEquals(belief,recb);
 			
 		} finally {
 			Stores.setCurrent(oldStore);

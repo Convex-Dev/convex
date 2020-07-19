@@ -136,7 +136,7 @@ public class EtchStore extends AStore {
 			if (o!=newObject) ref=ref.withValue(newObject);
 		}
 		
-		log.log(Stores.PERSIST_LOG_LEVEL,()->"Etch storing at status="+requiredStatus+" ref "+hash.toHexString()+" of class "+Utils.getClassName(o)+" with store "+this);
+		log.log(Stores.PERSIST_LOG_LEVEL,()->"Etch persisting at status="+requiredStatus+" ref "+hash.toHexString()+" of class "+Utils.getClassName(o)+" with store "+this);
 
 		Ref<ACell> result;
 		try {
@@ -158,7 +158,10 @@ public class EtchStore extends AStore {
 		Hash hash = ref.getHash();
 		Ref<ACell> existing = refForHash(hash);
 		if (existing != null) return existing; // already must be STORED at minimum
+ 
+		log.log(Stores.STORE_LOG_LEVEL,()-> "Etch storing at status=1 ref "+hash.toHexString()+" with store "+this);
 
+		
 		Ref<ACell> result;
 		try {
 			result=etch.write(hash, ref.withMinimumStatus(Ref.STORED));

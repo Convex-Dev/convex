@@ -132,15 +132,29 @@ public abstract class ARecord extends AMap<Keyword,Object> implements IRefContai
 	@Override
 	public final <N extends IRefContainer> N updateRefs(IRefFunction func) {
 		int n=size();		
-		Object[] obs=new Object[n];
+		Object[] newValues=new Object[n];
+		AVector<Keyword> keys=getKeys();
 		for (int i=0; i<n; i++) {
-			Object v=get(getKeys().get(i));
+			Object v=get(keys.get(i));
 			if (v instanceof IRefContainer) {
 				v=((IRefContainer)v).updateRefs(func);
 			}
-			obs[i]=v;
+			newValues[i]=v;
 		}
-		return (N) updateAll(obs);
+		return (N) updateAll(newValues);
+	}
+	
+	/**
+	 * Gets an array containing all values in this record, in format-defined key order.
+	 */
+	public Object[] getAll() {
+		int n=size();
+		Object[] result=new Object[n];
+		AVector<Keyword> keys=format.getKeys();
+		for (int i=0; i<n; i++) {
+			result[i]=get(keys.get(i));
+		}
+		return result;
 	}
 		
 	/**
@@ -271,6 +285,10 @@ public abstract class ARecord extends AMap<Keyword,Object> implements IRefContai
 	public AHashMap<Keyword, Object> empty() {
 		// coerce to AHashMap since we are removing all keys
 		return Maps.empty();
+	}
+
+	public RecordFormat getFormat() {
+		return format;
 	}
 
 }

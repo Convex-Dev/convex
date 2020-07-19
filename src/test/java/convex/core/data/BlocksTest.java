@@ -39,6 +39,8 @@ public class BlocksTest {
 		Block b = Block.create(ts, Vectors.of(st),Init.FIRST_PEER);
 		assertEquals(1, b.length());
 		assertEquals(t, b.getTransactions().get(0).getValue());
+		
+		RecordTest.doRecordTests(b);
 
 	}
 }

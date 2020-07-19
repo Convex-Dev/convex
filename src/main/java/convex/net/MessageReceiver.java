@@ -114,7 +114,7 @@ public class MessageReceiver {
 		int firstPos = bb.position();
 		byte messageCode = bb.get();
 		MessageType type = MessageType.decode(messageCode);
-		Object msg = Format.read(bb);
+		Object payload = Format.read(bb);
 		int pos = bb.position();
 		if (pos != expectedPosition) {
 			String m = "Unexpected message length, expected: " + (expectedPosition - firstPos) + " but got:"
@@ -122,7 +122,7 @@ public class MessageReceiver {
 			log.info(m);
 			throw new BadFormatException(m);
 		}
-		Message message = Message.create(peerConnection, type, msg);
+		Message message = Message.create(peerConnection, type, payload);
 		receivedMessageCount++;
 		if (action != null) {
 			try {

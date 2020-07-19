@@ -101,7 +101,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	}
 
 	@Override
-	protected Blob createBlob() {
+	protected Blob createEncoding() {
 		byte[] bs = name.getBytes(StandardCharsets.UTF_8);
 		int len = bs.length;
 		byte[] data = new byte[len + 2];

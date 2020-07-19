@@ -72,7 +72,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 				Hash hash = e.getMissingHash();
 				try {
 					if (m.getPeerConnection().sendMissingData(hash)) {
-						log.warning("Missing data "+hash.toHexString()+" requested for RESULT of type: "+Utils.getClassName(v));
+						log.warning("Missing data "+hash.toHexString()+" requested by client for RESULT of type: "+Utils.getClassName(v));
 						buffer(hash, m);
 					} else {
 						log.warning("Unable to request missing data");

@@ -120,7 +120,7 @@ public final class ECDSASignature extends ASignature {
 	}
 
 	@Override
-	protected Blob createBlob() {
+	protected Blob createEncoding() {
 		byte[] bs = new byte[SIGNATURE_LENGTH];
 		assert ((recoveryID >= 0) && (recoveryID <= 3));
 		bs[0] = (byte) (recoveryID + 27);

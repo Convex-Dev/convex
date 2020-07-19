@@ -3,6 +3,7 @@ package convex.core;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import convex.core.data.ABlob;
@@ -60,6 +61,7 @@ public class State extends ARecord {
 			BlobMaps.empty());
 
 	private static final Logger log = Logger.getLogger(State.class.getName());
+	private static final Level LEVEL_SCHEDULE=Level.FINE;
 
 	private final BlobMap<Address, AccountStatus> accounts;
 	private final BlobMap<Address, PeerStatus> peers;
@@ -250,7 +252,7 @@ public class State extends ARecord {
 
 		// now apply the transactions!
 		int n = al.size();
-		log.info("Applying " + n + " scheduled transactions");
+		log.log(LEVEL_SCHEDULE,"Applying " + n + " scheduled transactions");
 		for (int i = 0; i < n; i++) {
 			AVector<Object> st = (AVector<Object>) al.get(i);
 			Address origin = (Address) st.get(0);
@@ -263,13 +265,13 @@ public class State extends ARecord {
 				if (ctx.isExceptional()) {
 					// TODO: what to do here? probably ignore
 					// we maybe need to think about reporting scheduled results?
-					log.info("Scheduled transaction error: " + ctx.getValue());
+					log.log(LEVEL_SCHEDULE,"Scheduled transaction error: " + ctx.getValue());
 				} else {
 					state = ctx.getState();
-					log.info("Scheduled transaction succeeded");
+					log.log(LEVEL_SCHEDULE,"Scheduled transaction succeeded");
 				}
 			} catch (Exception e) {
-				log.info("Scheduled transaction failed");
+				log.log(LEVEL_SCHEDULE,"Scheduled transaction failed");
 				e.printStackTrace();
 			}
 

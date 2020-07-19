@@ -23,7 +23,7 @@ public abstract class ACell implements ICell, IWriteable {
 	/**
 	 * We cache the Blob for the binary format of this Cell
 	 */
-	private Blob binaryBlob;
+	private Blob encoding;
 
 	@Override
 	public void validate() throws InvalidDataException {
@@ -40,8 +40,8 @@ public abstract class ACell implements ICell, IWriteable {
 	
 	@Override
 	public final Blob getEncoding() {
-		if (binaryBlob==null) binaryBlob=createBlob();
-		return binaryBlob;
+		if (encoding==null) encoding=createEncoding();
+		return encoding;
 	}
 	
 	/**
@@ -53,8 +53,8 @@ public abstract class ACell implements ICell, IWriteable {
 	 * @param data
 	 */
 	public void attachEncoding(Blob data) {
-		if (this.binaryBlob!=null) return;
-		this.binaryBlob=data;
+		if (this.encoding!=null) return;
+		this.encoding=data;
 	}
 	
 	/**
@@ -63,7 +63,7 @@ public abstract class ACell implements ICell, IWriteable {
 	 * 
 	 * @return
 	 */
-	protected Blob createBlob() {
+	protected Blob createEncoding() {
 		int capacity=estimatedEncodingSize();
 		ByteBuffer b=ByteBuffer.allocate(capacity);
 		boolean done=false;
@@ -87,7 +87,6 @@ public abstract class ACell implements ICell, IWriteable {
 	
 	@Override
 	public final Hash getHash() {
-		// SECURITY: use Keccak256 hash of serialised data representation
 		// final method to avoid any mistakes.
 		return getEncoding().getContentHash();
 	}
@@ -97,8 +96,8 @@ public abstract class ACell implements ICell, IWriteable {
 	 * @return
 	 */
 	protected final Hash checkHash() {
-		if (binaryBlob==null) return null;
-		return binaryBlob.storedHash;
+		if (encoding==null) return null;
+		return encoding.contentHash;
 	}
 
 	/**
@@ -167,7 +166,7 @@ public abstract class ACell implements ICell, IWriteable {
 	 * @return The cached blob for this cell, or null if not available. 
 	 */
 	public ABlob cachedBlob() {
-		return binaryBlob;
+		return encoding;
 	}
 
 

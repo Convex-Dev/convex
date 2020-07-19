@@ -253,7 +253,8 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 			return RefDirect.create(value, null, Ref.EMBEDDED);
 		}
 		Ref<ACell> ref = RefDirect.create((ACell)value, null, Ref.UNKNOWN);
-		return (Ref<T>) Stores.current().announceRef(ref, noveltyHandler);
+		AStore store=Stores.current();
+		return (Ref<T>) store.announceRef(ref, noveltyHandler);
 	}
 
 	/**

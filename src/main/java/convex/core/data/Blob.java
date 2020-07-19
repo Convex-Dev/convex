@@ -124,7 +124,7 @@ public class Blob extends AArrayBlob {
 		// avoid false positives with other Blob types, especially Hash and Address
 		if (this.getClass() != other.getClass()) return false;
 
-		if ((storedHash != null) && (other.storedHash != null) && storedHash.equals(other.storedHash)) return true;
+		if ((contentHash != null) && (other.contentHash != null) && contentHash.equals(other.contentHash)) return true;
 		return Utils.arrayEquals(other.store, other.offset, this.store, this.offset, this.length);
 	}
 
@@ -223,8 +223,8 @@ public class Blob extends AArrayBlob {
 		return slice(chunkStart, Math.min(CHUNK_LENGTH, length - chunkStart));
 	}
 
-	public void attachHash(Hash hash) {
-		if (storedHash == null) storedHash = hash;
+	public void attachContentHash(Hash hash) {
+		if (contentHash == null) contentHash = hash;
 	}
 
 }

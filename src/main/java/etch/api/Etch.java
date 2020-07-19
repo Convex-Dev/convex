@@ -547,7 +547,7 @@ public class Etch {
 		try {
 			Hash hash=Hash.wrap(key);
 			ACell cell=Format.read(data);
-			data.attachHash(hash);
+			data.attachContentHash(hash);
 			cell.attachEncoding(data);
 			RefSoft<ACell> ref=RefSoft.create(cell, hash, status);
 			return ref;
@@ -624,7 +624,7 @@ public class Etch {
 			mbb.put(targetStatus);
 			return value;
 		} else {
-			return value.withMinimumStatus(currentStatus);
+			return value.withMinimumStatus(targetStatus);
 		}
 	}
 
