@@ -1472,6 +1472,22 @@ public class CoreTest {
 		assertTrue(evalB("(do (defn f [a] a) (fn? f))"));
 		assertEquals(Vectors.of(2L, 3L), eval("(do (defn f [a & more] more) (f 1 2 3))"));
 	}
+	
+	@Test
+	public void testSetStar() {
+		assertEquals(13L,evalL("(set* 'a 13)"));
+		assertEquals(13L,evalL("(do (set* \"a\" 13) a)"));
+		assertEquals(10L,evalL("(let [a 10] (let [] (set* 'a 13)) a)"));
+		assertUndeclaredError(step("(do (let [a 10] (set* 'a 20)) a)"));
+	}
+	
+	@Test
+	public void testSetBang() {
+		assertEquals(13L,evalL("(set! a 13)"));
+		assertEquals(13L,evalL("(do (set! a 13) a)"));
+		assertEquals(10L,evalL("(let [a 10] (let [] (set! a 13)) a)"));
+		assertUndeclaredError(step("(do (let [a 10] (set! a 20)) a)"));
+	}
 
 	@Test
 	public void testEval() {

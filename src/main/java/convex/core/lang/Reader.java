@@ -464,7 +464,7 @@ public class Reader extends BaseParser<Object> {
 
 	// MAIN PARSING FUNCTIONALITY
 
-	private String tempSource;
+	protected String tempSource;
 	public final boolean wrapSyntax;
 
 	/**
@@ -517,7 +517,7 @@ public class Reader extends BaseParser<Object> {
 		return doParse(runner, source);
 	}
 
-	private static <T> T doParse(ParseRunner<T> runner, String source) {
+	protected static <T> T doParse(ParseRunner<T> runner, String source) {
 		try {
 			ParsingResult<T> result = runner.run(source);
 			checkErrors(result);

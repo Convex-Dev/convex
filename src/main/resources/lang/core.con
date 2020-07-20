@@ -168,3 +168,11 @@
           :type :value}
    }
   #{})
+  
+ (defmacro set!
+    ^{:doc {:description "Sets a local binding identified by an unqualified symbol to the given value. This local change will be be visible until the scope leaves the current binding form (e.g. let binding, function body or recur). Fails with an ARGUMENT error if the symbol is qualified. This is probably most useful for updating a local variable in imperative style. Returns the value assigned to the local binding if successful."
+          :examples [{:code "(let [a 10] (set! a 20) a)"}]
+          :type :macro	 
+          :signature [{:params [sym value]}]}}
+    [sym value]
+    '(set* (quote ~sym) ~value))

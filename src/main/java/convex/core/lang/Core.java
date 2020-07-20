@@ -529,6 +529,25 @@ public class Core {
 			return context.withResult(juice, result);
 		}
 	});
+	
+	public static final CoreFn<Object> SET_STAR = reg(new CoreFn<>(Symbols.SET_STAR) {
+		@Override
+		public <I> Context<Object> invoke(Context<I> context, Object[] args) {
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+
+			Symbol sym = RT.toSymbol(args[0]);
+			if (sym == null) return context.withCastError(args[0], Symbol.class);
+
+			if (sym.isQualified()) {
+				return context.withArgumentError("Cannot set! with qualified symbol: " + sym);
+			}
+			
+			Object value=args[1];
+			
+			context= context.withLocalBindings(context.getLocalBindings().assoc(sym, value));
+			return context.withResult(Juice.ASSOC,value);
+		}
+	});
 
 	public static final CoreFn<Object> LOOKUP = reg(new CoreFn<>(Symbols.LOOKUP) {
 		@Override
