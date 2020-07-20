@@ -142,6 +142,13 @@ public class Init {
 						Maps.of(Keywords.NAME, "Oracle Actor (default)"));
 				s = ctx.getState();
 			}
+			
+			{ // Register core library
+				Context<?> ctx = Context.createFake(s, Core.CORE_ADDRESS);
+				ctx = ctx.actorCall(REGISTRY_ADDRESS, 0, "register",
+						Maps.of(Keywords.NAME, "Convex Core Library"));
+				s = ctx.getState();
+			}
 
 			INITIAL_STATE = s;
 		} catch (Throwable e) {
