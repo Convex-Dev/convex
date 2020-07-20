@@ -1479,6 +1479,8 @@ public class CoreTest {
 		assertEquals(13L,evalL("(do (set* \"a\" 13) a)"));
 		assertEquals(10L,evalL("(let [a 10] (let [] (set* 'a 13)) a)"));
 		assertUndeclaredError(step("(do (let [a 10] (set* 'a 20)) a)"));
+		
+		assertArgumentError(step("(set* 'a/b 10)"));
 	}
 	
 	@Test
@@ -1487,6 +1489,8 @@ public class CoreTest {
 		assertEquals(13L,evalL("(do (set! a 13) a)"));
 		assertEquals(10L,evalL("(let [a 10] (let [] (set! a 13)) a)"));
 		assertUndeclaredError(step("(do (let [a 10] (set! a 20)) a)"));
+		
+		assertArgumentError(step("(set! a/b 10)"));
 	}
 
 	@Test
