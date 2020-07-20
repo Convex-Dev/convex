@@ -10,7 +10,7 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Format;
-import convex.core.data.ObjectsTest;
+import convex.core.data.RecordTest;
 import convex.core.data.Ref;
 import convex.core.data.Sets;
 import convex.core.exceptions.BadFormatException;
@@ -35,7 +35,7 @@ public class StateTest {
 
 		s.validate();
 		
-		ObjectsTest.doCellTests(s);
+		RecordTest.doRecordTests(s);
 	}
 
 	@Test
