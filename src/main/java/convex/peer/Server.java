@@ -75,6 +75,7 @@ public class Server implements Closeable {
 	private static final Logger log = Logger.getLogger(Server.class.getName());
 	private static final Level LEVEL_BELIEF = Level.FINER;
 	private static final Level LEVEL_SERVER = Level.FINER;
+	private static final Level LEVEL_DATA = Level.FINEST;
 	private static final Level LEVEL_PARTIAL = Level.WARNING;
 	// private static final Level LEVEL_MESSAGE = Level.FINER;
 
@@ -482,7 +483,7 @@ public class Server implements Closeable {
 		r=r.persistShallow();
 		Hash payloadHash=r.getHash();
 
-		log.info(()->"Processing DATA of type: "+Utils.getClassName(payload)+ " with hash: "+payloadHash.toHexString() +" and encoding: "+Format.encodedBlob(payload).toHexString());
+		log.log(LEVEL_DATA,()->"Processing DATA of type: "+Utils.getClassName(payload)+ " with hash: "+payloadHash.toHexString() +" and encoding: "+Format.encodedBlob(payload).toHexString());
 
 		// if our data satisfies a missing data object, need to process it
 		maybeProcessPartial(r.getHash());
@@ -513,7 +514,7 @@ public class Server implements Closeable {
 					newBeliefs.put(addr, signedBelief);
 				}
 			}
-			log.log(Level.INFO, "Valid belief received by peer at "+getHostAddress()+ ": " + signedBelief.getValue().getHash().toHexString());
+			log.log(LEVEL_BELIEF, "Valid belief received by peer at "+getHostAddress()+ ": " + signedBelief.getValue().getHash().toHexString());
 		} catch (ClassCastException e) {
 			// bad message?
 			log.warning("Bad message from peer? "+e.getMessage());

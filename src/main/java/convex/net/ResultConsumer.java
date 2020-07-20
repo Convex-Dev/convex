@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.function.Consumer;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import convex.core.crypto.Hash;
@@ -22,7 +23,11 @@ import convex.core.util.Utils;
 public abstract class ResultConsumer implements Consumer<Message> {
 
 	private static final Logger log = Logger.getLogger(ResultConsumer.class.getName());
-
+	
+	private static final Level LEVEL_RESULT= Level.FINER;
+	private static final Level LEVEL_ERROR = Level.FINER;
+	private static final Level LEVEL_MISSING = Level.WARNING;
+		
 	@Override
 	public final void accept(Message m) {
 		MessageType type = m.getType();
@@ -57,7 +62,6 @@ public abstract class ResultConsumer implements Consumer<Message> {
 
 				// we now have the full result, so notify those interested
 				Object rv = v.get(1);
-				log.info("result received: " + v);
 				long id = m.getID();
 				boolean err = RT.bool(v.get(2));
 				if (err) {
@@ -72,14 +76,14 @@ public abstract class ResultConsumer implements Consumer<Message> {
 				Hash hash = e.getMissingHash();
 				try {
 					if (m.getPeerConnection().sendMissingData(hash)) {
-						log.warning("Missing data "+hash.toHexString()+" requested by client for RESULT of type: "+Utils.getClassName(v));
+						log.log(LEVEL_MISSING,"Missing data "+hash.toHexString()+" requested by client for RESULT of type: "+Utils.getClassName(v));
 						buffer(hash, m);
 					} else {
-						log.warning("Unable to request missing data");
+						log.log(LEVEL_MISSING,"Unable to request missing data");
 					}
 				} catch (IOException e1) {
 					// Ignore. We probably lost this result?
-					log.warning("IO Exception handling result - "+e1.getMessage());
+					log.log(LEVEL_MISSING,"IO Exception handling result - "+e1.getMessage());
 				}
 				return;
 			}
@@ -137,7 +141,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	 * @param payload
 	 */
 	protected void handleResult(Object payload) {
-		log.info("RESULT RECEIVED: " + payload);
+		log.log(LEVEL_RESULT,"RESULT RECEIVED: " + payload);
 	}
 
 	/**
@@ -165,6 +169,6 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	 * @param m
 	 */
 	protected void handleError(Message m) {
-		log.info("Error received: " + m.getErrorType() + " : " + m.getPayload());
+		log.log(LEVEL_ERROR,"Error received: " + m.getErrorType() + " : " + m.getPayload());
 	}
 }

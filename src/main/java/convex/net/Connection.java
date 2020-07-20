@@ -63,7 +63,7 @@ public class Connection {
 	private static final Logger log = Logger.getLogger(Connection.class.getName());
 
 	// Log level for send events
-	private static final Level LEVEL = Level.INFO;
+	private static final Level LEVEL_SEND = Level.FINER;
 
 	
 	/**
@@ -121,7 +121,7 @@ public class Connection {
 
 		Connection pc = create(clientChannel, receiveAction, store);
 		pc.startClientListening();
-		log.log(LEVEL, "Connect succeeded for host: " + hostAddress);
+		log.log(LEVEL_SEND, "Connect succeeded for host: " + hostAddress);
 		return pc;
 	}
 
@@ -172,7 +172,7 @@ public class Connection {
 	 * @throws IOException
 	 */
 	public boolean sendData(Object value) throws IOException {
-		log.log(LEVEL, "Sending data: " + Utils.toString(value));
+		log.log(LEVEL_SEND, "Sending data: " + Utils.toString(value));
 		ByteBuffer buf = Format.encodedBuffer(value);
 		return sendBuffer(MessageType.DATA, buf);
 	}
@@ -332,7 +332,7 @@ public class Connection {
 		});
 		
 		ByteBuffer buf = Format.encodedBuffer(sendVal);
-		log.log(Level.INFO, () -> "Sending message: " + type + " :: " + payload + " to " + getRemoteAddress() + " format: "
+		log.log(LEVEL_SEND, () -> "Sending message: " + type + " :: " + payload + " to " + getRemoteAddress() + " format: "
 				+ Format.encodedBlob(payload).toHexString());
 		boolean sent = sendBuffer(type, buf);
 		return sent;
@@ -385,10 +385,10 @@ public class Connection {
 				selector.wakeup();
 			}
 
-			log.log(LEVEL, () -> "Sent message " + type + " of length: " + dataLength + " Connection ID: "
+			log.log(LEVEL_SEND, () -> "Sent message " + type + " of length: " + dataLength + " Connection ID: "
 					+ System.identityHashCode(this));
 		} else {
-			log.log(LEVEL, () -> "Failed to send message " + type + " of length: " + dataLength + " Connection ID: "
+			log.log(LEVEL_SEND, () -> "Failed to send message " + type + " of length: " + dataLength + " Connection ID: "
 					+ System.identityHashCode(this));
 		}
 		return sent;
@@ -487,7 +487,7 @@ public class Connection {
 							}
 						} catch (ClosedChannelException e) {
 							// channel was closed, just lose the key?
-							log.log(LEVEL, "Unexpected ChannelClosedException, cancelling key: " + e.getMessage());
+							log.log(LEVEL_SEND, "Unexpected ChannelClosedException, cancelling key: " + e.getMessage());
 							key.cancel();
 						} catch (IOException e) {
 							log.warning("Unexpected IOException, cancelling key: " + e.getMessage());
