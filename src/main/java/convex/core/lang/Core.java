@@ -8,7 +8,6 @@ import java.util.Iterator;
 import java.util.Map;
 
 import convex.core.ErrorType;
-import convex.core.Init;
 import convex.core.State;
 import convex.core.crypto.Hash;
 import convex.core.data.ABlob;
@@ -1794,9 +1793,10 @@ public class Core {
 	 */
 	private static AHashMap<Symbol, Syntax> registerCoreCode(AHashMap<Symbol, Syntax> env) {
 		// we use a fake State to build the initial environment
-		State state = State.EMPTY.putAccount(Init.HERO,
+		Address ADDR=Address.dummy("0");
+		State state = State.EMPTY.putAccount(ADDR,
 				AccountStatus.createActor(0, Amount.create(1000000000), null, env));
-		Context<?> ctx = Context.createInitial(state, Init.HERO, 1000000L);
+		Context<?> ctx = Context.createInitial(state, ADDR, 1000000L);
 
 		Syntax form = null;
 		
@@ -1814,7 +1814,7 @@ public class Core {
 			throw Utils.sneakyThrow(t);
 		}
 
-		return ctx.getAccountStatus(Init.HERO).getEnvironment();
+		return ctx.getAccountStatus(ADDR).getEnvironment();
 	}
 
 	private static AHashMap<Symbol, Syntax> registerSpecials(AHashMap<Symbol, Syntax> env) {

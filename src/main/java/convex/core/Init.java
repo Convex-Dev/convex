@@ -14,7 +14,9 @@ import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
 import convex.core.data.Sets;
 import convex.core.data.Symbol;
+import convex.core.data.Vectors;
 import convex.core.lang.Context;
+import convex.core.lang.Core;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
 
@@ -40,6 +42,7 @@ public class Init {
 	public static final int NUM_GOVERNANCE = 5;
 	public static final int NUM_PEERS = 8;
 	public static final int NUM_ACTORS = 2;
+	public static final int NUM_LIBRARIES = 1;
 
 	public static long ALLOCATION;
 
@@ -69,6 +72,9 @@ public class Init {
 			BlobMap<Address, PeerStatus> peers = BlobMaps.empty();
 			BlobMap<Address, AccountStatus> accts = BlobMaps.empty();
 
+			// Core library
+			accts=addCoreLibrary(accts);
+
 			// governance accounts
 			accts = addGovernanceAccount(accts, RESERVED, 900000000000000000L); // 99%
 			accts = addGovernanceAccount(accts, MAINBANK, 90000000000000000L); // 9%
@@ -77,7 +83,7 @@ public class Init {
 																				// /day
 			accts = addGovernanceAccount(accts, LIVEPOOL, 900000000000L); // 0.001% = approx 3 days of mainpool feed
 			ALLOCATION = 100000 * 1000000L; // remaining allocation to divide between initial accounts
-
+			
 			// Set up initial peers
 			for (int i = 0; i < NUM_PEERS; i++) {
 				AKeyPair kp = AKeyPair.createSeeded(123454321 + i);
@@ -116,7 +122,7 @@ public class Init {
 			long total = s.computeTotalFunds();
 			if (total != Amount.MAX_AMOUNT) throw new Error("Bad total amount: " + total);
 			if (s.getPeers().size() != NUM_PEERS) throw new Error("Bad peer count: " + s.getPeers().size());
-			if (s.getAccounts().size() != NUM_PEERS + NUM_ACTORS + NUM_GOVERNANCE) throw new Error("Bad account count");
+			if (s.getAccounts().size() != NUM_PEERS + NUM_ACTORS + NUM_GOVERNANCE+NUM_LIBRARIES) throw new Error("Bad account count");
 
 			{ // Deploy Registry Actor
 				Context<?> ctx = Context.createFake(s, HERO);
@@ -157,6 +163,14 @@ public class Init {
 			Address a, long balance) {
 		AccountStatus as = AccountStatus.createGovernance(balance);
 		if (accts.containsKey(a)) throw new Error("Duplicate governance account!");
+		accts = accts.assoc(a, as);
+		return accts;
+	}
+	
+	private static BlobMap<Address, AccountStatus> addCoreLibrary(BlobMap<Address, AccountStatus> accts) {
+		Address a=Core.CORE_ADDRESS;
+		AccountStatus as = AccountStatus.createActor(0L, Amount.ZERO, Vectors.empty(), Core.CORE_NAMESPACE);
+		if (accts.containsKey(a)) throw new Error("Duplicate core library account!");
 		accts = accts.assoc(a, as);
 		return accts;
 	}
