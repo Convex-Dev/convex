@@ -73,6 +73,9 @@ public class ScryptTest {
     public void testVector() {
         assertEquals(Vectors.of(3L), eval("[1 + 2]"));
         assertEquals(Vectors.of(3L, 3L), eval("[1 + 2, 3]"));
+        assertEquals(Vectors.of(3L), eval("[1 + 2,]"));
+        assertEquals(Vectors.of(3L, 3L), eval("[1 + 2,, 3]"));
+        assertEquals(Vectors.of(3L, 3L), eval("[,1 + 2,, 3]"));
     }
 
 }
