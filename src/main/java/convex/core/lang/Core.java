@@ -80,7 +80,12 @@ public class Core {
 	/**
 	 * Symbol for core namespace
 	 */
-	private static final Symbol CORE_SYMBOL = Symbol.create("convex.core");
+	public static final Symbol CORE_SYMBOL = Symbol.create("convex.core");
+	
+	/**
+	 * Address for core library
+	 */
+	public static final Address CORE_ADDRESS=Address.dummy("cccc");
 
 	private static final HashSet<Object> tempReg = new HashSet<Object>();
 
@@ -1794,6 +1799,7 @@ public class Core {
 		Context<?> ctx = Context.createInitial(state, Init.HERO, 1000000L);
 
 		Syntax form = null;
+		
 		try {
 			AList<Syntax> forms = Reader.readAllSyntax(Utils.readResourceAsString("lang/core.con"));
 			for (Syntax f : forms) {
@@ -1801,12 +1807,11 @@ public class Core {
 				ctx = ctx.eval(form);
 				// System.out.println("Core compilation juice: "+ctx.getJuice());
 				if (ctx.isExceptional()) {
-					System.out.println("Error compiling form\n" + form + "\n Error + " + ctx.getExceptional());
+					throw new Error("Error compiling form: "+ Syntax.unwrapAll(form)+ " : "+ ctx.getExceptional());
 				}
 			}
-		} catch (Throwable t) {
-			System.err.println("ERROR IN CORE INIT WITH FORM: " + form);
-			t.printStackTrace();
+		} catch (IOException t) {
+			throw Utils.sneakyThrow(t);
 		}
 
 		return ctx.getAccountStatus(Init.HERO).getEnvironment();
@@ -1838,6 +1843,7 @@ public class Core {
 	static {
 		// Set up convex.core environment
 		AHashMap<Symbol, Syntax> coreEnv = Maps.empty();
+		
 		try {
 
 			// Register all objects from registered runtime
@@ -1851,12 +1857,15 @@ public class Core {
 			coreEnv = applyDocumentation(coreEnv);
 		} catch (Throwable e) {
 			e.printStackTrace();
-			throw new Error(e);
 		}
 		
 		CORE_NAMESPACE = coreEnv;
 
-		AHashMap<Symbol, Syntax> defaultEnv = coreEnv.assoc(Symbols.STAR_ALIASES,Syntax.create(Maps.of(CORE_SYMBOL,coreEnv)));
+		// Copy aliases into default environment
+		// TODO: should be only definition in default environment?
+		Syntax ALIASES=coreEnv.get(Symbols.STAR_ALIASES);
+		assert(ALIASES!=null);
+		AHashMap<Symbol, Syntax> defaultEnv = coreEnv.assoc(Symbols.STAR_ALIASES,ALIASES);
 		
 		ENVIRONMENT = defaultEnv;
 	}

@@ -165,9 +165,14 @@
 (def *exports* 
   ^{:doc {:description "A set of functions that are exported by the current smart contract. Exported functions may be called by any acount: suitable precautions should be applied."
           :examples [{:code "(assert (set? *exports*))"}]
-          :type :value}
-   }
+          :type :value}}
   #{})
+  
+(def *aliases*
+  ^{:doc {:description "A map of aliased symbols to Addresses that are imported in the current environment. Defaults to a single alias to the 'convex.core' core library."
+          :examples [{:code "(*aliases* 'convex.core)"}]
+          :type :value}}
+  {'convex.core (address "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")})
   
  (defmacro set!
     ^{:doc {:description "Sets a local binding identified by an unqualified symbol to the given value. This local change will be be visible until the scope leaves the current binding form (e.g. let binding, function body or recur). Fails with an ARGUMENT error if the symbol is qualified. This is probably most useful for updating a local variable in imperative style. Returns the value assigned to the local binding if successful."

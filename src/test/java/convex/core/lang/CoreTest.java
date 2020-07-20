@@ -67,6 +67,14 @@ public class CoreTest {
 	private static final long INITIAL_JUICE = TestState.INITIAL_JUICE;
 
 	@Test
+	public void testAliases() {
+		assertTrue(evalB("(map? *aliases*)"));
+		assertEquals(1L,evalL("(count *aliases*)"));
+		assertEquals(Core.CORE_SYMBOL,eval("(first (first *aliases*))"));
+		assertEquals(Core.CORE_ADDRESS,eval("(second (first *aliases*))"));
+	}
+	
+	@Test
 	public void testAddress() {
 		Address a = TestState.HERO;
 		assertEquals(a, eval("(address \"" + a.toHexString() + "\")"));
