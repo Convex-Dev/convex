@@ -12,14 +12,6 @@ import java.util.ArrayList;
 @BuildParseTree
 public class Scrypt extends Reader {
 
-    public Rule Vector() {
-        return Sequence(
-                '[',
-                CompoundExpressionList(),
-                FirstOf(']', Sequence(FirstOf(AnyOf("})"), EOI), push(error("Expected closing ']'")))),
-                push(prepare(Vectors.create(popNodeList()))));
-    }
-
     public Rule ExpressionInput() {
         return FirstOf(Sequence(
                 Spacing(),
@@ -29,12 +21,17 @@ public class Scrypt extends Reader {
                 push(error("Single expression expected")));
     }
 
-    public Rule ScryptLiteral() {
-        return FirstOf(NumberLiteral(), StringLiteral(), NilLiteral(), BooleanLiteral(), Keyword());
+    public Rule Vector() {
+        return Sequence(
+                '[',
+                CompoundExpressionList(),
+                FirstOf(']', Sequence(FirstOf(AnyOf("})"), EOI), push(error("Expected closing ']'")))),
+                push(prepare(Vectors.create(popNodeList()))));
     }
 
     public Rule Expression() {
         return FirstOf(
+                NestedExpression(),
                 NilLiteral(),
                 NumberLiteral(),
                 StringLiteral(),
@@ -44,19 +41,32 @@ public class Scrypt extends Reader {
                 Vector());
     }
 
-    public Rule InfixExpression() {
-        return Sequence(
-                '+',
-                Spacing(),
-                Expression(),
-                push(Syntax.create(List.of(Syntax.create(Symbols.PLUS), pop(), pop()))));
+    public Rule NestedExpression() {
+        return Sequence("(", Spacing(), CompoundExpression(), Spacing(), ")");
     }
 
-    /**
-     * Matches a single expression without whitespace
-     * <p>
-     * Returns the expression value at top of stack.
-     */
+    public Rule InfixOperator() {
+        return FirstOf(
+                Sequence("+", push(Symbols.PLUS)),
+                Sequence("-", push(Symbols.MINUS)),
+                Sequence("*", push(Symbols.TIMES)),
+                Sequence("/", push(Symbols.DIVIDE)),
+                Sequence("==", push(Symbols.EQUALS)));
+    }
+
+    public Rule InfixExpression() {
+        return Sequence(
+                Spacing(),
+                InfixOperator(),
+                Spacing(),
+                Expression(),
+                push(prepare(createInfixForm((Syntax) pop(), (Symbol) pop(), (Syntax) pop()))));
+    }
+
+    public List<Syntax> createInfixForm(Syntax op1, Symbol symbol, Syntax op2) {
+        return List.of(Syntax.create(symbol), op1, op2);
+    }
+
     public Rule CompoundExpression() {
         return Sequence(
                 Expression(),
@@ -80,7 +90,6 @@ public class Scrypt extends Reader {
 
     /**
      * Constructor for reader class. Called by Parboiled.createParser
-     *
      */
     public Scrypt() {
         super(true);
