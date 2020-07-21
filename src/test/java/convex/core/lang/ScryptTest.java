@@ -1,16 +1,21 @@
 package convex.core.lang;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import convex.core.Init;
-import convex.core.data.*;
-import convex.core.exceptions.ParseException;
+import org.junit.jupiter.api.Test;
 import org.parboiled.Parboiled;
 import org.parboiled.parserunners.ReportingParseRunner;
-import org.parboiled.support.ParseTreeUtils;
-import org.parboiled.support.ParsingResult;
 
-import static org.junit.jupiter.api.Assertions.*;
+import convex.core.Init;
+import convex.core.data.Keyword;
+import convex.core.data.Syntax;
+import convex.core.data.Vectors;
+import convex.core.exceptions.ParseException;
 
 public class ScryptTest {
 
@@ -37,7 +42,8 @@ public class ScryptTest {
         return (T) step(CON, source).getResult();
     }
 
-    @Test
+    @SuppressWarnings("rawtypes")
+	@Test
     public void testInfixOperator() {
         var parser = Parboiled.createParser(Scrypt.class);
 
