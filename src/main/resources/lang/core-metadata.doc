@@ -196,6 +196,14 @@
          :signature [{:params [num]}]}
 	}
  
+  def
+	{
+	 :doc {:description "Creates a definition in the current environment. This value will persist in the enviroment owned by the current account."
+         :examples [{:code "(def a 10)"}]
+         :type :special
+         :signature [{:params [sym value]}]}
+	}
+ 
   deploy
 	{
 	 :doc {:description "Deploys a smart contract. The first argument must be a Actor generator function, which will be called with the given arguments. Returns the new contract address if successful."

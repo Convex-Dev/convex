@@ -99,7 +99,8 @@ public class ScryptTest {
         }
     }
 
-    @Test
+    @SuppressWarnings("rawtypes")
+	@Test
     public void testNestedExpression() {
         var parser = Parboiled.createParser(Scrypt.class);
 
