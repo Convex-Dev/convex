@@ -697,6 +697,14 @@
          :signature [{:params [owner value]}]}
 	}
   
+  set*
+  {
+    :doc {:description "Sets a value in the current local bindings. Helper function for the 'set!', which should be preferred in most case."
+          :examples [{:code "(set* 'a 10)"}]
+          :type :function
+          :signature [{:params [symbol value]}]}
+  }
+  
   set?
   {
     :doc {:description "Tests if the agument is a Set."
