@@ -5,6 +5,10 @@ import org.junit.jupiter.api.Test;
 import convex.core.Init;
 import convex.core.data.*;
 import convex.core.exceptions.ParseException;
+import org.parboiled.Parboiled;
+import org.parboiled.parserunners.ReportingParseRunner;
+import org.parboiled.support.ParseTreeUtils;
+import org.parboiled.support.ParsingResult;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -31,6 +35,65 @@ public class ScryptTest {
     @SuppressWarnings("unchecked")
     public static <T> T eval(String source) {
         return (T) step(CON, source).getResult();
+    }
+
+    @Test
+    public void testInfixOperator() {
+        var parser = Parboiled.createParser(Scrypt.class);
+
+        // +
+
+        {
+            var result = new ReportingParseRunner(parser.InfixOperator()).run("+");
+
+            assertTrue(result.matched);
+            assertSame(Symbols.PLUS, result.resultValue);
+        }
+
+        {
+            assertFalse(new ReportingParseRunner(parser.InfixOperator()).run(" + ").matched);
+        }
+
+        // -
+
+        {
+            var result = new ReportingParseRunner(parser.InfixOperator()).run("-");
+
+            assertTrue(result.matched);
+            assertSame(Symbols.MINUS, result.resultValue);
+        }
+
+        {
+            assertFalse(new ReportingParseRunner(parser.InfixOperator()).run(" - ").matched);
+        }
+
+
+        // *
+
+        {
+            var result = new ReportingParseRunner(parser.InfixOperator()).run("*");
+
+            assertTrue(result.matched);
+            assertSame(Symbols.TIMES, result.resultValue);
+        }
+
+        {
+            assertFalse(new ReportingParseRunner(parser.InfixOperator()).run(" * ").matched);
+        }
+
+
+        // /
+
+        {
+            var result = new ReportingParseRunner(parser.InfixOperator()).run("/");
+
+            assertTrue(result.matched);
+            assertSame(Symbols.DIVIDE, result.resultValue);
+        }
+
+        {
+            assertFalse(new ReportingParseRunner(parser.InfixOperator()).run(" / ").matched);
+        }
     }
 
     @Test
