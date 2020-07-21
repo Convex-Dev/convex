@@ -81,28 +81,13 @@ public class Scrypt extends Reader {
     /**
      * Constructor for reader class. Called by Parboiled.createParser
      *
-     * @param wrapSyntax Sets flag to determine if Reader should wrap forms in
-     *                   Syntax Objects
      */
-    public Scrypt(Boolean wrapSyntax) {
-        super(wrapSyntax);
+    public Scrypt() {
+        super(true);
     }
 
     // Use a ThreadLocal reader because instances are not thread safe
-    private static final ThreadLocal<Scrypt> syntaxReader = new ThreadLocal<Scrypt>() {
-        @Override
-        protected Scrypt initialValue() {
-            return Parboiled.createParser(Scrypt.class, true);
-        }
-    };
-
-    // Use a ThreadLocal reader because instances are not thread safe
-    private static final ThreadLocal<Scrypt> formReader = new ThreadLocal<Scrypt>() {
-        @Override
-        protected Scrypt initialValue() {
-            return Parboiled.createParser(Scrypt.class, false);
-        }
-    };
+    private static final ThreadLocal<Scrypt> syntaxReader = ThreadLocal.withInitial(() -> Parboiled.createParser(Scrypt.class));
 
     /**
      * Parses an expression and returns a Syntax object
@@ -113,20 +98,7 @@ public class Scrypt extends Reader {
     public static Syntax readSyntax(String source) {
         Scrypt scryptReader = syntaxReader.get();
         scryptReader.tempSource = source;
-        return (Syntax) doParse(new ReportingParseRunner<Object>(scryptReader.ExpressionInput()), source);
-    }
-
-    /**
-     * Parses an expression and returns a form
-     *
-     * @param source
-     * @return Parsed form
-     */
-    @SuppressWarnings("unchecked")
-    public static <R> R read(String source) {
-        Reader reader = formReader.get();
-        reader.tempSource = source;
-        return (R) doParse(new ReportingParseRunner<Object>(reader.ExpressionInput()), source);
+        return (Syntax) doParse(new ReportingParseRunner<>(scryptReader.ExpressionInput()), source);
     }
 
 }
