@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import convex.core.data.List;
 import org.junit.jupiter.api.Test;
 import org.parboiled.Parboiled;
 import org.parboiled.parserunners.ReportingParseRunner;
@@ -43,12 +44,11 @@ public class ScryptTest {
     }
 
     @SuppressWarnings("rawtypes")
-	@Test
+    @Test
     public void testInfixOperator() {
         var parser = Parboiled.createParser(Scrypt.class);
 
         // +
-
         {
             var result = new ReportingParseRunner(parser.InfixOperator()).run("+");
 
@@ -61,7 +61,6 @@ public class ScryptTest {
         }
 
         // -
-
         {
             var result = new ReportingParseRunner(parser.InfixOperator()).run("-");
 
@@ -75,7 +74,6 @@ public class ScryptTest {
 
 
         // *
-
         {
             var result = new ReportingParseRunner(parser.InfixOperator()).run("*");
 
@@ -89,7 +87,6 @@ public class ScryptTest {
 
 
         // /
-
         {
             var result = new ReportingParseRunner(parser.InfixOperator()).run("/");
 
@@ -100,6 +97,49 @@ public class ScryptTest {
         {
             assertFalse(new ReportingParseRunner(parser.InfixOperator()).run(" / ").matched);
         }
+    }
+
+    @Test
+    public void testNestedExpression() {
+        var parser = Parboiled.createParser(Scrypt.class);
+
+        // Nested without an infix expression.
+        {
+            var result = new ReportingParseRunner(parser.NestedExpression()).run("( 1 )");
+            var syn = (Syntax) result.resultValue;
+
+            assertTrue(result.matched);
+            assertEquals(1L, (Long) syn.getValue());
+        }
+
+        // Nested Expression inside Nested Expression.
+        {
+            var result = new ReportingParseRunner(parser.NestedExpression()).run("( ( 1 ) )");
+            var syn = (Syntax) result.resultValue;
+
+            assertTrue(result.matched);
+            assertEquals(1L, (Long) syn.getValue());
+        }
+
+        // Space is not allowed before/after parenthesis - although it's allowed after/before parenthesis.
+        {
+            var result = new ReportingParseRunner(parser.NestedExpression()).run(" ( 1 ) ");
+
+            assertFalse(result.matched);
+        }
+
+        {
+            var result = new ReportingParseRunner(parser.NestedExpression()).run("(1 + 2)");
+            var syn = (Syntax) result.resultValue;
+            var value = (List) syn.getValue();
+
+            assertTrue(result.matched);
+            assertEquals(3, value.count());
+            assertSame(Symbols.PLUS, ((Syntax) value.get(0)).getValue());
+            assertEquals(2L, (Long) ((Syntax) value.get(1)).getValue());
+            assertEquals(1L, (Long) ((Syntax) value.get(2)).getValue());
+        }
+
     }
 
     @Test
