@@ -5,9 +5,6 @@ import org.junit.jupiter.api.Test;
 import convex.core.Init;
 import convex.core.data.*;
 import convex.core.exceptions.ParseException;
-import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
