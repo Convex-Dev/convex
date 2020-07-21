@@ -24,6 +24,7 @@ import convex.core.data.Address;
 import convex.core.data.Amount;
 import convex.core.data.IGet;
 import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
@@ -1822,18 +1823,30 @@ public class Core {
 		return env;
 	}
 
+	@SuppressWarnings("unchecked")
 	private static AHashMap<Symbol, Syntax> applyDocumentation(AHashMap<Symbol, Syntax> env) throws IOException {
 		AMap<Symbol, AHashMap<Object, Object>> m = Reader.read(Utils.readResourceAsString("lang/core-metadata.doc"));
 		for (Map.Entry<Symbol, AHashMap<Object, Object>> de : m.entrySet()) {
 			Symbol sym = de.getKey();
+			AHashMap<Object, Object> newMeta = de.getValue();
 			MapEntry<Symbol, Syntax> me = env.getEntry(sym);
 			if (me == null) {
-				System.err.println("CORE WARNING: Documentation for non-existent core symbol: " + sym);
-				continue;
+				AHashMap<Keyword, Object> doc=(AHashMap<Keyword, Object>) newMeta.get(Keywords.DOC);
+				if (doc==null) {
+					System.err.println("CORE WARNING: Missing :doc tag in metadata for: " + sym);
+				} else if (me==null) {
+					if (Keywords.SPECIAL.equals(doc.get(Keywords.TYPE))) {
+						// create a fake entry
+						me=MapEntry.create(sym, Syntax.create(sym,newMeta));		
+					} else {
+						System.err.println("CORE WARNING: Documentation for non-existent core symbol: " + sym);
+						continue;
+					}
+				}
 			}
 
 			Syntax oldSyn = me.getValue();
-			Syntax newSyn = oldSyn.mergeMeta(de.getValue());
+			Syntax newSyn = oldSyn.mergeMeta(newMeta);
 			env = env.assoc(sym, newSyn);
 		}
 
