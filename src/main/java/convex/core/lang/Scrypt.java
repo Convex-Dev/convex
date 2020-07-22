@@ -1,17 +1,19 @@
 package convex.core.lang;
 
-import convex.core.data.*;
+import java.util.ArrayList;
+
 import org.parboiled.Parboiled;
 import org.parboiled.Rule;
 import org.parboiled.annotations.BuildParseTree;
-import org.parboiled.annotations.DontLabel;
-import org.parboiled.annotations.SuppressNode;
 import org.parboiled.parserunners.ReportingParseRunner;
 import org.parboiled.support.Var;
 
-import java.util.ArrayList;
+import convex.core.data.List;
+import convex.core.data.Lists;
+import convex.core.data.Symbol;
+import convex.core.data.Syntax;
+import convex.core.data.Vectors;
 
-@SuppressWarnings({"InfiniteRecursion"})
 @BuildParseTree
 public class Scrypt extends Reader {
 

@@ -7,17 +7,16 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import convex.core.data.List;
 import org.junit.jupiter.api.Test;
 import org.parboiled.Parboiled;
 import org.parboiled.parserunners.ReportingParseRunner;
 
 import convex.core.Init;
 import convex.core.data.Keyword;
+import convex.core.data.List;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.exceptions.ParseException;
-import org.parboiled.support.ParseTreeUtils;
 
 public class ScryptTest {
 
@@ -144,7 +143,8 @@ public class ScryptTest {
 
     }
 
-    @Test
+    @SuppressWarnings("rawtypes")
+	@Test
     public void testFunctionApplication() {
         var parser = Parboiled.createParser(Scrypt.class);
 
