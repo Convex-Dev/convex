@@ -1,6 +1,7 @@
-;; file for core documentation
-;; read in as raw forms and added to metadata for each core symbol
-;; includes metadata for Convex Lisp special forms
+;; File for core documentation and other metadta
+;;
+;; Read in as raw forms and added to metadata for each core symbol specified
+;; Includes metadata for Convex Lisp special forms
 {
 	accept 
 	{
@@ -205,7 +206,7 @@
  
   dec
 	{
-	 :doc {:description "Decrements the given number by 1"
+	 :doc {:description "Decrements the given number by 1. Converts to Long if necessary."
          :examples [{:code "(dec 10)"}]
          :type :function
          :signature [{:params [num]}]}
@@ -237,7 +238,7 @@
  
   disj
 	{
-	 :doc {:description "Removes a key from a set."
+	 :doc {:description "Removes a key from a set. If the key does not exist, returns the same set unchanged."
          :examples [{:code "(disj #{1 2 3} 1)"}]
          :type :function
          :signature [{:params [coll key]}]}
@@ -262,7 +263,7 @@
 
   double
  	{
-	 :doc {:description "Casts a numerical value to a Double."
+	 :doc {:description "Casts any numerical value to a Double."
          :examples [{:code "(double 3)"}]
          :type :function
          :signature [{:params [a]}]}
@@ -456,7 +457,7 @@
   
   inc
 	{
-	 :doc {:description "Increments the given number by 1"
+	 :doc {:description "Increments the given number by 1. Converts to Long if necessary."
          :examples [{:code "(inc 10)"}]
          :type :function
          :signature [{:params [num]}]}
@@ -746,7 +747,7 @@
   
   set*
   {
-    :doc {:description "Sets a value in the current local bindings. Helper function for the 'set!', which should be preferred in most case."
+    :doc {:description "Sets or overwrites a value in the current local lexical bindings. Helper function for the 'set!', which should be preferred in most cases."
           :examples [{:code "(set* 'a 10)"}]
           :type :function
           :signature [{:params [symbol value]}]}
@@ -770,7 +771,7 @@
   
   sqrt
   {
-    :doc {:description "Computes the square root of a numbeic agument. Uses double precision maths. May return NaN for neagitive values."
+    :doc {:description "Computes the square root of a numerical argument. Uses double precision mathematics. May return NaN for negative values."
           :examples [{:code "(sqrt 16.0)"}]
           :type :function
           :signature [{:params [x]}]}
