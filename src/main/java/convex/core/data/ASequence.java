@@ -21,9 +21,19 @@ public abstract class ASequence<T> extends ACollection<T> implements List<T>, IG
 		return longIndexOf(o) >= 0;
 	}
 
-	public abstract long longIndexOf(Object o);
+	/**
+	 * Gets the first long index at which the specified value appears in the the sequence.
+	 * @param value Any value which could appear as an element of the sequence.
+	 * @return Index of the value, or -1 if not found.
+	 */
+	public abstract long longIndexOf(Object value);
 
-	public abstract long longLastIndexOf(Object o);
+	/**
+	 * Gets the last long index at which the specified value appears in the the sequence.
+	 * @param value Any value which could appear as an element of the sequence.
+	 * @return Index of the value, or -1 if not found.
+	 */
+	public abstract long longLastIndexOf(Object value);
 
 	public abstract <R> ASequence<R> map(Function<? super T, ? extends R> mapper);
 
@@ -47,6 +57,11 @@ public abstract class ASequence<T> extends ACollection<T> implements List<T>, IG
 		return result;
 	}
 
+	/**
+	 * Concatenates the elements from another sequence to the end of this sequence.
+	 * @param vals A sequence of values to concatenate.
+	 * @return The concatenated sequence, of the same type as this sequence.
+	 */
 	public abstract ASequence<T> concat(ASequence<T> vals);
 
 	@Override
@@ -171,8 +186,22 @@ public abstract class ASequence<T> extends ACollection<T> implements List<T>, IG
 	@Override
 	public abstract <R> ASequence<R> conj(R value);
 
+	/**
+	 * Produces a slice of this sequence, beginning with the specified start index and of the given length.
+	 * The start and length must be contained within this sequence. Will return the same sequence if the
+	 * start is zero and the length matches this sequence.
+	 * 
+	 * @param start Index of the start element
+	 * @param length Length of slice to create.
+	 * @return A sequence representing the requested slice.
+	 */
 	public abstract ASequence<T> slice(long start, long length);
 
+	/**
+	 * Prepends an element to this sequence, returning a list.
+	 * @param x Any new element value
+	 * @return A list starting with the new element.
+	 */
 	public abstract AList<T> cons(T x);
 
 	/**
