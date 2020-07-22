@@ -357,6 +357,14 @@
          :signature [{:params [coll]}]}
 	}
   
+  fn
+ 	{
+	 :doc {:description "Creates an anonymous function (closure) with the specified argument list and function body. Will close over variabels in the current lexical scope."
+         :examples [{:code "(let [f (fn [x] (* x x))] (f 10))"}]
+         :type :special
+         :signature [{:params [args & body]}]}
+	}
+  
   fn?
  	{
 	 :doc {:description "Tests if the argument is a function. Some arguments may be castable to functions but are not functions themselves, e.g. maps and vectors."
@@ -462,7 +470,7 @@
   
   into
 	{
-	 :doc {:description "Adds elements to a collection, in a collection-defined manner as with conj."
+	 :doc {:description "Adds elements to a collection, in a collection-defined manner as with 'conj'."
          :examples [{:code "(into {} [[1 2] [3 4]])"}]
          :type :function
          :signature [{:params [coll elements]}]}
@@ -495,7 +503,7 @@
  
   last
 	{
-	 :doc {:description "Returns the last element of a collection, in collection-defined order. Collection argument must be coercible to a sequence."
+	 :doc {:description "Returns the last element of a sequential collection, in collection-defined order. Collection argument must be coercible to a sequence."
          :examples [{:code "(last [1 2 3])"}]
          :type :function
          :signature [{:params [coll]}]}
@@ -558,6 +566,14 @@
           :type :function
           :signature [{:params [name]}]}
   }
+  
+  loop
+	{
+	 :doc {:description "Creates a loop body, binding one or more loop variables in a manner similar to 'let'. Within the loop body, 'recur' can be used to return to the start of the loop while re-binding the loop variables with new values. Does not consume stack."
+         :examples [{:code "(loop [i 10 acc 1] (if (> i 1) (recur (dec i) (* acc i)) acc))"}]
+         :type :function
+         :signature [{:params [bindings & body]}]}
+	}
   
   macro
   {
