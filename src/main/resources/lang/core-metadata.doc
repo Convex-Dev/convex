@@ -138,6 +138,19 @@
          :signature [{:params [a]}]}
 	}
  
+  cond
+	{
+	 :doc {:description "Performs conditional tests on successive (test, result) pairs of arguments, returning the result for the first test that succeeds. Performs short-circuit evaluation, i.e. result expressions that are not used and any test expressions after the first success will not be executed. In the case that no test succeeds, a single aditional argument may be added as a fallback value. If no fallback value is available, nil will be returned."
+         :examples [{:code "(cond test1 result1 else-value)"}
+                    {:code "(cond test1 result1 test2 result2 test3 result-3)"}]
+         :type :special
+         :signature [{:params []}
+                     {:params [test]}
+                     {:params [test result]}
+                     {:params [test result fallback-value]}
+                     {:params [test1 result1 test2 result2 & more]}]}
+	}
+ 
   compile
 	{
 	 :doc {:description "Compiles a form, returning an op."
@@ -234,6 +247,14 @@
          :examples [{:code "(dissoc {1 2 3 4} 3)"}]
          :type :function
          :signature [{:params [coll & keys]}]}
+	}
+ 
+  do
+	{
+	 :doc {:description "Executes multiple expressions sequentially, and returns the value of the final expression.."
+         :examples [{:code "(do (count [1 2 3]) :done)"}]
+         :type :special
+         :signature [{:params [& expressions]}]}
 	}
  
 
@@ -413,7 +434,7 @@
   
   if
   {
-	 :doc {:description "Calculates the test value, then returns the result of the true branch or false branch accordingly. The code in the other branch is not evaluated."
+	 :doc {:description "Calculates the value of the test expression, then returns the result of the true expression or false expression accordingly. Performs short-circuit evaluation, i.e. the expression in the unused branch is not evaluated. For a more general conditional expression that can handle multiple branches, consider 'cond' as an alternative."
          :examples [{:code "(if true :true-value :false-value)"}]
          :type :macro
          :signature [
