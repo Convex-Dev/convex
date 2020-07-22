@@ -67,6 +67,14 @@ public class CoreTest {
 	private static final long INITIAL_JUICE = TestState.INITIAL_JUICE;
 
 	@Test
+	public void testAliases() {
+		assertTrue(evalB("(map? *aliases*)"));
+		assertEquals(1L,evalL("(count *aliases*)"));
+		assertEquals(Core.CORE_SYMBOL,eval("(first (first *aliases*))"));
+		assertEquals(Core.CORE_ADDRESS,eval("(second (first *aliases*))"));
+	}
+	
+	@Test
 	public void testAddress() {
 		Address a = TestState.HERO;
 		assertEquals(a, eval("(address \"" + a.toHexString() + "\")"));
@@ -1471,6 +1479,26 @@ public class CoreTest {
 	public void testDefn() {
 		assertTrue(evalB("(do (defn f [a] a) (fn? f))"));
 		assertEquals(Vectors.of(2L, 3L), eval("(do (defn f [a & more] more) (f 1 2 3))"));
+	}
+	
+	@Test
+	public void testSetStar() {
+		assertEquals(13L,evalL("(set* 'a 13)"));
+		assertEquals(13L,evalL("(do (set* \"a\" 13) a)"));
+		assertEquals(10L,evalL("(let [a 10] (let [] (set* 'a 13)) a)"));
+		assertUndeclaredError(step("(do (let [a 10] (set* 'a 20)) a)"));
+		
+		assertArgumentError(step("(set* 'a/b 10)"));
+	}
+	
+	@Test
+	public void testSetBang() {
+		assertEquals(13L,evalL("(set! a 13)"));
+		assertEquals(13L,evalL("(do (set! a 13) a)"));
+		assertEquals(10L,evalL("(let [a 10] (let [] (set! a 13)) a)"));
+		assertUndeclaredError(step("(do (let [a 10] (set! a 20)) a)"));
+		
+		assertArgumentError(step("(set! a/b 10)"));
 	}
 
 	@Test

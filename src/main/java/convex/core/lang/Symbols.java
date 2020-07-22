@@ -223,6 +223,8 @@ public class Symbols {
 	public static final Symbol GET_HOLDING = Symbol.create("get-holding");
 	public static final Symbol SET_HOLDING = Symbol.create("set-holding");
 
+	public static final Symbol SET_BANG = Symbol.create("set!");
+	public static final Symbol SET_STAR = Symbol.create("set*");
 
 
 }

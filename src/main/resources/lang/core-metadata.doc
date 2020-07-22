@@ -1,5 +1,7 @@
-;; file for core documentation
-;; read in as raw forms and added to metadata for each core symbol
+;; File for core documentation and other metadta
+;;
+;; Read in as raw forms and added to metadata for each core symbol specified
+;; Includes metadata for Convex Lisp special forms
 {
 	accept 
 	{
@@ -138,6 +140,19 @@
          :signature [{:params [a]}]}
 	}
  
+  cond
+	{
+	 :doc {:description "Performs conditional tests on successive (test, result) pairs of arguments, returning the result for the first test that succeeds. Performs short-circuit evaluation, i.e. result expressions that are not used and any test expressions after the first success will not be executed. In the case that no test succeeds, a single aditional argument may be added as a fallback value. If no fallback value is available, nil will be returned."
+         :examples [{:code "(cond test1 result1 else-value)"}
+                    {:code "(cond test1 result1 test2 result2 test3 result-3)"}]
+         :type :special
+         :signature [{:params []}
+                     {:params [test]}
+                     {:params [test result]}
+                     {:params [test result fallback-value]}
+                     {:params [test1 result1 test2 result2 & more]}]}
+	}
+ 
   compile
 	{
 	 :doc {:description "Compiles a form, returning an op."
@@ -156,15 +171,16 @@
  
   conj
 	{
-	 :doc {:description "Adds elements to a data structure, in the natural mode of addition for the datat structure."
-         :examples [{:code "(conj [1 2] 3)"}]
+	 :doc {:description "Adds elements to a data structure, in the natural mode of addition for the data structure. Supports sequential collections, sets and maps."
+         :examples [{:code "(conj [1 2] 3)"}
+                    {:code "(conj {1 2} [3 4])"}]
          :type :function
          :signature [{:params [coll & elems]}]}
 	}
  
   cons
 	{
-	 :doc {:description "Constructs a list, by pre-pending the leading arguments to the last argument. The last argument must be coercable to a sequence."
+	 :doc {:description "Constructs a list, by prepending the leading arguments to the last argument. The last argument must be coercable to a sequence."
          :examples [{:code "(cons 1 2 '(3 4))"}]
          :type :function
          :signature [{:params [& args]}]}
@@ -190,10 +206,18 @@
  
   dec
 	{
-	 :doc {:description "Decrements the given number by 1"
+	 :doc {:description "Decrements the given number by 1. Converts to Long if necessary."
          :examples [{:code "(dec 10)"}]
          :type :function
          :signature [{:params [num]}]}
+	}
+ 
+  def
+	{
+	 :doc {:description "Creates a definition in the current environment. This value will persist in the enviroment owned by the current account."
+         :examples [{:code "(def a 10)"}]
+         :type :special
+         :signature [{:params [sym value]}]}
 	}
  
   deploy
@@ -214,7 +238,7 @@
  
   disj
 	{
-	 :doc {:description "Removes a key from a set."
+	 :doc {:description "Removes a key from a set. If the key does not exist, returns the same set unchanged."
          :examples [{:code "(disj #{1 2 3} 1)"}]
          :type :function
          :signature [{:params [coll key]}]}
@@ -228,10 +252,18 @@
          :signature [{:params [coll & keys]}]}
 	}
  
+  do
+	{
+	 :doc {:description "Executes multiple expressions sequentially, and returns the value of the final expression.."
+         :examples [{:code "(do (count [1 2 3]) :done)"}]
+         :type :special
+         :signature [{:params [& expressions]}]}
+	}
+ 
 
   double
  	{
-	 :doc {:description "Casts a numerical value to a Double."
+	 :doc {:description "Casts any numerical value to a Double."
          :examples [{:code "(double 3)"}]
          :type :function
          :signature [{:params [a]}]}
@@ -328,6 +360,14 @@
          :signature [{:params [coll]}]}
 	}
   
+  fn
+ 	{
+	 :doc {:description "Creates an anonymous function (closure) with the specified argument list and function body. Will close over variabels in the current lexical scope."
+         :examples [{:code "(let [f (fn [x] (* x x))] (f 10))"}]
+         :type :special
+         :signature [{:params [args & body]}]}
+	}
+  
   fn?
  	{
 	 :doc {:description "Tests if the argument is a function. Some arguments may be castable to functions but are not functions themselves, e.g. maps and vectors."
@@ -405,7 +445,7 @@
   
   if
   {
-	 :doc {:description "Calculates the test value, then returns the result of the true branch or false branch accordingly. The code in the other branch is not evaluated."
+	 :doc {:description "Calculates the value of the test expression, then returns the result of the true expression or false expression accordingly. Performs short-circuit evaluation, i.e. the expression in the unused branch is not evaluated. For a more general conditional expression that can handle multiple branches, consider 'cond' as an alternative."
          :examples [{:code "(if true :true-value :false-value)"}]
          :type :macro
          :signature [
@@ -417,7 +457,7 @@
   
   inc
 	{
-	 :doc {:description "Increments the given number by 1"
+	 :doc {:description "Increments the given number by 1. Converts to Long if necessary."
          :examples [{:code "(inc 10)"}]
          :type :function
          :signature [{:params [num]}]}
@@ -433,7 +473,7 @@
   
   into
 	{
-	 :doc {:description "Adds elements to a collection, in a collection-defined manner as with conj."
+	 :doc {:description "Adds elements to a collection, in a collection-defined manner as with 'conj'."
          :examples [{:code "(into {} [[1 2] [3 4]])"}]
          :type :function
          :signature [{:params [coll elements]}]}
@@ -466,7 +506,7 @@
  
   last
 	{
-	 :doc {:description "Returns the last element of a collection, in collection-defined order. Collection argument must be coercible to a sequence."
+	 :doc {:description "Returns the last element of a sequential collection, in collection-defined order. Collection argument must be coercible to a sequence."
          :examples [{:code "(last [1 2 3])"}]
          :type :function
          :signature [{:params [coll]}]}
@@ -529,6 +569,14 @@
           :type :function
           :signature [{:params [name]}]}
   }
+  
+  loop
+	{
+	 :doc {:description "Creates a loop body, binding one or more loop variables in a manner similar to 'let'. Within the loop body, 'recur' can be used to return to the start of the loop while re-binding the loop variables with new values. Does not consume stack."
+         :examples [{:code "(loop [i 10 acc 1] (if (> i 1) (recur (dec i) (* acc i)) acc))"}]
+         :type :special
+         :signature [{:params [bindings & body]}]}
+	}
   
   macro
   {
@@ -643,10 +691,10 @@
   
   return
   {
-    :doc {:description "Escapes from the currently executing code and returns the specified value from the current function."
+    :doc {:description "Escapes from the currently executing code and returns the specified value from the current function. Expressions following the 'return' will not be executed."
           :examples [{:code "(return :finished)"}]
           :type :special
-          :signature [{:params [val]}]}
+          :signature [{:params [value]}]}
   }
   
   rollback
@@ -697,6 +745,14 @@
          :signature [{:params [owner value]}]}
 	}
   
+  set*
+  {
+    :doc {:description "Sets or overwrites a value in the current local lexical bindings. Helper function for the 'set!', which should be preferred in most cases."
+          :examples [{:code "(set* 'a 10)"}]
+          :type :function
+          :signature [{:params [symbol value]}]}
+  }
+  
   set?
   {
     :doc {:description "Tests if the agument is a Set."
@@ -715,7 +771,7 @@
   
   sqrt
   {
-    :doc {:description "Computes the square root of a numbeic agument. Uses double precision maths. May return NaN for neagitive values."
+    :doc {:description "Computes the square root of a numerical argument. Uses double precision mathematics. May return NaN for negative values."
           :examples [{:code "(sqrt 16.0)"}]
           :type :function
           :signature [{:params [x]}]}

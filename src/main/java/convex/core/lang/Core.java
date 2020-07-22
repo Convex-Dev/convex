@@ -8,7 +8,6 @@ import java.util.Iterator;
 import java.util.Map;
 
 import convex.core.ErrorType;
-import convex.core.Init;
 import convex.core.State;
 import convex.core.crypto.Hash;
 import convex.core.data.ABlob;
@@ -25,6 +24,7 @@ import convex.core.data.Address;
 import convex.core.data.Amount;
 import convex.core.data.IGet;
 import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
@@ -80,7 +80,12 @@ public class Core {
 	/**
 	 * Symbol for core namespace
 	 */
-	private static final Symbol CORE_SYMBOL = Symbol.create("convex.core");
+	public static final Symbol CORE_SYMBOL = Symbol.create("convex.core");
+	
+	/**
+	 * Address for core library
+	 */
+	public static final Address CORE_ADDRESS=Address.dummy("cccc");
 
 	private static final HashSet<Object> tempReg = new HashSet<Object>();
 
@@ -527,6 +532,25 @@ public class Core {
 			long juice = Juice.FETCH;
 
 			return context.withResult(juice, result);
+		}
+	});
+	
+	public static final CoreFn<Object> SET_STAR = reg(new CoreFn<>(Symbols.SET_STAR) {
+		@Override
+		public <I> Context<Object> invoke(Context<I> context, Object[] args) {
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+
+			Symbol sym = RT.toSymbol(args[0]);
+			if (sym == null) return context.withCastError(args[0], Symbol.class);
+
+			if (sym.isQualified()) {
+				return context.withArgumentError("Cannot set! with qualified symbol: " + sym);
+			}
+			
+			Object value=args[1];
+			
+			context= context.withLocalBindings(context.getLocalBindings().assoc(sym, value));
+			return context.withResult(Juice.ASSOC,value);
 		}
 	});
 
@@ -1770,11 +1794,13 @@ public class Core {
 	 */
 	private static AHashMap<Symbol, Syntax> registerCoreCode(AHashMap<Symbol, Syntax> env) {
 		// we use a fake State to build the initial environment
-		State state = State.EMPTY.putAccount(Init.HERO,
+		Address ADDR=Address.dummy("0");
+		State state = State.EMPTY.putAccount(ADDR,
 				AccountStatus.createActor(0, Amount.create(1000000000), null, env));
-		Context<?> ctx = Context.createInitial(state, Init.HERO, 1000000L);
+		Context<?> ctx = Context.createInitial(state, ADDR, 1000000L);
 
 		Syntax form = null;
+		
 		try {
 			AList<Syntax> forms = Reader.readAllSyntax(Utils.readResourceAsString("lang/core.con"));
 			for (Syntax f : forms) {
@@ -1782,15 +1808,14 @@ public class Core {
 				ctx = ctx.eval(form);
 				// System.out.println("Core compilation juice: "+ctx.getJuice());
 				if (ctx.isExceptional()) {
-					System.out.println("Error compiling form\n" + form + "\n Error + " + ctx.getExceptional());
+					throw new Error("Error compiling form: "+ Syntax.unwrapAll(form)+ " : "+ ctx.getExceptional());
 				}
 			}
-		} catch (Throwable t) {
-			System.err.println("ERROR IN CORE INIT WITH FORM: " + form);
-			t.printStackTrace();
+		} catch (IOException t) {
+			throw Utils.sneakyThrow(t);
 		}
 
-		return ctx.getAccountStatus(Init.HERO).getEnvironment();
+		return ctx.getAccountStatus(ADDR).getEnvironment();
 	}
 
 	private static AHashMap<Symbol, Syntax> registerSpecials(AHashMap<Symbol, Syntax> env) {
@@ -1798,18 +1823,30 @@ public class Core {
 		return env;
 	}
 
+	@SuppressWarnings("unchecked")
 	private static AHashMap<Symbol, Syntax> applyDocumentation(AHashMap<Symbol, Syntax> env) throws IOException {
 		AMap<Symbol, AHashMap<Object, Object>> m = Reader.read(Utils.readResourceAsString("lang/core-metadata.doc"));
 		for (Map.Entry<Symbol, AHashMap<Object, Object>> de : m.entrySet()) {
 			Symbol sym = de.getKey();
+			AHashMap<Object, Object> newMeta = de.getValue();
 			MapEntry<Symbol, Syntax> me = env.getEntry(sym);
 			if (me == null) {
-				System.err.println("CORE WARNING: Documentation for non-existent core symbol: " + sym);
-				continue;
+				AHashMap<Keyword, Object> doc=(AHashMap<Keyword, Object>) newMeta.get(Keywords.DOC);
+				if (doc==null) {
+					System.err.println("CORE WARNING: Missing :doc tag in metadata for: " + sym);
+				} else if (me==null) {
+					if (Keywords.SPECIAL.equals(doc.get(Keywords.TYPE))) {
+						// create a fake entry
+						me=MapEntry.create(sym, Syntax.create(sym,newMeta));		
+					} else {
+						System.err.println("CORE WARNING: Documentation for non-existent core symbol: " + sym);
+						continue;
+					}
+				}
 			}
 
 			Syntax oldSyn = me.getValue();
-			Syntax newSyn = oldSyn.mergeMeta(de.getValue());
+			Syntax newSyn = oldSyn.mergeMeta(newMeta);
 			env = env.assoc(sym, newSyn);
 		}
 
@@ -1819,6 +1856,7 @@ public class Core {
 	static {
 		// Set up convex.core environment
 		AHashMap<Symbol, Syntax> coreEnv = Maps.empty();
+		
 		try {
 
 			// Register all objects from registered runtime
@@ -1832,12 +1870,15 @@ public class Core {
 			coreEnv = applyDocumentation(coreEnv);
 		} catch (Throwable e) {
 			e.printStackTrace();
-			throw new Error(e);
 		}
 		
 		CORE_NAMESPACE = coreEnv;
 
-		AHashMap<Symbol, Syntax> defaultEnv = coreEnv.assoc(Symbols.STAR_ALIASES,Syntax.create(Maps.of(CORE_SYMBOL,coreEnv)));
+		// Copy aliases into default environment
+		// TODO: should be only definition in default environment?
+		Syntax ALIASES=coreEnv.get(Symbols.STAR_ALIASES);
+		assert(ALIASES!=null);
+		AHashMap<Symbol, Syntax> defaultEnv = coreEnv.assoc(Symbols.STAR_ALIASES,ALIASES);
 		
 		ENVIRONMENT = defaultEnv;
 	}

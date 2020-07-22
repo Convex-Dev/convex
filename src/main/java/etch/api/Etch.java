@@ -10,6 +10,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import convex.core.crypto.Hash;
@@ -82,6 +83,7 @@ public class Etch {
 
 	private static final Logger log=Logger.getLogger(Etch.class.getName());
 
+	private static final Level LEVEL_STORE=Level.FINE;
 	
 	private final byte[] temp=new byte[INDEX_BLOCK_SIZE];
 
@@ -157,7 +159,7 @@ public class Etch {
 	 */
 	public static Etch create(File file) throws IOException {
 		Etch etch= new Etch(file);
-		log.info("Etch created on file: "+file+" with data length: "+etch.dataLength);
+		log.log(LEVEL_STORE,"Etch created on file: "+file+" with data length: "+etch.dataLength);
 		return etch;
 	}
 	
@@ -472,7 +474,7 @@ public class Etch {
 			
 			data.close();
 	
-			log.info("Etch closed on file: "+data+" with data length: "+dataLength);
+			log.log(LEVEL_STORE,"Etch closed on file: "+data+" with data length: "+dataLength);
 		} catch (IOException e) {
 			log.severe("Error closing Etch file: "+file);
 			e.printStackTrace();

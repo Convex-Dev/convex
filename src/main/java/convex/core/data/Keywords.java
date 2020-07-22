@@ -37,6 +37,10 @@ public class Keywords {
 	public static final Keyword DESCRIPTION = Keyword.create("description");
 	public static final Keyword EXAMPLES = Keyword.create("examples");
 	public static final Keyword CODE = Keyword.create("code");
+
+	public static final Keyword TYPE = Keyword.create("type");
+	public static final Keyword SPECIAL = Keyword.create("special");
+
 	
 	public static final Keyword PEER = Keyword.create("peer");
 	public static final Keyword STAKE = Keyword.create("stake");

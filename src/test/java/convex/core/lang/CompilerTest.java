@@ -405,6 +405,9 @@ public class CompilerTest {
 		c=c.execute(defop);
 		c=c.execute(comp("(c1 bar)",c));
 		assertEquals("bar",c.getResult());
+		
+		// TODO: think about this.
+		// assertEquals(2L,(long)eval("((macro [x] 2) (return 3))"));
 	}
 	
 	@Test 
@@ -418,13 +421,19 @@ public class CompilerTest {
 		assertEquals(Maps.of(11L,5L),eval("{~((fn [x] (do (return (+ x 7)) 100)) 4) 5}"));
 		assertEquals(Maps.of(1L,2L),eval("{(inc 0) 2}"));
 		
-		// TODO: is this sane?
 		assertEquals(2L,(long)eval("(count {*juice* *juice* *juice* *juice*})"));
 		assertEquals(4L,(long)eval("(count #{*juice* *juice* *juice* *juice*})"));
 	}
 	
 	@Test 
 	public void testInitialEnvironment() {
+		// list should be a core function
 		assertTrue(eval("list") instanceof AFn);
+		
+		// if should be a macro implemented as an expander
+		assertTrue(eval("if") instanceof AExpander);
+		
+		// def should be a special form, and evaluate to a symbol
+		assertEquals(Symbols.DEF,eval("def"));
 	}
 }

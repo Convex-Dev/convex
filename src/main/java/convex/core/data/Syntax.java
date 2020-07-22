@@ -131,11 +131,13 @@ public class Syntax extends ACell implements IRefContainer {
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		sb.append("#syntax {:datum ");
+		sb.append("#syntax ");
 		Utils.ednString(sb, datumRef.getValue());
-		sb.append(" :meta ");
-		Utils.ednString(sb, meta);
-		sb.append("}\n");
+	}
+	
+	@Override
+	public String toString() {
+		return Utils.ednString(datumRef.getValue());
 	}
 
 	@Override
