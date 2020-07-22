@@ -17,6 +17,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.exceptions.ParseException;
+import org.parboiled.support.ParseTreeUtils;
 
 public class ScryptTest {
 
@@ -141,6 +142,20 @@ public class ScryptTest {
             assertEquals(1L, (Long) ((Syntax) value.get(2)).getValue());
         }
 
+    }
+
+    @Test
+    public void testFunctionApplication() {
+        var parser = Parboiled.createParser(Scrypt.class);
+
+        {
+            assertTrue(new ReportingParseRunner(parser.FunctionApplication()).run("f()").matched);
+            assertTrue(new ReportingParseRunner(parser.FunctionApplication()).run("f(1)").matched);
+            assertTrue(new ReportingParseRunner(parser.FunctionApplication()).run("f( 1 )").matched);
+            assertTrue(new ReportingParseRunner(parser.FunctionApplication()).run("f(1, 2)").matched);
+            assertTrue(new ReportingParseRunner(parser.FunctionApplication()).run("f(1, 2 + 3)").matched);
+            assertTrue(new ReportingParseRunner(parser.FunctionApplication()).run("f(1, (2 + 3) * 2)").matched);
+        }
     }
 
     @Test
