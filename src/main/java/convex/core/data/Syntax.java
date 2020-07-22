@@ -15,6 +15,9 @@ import convex.core.util.Utils;
  * <li>Metadata for the Syntax Object, which may be an arbitrary hashmap</li>
  * </ul>
  * 
+ * Syntax Objects may not wrap another Syntax Object directly, but may contain nested
+ * Syntax Objects within data structures.
+ * 
  * Inspired by Racket.
  * 
  */
@@ -151,7 +154,7 @@ public class Syntax extends ACell implements IRefContainer {
 	public void validate() throws InvalidDataException {
 		super.validate();
 		if (datumRef.getValue() instanceof Syntax) {
-			throw new InvalidDataException("Cannot wrap a Syntax value twice",this);
+			throw new InvalidDataException("Cannot double-wrap a Syntax value",this);
 		}
 	}
 
@@ -227,13 +230,17 @@ public class Syntax extends ACell implements IRefContainer {
 	public static <R> R unwrapAll(Object maybeSyntax) {
 		Object a = unwrap(maybeSyntax);
 
-		if (a instanceof ACollection) {
-			return (R) ((ACollection<?>) a).map(e -> unwrapAll(e));
-		} else if (a instanceof AMap) {
-			AMap<?, ?> m = (AMap<?, ?>) a;
-			return (R) m.reduceEntries((acc, e) -> {
-				return acc.assoc(unwrapAll(e.getKey()), unwrapAll(e.getValue()));
-			}, (AMap<Object, Object>) Maps.empty());
+		if (a instanceof ADataStructure) {
+			if (a instanceof ACollection) {
+				return (R) ((ACollection<?>) a).map(e -> unwrapAll(e));
+			} else if (a instanceof AMap) {
+				AMap<?, ?> m = (AMap<?, ?>) a;
+				return (R) m.reduceEntries((acc, e) -> {
+					return acc.assoc(unwrapAll(e.getKey()), unwrapAll(e.getValue()));
+				}, (AMap<Object, Object>) Maps.empty());
+			} else {
+				throw new Error("Don't know how to unrap data structure of type: "+Utils.getClassName(a));
+			}
 		} else {
 			return (R) a;
 		}
