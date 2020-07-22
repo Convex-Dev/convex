@@ -204,8 +204,8 @@ public class SignedData<T> extends ACell implements IRefContainer {
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		sb.append("#signeddata {:ref ");
-		sb.append(valueRef.getHash().toString());
+		sb.append("#signeddata {");
+		sb.append(":data "+valueRef.getHash().toString());
 		sb.append("}");
 	}
 
