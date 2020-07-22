@@ -34,7 +34,6 @@ public class Scrypt extends Reader {
 
     public Rule Expression() {
         return FirstOf(
-                FunctionApplication(),
                 NestedExpression(),
                 NilLiteral(),
                 NumberLiteral(),
@@ -51,7 +50,7 @@ public class Scrypt extends Reader {
 
     public Rule FunctionApplication() {
         return Sequence(
-                Symbol(),
+                Expression(),
                 Spacing(),
                 FunctionParameters());
     }
@@ -87,9 +86,11 @@ public class Scrypt extends Reader {
     }
 
     public Rule CompoundExpression() {
-        return Sequence(
-                Expression(),
-                ZeroOrMore(Sequence(Spacing(), InfixExpression())));
+        return FirstOf(
+                Sequence(
+                        Expression(),
+                        ZeroOrMore(Sequence(Spacing(), InfixExpression()))),
+                FunctionApplication());
     }
 
     public Rule CompoundExpressionList() {
