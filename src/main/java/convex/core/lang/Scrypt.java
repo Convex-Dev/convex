@@ -4,11 +4,14 @@ import convex.core.data.*;
 import org.parboiled.Parboiled;
 import org.parboiled.Rule;
 import org.parboiled.annotations.BuildParseTree;
+import org.parboiled.annotations.DontLabel;
+import org.parboiled.annotations.SuppressNode;
 import org.parboiled.parserunners.ReportingParseRunner;
 import org.parboiled.support.Var;
 
 import java.util.ArrayList;
 
+@SuppressWarnings({"InfiniteRecursion"})
 @BuildParseTree
 public class Scrypt extends Reader {
 
@@ -31,6 +34,7 @@ public class Scrypt extends Reader {
 
     public Rule Expression() {
         return FirstOf(
+                FunctionApplication(),
                 NestedExpression(),
                 NilLiteral(),
                 NumberLiteral(),
@@ -43,6 +47,21 @@ public class Scrypt extends Reader {
 
     public Rule NestedExpression() {
         return Sequence("(", Spacing(), CompoundExpression(), Spacing(), ")");
+    }
+
+    public Rule FunctionApplication() {
+        return Sequence(
+                Symbol(),
+                Spacing(),
+                FunctionParameters());
+    }
+
+    public Rule FunctionParameters() {
+        return Sequence("(", Spacing(), Optional(FunctionParametersDecls()), Spacing(), ")");
+    }
+
+    public Rule FunctionParametersDecls() {
+        return Sequence(CompoundExpression(), Optional(",", Spacing(), FunctionParametersDecls()));
     }
 
     public Rule InfixOperator() {
