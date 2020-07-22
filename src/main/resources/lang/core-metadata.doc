@@ -1,5 +1,6 @@
 ;; file for core documentation
 ;; read in as raw forms and added to metadata for each core symbol
+;; includes metadata for Convex Lisp special forms
 {
 	accept 
 	{
@@ -169,15 +170,16 @@
  
   conj
 	{
-	 :doc {:description "Adds elements to a data structure, in the natural mode of addition for the datat structure."
-         :examples [{:code "(conj [1 2] 3)"}]
+	 :doc {:description "Adds elements to a data structure, in the natural mode of addition for the data structure. Supports sequential collections, sets and maps."
+         :examples [{:code "(conj [1 2] 3)"}
+                    {:code "(conj {1 2} [3 4])"}]
          :type :function
          :signature [{:params [coll & elems]}]}
 	}
  
   cons
 	{
-	 :doc {:description "Constructs a list, by pre-pending the leading arguments to the last argument. The last argument must be coercable to a sequence."
+	 :doc {:description "Constructs a list, by prepending the leading arguments to the last argument. The last argument must be coercable to a sequence."
          :examples [{:code "(cons 1 2 '(3 4))"}]
          :type :function
          :signature [{:params [& args]}]}
@@ -571,7 +573,7 @@
 	{
 	 :doc {:description "Creates a loop body, binding one or more loop variables in a manner similar to 'let'. Within the loop body, 'recur' can be used to return to the start of the loop while re-binding the loop variables with new values. Does not consume stack."
          :examples [{:code "(loop [i 10 acc 1] (if (> i 1) (recur (dec i) (* acc i)) acc))"}]
-         :type :function
+         :type :special
          :signature [{:params [bindings & body]}]}
 	}
   
@@ -688,10 +690,10 @@
   
   return
   {
-    :doc {:description "Escapes from the currently executing code and returns the specified value from the current function."
+    :doc {:description "Escapes from the currently executing code and returns the specified value from the current function. Expressions following the 'return' will not be executed."
           :examples [{:code "(return :finished)"}]
           :type :special
-          :signature [{:params [val]}]}
+          :signature [{:params [value]}]}
   }
   
   rollback
