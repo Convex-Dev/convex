@@ -36,7 +36,7 @@ public class API {
 
 		try {
 			config.put(Keywords.PORT, null);
-			config.put(Keywords.STORE, Stores.SERVER_STORE);
+			config.put(Keywords.STORE, Stores.DEFAULT);
 			config.put(Keywords.KEYPAIR, Init.KEYPAIRS[0]);
 			config.put(Keywords.STATE, Init.INITIAL_STATE);
 

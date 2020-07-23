@@ -8,6 +8,7 @@ import java.io.RandomAccessFile;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
+import java.nio.channels.FileLock;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.logging.Level;
@@ -103,7 +104,12 @@ public class Etch {
 		this.file=dataFile;
 		if (!dataFile.exists()) dataFile.createNewFile();
 		this.data=new RandomAccessFile(dataFile,"rw");
-		this.data.getChannel().lock();
+		FileChannel fileChannel=this.data.getChannel();
+		FileLock lock=fileChannel.tryLock();
+		if (lock==null) {
+			log.log(Level.SEVERE,"Unable to obtain lock on file: "+dataFile);
+			throw new IOException("File lock failed");
+		}
 		if (dataFile.length()==0) {
 			// need to create new file, with data length long and initial index block
 			MappedByteBuffer mbb=seekMap(0);

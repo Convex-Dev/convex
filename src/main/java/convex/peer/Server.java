@@ -134,7 +134,7 @@ public class Server implements Closeable {
 		this.peer = Peer.createStartupPeer(config);
 		AStore configStore = (AStore) config.get(Keywords.STORE);
 
-		store = (configStore == null) ? Stores.SERVER_STORE : configStore;
+		store = (configStore == null) ? Stores.DEFAULT : configStore;
 		nio = NIOServer.create(this, receiveQueue);
 	}
 

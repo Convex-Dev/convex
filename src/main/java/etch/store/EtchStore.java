@@ -28,13 +28,6 @@ import etch.api.Etch;
  * Garbage collection is left as an exercise for the reader.
  */
 public class EtchStore extends AStore {
-	public static final File DEFAULT_FILE = new File("etch-db");
-	
-	/**
-	 * Default Etch store instance. Intended for use by servers, but may be used by clients.
-	 */
-	public static final EtchStore DEFAULT = EtchStore.create(DEFAULT_FILE);
-	
 	private static final Logger log = Logger.getLogger(EtchStore.class.getName());
 
 	/**

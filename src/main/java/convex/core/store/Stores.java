@@ -9,13 +9,9 @@ public class Stores {
 	/**
 	 * Default store to use in client applications
 	 */
-	public static final AStore CLIENT_STORE = EtchStore.createTemp("client-db");
+	public static final AStore CLIENT_STORE = EtchStore.createTemp("convex-db");
 	
-	/**
-	 * Default store to use in server applications
-	 */
-	public static final AStore SERVER_STORE = EtchStore.DEFAULT;
-
+	public static final AStore DEFAULT = CLIENT_STORE;
 	
 	private static final ThreadLocal<AStore> currentStore = new ThreadLocal<>() {
 		@Override
