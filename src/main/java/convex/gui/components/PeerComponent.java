@@ -52,7 +52,7 @@ public class PeerComponent extends BaseListComponent {
 		JButton button = new JButton("");
 		button.setBorder(null);
 		add(button, BorderLayout.WEST);
-		button.setIcon(Toolkit.CAKE);
+		button.setIcon(Toolkit.CONVEX);
 		button.addActionListener(e -> {
 			launchPeerWindow(this.peer);
 		});

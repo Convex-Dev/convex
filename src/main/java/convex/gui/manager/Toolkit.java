@@ -66,6 +66,7 @@ public class Toolkit {
 	public static final ImageIcon UNLOCKED_ICON = scaledIcon(36, "/images/padlock-open.png");
 	public static final ImageIcon WARNING = scaledIcon(36, "/images/ic_priority_high_black_36dp.png");
 	public static final ImageIcon CAKE = scaledIcon(36, "/images/ic_cake_black_36dp.png");
+	public static final ImageIcon CONVEX = scaledIcon(36, "/images/Convex.png");
 	public static final ImageIcon COG = scaledIcon(36, "/images/cog.png");
 
 	public static final Font DEFAULT_FONT = new JLabel().getFont();
