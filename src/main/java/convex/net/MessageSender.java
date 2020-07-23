@@ -8,7 +8,7 @@ import java.util.logging.Logger;
 import convex.core.data.Format;
 
 public class MessageSender {
-	public static final int SEND_BUFFER_SIZE = Format.MAX_ENCODING_LENGTH * 5;
+	public static final int SEND_BUFFER_SIZE = Format.MAX_ENCODING_LENGTH * 10;
 
 	private final ByteChannel channel;
 

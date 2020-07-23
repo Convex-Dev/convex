@@ -28,7 +28,7 @@ import convex.core.exceptions.BadFormatException;
  *
  */
 public class MessageReceiver {
-	public static final int RECEIVE_BUFFER_SIZE = Format.MAX_ENCODING_LENGTH * 2 + 20;
+	public static final int RECEIVE_BUFFER_SIZE = Format.MAX_ENCODING_LENGTH * 5 + 20;
 
 	private ByteBuffer buffer = ByteBuffer.allocateDirect(RECEIVE_BUFFER_SIZE);
 	private final Consumer<Message> action;
