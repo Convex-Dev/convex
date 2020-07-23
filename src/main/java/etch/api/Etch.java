@@ -59,12 +59,18 @@ public class Etch {
 	private static final int LENGTH_SIZE=2;
 	private static final int POINTER_SIZE=8;
 	
+	/**
+	 * Index block is fixed size with 256 entries 
+	 */
 	private static final int INDEX_BLOCK_SIZE=POINTER_SIZE*256;
 	
-	// constants for memory mapping
-	private static final int MAX_CHUNK_SIZE=1<<30; // 1GB
-	private static final int BUFFER_MARGIN=65536; // 64k margin for writes
+	// constants for memory mapping buffers
+	private static final int MAX_BUFFER_SIZE=1<<30; // 1GB seems reasonable
+	private static final int BUFFER_MARGIN=65536; // 64k margin for writes past end of current buffer
 	
+	/**
+	 * Magic number for Etch files, must be first 2 bytes
+	 */
 	private static final byte[] MAGIC_NUMBER=Utils.hexToBytes("e7c6");
 	
 	private static final int SIZE_HEADER_MAGIC=2;
@@ -114,9 +120,12 @@ public class Etch {
 	private boolean BUILD_CHAINS=true;
 	
 	private Etch(File dataFile) throws IOException {
+		// Ensure we have a RandomAccessFile that exists
 		this.file=dataFile;
 		if (!dataFile.exists()) dataFile.createNewFile();
 		this.data=new RandomAccessFile(dataFile,"rw");
+		
+		// Try to exclusively lock the Etch database file
 		FileChannel fileChannel=this.data.getChannel();
 		FileLock lock=fileChannel.tryLock();
 		if (lock==null) {
@@ -127,7 +136,7 @@ public class Etch {
 		// at this point, we have an exclusive lock on the database file.
 		
 		if (dataFile.length()==0) {
-			// need to create new file, with data length long and initial index block
+			// Need to populate  new file, with data length long and initial index block
 			MappedByteBuffer mbb=seekMap(0);
 			mbb.put(MAGIC_NUMBER);
 			
@@ -212,10 +221,10 @@ public class Etch {
 		if ((position<0)||(position>dataLength)) {
 			throw new Error("Seek out of range in Etch file: "+Utils.toHexString(position));
 		}
-		int mapIndex=Utils.checkedInt(position/MAX_CHUNK_SIZE); // 1GB chunks
+		int mapIndex=Utils.checkedInt(position/MAX_BUFFER_SIZE); // 1GB chunks
 		
 		MappedByteBuffer mbb=getBuffer(mapIndex);
-		mbb.position(Utils.checkedInt(position-MAX_CHUNK_SIZE*(long)mapIndex));
+		mbb.position(Utils.checkedInt(position-MAX_BUFFER_SIZE*(long)mapIndex));
 		return mbb;
 	}
 
@@ -227,9 +236,9 @@ public class Etch {
 	}
 
 	private MappedByteBuffer createBuffer(int mapIndex) throws IOException {
-		long pos=mapIndex*(long)MAX_CHUNK_SIZE;
+		long pos=mapIndex*(long)MAX_BUFFER_SIZE;
 		int length=1<<16;
-		while((length<MAX_CHUNK_SIZE)&&((pos+length)<(dataLength+BUFFER_MARGIN))) {
+		while((length<MAX_BUFFER_SIZE)&&((pos+length)<(dataLength+BUFFER_MARGIN))) {
 			length*=2;
 		}
 		length+=BUFFER_MARGIN; // include margin
