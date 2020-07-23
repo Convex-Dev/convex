@@ -65,16 +65,29 @@ public class Etch {
 	private static final int MAX_CHUNK_SIZE=1<<30; // 1GB
 	private static final int BUFFER_MARGIN=65536; // 64k margin for writes
 	
-	/**
-	 * Length of dataLength header (64 bit long)
-	 */
-	private static final int SIZE_HEADER_LENGTH=8;
+	private static final byte[] MAGIC_NUMBER=Utils.hexToBytes("e7c6");
 	
+	private static final int SIZE_HEADER_MAGIC=2;
+	private static final int SIZE_HEADER_FILESIZE=8;
+	private static final int SIZE_HEADER_ROOT=32;
+
+	/**
+	 * Length of header, including:
+	 * - Magic number "e7c6"
+	 * - File size
+	 * - Root hash
+	 * 
+	 * "The Ultimate Answer to Life, The Universe and Everything is... 42!"
+     * - Douglas Adams, The Hitchhiker's Guide to the Galaxy
+	 */
+	private static final int SIZE_HEADER=SIZE_HEADER_MAGIC+SIZE_HEADER_FILESIZE+SIZE_HEADER_ROOT;
+	
+
 	/**
 	 * Start position of first index block
 	 * This is immediately after a long data length pointer at the start of the file
 	 */
-	private static final long INDEX_START=SIZE_HEADER_LENGTH; 
+	private static final long INDEX_START=SIZE_HEADER; 
 	
 	private static final long TYPE_MASK= 0xC000000000000000L;
 	private static final long PTR_PLAIN=0x0000000000000000L; // direct pointer to data
@@ -110,18 +123,34 @@ public class Etch {
 			log.log(Level.SEVERE,"Unable to obtain lock on file: "+dataFile);
 			throw new IOException("File lock failed");
 		}
+		
+		// at this point, we have an exclusive lock on the database file.
+		
 		if (dataFile.length()==0) {
 			// need to create new file, with data length long and initial index block
 			MappedByteBuffer mbb=seekMap(0);
-			mbb.putLong(SIZE_HEADER_LENGTH);
-			dataLength=SIZE_HEADER_LENGTH; // advance past initial long
+			mbb.put(MAGIC_NUMBER);
+			
+			// write zeros (temp is newly empty) for file size and root. Will fix later
+			mbb.put(temp,0,SIZE_HEADER_FILESIZE+SIZE_HEADER_ROOT);
+			dataLength=SIZE_HEADER; // advance past initial long
+			
+			// add an index block
 			long indexStart=appendNewIndexBlock();
 			assert(indexStart==INDEX_START);
-			mbb=seekMap(0);
+			
+			// ensure data length is initially correct
+			mbb=seekMap(SIZE_HEADER_MAGIC);
 			mbb.putLong(dataLength);
 		} else {
 			// existing file, so need to read the length pointer
 			MappedByteBuffer mbb=seekMap(0);
+			byte[] check=new byte[2];
+			mbb.get(check);
+			if(!Arrays.equals(MAGIC_NUMBER, check)) {
+				throw new IOException("Bad magic number! Probably not an Etch file: "+dataFile);
+			}
+			
 			long length = mbb.getLong();
 			dataLength=length;
 		}
