@@ -14,6 +14,7 @@ import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import convex.core.exceptions.BadFormatException;
@@ -35,6 +36,8 @@ public class NIOServer implements Closeable {
 	public static final int DEFAULT_PORT = 18888;
 
 	private static final Logger log=Logger.getLogger(NIOServer.class.getName());
+	
+	static final Level LEVEL_BAD_CONNECTION=Level.WARNING;
 
 	private ServerSocketChannel ssc=null;
 	
@@ -181,14 +184,13 @@ public class NIOServer implements Closeable {
 			}
 		} 
 		catch (ClosedChannelException e) {
-			log.finer("Channel closed from: "+conn.getRemoteAddress());
+			log.log(LEVEL_BAD_CONNECTION,"Channel closed from: "+conn.getRemoteAddress());
 			key.cancel();
 		} 
 		catch (BadFormatException e) {
-			log.finer("Cancelled connection: Bad data format from: "+conn.getRemoteAddress()+" message: "+e.getMessage());
+			log.log(LEVEL_BAD_CONNECTION,"Cancelled connection: Bad data format from: "+conn.getRemoteAddress()+" message: "+e.getMessage());
 			// TODO: blacklist peer?
 			key.cancel();
-			// e.printStackTrace();
 		}
 	}
 

@@ -520,7 +520,7 @@ public class Connection {
 			log.info("Remote server channel closed from: " + conn.getRemoteAddress());
 			key.cancel();
 		} catch (BadFormatException e) {
-			log.info("Cancelled connection: Bad data format from: " + conn.getRemoteAddress() + " " + e.getMessage());
+			log.log(NIOServer.LEVEL_BAD_CONNECTION,"Cancelled connection to Peer: Bad data format from: " + conn.getRemoteAddress() + " " + e.getMessage());
 			key.cancel();
 		} 
 	}
@@ -563,7 +563,7 @@ public class Connection {
 			}
 		} catch (IOException e) {
 			// TODO: figure out cases here. Probably channel closed?
-			log.warning(e.getMessage());
+			log.log(NIOServer.LEVEL_BAD_CONNECTION,e.getMessage());
 			key.cancel();
 		}
 	}
