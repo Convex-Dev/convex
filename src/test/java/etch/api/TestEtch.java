@@ -14,6 +14,7 @@ import convex.core.data.AVector;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
+import etch.Etch;
 
 public class TestEtch {
 	private static final int ITERATIONS = 3;

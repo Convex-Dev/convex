@@ -1,4 +1,4 @@
-package etch.store;
+package etch;
 
 import java.io.File;
 import java.io.IOException;
@@ -13,7 +13,6 @@ import convex.core.data.Ref;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
-import etch.api.Etch;
 
 /**
  * Class implementing on-disk memory-mapped storage of Convex data.
@@ -45,13 +44,9 @@ public class EtchStore extends AStore {
 	 * @param file File to use for storage. Will be created it it does not already exist.
 	 * @return EtchStore instance
 	 */
-	public static EtchStore create(File file) {
-		try {
-			Etch etch = Etch.create(file);
-			return new EtchStore(etch);
-		} catch (IOException e) {
-			throw Utils.sneakyThrow(e);
-		}
+	public static EtchStore create(File file) throws IOException {
+		Etch etch = Etch.create(file);
+		return new EtchStore(etch);
 	}
 
 	/**
@@ -179,5 +174,13 @@ public class EtchStore extends AStore {
 	 */
 	public String getFileName() {
 		return etch.getFile().toString();
+	}
+
+	public void close() {
+		etch.close();
+	}
+
+	public File getFile() {
+		return etch.getFile();
 	}
 }

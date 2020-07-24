@@ -7,8 +7,8 @@ import convex.core.State;
 import convex.core.data.Address;
 import convex.core.data.PeerStatus;
 import convex.core.util.Text;
+import convex.gui.components.models.StateModel;
 import convex.gui.manager.PeerManager;
-import convex.gui.manager.models.StateModel;
 import convex.net.Connection;
 import convex.peer.Server;
 

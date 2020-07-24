@@ -15,7 +15,7 @@ import convex.gui.manager.windows.etch.EtchWindow;
 import convex.gui.manager.windows.peer.PeerWindow;
 import convex.gui.manager.windows.state.StateWindow;
 import convex.peer.Server;
-import etch.store.EtchStore;
+import etch.EtchStore;
 
 @SuppressWarnings("serial")
 public class PeerComponent extends BaseListComponent {

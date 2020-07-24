@@ -34,7 +34,7 @@ import convex.core.transactions.Invoke;
 import convex.core.transactions.Transfer;
 import convex.core.util.Utils;
 import convex.test.Samples;
-import etch.store.EtchStore;
+import etch.EtchStore;
 
 public class EtchStoreTest {
 

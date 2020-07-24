@@ -11,8 +11,9 @@ import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
 import convex.core.store.Stores;
+import convex.gui.components.models.StateModel;
 import convex.gui.etch.panels.DatabasePanel;
-import etch.store.EtchStore;
+import etch.EtchStore;
 
 /**
  * A Client application for the Convex Network
@@ -59,7 +60,7 @@ public class EtchExplorer extends JPanel {
 	 */
 	JPanel panel = new JPanel();
 
-	EtchStore etch=(EtchStore) Stores.DEFAULT;
+	private static StateModel<EtchStore> etchState = StateModel.create((EtchStore) Stores.DEFAULT);
 	
 	DatabasePanel homePanel = new DatabasePanel(this);
 	JTabbedPane tabs = new JTabbedPane();
@@ -92,8 +93,18 @@ public class EtchExplorer extends JPanel {
 	public static Component getFrame() {
 		return frame;
 	}
+	
+	public StateModel<EtchStore> getEtchState() {
+		return etchState;
+	}
 
 	public EtchStore getStore() {
-		return etch;
+		return etchState.getValue();
+	}
+	
+	public void setStore(EtchStore newEtch) {
+		EtchStore e=etchState.getValue();
+		e.close();
+		etchState.setValue(newEtch);
 	}
 }

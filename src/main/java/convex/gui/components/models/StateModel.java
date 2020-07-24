@@ -1,4 +1,4 @@
-package convex.gui.manager.models;
+package convex.gui.components.models;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;

@@ -2,7 +2,7 @@ package convex.core.store;
 
 import java.util.logging.Level;
 
-import etch.store.EtchStore;
+import etch.EtchStore;
 
 public class Stores {
 	

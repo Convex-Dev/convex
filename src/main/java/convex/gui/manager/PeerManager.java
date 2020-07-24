@@ -26,6 +26,7 @@ import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
 import convex.gui.components.PeerView;
+import convex.gui.components.models.StateModel;
 import convex.gui.manager.mainpanels.AboutPanel;
 import convex.gui.manager.mainpanels.AccountsPanel;
 import convex.gui.manager.mainpanels.ActorsPanel;
@@ -34,7 +35,6 @@ import convex.gui.manager.mainpanels.KeyGenPanel;
 import convex.gui.manager.mainpanels.MessageFormatPanel;
 import convex.gui.manager.mainpanels.PeersListPanel;
 import convex.gui.manager.mainpanels.WalletPanel;
-import convex.gui.manager.models.StateModel;
 import convex.net.Connection;
 import convex.net.Message;
 

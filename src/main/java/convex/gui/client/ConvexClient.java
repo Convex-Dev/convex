@@ -25,10 +25,10 @@ import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
 import convex.gui.components.PeerView;
+import convex.gui.components.models.StateModel;
 import convex.gui.manager.mainpanels.AboutPanel;
 import convex.gui.client.panels.HomePanel;
 import convex.gui.manager.mainpanels.PeersListPanel;
-import convex.gui.manager.models.StateModel;
 import convex.net.Connection;
 import convex.net.Message;
 

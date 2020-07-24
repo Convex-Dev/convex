@@ -26,7 +26,7 @@ import convex.gui.components.ScrollyList;
 import convex.gui.manager.PeerManager;
 import convex.net.Connection;
 import convex.peer.Server;
-import etch.store.EtchStore;
+import etch.EtchStore;
 
 @SuppressWarnings("serial")
 public class PeersListPanel extends JPanel {

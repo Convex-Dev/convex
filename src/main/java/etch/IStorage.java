@@ -1,4 +1,4 @@
-package etch.api;
+package etch;
 
 import java.nio.ByteBuffer;
 

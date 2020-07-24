@@ -1,4 +1,4 @@
-package etch.api;
+package etch;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -502,7 +502,7 @@ public class Etch {
 	 * Close all files resources with this Etch store, including writing the final
 	 * data length.
 	 */
-	private synchronized void close() {
+	synchronized void close() {
 		try {
 			// write final data length
 			MappedByteBuffer mbb=seekMap(0);

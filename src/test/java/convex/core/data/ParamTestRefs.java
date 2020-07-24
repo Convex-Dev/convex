@@ -13,7 +13,7 @@ import org.junit.runners.Parameterized;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.store.Stores;
-import etch.store.EtchStore;
+import etch.EtchStore;
 
 @RunWith(Parameterized.class)
 public class ParamTestRefs {
