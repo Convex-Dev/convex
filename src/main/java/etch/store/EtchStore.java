@@ -172,4 +172,12 @@ public class EtchStore extends AStore {
 	public String toString() {
 		return "EtchStore at "+etch.getFile();
 	}
+
+	/**
+	 * Gets the database file name for this EtchStore
+	 * @return File name as a String
+	 */
+	public String getFileName() {
+		return etch.getFile().toString();
+	}
 }
