@@ -319,11 +319,6 @@ public class State extends ARecord {
 
 	@Override
 	public boolean isCanonical() {
-		// TODO fix?
-		if (!accounts.isCanonical()) return false;
-		if (!peers.isCanonical()) return false;
-		if (!store.isCanonical()) return false;
-		if (!globals.isCanonical()) return false;
 		return true;
 	}
 
