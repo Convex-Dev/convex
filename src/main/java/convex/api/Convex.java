@@ -10,6 +10,9 @@ import convex.net.Connection;
 
 /**
  * Class representing the client API to the Convex network
+ * 
+ * "I'm doing a (free) operating system (just a hobby, won't be big and professional like gnu)"
+ * - Linus Torvalds
  */
 public class Convex {
 

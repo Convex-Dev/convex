@@ -23,7 +23,8 @@ import convex.core.lang.Symbols;
 /**
  * Static functionality for generating the initial Convex State
  *
- * "The beginning is the most important part of the work." - Plato, The Republic
+ * "The beginning is the most important part of the work." 
+ * - Plato, The Republic
  */
 public class Init {
 	/**
