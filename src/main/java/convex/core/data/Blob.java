@@ -13,12 +13,21 @@ import convex.core.util.Utils;
  * General purpose immutable wrapper for byte array data.
  * 
  * Can be serialised directly if 4096 bytes or less, otherwise needs to be
- * structures as a BlobTree
- *
+ * structures as a BlobTree.
+ * 
+ * Encoding format is:
+ * - Tag.BLOB tag byte
+ * - VLC encoded Blob length in bytes (one or two bytes describing a length in range 0..4096)
+ * - Byte data of the given length
  */
 public class Blob extends AArrayBlob {
 	public static final Blob EMPTY = wrap(Utils.EMPTY_BYTES);
 	public static final int CHUNK_LENGTH = 4096;
+	
+	/**
+	 * Maximim encoding size for a Blob
+	 */
+	public static final int MAX_ENCODING_LENGTH = 1+2+CHUNK_LENGTH;
 
 	private Blob(byte[] bytes, int offset, int length) {
 		super(bytes, offset, length);

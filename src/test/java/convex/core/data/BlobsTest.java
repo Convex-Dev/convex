@@ -88,6 +88,13 @@ public class BlobsTest {
 
 		doBlobTests(Samples.FULL_BLOB);
 	}
+		
+	@Test 
+	public void testEncodingSize() {
+		int el=(int) Samples.FULL_BLOB.getEncoding().length();
+		assertEquals(Blobs.MAX_ENCODING_LENGTH,el);
+		assertEquals(Blob.MAX_ENCODING_LENGTH,el);
+	}
 
 	@Test
 	public void testBigBlob() throws InvalidDataException, BadFormatException {

@@ -24,8 +24,8 @@ import convex.core.util.Utils;
  */
 public class BlobTree extends ABlob implements IRefContainer {
 
-	public static final int SHIFT_PER_LEVEL = 4;
-	public static final int FANOUT = 1 << SHIFT_PER_LEVEL;
+	public static final int BIT_SHIFT_PER_LEVEL = 4;
+	public static final int FANOUT = 1 << BIT_SHIFT_PER_LEVEL;
 
 	private final Ref<ABlob>[] children;
 	private final int shift;
@@ -75,8 +75,8 @@ public class BlobTree extends ABlob implements IRefContainer {
 	public static int calcShift(long chunkCount) {
 		int shift = 0;
 		while (chunkCount > FANOUT) {
-			shift += SHIFT_PER_LEVEL;
-			chunkCount >>= SHIFT_PER_LEVEL;
+			shift += BIT_SHIFT_PER_LEVEL;
+			chunkCount >>= BIT_SHIFT_PER_LEVEL;
 		}
 		return shift;
 	}
@@ -256,9 +256,19 @@ public class BlobTree extends ABlob implements IRefContainer {
 		return writeRaw(b);
 	}
 	
-	public static final long MAX_ENCODING_SIZE=1+Format.MAX_VLC_LONG_LENGTH+(FANOUT*Format.MAX_REF_LENGTH);
+	/**
+	 * Maximum byte length of an encoded BlobTree node
+	 */
+	public static final int MAX_ENCODING_LENGTH=1+Format.MAX_VLC_LONG_LENGTH+(FANOUT*Format.MAX_REF_LENGTH);
 
-	public static BlobTree read(ByteBuffer data, long count) throws BadFormatException {
+	/**
+	 * Reads a BlobTree from a bytebuffer. Assumes that tag byte and count are already read
+	 * @param bb ByteBuffer
+	 * @param count
+	 * @return
+	 * @throws BadFormatException
+	 */
+	public static BlobTree read(ByteBuffer bb, long count) throws BadFormatException {
 		if (count < 0) {
 			// note that this conveniently also captures count overflows....
 			throw new BadFormatException("Negative length: " + count);
@@ -275,7 +285,7 @@ public class BlobTree extends ABlob implements IRefContainer {
 		@SuppressWarnings("unchecked")
 		Ref<ABlob>[] children = (Ref<ABlob>[]) new Ref[numChildren];
 		for (int i = 0; i < numChildren; i++) {
-			Ref<ABlob> ref = Ref.read(data);
+			Ref<ABlob> ref = Ref.read(bb);
 			children[i] = ref;
 		}
 
@@ -328,10 +338,13 @@ public class BlobTree extends ABlob implements IRefContainer {
 		if ((n < 2) | (n > FANOUT)) throw new InvalidDataException("Illegal number of BlobTree children: " + n, this);
 		int clen = childLength();
 		long total = 0;
+		
+		// We need to check the lengths of all child notes. Note that only the last child can
+		// be shorted than the defined childLength() for this shift level.
 		for (int i = 0; i < n; i++) {
 			ABlob child;
 			child = getChild(i);
-			child.validate();
+			// child.validate(); TODO check shouldn't be required since super.validate does this?
 			long cl = child.length();
 			total += cl;
 			if (i == (n - 1)) {

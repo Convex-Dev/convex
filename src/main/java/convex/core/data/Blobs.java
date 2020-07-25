@@ -9,6 +9,8 @@ import convex.core.util.Utils;
 public class Blobs {
 
 	static final int CHUNK_SHIFT = 12;
+	
+	public static final int MAX_ENCODING_LENGTH = Math.max(Blob.MAX_ENCODING_LENGTH, BlobTree.MAX_ENCODING_LENGTH);
 
 	@SuppressWarnings("unchecked")
 	public static <T extends ABlob> T createRandom(Random r, long length) {
