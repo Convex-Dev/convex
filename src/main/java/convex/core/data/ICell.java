@@ -31,10 +31,10 @@ public interface ICell extends IValidated, IWriteable, IObject {
 
 	/**
 	 * Writes this cell's encoding to a ByteBuffer, including a tag
-	 * @param b
+	 * @param bb
 	 * @return The updated ByteBuffer
 	 */
 	@Override
-	public ByteBuffer write(ByteBuffer b);
+	public ByteBuffer write(ByteBuffer bb);
 
 }

@@ -10,7 +10,7 @@ import convex.core.util.Utils;
 /**
  * Abstract base class for Cells.
  * 
- * Data cells may contain Refs to other Cells, in which case they must implement {@link IRefContainer}.
+ * Cells may contain Refs to other Cells, in which case they must implement {@link IRefContainer}.
  * 
  * All data objects intended for on-chain usage serialisation should extend this. The only 
  * exceptions are data objects which are embedded (inc. certain JVM types like Long etc.)

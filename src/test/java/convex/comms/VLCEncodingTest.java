@@ -28,13 +28,13 @@ public class VLCEncodingTest {
 	 */
 	@Test
 	public void testVLCLength() throws BadFormatException {
-		assertEquals(2, Format.getVLCLength(Format.MAX_ENCODING_LENGTH));
-		assertEquals(3, Format.getVLCLength(Format.MAX_ENCODING_LENGTH + 1));
+		assertEquals(2, Format.getVLCLength(Format.LIMIT_ENCODING_LENGTH));
+		assertEquals(3, Format.getVLCLength(Format.LIMIT_ENCODING_LENGTH + 1));
 
 		ByteBuffer bb = Blob.fromHex("BF7F").getByteBuffer();
 		assertEquals(0, bb.position());
 		int len = Format.peekMessageLength(bb);
-		assertEquals(Format.MAX_ENCODING_LENGTH, len);
+		assertEquals(Format.LIMIT_ENCODING_LENGTH, len);
 		assertEquals(2, Format.getVLCLength(len));
 	}
 

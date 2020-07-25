@@ -19,12 +19,12 @@ public abstract class AMapEntry<K, V> extends AVector<Object> implements List<Ob
 	public abstract Object get(long i);
 
 	@Override
-	public final AVector<Object> appendChunk(ListVector<Object> listVector) {
+	public final AVector<Object> appendChunk(VectorLeaf<Object> listVector) {
 		throw new IllegalArgumentException("Can't append chunk to a MapEntry of size: 2");
 	}
 
 	@Override
-	public final ListVector<Object> getChunk(long offset) {
+	public final VectorLeaf<Object> getChunk(long offset) {
 		throw new IllegalStateException("Can only get full chunk");
 	}
 

@@ -26,17 +26,17 @@ import convex.core.util.Utils;
  * @param <K> Type of keys
  * @param <V> Type of values
  */
-public class ListMap<K, V> extends AHashMap<K, V> {
+public class MapLeaf<K, V> extends AHashMap<K, V> {
 	public static final int MAX_LIST_MAP_SIZE = 8;
 
 	static final MapEntry<?, ?>[] EMPTY_ENTRIES = new MapEntry[0];
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	private static final ListMap<?, ?> EMPTY = new ListMap(EMPTY_ENTRIES);
+	private static final MapLeaf<?, ?> EMPTY = new MapLeaf(EMPTY_ENTRIES);
 
 	private final MapEntry<K, V>[] entries;
 
-	private ListMap(MapEntry<K, V>[] items) {
+	private MapLeaf(MapEntry<K, V>[] items) {
 		super(items.length);
 		entries = items;
 	}
@@ -50,7 +50,7 @@ public class ListMap<K, V> extends AHashMap<K, V> {
 	 * @param entries
 	 * @return New ListMap
 	 */
-	public static <K, V> ListMap<K, V> create(MapEntry<K, V>[] entries) {
+	public static <K, V> MapLeaf<K, V> create(MapEntry<K, V>[] entries) {
 		return create(entries, 0, entries.length);
 	}
 
@@ -64,18 +64,18 @@ public class ListMap<K, V> extends AHashMap<K, V> {
 	 *                offset
 	 * @return A new ListMap
 	 */
-	protected static <K, V> ListMap<K, V> create(MapEntry<K, V>[] entries, int offset, int length) {
+	protected static <K, V> MapLeaf<K, V> create(MapEntry<K, V>[] entries, int offset, int length) {
 		if (length == 0) return emptyMap();
 		if (length > MAX_LIST_MAP_SIZE) throw new IllegalArgumentException("Too many entries: " + entries.length);
 		MapEntry<K, V>[] sorted = Utils.copyOfRangeExcludeNulls(entries, offset, offset + length);
 		if (sorted.length == 0) return emptyMap();
 		Arrays.sort(sorted);
-		return new ListMap<K, V>(sorted);
+		return new MapLeaf<K, V>(sorted);
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <K, V> ListMap<K, V> create(MapEntry<K, V> item) {
-		return new ListMap<K, V>((MapEntry<K, V>[]) new MapEntry<?, ?>[] { item });
+	public static <K, V> MapLeaf<K, V> create(MapEntry<K, V> item) {
+		return new MapLeaf<K, V>((MapEntry<K, V>[]) new MapEntry<?, ?>[] { item });
 	}
 
 	@Override
@@ -162,27 +162,27 @@ public class ListMap<K, V> extends AHashMap<K, V> {
 	}
 
 	@Override
-	public ListMap<K, V> dissoc(K key) {
+	public MapLeaf<K, V> dissoc(K key) {
 		int i = seek(key);
 		if (i < 0) return this; // not found
 		return dissocEntry(i);
 	}
 
 	@Override
-	public ListMap<K, V> dissocRef(Ref<K> key) {
+	public MapLeaf<K, V> dissocRef(Ref<K> key) {
 		int i = seekKeyRef(key);
 		if (i < 0) return this; // not found
 		return dissocEntry(i);
 	}
 
 	@SuppressWarnings("unchecked")
-	private ListMap<K, V> dissocEntry(int internalIndex) {
+	private MapLeaf<K, V> dissocEntry(int internalIndex) {
 		int len = size();
 		if (len == 1) return emptyMap();
 		MapEntry<K, V>[] newEntries = (MapEntry<K, V>[]) new MapEntry[len - 1];
 		System.arraycopy(entries, 0, newEntries, 0, internalIndex);
 		System.arraycopy(entries, internalIndex + 1, newEntries, internalIndex, len - internalIndex - 1);
-		return new ListMap<K, V>(newEntries);
+		return new MapLeaf<K, V>(newEntries);
 	}
 
 	@Override
@@ -202,7 +202,7 @@ public class ListMap<K, V> extends AHashMap<K, V> {
 				// replace current entry
 				MapEntry<K, V>[] newEntries = entries.clone();
 				newEntries[i] = e;
-				return new ListMap<K, V>(newEntries);
+				return new MapLeaf<K, V>(newEntries);
 			}
 		}
 
@@ -215,10 +215,10 @@ public class ListMap<K, V> extends AHashMap<K, V> {
 		if (newLen <= MAX_LIST_MAP_SIZE) {
 			// new size implies a ListMap
 			Arrays.sort(newEntries);
-			return new ListMap<K, V>(newEntries);
+			return new MapLeaf<K, V>(newEntries);
 		} else {
 			// new size implies a TreeMap with the current given shift
-			return TreeMap.create(newEntries, shift);
+			return MapTree.create(newEntries, shift);
 		}
 	}
 
@@ -241,7 +241,7 @@ public class ListMap<K, V> extends AHashMap<K, V> {
 				// need to clone and update array
 				MapEntry<K, V>[] newEntries = entries.clone();
 				newEntries[i] = newEntry;
-				return new ListMap<K, V>(newEntries);
+				return new MapLeaf<K, V>(newEntries);
 			}
 		}
 
@@ -253,10 +253,10 @@ public class ListMap<K, V> extends AHashMap<K, V> {
 		if (len + 1 <= MAX_LIST_MAP_SIZE) {
 			// new size should be a ListMap
 			Arrays.sort(newEntries);
-			return new ListMap<K, V>(newEntries);
+			return new MapLeaf<K, V>(newEntries);
 		} else {
 			// new Size should be a TreeMap with current shift
-			return TreeMap.create(newEntries, shift);
+			return MapTree.create(newEntries, shift);
 		}
 	}
 
@@ -347,8 +347,8 @@ public class ListMap<K, V> extends AHashMap<K, V> {
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K, V> ListMap<K, V> read(ByteBuffer data, long count) throws BadFormatException {
-		if (count == 0) return (ListMap<K, V>) EMPTY;
+	public static <K, V> MapLeaf<K, V> read(ByteBuffer data, long count) throws BadFormatException {
+		if (count == 0) return (MapLeaf<K, V>) EMPTY;
 		if (count < 0) throw new BadFormatException("Negative count of listmap elements!");
 		if (count > MAX_LIST_MAP_SIZE) throw new BadFormatException("ListMap too big: " + count);
 
@@ -361,12 +361,12 @@ public class ListMap<K, V> extends AHashMap<K, V> {
 			throw new BadFormatException("Bad ordering of keys!");
 		}
 
-		return new ListMap<K, V>(items);
+		return new MapLeaf<K, V>(items);
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <K, V> ListMap<K, V> emptyMap() {
-		return (ListMap<K, V>) EMPTY;
+	public static <K, V> MapLeaf<K, V> emptyMap() {
+		return (MapLeaf<K, V>) EMPTY;
 	}
 
 	@Override
@@ -426,7 +426,7 @@ public class ListMap<K, V> extends AHashMap<K, V> {
 		}
 		if (newEntries==entries) return (R) this;
 		// Note: we assume no key hashes have changed
-		return (R) new ListMap(newEntries);
+		return (R) new MapLeaf(newEntries);
 	}
 
 	/**
@@ -437,7 +437,7 @@ public class ListMap<K, V> extends AHashMap<K, V> {
 	 * @param mask     Mask of digits to include
 	 * @return Filtered ListMap
 	 */
-	public ListMap<K, V> filterHexDigits(int digitPos, int mask) {
+	public MapLeaf<K, V> filterHexDigits(int digitPos, int mask) {
 		mask = mask & 0xFFFF;
 		if (mask == 0) return emptyMap();
 		if (mask == 0xFFFF) return this;
@@ -460,7 +460,7 @@ public class ListMap<K, V> extends AHashMap<K, V> {
 	 * @return
 	 */
 	@SuppressWarnings("unchecked")
-	private ListMap<K, V> filterEntries(int selection) {
+	private MapLeaf<K, V> filterEntries(int selection) {
 		if (selection == 0) return emptyMap(); // no items selected
 		int n = size();
 		if (selection == ((1 << n) - 1)) return this; // all items selected
@@ -472,7 +472,7 @@ public class ListMap<K, V> extends AHashMap<K, V> {
 			}
 		}
 		assert (ix == Integer.bitCount(selection));
-		return new ListMap<K, V>(newEntries);
+		return new MapLeaf<K, V>(newEntries);
 	}
 
 	@Override
@@ -487,12 +487,12 @@ public class ListMap<K, V> extends AHashMap<K, V> {
 
 	@Override
 	protected AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func, int shift) {
-		if (b instanceof ListMap) return mergeWith((ListMap<K, V>) b, func, shift);
-		if (b instanceof TreeMap) return ((TreeMap<K, V>) b).mergeWith(this, func.reverse());
+		if (b instanceof MapLeaf) return mergeWith((MapLeaf<K, V>) b, func, shift);
+		if (b instanceof MapTree) return ((MapTree<K, V>) b).mergeWith(this, func.reverse());
 		throw new TODOException("Unhandled map type: " + b.getClass());
 	}
 
-	private AHashMap<K, V> mergeWith(ListMap<K, V> b, MergeFunction<V> func, int shift) {
+	private AHashMap<K, V> mergeWith(MapLeaf<K, V> b, MergeFunction<V> func, int shift) {
 		int al = this.size();
 		int bl = b.size();
 		int ai = 0;
@@ -536,12 +536,12 @@ public class ListMap<K, V> extends AHashMap<K, V> {
 
 	@Override
 	public AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func) {
-		if (b instanceof ListMap) return mergeDifferences((ListMap<K, V>) b, func);
-		if (b instanceof TreeMap) return b.mergeWith(this, func.reverse());
+		if (b instanceof MapLeaf) return mergeDifferences((MapLeaf<K, V>) b, func);
+		if (b instanceof MapTree) return b.mergeWith(this, func.reverse());
 		throw new TODOException("Unhandled map type: " + b.getClass());
 	}
 
-	public AHashMap<K, V> mergeDifferences(ListMap<K, V> b, MergeFunction<V> func) {
+	public AHashMap<K, V> mergeDifferences(MapLeaf<K, V> b, MergeFunction<V> func) {
 		if (this.equals(b)) return this; // no change in identical case
 		int al = this.size();
 		int bl = b.size();
@@ -605,7 +605,7 @@ public class ListMap<K, V> extends AHashMap<K, V> {
 
 	@Override
 	public boolean equalsKeys(AMap<K, V> a) {
-		if (a instanceof ListMap) return equalsKeys((ListMap<K, V>) a);
+		if (a instanceof MapLeaf) return equalsKeys((MapLeaf<K, V>) a);
 		return false;
 	}
 
@@ -615,7 +615,7 @@ public class ListMap<K, V> extends AHashMap<K, V> {
 	 * @param a A map to compare keys with
 	 * @return Boolean true if the two maps have the same keys
 	 */
-	public boolean equalsKeys(ListMap<K, V> a) {
+	public boolean equalsKeys(MapLeaf<K, V> a) {
 		if (this == a) return true;
 		int n = this.size();
 		if (n != a.size()) return false;
@@ -627,11 +627,11 @@ public class ListMap<K, V> extends AHashMap<K, V> {
 
 	@Override
 	public boolean equals(AMap<K, V> a) {
-		if (!(a instanceof ListMap)) return false;
-		return equals((ListMap<K, V>) a);
+		if (!(a instanceof MapLeaf)) return false;
+		return equals((MapLeaf<K, V>) a);
 	}
 
-	public boolean equals(ListMap<K, V> a) {
+	public boolean equals(MapLeaf<K, V> a) {
 		if (this == a) return true;
 		int n = size();
 		if (n != a.size()) return false;
@@ -642,7 +642,7 @@ public class ListMap<K, V> extends AHashMap<K, V> {
 	}
 
 	@Override
-	public ListMap<K, V> mapEntries(Function<MapEntry<K, V>, MapEntry<K, V>> func) {
+	public MapLeaf<K, V> mapEntries(Function<MapEntry<K, V>, MapEntry<K, V>> func) {
 		MapEntry<K, V>[] newEntries = entries;
 		for (int i = 0; i < entries.length; i++) {
 			MapEntry<K, V> e = entries[i];

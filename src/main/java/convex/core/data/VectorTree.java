@@ -37,7 +37,7 @@ import convex.core.util.Utils;
  * 
  * @param <T>
  */
-public class TreeVector<T> extends AVector<T> {
+public class VectorTree<T> extends AVector<T> {
 
 	public static final int MINIMUM_SIZE = 2 * Vectors.CHUNK_SIZE;
 	private final int shift; // bits in each child block
@@ -45,7 +45,7 @@ public class TreeVector<T> extends AVector<T> {
 
 	private final Ref<AVector<T>>[] children;
 
-	private TreeVector(Ref<AVector<T>>[] children, long count) {
+	private VectorTree(Ref<AVector<T>>[] children, long count) {
 		super();
 		this.count = count;
 		this.shift = computeShift(count);
@@ -101,7 +101,7 @@ public class TreeVector<T> extends AVector<T> {
 	 * @param length
 	 * @return New TreeVector instance
 	 */
-	public static <T> TreeVector<T> create(T[] things, int offset, int length) {
+	public static <T> VectorTree<T> create(T[] things, int offset, int length) {
 		if (length < MINIMUM_SIZE)
 			throw new IllegalArgumentException("Can't create BlockVector with insufficient size: " + length);
 		if ((length & Vectors.BITMASK) != 0)
@@ -116,7 +116,7 @@ public class TreeVector<T> extends AVector<T> {
 			int bLen = Math.min(bSize, length - bSize * i);
 			bs[i] = Ref.create(Vectors.createChunked(things, offset + i * bSize, bLen));
 		}
-		TreeVector<T> tv = new TreeVector<T>(bs, length);
+		VectorTree<T> tv = new VectorTree<T>(bs, length);
 		return tv;
 	}
 
@@ -147,7 +147,7 @@ public class TreeVector<T> extends AVector<T> {
 
 		Ref<AVector<T>>[] newChildren = children.clone();
 		newChildren[b] = Ref.create(nc);
-		return new TreeVector<T>(newChildren, count);
+		return new VectorTree<T>(newChildren, count);
 	}
 
 	@Override
@@ -188,7 +188,7 @@ public class TreeVector<T> extends AVector<T> {
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> TreeVector<T> read(ByteBuffer bb, long count)
+	public static <T> VectorTree<T> read(ByteBuffer bb, long count)
 			throws BadFormatException, BufferUnderflowException {
 		if (count < 0) throw new BadFormatException("Negative count?");
 		int n = computeArraySize(count);
@@ -201,21 +201,21 @@ public class TreeVector<T> extends AVector<T> {
 			items[i] = ref;
 		}
 
-		return new TreeVector<T>(items, count);
+		return new VectorTree<T>(items, count);
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public TreeVector<T> appendChunk(ListVector<T> b) {
+	public VectorTree<T> appendChunk(VectorLeaf<T> b) {
 		if (b.hasPrefix()) throw new IllegalArgumentException("Can't append a block with a tail");
-		if (b.count() != ListVector.MAX_SIZE)
+		if (b.count() != VectorLeaf.MAX_SIZE)
 			throw new IllegalArgumentException("Invalid block size for append: " + b.count());
 		if (isPacked()) {
 			// full blockvector, so need to elevate to the next level
 			Ref<AVector<T>>[] newBlocks = new Ref[2];
 			newBlocks[0] = Ref.create(this);
 			newBlocks[1] = Ref.create(b);
-			return new TreeVector<T>(newBlocks, this.count() + b.count());
+			return new VectorTree<T>(newBlocks, this.count() + b.count());
 		}
 
 		int blength = children.length;
@@ -225,14 +225,14 @@ public class TreeVector<T> extends AVector<T> {
 			Ref<AVector<T>>[] newBlocks = new Ref[blength + 1];
 			System.arraycopy(children, 0, newBlocks, 0, blength);
 			newBlocks[blength] = Ref.create(b);
-			return new TreeVector<T>(newBlocks, count + Vectors.CHUNK_SIZE);
+			return new VectorTree<T>(newBlocks, count + Vectors.CHUNK_SIZE);
 		} else {
 			// add b into current last block
 			AVector<T> newLast = lastBlock.appendChunk(b);
 			Ref<AVector<T>>[] newBlocks = new Ref[blength];
 			System.arraycopy(children, 0, newBlocks, 0, blength - 1);
 			newBlocks[blength - 1] = Ref.create(newLast);
-			return new TreeVector<T>(newBlocks, count + Vectors.CHUNK_SIZE);
+			return new VectorTree<T>(newBlocks, count + Vectors.CHUNK_SIZE);
 		}
 	}
 
@@ -251,24 +251,24 @@ public class TreeVector<T> extends AVector<T> {
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Override
 	public AVector<T> append(T value) {
-		return new ListVector(new Ref[] { Ref.create(value) }, Ref.create(this), count + 1);
+		return new VectorLeaf(new Ref[] { Ref.create(value) }, Ref.create(this), count + 1);
 	}
 
 	@Override
 	public AVector<T> concat(ASequence<T> b) {
 		long bLen = b.count();
-		TreeVector<T> result = this;
+		VectorTree<T> result = this;
 		long bi = 0;
 		while (bi < bLen) {
 			if ((bi + Vectors.CHUNK_SIZE) <= bLen) {
 				// can append a whole chunk
-				ListVector<T> chunk = (ListVector<T>) b.subVector(bi, Vectors.CHUNK_SIZE);
+				VectorLeaf<T> chunk = (VectorLeaf<T>) b.subVector(bi, Vectors.CHUNK_SIZE);
 				result = result.appendChunk(chunk);
 				bi += Vectors.CHUNK_SIZE;
 			} else {
 				// we have less than a chunk left, so final result must be a ListVector with the
 				// current result as tail
-				ListVector<T> head = (ListVector<T>) b.subVector(bi, bLen - bi);
+				VectorLeaf<T> head = (VectorLeaf<T>) b.subVector(bi, bLen - bi);
 				return head.withPrefix(result);
 			}
 		}
@@ -284,11 +284,11 @@ public class TreeVector<T> extends AVector<T> {
 	 * @return
 	 */
 	@SuppressWarnings("unchecked")
-	static <T> TreeVector<T> wrap2(ListVector<T> head, ListVector<T> tail) {
+	static <T> VectorTree<T> wrap2(VectorLeaf<T> head, VectorLeaf<T> tail) {
 		Ref<AVector<T>>[] newBlocks = new Ref[2];
 		newBlocks[0] = Ref.create(tail);
 		newBlocks[1] = Ref.create(head);
-		return new TreeVector<T>(newBlocks, 2 * Vectors.CHUNK_SIZE);
+		return new VectorTree<T>(newBlocks, 2 * Vectors.CHUNK_SIZE);
 	}
 
 	@Override
@@ -456,7 +456,7 @@ public class TreeVector<T> extends AVector<T> {
 			AVector<R> r = children[i].getValue().map(mapper);
 			newBlocks[i] = Ref.create(r);
 		}
-		return new TreeVector<R>(newBlocks, count);
+		return new VectorTree<R>(newBlocks, count);
 	}
 
 	@Override
@@ -552,7 +552,7 @@ public class TreeVector<T> extends AVector<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public TreeVector<T> updateRefs(IRefFunction func) {
+	public VectorTree<T> updateRefs(IRefFunction func) {
 		int ic = children.length;
 		Ref<AVector<T>>[] newChildren = children;
 		for (int i = 0; i < ic; i++) {
@@ -565,16 +565,16 @@ public class TreeVector<T> extends AVector<T> {
 			}
 		}
 		if (newChildren==children) return this; // no change, safe to return this
-		return new TreeVector<>(newChildren, count);
+		return new VectorTree<>(newChildren, count);
 	}
 
 	@Override
 	public long commonPrefixLength(AVector<T> b) {
-		if (b instanceof TreeVector) return commonPrefixLength((TreeVector<T>) b);
+		if (b instanceof VectorTree) return commonPrefixLength((VectorTree<T>) b);
 		return b.commonPrefixLength(this); // Handle MapEntry and ListVectors
 	}
 
-	private long commonPrefixLength(TreeVector<T> b) {
+	private long commonPrefixLength(VectorTree<T> b) {
 		if (this.equals(b)) return count;
 
 		long cs = childSize();
@@ -594,7 +594,7 @@ public class TreeVector<T> extends AVector<T> {
 
 	// compute common prefix length assuming TreeVectors are aligned (same child
 	// size)
-	private long commonPrefixLengthAligned(TreeVector<T> b) {
+	private long commonPrefixLengthAligned(VectorTree<T> b) {
 		// check if we have the same stored hash. If so, quick exit!
 		Hash thisHash = checkHash();
 		if (thisHash != null) {
@@ -614,14 +614,14 @@ public class TreeVector<T> extends AVector<T> {
 	}
 
 	@Override
-	public ListVector<T> getChunk(long offset) {
+	public VectorLeaf<T> getChunk(long offset) {
 		long cs = childSize();
 		int ix = (int) (offset / cs);
 		AVector<T> child = children[ix].getValue();
 		long cOffset = offset - (ix * cs);
-		if (cs == ListVector.MAX_SIZE) {
+		if (cs == VectorLeaf.MAX_SIZE) {
 			if (cOffset != 0) throw new IndexOutOfBoundsException("Index: " + offset);
-			return (ListVector<T>) child;
+			return (VectorLeaf<T>) child;
 		}
 		return child.getChunk(cOffset);
 	}

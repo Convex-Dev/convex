@@ -26,7 +26,7 @@ public class VectorsTest {
 
 	@Test
 	public void testEmptyVector() {
-		ListVector<String> lv = ListVector.create(new String[0]);
+		VectorLeaf<String> lv = VectorLeaf.create(new String[0]);
 		AArrayBlob d = lv.getEncoding();
 		assertArrayEquals(new byte[] { Tag.VECTOR, 0 }, d.getBytes());
 	}
@@ -36,44 +36,44 @@ public class VectorsTest {
 		AVector<Integer> v = Samples.INT_VECTOR_300;
 
 		AVector<Integer> v1 = v.subVector(10, Vectors.CHUNK_SIZE);
-		assertEquals(ListVector.class, v1.getClass());
+		assertEquals(VectorLeaf.class, v1.getClass());
 		assertEquals(10, v1.get(0));
 
 		AVector<Integer> v2 = v.subVector(10, Vectors.CHUNK_SIZE * 2);
-		assertEquals(TreeVector.class, v2.getClass());
+		assertEquals(VectorTree.class, v2.getClass());
 		assertEquals(10, v2.get(0));
 
 		AVector<Integer> v3 = v.subVector(10, Vectors.CHUNK_SIZE * 2 - 1);
-		assertEquals(ListVector.class, v3.getClass());
+		assertEquals(VectorLeaf.class, v3.getClass());
 		assertEquals(10, v3.get(0));
 
 		AVector<Integer> v4 = v3.conj(1000);
-		assertEquals(TreeVector.class, v4.getClass());
+		assertEquals(VectorTree.class, v4.getClass());
 		assertEquals(26, v4.get(16));
 		assertEquals(v1, v4.subVector(0, Vectors.CHUNK_SIZE));
 	}
 
 	@Test
 	public void testCreateSpecialCases() {
-		assertSame(Vectors.empty(), ListVector.create(new Object[0]));
-		assertSame(Vectors.empty(), ListVector.create(new Object[10], 3, 0));
+		assertSame(Vectors.empty(), VectorLeaf.create(new Object[0]));
+		assertSame(Vectors.empty(), VectorLeaf.create(new Object[10], 3, 0));
 
-		assertThrows(IllegalArgumentException.class, () -> ListVector.create(new Object[0], 0, 0, null));
-		assertThrows(IllegalArgumentException.class, () -> ListVector.create(new Object[20], 1, 18, null));
+		assertThrows(IllegalArgumentException.class, () -> VectorLeaf.create(new Object[0], 0, 0, null));
+		assertThrows(IllegalArgumentException.class, () -> VectorLeaf.create(new Object[20], 1, 18, null));
 	}
 
 	@Test
 	public void testChunks() {
 		assertEquals(Samples.INT_VECTOR_16, Samples.INT_VECTOR_300.getChunk(0));
 		AVector<Integer> v = Samples.INT_VECTOR_300.getChunk(0);
-		assertEquals(TreeVector.class, v.getChunk(0).concat(v).getClass());
+		assertEquals(VectorTree.class, v.getChunk(0).concat(v).getClass());
 	}
 
 	@Test
 	public void testChunkConcat() {
-		ListVector<Integer> v = Samples.INT_VECTOR_300.getChunk(16);
+		VectorLeaf<Integer> v = Samples.INT_VECTOR_300.getChunk(16);
 		AVector<Integer> vv = v.concat(v);
-		assertEquals(TreeVector.class, vv.getClass());
+		assertEquals(VectorTree.class, vv.getClass());
 		assertEquals(v, vv.getChunk(16));
 
 		assertSame(Samples.INT_VECTOR_16, Samples.INT_VECTOR_16.empty().appendChunk(Samples.INT_VECTOR_16));
@@ -86,7 +86,7 @@ public class VectorsTest {
 
 		// can't append wrong chunk size
 		assertThrows(IllegalArgumentException.class,
-				() -> Samples.INT_VECTOR_16.appendChunk((ListVector<Integer>) Vectors.of(1, 2)));
+				() -> Samples.INT_VECTOR_16.appendChunk((VectorLeaf<Integer>) Vectors.of(1, 2)));
 
 	}
 
@@ -109,7 +109,7 @@ public class VectorsTest {
 	public void testAppending() {
 		int SIZE = 300;
 		@SuppressWarnings("unchecked")
-		AVector<Integer> lv = (ListVector<Integer>) ListVector.EMPTY;
+		AVector<Integer> lv = (VectorLeaf<Integer>) VectorLeaf.EMPTY;
 
 		for (int i = 0; i < SIZE; i++) {
 			lv = lv.append(i);
@@ -213,7 +213,7 @@ public class VectorsTest {
 	public void testIterator() {
 		int SIZE = 100;
 		@SuppressWarnings("unchecked")
-		AVector<Integer> lv = (ListVector<Integer>) ListVector.EMPTY;
+		AVector<Integer> lv = (VectorLeaf<Integer>) VectorLeaf.EMPTY;
 
 		for (int i = 0; i < SIZE; i++) {
 			lv = lv.append(i);
@@ -252,7 +252,7 @@ public class VectorsTest {
 
 		// test the byte layout of the empty vector
 		assertEquals(e.getEncoding(), Blob.fromHex("8000"));
-		assertEquals(e.getHash(), Vectors.of(new ListVector<?>[0]).getHash());
+		assertEquals(e.getHash(), Vectors.of(new VectorLeaf<?>[0]).getHash());
 	}
 
 	@Test

@@ -37,8 +37,27 @@ public class Format {
 	// Encoding constants
 	public static final int EMBEDDED_STRING_MAX_LENGTH = 32; // max UTF-16 length of embedded string
 	public static final int EMBEDDED_BLOB_MAX_LENGTH = 32;
-	public static final int MAX_ENCODING_LENGTH = 0x1FFF; // max length that can be VLC encoded in 2 bytes
+
+	/**
+	 * 8191 byte system-wide limit on the legal length of a data object encoding.
+	 * 
+	 * Technical reasons for this choice:
+	 * - This is the max length that can be VLC encoded in a 2 byte message header. This simplifies message encoding and decoding.
+	 * - It is big enough to include a 4096-byte Blob
+	 */
+	public static final int LIMIT_ENCODING_LENGTH = 0x1FFF; 
+	
+	
+	
 	public static final int MAX_VLC_LONG_LENGTH = 10; // 70 bits
+	
+	public static final int MAX_EMBEDDED_LENGTH=64; // TODO: fix
+	
+	/**
+	 * Maximum length in bytes of a Ref encoding (may be an embedded data object)
+	 */
+	public static final int MAX_REF_LENGTH = Math.max(Ref.MAX_ENCODING_LENGTH, MAX_EMBEDDED_LENGTH);
+
 
 	/**
 	 * Gets the length in bytes of VLC encoding for the given long value
@@ -189,7 +208,7 @@ public class Format {
 	 * @return The ByteBuffer after writing the message length
 	 */
 	public static ByteBuffer writeMessageLength(ByteBuffer bb, int len) {
-		if ((len < 0) || (len > MAX_ENCODING_LENGTH))
+		if ((len < 0) || (len > LIMIT_ENCODING_LENGTH))
 			throw new IllegalArgumentException("Invalid message length: " + len);
 		return writeVLCLong(bb, len);
 	}
@@ -605,7 +624,7 @@ public class Format {
 	/**
 	 * Reads an complete data object from a ByteBuffer.
 	 * 
-	 * May return any valid data object (including null)
+	 * May return any valid data object (including null, and non)
 	 * 
 	 * Assumes the presence of an object tag.
 	 * 

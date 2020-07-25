@@ -255,6 +255,8 @@ public class BlobTree extends ABlob implements IRefContainer {
 		b = Format.writeVLCLong(b, count);
 		return writeRaw(b);
 	}
+	
+	public static final long MAX_ENCODING_SIZE=1+Format.MAX_VLC_LONG_LENGTH+(FANOUT*Format.MAX_REF_LENGTH);
 
 	public static BlobTree read(ByteBuffer data, long count) throws BadFormatException {
 		if (count < 0) {

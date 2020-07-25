@@ -185,7 +185,7 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 	@Override
 	@SuppressWarnings("unchecked")
 	public AVector<Object> toVector() {
-		return new ListVector<Object>(new Ref[] { keyRef, valueRef });
+		return new VectorLeaf<Object>(new Ref[] { keyRef, valueRef });
 	}
 
 	@Override

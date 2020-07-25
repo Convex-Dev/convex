@@ -63,6 +63,9 @@ public class State extends ARecord {
 	private static final Logger log = Logger.getLogger(State.class.getName());
 	private static final Level LEVEL_SCHEDULE=Level.FINE;
 
+	// Note: we are embedding these directly in the State cell.
+	// TODO: check we aren't at risk of hitting max encoding size limits
+	
 	private final BlobMap<Address, AccountStatus> accounts;
 	private final BlobMap<Address, PeerStatus> peers;
 	private final ASet<Object> store;

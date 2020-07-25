@@ -56,7 +56,7 @@ public abstract class AVector<T> extends ASequence<T> {
 	 * @param listVector A chunk to append. Must be a ListVector of maximum size
 	 * @return The updated vector, of the same type as this vector @
 	 */
-	public abstract AVector<T> appendChunk(ListVector<T> listVector);
+	public abstract AVector<T> appendChunk(VectorLeaf<T> listVector);
 
 	/**
 	 * Gets the ListVector chunk at a given offset
@@ -64,7 +64,7 @@ public abstract class AVector<T> extends ASequence<T> {
 	 * @param offset Offset into this vector. Must be a valid chunk start position
 	 * @return The chunk referenced
 	 */
-	public abstract ListVector<T> getChunk(long offset);
+	public abstract VectorLeaf<T> getChunk(long offset);
 
 	/**
 	 * Appends a single element to this vector

@@ -86,7 +86,7 @@ public class ObjectsTest {
 
 		Blob b = Format.encodedBlob(a);
 
-		assertTrue(b.length <= Format.MAX_ENCODING_LENGTH);
+		assertTrue(b.length <= Format.LIMIT_ENCODING_LENGTH);
 		try {
 			Object a2;
 			a2 = Format.read(b);

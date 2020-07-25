@@ -136,25 +136,25 @@ public class MapsTest {
 
 	@Test
 	public void testTreeDigitForIndex() {
-		assertEquals(5, TreeMap.digitForIndex(0, (short) 0x020));
+		assertEquals(5, MapTree.digitForIndex(0, (short) 0x020));
 
-		assertEquals(0, TreeMap.digitForIndex(0, (short) 0x111));
-		assertEquals(4, TreeMap.digitForIndex(1, (short) 0x111));
-		assertEquals(8, TreeMap.digitForIndex(2, (short) 0x111));
+		assertEquals(0, MapTree.digitForIndex(0, (short) 0x111));
+		assertEquals(4, MapTree.digitForIndex(1, (short) 0x111));
+		assertEquals(8, MapTree.digitForIndex(2, (short) 0x111));
 	}
 
 	@Test
 	public void testBadDigitNegative() {
-		assertThrows(IllegalArgumentException.class, () -> TreeMap.digitForIndex(-1, (short) 0x111));
-		assertThrows(IllegalArgumentException.class, () -> TreeMap.digitForIndex(3, (short) 0x111));
+		assertThrows(IllegalArgumentException.class, () -> MapTree.digitForIndex(-1, (short) 0x111));
+		assertThrows(IllegalArgumentException.class, () -> MapTree.digitForIndex(3, (short) 0x111));
 	}
 
 	@Test
 	public void testSmallMergeIndentity() {
-		ListMap<Object, Object> m0 = (ListMap<Object, Object>) Maps.empty();
-		ListMap<Object, Object> m1 = Maps.of(1, 2, 3, 4);
-		ListMap<Object, Object> m2 = Maps.of(3, 4, 5, 6);
-		ListMap<Object, Object> m3 = Maps.of(1, 2, 3, 4, 5, 6);
+		MapLeaf<Object, Object> m0 = (MapLeaf<Object, Object>) Maps.empty();
+		MapLeaf<Object, Object> m1 = Maps.of(1, 2, 3, 4);
+		MapLeaf<Object, Object> m2 = Maps.of(3, 4, 5, 6);
+		MapLeaf<Object, Object> m3 = Maps.of(1, 2, 3, 4, 5, 6);
 
 		assertSame(m0, m1.mergeWith(m3, (a, b) -> null));
 		assertSame(m3, m3.mergeWith(m3, (a, b) -> a));
@@ -192,7 +192,7 @@ public class MapsTest {
 
 	@Test
 	public void testFilterHex() {
-		ListMap<Object, Object> m = Maps.of(1, true, 2, true, 3, true, -1000, true);
+		MapLeaf<Object, Object> m = Maps.of(1, true, 2, true, 3, true, -1000, true);
 		assertEquals(Maps.of(3, true), m.filterHexDigits(0, 64)); // hex digit 0 = 6 only
 		assertSame(m, m.filterHexDigits(0, 0xFFFF)); // all digits selected
 		assertSame(Maps.empty(), m.filterHexDigits(0, 0)); // all digits selected
@@ -236,7 +236,7 @@ public class MapsTest {
 	@SuppressWarnings("unchecked")
 	@Test
 	public void testTreeMapBuilding() {
-		assertThrows(Throwable.class, () -> TreeMap.create(new MapEntry[] { MapEntry.create(1, 2) }, 0));
+		assertThrows(Throwable.class, () -> MapTree.create(new MapEntry[] { MapEntry.create(1, 2) }, 0));
 	}
 
 	@Test

@@ -18,7 +18,7 @@ import convex.core.data.ARecord;
 import convex.core.data.Format;
 import convex.core.data.IRefContainer;
 import convex.core.data.Keyword;
-import convex.core.data.ListMap;
+import convex.core.data.MapLeaf;
 import convex.core.data.MapEntry;
 import convex.core.util.Utils;
 
@@ -78,8 +78,8 @@ public class StateTreePanel extends JPanel {
 					add(new Node(k + " = " + getString(c), c));
 				}
 				return;
-			} else if (userObject instanceof ListMap) {
-				ListMap m = (ListMap) userObject;
+			} else if (userObject instanceof MapLeaf) {
+				MapLeaf m = (MapLeaf) userObject;
 				for (Object oe : m.entrySet()) {
 					MapEntry e = (MapEntry) oe;
 					Object c = e.getValue();

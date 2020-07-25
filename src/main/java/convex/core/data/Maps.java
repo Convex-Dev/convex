@@ -11,7 +11,7 @@ import convex.core.exceptions.BadFormatException;
  */
 public class Maps {
 
-	private static final AMap<?, ?> EMPTY_MAP = ListMap.emptyMap();
+	private static final AMap<?, ?> EMPTY_MAP = MapLeaf.emptyMap();
 	private static final Ref<?> EMPTY_REF = Ref.create(EMPTY_MAP);
 
 	@SuppressWarnings("unchecked")
@@ -24,8 +24,8 @@ public class Maps {
 		return (Ref<R>) EMPTY_REF;
 	}
 
-	public static <K, V> ListMap<K, V> create(K k, V v) {
-		return ListMap.create(MapEntry.create(k, v));
+	public static <K, V> MapLeaf<K, V> create(K k, V v) {
+		return MapLeaf.create(MapEntry.create(k, v));
 	}
 
 	@SuppressWarnings("unchecked")
@@ -95,10 +95,10 @@ public class Maps {
 
 	public static <K, V> AMap<K, V> read(ByteBuffer bb) throws BadFormatException {
 		long count = Format.readVLCLong(bb);
-		if (count <= ListMap.MAX_LIST_MAP_SIZE) {
-			return ListMap.read(bb, count);
+		if (count <= MapLeaf.MAX_LIST_MAP_SIZE) {
+			return MapLeaf.read(bb, count);
 		} else {
-			return TreeMap.read(bb, count);
+			return MapTree.read(bb, count);
 		}
 	}
 

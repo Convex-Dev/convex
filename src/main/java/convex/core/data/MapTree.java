@@ -26,7 +26,7 @@ import convex.core.util.Utils;
  * @param <K>
  * @param <V>
  */
-public class TreeMap<K, V> extends AHashMap<K, V> {
+public class MapTree<K, V> extends AHashMap<K, V> {
 	/**
 	 * Child maps, one for each present bit in the mask, max 16
 	 */
@@ -44,7 +44,7 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 	 */
 	private final short mask;
 
-	private TreeMap(Ref<AHashMap<K, V>>[] blocks, int shift, short mask, long count) {
+	private MapTree(Ref<AHashMap<K, V>>[] blocks, int shift, short mask, long count) {
 		super(count);
 		this.children = blocks;
 		this.shift = shift;
@@ -69,9 +69,9 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <K, V> TreeMap<K, V> create(MapEntry<K, V>[] newEntries, int shift) {
+	public static <K, V> MapTree<K, V> create(MapEntry<K, V>[] newEntries, int shift) {
 		int n = newEntries.length;
-		if (n <= ListMap.MAX_LIST_MAP_SIZE) {
+		if (n <= MapLeaf.MAX_LIST_MAP_SIZE) {
 			throw new IllegalArgumentException(
 					"Insufficient distinct entries for TreeMap construction: " + newEntries.length);
 		}
@@ -83,12 +83,12 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 			int ix = e.getKeyHash().getHexDigit(shift);
 			Ref<AHashMap<K, V>> ref = children[ix];
 			if (ref == null) {
-				children[ix] = Ref.create(ListMap.create(e));
+				children[ix] = Ref.create(MapLeaf.create(e));
 			} else {
 				children[ix] = Ref.create(ref.getValue().assocEntry(e, shift + 1));
 			}
 		}
-		return (TreeMap<K, V>) createFull(children, shift);
+		return (MapTree<K, V>) createFull(children, shift);
 	}
 
 	/**
@@ -138,7 +138,7 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 		}
 
 		// compress small counts to ListMap
-		if (count <= ListMap.MAX_LIST_MAP_SIZE) {
+		if (count <= MapLeaf.MAX_LIST_MAP_SIZE) {
 			MapEntry<K, V>[] entries = new MapEntry[Utils.checkedInt(count)];
 			int ix = 0;
 			for (Ref<AHashMap<K, V>> childRef : children) {
@@ -149,7 +149,7 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 				}
 			}
 			assert (ix == count);
-			return ListMap.create(entries);
+			return MapLeaf.create(entries);
 		}
 		int sel = (1 << cLen) - 1;
 		short newMask = mask;
@@ -161,9 +161,9 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 			}
 		}
 		if (mask != newMask) {
-			return new TreeMap<K, V>(Utils.filterSmallArray(children, sel), shift, newMask, count);
+			return new MapTree<K, V>(Utils.filterSmallArray(children, sel), shift, newMask, count);
 		}
-		return new TreeMap<K, V>(children, shift, mask, count);
+		return new MapTree<K, V>(children, shift, mask, count);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -238,12 +238,12 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 		AHashMap<K, V> newChild = child.dissocRef(keyRef);
 		if (child == newChild) return this; // no removal, no change
 
-		if (count - 1 == ListMap.MAX_LIST_MAP_SIZE) {
+		if (count - 1 == MapLeaf.MAX_LIST_MAP_SIZE) {
 			// reduce to a ListMap
 			HashSet<Entry<K, V>> eset = entrySet();
 			boolean removed = eset.removeIf(e -> Utils.equals(((MapEntry<K, V>) e).getKeyRef(), keyRef));
 			if (!removed) throw new Error("Expected to remove at least one entry!");
-			return ListMap.create(eset.toArray((MapEntry<K, V>[]) ListMap.EMPTY_ENTRIES));
+			return MapLeaf.create(eset.toArray((MapEntry<K, V>[]) MapLeaf.EMPTY_ENTRIES));
 		} else {
 			// replace child
 			if (newChild.isEmpty()) return dissocChild(i);
@@ -264,7 +264,7 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 	}
 
 	@SuppressWarnings("unchecked")
-	private TreeMap<K, V> insertChild(int digit, Ref<AHashMap<K, V>> newChild) {
+	private MapTree<K, V> insertChild(int digit, Ref<AHashMap<K, V>> newChild) {
 		int bsize = children.length;
 		int i = Bits.positionForDigit(digit, mask);
 		short newMask = (short) (mask | (1 << digit));
@@ -275,7 +275,7 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 		System.arraycopy(children, i, newChildren, i + 1, bsize - i);
 		newChildren[i] = newChild;
 		long newCount = count + newChild.getValue().count();
-		return (TreeMap<K, V>) create(newChildren, shift, newMask, newCount);
+		return (MapTree<K, V>) create(newChildren, shift, newMask, newCount);
 	}
 
 	/**
@@ -286,13 +286,13 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 	 * @param newChild
 	 * @return @
 	 */
-	private TreeMap<K, V> replaceChild(int i, Ref<AHashMap<K, V>> newChild) {
+	private MapTree<K, V> replaceChild(int i, Ref<AHashMap<K, V>> newChild) {
 		if (children[i] == newChild) return this;
 		AHashMap<K, V> oldChild = children[i].getValue();
 		Ref<AHashMap<K, V>>[] newChildren = children.clone();
 		newChildren[i] = newChild;
 		long newCount = count + newChild.getValue().count() - oldChild.count();
-		return (TreeMap<K, V>) create(newChildren, shift, mask, newCount);
+		return (MapTree<K, V>) create(newChildren, shift, mask, newCount);
 	}
 
 	public static int digitForIndex(int index, short mask) {
@@ -307,18 +307,18 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 	}
 
 	@Override
-	public TreeMap<K, V> assoc(K key, V value) {
+	public MapTree<K, V> assoc(K key, V value) {
 		Ref<K> keyRef = Ref.create(key);
 		return assocRef(keyRef, value, shift);
 	}
 
 	@Override
-	public TreeMap<K, V> assocRef(Ref<K> keyRef, V value) {
+	public MapTree<K, V> assocRef(Ref<K> keyRef, V value) {
 		return assocRef(keyRef, value, shift);
 	}
 
 	@Override
-	protected TreeMap<K, V> assocRef(Ref<K> keyRef, V value, int shift) {
+	protected MapTree<K, V> assocRef(Ref<K> keyRef, V value, int shift) {
 		if (this.shift != shift) {
 			throw new Error("Invalid shift!");
 		}
@@ -326,7 +326,7 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) {
 			// location not present, need to insert new child
-			AHashMap<K, V> newChild = ListMap.create(MapEntry.createRef(keyRef, Ref.create(value)));
+			AHashMap<K, V> newChild = MapLeaf.create(MapEntry.createRef(keyRef, Ref.create(value)));
 			return insertChild(digit, Ref.create(newChild));
 		} else {
 			// child exists, so assoc in new ref at lower shift level
@@ -343,14 +343,14 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 	}
 
 	@Override
-	public TreeMap<K, V> assocEntry(MapEntry<K, V> e, int shift) {
+	public MapTree<K, V> assocEntry(MapEntry<K, V> e, int shift) {
 		assert (this.shift == shift); // should always be correct shift
 		Ref<K> keyRef = e.getKeyRef();
 		int digit = Utils.extractDigit(keyRef.getHash(), shift);
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) {
 			// location not present
-			AHashMap<K, V> newChild = ListMap.create(e);
+			AHashMap<K, V> newChild = MapLeaf.create(e);
 			return insertChild(digit, Ref.create(newChild));
 		} else {
 			// location needs update
@@ -433,7 +433,7 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K, V> TreeMap<K, V> read(ByteBuffer bb, long count) throws BadFormatException {
+	public static <K, V> MapTree<K, V> read(ByteBuffer bb, long count) throws BadFormatException {
 		int shift = bb.get();
 		short mask = bb.getShort();
 
@@ -448,7 +448,7 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 			blocks[i] = ref;
 		}
 		// create directly, we have all values
-		TreeMap<K, V> result = new TreeMap<K, V>(blocks, shift, mask, count);
+		MapTree<K, V> result = new MapTree<K, V>(blocks, shift, mask, count);
 		if (!result.isValidStructure()) throw new BadFormatException("Problem with TreeMap invariants");
 		return result;
 	}
@@ -462,7 +462,7 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 
 	@Override
 	public boolean isCanonical() {
-		if (count <= ListMap.MAX_LIST_MAP_SIZE) return false;
+		if (count <= MapLeaf.MAX_LIST_MAP_SIZE) return false;
 		return true;
 	}
 
@@ -495,7 +495,7 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 		}
 		if (newChildren == children) return (R) this;
 		// Note: we assume no key hashes have changed, so sturcture is the same
-		return (R) new TreeMap<>(newChildren, shift, mask, count);
+		return (R) new MapTree<>(newChildren, shift, mask, count);
 	}
 
 	@Override
@@ -505,17 +505,17 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 
 	@Override
 	protected AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func, int shift) {
-		if ((b instanceof TreeMap)) {
-			TreeMap<K, V> bt = (TreeMap<K, V>) b;
+		if ((b instanceof MapTree)) {
+			MapTree<K, V> bt = (MapTree<K, V>) b;
 			if (this.shift != bt.shift) throw new Error("Misaligned shifts!");
 			return mergeWith(bt, func, shift);
 		}
-		if ((b instanceof ListMap)) return mergeWith((ListMap<K, V>) b, func, shift);
+		if ((b instanceof MapLeaf)) return mergeWith((MapLeaf<K, V>) b, func, shift);
 		throw new Error("Unrecognised map type: " + b.getClass());
 	}
 
 	@SuppressWarnings("unchecked")
-	private AHashMap<K, V> mergeWith(TreeMap<K, V> b, MergeFunction<V> func, int shift) {
+	private AHashMap<K, V> mergeWith(MapTree<K, V> b, MergeFunction<V> func, int shift) {
 		// assume two TreeMaps with identical prefix and shift
 		assert (b.shift == shift);
 		int fullMask = mask | b.mask;
@@ -543,7 +543,7 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 	}
 
 	@SuppressWarnings("unchecked")
-	private AHashMap<K, V> mergeWith(ListMap<K, V> b, MergeFunction<V> func, int shift) {
+	private AHashMap<K, V> mergeWith(MapLeaf<K, V> b, MergeFunction<V> func, int shift) {
 		Ref<AHashMap<K, V>>[] newChildren = null;
 		int ix = 0;
 		for (int i = 0; i < 16; i++) {
@@ -551,7 +551,7 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 			if ((mask & imask) == 0) continue;
 			Ref<AHashMap<K, V>> cref = children[ix++];
 			AHashMap<K, V> child = cref.getValue();
-			ListMap<K, V> bSubset = b.filterHexDigits(shift, imask); // filter only relevant elements in b
+			MapLeaf<K, V> bSubset = b.filterHexDigits(shift, imask); // filter only relevant elements in b
 			AHashMap<K, V> newChild = child.mergeWith(bSubset, func, shift + 1);
 			if (child != newChild) {
 				if (newChildren == null) {
@@ -568,7 +568,7 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 		// if any new children created, create a new Map, else use this
 		AHashMap<K, V> result = (newChildren == null) ? this : createFull(newChildren, shift);
 
-		ListMap<K, V> extras = b.filterHexDigits(shift, ~mask);
+		MapLeaf<K, V> extras = b.filterHexDigits(shift, ~mask);
 		int en = extras.size();
 		for (int i = 0; i < en; i++) {
 			MapEntry<K, V> e = extras.entryAt(i);
@@ -584,19 +584,19 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 
 	@Override
 	public AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func) {
-		if ((b instanceof TreeMap)) {
-			TreeMap<K, V> bt = (TreeMap<K, V>) b;
+		if ((b instanceof MapTree)) {
+			MapTree<K, V> bt = (MapTree<K, V>) b;
 			// this is OK, top levels should both have shift 0 and be aligned down the tree.
 			if (this.shift != bt.shift) throw new Error("Misaligned shifts!");
 			return mergeDifferences(bt, func);
 		} else {
 			// must be ListMap
-			return mergeDifferences((ListMap<K, V>) b, func);
+			return mergeDifferences((MapLeaf<K, V>) b, func);
 		}
 	}
 
 	@SuppressWarnings("unchecked")
-	private AHashMap<K, V> mergeDifferences(TreeMap<K, V> b, MergeFunction<V> func) {
+	private AHashMap<K, V> mergeDifferences(MapTree<K, V> b, MergeFunction<V> func) {
 		// assume two treemaps with identical prefix and shift
 		if (this.equals(b)) return this; // no differences to merge
 		int fullMask = mask | b.mask;
@@ -626,7 +626,7 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 	}
 
 	@SuppressWarnings("unchecked")
-	private AHashMap<K, V> mergeDifferences(ListMap<K, V> b, MergeFunction<V> func) {
+	private AHashMap<K, V> mergeDifferences(MapLeaf<K, V> b, MergeFunction<V> func) {
 		Ref<AHashMap<K, V>>[] newChildren = null;
 		int ix = 0;
 		for (int i = 0; i < 16; i++) {
@@ -634,7 +634,7 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 			if ((mask & imask) == 0) continue;
 			Ref<AHashMap<K, V>> cref = children[ix++];
 			AHashMap<K, V> child = cref.getValue();
-			ListMap<K, V> bSubset = b.filterHexDigits(shift, imask); // filter only relevant elements in b
+			MapLeaf<K, V> bSubset = b.filterHexDigits(shift, imask); // filter only relevant elements in b
 			AHashMap<K, V> newChild = child.mergeDifferences(bSubset, func);
 			if (child != newChild) {
 				if (newChildren == null) {
@@ -650,7 +650,7 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 		assert (ix == children.length);
 		AHashMap<K, V> result = (newChildren == null) ? this : createFull(newChildren, shift);
 
-		ListMap<K, V> extras = b.filterHexDigits(shift, ~mask);
+		MapLeaf<K, V> extras = b.filterHexDigits(shift, ~mask);
 		int en = extras.size();
 		for (int i = 0; i < en; i++) {
 			MapEntry<K, V> e = extras.entryAt(i);
@@ -699,11 +699,11 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 
 	@Override
 	public boolean equalsKeys(AMap<K, V> a) {
-		if (a instanceof TreeMap) return equalsKeys((TreeMap<K, V>) a);
+		if (a instanceof MapTree) return equalsKeys((MapTree<K, V>) a);
 		return false;
 	}
 
-	boolean equalsKeys(TreeMap<K, V> a) {
+	boolean equalsKeys(MapTree<K, V> a) {
 		if (this == a) return true;
 		if (this.count != a.count) return false;
 		if (this.mask != a.mask) return false;
@@ -716,11 +716,11 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 
 	@Override
 	public boolean equals(AMap<K, V> a) {
-		if (!(a instanceof TreeMap)) return false;
-		return equals((TreeMap<K, V>) a);
+		if (!(a instanceof MapTree)) return false;
+		return equals((MapTree<K, V>) a);
 	}
 
-	boolean equals(TreeMap<K, V> b) {
+	boolean equals(MapTree<K, V> b) {
 		if (this == b) return true;
 		long n = count;
 		if (n != b.count) return false;
@@ -792,7 +792,7 @@ public class TreeMap<K, V> extends AHashMap<K, V> {
 	}
 
 	private boolean isValidStructure() {
-		if (count <= ListMap.MAX_LIST_MAP_SIZE) return false;
+		if (count <= MapLeaf.MAX_LIST_MAP_SIZE) return false;
 		if (children.length != Integer.bitCount(mask & 0xFFFF)) return false;
 		for (int i = 0; i < children.length; i++) {
 			if (children[i] == null) return false;

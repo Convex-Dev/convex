@@ -24,11 +24,11 @@ public class Vectors {
 	 */
 	public static <T> AVector<T> create(T[] elements, int offset, int length) {
 		if (length < 0) throw new IllegalArgumentException("Cannot create vector of negative length!");
-		if (length <= CHUNK_SIZE) return ListVector.create(elements, offset, length);
+		if (length <= CHUNK_SIZE) return VectorLeaf.create(elements, offset, length);
 		int tailLength = Utils.checkedInt((length >> BITS_PER_LEVEL) << BITS_PER_LEVEL);
 		AVector<T> tail = Vectors.createChunked(elements, offset, tailLength);
 		if (tail.count() == length) return tail;
-		return ListVector.create(elements, offset + tailLength, length - tailLength, tail);
+		return VectorLeaf.create(elements, offset + tailLength, length - tailLength, tail);
 	}
 
 	/**
@@ -42,8 +42,8 @@ public class Vectors {
 	static <T> AVector<T> createChunked(T[] elements, int offset, int length) {
 		if ((length == 0) || (length & BITMASK) != 0)
 			throw new IllegalArgumentException("Invalid vector length: " + length);
-		if (length == CHUNK_SIZE) return ListVector.create(elements, offset, length);
-		return TreeVector.create(elements, offset, length);
+		if (length == CHUNK_SIZE) return VectorLeaf.create(elements, offset, length);
+		return VectorTree.create(elements, offset, length);
 	}
 
 	/**
@@ -75,7 +75,7 @@ public class Vectors {
 
 	@SuppressWarnings("unchecked")
 	public static <T> AVector<T> empty() {
-		return (AVector<T>) ListVector.EMPTY;
+		return (AVector<T>) VectorLeaf.EMPTY;
 	}
 
 	@SafeVarargs
@@ -103,10 +103,10 @@ public class Vectors {
 	 */
 	public static <T> AVector<T> read(ByteBuffer bb) throws BadFormatException {
 		long count = Format.readVLCLong(bb);
-		if ((count <= ListVector.MAX_SIZE) || ((count & 0x0F) != 0)) {
-			return ListVector.read(bb, count);
+		if ((count <= VectorLeaf.MAX_SIZE) || ((count & 0x0F) != 0)) {
+			return VectorLeaf.read(bb, count);
 		} else {
-			return TreeVector.read(bb, count);
+			return VectorTree.read(bb, count);
 		}
 	}
 

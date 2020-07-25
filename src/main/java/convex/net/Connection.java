@@ -70,7 +70,7 @@ public class Connection {
 	 * Pre-allocated direct buffer for message sending TODO: is one per connection
 	 * OK? Users should synchronise on this briefly while building message.
 	 */
-	private final ByteBuffer frameBuf = ByteBuffer.allocateDirect(Format.MAX_ENCODING_LENGTH + 20);
+	private final ByteBuffer frameBuf = ByteBuffer.allocateDirect(Format.LIMIT_ENCODING_LENGTH + 20);
 
 	private final MessageReceiver receiver;
 	private final MessageSender sender;

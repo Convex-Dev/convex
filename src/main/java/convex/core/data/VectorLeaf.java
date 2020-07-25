@@ -30,9 +30,9 @@ import convex.core.util.Utils;
  *
  * @param <T> Type of vector elements
  */
-public class ListVector<T> extends AVector<T> {
+public class VectorLeaf<T> extends AVector<T> {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static final ListVector<?> EMPTY = new ListVector(new Ref<?>[0]);
+	public static final VectorLeaf<?> EMPTY = new VectorLeaf(new Ref<?>[0]);
 
 	/** Maximum size of a single ListVector before a tail is required */
 	public static final int MAX_SIZE = Vectors.CHUNK_SIZE;
@@ -41,14 +41,14 @@ public class ListVector<T> extends AVector<T> {
 	private final Ref<AVector<T>> prefix;
 	private final long count;
 
-	ListVector(Ref<T>[] items, Ref<AVector<T>> prefix, long count) {
+	VectorLeaf(Ref<T>[] items, Ref<AVector<T>> prefix, long count) {
 		this.items = items;
 		this.prefix = prefix;
 
 		this.count = count;
 	}
 
-	ListVector(Ref<T>[] items) {
+	VectorLeaf(Ref<T>[] items) {
 		this(items, null, items.length);
 	}
 
@@ -61,15 +61,15 @@ public class ListVector<T> extends AVector<T> {
 	 * @return New ListVector
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> ListVector<T> create(T[] things, int offset, int length) {
-		if (length == 0) return (ListVector<T>) ListVector.EMPTY;
+	public static <T> VectorLeaf<T> create(T[] things, int offset, int length) {
+		if (length == 0) return (VectorLeaf<T>) VectorLeaf.EMPTY;
 		if (length > Vectors.CHUNK_SIZE)
 			throw new IllegalArgumentException("Too many elements for ListVector: " + length);
 		Ref<T>[] items = new Ref[length];
 		for (int i = 0; i < length; i++) {
 			items[i] = Ref.create(things[i + offset]);
 		}
-		return new ListVector<T>(items);
+		return new VectorLeaf<T>(items);
 	}
 
 	/**
@@ -81,7 +81,7 @@ public class ListVector<T> extends AVector<T> {
 	 * @return The updated ListVector
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> ListVector<T> create(T[] things, int offset, int length, AVector<T> tail) {
+	public static <T> VectorLeaf<T> create(T[] things, int offset, int length, AVector<T> tail) {
 		if (length == 0)
 			throw new IllegalArgumentException("ListVector with tail cannot be created with zero head elements");
 		if (length > Vectors.CHUNK_SIZE)
@@ -90,10 +90,10 @@ public class ListVector<T> extends AVector<T> {
 		for (int i = 0; i < length; i++) {
 			items[i] = Ref.create(things[i + offset]);
 		}
-		return new ListVector<T>(items, Ref.create(tail), tail.count() + length);
+		return new VectorLeaf<T>(items, Ref.create(tail), tail.count() + length);
 	}
 
-	public static <T> ListVector<T> create(T[] things) {
+	public static <T> VectorLeaf<T> create(T[] things) {
 		return create(things, 0, things.length);
 	}
 
@@ -114,18 +114,18 @@ public class ListVector<T> extends AVector<T> {
 
 			if (localSize + 1 == Vectors.CHUNK_SIZE) {
 				// need to extend to TreeVector
-				ListVector<T> chunk = new ListVector<T>(newItems);
+				VectorLeaf<T> chunk = new VectorLeaf<T>(newItems);
 				if (!hasPrefix()) return chunk; // exactly one whole chunk
 				return prefix.getValue().appendChunk(chunk);
 			} else {
 				// just grow current ListVector head
-				return new ListVector<T>(newItems, prefix, count + 1);
+				return new VectorLeaf<T>(newItems, prefix, count + 1);
 			}
 		} else {
 			// this must be a full single chunk already, so turn this into tail of new
 			// ListVector
 			AVector<T> newTail = this;
-			return new ListVector<T>(new Ref[] { Ref.create(value) }, Ref.create(newTail), count + 1);
+			return new VectorLeaf<T>(new Ref[] { Ref.create(value) }, Ref.create(newTail), count + 1);
 		}
 	}
 
@@ -142,7 +142,7 @@ public class ListVector<T> extends AVector<T> {
 				int rn = Utils.checkedInt(Math.min(Vectors.CHUNK_SIZE, end - i));
 				if (rn == Vectors.CHUNK_SIZE) {
 					// we can append a whole chunk
-					result = result.appendChunk((ListVector<T>) b.subVector(i - aLen, rn));
+					result = result.appendChunk((VectorLeaf<T>) b.subVector(i - aLen, rn));
 					i += Vectors.CHUNK_SIZE;
 					continue;
 				}
@@ -155,7 +155,7 @@ public class ListVector<T> extends AVector<T> {
 	}
 
 	@Override
-	public AVector<T> appendChunk(ListVector<T> chunk) {
+	public AVector<T> appendChunk(VectorLeaf<T> chunk) {
 		if (chunk.count != Vectors.CHUNK_SIZE)
 			throw new IllegalArgumentException("Can't append a chunk of size: " + chunk.count());
 
@@ -166,7 +166,7 @@ public class ListVector<T> extends AVector<T> {
 		}
 		if (this.count != Vectors.CHUNK_SIZE)
 			throw new IllegalArgumentException("Can't append chunk to a ListVector of size: " + this.count);
-		return TreeVector.wrap2(chunk, this);
+		return VectorTree.wrap2(chunk, this);
 	}
 
 	@Override
@@ -200,12 +200,12 @@ public class ListVector<T> extends AVector<T> {
 			if (old == value) return this;
 			Ref<T>[] newItems = items.clone();
 			newItems[(int) ix] = Ref.create(value);
-			return new ListVector<T>(newItems, prefix, count);
+			return new VectorLeaf<T>(newItems, prefix, count);
 		} else {
 			AVector<T> tl = prefix.getValue();
 			AVector<T> newTail = tl.assoc(i, value);
 			if (tl == newTail) return this;
-			return new ListVector<T>(items, Ref.create(newTail), count);
+			return new VectorLeaf<T>(items, Ref.create(newTail), count);
 		}
 	}
 
@@ -219,15 +219,15 @@ public class ListVector<T> extends AVector<T> {
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> ListVector<T> read(ByteBuffer data, long count) throws BadFormatException {
+	public static <T> VectorLeaf<T> read(ByteBuffer data, long count) throws BadFormatException {
 		if (count < 0) throw new BadFormatException("Negative ListVector length");
-		if (count == 0) return (ListVector<T>) EMPTY;
+		if (count == 0) return (VectorLeaf<T>) EMPTY;
 		boolean prefixPresent = count > MAX_SIZE;
 
 		int n = ((int) count) & 0xF;
 		if (n == 0) {
 			if (count > 16) throw new BadFormatException("ListVector not valid for size 0 mod 16: " + count);
-			n = ListVector.MAX_SIZE; // we know this must be true since zero already caught
+			n = VectorLeaf.MAX_SIZE; // we know this must be true since zero already caught
 		}
 
 		Ref<T>[] items = (Ref<T>[]) new Ref<?>[n];
@@ -243,7 +243,7 @@ public class ListVector<T> extends AVector<T> {
 			tail = (Ref<AVector<T>>) o;
 		}
 
-		return new ListVector<T>(items, tail, count);
+		return new VectorLeaf<T>(items, tail, count);
 	}
 
 	@Override
@@ -291,10 +291,10 @@ public class ListVector<T> extends AVector<T> {
 		return prefix != null;
 	}
 
-	public ListVector<T> withPrefix(AVector<T> newPrefix) {
+	public VectorLeaf<T> withPrefix(AVector<T> newPrefix) {
 		if ((newPrefix == null) && !hasPrefix()) return this;
 		long tc = (newPrefix == null) ? 0L : newPrefix.count();
-		return new ListVector<T>(items, (newPrefix == null) ? null : Ref.create(newPrefix), tc + items.length);
+		return new VectorLeaf<T>(items, (newPrefix == null) ? null : Ref.create(newPrefix), tc + items.length);
 	}
 
 	@Override
@@ -478,7 +478,7 @@ public class ListVector<T> extends AVector<T> {
 			newItems[i] = Ref.create(r);
 		}
 
-		return (prefix == null) ? new ListVector<R>(newItems) : new ListVector<R>(newItems, newPrefix, count);
+		return (prefix == null) ? new VectorLeaf<R>(newItems) : new VectorLeaf<R>(newItems, newPrefix, count);
 	}
 
 	@Override
@@ -564,7 +564,7 @@ public class ListVector<T> extends AVector<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public ListVector<T> updateRefs(IRefFunction func) {
+	public VectorLeaf<T> updateRefs(IRefFunction func) {
 		Ref<?> newPrefix = (prefix == null) ? null : func.apply(prefix); // do this first for in-order traversal
 		int ic = items.length;
 		Ref<?>[] newItems = items;
@@ -577,17 +577,17 @@ public class ListVector<T> extends AVector<T> {
 			}
 		}
 		if ((items==newItems) && (prefix == newPrefix)) return this; // if no change, safe to return this
-		return new ListVector<T>((Ref<T>[]) newItems, (Ref<AVector<T>>) newPrefix, count);
+		return new VectorLeaf<T>((Ref<T>[]) newItems, (Ref<AVector<T>>) newPrefix, count);
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public boolean equals(Object a) {
-		if (!(a instanceof ListVector)) return false;
-		return equals((ListVector<T>) a);
+		if (!(a instanceof VectorLeaf)) return false;
+		return equals((VectorLeaf<T>) a);
 	}
 
-	public boolean equals(ListVector<T> v) {
+	public boolean equals(VectorLeaf<T> v) {
 		if (this == v) return true;
 		if (this.count != v.count()) return false;
 		if (!Utils.equals(this.prefix, v.prefix)) return false;
@@ -618,7 +618,7 @@ public class ListVector<T> extends AVector<T> {
 	}
 
 	@Override
-	public ListVector<T> getChunk(long offset) {
+	public VectorLeaf<T> getChunk(long offset) {
 		if (prefix == null) {
 			if (items.length != MAX_SIZE) throw new IllegalStateException("Can only get full chunk");
 			if (offset != 0) throw new IndexOutOfBoundsException("Chunk offset must be zero");
@@ -638,7 +638,7 @@ public class ListVector<T> extends AVector<T> {
 			@SuppressWarnings("unchecked")
 			Ref<T>[] newItems = new Ref[len];
 			System.arraycopy(items, Utils.checkedInt(start), newItems, 0, len);
-			return new ListVector<T>(newItems, null, length);
+			return new VectorLeaf<T>(newItems, null, length);
 		} else {
 			long tc = prefixLength();
 			if (start >= tc) {

@@ -21,13 +21,13 @@ import convex.core.data.BlobTree;
 import convex.core.data.Blobs;
 import convex.core.data.Keyword;
 import convex.core.data.List;
-import convex.core.data.ListMap;
-import convex.core.data.ListVector;
+import convex.core.data.MapLeaf;
+import convex.core.data.VectorLeaf;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
-import convex.core.data.TreeMap;
-import convex.core.data.TreeVector;
+import convex.core.data.MapTree;
+import convex.core.data.VectorTree;
 import convex.core.data.Vectors;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
@@ -43,12 +43,12 @@ public class Samples {
 	
 	public static final ECDSASignature BAD_SIGNATURE = ECDSASignature.create(0, BigInteger.ONE, BigInteger.ONE);
 
-	public static final ListVector<Integer> INT_VECTOR_10 = createTestIntVector(10);
-	public static final ListVector<Integer> INT_VECTOR_16 = createTestIntVector(16);
-	public static final ListVector<Integer> INT_VECTOR_23 = createTestIntVector(23);
-	public static final TreeVector<Integer> INT_VECTOR_32 = createTestIntVector(32);
-	public static final TreeVector<Integer> INT_VECTOR_256 = createTestIntVector(256);
-	public static final ListVector<Integer> INT_VECTOR_300 = createTestIntVector(300);
+	public static final VectorLeaf<Integer> INT_VECTOR_10 = createTestIntVector(10);
+	public static final VectorLeaf<Integer> INT_VECTOR_16 = createTestIntVector(16);
+	public static final VectorLeaf<Integer> INT_VECTOR_23 = createTestIntVector(23);
+	public static final VectorTree<Integer> INT_VECTOR_32 = createTestIntVector(32);
+	public static final VectorTree<Integer> INT_VECTOR_256 = createTestIntVector(256);
+	public static final VectorLeaf<Integer> INT_VECTOR_300 = createTestIntVector(300);
 
 	public static final AVector<AVector<Integer>> VECTOR_OF_VECTORS = Vectors.of(INT_VECTOR_10, INT_VECTOR_16,
 			INT_VECTOR_23);
@@ -56,9 +56,9 @@ public class Samples {
 	public static final List<Integer> INT_LIST_10 = Lists.create(INT_VECTOR_10);
 	public static final List<Integer> INT_LIST_300 = Lists.create(INT_VECTOR_300);
 
-	public static final ListMap<Long, Long> LONG_MAP_5 = createTestLongMap(5);
-	public static final TreeMap<Long, Long> LONG_MAP_10 = createTestLongMap(10);
-	public static final TreeMap<Long, Long> LONG_MAP_100 = createTestLongMap(100);
+	public static final MapLeaf<Long, Long> LONG_MAP_5 = createTestLongMap(5);
+	public static final MapTree<Long, Long> LONG_MAP_10 = createTestLongMap(10);
+	public static final MapTree<Long, Long> LONG_MAP_100 = createTestLongMap(100);
 
 	public static final BlobMap<Blob, Integer> INT_BLOBMAP_7 = BlobMaps.of(Blob.fromHex(""), 0, Blob.fromHex("0001"), 1,
 			Blob.fromHex("01"), 2, Blob.fromHex("010000"), 3, Blob.fromHex("010001"), 4, Blob.fromHex("ff0000"), 5,

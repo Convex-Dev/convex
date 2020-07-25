@@ -92,6 +92,8 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 
 	public static final int BYTE_LENGTH = 32;
 
+	public static final int MAX_ENCODING_LENGTH = 1+BYTE_LENGTH;
+
 	/**
 	 * Hash of the serialised representation of the value Computed and stored upon
 	 * demand.
