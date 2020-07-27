@@ -1874,11 +1874,12 @@ public class Core {
 		
 		CORE_NAMESPACE = coreEnv;
 
-		// Copy aliases into default environment
-		// TODO: should be only definition in default environment?
+		// Create *aliases* for default environment. Copy Aliases metadata from Core environment.
 		Syntax ALIASES=coreEnv.get(Symbols.STAR_ALIASES);
 		assert(ALIASES!=null);
-		AHashMap<Symbol, Syntax> defaultEnv = coreEnv.assoc(Symbols.STAR_ALIASES,ALIASES);
+		
+		ALIASES=ALIASES.withValue(Maps.of(null, Core.CORE_ADDRESS));
+		AHashMap<Symbol, Syntax> defaultEnv = Maps.of(Symbols.STAR_ALIASES,ALIASES);
 		
 		ENVIRONMENT = defaultEnv;
 	}

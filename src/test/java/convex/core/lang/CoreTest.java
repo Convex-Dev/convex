@@ -70,7 +70,7 @@ public class CoreTest {
 	public void testAliases() {
 		assertTrue(evalB("(map? *aliases*)"));
 		assertEquals(1L,evalL("(count *aliases*)"));
-		assertEquals(Core.CORE_SYMBOL,eval("(first (first *aliases*))"));
+		assertNull(eval("(first (first *aliases*))"));
 		assertEquals(Core.CORE_ADDRESS,eval("(second (first *aliases*))"));
 	}
 	
@@ -1275,9 +1275,9 @@ public class CoreTest {
 	}
 
 	private AVector<Syntax> ALL_PREDICATES = Vectors
-			.create(Core.ENVIRONMENT.filterValues(e -> e.getValue() instanceof CorePred).values());
+			.create(Core.CORE_NAMESPACE.filterValues(e -> e.getValue() instanceof CorePred).values());
 	private AVector<Syntax> ALL_CORE_DEFS = Vectors
-			.create(Core.ENVIRONMENT.filterValues(e -> e.getValue() instanceof ICoreDef).values());
+			.create(Core.CORE_NAMESPACE.filterValues(e -> e.getValue() instanceof ICoreDef).values());
 
 	@Test
 	public void testPredArity() {
@@ -1302,7 +1302,7 @@ public class CoreTest {
 		for (Syntax syndef : vals) {
 			ICoreDef def = syndef.getValue();
 			Symbol sym = def.getSymbol();
-			assertSame(def, Core.ENVIRONMENT.get(sym).getValue());
+			assertSame(def, Core.CORE_NAMESPACE.get(sym).getValue());
 
 			Blob b = Format.encodedBlob(def);
 			assertSame(def, Format.read(b));

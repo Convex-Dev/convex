@@ -206,6 +206,15 @@ public class Syntax extends ACell implements IRefContainer {
 		if (meta == newMetadata) return this;
 		return new Syntax(datumRef, newMetadata);
 	}
+	
+	/**
+	 * Updates Syntax with a new value. Always creates a new Syntax Object.
+	 * @param newValue
+	 * @return new Syntax Object
+	 */
+	public Syntax withValue(Object newValue) {
+		return create(newValue,meta);
+	}
 
 	/**
 	 * Removes all metadata from this Syntax Object
@@ -245,5 +254,6 @@ public class Syntax extends ACell implements IRefContainer {
 			return (R) a;
 		}
 	}
+
 
 }

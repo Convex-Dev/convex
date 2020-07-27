@@ -73,7 +73,7 @@ public class ActorsTest {
 
 		assertFalse((boolean)eval(ctx,"(exports? caddr 'foo)"));
 		
-		assertEquals(Core.COUNT,ctx.getAccountStatus(a).getEnvironmentValue(Symbols.COUNT));
+		assertEquals(Core.COUNT,ctx.lookup(Symbols.COUNT).getValue());
 		assertNull(ctx.getAccountStatus(a).getEnvironmentValue(Symbols.FOO));
 	}
 	

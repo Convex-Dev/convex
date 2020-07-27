@@ -347,7 +347,7 @@ public class Context<T> implements IObject {
 		if (le!=null) return (Context<R>) withResult(le.getValue());
 		
 		// second try lookup in dynamic environment
-		MapEntry<Symbol,Syntax> de=lookupDynamicEntry(getAccountStatus(),symbol);
+		MapEntry<Symbol,Syntax> de=lookupDynamicEntry(symbol);
 		if (de!=null) return withResult(de.getValue().getValue());
 		
 		// finally fallback to special symbol lookup
@@ -376,9 +376,16 @@ public class Context<T> implements IObject {
 			Symbol alias=sym.getNamespace();
 			AccountStatus aliasAccount=getAliasedAccount(env,alias);
 			if (aliasAccount==null) return null;
-			return lookupDynamicEntry(aliasAccount,sym.getUnqualifiedName());
+			result = lookupDynamicEntry(aliasAccount,sym.getUnqualifiedName());
 		} else {
 			result =env.getEntry(sym);
+			if (result==null) {
+				// Need to lookup in default alias
+				AccountStatus baseAccount=getAliasedAccount(env,null);
+				if (baseAccount!=null) {
+					result = lookupDynamicEntry(baseAccount,sym);
+				}
+			}
 		} 
 		return result;
 	}
@@ -405,10 +412,14 @@ public class Context<T> implements IObject {
 	 */
 	@SuppressWarnings("unchecked")
 	private AccountStatus getAliasedAccount(AHashMap<Symbol, Syntax> env, Symbol alias) {
+		// Check for *aliases* entry. Might not exist.
 		Object maybeAliases=env.get(Symbols.STAR_ALIASES);
-		if ((env==null)||(!(maybeAliases instanceof AHashMap))) return null; 
+		if (maybeAliases==null) return null;
 		
-		AHashMap<Symbol,Object> aliasMap=((AHashMap<Symbol,Object>)maybeAliases);
+		Object aliasesValue=((Syntax)maybeAliases).getValue();
+		if ((env==null)||(!(aliasesValue instanceof AHashMap))) return null; 
+		
+		AHashMap<Symbol,Object> aliasMap=((AHashMap<Symbol,Object>)aliasesValue);
 		Object value=aliasMap.get(alias);
 		if (!(value instanceof Address)) return null;
 		
