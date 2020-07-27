@@ -337,20 +337,36 @@ public class Context<T> implements IObject {
 	 * Looks up a symbol in the current execution context, without consuming any juice
 	 * 
 	 * @param <R> Type of value associated with the given symbol
-	 * @param sym
+	 * @param sym Symbol to look up
 	 * @return Context with the result of the lookup (may be an undeclared exception)
 	 */
 	@SuppressWarnings("unchecked")
 	public <R> Context<R> lookup(Symbol symbol) {
+		// first try lookup in local bindings
 		MapEntry<Symbol,T> le=lookupLocalEntry(symbol);
 		if (le!=null) return (Context<R>) withResult(le.getValue());
+		
+		// second try lookup in dynamic environment
 		MapEntry<Symbol,Syntax> de=lookupDynamicEntry(symbol);
 		if (de!=null) return withResult(de.getValue().getValue());
+		
+		// finally fallback to special symbol lookup
 		return lookupSpecial(symbol);
 	}
 	
+	/**
+	 * Looks up an environment entry in the current dynamic environment without consuming juice.
+	 * 
+	 * If the symbol is qualified, try lookup via *aliases*
+	 * 
+	 * @param sym Symbol to look up
+	 * @return
+	 */
 	public MapEntry<Symbol,Syntax> lookupDynamicEntry(Symbol sym) {
-		return getEnvironment().getEntry(sym);
+		AHashMap<Symbol, Syntax> env = getEnvironment();
+		MapEntry<Symbol,Syntax> result =env.getEntry(sym);
+		
+		return result;
 	}
 
 	/**
