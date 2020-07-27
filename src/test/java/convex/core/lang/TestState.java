@@ -179,14 +179,14 @@ public class TestState {
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <T> Context<T> step(Context<?> c, String source) {
+	public static <T> Context<T> step(Context<?> ctx, String source) {
 		Object form = Reader.read(source);
-		Context<AOp<Object>> cctx = c.expandCompile(form);
+		Context<AOp<Object>> cctx = ctx.expandCompile(form);
 		if (cctx.isExceptional()) return (Context<T>) cctx;
 
 		AOp<Object> op = cctx.getResult();
 
-		Context<T> rctx = (Context<T>) c.run(op);
+		Context<T> rctx = (Context<T>) ctx.run(op);
 		return rctx;
 	}
 
@@ -194,9 +194,9 @@ public class TestState {
 	 * Runs an execution step as a different address. Returns value after restoring
 	 * the original address.
 	 */
-	public static <T> Context<T> stepAs(String address, Context<?> c, String source) {
+	public static <T> Context<T> stepAs(String address, Context<?> ctx, String source) {
 		try {
-			return stepAs(RT.address(address), c, source);
+			return stepAs(RT.address(address), ctx, source);
 		} catch (Exception e) {
 			throw new Error(e);
 		}
