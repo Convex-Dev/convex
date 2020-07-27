@@ -128,4 +128,13 @@ public class Symbol extends ASymbolic {
 		if ((namespace!=null)&&namespace.isQualified()) throw new InvalidDataException("Invalid namespace, cannot be qualified: " + namespace, this);
 	}
 
+	/**
+	 * Converts to an unqualified Symbol by removing any namespace component
+	 * @return
+	 */
+	public Symbol getUnqualifiedName() {
+		// TODO Maybe optimise?
+		return Symbol.create(getName());
+	}
+
 }

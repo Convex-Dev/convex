@@ -347,7 +347,7 @@ public class Context<T> implements IObject {
 		if (le!=null) return (Context<R>) withResult(le.getValue());
 		
 		// second try lookup in dynamic environment
-		MapEntry<Symbol,Syntax> de=lookupDynamicEntry(symbol);
+		MapEntry<Symbol,Syntax> de=lookupDynamicEntry(getAccountStatus(),symbol);
 		if (de!=null) return withResult(de.getValue().getValue());
 		
 		// finally fallback to special symbol lookup
@@ -363,10 +363,56 @@ public class Context<T> implements IObject {
 	 * @return
 	 */
 	public MapEntry<Symbol,Syntax> lookupDynamicEntry(Symbol sym) {
-		AHashMap<Symbol, Syntax> env = getEnvironment();
-		MapEntry<Symbol,Syntax> result =env.getEntry(sym);
+		AccountStatus as=getAccountStatus();
+		return lookupDynamicEntry(as,sym);
+	}
+	
+	private MapEntry<Symbol,Syntax> lookupDynamicEntry(AccountStatus as,Symbol sym) {
+		// Get environment for Address, or default to initial environment
+		AHashMap<Symbol, Syntax> env = (as==null)?Core.ENVIRONMENT:as.getEnvironment();
 		
+		MapEntry<Symbol,Syntax> result;
+		if (sym.isQualified()) {
+			Symbol alias=sym.getNamespace();
+			AccountStatus aliasAccount=getAliasedAccount(env,alias);
+			if (aliasAccount==null) return null;
+			return lookupDynamicEntry(aliasAccount,sym.getUnqualifiedName());
+		} else {
+			result =env.getEntry(sym);
+		} 
 		return result;
+	}
+	
+	/**
+	 * Gets the account status for the current Address
+	 * 
+	 * @return AccountStatus object, or null if not found
+	 */
+	public AccountStatus getAccountStatus() {
+		Address a=getAddress();
+		
+		// Possible we don't have an Address (e.g. in a Query)
+		if (a==null) return null;
+			
+		return chainState.state.getAccount(a);
+	}
+
+	/**
+	 * Looks up the account for an Symbol alias in the given environment.
+	 * @param env
+	 * @param alias 
+	 * @return AccountStatus for the aliased, or null if not present
+	 */
+	@SuppressWarnings("unchecked")
+	private AccountStatus getAliasedAccount(AHashMap<Symbol, Syntax> env, Symbol alias) {
+		Object maybeAliases=env.get(Symbols.STAR_ALIASES);
+		if ((env==null)||(!(maybeAliases instanceof AHashMap))) return null; 
+		
+		AHashMap<Symbol,Object> aliasMap=((AHashMap<Symbol,Object>)maybeAliases);
+		Object value=aliasMap.get(alias);
+		if (!(value instanceof Address)) return null;
+		
+		return getAccountStatus((Address)value);
 	}
 
 	/**
@@ -1055,7 +1101,7 @@ public class Context<T> implements IObject {
 		if (init==null) return withCastError(args[0],IFn.class);
 		
 		// deploy initial contract state
-		State stateSetup=state.delpyActor(address, v, Core.ENVIRONMENT);
+		State stateSetup=state.deployActor(address, v, Core.ENVIRONMENT);
 		if (stateSetup==null) {
 			// if computed, just return the existing address
 			if (computedAddress) return (Context<R>) withResult(Juice.DEPLOY_CONTRACT,address);
