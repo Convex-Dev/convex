@@ -7,6 +7,7 @@ import org.parboiled.Parboiled;
 
 import convex.core.data.AList;
 import convex.core.data.AVector;
+import convex.core.data.Blobs;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
@@ -54,7 +55,7 @@ public class ReaderTest {
 	}
 
 	@Test
-	public void testReadStmbol() {
+	public void testReadSymbol() {
 		assertEquals(Symbols.FOO, Reader.readSymbol("foo"));
 		assertThrows(Error.class, () -> Reader.readSymbol(""));
 		assertThrows(Error.class, () -> Reader.readSymbol("1"));
@@ -103,6 +104,14 @@ public class ReaderTest {
 
 		// metadata ignored
 		assertEquals(3.23, Reader.read("^:foo 3.23"));
+	}
+	
+	@Test
+	public void testHexBlobs() {
+		assertEquals(Blobs.fromHex("cafebabe"), Reader.read("0xcafebabe"));
+		
+		assertThrows(Error.class, () -> Reader.read("0x"));
+		assertThrows(Error.class, () -> Reader.read("0x1"));
 	}
 
 	@Test

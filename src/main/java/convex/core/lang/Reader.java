@@ -23,6 +23,7 @@ import convex.core.data.AHashMap;
 import convex.core.data.AList;
 import convex.core.data.AMap;
 import convex.core.data.ASequence;
+import convex.core.data.Blob;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
@@ -263,7 +264,8 @@ public class Reader extends BaseParser<Object> {
 				'[', 
 				ExpressionList(),
 				FirstOf(']', 
-						Sequence(FirstOf(AnyOf("})"), EOI), push(error("Expected closing ']'")))),
+						Sequence(FirstOf(AnyOf("})"), EOI), 
+								 push(error("Expected closing ']'")))),
 				push(prepare(Vectors.create(popNodeList()))));
 	}
 
@@ -272,7 +274,8 @@ public class Reader extends BaseParser<Object> {
 				'(', 
 				ExpressionList(),
 				FirstOf(')', 
-						Sequence(FirstOf(AnyOf("]}"), EOI), push(error("Expected closing ')'")))),
+						Sequence(FirstOf(AnyOf("]}"), EOI), 
+								 push(error("Expected closing ')'")))),
 				push(prepare(Lists.create(popNodeList()))));
 	}
 
@@ -281,7 +284,8 @@ public class Reader extends BaseParser<Object> {
 				"#{", 
 				ExpressionList(),
 				FirstOf('}', 
-						Sequence(FirstOf(AnyOf("])"), EOI), push(error("Expected closing '}'")))),
+						Sequence(FirstOf(AnyOf("])"), EOI), 
+								 push(error("Expected closing '}'")))),
 				push(prepare(Sets.create(popNodeList()))));
 	}
 
@@ -290,15 +294,27 @@ public class Reader extends BaseParser<Object> {
 	}
 
 	public Rule Map() {
-		return Sequence("{", ExpressionList(),
-				FirstOf('}', Sequence(FirstOf(AnyOf("])"), EOI), push(error("Expected closing '}'")))),
+		return Sequence(
+				"{", 
+				ExpressionList(),
+				FirstOf('}', 
+				Sequence(
+						FirstOf(AnyOf("])"), EOI), 
+						push(error("Expected closing '}'")))),
 				push(prepare(Maps.of(popNodeList().toArray()))));
 	}
 
 	// CONSTANT LITERALS
 
 	public Rule Constant() {
-		return FirstOf(NumberLiteral(), StringLiteral(), NilLiteral(), BooleanLiteral(), CharLiteral());
+		return FirstOf(
+				HexLiteral(),
+				NumberLiteral(), 
+				StringLiteral(), 
+				NilLiteral(), 
+				BooleanLiteral(), 
+				CharLiteral()
+				);
 	}
 
 	public Rule NilLiteral() {
@@ -422,9 +438,17 @@ public class Reader extends BaseParser<Object> {
 	public Rule Digits() {
 		return OneOrMore(Digit());
 	}
+	
+	public Rule HexDigits() {
+		return OneOrMore(Sequence(HexDigit(),HexDigit()));
+	}
 
 	public Rule SignedInteger() {
 		return Sequence(Optional(AnyOf("+-")), Digits());
+	}
+	
+	public Rule HexLiteral() {
+		return Sequence("0x",Sequence(HexDigits(),push(prepare(Blob.fromHex(match())))));
 	}
 
 	public Rule Long() {
