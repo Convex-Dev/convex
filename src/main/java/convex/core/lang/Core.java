@@ -600,7 +600,8 @@ public class Core {
 			Object o = args[0];
 			Address address = RT.address(o);
 			if (address == null) {
-				if (o instanceof String) return context.withArgumentError("Not a valid address: " + o);
+				if (o instanceof String) return context.withArgumentError("String not convertible to a valid Address: " + o);
+				if (o instanceof ABlob) return context.withArgumentError("Blob not convertiable a valid Address: " + o);
 				return context.withCastError(o, Address.class);
 			}
 			long juice = Juice.ADDRESS;

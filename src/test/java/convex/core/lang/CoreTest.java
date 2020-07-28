@@ -78,6 +78,7 @@ public class CoreTest {
 	public void testAddress() {
 		Address a = TestState.HERO;
 		assertEquals(a, eval("(address \"" + a.toHexString() + "\")"));
+		assertEquals(a, eval("(address 0x" + a.toHexString() + ")"));
 		assertEquals(a, eval("(address (address \"" + a.toHexString() + "\"))"));
 		assertEquals(a, eval("(address (blob \"" + a.toHexString() + "\"))"));
 
@@ -85,8 +86,9 @@ public class CoreTest {
 		assertArityError(step("(address 1 2)"));
 		assertArityError(step("(address)"));
 
-		// invalid address length - not a cast error since strings are generally valid
+		// invalid address lengths - not a cast error since argument types (in general) are valid
 		assertArgumentError(step("(address \"1234abcd\")"));
+		assertArgumentError(step("(address 0x1234abcd)"));
 
 		// invalid conversions
 		assertCastError(step("(address :foo)"));
