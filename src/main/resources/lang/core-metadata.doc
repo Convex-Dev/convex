@@ -13,7 +13,7 @@
  
   actor?
 	{
-	 :doc {:description "Tests if the given address refers to an Actor. Argument must be coercable to Address"
+	 :doc {:description "Tests if the given Address refers to an Actor. Argument must be castable to Address"
          :examples [{:code "(actor? \"1Ba377262D7637068C8a84b732e30d3Ff62bA891\")"}]
          :type :function
          :signature [{:params [address]}]}
@@ -21,7 +21,7 @@
  
  	address 
 	{
-	 :doc {:description "Casts the argument to an Address. Handles hex Strings, Addresses and 20-byte blobs. "
+	 :doc {:description "Casts the argument to an Address. Valid arguments include hex Strings, Addresses and Blobs with the correct length. "
          :examples [{:code "(address \"1Ba377262D7637068C8a84b732e30d3Ff62bA891\")"}]
          :type :function
          :signature [{:params [a]}]}
@@ -29,7 +29,7 @@
  
  	address?
 	{
-	 :doc {:description "Tests is the argument is an Address."
+	 :doc {:description "Tests if the argument is an Address."
          :examples [{:code "(address :foo)"}]
          :type :function
          :signature [{:params [a]}]}
@@ -37,15 +37,16 @@
  
   apply
 	{
-	 :doc {:description "Applies the function f to the specified arguments, after flattening the last argument."
-         :examples [{:code "(apply + 1 2 3 [4 5 6])"}]
+	 :doc {:description "Applies a function to the specified arguments, after flattening the last argument."
+         :examples [{:code "(apply + [1 2 3])"}
+                    {:code "(apply + 1 2 [3 4 5])"}]
          :type :function
          :signature [{:params [f & more-args]}]}
 	}
  
   assert
 	{
-	 :doc {:description "Checks each test in turn, and raises an ASSERT error if any are not truthy."
+	 :doc {:description "Evaluates each test, and raises an ASSERT error if any are not truthy."
          :examples [{:code "(assert (= owner *caller*))"}]
          :type :function
          :signature [{:params [& tests]}]}
@@ -173,15 +174,17 @@
 	{
 	 :doc {:description "Adds elements to a data structure, in the natural mode of addition for the data structure. Supports sequential collections, sets and maps."
          :examples [{:code "(conj [1 2] 3)"}
-                    {:code "(conj {1 2} [3 4])"}]
+                    {:code "(conj {1 2} [3 4])"}
+                    {:code "(conj #{1 2} 3)"}]
          :type :function
          :signature [{:params [coll & elems]}]}
 	}
  
   cons
 	{
-	 :doc {:description "Constructs a list, by prepending the leading arguments to the last argument. The last argument must be coercable to a sequence."
-         :examples [{:code "(cons 1 2 '(3 4))"}]
+	 :doc {:description "Constructs a List, by prepending the leading arguments to the last argument. The last argument must be coercable to a sequence."
+         :examples [{:code "(cons 1 '(2 3))"}
+                    {:code "(cons 1 2 '(3 4))"}]
          :type :function
          :signature [{:params [& args]}]}
 	}
