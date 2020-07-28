@@ -83,6 +83,7 @@ public class BlobsTest {
 		ABlob blob = Blob.EMPTY;
 		assertEquals(0L,blob.toLong());
 		assertSame(blob,blob.getChunk(0));
+		assertSame(blob,blob.slice(0,0));
 	}
 
 	@Test

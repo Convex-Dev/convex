@@ -7,6 +7,7 @@ import org.parboiled.Parboiled;
 
 import convex.core.data.AList;
 import convex.core.data.AVector;
+import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -110,7 +111,7 @@ public class ReaderTest {
 	public void testHexBlobs() {
 		assertEquals(Blobs.fromHex("cafebabe"), Reader.read("0xcafebabe"));
 		assertEquals(Blobs.fromHex("0aA1"), Reader.read("0x0Aa1"));
-		assertEquals(Blobs.fromHex(""), Reader.read("0x"));
+		assertEquals(Blob.EMPTY, Reader.read("0x"));
 	
 		assertThrows(Error.class, () -> Reader.read("0x1")); // odd number of hex digits
 		assertThrows(Error.class, () -> Reader.read("0x123")); // odd number of hex digits
