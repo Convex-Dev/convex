@@ -110,9 +110,10 @@ public class ReaderTest {
 	public void testHexBlobs() {
 		assertEquals(Blobs.fromHex("cafebabe"), Reader.read("0xcafebabe"));
 		assertEquals(Blobs.fromHex("0aA1"), Reader.read("0x0Aa1"));
-		
-		assertThrows(Error.class, () -> Reader.read("0x")); // insufficient bytes
+		assertEquals(Blobs.fromHex(""), Reader.read("0x"));
+	
 		assertThrows(Error.class, () -> Reader.read("0x1")); // odd number of hex digits
+		assertThrows(Error.class, () -> Reader.read("0x123")); // odd number of hex digits
 	}
 
 	@Test

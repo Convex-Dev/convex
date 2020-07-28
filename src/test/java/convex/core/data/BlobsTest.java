@@ -77,6 +77,13 @@ public class BlobsTest {
 		doBlobTests(b);
 
 	}
+	
+	@Test
+	public void testEmptyBlob() {
+		ABlob blob = Blob.EMPTY;
+		assertEquals(0L,blob.toLong());
+		assertSame(blob,blob.getChunk(0));
+	}
 
 	@Test
 	public void testFullBlob() {

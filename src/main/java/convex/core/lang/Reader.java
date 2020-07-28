@@ -440,7 +440,7 @@ public class Reader extends BaseParser<Object> {
 	}
 	
 	public Rule HexDigits() {
-		return OneOrMore(Sequence(HexDigit(),HexDigit()));
+		return ZeroOrMore(Sequence(HexDigit(),HexDigit()));
 	}
 
 	public Rule SignedInteger() {
