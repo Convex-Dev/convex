@@ -164,4 +164,9 @@ public class LongBlob extends ABlob {
 		return length;
 	}
 
+	@Override
+	public long toLong() {
+		return value;
+	}
+
 }

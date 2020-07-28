@@ -229,6 +229,14 @@ public class CoreTest {
 		assertEquals(-128L, (long) eval("(long (byte 128))"));
 		assertEquals(97L, (long) eval("(long \\a)"));
 		assertEquals(2147483648L, (long) eval("(long 2147483648)"));
+		
+		assertEquals(4096L, (long) eval("(long 0x1000)"));
+		assertEquals(255L, (long) eval("(long 0xff)"));
+		assertEquals(4294967295L, (long) eval("(long 0xffffffff)"));
+		assertEquals(-1L, (long) eval("(long 0xffffffffffffffff)"));
+		assertEquals(255L, (long) eval("(long 0xff00000000000000ff)")); // only taking last 8 bytes
+		assertEquals(-1L, (long) eval("(long 0xcafebabeffffffffffffffff)")); // interpret as big endian big integer
+
 
 		assertArityError(step("(long)"));
 		assertArityError(step("(long 1 2)"));

@@ -176,6 +176,7 @@ public class BlobTree extends ABlob implements IRefContainer {
 			return getChild(ci).slice(start - ci * csize, length);
 		}
 
+		// FIXME: This looks broken
 		// TODO: handle big slices more effectively
 		int alen = Utils.checkedInt(this.count);
 		byte[] bs = new byte[alen];
@@ -415,6 +416,11 @@ public class BlobTree extends ABlob implements IRefContainer {
 		if (count != 8) throw new IllegalStateException(Errors.wrongLength(8, count));
 		return getChunk(0).longValue();
 	}
+	
+	@Override
+	public long toLong() {
+		return slice(count-8,8).toLong();
+	}
 
 	@Override
 	public int getRefCount() {
@@ -438,5 +444,6 @@ public class BlobTree extends ABlob implements IRefContainer {
 		if (children == newChildren) return this;
 		return new BlobTree(newChildren, shift, count);
 	}
+
 
 }

@@ -287,6 +287,15 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	public long hexLength() {
 		return length() << 1;
 	}
+	
+	/**
+	 * Converts this Blob to the corresponding long value.
+	 * 
+	 * Assumes big-endian format, as if the entire blob is interpreted as a signed big integer.
+	 * 
+	 * @return long value of this blob
+	 */
+	public abstract long toLong();
 
 	/**
 	 * Gets the long value of this Blob if the length is exactly 8 bytes, otherwise

@@ -337,11 +337,11 @@ public class RT {
 	}
 
 	/**
-	 * Coerces a value to a canonical numeric value. Result will be one of: - Long
-	 * for Byte, Integer, Short, Long, Amount - Double for Double, Float - Number
-	 * for any other number type (unchanged from original value)
-	 * 
-	 * TODO: probably tighten this to double, long only?
+	 * Coerces a value to a canonical numeric value. Result will be one of: 
+	 * <ul> 
+	 * <li>Long for Byte, Integer, Short, Long, Amount, Character, Blob</li>
+	 * <li>Double for Double, Float </li>
+	 * </ul>
 	 * 
 	 * @param a
 	 * @return The number value, or null if cannot be converted
@@ -362,8 +362,10 @@ public class RT {
 		if (c == Float.class) return (Double) a;
 
 		if (c == Character.class) return (long) ((Character) a);
-
-		if (a instanceof Number) return (Number) a;
+		
+		if (a instanceof ABlob) {
+			return (Long)((ABlob)a).toLong();
+		}
 
 		return null;
 	}
