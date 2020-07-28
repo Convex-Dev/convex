@@ -81,7 +81,7 @@ public class Samples {
 	public static final AMap<Object, Object> DIABOLICAL_MAP_2_10000;
 
 	public static final Random rand = new Random(123);
-	public static final long BIG_BLOB_LENGTH = 100000;
+	public static final long BIG_BLOB_LENGTH = 10000;
 	public static final BlobTree BIG_BLOB_TREE = Blobs.createRandom(Samples.rand, BIG_BLOB_LENGTH);
 	public static final Blob FULL_BLOB = Blobs.createRandom(Samples.rand, Blob.CHUNK_LENGTH);
 

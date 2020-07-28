@@ -28,6 +28,8 @@ public class BlobGen extends Generator<ABlob> {
 			return LongBlob.create(r.nextLong());
 		case 1:
 			return Samples.FULL_BLOB;
+		case 2:
+			return Samples.BIG_BLOB_TREE;
 		default:
 			return Blobs.createRandom(r.toJDKRandom(), len);
 		}
