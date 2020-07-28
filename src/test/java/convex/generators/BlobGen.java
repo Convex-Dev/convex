@@ -30,6 +30,13 @@ public class BlobGen extends Generator<ABlob> {
 			return Samples.FULL_BLOB;
 		case 2:
 			return Samples.BIG_BLOB_TREE;
+		case 3: {
+			// use a slice from a big blob
+			long length=Math.min(len, Samples.BIG_BLOB_LENGTH);
+			length=r.nextLong(0, length);
+			long start=r.nextLong(0,Samples.BIG_BLOB_LENGTH-length);
+			return Samples.BIG_BLOB_TREE.slice(start,length);
+		}
 		default:
 			return Blobs.createRandom(r.toJDKRandom(), len);
 		}

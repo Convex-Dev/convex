@@ -21,6 +21,7 @@ import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Blob;
+import convex.core.data.BlobsTest;
 import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Sets;
@@ -115,6 +116,8 @@ public class GenTestCore {
 		assertEquals(a.get(13),(byte)RT.nth(a, 13));
 		assertThrows(IndexOutOfBoundsException.class,()->RT.nth(a,-1));
 		assertThrows(IndexOutOfBoundsException.class,()->RT.nth(a,n));
+		
+		BlobsTest.doBlobTests(a);
 	}
 	
 	@Property
