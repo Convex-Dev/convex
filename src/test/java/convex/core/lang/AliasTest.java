@@ -21,16 +21,20 @@ public class AliasTest {
 	}
 	
 	@Test public void testLibraryAlias() {
-		Context<?> ctx=step("(def lib (deploy (fn [] (def foo 100))))");
+		Context<?> ctx=step("(def lib (deploy (fn [] (def foo 100) (defn bar [] (inc foo)))))");
 		Address libAddress=eval(ctx,"lib");
 		assertNotNull(libAddress);
 		
 		// no alias should exist yet
 		assertUndeclaredError(step(ctx,"foo"));
+		assertUndeclaredError(step(ctx,"mylib/foo"));
 		
 		ctx=step(ctx,"(def *aliases* (assoc *aliases* 'mylib lib))");
 		
 		// Alias should now work
 		assertEquals(100L,evalL(ctx,"mylib/foo"));
+		
+		// TODO: how should this work?
+		// assertEquals(101L,evalL(ctx,"(mylib/bar)"));
 	}
 }
