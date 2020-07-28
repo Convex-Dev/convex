@@ -339,9 +339,8 @@ public class Hash extends AArrayBlob {
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		sb.append("#hash \"");
+		sb.append("#hash 0x");
 		sb.append(toHexString());
-		sb.append("\"");
 	}
 
 	@Override

@@ -232,9 +232,8 @@ public class Address extends AArrayBlob {
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		sb.append("#addr \"");
+		sb.append("#addr 0x");
 		sb.append(toHexString());
-		sb.append("\"");
 	}
 
 	@Override

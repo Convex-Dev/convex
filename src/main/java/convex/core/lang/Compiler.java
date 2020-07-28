@@ -3,6 +3,7 @@ package convex.core.lang;
 import java.util.Map;
 
 import convex.core.ErrorType;
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
 import convex.core.data.AList;
@@ -10,7 +11,6 @@ import convex.core.data.AMap;
 import convex.core.data.ASequence;
 import convex.core.data.ASet;
 import convex.core.data.AVector;
-import convex.core.data.Address;
 import convex.core.data.Amount;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
@@ -173,7 +173,7 @@ public class Compiler {
 		if (form instanceof AMap) return compileMap((AMap<Syntax, Syntax>) form, context);
 		if (form instanceof ASet) return compileSet((ASet<Syntax>) form, context);
 
-		if ((form instanceof Keyword) || (form instanceof Address)) {
+		if ((form instanceof Keyword) || (form instanceof ABlob)) {
 			return compileConstant(context, form);
 		}
 

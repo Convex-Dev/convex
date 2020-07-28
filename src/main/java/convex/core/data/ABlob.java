@@ -239,9 +239,8 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		sb.append("#blob \"");
+		sb.append("#blob 0x");
 		toHexString(sb);
-		sb.append("\"");
 	}
 
 	/**
