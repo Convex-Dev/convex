@@ -165,7 +165,7 @@ public class EtchStore extends AStore {
 	
 	@Override
 	public String toString() {
-		return "EtchStore at "+etch.getFile();
+		return "EtchStore at: "+etch.getFile().getName();
 	}
 
 	/**
