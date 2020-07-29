@@ -38,13 +38,17 @@ public class Lookup<T> extends AOp<T> {
 	public static <T> Lookup<T> create(Address address, Symbol form) {
 		return new Lookup<T>(address,form);
 	}
+	
+	public static <T> Lookup<T> create(Address address, String name) {
+		return create(address,Symbol.create(name));
+	}
 
 	public static <T> Lookup<T> create(Symbol symbol) {
 		return create(null,symbol);
 	}
 
-	public static <T> Lookup<T> create(String key) {
-		return create(Symbol.create(key));
+	public static <T> Lookup<T> create(String name) {
+		return create(Symbol.create(name));
 	}
 
 	@Override
@@ -109,7 +113,7 @@ public class Lookup<T> extends AOp<T> {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		address.validateCell();
+		if (address!=null) address.validateCell();
 		symbol.validateCell();
 	}
 

@@ -5,6 +5,7 @@ import static convex.test.Assertions.assertUndeclaredError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,7 @@ import convex.core.data.Maps;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.ops.Cond;
 import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Def;
@@ -197,6 +199,17 @@ public class OpsTest {
 
 		Context<String> c2 = c.execute(op);
 		assertEquals("bar", c2.getResult());
+	}
+	
+	@Test
+	public void testLookup() throws InvalidDataException {
+		Lookup<?> l1=Lookup.create("foo");
+		l1.validateCell();
+		assertNull(l1.getAddress());
+		
+		Lookup<?> l2=Lookup.create(Core.CORE_ADDRESS,"count");
+		l2.validateCell();
+		assertSame(Core.CORE_ADDRESS,l2.getAddress());
 	}
 
 	@Test
