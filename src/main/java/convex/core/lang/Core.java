@@ -307,7 +307,6 @@ public class Core {
 				if (meta==null) return context.withCastError(args[1], AHashMap.class);
 				result = Syntax.create(args[0],meta);
 			}
-			
 
 			long juice = Juice.SYNTAX;
 

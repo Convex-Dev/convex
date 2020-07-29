@@ -19,14 +19,14 @@ public class Juice {
 	/**
 	 * Juice required to look up a value in the local environment.
 	 */
-	public static final long LOOKUP = 20;
+	public static final long LOOKUP = 15;
 	
 	/**
 	 * Juice required to look up a value in the dynamic environment.
 	 * 
 	 * Potentially a bit pricey since read only, but might hit storage so.....
 	 */
-	public static final long LOOKUP_DYNAMIC = 100;
+	public static final long LOOKUP_DYNAMIC = 50;
 
 	/**
 	 * Juice required to execute a Do block
@@ -126,6 +126,11 @@ public class Juice {
 	public static final long HASH = 500;
 
 	/**
+	 * Juice for a very cheap operation. O(1), no new cell allocations or non-trivial lookups.
+	 */
+	public static final long CHEAP_OP = 10;
+	
+	/**
 	 * Juice for a simple built-in core function. Simple operations are assumed to
 	 * require no expensive resource access, and operate with O(1) allocations
 	 */
@@ -138,7 +143,7 @@ public class Juice {
 	 * chars.
 	 */
 	protected static final long STR = SIMPLE_FN;
-	protected static final long STR_PER_CHAR = 10;
+	protected static final long STR_PER_CHAR = 5;
 
 	/**
 	 * Juice for storing a new constant value permanently in on-chain state Charged
@@ -221,11 +226,22 @@ public class Juice {
 
 	public static final long HALT = 50;
 
+	/**
+	 * Juice cost for accepting an offer of crypto funds.
+	 * 
+	 * We make this a little expensive because it involves updating two separate accounts.
+	 */
 	public static final long ACCEPT = 100;
 
-	public static final long SYNTAX = 50;
+	/**
+	 * Juice cost for constructing a Syntax Object. Fairly lightweight.
+	 */
+	public static final long SYNTAX = Juice.SIMPLE_FN;
 
-	public static final long META = Juice.LOOKUP;
+	/**
+	 * Juice cost for extracting metadata from a Syntax object.
+	 */
+	public static final long META = Juice.CHEAP_OP;
 
 	public static final long ASSOC = Juice.BUILD_DATA+Juice.BUILD_PER_ELEMENT*2;
 }
