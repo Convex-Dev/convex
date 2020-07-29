@@ -40,13 +40,13 @@ import convex.test.Samples;
 public class CompilerTest {
 	
 	@SuppressWarnings("unchecked")
-	public <T> AOp<T> comp(String source, Context<?> context) {
+	public <T extends AOp<?>> T comp(String source, Context<?> context) {
 		Object form=Reader.read(source);
-		AOp<T> code = (AOp<T>) context.expandCompile(form).getResult();
-		return code;
+		AOp<?> code = context.expandCompile(form).getResult();
+		return (T) code;
 	}
 	
-	public <T> AOp<T> comp(String source) {
+	public <T extends AOp<?>> T comp(String source) {
 		return comp(source,CONTEXT);
 	}
 	
@@ -315,6 +315,12 @@ public class CompilerTest {
 		
 		// infinite loop with wrong arity should fail with arity error first
 		assertArityError(step("(loop [] (recur 1))"));		
+	}
+	
+	@Test
+	public void testLookupAddress() {
+		Lookup<?> l=comp("foo");
+		assertEquals(CONTEXT.getAddress(),l.getAddress());
 	}
 	
 	@Test
