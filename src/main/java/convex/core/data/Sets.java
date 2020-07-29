@@ -8,7 +8,7 @@ import convex.core.util.Utils;
 public class Sets {
 
 	@SuppressWarnings("unchecked")
-	public static <T> Set<T> empty() {
+	public static <T> ASet<T> empty() {
 		return (Set<T>) Set.EMPTY;
 	}
 

@@ -38,16 +38,6 @@ public abstract class ABlobMap<K extends ABlob, V> extends AMap<K, V> {
 	public abstract V get(ABlob key);
 
 	@Override
-	public Set<K> keySet() {
-		throw new TODOException();
-	}
-
-	@Override
-	public AVector<V> values() {
-		throw new TODOException();
-	}
-
-	@Override
 	public boolean equalsKeys(AMap<K, V> map) {
 		// TODO: probably not needed? Only need this for set implementations
 		throw new TODOException();

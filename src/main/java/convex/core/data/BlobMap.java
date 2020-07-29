@@ -243,7 +243,7 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 	@Override
 	protected void accumulateEntrySet(HashSet<Entry<K, V>> h) {
 		for (int i = 0; i < children.length; i++) {
-			getChild(i).accumulateEntrySet(h);
+			children[i].getValue().accumulateEntrySet(h);
 		}
 		if (entry != null) h.add(entry);
 	}
@@ -251,7 +251,7 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 	@Override
 	protected void accumulateKeySet(HashSet<K> h) {
 		for (int i = 0; i < children.length; i++) {
-			getChild(i).accumulateKeySet(h);
+			children[i].getValue().accumulateKeySet(h);
 		}
 		if (entry != null) h.add(entry.getKey());
 	}
@@ -261,7 +261,7 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 		// add this entry first, since we want lexicographic order
 		if (entry != null) al.add(entry.getValue());
 		for (int i = 0; i < children.length; i++) {
-			getChild(i).accumulateValues(al);
+			children[i].getValue().accumulateValues(al);
 		}
 	}
 

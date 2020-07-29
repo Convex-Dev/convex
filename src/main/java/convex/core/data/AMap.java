@@ -3,6 +3,7 @@ package convex.core.data;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
@@ -56,6 +57,14 @@ public abstract class AMap<K, V> extends ADataStructure<MapEntry<K, V>>
 		accumulateValues(al);
 		return Vectors.create(al);
 	}
+	
+	// TODO: Review plausible alternative implementation for values()
+	//
+	//	@Override
+	//	public AVector<V> values() {
+	//		return reduceValues((v,e)->((AVector<V>)v).append(e), Vectors.empty());
+	//	}
+	
 
 	/**
 	 * Associates the given key with the specified value.
@@ -212,6 +221,13 @@ public abstract class AMap<K, V> extends ADataStructure<MapEntry<K, V>>
 	 */
 	public abstract <R> R reduceEntries(BiFunction<? super R, MapEntry<K, V>, ? extends R> func, R initial);
 
+	@Override
+	public Set<K> keySet() {
+		ASet<K> ks=reduceEntries((s,me)->((ASet<K>)s).include(me.getKey()), Sets.empty());
+		return (Set<K>)ks;
+	}
+
+	
 	/**
 	 * Returns true if this map has exactly the same keys as the other map
 	 * 

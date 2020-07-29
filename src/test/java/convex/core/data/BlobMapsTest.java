@@ -35,7 +35,7 @@ public class BlobMapsTest {
 
 		doBlobMapTests(m);
 
-		// add one entry
+		// add second entry
 		m = m.assoc(k2, 23L);
 		assertEquals(2L, m.count());
 		MapEntry<ABlob, Long> e2 = m.entryAt(1);
@@ -44,7 +44,7 @@ public class BlobMapsTest {
 
 		doBlobMapTests(m);
 
-		// add second entry
+		// add third entry
 		m = m.assoc(k3, 34L);
 		assertNotNull(m.toString());
 		assertEquals(3L, m.count());
@@ -53,6 +53,8 @@ public class BlobMapsTest {
 		assertEquals(34L, (long) e3.getValue());
 
 		doBlobMapTests(m);
+		
+		assertEquals(Vectors.of(17L,23L,34L),m.values());
 	}
 	
 	@SuppressWarnings("unlikely-arg-type")
