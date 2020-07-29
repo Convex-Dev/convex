@@ -67,13 +67,17 @@ public class Lookup<T> extends AOp<T> {
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer b) {
-		return Format.write(b, symbol);
+	public ByteBuffer writeRaw(ByteBuffer bb) {
+		bb= Format.write(bb, symbol);
+		bb= Format.write(bb, address);
+		return bb;
 	}
 
-	public static <T> Lookup<T> read(ByteBuffer b) throws BadFormatException {
-		Symbol sym = Format.read(b);
-		return create(sym);
+	public static <T> Lookup<T> read(ByteBuffer bb) throws BadFormatException {
+		Symbol sym = Format.read(bb);
+		if (sym==null) throw new BadFormatException("Lookup symbol cannot be null");
+		Address address = Format.read(bb);
+		return create(address,sym);
 	}
 
 	@Override
@@ -105,6 +109,7 @@ public class Lookup<T> extends AOp<T> {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
+		address.validateCell();
 		symbol.validateCell();
 	}
 
