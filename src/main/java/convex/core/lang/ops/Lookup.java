@@ -3,6 +3,7 @@ package convex.core.lang.ops;
 import java.nio.ByteBuffer;
 
 import convex.core.data.AMap;
+import convex.core.data.Address;
 import convex.core.data.Format;
 import convex.core.data.IRefContainer;
 import convex.core.data.IRefFunction;
@@ -26,15 +27,20 @@ import convex.core.util.Errors;
  * @param <T>
  */
 public class Lookup<T> extends AOp<T> {
-
+	private final Address address;
 	private final Symbol symbol;
 
-	private Lookup(Symbol symbol) {
+	private Lookup(Address address,Symbol symbol) {
+		this.address=address;
 		this.symbol = symbol;
 	}
 
+	public static <T> Lookup<T> create(Address address, Symbol form) {
+		return new Lookup<T>(address,form);
+	}
+
 	public static <T> Lookup<T> create(Symbol symbol) {
-		return new Lookup<T>(symbol);
+		return create(null,symbol);
 	}
 
 	public static <T> Lookup<T> create(String key) {
@@ -100,6 +106,14 @@ public class Lookup<T> extends AOp<T> {
 	@Override
 	public void validateCell() throws InvalidDataException {
 		symbol.validateCell();
+	}
+
+	/**
+	 * Gets the Account Address associated with this Lookup. May be null TODO: check this?
+	 * @return Address for this Lookup
+	 */
+	public Address getAddress() {
+		return address;
 	}
 
 }
