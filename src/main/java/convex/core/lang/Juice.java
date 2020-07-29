@@ -17,11 +17,16 @@ public class Juice {
 	public static final long DEF_OP = 500;
 
 	/**
-	 * Juice required to look up a value in the current environment.
+	 * Juice required to look up a value in the local environment.
+	 */
+	public static final long LOOKUP = 20;
+	
+	/**
+	 * Juice required to look up a value in the dynamic environment.
 	 * 
 	 * Potentially a bit pricey since read only, but might hit storage so.....
 	 */
-	public static final long LOOKUP = 40;
+	public static final long LOOKUP_DYNAMIC = 100;
 
 	/**
 	 * Juice required to execute a Do block

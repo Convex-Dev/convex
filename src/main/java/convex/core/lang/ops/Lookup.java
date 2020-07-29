@@ -46,8 +46,8 @@ public class Lookup<T> extends AOp<T> {
 		MapEntry<Symbol, T> le = context.lookupLocalEntry(symbol);
 		if (le != null) return context.withResult(Juice.LOOKUP, le.getValue());
 		MapEntry<Symbol, Syntax> de = context.lookupDynamicEntry(symbol);
-		if (de != null) return context.withResult(Juice.LOOKUP, de.getValue().getValue());
-		return context.lookupSpecial(symbol).consumeJuice(Juice.LOOKUP);
+		if (de != null) return context.withResult(Juice.LOOKUP_DYNAMIC, de.getValue().getValue());
+		return context.lookupSpecial(symbol).consumeJuice(Juice.LOOKUP_DYNAMIC);
 	}
 
 	@Override

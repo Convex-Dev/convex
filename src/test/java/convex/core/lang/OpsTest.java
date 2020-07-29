@@ -96,7 +96,7 @@ public class OpsTest {
 
 		AOp<String> lookupOp = Lookup.create(Symbol.create("foo"));
 		Context<String> c3 = c2.execute(lookupOp);
-		expectedJuice -= Juice.LOOKUP;
+		expectedJuice -= Juice.LOOKUP_DYNAMIC;
 		assertEquals(expectedJuice, c3.getJuice());
 		assertEquals("bar", c3.getResult());
 
@@ -116,7 +116,7 @@ public class OpsTest {
 		AOp<String> op = Do.create(Def.create("foo", Constant.create("bar")), Lookup.create("foo"));
 
 		Context<String> c2 = c.execute(op);
-		long expectedJuice = INITIAL_JUICE - (Juice.CONSTANT + Juice.DEF_OP + Juice.LOOKUP + Juice.DO);
+		long expectedJuice = INITIAL_JUICE - (Juice.CONSTANT + Juice.DEF_OP + Juice.LOOKUP_DYNAMIC + Juice.DO);
 		assertEquals(expectedJuice, c2.getJuice());
 		assertEquals("bar", c2.getResult());
 	}

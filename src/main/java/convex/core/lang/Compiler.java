@@ -186,7 +186,9 @@ public class Compiler {
 
 	@SuppressWarnings("unchecked")
 	private static <R, T extends AOp<R>> Context<T> compileSymbolLookup(Symbol form, Context<?> context) {
-		return (Context<T>) context.withResult(Juice.COMPILE_LOOKUP, Lookup.create((Symbol) form));
+
+		Lookup<T> lookUp=Lookup.create((Symbol) form);
+		return (Context<T>) context.withResult(Juice.COMPILE_LOOKUP, lookUp);
 	}
 
 	private static <R, T extends AOp<R>> Context<T> compileMap(AMap<Syntax, Syntax> form, Context<?> context) {

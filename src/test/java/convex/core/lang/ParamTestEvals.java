@@ -29,11 +29,17 @@ public class ParamTestEvals {
 
 	@Parameterized.Parameters(name = "{index}: {0}")
 	public static Collection<Object[]> dataExamples() {
-		return Arrays.asList(new Object[][] { { "(do)", null }, { "(do (do :foo))", Keyword.create("foo") },
-				{ "(do 1 2)", 2L }, { "(do 1 *result*)", 1L }, { "(do (do :foo) (do))", null },
-
-				{ "*result*", null }, { "*origin*", TestState.HERO }, { "*caller*", null },
-				{ "*address*", TestState.HERO }, { "(do 1 *result*)", 1L },
+		return Arrays.asList(new Object[][] { 
+				{ "(do)", null }, 
+				{ "(do (do :foo))", Keyword.create("foo") },
+				{ "(do 1 2)", 2L }, 
+				{ "(do 1 *result*)", 1L }, 
+				{ "(do (do :foo) (do))", null },
+				{ "*result*", null }, 
+				{ "*origin*", TestState.HERO }, 
+				{ "*caller*", null },
+				{ "*address*", TestState.HERO }, 
+				{ "(do 1 *result*)", 1L },
 
 				{ "(call \"" + TC_HEX + "\" (:my-address))", TEST_CONTRACT },
 				{ "(call \"" + TC_HEX + "\" (\"foo\"))", Keyword.create("bar") },
@@ -48,7 +54,8 @@ public class ParamTestEvals {
 
 				{ "(let [])", null }, { "(let [a 1])", null }, { "(let [a 1] a)", 1L },
 				{ "(do (def a 2) (let [a 13] a))", 13L }, { "*juice*", INITIAL_JUICE },
-				{ "(- *juice* *juice*)", Juice.LOOKUP }, { "((fn [a] a) 4)", 4L }, { "(do (def a 3) a)", 3L },
+				{ "(- *juice* *juice*)", Juice.LOOKUP_DYNAMIC }, 
+				{ "((fn [a] a) 4)", 4L }, { "(do (def a 3) a)", 3L },
 				{ "(do (let [a 1] (def f (fn [] a))) (f))", 1L }, { "1", 1L }, { "(not true)", false },
 				{ "(= true true)", true } });
 	}
