@@ -114,8 +114,9 @@ public class Peer {
 	 * Executes a query on this Peer. Returns the query result, or throws an
 	 * exception if the query does not succeed normally.
 	 * 
-	 * @param <T>
-	 * @param form
+	 * @param <T> Type of result
+	 * @param form Form to compile and execute.
+	 * @param origon Address to use for query execution
 	 * @return The Context containing the query results.
 	 * @throws ExecutionException
 	 */
@@ -123,12 +124,8 @@ public class Peer {
 	public <T> Context<T> executeQuery(Object form, Address origin) {
 		Context<?> ctx;
 
-		if (origin != null) {
-			// create context with max transaction juice for query
-			ctx = Context.createInitial(getConsensusState(), origin, Constants.MAX_TRANSACTION_JUICE);
-		} else {
-			ctx = Context.createFake(getConsensusState());
-		}
+		// create context with max transaction juice for query
+		ctx = Context.createInitial(getConsensusState(), origin, Constants.MAX_TRANSACTION_JUICE);
 
 		Context<AOp<T>> ectx = ctx.expandCompile(form);
 		if (ectx.isExceptional()) {
@@ -137,6 +134,16 @@ public class Peer {
 		AOp<T> op = ectx.getResult();
 		Context<T> rctx = ctx.run(op);
 		return rctx;
+	}
+	
+	/**
+	 * Executes a query in this 
+	 * @param <T>
+	 * @param form
+	 * @return
+	 */
+	public <T> Context<T> executeQuery(Object form) {
+		return executeQuery(form,Init.HERO);
 	}
 
 	public long getTimeStamp() {
@@ -278,5 +285,7 @@ public class Peer {
 	public Order getOrder(Address a) throws BadSignatureException {
 		return getBelief().getOrder(a);
 	}
+
+
 
 }

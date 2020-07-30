@@ -55,7 +55,11 @@ public class Lookup<T> extends AOp<T> {
 	public <I> Context<T> execute(Context<I> context) {
 		MapEntry<Symbol, T> le = context.lookupLocalEntry(symbol);
 		if (le != null) return context.withResult(Juice.LOOKUP, le.getValue());
-		MapEntry<Symbol, Syntax> de = context.lookupDynamicEntry(symbol);
+		
+		// TODO
+		Address namespaceAddress=(address==null)?context.getAddress():address;
+		MapEntry<Symbol, Syntax> de = context.lookupDynamicEntry(namespaceAddress,symbol);
+		
 		if (de != null) return context.withResult(Juice.LOOKUP_DYNAMIC, de.getValue().getValue());
 		return context.lookupSpecial(symbol).consumeJuice(Juice.LOOKUP_DYNAMIC);
 	}

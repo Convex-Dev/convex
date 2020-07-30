@@ -127,7 +127,8 @@ public class Init {
 
 			{ // Deploy Registry Actor
 				Context<?> ctx = Context.createFake(s, HERO);
-				Object cfn = ctx.eval(Reader.readResource("actors/registry.con")).getResult();
+				Object form=Reader.readResource("actors/registry.con");
+				Object cfn = ctx.eval(form).getResult();
 				ctx = ctx.deployActor(new Object[]{cfn},false);
 				REGISTRY_ADDRESS = (Address) ctx.getResult();
 				s = ctx.getState();

@@ -44,7 +44,7 @@ public class PeerTest {
 		assertEquals(0, p.getPeerOrder().getConsensusPoint());
 
 		// Run a query
-		assertEquals(3L, (Long) (p.executeQuery(Reader.read("(+ 1 2)"), null).getResult()));
+		assertEquals(3L, (Long) (p.executeQuery(Reader.read("(+ 1 2)")).getResult()));
 	}
 
 	@Test

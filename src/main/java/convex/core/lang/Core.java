@@ -1793,8 +1793,8 @@ public class Core {
 	 * @throws IOException
 	 */
 	private static AHashMap<Symbol, Syntax> registerCoreCode(AHashMap<Symbol, Syntax> env) {
-		// we use a fake State to build the initial environment
-		Address ADDR=Address.dummy("0");
+		// we use a fake State to build the initial environment with core address
+		Address ADDR=Core.CORE_ADDRESS;
 		State state = State.EMPTY.putAccount(ADDR,
 				AccountStatus.createActor(0, Amount.create(1000000000), null, env));
 		Context<?> ctx = Context.createInitial(state, ADDR, 1000000L);

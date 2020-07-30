@@ -30,6 +30,8 @@ public class Address extends AArrayBlob {
 
 	public static final int LENGTH_BITS = LENGTH * 8;
 
+	public static final Address ZERO = Address.dummy("0");
+
 	private Address(byte[] data, int offset, int length) {
 		super(data, offset, length);
 		if (length != LENGTH) throw new IllegalArgumentException("Address length must be " + LENGTH_BITS + " bits");
@@ -202,7 +204,7 @@ public class Address extends AArrayBlob {
 	 * @return Address generated from hash
 	 */
 	public static Address fromHash(Hash hash) {
-		return wrap(hash.slice(Hash.LENGTH - LENGTH, LENGTH)); // last bytes of 256bit keccak256 hash
+		return wrap(hash.slice(Hash.LENGTH - LENGTH, LENGTH)); // take last bytes of hash, in case Address is shorter
 	}
 
 	/**

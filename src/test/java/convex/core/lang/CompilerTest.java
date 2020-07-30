@@ -320,7 +320,7 @@ public class CompilerTest {
 	@Test
 	public void testLookupAddress() {
 		Lookup<?> l=comp("foo");
-		assertEquals(CONTEXT.getAddress(),l.getAddress());
+		assertEquals(null,l.getAddress());
 	}
 	
 	@Test

@@ -579,7 +579,7 @@ public class Reader extends BaseParser<Object> {
 
 	public static Object readResource(String path) throws IOException {
 		String source = Utils.readResourceAsString(path);
-		Reader reader = syntaxReader.get(); // TODO: convert to syntaxReader
+		Reader reader = syntaxReader.get(); 
 		reader.tempSource = source;
 		return doParse(new ReportingParseRunner<Object>(reader.ExpressionInput()), source);
 	}

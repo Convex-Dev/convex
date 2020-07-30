@@ -5,6 +5,7 @@ import java.util.concurrent.ExecutionException;
 
 import convex.core.Constants;
 import convex.core.ErrorType;
+import convex.core.Init;
 import convex.core.State;
 import convex.core.crypto.Hash;
 import convex.core.data.ABlobMap;
@@ -107,7 +108,11 @@ public class Context<T> implements IObject {
 		}
 		
 		public static ChainState create(State state, Address origin, Address caller, Address address, long offer) {
-			AHashMap<Symbol, Syntax> environment=(address==null)?Core.ENVIRONMENT:state.getAccount(address).getEnvironment();
+			AHashMap<Symbol, Syntax> environment=Core.ENVIRONMENT;
+			if (address!=null) {
+				AccountStatus as=state.getAccount(address);
+				if (as!=null) environment=as.getEnvironment();
+			}
 			return new ChainState(state,origin,caller,address,environment,offer);
 		}
 
@@ -175,17 +180,15 @@ public class Context<T> implements IObject {
 	}
 		
 	/**
-	 * Creates an execution context with no actor address. 
+	 * Creates an execution context with a default actor address. 
 	 * 
-	 * Useful for:
-	 * 1. Testing
-	 * 2. Queries with a null address
+	 * Useful for Testing
 	 * 
 	 * @param state
 	 * @return Fake context
 	 */
 	public static <R> Context<R> createFake(State state) {
-		return create(state,Constants.MAX_TRANSACTION_JUICE,Maps.empty(),null,0,null,null,null);
+		return createFake(state,Init.HERO);
 	}
 	
 	/**
@@ -199,6 +202,7 @@ public class Context<T> implements IObject {
 	 * @return Fake context
 	 */
 	public static <R> Context<R> createFake(State state, Address actor) {
+		if (actor==null) throw new Error("Null actor address!");
 		return create(state,Constants.MAX_TRANSACTION_JUICE,Maps.empty(),null,0,actor,null,actor);
 	}
 	
@@ -364,6 +368,20 @@ public class Context<T> implements IObject {
 	 */
 	public MapEntry<Symbol,Syntax> lookupDynamicEntry(Symbol sym) {
 		AccountStatus as=getAccountStatus();
+		return lookupDynamicEntry(as,sym);
+	}
+	
+	/**
+	 * Looks up an environment entry for a specific address without consuming juice.
+	 * 
+	 * If the symbol is qualified, try lookup via *aliases*
+	 * 
+	 * @param sym Symbol to look up
+	 * @return
+	 */
+	public MapEntry<Symbol,Syntax> lookupDynamicEntry(Address address,Symbol sym) {
+		AccountStatus as=getAccountStatus(address);
+		if (as==null) return null;
 		return lookupDynamicEntry(as,sym);
 	}
 	

@@ -11,7 +11,6 @@ import convex.core.data.AMap;
 import convex.core.data.ASequence;
 import convex.core.data.ASet;
 import convex.core.data.AVector;
-import convex.core.data.Address;
 import convex.core.data.Amount;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
@@ -187,9 +186,11 @@ public class Compiler {
 
 	@SuppressWarnings("unchecked")
 	private static <R, T extends AOp<R>> Context<T> compileSymbolLookup(Symbol form, Context<?> context) {
-		Address address=context.getAddress();
+		// TODO: figure out what to do with address when building lookup
+		// Doesn't work for expandCompile executed outside actors?
+		// Address address=context.getAddress();
 		
-		Lookup<T> lookUp=Lookup.create(address,(Symbol) form);
+		Lookup<T> lookUp=Lookup.create(form);
 		return (Context<T>) context.withResult(Juice.COMPILE_LOOKUP, lookUp);
 	}
 

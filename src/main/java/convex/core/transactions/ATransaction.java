@@ -82,7 +82,7 @@ public abstract class ATransaction extends ACell {
 		// update sequence
 		account = account.updateSequence(sequence);
 		if (account == null)
-			return Context.createFake(state).withError(ErrorType.SEQUENCE, "Bad sequence: " + sequence);
+			return Context.createFake(state,origin).withError(ErrorType.SEQUENCE, "Bad sequence: " + sequence);
 
 		state = state.putAccount(origin, account);
 

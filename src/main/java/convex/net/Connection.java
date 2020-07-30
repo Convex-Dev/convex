@@ -190,10 +190,10 @@ public class Connection {
 	}
 
 	/**
-	 * Sends a QUERY Message on this connection.
+	 * Sends a QUERY Message on this connection with a null Address
 	 * 
 	 * @param form A data object representing the query form
-	 * @return The ID of the message sent
+	 * @return The ID of the message sent, or -1 if send buffer is full.
 	 * @throws IOException
 	 */
 	public long sendQuery(Object form) throws IOException {
@@ -203,11 +203,8 @@ public class Connection {
 	/**
 	 * Sends a QUERY Message on this connection.
 	 * 
-	 * Uses the configured CLIENT_STORE to store the query, so that any missing data requests from the server
-	 * can be honoured.
-	 * 
 	 * @param form    A data object representing the query form
-	 * @param address The address with which to run the query
+	 * @param address The address with which to run the query, which may be null
 	 * @return The ID of the message sent, or -1 if send buffer is full.
 	 * @throws IOException
 	 */
