@@ -185,12 +185,12 @@ public class Compiler {
 	}
 
 	@SuppressWarnings("unchecked")
-	private static <R, T extends AOp<R>> Context<T> compileSymbolLookup(Symbol form, Context<?> context) {
+	private static <R, T extends AOp<R>> Context<T> compileSymbolLookup(Symbol sym, Context<?> context) {
 		// TODO: figure out what to do with address when building lookup
 		// Doesn't work for expandCompile executed outside actors?
 		// Address address=context.getAddress();
 		
-		Lookup<T> lookUp=Lookup.create(form);
+		Lookup<T> lookUp=Lookup.create(sym);
 		return (Context<T>) context.withResult(Juice.COMPILE_LOOKUP, lookUp);
 	}
 
@@ -315,7 +315,7 @@ public class Compiler {
 	}
 
 	/**
-	 * Returns true if the form is a list starting with Syntax Object equal to the
+	 * Returns true if the form is a List starting with Syntax Object equal to the
 	 * the specified element
 	 * 
 	 * @param element
@@ -492,6 +492,13 @@ public class Compiler {
 		return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
 	}
 	
+	/**
+	 * Initial expander used for expansion of forms prior to compilation.
+	 * 
+	 * Should work on both raw forms and syntax objects.
+	 * 
+	 * Follows the "Expansion-Passing Style" approach of Dybvig, Friedman, and Haynes
+	 */
 	public static final CoreExpander INITIAL_EXPANDER =new CoreExpander(Symbols.STAR_INITIAL_EXPANDER) {
 		@SuppressWarnings("unchecked")
 		@Override
