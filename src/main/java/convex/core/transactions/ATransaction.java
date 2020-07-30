@@ -32,18 +32,18 @@ public abstract class ATransaction extends ACell {
 	 * Writes this transaction to a bytebuffer, including the message tag
 	 */
 	@Override
-	public abstract ByteBuffer write(ByteBuffer b);
+	public abstract ByteBuffer write(ByteBuffer bb);
 
 	/**
 	 * Writes this transaction to a ByteBuffer, excluding the message tag
 	 * 
-	 * @param b
+	 * @param bb
 	 * @return Same ByteBuffer after writing
 	 */
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer b) {
-		b = Format.writeVLCLong(b, sequence);
-		return b;
+	public ByteBuffer writeRaw(ByteBuffer bb) {
+		bb = Format.writeVLCLong(bb, sequence);
+		return bb;
 	}
 
 	@Override
@@ -96,7 +96,7 @@ public abstract class ATransaction extends ACell {
 		}
 
 		// apply transaction. This may result in an error!
-		// comlete transaction handles error cases as well
+		// NOTE: completeTransaction handles error cases as well
 		ctx = this.apply(ctx);
 		ctx = ctx.completeTransaction(totalJuice, state.getJuicePrice());
 
