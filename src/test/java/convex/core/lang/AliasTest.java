@@ -95,4 +95,23 @@ public class AliasTest {
 		assertUndeclaredError(step(ctx,"foo"));
 		assertUndeclaredError(step(ctx,"mylib1/baddy"));
 	}
+	
+	@Test
+	public void testLibraryAssumptions() {
+		Context<?> ctx = step("(def lib (deploy '(defn run [code] (eval code))))");
+		Address lib = (Address) ctx.getResult();
+		ctx=step(ctx,"(do (import 0x"+lib.toHexString()+" :as lib))");
+		
+		// context setup should not change
+		assertEquals(ctx.getAddress(),eval(ctx,"(lib/run '*address*)"));
+		assertEquals(ctx.getOrigin(),eval(ctx,"(lib/run '*origin*)"));
+		assertEquals(ctx.getCaller(),eval(ctx,"(lib/run '*caller*)"));
+		assertEquals(ctx.getState(),eval(ctx,"(lib/run '*state*)"));
+		
+		// library def should define values in the current user's environment.
+		assertEquals(1337L,evalL(ctx,"(do (lib/run '(def x 1337)) x)"));
+
+		// shouldn't be possible by default to call on library code. Could be dangerous!
+		assertStateError(step(ctx,"(call lib (run 1))"));
+	}
 }

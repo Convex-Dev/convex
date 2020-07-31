@@ -487,10 +487,12 @@ public class Context<T> implements IObject {
 	}
 
 	/**
-	 * Gets the caller of the currently executing Actor
+	 * Gets the caller of the currently executing context. 
+	 * 
+	 * Will be null if this context was not called from elsewhere (e.g. is an origin context)
 	 * @return
 	 */
-	private Address getCaller() {
+	public Address getCaller() {
 		return chainState.caller;
 	}
 
