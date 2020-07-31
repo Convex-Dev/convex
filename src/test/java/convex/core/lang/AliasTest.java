@@ -76,5 +76,23 @@ public class AliasTest {
 		// check for bad keyword
 		assertAssertError(step(ctx,"(import lib :blazzzz mylib)"));
 	}
+	
+	@Test
+	public void testTransitiveImports() {
+		// create first library
+		Context<?> ctx = step("(def lib1 (deploy '(do (def foo 101))))");
+		Address lib1 = (Address) ctx.getResult();
+		assertNotNull(lib1);
+		
+		ctx = step(ctx,"(def lib2 (deploy '(do (import 0x"+lib1.toHexString()+" :as lib1) (def foo (inc lib1/foo)))))");
+		Address lib2 = (Address) ctx.getResult();
+		assertNotNull(lib2);
 
+		ctx=step(ctx,"(do (import 0x"+lib1.toHexString()+" :as mylib1) (import 0x"+lib2.toHexString()+" :as mylib2))");
+		
+		assertEquals(101,evalL(ctx,"mylib1/foo"));
+		assertEquals(102,evalL(ctx,"mylib2/foo"));
+		assertUndeclaredError(step(ctx,"foo"));
+		assertUndeclaredError(step(ctx,"mylib1/baddy"));
+	}
 }
