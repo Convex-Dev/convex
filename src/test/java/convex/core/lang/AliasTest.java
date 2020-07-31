@@ -21,7 +21,7 @@ public class AliasTest {
 	}
 	
 	@Test public void testLibraryAlias() {
-		Context<?> ctx=step("(def lib (deploy '(do (def foo 100) (defn bar [] (inc foo)))))");
+		Context<?> ctx=step("(def lib (deploy '(do (def foo 100) (defn bar [] (inc foo)) (defn baz [f] (f foo)))))");
 		Address libAddress=eval(ctx,"lib");
 		assertNotNull(libAddress);
 		
@@ -34,7 +34,15 @@ public class AliasTest {
 		// Alias should now work
 		assertEquals(100L,evalL(ctx,"mylib/foo"));
 		
-		// TODO: how should this work?
-		// assertEquals(101L,evalL(ctx,"(mylib/bar)"));
+		// Use of function with access to library namespace should work
+		assertEquals(101L,evalL(ctx,"(mylib/bar)"));
+		assertEquals(101L,evalL(ctx,"(let [f mylib/bar] (f))"));
+		
+		// Shouldn't be able to call as an actor
+		assertStateError(step(ctx,"(call lib (bar))"));
+		
+		// should be able to pass a closure to the library
+		assertEquals(10000L, evalL(ctx,"(let [f (fn [x] (* x x))] (mylib/baz f))"));
+		assertEquals(99L, evalL(ctx,"(do (def f (fn [x] (dec x))) (mylib/baz f))"));
 	}
 }
