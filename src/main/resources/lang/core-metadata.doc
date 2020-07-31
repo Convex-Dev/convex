@@ -1,7 +1,11 @@
 ;; File for core documentation and other metadta
 ;;
 ;; Read in as raw forms and added to metadata for each core symbol specified
-;; Includes metadata for Convex Lisp special forms
+;;
+;; Includes:
+;;  - metadata for core functions defined in Java code
+;;  - metadata for Convex Lisp special forms
+;;  - additional metadata for anything defined during core environment bootstrap (e.g. in core.con)
 {
 	accept 
 	{

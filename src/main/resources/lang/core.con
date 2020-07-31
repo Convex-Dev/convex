@@ -1,5 +1,6 @@
-;; Core definitions
-;; executed at the end of core language bootstrap
+;; Core definitions generated as part of core runtime environment bootstrap
+;;
+;; Ordering matters! Later definitions may require earlier ones.
 
 (def defmacro 
   ^{:doc {:description "Defines a macro in the current environment."
