@@ -90,7 +90,7 @@ public class OraclePanel extends JPanel {
 			if ((desc == null) || (desc.isBlank())) return;
 
 			Object code = Reader.read("(call \"" + oracleAddress.toHexString() + "\" " + "(register " + (key++)
-					+ "  {:desc \"" + desc + "\" }))");
+					+ "  {:desc \"" + desc + "\" :trust #{*address*}}))");
 			execute(code);
 		});
 
@@ -128,8 +128,8 @@ public class OraclePanel extends JPanel {
 			String actorCode;
 			try {
 				actorCode = Utils.readResourceAsString("actors/prediction-market.con");
-				String source = "(let [pmc " + actorCode + " ] " + "(deploy pmc " + " \""
-						+ oracleAddress.toChecksumHex() + "\" " + " " + key + " " + " " + outcomeString + "))";
+				String source = "(let [pmc " + actorCode + " ] " + "(deploy (pmc " + " 0x"
+						+ oracleAddress.toChecksumHex() + " " + key + " " + outcomeString + ")))";
 				Object code = Reader.read(source);
 				PeerManager.execute(WalletPanel.HERO, code, createMarketAction);
 			} catch (Exception e1) {
