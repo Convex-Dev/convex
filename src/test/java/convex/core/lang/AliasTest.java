@@ -9,10 +9,11 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.Address;
 import convex.core.data.Maps;
+import convex.core.data.Symbol;
 
 public class AliasTest {
 	@Test public void testInitialAlias() {
-		assertEquals(Maps.of(null,Core.CORE_ADDRESS),eval("*aliases*"));
+		assertEquals(Maps.of(null,Core.CORE_ADDRESS,Symbol.create("convex.core"),Core.CORE_ADDRESS),eval("*aliases*"));
 	}
 	
 	@Test public void testWipeAlias() {
