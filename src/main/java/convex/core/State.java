@@ -409,17 +409,17 @@ public class State extends ARecord {
 	/**
 	 * Deploys the specified Actor environment in the current state.
 	 * 
-	 * Returns the updated state, or null if the Actor already exists.
+	 * Returns the updated state, or null if the Account already exists.
 	 * 
 	 * @param address
 	 * @param actorArgs
 	 * @param environment
 	 * @return The updated state with the Actor deployed.
 	 */
-	public State deployActor(Address address, AVector<Object> actorArgs, AHashMap<Symbol, Syntax> environment) {
+	public State tryAddActor(Address address, AHashMap<Symbol, Syntax> environment) {
 		AccountStatus as = accounts.get(address);
 		if (as != null) return null;
-		as = AccountStatus.createActor(0, Amount.ZERO, actorArgs, environment);
+		as = AccountStatus.createActor(Amount.ZERO, environment);
 		BlobMap<Address, AccountStatus> newAccounts = accounts.assoc(address, as);
 		return withAccounts(newAccounts);
 	}

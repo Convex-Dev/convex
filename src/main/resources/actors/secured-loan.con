@@ -11,7 +11,7 @@
 ;;  a) Loan is repaid, and issuer regains control of collateral assets
 ;;  b) Loan defaults, and lender gains control of collateral assets
 
-(fn []
+(do
   
   
   

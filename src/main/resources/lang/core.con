@@ -167,6 +167,9 @@
           :examples [{:code "(assert (set? *exports*))"}]
           :type :value}}
   #{})
+
+(defmacro export [& syms]
+  '(def *exports* ~(cons 'conj '*exports* (map (fn [s] '(quote ~s)) syms))))
   
 (def *aliases*
   ^{:doc {:description "A map of aliased symbols to Addresses that are imported in the current environment. Defaults to a single alias to the 'convex.core' core library."

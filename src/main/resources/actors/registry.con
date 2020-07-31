@@ -1,4 +1,4 @@
-(fn [] 
+(do 
   (def registry {*address* {:name "Registry Contract"}})
   
   (defn register [data]

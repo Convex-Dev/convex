@@ -1,6 +1,5 @@
 package convex.core.lang;
 
-import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
 
 import convex.core.Constants;
@@ -23,7 +22,6 @@ import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
-import convex.core.data.Vectors;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.expanders.AExpander;
 import convex.core.lang.impl.AExceptional;
@@ -507,7 +505,7 @@ public class Context<T> implements IObject {
 	}
 
 	/**
-	 * Gets the result from this context. Throws an Error is the context return value is exceptional.
+	 * Gets the result from this context. Throws an Error if the context return value is exceptional.
 	 * 
 	 * @return Result value from this Context.
 	 */
@@ -1112,25 +1110,19 @@ public class Context<T> implements IObject {
 	 * @throws ExecutionException 
 	 */
 	@SuppressWarnings("unchecked")
-	public <R> Context<R> deployActor(Object[] args, boolean computedAddress) {
-		int n=args.length;
-		if (n< 1) return withArityError("contract deployment requires exactly a contract initialiser function as first argument");
-		AVector<Object> v=Vectors.of(args);
+	public <R> Context<R> deployActor(Object code, boolean computedAddress) {
 		State state=getState();
 		
 		Address address;
 		if (computedAddress) {
-			Hash hash=v.getHash();
+			Hash hash=Hash.compute(code);
 			address=Address.fromHash(hash);
 		} else {
 			address=Address.fromHash(state.getHash());
 		}
 		
-		IFn<?> init=(IFn<?>) RT.function(args[0]);
-		if (init==null) return withCastError(args[0],IFn.class);
-		
 		// deploy initial contract state
-		State stateSetup=state.deployActor(address, v, Core.ENVIRONMENT);
+		State stateSetup=state.tryAddActor(address, Core.ENVIRONMENT);
 		if (stateSetup==null) {
 			// if computed, just return the existing address
 			if (computedAddress) return (Context<R>) withResult(Juice.DEPLOY_CONTRACT,address);
@@ -1139,12 +1131,14 @@ public class Context<T> implements IObject {
 		}
 		
 		final Context<R> exContext=Context.create(stateSetup, juice, Maps.empty(), null, depth+1, getOrigin(),getAddress(), address);
-		Object[] callArgs=Arrays.copyOfRange(args, 1, n);
-		final Context<R> rctx=(Context<R>) exContext.invoke(init,callArgs);
+		final Context<R> rctx=exContext.eval(code);
+		
+		// TODO: think about error returns from actors
 		if (rctx.isExceptional()) return rctx; 
 		
+		//SECURITY: make sure this always works!!!
 		// restore context for the current execution
-		Context<R> result=Context.create(rctx.getState(), rctx.getJuice(), getLocalBindings(), rctx.getResult(), depth, getOrigin(),getCaller(), getAddress());
+		Context<R> result=Context.create(rctx.getState(), rctx.getJuice(), getLocalBindings(), rctx.getValue(), depth, getOrigin(),getCaller(), getAddress());
 		
 		return (Context<R>) result.withResult(Juice.DEPLOY_CONTRACT, address);
 	}

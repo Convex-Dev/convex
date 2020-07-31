@@ -1,5 +1,5 @@
-;; Test contract for state changes and rollback.
-(fn []   
+(do  ;; Test contract for state changes and rollback.
+ 
   (def fragile :ok)
   
   (defn halt-fn [x]

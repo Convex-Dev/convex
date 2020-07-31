@@ -1056,7 +1056,7 @@ public class CoreTest {
 
 	@Test
 	public void testCall() {
-		Context<Address> ctx = step("(def ctr (deploy (fn [] :foo :bar)))");
+		Context<Address> ctx = step("(def ctr (deploy '(do :foo :bar)))");
 
 		assertArityError(step(ctx, "(call)"));
 		assertArityError(step(ctx, "(call 12)"));
@@ -1067,7 +1067,7 @@ public class CoreTest {
 
 	@Test
 	public void testCallStar() {
-		Context<Address> ctx = step("(def ctr (deploy (fn [] :foo :bar)))");
+		Context<Address> ctx = step("(def ctr (deploy '(do :foo :bar)))");
 
 		assertArityError(step(ctx, "(call*)"));
 		assertArityError(step(ctx, "(call* 12)"));
@@ -1079,7 +1079,7 @@ public class CoreTest {
 
 	@Test
 	public void testDeploy() {
-		Context<Address> ctx = step("(def ctr (deploy (fn [] :foo :bar)))");
+		Context<Address> ctx = step("(def ctr (deploy '(fn [] :foo :bar)))");
 		Address ca = ctx.getValue();
 		assertNotNull(ca);
 		AccountStatus as = ctx.getAccountStatus(ca);
@@ -1090,12 +1090,12 @@ public class CoreTest {
 		assertEquals(0L, as.getBalance().getValue());
 		
 		// double-deploy should get different addresses
-		assertFalse(evalB("(let [cfn (fn [] 1)] (= (deploy cfn) (deploy cfn)))"));
+		assertFalse(evalB("(let [cfn '(do 1)] (= (deploy cfn) (deploy cfn)))"));
 	}
 	
 	@Test
 	public void testDeployOnce() {
-		Context<Address> ctx = step("(def ctr (deploy-once (fn [] :foo :bar)))");
+		Context<Address> ctx = step("(def ctr (deploy-once '(fn [] :foo :bar)))");
 		Address ca = ctx.getValue();
 		assertNotNull(ca);
 		AccountStatus as = ctx.getAccountStatus(ca);
@@ -1106,12 +1106,12 @@ public class CoreTest {
 		assertEquals(0L, as.getBalance().getValue());
 		
 		// double-deploy should get same address
-		assertTrue(evalB("(let [cfn (fn [x] 1)] (= (deploy-once cfn 1) (deploy-once cfn 1)))"));
+		assertTrue(evalB("(let [cfn '(do (def a 1))] (= (deploy-once cfn) (deploy-once cfn)))"));
 	}
 	
 	@Test
 	public void testActorQ() {
-		Context<Address> ctx = step("(def ctr (deploy (fn [] :foo :bar)))");
+		Context<Address> ctx = step("(def ctr (deploy '(fn [] :foo :bar)))");
 		Address ctr=ctx.getResult();
 		
 		assertTrue(evalB(ctx,"(actor? ctr)"));
@@ -1610,7 +1610,7 @@ public class CoreTest {
 
 	@Test
 	public void testExportsQ() {
-		Context<?> ctx = step("(def caddr (deploy (fn [] " + "(defn private [] :priv) " + "(defn public [] :pub)"
+		Context<?> ctx = step("(def caddr (deploy '(do " + "(defn private [] :priv) " + "(defn public [] :pub)"
 				+ "(export public count))))");
 
 		Address caddr = (Address) ctx.getResult();

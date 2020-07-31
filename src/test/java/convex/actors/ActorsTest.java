@@ -2,11 +2,7 @@ package convex.actors;
 
 import static convex.core.lang.TestState.eval;
 import static convex.core.lang.TestState.step;
-import static convex.test.Assertions.assertArityError;
-import static convex.test.Assertions.assertAssertError;
-import static convex.test.Assertions.assertCastError;
-import static convex.test.Assertions.assertFundsError;
-import static convex.test.Assertions.assertStateError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -29,7 +25,7 @@ import convex.core.util.Utils;
 public class ActorsTest {
 
 	@Test public void testDeployAndCall() {
-		Context<?> ctx=TestState.step("(def caddr (deploy (fn [n] (do (defn getter [] n) (defn hidden [] nil) (defn plus [x] (+ n x)) (export getter plus))) 10))");
+		Context<?> ctx=TestState.step("(def caddr (deploy '(let [n 10] (defn getter [] n) (defn hidden [] nil) (defn plus [x] (+ n x)) (export getter plus))))");
 		
 		assertEquals(Address.class,ctx.getResult().getClass());
 		
@@ -47,17 +43,15 @@ public class ActorsTest {
 		assertCastError(step(ctx,"(call caddr (plus :foo))"));
 	}
 	
+	@Test public void testSimpleDeploys() {
+		assertTrue((boolean)eval("(address? (deploy 1))"));
+	}
+	
 	@Test public void testDeployFailures() {
-		assertCastError(step("(deploy 1 2)"));
-		assertCastError(step("(deploy nil)"));
-		assertCastError(step("(deploy 'foo)"));
+		assertArityError(step("(deploy)"));
+		assertArityError(step("(deploy 1 2)")); 
 
-		assertArityError(TestState.step("(deploy)"));
-		assertArityError(TestState.step("(deploy {})")); // interprets as fn
-		
-		assertArityError(TestState.step("(deploy (fn [] nil) 2)")); // wrong generator args
-		assertArityError(TestState.step("(deploy (fn [] (count)))")); // arity error in generator
-		assertCastError(step("(deploy (fn [] (inc :foo)))"));
+		assertCompileError(step("(deploy '(if))"));
 	}
 	
 	@Test public void testNotActor() {
@@ -67,7 +61,7 @@ public class ActorsTest {
 	}
 	
 	@Test public void testMinimalContract() {
-		Context<?> ctx=TestState.step("(def caddr (deploy (fn [])))");
+		Context<?> ctx=TestState.step("(def caddr (deploy '(do)))");
 		Address a=(Address) ctx.getResult();
 		assertNotNull(a);
 
@@ -84,8 +78,9 @@ public class ActorsTest {
 		// setup address for this scene
 		Context<?> ctx=TestState.step("(do (def HERO (address \""+HERO+"\")) (def VILLAIN (address \""+VILLAIN+"\")))");
 		
+		// Technique of constructing a contract using a String
 		String contractString=Utils.readResourceAsString("contracts/token.con");
-		ctx=TestState.step(ctx,"(def my-token (deploy "+contractString+" 101 1000 HERO))"); // contract initialisation args
+		ctx=TestState.step(ctx,"(def my-token (deploy ("+contractString+" 101 1000 HERO)))"); // contract initialisation args
 		
 		assertEquals(1000L,(long)eval(ctx,"(call my-token (balance *address*))"));
 		assertEquals(0L,(long)eval(ctx,"(call my-token (balance VILLAIN))"));
@@ -113,8 +108,9 @@ public class ActorsTest {
 	@Test public void testHelloContract() throws IOException {
 		Context<?> ctx=TestState.step("(do )");
 		
+		// Technique for deploying contract with a quoted form
 		String contractString=Utils.readResourceAsString("contracts/hello.con");
-		ctx=TestState.step(ctx,"(def hello (deploy "+contractString+"))"); // contract initialisation args
+		ctx=TestState.step(ctx,"(def hello (deploy (quote "+contractString+")))"); 
 		
 		ctx=TestState.step(ctx,"(call hello (greet \"Nikki\"))");
 		assertEquals("Hello Nikki",ctx.getResult());
@@ -133,7 +129,8 @@ public class ActorsTest {
 		long initialBalance=ctx.getBalance(addr);
 		
 		String contractString=Utils.readResourceAsString("contracts/funding.con");
-		ctx=TestState.step(ctx,"(def funcon (deploy "+contractString+"))");
+		ctx=TestState.step(ctx,"(def funcon (deploy '"+contractString+"))");
+		assertFalse(ctx.isExceptional());
 		Address caddr=(Address) ctx.getResult();
 		
 		{
@@ -215,7 +212,7 @@ public class ActorsTest {
 		Context<?> ctx=TestState.step("(do )");
 		
 		String contractString=Utils.readResourceAsString("contracts/exceptional.con");
-		ctx=TestState.step(ctx,"(def ex (deploy "+contractString+"))"); // contract initialisation args
+		ctx=TestState.step(ctx,"(def ex (deploy '"+contractString+"))"); 
 		
 		ctx=TestState.step(ctx,"(call ex (halt-fn \"Jenny\"))");
 		assertEquals("Jenny",ctx.getResult());

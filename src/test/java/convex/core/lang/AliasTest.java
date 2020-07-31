@@ -21,7 +21,7 @@ public class AliasTest {
 	}
 	
 	@Test public void testLibraryAlias() {
-		Context<?> ctx=step("(def lib (deploy (fn [] (def foo 100) (defn bar [] (inc foo)))))");
+		Context<?> ctx=step("(def lib (deploy '(do (def foo 100) (defn bar [] (inc foo)))))");
 		Address libAddress=eval(ctx,"lib");
 		assertNotNull(libAddress);
 		

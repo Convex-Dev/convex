@@ -17,6 +17,7 @@ import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Init;
 import convex.core.State;
 import convex.core.data.AVector;
 import convex.core.data.Keywords;
@@ -283,6 +284,20 @@ public class CompilerTest {
 		assertUndeclaredError(step("'~undefined-1"));
 	}
 	
+	@Test 
+	public void testNestedQuote() {
+		assertEquals(10L,(long)eval("(+ (eval '(+ 1 ~2 ~(eval 3) ~(eval '(+ 0 4)))))"));
+
+		assertEquals(10L,(long)eval("(let [a 2 b 3] (eval '(+ 1 ~a ~(+ b 4))))"));
+	}
+	
+	@Test 
+	public void testQuotedMacro() {
+
+		assertEquals(2L,(long)eval("(eval '(if true ~(if true 2 3)))"));
+	}
+	
+	
 	@Test
 	public void testLet() {
 		assertEquals(Vectors.of(1L,3L),eval("(let [[a b] [3 1]] [b a])"));
@@ -320,7 +335,7 @@ public class CompilerTest {
 	@Test
 	public void testLookupAddress() {
 		Lookup<?> l=comp("foo");
-		assertEquals(null,l.getAddress());
+		assertEquals(Init.HERO,l.getAddress());
 	}
 	
 	@Test

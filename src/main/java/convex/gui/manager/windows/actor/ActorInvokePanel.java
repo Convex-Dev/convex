@@ -9,7 +9,6 @@ import convex.core.data.ASet;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Symbol;
-import convex.core.lang.Symbols;
 import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ScrollyList;
 import convex.gui.manager.PeerManager;
@@ -30,7 +29,7 @@ public class ActorInvokePanel extends JPanel {
 		setLayout(new BorderLayout());
 
 		AccountStatus as = PeerManager.getLatestState().getAccount(contract);
-		ASet<Symbol> exports = as.getEnvironment().get(Symbols.STAR_EXPORTS).getValue();
+		ASet<Symbol> exports = as.getExports();
 		for (Symbol s : exports) {
 			exportList.addElement(s);
 		}

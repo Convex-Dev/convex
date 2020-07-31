@@ -19,11 +19,8 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Init;
 import convex.core.data.Address;
-import convex.core.data.Keywords;
 import convex.core.data.Maps;
-import convex.core.data.Sets;
 import convex.core.lang.Context;
-import convex.core.lang.Reader;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
 
@@ -32,13 +29,15 @@ public class PredictionMarketTest {
 	@Test
 	public void testPredictionContract() throws IOException {
 		String contractString = Utils.readResourceAsString("actors/prediction-market.con");
-		Object cfn = TestState.INITIAL_CONTEXT.eval(Reader.read(contractString)).getResult();
-
-		Context<?> ctx = TestState.INITIAL_CONTEXT.deployActor(new Object[] {cfn, TestState.HERO, Keywords.BAR,
-				Sets.of(true, false)},true);
+			
+		// Run code to initialise actor with [oracle oracle-key outcomes]
+		Context<?> ctx = TestState.INITIAL_CONTEXT;
+		ctx=step("(deploy ("+contractString+" *address* :bar #{true,false}))");
+		
 		Address addr = (Address) ctx.getResult();
 		assertNotNull(addr);
-		ctx = step(ctx, "(def caddr \"" + addr.toHexString() + "\")");
+		ctx = step(ctx, "(def caddr (address 0x" + addr.toHexString() + "))");
+		assertFalse(ctx.isExceptional());
 
 		// tests of bonding curve function with empty stakes
 		assertEquals(0.0, (double) ctx.actorCall(addr, 0, "bond", Maps.empty()).getResult(), 0.01);
@@ -104,16 +103,17 @@ public class PredictionMarketTest {
 
 		// deploy an oracle contract.
 		String oracleString = Utils.readResourceAsString("actors/oracle-trusted.con");
-		Object ofn = TestState.INITIAL_CONTEXT.eval(Reader.read(oracleString)).getResult(); // compile
-		ctx = ctx.deployActor(new Object[] {ofn, 1337L, Sets.of(TestState.HERO)},true);
-		Address oaddr = (Address) ctx.getResult();
+		ctx=step("(def oaddr (deploy '"+oracleString+"))");
+		Address oaddr=(Address) ctx.getResult();
+		
 		ctx = step(ctx, "(def oaddr \"" + oaddr.toHexString() + "\")");
-		ctx = step(ctx, "(call oaddr (register :bar {}))");
+		
+		// call to create oracle with key :bar and current address (HERO) trusted
+		ctx = step(ctx, "(call oaddr (register :bar {:trust #{*address*}}))");
 
 		// deploy a prediction market using the oracle
 		String contractString = Utils.readResourceAsString("actors/prediction-market.con");
-		Object cfn = TestState.INITIAL_CONTEXT.eval(Reader.read(contractString)).getResult(); // compile
-		ctx = ctx.deployActor(new Object[] {cfn, oaddr, Keywords.BAR, Sets.of(true, false)},true);
+		ctx=step(ctx,"(deploy ("+contractString+" oaddr :bar #{true,false}))");
 		Address pmaddr = (Address) ctx.getResult();
 		ctx = step(ctx, "(def pmaddr \"" + pmaddr.toHexString() + "\")");
 		ctx = stepAs(VILLAIN, ctx, "(def pmaddr \"" + pmaddr.toHexString() + "\")");

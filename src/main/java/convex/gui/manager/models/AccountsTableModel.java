@@ -59,7 +59,7 @@ public class AccountsTableModel extends AbstractTableModel implements TableModel
 		case 2:
 			return as.getBalance().toFriendlyString();
 		case 3:
-			return as.getActorArgs();
+			return as.isActor();
 		case 4: {
 			AMap<Address, Object> reg = state.getAccount(Init.REGISTRY_ADDRESS).getEnvironment()
 					.get(Symbol.create("registry")).getValue();

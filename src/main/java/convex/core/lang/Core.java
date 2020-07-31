@@ -441,18 +441,18 @@ public class Core {
 	public static final CoreFn<Address> DEPLOY = reg(new CoreFn<>(Symbols.DEPLOY) {
 		@Override
 		public <I> Context<Address> invoke(Context<I> context, Object[] args) {
-			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
+			if (args.length !=1) return context.withArityError(exactArityMessage(1, args.length));
 
-			return context.deployActor(args,false);
+			return context.deployActor(args[0],false);
 		}
 	});
 	
 	public static final CoreFn<Address> DEPLOY_ONCE = reg(new CoreFn<>(Symbols.DEPLOY_ONCE) {
 		@Override
 		public <I> Context<Address> invoke(Context<I> context, Object[] args) {
-			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
+			if (args.length !=1) return context.withArityError(exactArityMessage(1, args.length));
 
-			return context.deployActor(args,true);
+			return context.deployActor(args[0],true);
 		}
 	});
 
@@ -1796,7 +1796,7 @@ public class Core {
 		// we use a fake State to build the initial environment with core address
 		Address ADDR=Core.CORE_ADDRESS;
 		State state = State.EMPTY.putAccount(ADDR,
-				AccountStatus.createActor(0, Amount.create(1000000000), null, env));
+				AccountStatus.createActor(Amount.create(1000000000), env));
 		Context<?> ctx = Context.createInitial(state, ADDR, 1000000L);
 
 		Syntax form = null;

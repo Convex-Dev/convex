@@ -7,11 +7,8 @@ import javax.swing.JPanel;
 import javax.swing.JTextArea;
 
 import convex.core.State;
-import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.Syntax;
-import convex.core.lang.Fn;
 import convex.gui.manager.PeerManager;
 import convex.gui.manager.Toolkit;
 
@@ -44,25 +41,11 @@ public class ActorInfoPanel extends JPanel {
 		StringBuilder sb = new StringBuilder();
 		AccountStatus as = latestState.getAccount(actor);
 
-		AVector<Object> v = as.getActorArgs();
-
 		sb.append("Actor Address: " + actor.toHexString() + "\n");
 		sb.append("Actor Balance: " + as.getBalance().toFriendlyString() + "\n");
 		sb.append("\n");
 
-		addInitParams(sb, v);
-
 		infoArea.setText(sb.toString());
-	}
-
-	static void addInitParams(StringBuilder sb, AVector<Object> v) {
-		sb.append("Initialisation parameters:\n");
-		AVector<Syntax> params = ((Fn<?>) v.get(0)).getParams();
-		int pc = params.size();
-		for (int i = 0; i < pc; i++) {
-			sb.append("  " + params.get(i).getValue() + " = " + v.get(i + 1) + "\n");
-		}
-		if (pc == 0) sb.append("  <no parameters>");
 	}
 
 }

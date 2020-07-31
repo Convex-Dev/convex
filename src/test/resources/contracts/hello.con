@@ -1,6 +1,5 @@
 ;; The Hello World of smart contracts
-(fn [] 
-  
+(do
   
   (def people #{})
   

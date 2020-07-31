@@ -1,5 +1,5 @@
-;; Testing contract for fund transfers via offer / accept
-(fn [] 
+(do ;; Testing contract for fund transfers via offer / accept
+  
   
   ;; function that accepts quarter of all funds offered
   (defn accept-quarter [] 

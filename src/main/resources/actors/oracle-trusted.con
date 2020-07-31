@@ -1,12 +1,11 @@
-;; a simple oracle contract that depends on a trusted set who may provide results
-(fn [seed trusted-set]
-  
-  (assert (set? trusted-set))
+(do 
+  ;; a simple oracle contract that depends on a trusted set who may provide results
+  ;; Trusted users are a set with key :trust in the registration data
   
   ;; Map of keys to oracle descriptive data
   (def full-list {})
   
-  ;; May of keys to oracle reuslts for each key
+  ;; May of keys to oracle results for each key
   (def results {})
   
   ;; ORACLE REGISTER INTERFACE
@@ -37,8 +36,8 @@
   ;; Returns the finalised value
   (defn provide [key value]
     (cond
-      (not (trusted-set *caller*)) (assert false) ;; Is this sensible?
-      (not (full-list key)) (assert false) ;; Fail if not registered
+      (not (get-in full-list [key :trust *caller*])) (fail 80 "Untrusted caller") ;; Is this sensible?
+      (not (full-list key)) (fail 80 (str "Unknown oracle key: " key)) ;; Fail if not registered
       (contains-key? results key) (results key)
       (def results (assoc results key value))
       value))

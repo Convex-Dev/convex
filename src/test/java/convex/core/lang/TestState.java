@@ -102,14 +102,14 @@ public class TestState {
 			State s = Init.INITIAL_STATE;
 			Context<?> ctx = Context.createFake(s, HERO);
 			for (int i = 0; i < NUM_CONTRACTS; i++) {
-
-				AFn<?> contract = eval(ctx,
-						"(fn [i] " + "(def my-data nil)" + "(defn write [x] (def my-data x)) "
+				// Construct code for each contract
+				Object contractCode = Reader.read(
+						"(do " + "(def my-data nil)" + "(defn write [x] (def my-data x)) "
 								+ "(defn read [] my-data)" + "(defn who-called-me [] *caller*)"
-								+ "(defn my-address [] *address*)" + "(defn my-number [] i)" + "(defn foo [] :bar)"
+								+ "(defn my-address [] *address*)" + "(defn my-number [] "+i+")" + "(defn foo [] :bar)"
 								+ "(export write read who-called-me my-address my-number foo)" + ")");
 
-				ctx = ctx.deployActor(new Object[] {contract, i},true);
+				ctx = ctx.deployActor(contractCode,true);
 				CONTRACTS[i] = (Address) ctx.getResult();
 			}
 			return ctx.getState();
@@ -143,7 +143,7 @@ public class TestState {
 		assertEquals(HERO, eval(ctx, "(call target (who-called-me))"));
 		assertEquals(TARGET, eval(ctx, "(call target (my-address))"));
 
-		assertEquals(0, (int) eval(ctx, "(call target (my-number))"));
+		assertEquals(0L, (long) eval(ctx, "(call target (my-number))"));
 
 		assertStateError(TestState.step(ctx, "(call target (missing-function))"));
 	}

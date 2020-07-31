@@ -2,6 +2,7 @@ package convex.core.data;
 
 import java.nio.ByteBuffer;
 
+import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Core;
@@ -21,15 +22,13 @@ import convex.core.util.Utils;
 public class AccountStatus extends ACell {
 	private final long sequence;
 	private final Amount balance;
-	private final AVector<Object> actorArgs;
 	private final AHashMap<Symbol, Syntax> environment;
 	private final ABlobMap<Address, Object> holdings;
 
-	private AccountStatus(long sequence, Amount balance, AVector<Object> actorArgs,
+	private AccountStatus(long sequence, Amount balance,
 			AHashMap<Symbol, Syntax> environment, ABlobMap<Address, Object> holdings) {
 		this.sequence = sequence;
 		this.balance = balance;
-		this.actorArgs = actorArgs;
 		this.environment = environment;
 		this.holdings=holdings;
 	}
@@ -42,7 +41,7 @@ public class AccountStatus extends ACell {
 	 * @return New AccountStatus
 	 */
 	public static AccountStatus create(long sequence, Amount balance) {
-		return new AccountStatus(sequence, balance, null, null,null);
+		return new AccountStatus(sequence, balance, null,null);
 	}
 
 	/**
@@ -54,12 +53,12 @@ public class AccountStatus extends ACell {
 	 */
 	public static AccountStatus createGovernance(long balance) {
 		Amount amount = Amount.create(balance);
-		return new AccountStatus(0, amount, null, null,null);
+		return new AccountStatus(0, amount, null,null);
 	}
 
-	public static AccountStatus createActor(long sequence, Amount balance, AVector<Object> actorArgs,
+	public static AccountStatus createActor(Amount balance,
 			AHashMap<Symbol, Syntax> environment) {
-		return new AccountStatus(sequence, balance, actorArgs, environment,null);
+		return new AccountStatus(Constants.ACTOR_SEQUENCE, balance, environment,null);
 	}
 
 	public static AccountStatus create(Amount balance) {
@@ -97,7 +96,6 @@ public class AccountStatus extends ACell {
 	public ByteBuffer writeRaw(ByteBuffer b) {
 		b = Format.writeVLCLong(b, sequence);
 		b = Format.write(b, balance);
-		b = Format.write(b, actorArgs);
 		b = Format.write(b, environment);
 		b = Format.write(b, holdings);
 		return b;
@@ -106,10 +104,9 @@ public class AccountStatus extends ACell {
 	public static AccountStatus read(ByteBuffer data) throws BadFormatException {
 		long sequence = Format.readVLCLong(data);
 		Amount balance = Format.read(data);
-		AVector<Object> actorArgs = Format.read(data);
 		AHashMap<Symbol, Syntax> environment = Format.read(data);
 		ABlobMap<Address,Object> holdings = Format.read(data);
-		return new AccountStatus(sequence, balance, actorArgs, environment,holdings);
+		return new AccountStatus(sequence, balance, environment,holdings);
 	}
 
 	@Override
@@ -123,7 +120,7 @@ public class AccountStatus extends ACell {
 	}
 
 	public boolean isActor() {
-		return actorArgs != null;
+		return sequence<0;
 	}
 
 	@Override
@@ -133,14 +130,6 @@ public class AccountStatus extends ACell {
 		sb.append(',');
 		sb.append(":seq " + Utils.ednString(sequence));
 		sb.append('}');
-	}
-
-	/**
-	 * Gets the Actor initialisation vector, or null if the accountis not an Actor.
-	 * @return Vector of Actor initialisation arguments, in the form [fn arg1 arg2 ... argN]
-	 */
-	public AVector<Object> getActorArgs() {
-		return actorArgs;
 	}
 
 	/**
@@ -155,18 +144,9 @@ public class AccountStatus extends ACell {
 	 *         found/exported.
 	 * @throws BadStateException
 	 */
-	@SuppressWarnings("unchecked")
 	public <R> IFn<R> getActorFunction(Symbol sym) {
-		if (actorArgs == null) return null;
-		// get *exports* from Actor environment, bail out if doesn't exist
-		Syntax exportSyn = environment.get(Symbols.STAR_EXPORTS);
-		if (exportSyn == null) return null;
-
-		// examine *exports* value, bail out if not a set
-		Object s = exportSyn.getValue();
-		if (!(s instanceof ASet)) return null;
-
-		ASet<Symbol> exports = (ASet<Symbol>) s;
+		ASet<Symbol> exports = getExports();
+		if (exports==null) return null;
 		if (!exports.contains(sym)) return null;
 
 		// get function from environment. Anything not a function results in null
@@ -195,7 +175,7 @@ public class AccountStatus extends ACell {
 	}
 
 	public AccountStatus withBalance(Amount newBalance) {
-		return new AccountStatus(sequence, newBalance, actorArgs, environment,holdings);
+		return new AccountStatus(sequence, newBalance, environment,holdings);
 	}
 
 	public AccountStatus withBalance(long newBalance) {
@@ -207,7 +187,7 @@ public class AccountStatus extends ACell {
 		if (newEnvironment==Core.ENVIRONMENT) newEnvironment=null;
 		
 		if (environment==newEnvironment) return this;
-		return new AccountStatus(sequence, balance, actorArgs, newEnvironment,holdings);
+		return new AccountStatus(sequence, balance, newEnvironment,holdings);
 	}
 
 	/**
@@ -218,21 +198,20 @@ public class AccountStatus extends ACell {
 	 */
 	public AccountStatus updateSequence(long newSequence) {
 		// SECURITY: shouldn't ever call updateSequence on a Actor address!
-		if (actorArgs != null) throw new Error("Trying to update Actor sequence number!");
+		if (isActor()) throw new Error("Trying to update Actor sequence number!");
 
 		long expected = sequence + 1;
 		if (expected != newSequence) {
 			return null;
 		}
 		// NOTE: we can always assume actorArgs is null from security checks above
-		return new AccountStatus(newSequence, balance, null, environment,holdings);
+		return new AccountStatus(newSequence, balance, environment,holdings);
 	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {
 		balance.validate();
 		if (environment != null) environment.validateCell();
-		RT.validate(actorArgs);
 	}
 
 	/**
@@ -278,6 +257,32 @@ public class AccountStatus extends ACell {
 	private AccountStatus withHoldings(ABlobMap<Address, Object> newHoldings) {
 		if (newHoldings.isEmpty()) newHoldings=null;
 		if (holdings==newHoldings) return this;
-		return new AccountStatus(sequence, balance, actorArgs, environment,newHoldings);
+		return new AccountStatus(sequence, balance, environment,newHoldings);
+	}
+
+	/**
+	 * Gets *exports* from account
+	 * 
+	 * Returns null if the account has no *exports*. This might be for any of the following reasons:
+	 * <ul>
+	 * <li>The accounts is not an actor</li>
+	 * <li>The account does not define the *exports* symbol</li>
+	 * </ul>
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public ASet<Symbol> getExports() {
+		if (!isActor()) return null;
+		
+		// get *exports* from Actor environment, bail out if doesn't exist
+		Syntax exportSyn = environment.get(Symbols.STAR_EXPORTS);
+		if (exportSyn == null) return null;
+
+		// examine *exports* value, bail out if not a set
+		Object s = exportSyn.getValue();
+		if (!(s instanceof ASet)) return null;
+
+		ASet<Symbol> exports = (ASet<Symbol>) s;
+		return exports;
 	}
 }

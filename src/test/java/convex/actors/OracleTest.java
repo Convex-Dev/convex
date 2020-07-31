@@ -1,6 +1,7 @@
 package convex.actors;
 
-import static convex.core.lang.TestState.*;
+import static convex.core.lang.TestState.eval;
+import static convex.core.lang.TestState.step;
 import static convex.test.Assertions.assertAssertError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -15,8 +16,8 @@ import convex.core.data.Address;
 import convex.core.data.Keywords;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
+import convex.core.lang.Reader;
 import convex.core.lang.TestState;
-import convex.core.util.Utils;
 
 public class OracleTest {
 
@@ -29,13 +30,15 @@ public class OracleTest {
 		Context<?> ctx = TestState
 				.step("(do (def HERO (address \"" + HERO + "\")) (def VILLAIN (address \"" + VILLAIN + "\")))");
 
-		String contractString = Utils.readResourceAsString("actors/oracle-trusted.con");
-		ctx = TestState.step(ctx, "(def oracle3 (deploy " + contractString + " 3 #{HERO}))"); // contract initialisation
-																								// args
+		Object contractCode = Reader.readResource("actors/oracle-trusted.con");
+		ctx = ctx.deployActor(contractCode, true); 
+		
 		Address oracle3 = (Address) ctx.getResult();
 		String o3_str = oracle3.toHexString();
+		ctx=step(ctx,"(def oracle3 (address 0x"+o3_str+"))");
 
-		ctx = TestState.step(ctx, "(call oracle3 (register :foo {}))"); // register an oracle
+		// register an oracle entry owned by our hero
+		ctx = TestState.step(ctx, "(call oracle3 (register :foo {:trust #{HERO}}))"); 
 		assertTrue(RT.bool(ctx.getResult()));
 
 		assertFalse((boolean) eval(ctx, "(call oracle3 (finalised? :foo))"));

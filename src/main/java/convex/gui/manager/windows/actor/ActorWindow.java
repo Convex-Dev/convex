@@ -28,7 +28,6 @@ public class ActorWindow extends BaseWindow {
 		add(tabbedPane, BorderLayout.CENTER);
 
 		tabbedPane.add("Overview", new ActorInfoPanel(manager, contract));
-		tabbedPane.add("Code", new ActorCodePanel(manager, contract));
 		tabbedPane.add("Environment", new StateTreePanel(as.getEnvironment()));
 		tabbedPane.add("Operations", new ActorInvokePanel(manager, contract));
 	}

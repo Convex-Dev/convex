@@ -14,7 +14,6 @@ import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
 import convex.core.data.Sets;
 import convex.core.data.Symbol;
-import convex.core.data.Vectors;
 import convex.core.lang.Context;
 import convex.core.lang.Core;
 import convex.core.lang.Reader;
@@ -58,7 +57,6 @@ public class Init {
 
 	public static final Address REGISTRY_ADDRESS;
 	public static final Address ORACLE_ADDRESS;
-	private static final Object ORACLE_SEED = 1337;
 
 	public static final AHashMap<Symbol, Object> INITIAL_GLOBALS = Maps.of(Symbols.TIMESTAMP,
 			Constants.INITIAL_TIMESTAMP, Symbols.FEES, 0L, Symbols.JUICE_PRICE, Constants.INITIAL_JUICE_PRICE);
@@ -128,16 +126,15 @@ public class Init {
 			{ // Deploy Registry Actor
 				Context<?> ctx = Context.createFake(s, HERO);
 				Object form=Reader.readResource("actors/registry.con");
-				Object cfn = ctx.eval(form).getResult();
-				ctx = ctx.deployActor(new Object[]{cfn},false);
+				ctx = ctx.deployActor(form,false);
 				REGISTRY_ADDRESS = (Address) ctx.getResult();
 				s = ctx.getState();
 			}
 
 			{ // Deploy Oracle Actor
 				Context<?> ctx = Context.createFake(s, HERO);
-				Object cfn = ctx.eval(Reader.readResource("actors/oracle-trusted.con")).getResult();
-				ctx = ctx.deployActor(new Object[] {cfn, ORACLE_SEED, Sets.of(HERO)},true);
+				Object form=Reader.readResource("actors/oracle-trusted.con");
+				ctx = ctx.deployActor(form,true);
 				ORACLE_ADDRESS = (Address) ctx.getResult();
 				ctx = Context.createFake(ctx.getState(), ORACLE_ADDRESS);
 				ctx = ctx.actorCall(REGISTRY_ADDRESS, 0, "register",
@@ -178,7 +175,7 @@ public class Init {
 	
 	private static BlobMap<Address, AccountStatus> addCoreLibrary(BlobMap<Address, AccountStatus> accts) {
 		Address a=Core.CORE_ADDRESS;
-		AccountStatus as = AccountStatus.createActor(0L, Amount.ZERO, Vectors.empty(), Core.CORE_NAMESPACE);
+		AccountStatus as = AccountStatus.createActor(Amount.ZERO, Core.CORE_NAMESPACE);
 		if (accts.containsKey(a)) throw new Error("Duplicate core library account!");
 		accts = accts.assoc(a, as);
 		return accts;

@@ -22,4 +22,9 @@ public class Constants {
 	
 	public static final boolean USE_ED25519=true;
 
+	/**
+	 * Sequence number used to identify standard actors
+	 */
+	public static final long ACTOR_SEQUENCE = -1;
+
 }
