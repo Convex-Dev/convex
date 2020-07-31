@@ -193,12 +193,12 @@
     '(set* (quote ~sym) ~value))
 
 (defmacro import
-  ^{:doc {:description "Import library in the current environment."
+  ^{:doc {:description "Import a library for use in the current environment. Creates an alias to the library so that symbols defined in the library can be addressed directly in the form 'alias/symbol-name'."
           :examples [{:code "(import 0x540Edc26038EF05c5B8442783Efa9561122B8732c0FD387Bf3e215a03f694428 :as alias)"}]
           :type :macro
           :signature [{:params [& args]}]}}
-  [& args]
-  (let [blob (first args)
-        alias (last args)]
+  [addr as sym]
+  (do 
+    (assert (= :as as))
     '(def *aliases*
-       (assoc *aliases* (quote ~alias) (address ~blob)))))
+       (assoc *aliases* (quote ~sym) (address ~addr)))))

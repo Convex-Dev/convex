@@ -61,5 +61,20 @@ public class AliasTest {
 		// Alias should now work
 		assertEquals(100L, evalL(ctx, "mylib/foo"));
 	}
+	
+	@Test
+	public void testBadImports() {
+		Context<?> ctx = step("(def lib (deploy '(def foo 100)))");
+		Address lib = (Address) ctx.getResult();
+		assertNotNull(lib);
+		
+		assertArityError(step(ctx,"(import)"));
+		assertArityError(step(ctx,"(import lib)"));
+		assertArityError(step(ctx,"(import lib :as)"));
+		assertArityError(step(ctx,"(import lib :as foo bar)"));
+		
+		// check for bad keyword
+		assertAssertError(step(ctx,"(import lib :blazzzz mylib)"));
+	}
 
 }
