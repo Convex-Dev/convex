@@ -321,14 +321,6 @@
          :signature [{:params [fn]}]}
 	}
   
-  export
- 	{
-	 :doc {:description "Exports symbols from the current smart contract. Exported symbols may be called by external parties. It is advised to carefully audit the security of usages of this function."
-         :examples [{:code "(export some-safe-function)"}]
-         :type :macro
-         :signature [{:params [& symbols]}]}
-	}
-  
   exports?
  	{
 	 :doc {:description "Tests if a specified smart contract exports a given symbol name."
