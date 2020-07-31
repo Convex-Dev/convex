@@ -45,4 +45,21 @@ public class AliasTest {
 		assertEquals(10000L, evalL(ctx,"(let [f (fn [x] (* x x))] (mylib/baz f))"));
 		assertEquals(99L, evalL(ctx,"(do (def f (fn [x] (dec x))) (mylib/baz f))"));
 	}
+
+	@Test
+	public void testImport() {
+		Context<?> ctx = step("(def lib (deploy (fn [] (def foo 100))))");
+		Address libAddress = eval(ctx, "lib");
+		assertNotNull(libAddress);
+
+		// no alias should exist yet
+		assertUndeclaredError(step(ctx, "foo"));
+		assertUndeclaredError(step(ctx, "mylib/foo"));
+
+		ctx = step(ctx, "(import lib :as mylib)");
+
+		// Alias should now work
+		assertEquals(100L, evalL(ctx, "mylib/foo"));
+	}
+
 }
