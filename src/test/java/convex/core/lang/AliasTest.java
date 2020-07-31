@@ -48,7 +48,7 @@ public class AliasTest {
 
 	@Test
 	public void testImport() {
-		Context<?> ctx = step("(def lib (deploy (fn [] (def foo 100))))");
+		Context<?> ctx = step("(def lib (deploy '(def foo 100)))");
 		Address libAddress = eval(ctx, "lib");
 		assertNotNull(libAddress);
 
