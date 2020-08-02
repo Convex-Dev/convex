@@ -7,10 +7,27 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
 
 /**
- * Class representing a Symbol.
+ * <p>Class representing a Symbol. Symbols are more commonly used in CVM code to refer to functions and values in the
+ * execution environment.</p>
+ * 
+ * <p>Symbols are simply small immutable data Objects, and can be used freely in data structures. They can be used as map
+ * keys, however for most normal circumstances Strings or Keywords are more appropriate as keys.
+ * </p>
+ * 
+ * <p>
+ * A Symbol comprises:
+ * - A name
+ * - An optional namespace
+ * </p>
+ * 
+ * <p>
+ * A Symbol with a namespace is said to be "qualified", accordingly a Symbol with no namespace is "unqualified".
+ * </p>
  *
+ * <p>
  * "Becoming sufficiently familiar with something is a substitute for
  * understanding it." - John Conway
+ * </p>
  */
 public class Symbol extends ASymbolic {
 
@@ -29,7 +46,10 @@ public class Symbol extends ASymbolic {
 	 */
 	public static Symbol create(Symbol namespace, String name) {
 		if (!validateName(name)) return null;
-		if ((namespace!=null)&&namespace.isQualified()) return null;
+		if (namespace!=null) {
+			// namespace can't currently be qualified itself
+			if (namespace.isQualified()) return null;
+		}
 		return new Symbol(namespace,name);
 	}
 	
@@ -65,6 +85,11 @@ public class Symbol extends ASymbolic {
 		return false;
 	}
 
+	/**
+	 * Tests if this Symbol is equal to another Symbol. Equality is defined by both namespace and name being equal.
+	 * @param sym
+	 * @return
+	 */
 	public boolean equals(Symbol sym) {
 		return sym.name.equals(name)&&Utils.equals(namespace,sym.getNamespace());
 	}
@@ -129,15 +154,18 @@ public class Symbol extends ASymbolic {
 	@Override
 	public void validateCell() throws InvalidDataException {
 		super.validateCell();
-		if ((namespace!=null)&&namespace.isQualified()) throw new InvalidDataException("Invalid namespace, cannot be qualified: " + namespace, this);
+		if (namespace!=null) {
+			if (namespace.isQualified()) throw new InvalidDataException("Invalid namespace, cannot be qualified: " + namespace, this);
+			namespace.validateCell();
+		}
 	}
 
 	/**
 	 * Converts to an unqualified Symbol by removing any namespace component
-	 * @return
+	 * @return An unqualified Symbol with the same name as this Symbol.
 	 */
-	public Symbol getUnqualifiedName() {
-		// TODO Maybe optimise?
+	public Symbol toUnqualified() {
+		if (namespace==null) return this;
 		return Symbol.create(getName());
 	}
 

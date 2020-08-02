@@ -399,7 +399,7 @@ public class Context<T> implements IObject {
 	
 	private MapEntry<Symbol,Syntax> lookupAliasedEntry(AccountStatus as,Symbol sym) {
 		if (as==null) return null;
-		Symbol unqualified=sym.getUnqualifiedName();
+		Symbol unqualified=sym.toUnqualified();
 		AHashMap<Symbol, Syntax> env = as.getEnvironment();
 		return env.getEntry(unqualified);
 	}
