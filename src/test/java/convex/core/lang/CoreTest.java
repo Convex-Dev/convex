@@ -1513,6 +1513,18 @@ public class CoreTest {
 	}
 	
 	@Test
+	public void testDefactor() {
+		Context<?> ctx=step("(let [agf (defactor multiply-actor [x] (defn calc [y] (* x y)) (export calc))] (def ma (deploy (agf 13))))");
+		
+		Address ma=(Address) ctx.getResult();
+		assertNotNull(ma);
+		
+		assertEquals(130L,evalL(ctx,"(call ma (calc 10))"));
+	}
+	
+	
+	
+	@Test
 	public void testSetStar() {
 		assertEquals(13L,evalL("(set* 'a 13)"));
 		assertEquals(13L,evalL("(do (set* \"a\" 13) a)"));

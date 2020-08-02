@@ -204,3 +204,14 @@
     (assert (= :as as))
     '(def *aliases*
        (assoc *aliases* (quote ~sym) (address ~addr)))))
+
+(defmacro defactor
+  ^{:doc {:description "Defines an actor generation function. An actor generation function creates depolyable code when called, and may take optional arguments to configure the deployed actor. The resulting code can be used with either 'deploy' or 'deploy-once'."
+         :examples [{:code "(let [agf (defactor multiply-actor [x] (defn calc [y] (* x y)) (export calc))] (deploy (agf 13))"}]
+         :type :macro	 
+         :signature [{:params [name params & body]}]}
+	}
+  [name params & body] 
+  (let [bindlist (reduce (fn [v p] (conj (conj v p) (list 'unquote p))) [] params)
+        code (cons 'let bindlist body)] 
+    '(defn ~name ~params (quote ~code))))
