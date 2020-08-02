@@ -327,10 +327,10 @@
   
   exports?
  	{
-	 :doc {:description "Tests if a specified smart contract exports a given symbol name."
-         :examples [{:code "(exports? contract-address 'function-name)"}]
+	 :doc {:description "Tests if a specified actor exports a given symbol name."
+         :examples [{:code "(exports? actor-address 'function-name)"}]
          :type :function
-         :signature [{:params [& symbols]}]}
+         :signature [{:params [actor symbol]}]}
 	}
   
   fail

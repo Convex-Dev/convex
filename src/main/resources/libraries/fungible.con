@@ -1,0 +1,25 @@
+(do
+  ;; Fungible library
+  ;;
+  ;; deploy with: (deploy-once fungible-code)
+  ;; 
+  ;; import with (import <address of fungible> :as fungible)
+  ;;
+  ;; Key usage:
+  ;;   (fungible/balance token)   ;; Gets own balance (i.e. for *address*)
+  ;;   (fungible/balance token other-address)   ;; Gets balance for another Address
+  
+  
+  (defn balance 
+    ^{:doc {:description "Gets the balance for a specified holder from a fungible token."
+         :examples [{:code "(balance my-token-address)"}]
+         :type :function
+         :signature [{:params [token holder]}]}
+	  }
+    [token holder]
+    (call token (fungible/balance holder)))
+  
+  
+  
+  
+  )
