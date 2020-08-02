@@ -198,7 +198,9 @@
           :type :macro
           :signature [{:params [& args]}]}}
   [addr as sym]
-  (do 
+  (let [sym (cond (symbol? sym) sym
+                  (= :default sym) nil
+                  (fail "import: alias must be a symbol or :default"))] 
     (assert (= :as as))
     '(def *aliases*
        (assoc *aliases* (quote ~sym) (address ~addr)))))

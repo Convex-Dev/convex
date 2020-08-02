@@ -66,6 +66,19 @@ public class AliasTest {
 	}
 	
 	@Test
+	public void testDefaultImport() {
+		Context<?> ctx = step("(def lib (deploy '(def foo 100)))");
+
+		ctx = step(ctx, "(import lib :as :default)");
+
+		// Alias should now work for default lookups
+		assertEquals(100L, evalL(ctx, "foo"));
+		
+		// core lookups should now be broken, sadly....
+		assertUndeclaredError(step(ctx, "count"));
+	}
+	
+	@Test
 	public void testBadImports() {
 		Context<?> ctx = step("(def lib (deploy '(def foo 100)))");
 		Address lib = (Address) ctx.getResult();
@@ -78,6 +91,12 @@ public class AliasTest {
 		
 		// check for bad keyword
 		assertAssertError(step(ctx,"(import lib :blazzzz mylib)"));
+		
+		// can't have bad alias
+		assertAssertError(step(ctx,"(import lib :as nil)"));
+		
+		// can't have non-address first argument
+		assertCastError(step(ctx,"(import :foo :as mylib)"));
 	}
 	
 	@Test void testBadSelfDefualtAlias() {

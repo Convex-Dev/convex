@@ -59,9 +59,9 @@ A minimal example:
 ;; => 13
 ```
 
-The complete set of aliases for the current environment is stored in the binding `*aliases*`, which is a map of Symbols to Addresses for the aliased Accounts. The `*aliases*` also inlcude a `:default` alias which is used for unqualified Symbols and is initially set to refer to the Convex core library  - however 
+The complete set of aliases for the current environment is stored in the binding `*aliases*`, which is a map of Symbols to Addresses for the aliased Accounts. The `*aliases*` also includes a `:default` alias which is used for unqualified Symbols and is initially set to refer to the Convex core library  - however this can be overriden if required.
 
-IMPORTANT SECURITY POINT: Library code executes in the same security context (i.e. `*address*` for the current Account does not change). This is useful because it means that library code can act on the callers behalf (e.g. transferring tokens, calling other Actors) but also presents some risks. Make sure that you trust library code that you call!
+IMPORTANT SECURITY POINT: Library code invoked as a normal function executes in the same security context as the calling code (i.e. `*address*` for the current Account does not change). This is useful because it means that library code can act on the callers behalf (e.g. transferring tokens, calling other Actors) but also presents some risks. Make sure that you trust library code that you call!
 
 ### Symbolic evaluation
 
@@ -91,7 +91,7 @@ Key threats and mitigations are outlined below.
 
 #### Code injection attacks
 
-If you don't completely trust the values in an environment that you don't control (whether a User or Actor Account), then be *extremely* careful about treating values from such environments as functions. For example, the following snippet of Actor code is subject to significant code injection risks:
+If you don't completely trust the values in an environment that you don't control (whether a User or Actor Account), then be *extremely* careful about using values from such environments as functions. For example, the following snippet of Actor code is subject to significant code injection risks:
 
 ```clojure
 (import some-dubious-library :as badlib)
