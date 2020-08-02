@@ -32,12 +32,16 @@ public class Init {
 	public static final State INITIAL_STATE;
 	
 	// Governance accounts
-
+	public static final Address NULL_ADDRESS = Address.dummy("0");
 	public static final Address RESERVED = Address.dummy("1");
 	public static final Address MAINBANK = Address.dummy("2");
 	public static final Address MAINPOOL = Address.dummy("3");
 	public static final Address LIVEPOOL = Address.dummy("4");
 	public static final Address ROOTFUND = Address.dummy("5");
+	
+	public static final Address CORE_ADDRESS;
+	public static final Address REGISTRY_ADDRESS=Address.dummy("f");
+	public static final Address ORACLE_ADDRESS;
 
 	public static final int NUM_GOVERNANCE = 5;
 	public static final int NUM_PEERS = 8;
@@ -55,11 +59,10 @@ public class Init {
 	public static final AKeyPair HERO_KP;
 	public static final AKeyPair VILLAIN_KP;
 
-	public static final Address REGISTRY_ADDRESS;
-	public static final Address ORACLE_ADDRESS;
 
 	public static final AHashMap<Symbol, Object> INITIAL_GLOBALS = Maps.of(Symbols.TIMESTAMP,
 			Constants.INITIAL_TIMESTAMP, Symbols.FEES, 0L, Symbols.JUICE_PRICE, Constants.INITIAL_JUICE_PRICE);
+
 
 
 
@@ -72,7 +75,8 @@ public class Init {
 			BlobMap<Address, AccountStatus> accts = BlobMaps.empty();
 
 			// Core library
-			accts=addCoreLibrary(accts);
+			CORE_ADDRESS=Core.CORE_ADDRESS;
+			accts=addCoreLibrary(accts,CORE_ADDRESS);
 
 			// governance accounts
 			accts = addGovernanceAccount(accts, RESERVED, 900000000000000000L); // 99%
@@ -123,11 +127,10 @@ public class Init {
 			if (s.getPeers().size() != NUM_PEERS) throw new Error("Bad peer count: " + s.getPeers().size());
 			if (s.getAccounts().size() != NUM_PEERS + NUM_ACTORS + NUM_GOVERNANCE+NUM_LIBRARIES) throw new Error("Bad account count");
 
-			{ // Deploy Registry Actor
+			{ // Deploy Registry Actor to fixed Address
 				Context<?> ctx = Context.createFake(s, HERO);
 				Object form=Reader.readResource("actors/registry.con");
-				ctx = ctx.deployActor(form,false);
-				REGISTRY_ADDRESS = (Address) ctx.getResult();
+				ctx = ctx.deployActor(form,REGISTRY_ADDRESS);
 				s = ctx.getState();
 			}
 
@@ -173,8 +176,8 @@ public class Init {
 		return accts;
 	}
 	
-	private static BlobMap<Address, AccountStatus> addCoreLibrary(BlobMap<Address, AccountStatus> accts) {
-		Address a=Core.CORE_ADDRESS;
+	private static BlobMap<Address, AccountStatus> addCoreLibrary(BlobMap<Address, AccountStatus> accts, Address a) {
+
 		AccountStatus as = AccountStatus.createActor(Amount.ZERO, Core.CORE_NAMESPACE);
 		if (accts.containsKey(a)) throw new Error("Duplicate core library account!");
 		accts = accts.assoc(a, as);

@@ -1114,35 +1114,56 @@ public class Context<T> implements IObject {
 	/**
 	 * Deploys an Actor in this context.
 	 * 
+	 * First argument must be an Actor generation code, which will be evaluated in the new Actor account 
+	 * to initialise the Actor
+	 * 
+	 * A Actor may be generated with a deterministic Address, in which case a repeated call with 
+	 * the same Actor generation code will always return the same Actor, without re-running the generation.
+	 * 
+	 * Result will contain the Actor address if successful.
+	 * 
+	 * @param code Actor initialisation code
+	 * @param deterministic Flag to indicate if a deterministic address should be computed
+	 * @return Updated Context with Actor deployed, or an exceptional result
+	 * @throws ExecutionException 
+	 */
+	@SuppressWarnings("unchecked")
+	public <R> Context<R> deployActor(Object code, boolean deterministic) {
+		State state=getState();
+		
+		Address address;
+		if (deterministic) {
+			Hash hash=Hash.compute(code);
+			address=Address.fromHash(hash);
+			
+			// Need to check if deterministic Account Address already exists for 'deploy-once'. If so, return it.
+			AccountStatus as=state.getAccount(address);
+			if (as!=null) return (Context<R>) withResult(Juice.DEPLOY_CONTRACT,address);
+		} else {
+			address=Address.fromHash(state.getHash());
+		}
+		
+		return deployActor(code,address);
+	}
+	
+	/**
+	 * Deploys an Actor in this context to a specified Address
+	 * 
 	 * First argument must be an Actor generator function.
 	 * 
 	 * Result will contain the Actor address if successful.
 	 * 
-	 * @param init Actor initialisation function
+	 * @param code Actor initialisation code
 	 * @param args
 	 * @return Updated Context with Actor deployed, or an exceptional result
 	 * @throws ExecutionException 
 	 */
 	@SuppressWarnings("unchecked")
-	public <R> Context<R> deployActor(Object code, boolean computedAddress) {
+	public <R> Context<R> deployActor(Object code, Address address) {
 		State state=getState();
-		
-		Address address;
-		if (computedAddress) {
-			Hash hash=Hash.compute(code);
-			address=Address.fromHash(hash);
-		} else {
-			address=Address.fromHash(state.getHash());
-		}
-		
 		// deploy initial contract state
 		State stateSetup=state.tryAddActor(address, Core.ENVIRONMENT);
-		if (stateSetup==null) {
-			// if computed, just return the existing address
-			if (computedAddress) return (Context<R>) withResult(Juice.DEPLOY_CONTRACT,address);
-			// this should never happen?
-			return withError(ErrorType.STATE,"Contract address conflict: "+address);
-		}
+		if (stateSetup==null) return withError(ErrorType.STATE,"Contract deployment address conflict: "+address);
 		
 		final Context<R> exContext=Context.create(stateSetup, juice, Maps.empty(), null, depth+1, getOrigin(),getAddress(), address);
 		final Context<R> rctx=exContext.eval(code);
@@ -1156,6 +1177,7 @@ public class Context<T> implements IObject {
 		
 		return (Context<R>) result.withResult(Juice.DEPLOY_CONTRACT, address);
 	}
+
 
 	@SuppressWarnings("unchecked")
 	public <R> Context<R> withError(ErrorType error) {
