@@ -47,6 +47,10 @@ public class Symbol extends ASymbolic {
 		return create(Symbol.create(ns),name);
 	}
 	
+	/**
+	 * Returns the namespace alias component of a Symbol, or null if not present
+	 * @return Namespace Symbol or null
+	 */
 	public Symbol getNamespace() {
 		return namespace;
 	}

@@ -4,9 +4,11 @@ import static convex.core.lang.TestState.*;
 import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.AMap;
 import convex.core.data.Address;
 import convex.core.data.Maps;
 import convex.core.data.Symbol;
@@ -76,6 +78,15 @@ public class AliasTest {
 		
 		// check for bad keyword
 		assertAssertError(step(ctx,"(import lib :blazzzz mylib)"));
+	}
+	
+	@Test void testBadSelfDefualtAlias() {
+		// should be possible to create a defualt alias to self
+		Context<?> ctx = step("(def *aliases* (assoc *aliases* nil *address*))");
+		assertTrue(ctx.getResult() instanceof AMap);
+		
+		// we don't want infinite recursion to happen here!
+		assertUndeclaredError(step(ctx,"foo"));
 	}
 	
 	@Test
