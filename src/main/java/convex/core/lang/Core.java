@@ -543,7 +543,7 @@ public class Core {
 			if (sym == null) return context.withCastError(args[0], Symbol.class);
 
 			if (sym.isQualified()) {
-				return context.withArgumentError("Cannot set! with qualified symbol: " + sym);
+				return context.withArgumentError("Cannot set local binding with qualified symbol: " + sym);
 			}
 			
 			Object value=args[1];
@@ -1478,13 +1478,13 @@ public class Core {
 			int alen = args.length;
 			if (alen > 2) return context.withArityError(maxArityMessage(2, alen));
 
-			Long eval = (alen > 0) ? RT.toLong(args[0]) : ErrorType.ASSERT.code();
+			Long eval = (alen == 2) ? RT.toLong(args[0]) : ErrorType.ASSERT.code();
 			if (eval == null) return context.withCastError(args[0], Long.class);
 
 			ErrorType type = ErrorType.decode(eval);
 			if (type == null) return context.withArgumentError("Unknown error type in fail: "+eval);
 
-			Object message = (alen == 2) ? args[1] : null;
+			Object message = (alen >0) ? args[alen-1] : null;
 			ErrorValue error = ErrorValue.create(type, message);
 
 			return context.withException(error);

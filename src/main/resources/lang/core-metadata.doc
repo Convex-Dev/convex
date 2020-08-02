@@ -335,12 +335,12 @@
   
   fail
  	{
-	 :doc {:description "Causes execution to fail at the current position. Error type defaults to ASSERT if not specified. Error message defaults to nil if not specified."
+	 :doc {:description "Causes execution to fail at the current position. Error type defaults to ASSERT if not specified. Error message defaults to nil if not specified. The message may be any value, but the use of short descriptive strings is recommended."
          :examples [{:code "(export some-safe-function)"}]
          :type :function
          :signature [{:params []}
-                     {:params [error-type]
-                      :params [error-type message]}]}
+                     {:params [message]}
+                     {:params [error-type message]}]}
 	}
   
   fetch

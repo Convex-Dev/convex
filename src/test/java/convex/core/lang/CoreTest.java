@@ -7,13 +7,16 @@ import static convex.core.lang.TestState.evalL;
 import static convex.core.lang.TestState.step;
 import static convex.test.Assertions.assertArgumentError;
 import static convex.test.Assertions.assertArityError;
+import static convex.test.Assertions.assertAssertError;
 import static convex.test.Assertions.assertBoundsError;
-import static convex.test.Assertions.*;
+import static convex.test.Assertions.assertCastError;
 import static convex.test.Assertions.assertCompileError;
 import static convex.test.Assertions.assertDepthError;
 import static convex.test.Assertions.assertFundsError;
 import static convex.test.Assertions.assertJuiceError;
+import static convex.test.Assertions.assertNobodyError;
 import static convex.test.Assertions.assertStateError;
+import static convex.test.Assertions.assertUndeclaredError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -26,6 +29,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Block;
 import convex.core.BlockResult;
+import convex.core.ErrorCodes;
 import convex.core.Init;
 import convex.core.State;
 import convex.core.crypto.Hash;
@@ -820,6 +824,20 @@ public class CoreTest {
 
 		assertArityError(step("(halt 1 2)"));
 	}
+	
+	@Test
+	public void testFail() {
+		assertAssertError(step("(fail)"));
+		assertAssertError(step("(fail \"Foo\")"));
+		assertAssertError(step("(fail 80 \"Foo\")"));
+		assertAssertError(step("(fail :foo)"));
+		
+		assertEquals(ErrorCodes.ASSERT,step("(fail)").getErrorType().getErrorCode());
+		
+		// Fail on unrecognised error code
+		// TODO: should maybe be more permissive?
+		assertArgumentError(step("(fail -1 :foo-message)"));
+	}
 
 	@Test
 	public void testRollback() {
@@ -1506,11 +1524,22 @@ public class CoreTest {
 	
 	@Test
 	public void testSetBang() {
+		// set returns its value
 		assertEquals(13L,evalL("(set! a 13)"));
+		
+		// set! works without a binding expression
 		assertEquals(13L,evalL("(do (set! a 13) a)"));
+		
+		// set! works in a function body
+		assertEquals(35L,evalL("(let [a 13 f (fn [x] (set! a 25) (+ x a))] (f 10))"));
+		
+		// set! only works in the scope of the immediate surrounding binding expression
 		assertEquals(10L,evalL("(let [a 10] (let [] (set! a 13)) a)"));
+		
+		// set! binding does not escape current form, still undeclared in enclosing local context
 		assertUndeclaredError(step("(do (let [a 10] (set! a 20)) a)"));
 		
+		// set! fails if trying to set a qualified argument name
 		assertArgumentError(step("(set! a/b 10)"));
 	}
 
