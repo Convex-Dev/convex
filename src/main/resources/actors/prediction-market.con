@@ -1,5 +1,4 @@
-(fn [oracle oracle-key outcomes]
-  '(let [oracle ~oracle oracle-key ~oracle-key outcomes ~outcomes]
+(defactor prediction-market [oracle oracle-key outcomes]
   
 	  ;; store oracle address and key in environment
 	  (def oracle (address oracle))
@@ -89,4 +88,4 @@
 	    
 	  (export get-outcomes bond stake price finalised? payout stakes totals)
 	  
-	  ))
+	  )
