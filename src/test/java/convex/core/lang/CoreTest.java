@@ -864,6 +864,9 @@ public class CoreTest {
 		assertEquals("count", eval("(name 'count)"));
 		assertEquals("foo", eval("(name \"foo\")"));
 		
+		// should extract symbol name, exluding namespace alias
+		assertEquals("bar", eval("(name 'foo/bar)"));
+		
 		// longer strings OK for name
 		assertEquals("duicgidvgefiucefiuvfeiuvefiuvgifegvfuievgiuefgviuefgviufegvieufgviuefvgevevgi", eval("(name \"duicgidvgefiucefiuvfeiuvefiuvgifegvfuievgiuefgviuefgviufegvieufgviuefvgevevgi\")"));
 

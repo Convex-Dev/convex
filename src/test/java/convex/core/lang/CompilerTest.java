@@ -165,6 +165,16 @@ public class CompilerTest {
 	@Test public void testDef() {
 		assertEquals(2L,(long)eval("(do (def a 2) (def b 3) a)"));
 		assertEquals(7L,(long)eval("(do (def a 2) (def a 7) a)"));
+		
+		// aliased symbols should get own entry
+		assertEquals(6L,(step("(do (def bar 6) (def foo/bar 3) bar)").getResult()));
+		assertEquals(3L,(step("(do (def foo/bar 3) (def bar 6) foo/bar)").getResult()));
+		
+		
+		// TODO: check if these are most logical error types?
+		assertCompileError(step("(def :a 1)"));
+		assertCompileError(step("(def a)"));
+		assertCompileError(step("(def a 2 3)"));
 	}
 	
 	@Test public void testDefMetadataOnLiteral() {

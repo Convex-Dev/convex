@@ -387,22 +387,22 @@ public class Context<T> implements IObject {
 		// Get environment for Address, or default to initial environment
 		AHashMap<Symbol, Syntax> env = (as==null)?Core.ENVIRONMENT:as.getEnvironment();
 		
-		MapEntry<Symbol,Syntax> result;
-		if (sym.isQualified()) {
-			Symbol alias=sym.getNamespace();
-			AccountStatus aliasAccount=getAliasedAccount(env,alias);
-			if (aliasAccount==null) return null;
-			result = lookupDynamicEntry(aliasAccount,sym.getUnqualifiedName());
-		} else {
-			result =env.getEntry(sym);
-			if (result==null) {
-				// Need to lookup in default alias
+		MapEntry<Symbol,Syntax> result=env.getEntry(sym);
+		
+		if (result==null) {
+			if (sym.isQualified()) {
+				Symbol alias=sym.getNamespace();
+				AccountStatus aliasAccount=getAliasedAccount(env,alias);
+				if (aliasAccount==null) return null;
+				result = lookupDynamicEntry(aliasAccount,sym.getUnqualifiedName());
+			} else {
+				// Need to lookup via default alias
 				AccountStatus baseAccount=getAliasedAccount(env,null);
 				if (baseAccount!=null) {
 					result = lookupDynamicEntry(baseAccount,sym);
 				}
-			}
-		} 
+			} 
+		}
 		return result;
 	}
 	
