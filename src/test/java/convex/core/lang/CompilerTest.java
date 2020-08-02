@@ -313,9 +313,23 @@ public class CompilerTest {
 		assertEquals(Vectors.of(1L,3L),eval("(let [[a b] [3 1]] [b a])"));
 		assertEquals(Vectors.of(2L,3L),eval("(let [[a & more] [1 2 3]] more)"));
 		
+		// results of bindings should be available for subsequent bindings
 		assertEquals(Vectors.of(1L,2L,3L),eval("(let [a [1 2] b (conj a 3)] b)"));
 
+		// Result of binding _ is ignored, though side effects must still happen
 		assertUndeclaredError(step("(let [_ 1] _)"));
+		assertEquals(Vectors.of(1L,2L),eval("(let [_ (def v [1 2])] v)"));
+		
+		// shouldn't be legal to let-bind qualified symbols
+		assertCompileError(step("(let [foo/bar 1] _)"));
+		
+		// ampersand edge cases
+		assertEquals(Vectors.of(1L,Vectors.of(2L),3L),eval("(let [[a & b c] [1 2 3]] [a b c])"));
+		
+		// bad uses of ampersand
+		assertCompileError(step("(let [[a &] [1 2 3]] a)")); // ampersand at end
+		assertCompileError(step("(let [[a & b & c] [1 2 3]] [a b c])")); // too many Cooks!
+
 	}
 	
 	@Test

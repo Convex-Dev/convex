@@ -702,32 +702,46 @@ public class Context<T> implements IObject {
 		if (bindingForm instanceof Syntax) bindingForm=((Syntax)bindingForm).getValue();
 		
 		if (bindingForm instanceof Symbol) {
-			if (bindingForm.equals(Symbols.UNDERSCORE)) return this;
-			return withLocalBindings( localBindings.assoc((Symbol) bindingForm,args));
+			Symbol sym=(Symbol)bindingForm;
+			if (sym.equals(Symbols.UNDERSCORE)) return this;
+			if (sym.isQualified()) return ctx.withCompileError("Can't create local binding for qualified symbol: "+sym);
+			return withLocalBindings( localBindings.assoc(sym,args));
 		} else if (bindingForm instanceof AVector) {
 			AVector<Syntax> v=(AVector<Syntax>)bindingForm;
-			long n=v.count(); // count of binding form symbols (may include & etc.)
+			long bindCount=v.count(); // count of binding form symbols (may include & etc.)
 			long argCount=RT.count(args);
-			for (long i=0; i<n; i++) {
+						
+			boolean foundAmpersand=false;
+			for (long i=0; i<bindCount; i++) {
 				// get datum for syntax element in binding form
 				Object bf=v.get(i).getValue(); 
 				
 				if (Symbols.AMPERSAND.equals(bf)) {
-					long nLeft=n-i; // should be two if usual usage [... & more]
-					if (nLeft==1) return ctx.withCompileError("Can't bind ampersand at end of binding form");
+					if (foundAmpersand) return ctx.withCompileError("Can't bind two or more ampersands n single binding vector");
 					
-					AVector<Object> rest=RT.vec(args).slice(i,argCount - i); // arg vector to end
+					long nLeft=bindCount-i-2; // number of following bindings should be zero in usual usage [... & more]
+					if (nLeft<0) return ctx.withCompileError("Can't bind ampersand at end of binding form");
+					
+					// bind variadic form at position i+1 to all args except nLeft
+					AVector<Object> rest=RT.vec(args).slice(i,(argCount - i)-nLeft);
 					ctx= ctx.updateBindings(v.get(i+1), rest);
-					return ctx;
+					
+					// mark ampersand as found, and skip to next binding form (i.e. past the variadic symbol following &)
+					foundAmpersand=true;
+					i++;
 				} else {
-					// (i==argcount) possible with an ampersand!
-					if (i>=argCount) return ctx.withArityError("Insufficient args: "+argCount);
+					// just a regular binding
+					long argIndex=foundAmpersand?(argCount-(bindCount-i)):i;
+					if (argIndex>=argCount) return ctx.withArityError("Insufficient arguments ("+argCount+") for binding form: "+bindingForm);
+					ctx=ctx.updateBindings(bf,RT.nth(args, argIndex));
 				}
-				ctx=ctx.updateBindings(bf,RT.nth(args, i));
 			}
+			
 			// at this point, should have consumed all bindings
-			if (n!=argCount) {
-				return ctx.withArityError("Expected "+n+" arguments but got "+argCount+" for binding form: "+bindingForm);
+			if (!foundAmpersand) {
+				if (bindCount!=argCount) {
+					return ctx.withArityError("Expected "+bindCount+" arguments but got "+argCount+" for binding form: "+bindingForm);
+				}
 			}
 		} else {
 			throw new TODOException("Don't understand binding form: "+bindingForm);
