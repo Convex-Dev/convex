@@ -15,7 +15,6 @@ import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
 import convex.net.Connection;
-import convex.net.Message;
 import convex.net.ResultConsumer;
 
 /**
@@ -56,8 +55,9 @@ public class API {
 			log.info("RESULT RECEIVED: " + m);
 		}
 
-		protected void handleError(long id, Message m) {
-			log.info("ERROR RECEIVED: " + m.getErrorCode() + " : " + m.getPayload());
+		@Override
+		protected void handleError(long id, Object code, Object msg) {
+			log.info("ERROR RECEIVED: " + code + " : " + msg);
 		}
 
 	};

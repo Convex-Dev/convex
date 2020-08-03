@@ -15,7 +15,6 @@ import convex.core.Init;
 import convex.core.State;
 import convex.core.data.Address;
 import convex.core.data.MapEntry;
-import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
@@ -26,7 +25,6 @@ import convex.gui.manager.PeerManager;
 import convex.gui.manager.Toolkit;
 import convex.gui.manager.mainpanels.WalletPanel;
 import convex.gui.manager.models.OracleTableModel;
-import convex.net.Message;
 import convex.net.ResultConsumer;
 
 @SuppressWarnings("serial")
@@ -162,21 +160,16 @@ public class OraclePanel extends JPanel {
 		}
 
 		@Override
-		protected void handleError(Message m) {
-			showError(m);
+		protected void handleError(long id, Object code, Object msg) {
+			showError(code,msg);
 		}
+
 	};
 
 	private final ResultConsumer receiveAction = new DefaultReceiveAction(scrollPane);
 
-	private void showError(Message m) {
-		Object em;
-		try {
-			em = RT.nth(m.getPayload(), 1);
-		} catch (Exception e) {
-			em = e.getMessage();
-		}
-		String resultString = "Error executing transaction: " + em;
+	private void showError(Object code, Object msg) {
+		String resultString = "Error executing transaction: " + code + " "+msg;
 		log.info(resultString);
 		Toast.display(scrollPane, resultString, Toast.FAIL);
 	}

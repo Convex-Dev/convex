@@ -11,7 +11,6 @@ import convex.core.crypto.Hash;
 import convex.core.data.AVector;
 import convex.core.data.Ref;
 import convex.core.exceptions.MissingDataException;
-import convex.core.lang.RT;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
 
@@ -63,9 +62,9 @@ public abstract class ResultConsumer implements Consumer<Message> {
 				// we now have the full result, so notify those interested
 				Object rv = v.get(1);
 				long id = m.getID();
-				boolean err = RT.bool(v.get(2));
-				if (err) {
-					handleError(id, m);
+				Object err = v.get(2);
+				if (err!=null) {
+					handleError(id, err, rv);
 				} else {
 					handleResult(id, rv);
 				}
@@ -154,21 +153,12 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	 * 
 	 * @param m
 	 */
-	protected void handleError(long id, Message m) {
-		handleError(m);
+	protected void handleError(long id, Object code, Object errorMessage) {
+		handleError(code,errorMessage);
 	}
-
-	/**
-	 * Method called when an error result is received.
-	 * 
-	 * Default behaviour is simply to log the error.
-	 * 
-	 * If this method throws a MissingDataException, missing data is requested and
-	 * the result handling may be retried later.
-	 * 
-	 * @param m
-	 */
-	protected void handleError(Message m) {
-		log.log(LEVEL_ERROR,"Error received: " + m.getErrorCode() + " : " + m.getPayload());
+	
+	
+	protected void handleError(Object code, Object errorMessage) {
+		log.log(LEVEL_ERROR,"Error received: " + code + " : " + errorMessage);
 	}
 }

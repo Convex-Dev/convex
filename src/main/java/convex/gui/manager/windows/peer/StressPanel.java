@@ -32,7 +32,6 @@ import convex.gui.components.PeerView;
 import convex.gui.manager.PeerManager;
 import convex.gui.manager.Toolkit;
 import convex.net.Connection;
-import convex.net.Message;
 import convex.net.ResultConsumer;
 
 @SuppressWarnings("serial")
@@ -114,7 +113,7 @@ public class StressPanel extends JPanel {
 		}
 
 		@Override
-		protected void handleError(Message m) {
+		protected void handleError(long id, Object code, Object msg) {
 			errors++;
 		}
 		

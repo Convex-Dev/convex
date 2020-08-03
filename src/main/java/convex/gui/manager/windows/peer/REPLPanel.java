@@ -21,7 +21,6 @@ import javax.swing.event.DocumentListener;
 import javax.swing.text.DefaultCaret;
 
 import convex.core.crypto.WalletEntry;
-import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.lang.Reader;
@@ -33,8 +32,8 @@ import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.PeerView;
 import convex.gui.manager.PeerManager;
-import convex.net.Message;
 import convex.net.Connection;
+import convex.net.Message;
 import convex.net.ResultConsumer;
 
 @SuppressWarnings("serial")
@@ -69,12 +68,10 @@ public class REPLPanel extends JPanel {
 			outputArea.append(" => " + m + "\n");
 			outputArea.setCaretPosition(outputArea.getDocument().getLength());
 		}
-
+		
 		@Override
-		protected void handleError(Message m) {
-			AVector<Object> v = m.getPayload();
-			Object rv = v.get(1);
-			outputArea.append(" Exception: " + rv + "\n");
+		protected void handleError(long id, Object code, Object msg) {
+			outputArea.append(" Exception: " + code + " "+ msg);
 		}
 	};
 

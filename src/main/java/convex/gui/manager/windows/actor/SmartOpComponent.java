@@ -39,7 +39,6 @@ import convex.gui.components.CodeLabel;
 import convex.gui.components.Toast;
 import convex.gui.manager.PeerManager;
 import convex.gui.manager.Toolkit;
-import convex.net.Message;
 import convex.net.Connection;
 import convex.net.ResultConsumer;
 
@@ -115,8 +114,8 @@ public class SmartOpComponent extends BaseListComponent {
 		}
 
 		@Override
-		protected void handleError(Message m) {
-			showError(m);
+		protected void handleError(long id, Object code, Object msg) {
+			showError(code,msg);
 		}
 	};
 
@@ -181,14 +180,8 @@ public class SmartOpComponent extends BaseListComponent {
 
 	}
 
-	private void showError(Message m) {
-		Object em;
-		try {
-			em = RT.nth(m.getPayload(), 1);
-		} catch (Exception e) {
-			em = e.getMessage();
-		}
-		String resultString = "Error executing transaction: " + em;
+	private void showError(Object code, Object msg) {
+		String resultString = "Error executing transaction: " + code + " "+msg;
 		log.info(resultString);
 		Toast.display(parent, resultString, Toast.FAIL);
 	}
