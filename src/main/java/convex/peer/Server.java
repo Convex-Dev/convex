@@ -470,8 +470,8 @@ public class Server implements Closeable {
 			if (result.isExceptional()) {
 				AExceptional err = result.getExceptional();
 				Object code=err.getCode();
-				
-				pc.sendResult(id, err.toString(), code);
+				Object message=(err instanceof ErrorValue)?((ErrorValue)err).getMessage():err.toString();
+				pc.sendResult(id, message, code);
 			} else {
 				pc.sendResult(id, result.getResult());
 			}
@@ -607,7 +607,7 @@ public class Server implements Closeable {
 						Object result = br.getResult(j);
 						pc.sendResult(m.getID(), result);
 					} else {
-						pc.sendResult(m.getID(), err.toString(), err.getCode());
+						pc.sendResult(m.getID(), err.getMessage(), err.getCode());
 					}
 				} catch (Exception e) {
 					log.warning("Error reporting result:"+e.getMessage());
