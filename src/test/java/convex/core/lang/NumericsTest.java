@@ -1,7 +1,6 @@
 package convex.core.lang;
 
-import static convex.core.lang.TestState.eval;
-import static convex.core.lang.TestState.step;
+import static convex.core.lang.TestState.*;
 import static convex.test.Assertions.assertArityError;
 import static convex.test.Assertions.assertCastError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -196,6 +195,18 @@ public class NumericsTest {
 		assertEquals(2L, (long) eval("(apply inc [1])"), 0);
 		assertEquals(1L, (long) eval("(apply * [])"), 0);
 		assertEquals(0L, (long) eval("(apply + nil)"), 0);
+	}
+	
+	@Test
+	public void testHexCasts() {
+		assertEquals(3L, evalL("(+ (long 0x01) (int 0x02))"));
+		
+		// check we are treating blobs as unsigned values
+		assertEquals(510L, evalL("(+ (long 0xFF) (long 0xFF))"));
+		assertEquals(-2L, evalL("(+ (long 0xFFFFFFFFFFFFFFFF) (long 0xFFFFFFFFFFFFFFFF))"));
+		
+		// take low order bytes of big long
+		assertEquals(-1L, evalL("(long 0x0000000000000000FFFFFFFFFFFFFFFF)"));
 	}
 
 	@Test
