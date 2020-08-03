@@ -838,6 +838,9 @@ public class CoreTest {
 			assertAssertError(step(ctx,"(check (= (+ 2 2) 5) (fail \"Laws of arithmetic violated\"))"));
 		}
 		
+		// cannot have null error code
+		assertArgumentError(step("(fail nil \"Hello\")"));
+		
 		assertArityError(step("(fail 1 \"Message\" 3)"));
 	}
 

@@ -1472,13 +1472,13 @@ public class Core {
 	});
 
 	public static final CoreFn<Boolean> FAIL = reg(new CoreFn<>(Symbols.FAIL) {
-		@SuppressWarnings("unused")
 		@Override
 		public <I> Context<Boolean> invoke(Context<I> context, Object[] args) {
 			int alen = args.length;
 			if (alen > 2) return context.withArityError(maxArityMessage(2, alen));
 
 			Object code = (alen == 2) ? args[0] : ErrorCodes.ASSERT;
+			if (code==null) return context.withError(ErrorCodes.ARGUMENT,"Error code cannot be nil");
 
 			Object message = (alen >0) ? args[alen-1] : null;
 			ErrorValue error = ErrorValue.create(code, message);

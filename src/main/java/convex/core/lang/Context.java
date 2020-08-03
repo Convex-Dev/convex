@@ -567,7 +567,7 @@ public class Context<T> implements IObject {
 	 */
 	@SuppressWarnings("unchecked")
 	public <R> Context<R> withJuiceError() {
-		AExceptional err=ErrorValue.create(ErrorCodes.JUICE);
+		AExceptional err=ErrorValue.create(ErrorCodes.JUICE, "Out of juice!");
 		return (Context<R>) new Context<>(chainState,0L,localBindings,err,depth,true);
 	}
 	

@@ -13,17 +13,18 @@ import org.parboiled.common.Utils;
  */
 public class ErrorValue extends AExceptional {
 
-	private final Object value;
+	private final Object code;
 	private final Object message;
 	private final ArrayList<Object> trace=new ArrayList<>();
 
-	public ErrorValue(Object value, Object message) {
-		this.value=value;
+	private ErrorValue(Object code, Object message) {
+		if (code==null) throw new IllegalArgumentException("Error code must not be null");
+		this.code=code;
 		this.message=message;
 	}
 
-	public static ErrorValue create(Object value) {
-		return new ErrorValue(value,null);
+	public static ErrorValue create(Object code) {
+		return new ErrorValue(code,null);
 	}
 	
 	/**
@@ -32,8 +33,8 @@ public class ErrorValue extends AExceptional {
 	 * @param message Off-chain message
 	 * @return New ErrorValue instance
 	 */
-	public static ErrorValue create(Object value, Object message) {
-		return new ErrorValue(value,message);
+	public static ErrorValue create(Object code, Object message) {
+		return new ErrorValue(code,message);
 	}
 
 	/**
@@ -43,7 +44,7 @@ public class ErrorValue extends AExceptional {
 	 * @return Error code value
 	 */
 	public Object getCode() {
-		return value;
+		return code;
 	} 
 	
 	public void addTrace(Object a) {
@@ -63,7 +64,7 @@ public class ErrorValue extends AExceptional {
 	@Override 
 	public String toString() {
 		StringBuilder sb=new StringBuilder();
-		sb.append("ErrorValue["+value+"]"+((message==null)?"":" : "+Utils.toString(message)));
+		sb.append("ErrorValue["+code+"]"+((message==null)?"":" : "+Utils.toString(message)));
 		for (Object o:trace) {
 			sb.append("\n");
 			sb.append(o.toString());
