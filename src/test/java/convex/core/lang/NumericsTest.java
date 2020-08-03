@@ -201,6 +201,9 @@ public class NumericsTest {
 	public void testHexCasts() {
 		assertEquals(3L, evalL("(+ (long 0x01) (int 0x02))"));
 		
+		// byte cast wraps over
+		assertEquals(-1, (byte)eval("(byte 0xFF)"));
+		
 		// check we are treating blobs as unsigned values
 		assertEquals(510L, evalL("(+ (long 0xFF) (long 0xFF))"));
 		assertEquals(-2L, evalL("(+ (long 0xFFFFFFFFFFFFFFFF) (long 0xFFFFFFFFFFFFFFFF))"));
