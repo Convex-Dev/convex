@@ -1,4 +1,4 @@
-(do
+(actor []
   ;; Fungible library
   ;;
   ;; deploy with: (deploy-once fungible-code)
@@ -17,7 +17,7 @@
          :signature [{:params [token holder]}]}
 	  }
     [token holder]
-    (call token (fungible/balance holder)))
+    (call token (token/balance holder)))
   
   
   
