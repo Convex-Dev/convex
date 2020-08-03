@@ -120,27 +120,28 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	}
 
 	/**
-	 * Method called when a non-error result is received.
+	 * Method called when a normal (non-error) result is received.
 	 * 
 	 * If this method throws a MissingDataException, missing data is requested and
 	 * the result handling may be retried later.
 	 * 
-	 * @param payload
+	 * @param id The ID of the original message to which this result corresponds
+	 * @param value The result value
 	 */
-	protected void handleResult(long id, Object payload) {
-		handleResult(payload);
+	protected void handleResult(long id, Object value) {
+		handleResult(value);
 	}
 
 	/**
-	 * Method called when a non-error result is received.
+	 * Method called when a normal (non-error) result is received.
 	 * 
 	 * If this method throws a MissingDataException, missing data is requested and
 	 * the result handling may be retried later.
 	 * 
-	 * @param payload
+	 * @param value The result value
 	 */
-	protected void handleResult(Object payload) {
-		log.log(LEVEL_RESULT,"RESULT RECEIVED: " + payload);
+	protected void handleResult(Object value) {
+		log.log(LEVEL_RESULT,"RESULT RECEIVED: " + value);
 	}
 
 	/**
@@ -151,13 +152,25 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	 * If this method throws a MissingDataException, missing data is requested and
 	 * the result handling may be retried later.
 	 * 
-	 * @param m
+	 * @param id The ID of the original message to which this result corresponds
+	 * @param code The error code received. May not be null, and is usually a Keyword
+	 * @param errorMessage The error message associated with the result (may be null)
 	 */
 	protected void handleError(long id, Object code, Object errorMessage) {
 		handleError(code,errorMessage);
 	}
 	
-	
+	/**
+	 * Method called when an error result is received.
+	 * 
+	 * Default behaviour is simply to log the error.
+	 * 
+	 * If this method throws a MissingDataException, missing data is requested and
+	 * the result handling may be retried later.
+	 * 
+	 * @param code The error code received. May not be null, and is usually a Keyword
+	 * @param errorMessage The error message associated with the result (may be null)
+	 */	
 	protected void handleError(Object code, Object errorMessage) {
 		log.log(LEVEL_ERROR,"Error received: " + code + " : " + errorMessage);
 	}
