@@ -17,7 +17,7 @@
          :signature [{:params [token holder]}]}
 	  }
     [token holder]
-    (call token (token/balance holder)))
+    (call token (balance holder)))
   
   
   

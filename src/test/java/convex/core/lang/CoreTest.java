@@ -29,7 +29,6 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Block;
 import convex.core.BlockResult;
-import convex.core.ErrorCodes;
 import convex.core.Init;
 import convex.core.State;
 import convex.core.crypto.Hash;
@@ -829,14 +828,17 @@ public class CoreTest {
 	public void testFail() {
 		assertAssertError(step("(fail)"));
 		assertAssertError(step("(fail \"Foo\")"));
-		assertAssertError(step("(fail 80 \"Foo\")"));
+		assertAssertError(step("(fail :ASSERT \"Foo\")"));
 		assertAssertError(step("(fail :foo)"));
 		
-		assertEquals(ErrorCodes.ASSERT,step("(fail)").getErrorType().getErrorCode());
+		assertAssertError(step("(fail)"));
 		
-		// Fail on unrecognised error code
-		// TODO: should maybe be more permissive?
-		assertArgumentError(step("(fail -1 :foo-message)"));
+		{ // need to double-step this: can't define macro and use it in the same expression?
+			Context<?> ctx=step("(defmacro check [condition reaction] '(if (not ~condition) ~reaction))");
+			assertAssertError(step(ctx,"(check (= (+ 2 2) 5) (fail \"Laws of arithmetic violated\"))"));
+		}
+		
+		assertArityError(step("(fail 1 \"Message\" 3)"));
 	}
 
 	@Test

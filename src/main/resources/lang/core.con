@@ -155,7 +155,7 @@
     }
   [addr & more] 
   (let [more (unsyntax more)]
-	  (if (empty? more) (fail 64 "Insufficient arguments to call")) ;; TODO remove magic number
+	  (if (empty? more) (fail :ARITY "Insufficient arguments to call")) ;; TODO remove magic number
 	  (let [n (count more)
 	        fnargs (last more)
 	        fnlist (cons (list 'quote (symbol (first fnargs))) (next fnargs))]

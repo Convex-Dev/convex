@@ -2,7 +2,7 @@ package convex.core.lang;
 
 import java.util.Map;
 
-import convex.core.ErrorType;
+import convex.core.ErrorCodes;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
@@ -451,7 +451,7 @@ public class Compiler {
 		if (n < 2) return context.withArityError("fn requires parameter vector and body in form: " + list);
 
 		Object paramsObject = list.get(1).getValue();
-		if (!(paramsObject instanceof AVector)) return context.withError(ErrorType.CAST,
+		if (!(paramsObject instanceof AVector)) return context.withError(ErrorCodes.CAST,
 				"fn requires a vector of parameters as first argument but got form: " + list);
 		context = context.compileAll(list.subVector(2, n - 2));
 		if (context.isExceptional()) return (Context<T>) context;

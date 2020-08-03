@@ -1,5 +1,6 @@
 package convex.core.lang.impl;
 
+import convex.core.ErrorCodes;
 import convex.core.data.ASequence;
 import convex.core.lang.RT;
 
@@ -43,5 +44,10 @@ public class RecurValue extends AExceptional {
 	public String toString() {
 		ASequence<?> seq = RT.sequence(values); // should always convert OK
 		return "RecurValue: " + seq;
+	}
+
+	@Override
+	public Object getCode() {
+		return ErrorCodes.RECUR;
 	}
 }

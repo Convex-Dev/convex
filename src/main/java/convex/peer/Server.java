@@ -17,7 +17,6 @@ import java.util.logging.Logger;
 import convex.core.Belief;
 import convex.core.Block;
 import convex.core.BlockResult;
-import convex.core.ErrorCodes;
 import convex.core.Init;
 import convex.core.Peer;
 import convex.core.crypto.AKeyPair;
@@ -470,7 +469,9 @@ public class Server implements Closeable {
 			Context<?> result = peer.executeQuery(form, address);
 			if (result.isExceptional()) {
 				AExceptional err = result.getExceptional();
-				pc.sendResult(id, err.toString(), ErrorCodes.extract(err));
+				Object code=err.getCode();
+				
+				pc.sendResult(id, err.toString(), code);
 			} else {
 				pc.sendResult(id, result.getResult());
 			}
@@ -606,7 +607,7 @@ public class Server implements Closeable {
 						Object result = br.getResult(j);
 						pc.sendResult(m.getID(), result);
 					} else {
-						pc.sendResult(m.getID(), err.toString(), err.code());
+						pc.sendResult(m.getID(), err.toString(), err.getCode());
 					}
 				} catch (Exception e) {
 					log.warning("Error reporting result:"+e.getMessage());

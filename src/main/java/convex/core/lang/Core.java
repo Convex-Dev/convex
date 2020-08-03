@@ -7,7 +7,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 
-import convex.core.ErrorType;
+import convex.core.ErrorCodes;
 import convex.core.State;
 import convex.core.crypto.Hash;
 import convex.core.data.ABlob;
@@ -280,12 +280,12 @@ public class Core {
 
 			// get timestamp target
 			Object tso = args[0];
-			if (!(tso instanceof Long)) return context.withError(ErrorType.CAST);
+			if (!(tso instanceof Long)) return context.withError(ErrorCodes.CAST);
 			long sts = (long) tso;
 
 			// get operation
 			Object opo = args[1];
-			if (!(opo instanceof AOp)) return context.withError(ErrorType.CAST);
+			if (!(opo instanceof AOp)) return context.withError(ErrorCodes.CAST);
 			AOp<?> op = (AOp<?>) opo;
 
 			return context.schedule(sts, op);
@@ -423,10 +423,10 @@ public class Core {
 			AList<Object> form = formSyntax.getValue();
 			
 			int n = form.size();
-			if (n < 1) return context.withError(ErrorType.COMPILE, "export form not valid?: " + form);
+			if (n < 1) return context.withError(ErrorCodes.COMPILE, "export form not valid?: " + form);
 			for (int i = 1; i < n; i++) {
 				Object so = Syntax.unwrap(form.get(i));
-				if (!(so instanceof Symbol)) return context.withError(ErrorType.COMPILE,
+				if (!(so instanceof Symbol)) return context.withError(ErrorCodes.COMPILE,
 						"export requires a list of symbols but got: " + Utils.getClass(so));
 			}
 
@@ -797,7 +797,7 @@ public class Core {
 			if (address == null) return context.withCastError(args[0], Address.class);
 			
 			AccountStatus as=context.getAccountStatus(address);
-			if (as==null) return context.withError(ErrorType.NOBODY,"Account with holdings does not exist.");
+			if (as==null) return context.withError(ErrorCodes.NOBODY,"Account with holdings does not exist.");
 			ABlobMap<Address,Object> holdings=as.getHoldings();
 			
 			// we get the target accounts holdings for the currently executing account
@@ -1478,14 +1478,10 @@ public class Core {
 			int alen = args.length;
 			if (alen > 2) return context.withArityError(maxArityMessage(2, alen));
 
-			Long eval = (alen == 2) ? RT.toLong(args[0]) : ErrorType.ASSERT.code();
-			if (eval == null) return context.withCastError(args[0], Long.class);
-
-			ErrorType type = ErrorType.decode(eval);
-			if (type == null) return context.withArgumentError("Unknown error type in fail: "+eval);
+			Object code = (alen == 2) ? args[0] : ErrorCodes.ASSERT;
 
 			Object message = (alen >0) ? args[alen-1] : null;
-			ErrorValue error = ErrorValue.create(type, message);
+			ErrorValue error = ErrorValue.create(code, message);
 
 			return context.withException(error);
 		}

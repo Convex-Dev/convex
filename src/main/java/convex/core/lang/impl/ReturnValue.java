@@ -2,6 +2,8 @@ package convex.core.lang.impl;
 
 import org.parboiled.common.Utils;
 
+import convex.core.ErrorCodes;
+
 /**
  * Class representing a function return value
  * 
@@ -28,5 +30,10 @@ public class ReturnValue<T> extends AExceptional {
 	@Override
 	public String toString() {
 		return "ReturnValue: " + Utils.toString(value);
+	}
+
+	@Override
+	public Object getCode() {
+		return ErrorCodes.RETURN;
 	}
 }

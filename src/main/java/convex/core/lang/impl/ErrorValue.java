@@ -4,8 +4,6 @@ import java.util.ArrayList;
 
 import org.parboiled.common.Utils;
 
-import convex.core.ErrorType;
-
 /**
  * Class representing a function error value
  * 
@@ -15,16 +13,16 @@ import convex.core.ErrorType;
  */
 public class ErrorValue extends AExceptional {
 
-	private final ErrorType value;
+	private final Object value;
 	private final Object message;
 	private final ArrayList<Object> trace=new ArrayList<>();
 
-	public ErrorValue(ErrorType value, Object message) {
+	public ErrorValue(Object value, Object message) {
 		this.value=value;
 		this.message=message;
 	}
 
-	public static ErrorValue create(ErrorType value) {
+	public static ErrorValue create(Object value) {
 		return new ErrorValue(value,null);
 	}
 	
@@ -34,11 +32,17 @@ public class ErrorValue extends AExceptional {
 	 * @param message Off-chain message
 	 * @return New ErrorValue instance
 	 */
-	public static ErrorValue create(ErrorType value, Object message) {
+	public static ErrorValue create(Object value, Object message) {
 		return new ErrorValue(value,message);
 	}
 
-	public ErrorType getType() {
+	/**
+	 * Gets the Error Code for this ErrorVAlue instance. The Error Code may be any value, but
+	 * by convention (and exclusively in Convex runtime code) it is a upper-case keyword e.g. :ASSERT
+	 * 
+	 * @return Error code value
+	 */
+	public Object getCode() {
 		return value;
 	} 
 	
@@ -65,9 +69,5 @@ public class ErrorValue extends AExceptional {
 			sb.append(o.toString());
 		}
 		return sb.toString();
-	}
-
-	public byte code() {
-		return value.code();
 	}
 }

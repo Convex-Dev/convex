@@ -118,7 +118,7 @@ public class StateTransitionsTest {
 			BlockResult br = s.applyBlock(b);
 			AVector<Object> results = br.getResults();
 			assertEquals(1, results.count());
-			assertEquals(ErrorType.SEQUENCE, br.getError(0).getType());
+			assertEquals(ErrorCodes.SEQUENCE, br.getError(0).getCode());
 		}
 
 		{ // transfer amount greater than current balance
@@ -126,7 +126,7 @@ public class StateTransitionsTest {
 			SignedData<ATransaction> st = SignedData.create(KEYPAIR_A, t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
 			BlockResult br = s.applyBlock(b);
-			assertEquals(ErrorType.FUNDS, br.getError(0).getType());
+			assertEquals(ErrorCodes.FUNDS, br.getError(0).getCode());
 
 			State newState = br.getState();
 			assertEquals(Amount.MAX_AMOUNT, newState.computeTotalFunds());
@@ -136,7 +136,7 @@ public class StateTransitionsTest {
 			Transfer t1 = Transfer.create(1, ADDRESS_B, 50);
 			SignedData<ATransaction> st = SignedData.create(KEYPAIR_C, t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
-			assertEquals(ErrorType.NOBODY, s.applyBlock(b).getError(0).getType());
+			assertEquals(ErrorCodes.NOBODY, s.applyBlock(b).getError(0).getCode());
 
 		}
 

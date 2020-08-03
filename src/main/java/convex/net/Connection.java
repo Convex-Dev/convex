@@ -266,7 +266,7 @@ public class Connection {
 	 * @return True if buffered for sending successfully, false otherwise
 	 * @throws IOException
 	 */
-	public boolean sendResult(Long id, Object result, Byte errorCode) throws IOException {
+	public boolean sendResult(Long id, Object result, Object errorCode) throws IOException {
 		AVector<Object> value = Vectors.of(id, result, errorCode);
 		return sendObject(MessageType.RESULT, value);
 	}

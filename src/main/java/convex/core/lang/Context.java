@@ -3,7 +3,7 @@ package convex.core.lang;
 import java.util.concurrent.ExecutionException;
 
 import convex.core.Constants;
-import convex.core.ErrorType;
+import convex.core.ErrorCodes;
 import convex.core.Init;
 import convex.core.State;
 import convex.core.crypto.Hash;
@@ -17,6 +17,7 @@ import convex.core.data.Address;
 import convex.core.data.Amount;
 import convex.core.data.BlobMap;
 import convex.core.data.IObject;
+import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
@@ -220,14 +221,14 @@ public class Context<T> implements IObject {
 		AccountStatus as=state.getAccounts().get(actor);
 		if (as==null) {
 			// no account
-			return Context.createFake(state).withError(ErrorType.NOBODY);
+			return Context.createFake(state).withError(ErrorCodes.NOBODY);
 		}
 		
 		long juicePrice=state.getJuicePrice();
 		long reserve=juicePrice*juice;
 		if (!as.hasBalance(reserve)) {
 			// insufficient balance to fund juice supply
-			return Context.createFake(state).withError(ErrorType.FUNDS);
+			return Context.createFake(state).withError(ErrorCodes.FUNDS);
 		}
 		Amount newBalance=as.getBalance().subtract(Amount.create(reserve));
 		as=as.withBalance(newBalance);
@@ -461,7 +462,7 @@ public class Context<T> implements IObject {
 			if (sym.equals(Symbols.STAR_STATE)) return (Context<R>) withResult(getState());
 			if (sym.equals(Symbols.STAR_HOLDINGS)) return (Context<R>) withResult(getHoldings());
 		}
-		return withError(ErrorType.UNDECLARED,sym.toString());
+		return withError(ErrorCodes.UNDECLARED,sym.toString());
 	}
 
 	/**
@@ -566,7 +567,7 @@ public class Context<T> implements IObject {
 	 */
 	@SuppressWarnings("unchecked")
 	public <R> Context<R> withJuiceError() {
-		AExceptional err=ErrorValue.create(ErrorType.JUICE);
+		AExceptional err=ErrorValue.create(ErrorCodes.JUICE);
 		return (Context<R>) new Context<>(chainState,0L,localBindings,err,depth,true);
 	}
 	
@@ -946,7 +947,7 @@ public class Context<T> implements IObject {
 	@SuppressWarnings("unchecked")
 	public <R> Context<R> withDepth(int newDepth) {
 		if (newDepth==depth) return (Context<R>) this;
-		if (newDepth>MAX_DEPTH) return withError(ErrorType.DEPTH);
+		if (newDepth>MAX_DEPTH) return withError(ErrorCodes.DEPTH);
 		return new Context<R>(chainState,juice,localBindings,(R) result,newDepth,isExceptional);
 	}
 	
@@ -971,15 +972,15 @@ public class Context<T> implements IObject {
 	 * @throws ExecutionException
 	 */
 	public Context<Long> transfer(Address target, long amount) {
-		if (amount<0) return withError(ErrorType.ARGUMENT,"Can't transfer a negative amount");
-		if (amount>Amount.MAX_AMOUNT) return withError(ErrorType.ARGUMENT,"Can't transfer an amount beyong maximum limit");
+		if (amount<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative amount");
+		if (amount>Amount.MAX_AMOUNT) return withError(ErrorCodes.ARGUMENT,"Can't transfer an amount beyong maximum limit");
 		
 		BlobMap<Address,AccountStatus> accounts=getState().getAccounts();
 		
 		Address source=getAddress();
 		AccountStatus sourceAccount=accounts.get(source);
 		if (sourceAccount==null) {
-			return withError(ErrorType.STATE,"Cannot transfer from non-existent account: "+source);
+			return withError(ErrorCodes.STATE,"Cannot transfer from non-existent account: "+source);
 		}
 		
 		long currentBalance=sourceAccount.getBalance().getValue();
@@ -1019,11 +1020,11 @@ public class Context<T> implements IObject {
 	 */
 	@SuppressWarnings("unchecked")
 	public <R> Context<R> acceptFunds(long amount) {
-		if (amount<0L) return this.withError(ErrorType.ARGUMENT,"Negative accept argument");
+		if (amount<0L) return this.withError(ErrorCodes.ARGUMENT,"Negative accept argument");
 		if (amount==0L) return (Context<R>) this.withResult(Juice.ACCEPT, 0L);
 		
 		long offer=getOffer();
-		if (amount>offer) return this.withError(ErrorType.STATE,"Insufficient offered funds");
+		if (amount>offer) return this.withError(ErrorCodes.STATE,"Insufficient offered funds");
 		
 		State state=getState();
 		Address addr=getAddress();
@@ -1051,9 +1052,9 @@ public class Context<T> implements IObject {
 		State state=getState();
 		Symbol sym=RT.toSymbol(functionName);
 		AccountStatus as=state.getAccount(target);
-		if (as==null) return this.withError(ErrorType.STATE,"Actor does not exist: "+target);
+		if (as==null) return this.withError(ErrorCodes.STATE,"Actor does not exist: "+target);
 		IFn<R> fn=as.getActorFunction(sym);
-		if (fn==null) return this.withError(ErrorType.STATE,"Actor does not have exported function to call: "+sym);
+		if (fn==null) return this.withError(ErrorCodes.STATE,"Actor does not have exported function to call: "+sym);
 		
 		if (offer>0L) {
 			Address senderAddress=getAddress();
@@ -1065,7 +1066,7 @@ public class Context<T> implements IObject {
 			cas=cas.withBalance(Amount.create(balance-offer));
 			state=state.putAccount(senderAddress, cas);
 		} else if (offer<0) {
-			return this.withError(ErrorType.ARGUMENT, "Cannot make negative offer in Actor call: "+offer);
+			return this.withError(ErrorCodes.ARGUMENT, "Cannot make negative offer in Actor call: "+offer);
 		}
 		
 		// Context for execution of Actor call. Increments depth
@@ -1163,7 +1164,7 @@ public class Context<T> implements IObject {
 		State state=getState();
 		// deploy initial contract state
 		State stateSetup=state.tryAddActor(address, Core.ENVIRONMENT);
-		if (stateSetup==null) return withError(ErrorType.STATE,"Contract deployment address conflict: "+address);
+		if (stateSetup==null) return withError(ErrorCodes.STATE,"Contract deployment address conflict: "+address);
 		
 		final Context<R> exContext=Context.create(stateSetup, juice, Maps.empty(), null, depth+1, getOrigin(),getAddress(), address);
 		final Context<R> rctx=exContext.eval(code);
@@ -1180,53 +1181,53 @@ public class Context<T> implements IObject {
 
 
 	@SuppressWarnings("unchecked")
-	public <R> Context<R> withError(ErrorType error) {
+	public <R> Context<R> withError(Keyword error) {
 		return (Context<R>) withException(ErrorValue.create(error));
 	}
 	
 	@SuppressWarnings("unchecked")
-	public <R> Context<R> withError(ErrorType error,Object message) {
+	public <R> Context<R> withError(Keyword error,Object message) {
 		return (Context<R>) withException(ErrorValue.create(error,message));
 	}
 
 	public <R> Context<R> withArityError(String string) {
-		return withError(ErrorType.ARITY,string);
+		return withError(ErrorCodes.ARITY,string);
 	}
 	
 	public <R> Context<R> withCompileError(String string) {
-		return withError(ErrorType.COMPILE,string);
+		return withError(ErrorCodes.COMPILE,string);
 	}
 	
 	public Context<Object> withBoundsError(long index) {
-		return withError(ErrorType.BOUNDS,"Index: "+index);
+		return withError(ErrorCodes.BOUNDS,"Index: "+index);
 	}
 	
 	public <R> Context<R> withCastError(Object a, Class<?> klass) {
-		return withError(ErrorType.CAST,"Can't convert "+a+" to class "+klass);
+		return withError(ErrorCodes.CAST,"Can't convert "+a+" to class "+klass);
 	}
 
 	/**
-	 * Gets the error type of this context's return value
+	 * Gets the error code of this context's return value
 	 * 
 	 * @return The ErrorType of the current exceptional value, or null if there is no error.
 	 */
-	public ErrorType getErrorType() {
+	public Object getErrorCode() {
 		if (result instanceof ErrorValue) {
-			return ((ErrorValue)result).getType();
+			return ((ErrorValue)result).getCode();
 		}
 		return null;
 	}
  
 	public <R> Context<R> withAssertError(String message) {
-		return withError(ErrorType.ASSERT);
+		return withError(ErrorCodes.ASSERT,message);
 	}
 	
 	public <R> Context<R> withFundsError(String message) {
-		return withError(ErrorType.FUNDS,message);
+		return withError(ErrorCodes.FUNDS,message);
 	}
 
 	public <R> Context<R> withArgumentError(String message) {
-		return withError(ErrorType.ARGUMENT,message);
+		return withError(ErrorCodes.ARGUMENT,message);
 	}
 
 	public long getTimeStamp() {
@@ -1244,7 +1245,7 @@ public class Context<T> implements IObject {
 	public Context<Long> schedule(long time, AOp<?> op) {
 		// check vs current timestamp
 		long timestamp=getTimeStamp();
-		if (timestamp<0) return withError(ErrorType.ARGUMENT);
+		if (timestamp<0) return withError(ErrorCodes.ARGUMENT);
 		if (time<timestamp) time=timestamp;
 		
 		long juice=(time-timestamp)/Juice.SCHEDULE_MILLIS_PER_JUICE_UNIT;
@@ -1268,7 +1269,7 @@ public class Context<T> implements IObject {
 	public <R> Context<R> setStake(Address peerAddress, long newStake) {
 		State s=getState();
 		PeerStatus ps=s.getPeer(peerAddress);
-		if (ps==null) return withError(ErrorType.STATE,"Peer does not exist for Address: "+peerAddress.toChecksumHex());
+		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for Address: "+peerAddress.toChecksumHex());
 		if (newStake<0) return this.withArgumentError("Cannot set a negative stake");
 		if (newStake>Amount.MAX_AMOUNT) return this.withArgumentError("Target stake out of valid Amount range");
 		
@@ -1299,7 +1300,7 @@ public class Context<T> implements IObject {
 	 */
 	public Context<Object> setHolding(Address targetAddress, Object value) {
 		AccountStatus as=getAccountStatus(targetAddress);
-		if (as==null) return withError(ErrorType.NOBODY,"No account in which to set holding");
+		if (as==null) return withError(ErrorCodes.NOBODY,"No account in which to set holding");
 		as=as.withHolding(getAddress(), value);
 		return withAccountStatus(targetAddress,as);
 	}

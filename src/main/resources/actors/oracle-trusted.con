@@ -36,7 +36,7 @@
   ;; Returns the finalised value
   (defn provide [key value]
     (cond
-      (not (get-in full-list [key :trust *caller*])) (fail 80 "Untrusted caller") ;; Is this sensible?
+      (not (get-in full-list [key :trust *caller*])) (fail :ASSERT "Untrusted caller") ;; Is this sensible?
       (not (full-list key)) (fail 80 (str "Unknown oracle key: " key)) ;; Fail if not registered
       (contains-key? results key) (results key)
       (def results (assoc results key value))

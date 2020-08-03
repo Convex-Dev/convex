@@ -2,7 +2,7 @@ package convex.core.transactions;
 
 import java.nio.ByteBuffer;
 
-import convex.core.ErrorType;
+import convex.core.ErrorCodes;
 import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.AccountStatus;
@@ -75,14 +75,14 @@ public abstract class ATransaction extends ACell {
 	public final <T> Context<T> applyTransaction(Address origin, State state) {
 		AccountStatus account = state.getAccounts().get(origin);
 		if (account == null) {
-			return (Context<T>) Context.createFake(state).withError(ErrorType.NOBODY);
+			return (Context<T>) Context.createFake(state).withError(ErrorCodes.NOBODY);
 		}
 
 		// Pre-transaction state updates (persist even if transaction fails)
 		// update sequence
 		account = account.updateSequence(sequence);
 		if (account == null)
-			return Context.createFake(state,origin).withError(ErrorType.SEQUENCE, "Bad sequence: " + sequence);
+			return Context.createFake(state,origin).withError(ErrorCodes.SEQUENCE, "Bad sequence: " + sequence);
 
 		state = state.putAccount(origin, account);
 

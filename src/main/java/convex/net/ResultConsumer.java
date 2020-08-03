@@ -169,6 +169,6 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	 * @param m
 	 */
 	protected void handleError(Message m) {
-		log.log(LEVEL_ERROR,"Error received: " + m.getErrorType() + " : " + m.getPayload());
+		log.log(LEVEL_ERROR,"Error received: " + m.getErrorCode() + " : " + m.getPayload());
 	}
 }

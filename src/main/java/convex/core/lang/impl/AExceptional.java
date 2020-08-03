@@ -13,6 +13,12 @@ package convex.core.lang.impl;
  * "Do not fear to be eccentric in opinion, for every opinion now accepted was
  * once eccentric." ― Bertrand Russell
  */
-public class AExceptional {
+public abstract class AExceptional {
+
+	/**
+	 * Returns the Error code for this exceptional value
+	 * @return
+	 */
+	public abstract Object getCode();
 
 }

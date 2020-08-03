@@ -1,7 +1,6 @@
 package convex.net;
 
 import convex.core.Belief;
-import convex.core.ErrorType;
 import convex.core.data.AVector;
 import convex.core.data.SignedData;
 import convex.core.util.Utils;
@@ -59,9 +58,8 @@ public class Message {
 		return type;
 	}
 	
-	public ErrorType getErrorType() {
-		ErrorType et=ErrorType.decode((byte) ((AVector<?>)payload).get(2));
-		if (et==null) throw new Error("Bad error type");
+	public Object getErrorCode() {
+		Object et=((AVector<?>)payload).get(2);
 		return et;
 	}
 

@@ -57,7 +57,7 @@ public class API {
 		}
 
 		protected void handleError(long id, Message m) {
-			log.info("ERROR RECEIVED: " + m.getErrorType() + " : " + m.getPayload());
+			log.info("ERROR RECEIVED: " + m.getErrorCode() + " : " + m.getPayload());
 		}
 
 	};
