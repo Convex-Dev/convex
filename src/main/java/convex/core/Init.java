@@ -39,8 +39,11 @@ public class Init {
 	public static final Address LIVEPOOL = Address.dummy("4");
 	public static final Address ROOTFUND = Address.dummy("5");
 	
-	public static final Address CORE_ADDRESS;
+	// Built-in Actor addresses
+	public static final Address TRUST_ADDRESS=Address.dummy("a");
+	public static final Address CORE_ADDRESS=Address.dummy("c");
 	public static final Address REGISTRY_ADDRESS=Address.dummy("f");
+	
 	public static final Address ORACLE_ADDRESS;
 
 	public static final int NUM_GOVERNANCE = 5;
@@ -75,7 +78,6 @@ public class Init {
 			BlobMap<Address, AccountStatus> accts = BlobMaps.empty();
 
 			// Core library
-			CORE_ADDRESS=Core.CORE_ADDRESS;
 			accts=addCoreLibrary(accts,CORE_ADDRESS);
 
 			// governance accounts
