@@ -11,13 +11,22 @@
   
   
   (defn balance 
-    ^{:doc {:description "Gets the balance for a specified holder from a fungible token."
+    ^{:doc {:description "Gets the balance from a fungible token. Checks the balance for the specified holder, or the current *address* if not specified."
          :examples [{:code "(balance my-token-address)"}]
          :type :function
          :signature [{:params [token holder]}]}
 	  }
     [token holder]
-    (call token (balance holder)))
+    (call token (balance holder))) 
+  
+  (defn transfer 
+    ^{:doc {:description "Transfers balance of a fungible token. Returns the amount transferred, or nil if the transfer fails."
+         :examples [{:code "(balance my-token-address)"}]
+         :type :function
+         :signature [{:params [token holder]}]}
+	  }
+    [token target amount]
+    (call token (transfer target amount))) 
   
   
   
