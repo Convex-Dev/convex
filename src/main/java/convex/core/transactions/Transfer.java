@@ -12,7 +12,7 @@ import convex.core.lang.Context;
 import convex.core.lang.Juice;
 
 /**
- * Transaction class representing a Transfer from one account to another
+ * Transaction class representing a coin Transfer from one account to another
  */
 public class Transfer extends ATransaction {
 	public static final long TRANSFER_JUICE = Juice.TRANSFER;

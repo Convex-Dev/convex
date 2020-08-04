@@ -80,5 +80,6 @@ public class Tag {
 	// transaction types
 	public static final byte INVOKE = (byte) 0xD0;
 	public static final byte TRANSFER = (byte) 0xD1;
+	public static final byte CALL = (byte) 0xD2;
 
 }

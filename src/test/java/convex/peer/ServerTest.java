@@ -31,8 +31,8 @@ public class ServerTest {
 
 	private Consumer<Message> handler = new ResultConsumer() {
 		@Override
-		protected void handleResult(long id, Object payload) {
-			results.put(id, payload);
+		protected void handleResult(long id, Object value) {
+			results.put(id, value);
 		}
 	};
 

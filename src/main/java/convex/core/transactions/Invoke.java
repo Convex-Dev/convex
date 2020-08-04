@@ -18,9 +18,14 @@ import convex.core.util.Utils;
 /**
  * Transaction class representing the Invoke of an on-chain operation.
  * 
- * May be specified as either: 1. a form (will be compiled and executed) 2. an
- * op (will be executed directly, cheaper)
+ * The command provided may be specified as either: 
+ * <ul>
+ * <li> A Form (will be compiled and executed) </li>
+ * <li> A pre-compiled Op (will be executed directly, cheaper)</li>
+ * </ul>
  * 
+ * Peers may separately implement functionality to parse and compile a command provided as a String: this must be
+ * performed outside the CVM which not provide a parser internally.
  */
 public class Invoke extends ATransaction implements IRefContainer {
 	protected final Object command;
@@ -40,19 +45,19 @@ public class Invoke extends ATransaction implements IRefContainer {
 		return writeRaw(b);
 	}
 	
+	@Override
+	public ByteBuffer writeRaw(ByteBuffer b) {
+		b = super.writeRaw(b); // nonce, address
+		b = Format.write(b, command);
+		return b;
+	}
+	
 	/**
 	 * Get the command for this transaction, as code.
 	 * @return Command object.
 	 */
 	public Object getCommand() {
 		return command;
-	}
-
-	@Override
-	public ByteBuffer writeRaw(ByteBuffer b) {
-		b = super.writeRaw(b); // nonce, address
-		b = Format.write(b, command);
-		return b;
 	}
 
 	/**
