@@ -386,5 +386,10 @@ public final class ECDSASignature extends ASignature {
 		// Nothing needed
 	}
 
+	@Override
+	public int getRefCount() {
+		return 0;
+	}
+
 
 }

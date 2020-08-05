@@ -210,5 +210,11 @@ public abstract class AArrayBlob extends ABlob {
 			return result;
 		}
 	}
+	
+	@Override
+	public int getRefCount() {
+		// Array-backed blobs have no child Refs by default
+		return 0;
+	}
 
 }

@@ -140,6 +140,20 @@ public class RefSoft<T> extends Ref<T> {
 	
 	@Override
 	public Long getMemorySize() {
+		// TODO: refactor?
+		return calcMemorySize();
+	}
+	
+	public void setMemorySize(Long mem) {
+		memorySize=mem;
+	}
+	
+
+	public long calcMemorySize() {
+		if (memorySize!=null) return memorySize;
+		if (isEmbedded()) return 0L;
+		ACell c=(ACell) getValue();
+		memorySize= c.calcMemorySize();
 		return memorySize;
 	}
 
@@ -166,4 +180,5 @@ public class RefSoft<T> extends Ref<T> {
 		if (softRef.get()!=newValue) return new RefSoft<T>(newValue,hash,status);
 		return this;
 	}
+
 }

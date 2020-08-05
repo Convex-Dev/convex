@@ -155,5 +155,10 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		// TODO maybe cache this?
 		return Ref.create(this);
 	}
+	
+	@Override
+	public int getRefCount() {
+		return 0;
+	}
 
 }

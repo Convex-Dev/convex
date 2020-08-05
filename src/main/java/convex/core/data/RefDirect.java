@@ -137,7 +137,8 @@ public class RefDirect<T> extends Ref<T> {
 
 	@Override
 	public Long getMemorySize() {
-		return null;
+		if (isEmbedded()) return 0L;
+		return ((ACell)value).calcMemorySize();
 	}
 
 	@Override

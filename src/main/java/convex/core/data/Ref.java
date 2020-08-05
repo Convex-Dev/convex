@@ -158,6 +158,8 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	public void ednString(StringBuilder sb) {
 		sb.append("#ref {:hash ");
 		sb.append(Utils.ednString(hash));
+		sb.append(", :status ");
+		sb.append(status);
 		sb.append("}");
 	}
 

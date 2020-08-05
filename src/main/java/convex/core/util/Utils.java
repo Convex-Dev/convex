@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 
 import convex.core.data.AArrayBlob;
 import convex.core.data.ABlob;
+import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.IObject;
 import convex.core.data.IRefContainer;
@@ -982,8 +983,8 @@ public class Utils {
 	 * @return Number of Refs in the object.
 	 */
 	public static int refCount(Object a) {
-		if (!(a instanceof IRefContainer)) return 0;
-		IRefContainer ra = (IRefContainer) a;
+		if (!(a instanceof ACell)) return 0;
+		ACell ra = (ACell) a;
 		return ra.getRefCount();
 	}
 

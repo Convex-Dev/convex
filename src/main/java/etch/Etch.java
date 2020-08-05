@@ -49,7 +49,7 @@ import convex.core.util.Utils;
  * Data is stored as:
  * - 32 bytes key
  * - X bytes monotonic label
- * - 2 bytes data length N
+ * - 2 bytes data length N (a short)
  * - N byes actual data
  */
 public class Etch {
@@ -79,9 +79,9 @@ public class Etch {
 
 	/**
 	 * Length of header, including:
-	 * - Magic number "e7c6"
-	 * - File size
-	 * - Root hash
+	 * - Magic number "e7c6" (2 bytes)
+	 * - File size (8 bytes)
+	 * - Root hash (32 bytes)
 	 * 
 	 * "The Ultimate Answer to Life, The Universe and Everything is... 42!"
      * - Douglas Adams, The Hitchhiker's Guide to the Galaxy
@@ -584,9 +584,12 @@ public class Etch {
 		
 		// seek to correct position, skipping over key
 		MappedByteBuffer mbb=seekMap(pointer+KEY_SIZE); 
+		
+		// get Status byte
 		byte status=mbb.get();
 		
-		short length=mbb.getShort(); // get data length
+		// get Data length
+		short length=mbb.getShort(); 
 		byte[] bs=new byte[length];
 		mbb.get(bs);
 		Blob data= Blob.wrap(bs);
@@ -596,6 +599,11 @@ public class Etch {
 			data.attachContentHash(hash);
 			cell.attachEncoding(data);
 			RefSoft<ACell> ref=RefSoft.create(cell, hash, status);
+			
+			if (status>=Ref.PERSISTED) {
+				ref.setMemorySize(cell.calcMemorySize());
+			}
+			
 			return ref;
 		} catch (BadFormatException e) {
 			throw new Error("Bad format in etch store: "+data.toHexString());

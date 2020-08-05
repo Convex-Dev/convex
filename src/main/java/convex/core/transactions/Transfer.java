@@ -119,4 +119,9 @@ public class Transfer extends ATransaction {
 	public long getMaxJuice() {
 		return Juice.TRANSFER;
 	}
+	
+	@Override
+	public int getRefCount() {
+		return 0;
+	}
 }

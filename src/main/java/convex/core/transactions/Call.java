@@ -81,5 +81,10 @@ public class Call extends ATransaction {
 	public void validateCell() throws InvalidDataException {
 		target.validateCell();
 	}
+	
+	@Override
+	public int getRefCount() {
+		return 0;
+	}
 
 }

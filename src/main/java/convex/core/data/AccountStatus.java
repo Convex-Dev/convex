@@ -285,4 +285,10 @@ public class AccountStatus extends ACell {
 		ASet<Symbol> exports = (ASet<Symbol>) s;
 		return exports;
 	}
+
+	@Override
+	public int getRefCount() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
 }

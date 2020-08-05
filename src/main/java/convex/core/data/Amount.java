@@ -265,4 +265,9 @@ public class Amount extends ACell implements Comparable<Amount> {
 		value = value.setScale(DECIMALS); // throws exception if not possible
 		return create(value.unscaledValue());
 	}
+
+	@Override
+	public int getRefCount() {
+		return 0;
+	}
 }

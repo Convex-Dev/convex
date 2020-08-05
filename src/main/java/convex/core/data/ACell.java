@@ -169,5 +169,35 @@ public abstract class ACell implements ICell, IWriteable {
 		return encoding;
 	}
 
+	/**
+	 * Calculates the total Memory Size for this Cell.
+	 * 
+	 * Requires any child refs to be of persisted status at minimum
+	 * 
+	 * @return
+	 */
+	public long calcMemorySize() {
+		long result=getEncoding().length();
+		int n=getRefCount();
+		for (int i=0; i<n; i++) {
+			Ref<?> childRef=getRef(i);
+			Long childSize=childRef.getMemorySize();
+			if (childSize==null) {
+				throw new Error("Null child size for: "+childRef + " with type "+Utils.getClassName(childRef.getValue()));
+			}
+			result += childSize;
+		}
+		return result;
+	}
+
+	/**
+	 * Gets the number of child refs in this Cell's encoding.
+	 * @return
+	 */
+	public abstract int getRefCount();
+
+	public <R> Ref<R> getRef(int i) {
+		throw new IndexOutOfBoundsException("No Refs to get in "+Utils.getClassName(this));
+	}
 
 }

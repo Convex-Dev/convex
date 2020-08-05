@@ -85,6 +85,11 @@ public class Ed25519Signature extends ASignature {
 		// TODO Auto-generated method stub
 		return 128;
 	}
+	
+	@Override
+	public int getRefCount() {
+		return 0;
+	}
 
 
 }

@@ -40,5 +40,10 @@ public abstract class BaseExpander extends AExpander {
 	public void validateCell() throws InvalidDataException {
 		// TODO
 	}
+	
+	@Override
+	public int getRefCount() {
+		return 0;
+	}
 
 }

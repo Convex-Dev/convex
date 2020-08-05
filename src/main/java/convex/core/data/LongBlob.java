@@ -168,5 +168,10 @@ public class LongBlob extends ABlob {
 	public long toLong() {
 		return value;
 	}
+	
+	@Override
+	public int getRefCount() {
+		return 0;
+	}
 
 }

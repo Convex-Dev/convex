@@ -168,5 +168,10 @@ public class Symbol extends ASymbolic {
 		if (namespace==null) return this;
 		return Symbol.create(getName());
 	}
+	
+	@Override
+	public int getRefCount() {
+		return 0;
+	}
 
 }
