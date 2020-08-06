@@ -84,6 +84,7 @@ public class Scrypt extends Reader {
     public Rule Statement() {
         return FirstOf(
                 DefStatement(),
+                LocalSetStatement(),
                 ExpressionStatement()
         );
     }
@@ -103,6 +104,21 @@ public class Scrypt extends Reader {
 
     public List<Syntax> buildDefStatement(Syntax expr, Syntax sym) {
         return (List<Syntax>) Lists.of(Syntax.create(Symbols.DEF), sym, expr);
+    }
+
+    public Rule LocalSetStatement() {
+        return Sequence(
+                Spacing(),
+                Symbol(),
+                EQU,
+                Expression(),
+                SEMI,
+                push(prepare(buildLocalSetStatement((Syntax) pop(), (Syntax) pop())))
+        );
+    }
+
+    public List<Syntax> buildLocalSetStatement(Syntax expr, Syntax sym) {
+        return (List<Syntax>) Lists.of(Syntax.create(Symbols.SET_BANG), sym, expr);
     }
 
     /**
