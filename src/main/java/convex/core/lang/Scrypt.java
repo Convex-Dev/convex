@@ -50,10 +50,10 @@ public class Scrypt extends Reader {
         );
     }
 
-    public Rule ExpressionInput() {
+    public Rule CompilationUnit() {
         return FirstOf(Sequence(
                 Spacing(),
-                CompoundExpression(),
+                FirstOf(Statement(), CompoundExpression()),
                 Spacing(),
                 EOI),
                 push(error("Single expression expected")));
@@ -67,6 +67,34 @@ public class Scrypt extends Reader {
                 Spacing(),
                 FirstOf(']', Sequence(FirstOf(AnyOf("})"), EOI), push(error("Expected closing ']'")))),
                 push(prepare(Vectors.create(popNodeList()))));
+    }
+
+    public Rule ExpressionStatement() {
+        return Sequence(CompoundExpression(), SEMI);
+    }
+
+    public Rule Statement() {
+        return FirstOf(
+                DefStatement(),
+                ExpressionStatement()
+        );
+    }
+
+    public Rule DefStatement() {
+        return Sequence(
+                Spacing(),
+                "def",
+                Spacing(),
+                Symbol(),
+                EQU,
+                Expression(),
+                SEMI,
+                push(prepare(buildDefStatement((Syntax) pop(), (Syntax) pop())))
+        );
+    }
+
+    public List<Syntax> buildDefStatement(Syntax expr, Syntax sym) {
+        return (List<Syntax>) Lists.of(Syntax.create(Symbols.DEF), sym, expr);
     }
 
     /**
@@ -91,9 +119,8 @@ public class Scrypt extends Reader {
         return Sequence(
                 OneOrMore(
                         Sequence(
-                                CompoundExpression(),
-                                ListAddAction(expVar),
-                                SEMI
+                                Statement(),
+                                ListAddAction(expVar)
                         )
                 ),
                 push(prepare(Lists.create(expVar.get()))));
@@ -148,11 +175,8 @@ public class Scrypt extends Reader {
                 Keyword(),
                 Symbol(),
                 Vector(),
-
-                // Block *must* come before Map.
-                BlockExpression(),
-
-                MapLiteralExpression());
+                MapLiteralExpression(),
+                BlockExpression());
     }
 
     public Rule NestedExpression() {
@@ -199,6 +223,7 @@ public class Scrypt extends Reader {
         );
     }
 
+
     public Rule CompoundExpressionList() {
         Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
         return Sequence(
@@ -234,10 +259,11 @@ public class Scrypt extends Reader {
     public static Syntax readSyntax(String source) {
         Scrypt scryptReader = syntaxReader.get();
         scryptReader.tempSource = source;
-        return (Syntax) doParse(new ReportingParseRunner<>(scryptReader.ExpressionInput()), source);
+        return doParse(new ReportingParseRunner<>(scryptReader.CompilationUnit()), source);
     }
 
 
+    final Rule EQU = Terminal("=", Ch('='));
     final Rule COMMA = Terminal(",");
     final Rule LPAR = Terminal("(");
     final Rule RPAR = Terminal(")");
@@ -249,6 +275,12 @@ public class Scrypt extends Reader {
     @DontLabel
     Rule Terminal(String string) {
         return Sequence(Spacing(), string, Spacing()).label('\'' + string + '\'');
+    }
+
+    @SuppressNode
+    @DontLabel
+    Rule Terminal(String string, Rule mustNotFollow) {
+        return Sequence(Spacing(), string, TestNot(mustNotFollow), Spacing()).label('\'' + string + '\'');
     }
 
 }

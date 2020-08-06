@@ -300,6 +300,25 @@ public class ScryptTest {
 
         assertEquals(Reader.read("(do 1)"), parse(block, "{ 1; }"));
         assertEquals(Reader.read("(do 1 :key [] {} (inc 1))"), parse(block, "{ 1; :key; []; {}; inc(1);}"));
+
+        assertEquals(Maps.empty(), eval("{}"));
+        assertEquals(1, (Long) eval("{1;}"));
+    }
+
+    @Test
+    public void testDef() {
+        var scrypt = scrypt();
+        var def = scrypt.DefStatement();
+
+        assertEquals(Reader.read("(def x 1)"), parse(def, "def x = 1;"));;
+
+        assertEquals(1, (Long) eval("def x = 1;"));
+        assertEquals(2, (Long) eval("{def x = 1; x + 1;}"));
+
+        assertEquals(2, (Long) eval("(inc)(1)"));
+
+        // Explain this
+        assertThrows(ParseException.class, () -> eval("{1;2}"));
     }
 
 }
