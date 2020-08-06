@@ -1,6 +1,5 @@
 package convex.core.lang;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 
 import convex.core.data.*;
@@ -70,6 +69,36 @@ public class Scrypt extends Reader {
                 push(prepare(Vectors.create(popNodeList()))));
     }
 
+    /**
+     * One or more expressions wrapped in '{ }' separated by ';'.
+     * <p>
+     * Compiles to '(do expression+ )'.
+     *
+     * @return Rule
+     */
+    public Rule BlockExpression() {
+        return Sequence(
+                LWING,
+                BlockBody(),
+                RWING,
+                push(prepare(Lists.create(popNodeList()).cons(Symbols.DO)))
+        );
+    }
+
+    public Rule BlockBody() {
+        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+
+        return Sequence(
+                OneOrMore(
+                        Sequence(
+                                CompoundExpression(),
+                                ListAddAction(expVar),
+                                SEMI
+                        )
+                ),
+                push(prepare(Lists.create(expVar.get()))));
+    }
+
     public Rule MapLiteralExpression() {
         return Sequence(
                 LWING,
@@ -119,6 +148,10 @@ public class Scrypt extends Reader {
                 Keyword(),
                 Symbol(),
                 Vector(),
+
+                // Block *must* come before Map.
+                BlockExpression(),
+
                 MapLiteralExpression());
     }
 
@@ -210,6 +243,7 @@ public class Scrypt extends Reader {
     final Rule RPAR = Terminal(")");
     final Rule LWING = Terminal("{");
     final Rule RWING = Terminal("}");
+    final Rule SEMI = Terminal(";");
 
     @SuppressNode
     @DontLabel
