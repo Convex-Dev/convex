@@ -86,7 +86,7 @@ public class Scrypt extends Reader {
         Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
 
         return Sequence(
-                ZeroOrMore(
+                Optional(
                         MapEntry(),
                         ListAddAction(expVar),
                         ZeroOrMore(
@@ -97,16 +97,16 @@ public class Scrypt extends Reader {
     }
 
     public Rule MapEntry() {
-        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
-
         return Sequence(
                 Expression(),
-                ListAddAction(expVar),
                 Spacing(),
                 Expression(),
-                ListAddAction(expVar),
-                push(MapEntry.create(expVar.get().get(0), expVar.get().get(1)))
+                push(buildMapEntry((Syntax) pop(), (Syntax) pop()))
         );
+    }
+
+    public MapEntry<Syntax, Syntax> buildMapEntry(Syntax v, Syntax k) {
+        return MapEntry.create(k, v);
     }
 
     public Rule Expression() {

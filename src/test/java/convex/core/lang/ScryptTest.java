@@ -290,6 +290,7 @@ public class ScryptTest {
         assertEquals(Reader.read("{}"), parse(map, "{}"));
         assertEquals(Reader.read("{:x 1 :y 2 :z 3}"), parse(map, "{:x 1, :y 2, :z 3}"));
         assertEquals(Reader.read("{{} 1 [] 2}"), parse(map, "{{} 1, [] 2}"));
+        assertThrows(ParseException.class, () -> eval("{1 2 3 4}"));
     }
 
 }
