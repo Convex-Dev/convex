@@ -76,7 +76,7 @@ public class Scrypt extends Reader {
                 MapEntries(),
                 RWING,
                 // Create a Map from a List of MapEntry.
-                // `MapLiteralEntries` builds up a list of MapEntry,
+                // `MapEntries` builds up a list of MapEntry,
                 // which we can get from `popNodeList`.
                 push(prepare(Maps.create(popNodeList())))
         );
