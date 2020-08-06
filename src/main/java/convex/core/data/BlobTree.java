@@ -433,11 +433,10 @@ public class BlobTree extends ABlob {
 		return (Ref<R>) children[i];
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <N extends ACell> N updateRefs(IRefFunction func) {
+	public BlobTree updateRefs(IRefFunction func) {
 		Ref<ABlob>[] newChildren = Ref.updateRefs(children, func);
-		return (N) withChildren(newChildren);
+		return withChildren(newChildren);
 	}
 
 	private BlobTree withChildren(Ref<ABlob>[] newChildren) {

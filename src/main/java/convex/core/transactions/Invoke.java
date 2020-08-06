@@ -3,7 +3,6 @@ package convex.core.transactions;
 import java.nio.ByteBuffer;
 
 import convex.core.Constants;
-import convex.core.data.ACell;
 import convex.core.data.Amount;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
@@ -131,12 +130,11 @@ public class Invoke extends ATransaction {
 		return Utils.getRef(command, i);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <N extends ACell> N updateRefs(IRefFunction func) {
+	public Invoke updateRefs(IRefFunction func) {
 		Object newCommand = Utils.updateRefs(command, func);
-		if (newCommand == command) return (N) this;
-		return (N) Invoke.create(getSequence(), newCommand);
+		if (newCommand == command) return this;
+		return Invoke.create(getSequence(), newCommand);
 	}
 
 }

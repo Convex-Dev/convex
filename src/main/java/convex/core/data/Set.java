@@ -135,7 +135,6 @@ public class Set<T> extends ASet<T> {
 		return me.getKey();
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public Set<T> updateRefs(IRefFunction func) {
 		AHashMap<T, Object> m = map.updateRefs(func);

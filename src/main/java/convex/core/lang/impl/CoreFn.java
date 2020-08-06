@@ -89,7 +89,6 @@ public abstract class CoreFn<T> extends AFn<T> implements ICoreDef {
 		throw new IndexOutOfBoundsException("Bad ref index: "+i);
 	}
 	
-	@SuppressWarnings("unchecked")
 	@Override
 	public CoreFn<T> updateRefs(IRefFunction func) {
 		return this;

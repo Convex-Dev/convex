@@ -2,7 +2,6 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
-import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.Format;
@@ -79,13 +78,13 @@ public class Lambda<T> extends AOp<Fn<T>> {
 		throw new IndexOutOfBoundsException(Errors.badIndex(i));
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <N extends ACell> N updateRefs(IRefFunction func)  {
+	public Lambda<T> updateRefs(IRefFunction func)  {
+		@SuppressWarnings("unchecked")
 		Ref<AOp<T>> newBody=(Ref<AOp<T>>) func.apply(body);
 		AVector<Syntax> newParams=params.updateRefs(func);
-		if ((params==newParams)&&(body==newBody)) return (N) this;
-		return (N) create(newParams,newBody);
+		if ((params==newParams)&&(body==newBody)) return this;
+		return create(newParams,newBody);
 	}
 
 	@Override

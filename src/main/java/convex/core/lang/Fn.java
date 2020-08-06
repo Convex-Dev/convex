@@ -171,7 +171,6 @@ public class Fn<T> extends AFn<T> {
 		return lexicalEnv.getRef(i);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public Fn<T> updateRefs(IRefFunction func) {
 		AVector<Syntax> newParams = params.updateRefs(func);

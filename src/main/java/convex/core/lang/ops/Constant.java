@@ -2,7 +2,6 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
-import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
@@ -87,12 +86,12 @@ public class Constant<T> extends AOp<T> {
 		return (Ref<R>) value;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <N extends ACell> N updateRefs(IRefFunction func) {
-		Ref<T> newRef = (Ref<T>) func.apply(value);
-		if (value == newRef) return (N) this;
-		return (N) createFromRef(newRef);
+	public Constant<T> updateRefs(IRefFunction func) {
+		@SuppressWarnings("unchecked")
+		Ref<T> newRef = func.apply(value);
+		if (value == newRef) return this;
+		return createFromRef(newRef);
 	}
 
 	@SuppressWarnings("unchecked")

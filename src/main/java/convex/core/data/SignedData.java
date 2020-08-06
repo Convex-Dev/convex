@@ -193,13 +193,13 @@ public class SignedData<T> extends ACell {
 		return (Ref<R>) valueRef;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <R extends ACell> R updateRefs(IRefFunction func) {
-		Ref<?> newValueRef = func.apply(valueRef);
-		if (valueRef == newValueRef) return (R) this;
+	public SignedData<T> updateRefs(IRefFunction func) {
+		@SuppressWarnings("unchecked")
+		Ref<T> newValueRef = (Ref<T>)func.apply(valueRef);
+		if (valueRef == newValueRef) return this;
 		// SECURITY: preserve validated flag
-		return (R) new SignedData<>(newValueRef, address, signature, validated);
+		return new SignedData<T>(newValueRef, address, signature, validated);
 	}
 
 	@Override

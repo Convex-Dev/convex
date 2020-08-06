@@ -113,7 +113,7 @@ public class EtchStore extends AStore {
 			@SuppressWarnings("unchecked")
 			IRefFunction func=r -> {
 				// Go via persist, since needs to check if Ref should be persisted at all
-				return persistRef(r,noveltyHandler,requiredStatus);
+				return (Ref<ACell>)persistRef(r,noveltyHandler,requiredStatus);
 			};
 			
 			// need to do recursive persistence

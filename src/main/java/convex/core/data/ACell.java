@@ -220,9 +220,8 @@ public abstract class ACell implements ICell, IWriteable {
 	 * 
 	 * Must return the same object if no Refs are altered.
 	 */
-	@SuppressWarnings("unchecked")
-	public <N extends ACell> N updateRefs(IRefFunction func) {
-		if (getRefCount()==0) return (N) this;
+	public ACell updateRefs(IRefFunction func) {
+		if (getRefCount()==0) return this;
 		throw new TODOException(Utils.getClassName(this) +" does not yet implement updateRefs(...)");
 	}
 

@@ -2,6 +2,7 @@ package convex.core.lang;
 
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.IRefFunction;
 import convex.core.data.Syntax;
 
 /**
@@ -20,5 +21,8 @@ public abstract class AFn<T> extends ACell implements IFn<T> {
 	 * @return A binding vector describing the parameters for this function
 	 */
 	public abstract AVector<Syntax> getParams();
+	
+	@Override
+	public abstract AFn<T> updateRefs(IRefFunction func);
 
 }

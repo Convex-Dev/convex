@@ -130,9 +130,8 @@ public abstract class ARecord extends AMap<Keyword,Object> {
 		throw new IndexOutOfBoundsException("Bad ref index: "+index);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public final <N extends ACell> N updateRefs(IRefFunction func) {
+	public final ARecord updateRefs(IRefFunction func) {
 		int n=size();		
 		Object[] newValues=new Object[n];
 		AVector<Keyword> keys=getKeys();
@@ -143,7 +142,7 @@ public abstract class ARecord extends AMap<Keyword,Object> {
 			}
 			newValues[i]=v;
 		}
-		return (N) updateAll(newValues);
+		return updateAll(newValues);
 	}
 	
 	/**

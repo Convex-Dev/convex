@@ -2,7 +2,6 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
-import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.Address;
 import convex.core.data.Format;
@@ -98,10 +97,9 @@ public class Lookup<T> extends AOp<T> {
 		throw new IndexOutOfBoundsException(Errors.badIndex(i));
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <N extends ACell> N updateRefs(IRefFunction func) {
-		return (N) this;
+	public Lookup<T> updateRefs(IRefFunction func) {
+		return this;
 	}
 
 	@SuppressWarnings("unchecked")

@@ -107,7 +107,6 @@ public class Expander extends AExpander {
 		return fn.getRef(i);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public Expander updateRefs(IRefFunction func) {
 		AFn<Object> newFn=fn.updateRefs(func);

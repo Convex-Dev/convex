@@ -2,7 +2,6 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
-import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.ASequence;
@@ -58,13 +57,12 @@ public class Let<T> extends AMultiOp<T> {
 		return new Let<T>(syms, ops, true);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <N extends ACell> N updateRefs(IRefFunction func) {
+	public Let<T> updateRefs(IRefFunction func) {
 		ASequence<AOp<?>> newOps = ops.updateRefs(func);
 		AVector<Syntax> newSymbols = symbols.updateRefs(func);
 
-		return (N) recreate(newOps, newSymbols);
+		return recreate(newOps, newSymbols);
 	}
 
 	@Override

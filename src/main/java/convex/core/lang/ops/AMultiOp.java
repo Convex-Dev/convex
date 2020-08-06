@@ -2,7 +2,6 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
-import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Format;
@@ -39,11 +38,10 @@ public abstract class AMultiOp<T> extends AOp<T> {
 		return bb;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <N extends ACell> N updateRefs(IRefFunction func) {
+	public AMultiOp<T> updateRefs(IRefFunction func) {
 		ASequence<AOp<?>> newOps = ops.updateRefs(func);
-		return (N) recreate(newOps);
+		return recreate(newOps);
 	}
 
 	@Override

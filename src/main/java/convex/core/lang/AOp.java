@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
 import convex.core.data.AMap;
+import convex.core.data.IRefFunction;
 import convex.core.data.Symbol;
 import convex.core.data.Tag;
 
@@ -76,4 +77,7 @@ public abstract class AOp<T> extends ACell {
 	 * @return This op specialised with the given bindings.
 	 */
 	public abstract AOp<T> specialise(AMap<Symbol, Object> binds);
+	
+	@Override
+	public abstract AOp<T> updateRefs(IRefFunction func);
 }

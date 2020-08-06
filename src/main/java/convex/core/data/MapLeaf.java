@@ -412,9 +412,9 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
-	public <R extends ACell> R updateRefs(IRefFunction func) {
+	public MapLeaf updateRefs(IRefFunction func) {
 		int n = entries.length;
-		if (n == 0) return (R) this;
+		if (n == 0) return this;
 		MapEntry<K, V>[] newEntries = entries;
 		for (int i = 0; i < n; i++) {
 			MapEntry<K, V> e = newEntries[i];
@@ -424,9 +424,9 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 				newEntries[i]=newEntry;
 			}
 		}
-		if (newEntries==entries) return (R) this;
+		if (newEntries==entries) return this;
 		// Note: we assume no key hashes have changed
-		return (R) new MapLeaf(newEntries);
+		return new MapLeaf(newEntries);
 	}
 
 	/**

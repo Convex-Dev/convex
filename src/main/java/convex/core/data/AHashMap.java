@@ -126,4 +126,6 @@ public abstract class AHashMap<K, V> extends AMap<K, V> {
 	 */
 	protected abstract void validateWithPrefix(String string) throws InvalidDataException;
 
+	@Override
+	public abstract AHashMap<K,V> updateRefs(IRefFunction func);
 }

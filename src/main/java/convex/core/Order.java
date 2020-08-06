@@ -235,7 +235,6 @@ public class Order extends ACell {
 		return blocks.getRef(i);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public Order updateRefs(IRefFunction func) {
 		AVector<Block> newBlocks = blocks.updateRefs(func);

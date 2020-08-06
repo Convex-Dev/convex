@@ -479,9 +479,9 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R extends ACell> R updateRefs(IRefFunction func) {
+	public MapTree<K,V> updateRefs(IRefFunction func) {
 		int n = children.length;
-		if (n == 0) return (R) this;
+		if (n == 0) return this;
 		Ref<AHashMap<K, V>>[] newChildren = children;
 		for (int i = 0; i < n; i++) {
 			Ref<AHashMap<K, V>> child = children[i];
@@ -493,9 +493,9 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 				newChildren[i] = newChild;
 			}
 		}
-		if (newChildren == children) return (R) this;
+		if (newChildren == children) return this;
 		// Note: we assume no key hashes have changed, so sturcture is the same
-		return (R) new MapTree<>(newChildren, shift, mask, count);
+		return new MapTree<>(newChildren, shift, mask, count);
 	}
 
 	@Override

@@ -175,13 +175,14 @@ public class Syntax extends ACell {
 		return meta.getRef(i - 1);
 	}
 
-	@SuppressWarnings("unchecked")
+	
 	@Override
-	public <N extends ACell> N updateRefs(IRefFunction func) {
+	public Syntax updateRefs(IRefFunction func) {
+		@SuppressWarnings("unchecked")
 		Ref<Object> newDatum = func.apply(datumRef);
 		AHashMap<Object, Object> newMeta = meta.updateRefs(func);
-		if ((datumRef == newDatum) && (meta == newMeta)) return (N) this;
-		return (N) new Syntax(newDatum, newMeta);
+		if ((datumRef == newDatum) && (meta == newMeta)) return this;
+		return new Syntax(newDatum, newMeta);
 	}
 
 	/**
