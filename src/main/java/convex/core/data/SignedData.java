@@ -30,7 +30,7 @@ import convex.core.exceptions.InvalidDataException;
  *
  * @param <T> The type of the signed object
  */
-public class SignedData<T> extends ACell implements IRefContainer {
+public class SignedData<T> extends ACell {
 	private final Ref<T> valueRef;
 	private final ASignature signature;
 	private final Address address;
@@ -195,7 +195,7 @@ public class SignedData<T> extends ACell implements IRefContainer {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R extends IRefContainer> R updateRefs(IRefFunction func) {
+	public <R extends ACell> R updateRefs(IRefFunction func) {
 		Ref<?> newValueRef = func.apply(valueRef);
 		if (valueRef == newValueRef) return (R) this;
 		// SECURITY: preserve validated flag

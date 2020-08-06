@@ -19,10 +19,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import convex.core.crypto.Hash;
+import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Format;
-import convex.core.data.IRefContainer;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
@@ -279,8 +279,8 @@ public class Connection {
 		// TODO: halt conditions to prevent sending the whole universe
 		Object o = r.getValue();
 		// send children first
-		if (o instanceof IRefContainer) {
-			IRefContainer rc = (IRefContainer) o;
+		if (o instanceof ACell) {
+			ACell rc = (ACell) o;
 			rc.updateRefs(sender());
 		}
 

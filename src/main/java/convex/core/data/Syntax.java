@@ -21,7 +21,7 @@ import convex.core.util.Utils;
  * Inspired by Racket.
  * 
  */
-public class Syntax extends ACell implements IRefContainer {
+public class Syntax extends ACell {
 	/**
 	 * Ref to the unwrapped datum value. Cannot refer to another Syntax object
 	 */
@@ -177,7 +177,7 @@ public class Syntax extends ACell implements IRefContainer {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <N extends IRefContainer> N updateRefs(IRefFunction func) {
+	public <N extends ACell> N updateRefs(IRefFunction func) {
 		Ref<Object> newDatum = func.apply(datumRef);
 		AHashMap<Object, Object> newMeta = meta.updateRefs(func);
 		if ((datumRef == newDatum) && (meta == newMeta)) return (N) this;

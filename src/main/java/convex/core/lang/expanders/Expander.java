@@ -2,7 +2,6 @@ package convex.core.lang.expanders;
 
 import java.nio.ByteBuffer;
 
-import convex.core.data.IRefContainer;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Syntax;
@@ -21,7 +20,7 @@ import convex.core.lang.Context;
  * 
  * "Code generation, like drinking alcohol, is good in moderation." - Alex Lowe
  */
-public class Expander extends AExpander implements IRefContainer {
+public class Expander extends AExpander {
 
 	/**
 	 * Expansion function of the form (fn [x e] ...)

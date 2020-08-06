@@ -1874,7 +1874,7 @@ public class Core {
 		Syntax ALIASES=coreEnv.get(Symbols.STAR_ALIASES);
 		assert(ALIASES!=null);
 		
-		ALIASES=ALIASES.withValue(Maps.of(null, Core.CORE_ADDRESS,Symbol.create("convex.core" ),Core.CORE_ADDRESS));
+		ALIASES=ALIASES.withValue(Maps.of(null, Core.CORE_ADDRESS));
 		AHashMap<Symbol, Syntax> defaultEnv = Maps.of(Symbols.STAR_ALIASES,ALIASES);
 		
 		ENVIRONMENT = defaultEnv;

@@ -3,9 +3,9 @@ package convex.core.transactions;
 import java.nio.ByteBuffer;
 
 import convex.core.Constants;
+import convex.core.data.ACell;
 import convex.core.data.Amount;
 import convex.core.data.Format;
-import convex.core.data.IRefContainer;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Tag;
@@ -27,7 +27,7 @@ import convex.core.util.Utils;
  * Peers may separately implement functionality to parse and compile a command provided as a String: this must be
  * performed outside the CVM which not provide a parser internally.
  */
-public class Invoke extends ATransaction implements IRefContainer {
+public class Invoke extends ATransaction {
 	protected final Object command;
 
 	protected Invoke(long nonce, Object args) {
@@ -133,7 +133,7 @@ public class Invoke extends ATransaction implements IRefContainer {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <N extends IRefContainer> N updateRefs(IRefFunction func) {
+	public <N extends ACell> N updateRefs(IRefFunction func) {
 		Object newCommand = Utils.updateRefs(command, func);
 		if (newCommand == command) return (N) this;
 		return (N) Invoke.create(getSequence(), newCommand);

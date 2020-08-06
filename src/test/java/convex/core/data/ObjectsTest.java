@@ -35,6 +35,10 @@ public class ObjectsTest {
 			throw Utils.sneakyThrow(e);
 		}
 		
+		if (a.getRefCount()>0) {
+			doRefContainerTests(a);
+		}
+		
 
 		doAnyValueTests(a);
 	}
@@ -94,10 +98,6 @@ public class ObjectsTest {
 		} catch (BadFormatException e) {
 			throw new Error("Can't read encoding: " + b.toHexString(), e);
 		}
-
-		if (a instanceof IRefContainer) {
-			doRefContainerTests((IRefContainer) a);
-		}
 	}
 
 	/**
@@ -105,7 +105,7 @@ public class ObjectsTest {
 	 * 
 	 * @param a
 	 */
-	private static void doRefContainerTests(IRefContainer a) {
+	private static void doRefContainerTests(ACell a) {
 		long tcount = Utils.totalRefCount(a);
 		int rcount = Utils.refCount(a);
 

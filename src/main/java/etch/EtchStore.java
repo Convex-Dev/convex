@@ -7,7 +7,6 @@ import java.util.logging.Logger;
 
 import convex.core.crypto.Hash;
 import convex.core.data.ACell;
-import convex.core.data.IRefContainer;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.store.AStore;
@@ -99,7 +98,6 @@ public class EtchStore extends AStore {
 		return persistRef(ref,noveltyHandler,Ref.ANNOUNCED);
 	}
 
-	@SuppressWarnings("unchecked")
 	public Ref<ACell> persistRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus) {
 		// check store for existing ref first. Return this is we have it
 		if (ref.isEmbedded()) return ref;
@@ -110,15 +108,16 @@ public class EtchStore extends AStore {
 		}
 
 		ACell o = ref.getValue();
-		if (o instanceof IRefContainer) {
+		if (o.getRefCount()>0) {
 			// Function to update Refs
+			@SuppressWarnings("unchecked")
 			IRefFunction func=r -> {
 				// Go via persist, since needs to check if Ref should be persisted at all
 				return persistRef(r,noveltyHandler,requiredStatus);
 			};
 			
 			// need to do recursive persistence
-			ACell newObject = ((IRefContainer) o).updateRefs(func);
+			ACell newObject = ((ACell) o).updateRefs(func);
 			
 			// perhaps need to update Ref 
 			if (o!=newObject) ref=ref.withValue(newObject);

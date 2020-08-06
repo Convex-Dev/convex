@@ -18,7 +18,7 @@ import convex.core.util.Utils;
  * Records are map-like data structures with fixed sets of keys, and optional custom behaviour.
  *
  */
-public abstract class ARecord extends AMap<Keyword,Object> implements IRefContainer {
+public abstract class ARecord extends AMap<Keyword,Object> {
 
 	protected final RecordFormat format;
 
@@ -99,7 +99,9 @@ public abstract class ARecord extends AMap<Keyword,Object> implements IRefContai
 	public abstract <V> V get(Keyword key);
 
 	/**
-	 * Gets the tag byte for this record type
+	 * Gets the tag byte for this record type. The Tag is the byte used to identify the
+	 * record in the binary encoding.
+	 * 
 	 * @return Record tag byte
 	 */
 	public abstract byte getRecordTag();
@@ -122,7 +124,7 @@ public abstract class ARecord extends AMap<Keyword,Object> implements IRefContai
 		for (int i=0; i<n; i++) {
 			Object v=get(getKeys().get(i));
 			int rc=Utils.refCount(v);
-			if (si<rc) return ((IRefContainer)v).getRef(si);
+			if (si<rc) return ((ACell)v).getRef(si);
 			si-=rc;
 		}
 		throw new IndexOutOfBoundsException("Bad ref index: "+index);
@@ -130,14 +132,14 @@ public abstract class ARecord extends AMap<Keyword,Object> implements IRefContai
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public final <N extends IRefContainer> N updateRefs(IRefFunction func) {
+	public final <N extends ACell> N updateRefs(IRefFunction func) {
 		int n=size();		
 		Object[] newValues=new Object[n];
 		AVector<Keyword> keys=getKeys();
 		for (int i=0; i<n; i++) {
 			Object v=get(keys.get(i));
-			if (v instanceof IRefContainer) {
-				v=((IRefContainer)v).updateRefs(func);
+			if (v instanceof ACell) {
+				v=((ACell)v).updateRefs(func);
 			}
 			newValues[i]=v;
 		}
@@ -158,11 +160,11 @@ public abstract class ARecord extends AMap<Keyword,Object> implements IRefContai
 	}
 		
 	/**
-	 * Updates all values in this record, in declared key order.
+	 * Updates all values in this record, in declared field order.
 	 * Returns this if no values are changed.
 	 * @param newVals
 	 */
-	protected abstract <R extends ARecord> R updateAll(Object[] newVals);
+	protected abstract ARecord updateAll(Object[] newVals);
 	
 	@Override
 	public boolean containsKey(Object key) {

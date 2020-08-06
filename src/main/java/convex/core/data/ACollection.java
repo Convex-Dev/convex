@@ -13,7 +13,7 @@ import convex.core.util.Errors;
  * 
  * @param <T> Type of elements in this collection
  */
-public abstract class ACollection<T> extends ADataStructure<T> implements Collection<T>, IRefContainer {
+public abstract class ACollection<T> extends ADataStructure<T> implements Collection<T> {
 
 	@Override
 	public abstract ByteBuffer write(ByteBuffer b);

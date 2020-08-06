@@ -48,6 +48,10 @@ public class Keywords {
 	public static final Keyword DELEGATED_STAKE = Keyword.create("delegated-stake");
 	
 	public static final Keyword URL = Keyword.create("url");
-
+	
+	public static final Keyword SEQUENCE = Keyword.create("sequence");
+	public static final Keyword BALANCE = Keyword.create("balance");
+	public static final Keyword ENVIRONMENT = Keyword.create("environment");
+	public static final Keyword HOLDINGS = Keyword.create("holdings");
 
 }

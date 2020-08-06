@@ -2,12 +2,12 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
+import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Format;
-import convex.core.data.IRefContainer;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
@@ -60,7 +60,7 @@ public class Let<T> extends AMultiOp<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <N extends IRefContainer> N updateRefs(IRefFunction func) {
+	public <N extends ACell> N updateRefs(IRefFunction func) {
 		ASequence<AOp<?>> newOps = ops.updateRefs(func);
 		AVector<Syntax> newSymbols = symbols.updateRefs(func);
 

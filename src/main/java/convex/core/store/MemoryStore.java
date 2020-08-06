@@ -6,7 +6,6 @@ import java.util.logging.Logger;
 
 import convex.core.crypto.Hash;
 import convex.core.data.ACell;
-import convex.core.data.IRefContainer;
 import convex.core.data.Ref;
 import convex.core.util.Utils;
 
@@ -45,9 +44,9 @@ public class MemoryStore extends AStore {
 		ref = ref.toDirect();
 
 		ACell o = ref.getValue();
-		if (o instanceof IRefContainer) {
+		if (o instanceof ACell) {
 			// need to do recursive persistence
-			o = ((IRefContainer) o).updateRefs(r -> {
+			o = ((ACell) o).updateRefs(r -> {
 				return announceRef(r,noveltyHandler);
 			});
 		}
@@ -75,10 +74,13 @@ public class MemoryStore extends AStore {
 		// Convert to direct Ref. Don't want to store a soft ref!
 		ref = ref.toDirect();
 
+		if (!(ref.getValue() instanceof ACell)) {
+			System.out.println("PANIC!");
+		}
 		ACell o = ref.getValue();
-		if (o instanceof IRefContainer) {
+		if (o instanceof ACell) {
 			// need to do recursive persistence
-			o = ((IRefContainer) o).updateRefs(r -> {
+			o = ((ACell) o).updateRefs(r -> {
 				return r.persist(noveltyHandler);
 			});
 		}

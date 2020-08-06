@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 
 import convex.core.crypto.Hash;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.TODOException;
 import convex.core.util.Utils;
 
 /**
@@ -191,13 +192,57 @@ public abstract class ACell implements ICell, IWriteable {
 	}
 
 	/**
-	 * Gets the number of child refs in this Cell's encoding.
-	 * @return
+	 * Gets the number of Refs contained within this Cell. This number is
+	 * final / immutable for any given instance.
+	 * 
+	 * @return The number of Refs in this Cell
 	 */
 	public abstract int getRefCount();
 
+	/**
+	 * Gets a numbered Ref from within this Cell.
+	 * 
+	 * @param i Index of ref to get
+	 * @return The Ref at the specified index
+	 */
 	public <R> Ref<R> getRef(int i) {
 		throw new IndexOutOfBoundsException("No Refs to get in "+Utils.getClassName(this));
+	}
+	
+	/**
+	 * Updates all Refs in this object using the given function.
+	 * 
+	 * The function *must not* change the hash value of refs, in order to ensure
+	 * structural integrity of modified data structures.
+	 * 
+	 * This is a building block for a very sneaky trick that enables use to do a lot
+	 * of efficient operations on large trees of smart references.
+	 * 
+	 * Must return the same object if no Refs are altered.
+	 */
+	@SuppressWarnings("unchecked")
+	public <N extends ACell> N updateRefs(IRefFunction func) {
+		if (getRefCount()==0) return (N) this;
+		throw new TODOException(Utils.getClassName(this) +" does not yet implement updateRefs(...)");
+	}
+
+	/**
+	 * Gets an array of child refs for this object, in the order accessible by
+	 * getRef. 
+	 * 
+	 * Concrete implementations may override this to optimise performance.
+	 * 
+	 * @param <R>
+	 * @return Array of Refs
+	 */
+	@SuppressWarnings("unchecked")
+	public <R> Ref<R>[] getChildRefs() {
+		int n = getRefCount();
+		Ref<R>[] refs = new Ref[n];
+		for (int i = 0; i < n; i++) {
+			refs[i] = getRef(i);
+		}
+		return refs;
 	}
 
 }

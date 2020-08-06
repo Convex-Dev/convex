@@ -191,7 +191,7 @@ public abstract class AVector<T> extends ASequence<T> {
 	public abstract boolean isCanonical();
 
 	@Override
-	public abstract <N extends IRefContainer> N updateRefs(IRefFunction func);
+	public abstract <N extends ACell> N updateRefs(IRefFunction func);
 
 	/**
 	 * Computes the length of the longest common prefix of this vector and another

@@ -9,7 +9,7 @@ import convex.core.lang.Core;
 import convex.core.lang.IFn;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
-import convex.core.util.Utils;
+import convex.core.lang.impl.RecordFormat;
 
 /**
  * Class representing the current on-chain status of an account.
@@ -19,14 +19,20 @@ import convex.core.util.Utils;
  * "People said I should accept the world. Bullshit! I don't accept the world."
  * - Richard Stallman
  */
-public class AccountStatus extends ACell {
+public class AccountStatus extends ARecord {
 	private final long sequence;
 	private final Amount balance;
 	private final AHashMap<Symbol, Syntax> environment;
 	private final ABlobMap<Address, Object> holdings;
+	
+	private static final Keyword[] ACCOUNT_KEYS = new Keyword[] { Keywords.SEQUENCE, Keywords.BALANCE,Keywords.ENVIRONMENT,
+			Keywords.HOLDINGS};
+
+	private static final RecordFormat FORMAT = RecordFormat.of(ACCOUNT_KEYS);
 
 	private AccountStatus(long sequence, Amount balance,
 			AHashMap<Symbol, Syntax> environment, ABlobMap<Address, Object> holdings) {
+		super(FORMAT);
 		this.sequence = sequence;
 		this.balance = balance;
 		this.environment = environment;
@@ -123,15 +129,6 @@ public class AccountStatus extends ACell {
 		return sequence<0;
 	}
 
-	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append("#accountstatus {");
-		sb.append(":balance " + Utils.ednString(balance));
-		sb.append(',');
-		sb.append(":seq " + Utils.ednString(sequence));
-		sb.append('}');
-	}
-
 	/**
 	 * Gets the exported function for a given symbol in an Actor
 	 * 
@@ -204,7 +201,7 @@ public class AccountStatus extends ACell {
 		if (expected != newSequence) {
 			return null;
 		}
-		// NOTE: we can always assume actorArgs is null from security checks above
+
 		return new AccountStatus(newSequence, balance, environment,holdings);
 	}
 
@@ -212,6 +209,7 @@ public class AccountStatus extends ACell {
 	public void validateCell() throws InvalidDataException {
 		balance.validate();
 		if (environment != null) environment.validateCell();
+		if (holdings != null) holdings.validateCell();
 	}
 
 	/**
@@ -288,7 +286,53 @@ public class AccountStatus extends ACell {
 
 	@Override
 	public int getRefCount() {
-		// TODO Auto-generated method stub
-		return 0;
+		int rc=(environment==null)?0:environment.getRefCount();
+		rc+=(holdings==null)?0:holdings.getRefCount();
+		return rc;
+	}
+	
+	public <R> Ref<R> getRef(int i) {
+		if (i<0) throw new IndexOutOfBoundsException(i);
+		int ec=(environment==null)?0:environment.getRefCount();
+		if (i<ec) return environment.getRef(i);
+		int hc=(holdings==null)?0:holdings.getRefCount();
+		if (i<hc+ec) return holdings.getRef(i-ec);
+		throw new IndexOutOfBoundsException(i);
+	}
+
+	@Override
+	protected String ednTag() {
+		return "#account";
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public <V> V get(Keyword key) {
+		if (Keywords.SEQUENCE.equals(key)) return (V) (Long)sequence;
+		if (Keywords.BALANCE.equals(key)) return (V) (Long)balance.getValue();
+		if (Keywords.ENVIRONMENT.equals(key)) return (V) environment;
+		if (Keywords.HOLDINGS.equals(key)) return (V) holdings;
+		
+		return null;
+	}
+
+	@Override
+	public byte getRecordTag() {
+		return Tag.ACCOUNT_STATUS;
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	protected AccountStatus updateAll(Object[] newVals) {
+		long newSeq=(long)newVals[0];
+		long newBal=(long)newVals[1];
+		AHashMap<Symbol, Syntax> newEnv=(AHashMap<Symbol, Syntax>) newVals[2];
+		ABlobMap<Address, Object> newHoldings=(ABlobMap<Address, Object>) newVals[3];
+		
+		if ((balance.getValue()==newBal)&&(sequence==newSeq)&&(newEnv==environment)&&(newHoldings==holdings)) {
+			return this;
+		}
+		
+		return new AccountStatus(newSeq,Amount.create(newBal),newEnv,newHoldings);
 	}
 }

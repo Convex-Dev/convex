@@ -39,8 +39,8 @@ public class GenTestAnyValue {
 	
 	@Property
 	public void testUpdateRefs(@From(ValueGen.class) Object o)  {
-		if (o instanceof IRefContainer) {
-			IRefContainer rc=(IRefContainer) o;
+		if (o instanceof ACell) {
+			ACell rc=(ACell) o;
 			int n=rc.getRefCount();
 			assertThrows(IndexOutOfBoundsException.class,()->rc.getRef(n));
 			assertThrows(IndexOutOfBoundsException.class,()->rc.getRef(-1));
@@ -56,9 +56,9 @@ public class GenTestAnyValue {
 		Blob b=Format.encodedBlob(o);
 		FuzzTestFormat.doMutationTest(b);
 		
-		if (o instanceof IRefContainer) {
+		if (o instanceof ACell) {
 			// break all the refs! This should still pass validateCell(), since it woun't change structure.
-			ACell c=((IRefContainer)o).updateRefs(r->{
+			ACell c=((ACell)o).updateRefs(r->{
 				byte[] badBytes=r.getHash().getBytes();
 				Utils.writeInt(12255, badBytes, 28);
 				Hash badHash=Hash.wrap(badBytes);

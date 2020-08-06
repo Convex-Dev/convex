@@ -6,8 +6,8 @@ import java.util.Enumeration;
 
 import javax.swing.tree.TreeNode;
 
-import convex.core.data.IRefContainer;
 import convex.core.data.Ref;
+import convex.core.data.ACell;
 import convex.core.util.Utils;
 
 public class StateTreeNode<T> implements TreeNode {
@@ -17,7 +17,7 @@ public class StateTreeNode<T> implements TreeNode {
 
 	public StateTreeNode(T o) {
 		this.object = o;
-		this.isContainer = (o instanceof IRefContainer);
+		this.isContainer = Utils.refCount(o)>0;
 	}
 
 	private static <R> StateTreeNode<R> create(R value) {
@@ -27,7 +27,7 @@ public class StateTreeNode<T> implements TreeNode {
 	@Override
 	public StateTreeNode<Object> getChildAt(int childIndex) {
 		if (isContainer) {
-			Object child = ((IRefContainer) object).getRef(childIndex).getValue();
+			Object child = ((ACell) object).getRef(childIndex).getValue();
 			return StateTreeNode.create(child);
 		}
 		;
@@ -36,7 +36,7 @@ public class StateTreeNode<T> implements TreeNode {
 
 	@Override
 	public int getChildCount() {
-		return isContainer ? ((IRefContainer) object).getRefCount() : 0;
+		return isContainer ? ((ACell) object).getRefCount() : 0;
 	}
 
 	@Override
@@ -64,7 +64,7 @@ public class StateTreeNode<T> implements TreeNode {
 	@Override
 	public Enumeration<? extends TreeNode> children() {
 
-		Ref<Object>[] childRefs = (isContainer ? ((IRefContainer) object).getChildRefs() : new Ref[0]);
+		Ref<Object>[] childRefs = (isContainer ? ((ACell) object).getChildRefs() : new Ref[0]);
 		ArrayList<StateTreeNode<Object>> tns = new ArrayList<>();
 		for (Ref<Object> r : childRefs) {
 			tns.add(StateTreeNode.create(r.getValue()));

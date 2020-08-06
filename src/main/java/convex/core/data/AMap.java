@@ -24,7 +24,7 @@ import convex.core.util.Utils;
  * @param <V> Type of values
  */
 public abstract class AMap<K, V> extends ADataStructure<MapEntry<K, V>>
-		implements Map<K, V>, IGet<V>, IRefContainer {
+		implements Map<K, V>, IGet<V> {
 
 	protected long count;
 
@@ -39,7 +39,7 @@ public abstract class AMap<K, V> extends ADataStructure<MapEntry<K, V>>
 
 	@Override
 	public int size() {
-		return (int) (Math.min(count(), Integer.MAX_VALUE));
+		return Utils.checkedInt(count());
 	}
 
 	@Override

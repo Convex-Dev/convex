@@ -197,7 +197,7 @@ public class List<T> extends AList<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <N extends IRefContainer> N updateRefs(IRefFunction func) {
+	public <N extends ACell> N updateRefs(IRefFunction func) {
 		AVector<T> newData = (AVector<T>) data.updateRefs(func);
 		if (newData == data) return (N) this;
 		return (N) new List<T>(newData);

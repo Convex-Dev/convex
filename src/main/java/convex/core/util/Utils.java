@@ -28,7 +28,6 @@ import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.IObject;
-import convex.core.data.IRefContainer;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.exceptions.TODOException;
@@ -996,12 +995,12 @@ public class Utils {
 	 * @return Total number of Refs
 	 */
 	public static long totalRefCount(Object a) {
-		if (!(a instanceof IRefContainer)) return 0;
+		if (!(a instanceof ACell)) return 0;
 
-		IRefContainer ra = (IRefContainer) a;
+		ACell ra = (ACell) a;
 		long[] count = new long[] { 0L };
 
-		IRefContainer ra2;
+		ACell ra2;
 		ra2 = ra.updateRefs(r -> {
 			count[0] += 1 + totalRefCount(r.getValue());
 
@@ -1012,16 +1011,16 @@ public class Utils {
 	}
 
 	public static <R> Ref<R> getRef(Object o, int i) {
-		if (o instanceof IRefContainer) {
-			return ((IRefContainer) o).getRef(i);
+		if (o instanceof ACell) {
+			return ((ACell) o).getRef(i);
 		}
 		throw new IllegalArgumentException("Bad ref index: " + i);
 	}
 
 	@SuppressWarnings("unchecked")
 	public static <T> T updateRefs(Object o, IRefFunction func) {
-		if (o instanceof IRefContainer) {
-			return ((IRefContainer) o).updateRefs(func);
+		if (o instanceof ACell) {
+			return (T)((ACell) o).updateRefs(func);
 		}
 		return (T) o;
 	}

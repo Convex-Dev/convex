@@ -2,7 +2,6 @@ package convex.core.lang;
 
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.core.data.IRefContainer;
 import convex.core.data.Syntax;
 
 /**
@@ -13,7 +12,7 @@ import convex.core.data.Syntax;
  *
  * @param <T> Return type of functions.
  */
-public abstract class AFn<T> extends ACell implements IFn<T>, IRefContainer {
+public abstract class AFn<T> extends ACell implements IFn<T> {
 
 	/**
 	 * Returns the declared param names for a function, or null if not available.

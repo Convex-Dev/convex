@@ -183,13 +183,13 @@ public class Set<T> extends ASet<T> {
 	@Override
 	public ASet<T> include(T a) {
 		if (map.containsKey(a)) return this;
-		return wrap(map.assocRef(Ref.create(a), Ref.TRUE_VALUE));
+		return wrap(map.assocRef(Ref.create(a), true));
 	}
 
 	@Override
 	public ASet<T> includeRef(Ref<T> ref) {
 		if (map.containsKeyRef(ref)) return this;
-		return wrap(map.assocRef(ref, Ref.TRUE_VALUE));
+		return wrap(map.assocRef(ref, false));
 	}
 
 	@Override

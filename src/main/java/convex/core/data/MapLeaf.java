@@ -412,7 +412,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
-	public <R extends IRefContainer> R updateRefs(IRefFunction func) {
+	public <R extends ACell> R updateRefs(IRefFunction func) {
 		int n = entries.length;
 		if (n == 0) return (R) this;
 		MapEntry<K, V>[] newEntries = entries;

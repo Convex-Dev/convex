@@ -16,10 +16,9 @@ import javax.swing.tree.TreePath;
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.Format;
-import convex.core.data.IRefContainer;
 import convex.core.data.Keyword;
-import convex.core.data.MapLeaf;
 import convex.core.data.MapEntry;
+import convex.core.data.MapLeaf;
 import convex.core.util.Utils;
 
 @SuppressWarnings("serial")
@@ -35,7 +34,7 @@ public class StateTreePanel extends JPanel {
 		public Node(String name, Object val) {
 			super(val);
 			this.name = name;
-			container = (val instanceof IRefContainer);
+			container = Utils.refCount(val)>0;
 		}
 
 		public Node(Object val) {
@@ -89,7 +88,7 @@ public class StateTreePanel extends JPanel {
 			}
 
 			if (!container) return;
-			IRefContainer rc = (IRefContainer) userObject;
+			ACell rc = (ACell) userObject;
 			int n = rc.getRefCount();
 			for (int i = 0; i < n; i++) {
 				Object child = rc.getRef(i).getValue();

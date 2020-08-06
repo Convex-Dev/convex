@@ -429,8 +429,8 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 			if (hs.contains(ref)) return;
 			hs.add(ref);
 			accumulateRefSet(ref.getValue(), hs);
-		} else if (a instanceof IRefContainer) {
-			IRefContainer rc = (IRefContainer) a;
+		} else if (a instanceof ACell) {
+			ACell rc = (ACell) a;
 			rc.updateRefs(r -> {
 				accumulateRefSet(r, hs);
 				return r;
@@ -489,8 +489,8 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	public ASet<Object> addAllToSet(ASet<Object> store) {
 		store = store.includeRef((Ref<Object>) this);
 		T o = getValue();
-		if (o instanceof IRefContainer) {
-			IRefContainer rc = (IRefContainer) o;
+		if (o instanceof ACell) {
+			ACell rc = (ACell) o;
 			int n = rc.getRefCount();
 			for (int i = 0; i < n; i++) {
 				Ref<Object> rr = rc.getRef(i);

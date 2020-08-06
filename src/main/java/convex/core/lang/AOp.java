@@ -4,7 +4,6 @@ import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
 import convex.core.data.AMap;
-import convex.core.data.IRefContainer;
 import convex.core.data.Symbol;
 import convex.core.data.Tag;
 
@@ -20,7 +19,7 @@ import convex.core.data.Tag;
  *
  * @param <T> the type of the operation return value
  */
-public abstract class AOp<T> extends ACell implements IRefContainer {
+public abstract class AOp<T> extends ACell {
 
 	/**
 	 * Executes this op with the given context. Must preserve depth unless an

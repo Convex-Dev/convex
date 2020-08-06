@@ -21,7 +21,7 @@ import convex.core.util.Utils;
  * @param <K> The type of keys
  * @param <V> The type of values
  */
-public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEntry<K, V>>, IRefContainer {
+public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEntry<K, V>> {
 
 	private final Ref<K> keyRef;
 	private final Ref<V> valueRef;

@@ -22,7 +22,7 @@ import convex.core.util.Utils;
  * One smart reference is maintained for each child node at each level
  * 
  */
-public class BlobTree extends ABlob implements IRefContainer {
+public class BlobTree extends ABlob {
 
 	public static final int BIT_SHIFT_PER_LEVEL = 4;
 	public static final int FANOUT = 1 << BIT_SHIFT_PER_LEVEL;
@@ -435,7 +435,7 @@ public class BlobTree extends ABlob implements IRefContainer {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <N extends IRefContainer> N updateRefs(IRefFunction func) {
+	public <N extends ACell> N updateRefs(IRefFunction func) {
 		Ref<ABlob>[] newChildren = Ref.updateRefs(children, func);
 		return (N) withChildren(newChildren);
 	}
