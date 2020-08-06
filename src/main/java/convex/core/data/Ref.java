@@ -448,12 +448,12 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 * 
 	 * @return Array of updated Refs
 	 */
-	@SuppressWarnings("unchecked")
 	public static <T> Ref<T>[] updateRefs(Ref<T>[] refs, IRefFunction func) {
 		Ref<T>[] newRefs = null;
 		int n = refs.length;
 		for (int i = 0; i < n; i++) {
 			Ref<T> ref = refs[i];
+			@SuppressWarnings("unchecked")
 			Ref<T> newRef = (Ref<T>) func.apply(ref);
 			if (ref != newRef) {
 				if (newRefs == null) {

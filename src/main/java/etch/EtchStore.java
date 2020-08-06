@@ -108,20 +108,18 @@ public class EtchStore extends AStore {
 		}
 
 		ACell o = ref.getValue();
-		if (o.getRefCount()>0) {
-			// Function to update Refs
-			@SuppressWarnings("unchecked")
-			IRefFunction func=r -> {
-				// Go via persist, since needs to check if Ref should be persisted at all
-				return (Ref<ACell>)persistRef(r,noveltyHandler,requiredStatus);
-			};
+		
+		@SuppressWarnings("unchecked")
+		IRefFunction func=r -> {
+			// Go via persist, since needs to check if Ref should be persisted at all
+			return persistRef((Ref<ACell>)r,noveltyHandler,requiredStatus);
+		};
 			
-			// need to do recursive persistence
-			ACell newObject = ((ACell) o).updateRefs(func);
-			
-			// perhaps need to update Ref 
-			if (o!=newObject) ref=ref.withValue(newObject);
-		}
+		// need to do recursive persistence
+		ACell newObject = ((ACell) o).updateRefs(func);
+		
+		// perhaps need to update Ref 
+		if (o!=newObject) ref=ref.withValue(newObject);
 		
 		log.log(Stores.PERSIST_LOG_LEVEL,()->"Etch persisting at status="+requiredStatus+" ref "+hash.toHexString()+" of class "+Utils.getClassName(o)+" with store "+this);
 

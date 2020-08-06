@@ -89,7 +89,7 @@ public class Constant<T> extends AOp<T> {
 	@Override
 	public Constant<T> updateRefs(IRefFunction func) {
 		@SuppressWarnings("unchecked")
-		Ref<T> newRef = func.apply(value);
+		Ref<T> newRef = (Ref<T>) func.apply(value);
 		if (value == newRef) return this;
 		return createFromRef(newRef);
 	}

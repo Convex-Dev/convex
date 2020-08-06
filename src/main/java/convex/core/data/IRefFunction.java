@@ -8,6 +8,5 @@ package convex.core.data;
 @FunctionalInterface
 public interface IRefFunction {
 
-	@SuppressWarnings("rawtypes")
-	public Ref apply(Ref t);
+	public Ref<?> apply(Ref<?> t);
 }

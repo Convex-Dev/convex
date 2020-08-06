@@ -196,7 +196,7 @@ public class SignedData<T> extends ACell {
 	@Override
 	public SignedData<T> updateRefs(IRefFunction func) {
 		@SuppressWarnings("unchecked")
-		Ref<T> newValueRef = (Ref<T>)func.apply(valueRef);
+		Ref<T> newValueRef = (Ref<T>) func.apply(valueRef);
 		if (valueRef == newValueRef) return this;
 		// SECURITY: preserve validated flag
 		return new SignedData<T>(newValueRef, address, signature, validated);

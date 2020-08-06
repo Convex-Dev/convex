@@ -22,7 +22,7 @@ public class MemoryStore extends AStore {
 	/**
 	 * Storage of persisted Refs for each hash value
 	 */
-	private final HashMap<Hash, Ref<?>> hashRefs = new HashMap<Hash, Ref<?>>();
+	private final HashMap<Hash, Ref<ACell>> hashRefs = new HashMap<Hash, Ref<ACell>>();
 
 	@Override
 	@SuppressWarnings("unchecked")
@@ -31,38 +31,34 @@ public class MemoryStore extends AStore {
 		return ref;
 	}
 	
-	@SuppressWarnings("unchecked")
 	@Override
-	public Ref<ACell> announceRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler) {
+	public Ref<ACell> announceRef(Ref<ACell> r2, Consumer<Ref<ACell>> noveltyHandler) {
 
 		// check store for existing ref first. Return this is we have it
-		Hash hash = ref.getHash();
+		Hash hash = r2.getHash();
 		Ref<ACell> existing = refForHash(hash);
 		if ((existing != null)&&(existing.getStatus()>=Ref.ANNOUNCED)) return existing;
 
 		// Convert to direct Ref. Don't want to store a soft ref!
-		ref = ref.toDirect();
+		r2 = r2.toDirect();
 
-		ACell o = ref.getValue();
-		if (o instanceof ACell) {
-			// need to do recursive persistence
-			o = ((ACell) o).updateRefs(r -> {
-				return announceRef(r,noveltyHandler);
-			});
-		}
-		ref=ref.withValue(o);
+		ACell o = r2.getValue();
+		o=o.updateRefs(r -> {
+			return r.announce(noveltyHandler);
+		});
+		
+		r2=r2.withValue(o);
 		final ACell oTemp=o;
 		log.log(Stores.PERSIST_LOG_LEVEL,()->"Announcing ref "+hash.toHexString()+" of class "+Utils.getClassName(oTemp)+" with store "+this);
 
-		ref=ref.withMinimumStatus(Ref.ANNOUNCED);
-		hashRefs.put(hash, ref);
+		r2=r2.withMinimumStatus(Ref.ANNOUNCED);
+		hashRefs.put(hash, r2);
 
-		if (noveltyHandler != null) noveltyHandler.accept(ref);
+		if (noveltyHandler != null) noveltyHandler.accept(r2);
 
-		return ref;
+		return r2;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public Ref<ACell> persistRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler) {
 
@@ -74,16 +70,12 @@ public class MemoryStore extends AStore {
 		// Convert to direct Ref. Don't want to store a soft ref!
 		ref = ref.toDirect();
 
-		if (!(ref.getValue() instanceof ACell)) {
-			System.out.println("PANIC!");
-		}
 		ACell o = ref.getValue();
-		if (o instanceof ACell) {
-			// need to do recursive persistence
-			o = ((ACell) o).updateRefs(r -> {
-				return r.persist(noveltyHandler);
-			});
-		}
+		// need to do recursive persistence
+		o = o.updateRefs(r -> {
+			return r.persist(noveltyHandler);
+		});
+		
 		ref=ref.withValue(o);
 		final ACell oTemp=o;
 		log.log(Stores.PERSIST_LOG_LEVEL,()->"Persisting ref "+hash.toHexString()+" of class "+Utils.getClassName(oTemp)+" with store "+this);
