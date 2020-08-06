@@ -1,5 +1,6 @@
 package convex.core.lang;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 
 import convex.core.data.*;
@@ -69,6 +70,45 @@ public class Scrypt extends Reader {
                 push(prepare(Vectors.create(popNodeList()))));
     }
 
+    public Rule MapLiteralExpression() {
+        return Sequence(
+                LWING,
+                MapEntries(),
+                RWING,
+                // Create a Map from a List of MapEntry.
+                // `MapLiteralEntries` builds up a list of MapEntry,
+                // which we can get from `popNodeList`.
+                push(prepare(Maps.create(popNodeList())))
+        );
+    }
+
+    public Rule MapEntries() {
+        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+
+        return Sequence(
+                ZeroOrMore(
+                        MapEntry(),
+                        ListAddAction(expVar),
+                        ZeroOrMore(
+                                COMMA,
+                                MapEntry(),
+                                ListAddAction(expVar))),
+                push(prepare(Lists.create(expVar.get()))));
+    }
+
+    public Rule MapEntry() {
+        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+
+        return Sequence(
+                Expression(),
+                ListAddAction(expVar),
+                Spacing(),
+                Expression(),
+                ListAddAction(expVar),
+                push(MapEntry.create(expVar.get().get(0), expVar.get().get(1)))
+        );
+    }
+
     public Rule Expression() {
         return FirstOf(
                 NestedExpression(),
@@ -78,7 +118,8 @@ public class Scrypt extends Reader {
                 BooleanLiteral(),
                 Keyword(),
                 Symbol(),
-                Vector());
+                Vector(),
+                MapLiteralExpression());
     }
 
     public Rule NestedExpression() {
@@ -129,10 +170,11 @@ public class Scrypt extends Reader {
         Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
         return Sequence(
                 Spacing(),
-                ZeroOrMore(Sequence( // initial expressions with following whitespace or delimiter
-                        CompoundExpression(),
-                        COMMA,
-                        ListAddAction(expVar))),
+                ZeroOrMore(
+                        Sequence( // initial expressions with following whitespace or delimiter
+                                CompoundExpression(),
+                                COMMA,
+                                ListAddAction(expVar))),
                 Optional(
                         Sequence( // final expression without whitespace
                                 CompoundExpression(), ListAddAction(expVar))),
@@ -166,6 +208,8 @@ public class Scrypt extends Reader {
     final Rule COMMA = Terminal(",");
     final Rule LPAR = Terminal("(");
     final Rule RPAR = Terminal(")");
+    final Rule LWING = Terminal("{");
+    final Rule RWING = Terminal("}");
 
     @SuppressNode
     @DontLabel
