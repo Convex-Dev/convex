@@ -20,6 +20,15 @@ public class ScryptTest {
 
     static final Context<?> CON = TestState.INITIAL_CONTEXT;
 
+    static Scrypt scrypt() {
+        return Parboiled.createParser(Scrypt.class);
+    }
+
+    @SuppressWarnings("rawtypes")
+    static ReportingParseRunner runner(Rule rule) {
+        return new ReportingParseRunner(rule);
+    }
+
     @SuppressWarnings("rawtypes")
     static Object parse(Rule rule, String source) {
         var result = new ReportingParseRunner(rule).run(source);
@@ -265,6 +274,23 @@ public class ScryptTest {
         assertEquals(Vectors.of(3L, 3L), eval("[1 + 2, 3]"));
         assertEquals(Vectors.of(3L), eval("[1 + 2,]"));
         assertEquals(Vectors.of(3L, 3L), eval("[1 + 2, 3]"));
+    }
+
+    @Test
+    public void testMap() {
+        var scrypt = scrypt();
+
+        var mapEntry = scrypt.MapEntry();
+
+        assertEquals(Reader.read("[:x, 1]"), parse(mapEntry, ":x 1"));
+        assertEquals(Reader.read("[[1 2], 3]"), parse(mapEntry, "[1, 2] 3"));
+
+        var map = scrypt.MapLiteralExpression();
+
+        assertEquals(Reader.read("{}"), parse(map, "{}"));
+        assertEquals(Reader.read("{:x 1 :y 2 :z 3}"), parse(map, "{:x 1, :y 2, :z 3}"));
+        assertEquals(Reader.read("{{} 1 [] 2}"), parse(map, "{{} 1, [] 2}"));
+        assertThrows(ParseException.class, () -> eval("{1 2 3 4}"));
     }
 
 }
