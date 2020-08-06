@@ -163,47 +163,20 @@ public class ScryptTest {
 
     @Test
     public void testFunctionApplication() {
-        var parser = Parboiled.createParser(Scrypt.class);
+        var parser = scrypt();
+        var rule = parser.FunctionApplication();
 
-        {
-            assertEquals(
-                    Reader.read("(f)"),
-                    parse(parser.FunctionApplication(), "f()"));
+        assertEquals(Reader.read("(f)"), parse(rule, "f()"));
+        assertEquals(Reader.read("(f 1)"), parse(rule, "f(1)"));
+        assertEquals(Reader.read("(f 1)"), parse(rule, "f( 1 )"));
+        assertEquals(Reader.read("(f 1 2)"), parse(rule, "f(1, 2)"));
+        assertEquals(Reader.read("(f 1 (+ 2 3))"), parse(rule, "f(1, 2 + 3)"));
+        assertEquals(Reader.read("(f 1 (* (+ 2 3) 4))"), parse(rule, "f(1, (2 + 3) * 4)"));
+        assertEquals(Reader.read("(if true 1)"), parse(rule, "if(true, 1)"));
 
-            assertEquals(
-                    Reader.read("(f 1)"),
-                    parse(parser.FunctionApplication(), "f(1)")
-            );
-
-            assertEquals(
-                    Reader.read("(f 1)"),
-                    parse(parser.FunctionApplication(), "f( 1 )")
-            );
-
-            assertEquals(
-                    Reader.read("(f 1 2)"),
-                    parse(parser.FunctionApplication(), "f(1, 2)")
-            );
-
-            assertEquals(
-                    Reader.read("(f 1 (+ 2 3))"),
-                    parse(parser.FunctionApplication(), "f(1, 2 + 3)")
-            );
-
-            assertEquals(
-                    Reader.read("(f 1 (* (+ 2 3) 4))"),
-                    parse(parser.FunctionApplication(), "f(1, (2 + 3) * 4)")
-            );
-
-            assertEquals(
-                    Reader.read("(if true 1)"),
-                    parse(parser.FunctionApplication(), "if(true, 1)")
-            );
-
-            assertEquals(1L, (Long) eval("if(true, 1)"));
-
-            assertEquals(2L, (Long) eval("(identity(inc))(1)"));
-        }
+        assertEquals(1L, (Long) eval("if(true, 1)"));
+        assertEquals(2L, (Long) eval("(identity(inc))(1)"));
+        assertEquals(2, (Long) eval("(inc)(1)"));
     }
 
     @Test
@@ -303,6 +276,9 @@ public class ScryptTest {
 
         assertEquals(Maps.empty(), eval("{}"));
         assertEquals(1, (Long) eval("{1;}"));
+
+        // Semicolon is *always* required - it's not simply a "separator".
+        assertThrows(ParseException.class, () -> eval("{1; 2}"));
     }
 
     @Test
@@ -314,11 +290,6 @@ public class ScryptTest {
 
         assertEquals(1, (Long) eval("def x = 1;"));
         assertEquals(2, (Long) eval("{def x = 1; x + 1;}"));
-
-        assertEquals(2, (Long) eval("(inc)(1)"));
-
-        // Explain this
-        assertThrows(ParseException.class, () -> eval("{1;2}"));
     }
 
 }
