@@ -226,7 +226,7 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	 * 
 	 * @return Memory Size of this Cell
 	 */
-	protected final long getMemorySize() {
+	public final long getMemorySize() {
 		if (memorySize>=0) return memorySize;
 		memorySize=(isEmbedded())?0:calcMemorySize();
 		return memorySize;

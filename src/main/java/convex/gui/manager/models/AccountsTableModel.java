@@ -22,7 +22,7 @@ public class AccountsTableModel extends AbstractTableModel implements TableModel
 		this.state = state;
 	}
 
-	private static final String[] FIXED_COLS = new String[] { "Address", "Count", "Balance", "Actor", "Name" };
+	private static final String[] FIXED_COLS = new String[] { "Address", "Type", "Count", "Balance", "Name", "Env.Size" };
 
 	public String getColumnName(int col) {
 		if (col < FIXED_COLS.length) return FIXED_COLS[col];
@@ -55,11 +55,13 @@ public class AccountsTableModel extends AbstractTableModel implements TableModel
 		case 0:
 			return address.toChecksumHex();
 		case 1:
-			return as.getSequence();
-		case 2:
-			return as.getBalance().toFriendlyString();
+			return as.isActor()?"Actor":"User";
+		case 2: {
+			long seq=as.getSequence();
+			return (seq>=0)?seq:"";
+		}
 		case 3:
-			return as.isActor();
+			return as.getBalance().toFriendlyString();
 		case 4: {
 			AMap<Address, Object> reg = state.getAccount(Init.REGISTRY_ADDRESS).getEnvironment()
 					.get(Symbol.create("registry")).getValue();
@@ -69,6 +71,8 @@ public class AccountsTableModel extends AbstractTableModel implements TableModel
 			AMap<Keyword, Object> a = (AMap<Keyword, Object>) reg.get(address);
 			return a.get(Keyword.create("name"));
 		}
+		case 5:
+			return as.getMemorySize();
 		default:
 			return "";
 		}

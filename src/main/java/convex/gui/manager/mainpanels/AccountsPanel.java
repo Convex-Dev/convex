@@ -38,7 +38,7 @@ public class AccountsPanel extends JPanel {
 		}
 
 		public void setValue(Object value) {
-			setText((value == null) ? "User" : "Actor");
+			setText(value.toString());
 		}
 	}
 
@@ -52,24 +52,30 @@ public class AccountsPanel extends JPanel {
 
 		DefaultTableCellRenderer leftRenderer = new DefaultTableCellRenderer();
 		leftRenderer.setHorizontalAlignment(JLabel.LEFT);
-		table.getColumnModel().getColumn(0).setCellRenderer(leftRenderer);
-		table.getColumnModel().getColumn(1).setCellRenderer(leftRenderer);
-		table.getColumnModel().getColumn(0).setPreferredWidth(150);
-		table.getColumnModel().getColumn(1).setPreferredWidth(70);
-
 		DefaultTableCellRenderer rightRenderer = new DefaultTableCellRenderer();
 		rightRenderer.setHorizontalAlignment(JLabel.RIGHT);
-		table.getColumnModel().getColumn(2).setCellRenderer(rightRenderer);
-		table.getColumnModel().getColumn(2).setPreferredWidth(170);
-
+		
+		table.getColumnModel().getColumn(0).setCellRenderer(leftRenderer);
+		table.getColumnModel().getColumn(0).setPreferredWidth(150);
+		
 		ActorRenderer actorRenderer = new ActorRenderer();
 		actorRenderer.setHorizontalAlignment(JLabel.CENTER);
-		table.getColumnModel().getColumn(3).setPreferredWidth(70);
-		table.getColumnModel().getColumn(3).setCellRenderer(actorRenderer);
+		table.getColumnModel().getColumn(1).setPreferredWidth(70);
+		table.getColumnModel().getColumn(1).setCellRenderer(actorRenderer);
+
+		table.getColumnModel().getColumn(2).setCellRenderer(rightRenderer);
+		table.getColumnModel().getColumn(2).setPreferredWidth(70);
+
+		table.getColumnModel().getColumn(3).setCellRenderer(rightRenderer);
+		table.getColumnModel().getColumn(3).setPreferredWidth(180);
 
 		table.getColumnModel().getColumn(4).setPreferredWidth(200);
 		table.getColumnModel().getColumn(4).setCellRenderer(leftRenderer);
 
+		table.getColumnModel().getColumn(5).setPreferredWidth(100);
+		table.getColumnModel().getColumn(5).setCellRenderer(rightRenderer);
+
+		
 		// popup menu, not sure why this doesn't work....
 		final JPopupMenu popupMenu = new JPopupMenu();
 		JMenuItem copyItem = new JMenuItem("Copy Address");
