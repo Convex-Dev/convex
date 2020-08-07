@@ -36,7 +36,7 @@ public class ScryptTest {
         if (result.matched) {
             return Syntax.unwrapAll(result.resultValue);
         } else {
-            throw new RuntimeException("Rule didn't match.");
+            throw new RuntimeException(rule.toString() + " failed to match " + source);
         }
     }
 
@@ -163,47 +163,20 @@ public class ScryptTest {
 
     @Test
     public void testFunctionApplication() {
-        var parser = Parboiled.createParser(Scrypt.class);
+        var parser = scrypt();
+        var rule = parser.FunctionApplication();
 
-        {
-            assertEquals(
-                    Reader.read("(f)"),
-                    parse(parser.FunctionApplication(), "f()"));
+        assertEquals(Reader.read("(f)"), parse(rule, "f()"));
+        assertEquals(Reader.read("(f 1)"), parse(rule, "f(1)"));
+        assertEquals(Reader.read("(f 1)"), parse(rule, "f( 1 )"));
+        assertEquals(Reader.read("(f 1 2)"), parse(rule, "f(1, 2)"));
+        assertEquals(Reader.read("(f 1 (+ 2 3))"), parse(rule, "f(1, 2 + 3)"));
+        assertEquals(Reader.read("(f 1 (* (+ 2 3) 4))"), parse(rule, "f(1, (2 + 3) * 4)"));
+        assertEquals(Reader.read("(if true 1)"), parse(rule, "if(true, 1)"));
 
-            assertEquals(
-                    Reader.read("(f 1)"),
-                    parse(parser.FunctionApplication(), "f(1)")
-            );
-
-            assertEquals(
-                    Reader.read("(f 1)"),
-                    parse(parser.FunctionApplication(), "f( 1 )")
-            );
-
-            assertEquals(
-                    Reader.read("(f 1 2)"),
-                    parse(parser.FunctionApplication(), "f(1, 2)")
-            );
-
-            assertEquals(
-                    Reader.read("(f 1 (+ 2 3))"),
-                    parse(parser.FunctionApplication(), "f(1, 2 + 3)")
-            );
-
-            assertEquals(
-                    Reader.read("(f 1 (* (+ 2 3) 4))"),
-                    parse(parser.FunctionApplication(), "f(1, (2 + 3) * 4)")
-            );
-
-            assertEquals(
-                    Reader.read("(if true 1)"),
-                    parse(parser.FunctionApplication(), "if(true, 1)")
-            );
-
-            assertEquals(1L, (Long) eval("if(true, 1)"));
-
-            assertEquals(2L, (Long) eval("(identity(inc))(1)"));
-        }
+        assertEquals(1L, (Long) eval("if(true, 1)"));
+        assertEquals(2L, (Long) eval("(identity(inc))(1)"));
+        assertEquals(2, (Long) eval("(inc)(1)"));
     }
 
     @Test
@@ -291,6 +264,32 @@ public class ScryptTest {
         assertEquals(Reader.read("{:x 1 :y 2 :z 3}"), parse(map, "{:x 1, :y 2, :z 3}"));
         assertEquals(Reader.read("{{} 1 [] 2}"), parse(map, "{{} 1, [] 2}"));
         assertThrows(ParseException.class, () -> eval("{1 2 3 4}"));
+    }
+
+    @Test
+    public void testBlock() {
+        var scrypt = scrypt();
+        var block = scrypt.BlockExpression();
+
+        assertEquals(Reader.read("(do 1)"), parse(block, "{ 1; }"));
+        assertEquals(Reader.read("(do 1 :key [] {} (inc 1))"), parse(block, "{ 1; :key; []; {}; inc(1);}"));
+
+        assertEquals(Maps.empty(), eval("{}"));
+        assertEquals(1, (Long) eval("{1;}"));
+
+        // Semicolon is *always* required - it's not simply a "separator".
+        assertThrows(ParseException.class, () -> eval("{1; 2}"));
+    }
+
+    @Test
+    public void testDef() {
+        var scrypt = scrypt();
+        var def = scrypt.DefStatement();
+
+        assertEquals(Reader.read("(def x 1)"), parse(def, "def x = 1;"));;
+
+        assertEquals(1, (Long) eval("def x = 1;"));
+        assertEquals(2, (Long) eval("{def x = 1; x + 1;}"));
     }
 
 }
