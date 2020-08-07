@@ -16,9 +16,9 @@ import convex.test.Samples;
 
 @RunWith(Parameterized.class)
 public class ParamTestNodes {
-	private ICell data;
+	private ACell data;
 
-	public ParamTestNodes(String label, ICell v) {
+	public ParamTestNodes(String label, ACell v) {
 		this.data = v;
 	}
 
@@ -42,7 +42,7 @@ public class ParamTestNodes {
 		Ref.createPersisted(data);
 		String hex = data.getEncoding().toHexString();
 		Blob d2 = Blob.fromHex(hex);
-		ICell rec = Format.read(d2);
+		ACell rec = Format.read(d2);
 		rec.validate();
 		assertEquals(data, rec);
 		assertEquals(data.getEncoding(), rec.getEncoding());

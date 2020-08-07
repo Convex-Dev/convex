@@ -14,6 +14,7 @@ import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import convex.core.Constants;
 import convex.core.crypto.Hash;
 import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
@@ -192,7 +193,7 @@ public class Etch {
 	 */	
 	public static Etch createTempEtch(String prefix) throws IOException {
 		File data = File.createTempFile(prefix+"-", null);
-		// data.deleteOnExit();
+		if (Constants.ETCH_DELETE_TEMP_ON_EXIT) data.deleteOnExit();
 		return new Etch(data);
 	}
 	

@@ -538,7 +538,7 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 * Gets the total memory size for this Ref, or null if not known.
 	 * @return Memory size in bytes.
 	 */
-	public abstract Long getMemorySize();
+	public abstract long getMemorySize();
 
 	/**
 	 * Updates the value stored within this Ref. New value must be equal in value to the old value (identical hash), 
@@ -554,6 +554,8 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 * @param bb
 	 * @return
 	 */
-	public abstract ByteBuffer writeRawHash(ByteBuffer bb);
+	public ByteBuffer writeRawHash(ByteBuffer bb) {
+		return getHash().writeRaw(bb);
+	}
 
 }

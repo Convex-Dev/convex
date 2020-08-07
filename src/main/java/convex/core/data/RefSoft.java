@@ -33,11 +33,6 @@ public class RefSoft<T> extends Ref<T> {
 	 */
 	protected SoftReference<T> softRef;
 	
-	/**
-	 * Optional memory size, for this Ref plus all its children. Required only for PERSISTED or above.
-	 */
-	protected Long memorySize=null;
-	
 	protected RefSoft(SoftReference<T> ref, Hash hash, int status) {
 		super(hash, status);
 		this.softRef = ref;
@@ -117,11 +112,6 @@ public class RefSoft<T> extends Ref<T> {
 	}
 
 	@Override
-	public ByteBuffer writeRawHash(ByteBuffer bb) {
-		return getHash().writeRaw(bb);
-	}
-
-	@Override
 	public boolean equalsValue(Ref<T> a) {
 		if (a == this) return true;
 		if ((this.hash == a.hash) && (this.hash != null)) return true;
@@ -139,21 +129,9 @@ public class RefSoft<T> extends Ref<T> {
 	}
 	
 	@Override
-	public Long getMemorySize() {
-		// TODO: refactor?
-		return calcMemorySize();
-	}
-	
-	public void setMemorySize(Long mem) {
-		memorySize=mem;
-	}
-	
-
-	public long calcMemorySize() {
-		if (memorySize!=null) return memorySize;
+	public long getMemorySize() {
 		ACell c=(ACell) getValue();
-		memorySize= c.calcMemorySize();
-		return memorySize;
+		return c.getMemorySize();
 	}
 
 	@Override

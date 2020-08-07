@@ -22,9 +22,18 @@ public class Constants {
 	
 	public static final boolean USE_ED25519=true;
 
+	public static final boolean ETCH_DELETE_TEMP_ON_EXIT = true;
+	
 	/**
 	 * Sequence number used to identify standard actors
 	 */
 	public static final long ACTOR_SEQUENCE = -1;
+
+	/**
+	 * Size in bytes of constant overhead applied per non-embedded Cell in memory accounting
+	 */
+	public static final long MEMORY_OVERHEAD = 64;
+
+	
 
 }

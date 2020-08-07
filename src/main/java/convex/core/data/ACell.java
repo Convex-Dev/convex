@@ -3,6 +3,7 @@ package convex.core.data;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 
+import convex.core.Constants;
 import convex.core.crypto.Hash;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.TODOException;
@@ -19,7 +20,7 @@ import convex.core.util.Utils;
  * "It is better to have 100 functions operate on one data structure than 
  * to have 10 functions operate on 10 data structures." - Alan Perlis
  */
-public abstract class ACell implements ICell, IWriteable {
+public abstract class ACell implements IWriteable, IValidated, IObject {
 
 	/**
 	 * We cache the Blob for the binary format of this Cell
@@ -28,6 +29,7 @@ public abstract class ACell implements ICell, IWriteable {
 	
 	/**
 	 * We cache the computed memorySize. May be 0 for embedded objects
+	 * -1 is initial value for when size is not calculated
 	 */
 	private long memorySize=-1;
 
@@ -44,7 +46,11 @@ public abstract class ACell implements ICell, IWriteable {
 	 */
 	public abstract void validateCell() throws InvalidDataException;
 	
-	@Override
+	/**
+	 * Gets the encoded byte representation of this cell.
+	 * 
+	 * @return A blob representing this cell in encoded form
+	 */
 	public final Blob getEncoding() {
 		if (encoding==null) encoding=createEncoding();
 		return encoding;
@@ -86,12 +92,20 @@ public abstract class ACell implements ICell, IWriteable {
 		return Blob.wrap(Utils.toByteArray(b));
 	}
 
-	@Override
+	/**
+	 * Length of binary representation of this object
+	 * @return The length of the encoded binary representation in bytes
+	 */
 	public final int encodedLength() {
 		return Utils.checkedInt(getEncoding().length());
 	}
 	
-	@Override
+	/**
+	 * Hash of data encoding of this cell. Calling this method
+	 * may force hash computation if needed.
+	 * 
+	 * @return The Hash of this cell's encoding.
+	 */
 	public final Hash getHash() {
 		// final method to avoid any mistakes.
 		return getEncoding().getContentHash();
@@ -142,8 +156,8 @@ public abstract class ACell implements ICell, IWriteable {
 	}
 
 	/**
-	 * Writes the encoded for of this Cell to a ByteBuffer.
-	 * Will write the appropriate tag byte first
+	 * Writes this Cell's encoding to a ByteBuffer, including a tag byte which will be written first
+	 *
 	 * @param bb A ByteBuffer to which to write the encoding
 	 * @return The passed ByteBuffer, after the representation of this object has been written.
 	 */
@@ -186,27 +200,31 @@ public abstract class ACell implements ICell, IWriteable {
 	/**
 	 * Calculates the total Memory Size for this Cell.
 	 * 
-	 * Requires any child refs to be of persisted status at minimum
+	 * Requires any child Refs to be of persisted status at minimum, or you might get
+	 * a MissingDataException
 	 * 
-	 * @return
+	 * @return Memory Size of this Cell
 	 */
 	protected long calcMemorySize() {
-		long result=getEncoding().length();
+		long  result=getEncoding().length();
+		
+		// add constant overhead
+		result += Constants.MEMORY_OVERHEAD;
+		
+		// add size for each child Ref (might be zero if embedded)
 		int n=getRefCount();
 		for (int i=0; i<n; i++) {
 			Ref<?> childRef=getRef(i);
-			Long childSize=childRef.getMemorySize();
-			if (childSize==null) {
-				throw new Error("Null child size for: "+childRef + " with type "+Utils.getClassName(childRef.getValue()));
-			}
+			long childSize=childRef.getMemorySize();
 			result += childSize;
 		}
 		return result;
 	}
 	
 	/**
-	 * Gets the memory size of this object, computing it if required.
-	 * @return
+	 * Gets the Memory Size of this Cell, computing it if required.
+	 * 
+	 * @return Memory Size of this Cell
 	 */
 	protected final long getMemorySize() {
 		if (memorySize>=0) return memorySize;

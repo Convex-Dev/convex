@@ -102,11 +102,6 @@ public class RefDirect<T> extends Ref<T> {
 	}
 
 	@Override
-	public ByteBuffer writeRawHash(ByteBuffer bb) {
-		return getHash().writeRaw(bb);
-	}
-
-	@Override
 	public Ref<T> toDirect() {
 		return this;
 	}
@@ -136,9 +131,9 @@ public class RefDirect<T> extends Ref<T> {
 	}
 
 	@Override
-	public Long getMemorySize() {
+	public long getMemorySize() {
 		if (isEmbedded()) return 0L;
-		return ((ACell)value).calcMemorySize();
+		return ((ACell)value).getMemorySize();
 	}
 
 	@Override
