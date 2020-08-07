@@ -36,7 +36,7 @@ public class Format {
 
 	// Encoding constants
 	public static final int EMBEDDED_STRING_MAX_LENGTH = 32; // max UTF-16 length of embedded string
-	public static final int EMBEDDED_BLOB_MAX_LENGTH = 32;
+	public static final int EMBEDDED_BLOB_MAX_LENGTH = 64; // max bytes in embedded blob
 
 	/**
 	 * 8191 byte system-wide limit on the legal length of a data object encoding.
@@ -481,7 +481,7 @@ public class Format {
 	/**
 	 * Reads a Ref<T> from the ByteBuffer.
 	 * 
-	 * Converts embedded objects to Refs automatically.
+	 * Converts embedded objects to RefDirects automatically.
 	 * 
 	 * @param bb ByteBuffer containing a ref to read
 	 * @throws BadFormatException If the data is badly formatted, or a non-embedded
@@ -720,7 +720,9 @@ public class Format {
 	 */
 	public static boolean isEmbedded(Object o) {
 		if (o == null) return true;
-		if (o instanceof Number) {
+		if (o instanceof ACell) {
+			return ((ACell)o).isEmbedded();
+		} else if (o instanceof Number) {
 			// six primitive number types
 			if (o instanceof Byte) return true;
 			if (o instanceof Short) return true;
@@ -734,16 +736,6 @@ public class Format {
 			// return true;
 			// if (o instanceof BigDecimal)
 			// return true;
-		} else if (o instanceof ACell) {
-			if (o instanceof ABlob) {
-				if (o instanceof Address) return true;
-				if (o instanceof Hash) return true;
-				if (o instanceof Blob) return ((ABlob) o).length() <= EMBEDDED_BLOB_MAX_LENGTH;
-			}
-			if ((o instanceof ADataStructure) && ((ADataStructure<?>) o).isEmpty()) return true;
-			if (o instanceof Symbol) return true;
-			if (o instanceof Keyword) return true;
-			if (o instanceof Amount) return true;
 		} else {
 			if (o instanceof Character) return true;
 			if (o instanceof Boolean) return true;

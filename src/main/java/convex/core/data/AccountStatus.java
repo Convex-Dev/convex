@@ -335,4 +335,10 @@ public class AccountStatus extends ARecord {
 		
 		return new AccountStatus(newSeq,Amount.create(newBal),newEnv,newHoldings);
 	}
+
+	@Override
+	public void attachMemorySize(long memorySize) {
+		// TODO Auto-generated method stub
+		
+	}
 }

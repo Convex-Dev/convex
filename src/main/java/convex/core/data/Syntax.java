@@ -256,5 +256,12 @@ public class Syntax extends ACell {
 		}
 	}
 
+	@Override
+	protected boolean isEmbedded() {
+		// TODO  Figure out if we can be more aggressive here?
+		// return Format.isEmbedded(datum) && Format.isEmbedded(meta);
+		return false;
+	}
+
 
 }

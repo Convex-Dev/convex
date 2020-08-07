@@ -124,4 +124,10 @@ public class Transfer extends ATransaction {
 	public int getRefCount() {
 		return 0;
 	}
+	
+	@Override
+	protected boolean isEmbedded() {
+		// TODO: consider if Transfer can be embedded. It's probably always small enough?
+		return false;
+	}
 }

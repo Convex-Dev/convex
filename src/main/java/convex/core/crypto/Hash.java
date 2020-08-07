@@ -371,4 +371,10 @@ public class Hash extends AArrayBlob {
 		if (length != LENGTH) throw new InvalidDataException("Address length must be 32 bytes = 256 bits", this);
 	}
 
+	@Override
+	protected boolean isEmbedded() {
+		// Hashes are always small enough to embed
+		return true;
+	}
+
 }

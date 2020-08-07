@@ -32,5 +32,11 @@ public abstract class ASignature extends ACell {
 			return ECDSASignature.read(bb);
 		}
 	}
+	
+	@Override
+	protected boolean isEmbedded() {
+		// Signatures are too long to embded
+		return false;
+	}
 
 }

@@ -103,5 +103,11 @@ public abstract class CoreFn<T> extends AFn<T> implements ICoreDef {
 	public void validateCell() throws InvalidDataException {
 		symbol.validateCell();
 	}
+	
+	@Override
+	protected boolean isEmbedded() {
+		// TODO: Maybe embed core functions, since they are the same encoding size as a single Symbol
+		return false;
+	}
 
 }

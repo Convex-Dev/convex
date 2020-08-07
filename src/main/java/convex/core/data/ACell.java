@@ -11,10 +11,10 @@ import convex.core.util.Utils;
 /**
  * Abstract base class for Cells.
  * 
- * Cells may contain Refs to other Cells, in which case they must implement {@link IRefContainer}.
+ * Cells may contain Refs to other Cells, which can be tested with getRefCount()
  * 
  * All data objects intended for on-chain usage serialisation should extend this. The only 
- * exceptions are data objects which are embedded (inc. certain JVM types like Long etc.)
+ * exceptions are data objects which are Embedded (inc. certain JVM types like Long etc.)
  * 
  * "It is better to have 100 functions operate on one data structure than 
  * to have 10 functions operate on 10 data structures." - Alan Perlis
@@ -25,6 +25,11 @@ public abstract class ACell implements ICell, IWriteable {
 	 * We cache the Blob for the binary format of this Cell
 	 */
 	private Blob encoding;
+	
+	/**
+	 * We cache the computed memorySize. May be 0 for embedded objects
+	 */
+	private long memorySize=-1;
 
 	@Override
 	public void validate() throws InvalidDataException {
@@ -146,6 +151,14 @@ public abstract class ACell implements ICell, IWriteable {
 	public abstract ByteBuffer write(ByteBuffer bb);
 
 	/**
+	 * Writes this object to a ByteBuffer excluding the message tag
+	 * 
+	 * @param bb A ByteBuffer to write this object to
+	 * @return The updated ByteBuffer
+	 */
+	public abstract ByteBuffer writeRaw(ByteBuffer bb);
+	
+	/**
 	 * Estimate the encoded data size for this Cell. Used for quickly sizing buffers.
 	 * Implementations should try to return a size that is likely to contain the entire object
 	 * when represented in binary format, including the tag byte.
@@ -177,7 +190,7 @@ public abstract class ACell implements ICell, IWriteable {
 	 * 
 	 * @return
 	 */
-	public long calcMemorySize() {
+	protected long calcMemorySize() {
 		long result=getEncoding().length();
 		int n=getRefCount();
 		for (int i=0; i<n; i++) {
@@ -190,10 +203,27 @@ public abstract class ACell implements ICell, IWriteable {
 		}
 		return result;
 	}
+	
+	/**
+	 * Gets the memory size of this object, computing it if required.
+	 * @return
+	 */
+	protected final long getMemorySize() {
+		if (memorySize>=0) return memorySize;
+		memorySize=(isEmbedded())?0:calcMemorySize();
+		return memorySize;
+	}
+
+	/**
+	 * Determines if this Cell Represents an embedded object.
+	 * @return true if Cell is embedded, false otherwise
+	 */
+	protected abstract boolean isEmbedded();
 
 	/**
 	 * Gets the number of Refs contained within this Cell. This number is
-	 * final / immutable for any given instance.
+	 * final / immutable for any given instance. Contained Refs may be either
+	 * soft or embedded.
 	 * 
 	 * @return The number of Refs in this Cell
 	 */
@@ -242,6 +272,22 @@ public abstract class ACell implements ICell, IWriteable {
 			refs[i] = getRef(i);
 		}
 		return refs;
+	}
+
+	/**
+	 * Updates the memorySize of this Cell
+	 * 
+	 * Not valid for embedded Cells, may throw IllegalOperationException()
+	 * 
+	 * @param memorySize Memory size to assign
+	 */
+	public void attachMemorySize(long memorySize) {
+		if (this.memorySize<0) {
+			this.memorySize=memorySize;
+		} else {
+			if (this.memorySize==memorySize) return;
+			throw new IllegalStateException("Attempting to attach memory size "+memorySize+" to object of class "+Utils.getClassName(this)+" which already has memorySize "+this.memorySize);
+		}
 	}
 
 }

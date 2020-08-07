@@ -267,4 +267,10 @@ public class Address extends AArrayBlob {
 			throw new InvalidDataException("Address length must be " + LENGTH + "  bytes = " + LENGTH_BITS + " bits",
 					this);
 	}
+
+	@Override
+	protected boolean isEmbedded() {
+		return true;
+	}
+
 }

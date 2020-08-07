@@ -549,4 +549,11 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 */
 	public abstract Ref<T> withValue(T newValue);
 
+	/**
+	 * Writes the raw ref Hash to the given ByteBuffer
+	 * @param bb
+	 * @return
+	 */
+	public abstract ByteBuffer writeRawHash(ByteBuffer bb);
+
 }

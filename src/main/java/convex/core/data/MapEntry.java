@@ -228,6 +228,13 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 	public boolean isCanonical() {
 		return true;
 	}
+	
+	@Override
+	public boolean isEmbedded() {
+		// Note MapEntries are included in direct encoding of MapLeaf
+		// But don't count as embedded in isolation
+		return false;
+	}
 
 	@Override
 	public int estimatedEncodingSize() {

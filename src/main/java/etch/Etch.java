@@ -21,7 +21,6 @@ import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Ref;
 import convex.core.data.RefSoft;
-import convex.core.exceptions.BadFormatException;
 import convex.core.util.Counters;
 import convex.core.util.Utils;
 
@@ -48,14 +47,16 @@ import convex.core.util.Utils;
  * 
  * Data is stored as:
  * - 32 bytes key
- * - X bytes monotonic label
+ * - X bytes monotonic label of which
+ *    - 1 byte status
+ *    - 8 bytes Memory Size
  * - 2 bytes data length N (a short)
  * - N byes actual data
  */
 public class Etch {
 	// structural constants for data block
 	private static final int KEY_SIZE=32;
-	private static final int LABEL_SIZE=1;
+	private static final int LABEL_SIZE=1+8; // status plus Memory Size long
 	private static final int LENGTH_SIZE=2;
 	private static final int POINTER_SIZE=8;
 	
@@ -191,7 +192,7 @@ public class Etch {
 	 */	
 	public static Etch createTempEtch(String prefix) throws IOException {
 		File data = File.createTempFile(prefix+"-", null);
-		data.deleteOnExit();
+		// data.deleteOnExit();
 		return new Etch(data);
 	}
 	
@@ -219,7 +220,7 @@ public class Etch {
 		position=slotPointer(position); // ensure we don't have any pesky type bits
 		
 		if ((position<0)||(position>dataLength)) {
-			throw new Error("Seek out of range in Etch file: "+Utils.toHexString(position));
+			throw new Error("Seek out of range in Etch file: "+Utils.toHexString(position)+ " file = "+file.getName());
 		}
 		int mapIndex=Utils.checkedInt(position/MAX_BUFFER_SIZE); // 1GB chunks
 		
@@ -588,6 +589,9 @@ public class Etch {
 		// get Status byte
 		byte status=mbb.get();
 		
+		// Get memory size
+		long memorySize=mbb.getLong();
+
 		// get Data length
 		short length=mbb.getShort(); 
 		byte[] bs=new byte[length];
@@ -598,15 +602,18 @@ public class Etch {
 			ACell cell=Format.read(data);
 			data.attachContentHash(hash);
 			cell.attachEncoding(data);
-			RefSoft<ACell> ref=RefSoft.create(cell, hash, status);
 			
-			if (status>=Ref.PERSISTED) {
-				ref.setMemorySize(cell.calcMemorySize());
+			if (memorySize>0) {
+				// need to attach memory size for cell
+				cell.attachMemorySize(memorySize);
 			}
 			
+			RefSoft<ACell> ref=RefSoft.create(cell, hash, status);
+
+			
 			return ref;
-		} catch (BadFormatException e) {
-			throw new Error("Bad format in etch store: "+data.toHexString());
+		} catch (Exception e) {
+			throw new Error("Failed to read data in in etch store: "+data.toHexString()+" status = "+status+" length ="+length+" pointer = "+Utils.toHexString(pointer)+ " memorySize="+memorySize,e);
 		}
 	}
 
@@ -671,15 +678,30 @@ public class Etch {
 	private Ref<ACell> updateInPlace(long position, Ref<ACell> value) throws IOException {
 		// Seek to status location
 		MappedByteBuffer mbb=seekMap(position+KEY_SIZE);
+		
+		// Get current stored values
 		byte currentStatus=mbb.get();
+		long currentSize=mbb.getLong();
+		
 		byte targetStatus=(byte)value.getStatus();
 		if (currentStatus<targetStatus) {
+			// need to increase status of store
 			mbb=seekMap(position+KEY_SIZE);
 			mbb.put(targetStatus);
+			
+			// maybe update size, if not already persisted
+			if ((currentSize==0L)&&(targetStatus>=Ref.PERSISTED)) {
+				mbb.putLong(value.getMemorySize());
+			}
+			
 			return value;
 		} else {
-			return value.withMinimumStatus(targetStatus);
+			// possibly update value status to reflect current store
+			return value.withMinimumStatus(currentStatus);
 		}
+		
+
+		
 	}
 
 	/**
@@ -769,26 +791,46 @@ public class Etch {
 	private long appendData(AArrayBlob key,Ref<ACell> value) throws IOException {
 		assert(key.length()==KEY_SIZE);
 		
-		long position=dataLength;
+		// Get relevant values for writing
+		// probably need to call these first, might move mbb position?
+		ACell cell=value.getValue();
+		Blob encoding=cell.getEncoding();
+		int status=value.getStatus();
+		
+		long memorySize=0L;
+		if (status>=Ref.PERSISTED) {
+			memorySize=value.getMemorySize();
+		}
+
+		// position ready for append
+		final long position=dataLength;
 		MappedByteBuffer mbb=seekMap(position);
 		
 		// append key
 		mbb.put(key.getInternalArray(),key.getOffset(),KEY_SIZE);
 		
-		// append status label
+		// append status label (1 byte)
 		mbb.put((byte)(Math.max(value.getStatus(),Ref.STORED)));
 		
-		Blob valueData=value.getValue().getEncoding();
+		// append Memory Size (8 bytes). Initialised to 0L is STORED only.
+		mbb.putLong(memorySize);
 		
 		// append blob length
-		short length=Utils.checkedShort(valueData.length());
+		short length=Utils.checkedShort(encoding.length());
+		if (length==0) throw new Error("Etch trying to write zero length encoding for: "+cell);
 		mbb.putShort(length);
 		
 		// append blob value
-		mbb.put(valueData.getInternalArray(),valueData.getOffset(),length);
+		mbb.put(encoding.getInternalArray(),encoding.getOffset(),length);
 		
 		// update total data length and return
-		dataLength=position+KEY_SIZE+LABEL_SIZE+LENGTH_SIZE+length;
+		dataLength=mbb.position();
+		
+		if (dataLength!=position+KEY_SIZE+LABEL_SIZE+LENGTH_SIZE+length) {
+			System.out.println("PANIC!");
+		}
+		
+		// return file position for added data
 		return position;
 	}
 

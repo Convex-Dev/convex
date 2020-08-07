@@ -96,13 +96,13 @@ public class RefDirect<T> extends Ref<T> {
 			b = Format.write(b, value);
 		} else {
 			b = b.put(Tag.REF);
-			writeRaw(b);
+			writeRawHash(b);
 		}
 		return b;
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
+	public ByteBuffer writeRawHash(ByteBuffer bb) {
 		return getHash().writeRaw(bb);
 	}
 

@@ -38,6 +38,12 @@ public abstract class AOp<T> extends ACell {
 	public int estimatedEncodingSize() {
 		return 100;
 	}
+	
+	@Override
+	protected boolean isEmbedded() {
+		// Ops never embedded?
+		return false;
+	}
 
 	@Override
 	public boolean isCanonical() {

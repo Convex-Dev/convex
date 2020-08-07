@@ -237,4 +237,10 @@ public class Blob extends AArrayBlob {
 		if (contentHash == null) contentHash = hash;
 	}
 
+	@Override
+	protected boolean isEmbedded() {
+		// Embedded iff short enough for embedding
+		return length<=Format.EMBEDDED_BLOB_MAX_LENGTH;
+	}
+
 }

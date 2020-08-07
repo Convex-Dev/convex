@@ -33,10 +33,10 @@ public class Constant<T> extends AOp<T> {
 	public static final Constant<AList<?>> EMPTY_LIST = new Constant<>(Ref.EMPTY_LIST);
 	public static final Constant<AVector<?>> EMPTY_VECTOR = new Constant<>(Ref.EMPTY_VECTOR);
 
-	private final Ref<T> value;
+	private final Ref<T> valueRef;
 
-	private Constant(Ref<T> value) {
-		this.value = value;
+	private Constant(Ref<T> valueRef) {
+		this.valueRef = valueRef;
 	}
 
 	public static <T> Constant<T> create(T value) {
@@ -50,22 +50,22 @@ public class Constant<T> extends AOp<T> {
 
 	@Override
 	public <I> Context<T> execute(Context<I> context) {
-		return context.withResult(Juice.CONSTANT, value.getValue());
+		return context.withResult(Juice.CONSTANT, valueRef.getValue());
 	}
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		sb.append(Utils.ednString(value.getValue()));
+		sb.append(Utils.ednString(valueRef.getValue()));
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer b) {
-		b = value.write(b);
-		return b;
+	public ByteBuffer writeRaw(ByteBuffer bb) {
+		bb = valueRef.write(bb);
+		return bb;
 	}
 
-	public static <T> AOp<T> read(ByteBuffer b) throws BadFormatException {
-		Ref<T> ref = Format.readRef(b);
+	public static <T> AOp<T> read(ByteBuffer bb) throws BadFormatException {
+		Ref<T> ref = Format.readRef(bb);
 		return createFromRef(ref);
 	}
 
@@ -83,14 +83,14 @@ public class Constant<T> extends AOp<T> {
 	@Override
 	public <R> Ref<R> getRef(int i) {
 		if (i != 0) throw new IndexOutOfBoundsException(Errors.badIndex(i));
-		return (Ref<R>) value;
+		return (Ref<R>) valueRef;
 	}
 
 	@Override
 	public Constant<T> updateRefs(IRefFunction func) {
 		@SuppressWarnings("unchecked")
-		Ref<T> newRef = (Ref<T>) func.apply(value);
-		if (value == newRef) return this;
+		Ref<T> newRef = (Ref<T>) func.apply(valueRef);
+		if (valueRef == newRef) return this;
 		return createFromRef(newRef);
 	}
 
@@ -107,6 +107,6 @@ public class Constant<T> extends AOp<T> {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (value == null) throw new InvalidDataException("Missing contant value ref!", this);
+		if (valueRef == null) throw new InvalidDataException("Missing contant value ref!", this);
 	}
 }

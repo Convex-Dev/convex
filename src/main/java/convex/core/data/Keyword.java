@@ -161,4 +161,10 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		return 0;
 	}
 
+	@Override
+	protected boolean isEmbedded() {
+		// Keywords are always embedded
+		return true;
+	}
+
 }

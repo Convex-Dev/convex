@@ -245,7 +245,7 @@ public class BlobTree extends ABlob {
 	public ByteBuffer writeRaw(ByteBuffer b) {
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
-			b = children[i].writeRaw(b);
+			b = children[i].writeRawHash(b);
 		}
 		return b;
 	}
@@ -442,6 +442,12 @@ public class BlobTree extends ABlob {
 	private BlobTree withChildren(Ref<ABlob>[] newChildren) {
 		if (children == newChildren) return this;
 		return new BlobTree(newChildren, shift, count);
+	}
+
+	@Override
+	protected boolean isEmbedded() {
+		// Never embedded. BlobTree always has big child Refs.
+		return false;
 	}
 
 

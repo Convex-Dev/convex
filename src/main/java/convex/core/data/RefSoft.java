@@ -112,12 +112,12 @@ public class RefSoft<T> extends Ref<T> {
 	@Override
 	public ByteBuffer write(ByteBuffer bb) {
 		bb = bb.put(Tag.REF);
-		bb = writeRaw(bb);
+		bb = writeRawHash(bb);
 		return bb;
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
+	public ByteBuffer writeRawHash(ByteBuffer bb) {
 		return getHash().writeRaw(bb);
 	}
 
@@ -151,7 +151,6 @@ public class RefSoft<T> extends Ref<T> {
 
 	public long calcMemorySize() {
 		if (memorySize!=null) return memorySize;
-		if (isEmbedded()) return 0L;
 		ACell c=(ACell) getValue();
 		memorySize= c.calcMemorySize();
 		return memorySize;
@@ -166,6 +165,7 @@ public class RefSoft<T> extends Ref<T> {
 	@Override
 	public void validate() throws InvalidDataException {
 		super.validate();
+		if (status==EMBEDDED) throw new InvalidDataException("Soft ref cannot be embedded!", this);
 		if (hash == null) throw new InvalidDataException("Hash should never be null in soft ref", this);
 		Object val = softRef.get();
 		if (val != null) {

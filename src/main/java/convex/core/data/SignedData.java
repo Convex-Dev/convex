@@ -225,4 +225,10 @@ public class SignedData<T> extends ACell {
 		return valueRef;
 	}
 
+	@Override
+	protected boolean isEmbedded() {
+		// Never embedded (value can be arbitrary)
+		return false;
+	}
+
 }

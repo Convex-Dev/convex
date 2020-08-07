@@ -11,11 +11,5 @@ public interface IWriteable {
 	 */
 	public ByteBuffer write(ByteBuffer bb);
 
-	/**
-	 * Writes this object to a ByteBuffer excluding the message tag
-	 * 
-	 * @param bb A ByteBuffer to write this object to
-	 * @return The updated ByteBuffer
-	 */
-	public ByteBuffer writeRaw(ByteBuffer bb);
+
 }

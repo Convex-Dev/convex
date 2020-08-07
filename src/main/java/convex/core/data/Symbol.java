@@ -174,4 +174,10 @@ public class Symbol extends ASymbolic {
 		return 0;
 	}
 
+	@Override
+	protected boolean isEmbedded() {
+		// Symbols are always embedded
+		return true;
+	}
+
 }

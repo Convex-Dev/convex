@@ -270,4 +270,9 @@ public class Amount extends ACell implements Comparable<Amount> {
 	public int getRefCount() {
 		return 0;
 	}
+
+	@Override
+	protected boolean isEmbedded() {
+		return true;
+	}
 }

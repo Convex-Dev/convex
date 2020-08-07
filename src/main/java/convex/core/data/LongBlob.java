@@ -174,4 +174,10 @@ public class LongBlob extends ABlob {
 		return 0;
 	}
 
+	@Override
+	protected boolean isEmbedded() {
+		// Always embedded
+		return true;
+	}
+
 }

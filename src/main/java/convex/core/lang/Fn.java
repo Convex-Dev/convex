@@ -145,6 +145,13 @@ public class Fn<T> extends AFn<T> {
 	public int estimatedEncodingSize() {
 		return 100;
 	}
+	
+
+	@Override
+	protected boolean isEmbedded() {
+		// Functions usually never embedded
+		return false;
+	}
 
 	@Override
 	public AVector<Syntax> getParams() {

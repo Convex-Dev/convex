@@ -109,4 +109,10 @@ public abstract class ATransaction extends ACell {
 	 * @return Juice limit
 	 */
 	public abstract long getMaxJuice();
+	
+	@Override
+	protected boolean isEmbedded() {
+		// Transactions generally too large for embedding
+		return false;
+	}
 }

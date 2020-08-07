@@ -241,4 +241,10 @@ public class Order extends ACell {
 		return this.withBlocks(newBlocks);
 	}
 
+	@Override
+	protected boolean isEmbedded() {
+		// Order is a potentially huge data structure, don't embed
+		return false;
+	}
+
 }

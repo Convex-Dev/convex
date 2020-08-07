@@ -36,6 +36,12 @@ public abstract class ADataStructure<E> extends ACell {
 	public boolean isEmpty() {
 		return count() == 0L;
 	}
+	
+	@Override
+	public boolean isEmbedded() {
+		// Logic: only empty data structures are embedded
+		return count() == 0L;
+	}
 
 	/**
 	 * Returns an empty instance of the same general type as this data structure.
