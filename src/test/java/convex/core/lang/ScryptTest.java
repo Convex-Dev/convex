@@ -7,20 +7,38 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import convex.core.data.*;
 import org.junit.jupiter.api.Test;
 import org.parboiled.Parboiled;
+import org.parboiled.Rule;
 import org.parboiled.parserunners.ReportingParseRunner;
 
 import convex.core.Init;
-import convex.core.data.Keyword;
-import convex.core.data.List;
-import convex.core.data.Syntax;
-import convex.core.data.Vectors;
 import convex.core.exceptions.ParseException;
 
 public class ScryptTest {
 
     static final Context<?> CON = TestState.INITIAL_CONTEXT;
+
+    static Scrypt scrypt() {
+        return Parboiled.createParser(Scrypt.class);
+    }
+
+    @SuppressWarnings("rawtypes")
+    static ReportingParseRunner runner(Rule rule) {
+        return new ReportingParseRunner(rule);
+    }
+
+    @SuppressWarnings("rawtypes")
+    static Object parse(Rule rule, String source) {
+        var result = new ReportingParseRunner(rule).run(source);
+
+        if (result.matched) {
+            return Syntax.unwrapAll(result.resultValue);
+        } else {
+            throw new RuntimeException("Rule didn't match.");
+        }
+    }
 
     @SuppressWarnings("unchecked")
     public static <T> Context<T> step(Context<?> c, String source) {
@@ -100,7 +118,7 @@ public class ScryptTest {
     }
 
     @SuppressWarnings("rawtypes")
-	@Test
+    @Test
     public void testNestedExpression() {
         var parser = Parboiled.createParser(Scrypt.class);
 
@@ -137,24 +155,54 @@ public class ScryptTest {
             assertTrue(result.matched);
             assertEquals(3, value.count());
             assertSame(Symbols.PLUS, ((Syntax) value.get(0)).getValue());
-            assertEquals(2L, (Long) ((Syntax) value.get(1)).getValue());
-            assertEquals(1L, (Long) ((Syntax) value.get(2)).getValue());
+            assertEquals(1L, (Long) ((Syntax) value.get(1)).getValue());
+            assertEquals(2L, (Long) ((Syntax) value.get(2)).getValue());
         }
 
     }
 
-    @SuppressWarnings("rawtypes")
-	@Test
+    @Test
     public void testFunctionApplication() {
         var parser = Parboiled.createParser(Scrypt.class);
 
         {
-            assertTrue(new ReportingParseRunner(parser.FunctionApplication()).run("f()").matched);
-            assertTrue(new ReportingParseRunner(parser.FunctionApplication()).run("f(1)").matched);
-            assertTrue(new ReportingParseRunner(parser.FunctionApplication()).run("f( 1 )").matched);
-            assertTrue(new ReportingParseRunner(parser.FunctionApplication()).run("f(1, 2)").matched);
-            assertTrue(new ReportingParseRunner(parser.FunctionApplication()).run("f(1, 2 + 3)").matched);
-            assertTrue(new ReportingParseRunner(parser.FunctionApplication()).run("f(1, (2 + 3) * 2)").matched);
+            assertEquals(
+                    Reader.read("(f)"),
+                    parse(parser.FunctionApplication(), "f()"));
+
+            assertEquals(
+                    Reader.read("(f 1)"),
+                    parse(parser.FunctionApplication(), "f(1)")
+            );
+
+            assertEquals(
+                    Reader.read("(f 1)"),
+                    parse(parser.FunctionApplication(), "f( 1 )")
+            );
+
+            assertEquals(
+                    Reader.read("(f 1 2)"),
+                    parse(parser.FunctionApplication(), "f(1, 2)")
+            );
+
+            assertEquals(
+                    Reader.read("(f 1 (+ 2 3))"),
+                    parse(parser.FunctionApplication(), "f(1, 2 + 3)")
+            );
+
+            assertEquals(
+                    Reader.read("(f 1 (* (+ 2 3) 4))"),
+                    parse(parser.FunctionApplication(), "f(1, (2 + 3) * 4)")
+            );
+
+            assertEquals(
+                    Reader.read("(if true 1)"),
+                    parse(parser.FunctionApplication(), "if(true, 1)")
+            );
+
+            assertEquals(1L, (Long) eval("if(true, 1)"));
+
+            assertEquals(2L, (Long) eval("(identity(inc))(1)"));
         }
     }
 
@@ -218,11 +266,31 @@ public class ScryptTest {
 
     @Test
     public void testVector() {
+        assertEquals(Vectors.empty(), eval("[]"));
+        assertEquals(Vectors.of(1L), eval("[1]"));
+        assertEquals(Vectors.of(1L), eval("[ 1 ]"));
+        assertEquals(Vectors.of(1L, 2L), eval("[1, 2]"));
         assertEquals(Vectors.of(3L), eval("[1 + 2]"));
         assertEquals(Vectors.of(3L, 3L), eval("[1 + 2, 3]"));
         assertEquals(Vectors.of(3L), eval("[1 + 2,]"));
-        assertEquals(Vectors.of(3L, 3L), eval("[1 + 2,, 3]"));
-        assertEquals(Vectors.of(3L, 3L), eval("[,1 + 2,, 3]"));
+        assertEquals(Vectors.of(3L, 3L), eval("[1 + 2, 3]"));
+    }
+
+    @Test
+    public void testMap() {
+        var scrypt = scrypt();
+
+        var mapEntry = scrypt.MapEntry();
+
+        assertEquals(Reader.read("[:x, 1]"), parse(mapEntry, ":x 1"));
+        assertEquals(Reader.read("[[1 2], 3]"), parse(mapEntry, "[1, 2] 3"));
+
+        var map = scrypt.MapLiteralExpression();
+
+        assertEquals(Reader.read("{}"), parse(map, "{}"));
+        assertEquals(Reader.read("{:x 1 :y 2 :z 3}"), parse(map, "{:x 1, :y 2, :z 3}"));
+        assertEquals(Reader.read("{{} 1 [] 2}"), parse(map, "{{} 1, [] 2}"));
+        assertThrows(ParseException.class, () -> eval("{1 2 3 4}"));
     }
 
 }

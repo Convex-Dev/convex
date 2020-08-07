@@ -1,21 +1,55 @@
 package convex.core.lang;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 
+import convex.core.data.*;
 import org.parboiled.Parboiled;
 import org.parboiled.Rule;
 import org.parboiled.annotations.BuildParseTree;
+import org.parboiled.annotations.DontLabel;
+import org.parboiled.annotations.SuppressNode;
 import org.parboiled.parserunners.ReportingParseRunner;
 import org.parboiled.support.Var;
 
-import convex.core.data.List;
-import convex.core.data.Lists;
-import convex.core.data.Symbol;
-import convex.core.data.Syntax;
-import convex.core.data.Vectors;
-
 @BuildParseTree
 public class Scrypt extends Reader {
+
+    public Rule Spacing() {
+        return ZeroOrMore(FirstOf(
+
+                // whitespace
+                OneOrMore(AnyOf(" \t\r\n\f").label("Whitespace")),
+
+                // traditional comment
+                Sequence("/*", ZeroOrMore(TestNot("*/"), ANY), "*/"),
+
+                // end of line comment
+                Sequence(
+                        "//",
+                        ZeroOrMore(TestNot(AnyOf("\r\n")), ANY),
+                        FirstOf("\r\n", '\r', '\n', EOI)
+                )
+        ));
+    }
+
+    Rule Arguments() {
+        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+
+        return Sequence(
+                LPAR,
+                Optional(Argument(expVar), ZeroOrMore(COMMA, Argument(expVar))),
+                RPAR,
+                push(prepare(Lists.create(expVar.get())))
+        );
+    }
+
+    Rule Argument(Var<ArrayList<Object>> expVar) {
+        return Sequence(
+                CompoundExpression(),
+                ListAddAction(expVar)
+        );
+    }
 
     public Rule ExpressionInput() {
         return FirstOf(Sequence(
@@ -29,9 +63,50 @@ public class Scrypt extends Reader {
     public Rule Vector() {
         return Sequence(
                 '[',
+                Spacing(),
                 CompoundExpressionList(),
+                Spacing(),
                 FirstOf(']', Sequence(FirstOf(AnyOf("})"), EOI), push(error("Expected closing ']'")))),
                 push(prepare(Vectors.create(popNodeList()))));
+    }
+
+    public Rule MapLiteralExpression() {
+        return Sequence(
+                LWING,
+                MapEntries(),
+                RWING,
+                // Create a Map from a List of MapEntry.
+                // `MapEntries` builds up a list of MapEntry,
+                // which we can get from `popNodeList`.
+                push(prepare(Maps.create(popNodeList())))
+        );
+    }
+
+    public Rule MapEntries() {
+        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+
+        return Sequence(
+                Optional(
+                        MapEntry(),
+                        ListAddAction(expVar),
+                        ZeroOrMore(
+                                COMMA,
+                                MapEntry(),
+                                ListAddAction(expVar))),
+                push(prepare(Lists.create(expVar.get()))));
+    }
+
+    public Rule MapEntry() {
+        return Sequence(
+                Expression(),
+                Spacing(),
+                Expression(),
+                push(buildMapEntry((Syntax) pop(), (Syntax) pop()))
+        );
+    }
+
+    public MapEntry<Syntax, Syntax> buildMapEntry(Syntax v, Syntax k) {
+        return MapEntry.create(k, v);
     }
 
     public Rule Expression() {
@@ -43,7 +118,8 @@ public class Scrypt extends Reader {
                 BooleanLiteral(),
                 Keyword(),
                 Symbol(),
-                Vector());
+                Vector(),
+                MapLiteralExpression());
     }
 
     public Rule NestedExpression() {
@@ -54,15 +130,8 @@ public class Scrypt extends Reader {
         return Sequence(
                 Expression(),
                 Spacing(),
-                FunctionParameters());
-    }
-
-    public Rule FunctionParameters() {
-        return Sequence("(", Spacing(), Optional(FunctionParametersDecls()), Spacing(), ")");
-    }
-
-    public Rule FunctionParametersDecls() {
-        return Sequence(CompoundExpression(), Optional(",", Spacing(), FunctionParametersDecls()));
+                Arguments(),
+                push(prepare(((AList) ((Syntax) pop()).getValue()).cons(pop()))));
     }
 
     public Rule InfixOperator() {
@@ -74,35 +143,38 @@ public class Scrypt extends Reader {
                 Sequence("==", push(Symbols.EQUALS)));
     }
 
-    public Rule InfixExpression() {
+    public Rule InfixExtension() {
         return Sequence(
                 Spacing(),
                 InfixOperator(),
                 Spacing(),
-                Expression(),
+                CompoundExpression(),
                 push(prepare(createInfixForm((Syntax) pop(), (Symbol) pop(), (Syntax) pop()))));
     }
 
     public List<Syntax> createInfixForm(Syntax op1, Symbol symbol, Syntax op2) {
-        return List.of(Syntax.create(symbol), op1, op2);
+        return List.of(Syntax.create(symbol), op2, op1);
     }
 
     public Rule CompoundExpression() {
         return FirstOf(
+                FunctionApplication(),
                 Sequence(
                         Expression(),
-                        ZeroOrMore(Sequence(Spacing(), InfixExpression()))),
-                FunctionApplication());
+                        ZeroOrMore(Sequence(Spacing(), InfixExtension()))
+                )
+        );
     }
 
     public Rule CompoundExpressionList() {
         Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
         return Sequence(
                 Spacing(),
-                ZeroOrMore(Sequence( // initial expressions with following whitespace or delimiter
-                        CompoundExpression(),
-                        Spacing(),
-                        ListAddAction(expVar))),
+                ZeroOrMore(
+                        Sequence( // initial expressions with following whitespace or delimiter
+                                CompoundExpression(),
+                                COMMA,
+                                ListAddAction(expVar))),
                 Optional(
                         Sequence( // final expression without whitespace
                                 CompoundExpression(), ListAddAction(expVar))),
@@ -130,6 +202,19 @@ public class Scrypt extends Reader {
         Scrypt scryptReader = syntaxReader.get();
         scryptReader.tempSource = source;
         return (Syntax) doParse(new ReportingParseRunner<>(scryptReader.ExpressionInput()), source);
+    }
+
+
+    final Rule COMMA = Terminal(",");
+    final Rule LPAR = Terminal("(");
+    final Rule RPAR = Terminal(")");
+    final Rule LWING = Terminal("{");
+    final Rule RWING = Terminal("}");
+
+    @SuppressNode
+    @DontLabel
+    Rule Terminal(String string) {
+        return Sequence(Spacing(), string, Spacing()).label('\'' + string + '\'');
     }
 
 }
