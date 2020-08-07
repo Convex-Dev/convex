@@ -16,8 +16,6 @@ import org.parboiled.parserunners.ReportingParseRunner;
 import convex.core.Init;
 import convex.core.exceptions.ParseException;
 
-import java.util.Vector;
-
 public class ScryptTest {
 
     static final Context<?> CON = TestState.INITIAL_CONTEXT;
@@ -288,7 +286,7 @@ public class ScryptTest {
         var scrypt = scrypt();
         var def = scrypt.DefStatement();
 
-        assertEquals(Reader.read("(def x 1)"), parse(def, "def x = 1;"));;
+        assertEquals(Reader.read("(def x 1)"), parse(def, "def x = 1;"));
 
         assertEquals(1, (Long) eval("def x = 1;"));
         assertEquals(2, (Long) eval("{def x = 1; x + 1;}"));
