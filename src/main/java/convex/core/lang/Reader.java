@@ -478,10 +478,11 @@ public class Reader extends BaseParser<Object> {
 		if (wrapSyntax) {
 			IndexRange ir = matchRange();
 			long start = ir.start;
-			long end = ir.end;
-			AHashMap<Object, Object> props = Maps.of(Keywords.START, start, Keywords.END, end, Keywords.SOURCE,
-					tempSource);
-			return Syntax.create(a, props);
+			//long end = ir.end;
+			AHashMap<Object, Object> props = Maps.of(Keywords.START, start);
+			//AHashMap<Object, Object> props = Maps.of(Keywords.START, start, Keywords.END, end, Keywords.SOURCE,
+			//		tempSource.substring((int)start, (int)end));
+			return Syntax.create(a,props);
 		}
 		return a;
 	}

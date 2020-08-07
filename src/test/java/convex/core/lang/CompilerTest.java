@@ -461,7 +461,7 @@ public class CompilerTest {
 		assertEquals(Maps.of(1L,2L),eval("{1 2 1 2}"));
 		
 		// TODO: sanity check? Does/should this depend on map ordering?
-		assertEquals(Maps.of(2L,3L),eval("{~(inc 1) 3 ~(dec 3) 4}"));
+		assertEquals(1L,(long)eval("(count {~(inc 1) 3 ~(dec 3) 4})"));
 		
 		assertEquals(Maps.of(11L,5L),eval("{~((fn [x] (do (return (+ x 7)) 100)) 4) 5}"));
 		assertEquals(Maps.of(1L,2L),eval("{(inc 0) 2}"));

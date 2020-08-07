@@ -29,7 +29,7 @@ public class Syntax extends ACell {
 
 	/** 
 	 * Metadata map
-	 * If empty, gets encoded as null
+	 * If empty, gets encoded as null in byte encoding
 	 */
 	private final AHashMap<Object, Object> meta;
 
@@ -39,9 +39,10 @@ public class Syntax extends ACell {
 	}
 
 	/**
-	 * Wraps a value as a Syntax Object, merging in the given new metadata
+	 * Wraps a value as a Syntax Object, adding the given new metadata
 	 * 
 	 * @param value
+	 * @param metadata to merge, may be null
 	 * @return Syntax instance
 	 */
 	public static Syntax create(Object value, AHashMap<Object, Object> meta) {
@@ -50,6 +51,8 @@ public class Syntax extends ACell {
 			if (meta==null) return stx;
 			return stx.mergeMeta(meta);
 		}
+		if (meta==null) meta=Maps.empty();
+		
 		return new Syntax(Ref.create(value), meta);
 	}
 
