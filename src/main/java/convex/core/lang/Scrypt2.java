@@ -46,31 +46,9 @@ public class Scrypt2 extends Reader {
         return doParse(new ReportingParseRunner<>(scryptReader.CompilationUnit()), source);
     }
 
-    public Rule Spacing() {
-        return ZeroOrMore(FirstOf(
-
-                // whitespace
-                OneOrMore(AnyOf(" \t\r\n\f").label("Whitespace")),
-
-                // traditional comment
-                Sequence("/*", ZeroOrMore(TestNot("*/"), ANY), "*/"),
-
-                // end of line comment
-                Sequence(
-                        "//",
-                        ZeroOrMore(TestNot(AnyOf("\r\n")), ANY),
-                        FirstOf("\r\n", '\r', '\n', EOI)
-                )
-        ));
-    }
-
-    Rule Argument(Var<ArrayList<Object>> expVar) {
-        return Sequence(
-                CompoundExpression(),
-                ListAddAction(expVar)
-        );
-    }
-
+    // --------------------------------
+    // COMPILATION UNIT
+    // --------------------------------
     public Rule CompilationUnit() {
         return FirstOf(
                 Sequence(
@@ -80,6 +58,133 @@ public class Scrypt2 extends Reader {
                         EOI
                 ),
                 push(error("Invalid program."))
+        );
+    }
+
+    // --------------------------------
+    // EXPRESSION
+    // --------------------------------
+    public Rule Expression() {
+        return FirstOf(
+                FunctionApplication(),
+                DoExpression(),
+                DefExpression(),
+                CondExpression(),
+
+                // Scalars
+                NumberLiteral(),
+                BooleanLiteral(),
+                Symbol(),
+                Keyword(),
+
+                // Compound
+                Vector(),
+                MapLiteralExpression()
+        );
+    }
+
+    // --------------------------------
+    // DO
+    // --------------------------------
+
+    /**
+     * Zero or more expressions wrapped in 'do { }'.
+     * <p>
+     * Compiles to '(do expression+ )'.
+     *
+     * @return Rule
+     */
+    public Rule DoExpression() {
+        return Sequence(
+                "do",
+                Spacing(),
+                LWING,
+                DoBody(),
+                RWING,
+                push(prepare(Lists.create(popNodeList()).cons(Symbols.DO)))
+        );
+    }
+
+    public Rule DoBody() {
+        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+
+        return Sequence(
+                ZeroOrMore(
+                        Spacing(),
+                        Expression(),
+                        Spacing(),
+                        ListAddAction(expVar)
+                ),
+                push(prepare(Lists.create(expVar.get())))
+        );
+    }
+
+    // --------------------------------
+    // COND
+    // --------------------------------
+    @SuppressWarnings({ "unchecked" })
+    public Rule CondExpression() {
+        return Sequence(
+                "cond",
+                Spacing(),
+                LWING,
+                CondTestExpressionList(),
+                RWING,
+                push(buildCondExpression((ArrayList<Object>) pop()))
+                
+        );
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public AList<Object> buildCondExpression(ArrayList<Object> testExpressionList) {
+        return Lists.create(testExpressionList).flatMap((pair) -> Lists.create((AList) pair))
+                .cons(Syntax.create(Symbols.COND));
+    }
+
+    public Rule CondTestExpressionList() {
+        var expVar = new Var<>(new ArrayList<Object>());
+
+        return OneOrMore(CondTestExpressionPair(), ListAddAction(expVar), push(expVar.get()));
+    }
+
+    public Rule CondTestExpressionPair() {
+        return Sequence(
+                Expression(),
+                Spacing(),
+                Expression(),
+                Spacing(),
+                push(buildCondTextExpression((Syntax) pop(), (Syntax) pop()))
+        );
+    }
+
+    public ASequence<Object> buildCondTextExpression(Syntax expression, Syntax test) {
+        return Lists.of(test, expression);
+    }
+
+    // --------------------------------
+    // DEF
+    // --------------------------------
+    public Rule DefExpression() {
+        return Sequence(
+                Spacing(),
+                "def",
+                Spacing(),
+                Symbol(),
+                EQU,
+                Expression(),
+                push(prepare(buildDefExpression((Syntax) pop(), (Syntax) pop())))
+        );
+    }
+
+    public List<Syntax> buildDefExpression(Syntax expr, Syntax sym) {
+        return (List<Syntax>) Lists.of(Syntax.create(Symbols.DEF), sym, expr);
+    }
+
+
+    Rule Argument(Var<ArrayList<Object>> expVar) {
+        return Sequence(
+                CompoundExpression(),
+                ListAddAction(expVar)
         );
     }
 
@@ -125,22 +230,6 @@ public class Scrypt2 extends Reader {
         );
     }
 
-    public Rule DefExpression() {
-        return Sequence(
-                Spacing(),
-                "def",
-                Spacing(),
-                Symbol(),
-                EQU,
-                Expression(),
-                push(prepare(buildDefStatement((Syntax) pop(), (Syntax) pop())))
-        );
-    }
-
-    public List<Syntax> buildDefStatement(Syntax expr, Syntax sym) {
-        return (List<Syntax>) Lists.of(Syntax.create(Symbols.DEF), sym, expr);
-    }
-
     public Rule LocalSetStatement() {
         return Sequence(
                 Spacing(),
@@ -154,38 +243,6 @@ public class Scrypt2 extends Reader {
 
     public List<Syntax> buildLocalSetStatement(Syntax expr, Syntax sym) {
         return (List<Syntax>) Lists.of(Syntax.create(Symbols.SET_BANG), sym, expr);
-    }
-
-    /**
-     * One or more expressions wrapped in 'do { }' separated by ';'.
-     * <p>
-     * Compiles to '(do expression+ )'.
-     *
-     * @return Rule
-     */
-    public Rule DoExpression() {
-        return Sequence(
-                "do",
-                Spacing(),
-                LWING,
-                DoBody(),
-                RWING,
-                push(prepare(Lists.create(popNodeList()).cons(Symbols.DO)))
-        );
-    }
-
-    public Rule DoBody() {
-        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
-
-        return Sequence(
-                ZeroOrMore(
-                        Spacing(),
-                        Expression(),
-                        Spacing(),
-                        ListAddAction(expVar)
-                ),
-                push(prepare(Lists.create(expVar.get())))
-        );
     }
 
     public Rule MapLiteralExpression() {
@@ -225,28 +282,6 @@ public class Scrypt2 extends Reader {
 
     public MapEntry<Syntax, Syntax> buildMapEntry(Syntax v, Syntax k) {
         return MapEntry.create(k, v);
-    }
-
-    public Rule Expression() {
-        return FirstOf(
-                FunctionApplication(),
-                DoExpression(),
-                DefExpression(),
-
-                // Scalars
-                NumberLiteral(),
-                BooleanLiteral(),
-                Symbol(),
-                Keyword(),
-
-                // Compound
-                Vector(),
-                MapLiteralExpression()
-        );
-    }
-
-    public Rule NestedExpression() {
-        return Sequence("(", Spacing(), CompoundExpression(), Spacing(), ")");
     }
 
     public Rule IfTestExpression() {
@@ -371,6 +406,24 @@ public class Scrypt2 extends Reader {
     @DontLabel
     Rule Terminal(String string, Rule mustNotFollow) {
         return Sequence(Spacing(), string, TestNot(mustNotFollow), Spacing()).label('\'' + string + '\'');
+    }
+
+    public Rule Spacing() {
+        return ZeroOrMore(FirstOf(
+
+                // whitespace
+                OneOrMore(AnyOf(" \t\r\n\f").label("Whitespace")),
+
+                // traditional comment
+                Sequence("/*", ZeroOrMore(TestNot("*/"), ANY), "*/"),
+
+                // end of line comment
+                Sequence(
+                        "//",
+                        ZeroOrMore(TestNot(AnyOf("\r\n")), ANY),
+                        FirstOf("\r\n", '\r', '\n', EOI)
+                )
+        ));
     }
 
 }
