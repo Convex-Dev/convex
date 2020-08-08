@@ -74,6 +74,7 @@ public class Symbols {
 	public static final Symbol EXPANDER = Symbol.create("expander");
 
 	public static final Symbol IF = Symbol.create("if");
+	public static final Symbol WHEN = Symbol.create("when");
 	public static final Symbol LET = Symbol.create("let");
 
 	public static final Symbol STORE = Symbol.create("store");
