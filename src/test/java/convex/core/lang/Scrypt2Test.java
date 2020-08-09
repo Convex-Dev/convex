@@ -31,7 +31,7 @@ public class Scrypt2Test {
 
     @SuppressWarnings("unchecked")
     public static <T> Context<T> step(Context<?> c, String source) {
-        Syntax syn = Scrypt.readSyntax(source);
+        Syntax syn = Scrypt2.readSyntax(source);
 
         Context<AOp<Object>> cctx = c.expandCompile(syn);
 
