@@ -95,6 +95,30 @@ public class Scrypt2Test {
         assertEquals(Reader.read("(cond (zero? x) 1)"), parse(compilationUnit, "cond { zero?(x) 1 }"));
         assertEquals(Reader.read("(cond false 1 true 2)"), parse(compilationUnit, "cond { false 1 true 2 }"));
 
+        /**
+         * 1 + inc(5) / 2
+         * (1 + inc(5)) / 2
+         */
+
+        /**
+         * fn (x) {
+         *   x
+         * }
+         */
+
+        /**
+         * defn identity(x) {
+         *   x
+         * }
+         */
+
+        /**
+         * let (x 1 y 2) {
+         *   x + y
+         * }
+         * 
+         */
+
     }
 
 }
