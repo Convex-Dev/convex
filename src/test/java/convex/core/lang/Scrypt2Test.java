@@ -61,6 +61,7 @@ public class Scrypt2Test {
         assertThrows(ParserRuntimeException.class, () -> parse(compilationUnit, ""));
         assertThrows(ParserRuntimeException.class, () -> parse(compilationUnit, "1 true"));
         assertThrows(ParserRuntimeException.class, () -> parse(compilationUnit, "{"));
+        assertThrows(ParserRuntimeException.class, () -> parse(compilationUnit, "def x"));
         assertThrows(ParserRuntimeException.class, () -> parse(compilationUnit, "inc(1"));
         assertThrows(ParserRuntimeException.class, () -> parse(compilationUnit, "cond { }"));
 
@@ -85,9 +86,9 @@ public class Scrypt2Test {
         assertEquals(Reader.read("(do 1 (inc 2) {:n 3})"), parse(compilationUnit, "do { 1 inc(2) {:n 3} }"));
 
         // Def Expression
-        assertEquals(Reader.read("(def x 1)"), parse(compilationUnit, "def x = 1"));
-        assertEquals(Reader.read("(def x (inc 1))"), parse(compilationUnit, "def x = inc(1)"));
-        assertEquals(Reader.read("(def x (do (reduce + [] [1,2,3])))"), parse(compilationUnit, "def x = do { reduce(+, [], [1, 2, 3]) }"));
+        assertEquals(Reader.read("(def x 1)"), parse(compilationUnit, "def x 1"));
+        assertEquals(Reader.read("(def x (inc 1))"), parse(compilationUnit, "def x inc(1)"));
+        assertEquals(Reader.read("(def x (do (reduce + [] [1,2,3])))"), parse(compilationUnit, "def x do { reduce(+, [], [1, 2, 3]) }"));
 
         // Cond Expression
         assertEquals(Reader.read("(cond false 1)"), parse(compilationUnit, "cond { false 1 }"));

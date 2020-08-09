@@ -170,7 +170,7 @@ public class Scrypt2 extends Reader {
                 "def",
                 Spacing(),
                 Symbol(),
-                EQU,
+                Spacing(),
                 Expression(),
                 push(prepare(buildDefExpression((Syntax) pop(), (Syntax) pop())))
         );
