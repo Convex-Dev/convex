@@ -286,10 +286,28 @@ public class ScryptTest {
         var scrypt = scrypt();
         var def = scrypt.DefStatement();
 
-        assertEquals(Reader.read("(def x 1)"), parse(def, "def x = 1;"));;
+        assertEquals(Reader.read("(def x 1)"), parse(def, "def x = 1;"));
 
         assertEquals(1, (Long) eval("def x = 1;"));
         assertEquals(2, (Long) eval("{def x = 1; x + 1;}"));
+    }
+
+    @Test
+    public void testSetLocalStatement() {
+        var scrypt = scrypt();
+        var localSetStatement = scrypt.LocalSetStatement();
+        var blockExpression = scrypt.BlockExpression();
+
+        assertEquals(Reader.read("(set! a 1)"), parse(localSetStatement, "a = 1;"));
+        assertEquals(Reader.read("(do (set! x [1 2]) (conj x 3))"), parse(blockExpression, "{x = [1, 2]; conj(x, 3);}"));
+
+        assertEquals(1, (Long) eval("x = 1;"));
+        assertEquals(2, (Long) eval("{x = 1; x + 1;}"));
+        assertEquals(Vectors.of(1L, 2L, 3L), eval("{x = [1, 2]; conj(x, 3);}"));
+        assertEquals(List.of(0L, 1L, 2L), eval("{x = [1, 2]; conj(x, 3); cons(0, x);}"));
+
+        assertThrows(ParseException.class, () -> eval("a ="));
+        assertThrows(ParseException.class, () -> eval("= 1"));
     }
 
 }
