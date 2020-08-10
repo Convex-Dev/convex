@@ -7,8 +7,7 @@ import org.parboiled.Rule;
 import org.parboiled.errors.ParserRuntimeException;
 import org.parboiled.parserunners.ReportingParseRunner;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class Scrypt2Test {
 
@@ -66,6 +65,7 @@ public class Scrypt2Test {
         assertThrows(ParserRuntimeException.class, () -> parse(compilationUnit, "cond { }"));
 
         // Scalar Data Types
+        assertEquals(Reader.read("nil"), parse(compilationUnit, "nil"));
         assertEquals(Reader.read("1"), parse(compilationUnit, "1"));
         assertEquals(Reader.read("true"), parse(compilationUnit, "true"));
         assertEquals(Reader.read("false"), parse(compilationUnit, "false"));
@@ -98,6 +98,7 @@ public class Scrypt2Test {
         assertEquals(2, (Long) eval("cond { true inc(1) }"));
         assertEquals(2, (Long) eval("cond { false 1 :default 2 }"));
         assertEquals(2, (Long) eval("cond { false 1  inc(1) 2 }"));
+        assertNull(eval("cond { false 1  nil 2 }"));
 
         /**
          * 1 + inc(5) / 2

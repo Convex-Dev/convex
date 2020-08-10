@@ -81,6 +81,7 @@ public class Scrypt2 extends Reader {
                 CondExpression(),
 
                 // Scalars
+                NilLiteral(),
                 NumberLiteral(),
                 BooleanLiteral(),
                 Symbol(),
