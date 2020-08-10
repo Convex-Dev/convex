@@ -78,8 +78,10 @@ public class Scrypt2Test {
 
         // Function Application
         assertEquals(Reader.read("(inc 1)"), parse(compilationUnit, "inc(1)"));
-        assertEquals(Reader.read("(map inc [1,2])"), parse(compilationUnit, "map(inc [1, 2])"));
         assertEquals(Reader.read("(inc (inc 1))"), parse(compilationUnit, "inc(inc(1))"));
+        assertEquals(Reader.read("(map inc [1,2])"), parse(compilationUnit, "map(inc [1, 2])"));
+        assertEquals(Reader.read("(map (fn [x] x) [1,2])"), parse(compilationUnit, "map(fn(x){x} [1, 2])"));
+        assertEquals(Reader.read("(reduce (fn [acc,x] (conj acc x)) [] [1,2])"), parse(compilationUnit, "reduce(fn(acc x){ conj(acc x) } [] [1, 2])"));
 
         // Do Expression
         assertEquals(Reader.read("(do)"), parse(compilationUnit, "do { }"));

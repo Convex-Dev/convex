@@ -10,7 +10,6 @@ import org.parboiled.annotations.SuppressNode;
 import org.parboiled.parserunners.ReportingParseRunner;
 import org.parboiled.support.Var;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 
 @BuildParseTree
@@ -259,14 +258,6 @@ public class Scrypt2 extends Reader {
         return (List<Syntax>) Lists.of(Syntax.create(Symbols.DEF), sym, expr);
     }
 
-
-    Rule Argument(Var<ArrayList<Object>> expVar) {
-        return Sequence(
-                CompoundExpression(),
-                ListAddAction(expVar)
-        );
-    }
-
     public Rule Vector() {
         return Sequence(
                 '[',
@@ -373,8 +364,12 @@ public class Scrypt2 extends Reader {
                 Symbol(),
                 Spacing(),
                 FunctionApplicationArguments(),
-                push(prepare(((AList<Syntax>) ((Syntax) pop()).getValue()).cons((Syntax) pop())))
+                push(prepare(buildFunctionApplication((ArrayList<Object>) pop(), (Syntax) pop())))
         );
+    }
+
+    public ASequence<Object> buildFunctionApplication(ArrayList<Object> args, Syntax sym) {
+        return Lists.create(args).cons(sym);
     }
 
     Rule FunctionApplicationArguments() {
@@ -382,10 +377,21 @@ public class Scrypt2 extends Reader {
 
         return Sequence(
                 LPAR,
-                Optional(Argument(expVar), ZeroOrMore(Spacing(), Argument(expVar))),
+                Optional(
+                        FunctionApplicationArgument(),
+                        ListAddAction(expVar),
+                        ZeroOrMore(
+                                FunctionApplicationArgument(),
+                                ListAddAction(expVar)
+                        )
+                ),
                 RPAR,
-                push(prepare(Lists.create(expVar.get())))
+                push(expVar.get())
         );
+    }
+
+    Rule FunctionApplicationArgument() {
+        return Sequence(Expression(), Spacing());
     }
 
     public Rule InfixOperator() {
