@@ -85,6 +85,7 @@ public class Scrypt2Test {
         assertEquals(Reader.read("(do)"), parse(compilationUnit, "do { }"));
         assertEquals(Reader.read("(do 1)"), parse(compilationUnit, "do { 1 }"));
         assertEquals(Reader.read("(do 1 (inc 2) {:n 3})"), parse(compilationUnit, "do { 1 inc(2) {:n 3} }"));
+        assertEquals(Reader.read("(do (def f (fn [x] x)) (f 1))"), parse(compilationUnit, "do { def f fn(x) { x } f(1) }"));
         assertEquals(1, (Long) eval("do { 1 }"));
 
         // Def Expression
@@ -115,11 +116,6 @@ public class Scrypt2Test {
          * (1 + inc(5)) / 2
          */
 
-        /**
-         * fn (x) {
-         *   x
-         * }
-         */
 
         /**
          * defn identity(x) {
