@@ -382,7 +382,7 @@ public class Scrypt2 extends Reader {
 
         return Sequence(
                 LPAR,
-                Optional(Argument(expVar), ZeroOrMore(COMMA, Argument(expVar))),
+                Optional(Argument(expVar), ZeroOrMore(Spacing(), Argument(expVar))),
                 RPAR,
                 push(prepare(Lists.create(expVar.get())))
         );
