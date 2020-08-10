@@ -10,6 +10,7 @@ import org.parboiled.annotations.SuppressNode;
 import org.parboiled.parserunners.ReportingParseRunner;
 import org.parboiled.support.Var;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 
 @BuildParseTree
@@ -17,8 +18,10 @@ public class Scrypt2 extends Reader {
 
     // Use a ThreadLocal reader because instances are not thread safe
     private static final ThreadLocal<Scrypt2> syntaxReader = ThreadLocal.withInitial(() -> Parboiled.createParser(Scrypt2.class));
+    public final Rule FN = Keyword("fn");
     public final Rule IF = Keyword("if");
     public final Rule ELSE = Keyword("else");
+
     final Rule EQU = Terminal("=", Ch('='));
     final Rule COMMA = Terminal(",");
     final Rule LPAR = Terminal("(");
@@ -75,6 +78,7 @@ public class Scrypt2 extends Reader {
     // --------------------------------
     public Rule Expression() {
         return FirstOf(
+                FunctionExpression(),
                 FunctionApplication(),
                 DoExpression(),
                 DefExpression(),
@@ -92,6 +96,73 @@ public class Scrypt2 extends Reader {
                 MapLiteralExpression()
         );
     }
+
+    // --------------------------------
+    // FUNCTION
+    // --------------------------------
+
+    public Rule FunctionExpression() {
+        return Sequence(
+                FN,
+                FunctionName(),
+                Spacing(),
+                FunctionParameters(),
+                Spacing(),
+                FunctionBody(),
+                push(buildFunctionExpression((Syntax) pop()))
+        );
+    }
+
+    public Syntax buildFunctionExpression(Syntax parameters) {
+        return Syntax.create(Lists.of(Symbols.FN, parameters));
+    }
+
+    public Rule FunctionName() {
+        return Optional(Symbol(), Spacing());
+    }
+
+    public Rule FunctionParameters() {
+        var expVar = new Var<>(new ArrayList<>());
+
+        return Sequence(
+                LPAR,
+                Spacing(),
+                Optional(
+                        OneOrMore(
+                                FunctionParameter(),
+                                ListAddAction(expVar)
+                        )
+                ),
+                RPAR,
+                push(prepare(Vectors.create(expVar.get())))
+        );
+    }
+
+    public Rule FunctionParameter() {
+        return Sequence(Symbol(), Spacing());
+    }
+
+    public Syntax buildFunctionParameters(ArrayList<Object> parameters) {
+        return Syntax.create(Vectors.of(parameters));
+    }
+
+    public Rule FunctionBody() {
+        var expVar = new Var<>(new ArrayList<>());
+
+        return Sequence(
+                LWING,
+                Spacing(),
+                Optional(
+                        OneOrMore(
+                                Expression(),
+                                Spacing(),
+                                ListAddAction(expVar)
+                        )
+                ),
+                RWING
+        );
+    }
+
 
     // --------------------------------
     // DO

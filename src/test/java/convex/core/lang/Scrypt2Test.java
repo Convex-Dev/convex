@@ -91,6 +91,7 @@ public class Scrypt2Test {
         assertEquals(Reader.read("(def x 1)"), parse(compilationUnit, "def x 1"));
         assertEquals(Reader.read("(def x (inc 1))"), parse(compilationUnit, "def x inc(1)"));
         assertEquals(Reader.read("(def x (do (reduce + [] [1,2,3])))"), parse(compilationUnit, "def x do { reduce(+, [], [1, 2, 3]) }"));
+        assertEquals(Reader.read("(def f (fn []))"), parse(compilationUnit, "def f fn(){}"));
 
         // Cond Expression
         assertEquals(Reader.read("(cond false 1)"), parse(compilationUnit, "cond { false 1 }"));
@@ -101,6 +102,12 @@ public class Scrypt2Test {
         assertEquals(2, (Long) eval("cond { false 1 :default 2 }"));
         assertEquals(2, (Long) eval("cond { false 1  inc(1) 2 }"));
         assertNull(eval("cond { false 1  nil 2 }"));
+
+        // Function Expression
+        assertEquals(Reader.read("(fn [])"), parse(compilationUnit, "fn ( ) { }"));
+        assertEquals(Reader.read("(fn [x])"), parse(compilationUnit, "fn (x) { }"));
+        assertEquals(Reader.read("(fn [x y])"), parse(compilationUnit, "fn (x y) { }"));
+        assertEquals(Reader.read("(fn [x] x)"), parse(compilationUnit, "fn (x) { x }"));
 
         /**
          * 1 + inc(5) / 2
