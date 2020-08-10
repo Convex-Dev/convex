@@ -83,7 +83,9 @@ public class Scrypt2Test {
 
         // Do Expression
         assertEquals(Reader.read("(do)"), parse(compilationUnit, "do { }"));
+        assertEquals(Reader.read("(do 1)"), parse(compilationUnit, "do { 1 }"));
         assertEquals(Reader.read("(do 1 (inc 2) {:n 3})"), parse(compilationUnit, "do { 1 inc(2) {:n 3} }"));
+        assertEquals(1, (Long) eval("do { 1 }"));
 
         // Def Expression
         assertEquals(Reader.read("(def x 1)"), parse(compilationUnit, "def x 1"));
