@@ -40,10 +40,19 @@ public class Scrypt2 extends Reader {
      * @param source
      * @return Parsed form
      */
+    @SuppressWarnings("rawtypes")
     public static Syntax readSyntax(String source) {
         Scrypt2 scryptReader = syntaxReader.get();
         scryptReader.tempSource = source;
-        return doParse(new ReportingParseRunner<>(scryptReader.CompilationUnit()), source);
+
+        var rule = scryptReader.CompilationUnit();
+        var result = new ReportingParseRunner(rule).run(source);
+
+        if (result.matched) {
+            return (Syntax) result.resultValue;
+        } else {
+            throw new RuntimeException(rule.toString() + " failed to match " + source);
+        }
     }
 
     // --------------------------------
@@ -130,19 +139,20 @@ public class Scrypt2 extends Reader {
                 LWING,
                 CondTestExpressionList(),
                 RWING,
-                push(buildCondExpression((ArrayList<Object>) pop()))
+                push(prepare(buildCondExpression((ArrayList<Object>) pop())))
                 
         );
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     public AList<Object> buildCondExpression(ArrayList<Object> testExpressionList) {
-        return Lists.create(testExpressionList).flatMap((pair) -> Lists.create((AList) pair))
-                .cons(Syntax.create(Symbols.COND));
+        var pairs = Lists.create(testExpressionList).flatMap((pair) -> Lists.create((AList) pair));
+
+        return pairs.cons(Syntax.create(Symbols.COND));
     }
 
     public Rule CondTestExpressionList() {
-        var expVar = new Var<>(new ArrayList<Object>());
+        var expVar = new Var<>(new ArrayList<>());
 
         return OneOrMore(CondTestExpressionPair(), ListAddAction(expVar), push(expVar.get()));
     }
