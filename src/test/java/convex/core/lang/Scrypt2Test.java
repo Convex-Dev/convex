@@ -108,6 +108,7 @@ public class Scrypt2Test {
         assertEquals(Reader.read("(fn [x])"), parse(compilationUnit, "fn (x) { }"));
         assertEquals(Reader.read("(fn [x y])"), parse(compilationUnit, "fn (x y) { }"));
         assertEquals(Reader.read("(fn [x] x)"), parse(compilationUnit, "fn (x) { x }"));
+        assertEquals(Reader.read("(fn [x] 1 {} [] (inc x))"), parse(compilationUnit, "fn (x) { 1 {} [] inc(x) }"));
 
         /**
          * 1 + inc(5) / 2

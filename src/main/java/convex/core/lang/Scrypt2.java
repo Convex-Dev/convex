@@ -101,20 +101,20 @@ public class Scrypt2 extends Reader {
     // FUNCTION
     // --------------------------------
 
+    @SuppressWarnings("rawtypes")
     public Rule FunctionExpression() {
         return Sequence(
                 FN,
-                FunctionName(),
-                Spacing(),
                 FunctionParameters(),
                 Spacing(),
                 FunctionBody(),
-                push(buildFunctionExpression((Syntax) pop()))
+                push(buildFunctionExpression((AVector) pop(), (Syntax) pop()))
         );
     }
 
-    public Syntax buildFunctionExpression(Syntax parameters) {
-        return Syntax.create(Lists.of(Symbols.FN, parameters));
+    @SuppressWarnings("rawtypes")
+    public Syntax buildFunctionExpression(AVector body, Syntax parameters) {
+        return Syntax.create(body.cons(parameters).cons(Syntax.create(Symbols.FN)));
     }
 
     public Rule FunctionName() {
@@ -142,10 +142,6 @@ public class Scrypt2 extends Reader {
         return Sequence(Symbol(), Spacing());
     }
 
-    public Syntax buildFunctionParameters(ArrayList<Object> parameters) {
-        return Syntax.create(Vectors.of(parameters));
-    }
-
     public Rule FunctionBody() {
         var expVar = new Var<>(new ArrayList<>());
 
@@ -159,7 +155,8 @@ public class Scrypt2 extends Reader {
                                 ListAddAction(expVar)
                         )
                 ),
-                RWING
+                RWING,
+                push(Vectors.create(expVar.get()))
         );
     }
 
