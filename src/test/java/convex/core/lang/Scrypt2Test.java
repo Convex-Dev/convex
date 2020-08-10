@@ -93,9 +93,11 @@ public class Scrypt2Test {
         // Cond Expression
         assertEquals(Reader.read("(cond false 1)"), parse(compilationUnit, "cond { false 1 }"));
         assertEquals(Reader.read("(cond (zero? x) 1)"), parse(compilationUnit, "cond { zero?(x) 1 }"));
-        assertEquals(Reader.read("(cond false 1 true 2)"), parse(compilationUnit, "cond { false 1 true 2 }"));
+        assertEquals(Reader.read("(cond false 1 (inc 1) 2)"), parse(compilationUnit, "cond { false 1  inc(1) 2 }"));
+        assertEquals(2, (Long) eval("cond { false 1 :default 2 }"));
         assertEquals(2, (Long) eval("cond { true inc(1) }"));
         assertEquals(2, (Long) eval("cond { false 1 :default 2 }"));
+        assertEquals(2, (Long) eval("cond { false 1  inc(1) 2 }"));
 
         /**
          * 1 + inc(5) / 2
