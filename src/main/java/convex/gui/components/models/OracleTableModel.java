@@ -1,4 +1,4 @@
-package convex.gui.manager.models;
+package convex.gui.components.models;
 
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableModel;

@@ -21,10 +21,10 @@ import convex.gui.components.ActionPanel;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.DefaultReceiveAction;
 import convex.gui.components.Toast;
+import convex.gui.components.models.OracleTableModel;
 import convex.gui.manager.PeerManager;
 import convex.gui.manager.Toolkit;
 import convex.gui.manager.mainpanels.WalletPanel;
-import convex.gui.manager.models.OracleTableModel;
 import convex.net.ResultConsumer;
 
 @SuppressWarnings("serial")
