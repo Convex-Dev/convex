@@ -1039,7 +1039,8 @@ public class CoreTest {
 
 	@Test
 	public void testBalance() {
-		String addr=Address.dummy("a").toHexString();
+		// null address, shouldn't have any balance initially
+		String addr=Address.dummy("0").toHexString();
 		assertNull(eval("(let [a (address \""+addr+"\")] (balance a))"));
 
 		// hero balance, should reflect cost of initial juice

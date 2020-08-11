@@ -39,21 +39,22 @@ public class Init {
 	public static final Address LIVEPOOL = Address.dummy("4");
 	public static final Address ROOTFUND = Address.dummy("5");
 	
-	// Built-in Actor addresses
-	public static final Address TRUST_ADDRESS=Address.dummy("a");
+	// Built-in special accounts
+	public static final Address MEMORY_EXCHANGE=Address.dummy("a");
+	public static final Address TRUST_ADDRESS=Address.dummy("b");
 	public static final Address CORE_ADDRESS=Address.dummy("c");
 	public static final Address REGISTRY_ADDRESS=Address.dummy("f");
 	
 	public static final Address ORACLE_ADDRESS;
 
-	public static final int NUM_GOVERNANCE = 5;
+	public static final int NUM_GOVERNANCE = 6;
 	public static final int NUM_PEERS = 8;
-	public static final int NUM_ACTORS = 2;
+	public static final int NUM_USERS = 2;
 	public static final int NUM_LIBRARIES = 1;
 
-	public static long ALLOCATION;
+	public static final long USER_ALLOCATION;
 
-	public static AKeyPair[] KEYPAIRS = new AKeyPair[NUM_PEERS + NUM_ACTORS];
+	public static AKeyPair[] KEYPAIRS = new AKeyPair[NUM_PEERS + NUM_USERS];
 
 	public static final Address HERO;
 	public static final Address VILLAIN;
@@ -84,17 +85,23 @@ public class Init {
 			accts = addGovernanceAccount(accts, RESERVED, 900000000000000000L); // 99%
 			accts = addGovernanceAccount(accts, MAINBANK, 90000000000000000L); // 9%
 			accts = addGovernanceAccount(accts, ROOTFUND, 9000000000000000L); // 1%
-			accts = addGovernanceAccount(accts, MAINPOOL, 999000000000000L); // 0.1% distribute 5% / year ~= 0.0003%
+			accts = addGovernanceAccount(accts, MAINPOOL, 998000000000000L); // 0.1% distribute 5% / year ~= 0.0003%
 																				// /day
 			accts = addGovernanceAccount(accts, LIVEPOOL, 900000000000L); // 0.001% = approx 3 days of mainpool feed
-			ALLOCATION = 100000 * 1000000L; // remaining allocation to divide between initial accounts
+			
+			// set up memory exchange. Initially 1GB available at 1000 per byte.
+			{
+				accts = addMemoryExchange(accts, MEMORY_EXCHANGE, 1000000000000L,1000000000L);
+			}
+			
+			USER_ALLOCATION = 100000 * 1000000L; // remaining allocation to divide between initial user accounts
 			
 			// Set up initial peers
 			for (int i = 0; i < NUM_PEERS; i++) {
 				AKeyPair kp = AKeyPair.createSeeded(123454321 + i);
 				KEYPAIRS[i] = kp;
 				Address address = kp.getAddress();
-				long peerFunds = ALLOCATION / 10;
+				long peerFunds = USER_ALLOCATION / 10;
 
 				// set a staked fund such that the first peer starts with super-majority
 				long stakedFunds = (long) (((i == 0) ? 0.75 : 0.01) * peerFunds);
@@ -106,11 +113,11 @@ public class Init {
 			FIRST_PEER = KEYPAIRS[0].getAddress();
 
 			// Set up initial actor accounts
-			for (int i = 0; i < NUM_ACTORS; i++) {
+			for (int i = 0; i < NUM_USERS; i++) {
 				AKeyPair kp = AKeyPair.createSeeded(543212345 + i);
 				KEYPAIRS[NUM_PEERS + i] = kp;
 				Address address = kp.getAddress();
-				accts = addAccount(accts, address, ALLOCATION / 10);
+				accts = addAccount(accts, address, USER_ALLOCATION / 10);
 			}
 
 			HERO_KP = KEYPAIRS[NUM_PEERS + 0];
@@ -127,12 +134,13 @@ public class Init {
 			long total = s.computeTotalFunds();
 			if (total != Amount.MAX_AMOUNT) throw new Error("Bad total amount: " + total);
 			if (s.getPeers().size() != NUM_PEERS) throw new Error("Bad peer count: " + s.getPeers().size());
-			if (s.getAccounts().size() != NUM_PEERS + NUM_ACTORS + NUM_GOVERNANCE+NUM_LIBRARIES) throw new Error("Bad account count");
+			if (s.getAccounts().size() != NUM_PEERS + NUM_USERS + NUM_GOVERNANCE+NUM_LIBRARIES) throw new Error("Bad account count");
 
 			{ // Deploy Registry Actor to fixed Address
 				Context<?> ctx = Context.createFake(s, HERO);
 				Object form=Reader.readResource("actors/registry.con");
 				ctx = ctx.deployActor(form,REGISTRY_ADDRESS);
+				// Note the Registry registers itself upon creation
 				s = ctx.getState();
 			}
 
@@ -141,17 +149,11 @@ public class Init {
 				Object form=Reader.readResource("actors/oracle-trusted.con");
 				ctx = ctx.deployActor(form,true);
 				ORACLE_ADDRESS = (Address) ctx.getResult();
-				ctx = Context.createFake(ctx.getState(), ORACLE_ADDRESS);
-				ctx = ctx.actorCall(REGISTRY_ADDRESS, 0, "register",
-						Maps.of(Keywords.NAME, "Oracle Actor (default)"));
-				s = ctx.getState();
+				s = register(ctx.getState(),ORACLE_ADDRESS,"Oracle Actor (default)");
 			}
 			
 			{ // Register core library
-				Context<?> ctx = Context.createFake(s, Core.CORE_ADDRESS);
-				ctx = ctx.actorCall(REGISTRY_ADDRESS, 0, "register",
-						Maps.of(Keywords.NAME, "Convex Core Library"));
-				s = ctx.getState();
+				s = register(s,CORE_ADDRESS,"Convex Core Library");
 			}
 
 			INITIAL_STATE = s;
@@ -160,6 +162,13 @@ public class Init {
 			e.printStackTrace();
 			throw new Error(e);
 		}
+	}
+	
+	private static State register(State state,Address origin, String name) {
+		Context<?> ctx = Context.createFake(state, origin);
+		ctx = ctx.actorCall(REGISTRY_ADDRESS, 0, "register",
+				Maps.of(Keywords.NAME, name));
+		return ctx.getState();
 	}
 
 	private static BlobMap<Address, PeerStatus> addPeer(BlobMap<Address, PeerStatus> peers, Address peerAddress,
@@ -172,6 +181,14 @@ public class Init {
 
 	private static BlobMap<Address, AccountStatus> addGovernanceAccount(BlobMap<Address, AccountStatus> accts,
 			Address a, long balance) {
+		AccountStatus as = AccountStatus.createGovernance(balance);
+		if (accts.containsKey(a)) throw new Error("Duplicate governance account!");
+		accts = accts.assoc(a, as);
+		return accts;
+	}
+	
+	private static BlobMap<Address, AccountStatus> addMemoryExchange(BlobMap<Address, AccountStatus> accts,
+			Address a, long balance, long allowance) {
 		AccountStatus as = AccountStatus.createGovernance(balance);
 		if (accts.containsKey(a)) throw new Error("Duplicate governance account!");
 		accts = accts.assoc(a, as);
