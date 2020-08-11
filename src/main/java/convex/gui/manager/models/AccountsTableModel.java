@@ -22,7 +22,7 @@ public class AccountsTableModel extends AbstractTableModel implements TableModel
 		this.state = state;
 	}
 
-	private static final String[] FIXED_COLS = new String[] { "Address", "Type", "Count", "Balance", "Name", "Env.Size" };
+	private static final String[] FIXED_COLS = new String[] { "Address", "Type", "Count", "Balance", "Name", "Env.Size", "Allowance" };
 
 	public String getColumnName(int col) {
 		if (col < FIXED_COLS.length) return FIXED_COLS[col];
@@ -73,6 +73,8 @@ public class AccountsTableModel extends AbstractTableModel implements TableModel
 		}
 		case 5:
 			return as.getMemorySize();
+		case 6:
+			return as.getAllowance();
 		default:
 			return "";
 		}

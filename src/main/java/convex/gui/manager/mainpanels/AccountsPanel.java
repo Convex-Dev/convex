@@ -75,6 +75,8 @@ public class AccountsPanel extends JPanel {
 		table.getColumnModel().getColumn(5).setPreferredWidth(100);
 		table.getColumnModel().getColumn(5).setCellRenderer(rightRenderer);
 
+		table.getColumnModel().getColumn(6).setPreferredWidth(100);
+		table.getColumnModel().getColumn(6).setCellRenderer(rightRenderer);
 		
 		// popup menu, not sure why this doesn't work....
 		final JPopupMenu popupMenu = new JPopupMenu();
