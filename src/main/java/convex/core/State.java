@@ -300,18 +300,27 @@ public class State extends ARecord {
 
 		AVector<SignedData<ATransaction>> transactions = block.getTransactions();
 		for (int i = 0; i < blockLength; i++) {
+			// extract the signed transaction from the block
 			SignedData<? extends ATransaction> signed = transactions.get(i);
 
-			ATransaction t = signed.getValue(); // validates signature if necessary
-			Address origin = signed.getAddress();
-			Context<?> ctx = t.applyTransaction(origin, state);
+			// execute the transaction using the *latest* state (not necessarily "this")
+			Context<?> ctx = state.applyTransaction(signed);
 			
+			// record results and state update
 			results[i] = ctx.getValue();
 			state = ctx.getState();
 		}
 		
 		// TODO: changes for complete block?
 		return BlockResult.create(state, results);
+	}
+	
+	private Context<?> applyTransaction(SignedData<? extends ATransaction> signedTransaction) throws BadSignatureException {
+		ATransaction t = signedTransaction.getValue(); // validates signature if necessary
+		
+		Address origin = signedTransaction.getAddress();
+		Context<?> ctx=t.applyTransaction(origin, this);
+		return ctx;
 	}
 
 	@Override

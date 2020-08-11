@@ -251,7 +251,9 @@ public class Context<T> implements IObject {
 	 * @return Updated context
 	 */
 	public Context<T> completeTransaction(State initialState, long totalJuice, long juicePrice) {
+		// get state at end of trsnaction application
 		State state=getState();
+		
 		long remainingJuice=Math.max(0L, juice);
 		long transactionJuice=totalJuice-remainingJuice;
 		assert(transactionJuice>=0);
