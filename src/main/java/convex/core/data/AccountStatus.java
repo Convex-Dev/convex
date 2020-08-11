@@ -22,32 +22,34 @@ import convex.core.lang.impl.RecordFormat;
 public class AccountStatus extends ARecord {
 	private final long sequence;
 	private final Amount balance;
+	private final long allowance;
 	private final AHashMap<Symbol, Syntax> environment;
 	private final ABlobMap<Address, Object> holdings;
 	
-	private static final Keyword[] ACCOUNT_KEYS = new Keyword[] { Keywords.SEQUENCE, Keywords.BALANCE,Keywords.ENVIRONMENT,
+	private static final Keyword[] ACCOUNT_KEYS = new Keyword[] { Keywords.SEQUENCE, Keywords.BALANCE,Keywords.ALLOWANCE,Keywords.ENVIRONMENT,
 			Keywords.HOLDINGS};
 
 	private static final RecordFormat FORMAT = RecordFormat.of(ACCOUNT_KEYS);
 
-	private AccountStatus(long sequence, Amount balance,
+	private AccountStatus(long sequence, Amount balance, long allowance,
 			AHashMap<Symbol, Syntax> environment, ABlobMap<Address, Object> holdings) {
 		super(FORMAT);
 		this.sequence = sequence;
 		this.balance = balance;
+		this.allowance = allowance;
 		this.environment = environment;
 		this.holdings=holdings;
 	}
 
 	/**
-	 * Create a regular account.
+	 * Create a regular account, with the specifoed abalance and zero allowance
 	 * 
 	 * @param sequence
 	 * @param balance
 	 * @return New AccountStatus
 	 */
 	public static AccountStatus create(long sequence, Amount balance) {
-		return new AccountStatus(sequence, balance, null,null);
+		return new AccountStatus(sequence, balance, 0L, null,null);
 	}
 
 	/**
@@ -59,12 +61,12 @@ public class AccountStatus extends ARecord {
 	 */
 	public static AccountStatus createGovernance(long balance) {
 		Amount amount = Amount.create(balance);
-		return new AccountStatus(0, amount, null,null);
+		return new AccountStatus(0, amount, 0L, null,null);
 	}
 
 	public static AccountStatus createActor(Amount balance,
 			AHashMap<Symbol, Syntax> environment) {
-		return new AccountStatus(Constants.ACTOR_SEQUENCE, balance, environment,null);
+		return new AccountStatus(Constants.ACTOR_SEQUENCE, balance, 0L,environment,null);
 	}
 
 	public static AccountStatus create(Amount balance) {
@@ -102,17 +104,19 @@ public class AccountStatus extends ARecord {
 	public ByteBuffer writeRaw(ByteBuffer b) {
 		b = Format.writeVLCLong(b, sequence);
 		b = Format.write(b, balance);
+		b = Format.write(b, allowance);
 		b = Format.write(b, environment);
 		b = Format.write(b, holdings);
 		return b;
 	}
 
-	public static AccountStatus read(ByteBuffer data) throws BadFormatException {
-		long sequence = Format.readVLCLong(data);
-		Amount balance = Format.read(data);
-		AHashMap<Symbol, Syntax> environment = Format.read(data);
-		ABlobMap<Address,Object> holdings = Format.read(data);
-		return new AccountStatus(sequence, balance, environment,holdings);
+	public static AccountStatus read(ByteBuffer bb) throws BadFormatException {
+		long sequence = Format.readVLCLong(bb);
+		Amount balance = Format.read(bb);
+		long allowance = Format.read(bb);
+		AHashMap<Symbol, Syntax> environment = Format.read(bb);
+		ABlobMap<Address,Object> holdings = Format.read(bb);
+		return new AccountStatus(sequence, balance, allowance, environment,holdings);
 	}
 
 	@Override
@@ -172,7 +176,15 @@ public class AccountStatus extends ARecord {
 	}
 
 	public AccountStatus withBalance(Amount newBalance) {
-		return new AccountStatus(sequence, newBalance, environment,holdings);
+		return new AccountStatus(sequence, newBalance, allowance, environment,holdings);
+	}
+	
+	public AccountStatus withAllowance(long newAllowance) {
+		return new AccountStatus(sequence, balance, newAllowance, environment,holdings);
+	}
+	
+	public AccountStatus withBalances(Amount newBalance, long newAllowance) {
+		return new AccountStatus(sequence, newBalance, newAllowance, environment,holdings);
 	}
 
 	public AccountStatus withBalance(long newBalance) {
@@ -184,7 +196,7 @@ public class AccountStatus extends ARecord {
 		if (newEnvironment==Core.ENVIRONMENT) newEnvironment=null;
 		
 		if (environment==newEnvironment) return this;
-		return new AccountStatus(sequence, balance, newEnvironment,holdings);
+		return new AccountStatus(sequence, balance, allowance,newEnvironment,holdings);
 	}
 
 	/**
@@ -202,7 +214,7 @@ public class AccountStatus extends ARecord {
 			return null;
 		}
 
-		return new AccountStatus(newSequence, balance, environment,holdings);
+		return new AccountStatus(newSequence, balance, allowance, environment,holdings);
 	}
 
 	@Override
@@ -255,7 +267,7 @@ public class AccountStatus extends ARecord {
 	private AccountStatus withHoldings(ABlobMap<Address, Object> newHoldings) {
 		if (newHoldings.isEmpty()) newHoldings=null;
 		if (holdings==newHoldings) return this;
-		return new AccountStatus(sequence, balance, environment,newHoldings);
+		return new AccountStatus(sequence, balance, allowance, environment,newHoldings);
 	}
 
 	/**
@@ -310,6 +322,7 @@ public class AccountStatus extends ARecord {
 	public <V> V get(Keyword key) {
 		if (Keywords.SEQUENCE.equals(key)) return (V) (Long)sequence;
 		if (Keywords.BALANCE.equals(key)) return (V) (Long)balance.getValue();
+		if (Keywords.ALLOWANCE.equals(key)) return (V) (Long)allowance;
 		if (Keywords.ENVIRONMENT.equals(key)) return (V) environment;
 		if (Keywords.HOLDINGS.equals(key)) return (V) holdings;
 		
@@ -326,19 +339,22 @@ public class AccountStatus extends ARecord {
 	protected AccountStatus updateAll(Object[] newVals) {
 		long newSeq=(long)newVals[0];
 		long newBal=(long)newVals[1];
-		AHashMap<Symbol, Syntax> newEnv=(AHashMap<Symbol, Syntax>) newVals[2];
-		ABlobMap<Address, Object> newHoldings=(ABlobMap<Address, Object>) newVals[3];
+		long newAllowance=(long)newVals[2];
+		AHashMap<Symbol, Syntax> newEnv=(AHashMap<Symbol, Syntax>) newVals[3];
+		ABlobMap<Address, Object> newHoldings=(ABlobMap<Address, Object>) newVals[4];
 		
 		if ((balance.getValue()==newBal)&&(sequence==newSeq)&&(newEnv==environment)&&(newHoldings==holdings)) {
 			return this;
 		}
 		
-		return new AccountStatus(newSeq,Amount.create(newBal),newEnv,newHoldings);
+		return new AccountStatus(newSeq,Amount.create(newBal),newAllowance,newEnv,newHoldings);
 	}
 
-	@Override
-	public void attachMemorySize(long memorySize) {
-		// TODO Auto-generated method stub
-		
+	/**
+	 * Gets the memory allowance for this account
+	 * @return
+	 */
+	public long getAllowance() {
+		return allowance;
 	}
 }

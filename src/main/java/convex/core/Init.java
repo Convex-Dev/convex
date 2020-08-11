@@ -189,7 +189,7 @@ public class Init {
 	
 	private static BlobMap<Address, AccountStatus> addMemoryExchange(BlobMap<Address, AccountStatus> accts,
 			Address a, long balance, long allowance) {
-		AccountStatus as = AccountStatus.createGovernance(balance);
+		AccountStatus as = AccountStatus.createGovernance(balance).withAllowance(allowance);
 		if (accts.containsKey(a)) throw new Error("Duplicate governance account!");
 		accts = accts.assoc(a, as);
 		return accts;
