@@ -72,7 +72,8 @@ public abstract class ATransaction extends ACell {
 	 * @return The updated chain state
 	 */
 	@SuppressWarnings("unchecked")
-	public final <T> Context<T> applyTransaction(Address origin, State state) {
+	public final <T> Context<T> applyTransaction(Address origin, final State initialState) {
+		State state=initialState;
 		AccountStatus account = state.getAccounts().get(origin);
 		if (account == null) {
 			return (Context<T>) Context.createFake(state).withError(ErrorCodes.NOBODY);
@@ -98,7 +99,7 @@ public abstract class ATransaction extends ACell {
 		// apply transaction. This may result in an error!
 		// NOTE: completeTransaction handles error cases as well
 		ctx = this.apply(ctx);
-		ctx = ctx.completeTransaction(totalJuice, state.getJuicePrice());
+		ctx = ctx.completeTransaction(initialState, totalJuice, state.getJuicePrice());
 
 		return (Context<T>) ctx;
 	}

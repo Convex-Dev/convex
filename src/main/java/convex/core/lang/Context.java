@@ -250,27 +250,31 @@ public class Context<T> implements IObject {
 	 * @param juicePrice juice price for transaction
 	 * @return Updated context
 	 */
-	public Context<T> completeTransaction(long totalJuice, long juicePrice) {
+	public Context<T> completeTransaction(State initialState, long totalJuice, long juicePrice) {
 		State state=getState();
 		long remainingJuice=Math.max(0L, juice);
-		long usedJuice=totalJuice-remainingJuice;
-		assert(usedJuice>=0);
+		long transactionJuice=totalJuice-remainingJuice;
+		assert(transactionJuice>=0);
 	
+		long refund=0L;
 		// maybe refund remaining juice
 		if (remainingJuice>0L) {
 			// Compute refund. Shouldn't be possible to overflow?
 			// But do a paranoid checked multiply just in case
-			long refund=Math.multiplyExact(remainingJuice,juicePrice);
-			
+			refund+=Math.multiplyExact(remainingJuice,juicePrice);
+		}
+		
+		// Make refund if needed
+		if (refund>0L) {
 			Address address=getAddress();
 			state=state.withBalance(address,state.getBalance(address).add(refund));
 		}
 		
 		// maybe add used juice to miner fees
-		if (usedJuice>0L) {
-			long juiceFees = usedJuice*juicePrice;
+		if (transactionJuice>0L) {
+			long transactionFees = transactionJuice*juicePrice;
 			long oldFees=(long)state.getGlobal(Symbols.FEES);
-			long newFees=oldFees+juiceFees;
+			long newFees=oldFees+transactionFees;
 			state=state.withGlobal(Symbols.FEES,newFees);
 		}
 		
