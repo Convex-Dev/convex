@@ -7,7 +7,7 @@ Decentralised databases have an issue with *state growth*, defined as the increa
 This growing demand for storage space presents a significant problem.
 
 - It creates a requirement for peers to incur increasing storage costs over time, for data that must be retained indefinitely
-- There are perverse incentives at work: a user might pay a one-off code to store data on-chain, but does not bear thye cost of indefinite future storage (which falls on peer operators)
+- There are perverse incentives at work: a user might pay a one-off code to store data on-chain, but does not bear the cost of indefinite future storage (which falls on peer operators)
 - Over time, careless use of on-chain storage may make it impractical for a typical individual to operate a peer with normal computer hardware and storage capabilities
 - This problem might be manageable for low-transaction-volume platforms, but is clearly unaccaptable for systems such as Convex that are designed to handle high volumes of transactions for sustained periods of time
 
@@ -23,7 +23,13 @@ Convex implements a novel solution of Memory Accounting to help manage the probl
 
 #### Memory Size
 
-Each CVM object is defined to have a "Memory Size" which approximates the storage requirement (in bytes) for the object (including all child objects, if the object is a data structure).
+Each CVM object is defined to have a "Memory Size" which approximates the actual storage requirement (in bytes) for the object
+
+The Memory Size includes:
+
+- The size of the encoding of the Cell in bytes
+- The total size of all child Cells, (e.g. if the object is a data structure)
+- An allowance for indexing and storage overheads (currently set to a fixed estimate of 64 bytes)
 
 #### Consumption
 
@@ -38,10 +44,10 @@ If a transaction has zero Memory Consumption, it will complete normally with no 
 If a transaction would complete normally, but has a positive Memory Consumption, the following resolutions are attempted, in this order:
 
 1. If the user has sufficient allowance, the additional memory requirement will be deducted from the allowance, and the transaction will complete normally
-2. If the transaction execution context has remaining juice, and attempt will be made to automatically purchase sufficient memory from the pool. The maximum amount paid will be the current juice price multiplied by the remaining juice for the transaction. If this succeeds, the transaction will complete sucessfully with the additional memory purchase included in the total juice cost.
+2. If the transaction execution context has remaining juice, and attempt will be made to automatically purchase sufficient memory from the pool. The maximum amount paid will be the current juice price multiplied by the remaining juice for the transaction. If this succeeds, the transaction will complete successfully with the additional memory purchase included in the total juice cost.
 3. The transaction will fail with a MEMORY condition, and any state changes will be rolled back. The User will still be charged the juice cost of the transaction
 
-If a transaction has negative Memory Consumption, the memory allowance of the user will be increased by the absolute size of this value. In effect, this is a refund.
+If a transaction has negative Memory Consumption, the memory allowance of the user will be increased by the absolute size of this value. In effect, this is a refund granted for releasing storage requirements.
 
 
 #### Allowance transfers
@@ -146,7 +152,9 @@ The memory size is persisted in storage as part of the header information for a 
 
 #### Memory Accounting impact
 
-The memory accounting subsystem is designed so that it always has a minimal effect on CVM state size, even if it causes changes in the CVM state (consumption of allowances etc.)
+The memory accounting subsystem is designed so that it always has a minimal effect on CVM state size, even though it causes changes in the CVM state (consumption of allowances etc.). This limits any risk of state growth size from the memory accounting itself.
+
+This is achieved mainly by ensuring that state changes due to memory accounting cause no net Cell allocations, at most small embedded fields within existing Cells are updated (specifically balances and allowances stored within Accounts). 
 
 #### Performance characteristics
 
@@ -161,11 +169,13 @@ The computational cost of performing this memory accounting is factored in to th
 
 ### Open Design Questions
 
-- It possible that memory accounting should also be used to add a per-transaction cost to submitted transactions based on the size of the transaction data
+- It possible that memory accounting could be used to add a per-transaction cost to submitted transactions based on the size of the transaction data. This would incentivise submitting smaller transactions.
 - There are options regarding on-chain procedures for opening up new storage allowances (which might depend on advances in underlying storage technology). Initial assumption is that this is a Foundation network governance responsibility - there is potentially a need to monitor medium-term state growth and release new allowances accordingly over time.
-- There is a potential for memory allowance hoarding and speculation, in anticipated of high prices driven by shortages. It may be necessary to set an clear expectation that holding allowances is risky, as new allowances may be issued at any time that devalue large allowance holdings.
+- There is a potential for memory allowance hoarding and speculation, in anticipated of high prices driven by shortages. It may be necessary to set an clear expectation that holding allowances is risky, as new allowances may be added to the Memory Pool at any time which would devalue large allowance holdings.
 - There is a risk that if memory price become too low, participants may become careless with memory usage. This is mitigated by the fact that on average we expect the Convex state to grow, so large falls in price precipitated by selling allowances is unlikely. This probably requires ongoing monitoring.
 - Computing allowances at the end of each transaction might cause extraneous storage activity - it would be more efficient to persist CVM state changes in their entirety at the end of each block. Need to investigate whether memory accounting can be efficiently performed in-memory before hitting storage? This is related to the problem of estimating maximum memory requirement per block.
+- It would be possible for state size changes caused by Memory Accounting itself (i.e. outside the scope of specific transaction effects) to be charged to the Memory Pool. This is unlikely to have a significant impact, so is probably unnecessary.
+- There is a potential to charge "rent" for total storage allocation over time. This would add significant complexity and potentially cause issues for Actors unable to pay sufficient rent, but might be a useful additional incentive to keep long-term storage requirements low.
 
 
 
