@@ -304,4 +304,10 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	 * @return The long value represented by the Blob
 	 */
 	public abstract long longValue();
+
+	/**
+	 * Returns true if this object is a regular blob (i.e. not a special blob like Hash or Address)
+	 * @return
+	 */
+	public abstract boolean isRegularBlob();
 }

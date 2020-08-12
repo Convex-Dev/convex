@@ -1704,7 +1704,8 @@ public class Core {
 	public static final CorePred BLOB_Q = reg(new CorePred(Symbols.BLOB_Q) {
 		@Override
 		public boolean test(Object val) {
-			return val instanceof ABlob;
+			if (!(val instanceof ABlob)) return false;
+			return ((ABlob)val).isRegularBlob();
 		}
 	});
 

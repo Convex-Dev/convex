@@ -273,4 +273,9 @@ public class Address extends AArrayBlob {
 		return true;
 	}
 
+	@Override
+	public boolean isRegularBlob() {
+		return false;
+	}
+
 }

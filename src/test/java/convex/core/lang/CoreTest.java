@@ -107,7 +107,9 @@ public class CoreTest {
 		assertEquals("cafebabe", eval("(str (blob \"Cafebabe\"))"));
 
 		assertTrue(evalB("(= *address* (address (blob *address*)))"));
-		assertTrue(evalB("(blob? (hash [1 2 3]))"));
+		
+		// round trip back to Blob
+		assertTrue(evalB("(blob? (blob (hash [1 2 3])))"));
 
 		assertArityError(step("(blob 1 2)"));
 		assertArityError(step("(blob)"));
@@ -884,7 +886,7 @@ public class CoreTest {
 	}
 	
 	@Test
-	public void testKeywordFn() {
+	public void testKeywordAsFunction() {
 		// lookups in maps
 		assertNull(eval("(:foo {})"));
 		assertNull(eval("(:foo {:bar 1} nil)"));
@@ -1482,8 +1484,13 @@ public class CoreTest {
 	@Test
 	public void testBlobPred() {
 		assertTrue(evalB("(blob? (blob *origin*))"));
+		assertTrue(evalB("(blob? 0xFF)"));
+		assertTrue(evalB("(blob? (blob 0x17))"));
+		
+		assertFalse(evalB("(blob? 17)"));
 		assertFalse(evalB("(blob? nil)"));
-		// TODO: more blob tests
+		assertFalse(evalB("(blob? *address*)"));
+		assertFalse(evalB("(blob? (hash *state*))"));
 	}
 
 	@Test
@@ -1511,6 +1518,7 @@ public class CoreTest {
 		assertTrue(evalB("(number? 0.5)"));
 		assertFalse(evalB("(number? nil)"));
 		assertFalse(evalB("(number? :foo)"));
+		assertFalse(evalB("(number? 0xFF)"));
 		assertFalse(evalB("(number? [1 2])"));
 	}
 

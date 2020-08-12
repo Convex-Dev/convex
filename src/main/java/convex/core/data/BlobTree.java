@@ -449,6 +449,11 @@ public class BlobTree extends ABlob {
 		// Never embedded. BlobTree always has big child Refs.
 		return false;
 	}
+	
+	@Override
+	public boolean isRegularBlob() {
+		return true;
+	}
 
 
 }

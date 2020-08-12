@@ -179,5 +179,10 @@ public class LongBlob extends ABlob {
 		// Always embedded
 		return true;
 	}
+	
+	@Override
+	public boolean isRegularBlob() {
+		return true;
+	}
 
 }

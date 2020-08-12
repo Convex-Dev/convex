@@ -243,4 +243,9 @@ public class Blob extends AArrayBlob {
 		return length<=Format.EMBEDDED_BLOB_MAX_LENGTH;
 	}
 
+	@Override
+	public boolean isRegularBlob() {
+		return true;
+	}
+
 }

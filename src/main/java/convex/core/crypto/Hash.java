@@ -377,4 +377,9 @@ public class Hash extends AArrayBlob {
 		return true;
 	}
 
+	@Override
+	public boolean isRegularBlob() {
+		return false;
+	}
+
 }
