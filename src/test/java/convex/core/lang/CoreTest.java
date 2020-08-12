@@ -1499,6 +1499,7 @@ public class CoreTest {
 		assertTrue(evalB("(long? (long *balance*))")); // TODO: is this sane?
 		assertFalse(evalB("(long? (int 1))"));
 		assertFalse(evalB("(long? nil)"));
+		assertFalse(evalB("(long? 0xFF)"));
 		assertFalse(evalB("(long? [1 2])"));
 	}
 
@@ -1528,6 +1529,7 @@ public class CoreTest {
 		assertTrue(evalB("(zero? (int 0))"));
 		assertTrue(evalB("(zero? 0.0)"));
 		assertFalse(evalB("(zero? 0.00005)"));
+		assertFalse(evalB("(zero? 0x00)")); // not numeric!
 
 		assertFalse(0.0 > -0.0); // check we are living in a sane universe
 		assertTrue(evalB("(zero? -0.0)"));
