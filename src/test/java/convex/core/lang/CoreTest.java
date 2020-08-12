@@ -869,6 +869,9 @@ public class CoreTest {
 		assertEquals(Keywords.STATE, eval("(keyword 'state)"));
 		assertEquals(Keywords.STATE, eval("(keyword (name :state))"));
 		assertEquals(Keywords.STATE, eval("(keyword (str 'state))"));
+		
+		// keyword lookups
+		assertNull(eval("((keyword :foo) nil)"));
 
 		assertArgumentError(step("(keyword (str))")); // too short
 
@@ -878,6 +881,31 @@ public class CoreTest {
 
 		assertArityError(step("(keyword)"));
 		assertArityError(step("(keyword 1 3)"));
+	}
+	
+	@Test
+	public void testKeywordFn() {
+		// lookups in maps
+		assertNull(eval("(:foo {})"));
+		assertNull(eval("(:foo {:bar 1} nil)"));
+		assertEquals(1L,evalL("(:foo {} 1)"));
+		assertEquals(1L,evalL("(:foo {:foo 1} 2)"));
+		
+		// lookups in sets
+		assertNull(eval("(:foo #{})"));
+		assertNull(eval("(:foo #{:bar} nil)"));
+		assertEquals(1L,evalL("(:foo #{} 1)"));
+		assertEquals(Keywords.FOO,eval("(:foo #{:foo} 2)"));
+
+		// lookups in vectors
+		assertNull(eval("(:foo [])"));
+		assertNull(eval("(:foo [] nil)"));
+		assertEquals(1L,evalL("(:foo [1 2 3] 1)"));
+		
+		// lookups on nil
+		assertNull(eval("((keyword :foo) nil)"));
+		assertNull(eval("(:foo nil)"));
+		assertEquals(1L,evalL("(:foo nil 1)"));
 	}
 
 	@Test

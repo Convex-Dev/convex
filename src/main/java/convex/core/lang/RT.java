@@ -1057,7 +1057,7 @@ public class RT {
 	}
 
 	/**
-	 * Converts the argument to an IGet instance
+	 * Converts the argument to an IGet instance. A null argument is considered an empty map.
 	 * 
 	 * @param <T>
 	 * @param o
@@ -1065,6 +1065,7 @@ public class RT {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T> IGet<T> toGettable(Object o) {
+		if (o==null) return Maps.empty();
 		if (o instanceof IGet) return (IGet<T>) o;
 		return null;
 	}
