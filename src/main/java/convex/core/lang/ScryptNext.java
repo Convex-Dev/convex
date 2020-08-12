@@ -13,10 +13,10 @@ import org.parboiled.support.Var;
 import java.util.ArrayList;
 
 @BuildParseTree
-public class Scrypt3 extends Reader {
+public class ScryptNext extends Reader {
 
     // Use a ThreadLocal reader because instances are not thread safe
-    private static final ThreadLocal<Scrypt3> syntaxReader = ThreadLocal.withInitial(() -> Parboiled.createParser(Scrypt3.class));
+    private static final ThreadLocal<ScryptNext> syntaxReader = ThreadLocal.withInitial(() -> Parboiled.createParser(ScryptNext.class));
     public final Rule DEF = Keyword("def");
     public final Rule COND = Keyword("cond");
     public final Rule FN = Keyword("fn");
@@ -39,7 +39,7 @@ public class Scrypt3 extends Reader {
     /**
      * Constructor for reader class. Called by Parboiled.createParser
      */
-    public Scrypt3() {
+    public ScryptNext() {
         super(true);
     }
 
@@ -51,7 +51,7 @@ public class Scrypt3 extends Reader {
      */
     @SuppressWarnings("rawtypes")
     public static Syntax readSyntax(String source) {
-        Scrypt3 scryptReader = syntaxReader.get();
+        ScryptNext scryptReader = syntaxReader.get();
         scryptReader.tempSource = source;
 
         var rule = scryptReader.CompilationUnit();

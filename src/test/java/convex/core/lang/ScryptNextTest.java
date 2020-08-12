@@ -10,12 +10,12 @@ import org.parboiled.parserunners.ReportingParseRunner;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class Scrypt3Test {
+public class ScryptNextTest {
 
     static final Context<?> CONTEXT = TestState.INITIAL_CONTEXT;
 
-    static Scrypt3 scrypt() {
-        return Parboiled.createParser(Scrypt3.class);
+    static ScryptNext scrypt() {
+        return Parboiled.createParser(ScryptNext.class);
     }
 
     @SuppressWarnings("rawtypes")
@@ -31,7 +31,7 @@ public class Scrypt3Test {
 
     @SuppressWarnings("unchecked")
     public static <T> Context<T> step(Context<?> c, String source) {
-        Syntax syn = Scrypt3.readSyntax(source);
+        Syntax syn = ScryptNext.readSyntax(source);
 
         Context<AOp<Object>> cctx = c.expandCompile(syn);
 
