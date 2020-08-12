@@ -53,7 +53,7 @@ public class ServerTest {
 
 		Map<Keyword, Object> config = new HashMap<>();
 		config.put(Keywords.PORT, 0);
-		config.put(Keywords.STATE, Init.INITIAL_STATE);
+		config.put(Keywords.STATE, Init.STATE);
 		config.put(Keywords.KEYPAIR, Init.KEYPAIRS[0]); // use first peer keypair
 
 		server = Server.create(config);

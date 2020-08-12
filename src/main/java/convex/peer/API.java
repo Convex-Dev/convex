@@ -37,7 +37,7 @@ public class API {
 			config.put(Keywords.PORT, null);
 			config.put(Keywords.STORE, Stores.DEFAULT);
 			config.put(Keywords.KEYPAIR, Init.KEYPAIRS[0]);
-			config.put(Keywords.STATE, Init.INITIAL_STATE);
+			config.put(Keywords.STATE, Init.STATE);
 
 			Server server = Server.create(config);
 			server.launch();

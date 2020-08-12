@@ -29,7 +29,7 @@ public class Init {
 	/**
 	 * The initial state of the Convex network
 	 */
-	public static final State INITIAL_STATE;
+	public static final State STATE;
 	
 	// Governance accounts
 	public static final Address NULL_ADDRESS = Address.dummy("0");
@@ -72,6 +72,8 @@ public class Init {
 
 	private static final Logger log = Logger.getLogger(Init.class.getName());
 
+	public static final AccountStatus CORE_ACCOUNT;
+
 	static {
 		try {
 			// accumulators for initial state maps
@@ -80,6 +82,7 @@ public class Init {
 
 			// Core library
 			accts=addCoreLibrary(accts,CORE_ADDRESS);
+			CORE_ACCOUNT=accts.get(CORE_ADDRESS);
 
 			// governance accounts
 			accts = addGovernanceAccount(accts, RESERVED, 900000000000000000L); // 99%
@@ -156,7 +159,7 @@ public class Init {
 				s = register(s,CORE_ADDRESS,"Convex Core Library");
 			}
 
-			INITIAL_STATE = s;
+			STATE = s;
 		} catch (Throwable e) {
 			log.severe("Error in Init initialiser!");
 			e.printStackTrace();

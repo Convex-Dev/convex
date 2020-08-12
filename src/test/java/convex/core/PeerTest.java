@@ -49,14 +49,14 @@ public class PeerTest {
 
 	@Test
 	public void testNullPeers() {
-		assertNull(Init.INITIAL_STATE.getPeer(Init.HERO)); // hero not a peer in initial state
+		assertNull(Init.STATE.getPeer(Init.HERO)); // hero not a peer in initial state
 	}
 
 	@Test
 	public void testStakeAccess() {
 		// use peer address from first peer for testing
 		Address pa = Init.FIRST_PEER;
-		PeerStatus ps = Init.INITIAL_STATE.getPeer(pa);
+		PeerStatus ps = Init.STATE.getPeer(pa);
 		long initialStake = ps.getOwnStake();
 		assertEquals(initialStake, ps.getTotalStake());
 

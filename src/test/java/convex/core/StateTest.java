@@ -28,7 +28,7 @@ public class StateTest {
 
 	@Test
 	public void testInitialState() throws InvalidDataException {
-		State s = Init.INITIAL_STATE;
+		State s = Init.STATE;
 		assertSame(s, s.withStore(s.getStore()));
 		assertSame(s, s.withAccounts(s.getAccounts()));
 		assertSame(s, s.withPeers(s.getPeers()));
@@ -40,7 +40,7 @@ public class StateTest {
 
 	@Test
 	public void testRoundTrip() throws BadFormatException {
-		State s = Init.INITIAL_STATE;
+		State s = Init.STATE;
 		// TODO: fix this
 		// s=s.store(Keywords.STATE);
 		// assertEquals(1,s.getStore().size());

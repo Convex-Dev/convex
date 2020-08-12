@@ -27,7 +27,7 @@ public class RecordGen extends Generator<ARecord> {
 		case 0:
 			return Belief.createSingleOrder(Init.HERO_KP);
 		case 1:
-			return Init.INITIAL_STATE;
+			return Init.STATE;
 		default:
 			return Block.of(Constants.INITIAL_TIMESTAMP);
 		}

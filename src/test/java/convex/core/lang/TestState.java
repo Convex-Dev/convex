@@ -99,7 +99,7 @@ public class TestState {
 
 	private static State createInitialState() {
 		try {
-			State s = Init.INITIAL_STATE;
+			State s = Init.STATE;
 			Context<?> ctx = Context.createFake(s, HERO);
 			for (int i = 0; i < NUM_CONTRACTS; i++) {
 				// Construct code for each contract

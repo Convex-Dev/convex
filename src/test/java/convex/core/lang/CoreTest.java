@@ -72,9 +72,8 @@ public class CoreTest {
 	@Test
 	public void testAliases() {
 		assertTrue(evalB("(map? *aliases*)"));
-		assertEquals(1L,evalL("(count *aliases*)"));
-		assertNull(eval("(first (first *aliases*))"));
-		assertEquals(Core.CORE_ADDRESS,eval("(second (first *aliases*))"));
+		assertEquals(0L,evalL("(count *aliases*)"));
+		assertTrue(evalB("(empty? *aliases*)"));
 	}
 	
 	@Test

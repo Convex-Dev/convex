@@ -156,7 +156,7 @@ public class BlobMapsTest {
 
 	@Test
 	public void testInitialAccountsBlobMap() {
-		BlobMap<Address, AccountStatus> bm = Init.INITIAL_STATE.getAccounts();
+		BlobMap<Address, AccountStatus> bm = Init.STATE.getAccounts();
 		doBlobMapTests(bm);
 	}
 

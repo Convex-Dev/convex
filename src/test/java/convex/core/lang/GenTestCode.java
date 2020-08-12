@@ -10,7 +10,7 @@ public class GenTestCode {
 
 	@Property
 	public void testExpand(@From(FormGen.class) Object form) {
-		Context<?> ctx = Context.createFake(Init.INITIAL_STATE, Init.HERO);
+		Context<?> ctx = Context.createFake(Init.STATE, Init.HERO);
 
 		ctx = ctx.expand(form);
 	}

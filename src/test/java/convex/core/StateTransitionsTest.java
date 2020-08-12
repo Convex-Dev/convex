@@ -167,7 +167,7 @@ public class StateTransitionsTest {
 
 	@Test
 	public void testScheduleOps() throws BadSignatureException {
-		State s = Init.INITIAL_STATE;
+		State s = Init.STATE;
 		Address TARGET = Address.dummy("2");
 		String taddr=TARGET.toHexString();
 

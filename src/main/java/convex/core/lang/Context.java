@@ -429,22 +429,34 @@ public class Context<T> implements IObject {
 	 * Looks up the account for an Symbol alias in the given environment.
 	 * @param env
 	 * @param alias 
-	 * @return AccountStatus for the aliased, or null if not present
+	 * @return AccountStatus for the alias, or null if not present
 	 */
 	@SuppressWarnings("unchecked")
 	private AccountStatus getAliasedAccount(AHashMap<Symbol, Syntax> env, Symbol alias) {
 		// Check for *aliases* entry. Might not exist.
 		Object maybeAliases=env.get(Symbols.STAR_ALIASES);
-		if (maybeAliases==null) return null;
+		
+		// if *aliases* does not exist, use null as alias for core account
+		if (maybeAliases==null) {
+			return (alias==null)?Init.CORE_ACCOUNT:null;
+		}
 		
 		Object aliasesValue=((Syntax)maybeAliases).getValue();
 		if ((env==null)||(!(aliasesValue instanceof AHashMap))) return null; 
 		
 		AHashMap<Symbol,Object> aliasMap=((AHashMap<Symbol,Object>)aliasesValue);
-		Object value=aliasMap.get(alias);
-		if (!(value instanceof Address)) return null;
+		MapEntry<Symbol,Object> aliasEntry=aliasMap.getEntry(alias);
 		
-		return getAccountStatus((Address)value);
+		if (aliasEntry==null) {
+			// no alias entry. Default to core iff alias is null.
+			return (alias==null)?Init.CORE_ACCOUNT:null;
+		}
+		
+		Object aValue=aliasEntry.getValue();
+		// return null if the alias isn't a valid address 
+		if (!(aValue instanceof Address)) return null;
+		
+		return getAccountStatus((Address)aValue);
 	}
 
 	/**
