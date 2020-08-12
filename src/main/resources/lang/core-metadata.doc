@@ -9,7 +9,7 @@
 {
 	accept 
 	{
-	 :doc {:description "Accepts funds up to the amount of *offer* from *caller*. Amount must cast to long. If successful, the amount will be added immediately to *balance*"
+	 :doc {:description "Accepts funds up to the amount of *offer* from *caller*. Amount must cast to long. If successful, the amount will be added immediately to the *balance* of the current *address*. This is the recommended way of transferring balance between Actors, as it requires a positive action to confirm receipt."
          :examples [{:code "(accept *offer*)"}]
          :type :function
          :signature [{:params [amount]}]}
@@ -984,6 +984,13 @@
            :examples [{:code "(* 1 2 3 4 5)"}]
            :type :function
            :signature [{:params [& xs]}]}
+  }
+  
+  *balance*
+   {
+     :doc {:description "Returns the available balance of the current account. Functionally equivalent to '(balance *address*)', but cheaper to execute. Note that the available balance *excludes* reserved balance for transaction execution. "
+           :examples [{:code "*balance*"}]
+           :type :special-symbol}
   }
   
   /
