@@ -56,7 +56,7 @@ public class StateTransitionsTest {
 
 		{ // transfer from existing to existing account A->B
 			Transfer t1 = Transfer.create(1, ADDRESS_B, 50);
-			SignedData<ATransaction> st = SignedData.create(KEYPAIR_A, t1);
+			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			long nowTS = Utils.getCurrentTimestamp();
 			Block b = Block.of(nowTS, st);
 			BlockResult br = s.applyBlock(b);
@@ -71,7 +71,7 @@ public class StateTransitionsTest {
 
 		{ // transfer from existing to new account A -> C
 			Transfer t1 = Transfer.create(1, ADDRESS_C, 50);
-			SignedData<ATransaction> st = SignedData.create(KEYPAIR_A, t1);
+			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
 			State s2 = s.applyBlock(b).getState();
 			assertEquals(Amount.create(9950 - TCOST), s2.getBalance(ADDRESS_A));
@@ -80,9 +80,9 @@ public class StateTransitionsTest {
 
 		{ // two transfers in sequence, both from A -> C
 			Transfer t1 = Transfer.create(1, ADDRESS_C, 150);
-			SignedData<ATransaction> st1 = SignedData.create(KEYPAIR_A, t1);
+			SignedData<ATransaction> st1 = KEYPAIR_A.signData(t1);
 			Transfer t2 = Transfer.create(2, ADDRESS_C, 150);
-			SignedData<ATransaction> st2 = SignedData.create(KEYPAIR_A, t2);
+			SignedData<ATransaction> st2 = KEYPAIR_A.signData(t2);
 			Block b = Block.of(System.currentTimeMillis(), st1, st2);
 
 			BlockResult br = s.applyBlock(b);
@@ -94,9 +94,9 @@ public class StateTransitionsTest {
 
 		{ // two transfers in sequence, 2 different accounts A B --> new account C
 			Transfer t1 = Transfer.create(1, ADDRESS_C, 50);
-			SignedData<ATransaction> st1 = SignedData.create(KEYPAIR_A, t1);
+			SignedData<ATransaction> st1 = KEYPAIR_A.signData(t1);
 			Transfer t2 = Transfer.create(1, ADDRESS_C, 50);
-			SignedData<ATransaction> st2 = SignedData.create(KEYPAIR_B, t2);
+			SignedData<ATransaction> st2 = KEYPAIR_B.signData(t2);
 			Block b = Block.of(System.currentTimeMillis(), st1, st2);
 
 			BlockResult br = s.applyBlock(b);
@@ -113,7 +113,7 @@ public class StateTransitionsTest {
 
 		{ // transfer with an incorrect sequence number
 			Transfer t1 = Transfer.create(2, ADDRESS_C, 50);
-			SignedData<ATransaction> st = SignedData.create(KEYPAIR_A, t1);
+			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
 			BlockResult br = s.applyBlock(b);
 			AVector<Object> results = br.getResults();
@@ -123,7 +123,7 @@ public class StateTransitionsTest {
 
 		{ // transfer amount greater than current balance
 			Transfer t1 = Transfer.create(1, ADDRESS_C, 50000);
-			SignedData<ATransaction> st = SignedData.create(KEYPAIR_A, t1);
+			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
 			BlockResult br = s.applyBlock(b);
 			assertEquals(ErrorCodes.FUNDS, br.getError(0).getCode());
@@ -134,7 +134,7 @@ public class StateTransitionsTest {
 
 		{ // transfer from a non-existent address
 			Transfer t1 = Transfer.create(1, ADDRESS_B, 50);
-			SignedData<ATransaction> st = SignedData.create(KEYPAIR_C, t1);
+			SignedData<ATransaction> st = KEYPAIR_C.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
 			assertEquals(ErrorCodes.NOBODY, s.applyBlock(b).getError(0).getCode());
 
@@ -152,7 +152,7 @@ public class StateTransitionsTest {
 			// System.out.println("Tansferring "+AMT+" to Niki");
 
 			Transfer t1 = Transfer.create(1, ADDRESS_NIKI, AMT);
-			SignedData<ATransaction> st = SignedData.create(KEYPAIR_A, t1);
+			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
 			BlockResult br = s.applyBlock(b);
 			// System.out.println("Transfer complete....");
@@ -181,7 +181,7 @@ public class StateTransitionsTest {
 		s = s.applyBlock(b1).getState();
 		assertEquals(BAL2 + 10000000, s.getBalance(TARGET).getValue());
 		assertEquals(INITIAL_TS + 100, s.getTimeStamp());
-
+		
 		// schedule 200ms later for 1s time
 		ATransaction t2 = Invoke.create(2, Reader.read(
 				"(schedule (+ *timestamp* 1000) (transfer \""+taddr+"\" 10000000))"));
