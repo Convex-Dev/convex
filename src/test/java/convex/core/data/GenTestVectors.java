@@ -9,7 +9,7 @@ import com.pholser.junit.quickcheck.From;
 import com.pholser.junit.quickcheck.Property;
 import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 
-import convex.generators.VectorGen;
+import convex.test.generators.VectorGen;
 
 @RunWith(JUnitQuickcheck.class)
 public class GenTestVectors {

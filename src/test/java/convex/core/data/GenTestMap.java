@@ -11,8 +11,8 @@ import com.pholser.junit.quickcheck.From;
 import com.pholser.junit.quickcheck.Property;
 import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 
-import convex.generators.MapGen;
-import convex.generators.PrimitiveGen;
+import convex.test.generators.MapGen;
+import convex.test.generators.PrimitiveGen;
 
 @RunWith(JUnitQuickcheck.class)
 public class GenTestMap {

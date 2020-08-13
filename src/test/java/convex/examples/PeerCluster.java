@@ -1,4 +1,4 @@
-package convex.samples;
+package convex.examples;
 
 import java.util.ArrayList;
 import java.util.HashMap;

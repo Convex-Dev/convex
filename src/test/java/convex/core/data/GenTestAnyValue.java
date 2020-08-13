@@ -19,8 +19,8 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
-import convex.generators.ValueGen;
 import convex.test.Samples;
+import convex.test.generators.ValueGen;
 
 @RunWith(JUnitQuickcheck.class)
 public class GenTestAnyValue {

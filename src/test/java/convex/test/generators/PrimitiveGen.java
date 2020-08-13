@@ -1,4 +1,4 @@
-package convex.generators;
+package convex.test.generators;
 
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;

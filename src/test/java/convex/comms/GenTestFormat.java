@@ -15,8 +15,8 @@ import convex.core.data.LongBlob;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
 import convex.core.util.Utils;
-import convex.generators.PrimitiveGen;
-import convex.generators.ValueGen;
+import convex.test.generators.PrimitiveGen;
+import convex.test.generators.ValueGen;
 
 @RunWith(JUnitQuickcheck.class)
 public class GenTestFormat {

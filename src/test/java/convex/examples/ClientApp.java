@@ -1,4 +1,4 @@
-package convex.samples;
+package convex.examples;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;

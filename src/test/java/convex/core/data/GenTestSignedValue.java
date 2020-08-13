@@ -17,8 +17,8 @@ import convex.core.Init;
 import convex.core.crypto.AKeyPair;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
-import convex.generators.ValueGen;
 import convex.test.Samples;
+import convex.test.generators.ValueGen;
 
 @RunWith(JUnitQuickcheck.class)
 public class GenTestSignedValue {

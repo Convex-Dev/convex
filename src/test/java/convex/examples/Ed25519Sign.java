@@ -1,4 +1,4 @@
-package convex.samples;
+package convex.examples;
 
 import java.security.InvalidKeyException;
 import java.security.KeyPair;

@@ -26,10 +26,10 @@ import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Sets;
 import convex.core.data.Vectors;
-import convex.generators.AddressGen;
-import convex.generators.ListGen;
-import convex.generators.SetGen;
-import convex.generators.VectorGen;
+import convex.test.generators.AddressGen;
+import convex.test.generators.ListGen;
+import convex.test.generators.SetGen;
+import convex.test.generators.VectorGen;
 
 /**
  * Set of generative tests for Runtime functions

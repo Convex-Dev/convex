@@ -4,7 +4,7 @@ import com.pholser.junit.quickcheck.From;
 import com.pholser.junit.quickcheck.Property;
 
 import convex.core.Init;
-import convex.generators.FormGen;
+import convex.test.generators.FormGen;
 
 public class GenTestCode {
 

@@ -11,8 +11,8 @@ import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 
 import convex.core.data.ACollection;
 import convex.core.data.ASet;
-import convex.generators.CollectionGen;
-import convex.generators.ValueGen;
+import convex.test.generators.CollectionGen;
+import convex.test.generators.ValueGen;
 
 @RunWith(JUnitQuickcheck.class)
 public class GenTestRT {

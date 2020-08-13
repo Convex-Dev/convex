@@ -14,7 +14,7 @@ import com.pholser.junit.quickcheck.Property;
 import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 
 import convex.core.lang.RT;
-import convex.generators.DataStructureGen;
+import convex.test.generators.DataStructureGen;
 
 @RunWith(JUnitQuickcheck.class)
 public class GenTestDataStructures {

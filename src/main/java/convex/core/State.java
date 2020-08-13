@@ -227,7 +227,7 @@ public class State extends ARecord {
 
 		// walk schedule entries to determine how many there are
 		// and remove from the current schedule
-		// we should optimise this later
+		// we can optimise bulk removal later
 		while (tcount < Constants.MAX_SCHEDULED_TRANSACTIONS_PER_BLOCK) {
 			if (sched.isEmpty()) break;
 			MapEntry<ABlob, AVector<Object>> me = sched.entryAt(0);
