@@ -339,7 +339,7 @@ public class State extends ARecord {
 	 * 
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
-	private <T> Context<T> applyTransaction(Address origin,ATransaction t) throws BadSignatureException {
+	public <T> Context<T> applyTransaction(Address origin,ATransaction t) {
 		State state=this;
 		
 		// Create context with juice subtracted

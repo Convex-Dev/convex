@@ -1,11 +1,11 @@
 package convex.core;
 
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AHashMap;
 import convex.core.data.AVector;
+import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -15,6 +15,8 @@ import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
+import convex.core.transactions.ATransaction;
+import convex.core.transactions.Invoke;
 
 /**
  * <p>
@@ -111,29 +113,42 @@ public class Peer {
 	}
 
 	/**
-	 * Executes a query on this Peer. Returns the query result, or throws an
-	 * exception if the query does not succeed normally.
+	 * Compiles and executes a query on the current consensus state of this Peer. 
 	 * 
 	 * @param <T> Type of result
 	 * @param form Form to compile and execute.
 	 * @param origon Address to use for query execution
 	 * @return The Context containing the query results.
-	 * @throws ExecutionException
 	 */
 	@SuppressWarnings("unchecked")
 	public <T> Context<T> executeQuery(Object form, Address origin) {
 		Context<?> ctx;
+		State state=getConsensusState();
 
-		// create context with max transaction juice for query
-		ctx = Context.createInitial(getConsensusState(), origin, Constants.MAX_TRANSACTION_JUICE);
+		ctx = Context.createInitial(state, origin, Constants.MAX_TRANSACTION_JUICE);
 
+		AccountStatus as=state.getAccount(origin);
+		long nonce=(as!=null)?as.getSequence()+1:0;
 		Context<AOp<T>> ectx = ctx.expandCompile(form);
 		if (ectx.isExceptional()) {
 			return (Context<T>) ectx;
 		}
 		AOp<T> op = ectx.getResult();
-		Context<T> rctx = ctx.run(op);
+		Context<T> rctx = executeQuery(origin,Invoke.create(nonce, op));
 		return rctx;
+	}
+	
+	/** 
+	 * Executes a query on the current consensus state of this Peer.
+	 * 
+	 * @param <T>
+	 * @param origin Address with which to execute the transaction
+	 * @param transaction Transaction to execute
+	 * @returnThe Context containing the query results.
+	 */
+	public <T> Context<T> executeQuery(Address origin, ATransaction transaction) {
+		Context<T> ctx=getConsensusState().applyTransaction(origin,transaction);
+		return ctx;
 	}
 	
 	/**

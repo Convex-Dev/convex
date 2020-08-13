@@ -16,7 +16,9 @@ import convex.core.data.AVector;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Vectors;
+import convex.core.lang.Reader;
 import convex.core.store.Stores;
+import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.net.Message;
@@ -31,8 +33,13 @@ public class ServerTest {
 
 	private Consumer<Message> handler = new ResultConsumer() {
 		@Override
-		protected void handleResult(long id, Object value) {
+		protected synchronized void handleResult(long id, Object value) {
 			results.put(id, value);
+		}
+		
+		@Override
+		protected synchronized void handleError(long id, Object code, Object message) {
+			results.put(id, code);
 		}
 	};
 
@@ -47,6 +54,23 @@ public class ServerTest {
 		Utils.timeout(200, () -> results.get(id1) != null);
 		assertEquals(v, results.get(id1));
 	}
+	
+	@Test
+	public void testServerTransactions() throws IOException, InterruptedException {
+		InetSocketAddress hostAddress=server.getHostAddress();
+		
+		// Connect to Peer Server using the current store for the client
+		Connection pc = Connection.connect(hostAddress, handler, Stores.current());
+		
+		long id1 = pc.sendTransaction(keyPair.signData(Invoke.create(1, Reader.read("[1 2 3]"))));
+		long id2 = pc.sendTransaction(keyPair.signData(Invoke.create(2, Reader.read("(return 2)"))));
+		Utils.timeout(200, () -> results.get(id2) != null);
+		
+		AVector<Long> v = Vectors.of(1l, 2l, 3l);
+		assertEquals(v, results.get(id1));
+		assertEquals(2L, results.get(id2));
+	}
+
 
 	{
 		keyPair = Init.KEYPAIRS[0];

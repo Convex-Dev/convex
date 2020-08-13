@@ -12,6 +12,10 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
+import convex.core.lang.impl.AExceptional;
+import convex.core.lang.impl.HaltValue;
+import convex.core.lang.impl.ReturnValue;
+import convex.core.lang.impl.RollbackValue;
 import convex.core.util.Utils;
 
 /**
@@ -75,11 +79,23 @@ public class Invoke extends ATransaction {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <T> Context<T> apply(Context<?> ctx) {
+	public <T> Context<T> apply(final Context<?> context) {
+		Context<T> ctx=(Context<T>) context;
 		if (command instanceof AOp) {
-			ctx = ctx.execute((AOp<Object>) command);
+			ctx = ctx.execute((AOp<T>) command);
 		} else {
 			ctx = ctx.eval(command);
+		}
+		if (ctx.isExceptional()) {
+			AExceptional ex=ctx.getExceptional();
+			if (ex instanceof HaltValue) {
+				ctx=ctx.withResult(((HaltValue<T>)ex).getValue());
+			} else if (ex instanceof ReturnValue) {
+				ctx=ctx.withResult(((ReturnValue<T>)ex).getValue());
+			} else if (ex instanceof RollbackValue) {
+				ctx=ctx.withResult(((RollbackValue<T>)ex).getValue());
+				ctx=ctx.withState(context.getState());
+			}
 		}
 		return (Context<T>) ctx;
 	}

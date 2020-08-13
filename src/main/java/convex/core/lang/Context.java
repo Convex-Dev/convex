@@ -250,7 +250,7 @@ public class Context<T> implements IObject {
 	 * @return Updated context
 	 */
 	public Context<T> completeTransaction(State initialState, long totalJuice, long juicePrice) {
-		// get state at end of trsnaction application
+		// get state at end of transaction application
 		State state=getState();
 		
 		long remainingJuice=Math.max(0L, juice);
@@ -283,7 +283,7 @@ public class Context<T> implements IObject {
 	}
 	
 	@SuppressWarnings("unchecked")
-	private <R> Context<R> withState(State newState) {
+	public <R> Context<R> withState(State newState) {
 		return (Context<R>) this.withChainState(chainState.withState(newState));
 	}
 	
