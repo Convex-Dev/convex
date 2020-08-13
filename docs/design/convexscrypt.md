@@ -8,6 +8,7 @@ WIP Ideas
 * Must work with Convex Lisp defined objects (ability to cross-utilise libraries etc.)
 * Should be familiar to user of ALGOL-like langauges (C, Java, JavaScript)
 * Must support infix arithmetic
+* Should match expectations of Java or JavaScript developers where possible
 
 ## Limitations
 
