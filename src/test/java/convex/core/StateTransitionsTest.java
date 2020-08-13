@@ -107,7 +107,7 @@ public class StateTransitionsTest {
 
 			AVector<Object> results = br.getResults();
 			assertEquals(2, results.count());
-			assertNull(br.getResult(0)); // null result for sucessful transfer
+			assertNull(br.getResult(0)); // null result for successful transfer
 			assertEquals(Amount.MAX_AMOUNT, br.getState().computeTotalFunds());
 		}
 

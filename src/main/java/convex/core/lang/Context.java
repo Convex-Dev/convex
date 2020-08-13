@@ -985,7 +985,7 @@ public class Context<T> implements IObject {
 	 * 
 	 * @param target Target Address, will be created if does not already exist.
 	 * @param amount Amount to transfer, must be between 0 and Amount.MAX_VALUE inclusive
-	 * @return The remaining balance for this address.
+	 * @return Context with a null result if the transaction succeeds, or an exceptional value if the transfer fails
 	 * @throws ExecutionException
 	 */
 	public Context<Long> transfer(Address target, long amount) {

@@ -1,6 +1,8 @@
 package convex.peer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -20,6 +22,7 @@ import convex.core.data.Vectors;
 import convex.core.lang.Reader;
 import convex.core.store.Stores;
 import convex.core.transactions.Invoke;
+import convex.core.transactions.Transfer;
 import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.net.Message;
@@ -67,13 +70,19 @@ public class ServerTest {
 		long id2 = pc.sendTransaction(keyPair.signData(Invoke.create(2, Reader.read("(return 2)"))));
 		long id2a = pc.sendTransaction(keyPair.signData(Invoke.create(2, Reader.read("22"))));
 		long id3 = pc.sendTransaction(keyPair.signData(Invoke.create(3, Reader.read("(rollback 3)"))));
-		Utils.timeout(200, () -> results.get(id3) != null);
+		long id4 = pc.sendTransaction(keyPair.signData(Transfer.create(4, Init.VILLAIN, 1000)));
+		
+		assertTrue(id4>=0);
+		
+		// wait for results to come back
+		Utils.timeout(200, () -> results.get(id4) != null);
 		
 		AVector<Long> v = Vectors.of(1l, 2l, 3l);
 		assertEquals(v, results.get(id1));
 		assertEquals(2L, results.get(id2));
 		assertEquals(ErrorCodes.SEQUENCE, results.get(id2a));
 		assertEquals(3L, results.get(id3));
+		assertNull( results.get(id4));
 	}
 
 
