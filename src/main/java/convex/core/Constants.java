@@ -17,6 +17,22 @@ public class Constants {
 	public static final long INITIAL_TIMESTAMP = Instant.parse("2020-02-02T00:20:20.0202Z").toEpochMilli();
 
 	public static final long INITIAL_JUICE_PRICE = 2L;
+	
+	/**
+	 * Initial memory Pool of 1gb
+	 */
+	public static final long INITIAL_MEMORY_POOL = 1000000000L;
+
+	/**
+	 * Initial memory price per byte
+	 */
+	public static final long INITIAL_MEMORY_PRICE = 10L;
+
+	/**
+	 * Memory accounting on/off switch. If off, no memory accounting will be applied for
+	 * transactions
+	 */
+	public static final boolean USE_MEMORY_ACCOUNTING=true;
 
 	public static final long MAX_TRANSACTION_JUICE = 1000000;
 	

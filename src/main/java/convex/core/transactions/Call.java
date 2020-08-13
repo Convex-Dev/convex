@@ -68,7 +68,7 @@ public class Call extends ATransaction {
 	}
 
 	@Override
-	protected <T> Context<T> apply(Context<?> ctx) {
+	public <T> Context<T> apply(Context<?> ctx) {
 		return ctx.actorCall(target, 0L, functionName, args.toArray());
 	}
 

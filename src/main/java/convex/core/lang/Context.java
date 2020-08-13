@@ -33,7 +33,7 @@ import convex.core.util.Errors;
 import convex.core.util.Utils;
 
 /**
- * Immutable representation of on-chain execution context.
+ * Immutable representation of on-chain CVM execution context.
  * 
  * Execution context includes:
  * - The current on-Chain state, including the defined execution environment for each Address
@@ -44,7 +44,7 @@ import convex.core.util.Utils;
  * 
  * Interestingly, this behaves like Scala's ZIO[<Context-Stuff>, AExceptional, T]
  * 
- * Contexts maintain execution depth and juice to control against arbitrary on-chain
+ * Contexts maintain checks on execution depth and juice to control against arbitrary on-chain
  * execution. Coupled with limits on total juice and limits on memory allocation
  * per unit juice, this places an upper bound on execution time and space.
  * 
@@ -215,10 +215,9 @@ public class Context<T> implements IObject {
 	 * @param state
 	 * @param juice
 	 * @return Initial execution context with reserved juice.
-	 * @throws NoAccountException 
 	 */
-	public static <T> Context<T> createInitial(State state, Address actor,long juice) {
-		AccountStatus as=state.getAccounts().get(actor);
+	public static <T> Context<T> createInitial(State state, Address origin,long juice) {
+		AccountStatus as=state.getAccounts().get(origin);
 		if (as==null) {
 			// no account
 			return Context.createFake(state).withError(ErrorCodes.NOBODY);
@@ -232,8 +231,8 @@ public class Context<T> implements IObject {
 		}
 		Amount newBalance=as.getBalance().subtract(Amount.create(reserve));
 		as=as.withBalance(newBalance);
-		state=state.putAccount(actor, as);
-		return create(state,juice,Maps.empty(),null,0,actor,null,actor);
+		state=state.putAccount(origin, as);
+		return create(state,juice,Maps.empty(),null,0,origin,null,origin);
 	}
 	
 

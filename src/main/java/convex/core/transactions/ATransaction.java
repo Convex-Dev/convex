@@ -2,11 +2,7 @@ package convex.core.transactions;
 
 import java.nio.ByteBuffer;
 
-import convex.core.ErrorCodes;
-import convex.core.State;
 import convex.core.data.ACell;
-import convex.core.data.AccountStatus;
-import convex.core.data.Address;
 import convex.core.data.Format;
 import convex.core.lang.Context;
 
@@ -57,51 +53,10 @@ public abstract class ATransaction extends ACell {
 	 * @param source The source account that has signed the transaction
 	 * @return The updated chain state
 	 */
-	protected abstract <T> Context<T> apply(Context<?> ctx);
+	public abstract <T> Context<T> apply(Context<?> ctx);
 
 	public final long getSequence() {
 		return sequence;
-	}
-
-	/**
-	 * Applies this transaction to the given state. Assumes the origin address has
-	 * been checked via digital signature.
-	 * 
-	 * @param state  The initial chain state
-	 * @param origin The origin account that has signed the transaction
-	 * @return The updated chain state
-	 */
-	@SuppressWarnings("unchecked")
-	public final <T> Context<T> applyTransaction(Address origin, final State initialState) {
-		State state=initialState;
-		AccountStatus account = state.getAccounts().get(origin);
-		if (account == null) {
-			return (Context<T>) Context.createFake(state).withError(ErrorCodes.NOBODY);
-		}
-
-		// Pre-transaction state updates (persist even if transaction fails)
-		// update sequence
-		account = account.updateSequence(sequence);
-		if (account == null)
-			return Context.createFake(state,origin).withError(ErrorCodes.SEQUENCE, "Bad sequence: " + sequence);
-
-		state = state.putAccount(origin, account);
-
-		// Create context with juice subtracted
-		Context<T> ctx = Context.createInitial(state, origin, getMaxJuice());
-		final long totalJuice = ctx.getJuice();
-
-		if (ctx.isExceptional()) {
-			// error while preparing transaction. No state change.
-			return ctx;
-		}
-
-		// apply transaction. This may result in an error!
-		// NOTE: completeTransaction handles error cases as well
-		ctx = this.apply(ctx);
-		ctx = ctx.completeTransaction(initialState, totalJuice, state.getJuicePrice());
-
-		return (Context<T>) ctx;
 	}
 
 	/**

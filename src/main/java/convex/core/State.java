@@ -315,11 +315,69 @@ public class State extends ARecord {
 		return BlockResult.create(state, results);
 	}
 	
-	private Context<?> applyTransaction(SignedData<? extends ATransaction> signedTransaction) throws BadSignatureException {
-		ATransaction t = signedTransaction.getValue(); // validates signature if necessary
+
+	/**
+	 * Applies a signed transaction to the State. 
+	 * 
+	 * SECURITY: Checks digital signature
+	 * 
+	 * @return Context containing the updated chain State (may be exceptional)
+	 */
+	private <T> Context<T> applyTransaction(SignedData<? extends ATransaction> signedTransaction) throws BadSignatureException {
+		// Extract transaction and origin address
+		Address origin=signedTransaction.getAddress();
+		ATransaction t=signedTransaction.getValue();
 		
-		Address origin = signedTransaction.getAddress();
-		Context<?> ctx=t.applyTransaction(origin, this);
+		Context<T> ctx=applyTransaction(origin,t);
+		return ctx;
+	}
+	
+	/**
+	 * Applies a transaction to the State. 
+	 * 
+	 * SECURITY: Assumes digital signature already checked.
+	 * 
+	 * @return Context containing the updated chain State (may be exceptional)
+	 */
+	private <T> Context<T> applyTransaction(Address origin,ATransaction t) throws BadSignatureException {
+		State state=this;
+		
+		// Create context with juice subtracted
+		Context<T> ctx = prepareTransaction(origin,t);
+		final long totalJuice = ctx.getJuice();
+		
+		if (ctx.isExceptional()) {
+			// We hit some error while preparing transaction. Return context with no state change,
+			// i.e. before executing the transaction
+			return ctx;
+		}
+
+		// apply transaction. This may result in an error!
+		// NOTE: completeTransaction handles error cases as well
+		ctx = t.apply(ctx);
+		ctx = ctx.completeTransaction(this, totalJuice, state.getJuicePrice());
+
+		return ctx;
+	}
+	
+	@SuppressWarnings("unchecked")
+	public <T> Context<T> prepareTransaction(Address origin,ATransaction t) {
+		// Pre-transaction state updates (persisted even if transaction fails)
+		AccountStatus account = getAccounts().get(origin);
+		if (account == null) {
+			return (Context<T>) Context.createFake(this).withError(ErrorCodes.NOBODY);
+		}
+
+		// Update sequence number for target account
+		long sequence=t.getSequence();
+		account = account.updateSequence(sequence);
+		if (account == null) {
+			return Context.createFake(this,origin).withError(ErrorCodes.SEQUENCE, "Bad sequence: " + sequence);
+		}
+		State preparedState = this.putAccount(origin, account);
+		
+		// Create context with juice subtracted
+		Context<T> ctx = Context.createInitial(preparedState, origin, t.getMaxJuice());
 		return ctx;
 	}
 
