@@ -2,11 +2,16 @@ package convex.core.transactions;
 
 import java.nio.ByteBuffer;
 
+import convex.core.Constants;
+import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Format;
+import convex.core.data.IRefFunction;
+import convex.core.data.Ref;
 import convex.core.data.Symbol;
 import convex.core.data.Tag;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Context;
 import convex.core.util.Utils;
@@ -22,8 +27,8 @@ import convex.core.util.Utils;
 public class Call extends ATransaction {
 
 	protected final Address target;
-	protected final Symbol functionName;
 	protected final long offer;
+	protected final Symbol functionName;
 	protected final AVector<Object> args;
 
 
@@ -34,6 +39,15 @@ public class Call extends ATransaction {
 		this.functionName=functionName;
 		this.offer=offer;
 		this.args=args;
+	}
+	
+	public static Call create(long sequence, Address target, long offer,Symbol functionName,AVector<Object> args) {
+		return new Call(sequence,target,0,functionName,args);
+	}
+
+	
+	public static Call create(long sequence, Address target, Symbol functionName,AVector<Object> args) {
+		return create(sequence,target,0,functionName,args);
 	}
 
 	@Override
@@ -50,16 +64,28 @@ public class Call extends ATransaction {
 	}
 	
 	@Override
-	public ByteBuffer write(ByteBuffer b) {
-		b = b.put(Tag.CALL);
-		return writeRaw(b);
+	public ByteBuffer write(ByteBuffer bb) {
+		bb = bb.put(Tag.CALL);
+		return writeRaw(bb);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer b) {
-		b = super.writeRaw(b); // nonce, address
-		b = Format.write(b, target);
-		return b;
+	public ByteBuffer writeRaw(ByteBuffer bb) {
+		bb = super.writeRaw(bb); // sequence
+		bb = Format.write(bb, target);
+		bb=Format.writeVLCLong(bb, offer);
+		bb=Format.write(bb, functionName);
+		bb=Format.write(bb, args);
+		return bb;
+	}
+	
+	public static ATransaction read(ByteBuffer bb) throws BadFormatException {
+		long sequence = Format.readVLCLong(bb);
+		Address target=Format.read(bb);
+		long offer = Format.readVLCLong(bb);
+		Symbol functionName=Format.read(bb);
+		AVector<Object> args = Format.read(bb);
+		return create(sequence, target, offer, functionName,args);
 	}
 
 	@Override
@@ -69,12 +95,12 @@ public class Call extends ATransaction {
 
 	@Override
 	public <T> Context<T> apply(Context<?> ctx) {
-		return ctx.actorCall(target, 0L, functionName, args.toArray());
+		return ctx.actorCall(target, offer, functionName, args.toArray());
 	}
 
 	@Override
 	public long getMaxJuice() {
-		return 0;
+		return Constants.MAX_TRANSACTION_JUICE;
 	}
 
 	@Override
@@ -84,7 +110,20 @@ public class Call extends ATransaction {
 	
 	@Override
 	public int getRefCount() {
-		return 0;
+		return args.getRefCount();
 	}
+	
+	@Override
+	public <T> Ref<T> getRef(int i) {
+		return args.getRef(i);
+	}
+
+	@Override
+	public ACell updateRefs(IRefFunction func) {
+		AVector<Object> newArgs=args.updateRefs(func);
+		if (args==newArgs) return this;
+		return new Call(sequence,target,offer,functionName,newArgs);
+	}
+
 
 }

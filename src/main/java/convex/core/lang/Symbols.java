@@ -226,6 +226,8 @@ public class Symbols {
 
 	public static final Symbol SET_BANG = Symbol.create("set!");
 	public static final Symbol SET_STAR = Symbol.create("set*");
+	
+	public static final Symbol REGISTER = Symbol.create("register");
 
 
 }

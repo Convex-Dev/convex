@@ -1034,12 +1034,13 @@ public class Utils {
 	 * 
 	 * @param millis
 	 * @param test
+	 * @return True if the operation timed out, false otherwise
 	 */
-	public static void timeout(int millis, Supplier<Boolean> test) {
+	public static boolean timeout(int millis, Supplier<Boolean> test) {
 		long start = System.currentTimeMillis();
 		long now = start;
 		do {
-			if (test.get()) return;
+			if (test.get()) return false;
 			try {
 				Thread.sleep((long) ((now - start) * 0.3 + 1));
 			} catch (InterruptedException e) {
@@ -1047,6 +1048,7 @@ public class Utils {
 			}
 			now = System.currentTimeMillis();
 		} while ((now - start) < millis);
+		return true;
 	}
 
 	private static long lastTimestamp = Instant.now().toEpochMilli();

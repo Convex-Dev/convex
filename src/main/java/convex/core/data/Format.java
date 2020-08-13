@@ -22,6 +22,7 @@ import convex.core.lang.Fn;
 import convex.core.lang.Ops;
 import convex.core.lang.expanders.Expander;
 import convex.core.transactions.ATransaction;
+import convex.core.transactions.Call;
 import convex.core.transactions.Invoke;
 import convex.core.transactions.Transfer;
 import convex.core.util.Utils;
@@ -689,6 +690,8 @@ public class Format {
 			return Invoke.read(bb);
 		} else if (tag == Tag.TRANSFER) {
 			return Transfer.read(bb);
+		} else if (tag == Tag.CALL) {
+			return Call.read(bb);
 		}
 		throw new BadFormatException("Can't read Transaction with tag " + Utils.toHexString(tag));
 	}

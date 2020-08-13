@@ -189,6 +189,7 @@ public class Server implements Closeable {
 	 */
 	private void processMessage(Message m) {
 		MessageType type = m.getType();
+		log.warning(m.toString());
 		try {
 			switch (type) {
 			case BELIEF:

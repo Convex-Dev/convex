@@ -71,10 +71,10 @@ public class Invoke extends ATransaction {
 	 * @return The Transfer object
 	 */
 	public static Invoke read(ByteBuffer b) throws BadFormatException {
-		long nonce = Format.readVLCLong(b);
+		long sequence = Format.readVLCLong(b);
 
 		Object args = Format.read(b);
-		return create(nonce, args);
+		return create(sequence, args);
 	}
 
 	@SuppressWarnings("unchecked")
