@@ -100,31 +100,27 @@ public class ScryptNext extends Reader {
     // --------------------------------
     public Rule Expression() {
         return Sequence(
-                FirstOf(// Special
+                FirstOf(
                         DefExpression(),
                         CondExpression(),
                         DoExpression(),
-
                         CallableExpression(),
                         FnExpression(),
                         LambdaExpression(),
-
-                        // Scalars
+                        ParExpression(),
                         StringLiteral(),
                         NilLiteral(),
                         NumberLiteral(),
                         BooleanLiteral(),
                         Symbol(),
                         Keyword(),
-
-                        // Compound
                         VectorExpression(),
                         MapExpression(),
                         Set(),
-
                         BlockExpression()
                 ),
-                Spacing()
+                Spacing(),
+                ZeroOrMore(InfixExtension())
         );
     }
 
@@ -132,13 +128,31 @@ public class ScryptNext extends Reader {
     // INFIX
     // --------------------------------
 
-    public Rule InfixExpression() {
+    public Rule NumberExpression() {
+        return Sequence(NumberLiteral(), Spacing());
+    }
+
+    public Rule InfixOperand() {
+        return FirstOf(
+                CallableExpression(),
+                NumberExpression()
+        );
+    }
+
+    public Rule InfixExtension() {
         return Sequence(
-                Expression(),
                 InfixOperator(),
                 Expression(),
-                ZeroOrMore(InfixOperator(), Expression())
+                push(prepare(infixExpression()))
         );
+    }
+
+    public AList<Object> infixExpression() {
+        var operand2 = pop();
+        var operator = pop();
+        var operand1 = pop();
+
+        return Lists.of(operator, operand1, operand2);
     }
 
     // --------------------------------
@@ -456,26 +470,21 @@ public class ScryptNext extends Reader {
     }
 
     public Rule InfixOperator() {
-        return FirstOf(
-                Sequence("+", push(Symbols.PLUS)),
-                Sequence("-", push(Symbols.MINUS)),
-                Sequence("*", push(Symbols.TIMES)),
-                Sequence("/", push(Symbols.DIVIDE)),
-                Sequence("==", push(Symbols.EQUALS)),
-                Sequence("<=", push(Symbols.LE)),
-                Sequence("<", push(Symbols.LT)),
-                Sequence(">=", push(Symbols.GE)),
-                Sequence(">", push(Symbols.GT))
-        );
-    }
-
-    public Rule InfixExtension() {
         return Sequence(
-                Spacing(),
-                InfixOperator(),
-                Spacing(),
-                CompoundExpression(),
-                push(prepare(createInfixForm((Syntax) pop(), (Symbol) pop(), (Syntax) pop()))));
+                FirstOf(
+                        Sequence("+", push(Symbols.PLUS)),
+                        Sequence("-", push(Symbols.MINUS)),
+                        Sequence("*", push(Symbols.TIMES)),
+                        Sequence("/", push(Symbols.DIVIDE)),
+                        Sequence("==", push(Symbols.EQUALS)),
+                        Sequence("==", push(Symbols.EQUALS)),
+                        Sequence("<=", push(Symbols.LE)),
+                        Sequence("<", push(Symbols.LT)),
+                        Sequence(">=", push(Symbols.GE)),
+                        Sequence(">", push(Symbols.GT))
+                ),
+                Spacing()
+        );
     }
 
     public List<Syntax> createInfixForm(Syntax op1, Symbol symbol, Syntax op2) {

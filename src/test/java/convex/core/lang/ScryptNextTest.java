@@ -63,6 +63,7 @@ public class ScryptNextTest {
         assertThrows(ParserRuntimeException.class, () -> parse(compilationUnit, "def x"));
         assertThrows(ParserRuntimeException.class, () -> parse(compilationUnit, "inc(1"));
         assertThrows(ParserRuntimeException.class, () -> parse(compilationUnit, "cond { }"));
+        assertThrows(ParserRuntimeException.class, () -> parse(compilationUnit, "1 +"));
 
         // Scalar Data Types
         assertEquals(Reader.read("nil"), parse(compilationUnit, "nil"));
@@ -88,6 +89,7 @@ public class ScryptNextTest {
         assertEquals(2, (Long) eval("{ inc(1); }"));
 
         // Do Expression
+        assertEquals(Reader.read("(do 1 2)"), parse(compilationUnit, "do(1, 2)"));
         assertEquals(Reader.read("(do)"), parse(compilationUnit, "do { }"));
         assertEquals(Reader.read("(do 1)"), parse(compilationUnit, "do { 1; }"));
         assertEquals(Reader.read("(do 1 (inc 2) {:n 3})"), parse(compilationUnit, "do { 1; inc(2); {:n 3}; }"));
@@ -114,6 +116,7 @@ public class ScryptNextTest {
         assertEquals(2, (Long) eval("cond { true inc(1) }"));
         assertEquals(2, (Long) eval("cond { false 1, :default 2 }"));
         assertEquals(2, (Long) eval("cond { false 1,  inc(1) 2 }"));
+        assertEquals(2, (Long) eval("cond (false, 1, inc(1), 2 )"));
         assertNull(eval("cond { false 1,  nil 2 }"));
 
         // When Expression
@@ -122,6 +125,8 @@ public class ScryptNextTest {
         assertEquals(Reader.read("(when true (f 1) 2)"), parse(compilationUnit, "when (true) { f(1); 2; }"));
 
         // If Else Expression
+        assertEquals(Reader.read("(if true 1)"), parse(compilationUnit, "if(true, 1)"));
+        assertEquals(Reader.read("(if true 1 2)"), parse(compilationUnit, "if(true, 1, 2)"));
         assertEquals(Reader.read("(if true 1)"), parse(compilationUnit, "if (true) 1"));
         assertEquals(Reader.read("(if true 1 2)"), parse(compilationUnit, "if (true) 1 else 2"));
         assertEquals(Reader.read("(if true (do 1 2))"), parse(compilationUnit, "if (true) { 1; 2; }"));
@@ -160,11 +165,18 @@ public class ScryptNextTest {
         assertEquals(Reader.read("(do (def x 1) (def y 2))"), parse(compilationUnit, "def x = 1; def y = 2;"));
         assertEquals(Reader.read("(do (def x 1) (if (zero? x) :zero :not-zero) nil 2)"), parse(compilationUnit, "def x = 1; if(zero?(x)) :zero else :not-zero; 2;"));
 
+        // Infix Expression
+        assertEquals(Reader.read("(+ 1 2)"), parse(compilationUnit, "1 + 2"));
+
+        // TODO Shouldn't this be a valid expression?
+        //assertEquals(Reader.read("(+ (inc 1) 2)"), parse(compilationUnit, "inc(1) + 2 + if (true) 1"));
+
+        assertEquals(Reader.read("(+ 1 (+ 2 3))"), parse(compilationUnit, "1+2+3"));
+        assertEquals(Reader.read("(+ 1 (+ 2 3))"), parse(compilationUnit, "1+(2+3)"));
+        assertEquals(Reader.read("(/ (+ 2 2) 2)"), parse(compilationUnit, "(2+2)/2"));
+
 
         /* TODO
-
-        1 + inc(5) / 2
-        (1 + inc(5)) / 2
 
         defn identity(x) {
           x
