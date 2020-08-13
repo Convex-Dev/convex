@@ -10,6 +10,7 @@ import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.ErrorCodes;
 import convex.core.Init;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AVector;
@@ -64,11 +65,15 @@ public class ServerTest {
 		
 		long id1 = pc.sendTransaction(keyPair.signData(Invoke.create(1, Reader.read("[1 2 3]"))));
 		long id2 = pc.sendTransaction(keyPair.signData(Invoke.create(2, Reader.read("(return 2)"))));
-		Utils.timeout(200, () -> results.get(id2) != null);
+		long id2a = pc.sendTransaction(keyPair.signData(Invoke.create(2, Reader.read("22"))));
+		long id3 = pc.sendTransaction(keyPair.signData(Invoke.create(3, Reader.read("(rollback 3)"))));
+		Utils.timeout(200, () -> results.get(id3) != null);
 		
 		AVector<Long> v = Vectors.of(1l, 2l, 3l);
 		assertEquals(v, results.get(id1));
 		assertEquals(2L, results.get(id2));
+		assertEquals(ErrorCodes.SEQUENCE, results.get(id2a));
+		assertEquals(3L, results.get(id3));
 	}
 
 
