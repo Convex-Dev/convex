@@ -1,6 +1,5 @@
 package convex.core.lang;
 
-import convex.core.data.Maps;
 import convex.core.data.Syntax;
 import org.junit.jupiter.api.Test;
 import org.parboiled.Parboiled;
@@ -29,6 +28,10 @@ public class ScryptNextTest {
         }
     }
 
+    static Object parse(String source) {
+        return parse(scrypt().CompilationUnit(), source);
+    }
+
     @SuppressWarnings("unchecked")
     public static <T> Context<T> step(Context<?> c, String source) {
         Syntax syn = ScryptNext.readSyntax(source);
@@ -54,139 +57,150 @@ public class ScryptNextTest {
 
     @Test
     public void testExpressions() {
-        var scrypt = scrypt();
+        // TODO Should fail because 'x+y' is not a valid identifier
+        assertEquals(Reader.read("(def x+y 1)"), parse("def x+y = 1;"));
 
-        var compilationUnit = scrypt.CompilationUnit();
+        // Body must be an expression
+        assertThrows(ParserRuntimeException.class, () -> parse("() ->"));
+        // Args must be symbols
+        assertThrows(ParserRuntimeException.class, () -> parse("(1) -> x"));
+        // Args must be wrapped in parenthesis
+        assertThrows(ParserRuntimeException.class, () -> parse("x, y -> x"));
 
-        assertThrows(ParserRuntimeException.class, () -> parse(compilationUnit, "1 true"));
-        assertThrows(ParserRuntimeException.class, () -> parse(compilationUnit, "{"));
-        assertThrows(ParserRuntimeException.class, () -> parse(compilationUnit, "def x"));
-        assertThrows(ParserRuntimeException.class, () -> parse(compilationUnit, "inc(1"));
-        assertThrows(ParserRuntimeException.class, () -> parse(compilationUnit, "cond { }"));
-        assertThrows(ParserRuntimeException.class, () -> parse(compilationUnit, "1 +"));
+        // Multiple expressions are not valid
+        assertThrows(ParserRuntimeException.class, () -> parse("1 true"));
+
+        // Missing closing '}'
+        assertThrows(ParserRuntimeException.class, () -> parse("{"));
+
+        // Requires binding
+        assertThrows(ParserRuntimeException.class, () -> parse("def x"));
+        // Expression must be followed by ';'
+        assertThrows(ParserRuntimeException.class, () -> parse("def x = (x) -> x"));
+        // Can't def using a block statement
+        assertThrows(ParserRuntimeException.class, () -> parse("def x = { 1; }"));
+        // Can't def using a when statement
+        assertThrows(ParserRuntimeException.class, () -> parse("def x = when (test) 1;"));
+        // Can't def using an if statement
+        assertThrows(ParserRuntimeException.class, () -> parse("def x = if (test) 1;"));
+        // Can't def using a nested def statement
+        assertThrows(ParserRuntimeException.class, () -> parse("def x = def y = 1"));
+
+        // Missing ')'
+        assertThrows(ParserRuntimeException.class, () -> parse("inc(1"));
+        // Missing expression after '+'
+        assertThrows(ParserRuntimeException.class, () -> parse("1 +"));
 
         // Scalar Data Types
-        assertEquals(Reader.read("nil"), parse(compilationUnit, "nil"));
-        assertEquals(Reader.read("\"Hello\""), parse(compilationUnit, "\"Hello\""));
-        assertEquals(Reader.read("1"), parse(compilationUnit, "1"));
-        assertEquals(Reader.read("true"), parse(compilationUnit, "true"));
-        assertEquals(Reader.read("false"), parse(compilationUnit, "false"));
-        assertEquals(Reader.read("symbol"), parse(compilationUnit, "symbol"));
-        assertEquals(Reader.read(":keyword"), parse(compilationUnit, ":keyword"));
+        assertEquals(Reader.read("nil"), parse("nil"));
+        assertEquals(Reader.read("\"Hello\""), parse("\"Hello\""));
+        assertEquals(Reader.read("1"), parse("1"));
+        assertEquals(Reader.read("true"), parse("true"));
+        assertEquals(Reader.read("false"), parse("false"));
+        assertEquals(Reader.read("symbol"), parse("symbol"));
+        assertEquals(Reader.read(":keyword"), parse(":keyword"));
 
         // Compound Data Types
-        assertEquals(Reader.read("[]"), parse(compilationUnit, "[]"));
-        assertEquals(Reader.read("{}"), parse(compilationUnit, "{}"));
-        assertEquals(Reader.read("{}"), parse(compilationUnit, "{};"));
-        assertEquals(Reader.read("#{}"), parse(compilationUnit, "#{}"));
+        assertEquals(Reader.read("[]"), parse("[]"));
+        assertEquals(Reader.read("{}"), parse("{}"));
+        assertEquals(Reader.read("{}"), parse("{};"));
+        assertEquals(Reader.read("#{}"), parse("#{}"));
 
-        // Block Expression
-        assertEquals(Reader.read("(do 1)"), parse(compilationUnit, "{ 1; }"));
-        assertEquals(Reader.read("(do 1 (inc 2) {:n 3})"), parse(compilationUnit, "{ 1; inc(2); {:n 3}; }"));
-        assertEquals(Reader.read("(do (def f (fn [x] x)) (f 1))"), parse(compilationUnit, "{ def f = fn(x) { x; }; f(1); }"));
-        assertEquals(Reader.read("(do (def x? true) (if x? (do 1 2)) 1)"), parse(compilationUnit, "do { def x? = true; if (x?) { 1; 2; } 1; }"));
-        assertEquals(Reader.read("(do (def x? true) (when x? 1) 1)"), parse(compilationUnit, "do { def x? = true; when (x?) { 1; } 1; }"));
-        assertEquals(2, (Long) eval("{ inc(1); }"));
+        // Def Statement
+        assertEquals(Reader.read("(def x 1)"), parse("def x = 1;"));
+        assertEquals(Reader.read("(def x 1)"), parse("def x = do { 1; };"));
+        assertEquals(Reader.read("(def f (fn [x xs] (conj xs x)))"), parse("def f = (x, xs) -> conj(xs, x);"));
+        assertEquals(Reader.read("(def x (inc 1))"), parse("def x = inc(1);"));
+        assertEquals(Reader.read("(def x (reduce + 0 [1,2,3]))"), parse("def x = reduce(+, 0, [1, 2, 3]);"));
+        assertEquals(Reader.read("(def x (reduce + 0 [1,2,3]))"), parse("def x = do { reduce(+, 0, [1, 2, 3]); };"));
+        assertEquals(Reader.read("(def f (fn []))"), parse("def f = fn(){};"));
 
-        // Do Expression
-        assertEquals(Reader.read("(do 1 2)"), parse(compilationUnit, "do(1, 2)"));
-        assertEquals(Reader.read("(do)"), parse(compilationUnit, "do { }"));
-        assertEquals(Reader.read("(do 1)"), parse(compilationUnit, "do { 1; }"));
-        assertEquals(Reader.read("(do 1 (inc 2) {:n 3})"), parse(compilationUnit, "do { 1; inc(2); {:n 3}; }"));
-        assertEquals(Reader.read("(do (def f (fn [x] x)) (f 1))"), parse(compilationUnit, "do { def f = fn(x) { x; }; f(1); }"));
-        assertNull(eval("do { }"));
-        assertEquals(1, (Long) eval("do { 1; }"));
+        // TODO Let Statement
+        //assertEquals(Reader.read("(set! x 1)"), parse("x = 1;"));
+        //assertEquals(Reader.read("(set! x 1)"), parse("let x = 1;"));
 
-        // Def Expression
-        assertEquals(Reader.read("(def x 1)"), parse(compilationUnit, "def x = 1"));
-        assertEquals(Reader.read("(def f (fn [x xs] (conj xs x)))"), parse(compilationUnit, "def f = (x, xs) -> conj(xs, x)"));
 
-        // TODO Do we want to allow this?
-        assertEquals(Reader.read("(def x (def y 1))"), parse(compilationUnit, "def x = def y = 1"));
+        // If Else Statement
+        assertEquals(Reader.read("(if true 1)"), parse("if(true, 1)"));
+        assertEquals(Reader.read("(if true 1 2)"), parse("if(true, 1, 2)"));
+        assertEquals(Reader.read("(cond true nil)"), parse("if (true) {}"));
+        assertEquals(Reader.read("(cond true 1)"), parse("if (true) 1;"));
+        assertEquals(Reader.read("(cond true 1 2)"), parse("if (true) 1; else 2;"));
+        assertEquals(Reader.read("(cond true 1 2)"), parse("if (true) { 1; } else 2;"));
+        assertEquals(Reader.read("(cond true 1 2)"), parse("if (true) { 1; } else { 2;} "));
+        assertEquals(Reader.read("(cond true (do (cond true 1) 2))"), parse("if (true) { if (true) 1; 2;}"));
 
-        assertEquals(Reader.read("(def x (inc 1))"), parse(compilationUnit, "def x = inc(1)"));
-        assertEquals(Reader.read("(def x (do (reduce + [] [1,2,3])))"), parse(compilationUnit, "def x = do { reduce(+, [], [1, 2, 3]); }"));
-        assertEquals(Reader.read("(def f (fn []))"), parse(compilationUnit, "def f = fn(){}"));
-
-        // Cond Expression
-        assertEquals(Reader.read("(cond false 1)"), parse(compilationUnit, "cond { false 1 }"));
-        assertEquals(Reader.read("(cond (zero? x) 1)"), parse(compilationUnit, "cond { zero?(x) 1 }"));
-        assertEquals(Reader.read("(cond false 1 (inc 1) 2)"), parse(compilationUnit, "cond { false 1,  inc(1) 2 }"));
-        assertEquals(2, (Long) eval("cond { false 1, :default 2 }"));
-        assertEquals(2, (Long) eval("cond { true inc(1) }"));
-        assertEquals(2, (Long) eval("cond { false 1, :default 2 }"));
-        assertEquals(2, (Long) eval("cond { false 1,  inc(1) 2 }"));
-        assertEquals(2, (Long) eval("cond (false, 1, inc(1), 2 )"));
-        assertNull(eval("cond { false 1,  nil 2 }"));
-
-        // When Expression
-        assertEquals(Reader.read("(when true 1)"), parse(compilationUnit, "when (true) { 1; }"));
-        assertEquals(Reader.read("(when true)"), parse(compilationUnit, "when (true) {}"));
-        assertEquals(Reader.read("(when true (f 1) 2)"), parse(compilationUnit, "when (true) { f(1); 2; }"));
-
-        // If Else Expression
-        assertEquals(Reader.read("(if true 1)"), parse(compilationUnit, "if(true, 1)"));
-        assertEquals(Reader.read("(if true 1 2)"), parse(compilationUnit, "if(true, 1, 2)"));
-        assertEquals(Reader.read("(if true 1)"), parse(compilationUnit, "if (true) 1"));
-        assertEquals(Reader.read("(if true 1 2)"), parse(compilationUnit, "if (true) 1 else 2"));
-        assertEquals(Reader.read("(if true (do 1 2))"), parse(compilationUnit, "if (true) { 1; 2; }"));
-        assertEquals(Reader.read("(if true (do 1 2) (do 3 4))"), parse(compilationUnit, "if (true) { 1; 2; } else { 3; 4; }"));
-        assertSame(Maps.empty(), eval("if (true) {}"));
+        // When Statement
+        assertEquals(Reader.read("(cond true 1)"), parse("when (true) 1;"));
+        assertEquals(Reader.read("(cond true 1)"), parse("when (true) { 1; }"));
+        assertEquals(Reader.read("(cond true nil)"), parse("when (true) {}"));
+        assertEquals(Reader.read("(cond true {})"), parse("when (true) {};"));
+        assertEquals(Reader.read("(cond true {})"), parse("when (true) { {}; }"));
+        assertEquals(Reader.read("(cond true nil)"), parse("when (true) ;"));
+        assertEquals(Reader.read("(cond true (do (f 1) 2))"), parse("when (true) { f(1); 2; }"));
 
         // Function Expression
-        assertEquals(Reader.read("(fn [])"), parse(compilationUnit, "fn ( ) { }"));
-        assertEquals(Reader.read("(fn [x])"), parse(compilationUnit, "fn (x) { }"));
-        assertEquals(Reader.read("(fn [x y])"), parse(compilationUnit, "fn (x, y) { }"));
-        assertEquals(Reader.read("(fn [x] x)"), parse(compilationUnit, "fn (x) { x; }"));
-        assertEquals(Reader.read("(fn [x y] x y)"), parse(compilationUnit, "fn (x, y) { x; y; }"));
-        assertEquals(Reader.read("(fn [x] 1 {} [] (inc x))"), parse(compilationUnit, "fn (x) { 1; {}; []; inc(x); }"));
+        assertEquals(Reader.read("(fn [])"), parse("fn ( ) { }"));
+        assertEquals(Reader.read("(fn [x])"), parse("fn (x) { }"));
+        assertEquals(Reader.read("(fn [x y])"), parse("fn (x, y) { }"));
+        assertEquals(Reader.read("(fn [x] x)"), parse("fn (x) { x; }"));
+        assertEquals(Reader.read("(fn [x y] x y)"), parse("fn (x, y) { x; y; }"));
+        assertEquals(Reader.read("(fn [x] 1 {} [] (inc x))"), parse("fn (x) { 1; {}; []; inc(x); }"));
 
         // Lambda Expression
-        assertEquals(Reader.read("(fn [] nil)"), parse(compilationUnit, "() -> nil"));
-        assertEquals(Reader.read("(fn [x] x)"), parse(compilationUnit, "(x) -> x"));
-        assertEquals(Reader.read("(fn [x xs] (conj xs x))"), parse(compilationUnit, "(x, xs) -> conj(xs, x)"));
+        assertEquals(Reader.read("(fn [] nil)"), parse("() -> nil"));
+        assertEquals(Reader.read("(fn [x] x)"), parse("(x) -> x"));
+        assertEquals(Reader.read("(fn [x xs] (conj xs x))"), parse("(x, xs) -> conj(xs, x)"));
 
         // Callable Expression
-        assertEquals(Reader.read("(f)"), parse(compilationUnit, "f()"));
-        assertEquals(Reader.read("([] 0)"), parse(compilationUnit, "[](0)"));
-        assertEquals(Reader.read("({} :key)"), parse(compilationUnit, "{}(:key)"));
-        assertEquals(Reader.read("(#{} x)"), parse(compilationUnit, "#{}(x)"));
-        assertEquals(Reader.read("((fn [] nil))"), parse(compilationUnit, "fn(){;}()"));
-        assertEquals(Reader.read("((fn [x] x) 1)"), parse(compilationUnit, "fn(x){x;}(1)"));
-        assertEquals(Reader.read("(inc 1)"), parse(compilationUnit, "inc(1)"));
-        assertEquals(Reader.read("(inc (inc 1))"), parse(compilationUnit, "inc(inc(1))"));
-        assertEquals(Reader.read("(map inc [1,2])"), parse(compilationUnit, "map(inc, [1, 2])"));
-        assertEquals(Reader.read("(map (fn [x] x) [1,2])"), parse(compilationUnit, "map(fn(x){x;}, [1, 2])"));
-        assertEquals(Reader.read("(map (fn [x] x) [1,2])"), parse(compilationUnit, "map((x) -> x, [1, 2])"));
-        assertEquals(Reader.read("(reduce (fn [acc,x] (conj acc x)) [] [1,2])"), parse(compilationUnit, "reduce(fn(acc, x){ conj(acc, x); }, [], [1, 2])"));
-        assertEquals(Reader.read("(reduce (fn [acc,x] (conj acc x)) [] [1,2])"), parse(compilationUnit, "reduce((acc, x) -> conj(acc, x), [], [1, 2])"));
+        assertEquals(Reader.read("(f)"), parse("f()"));
+        assertEquals(Reader.read("([] 0)"), parse("[](0)"));
+        assertEquals(Reader.read("({} :key)"), parse("{}(:key)"));
+        assertEquals(Reader.read("(#{} x)"), parse("#{}(x)"));
+        assertEquals(Reader.read("((fn [] nil))"), parse("fn(){;}()"));
+        assertEquals(Reader.read("((fn [x] x) 1)"), parse("fn(x){x;}(1)"));
+        assertEquals(Reader.read("(inc 1)"), parse("inc(1)"));
+        assertEquals(Reader.read("(inc (inc 1))"), parse("inc(inc(1))"));
+        assertEquals(Reader.read("(map inc [1,2])"), parse("map(inc, [1, 2])"));
+        assertEquals(Reader.read("(map (fn [x] x) [1,2])"), parse("map(fn(x){x;}, [1, 2])"));
+        assertEquals(Reader.read("(map (fn [x] x) [1,2])"), parse("map((x) -> x, [1, 2])"));
+        assertEquals(Reader.read("(reduce (fn [acc x] (+ acc x)) 0 [1 2 3])"), parse("reduce(fn(acc, x){ acc + x; }, 0, [1, 2, 3])"));
+        assertEquals(Reader.read("(reduce (fn [acc x] (+ acc x)) 0 [1 2 3])"), parse("reduce((acc, x) -> acc + x , 0, [1, 2, 3])"));
+        assertEquals(Reader.read("(reduce + 0 [1 2 3])"), parse("reduce(+, 0, [1, 2, 3])"));
 
         // Statements
-        assertEquals(Reader.read("(do (def x 1) (def y 2))"), parse(compilationUnit, "def x = 1; def y = 2;"));
-        assertEquals(Reader.read("(do (def x 1) (if (zero? x) :zero :not-zero) nil 2)"), parse(compilationUnit, "def x = 1; if(zero?(x)) :zero else :not-zero; 2;"));
+        assertEquals(Reader.read("1"), parse("1;"));
+        assertEquals(Reader.read("(fn [])"), parse("fn(){};"));
+        assertEquals(Reader.read("(fn [x] x)"), parse("(x) -> x;"));
+        assertEquals(Reader.read("(do (def x 1) (def y 2))"), parse("def x = 1; def y = 2;"));
+        assertEquals(Reader.read("(do (def x 1) (cond (zero? x) :zero :not-zero) 2)"), parse("def x = 1; if(zero?(x)) :zero; else :not-zero; 2;"));
 
         // Infix Expression
-        assertEquals(Reader.read("(+ 1 2)"), parse(compilationUnit, "1 + 2"));
+        assertEquals(Reader.read("(+ 1 2)"), parse("1 + 2"));
+        assertEquals(Reader.read("(+ 1 (+ 2 3))"), parse("1+2+3"));
+        assertEquals(Reader.read("(+ 1 (+ 2 3))"), parse("1+(2+3)"));
+        assertEquals(Reader.read("(/ (+ 2 2) 2)"), parse("(2+2)/2"));
 
-        // TODO Shouldn't this be a valid expression?
-        //assertEquals(Reader.read("(+ (inc 1) 2)"), parse(compilationUnit, "inc(1) + 2 + if (true) 1"));
+        // Block Statement
+        assertEquals(Reader.read("1"), parse("{ 1; }"));
+        assertEquals(Reader.read("(do 1 (inc 2) {:n 3})"), parse("{ 1; inc(2); {:n 3}; }"));
+        assertEquals(Reader.read("(do (def f (fn [x] x)) (f 1))"), parse("{ def f = fn(x) { x; }; f(1); }"));
+        assertEquals(Reader.read("(do (def x? true) (cond x? (do 1 2)) 1)"), parse("do { def x? = true; if (x?) { 1; 2; } 1; }"));
+        assertEquals(Reader.read("(do (def x? true) (cond x? 1))"), parse("do { def x? = true; when (x?) { 1; } }"));
+        assertEquals(2, (Long) eval("{ inc(1); }"));
 
-        assertEquals(Reader.read("(+ 1 (+ 2 3))"), parse(compilationUnit, "1+2+3"));
-        assertEquals(Reader.read("(+ 1 (+ 2 3))"), parse(compilationUnit, "1+(2+3)"));
-        assertEquals(Reader.read("(/ (+ 2 2) 2)"), parse(compilationUnit, "(2+2)/2"));
-
-
-        /* TODO
-
-        defn identity(x) {
-          x
-        }
-
-        let (x 1 y 2) {
-          x + y
-        }
-
-        */
+        // Do
+        assertEquals(Reader.read("(do 1 2)"), parse("do(1, 2)"));
+        assertEquals(Reader.read("nil"), parse("do { }"));
+        assertEquals(Reader.read("nil"), parse("do { };"));
+        assertEquals(Reader.read("{}"), parse("do { {}; }"));
+        assertEquals(Reader.read("nil"), parse("do { {} }"));
+        assertEquals(Reader.read("1"), parse("do { 1; }"));
+        assertEquals(Reader.read("1"), parse("do { 1; };"));
+        assertEquals(Reader.read("(do 1 (inc 2) {:n 3})"), parse("do { 1; inc(2); {:n 3}; }"));
+        assertEquals(Reader.read("(do (def f (fn [x] x)) (f 1))"), parse("do { def f = fn(x) { x; }; f(1); }"));
+        assertNull(eval("do { }"));
+        assertEquals(1, (Long) eval("do { 1; }"));
 
     }
 
