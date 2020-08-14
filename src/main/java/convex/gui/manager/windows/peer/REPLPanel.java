@@ -4,8 +4,11 @@ import java.awt.BorderLayout;
 import java.awt.Font;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
@@ -43,7 +46,13 @@ public class REPLPanel extends JPanel {
 	JTextArea outputArea;
 	private JButton btnClear;
 	private JButton btnInfo;
+	
+	private ArrayList<String> history=new ArrayList<>();
+	private int historyPosition=0;
 
+	private InputListener inputListener=new InputListener();
+
+	
 	private JPanel panel_1;
 
 	private AccountChooserPanel execPanel;
@@ -111,9 +120,14 @@ public class REPLPanel extends JPanel {
 		inputArea = new JTextArea();
 		inputArea.setRows(5);
 		inputArea.setFont(new Font("Monospaced", Font.PLAIN, 13));
-		inputArea.getDocument().addDocumentListener(new InputListener());
+		inputArea.getDocument().addDocumentListener(inputListener);
+		inputArea.addKeyListener(inputListener);
 		splitPane.setRightComponent(new JScrollPane(inputArea));
-
+		
+		// stop ctrl+arrow losing focus
+		setFocusTraversalKeysEnabled(false);
+		inputArea.setFocusTraversalKeysEnabled(false);
+		
 		execPanel = new AccountChooserPanel();
 		add(execPanel, BorderLayout.NORTH);
 
@@ -147,6 +161,10 @@ public class REPLPanel extends JPanel {
 
 	private void sendMessage(String s) {
 		if (s.isBlank()) return;
+		
+		history.add(s);
+		historyPosition=history.size();
+		
 		SwingUtilities.invokeLater(() -> {
 			outputArea.append(s);
 			outputArea.append("\n");
@@ -192,7 +210,7 @@ public class REPLPanel extends JPanel {
 	/**
 	 * Listener to detect returns at the end of the input box => send message
 	 */
-	private class InputListener implements DocumentListener {
+	private class InputListener implements DocumentListener, KeyListener {
 
 		@Override
 		public void insertUpdate(DocumentEvent e) {
@@ -212,6 +230,44 @@ public class REPLPanel extends JPanel {
 		@Override
 		public void changedUpdate(DocumentEvent e) {
 			// nothing special
+		}
+
+		@Override
+		public void keyTyped(KeyEvent e) {
+
+		}
+
+		@Override
+		public void keyPressed(KeyEvent e) {
+			// System.out.println(e);
+			if (e.isControlDown()) {
+				int code = e.getKeyCode();
+				int hSize=history.size();
+				if (code==KeyEvent.VK_UP) {
+
+					if (historyPosition>0) {
+						if (historyPosition==hSize) {
+							// store current in history
+							String s=inputArea.getText();
+							history.add(s);
+						}
+						historyPosition--;
+						setInput(history.get(historyPosition));
+					}
+					e.consume(); // mark event consumed
+				} else if (code==KeyEvent.VK_DOWN) {
+					if (historyPosition<hSize-1) {
+						historyPosition++;
+						setInput(history.get(historyPosition));
+					}
+					e.consume(); // mark event consumed
+				}
+			}
+		}
+
+		@Override
+		public void keyReleased(KeyEvent e) {
+			
 		}
 	}
 
