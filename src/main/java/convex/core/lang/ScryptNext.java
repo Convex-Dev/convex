@@ -18,6 +18,7 @@ public class ScryptNext extends Reader {
     // Use a ThreadLocal reader because instances are not thread safe
     private static final ThreadLocal<ScryptNext> syntaxReader = ThreadLocal.withInitial(() -> Parboiled.createParser(ScryptNext.class));
     public final Rule DEF = Keyword("def");
+    public final Rule DEFN = Keyword("defn");
     public final Rule FN = Keyword("fn");
     public final Rule IF = Keyword("if");
     public final Rule ELSE = Keyword("else");
@@ -91,6 +92,7 @@ public class ScryptNext extends Reader {
                 IfElseStatement(),
                 WhenStatement(),
                 DefStatement(),
+                DefnStatement(),
                 BlockStatement(),
                 EmptyStatement(),
                 ExpressionStatement()
@@ -196,6 +198,34 @@ public class ScryptNext extends Reader {
 
     public List<Syntax> defStatement(Syntax expr, Syntax sym) {
         return (List<Syntax>) Lists.of(Syntax.create(Symbols.DEF), sym, expr);
+    }
+
+    // --------------------------------
+    // DEFN STATEMENT
+    // --------------------------------
+    public Rule DefnStatement() {
+        return Sequence(
+                DEFN,
+                Symbol(),
+                WrapInParenthesis(ZeroOrMoreCommaSeparatedOf(Symbol())),
+                WrapInCurlyBraces(ZeroOrMoreOf(Statement())),
+                push(prepare(defnStatement()))
+        );
+    }
+
+    public AList<Object> defnStatement() {
+        var block = popNodeList();
+        var parameters = Vectors.create(popNodeList());
+        var name = pop();
+
+        return Lists.of(
+                Syntax.create(Symbols.DEF),
+                name,
+                Syntax.create(block
+                        .cons(parameters)
+                        .cons(Syntax.create(Symbols.FN))
+                )
+        );
     }
 
     // --------------------------------

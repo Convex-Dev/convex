@@ -115,6 +115,14 @@ public class ScryptNextTest {
         assertEquals(Reader.read("(def x (reduce + 0 [1,2,3]))"), parse("def x = do { reduce(+, 0, [1, 2, 3]); };"));
         assertEquals(Reader.read("(def f (fn []))"), parse("def f = fn(){};"));
 
+        // Defn Statement
+        assertEquals(Reader.read("(def f (fn [x] x))"), parse("defn f(x) { x; }"));
+        assertEquals(Reader.read("(def f (fn []))"), parse("defn f() { }"));
+        assertEquals(Reader.read("(def f (fn [] nil))"), parse("defn f() { {} }"));
+        assertEquals(Reader.read("(def f (fn [] {}))"), parse("defn f() { {}; }"));
+        assertEquals(parse("def f = fn(x){ x; };"), parse("defn f(x) { x; }"));
+
+
         // TODO Let Statement
         //assertEquals(Reader.read("(set! x 1)"), parse("x = 1;"));
         //assertEquals(Reader.read("(set! x 1)"), parse("let x = 1;"));
