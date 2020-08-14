@@ -139,6 +139,20 @@ public class FormatTest {
 		assertThrows(BadFormatException.class,()->Format.read(data));
 	}
 	
+	@Test
+	public void testMessageLength() {
+		// empty bytebuffer, therefore no message lengtg
+		ByteBuffer bb1=Blob.fromHex("").toByteBuffer();
+		assertThrows(BadFormatException.class,()->Format.peekMessageLength(bb1));
+		
+		// bad first byte! Needs to carry if 0x40 or more
+		ByteBuffer bb2=Blob.fromHex("43").toByteBuffer();
+		assertThrows(BadFormatException.class,()->Format.peekMessageLength(bb2));
+		
+		ByteBuffer bb3=Blob.fromHex("FFFF").toByteBuffer();
+		assertThrows(BadFormatException.class,()->Format.peekMessageLength(bb3));
+	}
+	
 	@Test 
 	public void testWriteRef() {
 		// TODO: consider whether this is valid
