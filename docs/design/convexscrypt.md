@@ -26,7 +26,7 @@ Scrypt is a language implemented primarily as a front-end to underlying CVM capa
 
 The Scrypt implementation incudes:
 
-- A custom PEG parser that translates source cost to an AST representation equivalent to Convex Lisp
+- A custom PEG parser that translates source code to an AST representation equivalent to Convex Lisp
 - A REPL-based user interface, intended for development and operational usage
 - A test suite and example code
 
@@ -38,3 +38,79 @@ Scrypt re-uses key capabilities from the rest of Convex:
 ### Open questions
 
 * Can we use char literals in Java style like `'c'` or does this clash with symbols too much?
+
+### Syntax examples
+
+#### Variable declaration
+```javascript
+def x = 1;
+
+def x = (x) -> x;
+
+def x = do {
+  map(inc, [1, 2, 3]);
+  
+  1; 
+};
+```
+
+#### If & else
+```javascript
+if (x > 1) {
+  x;
+} else {
+  y;
+}
+```
+
+#### When
+```javascript
+when (x > 1) {
+  x;
+}
+```
+
+#### Block
+```javascript
+{
+  doX();
+  doY();
+  z;
+}
+```
+
+#### Do
+```javascript
+do {
+  doX();
+  doY();
+  z;
+}
+```
+
+#### Anonymous function
+```javascript
+fn (x, y) { 
+  x + y; 
+}
+```
+
+#### Lambda
+```javascript
+(x) -> x
+
+(x, y) -> x + y
+
+(x, y) -> do {
+  doX();
+  doY();
+  z;
+}
+```
+
+#### Function declaration
+```javascript
+defn f(x) {
+  x;
+}
+```
