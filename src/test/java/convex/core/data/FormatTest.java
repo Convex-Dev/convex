@@ -140,7 +140,7 @@ public class FormatTest {
 	}
 	
 	@Test
-	public void testMessageLength() {
+	public void testMessageLength() throws BadFormatException {
 		// empty bytebuffer, therefore no message lengtg
 		ByteBuffer bb1=Blob.fromHex("").toByteBuffer();
 		assertThrows(BadFormatException.class,()->Format.peekMessageLength(bb1));
@@ -148,6 +148,19 @@ public class FormatTest {
 		// bad first byte! Needs to carry if 0x40 or more
 		ByteBuffer bb2=Blob.fromHex("43").toByteBuffer();
 		assertThrows(BadFormatException.class,()->Format.peekMessageLength(bb2));
+		
+		// maximum message length 
+		ByteBuffer bb2a=Blob.fromHex("BF7F").toByteBuffer();
+		assertEquals(Format.LIMIT_ENCODING_LENGTH,Format.peekMessageLength(bb2a));
+
+		// overflow message length
+		Blob overflow=Blob.fromHex("C000");
+		ByteBuffer bb2aa=overflow.toByteBuffer();
+		assertThrows(BadFormatException.class,()->Format.peekMessageLength(bb2aa));
+		
+		ByteBuffer bb2b=Blob.fromHex("8043").toByteBuffer();
+		assertEquals(67,Format.peekMessageLength(bb2b));
+
 		
 		ByteBuffer bb3=Blob.fromHex("FFFF").toByteBuffer();
 		assertThrows(BadFormatException.class,()->Format.peekMessageLength(bb3));
