@@ -18,7 +18,6 @@ public class ScryptNext extends Reader {
     // Use a ThreadLocal reader because instances are not thread safe
     private static final ThreadLocal<ScryptNext> syntaxReader = ThreadLocal.withInitial(() -> Parboiled.createParser(ScryptNext.class));
     public final Rule DEF = Keyword("def");
-    public final Rule COND = Keyword("cond");
     public final Rule FN = Keyword("fn");
     public final Rule IF = Keyword("if");
     public final Rule ELSE = Keyword("else");
@@ -74,7 +73,10 @@ public class ScryptNext extends Reader {
                         FirstOf(
                                 Sequence(Expression(), EOI),
                                 Sequence(Statement(), EOI),
-                                Sequence(StatementList(), push(prepare(popNodeList().cons(Syntax.create(Symbols.DO)))), EOI)
+                                Sequence(
+                                        ZeroOrMoreOf(Statement()),
+                                        push(prepare(popNodeList().cons(Syntax.create(Symbols.DO)))), EOI
+                                )
                         )
                 ),
                 push(error("Invalid program."))
@@ -86,14 +88,161 @@ public class ScryptNext extends Reader {
     // --------------------------------
     public Rule Statement() {
         return FirstOf(
-                IfElseExpression(),
+                IfElseStatement(),
                 WhenStatement(),
-                Sequence(DefExpression(), SEMI),
-                Sequence(Expression(), SEMI),
-                BlockExpression(),
-                Sequence(SEMI, push(prepare(null)))
+                DefStatement(),
+                BlockStatement(),
+                EmptyStatement(),
+                ExpressionStatement()
         );
     }
+
+    // --------------------------------
+    // IF ELSE STATEMENT
+    // --------------------------------
+    public Rule IfElseStatement() {
+        return FirstOf(
+                Sequence(
+                        IF,
+                        ParExpression(),
+                        Statement(),
+                        ELSE,
+                        Statement(),
+                        push(prepare(ifElseStatement()))
+                ),
+                Sequence(
+                        IF,
+                        ParExpression(),
+                        Statement(),
+                        push(prepare(ifStatement()))
+                )
+        );
+    }
+
+    @SuppressWarnings("rawtypes")
+    public ASequence ifStatement() {
+        // Pop expressions from if body
+        var body = pop();
+
+        // Pop test
+        var test = pop();
+
+        return Lists.of(
+                Syntax.create(Symbols.COND),
+                test,
+                body
+        );
+    }
+
+    @SuppressWarnings("rawtypes")
+    public ASequence ifElseStatement() {
+        // Pop expressions from else body
+        var elseBody = pop();
+
+        // Pop expressions from if body
+        var ifBody = pop();
+
+        // Pop test
+        var test = (Syntax) pop();
+
+        return Lists.of(
+                Syntax.create(Symbols.COND),
+                test,
+                ifBody,
+                elseBody
+        );
+    }
+
+    // --------------------------------
+    // WHEN STATEMENT
+    // --------------------------------
+    public Rule WhenStatement() {
+        return Sequence(
+                WHEN,
+                ParExpression(),
+                Statement(),
+                push(prepare(whenStatement()))
+        );
+    }
+
+    public AList<Syntax> whenStatement() {
+        // Pop expressions from body
+        Syntax body = (Syntax) pop();
+
+        // Pop test
+        Syntax test = (Syntax) pop();
+
+        return Lists.of(
+                Syntax.create(Symbols.COND),
+                test,
+                body
+        );
+    }
+
+    // --------------------------------
+    // DEF STATEMENT
+    // --------------------------------
+    public Rule DefStatement() {
+        return Sequence(
+                DEF,
+                Symbol(),
+                Spacing(),
+                EQU,
+                Expression(),
+                SEMI,
+                push(prepare(defStatement((Syntax) pop(), (Syntax) pop())))
+        );
+    }
+
+    public List<Syntax> defStatement(Syntax expr, Syntax sym) {
+        return (List<Syntax>) Lists.of(Syntax.create(Symbols.DEF), sym, expr);
+    }
+
+    // --------------------------------
+    // BLOCK STATEMENT
+    // --------------------------------
+    public Rule BlockStatement() {
+        return Sequence(
+                WrapInCurlyBraces(ZeroOrMoreOf(Statement())),
+                TestNot(SEMI),
+                push(block(popNodeList()))
+        );
+    }
+
+    public Object block(ASequence<Object> statements) {
+        Object form;
+
+        switch (statements.size()) {
+            case 0:
+                form = null;
+                break;
+            case 1:
+                form = statements.get(0);
+                break;
+            default:
+                form = statements.cons(Syntax.create(Symbols.DO));
+        }
+
+        return prepare(form);
+    }
+
+    // --------------------------------
+    // EXPRESSION STATEMENT
+    // --------------------------------
+    public Rule ExpressionStatement() {
+        return Sequence(Expression(), SEMI);
+    }
+
+    // --------------------------------
+    // EMPTY STATEMENT
+    // --------------------------------
+    public Rule EmptyStatement() {
+        return Sequence(SEMI, push(prepare(null)));
+    }
+
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
     // --------------------------------
     // EXPRESSION
@@ -101,8 +250,6 @@ public class ScryptNext extends Reader {
     public Rule Expression() {
         return Sequence(
                 FirstOf(
-                        DefExpression(),
-                        CondExpression(),
                         DoExpression(),
                         CallableExpression(),
                         FnExpression(),
@@ -116,8 +263,7 @@ public class ScryptNext extends Reader {
                         Keyword(),
                         VectorExpression(),
                         MapExpression(),
-                        Set(),
-                        BlockExpression()
+                        Set()
                 ),
                 Spacing(),
                 ZeroOrMore(InfixExtension())
@@ -125,20 +271,89 @@ public class ScryptNext extends Reader {
     }
 
     // --------------------------------
-    // INFIX
+    // DO EXPRESSION
     // --------------------------------
-
-    public Rule NumberExpression() {
-        return Sequence(NumberLiteral(), Spacing());
-    }
-
-    public Rule InfixOperand() {
-        return FirstOf(
-                CallableExpression(),
-                NumberExpression()
+    public Rule DoExpression() {
+        return Sequence(
+                DO,
+                WrapInCurlyBraces(ZeroOrMoreOf(Statement())),
+                push(block(popNodeList()))
         );
     }
 
+    // --------------------------------
+    // CALLABLE EXPRESSION
+    // --------------------------------
+    public Rule Callable() {
+        return FirstOf(
+                FnExpression(),
+                VectorExpression(),
+                MapExpression(),
+                Set()
+        );
+    }
+
+    public Rule CallableExpression() {
+        return Sequence(
+                FirstOf(
+                        Callable(),
+                        Symbol()
+                ),
+                Spacing(),
+                WrapInParenthesis(ZeroOrMoreCommaSeparatedOf(Expression())),
+                push(prepare(callableExpression()))
+        );
+    }
+
+    public ASequence<Object> callableExpression() {
+        var args = popNodeList();
+        var callableOrSym = pop();
+
+        return Lists.create(args).cons(callableOrSym);
+    }
+
+    // --------------------------------
+    // FUNCTION EXPRESSION
+    // --------------------------------
+    public Rule FnExpression() {
+        return Sequence(
+                FN,
+                WrapInParenthesis(ZeroOrMoreCommaSeparatedOf(Symbol())),
+                WrapInCurlyBraces(ZeroOrMoreOf(Statement())),
+                push(fnExpression())
+        );
+    }
+
+    public Syntax fnExpression() {
+        var block = popNodeList();
+        var parameters = Vectors.create(popNodeList());
+
+        return Syntax.create(block.cons(parameters).cons(Syntax.create(Symbols.FN)));
+    }
+
+    // --------------------------------
+    // LAMBDA EXPRESSION
+    // --------------------------------
+    public Rule LambdaExpression() {
+        return Sequence(
+                WrapInParenthesis(ZeroOrMoreCommaSeparatedOf(Symbol())),
+                RIGHT_ARROW,
+                Expression(),
+                push(prepare(lambdaExpression()))
+        );
+    }
+
+    public AList<Object> lambdaExpression() {
+        var fn = Syntax.create(Symbols.FN);
+        var body = pop();
+        var args = Vectors.create(popNodeList());
+
+        return Lists.of(fn, args, body);
+    }
+
+    // --------------------------------
+    // INFIX
+    // --------------------------------
     public Rule InfixExtension() {
         return Sequence(
                 InfixOperator(),
@@ -155,241 +370,10 @@ public class ScryptNext extends Reader {
         return Lists.of(operator, operand1, operand2);
     }
 
-    // --------------------------------
-    // FUNCTION
-    // --------------------------------
-    public Rule FnExpression() {
-        return Sequence(
-                FN,
-                ParOptMany(Symbol()),
-                Block(),
-                push(buildFnExpression())
-        );
-    }
-
-    public Syntax buildFnExpression() {
-        var block = popNodeList();
-        var parameters = Vectors.create(popNodeList());
-
-        return Syntax.create(block.cons(parameters).cons(Syntax.create(Symbols.FN)));
-    }
-
-    // --------------------------------
-    // LAMBDA
-    // --------------------------------
-    public Rule LambdaExpression() {
-        return Sequence(
-                // Args []
-                ParOptMany(Symbol()),
-                // ->
-                RIGHT_ARROW,
-                // Body
-                Expression(),
-                push(prepare(lambdaExpression()))
-        );
-    }
-
-    public AList<Object> lambdaExpression() {
-        var fn = Syntax.create(Symbols.FN);
-        var body = pop();
-        var args = Vectors.create(popNodeList());
-
-        return Lists.of(fn, args, body);
-    }
-
-    // --------------------------------
-    // BLOCK
-    // --------------------------------
-    public Rule BlockExpression() {
-        return Sequence(Block(), push(prepare(popNodeList().cons(Syntax.create(Symbols.DO)))));
-    }
-
-    public Rule Block() {
-        return Sequence(
-                LWING,
-                StatementList(),
-                RWING
-        );
-    }
-
-    public Rule StatementList() {
-        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
-
-        return Sequence(
-                ZeroOrMore(
-                        Statement(),
-                        ListAddAction(expVar)
-                ),
-                push(prepare(Lists.create(expVar.get())))
-        );
-    }
-
-    // --------------------------------
-    // DO
-    // --------------------------------
-    public Rule DoExpression() {
-        return Sequence(
-                DO,
-                BlockExpression()
-        );
-    }
-
-    // --------------------------------
-    // COND
-    // --------------------------------
-    @SuppressWarnings({"unchecked"})
-    public Rule CondExpression() {
-        return Sequence(
-                COND,
-                LWING,
-                CondTestExpressionList(),
-                RWING,
-                push(prepare(buildCondExpression((ArrayList<Object>) pop())))
-
-        );
-    }
-
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    public AList<Object> buildCondExpression(ArrayList<Object> testExpressionList) {
-        var pairs = Lists.create(testExpressionList).flatMap((pair) -> Lists.create((AList) pair));
-
-        return pairs.cons(Syntax.create(Symbols.COND));
-    }
-
-    public Rule CondTestExpressionList() {
-        var expVar = new Var<>(new ArrayList<>());
-
-        return Sequence(
-                CondTestExpressionPair(),
-                ListAddAction(expVar),
-                ZeroOrMore(
-                        COMMA,
-                        CondTestExpressionPair(),
-                        ListAddAction(expVar)
-
-                ),
-                push(expVar.get())
-        );
-    }
-
-    public Rule CondTestExpressionPair() {
-        return Sequence(
-                Expression(),
-                Expression(),
-                push(buildCondTextExpression())
-        );
-    }
-
-    public ASequence<Object> buildCondTextExpression() {
-        var expression = pop();
-        var test = pop();
-
-        return Lists.of(test, expression);
-    }
-
-    // --------------------------------
-    // WHEN
-    // --------------------------------
-    public Rule WhenStatement() {
-        return Sequence(
-                WHEN,
-                ParExpression(),
-                Block(),
-                push(prepare(buildWhenExpression()))
-        );
-    }
-
-    @SuppressWarnings("rawtypes")
-    public ASequence buildWhenExpression() {
-        // Pop expressions from body
-        var body = popNodeList();
-
-        // Pop test
-        var test = (Syntax) pop();
-
-        return body.cons(test).cons(Symbols.WHEN);
-    }
-
-    // --------------------------------
-    // IF ELSE
-    // --------------------------------
-    // TODO Need separate IfElseStatement?
-    public Rule IfElseExpression() {
-        return FirstOf(
-                Sequence(
-                        IF,
-                        ParExpression(),
-                        Expression(),
-                        ELSE,
-                        Expression(),
-                        push(prepare(buildIfElseExpression()))
-                ),
-                Sequence(
-                        IF,
-                        ParExpression(),
-                        Expression(),
-                        push(prepare(buildIfExpression()))
-                )
-        );
-    }
-
-    @SuppressWarnings("rawtypes")
-    public ASequence buildIfExpression() {
-        // Pop expressions from if body
-        var body = pop();
-
-        // Pop test
-        var test = (Syntax) pop();
-
-        return Lists.of(
-                Syntax.create(Symbols.IF),
-                test,
-                body
-        );
-    }
-
-    @SuppressWarnings("rawtypes")
-    public ASequence buildIfElseExpression() {
-        // Pop expressions from else body
-        var elseBody = pop();
-
-        // Pop expressions from if body
-        var ifBody = pop();
-
-        // Pop test
-        var test = (Syntax) pop();
-
-        return Lists.of(
-                Syntax.create(Symbols.IF),
-                test,
-                ifBody,
-                elseBody
-        );
-    }
-
-
-    // --------------------------------
-    // DEF
-    // --------------------------------
-    public Rule DefExpression() {
-        return Sequence(
-                DEF,
-                Symbol(),
-                Spacing(),
-                EQU,
-                Expression(),
-                push(prepare(buildDefExpression((Syntax) pop(), (Syntax) pop())))
-        );
-    }
-
-    public List<Syntax> buildDefExpression(Syntax expr, Syntax sym) {
-        return (List<Syntax>) Lists.of(Syntax.create(Symbols.DEF), sym, expr);
-    }
-
     public Rule VectorExpression() {
         return Sequence(
                 LBRK,
-                OptManyCommaSeparated(Expression()),
+                ZeroOrMoreCommaSeparatedOf(Expression()),
                 FirstOf(
                         RBRK,
                         Sequence(
@@ -441,34 +425,6 @@ public class ScryptNext extends Reader {
         return MapEntry.create(k, v);
     }
 
-    public Rule Callable() {
-        return FirstOf(
-                FnExpression(),
-                VectorExpression(),
-                MapExpression(),
-                Set()
-        );
-    }
-
-    public Rule CallableExpression() {
-        return Sequence(
-                FirstOf(
-                        Callable(),
-                        Symbol()
-                ),
-                Spacing(),
-                ParOptMany(Expression()),
-                push(prepare(callableExpression()))
-        );
-    }
-
-    public ASequence<Object> callableExpression() {
-        var args = popNodeList();
-        var callableOrSym = pop();
-
-        return Lists.create(args).cons(callableOrSym);
-    }
-
     public Rule InfixOperator() {
         return Sequence(
                 FirstOf(
@@ -484,20 +440,6 @@ public class ScryptNext extends Reader {
                         Sequence(">", push(Symbols.GT))
                 ),
                 Spacing()
-        );
-    }
-
-    public List<Syntax> createInfixForm(Syntax op1, Symbol symbol, Syntax op2) {
-        return List.of(Syntax.create(symbol), op2, op1);
-    }
-
-    public Rule CompoundExpression() {
-        return FirstOf(
-                CallableExpression(),
-                Sequence(
-                        Expression(),
-                        ZeroOrMore(Sequence(Spacing(), InfixExtension()))
-                )
         );
     }
 
@@ -551,18 +493,38 @@ public class ScryptNext extends Reader {
     }
 
     public Rule ParExpression() {
-        return Sequence(LPAR, Expression(), RPAR);
+        return WrapInParenthesis(Expression());
     }
 
-    public Rule ParOptMany(Rule rule) {
+    public Rule WrapInParenthesis(Rule rule) {
         return Sequence(
                 LPAR,
-                OptManyCommaSeparated(rule),
+                rule,
                 RPAR
         );
     }
 
-    public Rule OptManyCommaSeparated(Rule rule) {
+    public Rule WrapInCurlyBraces(Rule rule) {
+        return Sequence(
+                LWING,
+                rule,
+                RWING
+        );
+    }
+
+    public Rule ZeroOrMoreOf(Rule rule) {
+        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+
+        return Sequence(
+                ZeroOrMore(
+                        rule,
+                        ListAddAction(expVar)
+                ),
+                push(prepare(Lists.create(expVar.get())))
+        );
+    }
+
+    public Rule ZeroOrMoreCommaSeparatedOf(Rule rule) {
         Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
 
         return Sequence(
