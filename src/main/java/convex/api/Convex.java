@@ -2,11 +2,23 @@ package convex.api;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.HashMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 
+import convex.core.Constants;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.AVector;
 import convex.core.data.SignedData;
 import convex.core.store.Stores;
+import convex.core.transactions.ATransaction;
 import convex.net.Connection;
+import convex.net.Message;
+import convex.net.ResultConsumer;
 
 /**
  * Class representing the client API to the Convex network
@@ -15,9 +27,28 @@ import convex.net.Connection;
  * - Linus Torvalds
  */
 public class Convex {
+	
+	// private static final Logger log = Logger.getLogger(Convex.class.getName());
 
 	private final AKeyPair keyPair;
 	private Connection connection;
+	
+	private HashMap<Long,CompletableFuture<AVector<Object>>> awaiting=new HashMap<>();
+	
+	private Consumer<Message> handler = new ResultConsumer() {
+		@Override
+		protected synchronized void handleResultMessage(Message m) {
+			AVector<Object> v = m.getPayload();
+			long id = m.getID();
+			synchronized(awaiting) {
+				CompletableFuture<AVector<Object>> cf=awaiting.get(id);
+				if (cf!=null) {
+					awaiting.remove(id);
+					cf.complete(v);
+				}
+			}
+		}
+	};
 
 	private Convex(InetSocketAddress peerAddress, AKeyPair keyPair) {
 		this.keyPair=keyPair;
@@ -38,7 +69,7 @@ public class Convex {
 	}
 
 	private void connectToPeer(InetSocketAddress peerAddress) throws IOException {
-		setConnection(Connection.connect(peerAddress, null, Stores.CLIENT_STORE));
+		setConnection(Connection.connect(peerAddress, handler, Stores.CLIENT_STORE));
 	}
 	
 	/**
@@ -78,6 +109,38 @@ public class Convex {
 	public Connection getConnection() {
 		return connection;
 	}
+	
+	public Future<AVector<Object>> transact(ATransaction transaction) throws IOException {
+		CompletableFuture<AVector<Object>> cf=new CompletableFuture<AVector<Object>>();
+		
+		SignedData<ATransaction> signed=keyPair.signData(transaction);
+		
+		long id=connection.sendTransaction(signed);
+		if (id<0) {
+			throw new IOException("Failed to send transaction due to full buffer");
+		}
+		
+		// Store future for completion by result message
+		synchronized (awaiting) {
+			awaiting.put(id,cf);
+		}
+		
+		return cf;
+	}
+	
+	public AVector<Object> transactSync(ATransaction transaction) throws TimeoutException, IOException {
+		return transactSync(transaction,Constants.DEFAULT_CLIENT_TIMEOUT);
+	}
+	
+	public AVector<Object> transactSync(ATransaction transaction, long timeout) throws TimeoutException, IOException {
+		Future<AVector<Object>> cf=transact(transaction);
+		try {
+			return cf.get(timeout,TimeUnit.MILLISECONDS);
+		} catch (InterruptedException |ExecutionException e) {
+			throw new Error("Not possible? Since there is no Thread for the future....");
+		}
+	}
+
 
 	/**
 	 * Sets the current Connection for this Client

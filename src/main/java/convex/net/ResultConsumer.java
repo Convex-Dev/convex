@@ -55,37 +55,8 @@ public abstract class ResultConsumer implements Consumer<Message> {
 			break;
 		}
 		case RESULT: {
-			AVector<Object> v = m.getPayload();
-			try {
-				Ref.createPersisted(v);
-
-				// we now have the full result, so notify those interested
-				Object rv = v.get(1);
-				long id = m.getID();
-				Object err = v.get(2);
-				if (err!=null) {
-					handleError(id, err, rv);
-				} else {
-					handleResult(id, rv);
-				}
-				break;
-			} catch (MissingDataException e) {
-				// If there is missing data, re-buffer the message
-				// And wait for it to arrive later
-				Hash hash = e.getMissingHash();
-				try {
-					if (m.getPeerConnection().sendMissingData(hash)) {
-						log.log(LEVEL_MISSING,"Missing data "+hash.toHexString()+" requested by client for RESULT of type: "+Utils.getClassName(v));
-						buffer(hash, m);
-					} else {
-						log.log(LEVEL_MISSING,"Unable to request missing data");
-					}
-				} catch (IOException e1) {
-					// Ignore. We probably lost this result?
-					log.log(LEVEL_MISSING,"IO Exception handling result - "+e1.getMessage());
-				}
-				return;
-			}
+			handleResultMessage(m);
+			break;
 		}
 		default: {
 			log.info("Message type ignored: " + type);
@@ -143,7 +114,45 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	protected void handleResult(Object value) {
 		log.log(LEVEL_RESULT,"RESULT RECEIVED: " + value);
 	}
+	
+	/**
+	 * Method called when and result is received.
+	 * 
+	 * By default, delegates to handleResult and handleError
+	 */
+	protected void handleResultMessage(Message m) {
+		AVector<Object> v = m.getPayload();
+		try {
+			Ref.createPersisted(v);
 
+			// we now have the full result, so notify those interested
+			Object rv = v.get(1);
+			long id = m.getID();
+			Object err = v.get(2);
+			if (err!=null) {
+				handleError(id, err, rv);
+			} else {
+				handleResult(id, rv);
+			}
+		} catch (MissingDataException e) {
+			// If there is missing data, re-buffer the message
+			// And wait for it to arrive later
+			Hash hash = e.getMissingHash();
+			try {
+				if (m.getPeerConnection().sendMissingData(hash)) {
+					log.log(LEVEL_MISSING,"Missing data "+hash.toHexString()+" requested by client for RESULT of type: "+Utils.getClassName(v));
+					buffer(hash, m);
+				} else {
+					log.log(LEVEL_MISSING,"Unable to request missing data");
+				}
+			} catch (IOException e1) {
+				// Ignore. We probably lost this result?
+				log.log(LEVEL_MISSING,"IO Exception handling result - "+e1.getMessage());
+			}
+			return;
+		}
+	}
+	
 	/**
 	 * Method called when an error result is received.
 	 * 

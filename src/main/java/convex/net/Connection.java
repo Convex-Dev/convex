@@ -13,6 +13,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
+import java.util.Random;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -50,9 +51,9 @@ public class Connection {
 	final ByteChannel channel;
 	
 	/**
-	 * Counter for IDs of messages sent via this Connection
+	 * Counter for IDs of messages sent from this JVM
 	 */
-	private long idCounter = 1;
+	private static long idCounter = 0;
 	
 	/**
 	 * Store to use for this connection. Required for responding to incoming messages.
@@ -211,7 +212,7 @@ public class Connection {
 	public long sendQuery(Object form, Address address) throws IOException {
 		AStore temp=Stores.current();
 		try {
-			long id = idCounter++;
+			long id = ++idCounter;
 			AVector<Object> v = Vectors.of(id, form, address);
 			sendObject(MessageType.QUERY, v);
 			return id;
@@ -238,7 +239,7 @@ public class Connection {
 		AStore temp=Stores.current();
 		try {
 			Stores.setCurrent(store);
-			long id = idCounter++;
+			long id = ++idCounter;
 			AVector<Object> v = Vectors.of(id, signed);
 			boolean sent = sendObject(MessageType.TRANSACT, v);
 			return (sent) ? id : -1;
