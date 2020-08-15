@@ -1,6 +1,9 @@
 package convex.peer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -32,8 +35,8 @@ import convex.net.ResultConsumer;
 
 public class ServerTest {
 
-	final Server server;
-	final AKeyPair keyPair;
+	public static final Server server;
+	static final AKeyPair keyPair;
 	
 	private static final Logger log = Logger.getLogger(ServerTest.class.getName());
 
@@ -93,9 +96,10 @@ public class ServerTest {
 		assertNull( results.get(id4));
 		assertTrue( results.containsKey(id5));
 	}
+	
 
 
-	{
+	static {
 		keyPair = Init.KEYPAIRS[0];
 
 		Map<Keyword, Object> config = new HashMap<>();
