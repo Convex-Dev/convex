@@ -13,15 +13,20 @@ import java.util.function.Consumer;
 import convex.core.Constants;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AVector;
+import convex.core.data.Address;
 import convex.core.data.SignedData;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
+import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.net.Message;
 import convex.net.ResultConsumer;
 
 /**
  * Class representing the client API to the Convex network
+ * 
+ * An Object of the type Convex represents a stateful client connection to the Convex network
+ * that can issue transactions both synchronously and aynchronously.
  * 
  * "I'm doing a (free) operating system (just a hobby, won't be big and professional like gnu)"
  * - Linus Torvalds
@@ -32,6 +37,11 @@ public class Convex {
 
 	private final AKeyPair keyPair;
 	private Connection connection;
+	
+	/**
+	 * Sequence number for this client, or null if not yet known
+	 */
+	protected Long sequence=null;
 	
 	private HashMap<Long,CompletableFuture<AVector<Object>>> awaiting=new HashMap<>();
 	
@@ -66,6 +76,29 @@ public class Convex {
 		Convex convex=new Convex(peerAddress,keyPair);
 		convex.connectToPeer(peerAddress);
 		return convex;
+	}
+
+	/**
+	 * Gets the next sequence number for this Client, which should be used for building new signed
+	 * transactions
+	 * 
+	 * @return Sequence number as a Long value greater than zero
+	 */
+	public long getNextSequence() {
+		return getSequence()+1;
+	}
+	
+	/**
+	 * Gets the current sequence number for this Client, which is the sequence number of the last 
+	 * transaction observed for the current client's Account. 
+	 * 
+	 * @return Sequence number as a Long value, zero or positive
+	 */
+	private long getSequence() {
+		if (sequence==null) {
+			
+		}
+		return sequence;
 	}
 
 	private void connectToPeer(InetSocketAddress peerAddress) throws IOException {
@@ -110,6 +143,14 @@ public class Convex {
 		return connection;
 	}
 	
+	/**
+	 * Submits a transaction to the Convex network, returning a future once the transaction 
+	 * has been successfully queued.
+	 * 
+	 * @param transaction Transaction to execute
+	 * @return A Future for the result of the transaction
+	 * @throws IOException If the connection is broken, or the send buffer is full
+	 */
 	public Future<AVector<Object>> transact(ATransaction transaction) throws IOException {
 		CompletableFuture<AVector<Object>> cf=new CompletableFuture<AVector<Object>>();
 		
@@ -128,19 +169,73 @@ public class Convex {
 		return cf;
 	}
 	
+	/**
+	 * Submits a transaction synchronously to the Convex network, returning a future once the transaction 
+	 * has been successfully queued.
+	 * 
+	 * @param transaction Transaction to execute
+	 * @return The result of the transaction
+	 * @throws IOException If the connection is broken
+	 * @throws TimeoutException If the attempt to transact with the network is not confirmed by the specified timeout
+	 */
 	public AVector<Object> transactSync(ATransaction transaction) throws TimeoutException, IOException {
 		return transactSync(transaction,Constants.DEFAULT_CLIENT_TIMEOUT);
 	}
 	
+	/**
+	 * Submits a transaction synchronously to the Convex network, returning a future once the transaction 
+	 * has been successfully queued.
+	 * 
+	 * @param transaction Transaction to execute
+	 * @param timeout Number of milliseconds for timeout
+ 	 * @return The result of the transaction
+	 * @throws IOException If the connection is broken
+	 * @throws TimeoutException If the attempt to transact with the network is not confirmed by the specified timeout
+	 */
 	public AVector<Object> transactSync(ATransaction transaction, long timeout) throws TimeoutException, IOException {
+		// sample time at start of transaction attempt
+		long start=Utils.getCurrentTimestamp();
+		
 		Future<AVector<Object>> cf=transact(transaction);
+		
+		// adjust timeout if time elapsed to submit transaction
+		long now=Utils.getCurrentTimestamp();
+		timeout=Math.max(0L,timeout-(now-start));
 		try {
 			return cf.get(timeout,TimeUnit.MILLISECONDS);
 		} catch (InterruptedException |ExecutionException e) {
 			throw new Error("Not possible? Since there is no Thread for the future....");
 		}
 	}
+	
+	/**
+	 * Submits a query to the Convex network, returning a Future once the query 
+	 * has been successfully queued.
+	 * 
+	 * @param transaction Query to execute, as a Form or Op
+	 * @return A Future for the result of the query
+	 * @throws IOException If the connection is broken, or the send buffer is full
+	 */
+	public Future<AVector<Object>> transact(Object query) throws IOException {
+		CompletableFuture<AVector<Object>> cf=new CompletableFuture<AVector<Object>>();
+		
+		long id=connection.sendQuery(query,getAddress());
+		if (id<0) {
+			throw new IOException("Failed to send query due to full buffer");
+		}
+		
+		// Store future for completion by result message
+		synchronized (awaiting) {
+			awaiting.put(id,cf);
+		}
+		
+		return cf;
+	}
 
+
+	private Address getAddress() {
+		return keyPair.getAddress();
+	}
 
 	/**
 	 * Sets the current Connection for this Client

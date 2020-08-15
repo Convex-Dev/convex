@@ -72,6 +72,10 @@ public enum MessageType {
 	 * message.
 	 * 
 	 * Payload is: [id result error-flag]
+	 * 
+	 * Where:
+	 * - Result is the result of the request, or the message if an error occurred
+	 * - error-flag is nil if the transaction succeeded, or error code if it failed
 	 */
 	RESULT(8),
 
