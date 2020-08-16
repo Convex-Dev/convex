@@ -194,12 +194,12 @@ public class Convex {
 	 */
 	public AVector<Object> transactSync(ATransaction transaction, long timeout) throws TimeoutException, IOException {
 		// sample time at start of transaction attempt
-		long start=Utils.getCurrentTimestamp();
+		long start=Utils.getTimeMillis();
 		
 		Future<AVector<Object>> cf=transact(transaction);
 		
 		// adjust timeout if time elapsed to submit transaction
-		long now=Utils.getCurrentTimestamp();
+		long now=Utils.getTimeMillis();
 		timeout=Math.max(0L,timeout-(now-start));
 		try {
 			return cf.get(timeout,TimeUnit.MILLISECONDS);

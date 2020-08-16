@@ -1032,31 +1032,43 @@ public class Utils {
 	/**
 	 * Runs test repeatedly, until it returns true or the timeout has elapsed
 	 * 
-	 * @param millis
+	 * @param timeoutMillis
 	 * @param test
 	 * @return True if the operation timed out, false otherwise
 	 */
-	public static boolean timeout(int millis, Supplier<Boolean> test) {
-		long start = System.currentTimeMillis();
+	public static boolean timeout(int timeoutMillis, Supplier<Boolean> test) {
+		long start = getTimeMillis();
+		long end=start+timeoutMillis;
 		long now = start;
-		do {
+		
+		// loop until either test succeeds (return false) or the timeout happens (return true)
+		while (true) {
 			if (test.get()) return false;
+			
+			// test failed, so sleep
 			try {
-				Thread.sleep((long) ((now - start) * 0.3 + 1));
+				// compute sleep time 
+				long nextInterval=(long) ((now - start) * 0.3 + 1);
+				long sleepTime=Math.min(nextInterval, end-now);
+				if (sleepTime<0L) return true;
+				Thread.sleep(sleepTime);
 			} catch (InterruptedException e) {
 				// ignore;
 			}
-			now = System.currentTimeMillis();
-		} while ((now - start) < millis);
-		return true;
+			now = getTimeMillis();
+		}
 	}
 
 	private static long lastTimestamp = Instant.now().toEpochMilli();
 
 	/**
-	 * Gets the current system timestamp. Guaranteed monotonic within JVM.
+	 * Gets the current system timestamp. Guaranteed monotonic within this JVM.
 	 * 
-	 * @return Timestamp
+	 * Should be used for timestamps that need to be persisted or communicated
+	 * Should not be used for timing - use Utils.getTimeMillis() instead
+	 * 
+	 * 
+	 * @return Long representation of Timestamp
 	 */
 	public static long getCurrentTimestamp() {
 		// Use Instant milliseconds
@@ -1067,6 +1079,23 @@ public class Utils {
 		} else {
 			return lastTimestamp;
 		}
+	}
+	
+	private static final long startupTimestamp=getCurrentTimestamp();
+	private static final long startupNanos=System.nanoTime();
+	
+	/**
+	 * Gets the a millisecond accurate time suitable for use in timing.
+	 * 
+	 * Should not be used for timestamps
+	 * 
+	 * 
+	 * @return long
+	 */
+	public static long getTimeMillis() {
+		// Use nanoTime() for precision and guaranteed monotonicity
+		long elapsedMillis = (System.nanoTime()-startupNanos)/1000000;
+		return startupTimestamp+elapsedMillis;
 	}
 
 	/**
