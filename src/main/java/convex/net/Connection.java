@@ -100,9 +100,9 @@ public class Connection {
 	/**
 	 * Create a PeerConnection by connecting to a remote address
 	 * 
-	 * @param receiveAction
+	 * @param receiveAction A callback Consumer to be called for any received messages on this connection
 	 * @return New Connection instance
-	 * @throws IOException
+	 * @throws IOException If connection fails because of any IO problem
 	 */
 	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store)
 			throws IOException {
@@ -114,7 +114,7 @@ public class Connection {
 			try {
 				Thread.sleep(100);
 			} catch (InterruptedException e) {
-				throw new Error(e);
+				throw new IOException("Connect interrupted",e);
 			}
 		}
 		// clientChannel.setOption(StandardSocketOptions.SO_KEEPALIVE,true);

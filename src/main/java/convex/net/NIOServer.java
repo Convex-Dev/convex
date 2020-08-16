@@ -164,10 +164,12 @@ public class NIOServer implements Closeable {
 	private static Connection createPC(SocketChannel sc, BlockingQueue<Message> queue, AStore store) throws IOException {
 		return Connection.create(sc,m->{
 			try {
+				// Add message to the received message queue
 				queue.put(m);
 			} catch (InterruptedException e) {
 				// TODO Auto-generated catch block
-				e.printStackTrace();
+				log.warning("Interrupted while attempting to add to receive queue");
+				Thread.currentThread().interrupt();
 			}
 		},store);
 	}

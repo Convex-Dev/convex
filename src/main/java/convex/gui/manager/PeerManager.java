@@ -141,7 +141,9 @@ public class PeerManager extends JPanel {
 					}
 					latestState.setValue(latest);
 				} catch (InterruptedException e) {
-					throw new Error("Unexpected interruption of update thread", e);
+					//
+					log.warning("Update thread interrupted abnormally: "+e.getMessage());
+					Thread.currentThread().interrupt();
 				}
 			}
 			log.info("Manager update thread ended");

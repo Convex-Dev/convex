@@ -66,7 +66,9 @@ public class Toast extends JWindow {
 					setOpacity((float)opac) ;
 				}
 			} catch (InterruptedException e) {
-				// ignore
+				// set interrupted flag, clear toast and return
+				setOpacity(0.0f);
+				Thread.currentThread().interrupt();
 			} finally  {
 				setVisible(false);
 			}

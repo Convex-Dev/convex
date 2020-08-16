@@ -204,7 +204,7 @@ public class Convex {
 		try {
 			return cf.get(timeout,TimeUnit.MILLISECONDS);
 		} catch (InterruptedException |ExecutionException e) {
-			throw new Error("Not possible? Since there is no Thread for the future....");
+			throw new Error("Not possible? Since there is no Thread for the future....",e);
 		}
 	}
 	

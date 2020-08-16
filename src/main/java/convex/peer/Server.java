@@ -588,6 +588,7 @@ public class Server implements Closeable {
 				}
 			} catch (InterruptedException e) {
 				log.warning("Server manager loop interrupted?");
+				Thread.currentThread().interrupt();
 			}
 		}
 	};

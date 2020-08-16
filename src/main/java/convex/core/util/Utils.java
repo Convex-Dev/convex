@@ -1053,7 +1053,9 @@ public class Utils {
 				if (sleepTime<0L) return true;
 				Thread.sleep(sleepTime);
 			} catch (InterruptedException e) {
-				// ignore;
+				// ignore? Probably shouldn't happen though
+				// But should set interrupt flag as below;
+				Thread.currentThread().interrupt();
 			}
 			now = getTimeMillis();
 		}
