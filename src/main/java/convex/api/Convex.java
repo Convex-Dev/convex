@@ -35,8 +35,20 @@ public class Convex {
 	
 	// private static final Logger log = Logger.getLogger(Convex.class.getName());
 
-	private final AKeyPair keyPair;
-	private Connection connection;
+	/**
+	 * Key pair for this Client
+	 */
+	protected final AKeyPair keyPair;
+	
+	/**
+	 * Current Connection to a Peer, may be null or a closed connection.
+	 */
+	protected Connection connection;
+	
+	/**
+	 * Determines if auto-sequencing should be attempted
+	 */
+	private boolean autoSequence=true;
 	
 	/**
 	 * Sequence number for this client, or null if not yet known
@@ -176,7 +188,7 @@ public class Convex {
 	 * @param transaction Transaction to execute
 	 * @return The result of the transaction
 	 * @throws IOException If the connection is broken
-	 * @throws TimeoutException If the attempt to transact with the network is not confirmed by the specified timeout
+	 * @throws TimeoutException If the attempt to transact with the network is not confirmed within a reasonable time
 	 */
 	public AVector<Object> transactSync(ATransaction transaction) throws TimeoutException, IOException {
 		return transactSync(transaction,Constants.DEFAULT_CLIENT_TIMEOUT);
@@ -256,5 +268,21 @@ public class Convex {
 			c.close();
 		}
 		connection=null;
+	}
+
+	/**
+	 * Determines if this Client is configured to automatically generate sequence numbers
+	 * @return
+	 */
+	protected boolean isAutoSequence() {
+		return autoSequence;
+	}
+
+	/**
+	 * Configures auto-generation of sequence numbers
+	 * @param autoSequence true to enable auto-sequencing, false otherwise
+	 */
+	protected void setAutoSequence(boolean autoSequence) {
+		this.autoSequence = autoSequence;
 	}
 }
