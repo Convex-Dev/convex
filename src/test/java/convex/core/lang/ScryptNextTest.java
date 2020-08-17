@@ -57,8 +57,10 @@ public class ScryptNextTest {
 
     @Test
     public void testExpressions() {
-        // TODO Should fail because 'x+y' is not a valid identifier
-        assertEquals(Reader.read("(def x+y 1)"), parse("def x+y = 1;"));
+        // 'x+y' is not a valid Scrypt symbol - it's a valid *Convex Lisp* symbol though.
+        assertThrows(ParserRuntimeException.class, () -> parse("def x+y = 1;"));
+        // '-' in the middle of the name is invalid, an underscore '_' must be used instead.
+        assertThrows(ParserRuntimeException.class, () -> parse("invalid-symbol-"));
 
         // Body must be an expression
         assertThrows(ParserRuntimeException.class, () -> parse("() ->"));
@@ -98,7 +100,12 @@ public class ScryptNextTest {
         assertEquals(Reader.read("true"), parse("true"));
         assertEquals(Reader.read("false"), parse("false"));
         assertEquals(Reader.read("symbol"), parse("symbol"));
+        assertEquals(Reader.read("symbol-abc"), parse("symbol_abc"));
+        assertEquals(Reader.read("symbol-"), parse("symbol_"));
+        assertEquals(Reader.read("symbol?"), parse("symbol?"));
+        assertEquals(Reader.read("symbol!"), parse("symbol!"));
         assertEquals(Reader.read(":keyword"), parse(":keyword"));
+        assertEquals(Reader.read(":keyword-abc"), parse(":keyword_abc"));
 
         // Compound Data Types
         assertEquals(Reader.read("[]"), parse("[]"));
@@ -181,7 +188,7 @@ public class ScryptNextTest {
         assertEquals(Reader.read("(fn [])"), parse("fn(){};"));
         assertEquals(Reader.read("(fn [x] x)"), parse("(x) -> x;"));
         assertEquals(Reader.read("(do (def x 1) (def y 2))"), parse("def x = 1; def y = 2;"));
-        assertEquals(Reader.read("(do (def x 1) (cond (zero? x) :zero :not-zero) 2)"), parse("def x = 1; if(zero?(x)) :zero; else :not-zero; 2;"));
+        assertEquals(Reader.read("(do (def x 1) (cond (zero? x) :zero :not-zero) 2)"), parse("def x = 1; if(zero?(x)) :zero; else :not_zero; 2;"));
 
         // Infix Expression
         assertEquals(Reader.read("(+ 1 2)"), parse("1 + 2"));
