@@ -152,5 +152,11 @@ public class Invoke extends ATransaction {
 		if (newCommand == command) return this;
 		return Invoke.create(getSequence(), newCommand);
 	}
+	
+	@Override
+	public ATransaction withSequence(long newSequence) {
+		if (newSequence==this.sequence) return this;
+		return create(newSequence,command);
+	}
 
 }

@@ -363,18 +363,18 @@ public class State extends ARecord {
 	@SuppressWarnings("unchecked")
 	public <T> Context<T> prepareTransaction(Address origin,ATransaction t) {
 		// Pre-transaction state updates (persisted even if transaction fails)
-		AccountStatus account = getAccounts().get(origin);
+		AccountStatus account = getAccount(origin);
 		if (account == null) {
 			return (Context<T>) Context.createFake(this).withError(ErrorCodes.NOBODY);
 		}
 
 		// Update sequence number for target account
 		long sequence=t.getSequence();
-		account = account.updateSequence(sequence);
-		if (account == null) {
-			return Context.createFake(this,origin).withError(ErrorCodes.SEQUENCE, "Bad sequence: " + sequence);
+		AccountStatus newAccount = account.updateSequence(sequence);
+		if (newAccount == null) {
+			return Context.createFake(this,origin).withError(ErrorCodes.SEQUENCE, account.getSequence());
 		}
-		State preparedState = this.putAccount(origin, account);
+		State preparedState = this.putAccount(origin, newAccount);
 		
 		// Create context with juice subtracted
 		Context<T> ctx = Context.createInitial(preparedState, origin, t.getMaxJuice());

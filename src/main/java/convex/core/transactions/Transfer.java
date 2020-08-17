@@ -130,4 +130,10 @@ public class Transfer extends ATransaction {
 		// TODO: consider if Transfer can be embedded. It's probably always small enough?
 		return false;
 	}
+	
+	@Override
+	public ATransaction withSequence(long newSequence) {
+		if (newSequence==this.sequence) return this;
+		return create(newSequence,target,amount);
+	}
 }

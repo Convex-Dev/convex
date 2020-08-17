@@ -100,6 +100,10 @@ public class Convex {
 		return getSequence()+1;
 	}
 	
+	public void setNextSequence(long nextSequence) {
+		this.sequence=nextSequence-1;
+	}
+	
 	/**
 	 * Gets the current sequence number for this Client, which is the sequence number of the last 
 	 * transaction observed for the current client's Account. 
@@ -156,6 +160,20 @@ public class Convex {
 	}
 	
 	/**
+	 * Updates the given transaction to have the next sequence number.
+	 * @param t Any transaction, for which the correct next sequence number is desired
+	 * @return The updated transaction 
+	 */
+	public ATransaction applyNextSequence(ATransaction t) {
+		if (sequence!=null) {
+			// if we know the next sequence number to be applied, set it
+			return t.withSequence(++sequence);
+		} else {
+			return t;
+		}
+	}
+	
+	/**
 	 * Submits a transaction to the Convex network, returning a future once the transaction 
 	 * has been successfully queued.
 	 * 
@@ -165,6 +183,10 @@ public class Convex {
 	 */
 	public Future<AVector<Object>> transact(ATransaction transaction) throws IOException {
 		CompletableFuture<AVector<Object>> cf=new CompletableFuture<AVector<Object>>();
+		
+		if (autoSequence) {
+			transaction=applyNextSequence(transaction);
+		}
 		
 		SignedData<ATransaction> signed=keyPair.signData(transaction);
 		
@@ -228,7 +250,7 @@ public class Convex {
 	 * @return A Future for the result of the query
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
-	public Future<AVector<Object>> transact(Object query) throws IOException {
+	public Future<AVector<Object>> query(Object query) throws IOException {
 		CompletableFuture<AVector<Object>> cf=new CompletableFuture<AVector<Object>>();
 		
 		long id=connection.sendQuery(query,getAddress());

@@ -125,5 +125,11 @@ public class Call extends ATransaction {
 		return new Call(sequence,target,offer,functionName,newArgs);
 	}
 
+	@Override
+	public ATransaction withSequence(long newSequence) {
+		if (newSequence==this.sequence) return this;
+		return create(newSequence,target,offer,functionName,args);
+	}
+
 
 }

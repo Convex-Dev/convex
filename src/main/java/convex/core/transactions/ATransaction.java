@@ -71,4 +71,11 @@ public abstract class ATransaction extends ACell {
 		// Transactions generally too large for embedding
 		return false;
 	}
+
+	/**
+	 * Updates this transaction with the specified sequence number
+	 * @param newSequence NEw sequence number
+	 * @return Updated transaction, or this transaction is the sequence number is unchanged.
+	 */
+	public abstract ATransaction withSequence(long newSequence);
 }
