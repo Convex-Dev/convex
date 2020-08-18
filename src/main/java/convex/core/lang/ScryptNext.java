@@ -463,7 +463,6 @@ public class ScryptNext extends Reader {
                         Sequence("*", push(Symbols.TIMES)),
                         Sequence("/", push(Symbols.DIVIDE)),
                         Sequence("==", push(Symbols.EQUALS)),
-                        Sequence("==", push(Symbols.EQUALS)),
                         Sequence("<=", push(Symbols.LE)),
                         Sequence("<", push(Symbols.LT)),
                         Sequence(">=", push(Symbols.GE)),
@@ -502,6 +501,27 @@ public class ScryptNext extends Reader {
     @DontLabel
     Rule Terminal(String string, Rule mustNotFollow) {
         return Sequence(string, TestNot(mustNotFollow), Spacing()).label('\'' + string + '\'');
+    }
+
+    public Rule InitialSymbolCharacter() {
+        return Alphabet();
+    }
+    public Rule FollowingSymbolCharacter() {
+        return FirstOf(AlphaNumeric(), AnyOf("_?!"));
+    }
+
+    public Rule Symbol() {
+        return FirstOf(
+                Sequence(
+                        Sequence(InitialSymbolCharacter(), ZeroOrMore(FollowingSymbolCharacter())),
+                        // '_' must be replaced by '-'
+                        // Dash '-' is not a valid Scrypt symbol, an underscore '_'
+                        // is used instead but it must be converted to '-'.
+                        push(prepare(Symbol.create(match().replaceAll("_", "-"))))
+                ),
+                // Infix operators can be passed as arguments to high oder functions e.g.: reduce(+, 0, [1,2,3])
+                InfixOperator()
+        );
     }
 
     public Rule Spacing() {
