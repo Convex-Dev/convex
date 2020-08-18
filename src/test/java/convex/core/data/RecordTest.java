@@ -14,19 +14,28 @@ public class RecordTest {
 		AVector<Keyword> keys=format.getKeys();
 		int n=(int) keys.count();
 		
-		AVector<Object> vs=r.getValues();
-		assertEquals(n,vs.size());
+		AVector<Object> vals=r.getValues();
+		assertEquals(n,vals.size());
 		
-		Object[] vals=new Object[n]; // new array to extract values
+		Object[] vs=new Object[n]; // new array to extract values
 		for (int i=0; i<n; i++) {
+			// standard element access by key
 			Keyword k=keys.get(i);
 			Object v=r.get(k);
-			vals[i]=v;
+			vs[i]=v;
+			
+			// entry based access by key
+			MapEntry<Keyword,Object> me0=r.getEntry(k);
+			assertEquals(k,me0.getKey());
+			assertEquals(v,me0.getValue());
 			
 			// TODO: consider this invariant?
-			// assertSame(r,r.assoc(k, v));
-			assertEquals(v,vs.get(i));
+			assertEquals(r.toHashMap(),r.assoc(k, v));
 			
+			// indexed access
+			assertEquals(v,vals.get(i));
+			
+			// indexed entry-wise access
 			MapEntry<Keyword,Object> me=r.entryAt(i);
 			assertEquals(k,me.getKey());
 			assertEquals(v,me.getValue());
@@ -34,6 +43,6 @@ public class RecordTest {
 		
 		assertSame(r,r.updateAll(r.getAll()));
 		
-		ObjectsTest.doCellTests(r);
+		CollectionsTest.doDataStructureTests(r);
 	}
 }

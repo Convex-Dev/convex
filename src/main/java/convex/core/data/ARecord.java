@@ -304,6 +304,10 @@ public abstract class ARecord extends AMap<Keyword,Object> {
 		return Maps.empty();
 	}
 
+	/**
+	 * Gets the RecordFromat instance that describes this Record's layout
+	 * @return
+	 */
 	public RecordFormat getFormat() {
 		return format;
 	}

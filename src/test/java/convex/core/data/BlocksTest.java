@@ -25,6 +25,8 @@ public class BlocksTest {
 		assertEquals(b1.getHash(), b2.getHash());
 		assertEquals(b1.getEncoding(), b2.getEncoding());
 		assertEquals(b1, Format.read(b2.getEncoding()));
+		
+		RecordTest.doRecordTests(b1);
 	}
 
 	@Test

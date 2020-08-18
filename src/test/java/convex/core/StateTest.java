@@ -24,6 +24,8 @@ public class StateTest {
 		AMap<Address, AccountStatus> accts = s.getAccounts();
 		assertEquals(0, accts.count());
 		assertEquals(Sets.empty(), s.getStore());
+		
+		RecordTest.doRecordTests(s);
 	}
 
 	@Test
