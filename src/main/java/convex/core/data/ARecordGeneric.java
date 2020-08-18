@@ -2,6 +2,7 @@ package convex.core.data;
 
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.impl.RecordFormat;
+import convex.core.util.Utils;
 
 /**
  * Abstract base class for generic records.
@@ -21,6 +22,10 @@ public abstract class ARecordGeneric extends ARecord {
 	protected String ednTag() {
 		// TODO Auto-generated method stub
 		return null;
+	}
+@Override
+	public MapEntry<Keyword, Object> entryAt(long i) {
+		return MapEntry.create(format.getKey(Utils.checkedInt(i)), values.get(i));
 	}
 
 	@SuppressWarnings("unchecked")

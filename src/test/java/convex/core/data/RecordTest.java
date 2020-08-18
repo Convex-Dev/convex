@@ -26,6 +26,10 @@ public class RecordTest {
 			// TODO: consider this invariant?
 			// assertSame(r,r.assoc(k, v));
 			assertEquals(v,vs.get(i));
+			
+			MapEntry<Keyword,Object> me=r.entryAt(i);
+			assertEquals(k,me.getKey());
+			assertEquals(v,me.getValue());
 		}
 		
 		assertSame(r,r.updateAll(r.getAll()));
