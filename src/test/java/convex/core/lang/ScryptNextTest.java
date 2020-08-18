@@ -57,6 +57,11 @@ public class ScryptNextTest {
 
     @Test
     public void testExpressions() {
+        // Not allowed to start a symbol with '_'
+        assertThrows(ParserRuntimeException.class, () -> parse("_"));
+        // Not allowed to start a symbol with '&'
+        assertThrows(ParserRuntimeException.class, () -> parse("&"));
+
         // 'x+y' is not a valid Scrypt symbol - it's a valid *Convex Lisp* symbol though.
         assertThrows(ParserRuntimeException.class, () -> parse("def x+y = 1;"));
         // '-' in the middle of the name is invalid, an underscore '_' must be used instead.
