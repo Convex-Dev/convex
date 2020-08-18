@@ -32,6 +32,37 @@ public class Result extends ARecordGeneric {
 		return create(id,value,null);
 	}
 
+	/**
+	 * Returns the message ID for this result. Message ID is an arbitrary ID assigned by a client requesting a transaction.
+	 * 
+	 * @return ID from this result
+	 */
+	public Long getID() {
+		return (Long)values.get(0);
+	}
+	
+	/**
+	 * Returns the value this result. The value is the result of transaction execution (may be an error message if the transaction failed)
+	 * 
+	 * @return ID from this result
+	 */
+	public Object getValue() {
+		return values.get(1);
+	}
+	
+	/**
+	 * Returns the error code from this Result. Will be null if no error occurred.
+	 * 
+	 * @return ID from this result
+	 */
+	public Object getErrorCode() {
+		return values.get(2);
+	}
+	
+	@Override
+	public AVector<Object> getValues() {
+		return values;
+	}
 
 	protected ARecord withValues(AVector<Object> newValues) {
 		if (values==newValues) return this;

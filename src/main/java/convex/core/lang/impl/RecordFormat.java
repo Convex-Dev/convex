@@ -47,4 +47,13 @@ public class RecordFormat {
 	public Long indexFor(Keyword key) {
 		return indexes.get(key);
 	}
+
+	/**
+	 * Gets the key at the specified index
+	 * @param i
+	 * @return
+	 */
+	public Keyword getKey(int i) {
+		return keys.get(i);
+	}
 }

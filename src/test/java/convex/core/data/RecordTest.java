@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import convex.core.lang.impl.RecordFormat;
@@ -13,7 +14,10 @@ public class RecordTest {
 		AVector<Keyword> keys=format.getKeys();
 		int n=(int) keys.count();
 		
-		Object[] vals=new Object[n];
+		AVector<Object> vs=r.getValues();
+		assertEquals(n,vs.size());
+		
+		Object[] vals=new Object[n]; // new array to extract values
 		for (int i=0; i<n; i++) {
 			Keyword k=keys.get(i);
 			Object v=r.get(k);
@@ -21,6 +25,7 @@ public class RecordTest {
 			
 			// TODO: consider this invariant?
 			// assertSame(r,r.assoc(k, v));
+			assertEquals(v,vs.get(i));
 		}
 		
 		assertSame(r,r.updateAll(r.getAll()));

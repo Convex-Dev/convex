@@ -16,6 +16,8 @@ import convex.core.util.Utils;
  * Base class for record data types. 
  * 
  * Records are map-like data structures with fixed sets of keys, and optional custom behaviour.
+ * 
+ * Ordering of fields is defined by the Record's RecordFormat
  *
  */
 public abstract class ARecord extends AMap<Keyword,Object> {
@@ -79,6 +81,20 @@ public abstract class ARecord extends AMap<Keyword,Object> {
 	 */
 	public final AVector<Keyword> getKeys() {
 		return format.getKeys();
+	}
+	
+	/**
+	 * Gets a vector of values for this record, in format-determined order
+	 * 
+	 * @return Vector of Values
+	 */
+	public AVector<Object> getValues() {
+		int n=size();
+		Object[] os=new Object[n];
+		for (int i=0; i<n; i++) {
+			os[i]=get(format.getKey(i));
+		}
+		return Vectors.create(os);
 	}
 	
 	/**
