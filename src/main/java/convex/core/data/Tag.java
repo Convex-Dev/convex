@@ -58,10 +58,10 @@ public class Tag {
 
 	// Record data structures
 	public static final byte STATE = (byte) 0xA0;
-
 	public static final byte BELIEF = (byte) 0xAA;
 	public static final byte BLOCK = (byte) 0xAB;
 	public static final byte ORDER = (byte) 0xAC;
+	public static final byte RESULT = (byte)0xAD; // transaction result
 
 	public static final byte FALSE = (byte) 0xB0;
 	public static final byte TRUE = (byte) 0xB1;
@@ -81,5 +81,6 @@ public class Tag {
 	public static final byte INVOKE = (byte) 0xD0;
 	public static final byte TRANSFER = (byte) 0xD1;
 	public static final byte CALL = (byte) 0xD2;
+	
 
 }

@@ -54,5 +54,10 @@ public class Keywords {
 	public static final Keyword ENVIRONMENT = Keyword.create("environment");
 	public static final Keyword HOLDINGS = Keyword.create("holdings");
 	public static final Keyword ALLOWANCE = Keyword.create("allowance");
+	
+	
+	public static final Keyword ID = Keyword.create("id");
+	public static final Keyword RESULT = Keyword.create("result");
+	public static final Keyword ERROR_CODE = Keyword.create("error-code");
 
 }

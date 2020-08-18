@@ -116,7 +116,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	}
 	
 	/**
-	 * Method called when and result is received.
+	 * Method called when a result is received.
 	 * 
 	 * By default, delegates to handleResult and handleError
 	 */

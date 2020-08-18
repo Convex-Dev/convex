@@ -182,15 +182,17 @@ public class Convex {
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
 	public Future<AVector<Object>> transact(ATransaction transaction) throws IOException {
-		CompletableFuture<AVector<Object>> cf=new CompletableFuture<AVector<Object>>();
-		
 		if (autoSequence) {
 			transaction=applyNextSequence(transaction);
 		}
-		
 		SignedData<ATransaction> signed=keyPair.signData(transaction);
-		
+		return transact(signed);
+	}
+	
+	public Future<AVector<Object>> transact(SignedData<ATransaction> signed) throws IOException {
+		CompletableFuture<AVector<Object>> cf=new CompletableFuture<AVector<Object>>();
 		long id=connection.sendTransaction(signed);
+		
 		if (id<0) {
 			throw new IOException("Failed to send transaction due to full buffer");
 		}
@@ -202,6 +204,7 @@ public class Convex {
 		
 		return cf;
 	}
+
 	
 	/**
 	 * Submits a transaction synchronously to the Convex network, returning a future once the transaction 

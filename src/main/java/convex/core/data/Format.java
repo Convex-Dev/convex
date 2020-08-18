@@ -13,6 +13,7 @@ import java.nio.charset.CodingErrorAction;
 import convex.core.Belief;
 import convex.core.Block;
 import convex.core.Order;
+import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.Hash;
 import convex.core.exceptions.BadFormatException;
@@ -621,6 +622,10 @@ public class Format {
 		}
 		if (tag == Tag.BELIEF) {
 			return (T) Belief.read(bb);
+		}
+		
+		if (tag == Tag.RESULT) {
+			return (T) Result.read(bb);
 		}
 
 		throw new BadFormatException("Can't read record type with tag byte: " + tag);

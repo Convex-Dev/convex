@@ -93,8 +93,9 @@ public class Vectors {
 	}
 
 	/**
-	 * Reads a Vector for the specified bytebuffer. Distinguishes between child
-	 * types according to count.
+	 * Reads a Vector for the specified bytebuffer. Assumes Tag byte already consumed.
+	 * 
+	 * Distinguishes between child types according to count.
 	 * 
 	 * @param <T>
 	 * @param bb
