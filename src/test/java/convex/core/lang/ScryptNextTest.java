@@ -179,6 +179,9 @@ public class ScryptNextTest {
         assertEquals(Reader.read("(#{} x)"), parse("#{}(x)"));
         assertEquals(Reader.read("((fn [] nil))"), parse("fn(){;}()"));
         assertEquals(Reader.read("((fn [x] x) 1)"), parse("fn(x){x;}(1)"));
+        assertEquals(Reader.read("((f))"), parse("f()()"));
+        assertEquals(Reader.read("((f 1) 2)"), parse("f(1)(2)"));
+        assertEquals(Reader.read("(((f 1) 2 3) 4 5)"), parse("f(1)(2, 3)(4, 5)"));
         assertEquals(Reader.read("(inc 1)"), parse("inc(1)"));
         assertEquals(Reader.read("(inc (inc 1))"), parse("inc(inc(1))"));
         assertEquals(Reader.read("(map inc [1,2])"), parse("map(inc, [1, 2])"));

@@ -324,6 +324,8 @@ public class ScryptNext extends Reader {
     }
 
     public Rule CallableExpression() {
+        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+
         return Sequence(
                 FirstOf(
                         Callable(),
@@ -331,15 +333,27 @@ public class ScryptNext extends Reader {
                 ),
                 Spacing(),
                 WrapInParenthesis(ZeroOrMoreCommaSeparatedOf(Expression())),
-                push(prepare(callableExpression()))
+                ZeroOrMore(WrapInParenthesis(ZeroOrMoreCommaSeparatedOf(Expression())), ListAddAction(expVar)),
+                push(prepare(callableExpression(expVar.get())))
         );
     }
 
-    public ASequence<Object> callableExpression() {
+    public AList<Object> callableExpression(ArrayList<Object> listOfPar) {
         var args = popNodeList();
         var callableOrSym = pop();
 
-        return Lists.create(args).cons(callableOrSym);
+        if (listOfPar.isEmpty()) {
+            return Lists.create(args).cons(callableOrSym);
+        } else {
+            AList<Object> acc = Lists.create(args).cons(callableOrSym);
+
+            for (Object o : listOfPar) {
+                AList<Object> l = ((Syntax) o).getValue();
+
+                acc =  l.cons(acc);
+            }
+            return acc;
+        }
     }
 
     // --------------------------------
@@ -506,6 +520,7 @@ public class ScryptNext extends Reader {
     public Rule InitialSymbolCharacter() {
         return Alphabet();
     }
+
     public Rule FollowingSymbolCharacter() {
         return FirstOf(AlphaNumeric(), AnyOf("_?!"));
     }
