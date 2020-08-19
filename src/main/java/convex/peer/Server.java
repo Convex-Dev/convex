@@ -602,6 +602,8 @@ public class Server implements Closeable {
 			Message m = interests.get(h);
 			if (m != null) {
 				try {
+					log.info("Returning transaction result to "+m.getPeerConnection().getRemoteAddress());
+					
 					Connection pc = m.getPeerConnection();
 					if ((pc == null) || pc.isClosed()) continue;
 					ErrorValue err = br.getError(j);
@@ -612,7 +614,8 @@ public class Server implements Closeable {
 						pc.sendResult(m.getID(), err.getMessage(), err.getCode());
 					}
 				} catch (Exception e) {
-					log.warning("Error reporting result:"+e.getMessage());
+					System.err.println("Error sending Result: "+e.getMessage());
+					e.printStackTrace();
 					// ignore
 				}
 				interests.remove(h);

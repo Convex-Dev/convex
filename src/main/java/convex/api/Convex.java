@@ -11,8 +11,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 
 import convex.core.Constants;
+import convex.core.Result;
 import convex.core.crypto.AKeyPair;
-import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.SignedData;
 import convex.core.store.Stores;
@@ -55,15 +55,15 @@ public class Convex {
 	 */
 	protected Long sequence=null;
 	
-	private HashMap<Long,CompletableFuture<AVector<Object>>> awaiting=new HashMap<>();
+	private HashMap<Long,CompletableFuture<Result>> awaiting=new HashMap<>();
 	
 	private Consumer<Message> handler = new ResultConsumer() {
 		@Override
 		protected synchronized void handleResultMessage(Message m) {
-			AVector<Object> v = m.getPayload();
+			Result v = m.getPayload();
 			long id = m.getID();
 			synchronized(awaiting) {
-				CompletableFuture<AVector<Object>> cf=awaiting.get(id);
+				CompletableFuture<Result> cf=awaiting.get(id);
 				if (cf!=null) {
 					awaiting.remove(id);
 					cf.complete(v);
@@ -181,7 +181,7 @@ public class Convex {
 	 * @return A Future for the result of the transaction
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
-	public Future<AVector<Object>> transact(ATransaction transaction) throws IOException {
+	public Future<Result> transact(ATransaction transaction) throws IOException {
 		if (autoSequence) {
 			transaction=applyNextSequence(transaction);
 		}
@@ -189,8 +189,8 @@ public class Convex {
 		return transact(signed);
 	}
 	
-	public Future<AVector<Object>> transact(SignedData<ATransaction> signed) throws IOException {
-		CompletableFuture<AVector<Object>> cf=new CompletableFuture<AVector<Object>>();
+	public Future<Result> transact(SignedData<ATransaction> signed) throws IOException {
+		CompletableFuture<Result> cf=new CompletableFuture<Result>();
 		long id=connection.sendTransaction(signed);
 		
 		if (id<0) {
@@ -215,7 +215,7 @@ public class Convex {
 	 * @throws IOException If the connection is broken
 	 * @throws TimeoutException If the attempt to transact with the network is not confirmed within a reasonable time
 	 */
-	public AVector<Object> transactSync(ATransaction transaction) throws TimeoutException, IOException {
+	public Result transactSync(ATransaction transaction) throws TimeoutException, IOException {
 		return transactSync(transaction,Constants.DEFAULT_CLIENT_TIMEOUT);
 	}
 	
@@ -229,11 +229,11 @@ public class Convex {
 	 * @throws IOException If the connection is broken
 	 * @throws TimeoutException If the attempt to transact with the network is not confirmed by the specified timeout
 	 */
-	public AVector<Object> transactSync(ATransaction transaction, long timeout) throws TimeoutException, IOException {
+	public Result transactSync(ATransaction transaction, long timeout) throws TimeoutException, IOException {
 		// sample time at start of transaction attempt
 		long start=Utils.getTimeMillis();
 		
-		Future<AVector<Object>> cf=transact(transaction);
+		Future<Result> cf=transact(transaction);
 		
 		// adjust timeout if time elapsed to submit transaction
 		long now=Utils.getTimeMillis();
@@ -253,8 +253,8 @@ public class Convex {
 	 * @return A Future for the result of the query
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
-	public Future<AVector<Object>> query(Object query) throws IOException {
-		CompletableFuture<AVector<Object>> cf=new CompletableFuture<AVector<Object>>();
+	public Future<Result> query(Object query) throws IOException {
+		CompletableFuture<Result> cf=new CompletableFuture<Result>();
 		
 		long id=connection.sendQuery(query,getAddress());
 		if (id<0) {

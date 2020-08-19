@@ -11,7 +11,7 @@ import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Init;
-import convex.core.data.AVector;
+import convex.core.Result;
 import convex.core.lang.Reader;
 import convex.core.lang.TestState;
 import convex.core.transactions.Invoke;
@@ -25,9 +25,9 @@ public class TestConvex {
 		
 		assertTrue(cv.isConnected());
 
-		AVector<Object> r=cv.transactSync(Invoke.create(1L,Reader.read("*address*")),1000);
-		assertEquals(TestState.HERO,r.get(1));
-		assertNull(r.get(2));
+		Result r=cv.transactSync(Invoke.create(1L,Reader.read("*address*")),1000);
+		assertEquals(TestState.HERO,r.getValue());
+		assertNull(r.getErrorCode());
 		
 		cv.disconnect();
 		assertFalse(cv.isConnected());

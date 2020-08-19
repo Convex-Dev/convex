@@ -7,8 +7,8 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import convex.core.Result;
 import convex.core.crypto.Hash;
-import convex.core.data.AVector;
 import convex.core.data.Ref;
 import convex.core.exceptions.MissingDataException;
 import convex.core.store.Stores;
@@ -29,38 +29,43 @@ public abstract class ResultConsumer implements Consumer<Message> {
 		
 	@Override
 	public final void accept(Message m) {
-		MessageType type = m.getType();
-		switch (type) {
-		case DATA: {
-			// Just store the data, can't guarantee full persistence yet
-			try {
-				Object o = m.getPayload();
-				Ref<?> r = Ref.create(o);
-				r.persistShallow();
-				unbuffer(r.getHash());
-			} catch (MissingDataException e) {
-				// ignore?
+		try {
+			MessageType type = m.getType();
+			switch (type) {
+				case DATA: {
+					// Just store the data, can't guarantee full persistence yet
+					try {
+						Object o = m.getPayload();
+						Ref<?> r = Ref.create(o);
+						r.persistShallow();
+						unbuffer(r.getHash());
+					} catch (MissingDataException e) {
+						// ignore?
+					}
+					break;
+				}
+				case MISSING_DATA: {
+					// try to be helpful by returning sent data
+					Hash h = m.getPayload();
+					Ref<?> r = Stores.current().refForHash(h);
+					if (r != null) try {
+						m.getPeerConnection().sendData(r.getValue());
+					} catch (IOException e) {
+						log.warning(e.getMessage());
+					}
+					break;
+				}
+				case RESULT: {
+					handleResultMessage(m);
+					break;
+				}
+				default: {
+					log.info("Message type ignored: " + type);
+				}
 			}
-			break;
-		}
-		case MISSING_DATA: {
-			// try to be helpful by returning sent data
-			Hash h = m.getPayload();
-			Ref<?> r = Stores.current().refForHash(h);
-			if (r != null) try {
-				m.getPeerConnection().sendData(r.getValue());
-			} catch (IOException e) {
-				log.warning(e.getMessage());
-			}
-			break;
-		}
-		case RESULT: {
-			handleResultMessage(m);
-			break;
-		}
-		default: {
-			log.info("Message type ignored: " + type);
-		}
+		} catch (Throwable t) {
+			log.warning("Failed to accept message!");
+			t.printStackTrace();
 		}
 	}
 
@@ -121,14 +126,14 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	 * By default, delegates to handleResult and handleError
 	 */
 	protected void handleResultMessage(Message m) {
-		AVector<Object> v = m.getPayload();
+		Result result = m.getPayload();
 		try {
-			Ref.createPersisted(v);
+			Ref.createPersisted(result);
 
 			// we now have the full result, so notify those interested
-			Object rv = v.get(1);
+			Object rv = result.getValue();
 			long id = m.getID();
-			Object err = v.get(2);
+			Object err = result.getErrorCode();
 			if (err!=null) {
 				handleError(id, err, rv);
 			} else {
@@ -140,7 +145,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 			Hash hash = e.getMissingHash();
 			try {
 				if (m.getPeerConnection().sendMissingData(hash)) {
-					log.log(LEVEL_MISSING,"Missing data "+hash.toHexString()+" requested by client for RESULT of type: "+Utils.getClassName(v));
+					log.log(LEVEL_MISSING,"Missing data "+hash.toHexString()+" requested by client for RESULT of type: "+Utils.getClassName(result));
 					buffer(hash, m);
 				} else {
 					log.log(LEVEL_MISSING,"Unable to request missing data");

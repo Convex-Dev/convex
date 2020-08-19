@@ -9,10 +9,15 @@ import convex.core.data.Keywords;
 import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.impl.RecordFormat;
 
 /**
- * Class representing the result of 
+ * Class representing the result of a query or transaction.
+ * 
+ * A Result is used to communicate the outcome of a query of a transaction from a Peer to a Client.
+ * 
+ * 
  */
 public class Result extends ARecordGeneric {
 
@@ -22,11 +27,13 @@ public class Result extends ARecordGeneric {
 		super(RESULT_FORMAT, values);
 	}
 	
-	
-	private static Result create(long id, Object value, Object errorCode) {
-		return new Result(Vectors.of(id,value,errorCode));
+	public static Result create(AVector<Object> values) {
+		return new Result(values);
 	}
-
+	
+	public static Result create(long id, Object value, Object errorCode) {
+		return create(Vectors.of(id,value,errorCode));
+	}
 
 	public static Result create(long id, Object value) {
 		return create(id,value,null);
@@ -51,7 +58,9 @@ public class Result extends ARecordGeneric {
 	}
 	
 	/**
-	 * Returns the error code from this Result. Will be null if no error occurred.
+	 * Returns the Error Code from this Result. Normally this should be a Keyword.
+	 * 
+	 * Will be null if no error occurred.
 	 * 
 	 * @return ID from this result
 	 */
@@ -68,6 +77,15 @@ public class Result extends ARecordGeneric {
 		if (values==newValues) return this;
 		return new Result(newValues);
 	}
+	
+	@Override
+	public void validateCell() throws InvalidDataException {
+		super.validateCell();
+		Object id=values.get(0);
+		if ((id!=null)&&!(id instanceof Long)) {
+			throw new InvalidDataException("Result ID must be a long value",this);
+		}
+	}
 
 	@Override
 	public ByteBuffer write(ByteBuffer bb) {
@@ -75,6 +93,7 @@ public class Result extends ARecordGeneric {
 		bb=values.writeRaw(bb);
 		return bb;
 	}
+	
 	/**
 	 * Reads a Result from a ByteBuffer encoding. Assumes tag byte already read.
 	 * 
@@ -84,7 +103,9 @@ public class Result extends ARecordGeneric {
 	 */
 	public static Result read(ByteBuffer bb) throws BadFormatException {
 		AVector<Object> v=Vectors.read(bb);
-		return new Result(v);
+		if (v.size()!=3) throw new BadFormatException("Invalid number of fields for Result!");
+		
+		return create(v);
 	}
 
 

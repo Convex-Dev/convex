@@ -1,6 +1,7 @@
 package convex.net;
 
 import convex.core.Belief;
+import convex.core.Result;
 import convex.core.data.AVector;
 import convex.core.data.SignedData;
 import convex.core.util.Utils;
@@ -75,9 +76,13 @@ public class Message {
 	 */
 	public Long getID() {
 		switch (type) {
-			case QUERY: return (Long) ((AVector<?>)payload).get(0);
-			case RESULT: return (Long) ((AVector<?>)payload).get(0);
+			// Query and transact use a vector
+			case QUERY: 
 			case TRANSACT: return (Long) ((AVector<?>)payload).get(0);
+			
+			// Result is a special record type
+			case RESULT: return ((Result)payload).getID(); 
+			
 			default: return null;
 		}
 	}

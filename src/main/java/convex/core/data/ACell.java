@@ -41,7 +41,9 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	/**
 	 * Validates the local structure of this cell. Called by validate() super implementation.
 	 * 
-	 * Does not recursively validate contained Refs, but should validate all other structure of this cell
+	 * Should validate contained Refs, but should validate all other structure of this cell.
+	 * 
+	 * 
 	 * @throws InvalidDataException 
 	 */
 	public abstract void validateCell() throws InvalidDataException;

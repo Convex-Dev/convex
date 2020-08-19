@@ -15,6 +15,7 @@ public abstract class ARecordGeneric extends ARecord {
 
 	protected ARecordGeneric(RecordFormat format, AVector<Object> values) {
 		super(format);
+		if (values.count()!=format.count()) throw new IllegalArgumentException("Wrong number of field values for record: "+values.count());
 		this.values=values;
 	}
 

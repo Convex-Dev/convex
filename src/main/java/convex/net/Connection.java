@@ -19,6 +19,7 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import convex.core.Result;
 import convex.core.crypto.Hash;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
@@ -249,26 +250,26 @@ public class Connection {
 	}
 
 	/**
-	 * Sends a RESULT Message on this connection.
+	 * Sends a RESULT Message on this connection with no error code (i.e. a success)
 	 * 
 	 * @param result Any data object
 	 * @return True if buffered for sending successfully, false otherwise
 	 * @throws IOException
 	 */
 	public boolean sendResult(Long id, Object result) throws IOException {
-		AVector<Object> value = Vectors.of(id, result, null);
-		return sendObject(MessageType.RESULT, value);
+		return sendResult(id, result,null);
 	}
 
 	/**
 	 * Sends a RESULT Message on this connection.
 	 * 
 	 * @param result Any data object
+	 * @param errorCode Error code for this result. May be null to indicate success
 	 * @return True if buffered for sending successfully, false otherwise
 	 * @throws IOException
 	 */
 	public boolean sendResult(Long id, Object result, Object errorCode) throws IOException {
-		AVector<Object> value = Vectors.of(id, result, errorCode);
+		Result value = Result.create(id, result, errorCode);
 		return sendObject(MessageType.RESULT, value);
 	}
 
