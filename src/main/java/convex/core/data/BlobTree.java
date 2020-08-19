@@ -340,12 +340,13 @@ public class BlobTree extends ABlob {
 		int clen = childLength();
 		long total = 0;
 		
-		// We need to check the lengths of all child notes. Note that only the last child can
+		// We need to validate and check the lengths of all child notes. Note that only the last child can
 		// be shorted than the defined childLength() for this shift level.
 		for (int i = 0; i < n; i++) {
 			ABlob child;
 			child = getChild(i);
-			// child.validate(); TODO check shouldn't be required since super.validate does this?
+			child.validate();
+			
 			long cl = child.length();
 			total += cl;
 			if (i == (n - 1)) {

@@ -257,11 +257,6 @@ public class Address extends AArrayBlob {
 	}
 
 	@Override
-	public void validate() throws InvalidDataException {
-		super.validate();
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		if (length != LENGTH)
 			throw new InvalidDataException("Address length must be " + LENGTH + "  bytes = " + LENGTH_BITS + " bits",

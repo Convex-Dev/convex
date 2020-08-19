@@ -362,11 +362,6 @@ public class Hash extends AArrayBlob {
 	}
 
 	@Override
-	public void validate() throws InvalidDataException {
-		super.validate();
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		if (length != LENGTH) throw new InvalidDataException("Address length must be 32 bytes = 256 bits", this);
 	}

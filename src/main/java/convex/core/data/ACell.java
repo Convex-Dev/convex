@@ -233,7 +233,9 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	}
 
 	/**
-	 * Determines if this Cell Represents an embedded object.
+	 * Determines if this Cell Represents an embedded object. Embedded objects are encoded directly into
+	 * the encoding of the containing Cell (avoiding the need for a hashed reference). 
+	 * 
 	 * @return true if Cell is embedded, false otherwise
 	 */
 	protected abstract boolean isEmbedded();
