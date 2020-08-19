@@ -41,7 +41,7 @@ public class RecordTest {
 			assertEquals(v,me.getValue());
 		}
 		
-		assertSame(r,r.updateAll(r.getAll()));
+		assertSame(r,r.updateAll(r.getValuesArray()));
 		
 		CollectionsTest.doDataStructureTests(r);
 	}

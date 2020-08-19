@@ -73,6 +73,7 @@ public class Result extends ARecordGeneric {
 		return values;
 	}
 
+	@Override
 	protected ARecord withValues(AVector<Object> newValues) {
 		if (values==newValues) return this;
 		return new Result(newValues);

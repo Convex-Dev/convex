@@ -147,7 +147,7 @@ public abstract class ARecord extends AMap<Keyword,Object> {
 	}
 
 	@Override
-	public final ARecord updateRefs(IRefFunction func) {
+	public ARecord updateRefs(IRefFunction func) {
 		int n=size();		
 		Object[] newValues=new Object[n];
 		AVector<Keyword> keys=getKeys();
@@ -164,7 +164,7 @@ public abstract class ARecord extends AMap<Keyword,Object> {
 	/**
 	 * Gets an array containing all values in this record, in format-defined key order.
 	 */
-	public Object[] getAll() {
+	public Object[] getValuesArray() {
 		int n=size();
 		Object[] result=new Object[n];
 		AVector<Keyword> keys=format.getKeys();
@@ -176,7 +176,9 @@ public abstract class ARecord extends AMap<Keyword,Object> {
 		
 	/**
 	 * Updates all values in this record, in declared field order.
-	 * Returns this if no values are changed.
+	 * 
+	 * Returns this if all values are identical.
+	 * 
 	 * @param newVals
 	 */
 	protected abstract ARecord updateAll(Object[] newVals);

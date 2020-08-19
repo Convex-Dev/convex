@@ -21,10 +21,10 @@ public abstract class ARecordGeneric extends ARecord {
 
 	@Override
 	protected String ednTag() {
-		// TODO Auto-generated method stub
-		return null;
+		return "result";
 	}
-@Override
+	
+	@Override
 	public MapEntry<Keyword, Object> entryAt(long i) {
 		return MapEntry.create(format.getKey(Utils.checkedInt(i)), values.get(i));
 	}
@@ -41,6 +41,22 @@ public abstract class ARecordGeneric extends ARecord {
 	public byte getRecordTag() {
 		// TODO Auto-generated method stub
 		return 0;
+	}
+	
+	@Override
+	public int getRefCount() {
+		return values.getRefCount();
+	}
+	
+	@Override
+	public <R> Ref<R> getRef(int index) {
+		return values.getRef(index);
+	}
+
+	@Override
+	public ARecord updateRefs(IRefFunction func) {
+		AVector<Object> newValues=values.updateRefs(func);
+		return withValues(newValues);
 	}
 
 	@Override
@@ -60,7 +76,10 @@ public abstract class ARecordGeneric extends ARecord {
 	}
 
 	/**
-	 * Updates the record with a new set of values.
+	 * Updates the record with a new set of values. 
+	 * 
+	 * Returns this if and only if values vector is identical.
+	 * 
 	 * @param newVector
 	 * @return
 	 */
