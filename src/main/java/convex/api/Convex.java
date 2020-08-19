@@ -67,12 +67,14 @@ public class Convex {
 				if (cf!=null) {
 					awaiting.remove(id);
 					cf.complete(v);
+				} else {
+					// TODO: Maybe log that we got a message we weren't expecting?
 				}
 			}
 		}
 	};
 
-	private Convex(InetSocketAddress peerAddress, AKeyPair keyPair) {
+	private Convex(AKeyPair keyPair) {
 		this.keyPair=keyPair;
 	}
 
@@ -85,7 +87,7 @@ public class Convex {
 	 * @throws IOException If connection fails
 	 */
 	public static Convex connect(InetSocketAddress peerAddress, AKeyPair keyPair) throws IOException {
-		Convex convex=new Convex(peerAddress,keyPair);
+		Convex convex=new Convex(keyPair);
 		convex.connectToPeer(peerAddress);
 		return convex;
 	}
