@@ -56,6 +56,17 @@ public class ScryptNextTest {
 
 
     @Test
+    public void testArithmetic() {
+        assertEquals(Reader.read("(+ 1 2)"), parse("1 + 2"));
+        assertEquals(Reader.read("(+ (+ 1 2) 3)"), parse("1 + 2 + 3"));
+        assertEquals(Reader.read("(* 1 2)"), parse("1 * 2"));
+        assertEquals(Reader.read("(* (* 1 2) 3)"), parse(scrypt().Arithmetic2Expression() , "1 * 2 * 3"));
+        assertEquals(Reader.read("(+ 1 (* 2 3))"), parse("1 + 2 * 3"));
+        assertEquals(Reader.read("(+ (- 9 2) 3)"), parse("9 - 2 + 3"));
+        assertEquals(Reader.read("(- 9 (* 2 3))"), parse("9 - 2 * 3"));
+    }
+
+    @Test
     public void testExpressions() {
         // Not allowed to start a symbol with '_'
         assertThrows(ParserRuntimeException.class, () -> parse("_"));
@@ -198,12 +209,6 @@ public class ScryptNextTest {
         assertEquals(Reader.read("(do (def x 1) (def y 2))"), parse("def x = 1; def y = 2;"));
         assertEquals(Reader.read("(do (def x 1) (cond (zero? x) :zero :not-zero) 2)"), parse("def x = 1; if(zero?(x)) :zero; else :not_zero; 2;"));
 
-        // Infix Expression
-        assertEquals(Reader.read("(+ 1 2)"), parse("1 + 2"));
-        assertEquals(Reader.read("(+ 1 (+ 2 3))"), parse("1+2+3"));
-        assertEquals(Reader.read("(+ 1 (+ 2 3))"), parse("1+(2+3)"));
-        assertEquals(Reader.read("(/ (+ 2 2) 2)"), parse("(2+2)/2"));
-
         // Block Statement
         assertEquals(Reader.read("1"), parse("{ 1; }"));
         assertEquals(Reader.read("(do 1 (inc 2) {:n 3})"), parse("{ 1; inc(2); {:n 3}; }"));
@@ -224,7 +229,6 @@ public class ScryptNextTest {
         assertEquals(Reader.read("(do (def f (fn [x] x)) (f 1))"), parse("do { def f = fn(x) { x; }; f(1); }"));
         assertNull(eval("do { }"));
         assertEquals(1, (Long) eval("do { 1; }"));
-
     }
 
 }

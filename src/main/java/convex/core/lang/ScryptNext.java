@@ -7,6 +7,7 @@ import org.parboiled.annotations.BuildParseTree;
 import org.parboiled.annotations.DontLabel;
 import org.parboiled.annotations.MemoMismatches;
 import org.parboiled.annotations.SuppressNode;
+import org.parboiled.common.Tuple2;
 import org.parboiled.parserunners.ReportingParseRunner;
 import org.parboiled.support.Var;
 
@@ -274,29 +275,122 @@ public class ScryptNext extends Reader {
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
+    public Rule Literals() {
+        return FirstOf(
+                StringLiteral(),
+                NilLiteral(),
+                NumberLiteral(),
+                BooleanLiteral(),
+                Keyword()
+        );
+    }
+
     // --------------------------------
     // EXPRESSION
     // --------------------------------
     public Rule Expression() {
         return Sequence(
+                ExpressionPrecedence(),
+                Spacing()
+        );
+    }
+
+    public Rule ExpressionPrecedence() {
+        return Arithmetic1Expression();
+    }
+
+    public Rule Arithmetic1Expression() {
+        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+
+        return Sequence(
+                Arithmetic2Expression(),
+                ListAddAction(expVar),
+                Spacing(),
+                ZeroOrMore(Arithmetic1(), ListAddAction(expVar)),
+                push(prepare(arithmeticExpression(expVar.get())))
+        );
+    }
+
+    public Rule Arithmetic1() {
+        return Sequence(
                 FirstOf(
-                        DoExpression(),
-                        CallableExpression(),
-                        FnExpression(),
-                        LambdaExpression(),
-                        ParExpression(),
-                        StringLiteral(),
-                        NilLiteral(),
-                        NumberLiteral(),
-                        BooleanLiteral(),
-                        Symbol(),
-                        Keyword(),
-                        VectorExpression(),
-                        MapExpression(),
-                        Set()
+                        Sequence("+", push(prepare(Symbols.PLUS))),
+                        Sequence("-", push(prepare(Symbols.MINUS)))
                 ),
                 Spacing(),
-                ZeroOrMore(InfixExtension())
+                Arithmetic2Expression(),
+                Spacing(),
+                push(arithmetic())
+        );
+    }
+
+    public Rule Arithmetic2Expression() {
+        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+
+        return Sequence(
+                Primary(),
+                ListAddAction(expVar),
+                Spacing(),
+                ZeroOrMore(Arithmetic2(), ListAddAction(expVar)),
+                push(prepare(arithmeticExpression(expVar.get())))
+        );
+    }
+
+    public Rule Arithmetic2() {
+        return Sequence(
+                FirstOf(
+                        Sequence("*", push(prepare(Symbols.TIMES))),
+                        Sequence("/", push(prepare(Symbols.DIVIDE)))
+                ),
+                Spacing(),
+                Primary(),
+                Spacing(),
+                push(arithmetic())
+        );
+    }
+
+    public Syntax arithmeticExpression(ArrayList<Object> exprs) {
+        var primary = (Syntax) exprs.get(0);
+
+        if (exprs.size() == 1) {
+            return primary;
+        } else {
+            // List of Tuple2<Syntax, Syntax> - see arithmetic()
+            var rest =  exprs.subList(1, exprs.size());
+
+            var rest1 = (Tuple2<Syntax, Syntax>) rest.remove(0);
+
+            var sexp = Lists.of(rest1.a, primary, rest1.b);
+
+            for (Object o : rest) {
+                var operatorAndOperand = (Tuple2<Syntax, Syntax>) o;
+
+                sexp = Lists.of(operatorAndOperand.a, Syntax.create(sexp), operatorAndOperand.b);
+            }
+
+            return Syntax.create(sexp);
+        }
+    }
+
+    public Tuple2<Syntax, Syntax> arithmetic() {
+        var operand =  (Syntax) pop();
+        var operator = (Syntax) pop();
+
+        return new Tuple2<>(operator, operand);
+    }
+
+    public Rule Primary() {
+        return FirstOf(
+                CallableExpression(),
+                DoExpression(),
+                FnExpression(),
+                LambdaExpression(),
+                ParExpression(),
+                Literals(),
+                Symbol(),
+                Vector(),
+                Map(),
+                Set()
         );
     }
 
@@ -317,8 +411,8 @@ public class ScryptNext extends Reader {
     public Rule Callable() {
         return FirstOf(
                 FnExpression(),
-                VectorExpression(),
-                MapExpression(),
+                Vector(),
+                Map(),
                 Set()
         );
     }
@@ -350,7 +444,7 @@ public class ScryptNext extends Reader {
             for (Object o : listOfPar) {
                 AList<Object> l = ((Syntax) o).getValue();
 
-                acc =  l.cons(acc);
+                acc = l.cons(acc);
             }
             return acc;
         }
@@ -414,7 +508,7 @@ public class ScryptNext extends Reader {
         return Lists.of(operator, operand1, operand2);
     }
 
-    public Rule VectorExpression() {
+    public Rule Vector() {
         return Sequence(
                 LBRK,
                 ZeroOrMoreCommaSeparatedOf(Expression()),
@@ -429,7 +523,7 @@ public class ScryptNext extends Reader {
                 push(prepare(Vectors.create(popNodeList()))));
     }
 
-    public Rule MapExpression() {
+    public Rule Map() {
         return Sequence(
                 LWING,
                 MapEntries(),
@@ -472,15 +566,15 @@ public class ScryptNext extends Reader {
     public Rule InfixOperator() {
         return Sequence(
                 FirstOf(
-                        Sequence("+", push(Symbols.PLUS)),
-                        Sequence("-", push(Symbols.MINUS)),
-                        Sequence("*", push(Symbols.TIMES)),
-                        Sequence("/", push(Symbols.DIVIDE)),
-                        Sequence("==", push(Symbols.EQUALS)),
-                        Sequence("<=", push(Symbols.LE)),
-                        Sequence("<", push(Symbols.LT)),
-                        Sequence(">=", push(Symbols.GE)),
-                        Sequence(">", push(Symbols.GT))
+                        Sequence("+", push(prepare(Symbols.PLUS))),
+                        Sequence("-", push(prepare(Symbols.MINUS))),
+                        Sequence("*", push(prepare(Symbols.TIMES))),
+                        Sequence("/", push(prepare(Symbols.DIVIDE))),
+                        Sequence("==", push(prepare(Symbols.EQUALS))),
+                        Sequence("<=", push(prepare(Symbols.LE))),
+                        Sequence("<", push(prepare(Symbols.LT))),
+                        Sequence(">=", push(prepare(Symbols.GE))),
+                        Sequence(">", push(prepare(Symbols.GT)))
                 ),
                 Spacing()
         );
@@ -532,6 +626,10 @@ public class ScryptNext extends Reader {
                         // '_' must be replaced by '-'
                         // Dash '-' is not a valid Scrypt symbol, an underscore '_'
                         // is used instead but it must be converted to '-'.
+                        // TODO
+                        // _address_ => *address*
+                        // _address *address
+                        // address_ address*
                         push(prepare(Symbol.create(match().replaceAll("_", "-"))))
                 ),
                 // Infix operators can be passed as arguments to high oder functions e.g.: reduce(+, 0, [1,2,3])
