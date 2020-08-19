@@ -31,6 +31,12 @@ public class EconomicsTest {
 		assertEquals(0, Economics.swapPrice(0, 1675, 117));
 		assertEquals(0, Economics.swapPrice(0, 12, 1454517));
 		assertEquals(999999, Economics.swapPrice(999999, 1000000, 1));
+		
+		// TODO: seem to be some instability issues doing things like this?
+		// assertEquals(Long.MAX_VALUE-1000000, Economics.swapPrice(Long.MAX_VALUE-1000000, Long.MAX_VALUE, 1000000));
+		
+		// Fails because (double)(Long.MAX_VALUE-1) == (double)(Long.MAX_VALUE)
+		assertThrows(IllegalArgumentException.class, ()->Economics.swapPrice(Long.MAX_VALUE-1, Long.MAX_VALUE, 10));
 
 		assertThrows(IllegalArgumentException.class, () -> Economics.swapPrice(100, 100, 100));
 		assertThrows(IllegalArgumentException.class, () -> Economics.swapPrice(100, 0, 100));

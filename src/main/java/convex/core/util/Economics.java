@@ -28,7 +28,7 @@ public class Economics {
 	 * @return Price of A in terms of B
 	 */
 	public static long swapPrice(long delta,long a, long b) {
-		if ((a<0)||(b<0)) throw new IllegalArgumentException("Pool quantities cannot be negative");
+		if ((a<=0)||(b<=0)) throw new IllegalArgumentException("Pool quantities must be positive");
 		
 		double c = (double)a*(double)b;
 		double newA = (double)a-(double)delta;
@@ -38,8 +38,8 @@ public class Economics {
 		
 		if (newB>Long.MAX_VALUE) throw new IllegalArgumentException("Can't exceed Long pool size for B");
 		
-		// Round to closest whole value. Preserves c as close as possible.
-		long finalB=Math.round(newB);
+		// Round to next whole value. Preserves c as close as possible, but rounds b up.
+		long finalB=(long) Math.ceil(newB);
 		
 		return finalB-b;
 	}
