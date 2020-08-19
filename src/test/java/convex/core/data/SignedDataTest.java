@@ -1,9 +1,11 @@
 package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -31,6 +33,8 @@ public class SignedDataTest {
 		SignedData<Long> sd = kp.signData(1L);
 		sd.validateSignature();
 		assertEquals(1L, sd.getValue());
+		
+		assertTrue(sd.getDataRef().isEmbedded());
 	}
 
 	@Test
@@ -40,5 +44,8 @@ public class SignedDataTest {
 		SignedData<Object> sd = kp.signData(v);
 		sd.validateSignature();
 		assertEquals(v, sd.getValue());
+		
+		assertFalse(sd.getDataRef().isEmbedded());
+		assertEquals(TestState.HERO,sd.getAddress());
 	}
 }

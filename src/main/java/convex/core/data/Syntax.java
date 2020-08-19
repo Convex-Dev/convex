@@ -12,7 +12,7 @@ import convex.core.util.Utils;
  * A Syntax Object wraps:
  * <ul>
  * <li>A Form (which may contain nested Syntax Objects)</li>
- * <li>Metadata for the Syntax Object, which may be an arbitrary hashmap</li>
+ * <li>Metadata for the Syntax Object, which may be any arbitrary hashmap</li>
  * </ul>
  * 
  * Syntax Objects may not wrap another Syntax Object directly, but may contain nested
