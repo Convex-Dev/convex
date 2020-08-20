@@ -357,7 +357,7 @@ public class ScryptNext extends Reader {
             return primary;
         } else {
             // List of Tuple2<Syntax, Syntax> - see arithmetic()
-            var rest =  exprs.subList(1, exprs.size());
+            var rest = exprs.subList(1, exprs.size());
 
             var rest1 = (Tuple2<Syntax, Syntax>) rest.remove(0);
 
@@ -374,7 +374,7 @@ public class ScryptNext extends Reader {
     }
 
     public Tuple2<Syntax, Syntax> arithmetic() {
-        var operand =  (Syntax) pop();
+        var operand = (Syntax) pop();
         var operator = (Syntax) pop();
 
         return new Tuple2<>(operator, operand);
@@ -631,11 +631,17 @@ public class ScryptNext extends Reader {
                         // _address_ => *address*
                         // _address *address
                         // address_ address*
-                        push(prepare(Symbol.create(match().replaceAll("_", "-"))))
+                        push(prepare(convexLispSymbol(match())))
                 ),
                 // Infix operators can be passed as arguments to high oder functions e.g.: reduce(+, 0, [1,2,3])
                 InfixOperator()
         );
+    }
+
+    public Symbol convexLispSymbol(String s) {
+        var symStr = s.replaceAll("(^_|_$)", "*").replaceAll("_", "-");
+
+        return Symbol.create(symStr);
     }
 
     public Rule Spacing() {

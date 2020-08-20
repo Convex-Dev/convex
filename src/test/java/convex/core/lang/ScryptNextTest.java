@@ -54,7 +54,6 @@ public class ScryptNextTest {
         return (T) step(CONTEXT, source).getResult();
     }
 
-
     @Test
     public void testArithmetic() {
         assertEquals(Reader.read("(+ 1 2)"), parse("1 + 2"));
@@ -64,6 +63,14 @@ public class ScryptNextTest {
         assertEquals(Reader.read("(+ 1 (* 2 3))"), parse("1 + 2 * 3"));
         assertEquals(Reader.read("(+ (- 9 2) 3)"), parse("9 - 2 + 3"));
         assertEquals(Reader.read("(- 9 (* 2 3))"), parse("9 - 2 * 3"));
+    }
+
+    @Test
+    public void testSymbolTransform() {
+        assertEquals("*a", scrypt().convexLispSymbol("_a").getName());
+        assertEquals("a*", scrypt().convexLispSymbol("a_").getName());
+        assertEquals("*a*", scrypt().convexLispSymbol("_a_").getName());
+        assertEquals("*a-b*", scrypt().convexLispSymbol("_a_b_").getName());
     }
 
     @Test
@@ -117,7 +124,7 @@ public class ScryptNextTest {
         assertEquals(Reader.read("false"), parse("false"));
         assertEquals(Reader.read("symbol"), parse("symbol"));
         assertEquals(Reader.read("symbol-abc"), parse("symbol_abc"));
-        assertEquals(Reader.read("symbol-"), parse("symbol_"));
+        assertEquals(Reader.read("symbol*"), parse("symbol_"));
         assertEquals(Reader.read("symbol?"), parse("symbol?"));
         assertEquals(Reader.read("symbol!"), parse("symbol!"));
         assertEquals(Reader.read(":keyword"), parse(":keyword"));
