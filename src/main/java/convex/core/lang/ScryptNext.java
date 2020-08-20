@@ -1,17 +1,26 @@
 package convex.core.lang;
 
-import convex.core.data.*;
+import java.util.ArrayList;
+
 import org.parboiled.Parboiled;
 import org.parboiled.Rule;
 import org.parboiled.annotations.BuildParseTree;
 import org.parboiled.annotations.DontLabel;
 import org.parboiled.annotations.MemoMismatches;
 import org.parboiled.annotations.SuppressNode;
-import org.parboiled.common.Tuple2;
 import org.parboiled.parserunners.ReportingParseRunner;
 import org.parboiled.support.Var;
 
-import java.util.ArrayList;
+import convex.core.data.AList;
+import convex.core.data.ASequence;
+import convex.core.data.AVector;
+import convex.core.data.List;
+import convex.core.data.Lists;
+import convex.core.data.MapEntry;
+import convex.core.data.Maps;
+import convex.core.data.Symbol;
+import convex.core.data.Syntax;
+import convex.core.data.Vectors;
 
 @BuildParseTree
 public class ScryptNext extends Reader {
@@ -359,25 +368,25 @@ public class ScryptNext extends Reader {
             // List of Tuple2<Syntax, Syntax> - see arithmetic()
             var rest = exprs.subList(1, exprs.size());
 
-            var rest1 = (Tuple2<Syntax, Syntax>) rest.remove(0);
+            var rest1 = (AVector<Syntax>) rest.remove(0);
 
-            var sexp = Lists.of(rest1.a, primary, rest1.b);
+            var sexp = Lists.of(rest1.get(0), primary, rest1.get(1));
 
             for (Object o : rest) {
-                var operatorAndOperand = (Tuple2<Syntax, Syntax>) o;
+                var operatorAndOperand = (AVector<Syntax>) o;
 
-                sexp = Lists.of(operatorAndOperand.a, Syntax.create(sexp), operatorAndOperand.b);
+                sexp = Lists.of(operatorAndOperand.get(0), Syntax.create(sexp), operatorAndOperand.get(1));
             }
 
             return Syntax.create(sexp);
         }
     }
 
-    public Tuple2<Syntax, Syntax> arithmetic() {
+    public AVector<Syntax> arithmetic() {
         var operand = (Syntax) pop();
         var operator = (Syntax) pop();
 
-        return new Tuple2<>(operator, operand);
+        return Vectors.of(operator, operand);
     }
 
     public Rule Primary() {
