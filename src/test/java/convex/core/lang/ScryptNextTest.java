@@ -7,6 +7,7 @@ import org.parboiled.Rule;
 import org.parboiled.errors.ParserRuntimeException;
 import org.parboiled.parserunners.ReportingParseRunner;
 
+import static convex.test.Assertions.assertStateError;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class ScryptNextTest {
@@ -71,6 +72,26 @@ public class ScryptNextTest {
         assertEquals("a*", scrypt().convexLispSymbol("a_").getName());
         assertEquals("*a*", scrypt().convexLispSymbol("_a_").getName());
         assertEquals("*a-b*", scrypt().convexLispSymbol("_a_b_").getName());
+    }
+
+    @Test
+    public void testCall() {
+        assertEquals(Reader.read("(call \"<Address>\" (do-stuff 1 2))"), parse("call \"<Address>\" do_stuff(1, 2)"));
+        assertEquals(Reader.read("(call \"<Address>\" (do-stuff {:n 1}))"), parse("call \"<Address>\" do_stuff({:n 1})"));
+        assertEquals(Reader.read("(call \"<Address>\" (inc x) (buy \"Something\"))"), parse("call \"<Address>\" offer inc(x) buy(\"Something\")"));
+        assertEquals(Reader.read("(call \"<Address>\" (+ 1 (* 2 3)) (buy \"Something\"))"), parse("call \"<Address>\" offer 1 + (2 * 3) buy(\"Something\")"));
+
+        // ErrorValue[:STATE] : Actor does not exist
+        assertStateError(step("call \"F8a9dacc495d0605Ff1f329c04d8F9FE6549Fb4255308254F1A95298C7C0aBF2\" buy(\"Something\")"));
+
+        // Can't call without a function name
+        assertThrows(ParserRuntimeException.class, () -> parse("call \"ABC\""));
+        // Can't call without args
+        assertThrows(ParserRuntimeException.class, () -> parse("call \"ABC\" do_stuff"));
+        // Can't call without an address
+        assertThrows(ParserRuntimeException.class, () -> parse("call do_stuff(1, 2)"));
+        // Can't offer without amount
+        assertThrows(ParserRuntimeException.class, () -> parse("call \"<Address>\" offer do_stuff(1, 2)"));
     }
 
     @Test
