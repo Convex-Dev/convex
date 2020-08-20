@@ -349,7 +349,8 @@ public class ScryptNext extends Reader {
         );
     }
 
-    public Syntax arithmeticExpression(ArrayList<Object> exprs) {
+    @SuppressWarnings("unchecked")
+	public Syntax arithmeticExpression(ArrayList<Object> exprs) {
         var primary = (Syntax) exprs.get(0);
 
         if (exprs.size() == 1) {
