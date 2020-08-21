@@ -92,5 +92,10 @@ public class Ed25519Signature extends ASignature {
 		return 0;
 	}
 
+	@Override
+	public String toHexString() {
+		return Utils.toHexString(signatureBytes);
+	}
+
 
 }

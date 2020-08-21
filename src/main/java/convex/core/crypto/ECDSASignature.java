@@ -26,6 +26,7 @@ import convex.core.data.Blob;
 import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.TODOException;
 import convex.core.util.Utils;
 
 /**
@@ -389,6 +390,11 @@ public final class ECDSASignature extends ASignature {
 	@Override
 	public int getRefCount() {
 		return 0;
+	}
+
+	@Override
+	public String toHexString() {
+		throw new TODOException();
 	}
 
 

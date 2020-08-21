@@ -36,6 +36,12 @@ public abstract class ASignature extends ACell {
 	}
 	
 	/**
+	 * Gets the content of this Signature as a hex string
+	 * @return
+	 */
+	public abstract String toHexString();
+	
+	/**
 	 * Reads a Signature from the given ByteBuffer. Assumes tag byte already read.
 	 * 
 	 * Uses Ed25519 or ECDSA as configured.
