@@ -45,8 +45,11 @@ public class Ed25519Test {
 	
 	@Test
 	public void testSigFromHex() throws BadFormatException, InvalidDataException {
-		ASignature s1=ASignature.fromHex("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+		String s="cafebabe000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+		ASignature s1=ASignature.fromHex(s);
 		s1.validate();
+		
+		assertEquals(s,s1.toHexString());
 		
 		assertThrows(IllegalArgumentException.class,()->ASignature.fromHex("00"));
 	}
