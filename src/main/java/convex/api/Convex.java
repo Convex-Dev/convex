@@ -99,11 +99,11 @@ public class Convex {
 	 * @return Sequence number as a Long value greater than zero
 	 */
 	public long getNextSequence() {
-		return getSequence()+1;
+		return getSequence()+1L;
 	}
 	
 	public void setNextSequence(long nextSequence) {
-		this.sequence=nextSequence-1;
+		this.sequence=nextSequence-1L;
 	}
 	
 	/**

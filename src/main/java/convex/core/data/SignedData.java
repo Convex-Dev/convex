@@ -12,6 +12,17 @@ import convex.core.exceptions.InvalidDataException;
 /**
  * Node representing a signed data object.
  * 
+ * A signed data object encapsulates:
+ * <ul>
+ * <li>An Address that identifies the signer</li>
+ * <li>A digital signature </li>
+ * <li>An underlying data data object that has been signed.</li>
+ * </ul>
+ * 
+ * The SignedData instance is considered <b>valid</b> if the signature can be successfully validated for
+ * the given Address and data object, and if so can be taken as a cryptographic proof that the signature
+ * was created by someone in possession of the corresponding private key.
+ * 
  * Note we currently go via a Ref here for a few reasons: - It guarantees we
  * have a hash for signing - It makes the SignedData object
  * implementation/representation independent of the value type - It creates a
@@ -21,7 +32,7 @@ import convex.core.exceptions.InvalidDataException;
  * <ol>
  * <li>1 byte - Message.SIGNED_DATA tag </li>
  * <li>20/32 bytes - Address of signer</li>
- * <li>65 bytes - raw Signature data</li>
+ * <li>64 bytes - raw Signature data</li>
  * <li>32 bytes - Data hash (raw Ref)</li>
  * </ol>
  * 
@@ -227,7 +238,7 @@ public class SignedData<T> extends ACell {
 
 	@Override
 	protected boolean isEmbedded() {
-		// Never embedded (value can be arbitrary)
+		// Never embedded (too big??)
 		return false;
 	}
 
