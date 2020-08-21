@@ -24,6 +24,7 @@ public class Ed25519Signature extends ASignature {
 	}
 	
 	public static Ed25519Signature wrap(byte[] signature) {
+		if (signature.length!=SIGNATURE_LENGTH) throw new IllegalArgumentException("Bsd signature length for ED25519");
 		return new Ed25519Signature(signature);
 	}
 	

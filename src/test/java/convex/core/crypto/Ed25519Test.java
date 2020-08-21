@@ -3,6 +3,7 @@ package convex.core.crypto;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -21,6 +22,8 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
 import convex.core.data.Address;
+import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.InvalidDataException;
 
 public class Ed25519Test {
 	
@@ -38,6 +41,14 @@ public class Ed25519Test {
 		AKeyPair kp3=Ed25519KeyPair.createSeeded(13378);
 		assertEquals(kp1,kp2);
 		assertNotEquals(kp2,kp3);
+	}
+	
+	@Test
+	public void testSigFromHex() throws BadFormatException, InvalidDataException {
+		ASignature s1=ASignature.fromHex("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+		s1.validate();
+		
+		assertThrows(IllegalArgumentException.class,()->ASignature.fromHex("00"));
 	}
 	
 	@Test
