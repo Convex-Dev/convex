@@ -34,6 +34,11 @@ public class ListsTest {
 		assertEquals(3, Lists.of(1, 2, 3).toArray().length);
 		assertEquals(0, Lists.empty().toArray().length);
 	}
+	
+	@Test
+	public void testToString() {
+		assertEquals("(1 2 3)",Lists.of(1L, 2L, 3L).toString());
+	}
 
 	@Test
 	public void testContainsAll() {

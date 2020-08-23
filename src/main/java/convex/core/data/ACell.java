@@ -183,6 +183,12 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	 */
 	public abstract int estimatedEncodingSize();
 	
+	/**
+	 * Returns the String representation of this Cell.
+	 * 
+	 * The String representation is intended to be a easy-to-read textual representation of the Cell's data content.
+	 *
+	 */
 	@Override
 	public String toString() {
 		StringBuilder sb=new StringBuilder();
