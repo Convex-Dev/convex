@@ -2,6 +2,8 @@
 
 This guide is intended for developers interested in learning about Convex Lisp. We will take you through the basics of the language, all the way through to designing and deploying a simple smart contract!
 
+## Setup
+
 Using the [Sandbox](https://convex.world/#/sandbox) is the easiest way to experience Convex Lisp. We recommend that you try it out as you go through this guide: It's more fun to get instant feedback and try out new ideas quickly! To do this:
 
 - Open the Sandbox (you can create a free, anonymous temporary account with one just one click!)
@@ -45,8 +47,7 @@ Individual characters can be used as literals by preceding them with a backslash
 
 ```
 
-
-Keywords are special literal values that are intended for use as keys in hash maps, sets, etc. They can also be conveniently used as field names in records, or as special markers values like "enums" in other languages.
+Keywords are special literal values that are intended for use as keys in hash maps, sets, etc. They can also be conveniently used as field names in records, as special unique marker values, or as a member of a defined set of values like "enums" in other languages.
 
 ```clojure
 :foo
@@ -374,3 +375,147 @@ Some other ways of constructing a List:
 ```
 
 In normal code, you should generally prefer Vectors over Lists for storing data. Lists should mainly be used for generating code - in macros, for example.
+
+### Special forms
+
+Convex Lisp includes a number of special forms, that implement behaviour that can't be achieved using regular functions from the core library.
+
+#### Condtionals
+
+General purpose languages need some way of controlling conditional execution of code, and Convex Lisp is no exception. 
+
+Convex Lisp provides an `if` macro that evaluates a conditional expression, and then executes one of two other expressions depending on whether the value of the first is true of false.
+
+```clojure
+;; A simple if expression that always takes the 'true' branch
+(if true 20 30)
+=> 20
+
+;; A simple if expression that always takes the 'false' branch
+(if false 20 30)
+=> 30
+
+;; If no false branch is provided, the 'if' expression returns 'nil' in this case
+(if false 20)
+=> nil
+```
+
+Conditionals branch based on whether the conditional expression evaluated is truthy or falsey.
+
+- A value is considered **falsey** if it is either the boolean value `false` or `nil`
+- Any other value is considered **truthy**, including the boolean value `true` but also `[]`, `1`, `:foo` etc.
+
+Why do we do this rather than only allowing booleans? Well, it turns out that in a lot of situations, you want to branch based on whether a result is `nil` or non-`nil` (e.g. when you want to look up a value in a database). We could force developers to do a `(nil? x)` check to coerce each such result into a boolean, but this adds overhead and boilerplate code. Instead, we make conditionals work with truthy and falsey values directly, so that such conversion code is usually unnecessary.
+
+The `cond` special form works like `if`, but allows multiple tests, and can optionally provide a default result that 
+
+```clojure
+(cond 
+  false 10
+  false 20
+  true 30
+  false 40)
+=> 30
+  
+;; You can provide a default result if all tests fail
+(cond
+  false 10
+  false 20
+  "Nothing matched")
+=> "Nothing Matched"
+```
+
+Implementation note: `if` is actually a macro that expands to a `cond` form under the hood. So technically, `cond` is the lower level special form. In practice, it is usually more convenient and intuitive to use `if`.
+
+
+
+#### Do blocks
+
+The `do` special form groups a number of expressions into a single expression and returns the value of the last expression (or `nil` if there are zero expressions). Results from earlier expressions are discarded. Typically, the earlier expressions are included in order to perform some side effect.
+
+```clojure
+;; A do Block with three expressions inside, all are executed but only the last result is returned.
+(do 1 2 3)
+=> 3
+
+;; A do block with zero expressions always returns 'nil'
+(do)
+=> nil
+
+;; Side effects from ealier expressions are visible in later expressions
+(do (def a 100) (+ a a))
+=> 200
+```
+
+The `do` form serves a similar purpose to a code block in many other languages. It's useful for grouping a number of statements together for the purposes of side effects.
+
+
+#### Let and local variables
+
+The `let` special form allows you to define local variables in the scope of a code block. Apart from the local variable definition, a `let` block is similar to a `do` block.
+
+```clojure
+;; 'let' expression that defines 'x' in its body.
+(let [x 10] (* x x))
+=> 100
+
+;; You can define multiple local variables in one binding expression
+(let [x 10
+      y (* x x)] 
+  (+ x y))
+=> 110
+
+;; Local binding ceases to exist immediately after the '(let ...)' form
+(do (let [x 10]) x)
+=> ERROR (UNDECLARED)
+=> 'x' is undeclared.
+
+;; Local bindings take precedence over definitions in the surrounding environment
+(def foo 13)
+
+foo
+=> 13
+
+(let [foo 17] foo)
+=> 17
+```
+
+You can also use `set!` to set the binding of a local variable. This value will last until the end of the current binding form (a surrounding `let` block, or returning from a function body).
+
+```clojure
+(let [a 10]
+  (set! a 20)
+  a)
+=> 20
+```
+
+#### Def and the environemnent
+
+We've already seen the `def` special form in a couple of examples, where it was used to set the value of a symbol:
+
+```clojure
+(def message "Hello!")
+
+message
+=> "Hello"
+```
+
+The key difference with `def` compared to `let` is that it sets the value in the persistent environment, rather than just making a temporary local binding. The environment in Convex is special:
+
+- Every user Account gets its own *independent* environment. Two different users can define their own `message` and they will see their own version. 
+- You can only *modify* your own environment, using a digitally signed transaction for the relevant account. 
+- It is possible for anyone with access to the Convex network to *observe* any user environments on a read-only basis - so while nobody can modify your data, it isn't private!
+- The environment is *persistent* between transactions. Unless you choose to delete it, a definition in your environment will stay there forever. You can therefore use definitions in the environment to store data.
+- Definitions in the environment use some amount of *memory* on-chain. While small data allocations are typically not very expensive, care should be taken before storing large data structures in the environment.
+
+With memory 
+
+## Evaluation
+
+We've looked at the basic constructs of Convex Lisp, but it's worth taking a moment to look at the way that code is evaluated in Lisp. This section delves into some implementation details, and what makes Convex Lisp special.
+
+### Code is Data
+
+A key idea in Lisp is that 'Code is Data'. The language syntax is expressed in the data structures of the language.
+
+
