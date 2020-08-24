@@ -143,6 +143,7 @@ public class Context<T> implements IObject {
 		}
 
 		private ChainState withEnvironment(AHashMap<Symbol, Syntax> newEnvironment)  {
+			if (environment==newEnvironment) return this;
 			AccountStatus as=state.getAccount(address);
 			AccountStatus nas=as.withEnvironment(newEnvironment);
 			State newState=state.putAccount(address,nas);
@@ -810,13 +811,26 @@ public class Context<T> implements IObject {
 
 	/**
 	 * Defines a value in the environment of the current address
-	 * @param key
+	 * @param key Symbol of the mapping to create
 	 * @param value
 	 * @return Updated context with symbol defined in environment
 	 */
 	public Context<T> define(Symbol key, Syntax value) {
 		AHashMap<Symbol, Syntax> m = getEnvironment();
 		AHashMap<Symbol, Syntax> newEnvironment = m.assoc(key, value);
+		
+		return withEnvironment(newEnvironment);
+	}
+	
+
+	/**
+	 * Removes a definition mapping in the environment of the current address
+	 * @param key Symbol of the environment mapping to remove
+	 * @return Updated context with symbol definition removed from the environment, or this context if unchanged
+	 */
+	public Context<T> undefine(Symbol key) {
+		AHashMap<Symbol, Syntax> m = getEnvironment();
+		AHashMap<Symbol, Syntax> newEnvironment = m.dissoc(key);
 		
 		return withEnvironment(newEnvironment);
 	}

@@ -3,7 +3,9 @@ package convex.core.lang;
 import static convex.test.Assertions.assertJuiceError;
 import static convex.test.Assertions.assertUndeclaredError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -27,11 +29,27 @@ public class ContextTest {
 
 		assertUndeclaredError(c2.lookup(Symbol.create("some-bad-symbol")));
 	}
+	
+	@Test
+	public void testUndefine() {
+		Symbol sym = Symbol.create("the-test-symbol");
+
+		final Context<?> c2 = c.define(sym, Syntax.create("vampire"));
+		assertEquals("vampire", c2.lookup(sym).getResult());
+
+		final Context<?> c3 = c2.undefine(sym);
+		assertUndeclaredError(c3.lookup(sym));
+		
+		final Context<?> c4 = c3.undefine(sym);
+		assertSame(c3,c4);
+	}
 
 	@Test
 	public void testJuice() {
 		assertTrue(c.checkJuice(1000));
 		assertJuiceError(c.consumeJuice(c.getJuice() + 1));
+		
+		assertFalse(c.consumeJuice(c.getJuice()).isExceptional());
 	}
 
 	@Test
