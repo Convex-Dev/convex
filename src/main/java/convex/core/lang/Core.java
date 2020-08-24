@@ -552,6 +552,22 @@ public class Core {
 			return context.withResult(Juice.ASSOC,value);
 		}
 	});
+	
+	public static final CoreFn<Object> UNDEF_STAR = reg(new CoreFn<>(Symbols.UNDEF_STAR) {
+		@Override
+		public <I> Context<Object> invoke(Context<I> context, Object[] args) {
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+			Symbol sym=RT.toSymbol(args[0]);
+			if (sym == null) return context.withArgumentError("Invalid Symbol name for undef: " + Utils.toString(args[0]));
+			
+			@SuppressWarnings("unchecked")
+			Context<Object> ctx=(Context<Object>) context.undefine(sym);
+			
+			// return nil
+			return ctx.withResult(Juice.DEF_OP, null);
+
+		}
+	});
 
 	public static final CoreFn<Object> LOOKUP = reg(new CoreFn<>(Symbols.LOOKUP) {
 		@Override

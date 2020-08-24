@@ -69,6 +69,8 @@ public class Symbols {
 	public static final Symbol COND = Symbol.create("cond");
 	public static final Symbol DEF = Symbol.create("def");
 	public static final Symbol UNDEF = Symbol.create("undef");
+	public static final Symbol UNDEF_STAR = Symbol.create("undef*");
+
 	public static final Symbol FN = Symbol.create("fn");
 	public static final Symbol MACRO = Symbol.create("macro");
 	public static final Symbol EXPANDER = Symbol.create("expander");
@@ -228,6 +230,7 @@ public class Symbols {
 	public static final Symbol SET_STAR = Symbol.create("set*");
 	
 	public static final Symbol REGISTER = Symbol.create("register");
+	
 
 
 }

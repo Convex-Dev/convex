@@ -191,6 +191,14 @@
           :signature [{:params [sym value]}]}}
     [sym value]
     '(set* (quote ~sym) ~value))
+ 
+(defmacro undef
+    ^{:doc {:description "Undefines a symbol, removing the mapping from the surrent environment if it exists."
+          :examples [{:code "(do (def foo 1) (undef foo))"}]
+          :type :macro	 
+          :signature [{:params [sym]}]}}
+    [sym]
+    '(undef* (quote ~sym)))
 
 (defmacro import
   ^{:doc {:description "Import a library for use in the current environment. Creates an alias to the library so that symbols defined in the library can be addressed directly in the form 'alias/symbol-name'."

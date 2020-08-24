@@ -1548,6 +1548,32 @@ public class CoreTest {
 		assertTrue(evalB("(fn? fn?)"));
 		assertFalse(evalB("(fn? if)"));
 	}
+	
+	@Test
+	public void testDef() {
+		assertEquals(Vectors.of(2L, 3L), eval("(do (def v [2 3]) v)"));
+		
+		// TODO: are these error types logical?
+		assertCompileError(step("(def)"));
+		assertCompileError(step("(def a b c)"));
+		
+		assertUndeclaredError(step("(def a b)"));
+		
+		assertUndeclaredError(step("(def a a)"));
+	}
+	
+	@Test
+	public void testUndef() {
+		assertNull(eval("(undef count)"));
+		assertNull(eval("(undef foo)"));
+		assertNull(eval("(undef *balance*)"));
+		assertNull(eval("(undef foo/bar)"));
+		
+		assertEquals(Vectors.of(1L, 2L), eval("(do (def a 1) (def v [a 2]) (undef a) v)"));
+		
+		assertUndeclaredError(step("(do (def a 1) (undef a) a)"));
+	}
+	
 
 	@Test
 	public void testDefn() {
