@@ -564,7 +564,7 @@ public class Core {
 			Context<Object> ctx=(Context<Object>) context.undefine(sym);
 			
 			// return nil
-			return ctx.withResult(Juice.DEF_OP, null);
+			return ctx.withResult(Juice.DEF, null);
 
 		}
 	});

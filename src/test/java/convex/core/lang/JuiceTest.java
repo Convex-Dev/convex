@@ -140,7 +140,7 @@ public class JuiceTest {
 
 	@Test
 	public void testDef() {
-		assertEquals(Juice.DEF_OP + Juice.CONSTANT, juice("(def a 1)"));
+		assertEquals(Juice.DEF + Juice.CONSTANT, juice("(def a 1)"));
 	}
 
 	@Test

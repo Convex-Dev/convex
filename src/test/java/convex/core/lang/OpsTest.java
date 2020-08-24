@@ -92,7 +92,7 @@ public class OpsTest {
 		assertNull(env1.get(fooSym)); // initially no entry
 		assertEquals("bar", env2.get(fooSym).getValue());
 
-		long expectedJuice = INITIAL_JUICE - Juice.CONSTANT - Juice.DEF_OP;
+		long expectedJuice = INITIAL_JUICE - Juice.CONSTANT - Juice.DEF;
 		assertEquals(expectedJuice, c2.getJuice());
 		assertEquals("bar", c2.getResult());
 
@@ -118,7 +118,7 @@ public class OpsTest {
 		AOp<String> op = Do.create(Def.create("foo", Constant.create("bar")), Lookup.create("foo"));
 
 		Context<String> c2 = c.execute(op);
-		long expectedJuice = INITIAL_JUICE - (Juice.CONSTANT + Juice.DEF_OP + Juice.LOOKUP_DYNAMIC + Juice.DO);
+		long expectedJuice = INITIAL_JUICE - (Juice.CONSTANT + Juice.DEF + Juice.LOOKUP_DYNAMIC + Juice.DO);
 		assertEquals(expectedJuice, c2.getJuice());
 		assertEquals("bar", c2.getResult());
 	}

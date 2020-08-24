@@ -61,7 +61,7 @@ public class Def<T> extends AOp<T> {
 
 		// TODO: defined syntax metadata
 		opContext = opContext.define(symbol.getValue(), Syntax.create(opResult).withMeta(symbol.getMeta()));
-		return opContext.withResult(Juice.DEF_OP, opResult);
+		return opContext.withResult(Juice.DEF, opResult);
 	}
 
 	@Override

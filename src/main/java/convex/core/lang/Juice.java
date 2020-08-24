@@ -11,10 +11,11 @@ public class Juice {
 	/**
 	 * Juice required to define a value in the current environment.
 	 * 
-	 * This is somewhat expensive - we want to discourage over-use as a general rule
-	 * since it writes to global chain state.
+	 * We make this somewhat expensive - we want to discourage over-use as a general rule
+	 * since it writes to global chain state. However memory accounting helps discourage 
+	 * superfluous defs, so it only needs to reflect execution cost.
 	 */
-	public static final long DEF_OP = 500;
+	public static final long DEF = 100;
 
 	/**
 	 * Juice required to look up a value in the local environment.
@@ -26,7 +27,7 @@ public class Juice {
 	 * 
 	 * Potentially a bit pricey since read only, but might hit storage so.....
 	 */
-	public static final long LOOKUP_DYNAMIC = 50;
+	public static final long LOOKUP_DYNAMIC = 40;
 
 	/**
 	 * Juice required to execute a Do block
@@ -48,7 +49,7 @@ public class Juice {
 	 * Fairly cheap but some parameter munging required. Might revisit binding
 	 * costs?
 	 */
-	public static final long LET = 50;
+	public static final long LET = 30;
 
 	/**
 	 * Juice required to resolve a constant value
@@ -75,17 +76,17 @@ public class Juice {
 	/**
 	 * Juice required to call an Actor
 	 * 
-	 * Not too expensive for context switching?
+	 * Slightly expensive for context switching?
 	 */
 	public static final long CALL_OP = 100;
 
 	/**
-	 * Juice required to build a data structure
+	 * Juice required to build a data structure. Make a bit expensive?
 	 */
 	protected static final long BUILD_DATA = 50;
 
 	/**
-	 * Juice required per element changed when building a data structure Map entries
+	 * Juice required per element changed when building a data structure. Map entries
 	 * count as two elements.
 	 * 
 	 * We need to be a bit harsh on this! Risk of consuming too much heap space,
@@ -134,7 +135,7 @@ public class Juice {
 	 * Juice for a simple built-in core function. Simple operations are assumed to
 	 * require no expensive resource access, and operate with O(1) allocations
 	 */
-	public static final long SIMPLE_FN = 30;
+	public static final long SIMPLE_FN = 20;
 
 	/**
 	 * Juice for constructing a String
