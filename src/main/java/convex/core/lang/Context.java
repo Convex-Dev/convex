@@ -57,7 +57,7 @@ import convex.core.util.Utils;
  * "If you have a procedure with 10 parameters, you probably missed some" 
  * - Alan Perlis
  */
-public class Context<T> implements IObject {
+public final class Context<T> implements IObject {
 
 	private static final long MAX_DEPTH = 256;
 	
@@ -316,17 +316,20 @@ public class Context<T> implements IObject {
 	 */
 	@SuppressWarnings("unchecked")
 	public <R> Context<R> consumeJuice(long gulp) {
+		if (gulp<=0) throw new Error("Juice gulp must be positive!");
 		if(!checkJuice(gulp)) return withJuiceError();
 		long newJuice=juice-gulp;
 		return new Context<R>(chainState,newJuice,localBindings,(R) result,depth,isExceptional);
 	}
 	
+	/**
+	 * Checks if there is sufficient juice for a given gulp of consumption. Does not alter context in any way.
+	 * 
+	 * @param gulp Amount of juice to be consumed.
+	 * @return true if juice is sufficient, false otherwise.
+	 */
 	public boolean checkJuice(long gulp) {
-		assert(gulp>0);
-		if (gulp>juice) {
-			return false;
-		}
-		return true;
+		return (juice>=gulp);
 	}
 	
 	/**
@@ -460,7 +463,8 @@ public class Context<T> implements IObject {
 	}
 
 	/**
-	 * Looks up a special symbol in the environment
+	 * Looks up a special symbol in the environment. Consumes no juice.
+	 * 
 	 * @param <R>
 	 * @param sym
 	 * @return Context with value or special symbol, or undeclared exception if not found.
