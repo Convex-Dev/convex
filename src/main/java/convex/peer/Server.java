@@ -272,6 +272,7 @@ public class Server implements Closeable {
 		if (!sd.checkSignature()) {
 			// terminate the connection, dishonest peer.
 			m.getPeerConnection().close();
+			log.warning("Bad signature from Client, closing channel! "+sd);
 			return;
 		}
 

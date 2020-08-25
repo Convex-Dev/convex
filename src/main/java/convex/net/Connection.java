@@ -516,7 +516,7 @@ public class Connection {
 			int n = conn.handleChannelRecieve();
 			// log.finest("Received bytes: " + n);
 		} catch (ClosedChannelException e) {
-			log.info("Remote server channel closed from: " + conn.getRemoteAddress());
+			log.info("Channel closed from: " + conn.getRemoteAddress());
 			key.cancel();
 		} catch (BadFormatException e) {
 			log.log(NIOServer.LEVEL_BAD_CONNECTION,"Cancelled connection to Peer: Bad data format from: " + conn.getRemoteAddress() + " " + e.getMessage());
