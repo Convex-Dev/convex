@@ -8,7 +8,9 @@ import java.util.Random;
 import org.junit.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.ASignature;
 import convex.core.crypto.ECDSASignature;
+import convex.core.crypto.Ed25519Signature;
 import convex.core.crypto.Hash;
 import convex.core.data.AMap;
 import convex.core.data.ASet;
@@ -84,6 +86,8 @@ public class Samples {
 	public static final long BIG_BLOB_LENGTH = 10000;
 	public static final BlobTree BIG_BLOB_TREE = Blobs.createRandom(Samples.rand, BIG_BLOB_LENGTH);
 	public static final Blob FULL_BLOB = Blobs.createRandom(Samples.rand, Blob.CHUNK_LENGTH);
+	
+	public static final ASignature FAKE_SIGNATURE = Ed25519Signature.wrap(new byte[Ed25519Signature.SIGNATURE_LENGTH]);
 
 	static {
 		try {

@@ -273,6 +273,7 @@ public class Server implements Closeable {
 		if (!sd.checkSignature()) {
 			// terminate the connection, dishonest peer.
 			try {
+				// TODO: throttle?
 				m.getPeerConnection().sendResult(m.getID(), "Bad Signature!", ErrorCodes.SIGNATURE);
 			} catch (IOException e) {
 				// Ignore??
