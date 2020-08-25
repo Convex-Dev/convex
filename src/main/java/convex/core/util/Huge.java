@@ -75,6 +75,17 @@ public class Huge {
 		return new Huge(hi+sign+carry,lo+b);
 	}
 	
+	/**
+	 * Performs a fused multiply and divide (a * b) / c. Handles cases where (a*b) would overflow a single 64-bit long.
+	 * 
+	 * @param a
+	 * @param b
+	 * @param c
+	 * @return Result of operation, of null if result overflows a Long
+	 */
+	public static Long fusedMultiplyDivide(long a, long b, long c) {
+		throw new TODOException();
+	}
 
 	/**
 	 * Creates a Huge by adding another Huge

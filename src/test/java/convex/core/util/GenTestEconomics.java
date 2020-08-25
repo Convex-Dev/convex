@@ -24,8 +24,8 @@ public class GenTestEconomics {
 		if ((a>0)&&(b>0)) {
 			long price = Economics.swapPrice(0, a, b);
 			
-			// price should always be very close to zero, subject to numerical precision
-			assertEquals((double)price/b,0.0,0.000000000000001);
+			// price should always be 1, since must spend minimum 1 unit to increase pool
+			assertEquals(1L,price);
 		}
 	}
 }
