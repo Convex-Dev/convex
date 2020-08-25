@@ -176,14 +176,17 @@ public class AccountStatus extends ARecord {
 	}
 
 	public AccountStatus withBalance(Amount newBalance) {
+		if (balance==newBalance) return this;
 		return new AccountStatus(sequence, newBalance, allowance, environment,holdings);
 	}
 	
 	public AccountStatus withAllowance(long newAllowance) {
+		if (allowance==newAllowance) return this;
 		return new AccountStatus(sequence, balance, newAllowance, environment,holdings);
 	}
 	
 	public AccountStatus withBalances(Amount newBalance, long newAllowance) {
+		if ((balance==newBalance)&&(allowance==newAllowance)) return this;
 		return new AccountStatus(sequence, newBalance, newAllowance, environment,holdings);
 	}
 

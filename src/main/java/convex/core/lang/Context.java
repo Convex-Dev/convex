@@ -259,6 +259,7 @@ public final class Context<T> implements IObject {
 		assert(transactionJuice>=0);
 	
 		long refund=0L;
+		
 		// maybe refund remaining juice
 		if (remainingJuice>0L) {
 			// Compute refund. Shouldn't be possible to overflow?
@@ -266,11 +267,36 @@ public final class Context<T> implements IObject {
 			refund+=Math.multiplyExact(remainingJuice,juicePrice);
 		}
 		
+		// compute memory delta
+		Address address=getAddress();
+		AccountStatus newAs=state.getAccount(address);
+		AccountStatus oldAs=initialState.getAccount(address);
+		long memUsed=newAs.getMemorySize()-oldAs.getMemorySize();
+		long allowance=newAs.getAllowance();
+		
+		if (memUsed>0) {
+			long allowanceUsed=Math.min(allowance, memUsed);
+			if (allowanceUsed>0) {
+				newAs=newAs.withAllowance(allowance-allowanceUsed);
+			}
+			long purchaseNeeded=memUsed=allowanceUsed;
+			if (purchaseNeeded>0) {
+				// TODO: buy from pool
+			}
+		} else {
+			// credit back to allowance
+			long allowanceCredit=-memUsed;
+			newAs=newAs.withAllowance(allowance+allowanceCredit);
+		}
+		
 		// Make refund if needed
 		if (refund>0L) {
-			Address address=getAddress();
-			state=state.withBalance(address,state.getBalance(address).add(refund));
+			newAs=newAs.withBalance(newAs.getBalance().add(refund));
 		}
+		
+		// update Account
+		state=state.putAccount(address,newAs);
+
 		
 		// maybe add used juice to miner fees
 		if (transactionJuice>0L) {
