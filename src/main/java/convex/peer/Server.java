@@ -17,6 +17,7 @@ import java.util.logging.Logger;
 import convex.core.Belief;
 import convex.core.Block;
 import convex.core.BlockResult;
+import convex.core.ErrorCodes;
 import convex.core.Init;
 import convex.core.Peer;
 import convex.core.crypto.AKeyPair;
@@ -271,8 +272,12 @@ public class Server implements Closeable {
 		
 		if (!sd.checkSignature()) {
 			// terminate the connection, dishonest peer.
-			m.getPeerConnection().close();
-			log.warning("Bad signature from Client, closing channel! "+sd);
+			try {
+				m.getPeerConnection().sendResult(m.getID(), "Bad Signature!", ErrorCodes.SIGNATURE);
+			} catch (IOException e) {
+				// Ignore??
+			}
+			log.warning("Bad signature from Client! "+sd);
 			return;
 		}
 

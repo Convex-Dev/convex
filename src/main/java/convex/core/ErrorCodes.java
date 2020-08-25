@@ -143,4 +143,9 @@ public class ErrorCodes {
 	 * and return to the caller with whatever value is passed as the rollback result.
 	 */
 	public static final Keyword ROLLBACK =  Keyword.create("ROLLBACK");
+
+	/**
+	 * Exceptional Condition indicating a bad signature on a transaction
+	 */
+	public static final Object SIGNATURE = Keyword.create("SIGNATURE");
 }
