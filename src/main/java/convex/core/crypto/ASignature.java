@@ -15,7 +15,7 @@ public abstract class ASignature extends ACell {
 	 * Checks if the signature is valid for a given message hash
 	 * @param hash
 	 * @param address
-	 * @return True if signature is vaid, false otherwise
+	 * @return True if signature is valid, false otherwise
 	 */
 	public abstract boolean verify(Hash hash, Address address);
 	

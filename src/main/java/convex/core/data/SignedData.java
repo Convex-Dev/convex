@@ -235,6 +235,15 @@ public class SignedData<T> extends ACell {
 	public Ref<T> getDataRef() {
 		return valueRef;
 	}
+	
+	/**
+	 * Checks if this SignedData has a valid signature.
+	 * 
+	 * @return true if the Signature is valid for the given data, false otherwise.
+	 */
+	public boolean isValid() {
+		return signature.verify(valueRef.getHash(), address);
+	}
 
 	@Override
 	protected boolean isEmbedded() {

@@ -19,6 +19,8 @@ public class SignedDataTest {
 	public void testBadSignature() {
 		Ref<Long> dref = Ref.create(13L);
 		SignedData<Long> sd = SignedData.create(Samples.BAD_ADDRESS, Samples.BAD_SIGNATURE, dref);
+		
+		assertFalse(sd.isValid());
 
 		assertEquals(13L, (long) sd.getValueUnchecked());
 		assertSame(Samples.BAD_ADDRESS, sd.getAddress());
@@ -31,6 +33,9 @@ public class SignedDataTest {
 	public void testEmbeddedSignature() throws BadSignatureException {
 		AKeyPair kp = TestState.HERO_PAIR;
 		SignedData<Long> sd = kp.signData(1L);
+		
+		assertTrue(sd.isValid());
+		
 		sd.validateSignature();
 		assertEquals(1L, sd.getValue());
 		
@@ -42,6 +47,9 @@ public class SignedDataTest {
 		AKeyPair kp = TestState.HERO_PAIR;
 		AVector<Long> v = Vectors.of(1L, 2L, 3L);
 		SignedData<Object> sd = kp.signData(v);
+		
+		assertTrue(sd.isValid());
+		
 		sd.validateSignature();
 		assertEquals(v, sd.getValue());
 		
