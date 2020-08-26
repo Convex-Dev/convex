@@ -9,7 +9,9 @@ import java.awt.event.KeyListener;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
-import java.util.function.Consumer;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Logger;
 
 import javax.swing.JButton;
@@ -23,11 +25,13 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.DefaultCaret;
 
+import convex.api.Convex;
+import convex.core.Result;
+import convex.core.crypto.AKeyPair;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.lang.Reader;
-import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
@@ -36,8 +40,6 @@ import convex.gui.components.ActionPanel;
 import convex.gui.components.PeerView;
 import convex.gui.manager.PeerManager;
 import convex.net.Connection;
-import convex.net.Message;
-import convex.net.ResultConsumer;
 
 @SuppressWarnings("serial")
 public class REPLPanel extends JPanel {
@@ -55,9 +57,9 @@ public class REPLPanel extends JPanel {
 	
 	private JPanel panel_1;
 
-	private AccountChooserPanel execPanel;
+	private AccountChooserPanel execPanel = new AccountChooserPanel();
 
-	private final Connection peerConnection;
+	private final Convex convex;
 
 	private static final Logger log = Logger.getLogger(REPLPanel.class.getName());
 
@@ -71,18 +73,22 @@ public class REPLPanel extends JPanel {
 		if (value) inputArea.requestFocusInWindow();
 	}
 
-	public final Consumer<Message> resultHandler = new ResultConsumer() {
-		@Override
-		protected void handleResult(Object m) {
-			outputArea.append(" => " + m + "\n");
-			outputArea.setCaretPosition(outputArea.getDocument().getLength());
+	protected void handleResult(Result r) {
+		if (r.isError()) {
+			handleError(r.getErrorCode(),r.getValue());
+		} else {
+			handleResult(r.getValue());
 		}
-		
-		@Override
-		protected void handleError(long id, Object code, Object msg) {
-			outputArea.append(" Exception: " + code + " "+ msg);
-		}
-	};
+	}
+
+	protected void handleResult(Object m) {
+		outputArea.append(" => " + m + "\n");
+		outputArea.setCaretPosition(outputArea.getDocument().getLength());
+	}
+	
+	protected void handleError(Object code, Object msg) {
+		outputArea.append(" Exception: " + code + " "+ msg);
+	}
 
 	/**
 	 * Create the panel.
@@ -97,7 +103,7 @@ public class REPLPanel extends JPanel {
 		}
 		try {
 			// Connect to peer as a client
-			peerConnection = Connection.connect(addr, resultHandler, Stores.CLIENT_STORE);
+			convex = Convex.connect(addr, getKeyPair());
 		} catch (IOException ex) {
 			throw Utils.sneakyThrow(ex);
 		}
@@ -128,7 +134,7 @@ public class REPLPanel extends JPanel {
 		setFocusTraversalKeysEnabled(false);
 		inputArea.setFocusTraversalKeysEnabled(false);
 		
-		execPanel = new AccountChooserPanel();
+		
 		add(execPanel, BorderLayout.NORTH);
 
 		panel_1 = new ActionPanel();
@@ -141,7 +147,7 @@ public class REPLPanel extends JPanel {
 		btnInfo = new JButton("Connection Info");
 		panel_1.add(btnInfo);
 		btnInfo.addActionListener(e -> {
-			Connection pc = peerConnection;
+			Connection pc = convex.getConnection();
 			String infoString = "";
 			infoString += "Remote address:  " + pc.getRemoteAddress() + "\n";
 			infoString += "Local address:  " + pc.getLocalAddress() + "\n";
@@ -159,6 +165,12 @@ public class REPLPanel extends JPanel {
 		});
 	}
 
+	private AKeyPair getKeyPair() {
+		WalletEntry we=execPanel.getWalletEntry();
+		if (we==null) return null;
+		return we.getKeyPair();
+	}
+
 	private void sendMessage(String s) {
 		if (s.isBlank()) return;
 		
@@ -170,14 +182,14 @@ public class REPLPanel extends JPanel {
 			outputArea.append("\n");
 			try {
 				Object message = Reader.read(s);
-				long id;
+				Future<Result> future;
 				String mode = execPanel.getMode();
 				if (mode.equals("Query")) {
-					WalletEntry we = execPanel.getWalletEntry();
-					if (we == null) {
-						id = peerConnection.sendQuery(message);
+					AKeyPair kp=getKeyPair();
+					if (kp == null) {
+						future = convex.query(message,null);
 					} else {
-						id = peerConnection.sendQuery(message, we.getAddress());
+						future = convex.query(message, kp.getAddress());
 					}
 				} else if (mode.equals("Transact")) {
 					WalletEntry we = execPanel.getWalletEntry();
@@ -194,11 +206,15 @@ public class REPLPanel extends JPanel {
 					}
 					long nonce = as.getSequence() + 1;
 					ATransaction trans = Invoke.create(nonce, message);
-					id = peerConnection.sendTransaction(we.sign(trans));
+					future = convex.transact(we.sign(trans));
 				} else {
 					throw new Error("Unrecognosed REPL mode: " + mode);
 				}
-				log.finer("Sent message with ID: " + id);
+				log.finer("Sent message");
+				
+				handleResult(future.get(5000, TimeUnit.MILLISECONDS));
+			} catch (TimeoutException t) {
+				outputArea.append(" TIMEOUT waiting for result");
 			} catch (Throwable t) {
 				outputArea.append(" SEND ERROR: ");
 				outputArea.append(t.getMessage() + "\n");

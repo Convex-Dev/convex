@@ -109,5 +109,9 @@ public class Result extends ARecordGeneric {
 		return create(v);
 	}
 
+	public boolean isError() {
+		return getErrorCode()!=null;
+	}
+
 
 }

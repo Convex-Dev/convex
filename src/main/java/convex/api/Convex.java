@@ -256,9 +256,22 @@ public class Convex {
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
 	public Future<Result> query(Object query) throws IOException {
+		return query(query,getAddress());
+	}
+	
+	/**
+	 * Submits a query to the Convex network, returning a Future once the query 
+	 * has been successfully queued.
+	 * 
+	 * @param transaction Query to execute, as a Form or Op
+	 * @param Address Address to use for the query
+	 * @return A Future for the result of the query
+	 * @throws IOException If the connection is broken, or the send buffer is full
+	 */
+	public Future<Result> query(Object query, Address address) throws IOException {
 		CompletableFuture<Result> cf=new CompletableFuture<Result>();
 		
-		long id=connection.sendQuery(query,getAddress());
+		long id=connection.sendQuery(query,address);
 		if (id<0) {
 			throw new IOException("Failed to send query due to full buffer");
 		}
@@ -312,4 +325,6 @@ public class Convex {
 	protected void setAutoSequence(boolean autoSequence) {
 		this.autoSequence = autoSequence;
 	}
+
+
 }
