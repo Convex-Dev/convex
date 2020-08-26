@@ -63,6 +63,12 @@ public class Assertions {
 		Object cet = ctx.getErrorCode();
 		assertEquals(ErrorCodes.ARGUMENT, cet, "Expected ARGUMENT error but got: " + ctx.getValue());
 	}
+	
+	public static void assertMemoryError(Context<?> ctx) {
+		Object cet = ctx.getErrorCode();
+		assertEquals(ErrorCodes.MEMORY, cet, "Expected MEMORY error but got: " + ctx.getValue());
+	}
+
 
 	public static void assertFundsError(Context<?> ctx) {
 		Object cet = ctx.getErrorCode();

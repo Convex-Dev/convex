@@ -5,18 +5,7 @@ import static convex.core.lang.TestState.eval;
 import static convex.core.lang.TestState.evalB;
 import static convex.core.lang.TestState.evalL;
 import static convex.core.lang.TestState.step;
-import static convex.test.Assertions.assertArgumentError;
-import static convex.test.Assertions.assertArityError;
-import static convex.test.Assertions.assertAssertError;
-import static convex.test.Assertions.assertBoundsError;
-import static convex.test.Assertions.assertCastError;
-import static convex.test.Assertions.assertCompileError;
-import static convex.test.Assertions.assertDepthError;
-import static convex.test.Assertions.assertFundsError;
-import static convex.test.Assertions.assertJuiceError;
-import static convex.test.Assertions.assertNobodyError;
-import static convex.test.Assertions.assertStateError;
-import static convex.test.Assertions.assertUndeclaredError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -1182,6 +1171,32 @@ public class CoreTest {
 		assertFalse(evalB(ctx,"(actor? nil)"));
 		assertFalse(evalB(ctx,"(actor? [ctr])"));
 		assertFalse(evalB(ctx,"(actor? 'ctr)"));
+	}
+	
+	@Test
+	public void testTransferAllowance() {
+		long ALL=Constants.INITIAL_ACCOUNT_ALLOWANCE;
+		Address HERO = TestState.HERO;
+		assertEquals(ALL, evalL("*allowance*"));
+
+		assertEquals(ALL, step("(transfer-allownce *address* 1337)").getAccountStatus(HERO).getAllowance());
+		
+		assertEquals(ALL-1337, step("(transfer-allowance 0x"+Init.VILLAIN.toHexString()+" 1337)").getAccountStatus(HERO).getAllowance());
+
+		assertEquals(0L, step("(transfer-allowance 0x"+Init.VILLAIN.toHexString()+" "+ALL+")").getAccountStatus(HERO).getAllowance());
+ 
+		assertArgumentError(step("(transfer-allowance *address* -1000)"));	
+		assertMemoryError(step("(transfer-allowance *address* (+ 1 "+ALL+"))"));
+
+		// check bad arg types
+		assertCastError(step("(transfer-allowance -1000 1000)"));
+		assertCastError(step("(transfer-allowance *address* :foo)"));
+		
+		// check bad arities
+		assertArityError(step("(transfer-allowance -1000)"));
+		assertArityError(step("(transfer-allowance)"));
+		assertArityError(step("(transfer-allowance *address* 100 100)"));
+
 	}
 
 	@Test
