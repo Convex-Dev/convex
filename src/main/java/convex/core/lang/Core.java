@@ -693,6 +693,21 @@ public class Core {
 
 		}
 	});
+	
+	public static final CoreFn<Long> TRANSFER_ALLOWANCE = reg(new CoreFn<>(Symbols.TRANSFER_ALLOWANCE) {
+		@Override
+		public <I> Context<Long> invoke(Context<I> context, Object[] args) {
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+
+			Address address = RT.address(args[0]);
+			if (address == null) return context.withCastError(args[0], Address.class);
+
+			Long amount = RT.toLong(args[1]);
+			if (amount == null) return context.withCastError(args[0], Long.class);
+
+			return context.transferAllowance(address, amount).consumeJuice(Juice.TRANSFER);
+		}
+	});
 
 	public static final CoreFn<Long> STAKE = reg(new CoreFn<>(Symbols.STAKE) {
 		@Override

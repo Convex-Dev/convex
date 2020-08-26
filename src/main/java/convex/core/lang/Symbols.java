@@ -226,6 +226,9 @@ public class Symbols {
 
 	public static final Symbol GET_HOLDING = Symbol.create("get-holding");
 	public static final Symbol SET_HOLDING = Symbol.create("set-holding");
+	
+	public static final Symbol SET_ALLOWANCE = Symbol.create("set-allowance");
+	public static final Symbol TRANSFER_ALLOWANCE = Symbol.create("transfer-allowance");
 
 	public static final Symbol SET_BANG = Symbol.create("set!");
 	public static final Symbol SET_STAR = Symbol.create("set*");

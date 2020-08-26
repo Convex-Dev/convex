@@ -1062,7 +1062,7 @@ public final class Context<T> implements IObject {
 	 */
 	public Context<Long> transfer(Address target, long amount) {
 		if (amount<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative amount");
-		if (amount>Amount.MAX_AMOUNT) return withError(ErrorCodes.ARGUMENT,"Can't transfer an amount beyong maximum limit");
+		if (amount>Amount.MAX_AMOUNT) return withError(ErrorCodes.ARGUMENT,"Can't transfer an amount beyond maximum limit");
 		
 		BlobMap<Address,AccountStatus> accounts=getState().getAccounts();
 		
@@ -1095,6 +1095,52 @@ public final class Context<T> implements IObject {
 		// SECURITY: new context with updated accounts
 		Context<Long> result=new Context<>(chainState.withAccounts(accounts),juice,localBindings,null,depth,false);
 		
+		return result;
+	}
+	
+	/**
+	 * Transfers memory allowance from the current address to the target.
+	 * 
+	 * Uses no juice
+	 * 
+	 * @param target Target Address, must already exist
+	 * @param amount Allowance to transfer, must be between 0 and Amount.MAX_VALUE inclusive
+	 * @return Context with a null result if the transaction succeeds, or an exceptional value if the transfer fails
+	 * @throws ExecutionException
+	 */
+	public Context<Long> transferAllowance(Address target, Long amount) {
+		if (amount<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative aloowance amount");
+		if (amount>Amount.MAX_AMOUNT) return withError(ErrorCodes.ARGUMENT,"Can't transfer an allowance amount beyond maximum limit");
+		
+		BlobMap<Address,AccountStatus> accounts=getState().getAccounts();
+		
+		Address source=getAddress();
+		AccountStatus sourceAccount=accounts.get(source);
+		if (sourceAccount==null) {
+			return withError(ErrorCodes.STATE,"Cannot transfer from non-existent account: "+source);
+		}
+		
+		long currentBalance=sourceAccount.getAllowance();
+		if (currentBalance<amount) {
+			return withError(ErrorCodes.MEMORY,"Insufficient memory allowance for transfer");
+		}
+		
+		long newSourceBalance=currentBalance-amount;
+		AccountStatus newSourceAccount=sourceAccount.withAllowance(newSourceBalance);
+		accounts=accounts.assoc(source, newSourceAccount);
+
+		// new target account (note: could be source account, so we get from latest accounts)
+		AccountStatus targetAccount=accounts.get(target);	
+		if (targetAccount==null) {
+			return withError(ErrorCodes.STATE,"Cannot transfer to non-existent account: "+target);
+		}
+		
+		long newTargetBalance=targetAccount.getAllowance()+amount;
+		AccountStatus newTargetAccount=targetAccount.withAllowance(newTargetBalance);
+		accounts=accounts.assoc(target, newTargetAccount);
+
+		// SECURITY: new context with updated accounts
+		Context<Long> result=new Context<>(chainState.withAccounts(accounts),juice,localBindings,null,depth,false);
 		return result;
 	}
 
@@ -1397,4 +1443,6 @@ public final class Context<T> implements IObject {
 	protected <R> Context<R> withAccountStatus(Address target, AccountStatus accountStatus) {
 		return withState(getState().putAccount(target, accountStatus));
 	}
+
+
 }
