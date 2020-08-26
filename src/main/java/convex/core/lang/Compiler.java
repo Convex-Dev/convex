@@ -71,7 +71,12 @@ public class Compiler {
 	@SuppressWarnings("unchecked")
 	static <T> Context<AOp<T>> expandCompile(Object form, Context<?> context) {
 		// expand phase
-		final Context<Syntax> ctx = expand(form, context);
+		AExpander ex = INITIAL_EXPANDER;
+		
+		// use initial expander both as current and continuation expander
+		// call expand via context to get correct depth and exception handling
+		final Context<Syntax> ctx = context.expand(form, ex,ex);
+		
 		if (ctx.isExceptional()) return (Context<AOp<T>>) (Object) ctx;
 
 		// compile phase
@@ -97,19 +102,6 @@ public class Compiler {
 		} else {
 			return compileBasicConstant(form, context);
 		}
-	}
-
-	/**
-	 * Expands a single form using the default expander Should not be used directly,
-	 * intended for use via Context.expand(...)
-	 * 
-	 * @return Context with expanded Syntax Object as result
-	 */
-	static Context<Syntax> expand(Object form, Context<?> context) {
-		AExpander ex = Core.INITIAL_EXPANDER;
-		// use initial expander both as current and continuation expander
-		// call expand via context to get correct depth and exception handling
-		return context.expand(form, ex, ex);
 	}
 
 	/**

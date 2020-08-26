@@ -956,7 +956,8 @@ public final class Context<T> implements IObject {
 		Context<Syntax> rctx =this.adjustDepth(1);
 		if (rctx.isExceptional) return rctx;
 		
-		rctx = Compiler.expand(form, rctx);
+		AExpander ex = Core.INITIAL_EXPANDER;
+		rctx = rctx.expand(form,ex,ex);
 		
 		if (rctx.isExceptional()) {
 			
