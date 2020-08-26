@@ -52,6 +52,11 @@ public class Constants {
 
 	public static final long DEFAULT_CLIENT_TIMEOUT = 10000;
 
+	/**
+	 * Allowance for initial user / peer accounts
+	 */
+	public static final long INITIAL_ACCOUNT_ALLOWANCE = 100000;
+
 	
 
 }

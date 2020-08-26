@@ -212,6 +212,7 @@ public class Init {
 		Amount amount;
 		amount = Amount.create(balance);
 		AccountStatus as = AccountStatus.create(0L, amount); // zero sequence
+		as=as.withAllowance(Constants.INITIAL_ACCOUNT_ALLOWANCE);
 		if (accts.containsKey(a)) throw new Error("Duplicate peer account!");
 		accts = accts.assoc(a, as);
 		return accts;

@@ -528,6 +528,7 @@ public final class Context<T> implements IObject {
 			if (sym.equals(Symbols.STAR_JUICE)) return (Context<R>) withResult(getJuice());
 			if (sym.equals(Symbols.STAR_CALLER)) return (Context<R>) withResult(getCaller());
 			if (sym.equals(Symbols.STAR_ADDRESS)) return (Context<R>) withResult(getAddress());
+			if (sym.equals(Symbols.STAR_ALLOWANCE)) return (Context<R>) withResult(getAccountStatus().getAllowance());
 			if (sym.equals(Symbols.STAR_BALANCE)) return (Context<R>) withResult(getBalance());
 			if (sym.equals(Symbols.STAR_ORIGIN)) return (Context<R>) withResult(getOrigin());
 			if (sym.equals(Symbols.STAR_RESULT)) return (Context<R>) this;

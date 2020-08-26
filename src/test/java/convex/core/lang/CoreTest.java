@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Block;
 import convex.core.BlockResult;
+import convex.core.Constants;
 import convex.core.Init;
 import convex.core.State;
 import convex.core.crypto.Hash;
@@ -1812,6 +1813,9 @@ public class CoreTest {
 		assertEquals(HERO, eval("*address*"));
 		assertEquals(HERO, eval("*origin*"));
 		assertNull(eval("*caller*"));
+		
+		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE, evalL("*allowance*"));
+
 
 		// balance should return exact balance after execution
 		Context<?> ctx = step("(long *balance*)");

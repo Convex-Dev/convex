@@ -33,6 +33,6 @@ public class InitTest {
 	public void testHEro() {
 		AccountStatus as=s.getAccount(Init.HERO);
 		assertNotNull(as);
-		assertEquals(0L,as.getAllowance());
+		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE,as.getAllowance());
 	}
 }
