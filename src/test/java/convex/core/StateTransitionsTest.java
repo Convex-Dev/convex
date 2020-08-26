@@ -3,6 +3,7 @@ package convex.core;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -24,6 +25,9 @@ import convex.core.transactions.Invoke;
 import convex.core.transactions.Transfer;
 import convex.core.util.Utils;
 
+/**
+ * Tests for State transition scenarios
+ */
 public class StateTransitionsTest {
 
 	final AKeyPair KEYPAIR_A = ECDSAKeyPair.createSeeded(1001);
@@ -52,7 +56,7 @@ public class StateTransitionsTest {
 		assertEquals(Amount.create(1000), s.getBalance(ADDRESS_B));
 		assertEquals(Amount.create(0), s.getBalance(ADDRESS_C));
 
-		long TCOST = Juice.TRANSFER * Constants.INITIAL_JUICE_PRICE;
+		long TCOST = Juice.TRANSFER * s.getJuicePrice();
 
 		{ // transfer from existing to existing account A->B
 			Transfer t1 = Transfer.create(1, ADDRESS_B, 50);
@@ -163,6 +167,22 @@ public class StateTransitionsTest {
 
 		}
 
+	}
+	
+	
+	
+	@Test
+	public void testMemoryAccounting() throws BadSignatureException {
+		State s = Init.STATE;
+		AKeyPair kp = convex.core.lang.TestState.HERO_PAIR;
+		
+		long initialMem=s.getAccount(Init.HERO).getMemoryUsage();
+		
+		ATransaction t1 = Invoke.create(1,Reader.read("(def a 1)"));
+		Block b1 = Block.of(s.getTimeStamp(), kp.signData(t1));
+		s = s.applyBlock(b1).getState();
+		
+		assertTrue(initialMem<s.getAccount(Init.HERO).getMemoryUsage());
 	}
 
 	@Test

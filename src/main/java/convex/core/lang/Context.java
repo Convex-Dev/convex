@@ -29,6 +29,7 @@ import convex.core.lang.impl.AExceptional;
 import convex.core.lang.impl.ErrorValue;
 import convex.core.lang.impl.HaltValue;
 import convex.core.lang.impl.RollbackValue;
+import convex.core.util.Economics;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
@@ -246,17 +247,18 @@ public final class Context<T> implements IObject {
 	 * <li>Accumulates used juice fees in globals</li>
 	 * </ul>
 	 * 
-	 * @param totalJuice total juice reserved at start of transaction
-	 * @param juicePrice juice price for transaction
+	 * @param initialState State before transaction execution (after prepare)
+	 * @param initialJuice total juice reserved at start of transaction
 	 * @return Updated context
 	 */
-	public Context<T> completeTransaction(State initialState, long totalJuice, long juicePrice) {
+	public Context<T> completeTransaction(State initialState, long initialJuice) {
 		// get state at end of transaction application
 		State state=getState();
 		
 		long remainingJuice=Math.max(0L, juice);
-		long transactionJuice=totalJuice-remainingJuice;
-		assert(transactionJuice>=0);
+		long usedJuice=initialJuice-remainingJuice;
+		long juicePrice=initialState.getJuicePrice();
+		assert(usedJuice>=0);
 	
 		long refund=0L;
 		
@@ -269,44 +271,69 @@ public final class Context<T> implements IObject {
 		
 		// compute memory delta
 		Address address=getAddress();
-		AccountStatus newAs=state.getAccount(address);
-		AccountStatus oldAs=initialState.getAccount(address);
-		long memUsed=newAs.getMemorySize()-oldAs.getMemorySize();
-		long allowance=newAs.getAllowance();
+		AccountStatus account=state.getAccount(address);
+		long memUsed=state.getMemorySize()-initialState.getMemorySize();
+		long allowance=account.getAllowance();
+		long balanceLeft=account.getBalance().getValue();
+		boolean memoryFailure=false;
 		
+		long memorySpend=0L; // usually zero
 		if (memUsed>0) {
 			long allowanceUsed=Math.min(allowance, memUsed);
 			if (allowanceUsed>0) {
-				newAs=newAs.withAllowance(allowance-allowanceUsed);
+				account=account.withAllowance(allowance-allowanceUsed);
 			}
-			long purchaseNeeded=memUsed=allowanceUsed;
+			
+			// compute additional memory purchase requirement beyond allowance
+			long purchaseNeeded=memUsed-allowanceUsed;
 			if (purchaseNeeded>0) {
-				// TODO: buy from pool
+				AccountStatus pool=state.getAccount(Init.MEMORY_EXCHANGE);
+				// we do memory purchase if pool exists
+				if (pool!=null) {
+					long poolBalance=pool.getBalance().getValue();
+					long poolAllowance=pool.getAllowance();
+					memorySpend=Economics.swapPrice(purchaseNeeded, poolAllowance, poolBalance);
+					
+					if ((refund+balanceLeft)>=memorySpend) {
+						// enough to cover memory price, so automatically buy from pool
+						// System.out.println("Buying "+purchaseNeeded+" memory for: "+price);
+						pool=pool.withBalances(Amount.create(poolBalance+memorySpend), poolAllowance-purchaseNeeded);
+						state=state.putAccount(Init.MEMORY_EXCHANGE,pool);
+					} else {
+						// Insufficient memory, so need to roll back state to before transaction
+						// origin should still pay transaction fees, but no memory costs
+						state=initialState;
+						account=state.getAccount(address);
+						memoryFailure=true;
+					}
+				}
 			}
 		} else {
-			// credit back to allowance
+			// credit any unused memory back to allowance (may be zero)
 			long allowanceCredit=-memUsed;
-			newAs=newAs.withAllowance(allowance+allowanceCredit);
+			account=account.withAllowance(allowance+allowanceCredit);
 		}
 		
-		// Make refund if needed
-		if (refund>0L) {
-			newAs=newAs.withBalance(newAs.getBalance().add(refund));
-		}
+		// Make balance changes if needed for refund and memory purchase
+		account=account.addBalance(refund-memorySpend);
 		
 		// update Account
-		state=state.putAccount(address,newAs);
-
+		state=state.putAccount(address,account);
 		
 		// maybe add used juice to miner fees
-		if (transactionJuice>0L) {
-			long transactionFees = transactionJuice*juicePrice;
+		if (usedJuice>0L) {
+			long transactionFees = usedJuice*juicePrice;
 			long oldFees=(long)state.getGlobal(Symbols.FEES);
 			long newFees=oldFees+transactionFees;
 			state=state.withGlobal(Symbols.FEES,newFees);
 		}
 		
-		return withState(state);
+		// final state update and result reporting
+		Context<T> rctx=this.withState(state);
+		if (memoryFailure) {
+			rctx=rctx.withError(ErrorCodes.MEMORY, "Unable to allocate additional memory required for transaction ("+memUsed+" bytes)");
+		}
+		return rctx;
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -1247,8 +1274,8 @@ public final class Context<T> implements IObject {
 	}
 	
 	@SuppressWarnings("unchecked")
-	public <R> Context<R> withError(Keyword error,Object message) {
-		return (Context<R>) withException(ErrorValue.create(error,message));
+	public <R> Context<R> withError(Keyword errorCode,Object message) {
+		return (Context<R>) withException(ErrorValue.create(errorCode,message));
 	}
 
 	public <R> Context<R> withArityError(String string) {

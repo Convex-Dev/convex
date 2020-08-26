@@ -46,8 +46,15 @@ public abstract class ATransaction extends ACell {
 	public abstract int estimatedEncodingSize();
 
 	/**
-	 * Applies the effect of this transaction to the current state. Assumes all
-	 * relevant preparation complete.
+	 * Applies the functional effect of this transaction to the current state. 
+	 * 
+	 * Important points:
+	 * <ul>
+	 * <li>Assumes all relevant accounting preparation already complete, including juice reservation</li>
+	 * <li>Performs complete state update (including any rollbacks from errors)</li>
+	 * <li>Produces result, which may be exceptional</li>
+	 * <li>Does not finalise memory/juice accounting (will be completed afterwards)</li>
+	 * </ul>
 	 * 
 	 * @param state  The initial chain state
 	 * @param source The source account that has signed the transaction
@@ -64,7 +71,7 @@ public abstract class ATransaction extends ACell {
 	 * 
 	 * @return Juice limit
 	 */
-	public abstract long getMaxJuice();
+	public abstract Long getMaxJuice();
 	
 	@Override
 	protected boolean isEmbedded() {

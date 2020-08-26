@@ -65,8 +65,11 @@ public class Transfer extends ATransaction {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T> Context<T> apply(Context<?> ctx) {
+		// consume juice, ensure we have enough to make transfer!
 		ctx = ctx.consumeJuice(Juice.TRANSFER);
-		ctx = ctx.transfer(target, amount.getValue());
+		if (!ctx.isExceptional()) {
+			ctx = ctx.transfer(target, amount.getValue());
+		}
 		return (Context<T>) ctx;
 	}
 
@@ -116,7 +119,7 @@ public class Transfer extends ATransaction {
 	}
 
 	@Override
-	public long getMaxJuice() {
+	public Long getMaxJuice() {
 		return Juice.TRANSFER;
 	}
 	

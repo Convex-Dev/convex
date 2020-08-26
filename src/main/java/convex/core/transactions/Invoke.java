@@ -81,11 +81,15 @@ public class Invoke extends ATransaction {
 	@Override
 	public <T> Context<T> apply(final Context<?> context) {
 		Context<T> ctx=(Context<T>) context;
+		
+		// Run command
 		if (command instanceof AOp) {
 			ctx = ctx.execute((AOp<T>) command);
 		} else {
 			ctx = ctx.eval(command);
 		}
+		
+		// Handle exceptional return cases
 		if (ctx.isExceptional()) {
 			AExceptional ex=ctx.getExceptional();
 			if (ex instanceof HaltValue) {
@@ -96,6 +100,7 @@ public class Invoke extends ATransaction {
 				ctx=ctx.withResult(((RollbackValue<T>)ex).getValue());
 				ctx=ctx.withState(context.getState());
 			}
+			// Other exceptional cases fall through
 		}
 		return (Context<T>) ctx;
 	}
@@ -131,7 +136,7 @@ public class Invoke extends ATransaction {
 	}
 
 	@Override
-	public long getMaxJuice() {
+	public Long getMaxJuice() {
 		// TODO make this a field
 		return Constants.MAX_TRANSACTION_JUICE;
 	}

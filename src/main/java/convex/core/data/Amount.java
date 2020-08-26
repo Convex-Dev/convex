@@ -234,9 +234,9 @@ public class Amount extends ACell implements Comparable<Amount> {
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		sb.append("#amt ");
-		sb.append(toDecimalString());
-		sb.append("M");
+		sb.append("#amt \"");
+		sb.append(Text.toFriendlyBalance(value));
+		sb.append("\"");
 	}
 
 	public double toDouble() {

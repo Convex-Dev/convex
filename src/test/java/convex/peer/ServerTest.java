@@ -38,6 +38,18 @@ public class ServerTest {
 	public static final Server server;
 	static final AKeyPair keyPair;
 	
+	static {
+		keyPair = Init.KEYPAIRS[0];
+
+		Map<Keyword, Object> config = new HashMap<>();
+		config.put(Keywords.PORT, 0);
+		config.put(Keywords.STATE, Init.STATE);
+		config.put(Keywords.KEYPAIR, Init.KEYPAIRS[0]); // use first peer keypair
+
+		server = Server.create(config);
+		server.launch();
+	}
+	
 	private static final Logger log = Logger.getLogger(ServerTest.class.getName());
 
 	private HashMap<Long, Object> results = new HashMap<>();
@@ -99,15 +111,5 @@ public class ServerTest {
 	
 
 
-	static {
-		keyPair = Init.KEYPAIRS[0];
 
-		Map<Keyword, Object> config = new HashMap<>();
-		config.put(Keywords.PORT, 0);
-		config.put(Keywords.STATE, Init.STATE);
-		config.put(Keywords.KEYPAIR, Init.KEYPAIRS[0]); // use first peer keypair
-
-		server = Server.create(config);
-		server.launch();
-	}
 }

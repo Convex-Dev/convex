@@ -16,6 +16,9 @@ import convex.core.data.Sets;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 
+/**
+ * Tests for the State data structure
+ */
 public class StateTest {
 
 	@Test

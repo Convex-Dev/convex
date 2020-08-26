@@ -99,7 +99,7 @@ public class Call extends ATransaction {
 	}
 
 	@Override
-	public long getMaxJuice() {
+	public Long getMaxJuice() {
 		return Constants.MAX_TRANSACTION_JUICE;
 	}
 

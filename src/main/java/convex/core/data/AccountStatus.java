@@ -156,6 +156,10 @@ public class AccountStatus extends ARecord {
 		return fn;
 	}
 
+	/**
+	 * Gets the dynamic environment for this account. Defaults to the standard initial environment.
+	 * @return
+	 */
 	public AHashMap<Symbol, Syntax> getEnvironment() {
 		// default to standard environment
 		// needed to avoid circularity in static initialisation?
@@ -359,5 +363,24 @@ public class AccountStatus extends ARecord {
 	 */
 	public long getAllowance() {
 		return allowance;
+	}
+
+	/**
+	 * Gets the memory usage for this Account. Memory usage is defined as the size of the AccountStatus Cell
+	 * @return Memory usage of this Account in bytes.
+	 */
+	public long getMemoryUsage() {
+		return this.getMemorySize();
+	}
+
+	/**
+	 * Adds a change in balance to this account. Must not cause an illegal balance. Returns this instance unchanged
+	 * if the delta is zero
+	 * @param delta
+	 * @return
+	 */
+	public AccountStatus addBalance(long delta) {
+		if (delta==0) return this;
+		return withBalance(getBalance().getValue()+delta);
 	}
 }

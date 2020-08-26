@@ -335,14 +335,20 @@ public class State extends ARecord {
 	/**
 	 * Applies a transaction to the State. 
 	 * 
+	 * There are three phases in application of a transaction:
+	 * <ol>
+	 * <li>Preparation for accounting, with {@link #prepareTransaction(Address, ATransaction) prepareTransaction}</li>
+	 * <li>Functional application of the transaction with ATransaction.apply(....)</li>
+	 * <li>Completion of accounting, with completeTransaction</li>
+	 * </ol>
+	 * 
 	 * SECURITY: Assumes digital signature already checked.
 	 * 
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
 	public <T> Context<T> applyTransaction(Address origin,ATransaction t) {
-		State state=this;
 		
-		// Create context with juice subtracted
+		// Create prepared context (juice subtracted, sequence updated, transaction entry checks)
 		Context<T> ctx = prepareTransaction(origin,t);
 		final long totalJuice = ctx.getJuice();
 		
@@ -351,11 +357,16 @@ public class State extends ARecord {
 			// i.e. before executing the transaction
 			return ctx;
 		}
+		
+		State preparedState=ctx.getState();
+
 
 		// apply transaction. This may result in an error!
-		// NOTE: completeTransaction handles error cases as well
 		ctx = t.apply(ctx);
-		ctx = ctx.completeTransaction(this, totalJuice, state.getJuicePrice());
+
+		// complete transaction
+		// NOTE: completeTransaction handles error cases as well
+		ctx = ctx.completeTransaction(preparedState, totalJuice);
 
 		return ctx;
 	}
@@ -377,7 +388,10 @@ public class State extends ARecord {
 		State preparedState = this.putAccount(origin, newAccount);
 		
 		// Create context with juice subtracted
-		Context<T> ctx = Context.createInitial(preparedState, origin, t.getMaxJuice());
+		Long maxJuice=t.getMaxJuice();
+
+		long juiceLimit=Math.min(Constants.MAX_TRANSACTION_JUICE,(maxJuice==null)?account.getBalance().getValue():maxJuice);
+		Context<T> ctx = Context.createInitial(preparedState, origin, juiceLimit);
 		return ctx;
 	}
 
@@ -419,7 +433,7 @@ public class State extends ARecord {
 	 * 
 	 * @param address
 	 * @param accountStatus
-	 * @return @
+	 * @return Updates State, or this state if Account was unchanged
 	 */
 	public State putAccount(Address address, AccountStatus accountStatus) {
 		BlobMap<Address, AccountStatus> newAccounts = accounts.assoc(address, accountStatus);

@@ -85,7 +85,7 @@ public class Init {
 			CORE_ACCOUNT=accts.get(CORE_ADDRESS);
 
 			// governance accounts
-			accts = addGovernanceAccount(accts, RESERVED, 900000000000000000L); // 99%
+			accts = addGovernanceAccount(accts, RESERVED, 900000000000000000L); // 90%
 			accts = addGovernanceAccount(accts, MAINBANK, 90000000000000000L); // 9%
 			accts = addGovernanceAccount(accts, ROOTFUND, 9000000000000000L); // 1%
 			accts = addGovernanceAccount(accts, MAINPOOL, 998000000000000L); // 0.1% distribute 5% / year ~= 0.0003%
@@ -157,6 +157,7 @@ public class Init {
 			
 			{ // Register core library
 				s = register(s,CORE_ADDRESS,"Convex Core Library");
+				s = register(s,MEMORY_EXCHANGE,"Memory Exchange Pool");
 			}
 
 			STATE = s;
