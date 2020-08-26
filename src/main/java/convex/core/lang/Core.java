@@ -687,10 +687,22 @@ public class Core {
 			if (address == null) return context.withCastError(args[0], Address.class);
 
 			Long amount = RT.toLong(args[1]);
-			if (amount == null) return context.withCastError(args[0], Long.class);
+			if (amount == null) return context.withCastError(args[1], Long.class);
 
 			return context.transfer(address, amount).consumeJuice(Juice.TRANSFER);
 
+		}
+	});
+	
+	public static final CoreFn<Long> SET_ALLOWANCE = reg(new CoreFn<>(Symbols.SET_ALLOWANCE) {
+		@Override
+		public <I> Context<Long> invoke(Context<I> context, Object[] args) {
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+
+			Long amount = RT.toLong(args[0]);
+			if (amount == null) return context.withCastError(args[0], Long.class);
+
+			return context.setAllowance(amount).consumeJuice(Juice.TRANSFER);
 		}
 	});
 	
@@ -703,7 +715,7 @@ public class Core {
 			if (address == null) return context.withCastError(args[0], Address.class);
 
 			Long amount = RT.toLong(args[1]);
-			if (amount == null) return context.withCastError(args[0], Long.class);
+			if (amount == null) return context.withCastError(args[1], Long.class);
 
 			return context.transferAllowance(address, amount).consumeJuice(Juice.TRANSFER);
 		}

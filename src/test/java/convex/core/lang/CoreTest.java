@@ -1174,6 +1174,33 @@ public class CoreTest {
 	}
 	
 	@Test
+	public void testSetAllowance() {
+		
+		// zero price for unchanged allowance
+		assertEquals(0L, evalL("(set-allowance *allowance*)"));
+		
+		// sell whole allowance
+		assertEquals(0L, evalL("(do (set-allowance 0) *allowance*)"));
+		
+		// buy allowance reduces balance
+		assertTrue(evalL("(let [b *balance*] (set-allowance (inc *allowance*)) (- *balance* b))")<0);
+		
+		// sell allowance increases balance
+		assertTrue(evalL("(let [b *balance*] (set-allowance (dec *allowance*)) (- *balance* b))")>0);
+		
+		// trying to buy too much is a funds error
+		assertFundsError(step("(set-allowance 1000000000000000000)"));
+
+		
+		assertCastError(step("(set-allowance :foo)"));
+		assertCastError(step("(set-allowance nil)"));
+		
+		assertArityError(step("(set-allowance)"));
+		assertArityError(step("(set-allowance 1 2)"));
+
+	}
+	
+	@Test
 	public void testTransferAllowance() {
 		long ALL=Constants.INITIAL_ACCOUNT_ALLOWANCE;
 		Address HERO = TestState.HERO;

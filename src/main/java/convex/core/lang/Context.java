@@ -1143,6 +1143,45 @@ public final class Context<T> implements IObject {
 		Context<Long> result=new Context<>(chainState.withAccounts(accounts),juice,localBindings,null,depth,false);
 		return result;
 	}
+	
+	/**
+	 * Sets the memory allowance for the current account, buying / selling from the pool as necessary to 
+	 * ensure the correct final allowance
+	 * @param allowance
+	 * @return Context indicating the price paid for the allowance change (may be zero or negative for refund)
+	 */
+	public Context<Long> setAllowance(long allowance) {
+		BlobMap<Address,AccountStatus> accounts=getState().getAccounts();
+		if (allowance<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative aloowance amount");
+		if (allowance>Amount.MAX_AMOUNT) return withError(ErrorCodes.ARGUMENT,"Can't transfer an allowance amount beyond maximum limit");
+		
+		Address source=getAddress();
+		AccountStatus sourceAccount=accounts.get(source);
+		if (sourceAccount==null) {
+			return withError(ErrorCodes.STATE,"Cannot set allowance for non-existent account: "+source);
+		}
+		long current=sourceAccount.getAllowance();
+		long balance=sourceAccount.getBalance().getValue();
+		long delta=allowance-current;
+		if (delta==0L) return this.withResult(0L);
+		
+		AccountStatus pool=getState().getAccount(Init.MEMORY_EXCHANGE);
+		
+		try {
+			long poolAllowance=pool.getAllowance();
+			long poolBalance=pool.getBalance().getValue();
+			long price = Economics.swapPrice(delta, poolAllowance,poolBalance);
+			if (price>balance) {
+				return withError(ErrorCodes.FUNDS,"Cannot afford allowance, would cost: "+price);
+			}
+			sourceAccount=sourceAccount.withBalances(Amount.create(balance-price), allowance);
+			pool=pool.withBalances(Amount.create(poolBalance+price), poolAllowance-delta);
+			BlobMap<Address,AccountStatus> newAccounts=accounts.assoc(source, sourceAccount).assoc(Init.MEMORY_EXCHANGE,pool);
+			return new Context<Long>(chainState.withAccounts(newAccounts),juice,localBindings,null,depth,false);
+		} catch (IllegalArgumentException e) {
+			return withError(ErrorCodes.FUNDS,"Cannot trade allowance: "+e.getMessage());
+		}
+	}
 
 	/**
 	 * Accepts offered funds for the given address.
@@ -1443,6 +1482,7 @@ public final class Context<T> implements IObject {
 	protected <R> Context<R> withAccountStatus(Address target, AccountStatus accountStatus) {
 		return withState(getState().putAccount(target, accountStatus));
 	}
+
 
 
 }
