@@ -101,13 +101,13 @@ public class AccountStatus extends ARecord {
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer b) {
-		b = Format.writeVLCLong(b, sequence);
-		b = Format.write(b, balance);
-		b = Format.write(b, allowance);
-		b = Format.write(b, environment);
-		b = Format.write(b, holdings);
-		return b;
+	public ByteBuffer writeRaw(ByteBuffer bb) {
+		bb = Format.writeVLCLong(bb, sequence);
+		bb = Format.write(bb, balance);
+		bb = Format.write(bb, allowance);
+		bb = Format.write(bb, environment);
+		bb = Format.write(bb, holdings);
+		return bb;
 	}
 
 	public static AccountStatus read(ByteBuffer bb) throws BadFormatException {
