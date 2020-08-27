@@ -34,6 +34,7 @@ public class ScryptNext extends Reader {
     public final Rule ELSE = Keyword("else");
     public final Rule WHEN = Keyword("when");
     public final Rule DO = Keyword("do");
+    public final Rule CALL = Keyword("call");
 
     final Rule EQU = Terminal("=", Ch('='));
     final Rule COMMA = Terminal(",");
@@ -391,6 +392,7 @@ public class ScryptNext extends Reader {
 
     public Rule Primary() {
         return FirstOf(
+                CallExpression(),
                 CallableExpression(),
                 DoExpression(),
                 FnExpression(),
@@ -457,6 +459,71 @@ public class ScryptNext extends Reader {
                 acc = l.cons(acc);
             }
             return acc;
+        }
+    }
+
+    // --------------------------------
+    // CALL EXPRESSION
+    // --------------------------------
+
+    public Rule CallExpression() {
+        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+
+        return Sequence(
+                // Keyword
+                CALL,
+
+                // Address
+                StringLiteral(),
+                ListAddAction(expVar),
+                Spacing(),
+
+                // Optional offer
+                Optional(
+                        "offer",
+                        Spacing(),
+                        Expression(),
+                        ListAddAction(expVar),
+                        Spacing()
+                ),
+
+                // Function name
+                Symbol(),
+                ListAddAction(expVar),
+                Spacing(),
+
+                // Functions args
+                WrapInParenthesis(ZeroOrMoreCommaSeparatedOf(Expression())),
+                ListAddAction(expVar),
+
+                // Compile e.g.: (call <Address> offer 1000 (buy "Something"))
+                push(prepare(callExpression(expVar.get())))
+        );
+    }
+
+    @SuppressWarnings("unchecked")
+    public AList<Object> callExpression(ArrayList<Object> exprs) {
+        var hasOffer = exprs.size() == 4;
+        var address = exprs.get(0);
+        var offer = hasOffer ? exprs.get(1) : null;
+        var name = hasOffer ? exprs.get(2) : exprs.get(1);
+        var argsSyntax = (Syntax) (hasOffer ? exprs.get(3) : exprs.get(2));
+        var argsList = (AList<Object>) argsSyntax.getValue();
+        var call = argsList.cons(Syntax.unwrap(name));
+
+        if (hasOffer) {
+            return Lists.of(
+                    Symbols.CALL,
+                    address,
+                    Syntax.create(offer),
+                    call
+            );
+        } else {
+            return Lists.of(
+                    Symbols.CALL,
+                    address,
+                    call
+            );
         }
     }
 
