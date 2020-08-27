@@ -23,7 +23,6 @@ import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
-import convex.core.exceptions.TODOException;
 import convex.core.lang.expanders.AExpander;
 import convex.core.lang.impl.AExceptional;
 import convex.core.lang.impl.ErrorValue;
@@ -572,10 +571,10 @@ public final class Context<T> implements IObject {
 	}
 
 	/**
-	 * Gets the address of the currently executing Actor, or the address of the
+	 * Gets the address of the currently executing Account. May be the current actor, or the address of the
 	 * account that executed this transaction if no Actors have been called.
 	 * 
-	 * @return Address of the current account
+	 * @return Address of the current account, cannot be null
 	 */
 	public Address getAddress() {
 		return chainState.address;
@@ -621,10 +620,6 @@ public final class Context<T> implements IObject {
 	 */
 	public <R> Context<R> withResult(R value) {
 		return withResult(0,value);
-	}
-	
-	public <R> Context<R> withResult(R result, AHashMap<Symbol, Object> restoredBindings) {
-		return create(chainState,juice,restoredBindings,result,depth);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -821,7 +816,7 @@ public final class Context<T> implements IObject {
 				}
 			}
 		} else {
-			throw new TODOException("Don't understand binding form: "+bindingForm);
+			return ctx.withCompileError("Don't understand binding form: "+bindingForm);
 		}
 		// return after clearing result. Don't want to be exceptional....
 		return ctx.withResult(null);
@@ -1069,9 +1064,6 @@ public final class Context<T> implements IObject {
 		
 		Address source=getAddress();
 		AccountStatus sourceAccount=accounts.get(source);
-		if (sourceAccount==null) {
-			return withError(ErrorCodes.STATE,"Cannot transfer from non-existent account: "+source);
-		}
 		
 		long currentBalance=sourceAccount.getBalance().getValue();
 		if (currentBalance<amount) {
@@ -1228,8 +1220,6 @@ public final class Context<T> implements IObject {
 		Symbol sym=RT.toSymbol(functionName);
 		AccountStatus as=state.getAccount(target);
 		if (as==null) return this.withError(ErrorCodes.STATE,"Actor does not exist: "+target);
-		IFn<R> fn=as.getActorFunction(sym);
-		if (fn==null) return this.withError(ErrorCodes.STATE,"Actor does not have exported function to call: "+sym);
 		
 		if (offer>0L) {
 			Address senderAddress=getAddress();
@@ -1244,6 +1234,9 @@ public final class Context<T> implements IObject {
 			return this.withError(ErrorCodes.ARGUMENT, "Cannot make negative offer in Actor call: "+offer);
 		}
 		
+		IFn<R> fn=as.getActorFunction(sym);
+		if (fn==null) return this.withError(ErrorCodes.STATE,"Actor does not have exported function to call: "+sym);
+
 		// Context for execution of Actor call. Increments depth
 		// SECURITY: Must change address to the target Actor address.
 		// SECURITY: Must change caller to current address.

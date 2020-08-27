@@ -1102,13 +1102,23 @@ public class CoreTest {
 
 	@Test
 	public void testCall() {
-		Context<Address> ctx = step("(def ctr (deploy '(do :foo :bar)))");
+		Context<Address> ctx = step("(def ctr (deploy '(do (defn foo [] :bar) (export foo))))");
 
+		assertEquals(Keywords.BAR,eval(ctx,"(call ctr (foo))")); // regular call
+		assertEquals(Keywords.BAR,eval(ctx,"(call ctr 100 (foo))")); // call with offer
+		
 		assertArityError(step(ctx, "(call)"));
 		assertArityError(step(ctx, "(call 12)"));
 
 		assertCastError(step(ctx, "(call ctr :foo (bad-fn 1 2))")); // cast fail on offered value
 		assertStateError(step(ctx, "(call ctr 12 (bad-fn 1 2))")); // bad function
+
+		assertStateError(step(ctx, "(call 0x1234567812345678123456781234567812345678123456781234567812345678 12 (bad-fn 1 2))")); // bad actor
+		assertArgumentError(step(ctx, "(call ctr -12 (bad-fn 1 2))")); // negative offer
+
+		// bad actor takes precedence over bad offer
+		assertStateError(step(ctx, "(call 0x1234567812345678123456781234567812345678123456781234567812345678 -12 (bad-fn 1 2))")); 
+
 	}
 
 	@Test

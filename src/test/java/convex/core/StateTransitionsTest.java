@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import static convex.test.Assertions.*;
+
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ECDSAKeyPair;
 import convex.core.data.ABlob;
@@ -41,7 +43,7 @@ public class StateTransitionsTest {
 	final Address ADDRESS_C = KEYPAIR_C.getAddress();
 	final Address ADDRESS_NIKI = KEYPAIR_NIKI.getAddress();
 	final Address ADDRESS_ROBB = KEYPAIR_ROBB.getAddress();
-
+	
 	@Test
 	public void testAccountTransfers() throws BadSignatureException {
 		BlobMap<Address, AccountStatus> accounts = BlobMaps.of(ADDRESS_A, AccountStatus.create(Amount.create(10000)),

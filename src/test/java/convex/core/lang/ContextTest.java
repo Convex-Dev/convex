@@ -7,11 +7,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
+import convex.core.ErrorCodes;
 import convex.core.data.BlobMaps;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
@@ -45,6 +47,19 @@ public class ContextTest {
 		
 		final Context<?> c4 = c3.undefine(sym);
 		assertSame(c3,c4);
+	}
+	
+	@Test
+	public void testExceptionalState() {
+		Context<?> ctx=TestState.INITIAL_CONTEXT;
+		
+		assertFalse(ctx.isExceptional());
+		assertTrue(ctx.withError(ErrorCodes.ASSERT).isExceptional());
+		assertTrue(ctx.withError(ErrorCodes.ASSERT,"Assert Failed").isExceptional());
+		
+		assertThrows(IllegalArgumentException.class,()->ctx.withError(null));
+		
+		assertThrows(Error.class,()->ctx.withError(ErrorCodes.ASSERT).getResult());
 	}
 
 	@Test
