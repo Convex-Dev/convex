@@ -9,3 +9,12 @@ Convex is an engine for building and running trusted, decentralised applications
 * *Performance and Scalability* - Convex is capable of executing large volumes of transactions (1000s of transactions per second) with low latency (typically ~1 second for global consensus) 
 
 
+### Running with jfr
+
+java -XX:+FlightRecorder -XX:StartFlightRecording=duration=200s,filename=flight.jfr convex.performance.CVMBenchmark
+
+### Runing benchmark with Maven
+
+mvn test exec:java -Dexec.mainClass="convex.performance.CVMBenchmark" -Dexec.args="%classpath" -Dexec.classpathScope="test"
+
+

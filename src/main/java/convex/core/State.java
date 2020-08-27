@@ -389,7 +389,6 @@ public class State extends ARecord {
 		
 		// Create context with juice subtracted
 		Long maxJuice=t.getMaxJuice();
-
 		long juiceLimit=Math.min(Constants.MAX_TRANSACTION_JUICE,(maxJuice==null)?account.getBalance().getValue():maxJuice);
 		Context<T> ctx = Context.createInitial(preparedState, origin, juiceLimit);
 		return ctx;

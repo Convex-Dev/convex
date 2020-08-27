@@ -1821,7 +1821,7 @@ public class Core {
 
 	private static AHashMap<Symbol, Syntax> register(AHashMap<Symbol, Syntax> env, Object o) {
 		Symbol sym = symbolFor(o);
-		if (env.containsKey(sym)) throw new Error("Duplicate core declaration: " + sym);
+		assert (!env.containsKey(sym)) : "Duplicate core declaration: " + sym;
 		return env.assoc(sym, Syntax.create(o));
 	}
 
@@ -1847,9 +1847,8 @@ public class Core {
 				form = f;
 				ctx = ctx.eval(form);
 				// System.out.println("Core compilation juice: "+ctx.getJuice());
-				if (ctx.isExceptional()) {
-					throw new Error("Error compiling form: "+ Syntax.unwrapAll(form)+ " : "+ ctx.getExceptional());
-				}
+				assert (!ctx.isExceptional()) : "Error compiling form: "+ Syntax.unwrapAll(form)+ " : "+ ctx.getExceptional();
+				
 			}
 		} catch (IOException t) {
 			throw Utils.sneakyThrow(t);
@@ -1919,10 +1918,4 @@ public class Core {
 		
 		ENVIRONMENT = defaultEnv;
 	}
-
-	public static void main(String[] args) {
-		System.out.println("Core environment constructed with " + Core.ENVIRONMENT.count() + " definitions");
-		System.out.println("Core environment hash: " + ENVIRONMENT.getHash());
-	}
-
 }
