@@ -1520,9 +1520,11 @@ public class Core {
 			int alen = args.length;
 			if (alen > 2) return context.withArityError(maxArityMessage(2, alen));
 
+			// default to :ASSERT if no error code provided. Error code cannot be nil.
 			Object code = (alen == 2) ? args[0] : ErrorCodes.ASSERT;
 			if (code==null) return context.withError(ErrorCodes.ARGUMENT,"Error code cannot be nil");
 
+			// get message, or nil if not provided
 			Object message = (alen >0) ? args[alen-1] : null;
 			ErrorValue error = ErrorValue.create(code, message);
 

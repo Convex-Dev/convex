@@ -285,6 +285,11 @@ public class Convex {
 	}
 
 
+	/**
+	 * Returns the current Address for the client using the API.
+	 * 
+	 * @return Address instance
+	 */
 	private Address getAddress() {
 		return keyPair.getAddress();
 	}

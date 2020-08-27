@@ -7,8 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-import static convex.test.Assertions.*;
-
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ECDSAKeyPair;
 import convex.core.data.ABlob;
