@@ -138,6 +138,7 @@ public class ScryptNextTest {
         assertThrows(ParserRuntimeException.class, () -> parse("1 +"));
 
         // Scalar Data Types
+        // =====================
         assertEquals(Reader.read("nil"), parse("nil"));
         assertEquals(Reader.read("\"Hello\""), parse("\"Hello\""));
         assertEquals(Reader.read("1"), parse("1"));
@@ -152,13 +153,19 @@ public class ScryptNextTest {
         assertEquals(Reader.read(":keyword-abc"), parse(":keyword_abc"));
 
         // Compound Data Types
+        // =====================
         assertEquals(Reader.read("[]"), parse("[]"));
         assertEquals(Reader.read("{}"), parse("{}"));
         assertEquals(Reader.read("{}"), parse("{};"));
         assertEquals(Reader.read("#{}"), parse("#{}"));
 
         // Def Statement
+        // =====================
         assertEquals(Reader.read("(def x 1)"), parse("def x = 1;"));
+
+        // Missing semicolon
+        assertThrows(ParserRuntimeException.class, () -> parse("def x = 1"));
+
         assertEquals(Reader.read("(def x 1)"), parse("def x = do { 1; };"));
         assertEquals(Reader.read("(def f (fn [x xs] (conj xs x)))"), parse("def f = (x, xs) -> conj(xs, x);"));
         assertEquals(Reader.read("(def x (inc 1))"), parse("def x = inc(1);"));
@@ -167,7 +174,12 @@ public class ScryptNextTest {
         assertEquals(Reader.read("(def f (fn []))"), parse("def f = fn(){};"));
 
         // Defn Statement
+        // =====================
         assertEquals(Reader.read("(def f (fn [x] x))"), parse("defn f(x) { x; }"));
+
+        // Missing semicolon after x
+        assertThrows(ParserRuntimeException.class, () -> parse("defn f(x) { x }"));
+
         assertEquals(Reader.read("(def f (fn []))"), parse("defn f() { }"));
         assertEquals(Reader.read("(def f (fn [] nil))"), parse("defn f() { {} }"));
         assertEquals(Reader.read("(def f (fn [] {}))"), parse("defn f() { {}; }"));
@@ -180,6 +192,7 @@ public class ScryptNextTest {
 
 
         // If Else Statement
+        // =====================
         assertEquals(Reader.read("(if true 1)"), parse("if(true, 1)"));
         assertEquals(Reader.read("(if true 1 2)"), parse("if(true, 1, 2)"));
         assertEquals(Reader.read("(cond true nil)"), parse("if (true) {}"));
@@ -190,6 +203,7 @@ public class ScryptNextTest {
         assertEquals(Reader.read("(cond true (do (cond true 1) 2))"), parse("if (true) { if (true) 1; 2;}"));
 
         // When Statement
+        // =====================
         assertEquals(Reader.read("(cond true 1)"), parse("when (true) 1;"));
         assertEquals(Reader.read("(cond true 1)"), parse("when (true) { 1; }"));
         assertEquals(Reader.read("(cond true nil)"), parse("when (true) {}"));
@@ -199,6 +213,7 @@ public class ScryptNextTest {
         assertEquals(Reader.read("(cond true (do (f 1) 2))"), parse("when (true) { f(1); 2; }"));
 
         // Function Expression
+        // =====================
         assertEquals(Reader.read("(fn [])"), parse("fn ( ) { }"));
         assertEquals(Reader.read("(fn [x])"), parse("fn (x) { }"));
         assertEquals(Reader.read("(fn [x y])"), parse("fn (x, y) { }"));
@@ -207,11 +222,13 @@ public class ScryptNextTest {
         assertEquals(Reader.read("(fn [x] 1 {} [] (inc x))"), parse("fn (x) { 1; {}; []; inc(x); }"));
 
         // Lambda Expression
+        // =====================
         assertEquals(Reader.read("(fn [] nil)"), parse("() -> nil"));
         assertEquals(Reader.read("(fn [x] x)"), parse("(x) -> x"));
         assertEquals(Reader.read("(fn [x xs] (conj xs x))"), parse("(x, xs) -> conj(xs, x)"));
 
         // Callable Expression
+        // =====================
         assertEquals(Reader.read("(f)"), parse("f()"));
         assertEquals(Reader.read("([] 0)"), parse("[](0)"));
         assertEquals(Reader.read("({} :key)"), parse("{}(:key)"));
@@ -231,6 +248,7 @@ public class ScryptNextTest {
         assertEquals(Reader.read("(reduce + 0 [1 2 3])"), parse("reduce(+, 0, [1, 2, 3])"));
 
         // Statements
+        // =====================
         assertEquals(Reader.read("1"), parse("1;"));
         assertEquals(Reader.read("(fn [])"), parse("fn(){};"));
         assertEquals(Reader.read("(fn [x] x)"), parse("(x) -> x;"));
@@ -238,6 +256,11 @@ public class ScryptNextTest {
         assertEquals(Reader.read("(do (def x 1) (cond (zero? x) :zero :not-zero) 2)"), parse("def x = 1; if(zero?(x)) :zero; else :not_zero; 2;"));
 
         // Block Statement
+        // =====================
+
+        // Missing semicolon
+        assertThrows(ParserRuntimeException.class, () -> parse("{ 1 }"));
+
         assertEquals(Reader.read("1"), parse("{ 1; }"));
         assertEquals(Reader.read("(do 1 (inc 2) {:n 3})"), parse("{ 1; inc(2); {:n 3}; }"));
         assertEquals(Reader.read("(do (def f (fn [x] x)) (f 1))"), parse("{ def f = fn(x) { x; }; f(1); }"));
@@ -246,6 +269,7 @@ public class ScryptNextTest {
         assertEquals(2, (Long) eval("{ inc(1); }"));
 
         // Do
+        // =====================
         assertEquals(Reader.read("(do 1 2)"), parse("do(1, 2)"));
         assertEquals(Reader.read("nil"), parse("do { }"));
         assertEquals(Reader.read("nil"), parse("do { };"));
