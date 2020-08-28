@@ -2,7 +2,7 @@ package convex.gui.components;
 
 import javax.swing.JTextArea;
 
-import convex.gui.manager.Toolkit;
+import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
 public class CodeLabel extends JTextArea {

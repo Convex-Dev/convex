@@ -3,7 +3,7 @@ package convex.gui.components;
 import javax.swing.JButton;
 import javax.swing.JPopupMenu;
 
-import convex.gui.manager.Toolkit;
+import convex.gui.utils.Toolkit;
 
 /**
  * A dropdown menu that can be used wherever an embedded menu is needed.

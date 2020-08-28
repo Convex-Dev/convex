@@ -17,7 +17,7 @@ import convex.core.crypto.WalletEntry;
 import convex.core.data.Address;
 import convex.core.util.Text;
 import convex.gui.manager.PeerManager;
-import convex.gui.manager.Toolkit;
+import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
 public class WalletComponent extends BaseListComponent {

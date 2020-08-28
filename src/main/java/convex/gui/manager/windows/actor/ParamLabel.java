@@ -3,7 +3,7 @@ package convex.gui.manager.windows.actor;
 import javax.swing.JLabel;
 import javax.swing.SwingConstants;
 
-import convex.gui.manager.Toolkit;
+import convex.gui.utils.Toolkit;
 
 /**
  * Generic label component for displaying code

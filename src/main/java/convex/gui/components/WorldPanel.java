@@ -9,7 +9,7 @@ import java.io.IOException;
 import javax.imageio.ImageIO;
 import javax.swing.JPanel;
 
-import convex.gui.manager.utils.RobinsonProjection;
+import convex.gui.utils.RobinsonProjection;
 
 @SuppressWarnings("serial")
 public class WorldPanel extends JPanel {

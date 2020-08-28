@@ -24,8 +24,8 @@ import convex.core.data.MapEntry;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.models.AccountsTableModel;
 import convex.gui.manager.PeerManager;
-import convex.gui.manager.Toolkit;
 import convex.gui.manager.windows.actor.ActorWindow;
+import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
 public class AccountsPanel extends JPanel {

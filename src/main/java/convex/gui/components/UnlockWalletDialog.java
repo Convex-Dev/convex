@@ -15,7 +15,7 @@ import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.KeyStroke;
 
-import convex.gui.manager.Toolkit;
+import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
 public class UnlockWalletDialog extends JDialog {

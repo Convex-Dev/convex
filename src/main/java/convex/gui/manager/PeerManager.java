@@ -56,7 +56,7 @@ public class PeerManager extends JPanel {
 	 */
 	public static void main(String[] args) {
 		// call to set up Look and Feel
-		convex.gui.manager.Toolkit.init();
+		convex.gui.utils.Toolkit.init();
 
 		EventQueue.invokeLater(new Runnable() {
 			@Override

@@ -1,4 +1,4 @@
-package convex.gui.manager.utils;
+package convex.gui.utils;
 
 import java.awt.geom.Point2D;
 

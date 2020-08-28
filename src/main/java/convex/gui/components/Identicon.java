@@ -8,7 +8,7 @@ import javax.swing.border.BevelBorder;
 
 import convex.core.data.ABlob;
 import convex.core.util.Utils;
-import convex.gui.manager.Toolkit;
+import convex.gui.utils.Toolkit;
 
 /**
  * A simple identicon for visualising hash values.

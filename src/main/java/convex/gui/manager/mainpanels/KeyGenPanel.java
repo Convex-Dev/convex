@@ -21,7 +21,7 @@ import convex.core.data.Blob;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
 import convex.gui.manager.PeerManager;
-import convex.gui.manager.Toolkit;
+import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
 public class KeyGenPanel extends JPanel {

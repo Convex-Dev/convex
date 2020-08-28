@@ -10,7 +10,7 @@ import convex.core.State;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.gui.manager.PeerManager;
-import convex.gui.manager.Toolkit;
+import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
 public class ActorInfoPanel extends JPanel {

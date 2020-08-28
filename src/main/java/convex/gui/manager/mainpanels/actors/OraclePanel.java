@@ -23,8 +23,8 @@ import convex.gui.components.DefaultReceiveAction;
 import convex.gui.components.Toast;
 import convex.gui.components.models.OracleTableModel;
 import convex.gui.manager.PeerManager;
-import convex.gui.manager.Toolkit;
 import convex.gui.manager.mainpanels.WalletPanel;
+import convex.gui.utils.Toolkit;
 import convex.net.ResultConsumer;
 
 @SuppressWarnings("serial")

@@ -38,7 +38,7 @@ import convex.gui.components.BaseListComponent;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.Toast;
 import convex.gui.manager.PeerManager;
-import convex.gui.manager.Toolkit;
+import convex.gui.utils.Toolkit;
 import convex.net.Connection;
 import convex.net.ResultConsumer;
 

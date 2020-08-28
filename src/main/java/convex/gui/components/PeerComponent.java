@@ -10,10 +10,10 @@ import javax.swing.JTextArea;
 import javax.swing.border.EmptyBorder;
 
 import convex.gui.manager.PeerManager;
-import convex.gui.manager.Toolkit;
 import convex.gui.manager.windows.etch.EtchWindow;
 import convex.gui.manager.windows.peer.PeerWindow;
 import convex.gui.manager.windows.state.StateWindow;
+import convex.gui.utils.Toolkit;
 import convex.peer.Server;
 import etch.EtchStore;
 

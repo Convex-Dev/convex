@@ -30,7 +30,7 @@ import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.PeerView;
 import convex.gui.manager.PeerManager;
-import convex.gui.manager.Toolkit;
+import convex.gui.utils.Toolkit;
 import convex.net.Connection;
 import convex.net.ResultConsumer;
 

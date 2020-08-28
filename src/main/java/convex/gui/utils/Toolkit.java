@@ -1,4 +1,4 @@
-package convex.gui.manager;
+package convex.gui.utils;
 
 import java.awt.Color;
 import java.awt.Font;
@@ -6,6 +6,7 @@ import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
+import java.net.URL;
 import java.util.logging.Logger;
 
 import javax.swing.ImageIcon;
@@ -17,6 +18,7 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.plaf.FontUIResource;
 
+import convex.gui.client.ConvexClient;
 import mdlaf.MaterialLookAndFeel;
 import mdlaf.themes.AbstractMaterialTheme;
 import mdlaf.themes.MaterialOceanicTheme;
@@ -128,5 +130,9 @@ public class Toolkit {
 
 	public static void init() {
 		// Empty method, just triggers static initialisation
+	}
+
+	public static Image getImage(URL resourceURL) {
+		return java.awt.Toolkit.getDefaultToolkit().getImage(resourceURL);
 	}
 }

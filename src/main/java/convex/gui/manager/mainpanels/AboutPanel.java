@@ -11,7 +11,7 @@ import convex.core.State;
 import convex.core.util.Text;
 import convex.gui.components.ActionPanel;
 import convex.gui.manager.PeerManager;
-import convex.gui.manager.Toolkit;
+import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
 public class AboutPanel extends JPanel {
