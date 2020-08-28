@@ -1,7 +1,6 @@
 package convex.core.lang;
 
-import java.util.ArrayList;
-
+import convex.core.data.*;
 import org.parboiled.Parboiled;
 import org.parboiled.Rule;
 import org.parboiled.annotations.BuildParseTree;
@@ -11,16 +10,7 @@ import org.parboiled.annotations.SuppressNode;
 import org.parboiled.parserunners.ReportingParseRunner;
 import org.parboiled.support.Var;
 
-import convex.core.data.AList;
-import convex.core.data.ASequence;
-import convex.core.data.AVector;
-import convex.core.data.List;
-import convex.core.data.Lists;
-import convex.core.data.MapEntry;
-import convex.core.data.Maps;
-import convex.core.data.Symbol;
-import convex.core.data.Syntax;
-import convex.core.data.Vectors;
+import java.util.ArrayList;
 
 @BuildParseTree
 public class ScryptNext extends Reader {
@@ -192,6 +182,16 @@ public class ScryptNext extends Reader {
         );
     }
 
+    public Rule SemiTermination() {
+        return FirstOf(
+                SEMI,
+                Sequence(
+                        FirstOf(EOI, AnyOf("]})")),
+                        push(error("Missing semicolon ';'"))
+                )
+        );
+    }
+
     // --------------------------------
     // DEF STATEMENT
     // --------------------------------
@@ -202,7 +202,7 @@ public class ScryptNext extends Reader {
                 Spacing(),
                 EQU,
                 Expression(),
-                SEMI,
+                SemiTermination(),
                 push(prepare(defStatement((Syntax) pop(), (Syntax) pop())))
         );
     }
@@ -271,7 +271,7 @@ public class ScryptNext extends Reader {
     // EXPRESSION STATEMENT
     // --------------------------------
     public Rule ExpressionStatement() {
-        return Sequence(Expression(), SEMI);
+        return Sequence(Expression(), SemiTermination());
     }
 
     // --------------------------------
@@ -360,7 +360,7 @@ public class ScryptNext extends Reader {
     }
 
     @SuppressWarnings("unchecked")
-	public Syntax arithmeticExpression(ArrayList<Object> exprs) {
+    public Syntax arithmeticExpression(ArrayList<Object> exprs) {
         var primary = (Syntax) exprs.get(0);
 
         if (exprs.size() == 1) {
