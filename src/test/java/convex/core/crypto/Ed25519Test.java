@@ -1,5 +1,6 @@
 package convex.core.crypto;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
 import convex.core.data.Address;
+import convex.core.data.SignedData;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 
@@ -32,6 +34,31 @@ public class Ed25519Test {
 		AKeyPair kp1=Ed25519KeyPair.generate();
 		AKeyPair kp2=Ed25519KeyPair.generate();
 		assertNotEquals(kp1,kp2);
+	}
+	
+	@Test
+	public void testPublicKeyBytes() {
+		Ed25519KeyPair kp1=Ed25519KeyPair.generate();
+		byte[] publicBytes=kp1.getPublicKeyBytes(); 
+		byte[] addressBytes=kp1.getAddress().getBytes();
+		assertArrayEquals(publicBytes,addressBytes);
+	}
+	
+	@Test
+	public void testPrivateKeyBytes() {
+		Ed25519KeyPair kp1=Ed25519KeyPair.generate();
+		SignedData<Long> sd1=kp1.signData(1L);
+		assertTrue(sd1.isValid());
+		
+		byte[] privateKeyBytes=kp1.getPrivate().getEncoded();
+		
+
+		Ed25519KeyPair kp2=Ed25519KeyPair.create(kp1.getPublic(),kp1.getPrivate());
+		assertEquals(kp1.getAddress(),kp2.getAddress());
+		assertArrayEquals(privateKeyBytes,kp2.getPrivate().getEncoded());
+		
+		SignedData<Long> sd2=kp2.signData(1L);
+		assertTrue(sd2.isValid());
 	}
 	
 	@Test

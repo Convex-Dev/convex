@@ -43,6 +43,11 @@ public class Ed25519KeyPair extends AKeyPair {
 		Address address=extractAddress(keyPair.getPublic());
 		return new Ed25519KeyPair(keyPair,address);
 	}
+	
+	public static Ed25519KeyPair create(PublicKey publicKey, PrivateKey privateKey) {
+		KeyPair keyPair=new KeyPair(publicKey,privateKey);
+		return create(keyPair);
+	}
 
 	public static Ed25519KeyPair generate(SecureRandom random) {
 		try {
@@ -91,12 +96,20 @@ public class Ed25519KeyPair extends AKeyPair {
 		return Address.wrap(bytes,n-Address.LENGTH);
 	}
 
+	public byte[] getPublicKeyBytes() {
+		return getAddress().getBytes();
+	}
 
-	public static PrivateKey privateKeyFromBytes(byte[] key) {
+	/**
+	 * Creates a private key using the given raw bytes.
+	 * @param keyData 32 bytes private key data
+	 * @return Ed25519 Private Key instance
+	 */
+	public static PrivateKey privateKeyFromBytes(byte[] keyData) {
 		try {
 			KeyFactory keyFactory = KeyFactory.getInstance("Ed25519");
 			PrivateKeyInfo privKeyInfo = new PrivateKeyInfo(new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519),
-					new DEROctetString(key));
+					new DEROctetString(keyData));
 			PKCS8EncodedKeySpec pkcs8KeySpec = new PKCS8EncodedKeySpec(privKeyInfo.getEncoded());
 			PrivateKey privateKey = keyFactory.generatePrivate(pkcs8KeySpec);
 			return privateKey;
@@ -131,6 +144,7 @@ public class Ed25519KeyPair extends AKeyPair {
 		return address;
 	}
 
+
 	@Override
 	public <R> SignedData<R> signData(R value) {
 		return SignedData.create(this, value);
@@ -159,5 +173,8 @@ public class Ed25519KeyPair extends AKeyPair {
 		if (!keyPair.getPrivate().equals(other.keyPair.getPrivate())) return false;
 		return keyPair.getPublic().equals(other.getPublic());
 	}
+
+
+
 
 }
