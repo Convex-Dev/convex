@@ -273,6 +273,25 @@ public class CoreTest {
 		assertArityError(step("(boolean)"));
 		assertArityError(step("(boolean 1 2)"));
 	}
+	
+	@Test public void testIf() {
+		// basic branching
+		assertEquals(1L,evalL("(if true 1 2)"));
+		assertEquals(2L,evalL("(if false 1 2)"));
+
+		// expressions
+		assertEquals(6L,evalL("(if (= 1 1) (* 2 3) (* 3 4))"));
+		assertEquals(12L,evalL("(if (nil? false) (* 2 3) (* 3 4))"));
+
+		
+		// null return for missing false branch
+		assertNull(eval("(if false 1)"));
+		
+		// TODO: should these be arity errors?
+		assertCompileError(step("(if)"));
+		assertCompileError(step("(if 1)"));
+		assertCompileError(step("(if 1 2 3 4)"));
+	}
 
 	@Test
 	public void testEquals() {
@@ -379,6 +398,10 @@ public class CoreTest {
 		assertEquals(Maps.of(1L, 2L), eval("(hash-map 1 2)"));
 		assertEquals(Maps.of(null, null), eval("(hash-map nil nil)"));
 		assertEquals(Maps.of(1L, 2L, 3L, 4L), eval("(hash-map 3 4 1 2)"));
+		
+		// Check last value of equal keys is used
+		assertEquals(Maps.of(1L, 4L), eval("(hash-map 1 2 1 3 1 4)"));
+		assertEquals(Maps.of(1L, 2L), eval("(hash-map 1 4 1 3 1 2)"));
 
 		assertArityError(step("(hash-map 1)"));
 		assertArityError(step("(hash-map 1 2 3)"));
@@ -419,7 +442,12 @@ public class CoreTest {
 		assertEquals(Sets.of(1L, 2L), eval("(hash-set 1 2)"));
 		assertEquals(Sets.of((Object) null), eval("(hash-set nil nil)"));
 		assertEquals(Sets.of(1L, 2L, 3L, 4L), eval("(hash-set 3 4 1 2)"));
+		
+		// de-duplication
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(hash-set 1 2 3 1)"));
+		assertEquals(Sets.of((Long)null), eval("(hash-set nil nil nil)"));
+		assertEquals(Sets.of(Sets.empty()), eval("(hash-set (hash-set) (hash-set))"));
+		
 		assertEquals(Sets.of((Object) null), eval("(hash-set nil)"));
 	}
 
@@ -1634,6 +1662,16 @@ public class CoreTest {
 	public void testDefn() {
 		assertTrue(evalB("(do (defn f [a] a) (fn? f))"));
 		assertEquals(Vectors.of(2L, 3L), eval("(do (defn f [a & more] more) (f 1 2 3))"));
+	
+		// multiple expressions in body
+		assertEquals(2L,evalL("(do (defn f [a] 1 2) (f 3))"));
+
+		// arity problems
+		assertArityError(step("(defn)"));
+		assertArityError(step("(defn f)"));
+		
+		// bad function construction
+		assertCastError(step("(defn f b)"));
 	}
 	
 	@Test

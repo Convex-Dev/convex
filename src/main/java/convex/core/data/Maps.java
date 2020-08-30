@@ -28,6 +28,15 @@ public class Maps {
 		return MapLeaf.create(MapEntry.create(k, v));
 	}
 
+	/**
+	 * Constructs a map with the given keys and values. If keys are repreated, later keys will
+	 * overwrite earlier ones.
+	 * @param <R>
+	 * @param <K>
+	 * @param <V>
+	 * @param keysAndValues
+	 * @return
+	 */
 	@SuppressWarnings("unchecked")
 	public static <R extends AHashMap<K, V>, K, V> R of(Object... keysAndValues) {
 		int n = keysAndValues.length >> 1;

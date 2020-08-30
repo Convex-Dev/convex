@@ -345,8 +345,8 @@
   
   fetch
  	{
-	 :doc {:description "Fetches the object with the given Object ID from immutable storage. Returns nil if not found"
-         :examples [{:code "(fetch object-hash-id)"}]
+	 :doc {:description "Fetches the object with the given Object ID from immutable storage. Returns nil if the value is not found."
+         :examples [{:code "(fetch object-id)"}]
          :type :function
          :signature [{:params [id]}]}
 	}
@@ -361,7 +361,7 @@
   
   fn
  	{
-	 :doc {:description "Creates an anonymous function (closure) with the specified argument list and function body. Will close over variabels in the current lexical scope."
+	 :doc {:description "Creates an anonymous function (closure) with the specified argument list and function body. Will close over variables in the current lexical scope."
          :examples [{:code "(let [f (fn [x] (* x x))] (f 10))"}]
          :type :special
          :signature [{:params [args & body]}]}
@@ -412,7 +412,7 @@
   
   hash
   {
-	 :doc {:description "Calculates the Hash of a given value."
+	 :doc {:description "Calculates the 32-byte cryptographic Hash of a given value. A Hash may be used as the unqiue identifier of any distinct data value."
          :examples [{:code "(hash [1 2 3])"}]
          :type :function
          :signature [{:params [value]}]}
@@ -428,7 +428,7 @@
   
   hash-map
   {
-	 :doc {:description "Constructs a hash map with the given keys and values."
+	 :doc {:description "Constructs a hash map with the given keys and values. If a key is repeated, the last value will overwrite previous ones."
          :examples [{:code "(hash-map 1 2 3 4)"}]
          :type :function
          :signature [{:params [& kvs]}]}
@@ -436,7 +436,7 @@
   
   hash-set
   {
-	 :doc {:description "Constructs a hash set with the given values."
+	 :doc {:description "Constructs a hash set with the given values. If a value is repeated, it will be included only once in the set."
          :examples [{:code "(hash-set 1 2 3)"}]
          :type :function
          :signature [{:params [& values]}]}
@@ -444,7 +444,7 @@
   
   if
   {
-	 :doc {:description "Calculates the value of the test expression, then returns the result of the true expression or false expression accordingly. Performs short-circuit evaluation, i.e. the expression in the unused branch is not evaluated. For a more general conditional expression that can handle multiple branches, consider 'cond' as an alternative."
+	 :doc {:description "Calculates the value of a test expression, then branches and returns the result of the true expression or false expression depending on whether the test expression is true or false respectively. The values 'false' and 'nil' are considered flase, all other values are true. Performs short-circuit evaluation, i.e. the expression in the unused branch is not evaluated. If the false branch is omitted, it will be assumed to evaluate to 'nil'. For a more general conditional expression that can handle multiple branches, consider 'cond' as an alternative."
          :examples [{:code "(if true :true-value :false-value)"}]
          :type :macro
          :signature [
