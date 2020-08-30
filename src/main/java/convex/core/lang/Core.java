@@ -500,18 +500,12 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ASet<Object> store = context.getState().getStore();
-			long initialCount = store.count();
 
-			// this is non-trivial because we need to recursively check if child elements
-			// need to be stored.
 			Ref<Object> ref = Ref.create(args[0]);
-			ASet<Object> newStore = ref.addAllToSet(store);
-
-			long storedCount = newStore.count() - initialCount;
-			assert (storedCount >= 0);
+			ASet<Object> newStore = store.includeRef(ref);
 			context = context.withStore(newStore);
 
-			long juice = Juice.SIMPLE_FN + Juice.STORE * storedCount;
+			long juice = Juice.STORE;
 
 			return context.withResult(juice, ref.getHash());
 		}

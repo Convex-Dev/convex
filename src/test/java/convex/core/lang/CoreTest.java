@@ -321,7 +321,9 @@ public class CoreTest {
 		assertNull(eval("(let [a {1 2} h (hash a)] (fetch h))"));
 		assertEquals(Vectors.of(1L, 2L), eval("(let [a [1 2] h (hash a)] (store a) (fetch h))"));
 		assertEquals(Keywords.STORE, eval("(let [a :store h (hash a)] (store a) (fetch h))"));
-		assertEquals(Vectors.of(1L, 2L), eval("(let [a [1 2] b [a a] h (hash a)] (store b) (fetch h))"));
+		
+		// storing a parent should *not* store child objects
+		assertNull(eval("(let [a [1 2] b [a a] h (hash a)] (store b) (fetch h))"));
 
 		assertArityError(step("(store)"));
 		assertArityError(step("(store 1 2)"));

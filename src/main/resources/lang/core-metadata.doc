@@ -786,7 +786,7 @@
   
   store
   {
-    :doc {:description "Stores a value in immutable storage, and returns its hash ID."
+    :doc {:description "Stores a value permanently in immutable storage, and returns its hash ID. 'store' is useful primarily for data structures that you expect to be widely shared, but don't want to incur the memory costs of making many copies. Using 'store' and 'fetch' you can store the data just once, and access it by reference."
           :examples [{:code "(store [1 2 3 4])"}]
           :type :function
           :signature [{:params [value]}]}
