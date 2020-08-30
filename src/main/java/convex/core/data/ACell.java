@@ -264,7 +264,11 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	 * @return The Ref at the specified index
 	 */
 	public <R> Ref<R> getRef(int i) {
-		throw new IndexOutOfBoundsException("No Refs to get in "+Utils.getClassName(this));
+		if (getRefCount()==0) {
+			throw new IndexOutOfBoundsException("No Refs to get in "+Utils.getClassName(this));
+		} else {
+			throw new TODOException(Utils.getClassName(this) +" does not yet implement getRef(i) for i = "+i);
+		}
 	}
 	
 	/**
