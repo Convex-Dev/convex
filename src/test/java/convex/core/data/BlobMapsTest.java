@@ -18,6 +18,11 @@ public class BlobMapsTest {
 	@Test
 	public void testEmpty() throws InvalidDataException {
 		BlobMap<ABlob, Long> m = BlobMaps.empty();
+		
+		assertFalse(m.containsKey(Blob.EMPTY));
+		assertFalse(m.containsKey(null));
+		assertFalse(m.containsValue(1L));
+		assertFalse(m.containsValue(null));
 
 		assertEquals(0L, m.count());
 		assertSame(m, m.dissoc(Blob.fromHex("cafe")));
@@ -34,6 +39,12 @@ public class BlobMapsTest {
 		BlobMap<ABlob, Long> m = BlobMaps.create(k1, 17L);
 
 		doBlobMapTests(m);
+		
+		assertTrue(m.containsKey(k1));
+		assertTrue(m.containsValue(17L));
+		assertFalse(m.containsKey(k2));
+		assertFalse(m.containsKey(Blob.EMPTY));
+		assertFalse(m.containsKey(null));
 
 		// add second entry
 		m = m.assoc(k2, 23L);
