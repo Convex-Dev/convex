@@ -361,7 +361,7 @@ public final class Context<T> implements IObject {
 	}
 
 	/**
-	 * Consumes juice, returning an updated context or exceptional JUICE error.
+	 * Consumes juice, returning an updated context if sufficient juice remains or an exceptional JUICE error.
 	 * @param <R>
 	 * @param gulp
 	 * @return Updated context with juice consumed
