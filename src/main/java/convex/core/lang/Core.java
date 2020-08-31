@@ -12,6 +12,7 @@ import convex.core.State;
 import convex.core.crypto.Hash;
 import convex.core.data.ABlob;
 import convex.core.data.ABlobMap;
+import convex.core.data.ACollection;
 import convex.core.data.ADataStructure;
 import convex.core.data.AHashMap;
 import convex.core.data.AList;
@@ -56,8 +57,12 @@ import convex.core.util.Utils;
  * </ul>
  * 
  * In general, core functions defined in this class are thin Java wrappers over
- * static functions in RT, but also need to account for appropriate juice costs
- * / exceptional case handling
+ * functions available in the runtime, but also need to account for:
+ * <ul>
+ * <li>Argument checking </li>
+ * <li>Exceptional case handling</li>
+ * <li>Appropriate juice costs</li>
+ * </ul>
  * 
  * Where possible, we implement core functions in Convex Lisp itself, see
  * resources/lang/core.con
@@ -97,9 +102,14 @@ public class Core {
 	public static final CoreFn<AVector<?>> VECTOR = reg(new CoreFn<>(Symbols.VECTOR) {
 		@Override
 		public <I> Context<AVector<?>> invoke(Context<I> context, Object[] args) {
+			// Need to cherge juice on per-element basis
 			long juice = Juice.BUILD_DATA + args.length * Juice.BUILD_PER_ELEMENT;
 
+			// Check juice before building a big vector. 
+			// OK to fail early since will fail with JUICE anyway if vector is too big.
 			if (!context.checkJuice(juice)) return context.withJuiceError();
+			
+			// Build and return requested vector
 			AVector<?> result = Vectors.of(args);
 			return context.withResult(juice, result);
 		}
@@ -109,11 +119,15 @@ public class Core {
 		@Override
 		public <I> Context<ASequence<?>> invoke(Context<I> context, Object[] args) {
 			ASequence<?> result = null;
-			long juice = Juice.BUILD_DATA;
+			
+			// initial juice is a load of null
+			long juice = Juice.CONSTANT;
 			for (Object a : args) {
 				if (a == null) continue;
 				ASequence<?> seq = RT.sequence(a);
-				juice += seq.count() * Juice.BUILD_PER_ELEMENT;
+				
+				// check juice per element of concatenated sequences
+				juice += Juice.BUILD_DATA+ seq.count() * Juice.BUILD_PER_ELEMENT;
 				if (!context.checkJuice(juice)) return context.withJuiceError();
 				result = RT.concat(result, seq);
 			}
@@ -124,14 +138,16 @@ public class Core {
 	public static final CoreFn<AVector<?>> VEC = reg(new CoreFn<>(Symbols.VEC) {
 		@Override
 		public <I> Context<AVector<?>> invoke(Context<I> context, Object[] args) {
+			// Arity 1 exactly
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			Object o = args[0];
+			
+			// Need to compute juice before building potentially big vector
 			Long n = RT.count(o);
 			if (n == null) return context.withCastError(o, AVector.class);
-
 			long juice = Juice.BUILD_DATA + n * Juice.BUILD_PER_ELEMENT;
-
 			if (!context.checkJuice(juice)) return context.withJuiceError();
+			
 			AVector<?> result = RT.vec(o);
 			return context.withResult(juice, result);
 		}
@@ -142,11 +158,16 @@ public class Core {
 		public <I> Context<ASet<?>> invoke(Context<I> context, Object[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			Object o = args[0];
+			
+			// Need to compute juice before building a potentially big set
+			Long n = RT.count(o);
+			if (n == null) return context.withCastError(o, ACollection.class);
+			long juice = Juice.BUILD_DATA + n * Juice.BUILD_PER_ELEMENT;
+			if (!context.checkJuice(juice)) return context.withJuiceError();
+
 			ASet<?> result = RT.set(o);
 			if (result == null) return context.withCastError(o, ASet.class);
 
-			// TODO: cost overflow?
-			long juice = Juice.BUILD_DATA + result.count() * Juice.BUILD_PER_ELEMENT;
 			return context.withResult(juice, result);
 		}
 	});
@@ -156,8 +177,10 @@ public class Core {
 		public <I> Context<AList<?>> invoke(Context<I> context, Object[] args) {
 			// Any arity is OK
 
+			// Need to compute juice before building a potentially big list
 			long juice = Juice.BUILD_DATA + args.length * Juice.BUILD_PER_ELEMENT;
 			if (!context.checkJuice(juice)) return context.withJuiceError();
+			
 			AList<?> result = Lists.of(args);
 			return context.withResult(juice, result);
 		}
@@ -166,6 +189,7 @@ public class Core {
 	public static final CoreFn<String> STR = reg(new CoreFn<>(Symbols.STR) {
 		@Override
 		public <I> Context<String> invoke(Context<I> context, Object[] args) {
+			// TODO: pre-check juice? String rendering definitions?
 			String result = RT.str(args);
 			long juice = Juice.STR + result.length() * Juice.STR_PER_CHAR;
 			return context.withResult(juice, result);
@@ -175,8 +199,10 @@ public class Core {
 	public static final CoreFn<String> NAME = reg(new CoreFn<>(Symbols.NAME) {
 		@Override
 		public <I> Context<String> invoke(Context<I> context, Object[] args) {
+			// Arity 1
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
+			// Check can get as a String name
 			Object named = args[0];
 			String result = RT.getName(named);
 			if (result == null) return context.withCastError(named, String.class);
@@ -189,11 +215,14 @@ public class Core {
 	public static final CoreFn<Keyword> KEYWORD = reg(new CoreFn<>(Symbols.KEYWORD) {
 		@Override
 		public <I> Context<Keyword> invoke(Context<I> context, Object[] args) {
+			// Arity 1
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
+			// Check argument is valid name
 			String name = RT.name(args[0]);
 			if (name == null) return context.withCastError(args[0], Keyword.class);
 
+			// Check name converts to Keyword 
 			Keyword result = Keyword.create(name);
 			if (result == null) return context.withArgumentError("Invalid Keyword name: " + name);
 
@@ -204,11 +233,14 @@ public class Core {
 	public static final CoreFn<Symbol> SYMBOL = reg(new CoreFn<>(Symbols.SYMBOL) {
 		@Override
 		public <I> Context<Symbol> invoke(Context<I> context, Object[] args) {
+			// Arity 1
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
+			// Check argument is valid name
 			String name = RT.name(args[0]);
 			if (name == null) return context.withCastError(args[0], Symbol.class);
 
+			// Check name converts to Symbol 
 			Symbol result = Symbol.create(name);
 			if (result == null) return context.withArgumentError("Invalid Keyword name: " + name);
 
@@ -249,8 +281,9 @@ public class Core {
 			Syntax formSyntax=Syntax.create(scheduleForm);
 			AList<Object> form = formSyntax.getValue();
 			
+			// Arity 3 required
 			int n = form.size();
-			if (n != 3) return context.withArityError("Expander requires arity 2 but got:" + n);
+			if (n != 3) return context.withArityError("schedule requires arity 3 but got:" + n);
 
 			Context<Syntax> ctx = (Context<Syntax>) context;
 
@@ -459,8 +492,10 @@ public class Core {
 	public static final CoreFn<Long> ACCEPT = reg(new CoreFn<>(Symbols.ACCEPT) {
 		@Override
 		public <I> Context<Long> invoke(Context<I> context, Object[] args) {
+			// Arity 1
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
+			// must cast to Long
 			Long amount = RT.toLong(args[0]);
 			if (amount == null) return context.withCastError(args[0], Long.class);
 
