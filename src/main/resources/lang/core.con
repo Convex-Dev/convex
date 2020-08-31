@@ -233,3 +233,13 @@
 	}
   [name params & body] 
   '(def ~name ~(cons 'actor params body)))
+
+(defmacro defined?
+    ^{:doc {:description "Tests if a given symbol name is defined in the current environment."
+         :examples [{:code "(defined? defined?)"}]
+         :type :macro	 
+         :signature [{:params [sym]}]}
+	}
+  [sym]
+  '(boolean (lookup-syntax (quote ~sym))))
+

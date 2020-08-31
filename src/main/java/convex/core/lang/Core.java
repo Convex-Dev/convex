@@ -587,10 +587,12 @@ public class Core {
 		public <I> Context<Syntax> invoke(Context<I> context, Object[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
+			// ensure argument is a name type
 			String name = RT.name(args[0]);
 			if (name == null) return context.withCastError(args[0], Symbol.class);
-
-			Symbol sym = Symbol.create(name);
+			
+			// ensure argument converts to a Symbol correctly.
+			Symbol sym = RT.toSymbol(name);
 			if (sym == null) return context.withArgumentError("Invalid Symbol name: " + name);
 
 			MapEntry<Symbol, Syntax> me = context.lookupDynamicEntry(sym);

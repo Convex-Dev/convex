@@ -1001,7 +1001,7 @@ public class CoreTest {
 		
 		assertNull(eval("(lookup-syntax 'non-existent-symbol)"));
 
-		// invalid name string
+		// invalid name string (too long)
 		assertArgumentError(
 				step("(lookup-syntax \"cdiubcidciuecgieufgvuifeviufegviufeviuefbviufegviufevguiefvgfiuevgeufigv\")"));
 
@@ -1646,6 +1646,25 @@ public class CoreTest {
 		assertUndeclaredError(step("(def a b)"));
 		
 		assertUndeclaredError(step("(def a a)"));
+	}
+	
+	@Test
+	public void testDefined() {
+		assertFalse(evalB("(defined? foobar)"));
+		
+		assertTrue(evalB("(do (def foobar [2 3]) (defined? foobar))"));
+		assertTrue(evalB("(defined? count)"));
+		assertTrue(evalB("(defined? :count)"));
+		assertTrue(evalB("(defined? \"count\")"));
+		
+		// invalid names
+		assertCastError(step("(defined? nil)"));
+		assertCastError(step("(defined? 1)"));
+		assertCastError(step("(defined? 0x)"));
+		
+		assertArityError(step("(defined?)"));
+		assertArityError(step("(defined? foo bar)"));
+
 	}
 	
 	@Test
