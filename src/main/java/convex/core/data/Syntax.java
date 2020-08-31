@@ -57,7 +57,7 @@ public class Syntax extends ACell {
 	}
 
 	/**
-	 * Wraps a value as a Syntax Object with empty metadata
+	 * Wraps a value as a Syntax Object with empty metadata. Does not change existing Syntax objects.
 	 * 
 	 * @param value
 	 * @return Syntax instance
@@ -229,6 +229,14 @@ public class Syntax extends ACell {
 		return withMeta(Maps.empty());
 	}
 
+	/**
+	 * Unwraps a Syntax Object to get the underlying value.
+	 * 
+	 * If the argument is not a Syntax object, return it unchanged (already unwrapped)
+	 * @param <R> Expected type of value
+	 * @param x Any Object, which may be a Syntax Object
+	 * @return The unwrapped value
+	 */
 	@SuppressWarnings("unchecked")
 	public static <R> R unwrap(Object x) {
 		return (x instanceof Syntax) ? ((Syntax) x).getValue() : (R) x;

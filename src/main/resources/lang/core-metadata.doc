@@ -643,7 +643,8 @@
   not
   {
     :doc {:description "Inverts a truth value. Returns false for truthy input and true for falsey input."
-          :examples [{:code "(not true)"}]
+          :examples [{:code "(not true)"}
+                     {:code "(not nil)"}]
           :type :function
           :signature [{:params [b]}]}
   }

@@ -283,14 +283,14 @@ public class Core {
 			// get timestamp target
 			Object tso = args[0];
 			if (!(tso instanceof Long)) return context.withCastError(tso,Long.class);
-			long sts = (long) tso;
+			long scheduleTimestamp = (long) tso;
 
 			// get operation
 			Object opo = args[1];
 			if (!(opo instanceof AOp)) return context.withCastError(opo,AOp.class);
 			AOp<?> op = (AOp<?>) opo;
 
-			return context.schedule(sts, op);
+			return context.schedule(scheduleTimestamp, op);
 		}
 	});
 
@@ -319,12 +319,14 @@ public class Core {
 	public static final CoreFn<Object> UNSYNTAX = reg(new CoreFn<>(Symbols.UNSYNTAX) {
 		@Override
 		public <I> Context<Object> invoke(Context<I> context, Object[] args) {
+			// Arity 1
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
+			// Unwrap Syntax. Cannot fail.
 			Object result = Syntax.unwrap(args[0]);
 
+			// Return unwrapped value with juice
 			long juice = Juice.SYNTAX;
-
 			return context.withResult(juice, result);
 		}
 	});
@@ -1383,17 +1385,22 @@ public class Core {
 	public static final CoreFn<Object> NTH = reg(new CoreFn<>(Symbols.NTH) {
 		@Override
 		public <I> Context<Object> invoke(Context<I> context, Object[] args) {
+			// Arity 2
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
+			// First argument must be a Long index
 			Object coll = args[0];
 			Long ix = RT.toLong(args[1]);
 			if (ix == null) return context.withCastError(args[1], Long.class);
+			
+			// Second arg must be a countable collection
 			Long n = RT.count(coll);
 			if (n == null) return context.withCastError(coll, ASequence.class);
+			
+			// BOUNDS error if access is out of bounds
 			if ((ix < 0) || (ix >= n)) return context.withBoundsError(ix);
 
 			Object result = RT.nth(coll, ix);
-
 			return context.withResult(Juice.SIMPLE_FN, result);
 		}
 	});

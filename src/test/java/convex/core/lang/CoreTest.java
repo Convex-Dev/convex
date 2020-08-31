@@ -484,11 +484,12 @@ public class CoreTest {
 		assertEquals(2L, (long) eval("(nth [1 2] 1)"));
 		assertEquals('c', (char) eval("(nth \"abc\" 2)"));
 
+		assertArityError(step("(nth)"));
 		assertArityError(step("(nth [])"));
 		assertArityError(step("(nth [] 1 2)"));
 		assertArityError(step("(nth 1 1 2)")); // arity > cast
 
-		// TODO: cast error? or bounds error? Depends if nil counts as seqable?
+		// BOUNDS error because nil treated as empty sequence
 		assertBoundsError(step("(nth nil 10)"));
 
 		assertBoundsError(step("(nth [1 2] 10)"));
@@ -521,13 +522,16 @@ public class CoreTest {
 	@Test
 	public void testAssocNull() {
 		assertNull(eval("(assoc nil)")); // null is preserved
-		assertEquals(Maps.of(1L, 2L), eval("(assoc nil 1 2)")); // assoc promotes to maps
+		assertEquals(Maps.of(1L, 2L), eval("(assoc nil 1 2)")); // assoc promotes nil to maps
+		assertEquals(Maps.of(1L, 2L, 3L, 4L), eval("(assoc nil 1 2 3 4)")); // assoc promotes nil to maps
+		
+		// No values to assoc, retain initial nil
+		assertNull(eval("(assoc nil)"));
 	}
 
 	@Test
 	public void testAssocMaps() {
 		assertEquals(Maps.empty(), eval("(assoc {})"));
-		assertNull(eval("(assoc nil)"));
 		assertEquals(Maps.of(1L, 2L), eval("(assoc {} 1 2)"));
 		assertEquals(Maps.of(1L, 2L), eval("(assoc {1 2})"));
 		assertEquals(Maps.of(1L, 2L, 3L, 4L), eval("(assoc {} 1 2 3 4)"));
@@ -546,7 +550,11 @@ public class CoreTest {
 		assertCastError(step("(assoc :foo)"));
 		assertCastError(step("(assoc #{} :foo true)"));
 
+		// Arity error
 		assertArityError(step("(assoc)"));
+		assertArityError(step("(assoc nil 1)"));
+		assertArityError(step("(assoc nil 1 2 3)"));
+		assertArityError(step("(assoc 1 1)")); // ARITY before CAST
 	}
 
 	@Test
