@@ -26,18 +26,23 @@ public class API {
 
 	private static final Logger log = Logger.getLogger(API.class.getName());
 
+	public static Server launchPeer() {
+		Map<Keyword, Object> config = new HashMap<>();
+		return launchPeer(config);
+	}
+	
 	/**
 	 * Launches a Peer Server with a default configuration.
 	 * @return New Server instance
 	 */
-	public static Server launchPeer() {
-		Map<Keyword, Object> config = new HashMap<>();
+	public static Server launchPeer(Map<Keyword, Object> config) {
+		
 
 		try {
-			config.put(Keywords.PORT, null);
-			config.put(Keywords.STORE, Stores.DEFAULT);
-			config.put(Keywords.KEYPAIR, Init.KEYPAIRS[0]);
-			config.put(Keywords.STATE, Init.STATE);
+			if (!config.containsKey(Keywords.PORT)) config.put(Keywords.PORT, null);
+			if (!config.containsKey(Keywords.STORE)) config.put(Keywords.STORE, Stores.DEFAULT);
+			if (!config.containsKey(Keywords.KEYPAIR)) config.put(Keywords.KEYPAIR, Init.KEYPAIRS[0]);
+			if (!config.containsKey(Keywords.STATE)) config.put(Keywords.STATE, Init.STATE);
 
 			Server server = Server.create(config);
 			server.launch();
