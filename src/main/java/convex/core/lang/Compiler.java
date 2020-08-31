@@ -173,6 +173,11 @@ public class Compiler {
 		if (form instanceof Symbol) {
 			return compileSymbolLookup((Symbol) form, context);
 		}
+		
+		if (form instanceof AOp) {
+			// already compiled, just return as constant
+			return context.withResult(Juice.COMPILE_CONSTANT, (T)form);
+		}
 
 		throw new UnsupportedOperationException("TODO compile for: " + Utils.getClass(form));
 	}
@@ -598,6 +603,11 @@ public class Compiler {
 					updated = updated.assoc(newKey, newValue);
 				}
 				return ctx.withResult(Juice.EXPAND_SEQUENCE, Syntax.create(updated).withMeta(formSyntax.getMeta()));
+			}
+			
+			// If it's an Op, leave unchanged. Effectively a constant from expander POV.
+			if (form instanceof AOp) {
+				return context.withResult(Juice.EXPAND_CONSTANT, formSyntax);
 			}
 
 			throw new TODOException("Don't know how to expand: " + Utils.getClass(form));

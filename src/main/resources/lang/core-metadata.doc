@@ -704,14 +704,6 @@
           :signature [{:params [val]}]}
   }
   
-  schedule
-  {
-    :doc {:description "Schedules code for future execution under this account. Expands and compiles code now, but does not execute until the specified timestamp."
-          :examples [{:code "(schedule (+ *timestamp* 1000) (transfer my-friend 1000000))"}]
-          :type :macro
-          :signature [{:params [timestamp code]}]}
-  }
-  
   schedule*
   {
     :doc {:description "Schedules a form for future execution under this account. Expands and compiles form now, but does not execute until the specified timestamp."

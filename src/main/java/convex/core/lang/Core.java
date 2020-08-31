@@ -274,37 +274,6 @@ public class Core {
 
 	});
 
-	public static final CoreExpander SCHEDULE = reg(new CoreExpander(Symbols.SCHEDULE) {
-		@SuppressWarnings("unchecked")
-		@Override
-		public Context<Syntax> expand(Object scheduleForm, AExpander cont, Context<?> context) {
-			Syntax formSyntax=Syntax.create(scheduleForm);
-			AList<Object> form = formSyntax.getValue();
-			
-			// Arity 3 required
-			int n = form.size();
-			if (n != 3) return context.withArityError("schedule requires arity 3 but got:" + n);
-
-			Context<Syntax> ctx = (Context<Syntax>) context;
-
-			// expand target timestamp expression
-			ctx = ctx.expand(form.get(1), cont, cont);
-			if (ctx.isExceptional()) return ctx;
-			Object timeExp = ctx.getResult();
-
-			// expand scheduled operation expression
-			// might be embedded unquotes to expand?
-			Object opExp = Lists.of(Symbols.COMPILE, (Object) Lists.of(Symbols.QUOTE, form.get(2)));
-			ctx = ctx.expand(opExp, cont, cont);
-			if (ctx.isExceptional()) return ctx;
-			opExp = ctx.getResult();
-
-			// return final expansion
-			Syntax eForm = Syntax.create(Lists.of(Syntax.create(Symbols.SCHEDULE_STAR), timeExp, opExp));
-			return context.withResult(Juice.SCHEDULE_EXPAND, eForm);
-		}
-	});
-
 	public static final CoreFn<Long> SCHEDULE_STAR = reg(new CoreFn<>(Symbols.SCHEDULE_STAR) {
 		@Override
 		public <I> Context<Long> invoke(Context<I> context, Object[] args) {
@@ -313,12 +282,12 @@ public class Core {
 
 			// get timestamp target
 			Object tso = args[0];
-			if (!(tso instanceof Long)) return context.withError(ErrorCodes.CAST);
+			if (!(tso instanceof Long)) return context.withCastError(tso,Long.class);
 			long sts = (long) tso;
 
 			// get operation
 			Object opo = args[1];
-			if (!(opo instanceof AOp)) return context.withError(ErrorCodes.CAST);
+			if (!(opo instanceof AOp)) return context.withCastError(opo,AOp.class);
 			AOp<?> op = (AOp<?>) opo;
 
 			return context.schedule(sts, op);

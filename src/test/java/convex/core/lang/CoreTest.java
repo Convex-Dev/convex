@@ -1417,6 +1417,8 @@ public class CoreTest {
 
 	@Test
 	public void testCompile() {
+		assertEquals(Constant.create(1L), eval("(compile 1)"));
+		
 		assertEquals(Constant.class, eval("(compile 1)").getClass());
 		assertEquals(Constant.class, eval("(compile nil)").getClass());
 		assertEquals(Constant.class, eval("(compile (+ 1 2))").getClass());
@@ -1749,9 +1751,20 @@ public class CoreTest {
 		assertArityError(step("(eval)"));
 		assertArityError(step("(eval 1 2)"));
 	}
+	
+	@Test
+	public void testScheduleFailures() {
+		assertArityError(step("(schedule)"));
+		assertArityError(step("(schedule 1)"));
+		assertArityError(step("(schedule 1 2 3)"));
+		assertArityError(step("(schedule :foo 2 3)")); // ARITY error before CAST
+		
+		assertCastError(step("(schedule :foo (def a 2))"));
+		assertCastError(step("(schedule nil (def a 2))"));
+	}
 
 	@Test
-	public void testSchedule() throws BadSignatureException {
+	public void testScheduleExecution() throws BadSignatureException {
 		long expectedTS = INITIAL.getTimeStamp() + 1000;
 		Context<?> ctx = step("(schedule (+ *timestamp* 1000) (def a 2))");
 		assertEquals(expectedTS, ctx.getResult());
