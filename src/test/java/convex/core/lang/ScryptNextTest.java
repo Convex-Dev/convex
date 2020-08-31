@@ -96,8 +96,6 @@ public class ScryptNextTest {
 
     @Test
     public void testExpressions() {
-        // Not allowed to start a symbol with '_'
-        assertThrows(ParserRuntimeException.class, () -> parse("_"));
         // Not allowed to start a symbol with '&'
         assertThrows(ParserRuntimeException.class, () -> parse("&"));
 
@@ -144,6 +142,7 @@ public class ScryptNextTest {
         assertEquals(Reader.read("1"), parse("1"));
         assertEquals(Reader.read("true"), parse("true"));
         assertEquals(Reader.read("false"), parse("false"));
+        assertEquals(Reader.read("*balance*"), parse("_balance_"));
         assertEquals(Reader.read("symbol"), parse("symbol"));
         assertEquals(Reader.read("symbol-abc"), parse("symbol_abc"));
         assertEquals(Reader.read("symbol*"), parse("symbol_"));

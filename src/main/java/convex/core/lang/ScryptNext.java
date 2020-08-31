@@ -689,7 +689,7 @@ public class ScryptNext extends Reader {
     }
 
     public Rule InitialSymbolCharacter() {
-        return Alphabet();
+        return FirstOf(Alphabet(), '_');
     }
 
     public Rule FollowingSymbolCharacter() {
