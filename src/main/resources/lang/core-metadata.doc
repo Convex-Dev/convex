@@ -480,7 +480,7 @@
  
   keys
 	{
-	 :doc {:description "Returns a collection of keys in the given map."
+	 :doc {:description "Returns a vector of keys in the given map, in the map defined order."
          :examples [{:code "(keys {:foo 1 :bar 2})"}]
          :type :function
          :signature [{:params [m]}]}

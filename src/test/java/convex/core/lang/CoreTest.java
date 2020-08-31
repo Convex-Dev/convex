@@ -414,6 +414,9 @@ public class CoreTest {
 		assertEquals(Vectors.of(1L), eval("(keys {1 2})"));
 		assertEquals(Sets.of(1L, 3L, 5L), eval("(set (keys {1 2 3 4 5 6}))"));
 
+		assertEquals(Vectors.empty(),RT.keys(BlobMaps.empty()));
+		assertEquals(Vectors.of(Init.HERO),RT.keys(BlobMap.create(Init.HERO, 1L)));
+		
 		assertCastError(step("(keys 1)"));
 		assertCastError(step("(keys [])"));
 		assertCastError(step("(keys nil)")); // TODO: maybe empty set?
