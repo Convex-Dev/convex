@@ -15,6 +15,8 @@ import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.data.SignedData;
+import convex.core.lang.Symbols;
+import convex.core.lang.ops.Lookup;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.core.util.Utils;
@@ -114,7 +116,14 @@ public class Convex {
 	 */
 	private long getSequence() {
 		if (sequence==null) {
-			
+			try {
+				Future<Result> f=query(Lookup.create(Symbols.STAR_SEQUENCE));
+				Result r=f.get();
+				if (r.isError()) throw new Error("Error querying *sequence*: "+r.getValue());
+				sequence=(Long)(r.getValue());
+			} catch (IOException | InterruptedException | ExecutionException e) {
+				throw new Error("Error trying to get sequence number",e);
+			}
 		}
 		return sequence;
 	}

@@ -536,6 +536,7 @@ public final class Context<T> implements IObject {
 			if (sym.equals(Symbols.STAR_OFFER)) return (Context<R>) withResult((long)getOffer());
 			if (sym.equals(Symbols.STAR_STATE)) return (Context<R>) withResult(getState());
 			if (sym.equals(Symbols.STAR_HOLDINGS)) return (Context<R>) withResult(getHoldings());
+			if (sym.equals(Symbols.STAR_SEQUENCE)) return (Context<R>) withResult(getAccountStatus().getSequence());
 		}
 		return withError(ErrorCodes.UNDECLARED,sym.toString());
 	}

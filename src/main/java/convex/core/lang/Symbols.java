@@ -147,6 +147,7 @@ public class Symbols {
 	public static final Symbol STAR_OFFER = Symbol.create("*offer*");
 	public static final Symbol STAR_STATE = Symbol.create("*state*");
 	public static final Symbol STAR_HOLDINGS = Symbol.create("*holdings*");
+	public static final Symbol STAR_SEQUENCE = Symbol.create("*sequence*");
 
 	public static final Symbol STAR_ALIASES = Symbol.create("*aliases*");
 	
