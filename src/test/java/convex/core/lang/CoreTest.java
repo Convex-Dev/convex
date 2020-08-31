@@ -1088,11 +1088,16 @@ public class CoreTest {
 
 		assertEquals(Vectors.of(1L, 2L, 3L, 4L), eval("(apply vector 1 2 (list 3 4))"));
 		assertEquals(List.of(1L, 2L, 3L, 4L), eval("(apply list 1 2 [3 4])"));
+		assertEquals(List.of(1L, 2L), eval("(apply list 1 2 nil)"));
 
+		// Insufficient args to apply
 		assertArityError(step("(apply)"));
 		assertArityError(step("(apply vector)"));
-		assertArityError(step("(apply assoc nil)")); // no-args to assoc
+		
+		// Insufficient args to applied function
+		assertArityError(step("(apply assoc nil)")); 
 
+		// Cast error if not applied to collection
 		assertCastError(step("(apply inc 1)"));
 		assertCastError(step("(apply inc :foo)"));
 	}
@@ -1164,8 +1169,10 @@ public class CoreTest {
 
 	@Test
 	public void testCallStar() {
-		Context<Address> ctx = step("(def ctr (deploy '(do :foo :bar)))");
+		Context<Address> ctx = step("(def ctr (deploy '(do :foo (defn f [x] (inc x)) (export f g) )))");
 
+		assertEquals(9L,evalL(ctx, "(call* ctr 0 :f 8)"));
+		
 		assertArityError(step(ctx, "(call*)"));
 		assertArityError(step(ctx, "(call* 12)"));
 		assertArityError(step(ctx, "(call* 1 2)")); // no function
@@ -1336,6 +1343,10 @@ public class CoreTest {
 			assertEquals(TestState.TOTAL_FUNDS, rc.getState().computeTotalFunds());
 		}
 		
+		// staking on an account that isn't a peer
+		assertStateError(step(ctx,"(stake *address* 1234)"));
+		
+		// bad arg types
 		assertCastError(step(ctx,"(stake :foo 1234)"));
 		assertCastError(step(ctx,"(stake my-peer :foo)"));
 		assertCastError(step(ctx,"(stake my-peer nil)"));
@@ -1400,6 +1411,7 @@ public class CoreTest {
 		assertSame(Hash.NULL_HASH, eval("(hash nil)"));
 		assertSame(Hash.TRUE_HASH, eval("(hash true)"));
 		assertSame(Maps.empty().getHash(), eval("(hash {})"));
+		assertTrue(evalB("(= (hash 123) (hash 123))"));
 
 		assertArityError(step("(hash)"));
 		assertArityError(step("(hash nil nil)"));
@@ -1413,8 +1425,10 @@ public class CoreTest {
 		assertEquals(0L, (long) eval("(count \"\")"));
 		assertEquals(2L, (long) eval("(count (list :foo :bar))"));
 		assertEquals(2L, (long) eval("(count #{1 2 2})"));
-		assertEquals(2L, (long) eval("(count {1 2 2 3})"));
 		assertEquals(3L, (long) eval("(count [1 2 3])"));
+		
+		// Count of a map is the number of entries
+		assertEquals(2L, (long) eval("(count {1 2 2 3})")); 
 
 		assertCastError(step("(count 1)"));
 		assertCastError(step("(count :foo)"));
