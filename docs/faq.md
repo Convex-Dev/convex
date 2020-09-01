@@ -6,14 +6,25 @@ That's up to you! But we hope you'll find it compelling for these sort of reason
 - The ability to easily build powerful decentralised applications
 - Probably the best overall performance of any decentralised platform 
 
-## Is Convex really that fast?
+## What should go on-chain?
 
-This will undoubtedly be a subject of much debate. 
+You often have a choice between putting code and information on the public Convex network or keeping it on a separate server when building a decentralised application. Some applications might do both: we call these "hybrid" dApps.
 
-We don't like to brag, but we think we have the best overall combination of:
+Some general principles:
+
+- Put data *on-chain* when it need to be *publicly visible and verifiable*
+- Put data *on-chain* when you need to make trusted transactions between parties (e.g. exchanging digital assets)
+- Keep data *off-chain* when it needs to be private
+- Keep code and data *off-chain* if there are significant compute or storage requirements (it would be too expensive to put on-chain)
+
+## Is Convex fast?
+
+Yes. But it's not just about transaction speed.
+
+Convex is designed to offer a good overall combination of:
 
 - Low latency to stable consensus (~1 second on global network)
-- Execution throughput (10,000+ token-based smart contract transactions per second)
+- High execution throughput (10,000+ token-based smart contract transactions per second)
 - Advanced features (smart contracts, memory accounting, an on-chain compiler, autonomous Actors)
 - A unified global state machine
 - True decentralisation as a public utility network (with delegated proof of stake) 
