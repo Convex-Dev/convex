@@ -1966,15 +1966,7 @@ public class CoreTest {
 		assertArityError(step("(and true (count) nil)"));
 	}
 	
-	@Test
-	public void testSpecialResult() {
-		// initial context result should be null
-		assertNull(eval("*result*"));
-		
-		// Result should get value of last completed expression
-		assertEquals(Keywords.FOO, eval("(do :foo *result*)"));
-		assertNull(eval("(do (do) *result*)"));
-	}
+	
 	
 	@Test
 	public void testSpecialAddress() {
@@ -1985,13 +1977,22 @@ public class CoreTest {
 		assertEquals(HERO, eval("*origin*"));
 	}
 	
+	@Test
+	public void testSpecialAllowance() {
+		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE, evalL("*allowance*"));
+	}
+	
 
 	@Test
 	public void testSpecialBalance() {
+		// balance should return exact balance of account after execution
 		Address HERO = TestState.HERO;
 		Context<?> ctx = step("(long *balance*)");
 		Long bal=ctx.getAccountStatus(HERO).getBalance().getValue();
 		assertEquals(bal, ctx.getResult());
+		
+		// throwing it all away....
+		assertEquals(0L, evalL("(do (transfer 0x0000000000000000000000000000000000000000000000000000000000000000 *balance*) *balance*)"));
 		
 		// check balance as single expression
 		assertEquals(bal, eval("*balance*"));
@@ -2009,19 +2010,34 @@ public class CoreTest {
 	}
 	
 	@Test
-	public void testSpecialSymbols() {
+	public void testSpecialResult() {
+		// initial context result should be null
+		assertNull(eval("*result*"));
 		
-		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE, evalL("*allowance*"));
-
-
-		// balance should return exact balance after execution
-
+		// Result should get value of last completed expression
+		assertEquals(Keywords.FOO, eval("(do :foo *result*)"));
+		assertNull(eval("(do (do) *result*)"));
+	}
+	
+	@Test
+	public void testSpecialState() {
+		assertSame(INITIAL, eval("*state*"));
+		assertSame(INITIAL.getAccounts(), eval("(:accounts *state*)"));
+	}
+	
+	@Test
+	public void testSpecialJuice() {
 		// TODO: semantics of returning juice before lookup complete is OK?
 		// seems sensible, represents "juice left at this position".
 		assertEquals(INITIAL_JUICE, (long) eval("*juice*"));
+		
+		// juice gets consumed before returning a value
+		assertEquals(INITIAL_JUICE-Juice.DO - Juice.CONSTANT, (long) eval("(do 1 *juice*)"));
+	}
 
-		assertSame(INITIAL, eval("*state*"));
-		assertSame(INITIAL.getAccounts(), eval("(:accounts *state*)"));
+
+	@Test
+	public void testSpecialEdgeCases() {
 
 		// TODO: are we happy about letting people trash special symbols?
 		assertEquals(Keywords.FOO, eval("(let [*balance* :foo] *balance*)"));
@@ -2032,6 +2048,11 @@ public class CoreTest {
 	@Test public void testSpecialHoldings() {
 		assertSame(BlobMaps.empty(),eval("*holdings*"));
 		
+		// Test set-holding modifies *holdings* as expected
+		Address HERO = TestState.HERO;
+		assertNull(eval("(get-holding *address*)"));
+		assertEquals(BlobMaps.of(HERO,1L),eval("(do (set-holding *address* 1) *holdings*)"));
+		
 	}
 	
 	@Test public void testHoldings() {
@@ -2039,7 +2060,7 @@ public class CoreTest {
 		Address HERO = TestState.HERO;
 		Context<?> ctx = step("(def VILLAIN (address \""+VILLAIN.toHexString()+"\"))");
 		assertTrue(eval(ctx,"VILLAIN") instanceof Address);
-		ctx=step(ctx,"(def NOONE (address \""+Address.dummy("0").toHexString()+"\"))");
+		ctx=step(ctx,"(def NOONE 0x"+Address.dummy("0").toHexString()+")");
 		
 		// initial holding behaviour
 		assertNull(eval(ctx,"(get-holding VILLAIN)"));
