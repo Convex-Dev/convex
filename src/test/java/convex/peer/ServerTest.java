@@ -46,8 +46,7 @@ public class ServerTest {
 		config.put(Keywords.STATE, Init.STATE);
 		config.put(Keywords.KEYPAIR, Init.KEYPAIRS[0]); // use first peer keypair
 
-		server = Server.create(config);
-		server.launch();
+		server = API.launchPeer(config);
 	}
 	
 	private static final Logger log = Logger.getLogger(ServerTest.class.getName());
