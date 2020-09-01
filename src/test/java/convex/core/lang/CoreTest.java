@@ -5,7 +5,19 @@ import static convex.core.lang.TestState.eval;
 import static convex.core.lang.TestState.evalB;
 import static convex.core.lang.TestState.evalL;
 import static convex.core.lang.TestState.step;
-import static convex.test.Assertions.*;
+import static convex.test.Assertions.assertArgumentError;
+import static convex.test.Assertions.assertArityError;
+import static convex.test.Assertions.assertAssertError;
+import static convex.test.Assertions.assertBoundsError;
+import static convex.test.Assertions.assertCastError;
+import static convex.test.Assertions.assertCompileError;
+import static convex.test.Assertions.assertDepthError;
+import static convex.test.Assertions.assertFundsError;
+import static convex.test.Assertions.assertJuiceError;
+import static convex.test.Assertions.assertMemoryError;
+import static convex.test.Assertions.assertNobodyError;
+import static convex.test.Assertions.assertStateError;
+import static convex.test.Assertions.assertUndeclaredError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -26,7 +38,6 @@ import convex.core.data.ABlob;
 import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.Amount;
 import convex.core.data.Blob;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
@@ -1954,21 +1965,56 @@ public class CoreTest {
 		// arity error if fails before first falsey value
 		assertArityError(step("(and true (count) nil)"));
 	}
-
+	
 	@Test
-	public void testSpecialSymbols() {
-		Address HERO = TestState.HERO;
+	public void testSpecialResult() {
+		// initial context result should be null
+		assertNull(eval("*result*"));
+		
+		// Result should get value of last completed expression
 		assertEquals(Keywords.FOO, eval("(do :foo *result*)"));
+		assertNull(eval("(do (do) *result*)"));
+	}
+	
+	@Test
+	public void testSpecialAddress() {
+		Address HERO = TestState.HERO;
+		
+		// Hero should be address and origin in initial context
 		assertEquals(HERO, eval("*address*"));
 		assertEquals(HERO, eval("*origin*"));
+	}
+	
+
+	@Test
+	public void testSpecialBalance() {
+		Address HERO = TestState.HERO;
+		Context<?> ctx = step("(long *balance*)");
+		Long bal=ctx.getAccountStatus(HERO).getBalance().getValue();
+		assertEquals(bal, ctx.getResult());
+		
+		// check balance as single expression
+		assertEquals(bal, eval("*balance*"));
+		
+		// test overrides in local any dynamic context
+		assertNull(eval("(let [*balance* nil] *balance*)"));
+		assertNull(eval("(do (def *balance* nil) *balance*)"));
+	}
+	
+	@Test
+	public void testSpecialCaller() {
+		Address HERO = TestState.HERO;
 		assertNull(eval("*caller*"));
+		assertEquals(HERO, eval("(do (def c (deploy '(do (defn f [] *caller*) (export f)))) (call c (f)))"));
+	}
+	
+	@Test
+	public void testSpecialSymbols() {
 		
 		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE, evalL("*allowance*"));
 
 
 		// balance should return exact balance after execution
-		Context<?> ctx = step("(long *balance*)");
-		assertEquals(ctx.getAccountStatus(HERO).getBalance(), Amount.create((long) ctx.getResult()));
 
 		// TODO: semantics of returning juice before lookup complete is OK?
 		// seems sensible, represents "juice left at this position".

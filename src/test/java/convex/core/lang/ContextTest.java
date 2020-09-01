@@ -85,6 +85,8 @@ public class ContextTest {
 		assertEquals(c.getBalance(TestState.HERO),c.lookupSpecial(Symbols.STAR_BALANCE).getResult());
 		assertEquals(0L,c.lookupSpecial(Symbols.STAR_OFFER).getResult());
 		
+		assertEquals(0L,c.lookupSpecial(Symbols.STAR_SEQUENCE).getResult());
+
 		assertEquals(Constants.INITIAL_TIMESTAMP,c.lookupSpecial(Symbols.STAR_TIMESTAMP).getResult());
 		
 		assertSame(c.getState(), c.lookupSpecial(Symbols.STAR_STATE).getResult());
