@@ -345,7 +345,7 @@
   
   fetch
  	{
-	 :doc {:description "Fetches the object with the given Object ID from immutable storage. Returns nil if the value is not found."
+	 :doc {:description "Fetches the object with the given Object ID from immutable storage. Returns nil if the value is not found. Object ID may be a Hash or a Blob of correct length."
          :examples [{:code "(fetch object-id)"}]
          :type :function
          :signature [{:params [id]}]}
