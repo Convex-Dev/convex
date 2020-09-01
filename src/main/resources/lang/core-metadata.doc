@@ -973,7 +973,7 @@
   
   *
   {
-     :doc {:description "Multiplies numeric arguments."
+     :doc {:description "Multiplies numeric arguments. Result will be a Double if any arguments are Doubles, otherwise it will be a Long."
            :examples [{:code "(* 1 2 3 4 5)"}]
            :type :function
            :signature [{:params [& xs]}]}
@@ -988,7 +988,7 @@
   
   /
   {
-	 :doc {:description "Double precision point divide. With a single argument, returns the reciprocal of a number. With multiple arguments, divides the first argiment by the others in order."
+	 :doc {:description "Double precision point divide. With a single argument, returns the reciprocal of a number. With multiple arguments, divides the first argument by the others in order."
          :examples [{:code "(/ 10 3)"}]
          :type :function
          :signature [{:params [divisor]}
