@@ -900,6 +900,12 @@ public class RT {
 	 */
 	public static Hash toHash(Object o) {
 		if (o instanceof Hash) return ((Hash) o);
+		if (o instanceof ABlob) {
+			ABlob blob=(ABlob)o;
+			if (blob.length()!=Hash.LENGTH) return null;
+			return Hash.wrap(blob.getBytes());
+		}
+			
 		return null;
 	}
 
