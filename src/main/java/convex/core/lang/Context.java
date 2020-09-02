@@ -453,6 +453,7 @@ public final class Context<T> implements IObject {
 			}
 		}
 		
+		// Result is whatever is defined as the datum value in the environment entry
 		R result=syntax.getValue();
 		return (Context<R>) withResult(result);
 	}

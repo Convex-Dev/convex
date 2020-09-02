@@ -74,7 +74,8 @@ public class Invoke<T> extends AMultiOp<T> {
 	@Override
 	public <I> Context<T> execute(Context<I> context) {
 		// execute first op to obtain function value
-		Context<T> ctx = (Context<T>) context.execute(ops.get(0));
+		AOp<?> fnOp=ops.get(0);
+		Context<T> ctx = (Context<T>) context.execute(fnOp);
 		if (ctx.isExceptional()) return ctx;
 
 		Object rf = ctx.getResult();
@@ -84,7 +85,9 @@ public class Invoke<T> extends AMultiOp<T> {
 		int arity = ops.size() - 1;
 		Object[] args = new Object[arity];
 		for (int i = 0; i < arity; i++) {
-			ctx = (Context<T>) ctx.execute(ops.get(i + 1));
+			// Compute the op for each argument in order
+			AOp<?> argOp=ops.get(i + 1);
+			ctx = (Context<T>) ctx.execute(argOp);
 			if (ctx.isExceptional()) return ctx;
 
 			args[i] = ctx.getResult();
