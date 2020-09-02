@@ -9,7 +9,7 @@
 {
 	accept 
 	{
-	 :doc {:description "Accepts funds up to the amount of *offer* from *caller*. Amount must cast to long. If successful, the amount will be added immediately to the *balance* of the current *address*. This is the recommended way of transferring balance between Actors, as it requires a positive action to confirm receipt."
+	 :doc {:description "Accepts funds up to the amount of *offer* from *caller*. Amount must cast to long. If successful, the amount will be added immediately to the *balance* of the current *address*. This is the recommended way of transferring balance between Actors, as it requires a positive action to confirm receipt. Returns a STATE error if there are insufficient funds to accept."
          :examples [{:code "(accept *offer*)"}]
          :type :function
          :signature [{:params [amount]}]}
@@ -1070,8 +1070,9 @@
   
    *state*
   {
-     :doc {:description "Returns the current CVM state object. This is a very large object, and should normally only be used temporarily to look up relevant values."
-           :examples [{:code "*state*"}]
+     :doc {:description "Returns the current CVM state record. This is a very large object, and should normally only be used temporarily to look up relevant values."
+           :examples [{:code "(keys *state*)"}
+                      {:code "(get-in *state* [:accounts *address* :balance])"}]
            :type :special}
      :special-symbol true
   }
