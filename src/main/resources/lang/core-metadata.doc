@@ -353,7 +353,7 @@
   
   first
  	{
-	 :doc {:description "Returns the first element from a collection."
+	 :doc {:description "Returns the first element from a collection. Will cause a BOUNDS error if the collection is empty. It can be a good idea to check for this case with `empty?` first."
          :examples [{:code "(first [1 2 3])"}]
          :type :function
          :signature [{:params [coll]}]}
@@ -362,7 +362,7 @@
   fn
  	{
 	 :doc {:description "Creates an anonymous function (closure) with the specified argument list and function body. Will close over variables in the current lexical scope."
-         :examples [{:code "(let [f (fn [x] (* x x))] (f 10))"}]
+         :examples [{:code "(let [f (fn [x y] (* x y))] (f 10 7))"}]
          :type :special
          :signature [{:params [args & body]}]}
 	}
@@ -979,11 +979,109 @@
            :signature [{:params [& xs]}]}
   }
   
+  *address*
+  {
+     :doc {:description "Returns the Address of the current Account. This will be the User address in a newly submitted transaction, or the Actor if an Actor call is being executed."
+           :examples [{:code "(address? *address*)"}]
+           :type :special}
+     :special-symbol true
+  }
+  
+  *aliases*
+  {
+     :doc {:description "Returns the map of aliases in the current enviornment. Aliases enable symbols with namespaces e.g. 'library/foo' enables lookup of the symbol 'foo' via the 'library' alias."
+           :examples [{:code "*aliases*"}]
+           :type :special}
+     :special-symbol true
+  }
+  
+  *allowance*
+  {
+     :doc {:description "Gets the current Memory Allowance for this Account. May be zero - in which case any new memory allocations will be charged at the current memory exchange pool price."
+           :examples [{:code "*allowance*"}]
+           :type :special}
+     :special-symbol true
+  }
+  
   *balance*
    {
      :doc {:description "Returns the available balance of the current account. Functionally equivalent to '(balance *address*)', but cheaper to execute. Note that the available balance *excludes* reserved balance for transaction execution. "
            :examples [{:code "*balance*"}]
-           :type :special-symbol}
+           :type :special}
+     :special-symbol true
+  }
+   
+   *caller*
+   {
+     :doc {:description "Returns the Address of the caller Account, or nil if this is a top-level User transaction. If an Actor or User makes an Actor call, they will be the caller for the duration of execution in the context of the called code."
+           :examples [{:code "*caller*"}]
+           :type :special}
+     :special-symbol true
+
+  }
+   
+  *depth*
+  {
+     :doc {:description "Returns the current CVM stack depth. If the depth becomes too deep, the transaction will fail with a DEPTH exception. In most cases, the allowable depth should be sufficient."
+           :examples [{:code "*depth*"}]
+           :type :special}
+     :special-symbol true
+  }
+   
+  *holdings*
+   {
+     :doc {:description "Returns the holdings map for this Account. Holdings are data values controlled by other Accounts (usually Actors, e.g. Token contracts). They can be used to indicate that an Account may have special rights or holdings with respect to a specific Actor, although this interpretation is Actor-specific."
+           :examples [{:code "*holdings*"}]
+           :type :special}
+     :special-symbol true
+  }
+   
+   *juice*
+   {
+     :doc {:description "Returns the amount of execution juice remaining at this point of the current transaction. Juice is required for every CVM operation executed, and the transaction will fail immediately with a JUICE error if an attempt is made to consume juice beyond this value."
+           :examples [{:code "*juice*"}]
+           :type :special}
+     :special-symbol true
+  }
+   
+  *offer*
+  {
+     :doc {:description "Returns the amount of native coin offered by *caller* to the currently running Actor. Will usually be zero, unless the caller has included an offer with a 'call' expression. The Actor may take up to this amount using 'accept'."
+           :examples [{:code "*offer*"}]
+           :type :special}
+     :special-symbol true
+  }
+  
+  *origin*
+  {
+     :doc {:description "Returns the Address of the account that initially signed this transaction. Usually, you should NOT use this for access control, since a rogue Actor can potentially trick a User into creating a transaction that allows code to be indirectly executed. Consider using *caller* for access control instead."
+           :examples [{:code "*origin*"}]
+           :type :special}
+     :special-symbol true
+  }
+  
+   *result*
+  {
+     :doc {:description "Returns the result of the last CVM operation executed. Can be used, in some cases, to access the value of the previous expression. Will be nil for new transactions, or at the start of an Actor call."
+           :examples [{:code "(do 1 *result*)"}]
+           :type :special}
+     :special-symbol true
+  }
+  
+   *state*
+  {
+     :doc {:description "Returns the current CVM state object. This is a very large object, and should normally only be used temporarily to look up relevant values."
+           :examples [{:code "*state*"}]
+           :type :special}
+     :special-symbol true
+  }
+   
+  *timestamp*
+  {
+     :doc {:description "Returns the current timestamp. The timestamp is a Long value that is equal to the greatest timestamp of any block executed (including the current block). A timestamp can be interpreted as the number of milliseconds since January 1, 1970, 00:00:00 GMT. The block timestamp should always be less than or equal to the Unix timestamp of Peers that are in consensus."
+           :examples [{:code "*timestamp*"}]
+           :type :special}
+     :special-symbol true
   }
   
   /

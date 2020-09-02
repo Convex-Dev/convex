@@ -124,7 +124,7 @@ public class TestState {
 		Context<?> ctx = Context.createFake(INITIAL);
 		State s = ctx.getState();
 		assertEquals(INITIAL, s);
-		assertEquals(Init.HERO,ctx.lookupSpecial(Symbols.STAR_ADDRESS).getResult());
+		assertEquals(Init.HERO,ctx.computeSpecial(Symbols.STAR_ADDRESS).getResult());
 		assertSame(Core.COUNT, ctx.lookup(Symbols.COUNT).getResult());
 		assertEquals(Constants.INITIAL_TIMESTAMP, (long) ctx.lookup(Symbols.STAR_TIMESTAMP).getResult());
 		assertEquals(Constants.INITIAL_TIMESTAMP, s.getTimeStamp());

@@ -1854,9 +1854,12 @@ public class Core {
 			AList<Syntax> forms = Reader.readAllSyntax(Utils.readResourceAsString("lang/core.con"));
 			for (Syntax f : forms) {
 				form = f;
-				ctx = ctx.eval(form);
-				// System.out.println("Core compilation juice: "+ctx.getJuice());
+				ctx=ctx.expandCompile(form);
 				assert (!ctx.isExceptional()) : "Error compiling form: "+ Syntax.unwrapAll(form)+ " : "+ ctx.getExceptional();
+				AOp<?> op=(AOp<?>) ctx.getResult();
+				ctx = ctx.execute(op);
+				// System.out.println("Core compilation juice: "+ctx.getJuice());
+				assert (!ctx.isExceptional()) : "Error executing op: "+ op+ " : "+ ctx.getExceptional();
 				
 			}
 		} catch (IOException t) {

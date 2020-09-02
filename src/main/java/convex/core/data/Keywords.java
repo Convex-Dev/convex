@@ -40,7 +40,7 @@ public class Keywords {
 
 	public static final Keyword TYPE = Keyword.create("type");
 	public static final Keyword SPECIAL = Keyword.create("special");
-
+	public static final Keyword SPECIAL_SYMBOL = Keyword.create("special-symbol");
 	
 	public static final Keyword PEER = Keyword.create("peer");
 	public static final Keyword STAKE = Keyword.create("stake");
@@ -59,5 +59,6 @@ public class Keywords {
 	public static final Keyword ID = Keyword.create("id");
 	public static final Keyword RESULT = Keyword.create("result");
 	public static final Keyword ERROR_CODE = Keyword.create("error-code");
+
 
 }

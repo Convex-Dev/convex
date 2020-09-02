@@ -9,7 +9,6 @@ import convex.core.data.IRefFunction;
 import convex.core.data.MapEntry;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
-import convex.core.data.Syntax;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
@@ -55,12 +54,9 @@ public class Lookup<T> extends AOp<T> {
 		MapEntry<Symbol, T> le = context.lookupLocalEntry(symbol);
 		if (le != null) return context.withResult(Juice.LOOKUP, le.getValue());
 		
-		// TODO
+		// Do a dynamic lookup, with address if specified or address from current context otherwise
 		Address namespaceAddress=(address==null)?context.getAddress():address;
-		MapEntry<Symbol, Syntax> de = context.lookupDynamicEntry(namespaceAddress,symbol);
-		
-		if (de != null) return context.withResult(Juice.LOOKUP_DYNAMIC, de.getValue().getValue());
-		return context.lookupSpecial(symbol).consumeJuice(Juice.LOOKUP_DYNAMIC);
+		return context.lookupDynamic(namespaceAddress,symbol).consumeJuice(Juice.LOOKUP_DYNAMIC);
 	}
 
 	@Override

@@ -18,6 +18,7 @@ import convex.core.data.Amount;
 import convex.core.data.BlobMap;
 import convex.core.data.IObject;
 import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
@@ -411,11 +412,49 @@ public final class Context<T> implements IObject {
 		if (le!=null) return (Context<R>) withResult(le.getValue());
 		
 		// second try lookup in dynamic environment
-		MapEntry<Symbol,Syntax> de=lookupDynamicEntry(symbol);
-		if (de!=null) return withResult(de.getValue().getValue());
+		return lookupDynamic(symbol);
+	}
+	
+	/**
+	 * Looks up a value in the dynamic environment. Consumes no juice.
+	 * 
+	 * Returns an UNDECLARED exception if the symbol cannot be resolved.
+	 * 
+	 * @param <R>
+	 * @param symbol
+	 * @return
+	 */
+	public <R> Context<R> lookupDynamic(Symbol symbol) {
+		return lookupDynamic(getAddress(),symbol);
+	}
+	
+	/**
+	 * Looks up a value in the dynamic environment. Consumes no juice.
+	 * 
+	 * Returns an UNDECLARED exception if the symbol cannot be resolved.
+	 * 
+	 * @param <R>
+	 * @param symbol
+	 * @return
+	 */
+	public <R> Context<R> lookupDynamic(Address address, Symbol symbol) {
+		MapEntry<Symbol,Syntax> envEntry=lookupDynamicEntry(address,symbol);
 		
-		// finally fallback to special symbol lookup
-		return lookupSpecial(symbol);
+		// if not found, return UNDECLARED error
+		if (envEntry==null) return withError(ErrorCodes.UNDECLARED,symbol.toString());
+
+		Syntax syntax=envEntry.getValue();
+
+		// Check for special symbol
+		if (symbol.maybeSpecial()) {
+			if (RT.bool(syntax.getMeta().get(Keywords.SPECIAL_SYMBOL))) {
+				Context<R> rctx= computeSpecial(symbol);
+				if (rctx!=null) return rctx;
+			}
+		}
+		
+		R result=syntax.getValue();
+		return (Context<R>) withResult(result);
 	}
 	
 	/**
@@ -424,7 +463,7 @@ public final class Context<T> implements IObject {
 	 * If the symbol is qualified, try lookup via *aliases*
 	 * 
 	 * @param sym Symbol to look up
-	 * @return
+	 * @return Environment map entry for symbol, or null if not found
 	 */
 	public MapEntry<Symbol,Syntax> lookupDynamicEntry(Symbol sym) {
 		AccountStatus as=getAccountStatus();
@@ -455,7 +494,7 @@ public final class Context<T> implements IObject {
 			Symbol alias=sym.getNamespace();
 			AccountStatus aliasAccount=getAliasedAccount(env,alias);
 			result = lookupAliasedEntry(aliasAccount,sym);
-		}
+		} 
 		return result;
 	}
 	
@@ -515,30 +554,28 @@ public final class Context<T> implements IObject {
 	}
 
 	/**
-	 * Looks up a special symbol in the environment. Consumes no juice.
+	 * Computes the value special symbol in the environment. Consumes no juice.
 	 * 
 	 * @param <R>
 	 * @param sym
-	 * @return Context with value or special symbol, or undeclared exception if not found.
+	 * @return Context with value of special symbol, or null if not defined
 	 */
 	@SuppressWarnings("unchecked")
-	public <R> Context<R> lookupSpecial(Symbol sym)  {
-		if (sym.getName().charAt(0)==Symbols.SPECIAL_STAR) {
-			if (sym.equals(Symbols.STAR_JUICE)) return (Context<R>) withResult(getJuice());
-			if (sym.equals(Symbols.STAR_CALLER)) return (Context<R>) withResult(getCaller());
-			if (sym.equals(Symbols.STAR_ADDRESS)) return (Context<R>) withResult(getAddress());
-			if (sym.equals(Symbols.STAR_ALLOWANCE)) return (Context<R>) withResult(getAccountStatus().getAllowance());
-			if (sym.equals(Symbols.STAR_BALANCE)) return (Context<R>) withResult(getBalance());
-			if (sym.equals(Symbols.STAR_ORIGIN)) return (Context<R>) withResult(getOrigin());
-			if (sym.equals(Symbols.STAR_RESULT)) return (Context<R>) this;
-			if (sym.equals(Symbols.STAR_TIMESTAMP)) return (Context<R>) withResult(getState().getTimeStamp());
-			if (sym.equals(Symbols.STAR_DEPTH)) return (Context<R>) withResult((long)getDepth());
-			if (sym.equals(Symbols.STAR_OFFER)) return (Context<R>) withResult((long)getOffer());
-			if (sym.equals(Symbols.STAR_STATE)) return (Context<R>) withResult(getState());
-			if (sym.equals(Symbols.STAR_HOLDINGS)) return (Context<R>) withResult(getHoldings());
-			if (sym.equals(Symbols.STAR_SEQUENCE)) return (Context<R>) withResult(getAccountStatus().getSequence());
-		}
-		return withError(ErrorCodes.UNDECLARED,sym.toString());
+	public <R> Context<R> computeSpecial(Symbol sym)  {
+		if (sym.equals(Symbols.STAR_JUICE)) return (Context<R>) withResult(getJuice());
+		if (sym.equals(Symbols.STAR_CALLER)) return (Context<R>) withResult(getCaller());
+		if (sym.equals(Symbols.STAR_ADDRESS)) return (Context<R>) withResult(getAddress());
+		if (sym.equals(Symbols.STAR_ALLOWANCE)) return (Context<R>) withResult(getAccountStatus().getAllowance());
+		if (sym.equals(Symbols.STAR_BALANCE)) return (Context<R>) withResult(getBalance());
+		if (sym.equals(Symbols.STAR_ORIGIN)) return (Context<R>) withResult(getOrigin());
+		if (sym.equals(Symbols.STAR_RESULT)) return (Context<R>) this;
+		if (sym.equals(Symbols.STAR_TIMESTAMP)) return (Context<R>) withResult(getState().getTimeStamp());
+		if (sym.equals(Symbols.STAR_DEPTH)) return (Context<R>) withResult((long)getDepth());
+		if (sym.equals(Symbols.STAR_OFFER)) return (Context<R>) withResult((long)getOffer());
+		if (sym.equals(Symbols.STAR_STATE)) return (Context<R>) withResult(getState());
+		if (sym.equals(Symbols.STAR_HOLDINGS)) return (Context<R>) withResult(getHoldings());
+		if (sym.equals(Symbols.STAR_SEQUENCE)) return (Context<R>) withResult(getAccountStatus().getSequence());
+		return null;
 	}
 
 	/**

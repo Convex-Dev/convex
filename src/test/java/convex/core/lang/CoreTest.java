@@ -2021,6 +2021,10 @@ public class CoreTest {
 		// Result should get value of last completed expression
 		assertEquals(Keywords.FOO, eval("(do :foo *result*)"));
 		assertNull(eval("(do (do) *result*)"));
+		
+		// *result* should be cleared to nil in an Actor call.
+		assertNull(eval("(do (def c (deploy '(do (defn f [] *result*) (export f)))) (call c (f)))"));
+
 	}
 	
 	@Test

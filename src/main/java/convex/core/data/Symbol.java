@@ -180,4 +180,13 @@ public class Symbol extends ASymbolic {
 		return true;
 	}
 
+	/**
+	 * Returns true if the symbol starts with an asterisk '*' and is therefore potentially a special symbol.
+	 * 
+	 * @return True is potentially special, false otherwise.
+	 */
+	public boolean maybeSpecial() {
+		return name.charAt(0)=='*';
+	}
+
 }
