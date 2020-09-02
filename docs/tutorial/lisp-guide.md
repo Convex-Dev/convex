@@ -112,7 +112,7 @@ bad
 => 'bad' is undeclared.
 ```
 
-Some special symbols are provided by Convex to make it easier to access special features of the CVM. By convention, and in order to make them stand out when reading Convex Lisp code, these symbol names start and end with asterisks (`*`).
+Some *special symbols* are provided by Convex to make it easier to access special values provided by the CVM. By convention, and in order to make them stand out when reading Convex Lisp code, these symbol names start and end with asterisks (`*`).
 
 ```clojure
 ;; Get the available balance of the current Account via the special symbol '*balance*'
@@ -225,7 +225,7 @@ There are many functions in the core library that work with Vectors. Some simple
 => [1 2 3]
 ```
 
-In general, you should use Vectors whenever you need to store an ordered sequence of values. They are the fastest data structure for indexed lookup, and for appending a single element to the end with `conj`.
+In general, you should use Vectors whenever you need to store an ordered sequence of values. They are the fastest data structure for indexed lookup, and for appending a single element to the end with `conj`. Vectors are the natural Convex equivalent to what are often called "arrays" or "tuples" in other languages.
 
 #### Maps
 
@@ -387,7 +387,7 @@ In normal code, you should generally prefer Vectors over Lists for storing data.
 
 Convex Lisp includes a number of special forms, that implement behaviour that can't be achieved using regular functions from the core library.
 
-#### Condtionals
+#### Conditionals
 
 General purpose languages need some way of controlling conditional execution of code, and Convex Lisp is no exception. 
 
@@ -558,6 +558,40 @@ You can also use `recur` to repeat evaluation of a function body:
 
 `recur` implements "tail call optimisation", i.e. it recurs without consuming any stack space. This is important if you want to perform many iterations: stack depth on the CVM is a limited resource and your transactions will fail if you consume too much. `recur` is your friend.
 
+#### Quoting
+
+Sometimes, you want to use a symbol itself rather than the thing that the symbol refers to. In these cases, you can 'quote' the symbol.
+
+```clojure
+(def a 10)
+
+;; Use the value defined for the symbol a
+a
+=> 10
+
+;; Use the Symbol a itself
+(quote a)
+=> a
+
+;; The ' notation also quotes a Symbol
+'a
+=> a
+```
+
+You can also quote lists and other data structures - which returns these data structure *without* evaluating them.
+
+```clojure
+;; Evaluate a list normally
+(+ 1 2 3)
+=> 6
+
+;; Quote a list without evaluating it
+'(+ 1 2 3)
+=> (+ 1 2 3)
+```
+
+
+
 ## Evaluation
 
 We've looked at the basic constructs of Convex Lisp, but it's worth taking a moment to look at the way that code is evaluated in Lisp. This section delves into some implementation details, and what makes Convex Lisp special.
@@ -602,6 +636,8 @@ Hopefully, it is now clear why Lisp puts parentheses *before* the function name:
 ### Macros
 
 We've actually used a couple of macros already in this guide: `if`, `undef` and `defn` are all examples of macros. 
+
+A macro is a procedure that generates 
 
 
 ## Functional Programming

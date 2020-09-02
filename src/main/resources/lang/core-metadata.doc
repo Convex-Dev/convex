@@ -673,6 +673,15 @@
           :signature [{:params [x y]}]}
   }
   
+  quote
+  {
+    :doc {:description "Returns the quoted value of a form, without evaluating it. For example, you can quote a symbol to get the symbol itself rather than the value in the environment that it refers to."
+          :examples [{:code "(quote foo)"}
+                     {:code "(eval (quote (+ 1 2 3)))"}]
+          :type :special
+          :signature [{:params [form]}]}
+  }
+  
   recur
   {
     :doc {:description "Escapes from the currently executing code and recurs at the level of the next loop or function body."
