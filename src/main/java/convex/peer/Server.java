@@ -558,7 +558,8 @@ public class Server implements Closeable {
 				}
 				log.log(LEVEL_SERVER, "Reciever thread terminated normally for peer " + this);
 			} catch (Throwable e) {
-				log.severe("Receiver thread terminated abnormally! " + e.getMessage());
+				log.severe("Receiver thread terminated abnormally! ");
+				log.severe("Server FAILED: "+ e.getMessage());
 				e.printStackTrace();
 			}
 		}
