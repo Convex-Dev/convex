@@ -133,6 +133,10 @@ public class NIOServer implements Closeable {
 		}
 	};
 	
+	/**
+	 * Gets the port that this server instance is listening on.
+	 * @return Port number, or 0 if a server socket is not bound.
+	 */
 	public int getPort() {
 		if (ssc==null) return 0;
 		ServerSocket socket = ssc.socket();

@@ -302,6 +302,7 @@ public final class Context<T> implements IObject {
 					} else {
 						// Insufficient memory, so need to roll back state to before transaction
 						// origin should still pay transaction fees, but no memory costs
+						memorySpend=0L;
 						state=initialState;
 						account=state.getAccount(address);
 						memoryFailure=true;
