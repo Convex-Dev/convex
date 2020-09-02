@@ -1841,7 +1841,7 @@ public class Core {
 	 * @return Loaded environment map
 	 * @throws IOException
 	 */
-	private static AHashMap<Symbol, Syntax> registerCoreCode(AHashMap<Symbol, Syntax> env) {
+	private static AHashMap<Symbol, Syntax> registerCoreCode(AHashMap<Symbol, Syntax> env) throws IOException {
 		// we use a fake State to build the initial environment with core address
 		Address ADDR=Core.CORE_ADDRESS;
 		State state = State.EMPTY.putAccount(ADDR,
@@ -1850,7 +1850,6 @@ public class Core {
 
 		Syntax form = null;
 		
-		try {
 			AList<Syntax> forms = Reader.readAllSyntax(Utils.readResourceAsString("lang/core.con"));
 			for (Syntax f : forms) {
 				form = f;
@@ -1862,9 +1861,6 @@ public class Core {
 				assert (!ctx.isExceptional()) : "Error executing op: "+ op+ " : "+ ctx.getExceptional();
 				
 			}
-		} catch (IOException t) {
-			throw Utils.sneakyThrow(t);
-		}
 
 		return ctx.getAccountStatus(ADDR).getEnvironment();
 	}
@@ -1921,6 +1917,7 @@ public class Core {
 			coreEnv = applyDocumentation(coreEnv);
 		} catch (Throwable e) {
 			e.printStackTrace();
+			throw new Error("Error initialising core!",e);
 		}
 		
 		CORE_NAMESPACE = coreEnv;
