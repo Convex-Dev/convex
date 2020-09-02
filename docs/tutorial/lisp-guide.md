@@ -590,7 +590,12 @@ You can also quote lists and other data structures - which returns these data st
 => (+ 1 2 3)
 ```
 
+It is possible to 'unquote' within a quoted expression using the tilde (`~`), which has the effect of evaluating the unquoted part normally. 
 
+```clojure
+(quote [(+ 1 2 3) ~(+ 1 2 3)])
+=> [(+ 1 2 3) 6]
+```
 
 ## Evaluation
 
@@ -637,11 +642,55 @@ Hopefully, it is now clear why Lisp puts parentheses *before* the function name:
 
 We've actually used a couple of macros already in this guide: `if`, `undef` and `defn` are all examples of macros. 
 
-A macro is a procedure that generates 
+A macro is a procedure that generates new code at compile time (technically, in the *expansion* phase of the compiler). Macros are an incredibly powerful tool that allow you to enhance the Convex Lisp language with new capabilities and syntax.
+
+As a simple example, let's consider a macro that allows you to use 'infix' notation for for mathematical expressions, i.e. instead of writing `(+ 1 2)` we want to write `1 + 2`. It is possible to do this with a simple macro that rewrites the infix expression into the expected Lisp format:
+
+```clojure
+(defmacro infix [arg1 operator arg2]
+  (list operator arg1 arg2))
+
+(infix 1 + 3)
+=> 4
+```
+
+What is happening here? The macro defines an expander function that takes three arguments `[arg1 operator arg2]` and then outputs a list starting with the operator. This transforms `1 + 3` into the list `(+ 1 3)` which can then be executed normally. We can see the effect of macro expansion by using the `expand` function, which performs the expansion of a form without evaluating it:
+
+```clojure
+(expand '(infix 1 + 3))
+=> (+ 1 3)
+```
+
+Macros are powerful tools, but should only be used when they are needed - they are more complicated to use and understand than regular functions. The best use cases for macros are usually:
+
+- Writing new syntax / language extensions that need to make use of arguments *without* evaluating them beforehand. If you are happy to use arguments after regular evaluation, then regular functions are probably a better fit.
+- Situations where you want code to be evaluated at compile time, e.g. to avoid repeatedly performing the same expensive computation at runtime.
 
 
 ## Functional Programming
 
+Convex Lisp is designed to support functional programming. We regard functional programming as a paradigm where:
+
+- Functions are first class objects in the language
+- Programs are developed by composing pure functions and immutable data
+- Mutable data and side effects are generally avoided
+
+Functional programming offers us a number of major advantages:
+
+- Code expressed using pure functions is easier to reason about and test, because you don't have to worry about internal or external mutable state that might affect behaviour.
+- It is often much shorter and quicker to read/write than equivalent imperative code
+- Immutable data is a *great* fit for the CVM which is deigned around immutable, cryptographically verified data structures.
+
+Here's a simple example of functional programming, where we define a first-class function `square` and then pass it to another function to achieve our intended result:
+
+```clojure
+;; Define a function that squares a number
+(defn square [x] (* x x))
+
+;; Apply the square function to each element of a vector
+(map square [1 2 3 4])
+=> [1 4 9 16]
+```
 
 ## Advanced Topics
 
