@@ -848,12 +848,22 @@ This approach is powerful because:
 - We make use of Convex as a global repository for libraries
 - You can deploy libraries in the same way as you deploy Actors - no special tools needed!
 - Libraries get all the same security and management guarantees as Actors
-
-
+- You can use library functionality to access Actors
 
 ### Using libraries
 
-```
+Using libraries is easy! All you need to do is:
+
+- `import` the library using its Address and give it a convenient alias e.g. `foo`
+- Use symbols defined in the library by prefixing the symbol name with the alias e.g. `foo/bar`
+
+```clojure
+;; Import a library (in this case, the standard registry Actor)
+(import 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff :as reg)
+
+;; Use a symbol from the library (in this case, count the number of registered accounts)
+(count reg/registry)
+=> 67081
 ```
 
 ### Deploying libraries
@@ -935,7 +945,7 @@ There are only a small number of Op types on the CVM, which are roughly based on
 - **Let** - Defines a scope for local variables
 - **Lookup** - Looks up a value from a definition in the environment
 
-Ops can often be nested, e.g. an Op of type **Do** may contain multiple child Ops. In this way, single Ops can be used to represent whole programs or algorithms.
+Ops can be nested, e.g. an Op of type **Do** may contain multiple child Ops. In this way, single Ops can be used to represent whole programs or algorithms.
 
 Normally, users won't need to interact directly with Ops.
 
