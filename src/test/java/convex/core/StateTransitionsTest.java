@@ -169,7 +169,18 @@ public class StateTransitionsTest {
 
 	}
 	
-	
+	@Test
+	public void testDeploys() throws BadSignatureException {
+		State s = Init.STATE;
+		ATransaction t1 = Invoke.create(1,Reader.read("(def my-lib-address (deploy-once (defn foo [x] x)))"));
+		AKeyPair kp = convex.core.lang.TestState.HERO_PAIR;
+		Block b1 = Block.of(s.getTimeStamp(), kp.signData(t1));
+		BlockResult br=s.applyBlock(b1);
+		assertTrue(br.isError(0));
+		
+		s = br.getState();
+		
+	}
 	
 	@Test
 	public void testMemoryAccounting() throws BadSignatureException {

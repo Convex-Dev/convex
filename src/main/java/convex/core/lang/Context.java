@@ -1379,13 +1379,17 @@ public final class Context<T> implements IObject {
 		final Context<R> rctx=exContext.eval(code);
 		
 		// TODO: think about error returns from actors
-		if (rctx.isExceptional()) return rctx; 
+		if (rctx.isExceptional()) {
+			State rollbackState=getState();
+			Context<R> result=Context.create(rollbackState, rctx.getJuice(), getLocalBindings(), rctx.getValue(), depth, getOrigin(),getCaller(), getAddress());
+			return result; 
+		} else {
 		
-		//SECURITY: make sure this always works!!!
-		// restore context for the current execution
-		Context<R> result=Context.create(rctx.getState(), rctx.getJuice(), getLocalBindings(), rctx.getValue(), depth, getOrigin(),getCaller(), getAddress());
-		
-		return (Context<R>) result.withResult(Juice.DEPLOY_CONTRACT, address);
+			//SECURITY: make sure this always works!!!
+			// restore context for the current execution
+			Context<R> result=Context.create(rctx.getState(), rctx.getJuice(), getLocalBindings(), rctx.getValue(), depth, getOrigin(),getCaller(), getAddress());
+			return (Context<R>) result.withResult(Juice.DEPLOY_CONTRACT, address);
+		}
 	}
 
 
