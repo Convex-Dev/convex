@@ -692,6 +692,57 @@ Here's a simple example of functional programming, where we define a first-class
 => [1 4 9 16]
 ```
 
+We can get a bit more sophisticated, and use functions to create other functions:
+
+```
+;; Function to build a function combining a map and a reduce
+(defn mapreducer [init reducer mapper]
+  (fn [vals]
+    (reduce reducer init (map mapper vals))))
+
+;; Build a 'sum-of-squares' function using our 'mapreducer'    
+(def sum-of-squares (mapreducer 0 + square))   
+
+(sum-of-squares [1 10 100 1000])
+=> 1010101
+```
+
+`map` and `reduce` are both very powerful tools for functional programming, and in many cases can replace the need to implement imperative loops. They also help to avoid the dreaded "off by one" errors!
+
+## Actors
+
+Actors are autonomous programs that live on the CVM. Most importantly, they are the "workers" that enable to operation of smart contracts.
+
+Actors have quite similar capabilities to Users:
+
+- They have an Account on the CVM, with an address like `0x6f7f341B648F36B11C8AE735997Aeb868124951Beded1C5371C89cD1d3AA9E6b1`
+- They have their own dynamic environment, which can contain definitions and data just like a User's environment.
+- They can control digital assets, coins and memory allocations
+
+### Creating an Actor
+
+To create an Actor, you need to deploy some code to initialise the actor. The code is executed when the Actor is deployed, and can be used to set up the environment of the actor.
+
+```clojure
+;; Deploy an actor, get the resulting address
+(deploy-once '(def some-data "Hello"))
+=> 0x1416E4b915D0aeCAa9362a0d37612Bf924fA4BC01449827Ae907154f8317113B
+
+;; This is undeclared, since some-data exists in the Actor's environment, not ours
+some-data
+=> UNDECLARED
+```
+
+
+
+Your initialisation code *must* set up any capabilities you want the actor to have in the future: once deployed, you can't make any further changes if you make a mistake!
+
+
+
+
+
+
+
 ## Advanced Topics
 
 If you've got this far, you may be interested in some of the more advanced features of Convex Lisp. This section is intended for people who want to know more about how Convex Lisp work, and how it integrated with the capabilities of the CVM.
