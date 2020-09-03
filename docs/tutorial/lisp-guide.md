@@ -635,41 +635,16 @@ The power of 'Code is Data' starts to become apparent when you relise that since
 
 Hopefully, it is now clear why Lisp puts parentheses *before* the function name: it means that expressions can trivially be constructed as a single list, but prepending (`cons`) the desired function name to the list of arguments. Code generation becomes simple: just construct the expression you want!
 
-**Security Warning**: You should never use `eval` on code from an untrusted source. It will be able to execute anything that you can in your environment - including helping itself to any coins and tokens controlled by your account. If you are unsure whether this is a risk or not, a good rule is that you should avoid using `eval` at all in any environment with economically valuable assets.
+### SECURITY: Important note for `eval`
+
+You should **NEVER** use `eval` on data from an untrusted source. It will be able to execute anything that you can in your environment - including helping itself to any coins and tokens controlled by your account. If you are unsure whether this is a risk or not, a good rule is that you should avoid using `eval` at all in any environment with economically valuable assets.
 
 
-### Macros
-
-We've actually used a couple of macros already in this guide: `if`, `undef` and `defn` are all examples of macros. 
-
-A macro is a procedure that generates new code at compile time (technically, in the *expansion* phase of the compiler). Macros are an incredibly powerful tool that allow you to enhance the Convex Lisp language with new capabilities and syntax.
-
-As a simple example, let's consider a macro that allows you to use 'infix' notation for for mathematical expressions, i.e. instead of writing `(+ 1 2)` we want to write `1 + 2`. It is possible to do this with a simple macro that rewrites the infix expression into the expected Lisp format:
-
-```clojure
-(defmacro infix [arg1 operator arg2]
-  (list operator arg1 arg2))
-
-(infix 1 + 3)
-=> 4
-```
-
-What is happening here? The macro defines an expander function that takes three arguments `[arg1 operator arg2]` and then outputs a list starting with the operator. This transforms `1 + 3` into the list `(+ 1 3)` which can then be executed normally. We can see the effect of macro expansion by using the `expand` function, which performs the expansion of a form without evaluating it:
-
-```clojure
-(expand '(infix 1 + 3))
-=> (+ 1 3)
-```
-
-Macros are powerful tools, but should only be used when they are needed - they are more complicated to use and understand than regular functions. The best use cases for macros are usually:
-
-- Writing new syntax / language extensions that need to make use of arguments *without* evaluating them beforehand. If you are happy to use arguments after regular evaluation, then regular functions are probably a better fit.
-- Situations where you want code to be evaluated at compile time, e.g. to avoid repeatedly performing the same expensive computation at runtime.
 
 
 ## Functional Programming
 
-Convex Lisp is designed to support functional programming. We regard functional programming as a paradigm where:
+Convex Lisp is designed to support functional programming. We can think of functional programming as a paradigm where:
 
 - Functions are first class objects in the language
 - Programs are developed by composing pure functions and immutable data
@@ -874,7 +849,12 @@ This approach is powerful because:
 - You can deploy libraries in the same way as you deploy Actors - no special tools needed!
 - Libraries get all the same security and management guarantees as Actors
 
+
+
 ### Using libraries
+
+```
+```
 
 ### Deploying libraries
 
@@ -886,16 +866,23 @@ Deploying libraries is just like deploying an Actor, with a few key differences 
 ```clojure
 (def my-lib-address 
   (deploy-once
-    (defn distance [x y]
+    '(defn distance [x y]
        (sqrt (+ (* x x) (* y y))))))
        
 (import my-lib-address :as my-lib)
 
 (my-lib/distance 3.0 4.0)
-=> 5.0       
-       
-       
+=> 5.0
+```
 
+### Important security note for libraries
+
+A key difference between a `call` to an Actor function and running library code is the difference in *security context*:
+
+- An Actor `call` runs code in the Actor's environment, with the Actor itself the current `*address*` (and the calling Account as `*caller*`)
+- Library code runs in the environment of the current Account, i.e. `*address*` is unchanged
+
+As a result of this: **DO NOT RUN LIBRARY CODE YOU DO NOT TRUST**. Library code can do anything that your Account can, including transferring away all your coins and tokens, or calling arbitrary smart contracts. If you have any doubt about the trustworthiness of library code, do not use it from an Account that controls any valuable assets.
 
 ## Advanced Topics
 
@@ -972,4 +959,31 @@ Convex Ops are technically a form of [p-code](https://en.wikipedia.org/wiki/P-co
 - We can improve underlying performance and implementation details of the CVM without breaking CVM code that has been compiled to Ops.
 - Ops are designed to match up with the runtime and security checks that the CVM must perform when executing code securely on-chain. 
 
+### Macros
+
+We've actually used a couple of macros already in this guide: `if`, `undef` and `defn` are all examples of macros. 
+
+A macro is a procedure that generates new code at compile time (technically, in the *expansion* phase of the compiler). Macros are an incredibly powerful tool that allow you to enhance the Convex Lisp language with new capabilities and syntax.
+
+As a simple example, let's consider a macro that allows you to use 'infix' notation for for mathematical expressions, i.e. instead of writing `(+ 1 2)` we want to write `1 + 2`. It is possible to do this with a simple macro that rewrites the infix expression into the expected Lisp format:
+
+```clojure
+(defmacro infix [arg1 operator arg2]
+  (list operator arg1 arg2))
+
+(infix 1 + 3)
+=> 4
+```
+
+What is happening here? The macro defines an expander function that takes three arguments `[arg1 operator arg2]` and then outputs a list starting with the operator. This transforms `1 + 3` into the list `(+ 1 3)` which can then be executed normally. We can see the effect of macro expansion by using the `expand` function, which performs the expansion of a form without evaluating it:
+
+```clojure
+(expand '(infix 1 + 3))
+=> (+ 1 3)
+```
+
+Macros are powerful tools, but should only be used when they are needed - they are more complicated to use and understand than regular functions. The best use cases for macros are usually:
+
+- Writing new syntax / language extensions that need to make use of arguments *without* evaluating them beforehand. If you are happy to use arguments after regular evaluation, then regular functions are probably a better fit.
+- Situations where you want code to be evaluated at compile time, e.g. to avoid repeatedly performing the same expensive computation at runtime.
 
