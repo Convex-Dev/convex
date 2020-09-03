@@ -555,18 +555,20 @@
  
   lookup
   {
-    :doc {:description "Looks up the value of a symbol in the current execution environment. Name may be a symbol, keyword or String."
+    :doc {:description "Looks up the value of a symbol in the current execution environment, or the account of the given address if specified. Name may be a symbol, keyword or String. Returns nil if not found."
           :examples [{:code "(lookup 'count)"}]
           :type :function
-          :signature [{:params [name]}]}
+          :signature [{:params [name]}
+                      {:params [address name]}]}
   }
   
   lookup-syntax
   {
-    :doc {:description "Looks up the Syntax Object for a symbol in the current execution environment. Name may be a symbol, keyword or String."
+    :doc {:description "Looks up the Syntax Object for a symbol in the current execution environment, or the account of the given address if specified. Name may be a symbol, keyword or String. Returns nil if not found."
           :examples [{:code "(lookup-syntax 'count)"}]
           :type :function
-          :signature [{:params [name]}]}
+          :signature [{:params [name]}
+                      {:params [address name]}]}
   }
   
   loop

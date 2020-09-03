@@ -891,6 +891,7 @@ public final class Context<T> implements IObject {
 	 * @return AccountStatus for the specified address, or null if the account does not exist
 	 */
 	public AccountStatus getAccountStatus(Address address) {
+		if (address==null) return null;
 		return getState().getAccounts().get(address);
 	}
 

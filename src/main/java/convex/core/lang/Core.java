@@ -568,19 +568,28 @@ public class Core {
 
 		}
 	});
+	
+	
 
 	public static final CoreFn<Object> LOOKUP = reg(new CoreFn<>(Symbols.LOOKUP) {
 		@Override
 		public <I> Context<Object> invoke(Context<I> context, Object[] args) {
-			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+			int n=args.length;
+			if ((n<1)||(n>2)) return context.withArityError(rangeArityMessage(1,2, args.length));
 
-			String name = RT.name(args[0]);
-			if (name == null) return context.withCastError(args[0], Symbol.class);
+			// Get symbol name argument, must cast to Symbol as named type
+			Object nameArg=args[n-1];
+			String name = RT.name(nameArg);
+			if (name == null) return context.withCastError(nameArg, Symbol.class);
 
+			// get Address to perform lookup
+			Address address=(n==1)?context.getAddress():RT.address(args[0]);
+			if (address==null) return context.withCastError(args[0], Address.class);
+			
 			Symbol sym = Symbol.create(name);
 			if (sym == null) return context.withArgumentError("Invalid Symbol name: " + name);
 
-			MapEntry<Symbol, Syntax> me = context.lookupDynamicEntry(sym);
+			MapEntry<Symbol, Syntax> me = context.lookupDynamicEntry(address,sym);
 
 			long juice = Juice.LOOKUP;
 			Object result = (me == null) ? null : me.getValue().getValue();
@@ -591,17 +600,23 @@ public class Core {
 	public static final CoreFn<Syntax> LOOKUP_SYNTAX = reg(new CoreFn<>(Symbols.LOOKUP_SYNTAX) {
 		@Override
 		public <I> Context<Syntax> invoke(Context<I> context, Object[] args) {
-			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+			int n=args.length;
+			if ((n<1)||(n>2)) return context.withArityError(rangeArityMessage(1,2, args.length));
 
-			// ensure argument is a name type
-			String name = RT.name(args[0]);
-			if (name == null) return context.withCastError(args[0], Symbol.class);
+			// Get symbol name argument, must cast to Symbol as named type
+			Object nameArg=args[n-1];
+			String name = RT.name(nameArg);
+			if (name == null) return context.withCastError(nameArg, Symbol.class);
+
+			// get Address to perform lookup
+			Address address=(n==1)?context.getAddress():RT.address(args[0]);
+			if (address==null) return context.withCastError(args[0], Address.class);
 			
 			// ensure argument converts to a Symbol correctly.
 			Symbol sym = RT.toSymbol(name);
 			if (sym == null) return context.withArgumentError("Invalid Symbol name: " + name);
 
-			MapEntry<Symbol, Syntax> me = context.lookupDynamicEntry(sym);
+			MapEntry<Symbol, Syntax> me = context.lookupDynamicEntry(address,sym);
 
 			long juice = Juice.LOOKUP;
 			Syntax result = (me == null) ? null : me.getValue();

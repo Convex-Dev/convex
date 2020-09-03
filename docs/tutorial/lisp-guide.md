@@ -721,7 +721,7 @@ Actors have quite similar capabilities to Users:
 
 ### Creating an Actor
 
-To create an Actor, you need to deploy some code to initialise the actor. The code is executed when the Actor is deployed, and can be used to set up the environment of the actor.
+To create an Actor, you need to deploy some code to initialise the actor. The code is executed when the Actor is deployed, and can be used to set up the environment of the actor, e.g. defining new values or functions.
 
 ```clojure
 ;; Deploy an actor, get the resulting address
@@ -731,16 +731,170 @@ To create an Actor, you need to deploy some code to initialise the actor. The co
 ;; This is undeclared, since some-data exists in the Actor's environment, not ours
 some-data
 => UNDECLARED
+
+;; we can look up the data in the new Actor's environment however:
+(lookup 0x1416E4b915D0aeCAa9362a0d37612Bf924fA4BC01449827Ae907154f8317113B 'some-data)
+=> "Hello"
 ```
 
 
 
-Your initialisation code *must* set up any capabilities you want the actor to have in the future: once deployed, you can't make any further changes if you make a mistake!
 
+Your initialisation code *must* set up any capabilities you want the actor to have in the future: once deployed, you might not be able to make any further changes if you make a mistake (although it is possible to make Actor upgradable... more on this later).
 
+### Calling Actor functions
 
+Actors are more than just containers for data - they can be active participants in transactions. To create an Actor that exposes executable functionality to others, you need to `export` one or more functions. The following example is an Actor that allows callers to get and set a value
 
+```clojure
+;; define code for our Actor
+(def actor-code
+  '(do
+     (def value :initial-value)
+     
+     (defn set [v]
+       (def value v))
+       
+     (defn get []
+       value)
+       
+     (export get set)))
 
+;; Deploy the Actor and store the address as 'act' for convenient use later      
+(def act (deploy actor-code))
+
+;; Call 'get'
+(call act (get))
+=> :initial-value
+
+;; Call 'set' with a new value
+(call act (set :new-value))
+
+;; Call 'get' again
+(call act (get))
+=> :new-value
+```
+
+This actor is pretty simple, but it demonstrates the key ideas:
+
+- An Actor is an autonomous program, with its own execution environment
+- You can export functions to allow users to interact with an Actor
+
+### Building parameterised actors with `defactor`
+
+Sometimes you want to pass parameters to construct an Actor. `defactor` lets you build an actor with parameters, and also provides some magic syntax to make declaring actors a bit more elegant:
+
+```clojure
+(defactor multiplier [x]
+  (defn calc [y]
+     (* x y))
+     
+  (export calc))
+
+;; deploy multipliers with different parameters
+(def times2 (deploy-once (multiplier 2)))
+=> 0x80f0b6467DDbeB80a4A7D719A69949CFE9aC04bbdd6fD3A637Ef941Da39D86B9
+
+(def times3 (deploy-once (multiplier 3)))
+=> 0x322bc9a01E84922A9E27d77CCdE027a4b504F8B2a2AFf1D841608beac1263C5F
+
+;; test them out!
+(call times2 (calc 10))
+=> 20
+
+(call times3 (calc 10))
+=> 30
+```
+
+Note the use of `deploy-once` rather than `deploy` in this case. `deploy-once` is like deploy, but if an actor with exactly the same initialisation code has been deployed already it will simply return a reference to the existing Actor. This is useful in cases where you don't need multiple copies of the same Actor - it is cheaper to simply refer to a singleton Actor.
+
+Examples where `deploy-once` is a good idea:
+
+- An Actor which has no mutable state (like the multiplier above)
+- An Actor where you want multiple people to share the same instance, such as a chat room channel
+- An Actor that benefits from more users providing liquidity, e.g. a digital asset exchange
+
+### Sending funds to Actors
+
+Like Users, Actor Accounts can have their own balance of funds. 
+
+You can use the `transfer` function to transfer funds to an Actor, however this causes a problem: what if the Actor doesn't expect to receive funds, and there is not facility to transfer the funds elsewhere? This can cause coins to be irrevocably lost.
+
+The better way to transfer funds is to "offer" them to the Actor you are calling, which then has to actively `accept` the funds to acknowledge receipt. Then, if coded correctly, there is no risk of funds being transferred that the receiving actor is unable to handle.
+
+Below is a simple example of an Actor that accepts funds, keeps track of how much each caller has donated, and provides a payout mechanism to relay the funds to the given cause.
+
+```
+(defactor donations [cause]
+  (assert (address cause)) ;; cause must cast to an address!
+
+  (def all-donations {}) ;; a map of donation amounts
+
+  (defn donate []
+    (let [donation *offer*]
+      (if (> donation 0)
+        (let [past-donation (or (get all-donations *caller*) 0)]
+          (def all-donations (assoc all-donations *caller* (+ past-donation donation)))
+          (accept donation)
+          (return "Thanks for your donation")))))
+    
+  (defn payout []
+    (transfer cause *balance*))
+    
+  (export donate payout))
+```
+
+To use this Actor, it needs to be deployed and then called with the offer amount as an extra parameter to `call`:
+
+```
+;; A charity address that you want to be the beneficiary of donations
+(def charity (address 0xf3393030Fc4252b7a91C5306f4d6670062384818145bF6239380bDDa3486055c))
+
+;; Deploy the donations fund
+(def charity-fund (deploy-once donations foo))
+=> 0x62BccF81C937Bca59edFDcEd8fB3a5c0da895420d5932e5e688445A734aE68C5
+
+;; Donate to charity
+(call charity-fund 100000 (donate))
+=> "Thanks for your donation"
+
+;; See who has donated so far!
+(lookup charity-fund 'all-donations)
+=> {#addr 0x0f49f3005c950ff5822f6b51f7dfe31c18adbd90570afe99af680b8ce5e4996f 100000}
+```
+
+	
+## Libraries
+
+In most programming environments, it is helpful to bundle up code into libraries that can be shared and re-used. Convex Lisp is no exception, but takes a novel approach: Libraries are simply Actors!
+
+This approach is powerful because:
+
+- We make use of Convex as a global repository for libraries
+- You can deploy libraries in the same way as you deploy Actors - no special tools needed!
+- Libraries get all the same security and management guarantees as Actors
+
+### Using libraries
+
+### Deploying libraries
+
+Deploying libraries is just like deploying an Actor, with a few key differences to note:
+
+- You don't need to `export` any functions (unless you really want to enable `call`)
+- `deploy-once` is normally recommended, since libraries should be deployed once and re-used.
+
+```clojure
+(def my-lib-address 
+  (deploy-once
+    (defn distance [x y]
+       (sqrt (+ (* x x) (* y y))))))
+       
+(import my-lib-address :as my-lib)
+
+(my-lib/distance 3.0 4.0)
+=> 5.0       
+       
+       
 
 
 ## Advanced Topics

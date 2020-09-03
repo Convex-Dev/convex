@@ -738,9 +738,9 @@ public class RT {
 	/**
 	 * Casts the argument to a valid Address.
 	 * 
-	 * Handles - Strings, which are interpreted as 40-character hex strings -
+	 * Handles - Strings, which are interpreted as 64-character hex strings -
 	 * Addresses, which are returned unchanged - Blobs, which are converted to
-	 * addresses if and only if they are of the correct length (20 bytes)
+	 * addresses if and only if they are of the correct length (32 bytes)
 	 * 
 	 * @param a
 	 * @return Address value or null if not a valid address

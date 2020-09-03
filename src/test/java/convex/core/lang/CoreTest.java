@@ -1002,8 +1002,19 @@ public class CoreTest {
 		assertSame(Core.COUNT, eval("(lookup 'count)"));
 		assertSame(Core.COUNT, eval("(lookup \"count\")"));
 		
+		assertSame(Core.COUNT, eval("(lookup *address* 'count)"));
+
 		assertNull(eval("(lookup 'non-existent-symbol)"));
 		assertNull(eval("(lookup :non-existent-symbol)"));
+		
+		// Lookups after def
+		assertEquals(1L,evalL("(do (def foo 1) (lookup :foo))"));
+		assertEquals(1L,evalL("(do (def foo 1) (lookup *address* :foo))"));
+		
+		// Lookups in non-existent environment
+		assertNull(eval("(lookup 0x1234000000000000000000000000000000000000000000000000000000000000 'count)"));
+		assertNull(eval("(do (def foo 1) (lookup 0x1234000000000000000000000000000000000000000000000000000000000000 'foo))"));
+
 
 		// invalid name string
 		assertArgumentError(
@@ -1015,7 +1026,7 @@ public class CoreTest {
 		assertCastError(step("(lookup [])"));
 
 		assertArityError(step("(lookup)"));
-		assertArityError(step("(lookup 1 3)"));
+		assertArityError(step("(lookup 1 2 3)"));
 	}
 	
 	@Test
@@ -1023,6 +1034,10 @@ public class CoreTest {
 		assertSame(Core.COUNT, ((Syntax)eval("(lookup-syntax :count)")).getValue());
 		
 		assertNull(eval("(lookup-syntax 'non-existent-symbol)"));
+		
+		assertEquals(Syntax.create(1L),eval("(do (def foo 1) (lookup-syntax :foo))"));
+		assertEquals(Syntax.create(1L),eval("(do (def foo 1) (lookup-syntax *address* :foo))"));
+		assertNull(eval("(do (def foo 1) (lookup-syntax 0x1234000000000000000000000000000000000000000000000000000000000000 :foo))"));
 
 		// invalid name string (too long)
 		assertArgumentError(
@@ -1034,7 +1049,7 @@ public class CoreTest {
 		assertCastError(step("(lookup-syntax [])"));
 
 		assertArityError(step("(lookup-syntax)"));
-		assertArityError(step("(lookup-syntax 1 3)"));
+		assertArityError(step("(lookup-syntax 1 2 3)"));
 	}
 
 	@Test

@@ -50,11 +50,15 @@ public abstract class CoreFn<T> extends AFn<T> implements ICoreDef {
 	}
 
 	protected String minArityMessage(int minArity, int actual) {
-		return name() + " requires at minimum arity " + minArity + " but called with: " + actual;
+		return name() + " requires minimum arity " + minArity + " but called with: " + actual;
 	}
 
 	protected String maxArityMessage(int maxArity, int actual) {
 		return name() + " requires maximum arity " + maxArity + " but called with: " + actual;
+	}
+	
+	protected String rangeArityMessage(int minArity, int maxArity, int actual) {
+		return name() + " requires arity between "+minArity+ " and " + maxArity + " but called with: " + actual;
 	}
 
 	protected String exactArityMessage(int arity, int actual) {
