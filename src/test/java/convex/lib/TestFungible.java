@@ -33,6 +33,9 @@ public class TestFungible {
 	private static final Context<?> ctx=loadFungible();
 	private static final Address fungible=(Address) ctx.lookup(fSym).getResult();
 	
+	/**
+	 * Test that re-deployment of Fungible matches what is expected
+	 */
 	@Test public void testLibraryProperties() {
 		assertTrue(ctx.getAccountStatus(fungible).isActor());
 		assertEquals(fungible,TestState.CON_FUNGIBLE);

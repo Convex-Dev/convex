@@ -184,6 +184,12 @@
           :examples [{:code "(*aliases* 'my.library)"}]
           :type :value}}
   {})
+
+(def *registry*
+  ^{:doc {:description "The address of the Convex registry Actor."
+          :examples [{:code "(call *registry* (register {:name \"My name\"}))"}]
+          :type :value}}
+  (address 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff))
   
  (defmacro set!
     ^{:doc {:description "Sets a local binding identified by an unqualified symbol to the given value. This local change will be be visible until the scope leaves the current binding form (e.g. let binding, function body or recur). Fails with an ARGUMENT error if the symbol is qualified. This is probably most useful for updating a local variable in imperative style. Returns the value assigned to the local binding if successful."
