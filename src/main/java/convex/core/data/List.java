@@ -27,7 +27,7 @@ public class List<T> extends AList<T> {
 
 	static final List<Object> EMPTY = new List<>(Vectors.empty());
 
-	private AVector<T> data;
+	AVector<T> data;
 	private long count;
 
 	private List(AVector<T> data) {

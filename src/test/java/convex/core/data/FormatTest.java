@@ -2,6 +2,7 @@ package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -101,10 +102,12 @@ public class FormatTest {
 	}
 	
 	@Test public void testListRegression() throws BadFormatException {
-		AList<Object> l=Lists.of(Blobs.fromHex("41da2aa427dc50775dd0b077"), -1449690165);
+		MapEntry<Object,Object> me=MapEntry.create(Blobs.fromHex("41da2aa427dc50775dd0b077"), -1449690165);
+		List<Object> l=List.reverse(me);
+		assertNotEquals(me,l.data); // ensure MapEntry gets converted to canonical vector
 		
 		Blob b=Format.encodedBlob(l);
-		AList<Object> l2=Format.read(b);
+		List<Object> l2=Format.read(b);
 		
 		assertEquals(l,l2);
 	}
