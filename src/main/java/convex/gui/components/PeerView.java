@@ -24,7 +24,7 @@ public class PeerView {
 		if (peerServer != null) {
 			State state=PeerManager.getLatestState();
 			Address paddr=peerServer.getAddress();
-			sb.append(paddr.toChecksumHex()+"\n");
+			sb.append("0x"+paddr.toChecksumHex()+"\n");
 			sb.append("Local peer on: " + peerServer.getHostAddress() + " with store "+peerServer.getStore()+"\n");
 			
 			PeerStatus ps=state.getPeer(paddr);

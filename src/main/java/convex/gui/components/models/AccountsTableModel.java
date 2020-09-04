@@ -53,7 +53,7 @@ public class AccountsTableModel extends AbstractTableModel implements TableModel
 		AccountStatus as = me.getValue();
 		switch (columnIndex) {
 		case 0:
-			return address.toChecksumHex();
+			return "0x"+address.toChecksumHex();
 		case 1:
 			return as.isActor()?"Actor":"User";
 		case 2: {
