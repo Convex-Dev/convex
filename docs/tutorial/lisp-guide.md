@@ -997,3 +997,43 @@ Macros are powerful tools, but should only be used when they are needed - they a
 - Writing new syntax / language extensions that need to make use of arguments *without* evaluating them beforehand. If you are happy to use arguments after regular evaluation, then regular functions are probably a better fit.
 - Situations where you want code to be evaluated at compile time, e.g. to avoid repeatedly performing the same expensive computation at runtime.
 
+### Upgradable Actors
+
+A key risk of developing smart contracts is that once they are live, significant losses may occur if bugs are found. Losses could be from theft by malicious actors that manage to exploit a security weakness, or a bug that causes assets to be permanently lost.
+
+It is therefore *an option* to make Actors upgradable. This is no panacea but a trade-off: You can the ability to patch problems in the original smart contract, but also open up the possibility that this upgrade feature itself may be exploited by attackers.
+
+An upgradable actor can be implemented by providing an exeported function that allows a trusted user to execute an `eval` operation in the context of the Actor. A minimal implementation of this that lways trusts the user who deployed the Actor might look like:
+
+```clojure
+;; deploy an upgradable Actor
+(def upgradable-actor
+  (deploy 
+    '(do
+       (def owner *caller*)
+       
+       (defn upgrade [code]
+          (assert (= *caller* owner))
+          (eval code))
+          
+       (export upgrade))))
+       
+;; Check we are the owner!
+(= *address* (call upgradable-actor (upgrade 'owner)))
+=> true       
+
+;; Add a new function to the Actor and export it
+(call upgradable-actor 
+  (upgrade
+    '(do
+        (defn foo [x] :foo-called)
+        (export foo))))
+        
+;; Call the new function
+(call upgradable-actor (foo 12))
+=> :foo-called     
+```
+
+**SECURITY NOTE:** Adding a general purpose upgrade feature like this lets you correct bugs or add new enhancements to Actors, but it opens the risk that the same mechanism could be used to compromise the Actor's behaviour if an attacker were able to impersonate the owner, and also creates the risk that the Actor may be permananently disabled by the owner by mistake. As always, you must perform your own security analysis to determine whether this trade-off is worthwhile for the Actors that you deploy.
+
+
