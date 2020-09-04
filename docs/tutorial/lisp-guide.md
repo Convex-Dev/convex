@@ -13,17 +13,17 @@ Using the [Sandbox](https://convex.world/#/sandbox) is the easiest way to experi
 
 ## Lisp basics
 
-Lisp is fundamentally a language about expressions. All code in Lisp is ultimately an expression that can be evaluated to get a resulting value (or maybe an error, if something went wrong...). So let's take a quick tour through the most common types of expressions.
+Lisp all about expressions. All code in Lisp is ultimately an expression that can be evaluated to get a resulting value (or maybe an error, if something went wrong...). So let's take a quick tour through the most common types of expressions, and the values that they produce.
 
-### Literal values
+### Literals
 
-The simplest expression is simply a constant literal data value, which evaluates directly to itself!
+The simplest type of expression is a constant literal data value, which evaluates directly to itself!
 
 ```clojure
 1
 ```
 
-If you type the number `1` in the Sandbox and execute it, the result is simply the literal value itself:
+If you type the number `1` in the Sandbox and execute it, the result is the number one itself:
 
 ```clojure
 => 1
@@ -62,7 +62,8 @@ Keywords are special literal values that are intended for use as keys in hash ma
 ```
 
 The special values `true` and `false` are the two usual Boolean values:
-```
+
+```clojure
 true
 => true
 
@@ -72,7 +73,7 @@ false
 
 The special value `nil` is considered as the empty / missing value. It is also considered the same as `false` when used in conditional expressions which is often surprisingly useful: more on that later!
 
-```
+```clojure
 nil
 => nil
 ```
@@ -106,7 +107,7 @@ a
 
 If you try to evaluate a symbol that has no corresponding definition in the environment, you will get an UNDECLARED error:
 
-```
+```clojure
 bad
 => ERROR (UNDECLARED)
 => 'bad' is undeclared.
@@ -125,6 +126,10 @@ Some *special symbols* are provided by Convex to make it easier to access specia
 ```
 
 ### Functions
+
+Functions in Convex Lisp are the fundamental objects that represent computation: algorithms that can be applied to transform input data into output data.
+
+#### Function application syntax
 
 Functions can be called in an expression by placing the function name in a list before the arguments to a function. Usually, the function is specified by a Symbol:
 
@@ -146,6 +151,8 @@ inc(10)
 
 Why do we do this? It turns out that being able to express the whole function application expression as a list is extremely useful for more advanced techniques such as macros and code generation. A topic for later.
 
+#### The Core library
+
 The Convex core runtime library provides a wide variety of useful functions that you can see in the [Reference](https://convex.world/#/documentation/reference). Some simple examples to try out:
 
 ```clojure
@@ -158,6 +165,8 @@ The Convex core runtime library provides a wide variety of useful functions that
 (str? "Hello")
 => true
 ```
+
+#### Defining functions
 
 You can easily define your own functions with `defn`:
 
