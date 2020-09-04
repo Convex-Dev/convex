@@ -1,5 +1,6 @@
 package convex.lib;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -20,7 +21,7 @@ public class TestFungible {
 	private static Context<?> loadFungible() {
 		Context<?> ctx=TestState.INITIAL_CONTEXT;
 		try {
-			ctx=ctx.deployActor(Reader.readAll(Utils.readResourceAsString("libraries/fungible.con")), true);
+			ctx=ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/fungible.con")), true);
 		} catch (IOException e) {
 			throw new Error(e);
 		}
@@ -34,5 +35,6 @@ public class TestFungible {
 	
 	@Test public void testLibraryProperties() {
 		assertTrue(ctx.getAccountStatus(fungible).isActor());
+		assertEquals(fungible,TestState.CON_FUNGIBLE);
 	}
 }

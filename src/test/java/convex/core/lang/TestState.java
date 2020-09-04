@@ -4,6 +4,8 @@ import static convex.test.Assertions.assertStateError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+import java.io.IOException;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
@@ -31,6 +33,10 @@ public class TestState {
 
 	public static final Address[] CONTRACTS = new Address[NUM_CONTRACTS];
 
+	// Some contracts for testing
+	public static Address CON_FUNGIBLE=null;
+
+	
 	/**
 	 * A test state set up with a few accounts
 	 */
@@ -66,7 +72,7 @@ public class TestState {
 	 * initial context
 	 */
 	public static final Long TOTAL_FUNDS = Amount.MAX_AMOUNT;
-
+	
 	static {
 		try {
 			INITIAL_CONTEXT = Context.createFake(INITIAL, TestState.HERO);
@@ -96,6 +102,18 @@ public class TestState {
 			throw Utils.sneakyThrow(e);
 		}
 	}
+	
+	private static Context<?> deploy(Context<?> ctx,String actorResource) {
+		String source;
+		try {
+			source = Utils.readResourceAsString(actorResource);
+			Object contractCode=Reader.read(source);
+			ctx=ctx.deployActor(contractCode, true);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return ctx;
+	}
 
 	private static State createInitialState() {
 		try {
@@ -112,6 +130,10 @@ public class TestState {
 				ctx = ctx.deployActor(contractCode,true);
 				CONTRACTS[i] = (Address) ctx.getResult();
 			}
+			
+			ctx=deploy(ctx,"libraries/fungible.con");
+			CON_FUNGIBLE=(Address) ctx.getResult();
+			
 			return ctx.getState();
 		} catch (Throwable t) {
 			t.printStackTrace();
