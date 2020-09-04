@@ -770,6 +770,22 @@ public class CoreTest {
 		assertArityError(step("(into inc)"));
 		assertArityError(step("(into 1 2 3)")); // arity > cast
 	}
+	
+	@Test
+	public void testDotimes() {
+		assertEquals(Vectors.of(0L, 1L, 2L), eval("(do (def a []) (dotimes [i 3] (def a (conj a i))) a)"));
+		assertEquals(Vectors.empty(), eval("(do (def a []) (dotimes [i 0] (def a (conj a i))) a)"));
+		assertEquals(Vectors.empty(), eval("(do (def a []) (dotimes [i -1.5] (def a (conj a i))) a)"));
+		assertEquals(Vectors.empty(), eval("(do (def a []) (dotimes [i -1.5]) a)"));
+		
+		assertCastError(step("(dotimes [1 10])"));
+		assertCastError(step("(dotimes [i :foo])"));
+		
+		assertCastError(step("(dotimes :foo)"));
+		
+		assertArityError(step("(dotimes)"));
+
+	}
 
 	@Test
 	public void testMap() {

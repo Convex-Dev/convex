@@ -260,8 +260,8 @@
           :type :macro
           :signature [{:params [[sym count] & body]}] }}
   [[sym count] & body]
-  (let [n (long count)] 
-    (assert (symbol? sym))
+  (let [n (long count)
+        sym (symbol sym)] 
     '(loop [~sym 0]
        (if (< ~sym ~n)
          (do 

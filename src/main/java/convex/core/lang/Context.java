@@ -821,7 +821,10 @@ public final class Context<T> implements IObject {
 		} else if (bindingForm instanceof AVector) {
 			AVector<Syntax> v=(AVector<Syntax>)bindingForm;
 			long bindCount=v.count(); // count of binding form symbols (may include & etc.)
-			long argCount=RT.count(args);
+			
+			// Count the arguments, with a CAST error if args are not sequential
+			Long argCount=RT.count(args);
+			if (argCount==null) return ctx.withCastError(args, ASequence.class); 
 						
 			boolean foundAmpersand=false;
 			for (long i=0; i<bindCount; i++) {
