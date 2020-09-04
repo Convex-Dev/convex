@@ -31,7 +31,7 @@ public class List<T> extends AList<T> {
 	private long count;
 
 	private List(AVector<T> data) {
-		this.data = data;
+		this.data = data.toVector(); // ensure canonical, not a mapentry etc.
 		this.count = data.count();
 	}
 
@@ -230,20 +230,24 @@ public class List<T> extends AList<T> {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer b) {
-		b = b.put(Tag.LIST);
-		return writeRaw(b);
+	public ByteBuffer write(ByteBuffer bb) {
+		bb = bb.put(Tag.LIST);
+		return writeRaw(bb);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer b) {
-		b = Format.write(b, data);
-		return b;
+	public ByteBuffer writeRaw(ByteBuffer bb) {
+		bb = data.writeRaw(bb);
+		return bb;
 	}
-
-	public static <T> List<T> read(ByteBuffer b) throws BadFormatException {
+	
+	/**
+	 * Reads a List from the specified bytebuffer. Assumes Tag byte already consumed.
+	 * 
+	 */
+	public static <T> List<T> read(ByteBuffer bb) throws BadFormatException {
 		try {
-			AVector<T> data = Format.read(b);
+			AVector<T> data = Vectors.read(bb);
 			if (data == null) throw new BadFormatException("Expected vector but got null in List format");
 			return new List<T>(data);
 		} catch (ClassCastException e) {

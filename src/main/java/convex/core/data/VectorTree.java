@@ -179,8 +179,9 @@ public class VectorTree<T> extends AVector<T> {
 	}
 
 	/**
-	 * Reads a BlockVector from the provided ByteBuffer Assumes the header byte is
-	 * already read.
+	 * Reads a BlockVector from the provided ByteBuffer 
+	 * 
+	 * Assumes the header byte and count is already read.
 	 * 
 	 * @param bb
 	 * @param count

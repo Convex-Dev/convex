@@ -100,11 +100,13 @@ public class FormatTest {
 		assertEquals(s,s2);
 	}
 	
-	@Test public void testMalformedTreeVectorRegression() {
-		String s="810d6e6a57d5fd2cc66653bd4f72bd83580153344f68f5f643d98b2b5776954b8dc52f5a2014d6ccab85b3f83a5b36f92647";
-		ByteBuffer bb=ByteBuffer.wrap(Blob.fromHex(s).getInternalArray());
+	@Test public void testListRegression() throws BadFormatException {
+		AList<Object> l=Lists.of(Blobs.fromHex("41da2aa427dc50775dd0b077"), -1449690165);
 		
-		assertThrows(BadFormatException.class,()->{Format.read(bb);});
+		Blob b=Format.encodedBlob(l);
+		AList<Object> l2=Format.read(b);
+		
+		assertEquals(l,l2);
 	}
 	
 	@Test public void testMalformedStrings() {

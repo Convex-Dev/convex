@@ -537,7 +537,7 @@ public class Format {
 			return Expander.wrap(fn);
 		}
 
-		throw new BadFormatException("Can't read Op with tag byte: " + tag);
+		throw new BadFormatException("Can't read Op with tag byte: " + Utils.toHexString(tag));
 	}
 
 	/**
@@ -563,9 +563,7 @@ public class Format {
 						"Blob with type " + Utils.getClass(result) + " has excess bytes: " + bb.remaining());
 			} catch (BufferUnderflowException e) {
 				throw new BadFormatException("Blob has insufficients bytes: " + blob.length(), e);
-			} catch (BadFormatException e) {
-				throw new BadFormatException("Bad format for " + blob.toHexString(), e);
-			}
+			} 
 
 			if (result instanceof ACell) {
 				// cache the Blob in this data object, to avoid need to re-serialise

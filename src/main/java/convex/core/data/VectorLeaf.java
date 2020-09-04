@@ -210,8 +210,9 @@ public class VectorLeaf<T> extends AVector<T> {
 	}
 
 	/**
-	 * Reads a ListVector from the provided ByteBuffer Assumes the header byte is
-	 * already read.
+	 * Reads a ListVector from the provided ByteBuffer 
+	 * 
+	 * Assumes the header byte and count is already read.
 	 * 
 	 * @param data
 	 * @param count
@@ -220,13 +221,13 @@ public class VectorLeaf<T> extends AVector<T> {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T> VectorLeaf<T> read(ByteBuffer data, long count) throws BadFormatException {
-		if (count < 0) throw new BadFormatException("Negative ListVector length");
+		if (count < 0) throw new BadFormatException("Negative length");
 		if (count == 0) return (VectorLeaf<T>) EMPTY;
 		boolean prefixPresent = count > MAX_SIZE;
 
 		int n = ((int) count) & 0xF;
 		if (n == 0) {
-			if (count > 16) throw new BadFormatException("ListVector not valid for size 0 mod 16: " + count);
+			if (count > 16) throw new BadFormatException("Vector not valid for size 0 mod 16: " + count);
 			n = VectorLeaf.MAX_SIZE; // we know this must be true since zero already caught
 		}
 
