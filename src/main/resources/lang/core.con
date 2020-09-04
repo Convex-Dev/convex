@@ -101,8 +101,9 @@
   (apply concat (empty coll) (apply map f coll more)))
 
 (defn identity 
-  ^{:doc {:description "Identity function - returns the argument unchanged."
-         :examples [{:code "(identity :foo)"}]
+  ^{:doc {:description "An identity function which returns a single argument unchanged. Most useful when you want a 'do nothing' operation in higher order functions."
+         :examples [{:code "(identity :foo)"}
+                    {:code "(map identity [1 2 3])"}]
          :type :function	 
          :signature [{:params [a]}]}
 	}
@@ -251,4 +252,20 @@
           :signature [{:params [timestamp code]}] }}
     [timestamp code]
   '(schedule* ~timestamp (compile (quote ~code))))
+
+(defmacro dotimes 
+  ^{
+    :doc {:description "Repeats execution of the body 'count' times, binding the specified symbol from 0 to (count-1) on successive iterations. Returns nil in all cases."
+          :examples [{:code "(dotimes [i 10] (transfer *address* 10))"}]
+          :type :macro
+          :signature [{:params [[sym count] & body]}] }}
+  [[sym count] & body]
+  (let [n (long count)] 
+    (assert (symbol? sym))
+    '(loop [~sym 0]
+       (if (< ~sym ~n)
+         (do 
+           ~(cons do body)
+           (recur (inc ~sym)))
+         nil))))
 
