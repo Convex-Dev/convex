@@ -137,9 +137,16 @@ public class Syntax extends ACell {
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		// TODO: consider string format?
-		// sb.append("#syntax ");
+		sb.append("#syntax {:datum ");
 		Utils.ednString(sb, datumRef.getValue());
+		sb.append(" :meta ");
+		Utils.ednString(sb,meta);
+		sb.append('}');
+	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		Utils.print(sb, datumRef.getValue());
 	}
 	
 	@Override

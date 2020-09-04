@@ -27,7 +27,12 @@ public abstract class CoreExpander extends BaseExpander implements ICoreDef {
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		sb.append(symbol.getName());
+		symbol.ednString(sb);
+	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		symbol.print(sb);
 	}
 
 	@Override

@@ -117,6 +117,17 @@ public class Set<T> extends ASet<T> {
 		}
 		sb.append('}');
 	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		sb.append("#{");
+		int size = size();
+		for (int i = 0; i < size; i++) {
+			if (i > 0) sb.append(',');
+			Utils.print(sb,map.entryAt(i).getKey());
+		}
+		sb.append('}');
+	}
 
 	@Override
 	public int getRefCount() {

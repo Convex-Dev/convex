@@ -162,7 +162,13 @@ public final class ECDSASignature extends ASignature {
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		sb.append("#sig {");
+		sb.append("#sig ");
+		print(sb);
+	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		sb.append('{');
 		sb.append(":recID " + Utils.ednString(recoveryID));
 		sb.append(',');
 		sb.append(":r " + Utils.ednString(r));
@@ -170,6 +176,7 @@ public final class ECDSASignature extends ASignature {
 		sb.append(":s " + Utils.ednString(s));
 		sb.append('}');
 	}
+
 
 	@Override
 	public void validateCell() throws InvalidDataException {

@@ -219,6 +219,13 @@ public class SignedData<T> extends ACell {
 		sb.append(":data "+valueRef.getHash().toString());
 		sb.append("}");
 	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		sb.append("{");
+		sb.append(":signed "+valueRef.getHash().toString());
+		sb.append("}");
+	}
 
 	@Override
 	public void validate() throws InvalidDataException {

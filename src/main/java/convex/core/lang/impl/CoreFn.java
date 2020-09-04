@@ -67,7 +67,12 @@ public abstract class CoreFn<T> extends AFn<T> implements ICoreDef {
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		sb.append(symbol.getName());
+		symbol.ednString(sb);
+	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		symbol.print(sb);
 	}
 
 	@Override

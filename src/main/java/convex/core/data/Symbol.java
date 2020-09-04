@@ -139,6 +139,11 @@ public class Symbol extends ASymbolic {
 
 	@Override
 	public void ednString(StringBuilder sb) {
+		print(sb);
+	}
+	
+	@Override
+	public void print(StringBuilder sb) {
 		if (namespace!=null) {
 			namespace.ednString(sb);
 			sb.append('/');

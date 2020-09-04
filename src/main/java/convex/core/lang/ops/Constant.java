@@ -55,7 +55,12 @@ public class Constant<T> extends AOp<T> {
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		sb.append(Utils.ednString(valueRef.getValue()));
+		Utils.ednString(sb,valueRef.getValue());
+	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		Utils.print(sb,valueRef.getValue());
 	}
 
 	@Override

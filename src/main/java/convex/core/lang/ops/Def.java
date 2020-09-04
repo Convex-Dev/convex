@@ -92,6 +92,15 @@ public class Def<T> extends AOp<T> {
 		Utils.ednString(sb, op.getValue());
 		sb.append(')');
 	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		sb.append("(def ");
+		sb.append(symbol);
+		sb.append(' ');
+		Utils.print(sb, op.getValue());
+		sb.append(')');
+	}
 
 	@Override
 	public byte opCode() {

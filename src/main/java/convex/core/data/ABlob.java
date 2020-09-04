@@ -242,6 +242,12 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 		sb.append("#blob 0x");
 		toHexString(sb);
 	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		sb.append("0x");
+		toHexString(sb);
+	}
 
 	/**
 	 * Gets a byte buffer containing this Blob's data. Will have remaining bytes

@@ -95,6 +95,15 @@ public class Lambda<T> extends AOp<Fn<T>> {
 		body.ednString(sb);
 		sb.append(')');
 	}
+	
+	@Override
+	public void print(StringBuilder sb)  {
+		sb.append("(fn ");
+		params.print(sb);
+		sb.append(' ');
+		body.getValue().print(sb);
+		sb.append(')');
+	}
 
 	@Override
 	public byte opCode() {

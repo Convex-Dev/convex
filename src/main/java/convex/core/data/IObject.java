@@ -11,7 +11,7 @@ package convex.core.data;
 public interface IObject {
 
 	/**
-	 * Appends the String value of this object to the given StringBuilder in edn
+	 * Appends the edn value of this object to the given StringBuilder in edn
 	 * format
 	 * 
 	 */
@@ -27,4 +27,9 @@ public interface IObject {
 		ednString(sb);
 		return sb.toString();
 	}
+
+	/**
+	 * Appends the String value of this object to the given StringBuilder
+	 */
+	public void print(StringBuilder sb);
 }

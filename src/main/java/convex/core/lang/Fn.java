@@ -140,6 +140,15 @@ public class Fn<T> extends AFn<T> {
 		body.ednString(sb);
 		sb.append(')');
 	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		sb.append("(fn ");
+		params.print(sb);
+		sb.append(' ');
+		body.print(sb);
+		sb.append(')');
+	}
 
 	@Override
 	public int estimatedEncodingSize() {

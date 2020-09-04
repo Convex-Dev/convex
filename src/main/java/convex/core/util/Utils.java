@@ -23,6 +23,8 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import org.apache.commons.text.StringEscapeUtils;
+
 import convex.core.data.AArrayBlob;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
@@ -700,7 +702,49 @@ public class Utils {
 		buffer.get(bytes);
 		return Blob.wrap(bytes);
 	}
+	
+	/**
+	 * Prints an Object in readable String representation
+	 * @param v
+	 * @return
+	 */
+	public static String print(Object v) {
+		StringBuilder sb=new StringBuilder();
+		print(sb,v);
+		return sb.toString();
+	}
+	
+	/**
+	 * Prints an Object in readable String representation
+	 * @param v
+	 * @return
+	 */
+	public static void print(StringBuilder sb,Object v) {
+		if (v == null) {
+			sb.append("nil");
+		} else if (v instanceof IObject) {
+			((IObject)v).print(sb);
+		} else if (v instanceof Boolean||v instanceof Number){
+			sb.append(v.toString());
+		} else if (v instanceof String) {
+			sb.append('"');	
+			sb.append((String)v);
+			sb.append('"');				
+		} else if (v instanceof Instant) {
+			sb.append(((Instant)v).toEpochMilli());
+		} else if (v instanceof Character) {
+			sb.append(ednString((char)v));
+		} else {
+			throw new TODOException("Can't print: "+Utils.getClass(v));
+		}
+	}
+	
 
+	/**
+	 * Converts an Object to an edn String.
+	 * @param v Value to render as edn String
+	 * @return
+	 */
 	public static String ednString(Object v) {
 		if (v == null) return "nil";
 		if (v instanceof IObject) {
@@ -1110,6 +1154,14 @@ public class Utils {
 	 */
 	public static boolean firstDigitMatch(byte a, byte b) {
 		return (a & 0xF0) == (b & 0xF0);
+	}
+
+	public static String unescapeString(String s) {
+		return StringEscapeUtils.unescapeJava(s);
+	}
+	
+	public static String escapeString(String s) {
+		return StringEscapeUtils.escapeJava(s);
 	}
 
 }

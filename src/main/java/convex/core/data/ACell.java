@@ -192,7 +192,7 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	@Override
 	public String toString() {
 		StringBuilder sb=new StringBuilder();
-		ednString(sb);
+		print(sb);
 		return sb.toString();
 	}
 

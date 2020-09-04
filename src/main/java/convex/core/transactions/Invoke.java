@@ -124,6 +124,14 @@ public class Invoke extends ATransaction {
 		Utils.ednString(sb, command);
 		sb.append('}');
 	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		sb.append("{");
+		sb.append(":invoke ");
+		Utils.print(sb, command);
+		sb.append('}');
+	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {

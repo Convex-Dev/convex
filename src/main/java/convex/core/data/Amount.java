@@ -275,4 +275,9 @@ public class Amount extends ACell implements Comparable<Amount> {
 	protected boolean isEmbedded() {
 		return true;
 	}
+
+	@Override
+	public void print(StringBuilder sb) {
+		sb.append(value);
+	}
 }

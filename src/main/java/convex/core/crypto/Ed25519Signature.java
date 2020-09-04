@@ -59,6 +59,11 @@ public class Ed25519Signature extends ASignature {
 	public void ednString(StringBuilder sb) {
 		sb.append("#signature \""+Utils.toHexString(signatureBytes)+"\"");
 	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		sb.append("{:signature 0x"+Utils.toHexString(signatureBytes)+"}");
+	}
 
 	@Override
 	public boolean verify(Hash hash, Address address) {

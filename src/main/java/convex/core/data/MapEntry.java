@@ -158,6 +158,15 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 	public void ednString(StringBuilder sb) {
 		sb.append("#entry [" + Utils.ednString(getKey()) + "," + Utils.ednString(getValue()) + "]");
 	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		sb.append('[');
+		Utils.print(sb,getKey());
+		sb.append(',');
+		Utils.print(sb,getValue());
+		sb.append(']');
+	}
 
 	@SuppressWarnings("unchecked")
 	@Override

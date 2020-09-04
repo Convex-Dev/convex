@@ -45,6 +45,13 @@ public class Expander extends AExpander {
 		sb.append("#expander ");
 		fn.ednString(sb);
 	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		sb.append("(expander ");
+		fn.print(sb);
+		sb.append(')');
+	}
 
 	@SuppressWarnings("unchecked")
 	@Override

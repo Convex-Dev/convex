@@ -88,7 +88,18 @@ public abstract class AVector<T> extends ASequence<T> {
 		int size = size();
 		for (int i = 0; i < size; i++) {
 			if (i > 0) sb.append(',');
-			sb.append(Utils.ednString(get(i)));
+			Utils.ednString(sb,get(i));
+		}
+		sb.append(']');
+	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		sb.append('[');
+		int size = size();
+		for (int i = 0; i < size; i++) {
+			if (i > 0) sb.append(',');
+			Utils.print(sb,get(i));
 		}
 		sb.append(']');
 	}

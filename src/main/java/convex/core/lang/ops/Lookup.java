@@ -61,7 +61,12 @@ public class Lookup<T> extends AOp<T> {
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		sb.append(symbol.toString());
+		symbol.ednString(sb);
+	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		symbol.print(sb);
 	}
 
 	@Override

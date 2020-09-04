@@ -33,6 +33,17 @@ public class GenTestAnyValue {
 	}
 	
 	@Property
+	public void printFormats(@From(ValueGen.class) Object o) {
+		String s=Utils.print(o);
+		assertNotNull(s);
+		assertTrue(s.length()>0);
+		
+		// TODO: handle all reader cases
+		//Object o2=Reader.read(s);
+		// if (o!=null) assertNotNull(o2); 
+	}
+	
+	@Property
 	public void genericTests(@From(ValueGen.class) Object o) throws InvalidDataException, BadFormatException {
 		ObjectsTest.doAnyValueTests(o);
 	}

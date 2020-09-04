@@ -157,6 +157,19 @@ public abstract class AMap<K, V> extends ADataStructure<MapEntry<K, V>>
 		if (count() > 0) sb.setLength(sb.length() - 1); // delete trailing comma
 		sb.append('}');
 	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		sb.append('{');
+		this.forEach((k, v) -> {
+			Utils.print(sb,k);
+			sb.append(' ');
+			Utils.print(sb,v);
+			sb.append(',');
+		});
+		if (count() > 0) sb.setLength(sb.length() - 1); // delete trailing comma
+		sb.append('}');
+	}
 
 	/**
 	 * Associate the given map entry into the map

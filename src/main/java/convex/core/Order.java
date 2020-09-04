@@ -104,6 +104,17 @@ public class Order extends ACell {
 		blocks.ednString(sb);
 		sb.append("}\n");
 	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		sb.append("{");
+		sb.append(":prop " + getProposalPoint() + ",");
+		sb.append(":cons " + getConsensusPoint() + ",");
+		sb.append(":hash " + getHash() + ",");
+		sb.append(":blocks ");
+		blocks.print(sb);
+		sb.append("}\n");
+	}
 
 	/**
 	 * Checks if an Order is consistent with this Order.

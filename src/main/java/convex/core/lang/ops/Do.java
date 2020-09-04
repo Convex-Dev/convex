@@ -81,6 +81,17 @@ public class Do<T> extends AMultiOp<T> {
 		}
 		sb.append(')');
 	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		sb.append("(do");
+		int len = ops.size();
+		for (int i = 0; i < len; i++) {
+			sb.append(' ');
+			ops.get(i).print(sb);
+		}
+		sb.append(')');
+	}
 
 	@Override
 	public byte opCode() {

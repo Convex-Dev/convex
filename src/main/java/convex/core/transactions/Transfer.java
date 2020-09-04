@@ -95,6 +95,17 @@ public class Transfer extends ATransaction {
 		amount.ednString(sb);
 		sb.append('}');
 	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		sb.append("{");
+		sb.append(":transfer-to ");
+		target.print(sb);
+		sb.append(',');
+		sb.append(":amount ");
+		amount.print(sb);
+		sb.append('}');
+	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {

@@ -213,7 +213,18 @@ public class List<T> extends AList<T> {
 		long n = count;
 		for (long i = 0; i < n; i++) {
 			if (i > 0) sb.append(' ');
-			sb.append(Utils.ednString(data.get(n - 1 - i)));
+			Utils.ednString(sb,data.get(n - 1 - i));
+		}
+		sb.append(')');
+	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		sb.append('(');
+		long n = count;
+		for (long i = 0; i < n; i++) {
+			if (i > 0) sb.append(' ');
+			Utils.print(sb,data.get(n - 1 - i));
 		}
 		sb.append(')');
 	}

@@ -60,12 +60,13 @@ public class Reader extends BaseParser<Object> {
 	}
 
 	public Rule ExpressionInput() {
-		return FirstOf(Sequence(
+		return FirstOf(
+				Sequence(
 					Spacing(), 
 					Expression(), 
 					Spacing(), 
-					EOI),
-				push(error("Single expression expected")));
+					FirstOf(EOI,push(error("Extra input after expression")))),
+				push(error("Expression expected")));
 	}
 
 	public Rule SymbolInput() {
@@ -345,13 +346,7 @@ public class Reader extends BaseParser<Object> {
 		return Sequence(
 				'"', 
 				ZeroOrMore(Sequence(StringCharacter(), sb.append(matchOrDefault("0")))),
-				push(prepare(unescape(sb.get()))), '"');
-	}
-
-	public static String unescape(String s) {
-		s = s.replace("\\\"", "\"");
-		s = s.replace("\\\\", "\\");
-		return s;
+				push(prepare(Utils.unescapeString(sb.get()))), '"');
 	}
 
 	public Rule StringCharacter() {

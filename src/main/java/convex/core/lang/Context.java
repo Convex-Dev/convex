@@ -873,6 +873,19 @@ public final class Context<T> implements IObject {
 		getState().ednString(sb);
 		sb.append("}");
 	}
+	
+	@Override
+	public void print(StringBuilder sb)  {
+		sb.append("{");
+		sb.append(":juice "+juice);
+		sb.append(',');
+		sb.append(":result ");
+		Utils.print(sb,result);
+		sb.append(',');
+		sb.append(":state ");
+		getState().print(sb);
+		sb.append("}");
+	}
 
 	public convex.core.data.AHashMap<Symbol, Object> getLocalBindings() {
 		return localBindings;

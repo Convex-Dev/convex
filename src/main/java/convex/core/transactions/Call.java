@@ -64,6 +64,18 @@ public class Call extends ATransaction {
 	}
 	
 	@Override
+	public void print(StringBuilder sb) {
+		sb.append("{");
+		sb.append(":target ");
+		Utils.ednString(sb, target);
+		if (offer>0) {
+			sb.append(" :offer ");
+			sb.append(offer);
+		}
+		sb.append('}');
+	}
+	
+	@Override
 	public ByteBuffer write(ByteBuffer bb) {
 		bb = bb.put(Tag.CALL);
 		return writeRaw(bb);
