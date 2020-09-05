@@ -290,6 +290,8 @@ public class CompilerTest {
 		assertEquals(Lists.of(Symbols.INC,3L),eval("'(inc 3)"));
 		assertEquals(Lists.of(Symbols.INC,3L),eval("'(inc ~(+ 1 2))"));
 		
+		assertTrue((boolean)eval("(= (quote a/b) 'a/b)"));
+		
 		assertEquals(Symbol.create("undefined-1"),eval("'undefined-1"));
 		assertUndeclaredError(step("'~undefined-1"));
 	}
