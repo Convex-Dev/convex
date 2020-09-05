@@ -1386,9 +1386,9 @@ public final class Context<T> implements IObject {
 	 */
 	@SuppressWarnings("unchecked")
 	public <R> Context<R> deployActor(Object code, Address address) {
-		State state=getState();
+		final State initialState=getState();
 		// deploy initial contract state
-		State stateSetup=state.tryAddActor(address, Core.ENVIRONMENT);
+		State stateSetup=initialState.tryAddActor(address, Core.ENVIRONMENT);
 		if (stateSetup==null) return withError(ErrorCodes.STATE,"Contract deployment address conflict: "+address);
 		
 		final Context<R> exContext=Context.create(stateSetup, juice, Maps.empty(), null, depth+1, getOrigin(),getAddress(), address);
@@ -1396,18 +1396,41 @@ public final class Context<T> implements IObject {
 		
 		// TODO: think about error returns from actors
 		if (rctx.isExceptional()) {
-			State rollbackState=getState();
-			Context<R> result=Context.create(rollbackState, rctx.getJuice(), getLocalBindings(), rctx.getValue(), depth, getOrigin(),getCaller(), getAddress());
+			// rollback with nothing changed except lost juice
+			Context<R> result=rctx.secureRollback(this);
 			return result; 
 		} else {
 		
 			//SECURITY: make sure this always works!!!
 			// restore context for the current execution
-			Context<R> result=Context.create(rctx.getState(), rctx.getJuice(), getLocalBindings(), rctx.getValue(), depth, getOrigin(),getCaller(), getAddress());
+			Context<R> result=rctx.secureReturn(this);
 			return (Context<R>) result.withResult(Juice.DEPLOY_CONTRACT, address);
 		}
 	}
-
+	
+	/**
+	 * Gets the context after a secure return to the original Context
+	 * @param <R> Return type
+	 * @param original Original security context to return to
+	 * @return
+	 */
+	public <R> Context<R> secureReturn(Context<?> original) {
+		@SuppressWarnings("unchecked")
+		Context<R> result=Context.create(getState(), getJuice(), original.getLocalBindings(), (R)getValue(), original.depth, original.getOrigin(),original.getCaller(), original.getAddress());
+		return result;
+	}
+	
+	/**
+	 * Gets the context after a secure rollback to the original Context, retoring original state
+	 * @param <R> Return type
+	 * @param original Original security context to return to
+	 * @return
+	 */
+	public <R> Context<R> secureRollback(Context<?> original) {
+		@SuppressWarnings("unchecked")
+		Context<R> result=Context.create(original.getState(), getJuice(), original.getLocalBindings(), (R)getValue(), original.depth, original.getOrigin(),original.getCaller(), original.getAddress());
+		return result;
+	}
 
 	@SuppressWarnings("unchecked")
 	public <R> Context<R> withError(Keyword error) {

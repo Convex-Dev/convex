@@ -82,6 +82,7 @@ public class Init {
 
 			// Core library
 			accts=addCoreLibrary(accts,CORE_ADDRESS);
+			// Core Account should now be fully initialised
 			CORE_ACCOUNT=accts.get(CORE_ADDRESS);
 
 			// governance accounts
@@ -159,6 +160,7 @@ public class Init {
 				s = register(s,CORE_ADDRESS,"Convex Core Library");
 				s = register(s,MEMORY_EXCHANGE,"Memory Exchange Pool");
 			}
+			
 
 			STATE = s;
 		} catch (Throwable e) {

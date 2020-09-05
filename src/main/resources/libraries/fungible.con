@@ -1,4 +1,4 @@
-(actor []
+(do
   ;; Fungible library
   ;;
   ;; deploy with: (deploy-once fungible-code)
@@ -9,6 +9,7 @@
   ;;   (fungible/balance token)   ;; Gets own balance (i.e. for *address*)
   ;;   (fungible/balance token other-address)   ;; Gets balance for another Address
   
+  (call *registry* (register {:name "Fungible Library"}))
   
   (defn balance 
     ^{:doc {:description "Gets the balance from a fungible token. Checks the balance for the specified holder, or the current *address* if not specified."

@@ -10,7 +10,6 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
-import convex.core.data.Symbol;
 import convex.core.util.Utils;
 
 @SuppressWarnings("serial")
@@ -63,12 +62,10 @@ public class AccountsTableModel extends AbstractTableModel implements TableModel
 		case 3:
 			return as.getBalance().toFriendlyString();
 		case 4: {
-			AMap<Address, Object> reg = state.getAccount(Init.REGISTRY_ADDRESS).getEnvironment()
-					.get(Symbol.create("registry")).getValue();
-			Object o = reg.get(address);
+			Object o = state.getAccount(address).getHoldings().get(Init.REGISTRY_ADDRESS);
 			if (o == null) return "";
 			if (!(o instanceof AMap)) return "<Invalid registration, not a map!>";
-			AMap<Keyword, Object> a = (AMap<Keyword, Object>) reg.get(address);
+			AMap<Keyword, Object> a = (AMap<Keyword, Object>) o;
 			return a.get(Keyword.create("name"));
 		}
 		case 5:

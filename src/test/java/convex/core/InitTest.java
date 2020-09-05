@@ -26,7 +26,8 @@ public class InitTest {
 	}
 	
 	@Test public void testCoreAccount() {
-		assertEquals(Init.CORE_ACCOUNT,s.getAccount(Core.CORE_ADDRESS));
+		// core environment should be the same as when first created
+		assertEquals(Init.CORE_ACCOUNT.getEnvironment(),s.getAccount(Core.CORE_ADDRESS).getEnvironment());
 	}
 	
 	@Test 

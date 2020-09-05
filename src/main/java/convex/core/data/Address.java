@@ -237,6 +237,12 @@ public class Address extends AArrayBlob {
 		sb.append("#addr 0x");
 		sb.append(toHexString());
 	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		sb.append("0x");
+		sb.append(toChecksumHex());
+	}
 
 	@Override
 	public boolean isCanonical() {

@@ -14,6 +14,7 @@ import convex.core.lang.Context;
 import convex.core.lang.Reader;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
+import static convex.core.lang.TestState.*;
 
 public class TestFungible {
 	private static final Symbol fSym=Symbol.create("fungible");
@@ -39,5 +40,7 @@ public class TestFungible {
 	@Test public void testLibraryProperties() {
 		assertTrue(ctx.getAccountStatus(fungible).isActor());
 		assertEquals(fungible,TestState.CON_FUNGIBLE);
+		
+		assertEquals("Fungible Library",eval("(:name (call *registry* (lookup "+fungible+")))"));
 	}
 }

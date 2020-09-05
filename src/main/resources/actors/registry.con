@@ -1,10 +1,10 @@
 (do 
-  (def registry {*address* {:name "Registry Contract"}})
+  (set-holding *address* {:name "Registry Contract"})
   
   (defn register [data]
-    (def registry (assoc registry *caller* data)))
+    (set-holding *caller* data))
     
   (defn lookup [addr]
-    (get registry (address addr)))
+    (get-holding addr))
     
   (export register lookup))
