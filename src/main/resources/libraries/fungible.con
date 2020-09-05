@@ -29,7 +29,28 @@
     [token target amount]
     (call token (transfer target amount))) 
   
-  
+  (defn build-token [config]
+    (let [supply (long (or (:supply config) 1000000))
+          initial-holder (address (or (:initial-holder config) *address*))]
+      '(do
+         (def supply ~supply)
+         
+         (set-holding ~initial-holder ~supply)
+         
+         (defn balance [addr]
+            (or (get-holding addr) 0))
+       
+         (defn transfer [addr amount]
+           (let [addr (address addr)
+                 amount (long amount)
+                 bal (or (get-holding *caller*) 0)
+                 tbal (or (get-holding addr) 0)]
+             (assert (<= 0 amount bal)) ;; amount must be in valid range
+             (set-holding *caller* (- bal amount))
+             (set-holding addr (+ tbal amount))
+             ))
+       
+         (export transfer balance))))
   
   
   )
