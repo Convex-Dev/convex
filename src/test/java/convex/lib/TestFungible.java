@@ -18,6 +18,8 @@ import convex.core.lang.Reader;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
 
+import static convex.test.Assertions.*;
+
 public class TestFungible {
 	private static final Symbol fSym=Symbol.create("fun-actor");
 	
@@ -66,9 +68,19 @@ public class TestFungible {
 		Long bal=eval(ctx,"(fungible/balance token *address*)");
 		assertTrue(bal>0);
 		
-		// transfer to the Villain
-		ctx=step(ctx,"(fungible/transfer token "+TestState.VILLAIN+" 100)");
-		assertEquals(bal-100,(long)eval(ctx,"(fungible/balance token *address*)"));
-		assertEquals(100,(long)eval(ctx,"(fungible/balance token "+TestState.VILLAIN+")"));
+		// transfer to the Villain scenario
+		{
+			Context<?> tctx=step(ctx,"(fungible/transfer token "+TestState.VILLAIN+" 100)");
+			assertEquals(bal-100,(long)eval(tctx,"(fungible/balance token *address*)"));
+			assertEquals(100,(long)eval(tctx,"(fungible/balance token "+TestState.VILLAIN+")"));
+		}
+		
+		// acceptable transfers
+		assertNotError(step(ctx,"(fungible/transfer token *address* 0)"));
+		assertNotError(step(ctx,"(fungible/transfer token *address* "+bal+")"));
+		
+		// bad transfers
+		assertAssertError(step(ctx,"(fungible/transfer token *address* -1)"));
+		assertAssertError(step(ctx,"(fungible/transfer token *address* "+(bal+1)+")"));
 	}
 }
