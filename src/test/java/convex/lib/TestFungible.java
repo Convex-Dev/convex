@@ -56,8 +56,19 @@ public class TestFungible {
 		Context<?> ctx=TestFungible.ctx;
 		assertEquals(fungible,eval(ctx,"(get *aliases* 'fungible)"));
 		
-		ctx=step(ctx,"(def token (deploy (fungible/build-token nil)))");
+		// deploy a token with default config
+		ctx=step(ctx,"(def token (deploy (fungible/build-token {})))");
 		Address token = (Address) ctx.getResult();
 		assertTrue(ctx.getAccountStatus(token)!=null);
+		ctx=step(ctx,"(def token (address "+token+"))");
+		
+		// check our balance is positive as initial holder
+		Long bal=eval(ctx,"(fungible/balance token *address*)");
+		assertTrue(bal>0);
+		
+		// transfer to the Villain
+		ctx=step(ctx,"(fungible/transfer token "+TestState.VILLAIN+" 100)");
+		assertEquals(bal-100,(long)eval(ctx,"(fungible/balance token *address*)"));
+		assertEquals(100,(long)eval(ctx,"(fungible/balance token "+TestState.VILLAIN+")"));
 	}
 }
