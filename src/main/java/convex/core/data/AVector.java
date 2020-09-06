@@ -98,7 +98,7 @@ public abstract class AVector<T> extends ASequence<T> {
 		sb.append('[');
 		int size = size();
 		for (int i = 0; i < size; i++) {
-			if (i > 0) sb.append(',');
+			if (i > 0) sb.append(' ');
 			Utils.print(sb,get(i));
 		}
 		sb.append(']');

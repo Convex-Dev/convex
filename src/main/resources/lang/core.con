@@ -275,3 +275,16 @@
            (recur (inc ~sym)))
          nil))))
 
+(defmacro when-let 
+  ^{
+    :doc {:description "Executes the body with the symbol bound to the value of evaluating a given expression, if and only if the result of the expression is truthy. Returns nil otherwise."
+          :examples [{:code "(when-let [addr  (get-address)] (transfer addr 1000))"}]
+          :type :macro
+          :signature [{:params [[sym exp] & body]}] }}
+  [[sym exp] & body]
+  (let [;; _ (or (= 2 (count bindings)) (fail :ARITY "when-let requires a vector binding form or length 2"))
+        dobody (cons 'do body)]
+    '(let [~sym ~exp]
+       (if ~sym
+         ~dobody
+         nil))))

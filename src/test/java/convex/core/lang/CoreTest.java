@@ -157,6 +157,19 @@ public class CoreTest {
 		assertArityError(step("(short 1 2)"));
 		assertArityError(step("(short)"));
 	}
+	
+	@Test
+	public void testLet() {
+		assertCastError(step("(let [[a b] :foo] b)"));
+		
+		assertArityError(step("(let [[a b] nil] b)"));
+		assertArityError(step("(let [[a b] [1]] b)"));
+		assertEquals(2L,evalL("(let [[a b] [1 2]] b)"));
+		assertEquals(2L,evalL("(let [[a b] '(1 2)] b)"));
+
+		assertCompileError(step("(let ['(a b) '(1 2)] b)"));
+
+	}
 
 	@Test
 	public void testGet() {
@@ -663,6 +676,7 @@ public class CoreTest {
 		assertArityError(step("(first)"));
 		assertArityError(step("(first [1] 2)"));
 		assertCastError(step("(first 1)"));
+		assertCastError(step("(first :foo)"));
 	}
 
 	@Test
@@ -784,6 +798,8 @@ public class CoreTest {
 		assertCastError(step("(dotimes :foo)"));
 		
 		assertArityError(step("(dotimes)"));
+		assertArityError(step("(dotimes [i])"));
+		assertArityError(step("(dotimes [i 2 3])"));
 
 	}
 
@@ -925,7 +941,25 @@ public class CoreTest {
 		assertEquals(Vectors.empty(), eval("(when 2 3 4 5 [])"));
 
 		// TODO: needs to fix / check?
-		// assertArityError(step("(when)"));
+		assertArityError(step("(when)"));
+	}
+	
+	@Test
+	public void testWhenLet() {
+		assertEquals(1L,evalL("(when-let [a 1] a)"));
+		assertEquals(2L,evalL("(when-let [a true] 2)"));
+		assertEquals(3L,evalL("(when-let [a 1] 2 3)"));
+		
+		assertNull(eval("(when-let [a true])")); // empty trye branch
+		assertNull(eval("(when-let [a false] 1)")); // null on false branch
+		assertNull(eval("(when-let [a false])")); // null on false branch
+
+		assertCompileError(step("(when-let [:foo 1])"));
+
+		// TODO: needs to fix / check?
+		assertArityError(step("(when-let)"));
+		assertArityError(step("(when-let [])"));
+		assertArityError(step("(when-let [foo] 1)"));
 	}
 
 	@Test

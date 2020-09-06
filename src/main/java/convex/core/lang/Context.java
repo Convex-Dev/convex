@@ -840,6 +840,7 @@ public final class Context<T> implements IObject {
 					// bind variadic form at position i+1 to all args except nLeft
 					AVector<Object> rest=RT.vec(args).slice(i,(argCount - i)-nLeft);
 					ctx= ctx.updateBindings(v.get(i+1), rest);
+					if(ctx.isExceptional()) return ctx;
 					
 					// mark ampersand as found, and skip to next binding form (i.e. past the variadic symbol following &)
 					foundAmpersand=true;

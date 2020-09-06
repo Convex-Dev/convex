@@ -1034,7 +1034,7 @@ public class Core {
 			Object coll = args[0];
 			ASequence<?> seq = RT.sequence(coll);
 			if (seq == null) return context.withCastError(coll, ASequence.class);
-			if (seq.count()<1) return context.withBoundsError(1);
+			if (seq.count()<1) return context.withBoundsError(0);
 			Object result = seq.get(0);
 
 			long juice = Juice.SIMPLE_FN;
