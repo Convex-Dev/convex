@@ -1383,12 +1383,12 @@ public class CoreTest {
 		assertNotNull(as);
 		
 		// standard actors are accounts
-		assertNotNull(eval("(account *registry*)"));
+		assertTrue(eval("(account *registry*)") instanceof AccountStatus);
 		
 		// a fake address
 		assertNull(eval(ctx,"(account 0x1234567812345678123456781234567812345678123456781234567812345678)"));
 		
-		// hero address is an account
+		// current address is an account, and its balance is correct
 		assertTrue(evalB("(= *balance* (:balance (account *address*)))"));
 		
 		// invalid addresses
