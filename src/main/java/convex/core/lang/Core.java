@@ -577,17 +577,14 @@ public class Core {
 			int n=args.length;
 			if ((n<1)||(n>2)) return context.withArityError(rangeArityMessage(1,2, args.length));
 
-			// Get symbol name argument, must cast to Symbol as named type
-			Object nameArg=args[n-1];
-			String name = RT.name(nameArg);
-			if (name == null) return context.withCastError(nameArg, Symbol.class);
-
 			// get Address to perform lookup
 			Address address=(n==1)?context.getAddress():RT.address(args[0]);
 			if (address==null) return context.withCastError(args[0], Address.class);
 			
-			Symbol sym = Symbol.create(name);
-			if (sym == null) return context.withArgumentError("Invalid Symbol name: " + name);
+			// ensure argument converts to a Symbol correctly.
+			Object symArg=args[n-1];
+			Symbol sym = RT.toSymbol(symArg);
+			if (sym == null) return context.withCastError(symArg,Symbol.class);
 
 			MapEntry<Symbol, Syntax> me = context.lookupDynamicEntry(address,sym);
 
@@ -603,18 +600,14 @@ public class Core {
 			int n=args.length;
 			if ((n<1)||(n>2)) return context.withArityError(rangeArityMessage(1,2, args.length));
 
-			// Get symbol name argument, must cast to Symbol as named type
-			Object nameArg=args[n-1];
-			String name = RT.name(nameArg);
-			if (name == null) return context.withCastError(nameArg, Symbol.class);
-
 			// get Address to perform lookup
 			Address address=(n==1)?context.getAddress():RT.address(args[0]);
 			if (address==null) return context.withCastError(args[0], Address.class);
 			
 			// ensure argument converts to a Symbol correctly.
-			Symbol sym = RT.toSymbol(name);
-			if (sym == null) return context.withArgumentError("Invalid Symbol name: " + name);
+			Object symArg=args[n-1];
+			Symbol sym = RT.toSymbol(symArg);
+			if (sym == null) return context.withCastError(symArg,Symbol.class);
 
 			MapEntry<Symbol, Syntax> me = context.lookupDynamicEntry(address,sym);
 

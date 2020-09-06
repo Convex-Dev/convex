@@ -1011,6 +1011,26 @@ public class CoreTest {
 		assertArityError(step("(symbol)"));
 		assertArityError(step("(symbol 1 3)"));
 	}
+	
+	@Test
+	public void testImport() {
+		Context<?> ctx = step("(def lib (deploy '(do (def foo 100))))");
+		
+		{ // tests with a typical import
+			Context<?> ctx2=step(ctx,"(import lib :as mylib)");
+			assertEquals(100L, evalL(ctx2, "mylib/foo"));
+			assertUndeclaredError(step(ctx2, "mylib/bar"));
+			assertTrue(evalB(ctx2,"(syntax? (lookup-syntax 'mylib/foo))"));
+			assertTrue(evalB(ctx2,"(defined? mylib/foo)"));
+			assertFalse(evalB(ctx2,"(defined? mylib/bar)"));
+		}
+		
+		assertArityError(step(ctx,"(import)"));
+		assertArityError(step(ctx,"(import lib)"));	
+		assertArityError(step(ctx,"(import lib :as)"));	
+		assertArityError(step(ctx,"(import lib :as mylib :blah)"));	
+	}
+	
 
 	@Test
 	public void testLookup() {
@@ -1033,7 +1053,7 @@ public class CoreTest {
 
 
 		// invalid name string
-		assertArgumentError(
+		assertCastError(
 				step("(lookup \"cdiubcidciuecgieufgvuifeviufegviufeviuefbviufegviufevguiefvgfiuevgeufigv\")"));
 
 		assertCastError(step("(lookup count)"));
@@ -1056,7 +1076,7 @@ public class CoreTest {
 		assertNull(eval("(do (def foo 1) (lookup-syntax 0x1234000000000000000000000000000000000000000000000000000000000000 :foo))"));
 
 		// invalid name string (too long)
-		assertArgumentError(
+		assertCastError(
 				step("(lookup-syntax \"cdiubcidciuecgieufgvuifeviufegviufeviuefbviufegviufevguiefvgfiuevgeufigv\")"));
 
 		assertCastError(step("(lookup-syntax count)"));
