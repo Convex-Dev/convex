@@ -559,7 +559,9 @@ public class CoreTest {
 
 	@Test
 	public void testAssocMaps() {
+		// no key/values is OK
 		assertEquals(Maps.empty(), eval("(assoc {})"));
+		
 		assertEquals(Maps.of(1L, 2L), eval("(assoc {} 1 2)"));
 		assertEquals(Maps.of(1L, 2L), eval("(assoc {1 2})"));
 		assertEquals(Maps.of(1L, 2L, 3L, 4L), eval("(assoc {} 1 2 3 4)"));
