@@ -1734,7 +1734,6 @@ public class CoreTest {
 		
 		assertArityError(step("(defined?)"));
 		assertArityError(step("(defined? foo bar)"));
-
 	}
 	
 	@Test
@@ -1746,7 +1745,12 @@ public class CoreTest {
 		
 		assertEquals(Vectors.of(1L, 2L), eval("(do (def a 1) (def v [a 2]) (undef a) v)"));
 		
+		assertFalse(evalB("(do (def a 1) (undef a) (defined? a))"));
+		
 		assertUndeclaredError(step("(do (def a 1) (undef a) a)"));
+		
+		assertArityError(step("(undef a b)"));
+		assertArityError(step("(undef)"));
 	}
 	
 
