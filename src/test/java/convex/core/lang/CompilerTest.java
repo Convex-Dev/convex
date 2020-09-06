@@ -219,6 +219,7 @@ public class CompilerTest {
 		// test that if macro expansion happens correctly inside other macro
 		assertEquals(3L,(long)eval("(if (if 1 nil 3) 2 3)"));
 		
+		// ARITY error if too few or too many branches
 		assertArityError(step("(if :foo)"));
 		assertArityError(step("(if :foo 1 2 3 4 5)"));
 	}
@@ -264,6 +265,8 @@ public class CompilerTest {
 		
 		assertArityError(step("~(inc)"));
 		assertCastError(step("~(inc :foo)"));
+		
+		// TODO: what are right error types here?
 		assertCompileError(step("(unquote)"));
 		assertCompileError(step("(unquote 1 2)"));
 	}
@@ -295,6 +298,7 @@ public class CompilerTest {
 		
 		assertEquals(Symbol.create("undefined-1"),eval("'undefined-1"));
 		assertUndeclaredError(step("'~undefined-1"));
+		assertUndeclaredError(step("~'undefined-1"));
 	}
 	
 	@Test 
