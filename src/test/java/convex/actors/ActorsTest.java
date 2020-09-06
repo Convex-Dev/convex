@@ -51,7 +51,7 @@ public class ActorsTest {
 		assertArityError(step("(deploy)"));
 		assertArityError(step("(deploy 1 2)")); 
 
-		assertCompileError(step("(deploy '(if))"));
+		assertArityError(step("(deploy '(if))"));
 	}
 	
 	@Test public void testNotActor() {

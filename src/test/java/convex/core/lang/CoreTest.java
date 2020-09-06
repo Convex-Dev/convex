@@ -312,9 +312,9 @@ public class CoreTest {
 		assertNull(eval("(if false 1)"));
 		
 		// TODO: should these be arity errors?
-		assertCompileError(step("(if)"));
-		assertCompileError(step("(if 1)"));
-		assertCompileError(step("(if 1 2 3 4)"));
+		assertArityError(step("(if)"));
+		assertArityError(step("(if 1)"));
+		assertArityError(step("(if 1 2 3 4)"));
 	}
 
 	@Test
@@ -945,6 +945,26 @@ public class CoreTest {
 	}
 	
 	@Test
+	public void testIfLet() {
+		assertEquals(1L,evalL("(if-let [a 1] a)"));
+		assertEquals(2L,evalL("(if-let [a true] 2)"));
+		assertEquals(3L,evalL("(if-let [a []] 3 4)"));
+		assertEquals(4L,evalL("(if-let [a nil] 3 4)"));
+		assertEquals(5L,evalL("(if-let [a false] 3 5)"));
+
+		assertNull(eval("(if-let [a false] 1)")); // null on false branch
+
+		assertArityError(step("(if-let [:foo 1])"));
+
+		// TODO: needs to fix / check?
+		assertArityError(step("(if-let [a true])")); // no branches
+		assertArityError(step("(if-let [a true] 1 2 3)")); // too many branches
+		assertArityError(step("(if-let)"));
+		assertArityError(step("(if-let [])"));
+		assertArityError(step("(if-let [foo] 1)"));
+	}
+	
+	@Test
 	public void testWhenLet() {
 		assertEquals(1L,evalL("(when-let [a 1] a)"));
 		assertEquals(2L,evalL("(when-let [a true] 2)"));
@@ -1547,7 +1567,7 @@ public class CoreTest {
 
 		assertArityError(step("(compile)"));
 		assertArityError(step("(compile 1 2)"));
-		assertCompileError(step("(if 1)"));
+		assertArityError(step("(if 1)"));
 	}
 
 	private AVector<Syntax> ALL_PREDICATES = Vectors

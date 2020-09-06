@@ -1434,8 +1434,8 @@ public class Core {
 			@SuppressWarnings("unchecked")
 			AList<Object> form = (AList<Object>) o;
 			int n = form.size();
-			if (n < 3) return context.withCompileError("if requires at least two expressions but got: " + form);
-			if (n > 4) return context.withCompileError("if requires at most three expressions but got: " + form);
+			if (n < 3) return context.withArityError("if requires at least two expressions but got: " + form);
+			if (n > 4) return context.withArityError("if requires at most three expressions but got: " + form);
 
 			Object newForm = RT.cons(Symbols.COND, form.next());
 			context = context.consumeJuice(Juice.SIMPLE_MACRO);

@@ -219,7 +219,8 @@ public class CompilerTest {
 		// test that if macro expansion happens correctly inside other macro
 		assertEquals(3L,(long)eval("(if (if 1 nil 3) 2 3)"));
 		
-		assertCompileError(step("(if :foo)"));
+		assertArityError(step("(if :foo)"));
+		assertArityError(step("(if :foo 1 2 3 4 5)"));
 	}
 	
 	@Test
