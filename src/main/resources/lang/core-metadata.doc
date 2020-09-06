@@ -15,6 +15,14 @@
          :signature [{:params [amount]}]}
 	}
  
+  account 
+	{
+	 :doc {:description "Returns the Account record for a given addess, or nil if the account does not exist."
+         :examples [{:code "(account *address*)"}]
+         :type :function
+         :signature [{:params [address]}]}
+	}
+ 
   actor?
 	{
 	 :doc {:description "Tests if the given Address refers to an Actor. Argument must be castable to Address"

@@ -665,6 +665,22 @@ public class Core {
 			return context.withResult(juice, result);
 		}
 	});
+	
+	public static final CoreFn<AccountStatus> ACCOUNT = reg(new CoreFn<>(Symbols.ACCOUNT) {
+		@Override
+		public <I> Context<AccountStatus> invoke(Context<I> context, Object[] args) {
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+
+			Object a0 = args[0];
+			Address address = RT.address(a0);
+			if (address == null) return context.withCastError(a0, Address.class);
+
+			// return false if the argument is not an address
+			AccountStatus as = context.getAccountStatus(address);
+
+			return context.withResult(Juice.SIMPLE_FN, as);
+		}
+	});
 
 	public static final CoreFn<Long> BALANCE = reg(new CoreFn<>(Symbols.BALANCE) {
 		@Override

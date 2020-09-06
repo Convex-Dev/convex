@@ -1352,6 +1352,56 @@ public class CoreTest {
 	}
 	
 	@Test
+	public void testAccountQ() {
+		// a new Actor is an account
+		Context<Address> ctx = step("(def ctr (deploy '(fn [] :foo :bar)))");
+		assertTrue(evalB(ctx,"(account? ctr)"));
+		
+		// standard actors are accounts
+		assertTrue(evalB(ctx,"(account? *registry*)"));
+		
+		// a fake address
+		assertFalse(evalB(ctx,"(account? 0x1234567812345678123456781234567812345678123456781234567812345678)"));
+		
+		// hero address is an account
+		assertTrue(evalB(ctx,"(account? *address*)"));
+		
+		assertCastError(step("(account? :foo)"));
+		assertCastError(step("(account? nil)"));
+		assertCastError(step("(account? [])"));
+		assertCastError(step("(account? 'foo)"));
+		
+		assertArityError(step("(account?)"));
+		assertArityError(step("(account? 1 2)")); // ARITY before CAST
+	}
+	
+	@Test
+	public void testAccount() {
+		// a new Actor is an account
+		Context<Address> ctx = step("(def ctr (deploy '(fn [] :foo :bar)))");
+		AccountStatus as=eval(ctx,"(account ctr)");
+		assertNotNull(as);
+		
+		// standard actors are accounts
+		assertNotNull(eval("(account *registry*)"));
+		
+		// a fake address
+		assertNull(eval(ctx,"(account 0x1234567812345678123456781234567812345678123456781234567812345678)"));
+		
+		// hero address is an account
+		assertTrue(evalB("(= *balance* (:balance (account *address*)))"));
+		
+		// invalid addresses
+		assertCastError(step("(account nil)"));
+		assertCastError(step("(account :foo)"));
+		assertCastError(step("(account [])"));
+		assertCastError(step("(account 'foo)"));
+		
+		assertArityError(step("(account)"));
+		assertArityError(step("(account 1 2)")); // ARITY before CAST
+	}
+	
+	@Test
 	public void testSetAllowance() {
 		
 		// zero price for unchanged allowance
