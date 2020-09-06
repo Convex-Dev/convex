@@ -1000,9 +1000,9 @@ public class CoreTest {
 		assertEquals(Symbols.COUNT, eval("(symbol (name :count))"));
 		assertEquals(Symbols.COUNT, eval("(symbol (name \"count\"))"));
 
-		// too short or too long results in argument error
-		assertArgumentError(step("(symbol (str))"));
-		assertArgumentError(
+		// too short or too long results in CAST error
+		assertCastError(step("(symbol (str))"));
+		assertCastError(
 				step("(symbol \"duicgidvgefiucefiuvfeiuvefiuvgifegvfuievgiuefgviuefgviufegvieufgviuefvgevevgi\")"));
 
 		assertCastError(step("(symbol nil)"));

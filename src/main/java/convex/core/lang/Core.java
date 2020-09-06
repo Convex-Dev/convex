@@ -237,15 +237,12 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			// Check argument is valid name
-			String name = RT.name(args[0]);
-			if (name == null) return context.withCastError(args[0], Symbol.class);
-
-			// Check name converts to Symbol 
-			Symbol result = Symbol.create(name);
-			if (result == null) return context.withArgumentError("Invalid Keyword name: " + name);
+			Object symArg=args[0];
+			Symbol sym = RT.toSymbol(symArg);
+			if (sym == null) return context.withCastError(symArg, Symbol.class);
 
 			long juice = Juice.SYMBOL;
-			return context.withResult(juice, result);
+			return context.withResult(juice, sym);
 		}
 	});
 
