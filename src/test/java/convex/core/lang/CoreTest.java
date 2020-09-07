@@ -1908,6 +1908,13 @@ public class CoreTest {
 		
 		// bad function construction
 		assertCompileError(step("(defn f b)"));
+		
+	}
+	
+	@Test
+	public void testDefnMulti() {
+		assertEquals(2L,evalL("(do (defn f ([a] 1 2)) (f 3))"));
+		//TODO: more cases
 	}
 	
 	@Test
