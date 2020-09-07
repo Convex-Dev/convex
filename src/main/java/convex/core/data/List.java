@@ -358,6 +358,7 @@ public class List<T> extends AList<T> {
 
 	@Override
 	public AList<T> drop(long n) {
+		if (n==0) return this;
 		long newLen=count-n;
 		if (newLen<0) return null;
 		if (newLen==0) return Lists.empty();

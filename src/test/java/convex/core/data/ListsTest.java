@@ -2,6 +2,7 @@ package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -33,6 +34,21 @@ public class ListsTest {
 	public void testListToArray() {
 		assertEquals(3, Lists.of(1, 2, 3).toArray().length);
 		assertEquals(0, Lists.empty().toArray().length);
+	}
+	
+	@Test public void testDrop() {
+		assertSame(Lists.empty(), Lists.empty().drop(0));
+		assertNull(Lists.empty().drop(1));
+		
+		AList<Long> ll=Lists.of(1L, 2L, 3L);
+		
+		assertSame(ll,ll.drop(0));
+		assertSame(Lists.empty(),ll.drop(3));
+		
+		assertEquals(Lists.of(2L,3L),ll.drop(1));
+		assertEquals(Lists.of(3L),ll.drop(2));
+		
+		assertEquals(Lists.of(299),Samples.INT_LIST_300.drop(299));
 	}
 	
 	@Test
