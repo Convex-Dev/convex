@@ -48,6 +48,13 @@ public abstract class AList<T> extends ASequence<T> {
 
 	@Override
 	public abstract AList<T> assoc(long i, T value);
+
+	/**
+	 * Drops elements from the front of the list
+	 * @param n Number of elements to drop
+	 * @return List with n elements removed, or null if not possible
+	 */
+	public abstract AList<T> drop(long n);
 	
 	
 

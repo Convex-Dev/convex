@@ -450,7 +450,11 @@ public class Compiler {
 		Object paramsObject = list.get(1).getValue();
 		if (!(paramsObject instanceof AVector)) return context.withError(ErrorCodes.CAST,
 				"fn requires a vector of parameters as first argument but got form: " + list);
-		context = context.compileAll(list.subVector(2, n - 2));
+		
+		AVector<Syntax> paramsVector=(AVector<Syntax>) paramsObject;
+		AList<Syntax> bodyList=list.drop(2); 
+		
+		context = context.compileAll(bodyList);
 		if (context.isExceptional()) return (Context<T>) context;
 
 		AOp<T> body;
@@ -465,7 +469,7 @@ public class Compiler {
 			body = Do.create(((ASequence<AOp<?>>) context.getResult()));
 		}
 
-		Lambda<T> op = Lambda.create((AVector<Syntax>) paramsObject, body);
+		Lambda<T> op = Lambda.create(paramsVector, body);
 		return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
 	}
 

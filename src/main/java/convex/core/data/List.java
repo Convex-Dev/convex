@@ -355,4 +355,12 @@ public class List<T> extends AList<T> {
 	public void forEach(Consumer<? super T> action) {
 		data.forEach(action);
 	}
+
+	@Override
+	public AList<T> drop(long n) {
+		long newLen=count-n;
+		if (newLen<0) return null;
+		if (newLen==0) return Lists.empty();
+		return new List<T>(data.subVector(0, newLen));
+	}
 }
