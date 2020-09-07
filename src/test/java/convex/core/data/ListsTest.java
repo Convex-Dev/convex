@@ -47,8 +47,10 @@ public class ListsTest {
 		
 		assertEquals(Lists.of(2L,3L),ll.drop(1));
 		assertEquals(Lists.of(3L),ll.drop(2));
+		assertNull(ll.drop(5));
 		
 		assertEquals(Lists.of(299),Samples.INT_LIST_300.drop(299));
+		assertNull(Samples.INT_LIST_300.drop(400));
 	}
 	
 	@Test

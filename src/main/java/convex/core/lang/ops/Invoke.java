@@ -62,10 +62,6 @@ public class Invoke<T> extends AMultiOp<T> {
 		return recreate(newOps);
 	}
 
-	public static <T> Invoke<T> create(String string, ASequence<AOp<?>> args) {
-		return create(Lookup.create(string), args);
-	}
-
 	public static <T> Invoke<T> create(String string, AOp<?>... args) {
 		return create(Lookup.create(string), Vectors.create(args));
 	}

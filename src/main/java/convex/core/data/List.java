@@ -271,7 +271,7 @@ public class List<T> extends AList<T> {
 	}
 
 	/**
-	 * Prepends an element to the list in first position
+	 * Prepends an element to the list in first position.
 	 * 
 	 * @param value
 	 * @return Updated list
@@ -280,6 +280,12 @@ public class List<T> extends AList<T> {
 	public <R> List<R> conj(R value) {
 		return new List<R>((AVector<R>) data.conj(value));
 	}
+	
+	@Override
+	public AList<T> cons(T x) {
+		return new List<T>((AVector<T>) data.conj(x));
+	}
+
 
 	@SuppressWarnings("unchecked")
 	@Override
@@ -301,12 +307,8 @@ public class List<T> extends AList<T> {
 	}
 
 	@Override
-	public AList<T> cons(T x) {
-		return conj(x);
-	}
-
-	@Override
 	public <R> AList<R> map(Function<? super T, ? extends R> mapper) {
+		// TODO: reverse map order?
 		return new List<>(data.map(mapper));
 	}
 

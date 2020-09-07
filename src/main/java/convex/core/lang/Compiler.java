@@ -447,13 +447,47 @@ public class Compiler {
 		int n = list.size();
 		if (n < 2) return context.withArityError("fn requires parameter vector and body in form: " + list);
 
-		Object paramsObject = list.get(1).getValue();
-		if (!(paramsObject instanceof AVector)) return context.withError(ErrorCodes.CAST,
-				"fn requires a vector of parameters as first argument but got form: " + list);
+		// check if we have a vector, in which case we have a single function definition
+		Object firstObject = list.get(1).getValue();
+		if (firstObject instanceof AVector) {
+			AVector<Syntax> paramsVector=(AVector<Syntax>) firstObject;
+			AList<Syntax> bodyList=list.drop(2); 
+			return compileFnInstance(paramsVector,bodyList,context);
+		}
 		
-		AVector<Syntax> paramsVector=(AVector<Syntax>) paramsObject;
-		AList<Syntax> bodyList=list.drop(2); 
-		return compileFnInstance(paramsVector,bodyList,context);
+		//if we have a list, interpret as first instance
+		if (firstObject instanceof AList) {
+			if (n>2) return context.withError(ErrorCodes.TODO,"Support for multiple function instances not yet implemented");
+			return compileFnInstance((AList<Syntax>) firstObject,context);
+		}
+			
+		return context.withError(ErrorCodes.COMPILE,
+				"fn requires a vector of parameters or sequence of instances but got form: " + list);
+	}
+	
+	/**
+	 * Compiles a function instance function form "([...] ...)" to create a Lambda op.
+	 * 
+	 * @param <R> 
+	 * @param <T>
+	 * @param list
+	 * @param context
+	 * @return Context with compiled op as result.
+	 */
+	@SuppressWarnings("unchecked")
+	private static <R, T extends AOp<R>> Context<T> compileFnInstance(AList<Syntax> list, Context<?> context) {
+		int n = list.size();
+		if (n < 1) return context.withArityError("fn requires parameter vector and body in form: " + list);
+
+		Object firstObject = list.get(0).getValue();
+		if (firstObject instanceof AVector) {
+			AVector<Syntax> paramsVector=(AVector<Syntax>) firstObject;
+			AList<Syntax> bodyList=list.drop(1); 
+			return compileFnInstance(paramsVector,bodyList,context);
+		}
+			
+		return context.withError(ErrorCodes.COMPILE,
+				"fn instance requires a vector of parameters but got form: " + list);
 	}
 		
 	@SuppressWarnings("unchecked")

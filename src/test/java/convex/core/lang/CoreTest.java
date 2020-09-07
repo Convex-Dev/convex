@@ -1820,6 +1820,20 @@ public class CoreTest {
 		assertFalse(evalB("(zero? :foo)"));
 		assertFalse(evalB("(zero? [1 2])"));
 	}
+	
+	@Test
+	public void testFn() {
+		assertEquals(1L,evalL("((fn [] 1))"));
+		assertEquals(2L,evalL("((fn [x] 2) 1)"));
+		// TODO: more cases!
+	}
+	
+	@Test
+	public void testFnMulti() {
+		assertEquals(1L,evalL("((fn ([] 1)))"));
+		assertEquals(2L,evalL("((fn ([x] 2)) 1)"));
+		// TODO: more cases!
+	}
 
 	@Test
 	public void testFnPred() {
@@ -1893,7 +1907,7 @@ public class CoreTest {
 		assertArityError(step("(defn f)"));
 		
 		// bad function construction
-		assertCastError(step("(defn f b)"));
+		assertCompileError(step("(defn f b)"));
 	}
 	
 	@Test

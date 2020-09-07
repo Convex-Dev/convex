@@ -147,5 +147,10 @@ public class ErrorCodes {
 	/**
 	 * Exceptional Condition indicating a bad signature on a transaction.
 	 */
-	public static final Object SIGNATURE = Keyword.create("SIGNATURE");
+	public static final Keyword SIGNATURE = Keyword.create("SIGNATURE");
+
+	/**
+	 * Exceptional Condition indicating something is not yet implemented
+	 */
+	public static final Keyword TODO = Keyword.create("TODO");
 }
