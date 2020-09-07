@@ -453,19 +453,24 @@ public class Compiler {
 		
 		AVector<Syntax> paramsVector=(AVector<Syntax>) paramsObject;
 		AList<Syntax> bodyList=list.drop(2); 
+		return compileFnInstance(paramsVector,bodyList,context);
+	}
 		
+	@SuppressWarnings("unchecked")
+	private static <R, T extends AOp<R>> Context<T> compileFnInstance(AVector<Syntax> paramsVector, AList<Syntax> bodyList,Context<?> context) {
 		context = context.compileAll(bodyList);
 		if (context.isExceptional()) return (Context<T>) context;
 
+		int n=bodyList.size();
 		AOp<T> body;
-		if (n == 2) {
+		if (n == 0) {
 			// no body, so function just returns nil
 			body = Constant.nil();
-		} else if (n == 3) {
-			// one body element
+		} else if (n == 1) {
+			// one body element, so just unwrap from list
 			body = ((ASequence<AOp<T>>) context.getResult()).get(0);
 		} else {
-			// wrap in implicit do
+			// wrap multiple expressions in implicit do
 			body = Do.create(((ASequence<AOp<?>>) context.getResult()));
 		}
 
