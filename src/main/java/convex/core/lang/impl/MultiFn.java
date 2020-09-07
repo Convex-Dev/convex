@@ -92,6 +92,7 @@ public class MultiFn<T> extends AFn<T> {
 	
 	public static <T> MultiFn<T> read(ByteBuffer bb) throws BadFormatException, BufferUnderflowException {
 		AVector<Fn<T>> fns=Format.read(bb);
+		if (fns==null) throw new BadFormatException("Null fns!");
 		return new MultiFn<T>(fns);
 	}
 
