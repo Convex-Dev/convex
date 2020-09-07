@@ -17,6 +17,7 @@ import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.impl.Fn;
 import convex.core.lang.ops.Cond;
 import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Def;

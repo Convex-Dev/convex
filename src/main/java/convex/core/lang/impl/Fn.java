@@ -1,4 +1,4 @@
-package convex.core.lang;
+package convex.core.lang.impl;
 
 import java.nio.ByteBuffer;
 
@@ -12,9 +12,9 @@ import convex.core.data.Syntax;
 import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.impl.AExceptional;
-import convex.core.lang.impl.RecurValue;
-import convex.core.lang.impl.ReturnValue;
+import convex.core.lang.AFn;
+import convex.core.lang.AOp;
+import convex.core.lang.Context;
 
 /**
  * Value class representing a instantiated closure / lambda function.

@@ -13,9 +13,9 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
-import convex.core.lang.Fn;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
+import convex.core.lang.impl.Fn;
 import convex.core.util.Errors;
 
 /**
