@@ -76,11 +76,13 @@ public class Tag {
 	public static final byte CORE_DEF = (byte) 0xCD;
 	public static final byte EXPANDER = (byte) 0xCE;
 	public static final byte FN = (byte) 0xCF;
-
+	public static final byte FN_MULTI = (byte) 0xCB;
+	
 	// transaction types
 	public static final byte INVOKE = (byte) 0xD0;
 	public static final byte TRANSFER = (byte) 0xD1;
 	public static final byte CALL = (byte) 0xD2;
+
 	
 
 }

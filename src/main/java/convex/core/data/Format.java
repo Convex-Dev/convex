@@ -22,6 +22,7 @@ import convex.core.lang.Core;
 import convex.core.lang.Ops;
 import convex.core.lang.expanders.Expander;
 import convex.core.lang.impl.Fn;
+import convex.core.lang.impl.MultiFn;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Call;
 import convex.core.transactions.Invoke;
@@ -524,6 +525,11 @@ public class Format {
 			Syntax o = Core.CORE_NAMESPACE.get(sym);
 			if (o == null) throw new BadFormatException("Core definition not found [" + sym + "]");
 			return o.getValue();
+		}
+		
+		if (tag == Tag.FN_MULTI) {
+			AFn<?> fn = MultiFn.read(bb);
+			return fn;
 		}
 
 		if (tag == Tag.FN) {

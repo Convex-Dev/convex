@@ -26,6 +26,8 @@ import convex.core.data.Vectors;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.expanders.AExpander;
 import convex.core.lang.expanders.CoreExpander;
+import convex.core.lang.impl.Fn;
+import convex.core.lang.impl.MultiFn;
 import convex.core.lang.ops.Cond;
 import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Def;
@@ -455,14 +457,31 @@ public class Compiler {
 			return compileFnInstance(paramsVector,bodyList,context);
 		}
 		
-		//if we have a list, interpret as first instance
-		if (firstObject instanceof AList) {
-			if (n>2) return context.withError(ErrorCodes.TODO,"Support for multiple function instances not yet implemented");
-			return compileFnInstance((AList<Syntax>) firstObject,context);
+		return compileMultiFn(list.drop(1),context);
+	}
+	
+	@SuppressWarnings({ "unchecked", "unused" })
+	private static <R, T extends AOp<R>> Context<T> compileMultiFn(AList<Syntax> list, Context<?> context) {
+		AVector<Fn<R>> fns=Vectors.empty();
+		
+		int num=list.size();
+		for (int i=0; i<num; i++) {
+			Object o=list.get(i).getValue();
+			if (!(o instanceof AList)) {
+				return context.withError(ErrorCodes.COMPILE,"multi-function requires instances of form: ([args] ...)");
+			}
+			
+			context= compileFnInstance((AList<Syntax>) o,context);
+			if (context.isExceptional()) return (Context<T>) context;
+			// TODO: not handling next iteration yet
+			return (Context<T>) context;
+			//Fn<R> compiledFn=(Fn<R>) context.getResult();
+			//fns=fns.conj(compiledFn);
 		}
 			
-		return context.withError(ErrorCodes.COMPILE,
-				"fn requires a vector of parameters or sequence of instances but got form: " + list);
+		MultiFn<R> mf=MultiFn.create(fns);
+		throw new TODOException();
+		// return context.withResult(Juice.COMPILE_NODE,mf);
 	}
 	
 	/**
