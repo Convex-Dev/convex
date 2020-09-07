@@ -2,11 +2,9 @@ package convex.core.lang.impl;
 
 import java.nio.ByteBuffer;
 
-import convex.core.data.AVector;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
-import convex.core.data.Syntax;
 import convex.core.data.Tag;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AFn;
@@ -22,19 +20,17 @@ import convex.core.lang.Context;
 public abstract class CoreFn<T> extends AFn<T> implements ICoreDef {
 
 	private Symbol symbol;
+	private int arity;
+	private boolean variadic;
 
 	protected CoreFn(Symbol symbol) {
 		this.symbol = symbol;
+		this.arity=0;
+		this.variadic=true;
 	}
 
 	@Override
 	public abstract <I> Context<T> invoke(Context<I> context, Object[] args);
-
-	// TODO: proper param names for core functions
-	@Override
-	public AVector<Syntax> getParams() {
-		return null;
-	}
 
 	public Symbol getSymbol() {
 		return symbol;
@@ -63,6 +59,13 @@ public abstract class CoreFn<T> extends AFn<T> implements ICoreDef {
 
 	protected String exactArityMessage(int arity, int actual) {
 		return name() + " requires arity " + arity + " but called with: " + actual;
+	}
+	
+	@Override
+	public boolean hasArity(int n) {
+		if (n==arity) return true;
+		if (n<arity) return false;
+		return variadic;
 	}
 
 	@Override
@@ -115,8 +118,8 @@ public abstract class CoreFn<T> extends AFn<T> implements ICoreDef {
 	
 	@Override
 	protected boolean isEmbedded() {
-		// TODO: Maybe embed core functions, since they are the same encoding size as a single Symbol
-		return false;
+		// embed core functions, since they are the same size as small symbols
+		return true;
 	}
 
 }

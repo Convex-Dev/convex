@@ -1,9 +1,7 @@
 package convex.core.lang;
 
 import convex.core.data.ACell;
-import convex.core.data.AVector;
 import convex.core.data.IRefFunction;
-import convex.core.data.Syntax;
 
 /**
  * Base class for functions expressed as values
@@ -14,15 +12,18 @@ import convex.core.data.Syntax;
  * @param <T> Return type of functions.
  */
 public abstract class AFn<T> extends ACell implements IFn<T> {
-
-	/**
-	 * Returns the declared param names for a function, or null if not available.
-	 * 
-	 * @return A binding vector describing the parameters for this function
-	 */
-	public abstract AVector<Syntax> getParams();
+	
+	@Override
+	public abstract <I> Context<T> invoke(Context<I> context, Object[] args);
 	
 	@Override
 	public abstract AFn<T> updateRefs(IRefFunction func);
 
+	/**
+	 * Tests if this function supports the given arity.
+	 */
+	public boolean hasArity(int n) {
+		// TODO: make this more specific for subclasses
+		return true;
+	}
 }

@@ -25,7 +25,7 @@ import convex.core.data.Lists;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
-import convex.core.lang.AFn;
+import convex.core.lang.Fn;
 import convex.core.lang.IFn;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
@@ -77,7 +77,7 @@ public class SmartOpComponent extends BaseListComponent {
 		IFn<Object> fn = (IFn<Object>) as.getActorFunction(sym);
 
 		// Function might be a map or set
-		AVector<Syntax> params = (fn instanceof AFn) ? ((AFn<?>) fn).getParams()
+		AVector<Syntax> params = (fn instanceof Fn) ? ((Fn<?>) fn).getParams()
 				: Vectors.of(Syntax.create(Symbols.FOO));
 		paramCount = params.size();
 

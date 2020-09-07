@@ -52,6 +52,9 @@ public class Fn<T> extends AFn<T> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <I> Context<T> invoke(Context<I> context, Object[] args) {
+		int n=args.length;
+		if (!hasArity(n)) return context.withArityError("Function arity not supported: "+args);
+		
 		// update local bindings for the duration of this function call
 		final AHashMap<Symbol, Object> savedBindings = context.getLocalBindings();
 		int initialDepth = context.getDepth();
@@ -144,6 +147,11 @@ public class Fn<T> extends AFn<T> {
 	@Override
 	public void print(StringBuilder sb) {
 		sb.append("(fn ");
+		printParamBody(sb);
+		sb.append(')');
+	}
+	
+	public void printParamBody(StringBuilder sb) {
 		params.print(sb);
 		sb.append(' ');
 		body.print(sb);
@@ -162,7 +170,11 @@ public class Fn<T> extends AFn<T> {
 		return false;
 	}
 
-	@Override
+	/**
+	 * Returns the declared param names for a function.
+	 * 
+	 * @return A binding vector describing the parameters for this function
+	 */
 	public AVector<Syntax> getParams() {
 		return params;
 	}
