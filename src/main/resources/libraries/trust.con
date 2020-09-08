@@ -64,7 +64,7 @@
 	  }
     [config]
     (let [blacklist (reduce (fn [w x] (conj w (address x))) #{} (or (:blacklist config) [*address*]))  
-          controller (or (:controller config)  *address*)]
+          controller (address (or (:controller config)  *address*))]
       '(do
          (import ~trust :as trust)
          
@@ -72,7 +72,7 @@
          (def blacklist ~blacklist)
          
          ;; controller determines who can modify the blacklist
-         (def controller ~(address controller))
+         (def controller ~controller)
        
          (defn check-trusted? [subject action object]
            (not (contains-key? blacklist (address subject))))
@@ -83,6 +83,25 @@
              (fail :TRUST "No access to blacklist!")))
        
          (export check-trusted? set-trusted)))) 
-  
+    
+    (defn add-trusted-upgrade
+      ^{:doc {:description "Creates deployable code for an Actor upgradable by a ':root' User or Trust Monitor. A root-authorised user can 'eval' code in the Actor's environment using '(call actor (upgrade code-to-eval))'. If not specified, the generator of the code (*address*) will be the initial root user. SECURITY: A user or actor with root access can do *anything* to this actor. Do not hand out such access unwisely."
+         :examples [{:code "(deploy (add-trusted-upgrade {:root *address*}))"}]
+         :type :function
+         :signature [{:params [config]}]}
+	    }
+      [config]
+      (let [root (address (or (:controller config)  *address*))]
+        '(do
+           (import ~trust :as trust)
+           
+           (def upgradable-root ~root)
+           
+           (defn upgrade [code]
+             (if (trust/trusted? upgradable-root *caller*)
+               (eval code)
+               (fail :TRUST "No root access to upgrade capability!")))
+             
+           (export upgrade))))
   
   )

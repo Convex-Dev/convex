@@ -68,6 +68,24 @@ public class TestTrust {
 		assertFalse(evalB(ctx,"(trust/trusted? *address* (address 0x1234567812345678123456781234567812345678123456781234567812345678))"));
 	}
 	
+	@Test public void testUpgradeWhitelist() {
+		// check our alias is right
+		Context<?> ctx=TestTrust.ctx;
+
+		// deploy a whitelist with default config and upgradable capability
+		ctx=step(ctx,"(def wlist (deploy [(trust/build-whitelist nil) (trust/add-trusted-upgrade nil)]))");
+		Address wl=(Address) ctx.getResult();
+		assertNotNull(wl);
+		
+		assertTrue(evalB(ctx,"(trust/trusted? wlist *address*)"));
+		
+		// do an upgrade that blanks the witelist
+		ctx=step(ctx,"(call wlist (upgrade '(do (def whitelist #{}))))");
+		
+		// check that our edit has updated actor
+		assertFalse(evalB(ctx,"(trust/trusted? wlist *address*)"));
+	}
+	
 	@Test public void testWhitelist() {
 		// check our alias is right
 		Context<?> ctx=TestTrust.ctx;
