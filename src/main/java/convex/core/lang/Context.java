@@ -1564,6 +1564,16 @@ public final class Context<T> implements IObject {
 	protected <R> Context<R> withAccountStatus(Address target, AccountStatus accountStatus) {
 		return withState(getState().putAccount(target, accountStatus));
 	}
+	
+	/**
+	 * Switches the context to a new address, creating a new execution context. Suitable for testing.
+	 * @param <R>
+	 * @param newAddress New Address to use.
+	 * @return
+	 */
+	public <R> Context<R> switchAddress(Address newAddress) {
+		return createFake(getState(),newAddress);
+	}
 
 
 

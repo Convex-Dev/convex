@@ -1,7 +1,8 @@
 (do
   ;; Trust library 
   ;;
-  ;; This library is based on the Reference Monitor security model.
+  ;; This library is based on the Reference Monitor security model. The library works with 'Trust Monitors', which are 
+  ;; a design pattern of for reference monitors on the Convex platform.
   ;;
   ;; deploy with: (deploy-once trust-code)
   ;; 
@@ -16,16 +17,16 @@
   (def trust *address*)
   
   (defn trusted? 
-    ^{:doc {:description "Tests if a given subject is trusted by the specified trust-store. Returns true or false. If trust-store is a user address rather than an actor, it is defined to trust only itself."
+    ^{:doc {:description "Tests if a given subject is trusted by the specified trust monitor. Returns true or false. If trust-store is a user address rather than an actor, it is defined to trust only itself."
          :examples [{:code "(trusted? my-trusted-store *caller*)"}]
          :type :function
          :signature [{:params [trust-store subject]}]}
 	  }
-    [trust-store subject]
-    (let [trust-store (address trust-store)] 
-      (if (actor? trust-store) 
-        (call trust-store (check-trusted? subject nil nil))
-        (= trust-store subject)))) 
+    [trust-monitor subject]
+    (let [trust-monitor (address trust-monitor)] 
+      (if (actor? trust-monitor) 
+        (call trust-monitor (check-trusted? subject nil nil))
+        (= trust-monitor subject)))) 
   
   (defn build-whitelist
     ^{:doc {:description "Creates deployable code for a new whitelist. An optional config may be provided, where ':controller' is the user or trust monitor that has the ability to modify the whitelist, and ':whitelist' is a collection of addresses to put on the initial whitelist."
@@ -51,7 +52,35 @@
          (defn set-trusted [subject allow?]
            (if (trust/trusted? controller *caller*)
              (def whitelist ((if allow? conj disj) whitelist (address subject)))
-             (fail :SECURITY "No access to whitelist!")))
+             (fail :TRUST "No access to whitelist!")))
+       
+         (export check-trusted? set-trusted)))) 
+  
+    (defn build-blacklist
+    ^{:doc {:description "Creates deployable code for a new blacklist. An optional config may be provided, where ':controller' is the user or trust monitor that has the ability to modify the blacklist, and ':blacklist' is a collection of addresses to put on the initial blacklist."
+         :examples [{:code "(deploy (build-blacklist {:controller *address* :blacklist [my-foe-1 my-foe-2]}))"}]
+         :type :function
+         :signature [{:params [config]}]}
+	  }
+    [config]
+    (let [blacklist (reduce (fn [w x] (conj w (address x))) #{} (or (:blacklist config) [*address*]))  
+          controller (or (:controller config)  *address*)]
+      '(do
+         (import ~trust :as trust)
+         
+         ;; a blacklist of subjects that will be denied
+         (def blacklist ~blacklist)
+         
+         ;; controller determines who can modify the blacklist
+         (def controller ~(address controller))
+       
+         (defn check-trusted? [subject action object]
+           (not (contains-key? blacklist (address subject))))
+         
+         (defn set-trusted [subject allow?]
+           (if (trust/trusted? controller *caller*)
+             (def blacklist ((if allow? disj conj) blacklist (address subject)))
+             (fail :TRUST "No access to blacklist!")))
        
          (export check-trusted? set-trusted)))) 
   

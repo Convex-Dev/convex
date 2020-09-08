@@ -86,7 +86,7 @@ public class TestTrust {
 		assertCastError(step(ctx,"(trust/trusted? nil *address*)"));
 		assertCastError(step(ctx,"(trust/trusted? [] *address*)"));
 		
-		{
+		{ // check adding and removing to whitelist
 			Address a1=Samples.BAD_ADDRESS;
 			Context<?> c=ctx;
 			
@@ -103,6 +103,76 @@ public class TestTrust {
 			assertNotError(c);
 			assertFalse(evalB(c,"(trust/trusted? wlist "+a1+")"));
 		}
+		
+		{ // check the villain is excluded
+			Address a1=VILLAIN;;
+			Address a2=HERO;;
+			Context<?> c=ctx.switchAddress(a1);
+			c=step(c,"(do (import "+trusted+" :as trust) (def wlist (address "+wl+")))");
+			assertNotError(c);
+			
+			// villain can still check monitor
+			assertFalse(evalB(c,"(trust/trusted? wlist "+a1+")"));
+			assertTrue(evalB(c,"(trust/trusted? wlist "+a2+")"));
+			
+			// villain can't change whitelist
+			assertTrustError(step (c,"(call wlist (set-trusted "+a1+" true))"));
+			assertTrustError(step (c,"(call wlist (set-trusted "+a2+" false))"));
+		}
+	}
+	
+	@Test public void testBlacklist() {
+		Context<?> ctx=TestTrust.ctx;
 
+		// deploy a blacklist with default config
+		ctx=step(ctx,"(def blist (deploy (trust/build-blacklist {:blacklist ["+VILLAIN+"]})))");
+		Address wl=(Address) ctx.getResult();
+		assertNotNull(wl);
+		
+		// initial creator should not be on blacklist
+		assertTrue(evalB(ctx,"(trust/trusted? blist *address*)"));
+		
+		// our villain should be on the blacklist
+		assertFalse(evalB(ctx,"(trust/trusted? blist "+VILLAIN+")"));
+		
+		assertCastError(step(ctx,"(trust/trusted? blist nil)"));
+		assertCastError(step(ctx,"(trust/trusted? blist [])"));
+		
+		assertCastError(step(ctx,"(trust/trusted? nil *address*)"));
+		assertCastError(step(ctx,"(trust/trusted? [] *address*)"));
+		
+		{ // check adding and removing to blacklist
+			Address a1=Samples.BAD_ADDRESS;
+			Context<?> c=ctx;
+			
+			// Check not initially on blacklist
+			assertTrue(evalB(c,"(trust/trusted? blist "+a1+")"));
+	
+			// Add address to blacklist, shouldn't matter if it exists or not
+			c=step (c,"(call blist (set-trusted "+a1+" false))");
+			assertNotError(c);
+			assertFalse(evalB(c,"(trust/trusted? blist "+a1+")"));
+
+			// Check removal from blacklist
+			c=step (c,"(call blist (set-trusted "+a1+" true))");
+			assertNotError(c);
+			assertTrue(evalB(c,"(trust/trusted? blist "+a1+")"));
+		}
+		
+		{ // check the villain is excluded
+			Address a1=VILLAIN;;
+			Address a2=HERO;;
+			Context<?> c=ctx.switchAddress(a1);
+			c=step(c,"(do (import "+trusted+" :as trust) (def blist (address "+wl+")))");
+			assertNotError(c);
+			
+			// villain can still check monitor
+			assertFalse(evalB(c,"(trust/trusted? blist "+a1+")"));
+			assertTrue(evalB(c,"(trust/trusted? blist "+a2+")"));
+			
+			// villain can't change whitelist
+			assertTrustError(step (c,"(call blist (set-trusted "+a1+" true))"));
+			assertTrustError(step (c,"(call blist (set-trusted "+a2+" false))"));
+		}
 	}
 }
