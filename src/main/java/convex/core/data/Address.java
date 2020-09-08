@@ -164,7 +164,7 @@ public class Address extends AArrayBlob {
 	 *         Address
 	 */
 	public String toChecksumHex() {
-		StringBuilder sb = new StringBuilder();
+		StringBuilder sb = new StringBuilder(64);
 		Hash h = this.getContentHash();
 		for (int i = 0; i < LENGTH * 2; i++) {
 			int dh = h.getHexDigit(i);
