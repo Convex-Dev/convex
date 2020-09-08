@@ -10,7 +10,7 @@
 		<maven.compiler.target>11</maven.compiler.target>
 		<maven.compiler.source>11</maven.compiler.source>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<jmh.version>1.23</jmh.version>
+		<jmh.version>1.25.2</jmh.version>
 		<slf4j.version>1.7.30</slf4j.version>
 
 		<!--Freeze this for reproducible builds. -->
@@ -109,7 +109,7 @@
 		<dependency>
 			<groupId>org.bouncycastle</groupId>
 			<artifactId>bcprov-jdk15on</artifactId>
-			<version>1.65.01</version>
+			<version>1.66</version>
 		</dependency>
 		<dependency>
 			<groupId>org.parboiled</groupId>
