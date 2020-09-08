@@ -37,7 +37,7 @@ Here are some examples:
 
 ## What we need to deliver
 
-To realise our vision, the Convex Foundation and core team needs to build:
+To realise our vision, the Convex Foundation and core team are building:
 
 * **Global Database**: A consistent, replicated database capable of tracking all assets in circulation, and public information required to facilitate transactions. This must be scalable enough to handle global transactions (i.e. VISA-like transaction volumes)
 * **Utility coin**: The Convex coin is required to pay transaction costs to use the network. It serves as the native cryptocurrency on the platform, and for may be used for other platform facilities such as staking. Like Bitcoin, it has a *limited supply* guaranteed by the protocol.
@@ -46,7 +46,25 @@ To realise our vision, the Convex Foundation and core team needs to build:
 * **Consensus Algorithm**: An algorithm is required to ensure verifiable consensus across the network, so that ownership of assets / execution of contracts can be uniquely and reliably determined (avoiding the infamous "double spend" problem)
 * **Autonomous Actors**: Self-operating, unstoppable economic agents executing on the network can automatically fulfil important roles in the digital economy, perhaps even operating as virtual companies in their own right.
 * **Public Utility Network** A decentralised, public, permissionless network that anyone can access to transact without censorship or centralised gatekeepers.
-* **Good Governance**: Mechanisms that ensure the platform is governed effectively and efficiently now and in the future, in the joint interests of all builders, users and coin holders.
+
+As of now, we are able to demonstrate working examples of all the above. After a period of public development and refinement, this will transition rapidly towards the launch of the main production network.
+
+## Good Governance
+
+It is not sufficient to simply deliver technology.
+
+We require mechanisms that ensure the platform is **governed effectively and efficiently** now and in the future, in the joint interests of all builders, users and coin holders. We are ultimately trying to build a shared public utility that everyone can use.
+
+To achieve this, we are establishing the **Convex Foundation**, an organisation that will be responsible for building, delivering and managing the Convex public network. 
+
+We do **not allow forks** in the Convex network. Some people seem to think that forks are good things for decentralised systems, but we disagree strongly. This is for the following reasons:
+
+- Forks are harmful to users in the ecosystem - they create uncertainty over asset holdings, and which fork to build upon 
+- From an economic perspective, forks destroy value by subdividing the market and making cross-fork transactions more difficult
+- Forks create unnecessary political problems, which are a distraction and risk to people involved in the ecosystem
+- Technical improvements can and should be evaluated on their merits and rolled out responsibly
+
+Initially the Foundation will be managed by the founding team. As soon as practical this will be converted to decentralised governance, jointly owned by participants in the broader ecosystem. We will consider "on-chain" governance mechanisms, but it is important to note that such solutions are currently immature and unproven and there will always need to be some real world execution that requires off-chain governance.
 
 ## Principles
 
@@ -54,7 +72,7 @@ We shall design and build Convex according to the following principles:
 
 * **Self-Sovereignty** - Individuals should have ownership and control of their own digital identity and assets
 * **Neutrality** - The Convex platform and governance shall be totally neutral to all users, and will never censor legitimate transactions.
-* **Decentralisation** - We will deliver complete decentralisation of Convex, both as a technical platform and in terms of long term governance of the Foundation
+* **Decentralisation** - Our aim is to be fully decentralised, both as a technical platform and in terms of long term governance of the Foundation
 * **Sustainability** - We will ensure that all Convex technology is efficient and environmentally sustainable, and in particular does not create an incentive to waste energy or computational resources (e.g. Proof of Work)  
 * **Simplicity** - Our technology and user experience must be simple, in the sense that it is based on foundational concepts and building blocks that a robust and reusable
 * **Unbreaking** - We shall strive to achieve zero breaking changes or forks in the production network. The only such changes that will be allowed are to fix systematic threats to network security or governance.
