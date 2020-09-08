@@ -5,7 +5,6 @@ import java.util.Map;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AHashMap;
 import convex.core.data.AVector;
-import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -16,7 +15,6 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.transactions.ATransaction;
-import convex.core.transactions.Invoke;
 
 /**
  * <p>
@@ -127,14 +125,13 @@ public class Peer {
 
 		ctx = Context.createInitial(state, origin, Constants.MAX_TRANSACTION_JUICE);
 
-		AccountStatus as=state.getAccount(origin);
-		long nonce=(as!=null)?as.getSequence()+1:0;
 		Context<AOp<T>> ectx = ctx.expandCompile(form);
 		if (ectx.isExceptional()) {
 			return (Context<T>) ectx;
 		}
+		
 		AOp<T> op = ectx.getResult();
-		Context<T> rctx = executeQuery(origin,Invoke.create(nonce, op));
+		Context<T> rctx = ctx.execute(op);
 		return rctx;
 	}
 	
@@ -146,7 +143,7 @@ public class Peer {
 	 * @param transaction Transaction to execute
 	 * @returnThe Context containing the query results.
 	 */
-	public <T> Context<T> executeQuery(Address origin, ATransaction transaction) {
+	public <T> Context<T> executeDryRun(Address origin, ATransaction transaction) {
 		Context<T> ctx=getConsensusState().applyTransaction(origin,transaction);
 		return ctx;
 	}
