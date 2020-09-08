@@ -12,7 +12,7 @@ import javax.swing.ListModel;
 import convex.core.State;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.Address;
-import convex.core.data.Amount;
+import convex.core.util.Text;
 import convex.gui.manager.PeerManager;
 import convex.gui.manager.mainpanels.WalletPanel;
 
@@ -87,8 +87,8 @@ public class AccountChooserPanel extends JPanel {
 		if ((s == null) || (a == null)) {
 			balanceLabel.setText("Balance: <not available>");
 		} else {
-			Amount amt = s.getBalance(a);
-			balanceLabel.setText("Balance: " + amt.toFriendlyString());
+			long amt= s.getBalance(a);
+			balanceLabel.setText("Balance: " + Text.toFriendlyBalance(amt));
 		}
 	}
 

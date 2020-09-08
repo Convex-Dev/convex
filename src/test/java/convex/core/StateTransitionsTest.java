@@ -52,9 +52,9 @@ public class StateTransitionsTest {
 		State s = State.EMPTY.withAccounts(accounts); // don't need any peers for these tests
 		assertEquals(Amount.MAX_AMOUNT, s.computeTotalFunds());
 
-		assertEquals(Amount.create(10000), s.getBalance(ADDRESS_A));
-		assertEquals(Amount.create(1000), s.getBalance(ADDRESS_B));
-		assertEquals(Amount.create(0), s.getBalance(ADDRESS_C));
+		assertEquals(10000, s.getBalance(ADDRESS_A));
+		assertEquals(1000, s.getBalance(ADDRESS_B));
+		assertNull(s.getBalance(ADDRESS_C));
 
 		long TCOST = Juice.TRANSFER * s.getJuicePrice();
 
@@ -68,8 +68,8 @@ public class StateTransitionsTest {
 			assertEquals(1, results.count());
 			assertNull(br.getError(0)); // should be null for successful transfer transaction
 			State s2 = br.getState();
-			assertEquals(Amount.create(9950 - TCOST), s2.getBalance(ADDRESS_A));
-			assertEquals(Amount.create(1050), s2.getBalance(ADDRESS_B));
+			assertEquals(9950 - TCOST, s2.getBalance(ADDRESS_A));
+			assertEquals(1050, s2.getBalance(ADDRESS_B));
 			assertEquals(nowTS, s2.getTimeStamp());
 		}
 
@@ -78,8 +78,8 @@ public class StateTransitionsTest {
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
 			State s2 = s.applyBlock(b).getState();
-			assertEquals(Amount.create(9950 - TCOST), s2.getBalance(ADDRESS_A));
-			assertEquals(Amount.create(50), s2.getBalance(ADDRESS_C));
+			assertEquals(9950 - TCOST, s2.getBalance(ADDRESS_A));
+			assertEquals(50, s2.getBalance(ADDRESS_C));
 		}
 
 		{ // two transfers in sequence, both from A -> C
@@ -91,9 +91,9 @@ public class StateTransitionsTest {
 
 			BlockResult br = s.applyBlock(b);
 			State s2 = br.getState();
-			assertEquals(Amount.create(9700 - TCOST * 2), s2.getBalance(ADDRESS_A));
-			assertEquals(Amount.create(1000), s2.getBalance(ADDRESS_B));
-			assertEquals(Amount.create(300), s2.getBalance(ADDRESS_C));
+			assertEquals(9700 - TCOST * 2, s2.getBalance(ADDRESS_A));
+			assertEquals(1000, s2.getBalance(ADDRESS_B));
+			assertEquals(300, s2.getBalance(ADDRESS_C));
 		}
 
 		{ // two transfers in sequence, 2 different accounts A B --> new account C
@@ -105,9 +105,9 @@ public class StateTransitionsTest {
 
 			BlockResult br = s.applyBlock(b);
 			State s2 = br.getState();
-			assertEquals(Amount.create(9950 - TCOST), s2.getBalance(ADDRESS_A));
-			assertEquals(Amount.create(950 - TCOST), s2.getBalance(ADDRESS_B));
-			assertEquals(Amount.create(100), s2.getBalance(ADDRESS_C));
+			assertEquals(9950 - TCOST, s2.getBalance(ADDRESS_A));
+			assertEquals(950 - TCOST, s2.getBalance(ADDRESS_B));
+			assertEquals(100, s2.getBalance(ADDRESS_C));
 
 			AVector<Object> results = br.getResults();
 			assertEquals(2, results.count());
@@ -162,7 +162,7 @@ public class StateTransitionsTest {
 			// System.out.println("Transfer complete....");
 
 			State newState = br.getState();
-			assertEquals(AMT, newState.getBalance(ADDRESS_NIKI).getValue());
+			assertEquals(AMT, newState.getBalance(ADDRESS_NIKI));
 			// System.out.println("Niki has "+newState.getBalance(ADDRESS_NIKI).getValue());
 
 		}
@@ -204,13 +204,13 @@ public class StateTransitionsTest {
 
 		long INITIAL_TS = s.getTimeStamp();
 		AKeyPair kp = convex.core.lang.TestState.HERO_PAIR;
-		long BAL2 = s.getBalance(TARGET).getValue();
+		long BAL2 = s.getBalance(TARGET);
 
 		ATransaction t1 = Invoke.create(1,
 				Reader.read("(transfer \""+taddr+"\" 10000000)"));
 		Block b1 = Block.of(s.getTimeStamp() + 100, kp.signData(t1));
 		s = s.applyBlock(b1).getState();
-		assertEquals(BAL2 + 10000000, s.getBalance(TARGET).getValue());
+		assertEquals(BAL2 + 10000000, s.getBalance(TARGET));
 		assertEquals(INITIAL_TS + 100, s.getTimeStamp());
 		
 		// schedule 200ms later for 1s time
@@ -223,7 +223,7 @@ public class StateTransitionsTest {
 		BlobMap<ABlob, AVector<Object>> sched2 = s.getSchedule();
 		assertEquals(1L, sched2.count());
 		// no change to target balance yet
-		assertEquals(BAL2 + 10000000, s.getBalance(TARGET).getValue());
+		assertEquals(BAL2 + 10000000, s.getBalance(TARGET));
 
 		// advance 999ms
 		ATransaction t3 = Invoke.create(3, Reader.read("1"));
@@ -232,7 +232,7 @@ public class StateTransitionsTest {
 		assertNull(br3.getError(0));
 		s = br3.getState();
 		// no change to target balance yet
-		assertEquals(BAL2 + 10000000, s.getBalance(TARGET).getValue());
+		assertEquals(BAL2 + 10000000, s.getBalance(TARGET));
 
 		// advance 1ms to trigger scheduled transfer
 		ATransaction t4 = Invoke.create(4, Reader.read("1"));
@@ -241,7 +241,7 @@ public class StateTransitionsTest {
 		assertNull(br4.getError(0));
 		s = br4.getState();
 		// no change to target balance yet
-		assertEquals(BAL2 + 20000000, s.getBalance(TARGET).getValue());
+		assertEquals(BAL2 + 20000000, s.getBalance(TARGET));
 
 	}
 

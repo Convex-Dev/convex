@@ -135,6 +135,21 @@ public class Peer {
 		return rctx;
 	}
 	
+	/**
+	 * Estimates the coin cost of a executing a given transaction by performing a "dry run".
+	 * 
+	 * This will be exact if no intermediate transactions affect the state, and if no time-dependent functionality is used.
+	 * 
+	 * @param address Address for which to execute the transaction
+	 * @param trans Transaction to test
+	 * @return
+	 */
+	public long estimateCost(Address address, ATransaction trans) {
+		State state=getConsensusState();
+		Context<?> ctx=executeDryRun(address,trans);
+		return state.getBalance(address)-ctx.getState().getBalance(address);
+	}
+	
 	/** 
 	 * Executes a query on the current consensus state of this Peer.
 	 * 

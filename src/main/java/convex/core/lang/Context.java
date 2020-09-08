@@ -1256,7 +1256,7 @@ public final class Context<T> implements IObject {
 		
 		State state=getState();
 		Address addr=getAddress();
-		long balance=state.getBalance(addr).getValue();
+		long balance=state.getBalance(addr);
 		state=state.withBalance(addr,Amount.create(balance+amount));
 		
 		// need to update both state and offer

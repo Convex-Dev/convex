@@ -172,10 +172,15 @@ public class State extends ARecord {
 		return peers;
 	}
 
-	public Amount getBalance(Address address) {
+	/**
+	 * Gets the balance of a specific address, or null if the Address does not exist
+	 * @param address
+	 * @return
+	 */
+	public Long getBalance(Address address) {
 		AccountStatus acc = getAccounts().get(address);
-		if (acc == null) return Amount.ZERO;
-		return acc.getBalance();
+		if (acc == null) return null;
+		return acc.getBalance().getValue();
 	}
 
 	public State withBalance(Address address, Amount newBalance) {
