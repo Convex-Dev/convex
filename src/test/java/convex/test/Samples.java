@@ -41,6 +41,10 @@ import convex.core.exceptions.ValidationException;
 public class Samples {
 
 	public static Hash BAD_HASH = Hash.fromHex("1234000012340000123400001234000012340000123400001234000012340000");
+	
+	/**
+	 * An Address which cannot be valid
+	 */
 	public static final Address BAD_ADDRESS = Address.dummy("012345");
 	
 	public static final ECDSASignature BAD_SIGNATURE = ECDSASignature.create(0, BigInteger.ONE, BigInteger.ONE);

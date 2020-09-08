@@ -1,6 +1,8 @@
 (do
   ;; Trust library 
   ;;
+  ;; This library is based on the Reference Monitor security model.
+  ;;
   ;; deploy with: (deploy-once trust-code)
   ;; 
   ;; import with (import <address of trust> :as trust)
@@ -14,7 +16,7 @@
   (def trust *address*)
   
   (defn trusted? 
-    ^{:doc {:description "Tests if a given subject is trusted by the specified trust-store. Returns true or false."
+    ^{:doc {:description "Tests if a given subject is trusted by the specified trust-store. Returns true or false. If trust-store is a user address rather than an actor, it is defined to trust only itself."
          :examples [{:code "(trusted? my-trusted-store *caller*)"}]
          :type :function
          :signature [{:params [trust-store subject]}]}
@@ -47,7 +49,7 @@
            (contains-key? whitelist subject))
          
          (defn set-trusted [subject allow?]
-           (if (trust/trusted? controller subject)
+           (if (trust/trusted? controller *caller*)
              (def whitelist ((if allow? conj disj) whitelist subject))
              (fail :SECURITY "No access to whitelist!")))
        

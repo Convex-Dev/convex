@@ -18,6 +18,7 @@ import convex.core.lang.Context;
 import convex.core.lang.Reader;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
+import convex.test.Samples;
 
 import static convex.test.Assertions.*;
 import static convex.core.lang.TestState.*;
@@ -52,24 +53,56 @@ public class TestTrust {
 		assertTrue(ctx.getAccountStatus(trusted).isActor());
 		assertEquals(trusted,TestState.CON_TRUSTED);
 		
+		assertEquals(trusted,eval(ctx,"(get *aliases* 'trust)"));
+		
 		assertEquals("Trust Library",eval("(:name (call *registry* (lookup "+trusted+")))"));
+	}
+	
+	@Test public void testSelfTrust() {
+		// check our alias is right
+		Context<?> ctx=TestTrust.ctx;
+		
+		assertTrue(evalB(ctx,"(trust/trusted? *address* *address*)"));
+		assertFalse(evalB(ctx,"(trust/trusted? *address* nil)"));
+		assertFalse(evalB(ctx,"(trust/trusted? *address* :foo)"));
+		assertFalse(evalB(ctx,"(trust/trusted? *address* (address 0x1234567812345678123456781234567812345678123456781234567812345678))"));
 	}
 	
 	@Test public void testWhitelist() {
 		// check our alias is right
 		Context<?> ctx=TestTrust.ctx;
-		assertEquals(trusted,eval(ctx,"(get *aliases* 'trust)"));
-		
+
 		// deploy a whitelist with default config
 		ctx=step(ctx,"(def wlist (deploy (trust/build-whitelist nil)))");
 		Address wl=(Address) ctx.getResult();
 		assertNotNull(wl);
+		
+		// initial creator should be on whitelist
+		assertTrue(evalB(ctx,"(trust/trusted? wlist *address*)"));
 		
 		assertFalse(evalB(ctx,"(trust/trusted? wlist nil)"));
 		assertFalse(evalB(ctx,"(trust/trusted? wlist [])"));
 		
 		assertCastError(step(ctx,"(trust/trusted? nil *address*)"));
 		assertCastError(step(ctx,"(trust/trusted? [] *address*)"));
+		
+		{
+			Address a1=Samples.BAD_ADDRESS;
+			Context<?> c=ctx;
+			
+			// Check not initially on whitelist
+			assertFalse(evalB(c,"(trust/trusted? wlist "+a1+")"));
+	
+			// Add address to whitelist, shouldn't matter if it exists or not
+			c=step (c,"(call wlist (set-trusted "+a1+" true))");
+			assertNotError(c);
+			assertTrue(evalB(c,"(trust/trusted? wlist "+a1+")"));
+
+			// Check removal from whitelist
+			c=step (c,"(call wlist (set-trusted "+a1+" false))");
+			assertNotError(c);
+			assertFalse(evalB(c,"(trust/trusted? wlist "+a1+")"));
+		}
 
 	}
 }
