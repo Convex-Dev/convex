@@ -84,6 +84,21 @@
        
          (export check-trusted? set-trusted)))) 
     
+    (defn remove-upgradability! 
+      ^{:doc {:description "Removes upgradability from an Actor Account, assuming this capability was added in the same manner as 'add-trusted-upgrade'. SECURITY: This cannot be undone! USe with caution!"
+         :examples [{:code "(remove-upgradability! upgradable-actor)"}]
+         :type :function
+         :signature [{:params [config]}]}
+	    }
+      [actor]
+      (let [actor (address actor)]
+        (call actor (upgrade 
+                      '(do 
+                         (undef upgradable-root)
+                         (undef upgrade)
+                         (def *exports* (disj *exports* 'upgrade))
+                         )))))
+    
     (defn add-trusted-upgrade
       ^{:doc {:description "Creates deployable code for an Actor upgradable by a ':root' User or Trust Monitor. A root-authorised user can 'eval' code in the Actor's environment using '(call actor (upgrade code-to-eval))'. If not specified, the generator of the code (*address*) will be the initial root user. SECURITY: A user or actor with root access can do *anything* to this actor. Do not hand out such access unwisely."
          :examples [{:code "(deploy (add-trusted-upgrade {:root *address*}))"}]

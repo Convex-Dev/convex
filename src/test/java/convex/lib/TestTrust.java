@@ -79,11 +79,16 @@ public class TestTrust {
 		
 		assertTrue(evalB(ctx,"(trust/trusted? wlist *address*)"));
 		
-		// do an upgrade that blanks the witelist
+		// do an upgrade that blanks the whitelist
 		ctx=step(ctx,"(call wlist (upgrade '(do (def whitelist #{}))))");
 		
 		// check that our edit has updated actor
 		assertFalse(evalB(ctx,"(trust/trusted? wlist *address*)"));
+		
+		// check we can permanently remove upgradability
+		ctx=step(ctx,"(trust/remove-upgradability! wlist)");
+		assertNotError(ctx);
+		assertStateError(step(ctx,"(call wlist (upgrade '(do :foo)))"));
 	}
 	
 	@Test public void testWhitelist() {
