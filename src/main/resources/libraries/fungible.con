@@ -1,13 +1,14 @@
 (do
-  ;; Fungible library
+  ;; Fungible library 
   ;;
   ;; deploy with: (deploy-once fungible-code)
   ;; 
   ;; import with (import <address of fungible> :as fungible)
   ;;
   ;; Key usage:
-  ;;   (fungible/balance token)   ;; Gets own balance (i.e. for *address*)
-  ;;   (fungible/balance token other-address)   ;; Gets balance for another Address
+  ;;   (fungible/balance token)                        ;; Gets own balance (i.e. for *address*)
+  ;;   (fungible/balance token other-address)          ;; Gets balance for another Address
+  ;;   (fungible/transfer token target-address amount) ;; transfer to a new holder
   
   (call *registry* (register {:name "Fungible Library"}))
   
@@ -29,7 +30,13 @@
     [token target amount]
     (call token (transfer target amount))) 
   
-  (defn build-token [config]
+  (defn build-token 
+    ^{:doc {:description "Creates deployable code for a new fungible token. An optional config map can be provided"
+         :examples [{:code "(deploy (build-token {:supply 1000000 :initial-holder *address*}))"}]
+         :type :function
+         :signature [{:params [config]}]}
+	  }
+    [config]
     (let [supply (long (or (:supply config) 1000000))
           initial-holder (address (or (:initial-holder config) *address*))]
       '(do
