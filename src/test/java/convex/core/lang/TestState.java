@@ -35,6 +35,7 @@ public class TestState {
 
 	// Some contracts for testing
 	public static Address CON_FUNGIBLE=null;
+	public static Address CON_TRUSTED=null;
 
 	
 	/**
@@ -133,6 +134,9 @@ public class TestState {
 			
 			ctx=deploy(ctx,"libraries/fungible.con");
 			CON_FUNGIBLE=(Address) ctx.getResult();
+			
+			ctx=deploy(ctx,"libraries/trust.con");
+			CON_TRUSTED=(Address) ctx.getResult();
 			
 			return ctx.getState();
 		} catch (Throwable t) {

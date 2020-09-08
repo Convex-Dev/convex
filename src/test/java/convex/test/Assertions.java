@@ -28,6 +28,11 @@ public class Assertions {
 		Object cet = ctx.getErrorCode();
 		assertEquals(ErrorCodes.ARITY, cet, "Expected ARITY error but got result: " + ctx.getValue());
 	}
+	
+	public static void assertTrustError(Context<?> ctx) {
+		Object cet = ctx.getErrorCode();
+		assertEquals(ErrorCodes.TRUST, cet, "Expected TRUST error but got result: " + ctx.getValue());
+	}
 
 	public static void assertCompileError(Context<?> ctx) {
 		Object cet = ctx.getErrorCode();

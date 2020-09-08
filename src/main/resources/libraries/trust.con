@@ -1,0 +1,57 @@
+(do
+  ;; Trust library 
+  ;;
+  ;; deploy with: (deploy-once trust-code)
+  ;; 
+  ;; import with (import <address of trust> :as trust)
+  ;;
+  ;; Key usage:
+  ;;   (trust/trusted? trust-store address)                        ;; Checks if subject is trusted
+
+  (call *registry* (register {:name "Trust Library"}))
+  
+  ;; save current actor address, we will want it later to give to new actors
+  (def trust *address*)
+  
+  (defn trusted? 
+    ^{:doc {:description "Tests if a given subject is trusted by the specified trust-store. Returns true or false."
+         :examples [{:code "(trusted? my-trusted-store *caller*)"}]
+         :type :function
+         :signature [{:params [trust-store subject]}]}
+	  }
+    [trust-store subject]
+    (let [trust-store (address trust-store)] 
+      (if (actor? trust-store) 
+        (call trust-store (check-trusted? subject nil nil))
+        (= trust-store subject)))) 
+  
+  (defn build-whitelist
+    ^{:doc {:description "Creates deployable code for a new whitelist. An optional config may be provided"
+         :examples [{:code "(deploy (build-whitelist {:controller *address* :whitelist [*address*]}))"}]
+         :type :function
+         :signature [{:params [config]}]}
+	  }
+    [config]
+    (let [whitelist (into #{} (or (:whitelist config) [*address*]))  
+          controller (or (:controller config)  *address*)]
+      '(do
+         (import ~trust :as trust)
+         
+         ;; a whitelist of subjects that will be accepted
+         (def whitelist ~whitelist)
+         
+         ;; controller determines who can modify the whitelist
+         (def controller ~(address controller))
+       
+         (defn check-trusted? [subject action object]
+           (contains-key? whitelist subject))
+         
+         (defn set-trusted [subject allow?]
+           (if (trust/trusted? controller subject)
+             (def whitelist ((if allow? conj disj) whitelist subject))
+             (fail :SECURITY "No access to whitelist!")))
+       
+         (export check-trusted? set-trusted)))) 
+  
+  
+  )

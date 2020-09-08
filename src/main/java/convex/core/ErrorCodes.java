@@ -108,6 +108,12 @@ public class ErrorCodes {
 	 * the User.
 	 */
 	public static final Keyword ASSERT = Keyword.create("ASSERT");
+	
+	/**
+	 * Error code indicating that an a trust condition was violated. This usually means a USer or Actor
+	 * attempted to perform an unauthorised operation.
+	 */
+	public static final Keyword TRUST = Keyword.create("TRUST");
 
 	public static final Keyword UNEXPECTED = Keyword.create("UNEXPECTED");
 
