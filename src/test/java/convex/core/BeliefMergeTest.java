@@ -29,6 +29,7 @@ import convex.core.data.Symbol;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.Juice;
 import convex.core.lang.Symbols;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Transfer;
@@ -66,7 +67,7 @@ public class BeliefMergeTest {
 		}
 
 		AHashMap<Symbol, Object> globals = Init.INITIAL_GLOBALS;
-		globals = globals.assoc(Symbols.JUICE_PRICE, 0L); // free juice for simplicity
+		globals = globals.assoc(Symbols.JUICE_PRICE, 1L); // cheap juice for simplicity
 		INITIAL_STATE = State.create(accounts, peers, Sets.empty(), globals, BlobMaps.empty());
 		TOTAL_VALUE = INITIAL_STATE.computeTotalFunds();
 	}
@@ -190,6 +191,8 @@ public class BeliefMergeTest {
 		Amount INITIAL_BALANCE_PROPOSER = INITIAL_STATE.getBalance(PADDRESS);
 		Amount INITIAL_BALANCE_RECEIVER = INITIAL_STATE.getBalance(RADDRESS);
 		Amount TRANSFER_AMOUNT = Amount.create(100);
+		Amount TJUICE=Amount.create(Juice.TRANSFER);
+		
 		ATransaction trans = Transfer.create(1, RADDRESS, TRANSFER_AMOUNT); // note 1 = first sequence number required
 		Peer[] bs3 = proposeTransactions(bs2, PROPOSER, trans);
 		if (ANALYSIS) printAnalysis(bs3, "Make proposal");
@@ -233,7 +236,7 @@ public class BeliefMergeTest {
 		// final state checks
 		assertTrue(allBeliefsEqual(bs7)); // beliefs across peers should be equal
 		State finalState = bs7[0].getConsensusState();
-		assertEquals(INITIAL_BALANCE_PROPOSER.subtract(TRANSFER_AMOUNT), finalState.getBalance(PADDRESS));
+		assertEquals(INITIAL_BALANCE_PROPOSER.subtract(TRANSFER_AMOUNT).subtract(TJUICE), finalState.getBalance(PADDRESS));
 		assertEquals(INITIAL_BALANCE_RECEIVER.add(TRANSFER_AMOUNT), finalState.getBalance(RADDRESS));
 
 		// matter cannot be created or destroyed....
@@ -268,6 +271,8 @@ public class BeliefMergeTest {
 		Address RADDRESS = ADDRESSES[RECEIVER];
 		Amount INITIAL_BALANCE_PROPOSER = INITIAL_STATE.getBalance(PADDRESS);
 		Amount INITIAL_BALANCE_RECEIVER = INITIAL_STATE.getBalance(RADDRESS);
+		Amount TJUICE=Amount.create(Juice.TRANSFER);
+		
 		Peer[] bs3 = bs2;
 		for (int i = 0; i < NUM_PEERS; i++) {
 			Amount TRANSFER_AMOUNT = Amount.create(100);
@@ -312,8 +317,8 @@ public class BeliefMergeTest {
 		// should have 1 transaction each
 		assertEquals(1L, finalState.getAccounts().get(PADDRESS).getSequence());
 		assertEquals(1L, finalState.getAccounts().get(RADDRESS).getSequence());
-		assertEquals(INITIAL_BALANCE_PROPOSER, finalState.getBalance(PADDRESS));
-		assertEquals(INITIAL_BALANCE_RECEIVER, finalState.getBalance(RADDRESS));
+		assertEquals(INITIAL_BALANCE_PROPOSER.subtract(TJUICE), finalState.getBalance(PADDRESS));
+		assertEquals(INITIAL_BALANCE_RECEIVER.subtract(TJUICE), finalState.getBalance(RADDRESS));
 
 		// law of conservation of gil
 		assertEquals(TOTAL_VALUE, finalState.computeTotalFunds());
@@ -358,6 +363,9 @@ public class BeliefMergeTest {
 		Address RADDRESS = ADDRESSES[RECEIVER];
 		Amount INITIAL_BALANCE_PROPOSER = INITIAL_STATE.getBalance(PADDRESS);
 		Amount INITIAL_BALANCE_RECEIVER = INITIAL_STATE.getBalance(RADDRESS);
+		Amount TJUICE=Amount.create(Juice.TRANSFER*NUM_INITIAL_TRANS);
+
+		
 		Peer[] bs3 = bs2;
 		for (int i = 0; i < NUM_PEERS; i++) {
 			// propose initial transactions
@@ -404,8 +412,8 @@ public class BeliefMergeTest {
 			assertEquals(NUM_INITIAL_TRANS, accounts.get(ADDRESSES[i]).getSequence());
 		}
 		// should have equal balance
-		assertEquals(INITIAL_BALANCE_PROPOSER, finalState.getBalance(PADDRESS));
-		assertEquals(INITIAL_BALANCE_RECEIVER, finalState.getBalance(RADDRESS));
+		assertEquals(INITIAL_BALANCE_PROPOSER.subtract(TJUICE), finalState.getBalance(PADDRESS));
+		assertEquals(INITIAL_BALANCE_RECEIVER.subtract(TJUICE), finalState.getBalance(RADDRESS));
 
 		// 100% of value still exists
 		assertEquals(TOTAL_VALUE, finalState.computeTotalFunds());

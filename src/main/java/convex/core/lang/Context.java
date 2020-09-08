@@ -211,7 +211,7 @@ public final class Context<T> implements IObject {
 	 * Creates an initial execution context with the specified actor as origin, and reserving the appropriate 
 	 * amount of juice.
 	 * 
-	 * Juice limit is extracted from the actor's current balance.
+	 * Juice reserve is extracted from the actor's current balance.
 	 * 
 	 * @param <T>
 	 * @param state
@@ -225,13 +225,16 @@ public final class Context<T> implements IObject {
 			return Context.createFake(state).withError(ErrorCodes.NOBODY);
 		}
 		
+		long balance=as.getBalance().getValue();
 		long juicePrice=state.getJuicePrice();
+		
+		// reduce juice if insufficient balance
+		juice=Math.min(juice,balance/juicePrice);
 		long reserve=juicePrice*juice;
-		if (!as.hasBalance(reserve)) {
-			// insufficient balance to fund juice supply
-			return Context.createFake(state).withError(ErrorCodes.FUNDS);
-		}
-		Amount newBalance=as.getBalance().subtract(Amount.create(reserve));
+		
+		assert (reserve<=balance) : "Reserve calculation failed!";
+		
+		long newBalance=balance-reserve;
 		as=as.withBalance(newBalance);
 		state=state.putAccount(origin, as);
 		return create(state,juice,Maps.empty(),null,0,origin,null,origin);

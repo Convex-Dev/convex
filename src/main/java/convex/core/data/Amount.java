@@ -280,4 +280,6 @@ public class Amount extends ACell implements Comparable<Amount> {
 	public void print(StringBuilder sb) {
 		sb.append(value);
 	}
+
+
 }

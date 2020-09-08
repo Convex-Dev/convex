@@ -123,7 +123,7 @@ public class Peer {
 		Context<?> ctx;
 		State state=getConsensusState();
 
-		ctx = Context.createInitial(state, origin, Constants.MAX_TRANSACTION_JUICE);
+		ctx = Context.createFake(state, origin);
 
 		Context<AOp<T>> ectx = ctx.expandCompile(form);
 		if (ectx.isExceptional()) {
