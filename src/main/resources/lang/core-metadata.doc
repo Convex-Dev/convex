@@ -1024,7 +1024,7 @@
   
   *balance*
    {
-     :doc {:description "Returns the available balance of the current account. Functionally equivalent to '(balance *address*)', but cheaper to execute. Note that the available balance *excludes* reserved balance for transaction execution. "
+     :doc {:description "Returns the available balance of the current account. Functionally equivalent to '(balance *address*)', but cheaper to execute. Note that the available balance *excludes* reserved balance for transaction execution, so this number may be somewhat less than the total account balance during transaction execution."
            :examples [{:code "*balance*"}]
            :type :special}
      :special-symbol true
