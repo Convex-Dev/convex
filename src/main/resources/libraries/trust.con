@@ -28,13 +28,13 @@
         (= trust-store subject)))) 
   
   (defn build-whitelist
-    ^{:doc {:description "Creates deployable code for a new whitelist. An optional config may be provided"
+    ^{:doc {:description "Creates deployable code for a new whitelist. An optional config may be provided, where ':controller' is the user or trust monitor that has the ability to modify the whitelist, and ':whitelist' is a collection of addresses to put on the initial whitelist."
          :examples [{:code "(deploy (build-whitelist {:controller *address* :whitelist [*address*]}))"}]
          :type :function
          :signature [{:params [config]}]}
 	  }
     [config]
-    (let [whitelist (into #{} (or (:whitelist config) [*address*]))  
+    (let [whitelist (reduce (fn [w x] (conj w (address x))) #{} (or (:whitelist config) [*address*]))  
           controller (or (:controller config)  *address*)]
       '(do
          (import ~trust :as trust)
@@ -46,11 +46,11 @@
          (def controller ~(address controller))
        
          (defn check-trusted? [subject action object]
-           (contains-key? whitelist subject))
+           (contains-key? whitelist (address subject)))
          
          (defn set-trusted [subject allow?]
            (if (trust/trusted? controller *caller*)
-             (def whitelist ((if allow? conj disj) whitelist subject))
+             (def whitelist ((if allow? conj disj) whitelist (address subject)))
              (fail :SECURITY "No access to whitelist!")))
        
          (export check-trusted? set-trusted)))) 

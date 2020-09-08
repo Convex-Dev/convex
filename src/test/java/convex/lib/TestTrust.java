@@ -80,8 +80,8 @@ public class TestTrust {
 		// initial creator should be on whitelist
 		assertTrue(evalB(ctx,"(trust/trusted? wlist *address*)"));
 		
-		assertFalse(evalB(ctx,"(trust/trusted? wlist nil)"));
-		assertFalse(evalB(ctx,"(trust/trusted? wlist [])"));
+		assertCastError(step(ctx,"(trust/trusted? wlist nil)"));
+		assertCastError(step(ctx,"(trust/trusted? wlist [])"));
 		
 		assertCastError(step(ctx,"(trust/trusted? nil *address*)"));
 		assertCastError(step(ctx,"(trust/trusted? [] *address*)"));
