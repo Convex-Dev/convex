@@ -975,7 +975,7 @@
   
   +
   {
-     :doc {:description "Adds numeric arguments."
+     :doc {:description "Adds numerical arguments. Result will be a Long if all all integer, or a double if any floating point values are included."
            :examples [{:code "(+ 1 2 3)"}]
            :type :function
            :signature [{:params [& xs]}]}
@@ -1024,7 +1024,7 @@
   
   *balance*
    {
-     :doc {:description "Returns the available balance of the current account. Functionally equivalent to '(balance *address*)', but cheaper to execute. Note that the available balance *excludes* reserved balance for transaction execution, so this number may be somewhat less than the total account balance during transaction execution."
+     :doc {:description "Returns the available balance of the current account. Functionally equivalent to '(balance *address*)', but cheaper to execute. Note that the available balance excludes reserved balance for transaction execution, so this number may be somewhat less than the total account balance during transaction execution."
            :examples [{:code "*balance*"}]
            :type :special}
      :special-symbol true
