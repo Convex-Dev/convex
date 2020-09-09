@@ -1,4 +1,4 @@
-;; Core definitions generated as part of core runtime environment bootstrap
+;; Core definitions executed as part of core runtime environment bootstrap
 ;;
 ;; Ordering matters! Later definitions may require earlier ones.
 

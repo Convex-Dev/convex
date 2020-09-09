@@ -1,10 +1,29 @@
 (do 
+  ;; This code implements the standard Convex Registry
+  ;;
+  ;; It is deployed by default during network initialisation
+  ;; at the well-known address *registry* = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+  ;;
+  ;; This make it accessible from early in network bootstrap as a way to register and locate Accounts.
+  
   (set-holding *address* {:name "Registry Contract"})
   
-  (defn register [data]
+  (defn register 
+    ^{:doc {:description "Registers metadata for the *caller* account. Metadata can be an arbitrary value, but by convention is a map with defined fields."
+         :examples [{:code "(call *registry* (register  {:name \"My Name\"})"}]
+         :type :function
+         :signature [{:params [metadata]}]}
+	  }
+    [data]
     (set-holding *caller* data))
     
-  (defn lookup [addr]
-    (get-holding addr))
+  (defn lookup 
+    ^{:doc {:description "Looks up registry metadata for a given address."
+         :examples [{:code "(call *registry* (lookup somebody)"}]
+         :type :function
+         :signature [{:params [addr]}]}
+	  }
+    [addr]
+    (get-holding (address addr)))
     
   (export register lookup))

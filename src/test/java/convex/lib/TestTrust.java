@@ -53,13 +53,13 @@ public class TestTrust {
 		assertTrue(ctx.getAccountStatus(trusted).isActor());
 		assertEquals(trusted,TestState.CON_TRUSTED);
 		
+		// check alias is set up correctly
 		assertEquals(trusted,eval(ctx,"(get *aliases* 'trust)"));
 		
 		assertEquals("Trust Library",eval("(:name (call *registry* (lookup "+trusted+")))"));
 	}
 	
 	@Test public void testSelfTrust() {
-		// check our alias is right
 		Context<?> ctx=TestTrust.ctx;
 		
 		assertTrue(evalB(ctx,"(trust/trusted? *address* *address*)"));
@@ -69,7 +69,6 @@ public class TestTrust {
 	}
 	
 	@Test public void testUpgradeWhitelist() {
-		// check our alias is right
 		Context<?> ctx=TestTrust.ctx;
 
 		// deploy a whitelist with default config and upgradable capability
