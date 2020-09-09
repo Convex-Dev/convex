@@ -82,6 +82,15 @@ public class TestTrust {
 		// do an upgrade that blanks the whitelist
 		ctx=step(ctx,"(call wlist (upgrade '(do (def whitelist #{}))))");
 		
+		{
+			// check our villain cannot upgrade the actor!
+			Address a1=VILLAIN;;
+			Context<?> c=ctx.switchAddress(a1);
+			c=step(c,"(do (import "+trusted+" :as trust) (def wlist "+wl+"))");
+			
+			assertTrustError(step(c,"(call wlist (upgrade '(do :foo)))"));
+		}
+		
 		// check that our edit has updated actor
 		assertFalse(evalB(ctx,"(trust/trusted? wlist *address*)"));
 		
@@ -89,6 +98,9 @@ public class TestTrust {
 		ctx=step(ctx,"(trust/remove-upgradability! wlist)");
 		assertNotError(ctx);
 		assertStateError(step(ctx,"(call wlist (upgrade '(do :foo)))"));
+		
+		// actor functionality should still work otherwise
+		assertFalse(evalB(ctx,"(trust/trusted? wlist *address*)"));
 	}
 	
 	@Test public void testWhitelist() {

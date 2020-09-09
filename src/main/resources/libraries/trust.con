@@ -85,7 +85,7 @@
          (export check-trusted? set-trusted)))) 
     
     (defn remove-upgradability! 
-      ^{:doc {:description "Removes upgradability from an Actor Account, assuming this capability was added in the same manner as 'add-trusted-upgrade'. SECURITY: This cannot be undone! USe with caution!"
+      ^{:doc {:description "Removes upgradability from an Actor Account, assuming this capability was added in the same manner as 'add-trusted-upgrade'. SECURITY: This cannot be undone! Use with caution. You should verify that the removal of upgradability does not break any other actor functionality."
          :examples [{:code "(remove-upgradability! upgradable-actor)"}]
          :type :function
          :signature [{:params [config]}]}
@@ -94,6 +94,7 @@
       (let [actor (address actor)]
         (call actor (upgrade 
                       '(do 
+                         ;; undefine things used for upgradability
                          (undef upgradable-root)
                          (undef upgrade)
                          (def *exports* (disj *exports* 'upgrade))
@@ -106,7 +107,7 @@
          :signature [{:params [config]}]}
 	    }
       [config]
-      (let [root (address (or (:controller config)  *address*))]
+      (let [root (address (or (:root config)  *address*))]
         '(do
            (import ~trust :as trust)
            
