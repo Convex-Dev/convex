@@ -125,6 +125,7 @@ public class Core {
 			for (Object a : args) {
 				if (a == null) continue;
 				ASequence<?> seq = RT.sequence(a);
+				if (seq == null) return context.withCastError(a, ASequence.class);
 				
 				// check juice per element of concatenated sequences
 				juice += Juice.BUILD_DATA+ seq.count() * Juice.BUILD_PER_ELEMENT;

@@ -401,6 +401,9 @@ public class CoreTest {
 		assertSame(Vectors.empty(), eval("(concat nil [])"));
 		assertSame(Lists.empty(), eval("(concat () nil)"));
 		assertSame(Lists.empty(), eval("(concat nil ())"));
+		
+		assertCastError(step("(concat 1 2)"));
+		assertCastError(step("(concat \"Foo\" \"Bar\")"));
 
 		assertEquals(Vectors.of(1L, 2L, 3L, 4L), eval("(concat [1 2] [3 4])"));
 		assertEquals(Vectors.of(1L, 2L, 3L, 4L), eval("(concat nil [1 2] '(3) [] [4])"));
