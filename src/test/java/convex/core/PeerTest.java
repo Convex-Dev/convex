@@ -15,6 +15,9 @@ import convex.core.data.PeerStatus;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.lang.Reader;
 import convex.core.lang.TestState;
+import convex.test.Samples;
+
+import static convex.test.Assertions.*;
 
 public class PeerTest {
 
@@ -50,6 +53,17 @@ public class PeerTest {
 	@Test
 	public void testNullPeers() {
 		assertNull(Init.STATE.getPeer(Init.HERO)); // hero not a peer in initial state
+	}
+	
+	@Test
+	public void testQuery() throws BadSignatureException {
+		AKeyPair PEER0 = Init.KEYPAIRS[0];
+		Peer p = Peer.create(PEER0, TestState.INITIAL);
+		
+		assertEquals(3L,p.executeQuery(Reader.read("(+ 1 2)")).getResult());
+		assertEquals(Init.HERO,p.executeQuery(Reader.read("*address*"),Init.HERO).getResult());
+		
+		assertNobodyError(p.executeQuery(Reader.read("(+ 2 3)"),Samples.BAD_ADDRESS));
 	}
 
 	@Test
