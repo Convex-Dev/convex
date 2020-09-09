@@ -25,5 +25,21 @@
 	  }
     [addr]
     (get-holding (address addr)))
+  
+  (def cns-database {'convex.registry [*address* *caller*]})
+  
+  (defn cns-resolve 
+    ^{:doc {:description "Resolves a name in the Convex Name Service."
+         :examples [{:code "(call *registry* (lookup somebody)"}]
+         :type :function
+         :signature [{:params [addr]}]}
+	  }
+    [name]
+    (let [sym (symbol name)
+          rec (get cns-database sym)]
+      (if rec
+        (first rec))
+      )
+    )
     
-  (export register lookup))
+  (export register lookup cns-resolve))

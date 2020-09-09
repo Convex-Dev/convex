@@ -144,6 +144,7 @@ public class Init {
 				Context<?> ctx = Context.createFake(s, HERO);
 				Object form=Reader.readResource("actors/registry.con");
 				ctx = ctx.deployActor(form,REGISTRY_ADDRESS);
+				ctx.getResult();
 				// Note the Registry registers itself upon creation
 				s = ctx.getState();
 			}

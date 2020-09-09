@@ -1459,7 +1459,7 @@ public final class Context<T> implements IObject {
 	}
 	
 	public <R> Context<R> withCastError(Object a, Class<?> klass) {
-		return withError(ErrorCodes.CAST,"Can't convert "+a+" to class "+klass);
+		return withError(ErrorCodes.CAST,"Can't convert "+a+" of class "+Utils.getClassName(a)+" to class "+klass);
 	}
 
 	/**
