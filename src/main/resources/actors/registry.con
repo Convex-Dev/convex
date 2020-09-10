@@ -30,7 +30,7 @@
   
   (defn cns-resolve 
     ^{:doc {:description "Resolves a name in the Convex Name Service."
-         :examples [{:code "(call *registry* (lookup somebody)"}]
+         :examples [{:code "(call *registry* (cns-resolve 'convex.registry)"}]
          :type :function
          :signature [{:params [addr]}]}
 	  }
@@ -41,5 +41,21 @@
         (first rec))
       )
     )
+  
+   (defn cns-update
+    ^{:doc {:description "Updates or adds a name mapping in the Convex Name Service. Only the owner of a CNS record may update the mapping for an existing name"
+         :examples [{:code "(call *registry* (cns-update 'my.magic.actor addr)"}]
+         :type :function
+         :signature [{:params [name addr]}]}
+	  }
+    [name addr]
+    (let [addr (address addr)
+          caller *caller*
+          sym (symbol name)
+          rec (get cns-database sym)]
+      (and rec (not (= caller (second rec)))
+        (fail :TRUST "Caller does not have permission to update CNS"))
+      ;; All OK at this point, so update CNS normally with [address owner] vector
+      (def cns-database (assoc cns-database sym [addr caller]))))
     
-  (export register lookup cns-resolve))
+  (export register lookup cns-resolve cns-update))

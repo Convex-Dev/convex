@@ -1,6 +1,7 @@
 package convex.actors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.IOException;
 
@@ -14,8 +15,10 @@ import convex.core.data.Maps;
 import convex.core.data.Symbol;
 import convex.core.lang.Context;
 import convex.core.lang.TestState;
+import convex.test.Samples;
 
 import static convex.core.lang.TestState.*;
+import static convex.test.Assertions.*;
 
 public class RegistryTest {
 	static final Address REG = Init.REGISTRY_ADDRESS;
@@ -39,5 +42,28 @@ public class RegistryTest {
 		Context<?> ctx=TestState.INITIAL_CONTEXT;
 		
 		assertEquals(REG,eval(ctx,"(call *registry* (cns-resolve :convex.registry))"));
+	}
+	
+	@Test
+	public void testRegistryCNSUpdate() throws IOException {
+		Context<?> ctx=TestState.INITIAL_CONTEXT;
+		
+		assertNull(eval(ctx,"(call *registry* (cns-resolve :convex.test.foo))"));
+		
+		// Real Address we want for CNS mapping
+		final Address realAddr=Samples.BAD_ADDRESS;
+		
+		ctx=step(ctx,"(call *registry* (cns-update :convex.test.foo "+realAddr+"))");
+		assertEquals(realAddr,eval(ctx,"(call *registry* (cns-resolve :convex.test.foo))"));
+		
+		{ // Check VILLAIN can't steal CNS mapping
+			Context<?> c=ctx.switchAddress(Init.VILLAIN);
+
+			// VILLAIN shouldn't be able to use update on existing CNS mapping
+			assertTrustError(step(c,"(call *registry* (cns-update :convex.test.foo *address*))"));
+			
+			// original mapping should be held
+			assertEquals(realAddr,eval(c,"(call *registry* (cns-resolve :convex.test.foo))"));
+		}
 	}
 }
