@@ -344,7 +344,7 @@
   fail
  	{
 	 :doc {:description "Causes execution to fail at the current position. Error type defaults to ASSERT if not specified. Error message defaults to nil if not specified. The message may be any value, but the use of short descriptive strings is recommended."
-         :examples [{:code "(export some-safe-function)"}]
+         :examples [{:code "(fail :ASSERT \"Assertion failed\")"}]
          :type :function
          :signature [{:params []}
                      {:params [message]}
