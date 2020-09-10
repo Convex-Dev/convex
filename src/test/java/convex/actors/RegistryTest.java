@@ -65,5 +65,18 @@ public class RegistryTest {
 			// original mapping should be held
 			assertEquals(realAddr,eval(c,"(call *registry* (cns-resolve :convex.test.foo))"));
 		}
+		
+		{ // Check VILLAIN can create new mapping
+			// TODO probably shouldn't be free-for-all?
+			
+			Context<?> c=ctx.switchAddress(Init.VILLAIN);
+
+			// VILLAIN shouldn't be able to use update on existing CNS mapping
+			c=step(c,"(call *registry* (cns-update :convex.villain *address*))");
+			assertNotError(c);
+			
+			// original mapping should be held
+			assertEquals(Init.VILLAIN,eval(c,"(call *registry* (cns-resolve :convex.villain))"));
+		}
 	}
 }
