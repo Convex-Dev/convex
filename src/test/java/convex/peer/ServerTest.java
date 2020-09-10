@@ -2,7 +2,6 @@ package convex.peer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -104,7 +103,7 @@ public class ServerTest {
 		assertEquals(2L, results.get(id2));
 		assertEquals(ErrorCodes.SEQUENCE, results.get(id2a));
 		assertEquals(3L, results.get(id3));
-		assertNull( results.get(id4));
+		assertEquals(1000L, (long)results.get(id4));
 		assertTrue( results.containsKey(id5));
 	}
 	

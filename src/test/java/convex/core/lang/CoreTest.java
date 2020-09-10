@@ -1469,14 +1469,19 @@ public class CoreTest {
 		Address HERO = TestState.HERO;
 
 		// transfer to self. Note juice already accounted for in context.
+		assertEquals(1337L, evalL("(transfer *address* 1337)")); // should return transfer amount
 		assertEquals(BAL, step("(transfer *address* 1337)").getBalance(HERO));
 
 		// String representing a new Address
 		String naddr=Address.dummy("123").toHexString();
 		
 		// transfers to a new address
-		assertEquals(BAL - 1337,
-				step("(transfer (address \""+naddr+"\") 1337)").getBalance(HERO));
+		{
+			Context<?> nc1=step("(transfer (address \""+naddr+"\") 1337)");
+			assertEquals(1337L, nc1.getResult());
+			assertEquals(BAL - 1337,nc1.getBalance(HERO));
+		}
+		
 		assertEquals(1337L, evalL("(let [a (address \""+naddr+"\")]"
 				+ " (transfer a 1337)" + " (balance a))"));
 
@@ -1484,8 +1489,7 @@ public class CoreTest {
 				+ "   (not (= *balance* (transfer a 1337))))"));
 
 		// transfer it all!
-		assertEquals(0L,
-				step("(transfer (address \""+naddr+"\") *balance*)").getBalance(HERO));
+		assertEquals(0L,step("(transfer (address \""+naddr+"\") *balance*)").getBalance(HERO));
 
 		// Should never be possible to transfer negative amounts
 		assertArgumentError(step("(transfer *address* -1000)"));

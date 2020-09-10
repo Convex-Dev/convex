@@ -863,7 +863,7 @@
   
   transfer
   {
-    :doc {:description "Transfers the specified amoung of coins to the target-address."
+    :doc {:description "Transfers the specified amount of coins to the target-address. Returns the amount transferred if successful. Returns FUNDS error if there is insufficient balance in the sender's account."
           :examples [{:code "(transfer my-friend-address 12345678)"}]
           :type :function
           :signature [{:params [address amount]}]}

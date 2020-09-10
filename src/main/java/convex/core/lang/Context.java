@@ -1147,7 +1147,7 @@ public final class Context<T> implements IObject {
 		accounts=accounts.assoc(target, newTargetAccount);
 
 		// SECURITY: new context with updated accounts
-		Context<Long> result=new Context<>(chainState.withAccounts(accounts),juice,localBindings,null,depth,false);
+		Context<Long> result=new Context<>(chainState.withAccounts(accounts),juice,localBindings,amount,depth,false);
 		
 		return result;
 	}
