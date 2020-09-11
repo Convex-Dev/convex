@@ -2,6 +2,7 @@ package convex.test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import convex.core.ErrorCodes;
 import convex.core.lang.Context;
@@ -22,6 +23,11 @@ public class Assertions {
 	public static void assertError(Object et, Context<?> ctx) {
 		Object cet = ctx.getErrorCode();
 		assertEquals(et, cet, "Expected error type " + et + " but got result: " + ctx.getValue());
+	}
+	
+	public static void assertError(Context<?> ctx) {
+		Object cet = ctx.getErrorCode();
+		assertNotNull(cet, "Expected an error but got result: " + ctx.getValue());
 	}
 
 	public static void assertArityError(Context<?> ctx) {

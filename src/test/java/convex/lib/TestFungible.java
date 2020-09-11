@@ -1,7 +1,6 @@
 package convex.lib;
 
-import static convex.core.lang.TestState.eval;
-import static convex.core.lang.TestState.step;
+import static convex.core.lang.TestState.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -82,5 +81,47 @@ public class TestFungible {
 		// bad transfers
 		assertAssertError(step(ctx,"(fungible/transfer token *address* -1)"));
 		assertAssertError(step(ctx,"(fungible/transfer token *address* "+(bal+1)+")"));
+	}
+	
+	@Test public void testMint() {
+		// check our alias is right
+		Context<?> ctx=TestFungible.ctx;
+		
+		// deploy a token with default config
+		ctx=step(ctx,"(def token (deploy [(fungible/build-token {:supply 100}) (fungible/add-mint {:max-supply 1000})]))");
+		Address token = (Address) ctx.getResult();
+		assertTrue(ctx.getAccountStatus(token)!=null);
+		
+		// check our balance is positive as initial holder
+		Long bal=eval(ctx,"(fungible/balance token *address*)");
+		assertEquals(100L,bal);
+		
+		// Mint up to max and back down to zero
+		{
+			Context<?> c=step(ctx,"(fungible/mint token 900)");
+			assertEquals(1000L,evalL(c,"(fungible/balance token *address*)"));
+	
+			c=step(c,"(fungible/mint token -900)");
+			assertEquals(bal,evalL(c,"(fungible/balance token *address*)"));
+
+			c=step(c,"(fungible/mint token -100)");
+			assertEquals(0L,evalL(c,"(fungible/balance token *address*)"));
+		}
+		
+		// Illegal Minting amounts
+		{
+			assertError(step(ctx,"(fungible/mint token 901)")); // too much
+			assertError(step(ctx,"(fungible/mint token -101)")); // too little
+		}
+		
+		// Villain shouldn't be able to mint
+		{
+			Context<?> c=ctx.switchAddress(VILLAIN);
+			c=step(c,"(def token "+token+")");
+			c=step(c,"(import convex.fungible :as fungible)");
+			
+			assertTrustError(step(c,"(fungible/mint token 100)"));
+			assertTrustError(step(c,"(fungible/mint token 10000)")); // trust before amount checks
+		}
 	}
 }
