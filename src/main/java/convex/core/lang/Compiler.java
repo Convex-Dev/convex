@@ -327,10 +327,7 @@ public class Compiler {
 		AList<Syntax> list = (AList<Syntax>) form;
 		if (list.count() == 0) return false;
 		Object firstElement=list.get(0);
-		if (!(firstElement instanceof Syntax)) {
-			throw new Error("Expected Syntax as first element of list but got "+Utils.getClassName(firstElement)+" = "+firstElement+ " in form: " +form);
-		}
-		return Utils.equals(element, ((Syntax)firstElement).getValue());
+		return Utils.equals(element, Syntax.unwrap(firstElement));
 	}
 
 	@SuppressWarnings("unchecked")
@@ -554,6 +551,9 @@ public class Compiler {
 		return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
 	}
 	
+	
+
+	
 	/**
 	 * Initial expander used for expansion of forms prior to compilation.
 	 * 
@@ -593,6 +593,15 @@ public class Compiler {
 					// check for macro / expander in initial position.
 					if (first instanceof Symbol) {
 						Symbol sym = (Symbol) first;
+						
+						// TODO: handle quote
+						// if (sym.equals(Symbols.QUOTE)) {
+						//	if (listForm.size() != 2) return context.withCompileError(Symbols.QUOTE + " expects one argument.");
+						//	Syntax syn=Syntax.create(listForm.get(1));
+						//	Syntax quoteSyn=Syntax.create(Lists.of(Syntax.create(Symbols.QUOTE),syn));
+						//	return context.withResult(Juice.EXPAND_CONSTANT,quoteSyn);
+						// }
+						
 						MapEntry<Symbol, Syntax> me = context.lookupDynamicEntry(sym);
 						if (me != null) {
 							// TODO: examine syntax object for expander details?

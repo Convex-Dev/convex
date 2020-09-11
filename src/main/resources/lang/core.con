@@ -155,11 +155,13 @@
                       {:params [addr offer funcall]}]}
     }
   [addr & more] 
-  (let [more (unsyntax more)]
+  (let [addr (unsyntax addr)
+        more (unsyntax more)]
 	  (if (empty? more) (fail :ARITY "Insufficient arguments to call")) ;; TODO remove magic number
 	  (let [n (count more)
-	        fnargs (last more)
-	        fnlist (cons (list 'quote (symbol (first fnargs))) (next fnargs))]
+	        fnargs (unsyntax (last more))
+          sym (unsyntax (first fnargs))
+	        fnlist (cons (list 'quote sym) (next fnargs))]
 	    (cond
 	      (== n 1) (cons 'call* addr 0 fnlist)
 	      (== n 2) (cons 'call* addr (first more) fnlist)))))
@@ -213,13 +215,17 @@
           :type :macro
           :signature [{:params [& args]}]}}
   [addr as sym]
-  (let [addr (cond
-               (or (symbol? addr) (keyword? addr)) (call* *registry* 'cns-lookup 0 addr)
+  (let [addr (unsyntax addr)
+        addr (cond
+               (or (symbol? addr) (keyword? addr)) 
+                  (or (call* *registry* 0 'cns-resolve addr) 
+                      (fail :NOBODY (str "Could not resolve library name for import: " addr)))
                '(address ~addr))
+        sym (unsyntax sym)
         sym (cond (symbol? sym) sym
                   (= :default sym) nil
                   (fail "import: alias must be a symbol or :default"))] 
-    (assert (= :as as))
+    (assert (= :as (unsyntax as)))
     '(def *aliases*
        (assoc *aliases* (quote ~sym) ~addr))))
 

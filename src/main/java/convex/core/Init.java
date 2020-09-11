@@ -148,7 +148,29 @@ public class Init {
 				// Note the Registry registers itself upon creation
 				s = ctx.getState();
 			}
-
+			
+			{ // Deploy Trust library and register with CNS
+				Context<?> ctx = Context.createFake(s, HERO);
+				Object form=Reader.readResource("libraries/trust.con");
+				ctx = ctx.deployActor(form, true);
+				Address addr=(Address) ctx.getResult();
+				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'convex.trust "+addr+"))"));
+				ctx.getResult();
+				// Note the Registry registers itself upon creation
+				s = ctx.getState();
+			}
+			
+			{ // Deploy Fungible library and register with CNS
+				Context<?> ctx = Context.createFake(s, HERO);
+				Object form=Reader.readResource("libraries/fungible.con");
+				ctx = ctx.deployActor(form, true);
+				Address addr=(Address) ctx.getResult();
+				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'convex.fungible "+addr+"))"));
+				ctx.getResult();
+				// Note the Registry registers itself upon creation
+				s = ctx.getState();
+			}
+			
 			{ // Deploy Oracle Actor
 				Context<?> ctx = Context.createFake(s, HERO);
 				Object form=Reader.readResource("actors/oracle-trusted.con");
