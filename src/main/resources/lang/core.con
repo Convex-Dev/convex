@@ -213,12 +213,15 @@
           :type :macro
           :signature [{:params [& args]}]}}
   [addr as sym]
-  (let [sym (cond (symbol? sym) sym
+  (let [addr (cond
+               (or (symbol? addr) (keyword? addr)) (call* *registry* 'cns-lookup 0 addr)
+               '(address ~addr))
+        sym (cond (symbol? sym) sym
                   (= :default sym) nil
                   (fail "import: alias must be a symbol or :default"))] 
     (assert (= :as as))
     '(def *aliases*
-       (assoc *aliases* (quote ~sym) (address ~addr)))))
+       (assoc *aliases* (quote ~sym) ~addr))))
 
 
 (defmacro actor

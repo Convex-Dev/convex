@@ -1076,7 +1076,7 @@ public class CoreTest {
 		Context<?> ctx = step("(def lib (deploy '(do (def foo 100))))");
 		
 		{ // tests with a typical import
-			Context<?> ctx2=step(ctx,"(import lib :as mylib)");
+			Context<?> ctx2=step(ctx,"(import ~lib :as mylib)");
 			assertEquals(100L, evalL(ctx2, "mylib/foo"));
 			assertUndeclaredError(step(ctx2, "mylib/bar"));
 			assertTrue(evalB(ctx2,"(syntax? (lookup-syntax 'mylib/foo))"));
@@ -1085,9 +1085,9 @@ public class CoreTest {
 		}
 		
 		assertArityError(step(ctx,"(import)"));
-		assertArityError(step(ctx,"(import lib)"));	
-		assertArityError(step(ctx,"(import lib :as)"));	
-		assertArityError(step(ctx,"(import lib :as mylib :blah)"));	
+		assertArityError(step(ctx,"(import ~lib)"));	
+		assertArityError(step(ctx,"(import ~lib :as)"));	
+		assertArityError(step(ctx,"(import ~lib :as mylib :blah)"));	
 	}
 	
 

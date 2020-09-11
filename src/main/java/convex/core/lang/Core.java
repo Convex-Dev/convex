@@ -1872,17 +1872,18 @@ public class Core {
 
 		Syntax form = null;
 		
-			AList<Syntax> forms = Reader.readAllSyntax(Utils.readResourceAsString("lang/core.con"));
-			for (Syntax f : forms) {
-				form = f;
-				ctx=ctx.expandCompile(form);
-				assert (!ctx.isExceptional()) : "Error compiling form: "+ Syntax.unwrapAll(form)+ " : "+ ctx.getExceptional();
-				AOp<?> op=(AOp<?>) ctx.getResult();
-				ctx = ctx.execute(op);
-				// System.out.println("Core compilation juice: "+ctx.getJuice());
-				assert (!ctx.isExceptional()) : "Error executing op: "+ op+ " : "+ ctx.getExceptional();
-				
-			}
+		// Compile and execute forms in turn. Later definitions can use earlier macros!
+		AList<Syntax> forms = Reader.readAllSyntax(Utils.readResourceAsString("lang/core.con"));
+		for (Syntax f : forms) {
+			form = f;
+			ctx=ctx.expandCompile(form);
+			assert (!ctx.isExceptional()) : "Error compiling form: "+ Syntax.unwrapAll(form)+ " : "+ ctx.getExceptional();
+			AOp<?> op=(AOp<?>) ctx.getResult();
+			ctx = ctx.execute(op);
+			// System.out.println("Core compilation juice: "+ctx.getJuice());
+			assert (!ctx.isExceptional()) : "Error executing op: "+ op+ " : "+ ctx.getExceptional();
+			
+		}
 
 		return ctx.getAccountStatus(ADDR).getEnvironment();
 	}

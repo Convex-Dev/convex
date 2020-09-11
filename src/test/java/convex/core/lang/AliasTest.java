@@ -64,7 +64,7 @@ public class AliasTest {
 		assertUndeclaredError(step(ctx, "foo"));
 		assertUndeclaredError(step(ctx, "mylib/foo"));
 
-		ctx = step(ctx, "(import lib :as mylib)");
+		ctx = step(ctx, "(import ~lib :as mylib)");
 
 		// Alias should now work
 		assertEquals(100L, evalL(ctx, "mylib/foo"));
@@ -74,7 +74,7 @@ public class AliasTest {
 	public void testDefaultImport() {
 		Context<?> ctx = step("(def lib (deploy '(def foo 100)))");
 
-		ctx = step(ctx, "(import lib :as :default)");
+		ctx = step(ctx, "(import ~lib :as :default)");
 
 		// Alias should now work for default lookups
 		assertEquals(100L, evalL(ctx, "foo"));
@@ -90,15 +90,15 @@ public class AliasTest {
 		assertNotNull(lib);
 		
 		assertArityError(step(ctx,"(import)"));
-		assertArityError(step(ctx,"(import lib)"));
-		assertArityError(step(ctx,"(import lib :as)"));
-		assertArityError(step(ctx,"(import lib :as foo bar)"));
+		assertArityError(step(ctx,"(import ~lib)"));
+		assertArityError(step(ctx,"(import ~lib :as)"));
+		assertArityError(step(ctx,"(import ~lib :as foo bar)"));
 		
 		// check for bad keyword
-		assertAssertError(step(ctx,"(import lib :blazzzz mylib)"));
+		assertAssertError(step(ctx,"(import ~lib :blazzzz mylib)"));
 		
 		// can't have bad alias
-		assertAssertError(step(ctx,"(import lib :as nil)"));
+		assertAssertError(step(ctx,"(import ~lib :as nil)"));
 		
 		// can't have non-address first argument
 		assertCastError(step(ctx,"(import :foo :as mylib)"));
