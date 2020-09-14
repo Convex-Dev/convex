@@ -9,7 +9,6 @@ import convex.core.State;
 import convex.core.data.Address;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
-import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.lang.Context;
 import convex.core.lang.Core;
@@ -44,7 +43,7 @@ public class CVMBenchmark {
 	public void defInEnvironment() {
 		State s=Init.STATE;
 		Address addr=Init.HERO;
-		ATransaction trans=Invoke.create(1, convex.core.lang.ops.Def.create(Symbol.create("a"), Constant.create(13L)));
+		ATransaction trans=Invoke.create(1, convex.core.lang.ops.Def.create("a", Constant.create(13L)));
 		Context<Double>  ctx=s.applyTransaction(addr, trans);
 		ctx.getValue();
 	}
