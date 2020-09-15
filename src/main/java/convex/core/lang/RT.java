@@ -389,6 +389,11 @@ public class RT {
 		return n.doubleValue();
 	}
 
+	/**
+	 * Converts a numerical value to a Long
+	 * @param a
+	 * @return Long value, or null if not convertible
+	 */
 	public static Long toLong(Object a) {
 		if (a instanceof Long) return (Long) a;
 		Number n = number(a);

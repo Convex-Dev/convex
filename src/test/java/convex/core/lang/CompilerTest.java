@@ -1,6 +1,7 @@
 package convex.core.lang;
 
 import static convex.test.Assertions.assertArityError;
+import static convex.test.Assertions.assertBoundsError;
 import static convex.test.Assertions.assertCastError;
 import static convex.test.Assertions.assertCompileError;
 import static convex.test.Assertions.assertDepthError;
@@ -141,7 +142,7 @@ public class CompilerTest {
 		
 		// too much arity
 		assertArityError(step("({} 1 2 3)"));
-		assertThrows(IndexOutOfBoundsException.class,()->eval("([] 1)"));
+		assertBoundsError(step("([] 1)"));
 		assertArityError(step("([] 1 2 3)"));
 		assertArityError(step("(:foo 1 2 3)")); // arity > type
 	}

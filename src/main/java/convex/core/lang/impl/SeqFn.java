@@ -28,16 +28,19 @@ public class SeqFn<T> implements IFn<T> {
 	public <I> Context<T> invoke(Context<I> context, Object[] args) {
 		int n = args.length;
 		if (n == 1) {
-			long key = RT.toLong(args[0]);
+			Long key = RT.toLong(args[0]);
+			if (key==null) return context.withCastError(args[0], Long.class);
+			if ((key < 0) || (key >= seq.count())) return (Context<T>) context.withBoundsError(key);
 			T result = (T) seq.get(key);
 			return context.withResult(result);
 		} else if (n == 2) {
-			long key = RT.toLong(args[0]);
-			if ((key < 0) || (key > seq.count())) return (Context<T>) context.withResult(args[1]);
+			Long key = RT.toLong(args[0]);
+			if (key==null) return context.withCastError(args[0], Long.class);
+			if ((key < 0) || (key >= seq.count())) return (Context<T>) context.withResult(args[1]);
 			T result = (T) seq.get(key);
 			return context.withResult(result);
 		} else {
-			return context.withArityError("Expected arity 1 for sequence lookup");
+			return context.withArityError("Expected arity 1 or 2 for sequence lookup");
 		}
 	}
 

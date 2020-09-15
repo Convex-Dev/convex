@@ -520,6 +520,10 @@ public class CoreTest {
 		assertArityError(step("(nth [] 1 2)"));
 		assertArityError(step("(nth 1 1 2)")); // arity > cast
 
+		// cast errors for bad indexes
+		assertCastError(step("(nth [] :foo)"));
+		assertCastError(step("(nth [] nil)"));
+		
 		// BOUNDS error because nil treated as empty sequence
 		assertBoundsError(step("(nth nil 10)"));
 
@@ -1181,10 +1185,14 @@ public class CoreTest {
 		assertEquals(5L, (long) eval("([1 3 5 7] 2)"));
 
 		// bounds checks get applied
-		assertThrows(IndexOutOfBoundsException.class, () -> eval("([] 0)"));
-		assertThrows(IndexOutOfBoundsException.class, () -> eval("([1 2 3] -1)"));
-		assertThrows(IndexOutOfBoundsException.class, () -> eval("([1 2 3] 3)"));
+		assertBoundsError(step("([] 0)"));
+		assertBoundsError(step("([1 2 3] -1)"));
+		assertBoundsError(step("([1 2 3] 3)"));
 
+		// Bad index types
+		assertCastError(step("([] nil)"));
+		assertCastError(step("([] :foo)"));
+		
 		// bad arity
 		assertArityError(step("([])"));
 		assertArityError(step("([] 1 2 3 4)"));
@@ -1195,10 +1203,16 @@ public class CoreTest {
 		assertEquals(5L, (long) eval("('(1 3 5 7) 2)"));
 
 		// bounds checks get applied
-		assertThrows(IndexOutOfBoundsException.class, () -> eval("(() 0)"));
-		assertThrows(IndexOutOfBoundsException.class, () -> eval("('(1 2 3) -1)"));
-		assertThrows(IndexOutOfBoundsException.class, () -> eval("('(1 2 3) 3)"));
+		assertBoundsError(step("(() 0)"));
+		assertBoundsError(step("('(1 2 3) -1)"));
+		assertBoundsError(step("('(1 2 3) 3)"));
 
+		// cast error
+		assertCastError(step("(() nil)"));
+		assertCastError(step("(() :foo)"));
+		assertCastError(step("(() {})"));
+
+		
 		// bad arity
 		assertArityError(step("(())"));
 		assertArityError(step("(() 1 2 3 4)"));
