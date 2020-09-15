@@ -31,6 +31,14 @@ public class BlobsTest {
 		AArrayBlob d = Blob.create(new byte[] { Tag.NULL });
 		assertTrue(d.getContentHash().equals(Hash.NULL_HASH));
 	}
+	
+
+	@Test
+	public void testFromHex() {
+		// bad length for blob
+		assertThrows(IllegalArgumentException.class,()->Blob.fromHex("2"));
+		assertThrows(IllegalArgumentException.class,()->Blob.fromHex("zz"));
+	}
 
 	@Test
 	public void testBlobTreeConstruction() {

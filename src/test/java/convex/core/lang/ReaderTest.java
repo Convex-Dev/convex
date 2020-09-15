@@ -113,7 +113,10 @@ public class ReaderTest {
 		assertEquals(Blobs.fromHex("0aA1"), Reader.read("0x0Aa1"));
 		assertEquals(Blob.EMPTY, Reader.read("0x"));
 	
-		assertThrows(Error.class, () -> Reader.read("0x1")); // odd number of hex digits
+		// TODO: figure out the edge case
+		assertThrows(Error.class, () -> Reader.read("0x1"));
+		//assertThrows(Error.class, () -> Reader.read("[0x1]")); // odd number of hex digits
+
 		assertThrows(Error.class, () -> Reader.read("0x123")); // odd number of hex digits
 	}
 

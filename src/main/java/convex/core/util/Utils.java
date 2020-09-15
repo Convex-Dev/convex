@@ -213,22 +213,23 @@ public class Utils {
 
 	/**
 	 * Converts a hex string to a byte array. Must contain an even number of hex
-	 * digits.
+	 * digits, or else null will be returned
 	 * 
 	 * @param hex String containing Hex digits
-	 * @return byte array with the given hex value
+	 * @return byte array with the given hex value, or null if string is not valid
 	 */
 	public static byte[] hexToBytes(String hex) {
-		return hexToBytes(hex, hex.length());
+		byte[] bs= hexToBytes(hex, hex.length());
+		return bs;
 	}
 
 	/**
 	 * Converts a hex string to a byte array. Must contain an the expected number of
-	 * hex digits, or else an exception will be thrown
+	 * hex digits, or else null will be returned
 	 * 
 	 * @param hex          String containing Hex digits
 	 * @param stringLength number of hex digits in the string to use
-	 * @return byte array with the given hex value
+	 * @return byte array with the given hex value, or null if not valud
 	 */
 	public static byte[] hexToBytes(String hex, int stringLength) {
 		if (hex.length() != stringLength) {

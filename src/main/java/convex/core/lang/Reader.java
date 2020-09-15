@@ -420,9 +420,6 @@ public class Reader extends BaseParser<Object> {
 		return CharRange('0', '9');
 	}
 
-	public Rule HexDigit() {
-		return FirstOf(CharRange('0', '9'), CharRange('a', 'f'), CharRange('A', 'F'));
-	}
 
 	// NUMBERS
 
@@ -434,16 +431,22 @@ public class Reader extends BaseParser<Object> {
 		return OneOrMore(Digit());
 	}
 	
-	public Rule HexDigits() {
-		return ZeroOrMore(Sequence(HexDigit(),HexDigit()));
-	}
-
 	public Rule SignedInteger() {
 		return Sequence(Optional(AnyOf("+-")), Digits());
 	}
 	
+	// HEX
+	
+	public Rule HexDigit() {
+		return FirstOf(CharRange('0', '9'), CharRange('a', 'f'), CharRange('A', 'F'));
+	}
+	
+	public Rule HexBytes() {
+		return ZeroOrMore(Sequence(HexDigit(),HexDigit()));
+	}
+	
 	public Rule HexLiteral() {
-		return Sequence("0x",Sequence(HexDigits(),push(prepare(Blob.fromHex(match())))));
+		return Sequence("0x",Sequence(HexBytes(),TestNot(HexDigit())),push(prepare(Blob.fromHex(match()))));
 	}
 
 	public Rule Long() {
