@@ -474,7 +474,7 @@ public class ScryptNext extends Reader {
                 CALL,
 
                 // Address
-                StringLiteral(),
+                Expression(),
                 ListAddAction(expVar),
                 Spacing(),
 
