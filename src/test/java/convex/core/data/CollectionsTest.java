@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Iterator;
 import java.util.ListIterator;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 /**
@@ -91,6 +92,17 @@ public class CollectionsTest {
 			assertNull(da.getEntry(key));
 			assertEquals(a, da.assocEntry(me));
 		}
+		
+		{ // test that entrySet works properly
+			java.util.Set<Map.Entry<K, V>> es=a.entrySet();
+			assertEquals(es.size(),a.size());
+			AMap<K, V> t=a;
+			for (Map.Entry<K, V> me: es) {
+				t=t.dissoc(me.getKey());
+			}
+			assertSame(a.empty(),t);
+		}
+		
 		assertThrows(IndexOutOfBoundsException.class, () -> a.entryAt(-1));
 		assertThrows(IndexOutOfBoundsException.class, () -> a.entryAt(n));
 
