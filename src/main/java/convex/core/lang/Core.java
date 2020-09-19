@@ -1335,6 +1335,27 @@ public class Core {
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
+	
+	public static final CoreFn<Number> ABS = reg(new CoreFn<>(Symbols.ABS) {
+		@Override
+		public <I> Context<Number> invoke(Context<I> context, Object[] args) {
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+			Number result = RT.abs(args[0]);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args), Number.class);
+			return context.withResult(Juice.ARITHMETIC, result);
+		}
+	});
+	
+	public static final CoreFn<Long> SIGNUM = reg(new CoreFn<>(Symbols.SIGNUM) {
+		@Override
+		public <I> Context<Long> invoke(Context<I> context, Object[] args) {
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+			Long result = RT.signum(args[0]);
+			if (result == null) return context.withCastError(args[0], Number.class);
+			return context.withResult(Juice.ARITHMETIC, result);
+		}
+	});
+
 
 	public static final CoreFn<Double> POW = reg(new CoreFn<>(Symbols.POW) {
 		@Override

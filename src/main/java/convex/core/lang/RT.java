@@ -286,6 +286,34 @@ public class RT {
 		if (d == null) return null;
 		return StrictMath.sqrt(d);
 	}
+	
+	/**
+	 * Gets the absolute value of a numeric value. Supports double and long.
+	 * 
+	 * @param a Numeric value
+	 * @return
+	 */
+	public static Number abs(Object a) {
+		Number x=RT.number(a);
+		if (x==null) return null;
+		if (x instanceof Long) return Math.abs((Long)x);
+		return Math.abs((Double)x);
+	}
+	
+	/**
+	 * Gets the signum of a numeric value
+	 * 
+	 * @param a Numeric value
+	 * @return Long value of -1, 0 or 1, or null if the argument is not numeric
+	 */
+	public static Long signum(Object a) {
+		Number x=RT.number(a);
+		if (x==null) return null;
+		if (x instanceof Long) return (long) Long.signum((Long)x);
+		double xd=(Double)x;
+		if (Double.isNaN(xd)) return null;
+		return (long)Math.signum(xd);
+	}
 
 	/**
 	 * Compares two objects representing numbers numerically.
@@ -390,7 +418,7 @@ public class RT {
 	}
 
 	/**
-	 * Converts a numerical value to a Long
+	 * Converts a numerical value to a Long. Doubles and floats will be converted if possible.
 	 * @param a
 	 * @return Long value, or null if not convertible
 	 */
@@ -1080,6 +1108,7 @@ public class RT {
 		if (o instanceof IGet) return (IGet<T>) o;
 		return null;
 	}
+
 
 
 

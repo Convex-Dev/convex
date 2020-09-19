@@ -123,6 +123,8 @@ public class Symbols {
 	public static final Symbol TIMES = Symbol.create("*");
 	public static final Symbol DIVIDE = Symbol.create("/");
 
+	public static final Symbol ABS = Symbol.create("abs");
+	public static final Symbol SIGNUM = Symbol.create("signum");
 	public static final Symbol SQRT = Symbol.create("sqrt");
 	public static final Symbol EXP = Symbol.create("exp");
 	public static final Symbol POW = Symbol.create("pow");

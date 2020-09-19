@@ -498,6 +498,58 @@ public class CoreTest {
 		assertEquals("true", eval("(str true)"));
 		assertEquals("cafebabe", eval("(str (blob \"CAFEBABE\"))"));
 	}
+	
+	@Test
+	public void testAbs() {
+		// Integer cases
+		assertEquals(1L,evalL("(abs 1)"));
+		assertEquals(10L,evalL("(abs (byte 10))"));
+		assertEquals(17L,evalL("(abs -17)"));
+		assertEquals(Long.MAX_VALUE,evalL("(abs 9223372036854775807)"));
+		
+		// Double cases
+		assertEquals(1.0,eval("(abs 1.0)"));
+		assertEquals(13.0,eval("(abs (double -13))"));
+		assertEquals(Math.pow(10,100),eval("(abs (pow 10 100))"));
+		
+		// Fun Double cases
+		assertEquals(Double.NaN,eval("(abs NaN)"));
+		assertEquals(Double.POSITIVE_INFINITY,eval("(abs (/ 1 0))"));
+		assertEquals(Double.POSITIVE_INFINITY,eval("(abs (/ -1 0))"));
+		
+		// long overflow case
+		assertEquals(Long.MIN_VALUE,evalL("(abs -9223372036854775808)"));
+		assertEquals(Long.MAX_VALUE,evalL("(abs -9223372036854775807)"));
+		
+		assertArityError(step("(abs)"));
+		assertArityError(step("(abs :foo :bar)")); // arity > cast
+		assertCastError(step("(abs :foo)"));
+	}
+	
+	@Test
+	public void testSignum() {
+		// Integer cases
+		assertEquals(1L,evalL("(signum 1)"));
+		assertEquals(1L,evalL("(signum (byte 10))"));
+		assertEquals(-1L,evalL("(signum -17)"));
+		assertEquals(1L,evalL("(signum 9223372036854775807)"));
+		assertEquals(-1L,evalL("(signum -9223372036854775808)"));
+		
+		// Double cases
+		assertEquals(0L,evalL("(signum 0.0)"));
+		assertEquals(1L,evalL("(signum 1.0)"));
+		assertEquals(-1L,evalL("(signum (double -13))"));
+		assertEquals(1L,evalL("(signum (pow 10 100))"));
+		
+		// Fun Double cases
+		assertCastError(step("(signum NaN)"));
+		assertEquals(1L,evalL("(signum (/ 1 0))"));
+		assertEquals(-1L,evalL("(signum (/ -1 0))"));
+		
+		assertArityError(step("(signum)"));
+		assertArityError(step("(signum :foo :bar)")); // arity > cast
+		assertCastError(step("(signum :foo)"));
+	}
 
 	@Test
 	public void testNot() {
