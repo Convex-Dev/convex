@@ -50,7 +50,7 @@ public class StateTest {
 		// s=s.store(Keywords.STATE);
 		// assertEquals(1,s.getStore().size());
 
-		Ref<State> rs = Ref.create(s).persist();
+		Ref<State> rs = s.getRef().persist();
 		assertEquals(Ref.PERSISTED, rs.getStatus());
 
 		Blob b = Format.encodedBlob(s);

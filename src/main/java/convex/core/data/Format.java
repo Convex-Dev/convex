@@ -498,7 +498,7 @@ public class Format {
 	public static <T> Ref<T> readRef(ByteBuffer bb) throws BadFormatException {
 		T o = Format.read(bb);
 		if (o instanceof Ref) return (Ref<T>) o;
-		return Ref.create(o);
+		return Ref.get(o);
 	}
 
 	@SuppressWarnings("unchecked")

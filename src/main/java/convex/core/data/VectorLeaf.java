@@ -67,7 +67,7 @@ public class VectorLeaf<T> extends AVector<T> {
 			throw new IllegalArgumentException("Too many elements for ListVector: " + length);
 		Ref<T>[] items = new Ref[length];
 		for (int i = 0; i < length; i++) {
-			items[i] = Ref.create(things[i + offset]);
+			items[i] = Ref.get(things[i + offset]);
 		}
 		return new VectorLeaf<T>(items);
 	}
@@ -88,7 +88,7 @@ public class VectorLeaf<T> extends AVector<T> {
 			throw new IllegalArgumentException("Too many elements for ListVector: " + length);
 		Ref<T>[] items = new Ref[length];
 		for (int i = 0; i < length; i++) {
-			items[i] = Ref.create(things[i + offset]);
+			items[i] = Ref.get(things[i + offset]);
 		}
 		return new VectorLeaf<T>(items, tail.getRef(), tail.count() + length);
 	}
@@ -110,7 +110,7 @@ public class VectorLeaf<T> extends AVector<T> {
 			// extend storage array
 			Ref<T>[] newItems = new Ref[localSize + 1];
 			System.arraycopy(items, 0, newItems, 0, localSize);
-			newItems[localSize] = Ref.create(value);
+			newItems[localSize] = Ref.get(value);
 
 			if (localSize + 1 == Vectors.CHUNK_SIZE) {
 				// need to extend to TreeVector
@@ -125,7 +125,7 @@ public class VectorLeaf<T> extends AVector<T> {
 			// this must be a full single chunk already, so turn this into tail of new
 			// ListVector
 			AVector<T> newTail = this;
-			return new VectorLeaf<T>(new Ref[] { Ref.create(value) }, newTail.getRef(), count + 1);
+			return new VectorLeaf<T>(new Ref[] { Ref.get(value) }, newTail.getRef(), count + 1);
 		}
 	}
 
@@ -199,7 +199,7 @@ public class VectorLeaf<T> extends AVector<T> {
 			T old = items[(int) ix].getValue();
 			if (old == value) return this;
 			Ref<T>[] newItems = items.clone();
-			newItems[(int) ix] = Ref.create(value);
+			newItems[(int) ix] = Ref.get(value);
 			return new VectorLeaf<T>(newItems, prefix, count);
 		} else {
 			AVector<T> tl = prefix.getValue();
@@ -476,7 +476,7 @@ public class VectorLeaf<T> extends AVector<T> {
 		Ref<R>[] newItems = (Ref<R>[]) new Ref[ilength];
 		for (int i = 0; i < ilength; i++) {
 			R r = mapper.apply(items[i].getValue());
-			newItems[i] = Ref.create(r);
+			newItems[i] = Ref.get(r);
 		}
 
 		return (prefix == null) ? new VectorLeaf<R>(newItems) : new VectorLeaf<R>(newItems, newPrefix, count);

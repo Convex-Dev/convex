@@ -53,7 +53,7 @@ public class Syntax extends ACell {
 		}
 		if (meta==null) meta=Maps.empty();
 		
-		return new Syntax(Ref.create(value), meta);
+		return new Syntax(Ref.get(value), meta);
 	}
 
 	/**

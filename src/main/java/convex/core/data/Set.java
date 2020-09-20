@@ -66,7 +66,7 @@ public class Set<T> extends ASet<T> {
 	public static <T> Set<T> create(T[] elements) {
 		AHashMap<T, Object> m = Maps.empty();
 		for (T e : elements) {
-			MapEntry<T, Object> me = MapEntry.createRef(Ref.create(e), Ref.TRUE_VALUE);
+			MapEntry<T, Object> me = MapEntry.createRef(Ref.get(e), Ref.TRUE_VALUE);
 			m = m.assocEntry(me);
 		}
 		return Set.wrap(m);
@@ -193,7 +193,7 @@ public class Set<T> extends ASet<T> {
 	@Override
 	public ASet<T> include(T a) {
 		if (map.containsKey(a)) return this;
-		return wrap(map.assocRef(Ref.create(a), true));
+		return wrap(map.assocRef(Ref.get(a), true));
 	}
 
 	@Override

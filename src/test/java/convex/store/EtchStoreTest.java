@@ -21,6 +21,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Hash;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
+import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
@@ -52,7 +53,7 @@ public class EtchStoreTest {
 			assertNull(store.refForHash(BAD_HASH));
 
 			AMap<String, String> data = Maps.of("foo", "bar3621863168");
-			Ref<AMap<String, String>> goodRef = Ref.create(data);
+			Ref<AMap<String, String>> goodRef = data.getRef();
 			Hash goodHash = goodRef.getHash();
 			assertNull(store.refForHash(goodHash));
 
@@ -78,11 +79,11 @@ public class EtchStoreTest {
 			// in store
 			byte[] bytes = new byte[79];
 			sr.nextBytes(bytes);
-			Blob value = Blob.wrap(bytes);
-			Hash hash = value.getHash();
-			assertNotEquals(hash, value);
+			Blob randomBlob = Blob.wrap(bytes);
+			Hash hash = randomBlob.getHash();
+			assertNotEquals(hash, randomBlob);
 
-			Ref<Blob> initialRef = Ref.create(value);
+			Ref<Blob> initialRef = randomBlob.getRef();
 			assertEquals(Ref.UNKNOWN, initialRef.getStatus());
 			assertNull(Stores.current().refForHash(hash));
 			
@@ -96,7 +97,7 @@ public class EtchStoreTest {
 
 			Ref<Blob> newRef = Stores.current().refForHash(hash);
 			assertEquals(initialRef, newRef);
-			assertEquals(value, newRef.getValue());
+			assertEquals(randomBlob, newRef.getValue());
 		} finally {
 			Stores.setCurrent(oldStore);
 		}
@@ -120,8 +121,8 @@ public class EtchStoreTest {
 			
 			Belief belief=Belief.create(kp,ord);
 			
-			Ref<Belief> rb=Ref.create(belief);
-			Ref<ATransaction> rt=Ref.create(t1);
+			Ref<Belief> rb=belief.getRef();
+			Ref<ATransaction> rt=t1.getRef();
 			assertEquals(Ref.UNKNOWN,rb.getStatus());
 			assertEquals(Ref.UNKNOWN,rt.getStatus());
 			
@@ -142,7 +143,7 @@ public class EtchStoreTest {
 			assertEquals(1L,counter.get()); // Exactly one ref should be stored
 			
 			assertEquals(srb,store.refForHash(rb.getHash()));
-			assertNull(store.refForHash(Ref.create(t1).getHash()));
+			assertNull(store.refForHash(t1.getRef().getHash()));
 			
 			
 			// Persist belief
@@ -194,12 +195,12 @@ public class EtchStoreTest {
 		ArrayList<Ref<ACell>> al = new ArrayList<>();
 		try {
 			Stores.setCurrent(store);
-			Object data = Samples.INT_VECTOR_10;
+			AVector<Integer> data = Samples.INT_VECTOR_10;
 
 			// handler that records added refs
 			Consumer<Ref<ACell>> handler = r -> al.add(r);
 
-			Ref<Object> dataRef = Ref.create(data);
+			Ref<AVector<Integer>> dataRef = data.getRef();
 			Hash dataHash = dataRef.getHash();
 			assertNull(store.refForHash(dataHash));
 
@@ -207,7 +208,7 @@ public class EtchStoreTest {
 			assertEquals(1, al.size()); // got new novelty
 			assertEquals(data, al.get(0).getValue());
 
-			Ref.create(Samples.INT_VECTOR_300).persist();
+			Samples.INT_VECTOR_300.getRef().persist();
 			assertEquals(1, al.size()); // no new novelty transmitted
 		} finally {
 			Stores.setCurrent(oldStore);

@@ -60,7 +60,7 @@ public class GenTestSignedValue {
 
 	@Property(trials = 20)
 	public void signedDataRoundTrip(@From(ValueGen.class) Object data) throws BadFormatException {
-		Ref<Object> ref = Ref.create(data);
+		Ref<Object> ref = Ref.get(data);
 		SignedData<Object> good = SignedData.createWithRef(KEYPAIR, ref);
 		assertTrue(good.checkSignature());
 		// System.out.println(good.getSignature());

@@ -63,7 +63,7 @@ public class FormatTest {
 		Object o=Format.read(b);
 		assertEquals(k,o);
 		assertTrue(Format.isEmbedded(k));
-		Ref<?> r=Ref.create(o);
+		Ref<?> r=Ref.get(o);
 		assertTrue(r.isDirect());
 	}
 	

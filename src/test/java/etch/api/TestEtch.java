@@ -25,7 +25,7 @@ public class TestEtch {
 
 		AVector<Integer> v=Vectors.of(1,2,3);
 		Hash h = v.getHash();
-		Ref<ACell> r=Ref.create(v);
+		Ref<ACell> r=v.getRef();
 
 		assertNull(etch.read(h));
 		
@@ -46,7 +46,7 @@ public class TestEtch {
 			AVector<Long> v=Vectors.of(a);
 			Hash key = v.getHash();
 
-			etch.write(key, Ref.create(v));
+			etch.write(key, v.getRef());
 
 			Ref<ACell> r2 = etch.read(key);
 			assertEquals(v,r2.getValue());

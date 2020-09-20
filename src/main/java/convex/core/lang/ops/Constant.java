@@ -40,7 +40,7 @@ public class Constant<T> extends AOp<T> {
 	}
 
 	public static <T> Constant<T> create(T value) {
-		return new Constant<T>(Ref.create(value));
+		return new Constant<T>(Ref.get(value));
 	}
 
 	public static <T> Constant<T> createFromRef(Ref<T> valueRef) {

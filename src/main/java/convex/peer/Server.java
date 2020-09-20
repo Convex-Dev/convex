@@ -493,7 +493,7 @@ public class Server implements Closeable {
 		Object payload=m.getPayload();
 		
 		// TODO: be smarter about this? hold a per-client queue for a while?
-		Ref<?> r=Ref.create(payload).persistShallow();
+		Ref<?> r=Ref.get(payload).persistShallow();
 		r=r.persistShallow();
 		Hash payloadHash=r.getHash();
 
@@ -511,7 +511,7 @@ public class Server implements Closeable {
 
 		Object o = m.getPayload();
 
-		Ref<Object> ref = Ref.create(o);
+		Ref<Object> ref = Ref.get(o);
 		try {
 			// check we can persist the new belief
 			ref=ref.persist();

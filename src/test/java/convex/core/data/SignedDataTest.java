@@ -17,7 +17,7 @@ import convex.test.Samples;
 public class SignedDataTest {
 	@Test
 	public void testBadSignature() {
-		Ref<Long> dref = Ref.create(13L);
+		Ref<Long> dref = Ref.get(13L);
 		SignedData<Long> sd = SignedData.create(Samples.BAD_ADDRESS, Samples.BAD_SIGNATURE, dref);
 		
 		assertFalse(sd.isValid());

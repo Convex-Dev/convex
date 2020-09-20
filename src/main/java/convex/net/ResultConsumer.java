@@ -36,7 +36,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 					// Just store the data, can't guarantee full persistence yet
 					try {
 						Object o = m.getPayload();
-						Ref<?> r = Ref.create(o);
+						Ref<?> r = Ref.get(o);
 						r.persistShallow();
 						unbuffer(r.getHash());
 					} catch (MissingDataException e) {

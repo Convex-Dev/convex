@@ -42,7 +42,7 @@ public class Lambda<T> extends AOp<Fn<T>> {
 	}
 
 	public static <T> Lambda<T> create(AVector<Syntax> params, AOp<T> body) {
-		return create(params,Ref.create(body));
+		return create(params,body.getRef());
 	}
 	
 	@Override
@@ -54,10 +54,10 @@ public class Lambda<T> extends AOp<Fn<T>> {
 				binds=binds.dissoc((Symbol)o);
 			}
 		}
-		AOp<T> old=body.getValue();
-		AOp<T> neww=old.specialise(binds);
-		if (old==neww) return this;
-		return new Lambda<T>(params,Ref.create(neww));
+		AOp<T> oldBody=body.getValue();
+		AOp<T> newBody=oldBody.specialise(binds);
+		if (oldBody==newBody) return this;
+		return new Lambda<T>(params,newBody.getRef());
 	}
 
 	@Override

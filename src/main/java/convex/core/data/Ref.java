@@ -210,7 +210,10 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 * @param value Value to wrap in the Ref
 	 * @return New Ref wrapping the given value.
 	 */
-	public static <T> Ref<T> create(T value) {
+	@SuppressWarnings("unchecked")
+	public static <T> Ref<T> get(T value) {
+		if (value==null) return (Ref<T>) NULL_VALUE;
+		if (value instanceof ACell) return (Ref<T>) ((ACell)value).getRef();
 		return RefDirect.create(value);
 	}
 
@@ -354,11 +357,11 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 *         garbage collected before being persisted 
 	 */
 	@SuppressWarnings("unchecked")
-	public Ref<T> persist(Consumer<Ref<ACell>> noveltyHandler) {
+	public <R> Ref<R> persist(Consumer<Ref<ACell>> noveltyHandler) {
 		int status = getStatus();
-		if (status >= PERSISTED) return this; // already persisted in some form. Might be EMBEDDED
+		if (status >= PERSISTED) return (Ref<R>) this; // already persisted in some form. Might be EMBEDDED
 		AStore store=Stores.current();
-		return (Ref<T>) store.persistRef((Ref<ACell>)this, noveltyHandler);
+		return (Ref<R>) store.persistRef((Ref<ACell>)this, noveltyHandler);
 	}
 	
 	/**
@@ -370,7 +373,7 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 * @throws MissingDataException if the Ref cannot be fully persisted.
 	 * @return the persisted Ref
 	 */
-	public Ref<T> persist() {
+	public <R> Ref<R> persist() {
 		return persist(null);
 	}
 	
@@ -471,7 +474,7 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 		int n = values.length;
 		Ref<T>[] refs = new Ref[n];
 		for (int i = 0; i < n; i++) {
-			refs[i] = Ref.create(values[i]);
+			refs[i] = Ref.get(values[i]);
 		}
 		return refs;
 	}

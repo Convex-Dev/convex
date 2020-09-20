@@ -40,7 +40,7 @@ public class ParamTestRefs {
 			
 			{ // single embedded value
 				Long n=1567565765677L;
-				Ref<Long> r=Ref.create(n);
+				Ref<Long> r=Ref.get(n);
 				assertEquals(Ref.EMBEDDED,r.getStatus());
 				Ref<Long> r2=r.persist();
 				assertEquals(Ref.EMBEDDED,r2.getStatus());
@@ -50,7 +50,7 @@ public class ParamTestRefs {
 			
 			{ // structure with embedded value
 				AVector<Long> v=Vectors.of(6759578996496L);
-				Ref<AVector<Long>> r=Ref.create(v);
+				Ref<AVector<Long>> r=v.getRef();
 				assertEquals(Ref.UNKNOWN,r.getStatus());
 				Ref<AVector<Long>> r2=r.persist();
 				assertEquals(Ref.PERSISTED,r2.getStatus());
@@ -59,7 +59,7 @@ public class ParamTestRefs {
 			
 			{ // map with empedded structure
 				AMap<Long,AVector<Long>> m=Maps.of(156746748L,Vectors.of(8797987L));
-				Ref<AMap<Long,AVector<Long>>> r=Ref.create(m);
+				Ref<AMap<Long,AVector<Long>>> r=m.getRef();
 				assertEquals(Ref.UNKNOWN,r.getStatus());
 				
 				Ref<AMap<Long,AVector<Long>>> r2=r.persist();

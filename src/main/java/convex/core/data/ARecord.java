@@ -232,7 +232,7 @@ public abstract class ARecord extends AMap<Keyword,Object> {
 
 	@Override
 	public MapEntry<Keyword, Object> getKeyRefEntry(Ref<Keyword> ref) {
-		return MapEntry.createRef(ref, Ref.create(get(ref.getValue())));
+		return MapEntry.createRef(ref, Ref.get(get(ref.getValue())));
 	}
 
 	@Override

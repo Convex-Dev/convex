@@ -44,7 +44,7 @@ public class TestConvex {
 		
 		assertTrue(cv.isConnected());
 
-		Ref<ATransaction> tr=Ref.create(Invoke.create(1L,Reader.read("*address*")));
+		Ref<ATransaction> tr=Invoke.create(1L,Reader.read("*address*")).getRef();
 		Result r=cv.transact(SignedData.create(Init.HERO, Samples.FAKE_SIGNATURE,tr)).get();
 		assertEquals(ErrorCodes.SIGNATURE,r.getErrorCode());
 		

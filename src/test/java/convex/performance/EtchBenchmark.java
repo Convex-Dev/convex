@@ -26,7 +26,7 @@ public class EtchBenchmark {
 	static {
 		for (int i=0; i<1000; i++) {
 			AVector<Long> v=Vectors.of(0L,(long)i);
-			Ref<ACell> r=Ref.create(v);
+			Ref<ACell> r=v.getRef();
 			refs[i]=r;
 			r.getHash();
 			store.persistRef(r, null);
@@ -36,7 +36,7 @@ public class EtchBenchmark {
 	@Benchmark
 	public void writeData() {
 		AVector<Long> v=Vectors.of(1L,ix++);
-		store.persistRef(Ref.create(v), null);
+		store.persistRef(v.getRef(), null);
 	}
 	
 	@Benchmark

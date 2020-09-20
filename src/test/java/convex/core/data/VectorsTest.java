@@ -195,7 +195,7 @@ public class VectorsTest {
 	public void testUpdateRefs() {
 		AVector<Integer> vec = Vectors.of(1, 2, 3, 4);
 		AVector<Integer> vec2 = vec.updateRefs(r -> {
-			return Ref.create((Integer) (r.getValue()) + 1);
+			return Ref.get((Integer) (r.getValue()) + 1);
 		});
 		assertEquals(Vectors.of(2, 3, 4, 5), vec2);
 	}

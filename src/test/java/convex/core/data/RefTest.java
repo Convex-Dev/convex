@@ -47,7 +47,7 @@ public class RefTest {
 		assertEquals(272, Utils.totalRefCount(Samples.INT_VECTOR_256));
 
 		// 11 = 10 element refs plus one for enclosing ref
-		assertEquals(11, Ref.accumulateRefSet(Ref.create(Samples.INT_VECTOR_10)).size());
+		assertEquals(11, Ref.accumulateRefSet(Samples.INT_VECTOR_10.getRef()).size());
 	}
 
 	@Test
@@ -56,7 +56,7 @@ public class RefTest {
 		AVector<Object> v = Vectors.of(bb);
 		Hash bh = bb.getHash();
 		Hash vh = v.getHash();
-		Ref<AVector<Object>> ref = Ref.create(v).persistShallow();
+		Ref<AVector<Object>> ref = v.getRef().persistShallow();
 		assertEquals(Ref.STORED, ref.getStatus());
 
 		assertThrows(MissingDataException.class, () -> Ref.forHash(bh).getValue());
@@ -65,16 +65,16 @@ public class RefTest {
 
 	@Test
 	public void testEmbedded() {
-		assertTrue(Ref.create(1L).isEmbedded()); // a primitive
+		assertTrue(Ref.get(1L).isEmbedded()); // a primitive
 		assertTrue(Ref.NULL_VALUE.isEmbedded()); // singleton null ref
 		assertTrue(Ref.EMPTY_VECTOR.isEmbedded()); // singleton null ref
-		assertFalse(Ref.create(Blob.create(new byte[100])).isEmbedded()); // too big to embed
-		assertFalse(Ref.create(Samples.LONG_MAP_10).isEmbedded()); // a ref container
+		assertFalse(Blob.create(new byte[100]).getRef().isEmbedded()); // too big to embed
+		assertFalse(Samples.LONG_MAP_10.getRef().isEmbedded()); // a ref container
 	}
 
 	@Test
 	public void testPersistEmbeddedNull() throws InvalidDataException {
-		Ref<Object> nr = Ref.create(null);
+		Ref<Object> nr = Ref.get(null);
 		assertSame(Ref.NULL_VALUE, nr);
 		assertSame(nr, nr.persist());
 		nr.validate();
@@ -83,7 +83,7 @@ public class RefTest {
 
 	@Test
 	public void testPersistEmbeddedLong() {
-		Ref<Object> nr = Ref.create(10001L);
+		Ref<Object> nr = Ref.get(10001L);
 		assertSame(nr, nr.persist());
 		assertEquals(Ref.EMBEDDED, nr.getStatus());
 	}
@@ -92,7 +92,7 @@ public class RefTest {
 	public void testGoodData() {
 		AVector<String> value = Vectors.of("foo", "bar");
 		// a good ref
-		Ref<?> orig = Ref.create(value);
+		Ref<?> orig = value.getRef();
 		assertEquals(Ref.UNKNOWN, orig.getStatus());
 		assertFalse(orig.isPersisted());
 		orig = orig.persist();
@@ -106,16 +106,16 @@ public class RefTest {
 
 	@Test
 	public void testCompare() {
-		assertEquals(0, Ref.create(1).compareTo(Ref.createPersisted(1)));
-		assertEquals(1, Ref.create(1).compareTo(
+		assertEquals(0, Ref.get(1).compareTo(Ref.createPersisted(1)));
+		assertEquals(1, Ref.get(1).compareTo(
 				Ref.forHash(Hash.fromHex("0000000000000000000000000000000000000000000000000000000000000000"))));
-		assertEquals(-1, Ref.create(1).compareTo(
+		assertEquals(-1, Ref.get(1).compareTo(
 				Ref.forHash(Hash.fromHex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))));
 	}
 
 	@Test
 	public void testDiabolicalDeep() {
-		Ref<Object> a = Ref.create(Samples.DIABOLICAL_MAP_2_10000);
+		Ref<ACell> a = Samples.DIABOLICAL_MAP_2_10000.getRef();
 		// TODO: consider if this should be possible, currently not (stack overflow)
 		// Ref.accumulateRefSet(a);
 		assertFalse(a.isEmbedded());
@@ -123,7 +123,7 @@ public class RefTest {
 
 	@Test
 	public void testDiabolicalWide() {
-		Ref<Object> a = Ref.create(Samples.DIABOLICAL_MAP_30_30);
+		Ref<ACell> a = Samples.DIABOLICAL_MAP_30_30.getRef();
 		// OK since we manage de-duplication
 		Set<Ref<?>> set = Ref.accumulateRefSet(a);
 		assertEquals(1 + 30 * 16, set.size()); // 16 refs at each level after de-duping
@@ -132,7 +132,7 @@ public class RefTest {
 
 	@Test
 	public void testNullRef() {
-		Ref<?> nullRef = Ref.create(null);
+		Ref<?> nullRef = Ref.get(null);
 		assertNotNull(nullRef);
 		assertSame(nullRef.getHash(), Hash.NULL_HASH);
 	}

@@ -11,6 +11,7 @@ import org.junit.Test;
 import convex.core.crypto.Hash;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
+import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
@@ -36,7 +37,7 @@ public class MemoryStoreTest {
 			assertNull(ms.refForHash(BAD_HASH));
 
 			AMap<String, String> data = Maps.of("foo", "bar3621863168");
-			Ref<AMap<String, String>> goodRef = Ref.create(data);
+			Ref<AMap<String, String>> goodRef = data.getRef();
 			Hash goodHash = goodRef.getHash();
 			assertNull(ms.refForHash(goodHash));
 
@@ -63,7 +64,7 @@ public class MemoryStoreTest {
 		Hash hash = value.getHash();
 		assertNotEquals(hash, value);
 
-		Ref<Blob> initialRef = Ref.create(value);
+		Ref<Blob> initialRef = value.getRef();
 		assertEquals(Ref.UNKNOWN, initialRef.getStatus());
 		assertNull(Stores.current().refForHash(hash));
 		Ref<Blob> ref = initialRef.persist();
@@ -82,11 +83,11 @@ public class MemoryStoreTest {
 		ArrayList<Ref<ACell>> al = new ArrayList<>();
 		try {
 			Stores.setCurrent(ms);
-			Object data = Samples.INT_VECTOR_10;
+			AVector<Integer> data = Samples.INT_VECTOR_10;
 
 			Consumer<Ref<ACell>> handler = r -> al.add(r);
 
-			Ref<Object> dataRef = Ref.create(data);
+			Ref<AVector<Integer>> dataRef = data.getRef();
 			Hash dataHash = dataRef.getHash();
 			assertNull(ms.refForHash(dataHash));
 
@@ -94,7 +95,7 @@ public class MemoryStoreTest {
 			assertEquals(1, al.size());
 			assertEquals(data, al.get(0).getValue());
 
-			Ref.create(Samples.INT_VECTOR_300).persist();
+			Samples.INT_VECTOR_300.getRef().persist();
 			assertEquals(1, al.size()); // no new novelty transmitted
 		} finally {
 			Stores.setCurrent(oldStore);

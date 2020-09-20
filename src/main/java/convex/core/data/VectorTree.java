@@ -252,7 +252,7 @@ public class VectorTree<T> extends AVector<T> {
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Override
 	public AVector<T> append(T value) {
-		return new VectorLeaf(new Ref[] { Ref.create(value) }, this.getRef(), count + 1);
+		return new VectorLeaf(new Ref[] { Ref.get(value) }, this.getRef(), count + 1);
 	}
 
 	@Override

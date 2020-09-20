@@ -160,7 +160,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	@Override
 	public Ref<Keyword> getRef() {
 		// TODO maybe cache this?
-		return Ref.create(this);
+		return RefDirect.create(this);
 	}
 	
 	@Override

@@ -73,7 +73,7 @@ public class HashTest {
 		
 		// different ways of getting the same result, should all correspond
 		assertSame(Hash.NULL_HASH, Hash.compute(null));
-		assertSame(Hash.NULL_HASH, Ref.create(null).getHash());
+		assertSame(Hash.NULL_HASH, Ref.get(null).getHash());
 	}
 
 	@Test

@@ -50,7 +50,7 @@ public class ObjectsTest {
 			MemoryStore ms=new MemoryStore();
 			Stores.setCurrent(ms);
 			
-			Ref<ACell> r=Ref.create(a);
+			Ref<ACell> r=a.getRef();
 			
 			Hash hash=r.getHash();
 			
@@ -85,7 +85,7 @@ public class ObjectsTest {
 	public static void doAnyValueTests(Object a) {
 		assertTrue(Format.isCanonical(a));
 
-		Ref<Object> r = Ref.create(a).persist();
+		Ref<Object> r = Ref.get(a).persist();
 		assertEquals(a, r.getValue());
 
 		Blob b = Format.encodedBlob(a);

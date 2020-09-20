@@ -322,7 +322,7 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 					branch1 = branch2;
 					branch2 = temp;
 				}
-				Ref[] newChildren = new Ref[] { Ref.create(branch1), Ref.create(branch2) };
+				Ref[] newChildren = new Ref[] { branch1.getRef(), branch2.getRef() };
 				short newMask = (short) ((1 << d1) | (1 << d2));
 				BlobMap<K, V> fork = new BlobMap<K, V>(k, depth, mkl - depth, null, newChildren, newMask, count + 1L);
 				return fork;
@@ -379,7 +379,7 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 			short newMask = (short) (mask | (1 << childDigit));
 
 			System.arraycopy(children, 0, newChildren, 0, newPos); // earlier entries
-			newChildren[newPos] = Ref.create(newChild);
+			newChildren[newPos] = newChild.getRef();
 			System.arraycopy(children, newPos, newChildren, newPos + 1, n - newPos); // later entries
 			return new BlobMap<K, V>(prefix, depth, prefixLength, entry, newChildren, newMask,
 					count + newChild.count());
@@ -406,7 +406,7 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 				// need to replace a child
 				int childPos = Bits.positionForDigit(childDigit, mask);
 				newChildren = children.clone();
-				newChildren[childPos] = Ref.create(newChild);
+				newChildren[childPos] = newChild.getRef();
 				long newCount = count + newChild.count() - oldChild.count();
 				return new BlobMap<K, V>(prefix, depth, prefixLength, entry, newChildren, mask, newCount);
 			}

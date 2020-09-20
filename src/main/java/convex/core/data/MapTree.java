@@ -170,12 +170,12 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public boolean containsKey(Object key) {
-		return containsKeyRef((Ref<K>) Ref.create(key));
+		return containsKeyRef((Ref<K>) Ref.get(key));
 	}
 
 	@Override
 	public MapEntry<K, V> getEntry(K k) {
-		return getKeyRefEntry(Ref.create(k));
+		return getKeyRefEntry(Ref.get(k));
 	}
 
 	@Override
@@ -197,7 +197,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public V get(Object key) {
-		MapEntry<K, V> me = getKeyRefEntry((Ref<K>) Ref.create(key));
+		MapEntry<K, V> me = getKeyRefEntry((Ref<K>) Ref.get(key));
 		if (me == null) return null;
 		return me.getValue();
 	}
@@ -224,7 +224,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 
 	@Override
 	public AHashMap<K, V> dissoc(K key) {
-		return dissocRef((Ref<K>) Ref.create(key));
+		return dissocRef((Ref<K>) Ref.get(key));
 	}
 
 	@Override
@@ -309,7 +309,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 
 	@Override
 	public MapTree<K, V> assoc(K key, V value) {
-		Ref<K> keyRef = Ref.create(key);
+		Ref<K> keyRef = Ref.get(key);
 		return assocRef(keyRef, value, shift);
 	}
 
@@ -327,8 +327,8 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) {
 			// location not present, need to insert new child
-			AHashMap<K, V> newChild = MapLeaf.create(MapEntry.createRef(keyRef, Ref.create(value)));
-			return insertChild(digit, Ref.create(newChild));
+			AHashMap<K, V> newChild = MapLeaf.create(MapEntry.createRef(keyRef, Ref.get(value)));
+			return insertChild(digit, newChild.getRef());
 		} else {
 			// child exists, so assoc in new ref at lower shift level
 			AHashMap<K, V> child = children[i].getValue();

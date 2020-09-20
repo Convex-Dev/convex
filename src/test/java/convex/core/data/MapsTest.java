@@ -98,10 +98,10 @@ public class MapsTest {
 
 	@Test
 	public void testContainsRef() {
-		assertTrue(Samples.LONG_MAP_10.containsKeyRef(Ref.create(1L)));
-		assertFalse(Samples.LONG_MAP_10.containsKeyRef(Ref.create(12L)));
-		assertTrue(Samples.LONG_MAP_100.containsKeyRef(Ref.create(12L)));
-		assertFalse(Samples.LONG_MAP_100.containsKeyRef(Ref.create(100L)));
+		assertTrue(Samples.LONG_MAP_10.containsKeyRef(Ref.get(1L)));
+		assertFalse(Samples.LONG_MAP_10.containsKeyRef(Ref.get(12L)));
+		assertTrue(Samples.LONG_MAP_100.containsKeyRef(Ref.get(12L)));
+		assertFalse(Samples.LONG_MAP_100.containsKeyRef(Ref.get(100L)));
 	}
 
 	@Test

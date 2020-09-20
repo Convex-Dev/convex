@@ -95,12 +95,12 @@ public class GenTestAnyValue {
 			assertTrue(Format.isEmbedded(o2));
 			
 			// when we persist a ref to an embedded object, should be the object itself
-			Ref<Object> ref=Ref.create(o);
+			Ref<Object> ref=Ref.get(o);
 			assertTrue(ref.isDirect()); 
 			assertEquals(data,Format.encodedBlob(ref)); // should encode ref same as value
 		} else {
 			// when we persist a ref to non-embedeed object, should be a ref type
-			Ref<?> ref=Ref.create(o);
+			Ref<?> ref=Ref.get(o);
 			Blob b=Format.encodedBlob(ref);
 			assertEquals(Tag.REF,b.get(0));
 			assertEquals(33,b.length());
@@ -114,7 +114,7 @@ public class GenTestAnyValue {
 		// introduce a small offset to ensure blobs working correctly
 		data=Samples.ONE_ZERO_BYTE_DATA.append(data).slice(1).toBlob();
 		
-		Ref<Object> dataRef=Ref.create(o).persist(); // ensure in store
+		Ref<Object> dataRef=Ref.get(o).persist(); // ensure in store
 		Hash hash=Hash.compute(o);
 		assertEquals(dataRef.getHash(),hash);
 		

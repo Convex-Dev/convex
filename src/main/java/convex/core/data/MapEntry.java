@@ -38,13 +38,13 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 	}
 
 	public static <K, V> MapEntry<K, V> create(K key, V value) {
-		return createRef(Ref.create(key), Ref.create(value));
+		return createRef(Ref.get(key), Ref.get(value));
 	}
 
 	@Override
 	public MapEntry<K, V> withValue(V value) {
 		if (value == getValue()) return this;
-		return new MapEntry<K, V>(keyRef, Ref.create(value));
+		return new MapEntry<K, V>(keyRef, Ref.get(value));
 	}
 
 	@SuppressWarnings("unchecked")
@@ -58,7 +58,7 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 	@Override
 	protected AMapEntry<K, V> withKey(K key) {
 		if (key == getKey()) return this;
-		return new MapEntry<K, V>(Ref.create(key), valueRef);
+		return new MapEntry<K, V>(Ref.get(key), valueRef);
 	}
 
 	@Override

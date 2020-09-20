@@ -77,7 +77,7 @@ public class SignedData<T> extends ACell {
 	}
 
 	public static <T> SignedData<T> create(AKeyPair keyPair, T value2) {
-		return createWithRef(keyPair, Ref.create(value2));
+		return createWithRef(keyPair, Ref.get(value2));
 	}
 
 	/**

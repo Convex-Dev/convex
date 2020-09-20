@@ -505,7 +505,7 @@ public class Core {
 
 			ASet<Object> store = context.getState().getStore();
 
-			Ref<Object> ref = Ref.create(args[0]);
+			Ref<Object> ref = Ref.get(args[0]);
 			ASet<Object> newStore = store.includeRef(ref);
 			context = context.withStore(newStore);
 
