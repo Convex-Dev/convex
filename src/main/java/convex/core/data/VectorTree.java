@@ -114,7 +114,7 @@ public class VectorTree<T> extends AVector<T> {
 		Ref<AVector<T>>[] bs = (Ref<AVector<T>>[]) new Ref<?>[bNum];
 		for (int i = 0; i < bNum; i++) {
 			int bLen = Math.min(bSize, length - bSize * i);
-			bs[i] = Ref.create(Vectors.createChunked(things, offset + i * bSize, bLen));
+			bs[i] = Vectors.createChunked(things, offset + i * bSize, bLen).getRef();
 		}
 		VectorTree<T> tv = new VectorTree<T>(bs, length);
 		return tv;
@@ -146,7 +146,7 @@ public class VectorTree<T> extends AVector<T> {
 		if (oc == nc) return this;
 
 		Ref<AVector<T>>[] newChildren = children.clone();
-		newChildren[b] = Ref.create(nc);
+		newChildren[b] = nc.getRef();
 		return new VectorTree<T>(newChildren, count);
 	}
 
@@ -214,8 +214,8 @@ public class VectorTree<T> extends AVector<T> {
 		if (isPacked()) {
 			// full blockvector, so need to elevate to the next level
 			Ref<AVector<T>>[] newBlocks = new Ref[2];
-			newBlocks[0] = Ref.create(this);
-			newBlocks[1] = Ref.create(b);
+			newBlocks[0] = this.getRef();
+			newBlocks[1] = b.getRef();
 			return new VectorTree<T>(newBlocks, this.count() + b.count());
 		}
 
@@ -225,14 +225,14 @@ public class VectorTree<T> extends AVector<T> {
 			// need to extend block array
 			Ref<AVector<T>>[] newBlocks = new Ref[blength + 1];
 			System.arraycopy(children, 0, newBlocks, 0, blength);
-			newBlocks[blength] = Ref.create(b);
+			newBlocks[blength] = b.getRef();
 			return new VectorTree<T>(newBlocks, count + Vectors.CHUNK_SIZE);
 		} else {
 			// add b into current last block
 			AVector<T> newLast = lastBlock.appendChunk(b);
 			Ref<AVector<T>>[] newBlocks = new Ref[blength];
 			System.arraycopy(children, 0, newBlocks, 0, blength - 1);
-			newBlocks[blength - 1] = Ref.create(newLast);
+			newBlocks[blength - 1] = newLast.getRef();
 			return new VectorTree<T>(newBlocks, count + Vectors.CHUNK_SIZE);
 		}
 	}
@@ -252,7 +252,7 @@ public class VectorTree<T> extends AVector<T> {
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Override
 	public AVector<T> append(T value) {
-		return new VectorLeaf(new Ref[] { Ref.create(value) }, Ref.create(this), count + 1);
+		return new VectorLeaf(new Ref[] { Ref.create(value) }, this.getRef(), count + 1);
 	}
 
 	@Override
@@ -287,8 +287,8 @@ public class VectorTree<T> extends AVector<T> {
 	@SuppressWarnings("unchecked")
 	static <T> VectorTree<T> wrap2(VectorLeaf<T> head, VectorLeaf<T> tail) {
 		Ref<AVector<T>>[] newBlocks = new Ref[2];
-		newBlocks[0] = Ref.create(tail);
-		newBlocks[1] = Ref.create(head);
+		newBlocks[0] = tail.getRef();
+		newBlocks[1] = head.getRef();
 		return new VectorTree<T>(newBlocks, 2 * Vectors.CHUNK_SIZE);
 	}
 
@@ -455,7 +455,7 @@ public class VectorTree<T> extends AVector<T> {
 		Ref<AVector<R>>[] newBlocks = (Ref<AVector<R>>[]) new Ref<?>[blength];
 		for (int i = 0; i < blength; i++) {
 			AVector<R> r = children[i].getValue().map(mapper);
-			newBlocks[i] = Ref.create(r);
+			newBlocks[i] = r.getRef();
 		}
 		return new VectorTree<R>(newBlocks, count);
 	}

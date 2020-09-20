@@ -90,7 +90,7 @@ public class VectorLeaf<T> extends AVector<T> {
 		for (int i = 0; i < length; i++) {
 			items[i] = Ref.create(things[i + offset]);
 		}
-		return new VectorLeaf<T>(items, Ref.create(tail), tail.count() + length);
+		return new VectorLeaf<T>(items, tail.getRef(), tail.count() + length);
 	}
 
 	public static <T> VectorLeaf<T> create(T[] things) {
@@ -125,7 +125,7 @@ public class VectorLeaf<T> extends AVector<T> {
 			// this must be a full single chunk already, so turn this into tail of new
 			// ListVector
 			AVector<T> newTail = this;
-			return new VectorLeaf<T>(new Ref[] { Ref.create(value) }, Ref.create(newTail), count + 1);
+			return new VectorLeaf<T>(new Ref[] { Ref.create(value) }, newTail.getRef(), count + 1);
 		}
 	}
 
@@ -205,7 +205,7 @@ public class VectorLeaf<T> extends AVector<T> {
 			AVector<T> tl = prefix.getValue();
 			AVector<T> newTail = tl.assoc(i, value);
 			if (tl == newTail) return this;
-			return new VectorLeaf<T>(items, Ref.create(newTail), count);
+			return new VectorLeaf<T>(items, newTail.getRef(), count);
 		}
 	}
 
@@ -295,7 +295,7 @@ public class VectorLeaf<T> extends AVector<T> {
 	public VectorLeaf<T> withPrefix(AVector<T> newPrefix) {
 		if ((newPrefix == null) && !hasPrefix()) return this;
 		long tc = (newPrefix == null) ? 0L : newPrefix.count();
-		return new VectorLeaf<T>(items, (newPrefix == null) ? null : Ref.create(newPrefix), tc + items.length);
+		return new VectorLeaf<T>(items, (newPrefix == null) ? null : newPrefix.getRef(), tc + items.length);
 	}
 
 	@Override
@@ -470,7 +470,7 @@ public class VectorLeaf<T> extends AVector<T> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <R> AVector<R> map(Function<? super T, ? extends R> mapper) {
-		Ref<AVector<R>> newPrefix = (prefix == null) ? null : Ref.create(prefix.getValue().map(mapper));
+		Ref<AVector<R>> newPrefix = (prefix == null) ? null : prefix.getValue().map(mapper).getRef();
 
 		int ilength = items.length;
 		Ref<R>[] newItems = (Ref<R>[]) new Ref[ilength];

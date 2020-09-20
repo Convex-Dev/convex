@@ -12,7 +12,7 @@ import convex.core.exceptions.BadFormatException;
 public class Maps {
 
 	private static final AMap<?, ?> EMPTY_MAP = MapLeaf.emptyMap();
-	private static final Ref<?> EMPTY_REF = Ref.create(EMPTY_MAP);
+	private static final Ref<?> EMPTY_REF = EMPTY_MAP.getRef();
 
 	@SuppressWarnings("unchecked")
 	public static <K, V, R extends AHashMap<K, V>> R empty() {

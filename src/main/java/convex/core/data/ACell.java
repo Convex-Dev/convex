@@ -258,7 +258,15 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	public abstract int getRefCount();
 
 	/**
-	 * Gets a numbered Ref from within this Cell.
+	 * Gets the Ref for this Cell
+	 */
+	@SuppressWarnings("unchecked")
+	public <R extends ACell> Ref<R> getRef() {
+		return (Ref<R>) RefDirect.create(this);
+	}
+	
+	/**
+	 * Gets a numbered child Ref from within this Cell.
 	 * 
 	 * @param i Index of ref to get
 	 * @return The Ref at the specified index

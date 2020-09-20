@@ -208,7 +208,7 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 * lookup in stores etc.
 	 * 
 	 * @param value Value to wrap in the Ref
-	 * @return NEw Ref wrapping the given value.
+	 * @return New Ref wrapping the given value.
 	 */
 	public static <T> Ref<T> create(T value) {
 		return RefDirect.create(value);

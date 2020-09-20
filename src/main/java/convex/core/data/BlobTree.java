@@ -105,7 +105,7 @@ public class BlobTree extends ABlob {
 			if ((i < chunkCount - 1) && (childLength != Blob.CHUNK_LENGTH))
 				throw new IllegalArgumentException("Illegal internediate chunk size: " + childLength);
 
-			Ref<ABlob> child = Ref.create(blob);
+			Ref<ABlob> child = blob.getRef();
 			children[i] = child;
 			length += childLength;
 		}
@@ -126,7 +126,7 @@ public class BlobTree extends ABlob {
 			for (int i = 0; i < numChildren; i++) {
 				int childOffset = i * childSize;
 				BlobTree bt = create(blobs, offset + childOffset, Math.min(childSize, chunkCount - childOffset));
-				children[i] = Ref.create(bt);
+				children[i] = bt.getRef();
 				length += bt.count;
 			}
 			return new BlobTree(children, shift, length);

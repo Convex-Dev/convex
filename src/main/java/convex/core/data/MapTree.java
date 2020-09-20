@@ -83,9 +83,10 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 			int ix = e.getKeyHash().getHexDigit(shift);
 			Ref<AHashMap<K, V>> ref = children[ix];
 			if (ref == null) {
-				children[ix] = Ref.create(MapLeaf.create(e));
+				children[ix] = MapLeaf.create(e).getRef();
 			} else {
-				children[ix] = Ref.create(ref.getValue().assocEntry(e, shift + 1));
+				AHashMap<K, V> newChild=ref.getValue().assocEntry(e, shift + 1);
+				children[ix] = newChild.getRef();
 			}
 		}
 		return (MapTree<K, V>) createFull(children, shift);
@@ -247,7 +248,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 		} else {
 			// replace child
 			if (newChild.isEmpty()) return dissocChild(i);
-			return replaceChild(i, Ref.create(newChild));
+			return replaceChild(i, newChild.getRef());
 		}
 	}
 
@@ -332,7 +333,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 			// child exists, so assoc in new ref at lower shift level
 			AHashMap<K, V> child = children[i].getValue();
 			AHashMap<K, V> newChild = child.assocRef(keyRef, value, shift + 1);
-			return replaceChild(i, Ref.create(newChild));
+			return replaceChild(i, newChild.getRef());
 		}
 	}
 
@@ -351,13 +352,13 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 		if (i < 0) {
 			// location not present
 			AHashMap<K, V> newChild = MapLeaf.create(e);
-			return insertChild(digit, Ref.create(newChild));
+			return insertChild(digit, newChild.getRef());
 		} else {
 			// location needs update
 			AHashMap<K, V> child = children[i].getValue();
 			AHashMap<K, V> newChild = child.assocEntry(e, shift + 1);
 			if (child == newChild) return this;
-			return replaceChild(i, Ref.create(newChild));
+			return replaceChild(i, newChild.getRef());
 		}
 	}
 
@@ -536,7 +537,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 					}
 				}
 			}
-			if (newChildren != null) newChildren[digit] = Ref.create(rc);
+			if (newChildren != null) newChildren[digit] = rc.getRef();
 		}
 		if (newChildren == null) return this;
 		return createFull(newChildren, shift);
@@ -562,7 +563,9 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 					}
 				}
 			}
-			if (newChildren != null) newChildren[i] = Ref.create(newChild);
+			if (newChildren != null) {
+				newChildren[i] = newChild.getRef();
+			}
 		}
 		assert (ix == children.length);
 		// if any new children created, create a new Map, else use this
@@ -619,7 +622,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 					}
 				}
 			}
-			if (newChildren != null) newChildren[i] = (newChild == bc) ? bref : Ref.create(newChild);
+			if (newChildren != null) newChildren[i] = (newChild == bc) ? bref : newChild.getRef();
 		}
 		if (newChildren == null) return this;
 		return createFull(newChildren, shift);
@@ -645,7 +648,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 					}
 				}
 			}
-			if (newChildren != null) newChildren[i] = Ref.create(newChild);
+			if (newChildren != null) newChildren[i] = newChild.getRef();
 		}
 		assert (ix == children.length);
 		AHashMap<K, V> result = (newChildren == null) ? this : createFull(newChildren, shift);
@@ -744,7 +747,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 				if (children == newChildren) {
 					newChildren = children.clone();
 				}
-				newChildren[i] = Ref.create(newChild);
+				newChildren[i] = newChild.getRef();
 			}
 		}
 		if (newChildren == children) return this;

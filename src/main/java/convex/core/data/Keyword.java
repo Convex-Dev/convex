@@ -156,6 +156,8 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 
 	}
 
+	@SuppressWarnings("unchecked")
+	@Override
 	public Ref<Keyword> getRef() {
 		// TODO maybe cache this?
 		return Ref.create(this);

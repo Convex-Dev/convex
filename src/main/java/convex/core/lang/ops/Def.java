@@ -42,11 +42,11 @@ public class Def<T> extends AOp<T> {
 	}
 
 	public static <T> Def<T> create(Syntax key, AOp<T> op) {
-		return create(key, Ref.create(op));
+		return create(key, op.getRef());
 	}
 
 	public static <T> Def<T> create(Symbol key, AOp<T> op) {
-		return create(Syntax.create(key), Ref.create(op));
+		return create(Syntax.create(key), op.getRef());
 	}
 
 	public static <T> Def<T> create(String key, AOp<T> op) {
@@ -122,10 +122,10 @@ public class Def<T> extends AOp<T> {
 
 	@Override
 	public AOp<T> specialise(AMap<Symbol, Object> binds) {
-		AOp<T> old = op.getValue();
-		AOp<T> neww = old.specialise(binds);
-		if (old == neww) return this;
-		return new Def<T>(symbol, Ref.create(neww));
+		AOp<T> oldOp = op.getValue();
+		AOp<T> newOp = oldOp.specialise(binds);
+		if (oldOp == newOp) return this;
+		return new Def<T>(symbol, newOp.getRef());
 	}
 
 	@Override

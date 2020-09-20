@@ -305,7 +305,7 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 						count);
 				int splitDigit = prefix.getHexDigit(mkl);
 				short splitMask = (short) (1 << splitDigit);
-				BlobMap<K, V> result = new BlobMap<K, V>(k, depth, mkl - depth, e, new Ref[] { Ref.create(split) },
+				BlobMap<K, V> result = new BlobMap<K, V>(k, depth, mkl - depth, e, new Ref[] { split.getRef() },
 						splitMask, count + 1);
 				return result;
 			} else {
