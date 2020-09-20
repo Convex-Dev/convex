@@ -597,9 +597,9 @@ public class VectorTree<T> extends AVector<T> {
 	// size)
 	private long commonPrefixLengthAligned(VectorTree<T> b) {
 		// check if we have the same stored hash. If so, quick exit!
-		Hash thisHash = checkHash();
+		Hash thisHash = cachedHash();
 		if (thisHash != null) {
-			Hash bHash = b.checkHash();
+			Hash bHash = b.cachedHash();
 			if ((bHash != null) && (thisHash.equals(bHash))) return count;
 		}
 

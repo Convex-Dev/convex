@@ -155,13 +155,6 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		// TODO Auto-generated method stub
 
 	}
-
-	@SuppressWarnings("unchecked")
-	@Override
-	public Ref<Keyword> getRef() {
-		// TODO maybe cache this?
-		return RefDirect.create(this);
-	}
 	
 	@Override
 	public int getRefCount() {

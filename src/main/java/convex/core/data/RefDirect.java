@@ -141,4 +141,5 @@ public class RefDirect<T> extends Ref<T> {
 		if (newValue!=value) return new RefDirect<T>(newValue,hash,status);
 		return this;
 	}
+
 }

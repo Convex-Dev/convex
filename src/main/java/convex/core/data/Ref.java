@@ -202,6 +202,15 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 * @return Hash of the value
 	 */
 	public abstract Hash getHash();
+	
+	/**
+	 * Gets the Hash of this ref's value, or null if not yet computed
+	 * 
+	 * @return Hash of the value
+	 */
+	public final Hash cachedHash() {
+		return hash;
+	}
 
 	/**
 	 * Returns a direct Ref wrapping the given value. Does not perform any Ref

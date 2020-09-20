@@ -32,6 +32,11 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	 * -1 is initial value for when size is not calculated
 	 */
 	private long memorySize=-1;
+	
+	/**
+	 * Cached Ref. This is useful to manage persistence
+	 */
+	protected Ref<ACell> cachedRef=null;
 
 	@Override
 	public void validate() throws InvalidDataException {
@@ -117,7 +122,11 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	 * Gets the Hash if already computed, or null if not yet available
 	 * @return
 	 */
-	protected final Hash checkHash() {
+	protected final Hash cachedHash() {
+		if (cachedRef!=null) {
+			Hash h=cachedRef.cachedHash();
+			if (h!=null) return h;
+		}
 		if (encoding==null) return null;
 		return encoding.contentHash;
 	}
@@ -262,7 +271,10 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	 */
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Ref<R> getRef() {
-		return (Ref<R>) RefDirect.create(this);
+		if (cachedRef!=null) return (Ref<R>) cachedRef;
+		Ref<ACell> newRef= RefDirect.create(this);
+		cachedRef=newRef;
+		return (Ref<R>) newRef;
 	}
 	
 	/**
