@@ -1,0 +1,90 @@
+(do
+  ;; Torus library 
+  ;;
+  ;; deploy with: (deploy-once torus-code)
+  ;; 
+  ;; import with (import <address of fungible> :as fungible)
+  ;;
+  ;; Key usage:
+  ;;   (torus/build-market config)                  ;; Builds code for a Torus CVX/Token pair
+  ;;   (torus/factory token-address)                ;; Gets or deploys the canonical pair for a token
+
+  
+  (call *registry* (register {:name "Torus Exchange Library"}))
+  
+  (import convex.trust :as trust)
+  (import convex.fungible :as fungible)
+  
+  ;; Map of token addresses to pair Actor addresses (deployed with deploy-once)
+  (def pairs (empty (get state :accounts)))
+  
+ 
+  (defn factory 
+    ^{:doc {:description "Gets the canonical pair for a token, deploying it if necessary"
+         :examples [{:code "(deploy-once (build-market {:token token-address}))"}]
+         :type :function
+         :signature [{:params [config]}]}
+	  }
+    [token]
+    (let [token (address token)]
+      ;; return pair if already deployed
+      (if-let [pair (get pairs token)] (return pair))
+      
+      (let [code (build-market {:token token})
+            pair (deploy-once code)]
+        (def pairs (assoc pairs token pair))
+        pair)))
+  
+  (defn build-market
+    ^{:doc {:description "Creates deployable code for a new Torus token market"
+         :examples [{:code "(deploy-once (build-market {:token token-address}))"}]
+         :type :function
+         :signature [{:params [config]}]}
+	  }
+    [config]
+    (let [token (address (:token config))]
+      '(do
+         (def token ~token)
+         
+         (def total-shares 0)
+         (def token-holding 0)
+         
+         (defn calc-rate []
+           0.001)
+         
+         (defn swap [coins tokens]
+           (let [coins (long coins)
+                 _ (assert (<= 0 coins 1000000000000000000))
+                 tokens (long tokens)
+                 _ (assert (<= 0 tokens))
+                 old-tokens token-holding
+                 old-coins *balance*
+                 dt (- tokens old-tokens)
+                 rate (calc-rate)
+                 fee (* rate (abs dt))
+                 
+                 new-kk (* (double coins) (double tokens))
+                 kk (* (double old-coins) (double old-tokens))
+                 ])
+           )
+         
+         ;; token implementation to allow shares to be used as fungible tokens
+         (defn balance [addr]
+            (or (get-holding addr) 0))
+       
+         (defn transfer [addr amount]
+           (let [addr (address addr)
+                 amount (long amount)
+                 bal (or (get-holding *caller*) 0)
+                 tbal (or (get-holding addr) 0)]
+             (assert (<= 0 amount bal)) ;; amount must be in valid range
+            (set-holding *caller* (- bal amount))
+             (set-holding addr (+ tbal amount))
+             ))
+       
+         (export transfer balance))))
+  
+
+  
+  
+  )
