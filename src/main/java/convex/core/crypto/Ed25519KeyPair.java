@@ -153,7 +153,7 @@ public class Ed25519KeyPair extends AKeyPair {
 	@Override
 	public ASignature sign(Hash hash) {
 		try {
-			Signature signer = Signature.getInstance("EdDSA");
+			Signature signer = Signature.getInstance("Ed25519");
 			signer.initSign(getPrivate());
 			signer.update(hash.getInternalArray(), hash.getOffset(), Hash.LENGTH);
 			byte[] signature = signer.sign();
