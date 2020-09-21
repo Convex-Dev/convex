@@ -10,7 +10,8 @@ import org.openjdk.jmh.runner.options.Options;
 import convex.core.Block;
 import convex.core.Init;
 import convex.core.State;
-import convex.core.crypto.ECDSAKeyPair;
+import convex.core.crypto.AKeyPair;
+import convex.core.crypto.Ed25519KeyPair;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Amount;
@@ -24,19 +25,19 @@ public class TransactionBenchmark {
 	static final int NUM_ACCOUNTS = 1000;
 	static final int NUM_TRANSACTIONS = 1000;
 	private static final long INITIAL_FUNDS = 1000000000;
-	static ArrayList<ECDSAKeyPair> keyPairs = new ArrayList<ECDSAKeyPair>();
-	public static State state = State.EMPTY;
+	static ArrayList<AKeyPair> keyPairs = new ArrayList<AKeyPair>();
+	public static State state = Init.STATE;
 	public static Block block;
 	static ArrayList<SignedData<ATransaction>> transactions = new ArrayList<SignedData<ATransaction>>();
 
 	static {
 		for (int i = 0; i < NUM_ACCOUNTS; i++) {
-			ECDSAKeyPair kp = ECDSAKeyPair.generate();
+			AKeyPair kp = Ed25519KeyPair.generate();
 			keyPairs.add(kp);
 			state = state.putAccount(kp.getAddress(), (AccountStatus.create(Amount.create(INITIAL_FUNDS))));
 		}
 		for (int i = 0; i < NUM_TRANSACTIONS; i++) {
-			ECDSAKeyPair kp = keyPairs.get(new Random().nextInt(NUM_ACCOUNTS));
+			AKeyPair kp = keyPairs.get(new Random().nextInt(NUM_ACCOUNTS));
 			Address target = keyPairs.get(new Random().nextInt(NUM_ACCOUNTS)).getAddress();
 			Transfer t = Transfer.create(0, target, 1);
 			transactions.add(kp.signData(t));
