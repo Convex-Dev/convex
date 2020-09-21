@@ -145,7 +145,7 @@ public abstract class AArrayBlob extends ABlob {
 		return offset;
 	}
 
-	public boolean equals(byte[] bytes, int byteOffset) {
+	public boolean equalsBytes(byte[] bytes, int byteOffset) {
 		return Utils.arrayEquals(store, offset, bytes, byteOffset, length);
 	}
 

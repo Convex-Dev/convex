@@ -107,6 +107,9 @@ public class Etch {
 
 	private static final Level LEVEL_STORE=Level.FINE;
 	
+	/**
+	 * Temporary byte array for writer. Must not be used by readers.
+	 */
 	private final byte[] temp=new byte[INDEX_BLOCK_SIZE];
 
 	/**
@@ -225,7 +228,7 @@ public class Etch {
 		}
 		int mapIndex=Utils.checkedInt(position/MAX_BUFFER_SIZE); // 1GB chunks
 		
-		MappedByteBuffer mbb=getBuffer(mapIndex);
+		MappedByteBuffer mbb=(MappedByteBuffer) getBuffer(mapIndex);
 		mbb.position(Utils.checkedInt(position-MAX_BUFFER_SIZE*(long)mapIndex));
 		return mbb;
 	}
@@ -539,15 +542,16 @@ public class Etch {
 	/**
 	 * Checks if the key matches the data at the specified pointer position
 	 * @param key
-	 * @param dataPointer Pointer to data. Type bits in MSBs will be ignore.
+	 * @param dataPointer Pointer to data. Type bits in MSBs will be ignored.
 	 * @return
 	 * @throws IOException
 	 */
 	private boolean checkMatchingKey(AArrayBlob key, long dataPointer) throws IOException {
 		long dataPosition=dataPointer&~TYPE_MASK;
 		MappedByteBuffer mbb=seekMap(dataPosition);
+		// byte[] temp=new byte[KEY_SIZE];
 		mbb.get(temp, 0, KEY_SIZE);
-		if (key.equals(temp,0)) {
+		if (key.equalsBytes(temp,0)) {
 			// key already in store
 			return true;
 		}
