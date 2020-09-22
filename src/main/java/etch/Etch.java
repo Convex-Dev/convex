@@ -235,7 +235,7 @@ public class Etch {
 		}
 		int mapIndex=Utils.checkedInt(position/MAX_BUFFER_SIZE); // 1GB chunks
 		
-		MappedByteBuffer mbb=(MappedByteBuffer) getBuffer(mapIndex);
+		MappedByteBuffer mbb=(MappedByteBuffer) getBuffer(mapIndex).duplicate();
 		mbb.position(Utils.checkedInt(position-MAX_BUFFER_SIZE*(long)mapIndex));
 		return mbb;
 	}
@@ -261,6 +261,9 @@ public class Etch {
 
 	/**
 	 * Writes a key / value pair to the immutable store.
+	 * 
+	 * CONCURRENCY: Hold a lock for a single writer
+	 * 
 	 * @param key A key value (typically the Hash)
 	 * @param value Value data to associate with the key
 	 * @throws IOException
@@ -592,7 +595,7 @@ public class Etch {
 	 * @return Blob containing the data, or null if not found
 	 * @throws IOException
 	 */
-	public synchronized Ref<ACell> read(AArrayBlob key) throws IOException {
+	public Ref<ACell> read(AArrayBlob key) throws IOException {
 		Counters.etchRead++;
 		
 		long pointer=seekPosition(key);
@@ -763,16 +766,18 @@ public class Etch {
 			// continuation of chain from some previous index, therefore key can't be present
 			return -1;
 		} else if (type==PTR_START) {
-			// start of chain, so scan chain of entries
-			int i=0;
-			while (i<256) {
-				long ptr=slotValue&(~TYPE_MASK);
-				if (checkMatchingKey(key,ptr)) return ptr;
-				
-				i++; // advance to next position
-				slotValue=readSlot(indexPosition,digit+i);
-				type=(slotValue&TYPE_MASK);
-				if (!(type==PTR_CHAIN)) return -1; // reached end of chain
+			synchronized (this) {
+				// start of chain, so scan chain of entries
+				int i=0;
+				while (i<256) {
+					long ptr=slotValue&(~TYPE_MASK);
+					if (checkMatchingKey(key,ptr)) return ptr;
+					
+					i++; // advance to next position
+					slotValue=readSlot(indexPosition,digit+i);
+					type=(slotValue&TYPE_MASK);
+					if (!(type==PTR_CHAIN)) return -1; // reached end of chain
+				}
 			}
 			return -1;
 		} else {
