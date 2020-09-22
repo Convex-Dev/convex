@@ -110,7 +110,12 @@ public class Etch {
 	/**
 	 * Temporary byte array for writer. Must not be used by readers.
 	 */
-	private final byte[] temp=new byte[INDEX_BLOCK_SIZE];
+	private final ThreadLocal<byte[]> tempArray=new ThreadLocal<>() {
+		@Override
+		public byte[]  initialValue() {
+			return new byte[INDEX_BLOCK_SIZE];
+		}
+	};
 
 	/**
 	 * Internal pointer to end of database
@@ -146,7 +151,9 @@ public class Etch {
 			mbb.put(MAGIC_NUMBER);
 			
 			// write zeros (temp is newly empty) for file size and root. Will fix later
-			mbb.put(temp,0,SIZE_HEADER_FILESIZE+SIZE_HEADER_ROOT);
+			int headerZeros=SIZE_HEADER_FILESIZE+SIZE_HEADER_ROOT;
+			byte[] temp=new byte[headerZeros]; 
+			mbb.put(temp,0,headerZeros);
 			dataLength=SIZE_HEADER; // advance past initial long
 			
 			// add an index block
@@ -284,9 +291,11 @@ public class Etch {
 		} else if (type==PTR_PLAIN) {
 			// existing data pointer (non-zero)
 			// check if we have the same value first, otherwise need to resolve conflict
+			// This should have the current (potential collision) key in tempArray
 			if (checkMatchingKey(key,slotValue)) {
 				return updateInPlace(slotValue,value);
 			}
+			byte[] temp=tempArray.get();
 			
 			// we need to check the next slot position to see if we can extend to a chain
 			int nextDigit=digit+1;
@@ -549,7 +558,7 @@ public class Etch {
 	private boolean checkMatchingKey(AArrayBlob key, long dataPointer) throws IOException {
 		long dataPosition=dataPointer&~TYPE_MASK;
 		MappedByteBuffer mbb=seekMap(dataPosition);
-		// byte[] temp=new byte[KEY_SIZE];
+		byte[] temp=tempArray.get();
 		mbb.get(temp, 0, KEY_SIZE);
 		if (key.equalsBytes(temp,0)) {
 			// key already in store
@@ -567,6 +576,7 @@ public class Etch {
 	 */
 	private long appendLeafIndex(int digit, long dataPointer) throws IOException {
 		long position=dataLength;
+		byte[] temp=tempArray.get();
 		Arrays.fill(temp, (byte)0x00);
 		int ix=POINTER_SIZE*(digit&0xFF);
 		Utils.writeLong(dataPointer, temp, ix); // single node
@@ -778,6 +788,7 @@ public class Etch {
 	 */
 	private long appendNewIndexBlock() throws IOException {
 		long position=dataLength;
+		byte[] temp=tempArray.get();
 		MappedByteBuffer mbb=seekMap(position);
 		Arrays.fill(temp,(byte)0);
 		mbb.put(temp);
