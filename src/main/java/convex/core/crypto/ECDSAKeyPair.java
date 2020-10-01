@@ -15,7 +15,9 @@ import org.bouncycastle.jcajce.provider.asymmetric.ec.BCECPrivateKey;
 import org.bouncycastle.jcajce.provider.asymmetric.ec.BCECPublicKey;
 
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.SignedData;
+import convex.core.exceptions.TODOException;
 import convex.core.util.Utils;
 
 /**
@@ -197,6 +199,11 @@ public class ECDSAKeyPair extends AKeyPair {
 	@Override
 	public ASignature sign(Hash hash) {
 		return ECDSASignature.sign(hash, this);
+	}
+
+	@Override
+	public Blob getEncodedPrivateKey() {
+		throw new TODOException();
 	}
 
 }

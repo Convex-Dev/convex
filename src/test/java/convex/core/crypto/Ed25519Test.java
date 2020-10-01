@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -47,18 +48,27 @@ public class Ed25519Test {
 	@Test
 	public void testPrivateKeyBytes() {
 		Ed25519KeyPair kp1=Ed25519KeyPair.generate();
+		PrivateKey priv=kp1.getPrivate();
+		PublicKey pub=kp1.getPublic();
+		Address address=kp1.getAddress();
+		
 		SignedData<Long> sd1=kp1.signData(1L);
 		assertTrue(sd1.isValid());
 		
 		byte[] privateKeyBytes=kp1.getPrivate().getEncoded();
 		
 
-		Ed25519KeyPair kp2=Ed25519KeyPair.create(kp1.getPublic(),kp1.getPrivate());
-		assertEquals(kp1.getAddress(),kp2.getAddress());
+		Ed25519KeyPair kp2=Ed25519KeyPair.create(pub,priv);
+		assertEquals(address,kp2.getAddress());
 		assertArrayEquals(privateKeyBytes,kp2.getPrivate().getEncoded());
 		
 		SignedData<Long> sd2=kp2.signData(1L);
 		assertTrue(sd2.isValid());
+		
+		Blob pkb=Ed25519KeyPair.extractPrivateKey(priv);
+		AKeyPair kp3=Ed25519KeyPair.create(address, pkb);
+		
+		assertEquals(sd2,kp3.signData(1L));
 	}
 	
 	@Test

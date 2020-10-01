@@ -22,13 +22,18 @@ import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.SignedData;
 import convex.core.exceptions.TODOException;
+import convex.core.util.Utils;
 
 public class Ed25519KeyPair extends AKeyPair {
 
 	private final Address address;
 	private final KeyPair keyPair;
+	
+	public static final int PRIVATE_KEY_LENGTH=32;
+	private static final String ED25519 = "Ed25519";
 
 	private Ed25519KeyPair(KeyPair kp, Address address) {
 		this.keyPair = kp;
@@ -48,10 +53,16 @@ public class Ed25519KeyPair extends AKeyPair {
 		KeyPair keyPair=new KeyPair(publicKey,privateKey);
 		return create(keyPair);
 	}
+	
+	public static Ed25519KeyPair create(Address address, Blob encodedPrivateKey) {
+		PublicKey publicKey= publicKeyFromBytes(address.getBytes());
+		PrivateKey privateKey=privateKeyFromBlob(encodedPrivateKey);
+		return create(publicKey,privateKey);
+	}
 
 	public static Ed25519KeyPair generate(SecureRandom random) {
 		try {
-			KeyPairGenerator generator = KeyPairGenerator.getInstance("Ed25519");
+			KeyPairGenerator generator = KeyPairGenerator.getInstance(ED25519);
 			generator.initialize(256, random);
 			KeyPair kp = generator.generateKeyPair();
 			return create(kp);
@@ -63,7 +74,7 @@ public class Ed25519KeyPair extends AKeyPair {
 	public static Ed25519KeyPair createSeeded(long seed) {
 		SecureRandom r = new InsecureRandom(seed);
 		try {
-			KeyPairGenerator generator = KeyPairGenerator.getInstance("Ed25519");
+			KeyPairGenerator generator = KeyPairGenerator.getInstance(ED25519);
 			generator.initialize(256, r);
 			KeyPair kp = generator.generateKeyPair();
 			return create(kp);
@@ -95,21 +106,69 @@ public class Ed25519KeyPair extends AKeyPair {
 		// take the bytes at the end of the encoding
 		return Address.wrap(bytes,n-Address.LENGTH);
 	}
+	
+	/**
+	 * Gets a Ed25519 Private Key from a 32-byte array.
+	 * @param privKey
+	 * @return
+	 */
+	static PrivateKey privateFromBytes(byte[] privKey) {
+		try {
+			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
+			PrivateKeyInfo privKeyInfo = new PrivateKeyInfo(new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519), new DEROctetString(privKey));
+		
+			var pkcs8KeySpec = new PKCS8EncodedKeySpec(privKeyInfo.getEncoded());
+
+	        PrivateKey result = keyFactory.generatePrivate(pkcs8KeySpec);
+	        return result;
+		} catch (IOException | NoSuchAlgorithmException | InvalidKeySpecException e) {
+			throw Utils.sneakyThrow(e);
+		}
+	}
+	
+	@Override
+	public Blob getEncodedPrivateKey() {
+		return extractPrivateKey(getPrivate());
+	}
+	
+	/**
+	 * Extracts an Blob containing the private key data from an Ed25519 private key
+	 * 
+	 * SECURITY: Be careful with this Blob!
+	 * 
+	 * @param publicKey Public key
+	 * @return
+	 */
+	static Blob extractPrivateKey(PrivateKey privateKey) {
+		byte[] bytes=privateKey.getEncoded();
+		return Blob.wrap(bytes);
+	}
 
 	public byte[] getPublicKeyBytes() {
 		return getAddress().getBytes();
 	}
+	
+	public static PrivateKey privateKeyFromBlob(Blob encodedKey) {
+		try {
+			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
+			PKCS8EncodedKeySpec pkcs8KeySpec = new PKCS8EncodedKeySpec(encodedKey.getBytes());
+			PrivateKey privateKey = keyFactory.generatePrivate(pkcs8KeySpec);
+			return privateKey;
+		} catch (Exception e) {
+			throw Utils.sneakyThrow(e);
+		}
+	}
 
 	/**
 	 * Creates a private key using the given raw bytes.
-	 * @param keyData 32 bytes private key data
+	 * @param key 32 bytes private key data
 	 * @return Ed25519 Private Key instance
 	 */
-	public static PrivateKey privateKeyFromBytes(byte[] keyData) {
+	public static PrivateKey privateKeyFromBytes(byte[] key) {
 		try {
-			KeyFactory keyFactory = KeyFactory.getInstance("Ed25519");
+			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
 			PrivateKeyInfo privKeyInfo = new PrivateKeyInfo(new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519),
-					new DEROctetString(keyData));
+					new DEROctetString(key));
 			PKCS8EncodedKeySpec pkcs8KeySpec = new PKCS8EncodedKeySpec(privKeyInfo.getEncoded());
 			PrivateKey privateKey = keyFactory.generatePrivate(pkcs8KeySpec);
 			return privateKey;
@@ -120,7 +179,7 @@ public class Ed25519KeyPair extends AKeyPair {
 
 	public static PublicKey publicKeyFromBytes(byte[] key) {
 		try {
-			KeyFactory keyFactory = KeyFactory.getInstance("Ed25519");
+			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
 			SubjectPublicKeyInfo pubKeyInfo = new SubjectPublicKeyInfo(
 					new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519), key);
 			X509EncodedKeySpec x509KeySpec = new X509EncodedKeySpec(pubKeyInfo.getEncoded());
@@ -153,7 +212,7 @@ public class Ed25519KeyPair extends AKeyPair {
 	@Override
 	public ASignature sign(Hash hash) {
 		try {
-			Signature signer = Signature.getInstance("Ed25519");
+			Signature signer = Signature.getInstance(ED25519);
 			signer.initSign(getPrivate());
 			signer.update(hash.getInternalArray(), hash.getOffset(), Hash.LENGTH);
 			byte[] signature = signer.sign();
@@ -173,7 +232,6 @@ public class Ed25519KeyPair extends AKeyPair {
 		if (!keyPair.getPrivate().equals(other.keyPair.getPrivate())) return false;
 		return keyPair.getPublic().equals(other.getPublic());
 	}
-
 
 
 

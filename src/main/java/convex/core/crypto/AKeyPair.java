@@ -2,7 +2,9 @@ package convex.core.crypto;
 
 import convex.core.Constants;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.SignedData;
+import convex.core.exceptions.TODOException;
 
 /**
  * Abstract base class for key pairs in Convex.
@@ -16,6 +18,12 @@ public abstract class AKeyPair {
 	 * @return Address for this KeyPair
 	 */
 	public abstract Address getAddress();
+	
+	/**
+	 * Gets the Private key encoded as a Blob
+	 * @return Blob Private key data encoding
+	 */
+	public abstract Blob getEncodedPrivateKey();
 
 	/**
 	 * Signs a value with this key pair 
@@ -48,6 +56,21 @@ public abstract class AKeyPair {
 		} else {
 			return ECDSAKeyPair.createSeeded(seed);
 		}
+	}
+	
+	/**
+	 * Create a key pair with the given Address and encoded private key
+	 * 
+	 * SECURITY: Never use this for valuable keys or real assets: intended for deterministic testing only.
+	 * @param seed Any long value. The same seed will produce the same key pair.
+	 * @return New key pair
+	 */
+	public static AKeyPair create(Address address, Blob encodedPrivateKey) {
+		if (Constants.USE_ED25519) {
+			return Ed25519KeyPair.create(address,encodedPrivateKey);
+		} else {
+			throw new TODOException();
+		}	
 	}
 	
 	static {
