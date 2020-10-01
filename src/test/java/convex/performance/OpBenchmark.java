@@ -6,8 +6,11 @@ import org.openjdk.jmh.runner.options.Options;
 
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
+import convex.core.lang.Core;
 import convex.core.lang.Reader;
 import convex.core.lang.TestState;
+import convex.core.lang.ops.Constant;
+import convex.core.lang.ops.Invoke;
 
 public class OpBenchmark {
 	
@@ -25,10 +28,18 @@ public class OpBenchmark {
 		CTX.execute(constantOp);
 	}
 	
+	// sum with dynamic core lookup
 	static final AOp<Object> simpleSum=CTX.expandCompile(Reader.read("(+ 1 2)")).getResult();
 	@Benchmark
 	public void simpleSum() {
 		CTX.execute(simpleSum);
+	}
+	 
+	// sum without dynamic core lookup (much faster!!)
+	static final AOp<Object> simpleSum2=Invoke.create(Constant.create(Core.PLUS),Constant.create(1L),Constant.create(2));
+	@Benchmark
+	public void simpleSum2() {
+		CTX.execute(simpleSum2);
 	}
 	 
 
