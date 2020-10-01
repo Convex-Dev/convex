@@ -73,8 +73,7 @@ public class Ed25519Signature extends ASignature {
 	
 	public boolean verify(Hash hash, PublicKey publicKey) {
 		try {
-			Signature verifier;
-			verifier = Signature.getInstance("Ed25519");
+			Signature verifier = Signature.getInstance("Ed25519");
 		    verifier.initVerify(publicKey);
 		    verifier.update(hash.getInternalArray(),hash.getOffset(),Hash.LENGTH);
 			return verifier.verify(signatureBytes);
@@ -91,8 +90,7 @@ public class Ed25519Signature extends ASignature {
 
 	@Override
 	public int estimatedEncodingSize() {
-		// TODO Auto-generated method stub
-		return 128;
+		return 1+SIGNATURE_LENGTH;
 	}
 	
 	@Override
