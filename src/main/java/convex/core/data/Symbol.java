@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import java.nio.ByteBuffer;
+import java.util.WeakHashMap;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -31,12 +32,17 @@ import convex.core.util.Utils;
  */
 public class Symbol extends ASymbolic {
 
+	/**
+	 * Namespace component of the Symbol. Must not itself have a namespace. May be null.
+	 */
 	private final Symbol namespace;
 	
 	private Symbol(Symbol ns,String name) {
 		super(name);
 		this.namespace=ns;
 	}
+	
+	protected static final WeakHashMap<Symbol,Symbol> cache=new WeakHashMap<>(100);
 
 	/**
 	 * Creates a Symbol with the given unqualified namespace Symbol and name
@@ -50,7 +56,14 @@ public class Symbol extends ASymbolic {
 			// namespace can't currently be qualified itself
 			if (namespace.isQualified()) return null;
 		}
-		return new Symbol(namespace,name);
+		Symbol sym= new Symbol(namespace,name);
+		
+		// TODO: figure out if caching Symbols is a net win or not
+		Symbol cached=cache.get(sym);
+		if (cached!=null) return cached;
+		cache.put(sym,sym);
+		
+		return sym;
 	}
 	
 	/**
@@ -96,7 +109,7 @@ public class Symbol extends ASymbolic {
 
 	@Override
 	public int hashCode() {
-		return name.hashCode();
+		return name.hashCode()+20*((namespace==null)?0:namespace.hashCode());
 	}
 
 	@Override
