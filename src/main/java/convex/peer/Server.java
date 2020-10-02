@@ -642,6 +642,9 @@ public class Server implements Closeable {
 
 	@Override
 	public void close() {
+		if (peer!=null) {
+			
+		}
 		running = false;
 		nio.close();
 	}

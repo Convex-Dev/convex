@@ -90,6 +90,8 @@ public class Etch {
 	 */
 	private static final int SIZE_HEADER=SIZE_HEADER_MAGIC+SIZE_HEADER_FILESIZE+SIZE_HEADER_ROOT;
 	
+	protected static final long OFFSET_FILE_SIZE = SIZE_HEADER_MAGIC;
+	protected static final long OFFSET_ROOT_HASH = SIZE_HEADER_MAGIC+SIZE_HEADER_FILESIZE;
 
 	/**
 	 * Start position of first index block
@@ -106,6 +108,7 @@ public class Etch {
 	private static final Logger log=Logger.getLogger(Etch.class.getName());
 
 	private static final Level LEVEL_STORE=Level.FINE;
+	
 	
 	/**
 	 * Temporary byte array for writer. Must not be used by readers.
@@ -857,5 +860,12 @@ public class Etch {
 
 	public File getFile() {
 		return file;
+	}
+
+	public Hash getRootHash() throws IOException {
+		MappedByteBuffer mbb=seekMap(OFFSET_ROOT_HASH);
+		byte[] bs=new byte[Hash.LENGTH];
+		mbb.get(bs);
+		return Hash.wrap(bs);
 	}
 }

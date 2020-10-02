@@ -179,4 +179,8 @@ public class EtchStore extends AStore {
 	public File getFile() {
 		return etch.getFile();
 	}
+
+	public Hash getRootHash() throws IOException {
+		return etch.getRootHash();
+	}
 }

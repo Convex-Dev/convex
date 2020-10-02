@@ -1,13 +1,16 @@
 package convex.core;
 
+import java.io.IOException;
 import java.util.Map;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.Hash;
 import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadSignatureException;
@@ -15,6 +18,7 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.transactions.ATransaction;
+import etch.EtchStore;
 
 /**
  * <p>
@@ -78,6 +82,22 @@ public class Peer {
 		SignedData<Belief> sb = peerKP.signData(belief);
 		return new Peer(peerKP, sb, Vectors.of(initialState), Vectors.empty(), initialState.getTimeStamp());
 	}
+	
+	/**
+	 * Restores a Peer from the Etch database specified in Config
+	 * @param config
+	 * @return
+	 */
+	public static Peer restorePeer(Map<Keyword, Object> config) throws IOException {
+		EtchStore store = (EtchStore) config.get(Keywords.STORE);
+		if (store==null) throw new IllegalArgumentException("Peer restoration requires an Etch Store");
+		Hash root=store.getRootHash();
+		if (root==null) throw new IllegalStateException("Peer restoration: no root hash?");
+		Ref<Object> ref=store.refForHash(root);
+		if (ref==null) throw new IllegalStateException("Peer restoration: root hash lookup failed");
+		Peer peer=(Peer) ref.getValue();
+		return peer;
+	}
 
 	/**
 	 * Creates a new Peer instance at server startup using the provided
@@ -88,9 +108,9 @@ public class Peer {
 	 */
 	public static Peer createStartupPeer(Map<Keyword, Object> config) {
 		State initialState = (State) config.get(Keywords.STATE);
-		if (initialState == null) throw new IllegalArgumentException("Belief initialisation requires an initial state");
+		if (initialState == null) throw new IllegalArgumentException("Peer initialisation requires an initial state");
 		AKeyPair keyPair = (AKeyPair) config.get(Keywords.KEYPAIR);
-		if (keyPair == null) throw new IllegalArgumentException("Belief initialisation requires a keypair");
+		if (keyPair == null) throw new IllegalArgumentException("Peer initialisation requires a keypair");
 
 		return create(keyPair, initialState);
 	}
