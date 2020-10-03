@@ -283,7 +283,21 @@ public class Peer {
 		return states;
 	}
 
-	public BlockResult getResult(long i) {
+	/**
+	 * Gets the result of a specific transaction
+	 * @param i
+	 * @return
+	 */
+	public Object getResult(long blockIndex, long txIndex) {
+		return blockResults.get(blockIndex).getResult(txIndex);
+	}
+	
+	/**
+	 * Gets the BlockResult of a specific block index
+	 * @param i
+	 * @return
+	 */
+	public BlockResult getBlockResult(long i) {
 		return blockResults.get(i);
 	}
 

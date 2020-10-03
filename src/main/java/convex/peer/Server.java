@@ -378,7 +378,7 @@ public class Server implements Closeable {
 			log.log(LEVEL_BELIEF, "Consenus update from " + oldConsensusPoint + " to " + newConsensusPoint);
 			for (long i = oldConsensusPoint; i < newConsensusPoint; i++) {
 				Block block = peer.getPeerOrder().getBlock(i);
-				BlockResult br = peer.getResult(i);
+				BlockResult br = peer.getBlockResult(i);
 				reportTransactions(block, br);
 			}
 		}
@@ -643,7 +643,9 @@ public class Server implements Closeable {
 	@Override
 	public void close() {
 		if (peer!=null) {
-			
+			// Ref<?> peerRef=Ref.persist(peer);
+			// Hash peerHash=ref.getHash();
+			// store.setRootHash(peerHash);
 		}
 		running = false;
 		nio.close();
