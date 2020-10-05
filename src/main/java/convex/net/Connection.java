@@ -272,6 +272,16 @@ public class Connection {
 		Result value = Result.create(id, result, errorCode);
 		return sendObject(MessageType.RESULT, value);
 	}
+	
+	/**
+	 * Sends a RESULT Message on this connection.
+	 * 
+	 * @param result Result data structure
+	 * @throws IOException
+	 */
+	public boolean sendResult(Result result) throws IOException {
+		return sendObject(MessageType.RESULT, result);
+	}
 
 	private IRefFunction sender() {
 		return sendAll;

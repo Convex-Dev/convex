@@ -81,7 +81,7 @@ public class Message {
 			case TRANSACT: return (Long) ((AVector<?>)payload).get(0);
 			
 			// Result is a special record type
-			case RESULT: return ((Result)payload).getID(); 
+			case RESULT: return (Long)((Result)payload).getID(); 
 			
 			default: return null;
 		}

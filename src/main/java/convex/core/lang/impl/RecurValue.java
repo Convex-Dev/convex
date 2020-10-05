@@ -50,4 +50,9 @@ public class RecurValue extends AExceptional {
 	public Object getCode() {
 		return ErrorCodes.RECUR;
 	}
+
+	@Override
+	public Object getMessage() {
+		return values;
+	}
 }

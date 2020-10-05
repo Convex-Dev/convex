@@ -64,9 +64,9 @@ public class StateTransitionsTest {
 			long nowTS = Utils.getCurrentTimestamp();
 			Block b = Block.of(nowTS, st);
 			BlockResult br = s.applyBlock(b);
-			AVector<Object> results = br.getResults();
+			AVector<Result> results = br.getResults();
 			assertEquals(1, results.count());
-			assertNull(br.getError(0)); // should be null for successful transfer transaction
+			assertNull(br.getErrorCode(0)); // should be null for successful transfer transaction
 			State s2 = br.getState();
 			assertEquals(9950 - TCOST, s2.getBalance(ADDRESS_A));
 			assertEquals(1050, s2.getBalance(ADDRESS_B));
@@ -109,9 +109,9 @@ public class StateTransitionsTest {
 			assertEquals(950 - TCOST, s2.getBalance(ADDRESS_B));
 			assertEquals(100, s2.getBalance(ADDRESS_C));
 
-			AVector<Object> results = br.getResults();
+			AVector<Result> results = br.getResults();
 			assertEquals(2, results.count());
-			assertEquals(50L,(long)br.getResult(0)); // null result for successful transfer
+			assertEquals(50L,br.getResult(0).getValue()); // null result for successful transfer
 			assertEquals(Amount.MAX_AMOUNT, br.getState().computeTotalFunds());
 		}
 
@@ -120,9 +120,9 @@ public class StateTransitionsTest {
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
 			BlockResult br = s.applyBlock(b);
-			AVector<Object> results = br.getResults();
+			AVector<Result> results = br.getResults();
 			assertEquals(1, results.count());
-			assertEquals(ErrorCodes.SEQUENCE, br.getError(0).getCode());
+			assertEquals(ErrorCodes.SEQUENCE, br.getResult(0).getErrorCode());
 		}
 
 		{ // transfer amount greater than current balance
@@ -130,7 +130,7 @@ public class StateTransitionsTest {
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
 			BlockResult br = s.applyBlock(b);
-			assertEquals(ErrorCodes.FUNDS, br.getError(0).getCode());
+			assertEquals(ErrorCodes.FUNDS, br.getResult(0).getErrorCode());
 
 			State newState = br.getState();
 			assertEquals(Amount.MAX_AMOUNT, newState.computeTotalFunds());
@@ -140,7 +140,7 @@ public class StateTransitionsTest {
 			Transfer t1 = Transfer.create(1, ADDRESS_B, 50);
 			SignedData<ATransaction> st = KEYPAIR_C.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
-			assertEquals(ErrorCodes.NOBODY, s.applyBlock(b).getError(0).getCode());
+			assertEquals(ErrorCodes.NOBODY, s.applyBlock(b).getResult(0).getErrorCode());
 
 		}
 
@@ -218,7 +218,7 @@ public class StateTransitionsTest {
 				"(schedule (+ *timestamp* 1000) (transfer \""+taddr+"\" 10000000))"));
 		Block b2 = Block.of(s.getTimeStamp() + 200, kp.signData(t2));
 		BlockResult br2 = s.applyBlock(b2);
-		assertNull(br2.getError(0));
+		assertNull(br2.getErrorCode(0));
 		s = br2.getState();
 		BlobMap<ABlob, AVector<Object>> sched2 = s.getSchedule();
 		assertEquals(1L, sched2.count());
@@ -229,7 +229,7 @@ public class StateTransitionsTest {
 		ATransaction t3 = Invoke.create(3, Reader.read("1"));
 		Block b3 = Block.of(s.getTimeStamp() + 999, kp.signData(t3));
 		BlockResult br3 = s.applyBlock(b3);
-		assertNull(br3.getError(0));
+		assertNull(br3.getErrorCode(0));
 		s = br3.getState();
 		// no change to target balance yet
 		assertEquals(BAL2 + 10000000, s.getBalance(TARGET));
@@ -238,7 +238,7 @@ public class StateTransitionsTest {
 		ATransaction t4 = Invoke.create(4, Reader.read("1"));
 		Block b4 = Block.of(s.getTimeStamp() + 1, kp.signData(t4));
 		BlockResult br4 = s.applyBlock(b4);
-		assertNull(br4.getError(0));
+		assertNull(br4.getErrorCode(0));
 		s = br4.getState();
 		// no change to target balance yet
 		assertEquals(BAL2 + 20000000, s.getBalance(TARGET));

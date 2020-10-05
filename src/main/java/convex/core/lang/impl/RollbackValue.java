@@ -36,4 +36,9 @@ public class RollbackValue<T> extends AExceptional {
 	public Object getCode() {
 		return ErrorCodes.ROLLBACK;
 	}
+
+	@Override
+	public Object getMessage() {
+		return value;
+	}
 }

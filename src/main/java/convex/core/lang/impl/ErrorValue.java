@@ -56,9 +56,8 @@ public class ErrorValue extends AExceptional {
 	 * @param <T>
 	 * @return The message carried with this error
 	 */
-	@SuppressWarnings("unchecked")
-	public <T> T getMessage() {
-		return (T)message;
+	public Object getMessage() {
+		return message;
 	}
 
 	@Override 
@@ -71,4 +70,6 @@ public class ErrorValue extends AExceptional {
 		}
 		return sb.toString();
 	}
+
+
 }

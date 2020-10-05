@@ -36,4 +36,9 @@ public class HaltValue<T> extends AExceptional {
 	public Object getCode() {
 		return ErrorCodes.HALT;
 	}
+
+	@Override
+	public Object getMessage() {
+		return value;
+	}
 }

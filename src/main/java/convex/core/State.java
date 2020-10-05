@@ -301,7 +301,7 @@ public class State extends ARecord {
 	private BlockResult applyTransactions(Block block) throws BadSignatureException {
 		State state = this;
 		int blockLength = block.length();
-		Object[] results = new Object[blockLength];
+		Result[] results = new Result[blockLength];
 
 		AVector<SignedData<ATransaction>> transactions = block.getTransactions();
 		for (int i = 0; i < blockLength; i++) {
@@ -312,7 +312,7 @@ public class State extends ARecord {
 			Context<?> ctx = state.applyTransaction(signed);
 			
 			// record results and state update
-			results[i] = ctx.getValue();
+			results[i] = Result.fromContext((long)i,ctx);
 			state = ctx.getState();
 		}
 		

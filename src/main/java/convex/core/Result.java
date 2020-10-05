@@ -10,6 +10,8 @@ import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.Context;
+import convex.core.lang.impl.AExceptional;
 import convex.core.lang.impl.RecordFormat;
 
 /**
@@ -31,11 +33,11 @@ public class Result extends ARecordGeneric {
 		return new Result(values);
 	}
 	
-	public static Result create(long id, Object value, Object errorCode) {
+	public static Result create(Object id, Object value, Object errorCode) {
 		return create(Vectors.of(id,value,errorCode));
 	}
 
-	public static Result create(long id, Object value) {
+	public static Result create(Object id, Object value) {
 		return create(id,value,null);
 	}
 
@@ -44,8 +46,8 @@ public class Result extends ARecordGeneric {
 	 * 
 	 * @return ID from this result
 	 */
-	public Long getID() {
-		return (Long)values.get(0);
+	public Object getID() {
+		return values.get(0);
 	}
 	
 	/**
@@ -111,6 +113,21 @@ public class Result extends ARecordGeneric {
 
 	public boolean isError() {
 		return getErrorCode()!=null;
+	}
+
+	public static Result fromContext(Object id,Context<?> ctx) {
+		Object result=ctx.getValue();
+		Object code=null;
+		if (result instanceof AExceptional) {
+			AExceptional ex=(AExceptional)result;
+			result=ex.getMessage();
+			code=ex.getCode();
+		}
+		return create(id,result,code);
+	}
+
+	public Result withID(Object id) {
+		return create(values.assoc(0, id));
 	}
 
 

@@ -21,4 +21,10 @@ public abstract class AExceptional {
 	 */
 	public abstract Object getCode();
 
+	/**
+	 * Gets the message for an exceptional value. May or may not be meaningful.
+	 * @return
+	 */
+	public abstract Object getMessage();
+
 }

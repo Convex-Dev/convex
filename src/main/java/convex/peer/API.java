@@ -41,7 +41,7 @@ public class API {
 	 * :keypair (optional) - AKeyPair instance. Defaults to first auto-generated Peer keyPair;
 	 * :state (optional) - Initialisation state. Only used if initialising a new Peer.
 	 * :restore (optional) - Boolean Flag to restore from existing store. Default to true
-	 * :persist (optional) - Boolean flag to determine if peer state should be persisted in store at server close. Deafult true.
+	 * :persist (optional) - Boolean flag to determine if peer state should be persisted in store at server close. Default true.
 	 * @return New Server instance
 	 */
 	public static Server launchPeer(Map<Keyword, Object> peerConfig) {

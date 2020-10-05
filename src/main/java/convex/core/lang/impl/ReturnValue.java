@@ -36,4 +36,9 @@ public class ReturnValue<T> extends AExceptional {
 	public Object getCode() {
 		return ErrorCodes.RETURN;
 	}
+
+	@Override
+	public Object getMessage() {
+		return value;
+	}
 }

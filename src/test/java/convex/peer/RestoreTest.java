@@ -36,9 +36,11 @@ public class RestoreTest {
 		
 		Convex cvx1=Convex.connect(s1.getHostAddress(), Init.HERO_KP);
 		Result tx0=cvx1.transactSync(Invoke.create(1, Symbols.STAR_ADDRESS));
+		Result tx1=cvx1.transactSync(Invoke.create(1, Symbols.FOO));
 		assertEquals(Init.HERO,tx0.getValue());
 		Long balance1=cvx1.getBalance(Init.HERO);
 		assertTrue(balance1>0);
+		assertTrue(tx1.isError());
 		s1.close();
 		
 		// TODO: testing that server is definitely down

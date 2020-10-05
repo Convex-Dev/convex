@@ -20,6 +20,7 @@ import convex.core.BlockResult;
 import convex.core.ErrorCodes;
 import convex.core.Init;
 import convex.core.Peer;
+import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Hash;
 import convex.core.data.ACell;
@@ -650,13 +651,9 @@ public class Server implements Closeable {
 					
 					Connection pc = m.getPeerConnection();
 					if ((pc == null) || pc.isClosed()) continue;
-					ErrorValue err = br.getError(j);
-					if (err == null) {
-						Object result = br.getResult(j);
-						pc.sendResult(m.getID(), result);
-					} else {
-						pc.sendResult(m.getID(), err.getMessage(), err.getCode());
-					}
+					Object id=m.getID();
+					Result res=br.getResults().get(j).withID(id);
+					pc.sendResult(res);
 				} catch (Exception e) {
 					System.err.println("Error sending Result: "+e.getMessage());
 					e.printStackTrace();

@@ -11,8 +11,8 @@ import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.impl.ErrorValue;
 import convex.core.lang.impl.RecordFormat;
+import convex.core.util.Utils;
 
 /**
  * Class representing the result of applying a Block to a State.
@@ -23,7 +23,7 @@ import convex.core.lang.impl.RecordFormat;
  */
 public class BlockResult extends ARecord {
 	private State state;
-	private AVector<Object> results;
+	private AVector<Result> results;
 	
 	private static final Keyword[] BLOCKRESULT_KEYS = new Keyword[] { Keywords.STATE,
 			Keywords.RESULTS};
@@ -31,17 +31,17 @@ public class BlockResult extends ARecord {
 	private static final RecordFormat FORMAT = RecordFormat.of(BLOCKRESULT_KEYS);
 
 
-	private BlockResult(State state, AVector<Object> results) {
+	private BlockResult(State state, AVector<Result> results) {
 		super(FORMAT);
 		this.state = state;
 		this.results = results;
 	}
 
-	public static BlockResult create(State state, Object[] results) {
+	public static BlockResult create(State state, Result[] results) {
 		return new BlockResult(state, Vectors.of(results));
 	}
 	
-	public static BlockResult create(State state, AVector<Object> results) {
+	public static BlockResult create(State state, AVector<Result> results) {
 		return new BlockResult(state, results);
 	}
 
@@ -49,27 +49,26 @@ public class BlockResult extends ARecord {
 		return state;
 	}
 
-	public AVector<Object> getResults() {
+	public AVector<Result> getResults() {
 		return results;
 	}
 	
 	public boolean isError(long i) {
-		return getResult(i) instanceof ErrorValue;
+		return getResult(i).isError();
 	}
 
-	public Object getResult(long i) {
+	public Result getResult(long i) {
 		return results.get(i);
 	}
 
 	/**
-	 * Gets the error value for a given transaction
+	 * Gets the error code for a given transaction
 	 * @param i
-	 * @return ErrorValue instance, or null if the transaction succeeded.
+	 * @return Error code, or null if the transaction succeeded.
 	 */
-	public ErrorValue getError(long i) {
-		Object result=results.get(i);
-		if (!(result instanceof ErrorValue)) return null;
-		return (ErrorValue) result;
+	public Object getErrorCode(long i) {
+		Result result=results.get(i);
+		return result.getErrorCode();
 	}
 
 	@Override
@@ -94,7 +93,7 @@ public class BlockResult extends ARecord {
 	@Override
 	protected BlockResult updateAll(Object[] newVals) {
 		State newState=(State)newVals[0];
-		AVector<Object> newResults=(AVector<Object>)newVals[1];
+		AVector<Result> newResults=(AVector<Result>)newVals[1];
 		return create(newState,newResults);
 	}
 
@@ -102,6 +101,19 @@ public class BlockResult extends ARecord {
 	public void validateCell() throws InvalidDataException {
 		// TODO Auto-generated method stub
 		
+	}
+	
+	@Override
+	public void validate() throws InvalidDataException {
+		super.validate();
+		results.validate();
+		state.validate();
+		
+		long n=results.count();
+		for (long i=0; i<n; i++) {
+			Object r=results.get(i);
+			if (!(r instanceof Result)) throw new InvalidDataException("Not a Result at position "+i+" - found "+Utils.getClassName(r),this);
+		}
 	}
 
 	@Override
@@ -114,7 +126,9 @@ public class BlockResult extends ARecord {
 
 	public static BlockResult read(ByteBuffer bb) throws BadFormatException {
 		State newState=Format.read(bb);
-		AVector<Object> newResults=Format.read(bb);
+		if (newState==null) throw new BadFormatException("Null state");
+		AVector<Result> newResults=Format.read(bb);
+		if (newResults==null) throw new BadFormatException("Null results");
 		return create(newState,newResults);
 	}
 }
