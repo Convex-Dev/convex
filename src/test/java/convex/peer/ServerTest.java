@@ -100,7 +100,7 @@ public class ServerTest {
 		long id2 = pc.sendTransaction(keyPair.signData(Invoke.create(2, Reader.read("(return 2)"))));
 		long id2a = pc.sendTransaction(keyPair.signData(Invoke.create(2, Reader.read("22"))));
 		long id3 = pc.sendTransaction(keyPair.signData(Invoke.create(3, Reader.read("(rollback 3)"))));
-		long id4 = pc.sendTransaction(keyPair.signData(Transfer.create(4, Init.VILLAIN, 1000)));
+		long id4 = pc.sendTransaction(keyPair.signData(Transfer.create(4, Init.HERO, 1000)));
 		long id5 = pc.sendTransaction(keyPair.signData(Call.create(5, Init.REGISTRY_ADDRESS, Symbols.FOO, Vectors.of(Maps.empty()))));
 		
 		assertTrue(id5>=0);
