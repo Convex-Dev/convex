@@ -678,7 +678,8 @@ public class Server implements Closeable {
 
 	@Override
 	public synchronized void close() {
-		if (peer!=null) {
+		// persist peer state if necessary
+		if ((peer!=null)&&RT.bool(config.get(Keywords.PERSIST))) {
 			AStore tempStore=Stores.current();
 			try {
 				Stores.setCurrent(store);
@@ -693,10 +694,12 @@ public class Server implements Closeable {
 				Stores.setCurrent(tempStore);
 			}
 		}
+		
 		running = false;
 		if (updateThread!=null) updateThread.interrupt();
 		if (receiverThread!=null) receiverThread.interrupt();
 		nio.close();
+		peer=null;
 		// Note we don't do store.close(); because we don't own the store.
 	}
 

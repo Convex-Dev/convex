@@ -41,7 +41,7 @@ public class API {
 	 * :keypair (optional) - AKeyPair instance. Defaults to first auto-generated Peer keyPair;
 	 * :state (optional) - Initialisation state. Only used if initialising a new Peer.
 	 * :restore (optional) - Boolean Flag to restore from existing store. Default to true
-	 * 
+	 * :persist (optional) - Boolean flag to determine if peer state should be persisted in store at server close. Deafult true.
 	 * @return New Server instance
 	 */
 	public static Server launchPeer(Map<Keyword, Object> peerConfig) {
@@ -52,6 +52,7 @@ public class API {
 			if (!config.containsKey(Keywords.KEYPAIR)) config.put(Keywords.KEYPAIR, Init.KEYPAIRS[0]);
 			if (!config.containsKey(Keywords.STATE)) config.put(Keywords.STATE, Init.STATE);
 			if (!config.containsKey(Keywords.RESTORE)) config.put(Keywords.RESTORE, true);
+			if (!config.containsKey(Keywords.PERSIST)) config.put(Keywords.PERSIST, true);
 
 			Server server = Server.create(config);
 			server.launch();
