@@ -525,7 +525,7 @@ public class Etch {
 	synchronized void close() {
 		try {
 			// write final data length
-			MappedByteBuffer mbb=seekMap(0);
+			MappedByteBuffer mbb=seekMap(OFFSET_FILE_SIZE);
 			mbb.putLong(dataLength);
 			mbb=null;
 			

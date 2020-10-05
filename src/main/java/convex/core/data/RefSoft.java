@@ -143,7 +143,6 @@ public class RefSoft<T> extends Ref<T> {
 	@Override
 	public void validate() throws InvalidDataException {
 		super.validate();
-		if (status==EMBEDDED) throw new InvalidDataException("Soft ref cannot be embedded!", this);
 		if (hash == null) throw new InvalidDataException("Hash should never be null in soft ref", this);
 		Object val = softRef.get();
 		if (val != null) {

@@ -20,7 +20,12 @@ public class RefDirect<T> extends Ref<T> {
 	 * Direct value of this Ref
 	 */
 	private final T value;
-
+	
+	/**
+	 * Flag for known embedded status. Unknown if false.
+	 */
+	private boolean embedded=false;
+	
 	private RefDirect(T value, Hash hash, int status) {
 		super(hash, status);
 		this.value = value;
@@ -31,9 +36,7 @@ public class RefDirect<T> extends Ref<T> {
 	}
 
 	public static <T> RefDirect<T> create(T value, Hash hash) {
-		boolean embedded = Format.isEmbedded(value);
-		int status = embedded ? EMBEDDED : UNKNOWN;
-		return create(value, hash, status);
+		return create(value, hash, UNKNOWN);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -60,8 +63,6 @@ public class RefDirect<T> extends Ref<T> {
 			return create(value, hash, ANNOUNCED);
 		case INVALID:
 			return create(value, hash, INVALID);
-		case EMBEDDED:
-			throw new IllegalArgumentException("Embedded Ref should already have status EMBEDDED");
 		default:
 			throw new IllegalArgumentException("Ref status not recognised: " + newStatus);
 		}
@@ -78,7 +79,9 @@ public class RefDirect<T> extends Ref<T> {
 
 	@Override
 	public boolean isEmbedded() {
-		return status == EMBEDDED;
+		if (embedded) return true;
+		embedded=Format.isEmbedded(value);
+		return embedded;
 	}
 
 	@Override

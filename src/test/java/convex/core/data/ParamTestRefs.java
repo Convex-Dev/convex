@@ -2,6 +2,7 @@ package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -41,9 +42,9 @@ public class ParamTestRefs {
 			{ // single embedded value
 				Long n=1567565765677L;
 				Ref<Long> r=Ref.get(n);
-				assertEquals(Ref.EMBEDDED,r.getStatus());
+				assertTrue(r.isEmbedded());
 				Ref<Long> r2=r.persist();
-				assertEquals(Ref.EMBEDDED,r2.getStatus());
+				assertTrue(r.isEmbedded());
 				assertSame(n,r2.getValue());
 			}
 			
@@ -66,7 +67,7 @@ public class ParamTestRefs {
 				
 				assertEquals(Ref.PERSISTED,r2.getStatus());
 				MapEntry<Long, AVector<Long>> me2=r2.getValue().entryAt(0);
-				assertEquals(Ref.EMBEDDED,me2.getRef(0).getStatus());
+				assertTrue(me2.getRef(0).isEmbedded());
 				assertEquals(Ref.PERSISTED,me2.getRef(1).getStatus());
 			}		
 			

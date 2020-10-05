@@ -78,14 +78,14 @@ public class RefTest {
 		assertSame(Ref.NULL_VALUE, nr);
 		assertSame(nr, nr.persist());
 		nr.validate();
-		assertEquals(Ref.EMBEDDED, nr.getStatus());
+		assertTrue(nr.isEmbedded());
 	}
 
 	@Test
 	public void testPersistEmbeddedLong() {
 		Ref<Object> nr = Ref.get(10001L);
 		assertSame(nr, nr.persist());
-		assertEquals(Ref.EMBEDDED, nr.getStatus());
+		assertTrue(nr.isEmbedded());
 	}
 	
 	@Test

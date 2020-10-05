@@ -69,11 +69,6 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	public static final int ANNOUNCED = 4;
 
 	/**
-	 * Ref status indicating the Ref is embdedded, a pure immutable value
-	 */
-	public static final int EMBEDDED = 5;
-
-	/**
 	 * Ref status indicating that the Ref refers to data that has been proven to be invalid
 	 */
 	public static final int INVALID = -1;
@@ -82,10 +77,10 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 * Ref for null value. Important because we can't persist this, since null
 	 * collides with the result of an empty soft reference.
 	 */
-	public static final RefDirect<?> NULL_VALUE = RefDirect.create(null, Hash.NULL_HASH, EMBEDDED);
+	public static final RefDirect<?> NULL_VALUE = RefDirect.create(null, Hash.NULL_HASH, ANNOUNCED);
 
-	public static final RefDirect<Boolean> TRUE_VALUE = RefDirect.create(Boolean.TRUE, Hash.TRUE_HASH, EMBEDDED);
-	public static final RefDirect<Boolean> FALSE_VALUE = RefDirect.create(Boolean.FALSE, Hash.FALSE_HASH, EMBEDDED);
+	public static final RefDirect<Boolean> TRUE_VALUE = RefDirect.create(Boolean.TRUE, Hash.TRUE_HASH, ANNOUNCED);
+	public static final RefDirect<Boolean> FALSE_VALUE = RefDirect.create(Boolean.FALSE, Hash.FALSE_HASH, ANNOUNCED);
 
 	public static final RefDirect<AList<?>> EMPTY_LIST = RefDirect.create(Lists.empty());
 	public static final RefDirect<AVector<?>> EMPTY_VECTOR = RefDirect.create(Vectors.empty());
@@ -247,9 +242,6 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T> Ref<T> createPersisted(T value, Consumer<Ref<ACell>> noveltyHandler) {
-		if (Format.isEmbedded(value)) {
-			return RefDirect.create(value, null, Ref.EMBEDDED);
-		}
 		Ref<ACell> ref = RefDirect.create((ACell)value, null, Ref.UNKNOWN);
 		return (Ref<T>) Stores.current().persistRef(ref, noveltyHandler);
 	}
@@ -266,7 +258,7 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	@SuppressWarnings("unchecked")
 	public static <T> Ref<T> createAnnounced(T value, Consumer<Ref<ACell>> noveltyHandler) {
 		if (Format.isEmbedded(value)) {
-			return RefDirect.create(value, null, Ref.EMBEDDED);
+			return RefDirect.create(value, null, Ref.ANNOUNCED);
 		}
 		Ref<ACell> ref = RefDirect.create((ACell)value, null, Ref.UNKNOWN);
 		AStore store=Stores.current();
@@ -368,7 +360,7 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	@SuppressWarnings("unchecked")
 	public <R> Ref<R> persist(Consumer<Ref<ACell>> noveltyHandler) {
 		int status = getStatus();
-		if (status >= PERSISTED) return (Ref<R>) this; // already persisted in some form. Might be EMBEDDED
+		if (status >= PERSISTED) return (Ref<R>) this; // already persisted in some form
 		AStore store=Stores.current();
 		return (Ref<R>) store.persistRef((Ref<ACell>)this, noveltyHandler);
 	}
@@ -402,7 +394,7 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	@SuppressWarnings("unchecked")
 	public Ref<T> announce(Consumer<Ref<ACell>> noveltyHandler) {
 		int status = getStatus();
-		if (status >= ANNOUNCED) return this; // already announced. Might be EMBEDDED
+		if (status >= ANNOUNCED) return this; // already announced
 		AStore store=Stores.current();
 		return (Ref<T>) store.announceRef((Ref<ACell>)this, noveltyHandler);
 	}
