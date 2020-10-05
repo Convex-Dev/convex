@@ -1,6 +1,7 @@
 package convex.peer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -12,6 +13,7 @@ import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
+import convex.core.ErrorCodes;
 import convex.core.Init;
 import convex.core.Result;
 import convex.core.State;
@@ -37,12 +39,13 @@ public class RestoreTest {
 		Server s1=API.launchPeer(config);
 		
 		Convex cvx1=Convex.connect(s1.getHostAddress(), Init.HERO_KP);
-		Result tx0=cvx1.transactSync(Invoke.create(1, Symbols.STAR_ADDRESS));
-		Result tx1=cvx1.transactSync(Invoke.create(1, Symbols.FOO));
-		assertEquals(Init.HERO,tx0.getValue());
+		Result tx1=cvx1.transactSync(Invoke.create(1, Symbols.STAR_ADDRESS));
+		Result tx2f=cvx1.transactSync(Invoke.create(1, Symbols.FOO)); // bad sequence
+		assertEquals(Init.HERO,tx1.getValue());
 		Long balance1=cvx1.getBalance(Init.HERO);
 		assertTrue(balance1>0);
-		assertTrue(tx1.isError());
+		assertTrue(tx2f.isError());
+		assertEquals(ErrorCodes.SEQUENCE,tx2f.getErrorCode());
 		s1.close();
 		
 		// TODO: testing that server is definitely down
@@ -53,6 +56,9 @@ public class RestoreTest {
 		Convex cvx2=Convex.connect(s2.getHostAddress(), Init.HERO_KP);
 		Long balance2=cvx2.getBalance(Init.HERO);
 		assertEquals(balance1,balance2);
+		
+		Result tx2=cvx2.transactSync(Invoke.create(2, Symbols.BALANCE));
+		assertFalse(tx2.isError());
 		
 		State state=s2.getPeer().getConsensusState();
 		assertNotNull(state);
