@@ -635,6 +635,11 @@ public class Belief extends ARecord {
 		orders.validateCell();
 	}
 
+	/**
+	 * Returns the timestamp of this Belief. A Belief should have a new timestamp if
+	 * and only if the Peer incorporates new information.
+	 * @return
+	 */
 	public long getTimestamp() {
 		return timestamp;
 	}

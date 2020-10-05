@@ -35,6 +35,7 @@ import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.Context;
+import convex.core.lang.RT;
 import convex.core.lang.impl.AExceptional;
 import convex.core.lang.impl.ErrorValue;
 import convex.core.store.AStore;
@@ -132,13 +133,36 @@ public class Server implements Closeable {
 	private Server(Map<Keyword, Object> config) {
 		this.config = config;
 		this.manager = new ConnectionManager(config);
-		this.peer = Peer.createStartupPeer(config);
+	
 		AStore configStore = (AStore) config.get(Keywords.STORE);
-
 		store = (configStore == null) ? Stores.DEFAULT : configStore;
+		AKeyPair keyPair=(AKeyPair) config.get(Keywords.KEYPAIR);
+		
+		this.peer= establishPeer(keyPair,config);
+		
 		nio = NIOServer.create(this, receiveQueue);
 	}
 
+	private Peer establishPeer(AKeyPair keyPair,Map<Keyword, Object> config2) {
+		if (RT.bool(config.get(Keywords.RESTORE))) {
+			try {
+				Hash hash=store.getRootHash();
+				Peer peer=Peer.restorePeer(store,hash,keyPair);
+				return peer;
+			} catch (Throwable e) {
+				log.warning("Can't restore Peer from store. Defaulting to standard startup");
+			}
+		} 
+		return Peer.createStartupPeer(config);
+	}
+
+	/**
+	 * Creates a Server with a given config.
+	 * 
+	 * Config keys 
+	 * @param config
+	 * @return
+	 */
 	public static Server create(Map<Keyword, Object> config) {
 		return new Server(new HashMap<>(config));
 	}

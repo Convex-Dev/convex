@@ -180,7 +180,13 @@ public class EtchStore extends AStore {
 		return etch.getFile();
 	}
 
+	@Override
 	public Hash getRootHash() throws IOException {
 		return etch.getRootHash();
+	}
+	
+	@Override
+	public void setRootHash(Hash h) throws IOException {
+		etch.setRootHash(h);
 	}
 }

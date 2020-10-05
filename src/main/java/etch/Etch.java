@@ -862,10 +862,17 @@ public class Etch {
 		return file;
 	}
 
-	public Hash getRootHash() throws IOException {
+	public synchronized Hash getRootHash() throws IOException {
 		MappedByteBuffer mbb=seekMap(OFFSET_ROOT_HASH);
 		byte[] bs=new byte[Hash.LENGTH];
 		mbb.get(bs);
 		return Hash.wrap(bs);
+	}
+
+	public synchronized void setRootHash(Hash h) throws IOException {
+		MappedByteBuffer mbb=seekMap(OFFSET_ROOT_HASH);
+		byte[] bs=h.getBytes();
+		assert(bs.length==Hash.LENGTH);
+		mbb.put(bs);
 	}
 }

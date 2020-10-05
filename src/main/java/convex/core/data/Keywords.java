@@ -13,7 +13,12 @@ public class Keywords {
 	public static final Keyword TIMESTAMP = Keyword.create("timestamp");
 	public static final Keyword ACCOUNTS = Keyword.create("accounts");
 	public static final Keyword PEERS = Keyword.create("peers");
+	public static final Keyword BELIEF = Keyword.create("belief");
+	public static final Keyword STATES = Keyword.create("states");
+	public static final Keyword RESULTS = Keyword.create("results");
+	
 	public static final Keyword STORE = Keyword.create("store");
+	public static final Keyword RESTORE = Keyword.create("restore");
 
 	// for testing and suchlike
 	public static final Keyword FOO = Keyword.create("foo");
@@ -59,6 +64,7 @@ public class Keywords {
 	public static final Keyword ID = Keyword.create("id");
 	public static final Keyword RESULT = Keyword.create("result");
 	public static final Keyword ERROR_CODE = Keyword.create("error-code");
+	
 
 
 }

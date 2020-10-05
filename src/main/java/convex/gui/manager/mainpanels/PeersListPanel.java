@@ -25,6 +25,7 @@ import convex.gui.components.PeerView;
 import convex.gui.components.ScrollyList;
 import convex.gui.manager.PeerManager;
 import convex.net.Connection;
+import convex.peer.API;
 import convex.peer.Server;
 import etch.EtchStore;
 
@@ -74,7 +75,7 @@ public class PeersListPanel extends JPanel {
 		// Use a different fresh store for each peer
 		config.put(Keywords.STORE, EtchStore.createTemp());
 
-		Server ps = Server.create(config);
+		Server ps = API.launchPeer(config);
 		ps.launch();
 
 		PeerView peer = new PeerView();

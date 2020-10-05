@@ -6,10 +6,12 @@ import java.util.Map;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Hash;
 import convex.core.data.AHashMap;
+import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
@@ -17,8 +19,9 @@ import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
+import convex.core.store.AStore;
+import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
-import etch.EtchStore;
 
 /**
  * <p>
@@ -77,6 +80,27 @@ public class Peer {
 		this.timestamp = timeStamp;
 	}
 
+	@SuppressWarnings("unchecked")
+	public static Peer fromData(AKeyPair keyPair,AMap<Keyword, Object> peerData)  {
+		try {
+			SignedData<Belief> belief=(SignedData<Belief>) peerData.get(Keywords.BELIEF);
+			AVector<BlockResult> results=(AVector<BlockResult>) peerData.get(Keywords.RESULTS);
+			AVector<State> states=(AVector<State>) peerData.get(Keywords.STATES);
+			long timestamp=belief.getValue().getTimestamp();
+			return new Peer(keyPair,belief,states,results,timestamp);
+		} catch (BadSignatureException bse) {
+			throw new Error("Bad signature restoring Peer",bse);
+		}
+	}
+	
+	public AMap<Keyword, Object> toData() {
+		return Maps.of(
+			Keywords.BELIEF,belief,
+			Keywords.RESULTS,blockResults,
+			Keywords.STATES,states
+		);
+	}
+
 	public static Peer create(AKeyPair peerKP, State initialState) {
 		Belief belief = Belief.createSingleOrder(peerKP);
 		SignedData<Belief> sb = peerKP.signData(belief);
@@ -88,15 +112,21 @@ public class Peer {
 	 * @param config
 	 * @return
 	 */
-	public static Peer restorePeer(Map<Keyword, Object> config) throws IOException {
-		EtchStore store = (EtchStore) config.get(Keywords.STORE);
-		if (store==null) throw new IllegalArgumentException("Peer restoration requires an Etch Store");
-		Hash root=store.getRootHash();
-		if (root==null) throw new IllegalStateException("Peer restoration: no root hash?");
-		Ref<Object> ref=store.refForHash(root);
-		if (ref==null) throw new IllegalStateException("Peer restoration: root hash lookup failed");
-		Peer peer=(Peer) ref.getValue();
-		return peer;
+	public static Peer restorePeer(AStore store,Hash root, AKeyPair keyPair) throws IOException {
+		AStore tempStore=Stores.current();
+		try {
+			// temporarily set current store
+			Stores.setCurrent(store);
+			Ref<Object> ref=store.refForHash(root);
+			if (ref==null) throw new IllegalStateException("Peer restoration: root hash lookup failed");
+			@SuppressWarnings("unchecked")
+			AMap<Keyword,Object> peerData=(AMap<Keyword, Object>) ref.getValue();
+			
+			Peer peer=Peer.fromData(keyPair,peerData);
+			return peer;
+		} finally {
+			Stores.setCurrent(tempStore);
+		}
 	}
 
 	/**

@@ -1,5 +1,6 @@
 package convex.core.store;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
@@ -23,6 +24,8 @@ public class MemoryStore extends AStore {
 	 * Storage of persisted Refs for each hash value
 	 */
 	private final HashMap<Hash, Ref<ACell>> hashRefs = new HashMap<Hash, Ref<ACell>>();
+
+	private Hash rootHash;
 
 	@Override
 	@SuppressWarnings("unchecked")
@@ -104,5 +107,15 @@ public class MemoryStore extends AStore {
 
 		if (noveltyHandler != null) noveltyHandler.accept(ref);
 		return ref;
+	}
+
+	@Override
+	public Hash getRootHash() throws IOException {
+		return rootHash;
+	}
+
+	@Override
+	public void setRootHash(Hash h) {
+		rootHash=h;
 	}
 }

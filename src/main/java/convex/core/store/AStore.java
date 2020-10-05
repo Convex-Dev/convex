@@ -1,5 +1,6 @@
 package convex.core.store;
 
+import java.io.IOException;
 import java.util.function.Consumer;
 
 import convex.core.crypto.Hash;
@@ -65,4 +66,21 @@ public abstract class AStore {
 	 * @return The stored Ref, or null if the hash value is not persisted
 	 */
 	public abstract <T> Ref<T> refForHash(Hash hash);
+
+	/**
+	 * Gets the Root Hash from the Store. Root hash is typically used to store the Peer state
+	 * in situations where the Peer needs to be restored from persistent storage.
+	 * 
+	 * @return Root hash value from this store.
+	 * @throws IOException
+	 */
+	public abstract Hash getRootHash() throws IOException;
+
+	/**
+	 * Sets the root hash for this Store
+	 * @param h
+	 * @return
+	 * @throws IOException 
+	 */
+	public abstract void setRootHash(Hash h) throws IOException;
 }

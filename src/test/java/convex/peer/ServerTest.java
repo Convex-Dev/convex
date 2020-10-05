@@ -8,11 +8,14 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 import org.junit.jupiter.api.Test;
 
+import convex.api.Convex;
 import convex.core.ErrorCodes;
 import convex.core.Init;
 import convex.core.crypto.AKeyPair;
@@ -76,6 +79,14 @@ public class ServerTest {
 		long id1 = pc.sendQuery(v);
 		Utils.timeout(200, () -> results.get(id1) != null);
 		assertEquals(v, results.get(id1));
+	}
+	
+	@Test
+	public void testConvexAPI() throws IOException, InterruptedException, ExecutionException {
+		Convex convex=Convex.connect(server.getHostAddress(),Init.VILLAIN_KP);
+		
+		Future<convex.core.Result> f=convex.query(Symbols.STAR_BALANCE);
+		assertEquals(Init.STATE.getBalance(Init.VILLAIN),f.get().getValue());
 	}
 	
 	@Test
