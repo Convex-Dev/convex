@@ -1,6 +1,7 @@
 package convex.peer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import convex.api.Convex;
 import convex.core.Init;
 import convex.core.Result;
+import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -51,5 +53,8 @@ public class RestoreTest {
 		Convex cvx2=Convex.connect(s2.getHostAddress(), Init.HERO_KP);
 		Long balance2=cvx2.getBalance(Init.HERO);
 		assertEquals(balance1,balance2);
+		
+		State state=s2.getPeer().getConsensusState();
+		assertNotNull(state);
 	}
 }
