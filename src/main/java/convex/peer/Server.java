@@ -100,11 +100,13 @@ public class Server implements Closeable {
 	protected ConnectionManager manager;
 
 	private final AStore store;
-	private final Map<Keyword, Object> config;
+	private final HashMap<Keyword, Object> config;
 
 	private boolean running = false;
 
 	private NIOServer nio;
+	private Thread receiverThread=null;
+	private Thread updateThread=null;
 
 	/** The Peer instance current state of this server */
 	private Peer peer;
@@ -130,7 +132,7 @@ public class Server implements Closeable {
 	 */
 	private HashMap<Address, SignedData<Belief>> newBeliefs = new HashMap<>();
 
-	private Server(Map<Keyword, Object> config) {
+	private Server(HashMap<Keyword, Object> config) {
 		this.config = config;
 		this.manager = new ConnectionManager(config);
 	
@@ -157,14 +159,13 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Creates a Server with a given config.
+	 * Creates a Server with a given config. Reference to config is kept: don't mutate elsewhere.
 	 * 
-	 * Config keys 
 	 * @param config
 	 * @return
 	 */
-	public static Server create(Map<Keyword, Object> config) {
-		return new Server(new HashMap<>(config));
+	public static Server create(HashMap<Keyword, Object> config) {
+		return new Server(config);
 	}
 
 	/**
@@ -185,19 +186,23 @@ public class Server implements Closeable {
 		return peer;
 	}
 
-	public void launch() {
+	public synchronized void launch() {
 		Object p = config.get(Keywords.PORT);
 		Integer port = (p == null) ? null : Utils.toInt(p);
-
-		close(); // in case of relaunch? close first.
+		
 		try {
 			nio.launch();
+			port=nio.getPort();
 
 			// set running status now, so that loops don't terminate
 			running = true;
 
-			new Thread(receiverLoop, "Receive worker loop serving port: " + port).start();
-			new Thread(updateLoop, "Server management loop for port: " + port).start();
+			receiverThread=new Thread(receiverLoop, "Receive worker loop serving port: " + port);
+			receiverThread.start();
+			
+			updateThread=new Thread(updateLoop, "Server management loop for port: " + port);
+			updateThread.start();
+			
 			log.log(LEVEL_SERVER, "Peer Server started with Peer Address: " + getAddress().toChecksumHex());
 		} catch (Exception e) {
 			throw new Error("Failed to launch Server on port: " + port, e);
@@ -574,17 +579,24 @@ public class Server implements Closeable {
 
 			try {
 				log.log(LEVEL_SERVER, "Reciever thread started for peer at " + getHostAddress());
+				
 				while (running) { // loop until server terminated
 					Message m = receiveQueue.poll(100, TimeUnit.MILLISECONDS);
 					if (m != null) {
 						processMessage(m);
 					}
 				}
+				
 				log.log(LEVEL_SERVER, "Reciever thread terminated normally for peer " + this);
+			} catch (InterruptedException e) {
+				log.log(LEVEL_SERVER, "Receiver thread interrupted ");
 			} catch (Throwable e) {
 				log.severe("Receiver thread terminated abnormally! ");
 				log.severe("Server FAILED: "+ e.getMessage());
 				e.printStackTrace();
+			} finally {
+				// clear thread from Server as we terminate
+				receiverThread=null;
 			}
 		}
 	};
@@ -604,23 +616,23 @@ public class Server implements Closeable {
 
 				// loop while the server is running
 				while (running) {
-					try {
-						// sleep a bit, wait for transactions to accumulate
-						Thread.sleep(Server.MANAGER_PAUSE);
-	
-						// Update Peer timestamp first. This determines what we might accept.
-						peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
-	
-						// Try belief update
-						maybeUpdateBelief();
-					} catch (Throwable e) {
-						log.severe("Unexpected exception in server update loop: "+e.getMessage());
-						e.printStackTrace();
-					}
+					// sleep a bit, wait for transactions to accumulate
+					Thread.sleep(Server.MANAGER_PAUSE);
+
+					// Update Peer timestamp first. This determines what we might accept.
+					peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
+
+					// Try belief update
+					maybeUpdateBelief();
 				}
 			} catch (InterruptedException e) {
-				log.warning("Server manager loop interrupted?");
-				Thread.currentThread().interrupt();
+				log.fine("Server manager loop interrupted");
+			} catch (Throwable e) {
+					log.severe("Unexpected exception in server update loop: "+e.getMessage());
+					e.printStackTrace();
+			} finally {
+				// clear thread from Server as we terminate
+				updateThread=null;
 			}
 		}
 	};
@@ -665,14 +677,27 @@ public class Server implements Closeable {
 	}
 
 	@Override
-	public void close() {
+	public synchronized void close() {
 		if (peer!=null) {
-			// Ref<?> peerRef=Ref.persist(peer);
-			// Hash peerHash=ref.getHash();
-			// store.setRootHash(peerHash);
+			AStore tempStore=Stores.current();
+			try {
+				Stores.setCurrent(store);
+				ACell peerData=peer.toData();
+				Ref<?> peerRef=Ref.createPersisted(peerData);
+				Hash peerHash=peerRef.getHash();
+				store.setRootHash(peerHash);
+			} catch (IOException e) {
+				log.severe("Failed to persist peer state when closing server");
+				e.printStackTrace();
+			} finally {
+				Stores.setCurrent(tempStore);
+			}
 		}
 		running = false;
+		if (updateThread!=null) updateThread.interrupt();
+		if (receiverThread!=null) receiverThread.interrupt();
 		nio.close();
+		// Note we don't do store.close(); because we don't own the store.
 	}
 
 	/**

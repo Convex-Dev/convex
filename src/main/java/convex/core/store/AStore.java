@@ -83,4 +83,9 @@ public abstract class AStore {
 	 * @throws IOException 
 	 */
 	public abstract void setRootHash(Hash h) throws IOException;
+
+	/**
+	 * Closes this store and frees associated resources
+	 */
+	public abstract void close();
 }

@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
-import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -43,6 +42,8 @@ public class NIOServer implements Closeable {
 	
 	private BlockingQueue<Message> receiveQueue;
 	
+	private Selector selector=null;
+	
 	private boolean running=false;
 	
 	private final Server server;
@@ -70,7 +71,8 @@ public class NIOServer implements Closeable {
 			// set running status now, so that loops don't terminate
 			running=true;
 			
-			new Thread(selectorLoop,"NIO Server selector loop on port: "+port).start();
+			Thread selectorThread=new Thread(selectorLoop,"NIO Server selector loop on port: "+port);
+			selectorThread.start();
 			log.info("NIO server started on port "+port);
 		} catch (Exception e) {
 			throw new Error("Can't bind NIOServer to port: "+port,e);
@@ -87,9 +89,9 @@ public class NIOServer implements Closeable {
 		public void run() {			
 			// Use the store configured for the owning server.
 			Stores.setCurrent(server.getStore());
-			
 			try {
-				Selector selector = Selector.open();
+				selector = Selector.open();
+				
 				ssc.register(selector, SelectionKey.OP_ACCEPT);
 				
 				while (running) {
@@ -121,13 +123,37 @@ public class NIOServer implements Closeable {
 					}
 					// keys.clear();
 				}
-			}
-
-			catch (IOException e) {
+			} catch (IOException e) {
 				log.info("Unexpected IOException, terminating selector loop: "+e.getMessage());
 				// print error and terminate
 				e.printStackTrace();
 			} finally {
+				try {
+					// close all client channels
+					for (SelectionKey key: selector.keys()) {
+						key.channel().close();
+					}
+					selector.close();
+					selector=null;
+				} catch (IOException e) {
+					log.severe("IOException while closing NIO server");
+					e.printStackTrace();
+				} finally {
+					selector=null;
+				}
+				
+				
+				if (ssc!=null) {
+					try {
+						ssc.close();
+					} catch (IOException e) {
+						log.severe("IOException while closing NIO socket channel");
+						e.printStackTrace();
+					} finally {
+						ssc=null;
+					}
+				}
+				
 				log.info("Selector loop ended on port: "+getPort());
 			}
 		}
@@ -207,20 +233,10 @@ public class NIOServer implements Closeable {
 	@Override
 	public void close() {
 		running=false;
-		ServerSocketChannel ssc=this.ssc;
-		if (ssc!=null) {
-			SocketAddress sa=null;
-			try {
-				sa = ssc.getLocalAddress();
-				ssc.close();
-				log.info("Unbinding server socket: "+sa);
-			}
-			catch (IOException e) {
-				log.severe("Unexpected exception when unbinding "+sa+" : ");
-				e.printStackTrace();
-			}
-			this.ssc=null;
+		if (selector!=null) {
+			selector.wakeup();
 		}
+		
 	}
 
 	private void accept(Selector selector) throws IOException, ClosedChannelException {

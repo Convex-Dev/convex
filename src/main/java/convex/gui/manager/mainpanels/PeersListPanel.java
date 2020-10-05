@@ -76,7 +76,6 @@ public class PeersListPanel extends JPanel {
 		config.put(Keywords.STORE, EtchStore.createTemp());
 
 		Server ps = API.launchPeer(config);
-		ps.launch();
 
 		PeerView peer = new PeerView();
 		peer.peerServer = ps;

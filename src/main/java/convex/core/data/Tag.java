@@ -62,6 +62,7 @@ public class Tag {
 	public static final byte BLOCK = (byte) 0xAB;
 	public static final byte ORDER = (byte) 0xAC;
 	public static final byte RESULT = (byte)0xAD; // transaction result
+	public static final byte BLOCK_RESULT = (byte) 0xAE;
 
 	public static final byte FALSE = (byte) 0xB0;
 	public static final byte TRUE = (byte) 0xB1;

@@ -18,6 +18,7 @@ import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
 import convex.core.data.Sets;
 import convex.core.util.Utils;
+import convex.peer.API;
 import convex.peer.Server;
 
 public class PeerCluster {
@@ -73,7 +74,7 @@ public class PeerCluster {
 
 		log.info("Creating peer configurations");
 		for (Map<Keyword, Object> config : PEER_CONFIGS) {
-			peers.add(Server.create(config));
+			peers.add(API.launchPeer(config));
 		}
 
 		log.info("Server starting....");

@@ -44,7 +44,8 @@ public class API {
 	 * 
 	 * @return New Server instance
 	 */
-	public static Server launchPeer(Map<Keyword, Object> config) {
+	public static Server launchPeer(Map<Keyword, Object> peerConfig) {
+		HashMap<Keyword,Object> config=new HashMap<>(peerConfig);
 		try {
 			if (!config.containsKey(Keywords.PORT)) config.put(Keywords.PORT, null);
 			if (!config.containsKey(Keywords.STORE)) config.put(Keywords.STORE, Stores.DEFAULT);

@@ -118,4 +118,10 @@ public class MemoryStore extends AStore {
 	public void setRootHash(Hash h) {
 		rootHash=h;
 	}
+
+	@Override
+	public void close() {
+		hashRefs.clear();
+		rootHash=null;
+	}
 }

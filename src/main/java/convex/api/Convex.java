@@ -15,6 +15,7 @@ import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.data.SignedData;
+import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
 import convex.core.lang.ops.Lookup;
 import convex.core.store.Stores;
@@ -338,6 +339,16 @@ public class Convex {
 	 */
 	protected void setAutoSequence(boolean autoSequence) {
 		this.autoSequence = autoSequence;
+	}
+
+	public Long getBalance(Address address) throws IOException {
+		try {
+			Future<Result> result= query(Reader.read("(balance 0x"+address.toHexString()+")"));
+			Long bal= (Long) result.get(Constants.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS).getValue();
+			return bal;
+		} catch (ExecutionException | InterruptedException | TimeoutException ex) {
+			throw new IOException("Unable to query balance",ex);
+		}
 	}
 
 
