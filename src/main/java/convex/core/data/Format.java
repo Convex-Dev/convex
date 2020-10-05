@@ -38,9 +38,6 @@ import convex.core.util.Utils;
  */
 public class Format {
 
-	// Encoding constants
-	public static final int EMBEDDED_STRING_MAX_LENGTH = 32; // max UTF-16 length of embedded string
-	public static final int EMBEDDED_BLOB_MAX_LENGTH = 64; // max bytes in embedded blob
 
 	/**
 	 * 8191 byte system-wide limit on the legal length of a data object encoding.
@@ -55,7 +52,12 @@ public class Format {
 	
 	public static final int MAX_VLC_LONG_LENGTH = 10; // 70 bits
 	
-	public static final int MAX_EMBEDDED_LENGTH=64; // TODO: fix
+	/**
+	 * Maximum size in bytes of an embedded value, including tag
+	 */
+	public static final int MAX_EMBEDDED_LENGTH=80; // TODO: fix
+	
+
 	
 	/**
 	 * Maximum length in bytes of a Ref encoding (may be an embedded data object)
@@ -812,12 +814,14 @@ public class Format {
 		int initialLength;
 
 		if (o instanceof ACell) {
-			ABlob b = ((ACell) o).cachedBlob();
+			// check for a cached encoding
+			ACell cell = (ACell)o;
+			ABlob b = cell.cachedBlob();
 			if (b != null) return b.getByteBuffer();
 
-			initialLength = ((ACell) o).estimatedEncodingSize();
+			initialLength = cell.estimatedEncodingSize();
 		} else {
-			initialLength = EMBEDDED_BLOB_MAX_LENGTH + 1;
+			initialLength = MAX_EMBEDDED_LENGTH;
 		}
 		ByteBuffer b = ByteBuffer.allocate(initialLength);
 		boolean done = false;

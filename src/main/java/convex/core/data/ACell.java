@@ -255,7 +255,9 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	 * 
 	 * @return true if Cell is embedded, false otherwise
 	 */
-	protected abstract boolean isEmbedded();
+	protected boolean isEmbedded() {
+		return getEncoding().length()<=Format.MAX_EMBEDDED_LENGTH;
+	}
 
 	/**
 	 * Gets the number of Refs contained within this Cell. This number is

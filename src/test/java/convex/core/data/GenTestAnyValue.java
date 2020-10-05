@@ -16,7 +16,6 @@ import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 import convex.core.crypto.Hash;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.RT;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.test.Samples;
@@ -86,7 +85,6 @@ public class GenTestAnyValue {
 			Blob data=Format.encodedBlob(o);
 			
 			Object o2=Format.read(data);
-			RT.validate(o2);
 			
 			// check round trip properties
 			assertEquals(o,o2);

@@ -37,6 +37,10 @@ public class Syntax extends ACell {
 		this.datumRef = datumRef;
 		this.meta = props;
 	}
+	
+	public static Syntax createUnchecked(Object value, AHashMap<Object, Object> meta) {
+		return new Syntax(Ref.get(value),meta);
+	}
 
 	/**
 	 * Wraps a value as a Syntax Object, adding the given new metadata
@@ -274,13 +278,5 @@ public class Syntax extends ACell {
 			return (R) a;
 		}
 	}
-
-	@Override
-	protected boolean isEmbedded() {
-		// TODO  Figure out if we can be more aggressive here?
-		// return Format.isEmbedded(datum) && Format.isEmbedded(meta);
-		return false;
-	}
-
 
 }

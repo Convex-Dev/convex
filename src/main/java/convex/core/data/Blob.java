@@ -240,12 +240,6 @@ public class Blob extends AArrayBlob {
 	}
 
 	@Override
-	protected boolean isEmbedded() {
-		// Embedded iff short enough for embedding
-		return length<=Format.EMBEDDED_BLOB_MAX_LENGTH;
-	}
-
-	@Override
 	public boolean isRegularBlob() {
 		return true;
 	}

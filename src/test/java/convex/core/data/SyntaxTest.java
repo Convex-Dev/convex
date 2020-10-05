@@ -30,16 +30,12 @@ public class SyntaxTest {
 	@Test public void testNoDoubleWrapping() throws BadFormatException {
 		// A valid Syntax Object
 		Syntax inner=Syntax.create(null);
-		Ref<?> innerRef=Ref.createPersisted(inner);
-		
-		// This is an invalid Syntax object.
-		// However, it should read OK, because it looks like a valid Syntax object containing a Ref
-		Syntax s=Format.read("3420"+innerRef.getHash().toHexString()+"00");
-		assertEquals(inner,s.getValue());
-		assertSame(Maps.empty(),s.getMeta());
+		Syntax badSyntax=Syntax.createUnchecked(inner, Maps.empty());
+		assertEquals(inner,badSyntax.getValue());
+		assertSame(Maps.empty(),badSyntax.getMeta());
 		
 		// Should fail validation
-		assertThrows(InvalidDataException.class,()->s.validate());
+		assertThrows(InvalidDataException.class,()->badSyntax.validate());
 	}
 	
 	@Test public void testSyntaxMergingMetaData() {

@@ -1,15 +1,14 @@
 package convex.core.crypto;
 
-import static org.junit.jupiter.api.Assertions.*;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.Arrays;
 import java.util.Collection;
 
+import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
-import convex.core.crypto.Hash;
 import convex.core.data.ABlob;
 import convex.core.data.Blob;
 import convex.core.util.Utils;

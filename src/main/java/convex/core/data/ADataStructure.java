@@ -37,6 +37,7 @@ public abstract class ADataStructure<E> extends ACell {
 		return count() == 0L;
 	}
 	
+	// TODO: delete Old logic
 	@Override
 	public boolean isEmbedded() {
 		// Logic: only empty data structures are embedded
