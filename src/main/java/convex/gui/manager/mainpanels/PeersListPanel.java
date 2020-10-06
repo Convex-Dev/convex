@@ -1,6 +1,7 @@
 package convex.gui.manager.mainpanels;
 
 import java.awt.BorderLayout;
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -19,6 +20,7 @@ import convex.core.Init;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.store.Stores;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.PeerComponent;
 import convex.gui.components.PeerView;
@@ -29,7 +31,7 @@ import convex.peer.API;
 import convex.peer.Server;
 import etch.EtchStore;
 
-@SuppressWarnings("serial")
+@SuppressWarnings({ "serial", "unused" })
 public class PeersListPanel extends JPanel {
 
 	JPanel peersPanel;
@@ -64,7 +66,7 @@ public class PeersListPanel extends JPanel {
 	public static PeerView getFirst() {
 		return peerList.elementAt(0);
 	}
-
+	
 	public PeerView launchPeer(PeerManager manager, AKeyPair keyPair) {
 		Map<Keyword, Object> config = new HashMap<>();
 
@@ -73,7 +75,10 @@ public class PeersListPanel extends JPanel {
 		config.put(Keywords.STATE, Init.STATE);
 		
 		// Use a different fresh store for each peer
-		config.put(Keywords.STORE, EtchStore.createTemp());
+		// config.put(Keywords.STORE, EtchStore.createTemp());
+		
+		// Or Use a shared store
+		config.put(Keywords.STORE, Stores.getGlobalStore());
 
 		Server ps = API.launchPeer(config);
 
@@ -132,7 +137,7 @@ public class PeersListPanel extends JPanel {
 			Connection pc;
 			try {
 				// TODO: we want to receive anything?
-				pc = Connection.connect(hostAddress, null,PeerManager.CLIENT_STORE);
+				pc = Connection.connect(hostAddress, null,Stores.getGlobalStore());
 				PeerView pv = new PeerView();
 				pv.peerConnection = pc;
 				addPeer(pv);
@@ -145,6 +150,14 @@ public class PeersListPanel extends JPanel {
 		ScrollyList<PeerView> scrollyList = new ScrollyList<PeerView>(peerList,
 				peer -> new PeerComponent(manager, peer));
 		add(scrollyList, BorderLayout.CENTER);
+	}
+
+	public void closePeers() {
+		int n = peerList.getSize();
+		for (int i = 0; i < n; i++) {
+			PeerView p = peerList.getElementAt(i);
+			p.peerServer.close();
+		}
 	}
 
 }

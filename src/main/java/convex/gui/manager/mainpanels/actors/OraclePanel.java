@@ -1,6 +1,7 @@
 package convex.gui.manager.mainpanels.actors;
 
 import java.awt.BorderLayout;
+import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 import javax.swing.JButton;
@@ -12,6 +13,7 @@ import javax.swing.JTable;
 import javax.swing.table.DefaultTableCellRenderer;
 
 import convex.core.Init;
+import convex.core.Result;
 import convex.core.State;
 import convex.core.data.Address;
 import convex.core.data.MapEntry;
@@ -25,7 +27,6 @@ import convex.gui.components.models.OracleTableModel;
 import convex.gui.manager.PeerManager;
 import convex.gui.manager.mainpanels.WalletPanel;
 import convex.gui.utils.Toolkit;
-import convex.net.ResultConsumer;
 
 @SuppressWarnings("serial")
 public class OraclePanel extends JPanel {
@@ -129,7 +130,7 @@ public class OraclePanel extends JPanel {
 				String source = "(let [pmc " + actorCode + " ] " + "(deploy (pmc " + " 0x"
 						+ oracleAddress.toChecksumHex() + " " + key + " " + outcomeString + ")))";
 				Object code = Reader.read(source);
-				PeerManager.execute(WalletPanel.HERO, code, createMarketAction);
+				PeerManager.execute(WalletPanel.HERO, code).thenAcceptAsync(createMarketAction);
 			} catch (Exception e1) {
 				e1.printStackTrace();
 			}
@@ -137,11 +138,10 @@ public class OraclePanel extends JPanel {
 	}
 
 	private void execute(Object code) {
-		PeerManager.execute(WalletPanel.HERO, code, receiveAction);
+		PeerManager.execute(WalletPanel.HERO, code).thenAcceptAsync(receiveAction);
 	}
 
-	private final ResultConsumer createMarketAction = new ResultConsumer() {
-		@Override
+	private final Consumer<Result> createMarketAction = new Consumer<Result>() {
 		protected void handleResult(Object m) {
 			if (m instanceof Address) {
 				try {
@@ -159,14 +159,22 @@ public class OraclePanel extends JPanel {
 			}
 		}
 
-		@Override
 		protected void handleError(long id, Object code, Object msg) {
 			showError(code,msg);
 		}
 
+		@Override
+		public void accept(Result t) {
+			if (t.isError()) {
+				handleError((Long)t.getID(),t.getErrorCode(),t.getValue());
+			} else {
+				handleResult(t.getValue());
+			}
+		}
+
 	};
 
-	private final ResultConsumer receiveAction = new DefaultReceiveAction(scrollPane);
+	private final DefaultReceiveAction receiveAction = new DefaultReceiveAction(scrollPane);
 
 	private void showError(Object code, Object msg) {
 		String resultString = "Error executing transaction: " + code + " "+msg;

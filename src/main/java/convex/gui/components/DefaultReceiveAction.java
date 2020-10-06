@@ -1,13 +1,14 @@
 package convex.gui.components;
 
+import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 import javax.swing.JComponent;
 
+import convex.core.Result;
 import convex.core.util.Utils;
-import convex.net.ResultConsumer;
 
-public class DefaultReceiveAction extends ResultConsumer {
+public class DefaultReceiveAction implements Consumer<Result> {
 
 	public static final Logger log = Logger.getLogger(DefaultReceiveAction.class.getName());
 
@@ -16,13 +17,20 @@ public class DefaultReceiveAction extends ResultConsumer {
 	public DefaultReceiveAction(JComponent parent) {
 		this.parent = parent;
 	}
-
+	
 	@Override
+	public void accept(Result t) {
+		if (t.isError()) {
+			handleError((Long)t.getID(),t.getErrorCode(),t.getValue());
+		} else {
+			handleResult(t.getValue());
+		}
+	}
+
 	protected void handleResult(Object m) {
 		showResult(m);
 	}
 
-	@Override
 	protected void handleError(long id, Object code, Object msg) {
 		showError(code,msg);
 	}

@@ -13,10 +13,12 @@ public class Stores {
 	
 	public static final AStore DEFAULT = CLIENT_STORE;
 	
+	private static AStore globalStore=null;
+	
 	private static final ThreadLocal<AStore> currentStore = new ThreadLocal<>() {
 		@Override
 		protected AStore initialValue() {
-			return CLIENT_STORE;
+			return getGlobalStore();
 		}
 	};
 
@@ -43,5 +45,16 @@ public class Stores {
 	 */
 	public static void setCurrent(AStore store) {
 		currentStore.set(store);
+	}
+
+	public static AStore getGlobalStore() {
+		if (globalStore==null) {
+			globalStore=Stores.DEFAULT;
+		}
+		return globalStore;
+	}
+
+	public static void setGlobalStore(EtchStore store) {
+		globalStore=store;
 	}
 }
