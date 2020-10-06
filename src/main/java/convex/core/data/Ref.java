@@ -530,12 +530,6 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 		AStore store=Stores.current();
 		return (Ref<R>) store.storeRef((Ref<ACell>)this, noveltyHandler);
 	}
-	
-	/**
-	 * Gets the total memory size for this Ref, or null if not known.
-	 * @return Memory size in bytes.
-	 */
-	public abstract long getMemorySize();
 
 	/**
 	 * Updates the value stored within this Ref. New value must be equal in value to the old value (identical hash), 

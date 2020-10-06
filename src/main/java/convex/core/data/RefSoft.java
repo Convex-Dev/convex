@@ -127,12 +127,6 @@ public class RefSoft<T> extends Ref<T> {
 	public Hash getHash() {
 		return hash;
 	}
-	
-	@Override
-	public long getMemorySize() {
-		ACell c=(ACell) getValue();
-		return c.getMemorySize();
-	}
 
 	@Override
 	public boolean isEmbedded() {

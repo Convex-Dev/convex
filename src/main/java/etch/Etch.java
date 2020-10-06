@@ -695,11 +695,11 @@ public class Etch {
     /**
      * Updates a Ref in place at the specified position. Assumes data not changed.
      * @param position Data position in storage file
-     * @param value
+     * @param ref
      * @return
      * @throws IOException 
      */
-	private Ref<ACell> updateInPlace(long position, Ref<ACell> value) throws IOException {
+	private Ref<ACell> updateInPlace(long position, Ref<ACell> ref) throws IOException {
 		// Seek to status location
 		MappedByteBuffer mbb=seekMap(position+KEY_SIZE);
 		
@@ -707,7 +707,7 @@ public class Etch {
 		byte currentStatus=mbb.get();
 		long currentSize=mbb.getLong();
 		
-		byte targetStatus=(byte)value.getStatus();
+		byte targetStatus=(byte)ref.getStatus();
 		if (currentStatus<targetStatus) {
 			// need to increase status of store
 			mbb=seekMap(position+KEY_SIZE);
@@ -715,13 +715,13 @@ public class Etch {
 			
 			// maybe update size, if not already persisted
 			if ((currentSize==0L)&&(targetStatus>=Ref.PERSISTED)) {
-				mbb.putLong(value.getMemorySize());
+				mbb.putLong(ref.getValue().getMemorySize());
 			}
 			
-			return value;
+			return ref;
 		} else {
 			// possibly update value status to reflect current store
-			return value.withMinimumStatus(currentStatus);
+			return ref.withMinimumStatus(currentStatus);
 		}
 		
 
@@ -826,7 +826,7 @@ public class Etch {
 		
 		long memorySize=0L;
 		if (status>=Ref.PERSISTED) {
-			memorySize=value.getMemorySize();
+			memorySize=cell.getMemorySize();
 		}
 
 		// position ready for append

@@ -134,12 +134,6 @@ public class RefDirect<T> extends Ref<T> {
 	}
 
 	@Override
-	public long getMemorySize() {
-		if (isEmbedded()) return 0L;
-		return ((ACell)value).getMemorySize();
-	}
-
-	@Override
 	public Ref<T> withValue(T newValue) {
 		if (newValue!=value) return new RefDirect<T>(newValue,hash,status);
 		return this;
