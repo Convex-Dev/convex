@@ -5,6 +5,7 @@ import javax.swing.table.TableModel;
 
 import convex.core.State;
 import convex.core.data.AMap;
+import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
@@ -42,7 +43,9 @@ public class OracleTableModel extends AbstractTableModel implements TableModel {
 
 	@Override
 	public int getRowCount() {
-		AMap<Object,Object> list=state.getAccount(oracle).getEnvironmentValue(LIST_S); 
+		AccountStatus as=state.getAccount(oracle);
+		
+		AMap<Object,Object> list=as.getEnvironmentValue(LIST_S); 
 		return Utils.checkedInt(list.count());
 	}
 

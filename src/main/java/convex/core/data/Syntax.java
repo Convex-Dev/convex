@@ -107,11 +107,6 @@ public class Syntax extends ACell {
 	public boolean isCanonical() {
 		return true;
 	}
-	
-	@Override
-	public boolean isEmbedded() {
-		return false;
-	}
 
 	public static Syntax read(ByteBuffer bb) throws BadFormatException {
 		Ref<Object> datum = Format.readRef(bb);

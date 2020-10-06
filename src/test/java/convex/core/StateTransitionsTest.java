@@ -193,7 +193,7 @@ public class StateTransitionsTest {
 		Block b1 = Block.of(s.getTimeStamp(), kp.signData(t1));
 		s = s.applyBlock(b1).getState();
 		
-		assertTrue(initialMem<s.getAccount(Init.HERO).getMemoryUsage());
+		assertTrue(initialMem<=s.getAccount(Init.HERO).getMemoryUsage());
 	}
 
 	@Test
