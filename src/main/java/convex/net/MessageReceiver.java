@@ -114,7 +114,10 @@ public class MessageReceiver {
 		int firstPos = bb.position();
 		byte messageCode = bb.get();
 		MessageType type = MessageType.decode(messageCode);
+		
+		// Read an object from message
 		Object payload = Format.read(bb);
+		
 		int pos = bb.position();
 		if (pos != expectedPosition) {
 			String m = "Unexpected message length, expected: " + (expectedPosition - firstPos) + " but got:"

@@ -507,7 +507,7 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	/**
 	 * Persists a Ref shallowly in the current store.
 	 * 
-	 * Status will be updated STORED or higher.
+	 * Status will be updated to STORED or higher.
 	 * 
 	 * @return Ref with status of STORED or above
 	 */

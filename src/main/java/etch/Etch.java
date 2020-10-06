@@ -633,7 +633,7 @@ public class Etch {
 			}
 			
 			RefSoft<ACell> ref=RefSoft.create(cell, hash, status);
-
+			cell.attachRef(ref);
 			
 			return ref;
 		} catch (Exception e) {

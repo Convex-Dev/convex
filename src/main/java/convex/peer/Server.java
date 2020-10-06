@@ -301,7 +301,7 @@ public class Server implements Closeable {
 		Ref.createPersisted(sd);
 		
 		if (!sd.checkSignature()) {
-			// terminate the connection, dishonest peer.
+			// terminate the connection, dishonest client?
 			try {
 				// TODO: throttle?
 				m.getPeerConnection().sendResult(m.getID(), "Bad Signature!", ErrorCodes.SIGNATURE);
@@ -523,7 +523,7 @@ public class Server implements Closeable {
 		Object payload=m.getPayload();
 		
 		// TODO: be smarter about this? hold a per-client queue for a while?
-		Ref<?> r=Ref.get(payload).persistShallow();
+		Ref<?> r=Ref.get(payload);
 		r=r.persistShallow();
 		Hash payloadHash=r.getHash();
 
