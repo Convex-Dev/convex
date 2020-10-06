@@ -136,6 +136,7 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	 * 
 	 * Default is the first bytes (big-endian) of the Cell encoding hash, since this is consistent with
 	 * encoding-based equality. However, subclasses may provide more efficient hashcodes provided that
+	 * the usual invarients are preserved
 	 * 
 	 * @return int hash code.
 	 */

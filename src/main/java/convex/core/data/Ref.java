@@ -498,8 +498,19 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 		return store;
 	}
 
+	/**
+	 * Check if the Ref's value is embedded. 
+	 * 
+	 * If false, the value must be an ACell instance.
+	 * 
+	 * @return true if embedded, false otherwise
+	 */
 	public abstract boolean isEmbedded();
 
+	/**
+	 * Converts this Ref to a RefDirect
+	 * @return
+	 */
 	public Ref<T> toDirect() {
 		return RefDirect.create(getValue(), hash, status);
 	}
