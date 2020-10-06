@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -110,6 +111,9 @@ public class BlobsTest {
 		int el=(int) Samples.FULL_BLOB.getEncoding().length();
 		assertEquals(Blobs.MAX_ENCODING_LENGTH,el);
 		assertEquals(Blob.MAX_ENCODING_LENGTH,el);
+		
+		assertTrue(Samples.MAX_EMBEDDED_BLOB.isEmbedded());
+		assertFalse(Samples.FULL_BLOB.isEmbedded());
 	}
 
 	@Test

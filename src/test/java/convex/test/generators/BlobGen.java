@@ -23,14 +23,18 @@ public class BlobGen extends Generator<ABlob> {
 
 		long len = status.size();
 		int type = r.nextInt();
-		switch (type % 8) {
+		switch (type % 10) {
 		case 0:
 			return LongBlob.create(r.nextLong());
 		case 1:
 			return Samples.FULL_BLOB;
 		case 2:
 			return Samples.BIG_BLOB_TREE;
-		case 3: {
+		case 3:
+			return Samples.MAX_EMBEDDED_BLOB;
+		case 4:
+			return Samples.NON_EMBEDDED_BLOB;
+		case 5: {
 			// use a slice from a big blob
 			long length=Math.min(len, Samples.BIG_BLOB_LENGTH);
 			length=r.nextLong(0, length);

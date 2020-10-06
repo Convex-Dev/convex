@@ -764,7 +764,9 @@ public class Format {
 			if (o instanceof Boolean) return true;
 			// TODO: think about encodings and string lengths?
 			if (o instanceof String) return true;
-			// if (o instanceof String) return ((String) o).length() <= EMBEDDED_STRING_MAX_LENGTH;
+			
+			// TODO: fix this ugly hack!
+			// if (o instanceof String) return ((String) o).length() < (MAX_EMBEDDED_LENGTH /2);
 		}
 		return false;
 	}

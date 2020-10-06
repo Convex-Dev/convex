@@ -18,4 +18,5 @@ public class MessageSizeTest {
 		assertEquals(Format.MAX_EMBEDDED_LENGTH+1,Samples.NON_EMBEDDED_BLOB.getEncoding().length());
 		assertFalse(Samples.NON_EMBEDDED_BLOB.isEmbedded());
 	}
+	
 }

@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -91,6 +92,11 @@ public class ObjectsTest {
 		Blob b = Format.encodedBlob(a);
 
 		assertTrue(b.length <= Format.LIMIT_ENCODING_LENGTH);
+		
+		if (b.length > Format.MAX_EMBEDDED_LENGTH) {
+			if (!(a instanceof String)) assertFalse(Format.isEmbedded(a),()->"Testing: "+Utils.getClassName(a)+ " = "+Utils.toString(a));
+		}
+
 		try {
 			Object a2;
 			a2 = Format.read(b);
