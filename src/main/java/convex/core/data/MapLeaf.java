@@ -91,7 +91,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 
 	@Override
 	public MapEntry<K, V> getEntry(K k) {
-		// if we have an AData instance, use (or compute) the cached hash. Probably
+		// if we have an ACell instance, use (or compute) the cached hash. Probably
 		// faster.
 		if (k instanceof ACell) return getEntryByHash(((ACell) k).getHash());
 
