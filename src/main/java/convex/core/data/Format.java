@@ -342,7 +342,7 @@ public class Format {
 			throw new IllegalArgumentException("Can't encode numeric type to ByteBuffer: " + o.getClass());
 		}
 
-		if (o instanceof String) return writeString(bb, (String) o);
+		if (o instanceof String) return writeUTF8String(bb, (String) o);
 
 		if (o instanceof Character) {
 			bb = bb.put(Tag.CHAR);
@@ -368,15 +368,15 @@ public class Format {
 	}
 
 	/**
-	 * Writes a String to the byteBuffer. Includes string tag and length
+	 * Writes a UTF-8 String to the byteBuffer. Includes string tag and length
 	 * 
 	 * @param bb
 	 * @param s
 	 * @return ByteBuffer after writing
 	 */
-	public static ByteBuffer writeString(ByteBuffer bb, String s) {
+	public static ByteBuffer writeUTF8String(ByteBuffer bb, String s) {
 		bb = bb.put(Tag.STRING);
-		return writeRawString(bb, s);
+		return writeRawUTF8String(bb, s);
 	}
 
 	/**
@@ -387,7 +387,7 @@ public class Format {
 	 * @param s
 	 * @return ByteBuffer after writing
 	 */
-	public static ByteBuffer writeRawString(ByteBuffer bb, String s) {
+	public static ByteBuffer writeRawUTF8String(ByteBuffer bb, String s) {
 		if (s.length() == 0) {
 			bb = writeLength(bb, 0);
 		} else {
@@ -410,14 +410,14 @@ public class Format {
 	};
 
 	/**
-	 * Reads a String from a ByteBuffer. Assumes the object tag has already been
+	 * Reads a UTF-8 String from a ByteBuffer. Assumes the object tag has already been
 	 * read
 	 * 
 	 * @param bb
 	 * @return String from ByteBuffer
 	 * @throws BadFormatException
 	 */
-	public static String readString(ByteBuffer bb) throws BadFormatException {
+	public static String readUTF8String(ByteBuffer bb) throws BadFormatException {
 		try {
 			int len = readLength(bb);
 			if (len == 0) return "";
@@ -666,7 +666,7 @@ public class Format {
 			// Amounts use the low 4 bits of tag for a decimal scale factor
 			if ((tag & 0xF0) == Tag.AMOUNT) return (T) Amount.read(tag, bb);
 
-			if (tag == Tag.STRING) return (T) readString(bb);
+			if (tag == Tag.STRING) return (T) readUTF8String(bb);
 			if (tag == Tag.BLOB) return (T) Blobs.read(bb);
 			if (tag == Tag.HASH) return (T) Hash.read(bb);
 			if (tag == Tag.SYMBOL) return (T) readSymbol(bb);

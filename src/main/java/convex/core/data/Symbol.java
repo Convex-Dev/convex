@@ -121,7 +121,7 @@ public class Symbol extends ASymbolic {
 	@Override
 	public ByteBuffer writeRaw(ByteBuffer bb) {
 		bb = Format.write(bb, namespace);
-		bb = Format.writeRawString(bb, name);
+		bb = Format.writeRawUTF8String(bb, name);
 		return bb;
 	}
 
@@ -134,7 +134,7 @@ public class Symbol extends ASymbolic {
 	 */
 	public static Symbol read(ByteBuffer bb) throws BadFormatException {
 		Symbol namespace=Format.read(bb);
-		String name=Format.readString(bb);
+		String name=Format.readUTF8String(bb);
 		Symbol sym = Symbol.create(namespace,name);
 		if (sym == null) throw new BadFormatException("Can't read symbol");
 		return sym;
