@@ -304,8 +304,8 @@ public class Hash extends AArrayBlob {
 	 * @return Hash of the encoded data for the given value
 	 */
 	public static Hash compute(Object value) {
-		if (value == null) return NULL_HASH;
 		if (value instanceof ACell) return ((ACell) value).getHash();
+		if (value == null) return NULL_HASH;
 
 		if (value instanceof Boolean) {
 			return (Boolean) value ? TRUE_HASH : FALSE_HASH;

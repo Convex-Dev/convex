@@ -276,7 +276,7 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Ref<R> getRef() {
 		if (cachedRef!=null) return (Ref<R>) cachedRef;
-		Ref<ACell> newRef= RefDirect.create(this);
+		Ref<ACell> newRef= RefDirect.create(this,cachedHash());
 		cachedRef=newRef;
 		return (Ref<R>) newRef;
 	}
@@ -344,6 +344,16 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 			if (this.memorySize==memorySize) return;
 			throw new IllegalStateException("Attempting to attach memory size "+memorySize+" to object of class "+Utils.getClassName(this)+" which already has memorySize "+this.memorySize);
 		}
+	}
+	
+	/**
+	 * Updates the cached ref of this Cell
+	 * 
+	 * @param ref Ref to assign
+	 */
+	@SuppressWarnings("unchecked")
+	public void attachRef(Ref<?> ref) {
+		this.cachedRef=(Ref<ACell>) ref;
 	}
 
 }

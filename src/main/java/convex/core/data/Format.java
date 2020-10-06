@@ -311,7 +311,10 @@ public class Format {
 		if (o instanceof ACell) {
 			return ((ACell) o).write(bb);
 		}
+		return writeNonCell(bb,o);
+	}
 
+	public static ByteBuffer writeNonCell(ByteBuffer bb, Object o) {
 		if (o == null) {
 			return bb.put(Tag.NULL);
 		}

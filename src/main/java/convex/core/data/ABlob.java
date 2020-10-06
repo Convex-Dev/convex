@@ -18,7 +18,7 @@ import convex.core.util.Utils;
  */
 public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	/**
-	 * Cached hash of the Blob data
+	 * Cached hash of the Blob data. Might be null.
 	 */
 	protected Hash contentHash = null;
 
