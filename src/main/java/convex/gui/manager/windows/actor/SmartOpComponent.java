@@ -143,7 +143,7 @@ public class SmartOpComponent extends BaseListComponent {
 			long id;
 			
 			// connect to Peer as a client
-			Connection peerConnection = Connection.connect(addr, receiveAction, Stores.CLIENT_STORE);
+			Connection peerConnection = Connection.connect(addr, receiveAction, Stores.getGlobalStore());
 			
 			AccountChooserPanel execPanel = parent.execPanel;
 			String mode = execPanel.getMode();

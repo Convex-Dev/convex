@@ -5,18 +5,18 @@ import java.util.logging.Level;
 import etch.EtchStore;
 
 public class Stores {
+
+	// Default store
+	private static AStore defaultStore=null;
 	
-	/**
-	 * Default store to use in client applications
-	 */
-	public static final AStore CLIENT_STORE = EtchStore.createTemp("convex-db");
+	// Configured global store
+	private static AStore globalStore=null;
 	
-	public static final AStore DEFAULT = CLIENT_STORE;
-	
+	// Thread local current store, in case servers want different stores
 	private static final ThreadLocal<AStore> currentStore = new ThreadLocal<>() {
 		@Override
 		protected AStore initialValue() {
-			return CLIENT_STORE;
+			return getGlobalStore();
 		}
 	};
 
@@ -43,5 +43,23 @@ public class Stores {
 	 */
 	public static void setCurrent(AStore store) {
 		currentStore.set(store);
+	}
+	
+	public static AStore getDefaultStore() {
+		if (defaultStore==null) {
+			defaultStore=EtchStore.createTemp("convex-db");;
+		}
+		return defaultStore;
+	}
+
+	public static AStore getGlobalStore() {
+		if (globalStore==null) {
+			globalStore=getDefaultStore();
+		}
+		return globalStore;
+	}
+
+	public static void setGlobalStore(EtchStore store) {
+		globalStore=store;
 	}
 }

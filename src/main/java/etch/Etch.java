@@ -523,6 +523,7 @@ public class Etch {
 	 * data length.
 	 */
 	synchronized void close() {
+		if (file==null) return; // already closed
 		try {
 			// write final data length
 			MappedByteBuffer mbb=seekMap(OFFSET_FILE_SIZE);
@@ -542,6 +543,8 @@ public class Etch {
 		} catch (IOException e) {
 			log.severe("Error closing Etch file: "+file);
 			e.printStackTrace();
+		} finally {
+			file=null;
 		}
 	}
 

@@ -4,8 +4,11 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.EventQueue;
 import java.awt.Toolkit;
+import java.awt.event.WindowEvent;
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
@@ -13,14 +16,15 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
+import convex.api.Convex;
 import convex.core.Init;
 import convex.core.Peer;
+import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
@@ -35,15 +39,13 @@ import convex.gui.manager.mainpanels.KeyGenPanel;
 import convex.gui.manager.mainpanels.MessageFormatPanel;
 import convex.gui.manager.mainpanels.PeersListPanel;
 import convex.gui.manager.mainpanels.WalletPanel;
-import convex.net.Connection;
-import convex.net.Message;
+import convex.peer.Server;
+import etch.EtchStore;
 
 @SuppressWarnings("serial")
 public class PeerManager extends JPanel {
 
 	private static final Logger log = Logger.getLogger(PeerManager.class.getName());
-
-	public static final AStore CLIENT_STORE = Stores.CLIENT_STORE;
 
 	private static JFrame frame;
 
@@ -53,11 +55,14 @@ public class PeerManager extends JPanel {
 
 	/**
 	 * Launch the application.
+	 * @throws IOException 
 	 */
-	public static void main(String[] args) {
+	public static void main(String[] args) throws IOException {
+		Stores.setGlobalStore(EtchStore.create(new File("peers-shared-db")));
+		
 		// call to set up Look and Feel
 		convex.gui.utils.Toolkit.init();
-
+		
 		EventQueue.invokeLater(new Runnable() {
 			@Override
 			public void run() {
@@ -72,6 +77,13 @@ public class PeerManager extends JPanel {
 					frame.getContentPane().add(window, BorderLayout.CENTER);
 					frame.pack();
 					frame.setVisible(true);
+					
+					frame.addWindowListener(new java.awt.event.WindowAdapter() {
+				        public void windowClosing(WindowEvent winEvt) {
+				        	// shut down peers gracefully
+				    		window.peerPanel.closePeers();
+				        }
+				    });
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -85,7 +97,7 @@ public class PeerManager extends JPanel {
 	JPanel panel = new JPanel();
 
 	HomePanel homePanel = new HomePanel();
-	PeersListPanel peerPanel = new PeersListPanel(this);
+	PeersListPanel peerPanel;
 	WalletPanel walletPanel = new WalletPanel();
 	KeyGenPanel keyGenPanel = new KeyGenPanel(this);
 	MessageFormatPanel messagePanel = new MessageFormatPanel(this);
@@ -98,6 +110,8 @@ public class PeerManager extends JPanel {
 	 * Create the application.
 	 */
 	public PeerManager() {
+		peerPanel= new PeersListPanel(this);
+		
 		setLayout(new BorderLayout());
 		this.add(tabs, BorderLayout.CENTER);
 
@@ -118,6 +132,8 @@ public class PeerManager extends JPanel {
 
 	private boolean updateRunning = true;
 
+	private long cp = 0;
+
 	private Thread updateThread = new Thread(new Runnable() {
 		@Override
 		public void run() {
@@ -125,11 +141,13 @@ public class PeerManager extends JPanel {
 				try {
 					Thread.sleep(30);
 					java.util.List<PeerView> servers = peerPanel.getPeerViews();
-					long cp = 0;
 					State latest = latestState.getValue();
 					for (PeerView s : servers) {
-						Peer p = s.checkPeer();
-						if (p == null) continue;
+						Server serv=s.peerServer;
+						if (serv==null) continue;
+						
+						Peer p = serv.getPeer();
+						if (p==null) continue;
 
 						maxBlock = Math.max(maxBlock, p.getPeerOrder().getBlockCount());
 
@@ -139,10 +157,12 @@ public class PeerManager extends JPanel {
 							latest = p.getConsensusState();
 						}
 					}
+					
 					latestState.setValue(latest);
-				} catch (InterruptedException e) {
+				} catch (Exception e) {
 					//
 					log.warning("Update thread interrupted abnormally: "+e.getMessage());
+					e.printStackTrace();
 					Thread.currentThread().interrupt();
 				}
 			}
@@ -173,12 +193,40 @@ public class PeerManager extends JPanel {
 
 	/**
 	 * Builds a connection to the peer network
+	 * @throws IOException 
 	 */
-	public static Connection makeConnection(Consumer<Message> receiveAction) {
+	public static Convex makeConnection(AKeyPair kp) throws IOException {
 		InetSocketAddress host = getDefaultPeer().getHostAddress();
+		return Convex.connect(host, kp);
+	}
+
+	/**
+	 * Executes a transaction using the given Wallet
+	 * 
+	 * @param code
+	 * @param receiveAction
+	 */
+	public static CompletableFuture<Result> execute(WalletEntry we, Object code) {
+		Address address = we.getAddress();
+		AccountStatus as = getLatestState().getAccount(address);
+		long sequence = as.getSequence() + 1;
+		ATransaction trans = Invoke.create(sequence, code);
+		return execute(we,trans);
+	}
+	
+	/**
+	 * Executes a transaction using the given Wallet
+	 * 
+	 * @param code
+	 * @param receiveAction
+	 */
+	public static CompletableFuture<Result> execute(WalletEntry we, ATransaction trans) {
 		try {
-			Connection peerConnection = Connection.connect(host, receiveAction,PeerManager.CLIENT_STORE);
-			return peerConnection;
+			AKeyPair kp = we.getKeyPair();
+			Convex convex = makeConnection(kp);
+			CompletableFuture<Result> fr= convex.transact(trans);
+			log.finer("Sent transaction: "+trans.toString());
+			return fr;
 		} catch (IOException e) {
 			throw Utils.sneakyThrow(e);
 		}
@@ -190,36 +238,8 @@ public class PeerManager extends JPanel {
 	 * @param code
 	 * @param receiveAction
 	 */
-	public static void execute(WalletEntry we, Object code, Consumer<Message> receiveAction) {
-		try {
-			Connection peerConnection = makeConnection(receiveAction);
-			Address address = we.getAddress();
-			AccountStatus as = getLatestState().getAccount(address);
-			long sequence = as.getSequence() + 1;
-			ATransaction trans = Invoke.create(sequence, code);
-			AKeyPair kp = we.getKeyPair();
-			long id = peerConnection.sendTransaction(kp.signData(trans));
-			log.finer("Sent transaction with ID: " + id);
-		} catch (IOException e) {
-			throw Utils.sneakyThrow(e);
-		}
-	}
-
-	/**
-	 * Executes a transaction using the given Wallet
-	 * 
-	 * @param code
-	 * @param receiveAction
-	 */
-	public static void execute(WalletEntry we, ATransaction trans, Consumer<Message> receiveAction) {
-		try {
-			Connection peerConnection = makeConnection(receiveAction);
-			AKeyPair kp = we.getKeyPair();
-			long id = peerConnection.sendTransaction(kp.signData(trans));
-			log.finer("Sent transaction with ID: " + id);
-		} catch (IOException e) {
-			throw Utils.sneakyThrow(e);
-		}
+	public static void execute(WalletEntry we, ATransaction trans, Consumer<Result> receiveAction) {
+		execute(we,trans).thenAcceptAsync(receiveAction);
 	}
 
 	public static State getLatestState() {

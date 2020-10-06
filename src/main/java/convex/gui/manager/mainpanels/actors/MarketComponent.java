@@ -169,7 +169,7 @@ public class MarketComponent extends BaseListComponent {
 		WalletEntry we = marketsPanel.acctChooser.getWalletEntry();
 		AList<Object> cc = Lists.of(Symbol.create("stake"), outcome, newStake);
 		AList<Object> cmd = List.of(Symbols.CALL, address, offer, cc);
-		PeerManager.execute(we, cmd, new DefaultReceiveAction(marketsPanel));
+		PeerManager.execute(we, cmd).thenAcceptAsync(new DefaultReceiveAction(marketsPanel));
 	}
 
 	static DecimalFormat probFormatter = new DecimalFormat("0.0");

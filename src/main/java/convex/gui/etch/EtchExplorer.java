@@ -60,7 +60,7 @@ public class EtchExplorer extends JPanel {
 	 */
 	JPanel panel = new JPanel();
 
-	private static StateModel<EtchStore> etchState = StateModel.create((EtchStore) Stores.DEFAULT);
+	private static StateModel<EtchStore> etchState = StateModel.create((EtchStore)Stores.getGlobalStore());
 	
 	DatabasePanel homePanel = new DatabasePanel(this);
 	JTabbedPane tabs = new JTabbedPane();

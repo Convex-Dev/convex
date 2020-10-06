@@ -29,7 +29,7 @@ public class ConvexClient extends JPanel {
 
 	private static final Logger log = Logger.getLogger(ConvexClient.class.getName());
 
-	public static final AStore CLIENT_STORE = Stores.CLIENT_STORE;
+	public static final AStore CLIENT_STORE = Stores.getGlobalStore();
 
 	private static JFrame frame;
 

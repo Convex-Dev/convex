@@ -138,7 +138,7 @@ public class Server implements Closeable {
 		this.manager = new ConnectionManager(config);
 	
 		AStore configStore = (AStore) config.get(Keywords.STORE);
-		store = (configStore == null) ? Stores.DEFAULT : configStore;
+		store = (configStore == null) ? Stores.getGlobalStore() : configStore;
 		AKeyPair keyPair=(AKeyPair) config.get(Keywords.KEYPAIR);
 		
 		this.peer= establishPeer(keyPair,config);

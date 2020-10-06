@@ -130,7 +130,7 @@ public class Convex {
 	}
 
 	private void connectToPeer(InetSocketAddress peerAddress) throws IOException {
-		setConnection(Connection.connect(peerAddress, handler, Stores.CLIENT_STORE));
+		setConnection(Connection.connect(peerAddress, handler, Stores.current()));
 	}
 	
 	/**
@@ -193,7 +193,7 @@ public class Convex {
 	 * @return A Future for the result of the transaction
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
-	public Future<Result> transact(ATransaction transaction) throws IOException {
+	public CompletableFuture<Result> transact(ATransaction transaction) throws IOException {
 		if (autoSequence) {
 			transaction=applyNextSequence(transaction);
 		}
@@ -201,7 +201,7 @@ public class Convex {
 		return transact(signed);
 	}
 	
-	public Future<Result> transact(SignedData<ATransaction> signed) throws IOException {
+	public CompletableFuture<Result> transact(SignedData<ATransaction> signed) throws IOException {
 		CompletableFuture<Result> cf=new CompletableFuture<Result>();
 		long id=connection.sendTransaction(signed);
 		

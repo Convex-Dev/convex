@@ -6,6 +6,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.io.File;
+import java.io.IOException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
@@ -213,5 +215,16 @@ public class EtchStoreTest {
 		} finally {
 			Stores.setCurrent(oldStore);
 		}
+	}
+	
+	@Test
+	public void testReopen() throws IOException {
+		File file=File.createTempFile("etch",null);
+		EtchStore es=EtchStore.create(file);
+		es.setRootHash(Hash.NULL_HASH);
+		es.close();
+		
+		EtchStore es2=EtchStore.create(file);
+		assertEquals(Hash.NULL_HASH,es2.getRootHash());
 	}
 }
