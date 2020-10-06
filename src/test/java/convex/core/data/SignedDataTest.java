@@ -53,7 +53,6 @@ public class SignedDataTest {
 		sd.validateSignature();
 		assertEquals(v, sd.getValue());
 		
-		assertFalse(sd.getDataRef().isEmbedded());
 		assertEquals(TestState.HERO,sd.getAddress());
 	}
 }

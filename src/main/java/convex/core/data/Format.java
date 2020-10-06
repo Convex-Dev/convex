@@ -695,7 +695,7 @@ public class Format {
 		} catch (IllegalArgumentException e) {
 			throw new BadFormatException("Illegal argument reading encoding", e);
 		} catch (ClassCastException e) {
-			throw new BadFormatException("Unexpected data type", e);
+			throw new BadFormatException("Unexpected data type when decoding: "+e.getMessage(), e);
 		}
 
 		// report error

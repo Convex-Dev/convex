@@ -193,12 +193,24 @@ public class VectorTree<T> extends AVector<T> {
 			throws BadFormatException, BufferUnderflowException {
 		if (count < 0) throw new BadFormatException("Negative count?");
 		int n = computeArraySize(count);
-
 		Ref<AVector<T>>[] items = (Ref<AVector<T>>[]) new Ref<?>[n];
 		for (int i = 0; i < n; i++) {
 			T o = Format.read(bb);
-			if (!(o instanceof Ref)) throw new BadFormatException("Expected item Ref but got: " + o);
-			Ref<AVector<T>> ref = (Ref<AVector<T>>) o;
+			Ref<AVector<T>> ref;
+			if (!(o instanceof Ref)) {
+				// must be embedded so need to check consistency
+				if (!(o instanceof AVector)) throw new BadFormatException("Expected vector child but got: " + o);
+				AVector<T> cv=(AVector<T>)o;
+				long cl=cv.count();
+				long expectedChildSize=childSize(count,i);
+				if (cl!=expectedChildSize) {
+					throw new BadFormatException("Expected child length: " + expectedChildSize + " but got "+cl);
+				}
+				ref=cv.getRef();
+			} else {
+				// assume we have a ref to a vector
+				ref = (Ref<AVector<T>>) o;
+			}
 			items[i] = ref;
 		}
 
@@ -240,8 +252,20 @@ public class VectorTree<T> extends AVector<T> {
 	/**
 	 * Get the child size in number of chunks (for all except the last child)
 	 */
-	private long childSize() {
+	private final long childSize() {
 		return 1L << (shift);
+	}
+	
+	/**
+	 * Get the child size in number of chunks for a specific child
+	 */
+	private static long childSize(long count, int i) {
+		long n=computeArraySize(count);
+		if ((i<0)||(i>=n)) throw new IndexOutOfBoundsException("Bad child: "+i);
+		int shift=computeShift(count);
+		long cs= 1L<<shift;
+		if (i<(n-1)) return cs;
+		return count-(n-1)*cs;
 	}
 
 	@Override

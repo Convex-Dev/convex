@@ -240,8 +240,12 @@ public class VectorLeaf<T> extends AVector<T> {
 		Ref<AVector<T>> tail = null;
 		if (prefixPresent) {
 			Object o = Format.read(data);
-			if (!(o instanceof Ref)) throw new BadFormatException("Bad prefix format!");
-			tail = (Ref<AVector<T>>) o;
+			if (o instanceof Ref) {
+				tail=(Ref<AVector<T>>) o;
+			} else {
+				if (!(o instanceof AVector)) throw new BadFormatException("Bad prefix format! get "+Utils.getClassName(o));
+				tail=((AVector<T>)o).getRef();
+			}
 		}
 
 		return new VectorLeaf<T>(items, tail, count);

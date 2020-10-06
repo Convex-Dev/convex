@@ -36,7 +36,7 @@ public class MemoryStoreTest {
 
 			assertNull(ms.refForHash(BAD_HASH));
 
-			AMap<String, String> data = Maps.of("foo", "bar3621863168");
+			AMap<String, String> data = Maps.of("foo", "bar3621863168", Hash.NULL_HASH, Hash.NULL_HASH, "bar", Hash.NULL_HASH);
 			Ref<AMap<String, String>> goodRef = data.getRef();
 			Hash goodHash = goodRef.getHash();
 			assertNull(ms.refForHash(goodHash));
@@ -83,7 +83,7 @@ public class MemoryStoreTest {
 		ArrayList<Ref<ACell>> al = new ArrayList<>();
 		try {
 			Stores.setCurrent(ms);
-			AVector<Integer> data = Samples.INT_VECTOR_10;
+			AVector<Integer> data = Samples.INT_VECTOR_300;
 
 			Consumer<Ref<ACell>> handler = r -> al.add(r);
 
@@ -92,11 +92,12 @@ public class MemoryStoreTest {
 			assertNull(ms.refForHash(dataHash));
 
 			dataRef.persist(handler);
-			assertEquals(1, al.size());
-			assertEquals(data, al.get(0).getValue());
+			int num=al.size();
+			assertTrue(num>0);
+			assertEquals(data, al.get(num-1).getValue());
 
 			Samples.INT_VECTOR_300.getRef().persist();
-			assertEquals(1, al.size()); // no new novelty transmitted
+			assertEquals(num, al.size()); // no new novelty transmitted
 		} finally {
 			Stores.setCurrent(oldStore);
 		}

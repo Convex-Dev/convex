@@ -223,19 +223,21 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	 * @return Memory Size of this Cell
 	 */
 	protected long calcMemorySize() {
-		long  result=getEncoding().length();
+		long  encLength=getEncoding().length();
 		
-		// add constant overhead
-		result += Constants.MEMORY_OVERHEAD;
-		
+		long csize=0;
 		// add size for each child Ref (might be zero if embedded)
 		int n=getRefCount();
 		for (int i=0; i<n; i++) {
 			Ref<?> childRef=getRef(i);
 			long childSize=childRef.getMemorySize();
-			result += childSize;
+			csize += childSize;
 		}
-		return result;
+		
+		if ((csize==0)&&isEmbedded()) {
+			return 0;
+		} 
+		return encLength+csize+Constants.MEMORY_OVERHEAD;
 	}
 	
 	/**
@@ -245,7 +247,7 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	 */
 	public final long getMemorySize() {
 		if (memorySize>=0) return memorySize;
-		memorySize=(isEmbedded())?0:calcMemorySize();
+		memorySize=calcMemorySize();
 		return memorySize;
 	}
 

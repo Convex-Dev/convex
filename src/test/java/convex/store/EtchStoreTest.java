@@ -61,10 +61,12 @@ public class EtchStoreTest {
 
 			goodRef.persist();
 
-			Ref<AMap<String, String>> recRef = store.refForHash(goodHash);
-			assertNotNull(recRef);
-
-			assertEquals(data, recRef.getValue());
+			if (!data.isEmbedded()) {
+				Ref<AMap<String, String>> recRef = store.refForHash(goodHash);
+				assertNotNull(recRef);
+	
+				assertEquals(data, recRef.getValue());
+			}
 		} finally {
 			Stores.setCurrent(oldStore);
 		}
@@ -117,8 +119,6 @@ public class EtchStoreTest {
 			ATransaction t1=Invoke.create(0, Lists.of(Symbols.PLUS, Symbols.STAR_BALANCE, 1000L));
 			ATransaction t2=Transfer.create(1, Init.VILLAIN,1000000);
 			Block b=Block.of(Utils.getCurrentTimestamp(),kp.signData(t1),kp.signData(t2));
-			Blob blockEncoding=b.getEncoding();
-			Hash blockHash=blockEncoding.getContentHash();
 			Order ord=Order.create().propose(b);
 			
 			Belief belief=Belief.create(kp,ord);
@@ -142,16 +142,16 @@ public class EtchStoreTest {
 			counter.set(0L);
 			Ref<Belief> srb=rb.persistShallow(noveltyHandler);
 			assertEquals(Ref.STORED,srb.getStatus());
-			assertEquals(1L,counter.get()); // Exactly one ref should be stored
+			assertEquals(0L,counter.get()); // Should be embedded
 			
-			assertEquals(srb,store.refForHash(rb.getHash()));
+			// assertEquals(srb,store.refForHash(rb.getHash()));
 			assertNull(store.refForHash(t1.getRef().getHash()));
 			
 			
 			// Persist belief
 			counter.set(0L);
 			Ref<Belief> prb=srb.persist(noveltyHandler);
-			assertEquals(5L,counter.get());
+			assertEquals(4L,counter.get());
 			
 			// Persist again. Should be no new novelty
 			counter.set(0L);
@@ -163,7 +163,7 @@ public class EtchStoreTest {
 			counter.set(0L);
 			Ref<Belief> arb=srb.announce(noveltyHandler);
 			assertEquals(srb,arb);
-			assertEquals(5L,counter.get()); 
+			assertEquals(4L,counter.get()); 
 			
 			// Announce again. Should be no new novelty
 			counter.set(0L);
@@ -171,21 +171,17 @@ public class EtchStoreTest {
 			assertEquals(srb,arb2);
 			assertEquals(0L,counter.get()); // Nothing new announced
 			
-			// Check re-persisted ref has correct status
+			// Check re-stored ref has correct status
 			counter.set(0L);
 			Ref<Belief> arb3=srb.persistShallow(noveltyHandler);
 			assertEquals(0L,counter.get()); // Nothing new persisted
-			assertEquals(Ref.ANNOUNCED,arb3.getStatus());
+			assertTrue(Ref.STORED<=arb3.getStatus());
 			
-			// test block hash encoding
-			assertEquals(blockHash,ord.getChildRefs()[0].getHash());
-			Ref<Block> blockRef=store.refForHash(blockHash);
-			assertEquals(blockHash,blockRef.getHash());
-			
-			// Recover Belief from store
-			Belief recb=(Belief) store.refForHash(belief.getHash()).getValue();
-			assertEquals(belief,recb);
-			
+			if (!belief.isEmbedded()) {
+				// Recover Belief from store
+				Belief recb=(Belief) store.refForHash(belief.getHash()).getValue();
+				assertEquals(belief,recb);
+			}
 		} finally {
 			Stores.setCurrent(oldStore);
 		}
@@ -197,7 +193,7 @@ public class EtchStoreTest {
 		ArrayList<Ref<ACell>> al = new ArrayList<>();
 		try {
 			Stores.setCurrent(store);
-			AVector<Integer> data = Samples.INT_VECTOR_10;
+			AVector<Integer> data = Samples.INT_VECTOR_300;
 
 			// handler that records added refs
 			Consumer<Ref<ACell>> handler = r -> al.add(r);
@@ -207,11 +203,12 @@ public class EtchStoreTest {
 			assertNull(store.refForHash(dataHash));
 
 			dataRef.persist(handler);
-			assertEquals(1, al.size()); // got new novelty
-			assertEquals(data, al.get(0).getValue());
+			int num=al.size(); // number of novel cells persisted
+			assertTrue(num>0); // got new novelty
+			assertEquals(data, al.get(num-1).getValue());
 
 			Samples.INT_VECTOR_300.getRef().persist();
-			assertEquals(1, al.size()); // no new novelty transmitted
+			assertEquals(num, al.size()); // no new novelty transmitted
 		} finally {
 			Stores.setCurrent(oldStore);
 		}

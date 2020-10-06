@@ -480,7 +480,17 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 		int n = Utils.bitCount(mask);
 		Ref<ABlobMap>[] children = new Ref[n];
 		for (int i = 0; i < n; i++) {
-			Ref<ABlobMap> ref = Format.read(bb);
+			Ref<ABlobMap> ref;
+			Object co = Format.read(bb);
+			if (co instanceof Ref) {
+				// assume a blobmap child ref
+				ref=(Ref<ABlobMap>)co;
+			} else {
+				if (!(co instanceof ABlobMap)) throw new BadFormatException("Expected child BlobMap but got "+Utils.getClassName(co));
+				ABlobMap cbm=(ABlobMap)co;
+				// TODO: validate?
+				ref=cbm.getRef();
+			}
 			children[i] = ref;
 		}
 		return new BlobMap<K, V>(prefix, depth, prefixLength, me, children, mask, count);

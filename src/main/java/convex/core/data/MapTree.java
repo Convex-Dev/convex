@@ -444,8 +444,13 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 		for (int i = 0; i < ilength; i++) {
 			// need to be defensive to detect possible bad formats
 			Object o = Format.read(bb);
-			if (!(o instanceof Ref)) throw new BadFormatException("Expected item Ref but got: " + o);
-			Ref<AHashMap<K, V>> ref = (Ref<AHashMap<K, V>>) o;
+			Ref<AHashMap<K, V>> ref;
+			if (o instanceof Ref) {
+				ref= (Ref<AHashMap<K, V>>) o;
+			} else {
+				if (!(o instanceof AHashMap)) throw new BadFormatException("Expected Hashmap child but got: " + o);
+				ref=((AHashMap<K,V>)o).getRef();
+			}
 			blocks[i] = ref;
 		}
 		// create directly, we have all values

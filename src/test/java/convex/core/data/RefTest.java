@@ -53,13 +53,16 @@ public class RefTest {
 	@Test
 	public void testShallowPersist() {
 		Blob bb = Blob.createRandom(new Random(), 100); // unique blob too big to embed
-		AVector<Object> v = Vectors.of(bb);
+		AVector<Object> v = Vectors.of(bb,bb,bb,bb); // vector containing big blob four times. Shouldn't be embedded.
 		Hash bh = bb.getHash();
 		Hash vh = v.getHash();
+		
 		Ref<AVector<Object>> ref = v.getRef().persistShallow();
 		assertEquals(Ref.STORED, ref.getStatus());
 
 		assertThrows(MissingDataException.class, () -> Ref.forHash(bh).getValue());
+		
+		assertFalse(v.isEmbedded());
 		assertEquals(v, Ref.forHash(vh).getValue());
 	}
 
@@ -69,7 +72,7 @@ public class RefTest {
 		assertTrue(Ref.NULL_VALUE.isEmbedded()); // singleton null ref
 		assertTrue(Ref.EMPTY_VECTOR.isEmbedded()); // singleton null ref
 		assertFalse(Blob.create(new byte[100]).getRef().isEmbedded()); // too big to embed
-		assertFalse(Samples.LONG_MAP_10.getRef().isEmbedded()); // a ref container
+		assertTrue(Samples.LONG_MAP_10.getRef().isEmbedded()); // a ref container
 	}
 
 	@Test
@@ -99,9 +102,11 @@ public class RefTest {
 		assertTrue(orig.isPersisted());
 
 		// a ref using the same hash
-		Ref<?> ref = Ref.forHash(orig.getHash());
-		assertEquals(orig, ref);
-		assertEquals(value, ref.getValue());
+		if (!(value.isEmbedded())) {
+			Ref<?> ref = Ref.forHash(orig.getHash());
+			assertEquals(orig, ref);
+			assertEquals(value, ref.getValue());
+		}
 	}
 
 	@Test
