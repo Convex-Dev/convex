@@ -1,9 +1,13 @@
 package convex.store;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
-import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Random;
 import java.util.function.Consumer;
 
 import org.junit.Test;
@@ -13,6 +17,7 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.data.Format;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
@@ -43,10 +48,12 @@ public class MemoryStoreTest {
 
 			goodRef.persist();
 
-			Ref<AMap<String, String>> recRef = ms.refForHash(goodHash);
-			assertNotNull(recRef);
+			if (!(data.isEmbedded())) {
+				Ref<AMap<String, String>> recRef = ms.refForHash(goodHash);
+				assertNotNull(recRef);
+				assertEquals(data, recRef.getValue());
+			}
 
-			assertEquals(data, recRef.getValue());
 		} finally {
 			Stores.setCurrent(oldStore);
 		}
@@ -54,13 +61,9 @@ public class MemoryStoreTest {
 
 	@Test
 	public void testPersistedStatus() throws BadFormatException {
-		SecureRandom sr = new SecureRandom();
-
 		// generate Hash of unique secure random bytes to test - should not already be
 		// in store
-		byte[] bytes = new byte[79];
-		sr.nextBytes(bytes);
-		Blob value = Blob.wrap(bytes);
+		Blob value = Blob.createRandom(new Random(), Format.MAX_EMBEDDED_LENGTH);
 		Hash hash = value.getHash();
 		assertNotEquals(hash, value);
 
@@ -71,9 +74,11 @@ public class MemoryStoreTest {
 		assertEquals(Ref.PERSISTED, ref.getStatus());
 		assertTrue(ref.isPersisted());
 
-		Ref<Blob> newRef = Stores.current().refForHash(hash);
-		assertEquals(initialRef, newRef);
-		assertEquals(value, newRef.getValue());
+		if (!(value.isEmbedded())) {
+			Ref<Blob> newRef = Stores.current().refForHash(hash);
+			assertEquals(initialRef, newRef);
+			assertEquals(value, newRef.getValue());
+		}
 	}
 
 	@Test

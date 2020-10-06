@@ -71,7 +71,7 @@ public class RefTest {
 		assertTrue(Ref.get(1L).isEmbedded()); // a primitive
 		assertTrue(Ref.NULL_VALUE.isEmbedded()); // singleton null ref
 		assertTrue(Ref.EMPTY_VECTOR.isEmbedded()); // singleton null ref
-		assertFalse(Blob.create(new byte[100]).getRef().isEmbedded()); // too big to embed
+		assertFalse(Blob.create(new byte[Format.MAX_EMBEDDED_LENGTH]).getRef().isEmbedded()); // too big to embed
 		assertTrue(Samples.LONG_MAP_10.getRef().isEmbedded()); // a ref container
 	}
 
@@ -123,7 +123,7 @@ public class RefTest {
 		Ref<ACell> a = Samples.DIABOLICAL_MAP_2_10000.getRef();
 		// TODO: consider if this should be possible, currently not (stack overflow)
 		// Ref.accumulateRefSet(a);
-		assertFalse(a.isEmbedded());
+		assertTrue(a.isEmbedded());
 	}
 
 	@Test

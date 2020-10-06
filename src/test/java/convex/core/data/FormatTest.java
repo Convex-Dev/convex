@@ -123,7 +123,7 @@ public class FormatTest {
 		assertTrue(Format.isCanonical(null));
 		assertTrue(Format.isCanonical(1));
 		assertTrue(Format.isCanonical(Blob.create(new byte[1000]))); // should be OK
-		assertFalse(Format.isCanonical(Blob.create(new byte[10000]))); // too big to be canonical
+		assertFalse(Blob.create(new byte[10000]).isCanonical()); // too big to be canonical
 		
 		assertThrows(Error.class,()->Format.isCanonical(new ArrayList<Object>())); // a random class
 		assertThrows(Error.class,()->Format.isCanonical(new AtomicLong(10L))); // a random Number subclass

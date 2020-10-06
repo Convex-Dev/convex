@@ -33,7 +33,7 @@ import convex.core.util.Utils;
 public class Block extends ARecord {
 	private final long timestamp;
 	private final AVector<SignedData<ATransaction>> transactions;
-	private final Address peer;
+	private final Address peerAddress;
 
 	private static final Keyword[] BLOCK_KEYS = new Keyword[] { Keywords.TIMESTAMP, Keywords.TRANSACTIONS, Keywords.PEER };
 	private static final RecordFormat FORMAT = RecordFormat.of(BLOCK_KEYS);
@@ -50,7 +50,7 @@ public class Block extends ARecord {
 		super(FORMAT);
 		this.timestamp = timestamp;
 		this.transactions = transactions;
-		this.peer=peer;
+		this.peerAddress=peer;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -58,7 +58,7 @@ public class Block extends ARecord {
 	public <V> V get(Keyword k) {
 		if (Keywords.TIMESTAMP.equals(k)) return (V) ((Long) timestamp);
 		if (Keywords.TRANSACTIONS.equals(k)) return (V) transactions;
-		if (Keywords.PEER.equals(k)) return (V) peer;
+		if (Keywords.PEER.equals(k)) return (V) peerAddress;
 		return null;
 	}
 
@@ -68,7 +68,7 @@ public class Block extends ARecord {
 		long newTimestamp = (Long) newVals[0];		
 		AVector<SignedData<ATransaction>> newTransactions = (AVector<SignedData<ATransaction>>) newVals[1];
 		Address newPeer = (Address) newVals[2];
-		if ((this.transactions == newTransactions) && (this.timestamp == newTimestamp) && (peer==newPeer)) {
+		if ((this.transactions == newTransactions) && (this.timestamp == newTimestamp) && (peerAddress==newPeer)) {
 			return this;
 		}
 		return new Block(newTimestamp, newTransactions,newPeer);
@@ -89,7 +89,7 @@ public class Block extends ARecord {
 	 * @return Address of Peer publishing this block
 	 */
 	public Address getPeer() {
-		return peer;
+		return peerAddress;
 	}
 
 	/**
@@ -133,7 +133,7 @@ public class Block extends ARecord {
 		bb = bb.put(Tag.BLOCK);
 		bb = Format.writeLong(bb, timestamp);
 		bb = transactions.write(bb);
-		bb = Format.write(bb,peer);
+		bb = Format.write(bb,peerAddress);
 		return bb;
 	}
 

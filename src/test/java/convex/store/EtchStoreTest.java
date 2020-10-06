@@ -8,8 +8,8 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
-import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
@@ -25,6 +25,7 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.data.Format;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
@@ -77,13 +78,10 @@ public class EtchStoreTest {
 		AStore oldStore = Stores.current();
 		try {
 			Stores.setCurrent(store);
-			SecureRandom sr = new SecureRandom();
 
 			// generate Hash of unique secure random bytes to test - should not already be
 			// in store
-			byte[] bytes = new byte[79];
-			sr.nextBytes(bytes);
-			Blob randomBlob = Blob.wrap(bytes);
+			Blob randomBlob = Blob.createRandom(new Random(), Format.MAX_EMBEDDED_LENGTH+1);
 			Hash hash = randomBlob.getHash();
 			assertNotEquals(hash, randomBlob);
 
@@ -137,21 +135,19 @@ public class EtchStoreTest {
 				counter.incrementAndGet();
 			};
 
-			
 			// First try shallow persistence
 			counter.set(0L);
 			Ref<Belief> srb=rb.persistShallow(noveltyHandler);
 			assertEquals(Ref.STORED,srb.getStatus());
-			assertEquals(0L,counter.get()); // Should be embedded
+			assertEquals(1L,counter.get()); // One cell persisted
 			
 			// assertEquals(srb,store.refForHash(rb.getHash()));
 			assertNull(store.refForHash(t1.getRef().getHash()));
 			
-			
 			// Persist belief
 			counter.set(0L);
 			Ref<Belief> prb=srb.persist(noveltyHandler);
-			assertEquals(6L,counter.get());
+			assertEquals(4L,counter.get());
 			
 			// Persist again. Should be no new novelty
 			counter.set(0L);
@@ -163,7 +159,7 @@ public class EtchStoreTest {
 			counter.set(0L);
 			Ref<Belief> arb=srb.announce(noveltyHandler);
 			assertEquals(srb,arb);
-			assertEquals(6L,counter.get()); 
+			assertEquals(4L,counter.get()); 
 			
 			// Announce again. Should be no new novelty
 			counter.set(0L);

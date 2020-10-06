@@ -21,12 +21,6 @@ public interface IValidated {
 	 */
 	public void validate() throws InvalidDataException;
 
-	/**
-	 * Returns true if this object is in a canonical format for message writing.
-	 * Reading or writing a non-canonical value should be considered illegal
-	 * 
-	 * @return true if the object is in canonical format, false otherwise
-	 */
-	public boolean isCanonical();
+
 
 }

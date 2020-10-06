@@ -336,15 +336,6 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	public boolean isPersisted() {
 		return status >= PERSISTED;
 	}
-
-	/**
-	 * Refs are not canonical - they should not be regarded as valid data objects in
-	 * their own right as they are constituent elements of cells.
-	 */
-	@Override
-	public boolean isCanonical() {
-		return false;
-	}
 	
 	/**
 	 * Persists this Ref in the current store if not embedded and not already

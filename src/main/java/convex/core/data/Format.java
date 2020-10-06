@@ -55,7 +55,7 @@ public class Format {
 	/**
 	 * Maximum size in bytes of an embedded value, including tag
 	 */
-	public static final int MAX_EMBEDDED_LENGTH=80; // TODO: fix
+	public static final int MAX_EMBEDDED_LENGTH=140; // TODO: fix
 	
 
 	
@@ -302,10 +302,6 @@ public class Format {
 	 * @return The ByteBuffer after writing the specified object
 	 */
 	public static ByteBuffer write(ByteBuffer bb, Object o) {
-		if (!Format.isCanonical(o)) {
-			throw new IllegalArgumentException("Not canonical: " + o);
-		}
-
 		// Generic handling for all custom writeable types
 		// includes all AData instances (addresses, Symbols, Amounts, hashes etc.)
 		if (o instanceof ACell) {
@@ -728,10 +724,10 @@ public class Format {
 	 * @return true if object is canonical, false otherwise.
 	 */
 	public static boolean isCanonical(Object o) {
-		if (Format.isEmbedded(o)) return true;
 		if (o instanceof ACell) {
 			return ((ACell) o).isCanonical();
 		}
+		if (Format.isEmbedded(o)) return true;
 
 		if (o instanceof String) return true;
 

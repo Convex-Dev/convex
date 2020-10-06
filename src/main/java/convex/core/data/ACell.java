@@ -260,6 +260,14 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	public boolean isEmbedded() {
 		return getEncoding().length()<=Format.MAX_EMBEDDED_LENGTH;
 	}
+	
+	/**
+	 * Returns true if this object is in a canonical format for message writing.
+	 * Reading or writing a non-canonical value should be considered illegal
+	 * 
+	 * @return true if the object is in canonical format, false otherwise
+	 */
+	public abstract boolean isCanonical();
 
 	/**
 	 * Gets the number of Refs contained within this Cell. This number is
