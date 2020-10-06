@@ -29,6 +29,7 @@ import convex.core.data.MapLeaf;
 import convex.core.data.MapTree;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
+import convex.core.data.StringShort;
 import convex.core.data.VectorLeaf;
 import convex.core.data.VectorTree;
 import convex.core.data.Vectors;
@@ -96,6 +97,10 @@ public class Samples {
 
 	public static final Blob MAX_EMBEDDED_BLOB = createTestBlob(Format.MAX_EMBEDDED_LENGTH-Format.getVLCLength(Format.MAX_EMBEDDED_LENGTH)-1);
 	public static final Blob NON_EMBEDDED_BLOB = createTestBlob(MAX_EMBEDDED_BLOB.length()+1);
+
+	public static final StringShort MAX_EMBEDDED_STRING= StringShort.create("[0x1234567812345678123456781234567812345678123456781234567812345678]");
+	public static final StringShort NON_EMBEDDED_STRING= StringShort.create(MAX_EMBEDDED_STRING.toString()+" ");
+
 	
 	static {
 		try {

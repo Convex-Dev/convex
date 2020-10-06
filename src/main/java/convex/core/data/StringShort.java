@@ -29,6 +29,19 @@ public class StringShort extends AString {
 		super(data.length());
 		this.data=data;
 	}
+	
+	/**
+	 * Creates a StringShort instance from a regular Java String
+	 * 
+	 * @param string String to wrap as StringShort
+	 * @return StringShort instance, or null if String is of invalid size
+	 */
+	public static StringShort create(String string) {
+		int len=string.length();
+		if ((len<0)||(len>MAX_LENGTH)) return null;
+		return new StringShort(string);
+	}
+
 
 	@Override
 	public char charAt(int index) {
@@ -104,5 +117,6 @@ public class StringShort extends AString {
 		
 		return new StringShort(data);
 	}
+
 
 }
