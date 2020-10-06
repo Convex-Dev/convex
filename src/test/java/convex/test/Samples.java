@@ -21,14 +21,15 @@ import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.BlobTree;
 import convex.core.data.Blobs;
+import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.List;
-import convex.core.data.MapLeaf;
-import convex.core.data.VectorLeaf;
 import convex.core.data.Lists;
+import convex.core.data.MapLeaf;
+import convex.core.data.MapTree;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
-import convex.core.data.MapTree;
+import convex.core.data.VectorLeaf;
 import convex.core.data.VectorTree;
 import convex.core.data.Vectors;
 import convex.core.exceptions.InvalidDataException;
@@ -93,6 +94,9 @@ public class Samples {
 	
 	public static final ASignature FAKE_SIGNATURE = Ed25519Signature.wrap(new byte[Ed25519Signature.SIGNATURE_LENGTH]);
 
+	public static final Blob MAX_EMBEDDED_BLOB = createTestBlob(Format.MAX_EMBEDDED_LENGTH-Format.getVLCLength(Format.MAX_EMBEDDED_LENGTH)-1);
+	public static final Blob NON_EMBEDDED_BLOB = createTestBlob(MAX_EMBEDDED_BLOB.length()+1);
+	
 	static {
 		try {
 			// we should be able to actually build these, thanks to structural sharing.
@@ -104,6 +108,17 @@ public class Samples {
 			t.printStackTrace();
 			throw t;
 		}
+	}
+	
+
+	/**
+	 * Create a random test Blob of the given size
+	 * @param size
+	 * @return
+	 */
+	static Blob createTestBlob(long size) {
+		Blob b=Blob.createRandom(new Random(), size);
+		return b;
 	}
 
 	@SuppressWarnings("unchecked")
