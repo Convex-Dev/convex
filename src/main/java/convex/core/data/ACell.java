@@ -222,7 +222,7 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	 * 
 	 * @return Memory Size of this Cell
 	 */
-	protected long calcMemorySize() {
+	protected final long calcMemorySize() {
 		long  encLength=getEncoding().length();
 		
 		long csize=0;
@@ -234,7 +234,7 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 			csize += childSize;
 		}
 		
-		if ((csize==0)&&isEmbedded()) {
+		if ((n==0)&&isEmbedded()) {
 			return 0;
 		} 
 		return encLength+csize+Constants.MEMORY_OVERHEAD;
