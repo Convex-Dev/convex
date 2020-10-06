@@ -132,6 +132,8 @@ public class PeerManager extends JPanel {
 
 	private boolean updateRunning = true;
 
+	private long cp = 0;
+
 	private Thread updateThread = new Thread(new Runnable() {
 		@Override
 		public void run() {
@@ -139,7 +141,6 @@ public class PeerManager extends JPanel {
 				try {
 					Thread.sleep(30);
 					java.util.List<PeerView> servers = peerPanel.getPeerViews();
-					long cp = 0;
 					State latest = latestState.getValue();
 					for (PeerView s : servers) {
 						Server serv=s.peerServer;
@@ -158,9 +159,10 @@ public class PeerManager extends JPanel {
 					}
 					
 					latestState.setValue(latest);
-				} catch (InterruptedException e) {
+				} catch (Exception e) {
 					//
 					log.warning("Update thread interrupted abnormally: "+e.getMessage());
+					e.printStackTrace();
 					Thread.currentThread().interrupt();
 				}
 			}
