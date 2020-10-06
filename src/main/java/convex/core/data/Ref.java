@@ -68,6 +68,8 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 */
 	public static final int ANNOUNCED = 4;
 
+	public static final int MAX_STATUS = ANNOUNCED;
+	
 	/**
 	 * Ref status indicating that the Ref refers to data that has been proven to be invalid
 	 */
@@ -77,10 +79,10 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 * Ref for null value. Important because we can't persist this, since null
 	 * collides with the result of an empty soft reference.
 	 */
-	public static final RefDirect<?> NULL_VALUE = RefDirect.create(null, Hash.NULL_HASH, ANNOUNCED);
+	public static final RefDirect<?> NULL_VALUE = RefDirect.create(null, Hash.NULL_HASH, MAX_STATUS);
 
-	public static final RefDirect<Boolean> TRUE_VALUE = RefDirect.create(Boolean.TRUE, Hash.TRUE_HASH, ANNOUNCED);
-	public static final RefDirect<Boolean> FALSE_VALUE = RefDirect.create(Boolean.FALSE, Hash.FALSE_HASH, ANNOUNCED);
+	public static final RefDirect<Boolean> TRUE_VALUE = RefDirect.create(Boolean.TRUE, Hash.TRUE_HASH, MAX_STATUS);
+	public static final RefDirect<Boolean> FALSE_VALUE = RefDirect.create(Boolean.FALSE, Hash.FALSE_HASH, MAX_STATUS);
 
 	public static final RefDirect<AList<?>> EMPTY_LIST = RefDirect.create(Lists.empty());
 	public static final RefDirect<AVector<?>> EMPTY_VECTOR = RefDirect.create(Vectors.empty());
@@ -88,6 +90,8 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	public static final int BYTE_LENGTH = 32;
 
 	public static final int MAX_ENCODING_LENGTH = 1+BYTE_LENGTH;
+
+	
 
 	/**
 	 * Hash of the serialised representation of the value Computed and stored upon
@@ -240,9 +244,8 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 * @param value
 	 * @return Persisted Ref
 	 */
-	@SuppressWarnings("unchecked")
 	public static <T> Ref<T> createPersisted(T value, Consumer<Ref<ACell>> noveltyHandler) {
-		Ref<ACell> ref = RefDirect.create((ACell)value, null, Ref.UNKNOWN);
+		Ref<T> ref = RefDirect.create(value, null, Ref.UNKNOWN);
 		return (Ref<T>) Stores.current().persistRef(ref, noveltyHandler);
 	}
 	
@@ -255,12 +258,11 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 * @param value
 	 * @return Persisted Ref
 	 */
-	@SuppressWarnings("unchecked")
 	public static <T> Ref<T> createAnnounced(T value, Consumer<Ref<ACell>> noveltyHandler) {
 		if (Format.isEmbedded(value)) {
 			return RefDirect.create(value, null, Ref.ANNOUNCED);
 		}
-		Ref<ACell> ref = RefDirect.create((ACell)value, null, Ref.UNKNOWN);
+		Ref<T> ref = RefDirect.create(value, null, Ref.UNKNOWN);
 		AStore store=Stores.current();
 		return (Ref<T>) store.announceRef(ref, noveltyHandler);
 	}
@@ -362,7 +364,7 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 		int status = getStatus();
 		if (status >= PERSISTED) return (Ref<R>) this; // already persisted in some form
 		AStore store=Stores.current();
-		return (Ref<R>) store.persistRef((Ref<ACell>)this, noveltyHandler);
+		return (Ref<R>) store.persistRef(this, noveltyHandler);
 	}
 	
 	/**

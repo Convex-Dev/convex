@@ -102,11 +102,6 @@ public class MultiFn<T> extends AFn<T> {
 	}
 
 	@Override
-	protected boolean isEmbedded() {
-		return false;
-	}
-
-	@Override
 	public int getRefCount() {
 		return fns.getRefCount();
 	}

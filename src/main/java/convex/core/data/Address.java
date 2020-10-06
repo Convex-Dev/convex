@@ -270,7 +270,7 @@ public class Address extends AArrayBlob {
 	}
 
 	@Override
-	protected boolean isEmbedded() {
+	public boolean isEmbedded() {
 		return true;
 	}
 

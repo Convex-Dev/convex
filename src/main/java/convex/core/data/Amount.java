@@ -272,7 +272,7 @@ public class Amount extends ACell implements Comparable<Amount> {
 	}
 
 	@Override
-	protected boolean isEmbedded() {
+	public boolean isEmbedded() {
 		return true;
 	}
 

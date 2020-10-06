@@ -27,7 +27,7 @@ public abstract class AStore {
 	 *            minimum to present risk of MissingDataException.
 	 * @return The persisted Ref, of status ANNOUNCED at minimum
 	 */
-	public abstract Ref<ACell> announceRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler);
+	public abstract <T> Ref<T> announceRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler);
 	
 
 	/**
@@ -41,7 +41,7 @@ public abstract class AStore {
 	 *            minimum to present risk of MissingDataException.
 	 * @return The persisted Ref, of status PERSISTED at minimum
 	 */
-	public abstract Ref<ACell> persistRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler);
+	public abstract <T> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler);
 
 	/**
 	 * Stores a @Ref in long term storage as defined by this store implementation.
@@ -54,7 +54,7 @@ public abstract class AStore {
 	 *            minimum to present risk of MissingDataException.
 	 * @return The persisted Ref, of status STORED at minimum
 	 */
-	public abstract Ref<ACell> storeRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler);
+	public abstract <T> Ref<T> storeRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler);
 
 	/**
 	 * Gets the stored Ref for a given hash value, or null if not found.

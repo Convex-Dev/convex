@@ -89,74 +89,69 @@ public class EtchStore extends AStore {
 	}
 	
 	@Override
-	public Ref<ACell> persistRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler) {
+	public <T> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
 		return persistRef(ref,noveltyHandler,Ref.PERSISTED);
 	}
 	
 	@Override
-	public Ref<ACell> announceRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler) {
+	public <T> Ref<T> announceRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
 		return persistRef(ref,noveltyHandler,Ref.ANNOUNCED);
 	}
 
-	public Ref<ACell> persistRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus) {
-		// check store for existing ref first. Return this is we have it
-		if (ref.isEmbedded()) return ref;
-		Hash hash = ref.getHash();
-		Ref<ACell> existing = refForHash(hash);
-		if (existing != null) {
-			if (existing.getStatus()>=requiredStatus) return existing;
-		}
-
-		ACell o = ref.getValue();
+	@SuppressWarnings("unchecked")
+	public <T> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus) {
+		final T o=ref.getValue();
 		
-		@SuppressWarnings("unchecked")
-		IRefFunction func=r -> {
-			return persistRef((Ref<ACell>)r,noveltyHandler,requiredStatus);
-		};
+		if (o instanceof ACell) {
+			ACell cell=(ACell)o;
 			
-		// need to do recursive persistence
-		ACell newObject = ((ACell) o).updateRefs(func);
+			// check store for existing ref first. Return this if we have it
+			boolean embedded=ref.isEmbedded();
+			Hash hash =null;
+			if (!embedded) {;
+				hash = ref.getHash();
+				Ref<T> existing = refForHash(hash);
+				if (existing != null) {
+					if (existing.getStatus()>=requiredStatus) return existing;
+				}
+			}
+			
+			// beyond STORED level, need to recursively persist child refs
+			if (requiredStatus>Ref.STORED) {
+				IRefFunction func=r -> {
+					return persistRef((Ref<ACell>)r,noveltyHandler,requiredStatus);
+				};
+			
+				// need to do recursive persistence
+				ACell newObject = ((ACell) o).updateRefs(func);
 		
-		// perhaps need to update Ref 
-		if (o!=newObject) ref=ref.withValue(newObject);
-		
-		log.log(Stores.PERSIST_LOG_LEVEL,()->"Etch persisting at status="+requiredStatus+" ref "+hash.toHexString()+" of class "+Utils.getClassName(o)+" with store "+this);
+				// perhaps need to update Ref 
+				if (cell!=newObject) ref=ref.withValue((T)newObject);
+			}
+			
+			if (!embedded) {
+				final Hash fHash=hash;
+				log.log(Stores.PERSIST_LOG_LEVEL,()->"Etch persisting at status="+requiredStatus+" hash = 0x"+fHash.toHexString()+" ref of class "+Utils.getClassName(o)+" with store "+this);
 
-		Ref<ACell> result;
-		try {
-			// ensure status is PERSISTED when we write to store
-			ref=ref.withMinimumStatus(requiredStatus);
-			result=etch.write(hash, ref);
-		} catch (IOException e) {
-			throw new Error("IO exception from Etch", e);
+				Ref<ACell> result;
+				try {
+					// ensure status is sufficient when we write to store
+					ref=ref.withMinimumStatus(requiredStatus);
+					result=etch.write(hash, (Ref<ACell>) ref);
+				} catch (IOException e) {
+					throw new Error("IO exception from Etch", e);
+				}
+
+				// call novelty handler if newly persisted
+				if (noveltyHandler != null) noveltyHandler.accept(result);
+			}
 		}
-
-		// call novelty handler if newly persisted
-		if (noveltyHandler != null) noveltyHandler.accept(result);
-		return result;
+		return ref.withMinimumStatus(requiredStatus);
 	}
 
 	@Override
-	public Ref<ACell> storeRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler) {
-		// check store for existing ref first. Return this is we have it
-		Hash hash = ref.getHash();
-		Ref<ACell> existing = refForHash(hash);
-		if (existing != null) return existing; // already must be STORED at minimum
- 
-		log.log(Stores.STORE_LOG_LEVEL,()-> "Etch storing at status=1 ref "+hash.toHexString()+" with store "+this);
-
-		
-		Ref<ACell> result;
-		try {
-			result=etch.write(hash, ref.withMinimumStatus(Ref.STORED));
-		} catch (IOException e) {
-			throw new Error("IO exception from Etch", e);
-		}
-		
-		// call novelty handler if newly stored
-		if (noveltyHandler != null) noveltyHandler.accept(result);
-		
-		return result;
+	public <T> Ref<T> storeRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
+		return persistRef(ref,noveltyHandler,Ref.STORED);
 	}
 	
 	@Override

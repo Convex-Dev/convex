@@ -84,7 +84,7 @@ public class RefTest {
 	@Test
 	public void testPersistEmbeddedLong() {
 		Ref<Object> nr = Ref.get(10001L);
-		assertSame(nr, nr.persist());
+		assertSame(nr.getValue(), nr.persist().getValue());
 		assertTrue(nr.isEmbedded());
 	}
 	

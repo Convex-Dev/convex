@@ -162,13 +162,6 @@ public class Fn<T> extends AFn<T> {
 	public int estimatedEncodingSize() {
 		return 100;
 	}
-	
-
-	@Override
-	protected boolean isEmbedded() {
-		// Functions usually never embedded
-		return false;
-	}
 
 	/**
 	 * Returns the declared param names for a function.

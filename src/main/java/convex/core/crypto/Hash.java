@@ -367,7 +367,7 @@ public class Hash extends AArrayBlob {
 	}
 
 	@Override
-	protected boolean isEmbedded() {
+	public boolean isEmbedded() {
 		// Hashes are always small enough to embed
 		return true;
 	}

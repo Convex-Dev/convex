@@ -252,10 +252,4 @@ public class SignedData<T> extends ACell {
 		return signature.verify(valueRef.getHash(), address);
 	}
 
-	@Override
-	protected boolean isEmbedded() {
-		// Never embedded (too big??)
-		return false;
-	}
-
 }

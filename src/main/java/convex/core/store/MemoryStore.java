@@ -35,78 +35,59 @@ public class MemoryStore extends AStore {
 	}
 	
 	@Override
-	public Ref<ACell> announceRef(Ref<ACell> r2, Consumer<Ref<ACell>> noveltyHandler) {
-
-		// check store for existing ref first. Return this is we have it
-		Hash hash = r2.getHash();
-		Ref<ACell> existing = refForHash(hash);
-		if ((existing != null)&&(existing.getStatus()>=Ref.ANNOUNCED)) return existing;
-
-		// Convert to direct Ref. Don't want to store a soft ref!
-		r2 = r2.toDirect();
-
-		ACell o = r2.getValue();
-		o=o.updateRefs(r -> {
-			return r.announce(noveltyHandler);
-		});
-		
-		r2=r2.withValue(o);
-		final ACell oTemp=o;
-		log.log(Stores.PERSIST_LOG_LEVEL,()->"Announcing ref "+hash.toHexString()+" of class "+Utils.getClassName(oTemp)+" with store "+this);
-
-		r2=r2.withMinimumStatus(Ref.ANNOUNCED);
-		hashRefs.put(hash, r2);
-
-		if (noveltyHandler != null) noveltyHandler.accept(r2);
-
-		return r2;
+	public <T> Ref<T> announceRef(Ref<T> r2, Consumer<Ref<ACell>> noveltyHandler) {
+		return persistRef(r2,noveltyHandler,Ref.ANNOUNCED); 
 	}
 
 	@Override
-	public Ref<ACell> persistRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler) {
-
-		// check store for existing ref first. Return this is we have it
-		Hash hash = ref.getHash();
-		Ref<ACell> existing = refForHash(hash);
-		if ((existing != null)&&(existing.getStatus()>=Ref.PERSISTED)) return existing;
-
+	public <T> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
+		return persistRef(ref,noveltyHandler,Ref.PERSISTED);
+	}
+	
+	@SuppressWarnings("unchecked")
+	public <T> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus) {
 		// Convert to direct Ref. Don't want to store a soft ref!
 		ref = ref.toDirect();
 
-		ACell o = ref.getValue();
+		final T o=ref.getValue();
+		if (!(o instanceof ACell)) {
+			return ref.withMinimumStatus(Ref.MAX_STATUS);
+		}
+		
+		ACell cell = (ACell) o;
+		boolean embedded=cell.isEmbedded();
+		
+		Hash hash=null;
+		if (!embedded) {
+			// check store for existing ref first. Return this is we have it
+			hash = ref.getHash();
+			Ref<T> existing = refForHash(hash);
+			if ((existing != null)) {
+				if (existing.getStatus()>=requiredStatus) return existing;
+				ref=existing;
+			}
+		}
+		
 		// need to do recursive persistence
-		o = o.updateRefs(r -> {
+		cell  = cell.updateRefs(r -> {
 			return r.persist(noveltyHandler);
 		});
 		
-		ref=ref.withValue(o);
-		final ACell oTemp=o;
-		log.log(Stores.PERSIST_LOG_LEVEL,()->"Persisting ref "+hash.toHexString()+" of class "+Utils.getClassName(oTemp)+" with store "+this);
+		ref=ref.withValue((T)cell);
+		final ACell oTemp=cell;
+		final Hash fHash=hash;
+		log.log(Stores.PERSIST_LOG_LEVEL,()->"Persisting ref 0x"+fHash.toHexString()+" of class "+Utils.getClassName(oTemp)+" with store "+this);
 
-		
-		hashRefs.put(hash, ref);
-
-		if (noveltyHandler != null) noveltyHandler.accept(ref);
-
-		return ref.withMinimumStatus(Ref.PERSISTED);
+		if (!embedded) {
+			hashRefs.put(hash, (Ref<ACell>) ref);
+			if (noveltyHandler != null) noveltyHandler.accept((Ref<ACell>) ref);
+		}
+		return ref.withMinimumStatus(requiredStatus);
 	}
 
 	@Override
-	public Ref<ACell> storeRef(Ref<ACell> ref, Consumer<Ref<ACell>> noveltyHandler) {
-
-		// check store for existing ref first. Return this is we have it
-		Hash hash = ref.getHash();
-		Ref<ACell> existing = refForHash(hash);
-		if (existing != null) return existing; // already stored, so quick return
-
-		// Convert to direct Ref. Don't want to store a soft ref!
-		ref = ref.toDirect();
-		ref=ref.withMinimumStatus(Ref.STORED);
-
-		hashRefs.put(hash, ref);
-
-		if (noveltyHandler != null) noveltyHandler.accept(ref);
-		return ref;
+	public <T> Ref<T> storeRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
+		return persistRef(ref,noveltyHandler,Ref.STORED);
 	}
 
 	@Override

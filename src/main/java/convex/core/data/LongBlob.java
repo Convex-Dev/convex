@@ -175,7 +175,7 @@ public class LongBlob extends ABlob {
 	}
 
 	@Override
-	protected boolean isEmbedded() {
+	public boolean isEmbedded() {
 		// Always embedded
 		return true;
 	}

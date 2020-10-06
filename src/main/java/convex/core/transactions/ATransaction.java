@@ -72,12 +72,6 @@ public abstract class ATransaction extends ACell {
 	 * @return Juice limit
 	 */
 	public abstract Long getMaxJuice();
-	
-	@Override
-	protected boolean isEmbedded() {
-		// Transactions generally too large for embedding
-		return false;
-	}
 
 	/**
 	 * Updates this transaction with the specified sequence number

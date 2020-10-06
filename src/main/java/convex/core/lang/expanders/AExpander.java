@@ -26,10 +26,4 @@ public abstract class AExpander extends ACell {
 	 * @throws ExecutionException
 	 */
 	public abstract Context<Syntax> expand(Object form, AExpander ex, Context<?> context);
-
-	@Override
-	protected boolean isEmbedded() {
-		// TODO: Expanders never embedded?
-		return false;
-	}
 }

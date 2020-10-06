@@ -117,7 +117,7 @@ public abstract class CoreFn<T> extends AFn<T> implements ICoreDef {
 	}
 	
 	@Override
-	protected boolean isEmbedded() {
+	public boolean isEmbedded() {
 		// embed core functions, since they are the same size as small symbols
 		return true;
 	}

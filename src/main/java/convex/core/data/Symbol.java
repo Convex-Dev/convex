@@ -193,7 +193,7 @@ public class Symbol extends ASymbolic {
 	}
 
 	@Override
-	protected boolean isEmbedded() {
+	public boolean isEmbedded() {
 		// Symbols are always embedded
 		return true;
 	}

@@ -255,7 +255,7 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	 * 
 	 * @return true if Cell is embedded, false otherwise
 	 */
-	protected boolean isEmbedded() {
+	public boolean isEmbedded() {
 		return getEncoding().length()<=Format.MAX_EMBEDDED_LENGTH;
 	}
 

@@ -444,12 +444,6 @@ public class BlobTree extends ABlob {
 		if (children == newChildren) return this;
 		return new BlobTree(newChildren, shift, count);
 	}
-
-	@Override
-	protected boolean isEmbedded() {
-		// Never embedded. BlobTree always has big child Refs.
-		return false;
-	}
 	
 	@Override
 	public boolean isRegularBlob() {
