@@ -130,7 +130,7 @@ public class Convex {
 	}
 
 	private void connectToPeer(InetSocketAddress peerAddress) throws IOException {
-		setConnection(Connection.connect(peerAddress, handler, Stores.CLIENT_STORE));
+		setConnection(Connection.connect(peerAddress, handler, Stores.current()));
 	}
 	
 	/**

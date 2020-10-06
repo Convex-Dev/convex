@@ -90,7 +90,7 @@ public class API {
 		log.info("Launched server at address: " + hostAddress);
 
 		// connect with the specified consumer for callbacks
-		Connection c = Connection.connect(hostAddress, resultConsumer, Stores.CLIENT_STORE);
+		Connection c = Connection.connect(hostAddress, resultConsumer, Stores.getGlobalStore());
 
 		// send a query as the HERO user
 		long queryID = c.sendQuery(Reader.read("(+ 1 2)"), Init.HERO);

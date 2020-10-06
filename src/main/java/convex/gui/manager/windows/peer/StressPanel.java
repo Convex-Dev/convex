@@ -137,7 +137,7 @@ public class StressPanel extends JPanel {
 		try {
 			InetSocketAddress sa = peerView.peerServer.getHostAddress();
 
-			Connection pc = Connection.connect(sa, resultHandler, Stores.CLIENT_STORE);
+			Connection pc = Connection.connect(sa, resultHandler, Stores.getGlobalStore());
 
 			Address address = Init.HERO;
 			int transCount = (Integer) transactionCountSpinner.getValue();
