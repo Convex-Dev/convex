@@ -811,9 +811,11 @@ public class Format {
 		// estimate size of bytebuffer required, 33 bytes big enough for most small
 		// stuff
 		int initialLength;
+		
+		boolean isCell=(o instanceof ACell);
 
-		if (o instanceof ACell) {
-			// check for a cached encoding
+		if (isCell) {
+			// check for a cached encoding, use this if available
 			ACell cell = (ACell)o;
 			ABlob b = cell.cachedBlob();
 			if (b != null) return b.getByteBuffer();
@@ -822,24 +824,26 @@ public class Format {
 		} else {
 			initialLength = MAX_EMBEDDED_LENGTH;
 		}
-		ByteBuffer b = ByteBuffer.allocate(initialLength);
+		ByteBuffer bb = ByteBuffer.allocate(initialLength);
 		boolean done = false;
 		while (!done) {
 			try {
 				if ((o instanceof Ref)) {
 					// necessary to handle Refs specially, since these are not cells
-					b = ((IWriteable) o).write(b);
+					bb = ((IWriteable) o).write(bb);
+				} else if (isCell) {
+					bb = ((ACell)o).write(bb);
 				} else {
-					b = write(b, o);
+					bb=writeNonCell(bb,o);
 				}
 				done = true;
 			} catch (BufferOverflowException be) {
 				// retry with larger buffer
-				b = ByteBuffer.allocate(b.capacity() * 2 + 10);
+				bb = ByteBuffer.allocate(bb.capacity() * 2 + 10);
 			}
 		}
-		b.flip();
-		return b;
+		bb.flip();
+		return bb;
 	}
 
 	/**

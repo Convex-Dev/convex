@@ -84,19 +84,19 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	 */
 	protected Blob createEncoding() {
 		int capacity=estimatedEncodingSize();
-		ByteBuffer b=ByteBuffer.allocate(capacity);
+		ByteBuffer bb=ByteBuffer.allocate(capacity);
 		boolean done=false;
 		while (!done) {
 			try {
-				b=write(b);
+				bb=write(bb);
 				done=true;
 			} catch (BufferOverflowException be) {
 				capacity=capacity*2+10;
-				b=ByteBuffer.allocate(capacity);
+				bb=ByteBuffer.allocate(capacity);
 			}
 		}
-		b.flip();
-		return Blob.wrap(Utils.toByteArray(b));
+		bb.flip();
+		return Blob.wrap(Utils.toByteArray(bb));
 	}
 
 	/**
