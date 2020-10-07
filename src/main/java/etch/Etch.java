@@ -14,6 +14,8 @@ import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import convex.api.Shutdown;
+
 import convex.core.Constants;
 import convex.core.crypto.Hash;
 import convex.core.data.AArrayBlob;
@@ -180,7 +182,7 @@ public class Etch {
 		}
 		
 		// shutdown hook to close file / release lock
-		Runtime.getRuntime().addShutdownHook(new Thread() {
+		convex.api.Shutdown.addHook(Shutdown.ETCH,new Runnable() {
 		    public void run() {
 		        close();
 		    }
