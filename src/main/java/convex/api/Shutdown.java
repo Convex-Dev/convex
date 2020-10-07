@@ -43,6 +43,13 @@ public class Shutdown {
 	
 	private static final TreeMap<Integer, Group> order=new TreeMap<>();
 
+	/**
+	 * Add a Runnable shutdown hook with the given priority. Lower priority numbers will 
+	 * be executed first.
+	 * 
+	 * @param priority Priority number for shutdown hook
+	 * @param r
+	 */
 	public static synchronized void addHook(int priority,Runnable r) {
 		Group g=order.get(priority);
 		if (g==null) {
@@ -52,7 +59,10 @@ public class Shutdown {
 		g.addHook(r);
 	}
 
-	protected synchronized static void runHooks() {
+	/**
+	 * Execute all hooks. Called by standard Java shutdown process.
+	 */
+	private synchronized static void runHooks() {
 		for (Map.Entry<Integer,Group> me: order.entrySet()) {
 			me.getValue().runHooks();
 		}
