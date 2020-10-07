@@ -674,24 +674,31 @@ public class Server implements Closeable {
 	public void finalize() {
 		close();
 	}
+	
+	/**
+	 * Writes the Peer data to the current store.
+	 */
+	public void writePeerData() {
+		AStore tempStore=Stores.current();
+		try {
+			Stores.setCurrent(store);
+			ACell peerData=peer.toData();
+			Ref<?> peerRef=Ref.createPersisted(peerData);
+			Hash peerHash=peerRef.getHash();
+			store.setRootHash(peerHash);
+		} catch (IOException e) {
+			log.severe("Failed to persist peer state when closing server");
+			e.printStackTrace();
+		} finally {
+			Stores.setCurrent(tempStore);
+		}
+	}
 
 	@Override
 	public synchronized void close() {
 		// persist peer state if necessary
 		if ((peer!=null)&&RT.bool(config.get(Keywords.PERSIST))) {
-			AStore tempStore=Stores.current();
-			try {
-				Stores.setCurrent(store);
-				ACell peerData=peer.toData();
-				Ref<?> peerRef=Ref.createPersisted(peerData);
-				Hash peerHash=peerRef.getHash();
-				store.setRootHash(peerHash);
-			} catch (IOException e) {
-				log.severe("Failed to persist peer state when closing server");
-				e.printStackTrace();
-			} finally {
-				Stores.setCurrent(tempStore);
-			}
+			writePeerData();
 		}
 		
 		running = false;
