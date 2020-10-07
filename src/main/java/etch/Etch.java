@@ -178,6 +178,13 @@ public class Etch {
 			long length = mbb.getLong();
 			dataLength=length;
 		}
+		
+		// shutdown hook to close file / release lock
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+		    public void run() {
+		        close();
+		    }
+		});
 	}
 	
 	/**
