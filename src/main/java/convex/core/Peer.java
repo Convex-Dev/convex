@@ -110,7 +110,7 @@ public class Peer {
 	/**
 	 * Restores a Peer from the Etch database specified in Config
 	 * @param config
-	 * @return
+	 * @return Peer instance, or null if root hash was not found
 	 */
 	public static Peer restorePeer(AStore store,Hash root, AKeyPair keyPair) throws IOException {
 		AStore tempStore=Stores.current();
@@ -118,7 +118,7 @@ public class Peer {
 			// temporarily set current store
 			Stores.setCurrent(store);
 			Ref<Object> ref=store.refForHash(root);
-			if (ref==null) throw new IllegalStateException("Peer restoration: root hash lookup failed");
+			if (ref==null) return null; // not found case
 			@SuppressWarnings("unchecked")
 			AMap<Keyword,Object> peerData=(AMap<Keyword, Object>) ref.getValue();
 			

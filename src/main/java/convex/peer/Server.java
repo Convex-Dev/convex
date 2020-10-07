@@ -152,11 +152,12 @@ public class Server implements Closeable {
 			try {
 				Hash hash=store.getRootHash();
 				Peer peer=Peer.restorePeer(store,hash,keyPair);
-				return peer;
+				if (peer!=null )return peer;
 			} catch (Throwable e) {
-				log.warning("Can't restore Peer from store. Defaulting to standard startup");
+				log.warning("Can't restore Peer from store: "+e.getMessage());
 			}
 		} 
+		log.info("Defaulting to standard Peer startup.");
 		return Peer.createStartupPeer(config);
 	}
 
