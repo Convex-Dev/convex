@@ -48,6 +48,7 @@ import convex.core.data.List;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
+import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
@@ -2078,7 +2079,7 @@ public class CoreTest {
 
 	@Test
 	public void testExpand() {
-		assertEquals(Syntax.create("foo"), eval("(expand (str 'foo) (fn [x e] x))"));
+		assertEquals(Syntax.create(Strings.create("foo")), eval("(expand (name :foo) (fn [x e] x))"));
 		assertEquals(Syntax.create(3L), eval("(expand '[1 2 3] (fn [x e] (nth x 2)))"));
 
 		assertArityError(step("(expand)"));

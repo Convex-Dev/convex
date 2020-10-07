@@ -342,9 +342,9 @@ public class Format {
 			throw new IllegalArgumentException("Can't encode numeric type to ByteBuffer: " + o.getClass());
 		}
 
-		if (o instanceof String) {
-			return Strings.create((String)o).write(bb);
-		}
+		//if (o instanceof String) {
+		//	return Strings.create((String)o).write(bb);
+		//}
 
 		if (o instanceof Character) {
 			bb = bb.put(Tag.CHAR);
@@ -731,8 +731,6 @@ public class Format {
 		}
 		if (Format.isEmbedded(o)) return true;
 
-		if (o instanceof String) return true;
-
 		throw new Error("Can't determine if value of type " + Utils.getClass(o) + " is canonical: " + o);
 	}
 
@@ -764,11 +762,6 @@ public class Format {
 		} else {
 			if (o instanceof Character) return true;
 			if (o instanceof Boolean) return true;
-			// TODO: think about encodings and string lengths?
-			if (o instanceof String) return true;
-			
-			// TODO: fix this ugly hack!
-			// if (o instanceof String) return ((String) o).length() < (MAX_EMBEDDED_LENGTH /2);
 		}
 		return false;
 	}

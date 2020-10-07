@@ -4,10 +4,12 @@ import java.nio.ByteBuffer;
 
 import convex.core.data.AList;
 import convex.core.data.AMap;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
+import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -41,6 +43,10 @@ public class Constant<T> extends AOp<T> {
 
 	public static <T> Constant<T> create(T value) {
 		return new Constant<T>(Ref.get(value));
+	}
+	
+	public static Constant<AString> create(String stringValue) {
+		return new Constant<AString>(Strings.create(stringValue).getRef());
 	}
 
 	public static <T> Constant<T> createFromRef(Ref<T> valueRef) {

@@ -13,6 +13,7 @@ import convex.core.data.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
 import convex.core.data.Sets;
+import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.lang.Context;
 import convex.core.lang.Core;
@@ -196,7 +197,7 @@ public class Init {
 	private static State register(State state,Address origin, String name) {
 		Context<?> ctx = Context.createFake(state, origin);
 		ctx = ctx.actorCall(REGISTRY_ADDRESS, 0, "register",
-				Maps.of(Keywords.NAME, name));
+				Maps.of(Keywords.NAME, Strings.create(name)));
 		return ctx.getState();
 	}
 

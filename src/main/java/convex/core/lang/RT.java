@@ -643,7 +643,7 @@ public class RT {
 	/**
 	 * Converts arguments to a AString representation. Handles:
 	 * <ul>
-	 * <li>Strings (unchanged)</li>
+	 * <li>CVM Strings (unchanged)</li>
 	 * <li>Blobs (converted to hex)</li>
 	 * <li>Numbers (converted to canonical numeric representation)</li>
 	 * <li>Other Objects (represented as edn)
@@ -673,7 +673,7 @@ public class RT {
 		if (a instanceof ABlob) return Strings.create(((ABlob) a).toHexString());
 		if (a instanceof ACell) return Strings.create(((ACell) a).ednString());
 		if (a instanceof Boolean || a instanceof Character) return Strings.create(a.toString());
-		return null;
+		throw new UnsupportedOperationException("No str implementation for type: "+Utils.getClassName(a));
 	}
 
 	/**

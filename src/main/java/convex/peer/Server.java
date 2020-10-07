@@ -31,6 +31,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
@@ -304,7 +305,7 @@ public class Server implements Closeable {
 			// terminate the connection, dishonest client?
 			try {
 				// TODO: throttle?
-				m.getPeerConnection().sendResult(m.getID(), "Bad Signature!", ErrorCodes.SIGNATURE);
+				m.getPeerConnection().sendResult(m.getID(), Strings.create("Bad Signature!"), ErrorCodes.SIGNATURE);
 			} catch (IOException e) {
 				// Ignore??
 			}

@@ -41,15 +41,15 @@ public class ParamTestOps {
 		return Arrays
 				.asList(new Object[][] { { "Constant", Constant.create(1L), 1L },
 						{ "Lookup", Do.create(Def.create("foo", Constant.create(13)), Lookup.create("foo")), 13 },
-						{ "Def", Def.create("foo", Constant.create("bar")), "bar" },
+						{ "Def", Def.create("foo", Constant.create("bar")), Strings.create("bar") },
 						{ "Vector", Invoke.create("vector", Constant.create("foo"), Constant.create("bar")),
-								Vectors.of("foo", "bar") },
+								Vectors.of(Strings.create("foo"), Strings.create("bar")) },
 
-						{ "Do", Do.create(Constant.create("foo"), Constant.create("bar")), "bar" },
+						{ "Do", Do.create(Constant.create("foo"), Constant.create("bar")), Strings.create("bar") },
 						{ "Cond",
 								Cond.create(Constant.create(true), Constant.create("truthy"),
 										Constant.create("falsey")),
-								"truthy" },
+								Strings.create("truthy") },
 						{ "Def", Def.create("foo", Constant.create(1L)), 1L } });
 	}
 

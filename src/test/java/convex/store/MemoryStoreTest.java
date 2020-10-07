@@ -16,8 +16,10 @@ import convex.core.crypto.Hash;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
+import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Format;
+import convex.core.data.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
@@ -41,7 +43,7 @@ public class MemoryStoreTest {
 
 			assertNull(ms.refForHash(BAD_HASH));
 
-			AMap<String, String> data = Maps.of("foo", "bar3621863168", Hash.NULL_HASH, Hash.NULL_HASH, "bar", Hash.NULL_HASH);
+			AMap<String, String> data = Maps.of(Keywords.CODE,Address.ZERO);
 			Ref<AMap<String, String>> goodRef = data.getRef();
 			Hash goodHash = goodRef.getHash();
 			assertNull(ms.refForHash(goodHash));

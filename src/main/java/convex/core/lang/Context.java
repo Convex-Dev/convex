@@ -22,6 +22,7 @@ import convex.core.data.Keywords;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
+import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.lang.expanders.AExpander;
@@ -1442,16 +1443,16 @@ public final class Context<T> implements IObject {
 	}
 	
 	@SuppressWarnings("unchecked")
-	public <R> Context<R> withError(Keyword errorCode,Object message) {
-		return (Context<R>) withException(ErrorValue.create(errorCode,message));
+	public <R> Context<R> withError(Keyword errorCode,String message) {
+		return (Context<R>) withException(ErrorValue.create(errorCode,Strings.create(message)));
 	}
 
-	public <R> Context<R> withArityError(String string) {
-		return withError(ErrorCodes.ARITY,string);
+	public <R> Context<R> withArityError(String message) {
+		return withError(ErrorCodes.ARITY,message);
 	}
 	
-	public <R> Context<R> withCompileError(String string) {
-		return withError(ErrorCodes.COMPILE,string);
+	public <R> Context<R> withCompileError(String message) {
+		return withError(ErrorCodes.COMPILE,message);
 	}
 	
 	public Context<Object> withBoundsError(long index) {

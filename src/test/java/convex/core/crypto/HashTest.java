@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Ref;
+import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.util.Utils;
 
@@ -83,7 +84,7 @@ public class HashTest {
 
 	@Test
 	public void testExtractHash() {
-		Hash h = Hash.compute("foo");
+		Hash h = Hash.compute(Strings.create("foo"));
 		assertTrue(h.isCanonical());
 		Blob b = Format.encodedBlob(h);
 		byte[] bs = b.getBytes();

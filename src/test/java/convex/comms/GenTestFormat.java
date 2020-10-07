@@ -14,6 +14,7 @@ import convex.core.data.Format;
 import convex.core.data.FuzzTestFormat;
 import convex.core.data.LongBlob;
 import convex.core.data.Ref;
+import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
 import convex.core.util.Utils;
 import convex.test.generators.PrimitiveGen;
@@ -22,10 +23,11 @@ import convex.test.generators.ValueGen;
 @RunWith(JUnitQuickcheck.class)
 public class GenTestFormat {
 	@Property
-	public void messageRoundTrip(String s) throws BadFormatException {
+	public void messageRoundTrip(String str) throws BadFormatException {
+		AString s=Strings.create(str);
 		Blob b = Format.encodedBlob(s);
 		AString s2 = Format.read(b);
-		assertEquals(s, s2.toString());
+		assertEquals(s, s2);
 		assertEquals(b, Format.encodedBlob(s2));
 
 		FuzzTestFormat.doMutationTest(b);

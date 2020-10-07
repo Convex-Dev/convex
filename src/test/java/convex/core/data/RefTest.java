@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.crypto.Hash;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.lang.Symbols;
 import convex.core.util.Utils;
 import convex.test.Samples;
 
@@ -93,7 +94,7 @@ public class RefTest {
 	
 	@Test
 	public void testGoodData() {
-		AVector<String> value = Vectors.of("foo", "bar");
+		AVector<ASymbolic> value = Vectors.of(Keywords.FOO, Symbols.FOO);
 		// a good ref
 		Ref<?> orig = value.getRef();
 		assertEquals(Ref.UNKNOWN, orig.getStatus());

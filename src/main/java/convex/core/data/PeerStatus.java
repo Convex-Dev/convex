@@ -73,9 +73,9 @@ public class PeerStatus extends ARecord {
 	 * 
 	 * @return Host String
 	 */
-	public String getHostString() {
+	public AString getHostString() {
 		if (hostAddress == null) return null;
-		return hostAddress.toString();
+		return hostAddress;
 	}
 
 	@Override

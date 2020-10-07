@@ -18,6 +18,7 @@ import convex.core.data.ADataStructure;
 import convex.core.data.AList;
 import convex.core.data.ASequence;
 import convex.core.data.ASet;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Blob;
@@ -25,6 +26,7 @@ import convex.core.data.BlobsTest;
 import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Sets;
+import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.test.generators.AddressGen;
 import convex.test.generators.ListGen;
@@ -83,10 +85,11 @@ public class GenTestCore {
 		
 		assertSame(Lists.empty(),a.empty());
 		
-		ASequence<Object> ca=RT.cons("foo", a);
-		assertEquals("foo",ca.get(0));
+		AString foos=Strings.create("foo");
+		ASequence<Object> ca=RT.cons(foos, a);
+		assertEquals(foos,ca.get(0));
 		// assertEquals(a,RT.next(ca)); // TODO BUG: broken for big lists / vectors
-		assertEquals(ca,a.conj("foo"));
+		assertEquals(ca,a.conj(foos));
 	}
 	
 	@Property
@@ -99,9 +102,10 @@ public class GenTestCore {
 		}
 		assertSame(Vectors.empty(),a.empty());
 	
+		AString foos=Strings.create("foo");
 		long n=RT.count(a);
-		AVector<Object> ca=a.conj("foo");
-		assertEquals("foo",RT.nth(ca,n));
+		AVector<Object> ca=a.conj(foos);
+		assertEquals(foos,RT.nth(ca,n));
 	}
 	
 	private void doAddressTests(Address a) {
@@ -135,10 +139,10 @@ public class GenTestCore {
 		assertEquals(a,RT.set(RT.sequence(a)));
 
 		long n=RT.count(a);
-		String key="newkey1";
+		AString key=Strings.create("newkey1");
 		// loop until we have a key not in set
 		while(a.contains(key)) {
-			key="newkey"+(Integer.parseInt(key.substring(6))+1);
+			key=Strings.create("newkey"+(Integer.parseInt(key.toString().substring(6))+1));
 		}
 		
 		ASet<Object> ca=a.conj(key);

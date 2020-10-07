@@ -26,6 +26,7 @@ import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Format;
+import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
@@ -55,7 +56,7 @@ public class EtchStoreTest {
 
 			assertNull(store.refForHash(BAD_HASH));
 
-			AMap<String, String> data = Maps.of("foo", "bar3621863168");
+			AMap<String, String> data = Maps.of(Keywords.FOO,Symbols.FOO);
 			Ref<AMap<String, String>> goodRef = data.getRef();
 			Hash goodHash = goodRef.getHash();
 			assertNull(store.refForHash(goodHash));

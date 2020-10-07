@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.State;
 import convex.core.data.AMap;
+import convex.core.data.AString;
 import convex.core.data.Maps;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
@@ -82,26 +83,26 @@ public class OpsTest {
 		Context<?> c1 = INITIAL_CONTEXT;
 
 		Symbol fooSym = Symbol.create("foo");
-		AOp<String> op = Def.create(Syntax.create(fooSym), Constant.create("bar"));
+		AOp<AString> op = Def.create(Syntax.create(fooSym), Constant.create("bar"));
 
 		AMap<Symbol, Syntax> env1 = c1.getEnvironment();
-		Context<String> c2 = c1.execute(op);
+		Context<AString> c2 = c1.execute(op);
 		AMap<Symbol, Syntax> env2 = c2.getEnvironment();
 
 		assertNotEquals(env1, env2);
 
 		assertNull(env1.get(fooSym)); // initially no entry
-		assertEquals("bar", env2.get(fooSym).getValue());
+		assertEquals("bar", env2.get(fooSym).getValue().toString());
 
 		long expectedJuice = INITIAL_JUICE - Juice.CONSTANT - Juice.DEF;
 		assertEquals(expectedJuice, c2.getJuice());
-		assertEquals("bar", c2.getResult());
+		assertEquals("bar", c2.getResult().toString());
 
-		AOp<String> lookupOp = Lookup.create(Symbol.create("foo"));
-		Context<String> c3 = c2.execute(lookupOp);
+		AOp<AString> lookupOp = Lookup.create(Symbol.create("foo"));
+		Context<AString> c3 = c2.execute(lookupOp);
 		expectedJuice -= Juice.LOOKUP_DYNAMIC;
 		assertEquals(expectedJuice, c3.getJuice());
-		assertEquals("bar", c3.getResult());
+		assertEquals("bar", c3.getResult().toString());
 
 	}
 
@@ -116,33 +117,33 @@ public class OpsTest {
 	public void testDo() {
 		Context<?> c = INITIAL_CONTEXT;
 
-		AOp<String> op = Do.create(Def.create("foo", Constant.create("bar")), Lookup.create("foo"));
+		AOp<AString> op = Do.create(Def.create("foo", Constant.create("bar")), Lookup.create("foo"));
 
-		Context<String> c2 = c.execute(op);
+		Context<AString> c2 = c.execute(op);
 		long expectedJuice = INITIAL_JUICE - (Juice.CONSTANT + Juice.DEF + Juice.LOOKUP_DYNAMIC + Juice.DO);
 		assertEquals(expectedJuice, c2.getJuice());
-		assertEquals("bar", c2.getResult());
+		assertEquals("bar", c2.getResult().toString());
 	}
 
 	@Test
 	public void testLet() {
 		Context<?> c = INITIAL_CONTEXT;
-		AOp<String> op = Let.create(Vectors.of(Syntax.create(Symbols.FOO)),
+		AOp<AString> op = Let.create(Vectors.of(Syntax.create(Symbols.FOO)),
 				Vectors.of(Constant.create("bar"), Lookup.create("foo")), false);
-		Context<String> c2 = c.execute(op);
-		assertEquals("bar", c2.getResult());
+		Context<AString> c2 = c.execute(op);
+		assertEquals("bar", c2.getResult().toString());
 	}
 
 	@Test
 	public void testCondTrue() {
 		Context<?> c = INITIAL_CONTEXT;
 
-		AOp<String> op = Cond.create(Constant.create(true), Constant.create("trueResult"),
+		AOp<AString> op = Cond.create(Constant.create(true), Constant.create("trueResult"),
 				Constant.create("falseResult"));
 
-		Context<String> c2 = c.execute(op);
+		Context<AString> c2 = c.execute(op);
 
-		assertEquals("trueResult", c2.getResult());
+		assertEquals("trueResult", c2.getResult().toString());
 		long expectedJuice = INITIAL_JUICE - (Juice.COND_OP + Juice.CONSTANT + Juice.CONSTANT);
 		assertEquals(expectedJuice, c2.getJuice());
 	}
@@ -151,12 +152,12 @@ public class OpsTest {
 	public void testCondFalse() {
 		Context<?> c = INITIAL_CONTEXT;
 
-		AOp<String> op = Cond.create(Constant.create(false), Constant.create("trueResult"),
+		AOp<AString> op = Cond.create(Constant.create(false), Constant.create("trueResult"),
 				Constant.create("falseResult"));
 
-		Context<String> c2 = c.execute(op);
+		Context<AString> c2 = c.execute(op);
 
-		assertEquals("falseResult", c2.getResult());
+		assertEquals("falseResult", c2.getResult().toString());
 		long expectedJuice = INITIAL_JUICE - (Juice.COND_OP + Juice.CONSTANT + Juice.CONSTANT);
 		assertEquals(expectedJuice, c2.getJuice());
 	}
@@ -180,13 +181,13 @@ public class OpsTest {
 
 		Symbol sym = Symbol.create("val");
 
-		AOp<String> op = Cond.create(Do.create(Def.create(sym, Constant.create(false)), Constant.create(false)),
+		AOp<AString> op = Cond.create(Do.create(Def.create(sym, Constant.create(false)), Constant.create(false)),
 				Constant.create("1"), Lookup.create(sym), Constant.create("2"),
 				Do.create(Def.create(sym, Constant.create(true)), Constant.create(false)), Constant.create("3"),
 				Lookup.create(sym), Constant.create("4"), Constant.create("5"));
 
-		Context<String> c2 = c.execute(op);
-		assertEquals("4", c2.getResult());
+		Context<AString> c2 = c.execute(op);
+		assertEquals("4", c2.getResult().toString());
 	}
 
 	@Test
@@ -195,11 +196,11 @@ public class OpsTest {
 
 		Symbol sym = Symbol.create("arg0");
 
-		Invoke<String> op = Invoke.create(Lambda.create(Vectors.of(Syntax.create(sym)), Lookup.create(sym)),
+		Invoke<AString> op = Invoke.create(Lambda.create(Vectors.of(Syntax.create(sym)), Lookup.create(sym)),
 				Constant.create("bar"));
 
-		Context<String> c2 = c.execute(op);
-		assertEquals("bar", c2.getResult());
+		Context<AString> c2 = c.execute(op);
+		assertEquals("bar", c2.getResult().toString());
 	}
 	
 	@Test
