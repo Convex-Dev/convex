@@ -19,7 +19,7 @@ public class SymbolTest {
 
 		assertNull(Symbol.create(Text.whiteSpace(33)));
 		assertNull(Symbol.create(""));
-		assertNull(Symbol.create(null));
+		assertNull(Symbol.create((String)null));
 	}
 
 	@Test
@@ -33,7 +33,7 @@ public class SymbolTest {
 		Symbol k = Symbol.create("count");
 		assertEquals(Symbols.COUNT, k);
 
-		assertEquals("count", k.getName());
+		assertEquals("count", k.getName().toString());
 		assertEquals("count", k.toString());
 		assertEquals(8, k.getEncoding().length); // tag(1) + null namespace(1) + length(1) + name(5)
 

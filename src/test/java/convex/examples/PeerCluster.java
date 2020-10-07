@@ -7,6 +7,7 @@ import java.util.logging.Logger;
 
 import convex.core.State;
 import convex.core.crypto.ECDSAKeyPair;
+import convex.core.data.AString;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Amount;
@@ -17,6 +18,7 @@ import convex.core.data.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
 import convex.core.data.Sets;
+import convex.core.data.Strings;
 import convex.core.util.Utils;
 import convex.peer.API;
 import convex.peer.Server;
@@ -59,7 +61,7 @@ public class PeerCluster {
 			Address address = PEER_KEYS.get(i).getAddress();
 			Map<Keyword, Object> config = PEER_CONFIGS.get(i);
 			int port = Utils.toInt(config.get(Keywords.PORT));
-			String sa = "http://localhost"+ port;
+			AString sa = Strings.create("http://localhost"+ port);
 			PeerStatus ps = PeerStatus.create(Amount.create(1000000000), sa);
 			AccountStatus as = AccountStatus.create(Amount.create(1000000000));
 			peers = peers.assoc(address, ps);

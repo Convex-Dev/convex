@@ -16,6 +16,7 @@ import convex.core.data.AList;
 import convex.core.data.AMap;
 import convex.core.data.ASequence;
 import convex.core.data.ASet;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Amount;
@@ -29,6 +30,7 @@ import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.Sets;
+import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.exceptions.InvalidDataException;
@@ -570,7 +572,7 @@ public class RT {
 		if (o == null) throw new IndexOutOfBoundsException("Can't get nth element from null");
 
 		try {
-			if (o instanceof String) return (T) (Character) ((String) o).charAt(Utils.checkedInt(i));
+			if (o instanceof CharSequence) return (T) (Character) ((CharSequence) o).charAt(Utils.checkedInt(i));
 			if (o instanceof ASequence) return ((ASequence<T>) o).get(i);
 			if (o instanceof ABlob) return (T) (Byte) ((ABlob) o).get(i);
 
@@ -615,8 +617,8 @@ public class RT {
 	public static Long count(Object o) {
 		if (o == null) return 0L;
 		if (o instanceof ADataStructure) return ((ADataStructure<?>) o).count();
-		if (o instanceof String) {
-			return (long) ((String) o).length();
+		if (o instanceof CharSequence) {
+			return (long) ((CharSequence) o).length();
 		}
 		if (o instanceof ABlob) {
 			return ((ABlob) o).length();
@@ -639,7 +641,7 @@ public class RT {
 	}
 
 	/**
-	 * Converts arguments to a string representation. Handles:
+	 * Converts arguments to a AString representation. Handles:
 	 * <ul>
 	 * <li>Strings (unchanged)</li>
 	 * <li>Blobs (converted to hex)</li>
@@ -649,12 +651,12 @@ public class RT {
 	 * 
 	 * @param args
 	 */
-	public static String str(Object[] args) {
+	public static AString str(Object[] args) {
 		StringBuilder sb = new StringBuilder();
 		for (Object o : args) {
 			sb.append(RT.str(o));
 		}
-		return sb.toString();
+		return Strings.create(sb.toString());
 	}
 
 	/**
@@ -664,13 +666,13 @@ public class RT {
 	 * @param a
 	 * @return String representation of object
 	 */
-	public static String str(Object a) {
-		if (a == null) return "nil";
-		if (a instanceof String) return (String) a;
-		if (a instanceof Number) return a.toString();
-		if (a instanceof ABlob) return ((ABlob) a).toHexString();
-		if (a instanceof ACell) return ((ACell) a).ednString();
-		if (a instanceof Boolean || a instanceof Character) return a.toString();
+	public static AString str(Object a) {
+		if (a == null) return Strings.NIL;
+		if (a instanceof AString) return (AString) a;
+		if (a instanceof Number) return Strings.create(a.toString());
+		if (a instanceof ABlob) return Strings.create(((ABlob) a).toHexString());
+		if (a instanceof ACell) return Strings.create(((ACell) a).ednString());
+		if (a instanceof Boolean || a instanceof Character) return Strings.create(a.toString());
 		return null;
 	}
 
@@ -680,10 +682,11 @@ public class RT {
 	 * @param a
 	 * @return Name of the argument, or null if not Named
 	 */
-	public static String name(Object a) {
-		if (a instanceof String) return (String) a;
+	public static AString name(Object a) {
+		if (a instanceof AString) return (AString) a;
 		if (a instanceof Keyword) return ((Keyword) a).getName();
 		if (a instanceof Symbol) return ((Symbol) a).getName();
+		if (a instanceof String) return Strings.create((String)a);
 		return null;
 	}
 
@@ -780,24 +783,38 @@ public class RT {
 	 */
 	public static Address address(Object a) {
 		if (a instanceof Address) return (Address) a;
-		if (a instanceof String) return address((String) a);
+		if (a instanceof AString) return address((AString) a);
 		if (a instanceof ABlob) {
 			ABlob b = (ABlob) a;
 			if (b.length() != Address.LENGTH) return null;
 			return Address.wrap(b.getBytes());
 		}
+		if (a instanceof String) return address((String) a);
 
 		return null;
 	}
-
+	
 	/**
-	 * Casts a String argument to a valid Address.
+	 * Casts an String argument to a valid Address.
 	 * 
 	 * @return Address value, or null of String does not represent an address
 	 *         (argument error)
 	 */
 	private static Address address(String a) {
-		return Address.fromHexOrNull((String) a);
+		if (a.length()!=Address.LENGTH*2) return null;
+		return Address.fromHex(a);
+	}
+
+	
+	/**
+	 * Casts an AString argument to a valid Address.
+	 * 
+	 * @return Address value, or null of String does not represent an address
+	 *         (argument error)
+	 */
+	private static Address address(AString a) {
+		if (a.length()!=Address.LENGTH*2) return null;
+		return Address.fromHex(a.toString());
 	}
 
 	/**
@@ -810,6 +827,7 @@ public class RT {
 	public static ABlob blob(Object a) {
 		// handle address, hash, blob instances
 		if (a instanceof ABlob) return Blobs.canonical((ABlob) a);
+		if (a instanceof AString) return Blobs.fromHex(a.toString());
 		if (a instanceof String) return Blobs.fromHex((String) a);
 		return null;
 	}
@@ -950,7 +968,7 @@ public class RT {
 	 */
 	public static Keyword toKeyword(Object a) {
 		if (a instanceof Keyword) return (Keyword) a;
-		String name = name(a);
+		AString name = name(a);
 		if (name == null) return null;
 		Keyword k = Keyword.create(name);
 		return k;
@@ -964,7 +982,7 @@ public class RT {
 	 */
 	public static Symbol toSymbol(Object a) {
 		if (a instanceof Symbol) return (Symbol) a;
-		String name = name(a);
+		AString name = name(a);
 		if (name == null) return null;
 		return Symbol.create(name);
 	}
@@ -975,10 +993,10 @@ public class RT {
 	 * @param a
 	 * @return Name from the Object, or null if not a named object
 	 */
-	public static String getName(Object a) {
+	public static AString getName(Object a) {
 		if (a instanceof Keyword) return ((Keyword) a).getName();
 		if (a instanceof Symbol) return ((Symbol) a).getName();
-		if (a instanceof String) return ((String) a);
+		if (a instanceof AString) return (AString) a;
 		return null;
 	}
 

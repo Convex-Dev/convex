@@ -113,13 +113,13 @@ public class ActorsTest {
 		ctx=TestState.step(ctx,"(def hello (deploy (quote "+contractString+")))"); 
 		
 		ctx=TestState.step(ctx,"(call hello (greet \"Nikki\"))");
-		assertEquals("Hello Nikki",ctx.getResult());
+		assertEquals("Hello Nikki",ctx.getResult().toString());
 		
 		ctx=TestState.step(ctx,"(call hello (greet \"Nikki\"))");
-		assertEquals("Welcome back Nikki",ctx.getResult());
+		assertEquals("Welcome back Nikki",ctx.getResult().toString());
 		
 		ctx=TestState.step(ctx,"(call hello (greet \"Alice\"))");
-		assertEquals("Hello Alice",ctx.getResult());
+		assertEquals("Hello Alice",ctx.getResult().toString());
 		
 	}
 	
@@ -215,18 +215,18 @@ public class ActorsTest {
 		ctx=TestState.step(ctx,"(def ex (deploy '"+contractString+"))"); 
 		
 		ctx=TestState.step(ctx,"(call ex (halt-fn \"Jenny\"))");
-		assertEquals("Jenny",ctx.getResult());
+		assertEquals("Jenny",ctx.getResult().toString());
 
 		// calling this will break the fragile definition, but then rollback to restore it
 		ctx=TestState.step(ctx,"(call ex (rollback-fn \"Alice\"))");
-		assertEquals("Alice",ctx.getResult());
+		assertEquals("Alice",ctx.getResult().toString());
 
 		ctx=TestState.step(ctx,"(call ex (get-fragile))");
 		assertEquals(Keyword.create("ok"),ctx.getResult());
 		
 		// Calling this should break the fragile definition permanently
 		ctx=TestState.step(ctx,"(call ex (break-fn \"Lana\"))");
-		assertEquals("Lana",ctx.getResult());
+		assertEquals("Lana",ctx.getResult().toString());
 
 		ctx=TestState.step(ctx,"(call ex (get-fragile))");
 		assertEquals(Keyword.create("broken"),ctx.getResult());

@@ -68,10 +68,10 @@ public class ScryptNextTest {
 
     @Test
     public void testSymbolTransform() {
-        assertEquals("*a", scrypt().convexLispSymbol("_a").getName());
-        assertEquals("a*", scrypt().convexLispSymbol("a_").getName());
-        assertEquals("*a*", scrypt().convexLispSymbol("_a_").getName());
-        assertEquals("*a-b*", scrypt().convexLispSymbol("_a_b_").getName());
+        assertEquals("*a", scrypt().convexLispSymbol("_a").getName().toString());
+        assertEquals("a*", scrypt().convexLispSymbol("a_").getName().toString());
+        assertEquals("*a*", scrypt().convexLispSymbol("_a_").getName().toString());
+        assertEquals("*a-b*", scrypt().convexLispSymbol("_a_b_").getName().toString());
     }
 
     @Test

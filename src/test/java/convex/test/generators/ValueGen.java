@@ -24,7 +24,7 @@ public class ValueGen extends Generator<Object> {
 		case 1:
 			return gen().make(PrimitiveGen.class).generate(r, status);
 		case 2:
-			return gen().type(String.class).generate(r, status);
+			return gen().make(StringGen.class).generate(r, status);
 		case 3:
 			return gen().make(VectorGen.class).generate(r, status);
 		case 4:

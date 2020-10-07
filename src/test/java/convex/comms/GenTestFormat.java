@@ -8,6 +8,7 @@ import com.pholser.junit.quickcheck.From;
 import com.pholser.junit.quickcheck.Property;
 import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 
+import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.FuzzTestFormat;
@@ -23,8 +24,8 @@ public class GenTestFormat {
 	@Property
 	public void messageRoundTrip(String s) throws BadFormatException {
 		Blob b = Format.encodedBlob(s);
-		String s2 = Format.read(b);
-		assertEquals(s, s2);
+		AString s2 = Format.read(b);
+		assertEquals(s, s2.toString());
 		assertEquals(b, Format.encodedBlob(s2));
 
 		FuzzTestFormat.doMutationTest(b);

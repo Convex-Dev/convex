@@ -181,7 +181,8 @@ public class Compiler {
 			return context.withResult(Juice.COMPILE_CONSTANT, (T)form);
 		}
 
-		throw new UnsupportedOperationException("TODO compile for: " + Utils.getClass(form));
+		// return as a constant literal
+		return (Context<T>) context.withResult(Juice.COMPILE_CONSTANT, Constant.create(form));
 	}
 
 	@SuppressWarnings("unchecked")

@@ -117,6 +117,31 @@ public class StringShort extends AString {
 		
 		return new StringShort(data);
 	}
+	
+	@Override
+	public String toString() {
+		return data;
+	}
+	
+	@Override 
+	public int hashCode() {
+		return data.hashCode();
+	}
 
+	@Override 
+	public boolean equals(Object a) {
+		if (a instanceof StringShort) {
+			return equals((StringShort)a);
+		}
+		return false;
+	}
+	
+	public boolean equals(StringShort a) {
+		return this.data.equals(a.data);
+	}
 
+	@Override
+	public int compareTo(AString o) {
+		return data.compareTo(o.toString());
+	}
 }

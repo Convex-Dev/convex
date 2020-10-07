@@ -20,12 +20,13 @@ public class KeywordTest {
 		// null return for invalid names
 		assertNull(Keyword.create(Text.whiteSpace(33)));
 		assertNull(Keyword.create(""));
-		assertNull(Keyword.create(null));
+		assertNull(Keyword.create((String)null));
 
 		// exception for invalid names using createChecked
 		assertThrows(IllegalArgumentException.class, () -> Keyword.createChecked(Text.whiteSpace(33)));
 		assertThrows(IllegalArgumentException.class, () -> Keyword.createChecked(""));
-		assertThrows(IllegalArgumentException.class, () -> Keyword.createChecked(null));
+		assertThrows(IllegalArgumentException.class, () -> Keyword.createChecked((AString)null));
+		assertThrows(IllegalArgumentException.class, () -> Keyword.createChecked((String)null));
 	}
 
 	@Test
@@ -39,7 +40,7 @@ public class KeywordTest {
 		Keyword k = Keyword.create("foo");
 		assertEquals(Samples.FOO, k);
 
-		assertEquals("foo", k.getName());
+		assertEquals("foo", k.getName().toString());
 		assertEquals(":foo", k.toString());
 		assertEquals(5, k.getEncoding().length); // tag+length+3 name
 

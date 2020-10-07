@@ -24,9 +24,9 @@ public class PeerStatus extends ARecord {
 
 	private final ABlobMap<Address, Amount> stakes;
 
-	private final String hostAddress;
+	private final AString hostAddress;
 
-	private PeerStatus(Amount stake, ABlobMap<Address, Amount> stakes, Amount delegatedStake, String host) {
+	private PeerStatus(Amount stake, ABlobMap<Address, Amount> stakes, Amount delegatedStake, AString host) {
 		super(FORMAT);
 		this.stake = stake;
 		this.delegatedStake = delegatedStake;
@@ -38,7 +38,7 @@ public class PeerStatus extends ARecord {
 		return create(stake, null);
 	}
 
-	public static PeerStatus create(Amount stake, String hostString) {
+	public static PeerStatus create(Amount stake, AString hostString) {
 		return new PeerStatus(stake, BlobMaps.empty(), Amount.ZERO, hostString);
 	}
 	/**
@@ -98,7 +98,7 @@ public class PeerStatus extends ARecord {
 		ABlobMap<Address, Amount> stakes = Format.read(data);
 		Amount delegatedStake = Format.read(data);
 		
-		String hostString = Format.read(data);
+		AString hostString = Format.read(data);
 		
 		return new PeerStatus(stake,stakes,delegatedStake,hostString);
 	}
@@ -181,7 +181,7 @@ public class PeerStatus extends ARecord {
 		Amount newStake = (Amount) newVals[0];
 		ABlobMap<Address, Amount> newStakes = (ABlobMap<Address, Amount>) newVals[1];
 		Amount newDelStake = (Amount) newVals[2];
-		String newHostAddress = (String) newVals[3];
+		AString newHostAddress = (AString) newVals[3];
 		
 		if ((this.stake==newStake)&&(this.stakes==newStakes)
 				&&(this.hostAddress==newHostAddress)&&(this.delegatedStake==newDelStake)) {

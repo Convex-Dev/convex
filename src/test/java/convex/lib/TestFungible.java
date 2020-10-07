@@ -49,7 +49,7 @@ public class TestFungible {
 		assertTrue(ctx.getAccountStatus(fungible).isActor());
 		assertEquals(fungible,TestState.CON_FUNGIBLE);
 		
-		assertEquals("Fungible Library",eval("(:name (call *registry* (lookup "+fungible+")))"));
+		assertEquals("Fungible Library",eval("(:name (call *registry* (lookup "+fungible+")))").toString());
 	}
 	
 	@Test public void testBuildToken() {

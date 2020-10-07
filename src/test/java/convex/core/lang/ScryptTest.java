@@ -183,7 +183,7 @@ public class ScryptTest {
     public void testExpressionRule() {
         assertNull(eval("nil"));
         assertEquals(1L, (Long) eval("1"));
-        assertEquals("Foo", eval("\"Foo\""));
+        assertEquals(Strings.create("Foo"), eval("\"Foo\""));
         assertEquals(true, eval("true"));
         assertEquals(Keyword.create("keyword"), eval(":keyword"));
         assertSame(Core.MAP, eval("map"));
@@ -221,7 +221,7 @@ public class ScryptTest {
         assertEquals(1L, (Long) Scrypt.readSyntax("1").getValue());
         assertEquals(true, Scrypt.readSyntax("true").getValue());
         assertEquals(Keyword.create("k"), Scrypt.readSyntax(":k").getValue());
-        assertEquals("Foo", Scrypt.readSyntax("\"Foo\"").getValue());
+        assertEquals(Strings.create("Foo"), Scrypt.readSyntax("\"Foo\"").getValue());
         assertNull(Scrypt.readSyntax("nil").getValue());
     }
 

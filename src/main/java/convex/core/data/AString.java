@@ -3,7 +3,7 @@ package convex.core.data;
 /**
  * Class representing a CVM String
  */
-public abstract class AString extends ACell implements CharSequence {
+public abstract class AString extends ACell implements CharSequence, Comparable<AString> {
 
 	protected int length;
 	
@@ -21,7 +21,7 @@ public abstract class AString extends ACell implements CharSequence {
 
 	@Override
 	public void print(StringBuilder sb) {
-		sb.append(this);
+		ednString(sb);
 	}
 
 	@Override

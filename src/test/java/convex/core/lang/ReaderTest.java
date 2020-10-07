@@ -13,6 +13,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
+import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
@@ -130,10 +131,10 @@ public class ReaderTest {
 
 	@Test
 	public void testStrings() {
-		assertEquals("", Reader.read("\"\""));
-		assertEquals("bar", Reader.read("\"bar\""));
-		assertEquals(Vectors.of("bar"), Reader.read("[\"bar\"]"));
-		assertEquals("\"bar\"", Reader.read("\"\\\"bar\\\"\""));
+		assertSame(Strings.empty(), Reader.read("\"\""));
+		assertEquals(Strings.create("bar"), Reader.read("\"bar\""));
+		assertEquals(Vectors.of(Strings.create("bar")), Reader.read("[\"bar\"]"));
+		assertEquals(Strings.create("\"bar\""), Reader.read("\"\\\"bar\\\"\""));
 
 	}
 

@@ -4,6 +4,7 @@ import static convex.core.lang.TestState.INITIAL_CONTEXT;
 import static convex.core.lang.TestState.eval;
 import static convex.core.lang.TestState.evalB;
 import static convex.core.lang.TestState.evalL;
+import static convex.core.lang.TestState.evalS;
 import static convex.core.lang.TestState.step;
 import static convex.test.Assertions.assertArgumentError;
 import static convex.test.Assertions.assertArityError;
@@ -105,7 +106,7 @@ public class CoreTest {
 		assertEquals(b, eval("(blob \"Cafebabe\")"));
 		assertEquals(b, eval("(blob (blob \"cafebabe\"))"));
 
-		assertEquals("cafebabe", eval("(str (blob \"Cafebabe\"))"));
+		assertEquals("cafebabe", evalS("(str (blob \"Cafebabe\"))"));
 
 		assertTrue(evalB("(= *address* (address (blob *address*)))"));
 		
@@ -487,16 +488,16 @@ public class CoreTest {
 
 	@Test
 	public void testStr() {
-		assertEquals("", eval("(str)"));
-		assertEquals("1", eval("(str 1)"));
-		assertEquals("12", eval("(str 1 2)"));
-		assertEquals("baz", eval("(str \"baz\")"));
-		assertEquals("bazbar", eval("(str \"baz\" \"bar\")"));
-		assertEquals("baz", eval("(str \\b \\a \\z)"));
-		assertEquals(":foo", eval("(str :foo)"));
-		assertEquals("nil", eval("(str nil)"));
-		assertEquals("true", eval("(str true)"));
-		assertEquals("cafebabe", eval("(str (blob \"CAFEBABE\"))"));
+		assertEquals("", evalS("(str)"));
+		assertEquals("1", evalS("(str 1)"));
+		assertEquals("12", evalS("(str 1 2)"));
+		assertEquals("baz", evalS("(str \"baz\")"));
+		assertEquals("bazbar", evalS("(str \"baz\" \"bar\")"));
+		assertEquals("baz", evalS("(str \\b \\a \\z)"));
+		assertEquals(":foo", evalS("(str :foo)"));
+		assertEquals("nil", evalS("(str nil)"));
+		assertEquals("true", evalS("(str true)"));
+		assertEquals("cafebabe", evalS("(str (blob \"CAFEBABE\"))"));
 	}
 	
 	@Test
@@ -1089,15 +1090,15 @@ public class CoreTest {
 
 	@Test
 	public void testName() {
-		assertEquals("count", eval("(name :count)"));
-		assertEquals("count", eval("(name 'count)"));
-		assertEquals("foo", eval("(name \"foo\")"));
+		assertEquals("count", evalS("(name :count)"));
+		assertEquals("count", evalS("(name 'count)"));
+		assertEquals("foo", evalS("(name \"foo\")"));
 		
 		// should extract symbol name, exluding namespace alias
-		assertEquals("bar", eval("(name 'foo/bar)"));
+		assertEquals("bar", evalS("(name 'foo/bar)"));
 		
 		// longer strings OK for name
-		assertEquals("duicgidvgefiucefiuvfeiuvefiuvgifegvfuievgiuefgviuefgviufegvieufgviuefvgevevgi", eval("(name \"duicgidvgefiucefiuvfeiuvefiuvgifegvfuievgiuefgviuefgviufegvieufgviuefvgevevgi\")"));
+		assertEquals("duicgidvgefiucefiuvfeiuvefiuvgifegvfuievgiuefgviuefgviufegvieufgviuefvgevevgi", evalS("(name \"duicgidvgefiucefiuvfeiuvefiuvgifegvfuievgiuefgviuefgviufegvieufgviuefvgevevgi\")"));
 
 		assertCastError(step("(name nil)"));
 		assertCastError(step("(name [])"));
@@ -1275,7 +1276,7 @@ public class CoreTest {
 		assertNull(eval("(apply assoc [nil])"));
 		assertEquals(Vectors.empty(), eval("(apply vector ())"));
 		assertEquals(Lists.empty(), eval("(apply list [])"));
-		assertEquals("foo", eval("(apply str [\\f \\o \\o])"));
+		assertEquals("foo", evalS("(apply str [\\f \\o \\o])"));
 
 		assertEquals(Vectors.of(1L, 2L, 3L, 4L), eval("(apply vector 1 2 (list 3 4))"));
 		assertEquals(List.of(1L, 2L, 3L, 4L), eval("(apply list 1 2 [3 4])"));
@@ -2035,7 +2036,7 @@ public class CoreTest {
 
 	@Test
 	public void testEval() {
-		assertEquals("foo", eval("(eval (list 'str \\f \\o \\o))"));
+		assertEquals("foo", evalS("(eval (list 'str \\f \\o \\o))"));
 		assertNull(eval("(eval 'nil)"));
 		assertEquals(10L, (long) eval("(eval '(+ 3 7))"));
 		assertEquals(40L, (long) eval("(eval '(* 2 4 5))"));

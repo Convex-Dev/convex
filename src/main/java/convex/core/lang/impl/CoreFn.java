@@ -37,7 +37,7 @@ public abstract class CoreFn<T> extends AFn<T> implements ICoreDef {
 	}
 
 	protected String name() {
-		return symbol.getName();
+		return symbol.getName().toString();
 	}
 
 	@Override

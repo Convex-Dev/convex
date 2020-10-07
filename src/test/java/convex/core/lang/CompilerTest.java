@@ -91,7 +91,7 @@ public class CompilerTest {
 		assertEquals(1L,(long)eval("1"));
 		assertEquals(Samples.FOO,eval(":foo"));
 		assertEquals('d',(char)eval("\\d"));
-		assertEquals("baz",eval("\"baz\""));
+		assertEquals("baz",eval("\"baz\"").toString());
 		
 		assertSame(Vectors.empty(),eval("[]"));
 		assertSame(Lists.empty(),eval("()"));
@@ -430,7 +430,7 @@ public class CompilerTest {
 		Context<?> c=CONTEXT;
 		c=c.execute(comp("(defexpander bex [x e] \"foo\")"));
 		c=c.execute(comp("(bex 2)",c));
-		assertEquals("foo",c.getResult());
+		assertEquals("foo",c.getResult().toString());
 	}
 	
 	@Test 
@@ -457,7 +457,7 @@ public class CompilerTest {
 		AOp<?> defop=comp("(def c1 (macro [z] (str z)))");
 		c=c.execute(defop);
 		c=c.execute(comp("(c1 bar)",c));
-		assertEquals("bar",c.getResult());
+		assertEquals("bar",c.getResult().toString());
 		
 		// TODO: think about this.
 		// assertEquals(2L,(long)eval("((macro [x] 2) (return 3))"));

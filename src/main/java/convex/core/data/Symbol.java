@@ -37,7 +37,7 @@ public class Symbol extends ASymbolic {
 	 */
 	private final Symbol namespace;
 	
-	private Symbol(Symbol ns,String name) {
+	private Symbol(Symbol ns,AString name) {
 		super(name);
 		this.namespace=ns;
 	}
@@ -50,7 +50,7 @@ public class Symbol extends ASymbolic {
 	 * @param name Unqualified Symbol name
 	 * @return Symbol instance, or null if the Symbol is invalid
 	 */
-	public static Symbol create(Symbol namespace, String name) {
+	public static Symbol create(Symbol namespace, AString name) {
 		if (!validateName(name)) return null;
 		if (namespace!=null) {
 			// namespace can't currently be qualified itself
@@ -73,11 +73,20 @@ public class Symbol extends ASymbolic {
 	 * @return Symbol instance, or null if the name is invalid for a Symbol.
 	 */
 	public static Symbol create(String name) {
+		if (name==null) return null;
+		return create(null,Strings.create(name));
+	}
+	
+	public static Symbol create(AString name) {
 		return create(null,name);
 	}
 	
-	public static Symbol createWithNamespace(String name, String ns) {
+	public static Symbol createWithNamespace(AString name, AString ns) {
 		return create(Symbol.create(ns),name);
+	}
+	
+	public static Symbol createWithNamespace(String name, String ns) {
+		return createWithNamespace(Strings.create(name),Strings.create(ns));
 	}
 	
 	/**
@@ -88,9 +97,6 @@ public class Symbol extends ASymbolic {
 		return namespace;
 	}
 
-	public String getName() {
-		return name;
-	}
 
 	@Override
 	public boolean equals(Object o) {
@@ -121,7 +127,7 @@ public class Symbol extends ASymbolic {
 	@Override
 	public ByteBuffer writeRaw(ByteBuffer bb) {
 		bb = Format.write(bb, namespace);
-		bb = Format.writeRawUTF8String(bb, name);
+		bb = Format.writeRawUTF8String(bb, name.toString());
 		return bb;
 	}
 
@@ -135,7 +141,7 @@ public class Symbol extends ASymbolic {
 	public static Symbol read(ByteBuffer bb) throws BadFormatException {
 		Symbol namespace=Format.read(bb);
 		String name=Format.readUTF8String(bb);
-		Symbol sym = Symbol.create(namespace,name);
+		Symbol sym = Symbol.create(namespace,Strings.create(name));
 		if (sym == null) throw new BadFormatException("Can't read symbol");
 		return sym;
 	}
@@ -186,7 +192,8 @@ public class Symbol extends ASymbolic {
 		if (namespace==null) return this;
 		return Symbol.create(getName());
 	}
-	
+
+
 	@Override
 	public int getRefCount() {
 		return 0;
@@ -206,5 +213,7 @@ public class Symbol extends ASymbolic {
 	public boolean maybeSpecial() {
 		return name.charAt(0)=='*';
 	}
+
+
 
 }

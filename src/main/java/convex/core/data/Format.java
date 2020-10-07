@@ -342,7 +342,9 @@ public class Format {
 			throw new IllegalArgumentException("Can't encode numeric type to ByteBuffer: " + o.getClass());
 		}
 
-		if (o instanceof String) return writeUTF8String(bb, (String) o);
+		if (o instanceof String) {
+			return Strings.create((String)o).write(bb);
+		}
 
 		if (o instanceof Character) {
 			bb = bb.put(Tag.CHAR);
@@ -666,7 +668,7 @@ public class Format {
 			// Amounts use the low 4 bits of tag for a decimal scale factor
 			if ((tag & 0xF0) == Tag.AMOUNT) return (T) Amount.read(tag, bb);
 
-			if (tag == Tag.STRING) return (T) readUTF8String(bb);
+			if (tag == Tag.STRING) return (T) Strings.read(bb);
 			if (tag == Tag.BLOB) return (T) Blobs.read(bb);
 			if (tag == Tag.HASH) return (T) Hash.read(bb);
 			if (tag == Tag.SYMBOL) return (T) readSymbol(bb);

@@ -30,12 +30,12 @@ public class VectorGen extends Generator<AVector> {
 		}
 		case 1: {
 			Object o1 = gen().make(PrimitiveGen.class).generate(r, status);
-			Object o2 = gen().type(String.class).generate(r, status);
+			Object o2 = gen().make(StringGen.class).generate(r, status);
 			return Vectors.of(o1, o2);
 		}
 		case 2: {
 			Object o1 = gen().make(ValueGen.class).generate(r, status);
-			Object o2 = gen().type(String.class).generate(r, status);
+			Object o2 = gen().make(StringGen.class).generate(r, status);
 			Object o3 = gen().make(AmountGen.class).generate(r, status);
 			return Vectors.of(o1, o2, o3);
 		}

@@ -25,7 +25,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	/** Minimum size of a Keyword in UTF-16 chars representation */
 	public static final int MIN_CHARS = 1;
 
-	private Keyword(String name) {
+	private Keyword(AString name) {
 		super(name);
 	}
 
@@ -40,21 +40,33 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 			return null;
 		}
 
-		return new Keyword(name);
+		return new Keyword(Strings.create(name));
+	}
+	
+	public static Keyword create(AString name) {
+		if (name==null) throw new IllegalArgumentException("Invalid keyword name: null");
+		return create(name.toString());
 	}
 
 	/**
 	 * Creates a Keyword with the given name, throwing an exception if name is not
 	 * valid
 	 * 
-	 * @param name A String of at least 1 and no more than 64 UTF-8 bytes in length
+	 * @param aString A String of at least 1 and no more than 64 UTF-8 bytes in length
 	 * @return The new Keyword
 	 */
-	public static Keyword createChecked(String name) {
-		Keyword k = create(name);
-		if (k == null) throw new IllegalArgumentException("Invalid keyword name: " + name);
+	public static Keyword createChecked(AString aString) {
+		Keyword k = create(aString);
+		if (k == null) throw new IllegalArgumentException("Invalid keyword name: " + aString);
 		return k;
 	}
+	
+	public static Keyword createChecked(String aString) {
+		Keyword k = create(aString);
+		if (k == null) throw new IllegalArgumentException("Invalid keyword name: " + aString);
+		return k;
+	}
+
 
 	@Override
 	public boolean isCanonical() {
@@ -85,7 +97,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 
 			String name = new String(data, 2, len, StandardCharsets.UTF_8);
 			if (!validateName(name)) throw new BadFormatException("Invalid keyword name: " + name);
-			Keyword k = new Keyword(name);
+			Keyword k = create(name);
 			// re-use the created array as the Blob for this Keyword
 			k.attachEncoding(Blob.wrap(data));
 			return k;
@@ -96,13 +108,9 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		}
 	}
 
-	public String getName() {
-		return name;
-	}
-
 	@Override
 	protected Blob createEncoding() {
-		byte[] bs = name.getBytes(StandardCharsets.UTF_8);
+		byte[] bs = name.toString().getBytes(StandardCharsets.UTF_8);
 		int len = bs.length;
 		byte[] data = new byte[len + 2];
 		data[0] = Tag.KEYWORD;
@@ -166,6 +174,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		// Keywords are always embedded
 		return true;
 	}
+
 
 
 }

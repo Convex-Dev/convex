@@ -27,9 +27,9 @@ public class RTTest {
 
 	@Test
 	public void testName() {
-		assertEquals("foo", RT.name(Symbol.create("foo")));
-		assertEquals("foo", RT.name(Keyword.create("foo")));
-		assertEquals("foo", RT.name("foo"));
+		assertEquals("foo", RT.name(Symbol.create("foo")).toString());
+		assertEquals("foo", RT.name(Keyword.create("foo")).toString());
+		assertEquals("foo", RT.name("foo").toString());
 
 		assertNull(RT.name(null));
 		assertNull(RT.name(1));

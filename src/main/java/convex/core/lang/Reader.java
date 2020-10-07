@@ -29,6 +29,7 @@ import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
+import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
@@ -346,7 +347,7 @@ public class Reader extends BaseParser<Object> {
 		return Sequence(
 				'"', 
 				ZeroOrMore(Sequence(StringCharacter(), sb.append(matchOrDefault("0")))),
-				push(prepare(Utils.unescapeString(sb.get()))), '"');
+				push(prepare(Strings.create(Utils.unescapeString(sb.get())))), '"');
 	}
 
 	public Rule StringCharacter() {

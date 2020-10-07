@@ -111,7 +111,7 @@ public class GenTestCore {
 		
 		Blob b=a.toBlob();
 		assertEquals(b,RT.blob(a));
-		assertEquals(a.toHexString(),RT.str(a));
+		assertEquals(a.toHexString(),RT.str(a).toString());
 		
 		assertEquals(a.get(13),(byte)RT.nth(a, 13));
 		assertThrows(IndexOutOfBoundsException.class,()->RT.nth(a,-1));
@@ -154,7 +154,7 @@ public class GenTestCore {
 		assertSame(a,RT.number(a));
 		
 		long v=a;
-		assertEquals(Long.toString(v),RT.str(a));
+		assertEquals(Long.toString(v),RT.str(a).toString());
 		assertEquals((byte)v,(byte)RT.toByte(a));
 		assertEquals((short)v,(short)RT.toShort(a));
 		assertEquals((char)v,(char)RT.toCharacter(a));

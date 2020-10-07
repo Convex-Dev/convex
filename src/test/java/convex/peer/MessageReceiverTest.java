@@ -9,6 +9,7 @@ import java.util.ArrayList;
 
 import org.junit.Test;
 
+import convex.core.data.StringShort;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.Stores;
 import convex.core.util.MemoryByteChannel;
@@ -29,7 +30,7 @@ public class MessageReceiverTest {
 		MemoryByteChannel chan = MemoryByteChannel.create(10000);
 		Connection pc = Connection.create(chan, null,Stores.current());
 
-		Object msg1 = "Hello World!";
+		Object msg1 = StringShort.create("Hello World!");
 		assertTrue(pc.sendData(msg1));
 		Object msg2 = 13;
 		assertTrue(pc.sendData(msg2));

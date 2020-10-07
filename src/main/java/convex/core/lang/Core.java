@@ -19,6 +19,7 @@ import convex.core.data.AList;
 import convex.core.data.AMap;
 import convex.core.data.ASequence;
 import convex.core.data.ASet;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
@@ -187,25 +188,25 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<String> STR = reg(new CoreFn<>(Symbols.STR) {
+	public static final CoreFn<AString> STR = reg(new CoreFn<>(Symbols.STR) {
 		@Override
-		public <I> Context<String> invoke(Context<I> context, Object[] args) {
+		public <I> Context<AString> invoke(Context<I> context, Object[] args) {
 			// TODO: pre-check juice? String rendering definitions?
-			String result = RT.str(args);
+			AString result = RT.str(args);
 			long juice = Juice.STR + result.length() * Juice.STR_PER_CHAR;
 			return context.withResult(juice, result);
 		}
 	});
 
-	public static final CoreFn<String> NAME = reg(new CoreFn<>(Symbols.NAME) {
+	public static final CoreFn<AString> NAME = reg(new CoreFn<>(Symbols.NAME) {
 		@Override
-		public <I> Context<String> invoke(Context<I> context, Object[] args) {
+		public <I> Context<AString> invoke(Context<I> context, Object[] args) {
 			// Arity 1
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			// Check can get as a String name
 			Object named = args[0];
-			String result = RT.getName(named);
+			AString result = RT.getName(named);
 			if (result == null) return context.withCastError(named, String.class);
 
 			long juice = Juice.SIMPLE_FN;
@@ -220,7 +221,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			// Check argument is valid name
-			String name = RT.name(args[0]);
+			AString name = RT.name(args[0]);
 			if (name == null) return context.withCastError(args[0], Keyword.class);
 
 			// Check name converts to Keyword 
@@ -623,7 +624,7 @@ public class Core {
 			Object o = args[0];
 			Address address = RT.address(o);
 			if (address == null) {
-				if (o instanceof String) return context.withArgumentError("String not convertible to a valid Address: " + o);
+				if (o instanceof AString) return context.withArgumentError("String not convertible to a valid Address: " + o);
 				if (o instanceof ABlob) return context.withArgumentError("Blob not convertiable a valid Address: " + o);
 				return context.withCastError(o, Address.class);
 			}
@@ -1828,7 +1829,7 @@ public class Core {
 	public static final CorePred STR_Q = reg(new CorePred(Symbols.STR_Q) {
 		@Override
 		public boolean test(Object val) {
-			return val instanceof String;
+			return val instanceof AString;
 		}
 	});
 

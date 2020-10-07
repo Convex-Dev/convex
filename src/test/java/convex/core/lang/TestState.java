@@ -193,6 +193,10 @@ public class TestState {
 	public static long evalL(String source) {
 		return (long) eval(source);
 	}
+	
+	public static String evalS(String source) {
+		return eval(source).toString();
+	}
 
 	@SuppressWarnings("unchecked")
 	public static <T> T eval(String source) {

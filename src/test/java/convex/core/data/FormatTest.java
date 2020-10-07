@@ -95,9 +95,9 @@ public class FormatTest {
 	}
 	
 	@Test public void testStringRegression() throws BadFormatException {
-		String s="��zI�&$\\ž1�����4�E4�a8�#?$wD(�#";
+		StringShort s=StringShort.create("��zI�&$\\ž1�����4�E4�a8�#?$wD(�#");
 		Blob b=Format.encodedBlob(s);
-		String s2=Format.read(b);
+		StringShort s2=Format.read(b);
 		assertEquals(s,s2);
 	}
 	

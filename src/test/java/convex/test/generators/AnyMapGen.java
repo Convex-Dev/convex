@@ -37,14 +37,14 @@ public class AnyMapGen extends Generator<AMap> {
 			return Samples.LONG_MAP_100;
 		case 4: {
 			Object o1 = gen().make(PrimitiveGen.class).generate(r, status);
-			Object o2 = gen().type(String.class).generate(r, status);
+			Object o2 = gen().make(StringGen.class).generate(r, status);
 			return Maps.create(o1, o2);
 		}
 		case 5:
 			return BlobMap.EMPTY;
 		case 6: {
 			ABlob o1 = Format.encodedBlob(gen().make(PrimitiveGen.class).generate(r, status));
-			Object o2 = gen().type(String.class).generate(r, status);
+			Object o2 = gen().make(StringGen.class).generate(r, status);
 			return BlobMap.create(o1, o2);
 		}
 
