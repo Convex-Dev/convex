@@ -3,7 +3,6 @@ package convex.core.data;
 import java.nio.ByteBuffer;
 
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.TODOException;
 
 public class Strings {
 
@@ -25,7 +24,7 @@ public class Strings {
 		if (length<=StringShort.MAX_LENGTH) {
 			return StringShort.read((int)length,bb);
 		}
-		throw new BadFormatException("String too long to read");
+		return StringTree.read((int)length,bb);
 	}
 
 	public static AString create(String s) {
@@ -34,7 +33,7 @@ public class Strings {
 		if (len<=StringShort.MAX_LENGTH) {
 			return StringShort.create(s);
 		}
-		throw new TODOException("Can't build long strings yet");
+		return StringTree.create(s);
 	}
 
 	public static AString empty() {

@@ -49,7 +49,7 @@ public class StringShort extends AString {
 	}
 
 	@Override
-	public CharSequence subSequence(int start, int end) {
+	public StringShort subSequence(int start, int end) {
 		if ((start<0)||(end>length)) throw new IndexOutOfBoundsException("Out of range subSerqnce "+start+","+end);
 		if (end<start) throw new IllegalArgumentException("End before start!");
 		if ((start==0)&&(end==length)) return this;

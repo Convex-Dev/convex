@@ -242,19 +242,19 @@ public class BlobTree extends ABlob {
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer b) {
+	public ByteBuffer writeRaw(ByteBuffer bb) {
+		bb = Format.writeVLCLong(bb, count);
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
-			b = children[i].writeRawHash(b);
+			bb = children[i].writeRawHash(bb);
 		}
-		return b;
+		return bb;
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer b) {
-		b = b.put(Tag.BLOB);
-		b = Format.writeVLCLong(b, count);
-		return writeRaw(b);
+	public ByteBuffer write(ByteBuffer bb) {
+		bb = bb.put(Tag.BLOB);
+		return writeRaw(bb);
 	}
 	
 	/**

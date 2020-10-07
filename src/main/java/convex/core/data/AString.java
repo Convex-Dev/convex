@@ -29,12 +29,20 @@ public abstract class AString extends ACell implements CharSequence, Comparable<
 		return length;
 	}
 	
+	@Override
+	public int compareTo(AString o) {
+		return CharSequence.compare(this,o);
+	}
+	
 	@Override 
 	public String toString() {
 		StringBuilder sb=new StringBuilder(length); 
 		print(sb);
 		return sb.toString();
 	}
+	
+	@Override
+	public abstract AString subSequence(int start, int end);
 
 
 }
