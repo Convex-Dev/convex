@@ -38,7 +38,7 @@ public class StringTree extends AString {
 	}
 	
 
-	public static AString create(String s) {
+	public static StringTree create(String s) {
 		int len=s.length();
 		if (len<StringTree.MINIMUM_LENGTH) throw new IllegalArgumentException("String too short for StringTree");
 		int shift=calcShift(len);

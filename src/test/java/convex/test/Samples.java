@@ -30,6 +30,7 @@ import convex.core.data.MapTree;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.StringShort;
+import convex.core.data.StringTree;
 import convex.core.data.VectorLeaf;
 import convex.core.data.VectorTree;
 import convex.core.data.Vectors;
@@ -100,6 +101,8 @@ public class Samples {
 
 	public static final StringShort MAX_EMBEDDED_STRING= StringShort.create("[0x1234567812345678123456781234567812345678123456781234567812345678]");
 	public static final StringShort NON_EMBEDDED_STRING= StringShort.create(MAX_EMBEDDED_STRING.toString()+" ");
+	public static final StringShort MAX_SHORT_STRING= StringShort.create(createRandomString(StringShort.MAX_LENGTH));
+	public static final StringTree MIN_TREE_STRING= StringTree.create(createRandomString(StringTree.MINIMUM_LENGTH));
 
 	
 	static {
@@ -124,6 +127,14 @@ public class Samples {
 	static Blob createTestBlob(long size) {
 		Blob b=Blob.createRandom(new Random(), size);
 		return b;
+	}
+
+	private static String createRandomString(int n) {
+		char [] cs=new char[n];
+		for (int i=0; i<n; i++) {
+			cs[i]=(char)rand.nextInt();
+		}
+		return new String(cs);
 	}
 
 	@SuppressWarnings("unchecked")
