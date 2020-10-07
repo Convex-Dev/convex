@@ -14,6 +14,8 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import convex.api.Shutdown;
+
 import convex.core.Belief;
 import convex.core.Block;
 import convex.core.BlockResult;
@@ -205,6 +207,14 @@ public class Server implements Closeable {
 			
 			updateThread=new Thread(updateLoop, "Server management loop for port: " + port);
 			updateThread.start();
+			
+			// Close server on shutdown, before Etch stores
+			Shutdown.addHook(Shutdown.SERVER, new Runnable() {
+				@Override
+				public void run() {
+					close();
+				}			
+			});
 			
 			log.log(LEVEL_SERVER, "Peer Server started with Peer Address: " + getAddress().toChecksumHex());
 		} catch (Exception e) {
