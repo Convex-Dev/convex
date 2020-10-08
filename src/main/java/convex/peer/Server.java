@@ -698,8 +698,9 @@ public class Server implements Closeable {
 			Ref<?> peerRef=Ref.createPersisted(peerData);
 			Hash peerHash=peerRef.getHash();
 			store.setRootHash(peerHash);
-		} catch (IOException e) {
-			log.severe("Failed to persist peer state when closing server");
+			log.info("Stored peer data for Server: "+peerHash.toHexString());
+		} catch (Exception e) {
+			log.severe("Failed to persist peer state when closing server: " + e.getMessage());
 			e.printStackTrace();
 		} finally {
 			Stores.setCurrent(tempStore);
