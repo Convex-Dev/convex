@@ -686,9 +686,11 @@ public class Server implements Closeable {
 	}
 	
 	/**
-	 * Writes the Peer data to the current store.
+	 * Writes the Peer data to the configured store.
+	 * 
+	 * This will overwrite the previously persisted peer state.
 	 */
-	public void writePeerData() {
+	public void persistPeerData() {
 		AStore tempStore=Stores.current();
 		try {
 			Stores.setCurrent(store);
@@ -708,7 +710,7 @@ public class Server implements Closeable {
 	public synchronized void close() {
 		// persist peer state if necessary
 		if ((peer!=null)&&RT.bool(config.get(Keywords.PERSIST))) {
-			writePeerData();
+			persistPeerData();
 		}
 		
 		running = false;
