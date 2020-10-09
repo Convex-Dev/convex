@@ -4,6 +4,8 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 
+import javax.swing.SwingUtilities;
+
 /**
  * Model for state values which may be observer / listened to.
  * 
@@ -43,7 +45,12 @@ public class StateModel<T> {
 		T oldValue = this.value;
 		if (oldValue == newValue) return;
 		this.value = newValue;
-		propertyChangeSupport.firePropertyChange(new PropertyChangeEvent(this, "value", oldValue, newValue));
+		SwingUtilities.invokeLater(new Runnable() {
+			@Override
+			public void run() {
+				propertyChangeSupport.firePropertyChange(new PropertyChangeEvent(this, "value", oldValue, newValue));
+			}			
+		});
 	}
 
 	public void addPropertyChangeListener(PropertyChangeListener listener) {

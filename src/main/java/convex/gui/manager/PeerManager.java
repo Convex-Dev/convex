@@ -170,6 +170,8 @@ public class PeerManager extends JPanel {
 		}
 	}, "GUI Manager state update thread");
 
+
+
 	@Override
 	public void finalize() {
 		// terminate the update thread

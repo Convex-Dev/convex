@@ -125,25 +125,25 @@
 		<dependency>
 			<groupId>com.pholser</groupId>
 			<artifactId>junit-quickcheck-core</artifactId>
-			<version>0.9.4</version>
+			<version>0.9.5</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.pholser</groupId>
 			<artifactId>junit-quickcheck-generators</artifactId>
-			<version>0.9.4</version>
+			<version>0.9.5</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter-engine</artifactId>
-			<version>5.6.1</version>
+			<version>5.7.0</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.junit.vintage</groupId>
 			<artifactId>junit-vintage-engine</artifactId>
-			<version>5.6.1</version>
+			<version>5.7.0</version>
 			<scope>test</scope>
 		</dependency>
 
