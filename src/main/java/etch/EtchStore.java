@@ -100,6 +100,7 @@ public class EtchStore extends AStore {
 
 	@SuppressWarnings("unchecked")
 	public <T> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus) {
+		if (ref.getStatus()>=requiredStatus) return ref;
 		final T o=ref.getValue();
 		
 		if (o instanceof ACell) {
