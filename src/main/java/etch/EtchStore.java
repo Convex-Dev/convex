@@ -100,19 +100,22 @@ public class EtchStore extends AStore {
 
 	@SuppressWarnings("unchecked")
 	public <T> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus) {
+		// first check if the Ref is already persisted to required level
 		if (ref.getStatus()>=requiredStatus) return ref;
+		
 		final T o=ref.getValue();
 		
 		if (o instanceof ACell) {
 			ACell cell=(ACell)o;
 			
-			// check store for existing ref first. Return this if we have it
+			// check store for existing ref first. 
 			boolean embedded=ref.isEmbedded();
 			Hash hash =null;
 			if (!embedded) {;
 				hash = ref.getHash();
 				Ref<T> existing = refForHash(hash);
 				if (existing != null) {
+					// Return existing ref if status is sufficient
 					if (existing.getStatus()>=requiredStatus) return existing;
 				}
 			}
@@ -124,6 +127,7 @@ public class EtchStore extends AStore {
 				};
 			
 				// need to do recursive persistence
+				// TODO: maybe switch to a queue? Mitigate risk of stack overflow?
 				ACell newObject = ((ACell) o).updateRefs(func);
 		
 				// perhaps need to update Ref 
@@ -136,11 +140,11 @@ public class EtchStore extends AStore {
 
 				Ref<ACell> result;
 				try {
-					// ensure status is sufficient when we write to store
+					// ensure status is set when we write to store
 					ref=ref.withMinimumStatus(requiredStatus);
 					result=etch.write(hash, (Ref<ACell>) ref);
 				} catch (IOException e) {
-					throw new Error("IO exception from Etch", e);
+					throw Utils.sneakyThrow(e);
 				}
 
 				// call novelty handler if newly persisted
