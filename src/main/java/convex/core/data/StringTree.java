@@ -33,10 +33,13 @@ public class StringTree extends AString {
 		return shift;
 	}
 	
+	/**
+	 * Gets the length of each full child String
+	 * @return
+	 */
 	private final int childSize() {
 		return 1<<shift;
 	}
-	
 
 	public static StringTree create(String s) {
 		int len=s.length();
@@ -58,8 +61,9 @@ public class StringTree extends AString {
 
 	@Override
 	public char charAt(int index) {
-		int ci=index<<shift;
-		return children[ci].getValue().charAt(index-ci*childSize());
+		int ci=index>>shift;
+		int cix=index-ci*childSize();
+		return children[ci].getValue().charAt(cix);
 	}
 
 	@Override
@@ -115,6 +119,33 @@ public class StringTree extends AString {
 	@Override
 	public int getRefCount() {
 		return children.length;
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public <R> Ref<R> getRef(int i) {
+		int ic = children.length;
+		if (i < 0) throw new IndexOutOfBoundsException("Negative Ref index: " + i);
+		if (i < ic) return (Ref<R>) children[i];
+		throw new IndexOutOfBoundsException("Ref index out of range: " + i);
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public StringTree updateRefs(IRefFunction func) {
+		int ic = children.length;
+		Ref<AString>[] newChildren = children;
+		for (int i = 0; i < ic; i++) {
+			Ref<AString> current = children[i];
+			Ref<AString> newChild = (Ref<AString>) func.apply(current);
+			
+			if (newChild!=current) {
+				if (children==newChildren) newChildren=children.clone();
+				newChildren[i] = newChild;
+			}
+		}
+		if (newChildren==children) return this; // no change, safe to return this
+		return new StringTree(length,newChildren);
 	}
 
 
