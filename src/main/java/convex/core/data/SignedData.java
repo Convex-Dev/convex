@@ -136,17 +136,17 @@ public class SignedData<T> extends ACell {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer b) {
-		b = b.put(Tag.SIGNED_DATA);
-		return writeRaw(b);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.SIGNED_DATA;
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer b) {
-		b = address.writeRaw(b);
-		b = signature.writeRaw(b);
-		b = valueRef.write(b);
-		return b;
+	public int writeRaw(byte[] bs, int pos) {
+		pos = address.writeRaw(bs,pos);
+		pos = signature.writeRaw(bs,pos);
+		pos = valueRef.write(bs,pos);
+		return pos;
 	}
 
 	/**

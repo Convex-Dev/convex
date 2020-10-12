@@ -226,10 +226,9 @@ public class Address extends AArrayBlob {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer b) {
-		b = b.put(Tag.ADDRESS);
-		b = b.put(store, offset, LENGTH);
-		return b;
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.ADDRESS;
+		return writeRaw(bs,pos);
 	}
 
 	@Override

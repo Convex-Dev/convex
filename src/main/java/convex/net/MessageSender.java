@@ -28,7 +28,7 @@ public class MessageSender {
 	 * Buffers a message for sending.
 	 * 
 	 * @param src
-	 * @return True if successfully buffered, false otherwise (insufficient buffer
+	 * @return True if successfully buffered, false otherwise (insufficient send buffer
 	 *         size)
 	 */
 	public boolean bufferMessage(ByteBuffer src) {

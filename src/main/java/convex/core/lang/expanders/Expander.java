@@ -1,7 +1,5 @@
 package convex.core.lang.expanders;
 
-import java.nio.ByteBuffer;
-
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Syntax;
@@ -77,14 +75,14 @@ public class Expander extends AExpander {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb.put(Tag.EXPANDER);
-		return writeRaw(bb);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.EXPANDER;
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		return fn.write(bb);
+	public int writeRaw(byte[] bs, int pos) {
+		return fn.write(bs,pos);
 	}
 
 	@Override

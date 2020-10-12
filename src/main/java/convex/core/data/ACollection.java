@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -16,7 +15,7 @@ import convex.core.util.Errors;
 public abstract class ACollection<T> extends ADataStructure<T> implements Collection<T> {
 
 	@Override
-	public abstract ByteBuffer write(ByteBuffer b);
+	public abstract int write(byte[] bs, int pos);
 
 	@Override
 	public abstract boolean contains(Object o);

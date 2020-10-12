@@ -79,15 +79,15 @@ public class MultiFn<T> extends AFn<T> {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb.put(Tag.FN_MULTI);
-		return writeRaw(bb);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.FN_MULTI;
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		fns.write(bb);
-		return bb;
+	public int writeRaw(byte[] bs, int pos) {
+		pos = fns.write(bs,pos);
+		return pos;
 	}
 	
 	public static <T> MultiFn<T> read(ByteBuffer bb) throws BadFormatException, BufferUnderflowException {

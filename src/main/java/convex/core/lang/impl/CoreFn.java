@@ -1,7 +1,5 @@
 package convex.core.lang.impl;
 
-import java.nio.ByteBuffer;
-
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
@@ -79,15 +77,15 @@ public abstract class CoreFn<T> extends AFn<T> implements ICoreDef {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer b) {
-		b = b.put(Tag.CORE_DEF);
-		return writeRaw(b);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.CORE_DEF;
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer b) {
-		b = symbol.writeRaw(b);
-		return b;
+	public int writeRaw(byte[] bs, int pos) {
+		pos = symbol.writeRaw(bs,pos);
+		return pos;
 	}
 	
 	@Override

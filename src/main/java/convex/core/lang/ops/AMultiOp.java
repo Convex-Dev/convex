@@ -1,7 +1,5 @@
 package convex.core.lang.ops;
 
-import java.nio.ByteBuffer;
-
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Format;
@@ -33,9 +31,9 @@ public abstract class AMultiOp<T> extends AOp<T> {
 	protected abstract AMultiOp<T> recreate(ASequence<AOp<?>> newOps);
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb = Format.write(bb, ops);
-		return bb;
+	public int writeRaw(byte[] bs, int pos) {
+		pos = Format.write(bs,pos, ops);
+		return pos;
 	}
 
 	@Override

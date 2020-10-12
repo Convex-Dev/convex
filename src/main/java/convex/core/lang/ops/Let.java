@@ -190,9 +190,9 @@ public class Let<T> extends AMultiOp<T> {
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb = Format.write(bb, symbols);
-		return super.writeRaw(bb);
+	public int writeRaw(byte[] bs, int pos) {
+		pos = Format.write(bs,pos, symbols);
+		return super.writeRaw(bs,pos); // AMultiOp superclass writeRaw
 	}
 
 	public static <T> Let<T> read(ByteBuffer b) throws BadFormatException {

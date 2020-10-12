@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
@@ -123,7 +122,7 @@ public abstract class AMapEntry<K, V> extends AVector<Object> implements List<Ob
 	}
 
 	@Override
-	public abstract ByteBuffer write(ByteBuffer b);
+	public abstract int write(byte[] bs, int pos);
 
 	@Override
 	public long count() {

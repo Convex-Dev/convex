@@ -75,10 +75,10 @@ public class Lookup<T> extends AOp<T> {
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb= Format.write(bb, symbol);
-		bb= Format.write(bb, address);
-		return bb;
+	public int writeRaw(byte[] bs, int pos) {
+		pos= symbol.write(bs, pos);
+		pos= Format.write(bs,pos, address); // might be null
+		return pos;
 	}
 
 	public static <T> Lookup<T> read(ByteBuffer bb) throws BadFormatException {

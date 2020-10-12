@@ -93,15 +93,24 @@ public class RefDirect<T> extends Ref<T> {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer b) {
+	public int write(byte[] bs, int pos) {
 		if (isEmbedded()) {
 			// embedded, so write embedded representation directly instead of Ref
-			b = Format.write(b, value);
+			return  Format.write(bs,pos, value);
 		} else {
-			b = b.put(Tag.REF);
-			writeRawHash(b);
+			bs[pos++]=Tag.REF;;
+			return writeRawHash(bs,pos);
 		}
-		return b;
+	}
+	
+	@Override
+	public ByteBuffer write(ByteBuffer bb) {
+		if (isEmbedded()) {
+			return Format.write(bb, value);
+		} else {
+			bb=bb.put(Tag.REF);
+			return getHash().writeToBuffer(bb);
+		}
 	}
 
 	@Override
@@ -138,5 +147,13 @@ public class RefDirect<T> extends Ref<T> {
 		if (newValue!=value) return new RefDirect<T>(newValue,hash,status);
 		return this;
 	}
+
+	@Override
+	public int estimatedEncodingSize() {
+		// TODO improve estimate?
+		return 64;
+	}
+
+
 
 }

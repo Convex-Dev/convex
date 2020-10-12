@@ -44,5 +44,9 @@ public abstract class AString extends ACell implements CharSequence, Comparable<
 	@Override
 	public abstract AString subSequence(int start, int end);
 
-
+	@Override
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.STRING;
+		return writeRaw(bs,pos);
+	}
 }

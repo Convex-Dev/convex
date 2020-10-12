@@ -1,7 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
-
 import convex.core.exceptions.InvalidDataException;
 
 /**
@@ -50,12 +48,12 @@ public class StringSlice extends AString {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
+	public int write(byte[] bs, int pos) {
 		throw new UnsupportedOperationException("");
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
+	public int writeRaw(byte[] bs, int pos) {
 		throw new UnsupportedOperationException("");
 	}
 

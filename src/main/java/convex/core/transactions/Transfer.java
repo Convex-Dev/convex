@@ -35,17 +35,17 @@ public class Transfer extends ATransaction {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer b) {
-		b = b.put(Tag.TRANSFER);
-		return writeRaw(b);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.TRANSFER;
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer b) {
-		b = super.writeRaw(b); // nonce, address
-		b = target.writeRaw(b);
-		b = Format.write(b, amount);
-		return b;
+	public int writeRaw(byte[] bs, int pos) {
+		pos = super.writeRaw(bs,pos); // nonce, address
+		pos = target.writeRaw(bs,pos);
+		pos = Format.write(bs,pos, amount);
+		return pos;
 	}
 
 	/**

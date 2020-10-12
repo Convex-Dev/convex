@@ -76,19 +76,19 @@ public class Call extends ATransaction {
 	}
 	
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb = bb.put(Tag.CALL);
-		return writeRaw(bb);
+	public int write(byte[] bs, int pos) {
+		bs[pos++] = Tag.CALL;
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb = super.writeRaw(bb); // sequence
-		bb = Format.write(bb, target);
-		bb=Format.writeVLCLong(bb, offer);
-		bb=Format.write(bb, functionName);
-		bb=Format.write(bb, args);
-		return bb;
+	public int writeRaw(byte[] bs, int pos) {
+		pos = super.writeRaw(bs,pos); // sequence
+		pos = Format.write(bs,pos, target);
+		pos=Format.writeVLCLong(bs,pos, offer);
+		pos=Format.write(bs,pos, functionName);
+		pos=Format.write(bs,pos, args);
+		return pos;
 	}
 	
 	public static ATransaction read(ByteBuffer bb) throws BadFormatException {

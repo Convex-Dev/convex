@@ -221,13 +221,12 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	public abstract boolean equals(ABlob a);
 
 	/**
-	 * Writes the byte contents of this data object to a ByteBuffer.
+	 * Writes the raw byte contents of this blob to a ByteBuffer.
 	 * 
 	 * @param b
 	 * @return The passed ByteBuffer, after writing byte content
 	 */
-	@Override
-	public abstract ByteBuffer writeRaw(ByteBuffer bb);
+	public abstract ByteBuffer writeToBuffer(ByteBuffer bb);
 
 	/**
 	 * Gets a chunk of this Blob, as a canonical Blob up to the maximum chunk size

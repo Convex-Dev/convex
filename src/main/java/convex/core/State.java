@@ -114,19 +114,19 @@ public class State extends ARecord {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb = bb.put(Tag.STATE);
-		return writeRaw(bb);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=getRecordTag();
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb = accounts.write(bb);
-		bb = peers.write(bb);
-		bb = store.write(bb);
-		bb = globals.write(bb);
-		bb = schedule.write(bb);
-		return bb;
+	public int writeRaw(byte[] bs, int pos) {
+		pos = accounts.write(bs,pos);
+		pos = peers.write(bs,pos);
+		pos = store.write(bs,pos);
+		pos = globals.write(bs,pos);
+		pos = schedule.write(bs,pos);
+		return pos;
 	}
 
 	/**
@@ -451,7 +451,7 @@ public class State extends ARecord {
 	 * @return The AccountStatus for the given account, or null.
 	 */
 	public AccountStatus getAccount(Address target) {
-		return getAccounts().get(target);
+		return accounts.get(target);
 	}
 
 	/**

@@ -70,7 +70,7 @@ public class GenTestAnyValue {
 			// break all the refs! This should still pass validateCell(), since it woun't change structure.
 			ACell c=((ACell)o).updateRefs(r->{
 				byte[] badBytes=r.getHash().getBytes();
-				Utils.writeInt(12255, badBytes, 28);
+				Utils.writeInt(badBytes, 28,12255);
 				Hash badHash=Hash.wrap(badBytes);
 				return Ref.forHash(badHash);
 			});

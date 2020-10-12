@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -45,12 +44,12 @@ public abstract class ARecord extends AMap<Keyword,Object> {
 	 * @param b ByteBuffer to write to
 	 */
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer b) {
+	public int writeRaw(byte[] bs, int pos) {
 		List<Keyword> keys=getKeys();
 		for (Keyword key: keys) {
-			b=Format.write(b, get(key));
+			pos=Format.write(bs,pos, (Object)get(key));
 		}
-		return b;
+		return pos;
 	}
 	
 	@Override

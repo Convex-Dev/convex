@@ -400,22 +400,23 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb = bb.put(Tag.MAP);
-		return writeRaw(bb);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.MAP;
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
+	public int writeRaw(byte[] bs, int pos) {
 		int ilength = children.length;
-		bb = Format.writeVLCLong(bb, count);
-		bb = bb.put((byte) shift);
-		bb = bb.putShort(mask);
+		pos = Format.writeVLCLong(bs,pos, count);
+		
+		bs[pos++] = (byte) shift;
+		pos = Utils.writeShort(bs, pos,mask);
 
 		for (int i = 0; i < ilength; i++) {
-			bb = children[i].write(bb);
+			pos = children[i].write(bs,pos);
 		}
-		return bb;
+		return pos;
 	}
 
 	@Override

@@ -1,6 +1,6 @@
 package convex.core.lang;
 
-import java.nio.ByteBuffer;
+import java.util.concurrent.ExecutionException;
 
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -52,21 +52,22 @@ public abstract class AOp<T> extends ACell {
 	public abstract byte opCode();
 
 	@Override
-	public final ByteBuffer write(ByteBuffer b) {
-		b = b.put(Tag.OP);
-		b = b.put(opCode());
-		return writeRaw(b);
+	public final int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.OP;
+		bs[pos++]=opCode();
+		return writeRaw(bs,pos);
 	}
 
 	/**
 	 * Writes the raw data for this Op to the specified bytebuffer. Assumes Op tag
 	 * and opcode already written.
 	 * 
-	 * @param b ByteBuffer to write to
-	 * @return The updated ByteBuffer
+	 * @param bs Byte array to write to
+	 * @param pos Position to write in byte array
+	 * @return The updated position
 	 */
 	@Override
-	public abstract ByteBuffer writeRaw(ByteBuffer b);
+	public abstract int writeRaw(byte[] bs, int pos);
 
 	/**
 	 * Specialise this Op with a given set of bindings. Specialisation replaces

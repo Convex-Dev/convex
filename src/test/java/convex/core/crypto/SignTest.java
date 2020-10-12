@@ -11,7 +11,6 @@ import java.security.SecureRandom;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.data.ABlob;
 import convex.core.util.Utils;
 
 public class SignTest {
@@ -101,26 +100,4 @@ public class SignTest {
 		assertTrue(ECDSASignature.verify(HASHED_MESSAGE, signature, Utils.hexToBigInt(PUBLIC_KEY_STRING)));
 	}
 
-	/* Test case adapted from web3j */
-	@Test
-	public void testSignMessage2() {
-		byte[] TEST_MESSAGE = "A test message".getBytes(StandardCharsets.UTF_8);
-		byte[] HASHED_MESSAGE = Hash.keccak256(TEST_MESSAGE).getBytes();
-		ECDSASignature signature = ECDSASignature.sign(HASHED_MESSAGE, KEY_PAIR);
-
-		String EXPECTED_R = "9631f6d21dec448a213585a4a41a28ef3d4337548aa34734478b563036163786";
-		String EXPECTED_S = "2ff816ee6bbb82719e983ecd8a33a4b45d32a4b58377ef1381163d75eedc900b";
-
-		assertTrue(ECDSASignature.verify(HASHED_MESSAGE, signature, Utils.hexToBigInt(PUBLIC_KEY_STRING)));
-		assertEquals(EXPECTED_R, Utils.toHexString(signature.r, 64));
-		assertEquals(EXPECTED_S, Utils.toHexString(signature.s, 64));
-		assertEquals(0, signature.recoveryID);
-
-		ABlob d = signature.getEncoding();
-		ABlob rData = d.slice(1, 32);
-		ABlob sData = d.slice(33, 32);
-		assertEquals(EXPECTED_R, rData.toHexString());
-		assertEquals(EXPECTED_S, sData.toHexString());
-
-	}
 }

@@ -111,10 +111,10 @@ public class Lambda<T> extends AOp<Fn<T>> {
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer b) {
-		b=Format.write(b, params);
-		b=body.write(b);
-		return b;
+	public int writeRaw(byte[] bs, int pos) {
+		pos=params.write(bs, pos);
+		pos=body.write(bs,pos);
+		return pos;
 	}
 	
 	public static <T> Lambda<T> read(ByteBuffer b) throws BadFormatException {

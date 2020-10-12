@@ -230,15 +230,15 @@ public class List<T> extends AList<T> {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb = bb.put(Tag.LIST);
-		return writeRaw(bb);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.LIST;
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb = data.writeRaw(bb);
-		return bb;
+	public int writeRaw(byte[] bs, int pos) {
+		pos = data.writeRaw(bs,pos);
+		return pos;
 	}
 	
 	/**

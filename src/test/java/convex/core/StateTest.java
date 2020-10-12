@@ -1,6 +1,7 @@
 package convex.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
@@ -56,5 +57,8 @@ public class StateTest {
 		Blob b = Format.encodedBlob(s);
 		State s2 = Format.read(b);
 		assertEquals(s, s2);
+		
+		AccountStatus as=s2.getAccount(Init.HERO);
+		assertNotNull(as);
 	}
 }

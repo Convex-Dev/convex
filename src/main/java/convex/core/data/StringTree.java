@@ -74,20 +74,13 @@ public class StringTree extends AString {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb.put(Tag.STRING);
-		return writeRaw(bb);
-	}
-
-	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb=Format.writeVLCLong(bb, length);
+	public int writeRaw(byte[] bs, int pos) {
+		pos=Format.writeVLCLong(bs,pos, length);
 		int n=children.length;
 		for (int i=0; i<n; i++) {
-			bb = children[i].writeRawHash(bb);
+			pos = children[i].writeRawHash(bs,pos);
 		}
-
-		return bb;
+		return pos;
 	}
 	
 	@SuppressWarnings("unchecked")

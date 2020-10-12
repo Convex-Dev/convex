@@ -1,7 +1,5 @@
 package convex.core.transactions;
 
-import java.nio.ByteBuffer;
-
 import convex.core.data.ACell;
 import convex.core.data.Format;
 import convex.core.lang.Context;
@@ -25,21 +23,21 @@ public abstract class ATransaction extends ACell {
 	}
 
 	/**
-	 * Writes this transaction to a bytebuffer, including the message tag
+	 * Writes this transaction to a byte array, including the message tag
 	 */
 	@Override
-	public abstract ByteBuffer write(ByteBuffer bb);
+	public abstract int write(byte[] bs, int pos);
 
 	/**
-	 * Writes this transaction to a ByteBuffer, excluding the message tag
+	 * Writes this transaction to a byte array, excluding the message tag
 	 * 
 	 * @param bb
 	 * @return Same ByteBuffer after writing
 	 */
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb = Format.writeVLCLong(bb, sequence);
-		return bb;
+	public int writeRaw(byte[] bs, int pos) {
+		pos = Format.writeVLCLong(bs,pos, sequence);
+		return pos;
 	}
 
 	@Override

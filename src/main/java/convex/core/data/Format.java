@@ -8,6 +8,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CodingErrorAction;
 
 import convex.core.Belief;
@@ -97,6 +98,33 @@ public class Format {
 		}
 		byte end = (byte) (x & 0x7F); // last 7 bits of long, high bit zero
 		return bb.put(end);
+	}
+	
+	/**
+	 * Puts a variable length integer into the specified byte array (with no tag)
+	 * 
+	 * Format: - MSB of each byte 0=last octet, 1=more octets - Second highest bit
+	 * of first byte = sign - 6 or 7 bits of integer representation for each octet
+	 * 
+	 * @return - end position in byte array after writing VLC long
+	 */
+	public static int writeVLCLong(byte[] bs, int pos, long x) {
+		if ((x < 64) && (x >= -64)) {
+			// single byte, cleared high bit
+			byte single = (byte) (x & 0x7F);
+			bs[pos++]=single;
+			return pos;
+		}
+		
+		int bitLength = Utils.bitLength(x);
+		int blen = (bitLength + 6) / 7;
+		for (int i = blen - 1; i >= 1; i--) {
+			byte single = (byte) (0x80 | (x >> (7 * i))); // 7 bits with high bit set
+			bs[pos++]=single;
+		}
+		byte end = (byte) (x & 0x7F); // last 7 bits of long, high bit zero
+		bs[pos++]=end;
+		return pos;
 	}
 
 	/**
@@ -309,6 +337,87 @@ public class Format {
 		}
 		return writeNonCell(bb,o);
 	}
+	
+	/**
+	 * Writes a canonical object to a byte array, preceded by the appropriate tag
+	 * 
+	 * @param o Object value to write
+	 * @return The ByteBuffer after writing the specified object
+	 */
+	public static int write(byte[] bs, int pos, Object o) {
+		// Generic handling for all custom writeable types
+		// includes all AData instances (addresses, Symbols, Amounts, hashes etc.)
+		if (o instanceof ACell) {
+			return ((ACell) o).write(bs,pos);
+		}
+		return writeNonCell(bs,pos,o);
+	}
+	
+	/**
+	 * Writes a canonical object to a byte array, preceded by the appropriate tag
+	 * 
+	 * @param o Object value to write (may be null)
+	 * @return The ByteBuffer after writing the specified object
+	 */
+	public static int write(byte[] bs, int pos, ACell o) {
+		if (o==null) {
+			bs[pos++]=Tag.NULL;
+			return pos;
+		}
+		return ((ACell) o).write(bs,pos);
+	}
+	
+	public static int writeNonCell(byte[] bs, int pos, Object o) {
+		if (o == null) {
+			bs[pos++]=Tag.NULL;
+			return pos;
+		}
+		if (o instanceof Number) {
+			if (o instanceof Byte) {
+				bs[pos++]=Tag.BYTE;
+				bs[pos++]=(byte)o;
+				return pos;
+			}
+			if (o instanceof Short) {
+				bs[pos++]=Tag.SHORT;
+				return writeVLCLong(bs,pos, (short) o);
+			}
+			if (o instanceof Integer) {
+				bs[pos++]=Tag.INT;
+				return writeVLCLong(bs,pos, (int) o);
+			}
+			if (o instanceof Long) {
+				bs[pos++]=Tag.LONG;
+				return writeVLCLong(bs,pos, (long) o);
+			}
+			if (o instanceof Float) {
+				bs[pos++]=Tag.FLOAT;
+				int floatBits=Float.floatToRawIntBits((float)o);
+				return Utils.writeInt(bs,pos,floatBits);
+			}
+			if (o instanceof Double) {
+				bs[pos++]=Tag.DOUBLE;
+				long doubleBits=Double.doubleToRawLongBits((double)o);
+				return Utils.writeLong(bs,pos,doubleBits);
+			}
+			throw new IllegalArgumentException("Can't encode numeric type to byte array: " + o.getClass());
+		}
+
+		//if (o instanceof String) {
+		//	return Strings.create((String)o).write(bb);
+		//}
+
+		if (o instanceof Character) {
+			bs[pos++]=Tag.CHAR;
+			return Utils.writeChar(bs,pos,((char)o));
+		}
+		if (o instanceof Boolean) {
+			bs[pos++]=(((boolean) o) ? Tag.TRUE : Tag.FALSE);
+			return pos;
+		}
+
+		throw new IllegalArgumentException("Can't encode to ByteBuffer: " + o.getClass());
+	}
 
 	public static ByteBuffer writeNonCell(ByteBuffer bb, Object o) {
 		if (o == null) {
@@ -399,12 +508,43 @@ public class Format {
 		}
 		return bb;
 	}
+	
+	/**
+	 * Writes a raw string without tag to the byte array. Includes length in bytes
+	 * of UTF-8 representation
+	 * 
+	 * @param bb
+	 * @param s
+	 * @return ByteBuffer after writing
+	 */
+	public static int writeRawUTF8String(byte[] bs, int pos, String s) {
+		if (s.length() == 0) {
+			// zero length, no string bytes
+			return writeVLCLong(bs,pos,0);
+		} 
+		
+		byte[] sBytes = Utils.toByteArray(s);
+		int n=sBytes.length;
+		pos = writeVLCLong(bs,pos, sBytes.length);
+		System.arraycopy(sBytes, 0, bs, pos, n);
+		return pos+n;
+	}
 
-	private static Charset CHARSET = Charset.forName("UTF-8");
-	private static ThreadLocal<CharsetDecoder> STRING_DECODER = new ThreadLocal<CharsetDecoder>() {
+	public static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
+	public static final ThreadLocal<CharsetDecoder> UTF8_DECODERS = new ThreadLocal<CharsetDecoder>() {
 		@Override
 		protected CharsetDecoder initialValue() {
-			CharsetDecoder dec = CHARSET.newDecoder();
+			CharsetDecoder dec = UTF8_CHARSET.newDecoder();
+			dec.onUnmappableCharacter(CodingErrorAction.REPORT);
+			dec.onMalformedInput(CodingErrorAction.REPORT);
+			return dec;
+		}
+	};
+	
+	public static final ThreadLocal<CharsetEncoder> UTF8_ENCODERS = new ThreadLocal<CharsetEncoder>() {
+		@Override
+		protected CharsetEncoder initialValue() {
+			CharsetEncoder dec = UTF8_CHARSET.newEncoder();
 			dec.onUnmappableCharacter(CodingErrorAction.REPORT);
 			dec.onMalformedInput(CodingErrorAction.REPORT);
 			return dec;
@@ -427,7 +567,7 @@ public class Format {
 			byte[] bs = new byte[len];
 			bb.get(bs);
 
-			String s = STRING_DECODER.get().decode(ByteBuffer.wrap(bs)).toString();
+			String s = UTF8_DECODERS.get().decode(ByteBuffer.wrap(bs)).toString();
 			return s;
 			// return new String(bs, StandardCharsets.UTF_8);
 		} catch (BufferUnderflowException e) {
@@ -512,6 +652,8 @@ public class Format {
 		if (tag == Tag.MAP) return (T) Maps.read(bb);
 		if (tag == Tag.MAP_ENTRY) return (T) MapEntry.read(bb);
 
+		if (tag == Tag.SYNTAX) return (T) Syntax.read(bb);
+		
 		if (tag == Tag.SET) return (T) Set.read(bb);
 
 		if (tag == Tag.LIST) return (T) List.read(bb);
@@ -670,10 +812,10 @@ public class Format {
 
 			if (tag == Tag.STRING) return (T) Strings.read(bb);
 			if (tag == Tag.BLOB) return (T) Blobs.read(bb);
-			if (tag == Tag.HASH) return (T) Hash.read(bb);
 			if (tag == Tag.SYMBOL) return (T) readSymbol(bb);
 			if (tag == Tag.KEYWORD) return (T) Keyword.read(bb);
-			if (tag == Tag.SYNTAX) return (T) Syntax.read(bb);
+			
+			if (tag == Tag.HASH) return (T) Hash.read(bb);
 
 			if (tag == Tag.TRUE) return (T) Boolean.TRUE;
 			if (tag == Tag.FALSE) return (T) Boolean.FALSE;
@@ -682,7 +824,7 @@ public class Format {
 			if (tag == Tag.SIGNED_DATA) return (T) SignedData.read(bb);
 
 			// need to product compound objects since they may get ClassCastExceptions
-			// if the data format is cu=orrupted while reading child objects
+			// if the data format is corrupted while reading child objects
 			if ((tag & 0xF0) == 0x80) return readDataStructure(bb, tag);
 
 			if ((tag & 0xF0) == 0xA0) return (T) readRecord(bb, tag);
@@ -848,8 +990,8 @@ public class Format {
 	 * 
 	 * @param bb
 	 * @param prefix
-	 * @param depth
-	 * @param prefixLength
+	 * @param start
+	 * @param length
 	 * @return ByteBuffer after writing
 	 */
 	public static ByteBuffer writeHexDigits(ByteBuffer bb, ABlob src, long start, long length) {
@@ -862,6 +1004,28 @@ public class Format {
 		}
 		bb = bb.put(bs);
 		return bb;
+	}
+	
+	/**
+	 * Writes hex digits from digit position start, total length
+	 * 
+	 * @param bs Byte array
+	 * @param pos Position to write into byte array
+	 * @param src Source Blob for hex digits
+	 * @param start
+	 * @param length
+	 * @return position after writing
+	 */
+	public static int  writeHexDigits(byte[] bs, int pos, ABlob src, long start, long length) {
+		pos = Format.writeVLCLong(bs,pos, start);
+		pos = Format.writeVLCLong(bs,pos, length);
+		int nBytes = Utils.checkedInt((length + 1) >> 1);
+		byte[] bs2 = new byte[nBytes];
+		for (int i = 0; i < length; i++) {
+			Utils.setBits(bs2, 4, 4 * ((nBytes * 2) - i - 1), src.getHexDigit(start + i));
+		}
+		System.arraycopy(bs2, 0, bs, pos, nBytes);
+		return pos+nBytes;
 	}
 
 	/**

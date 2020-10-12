@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 
 import convex.core.Constants;
@@ -76,28 +75,7 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 		this.encoding=data;
 	}
 	
-	/**
-	 * Creates a Blob object representing this Cell. Should be called only after
-	 * the cached blob has been checked.
-	 * 
-	 * @return
-	 */
-	protected Blob createEncoding() {
-		int capacity=estimatedEncodingSize();
-		ByteBuffer bb=ByteBuffer.allocate(capacity);
-		boolean done=false;
-		while (!done) {
-			try {
-				bb=write(bb);
-				done=true;
-			} catch (BufferOverflowException be) {
-				capacity=capacity*2+10;
-				bb=ByteBuffer.allocate(capacity);
-			}
-		}
-		bb.flip();
-		return Blob.wrap(Utils.toByteArray(bb));
-	}
+
 
 	/**
 	 * Length of binary representation of this object
@@ -174,24 +152,51 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	 * @return The passed ByteBuffer, after the representation of this object has been written.
 	 */
 	@Override
-	public abstract ByteBuffer write(ByteBuffer bb);
-
-	/**
-	 * Writes this object to a ByteBuffer excluding the message tag
-	 * 
-	 * @param bb A ByteBuffer to write this object to
-	 * @return The updated ByteBuffer
-	 */
-	public abstract ByteBuffer writeRaw(ByteBuffer bb);
+	public final ByteBuffer write(ByteBuffer bb) {
+		return getEncoding().writeToBuffer(bb);
+	}
 	
 	/**
-	 * Estimate the encoded data size for this Cell. Used for quickly sizing buffers.
-	 * Implementations should try to return a size that is likely to contain the entire object
-	 * when represented in binary format, including the tag byte.
+	 * Writes this Cell's encoding to a byte array, including a tag byte which will be written first
+	 *
+	 * @param bs A byte array to which to write the encoding
+	 * @param pos The offset into the byte array
 	 * 
-	 * @return The estimated size for the binary representation of this object.
+	 * @return New position after writing
 	 */
-	public abstract int estimatedEncodingSize();
+	public abstract int write(byte[] bs, int pos);
+	
+	/**
+	 * Writes this Cell's encoding to a byte array, excluding the tag byte
+	 *
+	 * @param bs A byte array to which to write the encoding
+	 * @param pos The offset into the byte array
+	 * @return New position after writing
+	 */
+	public abstract int writeRaw(byte[] bs, int pos);
+	
+	/**
+	 * Creates a Blob object representing this Cell. Should be called only after
+	 * the cached blob has been checked.
+	 * 
+	 * @return
+	 */
+	public final Blob createEncoding() {
+		int capacity=estimatedEncodingSize();
+		byte[] bs=new byte[capacity];
+		int pos=0;
+		boolean done=false;
+		while (!done) {
+			try {
+				pos=write(bs,pos);
+				done=true;
+			} catch (IndexOutOfBoundsException be) {
+				capacity=capacity*2+10;
+				bs=new byte[capacity];
+			}
+		}
+		return Blob.wrap(bs,0,pos);
+	}
 	
 	/**
 	 * Returns the String representation of this Cell.

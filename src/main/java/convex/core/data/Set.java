@@ -159,14 +159,14 @@ public class Set<T> extends ASet<T> {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb = bb.put(Tag.SET);
-		return writeRaw(bb);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.SET;
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		return map.write(bb);
+	public int writeRaw(byte[] bs, int pos) {
+		return map.write(bs,pos);
 	}
 
 	@SuppressWarnings("unchecked")

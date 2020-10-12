@@ -343,8 +343,10 @@ public class Convex {
 
 	public Long getBalance(Address address) throws IOException {
 		try {
-			Future<Result> result= query(Reader.read("(balance 0x"+address.toHexString()+")"));
-			Long bal= (Long) result.get(Constants.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS).getValue();
+			Future<Result> future= query(Reader.read("(balance 0x"+address.toHexString()+")"));
+			Result result=future.get(Constants.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+			if (result.isError()) throw new Error(result.toString());
+			Long bal= (Long) result.getValue();
 			return bal;
 		} catch (ExecutionException | InterruptedException | TimeoutException ex) {
 			throw new IOException("Unable to query balance",ex);

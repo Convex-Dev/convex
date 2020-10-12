@@ -193,14 +193,15 @@ public class Blob extends AArrayBlob {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
+	public int write(byte[] bs, int pos) {
 		if (length > CHUNK_LENGTH) {
-			return BlobTree.create(this).write(bb);
+			return BlobTree.create(this).write(bs,pos);
 		} else {
 			// we have a Blob of canonical size
-			bb = bb.put(Tag.BLOB);
-			bb = Format.writeVLCLong(bb, length);
-			return writeRaw(bb);
+			bs[pos++]=Tag.BLOB;
+			pos=Format.writeVLCLong(bs, pos, length);
+			pos=writeRaw(bs,pos);
+			return pos;
 		}
 	}
 

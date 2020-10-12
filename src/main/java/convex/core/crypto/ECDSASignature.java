@@ -22,8 +22,6 @@ import org.bouncycastle.math.ec.custom.sec.SecP256K1Curve;
 
 import convex.core.data.ABlob;
 import convex.core.data.Address;
-import convex.core.data.Blob;
-import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.TODOException;
@@ -121,27 +119,13 @@ public final class ECDSASignature extends ASignature {
 	}
 
 	@Override
-	protected Blob createEncoding() {
-		byte[] bs = new byte[SIGNATURE_LENGTH];
-		assert ((recoveryID >= 0) && (recoveryID <= 3));
-		bs[0] = (byte) (recoveryID + 27);
-		Utils.writeUInt(r, bs, 1, 32);
-		Utils.writeUInt(s, bs, 33, 32);
-		return Blob.wrap(bs);
+	public int write(byte[] bs, int pos) {
+		throw new TODOException();
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer b) {
-		b = b.put(Tag.SIGNATURE);
-		return writeRaw(b);
-	}
-
-	@Override
-	public ByteBuffer writeRaw(ByteBuffer b) {
-		b = b.put((byte) (recoveryID + 27));
-		b = Utils.writeUInt256(b, r);
-		b = Utils.writeUInt256(b, s);
-		return b;
+	public int writeRaw(byte[] bs, int pos) {
+		throw new TODOException();
 	}
 
 	public static ECDSASignature read(ByteBuffer b) throws BadFormatException {

@@ -38,7 +38,7 @@ public class LongBlob extends ABlob {
 
 	@Override
 	public void getBytes(byte[] dest, int destOffset) {
-		Utils.writeLong(value, dest, destOffset);
+		Utils.writeLong(dest, destOffset,value);
 	}
 
 	@Override
@@ -115,12 +115,7 @@ public class LongBlob extends ABlob {
 		return toBlob().equals(a);
 	}
 
-	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb = bb.put((byte) 8);
-		bb = bb.putLong(value);
-		return bb;
-	}
+
 
 	@Override
 	public Blob getChunk(long i) {
@@ -139,9 +134,16 @@ public class LongBlob extends ABlob {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb = bb.put(Tag.BLOB);
-		return writeRaw(bb);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.BLOB;
+		return writeRaw(bs,pos);
+	}
+	
+	@Override
+	public int writeRaw(byte[] bs, int pos) {
+		bs[pos++]=((byte) 8);
+		Utils.writeLong(bs, pos, value);
+		return pos+8;
 	}
 
 	@Override
@@ -183,6 +185,11 @@ public class LongBlob extends ABlob {
 	@Override
 	public boolean isRegularBlob() {
 		return true;
+	}
+
+	@Override
+	public ByteBuffer writeToBuffer(ByteBuffer bb) {
+		return bb.putLong(value);
 	}
 
 }

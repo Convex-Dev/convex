@@ -108,10 +108,10 @@ public class Def<T> extends AOp<T> {
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer b) {
-		b = Format.write(b, symbol);
-		b = op.write(b);
-		return b;
+	public int writeRaw(byte[] bs, int pos) {
+		pos = Format.write(bs,pos, symbol);
+		pos = op.write(bs,pos);
+		return pos;
 	}
 
 	public static <T> Def<T> read(ByteBuffer b) throws BadFormatException {

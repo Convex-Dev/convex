@@ -127,14 +127,20 @@ public class Block extends ARecord {
 	public int length() {
 		return Utils.checkedInt(transactions.count());
 	}
+	
+	@Override
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=getRecordTag();
+		// generic record writeRaw, handles all fields in declared order
+		return writeRaw(bs,pos);
+	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb = bb.put(Tag.BLOCK);
-		bb = Format.writeLong(bb, timestamp);
-		bb = transactions.write(bb);
-		bb = Format.write(bb,peerAddress);
-		return bb;
+	public int writeRaw(byte[] bs, int pos) {
+		pos = Utils.writeLong(bs,pos, timestamp);
+		pos = transactions.write(bs,pos);
+		pos = Format.write(bs,pos,peerAddress);
+		return pos;
 	}
 
 	/**

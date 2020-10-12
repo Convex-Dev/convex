@@ -117,12 +117,20 @@ public class BlockResult extends ARecord {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb=bb.put(Tag.BLOCK_RESULT);
-		bb=state.write(bb);
-		bb=results.write(bb);
-		return bb;
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=getRecordTag();
+		// generic record writeRaw, handles all fields in declared order
+		return writeRaw(bs,pos);
 	}
+	
+	@Override
+	public int writeRaw(byte[] bs, int pos) {
+		pos=state.write(bs,pos);
+		pos=results.write(bs,pos);
+		return pos;
+	}
+	
+
 
 	public static BlockResult read(ByteBuffer bb) throws BadFormatException {
 		State newState=Format.read(bb);

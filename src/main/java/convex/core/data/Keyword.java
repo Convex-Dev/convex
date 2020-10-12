@@ -2,7 +2,8 @@ package convex.core.data;
 
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -32,7 +33,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	/**
 	 * Creates a Keyword with the given name
 	 * 
-	 * @param name A String of at least 1 and no more than 64 UTF-8 bytes in length
+	 * @param name A String to use as the keyword name
 	 * @return The new Keyword, or null if the name is invalid for a Keyword
 	 */
 	public static Keyword create(String name) {
@@ -73,11 +74,6 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		return true;
 	}
 
-	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		// write contents of Blob - skipping 1 tag byte
-		return getEncoding().slice(1).writeRaw(bb);
-	}
 
 	/**
 	 * Reads a Keyword from the given ByteBuffer, assuming tag already consumed
@@ -94,8 +90,8 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 			bb.get(data, 2, len);
 			data[0] = Tag.KEYWORD;
 			data[1] = (byte) len;
-
-			String name = new String(data, 2, len, StandardCharsets.UTF_8);
+			CharBuffer cs=Format.UTF8_DECODERS.get().decode(ByteBuffer.wrap(data, 2, len));
+			String name = cs.toString();
 			if (!validateName(name)) throw new BadFormatException("Invalid keyword name: " + name);
 			Keyword k = create(name);
 			// re-use the created array as the Blob for this Keyword
@@ -105,18 +101,20 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 			throw new BadFormatException("Buffer underflow", e);
 		} catch (IllegalArgumentException e) {
 			throw new BadFormatException("Invalid keyword read", e);
+		} catch (CharacterCodingException e) {
+			throw new BadFormatException("Bad UTF8 encoding", e);
 		}
+	}
+	
+	@Override
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.KEYWORD;
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	protected Blob createEncoding() {
-		byte[] bs = name.toString().getBytes(StandardCharsets.UTF_8);
-		int len = bs.length;
-		byte[] data = new byte[len + 2];
-		data[0] = Tag.KEYWORD;
-		data[1] = (byte) len;
-		System.arraycopy(bs, 0, data, 2, len);
-		return Blob.wrap(data);
+	public int writeRaw(byte[] bs, int pos) {
+		return Format.writeRawUTF8String(bs, pos, name.toString());
 	}
 
 	@Override
@@ -130,15 +128,11 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		sb.append(name);
 	}
 
-	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		// write contents of Blob - this includes tag
-		return getEncoding().writeRaw(bb);
-	}
+
 
 	@Override
 	public int estimatedEncodingSize() {
-		return getEncoding().length;
+		return name.length*2+3;
 	}
 
 	@Override

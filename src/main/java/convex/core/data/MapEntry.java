@@ -107,19 +107,7 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 		return valueRef;
 	}
 
-	/**
-	 * Writes the raw MapEntry content. Puts the key and value Refs onto the given
-	 * ByteBuffer
-	 * 
-	 * @param bb ByteBuffer to write to
-	 * @return Updated ByteBuffer after writing
-	 */
-	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb = keyRef.write(bb);
-		bb = valueRef.write(bb);
-		return bb;
-	}
+
 
 	public static <K, V> MapEntry<K, V> read(ByteBuffer bb) throws BadFormatException {
 		Ref<K> kr = Format.readRef(bb);
@@ -228,9 +216,23 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer b) {
-		b.put(Tag.MAP_ENTRY);
-		return writeRaw(b);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.MAP_ENTRY;
+		return writeRaw(bs,pos);
+	}
+	
+	/**
+	 * Writes the raw MapEntry content. Puts the key and value Refs onto the given
+	 * ByteBuffer
+	 * 
+	 * @param bb ByteBuffer to write to
+	 * @return Updated ByteBuffer after writing
+	 */
+	@Override
+	public int writeRaw(byte[] bs, int pos) {
+		pos = keyRef.write(bs,pos);
+		pos = valueRef.write(bs,pos);
+		return pos;
 	}
 
 	@Override

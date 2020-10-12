@@ -119,16 +119,16 @@ public class Symbol extends ASymbolic {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb = bb.put(Tag.SYMBOL);
-		return writeRaw(bb);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.SYMBOL;
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb = Format.write(bb, namespace);
-		bb = Format.writeRawUTF8String(bb, name.toString());
-		return bb;
+	public int writeRaw(byte[] bs, int pos) {
+		pos = Format.write(bs,pos, namespace);
+		pos = Format.writeRawUTF8String(bs, pos, name.toString());
+		return pos;
 	}
 
 	/**

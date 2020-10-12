@@ -62,7 +62,7 @@ public class AccountsTableModel extends AbstractTableModel implements TableModel
 		case 3:
 			return as.getBalance().toFriendlyString();
 		case 4: {
-			Object o = state.getAccount(address).getHoldings().get(Init.REGISTRY_ADDRESS);
+			Object o = as.getHoldings().get(Init.REGISTRY_ADDRESS);
 			if (o == null) return "";
 			if (!(o instanceof AMap)) return "<Invalid registration, not a map!>";
 			AMap<Keyword, Object> a = (AMap<Keyword, Object>) o;

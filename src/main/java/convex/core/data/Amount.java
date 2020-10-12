@@ -107,18 +107,18 @@ public class Amount extends ACell implements Comparable<Amount> {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer b) {
+	public int write(byte[] bs, int pos) {
 		int scale = Math.min(15, trailingZeros(value));
 
-		b = b.put((byte) (Tag.AMOUNT + scale));
+		bs[pos++] =((byte)(Tag.AMOUNT + scale));
 
 		long pot = powerOf10(scale);
 		long scaledValue = value / pot;
-		return Format.writeVLCLong(b, scaledValue);
+		return Format.writeVLCLong(bs,pos, scaledValue);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer b) {
+	public int writeRaw(byte[] bs, int pos) {
 		throw new UnsupportedOperationException("Amount always requires a tag");
 	}
 

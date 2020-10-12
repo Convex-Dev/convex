@@ -91,10 +91,10 @@ public class Result extends ARecordGeneric {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb.put(Tag.RESULT);
-		bb=values.writeRaw(bb);
-		return bb;
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.RESULT;
+		pos=values.writeRaw(bs,pos);
+		return pos;
 	}
 	
 	/**

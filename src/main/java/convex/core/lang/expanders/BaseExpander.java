@@ -1,7 +1,5 @@
 package convex.core.lang.expanders;
 
-import java.nio.ByteBuffer;
-
 import convex.core.data.Syntax;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Context;
@@ -13,8 +11,14 @@ public abstract class BaseExpander extends AExpander {
 		return false;
 	}
 
+
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
+	public int write(byte[] bs, int pos) {
+		throw new UnsupportedOperationException();
+	}
+	
+	@Override
+	public int writeRaw(byte[] bs, int pos) {
 		throw new UnsupportedOperationException();
 	}
 
@@ -26,10 +30,6 @@ public abstract class BaseExpander extends AExpander {
 	@Override
 	public abstract Context<Syntax> expand(Object form, AExpander ex, Context<?> context);
 
-	@Override
-	public ByteBuffer write(ByteBuffer b) {
-		throw new UnsupportedOperationException();
-	}
 
 	@Override
 	public int estimatedEncodingSize() {

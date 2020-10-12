@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 
 import convex.core.exceptions.InvalidDataException;
+import convex.core.util.Utils;
 
 /**
  * Class representing a short CVM string.
@@ -63,21 +64,14 @@ public class StringShort extends AString {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb.put(Tag.STRING);
-		return writeRaw(bb);
-	}
-
-	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb=Format.writeVLCLong(bb, length);
+	public int writeRaw(byte[] bs, int pos) {
+		pos=Format.writeVLCLong(bs,pos, length);
 		
-		CharBuffer cb=bb.asCharBuffer();
-		cb.put(data);
-		
-		// advance bb position to match bytes written
-		bb.position(bb.position()+cb.position()*2);
-		return bb;
+		int n=data.length();
+		for (int i=0; i<n; i++) {
+			pos=Utils.writeChar(bs, pos, data.charAt(i));
+		}
+		return pos;
 	}
 
 	@Override

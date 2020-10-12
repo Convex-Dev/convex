@@ -214,13 +214,13 @@ public class VectorLeaf<T> extends AVector<T> {
 	 * 
 	 * Assumes the header byte and count is already read.
 	 * 
-	 * @param data
+	 * @param bb
 	 * @param count
 	 * @return ListVector read from ByteBuffer
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> VectorLeaf<T> read(ByteBuffer data, long count) throws BadFormatException {
+	public static <T> VectorLeaf<T> read(ByteBuffer bb, long count) throws BadFormatException {
 		if (count < 0) throw new BadFormatException("Negative length");
 		if (count == 0) return (VectorLeaf<T>) EMPTY;
 		boolean prefixPresent = count > MAX_SIZE;
@@ -233,19 +233,13 @@ public class VectorLeaf<T> extends AVector<T> {
 
 		Ref<T>[] items = (Ref<T>[]) new Ref<?>[n];
 		for (int i = 0; i < n; i++) {
-			Ref<T> ref = Format.readRef(data);
+			Ref<T> ref = Format.readRef(bb);
 			items[i] = ref;
 		}
 
 		Ref<AVector<T>> tail = null;
 		if (prefixPresent) {
-			Object o = Format.read(data);
-			if (o instanceof Ref) {
-				tail=(Ref<AVector<T>>) o;
-			} else {
-				if (!(o instanceof AVector)) throw new BadFormatException("Bad prefix format! get "+Utils.getClassName(o));
-				tail=((AVector<T>)o).getRef();
-			}
+			tail=Format.readRef(bb);
 		}
 
 		return new VectorLeaf<T>(items, tail, count);
@@ -257,27 +251,27 @@ public class VectorLeaf<T> extends AVector<T> {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb = bb.put(Tag.VECTOR);
-		return writeRaw(bb);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.VECTOR;
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
+	public int writeRaw(byte[] bs, int pos) {
 		int ilength = items.length;
-		boolean hasTail = hasPrefix();
+		boolean hasPrefix = hasPrefix();
 
 		// count field
-		bb = Format.writeVLCLong(bb, count);
+		pos = Format.writeVLCLong(bs,pos, count);
 
 		for (int i = 0; i < ilength; i++) {
-			bb = items[i].write(bb);
+			pos= items[i].write(bs,pos);
 		}
 
-		if (hasTail) {
-			bb = prefix.write(bb);
+		if (hasPrefix) {
+			pos = prefix.write(bs,pos);
 		}
-		return bb;
+		return pos;
 	}
 
 	@Override

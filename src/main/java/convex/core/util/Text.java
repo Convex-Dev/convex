@@ -52,6 +52,11 @@ public class Text {
 	public static String toFriendlyBalance(long value) {
 		return balanceFormatter.format(value);
 	}
+	
+	static DecimalFormat percentFormatter = new DecimalFormat("##.###%");
+	public static String toPercentString(double value) {
+		return percentFormatter.format(value);
+	}
 
 	public static String toFriendlyBalance(double value) {
 		return toFriendlyBalance((long) value);

@@ -122,21 +122,21 @@ public class Syntax extends ACell {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb.put(Tag.SYNTAX);
-		return writeRaw(bb);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.SYNTAX;
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		datumRef.write(bb);
+	public int writeRaw(byte[] bs, int pos) {
+		pos=datumRef.write(bs,pos);
 		// encode empty props as null for efficiency
 		if (meta.isEmpty()) {
-			bb.put(Tag.NULL);
+			bs[pos++]=Tag.NULL;
 		} else {
-			meta.write(bb);
+			pos=meta.write(bs,pos);
 		}
-		return bb;
+		return pos;
 	}
 
 	@Override

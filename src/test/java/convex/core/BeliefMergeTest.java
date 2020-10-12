@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 
-import convex.core.crypto.ECDSAKeyPair;
+import convex.core.crypto.Ed25519KeyPair;
 import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
@@ -43,7 +43,7 @@ public class BeliefMergeTest {
 	public static final int NUM_INITIAL_TRANS = 10;
 	public static final int ROUNDS = 20;
 
-	public static final ECDSAKeyPair[] KEY_PAIRS = new ECDSAKeyPair[NUM_PEERS];
+	public static final Ed25519KeyPair[] KEY_PAIRS = new Ed25519KeyPair[NUM_PEERS];
 	public static final Address[] ADDRESSES = new Address[NUM_PEERS];
 	public static final State INITIAL_STATE;
 	private static final long TEST_TIMESTAMP = Instant.parse("1977-11-13T00:30:00Z").toEpochMilli();
@@ -56,7 +56,7 @@ public class BeliefMergeTest {
 		BlobMap<Address, AccountStatus> accounts = BlobMaps.empty();
 		BlobMap<Address, PeerStatus> peers = BlobMaps.empty();
 		for (int i = 0; i < NUM_PEERS; i++) {
-			ECDSAKeyPair kp = ECDSAKeyPair.createSeeded(seed + i * 17777);
+			Ed25519KeyPair kp = Ed25519KeyPair.createSeeded(seed + i * 17777);
 			Address addr = kp.getAddress();
 			KEY_PAIRS[i] = kp;
 			ADDRESSES[i] = addr;

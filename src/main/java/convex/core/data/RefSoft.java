@@ -106,9 +106,14 @@ public class RefSoft<T> extends Ref<T> {
 
 	@Override
 	public ByteBuffer write(ByteBuffer bb) {
-		bb = bb.put(Tag.REF);
-		bb = writeRawHash(bb);
-		return bb;
+		bb=bb.put(Tag.REF);
+		return getHash().writeToBuffer(bb);
+	}
+	
+	@Override
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.REF;
+		return getHash().writeRaw(bs, pos);
 	}
 
 	@Override
@@ -151,5 +156,12 @@ public class RefSoft<T> extends Ref<T> {
 		if (softRef.get()!=newValue) return new RefSoft<T>(newValue,hash,status);
 		return this;
 	}
+
+	@Override
+	public int estimatedEncodingSize() {
+		// TODO Is this always right?
+		return Hash.LENGTH+1;
+	}
+
 
 }

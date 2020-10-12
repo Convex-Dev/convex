@@ -44,7 +44,10 @@ public class OracleTableModel extends AbstractTableModel implements TableModel {
 	@Override
 	public int getRowCount() {
 		AccountStatus as=state.getAccount(oracle);
-		
+		if (as==null) {
+			System.err.println("Missing OracleTableModel account: "+oracle);
+			return 0;
+		}
 		AMap<Object,Object> list=as.getEnvironmentValue(LIST_S); 
 		return Utils.checkedInt(list.count());
 	}

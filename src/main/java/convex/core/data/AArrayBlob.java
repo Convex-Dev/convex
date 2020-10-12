@@ -86,8 +86,14 @@ public abstract class AArrayBlob extends ABlob {
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
+	public ByteBuffer writeToBuffer(ByteBuffer bb) {
 		return bb.put(store, offset, length);
+	}
+	
+	@Override
+	public int writeRaw(byte[] bs, int pos) {
+		System.arraycopy(store, offset, bs, pos, length);
+		return pos+length;
 	}
 
 	@Override

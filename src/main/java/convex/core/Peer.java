@@ -174,7 +174,9 @@ public class Peer {
 		State state=getConsensusState();
 
 		ctx = Context.createFake(state, origin);
-		if (state.getAccount(origin)==null) return ctx.withError(ErrorCodes.NOBODY,"Account does not exist for executeQuery");
+		if (state.getAccount(origin)==null) {
+			return ctx.withError(ErrorCodes.NOBODY,"Account does not exist for executeQuery: "+origin);
+		}
 
 		Context<AOp<T>> ectx = ctx.expandCompile(form);
 		if (ectx.isExceptional()) {

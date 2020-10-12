@@ -590,7 +590,7 @@ public class Etch {
 		byte[] temp=tempArray.get();
 		Arrays.fill(temp, (byte)0x00);
 		int ix=POINTER_SIZE*(digit&0xFF);
-		Utils.writeLong(dataPointer, temp, ix); // single node
+		Utils.writeLong(temp, ix,dataPointer); // single node
 		MappedByteBuffer mbb=seekMap(position);
 		mbb.put(temp); // write full index block
 		dataLength=position+INDEX_BLOCK_SIZE;
@@ -607,7 +607,10 @@ public class Etch {
 		Counters.etchRead++;
 		
 		long pointer=seekPosition(key);
-		if (pointer<0) return null; // not found
+		if (pointer<0) {
+			Counters.etchMiss++;
+			return null; // not found
+		}
 		
 		// seek to correct position, skipping over key
 		MappedByteBuffer mbb=seekMap(pointer+KEY_SIZE); 
@@ -846,7 +849,10 @@ public class Etch {
 		
 		// append blob length
 		short length=Utils.checkedShort(encoding.length());
-		if (length==0) throw new Error("Etch trying to write zero length encoding for: "+cell);
+		if (length==0) {
+			// Blob b=cell.createEncoding();
+			throw new Error("Etch trying to write zero length encoding for: "+Utils.getClassName(cell));
+		}
 		mbb.putShort(length);
 		
 		// append blob value

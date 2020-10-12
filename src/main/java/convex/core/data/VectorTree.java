@@ -156,20 +156,20 @@ public class VectorTree<T> extends AVector<T> {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb = bb.put(Tag.VECTOR);
-		return writeRaw(bb);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.VECTOR;
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb = Format.writeVLCLong(bb, count);
+	public int writeRaw(byte[] bs, int pos) {
+		pos= Format.writeVLCLong(bs,pos, count);
 
-		int ilength = children.length;
-		for (int i = 0; i < ilength; i++) {
-			bb = children[i].write(bb);
+		int n = children.length;
+		for (int i = 0; i < n; i++) {
+			pos = children[i].write(bs,pos);
 		}
-		return bb;
+		return pos;
 	}
 
 	@Override

@@ -240,22 +240,33 @@ public class BlobTree extends ABlob {
 		}
 		return true;
 	}
+	
+	@Override
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.BLOB;
+		return writeRaw(bs,pos);
+	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb = Format.writeVLCLong(bb, count);
+	public int writeRaw(byte[] bs, int pos) {
+		pos = Format.writeVLCLong(bs,pos, count);
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
-			bb = children[i].writeRawHash(bb);
+			// TODO: embed?
+			pos = children[i].writeRawHash(bs,pos);
+		}
+		return pos;
+	}
+
+	@Override
+	public ByteBuffer writeToBuffer(ByteBuffer bb) {
+		int n = children.length;
+		for (int i = 0; i < n; i++) {
+			bb = children[i].getValue().writeToBuffer(bb);
 		}
 		return bb;
 	}
 
-	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb = bb.put(Tag.BLOB);
-		return writeRaw(bb);
-	}
 	
 	/**
 	 * Maximum byte length of an encoded BlobTree node
@@ -449,6 +460,7 @@ public class BlobTree extends ABlob {
 	public boolean isRegularBlob() {
 		return true;
 	}
+
 
 
 }

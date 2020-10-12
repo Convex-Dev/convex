@@ -1,7 +1,5 @@
 package convex.core.lang.expanders;
 
-import java.nio.ByteBuffer;
-
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Tag;
@@ -36,15 +34,16 @@ public abstract class CoreExpander extends BaseExpander implements ICoreDef {
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb = symbol.writeRaw(bb);
-		return bb;
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.CORE_DEF;
+		return writeRaw(bs,pos);
 	}
-
+	
 	@Override
-	public ByteBuffer write(ByteBuffer b) {
-		b = b.put(Tag.CORE_DEF);
-		return writeRaw(b);
+	public int writeRaw(byte[] bs, int pos) {
+		// TODO: consider more compact encoding for core functions?
+		pos = symbol.writeRaw(bs,pos);
+		return pos;
 	}
 
 	@Override

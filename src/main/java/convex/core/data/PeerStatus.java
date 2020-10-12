@@ -79,18 +79,18 @@ public class PeerStatus extends ARecord {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer b) {
-		b = b.put(Tag.PEER_STATUS);
-		return writeRaw(b);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.PEER_STATUS;
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer b) {
-		b = Format.write(b, stake);
-		b = Format.write(b, stakes);
-		b = Format.write(b, delegatedStake);
-		b = Format.write(b, getHostString());
-		return b;
+	public int writeRaw(byte[] bs, int pos) {
+		pos = Format.write(bs,pos, stake);
+		pos = Format.write(bs,pos, stakes);
+		pos = Format.write(bs,pos, delegatedStake);
+		pos = Format.write(bs,pos, getHostString());
+		return pos;
 	}
 
 	public static PeerStatus read(ByteBuffer data) throws BadFormatException {

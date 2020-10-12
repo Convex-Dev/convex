@@ -47,18 +47,22 @@ public class Order extends ACell {
 		return create(Vectors.empty(), 0, 0);
 	}
 
+	private byte getRecordTag() {
+		return Tag.ORDER;
+	}
+	
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb = bb.put(Tag.ORDER);
-		return writeRaw(bb);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=getRecordTag();
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb = blocks.write(bb);
-		bb = Format.writeVLCLong(bb, proposalPoint);
-		bb = Format.writeVLCLong(bb, consensusPoint);
-		return bb;
+	public int writeRaw(byte[] bs, int pos) {
+		pos = blocks.write(bs,pos);
+		pos = Format.writeVLCLong(bs,pos, proposalPoint);
+		pos = Format.writeVLCLong(bs,pos, consensusPoint);
+		return pos;
 	}
 
 	public static Order read(ByteBuffer bb) throws BadFormatException {

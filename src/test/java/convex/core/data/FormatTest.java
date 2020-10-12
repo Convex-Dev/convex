@@ -172,6 +172,18 @@ public class FormatTest {
 	}
 	
 	@Test 
+	public void testHexDigits() {
+		byte[] bs=new byte[8];
+		
+		Blob src=Blob.fromHex("cafebabe");
+		Format.writeHexDigits(bs, 2, src, 2, 4);		
+		assertEquals(Blobs.fromHex("00000204feba0000"),Blob.wrap(bs));
+		
+		Format.writeHexDigits(bs, 3, src, 0, 3);
+		assertEquals(Blobs.fromHex("0000020003caf000"),Blob.wrap(bs));
+	}
+	
+	@Test 
 	public void testWriteRef() {
 		// TODO: consider whether this is valid
 		// shouldn't be allowed to write a Ref directly as a top-level message

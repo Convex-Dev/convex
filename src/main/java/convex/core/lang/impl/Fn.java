@@ -109,17 +109,17 @@ public class Fn<T> extends AFn<T> {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer b) {
-		b = b.put(Tag.FN);
-		return writeRaw(b);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.FN;
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb = params.write(bb);
-		bb = body.write(bb);
-		bb = lexicalEnv.write(bb);
-		return bb;
+	public int writeRaw(byte[] bs, int pos) {
+		pos = params.write(bs,pos);
+		pos = body.write(bs,pos);
+		pos = lexicalEnv.write(bs,pos);
+		return pos;
 	}
 
 	public static <T> Fn<T> read(ByteBuffer bb) throws BadFormatException {

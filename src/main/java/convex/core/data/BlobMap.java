@@ -434,28 +434,28 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb = bb.put(Tag.BLOBMAP);
-		return writeRaw(bb);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.BLOBMAP;
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb = Format.writeVLCLong(bb, count);
-		if (count == 0) return bb; // nothing more to know... this is the empty singleton
+	public int writeRaw(byte[] bs, int pos) {
+		pos = Format.writeVLCLong(bs,pos, count);
+		if (count == 0) return pos; // nothing more to know... this is the empty singleton
 
-		bb = Format.writeHexDigits(bb, prefix, depth, prefixLength);
-		bb = Format.write(bb, entry); // entry may be null
-		if (count == 1) return bb; // must be a single entry
+		pos = Format.writeHexDigits(bs,pos, prefix, depth, prefixLength);
+		pos = Format.write(bs,pos, entry); // entry may be null
+		if (count == 1) return pos; // must be a single entry
 
 		// finally write children
-		bb = bb.putShort(mask);
+		pos = Utils.writeShort(bs,pos,mask);
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
-			bb = children[i].write(bb);
+			pos = children[i].write(bs,pos);
 		}
 
-		return bb;
+		return pos;
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })

@@ -95,19 +95,19 @@ public class AccountStatus extends ARecord {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer b) {
-		b = b.put(Tag.ACCOUNT_STATUS);
-		return writeRaw(b);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.ACCOUNT_STATUS;
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb = Format.writeVLCLong(bb, sequence);
-		bb = Format.write(bb, balance);
-		bb = Format.write(bb, allowance);
-		bb = Format.write(bb, environment);
-		bb = Format.write(bb, holdings);
-		return bb;
+	public int writeRaw(byte[] bs, int pos) {
+		pos = Format.writeVLCLong(bs, pos,sequence);
+		pos = Format.write(bs,pos, balance);
+		pos = Format.write(bs,pos, allowance);
+		pos = Format.write(bs,pos, environment);
+		pos = Format.write(bs,pos, holdings);
+		return pos;
 	}
 
 	public static AccountStatus read(ByteBuffer bb) throws BadFormatException {

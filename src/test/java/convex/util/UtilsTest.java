@@ -220,9 +220,9 @@ public class UtilsTest {
 		byte[] bs = new byte[8];
 		assertEquals(0, Utils.readInt(bs, 0));
 		int a = 0xcafebabe;
-		Utils.writeInt(a, bs, 0);
+		Utils.writeInt(bs, 0, a);
 		assertEquals(a, Utils.readInt(bs, 0));
-		Utils.writeInt(a, bs, 4);
+		Utils.writeInt(bs, 4, a);
 		assertEquals(0xbabecafe, Utils.readInt(bs, 2));
 		assertEquals(0xcafebabe, Utils.readInt(bs, 4));
 	}
@@ -232,9 +232,9 @@ public class UtilsTest {
 		byte[] bs = new byte[20];
 		assertEquals(0, Utils.readLong(bs, 0));
 		long a = 0xffffffffcafebabeL;
-		Utils.writeLong(a, bs, 0);
+		Utils.writeLong(bs, 0, a);
 		assertEquals(a, Utils.readLong(bs, 0));
-		Utils.writeLong(a, bs, 4);
+		Utils.writeLong(bs, 4, a);
 		assertEquals(0xffffffffffffffffL, Utils.readLong(bs, 0));
 		assertEquals(0xcafebabe00000000L, Utils.readLong(bs, 8));
 	}

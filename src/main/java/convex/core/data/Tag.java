@@ -39,7 +39,6 @@ public class Tag {
 	public static final byte BLOB = (byte) 0x31;
 	public static final byte SYMBOL = (byte) 0x32;
 	public static final byte KEYWORD = (byte) 0x33;
-	public static final byte SYNTAX = (byte) 0x34;
 
 	// data type tags beyond this point
 
@@ -52,6 +51,7 @@ public class Tag {
 	public static final byte BLOBMAP = (byte) 0x84;
 
 	public static final byte MAP_ENTRY = (byte) 0x87;
+	public static final byte SYNTAX = (byte) 0x88;
 
 	// special data structure
 	public static final byte SIGNED_DATA = (byte) 0x90;

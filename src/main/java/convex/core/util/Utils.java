@@ -145,6 +145,34 @@ public class Utils {
 		int result = ((data[offset] & 0xFF) << 8) + (data[offset + 1] & 0xFF);
 		return (short) result;
 	}
+	
+	/**
+	 * Writes an char to a byte array in 2 byte big-endian representation
+	 * 
+	 * @param value  int value to write to the array
+	 * @param data   Byte array into which to write the given int
+	 * @param offset Offset into the array at which the int will be written
+	 * @return Offset after writing
+	 */
+	public static int writeChar(byte[] data, int offset,char value) {
+		data[offset++]=(byte)(value>>8);
+		data[offset++]=(byte)(value);
+		return offset;
+	}
+	
+	/**
+	 * Writes an char to a byte array in 2 byte big-endian representation
+	 * 
+	 * @param value  int value to write to the array
+	 * @param data   Byte array into which to write the given int
+	 * @param offset Offset into the array at which the int will be written
+	 * @return Offset after writing
+	 */
+	public static int writeShort(byte[] data, int offset,short value) {
+		data[offset++]=(byte)(value>>8);
+		data[offset++]=(byte)(value);
+		return offset;
+	}
 
 	/**
 	 * Writes an int to a byte array in 4 byte big-endian representation
@@ -152,11 +180,13 @@ public class Utils {
 	 * @param value  int value to write to the array
 	 * @param data   Byte array into which to write the given int
 	 * @param offset Offset into the array at which the int will be written
+	 * @return Offset after writing
 	 */
-	public static void writeInt(int value, byte[] data, int offset) {
+	public static int writeInt(byte[] data, int offset,int value) {
 		for (int i = 0; i <= 3; i++) {
 			data[offset + i] = (byte) ((value >> (8 * (3 - i))) & 0xFF);
 		}
+		return offset+4;
 	}
 
 	/**
@@ -168,12 +198,13 @@ public class Utils {
 	 * 
 	 * @throws IndexOutOfBoundsException If long reaches outside the destination
 	 *                                   byte array
-	 * 
+	 * @return Offset after writing 8 bytes
 	 */
-	public static void writeLong(long value, byte[] data, int offset) {
+	public static int writeLong(byte[] data, int offset,long value) {
 		for (int i = 0; i <= 7; i++) {
 			data[offset + i] = (byte) (value >> (8 * (7 - i)));
 		}
+		return offset+8;
 	}
 
 	/**

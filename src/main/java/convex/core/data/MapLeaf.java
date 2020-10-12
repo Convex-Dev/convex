@@ -316,19 +316,19 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb = bb.put(Tag.MAP);
-		return writeRaw(bb);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.MAP;
+		return writeRaw(bs,pos);
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb = Format.writeVLCLong(bb, count);
+	public int writeRaw(byte[] bs, int pos) {
+		pos = Format.writeVLCLong(bs,pos, count);
 
 		for (int i = 0; i < count; i++) {
-			bb = entries[i].writeRaw(bb);
+			pos = entries[i].writeRaw(bs,pos);
 		}
-		return bb;
+		return pos;
 	}
 
 	@Override

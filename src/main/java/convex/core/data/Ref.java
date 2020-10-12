@@ -550,14 +550,21 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 	 * @return Updated Ref
 	 */
 	public abstract Ref<T> withValue(T newValue);
-
+	
+	/**
+	 * Writes the ref to a byte array. Embdeds embedded values as necessary.
+	 * @param bb
+	 * @return
+	 */
+	public abstract int write(byte[] bs,int pos);
+	
 	/**
 	 * Writes the raw ref Hash to the given ByteBuffer
 	 * @param bb
 	 * @return
 	 */
-	public ByteBuffer writeRawHash(ByteBuffer bb) {
-		return getHash().writeRaw(bb);
+	public int writeRawHash(byte[] bs,int pos) {
+		return getHash().writeRaw(bs,pos);
 	}
 
 }

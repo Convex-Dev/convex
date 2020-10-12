@@ -332,9 +332,9 @@ public class Hash extends AArrayBlob {
 	}
 
 	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb = bb.put(Tag.HASH);
-		return writeRaw(bb);
+	public int write(byte[] bs, int pos) {
+		bs[pos++]=Tag.HASH;
+		return writeRaw(bs,pos);
 	}
 
 	@Override

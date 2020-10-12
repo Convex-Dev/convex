@@ -70,9 +70,9 @@ public class Constant<T> extends AOp<T> {
 	}
 
 	@Override
-	public ByteBuffer writeRaw(ByteBuffer bb) {
-		bb = valueRef.write(bb);
-		return bb;
+	public int writeRaw(byte[] bs, int pos) {
+		pos = valueRef.write(bs,pos);
+		return pos;
 	}
 
 	public static <T> AOp<T> read(ByteBuffer bb) throws BadFormatException {

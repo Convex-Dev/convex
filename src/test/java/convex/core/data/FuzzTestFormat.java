@@ -50,7 +50,7 @@ public class FuzzTestFormat {
 	}
 
 	private static void doFuzzTest(Blob b) throws BadFormatException {
-		ByteBuffer bb = ByteBuffer.wrap(b.getInternalArray());
+		ByteBuffer bb = b.getByteBuffer();
 
 		Object v = Format.read(bb);
 
@@ -71,7 +71,7 @@ public class FuzzTestFormat {
 		assertEquals(v, Format.read(b2),
 				() -> "Expected to be able to regenerate value: " + v + " of type " + Utils.getClass(v));
 		assertEquals(bb.position(), b2.length(), () -> {
-			return "Re-reading " + Utils.getClass(v) + ": " + v + " with encoding " + b.toHexString()
+			return "Bad length re-reading " + Utils.getClass(v) + ": " + v + " with encoding " + b.toHexString()
 					+ " and re-encoding" + b2.toHexString();
 		});
 
