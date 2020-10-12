@@ -115,7 +115,7 @@ public class Symbol extends ASymbolic {
 
 	@Override
 	public int hashCode() {
-		return name.hashCode()+20*((namespace==null)?0:namespace.hashCode());
+		return name.hashCode()+119*((namespace==null)?0:namespace.hashCode());
 	}
 
 	@Override
