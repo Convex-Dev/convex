@@ -39,14 +39,14 @@ public abstract class AObject {
 	protected abstract Blob createEncoding();
 	
 	/**
-	 * Attach the given Blob to this Cell, if no Blob is currently cached
+	 * Attach the given encoding Blob to this object, if no encoding is currently cached
 	 * 
 	 * Warning: Blob must be the correct canonical representation of this Cell,
 	 * otherwise bad things may happen (incorrect hashcode, etc.)
 	 * 
 	 * @param data
 	 */
-	public void attachEncoding(Blob data) {
+	public final void attachEncoding(Blob data) {
 		this.encoding=data;
 	}
 

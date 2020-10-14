@@ -709,6 +709,7 @@ public class Format {
 		if (tag == Tag.BLOB) {
 			return (T) Blobs.readFromBlob(blob);
 		} else {
+			// TODO: maybe refactor to avoid read from byte buffers?
 			ByteBuffer bb = blob.getByteBuffer();
 			T result;
 
@@ -720,11 +721,11 @@ public class Format {
 				throw new BadFormatException("Blob has insufficients bytes: " + blob.length(), e);
 			} 
 
-			if (result instanceof ACell) {
+			if (result instanceof AObject) {
 				// cache the Blob in this data object, to avoid need to re-serialise
 				// SECURITY: should be OK, since we have just successfully read from canonical
 				// format?
-				((ACell) result).attachEncoding(blob);
+				((AObject) result).attachEncoding(blob);
 			}
 			return result;
 		}
