@@ -73,6 +73,13 @@ public class StringSlice extends AString {
 	}
 
 
+	@Override
+	protected void appendToStringBuffer(StringBuilder sb, int start,int length) {
+		int sourceStart=this.start+start;
+		source.appendToStringBuffer(sb, sourceStart, length);
+	}
+
+
 
 
 }

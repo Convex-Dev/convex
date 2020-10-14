@@ -28,8 +28,8 @@ import org.apache.commons.text.StringEscapeUtils;
 import convex.core.data.AArrayBlob;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.AObject;
 import convex.core.data.Blob;
-import convex.core.data.IObject;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.exceptions.TODOException;
@@ -754,8 +754,8 @@ public class Utils {
 	public static void print(StringBuilder sb,Object v) {
 		if (v == null) {
 			sb.append("nil");
-		} else if (v instanceof IObject) {
-			((IObject)v).print(sb);
+		} else if (v instanceof AObject) {
+			((AObject)v).print(sb);
 		} else if (v instanceof Boolean||v instanceof Number){
 			sb.append(v.toString());
 		} else if (v instanceof String) {
@@ -779,9 +779,9 @@ public class Utils {
 	 */
 	public static String ednString(Object v) {
 		if (v == null) return "nil";
-		if (v instanceof IObject) {
+		if (v instanceof AObject) {
 			StringBuilder sb = new StringBuilder();
-			((IObject) v).ednString(sb);
+			((AObject) v).ednString(sb);
 			return sb.toString();
 		}
 
@@ -794,8 +794,8 @@ public class Utils {
 	}
 
 	public static void ednString(StringBuilder sb, Object v) {
-		if (v instanceof IObject) {
-			((IObject) v).ednString(sb);
+		if (v instanceof AObject) {
+			((AObject) v).ednString(sb);
 		} else {
 			sb.append(ednString(v));
 		}

@@ -37,10 +37,12 @@ public abstract class AString extends ACell implements CharSequence, Comparable<
 	@Override 
 	public String toString() {
 		StringBuilder sb=new StringBuilder(length); 
-		print(sb);
+		appendToStringBuffer(sb,0,length());
 		return sb.toString();
 	}
 	
+	protected abstract void appendToStringBuffer(StringBuilder sb, int start, int length);
+
 	@Override
 	public abstract AString subSequence(int start, int end);
 

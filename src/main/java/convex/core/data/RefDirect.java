@@ -39,6 +39,12 @@ public class RefDirect<T> extends Ref<T> {
 		return create(value, hash, UNKNOWN);
 	}
 
+	/**
+	 * Creates a new Direct ref to the given value. Does not compute hash.
+	 * @param <T>
+	 * @param value
+	 * @return
+	 */
 	@SuppressWarnings("unchecked")
 	public static <T> RefDirect<T> create(T value) {
 		if (value == null) return (RefDirect<T>) Ref.NULL_VALUE;
@@ -152,6 +158,20 @@ public class RefDirect<T> extends Ref<T> {
 	public int estimatedEncodingSize() {
 		// TODO improve estimate?
 		return 64;
+	}
+
+	@Override
+	protected Blob createEncoding() {
+		if (isEmbedded()) {
+			return Format.encodedBlob(value);
+		}
+		
+		byte[] bs=new byte[RefSoft.ENCODING_LENGTH];	
+		Hash h=getHash();
+		int pos=0;
+		bs[pos++]=Tag.REF;
+		pos=h.writeRaw(bs, pos);
+		return Blob.wrap(bs,0,pos);
 	}
 
 

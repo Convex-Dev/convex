@@ -49,8 +49,6 @@ public class Format {
 	 */
 	public static final int LIMIT_ENCODING_LENGTH = 0x1FFF; 
 	
-	
-	
 	public static final int MAX_VLC_LONG_LENGTH = 10; // 70 bits
 	
 	/**
@@ -552,6 +550,11 @@ public class Format {
 	};
 
 	/**
+	 * Largest non-cell encoding. Currently a maximum VLC long plus one byte?
+	 */
+	private static final int MAX_NON_CELL_LENGTH = 12;
+
+	/**
 	 * Reads a UTF-8 String from a ByteBuffer. Assumes the object tag has already been
 	 * read
 	 * 
@@ -909,35 +912,18 @@ public class Format {
 	}
 
 	/**
-	 * Gets the encoded bytes for an object in canonical message format
-	 * 
-	 * @param o The object to encode
-	 * @return Byte array of object encoding
-	 */
-	public static byte[] encodedBytes(Object o) {
-		ByteBuffer b = encodedBuffer(o);
-		return Utils.toByteArray(b);
-	}
-
-	/**
-	 * Gets the encoded hex string for an object in canonical message format
-	 * 
-	 * @param o The object to encode
-	 * @return Encoded hex string
-	 */
-	public static String encodedString(Object o) {
-		return Utils.toHexString(encodedBytes(o));
-	}
-
-	/**
 	 * Gets the encoded Blob for an object in canonical message format
 	 * 
 	 * @param o The object to encode
 	 * @return Encoded data as a blob
 	 */
 	public static Blob encodedBlob(Object o) {
-		if (o instanceof ACell) return ((ACell) o).getEncoding();
-		return Blob.wrap(encodedBytes(o));
+		if (o instanceof AObject) return ((AObject) o).getEncoding();
+		
+		// It's not a cell, so must be embedded
+		byte[] bs=new byte[MAX_NON_CELL_LENGTH];
+		int pos=writeNonCell(bs,0,o);
+		return Blob.wrap(bs,0,pos);
 	}
 
 	/**
@@ -1055,6 +1041,15 @@ public class Format {
 		}
 
 		return rs;
+	}
+
+	/**
+	 * Gets a hex String representing an object's encoding
+	 * @param o Any encodable object
+	 * @return Hex String
+	 */
+	public static String encodedString(Object o) {
+		return encodedBlob(o).toHexString();
 	}
 
 }

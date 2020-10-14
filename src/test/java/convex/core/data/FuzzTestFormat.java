@@ -65,21 +65,22 @@ public class FuzzTestFormat {
 		// format!
 		if (!(v instanceof Ref)) {
 			assertTrue(Format.isCanonical(v),()->"Not canonical: "+Utils.getClassName(v));
+			
+			Blob b2 = Format.encodedBlob(v);
+			assertEquals(v, Format.read(b2),
+					() -> "Expected to be able to regenerate value: " + v + " of type " + Utils.getClass(v));
+			assertEquals(bb.position(), b2.length(), () -> {
+				return "Bad length re-reading " + Utils.getClass(v) + ": " + v + " with encoding " + b.toHexString()
+						+ " and re-encoding" + b2.toHexString();
+			});
+			
+			// recursive fuzzing on this value
+			// this is good to test small mutations of
+			if (r.nextDouble() < 0.8) {
+				doMutationTest(b2);
+			}
 		}
 
-		Blob b2 = Format.encodedBlob(v);
-		assertEquals(v, Format.read(b2),
-				() -> "Expected to be able to regenerate value: " + v + " of type " + Utils.getClass(v));
-		assertEquals(bb.position(), b2.length(), () -> {
-			return "Bad length re-reading " + Utils.getClass(v) + ": " + v + " with encoding " + b.toHexString()
-					+ " and re-encoding" + b2.toHexString();
-		});
-
-		// recursive fuzzing on this value
-		// this is good to test small mutations of
-		if (r.nextDouble() < 0.9) {
-			doMutationTest(b2);
-		}
 	}
 
 	public static void doMutationTest(Blob b) {

@@ -9,14 +9,15 @@ import convex.core.State;
 import convex.core.crypto.Hash;
 import convex.core.data.ABlobMap;
 import convex.core.data.AHashMap;
+import convex.core.data.AObject;
 import convex.core.data.ASequence;
 import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Amount;
+import convex.core.data.Blob;
 import convex.core.data.BlobMap;
-import convex.core.data.IObject;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.MapEntry;
@@ -25,6 +26,7 @@ import convex.core.data.PeerStatus;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
+import convex.core.exceptions.TODOException;
 import convex.core.lang.expanders.AExpander;
 import convex.core.lang.impl.AExceptional;
 import convex.core.lang.impl.ErrorValue;
@@ -59,7 +61,7 @@ import convex.core.util.Utils;
  * "If you have a procedure with 10 parameters, you probably missed some" 
  * - Alan Perlis
  */
-public final class Context<T> implements IObject {
+public final class Context<T> extends AObject {
 
 	private static final long MAX_DEPTH = 256;
 	
@@ -1574,6 +1576,11 @@ public final class Context<T> implements IObject {
 	 */
 	public <R> Context<R> switchAddress(Address newAddress) {
 		return createFake(getState(),newAddress);
+	}
+
+	@Override
+	public Blob createEncoding() {
+		throw new TODOException();
 	}
 
 

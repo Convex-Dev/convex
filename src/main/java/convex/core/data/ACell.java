@@ -19,12 +19,8 @@ import convex.core.util.Utils;
  * "It is better to have 100 functions operate on one data structure than 
  * to have 10 functions operate on 10 data structures." - Alan Perlis
  */
-public abstract class ACell implements IWriteable, IValidated, IObject {
+public abstract class ACell extends AObject implements IWriteable, IValidated {
 
-	/**
-	 * We cache the Blob for the binary format of this Cell
-	 */
-	private Blob encoding;
 	
 	/**
 	 * We cache the computed memorySize. May be 0 for embedded objects
@@ -52,28 +48,9 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	 */
 	public abstract void validateCell() throws InvalidDataException;
 	
-	/**
-	 * Gets the encoded byte representation of this cell.
-	 * 
-	 * @return A blob representing this cell in encoded form
-	 */
-	public final Blob getEncoding() {
-		if (encoding==null) encoding=createEncoding();
-		return encoding;
-	}
+
 	
-	/**
-	 * Attach the given Blob to this Cell, if no Blob is currently cached
-	 * 
-	 * Warning: Blob must be the correct canonical representation of this Cell,
-	 * otherwise bad things may happen (incorrect hashcode, etc.)
-	 * 
-	 * @param data
-	 */
-	public void attachEncoding(Blob data) {
-		if (this.encoding!=null) return;
-		this.encoding=data;
-	}
+
 	
 
 
@@ -175,12 +152,7 @@ public abstract class ACell implements IWriteable, IValidated, IObject {
 	 */
 	public abstract int writeRaw(byte[] bs, int pos);
 	
-	/**
-	 * Creates a Blob object representing this Cell. Should be called only after
-	 * the cached blob has been checked.
-	 * 
-	 * @return
-	 */
+	@Override
 	public final Blob createEncoding() {
 		int capacity=estimatedEncodingSize();
 		byte[] bs=new byte[capacity];

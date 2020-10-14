@@ -138,4 +138,9 @@ public class StringShort extends AString {
 	public int compareTo(AString o) {
 		return data.compareTo(o.toString());
 	}
+
+	@Override
+	protected void appendToStringBuffer(StringBuilder sb, int start, int length) {
+		sb.append(data.substring(start, start+length));
+	}
 }

@@ -59,6 +59,11 @@ public class StringTree extends AString {
 		return new StringTree(len,children);
 	}
 
+	private int childIndexAt(int index) {
+		int ci=index>>shift;
+		return ci;
+	}
+	
 	@Override
 	public char charAt(int index) {
 		int ci=index>>shift;
@@ -146,6 +151,21 @@ public class StringTree extends AString {
 		}
 		if (newChildren==children) return this; // no change, safe to return this
 		return new StringTree(length,newChildren);
+	}
+
+	@Override
+	protected void appendToStringBuffer(StringBuilder sb, int start, int length) {
+		int cstart=childIndexAt(start);
+		int cend=childIndexAt(start+length-1);
+		int csize=childSize();
+		for (int i=cstart; i<=cend; i++) {
+			AString child=children[i].getValue();
+			
+			// compute indexes indo child
+			int c0=Math.max(0, start-i*csize);
+			int c1=Math.min(child.length, start+length-i*csize);
+			child.appendToStringBuffer(sb, c0, c1-c0);
+		}
 	}
 
 

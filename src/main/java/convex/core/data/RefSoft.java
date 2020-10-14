@@ -28,6 +28,8 @@ import convex.core.util.Utils;
  */
 public class RefSoft<T> extends Ref<T> {
 
+	static final int ENCODING_LENGTH = Hash.LENGTH+1;
+	
 	/**
 	 * SoftReference to value. Might get updated to a fresh instance.
 	 */
@@ -162,6 +164,14 @@ public class RefSoft<T> extends Ref<T> {
 		// TODO Is this always right?
 		return Hash.LENGTH+1;
 	}
+
+	@Override
+	protected Blob createEncoding() {
+		byte[] bs=new byte[RefSoft.ENCODING_LENGTH];
+		int pos=write(bs,0);
+		return Blob.wrap(bs,0,pos);
+	}
+	
 
 
 }

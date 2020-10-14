@@ -34,7 +34,7 @@ import convex.core.util.Utils;
  *
  * @param <T> Type of stored value
  */
-public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidated {
+public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWriteable, IValidated {
 
 	/**
 	 * Ref status indicating the status of this Ref is unknown. This is the default
@@ -154,12 +154,18 @@ public abstract class Ref<T> implements Comparable<Ref<T>>, IWriteable, IValidat
 		return getHash().hashCode();
 	}
 
+	@Override
 	public void ednString(StringBuilder sb) {
 		sb.append("#ref {:hash ");
 		sb.append(Utils.ednString(hash));
 		sb.append(", :status ");
 		sb.append(status);
 		sb.append("}");
+	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		ednString(sb);
 	}
 
 	@Override
