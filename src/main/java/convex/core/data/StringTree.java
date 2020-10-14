@@ -99,7 +99,7 @@ public class StringTree extends AString {
 		
 		Ref<AString>[] children = (Ref<AString>[]) new Ref[n];
 		for (int i = 0; i < n; i++) {
-			Ref<AString> ref = Ref.read(bb);
+			Ref<AString> ref = Ref.readRaw(bb);
 			children[i] = ref;
 		}
 

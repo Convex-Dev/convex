@@ -297,7 +297,7 @@ public class BlobTree extends ABlob {
 		@SuppressWarnings("unchecked")
 		Ref<ABlob>[] children = (Ref<ABlob>[]) new Ref[numChildren];
 		for (int i = 0; i < numChildren; i++) {
-			Ref<ABlob> ref = Ref.read(bb);
+			Ref<ABlob> ref = Ref.readRaw(bb);
 			children[i] = ref;
 		}
 

@@ -806,7 +806,7 @@ public class Format {
 
 		try {
 			// put this first, probably the most common, for performance
-			if (tag == Tag.REF) return (T) Ref.read(bb);
+			if (tag == Tag.REF) return (T) Ref.readRaw(bb);
 
 			if ((tag & 0xF0) == 0x00) return readBasicType(bb, tag);
 

@@ -274,7 +274,7 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	}
 
 	/**
-	 * Creates a Ref using a specific Hash. Fetches the actual value lazily for the
+	 * Creates a Ref using a specific Hash. Fetches the actual value lazily from the
 	 * store on demand.
 	 * 
 	 * Internal soft reference may be initially empty: This Ref might not have
@@ -301,12 +301,12 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	}
 
 	/**
-	 * Reads a ref from the given ByteBuffer Assumes no tag
+	 * Reads a ref from the given ByteBuffer Assumes no tag.
 	 * 
 	 * @param data ByteBuffer containing the data to read at the current position
 	 * @return Ref read from ByteBuffer
 	 */
-	public static <T> Ref<T> read(ByteBuffer data) {
+	public static <T> Ref<T> readRaw(ByteBuffer data) {
 		Hash h = Hash.read(data);
 		return Ref.forHash(h);
 	}

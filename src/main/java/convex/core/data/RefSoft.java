@@ -77,6 +77,8 @@ public class RefSoft<T> extends Ref<T> {
 			// Update soft reference to the fresh version. No point keeping old one....
 			if (storeRef instanceof RefSoft) {
 				this.softRef = ((RefSoft<T>) storeRef).softRef;
+			} else {
+				this.softRef = new SoftReference<T>(result);
 			}
 		}
 		return result;

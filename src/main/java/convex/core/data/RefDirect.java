@@ -31,7 +31,7 @@ public class RefDirect<T> extends Ref<T> {
 		this.value = value;
 	}
 
-	static <T> RefDirect<T> create(T value, Hash hash, int status) {
+	public static <T> RefDirect<T> create(T value, Hash hash, int status) {
 		return new RefDirect<T>(value, hash, status);
 	}
 

@@ -15,7 +15,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import convex.api.Shutdown;
-
 import convex.core.Constants;
 import convex.core.crypto.Hash;
 import convex.core.data.AArrayBlob;
@@ -637,7 +636,7 @@ public class Etch {
 				cell.attachMemorySize(memorySize);
 			}
 			
-			RefSoft<ACell> ref=RefSoft.create(cell, hash, status);
+			Ref<ACell> ref=RefSoft.create(cell, hash, status);
 			cell.attachRef(ref);
 			
 			return ref;
