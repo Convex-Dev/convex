@@ -219,8 +219,7 @@ public class Convex {
 
 	
 	/**
-	 * Submits a transaction synchronously to the Convex network, returning a future once the transaction 
-	 * has been successfully queued.
+	 * Submits a transaction synchronously to the Convex network, returning a Result
 	 * 
 	 * @param transaction Transaction to execute
 	 * @return The result of the transaction
@@ -232,8 +231,7 @@ public class Convex {
 	}
 	
 	/**
-	 * Submits a transaction synchronously to the Convex network, returning a future once the transaction 
-	 * has been successfully queued.
+	 * Submits a transaction synchronously to the Convex network, returning a Result
 	 * 
 	 * @param transaction Transaction to execute
 	 * @param timeout Number of milliseconds for timeout
