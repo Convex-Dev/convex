@@ -217,6 +217,17 @@ public class Convex {
 		return cf;
 	}
 
+	/**
+	 * Submits a transaction synchronously to the Convex network, returning a Result
+	 * 
+	 * @param transaction Transaction to execute
+	 * @return The result of the transaction
+	 * @throws IOException If the connection is broken
+	 * @throws TimeoutException If the attempt to transact with the network is not confirmed within a reasonable time
+	 */
+	public Result transactSync(SignedData<ATransaction> transaction) throws TimeoutException, IOException {
+		return transactSync(transaction,Constants.DEFAULT_CLIENT_TIMEOUT);
+	}
 	
 	/**
 	 * Submits a transaction synchronously to the Convex network, returning a Result
@@ -231,7 +242,7 @@ public class Convex {
 	}
 	
 	/**
-	 * Submits a transaction synchronously to the Convex network, returning a Result
+	 * Submits a signed transaction synchronously to the Convex network, returning a Result
 	 * 
 	 * @param transaction Transaction to execute
 	 * @param timeout Number of milliseconds for timeout
@@ -240,6 +251,31 @@ public class Convex {
 	 * @throws TimeoutException If the attempt to transact with the network is not confirmed by the specified timeout
 	 */
 	public Result transactSync(ATransaction transaction, long timeout) throws TimeoutException, IOException {
+		// sample time at start of transaction attempt
+		long start=Utils.getTimeMillis();
+		
+		Future<Result> cf=transact(transaction);
+		
+		// adjust timeout if time elapsed to submit transaction
+		long now=Utils.getTimeMillis();
+		timeout=Math.max(0L,timeout-(now-start));
+		try {
+			return cf.get(timeout,TimeUnit.MILLISECONDS);
+		} catch (InterruptedException |ExecutionException e) {
+			throw new Error("Not possible? Since there is no Thread for the future....",e);
+		}
+	}
+	
+	/**
+	 * Submits a signed transaction synchronously to the Convex network, returning a Result
+	 * 
+	 * @param transaction Transaction to execute
+	 * @param timeout Number of milliseconds for timeout
+ 	 * @return The result of the transaction
+	 * @throws IOException If the connection is broken
+	 * @throws TimeoutException If the attempt to transact with the network is not confirmed by the specified timeout
+	 */
+	public Result transactSync(SignedData<ATransaction> transaction, long timeout) throws TimeoutException, IOException {
 		// sample time at start of transaction attempt
 		long start=Utils.getTimeMillis();
 		
