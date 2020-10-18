@@ -99,14 +99,14 @@ public class PredictionMarketTest {
 		// setup address for this little play
 		String VILLAIN = TestState.VILLAIN.toHexString();
 		String HERO = TestState.HERO.toHexString();
-		Context<?> ctx = step("(do (def HERO (address \"" + HERO + "\")) (def VILLAIN (address \"" + VILLAIN + "\")))");
+		Context<?> ctx = step("(do (def HERO (address 0x" + HERO + ")) (def VILLAIN (address 0x" + VILLAIN + ")))");
 
 		// deploy an oracle contract.
 		String oracleString = Utils.readResourceAsString("actors/oracle-trusted.con");
 		ctx=step("(def oaddr (deploy '"+oracleString+"))");
 		Address oaddr=(Address) ctx.getResult();
 		
-		ctx = step(ctx, "(def oaddr \"" + oaddr.toHexString() + "\")");
+		ctx = step(ctx, "(def oaddr 0x" + oaddr.toHexString() + ")");
 		
 		// call to create oracle with key :bar and current address (HERO) trusted
 		ctx = step(ctx, "(call oaddr (register :bar {:trust #{*address*}}))");
