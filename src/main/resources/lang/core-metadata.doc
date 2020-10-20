@@ -9,7 +9,7 @@
 {
 	accept 
 	{
-	 :doc {:description "Accepts funds up to the amount of *offer* from *caller*. Amount must cast to long. If successful, the amount will be added immediately to the *balance* of the current *address*. This is the recommended way of transferring balance between Actors, as it requires a positive action to confirm receipt. Returns a STATE error if there are insufficient funds to accept."
+	 :doc {:description "Accepts funds up to the amount of *offer* from *caller*. Amount must cast to long. If successful, the amount will be added immediately to the *balance* of the current *address*. This is the recommended way of transferring balance between Actors, as it requires a positive action to confirm receipt. Returns the amount accepted if successful. Returns a STATE error if there are insufficient funds to accept."
          :examples [{:code "(accept *offer*)"}]
          :type :function
          :signature [{:params [amount]}]}
@@ -863,7 +863,7 @@
   
   transfer
   {
-    :doc {:description "Transfers the specified amount of coins to the target-address. Returns the amount transferred if successful. Returns FUNDS error if there is insufficient balance in the sender's account."
+    :doc {:description "Transfers the specified amount of coins to the target-address. Returns the amount transferred if successful. Returns FUNDS error if there is insufficient balance in the sender's account. Returns STATE error if the reciever is an Actor that is unable to accept funds."
           :examples [{:code "(transfer my-friend-address 12345678)"}]
           :type :function
           :signature [{:params [address amount]}]}

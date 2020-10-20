@@ -1145,7 +1145,13 @@ public final class Context<T> extends AObject {
 		} 
 		
 		if (targetAccount.isActor()) {
-			return this.withError(ErrorCodes.STATE,"Cannot transfer coins to actor account with no receive-coins implementation");		
+			// (call target amount (receive-coin source amount nil))
+			Context<Long> actx=actorCall(target,amount,Symbols.RECEIVE_COIN,source,amount,(Object)null);
+			if (actx.isExceptional()) return actx;
+			
+			// return value should be change in balance
+			Long sent=currentBalance-actx.getBalance(source);
+			return actx.withResult(sent);
 		} else {
 			// must be a user account
 			Amount oldTargetBalance=targetAccount.getBalance();

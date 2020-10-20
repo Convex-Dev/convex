@@ -1529,10 +1529,30 @@ public class CoreTest {
 	
 	@Test
 	public void testTransferToActor() {
+		// SECURITY: be careful with these tests
 		Address CORE=Init.CORE_ADDRESS;
 		
 		// should fail transferring to an account with no receive-coins export
 		assertStateError(step("(transfer 0x"+CORE.toHexString()+" 1337)"));
+		
+		{ // transfer to an Actor that accepts everything
+			Context<?> ctx=step("(deploy '(do (defn receive-coin [sender amount data] (accept amount)) (export receive-coin)))");
+			Address receiver=(Address) ctx.getResult();
+			
+			ctx=step(ctx,"(transfer 0x"+receiver.toHexString()+" 100)");
+			assertEquals(100L,ctx.getResult());
+			assertEquals(100L,ctx.getBalance(receiver));
+		}
+		
+		{ // transfer to an Actor that accepts nothing
+			Context<?> ctx=step("(deploy '(do (defn receive-coin [sender amount data] (accept 0)) (export receive-coin)))");
+			Address receiver=(Address) ctx.getResult();
+			
+			ctx=step(ctx,"(transfer 0x"+receiver.toHexString()+" 100)");
+			assertEquals(0L,ctx.getResult());
+			assertEquals(0L,ctx.getBalance(receiver));
+		}
+
 	}
 
 	@Test
