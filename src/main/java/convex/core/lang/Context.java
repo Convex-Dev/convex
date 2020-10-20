@@ -1142,12 +1142,17 @@ public final class Context<T> extends AObject {
 		AccountStatus targetAccount=accounts.get(target);	
 		if (targetAccount==null) {
 			targetAccount=AccountStatus.create();
-		}
+		} 
 		
-		Amount oldTargetBalance=targetAccount.getBalance();
-		Amount newTargetBalance=oldTargetBalance.add(amount);
-		AccountStatus newTargetAccount=targetAccount.withBalance(newTargetBalance);
-		accounts=accounts.assoc(target, newTargetAccount);
+		if (targetAccount.isActor()) {
+			return this.withError(ErrorCodes.STATE,"Cannot transfer coins to actor account with no receive-coins implementation");		
+		} else {
+			// must be a user account
+			Amount oldTargetBalance=targetAccount.getBalance();
+			Amount newTargetBalance=oldTargetBalance.add(amount);
+			AccountStatus newTargetAccount=targetAccount.withBalance(newTargetBalance);
+			accounts=accounts.assoc(target, newTargetAccount);
+		}
 
 		// SECURITY: new context with updated accounts
 		Context<Long> result=new Context<>(chainState.withAccounts(accounts),juice,localBindings,amount,depth,false);

@@ -1526,6 +1526,14 @@ public class CoreTest {
 		assertArityError(step("(transfer-allowance *address* 100 100)"));
 
 	}
+	
+	@Test
+	public void testTransferToActor() {
+		Address CORE=Init.CORE_ADDRESS;
+		
+		// should fail transferring to an account with no receive-coins export
+		assertStateError(step("(transfer 0x"+CORE.toHexString()+" 1337)"));
+	}
 
 	@Test
 	public void testTransfer() {

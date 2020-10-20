@@ -233,6 +233,11 @@ public class Symbols {
 	
 	public static final Symbol SET_ALLOWANCE = Symbol.create("set-allowance");
 	public static final Symbol TRANSFER_ALLOWANCE = Symbol.create("transfer-allowance");
+	
+	public static final Symbol RECEIVE_ALLOWANCE = Symbol.create("receive-allowance");
+	public static final Symbol RECEIVE_COIN = Symbol.create("receive-coin");
+	public static final Symbol RECEIVE_ASSET = Symbol.create("receive-asset");
+
 
 	public static final Symbol SET_BANG = Symbol.create("set!");
 	public static final Symbol SET_STAR = Symbol.create("set*");
