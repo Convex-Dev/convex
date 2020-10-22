@@ -328,6 +328,22 @@ public class Convex {
 		return cf;
 	}
 
+	public Result querySync(Object query) throws TimeoutException, IOException, InterruptedException, ExecutionException {
+		return querySync(query,getAddress());
+	}
+	
+	public Result querySync(Object query, long timeoutMillis) throws TimeoutException, IOException, InterruptedException, ExecutionException {
+		return querySync(query,getAddress(),timeoutMillis);
+	}
+
+	
+	public Result querySync(Object query, Address address) throws TimeoutException, IOException, InterruptedException, ExecutionException {
+		return querySync(query,address,Constants.DEFAULT_CLIENT_TIMEOUT);
+	}
+
+	public Result querySync(Object query, Address address, long timeoutMillis) throws TimeoutException, IOException, InterruptedException, ExecutionException {
+		return query(query,address).get(timeoutMillis,TimeUnit.MILLISECONDS);
+	}
 
 	/**
 	 * Returns the current Address for the client using the API.
