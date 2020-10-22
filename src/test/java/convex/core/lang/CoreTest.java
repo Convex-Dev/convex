@@ -1552,6 +1552,16 @@ public class CoreTest {
 			assertEquals(0L,ctx.getResult());
 			assertEquals(0L,ctx.getBalance(receiver));
 		}
+		
+		{ // transfer to an Actor that accepts half
+			Context<?> ctx=step("(deploy '(do (defn receive-coin [sender amount data] (accept (/ amount 2))) (export receive-coin)))");
+			Address receiver=(Address) ctx.getResult();
+			
+			ctx=step(ctx,"(transfer 0x"+receiver.toHexString()+" 100)");
+			assertEquals(50L,ctx.getResult());
+			assertEquals(50L,ctx.getBalance(receiver));
+		}
+
 
 	}
 
