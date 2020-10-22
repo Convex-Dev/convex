@@ -26,10 +26,11 @@ import convex.net.Message;
 import convex.net.ResultConsumer;
 
 /**
- * Class representing the client API to the Convex network
+ * Class representing the client API to the Convex network when connected directly using the
+ * binary protocol. This can be more efficient than using a REST API.
  * 
  * An Object of the type Convex represents a stateful client connection to the Convex network
- * that can issue transactions both synchronously and aynchronously.
+ * that can issue transactions both synchronously and asynchronously.
  * 
  * "I'm doing a (free) operating system (just a hobby, won't be big and professional like gnu)"
  * - Linus Torvalds
@@ -145,7 +146,7 @@ public class Convex {
 	}
 
 	/**
-	 * Gets the address for the currently connected peer
+	 * Gets the Internet address of the currently connected peer
 	 * @return
 	 */
 	public InetSocketAddress getPeerAddress() {
@@ -153,8 +154,7 @@ public class Convex {
 	}
 	
 	/**
-	 * Returns true if this Convex client instance has a non-null connection that is open,
-	 * false otherwise.
+	 * Checks if this Convex client instance has an open connection.
 	 * 
 	 * @return true if connected, false otherwise
 	 */
