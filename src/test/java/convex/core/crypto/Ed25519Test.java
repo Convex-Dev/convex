@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -21,7 +20,6 @@ import java.util.Base64;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.Constants;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.SignedData;
@@ -93,9 +91,6 @@ public class Ed25519Test {
 	
 	@Test
 	public void testAddressRoundTrip() {
-		// run only if we are using Ed25519 Addresses
-		assumeTrue(Constants.USE_ED25519);
-		
 		// Address should round trip to a Ed25519 public key and back again
 		Address a=Address.fromHex("0123456701234567012345670123456701234567012345670123456701234567");
 		PublicKey pk=Ed25519KeyPair.publicKeyFromBytes(a.getBytes());

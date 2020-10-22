@@ -9,8 +9,8 @@ public class SignKeyPairTest {
 
 	@Test
 	public void testSeeded() {
-		assertEquals(ECDSAKeyPair.createSeeded(13), ECDSAKeyPair.createSeeded(13));
+		assertEquals(AKeyPair.createSeeded(13), AKeyPair.createSeeded(13));
 
-		assertNotEquals(ECDSAKeyPair.createSeeded(13), ECDSAKeyPair.createSeeded(1337));
+		assertNotEquals(AKeyPair.createSeeded(13), AKeyPair.createSeeded(1337));
 	}
 }

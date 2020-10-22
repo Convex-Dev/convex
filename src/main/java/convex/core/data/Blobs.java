@@ -12,6 +12,10 @@ public class Blobs {
 	
 	public static final int MAX_ENCODING_LENGTH = Math.max(Blob.MAX_ENCODING_LENGTH, BlobTree.MAX_ENCODING_LENGTH);
 
+	public static <T extends ABlob> T createRandom(long length) {
+		return createRandom(new Random(),length);
+	}
+	
 	@SuppressWarnings("unchecked")
 	public static <T extends ABlob> T createRandom(Random r, long length) {
 		if (length <= Blob.CHUNK_LENGTH) return (T) Blob.createRandom(r, length);
@@ -76,5 +80,6 @@ public class Blobs {
 		result.attachEncoding(source);
 		return result;
 	}
+
 
 }

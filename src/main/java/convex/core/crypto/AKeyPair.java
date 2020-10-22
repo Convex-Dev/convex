@@ -1,10 +1,8 @@
 package convex.core.crypto;
 
-import convex.core.Constants;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.SignedData;
-import convex.core.exceptions.TODOException;
 
 /**
  * Abstract base class for key pairs in Convex.
@@ -51,11 +49,7 @@ public abstract class AKeyPair {
 	 * @return New key pair
 	 */
 	public static AKeyPair createSeeded(long seed) {
-		if (Constants.USE_ED25519) {
-			return Ed25519KeyPair.createSeeded(seed);
-		} else {
-			return ECDSAKeyPair.createSeeded(seed);
-		}
+		return Ed25519KeyPair.createSeeded(seed);
 	}
 	
 	/**
@@ -66,11 +60,7 @@ public abstract class AKeyPair {
 	 * @return New key pair
 	 */
 	public static AKeyPair create(Address address, Blob encodedPrivateKey) {
-		if (Constants.USE_ED25519) {
-			return Ed25519KeyPair.create(address,encodedPrivateKey);
-		} else {
-			throw new TODOException();
-		}	
+		return Ed25519KeyPair.create(address,encodedPrivateKey);
 	}
 	
 	static {
@@ -78,18 +68,14 @@ public abstract class AKeyPair {
 	}
 
 	public static AKeyPair generate() {
-		if (Constants.USE_ED25519) {
-			return Ed25519KeyPair.generate();
-		} else {
-			return ECDSAKeyPair.generate();
-		}
+		return Ed25519KeyPair.generate();
 	}
 
 	public static AKeyPair create(byte[] keyMaterial) {
-		if (Constants.USE_ED25519) {
-			return Ed25519KeyPair.create(keyMaterial);
-		} else {
-			return ECDSAKeyPair.create(keyMaterial);
-		}
+		return Ed25519KeyPair.create(keyMaterial);
+	}
+
+	public static AKeyPair create(Blob encodedKeyPair) {
+		return Ed25519KeyPair.create(encodedKeyPair);
 	}
 }

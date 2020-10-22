@@ -35,8 +35,6 @@ public class Constants {
 	public static final boolean USE_MEMORY_ACCOUNTING=true;
 
 	public static final long MAX_TRANSACTION_JUICE = 1000000;
-	
-	public static final boolean USE_ED25519=true;
 
 	public static final boolean ETCH_DELETE_TEMP_ON_EXIT = true;
 	

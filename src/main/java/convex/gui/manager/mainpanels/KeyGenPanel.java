@@ -12,10 +12,9 @@ import javax.swing.JPanel;
 import javax.swing.JTextArea;
 import javax.swing.border.EmptyBorder;
 
+import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Hash;
 import convex.core.crypto.Mnemonic;
-import convex.core.crypto.AKeyPair;
-import convex.core.crypto.ECDSAKeyPair;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.Blob;
 import convex.core.util.Utils;
@@ -51,9 +50,9 @@ public class KeyGenPanel extends JPanel {
 		try {
 			byte[] bs = Mnemonic.decode(s, 128);
 			Hash h = Blob.wrap(bs).getContentHash();
-			ECDSAKeyPair kp = ECDSAKeyPair.create(h.getBytes());
-			String pk = Utils.toHexString(kp.getPrivateKey(), 64);
-			privateKeyArea.setText(hexKeyFormat(pk));
+			AKeyPair kp = AKeyPair.create(h.getBytes());
+			String privateKeyString = kp.getEncodedPrivateKey().toHexString();
+			privateKeyArea.setText(hexKeyFormat(privateKeyString));
 		} catch (Exception ex) {
 			String pks = "<mnemonic not valid>";
 			if (s.isBlank()) pks = "<enter valid private key or mnemonic>";
@@ -76,10 +75,10 @@ public class KeyGenPanel extends JPanel {
 		String s = privateKeyArea.getText();
 		try {
 			Blob b = Blob.fromHex(Utils.stripWhiteSpace(s));
-			ECDSAKeyPair kp = ECDSAKeyPair.create(b.getBytes());
+			AKeyPair kp = AKeyPair.create(b);
 			// String pk=Utils.toHexString(kp.getPrivateKey(),64);
 			addressArea.setText(kp.getAddress().toChecksumHex());
-			publicKeyArea.setText(hexKeyFormat(Utils.toHexString(kp.getPublicKey(), 128)));
+			publicKeyArea.setText(hexKeyFormat(kp.getAddress().toChecksumHex()));
 			addWalletButton.setEnabled(true);
 		} catch (Exception ex) {
 			addressArea.setText("<enter valid private key>");

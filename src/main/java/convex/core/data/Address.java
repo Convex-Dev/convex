@@ -3,7 +3,6 @@ package convex.core.data;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 
-import convex.core.Constants;
 import convex.core.crypto.Hash;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Errors;
@@ -26,7 +25,7 @@ import convex.core.util.Utils;
  * 
  */
 public class Address extends AArrayBlob {
-	public static final int LENGTH = (Constants.USE_ED25519) ? 32 : 20;
+	public static final int LENGTH = 32;
 
 	public static final int LENGTH_BITS = LENGTH * 8;
 

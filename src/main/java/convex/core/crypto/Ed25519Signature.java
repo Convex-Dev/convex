@@ -77,7 +77,9 @@ public class Ed25519Signature extends ASignature {
 		    verifier.initVerify(publicKey);
 		    verifier.update(hash.getInternalArray(),hash.getOffset(),Hash.LENGTH);
 			return verifier.verify(signatureBytes);
-		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+		} catch (SignatureException se) {	
+			return false;
+		} catch (NoSuchAlgorithmException | InvalidKeyException e) {
 			throw new Error(e);
 		}
 	}
@@ -102,6 +104,7 @@ public class Ed25519Signature extends ASignature {
 	public String toHexString() {
 		return Utils.toHexString(signatureBytes);
 	}
+
 
 
 }

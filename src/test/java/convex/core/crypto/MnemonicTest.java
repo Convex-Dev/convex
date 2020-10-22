@@ -8,7 +8,6 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.Constants;
 import convex.core.data.Blob;
 
 public class MnemonicTest {
@@ -40,30 +39,5 @@ public class MnemonicTest {
 		String mnem = Mnemonic.createSecureRandom();
 		byte[] bs = Mnemonic.decode(mnem, 128);
 		assertEquals(16, bs.length);
-	}
-
-	@Test
-	public void testRoundTripKeyPair() {
-		Random r = new Random(78976976);
-		for (int i = 0; i < 100; i++) {
-			byte[] bs = Blob.createRandom(r, 32).getBytes();
-			String m = Mnemonic.encode(bs);
-
-			// round trip to keypair
-			ECDSAKeyPair kp = ECDSAKeyPair.create(bs);
-			String rm = Mnemonic.encode(kp.getPrivateKey(), 256);
-			assertEquals(m, rm);
-		}
-	}
-
-	@Test
-	public void testExample() {
-		if (Constants.USE_ED25519) {
-			assertEquals("a2cafeeaf8bce9d285669621a0be25327a94c6147ea0772e52cf2df490367423", Mnemonic
-					.decodeKeyPair("soft hulk kim led cog java wad bess tune army tube wast").getAddress().toHexString());
-		} else {
-			assertEquals("a0be25327a94c6147ea0772e52cf2df490367423", Mnemonic
-				.decodeKeyPair("soft hulk kim led cog java wad bess tune army tube wast").getAddress().toHexString());
-		}
 	}
 }

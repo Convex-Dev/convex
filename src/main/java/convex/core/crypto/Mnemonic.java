@@ -237,10 +237,10 @@ public class Mnemonic {
 		return encode(bs);
 	}
 
-	public static ECDSAKeyPair decodeKeyPair(String s) {
+	public static AKeyPair decodeKeyPair(String s) {
 		byte[] bs = Mnemonic.decode(s, 128);
 		Hash h = Blob.wrap(bs).getContentHash();
-		ECDSAKeyPair kp = ECDSAKeyPair.create(h.getBytes());
+		Ed25519KeyPair kp = Ed25519KeyPair.create(h.getBytes());
 		return kp;
 	}
 }

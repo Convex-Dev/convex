@@ -9,9 +9,6 @@ import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
 
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-
-import convex.core.crypto.ECDSASignature;
 import convex.core.data.Blob;
 import convex.core.util.Utils;
 
@@ -19,7 +16,6 @@ import convex.core.util.Utils;
  * Test class for Ed25519 functionality
  */
 public class Ed25519Sign {
-	protected static final BouncyCastleProvider SECURITY_PROVIDER=ECDSASignature.SECURITY_PROVIDER;
 
 	public static void main(String[] args) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException, SignatureException {
 		

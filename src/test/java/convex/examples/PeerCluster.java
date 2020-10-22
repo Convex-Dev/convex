@@ -6,7 +6,8 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import convex.core.State;
-import convex.core.crypto.ECDSAKeyPair;
+import convex.core.crypto.AKeyPair;
+import convex.core.crypto.Ed25519KeyPair;
 import convex.core.data.AString;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
@@ -29,12 +30,12 @@ public class PeerCluster {
 
 	public static final int NUM_PEERS = 5;
 	public static final ArrayList<Map<Keyword, Object>> PEER_CONFIGS = new ArrayList<>(NUM_PEERS);
-	public static final ArrayList<ECDSAKeyPair> PEER_KEYS = new ArrayList<>(NUM_PEERS);
+	public static final ArrayList<AKeyPair> PEER_KEYS = new ArrayList<>(NUM_PEERS);
 
 	static {
 		// create a key pair for each peer
 		for (int i = 0; i < NUM_PEERS; i++) {
-			PEER_KEYS.add(ECDSAKeyPair.generate());
+			PEER_KEYS.add(Ed25519KeyPair.createSeeded(1000+i));
 		}
 
 		// create configuration maps for each peer

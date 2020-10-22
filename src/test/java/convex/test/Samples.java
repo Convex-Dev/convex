@@ -2,14 +2,12 @@ package convex.test;
 
 import static org.junit.Assert.assertTrue;
 
-import java.math.BigInteger;
 import java.util.Random;
 
 import org.junit.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
-import convex.core.crypto.ECDSASignature;
 import convex.core.crypto.Ed25519Signature;
 import convex.core.crypto.Hash;
 import convex.core.data.AMap;
@@ -50,7 +48,7 @@ public class Samples {
 	 */
 	public static final Address BAD_ADDRESS = Address.dummy("012345");
 	
-	public static final ECDSASignature BAD_SIGNATURE = ECDSASignature.create(0, BigInteger.ONE, BigInteger.ONE);
+	public static final ASignature BAD_SIGNATURE = Ed25519Signature.wrap(Blobs.createRandom(64).getBytes());
 
 	public static final VectorLeaf<Integer> INT_VECTOR_10 = createTestIntVector(10);
 	public static final VectorLeaf<Integer> INT_VECTOR_16 = createTestIntVector(16);

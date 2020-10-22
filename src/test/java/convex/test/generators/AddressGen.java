@@ -6,7 +6,8 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
-import convex.core.crypto.ECDSAKeyPair;
+import convex.core.crypto.AKeyPair;
+import convex.core.crypto.Ed25519KeyPair;
 import convex.core.data.Address;
 
 public class AddressGen extends Generator<Address> {
@@ -17,7 +18,7 @@ public class AddressGen extends Generator<Address> {
 	@Override
 	public Address generate(SourceOfRandomness r, GenerationStatus status) {
 
-		ECDSAKeyPair kp = ECDSAKeyPair.generate(new SecureRandom());
-		return Address.fromPublicKey(kp.getPublicKey());
+		AKeyPair kp = Ed25519KeyPair.generate(new SecureRandom());
+		return kp.getAddress();
 	}
 }
