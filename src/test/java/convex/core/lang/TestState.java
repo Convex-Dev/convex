@@ -147,7 +147,7 @@ public class TestState {
 
 	@Test
 	public void testInitial() {
-		Context<?> ctx = Context.createFake(INITIAL);
+		Context<?> ctx = Context.createFake(INITIAL,Init.HERO);
 		State s = ctx.getState();
 		assertEquals(INITIAL, s);
 		assertEquals(Init.HERO,ctx.computeSpecial(Symbols.STAR_ADDRESS).getResult());

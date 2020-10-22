@@ -15,12 +15,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import convex.api.Shutdown;
-
 import convex.core.Belief;
 import convex.core.Block;
 import convex.core.BlockResult;
 import convex.core.ErrorCodes;
-import convex.core.Init;
 import convex.core.Peer;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
@@ -503,17 +501,16 @@ public class Server implements Closeable {
 	}
 
 	private void processQuery(Message m) {
-		// query is a vector [id , form, address?]
-		AVector<Object> v = m.getPayload();
-		Long id = (Long) v.get(0);
-		Object form = v.get(1);
-		
-		// extract the Address, or use HERO if not available.
-		Address address = (v.count() > 2) ? (Address) v.get(2) : Init.HERO; // optional address
-		if (address==null) address=Init.HERO;
-		
-		Connection pc = m.getPeerConnection();
 		try {
+			// query is a vector [id , form, address?]
+			AVector<Object> v = m.getPayload();
+			Long id = (Long) v.get(0);
+			Object form = v.get(1);
+			
+			// extract the Address, or use HERO if not available.
+			Address address = (Address) v.get(2); 
+			
+			Connection pc = m.getPeerConnection();
 			log.info("Processing query: " + form + " with address: " + address);
 			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " + address);
 			Context<?> result = peer.executeQuery(form, address);
@@ -527,7 +524,7 @@ public class Server implements Closeable {
 			}
 
 		} catch (Throwable t) {
-			log.warning("Query Error: " + form + " :: " + t);
+			log.warning("Query Error: "+ t);
 		}
 	}
 

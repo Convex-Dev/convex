@@ -192,7 +192,7 @@ public final class Context<T> extends AObject {
 	 * @return Fake context
 	 */
 	public static <R> Context<R> createFake(State state) {
-		return createFake(state,Init.HERO);
+		return createFake(state,Address.ZERO);
 	}
 	
 	/**

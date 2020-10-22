@@ -76,7 +76,7 @@ public class ServerTest {
 		// Connect to Peer Server using the current store for the client
 		Connection pc = Connection.connect(hostAddress, handler, Stores.current());
 		AVector<Long> v = Vectors.of(1l, 2l, 3l);
-		long id1 = pc.sendQuery(v);
+		long id1 = pc.sendQuery(v,Init.HERO);
 		Utils.timeout(200, () -> results.get(id1) != null);
 		assertEquals(v, results.get(id1));
 	}
