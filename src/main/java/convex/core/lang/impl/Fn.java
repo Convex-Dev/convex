@@ -6,6 +6,7 @@ import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
+import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
@@ -45,7 +46,11 @@ public class Fn<T> extends AFn<T> {
 
 	public static <T, I> Fn<T> create(AVector<Syntax> params, AOp<T> body, Context<I> context) {
 		AHashMap<Symbol, Object> binds = context.getLocalBindings();
-
+		return new Fn<T>(params, body, binds);
+	}
+	
+	public static <T, I> Fn<T> create(AVector<Syntax> params, AOp<T> body) {
+		AHashMap<Symbol, Object> binds = Maps.empty();
 		return new Fn<T>(params, body, binds);
 	}
 
@@ -155,7 +160,6 @@ public class Fn<T> extends AFn<T> {
 		params.print(sb);
 		sb.append(' ');
 		body.print(sb);
-		sb.append(')');
 	}
 
 	@Override

@@ -226,5 +226,11 @@ public class OpsTest {
 		Fn<Object> fn = c2.getResult();
 		assertEquals(sym, fn.getParams().get(0).getValue());
 	}
+	
+	@Test
+	public void testLambdaString() {
+		Fn<Object> fn = Fn.create(Vectors.empty(), Constant.nil());
+		assertEquals("(fn [] nil)",fn.toString());
+	}
 
 }
