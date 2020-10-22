@@ -295,7 +295,7 @@ public class Convex {
 	 * Submits a query to the Convex network, returning a Future once the query 
 	 * has been successfully queued.
 	 * 
-	 * @param transaction Query to execute, as a Form or Op
+	 * @param query Query to execute, as a Form or Op
 	 * @return A Future for the result of the query
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
@@ -307,8 +307,8 @@ public class Convex {
 	 * Submits a query to the Convex network, returning a Future once the query 
 	 * has been successfully queued.
 	 * 
-	 * @param transaction Query to execute, as a Form or Op
-	 * @param Address Address to use for the query
+	 * @param query Query to execute, as a Form or Op
+	 * @param address Address to use for the query
 	 * @return A Future for the result of the query
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
@@ -328,19 +328,47 @@ public class Convex {
 		return cf;
 	}
 
+	/**
+	 * Executes a query synchronously and waits for the Result
+	 * 
+	 */
 	public Result querySync(Object query) throws TimeoutException, IOException, InterruptedException, ExecutionException {
 		return querySync(query,getAddress());
 	}
 	
-	public Result querySync(Object query, long timeoutMillis) throws TimeoutException, IOException, InterruptedException, ExecutionException {
+	/**
+	 * Executes a query synchronously and waits for the Result
+	 * 
+	 * @param timeoutMillis Timeout to wait for query result. Will throw TimeoutException if not received in this time
+	 * @param query Query to execute, as a Form or Op
+	 * @return Result of query
+	 * @throws TimeoutException 
+	 */
+	public Result querySync(Object query, long timeoutMillis) throws IOException, InterruptedException, ExecutionException, TimeoutException {
 		return querySync(query,getAddress(),timeoutMillis);
 	}
 
 	
-	public Result querySync(Object query, Address address) throws TimeoutException, IOException, InterruptedException, ExecutionException {
+	/**
+	 * Executes a query synchronously and waits for the Result
+	 * 
+	 * @param address Address to use for the query
+	 * @param query Query to execute, as a Form or Op
+	 * @return Result of query
+	 * @throws TimeoutException 
+	 */
+	public Result querySync(Object query, Address address) throws IOException, InterruptedException, ExecutionException, TimeoutException {
 		return querySync(query,address,Constants.DEFAULT_CLIENT_TIMEOUT);
 	}
 
+	/**
+	 * Executes a query synchronously and waits for the Result
+	 * 
+	 * @param timeoutMillis Timeout to wait for query result. Will throw TimeoutException if not received in this time
+	 * @param address Address to use for the query
+	 * @param query Query to execute, as a Form or Op
+	 * @return Result of query
+	 */
 	public Result querySync(Object query, Address address, long timeoutMillis) throws TimeoutException, IOException, InterruptedException, ExecutionException {
 		return query(query,address).get(timeoutMillis,TimeUnit.MILLISECONDS);
 	}
