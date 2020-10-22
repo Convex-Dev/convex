@@ -165,21 +165,21 @@ public class Peer {
 	 * 
 	 * @param <T> Type of result
 	 * @param form Form to compile and execute.
-	 * @param origin Address to use for query execution
-	 * @return The Context containing the query results.
+	 * @param address Address to use for query execution
+	 * @return The Context containing the query results. Will be NOBODY error if address / account does not exist
 	 */
 	@SuppressWarnings("unchecked")
-	public <T> Context<T> executeQuery(Object form, Address origin) {
+	public <T> Context<T> executeQuery(Object form, Address address) {
 		State state=getConsensusState();
 		
-		if (origin==null) {
+		if (address==null) {
 			return  Context.createFake(state).withError(ErrorCodes.NOBODY,"Null Address provided for query");
 		}
 		
-		Context<?> ctx= Context.createFake(state, origin);
+		Context<?> ctx= Context.createFake(state, address);
 		
-		if (state.getAccount(origin)==null) {
-			return ctx.withError(ErrorCodes.NOBODY,"Account does not exist for executeQuery: "+origin);
+		if (state.getAccount(address)==null) {
+			return ctx.withError(ErrorCodes.NOBODY,"Account does not exist for query: "+address);
 		}
 
 		Context<AOp<T>> ectx = ctx.expandCompile(form);

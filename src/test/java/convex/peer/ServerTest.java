@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
@@ -82,10 +83,13 @@ public class ServerTest {
 	}
 	
 	@Test
-	public void testConvexAPI() throws IOException, InterruptedException, ExecutionException {
+	public void testConvexAPI() throws IOException, InterruptedException, ExecutionException, TimeoutException {
 		Convex convex=Convex.connect(server.getHostAddress(),Init.VILLAIN_KP);
 		
 		Future<convex.core.Result> f=convex.query(Symbols.STAR_BALANCE);
+		convex.core.Result f2=convex.querySync(Symbols.STAR_ADDRESS);
+		
+		assertEquals(Init.VILLAIN,f2.getValue());
 		assertEquals(Init.STATE.getBalance(Init.VILLAIN),f.get().getValue());
 	}
 	
