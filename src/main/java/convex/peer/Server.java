@@ -517,7 +517,15 @@ public class Server implements Closeable {
 			if (result.isExceptional()) {
 				AExceptional err = result.getExceptional();
 				Object code=err.getCode();
-				Object message=(err instanceof ErrorValue)?((ErrorValue)err).getMessage():err.toString();
+				Object message=(err instanceof ErrorValue)?((ErrorValue)err).getMessage():Strings.create(err.toString());
+				
+				// TODO: remove once we are sure everything is safe
+				if (message instanceof String) {
+					String sm=(String)message;
+					message=Strings.create(sm);
+					log.warning("Converted String message: " + sm);
+				}
+				
 				pc.sendResult(id, message, code);
 			} else {
 				pc.sendResult(id, result.getResult());
