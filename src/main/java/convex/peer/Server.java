@@ -523,7 +523,7 @@ public class Server implements Closeable {
 				if (message instanceof String) {
 					String sm=(String)message;
 					message=Strings.create(sm);
-					log.warning("Converted String message: " + sm);
+					log.warning("Converted String message in exceptional Result: " + sm);
 				}
 				
 				pc.sendResult(id, message, code);
