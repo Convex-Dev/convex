@@ -203,14 +203,14 @@ public class Convex {
 	
 	public CompletableFuture<Result> transact(SignedData<ATransaction> signed) throws IOException {
 		CompletableFuture<Result> cf=new CompletableFuture<Result>();
-		long id=connection.sendTransaction(signed);
-		
-		if (id<0) {
-			throw new IOException("Failed to send transaction due to full buffer");
-		}
-		
-		// Store future for completion by result message
 		synchronized (awaiting) {
+			long id=connection.sendTransaction(signed);
+			
+			if (id<0) {
+				throw new IOException("Failed to send transaction due to full buffer");
+			}
+		
+			// Store future for completion by result message
 			awaiting.put(id,cf);
 		}
 		
@@ -315,13 +315,13 @@ public class Convex {
 	public Future<Result> query(Object query, Address address) throws IOException {
 		CompletableFuture<Result> cf=new CompletableFuture<Result>();
 		
-		long id=connection.sendQuery(query,address);
-		if (id<0) {
-			throw new IOException("Failed to send query due to full buffer");
-		}
-		
-		// Store future for completion by result message
 		synchronized (awaiting) {
+			long id=connection.sendQuery(query,address);
+			if (id<0) {
+				throw new IOException("Failed to send query due to full buffer");
+			}
+		
+			// Store future for completion by result message
 			awaiting.put(id,cf);
 		}
 		
