@@ -514,6 +514,8 @@ public class Server implements Closeable {
 			log.info("Processing query: " + form + " with address: " + address);
 			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " + address);
 			Context<?> result = peer.executeQuery(form, address);
+			boolean resultReturned;
+			
 			if (result.isExceptional()) {
 				AExceptional err = result.getExceptional();
 				Object code=err.getCode();
@@ -526,9 +528,13 @@ public class Server implements Closeable {
 					log.warning("Converted String message in exceptional Result: " + sm);
 				}
 				
-				pc.sendResult(id, message, code);
+				resultReturned=pc.sendResult(id, message, code);
 			} else {
-				pc.sendResult(id, result.getResult());
+				resultReturned=pc.sendResult(id, result.getResult());
+			}
+			
+			if (!resultReturned) {
+				log.warning("Failed to send query result back to client with ID: "+id);
 			}
 
 		} catch (Throwable t) {
