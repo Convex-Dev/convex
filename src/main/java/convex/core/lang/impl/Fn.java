@@ -15,6 +15,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
+import convex.core.lang.Symbols;
 
 /**
  * Value class representing a instantiated closure / lambda function.
@@ -35,6 +36,8 @@ public class Fn<T> extends AClosure<T> {
 
 	private final AVector<Syntax> params;
 	private final AOp<T> body;
+	
+	private Long variadic=null;
 
 	private Fn(AVector<Syntax> params, AOp<T> body, AHashMap<Symbol, Object> lexicalEnv) {
 		super(lexicalEnv);
@@ -58,13 +61,37 @@ public class Fn<T> extends AClosure<T> {
 		if (this.lexicalEnv==env) return (F) this;
 		return (F) new Fn<T>(params, body, env);
 	}
+	
+	@Override
+	public boolean hasArity(int n) {
+		long var=checkVariadic();
+		long pc=params.count();
+		if (var>=0) return (n>=(pc-1));
+		return (n==pc);
+	}
+
+	/**
+	 * Checks if the function is variadic.
+	 * 
+	 * @return negative if non-variadic, index of variadic parameter if variadic
+	 */
+	private Long checkVariadic() {
+		if (variadic!=null) return variadic;
+		long pc=params.count();
+		for (int i=0; i<pc-1; i++) {
+			Syntax syn=params.get(i);
+			if (Symbols.AMPERSAND.equals(syn.getValue())) {
+				variadic=(long) (i+1);
+				return variadic;
+			}
+		}
+		variadic=-1L;
+		return -1L;
+	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public <I> Context<T> invoke(Context<I> context, Object[] args) {
-		int n=args.length;
-		if (!hasArity(n)) return context.withArityError("Function arity not supported: "+args);
-		
 		// update local bindings for the duration of this function call
 		final AHashMap<Symbol, Object> savedBindings = context.getLocalBindings();
 		int initialDepth = context.getDepth();
@@ -216,4 +243,6 @@ public class Fn<T> extends AClosure<T> {
 		body.validateCell();
 		lexicalEnv.validateCell();
 	}
+
+
 }

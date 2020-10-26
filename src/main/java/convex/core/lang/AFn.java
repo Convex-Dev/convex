@@ -33,8 +33,5 @@ public abstract class AFn<T> extends ACell implements IFn<T> {
 	/**
 	 * Tests if this function supports the given arity.
 	 */
-	public boolean hasArity(int n) {
-		// TODO: make this more specific for subclasses
-		return true;
-	}
+	public abstract boolean hasArity(int n);
 }

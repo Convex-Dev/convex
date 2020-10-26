@@ -838,7 +838,7 @@ public final class Context<T> extends AObject {
 				Object bf=v.get(i).getValue(); 
 				
 				if (Symbols.AMPERSAND.equals(bf)) {
-					if (foundAmpersand) return ctx.withCompileError("Can't bind two or more ampersands n single binding vector");
+					if (foundAmpersand) return ctx.withCompileError("Can't bind two or more ampersands in a single binding vector");
 					
 					long nLeft=bindCount-i-2; // number of following bindings should be zero in usual usage [... & more]
 					if (nLeft<0) return ctx.withCompileError("Can't bind ampersand at end of binding form");

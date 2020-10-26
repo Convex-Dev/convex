@@ -1945,7 +1945,9 @@ public class CoreTest {
 	public void testFnMulti() {
 		assertEquals(1L,evalL("((fn ([] 1)))"));
 		assertEquals(2L,evalL("((fn ([x] 2)) 1)"));
-		// TODO: more cases!
+		
+		assertEquals(1L,evalL("((fn ([x] 1) ([x y] 2)) 1)"));
+		assertEquals(2L,evalL("((fn ([x] 1) ([x y] 2)) 1 3)"));
 	}
 
 	@Test

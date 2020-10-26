@@ -27,7 +27,7 @@ import convex.core.util.Utils;
  *
  * @param <T>
  */
-public class Lambda<T> extends AOp<Fn<T>> {
+public class Lambda<T> extends AOp<AClosure<T>> {
 	
 	private Ref<AClosure<T>> function;
 
@@ -44,8 +44,8 @@ public class Lambda<T> extends AOp<Fn<T>> {
 	}
 
 	@Override
-	public <I> Context<Fn<T>> execute(Context<I> context) {
-		Fn<T> fn= function.getValue().withEnvironment(context.getLocalBindings());
+	public <I> Context<AClosure<T>> execute(Context<I> context) {
+		AClosure<T> fn= function.getValue().withEnvironment(context.getLocalBindings());
 		return context.withResult(Juice.LAMBDA,fn);
 	}
 
@@ -108,5 +108,9 @@ public class Lambda<T> extends AOp<Fn<T>> {
 	@Override
 	public void validateCell() throws InvalidDataException {
 		// nothing to do?
+	}
+
+	public AClosure<T> getFunction() {
+		return function.getValue();
 	}
 }

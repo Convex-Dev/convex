@@ -3,9 +3,11 @@ package convex.core.lang;
 import static convex.test.Assertions.assertJuiceError;
 import static convex.test.Assertions.assertUndeclaredError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -16,6 +18,7 @@ import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.Fn;
 import convex.core.lang.ops.Cond;
 import convex.core.lang.ops.Constant;
@@ -212,9 +215,10 @@ public class OpsTest {
 
 		Lambda<Object> lam = Lambda.create(Vectors.of(Syntax.create(sym)), Lookup.create(sym));
 
-		Context<Fn<Object>> c2 = c.execute(lam);
-		Fn<Object> fn = c2.getResult();
-		assertEquals(sym, fn.getParams().get(0).getValue());
+		Context<AClosure<Object>> c2 = c.execute(lam);
+		AClosure<Object> fn = c2.getResult();
+		assertTrue(fn.hasArity(1));
+		assertFalse(fn.hasArity(2));
 	}
 	
 	@Test
