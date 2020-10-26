@@ -2,11 +2,9 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
-import convex.core.data.AMap;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Format;
-import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.AOp;
@@ -37,15 +35,6 @@ public class Do<T> extends AMultiOp<T> {
 	protected Do<T> recreate(ASequence<AOp<?>> newOps) {
 		if (ops == newOps) return this;
 		return new Do<T>(newOps.toVector());
-	}
-
-	@Override
-	public AOp<T> specialise(AMap<Symbol, Object> binds) {
-		AVector<AOp<?>> newOps = ops.map(op -> {
-			return op.specialise(binds);
-		});
-		if (ops == newOps) return this;
-		return recreate(newOps);
 	}
 
 	public static <T> Do<T> create(ASequence<AOp<?>> ops) {

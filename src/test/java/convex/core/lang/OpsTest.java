@@ -6,14 +6,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.State;
 import convex.core.data.AMap;
 import convex.core.data.AString;
-import convex.core.data.Maps;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
@@ -59,14 +57,6 @@ public class OpsTest {
 			assertEquals(INITIAL_JUICE - Juice.CONSTANT, c2.getJuice());
 			assertNull(c2.getResult());
 		}
-	}
-
-	@Test
-	public void testSpecialise() {
-		Symbol sym = Symbol.create("foo");
-		AMap<Symbol, Object> binds = Maps.of(sym, 17);
-
-		assertTrue(Lookup.create(sym).specialise(binds) instanceof Constant);
 	}
 
 	@Test

@@ -2,12 +2,10 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
-import convex.core.data.AMap;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
-import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.AOp;
@@ -118,14 +116,4 @@ public class Cond<T> extends AMultiOp<T> {
 		ASequence<AOp<?>> newOps= ops.updateRefs(func);
 		return recreate(newOps);
 	}
-	
-	@Override
-	public AOp<T> specialise(AMap<Symbol, Object> binds)  {
-		AVector<AOp<?>> newOps=ops.map(op->{
-			return op.specialise(binds);
-		});
-		if (ops==newOps) return this;
-		return recreate(newOps);
-	}
-
 }

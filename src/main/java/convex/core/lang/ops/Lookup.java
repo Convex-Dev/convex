@@ -2,7 +2,6 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
-import convex.core.data.AMap;
 import convex.core.data.Address;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
@@ -101,17 +100,6 @@ public class Lookup<T> extends AOp<T> {
 	@Override
 	public Lookup<T> updateRefs(IRefFunction func) {
 		return this;
-	}
-
-	@SuppressWarnings("unchecked")
-	@Override
-	public AOp<T> specialise(AMap<Symbol, Object> binds) {
-		if (binds.containsKey(symbol)) {
-			// bindings cover lookup
-			return Constant.create((T) binds.get(symbol));
-		} else {
-			return this;
-		}
 	}
 
 	@Override

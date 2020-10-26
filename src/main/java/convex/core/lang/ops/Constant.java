@@ -3,14 +3,12 @@ package convex.core.lang.ops;
 import java.nio.ByteBuffer;
 
 import convex.core.data.AList;
-import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Strings;
-import convex.core.data.Symbol;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
@@ -108,12 +106,6 @@ public class Constant<T> extends AOp<T> {
 	@SuppressWarnings("unchecked")
 	public static <T> AOp<T> nil() {
 		return (AOp<T>) Constant.NULL;
-	}
-
-	@Override
-	public AOp<T> specialise(AMap<Symbol, Object> binds) {
-		// constants never affected by specialisation
-		return this;
 	}
 
 	@Override

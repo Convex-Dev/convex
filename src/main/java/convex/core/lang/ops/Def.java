@@ -2,7 +2,6 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
-import convex.core.data.AMap;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
@@ -118,14 +117,6 @@ public class Def<T> extends AOp<T> {
 		Syntax symbol = Format.read(b);
 		Ref<AOp<T>> ref = Format.readRef(b);
 		return create(symbol, ref);
-	}
-
-	@Override
-	public AOp<T> specialise(AMap<Symbol, Object> binds) {
-		AOp<T> oldOp = op.getValue();
-		AOp<T> newOp = oldOp.specialise(binds);
-		if (oldOp == newOp) return this;
-		return new Def<T>(symbol, newOp.getRef());
 	}
 
 	@Override

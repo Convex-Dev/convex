@@ -13,7 +13,6 @@ import convex.core.data.Syntax;
 import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.AFn;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
 
@@ -29,19 +28,18 @@ import convex.core.lang.Context;
  * 
  * @param <T> Return type of function
  */
-public class Fn<T> extends AFn<T> {
+public class Fn<T> extends AClosure<T> {
 
 	// note: embedding these fields directly for efficiency rather than going by
 	// Refs.
 
 	private final AVector<Syntax> params;
 	private final AOp<T> body;
-	private final AHashMap<Symbol, Object> lexicalEnv;
 
 	private Fn(AVector<Syntax> params, AOp<T> body, AHashMap<Symbol, Object> lexicalEnv) {
+		super(lexicalEnv);
 		this.params = params;
 		this.body = body;
-		this.lexicalEnv = lexicalEnv;
 	}
 
 	public static <T, I> Fn<T> create(AVector<Syntax> params, AOp<T> body, Context<I> context) {
@@ -52,6 +50,13 @@ public class Fn<T> extends AFn<T> {
 	public static <T, I> Fn<T> create(AVector<Syntax> params, AOp<T> body) {
 		AHashMap<Symbol, Object> binds = Maps.empty();
 		return new Fn<T>(params, body, binds);
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public <F extends AClosure<T>> F withEnvironment(AHashMap<Symbol, Object> env) {
+		if (this.lexicalEnv==env) return (F) this;
+		return (F) new Fn<T>(params, body, env);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -211,5 +216,4 @@ public class Fn<T> extends AFn<T> {
 		body.validateCell();
 		lexicalEnv.validateCell();
 	}
-
 }

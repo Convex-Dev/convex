@@ -3,7 +3,6 @@ package convex.core.lang.ops;
 import java.nio.ByteBuffer;
 
 import convex.core.data.AHashMap;
-import convex.core.data.AMap;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Format;
@@ -199,29 +198,5 @@ public class Let<T> extends AMultiOp<T> {
 		AVector<Syntax> syms = Format.read(b);
 		AVector<AOp<?>> ops = Format.read(b);
 		return createLet(syms, ops.toVector());
-	}
-
-	@Override
-	public AOp<T> specialise(AMap<Symbol, Object> binds) {
-		AVector<AOp<?>> oldOps = ops;
-
-		for (int i = 0; i < bindingCount; i++) {
-			AOp<?> old = oldOps.get(i);
-			AOp<?> neww = old.specialise(binds);
-			if (old != neww) oldOps = oldOps.assoc(i, neww);
-			Object s = symbols.get(i);
-
-			// TODO: fix this dirty hack
-			if (s instanceof Symbol) {
-				binds = binds.dissoc((Symbol) s);
-			}
-		}
-		int n = oldOps.size();
-		for (int i = bindingCount; i < n; i++) {
-			AOp<?> old = oldOps.get(i);
-			AOp<?> neww = old.specialise(binds);
-			if (old != neww) oldOps = oldOps.assoc(i, neww);
-		}
-		return recreate(oldOps);
 	}
 }

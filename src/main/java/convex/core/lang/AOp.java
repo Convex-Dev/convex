@@ -3,9 +3,7 @@ package convex.core.lang;
 import java.util.concurrent.ExecutionException;
 
 import convex.core.data.ACell;
-import convex.core.data.AMap;
 import convex.core.data.IRefFunction;
-import convex.core.data.Symbol;
 import convex.core.data.Tag;
 
 /**
@@ -68,16 +66,6 @@ public abstract class AOp<T> extends ACell {
 	 */
 	@Override
 	public abstract int writeRaw(byte[] bs, int pos);
-
-	/**
-	 * Specialise this Op with a given set of bindings. Specialisation replaces
-	 * symbol lookups with specific values. TODO: how useful is this? Make more
-	 * general?
-	 * 
-	 * @param binds Bindings of symbols to replace within this Op.
-	 * @return This op specialised with the given bindings.
-	 */
-	public abstract AOp<T> specialise(AMap<Symbol, Object> binds);
 	
 	@Override
 	public abstract AOp<T> updateRefs(IRefFunction func);
