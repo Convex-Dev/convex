@@ -66,7 +66,7 @@ public class Fn<T> extends AClosure<T> {
 	public boolean hasArity(int n) {
 		long var=checkVariadic();
 		long pc=params.count();
-		if (var>=0) return (n>=(pc-1));
+		if (var>=0) return n>=(pc-2); // n must be at least number of params excluding [& more]
 		return (n==pc);
 	}
 

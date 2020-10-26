@@ -1946,8 +1946,22 @@ public class CoreTest {
 		assertEquals(1L,evalL("((fn ([] 1)))"));
 		assertEquals(2L,evalL("((fn ([x] 2)) 1)"));
 		
-		assertEquals(1L,evalL("((fn ([x] 1) ([x y] 2)) 1)"));
-		assertEquals(2L,evalL("((fn ([x] 1) ([x y] 2)) 1 3)"));
+		// dispatch by arity
+		assertEquals(1L,evalL("((fn ([x] 1) ([x y] 2)) 3)"));
+		assertEquals(2L,evalL("((fn ([x] 1) ([x y] 2)) 3 4)"));
+		
+		// first matching impl chosen
+		assertEquals(1L,evalL("((fn ([x] 1) ([x] 2)) 3)"));
+
+		// variadic match
+		assertEquals(2L,evalL("((fn ([x] 1) ([x & more] 2)) 3 4 5 6)"));
+		assertEquals(2L,evalL("((fn ([x] 1) ([x y & more] 2)) 3 4)"));
+
+		// arity errors
+		assertArityError(step("((fn ([x] 1) ([x & more] 2)))")); 
+		assertArityError(step("((fn ([x] 1) ([x y] 2)))")); 
+		assertArityError(step("((fn ([x] 1) ([x y z] 2)) 2 3)")); 
+		assertArityError(step("((fn ([x] 1) ([x y z & more] 2)) 2 3)")); 
 	}
 
 	@Test
