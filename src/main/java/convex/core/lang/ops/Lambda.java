@@ -31,21 +31,16 @@ public class Lambda<T> extends AOp<Fn<T>> {
 	
 	private Ref<AClosure<T>> function;
 
-	public Lambda(Ref<AClosure<T>> newFunction) {
+	protected Lambda(Ref<AClosure<T>> newFunction) {
 		this.function=newFunction;
 	}
 	
-	protected Lambda(AVector<Syntax> params, Ref<AOp<T>> body) {
-		this(Fn.create(params, body.getValue()).getRef());
-	}
-
-
-	public static <T> Lambda<T> create(AVector<Syntax> params, Ref<AOp<T>> body) {
-		return new Lambda<T>(params,body);
-	}
-
 	public static <T> Lambda<T> create(AVector<Syntax> params, AOp<T> body) {
-		return create(params,body.getRef());
+		return new Lambda<T>(Fn.create(params,body).getRef());
+	}
+
+	public static <T> Lambda<T> create(AClosure<T> fn) {
+		return new Lambda<T>(fn.getRef());
 	}
 
 	@Override
