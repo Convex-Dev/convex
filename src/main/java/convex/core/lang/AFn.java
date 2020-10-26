@@ -20,6 +20,17 @@ public abstract class AFn<T> extends ACell implements IFn<T> {
 	public abstract AFn<T> updateRefs(IRefFunction func);
 
 	/**
+	 * Tests if this function supports the given argument list
+	 * 
+	 * By default, checks if the function supports the given arity only.
+	 * 
+	 * TODO: intention is to override this to include dynamic type checks etc.
+	 */
+	public boolean supportsArgs(Object[] args) {
+		return hasArity(args.length);
+	}
+	
+	/**
 	 * Tests if this function supports the given arity.
 	 */
 	public boolean hasArity(int n) {

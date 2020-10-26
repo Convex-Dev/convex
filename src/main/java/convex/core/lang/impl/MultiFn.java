@@ -55,15 +55,13 @@ public class MultiFn<T> extends AFn<T> {
 
 	@Override
 	public <I> Context<T> invoke(Context<I> context, Object[] args) {
-		int n=args.length;
 		for (int i=0; i<num; i++) {
 			Fn<T> fn=fns.get(i);
-			if (fn.hasArity(i)) {
-				// TODO: type checks (haha, have fun!)
+			if (fn.supportsArgs(args)) {
 				return fn.invoke(context, args);
 			}
 		}
-		return context.withArityError("No matching function arity found for arity "+n);
+		return context.withArityError("No matching function arity found for arity "+args.length);
 	}
 
 	@Override
