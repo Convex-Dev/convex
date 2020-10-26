@@ -3,10 +3,14 @@
   ;;
   ;; This library is based on the Reference Monitor security model. The library works with 'Trust Monitors', which are 
   ;; a design pattern of for reference monitors on the Convex platform.
-  ;;
-  ;; deploy with: (deploy-once trust-code)
   ;; 
-  ;; import with (import <address of trust> :as trust)
+  ;; See: https://en.wikipedia.org/wiki/Reference_monitor
+  ;;
+  ;; Library operation:
+  ;;
+  ;;   deploy with: (deploy-once trust-code)
+  ;; 
+  ;;   import with (import <address of trust> :as trust)
   ;;
   ;; Key usage:
   ;;   (trust/trusted? trust-store address)                        ;; Checks if subject is trusted
@@ -45,7 +49,7 @@
          
          ;; controller determines who can modify the whitelist
          (def controller ~(address controller))
-       
+         
          (defn check-trusted? [subject action object]
            (contains-key? whitelist (address subject)))
          
