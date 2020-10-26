@@ -9,6 +9,11 @@ import java.util.function.Predicate;
 
 import convex.core.exceptions.InvalidDataException;
 
+/**
+ * Experimental: implementation of AVector backed by a Java array for temporary usage purposes.
+ *
+ * @param <T>
+ */
 public class VectorArray<T> extends ASizedVector<T> {
 
 	private final T[] array;

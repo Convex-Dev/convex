@@ -32,7 +32,7 @@ public class Vectors {
 	}
 
 	/**
-	 * Create a vector using blocks. Suitable for a ListVector tail.
+	 * Create a canonical vector using blocks. Suitable for a ListVector tail.
 	 * 
 	 * @param elements
 	 * @param offset
@@ -85,8 +85,6 @@ public class Vectors {
 
 	@SuppressWarnings("unchecked")
 	public static <T> AVector<T> repeat(T m, int count) {
-		// TODO: could duplicate Refs as performance enhancement? Probably not important
-		// though
 		Object[] obs = new Object[count];
 		Arrays.fill(obs, m);
 		return (AVector<T>) create(obs);
