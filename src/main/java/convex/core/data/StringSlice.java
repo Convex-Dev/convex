@@ -16,7 +16,6 @@ public class StringSlice extends AString {
 		this.start=start;
 	}
 
-
 	public static AString create(StringTree source, int start, int len) {
 		if (len==0) return Strings.EMPTY;
 		if (len<0) throw new IllegalArgumentException("Negative length");

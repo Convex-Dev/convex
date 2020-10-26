@@ -18,7 +18,7 @@ public abstract class AMultiOp<T> extends AOp<T> {
 	protected final AVector<AOp<?>> ops;
 
 	protected AMultiOp(AVector<AOp<?>> ops) {
-		// TODO: need to think about bounds on number of child ops
+		// TODO: need to think about bounds on number of child ops?
 		this.ops = ops;
 	}
 

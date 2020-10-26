@@ -71,7 +71,7 @@ public final class Context<T> extends AObject {
 	/*
 	 *  Frequently changing fields during execution. Might consider mutability later,
 	 *  but the key idea is that it is very cheap to throw away short-lived Contexts 
-	 *  because the JVM GC generational GC will just sweep them up shortly afterwards.
+	 *  because the JVM generational GC will just sweep them up shortly afterwards.
 	 */
 	
 	private final long juice;
@@ -1500,6 +1500,12 @@ public final class Context<T> extends AObject {
 		return withError(ErrorCodes.ARGUMENT,message);
 	}
 
+	/**
+	 * Gets the current timestamp for this context. The timestamp is the greatest timestamp 
+	 * of all blocks in consensus (including the currently executing block).
+	 * 
+	 * @return Timestamp in milliseconds since UNIX epoch
+	 */
 	public long getTimeStamp() {
 		return getState().getTimeStamp();
 	}
