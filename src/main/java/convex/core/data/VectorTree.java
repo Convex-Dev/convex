@@ -37,17 +37,15 @@ import convex.core.util.Utils;
  * 
  * @param <T>
  */
-public class VectorTree<T> extends AVector<T> {
+public class VectorTree<T> extends ASizedVector<T> {
 
 	public static final int MINIMUM_SIZE = 2 * Vectors.CHUNK_SIZE;
 	private final int shift; // bits in each child block
-	private final long count; // total count of elements
 
 	private final Ref<AVector<T>>[] children;
 
 	private VectorTree(Ref<AVector<T>>[] children, long count) {
-		super();
-		this.count = count;
+		super(count);
 		this.shift = computeShift(count);
 		this.children = children;
 	}
@@ -148,11 +146,6 @@ public class VectorTree<T> extends AVector<T> {
 		Ref<AVector<T>>[] newChildren = children.clone();
 		newChildren[b] = nc.getRef();
 		return new VectorTree<T>(newChildren, count);
-	}
-
-	@Override
-	public long count() {
-		return count;
 	}
 
 	@Override

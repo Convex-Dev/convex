@@ -30,7 +30,7 @@ import convex.core.util.Utils;
  *
  * @param <T> Type of vector elements
  */
-public class VectorLeaf<T> extends AVector<T> {
+public class VectorLeaf<T> extends ASizedVector<T> {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static final VectorLeaf<?> EMPTY = new VectorLeaf(new Ref<?>[0]);
 
@@ -39,13 +39,11 @@ public class VectorLeaf<T> extends AVector<T> {
 
 	private final Ref<T>[] items;
 	private final Ref<AVector<T>> prefix;
-	private final long count;
 
 	VectorLeaf(Ref<T>[] items, Ref<AVector<T>> prefix, long count) {
+		super(count);
 		this.items = items;
 		this.prefix = prefix;
-
-		this.count = count;
 	}
 
 	VectorLeaf(Ref<T>[] items) {
@@ -243,11 +241,6 @@ public class VectorLeaf<T> extends AVector<T> {
 		}
 
 		return new VectorLeaf<T>(items, tail, count);
-	}
-
-	@Override
-	public long count() {
-		return count;
 	}
 
 	@Override
