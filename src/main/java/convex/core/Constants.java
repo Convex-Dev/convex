@@ -28,12 +28,6 @@ public class Constants {
 	 */
 	public static final long INITIAL_MEMORY_PRICE = 10L;
 
-	/**
-	 * Memory accounting on/off switch. If off, no memory accounting will be applied for
-	 * transactions
-	 */
-	public static final boolean USE_MEMORY_ACCOUNTING=true;
-
 	public static final long MAX_TRANSACTION_JUICE = 1000000;
 
 	public static final boolean ETCH_DELETE_TEMP_ON_EXIT = true;
