@@ -2052,7 +2052,9 @@ public class CoreTest {
 	@Test
 	public void testDefnMulti() {
 		assertEquals(2L,evalL("(do (defn f ([a] 1 2)) (f 3))"));
-		//TODO: more cases
+		assertEquals(2L,evalL("(do (defn f ([] 4) ([a] 1 2)) (f 3))"));
+		
+		assertArityError(step("(do (defn f ([] nil)) (f 3))"));
 	}
 	
 	@Test
