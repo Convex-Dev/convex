@@ -779,9 +779,10 @@ public final class Context<T> extends AObject {
 		Context<R> ctx = fn.invoke(this,args);
 
 		if (ctx.isExceptional()) {
-			AExceptional ex=ctx.getExceptional();
-			if (ex instanceof ErrorValue) {
-				ErrorValue ev=(ErrorValue)ex;
+			Object v=ctx.getExceptional();
+			
+			if (v instanceof ErrorValue) {
+				ErrorValue ev=(ErrorValue)v;
 				ev.addTrace("In function: "+fn.toString());
 			}
 		}
