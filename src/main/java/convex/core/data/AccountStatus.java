@@ -130,7 +130,7 @@ public class AccountStatus extends ARecord {
 	}
 
 	public boolean isActor() {
-		return sequence<0;
+		return sequence==Constants.ACTOR_SEQUENCE;
 	}
 
 	/**
