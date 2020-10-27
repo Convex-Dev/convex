@@ -1963,6 +1963,13 @@ public class CoreTest {
 		assertArityError(step("((fn ([x] 1) ([x y z] 2)) 2 3)")); 
 		assertArityError(step("((fn ([x] 1) ([x y z & more] 2)) 2 3)")); 
 	}
+	
+	@Test
+	public void testFnMultiRecur() {
+		assertEquals(7L,evalL("((fn ([x] x) ([x y] (recur 7))) 1 2)"));
+		
+		assertArityError(step("((fn ([x] x) ([x y] (recur))) 1 2)")); 
+	}
 
 	@Test
 	public void testFnPred() {

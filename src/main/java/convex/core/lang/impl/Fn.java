@@ -89,55 +89,20 @@ public class Fn<T> extends AClosure<T> {
 		return -1L;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public <I> Context<T> invoke(Context<I> context, Object[] args) {
 		// update local bindings for the duration of this function call
 		final AHashMap<Symbol, Object> savedBindings = context.getLocalBindings();
-		int initialDepth = context.getDepth();
 
 		// update to correct lexical environment, then bind function parameters
 		context = context.withLocalBindings(lexicalEnv);
 		Context<?> boundContext = context.updateBindings(params, args);
 		if (boundContext.isExceptional()) return boundContext.withLocalBindings(savedBindings);
 
-		Context<T> rc = boundContext.execute(body);
-		if (rc.isExceptional()) {
-			Object v = rc.getExceptional();
-
-			// recur as many times as needed
-			while (v instanceof RecurValue) {
-				// restore depth, since we are catching an exceptional
-				rc = rc.withDepth(initialDepth);
-
-				RecurValue rv = (RecurValue) v;
-				Object[] newArgs = rv.getValues();
-
-				// clear result to ensure no longer exceptional
-				rc = rc.withResult(null);
-
-				rc = rc.updateBindings(params, newArgs);
-				if (rc.isExceptional()) break; // might be arity error?
-
-				rc = rc.execute(body);
-				v = rc.getValue();
-			}
-
-			// unwrap return value if necessary
-			if (v instanceof ReturnValue) {
-				T o = ((ReturnValue<T>) v).getValue();
-				if (o instanceof AExceptional) {
-					// return exceptional value
-					rc = rc.withException((AExceptional) o);
-				} else {
-					// normal result, need to restore depth since catching an exceptional
-					rc = rc.withResult(o).withDepth(initialDepth);
-				}
-			}
-		}
+		Context<T> ctx = boundContext.execute(body);
 
 		// return with restored bindings
-		return rc.withLocalBindings(savedBindings);
+		return ctx.withLocalBindings(savedBindings);
 	}
 
 	@Override

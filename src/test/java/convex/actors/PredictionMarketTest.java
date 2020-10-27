@@ -119,7 +119,7 @@ public class PredictionMarketTest {
 		ctx = stepAs(VILLAIN, ctx, "(def pmaddr \"" + pmaddr.toHexString() + "\")");
 
 		// initial state checks
-		assertFalse(evalB(ctx, "(call pmaddr (finalised?))"));
+		assertEquals(false,eval(ctx, "(call pmaddr (finalised?))"));
 		assertEquals(0L, evalL(ctx, "(balance pmaddr)"));
 
 		{ // Act 1. Two players stake. our Villain wins this time....

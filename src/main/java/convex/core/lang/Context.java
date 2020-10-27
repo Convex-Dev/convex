@@ -31,6 +31,8 @@ import convex.core.lang.expanders.AExpander;
 import convex.core.lang.impl.AExceptional;
 import convex.core.lang.impl.ErrorValue;
 import convex.core.lang.impl.HaltValue;
+import convex.core.lang.impl.RecurValue;
+import convex.core.lang.impl.ReturnValue;
 import convex.core.lang.impl.RollbackValue;
 import convex.core.util.Economics;
 import convex.core.util.Errors;
@@ -697,7 +699,6 @@ public final class Context<T> extends AObject {
 	public <R> Context<R> withException(long gulp,AExceptional value) {
 		long newJuice=juice-gulp;
 		if (newJuice<0) return withJuiceError();
-		assert(value instanceof AExceptional);
 		
 		if ((this.result==value)&&(this.juice==newJuice)) return (Context<R>) this;
 		return (Context<R>) new Context<AExceptional>(chainState,newJuice,localBindings,value,depth,true);
@@ -780,6 +781,38 @@ public final class Context<T> extends AObject {
 
 		if (ctx.isExceptional()) {
 			Object v=ctx.getExceptional();
+			
+			// recur as many times as needed
+			while (v instanceof RecurValue) {
+				// don't recur if this is the recur function itself
+				if (fn==Core.RECUR) break;
+				
+				// restore depth, since we are catching an exceptional
+				ctx = ctx.withDepth(getDepth());
+
+				RecurValue rv = (RecurValue) v;
+				Object[] newArgs = rv.getValues();
+
+				// TODO: is this needed?
+				// clear result to ensure no longer exceptional
+				ctx = ctx.withResult(null);
+
+				ctx = fn.invoke(ctx,newArgs);
+				v = ctx.getValue();
+			}
+			
+			// unwrap return value if necessary
+			if ((v instanceof ReturnValue)&&(!(fn==Core.RETURN))) {
+				@SuppressWarnings("unchecked")
+				T o = ((ReturnValue<T>) v).getValue();
+				if (o instanceof AExceptional) {
+					// return exceptional value
+					ctx = ctx.withException((AExceptional) o);
+				} else {
+					// normal result, need to restore depth since catching an exceptional
+					ctx = ctx.withResult(o).withDepth(getDepth());
+				}
+			}
 			
 			if (v instanceof ErrorValue) {
 				ErrorValue ev=(ErrorValue)v;
