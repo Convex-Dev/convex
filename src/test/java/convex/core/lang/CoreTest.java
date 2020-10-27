@@ -1478,26 +1478,26 @@ public class CoreTest {
 	public void testSetAllowance() {
 		
 		// zero price for unchanged allowance
-		assertEquals(0L, evalL("(set-allowance *allowance*)"));
+		assertEquals(0L, evalL("(set-memory *memory*)"));
 		
 		// sell whole allowance
-		assertEquals(0L, evalL("(do (set-allowance 0) *allowance*)"));
+		assertEquals(0L, evalL("(do (set-memory 0) *memory*)"));
 		
 		// buy allowance reduces balance
-		assertTrue(evalL("(let [b *balance*] (set-allowance (inc *allowance*)) (- *balance* b))")<0);
+		assertTrue(evalL("(let [b *balance*] (set-memory (inc *memory*)) (- *balance* b))")<0);
 		
 		// sell allowance increases balance
-		assertTrue(evalL("(let [b *balance*] (set-allowance (dec *allowance*)) (- *balance* b))")>0);
+		assertTrue(evalL("(let [b *balance*] (set-memory (dec *memory*)) (- *balance* b))")>0);
 		
 		// trying to buy too much is a funds error
-		assertFundsError(step("(set-allowance 1000000000000000000)"));
+		assertFundsError(step("(set-memory 1000000000000000000)"));
 
 		
-		assertCastError(step("(set-allowance :foo)"));
-		assertCastError(step("(set-allowance nil)"));
+		assertCastError(step("(set-memory :foo)"));
+		assertCastError(step("(set-memory nil)"));
 		
-		assertArityError(step("(set-allowance)"));
-		assertArityError(step("(set-allowance 1 2)"));
+		assertArityError(step("(set-memory)"));
+		assertArityError(step("(set-memory 1 2)"));
 
 	}
 	
@@ -1505,25 +1505,25 @@ public class CoreTest {
 	public void testTransferAllowance() {
 		long ALL=Constants.INITIAL_ACCOUNT_ALLOWANCE;
 		Address HERO = TestState.HERO;
-		assertEquals(ALL, evalL("*allowance*"));
+		assertEquals(ALL, evalL(Symbols.STAR_ALLOWANCE.toString()));
 
-		assertEquals(ALL, step("(transfer-allownce *address* 1337)").getAccountStatus(HERO).getAllowance());
+		assertEquals(ALL, step("(transfer-memory *address* 1337)").getAccountStatus(HERO).getAllowance());
 		
-		assertEquals(ALL-1337, step("(transfer-allowance 0x"+Init.VILLAIN.toHexString()+" 1337)").getAccountStatus(HERO).getAllowance());
+		assertEquals(ALL-1337, step("(transfer-memory 0x"+Init.VILLAIN.toHexString()+" 1337)").getAccountStatus(HERO).getAllowance());
 
-		assertEquals(0L, step("(transfer-allowance 0x"+Init.VILLAIN.toHexString()+" "+ALL+")").getAccountStatus(HERO).getAllowance());
+		assertEquals(0L, step("(transfer-memory 0x"+Init.VILLAIN.toHexString()+" "+ALL+")").getAccountStatus(HERO).getAllowance());
  
-		assertArgumentError(step("(transfer-allowance *address* -1000)"));	
-		assertMemoryError(step("(transfer-allowance *address* (+ 1 "+ALL+"))"));
+		assertArgumentError(step("(transfer-memory *address* -1000)"));	
+		assertMemoryError(step("(transfer-memory *address* (+ 1 "+ALL+"))"));
 
 		// check bad arg types
-		assertCastError(step("(transfer-allowance -1000 1000)"));
-		assertCastError(step("(transfer-allowance *address* :foo)"));
+		assertCastError(step("(transfer-memory -1000 1000)"));
+		assertCastError(step("(transfer-memory *address* :foo)"));
 		
 		// check bad arities
-		assertArityError(step("(transfer-allowance -1000)"));
-		assertArityError(step("(transfer-allowance)"));
-		assertArityError(step("(transfer-allowance *address* 100 100)"));
+		assertArityError(step("(transfer-memory -1000)"));
+		assertArityError(step("(transfer-memory)"));
+		assertArityError(step("(transfer-memory *address* 100 100)"));
 
 	}
 	
@@ -2305,7 +2305,7 @@ public class CoreTest {
 	
 	@Test
 	public void testSpecialAllowance() {
-		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE, evalL("*allowance*"));
+		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE, evalL("*memory*"));
 	}
 	
 

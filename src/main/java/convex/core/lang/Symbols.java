@@ -138,7 +138,7 @@ public class Symbols {
 
 	public static final char SPECIAL_STAR = '*';
 	public static final Symbol STAR_ADDRESS = Symbol.create("*address*");
-	public static final Symbol STAR_ALLOWANCE = Symbol.create("*allowance*");
+	public static final Symbol STAR_ALLOWANCE = Symbol.create("*memory*");
 	public static final Symbol STAR_CALLER = Symbol.create("*caller*");
 	public static final Symbol STAR_ORIGIN = Symbol.create("*origin*");
 	public static final Symbol STAR_JUICE = Symbol.create("*juice*");
@@ -231,8 +231,8 @@ public class Symbols {
 	public static final Symbol GET_HOLDING = Symbol.create("get-holding");
 	public static final Symbol SET_HOLDING = Symbol.create("set-holding");
 	
-	public static final Symbol SET_ALLOWANCE = Symbol.create("set-allowance");
-	public static final Symbol TRANSFER_ALLOWANCE = Symbol.create("transfer-allowance");
+	public static final Symbol SET_MEMORY = Symbol.create("set-memory");
+	public static final Symbol TRANSFER_MEMORY = Symbol.create("transfer-memory");
 	
 	public static final Symbol RECEIVE_ALLOWANCE = Symbol.create("receive-allowance");
 	public static final Symbol RECEIVE_COIN = Symbol.create("receive-coin");

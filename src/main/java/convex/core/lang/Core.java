@@ -719,7 +719,7 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<Long> SET_ALLOWANCE = reg(new CoreFn<>(Symbols.SET_ALLOWANCE) {
+	public static final CoreFn<Long> SET_MEMORY = reg(new CoreFn<>(Symbols.SET_MEMORY) {
 		@Override
 		public <I> Context<Long> invoke(Context<I> context, Object[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
@@ -727,11 +727,11 @@ public class Core {
 			Long amount = RT.toLong(args[0]);
 			if (amount == null) return context.withCastError(args[0], Long.class);
 
-			return context.setAllowance(amount).consumeJuice(Juice.TRANSFER);
+			return context.setMemory(amount).consumeJuice(Juice.TRANSFER);
 		}
 	});
 	
-	public static final CoreFn<Long> TRANSFER_ALLOWANCE = reg(new CoreFn<>(Symbols.TRANSFER_ALLOWANCE) {
+	public static final CoreFn<Long> TRANSFER_MEMORY = reg(new CoreFn<>(Symbols.TRANSFER_MEMORY) {
 		@Override
 		public <I> Context<Long> invoke(Context<I> context, Object[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));

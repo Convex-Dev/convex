@@ -1251,7 +1251,7 @@ public final class Context<T> extends AObject {
 	 * @param allowance
 	 * @return Context indicating the price paid for the allowance change (may be zero or negative for refund)
 	 */
-	public Context<Long> setAllowance(long allowance) {
+	public Context<Long> setMemory(long allowance) {
 		BlobMap<Address,AccountStatus> accounts=getState().getAccounts();
 		if (allowance<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative aloowance amount");
 		if (allowance>Amount.MAX_AMOUNT) return withError(ErrorCodes.ARGUMENT,"Can't transfer an allowance amount beyond maximum limit");

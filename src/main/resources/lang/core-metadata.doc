@@ -1014,10 +1014,10 @@
      :special-symbol true
   }
   
-  *allowance*
+  *memory*
   {
      :doc {:description "Gets the current Memory Allowance for this Account. May be zero - in which case any new memory allocations will be charged at the current memory exchange pool price."
-           :examples [{:code "*allowance*"}]
+           :examples [{:code "*memory*"}]
            :type :special}
      :special-symbol true
   }
