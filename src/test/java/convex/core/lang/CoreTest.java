@@ -1969,6 +1969,8 @@ public class CoreTest {
 		assertEquals(7L,evalL("((fn ([x] x) ([x y] (recur 7))) 1 2)"));
 		
 		assertArityError(step("((fn ([x] x) ([x y] (recur))) 1 2)")); 
+		
+		assertJuiceError(step("((fn ([x] (recur 3 4)) ([x y] (recur 5))) 1 2)")); 
 	}
 
 	@Test

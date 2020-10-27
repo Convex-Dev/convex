@@ -769,12 +769,15 @@ public final class Context<T> extends AObject {
 	/**
 	 * Invokes a function within this context, returning an updated context. 
 	 * 
+	 * Handles function recur and return values.
+	 * 
 	 * Keeps depth constant upon return.
 	 * 
 	 * @param <R> Return type of the function
 	 * @param fn Function to execute
 	 * @return Updated Context
 	 */
+	@SuppressWarnings("unchecked")
 	public <R> Context<R> invoke(IFn<R> fn, Object[] args) {
 		// Note: we don't adjust depth here because execute(...) does it for us in the function body
 		Context<R> ctx = fn.invoke(this,args);
@@ -793,24 +796,20 @@ public final class Context<T> extends AObject {
 				RecurValue rv = (RecurValue) v;
 				Object[] newArgs = rv.getValues();
 
-				// TODO: is this needed?
-				// clear result to ensure no longer exceptional
-				ctx = ctx.withResult(null);
-
 				ctx = fn.invoke(ctx,newArgs);
 				v = ctx.getValue();
 			}
 			
 			// unwrap return value if necessary
 			if ((v instanceof ReturnValue)&&(!(fn==Core.RETURN))) {
-				@SuppressWarnings("unchecked")
-				T o = ((ReturnValue<T>) v).getValue();
-				if (o instanceof AExceptional) {
+				v = ((ReturnValue<T>) v).getValue();
+				if (v instanceof AExceptional) {
 					// return exceptional value
-					ctx = ctx.withException((AExceptional) o);
+					ctx = ctx.withException((AExceptional) v);
 				} else {
-					// normal result, need to restore depth since catching an exceptional
-					ctx = ctx.withResult(o).withDepth(getDepth());
+					// normal result, so simply unwrap
+					// need to restore depth since catching an exceptional
+					ctx = ctx.withResult(v).withDepth(getDepth());
 				}
 			}
 			
