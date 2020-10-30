@@ -14,7 +14,7 @@ import convex.core.util.Utils;
  *
  * @param <T> Type of list elements
  */
-public abstract class ASequence<T> extends ACollection<T> implements List<T>, IGet<T> {
+public abstract class ASequence<T> extends ACollection<T> implements List<T>, IAssociative<Long,T> {
 
 	@Override
 	public boolean contains(Object o) {
@@ -143,6 +143,11 @@ public abstract class ASequence<T> extends ACollection<T> implements List<T>, IG
 	@Override
 	public T set(int index, T element) {
 		throw new UnsupportedOperationException(Errors.immutable(this));
+	}
+	
+	@Override
+	public ASequence<T> assoc(Long key, T value) {
+		return assoc((long)key,value);
 	}
 
 	/**

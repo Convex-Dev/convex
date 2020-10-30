@@ -24,7 +24,7 @@ import convex.core.util.Utils;
  * @param <V> Type of values
  */
 public abstract class AMap<K, V> extends ADataStructure<MapEntry<K, V>>
-		implements Map<K, V>, IGet<V> {
+		implements Map<K, V>, IAssociative<K,V> {
 
 	protected long count;
 
@@ -73,7 +73,7 @@ public abstract class AMap<K, V> extends ADataStructure<MapEntry<K, V>>
 	 * @param value
 	 * @return An updated map with the new association
 	 */
-	public abstract AMap<K, V> assoc(K key, V value);
+	public abstract AMap<K,V> assoc(K key, V value);
 
 	/**
 	 * Dissociates a key from this map, returning an updated map if the key was

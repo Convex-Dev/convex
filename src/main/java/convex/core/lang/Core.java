@@ -24,6 +24,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Amount;
+import convex.core.data.IAssociative;
 import convex.core.data.IGet;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -852,6 +853,43 @@ public class Core {
 			}
 
 			return context.withResult(juice, result);
+		}
+	});
+	
+	public static final CoreFn<?> ASSOC_IN = reg(new CoreFn<>(Symbols.ASSOC_IN) {
+		@Override
+		public <I> Context<Object> invoke(Context<I> context, Object[] args) {
+			if (args.length != 3) return context.withArityError(exactArityMessage(3, args.length));
+
+			ASequence<Object> ixs = RT.sequence(args[1]);
+			if (ixs == null) return context.withCastError(args[1], ASequence.class);
+
+			int n = ixs.size();
+			long juice = (Juice.GET+Juice.ASSOC) * (1L + n);
+			Object data = args[0];
+			Object value=args[2];
+			// simply substitute value if key sequence is empty
+			if (n==0) return context.withResult(juice, value);
+			
+			@SuppressWarnings("unchecked")
+			IAssociative<Object,Object>[] ass=new IAssociative[n];
+			Object[] ks=new Object[n];
+			for (int i = 0; i < n; i++) {
+				IAssociative<Object,Object> struct = RT.toAssociative(data);
+				if (struct == null) return context.withCastError(data, IAssociative.class);
+				ass[i]=struct;
+				Object k=ixs.get(i);
+				ks[i]=k;
+				data=struct.get(k);
+			}
+			
+			for (int i = n-1; i >=0; i--) {
+				IAssociative<Object,Object> struct=ass[i];
+				Object k=ks[i];
+				value=RT.assoc(struct, k, value);
+				if (value==null) return context.withCastError(struct, IAssociative.class);
+			}
+			return context.withResult(juice, value);
 		}
 	});
 	

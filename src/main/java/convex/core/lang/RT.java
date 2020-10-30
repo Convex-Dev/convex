@@ -22,6 +22,7 @@ import convex.core.data.Address;
 import convex.core.data.Amount;
 import convex.core.data.Blobs;
 import convex.core.data.Format;
+import convex.core.data.IAssociative;
 import convex.core.data.IGet;
 import convex.core.data.IValidated;
 import convex.core.data.Keyword;
@@ -1124,6 +1125,20 @@ public class RT {
 	public static <T> IGet<T> toGettable(Object o) {
 		if (o==null) return Maps.empty();
 		if (o instanceof IGet) return (IGet<T>) o;
+		return null;
+	}
+	
+	/**
+	 * Converts the argument to an IAssociative instance. A null argument is considered an empty map.
+	 * 
+	 * @param <T>
+	 * @param o
+	 * @return IAssociative instance, or null if conversion is not possible
+	 */
+	@SuppressWarnings("unchecked")
+	public static <K,V> IAssociative<K,V> toAssociative(Object o) {
+		if (o==null) return Maps.empty();
+		if (o instanceof IGet) return (IAssociative<K,V>) o;
 		return null;
 	}
 

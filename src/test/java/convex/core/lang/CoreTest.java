@@ -634,6 +634,31 @@ public class CoreTest {
 		assertArityError(step("(assoc {} 1)"));
 
 	}
+	
+	@Test
+	public void testAssocIn() {
+		// empty index cases
+		assertEquals(2L, evalL("(assoc-in {} [] 2)")); // empty indexes returns value
+		assertEquals(2L, evalL("(assoc-in nil [] 2)")); // empty indexes returns value
+		assertEquals(2L, evalL("(assoc-in :old [] 2)")); // empty indexes returns value
+		
+		// map cases
+		assertEquals(Maps.of(1L,2L), eval("(assoc-in {} [1] 2)"));
+		assertEquals(Maps.of(1L,2L,3L,4L), eval("(assoc-in {3 4} [1] 2)"));
+		assertEquals(Maps.of(1L,2L), eval("(assoc-in nil [1] 2)"));
+		assertEquals(Maps.of(1L,Maps.of(5L,6L),3L,4L), eval("(assoc-in {3 4} [1 5] 6)"));
+		
+		// Cast errors
+		assertCastError(step("(assoc-in 1 [2] 3)"));
+		assertCastError(step("(assoc-in [1] [:foo] 3)"));
+		
+		// Arity error
+		assertArityError(step("(assoc-in)"));
+		assertArityError(step("(assoc-in nil)"));
+		assertArityError(step("(assoc-in nil 1)"));
+		assertArityError(step("(assoc-in nil 1 2 3)"));
+		assertArityError(step("(assoc-in :bad-struct [1] 2 :blah)")); // ARITY before CAST
+	}
 
 	@Test
 	public void testAssocFailures() {
