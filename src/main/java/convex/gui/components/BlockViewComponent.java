@@ -12,6 +12,7 @@ import convex.core.Peer;
 import convex.core.State;
 import convex.core.crypto.Hash;
 import convex.core.data.AVector;
+import convex.gui.components.models.StateModel;
 import convex.gui.manager.PeerManager;
 
 /**
@@ -30,7 +31,8 @@ public class BlockViewComponent extends JPanel {
 		setPreferredSize(new Dimension(1000, 10));
 
 		if (peer!=null) {
-			peer.state.addPropertyChangeListener(e -> {
+			StateModel<State> model=peer.getStateModel();
+			model.addPropertyChangeListener(e -> {
 				repaint();
 			});
 		}
@@ -38,14 +40,17 @@ public class BlockViewComponent extends JPanel {
 
 	@Override
 	public void paintComponent(Graphics g) {
-		Peer p = peerView.peerServer.getPeer();
-		Order chain = p.getPeerOrder();
-		AVector<Block> blocks = chain.getBlocks();
-		int n = (int) blocks.count();
 		g.setColor(Color.black);
 		int pw = getWidth();
 		int ph = getHeight();
 		g.fillRect(0, 0, pw, ph);
+		
+		Peer p = peerView.peerServer.getPeer();
+		Order order = p.getPeerOrder();
+		if (order==null) return; // no current peer order - maybe not a valid peer?
+		AVector<Block> blocks = order.getBlocks();
+		int n = (int) blocks.count();
+
 
 		int W = 10;
 		long tw = W * PeerManager.maxBlock;
@@ -53,9 +58,9 @@ public class BlockViewComponent extends JPanel {
 
 		for (int i = (int) (offset / W); i < n; i++) {
 			Color c = Color.orange;
-			if (i < chain.getProposalPoint()) c = Color.yellow;
-			if (i < chain.getConsensusPoint()) c = Color.green;
-			if (p.getConsensusPoint() != chain.getConsensusPoint()) {
+			if (i < order.getProposalPoint()) c = Color.yellow;
+			if (i < order.getConsensusPoint()) c = Color.green;
+			if (p.getConsensusPoint() != order.getConsensusPoint()) {
 				System.out.println("Strange consensus?");
 			}
 			int x = (int) (W * i - offset);

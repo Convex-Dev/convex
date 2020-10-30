@@ -37,7 +37,7 @@ public class EtchWindow extends BaseWindow {
 	@Override
 	public String getTitle() {
 		try {
-			 return "Storage view - "+peer.peerConnection.getRemoteAddress();
+			 return "Storage view - "+peer.getHostAddress();
 		}
 		catch (Exception e) {
 			return "Storage view - Unknown";

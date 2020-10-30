@@ -710,7 +710,7 @@ public class Server implements Closeable {
 			Hash peerHash=peerRef.getHash();
 			store.setRootHash(peerHash);
 			log.info("Stored peer data for Server: "+peerHash.toHexString());
-		} catch (Exception e) {
+		} catch (Throwable e) {
 			log.severe("Failed to persist peer state when closing server: " + e.getMessage());
 			e.printStackTrace();
 		} finally {

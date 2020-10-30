@@ -9,6 +9,8 @@ import javax.swing.JPopupMenu;
 import javax.swing.JTextArea;
 import javax.swing.border.EmptyBorder;
 
+import convex.core.Peer;
+import convex.gui.components.models.StateModel;
 import convex.gui.manager.PeerManager;
 import convex.gui.manager.windows.etch.EtchWindow;
 import convex.gui.manager.windows.peer.PeerWindow;
@@ -69,11 +71,7 @@ public class PeerComponent extends BaseListComponent {
 		description.setBackground(null);
 		panel.add(description, BorderLayout.CENTER);
 		
-		if (peer!=null) {
-			PeerManager.getStateModel().addPropertyChangeListener(e->{
-				description.setText(peer.toString());
-			});
-		}
+
 
 		// Setup popup menu for peer
 		JPopupMenu popupMenu = new JPopupMenu();
@@ -110,11 +108,21 @@ public class PeerComponent extends BaseListComponent {
 
 		popupMenu.add(replButton);
 
-		JPanel panel_1 = new BlockViewComponent(peer);
-		add(panel_1, BorderLayout.SOUTH);
+		JPanel blockView = new BlockViewComponent(peer);
+		add(blockView, BorderLayout.SOUTH);
 
 		DropdownMenu dm = new DropdownMenu(popupMenu);
 		add(dm, BorderLayout.EAST);
+		
+		if (peer!=null) {
+			StateModel<Peer> model=peer.peerModel;
+			if (model!=null) {
+				model.addPropertyChangeListener(e->{
+					blockView.repaint();
+					description.setText(peer.toString());
+				});
+			}
+		}
 
 	}
 }

@@ -12,11 +12,17 @@ import convex.gui.manager.PeerManager;
 import convex.net.Connection;
 import convex.peer.Server;
 
+/**
+ * Class representing a lightweight view of a Peer.
+ * 
+ * Peer may be either a local Server or remote.
+ */
 public class PeerView {
 	public Connection peerConnection = null;
 	public Server peerServer = null;
 
-	public StateModel<Peer> state = new StateModel<>(null);
+	public StateModel<Peer> peerModel = new StateModel<>(null);
+	public StateModel<State> stateModel = new StateModel<>(null);
 
 	@Override
 	public String toString() {
@@ -42,14 +48,17 @@ public class PeerView {
 	}
 
 	/**
-	 * Poll the current peer state. Returns null if not a local peer.
+	 * Poll the current peer state. Updates state models if necessary.
+	 * 
+	 * Returns null if not a local peer.
 	 * 
 	 * @return Peer state for this PeerView
 	 */
 	public Peer checkPeer() {
 		if (peerServer != null) {
 			Peer p = peerServer.getPeer();
-			state.setValue(p);
+			peerModel.setValue(p);
+			if (p!=null) stateModel.setValue(p.getConsensusState());
 			return p;
 		}
 		return null;
@@ -70,6 +79,10 @@ public class PeerView {
 
 	public boolean isLocal() {
 		return peerServer != null;
+	}
+
+	public StateModel<State> getStateModel() {
+		return stateModel;
 	}
 
 }

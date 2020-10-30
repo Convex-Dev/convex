@@ -18,6 +18,7 @@ import javax.swing.JTabbedPane;
 
 import convex.api.Convex;
 import convex.core.Init;
+import convex.core.Order;
 import convex.core.Peer;
 import convex.core.Result;
 import convex.core.State;
@@ -59,7 +60,7 @@ public class PeerManager extends JPanel {
 	 */
 	public static void main(String[] args) throws IOException {
 		Stores.setGlobalStore(EtchStore.create(new File("peers-shared-db")));
-		
+			
 		// call to set up Look and Feel
 		convex.gui.utils.Toolkit.init();
 		
@@ -124,7 +125,7 @@ public class PeerManager extends JPanel {
 		tabs.add("Actors", new ActorsPanel(this));
 		tabs.add("About", aboutPanel);
 
-		// launch a local peer for testing
+		// launch local peers for testing
 		EventQueue.invokeLater(() -> peerPanel.launchAllPeers(this));
 
 		updateThread.start();
@@ -140,26 +141,32 @@ public class PeerManager extends JPanel {
 			while (updateRunning) {
 				try {
 					Thread.sleep(30);
-					java.util.List<PeerView> servers = peerPanel.getPeerViews();
+					java.util.List<PeerView> peerViews = peerPanel.getPeerViews();
 					State latest = latestState.getValue();
-					for (PeerView s : servers) {
+					for (PeerView s : peerViews) {
+						s.checkPeer();
+						
 						Server serv=s.peerServer;
 						if (serv==null) continue;
 						
 						Peer p = serv.getPeer();
 						if (p==null) continue;
 
-						maxBlock = Math.max(maxBlock, p.getPeerOrder().getBlockCount());
+						Order order=p.getPeerOrder();
+						if (order==null) continue; // not an active peer?
+						maxBlock = Math.max(maxBlock, order.getBlockCount());
 
 						long pcp = p.getConsensusPoint();
 						if (pcp > cp) {
 							cp = pcp;
+							String ls="Consenus State update detected at depth "+cp;
+							System.err.println(ls);
 							latest = p.getConsensusState();
+							latestState.setValue(latest);
 						}
 					}
 					
-					latestState.setValue(latest);
-				} catch (Exception e) {
+				} catch (InterruptedException e) {
 					//
 					log.warning("Update thread interrupted abnormally: "+e.getMessage());
 					e.printStackTrace();

@@ -357,13 +357,16 @@ public class Peer {
 	}
 
 	public long getConsensusPoint() {
-		return getPeerOrder().getConsensusPoint();
+		Order order=getPeerOrder();
+		if (order==null) return 0;
+		return order.getConsensusPoint();
 	}
 
 	/**
 	 * Gets the current Order for this Peer
 	 * 
-	 * @return The Order for this peer in its current Belief.
+	 * @return The Order for this peer in its current Belief. Will return null if the Peer is not a peer in the current consensus state
+	 * 
 	 * @throws BadSignatureException
 	 */
 	public Order getPeerOrder() {

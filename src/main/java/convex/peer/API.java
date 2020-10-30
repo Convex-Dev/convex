@@ -25,16 +25,19 @@ public class API {
 	}
 	
 	/**
-	 * Launches a Peer Server with a default configuration.
+	 * <p>Launches a Peer Server with a default configuration.</p>
 	 * 
-	 * Config keys are:
+	 * <p>Config keys are:</p>
 	 * 
-	 * :port (optional) - Integer port number to use for incoming connections. Defaults to random.
-	 * :store (optional) - AStore instance. Defaults to the configured global store
-	 * :keypair (optional) - AKeyPair instance. Defaults to first auto-generated Peer keyPair;
-	 * :state (optional) - Initialisation state. Only used if initialising a new Peer.
-	 * :restore (optional) - Boolean Flag to restore from existing store. Default to true
-	 * :persist (optional) - Boolean flag to determine if peer state should be persisted in store at server close. Default true.
+	 * <ul>
+	 * <li>:port (optional) - Integer port number to use for incoming connections. Defaults to random.
+	 * <li>:store (optional) - AStore instance. Defaults to the configured global store
+	 * <li>:keypair (optional) - AKeyPair instance. Defaults to first auto-generated Peer keyPair;
+	 * <li>:state (optional) - Initialisation state. Only used if initialising a new Peer.
+	 * <li>:restore (optional) - Boolean Flag to restore from existing store. Default to true
+	 * <li>:persist (optional) - Boolean flag to determine if peer state should be persisted in store at server close. Default true.
+	 * </ul>
+	 * 
 	 * @return New Server instance
 	 */
 	public static Server launchPeer(Map<Keyword, Object> peerConfig) {
