@@ -191,7 +191,9 @@ public class VectorLeaf<T> extends ASizedVector<T> {
 
 	@Override
 	public AVector<T> assoc(long i, T value) {
-		if ((i < 0) || (i >= count)) throw new IndexOutOfBoundsException("Index: " + i);
+		if ((i < 0) || (i > count)) throw new IndexOutOfBoundsException("Index: " + i);
+		if (i==count) return conj(value);
+		
 		long ix = i - prefixLength();
 		if (ix >= 0) {
 			T old = items[(int) ix].getValue();

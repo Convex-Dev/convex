@@ -1066,6 +1066,14 @@ public class RT {
 		}
 	}
 
+	/**
+	 * Associates a key with a given value in an associative data structure
+	 * 
+	 * @param coll Any associative data structure
+	 * @param key Key to update or add
+	 * @param value Value to associate with key
+	 * @return
+	 */
 	@SuppressWarnings("unchecked")
 	public static <K, V> ADataStructure<?> assoc(Object coll, K key, V value) {
 		if (coll == null) return Maps.create(key, value);

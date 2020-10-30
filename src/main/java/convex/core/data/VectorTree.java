@@ -136,7 +136,9 @@ public class VectorTree<T> extends ASizedVector<T> {
 
 	@Override
 	public AVector<T> assoc(long i, T value) {
-		if ((i < 0) || (i >= count)) throw new IndexOutOfBoundsException("Index: " + i);
+		if ((i < 0) || (i > count)) throw new IndexOutOfBoundsException("Index: " + i);
+		if (i==count) return conj(value);
+
 		long bSize = 1L << shift; // size of a fully packed block
 		int b = (int) (i >> shift);
 		AVector<T> oc = children[b].getValue();

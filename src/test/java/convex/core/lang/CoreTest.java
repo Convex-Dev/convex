@@ -648,6 +648,11 @@ public class CoreTest {
 		assertEquals(Maps.of(1L,2L), eval("(assoc-in nil [1] 2)"));
 		assertEquals(Maps.of(1L,Maps.of(5L,6L),3L,4L), eval("(assoc-in {3 4} [1 5] 6)"));
 		
+		// vector cases
+		assertEquals(Vectors.of(1L, 5L, 3L),eval("(assoc-in [1 2 3] [1] 5)"));
+		assertEquals(Vectors.of(1L, 5L),eval("(assoc-in [1] [1] 5)"));
+		assertEquals(Vectors.of(1L, 2L, 5L),eval("(assoc-in (first {1 2}) [2] 5)"));
+		
 		// Cast errors
 		assertCastError(step("(assoc-in 1 [2] 3)"));
 		assertCastError(step("(assoc-in [1] [:foo] 3)"));

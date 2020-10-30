@@ -245,13 +245,13 @@ public class MapsTest {
 		MapEntry<Long, Long> me = m.getEntry(1L);
 		assertEquals(1L, me.getKey());
 		assertEquals(2L, me.getValue());
+		assertEquals(Vectors.of(1L,2L,3L), me.assoc(2, 3L));
 
 		assertThrows(UnsupportedOperationException.class, () -> me.setValue(6L));
 
 		assertEquals(me, me.assoc(0, 1L));
 		assertEquals(me, me.assoc(1, 2L));
 		assertThrows(IndexOutOfBoundsException.class, () -> me.assoc(-1, 0L));
-		assertThrows(IndexOutOfBoundsException.class, () -> me.assoc(2, 3L));
 
 		assertTrue(me.contains(1L));
 		assertTrue(me.contains(2L));

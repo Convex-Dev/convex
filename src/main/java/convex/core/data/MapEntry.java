@@ -52,6 +52,7 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 	public AVector<Object> assoc(long i, Object a) {
 		if (i == 0) return withKey((K) a);
 		if (i == 1) return withValue((V) a);
+		if (i== 2) return conj(a);
 		throw Utils.sneakyThrow(new IndexOutOfBoundsException("Index: i"));
 	}
 
