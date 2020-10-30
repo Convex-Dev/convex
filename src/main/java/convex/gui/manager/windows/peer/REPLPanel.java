@@ -29,6 +29,8 @@ import convex.api.Convex;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.WalletEntry;
+import convex.core.data.AString;
+import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.lang.Reader;
@@ -75,7 +77,7 @@ public class REPLPanel extends JPanel {
 
 	protected void handleResult(Result r) {
 		if (r.isError()) {
-			handleError(r.getErrorCode(),r.getValue());
+			handleError(r.getErrorCode(),r.getValue(),r.getTrace());
 		} else {
 			handleResult(r.getValue());
 		}
@@ -86,8 +88,11 @@ public class REPLPanel extends JPanel {
 		outputArea.setCaretPosition(outputArea.getDocument().getLength());
 	}
 	
-	protected void handleError(Object code, Object msg) {
-		outputArea.append(" Exception: " + code + " "+ msg);
+	protected void handleError(Object code, Object msg, AVector<AString> trace) {
+		outputArea.append(" Exception: " + code + " "+ msg+"\n");
+		for (AString s: trace) {
+			outputArea.append(" - "+s.toString()+"\n");
+		}
 	}
 
 	/**
