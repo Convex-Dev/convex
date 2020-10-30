@@ -209,28 +209,28 @@ public class Set<T> extends ASet<T> {
 
 	@Override
 	public Set<T> conjAll(Collection<T> b) {
-		if (b instanceof Set) return includeAll((Set<T>) b);
+		if (b instanceof Set) return conjAll((Set<T>) b);
 		ASequence<T> seq = RT.sequence(b);
 		if (seq == null) throw new IllegalArgumentException("Can't convert to seq: " + Utils.getClassName(b));
-		return includeAll(Set.create(RT.sequence(b)));
+		return conjAll(Set.create(RT.sequence(b)));
 	}
 
 	@Override
 	public Set<T> disjAll(Collection<T> b) {
-		if (b instanceof Set) return excludeAll((Set<T>) b);
+		if (b instanceof Set) return disjAll((Set<T>) b);
 		ASequence<T> seq = RT.sequence(b);
 		if (seq == null) throw new IllegalArgumentException("Can't convert to seq: " + Utils.getClassName(b));
-		return excludeAll(Set.create(seq));
+		return disjAll(Set.create(seq));
 	}
 
-	public Set<T> includeAll(Set<T> b) {
+	public Set<T> conjAll(Set<T> b) {
 		// any key in either map results in a non-null value, assuming one is non-null
 		AHashMap<T, Object> rmap = map.mergeDifferences(b.map, (x, y) -> (y == null) ? x : y);
 		if (map == rmap) return this;
 		return wrap(rmap);
 	}
 
-	public Set<T> excludeAll(Set<T> b) {
+	public Set<T> disjAll(Set<T> b) {
 		// any value in y removes the value in x
 		AHashMap<T, Object> rmap = map.mergeWith(b.map, (x, y) -> (y == null) ? x : null);
 		if (map == rmap) return this;
