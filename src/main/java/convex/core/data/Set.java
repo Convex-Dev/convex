@@ -208,7 +208,7 @@ public class Set<T> extends ASet<T> {
 	}
 
 	@Override
-	public Set<T> conjAll(Collection<T> b) {
+	public Set<T> conjAll(ACollection<T> b) {
 		if (b instanceof Set) return conjAll((Set<T>) b);
 		ASequence<T> seq = RT.sequence(b);
 		if (seq == null) throw new IllegalArgumentException("Can't convert to seq: " + Utils.getClassName(b));
@@ -216,7 +216,7 @@ public class Set<T> extends ASet<T> {
 	}
 
 	@Override
-	public Set<T> disjAll(Collection<T> b) {
+	public Set<T> disjAll(ACollection<T> b) {
 		if (b instanceof Set) return disjAll((Set<T>) b);
 		ASequence<T> seq = RT.sequence(b);
 		if (seq == null) throw new IllegalArgumentException("Can't convert to seq: " + Utils.getClassName(b));

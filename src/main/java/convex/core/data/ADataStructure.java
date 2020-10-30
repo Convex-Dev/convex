@@ -52,5 +52,22 @@ public abstract class ADataStructure<E> extends ACell {
 	 * @return The updated data structure.
 	 */
 	public abstract <R> ADataStructure<R> conj(R x);
+	
+	/**
+	 * Adds multiple elements to this data structure, in the natural manner defined by the
+	 * general data structure type. e.g. append at the end of a vector.
+	 * 
+	 * This may be more efficient than using 'conj' for individual items.
+	 * 
+	 * @param xs New elements to add
+	 * @return The updated data structure.
+	 */
+	public ADataStructure<E> conjAll(ACollection<E> xs) {
+		ADataStructure<E> result=this;
+		for (E x: xs) {
+			result=result.conj(x);
+		}
+		return result;
+	}
 
 }

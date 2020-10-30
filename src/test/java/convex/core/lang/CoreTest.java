@@ -46,6 +46,7 @@ import convex.core.data.Format;
 import convex.core.data.Keywords;
 import convex.core.data.List;
 import convex.core.data.Lists;
+import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
@@ -866,6 +867,9 @@ public class CoreTest {
 		assertEquals(Vectors.empty(), eval("(into nil [])"));
 		assertEquals(Vectors.of(1L, 2L, 3L), eval("(into nil [1 2 3])"));
 		assertEquals(Maps.empty(), eval("(into {} [])"));
+		
+		assertEquals(Vectors.of(MapEntry.create(1L, 2L)), eval("(into [] {1 2})"));
+
 
 		assertCastError(step("(into 1 [2 3])"));
 		assertCastError(step("(into nil :foo)"));

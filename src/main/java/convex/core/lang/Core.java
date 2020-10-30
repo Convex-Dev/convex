@@ -1681,7 +1681,7 @@ public class Core {
 				juice += Juice.BUILD_PER_ELEMENT * n;
 				if (!context.checkJuice(juice)) return context.withJuiceError();
 
-				result = RT.into(result, seq);
+				result = result.conjAll(seq);
 				if (result == null) return context.withCastError(args[0], MapEntry.class);
 			}
 

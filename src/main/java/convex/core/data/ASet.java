@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.util.Collection;
 import java.util.Set;
 
 import convex.core.crypto.Hash;
@@ -42,7 +41,7 @@ public abstract class ASet<T> extends ACollection<T> implements Set<T>, IGet<T> 
 	 * @param elements
 	 * @return Updated set
 	 */
-	public abstract ASet<T> conjAll(Collection<T> elements) ;
+	public abstract ASet<T> conjAll(ACollection<T> elements) ;
 	
 	/**
 	 * Updates the set to exclude all the given elements.
@@ -50,7 +49,7 @@ public abstract class ASet<T> extends ACollection<T> implements Set<T>, IGet<T> 
 	 * @param elements
 	 * @return Updated set
 	 */
-	public abstract ASet<T> disjAll(Collection<T> elements) ;
+	public abstract ASet<T> disjAll(ACollection<T> elements) ;
 
 	@SuppressWarnings("unchecked")
 	@Override

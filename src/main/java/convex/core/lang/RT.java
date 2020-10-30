@@ -546,21 +546,6 @@ public class RT {
 	}
 
 	/**
-	 * Merges a sequence of items into a data structure.
-	 * 
-	 * @return The updated data structure, or null if any added elements were
-	 *         invalid.
-	 */
-	public static <T> ADataStructure<T> into(ADataStructure<T> ds, ASequence<T> coll) {
-		ADataStructure<T> result = ds;
-		for (T o : coll) {
-			result = result.conj(o);
-			if (result == null) return null;
-		}
-		return result;
-	}
-
-	/**
 	 * Gets the nth element from a sequential collection
 	 * 
 	 * @param <T> Type of element in collection
