@@ -203,12 +203,12 @@ public class Set<T> extends ASet<T> {
 	}
 
 	@Override
-	public ASet<T> exclude(T a) {
+	public ASet<T> disj(T a) {
 		return wrap(map.dissoc(a));
 	}
 
 	@Override
-	public Set<T> includeAll(Collection<T> b) {
+	public Set<T> conjAll(Collection<T> b) {
 		if (b instanceof Set) return includeAll((Set<T>) b);
 		ASequence<T> seq = RT.sequence(b);
 		if (seq == null) throw new IllegalArgumentException("Can't convert to seq: " + Utils.getClassName(b));
@@ -216,7 +216,7 @@ public class Set<T> extends ASet<T> {
 	}
 
 	@Override
-	public Set<T> excludeAll(Collection<T> b) {
+	public Set<T> disjAll(Collection<T> b) {
 		if (b instanceof Set) return excludeAll((Set<T>) b);
 		ASequence<T> seq = RT.sequence(b);
 		if (seq == null) throw new IllegalArgumentException("Can't convert to seq: " + Utils.getClassName(b));

@@ -33,7 +33,7 @@ public abstract class ASet<T> extends ACollection<T> implements Set<T>, IGet<T> 
 	 * @param a
 	 * @return Updated set
 	 */
-	public abstract ASet<T> exclude(T a) ;
+	public abstract ASet<T> disj(T a) ;
 	
 	/**
 	 * Updates the set to include all the given elements.
@@ -42,7 +42,7 @@ public abstract class ASet<T> extends ACollection<T> implements Set<T>, IGet<T> 
 	 * @param elements
 	 * @return Updated set
 	 */
-	public abstract ASet<T> includeAll(Collection<T> elements) ;
+	public abstract ASet<T> conjAll(Collection<T> elements) ;
 	
 	/**
 	 * Updates the set to exclude all the given elements.
@@ -50,7 +50,7 @@ public abstract class ASet<T> extends ACollection<T> implements Set<T>, IGet<T> 
 	 * @param elements
 	 * @return Updated set
 	 */
-	public abstract ASet<T> excludeAll(Collection<T> elements) ;
+	public abstract ASet<T> disjAll(Collection<T> elements) ;
 
 	@SuppressWarnings("unchecked")
 	@Override

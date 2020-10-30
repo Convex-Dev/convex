@@ -1052,7 +1052,7 @@ public class Core {
 			ASet<Object> result = RT.toSet(args[0]);
 			if (result == null) return context.withCastError(args[0], ASet.class);
 
-			result = result.exclude((Object) args[1]);
+			result = result.disj((Object) args[1]);
 			long juice = Juice.BUILD_DATA + Juice.BUILD_PER_ELEMENT;
 			return context.withResult(juice, result);
 		}

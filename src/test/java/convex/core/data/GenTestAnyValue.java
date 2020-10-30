@@ -149,7 +149,7 @@ public class GenTestAnyValue {
 		s.validate();
 		assertEquals(o,s.iterator().next());
 		
-		ASet<Object> s2=s.exclude(o);
+		ASet<Object> s2=s.disj(o);
 		assertTrue(s2.isEmpty());
 	}
 
