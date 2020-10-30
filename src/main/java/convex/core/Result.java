@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 
 import convex.core.data.ARecord;
 import convex.core.data.ARecordGeneric;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Keywords;
 import convex.core.data.Tag;
@@ -12,6 +13,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Context;
 import convex.core.lang.impl.AExceptional;
+import convex.core.lang.impl.ErrorValue;
 import convex.core.lang.impl.RecordFormat;
 
 /**
@@ -23,7 +25,7 @@ import convex.core.lang.impl.RecordFormat;
  */
 public class Result extends ARecordGeneric {
 
-	public static final RecordFormat RESULT_FORMAT=RecordFormat.of(Keywords.ID,Keywords.RESULT,Keywords.ERROR_CODE);
+	public static final RecordFormat RESULT_FORMAT=RecordFormat.of(Keywords.ID,Keywords.RESULT,Keywords.ERROR_CODE,Keywords.TRACE);
 	
 	protected Result(AVector<Object> values) {
 		super(RESULT_FORMAT, values);
@@ -33,12 +35,16 @@ public class Result extends ARecordGeneric {
 		return new Result(values);
 	}
 	
+	public static Result create(Object id, Object value, Object errorCode, Object trace) {
+		return create(Vectors.of(id,value,errorCode,trace));
+	}
+	
 	public static Result create(Object id, Object value, Object errorCode) {
-		return create(Vectors.of(id,value,errorCode));
+		return create(id,value,errorCode,null);
 	}
 
 	public static Result create(Object id, Object value) {
-		return create(id,value,null);
+		return create(id,value,null,null);
 	}
 
 	/**
@@ -51,12 +57,22 @@ public class Result extends ARecordGeneric {
 	}
 	
 	/**
-	 * Returns the value this result. The value is the result of transaction execution (may be an error message if the transaction failed)
+	 * Returns the value for this result. The value is the result of transaction execution (may be an error message if the transaction failed)
 	 * 
 	 * @return ID from this result
 	 */
 	public Object getValue() {
 		return values.get(1);
+	}
+	
+	/**
+	 * Returns the stack trace for this result. May be null
+	 * 
+	 * @return ID from this result
+	 */
+	@SuppressWarnings("unchecked")
+	public AVector<AString> getTrace() {
+		return (AVector<AString>) values.get(3);
 	}
 	
 	/**
@@ -106,7 +122,7 @@ public class Result extends ARecordGeneric {
 	 */
 	public static Result read(ByteBuffer bb) throws BadFormatException {
 		AVector<Object> v=Vectors.read(bb);
-		if (v.size()!=3) throw new BadFormatException("Invalid number of fields for Result!");
+		if (v.size()!=RESULT_FORMAT.count()) throw new BadFormatException("Invalid number of fields for Result!");
 		
 		return create(v);
 	}
@@ -118,12 +134,16 @@ public class Result extends ARecordGeneric {
 	public static Result fromContext(Object id,Context<?> ctx) {
 		Object result=ctx.getValue();
 		Object code=null;
+		Object trace=null;
 		if (result instanceof AExceptional) {
 			AExceptional ex=(AExceptional)result;
 			result=ex.getMessage();
 			code=ex.getCode();
+			if (ex instanceof ErrorValue) {
+				trace=Vectors.create(((ErrorValue)ex).getTrace());
+			}
 		}
-		return create(id,result,code);
+		return create(id,result,code,trace);
 	}
 
 	public Result withID(Object id) {

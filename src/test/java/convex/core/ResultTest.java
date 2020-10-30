@@ -24,7 +24,7 @@ public class ResultTest {
 	public void testResultCreation() {
 		Result r1=Result.create(0L,1L,null);
 	
-		assertEquals(r1,Result.create(Vectors.of(0L,1L,null)));
+		assertEquals(r1,Result.create(Vectors.of(0L,1L,null,null)));
 		
 		RecordTest.doRecordTests(r1);
 	}

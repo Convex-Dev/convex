@@ -66,6 +66,7 @@ public class Keywords {
 	public static final Keyword ID = Keyword.create("id");
 	public static final Keyword RESULT = Keyword.create("result");
 	public static final Keyword ERROR_CODE = Keyword.create("error-code");
+	public static final Keyword TRACE = Keyword.create("trace");
 	
 
 

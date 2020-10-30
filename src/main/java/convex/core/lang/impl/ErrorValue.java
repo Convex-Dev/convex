@@ -1,8 +1,12 @@
 package convex.core.lang.impl;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.parboiled.common.Utils;
+
+import convex.core.data.AString;
+import convex.core.data.Strings;
 
 /**
  * Class representing a function error value
@@ -15,7 +19,7 @@ public class ErrorValue extends AExceptional {
 
 	private final Object code;
 	private final Object message;
-	private final ArrayList<Object> trace=new ArrayList<>();
+	private final ArrayList<AString> trace=new ArrayList<>();
 
 	private ErrorValue(Object code, Object message) {
 		if (code==null) throw new IllegalArgumentException("Error code must not be null");
@@ -47,8 +51,8 @@ public class ErrorValue extends AExceptional {
 		return code;
 	} 
 	
-	public void addTrace(Object a) {
-		trace.add(a);
+	public void addTrace(String traceMessage) {
+		trace.add(Strings.create(traceMessage));
 	}
 	
 	/**
@@ -69,6 +73,11 @@ public class ErrorValue extends AExceptional {
 			sb.append(o.toString());
 		}
 		return sb.toString();
+	}
+
+	public List<AString> getTrace() {
+		// TODO Auto-generated method stub
+		return trace;
 	}
 
 
