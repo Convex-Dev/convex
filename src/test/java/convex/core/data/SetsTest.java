@@ -36,9 +36,9 @@ public class SetsTest {
 		assertEquals("#{1}", s.toString());
 		s = s.include(2L);
 		assertEquals("#{1,2}", s.toString());
-		s = s.disj(1L);
+		s = s.exclude(1L);
 		assertEquals("#{2}", s.toString());
-		s = s.disj(2L);
+		s = s.exclude(2L);
 		assertTrue(s.isEmpty());
 		assertSame(s, Sets.empty());
 	}
@@ -100,7 +100,7 @@ public class SetsTest {
 	public void testMergingIdentity() {
 		ASet<Integer> a = Sets.of(1, 2, 3);
 		assertTrue(a == a.include(2));
-		assertTrue(a == a.conjAll(Sets.of(1, 3)));
+		assertTrue(a == a.includeAll(Sets.of(1, 3)));
 	}
 
 	@Test
@@ -108,14 +108,14 @@ public class SetsTest {
 		ASet<Integer> s = Sets.create(Samples.INT_VECTOR_300);
 		CollectionsTest.doSetTests(s);
 
-		ASet<Integer> s2 = s.conjAll(Sets.of(1, 2, 3, 100));
+		ASet<Integer> s2 = s.includeAll(Sets.of(1, 2, 3, 100));
 		assertEquals(s, s2);
 		assertSame(s, s2);
 
 		ASet<Integer> s3 = s.disjAll(Samples.INT_VECTOR_300);
 		assertSame(s3, Sets.empty());
 
-		ASet<Integer> s4 = s.disjAll(Sets.of(-1000));
+		ASet<Integer> s4 = s.excludeAll(Sets.of(-1000));
 		assertSame(s, s4);
 
 		ASet<Integer> s5a = Sets.of(1, 3, 7, -1000);

@@ -236,8 +236,8 @@ public abstract class AMap<K, V> extends ADataStructure<MapEntry<K, V>>
 
 	@Override
 	public Set<K> keySet() {
-		ASet<K> ks=reduceEntries((s,me)->((ASet<K>)s).include(me.getKey()), Sets.empty());
-		return (Set<K>)ks;
+		Set<K> ks=reduceEntries((s,me)->s.conj(me.getKey()), Sets.empty());
+		return ks;
 	}
 
 	

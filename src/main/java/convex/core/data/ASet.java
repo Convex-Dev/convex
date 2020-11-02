@@ -1,7 +1,5 @@
 package convex.core.data;
 
-import java.util.Set;
-
 import convex.core.crypto.Hash;
 
 /**
@@ -15,7 +13,7 @@ import convex.core.crypto.Hash;
  *
  * @param <T> Type of set elements
  */
-public abstract class ASet<T> extends ACollection<T> implements Set<T>, IGet<T> {
+public abstract class ASet<T> extends ACollection<T> implements java.util.Set<T>, IGet<T> {
 	
 	@Override
 	public abstract void ednString(StringBuilder sb) ;
@@ -32,7 +30,7 @@ public abstract class ASet<T> extends ACollection<T> implements Set<T>, IGet<T> 
 	 * @param a
 	 * @return Updated set
 	 */
-	public abstract ASet<T> disj(T a) ;
+	public abstract ASet<T> exclude(T a) ;
 	
 	/**
 	 * Updates the set to include all the given elements.
@@ -41,7 +39,7 @@ public abstract class ASet<T> extends ACollection<T> implements Set<T>, IGet<T> 
 	 * @param elements
 	 * @return Updated set
 	 */
-	public abstract ASet<T> conjAll(ACollection<T> elements) ;
+	public abstract ASet<T> includeAll(Set<T> elements) ;
 	
 	/**
 	 * Updates the set to exclude all the given elements.
@@ -49,7 +47,17 @@ public abstract class ASet<T> extends ACollection<T> implements Set<T>, IGet<T> 
 	 * @param elements
 	 * @return Updated set
 	 */
-	public abstract ASet<T> disjAll(ACollection<T> elements) ;
+	public abstract ASet<T> excludeAll(Set<T> elements) ;
+
+	@Override
+	public abstract ASet<T> conjAll(ACollection<T> xs);
+
+	/**
+	 * Removes all elements from this set, returning a new set.
+	 * @param xs Collection of elements to remove
+	 * @return
+	 */
+	public abstract ASet<T> disjAll(ACollection<T> xs);
 
 	@SuppressWarnings("unchecked")
 	@Override
@@ -94,9 +102,7 @@ public abstract class ASet<T> extends ACollection<T> implements Set<T>, IGet<T> 
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public ASet<T> conj(Object a) {
-		return include((T) a);
-	}
+	public abstract ASet<T> conj(Object a);
 
 	/**
 	 * Gets the Object in the set for the given hash, or null if not found

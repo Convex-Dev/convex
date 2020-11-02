@@ -19,6 +19,7 @@ import convex.core.data.List;
 import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
+import convex.core.data.Set;
 import convex.core.data.Sets;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
@@ -644,7 +645,7 @@ public class Compiler {
 
 			if (form instanceof ASet) {
 				Context<Syntax> ctx = (Context<Syntax>) context;
-				ASet<Syntax> updated = Sets.empty();
+				Set<Syntax> updated = Sets.empty();
 				for (Object elem : ((ASet<?>) form)) {
 					ctx = ctx.expand(elem, cont, cont);
 					if (ctx.isExceptional()) return ctx;

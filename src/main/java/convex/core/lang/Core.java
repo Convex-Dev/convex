@@ -1052,7 +1052,7 @@ public class Core {
 			ASet<Object> result = RT.toSet(args[0]);
 			if (result == null) return context.withCastError(args[0], ASet.class);
 
-			result = result.disj((Object) args[1]);
+			result = result.exclude((Object) args[1]);
 			long juice = Juice.BUILD_DATA + Juice.BUILD_PER_ELEMENT;
 			return context.withResult(juice, result);
 		}
@@ -1678,6 +1678,8 @@ public class Core {
 				ASequence<Object> seq = RT.sequence(a1);
 				if (seq == null) return context.withCastError(a1, ADataStructure.class);
 				long n = seq.count();
+				
+				// check juice before running expensive part
 				juice += Juice.BUILD_PER_ELEMENT * n;
 				if (!context.checkJuice(juice)) return context.withJuiceError();
 

@@ -17,6 +17,11 @@ import convex.core.util.Utils;
  * Wraps a map, where keys in the map represent the presence of an element in
  * the set Map values must be non-null to allow efficient merge operations to
  * distinguish between present and non-present set values.
+ * 
+ * Encoding:
+ * 
+ * 0    : Tag.SET
+ * 1..n : Equivalent map encoding with true keys (exc. MAP tag)
  *
  * @param <T> The type of set elements
  */
@@ -191,25 +196,31 @@ public class Set<T> extends ASet<T> {
 	}
 
 	@Override
-	public ASet<T> include(T a) {
+	public Set<T> include(T a) {
 		if (map.containsKey(a)) return this;
 		return wrap(map.assocRef(Ref.get(a), true));
 	}
 
 	@Override
-	public ASet<T> includeRef(Ref<T> ref) {
+	public Set<T> includeRef(Ref<T> ref) {
 		if (map.containsKeyRef(ref)) return this;
 		return wrap(map.assocRef(ref, false));
 	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public Set<T> conj(Object a) {
+		return include((T) a);
+	}
 
 	@Override
-	public ASet<T> disj(T a) {
+	public ASet<T> exclude(T a) {
 		return wrap(map.dissoc(a));
 	}
 
 	@Override
 	public Set<T> conjAll(ACollection<T> b) {
-		if (b instanceof Set) return conjAll((Set<T>) b);
+		if (b instanceof Set) return includeAll((Set<T>) b);
 		ASequence<T> seq = RT.sequence(b);
 		if (seq == null) throw new IllegalArgumentException("Can't convert to seq: " + Utils.getClassName(b));
 		return conjAll(Set.create(RT.sequence(b)));
@@ -217,20 +228,22 @@ public class Set<T> extends ASet<T> {
 
 	@Override
 	public Set<T> disjAll(ACollection<T> b) {
-		if (b instanceof Set) return disjAll((Set<T>) b);
+		if (b instanceof Set) return excludeAll((Set<T>) b);
 		ASequence<T> seq = RT.sequence(b);
 		if (seq == null) throw new IllegalArgumentException("Can't convert to seq: " + Utils.getClassName(b));
 		return disjAll(Set.create(seq));
 	}
 
-	public Set<T> conjAll(Set<T> b) {
+	@Override
+	public Set<T> includeAll(Set<T> b) {
 		// any key in either map results in a non-null value, assuming one is non-null
 		AHashMap<T, Object> rmap = map.mergeDifferences(b.map, (x, y) -> (y == null) ? x : y);
 		if (map == rmap) return this;
 		return wrap(rmap);
 	}
 
-	public Set<T> disjAll(Set<T> b) {
+	@Override
+	public Set<T> excludeAll(Set<T> b) {
 		// any value in y removes the value in x
 		AHashMap<T, Object> rmap = map.mergeWith(b.map, (x, y) -> (y == null) ? x : null);
 		if (map == rmap) return this;

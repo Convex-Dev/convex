@@ -8,12 +8,12 @@ import convex.core.util.Utils;
 public class Sets {
 
 	@SuppressWarnings("unchecked")
-	public static <T> ASet<T> empty() {
+	public static <T> Set<T> empty() {
 		return (Set<T>) Set.EMPTY;
 	}
 
 	@SafeVarargs
-	public static <T> ASet<T> of(T... elements) {
+	public static <T> Set<T> of(T... elements) {
 		return Set.create(elements);
 	}
 
