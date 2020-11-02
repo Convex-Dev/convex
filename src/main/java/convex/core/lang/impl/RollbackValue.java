@@ -11,7 +11,7 @@ import convex.core.ErrorCodes;
  * 
  * @param <T> Type of return value
  */
-public class RollbackValue<T> extends AExceptional {
+public class RollbackValue<T> extends AReturn {
 
 	private final T value;
 

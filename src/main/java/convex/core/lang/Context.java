@@ -1515,8 +1515,8 @@ public final class Context<T> extends AObject {
 	 * @return The ErrorType of the current exceptional value, or null if there is no error.
 	 */
 	public Object getErrorCode() {
-		if (result instanceof ErrorValue) {
-			return ((ErrorValue)result).getCode();
+		if (isExceptional) {
+			return ((AExceptional)result).getCode();
 		}
 		return null;
 	}

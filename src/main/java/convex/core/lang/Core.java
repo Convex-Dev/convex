@@ -45,6 +45,7 @@ import convex.core.lang.impl.CorePred;
 import convex.core.lang.impl.ErrorValue;
 import convex.core.lang.impl.HaltValue;
 import convex.core.lang.impl.RecurValue;
+import convex.core.lang.impl.Reduced;
 import convex.core.lang.impl.ReturnValue;
 import convex.core.lang.impl.RollbackValue;
 import convex.core.util.Utils;
@@ -1738,32 +1739,53 @@ public class Core {
 	public static final CoreFn<Object> REDUCE = reg(new CoreFn<>(Symbols.REDUCE) {
 		@SuppressWarnings("unchecked")
 		@Override
-		public <I> Context<Object> invoke(Context<I> context, Object[] args) {
-			if (args.length != 3) return context.withArityError(exactArityMessage(3, args.length));
+		public <I> Context<Object> invoke(Context<I> ctx, Object[] args) {
+			if (args.length != 3) return ctx.withArityError(exactArityMessage(3, args.length));
 
 			// check and cast first argument to a function
 			Object fnArg = args[0];
 			IFn<?> fn = RT.function(fnArg);
-			if (fn == null) return context.withCastError(fnArg, IFn.class);
+			if (fn == null) return ctx.withCastError(fnArg, IFn.class);
 
 			// Initial value
 			Object result = args[1];
 
 			Object maybeSeq = args[2];
 			ASequence<?> seq = RT.sequence(maybeSeq);
-			if (seq == null) return context.withCastError(maybeSeq, ASequence.class);
+			if (seq == null) return ctx.withCastError(maybeSeq, ASequence.class);
 
 			long c = seq.count();
 			Object[] xs = new Object[2]; // accumulator, next element
 
+			Context<Object> rc=(Context<Object>) ctx;
 			for (long i = 0; i < c; i++) {
 				xs[0] = result;
 				xs[1] = seq.get(i);
-				context = (Context<I>) context.invoke(fn, xs);
-				result = context.getResult();
+				rc = (Context<Object>) rc.invoke(fn, xs);
+				if (rc.isExceptional()) {
+					AExceptional ex=rc.getExceptional();
+				 	if (ex instanceof Reduced) {
+				 		result=((Reduced)ex).getValue();
+				 		rc=rc.withDepth(ctx.getDepth()); // return depth;
+				 		break;
+				 	}
+				 	return rc;
+				} else {
+					result=rc.getResult();
+				}
 			}
 
-			return context.withResult(Juice.REDUCE, result);
+			return rc.withResult(Juice.REDUCE, result);
+		}
+	});
+	
+	public static final CoreFn<?> REDUCED = reg(new CoreFn<>(Symbols.REDUCED) {
+		@Override
+		public <I> Context<Object> invoke(Context<I> context, Object[] args) {
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+
+			AExceptional result = Reduced.wrap(args[0]);
+			return context.withException(Juice.REDUCED, result);
 		}
 	});
 

@@ -135,6 +135,8 @@ public class Symbols {
 	public static final Symbol RECUR = Symbol.create("recur");
 	public static final Symbol RETURN = Symbol.create("return");
 	public static final Symbol BREAK = Symbol.create("break");
+	public static final Symbol REDUCED = Symbol.create("reduced");
+
 
 	public static final char SPECIAL_STAR = '*';
 	public static final Symbol STAR_ADDRESS = Symbol.create("*address*");

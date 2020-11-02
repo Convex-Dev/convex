@@ -11,7 +11,7 @@ import convex.core.ErrorCodes;
  * 
  * @param <T> Type of return value
  */
-public class ReturnValue<T> extends AExceptional {
+public class ReturnValue<T> extends AReturn {
 
 	private final T value;
 

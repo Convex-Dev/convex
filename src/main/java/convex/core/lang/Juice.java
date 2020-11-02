@@ -226,6 +226,8 @@ public class Juice {
 	public static final long ROLLBACK = 50;
 
 	public static final long HALT = 50;
+	
+	protected static final long REDUCED =50;
 
 	/**
 	 * Juice cost for accepting an offer of crypto funds.
@@ -245,4 +247,6 @@ public class Juice {
 	public static final long META = Juice.CHEAP_OP;
 
 	public static final long ASSOC = Juice.BUILD_DATA+Juice.BUILD_PER_ELEMENT*2;
+
+
 }

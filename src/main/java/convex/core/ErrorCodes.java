@@ -143,6 +143,11 @@ public class ErrorCodes {
 	public static final Keyword RETURN = Keyword.create("RETURN");
 	
 	/**
+	 * Excpetional condition indicated a 'reduced' result.
+	 */
+	public static final Keyword REDUCED = Keyword.create(":REDUCED");
+	
+	/**
 	 * Exceptional Condition indicating a halt operation was executed.
 	 * 
 	 * This will terminate the currently executing transaction context, roll back any state changes
@@ -159,4 +164,6 @@ public class ErrorCodes {
 	 * Exceptional Condition indicating something is not yet implemented
 	 */
 	public static final Keyword TODO = Keyword.create("TODO");
+
+
 }

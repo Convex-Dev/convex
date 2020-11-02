@@ -19,6 +19,7 @@ import static convex.test.Assertions.assertMemoryError;
 import static convex.test.Assertions.assertNobodyError;
 import static convex.test.Assertions.assertStateError;
 import static convex.test.Assertions.assertUndeclaredError;
+import static convex.test.Assertions.assertError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -32,6 +33,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.Block;
 import convex.core.BlockResult;
 import convex.core.Constants;
+import convex.core.ErrorCodes;
 import convex.core.Init;
 import convex.core.State;
 import convex.core.crypto.Hash;
@@ -946,6 +948,15 @@ public class CoreTest {
 		assertArityError(step("(reduce +)"));
 		assertArityError(step("(reduce + 1)"));
 		assertArityError(step("(reduce + 1 [2] [3])"));
+	}
+	
+	@Test
+	public void testReduced() {
+		assertEquals(Vectors.of(2L,3L), eval("(reduce (fn [i v] (if (== v 3) (reduced [i v]) v)) 1 [1 2 3 4 5])"));
+	
+		assertArityError(step("(reduced)"));
+		assertArityError(step("(reduced 1 2)"));
+		assertError(ErrorCodes.REDUCED,step("(reduced 1)"));
 	}
 
 	@Test

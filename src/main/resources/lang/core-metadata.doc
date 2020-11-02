@@ -703,9 +703,17 @@
   reduce
   {
     :doc {:description "Reduces over a sequential collection, calling the function with the accumulated value and each element."
-          :examples [{:code "(recur acc (dec i))"}]
+          :examples [{:code "(reduce (fn [acc x] (* acc x)) 1 [1 2 3 4 5])"}]
           :type :function
           :signature [{:params [f init coll]}]}
+  }
+  
+  reduced
+  {
+    :doc {:description "Returns immediately from the enclosing 'reduce' function, providing the given value as the result of the whole reduce operation. This can be used to terminate early from a reduce operation, saving transaction costs."
+          :examples [{:code "(reduce (fn [acc x] (reduced :exit)) 1 [1 2 3 4 5])"}]
+          :type :function
+          :signature [{:params [result]}]}
   }
   
   return

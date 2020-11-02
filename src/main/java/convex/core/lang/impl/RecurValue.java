@@ -10,7 +10,7 @@ import convex.core.lang.RT;
  * Contains argument values for each parameter to be substituted in the
  * surrounding function / loop
  */
-public class RecurValue extends AExceptional {
+public class RecurValue extends AReturn {
 
 	private final Object[] values;
 
