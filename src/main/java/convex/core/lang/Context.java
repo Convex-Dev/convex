@@ -1343,7 +1343,7 @@ public final class Context<T> extends AObject {
 		}
 		
 		IFn<R> fn=as.getActorFunction(sym);
-		if (fn==null) return this.withError(ErrorCodes.STATE,"Actor does not have exported function to call: "+sym);
+		if (fn==null) return this.withError(ErrorCodes.STATE,"Account does not have exported function: "+sym);
 
 		// Context for execution of Actor call. Increments depth
 		// SECURITY: Must change address to the target Actor address.
@@ -1354,6 +1354,7 @@ public final class Context<T> extends AObject {
 		final Context<R> ctx=exContext.invoke(fn,args);
 		
 		// SECURITY: must handle state transitions in results correctly
+		// calling handleStateReturns on 'this' to ensure original values are restored
 		return handleStateResults(ctx);
 	}
 	

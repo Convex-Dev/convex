@@ -289,6 +289,7 @@ public class AccountStatus extends ARecord {
 	 */
 	@SuppressWarnings("unchecked")
 	public ASet<Symbol> getExports() {
+		// This stops users from exporting functions!
 		if (!isActor()) return null;
 		
 		// get *exports* from Actor environment, bail out if doesn't exist
