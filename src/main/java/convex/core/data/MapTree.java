@@ -814,4 +814,34 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 		if (!isValidStructure()) throw new InvalidDataException("Bad structure", this);
 	}
 
+	@Override
+	public boolean containsAllKeys(AHashMap<K, V> map) {
+		if (map instanceof MapTree) {
+			return containsAllKeys((MapTree<K,V>)map);
+		}
+		// must be a MapLeaf
+		long n=map.count;
+		for (long i=0; i<n; i++) {
+			MapEntry<K,V> me=map.entryAt(i);
+			if (!this.containsKeyRef(me.getKeyRef())) return false;
+		}
+		return true;
+	}
+	
+	protected boolean containsAllKeys(MapTree<K, V> map) {
+		// fist check this mask contains all of target mask
+		if ((this.mask|map.mask)!=this.mask) return false;
+		
+		for (int i=0; i<16; i++) {
+			Ref<AHashMap<K,V>> child=this.childForDigit(i);
+			if (child==null) continue;
+			
+			Ref<AHashMap<K,V>> mchild=map.childForDigit(i);
+			if (mchild==null) continue;
+			
+			if (!(child.getValue().containsAllKeys(mchild.getValue()))) return false; 
+		}
+		return true;
+	}
+
 }

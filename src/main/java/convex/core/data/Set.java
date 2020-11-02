@@ -106,10 +106,21 @@ public class Set<T> extends ASet<T> {
 	public <V> V[] toArray(V[] a) {
 		return map.keySet().toArray(a);
 	}
-
+	
+	@SuppressWarnings("unchecked")
 	@Override
 	public boolean containsAll(Collection<?> c) {
-		return map.keySet().containsAll(c);
+		if (c instanceof Set) return ((Set<T>)c).isSubset(this);
+		// TODO: maybe faster implementation?
+		for (Object o: c) {
+			if (!this.contains(o)) return false;
+		}
+		return true;
+	}
+
+	@Override
+	public boolean isSubset(Set<T> set) {
+		return set.map.containsAllKeys(this.map);
 	}
 
 	@Override

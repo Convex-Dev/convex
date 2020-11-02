@@ -59,6 +59,21 @@ public class SetsTest {
 		assertTrue(Sets.of(1, 2, 3).containsAll(Sets.of(2, 3)));
 		assertFalse(Sets.of(1, 2).containsAll(Sets.of(2, 3, 4)));
 	}
+	
+	@Test
+	public void testSubsets() {
+		Set<Integer> EM=Sets.empty();
+		assertTrue(EM.isSubset(EM));
+		assertTrue(EM.isSubset(Samples.INT_SET_300));
+		assertTrue(EM.isSubset(Samples.INT_SET_10));
+		assertFalse(Samples.INT_SET_10.isSubset(EM));
+		assertFalse(Samples.INT_SET_300.isSubset(EM));
+
+		assertTrue(Samples.INT_SET_300.isSubset(Samples.INT_SET_300));
+		assertTrue(Samples.INT_SET_10.isSubset(Samples.INT_SET_300));
+		assertTrue(Samples.INT_SET_10.isSubset(Samples.INT_SET_10));
+		assertFalse(Samples.INT_SET_300.isSubset(Samples.INT_SET_10));
+	}
 
 	@Test
 	public void testMerging() {

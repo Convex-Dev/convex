@@ -86,6 +86,8 @@ public abstract class ASet<T> extends ACollection<T> implements java.util.Set<T>
 		return contains(o);
 	}
 	
+
+	
 	@SuppressWarnings("unchecked")
 	@Override
 	public final boolean equals(Object o) {
@@ -123,4 +125,11 @@ public abstract class ASet<T> extends ACollection<T> implements java.util.Set<T>
 	public ASet<T> empty() {
 		return Sets.empty();
 	}
+	
+	/**
+	 * Tests if this set is a (non-strict) subset of another Set
+	 * @param b Set to test against
+	 * @return True if this is a subset of the other set, false otherwise.
+	 */
+	public abstract boolean isSubset(Set<T> b);
 }

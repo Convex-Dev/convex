@@ -128,4 +128,11 @@ public abstract class AHashMap<K, V> extends AMap<K, V> {
 
 	@Override
 	public abstract AHashMap<K,V> updateRefs(IRefFunction func);
+
+	/**
+	 * Returns true if this map contains all the same keys as another map
+	 * @param map
+	 * @return
+	 */
+	public abstract boolean containsAllKeys(AHashMap<K, V> map);
 }
