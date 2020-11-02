@@ -68,6 +68,15 @@ public class SetsTest {
 		assertTrue(EM.isSubset(Samples.INT_SET_10));
 		assertFalse(Samples.INT_SET_10.isSubset(EM));
 		assertFalse(Samples.INT_SET_300.isSubset(EM));
+		
+		{
+			Set<Integer> s=Samples.createRandomSubset(Samples.INT_SET_300,0.5,1);
+			assertTrue(s.isSubset(Samples.INT_SET_300));
+		}
+		{
+			Set<Integer> s=Samples.createRandomSubset(Samples.INT_SET_10,0.5,2);
+			assertTrue(s.isSubset(Samples.INT_SET_10));
+		}
 
 		assertTrue(Samples.INT_SET_300.isSubset(Samples.INT_SET_300));
 		assertTrue(Samples.INT_SET_10.isSubset(Samples.INT_SET_300));

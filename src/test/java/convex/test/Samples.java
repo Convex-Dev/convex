@@ -10,7 +10,9 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
 import convex.core.crypto.Hash;
+import convex.core.data.ADataStructure;
 import convex.core.data.AMap;
+import convex.core.data.ASequence;
 import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.Address;
@@ -35,6 +37,7 @@ import convex.core.data.VectorTree;
 import convex.core.data.Vectors;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
+import convex.core.lang.RT;
 
 /**
  * Miscellaneous value objects for testing purposes
@@ -165,6 +168,19 @@ public class Samples {
 			obs[i * 2 + 1] = v;
 		}
 		return Maps.of(obs);
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static <R,T> R createRandomSubset(ADataStructure<T> v, double prob, int seed) {
+		ADataStructure<T> result=v.empty();
+		
+		Random r=new Random(seed);
+		for (T o: (ASequence<T>)RT.sequence(v)) {
+			if (r.nextDouble()<=prob) {
+				result=result.conj(o);
+			}
+		}
+		return (R) result;
 	}
 
 	private static AVector<Object> createNastyNestedVector(int fanout, int depth) {
