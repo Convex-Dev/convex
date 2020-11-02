@@ -112,6 +112,9 @@ public class SetsTest {
 		
 		// (intersect a #{}) => #{}
 		assertSame(Sets.empty(),a.intersectAll(Sets.of(5,6)));
+
+		// (intersect a b) => a if (subset? a b)
+		assertSame(a,a.intersectAll(Sets.of(0,1,2,3,4,5)));
 		
 		// regular intersection
 		assertEquals(Sets.of(2,3),a.intersectAll(Sets.of(2,3,4)));
