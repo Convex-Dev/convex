@@ -950,6 +950,14 @@ public class CoreTest {
 		assertArityError(step("(reduce + 1 [2] [3])"));
 	}
 	
+	@Test public void testReduceFail() {
+		// shouldn't fail because function never called
+		assertEquals(2L,evalL("(reduce address 2 [])"));
+		
+		assertArityError(step("(reduce address 2 [3 4])"));
+		assertCastError(step("(reduce (fn [a x] (address x)) 2 [3 4])"));
+	}
+	
 	@Test
 	public void testReduced() {
 		assertEquals(Vectors.of(2L,3L), eval("(reduce (fn [i v] (if (== v 3) (reduced [i v]) v)) 1 [1 2 3 4 5])"));
