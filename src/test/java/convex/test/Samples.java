@@ -26,6 +26,7 @@ import convex.core.data.Lists;
 import convex.core.data.MapLeaf;
 import convex.core.data.MapTree;
 import convex.core.data.Maps;
+import convex.core.data.Set;
 import convex.core.data.Sets;
 import convex.core.data.StringShort;
 import convex.core.data.StringTree;
@@ -63,6 +64,10 @@ public class Samples {
 	public static final List<Integer> INT_LIST_10 = Lists.create(INT_VECTOR_10);
 	public static final List<Integer> INT_LIST_300 = Lists.create(INT_VECTOR_300);
 
+	public static final Set<Integer> INT_SET_10 = Sets.create(INT_VECTOR_10);
+	public static final Set<Integer> INT_SET_300 = Sets.create(INT_VECTOR_300);
+
+	
 	public static final MapLeaf<Long, Long> LONG_MAP_5 = createTestLongMap(5);
 	public static final MapTree<Long, Long> LONG_MAP_10 = createTestLongMap(10);
 	public static final MapTree<Long, Long> LONG_MAP_100 = createTestLongMap(100);

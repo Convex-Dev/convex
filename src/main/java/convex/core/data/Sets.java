@@ -34,8 +34,8 @@ public class Sets {
 	 * @param source
 	 * @return A Set
 	 */
-	public static <T> ASet<T> create(ADataStructure<T> source) {
-		if (source instanceof ASet) return (ASet<T>) source;
+	public static <T> Set<T> create(ADataStructure<T> source) {
+		if (source instanceof Set) return (Set<T>) source;
 		if (source instanceof ASequence) return Set.create((ASequence<T>) source);
 		if (source instanceof AMap) {
 			ASequence<T> seq = RT.sequence(source); // should always be non-null

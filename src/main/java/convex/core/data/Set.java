@@ -293,6 +293,9 @@ public class Set<T> extends ASet<T> {
 	}
 
 	public Set<T> intersectAll(Set<T> xs) {
+		// ensure this is smaller set. Important to avoid creating new set if a subset.
+		if (count()>xs.count()) return xs.intersectAll(this);
+		
 		AHashMap<T, Object> newMap=map.mergeWith(xs.map, (a,b)->((a==null)||(b==null))?null:a);
 		if (map==newMap) return this;
 		return wrap(newMap);

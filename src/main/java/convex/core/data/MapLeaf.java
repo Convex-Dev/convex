@@ -506,7 +506,11 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 		while ((ai < al) || (bi < bl)) {
 			MapEntry<K, V> ae = (ai < al) ? this.entries[ai] : null;
 			MapEntry<K, V> be = (bi < bl) ? b.entries[bi] : null;
+			
+			// comparison
 			int c = (ae == null) ? 1 : ((be == null) ? -1 : ae.getKeyHash().compareTo(be.getKeyHash()));
+			
+			// new entry
 			MapEntry<K, V> newE = null;
 			if (c < 0) {
 				V r = func.merge(ae.getValue(), null);
