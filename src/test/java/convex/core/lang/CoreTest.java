@@ -964,6 +964,8 @@ public class CoreTest {
 	
 		assertArityError(step("(reduced)"));
 		assertArityError(step("(reduced 1 2)"));
+		
+		// reduced on its own is an exceptional result
 		assertError(ErrorCodes.REDUCED,step("(reduced 1)"));
 	}
 
