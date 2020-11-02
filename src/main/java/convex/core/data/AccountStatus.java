@@ -134,10 +134,14 @@ public class AccountStatus extends ARecord {
 	}
 
 	/**
-	 * Gets the exported function for a given symbol in an Actor
+	 * Gets the exported function for a given symbol in an Account
 	 * 
-	 * Returns null if not found (either this account is not an Actor, or it
-	 * does not have the specified exported symbol).
+	 * Returns null if not found. This might occur because:
+	 * 
+	 * <ul>
+	 * <li>The Account does not have the specified exported symbol.<li>
+	 * <li>The exported symbol does not refer to a function</li>
+	 * </ul>
 	 * 
 	 * @param <R>
 	 * @param sym
@@ -145,7 +149,7 @@ public class AccountStatus extends ARecord {
 	 *         found/exported.
 	 * @throws BadStateException
 	 */
-	public <R> IFn<R> getActorFunction(Symbol sym) {
+	public <R> IFn<R> getExportedFunction(Symbol sym) {
 		ASet<Symbol> exports = getExports();
 		if (exports==null) return null;
 		if (!exports.contains(sym)) return null;
@@ -282,18 +286,14 @@ public class AccountStatus extends ARecord {
 	 * 
 	 * Returns null if the account has no *exports*. This might be for any of the following reasons:
 	 * <ul>
-	 * <li>The accounts is not an actor</li>
 	 * <li>The account does not define the *exports* symbol</li>
 	 * </ul>
 	 * @return
 	 */
 	@SuppressWarnings("unchecked")
 	public ASet<Symbol> getExports() {
-		// This stops users from exporting functions!
-		if (!isActor()) return null;
-		
-		// get *exports* from Actor environment, bail out if doesn't exist
-		Syntax exportSyn = environment.get(Symbols.STAR_EXPORTS);
+		// get *exports* from environment, bail out if doesn't exist
+		Syntax exportSyn = getEnvironment().get(Symbols.STAR_EXPORTS);
 		if (exportSyn == null) return null;
 
 		// examine *exports* value, bail out if not a set

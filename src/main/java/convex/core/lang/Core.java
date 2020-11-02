@@ -415,7 +415,7 @@ public class Core {
 			AccountStatus as = context.getState().getAccount(addr);
 			if (as == null) return context.withResult(Juice.LOOKUP, Boolean.FALSE);
 
-			Boolean result = as.getActorFunction(sym) != null;
+			Boolean result = as.getExportedFunction(sym) != null;
 
 			return context.withResult(Juice.LOOKUP, result);
 		}

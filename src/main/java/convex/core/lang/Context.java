@@ -1342,7 +1342,7 @@ public final class Context<T> extends AObject {
 			return this.withError(ErrorCodes.ARGUMENT, "Cannot make negative offer in Actor call: "+offer);
 		}
 		
-		IFn<R> fn=as.getActorFunction(sym);
+		IFn<R> fn=as.getExportedFunction(sym);
 		if (fn==null) return this.withError(ErrorCodes.STATE,"Account does not have exported function: "+sym);
 
 		// Context for execution of Actor call. Increments depth

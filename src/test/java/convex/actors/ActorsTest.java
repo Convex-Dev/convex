@@ -13,6 +13,7 @@ import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Init;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -52,6 +53,14 @@ public class ActorsTest {
 		assertArityError(step("(deploy 1 2)")); 
 
 		assertArityError(step("(deploy '(if))"));
+	}
+	
+	@Test public void testUserAsActor() {
+		Context<?> ctx=step("(do (defn foo [] *caller*) (defn bar [] nil) (def z 1) (export foo z))");
+		assertEquals(Init.HERO,eval(ctx,"(call *address* (foo))"));
+		assertStateError(step(ctx,"(call *address* (non-existent-function))"));
+		assertStateError(step(ctx,"(call *address* (bar))"));
+		assertStateError(step(ctx,"(call *address* (z))"));
 	}
 	
 	@Test public void testNotActor() {

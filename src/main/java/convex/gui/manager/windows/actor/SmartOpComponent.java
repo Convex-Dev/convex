@@ -74,7 +74,7 @@ public class SmartOpComponent extends BaseListComponent {
 
 		AccountStatus as = PeerManager.getLatestState().getAccount(contract);
 
-		IFn<Object> fn = (IFn<Object>) as.getActorFunction(sym);
+		IFn<Object> fn = (IFn<Object>) as.getExportedFunction(sym);
 
 		// Function might be a map or set
 		AVector<Syntax> params = (fn instanceof Fn) ? ((Fn<?>) fn).getParams()
