@@ -285,6 +285,10 @@ public class List<T> extends AList<T> {
 	public AList<T> cons(T x) {
 		return new List<T>((AVector<T>) data.conj(x));
 	}
+	
+	public List<T> conjAll(ACollection<T> xs) {
+		return reverse(data.conjAll(xs));
+	}
 
 
 	@SuppressWarnings("unchecked")

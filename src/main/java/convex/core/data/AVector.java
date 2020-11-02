@@ -227,6 +227,13 @@ public abstract class AVector<T> extends ASequence<T> {
 	public final <R> AVector<R> conj(R value) {
 		return (AVector<R>) append((T) value);
 	}
+	
+	public AVector<T> conjAll(ACollection<T> xs) {
+		if (xs instanceof ASequence) {
+			return concat((ASequence<T>)xs);
+		}
+		return concat(Vectors.create(xs));
+	}
 
 	@Override
 	public AList<T> cons(T x) {
