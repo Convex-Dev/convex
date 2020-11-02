@@ -59,6 +59,14 @@ public abstract class ASet<T> extends ACollection<T> implements java.util.Set<T>
 	 */
 	public abstract ASet<T> disjAll(ACollection<T> xs);
 
+	/**
+	 * Returns the intersection of two sets
+	 * @param xs
+	 * @return
+	 */
+	public abstract ASet<T> intersectAll(ASet<T> xs);
+
+	
 	@SuppressWarnings("unchecked")
 	@Override
 	public T get(Object key) {

@@ -285,4 +285,18 @@ public class Set<T> extends ASet<T> {
 	public <R> ASet<R> map(Function<? super T, ? extends R> mapper) {
 		return Set.create(this.toVector().map(mapper));
 	}
+
+	@Override
+	public Set<T> intersectAll(ASet<T> xs) {
+		if (!(xs instanceof Set)) throw new UnsupportedOperationException("Must intersect with a set)");
+		return intersectAll((Set<T>)xs);
+	}
+
+	public Set<T> intersectAll(Set<T> xs) {
+		AHashMap<T, Object> newMap=map.mergeWith(xs.map, (a,b)->((a==null)||(b==null))?null:a);
+		if (map==newMap) return this;
+		return wrap(newMap);
+	}
+
+
 }

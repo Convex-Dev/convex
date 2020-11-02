@@ -102,6 +102,20 @@ public class SetsTest {
 		assertTrue(a == a.include(2));
 		assertTrue(a == a.includeAll(Sets.of(1, 3)));
 	}
+	
+	@Test
+	public void testIntersection() {
+		ASet<Integer> a = Sets.of(1, 2, 3);
+		
+		// (intersect a a) => a
+		assertSame(a,a.intersectAll(a));
+		
+		// (intersect a #{}) => #{}
+		assertSame(Sets.empty(),a.intersectAll(Sets.of(5,6)));
+		
+		assertEquals(Sets.of(2,3),a.intersectAll(Sets.of(2,3,4)));
+
+	}
 
 	@Test
 	public void testBigMerging() {
