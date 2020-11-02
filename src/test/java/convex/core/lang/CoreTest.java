@@ -1404,6 +1404,16 @@ public class CoreTest {
 		assertStateError(step(ctx, "(call 0x1234567812345678123456781234567812345678123456781234567812345678 -12 (bad-fn 1 2))")); 
 
 	}
+	
+	@Test
+	public void testCallSelf() {
+		Context<Address> ctx = step("(def ctr (deploy '(do (defn foo [] (call *address* (bar))) (defn bar [] (= *address* *caller*)) (export foo bar))))");
+
+		assertTrue(evalB(ctx, "(call ctr (foo))")); // nested call to same actor
+		assertFalse(evalB(ctx, "(call ctr (bar))")); // call from hero only
+
+	}
+
 
 	@Test
 	public void testCallStar() {
