@@ -410,7 +410,7 @@
   
   get-in
  	{
-	 :doc {:description "Gets an element by sucessively looking up keys in a collection according to the logic of get. Returns not-found if any lookup does not find the appropriate key."
+	 :doc {:description "Gets an element by sucessively looking up keys in a collection according to the logic of get. If any lookup does not find the appropriate key, will return nil (or the not-found value if provided)."
          :examples [{:code "(get-in [[1 2] [3 4]] [1 1])"}]
          :type :function
          :signature [{:params [coll keys]}
@@ -419,7 +419,7 @@
   
   halt
  	{
-	 :doc {:description "Completes execution in the current context with the specified result, or null if not provided. Does not roll back any state changes made. If the currently executing context is smart contract, the result will be used as the return value from the smart contract."
+	 :doc {:description "Completes execution in the current context with the specified result, or null if not provided. Does not roll back any state changes made. If the currently executing context is an actor, the result will be used as the return value from the actor call."
          :examples [{:code "(halt :we-are-finished-here)"}]
          :type :function
          :signature [{:params []}
@@ -564,7 +564,7 @@
    
   long?
 	{
-	 :doc {:description "Tests if the argument is a Long."
+	 :doc {:description "Tests if the argument is a Long value."
          :examples [{:code "(long? 1234)"}]
          :type :function
          :signature [{:params [a]}]}
@@ -598,7 +598,7 @@
   
   macro
   {
-    :doc {:description "Creates a macro expansion procedure."
+    :doc {:description "Creates a macro expansion procedure. When used in a function call position, the macro procedure will expand to the given expression, which should be a compilable form."
           :examples [{:code "(macro [x] '(or x y))"}]
           :type :macro
           :signature [{:params [params & body]}]}
