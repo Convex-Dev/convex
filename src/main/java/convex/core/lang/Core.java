@@ -1465,7 +1465,10 @@ public class Core {
 		public <I> Context<Hash> invoke(Context<I> context, Object[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Hash result = Hash.compute(args[0]);
+			ABlob blob=RT.ensureBlob(args[0]);
+			if (blob==null) return context.withCastError(args[0], ABlob.class);
+			
+			Hash result = blob.getContentHash();
 			return context.withResult(Juice.HASH, result);
 		}
 	});

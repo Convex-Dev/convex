@@ -115,7 +115,7 @@ public class CoreTest {
 		assertTrue(evalB("(= *address* (address (blob *address*)))"));
 		
 		// round trip back to Blob
-		assertTrue(evalB("(blob? (blob (hash [1 2 3])))"));
+		assertTrue(evalB("(blob? (blob (hash (encoding [1 2 3]))))"));
 
 		assertArityError(step("(blob 1 2)"));
 		assertArityError(step("(blob)"));
@@ -366,16 +366,16 @@ public class CoreTest {
 
 	@Test
 	public void testStore() {
-		assertNull(eval("(let [a {1 2} h (hash a)] (fetch h))"));
-		assertEquals(Vectors.of(1L, 2L), eval("(let [a [1 2] h (hash a)] (store a) (fetch h))"));
+		assertNull(eval("(let [a {1 2} h (hash (encoding a))] (fetch h))"));
+		assertEquals(Vectors.of(1L, 2L), eval("(let [a [1 2] h (hash (encoding a))] (store a) (fetch h))"));
 
 		// Blob should work with fetch
-		assertEquals(Vectors.of(1L, 2L,3L), eval("(let [a [1 2 3] h (hash a)] (store a) (fetch (blob h)))"));
+		assertEquals(Vectors.of(1L, 2L,3L), eval("(let [a [1 2 3] h (hash (encoding a))] (store a) (fetch (blob h)))"));
 
-		assertEquals(Keywords.STORE, eval("(let [a :store h (hash a)] (store a) (fetch h))"));
+		assertEquals(Keywords.STORE, eval("(let [a :store h (hash (encoding a))] (store a) (fetch h))"));
 		
 		// storing a parent should *not* store child objects
-		assertNull(eval("(let [a [1 2] b [a a] h (hash a)] (store b) (fetch h))"));
+		assertNull(eval("(let [a [1 2] b [a a] h (hash (encoding a))] (store b) (fetch h))"));
 
 		assertArityError(step("(store)"));
 		assertArityError(step("(store 1 2)"));
@@ -1794,10 +1794,13 @@ public class CoreTest {
 
 	@Test
 	public void testHash() {
-		assertSame(Hash.NULL_HASH, eval("(hash nil)"));
-		assertSame(Hash.TRUE_HASH, eval("(hash true)"));
-		assertSame(Maps.empty().getHash(), eval("(hash {})"));
-		assertTrue(evalB("(= (hash 123) (hash 123))"));
+		assertEquals(Hash.fromHex("a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a"),eval("(hash 0x)"));
+		
+		assertEquals(Hash.NULL_HASH, eval("(hash (encoding nil))"));
+		assertEquals(Hash.TRUE_HASH, eval("(hash (encoding true))"));
+		assertEquals(Maps.empty().getHash(), eval("(hash (encoding {}))"));
+		
+		assertTrue(evalB("(= (hash 0x12) (hash 0x12))"));
 
 		assertArityError(step("(hash)"));
 		assertArityError(step("(hash nil nil)"));
@@ -1986,7 +1989,7 @@ public class CoreTest {
 		assertFalse(evalB("(blob? 17)"));
 		assertFalse(evalB("(blob? nil)"));
 		assertFalse(evalB("(blob? *address*)"));
-		assertFalse(evalB("(blob? (hash *state*))"));
+		assertFalse(evalB("(blob? (hash (encoding *state*)))"));
 	}
 
 	@Test

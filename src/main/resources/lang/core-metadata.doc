@@ -302,7 +302,7 @@
   
   encoding
  	{
-	 :doc {:description "Returns the byte encoding for a given value, as a Blob."
+	 :doc {:description "Returns the byte encoding for a given value, as a Blob. The encoding is the unique canonical binary representation of a value. Encodings may change between Convex versions - it is unwise to rely on the exact representation."
          :examples [{:code "(encoding {1 2})"}]
          :type :function
          :signature [{:params [value]}]}
@@ -428,8 +428,9 @@
   
   hash
   {
-	 :doc {:description "Calculates the 32-byte cryptographic Hash of a given value's encoding. A Hash may be used as the unqiue identifier of any distinct data value."
-         :examples [{:code "(hash [1 2 3])"}]
+	 :doc {:description "Calculates the 32-byte SHA3-256 cryptographic Hash of a Blob. Also works with Hash and Address (since these are specialised types of Blob)."
+         :examples [{:code "(hash 0x1234)"}
+                    {:code "(hash (encoding :foo))"}]
          :type :function
          :signature [{:params [value]}]}
 	}
