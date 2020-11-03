@@ -24,6 +24,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Amount;
+import convex.core.data.Format;
 import convex.core.data.IAssociative;
 import convex.core.data.IGet;
 import convex.core.data.Keyword;
@@ -1265,6 +1266,19 @@ public class Core {
 		public boolean test(Object val) {
 			// TODO Auto-generated method stub
 			return RT.isBoolean(val);
+		}
+	});
+	
+	public static final CoreFn<ABlob> ENCODING = reg(new CoreFn<>(Symbols.ENCODING) {
+		@Override
+		public <I> Context<ABlob> invoke(Context<I> context, Object[] args) {
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+
+			Object a = args[0];
+			ABlob encoding=Format.encodedBlob(a);
+
+			long juice=Juice.addMul(Juice.BLOB, encoding.length(), Juice.BLOB_PER_BYTE);
+			return context.withResult(juice, encoding);
 		}
 	});
 

@@ -300,6 +300,14 @@
          :signature [{:params [coll]}]}
 	}
   
+  encoding
+ 	{
+	 :doc {:description "Returns the byte encoding for a given value, as a Blob."
+         :examples [{:code "(encoding {1 2})"}]
+         :type :function
+         :signature [{:params [value]}]}
+	}
+  
   eval
  	{
 	 :doc {:description "Compiles and evaluates a form in the current context."
