@@ -1374,15 +1374,28 @@ public final class Context<T> extends AObject {
 		}
 		
 		R rv=ctx.getValue();
-		if (rv instanceof RollbackValue) {
-			// roll back state to before Actor call
-			// Note: this will also refund unused offer.
-			returnState=this.getState(); 
-			rv=(R) ((RollbackValue<R>)rv).getValue();
-		} else if (rv instanceof HaltValue) {
-			rv=(R) ((HaltValue<R>)rv).getValue();
+		if (rv instanceof AExceptional) {
+			// SECURITY: need to handle exceptional states correctly
+			AExceptional ex=(AExceptional) rv;
+			if (ex instanceof RollbackValue) {
+				// roll back state to before Actor call
+				// Note: this will also refund unused offer.
+				returnState=this.getState(); 
+				rv=((RollbackValue<R>)ex).getValue();
+			} else if (ex instanceof HaltValue) {
+				rv=((HaltValue<R>)ex).getValue();
+			} else if (ex instanceof ErrorValue) {
+				// OK to pass through error, but need to roll back state changes
+				returnState=this.getState();
+			} else if (ex instanceof ReturnValue) {
+				// Normally doesn't happen (invoke catches this)
+				// but might in a user transaction. Treat as a Halt.
+				returnState=this.getState(); 
+				rv=((ReturnValue<R>)ex).getValue();
+			} else {
+				rv=(R) ErrorValue.create(ErrorCodes.UNEXPECTED, "Unexpected actor return of type:"+Utils.getClassName(ex));
+			}
 		}
-		
 		// Rebuild context for the current execution
 		// SECURITY: must restore origin,caller,address,local bindings, offer
 		Context<R> result=Context.create(returnState, ctx.getJuice(), getLocalBindings(), rv, depth, getOrigin(),getCaller(), address,getOffer());

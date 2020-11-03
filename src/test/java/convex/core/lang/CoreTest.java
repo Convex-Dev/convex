@@ -13,13 +13,13 @@ import static convex.test.Assertions.assertBoundsError;
 import static convex.test.Assertions.assertCastError;
 import static convex.test.Assertions.assertCompileError;
 import static convex.test.Assertions.assertDepthError;
+import static convex.test.Assertions.assertError;
 import static convex.test.Assertions.assertFundsError;
 import static convex.test.Assertions.assertJuiceError;
 import static convex.test.Assertions.assertMemoryError;
 import static convex.test.Assertions.assertNobodyError;
 import static convex.test.Assertions.assertStateError;
 import static convex.test.Assertions.assertUndeclaredError;
-import static convex.test.Assertions.assertError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -60,8 +60,6 @@ import convex.core.exceptions.BadSignatureException;
 import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.CorePred;
 import convex.core.lang.impl.ICoreDef;
-import convex.core.lang.impl.RecurValue;
-import convex.core.lang.impl.ReturnValue;
 import convex.core.lang.ops.Constant;
 
 /**
@@ -1055,13 +1053,13 @@ public class CoreTest {
 		assertArityError(step("(reduced 1 2)"));
 		
 		// reduced on its own is an exceptional result
-		assertError(ErrorCodes.REDUCED,step("(reduced 1)"));
+		assertError(ErrorCodes.UNEXPECTED,step("(reduced 1)"));
 	}
 
 	@Test
 	public void testReturn() {
 		// basic return mechanics
-		assertTrue(step("(return 1)").getValue() instanceof ReturnValue);
+		assertEquals(1L,evalL("(return 1)"));
 
 		assertEquals(Vectors.empty(), eval("(let [f (fn [x] (+ 1 (return x)))] (f []))")); // return in function body
 		assertEquals(Vectors.empty(), eval("(let [f (fn [x] (let [a (return x)] 2))] (f []))")); // return in let
@@ -1094,7 +1092,7 @@ public class CoreTest {
 		assertDepthError(step("(do   (def f (fn [x] (recur (f x))))   (f 1))"));
 
 		// basic return mechanics
-		assertTrue(step("(recur 1)").getValue() instanceof RecurValue);
+		assertError(ErrorCodes.UNEXPECTED,step("(recur 1)"));
 	}
 
 	@Test
