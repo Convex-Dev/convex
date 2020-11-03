@@ -92,7 +92,7 @@
   '(cond ~test nil ~(cons 'do body)))
 
 (defn mapcat 
-  ^{:doc {:description "Maps a funcion across the given collections, then concatenates the results."
+  ^{:doc {:description "Maps a funcion across the given collections, then concatenates the results. nil is treated as an empty collection."
          :examples [{:code "(mapcat vector [:foo :bar :baz] [1 2 3])"}]
          :type :function
          :signature [{:params [test & body]}]}
