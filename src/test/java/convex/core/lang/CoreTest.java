@@ -760,6 +760,24 @@ public class CoreTest {
 
 		assertCastError(step("(set 1)"));
 	}
+	
+	@Test
+	public void testSubsetQ() {
+		assertTrue(evalB("(subset? #{} #{})"));
+		assertTrue(evalB("(subset? #{} #{1 2 3})"));
+		assertTrue(evalB("(subset? #{2 3} #{1 2 3 4})"));
+		
+		assertFalse(evalB("(subset? #{2 3} #{1 2})"));
+		assertFalse(evalB("(subset? #{1 2 3} #{0})"));
+		assertFalse(evalB("(subset? #{#{}} #{#{1}})"));
+		
+		assertArityError(step("(subset?)"));
+		assertArityError(step("(subset? 1)"));
+		assertArityError(step("(subset? 1 2 3)"));
+
+		assertCastError(step("(subset? 1 2)"));
+		assertCastError(step("(subset? #{} [2])"));
+	}
 
 	@Test
 	public void testFirst() {

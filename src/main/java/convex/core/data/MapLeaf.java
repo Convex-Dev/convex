@@ -696,9 +696,12 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 
 	@Override
 	public boolean containsAllKeys(AHashMap<K, V> b) {
+		if (this==b) return true;
+		
 		// if map is too big, can't possibly contain all keys
 		if (b.count()>count) return false;
 		
+		// must be a mapleaf if this size or smaller
 		return containsAllKeys((MapLeaf<K,V>)b);
 	}
 	
@@ -707,13 +710,16 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 		for (MapEntry<K,V> meb:b.entries) {
 			Hash bh=meb.getKeyHash();
 			
+			if (ix>=count) return false; // no remaining entries in this
 			while (ix<count) {
 				MapEntry<K,V> mea=entries[ix];
 				Hash ah=mea.getKeyHash();
 				int c=ah.compareTo(bh);
 				if (c<0) {
+					// ah is smaller than bh
 					// need to advance ix and try next entry
 					ix++;
+					if (ix>=count) return false; // not found
 					continue;
 				} else if (c>0) {
 					return false; // didn't contain the key entry

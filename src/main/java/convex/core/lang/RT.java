@@ -30,6 +30,7 @@ import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
+import convex.core.data.Set;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
@@ -515,6 +516,8 @@ public class RT {
 
 	/**
 	 * Converts any collection into a sequence data structure.
+	 * 
+	 * Potentially O(n) in size of collection.
 	 * 
 	 * Nulls are converted to an empty vector.
 	 * 
@@ -1133,6 +1136,18 @@ public class RT {
 		if (o==null) return Maps.empty();
 		if (o instanceof IGet) return (IAssociative<K,V>) o;
 		return null;
+	}
+
+	/**
+	 * Coerces to a set. Returns null if the argument is not a set.
+	 * @param <T>
+	 * @param object
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T> Set<T> ensureSet(Object object) {
+		if (!(object instanceof Set)) return null;
+		return (Set<T>) object;
 	}
 
 

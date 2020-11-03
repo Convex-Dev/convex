@@ -248,5 +248,7 @@ public class Juice {
 
 	public static final long ASSOC = Juice.BUILD_DATA+Juice.BUILD_PER_ELEMENT*2;
 
+	public static final long SET_COMPARE_PER_ELEMENT = 10;
+
 
 }

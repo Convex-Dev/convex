@@ -32,6 +32,7 @@ import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
+import convex.core.data.Set;
 import convex.core.data.Sets;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
@@ -1002,6 +1003,26 @@ public class Core {
 			}
 
 			long juice = Juice.GET;
+			return context.withResult(juice, result);
+		}
+	});
+	
+	public static final CoreFn<Boolean> SUBSET_Q = reg(new CoreFn<>(Symbols.SUBSET_Q) {
+		@Override
+		public <I> Context<Boolean> invoke(Context<I> context, Object[] args) {
+			int n = args.length;
+			if (n != 2) return context.withArityError(exactArityMessage(2, n));
+
+			Set<Object> s0=RT.ensureSet(args[0]);
+			if (s0==null) return context.withCastError(args[0], ASet.class);
+			
+			long juice = Juice.SET_COMPARE_PER_ELEMENT*s0.count();
+			if (!context.checkJuice(juice)) return context.withJuiceError();
+			
+			Set<Object> s1=RT.ensureSet(args[1]);
+			if (s1==null) return context.withCastError(args[1], ASet.class);
+
+			boolean result=s0.isSubset(s1);
 			return context.withResult(juice, result);
 		}
 	});
