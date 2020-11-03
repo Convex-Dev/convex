@@ -778,6 +778,41 @@ public class CoreTest {
 		assertCastError(step("(subset? 1 2)"));
 		assertCastError(step("(subset? #{} [2])"));
 	}
+	
+	@Test
+	public void testSetUnion() {
+		assertEquals(Sets.empty(),eval("(union)"));
+
+		assertEquals(Sets.empty(),eval("(union nil)"));
+		assertEquals(Sets.empty(),eval("(union #{})"));
+		assertEquals(Sets.of(1L,2L),eval("(union #{1 2})"));
+
+		assertEquals(Sets.of(1L,2L,3L),eval("(union #{1 2} #{3})"));
+		
+		assertEquals(Sets.of(1L,2L,3L,4L,5L),eval("(union #{1 2} #{3} #{4 5})"));
+		
+		assertCastError(step("(union :foo)"));
+		assertCastError(step("(union [1] [2 3])"));
+	}
+	
+	@Test
+	public void testSetIntersection() {
+		assertEquals(Sets.empty(),eval("(intersection nil)"));
+		assertEquals(Sets.empty(),eval("(intersection #{})"));
+		assertEquals(Sets.of(1L,2L),eval("(intersection #{1 2})"));
+
+		assertEquals(Sets.empty(),eval("(intersection #{1 2} #{3})"));
+		
+		assertEquals(Sets.of(2L,3L),eval("(intersection #{1 2 3} #{2 3 4})"));
+		
+		assertEquals(Sets.of(3L),eval("(intersection #{1 2 3} #{2 3 4} #{3 4 5})"));
+
+		assertArityError(step("(intersection)"));
+		
+		assertCastError(step("(intersection :foo)"));
+		assertCastError(step("(intersection [1] [2 3])"));
+	}
+
 
 	@Test
 	public void testFirst() {

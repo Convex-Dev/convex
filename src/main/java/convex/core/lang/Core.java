@@ -168,7 +168,7 @@ public class Core {
 			// Need to compute juice before building a potentially big set
 			Long n = RT.count(o);
 			if (n == null) return context.withCastError(o, ACollection.class);
-			long juice = Juice.BUILD_DATA + n * Juice.BUILD_PER_ELEMENT;
+			long juice = Juice.addMul(Juice.BUILD_DATA ,n,Juice.BUILD_PER_ELEMENT);
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
 			ASet<?> result = RT.set(o);
@@ -177,6 +177,62 @@ public class Core {
 			return context.withResult(juice, result);
 		}
 	});
+	
+	public static final CoreFn<ASet<?>> UNION = reg(new CoreFn<>(Symbols.UNION) {
+		@Override
+		public <I> Context<ASet<?>> invoke(Context<I> context, Object[] args) {
+			int n=args.length;
+			Set<Object> result=Sets.empty();
+			
+			long juice=Juice.BUILD_DATA;
+			
+			for (int i=0; i<n; i++) {
+				Object arg=args[i];
+				if (arg==null) continue; // nil is empty set, can skip (no elements)
+				
+				Set<Object> set=RT.ensureSet(arg);
+				if (set==null) return context.withCastError(arg, ASet.class);
+				
+				// check juice before expensive operation
+				long size=set.count();
+				juice = Juice.addMul(juice, size, Juice.BUILD_PER_ELEMENT);
+				if (!context.checkJuice(juice)) return context.withJuiceError();
+			
+				result=result.includeAll(set);
+			}
+
+			return context.withResult(juice, result);
+		}
+	});
+	
+	public static final CoreFn<ASet<?>> INTERSECTION = reg(new CoreFn<>(Symbols.INTERSECTION) {
+		@Override
+		public <I> Context<ASet<?>> invoke(Context<I> context, Object[] args) {
+			if (args.length <1) return context.withArityError(minArityMessage(1, args.length));
+
+			int n=args.length;
+			Object arg0=args[0];
+			Set<Object> result=(arg0==null)?Sets.empty():RT.ensureSet(arg0);
+			if (result==null) return context.withCastError(arg0, ASet.class);
+			
+			long juice=Juice.BUILD_DATA;
+			
+			for (int i=1; i<n; i++) {
+				Object arg=args[i];
+				Set<Object> set=(arg==null)?Sets.empty():RT.ensureSet(args[i]);
+				if (set==null) return context.withCastError(args[i], ASet.class);
+				long size=set.count();
+				
+				juice = Juice.addMul(juice, size, Juice.BUILD_PER_ELEMENT);
+				if (!context.checkJuice(juice)) return context.withJuiceError();
+			
+				result=result.intersectAll(set);
+			}
+
+			return context.withResult(juice, result);
+		}
+	});
+
 
 	public static final CoreFn<AList<?>> LIST = reg(new CoreFn<>(Symbols.LIST) {
 		@Override
@@ -1464,7 +1520,7 @@ public class Core {
 		@Override
 		public <I> Context<Hash> invoke(Context<I> context, Object[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-
+ 
 			ABlob blob=RT.ensureBlob(args[0]);
 			if (blob==null) return context.withCastError(args[0], ABlob.class);
 			

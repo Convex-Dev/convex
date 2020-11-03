@@ -247,9 +247,14 @@ public class Symbols {
 	public static final Symbol REGISTER = Symbol.create("register");
 	
 	public static final Symbol SUBSET_Q = Symbol.create("subset?");
+	public static final Symbol UNION = Symbol.create("union");
+	public static final Symbol INTERSECTION = Symbol.create("intersection");
+	public static final Symbol DIFFERENCE = Symbol.create("difference");
+	
 	public static final Symbol MERGE = Symbol.create("merge");
 	
 	public static final Symbol ENCODING = Symbol.create("encoding");
+
 
 	
 
