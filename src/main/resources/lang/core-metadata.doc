@@ -428,7 +428,7 @@
   
   hash
   {
-	 :doc {:description "Calculates the 32-byte SHA3-256 cryptographic Hash of a Blob. Also works with Hash and Address (since these are specialised types of Blob)."
+	 :doc {:description "Calculates the 32-byte SHA3-256 cryptographic Hash of a Blob. Also works with Hash and Address arguments (since these are specialised types of Blob)."
          :examples [{:code "(hash 0x1234)"}
                     {:code "(hash (encoding :foo))"}]
          :type :function
