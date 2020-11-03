@@ -612,6 +612,14 @@
           :signature [{:params [coll]}]}
   }
   
+  merge
+  {
+    :doc {:description "Merges hashmaps, replacing existing values. nil is considered as an empty map."
+          :examples [{:code "(merge {1 2 3 4} {3 5 7 9}))"}]
+          :type :function
+          :signature [{:params [& maps]}]}
+  }
+  
   meta
   {
     :doc {:description "Returns metadata for a Syntax Object. Returns nil if the argument is not a Syntax Object."
