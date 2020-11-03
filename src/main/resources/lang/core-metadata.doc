@@ -486,6 +486,14 @@
          :type :function
          :signature [{:params [num]}]}
 	}
+ 
+  intersection
+  {
+    :doc {:description "Computes the intersection of one or more sets. 'nil' is treated as the empty set."
+          :examples [{:code "(intersection #{1 2} #{2 3})"}]
+          :type :function
+          :signature [{:params [set & more]}]}
+  }
   
   into
 	{
@@ -900,6 +908,14 @@
           :examples [{:code "(transfer my-friend-address 12345678)"}]
           :type :function
           :signature [{:params [address amount]}]}
+  }
+  
+  union
+  {
+    :doc {:description "Computes the union of zero or more sets. 'nil' is treated as the empty set."
+          :examples [{:code "(union #{1 2} #{2 3})"}]
+          :type :function
+          :signature [{:params [& sets]}]}
   }
   
   unsyntax
