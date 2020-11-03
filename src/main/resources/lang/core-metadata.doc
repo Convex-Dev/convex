@@ -830,7 +830,7 @@
   
   subset?
   {
-    :doc {:description "Tests if a set is a subset of a second set."
+    :doc {:description "Tests if a set is a subset of a second set. Both arguments bust be valid sets."
           :examples [{:code "(subset? #{1} #{1 2 3})"}]
           :type :function
           :signature [{:params [set1 set2]}]}
@@ -846,8 +846,8 @@
   
   str?
   {
-    :doc {:description "Tests if the argument is a Symbol."
-          :examples [{:code "(symbol? 'bar)"}]
+    :doc {:description "Tests if the argument is a String."
+          :examples [{:code "(str? \"foo\")"}]
           :type :function
           :signature [{:params [a]}]}
   }
