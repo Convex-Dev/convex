@@ -828,6 +828,14 @@
           :signature [{:params [a]}]}
   }
   
+  subset?
+  {
+    :doc {:description "Tests if a set is a subset of a second set."
+          :examples [{:code "(subset? #{1} #{1 2 3})"}]
+          :type :function
+          :signature [{:params [set1 set2]}]}
+  }
+  
   symbol
   {
     :doc {:description "Coerces a named value to a Symbol. Supports Symbols, Keywords and short Strings."
