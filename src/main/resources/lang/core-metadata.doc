@@ -420,7 +420,7 @@
   
   hash
   {
-	 :doc {:description "Calculates the 32-byte cryptographic Hash of a given value. A Hash may be used as the unqiue identifier of any distinct data value."
+	 :doc {:description "Calculates the 32-byte cryptographic Hash of a given value's encoding. A Hash may be used as the unqiue identifier of any distinct data value."
          :examples [{:code "(hash [1 2 3])"}]
          :type :function
          :signature [{:params [value]}]}
@@ -428,7 +428,7 @@
   
   hash?
   {
-	 :doc {:description "Tests if the given value is a Hash."
+	 :doc {:description "Tests if the given value is a Hash. A Hash is a specialised type of Blob"
          :examples [{:code "(hash? (hash *state*))"}]
          :type :function
          :signature [{:params [a]}]}
@@ -444,7 +444,7 @@
   
   hash-set
   {
-	 :doc {:description "Constructs a hash set with the given values. If a value is repeated, it will be included only once in the set."
+	 :doc {:description "Constructs a Set with the given values. If a value is repeated, it will be included only once in the set."
          :examples [{:code "(hash-set 1 2 3)"}]
          :type :function
          :signature [{:params [& values]}]}
@@ -472,7 +472,7 @@
  
   int
 	{
-	 :doc {:description "Casts the given argument to a 32-bit signed Int."
+	 :doc {:description "Casts the given argument to a 32-bit signed Integer."
          :examples [{:code "(int 10)"}]
          :type :function
          :signature [{:params [num]}]}
@@ -530,7 +530,7 @@
  
   list
 	{
-	 :doc {:description "Creates a list containing the given arguments as elements."
+	 :doc {:description "Creates a List containing the given arguments as elements."
          :examples [{:code "(list 1 2 3)"}]
          :type :function
          :signature [{:params [& elements]}]}
@@ -538,7 +538,7 @@
  
   list?
 	{
-	 :doc {:description "Tests if the argument is a List."
+	 :doc {:description "Tests if the argument is a List data structure."
          :examples [{:code "(list? :foo)"}]
          :type :function
          :signature [{:params [a]}]}
@@ -614,8 +614,8 @@
   
   merge
   {
-    :doc {:description "Merges hashmaps, replacing existing values. nil is considered as an empty map."
-          :examples [{:code "(merge {1 2 3 4} {3 5 7 9}))"}]
+    :doc {:description "Merges zero or more hashmaps, replacing existing values. nil is considered as an empty map."
+          :examples [{:code "(merge {1 2 3 4} {3 5 7 9})"}]
           :type :function
           :signature [{:params [& maps]}]}
   }
