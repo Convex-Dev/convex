@@ -247,6 +247,8 @@ public class Set<T> extends ASet<T> {
 
 	@Override
 	public Set<T> includeAll(Set<T> b) {
+		if (b.isEmpty()) return this;
+		
 		// any key in either map results in a non-null value, assuming one is non-null
 		AHashMap<T, Object> rmap = map.mergeDifferences(b.map, (x, y) -> (y == null) ? x : y);
 		if (map == rmap) return this;
@@ -255,6 +257,8 @@ public class Set<T> extends ASet<T> {
 
 	@Override
 	public Set<T> excludeAll(Set<T> b) {
+		if (b.isEmpty()) return this;
+		
 		// any value in y removes the value in x
 		AHashMap<T, Object> rmap = map.mergeWith(b.map, (x, y) -> (y == null) ? x : null);
 		if (map == rmap) return this;

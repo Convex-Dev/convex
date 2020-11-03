@@ -812,6 +812,24 @@ public class CoreTest {
 		assertCastError(step("(intersection :foo)"));
 		assertCastError(step("(intersection [1] [2 3])"));
 	}
+	
+	@Test
+	public void testSetDifference() {
+		assertEquals(Sets.empty(),eval("(difference nil)"));
+		assertEquals(Sets.empty(),eval("(difference #{})"));
+		assertEquals(Sets.of(1L,2L),eval("(difference #{1 2})"));
+
+		assertEquals(Sets.of(1L,2L),eval("(difference #{1 2} #{3})"));
+		
+		assertEquals(Sets.of(2L,3L),eval("(difference #{1 2 3} #{1 4})"));
+		
+		assertEquals(Sets.of(3L),eval("(difference #{1 2 3} #{2 4} #{1 5})"));
+
+		assertArityError(step("(difference)"));
+		
+		assertCastError(step("(difference :foo)"));
+		assertCastError(step("(difference [1] [2 3])"));
+	}
 
 
 	@Test

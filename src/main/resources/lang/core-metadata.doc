@@ -251,6 +251,14 @@
          :signature [{:params [init-fn & args]}]}
 	}
  
+  difference
+  {
+    :doc {:description "Computes the difference of one or more sets. 'nil' is treated as the empty set."
+          :examples [{:code "(difference #{1 2} #{2 3})"}]
+          :type :function
+          :signature [{:params [set & more]}]}
+  }
+ 
   disj
 	{
 	 :doc {:description "Removes a key from a set. If the key does not exist, returns the same set unchanged."
