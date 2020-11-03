@@ -990,20 +990,20 @@ public class RT {
 	}
 
 	/**
-	 * Converts to an ADataStructure interface
+	 * Casts to an ADataStructure instance
 	 * 
 	 * @param <E>
 	 * @param a
 	 * @return ADataStructure instance, or null if not a data structure
 	 */
 	@SuppressWarnings("unchecked")
-	public static <E> ADataStructure<E> toDataStructure(Object a) {
+	public static <E> ADataStructure<E> ensureDataStructure(Object a) {
 		if (a instanceof ADataStructure) return (ADataStructure<E>) a;
 		return null;
 	}
 
 	/**
-	 * Tests is the object is one of the canonical values true or false
+	 * Tests is the object is one of the canonical boolean values 'true' or 'false'
 	 * 
 	 * @param value Value to test
 	 * @return True if the value is a canonical boolean value.
@@ -1148,6 +1148,19 @@ public class RT {
 	public static <T> Set<T> ensureSet(Object object) {
 		if (!(object instanceof Set)) return null;
 		return (Set<T>) object;
+	}
+
+	/**
+	 * Casts the argument to a hashmap
+	 * @param <K> Type of keys
+	 * @param <V> Type of values
+	 * @param a Any object
+	 * @return AHashMap instance, or null if not a hash map
+	 */
+	@SuppressWarnings("unchecked")
+	public static <K,V> AHashMap<K, V> ensureHashMap(Object a) {
+		if (a instanceof AHashMap) return (AHashMap<K, V>) a;
+		return null;
 	}
 
 

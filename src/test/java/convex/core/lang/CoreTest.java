@@ -903,6 +903,24 @@ public class CoreTest {
 	}
 	
 	@Test
+	public void testMerge() {
+		assertEquals(Maps.empty(),eval("(merge)"));
+		assertEquals(Maps.empty(),eval("(merge nil)"));
+		assertEquals(Maps.empty(),eval("(merge nil nil)"));
+		
+		assertEquals(Maps.of(1L,2L,3L,4L),eval("(merge {1 2} {3 4})"));
+		assertEquals(Maps.of(1L,2L,3L,4L),eval("(merge {1 2 3 4} {})"));
+		assertEquals(Maps.of(1L,2L,3L,4L),eval("(merge nil {1 2 3 4})"));
+
+		assertEquals(Maps.of(1L,3L),eval("(merge {1 2} {1 3})"));
+		assertEquals(Maps.of(1L,3L),eval("(merge nil {1 2} nil {1 3} nil)"));
+
+		assertCastError(step("(merge [])"));
+		assertCastError(step("(merge {} [1 2 3])"));
+		assertCastError(step("(merge nil :foo)"));
+	}
+	
+	@Test
 	public void testDotimes() {
 		assertEquals(Vectors.of(0L, 1L, 2L), eval("(do (def a []) (dotimes [i 3] (def a (conj a i))) a)"));
 		assertEquals(Vectors.empty(), eval("(do (def a []) (dotimes [i 0] (def a (conj a i))) a)"));

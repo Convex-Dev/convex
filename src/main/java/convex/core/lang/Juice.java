@@ -250,5 +250,43 @@ public class Juice {
 
 	public static final long SET_COMPARE_PER_ELEMENT = 10;
 
+	/**
+	 * Saturating multiply and add result = a + b * c
+	 * 
+	 * Returns Long.MAX_VALUE on overflow.
+	 * 
+	 * @param juice
+	 * @param size
+	 * @param buildPerElement
+	 * @return
+	 */
+	public static final long addMul(long a, long b, long c) {
+		return add(a,mul(b,c));
+	}
+	
+	/**
+	 * Saturating multiply. Returns Long.MAX_VALUE on overflow.
+	 * @param a
+	 * @param b
+	 * @return
+	 */
+	public static final long mul(long a, long b) {
+		if ((a<0)||(b<0)) return Long.MAX_VALUE;
+		if (Math.multiplyHigh(a, b)>0) return Long.MAX_VALUE;
+		return a*b;
+	}
+	
+	/**
+	 * Saturating addition. Returns Long.MAX_VALUE on overflow.
+	 * @param a
+	 * @param b
+	 * @return
+	 */
+	public static final long add(long a, long b) {
+		if ((a<0)||(b<0)) return Long.MAX_VALUE;
+		if ((a+b)<0) return Long.MAX_VALUE;
+		return a+b;
+	}
+
 
 }

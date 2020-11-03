@@ -672,8 +672,8 @@ public final class Context<T> extends AObject {
 	
 	@SuppressWarnings("unchecked")
 	public <R extends X, X> Context<X> withResult(long gulp,R value) {
+		if (juice<gulp) return withJuiceError();
 		long newJuice=juice-gulp;
-		if (newJuice<0) return withJuiceError();
 		
 		if ((this.result==value)&&(this.juice==newJuice)) return (Context<X>) this;
 		return new Context<X>(chainState,newJuice,localBindings,value,depth,false);

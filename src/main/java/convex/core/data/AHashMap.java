@@ -39,6 +39,8 @@ public abstract class AHashMap<K, V> extends AMap<K, V> {
 	/**
 	 * Merge another map into this map. Replaces existing entries if they are
 	 * different
+	 * 
+	 * O(n) in size of map to merge.
 	 */
 	public AHashMap<K, V> merge(AHashMap<K, V> m) {
 		AHashMap<K, V> result = this;

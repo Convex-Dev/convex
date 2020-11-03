@@ -247,6 +247,7 @@ public class Symbols {
 	public static final Symbol REGISTER = Symbol.create("register");
 	
 	public static final Symbol SUBSET_Q = Symbol.create("subset?");
+	public static final Symbol MERGE = Symbol.create("merge");
 
 	
 

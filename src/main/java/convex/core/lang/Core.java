@@ -842,7 +842,7 @@ public class Core {
 			if ((o == null) && (n == 1)) return context.withResult(juice, null);
 
 			// convert to data structure
-			ADataStructure<?> result = RT.toDataStructure(o);
+			ADataStructure<?> result = RT.ensureDataStructure(o);
 
 			// values that are non-null but not a data structure are a cast error
 			if ((o != null) && (result == null)) return context.withCastError(o, ADataStructure.class);
@@ -1478,7 +1478,7 @@ public class Core {
 			// emptying nil is still nil
 			if (o == null) return context.withResult(Juice.SIMPLE_FN, null);
 
-			ADataStructure<?> coll = RT.toDataStructure(o);
+			ADataStructure<?> coll = RT.ensureDataStructure(o);
 			if (coll == null) return context.withCastError(o, ADataStructure.class);
 
 			Object result = coll.empty();
@@ -1687,14 +1687,14 @@ public class Core {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			Object a0 = args[0];
-			ADataStructure<Object> result = RT.toDataStructure(a0);
+			ADataStructure<Object> result = RT.ensureDataStructure(a0);
 			if ((a0 != null) && (result == null)) return context.withCastError(args[0], ADataStructure.class);
 
 			long juice = Juice.BUILD_DATA;
 			Object a1 = args[1];
 			if (a0 == null) {
 				// just keep second arg as complete data structure
-				result = RT.toDataStructure(a1);
+				result = RT.ensureDataStructure(a1);
 				if ((a1 != null) && (result == null)) return context.withCastError(args[0], ADataStructure.class);
 			} else {
 				ASequence<Object> seq = RT.sequence(a1);
@@ -1711,6 +1711,38 @@ public class Core {
 
 			return context.withResult(juice, result);
 		}
+	});
+	
+	public static final CoreFn<AHashMap<Object,Object>> MERGE = reg(new CoreFn<>(Symbols.MERGE) {
+
+		@Override
+		public <I> Context<AHashMap<Object, Object>> invoke(Context<I> context, Object[] args) {
+			int n=args.length;
+			if (n==0) return context.withResult(Juice.BUILD_DATA,Maps.empty());
+			
+			// TODO: handle blobmaps?
+			
+			Object arg0=args[0];
+			AHashMap<Object,Object> result=(arg0==null)?Maps.empty():RT.ensureHashMap(arg0);
+			if (result == null) return context.withCastError(arg0, AHashMap.class);
+			
+			long juice=Juice.BUILD_DATA;
+			for (int i=1; i<n; i++) {
+				Object argi=args[i];
+				AHashMap<Object,Object> argMap=(argi==null)?Maps.empty():RT.ensureHashMap(argi);
+				if (argMap == null) return context.withCastError(argi, AHashMap.class);
+				
+				long size=argMap.count();
+				juice=Juice.addMul(juice,size,Juice.BUILD_PER_ELEMENT);
+				
+				if (!context.checkJuice(juice)) return context.withJuiceError();
+				
+				result=result.merge(argMap);
+			}
+			
+			return context.withResult(juice, result);
+		}
+		
 	});
 
 	public static final CoreFn<ASequence<?>> MAP = reg(new CoreFn<>(Symbols.MAP) {
@@ -1738,7 +1770,7 @@ public class Core {
 				length = Math.min(length, seq.size());
 			}
 
-			final long juice = Juice.MAP + Juice.BUILD_DATA * length;
+			final long juice = Juice.addMul(Juice.MAP, Juice.BUILD_DATA , length);
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
 			ArrayList<Object> al = new ArrayList<>();
