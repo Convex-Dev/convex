@@ -17,7 +17,7 @@ import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 
 /**
- * Persistent Map for large maps requiring tree structure.
+ * Persistent Map for large hash maps requiring tree structure.
  * 
  * Internally implemented as a radix tree, indexed by key hash. Uses an array of
  * child Maps, with a bitmap mask indicating which hex digits are present, i.e.
@@ -426,7 +426,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 	}
 
 	/**
-	 * Reads a ListMap from the provided ByteBuffer Assumes the header byte is
+	 * Reads a ListMap from the provided ByteBuffer Assumes the header byte and count is
 	 * already read.
 	 * 
 	 * @param bb

@@ -185,6 +185,13 @@ public class Set<T> extends ASet<T> {
 		return map.write(bs,pos);
 	}
 
+	/**
+	 * Read a set from a ByteBuffer. Assumes tag byte already consumed
+	 * @param <T>
+	 * @param bb
+	 * @return
+	 * @throws BadFormatException
+	 */
 	@SuppressWarnings("unchecked")
 	public static <T> Set<T> read(ByteBuffer bb) throws BadFormatException {
 		Object o = Format.read(bb);
