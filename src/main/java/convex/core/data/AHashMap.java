@@ -137,4 +137,30 @@ public abstract class AHashMap<K, V> extends AMap<K, V> {
 	 * @return
 	 */
 	public abstract boolean containsAllKeys(AHashMap<K, V> map);
+
+	/**
+	 * Writes this HashMap to a byte array. Will include values by default.
+	 * @param bs Byte array
+	 * @param pos Position to write in byte array
+	 * @return
+	 */
+	public abstract int write(byte[] bs, int pos);
+	
+	/**
+	 * Writes this HashMap to a byte array.
+	 * @param bs Byte array
+	 * @param pos Position to write in byte array
+	 * @param includeValues True to include values, false to exclude
+	 * @return
+	 */
+	public abstract int write(byte[] bs, int pos, boolean includeValues);
+	
+	/**
+	 * Writes this HashMap's raw data to a byte array. Excludes tag and count.
+	 * @param bs Byte array
+	 * @param pos Position to write in byte array
+	 * @param includeValues True to include values, false to exclude
+	 * @return
+	 */
+	public abstract int writeRaw(byte[] bs, int pos, boolean includeValues);
 }

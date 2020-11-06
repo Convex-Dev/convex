@@ -182,7 +182,7 @@ public class Set<T> extends ASet<T> {
 
 	@Override
 	public int writeRaw(byte[] bs, int pos) {
-		return map.write(bs,pos);
+		return map.write(bs,pos,false);
 	}
 
 	/**
