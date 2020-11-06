@@ -446,7 +446,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K, V> MapTree<K, V> read(ByteBuffer bb, long count) throws BadFormatException {
+	public static <K, V> MapTree<K, V> read(ByteBuffer bb, long count, boolean includeValues) throws BadFormatException {
 		int shift = bb.get();
 		short mask = bb.getShort();
 

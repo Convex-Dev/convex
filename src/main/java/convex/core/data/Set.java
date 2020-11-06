@@ -30,6 +30,12 @@ public class Set<T> extends ASet<T> {
 	static final Set<?> EMPTY = new Set<>(Maps.empty());
 
 	/**
+	 * Dummy value used in underlying maps. Not important what this is, but should be small, efficient and non-null
+	 */
+	public static final Object DUMMY = true;
+	public static final Ref<?> DUMMY_REF = Ref.TRUE_VALUE;
+
+	/**
 	 * Internal map used to represent the set
 	 */
 	private final AHashMap<T, Object> map;
@@ -216,7 +222,7 @@ public class Set<T> extends ASet<T> {
 	@Override
 	public Set<T> include(T a) {
 		if (map.containsKey(a)) return this;
-		return wrap(map.assocRef(Ref.get(a), true));
+		return wrap(map.assocRef(Ref.get(a), DUMMY));
 	}
 
 	@Override
@@ -289,7 +295,7 @@ public class Set<T> extends ASet<T> {
 	public void validate() throws InvalidDataException {
 		super.validate();
 		map.mapEntries(e -> {
-			if (e.getValue() != Boolean.TRUE) {
+			if (e.getValue() != DUMMY) {
 				Object key = e.getKey();
 				throw Utils.sneakyThrow(new InvalidDataException(
 						"Set must have true entries in underlying map with key: " + key, this));

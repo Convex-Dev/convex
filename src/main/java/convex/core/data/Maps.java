@@ -113,9 +113,26 @@ public class Maps {
 	public static <K, V> AMap<K, V> read(ByteBuffer bb) throws BadFormatException {
 		long count = Format.readVLCLong(bb);
 		if (count <= MapLeaf.MAX_LIST_MAP_SIZE) {
-			return MapLeaf.read(bb, count);
+			return MapLeaf.read(bb, count,true);
 		} else {
-			return MapTree.read(bb, count);
+			return MapTree.read(bb, count,true);
+		}
+	}
+	
+	/**
+	 * Read a Hashmap from a ByteBuffer. Assumes tag byte already read.
+	 * @param <K>
+	 * @param <V>
+	 * @param bb
+	 * @return
+	 * @throws BadFormatException
+	 */
+	public static <K, V> AMap<K, V> readSet(ByteBuffer bb) throws BadFormatException {
+		long count = Format.readVLCLong(bb);
+		if (count <= MapLeaf.MAX_LIST_MAP_SIZE) {
+			return MapLeaf.read(bb, count,false);
+		} else {
+			return MapTree.read(bb, count,false);
 		}
 	}
 

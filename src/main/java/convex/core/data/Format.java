@@ -791,13 +791,19 @@ public class Format {
 	}
 
 	/**
+	 * <p>
 	 * Reads an complete data object from a ByteBuffer.
+	 * </p>
 	 * 
-	 * May return any valid data object (including null, and non)
+	 * <p>
+	 * May return any valid data object (including null, and non), or a Ref
+	 * </p>
 	 * 
+	 * <p>
 	 * Assumes the presence of an object tag.
+	 * </p>
 	 * 
-	 * @param bb
+	 * @param bb ByteBuffer from which to read
 	 * @return Value read from the ByteBuffer
 	 * @throws BadFormatException
 	 */

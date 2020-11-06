@@ -349,23 +349,30 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 	}
 
 	/**
-	 * Reads a ListMap from the provided ByteBuffer Assumes the header byte is
+	 * Reads a MapLeaf from the provided ByteBuffer Assumes the header byte is
 	 * already read.
 	 * 
 	 * @param data
 	 * @param count
+	 * @param includeValues True to include values, false otherwise (i.e. this is a Set)
 	 * @return A ListMap as deserialised from the provided ByteBuffer
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K, V> MapLeaf<K, V> read(ByteBuffer data, long count) throws BadFormatException {
+	public static <K, V> MapLeaf<K, V> read(ByteBuffer bb, long count, boolean includeValues) throws BadFormatException {
 		if (count == 0) return (MapLeaf<K, V>) EMPTY;
-		if (count < 0) throw new BadFormatException("Negative count of listmap elements!");
-		if (count > MAX_LIST_MAP_SIZE) throw new BadFormatException("ListMap too big: " + count);
+		if (count < 0) throw new BadFormatException("Negative count of map elements!");
+		if (count > MAX_LIST_MAP_SIZE) throw new BadFormatException("MapLeaf too big: " + count);
 
 		MapEntry<K, V>[] items = (MapEntry<K, V>[]) new MapEntry[(int) count];
 		for (int i = 0; i < count; i++) {
-			items[i] = MapEntry.read(data);
+			if (includeValues) {
+				items[i] = MapEntry.read(bb);
+			} else {
+				Ref<V> ref=Format.readRef(bb);
+				MapEntry<K,V> me=(MapEntry<K, V>) MapEntry.createRef(ref, convex.core.data.Set.DUMMY_REF);
+				items[i]=me;
+			}
 		}
 
 		if (!isValidOrder(items)) {
@@ -374,6 +381,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 
 		return new MapLeaf<K, V>(items);
 	}
+	
 
 	@SuppressWarnings("unchecked")
 	public static <K, V> MapLeaf<K, V> emptyMap() {
@@ -744,5 +752,6 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 		
 		return true;
 	}
+
 
 }
