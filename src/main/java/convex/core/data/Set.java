@@ -15,7 +15,7 @@ import convex.core.util.Utils;
  * Class implementing a persistent smart set.
  * 
  * Wraps a map, where keys in the map represent the presence of an element in
- * the set Map values must be non-null to allow efficient merge operations to
+ * the Set. Map values must be non-null to allow efficient merge operations to
  * distinguish between present and non-present set values.
  * 
  * Encoding:
@@ -31,8 +31,9 @@ public class Set<T> extends ASet<T> {
 
 	/**
 	 * Dummy value used in underlying maps. Not important what this is, but should be small, efficient and non-null
+	 * so we use Boolean.TRUE
 	 */
-	public static final Object DUMMY = true;
+	public static final Object DUMMY = Boolean.TRUE;
 	public static final Ref<?> DUMMY_REF = Ref.TRUE_VALUE;
 
 	/**

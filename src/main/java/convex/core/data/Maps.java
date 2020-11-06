@@ -110,7 +110,7 @@ public class Maps {
 	 * @return
 	 * @throws BadFormatException
 	 */
-	public static <K, V> AMap<K, V> read(ByteBuffer bb) throws BadFormatException {
+	public static <K, V> AHashMap<K, V> read(ByteBuffer bb) throws BadFormatException {
 		long count = Format.readVLCLong(bb);
 		if (count <= MapLeaf.MAX_LIST_MAP_SIZE) {
 			return MapLeaf.read(bb, count,true);
@@ -127,7 +127,7 @@ public class Maps {
 	 * @return
 	 * @throws BadFormatException
 	 */
-	public static <K, V> AMap<K, V> readSet(ByteBuffer bb) throws BadFormatException {
+	public static <K, V> AHashMap<K, V> readSet(ByteBuffer bb) throws BadFormatException {
 		long count = Format.readVLCLong(bb);
 		if (count <= MapLeaf.MAX_LIST_MAP_SIZE) {
 			return MapLeaf.read(bb, count,false);
