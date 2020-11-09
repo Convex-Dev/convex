@@ -27,7 +27,10 @@ import convex.core.util.Utils;
  * @param <V> Type of values
  */
 public class MapLeaf<K, V> extends AHashMap<K, V> {
-	public static final int MAX_LIST_MAP_SIZE = 8;
+	/**
+	 * Maximum number of entries in a MapLeaf
+	 */
+	public static final int MAX_ENTRIES = 8;
 
 	static final MapEntry<?, ?>[] EMPTY_ENTRIES = new MapEntry[0];
 
@@ -66,7 +69,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 	 */
 	protected static <K, V> MapLeaf<K, V> create(MapEntry<K, V>[] entries, int offset, int length) {
 		if (length == 0) return emptyMap();
-		if (length > MAX_LIST_MAP_SIZE) throw new IllegalArgumentException("Too many entries: " + entries.length);
+		if (length > MAX_ENTRIES) throw new IllegalArgumentException("Too many entries: " + entries.length);
 		MapEntry<K, V>[] sorted = Utils.copyOfRangeExcludeNulls(entries, offset, offset + length);
 		if (sorted.length == 0) return emptyMap();
 		Arrays.sort(sorted);
@@ -212,7 +215,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 		MapEntry<K, V>[] newEntries = (MapEntry<K, V>[]) new MapEntry<?, ?>[newLen];
 		System.arraycopy(entries, 0, newEntries, 0, len);
 		newEntries[newLen - 1] = e;
-		if (newLen <= MAX_LIST_MAP_SIZE) {
+		if (newLen <= MAX_ENTRIES) {
 			// new size implies a ListMap
 			Arrays.sort(newEntries);
 			return new MapLeaf<K, V>(newEntries);
@@ -250,7 +253,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 		MapEntry<K, V>[] newEntries = (MapEntry<K, V>[]) new MapEntry<?, ?>[len + 1];
 		System.arraycopy(entries, 0, newEntries, 0, len);
 		newEntries[len] = MapEntry.create(key, value);
-		if (len + 1 <= MAX_LIST_MAP_SIZE) {
+		if (len + 1 <= MAX_ENTRIES) {
 			// new size should be a ListMap
 			Arrays.sort(newEntries);
 			return new MapLeaf<K, V>(newEntries);
@@ -362,7 +365,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 	public static <K, V> MapLeaf<K, V> read(ByteBuffer bb, long count, boolean includeValues) throws BadFormatException {
 		if (count == 0) return (MapLeaf<K, V>) EMPTY;
 		if (count < 0) throw new BadFormatException("Negative count of map elements!");
-		if (count > MAX_LIST_MAP_SIZE) throw new BadFormatException("MapLeaf too big: " + count);
+		if (count > MAX_ENTRIES) throw new BadFormatException("MapLeaf too big: " + count);
 
 		MapEntry<K, V>[] items = (MapEntry<K, V>[]) new MapEntry[(int) count];
 		for (int i = 0; i < count; i++) {
@@ -703,7 +706,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 			throw new InvalidDataException("Empty map not using canonical instance", this);
 		}
 
-		if (count > MAX_LIST_MAP_SIZE) {
+		if (count > MAX_ENTRIES) {
 			throw new InvalidDataException("Too many items in list map: " + entries.length, this);
 		}
 

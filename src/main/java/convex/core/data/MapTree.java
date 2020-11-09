@@ -71,7 +71,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 	@SuppressWarnings("unchecked")
 	public static <K, V> MapTree<K, V> create(MapEntry<K, V>[] newEntries, int shift) {
 		int n = newEntries.length;
-		if (n <= MapLeaf.MAX_LIST_MAP_SIZE) {
+		if (n <= MapLeaf.MAX_ENTRIES) {
 			throw new IllegalArgumentException(
 					"Insufficient distinct entries for TreeMap construction: " + newEntries.length);
 		}
@@ -139,7 +139,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 		}
 
 		// compress small counts to ListMap
-		if (count <= MapLeaf.MAX_LIST_MAP_SIZE) {
+		if (count <= MapLeaf.MAX_ENTRIES) {
 			MapEntry<K, V>[] entries = new MapEntry[Utils.checkedInt(count)];
 			int ix = 0;
 			for (Ref<AHashMap<K, V>> childRef : children) {
@@ -239,7 +239,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 		AHashMap<K, V> newChild = child.dissocRef(keyRef);
 		if (child == newChild) return this; // no removal, no change
 
-		if (count - 1 == MapLeaf.MAX_LIST_MAP_SIZE) {
+		if (count - 1 == MapLeaf.MAX_ENTRIES) {
 			// reduce to a ListMap
 			HashSet<Entry<K, V>> eset = entrySet();
 			boolean removed = eset.removeIf(e -> Utils.equals(((MapEntry<K, V>) e).getKeyRef(), keyRef));
@@ -480,7 +480,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 
 	@Override
 	public boolean isCanonical() {
-		if (count <= MapLeaf.MAX_LIST_MAP_SIZE) return false;
+		if (count <= MapLeaf.MAX_ENTRIES) return false;
 		return true;
 	}
 
@@ -812,7 +812,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 	}
 
 	private boolean isValidStructure() {
-		if (count <= MapLeaf.MAX_LIST_MAP_SIZE) return false;
+		if (count <= MapLeaf.MAX_ENTRIES) return false;
 		if (children.length != Integer.bitCount(mask & 0xFFFF)) return false;
 		for (int i = 0; i < children.length; i++) {
 			if (children[i] == null) return false;
