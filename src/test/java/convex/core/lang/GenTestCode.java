@@ -2,11 +2,16 @@ package convex.core.lang;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Random;
+
+import org.parboiled.common.Utils;
+
 import com.pholser.junit.quickcheck.From;
 import com.pholser.junit.quickcheck.Property;
 
 import convex.core.Init;
 import convex.core.data.Syntax;
+import convex.core.exceptions.ParseException;
 import convex.test.generators.FormGen;
 
 public class GenTestCode {
@@ -28,6 +33,32 @@ public class GenTestCode {
 				
 				ctx=ctx.execute((AOp<?>) compObject);
 			}
+		}
+		
+		String s=Utils.toString(form);
+		doMutateTest(s);
+	}
+	
+	
+	@SuppressWarnings("unused")
+	public void doMutateTest(String original) {
+		StringBuffer sb=new StringBuffer(original);
+		Random r=new Random(original.hashCode());
+		
+		int n=r.nextInt(3);
+		switch (n) {
+			case 0: sb.deleteCharAt(r.nextInt(sb.length())); break;
+			case 1: sb.insert(r.nextInt(sb.length()+1),sb.charAt(r.nextInt(sb.length()))); break;
+			case 2: sb.setCharAt(r.nextInt(sb.length()),sb.charAt(r.nextInt(sb.length()))); break;
+			default:
+		}
+		
+		try {
+			String source=sb.toString();
+			Object newForm=Reader.read(source);
+			Syntax newSyntax=Reader.readSyntax(source);
+		} catch (ParseException p) {
+			// OK, we broken the string
 		}
 	}
 }
