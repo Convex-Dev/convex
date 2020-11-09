@@ -58,10 +58,12 @@ public class Symbol extends ASymbolic {
 		}
 		Symbol sym= new Symbol(namespace,name);
 		
-		// TODO: figure out if caching Symbols is a net win or not
-		Symbol cached=cache.get(sym);
-		if (cached!=null) return cached;
-		cache.put(sym,sym);
+		synchronized (cache) {
+			// TODO: figure out if caching Symbols is a net win or not
+			Symbol cached=cache.get(sym);
+			if (cached!=null) return cached;
+			cache.put(sym,sym);
+		}
 		
 		return sym;
 	}
