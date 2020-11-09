@@ -44,8 +44,10 @@ public class Format {
 	 * 8191 byte system-wide limit on the legal length of a data object encoding.
 	 * 
 	 * Technical reasons for this choice:
-	 * - This is the max length that can be VLC encoded in a 2 byte message header. This simplifies message encoding and decoding.
-	 * - It is big enough to include a 4096-byte Blob
+	 * <ul>
+	 * <li>This is the max length that can be VLC encoded in a 2 byte message header. This simplifies message encoding and decoding.</li>
+	 * <li>It is big enough to include a 4096-byte Blob</li>
+	 * </ul>
 	 */
 	public static final int LIMIT_ENCODING_LENGTH = 0x1FFF; 
 	
@@ -54,15 +56,12 @@ public class Format {
 	/**
 	 * Maximum size in bytes of an embedded value, including tag
 	 */
-	public static final int MAX_EMBEDDED_LENGTH=140; // TODO: fix
-	
-
+	public static final int MAX_EMBEDDED_LENGTH=140; // TODO: reconsider
 	
 	/**
 	 * Maximum length in bytes of a Ref encoding (may be an embedded data object)
 	 */
 	public static final int MAX_REF_LENGTH = Math.max(Ref.MAX_ENCODING_LENGTH, MAX_EMBEDDED_LENGTH);
-
 
 	/**
 	 * Gets the length in bytes of VLC encoding for the given long value
