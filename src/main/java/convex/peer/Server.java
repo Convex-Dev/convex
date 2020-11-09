@@ -652,8 +652,8 @@ public class Server implements Closeable {
 			} catch (InterruptedException e) {
 				log.fine("Server manager loop interrupted");
 			} catch (Throwable e) {
-					log.severe("Unexpected exception in server update loop: "+e.getMessage());
-					e.printStackTrace();
+				log.severe("Unexpected exception in server update loop: "+e.toString());
+				log.severe("Terminating Server update");
 			} finally {
 				// clear thread from Server as we terminate
 				updateThread=null;
