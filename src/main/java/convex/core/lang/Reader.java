@@ -392,7 +392,13 @@ public class Reader extends BaseParser<Object> {
 				Sequence(AnyOf(".+-"), NonNumericSymbolCharacter(), ZeroOrMore(FollowingSymbolCharacter())), 
 				'/', // allowed on its own as a symbol
 				'.' // dot special form
-		), push(prepare(Symbol.create(match()))));
+		), push(prepare(matchSymbol())));
+	}
+	
+	public Symbol matchSymbol() {
+		Symbol sym=Symbol.create(match());
+		if (sym==null) error("Invalid Symbol name");
+		return sym;
 	}
 
 	public Rule InitialSymbolCharacter() {

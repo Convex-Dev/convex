@@ -76,6 +76,12 @@ public class ReaderTest {
 		
 		// namespaces cannot themselves be qualified
 		assertThrows(ParseException.class,()->Reader.read("a/b/c"));
+		
+		// too long symbol names
+		assertThrows(ParseException.class,()->Reader.read("abcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnop"));
+		assertThrows(ParseException.class,()->Reader.read("abcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnop/a"));
+		assertThrows(ParseException.class,()->Reader.read("a/abcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnop"));
+
 	}
 
 	@Test
