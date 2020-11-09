@@ -76,10 +76,14 @@ public class Format {
 	}
 
 	/**
-	 * Puts a variable length integer into the specified bytebuffer (with no tag)
+	 * Puts a VLC encoded long into the specified bytebuffer (with no tag)
 	 * 
-	 * Format: - MSB of each byte 0=last octet, 1=more octets - Second highest bit
-	 * of first byte = sign - 6 or 7 bits of integer representation for each octet
+	 * Format: 
+	 * <ul>
+	 * <li>MSB of each byte 0=last octet, 1=more octets</li>
+	 * <li>Following MSB, 7 bits of integer representation for each octet</li>
+	 * <li>Second highest bit of first byte is interpreted as the sign</li> 
+	 * </ul>
 	 */
 	public static ByteBuffer writeVLCLong(ByteBuffer bb, long x) {
 		if ((x < 64) && (x >= -64)) {
@@ -100,8 +104,12 @@ public class Format {
 	/**
 	 * Puts a variable length integer into the specified byte array (with no tag)
 	 * 
-	 * Format: - MSB of each byte 0=last octet, 1=more octets - Second highest bit
-	 * of first byte = sign - 6 or 7 bits of integer representation for each octet
+	 * Format: 
+	 * <ul>
+	 * <li>MSB of each byte 0=last octet, 1=more octets</li>
+	 * <li>Following MSB, 7 bits of integer representation for each octet</li>
+	 * <li>Second highest bit of first byte is interpreted as the sign</li> 
+	 * </ul>
 	 * 
 	 * @return - end position in byte array after writing VLC long
 	 */
@@ -125,7 +133,7 @@ public class Format {
 	}
 
 	/**
-	 * Reads a VLC encoded long as a long from the given bytebuffer. Assumes no tag
+	 * Reads a VLC encoded long from the given bytebuffer. Assumes no tag
 	 * 
 	 * @throws BadFormatException
 	 */
@@ -157,7 +165,7 @@ public class Format {
 	}
 
 	/**
-	 * Sign extend 7th bit (sign) to all bits
+	 * Sign extend 7th bit (sign) of a byte to all bits in a long
 	 * 
 	 * @param b
 	 * @return The sign-extended byte as a long
