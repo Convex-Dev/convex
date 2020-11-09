@@ -17,12 +17,15 @@ import convex.core.util.Errors;
 import convex.core.util.Utils;
 
 /**
- * Persistent Merkle Vector implemented as a tree of chunks
+ * Persistent Vector implemented as a merkle tree of chunks
  * 
  * shift indicates the level of the tree: 4 = 1st level, 8 = second etc.
  * 
- * Invariants: - All children except the last must be fully packed - each leaf
- * chunk must be a tailless ListVector of size 16
+ * Invariants: 
+ * <ul>
+ * <li>All children except the last must be fully packed</li>
+ * <li>Each non-terminal leaf chunk must be a tailless VectorLeaf of size 16</li>
+ * </ul>
  * 
  * This implies that the entire tree must be a multiple of 16 in size. This is a
  * desirable property as we want dense trees in our canonical representation.

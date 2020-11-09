@@ -15,12 +15,16 @@ import convex.core.util.Errors;
 import convex.core.util.Utils;
 
 /**
- * A Persistent Vector implementation representing 0-16 elements with an
- * arbitrary AVector prefix.
+ * A Persistent Vector implementation representing 0-16 elements with a
+ * packed Vector prefix.
  * 
- * Design goals: - Allows fast access to most recently appended items - O(1)
- * append, equals - O(log n) access, update - O(log n) comparisons - Fast
- * computation of common prefix
+ * Design goals: 
+ * <ul>
+ * <li>Allows fast access to most recently appended items</li>
+ * <li>O(1) append, equals - O(log n) access, update</li>
+ * <li>O(log n) comparisons</li>
+ * <li>Fast computation of common prefix</li>
+ * </ul>
  * 
  * Representation in bytes:
  * 
@@ -192,6 +196,8 @@ public class VectorLeaf<T> extends ASizedVector<T> {
 	@Override
 	public AVector<T> assoc(long i, T value) {
 		if ((i < 0) || (i > count)) throw new IndexOutOfBoundsException("Index: " + i);
+		
+		// allow assoc to conj new final element
 		if (i==count) return conj(value);
 		
 		long ix = i - prefixLength();
