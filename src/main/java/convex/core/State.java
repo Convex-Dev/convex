@@ -308,12 +308,17 @@ public class State extends ARecord {
 			// extract the signed transaction from the block
 			SignedData<? extends ATransaction> signed = transactions.get(i);
 
-			// execute the transaction using the *latest* state (not necessarily "this")
-			Context<?> ctx = state.applyTransaction(signed);
-			
-			// record results and state update
-			results[i] = Result.fromContext((long)i,ctx);
-			state = ctx.getState();
+			// SECURITY: catch-all exception handler.
+			try {
+				// execute the transaction using the *latest* state (not necessarily "this")
+				Context<?> ctx = state.applyTransaction(signed);
+				
+				// record results and state update
+				results[i] = Result.fromContext((long)i,ctx);
+				state = ctx.getState();
+			} catch (Throwable t) {
+				results[i] = Result.create((long)i, "Unexpected fatal exception applying transaction: "+t.toString(),ErrorCodes.UNEXPECTED);
+			}
 		}
 		
 		// TODO: changes for complete block?
