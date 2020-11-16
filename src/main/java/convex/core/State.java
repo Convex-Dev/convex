@@ -317,7 +317,9 @@ public class State extends ARecord {
 				results[i] = Result.fromContext((long)i,ctx);
 				state = ctx.getState();
 			} catch (Throwable t) {
-				results[i] = Result.create((long)i, "Unexpected fatal exception applying transaction: "+t.toString(),ErrorCodes.UNEXPECTED);
+				String msg= "Unexpected fatal exception applying transaction: "+t.toString();
+				results[i] = Result.create((long)i, msg,ErrorCodes.UNEXPECTED);
+				log.severe(msg);
 			}
 		}
 		
