@@ -929,15 +929,23 @@ public class CoreTest {
 
 	@Test
 	public void testInto() {
-		assertEquals(Vectors.of(1L, 2L, 3L), eval("(into [1 2] [3])"));
-		assertEquals(Vectors.of(1L, 2L, 3L), eval("(into [1 2 3] nil)"));
-		assertEquals(Lists.of(2L, 1L, 3L, 4L), eval("(into '(3 4) '(1 2))"));
-		assertEquals(Sets.of(1L, 2L, 3L), eval("(into #{} [1 2 1 2 3])"));
-		assertEquals(Maps.of(1L, 2L, 3L, 4L), eval("(into {} [[1 2] [3 4] [1 2]])"));
+		// nil as data structure
 		assertNull(eval("(into nil nil)"));
+		assertEquals(Maps.of(1L,2L),eval("(into nil {1 2})"));
 		assertEquals(Vectors.empty(), eval("(into nil [])"));
 		assertEquals(Vectors.of(1L, 2L, 3L), eval("(into nil [1 2 3])"));
+		
+		assertEquals(Vectors.of(1L, 2L, 3L), eval("(into [1 2] [3])"));
+		assertEquals(Vectors.of(1L, 2L, 3L), eval("(into [1 2 3] nil)"));
+		assertEquals(Vectors.of(1L, 2L, 3L), eval("(into nil [1 2 3])"));
+
+		assertEquals(Lists.of(2L, 1L, 3L, 4L), eval("(into '(3 4) '(1 2))"));
+		
+		assertEquals(Sets.of(1L, 2L, 3L), eval("(into #{} [1 2 1 2 3])"));
+		
+		// map as data structure
 		assertEquals(Maps.empty(), eval("(into {} [])"));
+		assertEquals(Maps.of(1L, 2L, 3L, 4L), eval("(into {} [[1 2] [3 4] [1 2]])"));
 		
 		assertEquals(Vectors.of(MapEntry.create(1L, 2L)), eval("(into [] {1 2})"));
 
@@ -947,6 +955,7 @@ public class CoreTest {
 		assertCastError(step("(into {} [nil])")); // nil is not a MapEntry
 		assertCastError(step("(into {} [[:foo]])")); // length 1 vector shouldn't convert to MapEntry
 		assertCastError(step("(into {} [[:foo :bar :baz]])")); // length 1 vector shouldn't convert to MapEntry
+		assertCastError(step("(into {1 2} [2 3])"));
 
 		assertArityError(step("(into)"));
 		assertArityError(step("(into inc)"));

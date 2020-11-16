@@ -49,7 +49,7 @@ public abstract class ADataStructure<E> extends ACell {
 	 * general data structure type. e.g. append at the end of a vector.
 	 * 
 	 * @param x New element to add
-	 * @return The updated data structure.
+	 * @return The updated data structure, or null if a failure occurred due to invalid element type
 	 */
 	public abstract <R> ADataStructure<R> conj(R x);
 	
@@ -60,12 +60,13 @@ public abstract class ADataStructure<E> extends ACell {
 	 * This may be more efficient than using 'conj' for individual items.
 	 * 
 	 * @param xs New elements to add
-	 * @return The updated data structure.
+	 * @return The updated data structure, or null if a failure occurred due to invalid elementtypes
 	 */
 	public ADataStructure<E> conjAll(ACollection<E> xs) {
 		ADataStructure<E> result=this;
 		for (E x: xs) {
 			result=result.conj(x);
+			if (result==null) return null;
 		}
 		return result;
 	}

@@ -1797,7 +1797,7 @@ public class Core {
 			if (a0 == null) {
 				// just keep second arg as complete data structure
 				result = RT.ensureDataStructure(a1);
-				if ((a1 != null) && (result == null)) return context.withCastError(args[0], ADataStructure.class);
+				if ((a1 != null) && (result == null)) return context.withCastError(a1, ADataStructure.class);
 			} else {
 				ASequence<Object> seq = RT.sequence(a1);
 				if (seq == null) return context.withCastError(a1, ADataStructure.class);
@@ -1808,7 +1808,7 @@ public class Core {
 				if (!context.checkJuice(juice)) return context.withJuiceError();
 
 				result = result.conjAll(seq);
-				if (result == null) return context.withCastError(args[0], MapEntry.class);
+				if (result == null) return context.withError(ErrorCodes.CAST,"Invalid element type for 'into'");
 			}
 
 			return context.withResult(juice, result);
