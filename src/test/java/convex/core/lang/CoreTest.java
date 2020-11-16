@@ -949,13 +949,14 @@ public class CoreTest {
 		
 		assertEquals(Vectors.of(MapEntry.create(1L, 2L)), eval("(into [] {1 2})"));
 
-
-		assertCastError(step("(into 1 [2 3])"));
-		assertCastError(step("(into nil :foo)"));
+		assertCastError(step("(into 1 [2 3])")); // long is not a conjable data structure
+		assertCastError(step("(into nil :foo)")); // keyword is not a sequence of elements
+		
 		assertCastError(step("(into {} [nil])")); // nil is not a MapEntry
 		assertCastError(step("(into {} [[:foo]])")); // length 1 vector shouldn't convert to MapEntry
 		assertCastError(step("(into {} [[:foo :bar :baz]])")); // length 1 vector shouldn't convert to MapEntry
-		assertCastError(step("(into {1 2} [2 3])"));
+		assertCastError(step("(into {1 2} [2 3])")); // longs are not map entries
+		assertCastError(step("(into {1 2} [[] []])")); // empty vectors are not map entries
 
 		assertArityError(step("(into)"));
 		assertArityError(step("(into inc)"));
