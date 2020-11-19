@@ -901,6 +901,7 @@ public class CoreTest {
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(conj #{2 3 1} 1)"));
 
 		assertCastError(step("(conj {} 2)")); // can't cast long to a map entry
+		assertCastError(step("(conj {} [1 2 3])")); // wrong size vector for a map entry
 
 		assertCastError(step("(conj 1 2)"));
 		assertCastError(step("(conj (str :foo) 2)"));
@@ -1430,12 +1431,15 @@ public class CoreTest {
 		assertEquals(Vectors.empty(), eval("(apply vector ())"));
 		assertEquals(Lists.empty(), eval("(apply list [])"));
 		assertEquals("foo", evalS("(apply str [\\f \\o \\o])"));
+		
+		assertEquals(10L,evalL("(apply + 1 2 [3 4])"));
+		assertEquals(3L,evalL("(apply + 1 2 nil)"));
 
 		assertEquals(Vectors.of(1L, 2L, 3L, 4L), eval("(apply vector 1 2 (list 3 4))"));
 		assertEquals(List.of(1L, 2L, 3L, 4L), eval("(apply list 1 2 [3 4])"));
 		assertEquals(List.of(1L, 2L), eval("(apply list 1 2 nil)"));
 
-		// Insufficient args to apply
+		// Insufficient args to apply itself
 		assertArityError(step("(apply)"));
 		assertArityError(step("(apply vector)"));
 		
@@ -1445,6 +1449,9 @@ public class CoreTest {
 		// Cast error if not applied to collection
 		assertCastError(step("(apply inc 1)"));
 		assertCastError(step("(apply inc :foo)"));
+		
+		// not a sequential collection
+		assertCastError(step("(apply + 1 2 {})"));
 	}
 
 	@Test

@@ -1755,7 +1755,7 @@ public class Core {
 			AFn<Object> fn = (AFn<Object>) args[0];
 
 			Object lastArg = args[alen - 1];
-			ASequence<?> coll = RT.sequence(lastArg);
+			ASequence<?> coll = RT.ensureSequence(lastArg);
 			if (coll == null) return context.withCastError(lastArg, ASequence.class);
 
 			int vlen = coll.size(); // variable arg length

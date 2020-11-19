@@ -9,7 +9,7 @@
 {
 	accept 
 	{
-	 :doc {:description "Accepts funds up to the amount of *offer* from *caller*. Amount must cast to long. If successful, the amount will be added immediately to the *balance* of the current *address*. This is the recommended way of transferring balance between Actors, as it requires a positive action to confirm receipt. Returns the amount accepted if successful. Returns a STATE error if there are insufficient funds to accept."
+	 :doc {:description "Accepts offered coins up to the amount of *offer* from *caller*. Amount must cast to Long. If successful, the amount will be added immediately to the *balance* of the current *address*. This is the recommended way of transferring balance between Actors, as it requires a positive action to confirm receipt. Returns the amount accepted if successful. Returns a STATE error if there are insufficient funds to accept."
          :examples [{:code "(accept *offer*)"}]
          :type :function
          :signature [{:params [amount]}]}
@@ -17,7 +17,7 @@
  
   account 
 	{
-	 :doc {:description "Returns the Account record for a given addess, or nil if the account does not exist."
+	 :doc {:description "Returns the Account record for a given addess, or nil if the account does not exist. Argument must cast to Address."
          :examples [{:code "(account *address*)"}]
          :type :function
          :signature [{:params [address]}]}
@@ -33,7 +33,7 @@
  
  	address 
 	{
-	 :doc {:description "Casts the argument to an Address. Valid arguments include hex Strings, Addresses and Blobs with the correct length. "
+	 :doc {:description "Casts the argument to an Address. Valid arguments include hex Strings, Addresses and Blobs with the correct length (32 bytes)."
          :examples [{:code "(address \"1Ba377262D7637068C8a84b732e30d3Ff62bA891\")"}]
          :type :function
          :signature [{:params [a]}]}
@@ -41,15 +41,15 @@
  
  	address?
 	{
-	 :doc {:description "Tests if the argument is an Address."
-         :examples [{:code "(address :foo)"}]
+	 :doc {:description "Tests if the argument is an Address. Returns true if and only if the argument is an actual Address, not merely castable to one."
+         :examples [{:code "(address? :foo)"}]
          :type :function
          :signature [{:params [a]}]}
 	}
  
   apply
 	{
-	 :doc {:description "Applies a function to the specified arguments, after flattening the last argument."
+	 :doc {:description "Applies a function to the specified arguments, after flattening the last argument. Last argument must be a sequential collection, or 'nil' which is considered and empty collection."
          :examples [{:code "(apply + [1 2 3])"}
                     {:code "(apply + 1 2 [3 4 5])"}]
          :type :function

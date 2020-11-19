@@ -547,6 +547,25 @@ public class RT {
 
 		return null;
 	}
+	
+	/**
+	 * Ensures argument is a sequence data structure.
+	 * 
+	 * Nulls are converted to an empty vector.
+	 * 
+	 * Returns null if conversion is not possible.
+	 * 
+	 * @param <T>
+	 * @param o
+	 * @return An ASequence instance, or null if the argument cannot be converted to
+	 *         a sequence
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T> ASequence<T> ensureSequence(Object o) {
+		if (o == null) return Vectors.empty();
+		if (o instanceof ASequence) return (ASequence<T>) o;
+		return null;
+	}
 
 	/**
 	 * Gets the nth element from a sequential collection
