@@ -1,0 +1,108 @@
+(do
+  ;; Asset Abstraction library
+  ;;
+  ;; deploy with: (deploy-once asset-code)
+  ;;
+  ;; import with (import convex.asset :as asset)
+  ;;
+  ;; An asset is described by either a long (indicating a quantity of convex), or
+  ;; an [asset-address quantity] vector, where quantity is interpreted
+  ;; in an asset-specific manner. For example, for fungible currencies, quantity is the amount,
+  ;; whereas for non-fungible-tokens, quantity may be represented as a set of token ids.
+  ;;
+  ;; Key usage:
+  ;;   (asset/transfer receiver asset data)
+  ;;   (asset/owns? owner asset)
+  ;;   (asset/balance owner asset-address)
+  ;;
+  ;; transfer for assets other than convex is implemented in terms of an offer/accept model.
+  ;; In some instances, it may be useful to call these functions separately:
+  ;;
+  ;;   (asset/offer receiver asset)  ;; called by the sender
+  ;;   (asset/accept receiver asset) ;; called by the receiver
+  ;;   
+  ;;   (asset/check-transfer sender receiver asset)
+  ;;        Checks whether sender has permission to transfer asset to receiver.
+  ;;        Returns failure message if there is a restriction, nil if there is no restriction.
+  ;;
+  ;; In order to implement a new asset type that can be used by this library, you must write the
+  ;; following functions in your asset contract:
+  ;;   (check-transfer sender receiver quantity)
+  ;;   (offer receiver quantity)
+  ;;   (accept sender quantity)
+  ;;   (owns? owner quantity)
+  ;;   (balance owner)
+  
+  (import convex.core :as core)
+  (call *registry* (register (:name "Asset Abstraction Library")))
+  ;; (call *registry* (cns-update 'convex.asset *address*))
+  
+  (defn transfer
+    ^{:doc {:description "Transfers asset to receiver. Data is an arbitrary map, which will be passed to the receiver's receive-asset method. Returns asset description of asset/quantity that was successfully transferred.",
+            :examples [{:code "(transfer receiver 1000 data)"}
+                       {:code "(transfer receiver [fungible-token-address 1000] data)"}
+                       {:code "(transfer receiver [non-fungible-token-address #{1 4 6}] data)"}]
+            :type :function
+            :signature [{:params [receiver asset data]}]}}
+    [receiver asset data]
+    (let [receiver (address receiver)]
+      (cond
+        ;; asset is just an amount of convex
+        (long? asset) (core/transfer receiver asset)
+        (vector? asset)
+        (let [[asset-address quantity] asset]
+          (call asset-address (offer receiver quantity))
+          (when (exports? receiver 'receive-asset)
+            (call receiver (receive-asset asset data)))))))
+  
+  ;; For smart contract assets, you can offer and accept separately if you choose
+  (defn offer
+    ^{:doc {:description "Offers asset to receiver.",
+            :examples [{:code "(transfer receiver [fungible-token-address 1000] data)"}
+                       {:code "(transfer receiver [non-fungible-token-address #{1 4 6}] data)"}]
+            :type :function
+            :signature [{:params [receiver [asset-address quantity]]}]}}
+    [receiver [asset-address quantity]]
+    (call (address asset-address) (offer receiver quantity)))
+  
+  (defn accept
+    ^{:doc {:description "Offers asset to receiver.",
+            :examples [{:code "(transfer receiver [fungible-token-address 1000] data)"}
+                       {:code "(transfer receiver [non-fungible-token-address #{1 4 6}] data)"}]
+            :type :function
+            :signature [{:params [sender [asset-address quantity]]}]}}
+    [sender [asset-address quantity]]
+    (call (address asset-address) (accept sender quantity)))
+  
+  ;; Also, independently of general transfer, you can test whether there are restrictions on transferring
+  (defn check-transfer
+    ^{:doc {:description "Checks whether sender can transfer this asset to receiver. Returns a descriptive failure message if there is a restriction prohibiting transfer, or nil if there is no restriction.",
+            :examples [{:code "(check-transfer sender receiver [fungible-token-address 1000])"}
+                       {:code "(check-transfer sender receiver [non-fungible-token-address #{1 4 6}])"}]
+            :type :function
+            :signature [{:params [sender receiver [asset-address quantity]]}]}}
+    [sender receiver [asset-address quantity]]
+    (call asset-address (check-transfer sender receiver quantity)))
+
+  (defn balance
+    ^{:doc {:description "Return's asset balance for owner.",
+            :examples [{:code "(balance asset-address owner)"}]
+            :type :function
+            :signature [{:params [asset-address owner]}]}}
+    [asset-address owner]
+    (call (address asset-address) (balance owner)))
+  
+  (defn owns?
+    ^{:doc {:description "Tests whether owner owns a given quantity of an asset",
+            :examples [{:code "(owns? owner 1000)"}
+                       {:code "(owns? owner [fungible-token-address 1000])"}
+                       {:code "(owns? owner [non-fungible-token-address #{1 4 6}])"}]
+            :type :function
+            :signature [{:params [asset-address owner]}]}}
+    [owner asset]
+    (let [owner (address owner)]
+      (cond
+        (long? asset) (>= asset (core/balance owner))
+        (vector? asset)
+        (let [[asset-address quantity] asset]
+          (call (address asset-address) (owns? owner quantity)))))))
