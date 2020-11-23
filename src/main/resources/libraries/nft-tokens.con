@@ -323,6 +323,7 @@
   (defn accept [sender accepted-id-set]
     (let [sender (address sender),
           receiver *caller*,
+          accepted-id-set (num->set accepted-id-set)
           offered-id-set (get-in offers [sender receiver])]
       (when-not offer (fail "Offer not found"))
       (assert (subset? accepted-id-set offered-id-set)) ;; Assures receiver accepts a subset of offer
