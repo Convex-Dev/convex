@@ -253,7 +253,7 @@
               (let [class (get-token-class id)]
                 (if (and class (exports? class required-export))
                   (assoc m class
-                         (conj (get rtm class #{}) id))
+                         (conj (get m class #{}) id))
                   m)))
             {} id-set))
   
@@ -324,12 +324,12 @@
     (let [sender (address sender),
           receiver *caller*,
           accepted-id-set (num->set accepted-id-set)
-          offered-id-set (get-in offers [sender receiver])]
+          offered-id-set (set (get-in offers [sender receiver]))]
       (when-not offer (fail "Offer not found"))
       (assert (subset? accepted-id-set offered-id-set)) ;; Assures receiver accepts a subset of offer
       (if (= accepted-id-set offered-id-set)
         (cancel-offer sender receiver)
-        (def offers (assoc-in offers [sender receiver] (reduce disj offered-id-set accepted-id-set))))
+        (def offers (assoc-in offers [sender receiver] (difference offered-id-set accepted-id-set))))
       (perform-transfer sender receiver accepted-id-set)))
 
   (export create-token destroy-token get-token-owner get-token-creator get-token-data get-token-class balance get-offers check-trusted? set-token-data merge-token-data check-transfer offer accept owns? get-uri))

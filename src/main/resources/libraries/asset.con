@@ -64,7 +64,7 @@
             :type :function
             :signature [{:params [receiver [asset-address quantity]]}]}}
     [receiver [asset-address quantity]]
-    (call (address asset-address) (offer receiver quantity)))
+    (call asset-address (offer receiver quantity)))
   
   (defn accept
     ^{:doc {:description "Offers asset to receiver.",
@@ -73,7 +73,7 @@
             :type :function
             :signature [{:params [sender [asset-address quantity]]}]}}
     [sender [asset-address quantity]]
-    (call (address asset-address) (accept sender quantity)))
+    (call asset-address (accept sender quantity)))
   
   ;; Also, independently of general transfer, you can test whether there are restrictions on transferring
   (defn check-transfer
