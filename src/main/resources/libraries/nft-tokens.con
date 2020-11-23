@@ -234,7 +234,7 @@
 
   (defn merge-token-data [id data]
     ^{:doc {:description "Merges data into token's data map, if caller has the right to update overall data map or all the relevant fields. In other words, if (check-trusted? *caller* :update id) OR (check-trusted? *caller* [:update key] id) holds for every key in data.",
-            :examples [{:code "(merge-token-data1234 {:redeemed? true})"}]
+            :examples [{:code "(merge-token-data 1234 {:redeemed? true})"}]
             :type :function
             :signature [{:params [id data]}]}}              
     (if (not (or (check-trusted? *caller* :update id)
