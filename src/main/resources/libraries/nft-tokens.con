@@ -71,6 +71,9 @@
 
   (defn empty->nil [s]
     (if (empty? s) nil s))
+
+  (defn nil->empty [s]
+    (if (nil? s) #{} s))
   
   ;; For convenience, our asset path understands a long to be a singleton set
   ;; Here's a helper function to do that conversion
@@ -121,13 +124,13 @@
 
   ;; Implements the balance function for convex.asset.
   (defn balance [owner]
-    (get-holding (address owner)))      
+    (nil->empty (get-holding (address owner))))
 
   ;; Implements the owns? function for convex.asset.
   (defn owns? [owner id-set]
     (let [owner (address owner)
           id-set (num->set id-set)]
-      (subset? id-set (set (balance owner)))))
+      (subset? id-set (balance owner))))
 
   ;; check-trusted? determines whether a given address has certain rights.
 
@@ -324,7 +327,7 @@
     (let [sender (address sender),
           receiver *caller*,
           accepted-id-set (num->set accepted-id-set)
-          offered-id-set (set (get-in offers [sender receiver]))]
+          offered-id-set (get-in offers [sender receiver] #{})]
       (when-not offer (fail "Offer not found"))
       (assert (subset? accepted-id-set offered-id-set)) ;; Assures receiver accepts a subset of offer
       (if (= accepted-id-set offered-id-set)
