@@ -810,6 +810,7 @@ public class CoreTest {
 		assertEquals(Sets.of(1L,2L),eval("(intersection #{1 2})"));
 
 		assertEquals(Sets.empty(),eval("(intersection #{1 2} #{3})"));
+		assertEquals(Sets.empty(),eval("(intersection #{1 2 3} nil)"));
 		
 		assertEquals(Sets.of(2L,3L),eval("(intersection #{1 2 3} #{2 3 4})"));
 		

@@ -66,7 +66,7 @@
  
   assoc
 	{
-	 :doc {:description "Adds entries into an associative data structure, taking each two arguments as key/value pairs."
+	 :doc {:description "Adds entries into an associative data structure, taking each two arguments as key/value pairs. A nil data structure is considered as an empty map."
          :examples [{:code "(assoc {1 2} 3 4)"}]
          :type :function
          :signature [{:params [m & kvs]}]}
@@ -863,7 +863,7 @@
   
   subset?
   {
-    :doc {:description "Tests if a set is a subset of a second set. Both arguments bust be valid sets."
+    :doc {:description "Tests if a set is a subset of a second set. Both arguments must be sets. nil is considered as an empty set."
           :examples [{:code "(subset? #{1} #{1 2 3})"}]
           :type :function
           :signature [{:params [set1 set2]}]}
