@@ -1144,14 +1144,14 @@ public class RT {
 	}
 	
 	/**
-	 * Converts the argument to an IAssociative instance. A null argument is considered an empty map.
+	 * Ensures the argument is an IAssociative instance. A null argument is considered an empty map.
 	 * 
 	 * @param <T>
 	 * @param o
 	 * @return IAssociative instance, or null if conversion is not possible
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K,V> IAssociative<K,V> toAssociative(Object o) {
+	public static <K,V> IAssociative<K,V> ensureAssociative(Object o) {
 		if (o==null) return Maps.empty();
 		if (o instanceof IGet) return (IAssociative<K,V>) o;
 		return null;

@@ -963,7 +963,7 @@ public class Core {
 			IAssociative<Object,Object>[] ass=new IAssociative[n];
 			Object[] ks=new Object[n];
 			for (int i = 0; i < n; i++) {
-				IAssociative<Object,Object> struct = RT.toAssociative(data);
+				IAssociative<Object,Object> struct = RT.ensureAssociative(data);
 				if (struct == null) return context.withCastError(data, IAssociative.class);
 				ass[i]=struct;
 				Object k=ixs.get(i);
