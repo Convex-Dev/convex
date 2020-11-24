@@ -34,8 +34,8 @@
   ;;   (balance owner)
   
   (import 0xCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC :as core)
-  ;; (call *registry* (register (:name "Asset Abstraction Library")))
-  ;; (call *registry* (cns-update 'convex.asset *address*))
+  (call *registry* (register {:name "Asset Abstraction Library"}))
+  (call *registry* (cns-update 'convex.asset *address*))
   
   (defn transfer
     ^{:doc {:description "Transfers asset to receiver. Data is an arbitrary map, which will be passed to the receiver's receive-asset method.",

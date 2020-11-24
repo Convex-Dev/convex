@@ -58,8 +58,9 @@
   ;; If an account doesn't implement receive-asset, default behavior is to go ahead and perform the transfer.
   ;; If an actor doesn't implement receive-asset, default behavior is to fail.
 
-  ;; (import convex.asset :as asset)
-  ;; (call *registry* (register (:name "NFT Tokens")))
+ 
+  (call *registry* (register {:name "NFT Tokens"}))
+  (call *registry* (cns-update 'convex.nft-tokens *address*))
   
   (def next-token-id 0)
   (def token-records {}) ;; {id {:creator, :owner, :data, :policies, :class}}
