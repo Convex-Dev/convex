@@ -192,8 +192,7 @@
           token-record (if initial-data (assoc token-record :data initial-data) token-record)
           token-record (cond
                          (nil? policy-map-or-class) token-record
-                         (map?
-                          policy-map-or-class) (assoc token-record :policies policy-map-or-class)
+                         (map? policy-map-or-class) (assoc token-record :policies policy-map-or-class)
                          :else (assoc token-record :class policy-map-or-class))
           class (:class token-record)]          
       (set-holding *caller* (conj holdings id))
