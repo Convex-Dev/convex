@@ -638,10 +638,11 @@ public class CoreTest {
 	
 	@Test
 	public void testAssocIn() {
-		// empty index cases
+		// empty index cases - type of first arg not checked since no idexing happens
 		assertEquals(2L, evalL("(assoc-in {} [] 2)")); // empty indexes returns value
 		assertEquals(2L, evalL("(assoc-in nil [] 2)")); // empty indexes returns value
 		assertEquals(2L, evalL("(assoc-in :old [] 2)")); // empty indexes returns value
+		assertEquals(2L, evalL("(assoc-in 13 nil 2)")); // empty indexes returns value (nil considered empty seq)
 		
 		// map cases
 		assertEquals(Maps.of(1L,2L), eval("(assoc-in {} [1] 2)"));
@@ -654,7 +655,7 @@ public class CoreTest {
 		assertEquals(Vectors.of(1L, 5L),eval("(assoc-in [1] [1] 5)"));
 		assertEquals(Vectors.of(1L, 2L, 5L),eval("(assoc-in (first {1 2}) [2] 5)"));
 		
-		// Cast errors
+		// Cast errors - not associative collections
 		assertCastError(step("(assoc-in 1 [2] 3)"));
 		assertCastError(step("(assoc-in [1] [:foo] 3)"));
 		
@@ -751,7 +752,9 @@ public class CoreTest {
 	@Test
 	public void testSet() {
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(set [3 2 1 2])"));
-		assertEquals(Sets.empty(), eval("(set nil)"));
+		assertEquals(Sets.of(1L, 2L, 3L), eval("(set #{1 2 3})"));
+		
+		assertEquals(Sets.empty(), eval("(set nil)")); // nil treated as empty sequence of elements
 
 		assertArityError(step("(set)"));
 		assertArityError(step("(set 1 2)"));
