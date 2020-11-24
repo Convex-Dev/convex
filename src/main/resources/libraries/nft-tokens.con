@@ -72,9 +72,6 @@
   (defn empty->nil [s]
     (if (empty? s) nil s))
 
-  (defn nil->empty [s]
-    (if (nil? s) #{} s))
-  
   ;; For convenience, our asset path understands a long to be a singleton set
   ;; Here's a helper function to do that conversion
   (defn num->set [n]
@@ -124,7 +121,7 @@
 
   ;; Implements the balance function for convex.asset.
   (defn balance [owner]
-    (nil->empty (get-holding (address owner))))
+    (or (get-holding (address owner)) #{}))
 
   ;; Implements the owns? function for convex.asset.
   (defn owns? [owner id-set]
