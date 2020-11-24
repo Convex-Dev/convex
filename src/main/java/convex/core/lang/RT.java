@@ -1158,19 +1158,23 @@ public class RT {
 	}
 
 	/**
-	 * Coerces to a set. Returns null if the argument is not a set.
+	 * Coerces to a set. null is converted to the empty set. 
+	 * 
+	 * Returns null if the argument is not a set.
+	 * 
 	 * @param <T>
-	 * @param object
+	 * @param a
 	 * @return
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> Set<T> ensureSet(Object object) {
-		if (!(object instanceof Set)) return null;
-		return (Set<T>) object;
+	public static <T> Set<T> ensureSet(Object a) {
+		if (a==null) return Sets.empty();
+		if (!(a instanceof Set)) return null;
+		return (Set<T>) a;
 	}
 
 	/**
-	 * Casts the argument to a hashmap
+	 * Casts the argument to a hashmap. null is converted to the empty HashMap. 
 	 * @param <K> Type of keys
 	 * @param <V> Type of values
 	 * @param a Any object
@@ -1178,6 +1182,7 @@ public class RT {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <K,V> AHashMap<K, V> ensureHashMap(Object a) {
+		if (a==null) return Maps.empty();
 		if (a instanceof AHashMap) return (AHashMap<K, V>) a;
 		return null;
 	}

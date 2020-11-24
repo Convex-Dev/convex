@@ -1825,13 +1825,13 @@ public class Core {
 			// TODO: handle blobmaps?
 			
 			Object arg0=args[0];
-			AHashMap<Object,Object> result=(arg0==null)?Maps.empty():RT.ensureHashMap(arg0);
+			AHashMap<Object,Object> result=RT.ensureHashMap(arg0);
 			if (result == null) return context.withCastError(arg0, AHashMap.class);
 			
 			long juice=Juice.BUILD_DATA;
 			for (int i=1; i<n; i++) {
 				Object argi=args[i];
-				AHashMap<Object,Object> argMap=(argi==null)?Maps.empty():RT.ensureHashMap(argi);
+				AHashMap<Object,Object> argMap=RT.ensureHashMap(argi);
 				if (argMap == null) return context.withCastError(argi, AHashMap.class);
 				
 				long size=argMap.count();

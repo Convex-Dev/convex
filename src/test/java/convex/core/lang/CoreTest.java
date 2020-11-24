@@ -768,6 +768,13 @@ public class CoreTest {
 		assertTrue(evalB("(subset? #{} #{1 2 3})"));
 		assertTrue(evalB("(subset? #{2 3} #{1 2 3 4})"));
 		
+		// check nil is handled as empty set
+		assertTrue(evalB("(subset? nil #{})"));
+		assertTrue(evalB("(subset? #{} nil)"));
+		assertTrue(evalB("(subset? nil #{1 2 3})"));
+		assertFalse(evalB("(subset? #{1 2 3} nil)"));
+
+		
 		assertFalse(evalB("(subset? #{2 3} #{1 2})"));
 		assertFalse(evalB("(subset? #{1 2 3} #{0})"));
 		assertFalse(evalB("(subset? #{#{}} #{#{1}})"));
