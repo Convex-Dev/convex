@@ -13,7 +13,7 @@ B) Ensure effective governance of economic systems based on Convex technology
 As such the license has been written based on the following principles:
 
 - It is a "weak Copyleft" license, similar in spirit to the Eclipse Public License. Derivative Works must be released under the same license. However, you may freely link and utilise the Work from software using a different license.
-- When used to manage assets in a decentralised system, the Convex license places a requirement to operate the system according to the Convex Network Governance Rules. This is primarily done to prevent unauthorised forking, which would be contrary to the objective of Convex to support open, shared global public networks.
+- When used to manage assets in a decentralised system, the Convex license places a requirement to operate the system according to the Convex Network Governance Rules. This is primarily done to prevent unauthorised forking, which would be contrary to the objective of Convex to support open, shared global public networks for the Internet of Value
 
 # License Terms
 
