@@ -304,8 +304,8 @@
         
         (not (exports? receiver 'receive-asset))
         (cond
+          (actor? receiver) (fail "Receiver does not have receive-asset function")          
           (account? receiver) (perform-transfer sender receiver id-set)
-          (actor? receiver) (fail "Receiver does not have receive-asset function")
           :else (fail "Address cannot receive asset")),
         
         :else (def offers (assoc-in offers [sender receiver] id-set)))))
