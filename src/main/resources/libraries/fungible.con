@@ -67,7 +67,7 @@
              ))
          
          (defn owns? [owner quantity]
-           (let [bal (or (get-holding owner 0))
+           (let [bal (or (get-holding owner) 0)
                  quantity (long (or quantity 0))]
              (<= quantity bal)))
          
