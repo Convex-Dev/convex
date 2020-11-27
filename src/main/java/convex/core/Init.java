@@ -180,7 +180,10 @@ public class Init {
 				s = register(ctx.getState(),ORACLE_ADDRESS,"Oracle Actor (default)");
 			}
 			
-			{ // Register core library
+			{ // Register core libraries
+				Context<?> ctx = Context.createFake(s, HERO);
+				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'convex.core "+CORE_ADDRESS+"))"));
+				s=ctx.getState();
 				s = register(s,CORE_ADDRESS,"Convex Core Library");
 				s = register(s,MEMORY_EXCHANGE,"Memory Exchange Pool");
 			}

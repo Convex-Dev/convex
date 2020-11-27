@@ -1312,6 +1312,13 @@ public class CoreTest {
 		assertArityError(step(ctx,"(import ~lib :as mylib :blah)"));	
 	}
 	
+	@Test
+	public void testImportCore() {
+		Context<?> ctx = step("(import convex.core :as cc)");
+		assertFalse(ctx.isExceptional());
+		assertEquals((Object)eval(ctx,"count"),eval(ctx,"cc/count"));
+	}
+	
 
 	@Test
 	public void testLookup() {
