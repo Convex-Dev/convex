@@ -103,7 +103,7 @@
     [owner asset]
     (let [owner (address owner)]
       (cond
-        (long? asset) (>= asset (core/balance owner))
+        (long? asset) (<= asset (core/balance owner))
         (vector? asset)
         (let [[asset-address quantity] asset]
           (call (address asset-address) (owns? owner quantity)))))))
