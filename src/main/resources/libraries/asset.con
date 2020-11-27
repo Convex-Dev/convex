@@ -28,6 +28,7 @@
   ;; In order to implement a new asset type that can be used by this library, you must write the
   ;; following functions in your asset contract:
   ;;   (check-transfer sender receiver quantity)
+  ;;   (direct-transfer receiver quantity)
   ;;   (offer receiver quantity)
   ;;   (accept sender quantity)
   ;;   (owns? owner quantity)
@@ -50,11 +51,14 @@
         ;; asset is just an amount of convex
         (long? asset) (core/transfer receiver asset)
         (vector? asset)
-        (let [[asset-address quantity] asset,
-              offer-result (call asset-address (offer receiver quantity))]
-          (if (exports? receiver 'receive-asset)
-            (call receiver (receive-asset asset data))
-            offer-result)))))
+        (let [[asset-address quantity] asset]
+          (cond
+            (exports? receiver 'receive-asset)
+            (do (call asset-address (offer receiver quantity))(call receiver (receive-asset asset data))),
+            
+            (actor? receiver) (fail "Receiver does not have receive-asset function")          
+            (account? receiver) (call asset-address (direct-transfer receiver quantity))
+            :else (fail "Address cannot receive asset"))))))
   
   ;; For smart contract assets, you can offer and accept separately if you choose
   (defn offer

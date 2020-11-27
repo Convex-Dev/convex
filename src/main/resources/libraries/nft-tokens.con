@@ -57,7 +57,6 @@
   ;; whatever subset of the offered tokens they want.
   ;; If an account doesn't implement receive-asset, default behavior is to go ahead and perform the transfer.
   ;; If an actor doesn't implement receive-asset, default behavior is to fail.
-
  
   (call *registry* (register {:name "NFT Tokens"}))
   (call *registry* (cns-update 'convex.nft-tokens *address*))
@@ -286,6 +285,12 @@
               nil perform-transfer-map)
       [*address* id-set]))
 
+  ;; direct-transfer is the interface for a sender to call the private perform-transfer function
+  ;; This does not use the offer/accept model, and does not check whether the receiver wants to receive it.
+  ;; Therefore, it is preferred to use `asset/transfer` to transfer assets.
+  (defn direct-transfer [receiver id-set]
+    (perform-transfer *caller* receiver (num->set id-set)))
+
   ;; private function, to optimize memory use in offers
   (defn cancel-offer [sender receiver]
     (if-let [my-offers (empty->nil (dissoc (get offers sender) receiver))]
@@ -301,13 +306,6 @@
           id-set (num->set id-set)]
       (cond
         (empty? id-set) (cancel-offer sender receiver),
-        
-        (not (exports? receiver 'receive-asset))
-        (cond
-          (actor? receiver) (fail "Receiver does not have receive-asset function")          
-          (account? receiver) (perform-transfer sender receiver id-set)
-          :else (fail "Address cannot receive asset")),
-        
         :else (def offers (assoc-in offers [sender receiver] id-set)))))
 
   (defn get-offers
@@ -324,7 +322,7 @@
     (let [sender (address sender),
           receiver *caller*,
           accepted-id-set (num->set accepted-id-set)
-          offered-id-set (get-in offers [sender receiver] #{})]
+          offered-id-set (or (get-in offers [sender receiver]) #{})]
       (when-not offer (fail "Offer not found"))
       (assert (subset? accepted-id-set offered-id-set)) ;; Assures receiver accepts a subset of offer
       (if (= accepted-id-set offered-id-set)
@@ -332,7 +330,7 @@
         (def offers (assoc-in offers [sender receiver] (difference offered-id-set accepted-id-set))))
       (perform-transfer sender receiver accepted-id-set)))
 
-  (export create-token destroy-token get-token-owner get-token-creator get-token-data get-token-class balance get-offers check-trusted? set-token-data merge-token-data check-transfer offer accept owns? get-uri))
+  (export create-token destroy-token get-token-owner get-token-creator get-token-data get-token-class balance get-offers check-trusted? set-token-data merge-token-data check-transfer direct-transfer offer accept owns? get-uri))
 
 
 
