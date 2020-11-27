@@ -66,7 +66,12 @@
              (set-holding addr (+ tbal amount))
              ))
          
-         (export transfer balance))))
+         (defn owns? [owner quantity]
+           (let [bal (or (get-holding owner 0))
+                 quantity (long (or quantity 0))]
+             (<= quantity bal)))
+         
+         (export transfer balance owns?))))
   
   (defn add-mint 
     ^{:doc {:description "Creates deployable code that, when added to a fungible token actor, allows priviledged accounts to mint and burn tokens. The :minter may be a single address, or a Trust Monitor."
