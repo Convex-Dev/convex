@@ -8,7 +8,7 @@ Convex Public Licence v0.1 (WIP DRAFT)
 This license is intended to support the open development of software within the Convex ecosystem, with two primary objectives:
 
 A) Enable Open Source development of systems based on Convex technology
-B) Ensure effective governance of economic systems based on Convex technology
+B) Ensure effective governance of economic systems based on Convex technology by the Convex Foundation
 
 As such the license has been written based on the following principles:
 
@@ -105,7 +105,9 @@ You may distribute the Work (or Derivative Work) under this Licence, provided th
 
 9. Accepting Warranty or Additional Liability. While redistributing the Work or Derivative Works thereof, You may choose to offer, and charge a fee for, acceptance of support, warranty, indemnity, or other liability obligations and/or rights consistent with this Licence. However, in accepting such obligations, You may act only on Your own behalf and on Your sole responsibility, not on behalf of any other Contributor, and only if You agree to indemnify, defend, and hold each Contributor harmless for any liability incurred by, or claims asserted against, such Contributor by reason of your accepting any such warranty or additional liability.
 
+<-- Extra clause for license updates -->
 
+10. Relicensing. Contributor grants to the Convex Foundation a perpetual, worldwide, no-charge, royalty-free, irrevocable right to re-distribute contributions under any future revision of this license approved by the Convex Foundation.
 
 <--- Licence copyright --->
 
