@@ -150,6 +150,14 @@ public class Init {
 				s = ctx.getState();
 			}
 			
+			{ // Register core libraries now that registry exists
+				Context<?> ctx = Context.createFake(s, HERO);
+				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'convex.core "+CORE_ADDRESS+"))"));
+				s=ctx.getState();
+				s = register(s,CORE_ADDRESS,"Convex Core Library");
+				s = register(s,MEMORY_EXCHANGE,"Memory Exchange Pool");
+			}
+			
 			{ // Deploy Trust library and register with CNS
 				Context<?> ctx = Context.createFake(s, HERO);
 				Object form=Reader.readResource("libraries/trust.con");
@@ -180,14 +188,15 @@ public class Init {
 				s = register(ctx.getState(),ORACLE_ADDRESS,"Oracle Actor (default)");
 			}
 			
-			{ // Register core libraries
+			{ // Deploy Asset Actor
 				Context<?> ctx = Context.createFake(s, HERO);
-				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'convex.core "+CORE_ADDRESS+"))"));
+				Object form=Reader.readResource("libraries/asset.con");
+				ctx = ctx.deployActor(form,true);
+				if (ctx.isExceptional()) {
+					log.severe("Failure to deploy convex.asset: "+ctx.getExceptional());
+				}
 				s=ctx.getState();
-				s = register(s,CORE_ADDRESS,"Convex Core Library");
-				s = register(s,MEMORY_EXCHANGE,"Memory Exchange Pool");
 			}
-			
 
 			STATE = s;
 		} catch (Throwable e) {

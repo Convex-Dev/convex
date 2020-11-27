@@ -33,7 +33,7 @@
   ;;   (owns? owner quantity)
   ;;   (balance owner)
   
-  (import 0xCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC :as core)
+  (import convex.core :as core)
   (call *registry* (register {:name "Asset Abstraction Library"}))
   (call *registry* (cns-update 'convex.asset *address*))
   
