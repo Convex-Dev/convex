@@ -15,6 +15,8 @@ import convex.core.lang.Context;
 import convex.core.lang.Reader;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
+import convex.test.Assertions;
+import convex.test.Testing;
 
 public class TestNFT {
 	private static final Symbol nSym=Symbol.create("nft");
@@ -32,7 +34,7 @@ public class TestNFT {
 		} catch (IOException e) {
 			throw new Error(e);
 		}
-		
+		ctx=step(ctx,"(import convex.asset :as asset)");
 		return ctx;
 	}
 	
@@ -40,5 +42,10 @@ public class TestNFT {
 	
 	@Test public void testSetup() {
 		assertTrue(ctx.lookup(nSym).getValue() instanceof Address);
+	}
+	
+	@Test public void testOneAccount() {
+		Context<?> c=Testing.runTests(ctx,"contracts/nft/test1.con");
+		Assertions.assertNotError(c);
 	}
 }
