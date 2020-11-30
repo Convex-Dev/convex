@@ -686,7 +686,7 @@ public final class Context<T> extends AObject {
 	 */
 	@SuppressWarnings("unchecked")
 	public <R> Context<R> withJuiceError() {
-		AExceptional err=ErrorValue.create(ErrorCodes.JUICE, "Out of juice!");
+		AExceptional err=ErrorValue.create(ErrorCodes.JUICE,Strings.create("Out of juice!"));
 		return (Context<R>) new Context<>(chainState,0L,localBindings,err,depth,true);
 	}
 	
