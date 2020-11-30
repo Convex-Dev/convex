@@ -34,11 +34,31 @@ public class ErrorValue extends AExceptional {
 	/**
 	 * Creates an ErrorValue with the specified type and message. Message may be null.
 	 * @param value Type of error
-	 * @param message Off-chain message
+	 * @param message Off-chain message as CVM String
 	 * @return New ErrorValue instance
 	 */
-	public static ErrorValue create(Object code, Object message) {
+	public static ErrorValue create(Object code, AString message) {
 		return new ErrorValue(code,message);
+	}
+	
+	/**
+	 * Creates an ErrorValue with the specified type and message. Message may be null.
+	 * @param value Type of error
+	 * @param message Off-chain message, must be valid CVM Value
+	 * @return New ErrorValue instance
+	 */
+	public static ErrorValue createRaw(Object code, Object message) {
+		return new ErrorValue(code,message);
+	}
+	
+	/**
+	 * Creates an ErrorValue with the specified type and message. Message may be null.
+	 * @param value Type of error
+	 * @param message Off-chain message as Java String
+	 * @return New ErrorValue instance
+	 */
+	public static ErrorValue create(Object code, String message) {
+		return new ErrorValue(code,Strings.create(message));
 	}
 
 	/**
@@ -79,6 +99,7 @@ public class ErrorValue extends AExceptional {
 		// TODO Auto-generated method stub
 		return trace;
 	}
+
 
 
 }

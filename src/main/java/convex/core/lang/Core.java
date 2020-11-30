@@ -1739,7 +1739,7 @@ public class Core {
 
 			// get message, or nil if not provided
 			Object message = (alen >0) ? args[alen-1] : null;
-			ErrorValue error = ErrorValue.create(code, message);
+			ErrorValue error = ErrorValue.createRaw(code, message);
 
 			return context.withException(error);
 		}
