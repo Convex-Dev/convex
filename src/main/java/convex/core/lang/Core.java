@@ -361,6 +361,22 @@ public class Core {
 		}
 
 	});
+	
+	public static final CoreFn<Object> EVAL_AS = reg(new CoreFn<>(Symbols.EVAL_AS) {
+
+		@Override
+		public <I> Context<Object> invoke(Context<I> context, Object[] args) {
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+
+			Address address = RT.address(args[0]);
+			if (address==null) return context.withCastError(args[0], Address.class);
+			
+			Object form = args[1];
+			Context<Object> rctx = context.evalAs(address,form);
+			return rctx.consumeJuice(Juice.EVAL);
+		}
+
+	});
 
 	public static final CoreFn<Long> SCHEDULE_STAR = reg(new CoreFn<>(Symbols.SCHEDULE_STAR) {
 		@Override

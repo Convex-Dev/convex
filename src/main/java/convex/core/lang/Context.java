@@ -1103,6 +1103,13 @@ public final class Context<T> extends AObject {
 		AOp<R> op=compiledContext.getResult();
 		return compiledContext.execute(op);
 	}
+	
+	@SuppressWarnings("unchecked")
+	public <R> Context<R> evalAs(Address address, Object form) {
+		AccountStatus as=this.getAccountStatus(address);
+		if (as==null) return withError(ErrorCodes.NOBODY,"Address does not exist: "+address);
+		return (Context<R>) this;
+	}
 
 	
 	/**
@@ -1646,6 +1653,8 @@ public final class Context<T> extends AObject {
 	public Blob createEncoding() {
 		throw new TODOException();
 	}
+
+
 
 
 
