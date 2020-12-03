@@ -1,6 +1,7 @@
-;;(import convex.asset :as asset)
-;;(import convex.nft-tokens :as nft)
-;;(def nft (get *aliases* 'nft))
+;; Assumed done in test setup already
+;; (import convex.asset :as asset)
+;; (import convex.nft-tokens :as nft)
+;; (def nft (get *aliases* 'nft))
 
 ;; Testing with one account
 (do
