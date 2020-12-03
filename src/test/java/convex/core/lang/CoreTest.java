@@ -2326,6 +2326,18 @@ public class CoreTest {
 	}
 	
 	@Test
+	public void testEvalAsWhitelistUser() {
+		Context<?> ctx=step("(deploy '(do (defn check-trusted? [s a o] (= s (address "+TestState.VILLAIN+"))) (export check-trusted?)))");
+		Address monitor = (Address) ctx.getResult();
+		ctx=step(ctx,"(set-controller "+monitor+")");
+		
+		ctx=ctx.switchAddress(TestState.VILLAIN);
+		ctx=step(ctx,"(def hero "+TestState.HERO+")");
+		
+		assertEquals(3L, evalL(ctx,"(eval-as hero '(+ 1 2))"));
+	}
+	
+	@Test
 	public void testSetController() {
 		// set-controller returns new controller
 		assertEquals(TestState.VILLAIN, eval("(set-controller "+TestState.VILLAIN+")"));

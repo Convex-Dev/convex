@@ -1129,6 +1129,7 @@ public final class Context<T> extends AObject {
 			canControl=true;
 		} else {
 			AccountStatus controlAccount=this.getAccountStatus(controller);
+			if (controlAccount==null) return ctx.withError(ErrorCodes.TRUST,"Cannot control address because controller does not exist: "+controller);
 			if (controlAccount.isActor()) {
 				// (call target amount (receive-coin source amount nil))
 				ctx=ctx.actorCall(controller,0,Symbols.CHECK_TRUSTED_Q,caller,null,address);
