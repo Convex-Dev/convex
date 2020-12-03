@@ -25,208 +25,228 @@ import static convex.test.Assertions.*;
 import static convex.core.lang.TestState.*;
 
 public class TestTrust {
-	private static final Symbol tSym=Symbol.create("trust-actor");
-	
+	private static final Symbol tSym = Symbol.create("trust-actor");
+
 	private static Context<?> loadTrust() {
-		Context<?> ctx=TestState.INITIAL_CONTEXT;
+		Context<?> ctx = TestState.INITIAL_CONTEXT;
 		try {
-			ctx=ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/trust.con")), true);
-			Address trust=(Address) ctx.getResult();
-			String importS="(import "+trust+" :as trust)";
-			ctx=step(ctx,importS);
+			ctx = ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/trust.con")), true);
+			Address trust = (Address) ctx.getResult();
+			String importS = "(import " + trust + " :as trust)";
+			ctx = step(ctx, importS);
 			assertFalse(ctx.isExceptional());
-			
-			ctx=ctx.define(tSym, Syntax.create(trust));
+
+			ctx = ctx.define(tSym, Syntax.create(trust));
 		} catch (IOException e) {
 			throw new Error(e);
 		}
-		
+
 		return ctx;
 	}
-	
-	private static final Context<?> ctx=loadTrust();
-	private static final Address trusted=(Address) ctx.lookup(tSym).getResult();
-	
+
+	private static final Context<?> ctx = loadTrust();
+	private static final Address trusted = (Address) ctx.lookup(tSym).getResult();
+
 	/**
 	 * Test that re-deployment of Fungible matches what is expected
 	 */
-	@Test public void testLibraryProperties() {
+	@Test
+	public void testLibraryProperties() {
 		assertTrue(ctx.getAccountStatus(trusted).isActor());
-		assertEquals(trusted,TestState.CON_TRUSTED);
-		
+		assertEquals(trusted, TestState.CON_TRUSTED);
+
 		// check alias is set up correctly
-		assertEquals(trusted,eval(ctx,"(get *aliases* 'trust)"));
-		
-		assertEquals("Trust Library",eval("(:name (call *registry* (lookup "+trusted+")))").toString());
+		assertEquals(trusted, eval(ctx, "(get *aliases* 'trust)"));
+
+		assertEquals("Trust Library", eval("(:name (call *registry* (lookup " + trusted + ")))").toString());
 	}
-	
-	@Test public void testSelfTrust() {
-		Context<?> ctx=TestTrust.ctx;
-		
-		assertTrue(evalB(ctx,"(trust/trusted? *address* *address*)"));
-		assertFalse(evalB(ctx,"(trust/trusted? *address* nil)"));
-		assertFalse(evalB(ctx,"(trust/trusted? *address* :foo)"));
-		assertFalse(evalB(ctx,"(trust/trusted? *address* (address 0x1234567812345678123456781234567812345678123456781234567812345678))"));
+
+	@Test
+	public void testSelfTrust() {
+		Context<?> ctx = TestTrust.ctx;
+
+		assertTrue(evalB(ctx, "(trust/trusted? *address* *address*)"));
+		assertFalse(evalB(ctx, "(trust/trusted? *address* nil)"));
+		assertFalse(evalB(ctx, "(trust/trusted? *address* :foo)"));
+		assertFalse(evalB(ctx,
+				"(trust/trusted? *address* (address 0x1234567812345678123456781234567812345678123456781234567812345678))"));
 	}
-	
-	@Test public void testUpgradeWhitelist() {
-		Context<?> ctx=TestTrust.ctx;
+
+	@Test
+	public void testUpgradeWhitelist() {
+		Context<?> ctx = TestTrust.ctx;
 
 		// deploy a whitelist with default config and upgradable capability
-		ctx=step(ctx,"(def wlist (deploy [(trust/build-whitelist nil) (trust/add-trusted-upgrade nil)]))");
-		Address wl=(Address) ctx.getResult();
+		ctx = step(ctx, "(def wlist (deploy [(trust/build-whitelist nil) (trust/add-trusted-upgrade nil)]))");
+		Address wl = (Address) ctx.getResult();
 		assertNotNull(wl);
-		
-		assertTrue(evalB(ctx,"(trust/trusted? wlist *address*)"));
-		
+
+		assertTrue(evalB(ctx, "(trust/trusted? wlist *address*)"));
+
 		// do an upgrade that blanks the whitelist
-		ctx=step(ctx,"(call wlist (upgrade '(do (def whitelist #{}))))");
-		
+		ctx = step(ctx, "(call wlist (upgrade '(do (def whitelist #{}))))");
+
 		{
 			// check our villain cannot upgrade the actor!
-			Address a1=VILLAIN;;
-			Context<?> c=ctx.switchAddress(a1);
-			c=step(c,"(do (import "+trusted+" :as trust) (def wlist "+wl+"))");
-			
-			assertTrustError(step(c,"(call wlist (upgrade '(do :foo)))"));
+			Address a1 = VILLAIN;
+			;
+			Context<?> c = ctx.switchAddress(a1);
+			c = step(c, "(do (import " + trusted + " :as trust) (def wlist " + wl + "))");
+
+			assertTrustError(step(c, "(call wlist (upgrade '(do :foo)))"));
 		}
-		
+
 		// check that our edit has updated actor
-		assertFalse(evalB(ctx,"(trust/trusted? wlist *address*)"));
-		
+		assertFalse(evalB(ctx, "(trust/trusted? wlist *address*)"));
+
 		// check we can permanently remove upgradability
-		ctx=step(ctx,"(trust/remove-upgradability! wlist)");
+		ctx = step(ctx, "(trust/remove-upgradability! wlist)");
 		assertNotError(ctx);
-		assertStateError(step(ctx,"(call wlist (upgrade '(do :foo)))"));
-		
+		assertStateError(step(ctx, "(call wlist (upgrade '(do :foo)))"));
+
 		// actor functionality should still work otherwise
-		assertFalse(evalB(ctx,"(trust/trusted? wlist *address*)"));
+		assertFalse(evalB(ctx, "(trust/trusted? wlist *address*)"));
 	}
-	
-	@Test public void testWhitelist() {
+
+	@Test
+	public void testWhitelist() {
 		// check our alias is right
-		Context<?> ctx=TestTrust.ctx;
+		Context<?> ctx = TestTrust.ctx;
 
 		// deploy a whitelist with default config
-		ctx=step(ctx,"(def wlist (deploy (trust/build-whitelist nil)))");
-		Address wl=(Address) ctx.getResult();
+		ctx = step(ctx, "(def wlist (deploy (trust/build-whitelist nil)))");
+		Address wl = (Address) ctx.getResult();
 		assertNotNull(wl);
-		
+
 		// initial creator should be on whitelist
-		assertTrue(evalB(ctx,"(trust/trusted? wlist *address*)"));
-		
-		assertCastError(step(ctx,"(trust/trusted? wlist nil)"));
-		assertCastError(step(ctx,"(trust/trusted? wlist [])"));
-		
-		assertCastError(step(ctx,"(trust/trusted? nil *address*)"));
-		assertCastError(step(ctx,"(trust/trusted? [] *address*)"));
-		
+		assertTrue(evalB(ctx, "(trust/trusted? wlist *address*)"));
+
+		assertCastError(step(ctx, "(trust/trusted? wlist nil)"));
+		assertCastError(step(ctx, "(trust/trusted? wlist [])"));
+
+		assertCastError(step(ctx, "(trust/trusted? nil *address*)"));
+		assertCastError(step(ctx, "(trust/trusted? [] *address*)"));
+
 		{ // check adding and removing to whitelist
-			Address a1=Samples.BAD_ADDRESS;
-			Context<?> c=ctx;
-			
+			Address a1 = Samples.BAD_ADDRESS;
+			Context<?> c = ctx;
+
 			// Check not initially on whitelist
-			assertFalse(evalB(c,"(trust/trusted? wlist "+a1+")"));
-	
+			assertFalse(evalB(c, "(trust/trusted? wlist " + a1 + ")"));
+
 			// Add address to whitelist, shouldn't matter if it exists or not
-			c=step (c,"(call wlist (set-trusted "+a1+" true))");
+			c = step(c, "(call wlist (set-trusted " + a1 + " true))");
 			assertNotError(c);
-			assertTrue(evalB(c,"(trust/trusted? wlist "+a1+")"));
+			assertTrue(evalB(c, "(trust/trusted? wlist " + a1 + ")"));
 
 			// Check removal from whitelist
-			c=step (c,"(call wlist (set-trusted "+a1+" false))");
+			c = step(c, "(call wlist (set-trusted " + a1 + " false))");
 			assertNotError(c);
-			assertFalse(evalB(c,"(trust/trusted? wlist "+a1+")"));
+			assertFalse(evalB(c, "(trust/trusted? wlist " + a1 + ")"));
 		}
-		
+
 		{ // check the villain is excluded
-			Address a1=VILLAIN;;
-			Address a2=HERO;;
-			Context<?> c=ctx.switchAddress(a1);
-			c=step(c,"(do (import "+trusted+" :as trust) (def wlist (address "+wl+")))");
+			Address a1 = VILLAIN;
+			;
+			Address a2 = HERO;
+			;
+			Context<?> c = ctx.switchAddress(a1);
+			c = step(c, "(do (import " + trusted + " :as trust) (def wlist (address " + wl + ")))");
 			assertNotError(c);
-			
+
 			// villain can still check monitor
-			assertFalse(evalB(c,"(trust/trusted? wlist "+a1+")"));
-			assertTrue(evalB(c,"(trust/trusted? wlist "+a2+")"));
-			
+			assertFalse(evalB(c, "(trust/trusted? wlist " + a1 + ")"));
+			assertTrue(evalB(c, "(trust/trusted? wlist " + a2 + ")"));
+
 			// villain can't change whitelist
-			assertTrustError(step (c,"(call wlist (set-trusted "+a1+" true))"));
-			assertTrustError(step (c,"(call wlist (set-trusted "+a2+" false))"));
+			assertTrustError(step(c, "(call wlist (set-trusted " + a1 + " true))"));
+			assertTrustError(step(c, "(call wlist (set-trusted " + a2 + " false))"));
 		}
 	}
-	
-	@Test public void testBlacklist() {
-		Context<?> ctx=TestTrust.ctx;
+
+	@Test
+	public void testBlacklist() {
+		Context<?> ctx = TestTrust.ctx;
 
 		// deploy a blacklist with default config
-		ctx=step(ctx,"(def blist (deploy (trust/build-blacklist {:blacklist ["+VILLAIN+"]})))");
-		Address wl=(Address) ctx.getResult();
+		ctx = step(ctx, "(def blist (deploy (trust/build-blacklist {:blacklist [" + VILLAIN + "]})))");
+		Address wl = (Address) ctx.getResult();
 		assertNotNull(wl);
-		
+
 		// initial creator should not be on blacklist
-		assertTrue(evalB(ctx,"(trust/trusted? blist *address*)"));
-		
+		assertTrue(evalB(ctx, "(trust/trusted? blist *address*)"));
+
 		// our villain should be on the blacklist
-		assertFalse(evalB(ctx,"(trust/trusted? blist "+VILLAIN+")"));
-		
-		assertCastError(step(ctx,"(trust/trusted? blist nil)"));
-		assertCastError(step(ctx,"(trust/trusted? blist [])"));
-		
-		assertCastError(step(ctx,"(trust/trusted? nil *address*)"));
-		assertCastError(step(ctx,"(trust/trusted? [] *address*)"));
-		
+		assertFalse(evalB(ctx, "(trust/trusted? blist " + VILLAIN + ")"));
+
+		assertCastError(step(ctx, "(trust/trusted? blist nil)"));
+		assertCastError(step(ctx, "(trust/trusted? blist [])"));
+
+		assertCastError(step(ctx, "(trust/trusted? nil *address*)"));
+		assertCastError(step(ctx, "(trust/trusted? [] *address*)"));
+
 		{ // check adding and removing to blacklist
-			Address a1=Samples.BAD_ADDRESS;
-			Context<?> c=ctx;
-			
+			Address a1 = Samples.BAD_ADDRESS;
+			Context<?> c = ctx;
+
 			// Check not initially on blacklist
-			assertTrue(evalB(c,"(trust/trusted? blist "+a1+")"));
-	
+			assertTrue(evalB(c, "(trust/trusted? blist " + a1 + ")"));
+
 			// Add address to blacklist, shouldn't matter if it exists or not
-			c=step (c,"(call blist (set-trusted "+a1+" false))");
+			c = step(c, "(call blist (set-trusted " + a1 + " false))");
 			assertNotError(c);
-			assertFalse(evalB(c,"(trust/trusted? blist "+a1+")"));
+			assertFalse(evalB(c, "(trust/trusted? blist " + a1 + ")"));
 
 			// Check removal from blacklist
-			c=step (c,"(call blist (set-trusted "+a1+" true))");
+			c = step(c, "(call blist (set-trusted " + a1 + " true))");
 			assertNotError(c);
-			assertTrue(evalB(c,"(trust/trusted? blist "+a1+")"));
+			assertTrue(evalB(c, "(trust/trusted? blist " + a1 + ")"));
 		}
-		
+
 		{ // check the villain is excluded
-			Address a1=VILLAIN;;
-			Address a2=HERO;;
-			Context<?> c=ctx.switchAddress(a1);
-			c=step(c,"(do (import "+trusted+" :as trust) (def blist (address "+wl+")))");
+			Address a1 = VILLAIN;
+			;
+			Address a2 = HERO;
+			;
+			Context<?> c = ctx.switchAddress(a1);
+			c = step(c, "(do (import " + trusted + " :as trust) (def blist (address " + wl + ")))");
 			assertNotError(c);
-			
+
 			// villain can still check monitor
-			assertFalse(evalB(c,"(trust/trusted? blist "+a1+")"));
-			assertTrue(evalB(c,"(trust/trusted? blist "+a2+")"));
-			
+			assertFalse(evalB(c, "(trust/trusted? blist " + a1 + ")"));
+			assertTrue(evalB(c, "(trust/trusted? blist " + a2 + ")"));
+
 			// villain can't change whitelist
-			assertTrustError(step (c,"(call blist (set-trusted "+a1+" true))"));
-			assertTrustError(step (c,"(call blist (set-trusted "+a2+" false))"));
+			assertTrustError(step(c, "(call blist (set-trusted " + a1 + " true))"));
+			assertTrustError(step(c, "(call blist (set-trusted " + a2 + " false))"));
 		}
 	}
-	
-	@Test public void testWhitelistController() {
-		Context<?> ctx=TestTrust.ctx;
-		
-		// deploy a whitelist with default config
-		ctx=step(ctx,"(def wlist (deploy (trust/build-whitelist {:whitelist []})))");
-		ctx=step(ctx,"(def alice (deploy '(set-controller ~*address*)))");
-		ctx=step(ctx,"(def bob (deploy '(set-controller ~wlist)))");
-		
+
+	@Test
+	public void testWhitelistController() {
+		Context<?> ctx = TestTrust.ctx;
+
+		// deploy an initially empty whitelist
+		ctx = step(ctx, "(def wlist (deploy (trust/build-whitelist {:whitelist []})))");
+
+		// deploy two actors
+		ctx = step(ctx, "(def alice (deploy '(set-controller ~*address*)))");
+		ctx = step(ctx, "(def bob (deploy '(set-controller ~wlist)))");
+
 		// check initial trust
-		assertEquals(Keywords.FOO,eval(ctx,"(eval-as alice :foo)"));
-		assertTrustError(step (ctx,"(eval-as bob :foo)"));
-		
+		assertEquals(Keywords.FOO, eval(ctx, "(eval-as alice :foo)"));
+		assertTrustError(step(ctx, "(eval-as bob :foo)"));
+
 		// add alice to the whitelist
-		ctx=step(ctx,"(call wlist (set-trusted alice true))");
+		ctx = step(ctx, "(call wlist (set-trusted alice true))");
 
-		assertEquals(Keywords.FOO,eval(ctx,"(eval-as alice '(eval-as ~bob :foo))"));
+		// eval-as should work from alice to bob
+		assertEquals(eval(ctx, "bob"), (Object) eval(ctx, "(eval-as alice '(eval-as ~bob '*address*))"));
 
+		// remove alice from the whitelist
+		ctx = step(ctx, "(call wlist (set-trusted alice false))");
+
+		// eval-as should now fail
+		assertTrustError(step(ctx, "(eval-as alice '(eval-as ~bob :foo))"));
 	}
 }

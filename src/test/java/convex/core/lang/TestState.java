@@ -94,7 +94,7 @@ public class TestState {
 		}
 	}
 
-	public static <T> T eval(Context<?> c, String source) {
+	public static <T extends Object> T eval(Context<?> c, String source) {
 		try {
 			AOp<T> op = compile(c, source);
 			Context<T> rc = c.execute(op);
