@@ -12,6 +12,7 @@ import java.io.IOException;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.Address;
+import convex.core.data.Keywords;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.lang.Context;
@@ -26,7 +27,7 @@ import static convex.core.lang.TestState.*;
 public class TestTrust {
 	private static final Symbol tSym=Symbol.create("trust-actor");
 	
-	private static Context<?> loadFungible() {
+	private static Context<?> loadTrust() {
 		Context<?> ctx=TestState.INITIAL_CONTEXT;
 		try {
 			ctx=ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/trust.con")), true);
@@ -43,7 +44,7 @@ public class TestTrust {
 		return ctx;
 	}
 	
-	private static final Context<?> ctx=loadFungible();
+	private static final Context<?> ctx=loadTrust();
 	private static final Address trusted=(Address) ctx.lookup(tSym).getResult();
 	
 	/**
@@ -208,5 +209,24 @@ public class TestTrust {
 			assertTrustError(step (c,"(call blist (set-trusted "+a1+" true))"));
 			assertTrustError(step (c,"(call blist (set-trusted "+a2+" false))"));
 		}
+	}
+	
+	@Test public void testWhitelistController() {
+		Context<?> ctx=TestTrust.ctx;
+		
+		// deploy a whitelist with default config
+		ctx=step(ctx,"(def wlist (deploy (trust/build-whitelist {:whitelist []})))");
+		ctx=step(ctx,"(def alice (deploy '(set-controller ~*address*)))");
+		ctx=step(ctx,"(def bob (deploy '(set-controller ~wlist)))");
+		
+		// check initial trust
+		assertEquals(Keywords.FOO,eval(ctx,"(eval-as alice :foo)"));
+		assertTrustError(step (ctx,"(eval-as bob :foo)"));
+		
+		// add alice to the whitelist
+		ctx=step(ctx,"(call wlist (set-trusted alice true))");
+
+		assertEquals(Keywords.FOO,eval(ctx,"(eval-as alice '(eval-as ~bob :foo))"));
+
 	}
 }
