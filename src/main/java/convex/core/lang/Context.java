@@ -1113,11 +1113,38 @@ public final class Context<T> extends AObject {
 	 * @param form
 	 * @return
 	 */
+	@SuppressWarnings("unchecked")
 	public <R> Context<R> evalAs(Address address, Object form) {
-		if (address==getAddress()) return eval(form);
+		Address caller=getAddress();
+		if (caller.equals(address)) return eval(form);
 		AccountStatus as=this.getAccountStatus(address);
 		if (as==null) return withError(ErrorCodes.NOBODY,"Address does not exist: "+address);
-		return withError(ErrorCodes.TRUST,"Cannot control address: "+address);
+		
+		Address controller=as.getController();
+		if (controller==null) return withError(ErrorCodes.TRUST,"Cannot control address with nil controller set: "+address);
+		
+		boolean canControl=false;
+		Context<R> ctx=(Context<R>) this;
+		if (controller.equals(getAddress())) {
+			canControl=true;
+		} else {
+			AccountStatus controlAccount=this.getAccountStatus(controller);
+			if (controlAccount.isActor()) {
+				// (call target amount (receive-coin source amount nil))
+				ctx=ctx.actorCall(controller,0,Symbols.CHECK_TRUSTED_Q,caller,null,address);
+				if (ctx.isExceptional()) return ctx;
+				canControl=RT.bool(ctx.getResult());
+			}
+		}
+		
+		if (!canControl) return ctx.withError(ErrorCodes.TRUST,"Cannot control address: "+address);
+		
+		// SECURITY: eval with a context switch
+		final Context<R> exContext=Context.create(getState(), juice, Maps.empty(), null, depth+1, getOrigin(),caller, address,0);	
+		
+		final Context<R> rContext=exContext.eval(form);
+		// SECURITY: must handle results as if returning from an actor call
+		return handleStateResults(rContext);
 	}
 
 	
@@ -1359,7 +1386,7 @@ public final class Context<T> extends AObject {
 		}
 		
 		IFn<R> fn=as.getExportedFunction(sym);
-		if (fn==null) return this.withError(ErrorCodes.STATE,"Account does not have exported function: "+sym);
+		if (fn==null) return this.withError(ErrorCodes.STATE,"Account "+target+" does not have exported function: "+sym);
 
 		// Context for execution of Actor call. Increments depth
 		// SECURITY: Must change address to the target Actor address.

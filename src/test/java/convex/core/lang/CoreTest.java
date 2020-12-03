@@ -2300,11 +2300,41 @@ public class CoreTest {
 	}
 	
 	@Test
+	public void testEvalAsTrustedUser() {
+		Context<Object> ctx=step("(set-controller "+TestState.VILLAIN+")");
+		ctx=ctx.switchAddress(TestState.VILLAIN);
+		ctx=step(ctx,"(def hero "+TestState.HERO+")");
+		
+		assertEquals(3L, evalL(ctx,"(eval-as hero '(+ 1 2))"));
+		assertEquals(TestState.HERO, eval(ctx,"(eval-as hero '*address*)"));
+		assertEquals(TestState.VILLAIN, eval(ctx,"(eval-as hero '*caller*)"));
+		assertEquals(Keywords.FOO, eval(ctx,"(eval-as hero '(return :foo))"));
+		assertEquals(Keywords.FOO, eval(ctx,"(eval-as hero '(halt :foo))"));
+		assertEquals(Keywords.FOO, eval(ctx,"(eval-as hero '(rollback :foo))"));
+		
+		assertAssertError(step(ctx,"(eval-as hero '(assert false))"));
+	}
+	
+	@Test
+	public void testEvalAsUntrustedUser() {
+		Context<?> ctx=step("(set-controller nil)");
+		ctx=ctx.switchAddress(TestState.VILLAIN);
+		ctx=step(ctx,"(def hero "+TestState.HERO+")");
+		
+		assertTrustError(step(ctx,"(eval-as hero '(+ 1 2))"));
+		assertTrustError(step(ctx,"(eval-as (address hero) '(+ 1 2))"));
+	}
+	
+	@Test
 	public void testSetController() {
+		// set-controller returns new controller
 		assertEquals(TestState.VILLAIN, eval("(set-controller "+TestState.VILLAIN+")"));
+		assertEquals(TestState.VILLAIN, eval("(set-controller (address "+TestState.VILLAIN+"))"));
 		assertEquals(null, (Address)eval("(set-controller nil)"));
 		
 		assertCastError(step("(set-controller 1)"));
+		assertCastError(step("(set-controller (address nil))"));
+		
 		assertArityError(step("(set-controller)")); 
 		assertArityError(step("(set-controller 1 2)")); // arity > cast
 	}

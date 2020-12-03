@@ -236,6 +236,7 @@ public class Symbols {
 
 	public static final Symbol GET_CONTROLLER = Symbol.create("get-controller");
 	public static final Symbol SET_CONTROLLER = Symbol.create("set-controller");
+	public static final Symbol CHECK_TRUSTED_Q = Symbol.create("check-trusted?");
 
 	public static final Symbol SET_MEMORY = Symbol.create("set-memory");
 	public static final Symbol TRANSFER_MEMORY = Symbol.create("transfer-memory");
