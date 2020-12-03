@@ -1104,11 +1104,20 @@ public final class Context<T> extends AObject {
 		return compiledContext.execute(op);
 	}
 	
-	@SuppressWarnings("unchecked")
+	/**
+	 * Evaluates a form as another Address.
+	 * 
+	 * Causes TRUST error if the Address is not controlled by the current address.
+	 * @param <R>
+	 * @param address
+	 * @param form
+	 * @return
+	 */
 	public <R> Context<R> evalAs(Address address, Object form) {
+		if (address==getAddress()) return eval(form);
 		AccountStatus as=this.getAccountStatus(address);
 		if (as==null) return withError(ErrorCodes.NOBODY,"Address does not exist: "+address);
-		return (Context<R>) this;
+		return withError(ErrorCodes.TRUST,"Cannot control address: "+address);
 	}
 
 	

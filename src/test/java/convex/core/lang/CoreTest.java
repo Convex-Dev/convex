@@ -6,20 +6,7 @@ import static convex.core.lang.TestState.evalB;
 import static convex.core.lang.TestState.evalL;
 import static convex.core.lang.TestState.evalS;
 import static convex.core.lang.TestState.step;
-import static convex.test.Assertions.assertArgumentError;
-import static convex.test.Assertions.assertArityError;
-import static convex.test.Assertions.assertAssertError;
-import static convex.test.Assertions.assertBoundsError;
-import static convex.test.Assertions.assertCastError;
-import static convex.test.Assertions.assertCompileError;
-import static convex.test.Assertions.assertDepthError;
-import static convex.test.Assertions.assertError;
-import static convex.test.Assertions.assertFundsError;
-import static convex.test.Assertions.assertJuiceError;
-import static convex.test.Assertions.assertMemoryError;
-import static convex.test.Assertions.assertNobodyError;
-import static convex.test.Assertions.assertStateError;
-import static convex.test.Assertions.assertUndeclaredError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -2299,6 +2286,17 @@ public class CoreTest {
 
 		assertArityError(step("(eval)"));
 		assertArityError(step("(eval 1 2)"));
+	}
+	
+	@Test
+	public void testEvalAs() {
+		assertEquals("foo", evalS("(eval-as *address* (list 'str \\f \\o \\o))"));
+		
+		assertTrustError(step("(eval-as *registry* '1)"));
+		
+		assertCastError(step("(eval-as 1 2)"));
+		assertArityError(step("(eval-as 1)")); // arity > cast
+		assertArityError(step("(eval-as 1 2 3)"));
 	}
 	
 	@Test
