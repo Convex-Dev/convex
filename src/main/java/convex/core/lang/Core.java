@@ -1022,7 +1022,7 @@ public class Core {
 		@Override
 		public <I> Context<Object> invoke(Context<I> context, Object[] args) {
 			int n = args.length;
-			if (n !=2) return context.withArityError(exactArityMessage(1, n));
+			if (n !=2) return context.withArityError(exactArityMessage(2, n));
 			
 			Address address=RT.address(args[0]);
 			if (address == null) return context.withCastError(args[0], Address.class);
@@ -1036,6 +1036,24 @@ public class Core {
 			if (context.isExceptional()) return (Context<Object>) context;
 			
 			return context.withResult(Juice.ASSOC, result);
+		}
+	});
+	
+	public static final CoreFn<Object> SET_CONTROLLER = reg(new CoreFn<>(Symbols.SET_CONTROLLER) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public <I> Context<Object> invoke(Context<I> context, Object[] args) {
+			int n = args.length;
+			if (n !=1) return context.withArityError(exactArityMessage(1, n));
+			
+			// Get requested controller. Must be a valid address or null
+			Address controller=RT.address(args[0]);
+			if ((controller == null)&&(args[0]!=null)) return context.withCastError(args[0], Address.class);
+			
+			context=(Context<I>) context.setController(controller);
+			if (context.isExceptional()) return (Context<Object>) context;
+			
+			return context.withResult(Juice.ASSOC, controller);
 		}
 	});
 

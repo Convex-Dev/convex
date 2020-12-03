@@ -233,7 +233,10 @@ public class Symbols {
 
 	public static final Symbol GET_HOLDING = Symbol.create("get-holding");
 	public static final Symbol SET_HOLDING = Symbol.create("set-holding");
-	
+
+	public static final Symbol GET_CONTROLLER = Symbol.create("get-controller");
+	public static final Symbol SET_CONTROLLER = Symbol.create("set-controller");
+
 	public static final Symbol SET_MEMORY = Symbol.create("set-memory");
 	public static final Symbol TRANSFER_MEMORY = Symbol.create("transfer-memory");
 	

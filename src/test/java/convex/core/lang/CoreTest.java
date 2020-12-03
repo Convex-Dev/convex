@@ -2300,6 +2300,16 @@ public class CoreTest {
 	}
 	
 	@Test
+	public void testSetController() {
+		assertEquals(TestState.VILLAIN, eval("(set-controller "+TestState.VILLAIN+")"));
+		assertEquals(null, (Address)eval("(set-controller nil)"));
+		
+		assertCastError(step("(set-controller 1)"));
+		assertArityError(step("(set-controller)")); 
+		assertArityError(step("(set-controller 1 2)")); // arity > cast
+	}
+	
+	@Test
 	public void testScheduleFailures() {
 		assertArityError(step("(schedule)"));
 		assertArityError(step("(schedule 1)"));

@@ -1643,6 +1643,20 @@ public final class Context<T> extends AObject {
 		as=as.withHolding(getAddress(), value);
 		return withAccountStatus(targetAddress,as);
 	}
+	
+	/**
+	 * Sets the controller for the current Account
+	 * @param <R>
+	 * @param address
+	 * @return
+	 */
+	public <R> Context<R> setController(Address address) {
+		AccountStatus as=getAccountStatus();
+		as=as.withController(address);
+		return withAccountStatus(getAddress(),as);
+
+	}
+
 
 	protected <R> Context<R> withAccountStatus(Address target, AccountStatus accountStatus) {
 		return withState(getState().putAccount(target, accountStatus));

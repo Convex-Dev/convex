@@ -43,11 +43,6 @@ public class AccountStatus extends ARecord {
 		this.controller=controller;
 	}
 	
-	private AccountStatus(long sequence, Amount balance, long allowance,
-			AHashMap<Symbol, Syntax> environment, ABlobMap<Address, Object> holdings) {
-		this(sequence,balance,allowance,environment,holdings,null);
-	}
-
 	/**
 	 * Create a regular account, with the specifoed abalance and zero allowance
 	 * 
@@ -56,7 +51,7 @@ public class AccountStatus extends ARecord {
 	 * @return New AccountStatus
 	 */
 	public static AccountStatus create(long sequence, Amount balance) {
-		return new AccountStatus(sequence, balance, 0L, null,null);
+		return new AccountStatus(sequence, balance, 0L, null,null,null);
 	}
 
 	/**
@@ -68,12 +63,12 @@ public class AccountStatus extends ARecord {
 	 */
 	public static AccountStatus createGovernance(long balance) {
 		Amount amount = Amount.create(balance);
-		return new AccountStatus(0, amount, 0L, null,null);
+		return new AccountStatus(0, amount, 0L, null,null,null);
 	}
 
 	public static AccountStatus createActor(Amount balance,
 			AHashMap<Symbol, Syntax> environment) {
-		return new AccountStatus(Constants.ACTOR_SEQUENCE, balance, 0L,environment,null);
+		return new AccountStatus(Constants.ACTOR_SEQUENCE, balance, 0L,environment,null,null);
 	}
 
 	public static AccountStatus create(Amount balance) {
@@ -202,17 +197,17 @@ public class AccountStatus extends ARecord {
 
 	public AccountStatus withBalance(Amount newBalance) {
 		if (balance==newBalance) return this;
-		return new AccountStatus(sequence, newBalance, allowance, environment,holdings);
+		return new AccountStatus(sequence, newBalance, allowance, environment,holdings,controller);
 	}
 	
 	public AccountStatus withAllowance(long newAllowance) {
 		if (allowance==newAllowance) return this;
-		return new AccountStatus(sequence, balance, newAllowance, environment,holdings);
+		return new AccountStatus(sequence, balance, newAllowance, environment,holdings,controller);
 	}
 	
 	public AccountStatus withBalances(Amount newBalance, long newAllowance) {
 		if ((balance==newBalance)&&(allowance==newAllowance)) return this;
-		return new AccountStatus(sequence, newBalance, newAllowance, environment,holdings);
+		return new AccountStatus(sequence, newBalance, newAllowance, environment,holdings,controller);
 	}
 
 	public AccountStatus withBalance(long newBalance) {
@@ -224,7 +219,7 @@ public class AccountStatus extends ARecord {
 		if (newEnvironment==Core.ENVIRONMENT) newEnvironment=null;
 		
 		if (environment==newEnvironment) return this;
-		return new AccountStatus(sequence, balance, allowance,newEnvironment,holdings);
+		return new AccountStatus(sequence, balance, allowance,newEnvironment,holdings,controller);
 	}
 
 	/**
@@ -242,7 +237,7 @@ public class AccountStatus extends ARecord {
 			return null;
 		}
 
-		return new AccountStatus(newSequence, balance, allowance, environment,holdings);
+		return new AccountStatus(newSequence, balance, allowance, environment,holdings,controller);
 	}
 
 	@Override
@@ -295,7 +290,11 @@ public class AccountStatus extends ARecord {
 	private AccountStatus withHoldings(ABlobMap<Address, Object> newHoldings) {
 		if (newHoldings.isEmpty()) newHoldings=null;
 		if (holdings==newHoldings) return this;
-		return new AccountStatus(sequence, balance, allowance, environment,newHoldings);
+		return new AccountStatus(sequence, balance, allowance, environment,newHoldings,controller);
+	}
+	
+	public AccountStatus withController(Address controllerAddress) {
+		return new AccountStatus(sequence, balance, allowance, environment,holdings,controllerAddress);
 	}
 
 	/**
@@ -372,7 +371,7 @@ public class AccountStatus extends ARecord {
 			return this;
 		}
 		
-		return new AccountStatus(newSeq,Amount.create(newBal),newAllowance,newEnv,newHoldings);
+		return new AccountStatus(newSeq,Amount.create(newBal),newAllowance,newEnv,newHoldings,controller);
 	}
 
 	/**
@@ -401,4 +400,6 @@ public class AccountStatus extends ARecord {
 		if (delta==0) return this;
 		return withBalance(getBalance().getValue()+delta);
 	}
+
+
 }
