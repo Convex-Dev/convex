@@ -25,20 +25,27 @@ public class AccountStatus extends ARecord {
 	private final long allowance;
 	private final AHashMap<Symbol, Syntax> environment;
 	private final ABlobMap<Address, Object> holdings;
+	private final Address controller;
 	
 	private static final Keyword[] ACCOUNT_KEYS = new Keyword[] { Keywords.SEQUENCE, Keywords.BALANCE,Keywords.ALLOWANCE,Keywords.ENVIRONMENT,
-			Keywords.HOLDINGS};
+			Keywords.HOLDINGS, Keywords.CONTROLLER};
 
 	private static final RecordFormat FORMAT = RecordFormat.of(ACCOUNT_KEYS);
 
 	private AccountStatus(long sequence, Amount balance, long allowance,
-			AHashMap<Symbol, Syntax> environment, ABlobMap<Address, Object> holdings) {
+			AHashMap<Symbol, Syntax> environment, ABlobMap<Address, Object> holdings,Address controller) {
 		super(FORMAT);
 		this.sequence = sequence;
 		this.balance = balance;
 		this.allowance = allowance;
 		this.environment = environment;
 		this.holdings=holdings;
+		this.controller=controller;
+	}
+	
+	private AccountStatus(long sequence, Amount balance, long allowance,
+			AHashMap<Symbol, Syntax> environment, ABlobMap<Address, Object> holdings) {
+		this(sequence,balance,allowance,environment,holdings,null);
 	}
 
 	/**
@@ -107,6 +114,7 @@ public class AccountStatus extends ARecord {
 		pos = Format.write(bs,pos, allowance);
 		pos = Format.write(bs,pos, environment);
 		pos = Format.write(bs,pos, holdings);
+		pos = Format.write(bs,pos, controller);
 		return pos;
 	}
 
@@ -116,7 +124,8 @@ public class AccountStatus extends ARecord {
 		long allowance = Format.read(bb);
 		AHashMap<Symbol, Syntax> environment = Format.read(bb);
 		ABlobMap<Address,Object> holdings = Format.read(bb);
-		return new AccountStatus(sequence, balance, allowance, environment,holdings);
+		Address controller = Format.read(bb);
+		return new AccountStatus(sequence, balance, allowance, environment,holdings,controller);
 	}
 
 	@Override
@@ -169,6 +178,14 @@ public class AccountStatus extends ARecord {
 		// needed to avoid circularity in static initialisation?
 		if (environment == null) return Core.ENVIRONMENT;
 		return environment;
+	}
+	
+	/**
+	 * Get the controller for this Account
+	 * @return Controller Address, or null if there is no controller
+	 */
+	public Address getController() {
+		return controller;
 	}
 
 	/**
