@@ -96,12 +96,12 @@
     (call asset-address (check-transfer sender receiver quantity)))
 
   (defn balance
-    ^{:doc {:description "Return's asset balance for owner.",
+    ^{:doc {:description "Returns asset balance for a specified owner.",
             :examples [{:code "(balance asset-address owner)"}]
             :type :function
             :signature [{:params [asset-address owner]}]}}
-    [asset-address owner]
-    (call (address asset-address) (balance owner)))
+    ([asset-address owner]
+      (call (address asset-address) (balance (address owner)))))
   
   (defn owns?
     ^{:doc {:description "Tests whether owner owns a given quantity of an asset",

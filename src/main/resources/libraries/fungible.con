@@ -28,7 +28,7 @@
             :signature [{:params [token target amount]}]}
       }
     [token target amount]
-    (call token (transfer target amount))) 
+    (call token (direct-transfer target amount))) 
   
   (defn mint 
     ^{:doc {:description "Mints an amount of tokens for the given token. User must have minting privileges. Amount may be negative to burn fungible tokens."
@@ -56,7 +56,7 @@
          (defn balance [addr]
            (or (get-holding addr) 0))
          
-         (defn transfer [addr amount]
+         (defn direct-transfer [addr amount]
            (let [addr (address addr)
                  amount (long amount)
                  bal (or (get-holding *caller*) 0)
@@ -71,7 +71,11 @@
                  quantity (long (or quantity 0))]
              (<= quantity bal)))
          
-         (export transfer balance owns?))))
+         ;; no restrictions on transfer by default
+         (defn check-transfer [sender receiver quantity]
+           nil)
+         
+         (export direct-transfer balance owns? check-transfer))))
   
   (defn add-mint 
     ^{:doc {:description "Creates deployable code that, when added to a fungible token actor, allows priviledged accounts to mint and burn tokens. The :minter may be a single address, or a Trust Monitor."
