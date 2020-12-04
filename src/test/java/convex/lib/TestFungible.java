@@ -3,6 +3,7 @@ package convex.lib;
 import static convex.core.lang.TestState.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -31,6 +32,9 @@ public class TestFungible {
 			ctx=step(ctx,importS);
 			assertFalse(ctx.isExceptional());
 			
+			ctx=step(ctx,"(import convex.asset :as asset)");
+			assertFalse(ctx.isExceptional());
+			
 			ctx=ctx.define(fSym, Syntax.create(fun));
 		} catch (IOException e) {
 			throw new Error(e);
@@ -50,6 +54,24 @@ public class TestFungible {
 		assertEquals(fungible,TestState.CON_FUNGIBLE);
 		
 		assertEquals("Fungible Library",eval("(:name (call *registry* (lookup "+fungible+")))").toString());
+	}
+	
+	@Test public void testAssetAPI() {
+		Context<?> ctx=TestFungible.ctx;
+		ctx=step(ctx,"(def token (deploy (fungible/build-token {:supply 1000000})))");
+		Address token = (Address) ctx.getResult();
+		assertNotNull(token);
+		
+		assertEquals(1000000L,evalL(ctx,"(asset/balance token *address*)"));
+		assertEquals(0L,evalL(ctx,"(asset/balance token *registry*)"));
+		
+		ctx=step(ctx,"(asset/offer "+TestState.VILLAIN+" [token 1000])");
+		assertNotError(ctx);
+
+		ctx=step(ctx,"(asset/transfer "+TestState.VILLAIN+" [token 2000])");
+		assertNotError(ctx);
+
+		assertEquals(998000L,evalL(ctx,"(asset/balance token *address*)"));
 	}
 	
 	@Test public void testBuildToken() {

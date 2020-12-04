@@ -74,7 +74,7 @@
             :type :function
             :signature [{:params [receiver [asset-address quantity]]}]}}
     [receiver [asset-address quantity]]
-    (call asset-address (offer receiver quantity)))
+    (call asset-address (offer (address receiver) quantity)))
   
   (defn accept
     ^{:doc {:description "Offers asset to receiver.",

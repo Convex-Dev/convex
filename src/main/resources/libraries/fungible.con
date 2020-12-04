@@ -53,8 +53,38 @@
          
          (set-holding ~initial-holder ~supply)
          
+         ;; map of holder-address -> {offeree-address -> positive long amount}
+         ;; must enforce valid positive offers
+         (def offers {})
+         
          (defn balance [addr]
            (or (get-holding addr) 0))
+         
+         (defn offer [receiver quantity]
+           (let [receiver (address receiver)
+                 quantity (long quantity)
+                 om (get offers *caller*)]
+             (cond 
+               (<= 0 quantity) (if (get om receiver)
+                                 (def offers (assoc offers *caller* (dissoc om receiver))))
+               (def offers (assoc-in offers [*caller* receiver] quantity)))))
+           
+         (defn accept [sender quantity]
+           (let [sender (address sender)
+                 quantity (long quantity)
+                 om (get offers sender)
+                 sendbal (or (get-holding *caller*) 0)
+                 offer (get om caller)]
+             (if offer
+               (cond 
+                 (< quantity 0) (fail "Can't accept a negative quantity of fungible tokens.")
+                 (< offer quantity) (fail "Offer is insufficient")
+                 (< sendbal quantity) (fail "Sender balance is insufficient")
+                 (do 
+                   (def offers (assoc offers sender (assoc om *caller* (- offer quantity))))
+                   (set-holding sender (- sendbal quantity))
+                   (set-holding *caller* (+ (or (get-holding *caller) 0) quantity))))
+               (fail "No offer from sender"))))
          
          (defn direct-transfer [addr amount]
            (let [addr (address addr)
@@ -75,7 +105,7 @@
          (defn check-transfer [sender receiver quantity]
            nil)
          
-         (export direct-transfer balance owns? check-transfer))))
+         (export direct-transfer balance owns? offer accept check-transfer))))
   
   (defn add-mint 
     ^{:doc {:description "Creates deployable code that, when added to a fungible token actor, allows priviledged accounts to mint and burn tokens. The :minter may be a single address, or a Trust Monitor."
