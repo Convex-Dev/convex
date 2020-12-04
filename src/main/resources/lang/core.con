@@ -33,6 +33,16 @@
        fnform (syntax fnform (meta params))] 
     '(def ~name ~fnform)))
 
+(defmacro assert
+	^{
+	 :doc {:description "Evaluates each test, and raises an ASSERT error if any are not truthy."
+         :examples [{:code "(assert (= owner *caller*))"}]
+         :type :macro
+         :signature [{:params [& tests]}]}
+	}
+ [& tests]
+ (cons 'do (map (fn [test] '(cond ~test nil (fail :ASSERT ~(str "Assert failed: " (str test))))) tests)))
+
 (defmacro doc
   ^{:doc {:description "Returns the documentation for a given definition."
          :examples [{:code "(doc count)"}]
@@ -315,3 +325,5 @@
           :signature [{:params [address] }]}}
   [address]
   (boolean (account address)))
+
+

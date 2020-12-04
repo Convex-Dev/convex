@@ -1750,17 +1750,6 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Boolean> ASSERT = reg(new CoreFn<>(Symbols.ASSERT) {
-		@Override
-		public <I> Context<Boolean> invoke(Context<I> context, Object[] args) {
-			int n = args.length;
-			for (int i = 0; i < n; i++) {
-				if (!RT.bool(args[i])) return context.withAssertError("assert failed");
-			}
-			return context.withResult(Juice.SIMPLE_FN, Boolean.TRUE);
-		}
-	});
-
 	public static final CoreFn<Boolean> FAIL = reg(new CoreFn<>(Symbols.FAIL) {
 		@Override
 		public <I> Context<Boolean> invoke(Context<I> context, Object[] args) {

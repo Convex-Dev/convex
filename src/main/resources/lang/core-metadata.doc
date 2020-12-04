@@ -56,14 +56,6 @@
          :signature [{:params [f & more-args]}]}
 	}
  
-  assert
-	{
-	 :doc {:description "Evaluates each test, and raises an ASSERT error if any are not truthy."
-         :examples [{:code "(assert (= owner *caller*))"}]
-         :type :function
-         :signature [{:params [& tests]}]}
-	}
- 
   assoc
 	{
 	 :doc {:description "Adds entries into an associative data structure, taking each two arguments as key/value pairs. A nil data structure is considered as an empty map."
