@@ -3,11 +3,13 @@ package convex.lib;
 import static convex.core.lang.TestState.step;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static convex.test.Assertions.*;
 
 import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Init;
 import convex.core.data.Address;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
@@ -47,5 +49,24 @@ public class TestNFT {
 	@Test public void testOneAccount() {
 		Context<?> c=Testing.runTests(ctx,"contracts/nft/test1.con");
 		Assertions.assertNotError(c);
+	}
+	
+	@Test public void testTwoAccounts() {
+		Context<?> c=ctx;
+		// set up p2 as a zombie account
+		c=step(c,"(def p2 (address "+Init.VILLAIN+"))");
+		c=TestState.stepAs(TestState.VILLAIN,c,"(do "
+				+ "(import convex.asset :as asset)\r\n"
+				+ "(import convex.nft-tokens :as nft)\r\n"
+				+ "(def nft (get *aliases* 'nft))"
+				+ "(set-controller "+TestState.HERO+"))");
+		
+		c=Testing.runTests(c,"contracts/nft/test2.con");
+		Assertions.assertNotError(c);
+		
+		assertAssertError(step(c,"(do\r\n"
+				+ "  (def t1 (call nft (create-token nil nil)))\r\n"
+				+ "  (asset/transfer nft [nft t1] nil)\r\n"
+				+ "  (asset/offer nft [nft t1]))"));
 	}
 }

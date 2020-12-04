@@ -1177,6 +1177,11 @@ public final class Context<T> extends AObject {
 		return new Context<R>(chainState,juice,localBindings,(R) result,newDepth,isExceptional);
 	}
 	
+	@SuppressWarnings("unchecked")
+	public <R> Context<R> setJuice(long newJuice) {
+		return new Context<R>(chainState,newJuice,localBindings,(R) result,depth,isExceptional);
+	}
+	
 	/**
 	 * Tests if this context holds an exceptional result.
 	 * 
@@ -1704,6 +1709,8 @@ public final class Context<T> extends AObject {
 	public Blob createEncoding() {
 		throw new TODOException();
 	}
+
+
 
 
 
