@@ -490,6 +490,21 @@ public class CoreTest {
 	}
 	
 	@Test
+	public void testAssert() {
+		assertNull(eval("(assert)"));
+		assertNull(eval("(assert true)"));
+		assertNull(eval("(assert (= 1 1))"));
+		assertNull(eval("(assert '(= 1 2))")); // form itself is truthy, not evaluated
+		assertNull(eval("(assert '(assert false))")); // form itself is truthy, not evaluated
+		assertNull(eval("(assert 1 2 3)"));
+		
+		assertAssertError(step("(assert false)"));
+		assertAssertError(step("(assert true false)"));
+		assertAssertError(step("(assert (= 1 2))"));
+	}
+
+	
+	@Test
 	public void testAbs() {
 		// Integer cases
 		assertEquals(1L,evalL("(abs 1)"));
