@@ -88,7 +88,7 @@
   (def t5 (call nft (create-token {:name "Token5"} nil)))
   (def t6 (call nft (create-token {:name "Token6"} nil)))
   (def t7 (call nft (create-token {:name "Token7"} nil)))  
-  (asset/transfer a2 [nft #{t5 t6 t7}] nil)
+  (asset/transfer a2 [nft #{t5 t6 t7}])
   (assert (not (asset/owns? *address* [nft t5])))
   (assert (asset/owns? a2  [nft t5]))
   (assert (not (subset? #{t5} (asset/balance nft *address*))))

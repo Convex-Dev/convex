@@ -44,21 +44,27 @@
                        {:code "(transfer receiver [fungible-token-address 1000] data)"}
                        {:code "(transfer receiver [non-fungible-token-address #{1 4 6}] data)"}]
             :type :function
-            :signature [{:params [receiver asset data]}]}}
-    [receiver asset data]
-    (let [receiver (address receiver)]
-      (cond
-        ;; asset is just an amount of convex
-        (long? asset) (core/transfer receiver asset)
-        (vector? asset)
-        (let [[asset-address quantity] asset]
-          (cond
-            (exports? receiver 'receive-asset)
-            (do (call asset-address (offer receiver quantity))(call receiver (receive-asset asset data))),
-            
-            (actor? receiver) (fail "Receiver does not have receive-asset function")          
-            (account? receiver) (call asset-address (direct-transfer receiver quantity))
-            :else (fail "Address cannot receive asset"))))))
+            :signature [{:params [receiver asset]}
+                        {:params [receiver asset data]}]}}
+    ([receiver asset data]
+	    (let [receiver (address receiver)]
+	      (cond
+	        ;; asset is just an amount of convex
+	        (long? asset) (core/transfer receiver asset)
+	        (vector? asset)
+	        (let [[asset-address quantity] asset]
+	          (cond
+	            (exports? receiver 'receive-asset)
+	            (do 
+	              (call asset-address (offer receiver quantity))
+	              (call receiver (receive-asset asset data))),
+	            
+	            (actor? receiver) (fail "Receiver does not have receive-asset function")          
+	            (account? receiver) (call asset-address (direct-transfer receiver quantity))
+	            :else (fail "Address cannot receive asset")))
+	        :else (fail "Invalid asset"))))
+    ([receiver asset]
+      (recur receiver asset nil)))
   
   ;; For smart contract assets, you can offer and accept separately if you choose
   (defn offer
