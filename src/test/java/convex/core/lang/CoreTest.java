@@ -2317,7 +2317,7 @@ public class CoreTest {
 	@Test
 	public void testEvalAsTrustedUser() {
 		Context<Object> ctx=step("(set-controller "+TestState.VILLAIN+")");
-		ctx=ctx.switchAddress(TestState.VILLAIN);
+		ctx=ctx.forkWithAddress(TestState.VILLAIN);
 		ctx=step(ctx,"(def hero "+TestState.HERO+")");
 		
 		assertEquals(3L, evalL(ctx,"(eval-as hero '(+ 1 2))"));
@@ -2333,7 +2333,7 @@ public class CoreTest {
 	@Test
 	public void testEvalAsUntrustedUser() {
 		Context<?> ctx=step("(set-controller nil)");
-		ctx=ctx.switchAddress(TestState.VILLAIN);
+		ctx=ctx.forkWithAddress(TestState.VILLAIN);
 		ctx=step(ctx,"(def hero "+TestState.HERO+")");
 		
 		assertTrustError(step(ctx,"(eval-as hero '(+ 1 2))"));
@@ -2347,7 +2347,7 @@ public class CoreTest {
 		Address monitor = (Address) ctx.getResult();
 		ctx=step(ctx,"(set-controller "+monitor+")");
 		
-		ctx=ctx.switchAddress(TestState.VILLAIN);
+		ctx=ctx.forkWithAddress(TestState.VILLAIN);
 		ctx=step(ctx,"(def hero "+TestState.HERO+")");
 		
 		assertEquals(3L, evalL(ctx,"(eval-as hero '(+ 1 2))"));
@@ -2360,7 +2360,7 @@ public class CoreTest {
 		Address monitor = (Address) ctx.getResult();
 		ctx=step(ctx,"(set-controller "+monitor+")");
 		
-		ctx=ctx.switchAddress(TestState.VILLAIN);
+		ctx=ctx.forkWithAddress(TestState.VILLAIN);
 		ctx=step(ctx,"(def hero "+TestState.HERO+")");
 		
 		assertTrustError(step(ctx,"(eval-as hero '(+ 1 2))"));

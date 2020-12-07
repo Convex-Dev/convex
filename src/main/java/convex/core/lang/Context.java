@@ -1701,7 +1701,7 @@ public final class Context<T> extends AObject {
 	 * @param newAddress New Address to use.
 	 * @return
 	 */
-	public <R> Context<R> switchAddress(Address newAddress) {
+	public <R> Context<R> forkWithAddress(Address newAddress) {
 		return createFake(getState(),newAddress);
 	}
 

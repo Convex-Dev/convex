@@ -72,6 +72,11 @@ public class TestFungible {
 		assertNotError(ctx);
 
 		assertEquals(998000L,evalL(ctx,"(asset/balance token *address*)"));
+		assertEquals(2000L,evalL(ctx,"(asset/balance token "+TestState.VILLAIN+")"));
+		
+		assertTrue(evalB(ctx,"(asset/owns? "+TestState.VILLAIN+" [token 1000])"));
+		assertTrue(evalB(ctx,"(asset/owns? "+TestState.VILLAIN+" [token 2000])"));
+		assertFalse(evalB(ctx,"(asset/owns? "+TestState.VILLAIN+" [token 2001])"));
 	}
 	
 	@Test public void testBuildToken() {
@@ -138,7 +143,7 @@ public class TestFungible {
 		
 		// Villain shouldn't be able to mint
 		{
-			Context<?> c=ctx.switchAddress(VILLAIN);
+			Context<?> c=ctx.forkWithAddress(VILLAIN);
 			c=step(c,"(def token "+token+")");
 			c=step(c,"(import convex.fungible :as fungible)");
 			

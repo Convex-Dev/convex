@@ -57,7 +57,7 @@ public class RegistryTest {
 		assertEquals(realAddr,eval(ctx,"(call *registry* (cns-resolve :convex.test.foo))"));
 		
 		{ // Check VILLAIN can't steal CNS mapping
-			Context<?> c=ctx.switchAddress(Init.VILLAIN);
+			Context<?> c=ctx.forkWithAddress(Init.VILLAIN);
 
 			// VILLAIN shouldn't be able to use update on existing CNS mapping
 			assertTrustError(step(c,"(call *registry* (cns-update :convex.test.foo *address*))"));
@@ -69,7 +69,7 @@ public class RegistryTest {
 		{ // Check VILLAIN can create new mapping
 			// TODO probably shouldn't be free-for-all?
 			
-			Context<?> c=ctx.switchAddress(Init.VILLAIN);
+			Context<?> c=ctx.forkWithAddress(Init.VILLAIN);
 
 			// VILLAIN shouldn't be able to use update on existing CNS mapping
 			c=step(c,"(call *registry* (cns-update :convex.villain *address*))");

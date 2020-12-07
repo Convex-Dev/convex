@@ -90,7 +90,7 @@ public class TestTrust {
 			// check our villain cannot upgrade the actor!
 			Address a1 = VILLAIN;
 			;
-			Context<?> c = ctx.switchAddress(a1);
+			Context<?> c = ctx.forkWithAddress(a1);
 			c = step(c, "(do (import " + trusted + " :as trust) (def wlist " + wl + "))");
 
 			assertTrustError(step(c, "(call wlist (upgrade '(do :foo)))"));
@@ -150,7 +150,7 @@ public class TestTrust {
 			;
 			Address a2 = HERO;
 			;
-			Context<?> c = ctx.switchAddress(a1);
+			Context<?> c = ctx.forkWithAddress(a1);
 			c = step(c, "(do (import " + trusted + " :as trust) (def wlist (address " + wl + ")))");
 			assertNotError(c);
 
@@ -208,7 +208,7 @@ public class TestTrust {
 			;
 			Address a2 = HERO;
 			;
-			Context<?> c = ctx.switchAddress(a1);
+			Context<?> c = ctx.forkWithAddress(a1);
 			c = step(c, "(do (import " + trusted + " :as trust) (def blist (address " + wl + ")))");
 			assertNotError(c);
 
