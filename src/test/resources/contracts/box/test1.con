@@ -1,0 +1,10 @@
+;; Assumed done in test setup already
+;; (import convex.asset :as asset)
+;; (import <box contract> :as box)
+;; (def box (get *aliases* 'box))
+
+(def b1 (call box (create-box)))
+
+(assert (long? b1))
+(assert (= (asset/balance box *address*) #{b1}))  
+(assert (asset/owns? *address* [box #{b1}]))  

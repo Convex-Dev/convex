@@ -1,0 +1,42 @@
+(do
+  ;; Box asset smart contract
+  ;;
+  ;; A box acts as an holder of arbitrary assets. The owner of the box has exclusive rights to 
+  ;; put assets in or take assets out.
+  ;; 
+  ;; The box itself is an asset with the designator [box-actor id]
+  ;;
+  ;; deploy with: (deploy-once box-code)
+  
+  (def counter 0)
+  
+  
+  
+  ;; map of owner -> #{<box ids>}}
+  (def ownership {})
+  
+  ;; map of box-id -> {asset-addr -> quantity}
+  (def boxes {})
+  
+  
+  (defn create-box []
+    (let [id counter
+          owner *caller*
+          owned-boxes (or (get ownership owner) #{})]
+      (def ownership (assoc ownership owner (conj owned-boxes id)))
+      (def boxes (assoc boxes id {})) ;; new box contains no assets
+      (def counter (inc counter))
+      id)) 
+    
+  (defn burn [box-set]
+    ())
+  
+  (defn balance [owner]
+    (get ownership owner))
+  
+  (defn owns? [owner boxes]
+    (subset? boxes (get ownership owner)))
+  
+  
+  (export balance create-box burn owns?)
+  )
