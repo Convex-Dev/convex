@@ -1030,6 +1030,25 @@ public class CoreTest {
 		assertArityError(step("(map inc)"));
 		assertArityError(step("(map 1)")); // arity > cast
 	}
+	
+	@Test
+	public void testFor() {
+		assertEquals(Vectors.empty(), eval("(for [x nil] (inc x))"));
+		assertEquals(Vectors.empty(), eval("(for [x []] (inc x))"));
+		assertEquals(Vectors.of(2L,3L), eval("(for [x '(1 2)] (inc x))"));
+		assertEquals(Vectors.of(2L,3L), eval("(for [x [1 2]] (inc x))"));
+		
+		// TODO: maybe dubious error types?
+		
+		assertCastError(step("(for 1 1)")); // bad binding form
+		assertArityError(step("(for [x] 1)")); // bad binding form
+		assertArityError(step("(for [x [1 2] [2 3]] 1)")); // bad binding form length
+		assertCastError(step("(for [x :foo] 1)")); // bad sequence
+
+		assertArityError(step("(for)"));
+		assertArityError(step("(for [] nil nil)"));
+		assertCastError(step("(for 1)")); // arity > cast
+	}
 
 	@Test
 	public void testMapv() {

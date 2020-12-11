@@ -10,15 +10,13 @@
   
   (def counter 0)
   
-  
-  
   ;; map of owner -> #{<box ids>}}
   (def ownership {})
   
   ;; map of box-id -> {asset-addr -> quantity}
   (def boxes {})
   
-  
+  ;; Create a new box, with a fresh ID
   (defn create-box []
     (let [id counter
           owner *caller*
@@ -27,9 +25,17 @@
       (def boxes (assoc boxes id {})) ;; new box contains no assets
       (def counter (inc counter))
       id)) 
-    
+  
+  ;; Destroys a set of boxes. Boxes must be owned and empty.  
   (defn burn [box-set]
-    ())
+    (let [owned-boxes (ownership *caller*)]
+      (if (subset? box-set owned-boxes) :OK (fail :TRUST "Trying to burn boxes not owned!"))
+      (for [id (vec box-set)]
+        (let [contents (boxes id)]
+          (if (empty? contents)
+            (def boxes (dissoc boxes id))
+            (fail :STATE (str "Trying to delete non-empty box: " id)))))
+      (def ownership (assoc ownership *caller* (difference owned-boxes box-set)))))
   
   (defn balance [owner]
     (get ownership owner))

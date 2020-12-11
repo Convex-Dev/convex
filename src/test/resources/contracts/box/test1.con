@@ -8,3 +8,8 @@
 (assert (long? b1))
 (assert (= (asset/balance box *address*) #{b1}))  
 (assert (asset/owns? *address* [box #{b1}]))  
+
+;; burn the box
+(call box (burn #{b1}))
+(assert (not (asset/owns? *address* [box #{b1}])))
+(assert (= (asset/balance box *address*) #{}))  
