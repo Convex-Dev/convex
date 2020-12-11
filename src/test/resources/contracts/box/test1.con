@@ -9,7 +9,21 @@
 (assert (= (asset/balance box *address*) #{b1}))  
 (assert (asset/owns? *address* [box #{b1}]))  
 
-;; burn the box
+;; burn the box b1
 (call box (burn #{b1}))
 (assert (not (asset/owns? *address* [box #{b1}])))
 (assert (= (asset/balance box *address*) #{}))  
+
+
+;; use a zombie actor
+(def zombie (deploy '(do 
+                       (import convex.asset :as asset)
+                       (set-controller *caller*) 
+                       (defn receive-asset [asset data] (asset/accept *caller* asset))
+                       (export receive-asset))))
+
+(def b2 (call box (create-box)))
+
+(asset/transfer zombie [box #{b2}])
+
+(assert (= #{b2} (asset/balance box zombie)))

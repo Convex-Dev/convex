@@ -77,7 +77,7 @@
     (call asset-address (offer (address receiver) quantity)))
   
   (defn accept
-    ^{:doc {:description "Offers asset to receiver.",
+    ^{:doc {:description "Accepts asset from sender.",
             :examples [{:code "(transfer receiver [fungible-token-address 1000] data)"}
                        {:code "(transfer receiver [non-fungible-token-address #{1 4 6}] data)"}]
             :type :function
