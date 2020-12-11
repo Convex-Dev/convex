@@ -37,9 +37,10 @@
        (def offers (assoc offers sender (assoc sender-offers *caller* new-offer)))
        (internal-direct-transfer sender *caller* quantity)))
 
-  (defn direct-transfer [reciever quantity]
+  (defn direct-transfer [receiver quantity]
     (internal-direct-transfer *caller* receiver quantity))
   
+  ;; Internal transfer implementation. Must not be accessible from outside!
   (defn internal-direct-transfer [sender receiver quantity]
     (let [receiver (address receiver)
           sender-balance (get ownership sender #{})

@@ -18,6 +18,7 @@
 ;; use a zombie actor
 (def zombie (deploy '(do 
                        (import convex.asset :as asset)
+                       (def box ~box)
                        (set-controller *caller*) 
                        (defn receive-asset [asset data] (asset/accept *caller* asset))
                        (export receive-asset))))
@@ -28,3 +29,6 @@
 (asset/transfer zombie [box #{b2}])
 
 (assert (= #{b2} (asset/balance box zombie)))
+
+(eval-as zombie '(asset/transfer *caller* [box (asset/balance box *address*)]))
+(assert (= #{b2} (asset/balance box *address*)))
