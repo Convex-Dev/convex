@@ -72,7 +72,8 @@
           (if (empty? contents)
             (def boxes (dissoc boxes id))
             (fail :STATE (str "Trying to delete non-empty box: " id)))))
-      (def ownership (assoc ownership *caller* (difference owned-boxes box-set)))))
+      (def ownership (assoc ownership *caller* (difference owned-boxes box-set)))
+      :OK))
   
   (defn balance [owner]
     (get ownership owner))
