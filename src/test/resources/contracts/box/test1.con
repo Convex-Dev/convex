@@ -24,6 +24,7 @@
 
 (def b2 (call box (create-box)))
 
+(assert (= #{b2} (asset/balance box *address*)))
 (asset/transfer zombie [box #{b2}])
 
 (assert (= #{b2} (asset/balance box zombie)))
