@@ -1409,8 +1409,7 @@ public final class Context<T> extends AObject {
 	
 	@SuppressWarnings("unchecked")
 	private <R> Context<R> handleStateResults(Context<R> ctx, boolean rollback) {
-		
-		
+		/** Return value */
 		R rv=ctx.getValue();
 		if (rv instanceof AExceptional) {
 			// SECURITY: need to handle exceptional states correctly
@@ -1443,7 +1442,8 @@ public final class Context<T> extends AObject {
 		} else {
 			returnState=ctx.getState();
 			
-			// refund offer if needed
+			// Refund offer
+			// Not necessary if rolling back to initial context before offer was subtracted
 			long refund=ctx.getOffer();
 			if (refund>0) {
 				// we need to refund caller
