@@ -763,7 +763,7 @@ public final class Context<T> extends AObject {
 		Context<R> ctx=execute(op);
 		
 		// must handle state results like halt, rollback etc.
-		return handleStateResults(ctx);
+		return handleStateResults(ctx,false);
 	}
 	
 	/**
@@ -1145,7 +1145,7 @@ public final class Context<T> extends AObject {
 		
 		final Context<R> rContext=exContext.eval(form);
 		// SECURITY: must handle results as if returning from an actor call
-		return handleStateResults(rContext);
+		return handleStateResults(rContext,false);
 	}
 
 	
@@ -1404,23 +1404,12 @@ public final class Context<T> extends AObject {
 		
 		// SECURITY: must handle state transitions in results correctly
 		// calling handleStateReturns on 'this' to ensure original values are restored
-		return handleStateResults(ctx);
+		return handleStateResults(ctx,false);
 	}
 	
 	@SuppressWarnings("unchecked")
-	private <R> Context<R> handleStateResults(Context<R> ctx) {
-		State returnState=ctx.getState();
+	private <R> Context<R> handleStateResults(Context<R> ctx, boolean rollback) {
 		
-		// refund offer if needed
-		final Address address=getAddress(); // address we are returning to
-		long refund=ctx.getOffer();
-		if (refund>0) {
-			// we need to refund caller
-			AccountStatus cas=returnState.getAccount(address);
-			long balance=cas.getBalance().getValue();
-			cas=cas.withBalance(Amount.create(balance+refund));
-			returnState=returnState.putAccount(address, cas);
-		}
 		
 		R rv=ctx.getValue();
 		if (rv instanceof AExceptional) {
@@ -1429,20 +1418,39 @@ public final class Context<T> extends AObject {
 			if (ex instanceof RollbackValue) {
 				// roll back state to before Actor call
 				// Note: this will also refund unused offer.
-				returnState=this.getState(); 
+				rollback=true;; 
 				rv=((RollbackValue<R>)ex).getValue();
 			} else if (ex instanceof HaltValue) {
 				rv=((HaltValue<R>)ex).getValue();
 			} else if (ex instanceof ErrorValue) {
 				// OK to pass through error, but need to roll back state changes
-				returnState=this.getState();
+				rollback=true;
 			} else if (ex instanceof ReturnValue) {
 				// Normally doesn't happen (invoke catches this)
-				// but might in a user transaction. Treat as a Halt.
-				returnState=this.getState(); 
+				// but might in a user transaction. Treat as a Halt. 
 				rv=((ReturnValue<R>)ex).getValue();
 			} else {
+				rollback=true;
 				rv=(R) ErrorValue.create(ErrorCodes.UNEXPECTED, "Unexpected actor return of type:"+Utils.getClassName(ex));
+			}
+		}
+		
+		final Address address=getAddress(); // address we are returning to
+		State returnState;
+		
+		if (rollback) {
+			returnState=this.getState();
+		} else {
+			returnState=ctx.getState();
+			
+			// refund offer if needed
+			long refund=ctx.getOffer();
+			if (refund>0) {
+				// we need to refund caller
+				AccountStatus cas=returnState.getAccount(address);
+				long balance=cas.getBalance().getValue();
+				cas=cas.withBalance(Amount.create(balance+refund));
+				returnState=returnState.putAccount(address, cas);
 			}
 		}
 		// Rebuild context for the current execution
