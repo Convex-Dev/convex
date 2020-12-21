@@ -32,8 +32,8 @@ public class ParamTestVector {
 		return Arrays
 				.asList(new Object[][] { { "Empty Vector", Vectors.empty() }, { "Single value vector", Vectors.of(7) },
 						{ "MapEntry vector", MapEntry.create(1, 2) }, { "Nested vector", Vectors.of(Vectors.empty()) },
-						{ "Vector with Account status", Vectors.of(AccountStatus.create(Amount.create(1000))) },
-						{ "Vector with Peer status", Vectors.of(PeerStatus.create(Amount.create(1000))) },
+						{ "Vector with Account status", Vectors.of(AccountStatus.create(1000L)) },
+						{ "Vector with Peer status", Vectors.of(PeerStatus.create(1000L)) },
 						{ "Length 10 vector", Samples.INT_VECTOR_10 }, { "Length 16 vector", Samples.INT_VECTOR_16 },
 						{ "Length 23 vector", Samples.INT_VECTOR_23 }, { "Length 32 vector", Samples.INT_VECTOR_32 },
 						{ "Length 300 vector", Samples.INT_VECTOR_300 },

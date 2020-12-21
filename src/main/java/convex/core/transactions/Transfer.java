@@ -2,14 +2,15 @@ package convex.core.transactions;
 
 import java.nio.ByteBuffer;
 
+import convex.core.Constants;
 import convex.core.data.Address;
-import convex.core.data.Amount;
 import convex.core.data.Format;
 import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;
+import convex.core.lang.RT;
 
 /**
  * Transaction class representing a coin Transfer from one account to another
@@ -18,21 +19,18 @@ public class Transfer extends ATransaction {
 	public static final long TRANSFER_JUICE = Juice.TRANSFER;
 
 	protected final Address target;
-	protected final Amount amount;
+	protected final long amount;
 
-	protected Transfer(long nonce, Address target, Amount amount) {
+	protected Transfer(long nonce, Address target, long amount) {
 		super(nonce);
 		this.target = target;
 		this.amount = amount;
 	}
 
-	public static Transfer create(long nonce, Address target, Amount amount) {
+	public static Transfer create(long nonce, Address target, long amount) {
 		return new Transfer(nonce, target, amount);
 	}
 
-	public static Transfer create(long nonce, Address target, long amount) {
-		return create(nonce, target, Amount.create(amount));
-	}
 
 	@Override
 	public int write(byte[] bs, int pos) {
@@ -44,7 +42,7 @@ public class Transfer extends ATransaction {
 	public int writeRaw(byte[] bs, int pos) {
 		pos = super.writeRaw(bs,pos); // nonce, address
 		pos = target.writeRaw(bs,pos);
-		pos = Format.write(bs,pos, amount);
+		pos = Format.writeVLCLong(bs, pos, amount);
 		return pos;
 	}
 
@@ -58,7 +56,8 @@ public class Transfer extends ATransaction {
 	public static Transfer read(ByteBuffer b) throws BadFormatException {
 		long nonce = Format.readVLCLong(b);
 		Address target = Address.readRaw(b);
-		Amount amount = Amount.read(b.get(), b);
+		long amount = Format.readVLCLong(b);
+		if (!RT.isValidAmount(amount)) throw new BadFormatException("Invalid amount: "+amount);
 		return create(nonce, target, amount);
 	}
 
@@ -68,7 +67,7 @@ public class Transfer extends ATransaction {
 		// consume juice, ensure we have enough to make transfer!
 		ctx = ctx.consumeJuice(Juice.TRANSFER);
 		if (!ctx.isExceptional()) {
-			ctx = ctx.transfer(target, amount.getValue());
+			ctx = ctx.transfer(target, amount);
 		}
 		return (Context<T>) ctx;
 	}
@@ -77,7 +76,7 @@ public class Transfer extends ATransaction {
 	public int estimatedEncodingSize() {
 		// tag (1), nonce(<12) and target (33)
 		// plus allowance for Amount
-		return 1 + 12 + 33 + Amount.MAX_BYTE_LENGTH;
+		return 1 + 12 + 33 + Format.MAX_VLC_LONG_LENGTH;
 	}
 
 	@Override
@@ -91,8 +90,7 @@ public class Transfer extends ATransaction {
 		sb.append(":target ");
 		target.ednString(sb);
 		sb.append(',');
-		sb.append(":amount ");
-		amount.ednString(sb);
+		sb.append(":amount "+amount);
 		sb.append('}');
 	}
 	
@@ -102,14 +100,13 @@ public class Transfer extends ATransaction {
 		sb.append(":transfer-to ");
 		target.print(sb);
 		sb.append(',');
-		sb.append(":amount ");
-		amount.print(sb);
+		sb.append(":amount "+amount);
 		sb.append('}');
 	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (amount == null) throw new InvalidDataException("Null Amount", this);
+		if ((amount<0)||(amount>Constants.MAX_SUPPLY)) throw new InvalidDataException("Invalid amount", this);
 		if (target == null) throw new InvalidDataException("Null Address", this);
 	}
 	
@@ -126,7 +123,7 @@ public class Transfer extends ATransaction {
 	 * @return Amount of transfer, as a long
 	 */
 	public long getAmount() {
-		return amount.getValue();
+		return amount;
 	}
 
 	@Override

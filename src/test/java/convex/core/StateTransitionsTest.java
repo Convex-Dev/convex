@@ -2,7 +2,6 @@ package convex.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -13,7 +12,6 @@ import convex.core.data.ABlob;
 import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.Amount;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.SignedData;
@@ -44,13 +42,13 @@ public class StateTransitionsTest {
 	
 	@Test
 	public void testAccountTransfers() throws BadSignatureException {
-		BlobMap<Address, AccountStatus> accounts = BlobMaps.of(ADDRESS_A, AccountStatus.create(Amount.create(10000)),
-				ADDRESS_B, AccountStatus.create(Amount.create(1000)), ADDRESS_ROBB,
-				AccountStatus.create(Amount.create(Amount.MAX_AMOUNT - 10000 - 1000))
+		BlobMap<Address, AccountStatus> accounts = BlobMaps.of(ADDRESS_A, AccountStatus.create(10000),
+				ADDRESS_B, AccountStatus.create(1000L), ADDRESS_ROBB,
+				AccountStatus.create(Constants.MAX_SUPPLY - 10000 - 1000)
 		// No account for C yet
 		);
 		State s = State.EMPTY.withAccounts(accounts); // don't need any peers for these tests
-		assertEquals(Amount.MAX_AMOUNT, s.computeTotalFunds());
+		assertEquals(Constants.MAX_SUPPLY, s.computeTotalFunds());
 
 		assertEquals(10000, s.getBalance(ADDRESS_A));
 		assertEquals(1000, s.getBalance(ADDRESS_B));
@@ -112,7 +110,7 @@ public class StateTransitionsTest {
 			AVector<Result> results = br.getResults();
 			assertEquals(2, results.count());
 			assertEquals(50L,br.getResult(0).getValue()); // null result for successful transfer
-			assertEquals(Amount.MAX_AMOUNT, br.getState().computeTotalFunds());
+			assertEquals(Constants.MAX_SUPPLY, br.getState().computeTotalFunds());
 		}
 
 		{ // transfer with an incorrect sequence number
@@ -133,7 +131,7 @@ public class StateTransitionsTest {
 			assertEquals(ErrorCodes.FUNDS, br.getResult(0).getErrorCode());
 
 			State newState = br.getState();
-			assertEquals(Amount.MAX_AMOUNT, newState.computeTotalFunds());
+			assertEquals(Constants.MAX_SUPPLY, newState.computeTotalFunds());
 		}
 
 		{ // transfer from a non-existent address
@@ -142,10 +140,6 @@ public class StateTransitionsTest {
 			Block b = Block.of(System.currentTimeMillis(), st);
 			assertEquals(ErrorCodes.NOBODY, s.applyBlock(b).getResult(0).getErrorCode());
 
-		}
-
-		{ // transfer a negative amount
-			assertThrows(IllegalArgumentException.class, () -> Transfer.create(1, ADDRESS_B, -50));
 		}
 
 		{ // sending money to NIKI, a new account

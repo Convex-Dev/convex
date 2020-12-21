@@ -15,7 +15,6 @@ import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.Amount;
 import convex.core.data.Blob;
 import convex.core.data.BlobMap;
 import convex.core.data.Keyword;
@@ -230,7 +229,7 @@ public final class Context<T> extends AObject {
 			return Context.createFake(state).withError(ErrorCodes.NOBODY);
 		}
 		
-		long balance=as.getBalance().getValue();
+		long balance=as.getBalance();
 		long juicePrice=state.getJuicePrice();
 		
 		// reduce juice if insufficient balance
@@ -282,7 +281,7 @@ public final class Context<T> extends AObject {
 		AccountStatus account=state.getAccount(address);
 		long memUsed=state.getMemorySize()-initialState.getMemorySize();
 		long allowance=account.getAllowance();
-		long balanceLeft=account.getBalance().getValue();
+		long balanceLeft=account.getBalance();
 		boolean memoryFailure=false;
 		
 		long memorySpend=0L; // usually zero
@@ -298,14 +297,14 @@ public final class Context<T> extends AObject {
 				AccountStatus pool=state.getAccount(Init.MEMORY_EXCHANGE);
 				// we do memory purchase if pool exists
 				if (pool!=null) {
-					long poolBalance=pool.getBalance().getValue();
+					long poolBalance=pool.getBalance();
 					long poolAllowance=pool.getAllowance();
 					memorySpend=Economics.swapPrice(purchaseNeeded, poolAllowance, poolBalance);
 					
 					if ((refund+balanceLeft)>=memorySpend) {
 						// enough to cover memory price, so automatically buy from pool
 						// System.out.println("Buying "+purchaseNeeded+" memory for: "+price);
-						pool=pool.withBalances(Amount.create(poolBalance+memorySpend), poolAllowance-purchaseNeeded);
+						pool=pool.withBalances(poolBalance+memorySpend, poolAllowance-purchaseNeeded);
 						state=state.putAccount(Init.MEMORY_EXCHANGE,pool);
 					} else {
 						// Insufficient memory, so need to roll back state to before transaction
@@ -605,7 +604,7 @@ public final class Context<T> extends AObject {
 	public long getBalance(Address address) {
 		AccountStatus as=getAccountStatus(address);
 		if (as==null) return 0L;
-		return as.getBalance().getValue();
+		return as.getBalance();
 	}
 
 	/**
@@ -1204,14 +1203,14 @@ public final class Context<T> extends AObject {
 	 */
 	public Context<Long> transfer(Address target, long amount) {
 		if (amount<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative amount");
-		if (amount>Amount.MAX_AMOUNT) return withError(ErrorCodes.ARGUMENT,"Can't transfer an amount beyond maximum limit");
+		if (amount>Constants.MAX_SUPPLY) return withError(ErrorCodes.ARGUMENT,"Can't transfer an amount beyond maximum limit");
 		
 		BlobMap<Address,AccountStatus> accounts=getState().getAccounts();
 		
 		Address source=getAddress();
 		AccountStatus sourceAccount=accounts.get(source);
 		
-		long currentBalance=sourceAccount.getBalance().getValue();
+		long currentBalance=sourceAccount.getBalance();
 		if (currentBalance<amount) {
 			return this.withFundsError(Errors.insufficientFunds(source,amount));
 		}
@@ -1236,8 +1235,8 @@ public final class Context<T> extends AObject {
 			return actx.withResult(sent);
 		} else {
 			// must be a user account
-			Amount oldTargetBalance=targetAccount.getBalance();
-			Amount newTargetBalance=oldTargetBalance.add(amount);
+			long oldTargetBalance=targetAccount.getBalance();
+			long newTargetBalance=oldTargetBalance+amount;
 			AccountStatus newTargetAccount=targetAccount.withBalance(newTargetBalance);
 			accounts=accounts.assoc(target, newTargetAccount);
 		}
@@ -1260,7 +1259,7 @@ public final class Context<T> extends AObject {
 	 */
 	public Context<Long> transferAllowance(Address target, Long amount) {
 		if (amount<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative aloowance amount");
-		if (amount>Amount.MAX_AMOUNT) return withError(ErrorCodes.ARGUMENT,"Can't transfer an allowance amount beyond maximum limit");
+		if (amount>Constants.MAX_SUPPLY) return withError(ErrorCodes.ARGUMENT,"Can't transfer an allowance amount beyond maximum limit");
 		
 		BlobMap<Address,AccountStatus> accounts=getState().getAccounts();
 		
@@ -1303,7 +1302,7 @@ public final class Context<T> extends AObject {
 	public Context<Long> setMemory(long allowance) {
 		BlobMap<Address,AccountStatus> accounts=getState().getAccounts();
 		if (allowance<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative aloowance amount");
-		if (allowance>Amount.MAX_AMOUNT) return withError(ErrorCodes.ARGUMENT,"Can't transfer an allowance amount beyond maximum limit");
+		if (allowance>Constants.MAX_SUPPLY) return withError(ErrorCodes.ARGUMENT,"Can't transfer an allowance amount beyond maximum limit");
 		
 		Address source=getAddress();
 		AccountStatus sourceAccount=accounts.get(source);
@@ -1311,7 +1310,7 @@ public final class Context<T> extends AObject {
 			return withError(ErrorCodes.STATE,"Cannot set allowance for non-existent account: "+source);
 		}
 		long current=sourceAccount.getAllowance();
-		long balance=sourceAccount.getBalance().getValue();
+		long balance=sourceAccount.getBalance();
 		long delta=allowance-current;
 		if (delta==0L) return this.withResult(0L);
 		
@@ -1319,13 +1318,13 @@ public final class Context<T> extends AObject {
 		
 		try {
 			long poolAllowance=pool.getAllowance();
-			long poolBalance=pool.getBalance().getValue();
+			long poolBalance=pool.getBalance();
 			long price = Economics.swapPrice(delta, poolAllowance,poolBalance);
 			if (price>balance) {
 				return withError(ErrorCodes.FUNDS,"Cannot afford allowance, would cost: "+price);
 			}
-			sourceAccount=sourceAccount.withBalances(Amount.create(balance-price), allowance);
-			pool=pool.withBalances(Amount.create(poolBalance+price), poolAllowance-delta);
+			sourceAccount=sourceAccount.withBalances(balance-price, allowance);
+			pool=pool.withBalances(poolBalance+price, poolAllowance-delta);
 			BlobMap<Address,AccountStatus> newAccounts=accounts.assoc(source, sourceAccount).assoc(Init.MEMORY_EXCHANGE,pool);
 			return new Context<Long>(chainState.withAccounts(newAccounts),juice,localBindings,null,depth,false);
 		} catch (IllegalArgumentException e) {
@@ -1353,7 +1352,7 @@ public final class Context<T> extends AObject {
 		State state=getState();
 		Address addr=getAddress();
 		long balance=state.getBalance(addr);
-		state=state.withBalance(addr,Amount.create(balance+amount));
+		state=state.withBalance(addr,balance+amount);
 		
 		// need to update both state and offer
 		ChainState cs=chainState.withStateOffer(state,offer-amount);
@@ -1381,11 +1380,11 @@ public final class Context<T> extends AObject {
 		if (offer>0L) {
 			Address senderAddress=getAddress();
 			AccountStatus cas=state.getAccount(senderAddress);
-			long balance=cas.getBalance().getValue();
+			long balance=cas.getBalance();
 			if (balance<offer) {
 				return this.withFundsError("Insufficient funds for offer: "+offer);
 			}
-			cas=cas.withBalance(Amount.create(balance-offer));
+			cas=cas.withBalance(balance-offer);
 			state=state.putAccount(senderAddress, cas);
 		} else if (offer<0) {
 			return this.withError(ErrorCodes.ARGUMENT, "Cannot make negative offer in Actor call: "+offer);
@@ -1448,8 +1447,8 @@ public final class Context<T> extends AObject {
 			if (refund>0) {
 				// we need to refund caller
 				AccountStatus cas=returnState.getAccount(address);
-				long balance=cas.getBalance().getValue();
-				cas=cas.withBalance(Amount.create(balance+refund));
+				long balance=cas.getBalance();
+				cas=cas.withBalance(balance+refund);
 				returnState=returnState.putAccount(address, cas);
 			}
 		}
@@ -1651,7 +1650,7 @@ public final class Context<T> extends AObject {
 		PeerStatus ps=s.getPeer(peerAddress);
 		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for Address: "+peerAddress.toChecksumHex());
 		if (newStake<0) return this.withArgumentError("Cannot set a negative stake");
-		if (newStake>Amount.MAX_AMOUNT) return this.withArgumentError("Target stake out of valid Amount range");
+		if (newStake>Constants.MAX_SUPPLY) return this.withArgumentError("Target stake out of valid Amount range");
 		
 		Address myAddress=getAddress();
 		long balance=getBalance(myAddress);
@@ -1667,7 +1666,7 @@ public final class Context<T> extends AObject {
 		PeerStatus updatedPeer=ps.withDelegatedStake(myAddress, newStake);
 		
 		// Final updates. Hopefully everything balances. SECURITY: test this. A lot.
-		s=s.withBalance(myAddress, Amount.create(balance-delta)); // adjust own balance
+		s=s.withBalance(myAddress, balance-delta); // adjust own balance
 		s=s.withPeer(peerAddress, updatedPeer); // adjust peer
 		return withState(s);
 	}
@@ -1717,6 +1716,8 @@ public final class Context<T> extends AObject {
 	public Blob createEncoding() {
 		throw new TODOException();
 	}
+
+
 
 
 

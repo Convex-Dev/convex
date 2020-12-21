@@ -3,7 +3,6 @@ package convex.core.transactions;
 import java.nio.ByteBuffer;
 
 import convex.core.Constants;
-import convex.core.data.Amount;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
@@ -109,7 +108,7 @@ public class Invoke extends ATransaction {
 	public int estimatedEncodingSize() {
 		// tag (1), nonce(<12) and target (33)
 		// plus allowance for Amount
-		return 1 + 12 + 33 + Amount.MAX_BYTE_LENGTH;
+		return 1 + 12 + 33 + Format.MAX_VLC_LONG_LENGTH;
 	}
 
 	@Override

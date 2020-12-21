@@ -14,7 +14,6 @@ import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.Amount;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Format;
@@ -180,10 +179,10 @@ public class State extends ARecord {
 	public Long getBalance(Address address) {
 		AccountStatus acc = getAccounts().get(address);
 		if (acc == null) return null;
-		return acc.getBalance().getValue();
+		return acc.getBalance();
 	}
 
-	public State withBalance(Address address, Amount newBalance) {
+	public State withBalance(Address address, long newBalance) {
 		AccountStatus acc = getAccounts().get(address);
 		if (acc == null) {
 			throw new Error("No account for " + address);
@@ -401,7 +400,7 @@ public class State extends ARecord {
 		
 		// Create context with juice subtracted
 		Long maxJuice=t.getMaxJuice();
-		long juiceLimit=Math.min(Constants.MAX_TRANSACTION_JUICE,(maxJuice==null)?account.getBalance().getValue():maxJuice);
+		long juiceLimit=Math.min(Constants.MAX_TRANSACTION_JUICE,(maxJuice==null)?account.getBalance():maxJuice);
 		Context<T> ctx = Context.createInitial(preparedState, origin, juiceLimit);
 		return ctx;
 	}
@@ -511,7 +510,7 @@ public class State extends ARecord {
 	public State tryAddActor(Address address, AHashMap<Symbol, Syntax> environment) {
 		AccountStatus as = accounts.get(address);
 		if (as != null) return null;
-		as = AccountStatus.createActor(Amount.ZERO, environment);
+		as = AccountStatus.createActor(0L, environment);
 		BlobMap<Address, AccountStatus> newAccounts = accounts.assoc(address, as);
 		return withAccounts(newAccounts);
 	}
@@ -524,7 +523,7 @@ public class State extends ARecord {
 	 * @return The total value of all funds
 	 */
 	public long computeTotalFunds() {
-		long total = accounts.reduceValues((Long t, AccountStatus as) -> t + as.getBalance().getValue(), 0L);
+		long total = accounts.reduceValues((Long t, AccountStatus as) -> t + as.getBalance(), 0L);
 		total += peers.reduceValues((Long t, PeerStatus ps) -> t + ps.getTotalStake(), 0L);
 		total += getFees();
 		return total;

@@ -11,7 +11,6 @@ import convex.core.crypto.Ed25519KeyPair;
 import convex.core.data.AString;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.Amount;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Keyword;
@@ -63,8 +62,8 @@ public class PeerCluster {
 			Map<Keyword, Object> config = PEER_CONFIGS.get(i);
 			int port = Utils.toInt(config.get(Keywords.PORT));
 			AString sa = Strings.create("http://localhost"+ port);
-			PeerStatus ps = PeerStatus.create(Amount.create(1000000000), sa);
-			AccountStatus as = AccountStatus.create(Amount.create(1000000000));
+			PeerStatus ps = PeerStatus.create(1000000000, sa);
+			AccountStatus as = AccountStatus.create(1000000000);
 			peers = peers.assoc(address, ps);
 			accts = accts.assoc(address, as);
 		}

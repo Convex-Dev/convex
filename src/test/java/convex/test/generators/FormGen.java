@@ -6,7 +6,9 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
+import convex.core.data.AHashMap;
 import convex.core.data.Lists;
+import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
@@ -34,7 +36,7 @@ public class FormGen extends Generator<Object> {
 		case 2:
 			return gen().make(PrimitiveGen.class).generate(r, status);
 		case 3:
-			return gen().type(String.class).generate(r, status);
+			return Strings.create(gen().type(String.class).generate(r, status));
 
 		case 4:
 			return gen().make(NumericGen.class).generate(r, status);
@@ -42,15 +44,17 @@ public class FormGen extends Generator<Object> {
 		case 5: {
 			// random form containing core symbol at head
 			List<Object> subForms = this.times(r.nextInt(4)).generate(r, status);
-			int n = (int) Core.ENVIRONMENT.count();
-			Symbol sym = Core.ENVIRONMENT.entryAt(r.nextInt(n)).getKey();
+			AHashMap<Symbol, Syntax> env = Core.CORE_NAMESPACE;
+			int n = (int) env.count();
+			Symbol sym = env.entryAt(r.nextInt(n)).getKey();
 			return RT.cons(sym, Lists.create(subForms));
 		}
 
 		case 6: {
 			// random core symbol
-			int n = (int) Core.ENVIRONMENT.count();
-			Symbol sym = Core.ENVIRONMENT.entryAt(r.nextInt(n)).getKey();
+			AHashMap<Symbol, Syntax> env = Core.CORE_NAMESPACE;
+			int n = (int) env.count();
+			Symbol sym = env.entryAt(r.nextInt(n)).getKey();
 			return sym;
 		}
 

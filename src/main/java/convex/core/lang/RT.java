@@ -6,6 +6,7 @@ import java.math.BigInteger;
 import java.util.Collection;
 import java.util.function.BiFunction;
 
+import convex.core.Constants;
 import convex.core.crypto.Hash;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
@@ -19,7 +20,6 @@ import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Address;
-import convex.core.data.Amount;
 import convex.core.data.Blobs;
 import convex.core.data.Format;
 import convex.core.data.IAssociative;
@@ -390,7 +390,6 @@ public class RT {
 		if (c == Byte.class) return ((Byte) a).longValue();
 		if (c == Integer.class) return ((Integer) a).longValue();
 		if (c == Short.class) return ((Short) a).longValue();
-		if (c == Amount.class) return ((Amount) a).getValue();
 		if (c == Float.class) return (Double) a;
 
 		if (c == Character.class) return (long) ((Character) a);
@@ -459,13 +458,6 @@ public class RT {
 		Number n = number(a);
 		if (n == null) return null;
 		return (char) n.longValue();
-	}
-
-	public static Amount toAmount(Object a) {
-		if (a instanceof Amount) return ((Amount) a);
-		Long value = toLong(a);
-		if (value == null) return null;
-		return Amount.create(value);
 	}
 
 	private static long longValue(Object a) {
@@ -1193,6 +1185,10 @@ public class RT {
 	public static ABlob ensureBlob(Object object) {
 		if (object instanceof ABlob) return ((ABlob)object);
 		return null;
+	}
+
+	public static boolean isValidAmount(long amount) {
+		return ((amount>=0)&&(amount<Constants.MAX_SUPPLY));
 	}
 
 

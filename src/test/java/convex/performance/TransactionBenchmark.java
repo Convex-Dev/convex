@@ -14,7 +14,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519KeyPair;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.Amount;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.transactions.ATransaction;
@@ -34,7 +33,7 @@ public class TransactionBenchmark {
 		for (int i = 0; i < NUM_ACCOUNTS; i++) {
 			AKeyPair kp = Ed25519KeyPair.generate();
 			keyPairs.add(kp);
-			state = state.putAccount(kp.getAddress(), (AccountStatus.create(Amount.create(INITIAL_FUNDS))));
+			state = state.putAccount(kp.getAddress(), (AccountStatus.create(INITIAL_FUNDS)));
 		}
 		for (int i = 0; i < NUM_TRANSACTIONS; i++) {
 			AKeyPair kp = keyPairs.get(new Random().nextInt(NUM_ACCOUNTS));

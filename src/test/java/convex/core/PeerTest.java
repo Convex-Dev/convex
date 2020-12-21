@@ -1,23 +1,20 @@
 package convex.core;
 
+import static convex.test.Assertions.assertNobodyError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
-import convex.core.data.Amount;
 import convex.core.data.PeerStatus;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.lang.Reader;
 import convex.core.lang.TestState;
 import convex.test.Samples;
-
-import static convex.test.Assertions.*;
 
 public class PeerTest {
 
@@ -76,10 +73,6 @@ public class PeerTest {
 
 		assertEquals(0, ps.getDelegatedStake(pa));
 		assertEquals(0, ps.getDelegatedStake(Init.HERO));
-
-		// checks for bad staking
-		assertThrows(IllegalArgumentException.class, () -> ps.withDelegatedStake(Init.HERO, -1));
-		assertThrows(IllegalArgumentException.class, () -> ps.withDelegatedStake(Init.HERO, Amount.MAX_AMOUNT + 1));
 
 		// add a delegated stake
 		PeerStatus ps2 = ps.withDelegatedStake(Init.HERO, 1234);

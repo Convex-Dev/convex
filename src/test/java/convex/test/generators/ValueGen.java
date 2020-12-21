@@ -40,9 +40,9 @@ public class ValueGen extends Generator<Object> {
 		case 9:
 			return gen().make(NumericGen.class).generate(r, status);
 		case 10:
-			return gen().make(AmountGen.class).generate(r, status);
+			return gen().type(long.class).generate(r, status);
 		case 11:
-			return Symbol.create("sym" + gen().type(Long.class).generate(r, status).toString());
+			return Symbol.create("sym" + gen().type(Long.class).generate(r, status));
 		case 12:
 			return gen().make(KeywordGen.class).generate(r, status);
 		case 13:

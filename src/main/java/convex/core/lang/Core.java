@@ -23,7 +23,6 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.Amount;
 import convex.core.data.Format;
 import convex.core.data.IAssociative;
 import convex.core.data.IGet;
@@ -800,7 +799,7 @@ public class Core {
 			AccountStatus as = context.getAccountStatus(address);
 			Long balance = null;
 			if (as != null) {
-				balance = as.getBalance().getValue();
+				balance = as.getBalance();
 			}
 			long juice = Juice.BALANCE;
 
@@ -2129,7 +2128,7 @@ public class Core {
 		// we use a fake State to build the initial environment with core address
 		Address ADDR=Core.CORE_ADDRESS;
 		State state = State.EMPTY.putAccount(ADDR,
-				AccountStatus.createActor(Amount.create(1000000000), env));
+				AccountStatus.createActor(1000000000L, env));
 		Context<?> ctx = Context.createInitial(state, ADDR, 1000000L);
 
 		Syntax form = null;

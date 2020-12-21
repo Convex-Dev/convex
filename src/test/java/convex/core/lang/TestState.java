@@ -13,7 +13,6 @@ import convex.core.Init;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
-import convex.core.data.Amount;
 import convex.core.data.Keyword;
 import convex.core.util.Utils;
 
@@ -61,18 +60,18 @@ public class TestState {
 	/**
 	 * Balance of hero's account before spending any juice / funds
 	 */
-	public static final long HERO_BALANCE = INITIAL.getAccounts().get(HERO).getBalance().getValue();
+	public static final long HERO_BALANCE = INITIAL.getAccounts().get(HERO).getBalance();
 
 	/**
 	 * Balance of hero's account before spending any juice / funds
 	 */
-	public static final long VILLAIN_BALANCE = INITIAL.getAccounts().get(VILLAIN).getBalance().getValue();
+	public static final long VILLAIN_BALANCE = INITIAL.getAccounts().get(VILLAIN).getBalance();
 
 	/**
 	 * Total funds in the test state, minus those subtracted for juice in the
 	 * initial context
 	 */
-	public static final Long TOTAL_FUNDS = Amount.MAX_AMOUNT;
+	public static final Long TOTAL_FUNDS = Constants.MAX_SUPPLY;
 	
 	static {
 		try {

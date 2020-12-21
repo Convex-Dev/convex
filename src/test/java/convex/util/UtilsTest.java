@@ -2,12 +2,10 @@ package convex.util;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -15,7 +13,6 @@ import java.time.Instant;
 
 import org.junit.Test;
 
-import convex.core.data.Amount;
 import convex.core.data.Blob;
 import convex.core.data.Maps;
 import convex.core.util.Bits;
@@ -237,27 +234,6 @@ public class UtilsTest {
 		Utils.writeLong(bs, 4, a);
 		assertEquals(0xffffffffffffffffL, Utils.readLong(bs, 0));
 		assertEquals(0xcafebabe00000000L, Utils.readLong(bs, 8));
-	}
-
-	@Test
-	public void testAmounts() {
-		// reminder: two BigDecimals are not equal if they have different scale
-		assertNotEquals(new BigDecimal("1.0"), new BigDecimal("1.00"));
-
-		// Stripping all trailing zeros
-		assertEquals(Amount.create(1000000), Amount.parse("1.00000000000000000000000000"));
-
-		// canonical amounts are equal after stripping zeros
-		assertEquals(Amount.parse("100.00"), Amount.parse("100.0"));
-
-		// 19 decimal places
-		assertThrows(IllegalArgumentException.class, () -> Amount.parse("1.0000000000000000001"));
-
-		// too big
-		assertThrows(IllegalArgumentException.class, () -> Amount.parse("1E100"));
-
-		// can't create negative amount
-		assertThrows(IllegalArgumentException.class, () -> Amount.parse("-13.5"));
 	}
 
 	@Test

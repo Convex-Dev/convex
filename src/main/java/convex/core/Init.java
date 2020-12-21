@@ -6,7 +6,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.AHashMap;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.Amount;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Keywords;
@@ -137,7 +136,7 @@ public class Init {
 			State s = State.create(accts, peers, Sets.empty(), globals, BlobMaps.empty());
 
 			long total = s.computeTotalFunds();
-			if (total != Amount.MAX_AMOUNT) throw new Error("Bad total amount: " + total);
+			if (total != Constants.MAX_SUPPLY) throw new Error("Bad total amount: " + total);
 			if (s.getPeers().size() != NUM_PEERS) throw new Error("Bad peer count: " + s.getPeers().size());
 			if (s.getAccounts().size() != NUM_PEERS + NUM_USERS + NUM_GOVERNANCE+NUM_LIBRARIES) throw new Error("Bad account count");
 
@@ -215,9 +214,7 @@ public class Init {
 
 	private static BlobMap<Address, PeerStatus> addPeer(BlobMap<Address, PeerStatus> peers, Address peerAddress,
 			long initialStake) {
-		Amount amount;
-		amount = Amount.create(initialStake);
-		PeerStatus ps = PeerStatus.create(amount, null);
+		PeerStatus ps = PeerStatus.create(initialStake, null);
 		return peers.assoc(peerAddress, ps);
 	}
 
@@ -239,7 +236,7 @@ public class Init {
 	
 	private static BlobMap<Address, AccountStatus> addCoreLibrary(BlobMap<Address, AccountStatus> accts, Address a) {
 
-		AccountStatus as = AccountStatus.createActor(Amount.ZERO, Core.CORE_NAMESPACE);
+		AccountStatus as = AccountStatus.createActor(0L, Core.CORE_NAMESPACE);
 		if (accts.containsKey(a)) throw new Error("Duplicate core library account!");
 		accts = accts.assoc(a, as);
 		return accts;
@@ -247,9 +244,7 @@ public class Init {
 
 	private static BlobMap<Address, AccountStatus> addAccount(BlobMap<Address, AccountStatus> accts, Address a,
 			long balance) {
-		Amount amount;
-		amount = Amount.create(balance);
-		AccountStatus as = AccountStatus.create(0L, amount); // zero sequence
+		AccountStatus as = AccountStatus.create(0L, balance); // zero sequence
 		as=as.withAllowance(Constants.INITIAL_ACCOUNT_ALLOWANCE);
 		if (accts.containsKey(a)) throw new Error("Duplicate peer account!");
 		accts = accts.assoc(a, as);

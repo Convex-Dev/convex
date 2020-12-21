@@ -27,10 +27,9 @@ public class ParamTestNodes {
 		return Arrays.asList(new Object[][] { 
 			{ "Keyword :foo", Samples.FOO }, 
 			{ "Empty Vector", Vectors.empty() },
-			{ "Zero Amount", Amount.create(0) }, 
 			{ "Single value map", Maps.of(7, 8) },
-			{ "Account status", AccountStatus.create(Amount.create(1000)) },
-			{ "Peer status", PeerStatus.create(Amount.create(1000), Strings.create("http://www.google.com:18888")) },
+			{ "Account status", AccountStatus.create(1000L) },
+			{ "Peer status", PeerStatus.create(1000L, Strings.create("http://www.google.com:18888")) },
 			{ "Signed value", SignedData.create(Samples.KEY_PAIR, Strings.create("foo")) },
 			{ "Length 300 vector", Samples.INT_VECTOR_300 } });
 	}

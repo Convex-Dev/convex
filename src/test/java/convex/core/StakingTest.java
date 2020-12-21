@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.data.Amount;
 import convex.core.data.PeerStatus;
 import convex.core.lang.Context;
 import convex.core.lang.TestState;
@@ -68,7 +67,7 @@ public class StakingTest {
 		assertArgumentError(ctx0.setStake(Init.FIRST_PEER, Long.MAX_VALUE));
 
 		// insufficient funds for stake
-		assertFundsError(ctx0.setStake(Init.FIRST_PEER, Amount.MAX_AMOUNT));
+		assertFundsError(ctx0.setStake(Init.FIRST_PEER, Constants.MAX_SUPPLY));
 		assertFundsError(ctx0.setStake(Init.FIRST_PEER, ctx0.getBalance(Init.HERO) + 1));
 	}
 }

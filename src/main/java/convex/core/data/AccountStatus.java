@@ -21,7 +21,7 @@ import convex.core.lang.impl.RecordFormat;
  */
 public class AccountStatus extends ARecord {
 	private final long sequence;
-	private final Amount balance;
+	private final long balance;
 	private final long allowance;
 	private final AHashMap<Symbol, Syntax> environment;
 	private final ABlobMap<Address, Object> holdings;
@@ -32,7 +32,7 @@ public class AccountStatus extends ARecord {
 
 	private static final RecordFormat FORMAT = RecordFormat.of(ACCOUNT_KEYS);
 
-	private AccountStatus(long sequence, Amount balance, long allowance,
+	private AccountStatus(long sequence, long balance, long allowance,
 			AHashMap<Symbol, Syntax> environment, ABlobMap<Address, Object> holdings,Address controller) {
 		super(FORMAT);
 		this.sequence = sequence;
@@ -50,7 +50,7 @@ public class AccountStatus extends ARecord {
 	 * @param balance
 	 * @return New AccountStatus
 	 */
-	public static AccountStatus create(long sequence, Amount balance) {
+	public static AccountStatus create(long sequence, long balance) {
 		return new AccountStatus(sequence, balance, 0L, null,null,null);
 	}
 
@@ -62,21 +62,20 @@ public class AccountStatus extends ARecord {
 	 * @return New governance AccountStatus
 	 */
 	public static AccountStatus createGovernance(long balance) {
-		Amount amount = Amount.create(balance);
-		return new AccountStatus(0, amount, 0L, null,null,null);
+		return new AccountStatus(0, balance, 0L, null,null,null);
 	}
 
-	public static AccountStatus createActor(Amount balance,
+	public static AccountStatus createActor(long balance,
 			AHashMap<Symbol, Syntax> environment) {
 		return new AccountStatus(Constants.ACTOR_SEQUENCE, balance, 0L,environment,null,null);
 	}
 
-	public static AccountStatus create(Amount balance) {
+	public static AccountStatus create(long balance) {
 		return create(0, balance);
 	}
 
 	public static AccountStatus create() {
-		return create(0, Amount.ZERO);
+		return create(0, 0L);
 	}
 
 	/**
@@ -92,7 +91,7 @@ public class AccountStatus extends ARecord {
 		return sequence;
 	}
 
-	public Amount getBalance() {
+	public long getBalance() {
 		return balance;
 	}
 
@@ -115,7 +114,7 @@ public class AccountStatus extends ARecord {
 
 	public static AccountStatus read(ByteBuffer bb) throws BadFormatException {
 		long sequence = Format.readVLCLong(bb);
-		Amount balance = Format.read(bb);
+		long balance = Format.read(bb);
 		long allowance = Format.read(bb);
 		AHashMap<Symbol, Syntax> environment = Format.read(bb);
 		ABlobMap<Address,Object> holdings = Format.read(bb);
@@ -191,11 +190,11 @@ public class AccountStatus extends ARecord {
 	 */
 	public boolean hasBalance(long amt) {
 		if (amt < 0) return false;
-		if (amt > balance.getValue()) return false;
+		if (amt > balance) return false;
 		return true;
 	}
 
-	public AccountStatus withBalance(Amount newBalance) {
+	public AccountStatus withBalance(long newBalance) {
 		if (balance==newBalance) return this;
 		return new AccountStatus(sequence, newBalance, allowance, environment,holdings,controller);
 	}
@@ -205,13 +204,9 @@ public class AccountStatus extends ARecord {
 		return new AccountStatus(sequence, balance, newAllowance, environment,holdings,controller);
 	}
 	
-	public AccountStatus withBalances(Amount newBalance, long newAllowance) {
+	public AccountStatus withBalances(long newBalance, long newAllowance) {
 		if ((balance==newBalance)&&(allowance==newAllowance)) return this;
 		return new AccountStatus(sequence, newBalance, newAllowance, environment,holdings,controller);
-	}
-
-	public AccountStatus withBalance(long newBalance) {
-		return withBalance(Amount.create(newBalance));
 	}
 
 	public AccountStatus withEnvironment(AHashMap<Symbol, Syntax> newEnvironment) {
@@ -242,7 +237,6 @@ public class AccountStatus extends ARecord {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		balance.validate();
 		if (environment != null) environment.validateCell();
 		if (holdings != null) holdings.validateCell();
 	}
@@ -345,7 +339,7 @@ public class AccountStatus extends ARecord {
 	@Override
 	public <V> V get(Keyword key) {
 		if (Keywords.SEQUENCE.equals(key)) return (V) (Long)sequence;
-		if (Keywords.BALANCE.equals(key)) return (V) (Long)balance.getValue();
+		if (Keywords.BALANCE.equals(key)) return (V) (Long)balance;
 		if (Keywords.ALLOWANCE.equals(key)) return (V) (Long)allowance;
 		if (Keywords.ENVIRONMENT.equals(key)) return (V) environment;
 		if (Keywords.HOLDINGS.equals(key)) return (V) holdings;
@@ -367,11 +361,11 @@ public class AccountStatus extends ARecord {
 		AHashMap<Symbol, Syntax> newEnv=(AHashMap<Symbol, Syntax>) newVals[3];
 		ABlobMap<Address, Object> newHoldings=(ABlobMap<Address, Object>) newVals[4];
 		
-		if ((balance.getValue()==newBal)&&(sequence==newSeq)&&(newEnv==environment)&&(newHoldings==holdings)) {
+		if ((balance==newBal)&&(sequence==newSeq)&&(newEnv==environment)&&(newHoldings==holdings)) {
 			return this;
 		}
 		
-		return new AccountStatus(newSeq,Amount.create(newBal),newAllowance,newEnv,newHoldings,controller);
+		return new AccountStatus(newSeq,newBal,newAllowance,newEnv,newHoldings,controller);
 	}
 
 	/**
@@ -398,7 +392,7 @@ public class AccountStatus extends ARecord {
 	 */
 	public AccountStatus addBalance(long delta) {
 		if (delta==0) return this;
-		return withBalance(getBalance().getValue()+delta);
+		return withBalance(balance+delta);
 	}
 
 

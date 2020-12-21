@@ -12,7 +12,6 @@ import convex.core.data.ASequence;
 import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.Address;
-import convex.core.data.Amount;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.List;
@@ -134,7 +133,7 @@ public class Compiler {
 	private static <R, T extends AOp<R>> Context<T> compileBasicConstant(Object form, Context<?> context) {
 		if (form == null) return (Context<T>) context.withResult(Juice.COMPILE_CONSTANT, Constant.nil());
 
-		if (form instanceof String || form instanceof Amount || form instanceof Character) {
+		if (form instanceof String || form instanceof Character) {
 			return compileConstant(context, form);
 		}
 

@@ -19,7 +19,6 @@ import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.Amount;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.PeerStatus;
@@ -60,8 +59,8 @@ public class BeliefMergeTest {
 			Address addr = kp.getAddress();
 			KEY_PAIRS[i] = kp;
 			ADDRESSES[i] = addr;
-			AccountStatus accStatus = AccountStatus.create(Amount.create((i + 1) * 1000000));
-			PeerStatus peerStatus = PeerStatus.create(Amount.create((i + 1) * 100000));
+			AccountStatus accStatus = AccountStatus.create((i + 1) * 1000000);
+			PeerStatus peerStatus = PeerStatus.create((i + 1) * 100000);
 			accounts = accounts.assoc(addr, accStatus);
 			peers = peers.assoc(addr, peerStatus);
 		}
@@ -275,7 +274,7 @@ public class BeliefMergeTest {
 		
 		Peer[] bs3 = bs2;
 		for (int i = 0; i < NUM_PEERS; i++) {
-			Amount TRANSFER_AMOUNT = Amount.create(100);
+			long TRANSFER_AMOUNT = 100L;
 			ATransaction trans = Transfer.create(1, ADDRESSES[NUM_PEERS - 1 - i], TRANSFER_AMOUNT); // note 1 = first
 																									// sequence number
 																									// required
@@ -370,7 +369,7 @@ public class BeliefMergeTest {
 		for (int i = 0; i < NUM_PEERS; i++) {
 			// propose initial transactions
 			for (int j = 1; j <= NUM_INITIAL_TRANS; j++) {
-				Amount TRANSFER_AMOUNT = Amount.create(100);
+				long TRANSFER_AMOUNT = 100L;
 				ATransaction trans = Transfer.create(j, ADDRESSES[NUM_PEERS - 1 - i], TRANSFER_AMOUNT); // note 1 =
 																										// first
 																										// sequence

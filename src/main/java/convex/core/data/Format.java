@@ -824,9 +824,6 @@ public class Format {
 
 			if ((tag & 0xF0) == 0x00) return readBasicType(bb, tag);
 
-			// Amounts use the low 4 bits of tag for a decimal scale factor
-			if ((tag & 0xF0) == Tag.AMOUNT) return (T) Amount.read(tag, bb);
-
 			if (tag == Tag.STRING) return (T) Strings.read(bb);
 			if (tag == Tag.BLOB) return (T) Blobs.read(bb);
 			if (tag == Tag.SYMBOL) return (T) readSymbol(bb);

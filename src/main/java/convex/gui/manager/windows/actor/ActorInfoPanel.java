@@ -42,7 +42,7 @@ public class ActorInfoPanel extends JPanel {
 		AccountStatus as = latestState.getAccount(actor);
 
 		sb.append("Actor Address: " + actor.toHexString() + "\n");
-		sb.append("Actor Balance: " + as.getBalance().toFriendlyString() + "\n");
+		sb.append("Actor Balance: " + as.getBalance() + "\n");
 		sb.append("\n");
 
 		infoArea.setText(sb.toString());

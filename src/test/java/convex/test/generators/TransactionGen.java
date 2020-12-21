@@ -4,8 +4,8 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
+import convex.core.Constants;
 import convex.core.data.Address;
-import convex.core.data.Amount;
 import convex.core.data.Vectors;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
@@ -20,7 +20,7 @@ public class TransactionGen extends Generator<ATransaction> {
 	@Override
 	public ATransaction generate(SourceOfRandomness r, GenerationStatus status) {
 
-		Amount amt = Amount.create(r.nextLong(0, Amount.MAX_AMOUNT));
+		long amt = r.nextLong(0, Constants.MAX_SUPPLY);
 
 		Address src = Samples.KEY_PAIR.getAddress();
 		long seq = r.nextInt(10000);

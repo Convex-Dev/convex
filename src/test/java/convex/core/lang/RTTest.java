@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.AList;
 import convex.core.data.AVector;
 import convex.core.data.Address;
-import convex.core.data.Amount;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
@@ -33,7 +32,7 @@ public class RTTest {
 
 		assertNull(RT.name(null));
 		assertNull(RT.name(1));
-		assertNull(RT.name(Amount.create(10)));
+		assertNull(RT.name(10L));
 	}
 
 	@Test

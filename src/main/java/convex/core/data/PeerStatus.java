@@ -19,14 +19,14 @@ public class PeerStatus extends ARecord {
 
 	private static final RecordFormat FORMAT = RecordFormat.of(PEER_KEYS);
 	
-	private final Amount stake;
-	private final Amount delegatedStake;
+	private final long stake;
+	private final long delegatedStake;
 
-	private final ABlobMap<Address, Amount> stakes;
+	private final ABlobMap<Address, Long> stakes;
 
 	private final AString hostAddress;
 
-	private PeerStatus(Amount stake, ABlobMap<Address, Amount> stakes, Amount delegatedStake, AString host) {
+	private PeerStatus(long stake, ABlobMap<Address, Long> stakes, long delegatedStake, AString host) {
 		super(FORMAT);
 		this.stake = stake;
 		this.delegatedStake = delegatedStake;
@@ -34,12 +34,12 @@ public class PeerStatus extends ARecord {
 		this.stakes = stakes;
 	}
 
-	public static PeerStatus create(Amount stake) {
+	public static PeerStatus create(long stake) {
 		return create(stake, null);
 	}
 
-	public static PeerStatus create(Amount stake, AString hostString) {
-		return new PeerStatus(stake, BlobMaps.empty(), Amount.ZERO, hostString);
+	public static PeerStatus create(long stake, AString hostString) {
+		return new PeerStatus(stake, BlobMaps.empty(), 0L, hostString);
 	}
 	/**
 	 * Gets the stake of this peer
@@ -47,7 +47,7 @@ public class PeerStatus extends ARecord {
 	 * @return Total stake, including own stake + delegated stake
 	 */
 	public long getTotalStake() {
-		return stake.getValue() + delegatedStake.getValue();
+		return stake + delegatedStake;
 	}
 
 	/**
@@ -56,7 +56,7 @@ public class PeerStatus extends ARecord {
 	 * @return Own stake, excluding delegated stake
 	 */
 	public long getOwnStake() {
-		return stake.getValue();
+		return stake;
 	}
 
 	/**
@@ -65,7 +65,7 @@ public class PeerStatus extends ARecord {
 	 * @return Total of delegated stake
 	 */
 	public long getDelegatedStake() {
-		return delegatedStake.getValue();
+		return delegatedStake;
 	}
 
 	/**
@@ -94,9 +94,9 @@ public class PeerStatus extends ARecord {
 	}
 
 	public static PeerStatus read(ByteBuffer data) throws BadFormatException {
-		Amount stake = Format.read(data);
-		ABlobMap<Address, Amount> stakes = Format.read(data);
-		Amount delegatedStake = Format.read(data);
+		long stake = Format.read(data);
+		ABlobMap<Address, Long> stakes = Format.read(data);
+		long delegatedStake = Format.read(data);
 		
 		AString hostString = Format.read(data);
 		
@@ -122,9 +122,9 @@ public class PeerStatus extends ARecord {
 	 * @return Value of delegated stake
 	 */
 	public long getDelegatedStake(Address delegator) {
-		Amount a = stakes.get(delegator);
+		Long a = stakes.get(delegator);
 		if (a == null) return 0;
-		return a.getValue();
+		return a;
 	}
 
 	/**
@@ -136,22 +136,20 @@ public class PeerStatus extends ARecord {
 	 * @return Value of delegated stake
 	 */
 	public PeerStatus withDelegatedStake(Address delegator, long newStake) {
-		Amount newAmount = Amount.create(newStake); // throws if negative / out of range. Caller messed up!
 		long oldStake = getDelegatedStake(delegator);
 		if (oldStake == newStake) return this;
 
 		// compute adjustment to total delegated stake
-		Amount newDelegatedStake = Amount.create(delegatedStake.getValue() + newStake - oldStake);
+		long newDelegatedStake = delegatedStake + newStake - oldStake;
 
-		ABlobMap<Address, Amount> newStakes = (newStake == 0) ? stakes.dissoc(delegator)
-				: stakes.assoc(delegator, newAmount);
+		ABlobMap<Address, Long> newStakes = (newStake == 0L) ? stakes.dissoc(delegator)
+				: stakes.assoc(delegator, newStake);
 		return new PeerStatus(stake, newStakes, newDelegatedStake, hostAddress);
 	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		stake.validateCell();
-		delegatedStake.validateCell();
+		// TODO: Nothing?
 	}
 
 	@Override
@@ -162,9 +160,9 @@ public class PeerStatus extends ARecord {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <V> V get(Keyword key) {
-		if (Keywords.STAKE.equals(key)) return (V) stake;
+		if (Keywords.STAKE.equals(key)) return (V) (Long)stake;
 		if (Keywords.STAKES.equals(key)) return (V) stakes;
-		if (Keywords.DELEGATED_STAKE.equals(key)) return (V) delegatedStake;
+		if (Keywords.DELEGATED_STAKE.equals(key)) return (V) (Long)delegatedStake;
 		if (Keywords.URL.equals(key)) return (V) hostAddress;
 		
 		return null;
@@ -178,9 +176,9 @@ public class PeerStatus extends ARecord {
 	@SuppressWarnings("unchecked")
 	@Override
 	protected PeerStatus updateAll(Object[] newVals) {
-		Amount newStake = (Amount) newVals[0];
-		ABlobMap<Address, Amount> newStakes = (ABlobMap<Address, Amount>) newVals[1];
-		Amount newDelStake = (Amount) newVals[2];
+		long newStake = (Long) newVals[0];
+		ABlobMap<Address, Long> newStakes = (ABlobMap<Address, Long>) newVals[1];
+		Long newDelStake = (Long) newVals[2];
 		AString newHostAddress = (AString) newVals[3];
 		
 		if ((this.stake==newStake)&&(this.stakes==newStakes)
@@ -190,9 +188,9 @@ public class PeerStatus extends ARecord {
 		return new PeerStatus(newStake, newStakes, newDelStake, newHostAddress);
 	}
 
-	protected static Amount computeDelegatedStake(ABlobMap<Address, Amount> stakes) {
-		long ds = stakes.reduceValues((acc, e)->acc+e.getValue(), 0L);
-		return Amount.create(ds);
+	protected static long computeDelegatedStake(ABlobMap<Address, Long> stakes) {
+		long ds = stakes.reduceValues((acc, e)->acc+e, 0L);
+		return ds;
 	}
 
 }

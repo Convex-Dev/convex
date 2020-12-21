@@ -1592,7 +1592,7 @@ public class CoreTest {
 		assertEquals(ca, eval(ctx, "ctr")); // defined address in environment
 
 		// initial deployed state
-		assertEquals(0L, as.getBalance().getValue());
+		assertEquals(0L, as.getBalance());
 		
 		// double-deploy should get different addresses
 		assertFalse(evalB("(let [cfn '(do 1)] (= (deploy cfn) (deploy cfn)))"));
@@ -1608,7 +1608,7 @@ public class CoreTest {
 		assertEquals(ca, eval(ctx, "ctr")); // defined address in environment
 
 		// initial deployed state
-		assertEquals(0L, as.getBalance().getValue());
+		assertEquals(0L, as.getBalance());
 		
 		// double-deploy should get same address
 		assertTrue(evalB("(let [cfn '(do (def a 1))] (= (deploy-once cfn) (deploy-once cfn)))"));
@@ -2602,7 +2602,7 @@ public class CoreTest {
 		// balance should return exact balance of account after execution
 		Address HERO = TestState.HERO;
 		Context<?> ctx = step("(long *balance*)");
-		Long bal=ctx.getAccountStatus(HERO).getBalance().getValue();
+		Long bal=ctx.getAccountStatus(HERO).getBalance();
 		assertEquals(bal, ctx.getResult());
 		
 		// throwing it all away....

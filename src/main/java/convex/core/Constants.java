@@ -49,6 +49,8 @@ public class Constants {
 	 */
 	public static final long INITIAL_ACCOUNT_ALLOWANCE = 10000000;
 
+	public static final long MAX_SUPPLY = 1000000000000000000L;
+
 	
 
 }
