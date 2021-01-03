@@ -48,6 +48,8 @@ public class Do<T> extends AMultiOp<T> {
 		if (n == 0) return context.withResult(Juice.DO, (T) null); // need cast to avoid bindings overload
 
 		Context<T> ctx = (Context<T>) context.consumeJuice(Juice.DO);
+		if (ctx.isExceptional()) return ctx;
+		
 		// execute each operation in turn
 		// TODO: early return
 		for (int i = 0; i < n; i++) {

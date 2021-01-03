@@ -53,6 +53,11 @@ public class BlockResult extends ARecord {
 		return results;
 	}
 	
+	/**
+	 * Checks if a result at a specific position is an error
+	 * @param i Index of result in block
+	 * @return
+	 */
 	public boolean isError(long i) {
 		return getResult(i).isError();
 	}

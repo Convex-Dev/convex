@@ -3,7 +3,7 @@ package convex.gui.components.models;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
-import java.util.logging.Logger;
+// import java.util.logging.Logger;
 
 import javax.swing.SwingUtilities;
 
@@ -17,7 +17,7 @@ import javax.swing.SwingUtilities;
  */
 public class StateModel<T> {
 	
-	private static final Logger log = Logger.getLogger(StateModel.class.getName());
+	// private static final Logger log = Logger.getLogger(StateModel.class.getName());
 
 	
 	private final PropertyChangeSupport propertyChangeSupport = new PropertyChangeSupport(this);
@@ -53,7 +53,7 @@ public class StateModel<T> {
 		SwingUtilities.invokeLater(new Runnable() {
 			@Override
 			public void run() {
-				log.info("State update reported");
+				// log.info("State update reported");
 				propertyChangeSupport.firePropertyChange(new PropertyChangeEvent(this, "value", oldValue, newValue));
 			}			
 		});

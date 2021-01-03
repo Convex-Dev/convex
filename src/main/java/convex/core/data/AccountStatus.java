@@ -104,8 +104,8 @@ public class AccountStatus extends ARecord {
 	@Override
 	public int writeRaw(byte[] bs, int pos) {
 		pos = Format.writeVLCLong(bs, pos,sequence);
-		pos = Format.write(bs,pos, balance);
-		pos = Format.write(bs,pos, allowance);
+		pos = Format.writeVLCLong(bs,pos, balance);
+		pos = Format.writeVLCLong(bs,pos, allowance);
 		pos = Format.write(bs,pos, environment);
 		pos = Format.write(bs,pos, holdings);
 		pos = Format.write(bs,pos, controller);
@@ -114,8 +114,8 @@ public class AccountStatus extends ARecord {
 
 	public static AccountStatus read(ByteBuffer bb) throws BadFormatException {
 		long sequence = Format.readVLCLong(bb);
-		long balance = Format.read(bb);
-		long allowance = Format.read(bb);
+		long balance = Format.readVLCLong(bb);
+		long allowance = Format.readVLCLong(bb);
 		AHashMap<Symbol, Syntax> environment = Format.read(bb);
 		ABlobMap<Address,Object> holdings = Format.read(bb);
 		Address controller = Format.read(bb);

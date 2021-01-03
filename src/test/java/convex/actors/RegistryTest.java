@@ -23,6 +23,8 @@ import static convex.test.Assertions.*;
 public class RegistryTest {
 	static final Address REG = Init.REGISTRY_ADDRESS;
 
+	Context<?> INITIAL_CONTEXT=TestState.INITIAL_CONTEXT.fork();
+	
 	@Test
 	public void testRegistryContract() throws IOException {
 		// TODO: think about whether we want this in initial state
@@ -33,20 +35,20 @@ public class RegistryTest {
 		// Address addr=(Address) ctx.getResult();
 
 		AHashMap<Keyword, Object> ddo = Maps.of(Keyword.create("name"), "Bob");
-		Context<?> ctx = TestState.INITIAL_CONTEXT.actorCall(REG, 0, Symbol.create("register"), ddo);
+		Context<?> ctx = INITIAL_CONTEXT.actorCall(REG, 0, Symbol.create("register"), ddo);
 		assertEquals(ddo, ctx.actorCall(REG, 0, "lookup", ctx.getAddress()).getResult());
 	}
 	
 	@Test
 	public void testRegistryCNS() throws IOException {
-		Context<?> ctx=TestState.INITIAL_CONTEXT;
+		Context<?> ctx=INITIAL_CONTEXT.fork();
 		
 		assertEquals(REG,eval(ctx,"(call *registry* (cns-resolve :convex.registry))"));
 	}
 	
 	@Test
 	public void testRegistryCNSUpdate() throws IOException {
-		Context<?> ctx=TestState.INITIAL_CONTEXT;
+		Context<?> ctx=INITIAL_CONTEXT.fork();
 		
 		assertNull(eval(ctx,"(call *registry* (cns-resolve :convex.test.foo))"));
 		

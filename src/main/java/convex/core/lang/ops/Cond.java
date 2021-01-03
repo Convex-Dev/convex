@@ -57,6 +57,7 @@ public class Cond<T> extends AMultiOp<T> {
 	public <I> Context<T> execute(Context<I> context) {
 		int n=ops.size();
 		Context<?> ctx=context.consumeJuice(Juice.COND_OP);
+		if (ctx.isExceptional()) return (Context<T>) ctx;
 		
 		for (int i=0; i<(n-1); i+=2) {
 			AOp<?> testOp=ops.get(i);

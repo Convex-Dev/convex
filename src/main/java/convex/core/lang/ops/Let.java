@@ -86,9 +86,11 @@ public class Let<T> extends AMultiOp<T> {
 		return new Let<T>(newSymbols, newOps.toVector(), isLoop);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public <I> Context<T> execute(final Context<I> context) {
 		Context<?> ctx = context.consumeJuice(Juice.LET);
+		if (ctx.isExceptional()) return (Context<T>) ctx;
 
 		AHashMap<Symbol, Object> savedEnv = ctx.getLocalBindings();
 		// execute each operation in turn
@@ -108,9 +110,6 @@ public class Let<T> extends AMultiOp<T> {
 			// other exceptionals we can just let slip
 			Object o = ctx.getValue();
 			while (o instanceof RecurValue) {
-				// restore depth, since we are catching an exceptional
-				ctx = ctx.withDepth(context.getDepth());
-
 				RecurValue rv = (RecurValue) o;
 				Object[] newArgs = rv.getValues();
 				if (newArgs.length != bindingCount) {

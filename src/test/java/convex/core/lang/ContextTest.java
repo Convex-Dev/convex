@@ -23,13 +23,13 @@ import convex.core.data.Syntax;
  */
 public class ContextTest {
 
-	private final Context<?> c = TestState.INITIAL_CONTEXT;
+	private final Context<?> CTX = TestState.INITIAL_CONTEXT.fork();
 
 	@Test
 	public void testDefine() {
 		Symbol sym = Symbol.create("the-test-symbol");
 
-		final Context<?> c2 = c.define(sym, Syntax.create("buffy"));
+		final Context<?> c2 = CTX.fork().define(sym, Syntax.create("buffy"));
 		assertEquals("buffy", c2.lookup(sym).getResult());
 
 		assertUndeclaredError(c2.lookup(Symbol.create("some-bad-symbol")));
@@ -39,7 +39,7 @@ public class ContextTest {
 	public void testUndefine() {
 		Symbol sym = Symbol.create("the-test-symbol");
 
-		final Context<?> c2 = c.define(sym, Syntax.create("vampire"));
+		final Context<?> c2 = CTX.fork().define(sym, Syntax.create("vampire"));
 		assertEquals("vampire", c2.lookup(sym).getResult());
 
 		final Context<?> c3 = c2.undefine(sym);
@@ -51,7 +51,7 @@ public class ContextTest {
 	
 	@Test
 	public void testExceptionalState() {
-		Context<?> ctx=TestState.INITIAL_CONTEXT;
+		Context<?> ctx=CTX.fork();
 		
 		assertFalse(ctx.isExceptional());
 		assertTrue(ctx.withError(ErrorCodes.ASSERT).isExceptional());
@@ -64,48 +64,53 @@ public class ContextTest {
 
 	@Test
 	public void testJuice() {
+		Context<?> c=CTX.fork();
 		assertTrue(c.checkJuice(1000));
 		
 		// get a juice error if too much juice consumed
 		assertJuiceError(c.consumeJuice(c.getJuice() + 1));
 		
 		// no error if all juice is consumed
+		c=CTX.fork();
 		assertFalse(c.consumeJuice(c.getJuice()).isExceptional());
 	}
 
 	@Test
 	public void testSpecial() {
-		assertEquals(TestState.HERO, c.computeSpecial(Symbols.STAR_ADDRESS).getResult());
-		assertEquals(TestState.HERO, c.computeSpecial(Symbols.STAR_ORIGIN).getResult());
-		assertNull(c.computeSpecial(Symbols.STAR_CALLER).getResult());
+		Context<?> ctx=CTX.fork();
+		assertEquals(TestState.HERO, ctx.computeSpecial(Symbols.STAR_ADDRESS).getResult());
+		assertEquals(TestState.HERO, ctx.computeSpecial(Symbols.STAR_ORIGIN).getResult());
+		assertNull(ctx.computeSpecial(Symbols.STAR_CALLER).getResult());
 		
-		assertNull(c.computeSpecial(Symbols.STAR_RESULT).getResult());
-		assertEquals(c.getJuice(), c.computeSpecial(Symbols.STAR_JUICE).getResult());
-		assertEquals(0L,c.computeSpecial(Symbols.STAR_DEPTH).getResult());
-		assertEquals(c.getBalance(TestState.HERO),c.computeSpecial(Symbols.STAR_BALANCE).getResult());
-		assertEquals(0L,c.computeSpecial(Symbols.STAR_OFFER).getResult());
+		assertNull(ctx.computeSpecial(Symbols.STAR_RESULT).getResult());
+		assertEquals(ctx.getJuice(), ctx.computeSpecial(Symbols.STAR_JUICE).getResult());
+		assertEquals(0L,ctx.computeSpecial(Symbols.STAR_DEPTH).getResult());
+		assertEquals(ctx.getBalance(TestState.HERO),ctx.computeSpecial(Symbols.STAR_BALANCE).getResult());
+		assertEquals(0L,ctx.computeSpecial(Symbols.STAR_OFFER).getResult());
 		
-		assertEquals(0L,c.computeSpecial(Symbols.STAR_SEQUENCE).getResult());
+		assertEquals(0L,ctx.computeSpecial(Symbols.STAR_SEQUENCE).getResult());
 
-		assertEquals(Constants.INITIAL_TIMESTAMP,c.computeSpecial(Symbols.STAR_TIMESTAMP).getResult());
+		assertEquals(Constants.INITIAL_TIMESTAMP,ctx.computeSpecial(Symbols.STAR_TIMESTAMP).getResult());
 		
-		assertSame(c.getState(), c.computeSpecial(Symbols.STAR_STATE).getResult());
-		assertSame(BlobMaps.empty(),c.computeSpecial(Symbols.STAR_HOLDINGS).getResult());
+		assertSame(ctx.getState(), ctx.computeSpecial(Symbols.STAR_STATE).getResult());
+		assertSame(BlobMaps.empty(),ctx.computeSpecial(Symbols.STAR_HOLDINGS).getResult());
 		
-		assertUndeclaredError(c.eval(Symbol.create("*bad-special-symbol*")));
-		assertNull(c.computeSpecial(Symbol.create("count")));
+		assertUndeclaredError(ctx.eval(Symbol.create("*bad-special-symbol*")));
+		assertNull(ctx.computeSpecial(Symbol.create("count")));
 	}
 
 	@Test
 	public void testEdn() {
-		String s = c.ednString();
+		Context<?> ctx=CTX.fork();
+		String s = ctx.ednString();
 		assertNotNull(s);
 	}
 
 	@Test
 	public void testReturn() {
-		Context<Number> ctx = c.withResult(Long.valueOf(100));
-		assertEquals(c.getDepth(), ctx.getDepth());
+		Context<?> ctx=CTX.fork();
+		ctx = ctx.withResult(Long.valueOf(100));
+		assertEquals(ctx.getDepth(), ctx.getDepth());
 	}
 
 }

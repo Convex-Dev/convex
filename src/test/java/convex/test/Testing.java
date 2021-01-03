@@ -10,7 +10,14 @@ import convex.core.util.Utils;
 
 public class Testing {
 
+	/**
+	 * Runs all tests in a forked context
+	 * @param ctx
+	 * @param resourceName
+	 * @return Updates context after all test are run. This will be a new fork.
+	 */
 	public static Context<?> runTests(Context<?> ctx, String resourceName) {
+		ctx=ctx.fork();
 		try {
 			String source=Utils.readResourceAsString(resourceName);
 			AList<Object> forms=Reader.readAll(source);
@@ -20,7 +27,7 @@ public class Testing {
 					System.err.println("Error in form: "+form);
 					return ctx;
 				}
-				ctx=ctx.setJuice(Constants.MAX_TRANSACTION_JUICE);
+				ctx=ctx.withJuice(Constants.MAX_TRANSACTION_JUICE);
 			}
 			return ctx;
 		} catch (IOException e) {

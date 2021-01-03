@@ -80,7 +80,7 @@ public class ParamTestJuice {
 
 	public static <T> AOp<T> compile(String source) {
 		try {
-			Context<?> c = INITIAL_CONTEXT;
+			Context<?> c = INITIAL_CONTEXT.fork();
 			AOp<T> op = TestState.compile(c, source);
 			return op;
 		} catch (Exception e) {
@@ -90,9 +90,9 @@ public class ParamTestJuice {
 
 	public static <T> Context<T> eval(String source) {
 		try {
-			Context<?> c = INITIAL_CONTEXT;
+			Context<?> c = INITIAL_CONTEXT.fork();
 			AOp<T> op = TestState.compile(c, source);
-			Context<T> rc = c.execute(op);
+			Context<T> rc = c.fork().execute(op);
 			return rc;
 		} catch (Exception e) {
 			throw Utils.sneakyThrow(e);

@@ -14,7 +14,7 @@ import convex.core.lang.ops.Invoke;
 
 public class OpBenchmark {
 	
-	static final Context<?> CTX=TestState.INITIAL_CONTEXT;
+	static final Context<?> CTX=TestState.INITIAL_CONTEXT.fork();
 	
 	static final AOp<Object> loopOp=CTX.expandCompile(Reader.read("(dotimes [i 1000])")).getResult();
 	@Benchmark

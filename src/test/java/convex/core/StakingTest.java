@@ -21,11 +21,12 @@ public class StakingTest {
 	public void testDelegatedStaking() {
 
 	}
+	
+	Context<Object> CTX=TestState.INITIAL_CONTEXT.fork();
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testStake() {
-		Context<Object> ctx0 = (Context<Object>) TestState.INITIAL_CONTEXT;
+		Context<Object> ctx0 =CTX.fork();
 
 		Context<Object> ctx1 = ctx0.setStake(Init.FIRST_PEER, 1000);
 		PeerStatus ps1 = ctx1.getState().getPeer(Init.FIRST_PEER);
@@ -47,17 +48,15 @@ public class StakingTest {
 		assertFundsError(step(ctx0, "(stake " + PS + " (inc *balance*))"));
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testStakeReturns() {
-		Context<Object> ctx0 = (Context<Object>) TestState.INITIAL_CONTEXT;
+		Context<Object> ctx0 = CTX.fork();
 		assertEquals(1000L, (long) eval(ctx0, "(stake " + PS + " 1000)"));
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testBadStake() {
-		Context<Object> ctx0 = (Context<Object>) TestState.INITIAL_CONTEXT;
+		Context<Object> ctx0 = CTX.fork();
 
 		// not a peer, should be state error
 		assertStateError(ctx0.setStake(Init.HERO, 1000));

@@ -1,6 +1,5 @@
 package convex.core.lang;
 
-import static convex.core.lang.TestState.INITIAL_CONTEXT;
 import static convex.core.lang.TestState.eval;
 import static convex.core.lang.TestState.evalB;
 import static convex.core.lang.TestState.evalL;
@@ -59,6 +58,7 @@ public class CoreTest {
 
 	private static final State INITIAL = TestState.INITIAL;
 	private static final long INITIAL_JUICE = TestState.INITIAL_JUICE;
+	private static final Context<?> INITIAL_CONTEXT= TestState.INITIAL_CONTEXT.fork();
 
 	@Test
 	public void testAliases() {
@@ -1824,7 +1824,7 @@ public class CoreTest {
 	
 	@Test
 	public void testStake() {
-		Context<Object> ctx=step(TestState.INITIAL_CONTEXT,"(def my-peer \""+Init.FIRST_PEER.toHexString()+"\")");
+		Context<Object> ctx=step(INITIAL_CONTEXT,"(def my-peer \""+Init.FIRST_PEER.toHexString()+"\")");
 		Address MY_PEER=Init.FIRST_PEER;
 		long PS=ctx.getState().getPeer(Init.FIRST_PEER).getOwnStake();
 		
@@ -1955,7 +1955,7 @@ public class CoreTest {
 	public void testPredArity() {
 		AVector<Syntax> pvals = ALL_PREDICATES;
 		assertFalse(pvals.isEmpty());
-		Context<?> C = INITIAL_CONTEXT;
+		Context<?> C = INITIAL_CONTEXT.fork();
 		Object[] a0 = new Object[0];
 		Object[] a1 = new Object[1];
 		Object[] a2 = new Object[2];

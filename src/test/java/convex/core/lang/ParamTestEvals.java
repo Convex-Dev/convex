@@ -21,7 +21,7 @@ import convex.core.util.Utils;
 public class ParamTestEvals {
 
 	private static long INITIAL_JUICE = TestState.INITIAL_JUICE;
-	private static final Context<?> INITIAL_CONTEXT = TestState.INITIAL_CONTEXT;
+	private static final Context<?> INITIAL_CONTEXT = TestState.INITIAL_CONTEXT.fork();
 
 	private static final Address TEST_CONTRACT = TestState.CONTRACTS[0];
 
@@ -70,7 +70,7 @@ public class ParamTestEvals {
 
 	public <T> AOp<T> compile(String source) {
 		try {
-			Context<?> c = INITIAL_CONTEXT;
+			Context<?> c = INITIAL_CONTEXT.fork();
 			AOp<T> op = TestState.compile(c, source);
 			return op;
 		} catch (Exception e) {
@@ -80,7 +80,7 @@ public class ParamTestEvals {
 
 	public <T> Context<T> eval(AOp<T> op) {
 		try {
-			Context<?> c = INITIAL_CONTEXT;
+			Context<?> c = INITIAL_CONTEXT.fork();
 			Context<T> rc = c.execute(op);
 			return rc;
 		} catch (Exception e) {
@@ -90,7 +90,7 @@ public class ParamTestEvals {
 
 	public <T> Context<T> eval(String source) {
 		try {
-			Context<?> c = INITIAL_CONTEXT;
+			Context<?> c = INITIAL_CONTEXT.fork();
 			AOp<T> op = TestState.compile(c, source);
 			return eval(op);
 		} catch (Exception e) {

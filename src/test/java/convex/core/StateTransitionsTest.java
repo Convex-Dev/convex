@@ -1,6 +1,7 @@
 package convex.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -170,7 +171,7 @@ public class StateTransitionsTest {
 		AKeyPair kp = convex.core.lang.TestState.HERO_PAIR;
 		Block b1 = Block.of(s.getTimeStamp(), kp.signData(t1));
 		BlockResult br=s.applyBlock(b1);
-		assertTrue(br.isError(0));
+		assertFalse(br.isError(0));
 		
 		s = br.getState();
 		

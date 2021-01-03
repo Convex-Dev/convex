@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class ScryptNextTest {
 
-    static final Context<?> CONTEXT = TestState.INITIAL_CONTEXT;
+    static final Context<?> CONTEXT = TestState.INITIAL_CONTEXT.fork();
 
     static ScryptNext scrypt() {
         return Parboiled.createParser(ScryptNext.class);
@@ -35,7 +35,8 @@ public class ScryptNextTest {
 
     @SuppressWarnings("unchecked")
     public static <T> Context<T> step(Context<?> c, String source) {
-        Syntax syn = ScryptNext.readSyntax(source);
+        c=c.fork();
+    	Syntax syn = ScryptNext.readSyntax(source);
 
         Context<AOp<Object>> cctx = c.expandCompile(syn);
 

@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
  */
 public class JuiceTest {
 
-	private static Context<?> CONTEXT = TestState.INITIAL_CONTEXT;
+	private static Context<?> CONTEXT = TestState.INITIAL_CONTEXT.fork();
 	private static long JUICE = CONTEXT.getJuice();
 
 	/**
@@ -24,8 +24,8 @@ public class JuiceTest {
 	 */
 	public long juice(String source) {
 		Object form = Reader.read(source);
-		AOp<?> op = CONTEXT.expandCompile(form).getResult();
-		Context<?> jctx = CONTEXT.execute(op);
+		AOp<?> op = CONTEXT.fork().expandCompile(form).getResult();
+		Context<?> jctx = CONTEXT.fork().execute(op);
 		return JUICE - jctx.getJuice();
 	}
 
@@ -38,7 +38,7 @@ public class JuiceTest {
 	 */
 	public long compileJuice(String source) {
 		Object form = Reader.read(source);
-		Context<?> jctx = CONTEXT.expandCompile(form);
+		Context<?> jctx = CONTEXT.fork().expandCompile(form);
 		return JUICE - jctx.getJuice();
 	}
 
@@ -51,7 +51,7 @@ public class JuiceTest {
 	 */
 	public long expandJuice(String source) {
 		Object form = Reader.read(source);
-		Context<?> jctx = Core.INITIAL_EXPANDER.expand(form, Core.INITIAL_EXPANDER, CONTEXT);
+		Context<?> jctx = Core.INITIAL_EXPANDER.expand(form, Core.INITIAL_EXPANDER, CONTEXT.fork());
 		return JUICE - jctx.getJuice();
 	}
 

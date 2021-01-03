@@ -44,7 +44,7 @@ public class CompilerTest {
 	@SuppressWarnings("unchecked")
 	public <T extends AOp<?>> T comp(String source, Context<?> context) {
 		Object form=Reader.read(source);
-		AOp<?> code = context.expandCompile(form).getResult();
+		AOp<?> code = context.fork().expandCompile(form).getResult();
 		return (T) code;
 	}
 	
@@ -52,17 +52,17 @@ public class CompilerTest {
 		return comp(source,CONTEXT);
 	}
 	
-	private static final State INITIAL=TestState.INITIAL;
-	private static final Context<?> CONTEXT=TestState.INITIAL_CONTEXT;
+	private static final Context<?> CONTEXT=TestState.INITIAL_CONTEXT.fork();
+	private static final State INITIAL=CONTEXT.getState();
 
 	@SuppressWarnings("unchecked")
 	public static <T> Context<T> step(Context<?> c, String source) {
 		Object form = Reader.readSyntax(source);
-		c=c.expandCompile(form);
-		if (c.isExceptional()) return (Context<T>) c;
+		Context<AOp<Object>> cctx=c.fork().expandCompile(form);
+		if (cctx.isExceptional()) return (Context<T>) cctx;
 		
-		AOp<?> op = (AOp<?>) c.getResult();
-		Context<T> rctx = (Context<T>) c.execute(op);
+		AOp<?> op = (AOp<?>) cctx.getResult();
+		Context<T> rctx = (Context<T>) c.fork().execute(op);
 		return rctx;
 	}
 
@@ -78,7 +78,7 @@ public class CompilerTest {
 	public Syntax expand(String source) {
 		try {
 			Object form=Reader.read(source);
-			Syntax expanded =CONTEXT.expand(form).getResult();
+			Syntax expanded =CONTEXT.fork().expand(form).getResult();
 			return expanded;
 		}
 		catch (Exception e) {
@@ -108,11 +108,12 @@ public class CompilerTest {
 	}
 	
 	@Test public void testMinCompileRegression() throws IOException {
+		Context<?> c=CONTEXT.fork();
 		String src=Utils.readResourceAsString("testsource/min.con");
 		Object form=Reader.read(src);
-		Context<Syntax> exp=CONTEXT.expand(form);
+		Context<Syntax> exp=c.expand(form);
 		assertFalse(exp.isExceptional());
-		Context<AOp<Object>> com=CONTEXT.compile(exp.getResult());
+		Context<AOp<Object>> com=c.compile(exp.getResult());
 		assertFalse(com.isExceptional());
 	}
 	
@@ -414,20 +415,21 @@ public class CompilerTest {
 	@Test
 	public void testDiabolicals()  {
 		// 2^10000 map, too deep to expand
-		assertDepthError(CONTEXT.expand(Samples.DIABOLICAL_MAP_2_10000));
+		assertDepthError(CONTEXT.fork().expand(Samples.DIABOLICAL_MAP_2_10000));
 		// 30^30 map, too much data to expand
-		assertJuiceError(CONTEXT.expand(Samples.DIABOLICAL_MAP_30_30));
+		assertJuiceError(CONTEXT.fork().expand(Samples.DIABOLICAL_MAP_30_30));
 	}
 	
 	@Test
 	public void testExpander()  {
+		Context<?> c=CONTEXT.fork();
 		AExpander ex=eval("(expander (fn [x e] x))");
-		assertEquals("foo",ex.expand("foo", ex, CONTEXT).getResult().getValue());
+		assertEquals("foo",ex.expand("foo", ex, c).getResult().getValue());
 		
 		// Fails because function call compiled before macro is defined.... TODO verify if OK?
 		assertCastError(step("(do (def bex (expander (fn [x e] \"foo\"))) (bex 2))"));
 	
-		Context<?> c=CONTEXT;
+		
 		c=c.execute(comp("(defexpander bex [x e] \"foo\")"));
 		c=c.execute(comp("(bex 2)",c));
 		assertEquals("foo",c.getResult().toString());
@@ -453,7 +455,7 @@ public class CompilerTest {
 	
 	@Test
 	public void testMacro()  {
-		Context<?> c=CONTEXT;
+		Context<?> c=CONTEXT.fork();
 		AOp<?> defop=comp("(def c1 (macro [z] (str z)))");
 		c=c.execute(defop);
 		c=c.execute(comp("(c1 bar)",c));

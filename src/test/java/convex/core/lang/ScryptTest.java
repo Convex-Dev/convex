@@ -18,7 +18,7 @@ import convex.core.exceptions.ParseException;
 
 public class ScryptTest {
 
-    static final Context<?> CON = TestState.INITIAL_CONTEXT;
+    static final Context<?> CON = TestState.INITIAL_CONTEXT.fork();
 
     static Scrypt scrypt() {
         return Parboiled.createParser(Scrypt.class);
@@ -42,6 +42,7 @@ public class ScryptTest {
 
     @SuppressWarnings("unchecked")
     public static <T> Context<T> step(Context<?> c, String source) {
+    	c=c.fork();
         Syntax syn = Scrypt.readSyntax(source);
         Context<AOp<Object>> cctx = c.expandCompile(syn);
         if (cctx.isExceptional()) return (Context<T>) cctx;

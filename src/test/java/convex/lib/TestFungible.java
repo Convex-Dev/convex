@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
@@ -24,7 +23,8 @@ public class TestFungible {
 	private static final Symbol fSym=Symbol.create("fun-actor");
 	
 	private static Context<?> loadFungible() {
-		Context<?> ctx=TestState.INITIAL_CONTEXT;
+		Context<?> ctx=TestState.INITIAL_CONTEXT.fork();
+		assert(ctx.getDepth()==0):"Invalid depth: "+ctx.getDepth();
 		try {
 			ctx=ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/fungible.con")), true);
 			Address fun=(Address) ctx.getResult();
@@ -36,15 +36,21 @@ public class TestFungible {
 			assertFalse(ctx.isExceptional());
 			
 			ctx=ctx.define(fSym, Syntax.create(fun));
-		} catch (IOException e) {
+		} catch (Throwable e) {
+			e.printStackTrace();
 			throw new Error(e);
 		}
 		
 		return ctx;
 	}
 	
-	private static final Context<?> ctx=loadFungible();
-	private static final Address fungible=(Address) ctx.lookup(fSym).getResult();
+	private static final Context<?> ctx;
+	private static final Address fungible;
+	
+	static {
+		ctx=loadFungible();
+		fungible=(Address) ctx.lookup(fSym).getResult();
+	}
 	
 	/**
 	 * Test that re-deployment of Fungible matches what is expected
@@ -57,7 +63,7 @@ public class TestFungible {
 	}
 	
 	@Test public void testAssetAPI() {
-		Context<?> ctx=TestFungible.ctx;
+		Context<?> ctx=TestFungible.ctx.fork();
 		ctx=step(ctx,"(def token (deploy (fungible/build-token {:supply 1000000})))");
 		Address token = (Address) ctx.getResult();
 		assertNotNull(token);
@@ -81,7 +87,7 @@ public class TestFungible {
 	
 	@Test public void testBuildToken() {
 		// check our alias is right
-		Context<?> ctx=TestFungible.ctx;
+		Context<?> ctx=TestFungible.ctx.fork();
 		assertEquals(fungible,eval(ctx,"(get *aliases* 'fungible)"));
 		
 		// deploy a token with default config

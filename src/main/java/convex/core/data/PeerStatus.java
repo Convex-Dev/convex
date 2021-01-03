@@ -86,17 +86,17 @@ public class PeerStatus extends ARecord {
 
 	@Override
 	public int writeRaw(byte[] bs, int pos) {
-		pos = Format.write(bs,pos, stake);
+		pos = Format.writeVLCLong(bs,pos, stake);
 		pos = Format.write(bs,pos, stakes);
-		pos = Format.write(bs,pos, delegatedStake);
+		pos = Format.writeVLCLong(bs,pos, delegatedStake);
 		pos = Format.write(bs,pos, getHostString());
 		return pos;
 	}
 
 	public static PeerStatus read(ByteBuffer data) throws BadFormatException {
-		long stake = Format.read(data);
+		long stake = Format.readVLCLong(data);
 		ABlobMap<Address, Long> stakes = Format.read(data);
-		long delegatedStake = Format.read(data);
+		long delegatedStake = Format.readVLCLong(data);
 		
 		AString hostString = Format.read(data);
 		

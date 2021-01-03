@@ -1,13 +1,18 @@
 package convex.lib;
 
+import static convex.core.lang.TestState.HERO;
+import static convex.core.lang.TestState.VILLAIN;
 import static convex.core.lang.TestState.eval;
+import static convex.core.lang.TestState.evalB;
 import static convex.core.lang.TestState.step;
+import static convex.test.Assertions.assertCastError;
+import static convex.test.Assertions.assertNotError;
+import static convex.test.Assertions.assertStateError;
+import static convex.test.Assertions.assertTrustError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
@@ -21,32 +26,38 @@ import convex.core.lang.TestState;
 import convex.core.util.Utils;
 import convex.test.Samples;
 
-import static convex.test.Assertions.*;
-import static convex.core.lang.TestState.*;
-
 public class TestTrust {
 	private static final Symbol tSym = Symbol.create("trust-actor");
 
 	private static Context<?> loadTrust() {
-		Context<?> ctx = TestState.INITIAL_CONTEXT;
+		Context<?> ctx = TestState.INITIAL_CONTEXT.fork();
+		assert(ctx.getDepth()==0):"Invalid depth: "+ctx.getDepth();
+		
 		try {
 			ctx = ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/trust.con")), true);
+			assert(ctx.getDepth()==0):"Invalid depth: "+ctx.getDepth();
 			Address trust = (Address) ctx.getResult();
 			String importS = "(import " + trust + " :as trust)";
 			ctx = step(ctx, importS);
 			assertFalse(ctx.isExceptional());
 
 			ctx = ctx.define(tSym, Syntax.create(trust));
-		} catch (IOException e) {
+		} catch (Throwable e) {
+			e.printStackTrace();
 			throw new Error(e);
 		}
 
 		return ctx;
 	}
 
-	private static final Context<?> ctx = loadTrust();
-	private static final Address trusted = (Address) ctx.lookup(tSym).getResult();
+	private static final Context<?> ctx;
+	private static final Address trusted;
 
+	static {
+		ctx = loadTrust();
+		trusted = (Address) ctx.lookup(tSym).getResult();
+	}
+	
 	/**
 	 * Test that re-deployment of Fungible matches what is expected
 	 */
@@ -63,7 +74,7 @@ public class TestTrust {
 
 	@Test
 	public void testSelfTrust() {
-		Context<?> ctx = TestTrust.ctx;
+		Context<?> ctx = TestTrust.ctx.fork();
 
 		assertTrue(evalB(ctx, "(trust/trusted? *address* *address*)"));
 		assertFalse(evalB(ctx, "(trust/trusted? *address* nil)"));
@@ -74,7 +85,7 @@ public class TestTrust {
 
 	@Test
 	public void testUpgradeWhitelist() {
-		Context<?> ctx = TestTrust.ctx;
+		Context<?> ctx = TestTrust.ctx.fork();
 
 		// deploy a whitelist with default config and upgradable capability
 		ctx = step(ctx, "(def wlist (deploy [(trust/build-whitelist nil) (trust/add-trusted-upgrade nil)]))");

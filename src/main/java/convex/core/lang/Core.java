@@ -587,13 +587,13 @@ public class Core {
 			if (ctx.isExceptional()) return ctx;
 
 			Address target = RT.address(args[0]);
-			if (target == null) return context.withCastError(args[0], Address.class);
+			if (target == null) return ctx.withCastError(args[0], Address.class);
 
 			Long sendAmount = RT.toLong(args[1]);
-			if (sendAmount == null) return context.withCastError(args[1], Long.class);
+			if (sendAmount == null) return ctx.withCastError(args[1], Long.class);
 
 			Symbol sym = RT.toSymbol(args[2]);
-			if (sym == null) return context.withCastError(args[1], Symbol.class);
+			if (sym == null) return ctx.withCastError(args[1], Symbol.class);
 
 			// prepare contract call arguments
 			int arity = args.length - 3;
@@ -1943,7 +1943,6 @@ public class Core {
 					AExceptional ex=rc.getExceptional();
 				 	if (ex instanceof Reduced) {
 				 		result=((Reduced)ex).getValue();
-				 		rc=rc.withDepth(ctx.getDepth()); // return depth;
 				 		break;
 				 	}
 				 	return rc;

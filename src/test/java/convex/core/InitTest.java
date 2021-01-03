@@ -2,6 +2,7 @@ package convex.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.AccountStatus;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Core;
+import convex.core.lang.TestState;
 
 public class InitTest {
 	State s = Init.STATE;
@@ -16,6 +18,8 @@ public class InitTest {
 	@Test
 	public void testInitState() throws InvalidDataException {
 		s.validate();
+		assertEquals(0,TestState.INITIAL_CONTEXT.getDepth());
+		assertNull(TestState.INITIAL_CONTEXT.getResult());
 	}
 	
 	@Test 

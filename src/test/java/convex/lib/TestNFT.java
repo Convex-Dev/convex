@@ -1,6 +1,7 @@
 package convex.lib;
 
 import static convex.core.lang.TestState.step;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static convex.test.Assertions.*;
@@ -24,7 +25,7 @@ public class TestNFT {
 	private static final Symbol nSym=Symbol.create("nft");
 
 	private static Context<?> loadNFT() {
-		Context<?> ctx=TestState.INITIAL_CONTEXT;
+		Context<?> ctx=TestState.INITIAL_CONTEXT.fork();
 		try {
 			ctx=ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/nft-tokens.con")), true);
 			Address nft=(Address) ctx.getResult();
@@ -40,7 +41,7 @@ public class TestNFT {
 		return ctx;
 	}
 	
-	private static final Context<?> ctx=loadNFT();
+	private static final Context<?> ctx=loadNFT().fork();
 	
 	@Test public void testSetup() {
 		assertTrue(ctx.lookup(nSym).getValue() instanceof Address);
@@ -52,7 +53,8 @@ public class TestNFT {
 	}
 	
 	@Test public void testTwoAccounts() {
-		Context<?> c=ctx;
+		Context<?> c=ctx.fork();
+		assertEquals(0L,ctx.getDepth());
 		// set up p2 as a zombie account
 		c=step(c,"(def p2 (address "+Init.VILLAIN+"))");
 		c=TestState.stepAs(TestState.VILLAIN,c,"(do "

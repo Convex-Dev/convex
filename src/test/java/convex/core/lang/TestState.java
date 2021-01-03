@@ -2,6 +2,8 @@ package convex.core.lang;
 
 import static convex.test.Assertions.assertStateError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.io.IOException;
@@ -84,6 +86,7 @@ public class TestState {
 
 	@SuppressWarnings("unchecked")
 	static <T> AOp<T> compile(Context<?> c, String source) {
+		c=c.fork();
 		try {
 			Object form = Reader.read(source);
 			AOp<T> op = (AOp<T>) c.expandCompile(form).getResult();
@@ -206,15 +209,26 @@ public class TestState {
 		return step(INITIAL_CONTEXT, source);
 	}
 
+	/**
+	 * Steps execution in a new forked Context
+	 * @param <T>
+	 * @param ctx Initial context to fork
+	 * @param source
+	 * @return New forked context containing step result
+	 */
 	@SuppressWarnings("unchecked")
 	public static <T> Context<T> step(Context<?> ctx, String source) {
+		// Compile form in forked context
+		Context<AOp<Object>> cctx=ctx.fork();
 		Object form = Reader.read(source);
-		Context<AOp<Object>> cctx = ctx.expandCompile(form);
+		cctx = cctx.expandCompile(form);
 		if (cctx.isExceptional()) return (Context<T>) cctx;
-
 		AOp<Object> op = cctx.getResult();
 
-		Context<T> rctx = (Context<T>) ctx.run(op);
+		// Run form in separate forked context to get result context
+		Context<T> rctx = ctx.fork();
+		rctx=(Context<T>) rctx.run(op);
+		assert(rctx.getDepth()==0):"Invalid depth after step: "+rctx.getDepth();
 		return rctx;
 	}
 
@@ -240,8 +254,15 @@ public class TestState {
 		rc = step(rc, source);
 		return (Context<T>) Context.createFake(rc.getState(), c.getAddress()).withResult(rc.getValue());
 	}
+	
+	@Test public void testStateSetup() {
+		assertEquals(0,INITIAL_CONTEXT.getDepth());
+		assertFalse(INITIAL_CONTEXT.isExceptional());
+		assertNull(INITIAL_CONTEXT.getResult());
+	}
 
 	public static void main(String[] args) {
 		System.out.println(Utils.ednString(INITIAL));
 	}
+	
 }

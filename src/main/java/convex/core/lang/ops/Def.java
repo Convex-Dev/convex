@@ -54,13 +54,14 @@ public class Def<T> extends AOp<T> {
 
 	@Override
 	public <I> Context<T> execute(Context<I> context) {
-		Context<T> opContext = (Context<T>) context.execute(op.getValue());
-		if (opContext.isExceptional()) return opContext;
-		T opResult = opContext.getResult();
+		Context<T> ctx = (Context<T>) context.execute(op.getValue());
+		if (ctx.isExceptional()) return ctx;
+		
+		T opResult = ctx.getResult();
 
 		// TODO: defined syntax metadata
-		opContext = opContext.define(symbol.getValue(), Syntax.create(opResult).withMeta(symbol.getMeta()));
-		return opContext.withResult(Juice.DEF, opResult);
+		ctx = ctx.define(symbol.getValue(), Syntax.create(opResult).withMeta(symbol.getMeta()));
+		return ctx.withResult(Juice.DEF, opResult);
 	}
 
 	@Override
