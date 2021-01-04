@@ -162,7 +162,7 @@ public class LongBlob extends ABlob {
 	}
 
 	@Override
-	public long hexMatch(ABlob b, long start, long length) {
+	public long hexMatchLength(ABlob b, long start, long length) {
 		if (b == this) return length;
 		long end = start + length;
 		for (long i = start; i < end; i++) {

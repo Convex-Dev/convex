@@ -143,7 +143,9 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 		long kl = key.hexLength();
 		long pl = depth + prefixLength;
 		if (kl < pl) return null; // key is too short to start with current prefix
-		if (!prefix.hexMatches(key,depth,pl)) return null;
+		
+		// check hex range
+		if (!prefix.hexMatches(key,Utils.checkedInt(depth),Utils.checkedInt(pl))) return null;
 
 		if (kl == pl) return entry; // we matched this key exactly!
 
@@ -288,9 +290,9 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 		long mkl; // matched key length
 		if (newKeyLength >= pDepth) {
 			// constrain relevant key length by match with current prefix
-			mkl = depth + k.hexMatch(prefix, depth, prefixLength);
+			mkl = depth + k.hexMatchLength(prefix, depth, prefixLength);
 		} else {
-			mkl = depth + k.hexMatch(prefix, depth, newKeyLength - depth);
+			mkl = depth + k.hexMatchLength(prefix, depth, newKeyLength - depth);
 		}
 		if (mkl < pDepth) {
 			// we collide at a point shorter than the current prefix length

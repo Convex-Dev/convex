@@ -33,6 +33,18 @@ public class BlobsTest {
 		assertTrue(d.getContentHash().equals(Hash.NULL_HASH));
 	}
 	
+	@Test
+	public void testHexEquals() {
+		assertTrue(Blob.fromHex("0123").hexEquals(Blob.fromHex("0123"), 0, 4));
+		assertTrue(Blob.fromHex("0125").hexEquals(Blob.fromHex("5123"), 1, 2));
+		assertTrue(Blob.fromHex("012345").hexEquals(Blob.fromHex("a123"), 2, 2));
+		
+		// zero length ranges
+		assertTrue(Blob.fromHex("0123").hexEquals(Blob.fromHex("4567"), 1, 0));
+		assertTrue(Blob.fromHex("0123").hexEquals(Blob.fromHex("4567"), 0, 0));
+		assertTrue(Blob.fromHex("0123").hexEquals(Blob.fromHex("4567"), 4, 0));
+	}
+	
 
 	@Test
 	public void testFromHex() {
@@ -145,7 +157,7 @@ public class BlobsTest {
 		bbb.validate();
 		assertEquals(bb, bbb);
 		assertEquals(bb, rb.getValue());
-		assertEquals(bb.length(), bb.hexMatch(bbb, 0, len));
+		assertEquals(bb.length(), bb.hexMatchLength(bbb, 0, len));
 
 		doBlobTests(bb);
 	}

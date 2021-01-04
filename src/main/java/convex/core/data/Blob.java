@@ -245,36 +245,9 @@ public class Blob extends AArrayBlob {
 		return true;
 	}
 
-	/**
-	 * Tests if a specific range of hex digits are exactly equal.
-	 * @param key
-	 * @param start
-	 * @param end
-	 * @return true if digits are equal, false otherwise
-	 */
-	public boolean hexMatches(ABlob key, long start, long end) {
-		if (key==this) return true;
-		for (long i = start; i < end; i++) {
-			// null entry if key does not match prefix
-			if (key.getHexDigit(i) != getHexDigit(i)) return false;
-		}
-		return true;
-	}
+
 	
-	/**
-	 * Tests if a specific range of bytes are exactly equal.
-	 * @param key
-	 * @param start
-	 * @param end
-	 * @return true if digits are equal, false otherwise
-	 */
-	public boolean rangeMatches(ABlob key, long start, long end) {
-		for (long i = start; i < end; i++) {
-			// null entry if key does not match prefix
-			if (store[(int) (offset+i)] != key.getUnchecked(i)) return false;
-		}
-		return true;
-	}
+
 
 
 

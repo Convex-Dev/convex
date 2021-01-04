@@ -2,6 +2,7 @@ package convex.core.data;
 
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
+import java.util.Arrays;
 
 import convex.core.crypto.Hash;
 import convex.core.exceptions.InvalidDataException;
@@ -168,6 +169,58 @@ public abstract class AArrayBlob extends ABlob {
 	public boolean equalsBytes(byte[] bytes, int byteOffset) {
 		return Utils.arrayEquals(store, offset, bytes, byteOffset, length);
 	}
+	
+	/**
+	 * Tests if a specific range of bytes are exactly equal.
+	 * @param b
+	 * @param start
+	 * @param end
+	 * @return true if digits are equal, false otherwise
+	 */
+	public boolean rangeMatches(ABlob b, int start, int end) {
+		if (b instanceof AArrayBlob) return rangeMatches((AArrayBlob)b,start,end);
+		for (int i = start; i < end; i++) {
+			// null entry if key does not match prefix
+			if (store[offset+i] != b.getUnchecked(i)) return false;
+		}
+		return true;
+	}
+	
+	/**
+	 * Tests if a specific range of bytes are exactly equal.
+	 * @param key
+	 * @param start
+	 * @param end
+	 * @return true if digits are equal, false otherwise
+	 */
+	public boolean rangeMatches(AArrayBlob b, int start, int end) {
+		return Arrays.equals(store, offset+start, offset+end, b.store, b.offset+start,b.offset+end);
+	}
+	
+	@Override
+	public long hexMatchLength(ABlob b, long start, long length) {
+		if (b == this) return length;
+		long end = start + length;
+		for (long i = start; i < end; i++) {
+			if (!(getHexDigit(i) == b.getHexDigit(i))) return i - start;
+		}
+		return length;
+	}
+	
+	/**
+	 * Tests if a specific range of hex digits are exactly equal.
+	 * @param key
+	 * @param start
+	 * @param end
+	 * @return true if digits are equal, false otherwise
+	 */
+	public boolean hexMatches(ABlob key, int start, int end) {
+		if (key==this) return true;
+		if (start==end) return true; 
+		if ((start&1)!=0) if (key.getHexDigit(start) != getHexDigit(start)) return false;
+		if ((end&1)!=0) if (key.getHexDigit(end-1) != getHexDigit(end-1)) return false;
+		return rangeMatches(key,(start+1)>>1,end>>1);
+	}
 
 	@Override
 	public long commonHexPrefixLength(ABlob b) {
@@ -182,15 +235,7 @@ public abstract class AArrayBlob extends ABlob {
 		return max * 2;
 	}
 
-	@Override
-	public long hexMatch(ABlob b, long start, long length) {
-		if (b == this) return length;
-		long end = start + length;
-		for (long i = start; i < end; i++) {
-			if (!(getHexDigit(i) == b.getHexDigit(i))) return i - start;
-		}
-		return length;
-	}
+
 
 	@Override
 	public void validate() throws InvalidDataException {

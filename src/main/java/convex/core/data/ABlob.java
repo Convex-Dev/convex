@@ -303,16 +303,16 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	 * @param key
 	 * @return The number of matching hex characters
 	 */
-	public abstract long hexMatch(ABlob b, long start, long length);
+	public abstract long hexMatchLength(ABlob b, long start, long length);
 
 	public boolean hexEquals(ABlob b) {
 		long c = length();
 		if (b.length() != c) return false;
-		return hexMatch(b, 0L, c) == c;
+		return hexMatchLength(b, 0L, c) == c;
 	}
 
 	public boolean hexEquals(ABlob b, long start, long length) {
-		return hexMatch(b, start, length) == length;
+		return hexMatchLength(b, start, length) == length;
 	}
 
 	public long hexLength() {
