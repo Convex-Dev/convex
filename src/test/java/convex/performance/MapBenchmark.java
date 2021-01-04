@@ -11,8 +11,8 @@ public class MapBenchmark {
 
 	@Benchmark
 	public void longHash() {
-		AMap<Integer, Integer> m = Maps.empty();
-		for (int i = 0; i < 1000; i++) {
+		AMap<Long, Long> m = Maps.empty();
+		for (long i = 0; i < 1000; i++) {
 			m = m.assoc(i, i);
 		}
 	}

@@ -15,6 +15,7 @@ import convex.core.lang.Context;
 import convex.core.lang.Core;
 import convex.core.lang.Symbols;
 import convex.core.lang.ops.Constant;
+import convex.core.lang.ops.Lookup;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Call;
 import convex.core.transactions.Invoke;
@@ -35,10 +36,19 @@ public class CVMBenchmark {
 	}
 	 
 	@Benchmark
-	public void simpleCalculation() {
+	public void simpleCalculationStatic() {
 		State s=Init.STATE;
 		Address addr=Init.HERO;
 		ATransaction trans=Invoke.create(1, convex.core.lang.ops.Invoke.create(Constant.create(Core.PLUS),Constant.create(1L),Constant.create(2L)));
+		Context<Double>  ctx=s.applyTransaction(addr, trans);
+		ctx.getValue();
+	}
+	
+	@Benchmark
+	public void simpleCalculationDynamic() {
+		State s=Init.STATE;
+		Address addr=Init.HERO;
+		ATransaction trans=Invoke.create(1, convex.core.lang.ops.Invoke.create(Lookup.create("+"),Constant.create(1L),Constant.create(2L)));
 		Context<Double>  ctx=s.applyTransaction(addr, trans);
 		ctx.getValue();
 	}

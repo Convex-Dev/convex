@@ -14,10 +14,12 @@
 		<slf4j.version>1.7.30</slf4j.version>
 
 		<!--Freeze this for reproducible builds. -->
-		<project.build.outputTimestamp>2020-02-02T00:20:20.0202Z</project.build.outputTimestamp>
+		<project.build.outputTimestamp>2020-02-02T00:00:00Z</project.build.outputTimestamp>
 	</properties>
 
 	<build>
+		<finalName>convex</finalName>
+
 		<plugins>
 			<plugin>
 				<artifactId>maven-surefire-plugin</artifactId>
@@ -30,6 +32,17 @@
 						</property>
 					</systemProperties>
 				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<executions>
+					<execution>
+						<goals>
+							<goal>test-jar</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
@@ -63,6 +76,24 @@
 						</path>
 					</annotationProcessorPaths>
 				</configuration>
+			</plugin>
+			<plugin>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<version>3.3.0</version>
+				<configuration>
+					<descriptors>
+						<descriptor>src/main/assembly/full-test.xml</descriptor>
+					</descriptors>
+				</configuration>
+				<executions>
+					<execution>
+						<id>create-archive</id>
+						<phase>package</phase>
+						<goals>
+							<goal>single</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 		<pluginManagement>
