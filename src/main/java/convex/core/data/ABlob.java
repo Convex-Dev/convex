@@ -135,11 +135,13 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	 */
 	public int getHexDigit(long digitPos) {
 		byte b = get(digitPos >> 1);
-		if ((digitPos & 1) == 0) {
-			return (b >> 4) & 0x0F; // first hex digit
-		} else {
-			return b & 0x0F; // second hex digit
-		}
+		//if ((digitPos & 1) == 0) {
+		//	return (b >> 4) & 0x0F; // first hex digit
+		//} else {
+		//	return b & 0x0F; // second hex digit
+		//}
+		int shift = 4-(((int)digitPos&1)<<2);
+		return (b>>shift)&0x0F;
 	}
 
 	/**

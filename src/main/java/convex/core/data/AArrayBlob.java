@@ -89,16 +89,16 @@ public abstract class AArrayBlob extends ABlob {
 	public ByteBuffer writeToBuffer(ByteBuffer bb) {
 		return bb.put(store, offset, length);
 	}
-	
+
 	public int writeToBuffer(byte[] bs, int pos) {
 		System.arraycopy(store, offset, bs, pos, length);
-		return Utils.checkedInt(pos+length);
+		return Utils.checkedInt(pos + length);
 	}
-	
+
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		System.arraycopy(store, offset, bs, pos, length);
-		return pos+length;
+		return pos + length;
 	}
 
 	@Override
@@ -130,13 +130,16 @@ public abstract class AArrayBlob extends ABlob {
 		return store[offset + ix];
 	}
 
+	@Override
 	public int getHexDigit(long digitPos) {
-		byte b = get(digitPos >> 1);
-		if ((digitPos & 1) == 0) {
-			return (b >> 4) & 0x0F; // first hex digit
-		} else {
-			return b & 0x0F; // second hex digit
-		}
+		byte b = store[offset+ (int)(digitPos >> 1)];
+		// if ((digitPos & 1) == 0) {
+		// return (b >> 4) & 0x0F; // first hex digit
+		// } else {
+		// return b & 0x0F; // second hex digit
+		// }
+		int shift = 4 - (((int) digitPos & 1) << 2);
+		return (b >> shift) & 0x0F;
 	}
 
 	public Hash extractHash(int offset, int length) {
@@ -203,25 +206,34 @@ public abstract class AArrayBlob extends ABlob {
 		if (length != 8) throw new IllegalStateException(Errors.wrongLength(8, length));
 		return Utils.readLong(store, offset);
 	}
-	
+
 	@Override
 	public long toLong() {
-		if (length>=8) {
-			return Utils.readLong(store, offset+length-8);
+		if (length >= 8) {
+			return Utils.readLong(store, offset + length - 8);
 		} else {
-			long result=0l;
-			int ix=offset;
-			if ((length&4)!=0) {result+=0xffffffffL&Utils.readInt(store, ix); ix+=4;}
-			if ((length&2)!=0) {result=(result>>16)+(0xFFFF&Utils.readShort(store, ix)); ix+=2;}
-			if ((length&1)!=0) {result=(result>>8)+(0xFF&store[ix]); ix+=1;}
+			long result = 0l;
+			int ix = offset;
+			if ((length & 4) != 0) {
+				result += 0xffffffffL & Utils.readInt(store, ix);
+				ix += 4;
+			}
+			if ((length & 2) != 0) {
+				result = (result >> 16) + (0xFFFF & Utils.readShort(store, ix));
+				ix += 2;
+			}
+			if ((length & 1) != 0) {
+				result = (result >> 8) + (0xFF & store[ix]);
+				ix += 1;
+			}
 			// TODO: do we want to sign extend?
-			//int shift=8*(8-length);
+			// int shift=8*(8-length);
 			// correct sign
-			//result=(result<<shift)>>shift;
+			// result=(result<<shift)>>shift;
 			return result;
 		}
 	}
-	
+
 	@Override
 	public int getRefCount() {
 		// Array-backed blobs have no child Refs by default
