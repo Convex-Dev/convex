@@ -193,14 +193,14 @@ public class Blob extends AArrayBlob {
 	}
 
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		if (length > CHUNK_LENGTH) {
-			return BlobTree.create(this).write(bs,pos);
+			return BlobTree.create(this).encode(bs,pos);
 		} else {
 			// we have a Blob of canonical size
 			bs[pos++]=Tag.BLOB;
 			pos=Format.writeVLCLong(bs, pos, length);
-			pos=writeRaw(bs,pos);
+			pos=encodeRaw(bs,pos);
 			return pos;
 		}
 	}
@@ -244,5 +244,7 @@ public class Blob extends AArrayBlob {
 	public boolean isRegularBlob() {
 		return true;
 	}
+
+
 
 }

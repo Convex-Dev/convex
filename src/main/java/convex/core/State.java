@@ -113,13 +113,13 @@ public class State extends ARecord {
 	}
 
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++]=getRecordTag();
-		return writeRaw(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos = accounts.write(bs,pos);
 		pos = peers.write(bs,pos);
 		pos = store.write(bs,pos);

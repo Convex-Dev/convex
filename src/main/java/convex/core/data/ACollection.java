@@ -15,7 +15,7 @@ import convex.core.util.Errors;
 public abstract class ACollection<T> extends ADataStructure<T> implements Collection<T> {
 
 	@Override
-	public abstract int write(byte[] bs, int pos);
+	public abstract int encode(byte[] bs, int pos);
 
 	@Override
 	public abstract boolean contains(Object o);

@@ -122,7 +122,7 @@ public abstract class AMapEntry<K, V> extends AVector<Object> implements List<Ob
 	}
 
 	@Override
-	public abstract int write(byte[] bs, int pos);
+	public abstract int encode(byte[] bs, int pos);
 
 	@Override
 	public long count() {

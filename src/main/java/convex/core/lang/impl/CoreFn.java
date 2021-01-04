@@ -77,14 +77,14 @@ public abstract class CoreFn<T> extends AFn<T> implements ICoreDef {
 	}
 
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.CORE_DEF;
-		return writeRaw(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
-		pos = symbol.writeRaw(bs,pos);
+	public int encodeRaw(byte[] bs, int pos) {
+		pos = symbol.encodeRaw(bs,pos);
 		return pos;
 	}
 	

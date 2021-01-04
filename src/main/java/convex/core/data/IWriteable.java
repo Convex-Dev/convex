@@ -10,7 +10,7 @@ public interface IWriteable {
 	 * @param pos position at which to write the value
 	 * @return The updated position
 	 */
-	public int write(byte[] bs, int pos);
+	public int encode(byte[] bs, int pos);
 
 	/**
 	 * Writes this object to a ByteBuffer including an appropriate message tag

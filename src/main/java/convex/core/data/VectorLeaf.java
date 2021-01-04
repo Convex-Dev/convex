@@ -252,13 +252,13 @@ public class VectorLeaf<T> extends ASizedVector<T> {
 	}
 
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.VECTOR;
-		return writeRaw(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		int ilength = items.length;
 		boolean hasPrefix = hasPrefix();
 
@@ -266,11 +266,11 @@ public class VectorLeaf<T> extends ASizedVector<T> {
 		pos = Format.writeVLCLong(bs,pos, count);
 
 		for (int i = 0; i < ilength; i++) {
-			pos= items[i].write(bs,pos);
+			pos= items[i].encode(bs,pos);
 		}
 
 		if (hasPrefix) {
-			pos = prefix.write(bs,pos);
+			pos = prefix.encode(bs,pos);
 		}
 		return pos;
 	}

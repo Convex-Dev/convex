@@ -44,13 +44,13 @@ public class Ed25519Signature extends ASignature {
 	}
 
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.SIGNATURE;
-		return writeRaw(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 	
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		System.arraycopy(signatureBytes, 0, bs, pos, SIGNATURE_LENGTH);
 		return pos+SIGNATURE_LENGTH;
 	}

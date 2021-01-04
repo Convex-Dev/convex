@@ -90,8 +90,13 @@ public abstract class AArrayBlob extends ABlob {
 		return bb.put(store, offset, length);
 	}
 	
+	public int writeToBuffer(byte[] bs, int pos) {
+		System.arraycopy(store, offset, bs, pos, length);
+		return Utils.checkedInt(pos+length);
+	}
+	
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		System.arraycopy(store, offset, bs, pos, length);
 		return pos+length;
 	}

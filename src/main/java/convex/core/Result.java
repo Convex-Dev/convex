@@ -107,9 +107,9 @@ public class Result extends ARecordGeneric {
 	}
 
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.RESULT;
-		pos=values.writeRaw(bs,pos);
+		pos=values.encodeRaw(bs,pos);
 		return pos;
 	}
 	

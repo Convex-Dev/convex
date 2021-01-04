@@ -242,13 +242,13 @@ public class BlobTree extends ABlob {
 	}
 	
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.BLOB;
-		return writeRaw(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos = Format.writeVLCLong(bs,pos, count);
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
@@ -265,6 +265,15 @@ public class BlobTree extends ABlob {
 			bb = children[i].getValue().writeToBuffer(bb);
 		}
 		return bb;
+	}
+	
+	@Override
+	public int writeToBuffer(byte[] bs, int pos) {
+		int n = children.length;
+		for (int i = 0; i < n; i++) {
+			pos = children[i].getValue().writeToBuffer(bs,pos);
+		}
+		return pos;
 	}
 
 	

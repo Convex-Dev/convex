@@ -26,7 +26,7 @@ public abstract class ATransaction extends ACell {
 	 * Writes this transaction to a byte array, including the message tag
 	 */
 	@Override
-	public abstract int write(byte[] bs, int pos);
+	public abstract int encode(byte[] bs, int pos);
 
 	/**
 	 * Writes this transaction to a byte array, excluding the message tag
@@ -35,7 +35,7 @@ public abstract class ATransaction extends ACell {
 	 * @return Same ByteBuffer after writing
 	 */
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos = Format.writeVLCLong(bs,pos, sequence);
 		return pos;
 	}

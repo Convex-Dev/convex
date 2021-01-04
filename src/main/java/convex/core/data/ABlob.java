@@ -229,6 +229,14 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	public abstract ByteBuffer writeToBuffer(ByteBuffer bb);
 
 	/**
+	 * Writes the raw byte contents of this blob to a byte array
+	 * 
+	 * @param b
+	 * @return The passed ByteBuffer, after writing byte content
+	 */
+	public abstract int writeToBuffer(byte[] bs, int pos);
+	
+	/**
 	 * Gets a chunk of this Blob, as a canonical Blob up to the maximum chunk size
 	 * 
 	 * @param i Index of chunk

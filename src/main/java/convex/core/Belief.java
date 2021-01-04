@@ -589,10 +589,10 @@ public class Belief extends ARecord {
 	}
 
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++]=getRecordTag();
 		// generic record writeRaw, handles all fields in declared order
-		return writeRaw(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	public static Belief read(ByteBuffer bb) throws BadFormatException {

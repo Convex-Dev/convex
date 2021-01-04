@@ -74,7 +74,7 @@ public class Lookup<T> extends AOp<T> {
 	}
 
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos= symbol.write(bs, pos);
 		pos= Format.write(bs,pos, address); // might be null
 		return pos;

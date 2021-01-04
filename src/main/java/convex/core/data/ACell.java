@@ -134,6 +134,16 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
+	 * Writes this Cell's encoding to a byte array, including tag. USes cached encoding if available.
+	 * @param bs
+	 * @param pos
+	 * @return
+	 */
+	public int write(byte[] bs, int pos) {
+		return getEncoding().writeToBuffer(bs,pos);
+	}
+	
+	/**
 	 * Writes this Cell's encoding to a byte array, including a tag byte which will be written first
 	 *
 	 * @param bs A byte array to which to write the encoding
@@ -141,7 +151,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * 
 	 * @return New position after writing
 	 */
-	public abstract int write(byte[] bs, int pos);
+	public abstract int encode(byte[] bs, int pos);
 	
 	/**
 	 * Writes this Cell's encoding to a byte array, excluding the tag byte
@@ -150,7 +160,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @param pos The offset into the byte array
 	 * @return New position after writing
 	 */
-	public abstract int writeRaw(byte[] bs, int pos);
+	public abstract int encodeRaw(byte[] bs, int pos);
 	
 	@Override
 	public final Blob createEncoding() {
@@ -160,7 +170,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		boolean done=false;
 		while (!done) {
 			try {
-				pos=write(bs,pos);
+				pos=encode(bs,pos);
 				done=true;
 			} catch (IndexOutOfBoundsException be) {
 				capacity=capacity*2+10;

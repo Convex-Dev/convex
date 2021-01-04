@@ -217,9 +217,9 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 	}
 
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.MAP_ENTRY;
-		return writeRaw(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 	
 	/**
@@ -230,9 +230,9 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 	 * @return Updated ByteBuffer after writing
 	 */
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
-		pos = keyRef.write(bs,pos);
-		pos = valueRef.write(bs,pos);
+	public int encodeRaw(byte[] bs, int pos) {
+		pos = keyRef.encode(bs,pos);
+		pos = valueRef.encode(bs,pos);
 		return pos;
 	}
 

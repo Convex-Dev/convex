@@ -31,7 +31,7 @@ public abstract class AMultiOp<T> extends AOp<T> {
 	protected abstract AMultiOp<T> recreate(ASequence<AOp<?>> newOps);
 
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos = Format.write(bs,pos, ops);
 		return pos;
 	}

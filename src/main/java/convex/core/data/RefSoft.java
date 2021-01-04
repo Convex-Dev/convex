@@ -115,9 +115,9 @@ public class RefSoft<T> extends Ref<T> {
 	}
 	
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.REF;
-		return getHash().writeRaw(bs, pos);
+		return getHash().encodeRaw(bs, pos);
 	}
 
 	@Override
@@ -170,7 +170,7 @@ public class RefSoft<T> extends Ref<T> {
 	@Override
 	protected Blob createEncoding() {
 		byte[] bs=new byte[RefSoft.ENCODING_LENGTH];
-		int pos=write(bs,0);
+		int pos=encode(bs,0);
 		return Blob.wrap(bs,0,pos);
 	}
 	

@@ -44,7 +44,7 @@ public abstract class ARecord extends AMap<Keyword,Object> {
 	 * @param b ByteBuffer to write to
 	 */
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		List<Keyword> keys=getKeys();
 		for (Keyword key: keys) {
 			pos=Format.write(bs,pos, (Object)get(key));

@@ -108,9 +108,9 @@ public class Def<T> extends AOp<T> {
 	}
 
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos = Format.write(bs,pos, symbol);
-		pos = op.write(bs,pos);
+		pos = op.encode(bs,pos);
 		return pos;
 	}
 

@@ -68,8 +68,8 @@ public class Constant<T> extends AOp<T> {
 	}
 
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
-		pos = valueRef.write(bs,pos);
+	public int encodeRaw(byte[] bs, int pos) {
+		pos = valueRef.encode(bs,pos);
 		return pos;
 	}
 

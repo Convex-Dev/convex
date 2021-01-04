@@ -107,13 +107,13 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	}
 	
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.KEYWORD;
-		return writeRaw(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		return Format.writeRawUTF8String(bs, pos, name.toString());
 	}
 

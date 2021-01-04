@@ -562,7 +562,7 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	 * @param bb
 	 * @return
 	 */
-	public abstract int write(byte[] bs,int pos);
+	public abstract int encode(byte[] bs,int pos);
 	
 	/**
 	 * Writes the raw ref Hash to the given ByteBuffer
@@ -570,7 +570,7 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	 * @return
 	 */
 	public int writeRawHash(byte[] bs,int pos) {
-		return getHash().writeRaw(bs,pos);
+		return getHash().encodeRaw(bs,pos);
 	}
 
 }

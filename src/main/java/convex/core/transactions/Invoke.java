@@ -42,14 +42,14 @@ public class Invoke extends ATransaction {
 	}
 
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++] = Tag.INVOKE;
-		return writeRaw(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 	
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
-		pos = super.writeRaw(bs,pos); // nonce, address
+	public int encodeRaw(byte[] bs, int pos) {
+		pos = super.encodeRaw(bs,pos); // nonce, address
 		pos = Format.write(bs,pos, command);
 		return pos;
 	}

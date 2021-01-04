@@ -134,13 +134,13 @@ public class LongBlob extends ABlob {
 	}
 
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.BLOB;
-		return writeRaw(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 	
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		bs[pos++]=((byte) 8);
 		Utils.writeLong(bs, pos, value);
 		return pos+8;
@@ -190,6 +190,12 @@ public class LongBlob extends ABlob {
 	@Override
 	public ByteBuffer writeToBuffer(ByteBuffer bb) {
 		return bb.putLong(value);
+	}
+	
+	@Override
+	public int writeToBuffer(byte[] bs, int pos) {
+		Utils.writeLong(bs, pos, value);
+		return pos+8;
 	}
 
 }

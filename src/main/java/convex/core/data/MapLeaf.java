@@ -319,7 +319,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 	}
 
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.MAP;
 		return writeRaw(bs,pos,true);
 	}
@@ -331,7 +331,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 	}
 	
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		return writeRaw(bs,pos,true);
 	}
 
@@ -340,7 +340,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 		pos = Format.writeVLCLong(bs,pos, count);
 
 		for (int i = 0; i < count; i++) {
-			pos = entries[i].writeRaw(bs,pos);
+			pos = entries[i].encodeRaw(bs,pos);
 		}
 		return pos;
 	}

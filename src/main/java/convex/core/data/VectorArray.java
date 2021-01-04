@@ -177,7 +177,7 @@ public class VectorArray<T> extends ASizedVector<T> {
 	}
 
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		return toVector().write(bs, pos);
 	}
 
@@ -194,8 +194,8 @@ public class VectorArray<T> extends ASizedVector<T> {
 	}
 
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
-		return toVector().writeRaw(bs, pos);
+	public int encodeRaw(byte[] bs, int pos) {
+		return toVector().encodeRaw(bs, pos);
 	}
 
 	@Override

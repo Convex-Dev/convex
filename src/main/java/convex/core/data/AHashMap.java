@@ -144,7 +144,7 @@ public abstract class AHashMap<K, V> extends AMap<K, V> {
 	 * @param pos Position to write in byte array
 	 * @return
 	 */
-	public abstract int write(byte[] bs, int pos);
+	public abstract int encode(byte[] bs, int pos);
 	
 	/**
 	 * Writes this HashMap to a byte array.

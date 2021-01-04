@@ -230,14 +230,14 @@ public class List<T> extends AList<T> {
 	}
 
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.LIST;
-		return writeRaw(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
-		pos = data.writeRaw(bs,pos);
+	public int encodeRaw(byte[] bs, int pos) {
+		pos = data.encodeRaw(bs,pos);
 		return pos;
 	}
 	

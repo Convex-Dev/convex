@@ -434,13 +434,13 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 	}
 
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.BLOBMAP;
-		return writeRaw(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos = Format.writeVLCLong(bs,pos, count);
 		if (count == 0) return pos; // nothing more to know... this is the empty singleton
 
@@ -452,7 +452,7 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 		pos = Utils.writeShort(bs,pos,mask);
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
-			pos = children[i].write(bs,pos);
+			pos = children[i].encode(bs,pos);
 		}
 
 		return pos;

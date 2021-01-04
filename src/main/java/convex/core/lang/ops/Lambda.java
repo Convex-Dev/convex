@@ -85,8 +85,8 @@ public class Lambda<T> extends AOp<AClosure<T>> {
 	}
 
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
-		pos=function.write(bs, pos);
+	public int encodeRaw(byte[] bs, int pos) {
+		pos=function.encode(bs, pos);
 		return pos;
 	}
 	

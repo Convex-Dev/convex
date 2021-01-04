@@ -122,14 +122,14 @@ public class BlockResult extends ARecord {
 	}
 
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++]=getRecordTag();
 		// generic record writeRaw, handles all fields in declared order
-		return writeRaw(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 	
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos=state.write(bs,pos);
 		pos=results.write(bs,pos);
 		return pos;

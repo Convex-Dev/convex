@@ -400,7 +400,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 	}
 
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.MAP;
 		return writeRaw(bs,pos,true);
 	}
@@ -412,7 +412,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 	}
 	
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		return writeRaw(bs,pos,true);
 	}
 
@@ -425,7 +425,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 		pos = Utils.writeShort(bs, pos,mask);
 
 		for (int i = 0; i < ilength; i++) {
-			pos = children[i].write(bs,pos);
+			pos = children[i].encode(bs,pos);
 		}
 		return pos;
 	}

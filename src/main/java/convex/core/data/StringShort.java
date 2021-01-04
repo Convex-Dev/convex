@@ -64,7 +64,7 @@ public class StringShort extends AString {
 	}
 
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos=Format.writeVLCLong(bs,pos, length);
 		
 		int n=data.length();

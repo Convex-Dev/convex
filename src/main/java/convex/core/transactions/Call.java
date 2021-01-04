@@ -76,14 +76,14 @@ public class Call extends ATransaction {
 	}
 	
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++] = Tag.CALL;
-		return writeRaw(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
-		pos = super.writeRaw(bs,pos); // sequence
+	public int encodeRaw(byte[] bs, int pos) {
+		pos = super.encodeRaw(bs,pos); // sequence
 		pos = Format.write(bs,pos, target);
 		pos=Format.writeVLCLong(bs,pos, offer);
 		pos=Format.write(bs,pos, functionName);

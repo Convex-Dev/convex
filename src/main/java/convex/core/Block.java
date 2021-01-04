@@ -129,14 +129,14 @@ public class Block extends ARecord {
 	}
 	
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++]=getRecordTag();
 		// generic record writeRaw, handles all fields in declared order
-		return writeRaw(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos = Utils.writeLong(bs,pos, timestamp);
 		pos = transactions.write(bs,pos);
 		pos = Format.write(bs,pos,peerAddress);

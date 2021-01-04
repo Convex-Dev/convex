@@ -34,15 +34,15 @@ public abstract class CoreExpander extends BaseExpander implements ICoreDef {
 	}
 
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.CORE_DEF;
-		return writeRaw(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 	
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		// TODO: consider more compact encoding for core functions?
-		pos = symbol.writeRaw(bs,pos);
+		pos = symbol.encodeRaw(bs,pos);
 		return pos;
 	}
 

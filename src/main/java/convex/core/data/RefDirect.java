@@ -99,7 +99,7 @@ public class RefDirect<T> extends Ref<T> {
 	}
 
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		if (isEmbedded()) {
 			// embedded, so write embedded representation directly instead of Ref
 			return  Format.write(bs,pos, value);
@@ -170,7 +170,7 @@ public class RefDirect<T> extends Ref<T> {
 		Hash h=getHash();
 		int pos=0;
 		bs[pos++]=Tag.REF;
-		pos=h.writeRaw(bs, pos);
+		pos=h.encodeRaw(bs, pos);
 		return Blob.wrap(bs,0,pos);
 	}
 

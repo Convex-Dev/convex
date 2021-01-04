@@ -47,12 +47,12 @@ public class StringSlice extends AString {
 	}
 
 	@Override
-	public int write(byte[] bs, int pos) {
+	public int encode(byte[] bs, int pos) {
 		throw new UnsupportedOperationException("");
 	}
 
 	@Override
-	public int writeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		throw new UnsupportedOperationException("");
 	}
 

@@ -50,10 +50,10 @@ public abstract class AOp<T> extends ACell {
 	public abstract byte opCode();
 
 	@Override
-	public final int write(byte[] bs, int pos) {
+	public final int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.OP;
 		bs[pos++]=opCode();
-		return writeRaw(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	/**
@@ -65,7 +65,7 @@ public abstract class AOp<T> extends ACell {
 	 * @return The updated position
 	 */
 	@Override
-	public abstract int writeRaw(byte[] bs, int pos);
+	public abstract int encodeRaw(byte[] bs, int pos);
 	
 	@Override
 	public abstract AOp<T> updateRefs(IRefFunction func);
