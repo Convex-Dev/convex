@@ -29,30 +29,49 @@ This can be invoked by running `convex.gui.manager.PeerManager` as the main clas
 
 `java -jar convex.jar convex.gui.manager.PeerManager`
 
-### Running benchmarks 
+### Benchmarking
 
-Convex includes some benchmarks, which are used to evaluate performance enhancments. These are mosty implemented with the JMH framework.
+Convex includes a wide set of benchmarks, which are used to evaluate performance enhancements. These are mostly implemented with the JMH framework, and reside in the `convex.performance` package.
+
+#### Preparing to run benchmarks
+
+To run benchmarks, it is easiest to build the `convext-testing.jar` which includes all benchmarks, tests and dependencies. This can be done with the following commend:
+
+`mvn package`
 
 #### Directly running benchmarks
 
-You can launch benchmarks as main classes in the `convex.performance` package, e.g.
+After building the testing `.jar`, you can launch benchmarks as main classes in the `convex.performance` package, e.g.
 
-`java -jar convex.jar convex.performance.EtchBenchmark`
+`java -cp target/convex-testing.jar convex.performance.EtchBenchmark`
 
-#### Running with jfr
+#### Running with Java Flight Recorder
 
-java -XX:+FlightRecorder -XX:StartFlightRecording=duration=200s,filename=flight.jfr convex.performance.CVMBenchmark
+If you want to analyse profiling results for the benchmarks, you can run using JFR to produce a profiling output file `flight.jfr`
 
-#### Runing with Maven
+`java -cp target/convex-testing.jar -XX:+FlightRecorder -XX:StartFlightRecording=duration=200s,filename=flight.jfr convex.performance.CVMBenchmark`
 
-mvn test exec:java -Dexec.mainClass="convex.performance.CVMBenchmark" -Dexec.args="%classpath" -Dexec.classpathScope="test"
+The resulting `flight.jfr` can the be opened in tools such as JDK Mission Control which enables detailed analysis and visualisation of profiling results. This is a useful approach that the Convex team use to identify performance bottlenecks.
+
+#### Benchmark results
+
+After running benchmarks, you should see results similar to this:
+
+```
+Benchmark                      Mode  Cnt         Score         Error  Units
+EtchBenchmark.readDataRandom  thrpt    5  40929172.124 ± 1760027.956  ops/s
+EtchBenchmark.writeData       thrpt    5  10923667.591 ± 1527754.917  ops/s
+```
+
+For example, this can be interpreted as an indication that the Etch database layer is handling approximately 40 million reads and 10 million atomic writes per second in the testing environment. Usual benchmarking caveats apply and results may vary considerably based on your system setup (available RAM, disk performance etc.) - it is advisable to examine the benchmark source to determine precisely which operations are being performed.
+
 
 ## Contributing
 
 Open Source contributions are welcome under the terms of the Convex Public License. Contributors retain copyright to their work, but must accept the terms of the license.
 
-The Convex Foundation may, at its sole discretion, award contributors with Convex Coins as recognition of value contributed to the Convex ecosystem. 
+The Convex Foundation may, at its sole discretion, award contributors with Convex Coins as recognition of value contributed to the Convex ecosystem. Convex coins are the native coin of the Convex network, and function as a utility token that provides the right to make use of the services of the network. Convex coins may be exchangeable for other digital assets and currencies.
 
 ## Copyright
 
-Copyright 2017-2020 The Convex Foundation 
+Copyright 2017-2021 The Convex Foundation 

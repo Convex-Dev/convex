@@ -82,7 +82,7 @@
 				<version>3.3.0</version>
 				<configuration>
 					<descriptors>
-						<descriptor>src/main/assembly/full-test.xml</descriptor>
+						<descriptor>src/main/assembly/testing.xml</descriptor>
 					</descriptors>
 				</configuration>
 				<executions>

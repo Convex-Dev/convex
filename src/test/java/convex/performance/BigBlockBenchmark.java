@@ -19,7 +19,7 @@ import convex.core.exceptions.BadSignatureException;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Transfer;
 
-public class TransactionBenchmark {
+public class BigBlockBenchmark {
 
 	static final int NUM_ACCOUNTS = 1000;
 	static final int NUM_TRANSACTIONS = 1000;
@@ -38,7 +38,7 @@ public class TransactionBenchmark {
 		for (int i = 0; i < NUM_TRANSACTIONS; i++) {
 			AKeyPair kp = keyPairs.get(new Random().nextInt(NUM_ACCOUNTS));
 			Address target = keyPairs.get(new Random().nextInt(NUM_ACCOUNTS)).getAddress();
-			Transfer t = Transfer.create(0, target, 1);
+			Transfer t = Transfer.create(1, target, 1);
 			transactions.add(kp.signData(t));
 		}
 		block = Block.create(System.currentTimeMillis(),transactions,Init.FIRST_PEER);
@@ -46,11 +46,11 @@ public class TransactionBenchmark {
 
 	@Benchmark
 	public void benchmark() throws BadSignatureException {
-		state = state.applyBlock(block).getState();
+		state.applyBlock(block).getState();
 	}
 
 	public static void main(String[] args) throws Exception {
-		Options opt = Benchmarks.createOptions(TransactionBenchmark.class);
+		Options opt = Benchmarks.createOptions(BigBlockBenchmark.class);
 		new Runner(opt).run();
 	}
 }
