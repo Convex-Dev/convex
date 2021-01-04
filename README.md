@@ -2,14 +2,17 @@
 
 Convex is an decentralised network and execution engine for the Internet of Value.
 
+It is designed as a foundational layer for decentralised application and economic systems that manage digital assets, where asset ownership is cryptographically secured.
+
 ## About this repository
 
 This repository contains the core Convex distribution including:
 
 - The Convex Virtual Machine (CVM) including data structures and execution environment
-- The standard Convex Peer server implementation (NIO based) implementing Converget Proof of Stake (CPoS) for consensus
+- The standard Convex Peer server implementation (NIO based) implementing Convergent Proof of Stake (CPoS) for consensus
 - The Etch database for persistent data storage
-- A Swing GUI for managing local peers
+- A Swing GUI for managing local peers / exploring the network
+- JMH Benchmarking suite
 - Java Client API
 
 
@@ -17,7 +20,7 @@ This repository contains the core Convex distribution including:
 
 * *Virtual Machine* - The Convex Virtual Machine provides a secure execution environment based on the Lambda Calculus and capable of acting as the execution layer for smart contracts and autonomous agents.
 * *Decentralised Consensus* - Similar to Blockchain technology, Convex incorporates a consensus mechanism that ensures all nodes ultimately agree on true values in the system without the control of any single entity. This property means that it is inherently tamper-proof and censorship-resistant.
-* *Performance and Scalability* - Convex is capable of executing large volumes of transactions (1000s of transactions per second) with low latency (typically under a second for global consensus) 
+* *Performance and Scalability* - Convex is capable of executing large volumes of transactions (tens of thousands of transactions per second) with low latency (a second or two for global consensus) 
 
 ## Running Convex
 
@@ -35,7 +38,7 @@ Convex includes a wide set of benchmarks, which are used to evaluate performance
 
 #### Preparing to run benchmarks
 
-To run benchmarks, it is easiest to build the `convext-testing.jar` which includes all benchmarks, tests and dependencies. This can be done with the following commend:
+To run benchmarks, it is easiest to build the `convex-testing.jar` which includes all benchmarks, tests and dependencies. This can be done with the following commend:
 
 `mvn package`
 
@@ -71,6 +74,10 @@ For example, this can be interpreted as an indication that the Etch database lay
 Open Source contributions are welcome under the terms of the Convex Public License. Contributors retain copyright to their work, but must accept the terms of the license.
 
 The Convex Foundation may, at its sole discretion, award contributors with Convex Coins as recognition of value contributed to the Convex ecosystem. Convex coins are the native coin of the Convex network, and function as a utility token that provides the right to make use of the services of the network. Convex coins may be exchangeable for other digital assets and currencies.
+
+## Community
+
+We use Discord as the primary means for discussing Convex - you can join the public server at [https://discord.gg/5j2mPsk](https://discord.gg/5j2mPsk)
 
 ## Copyright
 
