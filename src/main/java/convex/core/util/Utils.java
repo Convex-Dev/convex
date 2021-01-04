@@ -357,14 +357,10 @@ public class Utils {
 	 * @param b
 	 * @param bOffset
 	 * @param length
-	 * @return true if rray regions are equal, false otherwise
+	 * @return true if array regions are equal, false otherwise
 	 */
 	public static boolean arrayEquals(byte[] a, int aOffset, byte[] b, int bOffset, int length) {
-		if ((b == a) && (aOffset == bOffset)) return true;
-		for (int i = 0; i < length; i++) {
-			if (a[aOffset + i] != b[bOffset + i]) return false;
-		}
-		return true;
+		return Arrays.equals(a, aOffset, aOffset+length, b, bOffset, bOffset+length);
 	}
 
 	/**
