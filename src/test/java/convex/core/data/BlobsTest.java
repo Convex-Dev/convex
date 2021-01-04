@@ -45,6 +45,15 @@ public class BlobsTest {
 		assertTrue(Blob.fromHex("0123").hexEquals(Blob.fromHex("4567"), 4, 0));
 	}
 	
+	@Test
+	public void testHexMatchLength() {
+		assertEquals(4,Blob.fromHex("0123").hexMatchLength(Blob.fromHex("0123"), 0, 4));
+		assertEquals(3,Blob.fromHex("0123").hexMatchLength(Blob.fromHex("012f"), 0, 4));
+		assertEquals(3,Blob.fromHex("ffff0123").hexMatchLength(Blob.fromHex("ffff012f"), 4, 4));
+
+		assertEquals(0,Blob.fromHex("ffff0123").hexMatchLength(Blob.fromHex("ffff012f"), 3, 0));
+	}
+	
 
 	@Test
 	public void testFromHex() {

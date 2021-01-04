@@ -295,7 +295,7 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	}
 
 	/**
-	 * Returns the number of matching hex digits in the given hex range. Assumes
+	 * Returns the number of matching hex digits in the given hex range of another blob. Assumes
 	 * range is valid for both blobs.
 	 * 
 	 * Returns length if this Blob is exactly equal to the specified hex range.
