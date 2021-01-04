@@ -120,21 +120,37 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	protected abstract void updateDigest(MessageDigest digest);
 
 	/**
-	 * Gets the byte at the specified position in this data object
+	 * Gets the byte at the specified position in this blob
 	 * 
 	 * @param i Index of the byte to get
 	 * @return The byte at the specified position
 	 */
-	public abstract byte get(long i);
+	public byte get(long i) {
+		if ((i < 0) || (i >= length())) {
+			throw new IndexOutOfBoundsException("Index: " + i);
+		}
+		return getUnchecked(i);
+	}
+	
+	/**
+	 * Gets the byte at the specified position in this data object, without bounds checking.
+	 * Only safe if index is known to be in bounds, otherwise result is undefined.
+	 * 
+	 * @param i Index of the byte to get
+	 * @return The byte at the specified position
+	 */
+	public abstract byte getUnchecked(long i);
 
 	/**
-	 * Gets the specified hex digit from this data object
+	 * Gets the specified hex digit from this data object.
+	 * 
+	 * Result is undefined if index is out of bounds.
 	 * 
 	 * @param digitPos The position of the hex digit
 	 * @return The value of the hex digit, in the range 0-15 inclusive
 	 */
 	public int getHexDigit(long digitPos) {
-		byte b = get(digitPos >> 1);
+		byte b = getUnchecked(digitPos >> 1);
 		//if ((digitPos & 1) == 0) {
 		//	return (b >> 4) & 0x0F; // first hex digit
 		//} else {
@@ -199,7 +215,7 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 		long blength = b.length();
 		long compareLength = Math.min(alength, blength);
 		for (long i = 0; i < compareLength; i++) {
-			int c = (0xFF & get(i)) - (0xFF & b.get(i));
+			int c = (0xFF & getUnchecked(i)) - (0xFF & b.getUnchecked(i));
 			if (c > 0) return 1;
 			if (c < 0) return -1;
 		}

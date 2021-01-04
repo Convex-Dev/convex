@@ -499,9 +499,7 @@ public class Utils {
 	 * @return Hex digit value as an integer 0..15 inclusive
 	 */
 	public static int extractDigit(ABlob data, int hexDigit) {
-		int b = data.get(hexDigit >> 1);
-		b = ((hexDigit & 1) == 0) ? (b >>> 4) & 15 : b & 15;
-		return b;
+		return data.getHexDigit(hexDigit);
 	}
 
 	/**

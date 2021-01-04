@@ -79,6 +79,11 @@ public class LongBlob extends ABlob {
 		checkIndex(i);
 		return (byte) (value >> ((LENGTH - i - 1) * 8));
 	}
+	
+	@Override
+	public byte getUnchecked(long i) {
+		return (byte) (value >> ((LENGTH - i - 1) * 8));
+	}
 
 	@Override
 	public int getHexDigit(long i) {
@@ -92,8 +97,8 @@ public class LongBlob extends ABlob {
 
 		long max = Math.min(LENGTH, b.length());
 		for (long i = 0; i < max; i++) {
-			byte ai = get(i);
-			byte bi = b.get(i);
+			byte ai = getUnchecked(i);
+			byte bi = b.getUnchecked(i);
 			if (ai != bi) return (i * 2) + (Utils.firstDigitMatch(ai, bi) ? 1 : 0);
 		}
 		return max * 2;

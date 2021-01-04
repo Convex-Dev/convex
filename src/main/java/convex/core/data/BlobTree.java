@@ -202,12 +202,12 @@ public class BlobTree extends ABlob {
 			getChild(i).updateDigest(digest);
 		}
 	}
-
+	
 	@Override
-	public byte get(long i) {
+	public byte getUnchecked(long i) {
 		int childLength = childLength();
 		int ci = (int) (i >> (shift + Blobs.CHUNK_SHIFT));
-		return getChild(ci).get(i - ci * childLength);
+		return getChild(ci).getUnchecked(i - ci * childLength);
 	}
 
 	private int childLength() {

@@ -122,11 +122,17 @@ public abstract class AArrayBlob extends ABlob {
 	}
 
 	@Override
-	public byte get(long i) {
+	public final byte get(long i) {
 		int ix = (int) i;
 		if ((ix != i) || (ix < 0) || (ix >= length)) {
 			throw new IndexOutOfBoundsException("Index: " + i);
 		}
+		return store[offset + ix];
+	}
+	
+	@Override
+	public final byte getUnchecked(long i) {
+		int ix = (int) i;
 		return store[offset + ix];
 	}
 
@@ -169,8 +175,8 @@ public abstract class AArrayBlob extends ABlob {
 
 		long max = Math.min(length(), b.length());
 		for (long i = 0; i < max; i++) {
-			byte ai = get(i);
-			byte bi = b.get(i);
+			byte ai = getUnchecked(i);
+			byte bi = b.getUnchecked(i);
 			if (ai != bi) return (i * 2) + (Utils.firstDigitMatch(ai, bi) ? 1 : 0);
 		}
 		return max * 2;
