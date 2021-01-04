@@ -432,8 +432,8 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 
 	@Override
 	public int estimatedEncodingSize() {
-		// allow space for tag, shift byte byte, 2 byte mask, 33 bytes per child ref
-		return 4 + 33 * children.length;
+		// allow space for tag, shift byte byte, 2 byte mask, embedded child refs
+		return 4 + Format.MAX_EMBEDDED_LENGTH * children.length;
 	}
 
 	/**

@@ -30,7 +30,7 @@ public abstract class ARecord extends AMap<Keyword,Object> {
 	
 	@Override
 	public int estimatedEncodingSize() {
-		return 100;
+		return (int) (Format.MAX_EMBEDDED_LENGTH*format.count());
 	}
 	
 	@Override

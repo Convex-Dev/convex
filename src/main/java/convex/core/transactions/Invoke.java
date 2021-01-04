@@ -108,7 +108,7 @@ public class Invoke extends ATransaction {
 	public int estimatedEncodingSize() {
 		// tag (1), nonce(<12) and target (33)
 		// plus allowance for Amount
-		return 1 + 12 + 33 + Format.MAX_VLC_LONG_LENGTH;
+		return 1 + 12 + Format.MAX_EMBEDDED_LENGTH + Format.MAX_VLC_LONG_LENGTH;
 	}
 
 	@Override

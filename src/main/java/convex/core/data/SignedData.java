@@ -148,6 +148,12 @@ public class SignedData<T> extends ACell {
 		pos = valueRef.encode(bs,pos);
 		return pos;
 	}
+	
+	@Override
+	public int estimatedEncodingSize() {
+		
+		return 10+Address.LENGTH+64+Format.MAX_EMBEDDED_LENGTH;
+	}
 
 	/**
 	 * Reads a SignedData instance from the given ByteBuffer
@@ -181,11 +187,7 @@ public class SignedData<T> extends ACell {
 		if (!checkSignature()) throw new BadSignatureException("Signature not valid!", this);
 	}
 
-	@Override
-	public int estimatedEncodingSize() {
-		// allow for ECDSA/Ed25519 different sizes of Address
-		return 99+Address.LENGTH;
-	}
+
 
 	@Override
 	public boolean isCanonical() {

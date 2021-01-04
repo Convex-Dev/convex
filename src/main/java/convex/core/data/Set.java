@@ -191,6 +191,11 @@ public class Set<T> extends ASet<T> {
 	public int encodeRaw(byte[] bs, int pos) {
 		return map.write(bs,pos,false);
 	}
+	
+	@Override
+	public int estimatedEncodingSize() {
+		return 1+map.estimatedEncodingSize();
+	}
 
 	/**
 	 * Read a set from a ByteBuffer. Assumes tag byte already consumed
@@ -215,10 +220,7 @@ public class Set<T> extends ASet<T> {
 		return map.count();
 	}
 
-	@Override
-	public int estimatedEncodingSize() {
-		return map.estimatedEncodingSize();
-	}
+
 
 	@Override
 	public Set<T> include(T a) {

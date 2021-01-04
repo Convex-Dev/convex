@@ -173,7 +173,7 @@ public class VectorTree<T> extends ASizedVector<T> {
 	@Override
 	public int estimatedEncodingSize() {
 		// Allow tag, long count, 33 bytes per child
-		return 12 + 33 * children.length;
+		return 12 + Format.MAX_EMBEDDED_LENGTH * children.length;
 	}
 
 	/**

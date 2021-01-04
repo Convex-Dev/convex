@@ -173,6 +173,8 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 				pos=encode(bs,pos);
 				done=true;
 			} catch (IndexOutOfBoundsException be) {
+				// We really want to eliminate these, because exception handling is expensive
+				// System.out.println("Insufficient encoding size: "+capacity+ " for "+this.getClass());
 				capacity=capacity*2+10;
 				bs=new byte[capacity];
 			}

@@ -192,6 +192,11 @@ public class Let<T> extends AMultiOp<T> {
 		pos = Format.write(bs,pos, symbols);
 		return super.encodeRaw(bs,pos); // AMultiOp superclass writeRaw
 	}
+	
+	@Override 
+	public int estimatedEncodingSize() {
+		return super.estimatedEncodingSize()+symbols.estimatedEncodingSize();
+	}
 
 	public static <T> Let<T> read(ByteBuffer b) throws BadFormatException {
 		AVector<Syntax> syms = Format.read(b);

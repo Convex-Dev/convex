@@ -123,6 +123,11 @@ public class Fn<T> extends AClosure<T> {
 		pos = lexicalEnv.write(bs,pos);
 		return pos;
 	}
+	
+	@Override
+	public int estimatedEncodingSize() {
+		return 1+params.estimatedEncodingSize()+body.estimatedEncodingSize()+lexicalEnv.estimatedEncodingSize();
+	}
 
 	public static <T> Fn<T> read(ByteBuffer bb) throws BadFormatException {
 		try {
@@ -159,10 +164,6 @@ public class Fn<T> extends AClosure<T> {
 		body.print(sb);
 	}
 
-	@Override
-	public int estimatedEncodingSize() {
-		return 100;
-	}
 
 	/**
 	 * Returns the declared param names for a function.

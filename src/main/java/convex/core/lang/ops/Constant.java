@@ -72,6 +72,11 @@ public class Constant<T> extends AOp<T> {
 		pos = valueRef.encode(bs,pos);
 		return pos;
 	}
+	
+	@Override
+	public int estimatedEncodingSize() {
+		return 1+Format.MAX_EMBEDDED_LENGTH;
+	}
 
 	public static <T> AOp<T> read(ByteBuffer bb) throws BadFormatException {
 		Ref<T> ref = Format.readRef(bb);

@@ -235,10 +235,7 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 		return prefix;
 	}
 
-	@Override
-	public int estimatedEncodingSize() {
-		return 50 + children.length * 40;
-	}
+
 
 	@Override
 	protected void accumulateEntrySet(HashSet<Entry<K, V>> h) {
@@ -456,6 +453,11 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 		}
 
 		return pos;
+	}
+	
+	@Override
+	public int estimatedEncodingSize() {
+		return 100 + (children.length*2+1) * Format.MAX_EMBEDDED_LENGTH;
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })

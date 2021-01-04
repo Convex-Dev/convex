@@ -267,7 +267,7 @@ public class List<T> extends AList<T> {
 
 	@Override
 	public int estimatedEncodingSize() {
-		return 50;
+		return data.estimatedEncodingSize();
 	}
 
 	/**

@@ -3,6 +3,7 @@ package convex.core.lang;
 import java.util.concurrent.ExecutionException;
 
 import convex.core.data.ACell;
+import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Tag;
 
@@ -34,7 +35,7 @@ public abstract class AOp<T> extends ACell {
 
 	@Override
 	public int estimatedEncodingSize() {
-		return 100;
+		return 10+Format.MAX_EMBEDDED_LENGTH;
 	}
 
 	@Override

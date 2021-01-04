@@ -113,6 +113,11 @@ public class Def<T> extends AOp<T> {
 		pos = op.encode(bs,pos);
 		return pos;
 	}
+	
+	@Override
+	public int estimatedEncodingSize() {
+		return symbol.estimatedEncodingSize()+Format.MAX_EMBEDDED_LENGTH;
+	}
 
 	public static <T> Def<T> read(ByteBuffer b) throws BadFormatException {
 		Syntax symbol = Format.read(b);

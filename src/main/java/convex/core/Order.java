@@ -64,6 +64,11 @@ public class Order extends ACell {
 		pos = Format.writeVLCLong(bs,pos, consensusPoint);
 		return pos;
 	}
+	
+	@Override
+	public int estimatedEncodingSize() {
+		return blocks.estimatedEncodingSize()+30; // blocks plus enough size for points
+	}
 
 	public static Order read(ByteBuffer bb) throws BadFormatException {
 		AVector<Block> blocks = Format.read(bb);
@@ -87,10 +92,7 @@ public class Order extends ACell {
 		return new Order(blocks, pp, cp);
 	}
 
-	@Override
-	public int estimatedEncodingSize() {
-		return 100;
-	}
+
 
 	@Override
 	public boolean isCanonical() {

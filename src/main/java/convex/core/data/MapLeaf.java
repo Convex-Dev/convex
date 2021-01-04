@@ -348,7 +348,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 	@Override
 	public int estimatedEncodingSize() {
 		// allow space for header, size byte, 2 refs per entry
-		return 2 + (2 * 33) * size();
+		return 2 + 2* Format.MAX_EMBEDDED_LENGTH * size();
 	}
 
 	/**

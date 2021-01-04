@@ -594,6 +594,11 @@ public class Belief extends ARecord {
 		// generic record writeRaw, handles all fields in declared order
 		return encodeRaw(bs,pos);
 	}
+	
+	@Override
+	public int estimatedEncodingSize() {
+		return 1+orders.estimatedEncodingSize()+12;
+	}
 
 	public static Belief read(ByteBuffer bb) throws BadFormatException {
 		AHashMap<Address, SignedData<Order>> chains = Format.read(bb);

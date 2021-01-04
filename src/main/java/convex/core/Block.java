@@ -142,6 +142,11 @@ public class Block extends ARecord {
 		pos = Format.write(bs,pos,peerAddress);
 		return pos;
 	}
+	
+	@Override
+	public int estimatedEncodingSize() {
+		return 10+transactions.estimatedEncodingSize()+Address.LENGTH;
+	}
 
 	/**
 	 * Reads a Block from the given bytebuffer, assuming tag is already read
@@ -162,11 +167,7 @@ public class Block extends ARecord {
 		}
 	}
 
-	@Override
-	public int estimatedEncodingSize() {
-		// TODO better default sizing?
-		return 100;
-	}
+
 
 	public AVector<SignedData<ATransaction>> getTransactions() {
 		return transactions;

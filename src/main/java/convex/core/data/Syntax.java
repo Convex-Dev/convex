@@ -175,7 +175,7 @@ public class Syntax extends ACell {
 
 	@Override
 	public int estimatedEncodingSize() {
-		return 100;
+		return 1+2*Format.MAX_EMBEDDED_LENGTH;
 	}
 
 	@Override

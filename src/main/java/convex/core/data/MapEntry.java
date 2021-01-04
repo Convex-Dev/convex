@@ -243,7 +243,7 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 
 	@Override
 	public int estimatedEncodingSize() {
-		return 65; // header plus two raw refs
+		return 1+Format.MAX_EMBEDDED_LENGTH*2; // header plus two embedded objects
 	}
 
 	@SuppressWarnings("unchecked")

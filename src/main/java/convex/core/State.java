@@ -127,6 +127,17 @@ public class State extends ARecord {
 		pos = schedule.write(bs,pos);
 		return pos;
 	}
+	
+	@Override
+	public int estimatedEncodingSize() {
+		int est=1;
+		est+=accounts.estimatedEncodingSize();
+		est+=peers.estimatedEncodingSize();
+		est+=store.estimatedEncodingSize();
+		est+=globals.estimatedEncodingSize();
+		est+=schedule.estimatedEncodingSize();
+		return est;
+	}
 
 	/**
 	 * Reads a State from a ByteBuffer encoding. Assumes tag byte already read.
@@ -403,12 +414,6 @@ public class State extends ARecord {
 		long juiceLimit=Math.min(Constants.MAX_TRANSACTION_JUICE,(maxJuice==null)?account.getBalance():maxJuice);
 		Context<T> ctx = Context.createInitial(preparedState, origin, juiceLimit);
 		return ctx;
-	}
-
-	@Override
-	public int estimatedEncodingSize() {
-		// TODO size this
-		return 150;
 	}
 
 	@Override

@@ -84,6 +84,11 @@ public class Expander extends AExpander {
 	public int encodeRaw(byte[] bs, int pos) {
 		return fn.write(bs,pos);
 	}
+	
+	@Override
+	public int estimatedEncodingSize() {
+		return 2+fn.estimatedEncodingSize();
+	}
 
 	@Override
 	public void validate() throws InvalidDataException {
@@ -91,10 +96,7 @@ public class Expander extends AExpander {
 		if (fn == null) throw new InvalidDataException("Null function in Expander", this);
 	}
 
-	@Override
-	public int estimatedEncodingSize() {
-		return 100;
-	}
+
 
 	@Override
 	public void validateCell() throws InvalidDataException {

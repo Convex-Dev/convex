@@ -279,7 +279,7 @@ public class VectorLeaf<T> extends ASizedVector<T> {
 	public int estimatedEncodingSize() {
 		// allow space for header, reasonable length, 33 bytes per element ref plus tail
 		// ref
-		return 1 + 9 + 33 * items.length + ((count > 16) ? 33 : 00);
+		return 1 + 9 + Format.MAX_EMBEDDED_LENGTH * items.length + ((count > 16) ? 33 : 00);
 	}
 
 	/**

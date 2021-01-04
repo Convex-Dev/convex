@@ -1063,4 +1063,10 @@ public class Format {
 		return encodedBlob(o).toHexString();
 	}
 
+	public static int estimateSize(Object o) {
+		if (o==null) return 1;
+		if (o instanceof ACell) return ((ACell)o).estimatedEncodingSize();
+		return 50;
+	}
+
 }

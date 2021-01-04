@@ -135,7 +135,10 @@ public class BlockResult extends ARecord {
 		return pos;
 	}
 	
-
+	@Override
+	public int estimatedEncodingSize() {
+		return 1+state.estimatedEncodingSize()+results.estimatedEncodingSize();
+	}
 
 	public static BlockResult read(ByteBuffer bb) throws BadFormatException {
 		State newState=Format.read(bb);
