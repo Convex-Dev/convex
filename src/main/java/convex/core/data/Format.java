@@ -1004,13 +1004,15 @@ public class Format {
 	}
 	
 	/**
-	 * Writes hex digits from digit position start, total length
+	 * Writes hex digits from digit position start, total length.
+	 * 
+	 * Fills final hex digit with 0 if length is odd.
 	 * 
 	 * @param bs Byte array
 	 * @param pos Position to write into byte array
 	 * @param src Source Blob for hex digits
-	 * @param start
-	 * @param length
+	 * @param start Start position in source blob (hex digit number from beginning)
+	 * @param length Number of hex digits to write
 	 * @return position after writing
 	 */
 	public static int  writeHexDigits(byte[] bs, int pos, ABlob src, long start, long length) {
@@ -1018,15 +1020,18 @@ public class Format {
 		pos = Format.writeVLCLong(bs,pos, length);
 		int nBytes = Utils.checkedInt((length + 1) >> 1);
 		byte[] bs2 = new byte[nBytes];
-		for (int i = 0; i < length; i++) {
-			Utils.setBits(bs2, 4, 4 * ((nBytes * 2) - i - 1), src.getHexDigit(start + i));
+		for (int i = 0; i < nBytes; i++) {
+			long ix=start+i*2;
+			int d0=src.getHexDigit(ix);
+			int d1=((i*2+1)<length)?src.getHexDigit(ix+1):0;
+			bs2[i]=(byte) ((d0<<4)|(d1&0x0f));
 		}
 		System.arraycopy(bs2, 0, bs, pos, nBytes);
 		return pos+nBytes;
 	}
 
 	/**
-	 * Writes hex digits from ByteBuffer into the specified range of a new byte
+	 * Reads hex digits from ByteBuffer into the specified range of a new byte
 	 * array. Needed for BlobMap encoding.
 	 * 
 	 * @param bb

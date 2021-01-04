@@ -365,7 +365,7 @@ public class Utils {
 
 	/**
 	 * Compares two byte arrays on an unsigned basis. Shorter arrays will be
-	 * considered "smaller".
+	 * considered "smaller" if they match in all other positions.
 	 * 
 	 * @param a
 	 * @param aOffset
