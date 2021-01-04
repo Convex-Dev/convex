@@ -24,7 +24,7 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private static final Ref<ABlobMap>[] EMPTY_CHILDREN = new Ref[0];
 
-	public static final BlobMap<ABlob, Object> EMPTY = new BlobMap<ABlob, Object>(null, 0, 0, null, EMPTY_CHILDREN,
+	public static final BlobMap<ABlob, Object> EMPTY = new BlobMap<ABlob, Object>(Blob.EMPTY, 0, 0, null, EMPTY_CHILDREN,
 			(short) 0, 0L);
 
 	/**
@@ -55,6 +55,8 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 
 	/**
 	 * Prefix blob, must contain hex digits in the range [depth,depth+prefixLength).
+	 * 
+	 * Can be null in 
 	 * 
 	 * May contain more hex digits in memory, this is irrelevant from the
 	 * perspective of serialisation.
@@ -141,10 +143,8 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 		long kl = key.hexLength();
 		long pl = depth + prefixLength;
 		if (kl < pl) return null; // key is too short to start with current prefix
-		for (long i = depth; i < pl; i++) {
-			// null entry if key does not match prefix
-			if (key.getHexDigit(i) != prefix.getHexDigit(i)) return null;
-		}
+		if (!prefix.hexMatches(key,depth,pl)) return null;
+
 		if (kl == pl) return entry; // we matched this key exactly!
 
 		int digit = key.getHexDigit(pl);
