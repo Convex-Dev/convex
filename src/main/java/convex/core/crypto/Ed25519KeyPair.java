@@ -2,6 +2,7 @@ package convex.core.crypto;
 
 import java.io.IOException;
 import java.security.InvalidKeyException;
+import java.security.Key;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -190,10 +191,12 @@ public class Ed25519KeyPair extends AKeyPair {
 		}
 	}
 
+	@Override
 	public PublicKey getPublic() {
 		return keyPair.getPublic();
 	}
 
+	@Override
 	public PrivateKey getPrivate() {
 		return keyPair.getPrivate();
 	}
@@ -231,6 +234,11 @@ public class Ed25519KeyPair extends AKeyPair {
 	public boolean equals(Ed25519KeyPair other) {
 		if (!keyPair.getPrivate().equals(other.keyPair.getPrivate())) return false;
 		return keyPair.getPublic().equals(other.getPublic());
+	}
+
+	public static AKeyPair create(Key sk) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 

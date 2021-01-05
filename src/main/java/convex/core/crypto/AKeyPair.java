@@ -1,5 +1,8 @@
 package convex.core.crypto;
 
+import java.security.PrivateKey;
+import java.security.PublicKey;
+
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.SignedData;
@@ -77,5 +80,15 @@ public abstract class AKeyPair {
 
 	public static AKeyPair create(Blob encodedKeyPair) {
 		return Ed25519KeyPair.create(encodedKeyPair);
+	}
+
+	public PrivateKey getPrivate() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public PublicKey getPublic() {
+		// TODO Auto-generated method stub
+		return null;
 	}
 }

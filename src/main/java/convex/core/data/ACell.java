@@ -110,7 +110,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * Checks for equality with another object. In general, data objects should be considered equal
 	 * if they have the same canonical representation, i.e. the same hash value.
 	 * 
-	 * Subclasses may override this this they have a more efficient equals implementation.
+	 * Subclasses should override this if they have a more efficient equals implementation.
 	 * 
 	 * @param a
 	 * @return True if this cell is equal to the other object
