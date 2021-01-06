@@ -602,6 +602,7 @@ public class Belief extends ARecord {
 
 	public static Belief read(ByteBuffer bb) throws BadFormatException {
 		AHashMap<Address, SignedData<Order>> chains = Format.read(bb);
+		if (chains == null) throw new BadFormatException("Null orders in Belief");
 		Long timestamp = Format.read(bb);
 		if (timestamp == null) throw new BadFormatException("Null timestamp");
 		return new Belief(chains, timestamp);

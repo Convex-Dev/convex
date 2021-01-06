@@ -1,7 +1,5 @@
 package convex.core.lang;
 
-import java.util.concurrent.ExecutionException;
-
 import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Init;
@@ -428,7 +426,7 @@ public final class Context<T> extends AObject {
 	 * 
 	 * @param <R>
 	 * @param symbol
-	 * @return
+	 * @return Updated Context
 	 */
 	public <R> Context<R> lookupDynamic(Symbol symbol) {
 		return lookupDynamic(getAddress(),symbol);
@@ -441,7 +439,7 @@ public final class Context<T> extends AObject {
 	 * 
 	 * @param <R>
 	 * @param symbol
-	 * @return
+	 * @return Updated Context
 	 */
 	public <R> Context<R> lookupDynamic(Address address, Symbol symbol) {
 		MapEntry<Symbol,Syntax> envEntry=lookupDynamicEntry(address,symbol);
@@ -1165,7 +1163,6 @@ public final class Context<T> extends AObject {
 	 * @param <R> Return type of compiled op.
 	 * @param forms A sequence of forms to compile
 	 * @return Updated context with vector of compiled forms
-	 * @throws ExecutionException
 	 */
 	public <R> Context<AVector<AOp<R>>> compileAll(ASequence<Syntax> forms) {
 		Context<AVector<AOp<R>>> rctx = Compiler.compileAll(forms, this);
@@ -1209,7 +1206,6 @@ public final class Context<T> extends AObject {
 	 * @param target Target Address, will be created if does not already exist.
 	 * @param amount Amount to transfer, must be between 0 and Amount.MAX_VALUE inclusive
 	 * @return Context with a null result if the transaction succeeds, or an exceptional value if the transfer fails
-	 * @throws ExecutionException
 	 */
 	public Context<Long> transfer(Address target, long amount) {
 		if (amount<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative amount");
@@ -1381,7 +1377,6 @@ public final class Context<T> extends AObject {
 	 * @param sym Symbol of function name defined by Actor
 	 * @param args Arguments to Actor function invocation
 	 * @return Context with result of Actor call (may be exceptional)
-	 * @throws ExecutionException
 	 */
 	public <R> Context<R> actorCall(Address target, long offer, Object functionName, Object... args) {
 		// SECURITY: set up state for actor call
@@ -1390,6 +1385,8 @@ public final class Context<T> extends AObject {
 		AccountStatus as=state.getAccount(target);
 		if (as==null) return this.withError(ErrorCodes.STATE,"Actor does not exist: "+target);
 		
+		// Handling for non-zero offers. 
+		// SECURITY: Subtract from balance first so we don't have double-spend issues!
 		if (offer>0L) {
 			Address senderAddress=getAddress();
 			AccountStatus cas=state.getAccount(senderAddress);
@@ -1453,6 +1450,7 @@ public final class Context<T> extends AObject {
 		if (rollback) {
 			returnState=this.getState();
 		} else {
+			// take state from the returning context
 			returnState=returnContext.getState();
 			
 			// Refund offer
@@ -1489,7 +1487,6 @@ public final class Context<T> extends AObject {
 	 * @param code Actor initialisation code
 	 * @param deterministic Flag to indicate if a deterministic address should be computed
 	 * @return Updated Context with Actor deployed, or an exceptional result
-	 * @throws ExecutionException 
 	 */
 	public Context<Address> deployActor(Object code, boolean deterministic) {
 		State state=getState();
@@ -1519,7 +1516,6 @@ public final class Context<T> extends AObject {
 	 * @param code Actor initialisation code
 	 * @param args
 	 * @return Updated Context with Actor deployed, or an exceptional result
-	 * @throws ExecutionException 
 	 */
 	public Context<Address> deployActor(Object code, Address address) {
 		final State initialState=getState();
