@@ -95,7 +95,7 @@ public class Init {
 			
 			// set up memory exchange. Initially 1GB available at 1000 per byte.
 			{
-				accts = addMemoryExchange(accts, MEMORY_EXCHANGE, 1000000000000L,1000000000L);
+				accts = addMemoryExchange(accts, MEMORY_EXCHANGE, 1000*1000000000L,1000000000L);
 			}
 			
 			USER_ALLOCATION = 100000 * 1000000L; // remaining allocation to divide between initial user accounts
@@ -140,6 +140,8 @@ public class Init {
 			if (s.getPeers().size() != NUM_PEERS) throw new Error("Bad peer count: " + s.getPeers().size());
 			if (s.getAccounts().size() != NUM_PEERS + NUM_USERS + NUM_GOVERNANCE+NUM_LIBRARIES) throw new Error("Bad account count");
 
+			// At this point we have a raw initial state with accounts
+			
 			{ // Deploy Registry Actor to fixed Address
 				Context<?> ctx = Context.createFake(s, HERO);
 				Object form=Reader.readResource("actors/registry.con");
