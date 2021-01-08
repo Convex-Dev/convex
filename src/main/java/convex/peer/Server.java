@@ -86,8 +86,8 @@ public class Server implements Closeable {
 	private BlockingQueue<Message> receiveQueue = new ArrayBlockingQueue<Message>(RECEIVE_QUEUE_SIZE);
 
 	/**
-	 * Message consumer that simply enqueues received messages
-	 * Used for outward connections. i.e. ones this Server has made.
+	 * Message consumer that simply enqueues received messages Used for outward
+	 * connections. i.e. ones this Server has made.
 	 */
 	private Consumer<Message> peerReceiveAction = new Consumer<Message>() {
 		@Override
@@ -107,8 +107,8 @@ public class Server implements Closeable {
 	private boolean running = false;
 
 	private NIOServer nio;
-	private Thread receiverThread=null;
-	private Thread updateThread=null;
+	private Thread receiverThread = null;
+	private Thread updateThread = null;
 
 	/** The Peer instance current state of this server */
 	private Peer peer;
@@ -120,13 +120,13 @@ public class Server implements Closeable {
 	 * Must all have been fully persisted.
 	 */
 	private ArrayList<SignedData<ATransaction>> newTransactions = new ArrayList<>();
-	
+
 	/**
 	 * The set of queued partial messages pending missing data.
 	 * 
 	 * Delivery will be re-attempted when missing data is provided
 	 */
-	private HashMap<Hash,Message> partialMessages = new HashMap<Hash,Message>();
+	private HashMap<Hash, Message> partialMessages = new HashMap<Hash, Message>();
 
 	/**
 	 * The list of new beliefs received from remote peers the block being created
@@ -137,32 +137,33 @@ public class Server implements Closeable {
 	private Server(HashMap<Keyword, Object> config) {
 		this.config = config;
 		this.manager = new ConnectionManager(config);
-	
+
 		AStore configStore = (AStore) config.get(Keywords.STORE);
 		store = (configStore == null) ? Stores.getGlobalStore() : configStore;
-		AKeyPair keyPair=(AKeyPair) config.get(Keywords.KEYPAIR);
-		
-		this.peer= establishPeer(keyPair,config);
-		
+		AKeyPair keyPair = (AKeyPair) config.get(Keywords.KEYPAIR);
+
+		this.peer = establishPeer(keyPair, config);
+
 		nio = NIOServer.create(this, receiveQueue);
 	}
 
-	private Peer establishPeer(AKeyPair keyPair,Map<Keyword, Object> config2) {
+	private Peer establishPeer(AKeyPair keyPair, Map<Keyword, Object> config2) {
 		if (RT.bool(config.get(Keywords.RESTORE))) {
 			try {
-				Hash hash=store.getRootHash();
-				Peer peer=Peer.restorePeer(store,hash,keyPair);
-				if (peer!=null )return peer;
+				Hash hash = store.getRootHash();
+				Peer peer = Peer.restorePeer(store, hash, keyPair);
+				if (peer != null) return peer;
 			} catch (Throwable e) {
-				log.warning("Can't restore Peer from store: "+e.getMessage());
+				log.warning("Can't restore Peer from store: " + e.getMessage());
 			}
-		} 
+		}
 		log.info("Defaulting to standard Peer startup.");
 		return Peer.createStartupPeer(config);
 	}
 
 	/**
-	 * Creates a Server with a given config. Reference to config is kept: don't mutate elsewhere.
+	 * Creates a Server with a given config. Reference to config is kept: don't
+	 * mutate elsewhere.
 	 * 
 	 * @param config
 	 * @return
@@ -192,28 +193,28 @@ public class Server implements Closeable {
 	public synchronized void launch() {
 		Object p = config.get(Keywords.PORT);
 		Integer port = (p == null) ? null : Utils.toInt(p);
-		
+
 		try {
 			nio.launch();
-			port=nio.getPort();
+			port = nio.getPort();
 
 			// set running status now, so that loops don't terminate
 			running = true;
 
-			receiverThread=new Thread(receiverLoop, "Receive worker loop serving port: " + port);
+			receiverThread = new Thread(receiverLoop, "Receive worker loop serving port: " + port);
 			receiverThread.start();
-			
-			updateThread=new Thread(updateLoop, "Server management loop for port: " + port);
+
+			updateThread = new Thread(updateLoop, "Server management loop for port: " + port);
 			updateThread.start();
-			
+
 			// Close server on shutdown, before Etch stores
 			Shutdown.addHook(Shutdown.SERVER, new Runnable() {
 				@Override
 				public void run() {
 					close();
-				}			
+				}
 			});
-			
+
 			log.log(LEVEL_SERVER, "Peer Server started with Peer Address: " + getAddress().toChecksumHex());
 		} catch (Exception e) {
 			throw new Error("Failed to launch Server on port: " + port, e);
@@ -230,7 +231,7 @@ public class Server implements Closeable {
 	 */
 	private void processMessage(Message m) {
 		MessageType type = m.getType();
-		
+
 		try {
 			switch (type) {
 			case BELIEF:
@@ -262,42 +263,45 @@ public class Server implements Closeable {
 			}
 		} catch (MissingDataException e) {
 			Hash missingHash = e.getMissingHash();
-			log.log(LEVEL_PARTIAL,"Missing data: " + missingHash.toHexString() + " in message of type " + type);
+			log.log(LEVEL_PARTIAL, "Missing data: " + missingHash.toHexString() + " in message of type " + type);
 			try {
-				registerPartialMessage(missingHash,m);
+				registerPartialMessage(missingHash, m);
 				m.getPeerConnection().sendMissingData(missingHash);
-				log.log(LEVEL_PARTIAL,()->"Requested missing data "+missingHash.toHexString()+ " for partial message");
+				log.log(LEVEL_PARTIAL,
+						() -> "Requested missing data " + missingHash.toHexString() + " for partial message");
 			} catch (IOException ex) {
-				log.log(Level.WARNING,()->"Exception while requesting missing data: "+ex.getMessage());
+				log.log(Level.WARNING, () -> "Exception while requesting missing data: " + ex.getMessage());
 			}
-		} catch (BadFormatException|ClassCastException|NullPointerException e) {
+		} catch (BadFormatException | ClassCastException | NullPointerException e) {
 			log.warning("Error processing client message: " + e);
 		}
 	}
 
 	/**
-	 * Respond to a request for missing data, on a best-efforts basis. 
-	 * Requests for missing data we do not hold are ignored.
+	 * Respond to a request for missing data, on a best-efforts basis. Requests for
+	 * missing data we do not hold are ignored.
 	 * 
 	 * @param m
-	 * @throws BadFormatException 
+	 * @throws BadFormatException
 	 */
 	private void processMissingData(Message m) throws BadFormatException {
 		// payload for a missing data request should be a valid Hash
 		Hash h = m.getPayload();
-		if (h==null) throw new BadFormatException("Hash required for missing data message");
-		
+		if (h == null) throw new BadFormatException("Hash required for missing data message");
+
 		Ref<?> r = store.refForHash(h);
 		if (r != null) {
 			try {
-				Object data=r.getValue();
+				Object data = r.getValue();
 				m.getPeerConnection().sendData(data);
-				log.info(() -> "Sent missing data for hash: " + h.toHexString() + " with type "+Utils.getClassName(data));
+				log.info(() -> "Sent missing data for hash: " + h.toHexString() + " with type "
+						+ Utils.getClassName(data));
 			} catch (IOException e) {
-				log.info(() -> "Unable to deliver missing data for " + h.toHexString() + " due to: "+e.getMessage());
+				log.info(() -> "Unable to deliver missing data for " + h.toHexString() + " due to: " + e.getMessage());
 			}
 		} else {
-			log.warning(() -> "Unable to provide missing data for " + h.toHexString() + " from store: "+Stores.current());
+			log.warning(
+					() -> "Unable to provide missing data for " + h.toHexString() + " from store: " + Stores.current());
 		}
 	}
 
@@ -309,7 +313,7 @@ public class Server implements Closeable {
 
 		// TODO: this should throw MissingDataException?
 		Ref.createPersisted(sd);
-		
+
 		if (!sd.checkSignature()) {
 			// terminate the connection, dishonest client?
 			try {
@@ -318,7 +322,7 @@ public class Server implements Closeable {
 			} catch (IOException e) {
 				// Ignore??
 			}
-			log.warning("Bad signature from Client! "+sd);
+			log.warning("Bad signature from Client! " + sd);
 			return;
 		}
 
@@ -327,41 +331,44 @@ public class Server implements Closeable {
 			registerInterest(sd.getHash(), m);
 		}
 	}
-	
+
 	/**
-	 * Checks if received data fulfils the requirement for a partial message
-	 * If so, process the message again.
+	 * Checks if received data fulfils the requirement for a partial message If so,
+	 * process the message again.
 	 * 
 	 * @param hash
-	 * @return true if the data request resulted in a re-queued message, false otherwise
+	 * @return true if the data request resulted in a re-queued message, false
+	 *         otherwise
 	 */
 	private boolean maybeProcessPartial(Hash hash) {
 		Message m;
 		synchronized (partialMessages) {
-			m=partialMessages.get(hash);
-			
-			if (m!=null) {
-				log.log(LEVEL_PARTIAL,()->"Attempting to re-queue partial message due to received hash: "+hash.toHexString());
+			m = partialMessages.get(hash);
+
+			if (m != null) {
+				log.log(LEVEL_PARTIAL,
+						() -> "Attempting to re-queue partial message due to received hash: " + hash.toHexString());
 				if (receiveQueue.offer(m)) {
 					partialMessages.remove(hash);
 					return true;
 				} else {
-					log.log(Level.WARNING,()->"Queue full for message with received hash: "+hash.toHexString());
+					log.log(Level.WARNING, () -> "Queue full for message with received hash: " + hash.toHexString());
 				}
 			}
 		}
 		return false;
- 	}
+	}
 
 	/**
 	 * Stores a partial message for potential later handling.
+	 * 
 	 * @param missingHash Hash of missing data dependency
-	 * @param m Message to re-attempt later when missing data is received.
+	 * @param m           Message to re-attempt later when missing data is received.
 	 */
 	private void registerPartialMessage(Hash missingHash, Message m) {
 		synchronized (partialMessages) {
-			log.log(LEVEL_PARTIAL,()->"Registering partial message with missing hash: "+missingHash);
-			partialMessages.put(missingHash,m);
+			log.log(LEVEL_PARTIAL, () -> "Registering partial message with missing hash: " + missingHash);
+			partialMessages.put(missingHash, m);
 		}
 	}
 
@@ -375,7 +382,7 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Handle general Belief update
+	 * Handle general Belief update, taking belief registered in newBeliefs
 	 * 
 	 * @throws InterruptedException
 	 */
@@ -400,14 +407,15 @@ public class Server implements Closeable {
 		final Belief belief = peer.getBelief();
 		if (belief == initialBelief) return false;
 
-		// At this point we know something updated our belief, so we want to rebroadcast belief to network
-		Consumer<Ref<ACell>> noveltyHandler= r -> {
+		// At this point we know something updated our belief, so we want to rebroadcast
+		// belief to network
+		Consumer<Ref<ACell>> noveltyHandler = r -> {
 			Object o = r.getValue();
-			if (o==belief) return; // skip sending data for belief cell itself, will be BELIEF payload
+			if (o == belief) return; // skip sending data for belief cell itself, will be BELIEF payload
 			Message msg = Message.createData(o);
 			manager.broadcast(msg);
 		};
-		
+
 		Ref.createAnnounced(belief, noveltyHandler);
 		SignedData<Belief> sb = peer.getSignedBelief();
 		Message msg = Message.createBelief(sb);
@@ -437,7 +445,7 @@ public class Server implements Closeable {
 			if (n == 0) return false;
 			// TODO: smaller block if too many transactions?
 			long timestamp = Utils.getCurrentTimestamp();
-			Block block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions,peer.getAddress());
+			Block block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions, peer.getAddress());
 
 			Ref.createPersisted(block);
 
@@ -461,11 +469,12 @@ public class Server implements Closeable {
 	 * @return True if peer Belief was updated, false otherwise.
 	 */
 	protected boolean maybeMergeBeliefs() {
-		synchronized (newBeliefs) {
-			int n = newBeliefs.size();
-
-			try {
-				Belief[] beliefs = new Belief[n];
+		try {
+			// First get the set of new beliefs for merging
+			Belief[] beliefs;
+			synchronized (newBeliefs) {
+				int n = newBeliefs.size();
+				beliefs = new Belief[n];
 				int i = 0;
 				for (Address addr : newBeliefs.keySet()) {
 					try {
@@ -476,27 +485,26 @@ public class Server implements Closeable {
 					}
 				}
 				newBeliefs.clear();
-
-				Peer newPeer = peer.mergeBeliefs(beliefs);
-				if (newPeer.getBelief() == peer.getBelief()) return false;
-
-				log.log(LEVEL_BELIEF, "New merged Belief update: " + newPeer.getBelief().getHash().toHexString());
-				// we merged successfully, so clear pending beliefs and update Peer
-				peer = newPeer;
-				return true;
-			} catch (MissingDataException e) {
-				// Shouldn't happen if beliefs are persisted
-				// e.printStackTrace();
-				throw new Error("Missing data in belief update: "+e.getMissingHash().toHexString(), e);
-			} catch (BadSignatureException e) {
-				// Shouldn't happen if Beliefs are already validated
-				// e.printStackTrace();
-				throw new Error("Bad Signature in belief update!", e);
-			} catch (InvalidDataException e) {
-				// Shouldn't happen if Beliefs are already validated
-				// e.printStackTrace();
-				throw new Error("Invalid data in belief update!", e);
 			}
+			Peer newPeer = peer.mergeBeliefs(beliefs);
+			if (newPeer.getBelief() == peer.getBelief()) return false;
+
+			log.log(LEVEL_BELIEF, "New merged Belief update: " + newPeer.getBelief().getHash().toHexString());
+			// we merged successfully, so clear pending beliefs and update Peer
+			peer = newPeer;
+			return true;
+		} catch (MissingDataException e) {
+			// Shouldn't happen if beliefs are persisted
+			// e.printStackTrace();
+			throw new Error("Missing data in belief update: " + e.getMissingHash().toHexString(), e);
+		} catch (BadSignatureException e) {
+			// Shouldn't happen if Beliefs are already validated
+			// e.printStackTrace();
+			throw new Error("Bad Signature in belief update!", e);
+		} catch (InvalidDataException e) {
+			// Shouldn't happen if Beliefs are already validated
+			// e.printStackTrace();
+			throw new Error("Invalid data in belief update!", e);
 		}
 	}
 
@@ -506,58 +514,64 @@ public class Server implements Closeable {
 			AVector<Object> v = m.getPayload();
 			Long id = (Long) v.get(0);
 			Object form = v.get(1);
-			
+
 			// extract the Address, or use HERO if not available.
-			Address address = (Address) v.get(2); 
-			
+			Address address = (Address) v.get(2);
+
 			Connection pc = m.getPeerConnection();
 			log.info("Processing query: " + form + " with address: " + address);
-			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " + address);
+			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
+			// address);
 			Context<?> result = peer.executeQuery(form, address);
 			boolean resultReturned;
-			
+
 			if (result.isExceptional()) {
 				AExceptional err = result.getExceptional();
-				Object code=err.getCode();
-				Object message=(err instanceof ErrorValue)?((ErrorValue)err).getMessage():Strings.create(err.toString());
-				
+				Object code = err.getCode();
+				Object message = (err instanceof ErrorValue) ? ((ErrorValue) err).getMessage()
+						: Strings.create(err.toString());
+
 				// TODO: remove once we are sure everything is safe
 				if (message instanceof String) {
-					String sm=(String)message;
-					message=Strings.create(sm);
+					String sm = (String) message;
+					message = Strings.create(sm);
 					log.warning("Converted String message in exceptional Result: " + sm);
 				}
-				
-				resultReturned=pc.sendResult(id, message, code);
+
+				resultReturned = pc.sendResult(id, message, code);
 			} else {
-				resultReturned=pc.sendResult(id, result.getResult());
+				resultReturned = pc.sendResult(id, result.getResult());
 			}
-			
+
 			if (!resultReturned) {
-				log.warning("Failed to send query result back to client with ID: "+id);
+				log.warning("Failed to send query result back to client with ID: " + id);
 			}
 
 		} catch (Throwable t) {
-			log.warning("Query Error: "+ t);
+			log.warning("Query Error: " + t);
 		}
 	}
 
 	private void processData(Message m) {
-		Object payload=m.getPayload();
-		
-		// TODO: be smarter about this? hold a per-client queue for a while?
-		Ref<?> r=Ref.get(payload);
-		r=r.persistShallow();
-		Hash payloadHash=r.getHash();
+		Object payload = m.getPayload();
 
-		log.log(LEVEL_DATA,()->"Processing DATA of type: "+Utils.getClassName(payload)+ " with hash: "+payloadHash.toHexString() +" and encoding: "+Format.encodedBlob(payload).toHexString());
+		// TODO: be smarter about this? hold a per-client queue for a while?
+		Ref<?> r = Ref.get(payload);
+		r = r.persistShallow();
+		Hash payloadHash = r.getHash();
+
+		log.log(LEVEL_DATA, () -> "Processing DATA of type: " + Utils.getClassName(payload) + " with hash: "
+				+ payloadHash.toHexString() + " and encoding: " + Format.encodedBlob(payload).toHexString());
 
 		// if our data satisfies a missing data object, need to process it
 		maybeProcessPartial(r.getHash());
 	}
 
-
-
+	/**
+	 * Process an incoming message that represents a Belief
+	 * 
+	 * @param m
+	 */
 	private void processBelief(Message m) {
 		Connection pc = m.getPeerConnection();
 		if (pc.isClosed()) return; // skip messages from closed peer
@@ -567,8 +581,8 @@ public class Server implements Closeable {
 		Ref<Object> ref = Ref.get(o);
 		try {
 			// check we can persist the new belief
-			ref=ref.persist();
-			
+			ref = ref.persist();
+
 			@SuppressWarnings("unchecked")
 			SignedData<Belief> signedBelief = (SignedData<Belief>) o;
 			signedBelief.validateSignature();
@@ -581,14 +595,15 @@ public class Server implements Closeable {
 					newBeliefs.put(addr, signedBelief);
 				}
 			}
-			log.log(LEVEL_BELIEF, "Valid belief received by peer at "+getHostAddress()+ ": " + signedBelief.getValue().getHash().toHexString());
+			log.log(LEVEL_BELIEF, "Valid belief received by peer at " + getHostAddress() + ": "
+					+ signedBelief.getValue().getHash().toHexString());
 		} catch (ClassCastException e) {
 			// bad message?
-			log.warning("Bad message from peer? "+e.getMessage());
+			log.warning("Bad message from peer? " + e.getMessage());
 		} catch (BadSignatureException e) {
 			// we got sent a bad signature.
 			// TODO: Probably need to slash peer? but ignore for now
-			log.warning("Bad signed belief from peer: "+Utils.ednString(o));
+			log.warning("Bad signed belief from peer: " + Utils.ednString(o));
 		}
 	}
 
@@ -603,24 +618,24 @@ public class Server implements Closeable {
 
 			try {
 				log.log(LEVEL_SERVER, "Reciever thread started for peer at " + getHostAddress());
-				
+
 				while (running) { // loop until server terminated
 					Message m = receiveQueue.poll(100, TimeUnit.MILLISECONDS);
 					if (m != null) {
 						processMessage(m);
 					}
 				}
-				
+
 				log.log(LEVEL_SERVER, "Reciever thread terminated normally for peer " + this);
 			} catch (InterruptedException e) {
 				log.log(LEVEL_SERVER, "Receiver thread interrupted ");
 			} catch (Throwable e) {
 				log.severe("Receiver thread terminated abnormally! ");
-				log.severe("Server FAILED: "+ e.getMessage());
+				log.severe("Server FAILED: " + e.getMessage());
 				e.printStackTrace();
 			} finally {
 				// clear thread from Server as we terminate
-				receiverThread=null;
+				receiverThread = null;
 			}
 		}
 	};
@@ -652,11 +667,11 @@ public class Server implements Closeable {
 			} catch (InterruptedException e) {
 				log.fine("Server manager loop interrupted");
 			} catch (Throwable e) {
-				log.severe("Unexpected exception in server update loop: "+e.toString());
+				log.severe("Unexpected exception in server update loop: " + e.toString());
 				log.severe("Terminating Server update");
 			} finally {
 				// clear thread from Server as we terminate
-				updateThread=null;
+				updateThread = null;
 			}
 		}
 	};
@@ -670,15 +685,15 @@ public class Server implements Closeable {
 			Message m = interests.get(h);
 			if (m != null) {
 				try {
-					log.info("Returning transaction result to "+m.getPeerConnection().getRemoteAddress());
-					
+					log.info("Returning transaction result to " + m.getPeerConnection().getRemoteAddress());
+
 					Connection pc = m.getPeerConnection();
 					if ((pc == null) || pc.isClosed()) continue;
-					Object id=m.getID();
-					Result res=br.getResults().get(j).withID(id);
+					Object id = m.getID();
+					Result res = br.getResults().get(j).withID(id);
 					pc.sendResult(res);
 				} catch (Exception e) {
-					System.err.println("Error sending Result: "+e.getMessage());
+					System.err.println("Error sending Result: " + e.getMessage());
 					e.printStackTrace();
 					// ignore
 				}
@@ -695,21 +710,21 @@ public class Server implements Closeable {
 	public void finalize() {
 		close();
 	}
-	
+
 	/**
 	 * Writes the Peer data to the configured store.
 	 * 
 	 * This will overwrite the previously persisted peer state.
 	 */
 	public void persistPeerData() {
-		AStore tempStore=Stores.current();
+		AStore tempStore = Stores.current();
 		try {
 			Stores.setCurrent(store);
-			ACell peerData=peer.toData();
-			Ref<?> peerRef=Ref.createPersisted(peerData);
-			Hash peerHash=peerRef.getHash();
+			ACell peerData = peer.toData();
+			Ref<?> peerRef = Ref.createPersisted(peerData);
+			Hash peerHash = peerRef.getHash();
 			store.setRootHash(peerHash);
-			log.info("Stored peer data for Server: "+peerHash.toHexString());
+			log.info("Stored peer data for Server: " + peerHash.toHexString());
 		} catch (Throwable e) {
 			log.severe("Failed to persist peer state when closing server: " + e.getMessage());
 			e.printStackTrace();
@@ -721,15 +736,15 @@ public class Server implements Closeable {
 	@Override
 	public synchronized void close() {
 		// persist peer state if necessary
-		if ((peer!=null)&&RT.bool(config.get(Keywords.PERSIST))) {
+		if ((peer != null) && RT.bool(config.get(Keywords.PERSIST))) {
 			persistPeerData();
 		}
-		
+
 		running = false;
-		if (updateThread!=null) updateThread.interrupt();
-		if (receiverThread!=null) receiverThread.interrupt();
+		if (updateThread != null) updateThread.interrupt();
+		if (receiverThread != null) receiverThread.interrupt();
 		nio.close();
-		peer=null;
+		peer = null;
 		// Note we don't do store.close(); because we don't own the store.
 	}
 
@@ -763,13 +778,15 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Connects this Peer to a target Peer, adding the Connection to this Server's Manager
+	 * Connects this Peer to a target Peer, adding the Connection to this Server's
+	 * Manager
+	 * 
 	 * @param hostAddress
 	 * @return The newly created connection
 	 * @throws IOException
 	 */
 	public Connection connectToPeer(InetSocketAddress hostAddress) throws IOException {
-		Connection pc = Connection.connect(hostAddress, peerReceiveAction,getStore());
+		Connection pc = Connection.connect(hostAddress, peerReceiveAction, getStore());
 		manager.addConnection(pc);
 		return pc;
 	}
