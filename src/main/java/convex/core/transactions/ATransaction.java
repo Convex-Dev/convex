@@ -42,12 +42,6 @@ public abstract class ATransaction extends ACell {
 
 	@Override
 	public abstract int estimatedEncodingSize();
-	
-	@Override
-	public final boolean isEmbedded() {
-		// don't embed transactions. Might need to persist individually.
-		return false;
-	}
 
 	/**
 	 * Applies the functional effect of this transaction to the current state. 

@@ -13,9 +13,12 @@ import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Init;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
+import convex.core.transactions.ATransaction;
+import convex.core.transactions.Transfer;
 import convex.core.util.Bits;
 import convex.test.Samples;
 
@@ -124,6 +127,27 @@ public class MapsTest {
 		// should merge back to original map. Useful also for testing empty children
 		// merges.
 		assertEquals(m, m1.mergeDifferences(m2, (a, b) -> (a == null) ? b : a));
+	}
+	
+	@Test
+	public void regressionEmbeddedTransfer() throws BadFormatException {
+		ATransaction trans=Transfer.create(0, Init.HERO, 58);
+		Short key=(short)23771;
+		AMap<Short,ATransaction> m=Maps.create(key,trans);
+		MapEntry<Short,ATransaction> me=m.entryAt(0);
+		assertEquals(key,me.getKey());
+		assertEquals(trans,me.getValue());
+		
+		// transaction should never be embedded
+		assertEquals(trans.isEmbedded(),me.getValueRef().isEmbedded());
+		
+		Blob b=m.getEncoding();
+		AMap<Short,ATransaction> m2=Format.read(b);
+		
+		assertEquals(m,m2);
+		
+		Blob b2=m2.getEncoding();
+		assertEquals(b,b2);
 	}
 
 	@Test

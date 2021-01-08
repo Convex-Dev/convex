@@ -148,7 +148,7 @@ public class EtchStoreTest {
 			// Persist belief
 			counter.set(0L);
 			Ref<Belief> prb=srb.persist(noveltyHandler);
-			assertEquals(4L,counter.get());
+			assertEquals(2L,counter.get());
 			
 			// Persist again. Should be no new novelty
 			counter.set(0L);
@@ -160,7 +160,7 @@ public class EtchStoreTest {
 			counter.set(0L);
 			Ref<Belief> arb=srb.announce(noveltyHandler);
 			assertEquals(srb,arb);
-			assertEquals(4L,counter.get()); 
+			assertEquals(2L,counter.get()); 
 			
 			// Announce again. Should be no new novelty
 			counter.set(0L);
