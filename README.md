@@ -52,7 +52,7 @@ After building the testing `.jar`, you can launch benchmarks as main classes in 
 
 If you want to analyse profiling results for the benchmarks, you can run using JFR to produce a profiling output file `flight.jfr`
 
-`java -cp target/convex-testing.jar -XX:+FlightRecorder -XX:StartFlightRecording=duration=200s,filename=flight.jfr convex.performance.CVMBenchmark`
+`java -cp target/convex-testing.jar -XX:+FlightRecorder -XX:StartFlightRecording=duration=200s,filename=flight.jfr -Djava.util.logging.config.file=logging.properties convex.performance.CVMBenchmark`
 
 The resulting `flight.jfr` can the be opened in tools such as JDK Mission Control which enables detailed analysis and visualisation of profiling results. This is a useful approach that the Convex team use to identify performance bottlenecks.
 

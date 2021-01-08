@@ -52,6 +52,10 @@ import convex.net.NIOServer;
 /**
  * A self contained server that can be launched with a config.
  * 
+ * Server creates the following threads:
+ * - A ReceiverThread that precesses message from the Server's receive Queue
+ * - An UpdateThreat that handles Belief updates and transaction processing
+ * 
  * "Programming is a science dressed up as art, because most of us don't
  * understand the physics of software and it's rarely, if ever, taught. The
  * physics of software is not algorithms, data structures, languages, and
@@ -68,8 +72,8 @@ public class Server implements Closeable {
 
 	private static final int RECEIVE_QUEUE_SIZE = 256;
 
-	// Pause for each iteration of manager loop.
-	private static final long MANAGER_PAUSE = 10L;
+	// MAximum Pause for each iteration of Server update loop.
+	private static final long SERVER_UPDATE_PAUSE = 30L;
 
 	// Pause before merging.
 	// Higher pause means more latency, but potentially reduces bandwidth by
@@ -201,10 +205,12 @@ public class Server implements Closeable {
 			// set running status now, so that loops don't terminate
 			running = true;
 
-			receiverThread = new Thread(receiverLoop, "Receive worker loop serving port: " + port);
+			receiverThread = new Thread(receiverLoop, "Receive queue worker loop serving port: " + port);
+			//receiverThread.setDaemon(true);
 			receiverThread.start();
 
-			updateThread = new Thread(updateLoop, "Server management loop for port: " + port);
+			updateThread = new Thread(updateLoop, "Server Belief update loop for port: " + port);
+			//updateThread.setDaemon(true);
 			updateThread.start();
 
 			// Close server on shutdown, before Etch stores
@@ -593,6 +599,9 @@ public class Server implements Closeable {
 				if ((current == null) || (current.getValueUnchecked().getTimestamp() >= signedBelief.getValueUnchecked()
 						.getTimestamp())) {
 					newBeliefs.put(addr, signedBelief);
+					
+					// Notify the update thread that there is something new to handle
+					updateThread.interrupt();
 				}
 			}
 			log.log(LEVEL_BELIEF, "Valid belief received by peer at " + getHostAddress() + ": "
@@ -655,17 +664,19 @@ public class Server implements Closeable {
 
 				// loop while the server is running
 				while (running) {
-					// sleep a bit, wait for transactions to accumulate
-					Thread.sleep(Server.MANAGER_PAUSE);
-
+					// Maybe sleep a bit, wait for some belief updates to accumulate
+					if (newBeliefs.isEmpty()) try {
+						Thread.sleep(SERVER_UPDATE_PAUSE);
+					} catch (InterruptedException e) {
+						// OK, we probably have a new Belief to process!
+					}
+					
 					// Update Peer timestamp first. This determines what we might accept.
 					peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
 
 					// Try belief update
 					maybeUpdateBelief();
 				}
-			} catch (InterruptedException e) {
-				log.fine("Server manager loop interrupted");
 			} catch (Throwable e) {
 				log.severe("Unexpected exception in server update loop: " + e.toString());
 				log.severe("Terminating Server update");

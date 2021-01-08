@@ -72,6 +72,7 @@ public class NIOServer implements Closeable {
 			running=true;
 			
 			Thread selectorThread=new Thread(selectorLoop,"NIO Server selector loop on port: "+port);
+			selectorThread.setDaemon(true);
 			selectorThread.start();
 			log.info("NIO server started on port "+port);
 		} catch (Exception e) {

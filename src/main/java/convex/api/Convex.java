@@ -194,7 +194,7 @@ public class Convex {
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
 	public CompletableFuture<Result> transact(ATransaction transaction) throws IOException {
-		if (autoSequence) {
+		if (autoSequence||(transaction.getSequence()<=0)) {
 			transaction=applyNextSequence(transaction);
 		}
 		SignedData<ATransaction> signed=keyPair.signData(transaction);
