@@ -73,7 +73,7 @@ public class Server implements Closeable {
 	private static final int RECEIVE_QUEUE_SIZE = 256;
 
 	// MAximum Pause for each iteration of Server update loop.
-	private static final long SERVER_UPDATE_PAUSE = 30L;
+	private static final long SERVER_UPDATE_PAUSE = 1L;
 
 	private static final Logger log = Logger.getLogger(Server.class.getName());
 	private static final Level LEVEL_BELIEF = Level.FINER;
@@ -81,6 +81,7 @@ public class Server implements Closeable {
 	private static final Level LEVEL_DATA = Level.FINEST;
 	private static final Level LEVEL_PARTIAL = Level.WARNING;
 	// private static final Level LEVEL_MESSAGE = Level.FINER;
+	
 
 	private BlockingQueue<Message> receiveQueue = new ArrayBlockingQueue<Message>(RECEIVE_QUEUE_SIZE);
 
