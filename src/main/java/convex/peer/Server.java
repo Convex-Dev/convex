@@ -75,11 +75,6 @@ public class Server implements Closeable {
 	// MAximum Pause for each iteration of Server update loop.
 	private static final long SERVER_UPDATE_PAUSE = 30L;
 
-	// Pause before merging.
-	// Higher pause means more latency, but potentially reduces bandwidth by
-	// aggregating more belief updates
-	private static final long MERGE_PAUSE = 10L;
-
 	private static final Logger log = Logger.getLogger(Server.class.getName());
 	private static final Level LEVEL_BELIEF = Level.FINER;
 	private static final Level LEVEL_SERVER = Level.FINER;
@@ -206,11 +201,11 @@ public class Server implements Closeable {
 			running = true;
 
 			receiverThread = new Thread(receiverLoop, "Receive queue worker loop serving port: " + port);
-			//receiverThread.setDaemon(true);
+			receiverThread.setDaemon(true);
 			receiverThread.start();
 
 			updateThread = new Thread(updateLoop, "Server Belief update loop for port: " + port);
-			//updateThread.setDaemon(true);
+			updateThread.setDaemon(true);
 			updateThread.start();
 
 			// Close server on shutdown, before Etch stores
@@ -403,8 +398,6 @@ public class Server implements Closeable {
 		// only do belief merge if needed: either after publishing a new block or with
 		// incoming beliefs
 		if ((!published) && newBeliefs.isEmpty()) return false;
-
-		Thread.sleep(MERGE_PAUSE);
 
 		maybeMergeBeliefs();
 
