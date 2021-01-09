@@ -9,7 +9,7 @@ import convex.core.util.Errors;
 import convex.core.util.Utils;
 
 /**
- * Immutable class representing an Ed25519 Public Key.
+ * Immutable class representing an Ed25519 Public Key for an Account
  * 
  * <p>
  * Using Ed25519:
@@ -17,14 +17,14 @@ import convex.core.util.Utils;
  * <li>Addresses are the Public Key (32 bytes)</li>
  * 
  */
-public class PublicKey extends AArrayBlob {
+public class AccountKey extends AArrayBlob {
 	public static final int LENGTH = 32;
 
 	public static final int LENGTH_BITS = LENGTH * 8;
 
-	public static final PublicKey ZERO = PublicKey.dummy("0");
+	public static final AccountKey ZERO = AccountKey.dummy("0");
 
-	private PublicKey(byte[] data, int offset, int length) {
+	private AccountKey(byte[] data, int offset, int length) {
 		super(data, offset, length);
 		if (length != LENGTH) throw new IllegalArgumentException("Address length must be " + LENGTH_BITS + " bits");
 	}
@@ -37,8 +37,8 @@ public class PublicKey extends AArrayBlob {
 	 * @param data
 	 * @return An Address wrapping the given bytes
 	 */
-	public static PublicKey wrap(byte[] data) {
-		return new PublicKey(data, 0, data.length);
+	public static AccountKey wrap(byte[] data) {
+		return new AccountKey(data, 0, data.length);
 	}
 
 	/**
@@ -50,12 +50,12 @@ public class PublicKey extends AArrayBlob {
 	 * @param offset Offset into byte array
 	 * @return An Address wrapping the given bytes
 	 */
-	public static PublicKey wrap(byte[] data, int offset) {
-		return new PublicKey(data, offset, LENGTH);
+	public static AccountKey wrap(byte[] data, int offset) {
+		return new AccountKey(data, offset, LENGTH);
 	}
 
-	private static PublicKey wrap(AArrayBlob source) {
-		return new PublicKey(source.store, source.offset, source.length);
+	private static AccountKey wrap(AArrayBlob source) {
+		return new AccountKey(source.store, source.offset, source.length);
 	}
 
 	/**
@@ -69,7 +69,7 @@ public class PublicKey extends AArrayBlob {
 	 * @param string Hex string to repeat to produce a visible dummy address
 	 * @return An Address that cannot be used to sign transactions.
 	 */
-	public static PublicKey dummy(String nonce) {
+	public static AccountKey dummy(String nonce) {
 		int n = nonce.length();
 		if (n == 0) throw new Error("Empty nonce");
 		if (n >= LENGTH / 2) throw new Error("Nonce too long for dummy address");
@@ -77,7 +77,7 @@ public class PublicKey extends AArrayBlob {
 		for (int i = 0; i < LENGTH * 2; i += n) {
 			sb.append(nonce);
 		}
-		return PublicKey.fromHex(sb.substring(0, LENGTH * 2));
+		return AccountKey.fromHex(sb.substring(0, LENGTH * 2));
 	}
 
 	@Override
@@ -90,11 +90,11 @@ public class PublicKey extends AArrayBlob {
 
 	@Override
 	public boolean equals(ABlob o) {
-		if (!(o instanceof PublicKey)) return false;
-		return equals((PublicKey) o);
+		if (!(o instanceof AccountKey)) return false;
+		return equals((AccountKey) o);
 	}
 
-	public boolean equals(PublicKey o) {
+	public boolean equals(AccountKey o) {
 		if (o == this) return true;
 		return Utils.arrayEquals(o.store, o.offset, this.store, this.offset, LENGTH);
 	}
@@ -106,8 +106,8 @@ public class PublicKey extends AArrayBlob {
 	 * @return An Address constructed from the hex string, or null if not a valid
 	 *         hex string
 	 */
-	public static PublicKey fromHex(String hexString) {
-		PublicKey result = fromHexOrNull(hexString);
+	public static AccountKey fromHex(String hexString) {
+		AccountKey result = fromHexOrNull(hexString);
 		if (result == null) throw new Error("Invalid Address hex String [" + hexString + "]");
 		return result;
 	}
@@ -119,7 +119,7 @@ public class PublicKey extends AArrayBlob {
 	 * @return An Address constructed from the hex string, or null if not a valid
 	 *         hex string
 	 */
-	public static PublicKey fromHexOrNull(String hexString) {
+	public static AccountKey fromHexOrNull(String hexString) {
 		byte[] bs = Utils.hexToBytes(hexString, LENGTH * 2);
 		if (bs == null) return null; // invalid string
 		if (bs.length != LENGTH) return null; // wrong length
@@ -134,9 +134,9 @@ public class PublicKey extends AArrayBlob {
 	 * @param hexString
 	 * @return An Address constructed from the hex string
 	 */
-	public static PublicKey fromChecksumHex(String hexString) {
+	public static AccountKey fromChecksumHex(String hexString) {
 		byte[] bs = Utils.hexToBytes(hexString, LENGTH * 2);
-		PublicKey a = PublicKey.wrap(bs);
+		AccountKey a = AccountKey.wrap(bs);
 		Hash h = a.getContentHash();
 		for (int i = 0; i < LENGTH * 2; i++) {
 			int dh = h.getHexDigit(i);
@@ -179,7 +179,7 @@ public class PublicKey extends AArrayBlob {
 	 * @param publicKey
 	 * @return The Address representing the given public key.
 	 */
-	public static PublicKey fromPublicKey(byte[] publicKey) {
+	public static AccountKey fromPublicKey(byte[] publicKey) {
 		if (publicKey.length != 64)
 			throw new IllegalArgumentException("Address creation requires a 512 bit public key");
 		Hash hash = Hash.keccak256(publicKey);
@@ -195,7 +195,7 @@ public class PublicKey extends AArrayBlob {
 	 * @param hash The hash of the ECDSA public key.
 	 * @return Address generated from hash
 	 */
-	public static PublicKey fromHash(Hash hash) {
+	public static AccountKey fromHash(Hash hash) {
 		return wrap(hash.slice(Hash.LENGTH - LENGTH, LENGTH)); // take last bytes of hash, in case Address is shorter
 	}
 
@@ -205,21 +205,21 @@ public class PublicKey extends AArrayBlob {
 	 * @param pubKey The public key from which to compute the Address
 	 * @return The Address representing the given public key.
 	 */
-	public static PublicKey fromPublicKey(BigInteger pubKey) {
+	public static AccountKey fromPublicKey(BigInteger pubKey) {
 		byte[] publicKey = new byte[64];
 		Utils.writeUInt(pubKey, publicKey, 0, 64);
 		return fromPublicKey(publicKey);
 	}
 
-	public static PublicKey readRaw(ByteBuffer data) {
+	public static AccountKey readRaw(ByteBuffer data) {
 		byte[] buff = new byte[LENGTH];
 		data.get(buff);
-		return PublicKey.wrap(buff);
+		return AccountKey.wrap(buff);
 	}
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.ADDRESS;
+		bs[pos++]=Tag.ACCOUNT_KEY;
 		return encodeRaw(bs,pos);
 	}
 

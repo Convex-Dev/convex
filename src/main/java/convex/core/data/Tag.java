@@ -33,6 +33,7 @@ public class Tag {
 	public static final byte ADDRESS = (byte) 0x21;
 	public static final byte SIGNATURE = (byte) 0x22;
 	public static final byte HASH = (byte) 0x24;
+	public static final byte ACCOUNT_KEY = (byte) 0x2a;
 
 	// Standard supported object data types
 	public static final byte STRING = (byte) 0x30;
