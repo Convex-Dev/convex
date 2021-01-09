@@ -28,7 +28,7 @@ public class Tag {
 	// Note: Amounts use the low 4 bits of the tag for decimal scale factor
 	public static final byte AMOUNT = (byte) 0x10; // Financial amount
 
-	// crypto primitives
+	// crypto and security primitives
 	public static final byte REF = (byte) 0x20;
 	public static final byte ADDRESS = (byte) 0x21;
 	public static final byte SIGNATURE = (byte) 0x22;
