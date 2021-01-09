@@ -82,13 +82,7 @@ public abstract class AKeyPair {
 		return Ed25519KeyPair.create(encodedKeyPair);
 	}
 
-	public PrivateKey getPrivate() {
-		// TODO Auto-generated method stub
-		return null;
-	}
+	public abstract PrivateKey getPrivate();
 
-	public PublicKey getPublic() {
-		// TODO Auto-generated method stub
-		return null;
-	}
+	public abstract PublicKey getPublic();
 }

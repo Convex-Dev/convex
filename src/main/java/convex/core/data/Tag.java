@@ -84,6 +84,7 @@ public class Tag {
 	public static final byte TRANSFER = (byte) 0xD1;
 	public static final byte CALL = (byte) 0xD2;
 
-	
+	// F? Illegal / reserved
+	public static final byte ILLEGAL = (byte) 0xFF;
 
 }
