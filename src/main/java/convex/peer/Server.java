@@ -105,6 +105,11 @@ public class Server implements Closeable {
 	private final HashMap<Keyword, Object> config;
 
 	private boolean running = false;
+	
+	/**
+	 * Flag to indicate if there are any new things for the server to process (Beliefs, transactions)
+	 */
+	private boolean newThings = false;
 
 	private NIOServer nio;
 	private Thread receiverThread = null;
@@ -329,6 +334,7 @@ public class Server implements Closeable {
 		}
 
 		synchronized (newTransactions) {
+			newThings=true;
 			newTransactions.add(sd);
 			registerInterest(sd.getHash(), m);
 		}
@@ -595,7 +601,7 @@ public class Server implements Closeable {
 					newBeliefs.put(addr, signedBelief);
 					
 					// Notify the update thread that there is something new to handle
-					updateThread.interrupt();
+					newThings=true;
 				}
 			}
 			log.log(LEVEL_BELIEF, "Valid belief received by peer at " + getHostAddress() + ": "
@@ -659,10 +665,10 @@ public class Server implements Closeable {
 				// loop while the server is running
 				while (running) {
 					// Maybe sleep a bit, wait for some belief updates to accumulate
-					if (newBeliefs.isEmpty()) try {
+					if (newThings) {
+						newThings=false;
+					} else {
 						Thread.sleep(SERVER_UPDATE_PAUSE);
-					} catch (InterruptedException e) {
-						// OK, we probably have a new Belief to process!
 					}
 					
 					// Update Peer timestamp first. This determines what we might accept.

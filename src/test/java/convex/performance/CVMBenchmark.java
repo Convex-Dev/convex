@@ -22,7 +22,10 @@ import convex.core.transactions.Invoke;
 import convex.core.transactions.Transfer;
 
 /**
- * Benchmark for applying transactions to CVM state. Skips signatures etc.
+ * Benchmark for applying transactions to CVM state. This is measuring the end-to-end time for processing 
+ * transactions themselves on the CVM.
+ * 
+ * Skips stuff around transactions, block overhead, signatures etc.
  */
 public class CVMBenchmark {
 	
