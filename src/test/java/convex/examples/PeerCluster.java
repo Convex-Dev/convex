@@ -9,6 +9,7 @@ import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519KeyPair;
 import convex.core.data.AString;
+import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.BlobMap;
@@ -56,16 +57,18 @@ public class PeerCluster {
 
 	private static State createInitialState() {
 		BlobMap<Address, AccountStatus> accts = BlobMaps.empty();
-		BlobMap<Address, PeerStatus> peers = BlobMaps.empty();
+		BlobMap<AccountKey, PeerStatus> peers = BlobMaps.empty();
 		for (int i = 0; i < NUM_PEERS; i++) {
-			Address address = PEER_KEYS.get(i).getAddress();
+			AccountKey address = PEER_KEYS.get(i).getAccountKey();
 			Map<Keyword, Object> config = PEER_CONFIGS.get(i);
 			int port = Utils.toInt(config.get(Keywords.PORT));
 			AString sa = Strings.create("http://localhost"+ port);
 			PeerStatus ps = PeerStatus.create(1000000000, sa);
-			AccountStatus as = AccountStatus.create(1000000000);
 			peers = peers.assoc(address, ps);
-			accts = accts.assoc(address, as);
+			
+			// TODO: Accounts
+			//AccountStatus as = AccountStatus.create(1000000000);
+			//accts = accts.assoc(address, as);
 		}
 
 		return State.create(accts, peers, Sets.empty(), Maps.empty(), BlobMaps.empty());

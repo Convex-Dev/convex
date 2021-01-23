@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.data.Address;
+import convex.core.data.AccountKey;
 import convex.core.data.PeerStatus;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.lang.Reader;
@@ -29,7 +29,7 @@ public class PeerTest {
 		assertSame(TestState.INITIAL, p.getConsensusState());
 
 		// Belief check
-		Address addr = p.getAddress();
+		AccountKey addr = p.getPeerKey();
 		Belief b = p.getBelief();
 		assertNotNull(b.getOrder(addr));
 
@@ -49,7 +49,7 @@ public class PeerTest {
 
 	@Test
 	public void testNullPeers() {
-		assertNull(Init.STATE.getPeer(Init.HERO)); // hero not a peer in initial state
+		assertNull(Init.STATE.getPeer(Init.HERO_KP.getAccountKey())); // hero not a peer in initial state
 	}
 	
 	@Test
@@ -66,12 +66,11 @@ public class PeerTest {
 	@Test
 	public void testStakeAccess() {
 		// use peer address from first peer for testing
-		Address pa = Init.FIRST_PEER;
+		AccountKey pa = Init.FIRST_PEER;
 		PeerStatus ps = Init.STATE.getPeer(pa);
 		long initialStake = ps.getOwnStake();
 		assertEquals(initialStake, ps.getTotalStake());
 
-		assertEquals(0, ps.getDelegatedStake(pa));
 		assertEquals(0, ps.getDelegatedStake(Init.HERO));
 
 		// add a delegated stake

@@ -115,8 +115,8 @@ public class EtchStoreTest {
 		try {
 			Stores.setCurrent(store);
 			
-			ATransaction t1=Invoke.create(0, Lists.of(Symbols.PLUS, Symbols.STAR_BALANCE, 1000L));
-			ATransaction t2=Transfer.create(1, Init.VILLAIN,1000000);
+			ATransaction t1=Invoke.create(Init.HERO,0, Lists.of(Symbols.PLUS, Symbols.STAR_BALANCE, 1000L));
+			ATransaction t2=Transfer.create(Init.HERO,1, Init.VILLAIN,1000000);
 			Block b=Block.of(Utils.getCurrentTimestamp(),kp.signData(t1),kp.signData(t2));
 			Order ord=Order.create().propose(b);
 			
@@ -140,7 +140,7 @@ public class EtchStoreTest {
 			counter.set(0L);
 			Ref<Belief> srb=rb.persistShallow(noveltyHandler);
 			assertEquals(Ref.STORED,srb.getStatus());
-			assertEquals(1L,counter.get()); // One cell persisted
+			assertEquals(0L,counter.get()); // One cell persisted
 			
 			// assertEquals(srb,store.refForHash(rb.getHash()));
 			assertNull(store.refForHash(t1.getRef().getHash()));
@@ -148,7 +148,7 @@ public class EtchStoreTest {
 			// Persist belief
 			counter.set(0L);
 			Ref<Belief> prb=srb.persist(noveltyHandler);
-			assertEquals(2L,counter.get());
+			assertEquals(3L,counter.get());
 			
 			// Persist again. Should be no new novelty
 			counter.set(0L);
@@ -160,7 +160,7 @@ public class EtchStoreTest {
 			counter.set(0L);
 			Ref<Belief> arb=srb.announce(noveltyHandler);
 			assertEquals(srb,arb);
-			assertEquals(2L,counter.get()); 
+			assertEquals(3L,counter.get()); 
 			
 			// Announce again. Should be no new novelty
 			counter.set(0L);

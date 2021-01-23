@@ -22,6 +22,7 @@ import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 
+import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.SignedData;
@@ -30,13 +31,13 @@ import convex.core.util.Utils;
 
 public class Ed25519KeyPair extends AKeyPair {
 
-	private final Address address;
+	private final AccountKey address;
 	private final KeyPair keyPair;
 	
 	public static final int PRIVATE_KEY_LENGTH=32;
 	private static final String ED25519 = "Ed25519";
 
-	private Ed25519KeyPair(KeyPair kp, Address address) {
+	private Ed25519KeyPair(KeyPair kp, AccountKey address) {
 		this.keyPair = kp;
 		this.address=address;
 	}
@@ -46,7 +47,7 @@ public class Ed25519KeyPair extends AKeyPair {
 	}
 	
 	public static Ed25519KeyPair create(KeyPair keyPair) {
-		Address address=extractAddress(keyPair.getPublic());
+		AccountKey address=extractAccountKey(keyPair.getPublic());
 		return new Ed25519KeyPair(keyPair,address);
 	}
 	
@@ -55,7 +56,7 @@ public class Ed25519KeyPair extends AKeyPair {
 		return create(keyPair);
 	}
 	
-	public static Ed25519KeyPair create(Address address, Blob encodedPrivateKey) {
+	public static Ed25519KeyPair create(AccountKey address, Blob encodedPrivateKey) {
 		PublicKey publicKey= publicKeyFromBytes(address.getBytes());
 		PrivateKey privateKey=privateKeyFromBlob(encodedPrivateKey);
 		return create(publicKey,privateKey);
@@ -101,11 +102,11 @@ public class Ed25519KeyPair extends AKeyPair {
 	 * @param publicKey Public key
 	 * @return
 	 */
-	static Address extractAddress(PublicKey publicKey) {
+	static AccountKey extractAccountKey(PublicKey publicKey) {
 		byte[] bytes=publicKey.getEncoded();
 		int n=bytes.length;
 		// take the bytes at the end of the encoding
-		return Address.wrap(bytes,n-Address.LENGTH);
+		return AccountKey.wrap(bytes,n-Address.LENGTH);
 	}
 	
 	/**
@@ -146,7 +147,7 @@ public class Ed25519KeyPair extends AKeyPair {
 	}
 
 	public byte[] getPublicKeyBytes() {
-		return getAddress().getBytes();
+		return getAccountKey().getBytes();
 	}
 	
 	public static PrivateKey privateKeyFromBlob(Blob encodedKey) {
@@ -202,7 +203,7 @@ public class Ed25519KeyPair extends AKeyPair {
 	}
 
 	@Override
-	public Address getAddress() {
+	public AccountKey getAccountKey() {
 		return address;
 	}
 

@@ -219,7 +219,7 @@ public class PeerManager extends JPanel {
 		Address address = we.getAddress();
 		AccountStatus as = getLatestState().getAccount(address);
 		long sequence = as.getSequence() + 1;
-		ATransaction trans = Invoke.create(sequence, code);
+		ATransaction trans = Invoke.create(address,sequence, code);
 		return execute(we,trans);
 	}
 	

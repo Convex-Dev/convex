@@ -11,18 +11,6 @@ import convex.core.util.Utils;
 /**
  * Immutable class representing an Address.
  * 
- * <p>
- * Using Ed25519:
- * </p>
- * <li>Addresses are the Public Key (32 bytes)</li>
- * 
- * <p>
- * Using ECDSA:
- * </p>
- * <li>Addresses are defined as the last 20 bytes of the keccak256 hash of the
- * public key as per the Ethereum standard</li>
- * 
- * 
  */
 public class Address extends AArrayBlob {
 	public static final int LENGTH = 32;
@@ -47,6 +35,21 @@ public class Address extends AArrayBlob {
 	public static Address wrap(byte[] data) {
 		return new Address(data, 0, data.length);
 	}
+	
+	/**
+	 * Creates an Address from a blob. Must be a valid Address byte sequence
+	 * @param b
+	 * @return AccountKey insatnce, or null if not valid
+	 */
+	public static Address create(ABlob b) {
+		if (b.length()!=LENGTH) return null;
+		if (b instanceof AArrayBlob) {
+			AArrayBlob ab=(AArrayBlob)b;
+			return new Address(ab.getInternalArray(),ab.getOffset(),LENGTH);
+		}
+		return wrap(b.getBytes());
+	}
+
 
 	/**
 	 * Wraps the specified bytes as an Address object Warning: underlying bytes are
@@ -276,5 +279,6 @@ public class Address extends AArrayBlob {
 	public boolean isRegularBlob() {
 		return false;
 	}
+
 
 }

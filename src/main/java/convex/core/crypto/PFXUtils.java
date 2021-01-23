@@ -113,7 +113,7 @@ public class PFXUtils {
 		
 		Certificate cert =createSelfSignedCertificate(kp);
 		
-		ks.setKeyEntry(kp.getAddress().toHexString(), kp.getPrivate(), pwdArray, new Certificate[] {cert});
+		ks.setKeyEntry(kp.getAccountKey().toHexString(), kp.getPrivate(), pwdArray, new Certificate[] {cert});
 		
 		return ks;
 	}

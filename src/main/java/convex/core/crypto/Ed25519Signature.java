@@ -7,7 +7,7 @@ import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
 
-import convex.core.data.Address;
+import convex.core.data.AccountKey;
 import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -66,7 +66,7 @@ public class Ed25519Signature extends ASignature {
 	}
 
 	@Override
-	public boolean verify(Hash hash, Address address) {
+	public boolean verify(Hash hash, AccountKey address) {
 	    PublicKey pk=Ed25519KeyPair.publicKeyFromBytes(address.getBytes());
 	    return verify(hash,pk);
 	}

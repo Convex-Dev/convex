@@ -8,6 +8,7 @@ import convex.core.crypto.Hash;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -46,7 +47,7 @@ import convex.core.transactions.ATransaction;
  */
 public class Peer {
 	/** This Peer's address */
-	private final Address address;
+	private final AccountKey address;
 
 	/** This Peer's key pair */
 	private final AKeyPair keyPair;
@@ -73,7 +74,7 @@ public class Peer {
 	private Peer(AKeyPair kp, SignedData<Belief> belief, AVector<State> states, AVector<BlockResult> results,
 			long timeStamp) {
 		this.keyPair = kp;
-		this.address = kp.getAddress();
+		this.address = kp.getAccountKey();
 		this.belief = belief;
 		this.states = states;
 		this.blockResults = results;
@@ -201,9 +202,10 @@ public class Peer {
 	 * @param trans Transaction to test
 	 * @return
 	 */
-	public long estimateCost(Address address, ATransaction trans) {
+	public long estimateCost(ATransaction trans) {
+		Address address=trans.getAddress();
 		State state=getConsensusState();
-		Context<?> ctx=executeDryRun(address,trans);
+		Context<?> ctx=executeDryRun(trans);
 		return state.getBalance(address)-ctx.getState().getBalance(address);
 	}
 	
@@ -215,8 +217,8 @@ public class Peer {
 	 * @param transaction Transaction to execute
 	 * @returnThe Context containing the query results.
 	 */
-	public <T> Context<T> executeDryRun(Address origin, ATransaction transaction) {
-		Context<T> ctx=getConsensusState().applyTransaction(origin,transaction);
+	public <T> Context<T> executeDryRun(ATransaction transaction) {
+		Context<T> ctx=getConsensusState().applyTransaction(transaction);
 		return ctx;
 	}
 	
@@ -238,7 +240,7 @@ public class Peer {
 	 * Gets the Address of this Peer. 
 	 * @return Address of Peer.
 	 */
-	public Address getAddress() {
+	public AccountKey getPeerKey() {
 		return address;
 	}
 
@@ -345,14 +347,14 @@ public class Peer {
 	 */
 	public Peer proposeBlock(Block block) throws BadSignatureException {
 		Belief b = getBelief();
-		AHashMap<Address, SignedData<Order>> chains = b.getChains();
+		AHashMap<AccountKey, SignedData<Order>> chains = b.getOrders();
 		SignedData<Order> mySignedChain = chains.get(address);
 
 		Order myChain = mySignedChain.getValue();
 
 		Order newChain = myChain.propose(block);
 		SignedData<Order> newSignedChain = sign(newChain);
-		AHashMap<Address, SignedData<Order>> newChains = chains.assoc(address, newSignedChain);
+		AHashMap<AccountKey, SignedData<Order>> newChains = chains.assoc(address, newSignedChain);
 		return updateBelief(b.withOrders(newChains));
 	}
 
@@ -383,7 +385,7 @@ public class Peer {
 	 * @return The current Order for the specified peer
 	 * @throws BadSignatureException
 	 */
-	public Order getOrder(Address a) throws BadSignatureException {
+	public Order getOrder(AccountKey a) throws BadSignatureException {
 		return getBelief().getOrder(a);
 	}
 

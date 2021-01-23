@@ -21,14 +21,14 @@ public class Transfer extends ATransaction {
 	protected final Address target;
 	protected final long amount;
 
-	protected Transfer(long nonce, Address target, long amount) {
-		super(nonce);
+	protected Transfer(Address address,long nonce, Address target, long amount) {
+		super(address,nonce);
 		this.target = target;
 		this.amount = amount;
 	}
 
-	public static Transfer create(long nonce, Address target, long amount) {
-		return new Transfer(nonce, target, amount);
+	public static Transfer create(Address address,long nonce, Address target, long amount) {
+		return new Transfer(address,nonce, target, amount);
 	}
 
 
@@ -49,16 +49,17 @@ public class Transfer extends ATransaction {
 	/**
 	 * Read a Transfer transaction from a ByteBuffer
 	 * 
-	 * @param b ByteBuffer containing the transaction
+	 * @param bb ByteBuffer containing the transaction
 	 * @throws BadFormatException if the data is invalid
 	 * @return The Transfer object
 	 */
-	public static Transfer read(ByteBuffer b) throws BadFormatException {
-		long nonce = Format.readVLCLong(b);
-		Address target = Address.readRaw(b);
-		long amount = Format.readVLCLong(b);
+	public static Transfer read(ByteBuffer bb) throws BadFormatException {
+		Address address=Address.readRaw(bb);
+		long nonce = Format.readVLCLong(bb);
+		Address target = Address.readRaw(bb);
+		long amount = Format.readVLCLong(bb);
 		if (!RT.isValidAmount(amount)) throw new BadFormatException("Invalid amount: "+amount);
-		return create(nonce, target, amount);
+		return create(address,nonce, target, amount);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -139,6 +140,6 @@ public class Transfer extends ATransaction {
 	@Override
 	public ATransaction withSequence(long newSequence) {
 		if (newSequence==this.sequence) return this;
-		return create(newSequence,target,amount);
+		return create(address,newSequence,target,amount);
 	}
 }

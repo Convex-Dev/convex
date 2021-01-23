@@ -3,7 +3,7 @@ package convex.core.crypto;
 import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
-import convex.core.data.Address;
+import convex.core.data.AccountKey;
 import convex.core.exceptions.BadFormatException;
 import convex.core.util.Utils;
 
@@ -12,10 +12,10 @@ public abstract class ASignature extends ACell {
 	/**
 	 * Checks if the signature is valid for a given message hash
 	 * @param hash
-	 * @param address
+	 * @param publickKey
 	 * @return True if signature is valid, false otherwise
 	 */
-	public abstract boolean verify(Hash hash, Address address);
+	public abstract boolean verify(Hash hash, AccountKey publickKey);
 	
 	/**
 	 * Reads a Signature from the given ByteBuffer. Assumes tag byte already read.

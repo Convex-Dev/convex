@@ -15,6 +15,7 @@ import convex.core.data.AMap;
 import convex.core.data.ASequence;
 import convex.core.data.ASet;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.BlobMap;
@@ -51,6 +52,7 @@ public class Samples {
 	 * An Address which cannot be valid
 	 */
 	public static final Address BAD_ADDRESS = Address.dummy("012345");
+	public static final AccountKey BAD_ACCOUNTKEY = AccountKey.dummy("ffff");
 	
 	public static final ASignature BAD_SIGNATURE = Ed25519Signature.wrap(Blobs.createRandom(64).getBytes());
 

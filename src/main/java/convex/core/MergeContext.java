@@ -1,7 +1,7 @@
 package convex.core;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.data.Address;
+import convex.core.data.AccountKey;
 import convex.core.data.SignedData;
 
 /**
@@ -16,14 +16,14 @@ import convex.core.data.SignedData;
  */
 public class MergeContext {
 
-	private final Address address;
+	private final AccountKey publicKey;
 	private final State state;
 	private final AKeyPair keyPair;
 	private final long timestamp;
 
 	private MergeContext(AKeyPair peerKeyPair, long mergeTimestamp, State consensusState) {
 		this.state = consensusState;
-		this.address = peerKeyPair.getAddress();
+		this.publicKey = peerKeyPair.getAccountKey();
 		this.keyPair = peerKeyPair;
 		this.timestamp = mergeTimestamp;
 	}
@@ -37,8 +37,8 @@ public class MergeContext {
 	 * 
 	 * @return The Address of the peer.
 	 */
-	public Address getAddress() {
-		return address;
+	public AccountKey getAccountKey() {
+		return publicKey;
 	}
 
 	public <T> SignedData<T> sign(T value) {

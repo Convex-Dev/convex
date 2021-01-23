@@ -33,21 +33,21 @@ public class Call extends ATransaction {
 
 
 	
-	protected Call(long sequence, Address target, long offer,Symbol functionName,AVector<Object> args) {
-		super(sequence);
+	protected Call(Address address, long sequence, Address target, long offer,Symbol functionName,AVector<Object> args) {
+		super(address,sequence);
 		this.target=target;
 		this.functionName=functionName;
 		this.offer=offer;
 		this.args=args;
 	}
 	
-	public static Call create(long sequence, Address target, long offer,Symbol functionName,AVector<Object> args) {
-		return new Call(sequence,target,0,functionName,args);
+	public static Call create(Address address, long sequence, Address target, long offer,Symbol functionName,AVector<Object> args) {
+		return new Call(address,sequence,target,0,functionName,args);
 	}
 
 	
-	public static Call create(long sequence, Address target, Symbol functionName,AVector<Object> args) {
-		return create(sequence,target,0,functionName,args);
+	public static Call create(Address address, long sequence, Address target, Symbol functionName,AVector<Object> args) {
+		return create(address,sequence,target,0,functionName,args);
 	}
 
 	@Override
@@ -92,12 +92,13 @@ public class Call extends ATransaction {
 	}
 	
 	public static ATransaction read(ByteBuffer bb) throws BadFormatException {
+		Address address=Address.readRaw(bb);
 		long sequence = Format.readVLCLong(bb);
 		Address target=Format.read(bb);
 		long offer = Format.readVLCLong(bb);
 		Symbol functionName=Format.read(bb);
 		AVector<Object> args = Format.read(bb);
-		return create(sequence, target, offer, functionName,args);
+		return create(address,sequence, target, offer, functionName,args);
 	}
 
 	@Override
@@ -134,13 +135,13 @@ public class Call extends ATransaction {
 	public ACell updateRefs(IRefFunction func) {
 		AVector<Object> newArgs=args.updateRefs(func);
 		if (args==newArgs) return this;
-		return new Call(sequence,target,offer,functionName,newArgs);
+		return new Call(address,sequence,target,offer,functionName,newArgs);
 	}
 
 	@Override
 	public ATransaction withSequence(long newSequence) {
 		if (newSequence==this.sequence) return this;
-		return create(newSequence,target,offer,functionName,args);
+		return create(address,newSequence,target,offer,functionName,args);
 	}
 
 

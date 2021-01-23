@@ -13,6 +13,7 @@ import java.util.function.Consumer;
 import convex.core.Constants;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.SignedData;
 import convex.core.lang.Reader;
@@ -43,6 +44,11 @@ public class Convex {
 	 * Key pair for this Client
 	 */
 	protected final AKeyPair keyPair;
+	
+	/**
+	 * Current addres for this Client
+	 */
+	protected Address address;
 	
 	/**
 	 * Current Connection to a Peer, may be null or a closed connection.
@@ -80,6 +86,9 @@ public class Convex {
 
 	private Convex(AKeyPair keyPair) {
 		this.keyPair=keyPair;
+		
+		// TODO: numeric address
+		this.address=Address.create(keyPair.getAccountKey());
 	}
 
 	/**
@@ -374,12 +383,21 @@ public class Convex {
 	}
 
 	/**
+	 * Returns the current AcountKey for the client using the API.
+	 * 
+	 * @return AcountKey instance
+	 */
+	public AccountKey getAccountKey() {
+		return keyPair.getAccountKey();
+	}
+	
+	/**
 	 * Returns the current Address for the client using the API.
 	 * 
 	 * @return Address instance
 	 */
-	private Address getAddress() {
-		return keyPair.getAddress();
+	public Address getAddress() {
+		return address;
 	}
 
 	/**

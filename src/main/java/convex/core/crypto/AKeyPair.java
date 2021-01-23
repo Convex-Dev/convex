@@ -3,6 +3,7 @@ package convex.core.crypto;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 
+import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.SignedData;
@@ -15,10 +16,10 @@ import convex.core.data.SignedData;
 public abstract class AKeyPair {
 
 	/**
-	 * Gets the Address of this KeyPair
-	 * @return Address for this KeyPair
+	 * Gets the Account Public Key of this KeyPair
+	 * @return AccountKey for this KeyPair
 	 */
-	public abstract Address getAddress();
+	public abstract AccountKey getAccountKey();
 	
 	/**
 	 * Gets the Private key encoded as a Blob

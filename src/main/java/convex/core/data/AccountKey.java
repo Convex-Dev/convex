@@ -53,6 +53,20 @@ public class AccountKey extends AArrayBlob {
 	public static AccountKey wrap(byte[] data, int offset) {
 		return new AccountKey(data, offset, LENGTH);
 	}
+	
+	/**
+	 * Creates an AccountKey from a blob. Must have correct length.
+	 * @param b
+	 * @return AccountKey insatnce, or null if not valid
+	 */
+	public static AccountKey create(ABlob b) {
+		if (b.length()!=LENGTH) return null;
+		if (b instanceof AArrayBlob) {
+			AArrayBlob ab=(AArrayBlob)b;
+			return new AccountKey(ab.getInternalArray(),ab.getOffset(),LENGTH);
+		}
+		return wrap(b.getBytes());
+	}
 
 	private static AccountKey wrap(AArrayBlob source) {
 		return new AccountKey(source.store, source.offset, source.length);
@@ -125,6 +139,12 @@ public class AccountKey extends AArrayBlob {
 		if (bs.length != LENGTH) return null; // wrong length
 		return wrap(bs);
 	}
+	
+	public static AccountKey fromHexOrNull(AString a) {
+		if (a.length()!=LENGTH*2) return null;
+		return fromHexOrNull(a.toString());
+	}
+
 
 	/**
 	 * Constructs an Address object from a checksummed hex string.
@@ -269,5 +289,7 @@ public class AccountKey extends AArrayBlob {
 	public boolean isRegularBlob() {
 		return false;
 	}
+
+
 
 }

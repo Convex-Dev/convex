@@ -131,7 +131,7 @@ public class MapsTest {
 	
 	@Test
 	public void regressionEmbeddedTransfer() throws BadFormatException {
-		ATransaction trans=Transfer.create(0, Init.HERO, 58);
+		ATransaction trans=Transfer.create(Init.HERO,0, Init.HERO, 58);
 		Short key=(short)23771;
 		AMap<Short,ATransaction> m=Maps.create(key,trans);
 		MapEntry<Short,ATransaction> me=m.entryAt(0);

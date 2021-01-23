@@ -19,6 +19,7 @@ import convex.core.data.ASequence;
 import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Blobs;
 import convex.core.data.Format;
@@ -794,6 +795,17 @@ public class RT {
 		return null;
 	}
 	
+	public static AccountKey accountKey(Object a) {
+		if (a instanceof AccountKey) return (AccountKey) a;
+		if (a instanceof AString) return accountKey(AccountKey.fromHexOrNull((AString)a));
+		if (a instanceof ABlob) {
+			ABlob b = (ABlob) a;
+			return AccountKey.create(b);
+		}
+
+		return null;
+	}
+	
 	/**
 	 * Casts an String argument to a valid Address.
 	 * 
@@ -1190,6 +1202,7 @@ public class RT {
 	public static boolean isValidAmount(long amount) {
 		return ((amount>=0)&&(amount<Constants.MAX_SUPPLY));
 	}
+
 
 
 

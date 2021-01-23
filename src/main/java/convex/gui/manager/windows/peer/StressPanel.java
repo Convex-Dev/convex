@@ -158,7 +158,7 @@ public class StressPanel extends JPanel {
 						}
 						sb.append("))");
 						String source = sb.toString();
-						ATransaction t = Invoke.create(++seq, Reader.read(source));
+						ATransaction t = Invoke.create(Init.HERO,++seq, Reader.read(source));
 						SignedData<ATransaction> signed = Init.HERO_KP.signData(t);
 						long id = pc.sendTransaction(signed);
 						while (id <= 0) {

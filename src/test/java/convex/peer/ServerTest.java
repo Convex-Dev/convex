@@ -21,6 +21,7 @@ import convex.core.ErrorCodes;
 import convex.core.Init;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AVector;
+import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
@@ -99,13 +100,13 @@ public class ServerTest {
 		
 		// Connect to Peer Server using the current store for the client
 		Connection pc = Connection.connect(hostAddress, handler, Stores.current());
-		
-		long id1 = pc.sendTransaction(keyPair.signData(Invoke.create(1, Reader.read("[1 2 3]"))));
-		long id2 = pc.sendTransaction(keyPair.signData(Invoke.create(2, Reader.read("(return 2)"))));
-		long id2a = pc.sendTransaction(keyPair.signData(Invoke.create(2, Reader.read("22"))));
-		long id3 = pc.sendTransaction(keyPair.signData(Invoke.create(3, Reader.read("(rollback 3)"))));
-		long id4 = pc.sendTransaction(keyPair.signData(Transfer.create(4, Init.HERO, 1000)));
-		long id5 = pc.sendTransaction(keyPair.signData(Call.create(5, Init.REGISTRY_ADDRESS, Symbols.FOO, Vectors.of(Maps.empty()))));
+		Address addr=Address.create(keyPair.getAccountKey());
+		long id1 = pc.sendTransaction(keyPair.signData(Invoke.create(addr, 1, Reader.read("[1 2 3]"))));
+		long id2 = pc.sendTransaction(keyPair.signData(Invoke.create(addr, 2, Reader.read("(return 2)"))));
+		long id2a = pc.sendTransaction(keyPair.signData(Invoke.create(addr, 2, Reader.read("22"))));
+		long id3 = pc.sendTransaction(keyPair.signData(Invoke.create(addr, 3, Reader.read("(rollback 3)"))));
+		long id4 = pc.sendTransaction(keyPair.signData(Transfer.create(addr, 4, Init.HERO, 1000)));
+		long id5 = pc.sendTransaction(keyPair.signData(Call.create(addr, 5, Init.REGISTRY_ADDRESS, Symbols.FOO, Vectors.of(Maps.empty()))));
 		
 		assertTrue(id5>=0);
 		assertTrue(!pc.isClosed());

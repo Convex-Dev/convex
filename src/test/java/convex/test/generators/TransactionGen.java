@@ -22,15 +22,15 @@ public class TransactionGen extends Generator<ATransaction> {
 
 		long amt = r.nextLong(0, Constants.MAX_SUPPLY);
 
-		Address src = Samples.KEY_PAIR.getAddress();
+		Address src = Address.create(Samples.KEY_PAIR.getAccountKey());
 		long seq = r.nextInt(10000);
 		int type = r.nextInt(2);
 		switch (type) {
 		case 0: {
-			return Transfer.create(seq, src, amt);
+			return Transfer.create(src,seq, src, amt);
 		}
 		case 1: {
-			return Invoke.create(seq, Vectors.empty());
+			return Invoke.create(src,seq, Vectors.empty());
 		}
 		default:
 			throw new Error("Invalid type: " + type);

@@ -19,6 +19,7 @@ public class AddressGen extends Generator<Address> {
 	public Address generate(SourceOfRandomness r, GenerationStatus status) {
 
 		AKeyPair kp = Ed25519KeyPair.generate(new SecureRandom());
-		return kp.getAddress();
+		// TODO: numeric addresses
+		return Address.create(kp.getAccountKey());
 	}
 }

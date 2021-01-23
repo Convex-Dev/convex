@@ -6,6 +6,7 @@ import java.util.List;
 
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
@@ -33,7 +34,7 @@ import convex.core.util.Utils;
 public class Block extends ARecord {
 	private final long timestamp;
 	private final AVector<SignedData<ATransaction>> transactions;
-	private final Address peerAddress;
+	private final AccountKey peerAddress;
 
 	private static final Keyword[] BLOCK_KEYS = new Keyword[] { Keywords.TIMESTAMP, Keywords.TRANSACTIONS, Keywords.PEER };
 	private static final RecordFormat FORMAT = RecordFormat.of(BLOCK_KEYS);
@@ -46,7 +47,7 @@ public class Block extends ARecord {
 		}
 	};
 
-	private Block(long timestamp, AVector<SignedData<ATransaction>> transactions, Address peer) {
+	private Block(long timestamp, AVector<SignedData<ATransaction>> transactions, AccountKey peer) {
 		super(FORMAT);
 		this.timestamp = timestamp;
 		this.transactions = transactions;
@@ -67,7 +68,7 @@ public class Block extends ARecord {
 	protected Block updateAll(Object[] newVals) {
 		long newTimestamp = (Long) newVals[0];		
 		AVector<SignedData<ATransaction>> newTransactions = (AVector<SignedData<ATransaction>>) newVals[1];
-		Address newPeer = (Address) newVals[2];
+		AccountKey newPeer = (AccountKey) newVals[2];
 		if ((this.transactions == newTransactions) && (this.timestamp == newTimestamp) && (peerAddress==newPeer)) {
 			return this;
 		}
@@ -88,7 +89,7 @@ public class Block extends ARecord {
 	 * 
 	 * @return Address of Peer publishing this block
 	 */
-	public Address getPeer() {
+	public AccountKey getPeer() {
 		return peerAddress;
 	}
 
@@ -100,7 +101,7 @@ public class Block extends ARecord {
 	 * @param peerAddress 
 	 * @return A new Block containing the specified signed transactions
 	 */
-	public static Block create(long timestamp, List<SignedData<ATransaction>> transactions, Address peerAddress) {
+	public static Block create(long timestamp, List<SignedData<ATransaction>> transactions, AccountKey peerAddress) {
 		return new Block(timestamp, Vectors.create(transactions),peerAddress);
 	}
 
@@ -110,7 +111,7 @@ public class Block extends ARecord {
 	 * @param transactions
 	 * @return A new Block containing the specified signed transactions
 	 */
-	public static Block create(long timestamp, AVector<SignedData<ATransaction>> transactions, Address peer) {
+	public static Block create(long timestamp, AVector<SignedData<ATransaction>> transactions, AccountKey peer) {
 		return new Block(timestamp, transactions,peer);
 	}
 
@@ -160,7 +161,7 @@ public class Block extends ARecord {
 		try {
 			AVector<SignedData<ATransaction>> transactions = Format.read(bb);
 			if (transactions==null) throw new BadFormatException("Null transactions");
-			Address peer=Format.read(bb);
+			AccountKey peer=Format.read(bb);
 			return Block.create(timestamp, transactions,peer);
 		} catch (ClassCastException e) {
 			throw new BadFormatException("Error reading Block format", e);

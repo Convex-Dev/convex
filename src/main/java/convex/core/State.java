@@ -12,6 +12,7 @@ import convex.core.data.AMap;
 import convex.core.data.ARecord;
 import convex.core.data.ASet;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.BlobMap;
@@ -66,12 +67,12 @@ public class State extends ARecord {
 	// TODO: check we aren't at risk of hitting max encoding size limits
 	
 	private final BlobMap<Address, AccountStatus> accounts;
-	private final BlobMap<Address, PeerStatus> peers;
+	private final BlobMap<AccountKey, PeerStatus> peers;
 	private final ASet<Object> store;
 	private final AHashMap<Symbol, Object> globals;
 	private final BlobMap<ABlob, AVector<Object>> schedule;
 
-	private State(BlobMap<Address, AccountStatus> accounts, BlobMap<Address, PeerStatus> peers, ASet<Object> store,
+	private State(BlobMap<Address, AccountStatus> accounts, BlobMap<AccountKey, PeerStatus> peers, ASet<Object> store,
 			AHashMap<Symbol, Object> globals, BlobMap<ABlob, AVector<Object>> schedule) {
 		super(FORMAT);
 		this.accounts = accounts;
@@ -96,7 +97,7 @@ public class State extends ARecord {
 	@Override
 	protected State updateAll(Object[] newVals) {
 		BlobMap<Address, AccountStatus> accounts = (BlobMap<Address, AccountStatus>) newVals[0];
-		BlobMap<Address, PeerStatus> peers = (BlobMap<Address, PeerStatus>) newVals[1];
+		BlobMap<AccountKey, PeerStatus> peers = (BlobMap<AccountKey, PeerStatus>) newVals[1];
 		ASet<Object> store = (ASet<Object>) newVals[2];
 		AHashMap<Symbol, Object> globals = (AHashMap<Symbol, Object>) newVals[3];
 		BlobMap<ABlob, AVector<Object>> schedule = (BlobMap<ABlob, AVector<Object>>) newVals[4];
@@ -107,7 +108,7 @@ public class State extends ARecord {
 		return new State(accounts, peers, store, globals, schedule);
 	}
 
-	public static State create(BlobMap<Address, AccountStatus> accounts, BlobMap<Address, PeerStatus> peers,
+	public static State create(BlobMap<Address, AccountStatus> accounts, BlobMap<AccountKey, PeerStatus> peers,
 			ASet<Object> store, AHashMap<Symbol, Object> globals, BlobMap<ABlob, AVector<Object>> schedule) {
 		return new State(accounts, peers, store, globals, schedule);
 	}
@@ -149,7 +150,7 @@ public class State extends ARecord {
 	public static State read(ByteBuffer bb) throws BadFormatException {
 		try {
 			BlobMap<Address, AccountStatus> accounts = Format.read(bb);
-			BlobMap<Address, PeerStatus> peers = Format.read(bb);
+			BlobMap<AccountKey, PeerStatus> peers = Format.read(bb);
 			ASet<Object> store = Format.read(bb);
 			AHashMap<Symbol, Object> globals = Format.read(bb);
 			BlobMap<ABlob, AVector<Object>> schedule = Format.read(bb);
@@ -178,7 +179,7 @@ public class State extends ARecord {
 	 * 
 	 * @return A map of addresses to PeerStatus records
 	 */
-	public BlobMap<Address, PeerStatus> getPeers() {
+	public BlobMap<AccountKey, PeerStatus> getPeers() {
 		return peers;
 	}
 
@@ -346,11 +347,10 @@ public class State extends ARecord {
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
 	private <T> Context<T> applyTransaction(SignedData<? extends ATransaction> signedTransaction) throws BadSignatureException {
-		// Extract transaction and origin address
-		Address origin=signedTransaction.getAddress();
+		// Extract transaction, performs signature check
 		ATransaction t=signedTransaction.getValue();
 		
-		Context<T> ctx=applyTransaction(origin,t);
+		Context<T> ctx=applyTransaction(t);
 		return ctx;
 	}
 	
@@ -368,7 +368,8 @@ public class State extends ARecord {
 	 * 
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
-	public <T> Context<T> applyTransaction(Address origin,ATransaction t) {
+	public <T> Context<T> applyTransaction(ATransaction t) {
+		Address origin = t.getAddress();
 		
 		// Create prepared context (juice subtracted, sequence updated, transaction entry checks)
 		Context<T> ctx = prepareTransaction(origin,t);
@@ -427,8 +428,8 @@ public class State extends ARecord {
 	 * 
 	 * @return @
 	 */
-	public HashMap<Address, Double> computeStakes() {
-		HashMap<Address, Double> hm = new HashMap<>(peers.size());
+	public HashMap<AccountKey, Double> computeStakes() {
+		HashMap<AccountKey, Double> hm = new HashMap<>(peers.size());
 		Double totalStake = peers.reduceEntries((acc, e) -> {
 			double stake = (double) (e.getValue().getTotalStake());
 			hm.put(e.getKey(), stake);
@@ -482,7 +483,7 @@ public class State extends ARecord {
 		return create(accounts, peers, newStore, globals, schedule);
 	}
 
-	public State withPeers(BlobMap<Address, PeerStatus> newPeers) {
+	public State withPeers(BlobMap<AccountKey, PeerStatus> newPeers) {
 		if (peers == newPeers) return this;
 		return create(accounts, newPeers, store, globals, schedule);
 	}
@@ -606,19 +607,19 @@ public class State extends ARecord {
 	 * @param peerAddress Address of Peer to check
 	 * @return PeerStatus
 	 */
-	public PeerStatus getPeer(Address peerAddress) {
+	public PeerStatus getPeer(AccountKey peerAddress) {
 		return getPeers().get(peerAddress);
 	}
 
 	/**
 	 * Updates the specified peer status
 	 * 
-	 * @param peerAddress
+	 * @param peerKey
 	 * @param updatedPeer
 	 * @return Updated state
 	 */
-	public State withPeer(Address peerAddress, PeerStatus updatedPeer) {
-		return withPeers(peers.assoc(peerAddress, updatedPeer));
+	public State withPeer(AccountKey peerKey, PeerStatus updatedPeer) {
+		return withPeers(peers.assoc(peerKey, updatedPeer));
 	}
 
 }

@@ -25,6 +25,7 @@ public class BigBlockBenchmark {
 	static final int NUM_TRANSACTIONS = 1000;
 	private static final long INITIAL_FUNDS = 1000000000;
 	static ArrayList<AKeyPair> keyPairs = new ArrayList<AKeyPair>();
+	static ArrayList<Address> addresses = new ArrayList<Address>();
 	public static State state = Init.STATE;
 	public static Block block;
 	static ArrayList<SignedData<ATransaction>> transactions = new ArrayList<SignedData<ATransaction>>();
@@ -33,12 +34,18 @@ public class BigBlockBenchmark {
 		for (int i = 0; i < NUM_ACCOUNTS; i++) {
 			AKeyPair kp = Ed25519KeyPair.generate();
 			keyPairs.add(kp);
-			state = state.putAccount(kp.getAddress(), (AccountStatus.create(INITIAL_FUNDS)));
+			
+			// TODO: numeric
+			Address a=Address.create(kp.getAccountKey());
+			state = state.putAccount(a, (AccountStatus.create(INITIAL_FUNDS)));
+			addresses.add(a);
 		}
 		for (int i = 0; i < NUM_TRANSACTIONS; i++) {
-			AKeyPair kp = keyPairs.get(new Random().nextInt(NUM_ACCOUNTS));
-			Address target = keyPairs.get(new Random().nextInt(NUM_ACCOUNTS)).getAddress();
-			Transfer t = Transfer.create(1, target, 1);
+			int src=new Random().nextInt(NUM_ACCOUNTS);
+			AKeyPair kp = keyPairs.get(src);
+			Address source=addresses.get(src);
+			Address target = addresses.get(new Random().nextInt(NUM_ACCOUNTS));
+			Transfer t = Transfer.create(source,1, target, 1);
 			transactions.add(kp.signData(t));
 		}
 		block = Block.create(System.currentTimeMillis(),transactions,Init.FIRST_PEER);

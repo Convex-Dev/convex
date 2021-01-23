@@ -25,6 +25,7 @@ import convex.core.State;
 import convex.core.crypto.Hash;
 import convex.core.data.ABlob;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Blob;
@@ -1825,7 +1826,7 @@ public class CoreTest {
 	@Test
 	public void testStake() {
 		Context<Object> ctx=step(INITIAL_CONTEXT,"(def my-peer \""+Init.FIRST_PEER.toHexString()+"\")");
-		Address MY_PEER=Init.FIRST_PEER;
+		AccountKey MY_PEER=Init.FIRST_PEER;
 		long PS=ctx.getState().getPeer(Init.FIRST_PEER).getOwnStake();
 		
 		{

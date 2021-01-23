@@ -39,8 +39,8 @@ public class RestoreTest {
 		Server s1=API.launchPeer(config);
 		
 		Convex cvx1=Convex.connect(s1.getHostAddress(), Init.HERO_KP);
-		Result tx1=cvx1.transactSync(Invoke.create(1, Symbols.STAR_ADDRESS));
-		Result tx2f=cvx1.transactSync(Invoke.create(1, Symbols.FOO)); // bad sequence
+		Result tx1=cvx1.transactSync(Invoke.create(Init.HERO,1, Symbols.STAR_ADDRESS));
+		Result tx2f=cvx1.transactSync(Invoke.create(Init.HERO,1, Symbols.FOO)); // bad sequence
 		assertEquals(Init.HERO,tx1.getValue());
 		Long balance1=cvx1.getBalance(Init.HERO);
 		assertTrue(balance1>0);
@@ -57,7 +57,7 @@ public class RestoreTest {
 		Long balance2=cvx2.getBalance(Init.HERO);
 		assertEquals(balance1,balance2);
 		
-		Result tx2=cvx2.transactSync(Invoke.create(2, Symbols.BALANCE));
+		Result tx2=cvx2.transactSync(Invoke.create(Init.HERO,2, Symbols.BALANCE));
 		assertFalse(tx2.isError());
 		
 		State state=s2.getPeer().getConsensusState();

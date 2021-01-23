@@ -31,7 +31,7 @@ public class TestConvex {
 		
 		assertTrue(cv.isConnected());
 
-		Result r=cv.transactSync(Invoke.create(1L,Reader.read("*address*")),1000);
+		Result r=cv.transactSync(Invoke.create(Init.HERO,1L,Reader.read("*address*")),1000);
 		assertEquals(TestState.HERO,r.getValue());
 		assertNull(r.getErrorCode());
 		
@@ -44,8 +44,8 @@ public class TestConvex {
 		
 		assertTrue(cv.isConnected());
 
-		Ref<ATransaction> tr=Invoke.create(1L,Reader.read("*address*")).getRef();
-		Result r=cv.transact(SignedData.create(Init.HERO, Samples.FAKE_SIGNATURE,tr)).get();
+		Ref<ATransaction> tr=Invoke.create(Init.HERO,1L,Reader.read("*address*")).getRef();
+		Result r=cv.transact(SignedData.create(Init.HERO_KP, Samples.FAKE_SIGNATURE,tr)).get();
 		assertEquals(ErrorCodes.SIGNATURE,r.getErrorCode());
 		
 		cv.disconnect();

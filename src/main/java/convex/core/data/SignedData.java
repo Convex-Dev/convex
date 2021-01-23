@@ -8,6 +8,7 @@ import convex.core.crypto.Hash;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.transactions.ATransaction;
 
 /**
  * Node representing a signed data object.
@@ -44,21 +45,21 @@ import convex.core.exceptions.InvalidDataException;
 public class SignedData<T> extends ACell {
 	private final Ref<T> valueRef;
 	private final ASignature signature;
-	private final Address address;
+	private final AccountKey address;
 	
 	/**
 	 * Validated flag. Not part of data representation: serves to avoid unnecessary re-validation.
 	 */
 	private boolean validated;
 
-	private SignedData(Ref<T> ref, Address address, ASignature sig, boolean validated) {
+	private SignedData(Ref<T> ref, AccountKey address, ASignature sig, boolean validated) {
 		this.valueRef = ref;
 		this.address = address;
 		signature = sig;
 		this.validated=validated;
 	}
 	
-	private SignedData(Ref<T> ref, Address address, ASignature sig) {
+	private SignedData(Ref<T> ref, AccountKey address, ASignature sig) {
 		this(ref,address,sig,false); // SECURITY: assume not validated unless specified
 	}
 
@@ -71,7 +72,7 @@ public class SignedData<T> extends ACell {
 	 */
 	public static <T> SignedData<T> createWithRef(AKeyPair keyPair, Ref<T> ref) {
 		ASignature sig = keyPair.sign(ref.getHash());
-		SignedData<T> sd = new SignedData<T>(ref, keyPair.getAddress(), sig);
+		SignedData<T> sd = new SignedData<T>(ref, keyPair.getAccountKey(), sig);
 		sd.validated = true; // validate stuff we have just signed by default
 		return sd;
 	}
@@ -88,11 +89,18 @@ public class SignedData<T> extends ACell {
 	 * @param ref     Ref to the data that has been signed
 	 * @return A new SignedData object
 	 */
-	public static <T> SignedData<T> create(Address address, ASignature sig, Ref<T> ref) {
+	public static <T> SignedData<T> create(AccountKey address, ASignature sig, Ref<T> ref) {
 		// boolean check=Sign.verify(ref.getHash(), sig, address);
 		// if (!check) throw new ValidationException("Invalid signature: "+sig);
 		return new SignedData<T>(ref, address, sig);
 	}
+	
+
+	public static SignedData<ATransaction> create(AKeyPair kp, ASignature sig, Ref<ATransaction> ref) {
+
+		return create(kp.getAccountKey(),sig,ref);
+	}
+
 
 	/**
 	 * Gets the signed value object encapsulated by this SignedData object.
@@ -116,13 +124,13 @@ public class SignedData<T> extends ACell {
 	}
 
 	/**
-	 * Gets the public Address of the signer. If the signature is valid, this
+	 * Gets the public key of the signer. If the signature is valid, this
 	 * represents a cryptographic proof that the signer was in possession of the
 	 * private key of this address.
 	 * 
-	 * @return Address of signer.
+	 * @return Public Key of signer.
 	 */
-	public Address getAddress() {
+	public AccountKey getAccountKey() {
 		return address;
 	}
 
@@ -164,7 +172,7 @@ public class SignedData<T> extends ACell {
 	 */
 	public static <T> SignedData<T> read(ByteBuffer data) throws BadFormatException {
 		// header already assumed to be consumed
-		Address address = Address.readRaw(data);
+		AccountKey address = AccountKey.readRaw(data);
 		ASignature sig = ASignature.read(data);
 		Ref<T> value = Format.readRef(data);
 		return create(address, sig, value);

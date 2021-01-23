@@ -59,7 +59,7 @@ public class StakingTest {
 		Context<Object> ctx0 = CTX.fork();
 
 		// not a peer, should be state error
-		assertStateError(ctx0.setStake(Init.HERO, 1000));
+		assertStateError(ctx0.setStake(Init.HERO_KP.getAccountKey(), 1000));
 
 		// bad arguments, out of range
 		assertArgumentError(ctx0.setStake(Init.FIRST_PEER, -1));

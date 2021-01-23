@@ -11,7 +11,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Transfer;
-import convex.test.Samples;
 
 public class BlocksTest {
 	@Test
@@ -31,10 +30,9 @@ public class BlocksTest {
 
 	@Test
 	public void testTransactions() throws BadSignatureException {
-		AKeyPair kp = Samples.KEY_PAIR;
-		Address addr = kp.getAddress();
+		AKeyPair kp = Init.HERO_KP;
 
-		ATransaction t = Transfer.create(0, addr, 1000);
+		ATransaction t = Transfer.create(Init.HERO,0, Init.VILLAIN, 1000);
 		SignedData<ATransaction> st = kp.signData(t);
 
 		long ts = System.currentTimeMillis();

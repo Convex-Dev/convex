@@ -4,6 +4,7 @@ import java.util.logging.Logger;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AHashMap;
+import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.BlobMap;
@@ -58,7 +59,7 @@ public class Init {
 
 	public static final Address HERO;
 	public static final Address VILLAIN;
-	public static final Address FIRST_PEER;
+	public static final AccountKey FIRST_PEER;
 
 	public static final AKeyPair HERO_KP;
 	public static final AKeyPair VILLAIN_KP;
@@ -77,7 +78,7 @@ public class Init {
 	static {
 		try {
 			// accumulators for initial state maps
-			BlobMap<Address, PeerStatus> peers = BlobMaps.empty();
+			BlobMap<AccountKey, PeerStatus> peers = BlobMaps.empty();
 			BlobMap<Address, AccountStatus> accts = BlobMaps.empty();
 
 			// Core library
@@ -104,30 +105,33 @@ public class Init {
 			for (int i = 0; i < NUM_PEERS; i++) {
 				AKeyPair kp = AKeyPair.createSeeded(123454321 + i);
 				KEYPAIRS[i] = kp;
-				Address address = kp.getAddress();
+				AccountKey peerKey = kp.getAccountKey();
 				long peerFunds = USER_ALLOCATION / 10;
 
 				// set a staked fund such that the first peer starts with super-majority
 				long stakedFunds = (long) (((i == 0) ? 0.75 : 0.01) * peerFunds);
 
 				// split peer funds between stake and account
-				peers = addPeer(peers, address, stakedFunds);
-				accts = addAccount(accts, address, peerFunds - stakedFunds);
+				peers = addPeer(peers, peerKey, stakedFunds);
+				
+				Address peerAddress=Address.create(peerKey);
+				accts = addAccount(accts, peerAddress, peerFunds - stakedFunds);
 			}
-			FIRST_PEER = KEYPAIRS[0].getAddress();
+			FIRST_PEER = KEYPAIRS[0].getAccountKey();
 
 			// Set up initial actor accounts
 			for (int i = 0; i < NUM_USERS; i++) {
 				AKeyPair kp = AKeyPair.createSeeded(543212345 + i);
 				KEYPAIRS[NUM_PEERS + i] = kp;
-				Address address = kp.getAddress();
+				// TODO: construct addresses
+				Address address = Address.create(kp.getAccountKey());
 				accts = addAccount(accts, address, USER_ALLOCATION / 10);
 			}
 
 			HERO_KP = KEYPAIRS[NUM_PEERS + 0];
-			HERO = HERO_KP.getAddress();
+			HERO = Address.create(HERO_KP.getAccountKey());
 			VILLAIN_KP = KEYPAIRS[NUM_PEERS + 1];
-			VILLAIN = VILLAIN_KP.getAddress();
+			VILLAIN = Address.create(VILLAIN_KP.getAccountKey());
 
 			// Build globals
 			AHashMap<Symbol, Object> globals = Maps.of(Symbols.TIMESTAMP, Constants.INITIAL_TIMESTAMP, Symbols.FEES, 0L,
@@ -214,10 +218,10 @@ public class Init {
 		return ctx.getState();
 	}
 
-	private static BlobMap<Address, PeerStatus> addPeer(BlobMap<Address, PeerStatus> peers, Address peerAddress,
+	private static BlobMap<AccountKey, PeerStatus> addPeer(BlobMap<AccountKey, PeerStatus> peers, AccountKey peerKey,
 			long initialStake) {
 		PeerStatus ps = PeerStatus.create(initialStake, null);
-		return peers.assoc(peerAddress, ps);
+		return peers.assoc(peerKey, ps);
 	}
 
 	private static BlobMap<Address, AccountStatus> addGovernanceAccount(BlobMap<Address, AccountStatus> accts,

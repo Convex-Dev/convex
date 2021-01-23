@@ -18,12 +18,12 @@ public class SignedDataTest {
 	@Test
 	public void testBadSignature() {
 		Ref<Long> dref = Ref.get(13L);
-		SignedData<Long> sd = SignedData.create(Samples.BAD_ADDRESS, Samples.BAD_SIGNATURE, dref);
+		SignedData<Long> sd = SignedData.create(Samples.BAD_ACCOUNTKEY, Samples.BAD_SIGNATURE, dref);
 		
 		assertFalse(sd.isValid());
 
 		assertEquals(13L, (long) sd.getValueUnchecked());
-		assertSame(Samples.BAD_ADDRESS, sd.getAddress());
+		assertSame(Samples.BAD_ACCOUNTKEY, sd.getAccountKey());
 		assertNotNull(sd.toString());
 
 		assertThrows(BadSignatureException.class, () -> sd.getValue());
@@ -53,6 +53,6 @@ public class SignedDataTest {
 		sd.validateSignature();
 		assertEquals(v, sd.getValue());
 		
-		assertEquals(TestState.HERO,sd.getAddress());
+		assertEquals(kp.getAccountKey(),sd.getAccountKey());
 	}
 }

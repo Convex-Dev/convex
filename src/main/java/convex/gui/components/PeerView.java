@@ -4,7 +4,7 @@ import java.net.InetSocketAddress;
 
 import convex.core.Peer;
 import convex.core.State;
-import convex.core.data.Address;
+import convex.core.data.AccountKey;
 import convex.core.data.PeerStatus;
 import convex.core.util.Text;
 import convex.gui.components.models.StateModel;
@@ -29,7 +29,7 @@ public class PeerView {
 		StringBuilder sb=new StringBuilder();
 		if (peerServer != null) {
 			State state=PeerManager.getLatestState();
-			Address paddr=peerServer.getAddress();
+			AccountKey paddr=peerServer.getAddress();
 			sb.append("0x"+paddr.toChecksumHex()+"\n");
 			sb.append("Local peer on: " + peerServer.getHostAddress() + " with store "+peerServer.getStore()+"\n");
 			

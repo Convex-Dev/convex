@@ -20,7 +20,7 @@ import java.util.Base64;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.data.Address;
+import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadFormatException;
@@ -39,7 +39,7 @@ public class Ed25519Test {
 	public void testPublicKeyBytes() {
 		Ed25519KeyPair kp1=Ed25519KeyPair.generate();
 		byte[] publicBytes=kp1.getPublicKeyBytes(); 
-		byte[] addressBytes=kp1.getAddress().getBytes();
+		byte[] addressBytes=kp1.getAccountKey().getBytes();
 		assertArrayEquals(publicBytes,addressBytes);
 	}
 	
@@ -48,7 +48,7 @@ public class Ed25519Test {
 		Ed25519KeyPair kp1=Ed25519KeyPair.generate();
 		PrivateKey priv=kp1.getPrivate();
 		PublicKey pub=kp1.getPublic();
-		Address address=kp1.getAddress();
+		AccountKey address=kp1.getAccountKey();
 		
 		SignedData<Long> sd1=kp1.signData(1L);
 		assertTrue(sd1.isValid());
@@ -57,7 +57,7 @@ public class Ed25519Test {
 		
 
 		Ed25519KeyPair kp2=Ed25519KeyPair.create(pub,priv);
-		assertEquals(address,kp2.getAddress());
+		assertEquals(address,kp2.getAccountKey());
 		assertArrayEquals(privateKeyBytes,kp2.getPrivate().getEncoded());
 		
 		SignedData<Long> sd2=kp2.signData(1L);
@@ -90,11 +90,11 @@ public class Ed25519Test {
 	}
 	
 	@Test
-	public void testAddressRoundTrip() {
+	public void testAccountKeyRoundTrip() {
 		// Address should round trip to a Ed25519 public key and back again
-		Address a=Address.fromHex("0123456701234567012345670123456701234567012345670123456701234567");
+		AccountKey a=AccountKey.fromHex("0123456701234567012345670123456701234567012345670123456701234567");
 		PublicKey pk=Ed25519KeyPair.publicKeyFromBytes(a.getBytes());
-		Address b=Ed25519KeyPair.extractAddress(pk);
+		AccountKey b=Ed25519KeyPair.extractAccountKey(pk);
 		assertEquals(a,b);
 	}
 	

@@ -38,13 +38,13 @@ public class LatencyBenchmark {
 	
 	@Benchmark
 	public void roundTripTransaction() throws TimeoutException, IOException {
-		client.transactSync(Invoke.create(-1, Constant.create(1L)));
+		client.transactSync(Invoke.create(Init.HERO,-1, Constant.create(1L)));
 	}
 	
 	@Benchmark
 	public void roundTripTwoTransactions() throws TimeoutException, IOException, InterruptedException, ExecutionException {
-		Future<Result> r1=client.transact(Invoke.create(-1, Constant.create(1L)));
-		Future<Result> r2=client2.transact(Invoke.create(-1, Constant.create(1L)));
+		Future<Result> r1=client.transact(Invoke.create(Init.HERO,-1, Constant.create(1L)));
+		Future<Result> r2=client2.transact(Invoke.create(Init.HERO,-1, Constant.create(1L)));
 		r1.get();
 		r2.get();
 	}

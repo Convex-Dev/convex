@@ -17,7 +17,6 @@ import convex.core.Init;
 import convex.core.crypto.AKeyPair;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
-import convex.test.Samples;
 import convex.test.generators.ValueGen;
 
 @RunWith(JUnitQuickcheck.class)
@@ -27,8 +26,8 @@ public class GenTestSignedValue {
 	}
 
 	private final AKeyPair KEYPAIR = Init.HERO_KP;
-	private final Address ADDRESS = KEYPAIR.getAddress();
-	private final Address BAD_ADDRESS = Samples.BAD_ADDRESS;
+	private final AccountKey ADDRESS = KEYPAIR.getAccountKey();
+	private final AccountKey BAD_ADDRESS = AccountKey.dummy("f");
 
 	@Test
 	public void testAddressLength() {

@@ -17,6 +17,7 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import convex.core.crypto.Ed25519KeyPair;
 import convex.core.data.AHashMap;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.BlobMap;
@@ -44,6 +45,7 @@ public class BeliefMergeTest {
 
 	public static final Ed25519KeyPair[] KEY_PAIRS = new Ed25519KeyPair[NUM_PEERS];
 	public static final Address[] ADDRESSES = new Address[NUM_PEERS];
+	public static final AccountKey[] KEYS = new AccountKey[NUM_PEERS];
 	public static final State INITIAL_STATE;
 	private static final long TEST_TIMESTAMP = Instant.parse("1977-11-13T00:30:00Z").toEpochMilli();
 	private static final long TOTAL_VALUE;
@@ -53,15 +55,18 @@ public class BeliefMergeTest {
 		long seed = 2654733563337952L;
 		// System.out.println("Generating with seed: "+seed);
 		BlobMap<Address, AccountStatus> accounts = BlobMaps.empty();
-		BlobMap<Address, PeerStatus> peers = BlobMaps.empty();
+		BlobMap<AccountKey, PeerStatus> peers = BlobMaps.empty();
 		for (int i = 0; i < NUM_PEERS; i++) {
 			Ed25519KeyPair kp = Ed25519KeyPair.createSeeded(seed + i * 17777);
-			Address addr = kp.getAddress();
+			AccountKey addr = kp.getAccountKey();
+			// TODO numeric addresses
+			Address address=Address.create(addr);
 			KEY_PAIRS[i] = kp;
-			ADDRESSES[i] = addr;
+			KEYS[i] = addr;
+			ADDRESSES[i] = address;
 			AccountStatus accStatus = AccountStatus.create((i + 1) * 1000000);
 			PeerStatus peerStatus = PeerStatus.create((i + 1) * 100000);
-			accounts = accounts.assoc(addr, accStatus);
+			accounts = accounts.assoc(address, accStatus);
 			peers = peers.assoc(addr, peerStatus);
 		}
 
@@ -187,50 +192,52 @@ public class BeliefMergeTest {
 		int RECEIVER = NUM_PEERS - 1;
 		Address PADDRESS = ADDRESSES[PROPOSER];
 		Address RADDRESS = ADDRESSES[RECEIVER];
+		AccountKey PKEY = KEYS[PROPOSER];
+		AccountKey RKEY = KEYS[RECEIVER];
 		long INITIAL_BALANCE_PROPOSER = INITIAL_STATE.getBalance(PADDRESS);
 		long INITIAL_BALANCE_RECEIVER = INITIAL_STATE.getBalance(RADDRESS);
 		long TRANSFER_AMOUNT = 100;
 		long TJUICE=Juice.TRANSFER;
 		
-		ATransaction trans = Transfer.create(1, RADDRESS, TRANSFER_AMOUNT); // note 1 = first sequence number required
+		ATransaction trans = Transfer.create(PADDRESS, 1, RADDRESS, TRANSFER_AMOUNT); // note 1 = first sequence number required
 		Peer[] bs3 = proposeTransactions(bs2, PROPOSER, trans);
 		if (ANALYSIS) printAnalysis(bs3, "Make proposal");
-		assertEquals(1, bs3[PROPOSER].getOrder(PADDRESS).getBlockCount());
-		assertEquals(0, bs3[RECEIVER].getOrder(PADDRESS).getBlockCount());
+		assertEquals(1, bs3[PROPOSER].getOrder(PKEY).getBlockCount());
+		assertEquals(0, bs3[RECEIVER].getOrder(PKEY).getBlockCount());
 
 		// New block should win vote for all peers, but not achieve enough support
 		// for proposed consensus yet
 		Peer[] bs4 = shareBeliefs(bs3);
 		if (ANALYSIS) printAnalysis(bs4, "Share 1st round, each peer should adopt proposed block");
-		assertEquals(1, bs4[PROPOSER].getOrder(PADDRESS).getBlockCount());
-		assertEquals(1, bs4[RECEIVER].getOrder(RADDRESS).getBlockCount());
-		assertEquals(0, bs4[PROPOSER].getOrder(RADDRESS).getBlockCount()); // proposer can't see block in receiver's
+		assertEquals(1, bs4[PROPOSER].getOrder(PKEY).getBlockCount());
+		assertEquals(1, bs4[RECEIVER].getOrder(RKEY).getBlockCount());
+		assertEquals(0, bs4[PROPOSER].getOrder(RKEY).getBlockCount()); // proposer can't see block in receiver's
 																			// chain yet
 
 		// all peers should propose new consensus, but not confirmed yet
-		assertEquals(0, bs4[PROPOSER].getOrder(PADDRESS).getProposalPoint());
-		assertEquals(0, bs4[RECEIVER].getOrder(RADDRESS).getProposalPoint());
+		assertEquals(0, bs4[PROPOSER].getOrder(PKEY).getProposalPoint());
+		assertEquals(0, bs4[RECEIVER].getOrder(RKEY).getProposalPoint());
 		Peer[] bs5 = shareBeliefs(bs4);
 		if (ANALYSIS) printAnalysis(bs5,
 				"Share 2nd round: each peer should propose consensus after seeing majority for new block");
-		assertEquals(1, bs5[PROPOSER].getOrder(PADDRESS).getProposalPoint());
-		assertEquals(1, bs5[RECEIVER].getOrder(RADDRESS).getProposalPoint());
+		assertEquals(1, bs5[PROPOSER].getOrder(PKEY).getProposalPoint());
+		assertEquals(1, bs5[RECEIVER].getOrder(RKEY).getProposalPoint());
 
 		// all peers should now agree on consensus, but don't know each other's
 		// consensus yet
-		assertEquals(0, bs5[PROPOSER].getOrder(PADDRESS).getConsensusPoint());
-		assertEquals(0, bs5[RECEIVER].getOrder(RADDRESS).getConsensusPoint());
-		assertEquals(0, bs5[PROPOSER].getOrder(RADDRESS).getConsensusPoint());
+		assertEquals(0, bs5[PROPOSER].getOrder(PKEY).getConsensusPoint());
+		assertEquals(0, bs5[RECEIVER].getOrder(RKEY).getConsensusPoint());
+		assertEquals(0, bs5[PROPOSER].getOrder(RKEY).getConsensusPoint());
 		Peer[] bs6 = shareBeliefs(bs5);
 		if (ANALYSIS) printAnalysis(bs6,
 				"Share 3nd round: each peer should confirm consensus after seeing proposals from others");
-		assertEquals(1, bs6[PROPOSER].getOrder(PADDRESS).getConsensusPoint());
-		assertEquals(1, bs6[RECEIVER].getOrder(RADDRESS).getConsensusPoint());
-		assertEquals(0, bs6[PROPOSER].getOrder(RADDRESS).getConsensusPoint());
+		assertEquals(1, bs6[PROPOSER].getOrder(PKEY).getConsensusPoint());
+		assertEquals(1, bs6[RECEIVER].getOrder(RKEY).getConsensusPoint());
+		assertEquals(0, bs6[PROPOSER].getOrder(RKEY).getConsensusPoint());
 
 		Peer[] bs7 = shareBeliefs(bs6);
 		if (ANALYSIS) printAnalysis(bs7, "Share 4th round: should reach full consensus, confirmations shared");
-		assertEquals(1, bs7[PROPOSER].getOrder(RADDRESS).getConsensusPoint()); // proposer now sees receivers consensus
+		assertEquals(1, bs7[PROPOSER].getOrder(RKEY).getConsensusPoint()); // proposer now sees receivers consensus
 
 		// final state checks
 		assertTrue(allBeliefsEqual(bs7)); // beliefs across peers should be equal
@@ -268,6 +275,8 @@ public class BeliefMergeTest {
 		int RECEIVER = NUM_PEERS - 1;
 		Address PADDRESS = ADDRESSES[PROPOSER];
 		Address RADDRESS = ADDRESSES[RECEIVER];
+		AccountKey PKEY = KEYS[PROPOSER];
+		AccountKey RKEY = KEYS[RECEIVER];
 		Long INITIAL_BALANCE_PROPOSER = INITIAL_STATE.getBalance(PADDRESS);
 		Long INITIAL_BALANCE_RECEIVER = INITIAL_STATE.getBalance(RADDRESS);
 		long TJUICE=Juice.TRANSFER;
@@ -275,27 +284,27 @@ public class BeliefMergeTest {
 		Peer[] bs3 = bs2;
 		for (int i = 0; i < NUM_PEERS; i++) {
 			long TRANSFER_AMOUNT = 100L;
-			ATransaction trans = Transfer.create(1, ADDRESSES[NUM_PEERS - 1 - i], TRANSFER_AMOUNT); // note 1 = first
+			ATransaction trans = Transfer.create(ADDRESSES[i],1, ADDRESSES[NUM_PEERS - 1 - i], TRANSFER_AMOUNT); // note 1 = first
 																									// sequence number
 																									// required
 			bs3 = proposeTransactions(bs3, i, trans);
 		}
 		if (ANALYSIS) printAnalysis(bs3, "Make proposals");
-		assertEquals(1, bs3[0].getOrder(PADDRESS).getBlockCount());
-		assertEquals(1, bs3[RECEIVER].getOrder(RADDRESS).getBlockCount());
-		assertEquals(0, bs3[RECEIVER].getOrder(PADDRESS).getBlockCount());
+		assertEquals(1, bs3[0].getOrder(PKEY).getBlockCount());
+		assertEquals(1, bs3[RECEIVER].getOrder(RKEY).getBlockCount());
+		assertEquals(0, bs3[RECEIVER].getOrder(PKEY).getBlockCount());
 
 		// New block should win vote for all peers, but not achieve enough support
 		// for proposed consensus yet
 		Peer[] bs4 = shareBeliefs(bs3);
 		if (ANALYSIS)
 			printAnalysis(bs4, "Share 1st round, each peer should see others chains, vote for same plus new blocks");
-		assertEquals(NUM_PEERS, bs4[PROPOSER].getOrder(PADDRESS).getBlockCount());
-		assertEquals(NUM_PEERS, bs4[RECEIVER].getOrder(RADDRESS).getBlockCount());
-		assertEquals(1, bs4[PROPOSER].getOrder(RADDRESS).getBlockCount()); // proposer can only see 1st block from
+		assertEquals(NUM_PEERS, bs4[PROPOSER].getOrder(PKEY).getBlockCount());
+		assertEquals(NUM_PEERS, bs4[RECEIVER].getOrder(RKEY).getBlockCount());
+		assertEquals(1, bs4[PROPOSER].getOrder(RKEY).getBlockCount()); // proposer can only see 1st block from
 																			// receiver
-		assertEquals(0, bs4[PROPOSER].getOrder(PADDRESS).getProposalPoint());
-		assertEquals(0, bs4[RECEIVER].getOrder(RADDRESS).getProposalPoint());
+		assertEquals(0, bs4[PROPOSER].getOrder(PKEY).getProposalPoint());
+		assertEquals(0, bs4[RECEIVER].getOrder(RKEY).getProposalPoint());
 
 		// Next round
 		Peer[] bs5 = shareBeliefs(bs4);
@@ -307,7 +316,7 @@ public class BeliefMergeTest {
 
 		Peer[] bs7 = shareBeliefs(bs6);
 		if (ANALYSIS) printAnalysis(bs7, "Share 4th round: should reach full consensus?");
-		assertEquals(NUM_PEERS, bs7[PROPOSER].getOrder(RADDRESS).getConsensusPoint()); // proposer now sees receivers
+		assertEquals(NUM_PEERS, bs7[PROPOSER].getOrder(RKEY).getConsensusPoint()); // proposer now sees receivers
 																						// consensus
 
 		// final state checks
@@ -360,6 +369,8 @@ public class BeliefMergeTest {
 		int RECEIVER = NUM_PEERS - 1;
 		Address PADDRESS = ADDRESSES[PROPOSER];
 		Address RADDRESS = ADDRESSES[RECEIVER];
+		AccountKey PKEY = KEYS[PROPOSER];
+		AccountKey RKEY = KEYS[RECEIVER];
 		long INITIAL_BALANCE_PROPOSER = INITIAL_STATE.getBalance(PADDRESS);
 		long INITIAL_BALANCE_RECEIVER = INITIAL_STATE.getBalance(RADDRESS);
 		long TJUICE=Juice.TRANSFER*NUM_INITIAL_TRANS;
@@ -370,7 +381,7 @@ public class BeliefMergeTest {
 			// propose initial transactions
 			for (int j = 1; j <= NUM_INITIAL_TRANS; j++) {
 				long TRANSFER_AMOUNT = 100L;
-				ATransaction trans = Transfer.create(j, ADDRESSES[NUM_PEERS - 1 - i], TRANSFER_AMOUNT); // note 1 =
+				ATransaction trans = Transfer.create(ADDRESSES[i],j, ADDRESSES[NUM_PEERS - 1 - i], TRANSFER_AMOUNT); // note 1 =
 																										// first
 																										// sequence
 																										// number
@@ -379,9 +390,9 @@ public class BeliefMergeTest {
 			}
 		}
 		if (ANALYSIS) printAnalysis(bs3, "Make proposals");
-		assertEquals(NUM_INITIAL_TRANS, bs3[0].getOrder(PADDRESS).getBlockCount());
-		assertEquals(NUM_INITIAL_TRANS, bs3[RECEIVER].getOrder(RADDRESS).getBlockCount());
-		assertEquals(0, bs3[RECEIVER].getOrder(PADDRESS).getBlockCount());
+		assertEquals(NUM_INITIAL_TRANS, bs3[0].getOrder(PKEY).getBlockCount());
+		assertEquals(NUM_INITIAL_TRANS, bs3[RECEIVER].getOrder(RKEY).getBlockCount());
+		assertEquals(0, bs3[RECEIVER].getOrder(PKEY).getBlockCount());
 
 		Peer[] bs4 = bs3;
 		for (int i = 1; i < ROUNDS; i++) {
@@ -392,13 +403,13 @@ public class BeliefMergeTest {
 		if (ANALYSIS) printAnalysis(bs4, "Share round: " + ROUNDS);
 
 		// final state checks
-		assertEquals(NUM_PEERS * NUM_INITIAL_TRANS, bs4[PROPOSER].getOrder(RADDRESS).getConsensusPoint()); // proposer
+		assertEquals(NUM_PEERS * NUM_INITIAL_TRANS, bs4[PROPOSER].getOrder(RKEY).getConsensusPoint()); // proposer
 																											// now sees
 																											// receivers
 																											// consensus
 		assertTrue(allBeliefsEqual(bs4));
 
-		Order finalChain = bs4[0].getOrder(PADDRESS);
+		Order finalChain = bs4[0].getOrder(PKEY);
 		AVector<Block> finalBlocks = finalChain.getBlocks();
 		assertEquals(NUM_PEERS * NUM_INITIAL_TRANS, new HashSet<>(finalBlocks).size());
 
@@ -444,7 +455,7 @@ public class BeliefMergeTest {
 			Peer ps = beliefs[i];
 			Belief b = beliefs[i].getBelief();
 
-			Order c = b.getOrder(ADDRESSES[i]);
+			Order c = b.getOrder(KEYS[i]);
 			int agreedPeers = 0;
 			String mat = "";
 			for (int j = 0; j < NUM_PEERS; j++) {
@@ -453,7 +464,7 @@ public class BeliefMergeTest {
 					j = NUM_PEERS - 6;
 					continue;
 				}
-				Order jc = b.getOrder(ADDRESSES[j]);
+				Order jc = b.getOrder(KEYS[j]);
 				mat += " " + ((jc == null) ? "----" : jc.getHash().toHexString(4));
 				if (c.equals(jc)) agreedPeers++;
 			}
@@ -469,7 +480,7 @@ public class BeliefMergeTest {
 			System.out.println(peerString(i) + " clen:" + Text.leftPad(clen, 3) + " prop:" + Text.leftPad(pp, 3)
 					+ " cons:" + Text.leftPad(cp, 3) + " state:" + ps.getConsensusState().getHash().toHexString(4)
 					+ " hash: " + c.getHash().toHexString(4) + " mat:" + mat + " agreed: " + agreedPeers + "/"
-					+ b.getChains().count() + " blks:" + blockRep);
+					+ b.getOrders().count() + " blks:" + blockRep);
 		}
 	}
 

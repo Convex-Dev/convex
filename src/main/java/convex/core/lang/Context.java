@@ -11,6 +11,7 @@ import convex.core.data.AObject;
 import convex.core.data.ASequence;
 import convex.core.data.ASet;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Blob;
@@ -1624,7 +1625,7 @@ public final class Context<T> extends AObject {
 	 * @return Context with final take set
 	 */
 	@SuppressWarnings("unchecked")
-	public <R> Context<R> setStake(Address peerAddress, long newStake) {
+	public <R> Context<R> setStake(AccountKey peerAddress, long newStake) {
 		State s=getState();
 		PeerStatus ps=s.getPeer(peerAddress);
 		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for Address: "+peerAddress.toChecksumHex());

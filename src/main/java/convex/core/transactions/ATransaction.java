@@ -1,6 +1,7 @@
 package convex.core.transactions;
 
 import convex.core.data.ACell;
+import convex.core.data.Address;
 import convex.core.data.Format;
 import convex.core.lang.Context;
 
@@ -16,9 +17,11 @@ import convex.core.lang.Context;
  *
  */
 public abstract class ATransaction extends ACell {
+	protected final Address address;
 	protected final long sequence;
 
-	protected ATransaction(long sequence) {
+	protected ATransaction(Address address, long sequence) {
+		this.address=address;
 		this.sequence = sequence;
 	}
 
@@ -36,6 +39,7 @@ public abstract class ATransaction extends ACell {
 	 */
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
+		pos = address.writeToBuffer(bs,pos);
 		pos = Format.writeVLCLong(bs,pos, sequence);
 		return pos;
 	}
@@ -60,9 +64,19 @@ public abstract class ATransaction extends ACell {
 	 */
 	public abstract <T> Context<T> apply(Context<?> ctx);
 
+	/**
+	 * Gets the Address for this transaction
+	 * @return
+	 */
+	public Address getAddress() {
+		return address;
+	}
+	
 	public final long getSequence() {
 		return sequence;
 	}
+	
+
 
 	/**
 	 * Gets the max juice allowed for this transaction
@@ -77,4 +91,5 @@ public abstract class ATransaction extends ACell {
 	 * @return Updated transaction, or this transaction is the sequence number is unchanged.
 	 */
 	public abstract ATransaction withSequence(long newSequence);
+
 }

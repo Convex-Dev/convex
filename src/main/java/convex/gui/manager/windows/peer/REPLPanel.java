@@ -175,6 +175,11 @@ public class REPLPanel extends JPanel {
 		if (we==null) return null;
 		return we.getKeyPair();
 	}
+	
+	private Address getAddress() {
+		WalletEntry we=execPanel.getWalletEntry();
+		return we.getAddress();
+	}
 
 	private void sendMessage(String s) {
 		if (s.isBlank()) return;
@@ -194,7 +199,7 @@ public class REPLPanel extends JPanel {
 					if (kp == null) {
 						future = convex.query(message,null);
 					} else {
-						future = convex.query(message, kp.getAddress());
+						future = convex.query(message, getAddress());
 					}
 				} else if (mode.equals("Transact")) {
 					WalletEntry we = execPanel.getWalletEntry();
@@ -203,14 +208,14 @@ public class REPLPanel extends JPanel {
 								"Please select an address to use for transactions before sending");
 						return;
 					}
-					Address address = we.getAddress();
+					Address address = getAddress();
 					AccountStatus as = PeerManager.getLatestState().getAccount(address);
 					if (as == null) {
 						JOptionPane.showMessageDialog(this, "Cannot send transaction: account does not exist");
 						return;
 					}
 					long nonce = as.getSequence() + 1;
-					ATransaction trans = Invoke.create(nonce, message);
+					ATransaction trans = Invoke.create(address,nonce, message);
 					future = convex.transact(we.sign(trans));
 				} else {
 					throw new Error("Unrecognosed REPL mode: " + mode);

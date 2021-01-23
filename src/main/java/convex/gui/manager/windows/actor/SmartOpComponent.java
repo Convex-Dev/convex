@@ -168,7 +168,7 @@ public class SmartOpComponent extends BaseListComponent {
 					return;
 				}
 				long nonce = as.getSequence() + 1;
-				ATransaction trans = Invoke.create(nonce, message);
+				ATransaction trans = Invoke.create(address,nonce, message);
 				id = peerConnection.sendTransaction(we.sign(trans));
 			} else {
 				throw new Error("Unrecognosed REPL mode: " + mode);

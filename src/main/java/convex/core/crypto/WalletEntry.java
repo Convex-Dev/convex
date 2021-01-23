@@ -1,6 +1,7 @@
 package convex.core.crypto;
 
 import convex.core.data.AMap;
+import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -13,24 +14,36 @@ import convex.core.exceptions.TODOException;
  * May be in a locked locked or unlocked state. Unlocking requires passphrase.
  */
 public class WalletEntry {
+	private final Address address;
 	private final AKeyPair keyPair;
 	private final AMap<Keyword, Object> data;
 
-	private WalletEntry(AMap<Keyword, Object> data, AKeyPair heroKp) {
+	private WalletEntry(Address address, AMap<Keyword, Object> data, AKeyPair kp) {
+		this.address=address;
 		this.data = data;
-		this.keyPair = heroKp;
+		this.keyPair = kp;
 	}
 
 	private WalletEntry(AMap<Keyword, Object> data) {
-		this(data, null);
+		this(null,data, null);
 	}
 
-	public static WalletEntry create(AKeyPair heroKp) {
-		return new WalletEntry(Maps.empty(), heroKp);
+	public static WalletEntry create(Address address,AKeyPair kp) {
+		return new WalletEntry(address, Maps.empty(), kp);
+	}
+	
+	public static WalletEntry create(AKeyPair kp) {
+		// tODO: Fix
+		Address address=Address.create(kp.getAccountKey());
+		return new WalletEntry(address, Maps.empty(), kp);
 	}
 
+	public AccountKey getAccountKey() {
+		return keyPair.getAccountKey();
+	}
+	
 	public Address getAddress() {
-		return keyPair.getAddress();
+		return address;
 	}
 
 	public AKeyPair getKeyPair() {
@@ -49,9 +62,15 @@ public class WalletEntry {
 		throw new TODOException();
 	}
 
-	private WalletEntry withKeyPair(AKeyPair kp) {
-		return new WalletEntry(data, kp);
+	public WalletEntry withKeyPair(AKeyPair kp) {
+		// TODO: need an Address in new format
+		return new WalletEntry(Address.create(kp.getAccountKey()),data, kp);
 	}
+	
+	public WalletEntry withAddress(Address address) {
+		return new WalletEntry(null,data, keyPair);
+	}
+
 
 	public WalletEntry lock() {
 		if (keyPair == null) throw new IllegalStateException("Wallet already locked!");
@@ -64,7 +83,7 @@ public class WalletEntry {
 
 	@Override
 	public String toString() {
-		return getAddress().toChecksumHex();
+		return getAccountKey().toChecksumHex();
 	}
 
 	public <R> SignedData<R> sign(R message) {

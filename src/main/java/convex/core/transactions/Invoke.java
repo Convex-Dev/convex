@@ -3,6 +3,7 @@ package convex.core.transactions;
 import java.nio.ByteBuffer;
 
 import convex.core.Constants;
+import convex.core.data.Address;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
@@ -32,13 +33,13 @@ import convex.core.util.Utils;
 public class Invoke extends ATransaction {
 	protected final Object command;
 
-	protected Invoke(long nonce, Object args) {
-		super(nonce);
+	protected Invoke(Address address,long nonce, Object args) {
+		super(address,nonce);
 		this.command = args;
 	}
 
-	public static Invoke create(long nonce, Object command) {
-		return new Invoke(nonce, command);
+	public static Invoke create(Address address,long nonce, Object command) {
+		return new Invoke(address,nonce, command);
 	}
 
 	@Override
@@ -65,15 +66,16 @@ public class Invoke extends ATransaction {
 	/**
 	 * Read a Transfer transaction from a ByteBuffer
 	 * 
-	 * @param b ByteBuffer containing the transaction
+	 * @param bb ByteBuffer containing the transaction
 	 * @throws BadFormatException if the data is invalid
 	 * @return The Transfer object
 	 */
-	public static Invoke read(ByteBuffer b) throws BadFormatException {
-		long sequence = Format.readVLCLong(b);
+	public static Invoke read(ByteBuffer bb) throws BadFormatException {
+		Address address=Address.readRaw(bb);
+		long sequence = Format.readVLCLong(bb);
 
-		Object args = Format.read(b);
-		return create(sequence, args);
+		Object args = Format.read(bb);
+		return create(address,sequence, args);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -162,13 +164,13 @@ public class Invoke extends ATransaction {
 	public Invoke updateRefs(IRefFunction func) {
 		Object newCommand = Utils.updateRefs(command, func);
 		if (newCommand == command) return this;
-		return Invoke.create(getSequence(), newCommand);
+		return Invoke.create(address,getSequence(), newCommand);
 	}
 	
 	@Override
 	public ATransaction withSequence(long newSequence) {
 		if (newSequence==this.sequence) return this;
-		return create(newSequence,command);
+		return create(address,newSequence,command);
 	}
 
 }

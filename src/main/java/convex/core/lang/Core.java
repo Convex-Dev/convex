@@ -21,6 +21,7 @@ import convex.core.data.ASequence;
 import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Format;
@@ -855,7 +856,7 @@ public class Core {
 		public <I> Context<Long> invoke(Context<I> context, Object[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			Address address = RT.address(args[0]);
+			AccountKey address = RT.accountKey(args[0]);
 			if (address == null) return context.withCastError(args[0], Address.class);
 
 			Long amount = RT.toLong(args[1]);

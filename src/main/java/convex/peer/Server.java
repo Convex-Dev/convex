@@ -25,6 +25,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Hash;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
@@ -137,7 +138,7 @@ public class Server implements Closeable {
 	 * The list of new beliefs received from remote peers the block being created
 	 * Should only modify with the lock for this Server help.
 	 */
-	private HashMap<Address, SignedData<Belief>> newBeliefs = new HashMap<>();
+	private HashMap<AccountKey, SignedData<Belief>> newBeliefs = new HashMap<>();
 
 	private Server(HashMap<Keyword, Object> config) {
 		this.config = config;
@@ -451,7 +452,7 @@ public class Server implements Closeable {
 			if (n == 0) return false;
 			// TODO: smaller block if too many transactions?
 			long timestamp = Utils.getCurrentTimestamp();
-			Block block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions, peer.getAddress());
+			Block block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions, peer.getPeerKey());
 
 			Ref.createPersisted(block);
 
@@ -482,7 +483,7 @@ public class Server implements Closeable {
 				int n = newBeliefs.size();
 				beliefs = new Belief[n];
 				int i = 0;
-				for (Address addr : newBeliefs.keySet()) {
+				for (AccountKey addr : newBeliefs.keySet()) {
 					try {
 						beliefs[i++] = newBeliefs.get(addr).getValue();
 					} catch (Exception e) {
@@ -594,7 +595,7 @@ public class Server implements Closeable {
 			signedBelief.validateSignature();
 
 			synchronized (newBeliefs) {
-				Address addr = signedBelief.getAddress();
+				AccountKey addr = signedBelief.getAccountKey();
 				SignedData<Belief> current = newBeliefs.get(addr);
 				if ((current == null) || (current.getValueUnchecked().getTimestamp() >= signedBelief.getValueUnchecked()
 						.getTimestamp())) {
@@ -778,14 +779,14 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Gets the address of the peer account
+	 * Gets the public key of the peer account
 	 * 
-	 * @return Address of this Peer
+	 * @return AccountKey of this Peer
 	 */
-	public Address getAddress() {
+	public AccountKey getAddress() {
 		AKeyPair kp = getKeyPair();
 		if (kp == null) return null;
-		return kp.getAddress();
+		return kp.getAccountKey();
 	}
 
 	/**
