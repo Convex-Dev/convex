@@ -13,13 +13,16 @@
   ;; Key usage:
   ;;   (asset/transfer receiver asset data)
   ;;   (asset/owns? owner asset)
-  ;;   (asset/balance owner asset-address)
+  ;;   (asset/balance asset-address owner)
   ;;
   ;; transfer for assets other than convex is implemented in terms of an offer/accept model.
   ;; In some instances, it may be useful to call these functions separately:
   ;;
   ;;   (asset/offer receiver asset)  ;; called by the sender
   ;;   (asset/accept receiver asset) ;; called by the receiver
+  ;;
+  ;;   (asset/get-offer asset-address sender receiver)
+  ;;        Gets current offer between sender and receiver
   ;;   
   ;;   (asset/check-transfer sender receiver asset)
   ;;        Checks whether sender has permission to transfer asset to receiver.
@@ -31,6 +34,7 @@
   ;;   (direct-transfer receiver quantity)
   ;;   (offer receiver quantity)
   ;;   (accept sender quantity)
+  ;;   (get-offer sender receiver)
   ;;   (owns? owner quantity)
   ;;   (balance owner)
   
@@ -47,24 +51,25 @@
             :signature [{:params [receiver asset]}
                         {:params [receiver asset data]}]}}
     ([receiver asset data]
-	    (let [receiver (address receiver)]
-	      (cond
-	        ;; asset is just an amount of convex
-	        (long? asset) (core/transfer receiver asset)
-	        (vector? asset)
-	        (let [[asset-address quantity] asset]
-	          (cond
-	            (exports? receiver 'receive-asset)
-	            (do 
-	              (call asset-address (offer receiver quantity))
-	              (call receiver (receive-asset asset data))),
-	            
-	            (actor? receiver) (fail "Receiver does not have receive-asset function")          
-	            (account? receiver) (call asset-address (direct-transfer receiver quantity))
-	            :else (fail "Address cannot receive asset")))
-	        :else (fail "Invalid asset"))))
+     (let [receiver (address receiver)]
+       (cond
+         ;; asset is just an amount of convex
+         (long? asset) (core/transfer receiver asset)
+         (vector? asset)
+         (let [[asset-address quantity] asset
+               asset-address (address asset-address)]
+           (cond
+             (exports? receiver 'receive-asset)
+             (do 
+               (call asset-address (offer receiver quantity))
+               (call receiver (receive-asset asset data))),
+             
+             (actor? receiver) (fail "Receiver does not have receive-asset function")          
+             (account? receiver) (call asset-address (direct-transfer receiver quantity))
+             :else (fail "Address cannot receive asset")))
+         :else (fail "Invalid asset"))))
     ([receiver asset]
-      (recur receiver asset nil)))
+     (recur receiver asset nil)))
   
   ;; For smart contract assets, you can offer and accept separately if you choose
   (defn offer
@@ -74,7 +79,15 @@
             :type :function
             :signature [{:params [receiver [asset-address quantity]]}]}}
     [receiver [asset-address quantity]]
-    (call asset-address (offer (address receiver) quantity)))
+    (call (address asset-address) (offer (address receiver) quantity)))
+
+  (defn get-offer
+    ^{:doc {:description "Gets the current offer from sender to receiver",
+            :examples [{:code "(get-offer asset-address sender receiver)"}]
+            :type :function
+            :signature [{:params [asset-address sender receiver]}]}}
+    [asset-address sender receiver]
+    (call (address asset-address) (get-offer (address sender) (address receiver))))
   
   (defn accept
     ^{:doc {:description "Accepts asset from sender.",
@@ -83,7 +96,7 @@
             :type :function
             :signature [{:params [sender [asset-address quantity]]}]}}
     [sender [asset-address quantity]]
-    (call asset-address (accept sender quantity)))
+    (call (address asset-address) (accept (address sender) quantity)))
   
   ;; Also, independently of general transfer, you can test whether there are restrictions on transferring
   (defn check-transfer
@@ -93,7 +106,7 @@
             :type :function
             :signature [{:params [sender receiver [asset-address quantity]]}]}}
     [sender receiver [asset-address quantity]]
-    (call asset-address (check-transfer sender receiver quantity)))
+    (call (address asset-address) (check-transfer (address sender) (address receiver) quantity)))
 
   (defn balance
     ^{:doc {:description "Returns asset balance for a specified owner.",
@@ -101,7 +114,7 @@
             :type :function
             :signature [{:params [asset-address owner]}]}}
     ([asset-address owner]
-      (call (address asset-address) (balance (address owner)))))
+     (call (address asset-address) (balance (address owner)))))
   
   (defn owns?
     ^{:doc {:description "Tests whether owner owns a given quantity of an asset",

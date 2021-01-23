@@ -57,9 +57,11 @@
   ;; whatever subset of the offered tokens they want.
   ;; If an account doesn't implement receive-asset, default behavior is to go ahead and perform the transfer.
   ;; If an actor doesn't implement receive-asset, default behavior is to fail.
- 
+  
   (call *registry* (register {:name "NFT Tokens"}))
   (call *registry* (cns-update 'convex.nft-tokens *address*))
+
+  (import convex.asset :as asset)
   
   (def next-token-id 0)
   (def token-records {}) ;; {id {:creator, :owner, :data, :policies, :class}}
@@ -161,7 +163,7 @@
             (= policy :creator) (= addr (get-token-creator id))
             (= policy :none) false                
             (long? policy) (= addr (get-token-owner policy)) ;; policy is a token id
-            ;;               (vector? policy) (asset/owns? addr policy)   ;; policy is an asset description
+            (vector? policy) (asset/owns? addr policy)   ;; policy is an asset description
             :else (= addr policy))))))
 
   ;; create-token
@@ -316,6 +318,15 @@
     [sender]
     (get offers (address sender)))
 
+  ;; get-offer is one of the API functions in the asset library
+  (defn get-offer
+    ^{:doc {:description "Gets the offer from a given sender to a given receiver.",
+            :examples [{:code "(get-offer sender receiver)"}]
+            :type :function
+            :signature [{:params [sender receiver]}]}}
+    [sender receiver]
+    (get-in offers [sender receiver]))
+  
   ;; accept-offer is one of the API functions for generalized transfer, called by receiver
   ;; Implemented for convex.asset
   (defn accept [sender accepted-id-set]
@@ -330,7 +341,7 @@
         (def offers (assoc-in offers [sender receiver] (difference offered-id-set accepted-id-set))))
       (perform-transfer sender receiver accepted-id-set)))
 
-  (export create-token destroy-token get-token-owner get-token-creator get-token-data get-token-class balance get-offers check-trusted? set-token-data merge-token-data check-transfer direct-transfer offer accept owns? get-uri))
+  (export create-token destroy-token get-token-owner get-token-creator get-token-data get-token-class balance get-offers get-offer check-trusted? set-token-data merge-token-data check-transfer direct-transfer offer accept owns? get-uri))
 
 
 
