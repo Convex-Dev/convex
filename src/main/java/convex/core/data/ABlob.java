@@ -344,4 +344,5 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	 * @return
 	 */
 	public abstract boolean isRegularBlob();
+
 }

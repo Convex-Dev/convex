@@ -290,5 +290,6 @@ public abstract class AArrayBlob extends ABlob {
 		// Array-backed blobs have no child Refs by default
 		return 0;
 	}
+	
 
 }
