@@ -39,6 +39,7 @@ public class AccountKeyTest {
 		Blob b = a.toBlob();
 		assertNotEquals(a, b);
 
+		// AccountKey has comparison equality with Blob
 		assertEquals(0, a.compareTo(b));
 		
 		BlobsTest.doBlobTests(a);			

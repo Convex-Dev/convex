@@ -205,8 +205,11 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	}
 
 	/**
-	 * Compares this blob to another blob, in lexographic order soring by first
-	 * bytes
+	 * Compares this blob to another blob, in lexographic order sorting by first
+	 * bytes.
+	 * 
+	 * Note: This means that compareTo does not precisely match equality, because
+	 * different blob types may be lexicographically equal but represent different values.
 	 */
 	@Override
 	public int compareTo(ABlob b) {
@@ -250,7 +253,7 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	 * Writes the raw byte contents of this blob to a byte array
 	 * 
 	 * @param b
-	 * @return The passed ByteBuffer, after writing byte content
+	 * @return The position in the array after writing
 	 */
 	public abstract int writeToBuffer(byte[] bs, int pos);
 	
