@@ -53,7 +53,7 @@ public class Samples {
 	 * An Address which cannot be valid
 	 */
 	public static final Address BAD_ADDRESS = Address.create(7777777777L);
-	public static final AccountKey BAD_ACCOUNTKEY = AccountKey.dummy("ffff");
+	public static final AccountKey BAD_ACCOUNTKEY = AccountKey.dummy("bbbb");
 	
 	public static final AKeyPair KEY_PAIR=Ed25519KeyPair.createSeeded(13371337L);
 	public static final AccountKey ACCOUNT_KEY = KEY_PAIR.getAccountKey();

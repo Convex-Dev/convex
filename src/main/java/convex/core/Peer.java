@@ -347,14 +347,14 @@ public class Peer {
 	 */
 	public Peer proposeBlock(Block block) throws BadSignatureException {
 		Belief b = getBelief();
-		AHashMap<AccountKey, SignedData<Order>> chains = b.getOrders();
-		SignedData<Order> mySignedChain = chains.get(peerKey);
+		AHashMap<AccountKey, SignedData<Order>> orders = b.getOrders();
 
-		Order myChain = mySignedChain.getValue();
+		Order myOrder = b.getOrder(peerKey);
+		if (myOrder==null) myOrder=Order.create();
 
-		Order newChain = myChain.propose(block);
+		Order newChain = myOrder.propose(block);
 		SignedData<Order> newSignedChain = sign(newChain);
-		AHashMap<AccountKey, SignedData<Order>> newChains = chains.assoc(peerKey, newSignedChain);
+		AHashMap<AccountKey, SignedData<Order>> newChains = orders.assoc(peerKey, newSignedChain);
 		return updateBelief(b.withOrders(newChains));
 	}
 

@@ -665,22 +665,27 @@ public class Server implements Closeable {
 
 				// loop while the server is running
 				while (running) {
-					// Maybe sleep a bit, wait for some belief updates to accumulate
-					if (newThings) {
-						newThings=false;
-					} else {
-						Thread.sleep(SERVER_UPDATE_PAUSE);
-					}
-					
 					// Update Peer timestamp first. This determines what we might accept.
 					peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
 
 					// Try belief update
 					maybeUpdateBelief();
+					
+					// Maybe sleep a bit, wait for some belief updates to accumulate
+					if (newThings) {
+						newThings=false;
+					} else {
+						try {
+							Thread.sleep(SERVER_UPDATE_PAUSE);
+						} catch (InterruptedException e) {
+							// continue
+						}
+					}
 				}
 			} catch (Throwable e) {
 				log.severe("Unexpected exception in server update loop: " + e.toString());
 				log.severe("Terminating Server update");
+				e.printStackTrace();
 			} finally {
 				// clear thread from Server as we terminate
 				updateThread = null;

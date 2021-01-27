@@ -142,6 +142,10 @@ public class Belief extends ARecord {
 
 		final AccountKey myAddress = mc.getAccountKey();
 		SignedData<Order> mySignedOrder = orders.get(myAddress);
+		if (mySignedOrder==null) {
+			// we don't have a current order, so start with an empty order
+			mySignedOrder=mc.sign(Order.create());
+		}
 
 		// accumulate combined list of latest chains for all peers
 		final AHashMap<AccountKey, SignedData<Order>> accOrders = accumulateOrders(mc, mySignedOrder, beliefs);
@@ -206,8 +210,8 @@ public class Belief extends ARecord {
 				}
 			});
 		}
-		// Keep this peer's current signed chain
-		return result.assoc(mySignedChain.getAccountKey(), mySignedChain);
+		// Keep this peer's current signed order
+		return result.assoc(mc.getAccountKey(), mySignedChain);
 	}
 
 	/**
