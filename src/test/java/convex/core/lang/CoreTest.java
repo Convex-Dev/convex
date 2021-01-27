@@ -742,9 +742,12 @@ public class CoreTest {
 		assertEquals(Sets.of(1L, 2L), eval("(disj #{1 2} 1.0)"));
 		assertSame(Sets.empty(), eval("(disj #{1} 1)"));
 		assertSame(Sets.empty(), eval("(reduce disj #{1 2} [1 2])"));
-		assertSame(Sets.empty(), eval("(disj nil 1)"));
 		assertEquals(Sets.empty(), eval("(disj #{} 1)"));
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(disj (set [3 2 1 2 4]) 4)"));
+		
+		// nil is treated as empty set
+		assertSame(Sets.empty(), eval("(disj nil 1)"));
+		assertSame(Sets.empty(), eval("(disj nil nil)"));
 
 		assertCastError(step("(disj [] 1)"));
 		assertArityError(step("(disj)"));
@@ -756,7 +759,7 @@ public class CoreTest {
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(set [3 2 1 2])"));
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(set #{1 2 3})"));
 		
-		assertEquals(Sets.empty(), eval("(set nil)")); // nil treated as empty sequence of elements
+		assertEquals(Sets.empty(), eval("(set nil)")); // nil treated as empty set of elements
 
 		assertArityError(step("(set)"));
 		assertArityError(step("(set 1 2)"));
@@ -796,6 +799,10 @@ public class CoreTest {
 		assertEquals(Sets.empty(),eval("(union nil)"));
 		assertEquals(Sets.empty(),eval("(union #{})"));
 		assertEquals(Sets.of(1L,2L),eval("(union #{1 2})"));
+		
+		// nil treated as empty set in all cases
+		assertEquals(Sets.of(1L,2L),eval("(union nil #{1 2})"));
+		assertEquals(Sets.of(1L,2L),eval("(union #{1 2} nil)"));
 
 		assertEquals(Sets.of(1L,2L,3L),eval("(union #{1 2} #{3})"));
 		
