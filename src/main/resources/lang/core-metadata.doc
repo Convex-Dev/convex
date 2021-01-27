@@ -232,7 +232,7 @@
 	 :doc {:description "Deploys an actor. The code provided will be executed to initialise the Actor's account."
          :examples [{:code "(deploy '(do (defn my-fn [x y] (+ x y)) (export my-fn)) )"}]
          :type :function
-         :signature [{:params [init-fn & args]}]}
+         :signature [{:params [code]}]}
 	}
  
   difference
