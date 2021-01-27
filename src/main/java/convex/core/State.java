@@ -6,6 +6,8 @@ import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.parboiled.common.Utils;
+
 import convex.core.data.ABlob;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
@@ -342,13 +344,23 @@ public class State extends ARecord {
 	/**
 	 * Applies a signed transaction to the State. 
 	 * 
-	 * SECURITY: Checks digital signature
+	 * SECURITY: Checks digital signature and correctness of account key
 	 * 
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
 	private <T> Context<T> applyTransaction(SignedData<? extends ATransaction> signedTransaction) throws BadSignatureException {
 		// Extract transaction, performs signature check
 		ATransaction t=signedTransaction.getValue();
+		Address addr=t.getAddress();
+		AccountStatus as = getAccount(addr);
+		if (as==null) {
+			return Context.createFake(this).withError(ErrorCodes.NOBODY,"Transaction for non-existent Account: "+addr);
+		} else {
+			AccountKey key=as.getAccountKey();
+			if (!Utils.equal(key, signedTransaction.getAccountKey())) {
+				return Context.createFake(this).withError(ErrorCodes.SIGNATURE,"Signature not valid for Account: "+addr+" expected public key: "+key);
+			}
+		}
 		
 		Context<T> ctx=applyTransaction(t);
 		return ctx;

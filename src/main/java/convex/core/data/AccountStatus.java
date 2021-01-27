@@ -406,5 +406,13 @@ public class AccountStatus extends ARecord {
 		return withBalance(balance+delta);
 	}
 
+	/**
+	 * Gets the public key for this Account. May bu null (e.g. for Actors)
+	 * @return Account public key
+	 */
+	public AccountKey getAccountKey() {
+		return publicKey;
+	}
+
 
 }
