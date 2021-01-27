@@ -9,9 +9,9 @@ import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519KeyPair;
 import convex.core.data.AString;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
-import convex.core.data.Address;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Keyword;
@@ -20,6 +20,7 @@ import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
 import convex.core.util.Utils;
 import convex.peer.API;
 import convex.peer.Server;
@@ -56,19 +57,19 @@ public class PeerCluster {
 	}
 
 	private static State createInitialState() {
-		BlobMap<Address, AccountStatus> accts = BlobMaps.empty();
+		// setting up NUM_PEERS peers with accounts 0..NUM_PEERS-1
+		AVector<AccountStatus> accts = Vectors.empty();
 		BlobMap<AccountKey, PeerStatus> peers = BlobMaps.empty();
 		for (int i = 0; i < NUM_PEERS; i++) {
-			AccountKey address = PEER_KEYS.get(i).getAccountKey();
+			AccountKey peerKey = PEER_KEYS.get(i).getAccountKey();
 			Map<Keyword, Object> config = PEER_CONFIGS.get(i);
 			int port = Utils.toInt(config.get(Keywords.PORT));
 			AString sa = Strings.create("http://localhost"+ port);
 			PeerStatus ps = PeerStatus.create(1000000000, sa);
-			peers = peers.assoc(address, ps);
+			peers = peers.assoc(peerKey, ps);
 			
-			// TODO: Accounts
-			//AccountStatus as = AccountStatus.create(1000000000);
-			//accts = accts.assoc(address, as);
+			AccountStatus as = AccountStatus.create(1000000000,peerKey);
+			accts = accts.conj(as);
 		}
 
 		return State.create(accts, peers, Sets.empty(), Maps.empty(), BlobMaps.empty());

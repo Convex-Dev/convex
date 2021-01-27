@@ -116,8 +116,8 @@ public class PredictionMarketTest {
 		String contractString = Utils.readResourceAsString("actors/prediction-market.con");
 		ctx=step(ctx,"(deploy ("+contractString+" oaddr :bar #{true,false}))");
 		Address pmaddr = (Address) ctx.getResult();
-		ctx = step(ctx, "(def pmaddr \"" + pmaddr.toHexString() + "\")");
-		ctx = stepAs(VILLAIN, ctx, "(def pmaddr \"" + pmaddr.toHexString() + "\")");
+		ctx = step(ctx, "(def pmaddr " + pmaddr.toString() + ")");
+		ctx = stepAs(VILLAIN, ctx, "(def pmaddr "+pmaddr.toString()+")");
 
 		// initial state checks
 		assertEquals(false,eval(ctx, "(call pmaddr (finalised?))"));

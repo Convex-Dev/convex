@@ -639,7 +639,7 @@ public class Etch {
 			
 			return ref;
 		} catch (Exception e) {
-			throw new Error("Failed to read data in in etch store: "+data.toHexString()+" status = "+status+" length ="+length+" pointer = "+Utils.toHexString(pointer)+ " memorySize="+memorySize,e);
+			throw new Error("Failed to read data in etch store: "+data.toHexString()+" status = "+status+" length ="+length+" pointer = "+Utils.toHexString(pointer)+ " memorySize="+memorySize,e);
 		}
 	}
 

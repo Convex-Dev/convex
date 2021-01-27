@@ -23,6 +23,7 @@ import convex.core.data.AHashMap;
 import convex.core.data.AList;
 import convex.core.data.AMap;
 import convex.core.data.ASequence;
+import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -315,7 +316,8 @@ public class Reader extends BaseParser<Object> {
 				StringLiteral(), 
 				NilLiteral(), 
 				BooleanLiteral(), 
-				CharLiteral()
+				CharLiteral(),
+				AddressLiteral()
 				);
 	}
 
@@ -455,6 +457,11 @@ public class Reader extends BaseParser<Object> {
 	public Rule HexLiteral() {
 		return Sequence("0x",Sequence(HexBytes(),TestNot(HexDigit())),push(prepare(Blob.fromHex(match()))));
 	}
+	
+	public Rule AddressLiteral() {
+		return Sequence("#", Digits(), push(prepare(Address.create(Long.parseLong(match())))));
+	}
+
 
 	public Rule Long() {
 		return Sequence(SignedInteger(), push(prepare(Long.parseLong(match()))));

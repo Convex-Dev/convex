@@ -26,7 +26,7 @@ public class AccountKey extends AArrayBlob {
 
 	private AccountKey(byte[] data, int offset, int length) {
 		super(data, offset, length);
-		if (length != LENGTH) throw new IllegalArgumentException("Address length must be " + LENGTH_BITS + " bits");
+		if (length != LENGTH) throw new IllegalArgumentException("AccountKey length must be " + LENGTH + " bytes");
 	}
 
 	/**

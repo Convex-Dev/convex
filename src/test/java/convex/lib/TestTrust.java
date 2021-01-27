@@ -34,12 +34,12 @@ public class TestTrust {
 		assert(ctx.getDepth()==0):"Invalid depth: "+ctx.getDepth();
 		
 		try {
-			ctx = ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/trust.con")), true);
+			ctx = ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/trust.con")));
 			assert(ctx.getDepth()==0):"Invalid depth: "+ctx.getDepth();
 			Address trust = (Address) ctx.getResult();
 			String importS = "(import " + trust + " :as trust)";
 			ctx = step(ctx, importS);
-			assertFalse(ctx.isExceptional());
+			assertNotError(ctx);
 
 			ctx = ctx.define(tSym, Syntax.create(trust));
 		} catch (Throwable e) {
@@ -54,8 +54,13 @@ public class TestTrust {
 	private static final Address trusted;
 
 	static {
-		ctx = loadTrust();
-		trusted = (Address) ctx.lookup(tSym).getResult();
+		try {
+			ctx = loadTrust();
+			trusted = (Address) ctx.lookup(tSym).getResult();
+		} catch (Throwable e) {
+			e.printStackTrace();
+			throw new Error(e);
+		}
 	}
 	
 	/**
@@ -64,12 +69,11 @@ public class TestTrust {
 	@Test
 	public void testLibraryProperties() {
 		assertTrue(ctx.getAccountStatus(trusted).isActor());
-		assertEquals(trusted, TestState.CON_TRUSTED);
 
 		// check alias is set up correctly
 		assertEquals(trusted, eval(ctx, "(get *aliases* 'trust)"));
 
-		assertEquals("Trust Library", eval("(:name (call *registry* (lookup " + trusted + ")))").toString());
+		assertEquals("Trust Library", eval(ctx,"(:name (call *registry* (lookup " + trusted + ")))").toString());
 	}
 
 	@Test
@@ -80,7 +84,7 @@ public class TestTrust {
 		assertFalse(evalB(ctx, "(trust/trusted? *address* nil)"));
 		assertFalse(evalB(ctx, "(trust/trusted? *address* :foo)"));
 		assertFalse(evalB(ctx,
-				"(trust/trusted? *address* (address 0x1234567812345678123456781234567812345678123456781234567812345678))"));
+				"(trust/trusted? *address* (address 666666))"));
 	}
 
 	@Test

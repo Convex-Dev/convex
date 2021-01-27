@@ -24,7 +24,7 @@ public class TestBox {
 	private static Context<?> loadBox() {
 		Context<?> ctx=TestState.INITIAL_CONTEXT.fork();
 		try {
-			ctx=ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/box.con")), true);
+			ctx=ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/box.con")));
 			Address nft=(Address) ctx.getResult();
 			assert (ctx.getDepth()==0):"Invalid depth: "+ctx.getDepth();
 			String importS="(import "+nft+" :as "+nSym.getName()+")";

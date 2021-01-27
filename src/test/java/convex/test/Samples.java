@@ -8,6 +8,7 @@ import org.junit.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
+import convex.core.crypto.Ed25519KeyPair;
 import convex.core.crypto.Ed25519Signature;
 import convex.core.crypto.Hash;
 import convex.core.data.ADataStructure;
@@ -51,10 +52,15 @@ public class Samples {
 	/**
 	 * An Address which cannot be valid
 	 */
-	public static final Address BAD_ADDRESS = Address.dummy("012345");
+	public static final Address BAD_ADDRESS = Address.create(7777777777L);
 	public static final AccountKey BAD_ACCOUNTKEY = AccountKey.dummy("ffff");
 	
+	public static final AKeyPair KEY_PAIR=Ed25519KeyPair.createSeeded(13371337L);
+	public static final AccountKey ACCOUNT_KEY = KEY_PAIR.getAccountKey();
+	
 	public static final ASignature BAD_SIGNATURE = Ed25519Signature.wrap(Blobs.createRandom(64).getBytes());
+	
+
 
 	public static final VectorLeaf<Integer> INT_VECTOR_10 = createTestIntVector(10);
 	public static final VectorLeaf<Integer> INT_VECTOR_16 = createTestIntVector(16);
@@ -87,8 +93,6 @@ public class Samples {
 
 	public static final Blob ONE_ZERO_BYTE_DATA = Blob.fromHex("00");
 
-	public static final AKeyPair KEY_PAIR = AKeyPair.generate();
-
 	public static final Keyword FOO = Keyword.create("foo");
 	public static final Keyword BAR = Keyword.create("bar");
 
@@ -111,6 +115,7 @@ public class Samples {
 	public static final StringShort NON_EMBEDDED_STRING= StringShort.create(MAX_EMBEDDED_STRING.toString()+" ");
 	public static final StringShort MAX_SHORT_STRING= StringShort.create(createRandomString(StringShort.MAX_LENGTH));
 	public static final StringTree MIN_TREE_STRING= StringTree.create(createRandomString(StringTree.MINIMUM_LENGTH));
+
 
 	
 	static {

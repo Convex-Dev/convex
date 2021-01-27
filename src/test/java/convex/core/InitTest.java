@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.AccountStatus;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.Core;
 import convex.core.lang.TestState;
 
 public class InitTest {
@@ -20,6 +19,8 @@ public class InitTest {
 		s.validate();
 		assertEquals(0,TestState.INITIAL_CONTEXT.getDepth());
 		assertNull(TestState.INITIAL_CONTEXT.getResult());
+		
+		assertNotNull(Init.FIRST_PEER_KEY);
 	}
 	
 	@Test 
@@ -31,11 +32,11 @@ public class InitTest {
 	
 	@Test public void testCoreAccount() {
 		// core environment should be the same as when first created
-		assertEquals(Init.CORE_ACCOUNT.getEnvironment(),s.getAccount(Core.CORE_ADDRESS).getEnvironment());
+		assertEquals(Init.CORE_ACCOUNT.getEnvironment(),s.getAccount(Init.CORE_ADDRESS).getEnvironment());
 	}
 	
 	@Test 
-	public void testHEro() {
+	public void testHero() {
 		AccountStatus as=s.getAccount(Init.HERO);
 		assertNotNull(as);
 		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE,as.getAllowance());

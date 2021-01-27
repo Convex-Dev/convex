@@ -135,7 +135,7 @@ public class MarketComponent extends BaseListComponent {
 		}
 
 		// Top label
-		add(new CodeLabel("Market Address: " + address.toChecksumHex()), BorderLayout.SOUTH);
+		add(new CodeLabel("Market Address: " + address.toString()), BorderLayout.SOUTH);
 
 		// state updates
 		updateStatus(state);

@@ -60,7 +60,7 @@
 ;; Testing transfer to actors
 
 
-  (def a2 (deploy-once '(do
+  (def a2 (deploy '(do
                           (import convex.asset :as asset)
                           (defn receive-asset [asset data]
                             (asset/accept *caller* asset))
@@ -135,7 +135,7 @@
 ;; Test transferring multiple tokens and accepting a subset
 
 
-  (def a2 (deploy-once '(do
+  (def a2 (deploy '(do
                           (import convex.asset :as asset)
                           (defn receive-asset [[addr id-set] data]
                             (asset/accept *caller* [addr (hash-set (apply min (vec id-set)) (apply max (vec id-set)))]))
@@ -191,7 +191,7 @@
 
 (do
   (def logger
-    (deploy-once
+    (deploy
      '(do
         (import convex.nft-tokens :as nft)
         (def nft (get *aliases* 'nft))
@@ -261,7 +261,7 @@
 
 (do
   (def transfer-max-twice
-    (deploy-once
+    (deploy
      '(do
         (import convex.nft-tokens :as nft)
         (def nft (get *aliases* 'nft))
@@ -307,7 +307,7 @@
   (assert (asset/owns? p2 [nft t2]))
 
 (do
-  (def a2 (deploy-once '(do
+  (def a2 (deploy '(do
                           (import convex.asset :as asset)
                           (defn receive-asset [asset data]
                             (asset/accept *caller* asset))

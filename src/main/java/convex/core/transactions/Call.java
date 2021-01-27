@@ -92,7 +92,7 @@ public class Call extends ATransaction {
 	}
 	
 	public static ATransaction read(ByteBuffer bb) throws BadFormatException {
-		Address address=Address.readRaw(bb);
+		Address address=Address.create(Format.readVLCLong(bb));
 		long sequence = Format.readVLCLong(bb);
 		Address target=Format.read(bb);
 		long offer = Format.readVLCLong(bb);
@@ -139,9 +139,15 @@ public class Call extends ATransaction {
 	}
 
 	@Override
-	public ATransaction withSequence(long newSequence) {
+	public Call withSequence(long newSequence) {
 		if (newSequence==this.sequence) return this;
 		return create(address,newSequence,target,offer,functionName,args);
+	}
+	
+	@Override
+	public Call withAddress(Address newAddress) {
+		if (newAddress==this.address) return this;
+		return create(newAddress,sequence,target,offer,functionName,args);
 	}
 
 

@@ -17,7 +17,7 @@ import convex.gui.components.WalletComponent;
 @SuppressWarnings("serial")
 public class WalletPanel extends JPanel {
 
-	public static final WalletEntry HERO = WalletEntry.create(Init.HERO_KP);
+	public static final WalletEntry HERO = WalletEntry.create(Init.HERO,Init.HERO_KP);
 
 	private static DefaultListModel<WalletEntry> listModel = new DefaultListModel<>();;
 	ScrollyList<WalletEntry> walletList;
@@ -39,13 +39,13 @@ public class WalletPanel extends JPanel {
 		JButton btnNew = new JButton("New");
 		toolBar.add(btnNew);
 		btnNew.addActionListener(e -> {
-			listModel.addElement(WalletEntry.create(AKeyPair.generate()));
+			listModel.addElement(WalletEntry.create(null,AKeyPair.generate()));
 		});
 
 		// inital list
 		addWalletEntry(HERO);
-		addWalletEntry(WalletEntry.create(Init.VILLAIN_KP));
-		addWalletEntry(WalletEntry.create(Init.KEYPAIRS[0]));
+		addWalletEntry(WalletEntry.create(Init.VILLAIN,Init.VILLAIN_KP));
+		addWalletEntry(WalletEntry.create(Init.FIRST_PEER,Init.KEYPAIRS[0]));
 
 		// create and add ScrollyList
 		walletList = new ScrollyList<WalletEntry>(listModel, we -> new WalletComponent(we));

@@ -160,7 +160,7 @@ public class SignedData<T> extends ACell {
 	@Override
 	public int estimatedEncodingSize() {
 		
-		return 10+Address.LENGTH+64+Format.MAX_EMBEDDED_LENGTH;
+		return 10+AccountKey.LENGTH+64+Format.MAX_EMBEDDED_LENGTH;
 	}
 
 	/**

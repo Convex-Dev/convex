@@ -26,11 +26,11 @@ public class TestFungible {
 		Context<?> ctx=TestState.INITIAL_CONTEXT.fork();
 		assert(ctx.getDepth()==0):"Invalid depth: "+ctx.getDepth();
 		try {
-			ctx=ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/fungible.con")), true);
+			ctx=ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/fungible.con")));
 			Address fun=(Address) ctx.getResult();
 			String importS="(import "+fun+" :as fungible)";
 			ctx=step(ctx,importS);
-			assertFalse(ctx.isExceptional());
+			assertNotError(ctx);
 			
 			ctx=step(ctx,"(import convex.asset :as asset)");
 			assertFalse(ctx.isExceptional());
@@ -57,9 +57,8 @@ public class TestFungible {
 	 */
 	@Test public void testLibraryProperties() {
 		assertTrue(ctx.getAccountStatus(fungible).isActor());
-		assertEquals(fungible,TestState.CON_FUNGIBLE);
 		
-		assertEquals("Fungible Library",eval("(:name (call *registry* (lookup "+fungible+")))").toString());
+		assertEquals("Fungible Library",eval(ctx,"(:name (call *registry* (lookup "+fungible+")))").toString());
 	}
 	
 	@Test public void testAssetAPI() {

@@ -64,8 +64,7 @@ public class CoreTest {
 	@Test
 	public void testAliases() {
 		assertTrue(evalB("(map? *aliases*)"));
-		assertEquals(0L,evalL("(count *aliases*)"));
-		assertTrue(evalB("(empty? *aliases*)"));
+		assertEquals(Maps.empty(),eval("*aliases*"));
 	}
 	
 	@Test
@@ -75,6 +74,7 @@ public class CoreTest {
 		assertEquals(a, eval("(address 0x" + a.toHexString() + ")"));
 		assertEquals(a, eval("(address (address \"" + a.toHexString() + "\"))"));
 		assertEquals(a, eval("(address (blob \"" + a.toHexString() + "\"))"));
+		assertEquals(a, eval("(address "+a.longValue()+")"));
 
 		// bad arities
 		assertArityError(step("(address 1 2)"));
@@ -86,7 +86,6 @@ public class CoreTest {
 
 		// invalid conversions
 		assertCastError(step("(address :foo)"));
-		assertCastError(step("(address 1234)"));
 		assertCastError(step("(address nil)"));
 	}
 
@@ -98,7 +97,7 @@ public class CoreTest {
 
 		assertEquals("cafebabe", evalS("(str (blob \"Cafebabe\"))"));
 
-		assertTrue(evalB("(= *address* (address (blob *address*)))"));
+		assertEquals((Object)eval("*address*"),eval("(address (blob *address*))"));
 		
 		// round trip back to Blob
 		assertTrue(evalB("(blob? (blob (hash (encoding [1 2 3]))))"));
@@ -1085,8 +1084,8 @@ public class CoreTest {
 		// shouldn't fail because function never called
 		assertEquals(2L,evalL("(reduce address 2 [])"));
 		
-		assertArityError(step("(reduce address 2 [3 4])"));
-		assertCastError(step("(reduce (fn [a x] (address x)) 2 [3 4])"));
+		assertArityError(step("(reduce address 2 [:foo :bar])"));
+		assertCastError(step("(reduce (fn [a x] (address x)) 2 [:foo :bar])"));
 	}
 	
 	@Test
@@ -1358,8 +1357,8 @@ public class CoreTest {
 		assertEquals(1L,evalL("(do (def foo 1) (lookup *address* :foo))"));
 		
 		// Lookups in non-existent environment
-		assertNull(eval("(lookup 0x1234000000000000000000000000000000000000000000000000000000000000 'count)"));
-		assertNull(eval("(do (def foo 1) (lookup 0x1234000000000000000000000000000000000000000000000000000000000000 'foo))"));
+		assertNull(eval("(lookup 77777777 'count)"));
+		assertNull(eval("(do (def foo 1) (lookup 66666666 'foo))"));
 
 
 		// invalid name string
@@ -1383,7 +1382,7 @@ public class CoreTest {
 		
 		assertEquals(Syntax.create(1L),eval("(do (def foo 1) (lookup-syntax :foo))"));
 		assertEquals(Syntax.create(1L),eval("(do (def foo 1) (lookup-syntax *address* :foo))"));
-		assertNull(eval("(do (def foo 1) (lookup-syntax 0x1234000000000000000000000000000000000000000000000000000000000000 :foo))"));
+		assertNull(eval("(do (def foo 1) (lookup-syntax 0 :foo))"));
 
 		// invalid name string (too long)
 		assertCastError(
@@ -1494,11 +1493,16 @@ public class CoreTest {
 		assertCastError(step("(apply + 1 2 {})"));
 	}
 
+
+	@Test
+	public void testNonExistentAccountBalance() {
+		// Address that doesn't exist address, shouldn't have any balance initially
+		long addr=7777777777L;
+		assertNull(eval("(let [a (address "+addr+")] (balance a))"));
+	}
+	
 	@Test
 	public void testBalance() {
-		// null address, shouldn't have any balance initially
-		String addr=Address.dummy("0").toHexString();
-		assertNull(eval("(let [a (address \""+addr+"\")] (balance a))"));
 
 		// hero balance, should reflect cost of initial juice
 		String a0 = TestState.HERO.toHexString();
@@ -1511,7 +1515,7 @@ public class CoreTest {
 		assertEquals(expectedVillainBalance, eval("(let [a (address \"" + a1 + "\")] (balance a))"));
 
 		assertCastError(step("(balance nil)"));
-		assertCastError(step("(balance 1)"));
+		assertCastError(step("(balance 0x00)"));
 		assertCastError(step("(balance :foo)"));
 
 		assertArityError(step("(balance)"));
@@ -1551,11 +1555,11 @@ public class CoreTest {
 		assertCastError(step(ctx, "(call ctr :foo (bad-fn 1 2))")); // cast fail on offered value
 		assertStateError(step(ctx, "(call ctr 12 (bad-fn 1 2))")); // bad function
 
-		assertStateError(step(ctx, "(call 0x1234567812345678123456781234567812345678123456781234567812345678 12 (bad-fn 1 2))")); // bad actor
+		assertStateError(step(ctx, "(call 666666 12 (bad-fn 1 2))")); // bad actor
 		assertArgumentError(step(ctx, "(call ctr -12 (bad-fn 1 2))")); // negative offer
 
 		// bad actor takes precedence over bad offer
-		assertStateError(step(ctx, "(call 0x1234567812345678123456781234567812345678123456781234567812345678 -12 (bad-fn 1 2))")); 
+		assertStateError(step(ctx, "(call 666666 -12 (bad-fn 1 2))")); 
 
 	}
 	
@@ -1600,22 +1604,6 @@ public class CoreTest {
 	}
 	
 	@Test
-	public void testDeployOnce() {
-		Context<Address> ctx = step("(def ctr (deploy-once '(fn [] :foo :bar)))");
-		Address ca = ctx.getValue();
-		assertNotNull(ca);
-		AccountStatus as = ctx.getAccountStatus(ca);
-		assertNotNull(as);
-		assertEquals(ca, eval(ctx, "ctr")); // defined address in environment
-
-		// initial deployed state
-		assertEquals(0L, as.getBalance());
-		
-		// double-deploy should get same address
-		assertTrue(evalB("(let [cfn '(do (def a 1))] (= (deploy-once cfn) (deploy-once cfn)))"));
-	}
-	
-	@Test
 	public void testActorQ() {
 		Context<Address> ctx = step("(def ctr (deploy '(fn [] :foo :bar)))");
 		Address ctr=ctx.getResult();
@@ -1643,7 +1631,7 @@ public class CoreTest {
 		assertTrue(evalB(ctx,"(account? *registry*)"));
 		
 		// a fake address
-		assertFalse(evalB(ctx,"(account? 0x1234567812345678123456781234567812345678123456781234567812345678)"));
+		assertFalse(evalB(ctx,"(account? 77777777)"));
 		
 		// hero address is an account
 		assertTrue(evalB(ctx,"(account? *address*)"));
@@ -1668,7 +1656,7 @@ public class CoreTest {
 		assertTrue(eval("(account *registry*)") instanceof AccountStatus);
 		
 		// a fake address
-		assertNull(eval(ctx,"(account 0x1234567812345678123456781234567812345678123456781234567812345678)"));
+		assertNull(eval(ctx,"(account 77777777)"));
 		
 		// current address is an account, and its balance is correct
 		assertTrue(evalB("(= *balance* (:balance (account *address*)))"));
@@ -1786,36 +1774,42 @@ public class CoreTest {
 		// transfer to self. Note juice already accounted for in context.
 		assertEquals(1337L, evalL("(transfer *address* 1337)")); // should return transfer amount
 		assertEquals(BAL, step("(transfer *address* 1337)").getBalance(HERO));
-
-		// String representing a new Address
-		String naddr=Address.dummy("123").toHexString();
 		
-		// transfers to a new address
+		// transfers to an address that doesn't exist
 		{
-			Context<?> nc1=step("(transfer (address \""+naddr+"\") 1337)");
-			assertEquals(1337L, nc1.getResult());
-			assertEquals(BAL - 1337,nc1.getBalance(HERO));
+			Context<?> nc1=step("(transfer (address 666666) 1337)");
+			assertNobodyError(nc1);
 		}
 		
-		assertEquals(1337L, evalL("(let [a (address \""+naddr+"\")]"
-				+ " (transfer a 1337)" + " (balance a))"));
+		
+		// String representing a new Address
+		Context<Address> ctx=step("(create-account nil)");
+		Address naddr=ctx.getResult();
 
-		assertTrue(() -> eval("(let [a (address \""+naddr+"\")]"
+		// transfers to a new address
+		{
+			Context<?> nc1=step(ctx,"(transfer "+naddr+" 1337)");
+			assertEquals(1337L, nc1.getResult());
+			assertEquals(BAL - 1337,nc1.getBalance(HERO));
+			assertEquals(1337L, evalL(nc1,"(balance "+naddr+")"));
+		}
+		
+		assertTrue(() -> eval(ctx,"(let [a "+naddr+"]"
 				+ "   (not (= *balance* (transfer a 1337))))"));
 
 		// transfer it all!
-		assertEquals(0L,step("(transfer (address \""+naddr+"\") *balance*)").getBalance(HERO));
+		assertEquals(0L,step(ctx,"(transfer "+naddr+" *balance*)").getBalance(HERO));
 
 		// Should never be possible to transfer negative amounts
 		assertArgumentError(step("(transfer *address* -1000)"));
-		assertArgumentError(step("(transfer (address \""+naddr+"\") -1)"));
+		assertArgumentError(step("(transfer "+naddr+" -1)"));
 
 		// Long.MAX_VALUE is too big for an Amount
 		assertArgumentError(step("(transfer *address* 9223372036854775807)")); // Long.MAX_VALUE
 
-		assertFundsError(step("(transfer *address* 9999999999999)"));
+		assertFundsError(step("(transfer *address* 999999999999999999)"));
 
-		assertCastError(step("(transfer 1 1)"));
+		assertCastError(step("(transfer :foo 1)"));
 		assertCastError(step("(transfer *address* :foo)"));
 
 		assertArityError(step("(transfer)"));
@@ -1825,20 +1819,24 @@ public class CoreTest {
 	
 	@Test
 	public void testStake() {
-		Context<Object> ctx=step(INITIAL_CONTEXT,"(def my-peer \""+Init.FIRST_PEER.toHexString()+"\")");
-		AccountKey MY_PEER=Init.FIRST_PEER;
-		long PS=ctx.getState().getPeer(Init.FIRST_PEER).getOwnStake();
+		Context<Object> ctx=step(INITIAL_CONTEXT,"(def my-peer \""+Init.FIRST_PEER_KEY.toHexString()+"\")");
+		AccountKey MY_PEER=Init.FIRST_PEER_KEY;
+		long PS=ctx.getState().getPeer(Init.FIRST_PEER_KEY).getOwnStake();
 		
 		{
 			// simple case of staking 1000000 on first peer of the realm
 			Context<Object> rc=step(ctx,"(stake my-peer 1000000)");
+			assertNotError(rc);
 			assertEquals(PS+1000000,rc.getState().getPeer(MY_PEER).getTotalStake());
 			assertEquals(1000000,rc.getState().getPeer(MY_PEER).getDelegatedStake());
 			assertEquals(TestState.TOTAL_FUNDS, rc.getState().computeTotalFunds());
 		}
 		
-		// staking on an account that isn't a peer
-		assertStateError(step(ctx,"(stake *address* 1234)"));
+		// staking on an account key that isn't a peer
+		assertStateError(step(ctx,"(stake 0x1234567812345678123456781234567812345678123456781234567812345678 1234)"));
+
+		// staking on an address
+		assertCastError(step(ctx,"(stake *address* 1234)"));
 		
 		// bad arg types
 		assertCastError(step(ctx,"(stake :foo 1234)"));
@@ -2329,7 +2327,7 @@ public class CoreTest {
 		
 		assertTrustError(step("(eval-as *registry* '1)"));
 		
-		assertCastError(step("(eval-as 1 2)"));
+		assertCastError(step("(eval-as :foo 2)"));
 		assertArityError(step("(eval-as 1)")); // arity > cast
 		assertArityError(step("(eval-as 1 2 3)"));
 	}
@@ -2393,7 +2391,7 @@ public class CoreTest {
 		assertEquals(TestState.VILLAIN, eval("(set-controller (address "+TestState.VILLAIN+"))"));
 		assertEquals(null, (Address)eval("(set-controller nil)"));
 		
-		assertCastError(step("(set-controller 1)"));
+		assertCastError(step("(set-controller :foo)"));
 		assertCastError(step("(set-controller (address nil))"));
 		
 		assertArityError(step("(set-controller)")); 
@@ -2423,7 +2421,7 @@ public class CoreTest {
 
 		assertTrue(step(ctx, "(do a)").isExceptional());
 
-		Block b = Block.of(expectedTS);
+		Block b = Block.of(expectedTS,Init.FIRST_PEER_KEY);
 		BlockResult br = s.applyBlock(b);
 		State s2 = br.getState();
 
@@ -2512,7 +2510,7 @@ public class CoreTest {
 		assertArityError(step(ctx, "(exports? 1)"));
 		assertArityError(step(ctx, "(exports? 1 2 3)"));
 
-		assertCastError(step(ctx, "(exports? 1 :foo)"));
+		assertCastError(step(ctx, "(exports? :foo :foo)"));
 		assertCastError(step(ctx, "(exports? nil :foo)"));
 		assertCastError(step(ctx, "(exports? caddr nil)"));
 		assertCastError(step(ctx, "(exports? caddr 1)"));
@@ -2607,7 +2605,7 @@ public class CoreTest {
 		assertEquals(bal, ctx.getResult());
 		
 		// throwing it all away....
-		assertEquals(0L, evalL("(do (transfer 0x0000000000000000000000000000000000000000000000000000000000000000 *balance*) *balance*)"));
+		assertEquals(0L, evalL("(do (transfer 0 *balance*) *balance*)"));
 		
 		// check balance as single expression
 		assertEquals(bal, eval("*balance*"));
@@ -2679,7 +2677,7 @@ public class CoreTest {
 		Address HERO = TestState.HERO;
 		Context<?> ctx = step("(def VILLAIN (address \""+VILLAIN.toHexString()+"\"))");
 		assertTrue(eval(ctx,"VILLAIN") instanceof Address);
-		ctx=step(ctx,"(def NOONE 0x"+Address.dummy("0").toHexString()+")");
+		ctx=step(ctx,"(def NOONE (address 7777777))");
 		
 		// initial holding behaviour
 		assertNull(eval(ctx,"(get-holding VILLAIN)"));

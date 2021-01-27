@@ -38,7 +38,9 @@ public class RestoreTest {
 		);
 		Server s1=API.launchPeer(config);
 		
-		Convex cvx1=Convex.connect(s1.getHostAddress(), Init.HERO_KP);
+		// Connect with HERO Account
+		Convex cvx1=Convex.connect(s1.getHostAddress(), Init.HERO,Init.HERO_KP);
+		
 		Result tx1=cvx1.transactSync(Invoke.create(Init.HERO,1, Symbols.STAR_ADDRESS));
 		Result tx2f=cvx1.transactSync(Invoke.create(Init.HERO,1, Symbols.FOO)); // bad sequence
 		assertEquals(Init.HERO,tx1.getValue());
@@ -52,8 +54,10 @@ public class RestoreTest {
 		// assertThrows(IOException.class,()->Convex.connect(s1.getHostAddress(), Init.HERO_KP));
 		// assertThrows(IOException.class,()->cvx1.getBalance(Init.HERO));
 		
+		// Launch peer and connect
 		Server s2=API.launchPeer(config);
-		Convex cvx2=Convex.connect(s2.getHostAddress(), Init.HERO_KP);
+		Convex cvx2=Convex.connect(s2.getHostAddress(), Init.HERO,Init.HERO_KP);
+		
 		Long balance2=cvx2.getBalance(Init.HERO);
 		assertEquals(balance1,balance2);
 		

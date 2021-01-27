@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Init;
 import convex.core.State;
 import convex.core.data.AMap;
 import convex.core.data.AString;
@@ -202,9 +203,9 @@ public class OpsTest {
 		l1.validateCell();
 		assertNull(l1.getAddress());
 		
-		Lookup<?> l2=Lookup.create(Core.CORE_ADDRESS,"count");
+		Lookup<?> l2=Lookup.create(Init.CORE_ADDRESS,"count");
 		l2.validateCell();
-		assertSame(Core.CORE_ADDRESS,l2.getAddress());
+		assertSame(Init.CORE_ADDRESS,l2.getAddress());
 	}
 
 	@Test

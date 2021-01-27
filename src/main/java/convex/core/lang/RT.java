@@ -775,27 +775,30 @@ public class RT {
 	/**
 	 * Casts the argument to a valid Address.
 	 * 
-	 * Handles - Strings, which are interpreted as 64-character hex strings -
+	 * Handles - Strings, which are interpreted as 16-character hex strings -
 	 * Addresses, which are returned unchanged - Blobs, which are converted to
-	 * addresses if and only if they are of the correct length (32 bytes)
+	 * addresses if and only if they are of the correct length (8 bytes)
 	 * 
 	 * @param a
 	 * @return Address value or null if not a valid address
 	 */
 	public static Address address(Object a) {
 		if (a instanceof Address) return (Address) a;
-		if (a instanceof AString) return address((AString) a);
-		if (a instanceof ABlob) {
-			ABlob b = (ABlob) a;
-			if (b.length() != Address.LENGTH) return null;
-			return Address.wrap(b.getBytes());
-		}
-		if (a instanceof String) return address((String) a);
-
-		return null;
+		if (a instanceof ABlob) return Address.create((ABlob)a);
+		if (a instanceof AString) return Address.fromHexOrNull(a.toString());
+		if (a instanceof String) return Address.fromHexOrNull(a.toString());
+		Long value=RT.toLong(a);
+		if (value==null) return null;
+		return Address.create(value);
 	}
 	
+	/**
+	 * Coerce to an AccountKey. Accepts strings and blobs of correct length
+	 * @param a
+	 * @return AccountKey instance, or null if coercion fails
+	 */
 	public static AccountKey accountKey(Object a) {
+		if (a==null) return null;
 		if (a instanceof AccountKey) return (AccountKey) a;
 		if (a instanceof AString) return accountKey(AccountKey.fromHexOrNull((AString)a));
 		if (a instanceof ABlob) {
@@ -804,29 +807,6 @@ public class RT {
 		}
 
 		return null;
-	}
-	
-	/**
-	 * Casts an String argument to a valid Address.
-	 * 
-	 * @return Address value, or null of String does not represent an address
-	 *         (argument error)
-	 */
-	private static Address address(String a) {
-		if (a.length()!=Address.LENGTH*2) return null;
-		return Address.fromHex(a);
-	}
-
-	
-	/**
-	 * Casts an AString argument to a valid Address.
-	 * 
-	 * @return Address value, or null of String does not represent an address
-	 *         (argument error)
-	 */
-	private static Address address(AString a) {
-		if (a.length()!=Address.LENGTH*2) return null;
-		return Address.fromHex(a.toString());
 	}
 
 	/**

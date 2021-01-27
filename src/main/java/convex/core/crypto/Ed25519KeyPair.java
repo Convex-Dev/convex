@@ -2,7 +2,6 @@ package convex.core.crypto;
 
 import java.io.IOException;
 import java.security.InvalidKeyException;
-import java.security.Key;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -23,7 +22,6 @@ import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 
 import convex.core.data.AccountKey;
-import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.SignedData;
 import convex.core.exceptions.TODOException;
@@ -31,7 +29,7 @@ import convex.core.util.Utils;
 
 public class Ed25519KeyPair extends AKeyPair {
 
-	private final AccountKey address;
+	private final AccountKey publicKey;
 	private final KeyPair keyPair;
 	
 	public static final int PRIVATE_KEY_LENGTH=32;
@@ -39,7 +37,7 @@ public class Ed25519KeyPair extends AKeyPair {
 
 	private Ed25519KeyPair(KeyPair kp, AccountKey address) {
 		this.keyPair = kp;
-		this.address=address;
+		this.publicKey=address;
 	}
 
 	public static Ed25519KeyPair generate() {
@@ -106,7 +104,7 @@ public class Ed25519KeyPair extends AKeyPair {
 		byte[] bytes=publicKey.getEncoded();
 		int n=bytes.length;
 		// take the bytes at the end of the encoding
-		return AccountKey.wrap(bytes,n-Address.LENGTH);
+		return AccountKey.wrap(bytes,n-AccountKey.LENGTH);
 	}
 	
 	/**
@@ -204,7 +202,7 @@ public class Ed25519KeyPair extends AKeyPair {
 
 	@Override
 	public AccountKey getAccountKey() {
-		return address;
+		return publicKey;
 	}
 
 
@@ -236,12 +234,6 @@ public class Ed25519KeyPair extends AKeyPair {
 		if (!keyPair.getPrivate().equals(other.keyPair.getPrivate())) return false;
 		return keyPair.getPublic().equals(other.getPublic());
 	}
-
-	public static AKeyPair create(Key sk) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
 
 
 }

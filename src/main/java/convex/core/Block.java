@@ -7,7 +7,6 @@ import java.util.List;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
-import convex.core.data.Address;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -34,7 +33,7 @@ import convex.core.util.Utils;
 public class Block extends ARecord {
 	private final long timestamp;
 	private final AVector<SignedData<ATransaction>> transactions;
-	private final AccountKey peerAddress;
+	private final AccountKey peerKey;
 
 	private static final Keyword[] BLOCK_KEYS = new Keyword[] { Keywords.TIMESTAMP, Keywords.TRANSACTIONS, Keywords.PEER };
 	private static final RecordFormat FORMAT = RecordFormat.of(BLOCK_KEYS);
@@ -51,7 +50,9 @@ public class Block extends ARecord {
 		super(FORMAT);
 		this.timestamp = timestamp;
 		this.transactions = transactions;
-		this.peerAddress=peer;
+		this.peerKey=peer;
+		
+		if (peerKey==null) throw new Error("Trying to construct block with null peer key");
 	}
 
 	@SuppressWarnings("unchecked")
@@ -59,7 +60,7 @@ public class Block extends ARecord {
 	public <V> V get(Keyword k) {
 		if (Keywords.TIMESTAMP.equals(k)) return (V) ((Long) timestamp);
 		if (Keywords.TRANSACTIONS.equals(k)) return (V) transactions;
-		if (Keywords.PEER.equals(k)) return (V) peerAddress;
+		if (Keywords.PEER.equals(k)) return (V) peerKey;
 		return null;
 	}
 
@@ -69,7 +70,7 @@ public class Block extends ARecord {
 		long newTimestamp = (Long) newVals[0];		
 		AVector<SignedData<ATransaction>> newTransactions = (AVector<SignedData<ATransaction>>) newVals[1];
 		AccountKey newPeer = (AccountKey) newVals[2];
-		if ((this.transactions == newTransactions) && (this.timestamp == newTimestamp) && (peerAddress==newPeer)) {
+		if ((this.transactions == newTransactions) && (this.timestamp == newTimestamp) && (peerKey==newPeer)) {
 			return this;
 		}
 		return new Block(newTimestamp, newTransactions,newPeer);
@@ -90,7 +91,7 @@ public class Block extends ARecord {
 	 * @return Address of Peer publishing this block
 	 */
 	public AccountKey getPeer() {
-		return peerAddress;
+		return peerKey;
 	}
 
 	/**
@@ -107,17 +108,17 @@ public class Block extends ARecord {
 
 	/**
 	 * Creates a block with the given transactions
-	 * 
 	 * @param transactions
+	 * 
 	 * @return A new Block containing the specified signed transactions
 	 */
-	public static Block create(long timestamp, AVector<SignedData<ATransaction>> transactions, AccountKey peer) {
-		return new Block(timestamp, transactions,peer);
+	public static Block create(long timestamp, AccountKey peerKey, AVector<SignedData<ATransaction>> transactions) {
+		return new Block(timestamp, transactions,peerKey);
 	}
 
 	@SafeVarargs
-	public static Block of(long timestamp, SignedData<ATransaction>... transactions) {
-		return new Block(timestamp, Vectors.of(transactions),null);
+	public static Block of(long timestamp, AccountKey peerKey, SignedData<ATransaction>... transactions) {
+		return new Block(timestamp, Vectors.of(transactions),peerKey);
 	}
 
 	/**
@@ -140,13 +141,13 @@ public class Block extends ARecord {
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = Utils.writeLong(bs,pos, timestamp);
 		pos = transactions.write(bs,pos);
-		pos = Format.write(bs,pos,peerAddress);
+		pos = Format.write(bs,pos,peerKey);
 		return pos;
 	}
 	
 	@Override
 	public int estimatedEncodingSize() {
-		return 10+transactions.estimatedEncodingSize()+Address.LENGTH;
+		return 10+transactions.estimatedEncodingSize()+AccountKey.LENGTH;
 	}
 
 	/**
@@ -161,8 +162,10 @@ public class Block extends ARecord {
 		try {
 			AVector<SignedData<ATransaction>> transactions = Format.read(bb);
 			if (transactions==null) throw new BadFormatException("Null transactions");
+			
 			AccountKey peer=Format.read(bb);
-			return Block.create(timestamp, transactions,peer);
+			if (peer==null) throw new BadFormatException("Null peer key in Block");
+			return Block.create(timestamp, peer,transactions);
 		} catch (ClassCastException e) {
 			throw new BadFormatException("Error reading Block format", e);
 		}

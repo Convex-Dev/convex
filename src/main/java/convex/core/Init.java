@@ -4,6 +4,7 @@ import java.util.logging.Logger;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AHashMap;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
@@ -15,6 +16,7 @@ import convex.core.data.PeerStatus;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
+import convex.core.data.Vectors;
 import convex.core.lang.Context;
 import convex.core.lang.Core;
 import convex.core.lang.Reader;
@@ -32,41 +34,51 @@ public class Init {
 	 */
 	public static final State STATE;
 	
-	// Governance accounts
-	public static final Address NULL_ADDRESS = Address.dummy("0");
-	public static final Address RESERVED = Address.dummy("1");
-	public static final Address MAINBANK = Address.dummy("2");
-	public static final Address MAINPOOL = Address.dummy("3");
-	public static final Address LIVEPOOL = Address.dummy("4");
-	public static final Address ROOTFUND = Address.dummy("5");
-	
-	// Built-in special accounts
-	public static final Address MEMORY_EXCHANGE=Address.dummy("a");
-	public static final Address TRUST_ADDRESS=Address.dummy("b");
-	public static final Address CORE_ADDRESS=Address.dummy("c");
-	public static final Address REGISTRY_ADDRESS=Address.dummy("f");
-	
-	public static final Address ORACLE_ADDRESS;
-
-	public static final int NUM_GOVERNANCE = 6;
+	public static final int NUM_GOVERNANCE = 9;
 	public static final int NUM_PEERS = 8;
 	public static final int NUM_USERS = 2;
-	public static final int NUM_LIBRARIES = 1;
+	public static final int NUM_LIBRARIES = 4;
 
 	public static final long USER_ALLOCATION;
 
-	public static AKeyPair[] KEYPAIRS = new AKeyPair[NUM_PEERS + NUM_USERS];
+	
+	// Governance accounts
+	public static final Address NULL = Address.create(0);
+	public static final Address INIT = Address.create(1);
+	
+	
+	public static final Address RESERVED = Address.create(2);
+	public static final Address MAINBANK = Address.create(3);
+	public static final Address MAINPOOL = Address.create(4);
+	public static final Address LIVEPOOL = Address.create(5);
+	public static final Address ROOTFUND = Address.create(6);
+	
+	// Built-in special accounts
+	public static final Address MEMORY_EXCHANGE=Address.create(7);
+	public static final Address CORE_ADDRESS=Address.create(8);
+	
+	// Hero is 9, VILLAIN is 10
+	public static final Address HERO=Address.create(9);
+	public static final Address VILLAIN=Address.create(10);
 
-	public static final Address HERO;
-	public static final Address VILLAIN;
-	public static final AccountKey FIRST_PEER;
+	public static final Address FIRST_PEER=Address.create(11);
+	
+	public static final AccountKey FIRST_PEER_KEY;
+
+
+	// Addresses for initial Actors
+	public static final Address REGISTRY_ADDRESS; // 19
+	public static final Address TRUST_ADDRESS; // 20
+	public static final Address ORACLE_ADDRESS; // 21
+	public static final Address FUNGIBLE_ADDRESS; // 22 
+	public static final Address ASSET_ADDRESS; // 23
+
+	public static AKeyPair[] KEYPAIRS = new AKeyPair[NUM_PEERS + NUM_USERS];
 
 	public static final AKeyPair HERO_KP;
 	public static final AKeyPair VILLAIN_KP;
 
 
-	public static final AHashMap<Symbol, Object> INITIAL_GLOBALS = Maps.of(Symbols.TIMESTAMP,
-			Constants.INITIAL_TIMESTAMP, Symbols.FEES, 0L, Symbols.JUICE_PRICE, Constants.INITIAL_JUICE_PRICE);
 
 
 
@@ -75,32 +87,53 @@ public class Init {
 
 	public static final AccountStatus CORE_ACCOUNT;
 
+
 	static {
 		try {
 			// accumulators for initial state maps
 			BlobMap<AccountKey, PeerStatus> peers = BlobMaps.empty();
-			BlobMap<Address, AccountStatus> accts = BlobMaps.empty();
+			AVector<AccountStatus> accts = Vectors.empty();
 
+
+			// governance accounts
+			accts = addGovernanceAccount(accts, NULL, 0L); // Null account
+			accts = addGovernanceAccount(accts, INIT, 0L); // Initialisation Account
+			
+			accts = addGovernanceAccount(accts, RESERVED, 750*Coin.EMERALD); // 75% for investors
+						
+			accts = addGovernanceAccount(accts, MAINBANK, 240*Coin.EMERALD); // 24% Foundation
+			
+			// Pools for network rewards
+			accts = addGovernanceAccount(accts, MAINPOOL, 1*Coin.EMERALD); // 0.1% distribute 5% / year ~= 0.0003%																// /day
+			accts = addGovernanceAccount(accts, LIVEPOOL, 5*Coin.DIAMOND); // 0.0005% = approx 2 days of mainpool feed
+			
+			accts = addGovernanceAccount(accts, ROOTFUND, 8*Coin.EMERALD); // 0.8% Long term net rewards
+
+			// set up memory exchange. Initially 1GB available at 1000 per byte. (one diamond coin liquidity)
+			{
+				accts = addMemoryExchange(accts, MEMORY_EXCHANGE, 1*Coin.DIAMOND,1000000000L);
+			}
+			
+			USER_ALLOCATION = 994*Coin.DIAMOND; // remaining allocation to divide between initial user accounts
+			
 			// Core library
 			accts=addCoreLibrary(accts,CORE_ADDRESS);
 			// Core Account should now be fully initialised
-			CORE_ACCOUNT=accts.get(CORE_ADDRESS);
+			CORE_ACCOUNT=accts.get(CORE_ADDRESS.longValue());
 
-			// governance accounts
-			accts = addGovernanceAccount(accts, RESERVED, 900000000000000000L); // 90%
-			accts = addGovernanceAccount(accts, MAINBANK, 90000000000000000L); // 9%
-			accts = addGovernanceAccount(accts, ROOTFUND, 9000000000000000L); // 1%
-			accts = addGovernanceAccount(accts, MAINPOOL, 998000000000000L); // 0.1% distribute 5% / year ~= 0.0003%
-																				// /day
-			accts = addGovernanceAccount(accts, LIVEPOOL, 900000000000L); // 0.001% = approx 3 days of mainpool feed
-			
-			// set up memory exchange. Initially 1GB available at 1000 per byte.
-			{
-				accts = addMemoryExchange(accts, MEMORY_EXCHANGE, 1000*1000000000L,1000000000L);
+			// Set up initial user accounts
+			for (int i = 0; i < NUM_USERS; i++) {
+				AKeyPair kp = AKeyPair.createSeeded(543212345 + i);
+				KEYPAIRS[NUM_PEERS + i] = kp;
+				// TODO: construct addresses
+				Address address = Address.create(HERO.longValue()+i);
+				accts = addAccount(accts, address,kp.getAccountKey(), USER_ALLOCATION / 10);
 			}
+
+			HERO_KP = KEYPAIRS[NUM_PEERS + 0];
+			VILLAIN_KP = KEYPAIRS[NUM_PEERS + 1];
 			
-			USER_ALLOCATION = 100000 * 1000000L; // remaining allocation to divide between initial user accounts
-			
+			// Finally add peers
 			// Set up initial peers
 			for (int i = 0; i < NUM_PEERS; i++) {
 				AKeyPair kp = AKeyPair.createSeeded(123454321 + i);
@@ -114,24 +147,14 @@ public class Init {
 				// split peer funds between stake and account
 				peers = addPeer(peers, peerKey, stakedFunds);
 				
-				Address peerAddress=Address.create(peerKey);
-				accts = addAccount(accts, peerAddress, peerFunds - stakedFunds);
+				Address peerAddress=Address.create(accts.count());
+				accts = addAccount(accts, peerAddress, peerKey, peerFunds - stakedFunds);
 			}
-			FIRST_PEER = KEYPAIRS[0].getAccountKey();
-
-			// Set up initial actor accounts
-			for (int i = 0; i < NUM_USERS; i++) {
-				AKeyPair kp = AKeyPair.createSeeded(543212345 + i);
-				KEYPAIRS[NUM_PEERS + i] = kp;
-				// TODO: construct addresses
-				Address address = Address.create(kp.getAccountKey());
-				accts = addAccount(accts, address, USER_ALLOCATION / 10);
+			
+			FIRST_PEER_KEY=KEYPAIRS[0].getAccountKey();
+			if (accts.count()!=FIRST_PEER.longValue()+NUM_PEERS) {
+				throw new Error("Unexpected number of accounts after adding peers: "+accts.count());
 			}
-
-			HERO_KP = KEYPAIRS[NUM_PEERS + 0];
-			HERO = Address.create(HERO_KP.getAccountKey());
-			VILLAIN_KP = KEYPAIRS[NUM_PEERS + 1];
-			VILLAIN = Address.create(VILLAIN_KP.getAccountKey());
 
 			// Build globals
 			AHashMap<Symbol, Object> globals = Maps.of(Symbols.TIMESTAMP, Constants.INITIAL_TIMESTAMP, Symbols.FEES, 0L,
@@ -142,15 +165,15 @@ public class Init {
 			long total = s.computeTotalFunds();
 			if (total != Constants.MAX_SUPPLY) throw new Error("Bad total amount: " + total);
 			if (s.getPeers().size() != NUM_PEERS) throw new Error("Bad peer count: " + s.getPeers().size());
-			if (s.getAccounts().size() != NUM_PEERS + NUM_USERS + NUM_GOVERNANCE+NUM_LIBRARIES) throw new Error("Bad account count");
+			if (s.getAccounts().size() != NUM_PEERS + NUM_USERS + NUM_GOVERNANCE) throw new Error("Bad account count");
 
 			// At this point we have a raw initial state with accounts
 			
 			{ // Deploy Registry Actor to fixed Address
 				Context<?> ctx = Context.createFake(s, HERO);
 				Object form=Reader.readResource("actors/registry.con");
-				ctx = ctx.deployActor(form,REGISTRY_ADDRESS);
-				ctx.getResult();
+				ctx = ctx.deployActor(form);
+				REGISTRY_ADDRESS=(Address) ctx.getResult();
 				// Note the Registry registers itself upon creation
 				s = ctx.getState();
 			}
@@ -166,10 +189,10 @@ public class Init {
 			{ // Deploy Trust library and register with CNS
 				Context<?> ctx = Context.createFake(s, HERO);
 				Object form=Reader.readResource("libraries/trust.con");
-				ctx = ctx.deployActor(form, true);
+				ctx = ctx.deployActor(form);
 				Address addr=(Address) ctx.getResult();
 				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'convex.trust "+addr+"))"));
-				ctx.getResult();
+				TRUST_ADDRESS=addr;
 				// Note the Registry registers itself upon creation
 				s = ctx.getState();
 			}
@@ -177,10 +200,10 @@ public class Init {
 			{ // Deploy Fungible library and register with CNS
 				Context<?> ctx = Context.createFake(s, HERO);
 				Object form=Reader.readResource("libraries/fungible.con");
-				ctx = ctx.deployActor(form, true);
+				ctx = ctx.deployActor(form);
 				Address addr=(Address) ctx.getResult();
 				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'convex.fungible "+addr+"))"));
-				ctx.getResult();
+				FUNGIBLE_ADDRESS=addr;
 				// Note the Registry registers itself upon creation
 				s = ctx.getState();
 			}
@@ -188,7 +211,7 @@ public class Init {
 			{ // Deploy Oracle Actor
 				Context<?> ctx = Context.createFake(s, HERO);
 				Object form=Reader.readResource("actors/oracle-trusted.con");
-				ctx = ctx.deployActor(form,true);
+				ctx = ctx.deployActor(form);
 				ORACLE_ADDRESS = (Address) ctx.getResult();
 				s = register(ctx.getState(),ORACLE_ADDRESS,"Oracle Actor (default)");
 			}
@@ -196,12 +219,17 @@ public class Init {
 			{ // Deploy Asset Actor
 				Context<?> ctx = Context.createFake(s, HERO);
 				Object form=Reader.readResource("libraries/asset.con");
-				ctx = ctx.deployActor(form,true);
+				ctx = ctx.deployActor(form);
 				if (ctx.isExceptional()) {
 					log.severe("Failure to deploy convex.asset: "+ctx.getExceptional());
 				}
+				ASSET_ADDRESS = (Address) ctx.getResult();
 				s=ctx.getState();
 			}
+			
+
+			
+			
 
 			STATE = s;
 		} catch (Throwable e) {
@@ -224,36 +252,36 @@ public class Init {
 		return peers.assoc(peerKey, ps);
 	}
 
-	private static BlobMap<Address, AccountStatus> addGovernanceAccount(BlobMap<Address, AccountStatus> accts,
+	private static AVector<AccountStatus> addGovernanceAccount(AVector<AccountStatus> accts,
 			Address a, long balance) {
+		if (accts.count()!=a.longValue()) throw new Error("Incorrect initialisation address: "+a);
 		AccountStatus as = AccountStatus.createGovernance(balance);
-		if (accts.containsKey(a)) throw new Error("Duplicate governance account!");
-		accts = accts.assoc(a, as);
+		accts = accts.conj(as);
 		return accts;
 	}
 	
-	private static BlobMap<Address, AccountStatus> addMemoryExchange(BlobMap<Address, AccountStatus> accts,
+	private static AVector<AccountStatus> addMemoryExchange(AVector<AccountStatus> accts,
 			Address a, long balance, long allowance) {
+		if (accts.count()!=a.longValue()) throw new Error("Incorrect memory exchange address: "+a);
 		AccountStatus as = AccountStatus.createGovernance(balance).withAllowance(allowance);
-		if (accts.containsKey(a)) throw new Error("Duplicate governance account!");
-		accts = accts.assoc(a, as);
+		accts = accts.conj(as);
 		return accts;
 	}
 	
-	private static BlobMap<Address, AccountStatus> addCoreLibrary(BlobMap<Address, AccountStatus> accts, Address a) {
+	private static AVector<AccountStatus> addCoreLibrary(AVector<AccountStatus> accts, Address a) {
+		if (accts.count()!=a.longValue()) throw new Error("Incorrect core library address: "+a);
 
 		AccountStatus as = AccountStatus.createActor(0L, Core.CORE_NAMESPACE);
-		if (accts.containsKey(a)) throw new Error("Duplicate core library account!");
-		accts = accts.assoc(a, as);
+		accts = accts.conj(as);
 		return accts;
 	}
 
-	private static BlobMap<Address, AccountStatus> addAccount(BlobMap<Address, AccountStatus> accts, Address a,
-			long balance) {
-		AccountStatus as = AccountStatus.create(0L, balance); // zero sequence
+	private static AVector<AccountStatus> addAccount(AVector<AccountStatus> accts, Address a,
+			AccountKey key,long balance) {
+		if (accts.count()!=a.longValue()) throw new Error("Incorrect account address: "+a);
+		AccountStatus as = AccountStatus.create(0L, balance,key); 
 		as=as.withAllowance(Constants.INITIAL_ACCOUNT_ALLOWANCE);
-		if (accts.containsKey(a)) throw new Error("Duplicate peer account!");
-		accts = accts.assoc(a, as);
+		accts = accts.conj(as);
 		return accts;
 	}
 

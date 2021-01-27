@@ -47,8 +47,8 @@ public class OraclePanel extends JPanel {
 
 		// ===========================================
 		// Top label
-		add(new CodeLabel("Oracle at address: " + oracleAddress.toChecksumHex() + "\n" + "Executing as user: "
-				+ Init.HERO.toChecksumHex()), BorderLayout.NORTH);
+		add(new CodeLabel("Oracle at address: " + oracleAddress.toString() + "\n" + "Executing as user: "
+				+ Init.HERO.toString()), BorderLayout.NORTH);
 
 		// ===========================================
 		// Central table
@@ -128,7 +128,7 @@ public class OraclePanel extends JPanel {
 			try {
 				actorCode = Utils.readResourceAsString("actors/prediction-market.con");
 				String source = "(let [pmc " + actorCode + " ] " + "(deploy (pmc " + " 0x"
-						+ oracleAddress.toChecksumHex() + " " + key + " " + outcomeString + ")))";
+						+ oracleAddress.toString() + " " + key + " " + outcomeString + ")))";
 				Object code = Reader.read(source);
 				PeerManager.execute(WalletPanel.HERO, code).thenAcceptAsync(createMarketAction);
 			} catch (Exception e1) {

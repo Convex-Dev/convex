@@ -6,9 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.data.AMap;
+import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
-import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.RecordTest;
@@ -25,7 +24,7 @@ public class StateTest {
 	@Test
 	public void testEmptyState() {
 		State s = State.EMPTY;
-		AMap<Address, AccountStatus> accts = s.getAccounts();
+		AVector<AccountStatus> accts = s.getAccounts();
 		assertEquals(0, accts.count());
 		assertEquals(Sets.empty(), s.getStore());
 		

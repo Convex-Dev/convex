@@ -57,7 +57,7 @@ public class State extends ARecord {
 
 	private static final RecordFormat FORMAT = RecordFormat.of(STATE_KEYS);
 
-	public static final State EMPTY = create(BlobMaps.empty(), BlobMaps.empty(), Sets.empty(), Init.INITIAL_GLOBALS,
+	public static final State EMPTY = create(Vectors.empty(), BlobMaps.empty(), Sets.empty(), Constants.INITIAL_GLOBALS,
 			BlobMaps.empty());
 
 	private static final Logger log = Logger.getLogger(State.class.getName());
@@ -66,13 +66,13 @@ public class State extends ARecord {
 	// Note: we are embedding these directly in the State cell.
 	// TODO: check we aren't at risk of hitting max encoding size limits
 	
-	private final BlobMap<Address, AccountStatus> accounts;
+	private final AVector<AccountStatus> accounts;
 	private final BlobMap<AccountKey, PeerStatus> peers;
 	private final ASet<Object> store;
 	private final AHashMap<Symbol, Object> globals;
 	private final BlobMap<ABlob, AVector<Object>> schedule;
 
-	private State(BlobMap<Address, AccountStatus> accounts, BlobMap<AccountKey, PeerStatus> peers, ASet<Object> store,
+	private State(AVector<AccountStatus> accounts, BlobMap<AccountKey, PeerStatus> peers, ASet<Object> store,
 			AHashMap<Symbol, Object> globals, BlobMap<ABlob, AVector<Object>> schedule) {
 		super(FORMAT);
 		this.accounts = accounts;
@@ -96,7 +96,7 @@ public class State extends ARecord {
 	@SuppressWarnings("unchecked")
 	@Override
 	protected State updateAll(Object[] newVals) {
-		BlobMap<Address, AccountStatus> accounts = (BlobMap<Address, AccountStatus>) newVals[0];
+		AVector<AccountStatus> accounts = (AVector<AccountStatus>) newVals[0];
 		BlobMap<AccountKey, PeerStatus> peers = (BlobMap<AccountKey, PeerStatus>) newVals[1];
 		ASet<Object> store = (ASet<Object>) newVals[2];
 		AHashMap<Symbol, Object> globals = (AHashMap<Symbol, Object>) newVals[3];
@@ -108,7 +108,7 @@ public class State extends ARecord {
 		return new State(accounts, peers, store, globals, schedule);
 	}
 
-	public static State create(BlobMap<Address, AccountStatus> accounts, BlobMap<AccountKey, PeerStatus> peers,
+	public static State create(AVector<AccountStatus> accounts, BlobMap<AccountKey, PeerStatus> peers,
 			ASet<Object> store, AHashMap<Symbol, Object> globals, BlobMap<ABlob, AVector<Object>> schedule) {
 		return new State(accounts, peers, store, globals, schedule);
 	}
@@ -149,7 +149,7 @@ public class State extends ARecord {
 	 */
 	public static State read(ByteBuffer bb) throws BadFormatException {
 		try {
-			BlobMap<Address, AccountStatus> accounts = Format.read(bb);
+			AVector<AccountStatus> accounts = Format.read(bb);
 			BlobMap<AccountKey, PeerStatus> peers = Format.read(bb);
 			ASet<Object> store = Format.read(bb);
 			AHashMap<Symbol, Object> globals = Format.read(bb);
@@ -160,7 +160,7 @@ public class State extends ARecord {
 		}
 	}
 
-	public BlobMap<Address, AccountStatus> getAccounts() {
+	public AVector<AccountStatus> getAccounts() {
 		return accounts;
 	}
 
@@ -189,13 +189,13 @@ public class State extends ARecord {
 	 * @return
 	 */
 	public Long getBalance(Address address) {
-		AccountStatus acc = getAccounts().get(address);
+		AccountStatus acc = getAccount(address);
 		if (acc == null) return null;
 		return acc.getBalance();
 	}
 
 	public State withBalance(Address address, long newBalance) {
-		AccountStatus acc = getAccounts().get(address);
+		AccountStatus acc = getAccount(address);
 		if (acc == null) {
 			throw new Error("No account for " + address);
 		} else {
@@ -439,7 +439,7 @@ public class State extends ARecord {
 		return hm;
 	}
 
-	public State withAccounts(BlobMap<Address, AccountStatus> newAccounts) {
+	public State withAccounts(AVector<AccountStatus> newAccounts) {
 		if (newAccounts == accounts) return this;
 		return create(newAccounts, peers, store, globals, schedule);
 	}
@@ -452,7 +452,20 @@ public class State extends ARecord {
 	 * @return Updates State, or this state if Account was unchanged
 	 */
 	public State putAccount(Address address, AccountStatus accountStatus) {
-		BlobMap<Address, AccountStatus> newAccounts = accounts.assoc(address, accountStatus);
+		long ix=address.longValue();
+		long n=accounts.count();
+		if (ix>n) {
+			throw new IndexOutOfBoundsException("Trying to add an account beyond accounts array at position: "+ix);
+		}
+		
+		AVector<AccountStatus> newAccounts;
+		if (ix==n) {
+			// adding a new account in next position
+			newAccounts=accounts.conj(accountStatus);
+		} else {
+			newAccounts = accounts.assoc(ix, accountStatus);
+		}
+		
 		return withAccounts(newAccounts);
 	}
 
@@ -463,7 +476,9 @@ public class State extends ARecord {
 	 * @return The AccountStatus for the given account, or null.
 	 */
 	public AccountStatus getAccount(Address target) {
-		return accounts.get(target);
+		long ix=target.longValue();
+		if (ix>=accounts.count()) return null;
+		return accounts.get(ix);
 	}
 
 	/**
@@ -506,18 +521,16 @@ public class State extends ARecord {
 	/**
 	 * Deploys the specified Actor environment in the current state.
 	 * 
-	 * Returns the updated state, or null if the Account already exists.
+	 * Returns the updated state. The actor will be the last account.
 	 * 
 	 * @param address
 	 * @param actorArgs
-	 * @param environment
+	 * @param environment Environment to use for new Actor Account. Can be null.
 	 * @return The updated state with the Actor deployed.
 	 */
-	public State tryAddActor(Address address, AHashMap<Symbol, Syntax> environment) {
-		AccountStatus as = accounts.get(address);
-		if (as != null) return null;
-		as = AccountStatus.createActor(0L, environment);
-		BlobMap<Address, AccountStatus> newAccounts = accounts.assoc(address, as);
+	public State tryAddActor(AHashMap<Symbol, Syntax> environment) {
+		AccountStatus as = AccountStatus.createActor(0L, environment);
+		AVector<AccountStatus> newAccounts = accounts.conj(as);
 		return withAccounts(newAccounts);
 	}
 
@@ -529,8 +542,8 @@ public class State extends ARecord {
 	 * @return The total value of all funds
 	 */
 	public long computeTotalFunds() {
-		long total = accounts.reduceValues((Long t, AccountStatus as) -> t + as.getBalance(), 0L);
-		total += peers.reduceValues((Long t, PeerStatus ps) -> t + ps.getTotalStake(), 0L);
+		long total = accounts.reduce((Long acc,AccountStatus as) -> acc + as.getBalance(), (Long)0L);
+		total += peers.reduceValues((Long acc, PeerStatus ps) -> acc + ps.getTotalStake(), 0L);
 		total += getFees();
 		return total;
 	}
@@ -546,6 +559,7 @@ public class State extends ARecord {
 		peers.validateCell();
 		store.validateCell();
 		globals.validateCell();
+		schedule.validateCell();
 	}
 
 	/**
@@ -620,6 +634,10 @@ public class State extends ARecord {
 	 */
 	public State withPeer(AccountKey peerKey, PeerStatus updatedPeer) {
 		return withPeers(peers.assoc(peerKey, updatedPeer));
+	}
+
+	public Address nextAddress() {
+		return Address.create(accounts.count());
 	}
 
 }

@@ -145,7 +145,7 @@ public class Blob extends AArrayBlob {
 	 */
 	public static Blob fromHex(String hexString) {
 		byte[] bs=Utils.hexToBytes(hexString);
-		if (bs==null) throw new IllegalArgumentException("Invalid hex string");
+		if (bs==null) throw new IllegalArgumentException("Invalid hex string for blob ["+hexString+"]");
 		return wrap(bs);
 	}
 

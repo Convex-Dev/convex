@@ -91,11 +91,6 @@ public class Core {
 	 * Symbol for core namespace
 	 */
 	public static final Symbol CORE_SYMBOL = Symbol.create("convex.core");
-	
-	/**
-	 * Address for core library
-	 */
-	public static final Address CORE_ADDRESS=Address.dummy("cccc");
 
 	private static final HashSet<Object> tempReg = new HashSet<Object>();
 
@@ -551,18 +546,10 @@ public class Core {
 		public <I> Context<Address> invoke(Context<I> context, Object[] args) {
 			if (args.length !=1) return context.withArityError(exactArityMessage(1, args.length));
 
-			return context.deployActor(args[0],false);
+			return context.deployActor(args[0]);
 		}
 	});
-	
-	public static final CoreFn<Address> DEPLOY_ONCE = reg(new CoreFn<>(Symbols.DEPLOY_ONCE) {
-		@Override
-		public <I> Context<Address> invoke(Context<I> context, Object[] args) {
-			if (args.length !=1) return context.withArityError(exactArityMessage(1, args.length));
 
-			return context.deployActor(args[0],true);
-		}
-	});
 
 	public static final CoreFn<Long> ACCEPT = reg(new CoreFn<>(Symbols.ACCEPT) {
 		@Override
@@ -738,6 +725,23 @@ public class Core {
 			return context.withResult(juice, address);
 		}
 	});
+	
+	public static final CoreFn<Address> CREATE_ACCOUNT = reg(new CoreFn<>(Symbols.CREATE_ACCOUNT) {
+		@Override
+		public <I> Context<Address> invoke(Context<I> context, Object[] args) {
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+
+			Object o = args[0];
+			AccountKey key = RT.accountKey(o);
+			if ((o!=null)&&(key == null)) {
+				return context.withCastError(o, AccountKey.class);
+			}
+			long juice = Juice.CREATE_ACCOUNT;
+			
+			Context<Address> rctx=context.createAccount(key);
+			return rctx.consumeJuice(juice);
+		}
+	});
 
 	public static final CoreFn<ABlob> BLOB = reg(new CoreFn<>(Symbols.BLOB) {
 		@Override
@@ -857,7 +861,7 @@ public class Core {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			AccountKey address = RT.accountKey(args[0]);
-			if (address == null) return context.withCastError(args[0], Address.class);
+			if (address == null) return context.withCastError(args[0], AccountKey.class);
 
 			Long amount = RT.toLong(args[1]);
 			if (amount == null) return context.withCastError(args[0], Long.class);
@@ -2126,7 +2130,7 @@ public class Core {
 	 */
 	private static AHashMap<Symbol, Syntax> registerCoreCode(AHashMap<Symbol, Syntax> env) throws IOException {
 		// we use a fake State to build the initial environment with core address
-		Address ADDR=Core.CORE_ADDRESS;
+		Address ADDR=Address.ZERO;
 		State state = State.EMPTY.putAccount(ADDR,
 				AccountStatus.createActor(1000000000L, env));
 		Context<?> ctx = Context.createInitial(state, ADDR, 1000000L);
@@ -2138,7 +2142,9 @@ public class Core {
 		for (Syntax f : forms) {
 			form = f;
 			ctx=ctx.expandCompile(form);
-			assert (!ctx.isExceptional()) : "Error compiling form: "+ Syntax.unwrapAll(form)+ " : "+ ctx.getExceptional();
+			if (ctx.isExceptional()) {
+				throw new Error("Error compiling form: "+ Syntax.unwrapAll(form)+ " : "+ ctx.getExceptional());
+			}
 			AOp<?> op=(AOp<?>) ctx.getResult();
 			ctx = ctx.execute(op);
 			// System.out.println("Core compilation juice: "+ctx.getJuice());

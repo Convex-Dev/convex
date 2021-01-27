@@ -31,12 +31,6 @@ public class WalletEntry {
 	public static WalletEntry create(Address address,AKeyPair kp) {
 		return new WalletEntry(address, Maps.empty(), kp);
 	}
-	
-	public static WalletEntry create(AKeyPair kp) {
-		// tODO: Fix
-		Address address=Address.create(kp.getAccountKey());
-		return new WalletEntry(address, Maps.empty(), kp);
-	}
 
 	public AccountKey getAccountKey() {
 		return keyPair.getAccountKey();

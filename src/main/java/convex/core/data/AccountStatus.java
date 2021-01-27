@@ -26,14 +26,15 @@ public class AccountStatus extends ARecord {
 	private final AHashMap<Symbol, Syntax> environment;
 	private final ABlobMap<Address, Object> holdings;
 	private final Address controller;
+	private final AccountKey publicKey;
 	
 	private static final Keyword[] ACCOUNT_KEYS = new Keyword[] { Keywords.SEQUENCE, Keywords.BALANCE,Keywords.ALLOWANCE,Keywords.ENVIRONMENT,
-			Keywords.HOLDINGS, Keywords.CONTROLLER};
+			Keywords.HOLDINGS, Keywords.CONTROLLER, Keywords.KEY};
 
 	private static final RecordFormat FORMAT = RecordFormat.of(ACCOUNT_KEYS);
 
 	private AccountStatus(long sequence, long balance, long allowance,
-			AHashMap<Symbol, Syntax> environment, ABlobMap<Address, Object> holdings,Address controller) {
+			AHashMap<Symbol, Syntax> environment, ABlobMap<Address, Object> holdings,Address controller, AccountKey publicKey) {
 		super(FORMAT);
 		this.sequence = sequence;
 		this.balance = balance;
@@ -41,17 +42,18 @@ public class AccountStatus extends ARecord {
 		this.environment = environment;
 		this.holdings=holdings;
 		this.controller=controller;
+		this.publicKey=publicKey;
 	}
 	
 	/**
-	 * Create a regular account, with the specifoed abalance and zero allowance
+	 * Create a regular account, with the specified balance and zero allowance
 	 * 
 	 * @param sequence
 	 * @param balance
 	 * @return New AccountStatus
 	 */
-	public static AccountStatus create(long sequence, long balance) {
-		return new AccountStatus(sequence, balance, 0L, null,null,null);
+	public static AccountStatus create(long sequence, long balance, AccountKey key) {
+		return new AccountStatus(sequence, balance, 0L, null,null,null,key);
 	}
 
 	/**
@@ -62,20 +64,24 @@ public class AccountStatus extends ARecord {
 	 * @return New governance AccountStatus
 	 */
 	public static AccountStatus createGovernance(long balance) {
-		return new AccountStatus(0, balance, 0L, null,null,null);
+		return new AccountStatus(0, balance, 0L, null,null,null,null);
 	}
 
 	public static AccountStatus createActor(long balance,
 			AHashMap<Symbol, Syntax> environment) {
-		return new AccountStatus(Constants.ACTOR_SEQUENCE, balance, 0L,environment,null,null);
+		return new AccountStatus(Constants.ACTOR_SEQUENCE, balance, 0L,environment,null,null,null);
 	}
 
-	public static AccountStatus create(long balance) {
-		return create(0, balance);
+	public static AccountStatus create(long balance, AccountKey key) {
+		return create(0, balance,key);
 	}
 
+	/**
+	 * Create a completely empty account, with no balance or public key
+	 * @return
+	 */
 	public static AccountStatus create() {
-		return create(0, 0L);
+		return create(0, 0L,null);
 	}
 
 	/**
@@ -109,6 +115,7 @@ public class AccountStatus extends ARecord {
 		pos = Format.write(bs,pos, environment);
 		pos = Format.write(bs,pos, holdings);
 		pos = Format.write(bs,pos, controller);
+		pos = Format.write(bs,pos, publicKey);
 		return pos;
 	}
 
@@ -119,12 +126,13 @@ public class AccountStatus extends ARecord {
 		AHashMap<Symbol, Syntax> environment = Format.read(bb);
 		ABlobMap<Address,Object> holdings = Format.read(bb);
 		Address controller = Format.read(bb);
-		return new AccountStatus(sequence, balance, allowance, environment,holdings,controller);
+		AccountKey publicKey = Format.read(bb);
+		return new AccountStatus(sequence, balance, allowance, environment,holdings,controller,publicKey);
 	}
 
 	@Override
 	public int estimatedEncodingSize() {
-		return 30+Format.estimateSize(environment)+Format.estimateSize(holdings)+Format.estimateSize(controller);
+		return 30+Format.estimateSize(environment)+Format.estimateSize(holdings)+Format.estimateSize(controller)+33;
 	}
 
 	@Override
@@ -196,17 +204,17 @@ public class AccountStatus extends ARecord {
 
 	public AccountStatus withBalance(long newBalance) {
 		if (balance==newBalance) return this;
-		return new AccountStatus(sequence, newBalance, allowance, environment,holdings,controller);
+		return new AccountStatus(sequence, newBalance, allowance, environment,holdings,controller,publicKey);
 	}
 	
 	public AccountStatus withAllowance(long newAllowance) {
 		if (allowance==newAllowance) return this;
-		return new AccountStatus(sequence, balance, newAllowance, environment,holdings,controller);
+		return new AccountStatus(sequence, balance, newAllowance, environment,holdings,controller,publicKey);
 	}
 	
 	public AccountStatus withBalances(long newBalance, long newAllowance) {
 		if ((balance==newBalance)&&(allowance==newAllowance)) return this;
-		return new AccountStatus(sequence, newBalance, newAllowance, environment,holdings,controller);
+		return new AccountStatus(sequence, newBalance, newAllowance, environment,holdings,controller,publicKey);
 	}
 
 	public AccountStatus withEnvironment(AHashMap<Symbol, Syntax> newEnvironment) {
@@ -214,7 +222,7 @@ public class AccountStatus extends ARecord {
 		if (newEnvironment==Core.ENVIRONMENT) newEnvironment=null;
 		
 		if (environment==newEnvironment) return this;
-		return new AccountStatus(sequence, balance, allowance,newEnvironment,holdings,controller);
+		return new AccountStatus(sequence, balance, allowance,newEnvironment,holdings,controller,publicKey);
 	}
 
 	/**
@@ -232,7 +240,7 @@ public class AccountStatus extends ARecord {
 			return null;
 		}
 
-		return new AccountStatus(newSequence, balance, allowance, environment,holdings,controller);
+		return new AccountStatus(newSequence, balance, allowance, environment,holdings,controller,publicKey);
 	}
 
 	@Override
@@ -284,11 +292,11 @@ public class AccountStatus extends ARecord {
 	private AccountStatus withHoldings(ABlobMap<Address, Object> newHoldings) {
 		if (newHoldings.isEmpty()) newHoldings=null;
 		if (holdings==newHoldings) return this;
-		return new AccountStatus(sequence, balance, allowance, environment,newHoldings,controller);
+		return new AccountStatus(sequence, balance, allowance, environment,newHoldings,controller,publicKey);
 	}
 	
 	public AccountStatus withController(Address controllerAddress) {
-		return new AccountStatus(sequence, balance, allowance, environment,holdings,controllerAddress);
+		return new AccountStatus(sequence, balance, allowance, environment,holdings,controllerAddress,publicKey);
 	}
 
 	/**
@@ -343,6 +351,7 @@ public class AccountStatus extends ARecord {
 		if (Keywords.ALLOWANCE.equals(key)) return (V) (Long)allowance;
 		if (Keywords.ENVIRONMENT.equals(key)) return (V) environment;
 		if (Keywords.HOLDINGS.equals(key)) return (V) holdings;
+		if (Keywords.KEY.equals(key)) return (V) publicKey;
 		
 		return null;
 	}
@@ -360,12 +369,14 @@ public class AccountStatus extends ARecord {
 		long newAllowance=(long)newVals[2];
 		AHashMap<Symbol, Syntax> newEnv=(AHashMap<Symbol, Syntax>) newVals[3];
 		ABlobMap<Address, Object> newHoldings=(ABlobMap<Address, Object>) newVals[4];
+		Address newController = (Address)newVals[5];
+		AccountKey newKey=(AccountKey)newVals[6];
 		
-		if ((balance==newBal)&&(sequence==newSeq)&&(newEnv==environment)&&(newHoldings==holdings)) {
+		if ((balance==newBal)&&(sequence==newSeq)&&(newEnv==environment)&&(newHoldings==holdings)&&(newController==controller)&&(newKey==publicKey)) {
 			return this;
 		}
 		
-		return new AccountStatus(newSeq,newBal,newAllowance,newEnv,newHoldings,controller);
+		return new AccountStatus(newSeq,newBal,newAllowance,newEnv,newHoldings,newController,newKey);
 	}
 
 	/**

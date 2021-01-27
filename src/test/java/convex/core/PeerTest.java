@@ -29,15 +29,15 @@ public class PeerTest {
 		assertSame(TestState.INITIAL, p.getConsensusState());
 
 		// Belief check
-		AccountKey addr = p.getPeerKey();
+		AccountKey peerKey = p.getPeerKey();
 		Belief b = p.getBelief();
-		assertNotNull(b.getOrder(addr));
+		assertNotNull(b.getOrder(peerKey));
 
 		// check adding a block
 		assertEquals(0, p.getPeerOrder().getBlockCount());
 		assertEquals(0, p.getPeerOrder().getConsensusPoint());
 
-		Block bl0 = Block.of(timestamp);
+		Block bl0 = Block.of(timestamp,peerKey);
 		p = p.proposeBlock(bl0);
 
 		assertEquals(1, p.getPeerOrder().getBlockCount());
@@ -66,7 +66,7 @@ public class PeerTest {
 	@Test
 	public void testStakeAccess() {
 		// use peer address from first peer for testing
-		AccountKey pa = Init.FIRST_PEER;
+		AccountKey pa = Init.FIRST_PEER_KEY;
 		PeerStatus ps = Init.STATE.getPeer(pa);
 		long initialStake = ps.getOwnStake();
 		assertEquals(initialStake, ps.getTotalStake());

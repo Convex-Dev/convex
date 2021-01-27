@@ -2,7 +2,11 @@ package convex.actors;
  
 import static convex.core.lang.TestState.eval;
 import static convex.core.lang.TestState.step;
-import static convex.test.Assertions.*;
+import static convex.test.Assertions.assertArityError;
+import static convex.test.Assertions.assertAssertError;
+import static convex.test.Assertions.assertCastError;
+import static convex.test.Assertions.assertFundsError;
+import static convex.test.Assertions.assertStateError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -24,7 +28,7 @@ import convex.core.lang.TestState;
 import convex.core.util.Utils;
 
 public class ActorsTest {
-
+ 
 	@Test public void testDeployAndCall() {
 		Context<?> ctx=TestState.step("(def caddr (deploy '(let [n 10] (defn getter [] n) (defn hidden [] nil) (defn plus [x] (+ n x)) (export getter plus))))");
 		

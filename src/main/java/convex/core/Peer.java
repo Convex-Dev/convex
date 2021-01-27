@@ -46,8 +46,8 @@ import convex.core.transactions.ATransaction;
  * the future is to invent it." - Alan Kay
  */
 public class Peer {
-	/** This Peer's address */
-	private final AccountKey address;
+	/** This Peer's key */
+	private final AccountKey peerKey;
 
 	/** This Peer's key pair */
 	private final AKeyPair keyPair;
@@ -74,7 +74,7 @@ public class Peer {
 	private Peer(AKeyPair kp, SignedData<Belief> belief, AVector<State> states, AVector<BlockResult> results,
 			long timeStamp) {
 		this.keyPair = kp;
-		this.address = kp.getAccountKey();
+		this.peerKey = kp.getAccountKey();
 		this.belief = belief;
 		this.states = states;
 		this.blockResults = results;
@@ -237,11 +237,11 @@ public class Peer {
 	}
 
 	/**
-	 * Gets the Address of this Peer. 
+	 * Gets the Peer Key of this Peer. 
 	 * @return Address of Peer.
 	 */
 	public AccountKey getPeerKey() {
-		return address;
+		return peerKey;
 	}
 
 	public Belief getBelief() {
@@ -295,7 +295,7 @@ public class Peer {
 	 */
 	private Peer updateBelief(Belief newBelief) throws BadSignatureException {
 		if (belief.getValue() == newBelief) return this;
-		Order myChain = newBelief.getOrder(address); // this peer's chain from new belief
+		Order myChain = newBelief.getOrder(peerKey); // this peer's chain from new belief
 		long consensusPoint = myChain.getConsensusPoint();
 		long stateIndex = states.count() - 1; // index of last state
 		AVector<Block> blocks = myChain.getBlocks();
@@ -348,13 +348,13 @@ public class Peer {
 	public Peer proposeBlock(Block block) throws BadSignatureException {
 		Belief b = getBelief();
 		AHashMap<AccountKey, SignedData<Order>> chains = b.getOrders();
-		SignedData<Order> mySignedChain = chains.get(address);
+		SignedData<Order> mySignedChain = chains.get(peerKey);
 
 		Order myChain = mySignedChain.getValue();
 
 		Order newChain = myChain.propose(block);
 		SignedData<Order> newSignedChain = sign(newChain);
-		AHashMap<AccountKey, SignedData<Order>> newChains = chains.assoc(address, newSignedChain);
+		AHashMap<AccountKey, SignedData<Order>> newChains = chains.assoc(peerKey, newSignedChain);
 		return updateBelief(b.withOrders(newChains));
 	}
 
@@ -373,7 +373,7 @@ public class Peer {
 	 */
 	public Order getPeerOrder() {
 		try {
-			return getBelief().getOrder(address);
+			return getBelief().getOrder(peerKey);
 		} catch (BadSignatureException e) {
 			throw new Error("Bad signature on own chain?", e);
 		}

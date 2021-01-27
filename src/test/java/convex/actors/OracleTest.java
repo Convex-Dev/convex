@@ -31,7 +31,7 @@ public class OracleTest {
 				.step("(do (def HERO (address \"" + HERO + "\")) (def VILLAIN (address \"" + VILLAIN + "\")))");
 
 		Object contractCode = Reader.readResource("actors/oracle-trusted.con");
-		ctx = ctx.deployActor(contractCode, true); 
+		ctx = ctx.deployActor(contractCode); 
 		
 		Address oracle3 = (Address) ctx.getResult();
 		String o3_str = oracle3.toHexString();

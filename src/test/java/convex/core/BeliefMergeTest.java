@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Random;
 
 import org.junit.jupiter.api.Test;
@@ -26,6 +25,7 @@ import convex.core.data.PeerStatus;
 import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.Symbol;
+import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
@@ -54,23 +54,23 @@ public class BeliefMergeTest {
 		// long seed=new Random().nextLong();
 		long seed = 2654733563337952L;
 		// System.out.println("Generating with seed: "+seed);
-		BlobMap<Address, AccountStatus> accounts = BlobMaps.empty();
+		AVector<AccountStatus> accounts = Vectors.empty();
 		BlobMap<AccountKey, PeerStatus> peers = BlobMaps.empty();
 		for (int i = 0; i < NUM_PEERS; i++) {
 			Ed25519KeyPair kp = Ed25519KeyPair.createSeeded(seed + i * 17777);
-			AccountKey addr = kp.getAccountKey();
+			AccountKey key = kp.getAccountKey();
 			// TODO numeric addresses
-			Address address=Address.create(addr);
+			Address address=Address.create(i);
 			KEY_PAIRS[i] = kp;
-			KEYS[i] = addr;
+			KEYS[i] = key;
 			ADDRESSES[i] = address;
-			AccountStatus accStatus = AccountStatus.create((i + 1) * 1000000);
+			AccountStatus accStatus = AccountStatus.create((i + 1) * 1000000,key);
 			PeerStatus peerStatus = PeerStatus.create((i + 1) * 100000);
-			accounts = accounts.assoc(address, accStatus);
-			peers = peers.assoc(addr, peerStatus);
+			accounts = accounts.conj(accStatus);
+			peers = peers.assoc(key, peerStatus);
 		}
 
-		AHashMap<Symbol, Object> globals = Init.INITIAL_GLOBALS;
+		AHashMap<Symbol, Object> globals = Constants.INITIAL_GLOBALS;
 		globals = globals.assoc(Symbols.JUICE_PRICE, 1L); // cheap juice for simplicity
 		INITIAL_STATE = State.create(accounts, peers, Sets.empty(), globals, BlobMaps.empty());
 		TOTAL_VALUE = INITIAL_STATE.computeTotalFunds();
@@ -140,7 +140,7 @@ public class BeliefMergeTest {
 			signedTransactions[ix] = initial[peerIndex].sign(transactions[ix]);
 		}
 		long newTimeStamp = ps.getTimeStamp() + peerIndex + 100;
-		Block block = Block.of(newTimeStamp, signedTransactions);
+		Block block = Block.of(newTimeStamp, KEYS[peerIndex], signedTransactions);
 
 		ps = ps.proposeBlock(block);
 		result[peerIndex] = ps;
@@ -160,7 +160,7 @@ public class BeliefMergeTest {
 		long newTimestamp1 = TEST_TIMESTAMP + 200;
 		b1 = b1.updateTimestamp(b1.getTimeStamp() + 200);
 		assertEquals(0, b1.getPeerOrder().getBlocks().size());
-		Peer b1a = b1.proposeBlock(Block.of(newTimestamp1)); // empty block, just with timestamp
+		Peer b1a = b1.proposeBlock(Block.of(newTimestamp1,KEYS[1])); // empty block, just with timestamp
 		assertEquals(1, b1a.getPeerOrder().getBlocks().size());
 
 		// merge updated belief, new proposed block should be included
@@ -323,8 +323,8 @@ public class BeliefMergeTest {
 		assertTrue(allBeliefsEqual(bs7));
 		State finalState = bs7[0].getConsensusState();
 		// should have 1 transaction each
-		assertEquals(1L, finalState.getAccounts().get(PADDRESS).getSequence());
-		assertEquals(1L, finalState.getAccounts().get(RADDRESS).getSequence());
+		assertEquals(1L, finalState.getAccount(PADDRESS).getSequence());
+		assertEquals(1L, finalState.getAccount(RADDRESS).getSequence());
 		assertEquals(INITIAL_BALANCE_PROPOSER-TJUICE, finalState.getBalance(PADDRESS));
 		assertEquals(INITIAL_BALANCE_RECEIVER-TJUICE, finalState.getBalance(RADDRESS));
 
@@ -414,12 +414,12 @@ public class BeliefMergeTest {
 		assertEquals(NUM_PEERS * NUM_INITIAL_TRANS, new HashSet<>(finalBlocks).size());
 
 		State finalState = bs4[0].getConsensusState();
-		Map<Address, AccountStatus> accounts = finalState.getAccounts();
+		AVector<AccountStatus> accounts = finalState.getAccounts();
 		if (ANALYSIS) printAccounts(accounts);
 
 		// should have correct number of transactions each
 		for (int i = 0; i < NUM_PEERS; i++) {
-			assertEquals(NUM_INITIAL_TRANS, accounts.get(ADDRESSES[i]).getSequence());
+			assertEquals(NUM_INITIAL_TRANS, accounts.get(ADDRESSES[i].longValue()).getSequence());
 		}
 		// should have equal balance
 		assertEquals(INITIAL_BALANCE_PROPOSER-TJUICE, finalState.getBalance(PADDRESS));
@@ -429,7 +429,7 @@ public class BeliefMergeTest {
 		assertEquals(TOTAL_VALUE, finalState.computeTotalFunds());
 	}
 
-	private void printAccounts(Map<Address, AccountStatus> accounts) {
+	private void printAccounts(AVector<AccountStatus> accounts) {
 		System.out.println("===== Accounts =====");
 		for (int i = 0; i < NUM_PEERS; i++) {
 			Address address = ADDRESSES[i];

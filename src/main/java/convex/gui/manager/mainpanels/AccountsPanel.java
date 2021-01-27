@@ -20,7 +20,6 @@ import javax.swing.table.DefaultTableCellRenderer;
 import convex.core.State;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.MapEntry;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.models.AccountsTableModel;
 import convex.gui.manager.PeerManager;
@@ -116,10 +115,11 @@ public class AccountsPanel extends JPanel {
 		JButton btnActor = new JButton("Examine Actor...");
 		actionPanel.add(btnActor);
 		btnActor.addActionListener(e -> {
-			MapEntry<Address, AccountStatus> as = tableModel.getEntry(table.getSelectedRow());
+			long ix=table.getSelectedRow();
+			AccountStatus as = tableModel.getEntry(ix);
 			if (as == null) return;
-			Address addr = as.getKey();
-			if (!as.getValue().isActor()) return;
+			Address addr = Address.create(ix);
+			if (!as.isActor()) return;
 			ActorWindow pw = new ActorWindow(manager, addr);
 			pw.launch();
 		});
@@ -141,9 +141,9 @@ public class AccountsPanel extends JPanel {
 		int row = table.getSelectedRow();
 		if (row < 0) return;
 
-		MapEntry<Address, AccountStatus> me = tableModel.getEntry(row);
+		Address addr=Address.create(row);
 		Clipboard clipboard = java.awt.Toolkit.getDefaultToolkit().getSystemClipboard();
-		StringSelection stringSelection = new StringSelection(me.getKey().toHexString());
+		StringSelection stringSelection = new StringSelection(addr.toHexString());
 		clipboard.setContents(stringSelection, null);
 	}
 

@@ -112,7 +112,7 @@ public class KeyGenPanel extends JPanel {
 		addWalletButton.addActionListener(e -> {
 			String pks = privateKeyArea.getText();
 			pks = Utils.stripWhiteSpace(pks);
-			WalletEntry we = WalletEntry.create(AKeyPair.create(Utils.hexToBytes(pks)));
+			WalletEntry we = WalletEntry.create(null,AKeyPair.create(Utils.hexToBytes(pks)));
 			manager.getWalletPanel().addWalletEntry(we);
 			manager.switchPanel("Wallet");
 

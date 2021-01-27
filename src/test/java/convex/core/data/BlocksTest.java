@@ -16,8 +16,8 @@ public class BlocksTest {
 	@Test
 	public void testEquality() throws BadFormatException {
 		long ts = System.currentTimeMillis();
-		Block b1 = Block.create(ts, Vectors.empty(),Init.FIRST_PEER);
-		Block b2 = Block.create(ts, Vectors.empty(),Init.FIRST_PEER);
+		Block b1 = Block.create(ts, Init.FIRST_PEER_KEY,Vectors.empty());
+		Block b2 = Block.create(ts, Init.FIRST_PEER_KEY,Vectors.empty());
 
 		assertEquals(b1, b2);
 		assertEquals(b1.hashCode(), b2.hashCode());
@@ -36,7 +36,7 @@ public class BlocksTest {
 		SignedData<ATransaction> st = kp.signData(t);
 
 		long ts = System.currentTimeMillis();
-		Block b = Block.create(ts, Vectors.of(st),Init.FIRST_PEER);
+		Block b = Block.create(ts, Init.FIRST_PEER_KEY,Vectors.of(st));
 		assertEquals(1, b.length());
 		assertEquals(t, b.getTransactions().get(0).getValue());
 		

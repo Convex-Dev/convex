@@ -35,7 +35,7 @@ public class PFXTest {
 		PFXUtils.saveKey(ks, kp, "thehero");
 		PFXUtils.saveStore(ks, f, "test");
 		
-		String alias=Init.HERO.toHexString();
+		String alias=Init.HERO_KP.getAccountKey().toHexString();
 		KeyStore ks2=PFXUtils.loadStore(f, "test");
 		assertEquals(alias,ks2.aliases().asIterator().next());
 		

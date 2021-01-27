@@ -9,7 +9,6 @@ import convex.core.data.AMap;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
-import convex.core.data.MapEntry;
 import convex.core.util.Utils;
 
 @SuppressWarnings("serial")
@@ -47,12 +46,11 @@ public class AccountsTableModel extends AbstractTableModel implements TableModel
 	@SuppressWarnings("unchecked")
 	@Override
 	public Object getValueAt(int rowIndex, int columnIndex) {
-		MapEntry<Address, AccountStatus> me = getEntry(rowIndex);
-		Address address = me.getKey();
-		AccountStatus as = me.getValue();
+		Address address = Address.create(rowIndex);
+		AccountStatus as = getEntry(rowIndex);
 		switch (columnIndex) {
 		case 0:
-			return "0x"+address.toChecksumHex();
+			return address.toString();
 		case 1:
 			return as.isActor()?"Actor":"User";
 		case 2: {
@@ -84,8 +82,8 @@ public class AccountsTableModel extends AbstractTableModel implements TableModel
 		}
 	}
 
-	public MapEntry<Address, AccountStatus> getEntry(int row) {
-		return state.getAccounts().entryAt(row);
+	public AccountStatus getEntry(long ix) {
+		return state.getAccounts().get(ix);
 	}
 
 }

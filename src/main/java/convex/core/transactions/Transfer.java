@@ -54,7 +54,7 @@ public class Transfer extends ATransaction {
 	 * @return The Transfer object
 	 */
 	public static Transfer read(ByteBuffer bb) throws BadFormatException {
-		Address address=Address.readRaw(bb);
+		Address address=Address.create(Format.readVLCLong(bb));
 		long nonce = Format.readVLCLong(bb);
 		Address target = Address.readRaw(bb);
 		long amount = Format.readVLCLong(bb);
@@ -138,8 +138,14 @@ public class Transfer extends ATransaction {
 	}
 	
 	@Override
-	public ATransaction withSequence(long newSequence) {
+	public Transfer withSequence(long newSequence) {
 		if (newSequence==this.sequence) return this;
 		return create(address,newSequence,target,amount);
+	}
+	
+	@Override
+	public Transfer withAddress(Address newAddress) {
+		if (newAddress==this.address) return this;
+		return create(newAddress,sequence,target,amount);
 	}
 }

@@ -85,7 +85,7 @@ public class ServerTest {
 	
 	@Test
 	public void testConvexAPI() throws IOException, InterruptedException, ExecutionException, TimeoutException {
-		Convex convex=Convex.connect(server.getHostAddress(),Init.VILLAIN_KP);
+		Convex convex=Convex.connect(server.getHostAddress(),Init.VILLAIN,Init.VILLAIN_KP);
 		
 		Future<convex.core.Result> f=convex.query(Symbols.STAR_BALANCE);
 		convex.core.Result f2=convex.querySync(Symbols.STAR_ADDRESS);
@@ -100,7 +100,7 @@ public class ServerTest {
 		
 		// Connect to Peer Server using the current store for the client
 		Connection pc = Connection.connect(hostAddress, handler, Stores.current());
-		Address addr=Address.create(keyPair.getAccountKey());
+		Address addr=Init.FIRST_PEER;
 		long id1 = pc.sendTransaction(keyPair.signData(Invoke.create(addr, 1, Reader.read("[1 2 3]"))));
 		long id2 = pc.sendTransaction(keyPair.signData(Invoke.create(addr, 2, Reader.read("(return 2)"))));
 		long id2a = pc.sendTransaction(keyPair.signData(Invoke.create(addr, 2, Reader.read("22"))));

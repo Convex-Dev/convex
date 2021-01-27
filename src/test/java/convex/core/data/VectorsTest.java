@@ -191,21 +191,22 @@ public class VectorsTest {
 		assertEquals(100 + (299 * 300) / 2, (int) vec.reduce((s, v) -> s + v, 100));
 	}
 	
-	// TODO: sensible tests on embedded vector sizes
-//	@Test 
-//	public void testEmbedding() {
-//		// should embed, little values
-//		AVector<Integer> vec = Vectors.of(1, 2, 3, 4);
-//		assertTrue(vec.isEmbedded());
-//		
-//		// should embed, small enough
-//		AVector<Object> vec2=Vectors.of(vec);
-//		assertTrue(vec2.isEmbedded());
-//
-//		AVector<Object> vec3=Vectors.of(vec,vec,vec,vec,vec);
-//		assertFalse(vec3.isEmbedded());
-//
-//	}
+	// TODO: more sensible tests on embedded vector sizes
+	@Test 
+	public void testEmbedding() {
+		// should embed, little values
+		AVector<Integer> vec = Vectors.of(1, 2, 3, 4);
+		assertTrue(vec.isEmbedded());
+		assertEquals(10L,vec.getEncoding().length());
+		
+		// should embed, small enough
+		AVector<Object> vec2=Vectors.of(vec,vec);
+		assertTrue(vec2.isEmbedded());
+		assertEquals(22L,vec2.getEncoding().length());
+
+		AVector<Object> vec3=Vectors.of(vec2,vec2,vec2,vec2,vec2,vec2,vec2,vec2);
+		assertFalse(vec3.isEmbedded());
+	}
 
 	@Test
 	public void testUpdateRefs() {

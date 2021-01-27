@@ -29,7 +29,7 @@ public class RecordGen extends Generator<ARecord> {
 		case 1:
 			return Init.STATE;
 		default:
-			return Block.of(Constants.INITIAL_TIMESTAMP);
+			return Block.of(Constants.INITIAL_TIMESTAMP,Init.FIRST_PEER_KEY);
 		}
 	}
 }

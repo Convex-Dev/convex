@@ -34,10 +34,6 @@ public class TestState {
 
 	public static final Address[] CONTRACTS = new Address[NUM_CONTRACTS];
 
-	// Some contracts for testing
-	public static Address CON_FUNGIBLE=null;
-	public static Address CON_TRUSTED=null;
-
 	
 	/**
 	 * A test state set up with a few accounts
@@ -62,12 +58,12 @@ public class TestState {
 	/**
 	 * Balance of hero's account before spending any juice / funds
 	 */
-	public static final long HERO_BALANCE = INITIAL.getAccounts().get(HERO).getBalance();
+	public static final long HERO_BALANCE = INITIAL.getAccount(HERO).getBalance();
 
 	/**
 	 * Balance of hero's account before spending any juice / funds
 	 */
-	public static final long VILLAIN_BALANCE = INITIAL.getAccounts().get(VILLAIN).getBalance();
+	public static final long VILLAIN_BALANCE = INITIAL.getAccount(VILLAIN).getBalance();
 
 	/**
 	 * Total funds in the test state, minus those subtracted for juice in the
@@ -106,12 +102,13 @@ public class TestState {
 		}
 	}
 	
-	private static Context<?> deploy(Context<?> ctx,String actorResource) {
+	// Deploy actor code directly into a Context
+	public static Context<?> deploy(Context<?> ctx,String actorResource) {
 		String source;
 		try {
 			source = Utils.readResourceAsString(actorResource);
 			Object contractCode=Reader.read(source);
-			ctx=ctx.deployActor(contractCode, true);
+			ctx=ctx.deployActor(contractCode);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -130,16 +127,10 @@ public class TestState {
 								+ "(defn my-address [] *address*)" + "(defn my-number [] "+i+")" + "(defn foo [] :bar)"
 								+ "(export write read who-called-me my-address my-number foo)" + ")");
 
-				ctx = ctx.deployActor(contractCode,true);
+				ctx = ctx.deployActor(contractCode);
 				CONTRACTS[i] = (Address) ctx.getResult();
 			}
-			
-			ctx=deploy(ctx,"libraries/fungible.con");
-			CON_FUNGIBLE=(Address) ctx.getResult();
-			
-			ctx=deploy(ctx,"libraries/trust.con");
-			CON_TRUSTED=(Address) ctx.getResult();
-			
+						
 			return ctx.getState();
 		} catch (Throwable t) {
 			t.printStackTrace();

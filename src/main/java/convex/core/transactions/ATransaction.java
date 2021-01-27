@@ -21,6 +21,7 @@ public abstract class ATransaction extends ACell {
 	protected final long sequence;
 
 	protected ATransaction(Address address, long sequence) {
+		if (address==null) throw new ClassCastException("Null Address for transaction");
 		this.address=address;
 		this.sequence = sequence;
 	}
@@ -39,7 +40,7 @@ public abstract class ATransaction extends ACell {
 	 */
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = address.writeToBuffer(bs,pos);
+		pos = Format.writeVLCLong(bs,pos, address.longValue());
 		pos = Format.writeVLCLong(bs,pos, sequence);
 		return pos;
 	}
@@ -87,9 +88,16 @@ public abstract class ATransaction extends ACell {
 
 	/**
 	 * Updates this transaction with the specified sequence number
-	 * @param newSequence NEw sequence number
-	 * @return Updated transaction, or this transaction is the sequence number is unchanged.
+	 * @param newSequence New sequence number
+	 * @return Updated transaction, or this transaction if the sequence number is unchanged.
 	 */
 	public abstract ATransaction withSequence(long newSequence);
+
+	/**
+	 * Updates this transaction with the specified address
+	 * @param newSequence New address
+	 * @return Updated transaction, or this transaction if unchanged.
+	 */
+	public abstract ATransaction withAddress(Address newAddress);
 
 }

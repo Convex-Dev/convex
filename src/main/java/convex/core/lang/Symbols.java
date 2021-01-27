@@ -259,6 +259,8 @@ public class Symbols {
 	public static final Symbol MERGE = Symbol.create("merge");
 	
 	public static final Symbol ENCODING = Symbol.create("encoding");
+	
+	public static final Symbol CREATE_ACCOUNT = Symbol.create("create-account");
 
 
 	

@@ -79,7 +79,7 @@ public class WalletComponent extends BaseListComponent {
 		// address field
 		JPanel cPanel = new JPanel();
 		cPanel.setLayout(new GridLayout(0, 1));
-		CodeLabel addressLabel = new CodeLabel("0x"+address.toChecksumHex());
+		CodeLabel addressLabel = new CodeLabel("0x"+address.toString());
 		addressLabel.setFont(Toolkit.MONO_FONT);
 		cPanel.add(addressLabel);
 		CodeLabel infoLabel = new CodeLabel(getInfoString());

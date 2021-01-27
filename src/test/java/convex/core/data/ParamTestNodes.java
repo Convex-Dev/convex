@@ -28,7 +28,7 @@ public class ParamTestNodes {
 			{ "Keyword :foo", Samples.FOO }, 
 			{ "Empty Vector", Vectors.empty() },
 			{ "Single value map", Maps.of(7, 8) },
-			{ "Account status", AccountStatus.create(1000L) },
+			{ "Account status", AccountStatus.create(1000L,Samples.ACCOUNT_KEY) },
 			{ "Peer status", PeerStatus.create(1000L, Strings.create("http://www.google.com:18888")) },
 			{ "Signed value", SignedData.create(Samples.KEY_PAIR, Strings.create("foo")) },
 			{ "Length 300 vector", Samples.INT_VECTOR_300 } });

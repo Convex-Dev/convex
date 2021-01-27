@@ -46,7 +46,7 @@ public class Convex {
 	protected final AKeyPair keyPair;
 	
 	/**
-	 * Current addres for this Client
+	 * Current address for this Client
 	 */
 	protected Address address;
 	
@@ -100,9 +100,30 @@ public class Convex {
 	 * @throws IOException If connection fails
 	 */
 	public static Convex connect(InetSocketAddress peerAddress, AKeyPair keyPair) throws IOException {
+		return connect(peerAddress,null,keyPair);
+	}
+	
+	/**
+	 * Create a Convex client by connecting to the specified Peer using the given key pair
+	 *
+	 * @param peerAddress Address of Peer
+	 * @param keyPair Key pair to use for client transactions
+	 * @return New Convex client instance
+	 * @throws IOException If connection fails
+	 */
+	public static Convex connect(InetSocketAddress peerAddress, Address address,AKeyPair keyPair) throws IOException {
 		Convex convex=new Convex(keyPair);
+		convex.setAddress(address);
 		convex.connectToPeer(peerAddress);
 		return convex;
+	}
+
+	/**
+	 * Sets the Address for this connection. This will be used by default for subsequent transactions and queries
+	 * @param address Address to use 
+	 */
+	public void setAddress(Address address) {
+		this.address=address;
 	}
 
 	/**
@@ -205,6 +226,9 @@ public class Convex {
 	public CompletableFuture<Result> transact(ATransaction transaction) throws IOException {
 		if (autoSequence||(transaction.getSequence()<=0)) {
 			transaction=applyNextSequence(transaction);
+		}
+		if (transaction.getAddress()==null) {
+			transaction = transaction.withAddress(address);
 		}
 		SignedData<ATransaction> signed=keyPair.signData(transaction);
 		return transact(signed);

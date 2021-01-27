@@ -27,7 +27,7 @@ public class TestNFT {
 	private static Context<?> loadNFT() {
 		Context<?> ctx=TestState.INITIAL_CONTEXT.fork();
 		try {
-			ctx=ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/nft-tokens.con")), true);
+			ctx=ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/nft-tokens.con")));
 			Address nft=(Address) ctx.getResult();
 			String importS="(import "+nft+" :as "+nSym.getName()+")";
 			ctx=step(ctx,importS);

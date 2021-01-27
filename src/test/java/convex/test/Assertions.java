@@ -1,8 +1,8 @@
 package convex.test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import convex.core.ErrorCodes;
 import convex.core.lang.Context;
@@ -11,7 +11,9 @@ import convex.core.util.Utils;
 public class Assertions {
 	
 	public static void assertNotError(Context<?> ctx) {
-		assertFalse(ctx.isExceptional(), "Expected no error but got: " + ctx.getValue());
+		if(ctx.isExceptional()) {
+			fail("Expected no error but got: " + ctx.getValue());
+		}
 	}
 
 	public static void assertTotalRefCount(long expected, Object o) {

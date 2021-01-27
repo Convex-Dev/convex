@@ -250,6 +250,8 @@ public class Juice {
 
 	public static final long SET_COMPARE_PER_ELEMENT = 10;
 
+	public static final long CREATE_ACCOUNT = 100;
+
 	/**
 	 * Saturating multiply and add result = a + b * c
 	 * 

@@ -1,9 +1,9 @@
 package convex.core.data;
 
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.security.MessageDigest;
 
-import convex.core.crypto.Hash;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
@@ -11,91 +11,44 @@ import convex.core.util.Utils;
 /**
  * Immutable class representing an Address.
  * 
+ * An Address is a specialised 8-byte long blob instance that wraps a non-negative long account number. This number
+ * serves as an index into the vector of accounts for the current state.
+ * 
  */
-public class Address extends AArrayBlob {
-	public static final int LENGTH = 32;
+public class Address extends ABlob {
 
-	public static final int LENGTH_BITS = LENGTH * 8;
+	private final long value;
 
-	public static final Address ZERO = Address.dummy("0");
+	public static final Address ZERO = Address.create(0);
 
-	private Address(byte[] data, int offset, int length) {
-		super(data, offset, length);
-		if (length != LENGTH) throw new IllegalArgumentException("Address length must be " + LENGTH_BITS + " bits");
-	}
-
-	/**
-	 * Wraps the specified bytes as an Address object Warning: underlying bytes are
-	 * used directly. Use only if no external references to the byte array will be
-	 * retained.
-	 * 
-	 * @param data
-	 * @return An Address wrapping the given bytes
-	 */
-	public static Address wrap(byte[] data) {
-		return new Address(data, 0, data.length);
+	private Address(long value) {
+		this.value=value;
 	}
 	
 	/**
-	 * Creates an Address from a blob. Must be a valid Address byte sequence
+	 * Creates an Address from a blob. Must be a valid long value
 	 * @param b
-	 * @return AccountKey insatnce, or null if not valid
+	 * @return Address instance, or null if not valid
+	 */
+	public static Address create(long value) {
+		if (value<0) return null;
+		return new Address(value);
+	}
+
+	/**
+	 * Creates an Address from a blob. Must be a valid long value
+	 * @param b
+	 * @return Address instance, or null if not valid
 	 */
 	public static Address create(ABlob b) {
-		if (b.length()!=LENGTH) return null;
-		if (b instanceof AArrayBlob) {
-			AArrayBlob ab=(AArrayBlob)b;
-			return new Address(ab.getInternalArray(),ab.getOffset(),LENGTH);
-		}
-		return wrap(b.getBytes());
-	}
-
-
-	/**
-	 * Wraps the specified bytes as an Address object Warning: underlying bytes are
-	 * used directly. Use only if no external references to the byte array will be
-	 * retained.
-	 * 
-	 * @param data   Data array containing address bytes.
-	 * @param offset Offset into byte array
-	 * @return An Address wrapping the given bytes
-	 */
-	public static Address wrap(byte[] data, int offset) {
-		return new Address(data, offset, LENGTH);
-	}
-
-	private static Address wrap(AArrayBlob slice) {
-		return new Address(slice.store, slice.offset, slice.length);
-	}
-
-	/**
-	 * Creates a "Dummy" Address that is not a valid public key, and therefore
-	 * cannot have valid signed transactions.
-	 * 
-	 * To do this, a short hex nonce is repeated to fill the entire address length. This
-	 * construction makes it possible to examine an Address and assess whether it is (plausibly) 
-	 * a dummy address.
-	 * 
-	 * @param string Hex string to repeat to produce a visible dummy address
-	 * @return An Address that cannot be used to sign transactions.
-	 */
-	public static Address dummy(String nonce) {
-		int n = nonce.length();
-		if (n == 0) throw new Error("Empty nonce");
-		if (n >= LENGTH / 2) throw new Error("Nonce too long for dummy address");
-		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < LENGTH * 2; i += n) {
-			sb.append(nonce);
-		}
-		return Address.fromHex(sb.substring(0, LENGTH * 2));
+		if (b.length()!=8) return null;
+		return create(b.longValue());
 	}
 
 	@Override
 	public int hashCode() {
-		// note: We use the first bytes as the hashcode for an Address.
-		// effectively randomly distributed for public keys
-		// avoids collisions with different nonces for dummy addresses
-		return Utils.readInt(store, offset);
+		// note: We use the Java hashcode of a long 
+		return Long.hashCode(value);
 	}
 
 	@Override
@@ -105,8 +58,7 @@ public class Address extends AArrayBlob {
 	}
 
 	public boolean equals(Address o) {
-		if (o == this) return true;
-		return Utils.arrayEquals(o.store, o.offset, this.store, this.offset, LENGTH);
+		return value==o.value;
 	}
 
 	/**
@@ -117,8 +69,13 @@ public class Address extends AArrayBlob {
 	 *         hex string
 	 */
 	public static Address fromHex(String hexString) {
+		// catch nulls just in case
+		if (hexString==null) return null;
+	
+		// catch odd length
+		if ((hexString.length()&1)!=0) return null;
+		
 		Address result = fromHexOrNull(hexString);
-		if (result == null) throw new Error("Invalid Address hex String [" + hexString + "]");
 		return result;
 	}
 
@@ -130,101 +87,18 @@ public class Address extends AArrayBlob {
 	 *         hex string
 	 */
 	public static Address fromHexOrNull(String hexString) {
-		byte[] bs = Utils.hexToBytes(hexString, LENGTH * 2);
-		if (bs == null) return null; // invalid string
-		if (bs.length != LENGTH) return null; // wrong length
-		return wrap(bs);
+		if (hexString.length()>16) return null;
+		Blob b=Blob.fromHex(hexString);
+		if (b==null) return null;
+		if (b.length!=8) return null;
+		return create(b.longValue());
 	}
 
-	/**
-	 * Constructs an Address object from a checksummed hex string.
-	 * 
-	 * Throws an exception if checksum is not valid
-	 * 
-	 * @param hexString
-	 * @return An Address constructed from the hex string
-	 */
-	public static Address fromChecksumHex(String hexString) {
-		byte[] bs = Utils.hexToBytes(hexString, LENGTH * 2);
-		Address a = Address.wrap(bs);
-		Hash h = a.getContentHash();
-		for (int i = 0; i < LENGTH * 2; i++) {
-			int dh = h.getHexDigit(i);
-			char c = hexString.charAt(i);
-			if (Character.isDigit(c)) continue;
-			boolean check = (c >= 'a') ^ (dh >= 8); // note 'a' is higher than 'A'
-			if (!check)
-				throw new IllegalArgumentException("Bad checksum at position " + i + " in address " + hexString);
-		}
+	public static Address readRaw(ByteBuffer bb) throws BadFormatException {
+		long value=Format.readVLCLong(bb);
+		Address a= Address.create(value);
+		if (a==null) throw new BadFormatException("Invalid VLC encoding for Address");
 		return a;
-	}
-
-	/**
-	 * Converts this Address to a checksummed hex string.
-	 * 
-	 * @return A String containing the checksummed hex representation of this
-	 *         Address
-	 */
-	public String toChecksumHex() {
-		StringBuilder sb = new StringBuilder(64);
-		Hash h = this.getContentHash();
-		for (int i = 0; i < LENGTH * 2; i++) {
-			int dh = h.getHexDigit(i);
-			int da = this.getHexDigit(i);
-			if (da < 10) {
-				sb.append((char) ('0' + da));
-			} else {
-				boolean up = (dh >= 8);
-				sb.append((char) ((up ? 'A' : 'a') + da - 10));
-			}
-		}
-		return sb.toString();
-	}
-
-	/**
-	 * Computes an Address from the Keccak256 hash of a 512 bit public key.
-	 * 
-	 * Method as used in Bitcoin / Ethereum. Not relevant in Ed25519 mode.
-	 * 
-	 * @param publicKey
-	 * @return The Address representing the given public key.
-	 */
-	public static Address fromPublicKey(byte[] publicKey) {
-		if (publicKey.length != 64)
-			throw new IllegalArgumentException("Address creation requires a 512 bit public key");
-		Hash hash = Hash.keccak256(publicKey);
-		return fromHash(hash); // Take last bytes of 256bit hash, up to the required Address length
-	}
-
-	/**
-	 * Create a synthetic Address from a Hash value.
-	 * 
-	 * SECURITY: Will be a usable user Address if and only if the Hash is of the
-	 * ECDSA 64 byte public key.
-	 * 
-	 * @param hash The hash of the ECDSA public key.
-	 * @return Address generated from hash
-	 */
-	public static Address fromHash(Hash hash) {
-		return wrap(hash.slice(Hash.LENGTH - LENGTH, LENGTH)); // take last bytes of hash, in case Address is shorter
-	}
-
-	/**
-	 * Computes an Address from a BigInteger public key
-	 * 
-	 * @param pubKey The public key from which to compute the Address
-	 * @return The Address representing the given public key.
-	 */
-	public static Address fromPublicKey(BigInteger pubKey) {
-		byte[] publicKey = new byte[64];
-		Utils.writeUInt(pubKey, publicKey, 0, 64);
-		return fromPublicKey(publicKey);
-	}
-
-	public static Address readRaw(ByteBuffer data) {
-		byte[] buff = new byte[LENGTH];
-		data.get(buff);
-		return Address.wrap(buff);
 	}
 
 	@Override
@@ -241,8 +115,8 @@ public class Address extends AArrayBlob {
 	
 	@Override
 	public void print(StringBuilder sb) {
-		sb.append("0x");
-		sb.append(toChecksumHex());
+		sb.append("#");
+		sb.append(value);
 	}
 
 	@Override
@@ -254,7 +128,7 @@ public class Address extends AArrayBlob {
 	@Override
 	public int estimatedEncodingSize() {
 		// tag plus LENGTH bytes
-		return 1 + LENGTH;
+		return 1 + Format.MAX_VLC_LONG_LENGTH;
 	}
 
 	@Override
@@ -265,9 +139,9 @@ public class Address extends AArrayBlob {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (length != LENGTH)
-			throw new InvalidDataException("Address length must be " + LENGTH + "  bytes = " + LENGTH_BITS + " bits",
-					this);
+		if (value<0)
+			throw new InvalidDataException("Address must be positive",this);
+
 	}
 
 	@Override
@@ -278,6 +152,101 @@ public class Address extends AArrayBlob {
 	@Override
 	public boolean isRegularBlob() {
 		return false;
+	}
+
+	@Override
+	public void getBytes(byte[] dest, int destOffset) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public long length() {
+		return 8;
+	}
+
+	@Override
+	public String toHexString() {
+		return Utils.toHexString(value);
+	}
+
+	@Override
+	public ABlob slice(long start, long length) {
+		if ((start==0)&&(length==8)) return this;
+		return toBlob().slice(start,length);
+	}
+
+	@Override
+	public Blob toBlob() {
+		byte[] bs=new byte[8];
+		Utils.writeLong(bs, 0, value);
+		return Blob.wrap(bs);
+	}
+
+	@Override
+	public long commonHexPrefixLength(ABlob b) {
+		return toBlob().commonHexPrefixLength(b);
+	}
+
+	@Override
+	protected void updateDigest(MessageDigest digest) {
+		toBlob().updateDigest(digest);
+	}
+
+	@Override
+	public byte getUnchecked(long i) {
+		return (byte)(value>>((7-i)*8));
+	}
+
+	@Override
+	public ABlob append(ABlob b) {
+		return toBlob().append(b);
+	}
+
+	@Override
+	public ByteBuffer writeToBuffer(ByteBuffer bb) {
+		return toBlob().writeToBuffer(bb);
+	}
+
+	@Override
+	public int writeToBuffer(byte[] bs, int pos) {
+		return toBlob().writeToBuffer(bs,pos);
+	}
+
+	@Override
+	public ByteBuffer getByteBuffer() {
+		return toBlob().getByteBuffer();
+	}
+
+	@Override
+	public void toHexString(StringBuilder sb) {
+		String s= Utils.toHexString(value);
+		sb.append(s);
+	}
+
+	@Override
+	public long hexMatchLength(ABlob b, long start, long length) {
+		return toBlob().hexMatchLength(b,start,length);
+	}
+
+	@Override
+	public long toLong() {
+		return value;
+	}
+
+	@Override
+	public long longValue() {
+		return value;
+	}
+
+	@Override
+	public int encodeRaw(byte[] bs, int pos) {
+		return Format.writeVLCLong(bs, pos, value);
+	}
+
+	@Override
+	public int getRefCount() {
+		return 0;
 	}
 
 

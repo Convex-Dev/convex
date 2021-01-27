@@ -201,7 +201,7 @@
   ^{:doc {:description "The address of the Convex registry Actor."
           :examples [{:code "(call *registry* (register {:name \"My name\"}))"}]
           :type :value}}
-  (address 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff))
+  (address 19))
   
  (defmacro set!
     ^{:doc {:description "Sets a local binding identified by an unqualified symbol to the given value. This local change will be be visible until the scope leaves the current binding form (e.g. let binding, function body or recur). Fails with an ARGUMENT error if the symbol is qualified. This is probably most useful for updating a local variable in imperative style. Returns the value assigned to the local binding if successful."
@@ -221,7 +221,7 @@
 
 (defmacro import
   ^{:doc {:description "Import a library for use in the current environment. Creates an alias to the library so that symbols defined in the library can be addressed directly in the form 'alias/symbol-name'."
-          :examples [{:code "(import 0x540Edc26038EF05c5B8442783Efa9561122B8732c0FD387Bf3e215a03f694428 :as alias)"}]
+          :examples [{:code "(import some.library :as alias)"}]
           :type :macro
           :signature [{:params [& args]}]}}
   [addr as sym]

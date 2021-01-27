@@ -37,15 +37,18 @@ public class RTTest {
 
 	@Test
 	public void testAddress() {
-		Address za = Address.wrap(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ,21,22,23,24,25,26,27,28,29,30,31,32},0);
+		Address za = Address.create(0x7777777);
 		assertEquals(za, RT.address(za.toBlob()));
 		assertSame(za, RT.address(za));
 
+		// reading a hex address
+		assertEquals(Address.create(18),RT.address("0000000000000012")); // OK, hex string
+		assertNull(RT.address("0012")); // too short
+		
 		// Check null return values for invalid addresses
 		assertNull(RT.address(null)); // null not allowed
-		assertNull(RT.address(1)); // ints not allowed
+		assertNull(RT.address(-1)); // negative ints not allowed
 		assertNull(RT.address("xyz2030405060708090a0b0c0d0e0f1011121314")); // bad format
-		assertNull(RT.address("0012")); // too short
 	}
 
 	@Test

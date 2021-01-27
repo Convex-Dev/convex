@@ -71,7 +71,7 @@ public class Invoke extends ATransaction {
 	 * @return The Transfer object
 	 */
 	public static Invoke read(ByteBuffer bb) throws BadFormatException {
-		Address address=Address.readRaw(bb);
+		Address address=Address.create(Format.readVLCLong(bb));
 		long sequence = Format.readVLCLong(bb);
 
 		Object args = Format.read(bb);
@@ -168,9 +168,15 @@ public class Invoke extends ATransaction {
 	}
 	
 	@Override
-	public ATransaction withSequence(long newSequence) {
+	public Invoke withSequence(long newSequence) {
 		if (newSequence==this.sequence) return this;
 		return create(address,newSequence,command);
+	}
+	
+	@Override
+	public Invoke withAddress(Address newAddress) {
+		if (newAddress==this.address) return this;
+		return create(newAddress,sequence,command);
 	}
 
 }

@@ -111,13 +111,14 @@ public class GenTestCore {
 	private void doAddressTests(Address a) {
 		assertSame(a,RT.address(a));
 		long n=RT.count(a);
-		assertEquals(Address.LENGTH,n);
 		
 		Blob b=a.toBlob();
 		assertEquals(b,RT.blob(a));
 		assertEquals(a.toHexString(),RT.str(a).toString());
 		
-		assertEquals(a.get(13),(byte)RT.nth(a, 13));
+		// Check a byte in the Address
+		assertEquals(a.get(6),(byte)RT.nth(a, 6));
+		
 		assertThrows(IndexOutOfBoundsException.class,()->RT.nth(a,-1));
 		assertThrows(IndexOutOfBoundsException.class,()->RT.nth(a,n));
 		

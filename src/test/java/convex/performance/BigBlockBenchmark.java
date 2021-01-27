@@ -35,9 +35,9 @@ public class BigBlockBenchmark {
 			AKeyPair kp = Ed25519KeyPair.generate();
 			keyPairs.add(kp);
 			
-			// TODO: numeric
-			Address a=Address.create(kp.getAccountKey());
-			state = state.putAccount(a, (AccountStatus.create(INITIAL_FUNDS)));
+			// Create synthetic accounts
+			Address a=state.nextAddress();
+			state = state.putAccount(a, (AccountStatus.create(INITIAL_FUNDS,kp.getAccountKey())));
 			addresses.add(a);
 		}
 		for (int i = 0; i < NUM_TRANSACTIONS; i++) {
@@ -48,7 +48,7 @@ public class BigBlockBenchmark {
 			Transfer t = Transfer.create(source,1, target, 1);
 			transactions.add(kp.signData(t));
 		}
-		block = Block.create(System.currentTimeMillis(),transactions,Init.FIRST_PEER);
+		block = Block.create(System.currentTimeMillis(),transactions,Init.FIRST_PEER_KEY);
 	}
 
 	@Benchmark

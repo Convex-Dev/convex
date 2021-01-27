@@ -1,10 +1,11 @@
 package convex.core.lang;
 
+import java.util.concurrent.ExecutionException;
+
 import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Init;
 import convex.core.State;
-import convex.core.crypto.Hash;
 import convex.core.data.ABlobMap;
 import convex.core.data.AHashMap;
 import convex.core.data.AObject;
@@ -15,7 +16,6 @@ import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Blob;
-import convex.core.data.BlobMap;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.MapEntry;
@@ -151,7 +151,7 @@ public final class Context<T> extends AObject {
 			return withState(newState);
 		}
 
-		private ChainState withAccounts(BlobMap<Address, AccountStatus> newAccounts) {
+		private ChainState withAccounts(AVector<AccountStatus> newAccounts) {
 			return withState(state.withAccounts(newAccounts));
 		}
 	}
@@ -219,7 +219,7 @@ public final class Context<T> extends AObject {
 	 * @return Initial execution context with reserved juice.
 	 */
 	public static <T> Context<T> createInitial(State state, Address origin,long juice) {
-		AccountStatus as=state.getAccounts().get(origin);
+		AccountStatus as=state.getAccount(origin);
 		if (as==null) {
 			// no account
 			return Context.createFake(state).withError(ErrorCodes.NOBODY);
@@ -953,8 +953,7 @@ public final class Context<T> extends AObject {
 	 * @return AccountStatus for the specified address, or null if the account does not exist
 	 */
 	public AccountStatus getAccountStatus(Address address) {
-		if (address==null) return null;
-		return getState().getAccounts().get(address);
+		return getState().getAccount(address);
 	}
 
 	public int getDepth() {
@@ -1212,10 +1211,11 @@ public final class Context<T> extends AObject {
 		if (amount<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative amount");
 		if (amount>Constants.MAX_SUPPLY) return withError(ErrorCodes.ARGUMENT,"Can't transfer an amount beyond maximum limit");
 		
-		BlobMap<Address,AccountStatus> accounts=getState().getAccounts();
+		AVector<AccountStatus> accounts=getState().getAccounts();
 		
 		Address source=getAddress();
-		AccountStatus sourceAccount=accounts.get(source);
+		long sourceIndex=source.longValue();
+		AccountStatus sourceAccount=accounts.get(sourceIndex);
 		
 		long currentBalance=sourceAccount.getBalance();
 		if (currentBalance<amount) {
@@ -1224,13 +1224,14 @@ public final class Context<T> extends AObject {
 		
 		long newSourceBalance=currentBalance-amount;
 		AccountStatus newSourceAccount=sourceAccount.withBalance(newSourceBalance);
-		accounts=accounts.assoc(source, newSourceAccount);
+		accounts=accounts.assoc(sourceIndex, newSourceAccount);
 
 		// new target account (note: could be source account, so we get from latest accounts)
-		AccountStatus targetAccount=accounts.get(target);	
-		if (targetAccount==null) {
-			targetAccount=AccountStatus.create();
+		long targetIndex=target.longValue();
+		if (targetIndex>=accounts.count()) {
+			return this.withError(ErrorCodes.NOBODY,"Target account for transfer "+target+" does not exist");
 		} 
+		AccountStatus targetAccount=accounts.get(targetIndex);	
 		
 		if (targetAccount.isActor()) {
 			// (call target amount (receive-coin source amount nil))
@@ -1247,7 +1248,7 @@ public final class Context<T> extends AObject {
 			long oldTargetBalance=targetAccount.getBalance();
 			long newTargetBalance=oldTargetBalance+amount;
 			AccountStatus newTargetAccount=targetAccount.withBalance(newTargetBalance);
-			accounts=accounts.assoc(target, newTargetAccount);
+			accounts=accounts.assoc(targetIndex, newTargetAccount);
 		}
 
 		// SECURITY: new context with updated accounts
@@ -1270,13 +1271,11 @@ public final class Context<T> extends AObject {
 		if (amount<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative aloowance amount");
 		if (amount>Constants.MAX_SUPPLY) return withError(ErrorCodes.ARGUMENT,"Can't transfer an allowance amount beyond maximum limit");
 		
-		BlobMap<Address,AccountStatus> accounts=getState().getAccounts();
+		AVector<AccountStatus> accounts=getState().getAccounts();
 		
 		Address source=getAddress();
-		AccountStatus sourceAccount=accounts.get(source);
-		if (sourceAccount==null) {
-			return withError(ErrorCodes.STATE,"Cannot transfer from non-existent account: "+source);
-		}
+		long sourceIndex=source.longValue();
+		AccountStatus sourceAccount=accounts.get(sourceIndex);
 		
 		long currentBalance=sourceAccount.getAllowance();
 		if (currentBalance<amount) {
@@ -1285,17 +1284,18 @@ public final class Context<T> extends AObject {
 		
 		long newSourceBalance=currentBalance-amount;
 		AccountStatus newSourceAccount=sourceAccount.withAllowance(newSourceBalance);
-		accounts=accounts.assoc(source, newSourceAccount);
+		accounts=accounts.assoc(sourceIndex, newSourceAccount);
 
 		// new target account (note: could be source account, so we get from latest accounts)
-		AccountStatus targetAccount=accounts.get(target);	
-		if (targetAccount==null) {
-			return withError(ErrorCodes.STATE,"Cannot transfer to non-existent account: "+target);
+		long targetIndex=target.longValue();
+		if (targetIndex>=accounts.count()) {
+			return withError(ErrorCodes.STATE,"Cannot transfer memory allowance to non-existent account: "+target);
 		}
+		AccountStatus targetAccount=accounts.get(targetIndex);	
 		
 		long newTargetBalance=targetAccount.getAllowance()+amount;
 		AccountStatus newTargetAccount=targetAccount.withAllowance(newTargetBalance);
-		accounts=accounts.assoc(target, newTargetAccount);
+		accounts=accounts.assoc(targetIndex, newTargetAccount);
 
 		// SECURITY: new context with updated accounts
 		Context<Long> result=withChainState(chainState.withAccounts(accounts)).withResult(null);
@@ -1309,15 +1309,14 @@ public final class Context<T> extends AObject {
 	 * @return Context indicating the price paid for the allowance change (may be zero or negative for refund)
 	 */
 	public Context<Long> setMemory(long allowance) {
-		BlobMap<Address,AccountStatus> accounts=getState().getAccounts();
+		AVector<AccountStatus> accounts=getState().getAccounts();
 		if (allowance<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative aloowance amount");
 		if (allowance>Constants.MAX_SUPPLY) return withError(ErrorCodes.ARGUMENT,"Can't transfer an allowance amount beyond maximum limit");
 		
 		Address source=getAddress();
-		AccountStatus sourceAccount=accounts.get(source);
-		if (sourceAccount==null) {
-			return withError(ErrorCodes.STATE,"Cannot set allowance for non-existent account: "+source);
-		}
+		long sourceIndex=source.longValue();
+		AccountStatus sourceAccount=accounts.get(sourceIndex);
+		
 		long current=sourceAccount.getAllowance();
 		long balance=sourceAccount.getBalance();
 		long delta=allowance-current;
@@ -1334,7 +1333,11 @@ public final class Context<T> extends AObject {
 			}
 			sourceAccount=sourceAccount.withBalances(balance-price, allowance);
 			pool=pool.withBalances(poolBalance+price, poolAllowance-delta);
-			BlobMap<Address,AccountStatus> newAccounts=accounts.assoc(source, sourceAccount).assoc(Init.MEMORY_EXCHANGE,pool);
+			
+			// Update accounts
+			AVector<AccountStatus> newAccounts=accounts.assoc(sourceIndex, sourceAccount);
+			newAccounts=newAccounts.assoc(Init.MEMORY_EXCHANGE.longValue(),pool);
+			
 			return withChainState(chainState.withAccounts(newAccounts)).withResult(null);
 		} catch (IllegalArgumentException e) {
 			return withError(ErrorCodes.FUNDS,"Cannot trade allowance: "+e.getMessage());
@@ -1477,51 +1480,23 @@ public final class Context<T> extends AObject {
 	/**
 	 * Deploys an Actor in this context.
 	 * 
-	 * First argument must be an Actor generation code, which will be evaluated in the new Actor account 
+	 * Argument argument must be an Actor generation code, which will be evaluated in the new Actor account 
 	 * to initialise the Actor
 	 * 
-	 * A Actor may be generated with a deterministic Address, in which case a repeated call with 
+	 * An Actor may be generated with a deterministic Address, in which case a repeated call with 
 	 * the same Actor generation code will always return the same Actor, without re-running the generation.
 	 * 
-	 * Result will contain the Actor address if successful.
+	 * Result will contain the new Actor address if successful.
 	 * 
 	 * @param code Actor initialisation code
-	 * @param deterministic Flag to indicate if a deterministic address should be computed
 	 * @return Updated Context with Actor deployed, or an exceptional result
 	 */
-	public Context<Address> deployActor(Object code, boolean deterministic) {
-		State state=getState();
-		
-		Address address;
-		if (deterministic) {
-			Hash hash=Hash.compute(code);
-			address=Address.fromHash(hash);
-			
-			// Need to check if deterministic Account Address already exists for 'deploy-once'. If so, return it.
-			AccountStatus as=state.getAccount(address);
-			if (as!=null) return withResult(Juice.DEPLOY_CONTRACT,address);
-		} else {
-			address=Address.fromHash(state.getHash());
-		}
-		
-		return deployActor(code,address);
-	}
-	
-	/**
-	 * Deploys an Actor in this context to a specified Address
-	 * 
-	 * First argument must be an Actor generator function.
-	 * 
-	 * Result will contain the Actor address if successful.
-	 * 
-	 * @param code Actor initialisation code
-	 * @param args
-	 * @return Updated Context with Actor deployed, or an exceptional result
-	 */
-	public Context<Address> deployActor(Object code, Address address) {
+	public Context<Address> deployActor(Object code) {
 		final State initialState=getState();
-		// deploy initial contract state
-		State stateSetup=initialState.tryAddActor(address, Core.ENVIRONMENT);
+		
+		// deploy initial contract state to next address
+		Address address=initialState.nextAddress();
+		State stateSetup=initialState.tryAddActor(null);
 		if (stateSetup==null) return withError(ErrorCodes.STATE,"Contract deployment address conflict: "+address);
 		
 		// Deployment execution context with forked context and incremented depth
@@ -1532,6 +1507,22 @@ public final class Context<T> extends AObject {
 		if (result.isExceptional()) return result;
 		result= result.handleStateResults(rctx,false);
 		return result.withResult(address);
+	}
+	
+	/**
+	 * Create a new Account with a given AccountKey (may be null for actors etc.)
+	 * @param key
+	 * @return Updated context with new Account added
+	 */
+	public Context<Address> createAccount(AccountKey key) {
+		final State initialState=getState();
+		Address address=initialState.nextAddress();
+		AVector<AccountStatus> accounts=initialState.getAccounts();
+		AccountStatus as=AccountStatus.create(0L, key);
+		accounts=accounts.conj(as);
+		final State newState=initialState.withAccounts(accounts);
+		Context<Address> rctx=this.withState(newState);
+		return rctx.withResult(address);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -1706,6 +1697,8 @@ public final class Context<T> extends AObject {
 	public Blob createEncoding() {
 		throw new TODOException();
 	}
+
+
 
 
 
