@@ -205,7 +205,7 @@
  
   count
 	{
-	 :doc {:description "Counts the number of elements in the given collection"
+	 :doc {:description "Counts the number of elements in the given collection. Returns the length of Blobs and Strings."
          :examples [{:code "(count [1 2 3])"}]
          :type :function
          :signature [{:params [coll]}]}
@@ -221,7 +221,7 @@
  
   def
 	{
-	 :doc {:description "Creates a definition in the current environment. This value will persist in the enviroment owned by the current account."
+	 :doc {:description "Creates a definition in the current environment. This value will persist in the environment owned by the current account."
          :examples [{:code "(def a 10)"}]
          :type :special
          :signature [{:params [sym value]}]}
@@ -229,16 +229,8 @@
  
   deploy
 	{
-	 :doc {:description "Deploys a smart contract. The first argument must be a Actor generator function, which will be called with the given arguments. Returns the new contract address if successful."
-         :examples [{:code "(deploy my-actor-fn 1 2 3)"}]
-         :type :function
-         :signature [{:params [init-fn & args]}]}
-	}
- 
-  deploy-once
-	{
-	 :doc {:description "Deploys an Actor if only if it has not already been deoplyed with the same arguments. The first argument must be a Actor generator function, which will be called with the given arguments. Returns the address of the existing or new Actor if successful."
-         :examples [{:code "(deploy my-actor-fn 1 2 3)"}]
+	 :doc {:description "Deploys an actor. The code provided will be executed to initialise the Actor's account."
+         :examples [{:code "(deploy '(do (defn my-fn [x y] (+ x y)) (export my-fn)) )"}]
          :type :function
          :signature [{:params [init-fn & args]}]}
 	}
