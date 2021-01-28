@@ -1679,6 +1679,23 @@ public class CoreTest {
 	}
 	
 	@Test
+	public void testSetKey() {
+		Context<?> ctx=INITIAL_CONTEXT;
+		
+		ctx=step(ctx,"(set-key 0x0000000000000000000000000000000000000000000000000000000000000000)");
+		assertEquals(AccountKey.ZERO,ctx.getResult());
+		assertEquals(AccountKey.ZERO,eval(ctx,"*key*"));
+		
+		ctx=step(ctx,"(set-key nil)");
+		assertNull(ctx.getResult());
+		assertNull(eval(ctx,"*key*"));
+		
+		ctx=step(ctx,"(set-key "+Init.HERO_KP.getAccountKey()+")");
+		assertEquals(Init.HERO_KP.getAccountKey(),ctx.getResult());
+		assertEquals(Init.HERO_KP.getAccountKey(),eval(ctx,"*key*"));
+	}
+	
+	@Test
 	public void testSetAllowance() {
 		
 		// zero price for unchanged allowance
@@ -2647,6 +2664,11 @@ public class CoreTest {
 	public void testSpecialState() {
 		assertSame(INITIAL, eval("*state*"));
 		assertSame(INITIAL.getAccounts(), eval("(:accounts *state*)"));
+	}
+	
+	@Test
+	public void testSpecialKey() {
+		assertEquals(Init.HERO_KP.getAccountKey(), eval("*key*"));
 	}
 	
 	@Test

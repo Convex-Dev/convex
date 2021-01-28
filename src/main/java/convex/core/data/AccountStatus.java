@@ -207,6 +207,12 @@ public class AccountStatus extends ARecord {
 		return new AccountStatus(sequence, newBalance, allowance, environment,holdings,controller,publicKey);
 	}
 	
+
+	public AccountStatus withAccountKey(AccountKey newKey) {
+		if (newKey==publicKey) return this;
+		return new AccountStatus(sequence, balance, allowance, environment,holdings,controller,newKey);
+	}
+	
 	public AccountStatus withAllowance(long newAllowance) {
 		if (allowance==newAllowance) return this;
 		return new AccountStatus(sequence, balance, newAllowance, environment,holdings,controller,publicKey);
@@ -413,6 +419,7 @@ public class AccountStatus extends ARecord {
 	public AccountKey getAccountKey() {
 		return publicKey;
 	}
+
 
 
 }

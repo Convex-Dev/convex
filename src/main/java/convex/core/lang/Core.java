@@ -1060,6 +1060,24 @@ public class Core {
 			return context.withResult(Juice.ASSOC, controller);
 		}
 	});
+	
+	public static final CoreFn<AccountKey> SET_KEY = reg(new CoreFn<>(Symbols.SET_KEY) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public <I> Context<AccountKey> invoke(Context<I> context, Object[] args) {
+			int n = args.length;
+			if (n !=1) return context.withArityError(exactArityMessage(1, n));
+			
+			// Get requested controller. Must be a valid address or null
+			AccountKey publicKey=RT.accountKey(args[0]);
+			if ((publicKey == null)&&(args[0]!=null)) return context.withCastError(args[0], AccountKey.class);
+			
+			context=(Context<I>) context.setAccountKey(publicKey);
+			if (context.isExceptional()) return (Context<AccountKey>) context;
+			
+			return context.withResult(Juice.ASSOC, publicKey);
+		}
+	});
 
 
 	public static final CoreFn<?> GET = reg(new CoreFn<>(Symbols.GET) {

@@ -1104,6 +1104,14 @@
      :special-symbol true
   }
    
+   *key*
+   {
+     :doc {:description "Returns the public key for this Account. May be null (e.g. for an Actor)."
+           :examples [{:code "*key*"}]
+           :type :special}
+     :special-symbol true
+  }
+   
   *offer*
   {
      :doc {:description "Returns the amount of native coin offered by *caller* to the currently running Actor. Will usually be zero, unless the caller has included an offer with a 'call' expression. The Actor may take up to this amount using 'accept'."

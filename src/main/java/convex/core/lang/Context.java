@@ -581,6 +581,7 @@ public final class Context<T> extends AObject {
 		if (sym.equals(Symbols.STAR_STATE)) return (Context<R>) withResult(getState());
 		if (sym.equals(Symbols.STAR_HOLDINGS)) return (Context<R>) withResult(getHoldings());
 		if (sym.equals(Symbols.STAR_SEQUENCE)) return (Context<R>) withResult(getAccountStatus().getSequence());
+		if (sym.equals(Symbols.STAR_KEY)) return (Context<R>) withResult(getAccountStatus().getAccountKey());
 		return null;
 	}
 
@@ -1667,6 +1668,18 @@ public final class Context<T> extends AObject {
 		return withAccountStatus(getAddress(),as);
 
 	}
+	
+	/**
+	 * Sets the public key for the current account
+	 * @param <R>
+	 * @param address
+	 * @return
+	 */
+	public <R> Context<R> setAccountKey(AccountKey publicKey) {
+		AccountStatus as=getAccountStatus();
+		as=as.withAccountKey(publicKey);
+		return withAccountStatus(getAddress(),as);
+	}
 
 
 	protected <R> Context<R> withAccountStatus(Address target, AccountStatus accountStatus) {
@@ -1697,6 +1710,8 @@ public final class Context<T> extends AObject {
 	public Blob createEncoding() {
 		throw new TODOException();
 	}
+
+
 
 
 
