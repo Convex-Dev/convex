@@ -44,6 +44,12 @@ public class Ed25519Test {
 	}
 	
 	@Test
+	public void testKeyRebuilding() {
+		AKeyPair kp1=Ed25519KeyPair.generate();
+		assertEquals(kp1,AKeyPair.create(kp1.getAccountKey(), kp1.getEncodedPrivateKey()));
+	}
+	
+	@Test
 	public void testPrivateKeyBytes() {
 		Ed25519KeyPair kp1=Ed25519KeyPair.generate();
 		PrivateKey priv=kp1.getPrivate();
