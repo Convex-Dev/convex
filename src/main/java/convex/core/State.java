@@ -541,7 +541,7 @@ public class State extends ARecord {
 	 * @return The updated state with the Actor deployed.
 	 */
 	public State tryAddActor(AHashMap<Symbol, Syntax> environment) {
-		AccountStatus as = AccountStatus.createActor(0L, environment);
+		AccountStatus as = AccountStatus.createActor(environment);
 		AVector<AccountStatus> newAccounts = accounts.conj(as);
 		return withAccounts(newAccounts);
 	}

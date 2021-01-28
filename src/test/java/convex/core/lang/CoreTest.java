@@ -1807,7 +1807,7 @@ public class CoreTest {
 		
 		
 		// String representing a new Address
-		Context<Address> ctx=step("(create-account nil)");
+		Context<Address> ctx=step("(create-account "+Init.HERO_KP.getAccountKey()+")");
 		Address naddr=ctx.getResult();
 
 		// transfers to a new address
@@ -2629,7 +2629,7 @@ public class CoreTest {
 		assertEquals(bal, ctx.getResult());
 		
 		// throwing it all away....
-		assertEquals(0L, evalL("(do (transfer 0 *balance*) *balance*)"));
+		assertEquals(0L, evalL("(do (transfer "+Init.VILLAIN+" *balance*) *balance*)"));
 		
 		// check balance as single expression
 		assertEquals(bal, eval("*balance*"));

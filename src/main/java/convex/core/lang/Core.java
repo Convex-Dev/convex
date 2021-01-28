@@ -2150,8 +2150,8 @@ public class Core {
 		// we use a fake State to build the initial environment with core address
 		Address ADDR=Address.ZERO;
 		State state = State.EMPTY.putAccount(ADDR,
-				AccountStatus.createActor(1000000000L, env));
-		Context<?> ctx = Context.createInitial(state, ADDR, 1000000L);
+				AccountStatus.createActor(env));
+		Context<?> ctx = Context.createFake(state, ADDR);
 
 		Syntax form = null;
 		

@@ -64,12 +64,11 @@ public class AccountStatus extends ARecord {
 	 * @return New governance AccountStatus
 	 */
 	public static AccountStatus createGovernance(long balance) {
-		return new AccountStatus(0, balance, 0L, null,null,null,null);
+		return new AccountStatus(Constants.INITIAL_SEQUENCE, balance, 0L, null,null,null,null);
 	}
 
-	public static AccountStatus createActor(long balance,
-			AHashMap<Symbol, Syntax> environment) {
-		return new AccountStatus(Constants.ACTOR_SEQUENCE, balance, 0L,environment,null,null,null);
+	public static AccountStatus createActor(AHashMap<Symbol, Syntax> environment) {
+		return new AccountStatus(Constants.INITIAL_SEQUENCE, 0L, 0L,environment,null,null,null);
 	}
 
 	public static AccountStatus create(long balance, AccountKey key) {
@@ -141,7 +140,7 @@ public class AccountStatus extends ARecord {
 	}
 
 	public boolean isActor() {
-		return sequence==Constants.ACTOR_SEQUENCE;
+		return publicKey==null;
 	}
 
 	/**
@@ -238,7 +237,7 @@ public class AccountStatus extends ARecord {
 	 * @return Updated account, or null if the sequence number was wrong
 	 */
 	public AccountStatus updateSequence(long newSequence) {
-		// SECURITY: shouldn't ever call updateSequence on a Actor address!
+		// SECURITY: shouldn't ever be trying to call updateSequence on a Actor address!
 		if (isActor()) throw new Error("Trying to update Actor sequence number!");
 
 		long expected = sequence + 1;

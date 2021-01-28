@@ -38,9 +38,9 @@ public class Constants {
 	public static final boolean ETCH_DELETE_TEMP_ON_EXIT = true;
 	
 	/**
-	 * Sequence number used to identify standard actors
+	 * Sequence number used for any new account
 	 */
-	public static final long ACTOR_SEQUENCE = -1;
+	public static final long INITIAL_SEQUENCE = 0;
 
 	/**
 	 * Size in bytes of constant overhead applied per non-embedded Cell in memory accounting
