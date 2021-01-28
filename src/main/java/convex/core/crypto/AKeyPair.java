@@ -4,7 +4,6 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 
 import convex.core.data.AccountKey;
-import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.SignedData;
 
@@ -63,7 +62,7 @@ public abstract class AKeyPair {
 	 * @param seed Any long value. The same seed will produce the same key pair.
 	 * @return New key pair
 	 */
-	public static AKeyPair create(Address address, Blob encodedPrivateKey) {
+	public static AKeyPair create(AccountKey address, Blob encodedPrivateKey) {
 		return Ed25519KeyPair.create(address,encodedPrivateKey);
 	}
 	
