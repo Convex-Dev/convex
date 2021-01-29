@@ -234,7 +234,7 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	/**
 	 * Creates a persisted Ref with the given value in the current store..
 	 * 
-	 * @param value
+	 * @param value Any CVM value to persist
 	 * @return Ref to the given value
 	 */
 	public static <T> Ref<T> createPersisted(T value) {
@@ -247,7 +247,7 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	 * Novelty handler is called for all new Refs that are persisted (recursively),
 	 * starting from lowest levels.
 	 * 
-	 * @param value
+	 * @param value Any CVM value to persist
 	 * @return Persisted Ref
 	 */
 	public static <T> Ref<T> createPersisted(T value, Consumer<Ref<ACell>> noveltyHandler) {
