@@ -86,6 +86,11 @@ public abstract class ATransaction extends ACell {
 	 */
 	public abstract Long getMaxJuice();
 
+	public final boolean isEmbedded() {
+		// don't embed transactions - we want them stored in their own right
+		return false;
+	}
+	
 	/**
 	 * Updates this transaction with the specified sequence number
 	 * @param newSequence New sequence number

@@ -26,7 +26,7 @@ public class GenTestSignedValue {
 	}
 
 	private final AKeyPair KEYPAIR = Init.HERO_KP;
-	private final AccountKey BAD_ADDRESS = AccountKey.dummy("f");
+	private final AccountKey BAD_ADDRESS = AccountKey.dummy("bad");
 
 	@Test
 	public void testNullValueSignings() throws BadSignatureException {

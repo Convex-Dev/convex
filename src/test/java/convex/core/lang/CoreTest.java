@@ -1806,7 +1806,7 @@ public class CoreTest {
 		}
 		
 		
-		// String representing a new Address
+		// String representing a new User Address
 		Context<Address> ctx=step("(create-account "+Init.HERO_KP.getAccountKey()+")");
 		Address naddr=ctx.getResult();
 
