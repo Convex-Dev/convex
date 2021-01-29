@@ -85,4 +85,9 @@ public abstract class AKeyPair {
 	public abstract PrivateKey getPrivate();
 
 	public abstract PublicKey getPublic();
+	
+	@Override
+	public String toString() {
+		return getAccountKey()+":"+getEncodedPrivateKey();
+	}
 }
