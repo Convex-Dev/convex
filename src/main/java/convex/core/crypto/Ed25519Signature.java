@@ -13,6 +13,9 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
 
+/**
+ * Immutable dtata value class representing an Ed25519 digital signature.
+ */
 public class Ed25519Signature extends ASignature {
 
 	/**
@@ -77,9 +80,9 @@ public class Ed25519Signature extends ASignature {
 		    verifier.initVerify(publicKey);
 		    verifier.update(hash.getInternalArray(),hash.getOffset(),Hash.LENGTH);
 			return verifier.verify(signatureBytes);
-		} catch (SignatureException se) {	
+		} catch (SignatureException | InvalidKeyException e) {	
 			return false;
-		} catch (NoSuchAlgorithmException | InvalidKeyException e) {
+		} catch (NoSuchAlgorithmException e) {
 			throw new Error(e);
 		}
 	}
