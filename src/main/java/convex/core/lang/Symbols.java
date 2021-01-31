@@ -166,6 +166,11 @@ public class Symbols {
 	public static final Symbol READ = Symbol.create("read");
 	public static final Symbol EVAL = Symbol.create("eval");
 	public static final Symbol EVAL_AS = Symbol.create("eval-as");
+	
+	public static final Symbol QUERY = Symbol.create("query");
+	public static final Symbol QUERY_AS = Symbol.create("query-as");
+
+	
 	public static final Symbol EXPAND = Symbol.create("expand");
 
 	public static final Symbol SCHEDULE = Symbol.create("schedule");

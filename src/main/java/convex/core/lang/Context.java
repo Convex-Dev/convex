@@ -1153,7 +1153,48 @@ public final class Context<T> extends AObject {
 		// SECURITY: must handle results as if returning from an actor call
 		return handleStateResults(rContext,false);
 	}
+	
+	/**
+	 * Executes code as if run in the current account, but always discarding state changes.
+	 * @param <R> Result type
+	 * @param form Code to execute. 
+	 * @return Context updated with query result and juice consumed
+	 */
+	public <R> Context<R> query(Object form) {
+		Context<R> ctx=this.fork();
+		
+		// adjust depth. May be exceptional if depth limit exceeded
+		ctx=ctx.withDepth(depth+1);
+		
+		// eval in current account if everything OK
+		if (!ctx.isExceptional()) {
+		   ctx=ctx.eval(form);
+		}
+		
+		// handle results including state rollback. Will propagate any errors.
+		return handleQuery(ctx,form);
+	}
+	
+	/**
+	 * Executes code as if run in the specified account, but always discarding state changes.
+	 * @param <R> Result type
+	 * @param form Code to execute. 
+	 * @return Context updated with query result and juice consumed
+	 */
+	public <R> Context<R> queryAs(Address address, Object form) {
+		// chainstate with the target address as origin.
+		ChainState cs=ChainState.create(getState(),address,null,address,0L);
+		Context<R> ctx=Context.create(cs, juice, Maps.empty(), null, depth);
+		ctx=ctx.evalAs(address, form);
+		return handleQuery(ctx,form);
+	}
 
+	protected <R> Context<R> handleQuery(Context<R> ctx, Object form) {
+
+		
+		this.juice=ctx.getJuice();
+		return this.withResult(ctx.getValue());
+	}
 	
 	/**
 	 * Compiles a sequence of forms in the current context. 
@@ -1175,6 +1216,12 @@ public final class Context<T> extends AObject {
 //		return withDepth(newDepth);
 //	}
 	
+	/**
+	 * Changes the depth of this context. Returns excepional result if depth limit exceeded.
+	 * @param <R>
+	 * @param newDepth
+	 * @return
+	 */
 	@SuppressWarnings("unchecked")
 	public <R> Context<R> withDepth(int newDepth) {
 		if (newDepth==depth) return (Context<R>) this;
@@ -1710,6 +1757,8 @@ public final class Context<T> extends AObject {
 	public Blob createEncoding() {
 		throw new TODOException();
 	}
+
+
 
 
 

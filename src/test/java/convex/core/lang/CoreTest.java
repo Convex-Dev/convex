@@ -2396,6 +2396,30 @@ public class CoreTest {
 	}
 	
 	@Test
+	public void testQuery() {
+		Context<AVector<Object>> ctx=step("(query '(do (def a 10) [*address* *origin* *caller* 10]))");
+		assertEquals(Vectors.of(Init.HERO,Init.HERO,null,10L), ctx.getResult());
+		
+		// shouldn't be any def in the environment
+		assertSame(INITIAL,ctx.getState());
+	}
+	
+	@Test
+	public void testQueryError() {
+		Context<Long> ctx=step("(query '(fail :FOO))");
+		assertAssertError(ctx);
+	}
+	
+	@Test
+	public void testQueryAs() {
+		Context<AVector<Object>> ctx=step("(query-as "+Init.VILLAIN+" '(do (def a 10) [*address* *origin* *caller* 10]))");
+		assertEquals(Vectors.of(Init.VILLAIN,Init.VILLAIN,null,10L), ctx.getResult());
+		
+		// shouldn't be any def in the environment
+		assertSame(INITIAL,ctx.getState());
+	}
+	
+	@Test
 	public void testEvalAsNotWhitelistedUser() {
 		// create trust monitor that allows HERO only
 		Context<?> ctx=step("(deploy '(do (defn check-trusted? [s a o] (= s (address "+TestState.HERO+"))) (export check-trusted?)))");

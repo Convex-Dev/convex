@@ -370,6 +370,34 @@ public class Core {
 			Context<Object> rctx = context.evalAs(address,form);
 			return rctx.consumeJuice(Juice.EVAL);
 		}
+	});
+	
+	public static final CoreFn<Object> QUERY = reg(new CoreFn<>(Symbols.QUERY) {
+
+		@Override
+		public <I> Context<Object> invoke(Context<I> context, Object[] args) {
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+
+			Object form = args[0];
+			Context<Object> rctx = context.query(form);
+			return rctx.consumeJuice(Juice.EVAL);
+		}
+
+	});
+	
+	public static final CoreFn<Object> QUERY_AS = reg(new CoreFn<>(Symbols.QUERY_AS) {
+
+		@Override
+		public <I> Context<Object> invoke(Context<I> context, Object[] args) {
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+
+			Address address = RT.address(args[0]);
+			if (address==null) return context.withCastError(args[0], Address.class);
+			
+			Object form = args[1];
+			Context<Object> rctx = context.queryAs(address,form);
+			return rctx.consumeJuice(Juice.EVAL);
+		}
 
 	});
 
