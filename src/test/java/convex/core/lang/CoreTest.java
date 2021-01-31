@@ -2402,12 +2402,18 @@ public class CoreTest {
 		
 		// shouldn't be any def in the environment
 		assertSame(INITIAL,ctx.getState());
+		
+		// some juice should be consumed
+		assertTrue(INITIAL_CONTEXT.getJuice()>ctx.getJuice());
 	}
 	
 	@Test
 	public void testQueryError() {
 		Context<Long> ctx=step("(query '(fail :FOO))");
 		assertAssertError(ctx);
+		
+		// some juice should be consumed
+		assertTrue(INITIAL_CONTEXT.getJuice()>ctx.getJuice());
 	}
 	
 	@Test
@@ -2417,6 +2423,19 @@ public class CoreTest {
 		
 		// shouldn't be any def in the environment
 		assertSame(INITIAL,ctx.getState());
+		assertSame(INITIAL_CONTEXT.getLocalBindings(),ctx.getLocalBindings());
+		
+		// some juice should be consumed
+		assertTrue(INITIAL_CONTEXT.getJuice()>ctx.getJuice());
+	}
+	
+	@Test
+	public void testQueryAsError() {
+		Context<Long> ctx=step("(query '(fail :FOO))");
+		assertAssertError(ctx);
+		
+		// some juice should be consumed
+		assertTrue(INITIAL_CONTEXT.getJuice()>ctx.getJuice());
 	}
 	
 	@Test
