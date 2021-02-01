@@ -22,6 +22,7 @@ import convex.core.data.Format;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
@@ -90,11 +91,11 @@ public class MemoryStoreTest {
 		ArrayList<Ref<ACell>> al = new ArrayList<>();
 		try {
 			Stores.setCurrent(ms);
-			AVector<Long> data = Samples.INT_VECTOR_300;
+			AVector<CVMLong> data = Samples.INT_VECTOR_300;
 
 			Consumer<Ref<ACell>> handler = r -> al.add(r);
 
-			Ref<AVector<Integer>> dataRef = data.getRef();
+			Ref<AVector<CVMLong>> dataRef = data.getRef();
 			Hash dataHash = dataRef.getHash();
 			assertNull(ms.refForHash(dataHash));
 

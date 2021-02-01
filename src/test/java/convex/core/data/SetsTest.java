@@ -9,8 +9,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
 import convex.test.Samples;
 
 public class SetsTest {
@@ -30,22 +33,27 @@ public class SetsTest {
 	public void testIncludeExclude() {
 		ASet<Object> s = Sets.empty();
 		assertEquals("#{}", s.toString());
-		s = s.include(1L);
+		s = s.include(RT.cvm(1L));
 		assertEquals("#{1}", s.toString());
-		s = s.include(1L);
+		s = s.include(RT.cvm(1L));
 		assertEquals("#{1}", s.toString());
-		s = s.include(2L);
+		s = s.include(RT.cvm(2L));
 		assertEquals("#{1,2}", s.toString());
-		s = s.exclude(1L);
+		s = s.exclude(RT.cvm(1L));
 		assertEquals("#{2}", s.toString());
-		s = s.exclude(2L);
+		s = s.exclude(RT.cvm(2L));
 		assertTrue(s.isEmpty());
 		assertSame(s, Sets.empty());
 	}
 
 	@Test
 	public void testPrimitiveEquality() {
-		assertEquals(Sets.of(1, 1L), Sets.of((Object) 1).include(1L));
+		// different primitive objects with same numeric value should not collide in set
+		CVMByte b=CVMByte.create(1);
+		ASet<Object> s=Sets.of(1L).include(b);
+		assertEquals(2L,s.count());
+		
+		assertEquals(Sets.of(b, 1L), s);
 	}
 
 	@Test
@@ -62,7 +70,7 @@ public class SetsTest {
 	
 	@Test
 	public void testSubsets() {
-		Set<Long> EM=Sets.empty();
+		Set<CVMLong> EM=Sets.empty();
 		assertTrue(EM.isSubset(EM));
 		assertTrue(EM.isSubset(Samples.INT_SET_300));
 		assertTrue(EM.isSubset(Samples.INT_SET_10));
@@ -70,11 +78,11 @@ public class SetsTest {
 		assertFalse(Samples.INT_SET_300.isSubset(EM));
 		
 		{
-			Set<Long> s=Samples.createRandomSubset(Samples.INT_SET_300,0.5,1);
+			Set<CVMLong> s=Samples.createRandomSubset(Samples.INT_SET_300,0.5,1);
 			assertTrue(s.isSubset(Samples.INT_SET_300));
 		}
 		{
-			Set<Long> s=Samples.createRandomSubset(Samples.INT_SET_10,0.5,2);
+			Set<CVMLong> s=Samples.createRandomSubset(Samples.INT_SET_10,0.5,2);
 			assertTrue(s.isSubset(Samples.INT_SET_10));
 		}
 
@@ -86,10 +94,10 @@ public class SetsTest {
 
 	@Test
 	public void testMerging() {
-		ASet<Long> a = Sets.of(1, 2, 3);
-		ASet<Long> b = Sets.of(2, 4, 6);
-		assertTrue(a.contains(3L));
-		assertFalse(b.contains(3L));
+		ASet<CVMLong> a = Sets.of(1, 2, 3);
+		ASet<CVMLong> b = Sets.of(2, 4, 6);
+		assertTrue(a.contains(RT.cvm(3L)));
+		assertFalse(b.contains(RT.cvm(3L)));
 
 		assertSame(Sets.empty(), a.disjAll(a));
 		assertEquals(Sets.of(1, 2, 3, 4, 6), a.conjAll(b));
@@ -98,10 +106,10 @@ public class SetsTest {
 	
 	@Test 
 	public void regressionRead() throws BadFormatException {
-		ASet<Long> v1=Sets.of(43);
+		ASet<CVMLong> v1=Sets.of(43);
 		Blob b1 = Format.encodedBlob(v1);
 		
-		ASet<Long> v2=Format.read(b1);
+		ASet<CVMLong> v2=Format.read(b1);
 		Blob b2 = Format.encodedBlob(v2);
 		
 		assertEquals(v1, v2);
@@ -122,14 +130,14 @@ public class SetsTest {
 
 	@Test
 	public void testMergingIdentity() {
-		ASet<Long> a = Sets.of(1L, 2L, 3L);
-		assertTrue(a == a.include(2L));
+		ASet<CVMLong> a = Sets.of(1L, 2L, 3L);
+		assertTrue(a == a.include(RT.cvm(2L)));
 		assertTrue(a == a.includeAll(Sets.of(1L, 3L)));
 	}
 	
 	@Test
 	public void testIntersection() {
-		ASet<Long> a = Sets.of(1, 2, 3);
+		ASet<CVMLong> a = Sets.of(1, 2, 3);
 		
 		// (intersect a a) => a
 		assertSame(a,a.intersectAll(a));
@@ -149,28 +157,28 @@ public class SetsTest {
 
 	@Test
 	public void testBigMerging() {
-		ASet<Long> s = Sets.create(Samples.INT_VECTOR_300);
+		ASet<CVMLong> s = Sets.create(Samples.INT_VECTOR_300);
 		CollectionsTest.doSetTests(s);
 
-		ASet<Long> s2 = s.includeAll(Sets.of(1, 2, 3, 100));
+		ASet<CVMLong> s2 = s.includeAll(Sets.of(1, 2, 3, 100));
 		assertEquals(s, s2);
 		assertSame(s, s2);
 
-		ASet<Long> s3 = s.disjAll(Samples.INT_VECTOR_300);
+		ASet<CVMLong> s3 = s.disjAll(Samples.INT_VECTOR_300);
 		assertSame(s3, Sets.empty());
 
-		ASet<Long> s4 = s.excludeAll(Sets.of(-1000));
+		ASet<CVMLong> s4 = s.excludeAll(Sets.of(-1000));
 		assertSame(s, s4);
 
-		ASet<Long> s5a = Sets.of(1, 3, 7, -1000);
-		ASet<Long> s5 = s5a.disjAll(s);
+		ASet<CVMLong> s5a = Sets.of(1, 3, 7, -1000);
+		ASet<CVMLong> s5 = s5a.disjAll(s);
 		assertEquals(Sets.of(-1000), s5);
 	}
 
 	@Test
 	public void testBadStructure() {
-		AHashMap<Long, Object> m = Maps.of(1L, true, 3L, false);
-		Set<Long> s = Set.wrap(m);
+		AHashMap<CVMLong, Object> m = Maps.of(1L, true, 3L, false);
+		Set<CVMLong> s = Set.wrap(m);
 
 		// should not be identical, different hashes
 		assertNotEquals(m, Sets.of(1L, 3L));

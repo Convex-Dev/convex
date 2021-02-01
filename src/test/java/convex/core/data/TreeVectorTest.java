@@ -10,6 +10,8 @@ import java.util.Spliterator;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.test.Samples;
 
 public class TreeVectorTest {
@@ -46,7 +48,7 @@ public class TreeVectorTest {
 
 	@Test
 	public void testIterator() {
-		AVector<Long> v = Samples.INT_VECTOR_256;
+		AVector<CVMLong> v = Samples.INT_VECTOR_256;
 		assertEquals(v.get(0), v.iterator().next());
 		assertEquals(v.get(255), v.listIterator(256).previous());
 
@@ -56,23 +58,23 @@ public class TreeVectorTest {
 
 	@Test
 	public void testMap() {
-		AVector<Long> orig = Samples.INT_VECTOR_300;
-		AVector<Long> inc = orig.map(i -> i + 5);
+		AVector<CVMLong> orig = Samples.INT_VECTOR_300;
+		AVector<CVMLong> inc = orig.map(i -> RT.cvm(i.longValue() + 5));
 		assertEquals(orig.count(), inc.count());
 		assertNotEquals(orig, inc);
-		AVector<Long> dec = inc.map(i -> i - 5);
+		AVector<CVMLong> dec = inc.map(i -> RT.cvm(i.longValue() - 5));
 		assertEquals(orig, dec);
 	}
 
 	@Test
 	public void testSpliterator() {
-		AVector<Long> a = Samples.INT_VECTOR_300.subVector(0, 256);
+		AVector<CVMLong> a = Samples.INT_VECTOR_300.subVector(0, 256);
 		assertEquals(VectorTree.class, a.getClass());
-		Spliterator<Long> spliterator = a.spliterator();
+		Spliterator<CVMLong> spliterator = a.spliterator();
 		assertEquals(256, spliterator.estimateSize());
 
-		int[] sum = new int[1];
-		spliterator.forEachRemaining(i -> sum[0] += i);
+		long[] sum = new long[1];
+		spliterator.forEachRemaining(i -> sum[0] += i.longValue());
 		assertEquals((255 * 256) / 2, sum[0]);
 
 	}

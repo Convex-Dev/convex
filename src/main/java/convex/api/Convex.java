@@ -17,6 +17,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.SignedData;
+import convex.core.data.prim.CVMLong;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
 import convex.core.lang.ops.Lookup;
@@ -77,7 +78,7 @@ public class Convex {
 		@Override
 		protected synchronized void handleResultMessage(Message m) {
 			Result v = m.getPayload();
-			long id = m.getID();
+			long id = m.getID().longValue();
 			synchronized(awaiting) {
 				CompletableFuture<Result> cf=awaiting.get(id);
 				if (cf!=null) {
@@ -480,8 +481,8 @@ public class Convex {
 			Future<Result> future= query(Reader.read("(balance "+address.toString()+")"));
 			Result result=future.get(Constants.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
 			if (result.isError()) throw new Error(result.toString());
-			Long bal= (Long) result.getValue();
-			return bal;
+			CVMLong bal= (CVMLong) result.getValue();
+			return bal.longValue();
 		} catch (ExecutionException | InterruptedException | TimeoutException ex) {
 			throw new IOException("Unable to query balance",ex);
 		}

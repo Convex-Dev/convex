@@ -1,6 +1,6 @@
 package convex.core.lang;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static convex.test.Assertions.assertCVMEquals;
 
 import org.junit.jupiter.api.Test;
 
@@ -11,8 +11,8 @@ public class SyntaxTest {
 
 	@Test
 	public void testSyntaxConstructor() {
-		Syntax s = Syntax.create(1L);
-		assertEquals(1L, (long) s.getValue());
+		Syntax s = Syntax.create(RT.cvm(1L));
+		assertCVMEquals(1L, s.getValue());
 
 		ObjectsTest.doCellTests(s);
 	}

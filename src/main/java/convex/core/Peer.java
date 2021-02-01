@@ -105,7 +105,7 @@ public class Peer {
 	public static Peer create(AKeyPair peerKP, State initialState) {
 		Belief belief = Belief.createSingleOrder(peerKP);
 		SignedData<Belief> sb = peerKP.signData(belief);
-		return new Peer(peerKP, sb, Vectors.of(initialState), Vectors.empty(), initialState.getTimeStamp());
+		return new Peer(peerKP, sb, Vectors.of(initialState), Vectors.empty(), initialState.getTimeStamp().longValue());
 	}
 	
 	/**

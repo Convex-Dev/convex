@@ -1,6 +1,7 @@
 package convex.core.lang.impl;
 
 import convex.core.data.ASequence;
+import convex.core.data.prim.CVMLong;
 import convex.core.lang.Context;
 import convex.core.lang.IFn;
 import convex.core.lang.RT;
@@ -28,15 +29,17 @@ public class SeqFn<T> implements IFn<T> {
 	public <I> Context<T> invoke(Context<I> context, Object[] args) {
 		int n = args.length;
 		if (n == 1) {
-			Long key = RT.toLong(args[0]);
+			CVMLong key = RT.toLong(args[0]);
 			if (key==null) return context.withCastError(args[0], Long.class);
-			if ((key < 0) || (key >= seq.count())) return (Context<T>) context.withBoundsError(key);
+			long ix=key.longValue();
+			if ((ix < 0) || (ix >= seq.count())) return (Context<T>) context.withBoundsError(ix);
 			T result = (T) seq.get(key);
 			return context.withResult(result);
 		} else if (n == 2) {
-			Long key = RT.toLong(args[0]);
+			CVMLong key = RT.toLong(args[0]);
 			if (key==null) return context.withCastError(args[0], Long.class);
-			if ((key < 0) || (key >= seq.count())) return (Context<T>) context.withResult(args[1]);
+			long ix=key.longValue();
+			if ((ix < 0) || (ix >= seq.count())) return (Context<T>) context.withResult(args[1]);
 			T result = (T) seq.get(key);
 			return context.withResult(result);
 		} else {

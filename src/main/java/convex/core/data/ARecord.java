@@ -47,7 +47,7 @@ public abstract class ARecord extends AMap<Keyword,Object> {
 	public int encodeRaw(byte[] bs, int pos) {
 		List<Keyword> keys=getKeys();
 		for (Keyword key: keys) {
-			pos=Format.write(bs,pos, (Object)get(key));
+			pos=Format.write(bs,pos, get(key));
 		}
 		return pos;
 	}

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static convex.test.Assertions.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -28,6 +29,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
 import convex.core.store.Stores;
@@ -119,7 +121,7 @@ public class ServerTest {
 		convex.core.Result f2=convex.querySync(Symbols.STAR_ADDRESS);
 		
 		assertEquals(Init.VILLAIN,f2.getValue());
-		assertEquals(Init.STATE.getBalance(Init.VILLAIN),f.get().getValue());
+		assertCVMEquals(Init.STATE.getBalance(Init.VILLAIN),f.get().getValue());
 	}
 	
 	@Test
@@ -142,12 +144,12 @@ public class ServerTest {
 		// wait for results to come back
 		assertFalse(Utils.timeout(1000, () -> results.containsKey(id5)));
 		
-		AVector<Long> v = Vectors.of(1l, 2l, 3l);
-		assertEquals(v, results.get(id1));
-		assertEquals(2L, results.get(id2));
+		AVector<CVMLong> v = Vectors.of(1l, 2l, 3l);
+		assertCVMEquals(v, results.get(id1));
+		assertCVMEquals(2L, results.get(id2));
 		assertEquals(ErrorCodes.SEQUENCE, results.get(id2a));
-		assertEquals(3L, results.get(id3));
-		assertEquals(1000L, (long)results.get(id4));
+		assertCVMEquals(3L, results.get(id3));
+		assertCVMEquals(1000L, results.get(id4));
 		assertTrue( results.containsKey(id5));
 	}
 	

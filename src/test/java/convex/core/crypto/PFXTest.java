@@ -16,6 +16,7 @@ import java.security.cert.CertificateException;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Init;
+import convex.core.lang.RT;
 
 public class PFXTest {
 
@@ -40,6 +41,6 @@ public class PFXTest {
 		assertEquals(alias,ks2.aliases().asIterator().next());
 		
 		AKeyPair kp2=PFXUtils.getKeyPair(ks2,alias, "thehero");
-		assertEquals(kp.signData(1L).getEncoding(),kp2.signData(1L).getEncoding());
+		assertEquals(kp.signData(RT.cvm(1L)).getEncoding(),kp2.signData(RT.cvm(1L)).getEncoding());
 	}
 }

@@ -9,11 +9,14 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import static convex.test.Assertions.*;
+
 import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.Init;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
@@ -29,26 +32,28 @@ public class MapsTest {
 	public void testMapBuilding() throws InvalidDataException, ValidationException {
 		int SIZE = 1000;
 
-		AMap<Long, Long> m = Maps.empty();
+		AMap<CVMLong, CVMLong> m = Maps.empty();
 		for (long i = 0; i < SIZE; i++) {
-			assertFalse(m.containsKey(i));
-			m = m.assoc(i, i);
+			CVMLong ci=RT.cvm(i);
+			assertFalse(m.containsKey(ci));
+			m = m.assoc(ci, ci);
 			// Log.debug(i+ ": "+m);
 			if ((i < 10) || (i % 23 == 0)) m.validate(); // PERF: only check some steps
 			assertEquals(i + 1, m.size());
-			assertEquals((Long) i, m.get(i));
-			assertTrue(m.containsKey(i));
+			assertEquals(ci, m.get(ci));
+			assertTrue(m.containsKey(ci));
 		}
 
 		long C = 1000000;
-		assertEquals(SIZE * (SIZE - 1) / 2 + C, (long) m.reduceValues((acc, a) -> acc + a, C));
-		assertEquals(SIZE * (SIZE - 1) + C, (long) m.reduceEntries((acc, e) -> acc + e.getKey() + e.getValue(), C));
+		assertEquals(SIZE * (SIZE - 1) / 2 + C, (long) m.reduceValues((acc, a) -> acc + a.longValue(), C));
+		assertEquals(SIZE * (SIZE - 1) + C, (long) m.reduceEntries((acc, e) -> acc + e.getKey().longValue() + e.getValue().longValue(), C));
 
 		for (long i = 0; i < SIZE; i++) {
-			assertTrue(m.containsKey(i));
-			m = m.dissoc(i);
+			CVMLong ci=RT.cvm(i);
+			assertTrue(m.containsKey(ci));
+			m = m.dissoc(ci);
 			assertEquals(SIZE - i - 1, m.size());
-			assertNull(m.get(i));
+			assertNull(m.get(ci));
 			if ((i < 10) || (i % 31 == 0)) m.validate(); // PERF: only check some steps
 		}
 
@@ -94,18 +99,18 @@ public class MapsTest {
 
 	@Test
 	public void testContains() {
-		assertTrue(Samples.LONG_MAP_10.containsValue(3L));
-		assertFalse(Samples.LONG_MAP_10.containsValue(12L));
-		assertTrue(Samples.LONG_MAP_100.containsValue(12L));
-		assertFalse(Samples.LONG_MAP_100.containsValue(100L));
+		assertTrue(Samples.LONG_MAP_10.containsValue(RT.cvm(3L)));
+		assertFalse(Samples.LONG_MAP_10.containsValue(RT.cvm(12L)));
+		assertTrue(Samples.LONG_MAP_100.containsValue(RT.cvm(12L)));
+		assertFalse(Samples.LONG_MAP_100.containsValue(RT.cvm(100L)));
 	}
 
 	@Test
 	public void testContainsRef() {
-		assertTrue(Samples.LONG_MAP_10.containsKeyRef(Ref.get(1L)));
-		assertFalse(Samples.LONG_MAP_10.containsKeyRef(Ref.get(12L)));
-		assertTrue(Samples.LONG_MAP_100.containsKeyRef(Ref.get(12L)));
-		assertFalse(Samples.LONG_MAP_100.containsKeyRef(Ref.get(100L)));
+		assertTrue(Samples.LONG_MAP_10.containsKeyRef(Ref.get(RT.cvm(1L))));
+		assertFalse(Samples.LONG_MAP_10.containsKeyRef(Ref.get(RT.cvm(12L))));
+		assertTrue(Samples.LONG_MAP_100.containsKeyRef(Ref.get(RT.cvm(12L))));
+		assertFalse(Samples.LONG_MAP_100.containsKeyRef(Ref.get(RT.cvm(100L))));
 	}
 
 	@Test
@@ -118,10 +123,10 @@ public class MapsTest {
 
 	@Test
 	public void testTruncateHexDigits() throws InvalidDataException, BadFormatException {
-		AHashMap<Long, Long> m = Samples.LONG_MAP_100;
+		AHashMap<CVMLong, CVMLong> m = Samples.LONG_MAP_100;
 		assertEquals(100, m.count());
-		AHashMap<Long, Long> m1 = m.mapEntries(e -> (e.getKeyHash().getHexDigit(0) < 8) ? e : null);
-		AHashMap<Long, Long> m2 = m.mapEntries(e -> (e.getKeyHash().getHexDigit(0) >= 8) ? e : null);
+		AHashMap<CVMLong, CVMLong> m1 = m.mapEntries(e -> (e.getKeyHash().getHexDigit(0) < 8) ? e : null);
+		AHashMap<CVMLong, CVMLong> m2 = m.mapEntries(e -> (e.getKeyHash().getHexDigit(0) >= 8) ? e : null);
 		assertEquals(100, m1.count() + m2.count());
 		m1.validate();
 		m2.validate();
@@ -133,9 +138,9 @@ public class MapsTest {
 	@Test
 	public void regressionEmbeddedTransfer() throws BadFormatException {
 		ATransaction trans=Transfer.create(Init.HERO,0, Init.HERO, 58);
-		Long key=23771L;
-		AMap<Long,ATransaction> m=Maps.create(key,trans);
-		MapEntry<Long,ATransaction> me=m.entryAt(0);
+		CVMLong key=CVMLong.create(23771L);
+		AMap<CVMLong,ATransaction> m=Maps.create(key,trans);
+		MapEntry<CVMLong,ATransaction> me=m.entryAt(0);
 		assertEquals(key,me.getKey());
 		assertEquals(trans,me.getValue());
 		
@@ -210,7 +215,7 @@ public class MapsTest {
 
 	@Test
 	public void testDuplicateEntryCreate() {
-		AMap<Long, Long> m = Maps.of(10, 2, 10, 3);
+		AMap<CVMLong, CVMLong> m = Maps.of(10, 2, 10, 3);
 		assertEquals(1, m.size());
 		assertEquals(RT.cvm(10L), m.entryAt(0).getKey());
 	}
@@ -227,21 +232,21 @@ public class MapsTest {
 		assertSame(Maps.empty(), m.filterHexDigits(0, 0)); // all digits selected
 	}
 
-	private static final Predicate<Long> EVEN_PRED = a -> {
-		return (a & 1L) == 0L;
+	private static final Predicate<CVMLong> EVEN_PRED = a -> {
+		return (a.longValue() & 1L) == 0L;
 	};
 
 	@Test
 	public void testFilterValues10() {
-		AHashMap<Long, Long> m = Samples.LONG_MAP_10;
-		AHashMap<Long, Long> m2 = m.filterValues(EVEN_PRED);
+		AHashMap<CVMLong, CVMLong> m = Samples.LONG_MAP_10;
+		AHashMap<CVMLong, CVMLong> m2 = m.filterValues(EVEN_PRED);
 		assertEquals(5, m2.size());
 	}
 
 	@Test
 	public void testFilterValues100() {
-		AHashMap<Long, Long> m = Samples.LONG_MAP_100;
-		AHashMap<Long, Long> m2 = m.filterValues(EVEN_PRED);
+		AHashMap<CVMLong, CVMLong> m = Samples.LONG_MAP_100;
+		AHashMap<CVMLong, CVMLong> m2 = m.filterValues(EVEN_PRED);
 		assertEquals(50, m2.size());
 
 	}
@@ -257,9 +262,9 @@ public class MapsTest {
 
 	@Test
 	public void testEquals() {
-		AMap<Long, Long> m = Samples.LONG_MAP_100;
+		AMap<CVMLong, CVMLong> m = Samples.LONG_MAP_100;
 		assertNotEquals(m, m.assoc(null, null));
-		assertNotEquals(m, m.assoc(2L, 3L));
+		assertNotEquals(m, m.assoc(RT.cvm(2L), RT.cvm(3L)));
 
 		CollectionsTest.doMapTests(m);
 	}
@@ -279,20 +284,20 @@ public class MapsTest {
 
 	@Test
 	public void testMapEntry() {
-		AMap<Long, Long> m = Maps.of(1L, 2L);
-		MapEntry<Long, Long> me = m.getEntry(1L);
-		assertEquals(1L, me.getKey());
-		assertEquals(2L, me.getValue());
-		assertEquals(Vectors.of(1L,2L,3L), me.assoc(2, 3L));
+		AMap<CVMLong, CVMLong> m = Maps.of(1L, 2L);
+		MapEntry<CVMLong, CVMLong> me = m.getEntry(RT.cvm(1L));
+		assertCVMEquals(1L, me.getKey());
+		assertCVMEquals(2L, me.getValue());
+		assertEquals(Vectors.of(1L,2L,3L), me.assoc(2, RT.cvm(3L)));
 
-		assertThrows(UnsupportedOperationException.class, () -> me.setValue(6L));
+		assertThrows(UnsupportedOperationException.class, () -> me.setValue(RT.cvm(6L)));
 
-		assertEquals(me, me.assoc(0, 1L));
-		assertEquals(me, me.assoc(1, 2L));
+		assertEquals(me, me.assoc(0, RT.cvm(1L)));
+		assertEquals(me, me.assoc(1, RT.cvm(2L)));
 		assertThrows(IndexOutOfBoundsException.class, () -> me.assoc(-1, 0L));
 
-		assertTrue(me.contains(1L));
-		assertTrue(me.contains(2L));
+		assertTrue(me.contains(RT.cvm(1L)));
+		assertTrue(me.contains(RT.cvm(2L)));
 		assertFalse(me.contains(true));
 		assertFalse(me.contains(null));
 
@@ -302,19 +307,19 @@ public class MapsTest {
 
 	@Test
 	public void testAssocs() {
-		AMap<Long, Long> m = Maps.of(1L, 2L);
-		assertSame(m, m.assoc(1L, 2L));
+		AMap<CVMLong, CVMLong> m = Maps.of(1L, 2L);
+		assertSame(m, m.assoc(RT.cvm(1L), RT.cvm(2L)));
 
 		CollectionsTest.doMapTests(m);
 	}
 
 	@Test
 	public void testConj() {
-		AMap<Long, Long> m = Maps.of(1L, 2L);
-		AMap<Long, Long> me = Maps.of(1L, 2L, 3L, 4L);
+		AMap<CVMLong, CVMLong> m = Maps.of(1L, 2L);
+		AMap<CVMLong, CVMLong> me = Maps.of(1L, 2L, 3L, 4L);
 		assertEquals(m, m.conj(Vectors.of(1L, 2L)));
 		assertEquals(me, m.conj(Vectors.of(3L, 4L)));
-		assertEquals(me, m.conj(MapEntry.create(3L, 4L)));
+		assertEquals(me, m.conj(MapEntry.of(3L, 4L)));
 
 		// failures with conj'ing things that aren't valid map entries
 		assertNull(m.conj(Vectors.empty()));
@@ -328,8 +333,8 @@ public class MapsTest {
 
 	@Test
 	public void testMergeWith() {
-		AHashMap<Long, Long> m = Maps.of(1L, 1L, 2L, 2L, 3L, 3L, 4L, 4L, 5L, 5L, 6L, 6L, 7L, 7L, 8L, 8L);
-		AHashMap<Long, Long> m2 = m.mergeWith(m, (a, b) -> ((a & 1L) == 0L) ? a : null);
+		AHashMap<CVMLong, CVMLong> m = Maps.of(1L, 1L, 2L, 2L, 3L, 3L, 4L, 4L, 5L, 5L, 6L, 6L, 7L, 7L, 8L, 8L);
+		AHashMap<CVMLong, CVMLong> m2 = m.mergeWith(m, (a, b) -> ((a.longValue() & 1L) == 0L) ? a : null);
 		assertEquals(4, m2.size());
 
 		AHashMap<Object, Object> bm = Maps.coerce(Samples.LONG_MAP_100);

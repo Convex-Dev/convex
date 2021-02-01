@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
 import convex.core.util.Utils;
 
 /**
@@ -69,6 +70,16 @@ public class Syntax extends ACell {
 	public static Syntax create(Object value) {
 		if (value instanceof Syntax) return (Syntax) value;
 		return create(value, Maps.empty());
+	}
+	
+	/**
+	 * Create a Syntax Object with the given value. Converts to appropriate CVM type as a convenience
+	 * 
+	 * @param value
+	 * @return Syntax instance
+	 */
+	public static Syntax of(Object value) {
+		return create(RT.cvm(value));
 	}
 
 	/**
@@ -278,5 +289,7 @@ public class Syntax extends ACell {
 			return (R) a;
 		}
 	}
+
+
 
 }

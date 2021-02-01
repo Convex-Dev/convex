@@ -6,6 +6,7 @@ import java.util.ListIterator;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import convex.core.data.prim.CVMLong;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
@@ -14,7 +15,7 @@ import convex.core.util.Utils;
  *
  * @param <T> Type of list elements
  */
-public abstract class ASequence<T> extends ACollection<T> implements List<T>, IAssociative<Long,T> {
+public abstract class ASequence<T> extends ACollection<T> implements List<T>, IAssociative<CVMLong,T> {
 
 	@Override
 	public boolean contains(Object o) {
@@ -106,31 +107,33 @@ public abstract class ASequence<T> extends ACollection<T> implements List<T>, IA
 	 */
 	@Override
 	public T get(Object key) {
-		if (key instanceof Long) {
-			long ix = (long) key;
+		if (key instanceof CVMLong) {
+			long ix = ((CVMLong) key).longValue();
 			if ((ix >= 0) && (ix < count())) return get(ix);
 		}
 		return null;
 	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public T get(Object key, Object notFound) {
+		if (key instanceof CVMLong) {
+			long ix = ((CVMLong) key).longValue();
+			if ((ix >= 0) && (ix < count())) return get(ix);
+		}
+		return (T) notFound;
+	}
 
 	@Override
 	public boolean containsKey(Object key) {
-		if (key instanceof Long) {
-			long ix = (long) key;
+		if (key instanceof CVMLong) {
+			long ix = ((CVMLong) key).longValue();
 			if ((ix >= 0) && (ix < count())) return true;
 		}
 		return false;
 	}
 
-	@SuppressWarnings("unchecked")
-	@Override
-	public T get(Object key, Object notFound) {
-		if (key instanceof Long) {
-			long ix = (long) key;
-			if ((ix >= 0) && (ix < count())) return get(ix);
-		}
-		return (T) notFound;
-	}
+
 
 	/**
 	 * Gets the element Ref at the specified index
@@ -146,8 +149,8 @@ public abstract class ASequence<T> extends ACollection<T> implements List<T>, IA
 	}
 	
 	@Override
-	public ASequence<T> assoc(Long key, T value) {
-		return assoc((long)key,value);
+	public ASequence<T> assoc(CVMLong key, T value) {
+		return assoc(key.longValue(),value);
 	}
 
 	/**

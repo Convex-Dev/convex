@@ -132,7 +132,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 
 			// we now have the full result, so notify those interested
 			Object rv = result.getValue();
-			long id = m.getID();
+			long id = m.getID().longValue();
 			Object err = result.getErrorCode();
 			if (err!=null) {
 				handleError(id, err, rv);

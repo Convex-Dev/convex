@@ -38,7 +38,10 @@ import convex.core.data.Sets;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.prim.APrimitive;
 import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMDouble;
+import convex.core.data.prim.CVMLong;
 import convex.core.lang.expanders.AExpander;
 import convex.core.lang.expanders.CoreExpander;
 import convex.core.lang.expanders.Expander;
@@ -409,9 +412,9 @@ public class Core {
 			if (n != 2) return context.withArityError(this.exactArityMessage(3, n));
 
 			// get timestamp target
-			Object tso = args[0];
-			if (!(tso instanceof Long)) return context.withCastError(tso,Long.class);
-			long scheduleTimestamp = (long) tso;
+			CVMLong tso = RT.toLong(args[0]);
+			if (tso==null) return context.withCastError(args[0],Long.class);
+			long scheduleTimestamp = tso.longValue();
 
 			// get operation
 			Object opo = args[1];
@@ -587,10 +590,10 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			// must cast to Long
-			Long amount = RT.toLong(args[0]);
+			CVMLong amount = RT.toLong(args[0]);
 			if (amount == null) return context.withCastError(args[0], Long.class);
 
-			return context.acceptFunds(amount);
+			return context.acceptFunds(amount.longValue());
 		}
 	});
 
@@ -606,17 +609,17 @@ public class Core {
 			Address target = RT.address(args[0]);
 			if (target == null) return ctx.withCastError(args[0], Address.class);
 
-			Long sendAmount = RT.toLong(args[1]);
+			CVMLong sendAmount = RT.toLong(args[1]);
 			if (sendAmount == null) return ctx.withCastError(args[1], Long.class);
 
 			Symbol sym = RT.toSymbol(args[2]);
-			if (sym == null) return ctx.withCastError(args[1], Symbol.class);
+			if (sym == null) return ctx.withCastError(args[2], Symbol.class);
 
 			// prepare contract call arguments
 			int arity = args.length - 3;
 			Object[] callArgs = Arrays.copyOfRange(args, 3, 3 + arity);
 
-			return ctx.actorCall(target, sendAmount, sym, callArgs);
+			return ctx.actorCall(target, sendAmount.longValue(), sym, callArgs);
 		}
 	});
 
@@ -822,18 +825,18 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Long> BALANCE = reg(new CoreFn<>(Symbols.BALANCE) {
+	public static final CoreFn<CVMLong> BALANCE = reg(new CoreFn<>(Symbols.BALANCE) {
 		@Override
-		public <I> Context<Long> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMLong> invoke(Context<I> context, Object[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			Address address = RT.address(args[0]);
 			if (address == null) return context.withCastError(args[0], Address.class);
 
 			AccountStatus as = context.getAccountStatus(address);
-			Long balance = null;
+			CVMLong balance = null;
 			if (as != null) {
-				balance = as.getBalance();
+				balance = CVMLong.create(as.getBalance());
 			}
 			long juice = Juice.BALANCE;
 
@@ -841,18 +844,18 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Long> TRANSFER = reg(new CoreFn<>(Symbols.TRANSFER) {
+	public static final CoreFn<CVMLong> TRANSFER = reg(new CoreFn<>(Symbols.TRANSFER) {
 		@Override
-		public <I> Context<Long> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMLong> invoke(Context<I> context, Object[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			Address address = RT.address(args[0]);
 			if (address == null) return context.withCastError(args[0], Address.class);
 
-			Long amount = RT.toLong(args[1]);
+			CVMLong amount = RT.toLong(args[1]);
 			if (amount == null) return context.withCastError(args[1], Long.class);
 
-			return context.transfer(address, amount).consumeJuice(Juice.TRANSFER);
+			return context.transfer(address, amount.longValue()).consumeJuice(Juice.TRANSFER);
 
 		}
 	});
@@ -862,10 +865,10 @@ public class Core {
 		public <I> Context<Long> invoke(Context<I> context, Object[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Long amount = RT.toLong(args[0]);
+			CVMLong amount = RT.toLong(args[0]);
 			if (amount == null) return context.withCastError(args[0], Long.class);
 
-			return context.setMemory(amount).consumeJuice(Juice.TRANSFER);
+			return context.setMemory(amount.longValue()).consumeJuice(Juice.TRANSFER);
 		}
 	});
 	
@@ -877,10 +880,10 @@ public class Core {
 			Address address = RT.address(args[0]);
 			if (address == null) return context.withCastError(args[0], Address.class);
 
-			Long amount = RT.toLong(args[1]);
+			CVMLong amount = RT.toLong(args[1]);
 			if (amount == null) return context.withCastError(args[1], Long.class);
 
-			return context.transferAllowance(address, amount).consumeJuice(Juice.TRANSFER);
+			return context.transferAllowance(address, amount.longValue()).consumeJuice(Juice.TRANSFER);
 		}
 	});
 
@@ -892,10 +895,10 @@ public class Core {
 			AccountKey address = RT.accountKey(args[0]);
 			if (address == null) return context.withCastError(args[0], AccountKey.class);
 
-			Long amount = RT.toLong(args[1]);
+			CVMLong amount = RT.toLong(args[1]);
 			if (amount == null) return context.withCastError(args[0], Long.class);
 
-			return context.setStake(address, amount).consumeJuice(Juice.TRANSFER);
+			return context.setStake(address, amount.longValue()).consumeJuice(Juice.TRANSFER);
 
 		}
 	});
@@ -1394,25 +1397,25 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Number> INC = reg(new CoreFn<>(Symbols.INC) {
+	public static final CoreFn<CVMLong> INC = reg(new CoreFn<>(Symbols.INC) {
 		@Override
-		public <I> Context<Number> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMLong> invoke(Context<I> context, Object[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			Object a = args[0];
-			Long result = RT.inc(a);
+			CVMLong result = RT.inc(a);
 			if (result == null) return context.withCastError(a, Long.class);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
 
-	public static final CoreFn<Number> DEC = reg(new CoreFn<>(Symbols.DEC) {
+	public static final CoreFn<CVMLong> DEC = reg(new CoreFn<>(Symbols.DEC) {
 		@Override
-		public <I> Context<Number> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMLong> invoke(Context<I> context, Object[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			Object a = args[0];
-			Long result = RT.dec(a);
+			CVMLong result = RT.dec(a);
 			if (result == null) return context.withCastError(a, Long.class);
 
 			return context.withResult(Juice.ARITHMETIC, result);
@@ -1452,26 +1455,26 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Long> LONG = reg(new CoreFn<>(Symbols.LONG) {
+	public static final CoreFn<CVMLong> LONG = reg(new CoreFn<>(Symbols.LONG) {
 		@Override
-		public <I> Context<Long> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMLong> invoke(Context<I> context, Object[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			Object a = args[0];
-			Long result = RT.toLong(a);
+			CVMLong result = RT.toLong(a);
 			if (result == null) return context.withCastError(a, Long.class);
 
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
 
-	public static final CoreFn<Double> DOUBLE = reg(new CoreFn<>(Symbols.DOUBLE) {
+	public static final CoreFn<CVMDouble> DOUBLE = reg(new CoreFn<>(Symbols.DOUBLE) {
 		@Override
-		public <I> Context<Double> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMDouble> invoke(Context<I> context, Object[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			Object a = args[0];
-			Double result = RT.toDouble(a);
+			CVMDouble result = RT.toDouble(a);
 			if (result == null) return context.withCastError(a, Double.class);
 
 			return context.withResult(Juice.ARITHMETIC, result);
@@ -1503,93 +1506,93 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Number> PLUS = reg(new CoreFn<>(Symbols.PLUS) {
+	public static final CoreFn<APrimitive> PLUS = reg(new CoreFn<>(Symbols.PLUS) {
 		@Override
-		public <I> Context<Number> invoke(Context<I> context, Object[] args) {
+		public <I> Context<APrimitive> invoke(Context<I> context, Object[] args) {
 			// All arities OK
 
-			Number result = RT.plus(args);
+			APrimitive result = RT.plus(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args), Number.class);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
 
-	public static final CoreFn<Number> MINUS = reg(new CoreFn<>(Symbols.MINUS) {
+	public static final CoreFn<APrimitive> MINUS = reg(new CoreFn<>(Symbols.MINUS) {
 		@Override
-		public <I> Context<Number> invoke(Context<I> context, Object[] args) {
+		public <I> Context<APrimitive> invoke(Context<I> context, Object[] args) {
 			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
-			Number result = RT.minus(args);
+			APrimitive result = RT.minus(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args), Number.class);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
 
-	public static final CoreFn<Number> TIMES = reg(new CoreFn<>(Symbols.TIMES) {
+	public static final CoreFn<APrimitive> TIMES = reg(new CoreFn<>(Symbols.TIMES) {
 		@Override
-		public <I> Context<Number> invoke(Context<I> context, Object[] args) {
+		public <I> Context<APrimitive> invoke(Context<I> context, Object[] args) {
 			// All arities OK
-			Number result = RT.times(args);
+			APrimitive result = RT.times(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args), Number.class);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
 
-	public static final CoreFn<Number> DIVIDE = reg(new CoreFn<>(Symbols.DIVIDE) {
+	public static final CoreFn<CVMDouble> DIVIDE = reg(new CoreFn<>(Symbols.DIVIDE) {
 		@Override
-		public <I> Context<Number> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMDouble> invoke(Context<I> context, Object[] args) {
 			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
 
-			Number result = RT.divide(args);
+			CVMDouble result = RT.divide(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args), Number.class);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
 
-	public static final CoreFn<Number> SQRT = reg(new CoreFn<>(Symbols.SQRT) {
+	public static final CoreFn<CVMDouble> SQRT = reg(new CoreFn<>(Symbols.SQRT) {
 		@Override
-		public <I> Context<Number> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMDouble> invoke(Context<I> context, Object[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-			Double result = RT.sqrt(args[0]);
+			CVMDouble result = RT.sqrt(args[0]);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args), Number.class);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
 	
-	public static final CoreFn<Number> ABS = reg(new CoreFn<>(Symbols.ABS) {
+	public static final CoreFn<APrimitive> ABS = reg(new CoreFn<>(Symbols.ABS) {
 		@Override
-		public <I> Context<Number> invoke(Context<I> context, Object[] args) {
+		public <I> Context<APrimitive> invoke(Context<I> context, Object[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-			Number result = RT.abs(args[0]);
+			APrimitive result = RT.abs(args[0]);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args), Number.class);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
 	
-	public static final CoreFn<Long> SIGNUM = reg(new CoreFn<>(Symbols.SIGNUM) {
+	public static final CoreFn<CVMLong> SIGNUM = reg(new CoreFn<>(Symbols.SIGNUM) {
 		@Override
-		public <I> Context<Long> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMLong> invoke(Context<I> context, Object[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-			Long result = RT.signum(args[0]);
+			CVMLong result = RT.signum(args[0]);
 			if (result == null) return context.withCastError(args[0], Number.class);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
 
 
-	public static final CoreFn<Double> POW = reg(new CoreFn<>(Symbols.POW) {
+	public static final CoreFn<CVMDouble> POW = reg(new CoreFn<>(Symbols.POW) {
 		@Override
-		public <I> Context<Double> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMDouble> invoke(Context<I> context, Object[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
-			Double result = RT.pow(args);
+			CVMDouble result = RT.pow(args);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
 
-	public static final CoreFn<Double> EXP = reg(new CoreFn<>(Symbols.EXP) {
+	public static final CoreFn<CVMDouble> EXP = reg(new CoreFn<>(Symbols.EXP) {
 		@Override
-		public <I> Context<Double> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMDouble> invoke(Context<I> context, Object[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-			Double result = RT.exp(args[0]);
+			CVMDouble result = RT.exp(args[0]);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1655,17 +1658,19 @@ public class Core {
 
 			// First argument must be a Long index
 			Object coll = args[0];
-			Long ix = RT.toLong(args[1]);
+			CVMLong ix = RT.toLong(args[1]);
 			if (ix == null) return context.withCastError(args[1], Long.class);
 			
 			// Second arg must be a countable collection
 			Long n = RT.count(coll);
 			if (n == null) return context.withCastError(coll, ASequence.class);
 			
+			long i=ix.longValue();
+			
 			// BOUNDS error if access is out of bounds
-			if ((ix < 0) || (ix >= n)) return context.withBoundsError(ix);
+			if ((i < 0) || (i >= n)) return context.withBoundsError(i);
 
-			Object result = RT.nth(coll, ix);
+			Object result = RT.nth(coll, i);
 			return context.withResult(Juice.SIMPLE_FN, result);
 		}
 	});
@@ -2086,7 +2091,7 @@ public class Core {
 	public static final CorePred LONG_Q = reg(new CorePred(Symbols.LONG_Q) {
 		@Override
 		public boolean test(Object val) {
-			return val instanceof Long;
+			return val instanceof CVMLong;
 		}
 	});
 
@@ -2170,13 +2175,19 @@ public class Core {
 			// System.out.println("Core compilation juice: "+ctx.getJuice());
 			assert (!ctx.isExceptional()) : "Error executing op: "+ op+ " : "+ ctx.getExceptional();
 			
+			try {
+				ctx.getEnvironment().getHash();
+			} catch (Throwable t) {
+				throw t;
+			}
+			
 		}
 
 		return ctx.getAccountStatus(ADDR).getEnvironment();
 	}
 
 	private static AHashMap<Symbol, Syntax> registerSpecials(AHashMap<Symbol, Syntax> env) {
-		env = env.assoc(Symbols.NAN, Syntax.create(Double.NaN));
+		env = env.assoc(Symbols.NAN, Syntax.create(CVMDouble.create(Double.NaN)));
 		return env;
 	}
 
@@ -2184,27 +2195,31 @@ public class Core {
 	private static AHashMap<Symbol, Syntax> applyDocumentation(AHashMap<Symbol, Syntax> env) throws IOException {
 		AMap<Symbol, AHashMap<Object, Object>> m = Reader.read(Utils.readResourceAsString("lang/core-metadata.doc"));
 		for (Map.Entry<Symbol, AHashMap<Object, Object>> de : m.entrySet()) {
-			Symbol sym = de.getKey();
-			AHashMap<Object, Object> newMeta = de.getValue();
-			MapEntry<Symbol, Syntax> me = env.getEntry(sym);
-			if (me == null) {
-				AHashMap<Keyword, Object> doc=(AHashMap<Keyword, Object>) newMeta.get(Keywords.DOC);
-				if (doc==null) {
-					System.err.println("CORE WARNING: Missing :doc tag in metadata for: " + sym);
-				} else if (me==null) {
-					if (Keywords.SPECIAL.equals(doc.get(Keywords.TYPE))) {
-						// create a fake entry
-						me=MapEntry.create(sym, Syntax.create(sym,newMeta));		
-					} else {
-						System.err.println("CORE WARNING: Documentation for non-existent core symbol: " + sym);
-						continue;
+			try {
+				Symbol sym = de.getKey();
+				AHashMap<Object, Object> newMeta = de.getValue();
+				MapEntry<Symbol, Syntax> me = env.getEntry(sym);
+				if (me == null) {
+					AHashMap<Keyword, Object> doc=(AHashMap<Keyword, Object>) newMeta.get(Keywords.DOC);
+					if (doc==null) {
+						System.err.println("CORE WARNING: Missing :doc tag in metadata for: " + sym);
+					} else if (me==null) {
+						if (Keywords.SPECIAL.equals(doc.get(Keywords.TYPE))) {
+							// create a fake entry
+							me=MapEntry.create(sym, Syntax.create(sym,newMeta));		
+						} else {
+							System.err.println("CORE WARNING: Documentation for non-existent core symbol: " + sym);
+							continue;
+						}
 					}
 				}
+	
+				Syntax oldSyn = me.getValue();
+				Syntax newSyn = oldSyn.mergeMeta(newMeta);
+				env = env.assoc(sym, newSyn);
+			} catch (Throwable t) {
+				throw new Error("Error apply documentation: "+de,t);
 			}
-
-			Syntax oldSyn = me.getValue();
-			Syntax newSyn = oldSyn.mergeMeta(newMeta);
-			env = env.assoc(sym, newSyn);
 		}
 
 		return env;
@@ -2223,7 +2238,7 @@ public class Core {
 
 			coreEnv = registerCoreCode(coreEnv);
 			coreEnv = registerSpecials(coreEnv);
-
+			
 			coreEnv = applyDocumentation(coreEnv);
 		} catch (Throwable e) {
 			e.printStackTrace();

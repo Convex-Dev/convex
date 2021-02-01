@@ -10,8 +10,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.PeerStatus;
 import convex.core.lang.Context;
 import convex.core.lang.TestState;
-import static convex.core.lang.TestState.step;
-import static convex.core.lang.TestState.eval;
+import static convex.core.lang.TestState.*;
 
 public class StakingTest {
 
@@ -49,7 +48,7 @@ public class StakingTest {
 	@Test
 	public void testStakeReturns() {
 		Context<Object> ctx0 = CTX.fork();
-		assertEquals(1000L, (long) eval(ctx0, "(stake " + Init.FIRST_PEER_KEY + " 1000)"));
+		assertEquals(1000L, evalL(ctx0, "(stake " + Init.FIRST_PEER_KEY + " 1000)"));
 	}
 
 	@Test

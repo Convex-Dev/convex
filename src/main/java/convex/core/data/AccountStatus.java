@@ -3,6 +3,7 @@ package convex.core.data;
 import java.nio.ByteBuffer;
 
 import convex.core.Constants;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Core;
@@ -351,9 +352,9 @@ public class AccountStatus extends ARecord {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <V> V get(Keyword key) {
-		if (Keywords.SEQUENCE.equals(key)) return (V) (Long)sequence;
-		if (Keywords.BALANCE.equals(key)) return (V) (Long)balance;
-		if (Keywords.ALLOWANCE.equals(key)) return (V) (Long)allowance;
+		if (Keywords.SEQUENCE.equals(key)) return (V) CVMLong.create(sequence);
+		if (Keywords.BALANCE.equals(key)) return (V) CVMLong.create(balance);
+		if (Keywords.ALLOWANCE.equals(key)) return (V) CVMLong.create(allowance);
 		if (Keywords.ENVIRONMENT.equals(key)) return (V) environment;
 		if (Keywords.HOLDINGS.equals(key)) return (V) holdings;
 		if (Keywords.KEY.equals(key)) return (V) publicKey;
@@ -369,9 +370,9 @@ public class AccountStatus extends ARecord {
 	@SuppressWarnings("unchecked")
 	@Override
 	protected AccountStatus updateAll(Object[] newVals) {
-		long newSeq=(long)newVals[0];
-		long newBal=(long)newVals[1];
-		long newAllowance=(long)newVals[2];
+		long newSeq=((CVMLong)newVals[0]).longValue();
+		long newBal=((CVMLong)newVals[1]).longValue();
+		long newAllowance=((CVMLong)newVals[2]).longValue();
 		AHashMap<Symbol, Syntax> newEnv=(AHashMap<Symbol, Syntax>) newVals[3];
 		ABlobMap<Address, Object> newHoldings=(ABlobMap<Address, Object>) newVals[4];
 		Address newController = (Address)newVals[5];

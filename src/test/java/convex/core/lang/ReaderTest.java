@@ -1,6 +1,7 @@
 package convex.core.lang;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static convex.test.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 import org.parboiled.Parboiled;
@@ -43,9 +44,9 @@ public class ReaderTest {
 
 	@Test
 	public void testComment() {
-		assertEquals(1L, (long) Reader.read(";this is a comment\n 1 \n"));
-		assertEquals(2L, (long) Reader.read("#_foo 2"));
-		assertEquals(3L, (long) Reader.read("3 #_foo"));
+		assertCVMEquals(1L, Reader.read(";this is a comment\n 1 \n"));
+		assertCVMEquals(2L, Reader.read("#_foo 2"));
+		assertCVMEquals(3L, Reader.read("3 #_foo"));
 	}
 
 	@Test
@@ -95,23 +96,23 @@ public class ReaderTest {
 
 	@Test
 	public void testChar() {
-		assertEquals('A', (char) Reader.read("\\A"));
-		assertEquals('a', (char) Reader.read("\\u0061"));
-		assertEquals(' ', (char) Reader.read("\\space"));
-		assertEquals('\t', (char) Reader.read("\\tab"));
-		assertEquals('\n', (char) Reader.read("\\newline"));
-		assertEquals('\f', (char) Reader.read("\\formfeed"));
-		assertEquals('\b', (char) Reader.read("\\backspace"));
-		assertEquals('\r', (char) Reader.read("\\return"));
+		assertCVMEquals('A', Reader.read("\\A"));
+		assertCVMEquals('a', Reader.read("\\u0061"));
+		assertCVMEquals(' ', Reader.read("\\space"));
+		assertCVMEquals('\t', Reader.read("\\tab"));
+		assertCVMEquals('\n', Reader.read("\\newline"));
+		assertCVMEquals('\f', Reader.read("\\formfeed"));
+		assertCVMEquals('\b', Reader.read("\\backspace"));
+		assertCVMEquals('\r', Reader.read("\\return"));
 	}
 
 	@Test
 	public void testNumbers() {
-		assertEquals(1L, (long) Reader.read("1"));
-		assertEquals(Double.valueOf(2.0), Reader.read("2.0"));
+		assertCVMEquals(1L, Reader.read("1"));
+		assertCVMEquals(2.0, Reader.read("2.0"));
 
 		// metadata ignored
-		assertEquals(3.23, Reader.read("^:foo 3.23"));
+		assertCVMEquals(3.23, Reader.read("^:foo 3.23"));
 	}
 	
 	@Test
@@ -174,7 +175,7 @@ public class ReaderTest {
 	@Test
 	public void testRules() {
 		Reader reader = Parboiled.createParser(Reader.class, false);
-		assertEquals(1L, (long) Reader.doParse(reader.Long(), "1  "));
+		assertCVMEquals(1L, Reader.doParse(reader.Long(), "1  "));
 	}
 
 	@Test
@@ -190,7 +191,7 @@ public class ReaderTest {
 	@Test
 	public void testSyntaxReader() {
 		assertEquals(Syntax.class, Reader.readSyntax("nil").getClass());
-		assertEquals(Syntax.create(1L), Reader.readSyntax("1").withoutMeta());
+		assertEquals(Syntax.create(RT.cvm(1L)), Reader.readSyntax("1").withoutMeta());
 		assertEquals(Syntax.create(Symbols.FOO), Reader.readSyntax("foo").withoutMeta());
 		assertEquals(Syntax.create(Keywords.FOO), Reader.readSyntax(":foo").withoutMeta());
 	}
@@ -201,7 +202,7 @@ public class ReaderTest {
 		Syntax s = Reader.readSyntax(src);
 		AVector<Syntax> v = s.getValue();
 		Syntax v1 = v.get(1);
-		assertEquals(2L, (long) v1.getValue());
+		assertCVMEquals(2L, v1.getValue());
 		//assertEquals(3L, v1.getStart());
 		//assertEquals(4L, v1.getEnd());
 
@@ -210,16 +211,16 @@ public class ReaderTest {
 
 	@Test
 	public void testMetadata() {
-		assertEquals(Boolean.TRUE, Reader.readSyntax("^:foo a").getMeta().get(Keywords.FOO));
+		assertCVMEquals(Boolean.TRUE, Reader.readSyntax("^:foo a").getMeta().get(Keywords.FOO));
 		
 		{
 			Syntax def=Reader.readAllSyntax("(def ^{:foo 2} a 1)").get(0);
 			AList<Syntax> form=def.getValue();
-			assertEquals(2L, form.get(1).getMeta().get(Keywords.FOO));
+			assertCVMEquals(2L, form.get(1).getMeta().get(Keywords.FOO));
 		}
 
 		// TODO: Decide how to handle values within meta - unwrap Syntax Objects?
-		assertEquals(Boolean.FALSE, Reader.readSyntax("^{:foo false} a").getMeta().get(Keywords.FOO));
+		assertCVMEquals(Boolean.FALSE, Reader.readSyntax("^{:foo false} a").getMeta().get(Keywords.FOO));
 		assertEquals(Vectors.of(1L, 2L), Reader.readSyntax("^{:foo [1 2]} a").getMeta().get(Keywords.FOO));
 	}
 }

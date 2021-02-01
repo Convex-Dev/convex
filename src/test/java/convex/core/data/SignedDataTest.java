@@ -10,19 +10,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
+import convex.core.lang.RT;
 import convex.core.lang.TestState;
 import convex.test.Samples;
 
 public class SignedDataTest {
 	@Test
 	public void testBadSignature() {
-		Ref<Long> dref = Ref.get(13L);
-		SignedData<Long> sd = SignedData.create(Samples.BAD_ACCOUNTKEY, Samples.BAD_SIGNATURE, dref);
+		Ref<CVMLong> dref = Ref.get(RT.cvm(13L));
+		SignedData<CVMLong> sd = SignedData.create(Samples.BAD_ACCOUNTKEY, Samples.BAD_SIGNATURE, dref);
 		
 		assertFalse(sd.isValid());
 
-		assertEquals(13L, (long) sd.getValueUnchecked());
+		assertEquals(13L, sd.getValueUnchecked().longValue());
 		assertSame(Samples.BAD_ACCOUNTKEY, sd.getAccountKey());
 		assertNotNull(sd.toString());
 
@@ -31,13 +33,15 @@ public class SignedDataTest {
 
 	@Test
 	public void testEmbeddedSignature() throws BadSignatureException {
+		CVMLong cl=RT.cvm(158587);
+		
 		AKeyPair kp = TestState.HERO_PAIR;
-		SignedData<Long> sd = kp.signData(1L);
+		SignedData<CVMLong> sd = kp.signData(cl);
 		
 		assertTrue(sd.isValid());
 		
 		sd.validateSignature();
-		assertEquals(1L, sd.getValue());
+		assertEquals(cl, sd.getValue());
 		
 		assertTrue(sd.getDataRef().isEmbedded());
 	}

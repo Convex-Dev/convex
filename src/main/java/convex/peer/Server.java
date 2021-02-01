@@ -33,6 +33,7 @@ import convex.core.data.Keywords;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
@@ -519,7 +520,7 @@ public class Server implements Closeable {
 		try {
 			// query is a vector [id , form, address?]
 			AVector<Object> v = m.getPayload();
-			Long id = (Long) v.get(0);
+			CVMLong id = (CVMLong) v.get(0);
 			Object form = v.get(1);
 
 			// extract the Address, or use HERO if not available.

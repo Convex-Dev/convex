@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.crypto.Hash;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.core.util.Utils;
 import convex.test.Samples;
@@ -112,10 +113,10 @@ public class RefTest {
 
 	@Test
 	public void testCompare() {
-		assertEquals(0, Ref.get(1L).compareTo(Ref.createPersisted(1L)));
-		assertEquals(1, Ref.get(1L).compareTo(
+		assertEquals(0, Ref.get(RT.cvm(1L)).compareTo(Ref.createPersisted(RT.cvm(1L))));
+		assertEquals(1, Ref.get(RT.cvm(1L)).compareTo(
 				Ref.forHash(Hash.fromHex("0000000000000000000000000000000000000000000000000000000000000000"))));
-		assertEquals(-1, Ref.get(1L).compareTo(
+		assertEquals(-1, Ref.get(RT.cvm(1L)).compareTo(
 				Ref.forHash(Hash.fromHex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))));
 	}
 

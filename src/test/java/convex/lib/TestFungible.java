@@ -96,14 +96,14 @@ public class TestFungible {
 		ctx=step(ctx,"(def token (address "+token+"))");
 		
 		// check our balance is positive as initial holder
-		Long bal=eval(ctx,"(fungible/balance token *address*)");
+		long bal=evalL(ctx,"(fungible/balance token *address*)");
 		assertTrue(bal>0);
 		
 		// transfer to the Villain scenario
 		{
 			Context<?> tctx=step(ctx,"(fungible/transfer token "+TestState.VILLAIN+" 100)");
-			assertEquals(bal-100,(long)eval(tctx,"(fungible/balance token *address*)"));
-			assertEquals(100,(long)eval(tctx,"(fungible/balance token "+TestState.VILLAIN+")"));
+			assertEquals(bal-100,evalL(tctx,"(fungible/balance token *address*)"));
+			assertEquals(100,evalL(tctx,"(fungible/balance token "+TestState.VILLAIN+")"));
 		}
 		
 		// acceptable transfers
@@ -125,7 +125,7 @@ public class TestFungible {
 		assertTrue(ctx.getAccountStatus(token)!=null);
 		
 		// check our balance is positive as initial holder
-		Long bal=eval(ctx,"(fungible/balance token *address*)");
+		Long bal=evalL(ctx,"(fungible/balance token *address*)");
 		assertEquals(100L,bal);
 		
 		// Mint up to max and back down to zero

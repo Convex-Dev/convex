@@ -31,6 +31,7 @@ import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Tag;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
@@ -171,9 +172,9 @@ public class State extends ARecord {
 	}
 
 	public long getFees() {
-		Long fees = (Long) globals.get(Symbols.FEES);
+		CVMLong fees = (CVMLong) globals.get(Symbols.FEES);
 		if (fees == null) return 0L;
-		return fees;
+		return fees.longValue();
 	}
 
 	/**
@@ -188,7 +189,7 @@ public class State extends ARecord {
 	/**
 	 * Gets the balance of a specific address, or null if the Address does not exist
 	 * @param address
-	 * @return
+	 * @return Long balance, or null if Account does not exist
 	 */
 	public Long getBalance(Address address) {
 		AccountStatus acc = getAccount(address);
@@ -223,10 +224,10 @@ public class State extends ARecord {
 
 	private State applyTimeUpdates(Block b) {
 		State state = this;
-		long ts = (Long) state.globals.get(Symbols.TIMESTAMP);
+		long ts = ((CVMLong) state.globals.get(Symbols.TIMESTAMP)).longValue();
 		long bts = b.getTimeStamp();
 		if (bts > ts) {
-			state = state.withGlobal(Symbols.TIMESTAMP, bts);
+			state = state.withGlobal(Symbols.TIMESTAMP, CVMLong.create(bts));
 		}
 
 		state = state.applyScheduledTransactions(b);
@@ -238,7 +239,7 @@ public class State extends ARecord {
 	private State applyScheduledTransactions(Block b) {
 		long tcount = 0;
 		BlobMap<ABlob, AVector<Object>> sched = this.schedule;
-		long timestamp = this.getTimeStamp();
+		CVMLong timestamp = this.getTimeStamp();
 
 		// ArrayList to accumulate the transactions to apply. Null until we need it
 		ArrayList<Object> al = null;
@@ -251,7 +252,7 @@ public class State extends ARecord {
 			MapEntry<ABlob, AVector<Object>> me = sched.entryAt(0);
 			ABlob key = me.getKey();
 			long time = key.longValue();
-			if (time > timestamp) break; // exit if we are still in the future
+			if (time > timestamp.longValue()) break; // exit if we are still in the future
 			AVector<Object> trans = me.getValue();
 			long numScheduled = trans.count(); // number scheduled at this schedule timestamp
 			long take = Math.min(numScheduled, Constants.MAX_SCHEDULED_TRANSACTIONS_PER_BLOCK - tcount);
@@ -327,11 +328,12 @@ public class State extends ARecord {
 				Context<?> ctx = state.applyTransaction(signed);
 				
 				// record results and state update
-				results[i] = Result.fromContext((long)i,ctx);
+				results[i] = Result.fromContext(CVMLong.create(i),ctx);
 				state = ctx.getState();
 			} catch (Throwable t) {
 				String msg= "Unexpected fatal exception applying transaction: "+t.toString();
-				results[i] = Result.create((long)i, msg,ErrorCodes.UNEXPECTED);
+				results[i] = Result.create(CVMLong.create(i), msg,ErrorCodes.UNEXPECTED);
+				t.printStackTrace();
 				log.severe(msg);
 			}
 		}
@@ -579,12 +581,12 @@ public class State extends ARecord {
 	 * 
 	 * @return The timestamp from this state.
 	 */
-	public long getTimeStamp() {
-		return (long) globals.get(Symbols.TIMESTAMP);
+	public CVMLong getTimeStamp() {
+		return (CVMLong) globals.get(Symbols.TIMESTAMP);
 	}
 
-	public long getJuicePrice() {
-		return (long) globals.get(Symbols.JUICE_PRICE);
+	public CVMLong getJuicePrice() {
+		return (CVMLong) globals.get(Symbols.JUICE_PRICE);
 	}
 
 	/**

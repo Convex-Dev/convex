@@ -13,8 +13,10 @@ import convex.core.data.Keywords;
 import convex.core.data.SignedData;
 import convex.core.data.Tag;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
 import convex.core.lang.impl.RecordFormat;
 import convex.core.transactions.ATransaction;
 import convex.core.util.Utils;
@@ -58,7 +60,7 @@ public class Block extends ARecord {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <V> V get(Keyword k) {
-		if (Keywords.TIMESTAMP.equals(k)) return (V) ((Long) timestamp);
+		if (Keywords.TIMESTAMP.equals(k)) return (V) CVMLong.create(timestamp);
 		if (Keywords.TRANSACTIONS.equals(k)) return (V) transactions;
 		if (Keywords.PEER.equals(k)) return (V) peerKey;
 		return null;
@@ -67,7 +69,7 @@ public class Block extends ARecord {
 	@SuppressWarnings("unchecked")
 	@Override
 	protected Block updateAll(Object[] newVals) {
-		long newTimestamp = (Long) newVals[0];		
+		long newTimestamp = RT.toLong(newVals[0]).longValue();		
 		AVector<SignedData<ATransaction>> newTransactions = (AVector<SignedData<ATransaction>>) newVals[1];
 		AccountKey newPeer = (AccountKey) newVals[2];
 		if ((this.transactions == newTransactions) && (this.timestamp == newTimestamp) && (peerKey==newPeer)) {

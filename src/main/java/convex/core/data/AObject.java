@@ -19,13 +19,13 @@ public abstract class AObject {
 	public String print() {
 		return ednString();
 	}
-
+	
 	/**
 	 * Gets the encoded byte representation of this cell.
 	 * 
 	 * @return A blob representing this cell in encoded form
 	 */
-	public final Blob getEncoding() {
+	public Blob getEncoding() {
 		if (encoding==null) encoding=createEncoding();
 		return encoding;
 	}

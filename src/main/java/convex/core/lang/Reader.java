@@ -34,6 +34,8 @@ import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMDouble;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
 import convex.core.util.Utils;
 
@@ -433,7 +435,7 @@ public class Reader extends BaseParser<Object> {
 	// NUMBERS
 
 	public Rule NumberLiteral() {
-		return FirstOf(Double(), Long(), Float());
+		return FirstOf(Double(), Long());
 	}
 
 	public Rule Digits() {
@@ -464,16 +466,12 @@ public class Reader extends BaseParser<Object> {
 
 
 	public Rule Long() {
-		return Sequence(SignedInteger(), push(prepare(Long.parseLong(match()))));
+		return Sequence(SignedInteger(), push(prepare(CVMLong.parse(match()))));
 	}
 
 	public Rule Double() {
 		return Sequence(Sequence(Optional(AnyOf("+-")), Optional(Digits()), '.', Digits(), Optional(ExponentPart())),
-				push(prepare(Double.parseDouble(match()))));
-	}
-
-	public Rule Float() {
-		return Sequence(Double(), 'f', push(prepare((float) pop())));
+				push(prepare(CVMDouble.parse(match()))));
 	}
 
 	public Rule ExponentPart() {

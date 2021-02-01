@@ -15,6 +15,8 @@ import convex.core.data.Lists;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMDouble;
+import convex.core.data.prim.CVMLong;
 
 /**
  * Tests for RT functions.
@@ -54,8 +56,8 @@ public class RTTest {
 
 	@Test
 	public void testSequence() {
-		AVector<Long> v = Vectors.of(1L, 2L, 3L);
-		AList<Long> l = Lists.of(1L, 2L, 3L);
+		AVector<CVMLong> v = Vectors.of(1L, 2L, 3L);
+		AList<CVMLong> l = Lists.of(1L, 2L, 3L);
 		assertEquals(Vectors.of(1L, 2L), RT.sequence(new Long[] { 1L, 2L }));
 		assertEquals(v, RT.sequence(new java.util.ArrayList<>(v)));
 		assertSame(v, RT.sequence(v));
@@ -69,8 +71,8 @@ public class RTTest {
 	
 	@Test 
 	public void testCVMCasts() {
-		assertEquals(1L,(Long)RT.cvm(1L));
-		assertEquals(0.17,(Double)RT.cvm(0.17));
+		assertEquals(CVMLong.create(1L),RT.cvm(1L));
+		assertEquals(CVMDouble.create(0.17),RT.cvm(0.17));
 		assertEquals(Strings.create("foo"),RT.cvm("foo"));
 		
 		// CVM objects shouldn't change

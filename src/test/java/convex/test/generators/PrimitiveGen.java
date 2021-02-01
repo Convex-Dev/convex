@@ -5,6 +5,8 @@ import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMDouble;
+import convex.core.data.prim.CVMLong;
 
 /**
  * Generator for primitive data values
@@ -29,9 +31,9 @@ public class PrimitiveGen extends Generator<Object> {
 		case 2:
 			return gen().type(char.class).generate(r, status);
 		case 3:
-			return gen().type(long.class).generate(r, status);
+			return CVMLong.create(r.nextLong());
 		case 4:
-			return gen().type(double.class).generate(r, status);
+			return CVMDouble.create(r.nextDouble());
 		case 5:
 			return gen().type(boolean.class).generate(r, status);
 		default:

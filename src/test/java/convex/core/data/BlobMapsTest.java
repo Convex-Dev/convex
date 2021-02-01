@@ -11,7 +11,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Init;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
 import convex.test.Samples;
 
 public class BlobMapsTest {
@@ -36,32 +38,32 @@ public class BlobMapsTest {
 		Blob k1 = Blob.fromHex("cafe");
 		Blob k2 = Blob.fromHex("cafebabe");
 		Blob k3 = Blob.fromHex("ccca");
-		BlobMap<ABlob, Long> m = BlobMaps.create(k1, 17L);
+		BlobMap<ABlob, CVMLong> m = BlobMaps.create(k1, RT.cvm(17L));
 
 		doBlobMapTests(m);
 		
 		assertTrue(m.containsKey(k1));
-		assertTrue(m.containsValue(17L));
+		assertTrue(m.containsValue(RT.cvm(17L)));
 		assertFalse(m.containsKey(k2));
 		assertFalse(m.containsKey(Blob.EMPTY));
 		assertFalse(m.containsKey(null));
 
 		// add second entry
-		m = m.assoc(k2, 23L);
+		m = m.assoc(k2, RT.cvm(23L));
 		assertEquals(2L, m.count());
-		MapEntry<ABlob, Long> e2 = m.entryAt(1);
+		MapEntry<ABlob, CVMLong> e2 = m.entryAt(1);
 		assertSame(k2, e2.getKey());
-		assertEquals(23L, (long) e2.getValue());
+		assertEquals(RT.cvm(23L), e2.getValue());
 
 		doBlobMapTests(m);
 
 		// add third entry
-		m = m.assoc(k3, 34L);
+		m = m.assoc(k3, RT.cvm(34L));
 		assertNotNull(m.toString());
 		assertEquals(3L, m.count());
-		MapEntry<ABlob, Long> e3 = m.entryAt(2);
+		MapEntry<ABlob, CVMLong> e3 = m.entryAt(2);
 		assertEquals(e3, m.getEntry(k3));
-		assertEquals(34L, (long) e3.getValue());
+		assertEquals(RT.cvm(34L), e3.getValue());
 
 		doBlobMapTests(m);
 		
@@ -83,12 +85,13 @@ public class BlobMapsTest {
 
 	@Test
 	public void testBlobMapConstruction() throws InvalidDataException {
-		BlobMap<ABlob, Long> m = BlobMap.create();
+		BlobMap<ABlob, CVMLong> m = BlobMap.create();
 		for (int i = 0; i < 100; i++) {
 			Long l = (long) Integer.hashCode(i);
+			CVMLong cl = RT.cvm(l);
 			LongBlob lb = LongBlob.create(l);
-			m = m.assoc(lb, l);
-			assertEquals(l, m.get(lb));
+			m = m.assoc(lb, cl);
+			assertEquals(cl, m.get(lb));
 		}
 		assertEquals(100L, m.count());
 		m.validate();
@@ -106,12 +109,13 @@ public class BlobMapsTest {
 
 	@Test
 	public void testBlobMapRandomConstruction() throws InvalidDataException {
-		BlobMap<ABlob, Long> m = BlobMap.create();
+		BlobMap<ABlob, CVMLong> m = BlobMap.create();
 		for (int i = 0; i < 100; i++) {
 			Long l = (Long.MAX_VALUE / 91 * i * 18);
+			CVMLong cl=RT.cvm(l);
 			LongBlob lb = LongBlob.create(l);
-			m = m.assoc(lb, l);
-			assertEquals(l, m.get(lb));
+			m = m.assoc(lb, cl);
+			assertEquals(cl, m.get(lb));
 		}
 		assertEquals(100L, m.count());
 		m.validate();
@@ -131,10 +135,11 @@ public class BlobMapsTest {
 	public void testSingleEntry() throws InvalidDataException {
 		Blob k = Blob.fromHex("cafe");
 		Blob k2 = Blob.fromHex("cafebabe");
-		BlobMap<ABlob, Long> m = BlobMaps.create(k, 17L);
+		CVMLong val=RT.cvm(177777L);
+		BlobMap<ABlob, CVMLong> m = BlobMaps.create(k, val);
 		assertEquals(1L, m.count());
 
-		assertEquals(17L, m.get(k));
+		assertEquals(val, m.get(k));
 
 		assertNull(m.get(Blob.EMPTY));
 		assertNull(m.get(k2));
@@ -144,9 +149,9 @@ public class BlobMapsTest {
 		assertSame(m, m.dissoc(k.slice(0, 1))); // short prefix key miss
 		assertSame(m, m.dissoc(Blob.fromHex("caef"))); // partial prefix key miss
 
-		MapEntry<ABlob, Long> me = m.entryAt(0);
+		MapEntry<ABlob, CVMLong> me = m.entryAt(0);
 		assertEquals(k, me.getKey());
-		assertEquals(17L, (long) me.getValue());
+		assertEquals(val, me.getValue());
 
 		doBlobMapTests(m);
 	}
@@ -155,9 +160,9 @@ public class BlobMapsTest {
 	public void testPrefixEntryTwo() throws InvalidDataException {
 		Blob k1 = Blob.fromHex("cafe");
 		Blob k2 = Blob.fromHex("cafebabe");
-		BlobMap<Blob, Long> m = BlobMaps.of(k1, 17L, k2, 23L);
-		BlobMap<Blob, Long> m1 = BlobMaps.of(k1, 17L);
-		BlobMap<Blob, Long> m2 = BlobMaps.of(k2, 23L);
+		BlobMap<Blob, CVMLong> m = BlobMaps.of(k1, 17L, k2, 23L);
+		BlobMap<Blob, CVMLong> m1 = BlobMaps.of(k1, 17L);
+		BlobMap<Blob, CVMLong> m2 = BlobMaps.of(k2, 23L);
 		assertSame(m, m.dissoc(k1.slice(0, 1)));
 		assertEquals(m1, m.dissoc(k2));
 		assertEquals(m2, m.dissoc(k1));
@@ -176,20 +181,20 @@ public class BlobMapsTest {
 		Blob k1 = Blob.fromHex("cafe");
 		Blob k2 = Blob.fromHex("cafebabe");
 		Blob k3 = Blob.fromHex("cafefeed");
-		BlobMap<Blob, Long> m = BlobMaps.of(k1, 17L, k2, 23L, k3, 47L);
+		BlobMap<Blob, CVMLong> m = BlobMaps.of(k1, 17L, k2, 23L, k3, 47L);
 		m.validate();
 		assertEquals(2L, m.dissoc(k1).count());
 
 		assertSame(m, m.assocEntry(m.getEntry(k1)));
-		assertEquals(m, m.assoc(k1, 17L));
-		assertNotEquals(m, m.assoc(k1, 27L));
+		assertEquals(m, m.assoc(k1, RT.cvm(17L)));
+		assertNotEquals(m, m.assoc(k1,  RT.cvm(27L)));
 
-		assertEquals(m, BlobMaps.of(k2, 23L, k3, 47L).assoc(k1, 17L));
+		assertEquals(m, BlobMaps.of(k2, 23L, k3, 47L).assoc(k1,  RT.cvm(17L)));
 
 		Blob k0 = Blob.fromHex("ca");
-		BlobMap<Blob, Long> m4 = m.assoc(k0, 7L);
+		BlobMap<Blob, CVMLong> m4 = m.assoc(k0,  RT.cvm(7L));
 		m4.validate();
-		BlobMap<Blob, Long> m4b = BlobMaps.of(k0, 7L, k1, 17L, k2, 23L, k3, 47L);
+		BlobMap<Blob, CVMLong> m4b = BlobMaps.of(k0, 7L, k1, 17L, k2, 23L, k3, 47L);
 		assertEquals(m4, m4b);
 		doBlobMapTests(m4);
 
@@ -198,7 +203,7 @@ public class BlobMapsTest {
 
 	@Test
 	public void testRemoveEntries() {
-		BlobMap<Blob, Long> m = Samples.INT_BLOBMAP_7;
+		BlobMap<Blob, CVMLong> m = Samples.INT_BLOBMAP_7;
 
 		assertSame(m, m.removeLeadingEntries(0));
 		assertSame(BlobMaps.empty(), m.removeLeadingEntries(7));
@@ -206,11 +211,11 @@ public class BlobMapsTest {
 
 	@Test
 	public void testSmallIntBlobMap() {
-		BlobMap<Blob, Long> m = Samples.INT_BLOBMAP_7;
+		BlobMap<Blob, CVMLong> m = Samples.INT_BLOBMAP_7;
 
 		for (int i = 0; i < 7; i++) {
-			MapEntry<Blob, Long> me = m.entryAt(i);
-			assertEquals(i, me.getValue());
+			MapEntry<Blob, CVMLong> me = m.entryAt(i);
+			assertEquals(i, me.getValue().longValue());
 			assertEquals(me, m.getEntry(me.getKey()));
 		}
 		doBlobMapTests(m);

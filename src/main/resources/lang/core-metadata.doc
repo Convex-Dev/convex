@@ -789,14 +789,6 @@
           :signature [{:params [a]}]}
   }
   
-  short
-  {
-    :doc {:description "Coerces the argument to a short signed Int16."
-          :examples [{:code "(short 32767)"}]
-          :type :function
-          :signature [{:params [a]}]}
-  }
-  
   sqrt
   {
     :doc {:description "Computes the square root of a numerical argument. Uses double precision mathematics. May return NaN for negative values."

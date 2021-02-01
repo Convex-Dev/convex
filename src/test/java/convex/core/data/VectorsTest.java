@@ -14,7 +14,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.lang.RT;
 import convex.test.Samples;
 
 /**
@@ -35,23 +37,23 @@ public class VectorsTest {
 
 	@Test
 	public void testSubVectors() {
-		AVector<Long> v = Samples.INT_VECTOR_300;
+		AVector<CVMLong> v = Samples.INT_VECTOR_300;
 
-		AVector<Long> v1 = v.subVector(10, Vectors.CHUNK_SIZE);
+		AVector<CVMLong> v1 = v.subVector(10, Vectors.CHUNK_SIZE);
 		assertEquals(VectorLeaf.class, v1.getClass());
-		assertEquals(10, v1.get(0));
+		assertEquals(RT.cvm(10), v1.get(0));
 
-		AVector<Long> v2 = v.subVector(10, Vectors.CHUNK_SIZE * 2);
+		AVector<CVMLong> v2 = v.subVector(10, Vectors.CHUNK_SIZE * 2);
 		assertEquals(VectorTree.class, v2.getClass());
-		assertEquals(10, v2.get(0));
+		assertEquals(RT.cvm(10), v2.get(0));
 
-		AVector<Long> v3 = v.subVector(10, Vectors.CHUNK_SIZE * 2 - 1);
+		AVector<CVMLong> v3 = v.subVector(10, Vectors.CHUNK_SIZE * 2 - 1);
 		assertEquals(VectorLeaf.class, v3.getClass());
-		assertEquals(10, v3.get(0));
+		assertEquals(RT.cvm(10), v3.get(0));
 
-		AVector<Long> v4 = v3.conj(1000L);
+		AVector<CVMLong> v4 = v3.conj(RT.cvm(1000L));
 		assertEquals(VectorTree.class, v4.getClass());
-		assertEquals(26, v4.get(16));
+		assertEquals(RT.cvm(26), v4.get(16));
 		assertEquals(v1, v4.subVector(0, Vectors.CHUNK_SIZE));
 	}
 
@@ -67,14 +69,14 @@ public class VectorsTest {
 	@Test
 	public void testChunks() {
 		assertEquals(Samples.INT_VECTOR_16, Samples.INT_VECTOR_300.getChunk(0));
-		AVector<Long> v = Samples.INT_VECTOR_300.getChunk(0);
+		AVector<CVMLong> v = Samples.INT_VECTOR_300.getChunk(0);
 		assertEquals(VectorTree.class, v.getChunk(0).concat(v).getClass());
 	}
 
 	@Test
 	public void testChunkConcat() {
-		VectorLeaf<Long> v = Samples.INT_VECTOR_300.getChunk(16);
-		AVector<Long> vv = v.concat(v);
+		VectorLeaf<CVMLong> v = Samples.INT_VECTOR_300.getChunk(16);
+		AVector<CVMLong> vv = v.concat(v);
 		assertEquals(VectorTree.class, vv.getClass());
 		assertEquals(v, vv.getChunk(16));
 
@@ -86,24 +88,28 @@ public class VectorsTest {
 		assertThrows(IllegalArgumentException.class, () -> Samples.INT_VECTOR_10.appendChunk(Samples.INT_VECTOR_16));
 		assertThrows(IllegalArgumentException.class, () -> Samples.INT_VECTOR_300.appendChunk(Samples.INT_VECTOR_16));
 
+		
+		VectorLeaf<CVMLong> tooSmall=VectorLeaf.create(new CVMLong[] {CVMLong.create(1),CVMLong.create(2)});
 		// can't append wrong chunk size
 		assertThrows(IllegalArgumentException.class,
-				() -> Samples.INT_VECTOR_16.appendChunk(VectorLeaf.create(new Long[] {1L,2L})));
+				() -> Samples.INT_VECTOR_16.appendChunk(tooSmall));
 
 	}
 
 	@Test
 	public void testIndexOf() {
-		AVector<Long> v = Samples.INT_VECTOR_300;
-		assertEquals(299, v.indexOf(299L));
-		assertEquals(299L, v.longIndexOf(299L));
-		assertEquals(299, v.lastIndexOf(299L));
-		assertEquals(299L, v.longLastIndexOf(299L));
+		AVector<CVMLong> v = Samples.INT_VECTOR_300;
+		CVMLong last=v.get(v.count()-1);
+		assertEquals(299, v.indexOf(last));
+		assertEquals(299L, v.longIndexOf(last));
+		assertEquals(299, v.lastIndexOf(last));
+		assertEquals(299L, v.longLastIndexOf(last));
 
-		assertEquals(29, v.indexOf(29L));
-		assertEquals(29L, v.longIndexOf(29L));
-		assertEquals(29, v.lastIndexOf(29L));
-		assertEquals(29L, v.longLastIndexOf(29L));
+		CVMLong mid=v.get(29);
+		assertEquals(29, v.indexOf(mid));
+		assertEquals(29L, v.longIndexOf(mid));
+		assertEquals(29, v.lastIndexOf(mid));
+		assertEquals(29L, v.longLastIndexOf(mid));
 
 	}
 
@@ -123,81 +129,83 @@ public class VectorsTest {
 
 	@Test
 	public void testBigMatch() {
-		AVector<Long> v = Samples.INT_VECTOR_300;
-		assertTrue(v.anyMatch(i -> i == 3));
-		assertTrue(v.anyMatch(i -> i == 299));
-		assertFalse(v.anyMatch(i -> i == -1));
+		AVector<CVMLong> v = Samples.INT_VECTOR_300;
+		assertTrue(v.anyMatch(i -> i.longValue() == 3));
+		assertTrue(v.anyMatch(i -> i.longValue() == 299));
+		assertFalse(v.anyMatch(i -> i.longValue() == -1));
 
-		assertFalse(v.allMatch(i -> i == 3));
-		assertTrue(v.allMatch(i -> i instanceof Long));
+		assertFalse(v.allMatch(i -> i.longValue() == 3));
+		assertTrue(v.allMatch(i -> i.longValue() >=0));
 	}
 
 	@Test
 	public void testAnyMatch() {
-		AVector<Long> v = Vectors.of(1, 2, 3, 4);
-		assertTrue(v.anyMatch(i -> i == 3));
-		assertFalse(v.anyMatch(i -> i == 5));
+		AVector<CVMLong> v = Vectors.of(1, 2, 3, 4);
+		assertTrue(v.anyMatch(i -> i.longValue() == 3));
+		assertFalse(v.anyMatch(i -> i.longValue() == 5));
 	}
 
 	@Test
 	public void testAllMatch() {
-		AVector<Long> v = Vectors.of(1, 2, 3, 4);
-		assertTrue(v.allMatch(i -> i instanceof Long));
-		assertFalse(v.allMatch(i -> i < 3));
+		AVector<CVMLong> v = Vectors.of(1, 2, 3, 4);
+		assertTrue(v.allMatch(i -> i instanceof CVMLong));
+		assertFalse(v.allMatch(i -> i.longValue() < 3));
 	}
 
 	@Test
 	public void testMap() {
-		AVector<Long> v = Vectors.of(1, 2, 3, 4);
-		AVector<Long> exp = Vectors.of(2, 3, 4, 5);
-		assertEquals(exp, v.map(i -> i + 1));
+		AVector<CVMLong> v = Vectors.of(1, 2, 3, 4);
+		AVector<CVMLong> exp = Vectors.of(2, 3, 4, 5);
+		assertEquals(exp, v.map(i -> CVMLong.create(i.longValue() + 1)));
 	}
 
 	@Test
 	public void testSmallAssoc() {
-		AVector<Long> v = Vectors.of(1, 2, 3, 4);
-		AVector<Long> nv = v.assoc(2, 10L);
+		AVector<CVMLong> v = Vectors.of(1, 2, 3, 4);
+		AVector<CVMLong> nv = v.assoc(2, RT.cvm(10L));
 		assertEquals(Vectors.of(1, 2, 10, 4), nv);
 	}
 
 	@Test
 	public void testBigAssoc() {
-		AVector<Long> v = Samples.INT_VECTOR_300;
-		AVector<Long> nv = v.assoc(100, 17L);
-		assertEquals(17L, nv.get(100));
+		AVector<CVMLong> v = Samples.INT_VECTOR_300;
+		AVector<CVMLong> nv = v.assoc(100, RT.cvm(17L));
+		assertEquals(RT.cvm(17L), nv.get(100));
 	}
 
 	@Test
 	public void testReduce() {
-		AVector<Long> vec = Vectors.of(1, 2, 3, 4);
-		assertEquals(110, (long) vec.reduce((s, v) -> s + v, 100L));
+		AVector<CVMLong> vec = Vectors.of(1, 2, 3, 4);
+		assertEquals(110, (long) vec.reduce((s, v) -> s + v.longValue(), 100L));
 	}
 
 	@Test
 	public void testMapEntry() {
-		AVector<?> v1 = Vectors.of(1L, 2L);
-		assertNotEquals(v1, MapEntry.create(1L, 2L));
-		assertEquals(v1, MapEntry.create(1L, 2L).toVector());
+		AVector<CVMLong> v1 = Vectors.of(1L, 2L);
+		
+		MapEntry<CVMLong,CVMLong> me=MapEntry.create(RT.cvm(1L), RT.cvm(2L));
+		assertNotEquals(v1, me);
+		assertEquals(v1, me.toVector());
 	}
 
 	@Test
 	public void testLastIndex() {
 		// regression test
-		AVector<Long> v = Samples.INT_VECTOR_300.concat(Vectors.of(1, null, 3, null));
+		AVector<CVMLong> v = Samples.INT_VECTOR_300.concat(Vectors.of(1, null, 3, null));
 		assertEquals(303L, v.longLastIndexOf(null));
 	}
 
 	@Test
 	public void testReduceBig() {
-		AVector<Long> vec = Samples.INT_VECTOR_300;
-		assertEquals(100 + (299 * 300) / 2, vec.reduce((s, v) -> s + v, 100L));
+		AVector<CVMLong> vec = Samples.INT_VECTOR_300;
+		assertEquals(100 + (299 * 300) / 2, vec.reduce((s, v) -> s + v.longValue(), 100L));
 	}
 	
 	// TODO: more sensible tests on embedded vector sizes
 	@Test 
 	public void testEmbedding() {
 		// should embed, little values
-		AVector<Integer> vec = Vectors.of(1, 2, 3, 4);
+		AVector<CVMLong> vec = Vectors.of(1, 2, 3, 4);
 		assertTrue(vec.isEmbedded());
 		assertEquals(10L,vec.getEncoding().length());
 		
@@ -212,17 +220,15 @@ public class VectorsTest {
 
 	@Test
 	public void testUpdateRefs() {
-		AVector<Long> vec = Vectors.of(1, 2, 3, 4);
-		AVector<Long> vec2 = vec.updateRefs(r -> {
-			return Ref.get((Long) (r.getValue()) + 1L);
-		});
+		AVector<CVMLong> vec = Vectors.of(1, 2, 3, 4);
+		AVector<CVMLong> vec2 = vec.updateRefs(r -> CVMLong.create(1L+((CVMLong)r.getValue()).longValue()).getRef());
 		assertEquals(Vectors.of(2, 3, 4, 5), vec2);
 	}
 
 	@Test
 	public void testNext() {
-		AVector<Long> v1 = Samples.INT_VECTOR_256;
-		AVector<Long> v2 = v1.next();
+		AVector<CVMLong> v1 = Samples.INT_VECTOR_256;
+		AVector<CVMLong> v2 = v1.next();
 		assertEquals(v1.get(1), v2.get(0));
 		assertEquals(v1.get(255), v2.get(254));
 		assertEquals(1L, v1.count() - v2.count());
@@ -290,7 +296,7 @@ public class VectorsTest {
 		assertEquals(2, Vectors.of(1, 2).commonPrefixLength(Vectors.of(1, 2, 8)));
 		assertEquals(0, Vectors.of(1, 2, 3).commonPrefixLength(Vectors.of(2, 2, 3)));
 
-		AVector<Long> v1 = Vectors.of(0, 1, 2, 3, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		AVector<CVMLong> v1 = Vectors.of(0, 1, 2, 3, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 				1, 1, 1);
 		assertEquals(5, v1.commonPrefixLength(Samples.INT_VECTOR_300));
 		assertEquals(5, Samples.INT_VECTOR_300.commonPrefixLength(v1));
@@ -298,7 +304,7 @@ public class VectorsTest {
 
 		assertEquals(10, Samples.INT_VECTOR_10.commonPrefixLength(Samples.INT_VECTOR_23));
 		assertEquals(256, Samples.INT_VECTOR_300.commonPrefixLength(Samples.INT_VECTOR_256));
-		assertEquals(256, Samples.INT_VECTOR_300.commonPrefixLength(Samples.INT_VECTOR_256.append(17L)));
+		assertEquals(256, Samples.INT_VECTOR_300.commonPrefixLength(Samples.INT_VECTOR_256.append(RT.cvm(17L))));
 	}
 
 	/**

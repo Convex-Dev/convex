@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import static convex.test.Assertions.*;
+
 import org.junit.runner.RunWith;
 
 import com.pholser.junit.quickcheck.From;
@@ -29,6 +31,7 @@ import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMLong;
 import convex.test.generators.AddressGen;
 import convex.test.generators.ListGen;
 import convex.test.generators.SetGen;
@@ -156,26 +159,25 @@ public class GenTestCore {
 	
 	@Property 
 	public void testLongFunctions(@From(LongGenerator.class) Long a) {
-		assertSame(a,RT.toLong(a));
-		assertSame(a,RT.number(a));
+		CVMLong ca=CVMLong.create(a);
+		assertEquals(ca,RT.toLong(a));
+		assertCVMEquals(a,RT.number(a));
 		
 		long v=a;
 		assertEquals(Long.toString(v),RT.str(a).toString());
 		assertSame(CVMByte.create(v),RT.toByte(a));
-		assertEquals((short)v,(short)RT.toShort(a));
 		assertEquals((char)v,(char)RT.toCharacter(a));
-		assertEquals((int)v,(int)RT.toInteger(a));
-		assertEquals(v+1,RT.inc(a));
-		assertEquals(v-1,RT.dec(a));
-		assertEquals(0,RT.compare(a,(Long)v));
-		assertEquals(-1,RT.compare((long)a,v+10));
-		assertEquals(1,RT.compare((long)a,v-10));
+		assertCVMEquals(v+1,RT.inc(a));
+		assertCVMEquals(v-1,RT.dec(a));
+		assertCVMEquals(0,RT.compare(a,(Long)v));
+		assertCVMEquals(-1,RT.compare((long)a,v+10));
+		assertCVMEquals(1,RT.compare((long)a,v-10));
 	
-		Long[] args=new Long[] {a};
-		assertEquals(-v,(long)RT.minus(args));
-		assertEquals(v,(long)RT.plus(args));
-		assertEquals(v,(long)RT.times(args));
-		assertEquals(1.0/v,(double)RT.divide(args));
+		CVMLong[] args=new CVMLong[] {ca};
+		assertEquals(-v,RT.minus(args).longValue());
+		assertEquals(v,RT.plus(args).longValue());
+		assertEquals(v,RT.times(args).longValue());
+		assertEquals(1.0/v,RT.divide(args).doubleValue());
 		
 		assertTrue(RT.lt(args));
 		assertTrue(RT.gt(args));
@@ -193,12 +195,16 @@ public class GenTestCore {
 	@Property 
 	public void testLongMaths(@From(LongGenerator.class) Long a, @From(LongGenerator.class) Long b) {
 		assertEquals(RT.compare(a, b),-RT.compare(b,a));
-	
-		Long[] args=new Long[] {a,b};
-		assertEquals(a+b,(long)RT.plus(args));
-		assertEquals(a*b,(long)RT.times(args));
-		assertEquals(a-b,(long)RT.minus(args));
-		assertEquals(((double)a)/((double)b),(double)RT.divide(args));
+
+		CVMLong ca=CVMLong.create(a);
+		CVMLong cb=CVMLong.create(b);
+
+		
+		CVMLong[] args=new CVMLong[] {ca,cb};
+		assertEquals(a+b,RT.plus(args).longValue());
+		assertEquals(a*b,RT.times(args).longValue());
+		assertEquals(a-b,RT.minus(args).longValue());
+		assertEquals(((double)a)/((double)b),RT.divide(args).doubleValue());
 		
 		assertEquals(a<b,RT.lt(args));
 		assertEquals(a>b,RT.gt(args));

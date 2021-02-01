@@ -1,10 +1,6 @@
 package convex.core.lang;
 
-import static convex.core.lang.TestState.eval;
-import static convex.core.lang.TestState.evalB;
-import static convex.core.lang.TestState.evalL;
-import static convex.core.lang.TestState.evalS;
-import static convex.core.lang.TestState.step;
+import static convex.core.lang.TestState.*;
 import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -139,22 +135,22 @@ public class CoreTest {
 
 	@Test
 	public void testGet() {
-		assertEquals(2L, (long) eval("(get {1 2} 1)"));
-		assertEquals(4L, (long) eval("(get {1 2 3 4} 3)"));
-		assertEquals(4L, (long) eval("(get {1 2 3 4} 3 7)"));
+		assertEquals(2L, evalL("(get {1 2} 1)"));
+		assertEquals(4L, evalL("(get {1 2 3 4} 3)"));
+		assertEquals(4L, evalL("(get {1 2 3 4} 3 7)"));
 		assertNull(eval("(get {1 2} 2)")); // null if not present
-		assertEquals(7L, (long) eval("(get {1 2 3 4} 5 7)")); // fallback arg
+		assertEquals(7L, evalL("(get {1 2 3 4} 5 7)")); // fallback arg
 
-		assertEquals(1L, (long) eval("(get #{1 2} 1)"));
-		assertEquals(2L, (long) eval("(get #{1 2} 2)"));
+		assertEquals(1L, evalL("(get #{1 2} 1)"));
+		assertEquals(2L, evalL("(get #{1 2} 2)"));
 		assertNull(eval("(get #{1 2} 3)")); // null if not present
-		assertEquals(4L, (long) eval("(get #{1 2} 3 4)")); // fallback
+		assertEquals(4L, evalL("(get #{1 2} 3 4)")); // fallback
 
-		assertEquals(2L, (long) eval("(get [1 2 3] 1)"));
-		assertEquals(2L, (long) eval("(get [1 2 3] 1 7)"));
-		assertEquals(7L, (long) eval("(get [1 2 3] 4 7)"));
-		assertEquals(7L, (long) eval("(get [1 2] nil 7)"));
-		assertEquals(7L, (long) eval("(get [1 2] -5 7)"));
+		assertEquals(2L, evalL("(get [1 2 3] 1)"));
+		assertEquals(2L, evalL("(get [1 2 3] 1 7)"));
+		assertEquals(7L, evalL("(get [1 2 3] 4 7)"));
+		assertEquals(7L, evalL("(get [1 2] nil 7)"));
+		assertEquals(7L, evalL("(get [1 2] -5 7)"));
 		assertNull(eval("(get [1 2] :foo)"));
 		assertNull(eval("(get [1 2] 10)"));
 		assertNull(eval("(get [1 2] -1)"));
@@ -162,8 +158,8 @@ public class CoreTest {
 
 		assertNull(eval("(get nil nil)"));
 		assertNull(eval("(get nil 10)"));
-		assertEquals(3L, (long) eval("(get nil 2 3)"));
-		assertEquals(3L, (long) eval("(get nil nil 3)"));
+		assertEquals(3L, evalL("(get nil 2 3)"));
+		assertEquals(3L, evalL("(get nil nil 3)"));
 
 		assertArityError(step("(get 1)")); // arity > cast
 		assertArityError(step("(get)"));
@@ -175,17 +171,17 @@ public class CoreTest {
 
 	@Test
 	public void testGetIn() {
-		assertEquals(2L, (long) eval("(get-in {1 2} [1])"));
-		assertEquals(4L, (long) eval("(get-in {1 {2 4} 3 5} [1 2])"));
-		assertEquals(1L, (long) eval("(get-in #{1 2} [1])"));
-		assertEquals(2L, (long) eval("(get-in [1 2 3] [1])"));
-		assertEquals(3L, (long) eval("(get-in [1 2 3] '(2))"));
-		assertEquals(3L, (long) eval("(get-in (list 1 2 3) [2])"));
-		assertEquals(4L, (long) eval("(get-in [1 2 {:foo 4} 3 5] [2 :foo])"));
+		assertEquals(2L, evalL("(get-in {1 2} [1])"));
+		assertEquals(4L, evalL("(get-in {1 {2 4} 3 5} [1 2])"));
+		assertEquals(1L, evalL("(get-in #{1 2} [1])"));
+		assertEquals(2L, evalL("(get-in [1 2 3] [1])"));
+		assertEquals(3L, evalL("(get-in [1 2 3] '(2))"));
+		assertEquals(3L, evalL("(get-in (list 1 2 3) [2])"));
+		assertEquals(4L, evalL("(get-in [1 2 {:foo 4} 3 5] [2 :foo])"));
 
 		// special case: don't coerce to collection if empty sequence of keys
 		// so non-collection value may be used safely
-		assertEquals(3L, (long) eval("(get-in 3 [])"));
+		assertEquals(3L, evalL("(get-in 3 [])"));
 
 		assertEquals(Maps.of(1L, 2L), eval("(get-in {1 2} nil)"));
 		assertEquals(Maps.of(1L, 2L), eval("(get-in {1 2} [])"));
@@ -209,17 +205,17 @@ public class CoreTest {
 
 	@Test
 	public void testLong() {
-		assertEquals(1L, (long) eval("(long 1)"));
-		assertEquals(128L, (long) eval("(long (byte 128))"));
-		assertEquals(97L, (long) eval("(long \\a)"));
-		assertEquals(2147483648L, (long) eval("(long 2147483648)"));
+		assertCVMEquals(1L, eval("(long 1)"));
+		assertEquals(128L, evalL("(long (byte 128))"));
+		assertEquals(97L, evalL("(long \\a)"));
+		assertEquals(2147483648L, evalL("(long 2147483648)"));
 		
-		assertEquals(4096L, (long) eval("(long 0x1000)"));
-		assertEquals(255L, (long) eval("(long 0xff)"));
-		assertEquals(4294967295L, (long) eval("(long 0xffffffff)"));
-		assertEquals(-1L, (long) eval("(long 0xffffffffffffffff)"));
-		assertEquals(255L, (long) eval("(long 0xff00000000000000ff)")); // only taking last 8 bytes
-		assertEquals(-1L, (long) eval("(long 0xcafebabeffffffffffffffff)")); // interpret as big endian big integer
+		assertEquals(4096L, evalL("(long 0x1000)"));
+		assertEquals(255L, evalL("(long 0xff)"));
+		assertEquals(4294967295L, evalL("(long 0xffffffff)"));
+		assertEquals(-1L, evalL("(long 0xffffffffffffffff)"));
+		assertEquals(255L, evalL("(long 0xff00000000000000ff)")); // only taking last 8 bytes
+		assertEquals(-1L, evalL("(long 0xcafebabeffffffffffffffff)")); // interpret as big endian big integer
 
 
 		assertArityError(step("(long)"));
@@ -231,9 +227,9 @@ public class CoreTest {
 
 	@Test
 	public void testChar() {
-		assertEquals('a', (char) eval("\\a"));
-		assertEquals('a', (char) eval("(char 97)"));
-		assertEquals('a', (char) eval("(nth \"bar\" 1)"));
+		assertCVMEquals('a', eval("\\a"));
+		assertCVMEquals('a', eval("(char 97)"));
+		assertCVMEquals('a', eval("(nth \"bar\" 1)"));
 
 		assertCastError(step("(char nil)"));
 		assertCastError(step("(char {})"));
@@ -296,6 +292,7 @@ public class CoreTest {
 		assertFalse(evalB("(= :foo 'foo)"));
 		assertTrue(evalB("(= :bar :bar :bar)"));
 		assertFalse(evalB("(= :bar :bar :bar 2)"));
+		assertFalse(evalB("(= *juice* *juice*)"));
 		assertTrue(evalB("(=)"));
 		assertTrue(evalB("(= nil nil)"));
 	}
@@ -489,14 +486,14 @@ public class CoreTest {
 		assertEquals(Long.MAX_VALUE,evalL("(abs 9223372036854775807)"));
 		
 		// Double cases
-		assertEquals(1.0,eval("(abs 1.0)"));
-		assertEquals(13.0,eval("(abs (double -13))"));
-		assertEquals(Math.pow(10,100),eval("(abs (pow 10 100))"));
+		assertEquals(1.0,evalD("(abs 1.0)"));
+		assertEquals(13.0,evalD("(abs (double -13))"));
+		assertEquals(Math.pow(10,100),evalD("(abs (pow 10 100))"));
 		
 		// Fun Double cases
-		assertEquals(Double.NaN,eval("(abs NaN)"));
-		assertEquals(Double.POSITIVE_INFINITY,eval("(abs (/ 1 0))"));
-		assertEquals(Double.POSITIVE_INFINITY,eval("(abs (/ -1 0))"));
+		assertEquals(Double.NaN,evalD("(abs NaN)"));
+		assertEquals(Double.POSITIVE_INFINITY,evalD("(abs (/ 1 0))"));
+		assertEquals(Double.POSITIVE_INFINITY,evalD("(abs (/ -1 0))"));
 		
 		// long overflow case
 		assertEquals(Long.MIN_VALUE,evalL("(abs -9223372036854775808)"));
@@ -545,8 +542,8 @@ public class CoreTest {
 
 	@Test
 	public void testNth() {
-		assertEquals(2L, (long) eval("(nth [1 2] 1)"));
-		assertEquals('c', (char) eval("(nth \"abc\" 2)"));
+		assertEquals(2L, evalL("(nth [1 2] 1)"));
+		assertCVMEquals('c', eval("(nth \"abc\" 2)"));
 
 		assertArityError(step("(nth)"));
 		assertArityError(step("(nth [])"));
@@ -828,8 +825,8 @@ public class CoreTest {
 
 	@Test
 	public void testFirst() {
-		assertEquals(1L, (long) eval("(first [1 2])"));
-		assertEquals(1L, (long) eval("(first '(1 2 3 4))"));
+		assertEquals(1L, evalL("(first [1 2])"));
+		assertEquals(1L, evalL("(first '(1 2 3 4))"));
 
 		assertBoundsError(step("(first [])"));
 		assertBoundsError(step("(first nil)"));
@@ -842,7 +839,7 @@ public class CoreTest {
 
 	@Test
 	public void testSecond() {
-		assertEquals(2L, (long) eval("(second [1 2])"));
+		assertEquals(2L, evalL("(second [1 2])"));
 
 		assertBoundsError(step("(second [2])"));
 		assertBoundsError(step("(second nil)"));
@@ -854,8 +851,8 @@ public class CoreTest {
 
 	@Test
 	public void testLast() {
-		assertEquals(2L, (long) eval("(last [1 2])"));
-		assertEquals(4L, (long) eval("(last [4])"));
+		assertEquals(2L, evalL("(last [1 2])"));
+		assertEquals(4L, evalL("(last [4])"));
 
 		assertBoundsError(step("(last [])"));
 		assertBoundsError(step("(last nil)"));
@@ -944,7 +941,7 @@ public class CoreTest {
 		assertEquals(Maps.empty(), eval("(into {} [])"));
 		assertEquals(Maps.of(1L, 2L, 3L, 4L), eval("(into {} [[1 2] [3 4] [1 2]])"));
 		
-		assertEquals(Vectors.of(MapEntry.create(1L, 2L)), eval("(into [] {1 2})"));
+		assertEquals(Vectors.of(MapEntry.of(1L, 2L)), eval("(into [] {1 2})"));
 
 		assertCastError(step("(into 1 [2 3])")); // long is not a conjable data structure
 		assertCastError(step("(into nil :foo)")); // keyword is not a sequence of elements
@@ -1045,14 +1042,14 @@ public class CoreTest {
 
 	@Test
 	public void testReduce() {
-		assertEquals(24L, (long) eval("(reduce * 1 [1 2 3 4])"));
-		assertEquals(2L, (long) eval("(reduce + 2 [])"));
-		assertEquals(2L, (long) eval("(reduce + 2 nil)"));
+		assertEquals(24L, evalL("(reduce * 1 [1 2 3 4])"));
+		assertEquals(2L, evalL("(reduce + 2 [])"));
+		assertEquals(2L, evalL("(reduce + 2 nil)"));
 
 		// add values, indexing into map entries as vectors
-		assertEquals(10.0, (double) eval("(reduce (fn [acc me] (+ acc (me 1))) 0.0 {:a 1, :b 2, 107 3, nil 4})"));
+		assertEquals(10.0, evalD("(reduce (fn [acc me] (+ acc (me 1))) 0.0 {:a 1, :b 2, 107 3, nil 4})"));
 		// reduce over map, destructuring keys and values
-		assertEquals(100.0, (double) eval(
+		assertEquals(100.0, evalD(
 				"(reduce (fn [acc [k v]] (let [x (double (v nil))] (+ acc (* x x)))) 0.0 {true {nil 10}})"));
 
 		assertCastError(step("(reduce 1 2 [])"));
@@ -1108,7 +1105,7 @@ public class CoreTest {
 	@Test
 	public void testRecur() {
 		// test factorial with accumulator
-		assertEquals((Object) 120L, eval("(let [f (fn [a x] (if (> x 1) (recur (* a x) (dec x)) a))] (f 1 5))"));
+		assertEquals(120L, evalL("(let [f (fn [a x] (if (> x 1) (recur (* a x) (dec x)) a))] (f 1 5))"));
 
 		assertArityError(step("(let [f (fn [x] (recur x x))] (f 1))"));
 		assertJuiceError(step("(let [f (fn [x] (recur x))] (f 1))"));
@@ -1123,13 +1120,13 @@ public class CoreTest {
 
 	@Test
 	public void testHalt() {
-		assertEquals(1L, (long) eval("(do (halt 1) (assert false))"));
+		assertEquals(1L, evalL("(do (halt 1) (assert false))"));
 		assertNull(eval("(do (halt) (assert false))"));
 
 		// halt should not roll back state changes
 		Context<?> ctx = step("(do (def a 13) (halt 2))");
-		assertEquals(2L, ctx.getResult());
-		assertEquals(13L, (long) eval(ctx, "a"));
+		assertCVMEquals(2L, ctx.getResult());
+		assertEquals(13L, evalL(ctx, "a"));
 
 		assertArityError(step("(halt 1 2)"));
 	}
@@ -1156,13 +1153,13 @@ public class CoreTest {
 
 	@Test
 	public void testRollback() {
-		assertEquals(1L, (long) eval("(do (rollback 1) (assert false))"));
-		assertEquals(1L, (long) eval("(do (def a 1) (rollback a) (assert false))"));
+		assertEquals(1L, evalL("(do (rollback 1) (assert false))"));
+		assertEquals(1L, evalL("(do (def a 1) (rollback a) (assert false))"));
 
 		// rollback should roll back state changes
 		Context<?> ctx = step("(def a 17)");
 		ctx = step(ctx, "(do (def a 13) (rollback 2))");
-		assertEquals(17L, (long) eval(ctx, "a"));
+		assertEquals(17L, evalL(ctx, "a"));
 	}
 
 	@Test
@@ -1363,8 +1360,8 @@ public class CoreTest {
 		
 		assertNull(eval("(lookup-syntax 'non-existent-symbol)"));
 		
-		assertEquals(Syntax.create(1L),eval("(do (def foo 1) (lookup-syntax :foo))"));
-		assertEquals(Syntax.create(1L),eval("(do (def foo 1) (lookup-syntax *address* :foo))"));
+		assertEquals(Syntax.of(1L),eval("(do (def foo 1) (lookup-syntax :foo))"));
+		assertEquals(Syntax.of(1L),eval("(do (def foo 1) (lookup-syntax *address* :foo))"));
 		assertNull(eval("(do (def foo 1) (lookup-syntax 0 :foo))"));
 
 		// invalid name string (too long)
@@ -1396,12 +1393,12 @@ public class CoreTest {
 
 	@Test
 	public void testMapAsFunction() {
-		assertEquals(1L, (long) eval("({2 1 1 2} 2)"));
+		assertEquals(1L, evalL("({2 1 1 2} 2)"));
 		assertNull(eval("({2 1 1 2} 3)"));
 		assertNull(eval("({} 3)"));
 
 		// fall-through behaviour
-		assertEquals(10L, (long) eval("({2 1 1 2} 5 10)"));
+		assertEquals(10L, evalL("({2 1 1 2} 5 10)"));
 		assertNull(eval("({} 1 nil)"));
 
 		// bad arity
@@ -1411,7 +1408,7 @@ public class CoreTest {
 
 	@Test
 	public void testVectorAsFunction() {
-		assertEquals(5L, (long) eval("([1 3 5 7] 2)"));
+		assertEquals(5L, evalL("([1 3 5 7] 2)"));
 
 		// bounds checks get applied
 		assertBoundsError(step("([] 0)"));
@@ -1429,7 +1426,7 @@ public class CoreTest {
 
 	@Test
 	public void testListAsFunction() {
-		assertEquals(5L, (long) eval("('(1 3 5 7) 2)"));
+		assertEquals(5L, evalL("('(1 3 5 7) 2)"));
 
 		// bounds checks get applied
 		assertBoundsError(step("(() 0)"));
@@ -1490,12 +1487,12 @@ public class CoreTest {
 		// hero balance, should reflect cost of initial juice
 		String a0 = TestState.HERO.toHexString();
 		Long expectedHeroBalance = TestState.HERO_BALANCE;
-		assertEquals(expectedHeroBalance, eval("(let [a (address \"" + a0 + "\")] (balance a))"));
+		assertEquals(expectedHeroBalance, evalL("(let [a (address \"" + a0 + "\")] (balance a))"));
 
 		// someone else's balance
 		String a1 = TestState.VILLAIN.toHexString();
 		Long expectedVillainBalance = TestState.VILLAIN_BALANCE;
-		assertEquals(expectedVillainBalance, eval("(let [a (address \"" + a1 + "\")] (balance a))"));
+		assertEquals(expectedVillainBalance, evalL("(let [a (address \"" + a1 + "\")] (balance a))"));
 
 		assertCastError(step("(balance nil)"));
 		assertCastError(step("(balance 0x00)"));
@@ -1507,9 +1504,9 @@ public class CoreTest {
 
 	@Test
 	public void testAccept() {
-		assertEquals(0L, (long) eval("(accept 0)"));
-		assertEquals(0L, (long) eval("(accept 0.0)"));
-		assertEquals(0L, (long) eval("(accept *offer*)")); // offer should be initially zero
+		assertEquals(0L, evalL("(accept 0)"));
+		assertEquals(0L, evalL("(accept 0.0)"));
+		assertEquals(0L, evalL("(accept *offer*)")); // offer should be initially zero
 
 		// accepting non-numeric value -> CAST error
 		assertCastError(step("(accept :foo)"));
@@ -1737,8 +1734,8 @@ public class CoreTest {
 			Address receiver=(Address) ctx.getResult();
 			
 			ctx=step(ctx,"(transfer 0x"+receiver.toHexString()+" 100)");
-			assertEquals(100L,ctx.getResult());
-			assertEquals(100L,ctx.getBalance(receiver));
+			assertCVMEquals(100L,ctx.getResult());
+			assertCVMEquals(100L,ctx.getBalance(receiver));
 		}
 		
 		{ // transfer to an Actor that accepts nothing
@@ -1746,8 +1743,8 @@ public class CoreTest {
 			Address receiver=(Address) ctx.getResult();
 			
 			ctx=step(ctx,"(transfer 0x"+receiver.toHexString()+" 100)");
-			assertEquals(0L,ctx.getResult());
-			assertEquals(0L,ctx.getBalance(receiver));
+			assertCVMEquals(0L,ctx.getResult());
+			assertCVMEquals(0L,ctx.getBalance(receiver));
 		}
 		
 		{ // transfer to an Actor that accepts half
@@ -1755,8 +1752,8 @@ public class CoreTest {
 			Address receiver=(Address) ctx.getResult();
 			
 			ctx=step(ctx,"(transfer 0x"+receiver.toHexString()+" 100)");
-			assertEquals(50L,ctx.getResult());
-			assertEquals(50L,ctx.getBalance(receiver));
+			assertCVMEquals(50L,ctx.getResult());
+			assertCVMEquals(50L,ctx.getBalance(receiver));
 		}
 
 
@@ -1789,7 +1786,7 @@ public class CoreTest {
 		// transfers to a new address
 		{
 			Context<?> nc1=step(ctx,"(transfer "+naddr+" 1337)");
-			assertEquals(1337L, nc1.getResult());
+			assertCVMEquals(1337L, nc1.getResult());
 			assertEquals(BAL - 1337,nc1.getBalance(HERO));
 			assertEquals(1337L, evalL(nc1,"(balance "+naddr+")"));
 		}
@@ -1882,18 +1879,18 @@ public class CoreTest {
 
 	@Test
 	public void testMin() {
-		assertEquals(1L, (long) eval("(min 1 2 3 4)"));
-		assertEquals(7L, (long) eval("(min 7)"));
-		assertEquals(2L, (long) eval("(min 4 3 2)"));
+		assertEquals(1L, evalL("(min 1 2 3 4)"));
+		assertEquals(7L, evalL("(min 7)"));
+		assertEquals(2L, evalL("(min 4 3 2)"));
 
 		assertArityError(step("(min)"));
 	}
 
 	@Test
 	public void testMax() {
-		assertEquals(4L, (long) eval("(max 1 2 3 4)"));
-		assertEquals(7L, (long) eval("(max 7)"));
-		assertEquals(4L, (long) eval("(max 4 3 2)"));
+		assertEquals(4L, evalL("(max 1 2 3 4)"));
+		assertEquals(7L, evalL("(max 7)"));
+		assertEquals(4L, evalL("(max 4 3 2)"));
 
 		assertArityError(step("(max)"));
 	}
@@ -1914,16 +1911,16 @@ public class CoreTest {
 
 	@Test
 	public void testCount() {
-		assertEquals(0L, (long) eval("(count nil)"));
-		assertEquals(0L, (long) eval("(count [])"));
-		assertEquals(0L, (long) eval("(count ())"));
-		assertEquals(0L, (long) eval("(count \"\")"));
-		assertEquals(2L, (long) eval("(count (list :foo :bar))"));
-		assertEquals(2L, (long) eval("(count #{1 2 2})"));
-		assertEquals(3L, (long) eval("(count [1 2 3])"));
+		assertEquals(0L, evalL("(count nil)"));
+		assertEquals(0L, evalL("(count [])"));
+		assertEquals(0L, evalL("(count ())"));
+		assertEquals(0L, evalL("(count \"\")"));
+		assertEquals(2L, evalL("(count (list :foo :bar))"));
+		assertEquals(2L, evalL("(count #{1 2 2})"));
+		assertEquals(3L, evalL("(count [1 2 3])"));
 		
 		// Count of a map is the number of entries
-		assertEquals(2L, (long) eval("(count {1 2 2 3})")); 
+		assertEquals(2L, evalL("(count {1 2 2 3})")); 
 
 		assertCastError(step("(count 1)"));
 		assertCastError(step("(count :foo)"));
@@ -2314,8 +2311,8 @@ public class CoreTest {
 	public void testEval() {
 		assertEquals("foo", evalS("(eval (list 'str \\f \\o \\o))"));
 		assertNull(eval("(eval 'nil)"));
-		assertEquals(10L, (long) eval("(eval '(+ 3 7))"));
-		assertEquals(40L, (long) eval("(eval '(* 2 4 5))"));
+		assertEquals(10L, evalL("(eval '(+ 3 7))"));
+		assertEquals(40L, evalL("(eval '(* 2 4 5))"));
 
 		assertArityError(step("(eval)"));
 		assertArityError(step("(eval 1 2)"));
@@ -2454,7 +2451,7 @@ public class CoreTest {
 
 	@Test
 	public void testScheduleExecution() throws BadSignatureException {
-		long expectedTS = INITIAL.getTimeStamp() + 1000;
+		long expectedTS = INITIAL.getTimeStamp().longValue() + 1000;
 		Context<?> ctx = step("(schedule (+ *timestamp* 1000) (def a 2))");
 		assertEquals(expectedTS, ctx.getResult());
 		State s = ctx.getState();
@@ -2469,13 +2466,13 @@ public class CoreTest {
 		State s2 = br.getState();
 
 		Context<?> ctx2 = Context.createInitial(s2, TestState.HERO, INITIAL_JUICE);
-		assertEquals(2L, (long) eval(ctx2, "a"));
+		assertEquals(2L, evalL(ctx2, "a"));
 	}
 
 	@Test
 	public void testExpand() {
-		assertEquals(Syntax.create(Strings.create("foo")), eval("(expand (name :foo) (fn [x e] x))"));
-		assertEquals(Syntax.create(3L), eval("(expand '[1 2 3] (fn [x e] (nth x 2)))"));
+		assertEquals(Syntax.of(Strings.create("foo")), eval("(expand (name :foo) (fn [x e] x))"));
+		assertEquals(Syntax.of(3L), eval("(expand '[1 2 3] (fn [x e] (nth x 2)))"));
 
 		assertArityError(step("(expand)"));
 		assertArityError(step("(expand 1 (fn [x e] x) :blah)"));
@@ -2484,16 +2481,16 @@ public class CoreTest {
 
 	@Test
 	public void testSyntax() {
-		assertEquals(Syntax.create(null), eval("(syntax nil)"));
-		assertEquals(Syntax.create(10L), eval("(syntax 10)"));
+		assertEquals(Syntax.of(null), eval("(syntax nil)"));
+		assertEquals(Syntax.of(10L), eval("(syntax 10)"));
 
 		// TODO: check if this is sensible
 		// Syntax should be idempotent and wrap one level only
-		assertEquals((Object)eval("(syntax 10)"), eval("(syntax (syntax 10))"));
+		assertCVMEquals(eval("(syntax 10)"), eval("(syntax (syntax 10))"));
 
 		// Syntax with null / empty metadata should equal basic syntax
-		assertEquals((Object)eval("(syntax 10)"), eval("(syntax 10 nil)"));
-		assertEquals((Object)eval("(syntax 10)"), eval("(syntax 10 {})"));
+		assertCVMEquals(eval("(syntax 10)"), eval("(syntax 10 nil)"));
+		assertCVMEquals(eval("(syntax 10)"), eval("(syntax 10 {})"));
 		
 		assertCastError(step("(syntax 2 3)"));
 		
@@ -2505,7 +2502,7 @@ public class CoreTest {
 	public void testUnsyntax() {
 		assertNull(eval("(unsyntax (syntax nil))"));
 		assertNull(eval("(unsyntax nil)"));
-		assertEquals(10L, (long) eval("(unsyntax (syntax 10))"));
+		assertEquals(10L, evalL("(unsyntax (syntax 10))"));
 		assertEquals(Keywords.FOO, eval("(unsyntax (expand :foo))"));
 
 		assertArityError(step("(unsyntax)"));
@@ -2561,9 +2558,9 @@ public class CoreTest {
 
 	@Test
 	public void testDec() {
-		assertEquals(0L, (long) eval("(dec 1)"));
-		assertEquals(0L, (long) eval("(dec (byte 1))"));
-		assertEquals(-10L, (long) eval("(dec -9)"));
+		assertEquals(0L, evalL("(dec 1)"));
+		assertEquals(0L, evalL("(dec (byte 1))"));
+		assertEquals(-10L, evalL("(dec -9)"));
 		// assertEquals(96L,(long)eval("(dec \\a)")); // TODO: think about this
 
 		assertCastError(step("(dec nil)"));
@@ -2576,8 +2573,8 @@ public class CoreTest {
 
 	@Test
 	public void testInc() {
-		assertEquals(2L, (long) eval("(inc 1)"));
-		assertEquals(2L, (long) eval("(inc (byte 1))"));
+		assertEquals(2L, evalL("(inc 1)"));
+		assertEquals(2L, evalL("(inc (byte 1))"));
 		// assertEquals(98L,(long)eval("(inc \\a)")); // TODO: think about this
 
 		assertCastError(step("(inc nil)"));
@@ -2645,13 +2642,13 @@ public class CoreTest {
 		Address HERO = TestState.HERO;
 		Context<?> ctx = step("(long *balance*)");
 		Long bal=ctx.getAccountStatus(HERO).getBalance();
-		assertEquals(bal, ctx.getResult());
+		assertCVMEquals(bal, ctx.getResult());
 		
 		// throwing it all away....
 		assertEquals(0L, evalL("(do (transfer "+Init.VILLAIN+" *balance*) *balance*)"));
 		
 		// check balance as single expression
-		assertEquals(bal, eval("*balance*"));
+		assertEquals(bal, evalL("*balance*"));
 		
 		// test overrides in local any dynamic context
 		assertNull(eval("(let [*balance* nil] *balance*)"));
@@ -2694,10 +2691,10 @@ public class CoreTest {
 	public void testSpecialJuice() {
 		// TODO: semantics of returning juice before lookup complete is OK?
 		// seems sensible, represents "juice left at this position".
-		assertEquals(INITIAL_JUICE, (long) eval("*juice*"));
+		assertEquals(INITIAL_JUICE, evalL("*juice*"));
 		
 		// juice gets consumed before returning a value
-		assertEquals(INITIAL_JUICE-Juice.DO - Juice.CONSTANT, (long) eval("(do 1 *juice*)"));
+		assertEquals(INITIAL_JUICE-Juice.DO - Juice.CONSTANT, evalL("(do 1 *juice*)"));
 	}
 
 
@@ -2734,7 +2731,7 @@ public class CoreTest {
 		assertNobodyError(step(ctx,"(get-holding NOONE)"));
 		
 		// OK to set holding for a real owner account
-	    assertEquals(100L,(long)eval(ctx,"(set-holding VILLAIN 100)"));
+	    assertEquals(100L,evalL(ctx,"(set-holding VILLAIN 100)"));
 	    
 		// error to set holding for a non-existent owner account
 		assertNobodyError(step(ctx,"(set-holding NOONE 200)"));
@@ -2744,9 +2741,9 @@ public class CoreTest {
 		
 		{ // test simple assign
 			Context<?> c2 = step(ctx,"(set-holding VILLAIN 123)");
-			assertEquals(123L,(long)eval(c2,"(get-holding VILLAIN)"));
+			assertEquals(123L,evalL(c2,"(get-holding VILLAIN)"));
 			assertTrue(c2.getAccountStatus(VILLAIN).getHoldings().containsKey(HERO));
-			assertEquals(123L,c2.getAccountStatus(VILLAIN).getHolding(HERO));
+			assertCVMEquals(123L,c2.getAccountStatus(VILLAIN).getHolding(HERO));
 		}
 		
 		{ // test null assign

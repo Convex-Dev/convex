@@ -102,8 +102,8 @@ public class Scrypt extends Reader {
         );
     }
 
-    public List<Syntax> buildDefStatement(Syntax expr, Syntax sym) {
-        return (convex.core.data.List<Syntax>) Lists.of(Syntax.create(Symbols.DEF), sym, expr);
+    public AList<Syntax> buildDefStatement(Syntax expr, Syntax sym) {
+        return Lists.of(Syntax.create(Symbols.DEF), sym, expr);
     }
 
     public Rule LocalSetStatement() {
@@ -117,8 +117,8 @@ public class Scrypt extends Reader {
         );
     }
 
-    public List<Syntax> buildLocalSetStatement(Syntax expr, Syntax sym) {
-        return (List<Syntax>) Lists.of(Syntax.create(Symbols.SET_BANG), sym, expr);
+    public AList<Syntax> buildLocalSetStatement(Syntax expr, Syntax sym) {
+        return Lists.of(Syntax.create(Symbols.SET_BANG), sym, expr);
     }
 
     /**

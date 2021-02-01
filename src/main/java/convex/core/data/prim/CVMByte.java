@@ -65,6 +65,11 @@ public class CVMByte extends APrimitive {
 		return Long.class;
 	}
 
+	@Override
+	public double doubleValue() {
+		return (double)value;
+	}
+
 
 
 }

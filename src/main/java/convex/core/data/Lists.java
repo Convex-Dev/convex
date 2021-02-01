@@ -8,7 +8,7 @@ public class Lists {
 	}
 
 	@SafeVarargs
-	public static <T> AList<T> of(T... vals) {
+	public static <T> AList<T> of(Object... vals) {
 		return List.of(vals);
 	}
 

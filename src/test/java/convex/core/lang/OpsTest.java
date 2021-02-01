@@ -18,6 +18,7 @@ import convex.core.data.AString;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.Fn;
@@ -51,7 +52,7 @@ public class OpsTest {
 			Context<Long> c2 = c.fork().execute(op);
 
 			assertEquals(INITIAL_JUICE - Juice.CONSTANT, c2.getJuice());
-			assertEquals(10L, (long) c2.getResult());
+			assertEquals(CVMLong.create(10L), c2.getResult());
 		}
 
 		{// null constant

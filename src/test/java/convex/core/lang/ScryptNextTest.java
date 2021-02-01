@@ -7,7 +7,7 @@ import org.parboiled.Rule;
 import org.parboiled.errors.ParserRuntimeException;
 import org.parboiled.parserunners.ReportingParseRunner;
 
-import static convex.test.Assertions.assertStateError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class ScryptNextTest {
@@ -266,7 +266,7 @@ public class ScryptNextTest {
         assertEquals(Reader.read("(do (def f (fn [x] x)) (f 1))"), parse("{ def f = fn(x) { x; }; f(1); }"));
         assertEquals(Reader.read("(do (def x? true) (cond x? (do 1 2)) 1)"), parse("do { def x? = true; if (x?) { 1; 2; } 1; }"));
         assertEquals(Reader.read("(do (def x? true) (cond x? 1))"), parse("do { def x? = true; when (x?) { 1; } }"));
-        assertEquals(2, (Long) eval("{ inc(1); }"));
+        assertCVMEquals(2, eval("{ inc(1); }"));
 
         // Do
         // =====================
@@ -280,7 +280,7 @@ public class ScryptNextTest {
         assertEquals(Reader.read("(do 1 (inc 2) {:n 3})"), parse("do { 1; inc(2); {:n 3}; }"));
         assertEquals(Reader.read("(do (def f (fn [x] x)) (f 1))"), parse("do { def f = fn(x) { x; }; f(1); }"));
         assertNull(eval("do { }"));
-        assertEquals(1, (Long) eval("do { 1; }"));
+        assertCVMEquals(1, eval("do { 1; }"));
     }
 
 }

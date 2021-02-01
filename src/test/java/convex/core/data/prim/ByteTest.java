@@ -1,5 +1,6 @@
 package convex.core.data.prim;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
@@ -33,6 +34,6 @@ public class ByteTest {
 	
 	@Test public void testCVMCast() {
 		// CVM converts all numbers to Long
-		assertSame(RT.cvm(1L),RT.cvm((byte)1));
+		assertEquals(RT.cvm(1L),(CVMLong)RT.cvm((byte)1));
 	}
 }

@@ -38,6 +38,8 @@ import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.data.prim.APrimitive;
 import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMDouble;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.impl.KeyFn;
 import convex.core.lang.impl.MapFn;
@@ -198,7 +200,7 @@ public class RT {
 		return Double.class;
 	}
 
-	public static Number plus(Object[] args) {
+	public static APrimitive plus(Object[] args) {
 		Class<?> type = commonNumericType(args);
 		if (type == null) return null;
 		if (type == Double.class) return plusDouble(args);
@@ -206,41 +208,41 @@ public class RT {
 		for (int i = 0; i < args.length; i++) {
 			result += RT.longValue(args[i]);
 		}
-		return result;
+		return CVMLong.create(result);
 	}
 
-	public static Double plusDouble(Object[] args) {
+	public static CVMDouble plusDouble(Object[] args) {
 		double result = 0;
 		for (int i = 0; i < args.length; i++) {
 			result += RT.doubleValue(args[i]);
 		}
-		return result;
+		return CVMDouble.create(result);
 	}
 
-	public static Number minus(Object[] args) {
+	public static APrimitive minus(Object[] args) {
 		Class<?> type = commonNumericType(args);
 		if (type == null) return null;
 		if (type == Double.class) return minusDouble(args);
 		int n = args.length;
 		long result = longValue(args[0]);
-		if (n == 1) return -result;
-		for (int i = 1; i < args.length; i++) {
+		if (n == 1) result= -result;
+		for (int i = 1; i < n; i++) {
 			result -= RT.longValue(args[i]);
 		}
-		return result;
+		return CVMLong.create(result);
 	}
 
-	public static Double minusDouble(Object[] args) {
+	public static APrimitive minusDouble(Object[] args) {
 		int n = args.length;
 		double result = doubleValue(args[0]);
-		if (n == 1) return -result;
+		if (n == 1) result= -result;
 		for (int i = 1; i < args.length; i++) {
 			result -= RT.doubleValue(args[i]);
 		}
-		return result;
+		return CVMDouble.create(result);
 	}
 
-	public static Number times(Object[] args) {
+	public static APrimitive times(Object[] args) {
 		Class<?> type = commonNumericType(args);
 		if (type == null) return null;
 		if (type == Double.class) return timesDouble(args);
@@ -248,40 +250,41 @@ public class RT {
 		for (int i = 0; i < args.length; i++) {
 			result *= RT.longValue(args[i]);
 		}
-		return result;
+		return CVMLong.create(result);
 	}
 
-	public static Number timesDouble(Object[] args) {
+	public static APrimitive timesDouble(Object[] args) {
 		double result = 1;
 		for (int i = 0; i < args.length; i++) {
 			result *= RT.doubleValue(args[i]);
 		}
-		return result;
+		return CVMDouble.create(result);
 	}
 
-	public static Double divide(Object[] args) {
+	public static CVMDouble divide(Object[] args) {
 		int n = args.length;
-		Double result = toDouble(args[0]);
-		if (result == null) return null;
+		CVMDouble arg0 = toDouble(args[0]);
+		if (arg0 == null) return null;
+		double result=arg0.doubleValue();
 
-		if (n == 1) return 1.0 / result;
+		if (n == 1) return CVMDouble.create(1.0 / result);
 		for (int i = 1; i < args.length; i++) {
-			Double v = toDouble(args[i]);
+			CVMDouble v = toDouble(args[i]);
 			if (v == null) return null;
-			result = result / v;
+			result = result / v.doubleValue();
 		}
-		return result;
+		return CVMDouble.create(result);
 	}
 
-	public static Double pow(Object[] args) {
+	public static CVMDouble pow(Object[] args) {
 		double a = doubleValue(args[0]);
 		double b = doubleValue(args[1]);
-		return StrictMath.pow(a, b);
+		return CVMDouble.create(StrictMath.pow(a, b));
 	}
 
-	public static Double exp(Object arg) {
+	public static CVMDouble exp(Object arg) {
 		double a = doubleValue(arg);
-		return StrictMath.exp(a);
+		return CVMDouble.create(StrictMath.exp(a));
 	}
 
 	/**
@@ -291,23 +294,23 @@ public class RT {
 	 * @param a
 	 * @return The square root of the number, or null if cast fails
 	 */
-	public static Double sqrt(Object a) {
-		Double d = RT.toDouble(a);
+	public static CVMDouble sqrt(Object a) {
+		CVMDouble d = RT.toDouble(a);
 		if (d == null) return null;
-		return StrictMath.sqrt(d);
+		return CVMDouble.create(StrictMath.sqrt(d.doubleValue()));
 	}
 	
 	/**
 	 * Gets the absolute value of a numeric value. Supports double and long.
 	 * 
-	 * @param a Numeric value
+	 * @param a Numeric CVM value
 	 * @return
 	 */
-	public static Number abs(Object a) {
+	public static APrimitive abs(Object a) {
 		Number x=RT.number(a);
 		if (x==null) return null;
-		if (x instanceof Long) return Math.abs((Long)x);
-		return Math.abs((Double)x);
+		if (x instanceof Long) return CVMLong.create( Math.abs((Long)x));
+		return CVMDouble.create(Math.abs((Double)x));
 	}
 	
 	/**
@@ -316,13 +319,13 @@ public class RT {
 	 * @param a Numeric value
 	 * @return Long value of -1, 0 or 1, or null if the argument is not numeric
 	 */
-	public static Long signum(Object a) {
+	public static CVMLong signum(Object a) {
 		Number x=RT.number(a);
 		if (x==null) return null;
-		if (x instanceof Long) return (long) Long.signum((Long)x);
+		if (x instanceof Long) return CVMLong.create(Long.signum((Long)x));
 		double xd=(Double)x;
 		if (Double.isNaN(xd)) return null;
-		return (long)Math.signum(xd);
+		return CVMLong.create((long)Math.signum(xd));
 	}
 
 	/**
@@ -375,7 +378,7 @@ public class RT {
 	}
 
 	/**
-	 * Coerces a value to a numeric value ready for maths operations. Result will be one of: 
+	 * Coerces a CVM value to a Java numeric value ready for maths operations. Result will be one of: 
 	 * <ul> 
 	 * <li>Long for Byte, Integer, Short, Long, Amount, Character, Blob</li>
 	 * <li>Double for Double, Float </li>
@@ -389,13 +392,11 @@ public class RT {
 		
 		// TODO: handle double primitives
 		if (a instanceof APrimitive) {
+			if (a instanceof CVMDouble) return ((CVMDouble)a).doubleValue();
 			return ((APrimitive)a).longValue();
 		}
 
-		Class<?> c = a.getClass();
-		if (c == Double.class) return (Double) a;
-		if (c == Long.class) return (Long) a;
-		if (c == Character.class) return (long) ((Character) a);
+		if (a instanceof Character) return (long) ((Character) a);
 		
 		if (a instanceof Number) {
 			return ((Number)a).longValue();
@@ -404,61 +405,51 @@ public class RT {
 		if (a instanceof ABlob) {
 			return (Long)((ABlob)a).toLong();
 		}
-		
 
 		return null;
 	}
 
-	public static Long inc(Object object) {
-		Long n = toLong(object);
+	public static CVMLong inc(Object object) {
+		CVMLong n = toLong(object);
 		if (n == null) return null;
-		return (Long) (n + 1L);
+		return CVMLong.create(n.longValue() + 1L);
 	}
 
-	public static Long dec(Object object) {
-		Long n = toLong(object);
+	public static CVMLong dec(Object object) {
+		CVMLong n = toLong(object);
 		if (n == null) return null;
-		return (Long) (n - 1L);
+		return CVMLong.create(n.longValue() - 1L);
 	}
 
-	public static Double toDouble(Object a) {
-		if (a instanceof Double) return (Double) a;
+	public static CVMDouble toDouble(Object a) {
+		if (a instanceof CVMDouble) return (CVMDouble) a;
 		Number n = number(a);
 		if (n == null) return null;
-		return n.doubleValue();
+		return CVMDouble.create(n.doubleValue());
 	}
 
 	/**
-	 * Converts a numerical value to a Long. Doubles and floats will be converted if possible.
+	 * Converts a numerical value to a CVM Long. Doubles and floats will be converted if possible.
 	 * @param a
 	 * @return Long value, or null if not convertible
 	 */
-	public static Long toLong(Object a) {
-		if (a instanceof Long) return (Long) a;
+	public static CVMLong toLong(Object a) {
+		if (a instanceof CVMLong) return (CVMLong) a;
 		Number n = number(a);
 		if (n == null) return null;
-		return n.longValue();
+		return CVMLong.create(n.longValue());
 	}
-
+	
+	/**
+	 * Converts a numerical value to a CVM Byte. Doubles and floats will be converted if possible.
+	 * @param a
+	 * @return Long value, or null if not convertible
+	 */
 	public static CVMByte toByte(Object a) {
 		if (a instanceof CVMByte) return (CVMByte) a;
 		Number n = number(a);
 		if (n == null) return null;
-		return CVMByte.create(n.longValue());
-	}
-
-	public static Short toShort(Object a) {
-		if (a instanceof Short) return (Short) a;
-		Number n = number(a);
-		if (n == null) return null;
-		return (short) n.longValue();
-	}
-
-	public static Integer toInteger(Object a) {
-		if (a instanceof Integer) return (Integer) a;
-		Number n = number(a);
-		if (n == null) return null;
-		return (int) n.longValue();
+		return CVMByte.create((byte)n.longValue());
 	}
 
 	public static Character toCharacter(Object a) {
@@ -477,6 +468,7 @@ public class RT {
 	}
 
 	private static double doubleValue(Object a) {
+		if (a instanceof APrimitive) return ((APrimitive) a).doubleValue();
 		if (a instanceof Double) return (Double) a;
 		if (a instanceof Number) return ((Number) a).doubleValue();
 		throw new IllegalArgumentException("Can't convert to double: " + Utils.getClassName(a));
@@ -795,9 +787,9 @@ public class RT {
 		if (a instanceof ABlob) return Address.create((ABlob)a);
 		if (a instanceof AString) return Address.fromHexOrNull(a.toString());
 		if (a instanceof String) return Address.fromHexOrNull(a.toString());
-		Long value=RT.toLong(a);
+		CVMLong value=RT.toLong(a);
 		if (value==null) return null;
-		return Address.create(value);
+		return Address.create(value.longValue());
 	}
 	
 	/**
@@ -1071,7 +1063,7 @@ public class RT {
 	 * @param coll Any associative data structure
 	 * @param key Key to update or add
 	 * @param value Value to associate with key
-	 * @return
+	 * @return Updated data structure
 	 */
 	@SuppressWarnings("unchecked")
 	public static <K, V> ADataStructure<?> assoc(Object coll, K key, V value) {
@@ -1079,8 +1071,8 @@ public class RT {
 		if (coll instanceof AMap) {
 			return ((AMap<K, V>) coll).assoc(key, value);
 		} else if (coll instanceof ASequence) {
-			if (!(key instanceof Long)) return null;
-			return ((ASequence<V>) coll).assoc((long) key, value);
+			if (!(key instanceof CVMLong)) return null;
+			return ((ASequence<V>) coll).assoc(((CVMLong) key).longValue(), value);
 		}
 		return null;
 	}
@@ -1209,11 +1201,25 @@ public class RT {
 		if (o==null) return null;
 		if (o instanceof ACell) return ((T)o);
 		if (o instanceof String) return (T) Strings.create((String)o);
-		if (o instanceof Double) return (T)o;
-		if (o instanceof Number) return (T)(Long)((Number)o).longValue();
+		if (o instanceof Double) return (T)CVMDouble.create(((Double)o));
+		if (o instanceof Number) return (T)CVMLong.create(((Number)o).longValue());
 		if (o instanceof Character) return (T)toCharacter(o);
 		if (o instanceof Boolean) return (T)RT.toBoolean(o);
 		throw new IllegalArgumentException("Can't convert to CVM type with class: "+Utils.getClassName(o));
+	}
+
+	/**
+	 * Converts a CVM value to equivalent JVM value
+	 * @param o
+	 * @return Java value, or unchanged input
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T> T jvm(Object o) {
+		if (o instanceof AString) return (T) o.toString();
+		if (o instanceof CVMLong) return (T)(Long)((CVMLong)o).longValue();
+		if (o instanceof CVMDouble) return (T)(Double)((CVMDouble)o).doubleValue();
+		if (o instanceof CVMByte) return (T)(Byte)(byte)((CVMByte)o).longValue();
+		return (T)o;
 	}
 
 

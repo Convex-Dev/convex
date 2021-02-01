@@ -2,6 +2,7 @@ package convex.core.data;
 
 import java.nio.ByteBuffer;
 
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.impl.RecordFormat;
@@ -22,11 +23,11 @@ public class PeerStatus extends ARecord {
 	private final long stake;
 	private final long delegatedStake;
 
-	private final ABlobMap<Address, Long> stakes;
+	private final ABlobMap<Address, CVMLong> stakes;
 
 	private final AString hostAddress;
 
-	private PeerStatus(long stake, ABlobMap<Address, Long> stakes, long delegatedStake, AString host) {
+	private PeerStatus(long stake, ABlobMap<Address, CVMLong> stakes, long delegatedStake, AString host) {
 		super(FORMAT);
 		this.stake = stake;
 		this.delegatedStake = delegatedStake;
@@ -95,7 +96,7 @@ public class PeerStatus extends ARecord {
 
 	public static PeerStatus read(ByteBuffer data) throws BadFormatException {
 		long stake = Format.readVLCLong(data);
-		ABlobMap<Address, Long> stakes = Format.read(data);
+		ABlobMap<Address, CVMLong> stakes = Format.read(data);
 		long delegatedStake = Format.readVLCLong(data);
 		
 		AString hostString = Format.read(data);
@@ -122,9 +123,9 @@ public class PeerStatus extends ARecord {
 	 * @return Value of delegated stake
 	 */
 	public long getDelegatedStake(Address delegator) {
-		Long a = stakes.get(delegator);
+		CVMLong a = stakes.get(delegator);
 		if (a == null) return 0;
-		return a;
+		return a.longValue();
 	}
 
 	/**
@@ -142,8 +143,8 @@ public class PeerStatus extends ARecord {
 		// compute adjustment to total delegated stake
 		long newDelegatedStake = delegatedStake + newStake - oldStake;
 
-		ABlobMap<Address, Long> newStakes = (newStake == 0L) ? stakes.dissoc(delegator)
-				: stakes.assoc(delegator, newStake);
+		ABlobMap<Address, CVMLong> newStakes = (newStake == 0L) ? stakes.dissoc(delegator)
+				: stakes.assoc(delegator, CVMLong.create(newStake));
 		return new PeerStatus(stake, newStakes, newDelegatedStake, hostAddress);
 	}
 
@@ -160,9 +161,9 @@ public class PeerStatus extends ARecord {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <V> V get(Keyword key) {
-		if (Keywords.STAKE.equals(key)) return (V) (Long)stake;
+		if (Keywords.STAKE.equals(key)) return (V) CVMLong.create(stake);
 		if (Keywords.STAKES.equals(key)) return (V) stakes;
-		if (Keywords.DELEGATED_STAKE.equals(key)) return (V) (Long)delegatedStake;
+		if (Keywords.DELEGATED_STAKE.equals(key)) return (V) CVMLong.create(delegatedStake);
 		if (Keywords.URL.equals(key)) return (V) hostAddress;
 		
 		return null;
@@ -176,9 +177,9 @@ public class PeerStatus extends ARecord {
 	@SuppressWarnings("unchecked")
 	@Override
 	protected PeerStatus updateAll(Object[] newVals) {
-		long newStake = (Long) newVals[0];
-		ABlobMap<Address, Long> newStakes = (ABlobMap<Address, Long>) newVals[1];
-		Long newDelStake = (Long) newVals[2];
+		long newStake = ((CVMLong) newVals[0]).longValue();
+		ABlobMap<Address, CVMLong> newStakes = (ABlobMap<Address, CVMLong>) newVals[1];
+		long newDelStake = ((CVMLong) newVals[2]).longValue();
 		AString newHostAddress = (AString) newVals[3];
 		
 		if ((this.stake==newStake)&&(this.stakes==newStakes)

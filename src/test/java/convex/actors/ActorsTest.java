@@ -1,9 +1,12 @@
 package convex.actors;
  
 import static convex.core.lang.TestState.eval;
+import static convex.core.lang.TestState.evalB;
+import static convex.core.lang.TestState.evalL;
 import static convex.core.lang.TestState.step;
 import static convex.test.Assertions.assertArityError;
 import static convex.test.Assertions.assertAssertError;
+import static convex.test.Assertions.assertCVMEquals;
 import static convex.test.Assertions.assertCastError;
 import static convex.test.Assertions.assertFundsError;
 import static convex.test.Assertions.assertStateError;
@@ -34,11 +37,11 @@ public class ActorsTest {
 		
 		assertEquals(Address.class,ctx.getResult().getClass());
 		
-		assertEquals(10L,(long)eval(ctx,"(call caddr (getter))"));
-		assertEquals(14L,(long)eval(ctx,"(call caddr (plus 4))"));
+		assertEquals(10L,evalL(ctx,"(call caddr (getter))"));
+		assertEquals(14L,evalL(ctx,"(call caddr (plus 4))"));
 		
-		assertFalse((boolean)eval(ctx,"(exports? caddr 'foo)"));
-		assertTrue((boolean)eval(ctx,"(exports? caddr 'getter)"));
+		assertFalse(evalB(ctx,"(exports? caddr 'foo)"));
+		assertTrue(evalB(ctx,"(exports? caddr 'getter)"));
 		
 		assertStateError(step(ctx,"(call caddr (bad-symbol 2))"));
 		assertStateError(step(ctx,"(call caddr (hidden 2))"));
@@ -49,7 +52,7 @@ public class ActorsTest {
 	}
 	
 	@Test public void testSimpleDeploys() {
-		assertTrue((boolean)eval("(address? (deploy 1))"));
+		assertTrue(evalB("(address? (deploy 1))"));
 	}
 	
 	@Test public void testDeployFailures() {
@@ -68,8 +71,8 @@ public class ActorsTest {
 	}
 	
 	@Test public void testNotActor() {
-		assertFalse((boolean)eval("(actor? *address*)"));
-		assertFalse((boolean)eval("(exports? *address* 'foo)"));
+		assertFalse(evalB("(actor? *address*)"));
+		assertFalse(evalB("(exports? *address* 'foo)"));
 		assertStateError(TestState.step("(call *address* (not-a-function))"));
 	}
 	
@@ -78,7 +81,7 @@ public class ActorsTest {
 		Address a=(Address) ctx.getResult();
 		assertNotNull(a);
 
-		assertFalse((boolean)eval(ctx,"(exports? caddr 'foo)"));
+		assertFalse(evalB(ctx,"(exports? caddr 'foo)"));
 		
 		assertEquals(Core.COUNT,ctx.lookup(Symbols.COUNT).getValue());
 		assertNull(ctx.getAccountStatus(a).getEnvironmentValue(Symbols.FOO));
@@ -95,20 +98,20 @@ public class ActorsTest {
 		String contractString=Utils.readResourceAsString("contracts/token.con");
 		ctx=TestState.step(ctx,"(def my-token (deploy ("+contractString+" 101 1000 HERO)))"); // contract initialisation args
 		
-		assertEquals(1000L,(long)eval(ctx,"(call my-token (balance *address*))"));
-		assertEquals(0L,(long)eval(ctx,"(call my-token (balance VILLAIN))"));
+		assertEquals(1000L,evalL(ctx,"(call my-token (balance *address*))"));
+		assertEquals(0L,evalL(ctx,"(call my-token (balance VILLAIN))"));
 		ctx=TestState.step(ctx,"(call my-token (transfer VILLAIN 10))");
 		ctx=TestState.step(ctx,"(call my-token (transfer HERO 100))"); // should have no effect
 		final Context<?> fctx=ctx; // save context for later tests
 		
-		assertEquals(990L,(long)eval(fctx,"(call my-token (balance *address*))"));
-		assertEquals(10L,(long)eval(fctx,"(call my-token (balance VILLAIN))"));
+		assertEquals(990L,evalL(fctx,"(call my-token (balance *address*))"));
+		assertEquals(10L,evalL(fctx,"(call my-token (balance VILLAIN))"));
 		
-		assertEquals(1000L,(long)eval(fctx,"(call my-token (total-supply))"));
+		assertEquals(1000L,evalL(fctx,"(call my-token (total-supply))"));
 
-		assertTrue((boolean)eval(fctx,"(actor? my-token)"));
-		assertFalse((boolean)eval(fctx,"(actor? HERO)"));
-		assertFalse((boolean)eval(fctx,"(actor? :foo)"));
+		assertTrue(evalB(fctx,"(actor? my-token)"));
+		assertFalse(evalB(fctx,"(actor? HERO)"));
+		assertFalse(evalB(fctx,"(actor? :foo)"));
 
 		// some tests for contract safety
 		assertAssertError(TestState.step(fctx,"(call my-token (transfer VILLAIN 1000))"));
@@ -149,14 +152,14 @@ public class ActorsTest {
 		{
 			// just test return of the correct *offer* value
 			ctx=TestState.step(ctx,"(call funcon 1234 (echo-offer))");
-			assertEquals(1234,(long)ctx.getResult());
+			assertCVMEquals(1234,ctx.getResult());
 			assertEquals(initialBalance,ctx.getBalance(addr));
 		} 
 		
 		{
 			// test accepting half of funds
 			final Context<?> rctx=TestState.step(ctx,"(call funcon 1000 (accept-quarter))");
-			assertEquals(250,(long)rctx.getResult());
+			assertCVMEquals(250,rctx.getResult());
 			assertEquals(250,rctx.getBalance(caddr));
 			
 			assertEquals(initialBalance-250,rctx.getBalance(addr));
@@ -166,7 +169,7 @@ public class ActorsTest {
 		{
 			// test accepting all funds
 			final Context<?> rctx=TestState.step(ctx,"(call funcon 1237 (accept-all))");
-			assertEquals(1237,(long)rctx.getResult());
+			assertCVMEquals(1237,rctx.getResult());
 			assertEquals(1237,rctx.getBalance(caddr));
 			
 			assertEquals(initialBalance-1237,rctx.getBalance(addr));
@@ -176,7 +179,7 @@ public class ActorsTest {
 		{
 			// test accepting zero funds
 			final Context<?> rctx=TestState.step(ctx,"(call funcon 1237 (accept-zero))");
-			assertEquals(0,(long)rctx.getResult());
+			assertCVMEquals(0,rctx.getResult());
 			assertEquals(0,rctx.getBalance(caddr));
 			
 			assertEquals(initialBalance,rctx.getBalance(addr));
@@ -197,7 +200,7 @@ public class ActorsTest {
 		{
 			// test contract that accepts funds repeatedly
 			final Context<?> rctx=TestState.step(ctx,"(call funcon 1337 (accept-repeat))");
-			assertEquals(0,(long)rctx.getResult()); // final offer echoed back
+			assertCVMEquals(0,rctx.getResult()); // final offer echoed back
 			assertEquals(1337,rctx.getBalance(caddr));
 			
 			assertEquals(initialBalance-1337,rctx.getBalance(addr));
@@ -207,7 +210,7 @@ public class ActorsTest {
 		{
 			// test contract that forwards funds to self
 			final Context<?> rctx=TestState.step(ctx,"(call funcon 1337 (accept-forward))");
-			assertEquals(1337,(long)rctx.getResult()); // result of forward to accept-all
+			assertCVMEquals(1337,rctx.getResult()); // result of forward to accept-all
 			assertEquals(1337,rctx.getBalance(caddr));
 			
 			assertEquals(initialBalance-1337,rctx.getBalance(addr));
@@ -215,10 +218,10 @@ public class ActorsTest {
 		}
 		
 		// test *offer* restored after send
-		assertEquals(0,(long)eval(ctx,"(do (call funcon 1237 (accept-zero)) *offer*)"));
+		assertEquals(0,evalL(ctx,"(do (call funcon 1237 (accept-zero)) *offer*)"));
 		
 		// test *offer* in contract with no send
-		assertEquals(0,(long)eval(ctx,"(call funcon (echo-offer))"));
+		assertEquals(0,evalL(ctx,"(call funcon (echo-offer))"));
 	}
 	
 	@Test public void testExceptionContract() throws IOException {

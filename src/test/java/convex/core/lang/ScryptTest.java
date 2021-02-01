@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static convex.test.Assertions.*;
 
 import convex.core.data.*;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,7 @@ import org.parboiled.parserunners.ReportingParseRunner;
 
 import convex.core.Init;
 import convex.core.exceptions.ParseException;
+import convex.core.data.prim.*;
 
 public class ScryptTest {
 
@@ -61,6 +63,15 @@ public class ScryptTest {
     public static <T> T eval(String source) {
         return (T) step(CON, source).getResult();
     }
+    
+    public static long evalL(String source) {
+        return ((CVMLong) step(CON, source).getResult()).longValue();
+    }
+    
+    public static double evalD(String source) {
+        return ((CVMDouble) step(CON, source).getResult()).doubleValue();
+    }
+
 
     @SuppressWarnings("rawtypes")
     @Test
@@ -129,7 +140,7 @@ public class ScryptTest {
             var syn = (Syntax) result.resultValue;
 
             assertTrue(result.matched);
-            assertEquals(1L, (Long) syn.getValue());
+            assertEquals(CVMLong.create(1L), syn.getValue());
         }
 
         // Nested Expression inside Nested Expression.
@@ -138,7 +149,7 @@ public class ScryptTest {
             var syn = (Syntax) result.resultValue;
 
             assertTrue(result.matched);
-            assertEquals(1L, (Long) syn.getValue());
+            assertEquals(CVMLong.create(1L), syn.getValue());
         }
 
         // Space is not allowed before/after parenthesis - although it's allowed after/before parenthesis.
@@ -156,8 +167,8 @@ public class ScryptTest {
             assertTrue(result.matched);
             assertEquals(3, value.count());
             assertSame(Symbols.PLUS, ((Syntax) value.get(0)).getValue());
-            assertEquals(1L, (Long) ((Syntax) value.get(1)).getValue());
-            assertEquals(2L, (Long) ((Syntax) value.get(2)).getValue());
+            assertEquals(CVMLong.create(1L), ((Syntax) value.get(1)).getValue());
+            assertEquals(CVMLong.create(2L), ((Syntax) value.get(2)).getValue());
         }
 
     }
@@ -175,15 +186,15 @@ public class ScryptTest {
         assertEquals(Reader.read("(f 1 (* (+ 2 3) 4))"), parse(rule, "f(1, (2 + 3) * 4)"));
         assertEquals(Reader.read("(if true 1)"), parse(rule, "if(true, 1)"));
 
-        assertEquals(1L, (Long) eval("if(true, 1)"));
-        assertEquals(2L, (Long) eval("(identity(inc))(1)"));
-        assertEquals(2, (Long) eval("(inc)(1)"));
+        assertCVMEquals(1L, eval("if(true, 1)"));
+        assertCVMEquals(2L, eval("(identity(inc))(1)"));
+        assertCVMEquals(2, eval("(inc)(1)"));
     }
 
     @Test
     public void testExpressionRule() {
         assertNull(eval("nil"));
-        assertEquals(1L, (Long) eval("1"));
+        assertEquals(1L, evalL("1"));
         assertEquals(Strings.create("Foo"), eval("\"Foo\""));
         assertEquals(true, eval("true"));
         assertEquals(Keyword.create("keyword"), eval(":keyword"));
@@ -192,34 +203,36 @@ public class ScryptTest {
 
     @Test
     public void testConstant() {
-        assertEquals((Long) Syntax.create(1L).getValue(), Scrypt.readSyntax("1").getValue());
-        assertEquals((Long) Syntax.create(1L).getValue(), Scrypt.readSyntax(" 1").getValue());
-        assertEquals((Long) Syntax.create(1L).getValue(), Scrypt.readSyntax("1  ").getValue());
-        assertEquals((Long) Syntax.create(1L).getValue(), Scrypt.readSyntax("\t1\n").getValue());
+    	CVMLong one=CVMLong.create(1L);
+        assertEquals(one, Scrypt.readSyntax("1").getValue());
+        assertEquals(one, Scrypt.readSyntax(" 1").getValue());
+        assertEquals(one, Scrypt.readSyntax("1  ").getValue());
+        assertEquals(one, Scrypt.readSyntax("\t1\n").getValue());
     }
 
     @Test
     public void testInfix() {
         // -- Arithmetic Operators
 
-        assertEquals(2L, (Long) eval("1 + 1"));
-        assertEquals(3L, (Long) eval("1+1+1"));
-        assertEquals(3L, (Long) eval("1 + 1 + 1"));
-        assertEquals(3L, (Long) eval("\t1 + \n1 + \t1"));
+        assertEquals(2L, evalL("1 + 1"));
+        assertEquals(3L, evalL("1+1+1"));
+        assertEquals(3L, evalL("1 + 1 + 1"));
+        assertEquals(3L, evalL("\t1 + \n1 + \t1"));
 
-        assertEquals(0L, (Long) eval("1 - 1"));
+        assertEquals(0L, evalL("1 - 1"));
 
-        assertEquals(7L, (Long) eval("1 + (2*3)"));
-        assertEquals(7L, (Long) eval("1 + \n(2 \t* \n3)"));
+        assertEquals(7L, evalL("1 + (2*3)"));
+        assertEquals(7L, evalL("1 + \n(2 \t* \n3)"));
 
-        assertEquals(1L, (Long) eval("1 * 1"));
+        assertEquals(1L, evalL("1 * 1"));
 
-        assertEquals(1.0, eval("1 / 1"));
+        assertEquals(1.0, evalD("1 / 1"));
     }
 
     @Test
     public void testLiteral() {
-        assertEquals(1L, (Long) Scrypt.readSyntax("1").getValue());
+    	CVMLong one=CVMLong.create(1L);
+    	assertEquals(one, Scrypt.readSyntax("1").getValue());
         assertEquals(true, Scrypt.readSyntax("true").getValue());
         assertEquals(Keyword.create("k"), Scrypt.readSyntax(":k").getValue());
         assertEquals(Strings.create("Foo"), Scrypt.readSyntax("\"Foo\"").getValue());
@@ -276,7 +289,7 @@ public class ScryptTest {
         assertEquals(Reader.read("(do 1 :key [] {} (inc 1))"), parse(block, "{ 1; :key; []; {}; inc(1);}"));
 
         assertEquals(Maps.empty(), eval("{}"));
-        assertEquals(1, (Long) eval("{1;}"));
+        assertEquals(1, evalL("{1;}"));
 
         // Semicolon is *always* required - it's not simply a "separator".
         assertThrows(ParseException.class, () -> eval("{1; 2}"));
@@ -289,8 +302,8 @@ public class ScryptTest {
 
         assertEquals(Reader.read("(def x 1)"), parse(def, "def x = 1;"));
 
-        assertEquals(1, (Long) eval("def x = 1;"));
-        assertEquals(2, (Long) eval("{def x = 1; x + 1;}"));
+        assertEquals(1, evalL("def x = 1;"));
+        assertEquals(2, evalL("{def x = 1; x + 1;}"));
     }
 
     @Test
@@ -302,8 +315,8 @@ public class ScryptTest {
         assertEquals(Reader.read("(set! a 1)"), parse(localSetStatement, "a = 1;"));
         assertEquals(Reader.read("(do (set! x [1 2]) (conj x 3))"), parse(blockExpression, "{x = [1, 2]; conj(x, 3);}"));
 
-        assertEquals(1, (Long) eval("x = 1;"));
-        assertEquals(2, (Long) eval("{x = 1; x + 1;}"));
+        assertEquals(1, evalL("x = 1;"));
+        assertEquals(2, evalL("{x = 1; x + 1;}"));
         assertEquals(Vectors.of(1L, 2L, 3L), eval("{x = [1, 2]; conj(x, 3);}"));
         assertEquals(List.of(0L, 1L, 2L), eval("{x = [1, 2]; conj(x, 3); cons(0, x);}"));
 

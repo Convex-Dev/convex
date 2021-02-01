@@ -19,10 +19,13 @@ import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.Hash;
 import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMDouble;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.AFn;
 import convex.core.lang.Core;
 import convex.core.lang.Ops;
+import convex.core.lang.RT;
 import convex.core.lang.expanders.Expander;
 import convex.core.lang.impl.Fn;
 import convex.core.lang.impl.MultiFn;
@@ -378,18 +381,6 @@ public class Format {
 			bs[pos++]=Tag.NULL;
 			return pos;
 		}
-		if (o instanceof Number) {
-			if (o instanceof Long) {
-				bs[pos++]=Tag.LONG;
-				return writeVLCLong(bs,pos, (long) o);
-			}
-			if (o instanceof Double) {
-				bs[pos++]=Tag.DOUBLE;
-				long doubleBits=Double.doubleToRawLongBits((double)o);
-				return Utils.writeLong(bs,pos,doubleBits);
-			}
-			throw new IllegalArgumentException("Can't encode numeric type to byte array: " + o.getClass());
-		}
 
 		//if (o instanceof String) {
 		//	return Strings.create((String)o).write(bb);
@@ -410,33 +401,6 @@ public class Format {
 	public static ByteBuffer writeNonCell(ByteBuffer bb, Object o) {
 		if (o == null) {
 			return bb.put(Tag.NULL);
-		}
-		if (o instanceof Number) {
-			if (o instanceof Byte) {
-				bb = bb.put(Tag.BYTE);
-				return bb.put((Byte) o);
-			}
-			if (o instanceof Short) {
-				bb = bb.put(Tag.SHORT);
-				return writeVLCLong(bb, (short) o);
-			}
-			if (o instanceof Integer) {
-				bb = bb.put(Tag.INT);
-				return writeVLCLong(bb, (int) o);
-			}
-			if (o instanceof Long) {
-				bb = bb.put(Tag.LONG);
-				return writeVLCLong(bb, (long) o);
-			}
-			if (o instanceof Float) {
-				bb = bb.put(Tag.FLOAT);
-				return bb.putFloat((float) o);
-			}
-			if (o instanceof Double) {
-				bb = bb.put(Tag.DOUBLE);
-				return bb.putDouble((double) o);
-			}
-			throw new IllegalArgumentException("Can't encode numeric type to ByteBuffer: " + o.getClass());
 		}
 
 		//if (o instanceof String) {
@@ -736,8 +700,8 @@ public class Format {
 			if (tag == Tag.NULL) return null;
 			if (tag == Tag.BYTE) return (T) CVMByte.create(bb.get());
 			if (tag == Tag.CHAR) return (T) (Character) bb.getChar();
-			if (tag == Tag.LONG) return (T) (Long) readVLCLong(bb);
-			if (tag == Tag.DOUBLE) return (T) (Double) bb.getDouble();
+			if (tag == Tag.LONG) return (T) CVMLong.create(readVLCLong(bb));
+			if (tag == Tag.DOUBLE) return (T) CVMDouble.create(bb.getDouble());
 
 			throw new BadFormatException("Can't read basic type with tag byte: " + tag);
 		} catch (IllegalArgumentException e) {
@@ -1042,11 +1006,11 @@ public class Format {
 
 	/**
 	 * Gets a hex String representing an object's encoding
-	 * @param o Any encodable object
+	 * @param o Any object, will be cast to appropriate CVM type
 	 * @return Hex String
 	 */
 	public static String encodedString(Object o) {
-		return encodedBlob(o).toHexString();
+		return encodedBlob(RT.cvm(o)).toHexString();
 	}
 
 	public static int estimateSize(Object o) {

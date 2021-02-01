@@ -24,6 +24,10 @@ public abstract  class APrimitive extends ACell {
 	}
 	
 	public abstract long longValue();
+	
+	
+	public abstract double doubleValue();
+
 
 	/**
 	 * Gets the numeric type that this primitive should be used as for calculations

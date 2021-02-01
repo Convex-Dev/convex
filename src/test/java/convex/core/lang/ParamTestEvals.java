@@ -1,6 +1,7 @@
 package convex.core.lang;
 
 import static org.junit.Assert.assertEquals;
+import static convex.test.Assertions.*;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -109,7 +110,7 @@ public class ParamTestEvals {
 		assertEquals(b, b2);
 
 		Object result = eval(op2).getResult();
-		assertEquals(expectedResult, result);
+		assertCVMEquals(expectedResult, result);
 	}
 
 	@Test
@@ -117,6 +118,6 @@ public class ParamTestEvals {
 		Context<?> c = eval(source);
 
 		Object result = c.getResult();
-		assertEquals(expectedResult, result);
+		assertCVMEquals(expectedResult, result);
 	}
 }

@@ -24,6 +24,7 @@ import convex.core.data.PeerStatus;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.expanders.AExpander;
 import convex.core.lang.impl.AExceptional;
@@ -226,7 +227,7 @@ public final class Context<T> extends AObject {
 		}
 		
 		long balance=as.getBalance();
-		long juicePrice=state.getJuicePrice();
+		long juicePrice=state.getJuicePrice().longValue();
 		
 		// reduce juice if insufficient balance
 		juice=Math.min(juice,balance/juicePrice);
@@ -260,7 +261,7 @@ public final class Context<T> extends AObject {
 		
 		long remainingJuice=Math.max(0L, juice);
 		long usedJuice=initialJuice-remainingJuice;
-		long juicePrice=initialState.getJuicePrice();
+		long juicePrice=initialState.getJuicePrice().longValue();
 		assert(usedJuice>=0);
 	
 		long refund=0L;
@@ -327,9 +328,9 @@ public final class Context<T> extends AObject {
 		// maybe add used juice to miner fees
 		if (usedJuice>0L) {
 			long transactionFees = usedJuice*juicePrice;
-			long oldFees=(long)state.getGlobal(Symbols.FEES);
+			long oldFees=((CVMLong)(state.getGlobal(Symbols.FEES))).longValue();
 			long newFees=oldFees+transactionFees;
-			state=state.withGlobal(Symbols.FEES,newFees);
+			state=state.withGlobal(Symbols.FEES,CVMLong.create(newFees));
 		}
 		
 		// final state update and result reporting
@@ -568,19 +569,19 @@ public final class Context<T> extends AObject {
 	 */
 	@SuppressWarnings("unchecked")
 	public <R> Context<R> computeSpecial(Symbol sym)  {
-		if (sym.equals(Symbols.STAR_JUICE)) return (Context<R>) withResult(getJuice());
+		if (sym.equals(Symbols.STAR_JUICE)) return (Context<R>) withResult(CVMLong.create(getJuice()));
 		if (sym.equals(Symbols.STAR_CALLER)) return (Context<R>) withResult(getCaller());
 		if (sym.equals(Symbols.STAR_ADDRESS)) return (Context<R>) withResult(getAddress());
 		if (sym.equals(Symbols.STAR_ALLOWANCE)) return (Context<R>) withResult(getAccountStatus().getAllowance());
-		if (sym.equals(Symbols.STAR_BALANCE)) return (Context<R>) withResult(getBalance());
+		if (sym.equals(Symbols.STAR_BALANCE)) return (Context<R>) withResult(CVMLong.create(getBalance()));
 		if (sym.equals(Symbols.STAR_ORIGIN)) return (Context<R>) withResult(getOrigin());
 		if (sym.equals(Symbols.STAR_RESULT)) return (Context<R>) this;
 		if (sym.equals(Symbols.STAR_TIMESTAMP)) return (Context<R>) withResult(getState().getTimeStamp());
-		if (sym.equals(Symbols.STAR_DEPTH)) return (Context<R>) withResult((long)getDepth());
-		if (sym.equals(Symbols.STAR_OFFER)) return (Context<R>) withResult((long)getOffer());
+		if (sym.equals(Symbols.STAR_DEPTH)) return (Context<R>) withResult(CVMLong.create(getDepth()));
+		if (sym.equals(Symbols.STAR_OFFER)) return (Context<R>) withResult(CVMLong.create(getOffer()));
 		if (sym.equals(Symbols.STAR_STATE)) return (Context<R>) withResult(getState());
 		if (sym.equals(Symbols.STAR_HOLDINGS)) return (Context<R>) withResult(getHoldings());
-		if (sym.equals(Symbols.STAR_SEQUENCE)) return (Context<R>) withResult(getAccountStatus().getSequence());
+		if (sym.equals(Symbols.STAR_SEQUENCE)) return (Context<R>) withResult(CVMLong.create(getAccountStatus().getSequence()));
 		if (sym.equals(Symbols.STAR_KEY)) return (Context<R>) withResult(getAccountStatus().getAccountKey());
 		return null;
 	}
@@ -1255,7 +1256,7 @@ public final class Context<T> extends AObject {
 	 * @param amount Amount to transfer, must be between 0 and Amount.MAX_VALUE inclusive
 	 * @return Context with a null result if the transaction succeeds, or an exceptional value if the transfer fails
 	 */
-	public Context<Long> transfer(Address target, long amount) {
+	public Context<CVMLong> transfer(Address target, long amount) {
 		if (amount<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative amount");
 		if (amount>Constants.MAX_SUPPLY) return withError(ErrorCodes.ARGUMENT,"Can't transfer an amount beyond maximum limit");
 		
@@ -1284,25 +1285,26 @@ public final class Context<T> extends AObject {
 		if (targetAccount.isActor()) {
 			// (call target amount (receive-coin source amount nil))
 			// SECURITY: actorCall must do fork to preserve this
-			Context<Long> actx=this.fork();
+			Context<CVMLong> actx=this.fork();
 			actx=actorCall(target,amount,Symbols.RECEIVE_COIN,source,amount,(Object)null);
 			if (actx.isExceptional()) return actx;
 			
 			// return value should be change in balance
 			Long sent=currentBalance-actx.getBalance(source);
-			return actx.withResult(sent);
+			return actx.withResult(CVMLong.create(sent));
 		} else {
 			// must be a user account
 			long oldTargetBalance=targetAccount.getBalance();
 			long newTargetBalance=oldTargetBalance+amount;
 			AccountStatus newTargetAccount=targetAccount.withBalance(newTargetBalance);
 			accounts=accounts.assoc(targetIndex, newTargetAccount);
+			
+			// SECURITY: new context with updated accounts
+			Context<CVMLong> result=withChainState(chainState.withAccounts(accounts)).withResult(CVMLong.create(amount));
+			
+			return result;
 		}
 
-		// SECURITY: new context with updated accounts
-		Context<Long> result=withChainState(chainState.withAccounts(accounts)).withResult(amount);
-		
-		return result;
 	}
 	
 	/**
@@ -1628,7 +1630,7 @@ public final class Context<T> extends AObject {
 	 * 
 	 * @return Timestamp in milliseconds since UNIX epoch
 	 */
-	public long getTimeStamp() {
+	public CVMLong getTimeStamp() {
 		return getState().getTimeStamp();
 	}
 
@@ -1642,7 +1644,7 @@ public final class Context<T> extends AObject {
 	 */
 	public Context<Long> schedule(long time, AOp<?> op) {
 		// check vs current timestamp
-		long timestamp=getTimeStamp();
+		long timestamp=getTimeStamp().longValue();
 		if (timestamp<0) return withError(ErrorCodes.ARGUMENT);
 		if (time<timestamp) time=timestamp;
 		

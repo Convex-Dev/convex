@@ -198,7 +198,7 @@ public class Compiler {
 
 	private static <R, T extends AOp<R>> Context<T> compileMap(AMap<Syntax, Syntax> form, Context<?> context) {
 		int n = form.size();
-		Syntax[] vs = new Syntax[1 + n * 2];
+		Object[] vs = new Object[1 + n * 2];
 		vs[0] = Syntax.create(Symbols.HASH_MAP);
 		for (int i = 0; i < n; i++) {
 			MapEntry<Syntax, Syntax> me = form.entryAt(i);

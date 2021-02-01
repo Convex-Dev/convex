@@ -6,8 +6,7 @@ import static convex.core.lang.TestState.evalD;
 import static convex.core.lang.TestState.evalL;
 import static convex.core.lang.TestState.step;
 import static convex.core.lang.TestState.stepAs;
-import static convex.test.Assertions.assertAssertError;
-import static convex.test.Assertions.assertStateError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -21,11 +20,28 @@ import convex.core.Init;
 import convex.core.data.Address;
 import convex.core.data.Maps;
 import convex.core.lang.Context;
+import convex.core.lang.RT;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
 
 public class PredictionMarketTest {
 
+	private <T> T evalCall(Context<?> ctx,Address addr, long offer, Object name, Object... args) {
+		Context<T> rctx=doCall(ctx,addr, offer, name, args);
+		return RT.jvm(rctx.getResult());
+	}
+	
+	@SuppressWarnings("unchecked")
+	private <T> Context<T> doCall(Context<?> ctx,Address addr, long offer, Object name, Object... args) {
+		int n=args.length;
+		for (int i=0; i<n; i++) {
+			args[i]=RT.cvm(args[i]);
+		}
+		
+		Context<?> rctx=ctx.actorCall(addr, offer, name, args);
+		return (Context<T>) rctx;
+	}
+	
 	@Test
 	public void testPredictionContract() throws IOException {
 		String contractString = Utils.readResourceAsString("actors/prediction-market.con");
@@ -40,56 +56,56 @@ public class PredictionMarketTest {
 		assertFalse(ctx.isExceptional());
 
 		// tests of bonding curve function with empty stakes
-		assertEquals(0.0, (double) ctx.actorCall(addr, 0L, "bond", Maps.empty()).getResult(), 0.01);
+		assertEquals(0.0, evalCall(ctx,addr, 0L, "bond", Maps.empty()), 0.01);
 
 		// bonding curve point with one staked outcome
-		assertEquals(10.0, (double) ctx.actorCall(addr, 0L, "bond", Maps.of(true, 10L)).getResult(), 0.01);
+		assertEquals(10.0, evalCall(ctx,addr, 0L, "bond", Maps.of(true, 10L)), 0.01);
 
 		// two staked outcomes
-		assertEquals(5.0, (double) ctx.actorCall(addr, 0L, "bond", Maps.of(true, 3L, false, 4L)).getResult(), 0.01);
+		assertEquals(5.0, evalCall(ctx,addr, 0L, "bond", Maps.of(true, 3L, false, 4L)), 0.01);
 
 		long initalBal=ctx.getBalance(Init.HERO);
 		{ // stake on, stake off.....
 			// first we stake on the 'true' outcome
-			Context<?> rctx1 = ctx.actorCall(addr, 10L, "stake", true, 10L);
-			assertEquals(10L, (long) rctx1.getResult());
+			Context<?> rctx1 = doCall(ctx,addr, 10L, "stake", true, 10L);
+			assertCVMEquals(10L, rctx1.getResult());
 			assertEquals(10L,  initalBal- rctx1.getBalance(Init.HERO));
 			assertEquals(1.0, evalD(rctx1, "(call caddr (price true))")); // should be exact price 100%
 			assertEquals(0.0, evalD(rctx1, "(call caddr (price false))")); // should be exact price 0%
 
 			// stake on other outcome. Note that we offer too much funds, but this won't be
 			// accepted so no issue.
-			Context<?> rctx2 = rctx1.actorCall(addr, 10L, "stake", false, 10L);
-			assertEquals(4L, (long) rctx2.getResult());
+			Context<?> rctx2 = doCall(rctx1,addr, 10L, "stake", false, 10L);
+			assertCVMEquals(4L, rctx2.getResult());
 			assertEquals(14L, initalBal - rctx2.getBalance(Init.HERO));
 			assertEquals(TestState.TOTAL_FUNDS, rctx2.getState().computeTotalFunds());
 
 			// halve stakes
-			Context<?> rctx3 = rctx2.actorCall(addr, 10L, "stake", false, 5L);
-			rctx3 = rctx3.actorCall(addr, 10L, "stake", true, 5L);
+			Context<?> rctx3 = doCall(rctx2,addr, 10L, "stake", false, 5L);
+			rctx3 = doCall(rctx3,addr, 10L, "stake", true, 5L);
 			assertEquals(7L, initalBal - rctx3.getBalance(Init.HERO));
 			assertEquals(0.5, evalD(rctx3, "(call caddr (price true))"), 0.1); // approx price given rounding
 
 			// zero one stake
-			Context<?> rctx4 = rctx3.actorCall(addr, 10L, "stake", false, 0L);
-			assertEquals(-2L, (long) rctx4.getResult()); // refund of 2
+			Context<?> rctx4 = doCall(rctx3,addr, 10L, "stake", false, 0L);
+			assertCVMEquals(-2L, rctx4.getResult()); // refund of 2
 			assertEquals(5L, initalBal - rctx4.getBalance(Init.HERO));
 
 			// Exit market
-			Context<?> rctx5 = rctx4.actorCall(addr, 10L, "stake", true, 0L);
-			assertEquals(-5L, (long) rctx5.getResult()); // refund of 5
+			Context<?> rctx5 =doCall(rctx4,addr, 10L, "stake", true, 0L);
+			assertCVMEquals(-5L, rctx5.getResult()); // refund of 5
 			assertEquals(0L, initalBal - rctx5.getBalance(Init.HERO));
 			assertEquals(TestState.TOTAL_FUNDS, rctx2.getState().computeTotalFunds());
 		}
 
 		{ // underfunded stake request
-			Context<?> rctx1 = ctx.actorCall(addr, 5L, "stake", true, 10L);
+			Context<?> rctx1 = doCall(ctx,addr, 5L, "stake", true, 10L);
 			assertStateError(rctx1); // TODO: what is right error type?
 			assertEquals(0L, initalBal - rctx1.getBalance(Init.HERO));
 		}
 
 		{ // negative stake request
-			Context<?> rctx1 = ctx.actorCall(addr, 5L, "stake", true, -10L);
+			Context<?> rctx1 = doCall(ctx,addr, 5L, "stake", true, -10L);
 			assertAssertError(rctx1); // TODO: what is right error type?
 			assertEquals(0L, initalBal - rctx1.getBalance(Init.HERO));
 		}
@@ -120,7 +136,7 @@ public class PredictionMarketTest {
 		ctx = stepAs(VILLAIN, ctx, "(def pmaddr "+pmaddr.toString()+")");
 
 		// initial state checks
-		assertEquals(false,eval(ctx, "(call pmaddr (finalised?))"));
+		assertEquals(false,evalB(ctx, "(call pmaddr (finalised?))"));
 		assertEquals(0L, evalL(ctx, "(balance pmaddr)"));
 
 		{ // Act 1. Two players stake. our Villain wins this time....
@@ -135,15 +151,15 @@ public class PredictionMarketTest {
 
 			// But alas, our hero is thwarted...
 			c = step(c, "(call oaddr (provide :bar false))");
-			assertEquals(Boolean.FALSE, c.getResult());
+			assertCVMEquals(Boolean.FALSE, c.getResult());
 
 			// collect payouts
 			c = step(c, "(call pmaddr (payout))");
-			assertEquals(0L, c.getResult());
+			assertCVMEquals(0L, c.getResult());
 			assertEquals(TestState.HERO_BALANCE - 4000, c.getBalance(TestState.HERO));
 
 			c = stepAs(VILLAIN, c, "(call pmaddr (payout))");
-			assertEquals(5000L, c.getResult());
+			assertCVMEquals(5000L, c.getResult());
 			assertEquals(TestState.HERO_BALANCE + 4000, c.getBalance(TestState.VILLAIN));
 
 			assertEquals(0L, c.getBalance(pmaddr));

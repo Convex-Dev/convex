@@ -20,11 +20,13 @@ import java.util.Base64;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
 
 public class Ed25519Test {
 	
@@ -49,9 +51,11 @@ public class Ed25519Test {
 		AKeyPair kp2=AKeyPair.create(kp1.getAccountKey(), kp1.getEncodedPrivateKey());
 		assertEquals(kp1.getAccountKey(),kp2.getAccountKey());
 		
+		ACell data=RT.cvm(1L);
+
 		// TODO: figure out why encodings are different
 		//assertEquals(kp1.getEncodedPrivateKey(),kp2.getEncodedPrivateKey());
-		assertEquals(kp1.signData(1L),kp2.signData(1L));
+		assertEquals(kp1.signData(data),kp2.signData(data));
 	}
 	
 	@Test
@@ -61,7 +65,8 @@ public class Ed25519Test {
 		PublicKey pub=kp1.getPublic();
 		AccountKey address=kp1.getAccountKey();
 		
-		SignedData<Long> sd1=kp1.signData(1L);
+		ACell data=RT.cvm(1L);
+		SignedData<ACell> sd1=kp1.signData(data);
 		assertTrue(sd1.isValid());
 		
 		byte[] privateKeyBytes=kp1.getPrivate().getEncoded();
@@ -71,13 +76,13 @@ public class Ed25519Test {
 		assertEquals(address,kp2.getAccountKey());
 		assertArrayEquals(privateKeyBytes,kp2.getPrivate().getEncoded());
 		
-		SignedData<Long> sd2=kp2.signData(1L);
+		SignedData<ACell> sd2=kp2.signData(data);
 		assertTrue(sd2.isValid());
 		
 		Blob pkb=Ed25519KeyPair.extractPrivateKey(priv);
 		AKeyPair kp3=Ed25519KeyPair.create(address, pkb);
 		
-		assertEquals(sd2,kp3.signData(1L));
+		assertEquals(sd2,kp3.signData(data));
 	}
 	
 	@Test

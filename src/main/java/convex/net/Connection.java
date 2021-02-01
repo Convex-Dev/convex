@@ -29,6 +29,7 @@ import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
@@ -256,7 +257,7 @@ public class Connection {
 	 * @return True if buffered for sending successfully, false otherwise
 	 * @throws IOException
 	 */
-	public boolean sendResult(Long id, Object result) throws IOException {
+	public boolean sendResult(CVMLong id, Object result) throws IOException {
 		return sendResult(id, result,null);
 	}
 
@@ -268,7 +269,7 @@ public class Connection {
 	 * @return True if buffered for sending successfully, false otherwise
 	 * @throws IOException
 	 */
-	public boolean sendResult(Long id, Object result, Object errorCode) throws IOException {
+	public boolean sendResult(CVMLong id, Object result, Object errorCode) throws IOException {
 		Result value = Result.create(id, result, errorCode);
 		return sendObject(MessageType.RESULT, value);
 	}

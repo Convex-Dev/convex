@@ -28,8 +28,8 @@ public class ParamTestRTSequences {
 	@Parameterized.Parameters(name = "{index}: {1}")
 	public static Collection<Object[]> dataExamples() {
 		return Arrays.asList(new Object[][] { { 0, null }, { 0, Vectors.empty() }, { 0, Lists.empty() },
-				{ 2, MapEntry.create(1L, 2L) }, { 2, MapEntry.create(Maps.of(1L, 2L), 2L) },
-				{ 2, MapEntry.create(null, 2L) }, { 3, Vectors.of(1L, 2L, 3L) }, { 2, List.of("foo", "bar") },
+				{ 2, MapEntry.of(1L, 2L) }, { 2, MapEntry.of(Maps.of(1L, 2L), 2L) },
+				{ 2, MapEntry.of(null, 2L) }, { 3, Vectors.of(1L, 2L, 3L) }, { 2, List.of("foo", "bar") },
 				{ 3, Sets.of(null, 1L, 1.0) } });
 	}
 
@@ -83,7 +83,7 @@ public class ParamTestRTSequences {
 			ASequence<?> nxt = RT.next(data);
 			assertEquals(expectedCount - 1, nxt.count());
 			if (expectedCount > 1) {
-				assertEquals((Object) RT.nth(data, 1), (Object) RT.nth(nxt, 0));
+				assertEquals((Object)RT.nth(data, 1), RT.nth(nxt, 0));
 			}
 		}
 	}

@@ -1,6 +1,6 @@
 package convex.core.lang;
 
-import static convex.test.Assertions.assertStateError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -16,6 +16,8 @@ import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
+import convex.core.data.prim.CVMDouble;
+import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 
 /**
@@ -48,7 +50,7 @@ public class TestState {
 	/**
 	 * Initial juice price
 	 */
-	public static final long JUICE_PRICE = INITIAL.getJuicePrice();
+	public static final CVMLong JUICE_PRICE = INITIAL.getJuicePrice();
 
 	/**
 	 * A test context set up with a few accounts
@@ -145,8 +147,8 @@ public class TestState {
 		assertEquals(INITIAL, s);
 		assertEquals(Init.HERO,ctx.computeSpecial(Symbols.STAR_ADDRESS).getResult());
 		assertSame(Core.COUNT, ctx.lookup(Symbols.COUNT).getResult());
-		assertEquals(Constants.INITIAL_TIMESTAMP, (long) ctx.lookup(Symbols.STAR_TIMESTAMP).getResult());
-		assertEquals(Constants.INITIAL_TIMESTAMP, s.getTimeStamp());
+		assertCVMEquals(Constants.INITIAL_TIMESTAMP, ctx.lookup(Symbols.STAR_TIMESTAMP).getResult());
+		assertCVMEquals(Constants.INITIAL_TIMESTAMP, s.getTimeStamp());
 	}
 
 	@Test
@@ -162,7 +164,7 @@ public class TestState {
 		assertEquals(HERO, eval(ctx, "(call target (who-called-me))"));
 		assertEquals(TARGET, eval(ctx, "(call target (my-address))"));
 
-		assertEquals(0L, (long) eval(ctx, "(call target (my-number))"));
+		assertEquals(0L, evalL(ctx, "(call target (my-number))"));
 
 		assertStateError(TestState.step(ctx, "(call target (missing-function))"));
 	}
@@ -176,15 +178,19 @@ public class TestState {
 	}
 
 	public static double evalD(Context<?> ctx, String source) {
-		return (double) eval(ctx, source);
+		return ((CVMDouble) eval(ctx, source)).doubleValue();
+	}
+	
+	public static double evalD(String source) {
+		return ((CVMDouble) eval(source)).doubleValue();
 	}
 
 	public static long evalL(Context<?> ctx, String source) {
-		return (long) eval(ctx, source);
+		return RT.toLong(eval(ctx, source)).longValue();
 	}
 
 	public static long evalL(String source) {
-		return (long) eval(source);
+		return RT.toLong(eval(source)).longValue();
 	}
 	
 	public static String evalS(String source) {

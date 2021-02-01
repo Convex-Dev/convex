@@ -186,7 +186,7 @@ public class StressPanel extends JPanel {
 					sb.append("\n");
 					sb.append("Send time:     " + formatter.format((sendTime - startTime) * 0.001) + "s\n");
 					sb.append("End time:      " + formatter.format((endTime - startTime) * 0.001) + "s\n");
-					sb.append("Consenus time: " + formatter.format((endState.getTimeStamp() - startTime) * 0.001) + "s\n");
+					sb.append("Consenus time: " + formatter.format((endState.getTimeStamp().longValue() - startTime) * 0.001) + "s\n");
 				
 					String report=sb.toString();
 					return report;

@@ -5,6 +5,8 @@ import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMDouble;
+import convex.core.data.prim.CVMLong;
 
 /**
  * Generator for arbitrary numeric values
@@ -22,9 +24,9 @@ public class NumericGen extends Generator<Object> {
 		case 0:
 			return CVMByte.create(r.nextLong());
 		case 1:
-			return gen().type(long.class).generate(r, status);
+			return CVMLong.create(r.nextLong());
 		case 2:
-			return gen().type(double.class).generate(r, status);
+			return CVMDouble.create(r.nextDouble());
 //			case 6:
 //				return gen().type(BigInteger.class).generate(r, status);
 //			case 7:

@@ -4,6 +4,7 @@ import convex.core.Belief;
 import convex.core.Result;
 import convex.core.data.AVector;
 import convex.core.data.SignedData;
+import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 
 /**
@@ -74,14 +75,14 @@ public class Message {
 	 * 
 	 * @return Message ID, or null if the message type does not use message IDs
 	 */
-	public Long getID() {
+	public CVMLong getID() {
 		switch (type) {
 			// Query and transact use a vector
 			case QUERY: 
-			case TRANSACT: return (Long) ((AVector<?>)payload).get(0);
+			case TRANSACT: return (CVMLong) ((AVector<?>)payload).get(0);
 			
 			// Result is a special record type
-			case RESULT: return (Long)((Result)payload).getID(); 
+			case RESULT: return (CVMLong)((Result)payload).getID(); 
 			
 			default: return null;
 		}

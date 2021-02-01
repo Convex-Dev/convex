@@ -9,6 +9,7 @@ import convex.core.data.AVector;
 import convex.core.data.Keywords;
 import convex.core.data.Tag;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Context;
@@ -35,15 +36,15 @@ public class Result extends ARecordGeneric {
 		return new Result(values);
 	}
 	
-	public static Result create(Object id, Object value, Object errorCode, Object trace) {
+	public static Result create(CVMLong id, Object value, Object errorCode, Object trace) {
 		return create(Vectors.of(id,value,errorCode,trace));
 	}
 	
-	public static Result create(Object id, Object value, Object errorCode) {
+	public static Result create(CVMLong id, Object value, Object errorCode) {
 		return create(id,value,errorCode,null);
 	}
 
-	public static Result create(Object id, Object value) {
+	public static Result create(CVMLong id, Object value) {
 		return create(id,value,null,null);
 	}
 
@@ -101,8 +102,8 @@ public class Result extends ARecordGeneric {
 	public void validateCell() throws InvalidDataException {
 		super.validateCell();
 		Object id=values.get(0);
-		if ((id!=null)&&!(id instanceof Long)) {
-			throw new InvalidDataException("Result ID must be a long value",this);
+		if ((id!=null)&&!(id instanceof CVMLong)) {
+			throw new InvalidDataException("Result ID must be a CVM long value",this);
 		}
 	}
 
@@ -131,7 +132,7 @@ public class Result extends ARecordGeneric {
 		return getErrorCode()!=null;
 	}
 
-	public static Result fromContext(Object id,Context<?> ctx) {
+	public static Result fromContext(CVMLong id,Context<?> ctx) {
 		Object result=ctx.getValue();
 		Object code=null;
 		Object trace=null;

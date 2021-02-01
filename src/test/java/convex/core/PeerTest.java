@@ -12,6 +12,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.data.PeerStatus;
 import convex.core.exceptions.BadSignatureException;
+import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.TestState;
 import convex.test.Samples;
@@ -44,7 +45,7 @@ public class PeerTest {
 		assertEquals(0, p.getPeerOrder().getConsensusPoint());
 
 		// Run a query
-		assertEquals(3L, (Long) (p.executeQuery(Reader.read("(+ 1 2)")).getResult()));
+		assertEquals(RT.cvm(3L), (p.executeQuery(Reader.read("(+ 1 2)")).getResult()));
 	}
 
 	@Test
@@ -57,7 +58,7 @@ public class PeerTest {
 		AKeyPair PEER0 = Init.KEYPAIRS[0];
 		Peer p = Peer.create(PEER0, TestState.INITIAL);
 		
-		assertEquals(3L,p.executeQuery(Reader.read("(+ 1 2)")).getResult());
+		assertEquals(RT.cvm(3L),p.executeQuery(Reader.read("(+ 1 2)")).getResult());
 		assertEquals(Init.HERO,p.executeQuery(Reader.read("*address*"),Init.HERO).getResult());
 		
 		assertNobodyError(p.executeQuery(Reader.read("(+ 2 3)"),Samples.BAD_ADDRESS));

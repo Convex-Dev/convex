@@ -79,11 +79,17 @@ public class Vectors {
 		return (AVector<T>) VectorLeaf.EMPTY;
 	}
 
+	/**
+	 * Creates a vector with the given values. Performs conversion to CVM types.
+	 * @param <T>
+	 * @param elements
+	 * @return New Vector
+	 */
 	@SuppressWarnings("unchecked")
 	@SafeVarargs
 	public static <T> AVector<T> of(Object... elements) {
 		int n=elements.length;
-		Object[] es=new Object[n];
+		T[] es=(T[]) elements.clone();
 		for (int i=0; i<n; i++) {
 			Object v=elements[i];
 			es[i]=(T)RT.cvm(v);

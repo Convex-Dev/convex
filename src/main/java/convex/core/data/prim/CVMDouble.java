@@ -1,29 +1,29 @@
 package convex.core.data.prim;
 
-import convex.core.data.Format;
 import convex.core.data.Tag;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.util.Utils;
 
-public class CVMLong extends APrimitive {
+public class CVMDouble extends APrimitive {
 
-	private final long value;
+	private final double value;
 	
-	public CVMLong(long value) {
+	public CVMDouble(double value) {
 		this.value=value;
 	}
 
-	public static CVMLong create(long value) {
-		return new CVMLong(value);
+	public static CVMDouble create(double value) {
+		return new CVMDouble(value);
 	}
 	
 	@Override
 	public long longValue() {
-		return value;
+		return (long)value;
 	}
 	
 	@Override
 	public int estimatedEncodingSize() {
-		return 1+Format.MAX_VLC_LONG_LENGTH;
+		return 1+8;
 	}
 
 	@Override
@@ -33,13 +33,14 @@ public class CVMLong extends APrimitive {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.LONG;
+		bs[pos++]=Tag.DOUBLE;
 		return encodeRaw(bs,pos);
 	}
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		return Format.writeVLCLong(bs, pos, value);
+		long doubleBits=Double.doubleToRawLongBits(value);
+		return Utils.writeLong(bs,pos,doubleBits);
 	}
 
 	@Override
@@ -54,16 +55,16 @@ public class CVMLong extends APrimitive {
 
 	@Override
 	public Class<?> numericType() {
-		return Long.class;
+		return Double.class;
 	}
 
 	@Override
 	public double doubleValue() {
-		return (double)value;
+		return value;
 	}
-	
-	public static CVMLong parse(String s) {
-		return create(Long.parseLong(s));
+
+	public static CVMDouble parse(String s) {
+		return create(Double.parseDouble(s));
 	}
 
 }

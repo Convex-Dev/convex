@@ -207,8 +207,8 @@ public class ScryptNext extends Reader {
         );
     }
 
-    public List<Syntax> defStatement(Syntax expr, Syntax sym) {
-        return (convex.core.data.List<Syntax>) Lists.of(Syntax.create(Symbols.DEF), sym, expr);
+    public AList<Syntax> defStatement(Syntax expr, Syntax sym) {
+        return Lists.of(Syntax.create(Symbols.DEF), sym, expr);
     }
 
     // --------------------------------

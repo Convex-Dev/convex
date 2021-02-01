@@ -14,7 +14,9 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.lang.RT;
 import convex.test.Samples;
 
 public class FormatTest {
@@ -29,7 +31,12 @@ public class FormatTest {
 		
 		bb.flip();
 		Blob b=Blob.fromByteBuffer(bb);
-		assertEquals(Long.MAX_VALUE,(long)Format.read(b));
+		
+		CVMLong max=RT.cvm(Long.MAX_VALUE);
+		
+		assertEquals(max,Format.read(b));
+		
+		assertEquals(max.getEncoding(),b);
 ;	}
 	
 //	@Test public void testBigIntegerRegression() throws BadFormatException {
@@ -80,7 +87,7 @@ public class FormatTest {
 	
 	@Test public void testBadFormats() throws BadFormatException {
 		// test excess high order bits above the long range
-		assertEquals(-3717066608267863778L,(long)Format.read("09ccb594f3d1bde9b21e"));
+		assertEquals(-3717066608267863778L,((CVMLong)Format.read("09ccb594f3d1bde9b21e")).longValue());
 		assertThrows(BadFormatException.class,()->{
 			Format.read("09b3ccb594f3d1bde9b21e");
 		});
@@ -89,7 +96,7 @@ public class FormatTest {
 		assertThrows(BadFormatException.class,()->Format.read("09ffffffffffffffffff7f"));
 
 		// test excess high bytes for negative number
-		assertEquals(Long.MIN_VALUE,(long)Format.read("09ff808080808080808000"));
+		assertEquals(RT.cvm(Long.MIN_VALUE),(CVMLong)Format.read("09ff808080808080808000"));
 		assertThrows(BadFormatException.class,()->Format.read("09ff80808080808080808000"));
 
 	}
@@ -102,7 +109,7 @@ public class FormatTest {
 	}
 	
 	@Test public void testListRegression() throws BadFormatException {
-		MapEntry<Object,Object> me=MapEntry.create(Blobs.fromHex("41da2aa427dc50975dd0b077"), -1449690165L);
+		MapEntry<Object,Object> me=MapEntry.create(Blobs.fromHex("41da2aa427dc50975dd0b077"), RT.cvm(-1449690165L));
 		List<Object> l=List.reverse(me);
 		assertNotEquals(me,l.data); // ensure MapEntry gets converted to canonical vector
 		

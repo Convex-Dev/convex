@@ -6,6 +6,7 @@ import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
+import convex.core.data.prim.CVMLong;
 
 /**
  * Generator for arbitrary values
@@ -40,7 +41,7 @@ public class ValueGen extends Generator<Object> {
 		case 9:
 			return gen().make(NumericGen.class).generate(r, status);
 		case 10:
-			return gen().type(long.class).generate(r, status);
+			return CVMLong.create(r.nextLong());
 		case 11:
 			return Symbol.create("sym" + gen().type(Long.class).generate(r, status));
 		case 12:

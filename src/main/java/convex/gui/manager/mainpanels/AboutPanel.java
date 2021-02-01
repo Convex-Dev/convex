@@ -8,6 +8,7 @@ import javax.swing.JPanel;
 import javax.swing.JTextArea;
 
 import convex.core.State;
+import convex.core.data.prim.CVMLong;
 import convex.core.util.Text;
 import convex.gui.components.ActionPanel;
 import convex.gui.manager.PeerManager;
@@ -56,10 +57,10 @@ public class AboutPanel extends JPanel {
 
 	private void updateState(State s) {
 		StringBuilder sb = new StringBuilder();
-		long timestamp = s.getTimeStamp();
+		CVMLong timestamp = s.getTimeStamp();
 
 		sb.append("Consensus state hash: " + s.getHash().toHexString() + "\n");
-		sb.append("Timestamp:            " + Text.dateFormat(timestamp) + "   (" + timestamp + ")\n");
+		sb.append("Timestamp:            " + Text.dateFormat(timestamp.longValue()) + "   (" + timestamp + ")\n");
 		sb.append("\n");
 		sb.append("Max Blocks:           " + lpad(PeerManager.maxBlock) + "\n");
 		sb.append("\n");
@@ -69,7 +70,7 @@ public class AboutPanel extends JPanel {
 		sb.append("\n");
 		sb.append("Globals\n");
 		sb.append("  fees:               " + lpad(Text.toFriendlyBalance(s.getFees())) + "\n");
-		sb.append("  juice-price:        " + lpad(Text.toFriendlyBalance(s.getJuicePrice())) + "\n");
+		sb.append("  juice-price:        " + lpad(Text.toFriendlyBalance(s.getJuicePrice().longValue())) + "\n");
 		sb.append("\n");
 		sb.append("Total funds:          " + lpad(Text.toFriendlyBalance(s.computeTotalFunds())) + "\n");
 		sb.append("Total stake:          " + lpad(Text.toFriendlyBalance(s.computeStakes().get(null))) + "\n");

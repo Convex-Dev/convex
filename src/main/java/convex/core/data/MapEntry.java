@@ -8,6 +8,7 @@ import java.util.function.Function;
 import convex.core.crypto.Hash;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
@@ -39,6 +40,18 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 
 	public static <K, V> MapEntry<K, V> create(K key, V value) {
 		return createRef(Ref.get(key), Ref.get(value));
+	}
+	
+	/**
+	 * Create a map entry, coerving key and value to correct CVM types.
+	 * @param <K> Type of Keys
+	 * @param <V> Type of Values
+	 * @param key Key to use for map entry
+	 * @param value Value to use for map entry
+	 * @return New MapEntry
+	 */
+	public static <K, V> MapEntry<K, V> of(Object key, Object value) {
+		return create(RT.cvm(key),RT.cvm(value));
 	}
 
 	@Override
@@ -282,5 +295,7 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 	public void validateCell() throws InvalidDataException {
 		// TODO: is there really Nothing to do?
 	}
+
+
 
 }

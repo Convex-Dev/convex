@@ -22,6 +22,7 @@ import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
 import convex.core.data.Tag;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
@@ -68,7 +69,7 @@ public class Belief extends ARecord {
 	@Override
 	public <V> V get(Keyword k) {
 		if (Keywords.ORDERS.equals(k)) return (V) orders;
-		if (Keywords.TIMESTAMP.equals(k)) return (V) ((Long) timestamp);
+		if (Keywords.TIMESTAMP.equals(k)) return (V) CVMLong.create(timestamp);
 		return null;
 	}
 
@@ -76,7 +77,7 @@ public class Belief extends ARecord {
 	@Override
 	protected Belief updateAll(Object[] newVals) {
 		AHashMap<AccountKey, SignedData<Order>> newOrders = (AHashMap<AccountKey, SignedData<Order>>) newVals[0];
-		Long newTimestamp = (Long) newVals[1];
+		long newTimestamp = ((CVMLong) newVals[1]).longValue();
 		if ((this.orders == newOrders)&&(this.timestamp==newTimestamp)) {
 			return this;
 		}
@@ -607,9 +608,9 @@ public class Belief extends ARecord {
 	public static Belief read(ByteBuffer bb) throws BadFormatException {
 		AHashMap<AccountKey, SignedData<Order>> chains = Format.read(bb);
 		if (chains == null) throw new BadFormatException("Null orders in Belief");
-		Long timestamp = Format.read(bb);
+		CVMLong timestamp = Format.read(bb);
 		if (timestamp == null) throw new BadFormatException("Null timestamp");
-		return new Belief(chains, timestamp);
+		return new Belief(chains, timestamp.longValue());
 	}
 
 	@Override

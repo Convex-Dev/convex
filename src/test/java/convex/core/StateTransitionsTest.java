@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static convex.test.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 
@@ -57,7 +58,7 @@ public class StateTransitionsTest {
 		assertEquals(1000, s.getBalance(ADDRESS_B));
 		assertNull(s.getBalance(ADDRESS_C));
 
-		long TCOST = Juice.TRANSFER * s.getJuicePrice();
+		long TCOST = Juice.TRANSFER * s.getJuicePrice().longValue();
 
 		{ // transfer from existing to existing account A->B
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_B, 50);
@@ -67,11 +68,11 @@ public class StateTransitionsTest {
 			BlockResult br = s.applyBlock(b);
 			AVector<Result> results = br.getResults();
 			assertEquals(1, results.count());
-			assertNull(br.getErrorCode(0)); // should be null for successful transfer transaction
+			assertNull(br.getErrorCode(0),br.getResult(0).toString()); // should be null for successful transfer transaction
 			State s2 = br.getState();
 			assertEquals(9950 - TCOST, s2.getBalance(ADDRESS_A));
 			assertEquals(1050, s2.getBalance(ADDRESS_B));
-			assertEquals(nowTS, s2.getTimeStamp());
+			assertCVMEquals(nowTS, s2.getTimeStamp());
 		}
 
 		{ // transfer from existing to non-existing account A -> C
@@ -143,7 +144,7 @@ public class StateTransitionsTest {
 
 			AVector<Result> results = br.getResults();
 			assertEquals(2, results.count());
-			assertEquals(50L,br.getResult(0).getValue()); // null result for successful transfer
+			assertCVMEquals(50L,br.getResult(0).getValue()); // result for successful transfer
 			assertEquals(Constants.MAX_SUPPLY, br.getState().computeTotalFunds());
 		}
 
@@ -200,7 +201,7 @@ public class StateTransitionsTest {
 		State s = Init.STATE;
 		ATransaction t1 = Invoke.create(Init.HERO,1,Reader.read("(def my-lib-address (deploy (defn foo [x] x)))"));
 		AKeyPair kp = convex.core.lang.TestState.HERO_PAIR;
-		Block b1 = Block.of(s.getTimeStamp(),Init.FIRST_PEER_KEY, kp.signData(t1));
+		Block b1 = Block.of(s.getTimeStamp().longValue(),Init.FIRST_PEER_KEY, kp.signData(t1));
 		BlockResult br=s.applyBlock(b1);
 		assertFalse(br.isError(0));
 		
@@ -216,8 +217,13 @@ public class StateTransitionsTest {
 		long initialMem=s.getAccount(Init.HERO).getMemoryUsage();
 		
 		ATransaction t1 = Invoke.create(Init.HERO,1,Reader.read("(def a 1)"));
-		Block b1 = Block.of(s.getTimeStamp(),Init.FIRST_PEER_KEY, kp.signData(t1));
-		s = s.applyBlock(b1).getState();
+		Block b1 = Block.of(s.getTimeStamp().longValue(),Init.FIRST_PEER_KEY, kp.signData(t1));
+		BlockResult br=s.applyBlock(b1);
+		
+		// should not be an error
+		assertNull(br.getErrorCode(0),br.getResult(0).toString());
+		
+		s = br.getState();
 		
 		assertTrue(initialMem<s.getAccount(Init.HERO).getMemoryUsage());
 	}
@@ -228,23 +234,23 @@ public class StateTransitionsTest {
 		Address TARGET = Init.VILLAIN;
 		String taddr=TARGET.toHexString();
 
-		long INITIAL_TS = s.getTimeStamp();
+		long INITIAL_TS = s.getTimeStamp().longValue();
 		AKeyPair kp = convex.core.lang.TestState.HERO_PAIR;
 		long BAL2 = s.getBalance(TARGET);
 
 		ATransaction t1 = Invoke.create(Init.HERO,1,
 				Reader.read("(transfer \""+taddr+"\" 10000000)"));
-		Block b1 = Block.of(s.getTimeStamp() + 100,Init.FIRST_PEER_KEY, kp.signData(t1));
+		Block b1 = Block.of(s.getTimeStamp().longValue() + 100,Init.FIRST_PEER_KEY, kp.signData(t1));
 		s = s.applyBlock(b1).getState();
 		assertEquals(BAL2 + 10000000, s.getBalance(TARGET));
-		assertEquals(INITIAL_TS + 100, s.getTimeStamp());
+		assertCVMEquals(INITIAL_TS + 100, s.getTimeStamp());
 		
 		// schedule 200ms later for 1s time
 		ATransaction t2 = Invoke.create(Init.HERO,2, Reader.read(
 				"(schedule (+ *timestamp* 1000) (transfer \""+taddr+"\" 10000000))"));
-		Block b2 = Block.of(s.getTimeStamp() + 200,Init.FIRST_PEER_KEY, kp.signData(t2));
+		Block b2 = Block.of(s.getTimeStamp().longValue() + 200,Init.FIRST_PEER_KEY, kp.signData(t2));
 		BlockResult br2 = s.applyBlock(b2);
-		assertNull(br2.getErrorCode(0));
+		assertNull(br2.getErrorCode(0),br2.getResult(0).toString());
 		s = br2.getState();
 		BlobMap<ABlob, AVector<Object>> sched2 = s.getSchedule();
 		assertEquals(1L, sched2.count());
@@ -253,7 +259,7 @@ public class StateTransitionsTest {
 
 		// advance 999ms
 		ATransaction t3 = Invoke.create(Init.HERO,3, Reader.read("1"));
-		Block b3 = Block.of(s.getTimeStamp() + 999,Init.FIRST_PEER_KEY, kp.signData(t3));
+		Block b3 = Block.of(s.getTimeStamp().longValue() + 999,Init.FIRST_PEER_KEY, kp.signData(t3));
 		BlockResult br3 = s.applyBlock(b3);
 		assertNull(br3.getErrorCode(0));
 		s = br3.getState();
@@ -262,7 +268,7 @@ public class StateTransitionsTest {
 
 		// advance 1ms to trigger scheduled transfer
 		ATransaction t4 = Invoke.create(Init.HERO,4, Reader.read("1"));
-		Block b4 = Block.of(s.getTimeStamp() + 1,Init.FIRST_PEER_KEY, kp.signData(t4));
+		Block b4 = Block.of(s.getTimeStamp().longValue() + 1,Init.FIRST_PEER_KEY, kp.signData(t4));
 		BlockResult br4 = s.applyBlock(b4);
 		assertNull(br4.getErrorCode(0));
 		s = br4.getState();

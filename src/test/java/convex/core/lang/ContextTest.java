@@ -1,7 +1,6 @@
 package convex.core.lang;
 
-import static convex.test.Assertions.assertJuiceError;
-import static convex.test.Assertions.assertUndeclaredError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -83,14 +82,14 @@ public class ContextTest {
 		assertNull(ctx.computeSpecial(Symbols.STAR_CALLER).getResult());
 		
 		assertNull(ctx.computeSpecial(Symbols.STAR_RESULT).getResult());
-		assertEquals(ctx.getJuice(), ctx.computeSpecial(Symbols.STAR_JUICE).getResult());
-		assertEquals(0L,ctx.computeSpecial(Symbols.STAR_DEPTH).getResult());
-		assertEquals(ctx.getBalance(TestState.HERO),ctx.computeSpecial(Symbols.STAR_BALANCE).getResult());
-		assertEquals(0L,ctx.computeSpecial(Symbols.STAR_OFFER).getResult());
+		assertCVMEquals(ctx.getJuice(), ctx.computeSpecial(Symbols.STAR_JUICE).getResult());
+		assertCVMEquals(0L,ctx.computeSpecial(Symbols.STAR_DEPTH).getResult());
+		assertCVMEquals(ctx.getBalance(TestState.HERO),ctx.computeSpecial(Symbols.STAR_BALANCE).getResult());
+		assertCVMEquals(0L,ctx.computeSpecial(Symbols.STAR_OFFER).getResult());
 		
-		assertEquals(0L,ctx.computeSpecial(Symbols.STAR_SEQUENCE).getResult());
+		assertCVMEquals(0L,ctx.computeSpecial(Symbols.STAR_SEQUENCE).getResult());
 
-		assertEquals(Constants.INITIAL_TIMESTAMP,ctx.computeSpecial(Symbols.STAR_TIMESTAMP).getResult());
+		assertCVMEquals(Constants.INITIAL_TIMESTAMP,ctx.computeSpecial(Symbols.STAR_TIMESTAMP).getResult());
 		
 		assertSame(ctx.getState(), ctx.computeSpecial(Symbols.STAR_STATE).getResult());
 		assertSame(BlobMaps.empty(),ctx.computeSpecial(Symbols.STAR_HOLDINGS).getResult());

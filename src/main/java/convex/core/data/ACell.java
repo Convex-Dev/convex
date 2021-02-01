@@ -107,6 +107,16 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
+	 * Gets the encoded byte representation of this cell.
+	 * 
+	 * @return A blob representing this cell in encoded form
+	 */
+	public final Blob getEncoding() {
+		if (encoding==null) encoding=createEncoding();
+		return encoding;
+	}
+	
+	/**
 	 * Checks for equality with another object. In general, data objects should be considered equal
 	 * if they have the same canonical representation, i.e. the same hash value.
 	 * 

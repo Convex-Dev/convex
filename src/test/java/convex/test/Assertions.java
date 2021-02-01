@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import convex.core.ErrorCodes;
 import convex.core.lang.Context;
+import convex.core.lang.RT;
 import convex.core.util.Utils;
 
 public class Assertions {
@@ -20,6 +21,10 @@ public class Assertions {
 		long count = Utils.totalRefCount(o);
 		assertEquals(expected, count,
 				() -> "Wrong number of Refs, expected " + expected + " but got " + o + " in object " + o);
+	}
+	
+	public static void assertCVMEquals(Object expected, Object result) {
+		assertEquals((Object)RT.cvm(expected),RT.cvm(result));
 	}
 
 	public static void assertError(Object et, Context<?> ctx) {

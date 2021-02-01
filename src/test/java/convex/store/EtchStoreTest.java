@@ -30,6 +30,7 @@ import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.Symbols;
 import convex.core.store.AStore;
@@ -192,7 +193,7 @@ public class EtchStoreTest {
 		ArrayList<Ref<ACell>> al = new ArrayList<>();
 		try {
 			Stores.setCurrent(store);
-			AVector<Long> data = Samples.INT_VECTOR_300;
+			AVector<CVMLong> data = Samples.INT_VECTOR_300;
 
 			// handler that records added refs
 			Consumer<Ref<ACell>> handler = r -> al.add(r);
