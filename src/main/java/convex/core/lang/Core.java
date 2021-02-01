@@ -38,6 +38,7 @@ import convex.core.data.Sets;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMByte;
 import convex.core.lang.expanders.AExpander;
 import convex.core.lang.expanders.CoreExpander;
 import convex.core.lang.expanders.Expander;
@@ -1490,13 +1491,13 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Byte> BYTE = reg(new CoreFn<>(Symbols.BYTE) {
+	public static final CoreFn<CVMByte> BYTE = reg(new CoreFn<>(Symbols.BYTE) {
 		@Override
-		public <I> Context<Byte> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMByte> invoke(Context<I> context, Object[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			Object a = args[0];
-			Byte result = RT.toByte(a);
+			CVMByte result = RT.toByte(a);
 			if (result == null) return context.withCastError(a, Byte.class);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}

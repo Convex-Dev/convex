@@ -18,6 +18,7 @@ import convex.core.Order;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.Hash;
+import convex.core.data.prim.CVMByte;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.AFn;
 import convex.core.lang.Core;
@@ -751,7 +752,7 @@ public class Format {
 	public static <T> T readBasicType(ByteBuffer bb, byte tag) throws BadFormatException, BufferUnderflowException {
 		try {
 			if (tag == Tag.NULL) return null;
-			if (tag == Tag.BYTE) return (T) (Object) bb.get();
+			if (tag == Tag.BYTE) return (T) CVMByte.create(bb.get());
 			if (tag == Tag.CHAR) return (T) (Character) bb.getChar();
 			if (tag == Tag.SHORT) return (T) (Short) Utils.checkedShort(readVLCLong(bb));
 			if (tag == Tag.INT) return (T) (Integer) Utils.checkedInt(readVLCLong(bb));

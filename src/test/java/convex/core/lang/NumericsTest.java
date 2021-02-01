@@ -4,9 +4,12 @@ import static convex.core.lang.TestState.*;
 import static convex.test.Assertions.assertArityError;
 import static convex.test.Assertions.assertCastError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+
+import convex.core.data.prim.CVMByte;
 
 /**
  * 
@@ -202,7 +205,7 @@ public class NumericsTest {
 		assertEquals(3L, evalL("(+ (long 0x01) (int 0x02))"));
 		
 		// byte cast wraps over
-		assertEquals(-1, (byte)eval("(byte 0xFF)"));
+		assertSame(CVMByte.create(-1), eval("(byte 0xFF)"));
 		
 		// check we are treating blobs as unsigned values
 		assertEquals(510L, evalL("(+ (long 0xFF) (long 0xFF))"));
@@ -220,7 +223,7 @@ public class NumericsTest {
 		assertEquals('a', (char) eval("(char 97)"));
 		assertEquals(97L, (long) eval("(long \\a)"));
 		assertEquals((short) 1, (short) eval("(short 65537)"));
-		assertEquals((byte) 1, (byte) eval("(byte 1)"));
+		assertSame(CVMByte.create(1), eval("(byte 1)"));
 	}
 
 	@Test

@@ -42,6 +42,7 @@ import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMByte;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.lang.impl.CoreFn;
@@ -111,10 +112,10 @@ public class CoreTest {
 
 	@Test
 	public void testByte() {
-		assertEquals((byte) 0x01, (byte) eval("(byte 1)"));
-		assertEquals((byte) 0xff, (byte) eval("(byte 255)"));
-		assertEquals((byte) 0xff, (byte) eval("(byte -1)"));
-		assertEquals((byte) 0xff, (byte) eval("(byte (byte -1))"));
+		assertSame(CVMByte.create(0x01), eval("(byte 1)"));
+		assertSame(CVMByte.create(0xff), eval("(byte 255)"));
+		assertSame(CVMByte.create(0xff), eval("(byte -1)"));
+		assertSame(CVMByte.create(0xff), eval("(byte (byte -1))"));
 
 		assertCastError(step("(byte nil)"));
 		assertCastError(step("(byte :foo)"));
@@ -129,7 +130,9 @@ public class CoreTest {
 		assertEquals((int) 255, (int) eval("(int 255)"));
 		assertEquals((int) 97, (int) eval("(int \\a)"));
 		assertEquals((int) Integer.MIN_VALUE, (int) eval("(int 2147483648)"));
-		assertEquals((int) -1, (int) eval("(int (byte 255))"));
+		
+		// Note: Convex bytes are unsigned. Signed bytes are pretty silly.
+		assertEquals((int) 255, (int) eval("(int (byte 255))"));
 
 		assertArityError(step("(int)"));
 		assertArityError(step("(int 1 2)"));
@@ -234,7 +237,7 @@ public class CoreTest {
 	@Test
 	public void testLong() {
 		assertEquals(1L, (long) eval("(long 1)"));
-		assertEquals(-128L, (long) eval("(long (byte 128))"));
+		assertEquals(128L, (long) eval("(long (byte 128))"));
 		assertEquals(97L, (long) eval("(long \\a)"));
 		assertEquals(2147483648L, (long) eval("(long 2147483648)"));
 		

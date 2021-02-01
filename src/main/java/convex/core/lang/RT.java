@@ -36,6 +36,8 @@ import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
+import convex.core.data.prim.APrimitive;
+import convex.core.data.prim.CVMByte;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.impl.KeyFn;
 import convex.core.lang.impl.MapFn;
@@ -381,6 +383,10 @@ public class RT {
 	 */
 	public static Number number(Object a) {
 		if (a == null) return null;
+		
+		if (a instanceof APrimitive) {
+			return ((APrimitive)a).longValue();
+		}
 
 		Class<?> c = a.getClass();
 		// canonical numeric types
@@ -388,7 +394,6 @@ public class RT {
 		if (c == Double.class) return (Double) a;
 
 		// other numeric primitives need widening
-		if (c == Byte.class) return ((Byte) a).longValue();
 		if (c == Integer.class) return ((Integer) a).longValue();
 		if (c == Short.class) return ((Short) a).longValue();
 		if (c == Float.class) return (Double) a;
@@ -398,6 +403,7 @@ public class RT {
 		if (a instanceof ABlob) {
 			return (Long)((ABlob)a).toLong();
 		}
+		
 
 		return null;
 	}
@@ -433,11 +439,11 @@ public class RT {
 		return n.longValue();
 	}
 
-	public static Byte toByte(Object a) {
-		if (a instanceof Byte) return (Byte) a;
+	public static CVMByte toByte(Object a) {
+		if (a instanceof CVMByte) return (CVMByte) a;
 		Number n = number(a);
 		if (n == null) return null;
-		return (byte) n.longValue();
+		return CVMByte.create(n.longValue());
 	}
 
 	public static Short toShort(Object a) {
@@ -575,7 +581,7 @@ public class RT {
 		try {
 			if (o instanceof CharSequence) return (T) (Character) ((CharSequence) o).charAt(Utils.checkedInt(i));
 			if (o instanceof ASequence) return ((ASequence<T>) o).get(i);
-			if (o instanceof ABlob) return (T) (Byte) ((ABlob) o).get(i);
+			if (o instanceof ABlob) return (T) CVMByte.create(((ABlob) o).get(i));
 
 			// shouldn't get called in on-chain code, but needed for destructuring / runtime
 			// optimisations

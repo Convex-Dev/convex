@@ -4,6 +4,8 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
+import convex.core.data.prim.CVMByte;
+
 /**
  * Generator for arbitrary numeric values
  *
@@ -18,7 +20,7 @@ public class NumericGen extends Generator<Object> {
 		int type = r.nextInt(6);
 		switch (type) {
 		case 0:
-			return gen().type(byte.class).generate(r, status);
+			return CVMByte.create(r.nextLong());
 		case 1:
 			return gen().type(short.class).generate(r, status);
 		case 2:
