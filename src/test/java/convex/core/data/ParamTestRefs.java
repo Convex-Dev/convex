@@ -11,6 +11,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.store.Stores;
@@ -40,8 +41,8 @@ public class ParamTestRefs {
 			Stores.setCurrent(store);
 			
 			{ // single embedded value
-				Long n=1567565765677L;
-				Ref<Long> r=Ref.get(n);
+				CVMLong n=CVMLong.create(1567565765677L);
+				Ref<CVMLong> r=Ref.get(n);
 				assertTrue(r.isEmbedded());
 				Ref<Long> r2=r.persist();
 				assertTrue(r.isEmbedded());
@@ -58,15 +59,15 @@ public class ParamTestRefs {
 				assertEquals(v.getRef(0),r2.getValue().getRef(0));
 			}
 			
-			{ // map with empedded structure
-				AMap<Long,AVector<Long>> m=Maps.of(156746748L,Vectors.of(8797987L));
-				Ref<AMap<Long,AVector<Long>>> r=m.getRef();
+			{ // map with embedded structure
+				AMap<CVMLong,AVector<CVMLong>> m=Maps.of(156746748L,Vectors.of(8797987L));
+				Ref<AMap<CVMLong,AVector<CVMLong>>> r=m.getRef();
 				assertEquals(Ref.UNKNOWN,r.getStatus());
 				
-				Ref<AMap<Long,AVector<Long>>> r2=r.persist();
+				Ref<AMap<CVMLong,AVector<CVMLong>>> r2=r.persist();
 				
 				assertEquals(Ref.PERSISTED,r2.getStatus());
-				MapEntry<Long, AVector<Long>> me2=r2.getValue().entryAt(0);
+				MapEntry<CVMLong, AVector<CVMLong>> me2=r2.getValue().entryAt(0);
 				assertTrue(me2.getRef(0).isEmbedded());
 				assertEquals(Ref.PERSISTED,me2.getRef(1).getStatus());
 			}		

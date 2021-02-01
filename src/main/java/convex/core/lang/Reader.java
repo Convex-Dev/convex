@@ -34,6 +34,7 @@ import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
@@ -341,8 +342,8 @@ public class Reader extends BaseParser<Object> {
 
 	public Rule BooleanLiteral() {
 		return FirstOf(
-				Sequence("true", TestNot(FollowingSymbolCharacter()), push(prepare(Boolean.TRUE))),
-				Sequence("false", TestNot(FollowingSymbolCharacter()), push(prepare(Boolean.FALSE))));
+				Sequence("true", TestNot(FollowingSymbolCharacter()), push(prepare(CVMBool.TRUE))),
+				Sequence("false", TestNot(FollowingSymbolCharacter()), push(prepare(CVMBool.FALSE))));
 	}
 
 	public Rule StringLiteral() {

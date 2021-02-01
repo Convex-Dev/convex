@@ -9,6 +9,7 @@ import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Strings;
+import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
@@ -29,8 +30,8 @@ import convex.core.util.Utils;
 public class Constant<T> extends AOp<T> {
 
 	public static final Constant<?> NULL = new Constant<>(Ref.NULL_VALUE);
-	public static final Constant<Boolean> TRUE = new Constant<>(Ref.TRUE_VALUE);
-	public static final Constant<Boolean> FALSE = new Constant<>(Ref.FALSE_VALUE);
+	public static final Constant<CVMBool> TRUE = new Constant<>(Ref.TRUE_VALUE);
+	public static final Constant<CVMBool> FALSE = new Constant<>(Ref.FALSE_VALUE);
 	public static final Constant<AList<?>> EMPTY_LIST = new Constant<>(Ref.EMPTY_LIST);
 	public static final Constant<AVector<?>> EMPTY_VECTOR = new Constant<>(Ref.EMPTY_VECTOR);
 

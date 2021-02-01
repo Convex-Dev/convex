@@ -39,6 +39,7 @@ import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.APrimitive;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -531,9 +532,9 @@ public class Core {
 
 	public static final CoreExpander INITIAL_EXPANDER = reg(Compiler.INITIAL_EXPANDER);
 
-	public static final CoreFn<Boolean> EXPORTS_Q = reg(new CoreFn<>(Symbols.EXPORTS_Q) {
+	public static final CoreFn<CVMBool> EXPORTS_Q = reg(new CoreFn<>(Symbols.EXPORTS_Q) {
 		@Override
-		public <R> Context<Boolean> invoke(Context<R> context, Object[] args) {
+		public <R> Context<CVMBool> invoke(Context<R> context, Object[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			Address addr = RT.address(args[0]);
@@ -543,9 +544,9 @@ public class Core {
 			if (sym == null) return context.withCastError(args[1], Symbol.class);
 
 			AccountStatus as = context.getState().getAccount(addr);
-			if (as == null) return context.withResult(Juice.LOOKUP, Boolean.FALSE);
+			if (as == null) return context.withResult(Juice.LOOKUP, CVMBool.FALSE);
 
-			Boolean result = as.getExportedFunction(sym) != null;
+			CVMBool result = RT.toBoolean(as.getExportedFunction(sym) != null);
 
 			return context.withResult(Juice.LOOKUP, result);
 		}
@@ -790,9 +791,9 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Boolean> ACTOR_Q = reg(new CoreFn<>(Symbols.ACTOR_Q) {
+	public static final CoreFn<CVMBool> ACTOR_Q = reg(new CoreFn<>(Symbols.ACTOR_Q) {
 		@Override
-		public <I> Context<Boolean> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMBool> invoke(Context<I> context, Object[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			Object a0 = args[0];
@@ -800,10 +801,10 @@ public class Core {
 
 			// return false if the argument is not an address
 			long juice = Juice.SIMPLE_FN;
-			if (address == null) return context.withResult(juice, false);
+			if (address == null) return context.withResult(juice, CVMBool.FALSE);
 
 			AccountStatus as = context.getAccountStatus(address);
-			boolean result = as.isActor();
+			CVMBool result = CVMBool.create(as.isActor());
 
 			return context.withResult(juice, result);
 		}
@@ -1160,20 +1161,20 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Boolean> CONTAINS_KEY_Q = reg(new CoreFn<>(Symbols.CONTAINS_KEY_Q) {
+	public static final CoreFn<CVMBool> CONTAINS_KEY_Q = reg(new CoreFn<>(Symbols.CONTAINS_KEY_Q) {
 		@Override
-		public <I> Context<Boolean> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMBool> invoke(Context<I> context, Object[] args) {
 			int n = args.length;
 			if (n != 2) return context.withArityError(exactArityMessage(2, n));
 
-			Boolean result;
+			CVMBool result;
 			Object coll = args[0];
 			if (coll == null) {
-				result = false; // treat nil as empty collection
+				result = CVMBool.FALSE; // treat nil as empty collection
 			} else {
 				IGet<Object> gettable = RT.toGettable(args[0]);
 				if (gettable == null) return context.withCastError(args[0], IGet.class);
-				result = gettable.containsKey(args[1]);
+				result = RT.toBoolean(gettable.containsKey(args[1]));
 			}
 
 			long juice = Juice.GET;
@@ -1181,9 +1182,9 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<Boolean> SUBSET_Q = reg(new CoreFn<>(Symbols.SUBSET_Q) {
+	public static final CoreFn<CVMBool> SUBSET_Q = reg(new CoreFn<>(Symbols.SUBSET_Q) {
 		@Override
-		public <I> Context<Boolean> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMBool> invoke(Context<I> context, Object[] args) {
 			int n = args.length;
 			if (n != 2) return context.withArityError(exactArityMessage(2, n));
 
@@ -1196,7 +1197,7 @@ public class Core {
 			Set<Object> s1=RT.ensureSet(args[1]);
 			if (s1==null) return context.withCastError(args[1], ASet.class);
 
-			boolean result=s0.isSubset(s1);
+			CVMBool result=RT.toBoolean(s0.isSubset(s1));
 			return context.withResult(juice, result);
 		}
 	});
@@ -1329,71 +1330,71 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Boolean> EQUALS = reg(new CoreFn<>(Symbols.EQUALS) {
+	public static final CoreFn<CVMBool> EQUALS = reg(new CoreFn<>(Symbols.EQUALS) {
 		@Override
-		public <I> Context<Boolean> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMBool> invoke(Context<I> context, Object[] args) {
 
 			// all arities OK, all args OK
-			boolean result = RT.allEqual(args);
+			CVMBool result = RT.toBoolean(RT.allEqual(args));
 			return context.withResult(Juice.EQUALS, result);
 		}
 	});
 
-	public static final CoreFn<Boolean> EQ = reg(new CoreFn<>(Symbols.EQ) {
+	public static final CoreFn<CVMBool> EQ = reg(new CoreFn<>(Symbols.EQ) {
 		@Override
-		public <I> Context<Boolean> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMBool> invoke(Context<I> context, Object[] args) {
 			// all arities OK, but need to watch for non-numeric arguments
 			Boolean result = RT.eq(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args), Number.class);
 
-			return context.withResult(Juice.NUMERIC_COMPARE, result);
+			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
 		}
 	});
 
-	public static final CoreFn<Boolean> GE = reg(new CoreFn<>(Symbols.GE) {
+	public static final CoreFn<CVMBool> GE = reg(new CoreFn<>(Symbols.GE) {
 		@Override
-		public <I> Context<Boolean> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMBool> invoke(Context<I> context, Object[] args) {
 			// all arities OK
 			Boolean result = RT.ge(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args), Number.class);
 
-			return context.withResult(Juice.NUMERIC_COMPARE, result);
+			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
 		}
 	});
 
-	public static final CoreFn<Boolean> GT = reg(new CoreFn<>(Symbols.GT) {
+	public static final CoreFn<CVMBool> GT = reg(new CoreFn<>(Symbols.GT) {
 		@Override
-		public <I> Context<Boolean> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMBool> invoke(Context<I> context, Object[] args) {
 			// all arities OK
 
 			Boolean result = RT.gt(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args), Number.class);
 
-			return context.withResult(Juice.NUMERIC_COMPARE, result);
+			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
 		}
 	});
 
-	public static final CoreFn<Boolean> LE = reg(new CoreFn<>(Symbols.LE) {
+	public static final CoreFn<CVMBool> LE = reg(new CoreFn<>(Symbols.LE) {
 		@Override
-		public <I> Context<Boolean> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMBool> invoke(Context<I> context, Object[] args) {
 			// all arities OK
 
 			Boolean result = RT.le(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args), Number.class);
 
-			return context.withResult(Juice.NUMERIC_COMPARE, result);
+			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
 		}
 	});
 
-	public static final CoreFn<Boolean> LT = reg(new CoreFn<>(Symbols.LT) {
+	public static final CoreFn<CVMBool> LT = reg(new CoreFn<>(Symbols.LT) {
 		@Override
-		public <I> Context<Boolean> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMBool> invoke(Context<I> context, Object[] args) {
 			// all arities OK
 
 			Boolean result = RT.lt(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args), Number.class);
 
-			return context.withResult(Juice.NUMERIC_COMPARE, result);
+			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
 		}
 	});
 
@@ -1422,13 +1423,13 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Boolean> BOOLEAN = reg(new CoreFn<>(Symbols.BOOLEAN) {
+	public static final CoreFn<CVMBool> BOOLEAN = reg(new CoreFn<>(Symbols.BOOLEAN) {
 		@Override
-		public <I> Context<Boolean> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMBool> invoke(Context<I> context, Object[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			// always works for any value
-			Boolean result = RT.toBoolean(args[0]);
+			CVMBool result = RT.toBoolean(args[0]);
 
 			return context.withResult(Juice.SIMPLE_FN, result);
 		}
@@ -1597,12 +1598,12 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Boolean> NOT = reg(new CoreFn<>(Symbols.NOT) {
+	public static final CoreFn<CVMBool> NOT = reg(new CoreFn<>(Symbols.NOT) {
 		@Override
-		public <I> Context<Boolean> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMBool> invoke(Context<I> context, Object[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			boolean result = !RT.bool(args[0]);
+			CVMBool result = RT.toBoolean(!RT.bool(args[0]));
 			return context.withResult(Juice.SIMPLE_FN, result);
 		}
 	});
@@ -1780,9 +1781,9 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Boolean> FAIL = reg(new CoreFn<>(Symbols.FAIL) {
+	public static final CoreFn<CVMBool> FAIL = reg(new CoreFn<>(Symbols.FAIL) {
 		@Override
-		public <I> Context<Boolean> invoke(Context<I> context, Object[] args) {
+		public <I> Context<CVMBool> invoke(Context<I> context, Object[] args) {
 			int alen = args.length;
 			if (alen > 2) return context.withArityError(maxArityMessage(2, alen));
 

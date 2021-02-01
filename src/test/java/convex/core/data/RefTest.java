@@ -70,7 +70,7 @@ public class RefTest {
 
 	@Test
 	public void testEmbedded() {
-		assertTrue(Ref.get(1L).isEmbedded()); // a primitive
+		assertTrue(Ref.get(RT.cvm(1L)).isEmbedded()); // a primitive
 		assertTrue(Ref.NULL_VALUE.isEmbedded()); // singleton null ref
 		assertTrue(Ref.EMPTY_VECTOR.isEmbedded()); // singleton null ref
 		assertFalse(Blob.create(new byte[Format.MAX_EMBEDDED_LENGTH]).getRef().isEmbedded()); // too big to embed
@@ -88,7 +88,8 @@ public class RefTest {
 
 	@Test
 	public void testPersistEmbeddedLong() {
-		Ref<Object> nr = Ref.get(10001L);
+		Object val=RT.cvm(10001L);
+		Ref<Object> nr = Ref.get(val);
 		assertSame(nr.getValue(), nr.persist().getValue());
 		assertTrue(nr.isEmbedded());
 	}

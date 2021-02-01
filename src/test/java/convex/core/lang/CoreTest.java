@@ -38,6 +38,7 @@ import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMByte;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
@@ -242,8 +243,8 @@ public class CoreTest {
 	@Test
 	public void testBoolean() {
 		// test precise values
-		assertSame(Boolean.TRUE, eval("(boolean 1)"));
-		assertSame(Boolean.FALSE, eval("(boolean nil)"));
+		assertSame(CVMBool.TRUE, eval("(boolean 1)"));
+		assertSame(CVMBool.FALSE, eval("(boolean nil)"));
 
 		// nil and false should be falsey
 		assertFalse(evalB("(boolean false)"));
@@ -1791,7 +1792,7 @@ public class CoreTest {
 			assertEquals(1337L, evalL(nc1,"(balance "+naddr+")"));
 		}
 		
-		assertTrue(() -> eval(ctx,"(let [a "+naddr+"]"
+		assertTrue(() -> evalB(ctx,"(let [a "+naddr+"]"
 				+ "   (not (= *balance* (transfer a 1337))))"));
 
 		// transfer it all!
@@ -2594,8 +2595,8 @@ public class CoreTest {
 		// ensure later branches never get executed
 		assertEquals(Keywords.FOO, eval("(or :foo (+ nil :bar))"));
 
-		assertFalse((Boolean) eval("(or nil nil false)"));
-		assertTrue((Boolean) eval("(or nil nil true)"));
+		assertFalse(evalB("(or nil nil false)"));
+		assertTrue(evalB("(or nil nil true)"));
 
 		// arity error if fails before first truth value
 		assertArityError(step("(or nil (count) true)"));
@@ -2603,7 +2604,7 @@ public class CoreTest {
 
 	@Test
 	public void testAnd() {
-		assertTrue((Boolean) eval("(and)"));
+		assertTrue(evalB("(and)"));
 		assertNull(eval("(and nil)"));
 		assertEquals(Keywords.FOO, eval("(and :foo)"));
 		assertEquals(Keywords.FOO, eval("(and :bar :foo)"));
@@ -2612,8 +2613,8 @@ public class CoreTest {
 		// ensure later branches never get executed
 		assertNull(eval("(and nil (+ nil :bar))"));
 
-		assertFalse((Boolean) eval("(and 1 false 2)"));
-		assertTrue((Boolean) eval("(and 1 :foo true true)"));
+		assertFalse(evalB("(and 1 false 2)"));
+		assertTrue(evalB("(and 1 :foo true true)"));
 
 		// arity error if fails before first falsey value
 		assertArityError(step("(and true (count) nil)"));

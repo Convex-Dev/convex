@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.function.Consumer;
 
 import convex.core.crypto.Hash;
+import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.store.AStore;
@@ -81,8 +82,8 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	 */
 	public static final RefDirect<?> NULL_VALUE = RefDirect.create(null, Hash.NULL_HASH, MAX_STATUS);
 
-	public static final RefDirect<Boolean> TRUE_VALUE = RefDirect.create(Boolean.TRUE, Hash.TRUE_HASH, MAX_STATUS);
-	public static final RefDirect<Boolean> FALSE_VALUE = RefDirect.create(Boolean.FALSE, Hash.FALSE_HASH, MAX_STATUS);
+	public static final RefDirect<CVMBool> TRUE_VALUE = RefDirect.create(CVMBool.TRUE, Hash.TRUE_HASH, MAX_STATUS);
+	public static final RefDirect<CVMBool> FALSE_VALUE = RefDirect.create(CVMBool.FALSE, Hash.FALSE_HASH, MAX_STATUS);
 
 	public static final RefDirect<AList<?>> EMPTY_LIST = RefDirect.create(Lists.empty());
 	public static final RefDirect<AVector<?>> EMPTY_VECTOR = RefDirect.create(Vectors.empty());

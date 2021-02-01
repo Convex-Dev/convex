@@ -140,10 +140,10 @@ public class NumericsTest {
 
 	@Test
 	public void testZero() {
-		assertTrue((boolean) eval("(== 0 -0)"));
-		assertTrue((boolean) eval("(== 0.0 -0.0)"));
-		assertTrue((boolean) eval("(== 0 -0.0)"));
-		assertTrue((boolean) eval("(<= 0 -0)"));
+		assertTrue(evalB("(== 0 -0)"));
+		assertTrue(evalB("(== 0.0 -0.0)"));
+		assertTrue(evalB("(== 0 -0.0)"));
+		assertTrue(evalB("(<= 0 -0)"));
 	}
 
 	@Test

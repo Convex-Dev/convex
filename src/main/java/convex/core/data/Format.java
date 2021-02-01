@@ -18,6 +18,7 @@ import convex.core.Order;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.Hash;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -382,17 +383,9 @@ public class Format {
 			return pos;
 		}
 
-		//if (o instanceof String) {
-		//	return Strings.create((String)o).write(bb);
-		//}
-
 		if (o instanceof Character) {
 			bs[pos++]=Tag.CHAR;
 			return Utils.writeChar(bs,pos,((char)o));
-		}
-		if (o instanceof Boolean) {
-			bs[pos++]=(((boolean) o) ? Tag.TRUE : Tag.FALSE);
-			return pos;
 		}
 
 		throw new IllegalArgumentException("Can't encode to ByteBuffer: " + o.getClass());
@@ -410,9 +403,6 @@ public class Format {
 		if (o instanceof Character) {
 			bb = bb.put(Tag.CHAR);
 			return bb.putChar((char) o);
-		}
-		if (o instanceof Boolean) {
-			return bb.put((byte) (((boolean) o) ? Tag.TRUE : Tag.FALSE));
 		}
 
 		throw new IllegalArgumentException("Can't encode to ByteBuffer: " + o.getClass());
@@ -775,8 +765,8 @@ public class Format {
 			
 			if (tag == Tag.HASH) return (T) Hash.read(bb);
 
-			if (tag == Tag.TRUE) return (T) Boolean.TRUE;
-			if (tag == Tag.FALSE) return (T) Boolean.FALSE;
+			if (tag == Tag.TRUE) return (T) CVMBool.TRUE;
+			if (tag == Tag.FALSE) return (T) CVMBool.FALSE;
 
 			if (tag == Tag.ADDRESS) return (T) Address.readRaw(bb);
 			if (tag == Tag.ACCOUNT_KEY) return (T) AccountKey.readRaw(bb);
@@ -843,26 +833,12 @@ public class Format {
 	 * @return true if object is embedded, false otherwise
 	 */
 	public static boolean isEmbedded(Object o) {
+		// TODO: should just be ACell.isEmbedded?
 		if (o == null) return true;
 		if (o instanceof ACell) {
 			return ((ACell)o).isEmbedded();
-		} else if (o instanceof Number) {
-			// six primitive number types
-			if (o instanceof Byte) return true;
-			if (o instanceof Short) return true;
-			if (o instanceof Integer) return true;
-			if (o instanceof Long) return true;
-			if (o instanceof Float) return true;
-			if (o instanceof Double) return true;
-
-			// TODO: probably can't allow this - could be too big for embedding?
-			// if (o instanceof BigInteger)
-			// return true;
-			// if (o instanceof BigDecimal)
-			// return true;
 		} else {
 			if (o instanceof Character) return true;
-			if (o instanceof Boolean) return true;
 		}
 		return false;
 	}

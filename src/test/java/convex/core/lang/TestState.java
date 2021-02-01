@@ -16,6 +16,7 @@ import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
@@ -170,11 +171,11 @@ public class TestState {
 	}
 
 	public static boolean evalB(String source) {
-		return (boolean) eval(source);
+		return ((CVMBool)eval(source)).booleanValue();
 	}
 
 	public static boolean evalB(Context<?> ctx, String source) {
-		return (boolean) eval(ctx, source);
+		return ((CVMBool)eval(ctx, source)).booleanValue();
 	}
 
 	public static double evalD(Context<?> ctx, String source) {

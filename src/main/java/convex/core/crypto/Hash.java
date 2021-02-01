@@ -13,7 +13,9 @@ import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Tag;
+import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
@@ -307,8 +309,8 @@ public class Hash extends AArrayBlob {
 		if (value == null) return NULL_HASH;
 		if (value instanceof ACell) return ((ACell) value).getHash();
 
-		if (value instanceof Boolean) {
-			return (Boolean) value ? TRUE_HASH : FALSE_HASH;
+		if (value instanceof CVMBool) {
+			return RT.bool(value) ? TRUE_HASH : FALSE_HASH;
 		}
 
 		AArrayBlob d = Format.encodedBlob(value);

@@ -1,7 +1,6 @@
 package convex.actors;
 
-import static convex.core.lang.TestState.eval;
-import static convex.core.lang.TestState.step;
+import static convex.core.lang.TestState.*;
 import static convex.test.Assertions.assertAssertError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -41,20 +40,20 @@ public class OracleTest {
 		ctx = TestState.step(ctx, "(call oracle3 (register :foo {:trust #{HERO}}))"); 
 		assertTrue(RT.bool(ctx.getResult()));
 
-		assertFalse((boolean) eval(ctx, "(call oracle3 (finalised? :foo))"));
+		assertFalse(evalB(ctx, "(call oracle3 (finalised? :foo))"));
 		assertNull(eval(ctx, "(call oracle3 (read :foo))"));
 
 		{
 			// some tests for Actor safety pre-setting
 			final Context<?> fctx = Context.createInitial(ctx.getState(), TestState.VILLAIN, TestState.INITIAL_JUICE);
 			assertFalse(fctx.isExceptional());
-			assertFalse((boolean) eval(fctx, "(call (address \"" + o3_str + "\") (finalised? :foo))"));
+			assertFalse(evalB(fctx, "(call (address \"" + o3_str + "\") (finalised? :foo))"));
 			assertAssertError(TestState.step(fctx, "(call (address \"" + o3_str + "\") (provide :foo :bad-value))"));
 		}
 
 		// finalise the oracle
 		ctx = TestState.step(ctx, "(call oracle3 (provide :foo :bar))");
-		assertTrue((boolean) eval(ctx, "(call oracle3 (finalised? :foo))"));
+		assertTrue(evalB(ctx, "(call oracle3 (finalised? :foo))"));
 		assertEquals(Keywords.BAR, eval(ctx, "(call oracle3 (read :foo))"));
 
 		// try to update after finalisation

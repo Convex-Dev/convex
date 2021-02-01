@@ -6,6 +6,7 @@ import java.util.Iterator;
 import java.util.function.Function;
 
 import convex.core.crypto.Hash;
+import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
@@ -33,7 +34,7 @@ public class Set<T> extends ASet<T> {
 	 * Dummy value used in underlying maps. Not important what this is, but should be small, efficient and non-null
 	 * so we use Boolean.TRUE
 	 */
-	public static final Object DUMMY = Boolean.TRUE;
+	public static final Object DUMMY = CVMBool.TRUE;
 	public static final Ref<?> DUMMY_REF = Ref.TRUE_VALUE;
 
 	/**

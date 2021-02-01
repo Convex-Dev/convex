@@ -24,6 +24,7 @@ import convex.core.data.Sets;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.ParseException;
 import convex.core.lang.expanders.AExpander;
 import convex.core.lang.ops.Constant;
@@ -93,8 +94,8 @@ public class CompilerTest {
 		assertSame(Lists.empty(),eval("()"));
 
 		assertNull(eval("nil"));
-		assertSame(Boolean.TRUE,eval("true"));
-		assertSame(Boolean.FALSE,eval("false"));
+		assertSame(CVMBool.TRUE,eval("true"));
+		assertSame(CVMBool.FALSE,eval("false"));
 	}
 	
 	@Test public void testDo() {
@@ -178,21 +179,21 @@ public class CompilerTest {
 	@Test public void testDefMetadataOnLiteral() {
 		Context<?> ctx=step("(def a ^:foo 2)");
 		Syntax stx=ctx.getEnvironment().getEntry(Symbol.create("a")).getValue();
-		assertEquals(Boolean.TRUE,stx.getMeta().get(Keywords.FOO));
+		assertSame(CVMBool.TRUE,stx.getMeta().get(Keywords.FOO));
 	}
 	
 	@Test public void testDefMetadataOnForm() {
 		Context<?> ctx=step("(def a ^:foo (+ 1 2))");
 		Syntax stx=ctx.getEnvironment().getEntry(Symbol.create("a")).getValue();
 		assertCVMEquals(3L,stx.getValue());
-		assertCVMEquals(Boolean.TRUE,stx.getMeta().get(Keywords.FOO));
+		assertSame(CVMBool.TRUE,stx.getMeta().get(Keywords.FOO));
 	}
 	
 	@Test public void testDefMetadataOnSymbol() {
 		Context<?> ctx=step("(def ^{:foo true} a (+ 1 2))");
 		Syntax stx=ctx.getEnvironment().getEntry(Symbol.create("a")).getValue();
 		assertCVMEquals(3L,stx.getValue());
-		assertEquals(Boolean.TRUE,stx.getMeta().get(Keywords.FOO));
+		assertSame(CVMBool.TRUE,stx.getMeta().get(Keywords.FOO));
 	}
 	
 	@Test public void testCond() {

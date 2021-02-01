@@ -196,7 +196,7 @@ public class ScryptTest {
         assertNull(eval("nil"));
         assertEquals(1L, evalL("1"));
         assertEquals(Strings.create("Foo"), eval("\"Foo\""));
-        assertEquals(true, eval("true"));
+        assertCVMEquals(true, eval("true"));
         assertEquals(Keyword.create("keyword"), eval(":keyword"));
         assertSame(Core.MAP, eval("map"));
     }
@@ -233,7 +233,7 @@ public class ScryptTest {
     public void testLiteral() {
     	CVMLong one=CVMLong.create(1L);
     	assertEquals(one, Scrypt.readSyntax("1").getValue());
-        assertEquals(true, Scrypt.readSyntax("true").getValue());
+        assertCVMEquals(true, Scrypt.readSyntax("true").getValue());
         assertEquals(Keyword.create("k"), Scrypt.readSyntax(":k").getValue());
         assertEquals(Strings.create("Foo"), Scrypt.readSyntax("\"Foo\"").getValue());
         assertNull(Scrypt.readSyntax("nil").getValue());

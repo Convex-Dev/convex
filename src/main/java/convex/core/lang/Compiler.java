@@ -23,6 +23,7 @@ import convex.core.data.Sets;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.expanders.AExpander;
 import convex.core.lang.expanders.CoreExpander;
@@ -141,8 +142,8 @@ public class Compiler {
 			return compileNumber(context, (Number) form);
 		}
 
-		if (form instanceof Boolean) {
-			Constant<Boolean> bOp = (((boolean) form) ? Constant.TRUE : Constant.FALSE);
+		if (form instanceof CVMBool) {
+			Constant<CVMBool> bOp = RT.bool(form) ? Constant.TRUE : Constant.FALSE;
 			return (Context<T>) context.withResult(Juice.COMPILE_CONSTANT, bOp);
 		}
 

@@ -128,7 +128,7 @@ public class FormatTest {
 	@Test public void testCanonical() {
 		assertTrue(Format.isCanonical(Vectors.empty()));
 		assertTrue(Format.isCanonical(null));
-		assertTrue(Format.isCanonical(1));
+		assertTrue(Format.isCanonical(RT.cvm(1)));
 		assertTrue(Format.isCanonical(Blob.create(new byte[1000]))); // should be OK
 		assertFalse(Blob.create(new byte[10000]).isCanonical()); // too big to be canonical
 		

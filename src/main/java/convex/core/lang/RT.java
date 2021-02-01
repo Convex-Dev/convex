@@ -37,6 +37,7 @@ import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.data.prim.APrimitive;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -638,7 +639,7 @@ public class RT {
 	 * @return true if object is truthy, false otherwise
 	 */
 	public static boolean bool(Object a) {
-		return !((a == null) || (a == Boolean.FALSE));
+		return !((a == null) || (a == CVMBool.FALSE) || (a==Boolean.FALSE));
 	}
 
 	/**
@@ -907,9 +908,19 @@ public class RT {
 	 * @param o
 	 * @return A boolean value representing false or true
 	 */
-	public static Boolean toBoolean(Object o) {
-		if (RT.bool(o)) return Boolean.TRUE;
-		return Boolean.FALSE;
+	public static CVMBool toBoolean(Object o) {
+		if (RT.bool(o)) return CVMBool.TRUE;
+		return CVMBool.FALSE;
+	}
+	
+	/**
+	 * Convert any value to a Boolean object.
+	 * 
+	 * @param o
+	 * @return A boolean value representing false or true
+	 */
+	public static CVMBool toBoolean(boolean b) {
+		return b?CVMBool.TRUE:CVMBool.FALSE;
 	}
 
 	/**
@@ -1012,7 +1023,7 @@ public class RT {
 	 * @return True if the value is a canonical boolean value.
 	 */
 	public static boolean isBoolean(Object value) {
-		return (value == Boolean.TRUE) || (value == Boolean.FALSE);
+		return (value == CVMBool.TRUE) || (value == CVMBool.FALSE);
 	}
 
 	/**
@@ -1219,6 +1230,7 @@ public class RT {
 		if (o instanceof CVMLong) return (T)(Long)((CVMLong)o).longValue();
 		if (o instanceof CVMDouble) return (T)(Double)((CVMDouble)o).doubleValue();
 		if (o instanceof CVMByte) return (T)(Byte)(byte)((CVMByte)o).longValue();
+		if (o instanceof CVMBool) return (T)(Boolean)((CVMBool)o).booleanValue();
 		return (T)o;
 	}
 
