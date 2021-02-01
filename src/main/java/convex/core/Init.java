@@ -20,7 +20,6 @@ import convex.core.data.Vectors;
 import convex.core.lang.Context;
 import convex.core.lang.Core;
 import convex.core.lang.Reader;
-import convex.core.lang.Symbols;
 
 /**
  * Static functionality for generating the initial Convex State
@@ -157,8 +156,7 @@ public class Init {
 			}
 
 			// Build globals
-			AHashMap<Symbol, Object> globals = Maps.of(Symbols.TIMESTAMP, Constants.INITIAL_TIMESTAMP, Symbols.FEES, 0L,
-					Symbols.JUICE_PRICE, Constants.INITIAL_JUICE_PRICE);
+			AHashMap<Symbol, Object> globals = Constants.INITIAL_GLOBALS;
 
 			State s = State.create(accts, peers, Sets.empty(), globals, BlobMaps.empty());
 
@@ -170,7 +168,7 @@ public class Init {
 			// At this point we have a raw initial state with accounts
 			
 			{ // Deploy Registry Actor to fixed Address
-				Context<?> ctx = Context.createFake(s, HERO);
+				Context<?> ctx = Context.createFake(s, INIT);
 				Object form=Reader.readResource("actors/registry.con");
 				ctx = ctx.deployActor(form);
 				REGISTRY_ADDRESS=(Address) ctx.getResult();
@@ -179,7 +177,7 @@ public class Init {
 			}
 			
 			{ // Register core libraries now that registry exists
-				Context<?> ctx = Context.createFake(s, HERO);
+				Context<?> ctx = Context.createFake(s, INIT);
 				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'convex.core "+CORE_ADDRESS+"))"));
 				s=ctx.getState();
 				s = register(s,CORE_ADDRESS,"Convex Core Library");
@@ -187,7 +185,7 @@ public class Init {
 			}
 			
 			{ // Deploy Trust library and register with CNS
-				Context<?> ctx = Context.createFake(s, HERO);
+				Context<?> ctx = Context.createFake(s, INIT);
 				Object form=Reader.readResource("libraries/trust.con");
 				ctx = ctx.deployActor(form);
 				Address addr=(Address) ctx.getResult();
@@ -198,7 +196,7 @@ public class Init {
 			}
 			
 			{ // Deploy Fungible library and register with CNS
-				Context<?> ctx = Context.createFake(s, HERO);
+				Context<?> ctx = Context.createFake(s, INIT);
 				Object form=Reader.readResource("libraries/fungible.con");
 				ctx = ctx.deployActor(form);
 				Address addr=(Address) ctx.getResult();
@@ -209,7 +207,7 @@ public class Init {
 			}
 			
 			{ // Deploy Oracle Actor
-				Context<?> ctx = Context.createFake(s, HERO);
+				Context<?> ctx = Context.createFake(s, INIT);
 				Object form=Reader.readResource("actors/oracle-trusted.con");
 				ctx = ctx.deployActor(form);
 				ORACLE_ADDRESS = (Address) ctx.getResult();
@@ -217,7 +215,7 @@ public class Init {
 			}
 			
 			{ // Deploy Asset Actor
-				Context<?> ctx = Context.createFake(s, HERO);
+				Context<?> ctx = Context.createFake(s, INIT);
 				Object form=Reader.readResource("libraries/asset.con");
 				ctx = ctx.deployActor(form);
 				if (ctx.isExceptional()) {
