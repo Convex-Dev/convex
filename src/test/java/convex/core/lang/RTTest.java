@@ -12,6 +12,7 @@ import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
+import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 
@@ -64,5 +65,17 @@ public class RTTest {
 		// null return values if cast fails
 		assertNull(RT.sequence(1)); // ints not allowed
 		assertNull(RT.sequence(Keywords.FOO)); // keywords not allowed
+	}
+	
+	@Test 
+	public void testCVMCasts() {
+		assertEquals(1L,(Long)RT.cvm(1L));
+		assertEquals(0.17,(Double)RT.cvm(0.17));
+		assertEquals(Strings.create("foo"),RT.cvm("foo"));
+		
+		// CVM objects shouldn't change
+		Keyword k=Keyword.create("test-key");
+		assertSame(k,RT.cvm(k));
+
 	}
 }

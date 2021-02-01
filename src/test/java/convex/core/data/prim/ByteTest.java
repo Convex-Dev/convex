@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.Hash;
 import convex.core.data.ObjectsTest;
+import convex.core.lang.RT;
 
 public class ByteTest {
 
@@ -28,5 +29,10 @@ public class ByteTest {
 			ObjectsTest.doAnyValueTests(b);
 		}
 		
+	}
+	
+	@Test public void testCVMCast() {
+		// CVM converts all numbers to Long
+		assertSame(RT.cvm(1L),RT.cvm((byte)1));
 	}
 }
