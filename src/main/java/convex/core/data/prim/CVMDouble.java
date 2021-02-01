@@ -4,7 +4,12 @@ import convex.core.data.Tag;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
 
-public class CVMDouble extends APrimitive {
+/**
+ * Class for CVM double floating-point values.
+ * 
+ * Follows the Java standard / IEEE 784 spec.
+ */
+public final class CVMDouble extends APrimitive {
 
 	private final double value;
 	

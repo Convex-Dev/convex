@@ -3,7 +3,12 @@ package convex.core.data.prim;
 import convex.core.data.Tag;
 import convex.core.exceptions.InvalidDataException;
 
-public class CVMBool extends APrimitive {
+/**
+ * Class for CVM Boolean types.
+ * 
+ * Two canonical values are provided, TRUE and FALSE. No other instances should exist.
+ */
+public final class CVMBool extends APrimitive {
 
 	private final boolean value;
 	

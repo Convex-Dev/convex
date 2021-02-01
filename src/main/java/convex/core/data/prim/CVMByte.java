@@ -3,7 +3,13 @@ package convex.core.data.prim;
 import convex.core.data.Tag;
 import convex.core.exceptions.InvalidDataException;
 
-public class CVMByte extends APrimitive {
+/**
+ * Class for CVM Byte instances.
+ * 
+ * Bytes are unsigned 8-bit integers which upcast to long for numerical operations.
+ * 
+ */
+public final class CVMByte extends APrimitive {
 
 	private final byte value;
 	

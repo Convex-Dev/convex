@@ -4,7 +4,12 @@ import convex.core.data.Format;
 import convex.core.data.Tag;
 import convex.core.exceptions.InvalidDataException;
 
-public class CVMLong extends APrimitive {
+/**
+ * Class for CVM long values.
+ * 
+ * Longs are signed 64-but integers, and are the prmary fixed point integer type on the CVM.
+ */
+public final class CVMLong extends APrimitive {
 
 	private final long value;
 	
