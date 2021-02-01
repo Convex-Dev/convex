@@ -15,18 +15,20 @@ import convex.core.data.FuzzTestFormat;
 import convex.core.data.Tag;
 import convex.core.data.prim.CVMByte;
 import convex.core.exceptions.BadFormatException;
+import convex.core.lang.RT;
 
 @RunWith(Parameterized.class)
 public class VLCParamTest {
 	private Object value;
 
 	public VLCParamTest(Object value) {
-		this.value = value;
+		// create using CVM-coerced values
+		this.value = RT.cvm(value);
 	}
 
 	@Parameterized.Parameters(name = "{0}")
 	public static Collection<Object[]> dataExamples() {
-		return Arrays.asList(new Object[][] { { 0L }, { 63L }, { 64L }, { -63L }, { -64L }, { -65L }, { 1234 },
+		return Arrays.asList(new Object[][] { { 0L }, { 63L }, { 64L }, { -63L }, { -64L }, { -65L }, { 1234L },
 				{ 1234578 }, { -1234578 }, { CVMByte.create(1) }, { CVMByte.create(255) }, { Long.MAX_VALUE }, { Long.MIN_VALUE },
 				{ Integer.MAX_VALUE }, { Integer.MIN_VALUE },
 //			{ BigInteger.valueOf(Long.MAX_VALUE).multiply(BigInteger.TEN) },

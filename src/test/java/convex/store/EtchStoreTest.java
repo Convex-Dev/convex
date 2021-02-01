@@ -192,7 +192,7 @@ public class EtchStoreTest {
 		ArrayList<Ref<ACell>> al = new ArrayList<>();
 		try {
 			Stores.setCurrent(store);
-			AVector<Integer> data = Samples.INT_VECTOR_300;
+			AVector<Long> data = Samples.INT_VECTOR_300;
 
 			// handler that records added refs
 			Consumer<Ref<ACell>> handler = r -> al.add(r);

@@ -198,7 +198,7 @@ public class BlobMapsTest {
 
 	@Test
 	public void testRemoveEntries() {
-		BlobMap<Blob, Integer> m = Samples.INT_BLOBMAP_7;
+		BlobMap<Blob, Long> m = Samples.INT_BLOBMAP_7;
 
 		assertSame(m, m.removeLeadingEntries(0));
 		assertSame(BlobMaps.empty(), m.removeLeadingEntries(7));
@@ -206,10 +206,10 @@ public class BlobMapsTest {
 
 	@Test
 	public void testSmallIntBlobMap() {
-		BlobMap<Blob, Integer> m = Samples.INT_BLOBMAP_7;
+		BlobMap<Blob, Long> m = Samples.INT_BLOBMAP_7;
 
 		for (int i = 0; i < 7; i++) {
-			MapEntry<Blob, Integer> me = m.entryAt(i);
+			MapEntry<Blob, Long> me = m.entryAt(i);
 			assertEquals(i, me.getValue());
 			assertEquals(me, m.getEntry(me.getKey()));
 		}

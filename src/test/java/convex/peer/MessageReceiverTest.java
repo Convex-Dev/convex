@@ -9,8 +9,8 @@ import java.util.ArrayList;
 
 import org.junit.Test;
 
-import convex.core.data.StringShort;
 import convex.core.exceptions.BadFormatException;
+import convex.core.lang.RT;
 import convex.core.store.Stores;
 import convex.core.util.MemoryByteChannel;
 import convex.net.Message;
@@ -30,9 +30,9 @@ public class MessageReceiverTest {
 		MemoryByteChannel chan = MemoryByteChannel.create(10000);
 		Connection pc = Connection.create(chan, null,Stores.current());
 
-		Object msg1 = StringShort.create("Hello World!");
+		Object msg1 = RT.cvm("Hello World!");
 		assertTrue(pc.sendData(msg1));
-		Object msg2 = 13;
+		Object msg2 = RT.cvm(13L);
 		assertTrue(pc.sendData(msg2));
 
 		// need to call sendBytes to flush send buffer to channel

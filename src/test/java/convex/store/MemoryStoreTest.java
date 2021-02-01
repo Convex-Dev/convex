@@ -90,7 +90,7 @@ public class MemoryStoreTest {
 		ArrayList<Ref<ACell>> al = new ArrayList<>();
 		try {
 			Stores.setCurrent(ms);
-			AVector<Integer> data = Samples.INT_VECTOR_300;
+			AVector<Long> data = Samples.INT_VECTOR_300;
 
 			Consumer<Ref<ACell>> handler = r -> al.add(r);
 

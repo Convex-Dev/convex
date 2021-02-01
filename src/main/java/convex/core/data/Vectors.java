@@ -6,6 +6,7 @@ import java.util.Collection;
 import org.bouncycastle.util.Arrays;
 
 import convex.core.exceptions.BadFormatException;
+import convex.core.lang.RT;
 import convex.core.util.Utils;
 
 public class Vectors {
@@ -22,7 +23,7 @@ public class Vectors {
 	 * @param length
 	 * @return New vector with the specified elements
 	 */
-	public static <T> AVector<T> create(T[] elements, int offset, int length) {
+	public static <T> AVector<T> create(Object[] elements, int offset, int length) {
 		if (length < 0) throw new IllegalArgumentException("Cannot create vector of negative length!");
 		if (length <= CHUNK_SIZE) return VectorLeaf.create(elements, offset, length);
 		int tailLength = Utils.checkedInt((length >> BITS_PER_LEVEL) << BITS_PER_LEVEL);
@@ -39,7 +40,7 @@ public class Vectors {
 	 * @param length
 	 * @return A vector, which must consist of a positive number of complete chunks.
 	 */
-	static <T> AVector<T> createChunked(T[] elements, int offset, int length) {
+	static <T> AVector<T> createChunked(Object[] elements, int offset, int length) {
 		if ((length == 0) || (length & BITMASK) != 0)
 			throw new IllegalArgumentException("Invalid vector length: " + length);
 		if (length == CHUNK_SIZE) return VectorLeaf.create(elements, offset, length);
@@ -78,9 +79,16 @@ public class Vectors {
 		return (AVector<T>) VectorLeaf.EMPTY;
 	}
 
+	@SuppressWarnings("unchecked")
 	@SafeVarargs
-	public static <T> AVector<T> of(T... elements) {
-		return create(elements, 0, elements.length);
+	public static <T> AVector<T> of(Object... elements) {
+		int n=elements.length;
+		Object[] es=new Object[n];
+		for (int i=0; i<n; i++) {
+			Object v=elements[i];
+			es[i]=(T)RT.cvm(v);
+		}
+		return create(es, 0, n);
 	}
 
 	@SuppressWarnings("unchecked")

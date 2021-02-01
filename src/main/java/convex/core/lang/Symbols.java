@@ -109,8 +109,6 @@ public class Symbols {
 
 	public static final Symbol LONG = Symbol.create("long");
 	public static final Symbol BYTE = Symbol.create("byte");
-	public static final Symbol SHORT = Symbol.create("short");
-	public static final Symbol INT = Symbol.create("int");
 	public static final Symbol CHAR = Symbol.create("char");
 
 	public static final Symbol DOUBLE = Symbol.create("double");

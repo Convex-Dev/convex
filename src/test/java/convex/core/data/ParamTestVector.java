@@ -30,8 +30,8 @@ public class ParamTestVector {
 	@Parameterized.Parameters(name = "{index}: {0}")
 	public static Collection<Object[]> dataExamples() {
 		return Arrays
-				.asList(new Object[][] { { "Empty Vector", Vectors.empty() }, { "Single value vector", Vectors.of(7) },
-						{ "MapEntry vector", MapEntry.create(1, 2) }, { "Nested vector", Vectors.of(Vectors.empty()) },
+				.asList(new Object[][] { { "Empty Vector", Vectors.empty() }, { "Single value vector", Vectors.of(7L) },
+						{ "MapEntry vector", MapEntry.create(1L, 2L) }, { "Nested vector", Vectors.of(Vectors.empty()) },
 						{ "Vector with Account status", Vectors.of(AccountStatus.create(1000L,Samples.ACCOUNT_KEY)) },
 						{ "Vector with Peer status", Vectors.of(PeerStatus.create(1000L)) },
 						{ "Length 10 vector", Samples.INT_VECTOR_10 }, { "Length 16 vector", Samples.INT_VECTOR_16 },

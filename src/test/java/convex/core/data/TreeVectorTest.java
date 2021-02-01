@@ -46,7 +46,7 @@ public class TreeVectorTest {
 
 	@Test
 	public void testIterator() {
-		AVector<Integer> v = Samples.INT_VECTOR_256;
+		AVector<Long> v = Samples.INT_VECTOR_256;
 		assertEquals(v.get(0), v.iterator().next());
 		assertEquals(v.get(255), v.listIterator(256).previous());
 
@@ -56,19 +56,19 @@ public class TreeVectorTest {
 
 	@Test
 	public void testMap() {
-		AVector<Integer> orig = Samples.INT_VECTOR_300;
-		AVector<Integer> inc = orig.map(i -> i + 5);
+		AVector<Long> orig = Samples.INT_VECTOR_300;
+		AVector<Long> inc = orig.map(i -> i + 5);
 		assertEquals(orig.count(), inc.count());
 		assertNotEquals(orig, inc);
-		AVector<Integer> dec = inc.map(i -> i - 5);
+		AVector<Long> dec = inc.map(i -> i - 5);
 		assertEquals(orig, dec);
 	}
 
 	@Test
 	public void testSpliterator() {
-		AVector<Integer> a = Samples.INT_VECTOR_300.subVector(0, 256);
+		AVector<Long> a = Samples.INT_VECTOR_300.subVector(0, 256);
 		assertEquals(VectorTree.class, a.getClass());
-		Spliterator<Integer> spliterator = a.spliterator();
+		Spliterator<Long> spliterator = a.spliterator();
 		assertEquals(256, spliterator.estimateSize());
 
 		int[] sum = new int[1];

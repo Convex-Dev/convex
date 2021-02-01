@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import convex.core.lang.RT;
 import convex.core.util.Utils;
 
 public class BlobMaps {
@@ -28,7 +29,8 @@ public class BlobMaps {
 		if (Utils.isOdd(n)) throw new IllegalArgumentException("Even number of key + values required");
 		BlobMap<K, V> result = empty();
 		for (int i = 0; i < n; i += 2) {
-			result = result.assoc((K) kvs[i], (V) kvs[i + 1]);
+			V value=RT.cvm(kvs[i + 1]);
+			result = result.assoc((K) kvs[i], value);
 		}
 
 		return (R) result;

@@ -40,18 +40,18 @@ public class PredictionMarketTest {
 		assertFalse(ctx.isExceptional());
 
 		// tests of bonding curve function with empty stakes
-		assertEquals(0.0, (double) ctx.actorCall(addr, 0, "bond", Maps.empty()).getResult(), 0.01);
+		assertEquals(0.0, (double) ctx.actorCall(addr, 0L, "bond", Maps.empty()).getResult(), 0.01);
 
 		// bonding curve point with one staked outcome
-		assertEquals(10.0, (double) ctx.actorCall(addr, 0, "bond", Maps.of(true, 10)).getResult(), 0.01);
+		assertEquals(10.0, (double) ctx.actorCall(addr, 0L, "bond", Maps.of(true, 10L)).getResult(), 0.01);
 
 		// two staked outcomes
-		assertEquals(5.0, (double) ctx.actorCall(addr, 0, "bond", Maps.of(true, 3, false, 4)).getResult(), 0.01);
+		assertEquals(5.0, (double) ctx.actorCall(addr, 0L, "bond", Maps.of(true, 3L, false, 4L)).getResult(), 0.01);
 
 		long initalBal=ctx.getBalance(Init.HERO);
 		{ // stake on, stake off.....
 			// first we stake on the 'true' outcome
-			Context<?> rctx1 = ctx.actorCall(addr, 10, "stake", true, 10);
+			Context<?> rctx1 = ctx.actorCall(addr, 10L, "stake", true, 10L);
 			assertEquals(10L, (long) rctx1.getResult());
 			assertEquals(10L,  initalBal- rctx1.getBalance(Init.HERO));
 			assertEquals(1.0, evalD(rctx1, "(call caddr (price true))")); // should be exact price 100%
@@ -59,37 +59,37 @@ public class PredictionMarketTest {
 
 			// stake on other outcome. Note that we offer too much funds, but this won't be
 			// accepted so no issue.
-			Context<?> rctx2 = rctx1.actorCall(addr, 10, "stake", false, 10);
+			Context<?> rctx2 = rctx1.actorCall(addr, 10L, "stake", false, 10L);
 			assertEquals(4L, (long) rctx2.getResult());
 			assertEquals(14L, initalBal - rctx2.getBalance(Init.HERO));
 			assertEquals(TestState.TOTAL_FUNDS, rctx2.getState().computeTotalFunds());
 
 			// halve stakes
-			Context<?> rctx3 = rctx2.actorCall(addr, 10, "stake", false, 5);
-			rctx3 = rctx3.actorCall(addr, 10, "stake", true, 5);
+			Context<?> rctx3 = rctx2.actorCall(addr, 10L, "stake", false, 5L);
+			rctx3 = rctx3.actorCall(addr, 10L, "stake", true, 5L);
 			assertEquals(7L, initalBal - rctx3.getBalance(Init.HERO));
 			assertEquals(0.5, evalD(rctx3, "(call caddr (price true))"), 0.1); // approx price given rounding
 
 			// zero one stake
-			Context<?> rctx4 = rctx3.actorCall(addr, 10, "stake", false, 0);
+			Context<?> rctx4 = rctx3.actorCall(addr, 10L, "stake", false, 0L);
 			assertEquals(-2L, (long) rctx4.getResult()); // refund of 2
 			assertEquals(5L, initalBal - rctx4.getBalance(Init.HERO));
 
 			// Exit market
-			Context<?> rctx5 = rctx4.actorCall(addr, 10, "stake", true, 0);
+			Context<?> rctx5 = rctx4.actorCall(addr, 10L, "stake", true, 0L);
 			assertEquals(-5L, (long) rctx5.getResult()); // refund of 5
 			assertEquals(0L, initalBal - rctx5.getBalance(Init.HERO));
 			assertEquals(TestState.TOTAL_FUNDS, rctx2.getState().computeTotalFunds());
 		}
 
 		{ // underfunded stake request
-			Context<?> rctx1 = ctx.actorCall(addr, 5, "stake", true, 10);
+			Context<?> rctx1 = ctx.actorCall(addr, 5L, "stake", true, 10L);
 			assertStateError(rctx1); // TODO: what is right error type?
 			assertEquals(0L, initalBal - rctx1.getBalance(Init.HERO));
 		}
 
 		{ // negative stake request
-			Context<?> rctx1 = ctx.actorCall(addr, 5, "stake", true, -10);
+			Context<?> rctx1 = ctx.actorCall(addr, 5L, "stake", true, -10L);
 			assertAssertError(rctx1); // TODO: what is right error type?
 			assertEquals(0L, initalBal - rctx1.getBalance(Init.HERO));
 		}

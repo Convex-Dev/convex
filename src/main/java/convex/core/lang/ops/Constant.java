@@ -15,6 +15,7 @@ import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
+import convex.core.lang.RT;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
@@ -40,7 +41,7 @@ public class Constant<T> extends AOp<T> {
 	}
 
 	public static <T> Constant<T> create(T value) {
-		return new Constant<T>(Ref.get(value));
+		return new Constant<T>(Ref.get(RT.cvm(value)));
 	}
 	
 	public static Constant<AString> create(String stringValue) {

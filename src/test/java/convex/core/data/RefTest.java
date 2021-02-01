@@ -112,10 +112,10 @@ public class RefTest {
 
 	@Test
 	public void testCompare() {
-		assertEquals(0, Ref.get(1).compareTo(Ref.createPersisted(1)));
-		assertEquals(1, Ref.get(1).compareTo(
+		assertEquals(0, Ref.get(1L).compareTo(Ref.createPersisted(1L)));
+		assertEquals(1, Ref.get(1L).compareTo(
 				Ref.forHash(Hash.fromHex("0000000000000000000000000000000000000000000000000000000000000000"))));
-		assertEquals(-1, Ref.get(1).compareTo(
+		assertEquals(-1, Ref.get(1L).compareTo(
 				Ref.forHash(Hash.fromHex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))));
 	}
 
@@ -132,7 +132,7 @@ public class RefTest {
 		Ref<ACell> a = Samples.DIABOLICAL_MAP_30_30.getRef();
 		// OK since we manage de-duplication
 		Set<Ref<?>> set = Ref.accumulateRefSet(a);
-		assertEquals(1 + 30 * 16, set.size()); // 16 refs at each level after de-duping
+		assertEquals(31 + 30 * 16, set.size()); // 16 refs at each level after de-duping
 		assertFalse(a.isEmbedded());
 	}
 

@@ -185,6 +185,9 @@ public class RT {
 	 * @return Long.class or Double.class if cast possible, or null if not numeric.
 	 */
 	public static Class<?> numericType(Object a) {
+		if (a instanceof APrimitive) {
+			return ((APrimitive)a).numericType();
+		}
 		if (!(a instanceof Number)) {
 			if (a instanceof Character) return Long.class; // Only non-number we allow, can upcast to long
 			return null;
@@ -372,7 +375,7 @@ public class RT {
 	}
 
 	/**
-	 * Coerces a value to a canonical numeric value. Result will be one of: 
+	 * Coerces a value to a numeric value ready for maths operations. Result will be one of: 
 	 * <ul> 
 	 * <li>Long for Byte, Integer, Short, Long, Amount, Character, Blob</li>
 	 * <li>Double for Double, Float </li>
@@ -384,21 +387,19 @@ public class RT {
 	public static Number number(Object a) {
 		if (a == null) return null;
 		
+		// TODO: handle double primitives
 		if (a instanceof APrimitive) {
 			return ((APrimitive)a).longValue();
 		}
 
 		Class<?> c = a.getClass();
-		// canonical numeric types
-		if (c == Long.class) return (Long) a;
 		if (c == Double.class) return (Double) a;
-
-		// other numeric primitives need widening
-		if (c == Integer.class) return ((Integer) a).longValue();
-		if (c == Short.class) return ((Short) a).longValue();
-		if (c == Float.class) return (Double) a;
-
+		if (c == Long.class) return (Long) a;
 		if (c == Character.class) return (long) ((Character) a);
+		
+		if (a instanceof Number) {
+			return ((Number)a).longValue();
+		}
 		
 		if (a instanceof ABlob) {
 			return (Long)((ABlob)a).toLong();
@@ -468,10 +469,11 @@ public class RT {
 	}
 
 	private static long longValue(Object a) {
+		if (a instanceof APrimitive) return ((APrimitive) a).longValue();
 		if (a instanceof Long) return (Long) a;
 		if (a instanceof Number) return ((Number) a).longValue();
 		if (a instanceof Character) return (long) ((char) a);
-		throw new IllegalArgumentException("Can't convert to double: " + Utils.getClassName(a));
+		throw new IllegalArgumentException("Can't convert to long: " + Utils.getClassName(a));
 	}
 
 	private static double doubleValue(Object a) {
@@ -1188,6 +1190,33 @@ public class RT {
 	public static boolean isValidAmount(long amount) {
 		return ((amount>=0)&&(amount<Constants.MAX_SUPPLY));
 	}
+	
+	public static boolean isNumber(Object val) {
+		// TODO: handle other numerics
+		return (val instanceof Number)||(val instanceof APrimitive);
+	}
+
+	/**
+	 * Converts a Java value to a CVM type
+	 * 
+	 * TODO: should be an ACell return
+	 * 
+	 * @param o Any Java Object
+	 * @return Valid CVM type
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T> T cvm(Object o) {
+		if (o==null) return null;
+		if (o instanceof ACell) return ((T)o);
+		if (o instanceof String) return (T) Strings.create((String)o);
+		if (o instanceof Double) return (T)o;
+		if (o instanceof Number) return (T)(Long)((Number)o).longValue();
+		if (o instanceof Character) return (T)toCharacter(o);
+		if (o instanceof Boolean) return (T)RT.toBoolean(o);
+		throw new IllegalArgumentException("Can't convert to CVM type with class: "+Utils.getClassName(o));
+	}
+
+
 
 
 

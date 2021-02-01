@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 
 import convex.core.exceptions.BadFormatException;
+import convex.core.lang.RT;
 
 /**
  * Utility class for map functions
@@ -35,7 +36,7 @@ public class Maps {
 	 * @param <K>
 	 * @param <V>
 	 * @param keysAndValues
-	 * @return
+	 * @return Map with given keys and values
 	 */
 	@SuppressWarnings("unchecked")
 	public static <R extends AHashMap<K, V>, K, V> R of(Object... keysAndValues) {
@@ -45,8 +46,8 @@ public class Maps {
 
 		AMap<K, V> result = Maps.empty();
 		for (int i = 0; i < n; i++) {
-			K key = (K) keysAndValues[i * 2];
-			V value = (V) keysAndValues[i * 2 + 1];
+			K key = (K) RT.cvm(keysAndValues[i * 2]);
+			V value = (V) RT.cvm(keysAndValues[i * 2 + 1]);
 			result = result.assoc(key, value);
 		}
 		return (R) result;

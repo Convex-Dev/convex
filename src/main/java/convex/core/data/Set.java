@@ -75,9 +75,10 @@ public class Set<T> extends ASet<T> {
 		return Set.wrap(m[0]);
 	}
 
-	public static <T> Set<T> create(T[] elements) {
+	public static <T> Set<T> create(Object[] elements) {
 		AHashMap<T, Object> m = Maps.empty();
-		for (T e : elements) {
+		for (Object o : elements) {
+			T e = RT.cvm(o);
 			MapEntry<T, Object> me = MapEntry.createRef(Ref.get(e), Ref.TRUE_VALUE);
 			m = m.assocEntry(me);
 		}

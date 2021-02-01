@@ -38,7 +38,12 @@ public class BlockResult extends ARecord {
 	}
 
 	public static BlockResult create(State state, Result[] results) {
-		return new BlockResult(state, Vectors.of(results));
+		int n=results.length;
+		Object[] rs=new Object[n];
+		for (int i=0; i<n; i++) {
+			rs[i]=results[i];
+		}
+		return new BlockResult(state, Vectors.of(rs));
 	}
 	
 	public static BlockResult create(State state, AVector<Result> results) {

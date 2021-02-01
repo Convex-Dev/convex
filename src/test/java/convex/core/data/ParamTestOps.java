@@ -16,6 +16,7 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
+import convex.core.lang.RT;
 import convex.core.lang.TestState;
 import convex.core.lang.ops.Cond;
 import convex.core.lang.ops.Constant;
@@ -39,8 +40,8 @@ public class ParamTestOps {
 	@Parameterized.Parameters(name = "{index}: {0}")
 	public static Collection<Object[]> dataExamples() throws BadFormatException {
 		return Arrays
-				.asList(new Object[][] { { "Constant", Constant.create(1L), 1L },
-						{ "Lookup", Do.create(Def.create("foo", Constant.create(13)), Lookup.create("foo")), 13 },
+				.asList(new Object[][] { { "Constant", Constant.create(1L), RT.cvm(1L) },
+						{ "Lookup", Do.create(Def.create("foo", Constant.create(13)), Lookup.create("foo")), RT.cvm(13) },
 						{ "Def", Def.create("foo", Constant.create("bar")), Strings.create("bar") },
 						{ "Vector", Invoke.create("vector", Constant.create("foo"), Constant.create("bar")),
 								Vectors.of(Strings.create("foo"), Strings.create("bar")) },

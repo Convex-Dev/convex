@@ -16,13 +16,13 @@ public class StreamsTest {
 
 	@Test
 	public void testIntStream() throws InvalidDataException, ValidationException {
-		AVector<Integer> v = Samples.INT_VECTOR_300;
-		Stream<Integer> s = v.stream();
+		AVector<Long> v = Samples.INT_VECTOR_300;
+		Stream<Long> s = v.stream();
 
-		List<Integer> list = s.map(i -> i).collect(Collectors.toList());
+		List<Long> list = s.map(i -> i).collect(Collectors.toList());
 		assertEquals(v.size(), list.size());
 
-		AVector<Integer> v2 = Vectors.create(list);
+		AVector<Long> v2 = Vectors.create(list);
 		v2.validate();
 		assertEquals(v.getClass(), v2.getClass());
 		assertEquals(v, v2);

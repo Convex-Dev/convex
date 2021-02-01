@@ -102,7 +102,7 @@ public class VectorTree<T> extends ASizedVector<T> {
 	 * @param length
 	 * @return New TreeVector instance
 	 */
-	public static <T> VectorTree<T> create(T[] things, int offset, int length) {
+	public static <T> VectorTree<T> create(Object[] things, int offset, int length) {
 		if (length < MINIMUM_SIZE)
 			throw new IllegalArgumentException("Can't create BlockVector with insufficient size: " + length);
 		if ((length & Vectors.BITMASK) != 0)

@@ -60,6 +60,11 @@ public class CVMByte extends APrimitive {
 		sb.append(longValue());
 	}
 
+	@Override
+	public Class<?> numericType() {
+		return Long.class;
+	}
+
 
 
 }

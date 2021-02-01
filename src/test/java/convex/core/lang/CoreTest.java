@@ -123,33 +123,6 @@ public class CoreTest {
 		assertArityError(step("(byte)"));
 		assertArityError(step("(byte nil nil)")); // arity before cast
 	}
-
-	@Test
-	public void testInt() {
-		assertEquals((int) 0x01, (int) eval("(int 1)"));
-		assertEquals((int) 255, (int) eval("(int 255)"));
-		assertEquals((int) 97, (int) eval("(int \\a)"));
-		assertEquals((int) Integer.MIN_VALUE, (int) eval("(int 2147483648)"));
-		
-		// Note: Convex bytes are unsigned. Signed bytes are pretty silly.
-		assertEquals((int) 255, (int) eval("(int (byte 255))"));
-
-		assertArityError(step("(int)"));
-		assertArityError(step("(int 1 2)"));
-
-		assertCastError(step("(int nil)"));
-		assertCastError(step("(int [])"));
-	}
-
-	@Test
-	public void testShort() {
-		assertEquals((short) 7, (short) eval("(short 7)"));
-
-		assertCastError(step("(short [1 2])"));
-
-		assertArityError(step("(short 1 2)"));
-		assertArityError(step("(short)"));
-	}
 	
 	@Test
 	public void testLet() {
@@ -2129,7 +2102,7 @@ public class CoreTest {
 	public void testLongPred() {
 		assertTrue(evalB("(long? 1)"));
 		assertTrue(evalB("(long? (long *balance*))")); // TODO: is this sane?
-		assertFalse(evalB("(long? (int 1))"));
+		assertFalse(evalB("(long? (byte 1))"));
 		assertFalse(evalB("(long? nil)"));
 		assertFalse(evalB("(long? 0xFF)"));
 		assertFalse(evalB("(long? [1 2])"));
@@ -2147,7 +2120,7 @@ public class CoreTest {
 	@Test
 	public void testNumberPred() {
 		assertTrue(evalB("(number? 0)"));
-		assertTrue(evalB("(number? (int 0))"));
+		assertTrue(evalB("(number? (byte 0))"));
 		assertTrue(evalB("(number? 0.5)"));
 		assertFalse(evalB("(number? nil)"));
 		assertFalse(evalB("(number? :foo)"));
@@ -2158,7 +2131,7 @@ public class CoreTest {
 	@Test
 	public void testZeroPred() {
 		assertTrue(evalB("(zero? 0)"));
-		assertTrue(evalB("(zero? (int 0))"));
+		assertTrue(evalB("(zero? (byte 0))"));
 		assertTrue(evalB("(zero? 0.0)"));
 		assertFalse(evalB("(zero? 0.00005)"));
 		assertFalse(evalB("(zero? 0x00)")); // not numeric!

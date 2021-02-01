@@ -118,7 +118,7 @@ public class Block extends ARecord {
 
 	@SafeVarargs
 	public static Block of(long timestamp, AccountKey peerKey, SignedData<ATransaction>... transactions) {
-		return new Block(timestamp, Vectors.of(transactions),peerKey);
+		return new Block(timestamp, Vectors.of((Object[])transactions),peerKey);
 	}
 
 	/**

@@ -62,7 +62,7 @@ public class SetsTest {
 	
 	@Test
 	public void testSubsets() {
-		Set<Integer> EM=Sets.empty();
+		Set<Long> EM=Sets.empty();
 		assertTrue(EM.isSubset(EM));
 		assertTrue(EM.isSubset(Samples.INT_SET_300));
 		assertTrue(EM.isSubset(Samples.INT_SET_10));
@@ -70,11 +70,11 @@ public class SetsTest {
 		assertFalse(Samples.INT_SET_300.isSubset(EM));
 		
 		{
-			Set<Integer> s=Samples.createRandomSubset(Samples.INT_SET_300,0.5,1);
+			Set<Long> s=Samples.createRandomSubset(Samples.INT_SET_300,0.5,1);
 			assertTrue(s.isSubset(Samples.INT_SET_300));
 		}
 		{
-			Set<Integer> s=Samples.createRandomSubset(Samples.INT_SET_10,0.5,2);
+			Set<Long> s=Samples.createRandomSubset(Samples.INT_SET_10,0.5,2);
 			assertTrue(s.isSubset(Samples.INT_SET_10));
 		}
 
@@ -86,10 +86,10 @@ public class SetsTest {
 
 	@Test
 	public void testMerging() {
-		ASet<Integer> a = Sets.of(1, 2, 3);
-		ASet<Integer> b = Sets.of(2, 4, 6);
-		assertTrue(a.contains(3));
-		assertFalse(b.contains(3));
+		ASet<Long> a = Sets.of(1, 2, 3);
+		ASet<Long> b = Sets.of(2, 4, 6);
+		assertTrue(a.contains(3L));
+		assertFalse(b.contains(3L));
 
 		assertSame(Sets.empty(), a.disjAll(a));
 		assertEquals(Sets.of(1, 2, 3, 4, 6), a.conjAll(b));
@@ -98,10 +98,10 @@ public class SetsTest {
 	
 	@Test 
 	public void regressionRead() throws BadFormatException {
-		ASet<Integer> v1=Sets.of(43);
+		ASet<Long> v1=Sets.of(43);
 		Blob b1 = Format.encodedBlob(v1);
 		
-		ASet<Integer> v2=Format.read(b1);
+		ASet<Long> v2=Format.read(b1);
 		Blob b2 = Format.encodedBlob(v2);
 		
 		assertEquals(v1, v2);
@@ -122,14 +122,14 @@ public class SetsTest {
 
 	@Test
 	public void testMergingIdentity() {
-		ASet<Integer> a = Sets.of(1, 2, 3);
-		assertTrue(a == a.include(2));
-		assertTrue(a == a.includeAll(Sets.of(1, 3)));
+		ASet<Long> a = Sets.of(1L, 2L, 3L);
+		assertTrue(a == a.include(2L));
+		assertTrue(a == a.includeAll(Sets.of(1L, 3L)));
 	}
 	
 	@Test
 	public void testIntersection() {
-		ASet<Integer> a = Sets.of(1, 2, 3);
+		ASet<Long> a = Sets.of(1, 2, 3);
 		
 		// (intersect a a) => a
 		assertSame(a,a.intersectAll(a));
@@ -149,21 +149,21 @@ public class SetsTest {
 
 	@Test
 	public void testBigMerging() {
-		ASet<Integer> s = Sets.create(Samples.INT_VECTOR_300);
+		ASet<Long> s = Sets.create(Samples.INT_VECTOR_300);
 		CollectionsTest.doSetTests(s);
 
-		ASet<Integer> s2 = s.includeAll(Sets.of(1, 2, 3, 100));
+		ASet<Long> s2 = s.includeAll(Sets.of(1, 2, 3, 100));
 		assertEquals(s, s2);
 		assertSame(s, s2);
 
-		ASet<Integer> s3 = s.disjAll(Samples.INT_VECTOR_300);
+		ASet<Long> s3 = s.disjAll(Samples.INT_VECTOR_300);
 		assertSame(s3, Sets.empty());
 
-		ASet<Integer> s4 = s.excludeAll(Sets.of(-1000));
+		ASet<Long> s4 = s.excludeAll(Sets.of(-1000));
 		assertSame(s, s4);
 
-		ASet<Integer> s5a = Sets.of(1, 3, 7, -1000);
-		ASet<Integer> s5 = s5a.disjAll(s);
+		ASet<Long> s5a = Sets.of(1, 3, 7, -1000);
+		ASet<Long> s5 = s5a.disjAll(s);
 		assertEquals(Sets.of(-1000), s5);
 	}
 

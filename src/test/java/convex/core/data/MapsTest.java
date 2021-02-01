@@ -17,6 +17,7 @@ import convex.core.Init;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
+import convex.core.lang.RT;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Transfer;
 import convex.core.util.Bits;
@@ -28,22 +29,22 @@ public class MapsTest {
 	public void testMapBuilding() throws InvalidDataException, ValidationException {
 		int SIZE = 1000;
 
-		AMap<Integer, Integer> m = Maps.empty();
-		for (int i = 0; i < SIZE; i++) {
+		AMap<Long, Long> m = Maps.empty();
+		for (long i = 0; i < SIZE; i++) {
 			assertFalse(m.containsKey(i));
 			m = m.assoc(i, i);
 			// Log.debug(i+ ": "+m);
 			if ((i < 10) || (i % 23 == 0)) m.validate(); // PERF: only check some steps
 			assertEquals(i + 1, m.size());
-			assertEquals((Integer) i, m.get(i));
+			assertEquals((Long) i, m.get(i));
 			assertTrue(m.containsKey(i));
 		}
 
-		int C = 1000000;
-		assertEquals(SIZE * (SIZE - 1) / 2 + C, (int) m.reduceValues((acc, a) -> acc + a, C));
-		assertEquals(SIZE * (SIZE - 1) + C, (int) m.reduceEntries((acc, e) -> acc + e.getKey() + e.getValue(), C));
+		long C = 1000000;
+		assertEquals(SIZE * (SIZE - 1) / 2 + C, (long) m.reduceValues((acc, a) -> acc + a, C));
+		assertEquals(SIZE * (SIZE - 1) + C, (long) m.reduceEntries((acc, e) -> acc + e.getKey() + e.getValue(), C));
 
-		for (int i = 0; i < SIZE; i++) {
+		for (long i = 0; i < SIZE; i++) {
 			assertTrue(m.containsKey(i));
 			m = m.dissoc(i);
 			assertEquals(SIZE - i - 1, m.size());
@@ -132,9 +133,9 @@ public class MapsTest {
 	@Test
 	public void regressionEmbeddedTransfer() throws BadFormatException {
 		ATransaction trans=Transfer.create(Init.HERO,0, Init.HERO, 58);
-		Short key=(short)23771;
-		AMap<Short,ATransaction> m=Maps.create(key,trans);
-		MapEntry<Short,ATransaction> me=m.entryAt(0);
+		Long key=23771L;
+		AMap<Long,ATransaction> m=Maps.create(key,trans);
+		MapEntry<Long,ATransaction> me=m.entryAt(0);
 		assertEquals(key,me.getKey());
 		assertEquals(trans,me.getValue());
 		
@@ -175,10 +176,10 @@ public class MapsTest {
 
 	@Test
 	public void testSmallMergeIndentity() {
-		MapLeaf<Object, Object> m0 = (MapLeaf<Object, Object>) Maps.empty();
-		MapLeaf<Object, Object> m1 = Maps.of(1, 2, 3, 4);
-		MapLeaf<Object, Object> m2 = Maps.of(3, 4, 5, 6);
-		MapLeaf<Object, Object> m3 = Maps.of(1, 2, 3, 4, 5, 6);
+		AHashMap<Object, Object> m0 = Maps.empty();
+		AHashMap<Object, Object> m1 = Maps.of(1, 2, 3, 4);
+		AHashMap<Object, Object> m2 = Maps.of(3, 4, 5, 6);
+		AHashMap<Object, Object> m3 = Maps.of(1, 2, 3, 4, 5, 6);
 
 		assertSame(m0, m1.mergeWith(m3, (a, b) -> null));
 		assertSame(m3, m3.mergeWith(m3, (a, b) -> a));
@@ -209,15 +210,19 @@ public class MapsTest {
 
 	@Test
 	public void testDuplicateEntryCreate() {
-		AMap<Integer, Integer> m = Maps.of(10, 2, 10, 3);
+		AMap<Long, Long> m = Maps.of(10, 2, 10, 3);
 		assertEquals(1, m.size());
-		assertEquals(10, (int) (m.entryAt(0).getKey()));
+		assertEquals(RT.cvm(10L), m.entryAt(0).getKey());
 	}
 
 	@Test
 	public void testFilterHex() {
 		MapLeaf<Object, Object> m = Maps.of(1, true, 2, true, 3, true, -1000, true);
-		assertEquals(Maps.of(3, true), m.filterHexDigits(0, 64)); // hex digit 0 = 6 only
+		assertEquals(4L,m.count());
+		
+		// TODO: selective filter
+		//assertEquals(Maps.of(3L, true), m.filterHexDigits(0, 64)); // hex digit 0 = 6 only
+		
 		assertSame(m, m.filterHexDigits(0, 0xFFFF)); // all digits selected
 		assertSame(Maps.empty(), m.filterHexDigits(0, 0)); // all digits selected
 	}
@@ -239,6 +244,15 @@ public class MapsTest {
 		AHashMap<Long, Long> m2 = m.filterValues(EVEN_PRED);
 		assertEquals(50, m2.size());
 
+	}
+	
+	@Test 
+	public void testEmpty() {
+		AMap<Keyword,Keyword> m=Maps.empty();
+		assertEquals(0L,m.count());
+		assertSame(m,Maps.empty());
+		
+		assertEquals(2L,m.getEncoding().length());
 	}
 
 	@Test
@@ -320,12 +334,14 @@ public class MapsTest {
 
 		AHashMap<Object, Object> bm = Maps.coerce(Samples.LONG_MAP_100);
 		AHashMap<Object, Object> sm = Maps.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+		
+		// change values in big map using small map
 		AHashMap<Object, Object> bm2 = bm.mergeWith(sm, (a, b) -> {
 			return (a == null) ? b : a;
 		});
-		assertEquals(105, bm2.count());
+		assertEquals(100, bm2.count());
 		assertEquals(bm2, sm.mergeWith(bm, (a, b) -> {
-			return (a == null) ? b : a;
+			return (b == null) ? a : b;
 		}));
 
 		CollectionsTest.doMapTests(m);

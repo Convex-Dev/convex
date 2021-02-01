@@ -202,7 +202,7 @@ public class NumericsTest {
 	
 	@Test
 	public void testHexCasts() {
-		assertEquals(3L, evalL("(+ (long 0x01) (int 0x02))"));
+		assertEquals(RT.cvm(3L), (Long)eval("(+ (long 0x01) (byte 0x02))"));
 		
 		// byte cast wraps over
 		assertSame(CVMByte.create(-1), eval("(byte 0xFF)"));
@@ -219,10 +219,8 @@ public class NumericsTest {
 	public void testCasts() {
 		assertEquals(0L, (long) eval("(long (byte 256))"));
 		assertEquals(1L, (long) eval("(long 1)"));
-		assertEquals(1, (int) eval("(int 1)"));
 		assertEquals('a', (char) eval("(char 97)"));
 		assertEquals(97L, (long) eval("(long \\a)"));
-		assertEquals((short) 1, (short) eval("(short 65537)"));
 		assertSame(CVMByte.create(1), eval("(byte 1)"));
 	}
 

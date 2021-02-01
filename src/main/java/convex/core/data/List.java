@@ -50,10 +50,10 @@ public class List<T> extends AList<T> {
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <T> List<T> of(T... elements) {
+	public static <T> List<T> of(Object... elements) {
 		if (elements.length == 0) return (List<T>) EMPTY;
 		Utils.reverse(elements);
-		return new List<T>(Vectors.create(elements));
+		return new List<T>(Vectors.of(elements));
 	}
 
 	@Override

@@ -228,6 +228,7 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	public static <T> Ref<T> get(T value) {
 		if (value==null) return (Ref<T>) NULL_VALUE;
 		if (value instanceof ACell) return (Ref<T>) ((ACell)value).getRef();
+		
 		return RefDirect.create(value);
 	}
 

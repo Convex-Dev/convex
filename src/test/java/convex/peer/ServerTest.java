@@ -105,7 +105,7 @@ public class ServerTest {
 		Convex convex=Convex.connect(server.getHostAddress(),Init.VILLAIN,Init.VILLAIN_KP);
 		
 		// Java strings aren't serialisable commands
-		assertThrows(IllegalArgumentException.class,()->convex.query("foo"));
+		assertThrows(IllegalArgumentException.class,()->convex.query(Invoke.create(Init.VILLAIN, 0, "Foo")));
 		
 		// test the connection is still working
 		assertNotNull(convex.getBalance(Init.VILLAIN));

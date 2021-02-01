@@ -1503,32 +1503,6 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Short> SHORT = reg(new CoreFn<>(Symbols.SHORT) {
-		@Override
-		public <I> Context<Short> invoke(Context<I> context, Object[] args) {
-			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-
-			Object a = args[0];
-			Short result = RT.toShort(a);
-			if (result == null) return context.withCastError(a, Short.class);
-
-			return context.withResult(Juice.ARITHMETIC, result);
-		}
-	});
-
-	public static final CoreFn<Integer> INT = reg(new CoreFn<>(Symbols.INT) {
-		@Override
-		public <I> Context<Integer> invoke(Context<I> context, Object[] args) {
-			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-
-			Object a = args[0];
-			Integer result = RT.toInteger(a);
-			if (result == null) return context.withCastError(a, Integer.class);
-
-			return context.withResult(Juice.ARITHMETIC, result);
-		}
-	});
-
 	public static final CoreFn<Number> PLUS = reg(new CoreFn<>(Symbols.PLUS) {
 		@Override
 		public <I> Context<Number> invoke(Context<I> context, Object[] args) {
@@ -2126,7 +2100,7 @@ public class Core {
 	public static final CorePred NUMBER_Q = reg(new CorePred(Symbols.NUMBER_Q) {
 		@Override
 		public boolean test(Object val) {
-			return val instanceof Number;
+			return RT.isNumber(val);
 		}
 	});
 
@@ -2140,9 +2114,8 @@ public class Core {
 	public static final CorePred ZERO_Q = reg(new CorePred(Symbols.ZERO_Q) {
 		@Override
 		public boolean test(Object val) {
-			if (!(val instanceof Number)) return false;
-			if ((val instanceof Long)) return ((long) val == 0L);
-			Number n = (Number) val;
+			if (!RT.isNumber(val)) return false;
+			Number n = RT.number(val);
 
 			// According to the IEEE 754 standard, negative zero and positive zero should
 			// compare as equal with the usual (numerical) comparison operators

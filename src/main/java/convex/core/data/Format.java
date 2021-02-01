@@ -379,27 +379,9 @@ public class Format {
 			return pos;
 		}
 		if (o instanceof Number) {
-			if (o instanceof Byte) {
-				bs[pos++]=Tag.BYTE;
-				bs[pos++]=(byte)o;
-				return pos;
-			}
-			if (o instanceof Short) {
-				bs[pos++]=Tag.SHORT;
-				return writeVLCLong(bs,pos, (short) o);
-			}
-			if (o instanceof Integer) {
-				bs[pos++]=Tag.INT;
-				return writeVLCLong(bs,pos, (int) o);
-			}
 			if (o instanceof Long) {
 				bs[pos++]=Tag.LONG;
 				return writeVLCLong(bs,pos, (long) o);
-			}
-			if (o instanceof Float) {
-				bs[pos++]=Tag.FLOAT;
-				int floatBits=Float.floatToRawIntBits((float)o);
-				return Utils.writeInt(bs,pos,floatBits);
 			}
 			if (o instanceof Double) {
 				bs[pos++]=Tag.DOUBLE;
@@ -754,10 +736,7 @@ public class Format {
 			if (tag == Tag.NULL) return null;
 			if (tag == Tag.BYTE) return (T) CVMByte.create(bb.get());
 			if (tag == Tag.CHAR) return (T) (Character) bb.getChar();
-			if (tag == Tag.SHORT) return (T) (Short) Utils.checkedShort(readVLCLong(bb));
-			if (tag == Tag.INT) return (T) (Integer) Utils.checkedInt(readVLCLong(bb));
 			if (tag == Tag.LONG) return (T) (Long) readVLCLong(bb);
-			if (tag == Tag.FLOAT) return (T) (Float) bb.getFloat();
 			if (tag == Tag.DOUBLE) return (T) (Double) bb.getDouble();
 
 			throw new BadFormatException("Can't read basic type with tag byte: " + tag);

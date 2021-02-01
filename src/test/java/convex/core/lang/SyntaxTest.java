@@ -11,8 +11,8 @@ public class SyntaxTest {
 
 	@Test
 	public void testSyntaxConstructor() {
-		Syntax s = Syntax.create(1);
-		assertEquals(1, (int) s.getValue());
+		Syntax s = Syntax.create(1L);
+		assertEquals(1L, (long) s.getValue());
 
 		ObjectsTest.doCellTests(s);
 	}

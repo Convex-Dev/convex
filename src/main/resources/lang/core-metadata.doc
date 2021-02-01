@@ -471,14 +471,6 @@
          :signature [{:params [num]}]}
 	}
  
-  int
-	{
-	 :doc {:description "Casts the given argument to a 32-bit signed Integer."
-         :examples [{:code "(int 10)"}]
-         :type :function
-         :signature [{:params [num]}]}
-	}
- 
   intersection
   {
     :doc {:description "Computes the intersection of one or more sets. 'nil' is treated as the empty set."

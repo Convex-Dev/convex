@@ -62,28 +62,28 @@ public class Samples {
 	
 
 
-	public static final VectorLeaf<Integer> INT_VECTOR_10 = createTestIntVector(10);
-	public static final VectorLeaf<Integer> INT_VECTOR_16 = createTestIntVector(16);
-	public static final VectorLeaf<Integer> INT_VECTOR_23 = createTestIntVector(23);
-	public static final VectorTree<Integer> INT_VECTOR_32 = createTestIntVector(32);
-	public static final VectorTree<Integer> INT_VECTOR_256 = createTestIntVector(256);
-	public static final VectorLeaf<Integer> INT_VECTOR_300 = createTestIntVector(300);
+	public static final VectorLeaf<Long> INT_VECTOR_10 = createTestIntVector(10);
+	public static final VectorLeaf<Long> INT_VECTOR_16 = createTestIntVector(16);
+	public static final VectorLeaf<Long> INT_VECTOR_23 = createTestIntVector(23);
+	public static final VectorTree<Long> INT_VECTOR_32 = createTestIntVector(32);
+	public static final VectorTree<Long> INT_VECTOR_256 = createTestIntVector(256);
+	public static final VectorLeaf<Long> INT_VECTOR_300 = createTestIntVector(300);
 
-	public static final AVector<AVector<Integer>> VECTOR_OF_VECTORS = Vectors.of(INT_VECTOR_10, INT_VECTOR_16,
+	public static final AVector<AVector<Long>> VECTOR_OF_VECTORS = Vectors.of(INT_VECTOR_10, INT_VECTOR_16,
 			INT_VECTOR_23);
 
-	public static final List<Integer> INT_LIST_10 = Lists.create(INT_VECTOR_10);
-	public static final List<Integer> INT_LIST_300 = Lists.create(INT_VECTOR_300);
+	public static final List<Long> INT_LIST_10 = Lists.create(INT_VECTOR_10);
+	public static final List<Long> INT_LIST_300 = Lists.create(INT_VECTOR_300);
 
-	public static final Set<Integer> INT_SET_10 = Sets.create(INT_VECTOR_10);
-	public static final Set<Integer> INT_SET_300 = Sets.create(INT_VECTOR_300);
+	public static final Set<Long> INT_SET_10 = Sets.create(INT_VECTOR_10);
+	public static final Set<Long> INT_SET_300 = Sets.create(INT_VECTOR_300);
 
 	
 	public static final MapLeaf<Long, Long> LONG_MAP_5 = createTestLongMap(5);
 	public static final MapTree<Long, Long> LONG_MAP_10 = createTestLongMap(10);
 	public static final MapTree<Long, Long> LONG_MAP_100 = createTestLongMap(100);
 
-	public static final BlobMap<Blob, Integer> INT_BLOBMAP_7 = BlobMaps.of(Blob.fromHex(""), 0, Blob.fromHex("0001"), 1,
+	public static final BlobMap<Blob, Long> INT_BLOBMAP_7 = BlobMaps.of(Blob.fromHex(""), 0, Blob.fromHex("0001"), 1,
 			Blob.fromHex("01"), 2, Blob.fromHex("010000"), 3, Blob.fromHex("010001"), 4, Blob.fromHex("ff0000"), 5,
 			Blob.fromHex("ff0101"), 6);
 
@@ -151,17 +151,17 @@ public class Samples {
 	}
 
 	@SuppressWarnings("unchecked")
-	static <T extends AVector<Integer>> T createTestIntVector(int size) {
-		AVector<Integer> v = Vectors.empty();
+	static <T extends AVector<Long>> T createTestIntVector(int size) {
+		AVector<Long> v = Vectors.empty();
 		for (int i = 0; i < size; i++) {
-			v = v.append(i);
+			v = v.append((long)i);
 		}
 		return (T) v;
 	}
 
 	private static AMap<Object, Object> createNastyNestedMap(int fanout, int depth) {
 		AMap<Object, Object> m = Maps.empty();
-		for (int i = 0; i < depth; i++) {
+		for (long i = 0; i < depth; i++) {
 			m = createRepeatedValueMap(m, fanout);
 			m.getHash(); // needed to to stop hash calculations getting too deep
 		}
@@ -171,8 +171,8 @@ public class Samples {
 	private static AMap<Object, Object> createRepeatedValueMap(Object v, int count) {
 		Object[] obs = new Object[count * 2];
 		for (int i = 0; i < count; i++) {
-			obs[i * 2] = i;
-			obs[i * 2 + 1] = v;
+			obs[i * 2] = RT.cvm(i);
+			obs[i * 2 + 1] = RT.cvm(v);
 		}
 		return Maps.of(obs);
 	}

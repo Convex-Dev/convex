@@ -52,6 +52,9 @@ public class CVMLong extends APrimitive {
 		sb.append(value);
 	}
 
-
+	@Override
+	public Class<?> numericType() {
+		return Long.class;
+	}
 
 }

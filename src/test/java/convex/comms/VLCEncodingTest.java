@@ -59,47 +59,6 @@ public class VLCEncodingTest {
 		assertEquals("09ff808080808080808000", Format.encodedString(Long.MIN_VALUE));
 	}
 
-	@Test
-	public void testIntVLC() {
-		// note 07 as tag for int
-		assertEquals("0700", Format.encodedString(0));
-		assertEquals("0701", Format.encodedString(1));
-		assertEquals("077f", Format.encodedString(-1));
-
-		assertEquals("073f", Format.encodedString(63)); // 6 lowest bits set
-		assertEquals("078040", Format.encodedString(64)); // first overflow to 2 bytes VLC
-		assertEquals("078100", Format.encodedString(128)); // first carry of positive bit
-
-		assertEquals("0741", Format.encodedString(-63));
-		assertEquals("0740", Format.encodedString(-64)); // sign bit only in 1 byte
-		assertEquals("07ff3f", Format.encodedString(-65)); // sign overflow to 2 bytes VLC
-		assertEquals("07ff00", Format.encodedString(-128));
-		assertEquals("07fe7f", Format.encodedString(-129)); // first negative carry
-
-		assertEquals("0787ffffff7f", Format.encodedString(Integer.MAX_VALUE));
-		assertEquals("07f880808000", Format.encodedString(Integer.MIN_VALUE));
-	}
-
-	@Test
-	public void testShortVLC() {
-		// note 05 as tag for short
-		assertEquals("0500", Format.encodedString((short) 0));
-		assertEquals("0501", Format.encodedString((short) 1));
-		assertEquals("057f", Format.encodedString((short) -1));
-
-		assertEquals("053f", Format.encodedString((short) 63)); // 6 lowest bits set
-		assertEquals("058040", Format.encodedString((short) 64)); // first overflow to 2 bytes VLC
-		assertEquals("058100", Format.encodedString((short) 128)); // first carry of positive bit
-
-		assertEquals("0541", Format.encodedString((short) -63));
-		assertEquals("0540", Format.encodedString((short) -64)); // sign bit only in 1 byte
-		assertEquals("05ff3f", Format.encodedString((short) -65)); // sign overflow to 2 bytes VLC
-		assertEquals("05ff00", Format.encodedString((short) -128));
-		assertEquals("05fe7f", Format.encodedString((short) -129)); // first negative carry
-
-		assertEquals("0581ff7f", Format.encodedString(Short.MAX_VALUE));
-		assertEquals("05fe8000", Format.encodedString(Short.MIN_VALUE));
-	}
 
 //  TODO: Currently not allowing BigInteger as valid data object. May reconsider.
 //	@Test public void testBigIntegerVLC() {
@@ -172,9 +131,9 @@ public class VLCEncodingTest {
 	}
 
 	@Test
-	public void testIntVLCRegression() throws BadFormatException {
-		int b = 1234578;
+	public void testLongVLCRegression() throws BadFormatException {
+		long b = 1234578;
 		Blob blob = Format.encodedBlob(b);
-		assertEquals(b, (int) Format.read(blob));
+		assertEquals(b, (long) Format.read(blob));
 	}
 }

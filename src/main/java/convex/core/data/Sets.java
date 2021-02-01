@@ -13,7 +13,7 @@ public class Sets {
 	}
 
 	@SafeVarargs
-	public static <T> Set<T> of(T... elements) {
+	public static <T> Set<T> of(Object... elements) {
 		return Set.create(elements);
 	}
 

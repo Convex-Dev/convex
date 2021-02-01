@@ -17,19 +17,13 @@ public class NumericGen extends Generator<Object> {
 
 	@Override
 	public Object generate(SourceOfRandomness r, GenerationStatus status) {
-		int type = r.nextInt(6);
+		int type = r.nextInt(3);
 		switch (type) {
 		case 0:
 			return CVMByte.create(r.nextLong());
 		case 1:
-			return gen().type(short.class).generate(r, status);
-		case 2:
-			return gen().type(int.class).generate(r, status);
-		case 3:
 			return gen().type(long.class).generate(r, status);
-		case 4:
-			return gen().type(float.class).generate(r, status);
-		case 5:
+		case 2:
 			return gen().type(double.class).generate(r, status);
 //			case 6:
 //				return gen().type(BigInteger.class).generate(r, status);
