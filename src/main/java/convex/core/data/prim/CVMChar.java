@@ -1,24 +1,24 @@
 package convex.core.data.prim;
 
-import convex.core.data.Format;
 import convex.core.data.Tag;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.util.Utils;
 
 /**
- * Class for CVM long values.
+ * Class for CVM character values.
  * 
- * Longs are signed 64-bit integers, and are the primary fixed point integer type on the CVM.
+ * Chars are 16-bit UTF-16 unsigned integers, and are the elements of Strings CVM.
  */
-public final class CVMLong extends APrimitive {
+public final class CVMChar extends APrimitive {
 
-	private final long value;
+	private final char value;
 	
-	public CVMLong(long value) {
+	public CVMChar(char value) {
 		this.value=value;
 	}
 
-	public static CVMLong create(long value) {
-		return new CVMLong(value);
+	public static CVMChar create(long value) {
+		return new CVMChar((char)value);
 	}
 	
 	@Override
@@ -28,7 +28,7 @@ public final class CVMLong extends APrimitive {
 	
 	@Override
 	public int estimatedEncodingSize() {
-		return 1+Format.MAX_VLC_LONG_LENGTH;
+		return 1+2;
 	}
 
 	@Override
@@ -38,13 +38,13 @@ public final class CVMLong extends APrimitive {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.LONG;
+		bs[pos++]=Tag.CHAR;
 		return encodeRaw(bs,pos);
 	}
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		return Format.writeVLCLong(bs, pos, value);
+		return Utils.writeChar(bs,pos,((char)value));
 	}
 
 	@Override
@@ -67,7 +67,7 @@ public final class CVMLong extends APrimitive {
 		return (double)value;
 	}
 	
-	public static CVMLong parse(String s) {
+	public static CVMChar parse(String s) {
 		return create(Long.parseLong(s));
 	}
 

@@ -193,7 +193,8 @@ public class VectorTree<T> extends ASizedVector<T> {
 		int n = computeArraySize(count);
 		Ref<AVector<T>>[] items = (Ref<AVector<T>>[]) new Ref<?>[n];
 		for (int i = 0; i < n; i++) {
-			T o = Format.read(bb);
+			// TODO: this needs cleanup!
+			Object o = Format.read(bb);
 			Ref<AVector<T>> ref;
 			if (!(o instanceof Ref)) {
 				// must be embedded so need to check consistency

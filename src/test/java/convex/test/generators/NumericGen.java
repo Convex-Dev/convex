@@ -27,6 +27,7 @@ public class NumericGen extends Generator<Object> {
 			return CVMLong.create(r.nextLong());
 		case 2:
 			return CVMDouble.create(r.nextDouble());
+// TODO: bigger numerics?
 //			case 6:
 //				return gen().type(BigInteger.class).generate(r, status);
 //			case 7:

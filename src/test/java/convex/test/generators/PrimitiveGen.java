@@ -6,6 +6,7 @@ import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 
@@ -30,7 +31,7 @@ public class PrimitiveGen extends Generator<Object> {
 		case 1:
 			return CVMByte.create(r.nextLong());
 		case 2:
-			return gen().type(char.class).generate(r, status);
+			return CVMChar.create(r.nextLong());
 		case 3:
 			return CVMLong.create(r.nextLong());
 		case 4:

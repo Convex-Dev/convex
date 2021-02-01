@@ -20,6 +20,7 @@ import convex.core.State;
 import convex.core.crypto.Hash;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -340,12 +341,16 @@ public class Format {
 	 * @return The ByteBuffer after writing the specified object
 	 */
 	public static ByteBuffer write(ByteBuffer bb, Object o) {
-		// Generic handling for all custom writeable types
-		// includes all AData instances (addresses, Symbols, Amounts, hashes etc.)
+		// first check for null
+		if (o == null) {
+			return bb.put(Tag.NULL);
+		}
+		
+		// Generic handling for all non-null CVM types
 		if (o instanceof ACell) {
 			return ((ACell) o).write(bb);
 		}
-		return writeNonCell(bb,o);
+		throw new IllegalArgumentException("Can't write: "+o);
 	}
 	
 	/**
@@ -355,12 +360,17 @@ public class Format {
 	 * @return The ByteBuffer after writing the specified object
 	 */
 	public static int write(byte[] bs, int pos, Object o) {
-		// Generic handling for all custom writeable types
-		// includes all AData instances (addresses, Symbols, Amounts, hashes etc.)
+		// first check for null
+		if (o == null) {
+			bs[pos++]=Tag.NULL;
+			return pos;
+		}
+		
+		// Generic handling for all non-null CVM types
 		if (o instanceof ACell) {
 			return ((ACell) o).write(bs,pos);
 		}
-		return writeNonCell(bs,pos,o);
+		throw new IllegalArgumentException("Can't write: "+o);
 	}
 	
 	/**
@@ -369,40 +379,17 @@ public class Format {
 	 * @param o Object value to write (may be null)
 	 * @return The ByteBuffer after writing the specified object
 	 */
-	public static int write(byte[] bs, int pos, ACell o) {
-		if (o==null) {
+	public static int write(byte[] bs, int pos, ACell cell) {
+		if (cell==null) {
 			bs[pos++]=Tag.NULL;
 			return pos;
 		}
-		return ((ACell) o).write(bs,pos);
-	}
-	
-	public static int writeNonCell(byte[] bs, int pos, Object o) {
-		if (o == null) {
-			bs[pos++]=Tag.NULL;
-			return pos;
-		}
-
-		if (o instanceof Character) {
-			bs[pos++]=Tag.CHAR;
-			return Utils.writeChar(bs,pos,((char)o));
-		}
-
-		throw new IllegalArgumentException("Can't encode to ByteBuffer: " + o.getClass());
+		return cell.write(bs,pos);
 	}
 
 	public static ByteBuffer writeNonCell(ByteBuffer bb, Object o) {
 		if (o == null) {
 			return bb.put(Tag.NULL);
-		}
-
-		//if (o instanceof String) {
-		//	return Strings.create((String)o).write(bb);
-		//}
-
-		if (o instanceof Character) {
-			bb = bb.put(Tag.CHAR);
-			return bb.putChar((char) o);
 		}
 
 		throw new IllegalArgumentException("Can't encode to ByteBuffer: " + o.getClass());
@@ -494,11 +481,6 @@ public class Format {
 	};
 
 	/**
-	 * Largest non-cell encoding. Currently a maximum VLC long plus one byte?
-	 */
-	private static final int MAX_NON_CELL_LENGTH = 12;
-
-	/**
 	 * Reads a UTF-8 String from a ByteBuffer. Assumes the object tag has already been
 	 * read
 	 * 
@@ -587,7 +569,7 @@ public class Format {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T> Ref<T> readRef(ByteBuffer bb) throws BadFormatException {
-		T o = Format.read(bb);
+		T o = (T) Format.read(bb);
 		if (o instanceof Ref) return (Ref<T>) o;
 		return Ref.get(o);
 	}
@@ -658,7 +640,7 @@ public class Format {
 			T result;
 
 			try {
-				result = read(bb);
+				result = (T) read(bb);
 				if (bb.hasRemaining()) throw new BadFormatException(
 						"Blob with type " + Utils.getClass(result) + " has excess bytes: " + bb.remaining());
 			} catch (BufferUnderflowException e) {
@@ -685,11 +667,11 @@ public class Format {
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> T readBasicType(ByteBuffer bb, byte tag) throws BadFormatException, BufferUnderflowException {
+	public static <T extends ACell> T readBasicType(ByteBuffer bb, byte tag) throws BadFormatException, BufferUnderflowException {
 		try {
 			if (tag == Tag.NULL) return null;
 			if (tag == Tag.BYTE) return (T) CVMByte.create(bb.get());
-			if (tag == Tag.CHAR) return (T) (Character) bb.getChar();
+			if (tag == Tag.CHAR) return (T) CVMChar.create(bb.getChar());
 			if (tag == Tag.LONG) return (T) CVMLong.create(readVLCLong(bb));
 			if (tag == Tag.DOUBLE) return (T) CVMDouble.create(bb.getDouble());
 
@@ -749,14 +731,14 @@ public class Format {
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> T read(ByteBuffer bb) throws BadFormatException, BufferUnderflowException {
+	public static <T extends AObject> T read(ByteBuffer bb) throws BadFormatException, BufferUnderflowException {
 		byte tag = bb.get();
 
 		try {
 			// put this first, probably the most common, for performance
 			if (tag == Tag.REF) return (T) Ref.readRaw(bb);
 
-			if ((tag & 0xF0) == 0x00) return readBasicType(bb, tag);
+			if ((tag & 0xF0) == 0x00) return (T) readBasicType(bb, tag);
 
 			if (tag == Tag.STRING) return (T) Strings.read(bb);
 			if (tag == Tag.BLOB) return (T) Blobs.read(bb);
@@ -850,12 +832,10 @@ public class Format {
 	 * @return Encoded data as a blob
 	 */
 	public static Blob encodedBlob(Object o) {
+		if (o==null) return Blob.NULL_ENCODING;
 		if (o instanceof AObject) return ((AObject) o).getEncoding();
 		
-		// It's not a cell, so must be embedded
-		byte[] bs=new byte[MAX_NON_CELL_LENGTH];
-		int pos=writeNonCell(bs,0,o);
-		return Blob.wrap(bs,0,pos);
+		throw new IllegalArgumentException("Can't get encoded blob for class:" + o.getClass());
 	}
 
 	/**
