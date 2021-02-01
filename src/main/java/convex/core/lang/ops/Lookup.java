@@ -19,7 +19,10 @@ import convex.core.util.Errors;
 /**
  * Op to look up a symbol in the current execution context.
  * 
- * Consumes juice for lookup.
+ * Holds an optional Address to specify lookup in another Account environment. If null, the Lookup will be performed in
+ * the current environment.
+ * 
+ * Consumes juice for lookup when executed.
  *
  * @param <T>
  */

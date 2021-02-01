@@ -39,12 +39,12 @@ import convex.core.util.Utils;
 
 /**
  * Compiler class responsible for transforming forms (code as data) into an
- * operation AST tree.
+ * Op tree for execution.
  * 
  * Phases in complete evaluation: 
  * <ol>
- * <li>Expansion (form -> form2)</li>
- * <li>Compile (form2 -> op)</li> 
+ * <li>Expansion (form -> AST)</li>
+ * <li>Compile (AST -> op)</li> 
  * <li>Execute (op -> result)</li>
  * </ol>
  * 
@@ -71,7 +71,7 @@ public class Compiler {
 	 */
 	@SuppressWarnings("unchecked")
 	static <T> Context<AOp<T>> expandCompile(Object form, Context<?> context) {
-		// expand phase
+		// expand phase starts with initial expander
 		AExpander ex = INITIAL_EXPANDER;
 		
 		// use initial expander both as current and continuation expander
@@ -92,7 +92,7 @@ public class Compiler {
 	 * Updates context with result, juice consumed
 	 * 
 	 * @param <T> Type of op result
-	 * @param form A form, either raw or wrapped in a Syntax Object
+	 * @param expandedForm A fully expanded form expressed as a Syntax Object
 	 * @param context
 	 * @return Context with compiled Op as result
 	 */
@@ -150,9 +150,12 @@ public class Compiler {
 	}
 
 	private static <R, T extends AOp<R>> Context<T> compileNumber(Context<?> context, Number form) {
+		// Check we have a valid embedded number type.
+		// TODO: needs to change is we extend support to bigints
 		if (!Format.isEmbedded(form)) {
 			return context.withCompileError("Not a valid Number in form, Type=" + form.getClass());
 		}
+		
 		return compileConstant(context, form);
 	}
 
@@ -186,6 +189,7 @@ public class Compiler {
 
 	@SuppressWarnings("unchecked")
 	private static <R, T extends AOp<R>> Context<T> compileSymbolLookup(Symbol sym, Context<?> context) {
+		// Get address of compilation environment to use for lookup resolution.
 		Address address=context.getAddress();
 		
 		Lookup<T> lookUp=Lookup.create(address,sym);
