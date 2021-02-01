@@ -9,6 +9,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
+import java.util.logging.Logger;
 
 import convex.core.Constants;
 import convex.core.Result;
@@ -25,18 +26,23 @@ import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.net.Message;
 import convex.net.ResultConsumer;
+import convex.peer.Server;
 
 /**
  * Class representing the client API to the Convex network when connected directly using the
  * binary protocol. This can be more efficient than using a REST API.
  * 
  * An Object of the type Convex represents a stateful client connection to the Convex network
- * that can issue transactions both synchronously and asynchronously.
+ * that can issue transactions both synchronously and asynchronously. This can be used by both
+ * peers and JVM-based clients.
  * 
  * "I'm doing a (free) operating system (just a hobby, won't be big and professional like gnu)"
  * - Linus Torvalds
  */
+@SuppressWarnings("unused")
 public class Convex {
+	
+	private static final Logger log = Logger.getLogger(Convex.class.getName());
 	
 	// private static final Logger log = Logger.getLogger(Convex.class.getName());
 
@@ -78,7 +84,7 @@ public class Convex {
 					awaiting.remove(id);
 					cf.complete(v);
 				} else {
-					// TODO: Maybe log that we got a message we weren't expecting?
+					log.warning("Unexpected result received for message ID: "+id+ " - was not expecting this message");
 				}
 			}
 		}
@@ -217,7 +223,7 @@ public class Convex {
 	
 	/**
 	 * Submits a transaction to the Convex network, returning a future once the transaction 
-	 * has been successfully queued.
+	 * has been successfully queued. Signs the transaction with the currently set key pair
 	 * 
 	 * @param transaction Transaction to execute
 	 * @return A Future for the result of the transaction
@@ -234,6 +240,14 @@ public class Convex {
 		return transact(signed);
 	}
 	
+	/**
+	 * Submits a signed transaction to the Convex network, returning a future once the transaction 
+	 * has been successfully queued.
+	 * 
+	 * @param signed Signed transaction to execute
+	 * @return A Future for the result of the transaction
+	 * @throws IOException If the connection is broken, or the send buffer is full
+	 */	
 	public CompletableFuture<Result> transact(SignedData<ATransaction> signed) throws IOException {
 		CompletableFuture<Result> cf=new CompletableFuture<Result>();
 		synchronized (awaiting) {
@@ -463,7 +477,7 @@ public class Convex {
 
 	public Long getBalance(Address address) throws IOException {
 		try {
-			Future<Result> future= query(Reader.read("(balance 0x"+address.toHexString()+")"));
+			Future<Result> future= query(Reader.read("(balance "+address.toString()+")"));
 			Result result=future.get(Constants.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
 			if (result.isError()) throw new Error(result.toString());
 			Long bal= (Long) result.getValue();
