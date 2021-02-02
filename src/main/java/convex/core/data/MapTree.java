@@ -780,6 +780,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			ACell ch=children[i].getValue();
 			if (!(ch instanceof AHashMap)) throw new InvalidDataException("Not an AHashMap child at index: "+i,this);
 			
+			// most important to check lengths of children add up!
 			AHashMap<K,V> c=(AHashMap<K, V>) ch;
 			cc += c.count();
 		}
