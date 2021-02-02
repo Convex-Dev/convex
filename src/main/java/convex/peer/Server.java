@@ -300,7 +300,7 @@ public class Server implements Closeable {
 		Ref<?> r = store.refForHash(h);
 		if (r != null) {
 			try {
-				Object data = r.getValue();
+				ACell data = r.getValue();
 				m.getPeerConnection().sendData(data);
 				log.info(() -> "Sent missing data for hash: " + h.toHexString() + " with type "
 						+ Utils.getClassName(data));

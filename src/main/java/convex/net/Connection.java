@@ -174,7 +174,7 @@ public class Connection {
 	 * @return true if buffered successfully, false otherwise (not sent)
 	 * @throws IOException
 	 */
-	public boolean sendData(Object value) throws IOException {
+	public boolean sendData(ACell value) throws IOException {
 		log.log(LEVEL_SEND, "Sending data: " + Utils.toString(value));
 		ByteBuffer buf = Format.encodedBuffer(value);
 		return sendBuffer(MessageType.DATA, buf);
@@ -334,7 +334,7 @@ public class Connection {
 		ACell sendVal = payload;
 		Ref.createPersisted(sendVal, r -> {
 			try {
-				Object data=r.getValue();
+				ACell data=r.getValue();
 				boolean sent = sendData(data);
 			} catch (IOException e) {
 				throw Utils.sneakyThrow(e);

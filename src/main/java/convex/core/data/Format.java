@@ -837,35 +837,25 @@ public class Format {
 	 * @param o The object to encode
 	 * @return A ByteBuffer ready to read (i.e. already flipped)
 	 */
-	public static ByteBuffer encodedBuffer(Object o) {
+	public static ByteBuffer encodedBuffer(ACell cell) {
 		// estimate size of bytebuffer required, 33 bytes big enough for most small
 		// stuff
 		int initialLength;
 		
-		boolean isCell=(o instanceof ACell);
-
-		if (isCell) {
-			// check for a cached encoding, use this if available
-			ACell cell = (ACell)o;
-			ABlob b = cell.cachedBlob();
-			if (b != null) return b.getByteBuffer();
-
-			initialLength = cell.estimatedEncodingSize();
-		} else {
-			initialLength = MAX_EMBEDDED_LENGTH;
+		if (cell==null) {
+			return ByteBuffer.wrap(new byte[] {0}).flip();
 		}
+		
+		ABlob b = cell.cachedBlob();
+		if (b != null) return b.getByteBuffer();
+
+		initialLength = cell.estimatedEncodingSize();
+		
 		ByteBuffer bb = ByteBuffer.allocate(initialLength);
 		boolean done = false;
 		while (!done) {
 			try {
-				if ((o instanceof Ref)) {
-					// necessary to handle Refs specially, since these are not cells
-					bb = ((IWriteable) o).write(bb);
-				} else if (isCell) {
-					bb = ((ACell)o).write(bb);
-				} else {
-					bb=writeNonCell(bb,o);
-				}
+				bb = cell.write(bb);
 				done = true;
 			} catch (BufferOverflowException be) {
 				// retry with larger buffer
