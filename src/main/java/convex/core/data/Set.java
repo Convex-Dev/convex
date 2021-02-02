@@ -303,11 +303,11 @@ public class Set<T extends ACell> extends ASet<T> {
 	@Override
 	public void validate() throws InvalidDataException {
 		super.validate();
+		map.validate();
 		map.mapEntries(e -> {
 			if (e.getValue() != DUMMY) {
-				Object key = e.getKey();
 				throw Utils.sneakyThrow(new InvalidDataException(
-						"Set must have true entries in underlying map with key: " + key, this));
+						"Set must have cureect DUMMY entries in underlying map", this));
 			}
 			return e;
 		});

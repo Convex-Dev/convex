@@ -945,17 +945,25 @@ public class Format {
 
 	/**
 	 * Gets a hex String representing an object's encoding
+	 * @param cell Any cell
+	 * @return Hex String
+	 */
+	public static String encodedString(ACell cell) {
+		return encodedBlob(cell).toHexString();
+	}
+	
+	/**
+	 * Gets a hex String representing an object's encoding
 	 * @param o Any object, will be cast to appropriate CVM type
 	 * @return Hex String
 	 */
 	public static String encodedString(Object o) {
-		return encodedBlob(RT.cvm(o)).toHexString();
+		return encodedString(RT.cvm(o));
 	}
 
-	public static int estimateSize(Object o) {
-		if (o==null) return 1;
-		if (o instanceof ACell) return ((ACell)o).estimatedEncodingSize();
-		return 50;
+	public static int estimateSize(ACell cell) {
+		if (cell==null) return 1;
+		return cell.estimatedEncodingSize();
 	}
 
 }

@@ -1063,14 +1063,15 @@ public class RT {
 			((ACell) o).validate();
 		} else if (o instanceof Ref) {
 			((Ref<?>) o).validate();
-		} 
-		
-		throw new InvalidDataException("Data of class" + Utils.getClass(o)
-					+ " neither IValidated, canonical nor embedded: " + Utils.ednString(o), o);
+		} else {
+			throw new InvalidDataException("Data of class" + Utils.getClass(o)
+						+ " neither IValidated, canonical nor embedded: ", o);
+		}
 		
 	}
 
-	public static void validateCell(Object o) throws InvalidDataException {
+	public static void validateCell(ACell o) throws InvalidDataException {
+		if (o==null) return;
 		if (o instanceof ACell) {
 			((ACell) o).validateCell();
 		}

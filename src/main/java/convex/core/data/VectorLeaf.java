@@ -667,6 +667,7 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 		return slice(1, count - 1);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public void validate() throws InvalidDataException {
 		super.validate();
@@ -680,7 +681,12 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 				throw new InvalidDataException("Empty ListVector with prefix? This is not right...", this);
 			}
 
-			AVector<T> tv = prefix.getValue();
+			ACell ccell=prefix.getValue();
+			if (!(ccell instanceof AVector)) {
+				throw new InvalidDataException("Prefix is not a vector", this);			
+			}
+			
+			AVector<T> tv = (AVector<T>)ccell;
 			if (prefixLength() != tv.count()) {
 				throw new InvalidDataException("Expected prefix length: " + prefixLength() + " but found " + tv.count(),
 						this);
