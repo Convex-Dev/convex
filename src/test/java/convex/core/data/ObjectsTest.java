@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import convex.core.crypto.Hash;
@@ -90,6 +91,10 @@ public class ObjectsTest {
 		assertEquals(a, r.getValue());
 
 		Blob b = Format.encodedBlob(a);
+		if (a!=null) {
+			assertSame(b,a.getEncoding());
+			assertEquals(b.length,a.getEncodingLength());
+		} 
 
 		assertTrue(b.length <= Format.LIMIT_ENCODING_LENGTH);
 		
