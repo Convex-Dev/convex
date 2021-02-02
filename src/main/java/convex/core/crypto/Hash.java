@@ -13,9 +13,7 @@ import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Tag;
-import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.RT;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
@@ -309,15 +307,24 @@ public class Hash extends AArrayBlob {
 		if (value == null) return NULL_HASH;
 		if (value instanceof ACell) return ((ACell) value).getHash();
 
-		if (value instanceof CVMBool) {
-			return RT.bool(value) ? TRUE_HASH : FALSE_HASH;
-		}
-
 		AArrayBlob d = Format.encodedBlob(value);
 		// SECURITY: make sure we use content hash, and not the d.getHash() (which is the
 		// hash of the serialisation of the serialisation of the object!)
 		Hash h = d.getContentHash();
 		return h;
+	}
+	
+	/**
+	 * Computes the Hash for any ACell value.
+	 * 
+	 * May return a cached Hash if available in memory
+	 * 
+	 * @param value
+	 * @return Hash of the encoded data for the given value
+	 */
+	public static Hash compute(ACell value) {
+		if (value == null) return NULL_HASH;
+		return value.getHash();
 	}
 
 	/**
