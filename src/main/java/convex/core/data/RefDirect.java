@@ -85,17 +85,15 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 
 	@Override
 	public boolean isEmbedded() {
+		if (value==null) return true;
 		if (embedded) return true;
-		embedded=Format.isEmbedded(value);
-		return embedded;
+		return value.isEmbedded();
 	}
 
 	@Override
 	public Hash getHash() {
-		if (hash == null) {
-			hash = Hash.compute(value);
-		}
-		return hash;
+		if (value==null) return Hash.NULL_HASH;
+		return value.getHash();
 	}
 
 	@Override
