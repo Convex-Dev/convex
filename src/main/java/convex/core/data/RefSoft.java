@@ -28,7 +28,7 @@ import convex.core.util.Utils;
  */
 public class RefSoft<T extends ACell> extends Ref<T> {
 
-	static final int ENCODING_LENGTH = Hash.LENGTH+1;
+	static final int ENCODING_LENGTH = Ref.INDIRECT_ENCODING_LENGTH;
 	
 	/**
 	 * SoftReference to value. Might get updated to a fresh instance.
@@ -161,15 +161,19 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 
 	@Override
 	public int estimatedEncodingSize() {
-		// TODO Is this always right?
-		return Hash.LENGTH+1;
+		return ENCODING_LENGTH;
 	}
 
 	@Override
 	protected Blob createEncoding() {
-		byte[] bs=new byte[RefSoft.ENCODING_LENGTH];
+		byte[] bs=new byte[ENCODING_LENGTH];
 		int pos=encode(bs,0);
 		return Blob.wrap(bs,0,pos);
+	}
+
+	@Override
+	public long getEncodingLength() {
+		return ENCODING_LENGTH;
 	}
 	
 

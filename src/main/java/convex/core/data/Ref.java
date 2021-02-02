@@ -91,7 +91,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 
 	public static final int BYTE_LENGTH = 32;
 
-	public static final int MAX_ENCODING_LENGTH = 1+BYTE_LENGTH;
+	public static final int INDIRECT_ENCODING_LENGTH = 1+BYTE_LENGTH;
 
 	
 
@@ -576,5 +576,13 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public int writeRawHash(byte[] bs,int pos) {
 		return getHash().encodeRaw(bs,pos);
 	}
+
+	/**
+	 * Gets the encoding length for writing this Ref. Will be equal to the encoding length
+	 * of the Ref's value if embedded.
+	 *  
+	 * @return
+	 */
+	public abstract long getEncodingLength();
 
 }

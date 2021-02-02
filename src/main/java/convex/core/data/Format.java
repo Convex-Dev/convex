@@ -67,7 +67,7 @@ public class Format {
 	/**
 	 * Maximum length in bytes of a Ref encoding (may be an embedded data object)
 	 */
-	public static final int MAX_REF_LENGTH = Math.max(Ref.MAX_ENCODING_LENGTH, MAX_EMBEDDED_LENGTH);
+	public static final int MAX_REF_LENGTH = Math.max(Ref.INDIRECT_ENCODING_LENGTH, MAX_EMBEDDED_LENGTH);
 
 	/**
 	 * Gets the length in bytes of VLC encoding for the given long value

@@ -113,7 +113,7 @@ public class StringTree extends AString {
 	@Override
 	public int estimatedEncodingSize() {
 		// Usually all children will be non-embedded Refs
-		return 10+Ref.MAX_ENCODING_LENGTH*children.length;
+		return 10+Ref.INDIRECT_ENCODING_LENGTH*children.length;
 	}
 
 	@Override

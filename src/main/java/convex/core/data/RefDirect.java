@@ -176,6 +176,16 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 		return Blob.wrap(bs,0,pos);
 	}
 
+	@Override
+	public long getEncodingLength() {
+		if (value==null) return 1;
+		if (isEmbedded()) {
+			return value.getEncodingLength();
+		} else {
+			return Ref.INDIRECT_ENCODING_LENGTH;
+		}
+	}
+
 
 
 }
