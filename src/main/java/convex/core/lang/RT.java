@@ -1,8 +1,6 @@
 package convex.core.lang;
 
 import java.lang.reflect.Array;
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.Collection;
 import java.util.function.BiFunction;
 
@@ -22,10 +20,8 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Blobs;
-import convex.core.data.Format;
 import convex.core.data.IAssociative;
 import convex.core.data.IGet;
-import convex.core.data.IValidated;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
 import convex.core.data.MapEntry;
@@ -1062,18 +1058,16 @@ public class RT {
 	 *                              the data has missing data
 	 */
 	public static void validate(Object o) throws InvalidDataException {
-		if (o instanceof IValidated) {
-			((IValidated) o).validate();
+		if (o==null) return;
+		if (o instanceof ACell) {
+			((ACell) o).validate();
 		} else if (o instanceof Ref) {
 			((Ref<?>) o).validate();
-		} else if (!Format.isEmbedded(o)) {
-			// TODO: figure out what counts as valid
-			if (o instanceof BigDecimal) return;
-			if (o instanceof BigInteger) return;
-			if (o instanceof String) return;
-			throw new InvalidDataException("Data of class" + Utils.getClass(o)
+		} 
+		
+		throw new InvalidDataException("Data of class" + Utils.getClass(o)
 					+ " neither IValidated, canonical nor embedded: " + Utils.ednString(o), o);
-		}
+		
 	}
 
 	public static void validateCell(Object o) throws InvalidDataException {

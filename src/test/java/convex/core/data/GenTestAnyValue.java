@@ -79,12 +79,12 @@ public class GenTestAnyValue {
 	}
 	
 	@Property
-	public void validEmbedded(@From(ValueGen.class) Object o) throws InvalidDataException, BadFormatException {
+	public void validEmbedded(@From(ValueGen.class) ACell o) throws InvalidDataException, BadFormatException {
 		if (Format.isEmbedded(o)) {
 			// shouldn't need to persist embedded data
 			Blob data=Format.encodedBlob(o);
 			
-			Object o2=Format.read(data);
+			ACell o2=Format.read(data);
 			
 			// check round trip properties
 			assertEquals(o,o2);
@@ -106,7 +106,7 @@ public class GenTestAnyValue {
 	}
 	
 	@Property (trials=20)
-	public void dataRoundTrip(@From(ValueGen.class) Object o) throws BadFormatException {
+	public void dataRoundTrip(@From(ValueGen.class) ACell o) throws BadFormatException {
 		Blob data=Format.encodedBlob(o);
 		
 		// introduce a small offset to ensure blobs working correctly
@@ -117,7 +117,7 @@ public class GenTestAnyValue {
 		assertEquals(dataRef.getHash(),hash);
 		
 		// re-read data, should be canonical
-		Object o2=Format.read(data);
+		ACell o2=Format.read(data);
 		assertTrue(Format.isCanonical(o2));
 		
 		// equality checks

@@ -15,7 +15,6 @@ import javax.swing.tree.TreePath;
 
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
-import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
 import convex.core.data.MapLeaf;
@@ -47,10 +46,6 @@ public class StateTreePanel extends JPanel {
 		}
 
 		private static String getString(Object val) {
-			if (Format.isEmbedded(val)) {
-				return val.toString();
-			}
-
 			if (val instanceof ACell) {
 				ACell r = (ACell) val;
 				return r.getClass().getSimpleName() + " [" + r.getHash().toHexString(6) + "...]";

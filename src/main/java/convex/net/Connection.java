@@ -290,14 +290,14 @@ public class Connection {
 
 	private final IRefFunction sendAll = (r -> {
 		// TODO: halt conditions to prevent sending the whole universe
-		Object o = r.getValue();
+		ACell o = r.getValue();
+		if (o==null) return r;
+		
 		// send children first
-		if (o instanceof ACell) {
-			ACell rc = (ACell) o;
-			rc.updateRefs(sender());
-		}
+		o.updateRefs(sender());
 
-		if (!Format.isEmbedded(o)) {
+		// only send this value if not embedded
+		if (!o.isEmbedded()) {
 			try {
 				sendData(o);
 			} catch (IOException e) {

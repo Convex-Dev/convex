@@ -147,11 +147,9 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	public void validate() throws InvalidDataException {
 		super.validate();
 		if (hash == null) throw new InvalidDataException("Hash should never be null in soft ref", this);
-		Object val = softRef.get();
-		if (val != null) {
-			if (Format.isEmbedded(val)) {
-				throw new InvalidDataException("Soft Ref should not contain embedded value", this);
-			}
+		ACell val = softRef.get();
+		if (Format.isEmbedded(val)) {
+			throw new InvalidDataException("Soft Ref should not contain embedded value", this);
 		}
 	}
 

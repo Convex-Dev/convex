@@ -9,8 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.Test;
 
@@ -130,10 +128,7 @@ public class FormatTest {
 		assertTrue(Format.isCanonical(null));
 		assertTrue(Format.isCanonical(RT.cvm(1)));
 		assertTrue(Format.isCanonical(Blob.create(new byte[1000]))); // should be OK
-		assertFalse(Blob.create(new byte[10000]).isCanonical()); // too big to be canonical
-		
-		assertThrows(Error.class,()->Format.isCanonical(new ArrayList<Object>())); // a random class
-		assertThrows(Error.class,()->Format.isCanonical(new AtomicLong(10L))); // a random Number subclass
+		assertFalse(Blob.create(new byte[10000]).isCanonical()); // too big to be canonical	
 	}
 	
 	@Test public void testReadBlobData() throws BadFormatException {

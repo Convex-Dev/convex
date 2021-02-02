@@ -800,13 +800,9 @@ public class Format {
 	 * @param o
 	 * @return true if object is canonical, false otherwise.
 	 */
-	public static boolean isCanonical(Object o) {
-		if (o instanceof ACell) {
-			return ((ACell) o).isCanonical();
-		}
-		if (Format.isEmbedded(o)) return true;
-
-		throw new Error("Can't determine if value of type " + Utils.getClass(o) + " is canonical: " + o);
+	public static boolean isCanonical(ACell o) {
+		if (o==null) return true;
+		return o.isCanonical();
 	}
 
 	/**
@@ -816,15 +812,10 @@ public class Format {
 	 * @param o
 	 * @return true if object is embedded, false otherwise
 	 */
-	public static boolean isEmbedded(Object o) {
+	public static boolean isEmbedded(ACell o) {
 		// TODO: should just be ACell.isEmbedded?
 		if (o == null) return true;
-		if (o instanceof ACell) {
-			return ((ACell)o).isEmbedded();
-		} else {
-			if (o instanceof Character) return true;
-		}
-		return false;
+		return o.isEmbedded();
 	}
 
 	/**
