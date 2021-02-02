@@ -217,13 +217,13 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	/**
 	 * Calculates the total Memory Size for this Cell.
 	 * 
-	 * Requires any child Refs to be of persisted status at minimum, or you might get
-	 * a MissingDataException
+	 * Requires any child Refs to be either Direct or of persisted status at minimum, 
+	 * or you might get a MissingDataException
 	 * 
 	 * @return Memory Size of this Cell
 	 */
-	protected final long calcMemorySize() {
-		long baseSize=getEncoding().length();
+	protected long calcMemorySize() {
+		long baseSize=getEncodingLength();
 		
 		long csize=0;
 		// add size for each child Ref (might be zero if embedded)
@@ -240,11 +240,22 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		
 		long result=baseSize+csize;
 		if (!isEmbedded()) {
+			// Add overhead for storage of non-embedded cell
 			result+=Constants.MEMORY_OVERHEAD;
 		} 
 		return result;
 	}
 	
+	/**
+	 * Method to calculate the encoding length of a Cell. May be overridden to avoid
+	 * creating encodings during memory size calculations. This reduces hashing!
+	 * 
+	 * @return Exact encoding length of this Cell
+	 */
+	protected long getEncodingLength() {
+		return getEncoding().length();
+	}
+
 	/**
 	 * Gets the Memory Size of this Cell, computing it if required.
 	 * 

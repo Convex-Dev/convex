@@ -98,6 +98,10 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
+		if (value==null) {
+			bs[pos++]=Tag.NULL;
+			return pos;
+		}
 		if (isEmbedded()) {
 			// embedded, so write embedded representation directly instead of Ref
 			return  Format.write(bs,pos, value);
