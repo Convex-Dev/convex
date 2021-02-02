@@ -1245,6 +1245,7 @@ public class RT {
 		if (o instanceof CVMDouble) return (T)(Double)((CVMDouble)o).doubleValue();
 		if (o instanceof CVMByte) return (T)(Byte)(byte)((CVMByte)o).longValue();
 		if (o instanceof CVMBool) return (T)(Boolean)((CVMBool)o).booleanValue();
+		if (o instanceof CVMChar) return (T)(Character)((CVMChar)o).charValue();
 		return (T)o;
 	}
 

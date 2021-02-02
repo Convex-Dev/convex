@@ -71,4 +71,8 @@ public final class CVMChar extends APrimitive {
 		return create(Long.parseLong(s));
 	}
 
+	public char charValue() {
+		return value;
+	}
+
 }
