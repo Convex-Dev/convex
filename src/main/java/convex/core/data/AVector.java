@@ -38,7 +38,7 @@ import convex.core.util.Utils;
  *
  * @param <T>
  */
-public abstract class AVector<T> extends ASequence<T> {
+public abstract class AVector<T extends ACell> extends ASequence<T> {
 
 	/**
 	 * Gets the element at the specified index in this vector
@@ -136,11 +136,11 @@ public abstract class AVector<T> extends ASequence<T> {
 	public abstract boolean allMatch(Predicate<? super T> pred);
 
 	@Override
-	public abstract <R> AVector<R> map(Function<? super T, ? extends R> mapper);
+	public abstract <R extends ACell> AVector<R> map(Function<? super T, ? extends R> mapper);
 
 	@Override
 	@SuppressWarnings("unchecked")
-	public <R> AVector<R> flatMap(Function<? super T, ? extends ASequence<R>> mapper) {
+	public <R extends ACell> AVector<R> flatMap(Function<? super T, ? extends ASequence<R>> mapper) {
 		ASequence<ASequence<R>> vals = this.map(mapper);
 		AVector<R> result = (AVector<R>) this.empty();
 		for (ASequence<R> seq : vals) {
@@ -150,7 +150,7 @@ public abstract class AVector<T> extends ASequence<T> {
 	}
 
 	@Override
-	public abstract AVector<T> concat(ASequence<T> b);
+	public abstract <R extends ACell> AVector<R> concat(ASequence<R> b);
 
 	public abstract <R> R reduce(BiFunction<? super R, ? super T, ? extends R> func, R value);
 
@@ -224,13 +224,13 @@ public abstract class AVector<T> extends ASequence<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public final <R> AVector<R> conj(R value) {
+	public final <R extends ACell> AVector<R> conj(R value) {
 		return (AVector<R>) append((T) value);
 	}
 	
-	public AVector<T> conjAll(ACollection<T> xs) {
+	public <R extends ACell> AVector<R> conjAll(ACollection<R> xs) {
 		if (xs instanceof ASequence) {
-			return concat((ASequence<T>)xs);
+			return concat((ASequence<R>)xs);
 		}
 		return concat(Vectors.create(xs));
 	}
@@ -249,7 +249,7 @@ public abstract class AVector<T> extends ASequence<T> {
 	}
 
 	@Override
-	public abstract AVector<T> assoc(long i, T value);
+	public abstract <R extends ACell> AVector<R> assoc(long i, R value);
 
 	@Override
 	public AVector<T> empty() {

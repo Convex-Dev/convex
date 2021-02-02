@@ -14,6 +14,7 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import convex.core.crypto.Ed25519KeyPair;
+import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -71,7 +72,7 @@ public class BeliefMergeTest {
 			peers = peers.assoc(key, peerStatus);
 		}
 
-		AHashMap<Symbol, Object> globals = Constants.INITIAL_GLOBALS;
+		AHashMap<Symbol, ACell> globals = Constants.INITIAL_GLOBALS;
 		globals = globals.assoc(Symbols.JUICE_PRICE, RT.cvm(1L)); // cheap juice for simplicity. USe CVM long
 		INITIAL_STATE = State.create(accounts, peers, Sets.empty(), globals, BlobMaps.empty());
 		TOTAL_VALUE = INITIAL_STATE.computeTotalFunds();

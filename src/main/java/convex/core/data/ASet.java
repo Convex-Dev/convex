@@ -13,7 +13,7 @@ import convex.core.crypto.Hash;
  *
  * @param <T> Type of set elements
  */
-public abstract class ASet<T> extends ACollection<T> implements java.util.Set<T>, IGet<T> {
+public abstract class ASet<T extends ACell> extends ACollection<T> implements java.util.Set<T>, IGet<T> {
 	
 	@Override
 	public abstract void ednString(StringBuilder sb) ;
@@ -23,7 +23,7 @@ public abstract class ASet<T> extends ACollection<T> implements java.util.Set<T>
 	 * @param a
 	 * @return Updated set
 	 */
-	public abstract ASet<T> include(T a);
+	public abstract <R extends ACell> ASet<R> include(R a);
 	
 	/**
 	 * Updates the set to exclude the given element
@@ -39,7 +39,7 @@ public abstract class ASet<T> extends ACollection<T> implements java.util.Set<T>
 	 * @param elements
 	 * @return Updated set
 	 */
-	public abstract ASet<T> includeAll(Set<T> elements) ;
+	public abstract <R extends ACell> ASet<R> includeAll(Set<R> elements) ;
 	
 	/**
 	 * Updates the set to exclude all the given elements.
@@ -50,7 +50,7 @@ public abstract class ASet<T> extends ACollection<T> implements java.util.Set<T>
 	public abstract ASet<T> excludeAll(Set<T> elements) ;
 
 	@Override
-	public abstract ASet<T> conjAll(ACollection<T> xs);
+	public abstract <R extends ACell> ASet<R> conjAll(ACollection<R> xs);
 
 	/**
 	 * Removes all elements from this set, returning a new set.
@@ -82,7 +82,7 @@ public abstract class ASet<T> extends ACollection<T> implements java.util.Set<T>
 	}
 	
 	@Override
-	public final boolean containsKey(Object o) {
+	public final boolean containsKey(ACell o) {
 		return contains(o);
 	}
 	
@@ -108,18 +108,17 @@ public abstract class ASet<T> extends ACollection<T> implements java.util.Set<T>
 	 * @param ref
 	 * @return Updated set
 	 */
-	public abstract ASet<T> includeRef(Ref<T> ref) ;
+	public abstract <R extends ACell> ASet<R> includeRef(Ref<R> ref) ;
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public abstract ASet<T> conj(Object a);
+	public abstract <R extends ACell> ASet<R> conj(R a);
 
 	/**
 	 * Gets the Object in the set for the given hash, or null if not found
 	 * @param hash
 	 * @return The set value for the given Hash if found, null otherwise.
 	 */
-	public abstract Object getByHash(Hash hash) ;
+	public abstract ACell getByHash(Hash hash) ;
 	
 	@Override
 	public ASet<T> empty() {

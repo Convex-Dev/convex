@@ -19,8 +19,9 @@ import convex.test.generators.DataStructureGen;
 @RunWith(JUnitQuickcheck.class)
 public class GenTestDataStructures {
 
+	@SuppressWarnings("rawtypes")
 	@Property
-	public void empty(@From(DataStructureGen.class) ADataStructure<?> a) {
+	public void empty(@From(DataStructureGen.class) ADataStructure a) {
 		long c = a.count();
 
 		ADataStructure<?> e = a.empty();
@@ -33,17 +34,18 @@ public class GenTestDataStructures {
 		assertEquals(0, e.size());
 	}
 
+	@SuppressWarnings("rawtypes")
 	@Property
-	public void testSequence(@From(DataStructureGen.class) ADataStructure<?> a) {
+	public void testSequence(@From(DataStructureGen.class) ADataStructure a) {
 		ASequence<?> seq = RT.sequence(a);
 		assertEquals(seq.count(), a.count());
 	}
 
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Property
-	public void testJavaInterface(@From(DataStructureGen.class) ADataStructure<?> a) {
+	public void testJavaInterface(@From(DataStructureGen.class) ADataStructure a) {
 		if (a instanceof Collection) {
-			Collection<Object> coll = (Collection<Object>) a;
+			ACollection<ACell> coll = (ACollection<ACell>) a;
 
 			assertThrows(UnsupportedOperationException.class, () -> coll.clear());
 			assertThrows(UnsupportedOperationException.class, () -> coll.addAll(coll));
@@ -52,8 +54,8 @@ public class GenTestDataStructures {
 			assertThrows(UnsupportedOperationException.class, () -> coll.remove(null));
 
 			if (coll instanceof List) {
-				List<Object> list = (List<Object>) a;
-				ASequence<Object> seq = (ASequence<Object>) list; // must be an ASequence
+				List<ACell> list = (List<ACell>) a;
+				ASequence<ACell> seq = (ASequence<ACell>) list; // must be an ASequence
 
 				assertThrows(UnsupportedOperationException.class, () -> list.set(0, null));
 				assertThrows(UnsupportedOperationException.class, () -> list.addAll(0, coll));

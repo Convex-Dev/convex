@@ -2,6 +2,7 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
+import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Format;
@@ -24,9 +25,9 @@ import convex.core.lang.RT;
  *
  * @param <T>
  */
-public class Cond<T> extends AMultiOp<T> {
+public class Cond<T extends ACell> extends AMultiOp<T> {
 
-	protected Cond(AVector<AOp<?>> ops) {
+	protected Cond(AVector<AOp<ACell>> ops) {
 		super(ops);
 	}
 
@@ -37,30 +38,30 @@ public class Cond<T> extends AMultiOp<T> {
 	 * @param ops
 	 * @return Cond instance
 	 */
-	public static <T> Cond<T> create(AOp<?>... ops) {
-		ASequence<AOp<?>> refOps=Vectors.create(ops);
+	public static <T extends ACell> Cond<T> create(AOp<?>... ops) {
+		ASequence<AOp<ACell>> refOps=Vectors.create(ops);
 		return create(refOps);
 	}
 	
 	@Override
-	protected Cond<T> recreate(ASequence<AOp<?>> newOps) {
+	protected Cond<T> recreate(ASequence<AOp<ACell>> newOps) {
 		if (ops==newOps) return this;
 		return new Cond<T>(newOps.toVector());
 	}
 	
-	public static <T> Cond<T> create(ASequence<AOp<?>> ops) {
+	public static <T extends ACell> Cond<T> create(ASequence<AOp<ACell>> ops) {
 		return new Cond<T>(ops.toVector());
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <I> Context<T> execute(Context<I> context) {
+	public <I extends ACell> Context<T> execute(Context<I> context) {
 		int n=ops.size();
 		Context<?> ctx=context.consumeJuice(Juice.COND_OP);
 		if (ctx.isExceptional()) return (Context<T>) ctx;
 		
 		for (int i=0; i<(n-1); i+=2) {
-			AOp<?> testOp=ops.get(i);
+			AOp<ACell> testOp=ops.get(i);
 			ctx=ctx.execute(testOp);
 			
 			// bail out from exceptional result in test
@@ -107,14 +108,14 @@ public class Cond<T> extends AMultiOp<T> {
 		return Ops.COND;
 	}
 
-	public static <T> Cond<T> read(ByteBuffer b) throws BadFormatException {
-		AVector<AOp<?>> ops=Format.read(b);
+	public static <T extends ACell> Cond<T> read(ByteBuffer b) throws BadFormatException {
+		AVector<AOp<ACell>> ops=Format.read(b);
 		return create(ops);
 	}
 
 	@Override
 	public Cond<T> updateRefs(IRefFunction func)  {
-		ASequence<AOp<?>> newOps= ops.updateRefs(func);
+		ASequence<AOp<ACell>> newOps= ops.updateRefs(func);
 		return recreate(newOps);
 	}
 }

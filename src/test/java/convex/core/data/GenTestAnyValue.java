@@ -43,7 +43,7 @@ public class GenTestAnyValue {
 	}
 	
 	@Property
-	public void genericTests(@From(ValueGen.class) Object o) throws InvalidDataException, BadFormatException {
+	public void genericTests(@From(ValueGen.class) ACell o) throws InvalidDataException, BadFormatException {
 		ObjectsTest.doAnyValueTests(o);
 	}
 	
@@ -93,7 +93,7 @@ public class GenTestAnyValue {
 			assertTrue(Format.isEmbedded(o2));
 			
 			// when we persist a ref to an embedded object, should be the object itself
-			Ref<Object> ref=Ref.get(o);
+			Ref<ACell> ref=Ref.get(o);
 			assertTrue(ref.isDirect()); 
 			assertEquals(data,Format.encodedBlob(ref)); // should encode ref same as value
 		} else {
@@ -112,7 +112,7 @@ public class GenTestAnyValue {
 		// introduce a small offset to ensure blobs working correctly
 		data=Samples.ONE_ZERO_BYTE_DATA.append(data).slice(1).toBlob();
 		
-		Ref<Object> dataRef=Ref.get(o).persist(); // ensure in store
+		Ref<ACell> dataRef=Ref.get(o).persist(); // ensure in store
 		Hash hash=Hash.compute(o);
 		assertEquals(dataRef.getHash(),hash);
 		
@@ -130,26 +130,26 @@ public class GenTestAnyValue {
 		assertEquals(data,data2);
 		
 		// simulate retrieval via hash
-		Ref<Object> dataRef2=Stores.current().refForHash(hash);
+		Ref<ACell> dataRef2=Stores.current().refForHash(hash);
 		if (dataRef2==null) {
 			assertTrue(Format.isEmbedded(o));
 		} else {
 			// should be in store if not embedded
 			assertFalse(Format.isEmbedded(o));
 			assertEquals(dataRef,dataRef2);
-			Ref<Object> r2=Ref.forHash(hash);
+			Ref<ACell> r2=Ref.forHash(hash);
 			Object o3=r2.getValue();
 			assertEquals(o,o3);
 		}
 	}
 	
 	@Property
-	public void setInclusion(@From(ValueGen.class) Object o) throws BadFormatException, InvalidDataException {
-		ASet<Object> s=Sets.of(o);
+	public void setInclusion(@From(ValueGen.class) ACell o) throws BadFormatException, InvalidDataException {
+		ASet<ACell> s=Sets.of(o);
 		s.validate();
 		assertEquals(o,s.iterator().next());
 		
-		ASet<Object> s2=s.exclude(o);
+		ASet<ACell> s2=s.exclude(o);
 		assertTrue(s2.isEmpty());
 	}
 

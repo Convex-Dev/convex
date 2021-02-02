@@ -26,28 +26,28 @@ import convex.core.util.Utils;
  *
  * @param <T> The type of set elements
  */
-public class Set<T> extends ASet<T> {
+public class Set<T extends ACell> extends ASet<T> {
 
-	static final Set<?> EMPTY = new Set<>(Maps.empty());
+	static final Set<?> EMPTY = new Set<ACell>(Maps.empty());
 
 	/**
 	 * Dummy value used in underlying maps. Not important what this is, but should be small, efficient and non-null
 	 * so we use Boolean.TRUE
 	 */
-	public static final Object DUMMY = CVMBool.TRUE;
-	public static final Ref<?> DUMMY_REF = Ref.TRUE_VALUE;
+	public static final CVMBool DUMMY = CVMBool.TRUE;
+	public static final Ref<CVMBool> DUMMY_REF = Ref.TRUE_VALUE;
 
 	/**
 	 * Internal map used to represent the set
 	 */
-	private final AHashMap<T, Object> map;
+	private final AHashMap<T, ACell> map;
 
-	private Set(AHashMap<T, Object> source) {
+	private Set(AHashMap<T, ACell> source) {
 		map = source;
 	}
 
 	@SuppressWarnings("unchecked")
-	static <T> Set<T> wrap(AHashMap<T, Object> source) {
+	static <T extends ACell> Set<T> wrap(AHashMap<T, ACell> source) {
 		if (source.isEmpty()) return (Set<T>) EMPTY;
 		return new Set<T>(source);
 	}
@@ -60,7 +60,7 @@ public class Set<T> extends ASet<T> {
 	 * @return
 	 */
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	static <T> Set<T> create(ASequence<T> a) {
+	static <T extends ACell> Set<T> create(ASequence<T> a) {
 		if (a.isEmpty()) return (Set<T>) EMPTY;
 
 		// dirty, dirty hack because Java doesn't like mutating variables in enclosing
@@ -70,17 +70,17 @@ public class Set<T> extends ASet<T> {
 		// we use the visitor approach to optimise this, because we want to avoid
 		// building new Refs for each element.
 		a.visitElementRefs(r -> {
-			MapEntry<T, Object> me = MapEntry.createRef(r, Ref.TRUE_VALUE);
+			MapEntry<T, ACell> me = MapEntry.createRef(r, Ref.TRUE_VALUE);
 			m[0] = m[0].assocEntry(me);
 		});
 		return Set.wrap(m[0]);
 	}
 
-	public static <T> Set<T> create(Object[] elements) {
-		AHashMap<T, Object> m = Maps.empty();
+	public static <T extends ACell> Set<T> create(Object[] elements) {
+		AHashMap<T, ACell> m = Maps.empty();
 		for (Object o : elements) {
 			T e = RT.cvm(o);
-			MapEntry<T, Object> me = MapEntry.createRef(Ref.get(e), Ref.TRUE_VALUE);
+			MapEntry<T, ACell> me = MapEntry.createRef(Ref.get(e), Ref.TRUE_VALUE);
 			m = m.assocEntry(me);
 		}
 		return Set.wrap(m);
@@ -160,20 +160,20 @@ public class Set<T> extends ASet<T> {
 	}
 
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		return map.getRef(i);
 	}
 
 	@Override
-	public Object getByHash(Hash hash) {
-		MapEntry<?, ?> me = map.getEntryByHash(hash);
+	public T getByHash(Hash hash) {
+		MapEntry<T, ?> me = map.getEntryByHash(hash);
 		if (me == null) return null;
 		return me.getKey();
 	}
 
 	@Override
 	public Set<T> updateRefs(IRefFunction func) {
-		AHashMap<T, Object> m = map.updateRefs(func);
+		AHashMap<T, ACell> m = map.updateRefs(func);
 		if (map == m) return this;
 		return wrap(m);
 	}
@@ -207,12 +207,12 @@ public class Set<T> extends ASet<T> {
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> Set<T> read(ByteBuffer bb) throws BadFormatException {
+	public static <T extends ACell> Set<T> read(ByteBuffer bb) throws BadFormatException {
 		Object o = Format.read(bb);
 		// we need to read the hashmap object directly, and validate it is indeed a
 		// hashmap
 		if (!(o instanceof AHashMap)) throw new BadFormatException("Map expected as set content");
-		AHashMap<T, Object> map = (AHashMap<T, Object>) o;
+		AHashMap<T, ACell> map = (AHashMap<T, ACell>) o;
 
 		return wrap(map);
 	}
@@ -224,22 +224,25 @@ public class Set<T> extends ASet<T> {
 
 
 
-	@Override
-	public Set<T> include(T a) {
-		if (map.containsKey(a)) return this;
-		return wrap(map.assocRef(Ref.get(a), DUMMY));
-	}
-
-	@Override
-	public Set<T> includeRef(Ref<T> ref) {
-		if (map.containsKeyRef(ref)) return this;
-		return wrap(map.assocRef(ref, false));
-	}
-	
 	@SuppressWarnings("unchecked")
 	@Override
-	public Set<T> conj(Object a) {
-		return include((T) a);
+	public <R extends ACell> Set<R> include(R a) {
+		AHashMap<R, ACell> mymap=(AHashMap<R, ACell>) map;
+		if (mymap.containsKey(a)) return (Set<R>) this;
+		return wrap(mymap.assocRef(Ref.get(a), DUMMY));
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public <R extends ACell> Set<R> includeRef(Ref<R> ref) {
+		AHashMap<R, ACell> mymap=(AHashMap<R, ACell>) map;
+		if (mymap.containsKeyRef(ref)) return (Set<R>) this;
+		return wrap(mymap.assocRef(ref, DUMMY));
+	}
+	
+	@Override
+	public <R extends ACell> Set<R> conj(R a) {
+		return include((R) a);
 	}
 
 	@Override
@@ -248,8 +251,8 @@ public class Set<T> extends ASet<T> {
 	}
 
 	@Override
-	public Set<T> conjAll(ACollection<T> b) {
-		if (b instanceof Set) return includeAll((Set<T>) b);
+	public <R extends ACell> Set<R> conjAll(ACollection<R> b) {
+		if (b instanceof Set) return includeAll((Set<R>) b);
 		ASequence<T> seq = RT.sequence(b);
 		if (seq == null) throw new IllegalArgumentException("Can't convert to seq: " + Utils.getClassName(b));
 		return conjAll(Set.create(RT.sequence(b)));
@@ -263,13 +266,14 @@ public class Set<T> extends ASet<T> {
 		return disjAll(Set.create(seq));
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public Set<T> includeAll(Set<T> b) {
-		if (b.isEmpty()) return this;
+	public <R extends ACell> Set<R> includeAll(Set<R> b) {
+		if (b.isEmpty()) return (Set<R>) this;
 		
 		// any key in either map results in a non-null value, assuming one is non-null
-		AHashMap<T, Object> rmap = map.mergeDifferences(b.map, (x, y) -> (y == null) ? x : y);
-		if (map == rmap) return this;
+		AHashMap<R, ACell> rmap = ((AHashMap<R, ACell>)map).mergeDifferences(b.map, (x, y) -> (y == null) ? x : y);
+		if (map == rmap) return (Set<R>) this;
 		return wrap(rmap);
 	}
 
@@ -278,7 +282,7 @@ public class Set<T> extends ASet<T> {
 		if (b.isEmpty()) return this;
 		
 		// any value in y removes the value in x
-		AHashMap<T, Object> rmap = map.mergeWith(b.map, (x, y) -> (y == null) ? x : null);
+		AHashMap<T, ACell> rmap = map.mergeWith(b.map, (x, y) -> (y == null) ? x : null);
 		if (map == rmap) return this;
 		return wrap(rmap);
 	}
@@ -315,7 +319,7 @@ public class Set<T> extends ASet<T> {
 	}
 
 	@Override
-	public <R> ASet<R> map(Function<? super T, ? extends R> mapper) {
+	public <R extends ACell> ASet<R> map(Function<? super T, ? extends R> mapper) {
 		return Set.create(this.toVector().map(mapper));
 	}
 
@@ -329,7 +333,7 @@ public class Set<T> extends ASet<T> {
 		// ensure this is smaller set. Important to avoid creating new set if a subset.
 		if (count()>xs.count()) return xs.intersectAll(this);
 		
-		AHashMap<T, Object> newMap=map.mergeWith(xs.map, (a,b)->((a==null)||(b==null))?null:a);
+		AHashMap<T, ACell> newMap=map.mergeWith(xs.map, (a,b)->((a==null)||(b==null))?null:a);
 		if (map==newMap) return this;
 		return wrap(newMap);
 	}

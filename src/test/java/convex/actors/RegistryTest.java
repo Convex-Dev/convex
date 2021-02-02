@@ -8,6 +8,7 @@ import java.io.IOException;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Init;
+import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
@@ -34,7 +35,7 @@ public class RegistryTest {
 		// Context<?> ctx=CoreTest.INITIAL_CONTEXT.deployContract(cfn);
 		// Address addr=(Address) ctx.getResult();
 
-		AHashMap<Keyword, Object> ddo = Maps.of(Keyword.create("name"), "Bob");
+		AHashMap<Keyword, ACell> ddo = Maps.of(Keyword.create("name"), "Bob");
 		Context<?> ctx = INITIAL_CONTEXT.actorCall(REG, 0, Symbol.create("register"), ddo);
 		assertEquals(ddo, ctx.actorCall(REG, 0, "lookup", ctx.getAddress()).getResult());
 	}

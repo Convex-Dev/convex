@@ -1,25 +1,26 @@
 package convex.core.lang.impl;
 
+import convex.core.data.ACell;
 import convex.core.data.IGet;
 import convex.core.data.Keyword;
 import convex.core.lang.Context;
 import convex.core.lang.IFn;
 import convex.core.lang.RT;
 
-public class KeyFn<T> implements IFn<T> {
+public class KeyFn<T extends ACell> implements IFn<T> {
 	private Keyword key;
 
 	public KeyFn(Keyword k) {
 		this.key = k;
 	}
 
-	public static <T> KeyFn<T> wrap(Keyword k) {
+	public static <T extends ACell> KeyFn<T> wrap(Keyword k) {
 		return new KeyFn<T>(k);
 	}
 
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
-	public <I> Context<T> invoke(Context<I> context, Object[] args) {
+	public Context<T> invoke(Context context, Object[] args) {
 		int n = args.length;
 		T result;
 		if (n == 1) {
@@ -28,7 +29,7 @@ public class KeyFn<T> implements IFn<T> {
 			result = gettable.get(key);
 		} else if (n == 2) {
 			Object ds = args[0];
-			Object notFound = args[1];
+			ACell notFound = (ACell) args[1];
 			if (ds == null) {
 				result = (T) notFound;
 			} else {

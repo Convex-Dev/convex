@@ -23,7 +23,7 @@ public class Vectors {
 	 * @param length
 	 * @return New vector with the specified elements
 	 */
-	public static <T> AVector<T> create(Object[] elements, int offset, int length) {
+	public static <T extends ACell> AVector<T> create(Object[] elements, int offset, int length) {
 		if (length < 0) throw new IllegalArgumentException("Cannot create vector of negative length!");
 		if (length <= CHUNK_SIZE) return VectorLeaf.create(elements, offset, length);
 		int tailLength = Utils.checkedInt((length >> BITS_PER_LEVEL) << BITS_PER_LEVEL);
@@ -40,7 +40,7 @@ public class Vectors {
 	 * @param length
 	 * @return A vector, which must consist of a positive number of complete chunks.
 	 */
-	static <T> AVector<T> createChunked(Object[] elements, int offset, int length) {
+	static <T extends ACell> AVector<T> createChunked(Object[] elements, int offset, int length) {
 		if ((length == 0) || (length & BITMASK) != 0)
 			throw new IllegalArgumentException("Invalid vector length: " + length);
 		if (length == CHUNK_SIZE) return VectorLeaf.create(elements, offset, length);
@@ -54,7 +54,7 @@ public class Vectors {
 	 * @param elements
 	 * @return New vector with the specified elements
 	 */
-	public static <T> AVector<T> create(T[] elements) {
+	public static <T extends ACell> AVector<T> create(Object[] elements) {
 		return create(elements, 0, elements.length);
 	}
 
@@ -68,14 +68,14 @@ public class Vectors {
 	 * @return New vector with the specified collection of elements
 	 */
 	@SuppressWarnings("unchecked")
-	public static <R, T> AVector<R> create(Collection<?> list) {
+	public static <R extends ACell, T extends ACell> AVector<R> create(Collection<?> list) {
 		if (list instanceof AVector) return (AVector<R>) list;
 		if (list.size() == 0) return empty();
 		return (AVector<R>) create(list.toArray());
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <T> AVector<T> empty() {
+	public static <T extends ACell> AVector<T> empty() {
 		return (AVector<T>) VectorLeaf.EMPTY;
 	}
 
@@ -87,9 +87,9 @@ public class Vectors {
 	 */
 	@SuppressWarnings("unchecked")
 	@SafeVarargs
-	public static <T> AVector<T> of(Object... elements) {
+	public static <T extends ACell> AVector<T> of(Object... elements) {
 		int n=elements.length;
-		T[] es=(T[]) elements.clone();
+		Object[] es= elements.clone();
 		for (int i=0; i<n; i++) {
 			Object v=elements[i];
 			es[i]=(T)RT.cvm(v);
@@ -98,7 +98,7 @@ public class Vectors {
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <T> AVector<T> repeat(T m, int count) {
+	public static <T extends ACell> AVector<T> repeat(T m, int count) {
 		Object[] obs = new Object[count];
 		Arrays.fill(obs, m);
 		return (AVector<T>) create(obs);
@@ -114,7 +114,7 @@ public class Vectors {
 	 * @return Vector read from ByteBuffer
 	 * @throws BadFormatException
 	 */
-	public static <T> AVector<T> read(ByteBuffer bb) throws BadFormatException {
+	public static <T extends ACell> AVector<T> read(ByteBuffer bb) throws BadFormatException {
 		long count = Format.readVLCLong(bb);
 		if ((count <= VectorLeaf.MAX_SIZE) || ((count & 0x0F) != 0)) {
 			return VectorLeaf.read(bb, count);

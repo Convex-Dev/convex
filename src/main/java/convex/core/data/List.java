@@ -23,9 +23,9 @@ import convex.core.util.Utils;
  * 
  * @param <T>
  */
-public class List<T> extends AList<T> {
+public class List<T extends ACell> extends AList<T> {
 
-	static final List<Object> EMPTY = new List<>(Vectors.empty());
+	static final List<ACell> EMPTY = new List<>(Vectors.empty());
 
 	AVector<T> data;
 	private long count;
@@ -44,13 +44,13 @@ public class List<T> extends AList<T> {
 	 * @return Vector representing this list in reverse order
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> List<T> reverse(AVector<T> vector) {
+	public static <T extends ACell> List<T> reverse(AVector<T> vector) {
 		if (vector.isEmpty()) return (List<T>) Lists.empty();
 		return new List<T>(vector);
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <T> List<T> of(Object... elements) {
+	public static <T extends ACell> List<T> of(Object... elements) {
 		if (elements.length == 0) return (List<T>) EMPTY;
 		Utils.reverse(elements);
 		return new List<T>(Vectors.of(elements));
@@ -80,11 +80,12 @@ public class List<T> extends AList<T> {
 		return data.getElementRef(count - 1 - i);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public AList<T> assoc(long i, T value) {
-		AVector<T> newData;
+	public <R extends ACell> AList<R> assoc(long i, R value) {
+		AVector<R> newData;
 		newData = data.assoc(count - 1 - i, value);
-		if (data == newData) return this;
+		if (data == newData) return (AList<R>) this;
 		return new List<>(newData);
 	}
 
@@ -191,7 +192,7 @@ public class List<T> extends AList<T> {
 	}
 
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		return data.getRef(i);
 	}
 
@@ -245,7 +246,7 @@ public class List<T> extends AList<T> {
 	 * Reads a List from the specified bytebuffer. Assumes Tag byte already consumed.
 	 * 
 	 */
-	public static <T> List<T> read(ByteBuffer bb) throws BadFormatException {
+	public static <T extends ACell> List<T> read(ByteBuffer bb) throws BadFormatException {
 		try {
 			AVector<T> data = Vectors.read(bb);
 			if (data == null) throw new BadFormatException("Expected vector but got null in List format");
@@ -277,7 +278,7 @@ public class List<T> extends AList<T> {
 	 * @return Updated list
 	 */
 	@Override
-	public <R> List<R> conj(R value) {
+	public <R extends ACell> List<R> conj(R value) {
 		return new List<R>((AVector<R>) data.conj(value));
 	}
 	
@@ -286,7 +287,7 @@ public class List<T> extends AList<T> {
 		return new List<T>((AVector<T>) data.conj(x));
 	}
 	
-	public List<T> conjAll(ACollection<T> xs) {
+	public <R extends ACell> List<R> conjAll(ACollection<R> xs) {
 		return reverse(data.conjAll(xs));
 	}
 
@@ -311,16 +312,17 @@ public class List<T> extends AList<T> {
 	}
 
 	@Override
-	public <R> AList<R> map(Function<? super T, ? extends R> mapper) {
+	public <R extends ACell> AList<R> map(Function<? super T, ? extends R> mapper) {
 		// TODO: reverse map order?
 		return new List<>(data.map(mapper));
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public AList<T> concat(ASequence<T> vals) {
-		AVector<T> rvals;
+	public <R extends ACell> List<R> concat(ASequence<R> vals) {
+		AVector<R> rvals;
 		if (vals instanceof List) {
-			rvals = ((List<T>) vals).data;
+			rvals = ((List<R>) vals).data;
 		} else {
 			rvals = Vectors.empty();
 			long n = vals.count();
@@ -328,7 +330,7 @@ public class List<T> extends AList<T> {
 				rvals = rvals.conj(vals.get(n - i - 1));
 			}
 		}
-		return List.reverse(rvals.concat(data));
+		return List.reverse(rvals.concat((AVector<R>)data));
 	}
 
 	@Override

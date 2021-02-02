@@ -44,15 +44,15 @@ public class MemoryStoreTest {
 
 			assertNull(ms.refForHash(BAD_HASH));
 
-			AMap<String, String> data = Maps.of(Keywords.CODE,Address.ZERO);
-			Ref<AMap<String, String>> goodRef = data.getRef();
+			AMap<ACell, ACell> data = Maps.of(Keywords.CODE,Address.ZERO);
+			Ref<AMap<ACell, ACell>> goodRef = data.getRef();
 			Hash goodHash = goodRef.getHash();
 			assertNull(ms.refForHash(goodHash));
 
 			goodRef.persist();
 
 			if (!(data.isEmbedded())) {
-				Ref<AMap<String, String>> recRef = ms.refForHash(goodHash);
+				Ref<AMap<ACell, ACell>> recRef = ms.refForHash(goodHash);
 				assertNotNull(recRef);
 				assertEquals(data, recRef.getValue());
 			}

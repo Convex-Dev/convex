@@ -11,6 +11,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import convex.core.State;
+import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
@@ -40,18 +41,20 @@ public class ParamTestOps {
 	@Parameterized.Parameters(name = "{index}: {0}")
 	public static Collection<Object[]> dataExamples() throws BadFormatException {
 		return Arrays
-				.asList(new Object[][] { { "Constant", Constant.create(1L), RT.cvm(1L) },
-						{ "Lookup", Do.create(Def.create("foo", Constant.create(13)), Lookup.create("foo")), RT.cvm(13) },
+				.asList(new Object[][] { 
+					    { "Constant", Constant.of(1L), RT.cvm(1L) },
+						{ "Lookup", Do.create(Def.create("foo", Constant.of(13)), 
+								Lookup.create("foo")), RT.cvm(13) },
 						{ "Def", Def.create("foo", Constant.create("bar")), Strings.create("bar") },
 						{ "Vector", Invoke.create("vector", Constant.create("foo"), Constant.create("bar")),
 								Vectors.of(Strings.create("foo"), Strings.create("bar")) },
 
 						{ "Do", Do.create(Constant.create("foo"), Constant.create("bar")), Strings.create("bar") },
 						{ "Cond",
-								Cond.create(Constant.create(true), Constant.create("truthy"),
+								Cond.create(Constant.of(CVMBool.TRUE), Constant.create("truthy"),
 										Constant.create("falsey")),
 								Strings.create("truthy") },
-						{ "Def", Def.create("foo", Constant.create(1L)), 1L } });
+						{ "Def", Def.create("foo", Constant.of(1L)), 1L } });
 	}
 
 	@Test

@@ -11,6 +11,7 @@ import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519KeyPair;
 import convex.core.crypto.Ed25519Signature;
 import convex.core.crypto.Hash;
+import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
 import convex.core.data.AMap;
 import convex.core.data.ASequence;
@@ -70,7 +71,7 @@ public class Samples {
 	public static final VectorTree<CVMLong> INT_VECTOR_256 = createTestIntVector(256);
 	public static final VectorLeaf<CVMLong> INT_VECTOR_300 = createTestIntVector(300);
 
-	public static final AVector<AVector<Long>> VECTOR_OF_VECTORS = Vectors.of(INT_VECTOR_10, INT_VECTOR_16,
+	public static final AVector<AVector<CVMLong>> VECTOR_OF_VECTORS = Vectors.of(INT_VECTOR_10, INT_VECTOR_16,
 			INT_VECTOR_23);
 
 	public static final List<CVMLong> INT_LIST_10 = Lists.create(INT_VECTOR_10);
@@ -97,10 +98,10 @@ public class Samples {
 	public static final Keyword FOO = Keyword.create("foo");
 	public static final Keyword BAR = Keyword.create("bar");
 
-	public static final AVector<Object> DIABOLICAL_VECTOR_30_30;
-	public static final AVector<Object> DIABOLICAL_VECTOR_2_10000;
-	public static final AMap<Object, Object> DIABOLICAL_MAP_30_30;
-	public static final AMap<Object, Object> DIABOLICAL_MAP_2_10000;
+	public static final AVector<ACell> DIABOLICAL_VECTOR_30_30;
+	public static final AVector<ACell> DIABOLICAL_VECTOR_2_10000;
+	public static final AMap<ACell, ACell> DIABOLICAL_MAP_30_30;
+	public static final AMap<ACell, ACell> DIABOLICAL_MAP_2_10000;
 
 	public static final Random rand = new Random(123);
 	public static final long BIG_BLOB_LENGTH = 10000;
@@ -160,8 +161,8 @@ public class Samples {
 		return (T) v;
 	}
 
-	private static AMap<Object, Object> createNastyNestedMap(int fanout, int depth) {
-		AMap<Object, Object> m = Maps.empty();
+	private static AMap<ACell, ACell> createNastyNestedMap(int fanout, int depth) {
+		AMap<ACell, ACell> m = Maps.empty();
 		for (long i = 0; i < depth; i++) {
 			m = createRepeatedValueMap(m, fanout);
 			m.getHash(); // needed to to stop hash calculations getting too deep
@@ -169,7 +170,7 @@ public class Samples {
 		return m;
 	}
 
-	private static AMap<Object, Object> createRepeatedValueMap(Object v, int count) {
+	private static AMap<ACell, ACell> createRepeatedValueMap(Object v, int count) {
 		Object[] obs = new Object[count * 2];
 		for (int i = 0; i < count; i++) {
 			obs[i * 2] = RT.cvm(i);
@@ -179,7 +180,7 @@ public class Samples {
 	}
 	
 	@SuppressWarnings("unchecked")
-	public static <R,T> R createRandomSubset(ADataStructure<T> v, double prob, int seed) {
+	public static <R,T extends ACell> R createRandomSubset(ADataStructure<T> v, double prob, int seed) {
 		ADataStructure<T> result=v.empty();
 		
 		Random r=new Random(seed);
@@ -191,8 +192,8 @@ public class Samples {
 		return (R) result;
 	}
 
-	private static AVector<Object> createNastyNestedVector(int fanout, int depth) {
-		AVector<Object> m = Vectors.empty();
+	private static AVector<ACell> createNastyNestedVector(int fanout, int depth) {
+		AVector<ACell> m = Vectors.empty();
 		for (int i = 0; i < depth; i++) {
 			m = Vectors.repeat(m, fanout);
 			m.getHash(); // needed to to stop hash calculations getting too deep

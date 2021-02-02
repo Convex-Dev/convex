@@ -42,7 +42,7 @@ import convex.core.transactions.ATransaction;
  *
  * @param <T> The type of the signed object
  */
-public class SignedData<T> extends ACell {
+public class SignedData<T extends ACell> extends ACell {
 	private final Ref<T> valueRef;
 	private final ASignature signature;
 	private final AccountKey address;
@@ -70,14 +70,14 @@ public class SignedData<T> extends ACell {
 	 * @param ref     Ref to the data to sign
 	 * @return SignedData object signed with the given key-pair
 	 */
-	public static <T> SignedData<T> createWithRef(AKeyPair keyPair, Ref<T> ref) {
+	public static <T extends ACell> SignedData<T> createWithRef(AKeyPair keyPair, Ref<T> ref) {
 		ASignature sig = keyPair.sign(ref.getHash());
 		SignedData<T> sd = new SignedData<T>(ref, keyPair.getAccountKey(), sig);
 		sd.validated = true; // validate stuff we have just signed by default
 		return sd;
 	}
 
-	public static <T> SignedData<T> create(AKeyPair keyPair, T value2) {
+	public static <T extends ACell> SignedData<T> create(AKeyPair keyPair, T value2) {
 		return createWithRef(keyPair, Ref.get(value2));
 	}
 
@@ -89,7 +89,7 @@ public class SignedData<T> extends ACell {
 	 * @param ref     Ref to the data that has been signed
 	 * @return A new SignedData object
 	 */
-	public static <T> SignedData<T> create(AccountKey address, ASignature sig, Ref<T> ref) {
+	public static <T extends ACell> SignedData<T> create(AccountKey address, ASignature sig, Ref<T> ref) {
 		// boolean check=Sign.verify(ref.getHash(), sig, address);
 		// if (!check) throw new ValidationException("Invalid signature: "+sig);
 		return new SignedData<T>(ref, address, sig);
@@ -170,7 +170,7 @@ public class SignedData<T> extends ACell {
 	 * @return A SignedData object
 	 * @throws BadFormatException
 	 */
-	public static <T> SignedData<T> read(ByteBuffer data) throws BadFormatException {
+	public static <T extends ACell> SignedData<T> read(ByteBuffer data) throws BadFormatException {
 		// header already assumed to be consumed
 		AccountKey address = AccountKey.readRaw(data);
 		ASignature sig = ASignature.read(data);
@@ -209,7 +209,7 @@ public class SignedData<T> extends ACell {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		if (i != 0) throw new IndexOutOfBoundsException("Illegal SignedData ref index: " + i);
 		return (Ref<R>) valueRef;
 	}

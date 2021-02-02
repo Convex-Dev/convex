@@ -5,9 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
 
 import convex.core.State;
+import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.ASet;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 
 /**
@@ -28,7 +30,7 @@ public class DataStructuresTest {
 		}
 	}
 
-	public <T> T eval(String source) {
+	public <T extends ACell> T eval(String source) {
 		try {
 			Context<?> c = INITIAL_CONTEXT;
 			AOp<T> op = TestState.compile(c, source);
@@ -41,11 +43,11 @@ public class DataStructuresTest {
 
 	@Test
 	public void testSetRoundTripRegression() {
-		ASet<Long> a = eval("#{1,8,0,4,9,5,2,3,7,6}");
+		ASet<CVMLong> a = eval("#{1,8,0,4,9,5,2,3,7,6}");
 		assertEquals(10, a.count());
-		ASequence<Long> b = RT.sequence(a);
+		ASequence<CVMLong> b = RT.sequence(a);
 		assertEquals(10, b.count());
-		ASet<Long> c = RT.set(b);
+		ASet<CVMLong> c = RT.set(b);
 		assertEquals(a, c);
 	}
 

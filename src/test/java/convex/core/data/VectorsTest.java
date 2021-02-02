@@ -7,10 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static convex.test.Assertions.*;
 
 import java.util.ListIterator;
 import java.util.Spliterator;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.Test;
 
@@ -28,7 +29,7 @@ public class VectorsTest {
 
 	@Test
 	public void testEmptyVector() {
-		VectorLeaf<String> lv = VectorLeaf.create(new String[0]);
+		AVector<AString> lv = Vectors.empty();
 		AArrayBlob d = lv.getEncoding();
 		assertArrayEquals(new byte[] { Tag.VECTOR, 0 }, d.getBytes());
 		
@@ -59,8 +60,8 @@ public class VectorsTest {
 
 	@Test
 	public void testCreateSpecialCases() {
-		assertSame(Vectors.empty(), VectorLeaf.create(new Object[0]));
-		assertSame(Vectors.empty(), VectorLeaf.create(new Object[10], 3, 0));
+		assertSame(Vectors.empty(), VectorLeaf.create(new ACell[0]));
+		assertSame(Vectors.empty(), VectorLeaf.create(new ACell[10], 3, 0));
 
 		assertThrows(IllegalArgumentException.class, () -> VectorLeaf.create(new Object[0], 0, 0, null));
 		assertThrows(IllegalArgumentException.class, () -> VectorLeaf.create(new Object[20], 1, 18, null));
@@ -117,12 +118,13 @@ public class VectorsTest {
 	public void testAppending() {
 		int SIZE = 300;
 		@SuppressWarnings("unchecked")
-		AVector<Integer> lv = (VectorLeaf<Integer>) VectorLeaf.EMPTY;
+		AVector<CVMLong> lv = (VectorLeaf<CVMLong>) VectorLeaf.EMPTY;
 
 		for (int i = 0; i < SIZE; i++) {
-			lv = lv.append(i);
+			CVMLong ci=RT.cvm(i);
+			lv = lv.append(ci);
 			assertEquals(i + 1L, lv.count());
-			assertEquals(i, (int) lv.get(i));
+			assertEquals(ci, lv.get(i));
 		}
 		assertEquals(300L, lv.count());
 	}
@@ -210,11 +212,11 @@ public class VectorsTest {
 		assertEquals(10L,vec.getEncoding().length());
 		
 		// should embed, small enough
-		AVector<Object> vec2=Vectors.of(vec,vec);
+		AVector<ACell> vec2=Vectors.of(vec,vec);
 		assertTrue(vec2.isEmbedded());
 		assertEquals(22L,vec2.getEncoding().length());
 
-		AVector<Object> vec3=Vectors.of(vec2,vec2,vec2,vec2,vec2,vec2,vec2,vec2);
+		AVector<ACell> vec3=Vectors.of(vec2,vec2,vec2,vec2,vec2,vec2,vec2,vec2);
 		assertFalse(vec3.isEmbedded());
 	}
 
@@ -238,34 +240,34 @@ public class VectorsTest {
 	public void testIterator() {
 		int SIZE = 100;
 		@SuppressWarnings("unchecked")
-		AVector<Integer> lv = (VectorLeaf<Integer>) VectorLeaf.EMPTY;
+		AVector<CVMLong> lv = (VectorLeaf<CVMLong>) VectorLeaf.EMPTY;
 
 		for (int i = 0; i < SIZE; i++) {
-			lv = lv.append(i);
+			lv = lv.append(RT.cvm(i));
 			assertTrue(lv.isCanonical());
 		}
-		assertEquals(4950, (int) lv.reduce((s, v) -> s + v, 0));
+		assertEquals(4950L, lv.reduce((acc, v) -> acc + v.longValue(), 0L));
 
 		// forward iteration
-		ListIterator<Integer> it = lv.listIterator();
-		Spliterator<Integer> split = lv.spliterator();
-		AtomicInteger splitAcc = new AtomicInteger(0);
+		ListIterator<CVMLong> it = lv.listIterator();
+		Spliterator<CVMLong> split = lv.spliterator();
+		AtomicLong splitAcc = new AtomicLong(0);
 		for (int i = 0; i < SIZE; i++) {
 			assertTrue(it.hasNext());
-			assertTrue(split.tryAdvance(a -> splitAcc.addAndGet(a)));
+			assertTrue(split.tryAdvance(a -> splitAcc.addAndGet(a.longValue())));
 			assertEquals(i, it.nextIndex());
-			assertEquals((Integer) i, it.next());
+			assertEquals(RT.cvm(i), it.next());
 		}
 		assertEquals(100, it.nextIndex());
 		assertEquals(4950, splitAcc.get());
 		assertFalse(it.hasNext());
 
 		// backward iteration
-		ListIterator<Integer> li = lv.listIterator(SIZE);
+		ListIterator<CVMLong> li = lv.listIterator(SIZE);
 		for (int i = SIZE - 1; i >= 0; i--) {
 			assertTrue(li.hasPrevious());
 			assertEquals(i, li.previousIndex());
-			assertEquals((Integer) i, li.previous());
+			assertCVMEquals(i, li.previous());
 		}
 		assertEquals(-1, li.previousIndex());
 		assertFalse(li.hasPrevious());
@@ -310,7 +312,7 @@ public class VectorsTest {
 	/**
 	 * Generic tests for any vector
 	 */
-	public static <T> void doVectorTests(AVector<T> v) {
+	public static <T extends ACell> void doVectorTests(AVector<T> v) {
 		long n = v.count();
 
 		if (n == 0) {

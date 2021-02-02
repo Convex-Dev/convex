@@ -3,6 +3,7 @@ package convex.core.transactions;
 import java.nio.ByteBuffer;
 
 import convex.core.Constants;
+import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Format;
 import convex.core.data.Tag;
@@ -64,7 +65,7 @@ public class Transfer extends ATransaction {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <T> Context<T> apply(Context<?> ctx) {
+	public <T extends ACell> Context<T> apply(Context<?> ctx) {
 		// consume juice, ensure we have enough to make transfer!
 		ctx = ctx.consumeJuice(Juice.TRANSFER);
 		if (!ctx.isExceptional()) {

@@ -1,5 +1,6 @@
 package convex.core.lang.ops;
 
+import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Format;
@@ -14,10 +15,10 @@ import convex.core.lang.AOp;
  * MultiOps may selectively evaluate sub-expressions.
  *
  */
-public abstract class AMultiOp<T> extends AOp<T> {
-	protected final AVector<AOp<?>> ops;
+public abstract class AMultiOp<T extends ACell> extends AOp<T> {
+	protected final AVector<AOp<ACell>> ops;
 
-	protected AMultiOp(AVector<AOp<?>> ops) {
+	protected AMultiOp(AVector<AOp<ACell>> ops) {
 		// TODO: need to think about bounds on number of child ops?
 		this.ops = ops;
 	}
@@ -28,7 +29,7 @@ public abstract class AMultiOp<T> extends AOp<T> {
 	 * @param newOps
 	 * @return
 	 */
-	protected abstract AMultiOp<T> recreate(ASequence<AOp<?>> newOps);
+	protected abstract AMultiOp<T> recreate(ASequence<AOp<ACell>> newOps);
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
@@ -43,7 +44,7 @@ public abstract class AMultiOp<T> extends AOp<T> {
 
 	@Override
 	public AMultiOp<T> updateRefs(IRefFunction func) {
-		ASequence<AOp<?>> newOps = ops.updateRefs(func);
+		ASequence<AOp<ACell>> newOps = ops.updateRefs(func);
 		return recreate(newOps);
 	}
 
@@ -54,7 +55,7 @@ public abstract class AMultiOp<T> extends AOp<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		return (Ref<R>) ops.getRef(i);
 	}
 

@@ -12,7 +12,7 @@ import convex.core.util.Errors;
  * 
  * @param <T> Type of elements in this collection
  */
-public abstract class ACollection<T> extends ADataStructure<T> implements Collection<T> {
+public abstract class ACollection<T extends ACell> extends ADataStructure<T> implements Collection<T> {
 
 	@Override
 	public abstract int encode(byte[] bs, int pos);
@@ -67,7 +67,7 @@ public abstract class ACollection<T> extends ADataStructure<T> implements Collec
 	 * Converts this collection to a canonical vector of elements
 	 * @return This collection coerced to a vector
 	 */
-	public abstract AVector<T> toVector();
+	public abstract <R extends ACell> AVector<R> toVector();
 
 	/**
 	 * Adds an element to this collection, according to the natural semantics of the collection
@@ -75,7 +75,7 @@ public abstract class ACollection<T> extends ADataStructure<T> implements Collec
 	 * @return The updated collection
 	 */
 	@Override
-	public abstract <R> ACollection<R> conj(R x);
+	public abstract <R extends ACell> ACollection<R> conj(R x);
 	
-	public abstract <R> ACollection<R> map(Function<? super T, ? extends R> mapper);
+	public abstract <R extends ACell> ACollection<R> map(Function<? super T, ? extends R> mapper);
 }

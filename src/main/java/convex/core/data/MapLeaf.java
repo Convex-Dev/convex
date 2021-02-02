@@ -26,7 +26,7 @@ import convex.core.util.Utils;
  * @param <K> Type of keys
  * @param <V> Type of values
  */
-public class MapLeaf<K, V> extends AHashMap<K, V> {
+public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	/**
 	 * Maximum number of entries in a MapLeaf
 	 */
@@ -53,7 +53,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 	 * @param entries
 	 * @return New ListMap
 	 */
-	public static <K, V> MapLeaf<K, V> create(MapEntry<K, V>[] entries) {
+	public static <K extends ACell, V extends ACell> MapLeaf<K, V> create(MapEntry<K, V>[] entries) {
 		return create(entries, 0, entries.length);
 	}
 
@@ -67,7 +67,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 	 *                offset
 	 * @return A new ListMap
 	 */
-	protected static <K, V> MapLeaf<K, V> create(MapEntry<K, V>[] entries, int offset, int length) {
+	protected static <K extends ACell, V extends ACell> MapLeaf<K, V> create(MapEntry<K, V>[] entries, int offset, int length) {
 		if (length == 0) return emptyMap();
 		if (length > MAX_ENTRIES) throw new IllegalArgumentException("Too many entries: " + entries.length);
 		MapEntry<K, V>[] sorted = Utils.copyOfRangeExcludeNulls(entries, offset, offset + length);
@@ -77,7 +77,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <K, V> MapLeaf<K, V> create(MapEntry<K, V> item) {
+	public static <K extends ACell, V extends ACell> MapLeaf<K, V> create(MapEntry<K, V> item) {
 		return new MapLeaf<K, V>((MapEntry<K, V>[]) new MapEntry<?, ?>[] { item });
 	}
 
@@ -88,7 +88,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public boolean containsKey(Object key) {
+	public boolean containsKey(ACell key) {
 		return getEntry((K) key) != null;
 	}
 
@@ -362,7 +362,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K, V> MapLeaf<K, V> read(ByteBuffer bb, long count, boolean includeValues) throws BadFormatException {
+	public static <K extends ACell, V extends ACell> MapLeaf<K, V> read(ByteBuffer bb, long count, boolean includeValues) throws BadFormatException {
 		if (count == 0) return (MapLeaf<K, V>) EMPTY;
 		if (count < 0) throw new BadFormatException("Negative count of map elements!");
 		if (count > MAX_ENTRIES) throw new BadFormatException("MapLeaf too big: " + count);
@@ -387,7 +387,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 	
 
 	@SuppressWarnings("unchecked")
-	public static <K, V> MapLeaf<K, V> emptyMap() {
+	public static <K extends ACell, V extends ACell> MapLeaf<K, V> emptyMap() {
 		return (MapLeaf<K, V>) EMPTY;
 	}
 
@@ -404,7 +404,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 		return isValidOrder(entries);
 	}
 
-	private static <K, V> boolean isValidOrder(MapEntry<K, V>[] entries) {
+	private static <K extends ACell, V extends ACell> boolean isValidOrder(MapEntry<K, V>[] entries) {
 		long count = entries.length;
 		for (int i = 0; i < count - 1; i++) {
 			Hash a = entries[i].getKeyHash();
@@ -423,7 +423,7 @@ public class MapLeaf<K, V> extends AHashMap<K, V> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		MapEntry<K, V> e = entries[i >> 1]; // IndexOutOfBoundsException if out of range
 		if ((i & 1) == 0) {
 			return (Ref<R>) e.getKeyRef();

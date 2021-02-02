@@ -29,7 +29,7 @@ public class ContextTest {
 		Symbol sym = Symbol.create("the-test-symbol");
 
 		final Context<?> c2 = CTX.fork().define(sym, Syntax.create("buffy"));
-		assertEquals("buffy", c2.lookup(sym).getResult());
+		assertCVMEquals("buffy", c2.lookup(sym).getResult());
 
 		assertUndeclaredError(c2.lookup(Symbol.create("some-bad-symbol")));
 	}
@@ -39,7 +39,7 @@ public class ContextTest {
 		Symbol sym = Symbol.create("the-test-symbol");
 
 		final Context<?> c2 = CTX.fork().define(sym, Syntax.create("vampire"));
-		assertEquals("vampire", c2.lookup(sym).getResult());
+		assertCVMEquals("vampire", c2.lookup(sym).getResult());
 
 		final Context<?> c3 = c2.undefine(sym);
 		assertUndeclaredError(c3.lookup(sym));
@@ -108,7 +108,7 @@ public class ContextTest {
 	@Test
 	public void testReturn() {
 		Context<?> ctx=CTX.fork();
-		ctx = ctx.withResult(Long.valueOf(100));
+		ctx = ctx.withResult(RT.cvm(100));
 		assertEquals(ctx.getDepth(), ctx.getDepth());
 	}
 

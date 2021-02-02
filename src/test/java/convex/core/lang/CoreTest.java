@@ -20,6 +20,7 @@ import convex.core.Init;
 import convex.core.State;
 import convex.core.crypto.Hash;
 import convex.core.data.ABlob;
+import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
@@ -40,6 +41,7 @@ import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.lang.impl.CoreFn;
@@ -410,7 +412,7 @@ public class CoreTest {
 		assertEquals(Sets.of(1L, 3L, 5L), eval("(set (keys {1 2 3 4 5 6}))"));
 
 		assertEquals(Vectors.empty(),RT.keys(BlobMaps.empty()));
-		assertEquals(Vectors.of(Init.HERO),RT.keys(BlobMap.create(Init.HERO, 1L)));
+		assertEquals(Vectors.of(Init.HERO),RT.keys(BlobMap.of(Init.HERO, 1L)));
 		
 		assertCastError(step("(keys 1)"));
 		assertCastError(step("(keys [])"));
@@ -1571,7 +1573,7 @@ public class CoreTest {
 	@Test
 	public void testDeploy() {
 		Context<Address> ctx = step("(def ctr (deploy '(fn [] :foo :bar)))");
-		Address ca = ctx.getValue();
+		Address ca = ctx.getResult();
 		assertNotNull(ca);
 		AccountStatus as = ctx.getAccountStatus(ca);
 		assertNotNull(as);
@@ -1734,7 +1736,7 @@ public class CoreTest {
 			Context<?> ctx=step("(deploy '(do (defn receive-coin [sender amount data] (accept amount)) (export receive-coin)))");
 			Address receiver=(Address) ctx.getResult();
 			
-			ctx=step(ctx,"(transfer 0x"+receiver.toHexString()+" 100)");
+			ctx=step(ctx,"(transfer "+receiver.toString()+" 100)");
 			assertCVMEquals(100L,ctx.getResult());
 			assertCVMEquals(100L,ctx.getBalance(receiver));
 		}
@@ -1743,7 +1745,7 @@ public class CoreTest {
 			Context<?> ctx=step("(deploy '(do (defn receive-coin [sender amount data] (accept 0)) (export receive-coin)))");
 			Address receiver=(Address) ctx.getResult();
 			
-			ctx=step(ctx,"(transfer 0x"+receiver.toHexString()+" 100)");
+			ctx=step(ctx,"(transfer "+receiver.toString()+" 100)");
 			assertCVMEquals(0L,ctx.getResult());
 			assertCVMEquals(0L,ctx.getBalance(receiver));
 		}
@@ -1752,6 +1754,7 @@ public class CoreTest {
 			Context<?> ctx=step("(deploy '(do (defn receive-coin [sender amount data] (accept (/ amount 2))) (export receive-coin)))");
 			Address receiver=(Address) ctx.getResult();
 			
+			// should be OK with a Blob Address
 			ctx=step(ctx,"(transfer 0x"+receiver.toHexString()+" 100)");
 			assertCVMEquals(50L,ctx.getResult());
 			assertCVMEquals(50L,ctx.getBalance(receiver));
@@ -1817,13 +1820,13 @@ public class CoreTest {
 	
 	@Test
 	public void testStake() {
-		Context<Object> ctx=step(INITIAL_CONTEXT,"(def my-peer \""+Init.FIRST_PEER_KEY.toHexString()+"\")");
+		Context<ACell> ctx=step(INITIAL_CONTEXT,"(def my-peer \""+Init.FIRST_PEER_KEY.toHexString()+"\")");
 		AccountKey MY_PEER=Init.FIRST_PEER_KEY;
 		long PS=ctx.getState().getPeer(Init.FIRST_PEER_KEY).getOwnStake();
 		
 		{
 			// simple case of staking 1000000 on first peer of the realm
-			Context<Object> rc=step(ctx,"(stake my-peer 1000000)");
+			Context<ACell> rc=step(ctx,"(stake my-peer 1000000)");
 			assertNotError(rc);
 			assertEquals(PS+1000000,rc.getState().getPeer(MY_PEER).getTotalStake());
 			assertEquals(1000000,rc.getState().getPeer(MY_PEER).getDelegatedStake());
@@ -1932,7 +1935,7 @@ public class CoreTest {
 
 	@Test
 	public void testCompile() {
-		assertEquals(Constant.create(1L), eval("(compile 1)"));
+		assertEquals(Constant.of(1L), eval("(compile 1)"));
 		
 		assertEquals(Constant.class, eval("(compile 1)").getClass());
 		assertEquals(Constant.class, eval("(compile nil)").getClass());
@@ -2332,7 +2335,7 @@ public class CoreTest {
 	
 	@Test
 	public void testEvalAsTrustedUser() {
-		Context<Object> ctx=step("(set-controller "+TestState.VILLAIN+")");
+		Context<ACell> ctx=step("(set-controller "+TestState.VILLAIN+")");
 		ctx=ctx.forkWithAddress(TestState.VILLAIN);
 		ctx=step(ctx,"(def hero "+TestState.HERO+")");
 		
@@ -2371,7 +2374,7 @@ public class CoreTest {
 	
 	@Test
 	public void testQuery() {
-		Context<AVector<Object>> ctx=step("(query '(do (def a 10) [*address* *origin* *caller* 10]))");
+		Context<AVector<ACell>> ctx=step("(query '(do (def a 10) [*address* *origin* *caller* 10]))");
 		assertEquals(Vectors.of(Init.HERO,Init.HERO,null,10L), ctx.getResult());
 		
 		// shouldn't be any def in the environment
@@ -2383,7 +2386,7 @@ public class CoreTest {
 	
 	@Test
 	public void testQueryError() {
-		Context<Long> ctx=step("(query '(fail :FOO))");
+		Context<CVMLong> ctx=step("(query '(fail :FOO))");
 		assertAssertError(ctx);
 		
 		// some juice should be consumed
@@ -2392,7 +2395,7 @@ public class CoreTest {
 	
 	@Test
 	public void testQueryAs() {
-		Context<AVector<Object>> ctx=step("(query-as "+Init.VILLAIN+" '(do (def a 10) [*address* *origin* *caller* 10]))");
+		Context<AVector<ACell>> ctx=step("(query-as "+Init.VILLAIN+" '(do (def a 10) [*address* *origin* *caller* 10]))");
 		assertEquals(Vectors.of(Init.VILLAIN,Init.VILLAIN,null,10L), ctx.getResult());
 		
 		// shouldn't be any def in the environment
@@ -2405,7 +2408,7 @@ public class CoreTest {
 	
 	@Test
 	public void testQueryAsError() {
-		Context<Long> ctx=step("(query '(fail :FOO))");
+		Context<CVMLong> ctx=step("(query '(fail :FOO))");
 		assertAssertError(ctx);
 		
 		// some juice should be consumed
@@ -2454,9 +2457,9 @@ public class CoreTest {
 	public void testScheduleExecution() throws BadSignatureException {
 		long expectedTS = INITIAL.getTimeStamp().longValue() + 1000;
 		Context<?> ctx = step("(schedule (+ *timestamp* 1000) (def a 2))");
-		assertEquals(expectedTS, ctx.getResult());
+		assertCVMEquals(expectedTS, ctx.getResult());
 		State s = ctx.getState();
-		BlobMap<ABlob, AVector<Object>> sched = s.getSchedule();
+		BlobMap<ABlob, AVector<ACell>> sched = s.getSchedule();
 		assertEquals(1L, sched.count());
 		assertEquals(expectedTS, sched.entryAt(0).getKey().longValue());
 
@@ -2756,7 +2759,7 @@ public class CoreTest {
 	@Test
 	public void testSymbolFor() {
 		assertEquals(Symbols.COUNT, Core.symbolFor(Core.COUNT));
-		assertThrows(Throwable.class, () -> Core.symbolFor(0));
+		assertThrows(Throwable.class, () -> Core.symbolFor(null));
 	}
 
 	@Test

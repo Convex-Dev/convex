@@ -26,7 +26,7 @@ import convex.core.util.Utils;
  * @param <K>
  * @param <V>
  */
-public class MapTree<K, V> extends AHashMap<K, V> {
+public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	/**
 	 * Child maps, one for each present bit in the mask, max 16
 	 */
@@ -58,7 +58,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 	 * @param children
 	 * @return The total count of all child maps
 	 */
-	private static <K, V> long computeCount(Ref<AHashMap<K, V>>[] children) {
+	private static <K extends ACell, V extends ACell> long computeCount(Ref<AHashMap<K, V>>[] children) {
 		long n = 0;
 		for (Ref<AHashMap<K, V>> cref : children) {
 			if (cref == null) continue;
@@ -69,7 +69,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <K, V> MapTree<K, V> create(MapEntry<K, V>[] newEntries, int shift) {
+	public static <K extends ACell, V extends ACell> MapTree<K, V> create(MapEntry<K, V>[] newEntries, int shift) {
 		int n = newEntries.length;
 		if (n <= MapLeaf.MAX_ENTRIES) {
 			throw new IllegalArgumentException(
@@ -99,7 +99,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 	 *                 will be filtered out
 	 * @return
 	 */
-	private static <K, V> AHashMap<K, V> createFull(Ref<AHashMap<K, V>>[] children, int shift, long count) {
+	private static <K extends ACell, V extends ACell> AHashMap<K, V> createFull(Ref<AHashMap<K, V>>[] children, int shift, long count) {
 		if (children.length != 16) throw new IllegalArgumentException("16 children required!");
 		Ref<AHashMap<K, V>>[] newChildren = Utils.filterArray(children, a -> {
 			if (a == null) return false;
@@ -114,7 +114,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 		}
 	}
 
-	private static <K, V> AHashMap<K, V> createFull(Ref<AHashMap<K, V>>[] newChildren, int shift) {
+	private static <K extends ACell, V extends ACell> AHashMap<K, V> createFull(Ref<AHashMap<K, V>>[] newChildren, int shift) {
 		return createFull(newChildren, shift, computeCount(newChildren));
 	}
 
@@ -131,7 +131,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 	 * @return A new map as specified @
 	 */
 	@SuppressWarnings("unchecked")
-	private static <K, V> AHashMap<K, V> create(Ref<AHashMap<K, V>>[] children, int shift, short mask, long count) {
+	private static <K extends ACell, V extends ACell> AHashMap<K, V> create(Ref<AHashMap<K, V>>[] children, int shift, short mask, long count) {
 		int cLen = children.length;
 		if (Integer.bitCount(mask & 0xFFFF) != cLen) {
 			throw new IllegalArgumentException(
@@ -169,7 +169,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public boolean containsKey(Object key) {
+	public boolean containsKey(ACell key) {
 		return containsKeyRef((Ref<K>) Ref.get(key));
 	}
 
@@ -197,7 +197,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public V get(Object key) {
-		MapEntry<K, V> me = getKeyRefEntry((Ref<K>) Ref.get(key));
+		MapEntry<K, V> me = getKeyRefEntry((Ref<K>) Ref.get((K) key));
 		if (me == null) return null;
 		return me.getValue();
 	}
@@ -446,7 +446,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K, V> MapTree<K, V> read(ByteBuffer bb, long count, boolean includeValues) throws BadFormatException {
+	public static <K extends ACell, V extends ACell> MapTree<K, V> read(ByteBuffer bb, long count, boolean includeValues) throws BadFormatException {
 		int shift = bb.get();
 		short mask = bb.getShort();
 
@@ -454,15 +454,8 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 		Ref<AHashMap<K, V>>[] blocks = (Ref<AHashMap<K, V>>[]) new Ref<?>[ilength];
 
 		for (int i = 0; i < ilength; i++) {
-			// need to be defensive to detect possible bad formats
-			Object o = Format.read(bb);
-			Ref<AHashMap<K, V>> ref;
-			if (o instanceof Ref) {
-				ref= (Ref<AHashMap<K, V>>) o;
-			} else {
-				if (!(o instanceof AHashMap)) throw new BadFormatException("Expected Hashmap child but got: " + o);
-				ref=((AHashMap<K,V>)o).getRef();
-			}
+			// need to rad as a Ref
+			Ref<AHashMap<K, V>> ref = Format.readRef(bb);
 			blocks[i] = ref;
 		}
 		// create directly, we have all values
@@ -491,7 +484,7 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		return (Ref<R>) children[i];
 	}
 
@@ -775,11 +768,22 @@ public class MapTree<K, V> extends AHashMap<K, V> {
 		return create(newChildren, shift, mask, computeCount(newChildren));
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public void validate() throws InvalidDataException {
 		super.validate();
 		validateWithPrefix("");
-		long cc = computeCount(children);
+		
+		long cc=0L;
+		int n=children.length;
+		for (int i=0; i<n; i++) {
+			ACell ch=children[i].getValue();
+			if (!(ch instanceof AHashMap)) throw new InvalidDataException("Not an AHashMap child at index: "+i,this);
+			
+			AHashMap<K,V> c=(AHashMap<K, V>) ch;
+			cc += c.count();
+		}
+		
 		if (count != cc)
 			throw new InvalidDataException("Bad child count, expected " + count + " but children had: " + cc, this);
 	}

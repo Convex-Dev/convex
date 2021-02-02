@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Init;
 import convex.core.State;
+import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Symbol;
@@ -48,16 +49,16 @@ public class OpsTest {
 		Context<?> c = INITIAL_CONTEXT.fork();
 
 		{// simple long constant
-			AOp<Long> op = Constant.create(10L);
-			Context<Long> c2 = c.fork().execute(op);
+			AOp<CVMLong> op = Constant.of(10L);
+			Context<CVMLong> c2 = c.fork().execute(op);
 
 			assertEquals(INITIAL_JUICE - Juice.CONSTANT, c2.getJuice());
 			assertEquals(CVMLong.create(10L), c2.getResult());
 		}
 
 		{// null constant
-			AOp<Long> op = Constant.nil();
-			Context<Long> c2 = c.fork().execute(op);
+			AOp<ACell> op = Constant.nil();
+			Context<ACell> c2 = c.fork().execute(op);
 
 			assertEquals(INITIAL_JUICE - Juice.CONSTANT, c2.getJuice());
 			assertNull(c2.getResult());
@@ -69,7 +70,7 @@ public class OpsTest {
 		long JUICE = Juice.CONSTANT - 1; // insufficient juice to run operation
 		Context<?> c = Context.createInitial(INITIAL, TestState.HERO, JUICE);
 
-		AOp<Long> op = Constant.create(10L);
+		AOp<CVMLong> op = Constant.of(10L);
 		assertJuiceError(c.execute(op));
 	}
 
@@ -104,7 +105,7 @@ public class OpsTest {
 	@Test
 	public void testUndeclaredLookup() {
 		Context<?> c = INITIAL_CONTEXT.fork();
-		AOp<String> op = Lookup.create("missing-symbol");
+		AOp<AString> op = Lookup.create("missing-symbol");
 		assertUndeclaredError(c.execute(op));
 	}
 
@@ -133,7 +134,7 @@ public class OpsTest {
 	public void testCondTrue() {
 		Context<?> c = INITIAL_CONTEXT.fork();
 
-		AOp<AString> op = Cond.create(Constant.create(true), Constant.create("trueResult"),
+		AOp<AString> op = Cond.create(Constant.of(true), Constant.create("trueResult"),
 				Constant.create("falseResult"));
 
 		Context<AString> c2 = c.execute(op);
@@ -147,7 +148,7 @@ public class OpsTest {
 	public void testCondFalse() {
 		Context<?> c = INITIAL_CONTEXT.fork();
 
-		AOp<AString> op = Cond.create(Constant.create(false), Constant.create("trueResult"),
+		AOp<AString> op = Cond.create(Constant.of(false), Constant.create("trueResult"),
 				Constant.create("falseResult"));
 
 		Context<AString> c2 = c.execute(op);
@@ -161,9 +162,9 @@ public class OpsTest {
 	public void testCondNoResult() {
 		Context<?> c = INITIAL_CONTEXT.fork();
 
-		AOp<String> op = Cond.create(Constant.create(false), Constant.create("trueResult"));
+		AOp<AString> op = Cond.create(Constant.of(false), Constant.create("trueResult"));
 
-		Context<String> c2 = c.execute(op);
+		Context<AString> c2 = c.execute(op);
 
 		assertNull(c2.getResult());
 		long expectedJuice = INITIAL_JUICE - (Juice.COND_OP + Juice.CONSTANT);
@@ -176,10 +177,10 @@ public class OpsTest {
 
 		Symbol sym = Symbol.create("val");
 
-		AOp<AString> op = Cond.create(Do.create(Def.create(sym, Constant.create(false)), Constant.create(false)),
-				Constant.create("1"), Lookup.create(sym), Constant.create("2"),
-				Do.create(Def.create(sym, Constant.create(true)), Constant.create(false)), Constant.create("3"),
-				Lookup.create(sym), Constant.create("4"), Constant.create("5"));
+		AOp<AString> op = Cond.create(Do.create(Def.create(sym, Constant.of(false)), Constant.of(false)),
+				Constant.create("1"), Lookup.create(sym), Constant.of("2"),
+				Do.create(Def.create(sym, Constant.of(true)), Constant.of(false)), Constant.of("3"),
+				Lookup.create(sym), Constant.of("4"), Constant.of("5"));
 
 		Context<AString> c2 = c.execute(op);
 		assertEquals("4", c2.getResult().toString());
@@ -215,17 +216,17 @@ public class OpsTest {
 
 		Symbol sym = Symbol.create("arg0");
 
-		Lambda<Object> lam = Lambda.create(Vectors.of(Syntax.create(sym)), Lookup.create(sym));
+		Lambda<ACell> lam = Lambda.create(Vectors.of(Syntax.create(sym)), Lookup.create(sym));
 
-		Context<AClosure<Object>> c2 = c.execute(lam);
-		AClosure<Object> fn = c2.getResult();
+		Context<AClosure<ACell>> c2 = c.execute(lam);
+		AClosure<ACell> fn = c2.getResult();
 		assertTrue(fn.hasArity(1));
 		assertFalse(fn.hasArity(2));
 	}
 	
 	@Test
 	public void testLambdaString() {
-		Fn<Object> fn = Fn.create(Vectors.empty(), Constant.nil());
+		Fn<ACell> fn = Fn.create(Vectors.empty(), Constant.nil());
 		assertEquals("(fn [] nil)",fn.toString());
 	}
 

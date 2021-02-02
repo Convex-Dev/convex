@@ -11,6 +11,8 @@ import convex.core.exceptions.InvalidDataException;
  */
 public final class CVMLong extends APrimitive {
 
+	public static final CVMLong ZERO = CVMLong.create(0L);
+	
 	private final long value;
 	
 	public CVMLong(long value) {

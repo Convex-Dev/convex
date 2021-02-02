@@ -1,30 +1,31 @@
 package convex.core.lang.impl;
 
 import convex.core.ErrorCodes;
+import convex.core.data.ACell;
 
 public class Reduced extends AReturn {
 
-	private final Object value;
+	private final ACell value;
 
-	public Reduced(Object value) {
+	public Reduced(ACell value) {
 		this.value=value;
 	}
 
-	public static Reduced wrap(Object value) {
+	public static Reduced wrap(ACell value) {
 		return new Reduced(value);
 	}
 	
 	@Override
-	public Object getCode() {
+	public ACell getCode() {
 		return ErrorCodes.REDUCED;
 	}
 
 	@Override
-	public Object getMessage() {
-		return "Return value from 'reduced'";
+	public ACell getMessage() {
+		return null;
 	}
 	
-	public Object getValue() {
+	public ACell getValue() {
 		return value;
 	}
 

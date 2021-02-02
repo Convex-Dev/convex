@@ -10,6 +10,7 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import etch.EtchStore;
 
 public class EtchBenchmark {
@@ -25,7 +26,7 @@ public class EtchBenchmark {
 	
 	static {
 		for (int i=0; i<1000; i++) {
-			AVector<Long> v=Vectors.of(0L,(long)i);
+			AVector<CVMLong> v=Vectors.of(0L,(long)i);
 			Ref<ACell> r=v.getRef();
 			refs[i]=r;
 			r.getHash();
@@ -35,7 +36,7 @@ public class EtchBenchmark {
 	
 	@Benchmark
 	public void writeData() {
-		AVector<Long> v=Vectors.of(1L,ix++);
+		AVector<CVMLong> v=Vectors.of(1L,ix++);
 		store.persistRef(v.getRef(), null);
 	}
 	

@@ -14,6 +14,7 @@ import javax.swing.SwingConstants;
 
 import convex.core.State;
 import convex.core.crypto.WalletEntry;
+import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
@@ -23,6 +24,7 @@ import convex.core.data.List;
 import convex.core.data.Lists;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
+import convex.core.data.prim.CVMLong;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
@@ -36,7 +38,7 @@ import convex.gui.utils.Toolkit;
 public class MarketComponent extends BaseListComponent {
 
 	private Address address;
-	AVector<Object> outcomes;
+	AVector<ACell> outcomes;
 
 	HashMap<Object, JLabel> probLabels = new HashMap<>(); // probabilities
 	HashMap<Object, JLabel> tsLabels = new HashMap<>(); // total stake
@@ -64,15 +66,15 @@ public class MarketComponent extends BaseListComponent {
 		Object key = pmEnv.get(Symbol.create("oracle-key")).getValue();
 
 		AMap<Symbol, Syntax> oracleEnv = state.getEnvironment(oracleAddress);
-		AMap<Object, Object> fullList = oracleEnv.get(Symbol.create("full-list")).getValue();
-		AMap<Keyword, Object> oracleData = (AMap<Keyword, Object>) fullList.get(key);
+		AMap<ACell, ACell> fullList = oracleEnv.get(Symbol.create("full-list")).getValue();
+		AMap<Keyword, ACell> oracleData = (AMap<Keyword, ACell>) fullList.get(key);
 		if (oracleData == null) throw new Error("No oracle data for key?");
 
 		// Layout
 		setLayout(new BorderLayout());
 
 		// Top label
-		String oName = (String) oracleData.get(Keyword.create("desc"));
+		String oName = RT.jvm( oracleData.get(Keyword.create("desc")));
 		if (oName == null) oName = "Nameless Oracle";
 		title = new CodeLabel(oName);
 		title.setFont(Toolkit.MONO_FONT);
@@ -167,8 +169,8 @@ public class MarketComponent extends BaseListComponent {
 		long offer = Math.max(0, delta); // covers stake increase for sure?
 
 		WalletEntry we = marketsPanel.acctChooser.getWalletEntry();
-		AList<Object> cc = Lists.of(Symbol.create("stake"), outcome, newStake);
-		AList<Object> cmd = List.of(Symbols.CALL, address, offer, cc);
+		AList<ACell> cc = Lists.of(Symbol.create("stake"), outcome, newStake);
+		AList<ACell> cmd = List.of(Symbols.CALL, address, offer, cc);
 		PeerManager.execute(we, cmd).thenAcceptAsync(new DefaultReceiveAction(marketsPanel));
 	}
 
@@ -181,19 +183,19 @@ public class MarketComponent extends BaseListComponent {
 			for (int i = 0; i < numOutcomes; i++) {
 				Object outcome = outcomes.get(i);
 
-				double p = (double) ctx.actorCall(address, 0, "price", outcome).getResult();
+				double p = RT.jvm(ctx.actorCall(address, 0, "price", outcome).getResult());
 				if (Double.isNaN(p)) p = 1.0 / numOutcomes;
 				String prob = probFormatter.format(p * 100.0) + "%";
 				probLabels.get(outcome).setText(prob);
 
-				Long ts = (Long) ctx.actorCall(address, 0, "totals", outcome).getResult();
+				Long ts = RT.jvm( ctx.actorCall(address, 0, "totals", outcome).getResult());
 				String totalStake = ts.toString();
 				tsLabels.get(outcome).setText(totalStake);
 
 				@SuppressWarnings("unchecked")
-				AMap<Address, Long> stks = (AMap<Address, Long>) ctx.actorCall(address, 0, "stakes", outcome)
+				AMap<Address, CVMLong> stks = (AMap<Address, CVMLong>) ctx.actorCall(address, 0, "stakes", outcome)
 						.getResult();
-				Long stk = stks.get(caller);
+				Long stk = stks.get(caller).longValue();
 				String ownStake = (stk == null) ? "0" : stk.toString();
 				osLabels.get(outcome).setText(ownStake);
 			}
@@ -206,8 +208,8 @@ public class MarketComponent extends BaseListComponent {
 		Address caller = marketsPanel.acctChooser.getSelectedAddress();
 		Context<?> ctx = Context.createFake(state, caller);
 		@SuppressWarnings("unchecked")
-		AMap<Address, Long> stks = (AMap<Address, Long>) ctx.actorCall(address, 0, "stakes", outcome).getResult();
-		return stks.get(caller);
+		AMap<Address, CVMLong> stks = (AMap<Address, CVMLong>) ctx.actorCall(address, 0, "stakes", RT.cvm(outcome)).getResult();
+		return stks.get(caller).longValue();
 	}
 
 }

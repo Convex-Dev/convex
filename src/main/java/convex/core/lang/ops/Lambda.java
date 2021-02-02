@@ -13,6 +13,7 @@ import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
+import convex.core.data.ACell;
 import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.Fn;
 import convex.core.util.Errors;
@@ -27,7 +28,7 @@ import convex.core.util.Utils;
  *
  * @param <T>
  */
-public class Lambda<T> extends AOp<AClosure<T>> {
+public class Lambda<T extends ACell> extends AOp<AClosure<T>> {
 	
 	private Ref<AClosure<T>> function;
 
@@ -35,16 +36,16 @@ public class Lambda<T> extends AOp<AClosure<T>> {
 		this.function=newFunction;
 	}
 	
-	public static <T> Lambda<T> create(AVector<Syntax> params, AOp<T> body) {
+	public static <T extends ACell> Lambda<T> create(AVector<Syntax> params, AOp<T> body) {
 		return new Lambda<T>(Fn.create(params,body).getRef());
 	}
 
-	public static <T> Lambda<T> create(AClosure<T> fn) {
+	public static <T extends ACell> Lambda<T> create(AClosure<T> fn) {
 		return new Lambda<T>(fn.getRef());
 	}
 
 	@Override
-	public <I> Context<AClosure<T>> execute(Context<I> context) {
+	public <I extends ACell> Context<AClosure<T>> execute(Context<I> context) {
 		AClosure<T> fn= function.getValue().withEnvironment(context.getLocalBindings());
 		return context.withResult(Juice.LAMBDA,fn);
 	}
@@ -56,7 +57,7 @@ public class Lambda<T> extends AOp<AClosure<T>> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		if (i==0) return (Ref<R>) function;
 		throw new IndexOutOfBoundsException(Errors.badIndex(i));
 	}
@@ -90,7 +91,7 @@ public class Lambda<T> extends AOp<AClosure<T>> {
 		return pos;
 	}
 	
-	public static <T> Lambda<T> read(ByteBuffer bb) throws BadFormatException {
+	public static <T extends ACell> Lambda<T> read(ByteBuffer bb) throws BadFormatException {
 		Ref<AClosure<T>> function=Format.readRef(bb);
 		return new Lambda<T>(function);
 	}

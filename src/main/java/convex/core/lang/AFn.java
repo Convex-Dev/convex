@@ -11,10 +11,10 @@ import convex.core.data.IRefFunction;
  *
  * @param <T> Return type of functions.
  */
-public abstract class AFn<T> extends ACell implements IFn<T> {
+public abstract class AFn<T extends ACell> extends ACell implements IFn<T> {
 	
 	@Override
-	public abstract <I> Context<T> invoke(Context<I> context, Object[] args);
+	public abstract Context<T> invoke(Context<ACell> context, Object[] args);
 	
 	@Override
 	public abstract AFn<T> updateRefs(IRefFunction func);

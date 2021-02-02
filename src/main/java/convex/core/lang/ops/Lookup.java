@@ -2,6 +2,7 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
+import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
@@ -26,7 +27,7 @@ import convex.core.util.Errors;
  *
  * @param <T>
  */
-public class Lookup<T> extends AOp<T> {
+public class Lookup<T extends ACell> extends AOp<T> {
 	private final Address address;
 	private final Symbol symbol;
 
@@ -35,24 +36,24 @@ public class Lookup<T> extends AOp<T> {
 		this.symbol = symbol;
 	}
 
-	public static <T> Lookup<T> create(Address address, Symbol form) {
+	public static <T extends ACell> Lookup<T> create(Address address, Symbol form) {
 		return new Lookup<T>(address,form);
 	}
 	
-	public static <T> Lookup<T> create(Address address, String name) {
+	public static <T extends ACell> Lookup<T> create(Address address, String name) {
 		return create(address,Symbol.create(name));
 	}
 
-	public static <T> Lookup<T> create(Symbol symbol) {
+	public static <T extends ACell> Lookup<T> create(Symbol symbol) {
 		return create(null,symbol);
 	}
 
-	public static <T> Lookup<T> create(String name) {
+	public static <T extends ACell> Lookup<T> create(String name) {
 		return create(Symbol.create(name));
 	}
 
 	@Override
-	public <I> Context<T> execute(Context<I> context) {
+	public <I extends ACell> Context<T> execute(Context<I> context) {
 		MapEntry<Symbol, T> le = context.lookupLocalEntry(symbol);
 		if (le != null) return context.withResult(Juice.LOOKUP, le.getValue());
 		
@@ -83,7 +84,7 @@ public class Lookup<T> extends AOp<T> {
 		return pos;
 	}
 
-	public static <T> Lookup<T> read(ByteBuffer bb) throws BadFormatException {
+	public static <T extends ACell> Lookup<T> read(ByteBuffer bb) throws BadFormatException {
 		Symbol sym = Format.read(bb);
 		if (sym==null) throw new BadFormatException("Lookup symbol cannot be null");
 		Address address = Format.read(bb);
@@ -96,7 +97,7 @@ public class Lookup<T> extends AOp<T> {
 	}
 
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		throw new IndexOutOfBoundsException(Errors.badIndex(i));
 	}
 

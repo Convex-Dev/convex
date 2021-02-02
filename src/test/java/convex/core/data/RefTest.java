@@ -55,11 +55,11 @@ public class RefTest {
 	@Test
 	public void testShallowPersist() {
 		Blob bb = Blob.createRandom(new Random(), 100); // unique blob too big to embed
-		AVector<Object> v = Vectors.of(bb,bb,bb,bb); // vector containing big blob four times. Shouldn't be embedded.
+		AVector<ACell> v = Vectors.of(bb,bb,bb,bb); // vector containing big blob four times. Shouldn't be embedded.
 		Hash bh = bb.getHash();
 		Hash vh = v.getHash();
 		
-		Ref<AVector<Object>> ref = v.getRef().persistShallow();
+		Ref<AVector<ACell>> ref = v.getRef().persistShallow();
 		assertEquals(Ref.STORED, ref.getStatus());
 
 		assertThrows(MissingDataException.class, () -> Ref.forHash(bh).getValue());
@@ -79,7 +79,7 @@ public class RefTest {
 
 	@Test
 	public void testPersistEmbeddedNull() throws InvalidDataException {
-		Ref<Object> nr = Ref.get(null);
+		Ref<ACell> nr = Ref.get(null);
 		assertSame(Ref.NULL_VALUE, nr);
 		assertSame(nr, nr.persist());
 		nr.validate();
@@ -89,7 +89,7 @@ public class RefTest {
 	@Test
 	public void testPersistEmbeddedLong() {
 		Object val=RT.cvm(10001L);
-		Ref<Object> nr = Ref.get(val);
+		Ref<ACell> nr = Ref.get(val);
 		assertSame(nr.getValue(), nr.persist().getValue());
 		assertTrue(nr.isEmbedded());
 	}

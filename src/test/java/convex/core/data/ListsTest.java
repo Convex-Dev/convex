@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.prim.CVMLong;
 import convex.test.Samples;
 
 public class ListsTest {
@@ -18,7 +19,7 @@ public class ListsTest {
 
 	@Test
 	public void testEmptyList() {
-		AList<Object> e = Lists.empty();
+		AList<ACell> e = Lists.empty();
 		assertEquals(0, e.size());
 		assertSame(e, Lists.of());
 		assertFalse(e.contains(null));
@@ -40,7 +41,7 @@ public class ListsTest {
 		assertSame(Lists.empty(), Lists.empty().drop(0));
 		assertNull(Lists.empty().drop(1));
 		
-		AList<Long> ll=Lists.of(1L, 2L, 3L);
+		AList<CVMLong> ll=Lists.of(1L, 2L, 3L);
 		
 		assertSame(ll,ll.drop(0));
 		assertSame(Lists.empty(),ll.drop(3));
@@ -74,7 +75,7 @@ public class ListsTest {
 	/**
 	 * Generic tests for any list
 	 */
-	public static <T> void doListTests(AList<T> a) {
+	public static <T extends ACell> void doListTests(AList<T> a) {
 		long n = a.count();
 
 		if (n == 0) {

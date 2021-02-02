@@ -49,8 +49,8 @@ public class SignedDataTest {
 	@Test
 	public void testDataStructureSignature() throws BadSignatureException {
 		AKeyPair kp = TestState.HERO_PAIR;
-		AVector<Long> v = Vectors.of(1L, 2L, 3L);
-		SignedData<Object> sd = kp.signData(v);
+		AVector<CVMLong> v = Vectors.of(1L, 2L, 3L);
+		SignedData<AVector<CVMLong>> sd = kp.signData(v);
 		
 		assertTrue(sd.isValid());
 		

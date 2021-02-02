@@ -10,6 +10,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Format;
@@ -69,7 +70,7 @@ public class ParamTestEvals {
 		this.expectedResult = expectedResult;
 	}
 
-	public <T> AOp<T> compile(String source) {
+	public <T extends ACell> AOp<T> compile(String source) {
 		try {
 			Context<?> c = INITIAL_CONTEXT.fork();
 			AOp<T> op = TestState.compile(c, source);
@@ -79,7 +80,7 @@ public class ParamTestEvals {
 		}
 	}
 
-	public <T> Context<T> eval(AOp<T> op) {
+	public <T extends ACell> Context<T> eval(AOp<T> op) {
 		try {
 			Context<?> c = INITIAL_CONTEXT.fork();
 			Context<T> rc = c.execute(op);
@@ -89,7 +90,7 @@ public class ParamTestEvals {
 		}
 	}
 
-	public <T> Context<T> eval(String source) {
+	public <T extends ACell> Context<T> eval(String source) {
 		try {
 			Context<?> c = INITIAL_CONTEXT.fork();
 			AOp<T> op = TestState.compile(c, source);

@@ -31,9 +31,8 @@ public class ScryptTest {
         return new ReportingParseRunner(rule);
     }
 
-    @SuppressWarnings("rawtypes")
     static Object parse(Rule rule, String source) {
-        var result = new ReportingParseRunner(rule).run(source);
+        var result = new ReportingParseRunner<ACell>(rule).run(source);
 
         if (result.matched) {
             return Syntax.unwrapAll(result.resultValue);
@@ -43,19 +42,19 @@ public class ScryptTest {
     }
 
     @SuppressWarnings("unchecked")
-    public static <T> Context<T> step(Context<?> c, String source) {
+    public static <T extends ACell> Context<T> step(Context<?> c, String source) {
     	c=c.fork();
         Syntax syn = Scrypt.readSyntax(source);
-        Context<AOp<Object>> cctx = c.expandCompile(syn);
+        Context<AOp<ACell>> cctx = c.expandCompile(syn);
         if (cctx.isExceptional()) return (Context<T>) cctx;
 
-        AOp<Object> op = cctx.getResult();
+        AOp<ACell> op = cctx.getResult();
 
         Context<T> rctx = (Context<T>) c.run(op);
         return rctx;
     }
 
-    public static <T> Context<T> step(String source) {
+    public static <T extends ACell> Context<T> step(String source) {
         return step(CON, source);
     }
 

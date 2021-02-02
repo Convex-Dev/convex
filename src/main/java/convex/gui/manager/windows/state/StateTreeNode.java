@@ -64,9 +64,9 @@ public class StateTreeNode<T> implements TreeNode {
 	@Override
 	public Enumeration<? extends TreeNode> children() {
 
-		Ref<Object>[] childRefs = (isContainer ? ((ACell) object).getChildRefs() : new Ref[0]);
+		Ref<ACell>[] childRefs = (isContainer ? ((ACell) object).getChildRefs() : new Ref[0]);
 		ArrayList<StateTreeNode<Object>> tns = new ArrayList<>();
-		for (Ref<Object> r : childRefs) {
+		for (Ref<ACell> r : childRefs) {
 			tns.add(StateTreeNode.create(r.getValue()));
 		}
 		return Collections.enumeration(tns);

@@ -44,17 +44,17 @@ public class ParamTestRefs {
 				CVMLong n=CVMLong.create(1567565765677L);
 				Ref<CVMLong> r=Ref.get(n);
 				assertTrue(r.isEmbedded());
-				Ref<Long> r2=r.persist();
+				Ref<CVMLong> r2=r.persist();
 				assertTrue(r.isEmbedded());
 				assertSame(n,r2.getValue());
 			}
 			
 			
 			{ // structure with embedded value
-				AVector<Long> v=Vectors.of(6759578996496L);
-				Ref<AVector<Long>> r=v.getRef();
+				AVector<CVMLong> v=Vectors.of(6759578996496L);
+				Ref<AVector<CVMLong>> r=v.getRef();
 				assertEquals(Ref.UNKNOWN,r.getStatus());
-				Ref<AVector<Long>> r2=r.persist();
+				Ref<AVector<CVMLong>> r2=r.persist();
 				assertEquals(Ref.PERSISTED,r2.getStatus());
 				assertEquals(v.getRef(0),r2.getValue().getRef(0));
 			}

@@ -3,6 +3,7 @@ package convex.core.crypto;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 
+import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.SignedData;
@@ -32,7 +33,7 @@ public abstract class AKeyPair {
 	 * @param value Value to sign. Can be any valid CVM value.
 	 * @return Signed Data Object
 	 */
-	public abstract <R> SignedData<R> signData(R value);
+	public abstract <R extends ACell> SignedData<R> signData(R value);
 
 	@Override
 	public abstract boolean equals(Object a);

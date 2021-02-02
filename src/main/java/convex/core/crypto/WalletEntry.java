@@ -1,5 +1,6 @@
 package convex.core.crypto;
 
+import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
@@ -16,15 +17,15 @@ import convex.core.exceptions.TODOException;
 public class WalletEntry {
 	private final Address address;
 	private final AKeyPair keyPair;
-	private final AMap<Keyword, Object> data;
+	private final AMap<Keyword, ACell> data;
 
-	private WalletEntry(Address address, AMap<Keyword, Object> data, AKeyPair kp) {
+	private WalletEntry(Address address, AMap<Keyword, ACell> data, AKeyPair kp) {
 		this.address=address;
 		this.data = data;
 		this.keyPair = kp;
 	}
 
-	private WalletEntry(AMap<Keyword, Object> data) {
+	private WalletEntry(AMap<Keyword, ACell> data) {
 		this(null,data, null);
 	}
 
@@ -80,7 +81,7 @@ public class WalletEntry {
 		return getAccountKey().toChecksumHex();
 	}
 
-	public <R> SignedData<R> sign(R message) {
+	public <R extends ACell> SignedData<R> sign(R message) {
 		return keyPair.signData(message);
 	}
 }

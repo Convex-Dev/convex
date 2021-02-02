@@ -17,6 +17,7 @@ import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
+import convex.core.data.ACell;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
@@ -27,7 +28,7 @@ import convex.core.util.Utils;
  *
  * @param <T> Type of constant value
  */
-public class Constant<T> extends AOp<T> {
+public class Constant<T extends ACell> extends AOp<T> {
 
 	public static final Constant<?> NULL = new Constant<>(Ref.NULL_VALUE);
 	public static final Constant<CVMBool> TRUE = new Constant<>(Ref.TRUE_VALUE);
@@ -41,21 +42,25 @@ public class Constant<T> extends AOp<T> {
 		this.valueRef = valueRef;
 	}
 
-	public static <T> Constant<T> create(T value) {
-		return new Constant<T>(Ref.get(RT.cvm(value)));
+	public static <T extends ACell> Constant<T> create(T value) {
+		return new Constant<T>(Ref.get(value));
+	}
+	
+	public static <T extends ACell> Constant<T> of(Object value) {
+		return create(RT.cvm(value));
 	}
 	
 	public static Constant<AString> create(String stringValue) {
 		return new Constant<AString>(Strings.create(stringValue).getRef());
 	}
 
-	public static <T> Constant<T> createFromRef(Ref<T> valueRef) {
+	public static <T extends ACell> Constant<T> createFromRef(Ref<T> valueRef) {
 		if (valueRef == null) throw new IllegalArgumentException("Can't create with null ref");
 		return new Constant<T>(valueRef);
 	}
 
 	@Override
-	public <I> Context<T> execute(Context<I> context) {
+	public <I extends ACell> Context<T> execute(Context<I> context) {
 		return context.withResult(Juice.CONSTANT, valueRef.getValue());
 	}
 
@@ -80,7 +85,7 @@ public class Constant<T> extends AOp<T> {
 		return 1+Format.MAX_EMBEDDED_LENGTH;
 	}
 
-	public static <T> AOp<T> read(ByteBuffer bb) throws BadFormatException {
+	public static <T extends ACell> AOp<T> read(ByteBuffer bb) throws BadFormatException {
 		Ref<T> ref = Format.readRef(bb);
 		return createFromRef(ref);
 	}
@@ -97,7 +102,7 @@ public class Constant<T> extends AOp<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		if (i != 0) throw new IndexOutOfBoundsException(Errors.badIndex(i));
 		return (Ref<R>) valueRef;
 	}
@@ -111,7 +116,7 @@ public class Constant<T> extends AOp<T> {
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <T> AOp<T> nil() {
+	public static <T extends ACell> AOp<T> nil() {
 		return (AOp<T>) Constant.NULL;
 	}
 
@@ -119,4 +124,6 @@ public class Constant<T> extends AOp<T> {
 	public void validateCell() throws InvalidDataException {
 		if (valueRef == null) throw new InvalidDataException("Missing contant value ref!", this);
 	}
+
+
 }

@@ -2,6 +2,7 @@ package convex.core.lang;
 
 import java.nio.ByteBuffer;
 
+import convex.core.data.ACell;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.ops.Cond;
 import convex.core.lang.ops.Constant;
@@ -39,7 +40,7 @@ public class Ops {
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> AOp<T> read(ByteBuffer bb) throws BadFormatException {
+	public static <T extends ACell> AOp<T> read(ByteBuffer bb) throws BadFormatException {
 		byte opCode = bb.get();
 		switch (opCode) {
 		case Ops.INVOKE:

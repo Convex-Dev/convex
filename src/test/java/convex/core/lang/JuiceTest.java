@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ACell;
+
 /**
  * Tests for expected juice costs
  * 
@@ -23,7 +25,7 @@ public class JuiceTest {
 	 * @return Juice consumed
 	 */
 	public long juice(String source) {
-		Object form = Reader.read(source);
+		ACell form = Reader.read(source);
 		AOp<?> op = CONTEXT.fork().expandCompile(form).getResult();
 		Context<?> jctx = CONTEXT.fork().execute(op);
 		return JUICE - jctx.getJuice();
@@ -37,7 +39,7 @@ public class JuiceTest {
 	 * @return Juice consumed
 	 */
 	public long compileJuice(String source) {
-		Object form = Reader.read(source);
+		ACell form = Reader.read(source);
 		Context<?> jctx = CONTEXT.fork().expandCompile(form);
 		return JUICE - jctx.getJuice();
 	}
@@ -50,7 +52,7 @@ public class JuiceTest {
 	 * @return Juice consumed
 	 */
 	public long expandJuice(String source) {
-		Object form = Reader.read(source);
+		ACell form = Reader.read(source);
 		Context<?> jctx = Core.INITIAL_EXPANDER.expand(form, Core.INITIAL_EXPANDER, CONTEXT.fork());
 		return JUICE - jctx.getJuice();
 	}

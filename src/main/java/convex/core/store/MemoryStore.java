@@ -29,23 +29,23 @@ public class MemoryStore extends AStore {
 
 	@Override
 	@SuppressWarnings("unchecked")
-	public <T> Ref<T> refForHash(Hash hash) {
+	public <T extends ACell> Ref<T> refForHash(Hash hash) {
 		Ref<T> ref = (Ref<T>) hashRefs.get(hash);
 		return ref;
 	}
 	
 	@Override
-	public <T> Ref<T> announceRef(Ref<T> r2, Consumer<Ref<ACell>> noveltyHandler) {
+	public <T extends ACell> Ref<T> announceRef(Ref<T> r2, Consumer<Ref<ACell>> noveltyHandler) {
 		return persistRef(r2,noveltyHandler,Ref.ANNOUNCED); 
 	}
 
 	@Override
-	public <T> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
+	public <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
 		return persistRef(ref,noveltyHandler,Ref.PERSISTED);
 	}
 	
 	@SuppressWarnings("unchecked")
-	public <T> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus) {
+	public <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus) {
 		// Convert to direct Ref. Don't want to store a soft ref!
 		ref = ref.toDirect();
 
@@ -86,7 +86,7 @@ public class MemoryStore extends AStore {
 	}
 
 	@Override
-	public <T> Ref<T> storeRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
+	public <T extends ACell> Ref<T> storeRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
 		return persistRef(ref,noveltyHandler,Ref.STORED);
 	}
 

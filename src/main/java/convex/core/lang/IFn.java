@@ -1,5 +1,7 @@
 package convex.core.lang;
 
+import convex.core.data.ACell;
+
 /**
  * Interface for invokable objects with function interface.
  * 
@@ -8,7 +10,7 @@ package convex.core.lang;
  * 
  * @param <T> Return type of function
  */
-public interface IFn<T> {
+public interface IFn<T extends ACell> {
 
 	/**
 	 * Invoke this function in the given context.
@@ -20,6 +22,6 @@ public interface IFn<T> {
 	 *         value
 	 * @throws ExecutionException
 	 */
-	public abstract <I> Context<T> invoke(Context<I> context, Object[] args);
+	public abstract Context<T> invoke(Context<ACell> context, Object[] args);
 
 }

@@ -39,6 +39,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.APrimitive;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
@@ -453,11 +454,11 @@ public class RT {
 		return CVMByte.create((byte)n.longValue());
 	}
 
-	public static Character toCharacter(Object a) {
-		if (a instanceof Character) return (Character) a;
+	public static CVMChar toCharacter(Object a) {
+		if (a instanceof CVMChar) return (CVMChar) a;
 		Number n = number(a);
 		if (n == null) return null;
-		return (char) n.longValue();
+		return CVMChar.create(n.longValue());
 	}
 
 	private static long longValue(Object a) {
@@ -481,7 +482,7 @@ public class RT {
 	 * @return AVector instance
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> AVector<T> vec(Object o) {
+	public static <T extends ACell> AVector<T> vec(Object o) {
 		if (o == null) return Vectors.empty();
 		if (o instanceof ACollection) return vec((ACollection<T>) o);
 		return vec(sequence(o));
@@ -491,7 +492,7 @@ public class RT {
 	 * Converts any collection to a set
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> ASet<T> set(Object o) {
+	public static <T extends ACell> ASet<T> set(Object o) {
 		if (o == null) return Sets.empty();
 		if (o instanceof ASet) return (ASet<T>) o;
 		if (o instanceof Collection) return Sets.create((Collection<T>) o);
@@ -503,7 +504,7 @@ public class RT {
 	 * 
 	 * Null values are converted to empty vector (considered as empty sequence)
 	 */
-	public static <T> AVector<T> vec(ACollection<T> coll) {
+	public static <T extends ACell> AVector<T> vec(ACollection<T> coll) {
 		if (coll == null) return Vectors.empty();
 		return coll.toVector();
 	}
@@ -523,7 +524,7 @@ public class RT {
 	 *         a sequence
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> ASequence<T> sequence(Object o) {
+	public static <T extends ACell> ASequence<T> sequence(Object o) {
 		if (o == null) return Vectors.empty();
 		if (o instanceof ASequence) return (ASequence<T>) o;
 		if (o instanceof ACollection) return ((ACollection<T>) o).toVector();
@@ -533,7 +534,7 @@ public class RT {
 		}
 
 		if (o.getClass().isArray()) {
-			T[] arr = (T[]) Utils.toObjectArray(o);
+			Object[] arr = (Object[]) Utils.toObjectArray(o);
 			return Vectors.create(arr);
 		}
 
@@ -555,7 +556,7 @@ public class RT {
 	 *         a sequence
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> ASequence<T> ensureSequence(Object o) {
+	public static <T extends ACell> ASequence<T> ensureSequence(Object o) {
 		if (o == null) return Vectors.empty();
 		if (o instanceof ASequence) return (ASequence<T>) o;
 		return null;
@@ -569,30 +570,43 @@ public class RT {
 	 * @return Element from collection at the specified position
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> T nth(Object o, long i) {
+	public static <T extends ACell> T nth(ACell o, long i) {
 		// special case, we treat nil as empty sequence
 		if (o == null) throw new IndexOutOfBoundsException("Can't get nth element from null");
 
-		try {
-			if (o instanceof CharSequence) return (T) (Character) ((CharSequence) o).charAt(Utils.checkedInt(i));
-			if (o instanceof ASequence) return ((ASequence<T>) o).get(i);
-			if (o instanceof ABlob) return (T) CVMByte.create(((ABlob) o).get(i));
+		if (o instanceof ASequence) return ((ASequence<T>) o).get(i);
+		if (o instanceof ABlob) return (T) CVMByte.create(((ABlob) o).get(i));
+		if (o instanceof AString) return (T) CVMChar.create(((AString) o).charAt(Utils.checkedInt(i)));
 
-			// shouldn't get called in on-chain code, but needed for destructuring / runtime
-			// optimisations
+		ASequence<?> seq = sequence(o);
+		if (seq == null)
+			throw new ClassCastException("Can't get nth element from object of class: " + Utils.getClassName(o));
+
+		return (T) seq.get(i);
+	}
+	
+	/**
+	 * Variant of nth that also handles Java Arrays. Used for destructuring.
+	 * 
+	 * @param <T> Return type
+	 * @param o Object to check for indexed element
+	 * @param i Index to check
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> T nth(Object o, long i) {
+		if (o instanceof ACell) return nth((ACell)o,i);
+
+		try {
 			if (o.getClass().isArray()) {
 				return (T) Array.get(o, Utils.checkedInt(i));
 			}
-
-			ASequence<?> seq = sequence(o);
-			if (seq == null)
-				throw new ClassCastException("Can't get nth element from object of class: " + Utils.getClassName(o));
-
-			return (T) seq.get(i);
 		} catch (IllegalArgumentException e) {
 			// can come from checkedInt calls
 			throw new IndexOutOfBoundsException(e.getMessage());
 		}
+
+		throw new ClassCastException("Can't get nth element from object of class: " + Utils.getClassName(o));
 	}
 
 	/**
@@ -604,7 +618,7 @@ public class RT {
 	 * @return The remaining sequence, or null if no more elements
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> ASequence<T> next(Object o) {
+	public static <T extends ACell> ASequence<T> next(Object o) {
 		if (o == null) return null;
 		if (o instanceof ASequence) return ((ASequence<T>) o).next();
 		throw new IllegalArgumentException("Not a sequence: " + Utils.getClassName(o));
@@ -702,7 +716,7 @@ public class RT {
 	 * @return A new list with the cons'ed element at the start
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> AList<T> cons(T x, ASequence<?> xs) {
+	public static <T extends ACell> AList<T> cons(T x, ASequence<?> xs) {
 		if (xs == null) return Lists.of(x);
 		return ((ASequence<T>) xs).cons(x);
 	}
@@ -717,7 +731,7 @@ public class RT {
 	 * @param xs  Any sequential object, or null (will be treated as empty sequence)
 	 * @return A new list with the cons'ed elements at the start
 	 */
-	public static <T> AList<T> cons(T x, T y, Object xs) {
+	public static <T extends ACell> AList<T> cons(T x, T y, Object xs) {
 		ASequence<T> nxs = RT.sequence(xs);
 		if (xs == null) return Lists.of(x, y);
 		return nxs.cons(y).cons(x);
@@ -734,7 +748,7 @@ public class RT {
 	 * @param xs  Any sequential object
 	 * @return A new list with the cons'ed elements at the start
 	 */
-	public static <T> AList<T> cons(T x, T y, T z, Object xs) {
+	public static <T extends ACell> AList<T> cons(T x, T y, T z, Object xs) {
 		ASequence<T> nxs = RT.sequence(xs);
 		return nxs.cons(y).cons(x).cons(z);
 	}
@@ -747,7 +761,7 @@ public class RT {
 	 * @return Collection object, or null if coercion failed.
 	 */
 	@SuppressWarnings("unchecked")
-	static <E> ADataStructure<E> collection(Object a) {
+	static <E extends ACell> ADataStructure<E> collection(Object a) {
 		if (a == null) return Vectors.empty();
 		if (a instanceof ADataStructure) return (ADataStructure<E>) a;
 		return null;
@@ -763,7 +777,7 @@ public class RT {
 	 * 
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> IFn<T> function(Object a) {
+	public static <T extends ACell> IFn<T> function(Object a) {
 		if (a instanceof AFn) return (IFn<T>) a;
 		if (a instanceof AMap) return MapFn.wrap((AMap<?, T>) a);
 		if (a instanceof ASequence) return SeqFn.wrap((ASequence<?>) a);
@@ -836,14 +850,14 @@ public class RT {
 	 * 
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K, V> AMap<K, V> toMap(Object a) {
+	public static <K extends ACell, V extends ACell> AMap<K, V> toMap(Object a) {
 		if (a == null) return Maps.empty();
 		if (a instanceof AMap) return (AMap<K, V>) a;
 		return null;
 	}
 	
 	@SuppressWarnings("unchecked")
-	public static <K, V> AHashMap<K, V> toHashMap(Object a) {
+	public static <K extends ACell, V extends ACell> AHashMap<K, V> toHashMap(Object a) {
 		if (a == null) return Maps.empty();
 		AMap<K, V> m=RT.toMap(a);
 		if (m instanceof AHashMap) return (AHashMap<K, V>) a;
@@ -858,7 +872,7 @@ public class RT {
 	 * @return A set instance, or null if the argument cannot be converted to a set
 	 */
 	@SuppressWarnings("unchecked")
-	public static <V> ASet<V> toSet(Object a) {
+	public static <V extends ACell> ASet<V> toSet(Object a) {
 		if (a == null) return Sets.empty();
 		if (a instanceof ASet) return (ASet<V>) a;
 		return null;
@@ -886,15 +900,15 @@ public class RT {
 	 *         if not found.
 	 */
 	@SuppressWarnings("unchecked")
-	public static Object get(Object coll, Object key, Object notFound) {
+	public static ACell get(IGet<?> coll, ACell key, ACell notFound) {
 		if (coll == null) return notFound;
-		if (coll instanceof AMap) return ((AMap<Object, Object>) coll).get(key, notFound);
-		if (coll instanceof ASet) return ((ASet<Object>) coll).contains(key) ? key : notFound;
+		if (coll instanceof AMap) return ((AMap<ACell, ACell>) coll).get(key, notFound);
+		if (coll instanceof ASet) return ((ASet<ACell>) coll).contains(key) ? key : notFound;
 		if (coll instanceof ASequence) {
 			// we consider Long keys only to be included
-			if (key instanceof Long) {
-				ASequence<Object> seq = (ASequence<Object>) coll;
-				long ix = (Long) key;
+			if (key instanceof CVMLong) {
+				ASequence<ACell> seq = (ASequence<ACell>) coll;
+				long ix = ((CVMLong) key).longValue();
 				if ((ix >= 0) && (ix < seq.count())) return seq.get(ix);
 			}
 			return notFound;
@@ -932,7 +946,7 @@ public class RT {
 	 * @return MapEntry instance, or null if conversion fails
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K, V> MapEntry<K, V> toMapEntry(Object x) {
+	public static <K extends ACell, V extends ACell> MapEntry<K, V> toMapEntry(Object x) {
 		MapEntry<K, V> me;
 		if (x instanceof MapEntry) {
 			me = (MapEntry<K, V>) x;
@@ -1011,7 +1025,7 @@ public class RT {
 	 * @return ADataStructure instance, or null if not a data structure
 	 */
 	@SuppressWarnings("unchecked")
-	public static <E> ADataStructure<E> ensureDataStructure(Object a) {
+	public static <E extends ACell> ADataStructure<E> ensureDataStructure(Object a) {
 		if (a instanceof ADataStructure) return (ADataStructure<E>) a;
 		return null;
 	}
@@ -1077,13 +1091,13 @@ public class RT {
 	 * @return Updated data structure
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K, V> ADataStructure<?> assoc(Object coll, K key, V value) {
-		if (coll == null) return Maps.create(key, value);
+	public static <R extends ACell,K extends ACell, V extends ACell> ADataStructure<R> assoc(Object coll, K key, V value) {
+		if (coll == null) return (ADataStructure<R>) Maps.create(key, value);
 		if (coll instanceof AMap) {
-			return ((AMap<K, V>) coll).assoc(key, value);
+			return (ADataStructure<R>) ((AMap<K, V>) coll).assoc(key, value);
 		} else if (coll instanceof ASequence) {
 			if (!(key instanceof CVMLong)) return null;
-			return ((ASequence<V>) coll).assoc(((CVMLong) key).longValue(), value);
+			return (ADataStructure<R>) ((ASequence<V>) coll).assoc(((CVMLong) key).longValue(), value);
 		}
 		return null;
 	}
@@ -1095,12 +1109,12 @@ public class RT {
 	 * @return Vector of keys in the map
 	 */
 	@SuppressWarnings("unchecked")
-	public static AVector<Object> keys(Object a) {
+	public static <R extends ACell> AVector<R> keys(Object a) {
 		if (!(a instanceof AMap)) return null;
-		AMap<Object, Object> m = (AMap<Object, Object>) a;
-		return m.reduceEntries(new BiFunction<AVector<Object>, MapEntry<Object, Object>, AVector<Object>>() {
+		AMap<R, ACell> m = (AMap<R, ACell>) a;
+		return m.reduceEntries(new BiFunction<>() {
 			@Override
-			public AVector<Object> apply(AVector<Object> t, MapEntry<Object, Object> u) {
+			public AVector<R> apply(AVector<R> t, MapEntry<R, ACell> u) {
 				return t.conj(u.getKey());
 			}
 		}, Vectors.empty());
@@ -1113,12 +1127,12 @@ public class RT {
 	 * @return VEctor of values from a map, or null if the object is not a map
 	 */
 	@SuppressWarnings("unchecked")
-	public static AVector<Object> values(Object a) {
+	public static <R extends ACell> AVector<R> values(Object a) {
 		if (!(a instanceof AMap)) return null;
-		AMap<Object, Object> m = (AMap<Object, Object>) a;
-		return m.reduceValues(new BiFunction<AVector<Object>, Object, AVector<Object>>() {
+		AMap<ACell, R> m = (AMap<ACell, R>) a;
+		return m.reduceValues(new BiFunction<AVector<R>, R, AVector<R>>() {
 			@Override
-			public AVector<Object> apply(AVector<Object> t, Object u) {
+			public AVector<R> apply(AVector<R> t, R u) {
 				return t.conj(u);
 			}
 		}, Vectors.empty());
@@ -1132,7 +1146,7 @@ public class RT {
 	 * @return IGet instance, or null if conversion is not possible
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> IGet<T> toGettable(Object o) {
+	public static <T extends ACell> IGet<T> toGettable(Object o) {
 		if (o==null) return Maps.empty();
 		if (o instanceof IGet) return (IGet<T>) o;
 		return null;
@@ -1146,7 +1160,7 @@ public class RT {
 	 * @return IAssociative instance, or null if conversion is not possible
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K,V> IAssociative<K,V> ensureAssociative(Object o) {
+	public static <K extends ACell,V extends ACell> IAssociative<K,V> ensureAssociative(Object o) {
 		if (o==null) return Maps.empty();
 		if (o instanceof IGet) return (IAssociative<K,V>) o;
 		return null;
@@ -1162,7 +1176,7 @@ public class RT {
 	 * @return
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> Set<T> ensureSet(Object a) {
+	public static <T extends ACell> Set<T> ensureSet(Object a) {
 		if (a==null) return Sets.empty();
 		if (!(a instanceof Set)) return null;
 		return (Set<T>) a;
@@ -1176,7 +1190,7 @@ public class RT {
 	 * @return AHashMap instance, or null if not a hash map
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K,V> AHashMap<K, V> ensureHashMap(Object a) {
+	public static <K extends ACell,V extends ACell> AHashMap<K, V> ensureHashMap(Object a) {
 		if (a==null) return Maps.empty();
 		if (a instanceof AHashMap) return (AHashMap<K, V>) a;
 		return null;
@@ -1208,13 +1222,13 @@ public class RT {
 	 * @return Valid CVM type
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> T cvm(Object o) {
+	public static <T extends ACell> T cvm(Object o) {
 		if (o==null) return null;
 		if (o instanceof ACell) return ((T)o);
 		if (o instanceof String) return (T) Strings.create((String)o);
 		if (o instanceof Double) return (T)CVMDouble.create(((Double)o));
 		if (o instanceof Number) return (T)CVMLong.create(((Number)o).longValue());
-		if (o instanceof Character) return (T)toCharacter(o);
+		if (o instanceof Character) return (T)CVMChar.create((Character)o);
 		if (o instanceof Boolean) return (T)RT.toBoolean(o);
 		throw new IllegalArgumentException("Can't convert to CVM type with class: "+Utils.getClassName(o));
 	}

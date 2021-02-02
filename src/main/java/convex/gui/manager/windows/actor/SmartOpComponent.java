@@ -17,6 +17,7 @@ import javax.swing.JTextField;
 import org.parboiled.common.Utils;
 
 import convex.core.crypto.WalletEntry;
+import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
@@ -46,7 +47,7 @@ import convex.net.ResultConsumer;
 public class SmartOpComponent extends BaseListComponent {
 
 	protected ActorInvokePanel parent;
-	protected Object sym;
+	protected Symbol sym;
 	int paramCount;
 
 	/**
@@ -58,6 +59,7 @@ public class SmartOpComponent extends BaseListComponent {
 
 	private static final Logger log = Logger.getLogger(SmartOpComponent.class.getName());
 
+	@SuppressWarnings("rawtypes")
 	public SmartOpComponent(ActorInvokePanel parent, Address contract, Symbol sym) {
 		this.parent = parent;
 		this.sym = sym;
@@ -74,7 +76,7 @@ public class SmartOpComponent extends BaseListComponent {
 
 		AccountStatus as = PeerManager.getLatestState().getAccount(contract);
 
-		IFn<Object> fn = (IFn<Object>) as.getExportedFunction(sym);
+		IFn fn = (IFn) as.getExportedFunction(sym);
 
 		// Function might be a map or set
 		AVector<Syntax> params = (fn instanceof Fn) ? ((Fn<?>) fn).getParams()
@@ -122,23 +124,23 @@ public class SmartOpComponent extends BaseListComponent {
 	private void execute() {
 		InetSocketAddress addr = PeerManager.getDefaultPeer().getHostAddress();
 
-		AVector<Object> args = Vectors.empty();
+		AVector<ACell> args = Vectors.empty();
 		for (int i = 0; i < paramCount; i++) {
 			JTextField argBox = paramFields.get(i);
 			String s = argBox.getText();
-			Object arg = (s.isBlank()) ? null : Reader.read(s);
+			ACell arg = (s.isBlank()) ? null : Reader.read(s);
 			args = args.conj(arg);
 		}
 		String offerString = paramFields.get(null).getText();
 		Long offer = (offerString.isBlank()) ? null : Long.parseLong(offerString.trim());
 
-		AList<Object> rest = Lists.of(Lists.create(args).cons(sym)); // (foo 1 2 3)
+		AList<ACell> rest = Lists.of(Lists.create(args).cons(sym)); // (foo 1 2 3)
 		if (offer != null) {
-			rest = rest.cons(offer);
+			rest = rest.cons(RT.cvm(offer));
 		}
 
 		try {
-			Object message = RT.cons(Symbols.CALL, parent.contract, rest);
+			ACell message = RT.cons(Symbols.CALL, parent.contract, rest);
 
 			long id;
 			

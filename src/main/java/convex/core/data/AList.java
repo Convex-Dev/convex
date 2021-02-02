@@ -22,7 +22,7 @@ import java.util.function.Function;
  * 
  * @param <T> Type of list
  */
-public abstract class AList<T> extends ASequence<T> {
+public abstract class AList<T extends ACell> extends ASequence<T> {
 
 	@Override
 	public abstract AList<T> cons(T x);
@@ -33,7 +33,7 @@ public abstract class AList<T> extends ASequence<T> {
 	 * Returns a new list.
 	 */
 	@Override
-	public abstract <R> AList<R> conj(R x);
+	public abstract <R extends ACell> AList<R> conj(R x);
 
 	@Override
 	public AList<T> empty() {
@@ -41,13 +41,13 @@ public abstract class AList<T> extends ASequence<T> {
 	}
 
 	@Override
-	public abstract <R> AList<R> map(Function<? super T, ? extends R> mapper);
+	public abstract <R extends ACell> AList<R> map(Function<? super T, ? extends R> mapper);
 
 	@Override
-	public abstract AList<T> concat(ASequence<T> vals);
+	public abstract <R extends ACell> AList<R> concat(ASequence<R> vals);
 
 	@Override
-	public abstract AList<T> assoc(long i, T value);
+	public abstract <R extends ACell> AList<R> assoc(long i, R value);
 
 	/**
 	 * Drops elements from the front of the list

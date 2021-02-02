@@ -19,6 +19,7 @@ import org.parboiled.support.ParsingResult;
 import org.parboiled.support.StringVar;
 import org.parboiled.support.Var;
 
+import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AList;
 import convex.core.data.AMap;
@@ -35,6 +36,7 @@ import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
+import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
@@ -52,7 +54,7 @@ import convex.core.util.Utils;
  * "Talk is cheap. Show me the code." - Linus Torvalds
  */
 @BuildParseTree
-public class Reader extends BaseParser<Object> {
+public class Reader extends BaseParser<ACell> {
 
 	// OVERALL PARSING INPUT RULES
 
@@ -138,7 +140,7 @@ public class Reader extends BaseParser<Object> {
 	}
 
 	public Syntax assocMeta(Syntax exp, Syntax meta) {
-		AHashMap<Object, Object> metaMap = interpretMetadata(meta);
+		AHashMap<ACell, ACell> metaMap = interpretMetadata(meta);
 		return exp.mergeMeta(metaMap);
 	}
 
@@ -151,9 +153,9 @@ public class Reader extends BaseParser<Object> {
 	 * @return Metadata map
 	 */
 	@SuppressWarnings("unchecked")
-	public AHashMap<Object, Object> interpretMetadata(Syntax metaNode) {
-		Object val = Syntax.unwrapAll(metaNode);
-		if (val instanceof AMap) return (AHashMap<Object, Object>) val;
+	public AHashMap<ACell, ACell> interpretMetadata(Syntax metaNode) {
+		ACell val = Syntax.unwrapAll(metaNode);
+		if (val instanceof AMap) return (AHashMap<ACell, ACell>) val;
 		if (val instanceof Keyword) return Maps.of(val, Boolean.TRUE);
 		return Maps.of(Keywords.TAG, val);
 	}
@@ -187,22 +189,22 @@ public class Reader extends BaseParser<Object> {
 				Quoted(UndelimitedExpression()));
 	}
 
-	public class AddAction implements Action<Object> {
-		private Var<ArrayList<Object>> expVar;
+	public class AddAction implements Action<ACell> {
+		private Var<ArrayList<ACell>> expVar;
 
-		public AddAction(Var<ArrayList<Object>> expVar) {
+		public AddAction(Var<ArrayList<ACell>> expVar) {
 			this.expVar = expVar;
 		}
 
 		@Override
-		public boolean run(Context<Object> context) {
-			Object o = (Object) pop();
+		public boolean run(Context<ACell> context) {
+			ACell o = pop();
 			expVar.get().add(o);
 			return true;
 		}
 	}
 
-	Action<Object> ListAddAction(Var<ArrayList<Object>> expVar) {
+	Action<ACell> ListAddAction(Var<ArrayList<ACell>> expVar) {
 		return new AddAction(expVar);
 	}
 
@@ -213,7 +215,7 @@ public class Reader extends BaseParser<Object> {
 	 * Returns a List of expressions on stack.
 	 */
 	public Rule ExpressionList() {
-		Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+		Var<ArrayList<ACell>> expVar = new Var<>(new ArrayList<>());
 		return Sequence(
 				Spacing(), 
 				ZeroOrMore(Sequence( // initial expressions with following whitespace or delimiter
@@ -255,7 +257,7 @@ public class Reader extends BaseParser<Object> {
 	// DATA TYPE LITERALS
 
 	@SuppressWarnings("unchecked")
-	protected <T> ASequence<T> popNodeList() {
+	protected <T extends ACell> ASequence<T> popNodeList() {
 		Object o = pop();
 		if (o instanceof Syntax) o = ((Syntax) o).getValue();
 		return (ASequence<T>) o;
@@ -330,14 +332,28 @@ public class Reader extends BaseParser<Object> {
 
 	public Rule CharLiteral() {
 		return Sequence('\\',
-				FirstOf(Sequence("newline", push('\n')), 
-						Sequence("space", push(' ')), 
-						Sequence("tab", push('\t')),
-						Sequence("formfeed", push('\f')), 
-						Sequence("backspace", push('\b')),
-						Sequence("return", push('\r')),
-						Sequence("u", NTimes(4, HexDigit()), push(prepare((char) Long.parseLong(match(), 16)))),
-						Sequence(ANY, push(prepare((char) match().charAt(0))))));
+				FirstOf(Sequence("newline", push(prepareChar('\n'))), 
+						Sequence("space", push(prepareChar(' '))), 
+						Sequence("tab", push(prepareChar('\t'))),
+						Sequence("formfeed", push(prepareChar('\f'))), 
+						Sequence("backspace", push(prepareChar('\b'))),
+						Sequence("return", push(prepareChar('\r'))),
+						Sequence("u", NTimes(4, HexDigit()), push(prepareChar((char) Long.parseLong(match(), 16)))),
+						Sequence(ANY, push(prepareChar(match().charAt(0))))));
+	}
+	
+	/**
+	 * Prepare AST result Syntax Object
+	 * 
+	 * @param a Raw parsed object
+	 * @return AST object, may be a Syntax Object
+	 */
+	protected ACell prepareChar(char c) {
+		CVMChar cc=CVMChar.create(c);
+		if (wrapSyntax) {
+			return Syntax.create(cc);
+		}
+		return cc;
 	}
 
 	public Rule BooleanLiteral() {
@@ -485,12 +501,12 @@ public class Reader extends BaseParser<Object> {
 	 * @param a Raw parsed object
 	 * @return AST object, may be a Syntax Object
 	 */
-	protected Object prepare(Object a) {
+	protected ACell prepare(ACell a) {
 		if (wrapSyntax) {
 			IndexRange ir = matchRange();
 			long start = ir.start;
 			//long end = ir.end;
-			AHashMap<Object, Object> props = Maps.of(Keywords.START, start);
+			AHashMap<ACell, ACell> props = Maps.of(Keywords.START, RT.cvm(start));
 			//AHashMap<Object, Object> props = Maps.of(Keywords.START, start, Keywords.END, end, Keywords.SOURCE,
 			//		tempSource.substring((int)start, (int)end));
 			return Syntax.create(a,props);
@@ -548,12 +564,12 @@ public class Reader extends BaseParser<Object> {
 		}
 	}
 
-	public static <T> T doParse(Rule rule, String source) {
+	public static <T extends ACell> T doParse(Rule rule, String source) {
 		ParseRunner<T> runner = new ReportingParseRunner<T>(rule);
 		return doParse(runner, source);
 	}
 
-	protected static <T> T doParse(ParseRunner<T> runner, String source) {
+	protected static <T extends ACell> T doParse(ParseRunner<T> runner, String source) {
 		try {
 			ParsingResult<T> result = runner.run(source);
 			checkErrors(result);
@@ -571,10 +587,10 @@ public class Reader extends BaseParser<Object> {
 	 * @return Parsed form
 	 */
 	@SuppressWarnings("unchecked")
-	public static <R> R read(String source) {
+	public static <R extends ACell> R read(String source) {
 		Reader reader = formReader.get();
 		reader.tempSource = source;
-		return (R) doParse(new ReportingParseRunner<Object>(reader.ExpressionInput()), source);
+		return (R) doParse(new ReportingParseRunner<ACell>(reader.ExpressionInput()), source);
 	}
 
 	/**
@@ -586,14 +602,14 @@ public class Reader extends BaseParser<Object> {
 	public static Syntax readSyntax(String source) {
 		Reader reader = syntaxReader.get();
 		reader.tempSource = source;
-		return (Syntax) doParse(new ReportingParseRunner<Object>(reader.ExpressionInput()), source);
+		return (Syntax) doParse(new ReportingParseRunner<ACell>(reader.ExpressionInput()), source);
 	}
 
-	public static Object readResource(String path) throws IOException {
+	public static ACell readResource(String path) throws IOException {
 		String source = Utils.readResourceAsString(path);
 		Reader reader = syntaxReader.get(); 
 		reader.tempSource = source;
-		return doParse(new ReportingParseRunner<Object>(reader.ExpressionInput()), source);
+		return doParse(new ReportingParseRunner<ACell>(reader.ExpressionInput()), source);
 	}
 
 	/**
@@ -605,7 +621,7 @@ public class Reader extends BaseParser<Object> {
 	public static AList<Syntax> readAllSyntax(String source) {
 		Reader reader = syntaxReader.get();
 		reader.tempSource = source;
-		Syntax s = (Syntax) doParse(new ReportingParseRunner<Object>(reader.Input()), source);
+		Syntax s = (Syntax) doParse(new ReportingParseRunner<ACell>(reader.Input()), source);
 		return s.getValue();
 	}
 
@@ -616,10 +632,10 @@ public class Reader extends BaseParser<Object> {
 	 * @return List of Syntax Objects
 	 */
 	@SuppressWarnings("unchecked")
-	public static AList<Object> readAll(String source) {
+	public static AList<ACell> readAll(String source) {
 		Reader reader = formReader.get();
 		reader.tempSource = source;
-		AList<Object> list = (AList<Object>) doParse(new ReportingParseRunner<Object>(reader.Input()), source);
+		AList<ACell> list = (AList<ACell>) doParse(new ReportingParseRunner<ACell>(reader.Input()), source);
 		return list;
 	}
 

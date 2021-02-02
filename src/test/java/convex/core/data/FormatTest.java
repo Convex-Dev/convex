@@ -109,12 +109,12 @@ public class FormatTest {
 	}
 	
 	@Test public void testListRegression() throws BadFormatException {
-		MapEntry<Object,Object> me=MapEntry.create(Blobs.fromHex("41da2aa427dc50975dd0b077"), RT.cvm(-1449690165L));
-		List<Object> l=List.reverse(me);
+		MapEntry<ACell,ACell> me=MapEntry.create(Blobs.fromHex("41da2aa427dc50975dd0b077"), RT.cvm(-1449690165L));
+		List<ACell> l=List.reverse(me);
 		assertNotEquals(me,l.data); // ensure MapEntry gets converted to canonical vector
 		
 		Blob b=Format.encodedBlob(l);
-		List<Object> l2=Format.read(b);
+		List<ACell> l2=Format.read(b);
 		
 		assertEquals(l,l2);
 	}

@@ -6,6 +6,7 @@ import org.openjdk.jmh.runner.options.Options;
 
 import convex.core.Init;
 import convex.core.State;
+import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
@@ -34,7 +35,7 @@ public class CVMBenchmark {
 		State s=Init.STATE;
 		Address addr=Init.HERO;
 		ATransaction trans=Transfer.create(addr,1, Init.VILLAIN, 1000);
-		Context<Double>  ctx=s.applyTransaction(trans);
+		Context<ACell>  ctx=s.applyTransaction(trans);
 		ctx.getValue();
 	}
 	 
@@ -42,8 +43,8 @@ public class CVMBenchmark {
 	public void simpleCalculationStatic() {
 		State s=Init.STATE;
 		Address addr=Init.HERO;
-		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Invoke.create(Constant.create(Core.PLUS),Constant.create(1L),Constant.create(2L)));
-		Context<Double>  ctx=s.applyTransaction(trans);
+		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Invoke.create(Constant.create(Core.PLUS),Constant.of(1L),Constant.of(2L)));
+		Context<ACell>  ctx=s.applyTransaction(trans);
 		ctx.getValue();
 	}
 	
@@ -51,8 +52,8 @@ public class CVMBenchmark {
 	public void simpleCalculationDynamic() {
 		State s=Init.STATE;
 		Address addr=Init.HERO;
-		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Invoke.create(Lookup.create("+"),Constant.create(1L),Constant.create(2L)));
-		Context<Double>  ctx=s.applyTransaction(trans);
+		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Invoke.create(Lookup.create("+"),Constant.of(1L),Constant.of(2L)));
+		Context<ACell> ctx=s.applyTransaction(trans);
 		ctx.getValue();
 	}
 	
@@ -60,8 +61,8 @@ public class CVMBenchmark {
 	public void defInEnvironment() {
 		State s=Init.STATE;
 		Address addr=Init.HERO;
-		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Def.create("a", Constant.create(13L)));
-		Context<Double>  ctx=s.applyTransaction(trans);
+		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Def.create("a", Constant.of(13L)));
+		Context<ACell>  ctx=s.applyTransaction(trans);
 		ctx.getValue();
 	}
 	
@@ -70,7 +71,7 @@ public class CVMBenchmark {
 		State s=Init.STATE;
 		Address addr=Init.HERO;
 		ATransaction trans=Call.create(addr,1L, Init.REGISTRY_ADDRESS, Symbols.REGISTER, Vectors.of(Maps.of(Keywords.NAME,Strings.create("Bob"))));
-		Context<Double>  ctx=s.applyTransaction(trans);
+		Context<ACell>  ctx=s.applyTransaction(trans);
 		ctx.getValue();
 	}
 

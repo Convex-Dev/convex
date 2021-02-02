@@ -10,6 +10,7 @@ import org.parboiled.annotations.SuppressNode;
 import org.parboiled.parserunners.ReportingParseRunner;
 import org.parboiled.support.Var;
 
+import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.List;
 import convex.core.data.Lists;
@@ -41,7 +42,7 @@ public class Scrypt extends Reader {
     }
 
     Rule Arguments() {
-        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+        Var<ArrayList<ACell>> expVar = new Var<>(new ArrayList<>());
 
         return Sequence(
                 LPAR,
@@ -51,7 +52,7 @@ public class Scrypt extends Reader {
         );
     }
 
-    Rule Argument(Var<ArrayList<Object>> expVar) {
+    Rule Argument(Var<ArrayList<ACell>> expVar) {
         return Sequence(
                 CompoundExpression(),
                 ListAddAction(expVar)
@@ -138,7 +139,7 @@ public class Scrypt extends Reader {
     }
 
     public Rule BlockBody() {
-        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+        Var<ArrayList<ACell>> expVar = new Var<>(new ArrayList<>());
 
         return Sequence(
                 OneOrMore(
@@ -163,7 +164,7 @@ public class Scrypt extends Reader {
     }
 
     public Rule MapEntries() {
-        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+        Var<ArrayList<ACell>> expVar = new Var<>(new ArrayList<>());
 
         return Sequence(
                 Optional(
@@ -250,7 +251,7 @@ public class Scrypt extends Reader {
 
 
     public Rule CompoundExpressionList() {
-        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+        Var<ArrayList<ACell>> expVar = new Var<>(new ArrayList<>());
         return Sequence(
                 Spacing(),
                 ZeroOrMore(

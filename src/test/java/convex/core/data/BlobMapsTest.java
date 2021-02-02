@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static convex.test.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 
@@ -19,11 +20,11 @@ import convex.test.Samples;
 public class BlobMapsTest {
 	@Test
 	public void testEmpty() throws InvalidDataException {
-		BlobMap<ABlob, Long> m = BlobMaps.empty();
+		BlobMap<ABlob, ACell> m = BlobMaps.empty();
 		
 		assertFalse(m.containsKey(Blob.EMPTY));
 		assertFalse(m.containsKey(null));
-		assertFalse(m.containsValue(1L));
+		assertFalse(m.containsValue(RT.cvm(1L)));
 		assertFalse(m.containsValue(null));
 
 		assertEquals(0L, m.count());
@@ -74,9 +75,9 @@ public class BlobMapsTest {
 	@Test
 	public void testGet() throws InvalidDataException {
 		Blob k1 = Blob.fromHex("cafe");
-		BlobMap<ABlob, Long> m = BlobMaps.create(k1, 17L);
+		BlobMap<ABlob, CVMLong> m = BlobMaps.of(k1, 17L);
 		assertNull(m.get("cafe")); // needs a blob. String counts as non-existent key
-		assertEquals(17L,m.get(k1));
+		assertCVMEquals(17L,m.get(k1));
 		
 		assertNull(m.get((Object)null)); // Null counts as non-existent key when used as an Object arg
 
@@ -221,7 +222,7 @@ public class BlobMapsTest {
 		doBlobMapTests(m);
 	}
 
-	private <K extends ABlob, V> void doBlobMapTests(BlobMap<K, V> m) {
+	private <K extends ABlob, V extends ACell> void doBlobMapTests(BlobMap<K, V> m) {
 		long n = m.count();
 
 		if (n >= 2) {

@@ -17,6 +17,7 @@ import java.io.IOException;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Init;
+import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Maps;
 import convex.core.lang.Context;
@@ -26,13 +27,14 @@ import convex.core.util.Utils;
 
 public class PredictionMarketTest {
 
+	@SuppressWarnings("rawtypes")
 	private <T> T evalCall(Context<?> ctx,Address addr, long offer, Object name, Object... args) {
-		Context<T> rctx=doCall(ctx,addr, offer, name, args);
+		Context rctx=doCall(ctx,addr, offer, name, args);
 		return RT.jvm(rctx.getResult());
 	}
 	
 	@SuppressWarnings("unchecked")
-	private <T> Context<T> doCall(Context<?> ctx,Address addr, long offer, Object name, Object... args) {
+	private <T extends ACell> Context<T> doCall(Context<?> ctx,Address addr, long offer, Object name, Object... args) {
 		int n=args.length;
 		for (int i=0; i<n; i++) {
 			args[i]=RT.cvm(args[i]);
@@ -42,12 +44,13 @@ public class PredictionMarketTest {
 		return (Context<T>) rctx;
 	}
 	
+	@SuppressWarnings("rawtypes")
 	@Test
 	public void testPredictionContract() throws IOException {
 		String contractString = Utils.readResourceAsString("actors/prediction-market.con");
 			
 		// Run code to initialise actor with [oracle oracle-key outcomes]
-		Context<?> ctx = TestState.INITIAL_CONTEXT.fork();
+		Context ctx = TestState.INITIAL_CONTEXT.fork();
 		ctx=step("(deploy ("+contractString+" *address* :bar #{true,false}))");
 		
 		Address addr = (Address) ctx.getResult();
@@ -56,7 +59,7 @@ public class PredictionMarketTest {
 		assertFalse(ctx.isExceptional());
 
 		// tests of bonding curve function with empty stakes
-		assertEquals(0.0, evalCall(ctx,addr, 0L, "bond", Maps.empty()), 0.01);
+		assertEquals(0.0, (double)evalCall(ctx,addr, 0L, "bond", Maps.empty()), 0.01);
 
 		// bonding curve point with one staked outcome
 		assertEquals(10.0, evalCall(ctx,addr, 0L, "bond", Maps.of(true, 10L)), 0.01);

@@ -14,7 +14,7 @@ import convex.core.exceptions.InvalidDataException;
  *
  * @param <T>
  */
-public class VectorArray<T> extends ASizedVector<T> {
+public class VectorArray<T extends ACell> extends ASizedVector<T> {
 
 	private final T[] array;
 	private final int offset;
@@ -84,20 +84,19 @@ public class VectorArray<T> extends ASizedVector<T> {
 	}
 
 	@Override
-	public <R> AVector<R> map(Function<? super T, ? extends R> mapper) {
+	public <R extends ACell> AVector<R> map(Function<? super T, ? extends R> mapper) {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
 	@Override
-	public AVector<T> concat(ASequence<T> b) {
+	public <R extends ACell> AVector<R> concat(ASequence<R> b) {
 		return toVector().concat(b);
 	}
 
 	@Override
 	public <R> R reduce(BiFunction<? super R, ? super T, ? extends R> func, R value) {
-		// TODO Auto-generated method stub
-		return null;
+		throw new UnsupportedOperationException();
 	}
 
 	@Override
@@ -135,7 +134,7 @@ public class VectorArray<T> extends ASizedVector<T> {
 	}
 
 	@Override
-	public AVector<T> assoc(long i, T value) {
+	public <R extends ACell> AVector<R> assoc(long i, R value) {
 		return toVector().assoc(i,value);
 	}
 
@@ -168,12 +167,13 @@ public class VectorArray<T> extends ASizedVector<T> {
 		return Ref.get(get(index));
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public VectorArray<T> subVector(long start, long length) {
+	public <R extends ACell> VectorArray<R> subVector(long start, long length) {
 		checkRange(start, length);
-		if (length == count) return this;
+		if (length == count) return (VectorArray<R>) this;
 
-		return new VectorArray<T>(length,array,offset+(int)(start*stride),stride);
+		return new VectorArray<R>(length,(R[])array,offset+(int)(start*stride),stride);
 	}
 
 	@Override

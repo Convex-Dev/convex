@@ -3,6 +3,7 @@ package convex.core.lang.impl;
 import org.parboiled.common.Utils;
 
 import convex.core.ErrorCodes;
+import convex.core.data.ACell;
 
 /**
  * Class representing a function return value
@@ -11,7 +12,7 @@ import convex.core.ErrorCodes;
  * 
  * @param <T> Type of return value
  */
-public class RollbackValue<T> extends AReturn {
+public class RollbackValue<T extends ACell> extends AReturn {
 
 	private final T value;
 
@@ -19,7 +20,7 @@ public class RollbackValue<T> extends AReturn {
 		this.value = value;
 	}
 
-	public static <T> RollbackValue<T> wrap(T value) {
+	public static <T extends ACell> RollbackValue<T> wrap(T value) {
 		return new RollbackValue<T>(value);
 	}
 
@@ -33,12 +34,12 @@ public class RollbackValue<T> extends AReturn {
 	}
 	
 	@Override
-	public Object getCode() {
+	public ACell getCode() {
 		return ErrorCodes.ROLLBACK;
 	}
 
 	@Override
-	public Object getMessage() {
+	public ACell getMessage() {
 		return value;
 	}
 }

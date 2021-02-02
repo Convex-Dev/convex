@@ -3,6 +3,7 @@ package convex.core.lang.impl;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 
+import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.Format;
@@ -16,12 +17,12 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AFn;
 import convex.core.lang.Context;
 
-public class MultiFn<T> extends AClosure<T> {
+public class MultiFn<T extends ACell> extends AClosure<T> {
 
 	private final AVector<AFn<T>> fns;
 	private final int num;
 	
-	private MultiFn(AVector<AFn<T>> fns, AHashMap<Symbol,Object> env) {
+	private MultiFn(AVector<AFn<T>> fns, AHashMap<Symbol, ACell> env) {
 		super(env);
 		this.fns=fns;
 		this.num=fns.size();
@@ -32,7 +33,7 @@ public class MultiFn<T> extends AClosure<T> {
 	}
 	
 
-	public static <R> MultiFn<R> create(AVector<AFn<R>> fns) {
+	public static <R extends ACell> MultiFn<R> create(AVector<AFn<R>> fns) {
 		return new MultiFn<>(fns);
 	}
 	
@@ -62,11 +63,11 @@ public class MultiFn<T> extends AClosure<T> {
 	}
 
 	@Override
-	public <I> Context<T> invoke(Context<I> context, Object[] args) {
+	public Context<T> invoke(Context<ACell> context, Object[] args) {
 		for (int i=0; i<num; i++) {
 			AFn<T> fn=fns.get(i);
 			if (fn.supportsArgs(args)) {
-				return fn.invoke(context, args);
+				return fn.invoke((Context<ACell>) context, args);
 			}
 		}
 		// TODO: type specific message?
@@ -108,7 +109,7 @@ public class MultiFn<T> extends AClosure<T> {
 		return pos;
 	}
 	
-	public static <T> MultiFn<T> read(ByteBuffer bb) throws BadFormatException, BufferUnderflowException {
+	public static <T extends ACell> MultiFn<T> read(ByteBuffer bb) throws BadFormatException, BufferUnderflowException {
 		AVector<AFn<T>> fns=Format.read(bb);
 		if (fns==null) throw new BadFormatException("Null fns!");
 		return new MultiFn<T>(fns);
@@ -125,14 +126,14 @@ public class MultiFn<T> extends AClosure<T> {
 	}
 	
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		return fns.getRef(i);
 	}
 
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Override
-	public <F extends AClosure<T>> F withEnvironment(AHashMap<Symbol, Object> env) {
+	public <F extends AClosure<T>> F withEnvironment(AHashMap<Symbol, ACell> env) {
 		if (env==this.lexicalEnv) return (F) this;
 		return (F) new MultiFn(fns,env);
 	}

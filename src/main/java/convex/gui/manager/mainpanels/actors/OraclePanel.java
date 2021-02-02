@@ -15,6 +15,7 @@ import javax.swing.table.DefaultTableCellRenderer;
 import convex.core.Init;
 import convex.core.Result;
 import convex.core.State;
+import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.MapEntry;
 import convex.core.lang.Reader;
@@ -88,7 +89,7 @@ public class OraclePanel extends JPanel {
 			String desc = JOptionPane.showInputDialog(this, "Enter Oracle description as plain text:");
 			if ((desc == null) || (desc.isBlank())) return;
 
-			Object code = Reader.read("(call \"" + oracleAddress.toHexString() + "\" " + "(register " + (key++)
+			ACell code = Reader.read("(call \"" + oracleAddress.toHexString() + "\" " + "(register " + (key++)
 					+ "  {:desc \"" + desc + "\" :trust #{*address*}}))");
 			execute(code);
 		});
@@ -100,9 +101,9 @@ public class OraclePanel extends JPanel {
 			if ((value == null) || (value.isBlank())) return;
 			int ix = table.getSelectedRow();
 			if (ix < 0) return;
-			MapEntry<Object, Object> me = tableModel.getList().entryAt(ix);
+			MapEntry<ACell, ACell> me = tableModel.getList().entryAt(ix);
 
-			Object code = Reader.read(
+			ACell code = Reader.read(
 					"(call \"" + oracleAddress.toHexString() + "\" " + "(provide " + me.getKey() + " " + value + "))");
 			execute(code);
 		});
@@ -112,7 +113,7 @@ public class OraclePanel extends JPanel {
 		makeMarketButton.addActionListener(e -> {
 			int ix = table.getSelectedRow();
 			if (ix < 0) return;
-			MapEntry<Object, Object> me = tableModel.getList().entryAt(ix);
+			MapEntry<ACell, ACell> me = tableModel.getList().entryAt(ix);
 			Object key = me.getKey();
 			log.info("Making market: " + key);
 
@@ -129,7 +130,7 @@ public class OraclePanel extends JPanel {
 				actorCode = Utils.readResourceAsString("actors/prediction-market.con");
 				String source = "(let [pmc " + actorCode + " ] " + "(deploy (pmc " + " 0x"
 						+ oracleAddress.toString() + " " + key + " " + outcomeString + ")))";
-				Object code = Reader.read(source);
+				ACell code = Reader.read(source);
 				PeerManager.execute(WalletPanel.HERO, code).thenAcceptAsync(createMarketAction);
 			} catch (Exception e1) {
 				e1.printStackTrace();
@@ -137,7 +138,7 @@ public class OraclePanel extends JPanel {
 		});
 	}
 
-	private void execute(Object code) {
+	private void execute(ACell code) {
 		PeerManager.execute(WalletPanel.HERO, code).thenAcceptAsync(receiveAction);
 	}
 

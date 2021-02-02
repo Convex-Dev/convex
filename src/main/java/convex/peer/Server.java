@@ -41,7 +41,6 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.lang.impl.AExceptional;
-import convex.core.lang.impl.ErrorValue;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
@@ -317,7 +316,7 @@ public class Server implements Closeable {
 	@SuppressWarnings("unchecked")
 	private void processTransact(Message m) {
 		// query is a vector [id , signed-object]
-		AVector<Object> v = m.getPayload();
+		AVector<ACell> v = m.getPayload();
 		SignedData<ATransaction> sd = (SignedData<ATransaction>) v.get(1);
 
 		// TODO: this should throw MissingDataException?
@@ -519,9 +518,9 @@ public class Server implements Closeable {
 	private void processQuery(Message m) {
 		try {
 			// query is a vector [id , form, address?]
-			AVector<Object> v = m.getPayload();
+			AVector<ACell> v = m.getPayload();
 			CVMLong id = (CVMLong) v.get(0);
-			Object form = v.get(1);
+			ACell form = v.get(1);
 
 			// extract the Address, or use HERO if not available.
 			Address address = (Address) v.get(2);
@@ -530,21 +529,13 @@ public class Server implements Closeable {
 			log.info("Processing query: " + form + " with address: " + address);
 			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
 			// address);
-			Context<?> result = peer.executeQuery(form, address);
+			Context<ACell> result = peer.executeQuery(form, address);
 			boolean resultReturned;
 
 			if (result.isExceptional()) {
 				AExceptional err = result.getExceptional();
-				Object code = err.getCode();
-				Object message = (err instanceof ErrorValue) ? ((ErrorValue) err).getMessage()
-						: Strings.create(err.toString());
-
-				// TODO: remove once we are sure everything is safe
-				if (message instanceof String) {
-					String sm = (String) message;
-					message = Strings.create(sm);
-					log.warning("Converted String message in exceptional Result: " + sm);
-				}
+				ACell code = err.getCode();
+				ACell message = err.getMessage();
 
 				resultReturned = pc.sendResult(id, message, code);
 			} else {
@@ -561,7 +552,7 @@ public class Server implements Closeable {
 	}
 
 	private void processData(Message m) {
-		Object payload = m.getPayload();
+		ACell payload = m.getPayload();
 
 		// TODO: be smarter about this? hold a per-client queue for a while?
 		Ref<?> r = Ref.get(payload);
@@ -584,9 +575,9 @@ public class Server implements Closeable {
 		Connection pc = m.getPeerConnection();
 		if (pc.isClosed()) return; // skip messages from closed peer
 
-		Object o = m.getPayload();
+		ACell o = m.getPayload();
 
-		Ref<Object> ref = Ref.get(o);
+		Ref<ACell> ref = Ref.get(o);
 		try {
 			// check we can persist the new belief
 			ref = ref.persist();
@@ -707,7 +698,7 @@ public class Server implements Closeable {
 
 					Connection pc = m.getPeerConnection();
 					if ((pc == null) || pc.isClosed()) continue;
-					Object id = m.getID();
+					ACell id = m.getID();
 					Result res = br.getResults().get(j).withID(id);
 					pc.sendResult(res);
 				} catch (Exception e) {

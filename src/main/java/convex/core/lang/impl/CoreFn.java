@@ -1,5 +1,6 @@
 package convex.core.lang.impl;
 
+import convex.core.data.ACell;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
@@ -15,7 +16,7 @@ import convex.core.lang.Context;
  *
  * @param <T> Type of function result
  */
-public abstract class CoreFn<T> extends AFn<T> implements ICoreDef {
+public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef {
 
 	private Symbol symbol;
 	private int arity;
@@ -28,7 +29,7 @@ public abstract class CoreFn<T> extends AFn<T> implements ICoreDef {
 	}
 
 	@Override
-	public abstract <I> Context<T> invoke(Context<I> context, Object[] args);
+	public abstract Context<T> invoke(Context<ACell> context, Object[] args);
 
 	public Symbol getSymbol() {
 		return symbol;
@@ -95,7 +96,7 @@ public abstract class CoreFn<T> extends AFn<T> implements ICoreDef {
 	}
 	
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		throw new IndexOutOfBoundsException("Bad ref index: "+i);
 	}
 	

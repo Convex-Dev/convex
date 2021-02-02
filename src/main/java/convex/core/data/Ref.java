@@ -8,6 +8,7 @@ import convex.core.crypto.Hash;
 import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
@@ -35,7 +36,7 @@ import convex.core.util.Utils;
  *
  * @param <T> Type of stored value
  */
-public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWriteable, IValidated {
+public abstract class Ref<T extends ACell> extends AObject implements Comparable<Ref<T>>, IWriteable, IValidated {
 
 	/**
 	 * Ref status indicating the status of this Ref is unknown. This is the default
@@ -226,11 +227,16 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	 * @return New Ref wrapping the given value.
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> Ref<T> get(T value) {
+	public static <T extends ACell> Ref<T> get(T value) {
 		if (value==null) return (Ref<T>) NULL_VALUE;
-		if (value instanceof ACell) return (Ref<T>) ((ACell)value).getRef();
-		
-		return RefDirect.create(value);
+		return ((T)value).getRef();
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> Ref<T> get(Object value) {
+		if (value==null) return (Ref<T>) NULL_VALUE;
+		if (value instanceof ACell) return ((ACell)value).getRef();
+		return RT.cvm(value).getRef();
 	}
 
 	/**
@@ -239,7 +245,7 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	 * @param value Any CVM value to persist
 	 * @return Ref to the given value
 	 */
-	public static <T> Ref<T> createPersisted(T value) {
+	public static <T extends ACell> Ref<T> createPersisted(T value) {
 		return createPersisted(value, null);
 	}
 
@@ -252,7 +258,7 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	 * @param value Any CVM value to persist
 	 * @return Persisted Ref
 	 */
-	public static <T> Ref<T> createPersisted(T value, Consumer<Ref<ACell>> noveltyHandler) {
+	public static <T extends ACell> Ref<T> createPersisted(T value, Consumer<Ref<ACell>> noveltyHandler) {
 		Ref<T> ref = RefDirect.create(value, null, Ref.UNKNOWN);
 		return (Ref<T>) Stores.current().persistRef(ref, noveltyHandler);
 	}
@@ -266,7 +272,7 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	 * @param value
 	 * @return Persisted Ref
 	 */
-	public static <T> Ref<T> createAnnounced(T value, Consumer<Ref<ACell>> noveltyHandler) {
+	public static <T extends ACell> Ref<T> createAnnounced(T value, Consumer<Ref<ACell>> noveltyHandler) {
 		if (Format.isEmbedded(value)) {
 			return RefDirect.create(value, null, Ref.ANNOUNCED);
 		}
@@ -286,7 +292,7 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	 * @param hash The hash value for this Ref to refer to
 	 * @return Ref for the specific hash.
 	 */
-	public static <T> Ref<T> forHash(Hash hash) {
+	public static <T extends ACell> Ref<T> forHash(Hash hash) {
 		return RefSoft.create(hash);
 	}
 
@@ -308,7 +314,7 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	 * @param data ByteBuffer containing the data to read at the current position
 	 * @return Ref read from ByteBuffer
 	 */
-	public static <T> Ref<T> readRaw(ByteBuffer data) {
+	public static <T extends ACell> Ref<T> readRaw(ByteBuffer data) {
 		Hash h = Hash.read(data);
 		return Ref.forHash(h);
 	}
@@ -317,10 +323,8 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 		if (hash != null) hash.validate();
 		// TODO is this sane?
 		if (status < VERIFIED) {
-			Object o = getValue();
-			if (o instanceof IValidated) {
-				((IValidated) o).validate();
-			}
+			T o = getValue();
+			o.validate();
 		}
 	}
 
@@ -359,7 +363,7 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	 *         garbage collected before being persisted 
 	 */
 	@SuppressWarnings("unchecked")
-	public <R> Ref<R> persist(Consumer<Ref<ACell>> noveltyHandler) {
+	public <R extends ACell> Ref<R> persist(Consumer<Ref<ACell>> noveltyHandler) {
 		int status = getStatus();
 		if (status >= PERSISTED) return (Ref<R>) this; // already persisted in some form
 		AStore store=Stores.current();
@@ -375,7 +379,7 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	 * @throws MissingDataException if the Ref cannot be fully persisted.
 	 * @return the persisted Ref
 	 */
-	public <R> Ref<R> persist() {
+	public <R extends ACell> Ref<R> persist() {
 		return persist(null);
 	}
 	
@@ -453,7 +457,7 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	 * 
 	 * @return Array of updated Refs
 	 */
-	public static <T> Ref<T>[] updateRefs(Ref<T>[] refs, IRefFunction func) {
+	public static <T extends ACell> Ref<T>[] updateRefs(Ref<T>[] refs, IRefFunction func) {
 		Ref<T>[] newRefs = null;
 		int n = refs.length;
 		for (int i = 0; i < n; i++) {
@@ -472,7 +476,7 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <T> Ref<T>[] createArray(T[] values) {
+	public static <T extends ACell> Ref<T>[] createArray(T[] values) {
 		int n = values.length;
 		Ref<T>[] refs = new Ref[n];
 		for (int i = 0; i < n; i++) {
@@ -491,17 +495,15 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	 * @return Set containing this Ref and all direct or indirect child refs
 	 */
 	@SuppressWarnings("unchecked")
-	public ASet<Object> addAllToSet(ASet<Object> store) {
-		store = store.includeRef((Ref<Object>) this);
-		T o = getValue();
-		if (o instanceof ACell) {
-			ACell rc = (ACell) o;
-			int n = rc.getRefCount();
-			for (int i = 0; i < n; i++) {
-				Ref<Object> rr = rc.getRef(i);
-				if (rr.isEmbedded()) continue;
-				store = rr.addAllToSet(store);
-			}
+	public ASet<ACell> addAllToSet(ASet<ACell> store) {
+		store = store.includeRef((Ref<ACell>) this);
+		ACell rc = getValue();
+		
+		int n = rc.getRefCount();
+		for (int i = 0; i < n; i++) {
+			Ref<ACell> rr = rc.getRef(i);
+			if (rr.isEmbedded()) continue;
+			store = rr.addAllToSet(store);
 		}
 		return store;
 	}
@@ -531,7 +533,7 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	 * @return Ref with status of STORED or above
 	 */
 	@SuppressWarnings("unchecked")
-	public <R> Ref<R> persistShallow() {
+	public <R extends ACell> Ref<R> persistShallow() {
 		AStore store=Stores.current();
 		return (Ref<R>) store.storeRef((Ref<ACell>)this, null);
 	}
@@ -545,7 +547,7 @@ public abstract class Ref<T> extends AObject implements Comparable<Ref<T>>, IWri
 	 * @return Ref with status of STORED or above
 	 */
 	@SuppressWarnings("unchecked")
-	public <R> Ref<R> persistShallow(Consumer<Ref<ACell>> noveltyHandler) {
+	public <R extends ACell> Ref<R> persistShallow(Consumer<Ref<ACell>> noveltyHandler) {
 		AStore store=Stores.current();
 		return (Ref<R>) store.storeRef((Ref<ACell>)this, noveltyHandler);
 	}

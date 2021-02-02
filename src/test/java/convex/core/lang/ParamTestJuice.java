@@ -12,6 +12,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import convex.core.State;
+import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
@@ -80,7 +81,7 @@ public class ParamTestJuice {
 		}
 	}
 
-	public static <T> AOp<T> compile(String source) {
+	public static <T extends ACell> AOp<T> compile(String source) {
 		try {
 			Context<?> c = INITIAL_CONTEXT.fork();
 			AOp<T> op = TestState.compile(c, source);
@@ -90,7 +91,7 @@ public class ParamTestJuice {
 		}
 	}
 
-	public static <T> Context<T> eval(String source) {
+	public static <T extends ACell> Context<T> eval(String source) {
 		try {
 			Context<?> c = INITIAL_CONTEXT.fork();
 			AOp<T> op = TestState.compile(c, source);

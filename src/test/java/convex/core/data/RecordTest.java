@@ -14,18 +14,18 @@ public class RecordTest {
 		AVector<Keyword> keys=format.getKeys();
 		int n=(int) keys.count();
 		
-		AVector<Object> vals=r.getValues();
+		AVector<ACell> vals=r.getValues();
 		assertEquals(n,vals.size());
 		
 		Object[] vs=new Object[n]; // new array to extract values
 		for (int i=0; i<n; i++) {
 			// standard element access by key
 			Keyword k=keys.get(i);
-			Object v=r.get(k);
+			ACell v=r.get(k);
 			vs[i]=v;
 			
 			// entry based access by key
-			MapEntry<Keyword,Object> me0=r.getEntry(k);
+			MapEntry<Keyword,ACell> me0=r.getEntry(k);
 			assertEquals(k,me0.getKey());
 			assertEquals(v,me0.getValue());
 			
@@ -36,7 +36,7 @@ public class RecordTest {
 			assertEquals(v,vals.get(i));
 			
 			// indexed entry-wise access
-			MapEntry<Keyword,Object> me=r.entryAt(i);
+			MapEntry<Keyword,ACell> me=r.entryAt(i);
 			assertEquals(k,me.getKey());
 			assertEquals(v,me.getValue());
 		}

@@ -1,5 +1,6 @@
 package convex.core.lang.expanders;
 
+import convex.core.data.ACell;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Syntax;
@@ -23,9 +24,9 @@ public class Expander extends AExpander {
 	/**
 	 * Expansion function of the form (fn [x e] ...)
 	 */
-	private final AFn<Object> fn;
+	private final AFn<ACell> fn;
 
-	public Expander(AFn<Object> expansionFunction) {
+	public Expander(AFn<ACell> expansionFunction) {
 		this.fn = expansionFunction;
 	}
 
@@ -34,7 +35,7 @@ public class Expander extends AExpander {
 		return true;
 	}
 
-	public static Expander wrap(AFn<Object> expansionFunction) {
+	public static Expander wrap(AFn<ACell> expansionFunction) {
 		return new Expander(expansionFunction);
 	}
 
@@ -53,16 +54,16 @@ public class Expander extends AExpander {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public Context<Syntax> expand(Object form, AExpander ex, Context<?> context) {
+	public Context<Syntax> expand(ACell form, AExpander ex, Context<?> context) {
 		Object[] args = new Object[2];
 		args[0] = form;
 		args[1] = ex;
 
 		// call expansion fn
-		Context<Object> ectx = (Context<Object>) (Object) context.invoke(fn, args);
+		Context<ACell> ectx = (Context<ACell>) (Object)context.invoke(fn, args);
 		if (ectx.isExceptional()) return (Context<Syntax>) (Object) ectx;
 
-		Object er = ectx.getResult();
+		ACell er = ectx.getResult();
 
 		Syntax exForm = Syntax.create(er);
 		
@@ -110,13 +111,13 @@ public class Expander extends AExpander {
 	}
 
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		return fn.getRef(i);
 	}
 
 	@Override
 	public Expander updateRefs(IRefFunction func) {
-		AFn<Object> newFn=fn.updateRefs(func);
+		AFn<ACell> newFn=fn.updateRefs(func);
 		if (fn==newFn) return this;
 		return new Expander(newFn);
 	}

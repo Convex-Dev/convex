@@ -1,5 +1,6 @@
 package convex.core.exceptions;
 
+import convex.core.data.ACell;
 import convex.core.data.SignedData;
 
 @SuppressWarnings("serial")
@@ -13,7 +14,7 @@ public class BadSignatureException extends ValidationException {
 	}
 
 	@SuppressWarnings("unchecked")
-	public <T> SignedData<T> getSignature() {
+	public <T extends ACell> SignedData<T> getSignature() {
 		return (SignedData<T>) sig;
 	}
 

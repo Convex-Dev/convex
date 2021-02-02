@@ -248,7 +248,7 @@ public class Order extends ACell {
 	}
 
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		return blocks.getRef(i);
 	}
 

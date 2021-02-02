@@ -23,7 +23,7 @@ import convex.core.util.Utils;
  * @param <K> Type of keys
  * @param <V> Type of values
  */
-public abstract class AMap<K, V> extends ADataStructure<MapEntry<K, V>>
+public abstract class AMap<K extends ACell, V extends ACell> extends ADataStructure<MapEntry<K, V>>
 		implements Map<K, V>, IAssociative<K,V> {
 
 	protected long count;
@@ -86,6 +86,19 @@ public abstract class AMap<K, V> extends ADataStructure<MapEntry<K, V>>
 
 	public final boolean containsKeyRef(Ref<K> ref) {
 		return getKeyRefEntry(ref) != null;
+	}
+	
+	@SuppressWarnings("unchecked")
+	public boolean containsKey(ACell key) {
+		return getEntry((K)key)!=null;
+	}
+
+	@Override
+	public final boolean containsKey(Object key) {
+		if ((key==null)||(key instanceof ACell)) {
+			return containsKey((ACell)key);
+		}
+		return false;
 	}
 
 	/**
@@ -292,7 +305,7 @@ public abstract class AMap<K, V> extends ADataStructure<MapEntry<K, V>>
 	 *         is not a valid map entry
 	 */
 	@SuppressWarnings("unchecked")
-	public <R> ADataStructure<R> conj(R x) {
+	public <R extends ACell> ADataStructure<R> conj(R x) {
 		MapEntry<K, V> me = RT.toMapEntry(x);
 		if (me == null) return null;
 		return (ADataStructure<R>) assocEntry(me);

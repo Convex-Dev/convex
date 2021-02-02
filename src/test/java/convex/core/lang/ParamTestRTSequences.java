@@ -2,6 +2,7 @@ package convex.core.lang;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static convex.test.Assertions.*;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -10,6 +11,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.List;
@@ -62,9 +64,9 @@ public class ParamTestRTSequences {
 
 	@Test
 	public void testCons() {
-		ASequence<?> a = RT.cons("foo", data);
-		assertEquals("foo", a.get(0));
-		assertEquals("foo", RT.nth(a, 0));
+		ASequence<ACell> a = RT.cons(RT.cvm("foo"), data);
+		assertCVMEquals("foo", a.get(0));
+		assertCVMEquals("foo", RT.nth(a, 0));
 	}
 
 	@Test

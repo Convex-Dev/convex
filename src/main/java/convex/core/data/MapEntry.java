@@ -22,7 +22,7 @@ import convex.core.util.Utils;
  * @param <K> The type of keys
  * @param <V> The type of values
  */
-public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEntry<K, V>> {
+public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> implements Comparable<MapEntry<K, V>> {
 
 	private final Ref<K> keyRef;
 	private final Ref<V> valueRef;
@@ -33,12 +33,12 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <K, V> MapEntry<K, V> createRef(Ref<? extends K> keyRef, Ref<? extends V> valueRef) {
+	public static <K extends ACell, V extends ACell> MapEntry<K, V> createRef(Ref<? extends K> keyRef, Ref<? extends V> valueRef) {
 		// ensure we have a hash at least
 		return new MapEntry<K, V>((Ref<K>) keyRef, (Ref<V>) valueRef);
 	}
 
-	public static <K, V> MapEntry<K, V> create(K key, V value) {
+	public static <K extends ACell, V extends ACell> MapEntry<K, V> create(K key, V value) {
 		return createRef(Ref.get(key), Ref.get(value));
 	}
 	
@@ -50,7 +50,7 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 	 * @param value Value to use for map entry
 	 * @return New MapEntry
 	 */
-	public static <K, V> MapEntry<K, V> of(Object key, Object value) {
+	public static <K extends ACell, V extends ACell> MapEntry<K, V> of(Object key, Object value) {
 		return create(RT.cvm(key),RT.cvm(value));
 	}
 
@@ -62,9 +62,9 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public AVector<Object> assoc(long i, Object a) {
-		if (i == 0) return withKey((K) a);
-		if (i == 1) return withValue((V) a);
+	public <R extends ACell> AVector<R> assoc(long i, R a) {
+		if (i == 0) return (AVector<R>) withKey((K) a);
+		if (i == 1) return (AVector<R>) withValue((V) a);
 		if (i== 2) return conj(a);
 		throw Utils.sneakyThrow(new IndexOutOfBoundsException("Index: i"));
 	}
@@ -81,12 +81,12 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 	}
 
 	@Override
-	public <R> AVector<R> map(Function<? super Object, ? extends R> mapper) {
+	public <R extends ACell> AVector<R> map(Function<? super ACell, ? extends R> mapper) {
 		return Vectors.of(mapper.apply(getKey()), mapper.apply(getValue()));
 	}
 
 	@Override
-	public <R> R reduce(BiFunction<? super R, ? super Object, ? extends R> func, R value) {
+	public <R> R reduce(BiFunction<? super R, ? super ACell, ? extends R> func, R value) {
 		R result = func.apply(value, getKey());
 		result = func.apply(result, getKey());
 		return result;
@@ -123,7 +123,7 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 
 
 
-	public static <K, V> MapEntry<K, V> read(ByteBuffer bb) throws BadFormatException {
+	public static <K extends ACell, V extends ACell> MapEntry<K, V> read(ByteBuffer bb) throws BadFormatException {
 		Ref<K> kr = Format.readRef(bb);
 		Ref<V> vr = Format.readRef(bb);
 		return new MapEntry<K, V>(kr, vr);
@@ -142,7 +142,7 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		if ((i >> 1) != 0) throw new IndexOutOfBoundsException(i);
 		return (Ref<R>) (((i & 1) == 0) ? keyRef : valueRef);
 	}
@@ -195,8 +195,8 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 
 	@Override
 	@SuppressWarnings("unchecked")
-	public AVector<Object> toVector() {
-		return new VectorLeaf<Object>(new Ref[] { keyRef, valueRef });
+	public <R extends ACell> AVector<R> toVector() {
+		return new VectorLeaf<R>(new Ref[] { keyRef, valueRef });
 	}
 
 	@Override
@@ -215,7 +215,7 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 	}
 
 	@Override
-	public Object get(long i) {
+	public ACell get(long i) {
 		if (i == 0) return getKey();
 		if (i == 1) return getValue();
 		throw new IndexOutOfBoundsException(Errors.badIndex(i));
@@ -223,9 +223,9 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 
 	@SuppressWarnings("unchecked")
 	@Override
-	protected Ref<Object> getElementRef(long i) {
-		if (i == 0) return (Ref<Object>) keyRef;
-		if (i == 1) return (Ref<Object>) valueRef;
+	protected Ref<ACell> getElementRef(long i) {
+		if (i == 0) return (Ref<ACell>) keyRef;
+		if (i == 1) return (Ref<ACell>) valueRef;
 		throw new IndexOutOfBoundsException(Errors.badIndex(i));
 	}
 
@@ -261,15 +261,15 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public void visitElementRefs(Consumer<Ref<Object>> f) {
-		f.accept((Ref<Object>) keyRef);
-		f.accept((Ref<Object>) valueRef);
+	public void visitElementRefs(Consumer<Ref<ACell>> f) {
+		f.accept((Ref<ACell>) keyRef);
+		f.accept((Ref<ACell>) valueRef);
 	}
 
 	@Override
-	public AVector<Object> concat(ASequence<Object> b) {
+	public <R  extends ACell> AVector<R> concat(ASequence<R> b) {
 		long bLen = b.count();
-		AVector<Object> result = this;
+		AVector<R> result = this.toVector();
 		long i = 0;
 		while (i < bLen) {
 			result = result.conj(b.get(i));
@@ -279,8 +279,9 @@ public class MapEntry<K, V> extends AMapEntry<K, V> implements Comparable<MapEnt
 	}
 
 	@Override
-	public AVector<Object> subVector(long start, long length) {
-		return toVector().subVector(start, length);
+	public <R extends ACell> AVector<R> subVector(long start, long length) {
+		AVector<R> vec=toVector();
+		return vec.subVector(start, length);
 	}
 
 	@Override

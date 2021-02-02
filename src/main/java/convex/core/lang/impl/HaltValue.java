@@ -3,6 +3,7 @@ package convex.core.lang.impl;
 import org.parboiled.common.Utils;
 
 import convex.core.ErrorCodes;
+import convex.core.data.ACell;
 
 /**
  * Class representing a halt return value
@@ -11,7 +12,7 @@ import convex.core.ErrorCodes;
  * 
  * @param <T> Type of return value
  */
-public class HaltValue<T> extends AReturn {
+public class HaltValue<T extends ACell> extends AReturn {
 
 	private final T value;
 
@@ -19,7 +20,7 @@ public class HaltValue<T> extends AReturn {
 		this.value = value;
 	}
 
-	public static <T> HaltValue<T> wrap(T value) {
+	public static <T extends ACell> HaltValue<T> wrap(T value) {
 		return new HaltValue<T>(value);
 	}
 
@@ -33,12 +34,12 @@ public class HaltValue<T> extends AReturn {
 	}
 
 	@Override
-	public Object getCode() {
+	public ACell getCode() {
 		return ErrorCodes.HALT;
 	}
 
 	@Override
-	public Object getMessage() {
-		return value;
+	public ACell getMessage() {
+		return null;
 	}
 }

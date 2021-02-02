@@ -63,7 +63,7 @@ public abstract class ATransaction extends ACell {
 	 * @param source The source account that has signed the transaction
 	 * @return The updated chain state
 	 */
-	public abstract <T> Context<T> apply(Context<?> ctx);
+	public abstract <T extends ACell> Context<T> apply(Context<?> ctx);
 
 	/**
 	 * Gets the Address for this transaction

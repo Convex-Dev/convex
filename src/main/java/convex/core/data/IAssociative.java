@@ -6,7 +6,7 @@ package convex.core.data;
  * @param <K>
  * @param <V>
  */
-public interface IAssociative<K,V> extends IGet<V> {
+public interface IAssociative<K extends ACell,V extends ACell> extends IGet<V> {
 
 	/**
 	 * Associates a key with a value in this associative data structure.

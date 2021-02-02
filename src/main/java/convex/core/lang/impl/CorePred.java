@@ -14,8 +14,9 @@ public abstract class CorePred extends CoreFn<CVMBool> {
 		super(symbol);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public <I> Context<CVMBool> invoke(Context<I> context, Object[] args) {
+	public Context<CVMBool> invoke(@SuppressWarnings("rawtypes") Context context, Object[] args) {
 		if (args.length != 1) return context.withArityError(name() + " requires exactly one argument");
 		Object val = args[0];
 		// ensure we return one of the two canonical boolean values

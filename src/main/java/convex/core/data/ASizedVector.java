@@ -5,7 +5,7 @@ package convex.core.data;
  *
  * @param <T>
  */
-public abstract class ASizedVector<T> extends AVector<T> {
+public abstract class ASizedVector<T extends ACell> extends AVector<T> {
 
 	protected final long count;
 	

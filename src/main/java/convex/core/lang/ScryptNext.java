@@ -224,7 +224,7 @@ public class ScryptNext extends Reader {
         );
     }
 
-    public AList<Object> defnStatement() {
+    public AList<ACell> defnStatement() {
         var block = popNodeList();
         var parameters = Vectors.create(popNodeList());
         var name = pop();
@@ -250,8 +250,8 @@ public class ScryptNext extends Reader {
         );
     }
 
-    public Object block(ASequence<Object> statements) {
-        Object form;
+    public ACell block(ASequence<ACell> statements) {
+    	ACell form;
 
         switch (statements.size()) {
             case 0:
@@ -310,7 +310,7 @@ public class ScryptNext extends Reader {
     }
 
     public Rule Arithmetic1Expression() {
-        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+        Var<ArrayList<ACell>> expVar = new Var<>(new ArrayList<>());
 
         return Sequence(
                 Arithmetic2Expression(),
@@ -335,7 +335,7 @@ public class ScryptNext extends Reader {
     }
 
     public Rule Arithmetic2Expression() {
-        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+        Var<ArrayList<ACell>> expVar = new Var<>(new ArrayList<>());
 
         return Sequence(
                 Primary(),
@@ -360,7 +360,7 @@ public class ScryptNext extends Reader {
     }
 
     @SuppressWarnings("unchecked")
-    public Syntax arithmeticExpression(ArrayList<Object> exprs) {
+    public Syntax arithmeticExpression(ArrayList<ACell> exprs) {
         var primary = (Syntax) exprs.get(0);
 
         if (exprs.size() == 1) {
@@ -430,7 +430,7 @@ public class ScryptNext extends Reader {
     }
 
     public Rule CallableExpression() {
-        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+        Var<ArrayList<ACell>> expVar = new Var<>(new ArrayList<>());
 
         return Sequence(
                 FirstOf(
@@ -444,17 +444,17 @@ public class ScryptNext extends Reader {
         );
     }
 
-    public AList<Object> callableExpression(ArrayList<Object> listOfPar) {
+    public AList<ACell> callableExpression(ArrayList<ACell> listOfPar) {
         var args = popNodeList();
         var callableOrSym = pop();
 
         if (listOfPar.isEmpty()) {
             return Lists.create(args).cons(callableOrSym);
         } else {
-            AList<Object> acc = Lists.create(args).cons(callableOrSym);
+            AList<ACell> acc = Lists.create(args).cons(callableOrSym);
 
             for (Object o : listOfPar) {
-                AList<Object> l = ((Syntax) o).getValue();
+                AList<ACell> l = ((Syntax) o).getValue();
 
                 acc = l.cons(acc);
             }
@@ -467,7 +467,7 @@ public class ScryptNext extends Reader {
     // --------------------------------
 
     public Rule CallExpression() {
-        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+        Var<ArrayList<ACell>> expVar = new Var<>(new ArrayList<>());
 
         return Sequence(
                 // Keyword
@@ -502,13 +502,13 @@ public class ScryptNext extends Reader {
     }
 
     @SuppressWarnings("unchecked")
-    public AList<Object> callExpression(ArrayList<Object> exprs) {
+    public AList<ACell> callExpression(ArrayList<ACell> exprs) {
         var hasOffer = exprs.size() == 4;
         var address = exprs.get(0);
-        var offer = hasOffer ? exprs.get(1) : null;
+        ACell offer = hasOffer ? exprs.get(1) : null;
         var name = hasOffer ? exprs.get(2) : exprs.get(1);
         var argsSyntax = (Syntax) (hasOffer ? exprs.get(3) : exprs.get(2));
-        var argsList = (AList<Object>) argsSyntax.getValue();
+        var argsList = (AList<ACell>) argsSyntax.getValue();
         var call = argsList.cons(Syntax.unwrap(name));
 
         if (hasOffer) {
@@ -558,7 +558,7 @@ public class ScryptNext extends Reader {
         );
     }
 
-    public AList<Object> lambdaExpression() {
+    public AList<ACell> lambdaExpression() {
         var fn = Syntax.create(Symbols.FN);
         var body = pop();
         var args = Vectors.create(popNodeList());
@@ -577,7 +577,7 @@ public class ScryptNext extends Reader {
         );
     }
 
-    public AList<Object> infixExpression() {
+    public AList<ACell> infixExpression() {
         var operand2 = pop();
         var operator = pop();
         var operand1 = pop();
@@ -614,7 +614,7 @@ public class ScryptNext extends Reader {
     }
 
     public Rule MapEntries() {
-        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+        Var<ArrayList<ACell>> expVar = new Var<>(new ArrayList<>());
 
         return Sequence(
                 Optional(
@@ -759,7 +759,7 @@ public class ScryptNext extends Reader {
     }
 
     public Rule ZeroOrMoreOf(Rule rule) {
-        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+        Var<ArrayList<ACell>> expVar = new Var<>(new ArrayList<>());
 
         return Sequence(
                 ZeroOrMore(
@@ -771,7 +771,7 @@ public class ScryptNext extends Reader {
     }
 
     public Rule ZeroOrMoreCommaSeparatedOf(Rule rule) {
-        Var<ArrayList<Object>> expVar = new Var<>(new ArrayList<>());
+        Var<ArrayList<ACell>> expVar = new Var<>(new ArrayList<>());
 
         return Sequence(
                 Optional(

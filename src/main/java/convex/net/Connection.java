@@ -199,7 +199,7 @@ public class Connection {
 	 * @return The ID of the message sent, or -1 if send buffer is full.
 	 * @throws IOException
 	 */
-	public long sendQuery(Object form) throws IOException {
+	public long sendQuery(ACell form) throws IOException {
 		return sendQuery(form, null);
 	}
 
@@ -211,11 +211,11 @@ public class Connection {
 	 * @return The ID of the message sent, or -1 if send buffer is full.
 	 * @throws IOException
 	 */
-	public long sendQuery(Object form, Address address) throws IOException {
+	public long sendQuery(ACell form, Address address) throws IOException {
 		AStore temp=Stores.current();
 		try {
 			long id = ++idCounter;
-			AVector<Object> v = Vectors.of(id, form, address);
+			AVector<ACell> v = Vectors.of(id, form, address);
 			sendObject(MessageType.QUERY, v);
 			return id;
 		} finally {
@@ -242,7 +242,7 @@ public class Connection {
 		try {
 			Stores.setCurrent(store);
 			long id = ++idCounter;
-			AVector<Object> v = Vectors.of(id, signed);
+			AVector<ACell> v = Vectors.of(id, signed);
 			boolean sent = sendObject(MessageType.TRANSACT, v);
 			return (sent) ? id : -1;
 		} finally {
@@ -257,7 +257,7 @@ public class Connection {
 	 * @return True if buffered for sending successfully, false otherwise
 	 * @throws IOException
 	 */
-	public boolean sendResult(CVMLong id, Object result) throws IOException {
+	public boolean sendResult(CVMLong id, ACell result) throws IOException {
 		return sendResult(id, result,null);
 	}
 
@@ -269,7 +269,7 @@ public class Connection {
 	 * @return True if buffered for sending successfully, false otherwise
 	 * @throws IOException
 	 */
-	public boolean sendResult(CVMLong id, Object result, Object errorCode) throws IOException {
+	public boolean sendResult(CVMLong id, ACell result, ACell errorCode) throws IOException {
 		Result value = Result.create(id, result, errorCode);
 		return sendObject(MessageType.RESULT, value);
 	}
@@ -326,12 +326,12 @@ public class Connection {
 	 * @return
 	 * @throws IOException
 	 */
-	public boolean sendObject(MessageType type, Object payload) throws IOException {
+	public boolean sendObject(MessageType type, ACell payload) throws IOException {
 		Counters.sendCount++;
 
 		// Need to ensure message is persisted at least, so we can respond to missing data messages
 		// using the current threat store
-		Object sendVal = payload;
+		ACell sendVal = payload;
 		Ref.createPersisted(sendVal, r -> {
 			try {
 				Object data=r.getValue();

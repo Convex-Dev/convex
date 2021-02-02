@@ -189,8 +189,8 @@ public class PeerStatus extends ARecord {
 		return new PeerStatus(newStake, newStakes, newDelStake, newHostAddress);
 	}
 
-	protected static long computeDelegatedStake(ABlobMap<Address, Long> stakes) {
-		long ds = stakes.reduceValues((acc, e)->acc+e, 0L);
+	protected static long computeDelegatedStake(ABlobMap<Address, CVMLong> stakes) {
+		long ds = stakes.reduceValues((acc, e)->acc+e.longValue(), 0L);
 		return ds;
 	}
 

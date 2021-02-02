@@ -1,5 +1,6 @@
 package convex.core.lang.impl;
 
+import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.Context;
@@ -12,7 +13,7 @@ import convex.core.lang.RT;
  * 
  * @param <T> Type of values to return
  */
-public class SeqFn<T> implements IFn<T> {
+public class SeqFn<T extends ACell> implements IFn<T> {
 
 	private ASequence<?> seq;
 
@@ -20,13 +21,13 @@ public class SeqFn<T> implements IFn<T> {
 		this.seq = m;
 	}
 
-	public static <T> SeqFn<T> wrap(ASequence<?> m) {
+	public static <T extends ACell> SeqFn<T> wrap(ASequence<?> m) {
 		return new SeqFn<T>(m);
 	}
 
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
-	public <I> Context<T> invoke(Context<I> context, Object[] args) {
+	public Context<T> invoke(Context context, Object[] args) {
 		int n = args.length;
 		if (n == 1) {
 			CVMLong key = RT.toLong(args[0]);
@@ -39,7 +40,7 @@ public class SeqFn<T> implements IFn<T> {
 			CVMLong key = RT.toLong(args[0]);
 			if (key==null) return context.withCastError(args[0], Long.class);
 			long ix=key.longValue();
-			if ((ix < 0) || (ix >= seq.count())) return (Context<T>) context.withResult(args[1]);
+			if ((ix < 0) || (ix >= seq.count())) return (Context<T>) context.withResult((T)args[1]);
 			T result = (T) seq.get(key);
 			return context.withResult(result);
 		} else {

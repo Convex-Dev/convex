@@ -3,6 +3,7 @@ package convex.core.transactions;
 import java.nio.ByteBuffer;
 
 import convex.core.Constants;
+import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
@@ -12,6 +13,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
+import convex.core.lang.RT;
 import convex.core.lang.impl.AExceptional;
 import convex.core.lang.impl.HaltValue;
 import convex.core.lang.impl.ReturnValue;
@@ -31,15 +33,19 @@ import convex.core.util.Utils;
  * performed outside the CVM which not provide a parser internally.
  */
 public class Invoke extends ATransaction {
-	protected final Object command;
+	protected final ACell command;
 
-	protected Invoke(Address address,long nonce, Object args) {
+	protected Invoke(Address address,long nonce, ACell args) {
 		super(address,nonce);
 		this.command = args;
 	}
 
-	public static Invoke create(Address address,long nonce, Object command) {
+	public static Invoke create(Address address,long nonce, ACell command) {
 		return new Invoke(address,nonce, command);
+	}
+	
+	public static Invoke create(Address address,long nonce, Object command) {
+		return create(address,nonce, RT.cvm(command));
 	}
 
 	@Override
@@ -74,13 +80,13 @@ public class Invoke extends ATransaction {
 		Address address=Address.create(Format.readVLCLong(bb));
 		long sequence = Format.readVLCLong(bb);
 
-		Object args = Format.read(bb);
+		ACell args = Format.read(bb);
 		return create(address,sequence, args);
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <T> Context<T> apply(final Context<?> context) {
+	public <T extends ACell> Context<T> apply(final Context<?> context) {
 		Context<T> ctx=(Context<T>) context;
 		
 		// Run command
@@ -156,13 +162,13 @@ public class Invoke extends ATransaction {
 	}
 
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		return Utils.getRef(command, i);
 	}
 
 	@Override
 	public Invoke updateRefs(IRefFunction func) {
-		Object newCommand = Utils.updateRefs(command, func);
+		ACell newCommand = Utils.updateRefs(command, func);
 		if (newCommand == command) return this;
 		return Invoke.create(address,getSequence(), newCommand);
 	}

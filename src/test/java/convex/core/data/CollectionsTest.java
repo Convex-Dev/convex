@@ -19,7 +19,7 @@ public class CollectionsTest {
 	/**
 	 * Generic tests for any sequence
 	 */
-	public static <T> void doSequenceTests(ASequence<T> a) {
+	public static <T extends ACell> void doSequenceTests(ASequence<T> a) {
 		long n = a.count();
 
 		if (n > 0) {
@@ -50,7 +50,7 @@ public class CollectionsTest {
 	/**
 	 * Generic tests for any data structure
 	 */
-	public static <T> void doDataStructureTests(ADataStructure<T> a) {
+	public static <T extends ACell> void doDataStructureTests(ADataStructure<T> a) {
 		long n = a.count();
 		if (n == 0) {
 			assertSame(a.empty(), a);
@@ -62,7 +62,7 @@ public class CollectionsTest {
 	/**
 	 * Generic tests for any collection
 	 */
-	public static <T> void doCollectionTests(ACollection<T> a) {
+	public static <T extends ACell> void doCollectionTests(ACollection<T> a) {
 		Iterator<T> it = a.iterator();
 		assertThrows(Throwable.class, () -> it.remove());
 
@@ -72,7 +72,7 @@ public class CollectionsTest {
 	/**
 	 * Generic tests for any map
 	 */
-	public static <K, V> void doMapTests(AMap<K, V> a) {
+	public static <K extends ACell, V extends ACell> void doMapTests(AMap<K, V> a) {
 		long n = a.count();
 		if (n == 0) {
 			assertThrows(IndexOutOfBoundsException.class, () -> a.entryAt(0));
@@ -112,7 +112,7 @@ public class CollectionsTest {
 	/**
 	 * Generic tests for any set
 	 */
-	public static <V> void doSetTests(ASet<V> a) {
+	public static <V extends ACell> void doSetTests(ASet<V> a) {
 		doCollectionTests(a);
 	}
 }

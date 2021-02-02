@@ -30,18 +30,18 @@ public class GenTestSignedValue {
 
 	@Test
 	public void testNullValueSignings() throws BadSignatureException {
-		SignedData<Object> sd = SignedData.create(KEYPAIR, null);
+		SignedData<ACell> sd = SignedData.create(KEYPAIR, null);
 		assertNull(sd.getValue());
 		assertTrue(sd.checkSignature());
 	}
 
 	@Property(trials = 20)
-	public void dataSigning(@From(ValueGen.class) Object data) {
-		SignedData<Object> good = KEYPAIR.signData(data);
+	public void dataSigning(@From(ValueGen.class) ACell data) {
+		SignedData<ACell> good = KEYPAIR.signData(data);
 		assertEquals(good,SignedData.create(KEYPAIR, data));
 		assertTrue(good.checkSignature());
 
-		SignedData<Object> bad = SignedData.create(BAD_ADDRESS, good.getSignature(), good.getDataRef());
+		SignedData<ACell> bad = SignedData.create(BAD_ADDRESS, good.getSignature(), good.getDataRef());
 		assertFalse(bad.checkSignature());
 		try {
 			bad.validateSignature();
@@ -53,13 +53,13 @@ public class GenTestSignedValue {
 
 	@Property(trials = 20)
 	public void signedDataRoundTrip(@From(ValueGen.class) Object data) throws BadFormatException {
-		Ref<Object> ref = Ref.get(data);
-		SignedData<Object> good = SignedData.createWithRef(KEYPAIR, ref);
+		Ref<ACell> ref = Ref.get(data);
+		SignedData<ACell> good = SignedData.createWithRef(KEYPAIR, ref);
 		assertTrue(good.checkSignature());
 		// System.out.println(good.getSignature());
 		Blob d = good.getEncoding();
 		// System.out.println(d);
-		SignedData<Object> good2 = Format.read(d);
+		SignedData<ACell> good2 = Format.read(d);
 		assertEquals(good, good2);
 	}
 }

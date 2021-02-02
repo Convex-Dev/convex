@@ -3,6 +3,7 @@ package convex.core;
 import java.util.logging.Logger;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -156,7 +157,7 @@ public class Init {
 			}
 
 			// Build globals
-			AHashMap<Symbol, Object> globals = Constants.INITIAL_GLOBALS;
+			AHashMap<Symbol, ACell> globals = Constants.INITIAL_GLOBALS;
 
 			State s = State.create(accts, peers, Sets.empty(), globals, BlobMaps.empty());
 
@@ -168,8 +169,8 @@ public class Init {
 			// At this point we have a raw initial state with accounts
 			
 			{ // Deploy Registry Actor to fixed Address
-				Context<?> ctx = Context.createFake(s, INIT);
-				Object form=Reader.readResource("actors/registry.con");
+				Context<Address> ctx = Context.createFake(s, INIT);
+				ACell form=Reader.readResource("actors/registry.con");
 				ctx = ctx.deployActor(form);
 				REGISTRY_ADDRESS=(Address) ctx.getResult();
 				// Note the Registry registers itself upon creation
@@ -186,7 +187,7 @@ public class Init {
 			
 			{ // Deploy Trust library and register with CNS
 				Context<?> ctx = Context.createFake(s, INIT);
-				Object form=Reader.readResource("libraries/trust.con");
+				ACell form=Reader.readResource("libraries/trust.con");
 				ctx = ctx.deployActor(form);
 				Address addr=(Address) ctx.getResult();
 				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'convex.trust "+addr+"))"));
@@ -196,8 +197,8 @@ public class Init {
 			}
 			
 			{ // Deploy Fungible library and register with CNS
-				Context<?> ctx = Context.createFake(s, INIT);
-				Object form=Reader.readResource("libraries/fungible.con");
+				Context<Address> ctx = Context.createFake(s, INIT);
+				ACell form=Reader.readResource("libraries/fungible.con");
 				ctx = ctx.deployActor(form);
 				Address addr=(Address) ctx.getResult();
 				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'convex.fungible "+addr+"))"));
@@ -207,16 +208,16 @@ public class Init {
 			}
 			
 			{ // Deploy Oracle Actor
-				Context<?> ctx = Context.createFake(s, INIT);
-				Object form=Reader.readResource("actors/oracle-trusted.con");
+				Context<Address> ctx = Context.createFake(s, INIT);
+				ACell form=Reader.readResource("actors/oracle-trusted.con");
 				ctx = ctx.deployActor(form);
 				ORACLE_ADDRESS = (Address) ctx.getResult();
 				s = register(ctx.getState(),ORACLE_ADDRESS,"Oracle Actor (default)");
 			}
 			
 			{ // Deploy Asset Actor
-				Context<?> ctx = Context.createFake(s, INIT);
-				Object form=Reader.readResource("libraries/asset.con");
+				Context<Address> ctx = Context.createFake(s, INIT);
+				ACell form=Reader.readResource("libraries/asset.con");
 				ctx = ctx.deployActor(form);
 				if (ctx.isExceptional()) {
 					log.severe("Failure to deploy convex.asset: "+ctx.getExceptional());

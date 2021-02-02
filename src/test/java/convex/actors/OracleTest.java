@@ -11,6 +11,7 @@ import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Keywords;
 import convex.core.lang.Context;
@@ -20,16 +21,17 @@ import convex.core.lang.TestState;
 
 public class OracleTest {
 
+	@SuppressWarnings("rawtypes")
 	@Test
 	public void testOracleActor() throws IOException {
 		String VILLAIN = TestState.VILLAIN.toHexString();
 		String HERO = TestState.HERO.toHexString();
 
 		// setup address for this scene
-		Context<?> ctx = TestState
+		Context ctx = TestState
 				.step("(do (def HERO (address \"" + HERO + "\")) (def VILLAIN (address \"" + VILLAIN + "\")))");
 
-		Object contractCode = Reader.readResource("actors/oracle-trusted.con");
+		ACell contractCode = Reader.readResource("actors/oracle-trusted.con");
 		ctx = ctx.deployActor(contractCode); 
 		
 		Address oracle3 = (Address) ctx.getResult();

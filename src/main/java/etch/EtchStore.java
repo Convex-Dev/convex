@@ -78,7 +78,7 @@ public class EtchStore extends AStore {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <T> Ref<T> refForHash(Hash hash) {
+	public <T extends ACell> Ref<T> refForHash(Hash hash) {
 		try {
 			Ref<ACell> existing = etch.read(hash);
 			if (existing == null) return null;
@@ -89,17 +89,17 @@ public class EtchStore extends AStore {
 	}
 	
 	@Override
-	public <T> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
+	public <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
 		return persistRef(ref,noveltyHandler,Ref.PERSISTED);
 	}
 	
 	@Override
-	public <T> Ref<T> announceRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
+	public <T extends ACell> Ref<T> announceRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
 		return persistRef(ref,noveltyHandler,Ref.ANNOUNCED);
 	}
 
 	@SuppressWarnings("unchecked")
-	public <T> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus) {
+	public <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus) {
 		// first check if the Ref is already persisted to required level
 		if (ref.getStatus()>=requiredStatus) return ref;
 		
@@ -155,7 +155,7 @@ public class EtchStore extends AStore {
 	}
 
 	@Override
-	public <T> Ref<T> storeRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
+	public <T extends ACell> Ref<T> storeRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
 		return persistRef(ref,noveltyHandler,Ref.STORED);
 	}
 	

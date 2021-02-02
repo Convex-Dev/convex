@@ -128,7 +128,7 @@ public class StringTree extends AString {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		int ic = children.length;
 		if (i < 0) throw new IndexOutOfBoundsException("Negative Ref index: " + i);
 		if (i < ic) return (Ref<R>) children[i];

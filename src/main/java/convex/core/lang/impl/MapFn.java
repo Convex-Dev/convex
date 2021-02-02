@@ -1,10 +1,11 @@
 package convex.core.lang.impl;
 
+import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.lang.Context;
 import convex.core.lang.IFn;
 
-public class MapFn<K, T> implements IFn<T> {
+public class MapFn<K extends ACell, T  extends ACell> implements IFn<T> {
 
 	private AMap<K, T> map;
 
@@ -12,13 +13,13 @@ public class MapFn<K, T> implements IFn<T> {
 		this.map = m;
 	}
 
-	public static <K, T> MapFn<K, T> wrap(AMap<K, T> m) {
+	public static <K extends ACell, T extends ACell> MapFn<K, T> wrap(AMap<K, T> m) {
 		return new MapFn<K, T>(m);
 	}
 
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
-	public <I> Context<T> invoke(Context<I> context, Object[] args) {
+	public Context<T> invoke(Context context, Object[] args) {
 		int n = args.length;
 		T result;
 		if (n == 1) {

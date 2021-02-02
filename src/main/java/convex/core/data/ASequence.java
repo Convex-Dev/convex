@@ -15,7 +15,7 @@ import convex.core.util.Utils;
  *
  * @param <T> Type of list elements
  */
-public abstract class ASequence<T> extends ACollection<T> implements List<T>, IAssociative<CVMLong,T> {
+public abstract class ASequence<T extends ACell> extends ACollection<T> implements List<T>, IAssociative<CVMLong,T> {
 
 	@Override
 	public boolean contains(Object o) {
@@ -36,7 +36,7 @@ public abstract class ASequence<T> extends ACollection<T> implements List<T>, IA
 	 */
 	public abstract long longLastIndexOf(Object value);
 
-	public abstract <R> ASequence<R> map(Function<? super T, ? extends R> mapper);
+	public abstract <R extends ACell> ASequence<R> map(Function<? super T, ? extends R> mapper);
 
 	@Override
 	public abstract void forEach(Consumer<? super T> action);
@@ -49,7 +49,7 @@ public abstract class ASequence<T> extends ACollection<T> implements List<T>, IA
 	public abstract void visitElementRefs(Consumer<Ref<T>> f);
 
 	@SuppressWarnings("unchecked")
-	public <R> ASequence<R> flatMap(Function<? super T, ? extends ASequence<R>> mapper) {
+	public <R extends ACell> ASequence<R> flatMap(Function<? super T, ? extends ASequence<R>> mapper) {
 		ASequence<ASequence<R>> vals = this.map(mapper);
 		ASequence<R> result = (ASequence<R>) this.empty();
 		for (ASequence<R> seq : vals) {
@@ -63,7 +63,7 @@ public abstract class ASequence<T> extends ACollection<T> implements List<T>, IA
 	 * @param vals A sequence of values to concatenate.
 	 * @return The concatenated sequence, of the same type as this sequence.
 	 */
-	public abstract ASequence<T> concat(ASequence<T> vals);
+	public abstract <R extends ACell> ASequence<R> concat(ASequence<R> vals);
 
 	@Override
 	public final boolean addAll(int index, Collection<? extends T> c) {
@@ -125,7 +125,7 @@ public abstract class ASequence<T> extends ACollection<T> implements List<T>, IA
 	}
 
 	@Override
-	public boolean containsKey(Object key) {
+	public boolean containsKey(ACell key) {
 		if (key instanceof CVMLong) {
 			long ix = ((CVMLong) key).longValue();
 			if ((ix >= 0) && (ix < count())) return true;
@@ -160,7 +160,7 @@ public abstract class ASequence<T> extends ACollection<T> implements List<T>, IA
 	 * @param value New element value
 	 * @return Updated sequence
 	 */
-	public abstract ASequence<T> assoc(long i, T value);
+	public abstract <R extends ACell> ASequence<R> assoc(long i, R value);
 
 	/**
 	 * Checks if an index range is valid for this sequence
@@ -192,7 +192,7 @@ public abstract class ASequence<T> extends ACollection<T> implements List<T>, IA
 	 * @return Updated sequence
 	 */
 	@Override
-	public abstract <R> ASequence<R> conj(R value);
+	public abstract <R extends ACell> ASequence<R> conj(R value);
 
 	/**
 	 * Produces a slice of this sequence, beginning with the specified start index and of the given length.
@@ -219,7 +219,7 @@ public abstract class ASequence<T> extends ACollection<T> implements List<T>, IA
 	 * @param length
 	 * @return Sub-vector of this sequence
 	 */
-	public abstract AVector<T> subVector(long start, long length);
+	public abstract <R extends ACell> AVector<R> subVector(long start, long length);
 
 	@Override
 	public final java.util.List<T> subList(int fromIndex, int toIndex) {

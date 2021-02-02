@@ -5,6 +5,7 @@ import java.util.Map;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Hash;
+import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
@@ -82,7 +83,7 @@ public class Peer {
 	}
 
 	@SuppressWarnings("unchecked")
-	public static Peer fromData(AKeyPair keyPair,AMap<Keyword, Object> peerData)  {
+	public static Peer fromData(AKeyPair keyPair,AMap<Keyword, ACell> peerData)  {
 		try {
 			SignedData<Belief> belief=(SignedData<Belief>) peerData.get(Keywords.BELIEF);
 			AVector<BlockResult> results=(AVector<BlockResult>) peerData.get(Keywords.RESULTS);
@@ -94,7 +95,7 @@ public class Peer {
 		}
 	}
 	
-	public AMap<Keyword, Object> toData() {
+	public AMap<Keyword, ACell> toData() {
 		return Maps.of(
 			Keywords.BELIEF,belief,
 			Keywords.RESULTS,blockResults,
@@ -118,10 +119,10 @@ public class Peer {
 		try {
 			// temporarily set current store
 			Stores.setCurrent(store);
-			Ref<Object> ref=store.refForHash(root);
+			Ref<ACell> ref=store.refForHash(root);
 			if (ref==null) return null; // not found case
 			@SuppressWarnings("unchecked")
-			AMap<Keyword,Object> peerData=(AMap<Keyword, Object>) ref.getValue();
+			AMap<Keyword,ACell> peerData=(AMap<Keyword, ACell>) ref.getValue();
 			
 			Peer peer=Peer.fromData(keyPair,peerData);
 			return peer;
@@ -170,7 +171,7 @@ public class Peer {
 	 * @return The Context containing the query results. Will be NOBODY error if address / account does not exist
 	 */
 	@SuppressWarnings("unchecked")
-	public <T> Context<T> executeQuery(Object form, Address address) {
+	public <T extends ACell> Context<T> executeQuery(ACell form, Address address) {
 		State state=getConsensusState();
 		
 		if (address==null) {
@@ -217,7 +218,7 @@ public class Peer {
 	 * @param transaction Transaction to execute
 	 * @returnThe Context containing the query results.
 	 */
-	public <T> Context<T> executeDryRun(ATransaction transaction) {
+	public <T extends ACell> Context<T> executeDryRun(ATransaction transaction) {
 		Context<T> ctx=getConsensusState().applyTransaction(transaction);
 		return ctx;
 	}
@@ -228,7 +229,7 @@ public class Peer {
 	 * @param form
 	 * @return
 	 */
-	public <T> Context<T> executeQuery(Object form) {
+	public <T extends ACell> Context<T> executeQuery(ACell form) {
 		return executeQuery(form,Init.HERO);
 	}
 
@@ -256,7 +257,7 @@ public class Peer {
 		return belief;
 	}
 
-	public <T> SignedData<T> sign(T value) {
+	public <T extends ACell> SignedData<T> sign(T value) {
 		return SignedData.create(keyPair, value);
 	}
 

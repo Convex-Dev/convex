@@ -4,6 +4,7 @@ import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableModel;
 
 import convex.core.State;
+import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
@@ -48,7 +49,7 @@ public class OracleTableModel extends AbstractTableModel implements TableModel {
 			System.err.println("Missing OracleTableModel account: "+oracle);
 			return 0;
 		}
-		AMap<Object,Object> list=as.getEnvironmentValue(LIST_S); 
+		AMap<ACell,ACell> list=as.getEnvironmentValue(LIST_S); 
 		return Utils.checkedInt(list.count());
 	}
 
@@ -62,9 +63,9 @@ public class OracleTableModel extends AbstractTableModel implements TableModel {
 		return false;
 	}
 	
-	public AMap<Object,Object> getList() {
+	public AMap<ACell,ACell> getList() {
 		AMap<Symbol,Syntax> env=state.getAccount(oracle).getEnvironment();
-		AMap<Object,Object> list=env.get(LIST_S).getValue(); 
+		AMap<ACell,ACell> list=env.get(LIST_S).getValue(); 
 		return list;
 	}
 
@@ -72,22 +73,22 @@ public class OracleTableModel extends AbstractTableModel implements TableModel {
 	@Override
 	public Object getValueAt(int rowIndex, int columnIndex) {
 		AMap<Symbol,Syntax> env=state.getAccount(oracle).getEnvironment();
-		AMap<Object,Object> list=env.get(LIST_S).getValue(); 
-		MapEntry<Object,Object> me=list.entryAt(rowIndex);
-		Object key=me.getKey();
+		AMap<ACell,ACell> list=env.get(LIST_S).getValue(); 
+		MapEntry<ACell,ACell> me=list.entryAt(rowIndex);
+		ACell key=me.getKey();
 		switch (columnIndex) {
 			case 0: return key.toString();
 			case 1: {
-				AMap<Keyword, Object> data=(AMap<Keyword, Object>) me.getValue();
+				AMap<Keyword, ACell> data=(AMap<Keyword, ACell>) me.getValue();
 				return data.get(DESC_K);
 			}
 			case 2: {
-				boolean done=((AMap<Object, Object>) env.get(RESULTS_S).getValue()).containsKey(key);
+				boolean done=((AMap<ACell, ACell>) env.get(RESULTS_S).getValue()).containsKey(key);
 				return done?"Yes":"No";
 			}
 			case 3: {
-				AMap<Object, Object> results=((AMap<Object, Object>) env.get(RESULTS_S).getValue());
-				MapEntry<Object,Object> rme=results.getEntry(key);
+				AMap<ACell, ACell> results=((AMap<ACell, ACell>) env.get(RESULTS_S).getValue());
+				MapEntry<ACell,ACell> rme=results.getEntry(key);
 				return (rme==null)?"":rme.getValue();
 			}
 			

@@ -11,9 +11,9 @@ import convex.core.util.Utils;
  */
 public abstract class ARecordGeneric extends ARecord {
 
-	protected AVector<Object> values;
+	protected AVector<ACell> values;
 
-	protected ARecordGeneric(RecordFormat format, AVector<Object> values) {
+	protected ARecordGeneric(RecordFormat format, AVector<ACell> values) {
 		super(format);
 		if (values.count()!=format.count()) throw new IllegalArgumentException("Wrong number of field values for record: "+values.count());
 		this.values=values;
@@ -25,7 +25,7 @@ public abstract class ARecordGeneric extends ARecord {
 	}
 	
 	@Override
-	public MapEntry<Keyword, Object> entryAt(long i) {
+	public MapEntry<Keyword, ACell> entryAt(long i) {
 		return MapEntry.create(format.getKey(Utils.checkedInt(i)), values.get(i));
 	}
 
@@ -38,10 +38,7 @@ public abstract class ARecordGeneric extends ARecord {
 	}
 
 	@Override
-	public byte getRecordTag() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
+	public abstract byte getRecordTag();
 	
 	@Override
 	public int getRefCount() {
@@ -49,13 +46,13 @@ public abstract class ARecordGeneric extends ARecord {
 	}
 	
 	@Override
-	public <R> Ref<R> getRef(int index) {
+	public <R extends ACell> Ref<R> getRef(int index) {
 		return values.getRef(index);
 	}
 
 	@Override
 	public ARecord updateRefs(IRefFunction func) {
-		AVector<Object> newValues=values.updateRefs(func);
+		AVector<ACell> newValues=values.updateRefs(func);
 		return withValues(newValues);
 	}
 
@@ -71,7 +68,7 @@ public abstract class ARecordGeneric extends ARecord {
 			}
 		}
 		if (!changed) return this;
-		AVector<Object> newVector=Vectors.create(newVals);
+		AVector<ACell> newVector=Vectors.create(newVals);
 		return withValues(newVector);
 	}
 
@@ -83,7 +80,7 @@ public abstract class ARecordGeneric extends ARecord {
 	 * @param newVector
 	 * @return
 	 */
-	protected abstract ARecord withValues(AVector<Object> newValues);
+	protected abstract ARecord withValues(AVector<ACell> newValues);
 
 	@Override
 	public void validateCell() throws InvalidDataException {

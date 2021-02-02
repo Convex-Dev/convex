@@ -13,6 +13,7 @@ import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
+import convex.core.data.ACell;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
@@ -23,7 +24,7 @@ import convex.core.util.Utils;
  * 
  * @param <T> Type of defined value
  */
-public class Def<T> extends AOp<T> {
+public class Def<T extends ACell> extends AOp<T> {
 
 	// symbol Syntax Object including metadata to add to the defined environment
 	private final Syntax symbol;
@@ -36,24 +37,24 @@ public class Def<T> extends AOp<T> {
 		this.symbol = key;
 	}
 
-	public static <T> Def<T> create(Syntax key, Ref<AOp<T>> op) {
+	public static <T extends ACell> Def<T> create(Syntax key, Ref<AOp<T>> op) {
 		return new Def<T>(key, op);
 	}
 
-	public static <T> Def<T> create(Syntax key, AOp<T> op) {
+	public static <T extends ACell> Def<T> create(Syntax key, AOp<T> op) {
 		return create(key, op.getRef());
 	}
 
-	public static <T> Def<T> create(Symbol key, AOp<T> op) {
+	public static <T extends ACell> Def<T> create(Symbol key, AOp<T> op) {
 		return create(Syntax.create(key), op.getRef());
 	}
 
-	public static <T> Def<T> create(String key, AOp<T> op) {
+	public static <T extends ACell> Def<T> create(String key, AOp<T> op) {
 		return create(Symbol.create(key), op);
 	}
 
 	@Override
-	public <I> Context<T> execute(Context<I> context) {
+	public <I extends ACell> Context<T> execute(Context<I> context) {
 		Context<T> ctx = (Context<T>) context.execute(op.getValue());
 		if (ctx.isExceptional()) return ctx;
 		
@@ -119,7 +120,7 @@ public class Def<T> extends AOp<T> {
 		return symbol.estimatedEncodingSize()+Format.MAX_EMBEDDED_LENGTH;
 	}
 
-	public static <T> Def<T> read(ByteBuffer b) throws BadFormatException {
+	public static <T extends ACell> Def<T> read(ByteBuffer b) throws BadFormatException {
 		Syntax symbol = Format.read(b);
 		Ref<AOp<T>> ref = Format.readRef(b);
 		return create(symbol, ref);

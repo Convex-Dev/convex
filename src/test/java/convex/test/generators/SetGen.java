@@ -4,6 +4,7 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
+import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.Sets;
@@ -37,7 +38,7 @@ public class SetGen extends Generator<ASet> {
 		case 4:
 			return Samples.LONG_SET_100;
 		default: {
-			AVector<Object> o1 = gen().make(VectorGen.class).generate(r, status);
+			AVector<ACell> o1 = gen().make(VectorGen.class).generate(r, status);
 			return Sets.create(o1);
 		}
 		}

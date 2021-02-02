@@ -19,7 +19,7 @@ import convex.core.data.Tag;
  *
  * @param <T> the type of the operation return value
  */
-public abstract class AOp<T> extends ACell {
+public abstract class AOp<T extends ACell> extends ACell {
 
 	/**
 	 * Executes this op with the given context. Must preserve depth unless an
@@ -31,7 +31,7 @@ public abstract class AOp<T> extends ACell {
 	 * 
 	 * @throws ExecutionException
 	 */
-	public abstract <I> Context<T> execute(Context<I> context);
+	public abstract <I extends ACell> Context<T> execute(Context<I> context);
 
 	@Override
 	public int estimatedEncodingSize() {

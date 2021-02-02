@@ -2,12 +2,12 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
+import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Format;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
-import convex.core.lang.AFn;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.IFn;
@@ -22,42 +22,42 @@ import convex.core.lang.RT;
  *
  * @param <T>
  */
-public class Invoke<T> extends AMultiOp<T> {
+public class Invoke<T extends ACell> extends AMultiOp<T> {
 
-	protected Invoke(AVector<AOp<?>> ops) {
+	protected Invoke(AVector<AOp<ACell>> ops) {
 		super(ops);
 	}
 
-	public static <T> Invoke<T> create(ASequence<AOp<?>> ops) {
-		AVector<AOp<?>> vops = ops.toVector();
+	public static <T extends ACell> Invoke<T> create(ASequence<AOp<ACell>> ops) {
+		AVector<AOp<ACell>> vops = ops.toVector();
 		return new Invoke<T>(vops);
 	}
 
-	public static <T> Invoke<T> create(AOp<?>... ops) {
+	public static <T extends ACell> Invoke<T> create(AOp<?>... ops) {
 		return create(Vectors.create(ops));
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <T, A extends AOp<?>, F extends AOp<AFn<?>>> Invoke<T> create(F f, ASequence<A> args) {
-		ASequence<AOp<?>> nargs = (ASequence<AOp<?>>) args;
-		ASequence<AOp<?>> ops = nargs.cons(f);
+	public static <T extends ACell, A extends AOp<ACell>, F extends AOp<ACell>> Invoke<T> create(F f, ASequence<A> args) {
+		ASequence<AOp<ACell>> nargs = (ASequence<AOp<ACell>>) args;
+		ASequence<AOp<ACell>> ops = nargs.cons(f);
 
 		return create(ops);
 	}
 
 	@Override
-	protected Invoke<T> recreate(ASequence<AOp<?>> newOps) {
+	protected Invoke<T> recreate(ASequence<AOp<ACell>> newOps) {
 		if (ops == newOps) return this;
 		return create(newOps);
 	}
 
-	public static <T> Invoke<T> create(String string, AOp<?>... args) {
+	public static <T extends ACell> Invoke<T> create(String string, AOp<?>... args) {
 		return create(Lookup.create(string), Vectors.create(args));
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <I> Context<T> execute(Context<I> context) {
+	public <I extends ACell> Context<T> execute(Context<I> context) {
 		// execute first op to obtain function value
 		AOp<?> fnOp=ops.get(0);
 		Context<T> ctx = (Context<T>) context.execute(fnOp);
@@ -109,8 +109,8 @@ public class Invoke<T> extends AMultiOp<T> {
 		return Ops.INVOKE;
 	}
 
-	public static <T> Invoke<T> read(ByteBuffer bb) throws BadFormatException {
-		AVector<AOp<?>> ops = Format.read(bb);
+	public static <T extends ACell> Invoke<T> read(ByteBuffer bb) throws BadFormatException {
+		AVector<AOp<ACell>> ops = Format.read(bb);
 		if (ops == null) throw new BadFormatException("Can't read an Invoke with no ops");
 
 		return create(ops);

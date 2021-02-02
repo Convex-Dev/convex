@@ -6,14 +6,16 @@ import org.openjdk.jmh.runner.options.Options;
 
 import convex.core.data.AMap;
 import convex.core.data.Maps;
+import convex.core.data.prim.CVMLong;
 
 public class MapBenchmark {
 
 	@Benchmark
-	public void longHash() {
-		AMap<Long, Long> m = Maps.empty();
+	public void assocMap1000() {
+		AMap<CVMLong, CVMLong> m = Maps.empty();
 		for (long i = 0; i < 1000; i++) {
-			m = m.assoc(i, i);
+			CVMLong ci=CVMLong.create(i);
+			m = m.assoc(ci, ci);
 		}
 	}
 

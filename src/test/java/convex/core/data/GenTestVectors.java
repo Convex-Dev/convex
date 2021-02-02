@@ -14,17 +14,19 @@ import convex.test.generators.VectorGen;
 @RunWith(JUnitQuickcheck.class)
 public class GenTestVectors {
 
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Property
-	public void testGenericProperties(@From(VectorGen.class) AVector<Object> a) {
+	public void testGenericProperties(@From(VectorGen.class) AVector a) {
 		VectorsTest.doVectorTests(a);
 	}
 
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Property
-	public void testConcatPrefixes(@From(VectorGen.class) AVector<Object> a, @From(VectorGen.class) AVector<Object> b) {
+	public void testConcatPrefixes(@From(VectorGen.class) AVector a, @From(VectorGen.class) AVector b) {
 		long al = a.count();
 		long bl = b.count();
 
-		AVector<Object> ab = a.concat(b);
+		AVector<ACell> ab = a.concat(b);
 		VectorsTest.doVectorTests(ab); // useful to test these
 
 		assertEquals(al + bl, ab.count());

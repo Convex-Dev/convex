@@ -8,6 +8,7 @@ import com.pholser.junit.quickcheck.From;
 import com.pholser.junit.quickcheck.Property;
 import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 
+import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Format;
@@ -44,8 +45,8 @@ public class GenTestFormat {
 	}
 
 	@Property
-	public void dataRoundTrip(@From(ValueGen.class) Object value) throws BadFormatException {
-		Ref<Object> pref = Ref.createPersisted(value); // ensure persisted
+	public void dataRoundTrip(@From(ValueGen.class) ACell value) throws BadFormatException {
+		Ref<ACell> pref = Ref.createPersisted(value); // ensure persisted
 		Blob b = Format.encodedBlob(value);
 		Object o = Format.read(b);
 

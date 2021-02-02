@@ -25,5 +25,5 @@ public abstract class AExpander extends ACell {
 	 * @return Updated context with expanded form as result.
 	 * @throws ExecutionException
 	 */
-	public abstract Context<Syntax> expand(Object form, AExpander ex, Context<?> context);
+	public abstract Context<Syntax> expand(ACell form, AExpander ex, Context<?> context);
 }

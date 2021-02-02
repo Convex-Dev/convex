@@ -2,6 +2,7 @@ package convex.net;
 
 import convex.core.Belief;
 import convex.core.Result;
+import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
@@ -52,7 +53,7 @@ public class Message {
 	}
 
 	@SuppressWarnings("unchecked")
-	public <T> T getPayload() {
+	public <T extends ACell> T getPayload() {
 		return (T) payload;
 	}
 

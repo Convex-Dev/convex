@@ -15,7 +15,7 @@ import convex.core.util.Utils;
  * 
  * @param <T>
  */
-public class RefDirect<T> extends Ref<T> {
+public class RefDirect<T extends ACell> extends Ref<T> {
 	/**
 	 * Direct value of this Ref
 	 */
@@ -31,11 +31,11 @@ public class RefDirect<T> extends Ref<T> {
 		this.value = value;
 	}
 
-	public static <T> RefDirect<T> create(T value, Hash hash, int status) {
+	public static <T extends ACell> RefDirect<T> create(T value, Hash hash, int status) {
 		return new RefDirect<T>(value, hash, status);
 	}
 
-	public static <T> RefDirect<T> create(T value, Hash hash) {
+	public static <T extends ACell> RefDirect<T> create(T value, Hash hash) {
 		return create(value, hash, UNKNOWN);
 	}
 
@@ -46,7 +46,7 @@ public class RefDirect<T> extends Ref<T> {
 	 * @return
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> RefDirect<T> create(T value) {
+	public static <T extends ACell> RefDirect<T> create(T value) {
 		if (value == null) return (RefDirect<T>) Ref.NULL_VALUE;
 		return create(value, null);
 	}

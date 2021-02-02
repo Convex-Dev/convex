@@ -9,6 +9,7 @@ import java.util.logging.Logger;
 import org.parboiled.common.Utils;
 
 import convex.core.data.ABlob;
+import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.ARecord;
@@ -27,6 +28,7 @@ import convex.core.data.MapEntry;
 import convex.core.data.PeerStatus;
 import convex.core.data.Sets;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Tag;
@@ -71,12 +73,12 @@ public class State extends ARecord {
 	
 	private final AVector<AccountStatus> accounts;
 	private final BlobMap<AccountKey, PeerStatus> peers;
-	private final ASet<Object> store;
-	private final AHashMap<Symbol, Object> globals;
-	private final BlobMap<ABlob, AVector<Object>> schedule;
+	private final ASet<ACell> store;
+	private final AHashMap<Symbol, ACell> globals;
+	private final BlobMap<ABlob, AVector<ACell>> schedule;
 
-	private State(AVector<AccountStatus> accounts, BlobMap<AccountKey, PeerStatus> peers, ASet<Object> store,
-			AHashMap<Symbol, Object> globals, BlobMap<ABlob, AVector<Object>> schedule) {
+	private State(AVector<AccountStatus> accounts, BlobMap<AccountKey, PeerStatus> peers, ASet<ACell> store,
+			AHashMap<Symbol, ACell> globals, BlobMap<ABlob, AVector<ACell>> schedule) {
 		super(FORMAT);
 		this.accounts = accounts;
 		this.peers = peers;
@@ -101,9 +103,9 @@ public class State extends ARecord {
 	protected State updateAll(Object[] newVals) {
 		AVector<AccountStatus> accounts = (AVector<AccountStatus>) newVals[0];
 		BlobMap<AccountKey, PeerStatus> peers = (BlobMap<AccountKey, PeerStatus>) newVals[1];
-		ASet<Object> store = (ASet<Object>) newVals[2];
-		AHashMap<Symbol, Object> globals = (AHashMap<Symbol, Object>) newVals[3];
-		BlobMap<ABlob, AVector<Object>> schedule = (BlobMap<ABlob, AVector<Object>>) newVals[4];
+		ASet<ACell> store = (ASet<ACell>) newVals[2];
+		AHashMap<Symbol, ACell> globals = (AHashMap<Symbol, ACell>) newVals[3];
+		BlobMap<ABlob, AVector<ACell>> schedule = (BlobMap<ABlob, AVector<ACell>>) newVals[4];
 		if ((this.accounts == accounts) && (this.peers == peers) && (this.store == store) && (this.globals == globals)
 				&& (this.schedule == schedule)) {
 			return this;
@@ -112,7 +114,7 @@ public class State extends ARecord {
 	}
 
 	public static State create(AVector<AccountStatus> accounts, BlobMap<AccountKey, PeerStatus> peers,
-			ASet<Object> store, AHashMap<Symbol, Object> globals, BlobMap<ABlob, AVector<Object>> schedule) {
+			ASet<ACell> store, AHashMap<Symbol, ACell> globals, BlobMap<ABlob, AVector<ACell>> schedule) {
 		return new State(accounts, peers, store, globals, schedule);
 	}
 
@@ -154,9 +156,9 @@ public class State extends ARecord {
 		try {
 			AVector<AccountStatus> accounts = Format.read(bb);
 			BlobMap<AccountKey, PeerStatus> peers = Format.read(bb);
-			ASet<Object> store = Format.read(bb);
-			AHashMap<Symbol, Object> globals = Format.read(bb);
-			BlobMap<ABlob, AVector<Object>> schedule = Format.read(bb);
+			ASet<ACell> store = Format.read(bb);
+			AHashMap<Symbol, ACell> globals = Format.read(bb);
+			BlobMap<ABlob, AVector<ACell>> schedule = Format.read(bb);
 			return create(accounts, peers, store, globals, schedule);
 		} catch (ClassCastException ex) {
 			throw new BadFormatException("Can't read state", ex);
@@ -167,7 +169,7 @@ public class State extends ARecord {
 		return accounts;
 	}
 
-	public ASet<Object> getStore() {
+	public ASet<ACell> getStore() {
 		return store;
 	}
 
@@ -238,7 +240,7 @@ public class State extends ARecord {
 	@SuppressWarnings("unchecked")
 	private State applyScheduledTransactions(Block b) {
 		long tcount = 0;
-		BlobMap<ABlob, AVector<Object>> sched = this.schedule;
+		BlobMap<ABlob, AVector<ACell>> sched = this.schedule;
 		CVMLong timestamp = this.getTimeStamp();
 
 		// ArrayList to accumulate the transactions to apply. Null until we need it
@@ -249,11 +251,11 @@ public class State extends ARecord {
 		// we can optimise bulk removal later
 		while (tcount < Constants.MAX_SCHEDULED_TRANSACTIONS_PER_BLOCK) {
 			if (sched.isEmpty()) break;
-			MapEntry<ABlob, AVector<Object>> me = sched.entryAt(0);
+			MapEntry<ABlob, AVector<ACell>> me = sched.entryAt(0);
 			ABlob key = me.getKey();
 			long time = key.longValue();
 			if (time > timestamp.longValue()) break; // exit if we are still in the future
-			AVector<Object> trans = me.getValue();
+			AVector<ACell> trans = me.getValue();
 			long numScheduled = trans.count(); // number scheduled at this schedule timestamp
 			long take = Math.min(numScheduled, Constants.MAX_SCHEDULED_TRANSACTIONS_PER_BLOCK - tcount);
 
@@ -276,7 +278,7 @@ public class State extends ARecord {
 		int n = al.size();
 		log.log(LEVEL_SCHEDULE,"Applying " + n + " scheduled transactions");
 		for (int i = 0; i < n; i++) {
-			AVector<Object> st = (AVector<Object>) al.get(i);
+			AVector<ACell> st = (AVector<ACell>) al.get(i);
 			Address origin = (Address) st.get(0);
 			AOp<?> op = (AOp<?>) st.get(1);
 			Context<?> ctx;
@@ -302,12 +304,12 @@ public class State extends ARecord {
 		return state;
 	}
 
-	private State withSchedule(BlobMap<ABlob, AVector<Object>> newSchedule) {
+	private State withSchedule(BlobMap<ABlob, AVector<ACell>> newSchedule) {
 		if (schedule == newSchedule) return this;
 		return new State(accounts, peers, store, globals, newSchedule);
 	}
 
-	private State withGlobals(AHashMap<Symbol, Object> newGlobals) {
+	private State withGlobals(AHashMap<Symbol, ACell> newGlobals) {
 		if (newGlobals == globals) return this;
 		return new State(accounts, peers, store, newGlobals, schedule);
 	}
@@ -332,7 +334,7 @@ public class State extends ARecord {
 				state = ctx.getState();
 			} catch (Throwable t) {
 				String msg= "Unexpected fatal exception applying transaction: "+t.toString();
-				results[i] = Result.create(CVMLong.create(i), msg,ErrorCodes.UNEXPECTED);
+				results[i] = Result.create(CVMLong.create(i), Strings.create(msg),ErrorCodes.UNEXPECTED);
 				t.printStackTrace();
 				log.severe(msg);
 			}
@@ -350,7 +352,7 @@ public class State extends ARecord {
 	 * 
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
-	private <T> Context<T> applyTransaction(SignedData<? extends ATransaction> signedTransaction) throws BadSignatureException {
+	private <T extends ACell> Context<T> applyTransaction(SignedData<? extends ATransaction> signedTransaction) throws BadSignatureException {
 		// Extract transaction, performs signature check
 		ATransaction t=signedTransaction.getValue();
 		Address addr=t.getAddress();
@@ -382,7 +384,7 @@ public class State extends ARecord {
 	 * 
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
-	public <T> Context<T> applyTransaction(ATransaction t) {
+	public <T extends ACell> Context<T> applyTransaction(ATransaction t) {
 		Address origin = t.getAddress();
 		
 		// Create prepared context (juice subtracted, sequence updated, transaction entry checks)
@@ -409,7 +411,7 @@ public class State extends ARecord {
 	}
 	
 	@SuppressWarnings("unchecked")
-	public <T> Context<T> prepareTransaction(Address origin,ATransaction t) {
+	public <T extends ACell> Context<T> prepareTransaction(Address origin,ATransaction t) {
 		// Pre-transaction state updates (persisted even if transaction fails)
 		AccountStatus account = getAccount(origin);
 		if (account == null) {
@@ -507,9 +509,9 @@ public class State extends ARecord {
 		return as.getEnvironment();
 	}
 
-	public State withStore(ASet<Object> newStore) {
-		if (store == newStore) return this;
-		return create(accounts, peers, newStore, globals, schedule);
+	public State withStore(ASet<ACell> store2) {
+		if (store == store2) return this;
+		return create(accounts, peers, store2, globals, schedule);
 	}
 
 	public State withPeers(BlobMap<AccountKey, PeerStatus> newPeers) {
@@ -517,8 +519,8 @@ public class State extends ARecord {
 		return create(accounts, newPeers, store, globals, schedule);
 	}
 
-	public State store(Object a) {
-		ASet<Object> newStore = store.include(a);
+	public State store(ACell a) {
+		ASet<ACell> newStore = store.include(a);
 		return withStore(newStore);
 	}
 
@@ -596,16 +598,16 @@ public class State extends ARecord {
 	 * @return The updated State
 	 */
 	public State scheduleOp(long time, Address address, AOp<?> op) {
-		AVector<Object> v = Vectors.of(address, op);
+		AVector<ACell> v = Vectors.of(address, op);
 
 		LongBlob key = LongBlob.create(time);
-		AVector<Object> list = schedule.get(key);
+		AVector<ACell> list = schedule.get(key);
 		if (list == null) {
 			list = Vectors.of(v);
 		} else {
 			list = list.append(v);
 		}
-		BlobMap<ABlob, AVector<Object>> newSchedule = schedule.assoc(key, list);
+		BlobMap<ABlob, AVector<ACell>> newSchedule = schedule.assoc(key, list);
 
 		return this.withSchedule(newSchedule);
 	}
@@ -615,7 +617,7 @@ public class State extends ARecord {
 	 * 
 	 * @return The schedule data structure.
 	 */
-	public BlobMap<ABlob, AVector<Object>> getSchedule() {
+	public BlobMap<ABlob, AVector<ACell>> getSchedule() {
 		return schedule;
 	}
 
@@ -624,7 +626,7 @@ public class State extends ARecord {
 		return (R) globals.get(sym);
 	}
 
-	public State withGlobal(Symbol sym, Object value) {
+	public State withGlobal(Symbol sym, ACell value) {
 		return this.withGlobals(globals.assoc(sym, value));
 	}
 

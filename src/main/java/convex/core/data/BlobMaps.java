@@ -14,17 +14,17 @@ public class BlobMaps {
 	 * @return The empty BlobMap
 	 */
 	@SuppressWarnings("unchecked")
-	public static <R extends ABlobMap<K, V>, K extends ABlob, V> R empty() {
+	public static <R extends ABlobMap<K, V>, K extends ABlob, V extends ACell> R empty() {
 		return (R) BlobMap.EMPTY;
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <R extends ABlobMap<K, V>, K extends ABlob, V> R create(K k, V v) {
+	public static <R extends ABlobMap<K, V>, K extends ABlob, V extends ACell> R create(K k, V v) {
 		return (R) BlobMap.create(k, v);
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <R extends ABlobMap<K, V>, K extends ABlob, V> R of(Object... kvs) {
+	public static <R extends ABlobMap<K, V>, K extends ABlob, V extends ACell> R of(Object... kvs) {
 		int n = kvs.length;
 		if (Utils.isOdd(n)) throw new IllegalArgumentException("Even number of key + values required");
 		BlobMap<K, V> result = empty();

@@ -57,15 +57,15 @@ public class EtchStoreTest {
 
 			assertNull(store.refForHash(BAD_HASH));
 
-			AMap<String, String> data = Maps.of(Keywords.FOO,Symbols.FOO);
-			Ref<AMap<String, String>> goodRef = data.getRef();
+			AMap<ACell, ACell> data = Maps.of(Keywords.FOO,Symbols.FOO);
+			Ref<AMap<ACell, ACell>> goodRef = data.getRef();
 			Hash goodHash = goodRef.getHash();
 			assertNull(store.refForHash(goodHash));
 
 			goodRef.persist();
 
 			if (!data.isEmbedded()) {
-				Ref<AMap<String, String>> recRef = store.refForHash(goodHash);
+				Ref<AMap<ACell, ACell>> recRef = store.refForHash(goodHash);
 				assertNotNull(recRef);
 	
 				assertEquals(data, recRef.getValue());
@@ -198,7 +198,7 @@ public class EtchStoreTest {
 			// handler that records added refs
 			Consumer<Ref<ACell>> handler = r -> al.add(r);
 
-			Ref<AVector<Integer>> dataRef = data.getRef();
+			Ref<AVector<CVMLong>> dataRef = data.getRef();
 			Hash dataHash = dataRef.getHash();
 			assertNull(store.refForHash(dataHash));
 

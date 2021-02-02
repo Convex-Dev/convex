@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ACell;
 import convex.core.data.PeerStatus;
 import convex.core.lang.Context;
 import convex.core.lang.TestState;
@@ -19,13 +20,13 @@ public class StakingTest {
 
 	}
 	
-	Context<Object> CTX=TestState.INITIAL_CONTEXT.fork();
+	Context<ACell> CTX=TestState.INITIAL_CONTEXT.fork();
 
 	@Test
 	public void testStake() {
-		Context<Object> ctx0 =CTX.fork();
+		Context<ACell> ctx0 =CTX.fork();
 
-		Context<Object> ctx1 = ctx0.setStake(Init.FIRST_PEER_KEY, 1000);
+		Context<ACell> ctx1 = ctx0.setStake(Init.FIRST_PEER_KEY, 1000);
 		PeerStatus ps1 = ctx1.getState().getPeer(Init.FIRST_PEER_KEY);
 		assertEquals(1000L, ps1.getDelegatedStake());
 		assertEquals(TestState.TOTAL_FUNDS, ctx1.getState().computeTotalFunds());
@@ -33,11 +34,11 @@ public class StakingTest {
 		// round tripping this should return to initial state precisely
 		// since we are not consuming any juice here, or adjusting anything other than
 		// stake positions
-		Context<Object> ctx2 = ctx1.setStake(Init.FIRST_PEER_KEY, 0);
+		Context<ACell> ctx2 = ctx1.setStake(Init.FIRST_PEER_KEY, 0);
 		assertEquals(ctx0.getState(), ctx2.getState());
 
 		// test putting entire balance on stake
-		Context<Object> ctx3 = step(ctx0, "(stake " + Init.FIRST_PEER_KEY + " *balance*)");
+		Context<ACell> ctx3 = step(ctx0, "(stake " + Init.FIRST_PEER_KEY + " *balance*)");
 		assertEquals(0L, ctx3.getBalance(Init.HERO));
 		assertEquals(TestState.HERO_BALANCE, ctx3.getState().getPeer(Init.FIRST_PEER_KEY).getDelegatedStake(Init.HERO));
 
@@ -47,13 +48,13 @@ public class StakingTest {
 
 	@Test
 	public void testStakeReturns() {
-		Context<Object> ctx0 = CTX.fork();
+		Context<ACell> ctx0 = CTX.fork();
 		assertEquals(1000L, evalL(ctx0, "(stake " + Init.FIRST_PEER_KEY + " 1000)"));
 	}
 
 	@Test
 	public void testBadStake() {
-		Context<Object> ctx0 = CTX.fork();
+		Context<ACell> ctx0 = CTX.fork();
 
 		// not a peer, should be state error
 		assertStateError(ctx0.setStake(Init.HERO_KP.getAccountKey(), 1000));

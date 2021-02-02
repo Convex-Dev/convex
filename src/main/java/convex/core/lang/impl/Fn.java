@@ -2,6 +2,7 @@ package convex.core.lang.impl;
 
 import java.nio.ByteBuffer;
 
+import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.Format;
@@ -29,7 +30,7 @@ import convex.core.lang.Symbols;
  * 
  * @param <T> Return type of function
  */
-public class Fn<T> extends AClosure<T> {
+public class Fn<T extends ACell> extends AClosure<T> {
 
 	// note: embedding these fields directly for efficiency rather than going by
 	// Refs.
@@ -39,25 +40,26 @@ public class Fn<T> extends AClosure<T> {
 	
 	private Long variadic=null;
 
-	private Fn(AVector<Syntax> params, AOp<T> body, AHashMap<Symbol, Object> lexicalEnv) {
+	private Fn(AVector<Syntax> params, AOp<T> body, AHashMap<Symbol, ACell> lexicalEnv) {
 		super(lexicalEnv);
 		this.params = params;
 		this.body = body;
 	}
 
-	public static <T, I> Fn<T> create(AVector<Syntax> params, AOp<T> body, Context<I> context) {
-		AHashMap<Symbol, Object> binds = context.getLocalBindings();
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public static <T extends ACell> Fn<T> create(AVector<Syntax> params, AOp<T> body, Context context) {
+		AHashMap<Symbol, ACell> binds = context.getLocalBindings();
 		return new Fn<T>(params, body, binds);
 	}
 	
-	public static <T, I> Fn<T> create(AVector<Syntax> params, AOp<T> body) {
-		AHashMap<Symbol, Object> binds = Maps.empty();
+	public static <T extends ACell, I> Fn<T> create(AVector<Syntax> params, AOp<T> body) {
+		AHashMap<Symbol, ACell> binds = Maps.empty();
 		return new Fn<T>(params, body, binds);
 	}
 	
 	@SuppressWarnings("unchecked")
 	@Override
-	public <F extends AClosure<T>> F withEnvironment(AHashMap<Symbol, Object> env) {
+	public <F extends AClosure<T>> F withEnvironment(AHashMap<Symbol, ACell> env) {
 		if (this.lexicalEnv==env) return (F) this;
 		return (F) new Fn<T>(params, body, env);
 	}
@@ -89,14 +91,15 @@ public class Fn<T> extends AClosure<T> {
 		return -1L;
 	}
 
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
-	public <I> Context<T> invoke(Context<I> context, Object[] args) {
+	public Context<T> invoke(Context context, Object[] args) {
 		// update local bindings for the duration of this function call
-		final AHashMap<Symbol, Object> savedBindings = context.getLocalBindings();
+		final AHashMap<Symbol, ACell> savedBindings = context.getLocalBindings();
 
 		// update to correct lexical environment, then bind function parameters
 		context = context.withLocalBindings(lexicalEnv);
-		Context<?> boundContext = context.updateBindings(params, args);
+		Context<T> boundContext = context.updateBindings(params, args);
 		if (boundContext.isExceptional()) return boundContext.withLocalBindings(savedBindings);
 
 		Context<T> ctx = boundContext.execute(body);
@@ -129,13 +132,13 @@ public class Fn<T> extends AClosure<T> {
 		return 1+params.estimatedEncodingSize()+body.estimatedEncodingSize()+lexicalEnv.estimatedEncodingSize();
 	}
 
-	public static <T> Fn<T> read(ByteBuffer bb) throws BadFormatException {
+	public static <T extends ACell> Fn<T> read(ByteBuffer bb) throws BadFormatException {
 		try {
 			AVector<Syntax> params = Format.read(bb);
 			if (params==null) throw new BadFormatException("Null parameters to Fn");
 			AOp<T> body = Format.read(bb);
 			if (body==null) throw new BadFormatException("Null body in Fn");
-			AHashMap<Symbol, Object> lexicalEnv = Format.read(bb);
+			AHashMap<Symbol, ACell> lexicalEnv = Format.read(bb);
 			return new Fn<>(params, body, lexicalEnv);
 		} catch (ClassCastException e) {
 			throw new BadFormatException("Bad Fn format", e);
@@ -184,7 +187,7 @@ public class Fn<T> extends AClosure<T> {
 	}
 
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		int pc = params.getRefCount();
 		if (i < pc) return params.getRef(i);
 		i -= pc;
@@ -198,7 +201,7 @@ public class Fn<T> extends AClosure<T> {
 	public Fn<T> updateRefs(IRefFunction func) {
 		AVector<Syntax> newParams = params.updateRefs(func);
 		AOp<T> newBody = body.updateRefs(func);
-		AHashMap<Symbol, Object> newLexicalEnv = lexicalEnv.updateRefs(func);
+		AHashMap<Symbol, ACell> newLexicalEnv = lexicalEnv.updateRefs(func);
 		if ((params == newParams) && (body == newBody) && (lexicalEnv == newLexicalEnv)) return this;
 		return new Fn<>(newParams, newBody, lexicalEnv);
 	}

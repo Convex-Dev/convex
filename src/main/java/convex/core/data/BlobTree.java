@@ -450,7 +450,7 @@ public class BlobTree extends ABlob {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		return (Ref<R>) children[i];
 	}
 

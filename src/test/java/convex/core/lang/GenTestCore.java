@@ -16,6 +16,7 @@ import com.pholser.junit.quickcheck.Property;
 import com.pholser.junit.quickcheck.generator.java.lang.LongGenerator;
 import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 
+import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
 import convex.core.data.AList;
 import convex.core.data.ASequence;
@@ -46,12 +47,12 @@ import convex.test.generators.VectorGen;
 @RunWith(JUnitQuickcheck.class)
 public class GenTestCore {
 	
-	private void doDataStructureTests(ADataStructure<Object> a) {
+	private void doDataStructureTests(ADataStructure<ACell> a) {
 		long n=RT.count(a);
 
 		assertTrue(RT.bool(a));
 		
-		ASet<Object> uniqueVals=RT.set(a);
+		ASet<ACell> uniqueVals=RT.set(a);
 		long ucount=RT.count(uniqueVals);
 		assertTrue(ucount<=n);
 		
@@ -62,7 +63,7 @@ public class GenTestCore {
 		}
 	}
 
-	private void doSequenceTests(ASequence<Object> a)  {
+	private void doSequenceTests(ASequence<ACell> a)  {
 		doDataStructureTests(a);
 		
 		long n=RT.count(a);
@@ -78,26 +79,28 @@ public class GenTestCore {
 	 * Tests for objects that can be coerced into sequences
 	 * @param a
 	 */
-	private void doSequenceableTests(Object a) {
-		ASequence<Object> seq=RT.sequence(a);
+	private void doSequenceableTests(ACell a) {
+		ASequence<ACell> seq=RT.sequence(a);
 		doSequenceTests(seq);
 	}
 	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Property
-	public void testListFunctions(@From(ListGen.class) AList<Object> a) {
+	public void testListFunctions(@From(ListGen.class) AList a) {
 		doSequenceTests(a);
 		
 		assertSame(Lists.empty(),a.empty());
 		
 		AString foos=Strings.create("foo");
-		ASequence<Object> ca=RT.cons(foos, a);
+		ASequence<ACell> ca=RT.cons(foos, a);
 		assertEquals(foos,ca.get(0));
 		// assertEquals(a,RT.next(ca)); // TODO BUG: broken for big lists / vectors
 		assertEquals(ca,a.conj(foos));
 	}
 	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Property
-	public void testVectorFunctions(@From(VectorGen.class) AVector<Object> a) {
+	public void testVectorFunctions(@From(VectorGen.class) AVector a) {
 		doSequenceTests(a);
 		
 		if (!(a instanceof MapEntry)) {
@@ -108,7 +111,7 @@ public class GenTestCore {
 	
 		AString foos=Strings.create("foo");
 		long n=RT.count(a);
-		AVector<Object> ca=a.conj(foos);
+		AVector<ACell> ca=a.conj(foos);
 		assertEquals(foos,RT.nth(ca,n));
 	}
 	
@@ -134,8 +137,9 @@ public class GenTestCore {
 		doAddressTests(a);
 	}
 	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Property
-	public void testSetFunctions(@From(SetGen.class) ASet<Object> a) {
+	public void testSetFunctions(@From(SetGen.class) ASet a) {
 		doSequenceableTests(a);
 		
 		assertSame(a,RT.set(a));
@@ -150,7 +154,7 @@ public class GenTestCore {
 			key=Strings.create("newkey"+(Integer.parseInt(key.toString().substring(6))+1));
 		}
 		
-		ASet<Object> ca=a.conj(key);
+		ASet<ACell> ca=a.conj(key);
 		assertEquals(key,RT.get(ca, key));
 		assertEquals(n+1, RT.count(ca));
 		assertFalse(a.containsKey(key));
@@ -166,7 +170,7 @@ public class GenTestCore {
 		long v=a;
 		assertEquals(Long.toString(v),RT.str(a).toString());
 		assertSame(CVMByte.create(v),RT.toByte(a));
-		assertEquals((char)v,(char)RT.toCharacter(a));
+		assertCVMEquals((char)v,RT.toCharacter(a));
 		assertCVMEquals(v+1,RT.inc(a));
 		assertCVMEquals(v-1,RT.dec(a));
 		assertCVMEquals(0,RT.compare(a,(Long)v));

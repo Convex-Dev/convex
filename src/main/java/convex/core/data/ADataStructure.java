@@ -7,7 +7,7 @@ package convex.core.data;
  * "When you know your data can never change out from underneath you, everything
  * is different." - Rich Hickey
  */
-public abstract class ADataStructure<E> extends ACell {
+public abstract class ADataStructure<E extends ACell> extends ACell {
 
 	/**
 	 * Returns the number of elements in this data structure
@@ -51,7 +51,7 @@ public abstract class ADataStructure<E> extends ACell {
 	 * @param x New element to add
 	 * @return The updated data structure, or null if a failure occurred due to invalid element type
 	 */
-	public abstract <R> ADataStructure<R> conj(R x);
+	public abstract <R extends ACell> ADataStructure<R> conj(R x);
 	
 	/**
 	 * Adds multiple elements to this data structure, in the natural manner defined by the
@@ -62,9 +62,10 @@ public abstract class ADataStructure<E> extends ACell {
 	 * @param xs New elements to add
 	 * @return The updated data structure, or null if a failure occurred due to invalid elementtypes
 	 */
-	public ADataStructure<E> conjAll(ACollection<E> xs) {
-		ADataStructure<E> result=this;
-		for (E x: xs) {
+	@SuppressWarnings("unchecked")
+	public <R extends ACell> ADataStructure<R> conjAll(ACollection<R> xs) {
+		ADataStructure<R> result=(ADataStructure<R>) this;
+		for (R x: xs) {
 			result=result.conj(x);
 			if (result==null) return null;
 		}

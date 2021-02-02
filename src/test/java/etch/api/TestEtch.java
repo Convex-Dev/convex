@@ -13,6 +13,7 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import etch.Etch;
 
@@ -23,7 +24,7 @@ public class TestEtch {
 	public void testTempStore() throws IOException {
 		Etch etch = Etch.createTempEtch();
 
-		AVector<Integer> v=Vectors.of(1,2,3);
+		AVector<CVMLong> v=Vectors.of(1,2,3);
 		Hash h = v.getHash();
 		Ref<ACell> r=v.getRef();
 
@@ -43,7 +44,7 @@ public class TestEtch {
 		int COUNT = 1000;
 		for (int i = 0; i < COUNT; i++) {
 			Long a = (long) i;
-			AVector<Long> v=Vectors.of(a);
+			AVector<CVMLong> v=Vectors.of(a);
 			Hash key = v.getHash();
 
 			etch.write(key, v.getRef());
@@ -56,7 +57,7 @@ public class TestEtch {
 		for (int ii = 0; ii < ITERATIONS; ii++) {
 			for (int i = 0; i < COUNT; i++) {
 				Long a = (long) i;
-				AVector<Long> v=Vectors.of(a);
+				AVector<CVMLong> v=Vectors.of(a);
 				Hash key = v.getHash();
 				Ref<ACell> r2 = etch.read(key);
 

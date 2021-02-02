@@ -5,25 +5,24 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.security.KeyStore;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.logging.Logger;
 
-import convex.core.data.AMap;
 import convex.core.data.Address;
-import convex.core.data.Maps;
 
 public class Wallet {
 	public static final String KEYSTORE_TYPE="pkcs12";
 	
 	private static final Logger log = Logger.getLogger(Wallet.class.getName());
 
-	private AMap<Address, WalletEntry> data;
+	private HashMap<Address, WalletEntry> data;
 
-	private Wallet(AMap<Address, WalletEntry> data) {
+	private Wallet(HashMap<Address, WalletEntry> data) {
 		this.data = data;
 	}
 
 	public static Wallet create() {
-		return new Wallet(Maps.empty());
+		return new Wallet(new HashMap<Address, WalletEntry>());
 	}
 
 	public WalletEntry get(Address a) {

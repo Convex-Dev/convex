@@ -17,8 +17,9 @@ import convex.test.generators.PrimitiveGen;
 @RunWith(JUnitQuickcheck.class)
 public class GenTestMap {
 
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Property
-	public void primitiveAssoc(@From(MapGen.class) AHashMap<Object, Object> m, @From(PrimitiveGen.class) Object prim) {
+	public void primitiveAssoc(@From(MapGen.class) AHashMap m, @From(PrimitiveGen.class) ACell prim) {
 		long n = m.count();
 		long expectedN = (m.containsKey(prim)) ? n : n + 1;
 
@@ -34,37 +35,41 @@ public class GenTestMap {
 
 	}
 
+	@SuppressWarnings("rawtypes")
 	@Property
-	public void testHashCodes(@From(MapGen.class) AMap<Object, Object> m) {
+	public void testHashCodes(@From(MapGen.class) AMap m) {
 		assertEquals(m.hashCode(), m.getHash().hashCode());
 	}
 
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Property
-	public void mapToIdentity(@From(MapGen.class) AHashMap<Object, Object> m) {
-		AHashMap<Object, Object> m2 = m.mapEntries(e -> e);
+	public void mapToIdentity(@From(MapGen.class) AHashMap m) {
+		AHashMap<ACell, ACell> m2 = m.mapEntries(e -> e);
 
 		// check that the map is unchanged
 		assertTrue(m2 == m);
 	}
 
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Property
-	public void merging1(@From(MapGen.class) AHashMap<Object, Object> m) {
+	public void merging1(@From(MapGen.class) AHashMap m) {
 		m = m.filterValues(v -> v != null); // don't want null values, to avoid accidental entry removal
 
-		AMap<Object, Object> m1 = m.mergeWith(m, (a, b) -> a);
+		AMap<ACell, ACell> m1 = m.mergeWith(m, (a, b) -> a);
 		assertEquals(m, m1);
 
-		AMap<Object, Object> m2 = m.mergeWith(Maps.empty(), (a, b) -> a);
+		AMap<ACell, ACell> m2 = m.mergeWith(Maps.empty(), (a, b) -> a);
 		assertEquals(m, m2);
 
-		AMap<Object, Object> m3 = m.mergeWith(Maps.empty(), (a, b) -> b);
+		AMap<ACell, ACell> m3 = m.mergeWith(Maps.empty(), (a, b) -> b);
 		assertSame(Maps.empty(), m3);
 
 	}
 
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Property
-	public void merging2(@From(MapGen.class) AHashMap<Object, Object> a,
-			@From(MapGen.class) AHashMap<Object, Object> b) {
+	public void merging2(@From(MapGen.class) AHashMap a,
+			@From(MapGen.class) AHashMap b) {
 		long[] c = new long[] { 0L };
 		a.mergeWith(b, (va, vb) -> ((c[0]++ & 1) == 0L) ? va : vb);
 		assertTrue(c[0] >= Math.max(a.count(), b.count()));

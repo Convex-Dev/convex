@@ -14,6 +14,7 @@ import java.util.logging.Logger;
 import convex.core.Constants;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.SignedData;
@@ -178,7 +179,7 @@ public class Convex {
 	 * @param value Value to sign
 	 * @return
 	 */
-	public <T> SignedData<T> signData(T value) {
+	public <T extends ACell> SignedData<T> signData(T value) {
 		return keyPair.signData(value);
 	}
 
@@ -347,7 +348,7 @@ public class Convex {
 	 * @return A Future for the result of the query
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
-	public Future<Result> query(Object query) throws IOException {
+	public Future<Result> query(ACell query) throws IOException {
 		return query(query,getAddress());
 	}
 	
@@ -360,7 +361,7 @@ public class Convex {
 	 * @return A Future for the result of the query
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
-	public Future<Result> query(Object query, Address address) throws IOException {
+	public Future<Result> query(ACell query, Address address) throws IOException {
 		CompletableFuture<Result> cf=new CompletableFuture<Result>();
 		
 		synchronized (awaiting) {
@@ -380,7 +381,7 @@ public class Convex {
 	 * Executes a query synchronously and waits for the Result
 	 * 
 	 */
-	public Result querySync(Object query) throws TimeoutException, IOException, InterruptedException, ExecutionException {
+	public Result querySync(ACell query) throws TimeoutException, IOException, InterruptedException, ExecutionException {
 		return querySync(query,getAddress());
 	}
 	
@@ -392,7 +393,7 @@ public class Convex {
 	 * @return Result of query
 	 * @throws TimeoutException 
 	 */
-	public Result querySync(Object query, long timeoutMillis) throws IOException, InterruptedException, ExecutionException, TimeoutException {
+	public Result querySync(ACell query, long timeoutMillis) throws IOException, InterruptedException, ExecutionException, TimeoutException {
 		return querySync(query,getAddress(),timeoutMillis);
 	}
 
@@ -405,7 +406,7 @@ public class Convex {
 	 * @return Result of query
 	 * @throws TimeoutException 
 	 */
-	public Result querySync(Object query, Address address) throws IOException, InterruptedException, ExecutionException, TimeoutException {
+	public Result querySync(ACell query, Address address) throws IOException, InterruptedException, ExecutionException, TimeoutException {
 		return querySync(query,address,Constants.DEFAULT_CLIENT_TIMEOUT);
 	}
 
@@ -417,7 +418,7 @@ public class Convex {
 	 * @param query Query to execute, as a Form or Op
 	 * @return Result of query
 	 */
-	public Result querySync(Object query, Address address, long timeoutMillis) throws TimeoutException, IOException, InterruptedException, ExecutionException {
+	public Result querySync(ACell query, Address address, long timeoutMillis) throws TimeoutException, IOException, InterruptedException, ExecutionException {
 		return query(query,address).get(timeoutMillis,TimeUnit.MILLISECONDS);
 	}
 

@@ -4,6 +4,7 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
+import convex.core.data.prim.APrimitive;
 import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -12,13 +13,13 @@ import convex.core.data.prim.CVMLong;
  * Generator for arbitrary numeric values
  *
  */
-public class NumericGen extends Generator<Object> {
+public class NumericGen extends Generator<APrimitive> {
 	public NumericGen() {
-		super(Object.class);
+		super(APrimitive.class);
 	}
 
 	@Override
-	public Object generate(SourceOfRandomness r, GenerationStatus status) {
+	public APrimitive generate(SourceOfRandomness r, GenerationStatus status) {
 		int type = r.nextInt(3);
 		switch (type) {
 		case 0:

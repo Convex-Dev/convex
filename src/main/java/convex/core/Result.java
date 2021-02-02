@@ -2,6 +2,7 @@ package convex.core;
 
 import java.nio.ByteBuffer;
 
+import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.ARecordGeneric;
 import convex.core.data.AString;
@@ -28,23 +29,23 @@ public class Result extends ARecordGeneric {
 
 	public static final RecordFormat RESULT_FORMAT=RecordFormat.of(Keywords.ID,Keywords.RESULT,Keywords.ERROR_CODE,Keywords.TRACE);
 	
-	protected Result(AVector<Object> values) {
+	protected Result(AVector<ACell> values) {
 		super(RESULT_FORMAT, values);
 	}
 	
-	public static Result create(AVector<Object> values) {
+	public static Result create(AVector<ACell> values) {
 		return new Result(values);
 	}
 	
-	public static Result create(CVMLong id, Object value, Object errorCode, Object trace) {
+	public static Result create(CVMLong id, ACell value, ACell errorCode, Object trace) {
 		return create(Vectors.of(id,value,errorCode,trace));
 	}
 	
-	public static Result create(CVMLong id, Object value, Object errorCode) {
+	public static Result create(CVMLong id, ACell value, ACell errorCode) {
 		return create(id,value,errorCode,null);
 	}
 
-	public static Result create(CVMLong id, Object value) {
+	public static Result create(CVMLong id, ACell value) {
 		return create(id,value,null,null);
 	}
 
@@ -88,12 +89,12 @@ public class Result extends ARecordGeneric {
 	}
 	
 	@Override
-	public AVector<Object> getValues() {
+	public AVector<ACell> getValues() {
 		return values;
 	}
 
 	@Override
-	protected ARecord withValues(AVector<Object> newValues) {
+	protected ARecord withValues(AVector<ACell> newValues) {
 		if (values==newValues) return this;
 		return new Result(newValues);
 	}
@@ -122,7 +123,7 @@ public class Result extends ARecordGeneric {
 	 * @throws BadFormatException If a Result could not be read
 	 */
 	public static Result read(ByteBuffer bb) throws BadFormatException {
-		AVector<Object> v=Vectors.read(bb);
+		AVector<ACell> v=Vectors.read(bb);
 		if (v.size()!=RESULT_FORMAT.count()) throw new BadFormatException("Invalid number of fields for Result!");
 		
 		return create(v);
@@ -134,7 +135,7 @@ public class Result extends ARecordGeneric {
 
 	public static Result fromContext(CVMLong id,Context<?> ctx) {
 		Object result=ctx.getValue();
-		Object code=null;
+		ACell code=null;
 		Object trace=null;
 		if (result instanceof AExceptional) {
 			AExceptional ex=(AExceptional)result;
@@ -144,11 +145,16 @@ public class Result extends ARecordGeneric {
 				trace=Vectors.create(((ErrorValue)ex).getTrace());
 			}
 		}
-		return create(id,result,code,trace);
+		return create(id,(ACell)result,code,trace);
 	}
 
-	public Result withID(Object id) {
+	public Result withID(ACell id) {
 		return create(values.assoc(0, id));
+	}
+
+	@Override
+	public byte getRecordTag() {
+		return Tag.RESULT;
 	}
 
 

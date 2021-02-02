@@ -14,7 +14,7 @@ import convex.core.exceptions.TODOException;
  *
  * @param <V>
  */
-public abstract class ABlobMap<K extends ABlob, V> extends AMap<K, V> {
+public abstract class ABlobMap<K extends ABlob, V extends ACell> extends AMap<K, V> {
 	protected ABlobMap(long count) {
 		super(count);
 	}
@@ -26,7 +26,7 @@ public abstract class ABlobMap<K extends ABlob, V> extends AMap<K, V> {
 	}
 
 	@Override
-	public boolean containsKey(Object key) {
+	public boolean containsKey(ACell key) {
 		if (!(key instanceof ABlob)) return false;
 		return (getEntry((ABlob) key) != null);
 	}
@@ -60,7 +60,7 @@ public abstract class ABlobMap<K extends ABlob, V> extends AMap<K, V> {
 	public abstract int getRefCount();
 
 	@Override
-	public abstract <R> Ref<R> getRef(int i);
+	public abstract <R extends ACell> Ref<R> getRef(int i);
 
 	@Override
 	public boolean isCanonical() {

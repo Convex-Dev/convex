@@ -1,5 +1,6 @@
 package convex.core.lang;
 
+import convex.core.data.ACell;
 import convex.core.data.Syntax;
 import org.junit.jupiter.api.Test;
 import org.parboiled.Parboiled;
@@ -18,9 +19,8 @@ public class ScryptNextTest {
         return Parboiled.createParser(ScryptNext.class);
     }
 
-    @SuppressWarnings("rawtypes")
     static Object parse(Rule rule, String source) {
-        var result = new ReportingParseRunner(rule).run(source);
+        var result = new ReportingParseRunner<ACell>(rule).run(source);
 
         if (result.matched) {
             return Syntax.unwrapAll(result.resultValue);
@@ -34,25 +34,25 @@ public class ScryptNextTest {
     }
 
     @SuppressWarnings("unchecked")
-    public static <T> Context<T> step(Context<?> c, String source) {
+    public static <T extends ACell> Context<T> step(Context<?> c, String source) {
         c=c.fork();
     	Syntax syn = ScryptNext.readSyntax(source);
 
-        Context<AOp<Object>> cctx = c.expandCompile(syn);
+        Context<AOp<ACell>> cctx = c.expandCompile(syn);
 
         if (cctx.isExceptional()) return (Context<T>) cctx;
 
-        AOp<Object> op = cctx.getResult();
+        AOp<ACell> op = cctx.getResult();
 
         return (Context<T>) c.run(op);
     }
 
-    public static <T> Context<T> step(String source) {
+    public static <T extends ACell> Context<T> step(String source) {
         return step(CONTEXT, source);
     }
 
     @SuppressWarnings("unchecked")
-    public static <T> T eval(String source) {
+    public static <T extends ACell> T eval(String source) {
         return (T) step(CONTEXT, source).getResult();
     }
 

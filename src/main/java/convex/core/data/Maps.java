@@ -16,16 +16,16 @@ public class Maps {
 	private static final Ref<?> EMPTY_REF = EMPTY_MAP.getRef();
 
 	@SuppressWarnings("unchecked")
-	public static <K, V, R extends AHashMap<K, V>> R empty() {
+	public static <K extends ACell, V extends ACell, R extends AHashMap<K, V>> R empty() {
 		return (R) EMPTY_MAP;
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <K, V, R extends AMap<K, V>> Ref<R> emptyRef() {
+	public static <K extends ACell, V extends ACell, R extends AMap<K, V>> Ref<R> emptyRef() {
 		return (Ref<R>) EMPTY_REF;
 	}
 
-	public static <K, V> MapLeaf<K, V> create(K k, V v) {
+	public static <K extends ACell, V extends ACell> MapLeaf<K, V> create(K k, V v) {
 		return MapLeaf.create(MapEntry.create(k, v));
 	}
 
@@ -39,7 +39,7 @@ public class Maps {
 	 * @return Map with given keys and values
 	 */
 	@SuppressWarnings("unchecked")
-	public static <R extends AHashMap<K, V>, K, V> R of(Object... keysAndValues) {
+	public static <R extends AHashMap<K, V>, K extends ACell, V extends ACell> R of(Object... keysAndValues) {
 		int n = keysAndValues.length >> 1;
 		if (keysAndValues.length != n * 2)
 			throw new IllegalArgumentException("Even number of values need for key-value pairs");
@@ -75,7 +75,7 @@ public class Maps {
 	 * @param entries
 	 * @return AHashMap instance
 	 */
-	public static <K, V> AHashMap<K, V> create(java.util.List<MapEntry<K, V>> entries) {
+	public static <K extends ACell, V extends ACell> AHashMap<K, V> create(java.util.List<MapEntry<K, V>> entries) {
 		return createWithShift(0, entries);
 	}
 
@@ -88,7 +88,7 @@ public class Maps {
 	 * @param entries
 	 * @return AHashMap instance
 	 */
-	public static <K, V> AHashMap<K, V> createWithShift(int shift, java.util.List<MapEntry<K, V>> entries) {
+	public static <K extends ACell, V extends ACell> AHashMap<K, V> createWithShift(int shift, java.util.List<MapEntry<K, V>> entries) {
 		int n = entries.size();
 		if (n == 0) return empty();
 		AHashMap<K, V> result = Maps.empty();
@@ -99,7 +99,7 @@ public class Maps {
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <K, V, R extends AMap<K, V>> R coerce(AMap<?, ?> m) {
+	public static <K extends ACell, V extends ACell, R extends AMap<K, V>> R coerce(AMap<?, ?> m) {
 		return (R) m;
 	}
 
@@ -111,7 +111,7 @@ public class Maps {
 	 * @return
 	 * @throws BadFormatException
 	 */
-	public static <K, V> AHashMap<K, V> read(ByteBuffer bb) throws BadFormatException {
+	public static <K extends ACell, V extends ACell> AHashMap<K, V> read(ByteBuffer bb) throws BadFormatException {
 		long count = Format.readVLCLong(bb);
 		if (count <= MapLeaf.MAX_ENTRIES) {
 			return MapLeaf.read(bb, count,true);
@@ -128,7 +128,7 @@ public class Maps {
 	 * @return
 	 * @throws BadFormatException
 	 */
-	public static <K, V> AHashMap<K, V> readSet(ByteBuffer bb) throws BadFormatException {
+	public static <K extends ACell, V extends ACell> AHashMap<K, V> readSet(ByteBuffer bb) throws BadFormatException {
 		long count = Format.readVLCLong(bb);
 		if (count <= MapLeaf.MAX_ENTRIES) {
 			return MapLeaf.read(bb, count,false);

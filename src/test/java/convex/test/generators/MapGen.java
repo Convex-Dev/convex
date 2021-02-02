@@ -4,6 +4,7 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
+import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.Maps;
@@ -31,8 +32,8 @@ public class MapGen extends Generator<AHashMap> {
     		case 2: return Samples.LONG_MAP_10;
     		case 3: return Samples.LONG_MAP_100;
     		case 4: {
-    			Object o1=gen().make(PrimitiveGen.class).generate(r, status);
-    			Object o2=gen().make(StringGen.class).generate(r, status);
+    			ACell o1=gen().make(PrimitiveGen.class).generate(r, status);
+    			ACell o2=gen().make(StringGen.class).generate(r, status);
     			return Maps.create(o1,o2);
     		}
     		

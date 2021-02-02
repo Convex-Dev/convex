@@ -26,7 +26,7 @@ import convex.core.util.Utils;
  * 
  * @param <T>
  */
-public class RefSoft<T> extends Ref<T> {
+public class RefSoft<T extends ACell> extends Ref<T> {
 
 	static final int ENCODING_LENGTH = Hash.LENGTH+1;
 	
@@ -48,7 +48,7 @@ public class RefSoft<T> extends Ref<T> {
 		this(new SoftReference<T>(null), hash, UNKNOWN);
 	}
 
-	public static <T> RefSoft<T> create(T value, Hash hash, int status) {
+	public static <T extends ACell> RefSoft<T> create(T value, Hash hash, int status) {
 		return new RefSoft<T>(value, hash, status);
 	}
 
@@ -62,7 +62,7 @@ public class RefSoft<T> extends Ref<T> {
 	 * @param hash Hash ID of value.
 	 * @return New RefSoft instance
 	 */
-	public static <T> RefSoft<T> create(Hash hash) {
+	public static <T extends ACell> RefSoft<T> create(Hash hash) {
 		return new RefSoft<T>(hash);
 	}
 

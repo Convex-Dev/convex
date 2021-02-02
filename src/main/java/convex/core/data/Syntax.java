@@ -2,6 +2,7 @@ package convex.core.data;
 
 import java.nio.ByteBuffer;
 
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
@@ -26,20 +27,20 @@ public class Syntax extends ACell {
 	/**
 	 * Ref to the unwrapped datum value. Cannot refer to another Syntax object
 	 */
-	private final Ref<Object> datumRef;
+	private final Ref<ACell> datumRef;
 
 	/** 
 	 * Metadata map
 	 * If empty, gets encoded as null in byte encoding
 	 */
-	private final AHashMap<Object, Object> meta;
+	private final AHashMap<ACell, ACell> meta;
 
-	private Syntax(Ref<Object> datumRef, AHashMap<Object, Object> props) {
+	private Syntax(Ref<ACell> datumRef, AHashMap<ACell, ACell> props) {
 		this.datumRef = datumRef;
 		this.meta = props;
 	}
 	
-	public static Syntax createUnchecked(Object value, AHashMap<Object, Object> meta) {
+	public static Syntax createUnchecked(ACell value, AHashMap<ACell, ACell> meta) {
 		return new Syntax(Ref.get(value),meta);
 	}
 
@@ -50,7 +51,7 @@ public class Syntax extends ACell {
 	 * @param metadata to merge, may be null
 	 * @return Syntax instance
 	 */
-	public static Syntax create(Object value, AHashMap<Object, Object> meta) {
+	public static Syntax create(ACell value, AHashMap<ACell, ACell> meta) {
 		if (value instanceof Syntax) {
 			Syntax stx=((Syntax) value);
 			if (meta==null) return stx;
@@ -64,12 +65,22 @@ public class Syntax extends ACell {
 	/**
 	 * Wraps a value as a Syntax Object with empty metadata. Does not change existing Syntax objects.
 	 * 
-	 * @param value
+	 * @param value Any CVM value
+	 * @return Syntax instance
+	 */
+	public static Syntax create(ACell value) {
+		if (value instanceof Syntax) return (Syntax) value;
+		return create(value, Maps.empty());
+	}
+	
+	/**
+	 * Wraps a value as a Syntax Object with empty metadata. Does not change existing Syntax objects.
+	 * 
+	 * @param value Any value, will be converted to valid CVM type
 	 * @return Syntax instance
 	 */
 	public static Syntax create(Object value) {
-		if (value instanceof Syntax) return (Syntax) value;
-		return create(value, Maps.empty());
+		return create(RT.cvm(value));
 	}
 	
 	/**
@@ -98,20 +109,26 @@ public class Syntax extends ACell {
 	 * 
 	 * @return Metadata for this Syntax Object as a hashmap
 	 */
-	public AHashMap<Object, Object> getMeta() {
+	public AHashMap<ACell, ACell> getMeta() {
 		return meta;
 	}
 
 	public Long getStart() {
-		return (Long) meta.get(Keywords.START);
+		Object v= meta.get(Keywords.START);
+		if (v instanceof CVMLong) return ((CVMLong)v).longValue();
+		return null;
 	}
 
 	public Long getEnd() {
-		return (Long) meta.get(Keywords.END);
+		Object v= meta.get(Keywords.END);
+		if (v instanceof CVMLong) return ((CVMLong)v).longValue();
+		return null;
 	}
 
 	public String getSource() {
-		return (String) meta.get(Keywords.SOURCE);
+		Object v= meta.get(Keywords.SOURCE);
+		if (v instanceof AString) return v.toString();
+		return null;
 	}
 
 	@Override
@@ -120,8 +137,8 @@ public class Syntax extends ACell {
 	}
 
 	public static Syntax read(ByteBuffer bb) throws BadFormatException {
-		Ref<Object> datum = Format.readRef(bb);
-		AHashMap<Object, Object> props = Format.read(bb);
+		Ref<ACell> datum = Format.readRef(bb);
+		AHashMap<ACell, ACell> props = Format.read(bb);
 		if (props == null) {
 			props = Maps.empty(); // we encode empty props as null for efficiency
 		} else {
@@ -196,7 +213,7 @@ public class Syntax extends ACell {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		if (i == 0) return (Ref<R>) datumRef;
 		return meta.getRef(i - 1);
 	}
@@ -205,8 +222,8 @@ public class Syntax extends ACell {
 	@Override
 	public Syntax updateRefs(IRefFunction func) {
 		@SuppressWarnings("unchecked")
-		Ref<Object> newDatum = (Ref<Object>)func.apply(datumRef);
-		AHashMap<Object, Object> newMeta = meta.updateRefs(func);
+		Ref<ACell> newDatum = (Ref<ACell>)func.apply(datumRef);
+		AHashMap<ACell, ACell> newMeta = meta.updateRefs(func);
 		if ((datumRef == newDatum) && (meta == newMeta)) return this;
 		return new Syntax(newDatum, newMeta);
 	}
@@ -217,8 +234,8 @@ public class Syntax extends ACell {
 	 * @param additionalMetadata
 	 * @return Syntax Object with updated metadata
 	 */
-	public Syntax mergeMeta(AHashMap<Object, Object> additionalMetadata) {
-		AHashMap<Object, Object> mm = meta;
+	public Syntax mergeMeta(AHashMap<ACell, ACell> additionalMetadata) {
+		AHashMap<ACell, ACell> mm = meta;
 		mm = mm.merge(additionalMetadata);
 		return this.withMeta(mm);
 	}
@@ -229,7 +246,7 @@ public class Syntax extends ACell {
 	 * @param newMetadata
 	 * @return Syntax Object with updated metadata
 	 */
-	public Syntax withMeta(AHashMap<Object, Object> newMetadata) {
+	public Syntax withMeta(AHashMap<ACell, ACell> newMetadata) {
 		if (meta == newMetadata) return this;
 		return new Syntax(datumRef, newMetadata);
 	}
@@ -239,7 +256,7 @@ public class Syntax extends ACell {
 	 * @param newValue
 	 * @return new Syntax Object
 	 */
-	public Syntax withValue(Object newValue) {
+	public Syntax withValue(ACell newValue) {
 		return create(newValue,meta);
 	}
 
@@ -271,7 +288,7 @@ public class Syntax extends ACell {
 	 * @return Unwrapped object
 	 */
 	@SuppressWarnings("unchecked")
-	public static <R> R unwrapAll(Object maybeSyntax) {
+	public static <R extends ACell> R unwrapAll(ACell maybeSyntax) {
 		Object a = unwrap(maybeSyntax);
 
 		if (a instanceof ADataStructure) {
@@ -281,7 +298,7 @@ public class Syntax extends ACell {
 				AMap<?, ?> m = (AMap<?, ?>) a;
 				return (R) m.reduceEntries((acc, e) -> {
 					return acc.assoc(unwrapAll(e.getKey()), unwrapAll(e.getValue()));
-				}, (AMap<Object, Object>) Maps.empty());
+				}, (AMap<ACell, ACell>) Maps.empty());
 			} else {
 				throw new Error("Don't know how to unrap data structure of type: "+Utils.getClassName(a));
 			}

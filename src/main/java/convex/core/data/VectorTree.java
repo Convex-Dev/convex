@@ -40,7 +40,7 @@ import convex.core.util.Utils;
  * 
  * @param <T>
  */
-public class VectorTree<T> extends ASizedVector<T> {
+public class VectorTree<T extends ACell> extends ASizedVector<T> {
 
 	public static final int MINIMUM_SIZE = 2 * Vectors.CHUNK_SIZE;
 	private final int shift; // bits in each child block
@@ -102,7 +102,7 @@ public class VectorTree<T> extends ASizedVector<T> {
 	 * @param length
 	 * @return New TreeVector instance
 	 */
-	public static <T> VectorTree<T> create(Object[] things, int offset, int length) {
+	public static <T extends ACell> VectorTree<T> create(Object[] things, int offset, int length) {
 		if (length < MINIMUM_SIZE)
 			throw new IllegalArgumentException("Can't create BlockVector with insufficient size: " + length);
 		if ((length & Vectors.BITMASK) != 0)
@@ -137,20 +137,23 @@ public class VectorTree<T> extends ASizedVector<T> {
 		return children[b].getValue().getElementRef(i - b * bSize);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public AVector<T> assoc(long i, T value) {
+	public <R extends ACell> AVector<R> assoc(long i, R value) {
 		if ((i < 0) || (i > count)) throw new IndexOutOfBoundsException("Index: " + i);
 		if (i==count) return conj(value);
+		
+		Ref<AVector<R>>[] rchildren=(Ref[])children;
 
 		long bSize = 1L << shift; // size of a fully packed block
 		int b = (int) (i >> shift);
-		AVector<T> oc = children[b].getValue();
-		AVector<T> nc = oc.assoc(i - (b * bSize), value);
-		if (oc == nc) return this;
+		AVector<R> oc = rchildren[b].getValue();
+		AVector<R> nc = oc.assoc(i - (b * bSize), value);
+		if (oc == nc) return (AVector<R>) this;
 
-		Ref<AVector<T>>[] newChildren = children.clone();
+		Ref<AVector<R>>[] newChildren = rchildren.clone();
 		newChildren[b] = nc.getRef();
-		return new VectorTree<T>(newChildren, count);
+		return new VectorTree<R>(newChildren, count);
 	}
 
 	@Override
@@ -187,29 +190,15 @@ public class VectorTree<T> extends ASizedVector<T> {
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> VectorTree<T> read(ByteBuffer bb, long count)
+	public static <T extends ACell> VectorTree<T> read(ByteBuffer bb, long count)
 			throws BadFormatException, BufferUnderflowException {
 		if (count < 0) throw new BadFormatException("Negative count?");
 		int n = computeArraySize(count);
 		Ref<AVector<T>>[] items = (Ref<AVector<T>>[]) new Ref<?>[n];
 		for (int i = 0; i < n; i++) {
 			// TODO: this needs cleanup!
-			Object o = Format.read(bb);
-			Ref<AVector<T>> ref;
-			if (!(o instanceof Ref)) {
-				// must be embedded so need to check consistency
-				if (!(o instanceof AVector)) throw new BadFormatException("Expected vector child but got: " + o);
-				AVector<T> cv=(AVector<T>)o;
-				long cl=cv.count();
-				long expectedChildSize=childSize(count,i);
-				if (cl!=expectedChildSize) {
-					throw new BadFormatException("Expected child length: " + expectedChildSize + " but got "+cl);
-				}
-				ref=cv.getRef();
-			} else {
-				// assume we have a ref to a vector
-				ref = (Ref<AVector<T>>) o;
-			}
+			Ref<AVector<T>> ref = Format.readRef(bb);
+			
 			items[i] = ref;
 		}
 
@@ -278,22 +267,23 @@ public class VectorTree<T> extends ASizedVector<T> {
 		return new VectorLeaf(new Ref[] { Ref.get(value) }, this.getRef(), count + 1);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public AVector<T> concat(ASequence<T> b) {
+	public <R extends ACell> AVector<R> concat(ASequence<R> b) {
 		long bLen = b.count();
-		VectorTree<T> result = this;
+		VectorTree<R> result = (VectorTree<R>) this;
 		long bi = 0;
 		while (bi < bLen) {
 			if ((bi + Vectors.CHUNK_SIZE) <= bLen) {
 				// can append a whole chunk
-				VectorLeaf<T> chunk = (VectorLeaf<T>) b.subVector(bi, Vectors.CHUNK_SIZE);
+				VectorLeaf<R> chunk = (VectorLeaf<R>) b.subVector(bi, Vectors.CHUNK_SIZE);
 				result = result.appendChunk(chunk);
 				bi += Vectors.CHUNK_SIZE;
 			} else {
 				// we have less than a chunk left, so final result must be a ListVector with the
 				// current result as tail
 				VectorLeaf<T> head = (VectorLeaf<T>) b.subVector(bi, bLen - bi);
-				return head.withPrefix(result);
+				return ((VectorLeaf<R>)head).withPrefix(result);
 			}
 		}
 		return result;
@@ -308,7 +298,7 @@ public class VectorTree<T> extends ASizedVector<T> {
 	 * @return
 	 */
 	@SuppressWarnings("unchecked")
-	static <T> VectorTree<T> wrap2(VectorLeaf<T> head, VectorLeaf<T> tail) {
+	static <T extends ACell> VectorTree<T> wrap2(VectorLeaf<T> head, VectorLeaf<T> tail) {
 		Ref<AVector<T>>[] newBlocks = new Ref[2];
 		newBlocks[0] = tail.getRef();
 		newBlocks[1] = head.getRef();
@@ -473,7 +463,7 @@ public class VectorTree<T> extends ASizedVector<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R> AVector<R> map(Function<? super T, ? extends R> mapper) {
+	public <R extends ACell> AVector<R> map(Function<? super T, ? extends R> mapper) {
 		int blength = children.length;
 		Ref<AVector<R>>[] newBlocks = (Ref<AVector<R>>[]) new Ref<?>[blength];
 		for (int i = 0; i < blength; i++) {
@@ -554,10 +544,11 @@ public class VectorTree<T> extends ASizedVector<T> {
 		return true;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public final AVector<T> toVector() {
+	public final <R extends ACell> AVector<R> toVector() {
 		assert (isCanonical());
-		return this;
+		return (AVector<R>) this;
 	}
 
 	@Override
@@ -567,7 +558,7 @@ public class VectorTree<T> extends ASizedVector<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		int ic = children.length;
 		if (i < 0) throw new IndexOutOfBoundsException("Negative Ref index: " + i);
 		if (i < ic) return (Ref<R>) children[i];
@@ -677,14 +668,18 @@ public class VectorTree<T> extends ASizedVector<T> {
 		if (blen < 2) throw new InvalidDataException("Insufficient children: " + blen, this);
 		long bsize = childSize();
 		for (int i = 0; i < blen; i++) {
-			AVector<T> b = children[i].getValue();
+			ACell ch = children[i].getValue();
+			if (!(ch instanceof AVector)) throw new InvalidDataException("Child "+i+" is not a vector!",this);
+			@SuppressWarnings("unchecked")
+			AVector<T> b=(AVector<T>)ch;
+			
 			b.validate();
-			if (i < (blen - 1)) {
-				if (bsize != b.count()) {
-					throw new InvalidDataException("Expected block size: " + bsize + " for blocks[" + i + "] but was: "
-							+ b.count() + " in BlockVector of size: " + count, this);
-				}
+			long expectedChildSize=childSize(count,i);	
+			if (expectedChildSize != b.count()) {
+				throw new InvalidDataException("Expected block size: " + bsize + " for blocks[" + i + "] but was: "
+						+ b.count() + " in BlockVector of size: " + count, this);
 			}
+
 			c += b.count();
 		}
 		if (c != count) {

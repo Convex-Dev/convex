@@ -4,6 +4,7 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
+import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.MapEntry;
 import convex.core.data.Vectors;
@@ -51,8 +52,8 @@ public class VectorGen extends Generator<AVector> {
 		case 7:
 			return Vectors.empty();
 		case 8: {
-			Object o1 = gen().make(ValueGen.class).generate(r, status);
-			Object o2 = gen().make(ValueGen.class).generate(r, status);
+			ACell o1 = gen().make(ValueGen.class).generate(r, status);
+			ACell o2 = gen().make(ValueGen.class).generate(r, status);
 			return MapEntry.create(o1, o2);
 		}
 		default: {

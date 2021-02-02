@@ -568,10 +568,12 @@ public class Format {
 	 *                            object is found.
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> Ref<T> readRef(ByteBuffer bb) throws BadFormatException {
-		T o = (T) Format.read(bb);
-		if (o instanceof Ref) return (Ref<T>) o;
-		return Ref.get(o);
+	public static <T extends ACell> Ref<T> readRef(ByteBuffer bb) throws BadFormatException {
+		byte tag=bb.get();
+		if (tag==Tag.REF) return Ref.readRaw(bb);
+		ACell cell= Format.read(tag,bb);
+		if (cell==null) return (Ref<T>) Ref.NULL_VALUE;
+		return cell.getRef();
 	}
 
 	@SuppressWarnings("unchecked")
@@ -613,7 +615,7 @@ public class Format {
 		}
 
 		if (tag == Tag.EXPANDER) {
-			AFn<Object> fn = read(bb);
+			AFn<ACell> fn = read(bb);
 			if (fn == null) throw new BadFormatException("Can't create expander with null function");
 			return Expander.wrap(fn);
 		}
@@ -630,7 +632,7 @@ public class Format {
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> T read(Blob blob) throws BadFormatException {
+	public static <T extends ACell> T read(Blob blob) throws BadFormatException {
 		byte tag = blob.get(0);
 		if (tag == Tag.BLOB) {
 			return (T) Blobs.readFromBlob(blob);
@@ -657,7 +659,7 @@ public class Format {
 		}
 	}
 
-	public static <T> T read(String hexString) throws BadFormatException {
+	public static <T extends ACell> T read(String hexString) throws BadFormatException {
 		return read(Blob.fromHex(hexString));
 	}
 
@@ -730,15 +732,15 @@ public class Format {
 	 * @return Value read from the ByteBuffer
 	 * @throws BadFormatException
 	 */
-	@SuppressWarnings("unchecked")
-	public static <T extends AObject> T read(ByteBuffer bb) throws BadFormatException, BufferUnderflowException {
+	public static <T extends ACell> T read(ByteBuffer bb) throws BadFormatException, BufferUnderflowException {
 		byte tag = bb.get();
-
+		return read(tag,bb);
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> T read(byte tag,ByteBuffer bb) throws BadFormatException, BufferUnderflowException {
 		try {
-			// put this first, probably the most common, for performance
-			if (tag == Tag.REF) return (T) Ref.readRaw(bb);
-
-			if ((tag & 0xF0) == 0x00) return (T) readBasicType(bb, tag);
+			if ((tag & 0xF0) == 0x00) return readBasicType(bb, tag);
 
 			if (tag == Tag.STRING) return (T) Strings.read(bb);
 			if (tag == Tag.BLOB) return (T) Blobs.read(bb);

@@ -12,18 +12,18 @@ import convex.core.exceptions.TODOException;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
-public abstract class AMapEntry<K, V> extends AVector<Object> implements List<Object>, Map.Entry<K, V> {
+public abstract class AMapEntry<K extends ACell, V extends ACell> extends AVector<ACell> implements List<ACell>, Map.Entry<K, V> {
 
 	@Override
-	public abstract Object get(long i);
+	public abstract ACell get(long i);
 
 	@Override
-	public final AVector<Object> appendChunk(VectorLeaf<Object> listVector) {
+	public final AVector<ACell> appendChunk(VectorLeaf<ACell> listVector) {
 		throw new IllegalArgumentException("Can't append chunk to a MapEntry of size: 2");
 	}
 
 	@Override
-	public final VectorLeaf<Object> getChunk(long offset) {
+	public final VectorLeaf<ACell> getChunk(long offset) {
 		throw new IllegalStateException("Can only get full chunk");
 	}
 
@@ -36,7 +36,7 @@ public abstract class AMapEntry<K, V> extends AVector<Object> implements List<Ob
 	public abstract int getRefCount();
 
 	@Override
-	public abstract <R> Ref<R> getRef(int i);
+	public abstract <R extends ACell> Ref<R> getRef(int i);
 
 	@Override
 	public abstract K getKey();
@@ -53,27 +53,27 @@ public abstract class AMapEntry<K, V> extends AVector<Object> implements List<Ob
 	public abstract boolean isCanonical();
 
 	@Override
-	public AVector<Object> append(Object value) {
+	public AVector<ACell> append(ACell value) {
 		return toVector().append(value);
 	}
 
 	@Override
-	public Spliterator<Object> spliterator(long position) {
+	public Spliterator<ACell> spliterator(long position) {
 		return toVector().spliterator(position);
 	}
 
 	@Override
-	public ListIterator<Object> listIterator(long index) {
+	public ListIterator<ACell> listIterator(long index) {
 		return toVector().listIterator(index);
 	}
 
 	@Override
-	public ListIterator<Object> listIterator() {
+	public ListIterator<ACell> listIterator() {
 		return toVector().listIterator();
 	}
 
 	@Override
-	public Iterator<Object> iterator() {
+	public Iterator<ACell> iterator() {
 		return toVector().iterator();
 	}
 
@@ -88,7 +88,7 @@ public abstract class AMapEntry<K, V> extends AVector<Object> implements List<Ob
 	}
 
 	@Override
-	public long commonPrefixLength(AVector<Object> b) {
+	public long commonPrefixLength(AVector<ACell> b) {
 		if (b == this) return 2;
 		long bc = b.count();
 		if (bc == 0) return 0;
@@ -117,7 +117,7 @@ public abstract class AMapEntry<K, V> extends AVector<Object> implements List<Ob
 	protected abstract AMapEntry<K, V> withValue(V value);
 
 	@Override
-	public AVector<Object> next() {
+	public AVector<ACell> next() {
 		return Vectors.of(getValue());
 	}
 
@@ -130,22 +130,22 @@ public abstract class AMapEntry<K, V> extends AVector<Object> implements List<Ob
 	}
 
 	@Override
-	public final Object set(int index, Object element) {
+	public final ACell set(int index, ACell element) {
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	public boolean anyMatch(Predicate<? super Object> pred) {
+	public boolean anyMatch(Predicate<? super ACell> pred) {
 		return toVector().anyMatch(pred);
 	}
 
 	@Override
-	public boolean allMatch(Predicate<? super Object> pred) {
+	public boolean allMatch(Predicate<? super ACell> pred) {
 		return toVector().allMatch(pred);
 	}
 
 	@Override
-	public void forEach(Consumer<? super Object> action) {
+	public void forEach(Consumer<? super ACell> action) {
 		action.accept(getKey());
 		action.accept(getValue());
 	}

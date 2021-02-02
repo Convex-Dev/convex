@@ -1,5 +1,6 @@
 package convex.core.lang.expanders;
 
+import convex.core.data.ACell;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Tag;
@@ -57,7 +58,7 @@ public abstract class CoreExpander extends BaseExpander implements ICoreDef {
 	}
 
 	@Override
-	public abstract Context<Syntax> expand(Object form, AExpander cont, Context<?> context);
+	public abstract Context<Syntax> expand(ACell form, AExpander cont, Context<?> context);
 
 	@Override
 	public void validateCell() throws InvalidDataException {

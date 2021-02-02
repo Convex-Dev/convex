@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 
 import convex.core.data.Ref;
+import convex.core.lang.RT;
 import convex.core.store.Stores;
 import convex.net.Connection;
 import convex.peer.Server;
@@ -33,8 +34,8 @@ public class ClientApp {
 		}, Stores.current());
 
 		// send a couple of queries, wait for results
-		pc.sendQuery("A beautiful life - something special - a magic moment");
-		pc.sendQuery(1L);
+		pc.sendQuery(RT.cvm("A beautiful life - something special - a magic moment"));
+		pc.sendQuery(RT.cvm(1L));
 		Thread.sleep(3000);
 		pc.close();
 

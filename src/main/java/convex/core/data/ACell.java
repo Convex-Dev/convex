@@ -300,7 +300,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @param i Index of ref to get
 	 * @return The Ref at the specified index
 	 */
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		if (getRefCount()==0) {
 			throw new IndexOutOfBoundsException("No Refs to get in "+Utils.getClassName(this));
 		} else {
@@ -334,7 +334,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return Array of Refs
 	 */
 	@SuppressWarnings("unchecked")
-	public <R> Ref<R>[] getChildRefs() {
+	public <R extends ACell> Ref<R>[] getChildRefs() {
 		int n = getRefCount();
 		Ref<R>[] refs = new Ref[n];
 		for (int i = 0; i < n; i++) {

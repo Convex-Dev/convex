@@ -1080,11 +1080,11 @@ public class Utils {
 		return count[0];
 	}
 
-	public static <R> Ref<R> getRef(Object o, int i) {
+	public static <R extends ACell> Ref<R> getRef(Object o, int i) {
 		if (o instanceof ACell) {
 			return ((ACell) o).getRef(i);
 		}
-		throw new IllegalArgumentException("Bad ref index: " + i);
+		throw new IllegalArgumentException("Bad ref index: " + i+ " on object of class "+getClassName(o));
 	}
 
 	@SuppressWarnings("unchecked")

@@ -2,6 +2,7 @@ package convex.core;
 
 import java.time.Instant;
 
+import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Maps;
 import convex.core.data.Symbol;
@@ -58,7 +59,7 @@ public class Constants {
 
 	public static final long MAX_DEPTH = 256;
 
-	public static final AHashMap<Symbol, Object> INITIAL_GLOBALS = Maps.of(Symbols.TIMESTAMP,
+	public static final AHashMap<Symbol, ACell> INITIAL_GLOBALS = Maps.of(Symbols.TIMESTAMP,
 			Constants.INITIAL_TIMESTAMP, Symbols.FEES, 0L, Symbols.JUICE_PRICE, Constants.INITIAL_JUICE_PRICE);
 
 

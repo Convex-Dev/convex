@@ -24,6 +24,7 @@ import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.WalletEntry;
+import convex.core.data.ACell;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.store.Stores;
@@ -215,7 +216,7 @@ public class PeerManager extends JPanel {
 	 * @param code
 	 * @param receiveAction
 	 */
-	public static CompletableFuture<Result> execute(WalletEntry we, Object code) {
+	public static CompletableFuture<Result> execute(WalletEntry we, ACell code) {
 		Address address = we.getAddress();
 		AccountStatus as = getLatestState().getAccount(address);
 		long sequence = as.getSequence() + 1;

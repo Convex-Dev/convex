@@ -24,14 +24,14 @@ public class SetsTest {
 
 	@Test
 	public void testEmptySet() {
-		ASet<Object> e = Sets.empty();
+		ASet<ACell> e = Sets.empty();
 		assertEquals(0, e.size());
 		assertFalse(e.contains(null));
 	}
 
 	@Test
 	public void testIncludeExclude() {
-		ASet<Object> s = Sets.empty();
+		ASet<ACell> s = Sets.empty();
 		assertEquals("#{}", s.toString());
 		s = s.include(RT.cvm(1L));
 		assertEquals("#{1}", s.toString());
@@ -50,7 +50,7 @@ public class SetsTest {
 	public void testPrimitiveEquality() {
 		// different primitive objects with same numeric value should not collide in set
 		CVMByte b=CVMByte.create(1);
-		ASet<Object> s=Sets.of(1L).include(b);
+		ASet<ACell> s=Sets.of(1L).include(b);
 		assertEquals(2L,s.count());
 		
 		assertEquals(Sets.of(b, 1L), s);
@@ -118,21 +118,21 @@ public class SetsTest {
 
 	@Test
 	public void regressionNils() throws InvalidDataException {
-		AMap<Object, Object> m = Maps.of(null, null);
+		AMap<ACell, ACell> m = Maps.of(null, null);
 		assertEquals(1, m.size());
 		assertTrue(m.containsKey(null));
 
-		ASet<Object> s = Sets.of(m);
+		ASet<ACell> s = Sets.of(m);
 		s.validate();
-		s = s.include((Object) m);
+		s = s.include( m);
 		s.validate();
 	}
 
 	@Test
 	public void testMergingIdentity() {
 		ASet<CVMLong> a = Sets.of(1L, 2L, 3L);
-		assertTrue(a == a.include(RT.cvm(2L)));
-		assertTrue(a == a.includeAll(Sets.of(1L, 3L)));
+		assertSame(a, a.include(RT.cvm(2L)));
+		assertSame(a, a.includeAll(Sets.of(1L, 3L)));
 	}
 	
 	@Test
@@ -177,7 +177,7 @@ public class SetsTest {
 
 	@Test
 	public void testBadStructure() {
-		AHashMap<CVMLong, Object> m = Maps.of(1L, true, 3L, false);
+		AHashMap<CVMLong, ACell> m = Maps.of(1L, true, 3L, false);
 		Set<CVMLong> s = Set.wrap(m);
 
 		// should not be identical, different hashes

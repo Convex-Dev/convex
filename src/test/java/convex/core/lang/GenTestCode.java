@@ -10,6 +10,7 @@ import com.pholser.junit.quickcheck.From;
 import com.pholser.junit.quickcheck.Property;
 
 import convex.core.Init;
+import convex.core.data.ACell;
 import convex.core.data.Syntax;
 import convex.core.exceptions.ParseException;
 import convex.test.generators.FormGen;
@@ -17,7 +18,7 @@ import convex.test.generators.FormGen;
 public class GenTestCode {
 
 	@Property
-	public void testExpand(@From(FormGen.class) Object form) {
+	public void testExpand(@From(FormGen.class) ACell form) {
 		Context<?> ctx = Context.createFake(Init.STATE, Init.HERO);
 		ctx = ctx.expand(form);
 		

@@ -1,5 +1,7 @@
 package convex.core.lang.impl;
 
+import convex.core.data.ACell;
+
 /**
  * Abstract base class for exceptional return values.
  * 
@@ -19,12 +21,12 @@ public abstract class AExceptional {
 	 * Returns the Error code for this exceptional value
 	 * @return
 	 */
-	public abstract Object getCode();
+	public abstract ACell getCode();
 
 	/**
 	 * Gets the message for an exceptional value. May or may not be meaningful.
 	 * @return
 	 */
-	public abstract Object getMessage();
+	public abstract ACell getMessage();
 
 }

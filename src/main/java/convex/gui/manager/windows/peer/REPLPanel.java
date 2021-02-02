@@ -29,6 +29,7 @@ import convex.api.Convex;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.WalletEntry;
+import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
@@ -191,7 +192,7 @@ public class REPLPanel extends JPanel {
 			outputArea.append(s);
 			outputArea.append("\n");
 			try {
-				Object message = Reader.read(s);
+				ACell message = Reader.read(s);
 				Future<Result> future;
 				String mode = execPanel.getMode();
 				if (mode.equals("Query")) {

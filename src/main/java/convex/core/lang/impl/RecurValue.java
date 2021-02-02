@@ -1,6 +1,7 @@
 package convex.core.lang.impl;
 
 import convex.core.ErrorCodes;
+import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.lang.RT;
 
@@ -47,12 +48,12 @@ public class RecurValue extends AReturn {
 	}
 
 	@Override
-	public Object getCode() {
+	public ACell getCode() {
 		return ErrorCodes.RECUR;
 	}
 
 	@Override
-	public Object getMessage() {
-		return values;
+	public ACell getMessage() {
+		return null;
 	}
 }

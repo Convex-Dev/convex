@@ -1,11 +1,10 @@
 package convex.peer;
 
+import static convex.test.Assertions.assertCVMEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static convex.test.Assertions.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -81,7 +80,7 @@ public class ServerTest {
 		
 		// Connect to Peer Server using the current store for the client
 		Connection pc = Connection.connect(hostAddress, handler, Stores.current());
-		AVector<Long> v = Vectors.of(1l, 2l, 3l);
+		AVector<CVMLong> v = Vectors.of(1l, 2l, 3l);
 		long id1 = pc.sendQuery(v,Init.HERO);
 		Utils.timeout(200, () -> results.get(id1) != null);
 		assertEquals(v, results.get(id1));
@@ -105,9 +104,6 @@ public class ServerTest {
 	
 	@Test public void testBadMessage() throws IOException {
 		Convex convex=Convex.connect(server.getHostAddress(),Init.VILLAIN,Init.VILLAIN_KP);
-		
-		// Java strings aren't serialisable commands
-		assertThrows(IllegalArgumentException.class,()->convex.query(Invoke.create(Init.VILLAIN, 0, "Foo")));
 		
 		// test the connection is still working
 		assertNotNull(convex.getBalance(Init.VILLAIN));

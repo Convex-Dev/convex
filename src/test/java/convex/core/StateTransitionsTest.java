@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519KeyPair;
 import convex.core.data.ABlob;
+import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
@@ -252,7 +253,7 @@ public class StateTransitionsTest {
 		BlockResult br2 = s.applyBlock(b2);
 		assertNull(br2.getErrorCode(0),br2.getResult(0).toString());
 		s = br2.getState();
-		BlobMap<ABlob, AVector<Object>> sched2 = s.getSchedule();
+		BlobMap<ABlob, AVector<ACell>> sched2 = s.getSchedule();
 		assertEquals(1L, sched2.count());
 		// no change to target balance yet
 		assertEquals(BAL2 + 10000000, s.getBalance(TARGET));

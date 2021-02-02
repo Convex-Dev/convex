@@ -25,7 +25,7 @@ public class AccountStatus extends ARecord {
 	private final long balance;
 	private final long allowance;
 	private final AHashMap<Symbol, Syntax> environment;
-	private final ABlobMap<Address, Object> holdings;
+	private final ABlobMap<Address, ACell> holdings;
 	private final Address controller;
 	private final AccountKey publicKey;
 	
@@ -35,7 +35,7 @@ public class AccountStatus extends ARecord {
 	private static final RecordFormat FORMAT = RecordFormat.of(ACCOUNT_KEYS);
 
 	private AccountStatus(long sequence, long balance, long allowance,
-			AHashMap<Symbol, Syntax> environment, ABlobMap<Address, Object> holdings,Address controller, AccountKey publicKey) {
+			AHashMap<Symbol, Syntax> environment, ABlobMap<Address, ACell> holdings,Address controller, AccountKey publicKey) {
 		super(FORMAT);
 		this.sequence = sequence;
 		this.balance = balance;
@@ -124,7 +124,7 @@ public class AccountStatus extends ARecord {
 		long balance = Format.readVLCLong(bb);
 		long allowance = Format.readVLCLong(bb);
 		AHashMap<Symbol, Syntax> environment = Format.read(bb);
-		ABlobMap<Address,Object> holdings = Format.read(bb);
+		ABlobMap<Address,ACell> holdings = Format.read(bb);
 		Address controller = Format.read(bb);
 		AccountKey publicKey = Format.read(bb);
 		return new AccountStatus(sequence, balance, allowance, environment,holdings,controller,publicKey);
@@ -160,7 +160,7 @@ public class AccountStatus extends ARecord {
 	 *         found/exported.
 	 * @throws BadStateException
 	 */
-	public <R> IFn<R> getExportedFunction(Symbol sym) {
+	public <R extends ACell> IFn<R> getExportedFunction(Symbol sym) {
 		ASet<Symbol> exports = getExports();
 		if (exports==null) return null;
 		if (!exports.contains(sym)) return null;
@@ -273,8 +273,8 @@ public class AccountStatus extends ARecord {
 	 * Gets the holdings for this account. Will always be a non-null map.
 	 * @return Holdings map for this account
 	 */
-	public ABlobMap<Address, Object> getHoldings() {
-		ABlobMap<Address, Object> result=holdings;
+	public ABlobMap<Address, ACell> getHoldings() {
+		ABlobMap<Address, ACell> result=holdings;
 		if (result==null) return BlobMaps.empty();
 		return result;
 	}
@@ -283,8 +283,8 @@ public class AccountStatus extends ARecord {
 		return holdings.get(addr);
 	}
 	
-	public AccountStatus withHolding(Address addr,Object value) {
-		ABlobMap<Address, Object> newHoldings=getHoldings();
+	public AccountStatus withHolding(Address addr,ACell value) {
+		ABlobMap<Address, ACell> newHoldings=getHoldings();
 		if (value==null) {
 			newHoldings=newHoldings.dissoc(addr);
 		} else if (newHoldings==null) {
@@ -295,7 +295,7 @@ public class AccountStatus extends ARecord {
 		return withHoldings(newHoldings);
 	}
 
-	private AccountStatus withHoldings(ABlobMap<Address, Object> newHoldings) {
+	private AccountStatus withHoldings(ABlobMap<Address, ACell> newHoldings) {
 		if (newHoldings.isEmpty()) newHoldings=null;
 		if (holdings==newHoldings) return this;
 		return new AccountStatus(sequence, balance, allowance, environment,newHoldings,controller,publicKey);
@@ -335,7 +335,7 @@ public class AccountStatus extends ARecord {
 		return rc;
 	}
 	
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		if (i<0) throw new IndexOutOfBoundsException(i);
 		int ec=(environment==null)?0:environment.getRefCount();
 		if (i<ec) return environment.getRef(i);
@@ -374,7 +374,7 @@ public class AccountStatus extends ARecord {
 		long newBal=((CVMLong)newVals[1]).longValue();
 		long newAllowance=((CVMLong)newVals[2]).longValue();
 		AHashMap<Symbol, Syntax> newEnv=(AHashMap<Symbol, Syntax>) newVals[3];
-		ABlobMap<Address, Object> newHoldings=(ABlobMap<Address, Object>) newVals[4];
+		ABlobMap<Address, ACell> newHoldings=(ABlobMap<Address, ACell>) newVals[4];
 		Address newController = (Address)newVals[5];
 		AccountKey newKey=(AccountKey)newVals[6];
 		

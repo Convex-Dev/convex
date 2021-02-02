@@ -3,6 +3,7 @@ package convex.test;
 import java.io.IOException;
 
 import convex.core.Constants;
+import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.lang.Context;
 import convex.core.lang.Reader;
@@ -20,8 +21,8 @@ public class Testing {
 		ctx=ctx.fork();
 		try {
 			String source=Utils.readResourceAsString(resourceName);
-			AList<Object> forms=Reader.readAll(source);
-			for (Object form: forms) {
+			AList<ACell> forms=Reader.readAll(source);
+			for (ACell form: forms) {
 				ctx=ctx.eval(form);
 				if (ctx.isExceptional()) {
 					System.err.println("Error in form: "+form);

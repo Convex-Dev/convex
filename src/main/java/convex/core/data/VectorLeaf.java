@@ -35,7 +35,7 @@ import convex.core.util.Utils;
  *
  * @param <T> Type of vector elements
  */
-public class VectorLeaf<T> extends ASizedVector<T> {
+public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static final VectorLeaf<?> EMPTY = new VectorLeaf(new Ref<?>[0]);
 
@@ -64,7 +64,7 @@ public class VectorLeaf<T> extends ASizedVector<T> {
 	 * @return New ListVector
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> VectorLeaf<T> create(Object[] things, int offset, int length) {
+	public static <T extends ACell> VectorLeaf<T> create(Object[] things, int offset, int length) {
 		if (length == 0) return (VectorLeaf<T>) VectorLeaf.EMPTY;
 		if (length > Vectors.CHUNK_SIZE)
 			throw new IllegalArgumentException("Too many elements for ListVector: " + length);
@@ -85,7 +85,7 @@ public class VectorLeaf<T> extends ASizedVector<T> {
 	 * @return The updated ListVector
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> VectorLeaf<T> create(Object[] things, int offset, int length, AVector<T> tail) {
+	public static <T extends ACell> VectorLeaf<T> create(Object[] things, int offset, int length, AVector<T> tail) {
 		if (length == 0)
 			throw new IllegalArgumentException("ListVector with tail cannot be created with zero head elements");
 		if (length > Vectors.CHUNK_SIZE)
@@ -98,13 +98,14 @@ public class VectorLeaf<T> extends ASizedVector<T> {
 		return new VectorLeaf<T>(items, tail.getRef(), tail.count() + length);
 	}
 
-	public static <T> VectorLeaf<T> create(T[] things) {
+	public static <T extends ACell> VectorLeaf<T> create(T[] things) {
 		return create(things, 0, things.length);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public final AVector<T> toVector() {
-		return this;
+	public final <R extends ACell> AVector<R> toVector() {
+		return (AVector<R>) this;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -134,12 +135,13 @@ public class VectorLeaf<T> extends ASizedVector<T> {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public AVector<T> concat(ASequence<T> b) {
+	public <R extends ACell> AVector<R> concat(ASequence<R> b) {
 		// Maybe can optimise?
 		long aLen = count();
 		long bLen = b.count();
-		AVector<T> result = this;
+		AVector<R> result = (AVector<R>) this;
 		long i = aLen;
 		long end = aLen + bLen;
 		while (i < end) {
@@ -147,7 +149,7 @@ public class VectorLeaf<T> extends ASizedVector<T> {
 				int rn = Utils.checkedInt(Math.min(Vectors.CHUNK_SIZE, end - i));
 				if (rn == Vectors.CHUNK_SIZE) {
 					// we can append a whole chunk
-					result = result.appendChunk((VectorLeaf<T>) b.subVector(i - aLen, rn));
+					result = result.appendChunk((VectorLeaf<R>) b.subVector(i - aLen, rn));
 					i += Vectors.CHUNK_SIZE;
 					continue;
 				}
@@ -196,8 +198,9 @@ public class VectorLeaf<T> extends ASizedVector<T> {
 		}
 	}
 
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
-	public AVector<T> assoc(long i, T value) {
+	public <R  extends ACell> AVector<R> assoc(long i, R value) {
 		if ((i < 0) || (i > count)) throw new IndexOutOfBoundsException("Index: " + i);
 		
 		// allow assoc to conj new final element
@@ -205,16 +208,16 @@ public class VectorLeaf<T> extends ASizedVector<T> {
 		
 		long ix = i - prefixLength();
 		if (ix >= 0) {
-			T old = items[(int) ix].getValue();
-			if (old == value) return this;
-			Ref<T>[] newItems = items.clone();
+			R old = (R) items[(int) ix].getValue();
+			if (old == value) return (AVector<R>) this;
+			Ref<R>[] newItems = (Ref<R>[]) items.clone();
 			newItems[(int) ix] = Ref.get(value);
-			return new VectorLeaf<T>(newItems, prefix, count);
+			return new VectorLeaf<R>(newItems, (Ref)prefix, count);
 		} else {
 			AVector<T> tl = prefix.getValue();
-			AVector<T> newTail = tl.assoc(i, value);
-			if (tl == newTail) return this;
-			return new VectorLeaf<T>(items, newTail.getRef(), count);
+			AVector<R> newTail = tl.assoc(i, value);
+			if (tl == newTail) return (AVector<R>) this;
+			return new VectorLeaf<R>((Ref[])items, newTail.getRef(), count);
 		}
 	}
 
@@ -229,7 +232,7 @@ public class VectorLeaf<T> extends ASizedVector<T> {
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> VectorLeaf<T> read(ByteBuffer bb, long count) throws BadFormatException {
+	public static <T extends ACell> VectorLeaf<T> read(ByteBuffer bb, long count) throws BadFormatException {
 		if (count < 0) throw new BadFormatException("Negative length");
 		if (count == 0) return (VectorLeaf<T>) EMPTY;
 		boolean prefixPresent = count > MAX_SIZE;
@@ -471,7 +474,7 @@ public class VectorLeaf<T> extends ASizedVector<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R> AVector<R> map(Function<? super T, ? extends R> mapper) {
+	public <R extends ACell> AVector<R> map(Function<? super T, ? extends R> mapper) {
 		Ref<AVector<R>> newPrefix = (prefix == null) ? null : prefix.getValue().map(mapper).getRef();
 
 		int ilength = items.length;
@@ -557,7 +560,7 @@ public class VectorLeaf<T> extends ASizedVector<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		int ic = items.length;
 		if (i < 0) throw new IndexOutOfBoundsException("Negative Ref index: " + i);
 		if (i < ic) return (Ref<R>) items[i];
@@ -631,17 +634,17 @@ public class VectorLeaf<T> extends ASizedVector<T> {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public AVector<T> subVector(long start, long length) {
+	public <R  extends ACell> AVector<R> subVector(long start, long length) {
 		checkRange(start, length);
-		if (length == count) return this;
+		if (length == count) return (AVector<R>) this;
 
 		if (prefix == null) {
 			int len = Utils.checkedInt(length);
-			@SuppressWarnings("unchecked")
-			Ref<T>[] newItems = new Ref[len];
+			Ref<R>[] newItems = new Ref[len];
 			System.arraycopy(items, Utils.checkedInt(start), newItems, 0, len);
-			return new VectorLeaf<T>(newItems, null, length);
+			return new VectorLeaf<R>(newItems, null, length);
 		} else {
 			long tc = prefixLength();
 			if (start >= tc) {

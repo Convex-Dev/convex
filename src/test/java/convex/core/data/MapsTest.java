@@ -16,6 +16,7 @@ import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Init;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -115,9 +116,9 @@ public class MapsTest {
 
 	@Test
 	public void testMapToString() {
-		AMap<Long, Long> m = Maps.empty();
+		AMap<CVMLong, CVMLong> m = Maps.empty();
 		assertEquals("{}", m.toString());
-		m = m.assoc(1L, 2L);
+		m = m.assoc(RT.cvm(1L), RT.cvm(2L));
 		assertEquals("{1 2}", m.toString());
 	}
 
@@ -148,7 +149,7 @@ public class MapsTest {
 		assertEquals(trans.isEmbedded(),me.getValueRef().isEmbedded());
 		
 		Blob b=m.getEncoding();
-		AMap<Short,ATransaction> m2=Format.read(b);
+		AMap<CVMLong,ATransaction> m2=Format.read(b);
 		
 		assertEquals(m,m2);
 		
@@ -181,10 +182,10 @@ public class MapsTest {
 
 	@Test
 	public void testSmallMergeIndentity() {
-		AHashMap<Object, Object> m0 = Maps.empty();
-		AHashMap<Object, Object> m1 = Maps.of(1, 2, 3, 4);
-		AHashMap<Object, Object> m2 = Maps.of(3, 4, 5, 6);
-		AHashMap<Object, Object> m3 = Maps.of(1, 2, 3, 4, 5, 6);
+		AHashMap<ACell, ACell> m0 = Maps.empty();
+		AHashMap<ACell, ACell> m1 = Maps.of(1, 2, 3, 4);
+		AHashMap<ACell, ACell> m2 = Maps.of(3, 4, 5, 6);
+		AHashMap<ACell, ACell> m3 = Maps.of(1, 2, 3, 4, 5, 6);
 
 		assertSame(m0, m1.mergeWith(m3, (a, b) -> null));
 		assertSame(m3, m3.mergeWith(m3, (a, b) -> a));
@@ -197,17 +198,17 @@ public class MapsTest {
 
 	@Test
 	public void regressionCreateWithDuplicateEntries() {
-		MapEntry<Long, Long> e = MapEntry.create(1L, 2L);
-		AMap<Long, Long> m = Maps.create(Vectors.of(e, e));
+		MapEntry<CVMLong, CVMLong> e = MapEntry.of(1L, 2L);
+		AMap<CVMLong, CVMLong> m = Maps.create(Vectors.of(e, e));
 		assertEquals(1, m.size());
 	}
 
 	@Test
 	public void regressionTestMerge() throws InvalidDataException {
-		AHashMap<Object, Object> m = Maps.of(Blob.fromHex("798b809c"), null);
+		AHashMap<ACell, ACell> m = Maps.of(Blob.fromHex("798b809c"), null);
 		m.validate();
 		// this should remove the entry, since mergeWith removes null values
-		AHashMap<Object, Object> m1 = m.mergeWith(m, (a, b) -> a);
+		AHashMap<ACell, ACell> m1 = m.mergeWith(m, (a, b) -> a);
 		assertSame(Maps.empty(), m1);
 
 		CollectionsTest.doMapTests(m);
@@ -222,7 +223,7 @@ public class MapsTest {
 
 	@Test
 	public void testFilterHex() {
-		MapLeaf<Object, Object> m = Maps.of(1, true, 2, true, 3, true, -1000, true);
+		MapLeaf<CVMLong, ACell> m = Maps.of(1, true, 2, true, 3, true, -1000, true);
 		assertEquals(4L,m.count());
 		
 		// TODO: selective filter
@@ -279,7 +280,7 @@ public class MapsTest {
 	@SuppressWarnings("unchecked")
 	@Test
 	public void testTreeMapBuilding() {
-		assertThrows(Throwable.class, () -> MapTree.create(new MapEntry[] { MapEntry.create(1, 2) }, 0));
+		assertThrows(Throwable.class, () -> MapTree.create(new MapEntry[] { MapEntry.of(1, 2) }, 0));
 	}
 
 	@Test
@@ -294,11 +295,11 @@ public class MapsTest {
 
 		assertEquals(me, me.assoc(0, RT.cvm(1L)));
 		assertEquals(me, me.assoc(1, RT.cvm(2L)));
-		assertThrows(IndexOutOfBoundsException.class, () -> me.assoc(-1, 0L));
+		assertThrows(IndexOutOfBoundsException.class, () -> me.assoc(-1, RT.cvm(0L)));
 
 		assertTrue(me.contains(RT.cvm(1L)));
 		assertTrue(me.contains(RT.cvm(2L)));
-		assertFalse(me.contains(true));
+		assertFalse(me.contains(CVMBool.TRUE));
 		assertFalse(me.contains(null));
 
 		// generic tests for MapEntry treated as a vector
@@ -337,11 +338,11 @@ public class MapsTest {
 		AHashMap<CVMLong, CVMLong> m2 = m.mergeWith(m, (a, b) -> ((a.longValue() & 1L) == 0L) ? a : null);
 		assertEquals(4, m2.size());
 
-		AHashMap<Object, Object> bm = Maps.coerce(Samples.LONG_MAP_100);
-		AHashMap<Object, Object> sm = Maps.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+		AHashMap<ACell, ACell> bm = Maps.coerce(Samples.LONG_MAP_100);
+		AHashMap<ACell, ACell> sm = Maps.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
 		
 		// change values in big map using small map
-		AHashMap<Object, Object> bm2 = bm.mergeWith(sm, (a, b) -> {
+		AHashMap<ACell, ACell> bm2 = bm.mergeWith(sm, (a, b) -> {
 			return (a == null) ? b : a;
 		});
 		assertEquals(100, bm2.count());

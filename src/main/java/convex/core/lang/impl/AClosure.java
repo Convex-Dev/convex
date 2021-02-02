@@ -1,5 +1,6 @@
 package convex.core.lang.impl;
 
+import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Symbol;
 import convex.core.lang.AFn;
@@ -9,13 +10,13 @@ import convex.core.lang.AFn;
  *
  * @param <T> Return type of function
  */
-public abstract class AClosure<T> extends AFn<T> {
+public abstract class AClosure<T extends ACell> extends AFn<T> {
 	/**
 	 * Lexical environment saved for this closure
 	 */
-	protected final AHashMap<Symbol, Object> lexicalEnv;
+	protected final AHashMap<Symbol, ACell> lexicalEnv;
 
-	protected AClosure(AHashMap<Symbol, Object> lexicalEnv) {
+	protected AClosure(AHashMap<Symbol, ACell> lexicalEnv) {
 		this.lexicalEnv=lexicalEnv;
 	}
 	
@@ -25,5 +26,5 @@ public abstract class AClosure<T> extends AFn<T> {
 	 * @param env New lexical environment to use for this closure
 	 * @return Closure updated with new lexical environment
 	 */
-	public abstract <F extends AClosure<T>> F withEnvironment(AHashMap<Symbol, Object> env);
+	public abstract <F extends AClosure<T>> F withEnvironment(AHashMap<Symbol, ACell> env);
 }

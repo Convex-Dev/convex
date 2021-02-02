@@ -28,6 +28,6 @@ public interface IGet<V> {
 	 * @param key
 	 * @return true if the data structure contains the key, false otherwise
 	 */
-	public boolean containsKey(Object key);
+	public boolean containsKey(ACell key);
 
 }

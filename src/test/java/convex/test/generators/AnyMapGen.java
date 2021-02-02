@@ -6,6 +6,7 @@ import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.ABlob;
 import convex.core.data.AMap;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.BlobMap;
 import convex.core.data.Format;
@@ -38,13 +39,13 @@ public class AnyMapGen extends Generator<AMap> {
 		case 4: {
 			Object o1 = gen().make(PrimitiveGen.class).generate(r, status);
 			Object o2 = gen().make(StringGen.class).generate(r, status);
-			return Maps.create(o1, o2);
+			return Maps.of(o1, o2);
 		}
 		case 5:
 			return BlobMap.EMPTY;
 		case 6: {
 			ABlob o1 = Format.encodedBlob(gen().make(PrimitiveGen.class).generate(r, status));
-			Object o2 = gen().make(StringGen.class).generate(r, status);
+			AString o2 = gen().make(StringGen.class).generate(r, status);
 			return BlobMap.create(o1, o2);
 		}
 

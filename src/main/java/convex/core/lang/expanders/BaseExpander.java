@@ -1,5 +1,6 @@
 package convex.core.lang.expanders;
 
+import convex.core.data.ACell;
 import convex.core.data.Syntax;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Context;
@@ -28,7 +29,7 @@ public abstract class BaseExpander extends AExpander {
 	}
 
 	@Override
-	public abstract Context<Syntax> expand(Object form, AExpander ex, Context<?> context);
+	public abstract Context<Syntax> expand(ACell form, AExpander ex, Context<?> context);
 
 
 	@Override

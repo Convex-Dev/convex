@@ -6,6 +6,7 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
+import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Lists;
 import convex.core.data.Strings;
@@ -18,13 +19,13 @@ import convex.core.lang.RT;
 /**
  * Generator for plausible forms
  */
-public class FormGen extends Generator<Object> {
+public class FormGen extends Generator<ACell> {
 	public FormGen() {
-		super(Object.class);
+		super(ACell.class);
 	}
 
 	@Override
-	public Object generate(SourceOfRandomness r, GenerationStatus status) {
+	public ACell generate(SourceOfRandomness r, GenerationStatus status) {
 		int type = r.nextInt(8);
 		switch (type) {
 		case 0:
@@ -43,7 +44,7 @@ public class FormGen extends Generator<Object> {
 
 		case 5: {
 			// random form containing core symbol at head
-			List<Object> subForms = this.times(r.nextInt(4)).generate(r, status);
+			List<ACell> subForms = this.times(r.nextInt(4)).generate(r, status);
 			AHashMap<Symbol, Syntax> env = Core.CORE_NAMESPACE;
 			int n = (int) env.count();
 			Symbol sym = env.entryAt(r.nextInt(n)).getKey();
@@ -59,7 +60,8 @@ public class FormGen extends Generator<Object> {
 		}
 
 		case 7: {
-			List<Object> subForms = this.times(r.nextInt(4)).generate(r, status);
+			// a vector of random subforms
+			List<ACell> subForms = this.times(r.nextInt(4)).generate(r, status);
 			return Vectors.create(subForms);
 		}
 

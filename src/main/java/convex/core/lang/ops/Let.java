@@ -2,6 +2,7 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
+import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
@@ -27,7 +28,7 @@ import convex.core.util.Utils;
  *
  * @param <T>
  */
-public class Let<T> extends AMultiOp<T> {
+public class Let<T extends ACell> extends AMultiOp<T> {
 
 	/**
 	 * Vector of binding forms. Can be destructuring forms
@@ -37,28 +38,28 @@ public class Let<T> extends AMultiOp<T> {
 	protected final int bindingCount;
 	protected final boolean isLoop;
 
-	protected Let(AVector<Syntax> syms, AVector<AOp<?>> ops, boolean isLoop) {
+	protected Let(AVector<Syntax> syms, AVector<AOp<ACell>> ops, boolean isLoop) {
 		super(ops);
 		symbols = syms;
 		bindingCount = syms.size();
 		this.isLoop = isLoop;
 	}
 
-	public static <T> Let<T> create(AVector<Syntax> syms, AVector<AOp<?>> ops, boolean isLoop) {
+	public static <T extends ACell> Let<T> create(AVector<Syntax> syms, AVector<AOp<ACell>> ops, boolean isLoop) {
 		return new Let<T>(syms, ops, isLoop);
 	}
 
-	public static <T> Let<T> createLet(AVector<Syntax> syms, AVector<AOp<?>> ops) {
+	public static <T extends ACell> Let<T> createLet(AVector<Syntax> syms, AVector<AOp<ACell>> ops) {
 		return new Let<T>(syms, ops, false);
 	}
 
-	public static <T> Let<T> createLoop(AVector<Syntax> syms, AVector<AOp<?>> ops) {
+	public static <T extends ACell> Let<T> createLoop(AVector<Syntax> syms, AVector<AOp<ACell>> ops) {
 		return new Let<T>(syms, ops, true);
 	}
 
 	@Override
 	public Let<T> updateRefs(IRefFunction func) {
-		ASequence<AOp<?>> newOps = ops.updateRefs(func);
+		ASequence<AOp<ACell>> newOps = ops.updateRefs(func);
 		AVector<Syntax> newSymbols = symbols.updateRefs(func);
 
 		return recreate(newOps, newSymbols);
@@ -70,29 +71,29 @@ public class Let<T> extends AMultiOp<T> {
 	}
 
 	@Override
-	public final <R> Ref<R> getRef(int i) {
+	public final <R extends ACell> Ref<R> getRef(int i) {
 		int n = super.getRefCount();
 		if (i < n) return super.getRef(i);
 		return symbols.getRef(i - n);
 	}
 
 	@Override
-	protected Let<T> recreate(ASequence<AOp<?>> newOps) {
+	protected Let<T> recreate(ASequence<AOp<ACell>> newOps) {
 		return recreate(newOps, symbols);
 	}
 
-	protected Let<T> recreate(ASequence<AOp<?>> newOps, AVector<Syntax> newSymbols) {
+	protected Let<T> recreate(ASequence<AOp<ACell>> newOps, AVector<Syntax> newSymbols) {
 		if ((ops == newOps) && (symbols == newSymbols)) return this;
 		return new Let<T>(newSymbols, newOps.toVector(), isLoop);
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <I> Context<T> execute(final Context<I> context) {
+	public <I extends ACell> Context<T> execute(final Context<I> context) {
 		Context<?> ctx = context.consumeJuice(Juice.LET);
 		if (ctx.isExceptional()) return (Context<T>) ctx;
 
-		AHashMap<Symbol, Object> savedEnv = ctx.getLocalBindings();
+		AHashMap<Symbol, ACell> savedEnv = ctx.getLocalBindings();
 		// execute each operation in turn
 		// TODO: early return
 		for (int i = 0; i < bindingCount; i++) {
@@ -198,7 +199,7 @@ public class Let<T> extends AMultiOp<T> {
 		return super.estimatedEncodingSize()+symbols.estimatedEncodingSize();
 	}
 
-	public static <T> Let<T> read(ByteBuffer b) throws BadFormatException {
+	public static <T extends ACell> Let<T> read(ByteBuffer b) throws BadFormatException {
 		AVector<Syntax> syms = Format.read(b);
 		AVector<AOp<?>> ops = Format.read(b);
 		return createLet(syms, ops.toVector());

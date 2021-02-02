@@ -8,20 +8,20 @@ import convex.core.util.Utils;
 public class Sets {
 
 	@SuppressWarnings("unchecked")
-	public static <T> Set<T> empty() {
+	public static <T extends ACell> Set<T> empty() {
 		return (Set<T>) Set.EMPTY;
 	}
 
 	@SafeVarargs
-	public static <T> Set<T> of(Object... elements) {
+	public static <T extends ACell> Set<T> of(Object... elements) {
 		return Set.create(elements);
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <T> ASet<T> create(Object source) {
+	public static <T extends ACell> ASet<T> create(Object source) {
 		if (source instanceof ADataStructure) return create((ADataStructure<T>) source);
 		if (source instanceof Collection) {
-			T[] elements = (T[]) ((Collection<T>) source).toArray();
+			Object[] elements = (Object[]) ((Collection<T>) source).toArray();
 			return Set.create(elements);
 		}
 		throw new Error("Unexpected type!" + Utils.getClass(source));
@@ -34,7 +34,7 @@ public class Sets {
 	 * @param source
 	 * @return A Set
 	 */
-	public static <T> Set<T> create(ADataStructure<T> source) {
+	public static <T extends ACell> Set<T> create(ADataStructure<T> source) {
 		if (source instanceof Set) return (Set<T>) source;
 		if (source instanceof ASequence) return Set.create((ASequence<T>) source);
 		if (source instanceof AMap) {

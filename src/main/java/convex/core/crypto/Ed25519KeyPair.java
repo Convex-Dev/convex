@@ -21,6 +21,7 @@ import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 
+import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.SignedData;
@@ -207,7 +208,7 @@ public class Ed25519KeyPair extends AKeyPair {
 
 
 	@Override
-	public <R> SignedData<R> signData(R value) {
+	public <R extends ACell> SignedData<R> signData(R value) {
 		return SignedData.create(this, value);
 	}
 

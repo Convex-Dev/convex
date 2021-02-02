@@ -5,6 +5,7 @@ import javax.swing.table.TableModel;
 
 import convex.core.Init;
 import convex.core.State;
+import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
@@ -63,7 +64,7 @@ public class AccountsTableModel extends AbstractTableModel implements TableModel
 			Object o = as.getHoldings().get(Init.REGISTRY_ADDRESS);
 			if (o == null) return "";
 			if (!(o instanceof AMap)) return "<Invalid registration, not a map!>";
-			AMap<Keyword, Object> a = (AMap<Keyword, Object>) o;
+			AMap<Keyword, ACell> a = (AMap<Keyword, ACell>) o;
 			return a.get(Keyword.create("name"));
 		}
 		case 5:

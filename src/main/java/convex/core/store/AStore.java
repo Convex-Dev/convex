@@ -27,7 +27,7 @@ public abstract class AStore {
 	 *            minimum to present risk of MissingDataException.
 	 * @return The persisted Ref, of status ANNOUNCED at minimum
 	 */
-	public abstract <T> Ref<T> announceRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler);
+	public abstract <T extends ACell> Ref<T> announceRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler);
 	
 
 	/**
@@ -41,7 +41,7 @@ public abstract class AStore {
 	 *            minimum to present risk of MissingDataException.
 	 * @return The persisted Ref, of status PERSISTED at minimum
 	 */
-	public abstract <T> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler);
+	public abstract <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler);
 
 	/**
 	 * Stores a @Ref in long term storage as defined by this store implementation.
@@ -54,7 +54,7 @@ public abstract class AStore {
 	 *            minimum to present risk of MissingDataException.
 	 * @return The persisted Ref, of status STORED at minimum
 	 */
-	public abstract <T> Ref<T> storeRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler);
+	public abstract <T extends ACell> Ref<T> storeRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler);
 
 	/**
 	 * Gets the stored Ref for a given hash value, or null if not found.
@@ -65,7 +65,7 @@ public abstract class AStore {
 	 * @param hash A hash value to look up in the persisted store
 	 * @return The stored Ref, or null if the hash value is not persisted
 	 */
-	public abstract <T> Ref<T> refForHash(Hash hash);
+	public abstract <T extends ACell> Ref<T> refForHash(Hash hash);
 
 	/**
 	 * Gets the Root Hash from the Store. Root hash is typically used to store the Peer state

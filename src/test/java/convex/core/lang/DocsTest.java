@@ -7,6 +7,7 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.Keywords;
@@ -20,12 +21,12 @@ public class DocsTest {
 		for (Map.Entry<Symbol,Syntax> me: Core.ENVIRONMENT.entrySet()) {
 			Symbol sym=me.getKey();
 			Syntax syntax=me.getValue();
-			AHashMap<Object, Object> meta = syntax.getMeta();
+			AHashMap<ACell,ACell> meta = syntax.getMeta();
 			if (meta.isEmpty()) {
 				if (PRINT_MISSING) System.err.println("Empty metadata in Core: "+sym);
 			} else {
 				@SuppressWarnings("unchecked")
-				AHashMap<Object,Object> doc=(AHashMap<Object, Object>) meta.get(Keywords.DOC);
+				AHashMap<ACell,ACell> doc=(AHashMap<ACell, ACell>) meta.get(Keywords.DOC);
 				if (doc==null) {
 					if (PRINT_MISSING) System.err.println("No documentation in Core: "+sym);
 				} else {
@@ -35,23 +36,23 @@ public class DocsTest {
 		}
 	}
 	
-	public void doDocTest(Symbol sym,AHashMap<Object,Object> doc) {
-		String desc=(String) doc.get(Keywords.DESCRIPTION);
+	public void doDocTest(Symbol sym,AHashMap<ACell,ACell> doc) {
+		String desc=RT.jvm(doc.get(Keywords.DESCRIPTION));
 		if (desc==null) {
 			if (PRINT_MISSING) System.err.println("No description on Core def: "+sym);
 		}
 		
 		@SuppressWarnings("unchecked")
-		AVector<AHashMap<Object,Object>> examples=(AVector<AHashMap<Object, Object>>) doc.get(Keywords.EXAMPLES);
+		AVector<AHashMap<ACell,ACell>> examples=(AVector<AHashMap<ACell, ACell>>) doc.get(Keywords.EXAMPLES);
 		if (examples!=null) {
-			for (AHashMap<Object,Object> ex:examples) {
+			for (AHashMap<ACell,ACell> ex:examples) {
 				doExampleTest(sym,ex);
 			}
 		}
 	}
 
-	private void doExampleTest(Symbol sym, AHashMap<Object, Object> ex) {
-		String code=(String) ex.get(Keywords.CODE);
+	private void doExampleTest(Symbol sym, AHashMap<ACell, ACell> ex) {
+		String code=RT.jvm( ex.get(Keywords.CODE));
 		
 		Context<?> ctx=step(code);
 		assertNotNull(ctx);

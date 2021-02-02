@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.parboiled.common.Utils;
 
+import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Strings;
 
@@ -17,17 +18,17 @@ import convex.core.data.Strings;
  */
 public class ErrorValue extends AExceptional {
 
-	private final Object code;
-	private final Object message;
+	private final ACell code;
+	private final ACell message;
 	private final ArrayList<AString> trace=new ArrayList<>();
 
-	private ErrorValue(Object code, Object message) {
+	private ErrorValue(ACell code, ACell message) {
 		if (code==null) throw new IllegalArgumentException("Error code must not be null");
 		this.code=code;
 		this.message=message;
 	}
 
-	public static ErrorValue create(Object code) {
+	public static ErrorValue create(ACell code) {
 		return new ErrorValue(code,null);
 	}
 	
@@ -37,7 +38,7 @@ public class ErrorValue extends AExceptional {
 	 * @param message Off-chain message as CVM String
 	 * @return New ErrorValue instance
 	 */
-	public static ErrorValue create(Object code, AString message) {
+	public static ErrorValue create(ACell code, AString message) {
 		return new ErrorValue(code,message);
 	}
 	
@@ -47,7 +48,7 @@ public class ErrorValue extends AExceptional {
 	 * @param message Off-chain message, must be valid CVM Value
 	 * @return New ErrorValue instance
 	 */
-	public static ErrorValue createRaw(Object code, Object message) {
+	public static ErrorValue createRaw(ACell code, ACell message) {
 		return new ErrorValue(code,message);
 	}
 	
@@ -57,7 +58,7 @@ public class ErrorValue extends AExceptional {
 	 * @param message Off-chain message as Java String
 	 * @return New ErrorValue instance
 	 */
-	public static ErrorValue create(Object code, String message) {
+	public static ErrorValue create(ACell code, String message) {
 		return new ErrorValue(code,Strings.create(message));
 	}
 
@@ -67,7 +68,7 @@ public class ErrorValue extends AExceptional {
 	 * 
 	 * @return Error code value
 	 */
-	public Object getCode() {
+	public ACell getCode() {
 		return code;
 	} 
 	
@@ -80,7 +81,7 @@ public class ErrorValue extends AExceptional {
 	 * @param <T>
 	 * @return The message carried with this error
 	 */
-	public Object getMessage() {
+	public ACell getMessage() {
 		return message;
 	}
 

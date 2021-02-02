@@ -9,6 +9,7 @@ import java.util.function.BiFunction;
 import convex.core.crypto.Hash;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
 import convex.core.util.Bits;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
@@ -20,11 +21,11 @@ import convex.core.util.Utils;
  *
  * @param <V>
  */
-public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
+public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private static final Ref<ABlobMap>[] EMPTY_CHILDREN = new Ref[0];
 
-	public static final BlobMap<ABlob, Object> EMPTY = new BlobMap<ABlob, Object>(Blob.EMPTY, 0, 0, null, EMPTY_CHILDREN,
+	public static final BlobMap<ABlob, ACell> EMPTY = new BlobMap<ABlob, ACell>(Blob.EMPTY, 0, 0, null, EMPTY_CHILDREN,
 			(short) 0, 0L);
 
 	/**
@@ -82,17 +83,17 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <K extends ABlob, V> BlobMap<K, V> create() {
+	public static <K extends ABlob, V extends ACell> BlobMap<K, V> create() {
 		return (BlobMap<K, V>) EMPTY;
 	}
 
-	public static <K extends ABlob, V> BlobMap<K, V> create(MapEntry<K, V> me) {
+	public static <K extends ABlob, V extends ACell> BlobMap<K, V> create(MapEntry<K, V> me) {
 		Blob prefix = me.getKey().toBlob();
 		long hexLength = prefix.hexLength();
 		return new BlobMap<K, V>(prefix, 0, hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
 	}
 
-	private static <K extends ABlob, V> BlobMap<K, V> createAtDepth(MapEntry<K, V> me, long depth) {
+	private static <K extends ABlob, V extends ACell> BlobMap<K, V> createAtDepth(MapEntry<K, V> me, long depth) {
 		Blob prefix = me.getKey().toBlob();
 		long hexLength = prefix.hexLength();
 		if (depth > hexLength)
@@ -100,11 +101,15 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 		return new BlobMap<K, V>(prefix, depth, hexLength - depth, me, EMPTY_CHILDREN, (short) 0, 1L);
 	}
 
-	public static <K extends ABlob, V> BlobMap<K, V> create(K k, V v) {
+	public static <K extends ABlob, V extends ACell> BlobMap<K, V> create(K k, V v) {
 		Blob prefix=k.toBlob();
 		MapEntry<K, V> me = MapEntry.create(k, v);
 		long hexLength = k.hexLength();
 		return new BlobMap<K, V>(prefix, 0, hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
+	}
+	
+	public static <K extends ABlob, V extends ACell> BlobMap<K, V> of(Object k, Object v) {
+		return create(RT.cvm(k),RT.cvm(v));
 	}
 
 	@Override
@@ -175,7 +180,7 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R> Ref<R> getRef(int i) {
+	public <R extends ACell> Ref<R> getRef(int i) {
 		if (entry != null) {
 			int erc = entry.getRefCount();
 			if (i < erc) return entry.getRef(i);
@@ -463,7 +468,7 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static <K extends ABlob, V> BlobMap<K, V> read(ByteBuffer bb) throws BadFormatException {
+	public static <K extends ABlob, V extends ACell> BlobMap<K, V> read(ByteBuffer bb) throws BadFormatException {
 		long count = Format.readVLCLong(bb);
 		if (count < 0) throw new BadFormatException("Negative count!");
 		if (count == 0) return (BlobMap<K, V>) EMPTY;
@@ -484,17 +489,7 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 		int n = Utils.bitCount(mask);
 		Ref<ABlobMap>[] children = new Ref[n];
 		for (int i = 0; i < n; i++) {
-			Ref<ABlobMap> ref;
-			Object co = Format.read(bb);
-			if (co instanceof Ref) {
-				// assume a blobmap child ref
-				ref=(Ref<ABlobMap>)co;
-			} else {
-				if (!(co instanceof ABlobMap)) throw new BadFormatException("Expected child BlobMap but got "+Utils.getClassName(co));
-				ABlobMap cbm=(ABlobMap)co;
-				// TODO: validate?
-				ref=cbm.getRef();
-			}
+			Ref<ABlobMap> ref = Format.readRef(bb);
 			children[i] = ref;
 		}
 		return new BlobMap<K, V>(prefix, depth, prefixLength, me, children, mask, count);
@@ -614,5 +609,7 @@ public class BlobMap<K extends ABlob, V> extends ABlobMap<K, V> {
 		}
 		return bm;
 	}
+
+
 
 }

@@ -83,10 +83,10 @@ public class ObjectsTest {
 	 * 
 	 * @param a
 	 */
-	public static void doAnyValueTests(Object a) {
+	public static void doAnyValueTests(ACell a) {
 		assertTrue(Format.isCanonical(a));
 
-		Ref<Object> r = Ref.get(a).persist();
+		Ref<ACell> r = Ref.get(a).persist();
 		assertEquals(a, r.getValue());
 
 		Blob b = Format.encodedBlob(a);
@@ -94,7 +94,7 @@ public class ObjectsTest {
 		assertTrue(b.length <= Format.LIMIT_ENCODING_LENGTH);
 		
 		if (b.length > Format.MAX_EMBEDDED_LENGTH) {
-			if (!(a instanceof String)) assertFalse(Format.isEmbedded(a),()->"Testing: "+Utils.getClassName(a)+ " = "+Utils.toString(a));
+			assertFalse(Format.isEmbedded(a),()->"Testing: "+Utils.getClassName(a)+ " = "+Utils.toString(a));
 		}
 
 		try {

@@ -29,11 +29,11 @@ public class Call extends ATransaction {
 	protected final Address target;
 	protected final long offer;
 	protected final Symbol functionName;
-	protected final AVector<Object> args;
+	protected final AVector<ACell> args;
 
 
 	
-	protected Call(Address address, long sequence, Address target, long offer,Symbol functionName,AVector<Object> args) {
+	protected Call(Address address, long sequence, Address target, long offer,Symbol functionName,AVector<ACell> args) {
 		super(address,sequence);
 		this.target=target;
 		this.functionName=functionName;
@@ -41,12 +41,12 @@ public class Call extends ATransaction {
 		this.args=args;
 	}
 	
-	public static Call create(Address address, long sequence, Address target, long offer,Symbol functionName,AVector<Object> args) {
+	public static Call create(Address address, long sequence, Address target, long offer,Symbol functionName,AVector<ACell> args) {
 		return new Call(address,sequence,target,0,functionName,args);
 	}
 
 	
-	public static Call create(Address address, long sequence, Address target, Symbol functionName,AVector<Object> args) {
+	public static Call create(Address address, long sequence, Address target, Symbol functionName,AVector<ACell> args) {
 		return create(address,sequence,target,0,functionName,args);
 	}
 
@@ -97,7 +97,7 @@ public class Call extends ATransaction {
 		Address target=Format.read(bb);
 		long offer = Format.readVLCLong(bb);
 		Symbol functionName=Format.read(bb);
-		AVector<Object> args = Format.read(bb);
+		AVector<ACell> args = Format.read(bb);
 		return create(address,sequence, target, offer, functionName,args);
 	}
 
@@ -107,7 +107,7 @@ public class Call extends ATransaction {
 	}
 
 	@Override
-	public <T> Context<T> apply(Context<?> ctx) {
+	public <T extends ACell> Context<T> apply(Context<?> ctx) {
 		return ctx.actorCall(target, offer, functionName, args.toArray());
 	}
 
@@ -127,13 +127,13 @@ public class Call extends ATransaction {
 	}
 	
 	@Override
-	public <T> Ref<T> getRef(int i) {
+	public <T extends ACell> Ref<T> getRef(int i) {
 		return args.getRef(i);
 	}
 
 	@Override
 	public ACell updateRefs(IRefFunction func) {
-		AVector<Object> newArgs=args.updateRefs(func);
+		AVector<ACell> newArgs=args.updateRefs(func);
 		if (args==newArgs) return this;
 		return new Call(address,sequence,target,offer,functionName,newArgs);
 	}

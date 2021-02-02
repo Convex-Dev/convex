@@ -1,6 +1,7 @@
 package convex.core;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.SignedData;
 
@@ -41,7 +42,7 @@ public class MergeContext {
 		return publicKey;
 	}
 
-	public <T> SignedData<T> sign(T value) {
+	public <T extends ACell> SignedData<T> sign(T value) {
 		return SignedData.create(keyPair, value);
 	}
 

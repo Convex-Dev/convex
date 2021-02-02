@@ -14,6 +14,7 @@ import convex.core.Constants;
 import convex.core.Init;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMBool;
@@ -84,10 +85,10 @@ public class TestState {
 	}
 
 	@SuppressWarnings("unchecked")
-	static <T> AOp<T> compile(Context<?> c, String source) {
+	static <T extends ACell> AOp<T> compile(Context<?> c, String source) {
 		c=c.fork();
 		try {
-			Object form = Reader.read(source);
+			ACell form = Reader.read(source);
 			AOp<T> op = (AOp<T>) c.expandCompile(form).getResult();
 			return op;
 		} catch (Exception e) {
@@ -95,7 +96,7 @@ public class TestState {
 		}
 	}
 
-	public static <T extends Object> T eval(Context<?> c, String source) {
+	public static <T extends ACell> T eval(Context<?> c, String source) {
 		try {
 			AOp<T> op = compile(c, source);
 			Context<T> rc = c.execute(op);
@@ -110,7 +111,7 @@ public class TestState {
 		String source;
 		try {
 			source = Utils.readResourceAsString(actorResource);
-			Object contractCode=Reader.read(source);
+			ACell contractCode=Reader.read(source);
 			ctx=ctx.deployActor(contractCode);
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -124,7 +125,7 @@ public class TestState {
 			Context<?> ctx = Context.createFake(s, HERO);
 			for (int i = 0; i < NUM_CONTRACTS; i++) {
 				// Construct code for each contract
-				Object contractCode = Reader.read(
+				ACell contractCode = Reader.read(
 						"(do " + "(def my-data nil)" + "(defn write [x] (def my-data x)) "
 								+ "(defn read [] my-data)" + "(defn who-called-me [] *caller*)"
 								+ "(defn my-address [] *address*)" + "(defn my-number [] "+i+")" + "(defn foo [] :bar)"
@@ -199,11 +200,11 @@ public class TestState {
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <T> T eval(String source) {
+	public static <T extends ACell> T eval(String source) {
 		return (T) step(source).getResult();
 	}
 
-	public static <T> Context<T> step(String source) {
+	public static <T extends ACell> Context<T> step(String source) {
 		return step(INITIAL_CONTEXT, source);
 	}
 
@@ -215,13 +216,13 @@ public class TestState {
 	 * @return New forked context containing step result
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> Context<T> step(Context<?> ctx, String source) {
+	public static <T extends ACell> Context<T> step(Context<?> ctx, String source) {
 		// Compile form in forked context
-		Context<AOp<Object>> cctx=ctx.fork();
-		Object form = Reader.read(source);
+		Context<AOp<ACell>> cctx=ctx.fork();
+		ACell form = Reader.read(source);
 		cctx = cctx.expandCompile(form);
 		if (cctx.isExceptional()) return (Context<T>) cctx;
-		AOp<Object> op = cctx.getResult();
+		AOp<ACell> op = cctx.getResult();
 
 		// Run form in separate forked context to get result context
 		Context<T> rctx = ctx.fork();
@@ -234,7 +235,7 @@ public class TestState {
 	 * Runs an execution step as a different address. Returns value after restoring
 	 * the original address.
 	 */
-	public static <T> Context<T> stepAs(String address, Context<?> ctx, String source) {
+	public static <T extends ACell> Context<T> stepAs(String address, Context<?> ctx, String source) {
 		try {
 			return stepAs(RT.address(address), ctx, source);
 		} catch (Exception e) {
@@ -247,10 +248,10 @@ public class TestState {
 	 * the original address.
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> Context<T> stepAs(Address address, Context<?> c, String source) {
+	public static <T extends ACell> Context<T> stepAs(Address address, Context<?> c, String source) {
 		Context<?> rc = Context.createFake(c.getState(), address);
 		rc = step(rc, source);
-		return (Context<T>) Context.createFake(rc.getState(), c.getAddress()).withResult(rc.getValue());
+		return (Context<T>) Context.createFake(rc.getState(), c.getAddress()).withValue(rc.getValue());
 	}
 	
 	@Test public void testStateSetup() {

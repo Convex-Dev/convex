@@ -4,13 +4,14 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
+import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
 import convex.core.data.MapEntry;
 
 /**
  * Generator for arbitrary collections
  */
-public class DataStructureGen extends Generator<ADataStructure<?>> {
+public class DataStructureGen extends Generator<ADataStructure<ACell>> {
 	@SuppressWarnings("rawtypes")
 	private static final Class cls = (Class) ADataStructure.class;
 
@@ -19,8 +20,9 @@ public class DataStructureGen extends Generator<ADataStructure<?>> {
 		super(cls);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public ADataStructure<?> generate(SourceOfRandomness r, GenerationStatus status) {
+	public ADataStructure<ACell> generate(SourceOfRandomness r, GenerationStatus status) {
 		int type = r.nextInt(5);
 
 		switch (type) {
@@ -35,7 +37,7 @@ public class DataStructureGen extends Generator<ADataStructure<?>> {
 
 		// generate map entries as special cases of vectors
 		case 4: {
-			Generator<Object> vgen = gen().make(ValueGen.class);
+			Generator<ACell> vgen = gen().make(ValueGen.class);
 			return MapEntry.create(vgen.generate(r, status), vgen.generate(r, status));
 		}
 		}

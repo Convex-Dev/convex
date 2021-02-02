@@ -4,12 +4,13 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
+import convex.core.data.ACell;
 import convex.core.data.ACollection;
 
 /**
  * Generator for arbitrary collections
  */
-public class CollectionGen extends Generator<ACollection<?>> {
+public class CollectionGen extends Generator<ACollection<ACell>> {
 	@SuppressWarnings("rawtypes")
 	private static final Class cls = (Class) ACollection.class;
 
@@ -20,7 +21,7 @@ public class CollectionGen extends Generator<ACollection<?>> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public ACollection<Object> generate(SourceOfRandomness r, GenerationStatus status) {
+	public ACollection<ACell> generate(SourceOfRandomness r, GenerationStatus status) {
 		int type = r.nextInt(3);
 		switch (type) {
 		case 0:

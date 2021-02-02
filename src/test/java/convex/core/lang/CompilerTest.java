@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Init;
 import convex.core.State;
+import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
@@ -25,6 +26,7 @@ import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
 import convex.core.lang.expanders.AExpander;
 import convex.core.lang.ops.Constant;
@@ -40,7 +42,7 @@ public class CompilerTest {
 	
 	@SuppressWarnings("unchecked")
 	public <T extends AOp<?>> T comp(String source, Context<?> context) {
-		Object form=Reader.read(source);
+		ACell form=Reader.read(source);
 		AOp<?> code = context.fork().expandCompile(form).getResult();
 		return (T) code;
 	}
@@ -53,9 +55,9 @@ public class CompilerTest {
 	private static final State INITIAL=CONTEXT.getState();
 
 	@SuppressWarnings("unchecked")
-	public static <T> Context<T> step(Context<?> c, String source) {
-		Object form = Reader.readSyntax(source);
-		Context<AOp<Object>> cctx=c.fork().expandCompile(form);
+	public static <T extends ACell> Context<T> step(Context<?> c, String source) {
+		ACell form = Reader.readSyntax(source);
+		Context<AOp<ACell>> cctx=c.fork().expandCompile(form);
 		if (cctx.isExceptional()) return (Context<T>) cctx;
 		
 		AOp<?> op = (AOp<?>) cctx.getResult();
@@ -63,7 +65,7 @@ public class CompilerTest {
 		return rctx;
 	}
 
-	public static <T> Context<T> step(String source) {
+	public static <T extends ACell> Context<T> step(String source) {
 		return step(CONTEXT, source);
 	}
 
@@ -74,7 +76,7 @@ public class CompilerTest {
 	
 	public Syntax expand(String source) {
 		try {
-			Object form=Reader.read(source);
+			ACell form=Reader.read(source);
 			Syntax expanded =CONTEXT.fork().expand(form).getResult();
 			return expanded;
 		}
@@ -107,10 +109,10 @@ public class CompilerTest {
 	@Test public void testMinCompileRegression() throws IOException {
 		Context<?> c=CONTEXT.fork();
 		String src=Utils.readResourceAsString("testsource/min.con");
-		Object form=Reader.read(src);
+		ACell form=Reader.read(src);
 		Context<Syntax> exp=c.expand(form);
 		assertFalse(exp.isExceptional());
-		Context<AOp<Object>> com=c.compile(exp.getResult());
+		Context<AOp<ACell>> com=c.compile(exp.getResult());
 		assertFalse(com.isExceptional());
 	}
 	
@@ -228,7 +230,7 @@ public class CompilerTest {
 		// fake state with default juice
 		Context<?> c=Context.createFake(INITIAL, TestState.HERO);
 		
-		AOp<Long> op=Do.create(
+		AOp<CVMLong> op=Do.create(
 				    // define a nasty function that calls its argument recursively on itself
 					Def.create("fubar", 
 							Lambda.create(Vectors.of(Syntax.create(Symbol.create("func"))), 
@@ -260,7 +262,7 @@ public class CompilerTest {
 		assertEquals(2L,evalL("'~(do *depth*)")); // depth in expansion
 
 		// not we require compilation down to a single constant
-		assertEquals(Constant.create(7L),comp("~(+ 7)"));
+		assertEquals(Constant.of(7L),comp("~(+ 7)"));
 		
 		assertArityError(step("~(inc)"));
 		assertCastError(step("~(inc :foo)"));
@@ -421,7 +423,7 @@ public class CompilerTest {
 	public void testExpander()  {
 		Context<?> c=CONTEXT.fork();
 		AExpander ex=eval("(expander (fn [x e] x))");
-		assertEquals("foo",ex.expand("foo", ex, c).getResult().getValue());
+		assertCVMEquals("foo",ex.expand(RT.cvm("foo"), ex, c).getResult().getValue());
 		
 		// Fails because function call compiled before macro is defined.... TODO verify if OK?
 		assertCastError(step("(do (def bex (expander (fn [x e] \"foo\"))) (bex 2))"));
@@ -440,7 +442,7 @@ public class CompilerTest {
 	
 	@Test 
 	public void testMacrosNested() {
-		AVector<Long> expected=Vectors.of(1L,2L);
+		AVector<CVMLong> expected=Vectors.of(1L,2L);
 		assertEquals(expected,eval("(when (or nil true) (and [1 2]))"));		
 	}
 	
