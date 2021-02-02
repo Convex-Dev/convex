@@ -10,10 +10,8 @@ import convex.core.data.AList;
 import convex.core.data.AMap;
 import convex.core.data.ASequence;
 import convex.core.data.ASet;
-import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Address;
-import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.List;
 import convex.core.data.Lists;
@@ -24,8 +22,6 @@ import convex.core.data.Sets;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
-import convex.core.data.prim.APrimitive;
-import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.expanders.AExpander;
 import convex.core.lang.expanders.CoreExpander;
@@ -101,11 +97,8 @@ public class Compiler {
 	 */
 	static <T extends ACell> Context<AOp<T>> compile(Syntax expandedForm, Context<?> context) {
 		ACell form = expandedForm.getValue();
-		if (form instanceof ACell) {
-			return compileCell((ACell) form, context);
-		} else {
-			return compileBasicConstant(form, context);
-		}
+		if (form==null) return compileConstant(context,null);
+		return compileCell(form, context);
 	}
 
 	/**
@@ -130,36 +123,6 @@ public class Compiler {
 			obs = obs.conj((AOp<T>) context.getResult());
 		}
 		return context.withResult(obs);
-	}
-
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	private static <R extends ACell, T extends AOp<R>> Context<T> compileBasicConstant(ACell form, Context context) {
-		if (form == null) return context.withResult(Juice.COMPILE_CONSTANT, Constant.nil());
-
-		if (form instanceof AString) {
-			return compileConstant(context, form);
-		}
-
-		if (form instanceof APrimitive) {
-			return compileNumber(context, (APrimitive) form);
-		}
-
-		if (form instanceof CVMBool) {
-			Constant<CVMBool> bOp = RT.bool(form) ? Constant.TRUE : Constant.FALSE;
-			return (Context<T>) context.withResult(Juice.COMPILE_CONSTANT, bOp);
-		}
-
-		return context.withCompileError("Unexpected basic value type: " + form.getClass());
-	}
-
-	private static <R extends ACell, T extends AOp<R>> Context<T> compileNumber(Context<?> context, APrimitive form) {
-		// Check we have a valid embedded number type.
-		// TODO: needs to change is we extend support to bigints
-		if (!Format.isEmbedded(form)) {
-			return context.withCompileError("Not a valid Number in form, Type=" + form.getClass());
-		}
-		
-		return compileConstant(context, form);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -187,7 +150,7 @@ public class Compiler {
 		}
 
 		// return as a constant literal
-		return (Context<T>) context.withResult(Juice.COMPILE_CONSTANT, Constant.create(form));
+		return compileConstant(context,form);
 	}
 
 	@SuppressWarnings("unchecked")

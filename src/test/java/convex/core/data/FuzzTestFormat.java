@@ -52,33 +52,31 @@ public class FuzzTestFormat {
 	private static void doFuzzTest(Blob b) throws BadFormatException {
 		ByteBuffer bb = b.getByteBuffer();
 
-		Object v = Format.read(bb);
+		ACell v = Format.read(bb);
 
 		// If we have read the object, check that we can validate as a cell, at minimum
 		try {
-			RT.validateCell(v);
+			RT.validate(v);
 		} catch (InvalidDataException e) {
-			throw Utils.sneakyThrow(e);
+			throw new BadFormatException("Validation failed",e);
 		}
 
 		// if we manage to read the object and it is not a Ref, it must be in canonical
 		// format!
-		if (!(v instanceof Ref)) {
-			assertTrue(Format.isCanonical(v),()->"Not canonical: "+Utils.getClassName(v));
-			
-			Blob b2 = Format.encodedBlob(v);
-			assertEquals(v, Format.read(b2),
-					() -> "Expected to be able to regenerate value: " + v + " of type " + Utils.getClass(v));
-			assertEquals(bb.position(), b2.length(), () -> {
-				return "Bad length re-reading " + Utils.getClass(v) + ": " + v + " with encoding " + b.toHexString()
-						+ " and re-encoding" + b2.toHexString();
-			});
-			
-			// recursive fuzzing on this value
-			// this is good to test small mutations of
-			if (r.nextDouble() < 0.8) {
-				doMutationTest(b2);
-			}
+		assertTrue(Format.isCanonical(v),()->"Not canonical: "+Utils.getClassName(v));
+		
+		Blob b2 = Format.encodedBlob(v);
+		assertEquals(v, Format.read(b2),
+				() -> "Expected to be able to regenerate value: " + v + " of type " + Utils.getClass(v));
+		assertEquals(bb.position(), b2.length(), () -> {
+			return "Bad length re-reading " + Utils.getClass(v) + ": " + v + " with encoding " + b.toHexString()
+					+ " and re-encoding" + b2.toHexString();
+		});
+		
+		// recursive fuzzing on this value
+		// this is good to test small mutations of
+		if (r.nextDouble() < 0.8) {
+			doMutationTest(b2);
 		}
 
 	}
