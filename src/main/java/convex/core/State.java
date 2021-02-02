@@ -135,6 +135,17 @@ public class State extends ARecord {
 	}
 	
 	@Override
+	public long getEncodingLength() {
+		long length=1;
+		length+=accounts.getEncodingLength();
+		length+=peers.getEncodingLength();
+		length+=store.getEncodingLength();
+		length+=globals.getEncodingLength();
+		length+=schedule.getEncodingLength();
+		return length;
+	}
+	
+	@Override
 	public int estimatedEncodingSize() {
 		int est=1;
 		est+=accounts.estimatedEncodingSize();

@@ -174,7 +174,7 @@ public class VectorTree<T extends ACell> extends ASizedVector<T> {
 	}
 	
 	@Override
-	protected long getEncodingLength() {
+	public long getEncodingLength() {
 		if (encoding!=null) return encoding.length();
 		
 		// tag and count
