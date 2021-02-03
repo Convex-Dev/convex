@@ -28,7 +28,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	private static final Level LEVEL_MISSING = Level.WARNING;
 		
 	@Override
-	public final void accept(Message m) {
+	public void accept(Message m) {
 		try {
 			MessageType type = m.getType();
 			switch (type) {

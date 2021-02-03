@@ -6,6 +6,7 @@ import java.util.logging.Logger;
 import javax.swing.JComponent;
 
 import convex.core.Result;
+import convex.core.lang.RT;
 import convex.core.util.Utils;
 
 public class DefaultReceiveAction implements Consumer<Result> {
@@ -21,7 +22,7 @@ public class DefaultReceiveAction implements Consumer<Result> {
 	@Override
 	public void accept(Result t) {
 		if (t.isError()) {
-			handleError((Long)t.getID(),t.getErrorCode(),t.getValue());
+			handleError(RT.jvm(t.getID()),t.getErrorCode(),t.getValue());
 		} else {
 			handleResult(t.getValue());
 		}

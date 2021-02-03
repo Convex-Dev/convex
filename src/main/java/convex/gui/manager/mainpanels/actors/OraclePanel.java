@@ -18,6 +18,7 @@ import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.MapEntry;
+import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
@@ -167,7 +168,7 @@ public class OraclePanel extends JPanel {
 		@Override
 		public void accept(Result t) {
 			if (t.isError()) {
-				handleError((Long)t.getID(),t.getErrorCode(),t.getValue());
+				handleError(RT.jvm(t.getID()),t.getErrorCode(),t.getValue());
 			} else {
 				handleResult(t.getValue());
 			}

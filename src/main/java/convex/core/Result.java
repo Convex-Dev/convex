@@ -54,7 +54,7 @@ public class Result extends ARecordGeneric {
 	 * 
 	 * @return ID from this result
 	 */
-	public Object getID() {
+	public ACell getID() {
 		return values.get(0);
 	}
 	
@@ -63,7 +63,7 @@ public class Result extends ARecordGeneric {
 	 * 
 	 * @return ID from this result
 	 */
-	public Object getValue() {
+	public ACell getValue() {
 		return values.get(1);
 	}
 	
@@ -84,7 +84,7 @@ public class Result extends ARecordGeneric {
 	 * 
 	 * @return ID from this result
 	 */
-	public Object getErrorCode() {
+	public ACell getErrorCode() {
 		return values.get(2);
 	}
 	

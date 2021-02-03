@@ -76,7 +76,7 @@ public class Convex {
 	
 	private HashMap<Long,CompletableFuture<Result>> awaiting=new HashMap<>();
 	
-	private Consumer<Message> handler = new ResultConsumer() {
+	private final Consumer<Message> internalHandler = new ResultConsumer() {
 		@Override
 		protected synchronized void handleResultMessage(Message m) {
 			Result v = m.getPayload();
@@ -90,8 +90,25 @@ public class Convex {
 					log.warning("Unexpected result received for message ID: "+id+ " - was not expecting this message");
 				}
 			}
+			
+
+		}
+		
+		@Override
+		public void accept(Message m) {
+			super.accept(m);
+			
+			if (delegatedHandler!=null) {
+				try {
+					delegatedHandler.accept(m);
+				} catch (Throwable t) {
+					log.warning("Exception thrown in user-supplied handler function:"+t);
+				}
+			}
 		}
 	};
+	
+	private Consumer<Message> delegatedHandler=null;
 
 	private Convex(Address address,AKeyPair keyPair) {
 		this.keyPair=keyPair;
@@ -138,6 +155,10 @@ public class Convex {
 		this.sequence=nextSequence-1L;
 	}
 	
+	public void setHandler(Consumer<Message> handler) {
+		this.delegatedHandler=handler;
+	}
+	
 	/**
 	 * Gets the current sequence number for this Client, which is the sequence number of the last 
 	 * transaction observed for the current client's Account. 
@@ -159,7 +180,7 @@ public class Convex {
 	}
 
 	private void connectToPeer(InetSocketAddress peerAddress) throws IOException {
-		setConnection(Connection.connect(peerAddress, handler, Stores.current()));
+		setConnection(Connection.connect(peerAddress, internalHandler, Stores.current()));
 	}
 	
 	/**
@@ -443,12 +464,13 @@ public class Convex {
 	/**
 	 * Disconnects the client from the network.
 	 */
-	public void disconnect() {
+	public synchronized void disconnect() {
 		Connection c=this.connection;
 		if (c!=null) {
 			c.close();
 		}
 		connection=null;
+		awaiting.clear();
 	}
 
 	/**

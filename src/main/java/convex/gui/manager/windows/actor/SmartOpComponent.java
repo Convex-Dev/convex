@@ -3,7 +3,6 @@ package convex.gui.manager.windows.actor;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.logging.Logger;
@@ -16,6 +15,8 @@ import javax.swing.JTextField;
 
 import org.parboiled.common.Utils;
 
+import convex.api.Convex;
+import convex.core.Result;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.ACell;
 import convex.core.data.AList;
@@ -31,7 +32,6 @@ import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
 import convex.core.lang.impl.Fn;
-import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.gui.components.AccountChooserPanel;
@@ -40,8 +40,7 @@ import convex.gui.components.CodeLabel;
 import convex.gui.components.Toast;
 import convex.gui.manager.PeerManager;
 import convex.gui.utils.Toolkit;
-import convex.net.Connection;
-import convex.net.ResultConsumer;
+
 
 @SuppressWarnings("serial")
 public class SmartOpComponent extends BaseListComponent {
@@ -109,18 +108,6 @@ public class SmartOpComponent extends BaseListComponent {
 
 	}
 
-	private final ResultConsumer receiveAction = new ResultConsumer() {
-		@Override
-		protected void handleResult(Object m) {
-			showResult(m);
-		}
-
-		@Override
-		protected void handleError(long id, Object code, Object msg) {
-			showError(code,msg);
-		}
-	};
-
 	private void execute() {
 		InetSocketAddress addr = PeerManager.getDefaultPeer().getHostAddress();
 
@@ -141,43 +128,40 @@ public class SmartOpComponent extends BaseListComponent {
 
 		try {
 			ACell message = RT.cons(Symbols.CALL, parent.contract, rest);
-
-			long id;
-			
-			// connect to Peer as a client
-			Connection peerConnection = Connection.connect(addr, receiveAction, Stores.getGlobalStore());
 			
 			AccountChooserPanel execPanel = parent.execPanel;
+			WalletEntry we = execPanel.getWalletEntry();
+			Address myAddress=we.getAddress();
+			
+			// connect to Peer as a client
+			Convex peerConnection = Convex.connect(addr, we.getAddress(),we.getKeyPair());
+			
 			String mode = execPanel.getMode();
+			Result r=null;
 			if (mode.equals("Query")) {
-				WalletEntry we = execPanel.getWalletEntry();
-				if (we == null) {
-					id = peerConnection.sendQuery(message);
-				} else {
-					id = peerConnection.sendQuery(message, we.getAddress());
-				}
+				r=peerConnection.querySync(message);
 			} else if (mode.equals("Transact")) {
-				WalletEntry we = execPanel.getWalletEntry();
-				if ((we == null) || (we.isLocked())) {
+				if (we.isLocked()) {
 					JOptionPane.showMessageDialog(this,
 							"Please select an unlocked wallet address to use for transactions before sending");
 					return;
 				}
-				Address address = we.getAddress();
-				AccountStatus as = PeerManager.getLatestState().getAccount(address);
-				if (as == null) {
-					JOptionPane.showMessageDialog(this, "Cannot send transaction: account does not exist");
-					return;
-				}
-				long nonce = as.getSequence() + 1;
-				ATransaction trans = Invoke.create(address,nonce, message);
-				id = peerConnection.sendTransaction(we.sign(trans));
+				
+				ATransaction trans = Invoke.create(myAddress,-1, message);
+				r = peerConnection.transactSync(trans);
 			} else {
-				throw new Error("Unrecognosed REPL mode: " + mode);
+				throw new Error("Unexpected mode: "+mode);
 			}
-			log.info("Message sent with ID: " + id + " : " + message);
-		} catch (IOException e) {
+			if (r.isError()) {
+				showError(r.getErrorCode(),r.getValue());
+			} else {
+				showResult(r.getValue());
+			}
+			
+		} catch (Throwable e) {
 			log.warning(e.getMessage());
+			Toast.display(parent, "Unexpected Error: "+e.getMessage(), Toast.FAIL);
+
 		}
 
 	}
