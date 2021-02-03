@@ -51,15 +51,25 @@ public class LatencyBenchmark {
 	}
 	
 	@Benchmark
-	public void roundTrip100Transactions() throws TimeoutException, IOException, InterruptedException, ExecutionException {
-		doTransactions(100);
+	public void roundTrip10Transactions() throws TimeoutException, IOException, InterruptedException, ExecutionException {
+		doTransactions(10);
+	}
+	
+	@Benchmark
+	public void roundTrip50Transactions() throws TimeoutException, IOException, InterruptedException, ExecutionException {
+		doTransactions(50);
+	}
+	
+	@Benchmark
+	public void roundTrip1000Transactions() throws TimeoutException, IOException, InterruptedException, ExecutionException {
+		doTransactions(1000);
 	}
 	
 	@SuppressWarnings("unchecked")
 	private void doTransactions(int n) throws IOException, InterruptedException, ExecutionException, TimeoutException {
 		Future<Result>[] rs=new Future[n];
 		for (int i=0; i<n; i++) {
-			Future<Result> f=client.transact(Invoke.create(Init.HERO,-1, Constant.of(1L)));
+			Future<Result> f=client.transact(Invoke.create(Init.HERO,-1, Constant.of(i)));
 			rs[i]=f;
 		}
 		for (int i=0; i<n; i++) {

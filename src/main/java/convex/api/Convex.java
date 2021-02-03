@@ -128,8 +128,10 @@ public class Convex {
 	 * 
 	 * @return Sequence number as a Long value greater than zero
 	 */
-	public long getNextSequence() {
-		return getSequence()+1L;
+	private long getIncrementedSequence() {
+		long next= getSequence()+1L;
+		sequence=next;
+		return next;
 	}
 	
 	public void setNextSequence(long nextSequence) {
@@ -142,7 +144,7 @@ public class Convex {
 	 * 
 	 * @return Sequence number as a Long value, zero or positive
 	 */
-	private long getSequence() {
+	public long getSequence() {
 		if (sequence==null) {
 			try {
 				Future<Result> f=query(Lookup.create(Symbols.STAR_SEQUENCE));
@@ -204,10 +206,10 @@ public class Convex {
 	 */
 	public synchronized ATransaction applyNextSequence(ATransaction t) {
 		if (sequence!=null) {
-			// if we know the next sequence number to be applied, set it
+			// if already we know the next sequence number to be applied, set it
 			return t.withSequence(++sequence);
 		} else {
-			return t.withSequence(getNextSequence());
+			return t.withSequence(getIncrementedSequence());
 		}
 	}
 	
@@ -219,7 +221,7 @@ public class Convex {
 	 * @return A Future for the result of the transaction
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
-	public CompletableFuture<Result> transact(ATransaction transaction) throws IOException {
+	public synchronized CompletableFuture<Result> transact(ATransaction transaction) throws IOException {
 		if (autoSequence||(transaction.getSequence()<=0)) {
 			transaction=applyNextSequence(transaction);
 		}
