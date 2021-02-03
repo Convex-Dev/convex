@@ -32,7 +32,6 @@ import convex.core.crypto.WalletEntry;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.lang.Reader;
 import convex.core.transactions.ATransaction;
@@ -41,8 +40,6 @@ import convex.core.util.Utils;
 import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.PeerView;
-import convex.gui.manager.PeerManager;
-import convex.net.Connection;
 
 @SuppressWarnings("serial")
 public class REPLPanel extends JPanel {
@@ -153,12 +150,10 @@ public class REPLPanel extends JPanel {
 		btnInfo = new JButton("Connection Info");
 		panel_1.add(btnInfo);
 		btnInfo.addActionListener(e -> {
-			Connection pc = convex.getConnection();
 			String infoString = "";
-			infoString += "Remote address:  " + pc.getRemoteAddress() + "\n";
-			infoString += "Local address:  " + pc.getLocalAddress() + "\n";
-			infoString += "Recieved count:  " + pc.getReceivedCount() + "\n";
-			pc.wakeUp();
+			infoString += "Remote host:  " + convex.getPeerAddress() + "\n";
+			infoString += "Sequence:  " + convex.getSequence() + "\n";
+			infoString += "Connection Account:  " + convex.getAddress() + "\n";
 
 			JOptionPane.showMessageDialog(this, infoString);
 		});
@@ -210,14 +205,8 @@ public class REPLPanel extends JPanel {
 						return;
 					}
 					Address address = getAddress();
-					AccountStatus as = PeerManager.getLatestState().getAccount(address);
-					if (as == null) {
-						JOptionPane.showMessageDialog(this, "Cannot send transaction: account does not exist");
-						return;
-					}
-					long nonce = as.getSequence() + 1;
-					ATransaction trans = Invoke.create(address,nonce, message);
-					future = convex.transact(we.sign(trans));
+					ATransaction trans = Invoke.create(address,-1, message);
+					future = convex.transact(trans);
 				} else {
 					throw new Error("Unrecognosed REPL mode: " + mode);
 				}
