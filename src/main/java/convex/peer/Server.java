@@ -71,7 +71,7 @@ import convex.net.NIOServer;
 public class Server implements Closeable {
 	public static final int DEFAULT_PORT = 18888;
 
-	private static final int RECEIVE_QUEUE_SIZE = 256;
+	private static final int RECEIVE_QUEUE_SIZE = 10000;
 
 	// MAximum Pause for each iteration of Server update loop.
 	private static final long SERVER_UPDATE_PAUSE = 1L;
@@ -83,11 +83,13 @@ public class Server implements Closeable {
 	private static final Level LEVEL_PARTIAL = Level.WARNING;
 	// private static final Level LEVEL_MESSAGE = Level.FINER;
 	
-
+	/**
+	 * Queue for received messages to be processed by this Peer Server
+	 */
 	private BlockingQueue<Message> receiveQueue = new ArrayBlockingQueue<Message>(RECEIVE_QUEUE_SIZE);
 
 	/**
-	 * Message consumer that simply enqueues received messages Used for outward
+	 * Message consumer that simply enqueues received messages. Used for outward
 	 * connections. i.e. ones this Server has made.
 	 */
 	private Consumer<Message> peerReceiveAction = new Consumer<Message>() {
@@ -230,7 +232,7 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Process a message received from a peer. We know at this point that the
+	 * Process a message received from a peer or client. We know at this point that the
 	 * message parsed successfully, not much else.....
 	 * 
 	 * If the message is partial, will be queued pending delivery of missing data

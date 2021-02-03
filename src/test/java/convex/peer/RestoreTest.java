@@ -13,7 +13,6 @@ import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
-import convex.core.ErrorCodes;
 import convex.core.Init;
 import convex.core.Result;
 import convex.core.State;
@@ -42,12 +41,9 @@ public class RestoreTest {
 		Convex cvx1=Convex.connect(s1.getHostAddress(), Init.HERO,Init.HERO_KP);
 		
 		Result tx1=cvx1.transactSync(Invoke.create(Init.HERO,1, Symbols.STAR_ADDRESS));
-		Result tx2f=cvx1.transactSync(Invoke.create(Init.HERO,1, Symbols.FOO)); // bad sequence
 		assertEquals(Init.HERO,tx1.getValue());
 		Long balance1=cvx1.getBalance(Init.HERO);
 		assertTrue(balance1>0);
-		assertTrue(tx2f.isError());
-		assertEquals(ErrorCodes.SEQUENCE,tx2f.getErrorCode());
 		s1.close();
 		
 		// TODO: testing that server is definitely down

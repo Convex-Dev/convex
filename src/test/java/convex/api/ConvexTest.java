@@ -26,7 +26,7 @@ import convex.core.transactions.Invoke;
 import convex.peer.ServerTest;
 import convex.test.Samples;
 
-public class TestConvex {
+public class ConvexTest {
 
 	static Convex cv;
 	
