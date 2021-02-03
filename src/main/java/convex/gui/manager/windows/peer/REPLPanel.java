@@ -109,7 +109,7 @@ public class REPLPanel extends JPanel {
 		}
 		try {
 			// Connect to peer as a client
-			convex = Convex.connect(addr, getKeyPair());
+			convex = Convex.connect(addr, getAddress(),getKeyPair());
 		} catch (IOException ex) {
 			throw Utils.sneakyThrow(ex);
 		}

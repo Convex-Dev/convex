@@ -205,9 +205,9 @@ public class PeerManager extends JPanel {
 	 * Builds a connection to the peer network
 	 * @throws IOException 
 	 */
-	public static Convex makeConnection(AKeyPair kp) throws IOException {
+	public static Convex makeConnection(Address address,AKeyPair kp) throws IOException {
 		InetSocketAddress host = getDefaultPeer().getHostAddress();
-		return Convex.connect(host, kp);
+		return Convex.connect(host,address, kp);
 	}
 
 	/**
@@ -233,7 +233,7 @@ public class PeerManager extends JPanel {
 	public static CompletableFuture<Result> execute(WalletEntry we, ATransaction trans) {
 		try {
 			AKeyPair kp = we.getKeyPair();
-			Convex convex = makeConnection(kp);
+			Convex convex = makeConnection(we.getAddress(),kp);
 			CompletableFuture<Result> fr= convex.transact(trans);
 			log.finer("Sent transaction: "+trans.toString());
 			return fr;

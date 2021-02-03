@@ -3,6 +3,7 @@ package convex.performance;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.openjdk.jmh.annotations.Benchmark;
@@ -28,8 +29,8 @@ public class LatencyBenchmark {
 	static {
 		server=API.launchPeer();
 		try {
-			client=Convex.connect(server.getHostAddress(), Init.HERO_KP);
-			client2=Convex.connect(server.getHostAddress(), Init.VILLAIN_KP);
+			client=Convex.connect(server.getHostAddress(), Init.HERO,Init.HERO_KP);
+			client2=Convex.connect(server.getHostAddress(), Init.VILLAIN,Init.VILLAIN_KP);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -44,11 +45,28 @@ public class LatencyBenchmark {
 	@Benchmark
 	public void roundTripTwoTransactions() throws TimeoutException, IOException, InterruptedException, ExecutionException {
 		Future<Result> r1=client.transact(Invoke.create(Init.HERO,-1, Constant.of(1L)));
-		Future<Result> r2=client2.transact(Invoke.create(Init.HERO,-1, Constant.of(1L)));
+		Future<Result> r2=client2.transact(Invoke.create(Init.VILLAIN,-1, Constant.of(1L)));
 		r1.get();
 		r2.get();
 	}
 	
+	@Benchmark
+	public void roundTrip100Transactions() throws TimeoutException, IOException, InterruptedException, ExecutionException {
+		doTransactions(100);
+	}
+	
+	@SuppressWarnings("unchecked")
+	private void doTransactions(int n) throws IOException, InterruptedException, ExecutionException, TimeoutException {
+		Future<Result>[] rs=new Future[n];
+		for (int i=0; i<n; i++) {
+			Future<Result> f=client.transact(Invoke.create(Init.HERO,-1, Constant.of(1L)));
+			rs[i]=f;
+		}
+		for (int i=0; i<n; i++) {
+			rs[i].get(1000,TimeUnit.MILLISECONDS);
+		}
+	}
+
 	@Benchmark
 	public void roundTripQuery() throws TimeoutException, IOException, InterruptedException, ExecutionException {
 		client.querySync(Constant.of(1L));

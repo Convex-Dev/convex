@@ -8,6 +8,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 
 import convex.core.Block;
+import convex.core.BlockResult;
 import convex.core.Init;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
@@ -54,7 +55,8 @@ public class BigBlockBenchmark {
 
 	@Benchmark
 	public void benchmark() throws BadSignatureException {
-		Ref.createPersisted(state.applyBlock(block).getState());
+		BlockResult br=state.applyBlock(block);
+		Ref.createPersisted(br.getState());
 	}
 
 	public static void main(String[] args) throws Exception {

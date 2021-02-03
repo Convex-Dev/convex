@@ -27,7 +27,7 @@ public class TestConvex {
 
 	
 	@Test public void testConvex() throws IOException, TimeoutException {
-		Convex cv=Convex.connect(ServerTest.server.getHostAddress(), Init.HERO_KP);
+		Convex cv=Convex.connect(ServerTest.server.getHostAddress(), Init.HERO,Init.HERO_KP);
 		
 		assertTrue(cv.isConnected());
 
@@ -40,7 +40,7 @@ public class TestConvex {
 	}
 	
 	@Test public void testBadSignature() throws IOException, TimeoutException, InterruptedException, ExecutionException {
-		Convex cv=Convex.connect(ServerTest.server.getHostAddress(), Init.HERO_KP);
+		Convex cv=Convex.connect(ServerTest.server.getHostAddress(), Init.HERO,Init.HERO_KP);
 		
 		assertTrue(cv.isConnected());
 

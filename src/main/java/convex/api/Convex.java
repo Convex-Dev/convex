@@ -19,6 +19,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
 import convex.core.lang.ops.Lookup;
@@ -92,23 +93,11 @@ public class Convex {
 		}
 	};
 
-	private Convex(AKeyPair keyPair) {
+	private Convex(Address address,AKeyPair keyPair) {
 		this.keyPair=keyPair;
 		
 		// TODO: numeric address
-		this.address=Address.create(keyPair.getAccountKey());
-	}
-
-	/**
-	 * Create a Convex client by connecting to the specified Peer using the given key pair
-	 *
-	 * @param peerAddress Address of Peer
-	 * @param keyPair Key pair to use for client transactions
-	 * @return New Convex client instance
-	 * @throws IOException If connection fails
-	 */
-	public static Convex connect(InetSocketAddress peerAddress, AKeyPair keyPair) throws IOException {
-		return connect(peerAddress,null,keyPair);
+		this.address=address;
 	}
 	
 	/**
@@ -120,8 +109,7 @@ public class Convex {
 	 * @throws IOException If connection fails
 	 */
 	public static Convex connect(InetSocketAddress peerAddress, Address address,AKeyPair keyPair) throws IOException {
-		Convex convex=new Convex(keyPair);
-		convex.setAddress(address);
+		Convex convex=new Convex(address,keyPair);
 		convex.connectToPeer(peerAddress);
 		return convex;
 	}
@@ -159,8 +147,8 @@ public class Convex {
 			try {
 				Future<Result> f=query(Lookup.create(Symbols.STAR_SEQUENCE));
 				Result r=f.get();
-				if (r.isError()) throw new Error("Error querying *sequence*: "+r.getValue());
-				sequence=(Long)(r.getValue());
+				if (r.isError()) throw new Error("Error querying *sequence*: "+r.getErrorCode()+" "+r.getValue());
+				sequence=RT.jvm(r.getValue());
 			} catch (IOException | InterruptedException | ExecutionException e) {
 				throw new Error("Error trying to get sequence number",e);
 			}
@@ -214,12 +202,12 @@ public class Convex {
 	 * @param t Any transaction, for which the correct next sequence number is desired
 	 * @return The updated transaction 
 	 */
-	public ATransaction applyNextSequence(ATransaction t) {
+	public synchronized ATransaction applyNextSequence(ATransaction t) {
 		if (sequence!=null) {
 			// if we know the next sequence number to be applied, set it
 			return t.withSequence(++sequence);
 		} else {
-			return t;
+			return t.withSequence(getNextSequence());
 		}
 	}
 	

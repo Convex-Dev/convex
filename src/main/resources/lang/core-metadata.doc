@@ -1120,6 +1120,14 @@
      :special-symbol true
   }
   
+  *sequence*
+  {
+     :doc {:description "Returns the current sequence number for this account. The sequence number is equal to the number of signed transactions executed. The next valid sequence number is (*sequence* + 1)."
+           :examples [{:code "*sequence*"}]
+           :type :special}
+     :special-symbol true
+  }
+  
    *state*
   {
      :doc {:description "Returns the current CVM state record. This is a very large object, and should normally only be used temporarily to look up relevant values."

@@ -89,10 +89,13 @@ public class ErrorValue extends AExceptional {
 	public String toString() {
 		StringBuilder sb=new StringBuilder();
 		sb.append("ErrorValue["+code+"]"+((message==null)?"":" : "+Utils.toString(message)));
-		for (Object o:trace) {
-			sb.append("\n");
-			sb.append(o.toString());
+		if (trace!=null) {
+			for (Object o:trace) {
+				sb.append("\n");
+				sb.append(o.toString());
+			}
 		}
+			
 		return sb.toString();
 	}
 

@@ -701,7 +701,7 @@ public class Server implements Closeable {
 					ACell id = m.getID();
 					Result res = br.getResults().get(j).withID(id);
 					pc.sendResult(res);
-				} catch (Exception e) {
+				} catch (Throwable e) {
 					System.err.println("Error sending Result: " + e.getMessage());
 					e.printStackTrace();
 					// ignore
