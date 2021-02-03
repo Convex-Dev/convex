@@ -31,7 +31,10 @@ import convex.core.exceptions.BadFormatException;
 public class MessageReceiver {
 	public static final int RECEIVE_BUFFER_SIZE = Format.LIMIT_ENCODING_LENGTH * 5 + 20;
 
-	private ByteBuffer buffer = ByteBuffer.allocateDirect(RECEIVE_BUFFER_SIZE);
+	// Maybe use a direct buffer since we are copying from the socket channel?
+	// But probably doesn't make any difference.
+	private ByteBuffer buffer = ByteBuffer.allocate(RECEIVE_BUFFER_SIZE);
+	
 	private final Consumer<Message> action;
 	private final Connection peerConnection;
 
@@ -81,6 +84,8 @@ public class MessageReceiver {
 			if (buffer.position() < lengthLength + len) {
 				return n; // message not yet fully received
 			}
+			
+			
 
 			// Log.debug("Message received with length: "+len);
 			buffer.flip();
@@ -102,12 +107,14 @@ public class MessageReceiver {
 
 	/**
 	 * Reads exactly one message from the ByteBuffer, checking that the position is
-	 * advanced as expected.
+	 * advanced as expected. Buffer must contain sufficient bytes for given message length.
 	 * 
 	 * Expects a message code at the buffer's current position.
 	 * 
 	 * Calls the receive action with the message if successfully received. Should be called with
 	 * the correct store for this Connection.
+	 * 
+	 * SECURITY: Gets called on NIO server thread
 	 * 
 	 * @throws BadFormatException if the message is incorrectly formatted`
 	 */

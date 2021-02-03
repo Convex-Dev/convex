@@ -516,6 +516,8 @@ public class Connection {
 	/**
 	 * Handles channel reads from a SelectionKey for the client listener
 	 * 
+	 * SECURITY: Called on Connection Selector Thread
+	 * 
 	 * @param key
 	 * @throws IOException
 	 */
@@ -540,6 +542,8 @@ public class Connection {
 	 * 
 	 * Will switch the current store to the Connection-specific store if required.
 	 * 
+	 * SECURITY: Called on NIO Thread (Server or client Connection)
+	 * 
 	 * @return The number of bytes read from channel
 	 * @throws IOException
 	 * @throws BadFormatException
@@ -557,6 +561,8 @@ public class Connection {
 
 	/**
 	 * Handles writes to the channel.
+	 * 
+	 * SECURITY: Called on Connection Selector Thread
 	 * 
 	 * @param key
 	 */

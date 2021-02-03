@@ -631,9 +631,18 @@ public class Format {
 	 * @return Value read from the blob of encoded data
 	 * @throws BadFormatException
 	 */
-	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T read(Blob blob) throws BadFormatException {
 		byte tag = blob.get(0);
+		return read(tag,blob);
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> T read(byte tag, Blob blob) throws BadFormatException {
+		if (tag == Tag.NULL) {
+			long len=blob.length();
+			if (len!=1) throw new BadFormatException("Bad null encoding with length"+len);
+			return null;
+		}
 		if (tag == Tag.BLOB) {
 			return (T) Blobs.readFromBlob(blob);
 		} else {
@@ -649,15 +658,11 @@ public class Format {
 				throw new BadFormatException("Blob has insufficients bytes: " + blob.length(), e);
 			} 
 
-			if (result instanceof AObject) {
-				// cache the Blob in this data object, to avoid need to re-serialise
-				// SECURITY: should be OK, since we have just successfully read from canonical
-				// format?
-				((AObject) result).attachEncoding(blob);
-			}
+			result.attachEncoding(blob);
 			return result;
 		}
 	}
+
 
 	public static <T extends ACell> T read(String hexString) throws BadFormatException {
 		return read(Blob.fromHex(hexString));

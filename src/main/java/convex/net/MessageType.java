@@ -3,6 +3,7 @@ package convex.net;
 import convex.core.exceptions.BadFormatException;
 
 public enum MessageType {
+	
 	/**
 	 * A message that requests the remote endpoint to respond with a signed
 	 * response.

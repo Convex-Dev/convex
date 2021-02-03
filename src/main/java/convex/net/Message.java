@@ -68,7 +68,7 @@ public class Message {
 
 	@Override
 	public String toString() {
-		return "#message {:type " + getType() + " :value " + Utils.ednString(payload) + "}";
+		return "#message {:type " + getType() + " :payload " + Utils.ednString(payload) + "}";
 	}
 
 	/**
