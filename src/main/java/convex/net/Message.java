@@ -19,24 +19,24 @@ import convex.core.util.Utils;
 public class Message {
 
 	private final Connection peerConnection;
-	private final Object payload;
+	private final ACell payload;
 	private final MessageType type;
 
-	private Message(Connection peerConnection, MessageType type, Object payload) {
+	private Message(Connection peerConnection, MessageType type, ACell payload) {
 		this.peerConnection = peerConnection;
 		this.type = type;
 		this.payload = payload;
 	}
 
-	public static Message create(Connection peerConnection, MessageType type, Object payload) {
+	public static Message create(Connection peerConnection, MessageType type, ACell payload) {
 		return new Message(peerConnection, type, payload);
 	}
 
-	public static Message create(Connection peerConnection, Object o) {
+	public static Message create(Connection peerConnection, ACell o) {
 		return create(peerConnection, MessageType.DATA, o);
 	}
 	
-	public static Message createData(Object o) {
+	public static Message createData(ACell o) {
 		return create(null,MessageType.DATA,o);
 	}
 	
@@ -61,8 +61,8 @@ public class Message {
 		return type;
 	}
 	
-	public Object getErrorCode() {
-		Object et=((AVector<?>)payload).get(2);
+	public ACell getErrorCode() {
+		ACell et=((AVector<?>)payload).get(2);
 		return et;
 	}
 

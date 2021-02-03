@@ -61,7 +61,7 @@ public class ConvexTest {
 	
 	@SuppressWarnings("unchecked")
 	@Test public void testManyTransactions() throws IOException, TimeoutException, InterruptedException, ExecutionException {
-		int n=1000;
+		int n=100;
 		Future<Result>[] rs=new Future[n];
 		for (int i=0; i<n; i++) {
 			Future<Result> f=cv.transact(Invoke.create(Init.HERO,0, Constant.of(i)));

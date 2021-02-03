@@ -7,6 +7,7 @@ import java.nio.channels.ReadableByteChannel;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
+import convex.core.data.ACell;
 import convex.core.data.Format;
 import convex.core.exceptions.BadFormatException;
 
@@ -116,7 +117,7 @@ public class MessageReceiver {
 		MessageType type = MessageType.decode(messageCode);
 		
 		// Read an object from message
-		Object payload = Format.read(bb);
+		ACell payload = Format.read(bb);
 		
 		int pos = bb.position();
 		if (pos != expectedPosition) {

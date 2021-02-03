@@ -419,7 +419,7 @@ public class Server implements Closeable {
 		// At this point we know something updated our belief, so we want to rebroadcast
 		// belief to network
 		Consumer<Ref<ACell>> noveltyHandler = r -> {
-			Object o = r.getValue();
+			ACell o = r.getValue();
 			if (o == belief) return; // skip sending data for belief cell itself, will be BELIEF payload
 			Message msg = Message.createData(o);
 			manager.broadcast(msg);
