@@ -214,10 +214,6 @@ public class Format {
 	 *                            message length
 	 */
 	public static int peekMessageLength(ByteBuffer bb) throws BadFormatException {
-		if (!bb.hasRemaining()) {
-			throw new BadFormatException(
-					"Format.peekMessageLength: No message length field:" + Utils.readBufferData(bb));
-		}
 		int len = bb.get(0);
 
 		// Zero message length not allowed

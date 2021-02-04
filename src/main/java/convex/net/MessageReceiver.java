@@ -29,7 +29,8 @@ import convex.core.exceptions.BadFormatException;
  *
  */
 public class MessageReceiver {
-	public static final int RECEIVE_BUFFER_SIZE = Format.LIMIT_ENCODING_LENGTH * 5 + 20;
+	// Receive buffer must be big enough for one max sized message plus message header
+	public static final int RECEIVE_BUFFER_SIZE = Format.LIMIT_ENCODING_LENGTH  + 20;
 
 	// Maybe use a direct buffer since we are copying from the socket channel?
 	// But probably doesn't make any difference.
@@ -66,47 +67,62 @@ public class MessageReceiver {
 	 * May be called multiple times during receipt of a single message, i.e. can
 	 * handle partial message receipt.
 	 * 
+	 * Will consume enough bytes from channel to handle exactly one message. Bytes
+	 * will be left unconsumed on the channel if more are available. 
+	 * 
+	 * This hopefully
+	 * creates sufficient backpressure on clients sending a lot of messages.
+	 * 
 	 * @param chan
 	 * @throws IOException
 	 * @return The number of bytes read from the channel
 	 * @throws BadFormatException
 	 */
 	public synchronized int receiveFromChannel(ReadableByteChannel chan) throws IOException, BadFormatException {
-		int n = chan.read(buffer);
-		if (n == 0) {
-			return 0;
-		}
-		if (n < 0) throw new ClosedChannelException();
-		// Log.debug("Bytes received: "+n);
-
-		while (buffer.position() >= 2) { // ensure we have at least a message length to read
-			// peek message length at start of buffer. May throw BFE.
-			int len = Format.peekMessageLength(buffer);
-
-			// compute length of message length field at start of message
-			int lengthLength = (len < 64) ? 1 : 2;
-			if (buffer.position() < lengthLength + len) {
-				return n; // message not yet fully received
-			}
+		int numRead=0;
+		
+		// first read a message length
+		if (buffer.position()<2) {
+			buffer.limit(2);
+			numRead = chan.read(buffer);
 			
+			if (numRead < 0) throw new ClosedChannelException();
 			
-
-			// Log.debug("Message received with length: "+len);
-			buffer.flip();
-
-			// position buffer ready to receive message content (i.e. skip length
-			// field). We still want to include the message code.
-			buffer.position(lengthLength);
-
-			// receive message, expecting the specified final position
-			int expectedPosition = lengthLength + len;
-			receiveMessage(buffer, expectedPosition);
-
-			// keep remaining data in buffer, flip and prepare for more reads
-			// there might be more messages / fragments on the channel
-			buffer.compact();
+			// exit if we don't have at least 2 bytes for message length
+			if (buffer.position()<2) return numRead;
 		}
-		return n;
+		
+		// peek message length at start of buffer. May throw BFE.
+		int len = Format.peekMessageLength(buffer);
+		int lengthLength = (len < 64) ? 1 : 2;
+		
+		// limit buffer to total message size including length
+		int size=lengthLength + len;
+		buffer.limit(size);
+		
+		// try to read more bytes up to limit of total message size
+		{
+			int n=chan.read(buffer);
+			if (n < 0) throw new ClosedChannelException();
+			numRead+=n;
+		}
+
+		// exit if we are still waiting for more bytes
+		if (buffer.hasRemaining()) return numRead;
+			
+		// Log.debug("Message received with length: "+len);
+		buffer.flip();
+
+		// position buffer ready to receive message content (i.e. skip length
+		// field). We still want to include the message code.
+		buffer.position(lengthLength);
+
+		// receive message, expecting the specified final position
+		int expectedPosition = lengthLength + len;
+		receiveMessage(buffer, expectedPosition);
+
+		buffer.clear();
+		return numRead;
 	}
 
 	/**

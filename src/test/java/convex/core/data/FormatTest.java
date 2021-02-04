@@ -150,7 +150,7 @@ public class FormatTest {
 	public void testMessageLength() throws BadFormatException {
 		// empty bytebuffer, therefore no message lengtg
 		ByteBuffer bb1=Blob.fromHex("").toByteBuffer();
-		assertThrows(BadFormatException.class,()->Format.peekMessageLength(bb1));
+		assertThrows(IndexOutOfBoundsException.class,()->Format.peekMessageLength(bb1));
 		
 		// bad first byte! Needs to carry if 0x40 or more
 		ByteBuffer bb2=Blob.fromHex("43").toByteBuffer();

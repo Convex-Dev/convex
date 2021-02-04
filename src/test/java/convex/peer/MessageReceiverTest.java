@@ -41,9 +41,11 @@ public class MessageReceiverTest {
 		assertFalse(pc.sendBytes());
 
 		mr.receiveFromChannel(chan);
-
-		assertEquals(2, received.size());
+		assertEquals(1, received.size());
 		assertEquals(msg1, received.get(0).getPayload());
+		
+		mr.receiveFromChannel(chan);
+		assertEquals(2, received.size());
 		assertEquals(msg2, received.get(1).getPayload());
 
 		Message m1 = received.get(0);

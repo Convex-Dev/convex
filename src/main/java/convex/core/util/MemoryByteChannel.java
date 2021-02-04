@@ -26,10 +26,13 @@ public class MemoryByteChannel implements ByteChannel {
 	public int read(ByteBuffer dst) throws IOException {
 		if (!open) throw new ClosedChannelException();
 		memory.flip();
+		int savledLimit=memory.limit();
+		memory.limit(dst.remaining());
 		dst.put(memory);
-		int num=memory.position(); // number of bytes read into dst
+		int numRead=memory.position(); // number of bytes read into dst
+		memory.limit(savledLimit);
 		memory.compact();
-		return num;
+		return numRead;
 	}
 
 	@Override
