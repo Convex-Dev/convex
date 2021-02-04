@@ -124,7 +124,7 @@ public class Juice {
 	 * 
 	 * Expensive.
 	 */
-	public static final long HASH = 500;
+	public static final long HASH = 10000;
 
 	/**
 	 * Juice for a very cheap operation. O(1), no new cell allocations or non-trivial lookups.
