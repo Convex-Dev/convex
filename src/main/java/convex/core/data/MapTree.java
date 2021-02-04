@@ -782,6 +782,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			
 			// most important to check lengths of children add up!
 			AHashMap<K,V> c=(AHashMap<K, V>) ch;
+			c.validate();
 			cc += c.count();
 		}
 		
