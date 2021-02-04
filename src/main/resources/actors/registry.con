@@ -2,7 +2,7 @@
   ;; This code implements the standard Convex Registry
   ;;
   ;; It is deployed by default during network initialisation
-  ;; at the well-known address *registry* = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+  ;; at the well-known address *registry* = xxx
   ;;
   ;; This make it accessible from early in network bootstrap as a way to register and locate Accounts.
   
