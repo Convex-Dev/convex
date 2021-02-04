@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
 
+import convex.core.Constants;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519KeyPair;
@@ -16,7 +17,6 @@ import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
-import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
@@ -72,7 +72,7 @@ public class PeerCluster {
 			accts = accts.conj(as);
 		}
 
-		return State.create(accts, peers, Sets.empty(), Maps.empty(), BlobMaps.empty());
+		return State.create(accts, peers, Sets.empty(), Constants.INITIAL_GLOBALS, BlobMaps.empty());
 	}
 
 	public static void main(String... args) {
@@ -81,11 +81,6 @@ public class PeerCluster {
 		log.info("Creating peer configurations");
 		for (Map<Keyword, Object> config : PEER_CONFIGS) {
 			peers.add(API.launchPeer(config));
-		}
-
-		log.info("Server starting....");
-		for (Server peer : peers) {
-			peer.launch();
 		}
 
 		try {
