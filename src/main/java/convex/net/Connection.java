@@ -38,7 +38,7 @@ import convex.core.util.Counters;
 import convex.core.util.Utils;
 
 /**
- * <p>Class representing Connections to a Peer.</p>
+ * <p>Class representing a Connection between network participants.</p>
  * 
  * <p>Sent messages are sent asynchronously via the shared client selector.</p>
  * 
