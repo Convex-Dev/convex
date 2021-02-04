@@ -16,6 +16,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 
+import convex.api.Convex;
 import convex.core.Init;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Keyword;
@@ -26,7 +27,6 @@ import convex.gui.components.PeerComponent;
 import convex.gui.components.PeerView;
 import convex.gui.components.ScrollyList;
 import convex.gui.manager.PeerManager;
-import convex.net.Connection;
 import convex.peer.API;
 import convex.peer.Server;
 import etch.EtchStore;
@@ -84,12 +84,8 @@ public class PeersListPanel extends JPanel {
 
 		PeerView peer = new PeerView();
 		peer.peerServer = ps;
-		try {
-			InetSocketAddress sa = ps.getHostAddress();
-			peer.peerConnection = ps.connectToPeer(sa);
-		} catch (IOException e) {
-			log.severe("Can't create local connection to launched peer: " + e.getMessage());
-		}
+		InetSocketAddress sa = ps.getHostAddress();
+		
 		addPeer(peer);
 		return peer;
 	}
@@ -134,10 +130,10 @@ public class PeersListPanel extends JPanel {
 			String host = ss[0].trim();
 			int port = (ss.length > 1) ? Integer.parseInt(ss[1].trim()) : 0;
 			InetSocketAddress hostAddress = new InetSocketAddress(host, port);
-			Connection pc;
+			Convex pc;
 			try {
 				// TODO: we want to receive anything?
-				pc = Connection.connect(hostAddress, null,Stores.getGlobalStore());
+				pc = Convex.connect(hostAddress, Init.HERO,Init.HERO_KP);
 				PeerView pv = new PeerView();
 				pv.peerConnection = pc;
 				addPeer(pv);

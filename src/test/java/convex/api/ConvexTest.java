@@ -41,7 +41,7 @@ public class ConvexTest {
 	@Test public void testConnection() throws IOException {
 		Convex convex=Convex.connect(ServerTest.server.getHostAddress(), Init.HERO,Init.HERO_KP);
 		assertTrue(convex.isConnected());
-		convex.disconnect();
+		convex.close();
 		assertFalse(convex.isConnected());
 	}
 	

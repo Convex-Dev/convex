@@ -40,10 +40,12 @@ public class MessageReceiverTest {
 		// since we aren't using a Selector / SocketChannel here
 		assertFalse(pc.sendBytes());
 
+		// receive first message
 		mr.receiveFromChannel(chan);
 		assertEquals(1, received.size());
 		assertEquals(msg1, received.get(0).getPayload());
 		
+		// receive second message
 		mr.receiveFromChannel(chan);
 		assertEquals(2, received.size());
 		assertEquals(msg2, received.get(1).getPayload());

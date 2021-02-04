@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
+import java.util.ArrayList;
+import java.util.concurrent.Future;
 
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -18,12 +20,12 @@ import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 
+import convex.api.Convex;
 import convex.core.Init;
+import convex.core.Result;
 import convex.core.State;
 import convex.core.data.Address;
-import convex.core.data.SignedData;
 import convex.core.lang.Reader;
-import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
@@ -31,7 +33,6 @@ import convex.gui.components.ActionPanel;
 import convex.gui.components.PeerView;
 import convex.gui.manager.PeerManager;
 import convex.gui.utils.Toolkit;
-import convex.net.Connection;
 import convex.net.ResultConsumer;
 
 @SuppressWarnings("serial")
@@ -45,6 +46,7 @@ public class StressPanel extends JPanel {
 
 	private JSpinner transactionCountSpinner;
 	private JSpinner opCountSpinner;
+	private JSpinner clientCountSpinner;
 
 	public StressPanel(PeerView peerView) {
 		this.peerView = peerView;
@@ -76,7 +78,7 @@ public class StressPanel extends JPanel {
 		panel.add(optionPanel);
 		optionPanel.setLayout(new GridLayout(0, 2, 0, 0));
 
-		JLabel lblNewLabel = new JLabel("Transactions");
+		JLabel lblNewLabel = new JLabel("Transactions per client");
 		optionPanel.add(lblNewLabel);
 		transactionCountSpinner = new JSpinner();
 		transactionCountSpinner.setModel(new SpinnerNumberModel(1000, 1, 1000000, 100));
@@ -87,6 +89,13 @@ public class StressPanel extends JPanel {
 		opCountSpinner = new JSpinner();
 		opCountSpinner.setModel(new SpinnerNumberModel(1, 1, 1000, 10));
 		optionPanel.add(opCountSpinner);
+		
+		JLabel lblNewLabel3 = new JLabel("Clients");
+		optionPanel.add(lblNewLabel3);
+		clientCountSpinner = new JSpinner();
+		clientCountSpinner.setModel(new SpinnerNumberModel(1, 1, 1, 1));
+		optionPanel.add(clientCountSpinner);
+
 
 		// =========================================
 		// Result Panel
@@ -123,50 +132,46 @@ public class StressPanel extends JPanel {
 	private JPanel resultPanel;
 	private JTextArea resultArea;
 
-	long startTime;
-	long endTime;
-
 	NumberFormat formatter = new DecimalFormat("#0.000");
 
 	
 	private synchronized void runStressTest() {
 		errors = 0;
 		results = 0;
-		State startState = PeerManager.getLatestState();
-		startTime = Utils.getCurrentTimestamp();
-		try {
-			InetSocketAddress sa = peerView.peerServer.getHostAddress();
+			Address address=Init.HERO;
 
-			Connection pc = Connection.connect(sa, resultHandler, Stores.getGlobalStore());
-
-			Address address = Init.HERO;
 			int transCount = (Integer) transactionCountSpinner.getValue();
 			int opCount = (Integer) opCountSpinner.getValue();
+			// TODO: enable multiple clients
+			// int clientCount = (Integer) opCountSpinner.getValue();
 			
 			new SwingWorker<String,Object>() {
 				@Override
 				protected String doInBackground() throws Exception {
+					StringBuilder sb = new StringBuilder();
+					
+					try {
+
+
+					InetSocketAddress sa = peerView.peerServer.getHostAddress();
+					long startTime = Utils.getCurrentTimestamp();
+
 					// Use client store
 					// Stores.setCurrent(Stores.CLIENT_STORE);
+					ArrayList<Future<Result>> frs=new ArrayList<>();
+					Convex pc = Convex.connect(sa, address,Init.HERO_KP);
 					
-					long seq = startState.getAccount(address).getSequence();
 					for (int i = 0; i < transCount; i++) {
-						StringBuilder sb = new StringBuilder();
-						sb.append("(def a (do ");
+						StringBuilder tsb = new StringBuilder();
+						tsb.append("(def a (do ");
 						for (int j = 0; j < opCount; j++) {
-							sb.append(" (* 10 " + seq + ")");
+							tsb.append(" (* 10 " + i + ")");
 						}
-						sb.append("))");
-						String source = sb.toString();
-						ATransaction t = Invoke.create(Init.HERO,++seq, Reader.read(source));
-						SignedData<ATransaction> signed = Init.HERO_KP.signData(t);
-						long id = pc.sendTransaction(signed);
-						while (id <= 0) {
-							// loop if there is temporary blockage on sending messages
-							Thread.sleep(0);
-							if (pc.isClosed()) throw new Error("Cannot use Peer Connection: " + pc);
-							id = pc.sendTransaction(signed);
-						}
+						tsb.append("))");
+						String source = tsb.toString();
+						ATransaction t = Invoke.create(Init.HERO,-1, Reader.read(source));
+						Future<Result> fr = pc.transact(t);
+						frs.add(fr);
 					}
 					
 					long sendTime = Utils.getCurrentTimestamp();
@@ -174,20 +179,26 @@ public class StressPanel extends JPanel {
 					while ((results < transCount) && (Utils.getCurrentTimestamp() < sendTime + 1000)) {
 						Thread.sleep(1);
 					}
-					endTime = Utils.getCurrentTimestamp();
+					long endTime = Utils.getCurrentTimestamp();
 					
 					Thread.sleep(100); // wait for state update to be reflected
 					State endState = PeerManager.getLatestState();
 
-					StringBuilder sb = new StringBuilder();
+					
 					sb.append("Results for " + transCount + " transactions\n");
 					sb.append(results + " responses received\n");
 					sb.append(errors + " errors received\n");
 					sb.append("\n");
 					sb.append("Send time:     " + formatter.format((sendTime - startTime) * 0.001) + "s\n");
 					sb.append("End time:      " + formatter.format((endTime - startTime) * 0.001) + "s\n");
-					sb.append("Consenus time: " + formatter.format((endState.getTimeStamp().longValue() - startTime) * 0.001) + "s\n");
+					sb.append("Consensus time: " + formatter.format((endState.getTimeStamp().longValue() - startTime) * 0.001) + "s\n");
 				
+					} catch (IOException e) {
+						e.printStackTrace();
+					} finally {
+						btnRun.setEnabled(true);
+					}
+					
 					String report=sb.toString();
 					return report;
 				}
@@ -202,10 +213,6 @@ public class StressPanel extends JPanel {
 				}
 			}.execute();
 			
-		} catch (IOException e) {
-			e.printStackTrace();
-		} finally {
-			btnRun.setEnabled(true);
-		}
+
 	}
 }

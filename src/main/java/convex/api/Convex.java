@@ -195,10 +195,10 @@ public class Convex {
 	}
 
 	/**
-	 * Gets the Internet address of the currently connected peer
+	 * Gets the Internet address of the currently connected remote
 	 * @return
 	 */
-	public InetSocketAddress getPeerAddress() {
+	public InetSocketAddress getRemoteAddress() {
 		return connection.getRemoteAddress();
 	}
 	
@@ -457,14 +457,14 @@ public class Convex {
 	 */
 	private void setConnection(Connection conn) {
 		if (this.connection==conn) return;
-		disconnect();
+		close();
 		this.connection = conn;
 	}
 
 	/**
 	 * Disconnects the client from the network.
 	 */
-	public synchronized void disconnect() {
+	public synchronized void close() {
 		Connection c=this.connection;
 		if (c!=null) {
 			c.close();
@@ -500,6 +500,7 @@ public class Convex {
 			throw new IOException("Unable to query balance",ex);
 		}
 	}
+
 
 
 }
