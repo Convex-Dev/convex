@@ -47,12 +47,6 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @throws InvalidDataException 
 	 */
 	public abstract void validateCell() throws InvalidDataException;
-	
-
-	
-
-	
-
 
 	/**
 	 * Length of binary representation of this object
@@ -215,31 +209,31 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 
 	/**
-	 * Calculates the total Memory Size for this Cell.
+	 * Calculates the Memory Size for this Cell.
 	 * 
 	 * Requires any child Refs to be either Direct or of persisted status at minimum, 
 	 * or you might get a MissingDataException
 	 * 
 	 * @return Memory Size of this Cell
 	 */
-	protected long calcMemorySize() {
-		long baseSize=getEncodingLength();
-		
-		long csize=0;
+	protected long calcMemorySize() {	
 		// add size for each child Ref (might be zero if embedded)
+		long result=0;
 		int n=getRefCount();
 		for (int i=0; i<n; i++) {
 			Ref<?> childRef=getRef(i);
 			if (!childRef.isEmbedded()) {
 				@SuppressWarnings("unchecked")
 				Ref<ACell> cellRef=(Ref<ACell>) childRef;
-				long childSize=cellRef.getValue().getMemorySize();
-				csize += childSize;
+				long childSize=cellRef.getMemorySize();
+				result += childSize;
 			}
 		}
 		
-		long result=baseSize+csize;
 		if (!isEmbedded()) {
+			// We need to count this cell's encode length
+			result+=getEncodingLength();
+			
 			// Add overhead for storage of non-embedded cell
 			result+=Constants.MEMORY_OVERHEAD;
 		} 
@@ -258,6 +252,9 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 
 	/**
 	 * Gets the Memory Size of this Cell, computing it if required.
+	 * 
+	 * The memory size is the total storage requirement for this cell. Embedded cells do not require storage for
+	 * their own encoding, but may require storage for nested non-embedded Refs.
 	 * 
 	 * @return Memory Size of this Cell
 	 */

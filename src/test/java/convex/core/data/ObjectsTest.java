@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import convex.core.Constants;
 import convex.core.crypto.Hash;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -85,6 +86,7 @@ public class ObjectsTest {
 	 * @param a
 	 */
 	public static void doAnyValueTests(ACell a) {
+		boolean embedded=Format.isEmbedded(a);
 		assertTrue(Format.isCanonical(a));
 
 		Ref<ACell> r = Ref.get(a).persist();
@@ -95,6 +97,20 @@ public class ObjectsTest {
 			assertSame(b,a.getEncoding());
 			assertEquals(b.length,a.getEncodingLength());
 		} 
+		
+		// tests for memory size
+		if (!embedded) {
+			long memorySize=a.getMemorySize();
+			long encodingSize=a.getEncodingLength();
+			int rc=a.getRefCount();
+			long childMem=0;
+			for (int i=0; i<rc; i++) {
+				Ref<ACell> childRef=a.getRef(i);
+				long cms=childRef.getMemorySize();
+				childMem+=cms;
+			}
+			assertEquals(memorySize,encodingSize+childMem+Constants.MEMORY_OVERHEAD);
+		}
 
 		assertTrue(b.length <= Format.LIMIT_ENCODING_LENGTH);
 		

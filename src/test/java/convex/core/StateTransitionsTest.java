@@ -215,7 +215,7 @@ public class StateTransitionsTest {
 		State s = Init.STATE;
 		AKeyPair kp = convex.core.lang.TestState.HERO_PAIR;
 		
-		long initialMem=s.getAccount(Init.HERO).getMemoryUsage();
+		long initialMem=s.getMemorySize();
 		
 		ATransaction t1 = Invoke.create(Init.HERO,1,Reader.read("(def a 1)"));
 		Block b1 = Block.of(s.getTimeStamp().longValue(),Init.FIRST_PEER_KEY, kp.signData(t1));
@@ -226,7 +226,9 @@ public class StateTransitionsTest {
 		
 		s = br.getState();
 		
-		assertTrue(initialMem<s.getAccount(Init.HERO).getMemoryUsage());
+		// should have increased memory size for account
+		long newMem=s.getMemorySize();
+		assertTrue(initialMem<newMem);
 	}
 
 	@Test

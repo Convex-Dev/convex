@@ -13,6 +13,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.Hash;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
@@ -119,6 +120,20 @@ public class RefTest {
 				Ref.forHash(Hash.fromHex("0000000000000000000000000000000000000000000000000000000000000000"))));
 		assertEquals(-1, Ref.get(RT.cvm(1L)).compareTo(
 				Ref.forHash(Hash.fromHex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))));
+	}
+	
+	@Test
+	public void testVectorRefCounts() {
+		AVector<CVMLong> v=Vectors.of(1,2,3);
+		assertEquals(3,v.getRefCount());
+		
+		AVector<CVMLong> zv=Vectors.repeat(CVMLong.create(0), 16);
+		assertEquals(16,zv.getRefCount());
+		
+		// 3 tail elements after prefix ref
+		AVector<CVMLong> zvv=zv.concat(v);
+		assertEquals(4,zvv.getRefCount());
+
 	}
 
 	@Test

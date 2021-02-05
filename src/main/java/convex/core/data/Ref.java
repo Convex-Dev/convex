@@ -585,4 +585,13 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 */
 	public abstract long getEncodingLength();
 
+	/**
+	 * Gets the indirect memory size for this Ref
+	 * @return 0 for fully embedded values with no child refs, memory size of referred value otherwise
+	 */
+	public long getMemorySize() {
+		if (isEmbedded()) return 0;
+		return getValue().getMemorySize();
+	}
+
 }

@@ -51,7 +51,7 @@ import convex.core.util.Utils;
  * - 32 bytes key
  * - X bytes monotonic label of which
  *    - 1 byte status
- *    - 8 bytes Memory Size
+ *    - 8 bytes Memory Size (TODO: might be negative for unknown?)
  * - 2 bytes data length N (a short)
  * - N byes actual data
  */
@@ -629,7 +629,7 @@ public class Etch {
 			data.attachContentHash(hash);
 			cell.attachEncoding(data);
 			
-			if (memorySize>0) {
+			if (memorySize>=0) {
 				// need to attach memory size for cell
 				cell.attachMemorySize(memorySize);
 			}
