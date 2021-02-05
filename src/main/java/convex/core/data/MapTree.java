@@ -768,26 +768,11 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return create(newChildren, shift, mask, computeCount(newChildren));
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public void validate() throws InvalidDataException {
 		super.validate();
+		// Perform validation for this tree position
 		validateWithPrefix("");
-		
-		long cc=0L;
-		int n=children.length;
-		for (int i=0; i<n; i++) {
-			ACell ch=children[i].getValue();
-			if (!(ch instanceof AHashMap)) throw new InvalidDataException("Not an AHashMap child at index: "+i,this);
-			
-			// most important to check lengths of children add up!
-			AHashMap<K,V> c=(AHashMap<K, V>) ch;
-			c.validate();
-			cc += c.count();
-		}
-		
-		if (count != cc)
-			throw new InvalidDataException("Bad child count, expected " + count + " but children had: " + cc, this);
 	}
 
 	@Override
@@ -798,12 +783,13 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		}
 		int bsize = children.length;
 
+		long childCount=0;;
 		for (int i = 0; i < bsize; i++) {
 			if (children[i] == null)
 				throw new InvalidDataException("Null child ref at " + prefix + Utils.toHexChar(digitForIndex(i, mask)),
 						this);
 			Object o = children[i].getValue();
-			if (!(o instanceof AMap)) {
+			if (!(o instanceof AHashMap)) {
 				throw new InvalidDataException(
 						"Expected map child at " + prefix + Utils.toHexChar(digitForIndex(i, mask)), this);
 			}
@@ -814,6 +800,12 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 						this);
 			int d = digitForIndex(i, mask);
 			child.validateWithPrefix(prefix + Utils.toHexChar(d));
+			
+			childCount += child.count();
+		}
+		
+		if (count != childCount) {
+			throw new InvalidDataException("Bad child count, expected " + count + " but children had: " + childCount, this);
 		}
 	}
 
