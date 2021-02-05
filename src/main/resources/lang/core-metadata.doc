@@ -80,6 +80,14 @@
          :signature [{:params [address]}]}
 	}
  
+  blob-map
+	{
+	 :doc {:description "Creates an empty BlobMap. Blobmaps support blob types as keys only."
+         :examples [{:code "(blob-map)"}]
+         :type :function
+         :signature [{:params []}]}
+	}
+ 
    blob?
 	{
 	 :doc {:description "Tests if the argument is a blob."

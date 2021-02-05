@@ -404,6 +404,13 @@ public class CoreTest {
 		assertArityError(step("(hash-map 1 2 3)"));
 		assertArityError(step("(hash-map 1 2 3 4 5)"));
 	}
+	
+	@Test
+	public void testBlobMap() {
+		assertEquals(BlobMaps.empty(), eval("(blob-map)"));
+		
+		assertArityError(step("(blob-map 1)"));
+	}
 
 	@Test
 	public void testKeys() {

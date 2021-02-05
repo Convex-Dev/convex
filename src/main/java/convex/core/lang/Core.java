@@ -25,6 +25,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.core.data.BlobMaps;
 import convex.core.data.Format;
 import convex.core.data.IAssociative;
 import convex.core.data.IGet;
@@ -824,6 +825,18 @@ public class Core {
 			long juice = Juice.BLOB + Juice.BLOB_PER_BYTE * blob.length();
 
 			return context.withResult(juice, blob);
+		}
+	});
+	
+	public static final CoreFn<ABlobMap> BLOB_MAP = reg(new CoreFn<>(Symbols.BLOB_MAP) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<ABlobMap> invoke(Context context, Object[] args) {
+			if (args.length != 0) return context.withArityError(exactArityMessage(0, args.length));
+
+			long juice = Juice.BUILD_DATA;
+
+			return context.withResult(juice, BlobMaps.empty());
 		}
 	});
 

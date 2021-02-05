@@ -23,6 +23,7 @@ public class Symbols {
 	public static final Symbol VEC = Symbol.create("vec");
 	public static final Symbol SET = Symbol.create("set");
 	public static final Symbol HASH_MAP = Symbol.create("hash-map");
+	public static final Symbol BLOB_MAP = Symbol.create("blob-map");
 	public static final Symbol HASH_SET = Symbol.create("hash-set");
 	public static final Symbol LIST = Symbol.create("list");
 	public static final Symbol EMPTY = Symbol.create("empty");
@@ -267,6 +268,7 @@ public class Symbols {
 	
 	public static final Symbol CREATE_ACCOUNT = Symbol.create("create-account");
 	public static final Symbol SET_KEY = Symbol.create("set-key");
+
 
 
 	

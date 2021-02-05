@@ -15,8 +15,8 @@
   (import convex.trust :as trust)
   (import convex.fungible :as fungible)
   
-  ;; Map of token addresses to pair Actor addresses (deployed with deploy-once)
-  (def pairs (empty (get state :accounts)))
+  ;; BlobMap of token addresses to pair Actor addresses (deployed with deploy-once)
+  (def pairs (blob-map))
   
  
   (defn factory 
