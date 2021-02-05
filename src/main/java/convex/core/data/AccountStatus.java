@@ -167,7 +167,9 @@ public class AccountStatus extends ARecord {
 
 		// get function from environment. Anything not a function results in null
 		Syntax functionSyn = environment.get(sym);
-		if (functionSyn==null) return null;
+		
+		if (functionSyn==null) return null; // check in case exported definition is not declared
+		
 		IFn<R> fn = RT.function(functionSyn.getValue());
 		return fn;
 	}
