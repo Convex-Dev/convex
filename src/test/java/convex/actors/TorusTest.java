@@ -25,8 +25,9 @@ public class TorusTest {
 		try {
 			Context<?> ctx=INITIAL;
 			ctx=step(ctx,"(import convex.fungible :as fun)");
+			ctx=step(ctx,"(import convex.asset :as asset)");
 			
-			// Deploy currencies for testing
+			// Deploy currencies for testing (10m each, 2 decimal places)
 			ctx=step(ctx,"(def USD (deploy (fun/build-token {:supply 1000000000})))");
 			assertNotError(ctx);
 			USD=(Address) ctx.getResult();
@@ -55,8 +56,13 @@ public class TorusTest {
 	@Test public void testInitialMarket() {
 		Context<?> ctx=CONTEXT.fork();
 		
-		ctx= step(ctx,"(call TORUS (get-market USD))");
+		// Check we can access the USD market
+		ctx= step(ctx,"(def USDM (call TORUS (get-market USD)))");
 		assertEquals(USD_MARKET,ctx.getResult());
+		
+		// Deposit some liquidity $100,000 for 1000 Gold
+		ctx= step(ctx,"(asset/offer USDM [USD 10000000])");
+		ctx= step(ctx,"(call USDM 1000000000000 (add-liquidity 10000000))");
 	}
 
 	@Test public void testSetup() {
