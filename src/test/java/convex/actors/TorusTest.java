@@ -2,6 +2,7 @@ package convex.actors;
  
 import static convex.core.lang.TestState.step;
 import static convex.test.Assertions.assertNotError;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,7 @@ public class TorusTest {
 			ctx=step(ctx,"(def USD (deploy (fun/build-token {:supply 1000000000})))");
 			assertNotError(ctx);
 			USD=(Address) ctx.getResult();
-			System.out.println("USD deployed Address = "+USD);
+			//System.out.println("USD deployed Address = "+USD);
 			ctx=step(ctx,"(def GBP (deploy (fun/build-token {:supply 1000000000})))");
 			GBP=(Address) ctx.getResult();
 			
@@ -38,10 +39,11 @@ public class TorusTest {
 			assertNotError(ctx);
 			TORUS=(Address)ctx.getResult();
 			assertNotNull(ctx.getAccountStatus(TORUS));
-			System.out.println("Torus deployed Address = "+TORUS);
+			ctx= step(ctx,"(def TORUS "+TORUS+")");
+			//System.out.println("Torus deployed Address = "+TORUS);
 			
 			// Deploy USD market. No market for GBP yet!
-			ctx= step(ctx,"(call "+TORUS+" (create-market USD))");
+			ctx= step(ctx,"(call TORUS (create-market USD))");
 			USD_MARKET=(Address)ctx.getResult();
 			CONTEXT= ctx.withResult(TORUS);
 		} catch (Throwable e) {
@@ -51,7 +53,10 @@ public class TorusTest {
 	}
 	
 	@Test public void testInitialMarket() {
+		Context<?> ctx=CONTEXT.fork();
 		
+		ctx= step(ctx,"(call TORUS (get-market USD))");
+		assertEquals(USD_MARKET,ctx.getResult());
 	}
 
 	@Test public void testSetup() {
