@@ -561,10 +561,13 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <R extends ACell> Ref<R> getRef(int i) {
-		int ic = items.length;
+		if (prefix != null) {
+			if (i==0) return (Ref<R>) prefix;
+			i--; // DEcrement so that i indexes into child array after skipping prefix ref
+		}
+		int itemsCount = items.length;
 		if (i < 0) throw new IndexOutOfBoundsException("Negative Ref index: " + i);
-		if (i < ic) return (Ref<R>) items[i];
-		if ((i == ic) && (prefix != null)) return (Ref<R>) prefix;
+		if (i < itemsCount) return (Ref<R>) items[i];
 		throw new IndexOutOfBoundsException("Ref index out of range: " + i);
 	}
 
