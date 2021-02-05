@@ -33,6 +33,16 @@ public class BlobMapsTest {
 
 		doBlobMapTests(m);
 	}
+	
+	@Test
+	public void testBadAssoc() throws InvalidDataException {
+		BlobMap<ABlob, CVMLong> m =BlobMaps.create(Init.HERO, RT.cvm(1L));
+		m=m.assoc(Init.VILLAIN, RT.cvm(2L));
+		assertEquals(2L,m.count());
+		
+		assertNull(m.assoc(null, null));
+	}
+
 
 	@Test
 	public void testAssoc() throws InvalidDataException {

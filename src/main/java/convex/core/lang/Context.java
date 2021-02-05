@@ -1599,6 +1599,10 @@ public final class Context<T extends ACell> extends AObject {
 	public <R extends ACell> Context<R> withCastError(Object a, Class<?> klass) {
 		return withError(ErrorCodes.CAST,"Can't convert "+a+" of class "+Utils.getClassName(a)+" to class "+klass);
 	}
+	
+	public <R extends ACell> Context<R> withCastError(Object a, String message) {
+		return withError(ErrorCodes.CAST,message);
+	}
 
 	/**
 	 * Gets the error code of this context's return value

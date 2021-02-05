@@ -1048,8 +1048,9 @@ public class Core {
 			// assoc additional elements. Must produce a valid non-null data structure after
 			// each assoc
 			for (int i = 1; i < n; i += 2) {
-				result = RT.assoc(result, (ACell)args[i], (ACell)args[i + 1]);
-				if (result == null) return context.withCastError(o, ADataStructure.class);
+				ACell key=(ACell)args[i];
+				result = RT.assoc(result, key, (ACell)args[i + 1]);
+				if (result == null) return context.withCastError(key, "Cannot assoc value - invalid map key type");
 			}
 
 			return context.withResult(juice, result);

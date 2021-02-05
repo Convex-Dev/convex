@@ -193,6 +193,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 
 	@Override
 	public BlobMap<K, V> assoc(K key, V value) {
+		if (!(key instanceof ABlob)) return null;
 		return assocEntry(MapEntry.create(key, value));
 	}
 

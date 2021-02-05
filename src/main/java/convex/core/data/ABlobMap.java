@@ -67,6 +67,11 @@ public abstract class ABlobMap<K extends ABlob, V extends ACell> extends AMap<K,
 		return true;
 	}
 
+	/**
+	 * Associates a blob key with a value in this data structure.
+	 * 
+	 * Returns null if the key is not a valid BlobMap key
+	 */
 	@Override
 	public abstract ABlobMap<K, V> assoc(K key, V value);
 
