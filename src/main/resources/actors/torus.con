@@ -15,25 +15,33 @@
   (import convex.trust :as trust)
   (import convex.fungible :as fungible)
   
-  ;; BlobMap of token addresses to pair Actor addresses (deployed with deploy-once)
-  (def pairs (blob-map))
+  ;; BlobMap of token addresses to market Actor addresses
+  (def markets (blob-map))
   
- 
-  (defn factory 
-    ^{:doc {:description "Gets the canonical pair for a token, deploying it if necessary"
+  (defn get-market 
+    ^{:doc {:description "Gets the canonical market for a token. Returns nil if the market does not exist."
          :examples [{:code "(deploy-once (build-market {:token token-address}))"}]
          :type :function
          :signature [{:params [config]}]}
 	  }
     [token]
-    (let [token (address token)]
-      ;; return pair if already deployed
-      (if-let [pair (get pairs token)] (return pair))
-      
-      (let [code (build-market {:token token})
-            pair (deploy code)]
-        (def pairs (assoc pairs token pair))
-        pair)))
+    (get markets token))
+  
+  (defn create-market
+    ^{:doc {:description "Gets the canonical market for a token. Returns nil if the market does not exist."
+         :examples [{:code "(deploy-once (build-market {:token token-address}))"}]
+         :type :function
+         :signature [{:params [config]}]}
+	  }
+    ([token] 
+      (if-let [market (get markets token)]
+        market
+        (let [token (address token)
+              code (build-market token *address*)
+              market (deploy code)
+              ]
+          (def markets (assoc markets token market))
+          market))))
   
   (defn build-market
     ^{:doc {:description "Creates deployable code for a new Torus token market"
@@ -41,10 +49,11 @@
          :type :function
          :signature [{:params [config]}]}
 	  }
-    [config]
+    [token torus]
     (let [token (address (:token config))]
       '(do
          (def token ~token)
+         (def torus ~torus)
          
          (def total-shares 0)
          (def token-holding 0)
@@ -86,5 +95,5 @@
   
 
   
-  
+    (export get-market create-market)
   )
