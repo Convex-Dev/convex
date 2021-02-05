@@ -585,7 +585,11 @@ public class CoreTest {
 	public void testVec() {
 		assertSame(Vectors.empty(), eval("(vec nil)"));
 		assertSame(Vectors.empty(), eval("(vec [])"));
-		assertEquals(Vectors.of(1L, 2L, 3L, 4L), eval("(vec (list 1 2 3 4))"));
+		assertSame(Vectors.empty(), eval("(vec {})"));
+		assertSame(Vectors.empty(), eval("(vec (blob-map))"));
+		
+		assertEquals(Vectors.of(1,2,3,4), eval("(vec (list 1 2 3 4))"));
+		assertEquals(Vectors.of(MapEntry.of(1,2)), eval("(vec {1,2})"));
 
 		assertCastError(step("(vec 1)"));
 		assertCastError(step("(vec :foo)"));
@@ -1126,6 +1130,16 @@ public class CoreTest {
 
 		// basic return mechanics
 		assertError(ErrorCodes.UNEXPECTED,step("(recur 1)"));
+	}
+	
+	@Test
+	public void testRecurMultiFn() {
+		// test function that should exit on recur with value 13
+		Context<?> ctx=step("(defn f ([] 13) ([a] (inc (recur))))");
+
+		assertEquals(13L,evalL(ctx,"(f)"));
+		assertEquals(13L,evalL(ctx,"(f :foo)"));
+		assertArityError(step(ctx,"(f 1 2)"));
 	}
 
 	@Test
