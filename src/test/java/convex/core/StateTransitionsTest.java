@@ -200,11 +200,11 @@ public class StateTransitionsTest {
 	@Test
 	public void testDeploys() throws BadSignatureException {
 		State s = Init.STATE;
-		ATransaction t1 = Invoke.create(Init.HERO,1,Reader.read("(def my-lib-address (deploy (defn foo [x] x)))"));
+		ATransaction t1 = Invoke.create(Init.HERO,1,Reader.read("(def my-lib-address (deploy '(defn foo [x] x)))"));
 		AKeyPair kp = convex.core.lang.TestState.HERO_PAIR;
 		Block b1 = Block.of(s.getTimeStamp().longValue(),Init.FIRST_PEER_KEY, kp.signData(t1));
 		BlockResult br=s.applyBlock(b1);
-		assertFalse(br.isError(0));
+		assertFalse(br.isError(0),br.getResult(0).toString());
 		
 		s = br.getState();
 		

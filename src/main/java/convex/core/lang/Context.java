@@ -1553,10 +1553,10 @@ public final class Context<T extends ACell> extends AObject {
 		final Context<Address> exContext=Context.create(stateSetup, juice, Maps.empty(), null, depth+1, getOrigin(),getAddress(), address);
 		final Context<Address> rctx=exContext.eval(code);
 		
-		Context<Address> result=this.consumeJuice(Juice.DEPLOY_CONTRACT);
+		Context<Address> result=this.handleStateResults(rctx,false);
 		if (result.isExceptional()) return result;
-		result= result.handleStateResults(rctx,false);
-		return result.withResult(address);
+		
+		return result.withResult(Juice.DEPLOY_CONTRACT,address);
 	}
 	
 	/**

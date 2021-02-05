@@ -34,8 +34,8 @@
          :signature [{:params [config]}]}
 	  }
     ([token] 
-      (if-let [market (get markets token)]
-        market
+      (let [existing-market (get markets token)]
+        (if existing-market (return existing-market))
         (let [token (address token)
               code (build-market token *address*)
               market (deploy code)
@@ -50,8 +50,10 @@
          :signature [{:params [config]}]}
 	  }
     [token torus]
-    (let [token (address (:token config))]
+    (let []
       '(do
+         (import convex.asset :as asset)
+         
          (def token ~token)
          (def torus ~torus)
          
@@ -59,7 +61,11 @@
          (def token-holding 0)
          
          (defn calc-rate []
+           ;; TODO: have vairable rate set by torus and/or trade velocity
+           ;; Maybe BASE_FEE / 1 + (THROUGHPUT / LIQUIDITY) ?
            0.001)
+         
+         
          
          (defn swap [coins tokens]
            (let [coins (long coins)
@@ -77,6 +83,7 @@
                  ])
            )
          
+         ;; TODO
          ;; token implementation to allow shares to be used as fungible tokens
          (defn balance [addr]
             (or (get-holding addr) 0))
