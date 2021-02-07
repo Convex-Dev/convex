@@ -82,6 +82,10 @@ public class TestFungible {
 		assertTrue(evalB(ctx,"(asset/owns? "+TestState.VILLAIN+" [token 1000])"));
 		assertTrue(evalB(ctx,"(asset/owns? "+TestState.VILLAIN+" [token 2000])"));
 		assertFalse(evalB(ctx,"(asset/owns? "+TestState.VILLAIN+" [token 2001])"));
+		
+		// test offer
+		ctx=step(ctx,"(asset/offer "+TestState.VILLAIN+" [token 1337])");
+		assertEquals(1337L,evalL(ctx,"(asset/get-offer token *address* "+TestState.VILLAIN+")"));
 	}
 	
 	@Test public void testBuildToken() {

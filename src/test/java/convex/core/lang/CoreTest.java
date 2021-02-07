@@ -1545,6 +1545,23 @@ public class CoreTest {
 		assertArityError(step("(accept)"));
 		assertArityError(step("(accept 1 2)"));
 	}
+	
+	@Test
+	public void testAcceptInActor() {
+		Context<?> ctx=INITIAL_CONTEXT.fork();
+		ctx=step(ctx,"(def act (deploy '(do (defn receive-coin [sender amount data] (accept amount))  (defn echo-offer [] *offer*) (export echo-offer receive-coin))))");
+		
+		ctx=step(ctx,"(transfer act 100)");
+		assertEquals(100L, (long)RT.jvm(ctx.getResult()));
+		assertEquals(100L,evalL(ctx,"(balance act)"));
+		assertEquals(999L,evalL(ctx,"(call act 999 (echo-offer))"));
+		
+		// send via contract call
+		ctx=step(ctx,"(call act 666 (receive-coin *address* 350 nil))");
+		assertEquals(350L, (long)RT.jvm(ctx.getResult()));
+		assertEquals(450L,evalL(ctx,"(balance act)"));
+		
+	}
 
 	@Test
 	public void testCall() {

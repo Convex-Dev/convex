@@ -57,30 +57,42 @@
          (def token ~token)
          (def torus ~torus)
          
-         (def l2 0.0)
+         (def l2 0.0)  ;; liquidity pool = token balance * convex balance
          
          (def total-shares 0)
-         (def token-holding 0)
+         (def token-balance 0)
          
          (defn calc-rate []
            ;; TODO: have vairable rate set by torus and/or trade velocity
            ;; Maybe BASE_FEE / 1 + (THROUGHPUT / LIQUIDITY) ?
            0.001)
          
-         (defn add-liqidity [amt]
-           (let [cvx (accept *offer*)
-                 amt (long amt)
-                 _ (asset/accept *caller* [token (long amt)])
-                 new-coin-holding (+ cvx *balance*) 
-                 new-token-holding (+ token-holding amt)
-                 new-l2 (* (double new-coin-holding) new-token-holding)
-                 delta-l2 (- new-l2 l2)
-                 _ (assert (> delta-l2 0))
-                 purchased-shares (long (* 0.999 delta-l2))]
-              (set-holding *caller* (+ purchased-shares (or (get-holding *caller* 0))))
-              (def total-shares (+ total-shares puchased-shares))
-              (def token-holding (+ token-holding amt))
-              purchased-shares))
+         ;; price is convex amount per token, or nil if there are no tokens in liquidity pool
+         (defn price []
+           (if (> token-balance 0) (/ (double *balance*) token-balance)))
+         
+         (defn add-liquidity [amt]
+           (let [amt (long amt)                                 ;; amount of tokens deposited
+                 price (price)                                  ;; price of token in CVX, nil if no current liquidity
+                 cvx (accept (if price (* price amt) *offer*))  ;; amount of CVX deposited
+                 _ (asset/accept *caller* [token (long amt)])   ;; ensure tokens are transferred from caller to market actor
+                 
+                 ;; compute new total balances for actor
+                 new-token-balance (+ token-balance amt)
+                 
+                 ;; compute new pool size
+                 new-l2 (* *balance* new-token-balance)
+                 
+                 ;; compute number of new shares for depositor = increase in liquidity (%) * current total shares
+                 liquidity (sqrt l2) ;; liquidity defined as geometric mean of Convex and Token balances   
+                 delta (long (* (- (sqrt new-l2) liquidity) (/ total-shares liquidity)))
+                 
+                 ;; _ (assert (> delta 0))
+                 ]
+              (set-holding *caller* (+ delta (or (get-holding *caller*) 0)))
+              (def total-shares (+ total-shares delta))
+              (def token-balance (+ token-balance amt))
+              delta))
          
          (defn swap [coins tokens]
            (let [coins (long coins)
@@ -113,7 +125,7 @@
              (set-holding addr (+ tbal amount))
              ))
        
-         (export add-liquidity transfer balance))))
+         (export add-liquidity transfer balance price))))
   
 
   

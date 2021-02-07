@@ -74,8 +74,8 @@
   ;; For smart contract assets, you can offer and accept separately if you choose
   (defn offer
     ^{:doc {:description "Offers asset to receiver.",
-            :examples [{:code "(transfer receiver [fungible-token-address 1000] data)"}
-                       {:code "(transfer receiver [non-fungible-token-address #{1 4 6}] data)"}]
+            :examples [{:code "(offer receiver [fungible-token-address 1000])"}
+                       {:code "(offer receiver [non-fungible-token-address #{1 4 6}])"}]
             :type :function
             :signature [{:params [receiver [asset-address quantity]]}]}}
     [receiver [asset-address quantity]]

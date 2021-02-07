@@ -62,19 +62,23 @@
          
          (defn offer [receiver quantity]
            (let [receiver (address receiver)
-                 quantity (long quantity)
+                 quantity (if quantity (long quantity) 0)
                  om (get offers *caller*)]
              (cond 
-               (<= 0 quantity) (if (get om receiver)
+               (<= quantity 0) (if (get om receiver)
                                  (def offers (assoc offers *caller* (dissoc om receiver))))
-               (def offers (assoc-in offers [*caller* receiver] quantity)))))
+               (def offers (assoc-in offers [*caller* receiver] quantity)))
+             quantity))
+         
+         (defn get-offer [sender receiver] 
+           (or (get (get offers sender) receiver) 0))
            
          (defn accept [sender quantity]
            (let [sender (address sender)
                  quantity (long quantity)
                  om (get offers sender)
-                 sendbal (or (get-holding *caller*) 0)
-                 offer (get om caller)]
+                 sendbal (or (get-holding sender) 0)
+                 offer (get om *caller*)]
              (if offer
                (cond 
                  (< quantity 0) (fail "Can't accept a negative quantity of fungible tokens.")
@@ -83,7 +87,7 @@
                  (do 
                    (def offers (assoc offers sender (assoc om *caller* (- offer quantity))))
                    (set-holding sender (- sendbal quantity))
-                   (set-holding *caller* (+ (or (get-holding *caller) 0) quantity))))
+                   (set-holding *caller* (+ (or (get-holding *caller*) 0) quantity))))
                (fail "No offer from sender"))))
          
          (defn direct-transfer [addr amount]
@@ -105,7 +109,7 @@
          (defn check-transfer [sender receiver quantity]
            nil)
          
-         (export direct-transfer balance owns? offer accept check-transfer))))
+         (export direct-transfer balance owns? offer accept get-offer check-transfer))))
   
   (defn add-mint 
     ^{:doc {:description "Creates deployable code that, when added to a fungible token actor, allows priviledged accounts to mint and burn tokens. The :minter may be a single address, or a Trust Monitor."

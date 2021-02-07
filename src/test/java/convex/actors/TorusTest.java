@@ -1,7 +1,7 @@
 package convex.actors;
  
-import static convex.core.lang.TestState.step;
-import static convex.test.Assertions.assertNotError;
+import static convex.core.lang.TestState.*;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -60,9 +60,21 @@ public class TorusTest {
 		ctx= step(ctx,"(def USDM (call TORUS (get-market USD)))");
 		assertEquals(USD_MARKET,ctx.getResult());
 		
-		// Deposit some liquidity $100,000 for 1000 Gold
+		// Offer tokens to market
 		ctx= step(ctx,"(asset/offer USDM [USD 10000000])");
+		assertEquals(10000000L,evalL(ctx,"(asset/get-offer USD *address* USDM)"));
+		
+		// Deposit some liquidity $100,000 for 1000 Gold
 		ctx= step(ctx,"(call USDM 1000000000000 (add-liquidity 10000000))");
+		assertNotError(ctx);
+
+		assertEquals(10000000L,evalL(ctx,"(asset/balance USD USDM)"));
+		assertEquals(1000000000000L,evalL(ctx,"(balance USDM)"));
+		
+		// Should have consumed full offer of tokens
+		assertEquals(0L,evalL(ctx,"(asset/get-offer USD *address* USDM)"));
+
+		assertEquals(100000.0,evalD(ctx,"(call USDM (price))"));
 	}
 
 	@Test public void testSetup() {
