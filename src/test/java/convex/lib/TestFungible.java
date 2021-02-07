@@ -179,6 +179,7 @@ public class TestFungible {
 	public void doFungibleTests (Context<?> ctx, Address token, Address user) {
 		ctx=ctx.forkWithAddress(user);
 		ctx=step(ctx,"(import convex.asset :as asset)");
+		ctx=step(ctx,"(import convex.fungible :as fungible)");
 		ctx=step(ctx,"(def token "+token+")");
 		ctx = TestState.step(ctx,"(def actor (deploy '(set-controller "+user+")))");
 		Address actor = (Address) ctx.getResult();
