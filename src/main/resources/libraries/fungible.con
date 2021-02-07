@@ -92,7 +92,7 @@
          
          (defn direct-transfer [addr amount]
            (let [addr (address addr)
-                 amount (long amount)
+                 amount (if amount (long amount) 0)
                  bal (or (get-holding *caller*) 0)
                  tbal (or (get-holding addr) 0)]
              (assert (<= 0 amount bal)) ;; amount must be in valid range

@@ -68,6 +68,9 @@ public class TestFungible {
 		Address token = (Address) ctx.getResult();
 		assertNotNull(token);
 		
+		// generic tests
+		doFungibleTests(ctx,token,ctx.getAddress());
+		
 		assertEquals(1000000L,evalL(ctx,"(asset/balance token *address*)"));
 		assertEquals(0L,evalL(ctx,"(asset/balance token *registry*)"));
 		
@@ -100,6 +103,9 @@ public class TestFungible {
 		assertTrue(ctx.getAccountStatus(token)!=null);
 		ctx=step(ctx,"(def token (address "+token+"))");
 		
+		// GEnric tests
+		doFungibleTests(ctx,token,ctx.getAddress());
+
 		// check our balance is positive as initial holder
 		long bal=evalL(ctx,"(fungible/balance token *address*)");
 		assertTrue(bal>0);
@@ -182,9 +188,14 @@ public class TestFungible {
 		assertEquals(0L, evalL(ctx,"(asset/balance token actor)"));
 		assertTrue(BAL>0,"Should provide a user account with positive balance!");
 		
-		// transfer all to self
+		// transfer all to self, should not affect balance
 		ctx=step(ctx,"(asset/transfer *address* [token "+BAL+"])");
 		assertEquals(BAL,RT.jvm(ctx.getResult()));
+		assertEquals(BAL, evalL(ctx,"(asset/balance token *address*)"));
+		
+		// transfer nothing to self, should not affect balance
+		ctx=step(ctx,"(asset/transfer *address* [token nil])");
+		assertEquals(0L,(long)RT.jvm(ctx.getResult()));
 		assertEquals(BAL, evalL(ctx,"(asset/balance token *address*)"));
 	}
 }
