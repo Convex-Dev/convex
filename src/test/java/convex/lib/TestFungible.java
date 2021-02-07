@@ -13,6 +13,7 @@ import convex.core.data.Address;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.lang.Context;
+import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
@@ -121,12 +122,15 @@ public class TestFungible {
 	
 	@Test public void testMint() {
 		// check our alias is right
-		Context<?> ctx=TestFungible.ctx;
+		Context<?> ctx=TestFungible.ctx.fork();
 		
 		// deploy a token with default config
 		ctx=step(ctx,"(def token (deploy [(fungible/build-token {:supply 100}) (fungible/add-mint {:max-supply 1000})]))");
 		Address token = (Address) ctx.getResult();
 		assertTrue(ctx.getAccountStatus(token)!=null);
+		
+		// do Generic Tests
+		doFungibleTests(ctx,token,ctx.getAddress());
 		
 		// check our balance is positive as initial holder
 		Long bal=evalL(ctx,"(fungible/balance token *address*)");
@@ -159,5 +163,28 @@ public class TestFungible {
 			assertTrustError(step(c,"(fungible/mint token 100)"));
 			assertTrustError(step(c,"(fungible/mint token 10000)")); // trust before amount checks
 		}
+	}
+	
+	/**
+	 * Generic tests for a fungible token. User account should have some of fungible token and sufficient coins.
+	 * @param ctx
+	 * @param fun
+	 */
+	public void doFungibleTests (Context<?> ctx, Address token, Address user) {
+		ctx=ctx.forkWithAddress(user);
+		ctx=step(ctx,"(import convex.asset :as asset)");
+		ctx=step(ctx,"(def token "+token+")");
+		ctx = TestState.step(ctx,"(def actor (deploy '(set-controller "+user+")))");
+		Address actor = (Address) ctx.getResult();
+		assertNotNull(actor);
+		
+		Long BAL=evalL(ctx,"(asset/balance token *address*)");
+		assertEquals(0L, evalL(ctx,"(asset/balance token actor)"));
+		assertTrue(BAL>0,"Should provide a user account with positive balance!");
+		
+		// transfer all to self
+		ctx=step(ctx,"(asset/transfer *address* [token "+BAL+"])");
+		assertEquals(BAL,RT.jvm(ctx.getResult()));
+		assertEquals(BAL, evalL(ctx,"(asset/balance token *address*)"));
 	}
 }

@@ -96,6 +96,7 @@
                  bal (or (get-holding *caller*) 0)
                  tbal (or (get-holding addr) 0)]
              (assert (<= 0 amount bal)) ;; amount must be in valid range
+             (if (= *caller* addr) (return amount)) ;; need this check in case of self transfers
              (set-holding *caller* (- bal amount))
              (set-holding addr (+ tbal amount))
              ))
