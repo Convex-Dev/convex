@@ -15,6 +15,7 @@ import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
+import convex.lib.TestFungible;
 
 public class TorusTest {
 	static Address USD = null;
@@ -112,6 +113,9 @@ public class TorusTest {
 		assertEquals(10000000L,evalL(ctx,"(asset/balance USD USDM)"));
 		assertEquals(990000000L,evalL(ctx,"(asset/balance USD *address*)"));
 		assertTrue(ctx.getBalance()>balanceBeforeWithdrawal);
+		
+		// Generic fungible test on shares
+		TestFungible.doFungibleTests(ctx,USD_MARKET,ctx.getAddress());
 	}
 
 	@Test public void testSetup() {

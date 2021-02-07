@@ -176,7 +176,7 @@ public class TestFungible {
 	 * @param ctx
 	 * @param fun
 	 */
-	public void doFungibleTests (Context<?> ctx, Address token, Address user) {
+	public static void doFungibleTests (Context<?> ctx, Address token, Address user) {
 		ctx=ctx.forkWithAddress(user);
 		ctx=step(ctx,"(import convex.asset :as asset)");
 		ctx=step(ctx,"(import convex.fungible :as fungible)");
