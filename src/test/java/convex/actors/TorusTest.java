@@ -4,6 +4,7 @@ import static convex.core.lang.TestState.*;
 import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 
@@ -59,6 +60,9 @@ public class TorusTest {
 		// Check we can access the USD market
 		ctx= step(ctx,"(def USDM (call TORUS (get-market USD)))");
 		assertEquals(USD_MARKET,ctx.getResult());
+		
+		// should be no price for initial market with zero liquidity
+		assertNull(eval(ctx,"(call USDM (price))"));
 		
 		// Offer tokens to market
 		ctx= step(ctx,"(asset/offer USDM [USD 10000000])");
