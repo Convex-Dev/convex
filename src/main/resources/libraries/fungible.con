@@ -83,7 +83,7 @@
                (cond 
                  (< quantity 0) (fail "Can't accept a negative quantity of fungible tokens.")
                  (< offer quantity) (fail "Offer is insufficient")
-                 (< sendbal quantity) (fail "Sender balance is insufficient")
+                 (< sendbal quantity) (fail "Sender token balance is insufficient")
                  (do 
                    (def offers (assoc offers sender (assoc om *caller* (- offer quantity))))
                    (set-holding sender (- sendbal quantity))

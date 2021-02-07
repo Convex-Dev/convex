@@ -57,8 +57,6 @@
          (def token ~token)
          (def torus ~torus)
          
-         (def l2 0.0)  ;; liquidity pool = token balance * convex balance
-         
          (def total-shares 0)
          (def token-balance 0)
          
@@ -72,23 +70,24 @@
            (if (> token-balance 0) (/ (double *balance*) token-balance)))
          
          (defn add-liquidity [amt]
-           (let [amt (long amt)                                 ;; amount of tokens deposited
-                 price (price)                                  ;; price of token in CVX, nil if no current liquidity
-                 cvx (accept (if price (* price amt) *offer*))  ;; amount of CVX deposited
-                 _ (asset/accept *caller* [token (long amt)])   ;; ensure tokens are transferred from caller to market actor
+           (let [amt (long amt)                                        ;; amount of tokens deposited
+                 price (price)                                         ;; price of token in CVX, nil if no current liquidity
+                 initial-cvx-balance *balance*                         ;; initial CVX balance
+                 cvx (accept (if price (* price amt) *offer*))         ;; amount of CVX deposited
+                 _ (asset/accept *caller* [token (long amt)])          ;; ensure tokens are transferred from caller to market actor
                  
                  ;; compute new total balances for actor
                  new-token-balance (+ token-balance amt)
                  
-                 ;; compute new pool size
-                 new-l2 (* *balance* new-token-balance)
-                 
                  ;; compute number of new shares for depositor = increase in liquidity (%) * current total shares
-                 liquidity (sqrt l2) ;; liquidity defined as geometric mean of Convex and Token balances   
-                 delta (long (* (- (sqrt new-l2) liquidity) (/ total-shares liquidity)))
-                 
-                 ;; _ (assert (> delta 0))
+                 ;; if no current liquidity just initialise with the amount deposited
+                 delta (if (> total-shares 0)
+                         (let [liquidity (sqrt (* (double initial-cvx-balance) token-balance)) ;; initial size of liquidity pool (geomentric mean)
+                               new-liquidity (sqrt (* (double *balance*) new-token-balance))]
+                           (long (* (- new-liquidity liquidity) (/ total-shares liquidity))))
+                         (long amt))
                  ]
+              ;; Perform updates to reflect new holdings of liquidity pool shares and total token balance
               (set-holding *caller* (+ delta (or (get-holding *caller*) 0)))
               (def total-shares (+ total-shares delta))
               (def token-balance (+ token-balance amt))

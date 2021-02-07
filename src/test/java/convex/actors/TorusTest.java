@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.Address;
 import convex.core.lang.Context;
+import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
@@ -64,21 +65,45 @@ public class TorusTest {
 		// should be no price for initial market with zero liquidity
 		assertNull(eval(ctx,"(call USDM (price))"));
 		
-		// Offer tokens to market
-		ctx= step(ctx,"(asset/offer USDM [USD 10000000])");
-		assertEquals(10000000L,evalL(ctx,"(asset/get-offer USD *address* USDM)"));
+		// Offer tokens to market ($200k)
+		ctx= step(ctx,"(asset/offer USDM [USD 20000000])");
+		assertEquals(20000000L,evalL(ctx,"(asset/get-offer USD *address* USDM)"));
 		
-		// Deposit some liquidity $100,000 for 1000 Gold
+		// ============================================================
+		// FIRST TEST: Initial deposit of $100k USD liquidity
+		// Deposit some liquidity $100,000 for 1000 Gold = $100 price = 100000 CVX / US Cent
 		ctx= step(ctx,"(call USDM 1000000000000 (add-liquidity 10000000))");
-		assertNotError(ctx);
+		long INITIAL_SHARES=RT.jvm(ctx.getResult());
 
 		assertEquals(10000000L,evalL(ctx,"(asset/balance USD USDM)"));
 		assertEquals(1000000000000L,evalL(ctx,"(balance USDM)"));
+		assertEquals(INITIAL_SHARES,evalL(ctx,"(asset/balance USDM *address*)")); // Initial pool shares, accessible as a fungible asset balance
 		
-		// Should have consumed full offer of tokens
-		assertEquals(0L,evalL(ctx,"(asset/get-offer USD *address* USDM)"));
+		// Should have consumed half the full offer of tokens
+		assertEquals(10000000L,evalL(ctx,"(asset/get-offer USD *address* USDM)"));
 
+		// price should be 100000 CVX / US Cent
 		assertEquals(100000.0,evalD(ctx,"(call USDM (price))"));
+		
+		// ============================================================
+		// SECOND TEST: Initial deposit of $100k USD liquidity
+		// Deposit more liquidity $100,000 for 1000 Gold - previous token offer should cover this
+		ctx= step(ctx,"(call USDM 1000000000000 (add-liquidity 10000000))");
+		long NEW_SHARES=RT.jvm(ctx.getResult());
+		assertEquals(20000000L,evalL(ctx,"(asset/balance USD USDM)"));
+		
+		// Check new pool shares, accessible as a fungible asset balance
+		assertEquals(INITIAL_SHARES+NEW_SHARES,evalL(ctx,"(asset/balance USDM *address*)")); 
+		
+		// Price should be unchanged
+		assertEquals(100000.0,evalD(ctx,"(call USDM (price))"));
+		
+		// should have consumed remaining token offer
+		assertEquals(0L,evalL(ctx,"(asset/get-offer USD *address* USDM)"));
+		
+		// ============================================================
+		// THIRD TEST - withdraw half of liquidity
+
 	}
 
 	@Test public void testSetup() {
