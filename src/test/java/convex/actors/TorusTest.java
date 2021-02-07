@@ -5,6 +5,7 @@ import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -73,7 +74,7 @@ public class TorusTest {
 		// FIRST TEST: Initial deposit of $100k USD liquidity
 		// Deposit some liquidity $100,000 for 1000 Gold = $100 price = 100000 CVX / US Cent
 		ctx= step(ctx,"(call USDM 1000000000000 (add-liquidity 10000000))");
-		long INITIAL_SHARES=RT.jvm(ctx.getResult());
+		final long INITIAL_SHARES=RT.jvm(ctx.getResult());
 
 		assertEquals(10000000L,evalL(ctx,"(asset/balance USD USDM)"));
 		assertEquals(1000000000000L,evalL(ctx,"(balance USDM)"));
@@ -89,7 +90,7 @@ public class TorusTest {
 		// SECOND TEST: Initial deposit of $100k USD liquidity
 		// Deposit more liquidity $100,000 for 1000 Gold - previous token offer should cover this
 		ctx= step(ctx,"(call USDM 1000000000000 (add-liquidity 10000000))");
-		long NEW_SHARES=RT.jvm(ctx.getResult());
+		final long NEW_SHARES=RT.jvm(ctx.getResult());
 		assertEquals(20000000L,evalL(ctx,"(asset/balance USD USDM)"));
 		
 		// Check new pool shares, accessible as a fungible asset balance
@@ -103,7 +104,14 @@ public class TorusTest {
 		
 		// ============================================================
 		// THIRD TEST - withdraw half of liquidity
-
+		long balanceBeforeWithdrawal=ctx.getBalance();
+		ctx= step(ctx,"(call USDM (withdraw-liquidity "+NEW_SHARES+"))");
+		assertEquals(RT.cvm(NEW_SHARES),ctx.getResult());
+		
+		assertEquals(INITIAL_SHARES,evalL(ctx,"(asset/balance USDM *address*)"));
+		assertEquals(10000000L,evalL(ctx,"(asset/balance USD USDM)"));
+		assertEquals(990000000L,evalL(ctx,"(asset/balance USD *address*)"));
+		assertTrue(ctx.getBalance()>balanceBeforeWithdrawal);
 	}
 
 	@Test public void testSetup() {

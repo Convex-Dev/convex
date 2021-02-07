@@ -596,7 +596,7 @@ public final class Context<T extends ACell> extends AObject {
 		return as.getHoldings();
 	}
 
-	private long getBalance() {
+	public long getBalance() {
 		return getBalance(getAddress());
 	}
 	
@@ -1254,7 +1254,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * 
 	 * @param target Target Address, will be created if does not already exist.
 	 * @param amount Amount to transfer, must be between 0 and Amount.MAX_VALUE inclusive
-	 * @return Context with a null result if the transaction succeeds, or an exceptional value if the transfer fails
+	 * @return Context with sent amount if the transaction succeeds, or an exceptional value if the transfer fails
 	 */
 	public Context<CVMLong> transfer(Address target, long amount) {
 		if (amount<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative amount");
@@ -1289,7 +1289,7 @@ public final class Context<T extends ACell> extends AObject {
 			actx=actorCall(target,amount,Symbols.RECEIVE_COIN,source,CVMLong.create(amount),null);
 			if (actx.isExceptional()) return actx;
 			
-			// return value should be change in balance
+			// TODO: Should return value be change in balance? or amount offered?
 			Long sent=currentBalance-actx.getBalance(source);
 			return actx.withResult(CVMLong.create(sent));
 		} else {

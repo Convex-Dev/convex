@@ -870,7 +870,7 @@ public class Core {
 			Address address = RT.address(a0);
 			if (address == null) return context.withCastError(a0, Address.class);
 
-			// return false if the argument is not an address
+			// Note: returns null if the argument is not an address
 			AccountStatus as = context.getAccountStatus(address);
 
 			return context.withResult(Juice.SIMPLE_FN, as);

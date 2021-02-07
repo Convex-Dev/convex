@@ -100,6 +100,7 @@ public class NumericsTest {
 	@Test
 	public void testTimesDouble() {
 		assertEquals(0.0, evalD("(* 0 10.0)"));
+		assertEquals(5.0, evalD("(* 0.5 10)"));
 		assertEquals(2.25, evalD("(* -1.5 -1.5)"));
 	}
 
