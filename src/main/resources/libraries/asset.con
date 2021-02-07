@@ -91,8 +91,7 @@
   
   (defn accept
     ^{:doc {:description "Accepts asset from sender.",
-            :examples [{:code "(transfer receiver [fungible-token-address 1000] data)"}
-                       {:code "(transfer receiver [non-fungible-token-address #{1 4 6}] data)"}]
+            :examples [{:code "(accept sender [fungible-token-address 1000])"}]
             :type :function
             :signature [{:params [sender [asset-address quantity]]}]}}
     [sender [asset-address quantity]]

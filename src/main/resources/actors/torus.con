@@ -14,6 +14,7 @@
   
   (import convex.trust :as trust)
   (import convex.fungible :as fungible)
+
   
   ;; BlobMap of token addresses to market Actor addresses
   (def markets (blob-map))
@@ -51,13 +52,17 @@
 	  }
     [token torus]
     (let []
+      [;; start with code for a basic fungible token, with zero supply.
+       (fungible/build-token {:supply 0})
+       
+       ;; Add code for market functionality
       '(do
          (import convex.asset :as asset)
+         (import convex.core :as core)
          
          (def token ~token)
          (def torus ~torus)
          
-         (def total-shares 0)
          (def token-balance 0)
          
          (defn calc-rate []
@@ -73,7 +78,7 @@
            (let [amt (long amt)                                        ;; amount of tokens deposited
                  price (price)                                         ;; price of token in CVX, nil if no current liquidity
                  initial-cvx-balance *balance*                         ;; initial CVX balance
-                 cvx (accept (if price (* price amt) *offer*))         ;; amount of CVX deposited
+                 cvx (core/accept (if price (* price amt) *offer*))    ;; amount of CVX deposited
                  _ (asset/accept *caller* [token (long amt)])          ;; ensure tokens are transferred from caller to market actor
                  
                  ;; compute new total balances for actor
@@ -81,15 +86,15 @@
                  
                  ;; compute number of new shares for depositor = increase in liquidity (%) * current total shares
                  ;; if no current liquidity just initialise with the amount deposited
-                 delta (if (> total-shares 0)
+                 delta (if (> supply 0)
                          (let [liquidity (sqrt (* (double initial-cvx-balance) token-balance)) ;; initial size of liquidity pool (geomentric mean)
                                new-liquidity (sqrt (* (double *balance*) new-token-balance))]
-                           (long (* (- new-liquidity liquidity) (/ total-shares liquidity))))
+                           (long (* (- new-liquidity liquidity) (/ supply liquidity))))
                          (long amt))
                  ]
               ;; Perform updates to reflect new holdings of liquidity pool shares and total token balance
               (set-holding *caller* (+ delta (or (get-holding *caller*) 0)))
-              (def total-shares (+ total-shares delta))
+              (def supply (+ supply delta))
               (def token-balance (+ token-balance amt))
               delta))
          
@@ -108,23 +113,9 @@
                  kk (* (double old-coins) (double old-tokens))
                  ])
            )
-         
-         ;; TODO
-         ;; token implementation to allow shares to be used as fungible tokens
-         (defn balance [addr]
-            (or (get-holding addr) 0))
        
-         (defn transfer [addr amount]
-           (let [addr (address addr)
-                 amount (long amount)
-                 bal (or (get-holding *caller*) 0)
-                 tbal (or (get-holding addr) 0)]
-             (assert (<= 0 amount bal)) ;; amount must be in valid range
-            (set-holding *caller* (- bal amount))
-             (set-holding addr (+ tbal amount))
-             ))
-       
-         (export add-liquidity transfer balance price))))
+         (export add-liquidity price))
+      ]))
   
 
   
