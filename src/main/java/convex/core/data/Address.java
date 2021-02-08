@@ -93,6 +93,30 @@ public class Address extends ABlob {
 		if (b.length!=8) return null;
 		return create(b.longValue());
 	}
+	
+	/**
+	 * Constructs an Address from an arbitrary String, attempting to parse different possible formats
+	 * @param bb
+	 * @return Address parsed, or null if not valid
+	 */
+	public static Address parse(String s) {
+		s=s.trim();
+		if (s.startsWith("#")) {
+			s=s.substring(1);
+		} 
+		
+		try {
+			Long l=Long.parseLong(s.substring(1));
+			return Address.create(l);
+		} catch (NumberFormatException e) {
+			// fall through
+		}
+		
+		if (s.startsWith("0x")) {
+			s=s.substring(2);
+		}
+		return fromHexOrNull(s);
+	}
 
 	public static Address readRaw(ByteBuffer bb) throws BadFormatException {
 		long value=Format.readVLCLong(bb);
