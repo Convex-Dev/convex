@@ -132,23 +132,26 @@
                (fungible/transfer token *caller* token-refund)
                shares))
          
-         (defn swap [coins tokens]
-           (let [coins (long coins)
-                 _ (assert (<= 0 coins 1000000000000000000))
-                 tokens (long tokens)
-                 _ (assert (<= 0 tokens))
-                 old-tokens token-holding
-                 old-coins *balance*
-                 dt (- tokens old-tokens)
+         
+         
+         (defn buy-tokens [amt]
+           (let [amt (long amt)
+                 token-balance token-balance
+                 _ (assert (< 0 amt token-balance))   ;; SECURITY: check pool can provide!
+                 cvx-balance *balance*
+                 pool (* (double token-balance) cvx-balance)
                  rate (calc-rate)
-                 fee (* rate (abs dt))
                  
-                 new-kk (* (double coins) (double tokens))
-                 kk (* (double old-coins) (double old-tokens))
-                 ])
+                 ;; Ensure payment in CVX is sufficient
+                 required-cvx (long (* (+ 1.0 rate) (/ pool (- token-balance amt))))
+                 _ (core/accept required-cvx) 
+                 ]
+             (def token-balance (- token-balance amt))
+             (fungible/transfer token *caller* amt)
+             required-cvx)
            )
        
-         (export add-liquidity withdraw-liquidity price))
+         (export add-liquidity buy-tokens sell-tokens withdraw-liquidity price))
       ]))
   
 

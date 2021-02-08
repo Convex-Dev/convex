@@ -116,6 +116,15 @@ public class TorusTest {
 		
 		// Generic fungible test on shares
 		TestFungible.doFungibleTests(ctx,USD_MARKET,ctx.getAddress());
+		
+		// ============================================================
+		// FORTH TEST - buy half of all tokens ($50k)
+		ctx= step(ctx,"(call USDM *balance* (buy-tokens 5000000))");
+		long paidConvex=RT.jvm(ctx.getResult());
+		assertTrue(paidConvex>1000000000000L); // should cost more than pool Convex balance after fee
+		assertEquals(5000000L,evalL(ctx,"(asset/balance USD USDM)"));
+		assertEquals(995000000L,evalL(ctx,"(asset/balance USD *address*)"));
+		assertEquals(INITIAL_SHARES,evalL(ctx,"(asset/balance USDM *address*)"));
 	}
 
 	@Test public void testSetup() {
