@@ -636,6 +636,14 @@ public class State extends ARecord {
 	public <R> R getGlobal(Symbol sym) {
 		return (R) globals.get(sym);
 	}
+	
+	/**
+	 * Gets the global value map
+	 * @return Map of global values
+	 */
+	public  AHashMap<Symbol, ACell> getGlobals() {
+		return globals;
+	}
 
 	public State withGlobal(Symbol sym, ACell value) {
 		return this.withGlobals(globals.assoc(sym, value));
