@@ -222,12 +222,8 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		int n=getRefCount();
 		for (int i=0; i<n; i++) {
 			Ref<?> childRef=getRef(i);
-			if (!childRef.isEmbedded()) {
-				@SuppressWarnings("unchecked")
-				Ref<ACell> cellRef=(Ref<ACell>) childRef;
-				long childSize=cellRef.getMemorySize();
-				result += childSize;
-			}
+			long childSize=childRef.getMemorySize();
+			result+=childSize;
 		}
 		
 		if (!isEmbedded()) {

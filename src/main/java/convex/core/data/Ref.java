@@ -590,8 +590,9 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * @return 0 for fully embedded values with no child refs, memory size of referred value otherwise
 	 */
 	public long getMemorySize() {
-		if (isEmbedded()) return 0;
-		return getValue().getMemorySize();
+		T value=getValue();
+		if (value==null) return 0;
+		return value.getMemorySize();
 	}
 
 }

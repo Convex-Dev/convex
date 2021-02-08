@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static convex.test.Assertions.*;
 
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import convex.core.data.Vectors;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.lang.Juice;
 import convex.core.lang.Reader;
+import convex.core.lang.TestState;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.transactions.Transfer;
@@ -208,6 +210,34 @@ public class StateTransitionsTest {
 		
 		s = br.getState();
 		
+	}
+	
+	@Test public void testManyDeploysMemoryRegression() throws BadSignatureException {
+		State s=TestState.INITIAL;
+		long lastSize=s.getMemorySize();
+		assertTrue(lastSize>0);
+		
+		for (int i=1; i<=100; i++) { // i is sequence number
+			ATransaction trans=Invoke.create(Init.HERO, i, Reader.read("(def storage-example\r\n"
+					+ "  (deploy '(do (def stored-data nil)\r\n"
+					+ "                     (defn get [] stored-data)\r\n"
+					+ "                     (defn set [x] (def stored-data x))\r\n"
+					+ "                     (export get set))))"));
+			AKeyPair kp = convex.core.lang.TestState.HERO_PAIR;
+			Block b=Block.of(s.getTimeStamp().longValue(),Init.FIRST_PEER_KEY,kp.signData(trans));
+			BlockResult br=s.applyBlock(b);
+			Result r=br.getResult(0);
+			assertFalse(r.isError(),r.toString());
+			assertTrue(r.getValue() instanceof Address);
+			State newState=br.getState();
+			
+			long size=newState.getMemorySize();
+			if (size<=lastSize) {
+				fail("[i="+i+"] Original size: "+lastSize+" -> new size: "+size);
+			}
+			lastSize=size;
+			s=newState;
+		}
 	}
 	
 	@Test

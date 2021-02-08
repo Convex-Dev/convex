@@ -224,6 +224,8 @@ public class ActorsTest {
 		assertEquals(0,evalL(ctx,"(call funcon (echo-offer))"));
 	}
 	
+
+	
 	@Test public void testExceptionContract() throws IOException {
 		Context<?> ctx=TestState.step("(do )");
 		
