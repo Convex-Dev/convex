@@ -105,17 +105,20 @@ public class Address extends ABlob {
 			s=s.substring(1);
 		} 
 		
+		if (s.startsWith("0x")) {
+			s=s.substring(2);
+			return fromHexOrNull(s);
+		}
+		
 		try {
-			Long l=Long.parseLong(s.substring(1));
-			return Address.create(l);
+			Long l=Long.parseLong(s);
+			if (l!=null) return Address.create(l);
 		} catch (NumberFormatException e) {
 			// fall through
 		}
 		
-		if (s.startsWith("0x")) {
-			s=s.substring(2);
-		}
-		return fromHexOrNull(s);
+		return null;
+		
 	}
 
 	public static Address readRaw(ByteBuffer bb) throws BadFormatException {

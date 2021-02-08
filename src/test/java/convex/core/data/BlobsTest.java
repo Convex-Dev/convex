@@ -3,6 +3,7 @@ package convex.core.data;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -58,8 +59,8 @@ public class BlobsTest {
 	@Test
 	public void testFromHex() {
 		// bad length for blob
-		assertThrows(IllegalArgumentException.class,()->Blob.fromHex("2"));
-		assertThrows(IllegalArgumentException.class,()->Blob.fromHex("zz"));
+		assertNull(Blob.fromHex("2"));
+		assertNull(Blob.fromHex("zz"));
 	}
 
 	@Test

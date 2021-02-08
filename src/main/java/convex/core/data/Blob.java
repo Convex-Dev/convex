@@ -143,11 +143,11 @@ public class Blob extends AArrayBlob {
 	 * Constructs a Blob object from a hex string
 	 * 
 	 * @param hexString
-	 * @return Blob with the provided hex value
+	 * @return Blob with the provided hex value, or null if not a valid blob
 	 */
 	public static Blob fromHex(String hexString) {
 		byte[] bs=Utils.hexToBytes(hexString);
-		if (bs==null) throw new IllegalArgumentException("Invalid hex string for blob ["+hexString+"]");
+		if (bs==null) return null;
 		return wrap(bs);
 	}
 
