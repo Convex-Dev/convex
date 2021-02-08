@@ -138,18 +138,38 @@
            (let [amt (long amt)
                  token-balance token-balance
                  _ (assert (< 0 amt token-balance))   ;; SECURITY: check pool can provide!
+                 
+                 ;; Compute pool and fees
                  cvx-balance *balance*
                  pool (* (double token-balance) cvx-balance)
                  rate (calc-rate)
                  
                  ;; Ensure payment in CVX is sufficient
-                 required-cvx (long (* (+ 1.0 rate) (/ pool (- token-balance amt))))
+                 required-cvx (long (* (+ 1.0 rate) (- (/ pool (- token-balance amt)) cvx-balance)))
                  _ (core/accept required-cvx) 
                  ]
              (def token-balance (- token-balance amt))
              (fungible/transfer token *caller* amt)
-             required-cvx)
-           )
+             required-cvx))
+         
+          (defn sell-tokens [amt]
+           (let [amt (long amt)
+                 _ (assert (< 0 amt))   ;; Amount must be positive
+                 _ (asset/accept *caller* [token amt]) 
+                 
+                 ;; Compute pool and fees
+                 token-balance token-balance
+                 cvx-balance *balance*
+                 pool (* (double token-balance) cvx-balance)
+                 rate (calc-rate)
+                 
+                 ;; Compute gained Convex coins from sale
+                 new-token-balance (+ token-balance amt)
+                 gained-cvx (long (/ (- cvx-balance (/ pool new-token-balance)) (+ 1.0 rate)))
+                 ]
+             (def token-balance new-token-balance)
+             (core/transfer *caller* gained-cvx)
+             gained-cvx))
        
          (export add-liquidity buy-tokens sell-tokens withdraw-liquidity price))
       ]))

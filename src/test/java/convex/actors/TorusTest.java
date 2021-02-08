@@ -113,6 +113,7 @@ public class TorusTest {
 		assertEquals(10000000L,evalL(ctx,"(asset/balance USD USDM)"));
 		assertEquals(990000000L,evalL(ctx,"(asset/balance USD *address*)"));
 		assertTrue(ctx.getBalance()>balanceBeforeWithdrawal);
+		assertEquals(1000000000000L,evalL(ctx,"(balance USDM)")); // Convex balance back to start
 		
 		// Generic fungible test on shares
 		TestFungible.doFungibleTests(ctx,USD_MARKET,ctx.getAddress());
@@ -122,9 +123,22 @@ public class TorusTest {
 		ctx= step(ctx,"(call USDM *balance* (buy-tokens 5000000))");
 		long paidConvex=RT.jvm(ctx.getResult());
 		assertTrue(paidConvex>1000000000000L); // should cost more than pool Convex balance after fee
+		assertTrue(paidConvex<1100000000000L,"Paid:" +paidConvex); // but less than 10% fee
 		assertEquals(5000000L,evalL(ctx,"(asset/balance USD USDM)"));
 		assertEquals(995000000L,evalL(ctx,"(asset/balance USD *address*)"));
 		assertEquals(INITIAL_SHARES,evalL(ctx,"(asset/balance USDM *address*)"));
+		
+		// ============================================================
+		// FIFTH TEST - sell back tokens ($50k)
+		ctx= step(ctx,"(asset/offer USDM [USD 5000000])");
+		ctx= step(ctx,"(call USDM (sell-tokens 5000000))");
+		long gainedConvex=RT.jvm(ctx.getResult());
+		assertTrue(gainedConvex>900000000000L); // should gain most of money back
+		assertTrue(gainedConvex<paidConvex,"Gain:" +gainedConvex); // but less than cost, since we have fees
+		assertEquals( 10000000L,evalL(ctx,"(asset/balance USD USDM)"));
+		assertEquals(990000000L,evalL(ctx,"(asset/balance USD *address*)"));
+		assertEquals(INITIAL_SHARES,evalL(ctx,"(asset/balance USDM *address*)"));
+
 	}
 
 	@Test public void testSetup() {
