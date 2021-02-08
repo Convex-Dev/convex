@@ -38,9 +38,10 @@ public class EtchStore extends AStore {
 	}
 
 	/**
-	 * Creates an EtchStore using a specified file. 
+	 * Creates an EtchStore using a specified file.
 	 * 
-	 * @param file File to use for storage. Will be created it it does not already exist.
+	 * @param file File to use for storage. Will be created it it does not already
+	 *             exist.
 	 * @return EtchStore instance
 	 */
 	public static EtchStore create(File file) throws IOException {
@@ -61,7 +62,7 @@ public class EtchStore extends AStore {
 			throw Utils.sneakyThrow(e);
 		}
 	}
-	
+
 	/**
 	 * Create an Etch store using a new temporary file with a generated prefix
 	 * 
@@ -87,85 +88,86 @@ public class EtchStore extends AStore {
 			throw new Error("IO exception from Etch", e);
 		}
 	}
-	
+
 	@Override
 	public <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
-		return persistRef(ref,noveltyHandler,Ref.PERSISTED);
+		return persistRef(ref, noveltyHandler, Ref.PERSISTED);
 	}
-	
+
 	@Override
 	public <T extends ACell> Ref<T> announceRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
-		return persistRef(ref,noveltyHandler,Ref.ANNOUNCED);
+		return persistRef(ref, noveltyHandler, Ref.ANNOUNCED);
 	}
 
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus) {
 		// first check if the Ref is already persisted to required level
-		if (ref.getStatus()>=requiredStatus) return ref;
-		
-		final T o=ref.getValue();
-		
-		if (o instanceof ACell) {
-			ACell cell=(ACell)o;
-			
-			// check store for existing ref first. 
-			boolean embedded=ref.isEmbedded();
-			Hash hash =null;
-			if (!embedded) {;
-				hash = ref.getHash();
-				Ref<T> existing = refForHash(hash);
-				if (existing != null) {
-					// Return existing ref if status is sufficient
-					if (existing.getStatus()>=requiredStatus) return existing;
-				}
-			}
-			
-			// beyond STORED level, need to recursively persist child refs
-			if (requiredStatus>Ref.STORED) {
-				IRefFunction func=r -> {
-					return persistRef((Ref<ACell>)r,noveltyHandler,requiredStatus);
-				};
-			
-				// need to do recursive persistence
-				// TODO: maybe switch to a queue? Mitigate risk of stack overflow?
-				ACell newObject = ((ACell) o).updateRefs(func);
-		
-				// perhaps need to update Ref 
-				if (cell!=newObject) ref=ref.withValue((T)newObject);
-			}
-			
-			if (!embedded) {
-				final Hash fHash=hash;
-				log.log(Stores.PERSIST_LOG_LEVEL,()->"Etch persisting at status="+requiredStatus+" hash = 0x"+fHash.toHexString()+" ref of class "+Utils.getClassName(o)+" with store "+this);
+		if (ref.getStatus() >= requiredStatus) return ref;
 
-				Ref<ACell> result;
-				try {
-					// ensure status is set when we write to store
-					ref=ref.withMinimumStatus(requiredStatus);
-					result=etch.write(hash, (Ref<ACell>) ref);
-				} catch (IOException e) {
-					throw Utils.sneakyThrow(e);
-				}
+		final ACell cell = ref.getValue();
 
-				// call novelty handler if newly persisted
-				if (noveltyHandler != null) noveltyHandler.accept(result);
+		if (cell == null) return (Ref<T>) Ref.NULL_VALUE;
+
+		// check store for existing ref first.
+		boolean embedded = cell.isEmbedded();
+		Hash hash = null;
+		if (!embedded) {
+			;
+			hash = ref.getHash();
+			Ref<T> existing = refForHash(hash);
+			if (existing != null) {
+				// Return existing ref if status is sufficient
+				if (existing.getStatus() >= requiredStatus) return existing;
 			}
+		}
+
+		// beyond STORED level, need to recursively persist child refs
+		if (requiredStatus > Ref.STORED) {
+			IRefFunction func = r -> {
+				return persistRef((Ref<ACell>) r, noveltyHandler, requiredStatus);
+			};
+
+			// need to do recursive persistence
+			// TODO: maybe switch to a queue? Mitigate risk of stack overflow?
+			ACell newObject = cell.updateRefs(func);
+
+			// perhaps need to update Ref
+			if (cell != newObject) ref = ref.withValue((T) newObject);
+		}
+
+		if (!embedded) {
+			final Hash fHash = hash;
+			log.log(Stores.PERSIST_LOG_LEVEL, () -> "Etch persisting at status=" + requiredStatus + " hash = 0x"
+					+ fHash.toHexString() + " ref of class " + Utils.getClassName(cell) + " with store " + this);
+
+			Ref<ACell> result;
+			try {
+				// ensure status is set when we write to store
+				ref = ref.withMinimumStatus(requiredStatus);
+				result = etch.write(hash, (Ref<ACell>) ref);
+			} catch (IOException e) {
+				throw Utils.sneakyThrow(e);
+			}
+
+			// call novelty handler if newly persisted
+			if (noveltyHandler != null) noveltyHandler.accept(result);
 		}
 		return ref.withMinimumStatus(requiredStatus);
 	}
 
 	@Override
 	public <T extends ACell> Ref<T> storeRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
-		return persistRef(ref,noveltyHandler,Ref.STORED);
+		return persistRef(ref, noveltyHandler, Ref.STORED);
 	}
-	
+
 	@Override
 	public String toString() {
-		return "EtchStore at: "+etch.getFile().getName();
+		return "EtchStore at: " + etch.getFile().getName();
 	}
 
 	/**
 	 * Gets the database file name for this EtchStore
+	 * 
 	 * @return File name as a String
 	 */
 	public String getFileName() {
@@ -184,7 +186,7 @@ public class EtchStore extends AStore {
 	public Hash getRootHash() throws IOException {
 		return etch.getRootHash();
 	}
-	
+
 	@Override
 	public void setRootHash(Hash h) throws IOException {
 		etch.setRootHash(h);

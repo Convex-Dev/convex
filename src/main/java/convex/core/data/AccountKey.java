@@ -284,6 +284,12 @@ public class AccountKey extends AArrayBlob {
 	public boolean isEmbedded() {
 		return true;
 	}
+	
+	@Override
+	protected long calcMemorySize() {	
+		// always embedded and no child Refs, so memory size == 0
+		return 0;
+	}
 
 	@Override
 	public boolean isRegularBlob() {

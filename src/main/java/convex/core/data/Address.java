@@ -148,6 +148,12 @@ public class Address extends ABlob {
 	public boolean isEmbedded() {
 		return true;
 	}
+	
+	@Override
+	protected long calcMemorySize() {	
+		// always embedded and no child Refs, so memory size == 0
+		return 0;
+	}
 
 	@Override
 	public boolean isRegularBlob() {

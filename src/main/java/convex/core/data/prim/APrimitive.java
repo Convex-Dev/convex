@@ -23,6 +23,12 @@ public abstract  class APrimitive extends ACell {
 		return true;
 	}
 	
+	@Override
+	protected long calcMemorySize() {	
+		// always embedded and no child Refs, so memory size == 0
+		return 0;
+	}
+	
 	public abstract long longValue();
 	
 	

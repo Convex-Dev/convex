@@ -15,6 +15,18 @@ public abstract class ASymbolic extends ACell {
 		this.name = name;
 	}
 	
+	@Override
+	public boolean isEmbedded() {
+		// Symbolic objects are always embedded
+		return true;
+	}
+	
+	@Override
+	protected long calcMemorySize() {	
+		// always embedded and no child Refs, so memory size == 0
+		return 0;
+	}
+	
 	public AString getName() {
 		return name;
 	}

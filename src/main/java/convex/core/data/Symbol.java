@@ -201,12 +201,6 @@ public class Symbol extends ASymbolic {
 		return 0;
 	}
 
-	@Override
-	public boolean isEmbedded() {
-		// Symbols are always embedded
-		return true;
-	}
-
 	/**
 	 * Returns true if the symbol starts with an asterisk '*' and is therefore potentially a special symbol.
 	 * 

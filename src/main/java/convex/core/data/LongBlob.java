@@ -188,6 +188,12 @@ public class LongBlob extends ABlob {
 	}
 	
 	@Override
+	protected long calcMemorySize() {	
+		// always embedded and no child Refs, so memory size == 0
+		return 0;
+	}
+	
+	@Override
 	public boolean isRegularBlob() {
 		return true;
 	}
