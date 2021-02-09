@@ -118,7 +118,19 @@ public class Address extends ABlob {
 		}
 		
 		return null;
-		
+	}
+	
+	/**
+	 * Constructs an Address from an arbitrary Object, attempting to parse different possible formats
+	 * @param bb
+	 * @return Address parsed, or null if not valid
+	 */
+	public static Address parse(Object o) {
+		if (o instanceof Address) return (Address) o;
+		if (o instanceof String) return parse((String)o);
+		if (o instanceof Number) return create(((Number)o).longValue());
+		if (o instanceof ABlob) return create((ABlob)o);
+		return null;
 	}
 
 	public static Address readRaw(ByteBuffer bb) throws BadFormatException {
@@ -281,6 +293,8 @@ public class Address extends ABlob {
 	public int getRefCount() {
 		return 0;
 	}
+
+
 
 
 }

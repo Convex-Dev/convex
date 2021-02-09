@@ -288,7 +288,9 @@ public class Hash extends AArrayBlob {
 	 * @return Hash with the given hex string value
 	 */
 	public static Hash fromHex(String hexString) {
-		return wrap(Utils.hexToBytes(hexString));
+		byte [] bs=Utils.hexToBytes(hexString);
+		if (bs.length!=LENGTH) return null;
+		return wrap(bs);
 	}
 
 	public static Hash wrap(AArrayBlob data, int offset, int length) {
