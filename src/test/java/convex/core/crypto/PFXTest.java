@@ -23,24 +23,24 @@ public class PFXTest {
 	@Test public void testNewStore() throws IOException, KeyStoreException, NoSuchAlgorithmException, CertificateException, InvalidKeyException, SecurityException, SignatureException, UnrecoverableKeyException {
 		File f=File.createTempFile("temp-keystore", "pfx");
 		
-		PFXUtils.createStore(f, "test");
+		PFXTools.createStore(f, "test");
 		
 		// check password is being applied
-		assertThrows(IOException.class,()->PFXUtils.loadStore(f,"foobar"));
+		assertThrows(IOException.class,()->PFXTools.loadStore(f,"foobar"));
 		
 		// don't throw, no integrity checking on null?
 		//assertThrows(IOException.class,()->PFXUtils.loadStore(f,null));
 		
-		KeyStore ks=PFXUtils.loadStore(f, "test");
+		KeyStore ks=PFXTools.loadStore(f, "test");
 		AKeyPair kp=Init.HERO_KP;
-		PFXUtils.saveKey(ks, kp, "thehero");
-		PFXUtils.saveStore(ks, f, "test");
+		PFXTools.saveKey(ks, kp, "thehero");
+		PFXTools.saveStore(ks, f, "test");
 		
 		String alias=Init.HERO_KP.getAccountKey().toHexString();
-		KeyStore ks2=PFXUtils.loadStore(f, "test");
+		KeyStore ks2=PFXTools.loadStore(f, "test");
 		assertEquals(alias,ks2.aliases().asIterator().next());
 		
-		AKeyPair kp2=PFXUtils.getKeyPair(ks2,alias, "thehero");
+		AKeyPair kp2=PFXTools.getKeyPair(ks2,alias, "thehero");
 		assertEquals(kp.signData(RT.cvm(1L)).getEncoding(),kp2.signData(RT.cvm(1L)).getEncoding());
 	}
 }

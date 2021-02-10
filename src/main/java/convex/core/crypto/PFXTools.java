@@ -24,7 +24,7 @@ import org.bouncycastle.jce.X509Principal;
 import org.bouncycastle.x509.X509V3CertificateGenerator;
 
 @SuppressWarnings("deprecation")
-public class PFXUtils {
+public class PFXTools {
 	public static final String KEYSTORE_TYPE="PKCS12";
 	
 	public static final String CERTIFICATE_ALGORITHM = "RSA";
