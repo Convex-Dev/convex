@@ -72,6 +72,7 @@ public class Init {
 	public static final Address ORACLE_ADDRESS; // 21
 	public static final Address FUNGIBLE_ADDRESS; // 22 
 	public static final Address ASSET_ADDRESS; // 23
+	public static final Address TORUS_ADDRESS; // 23
 
 	public static AKeyPair[] KEYPAIRS = new AKeyPair[NUM_PEERS + NUM_USERS];
 
@@ -223,6 +224,19 @@ public class Init {
 					log.severe("Failure to deploy convex.asset: "+ctx.getExceptional());
 				}
 				ASSET_ADDRESS = (Address) ctx.getResult();
+				s=ctx.getState();
+			}
+			
+			{ // Deploy Torus Actor
+				Context<Address> ctx = Context.createFake(s, INIT);
+				ACell form=Reader.readResource("actors/torus.con");
+				ctx = ctx.deployActor(form);
+				Address addr=ctx.getResult();
+				if (ctx.isExceptional()) {
+					log.severe("Failure to deploy convex.asset: "+ctx.getExceptional());
+				}
+				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'torus.exchange "+addr+"))"));
+				TORUS_ADDRESS = addr;
 				s=ctx.getState();
 			}
 			

@@ -19,6 +19,7 @@
 
   
   (call *registry* (register {:name "Torus Exchange Library"}))
+
   
   (import convex.trust :as trust)
   (import convex.fungible :as fungible)
@@ -254,7 +255,7 @@
         sold))
     
     (defn add-liquidity [token token-amount cvx-amount]
-      (let [market (or (get-market token) (fail (str "Torus: market does not exist for token: " token)))]
+      (let [market (create-market token)]
         (asset/offer market [token token-amount])
         (call market cvx-amount (add-liquidity token-amount))))
     
