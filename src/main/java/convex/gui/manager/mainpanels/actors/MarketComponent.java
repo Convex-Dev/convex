@@ -181,7 +181,7 @@ public class MarketComponent extends BaseListComponent {
 			Address caller = marketsPanel.acctChooser.getSelectedAddress();
 			Context<?> ctx = Context.createFake(state, caller); // fake for caller
 			for (int i = 0; i < numOutcomes; i++) {
-				Object outcome = outcomes.get(i);
+				ACell outcome = outcomes.get(i);
 
 				double p = RT.jvm(ctx.actorCall(address, 0, "price", outcome).getResult());
 				if (Double.isNaN(p)) p = 1.0 / numOutcomes;

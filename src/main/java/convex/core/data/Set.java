@@ -76,7 +76,19 @@ public class Set<T extends ACell> extends ASet<T> {
 		return Set.wrap(m[0]);
 	}
 
-	public static <T extends ACell> Set<T> create(Object[] elements) {
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> Set<T> of(Object... elements) {
+		AHashMap<T, ACell> m = Maps.empty();
+		for (Object o : elements) {
+			T e = RT.cvm(o);
+			Ref<T> keyRef=(e==null)?(Ref<T>) Ref.NULL_VALUE:e.getRef();
+			MapEntry<T, ACell> me = MapEntry.createRef(keyRef, Ref.TRUE_VALUE);
+			m = m.assocEntry(me);
+		}
+		return Set.wrap(m);
+	}
+	
+	public static <T extends ACell> Set<T> create(ACell[] elements) {
 		AHashMap<T, ACell> m = Maps.empty();
 		for (Object o : elements) {
 			T e = RT.cvm(o);
@@ -290,7 +302,7 @@ public class Set<T extends ACell> extends ASet<T> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public AVector<T> toVector() {
-		return (AVector<T>) RT.vec(Vectors.create(map.keySet().toArray()));
+		return map.getKeys();
 	}
 
 	@Override

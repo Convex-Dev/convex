@@ -2,6 +2,7 @@ package convex.core;
 
 import java.nio.ByteBuffer;
 
+import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
 import convex.core.data.Format;
@@ -101,7 +102,7 @@ public class BlockResult extends ARecord {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	protected BlockResult updateAll(Object[] newVals) {
+	protected BlockResult updateAll(ACell[] newVals) {
 		State newState=(State)newVals[0];
 		AVector<Result> newResults=(AVector<Result>)newVals[1];
 		return create(newState,newResults);

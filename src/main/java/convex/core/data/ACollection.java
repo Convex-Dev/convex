@@ -6,6 +6,7 @@ import java.util.Iterator;
 import java.util.function.Function;
 
 import convex.core.util.Errors;
+import convex.core.util.Utils;
 
 /**
  * Abstract base class for Persistent Merkle Collections
@@ -69,6 +70,20 @@ public abstract class ACollection<T extends ACell> extends ADataStructure<T> imp
 	 */
 	public abstract <R extends ACell> AVector<R> toVector();
 
+	
+	/**
+	 * Converts this collection to a new Cell array
+	 * @return A new cell array containing the elements of this sequence
+	 */
+	public ACell[] toCellArray() {
+		int n=Utils.checkedInt(count());
+		ACell[] cells=new ACell[n];
+		int i=0;
+		for (ACell cell: this) {
+			cells[i++]=cell;
+		}
+		return cells;
+	}
 	/**
 	 * Adds an element to this collection, according to the natural semantics of the collection
 	 * @param x Value to add

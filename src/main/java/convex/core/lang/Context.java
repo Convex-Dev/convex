@@ -789,7 +789,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return Updated Context
 	 */
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> invoke(IFn<R> fn, Object[] args) {
+	public <R extends ACell> Context<R> invoke(IFn<R> fn, ACell[] args) {
 		// Note: we don't adjust depth here because execute(...) does it for us in the function body
 		Context<R> ctx = fn.invoke((Context<ACell>) this,args);
 
@@ -802,7 +802,7 @@ public final class Context<T extends ACell> extends AObject {
 				if (fn==Core.RECUR) break;
 
 				RecurValue rv = (RecurValue) v;
-				Object[] newArgs = rv.getValues();
+				ACell[] newArgs = rv.getValues();
 
 				ctx = fn.invoke((Context<ACell>) ctx,newArgs);
 				v = ctx.getValue();
@@ -1432,7 +1432,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * @param args Arguments to Actor function invocation
 	 * @return Context with result of Actor call (may be exceptional)
 	 */
-	public <R extends ACell> Context<R> actorCall(Address target, long offer, Object functionName, Object... args) {
+	public <R extends ACell> Context<R> actorCall(Address target, long offer, Object functionName, ACell... args) {
 		// SECURITY: set up state for actor call
 		State state=getState();
 		Symbol sym=RT.toSymbol(functionName);

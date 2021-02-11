@@ -530,7 +530,7 @@ public class RT {
 		}
 
 		if (o.getClass().isArray()) {
-			Object[] arr = (Object[]) Utils.toObjectArray(o);
+			ACell[] arr = Utils.toCellArray(o);
 			return Vectors.create(arr);
 		}
 

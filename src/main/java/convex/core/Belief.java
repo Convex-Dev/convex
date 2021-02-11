@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.ARecord;
@@ -75,7 +76,7 @@ public class Belief extends ARecord {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	protected Belief updateAll(Object[] newVals) {
+	protected Belief updateAll(ACell[] newVals) {
 		AHashMap<AccountKey, SignedData<Order>> newOrders = (AHashMap<AccountKey, SignedData<Order>>) newVals[0];
 		long newTimestamp = ((CVMLong) newVals[1]).longValue();
 		if ((this.orders == newOrders)&&(this.timestamp==newTimestamp)) {

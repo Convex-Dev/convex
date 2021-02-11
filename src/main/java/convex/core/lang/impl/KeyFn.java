@@ -20,7 +20,7 @@ public class KeyFn<T extends ACell> implements IFn<T> {
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
-	public Context<T> invoke(Context context, Object[] args) {
+	public Context<T> invoke(Context context, ACell[] args) {
 		int n = args.length;
 		T result;
 		if (n == 1) {
@@ -28,8 +28,8 @@ public class KeyFn<T extends ACell> implements IFn<T> {
 			if (gettable == null) return context.withCastError(args[0], IGet.class);
 			result = gettable.get(key);
 		} else if (n == 2) {
-			Object ds = args[0];
-			ACell notFound = (ACell) args[1];
+			ACell ds = args[0];
+			ACell notFound = args[1];
 			if (ds == null) {
 				result = (T) notFound;
 			} else {

@@ -93,7 +93,7 @@ public class Fn<T extends ACell> extends AClosure<T> {
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
-	public Context<T> invoke(Context context, Object[] args) {
+	public Context<T> invoke(Context context, ACell[] args) {
 		// update local bindings for the duration of this function call
 		final AHashMap<Symbol, ACell> savedBindings = context.getLocalBindings();
 

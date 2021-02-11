@@ -105,7 +105,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	 */
 	public AVector<ACell> getValues() {
 		int n=size();
-		Object[] os=new Object[n];
+		ACell[] os=new ACell[n];
 		for (int i=0; i<n; i++) {
 			os[i]=get(format.getKey(i));
 		}
@@ -164,13 +164,11 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	@Override
 	public ARecord updateRefs(IRefFunction func) {
 		int n=size();		
-		Object[] newValues=new Object[n];
+		ACell[] newValues=new ACell[n];
 		AVector<Keyword> keys=getKeys();
 		for (int i=0; i<n; i++) {
-			Object v=get(keys.get(i));
-			if (v instanceof ACell) {
-				v=((ACell)v).updateRefs(func);
-			}
+			ACell v=get(keys.get(i));
+			if (v!=null) v=v.updateRefs(func);
 			newValues[i]=v;
 		}
 		return updateAll(newValues);
@@ -179,9 +177,9 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	/**
 	 * Gets an array containing all values in this record, in format-defined key order.
 	 */
-	public Object[] getValuesArray() {
+	public ACell[] getValuesArray() {
 		int n=size();
-		Object[] result=new Object[n];
+		ACell[] result=new ACell[n];
 		AVector<Keyword> keys=format.getKeys();
 		for (int i=0; i<n; i++) {
 			result[i]=get(keys.get(i));
@@ -196,7 +194,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	 * 
 	 * @param newVals
 	 */
-	protected abstract ARecord updateAll(Object[] newVals);
+	protected abstract ARecord updateAll(ACell[] newVals);
 	
 	@Override
 	public boolean containsKey(ACell key) {

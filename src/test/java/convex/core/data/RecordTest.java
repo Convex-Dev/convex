@@ -17,7 +17,7 @@ public class RecordTest {
 		AVector<ACell> vals=r.getValues();
 		assertEquals(n,vals.size());
 		
-		Object[] vs=new Object[n]; // new array to extract values
+		ACell[] vs=new ACell[n]; // new array to extract values
 		for (int i=0; i<n; i++) {
 			// standard element access by key
 			Keyword k=keys.get(i);

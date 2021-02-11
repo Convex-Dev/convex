@@ -185,7 +185,7 @@ public class VectorArray<T extends ACell> extends ASizedVector<T> {
 	@Override
 	public AVector<T> toVector() {
 		if (stride==1) Vectors.create(array, offset, (int)count);
-		return (AVector<T>) Vectors.create(toArray());
+		return (AVector<T>) Vectors.create(toCellArray());
 	}
 
 	@Override

@@ -372,7 +372,7 @@ public class AccountStatus extends ARecord {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	protected AccountStatus updateAll(Object[] newVals) {
+	protected AccountStatus updateAll(ACell[] newVals) {
 		long newSeq=((CVMLong)newVals[0]).longValue();
 		long newBal=((CVMLong)newVals[1]).longValue();
 		long newAllowance=((CVMLong)newVals[2]).longValue();

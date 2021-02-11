@@ -19,11 +19,11 @@ public class MapFn<K extends ACell, T  extends ACell> implements IFn<T> {
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
-	public Context<T> invoke(Context context, Object[] args) {
+	public Context<T> invoke(Context context, ACell[] args) {
 		int n = args.length;
 		T result;
 		if (n == 1) {
-			Object key = args[0];
+			ACell key = args[0];
 			result = map.get(key);
 		} else if (n == 2) {
 			K key = (K) args[0];

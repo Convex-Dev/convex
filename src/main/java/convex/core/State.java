@@ -100,7 +100,7 @@ public class State extends ARecord {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	protected State updateAll(Object[] newVals) {
+	protected State updateAll(ACell[] newVals) {
 		AVector<AccountStatus> accounts = (AVector<AccountStatus>) newVals[0];
 		BlobMap<AccountKey, PeerStatus> peers = (BlobMap<AccountKey, PeerStatus>) newVals[1];
 		ASet<ACell> store = (ASet<ACell>) newVals[2];

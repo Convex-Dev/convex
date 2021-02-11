@@ -176,7 +176,7 @@ public class PeerStatus extends ARecord {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	protected PeerStatus updateAll(Object[] newVals) {
+	protected PeerStatus updateAll(ACell[] newVals) {
 		long newStake = ((CVMLong) newVals[0]).longValue();
 		ABlobMap<Address, CVMLong> newStakes = (ABlobMap<Address, CVMLong>) newVals[1];
 		long newDelStake = ((CVMLong) newVals[2]).longValue();

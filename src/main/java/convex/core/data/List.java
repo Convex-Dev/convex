@@ -55,6 +55,11 @@ public class List<T extends ACell> extends AList<T> {
 		Utils.reverse(elements);
 		return new List<T>(Vectors.of(elements));
 	}
+	
+	public static <T extends ACell> List<T> create(ACell... args) {
+		Utils.reverse(args);
+		return new List<T>(Vectors.create(args));
+	}
 
 	@Override
 	public Object[] toArray() {
@@ -295,7 +300,7 @@ public class List<T extends ACell> extends AList<T> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public AVector<T> toVector() {
-		return (AVector<T>) Vectors.create(toArray());
+		return (AVector<T>) Vectors.create(toCellArray());
 	}
 
 	@Override
@@ -372,4 +377,6 @@ public class List<T extends ACell> extends AList<T> {
 		if (newLen==0) return Lists.empty();
 		return new List<T>(data.subVector(0, newLen));
 	}
+
+
 }

@@ -57,7 +57,7 @@ public abstract class ARecordGeneric extends ARecord {
 	}
 
 	@Override
-	protected ARecord updateAll(Object[] newVals) {
+	protected ARecord updateAll(ACell[] newVals) {
 		int n=size();
 		if (newVals.length!=n) throw new IllegalArgumentException("Wrong number of values: "+newVals.length);
 		boolean changed = false;

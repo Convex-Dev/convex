@@ -22,6 +22,6 @@ public interface IFn<T extends ACell> {
 	 *         value
 	 * @throws ExecutionException
 	 */
-	public abstract Context<T> invoke(Context<ACell> context, Object[] args);
+	public abstract Context<T> invoke(Context<ACell> context, ACell[] args);
 
 }

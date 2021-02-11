@@ -20,10 +20,10 @@ public class SetFn<T  extends ACell> implements IFn<CVMBool> {
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Override
-	public Context<CVMBool> invoke(Context context, Object[] args) {
+	public Context<CVMBool> invoke(Context context, ACell[] args) {
 		int n = args.length;
 		if (n == 1) {
-			Object key = args[0];
+			ACell key = args[0];
 			CVMBool result = CVMBool.create(set.contains(key));
 			return context.withResult(result);
 		} else {

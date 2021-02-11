@@ -68,7 +68,7 @@ public class Invoke<T extends ACell> extends AMultiOp<T> {
 		if (fn == null) return context.withCastError(rf, IFn.class);
 
 		int arity = ops.size() - 1;
-		Object[] args = new Object[arity];
+		ACell[] args = new ACell[arity];
 		for (int i = 0; i < arity; i++) {
 			// Compute the op for each argument in order
 			AOp<?> argOp=ops.get(i + 1);

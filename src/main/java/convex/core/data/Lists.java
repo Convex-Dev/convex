@@ -16,5 +16,4 @@ public class Lists {
 	public static <T extends ACell> AList<T> empty() {
 		return (List<T>) List.EMPTY;
 	}
-
 }

@@ -27,7 +27,7 @@ public class SeqFn<T extends ACell> implements IFn<T> {
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
-	public Context<T> invoke(Context context, Object[] args) {
+	public Context<T> invoke(Context context, ACell[] args) {
 		int n = args.length;
 		if (n == 1) {
 			CVMLong key = RT.toLong(args[0]);

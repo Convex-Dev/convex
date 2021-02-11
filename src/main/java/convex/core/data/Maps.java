@@ -31,7 +31,7 @@ public class Maps {
 
 	/**
 	 * Constructs a map with the given keys and values. If keys are repreated, later keys will
-	 * overwrite earlier ones.
+	 * overwrite earlier ones. Performs conversion to CVM types.
 	 * @param <R>
 	 * @param <K>
 	 * @param <V>
@@ -48,6 +48,30 @@ public class Maps {
 		for (int i = 0; i < n; i++) {
 			K key = (K) RT.cvm(keysAndValues[i * 2]);
 			V value = (V) RT.cvm(keysAndValues[i * 2 + 1]);
+			result = result.assoc(key, value);
+		}
+		return (R) result;
+	}
+	
+	/**
+	 * Constructs a map with the given keys and values. If keys are repreated, later keys will
+	 * overwrite earlier ones. Performs conversion to CVM types.
+	 * @param <R>
+	 * @param <K>
+	 * @param <V>
+	 * @param keysAndValues
+	 * @return Map with given keys and values
+	 */
+	@SuppressWarnings("unchecked")
+	public static <R extends AHashMap<K, V>, K extends ACell, V extends ACell> R create(ACell[] keysAndValues) {
+		int n = keysAndValues.length >> 1;
+		if (keysAndValues.length != n * 2)
+			throw new IllegalArgumentException("Even number of values need for key-value pairs");
+
+		AMap<K, V> result = Maps.empty();
+		for (int i = 0; i < n; i++) {
+			K key = (K) keysAndValues[i * 2];
+			V value = (V) keysAndValues[i * 2 + 1];
 			result = result.assoc(key, value);
 		}
 		return (R) result;

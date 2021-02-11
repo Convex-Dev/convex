@@ -29,7 +29,7 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 	}
 
 	@Override
-	public abstract Context<T> invoke(Context<ACell> context, Object[] args);
+	public abstract Context<T> invoke(Context<ACell> context, ACell[] args);
 
 	public Symbol getSymbol() {
 		return symbol;

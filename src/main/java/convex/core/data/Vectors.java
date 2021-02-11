@@ -23,7 +23,7 @@ public class Vectors {
 	 * @param length
 	 * @return New vector with the specified elements
 	 */
-	public static <T extends ACell> AVector<T> create(Object[] elements, int offset, int length) {
+	public static <T extends ACell> AVector<T> create(ACell[] elements, int offset, int length) {
 		if (length < 0) throw new IllegalArgumentException("Cannot create vector of negative length!");
 		if (length <= CHUNK_SIZE) return VectorLeaf.create(elements, offset, length);
 		int tailLength = Utils.checkedInt((length >> BITS_PER_LEVEL) << BITS_PER_LEVEL);
@@ -54,7 +54,7 @@ public class Vectors {
 	 * @param elements
 	 * @return New vector with the specified elements
 	 */
-	public static <T extends ACell> AVector<T> create(Object[] elements) {
+	public static <T extends ACell> AVector<T> create(ACell[] elements) {
 		return create(elements, 0, elements.length);
 	}
 
@@ -69,10 +69,18 @@ public class Vectors {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <R extends ACell, T extends ACell> AVector<R> create(Collection<?> list) {
+		if (list instanceof ASequence) return create((ASequence<R>) list);
+		if (list.size() == 0) return empty();
+		ACell[] cells=Utils.toCellArray(list.toArray());
+		return (AVector<R>) create(cells);
+	}
+	
+	public static <R extends ACell, T extends ACell> AVector<R> create(ASequence<R> list) {
 		if (list instanceof AVector) return (AVector<R>) list;
 		if (list.size() == 0) return empty();
-		return (AVector<R>) create(list.toArray());
+		return create(list.toCellArray());
 	}
+
 
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> AVector<T> empty() {
@@ -89,7 +97,7 @@ public class Vectors {
 	@SafeVarargs
 	public static <T extends ACell> AVector<T> of(Object... elements) {
 		int n=elements.length;
-		Object[] es= elements.clone();
+		ACell[] es= new ACell[n];
 		for (int i=0; i<n; i++) {
 			Object v=elements[i];
 			es[i]=(T)RT.cvm(v);
@@ -99,7 +107,7 @@ public class Vectors {
 
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> AVector<T> repeat(T m, int count) {
-		Object[] obs = new Object[count];
+		ACell[] obs = new ACell[count];
 		Arrays.fill(obs, m);
 		return (AVector<T>) create(obs);
 	}

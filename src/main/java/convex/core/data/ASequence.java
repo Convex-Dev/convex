@@ -184,6 +184,19 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	public final T remove(int index) {
 		throw new UnsupportedOperationException(Errors.immutable(this));
 	}
+	
+	/**
+	 * Converts this sequence to a new Cell array
+	 * @return A new cell array containing the elements of this sequence
+	 */
+	public ACell[] toCellArray() {
+		int n=Utils.checkedInt(count());
+		ACell[] cells=new ACell[n];
+		for (int i=0; i<n; i++) {
+			cells[i]=get(i);
+		}
+		return cells;
+	}
 
 	/**
 	 * Adds an element to the sequence in the natural position

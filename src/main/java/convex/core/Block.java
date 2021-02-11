@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 import java.util.Comparator;
 import java.util.List;
 
+import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -68,7 +69,7 @@ public class Block extends ARecord {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	protected Block updateAll(Object[] newVals) {
+	protected Block updateAll(ACell[] newVals) {
 		long newTimestamp = RT.toLong(newVals[0]).longValue();		
 		AVector<SignedData<ATransaction>> newTransactions = (AVector<SignedData<ATransaction>>) newVals[1];
 		AccountKey newPeer = (AccountKey) newVals[2];

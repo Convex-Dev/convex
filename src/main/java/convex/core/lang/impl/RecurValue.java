@@ -13,9 +13,9 @@ import convex.core.lang.RT;
  */
 public class RecurValue extends AReturn {
 
-	private final Object[] values;
+	private final ACell[] values;
 
-	private RecurValue(Object[] values) {
+	private RecurValue(ACell[] values) {
 		this.values = values;
 	}
 
@@ -25,7 +25,7 @@ public class RecurValue extends AReturn {
 	 * @param values
 	 * @return new RecurValue
 	 */
-	public static RecurValue wrap(Object... values) {
+	public static RecurValue wrap(ACell... values) {
 		return new RecurValue(values);
 	}
 
@@ -33,7 +33,7 @@ public class RecurValue extends AReturn {
 		return values[i];
 	}
 
-	public Object[] getValues() {
+	public ACell[] getValues() {
 		return values;
 	}
 

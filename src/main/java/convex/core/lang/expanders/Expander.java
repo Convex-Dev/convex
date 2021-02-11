@@ -55,7 +55,7 @@ public class Expander extends AExpander {
 	@SuppressWarnings("unchecked")
 	@Override
 	public Context<Syntax> expand(ACell form, AExpander ex, Context<?> context) {
-		Object[] args = new Object[2];
+		ACell[] args = new ACell[2];
 		args[0] = form;
 		args[1] = ex;
 

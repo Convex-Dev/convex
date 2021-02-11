@@ -1994,9 +1994,9 @@ public class CoreTest {
 		AVector<Syntax> pvals = ALL_PREDICATES;
 		assertFalse(pvals.isEmpty());
 		Context<?> C = INITIAL_CONTEXT.fork();
-		Object[] a0 = new Object[0];
-		Object[] a1 = new Object[1];
-		Object[] a2 = new Object[2];
+		ACell[] a0 = new ACell[0];
+		ACell[] a1 = new ACell[1];
+		ACell[] a2 = new ACell[2];
 		for (Syntax psyntax : pvals) {
 			CorePred pred = psyntax.getValue();
 			assertTrue(RT.isBoolean(pred.invoke(C, a1).getResult()), "Predicate: " + pred);

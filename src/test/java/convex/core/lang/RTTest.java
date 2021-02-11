@@ -58,7 +58,7 @@ public class RTTest {
 	public void testSequence() {
 		AVector<CVMLong> v = Vectors.of(1L, 2L, 3L);
 		AList<CVMLong> l = Lists.of(1L, 2L, 3L);
-		assertEquals(Vectors.of(1L, 2L), RT.sequence(new Long[] { 1L, 2L }));
+		assertEquals(Vectors.of(1L, 2L,3L), RT.sequence(l.toCellArray()));
 		assertEquals(v, RT.sequence(new java.util.ArrayList<>(v)));
 		assertSame(v, RT.sequence(v));
 		assertSame(l, RT.sequence(l));

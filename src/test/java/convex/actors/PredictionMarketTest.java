@@ -36,11 +36,12 @@ public class PredictionMarketTest {
 	@SuppressWarnings("unchecked")
 	private <T extends ACell> Context<T> doCall(Context<?> ctx,Address addr, long offer, Object name, Object... args) {
 		int n=args.length;
+		ACell[] cvmArgs=new ACell[n];
 		for (int i=0; i<n; i++) {
-			args[i]=RT.cvm(args[i]);
+			cvmArgs[i]=RT.cvm(args[i]);
 		}
 		
-		Context<?> rctx=ctx.actorCall(addr, offer, name, args);
+		Context<?> rctx=ctx.actorCall(addr, offer, name, cvmArgs);
 		return (Context<T>) rctx;
 	}
 	

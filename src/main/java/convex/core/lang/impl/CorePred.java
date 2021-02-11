@@ -1,5 +1,6 @@
 package convex.core.lang.impl;
 
+import convex.core.data.ACell;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMBool;
 import convex.core.lang.Context;
@@ -16,13 +17,13 @@ public abstract class CorePred extends CoreFn<CVMBool> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public Context<CVMBool> invoke(@SuppressWarnings("rawtypes") Context context, Object[] args) {
+	public Context<CVMBool> invoke(@SuppressWarnings("rawtypes") Context context, ACell[] args) {
 		if (args.length != 1) return context.withArityError(name() + " requires exactly one argument");
-		Object val = args[0];
+		ACell val = args[0];
 		// ensure we return one of the two canonical boolean values
 		CVMBool result = test(val) ? CVMBool.TRUE : CVMBool.FALSE;
 		return context.withResult(Juice.SIMPLE_FN, result);
 	}
 
-	public abstract boolean test(Object val);
+	public abstract boolean test(ACell val);
 }

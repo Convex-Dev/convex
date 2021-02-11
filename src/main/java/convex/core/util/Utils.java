@@ -473,6 +473,21 @@ public class Utils {
 		}
 		return result;
 	}
+	
+	/**
+	 * Converts any array to an ACell[] array. Elements must be Cells.
+	 * 
+	 * @param anyArray
+	 * @return ACell[] array
+	 */
+	public static ACell[] toCellArray(Object anyArray) {
+		int n = Array.getLength(anyArray);
+		ACell[] result = new ACell[n];
+		for (int i = 0; i < n; i++) {
+			result[i] = (ACell) Array.get(anyArray, i);
+		}
+		return result;
+	}
 
 	/**
 	 * Equality method allowing for nulls

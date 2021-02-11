@@ -292,7 +292,7 @@ public class Compiler {
 	 *         specified element, false otherwise.
 	 */
 	@SuppressWarnings("unchecked")
-	private static boolean isListStarting(Symbol element, Object form) {
+	private static boolean isListStarting(Symbol element, ACell form) {
 		if (!(form instanceof AList)) return false;
 		AList<Syntax> list = (AList<Syntax>) form;
 		if (list.count() == 0) return false;
