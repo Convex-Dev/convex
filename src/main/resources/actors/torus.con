@@ -279,5 +279,7 @@
               curr-price (or (call market2 (price)) (return nil))]
           (/ cvx-price curr-price))))
   
+    ;; We only export these two functions, which are needed to interact with torus market registry.
+    ;; Torus mainly operates as a library.
     (export get-market create-market)
   )

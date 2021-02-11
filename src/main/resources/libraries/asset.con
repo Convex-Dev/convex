@@ -56,17 +56,23 @@
          ;; asset is just an amount of convex
          (long? asset) (core/transfer receiver asset)
          (vector? asset)
-         (let [[asset-address quantity] asset
-               asset-address (address asset-address)]
-           (cond
-             (exports? receiver 'receive-asset)
-             (do 
-               (call asset-address (offer receiver quantity))
-               (call receiver (receive-asset asset data))),
+           (let [[asset-address quantity] asset
+                 asset-address (address asset-address)]
+             (cond
+               (exports? receiver 'receive-asset)
+               (do 
+                 (call asset-address (offer receiver quantity))
+                 (call receiver (receive-asset asset data))),
              
-             (actor? receiver) (fail "Receiver does not have receive-asset function")          
-             (account? receiver) (call asset-address (direct-transfer receiver quantity))
-             :else (fail "Address cannot receive asset")))
+               (actor? receiver) (fail "Receiver does not have receive-asset function")          
+               (account? receiver) (call asset-address (direct-transfer receiver quantity))
+               :else (fail "Address cannot receive asset")))
+         (map? asset)
+           (reduce
+             (fn [rs entry]
+               (assoc rs (first entry) (transfer receiver entry data)))
+             {}
+             asset)
          :else (fail "Invalid asset"))))
     ([receiver asset]
      (recur receiver asset nil)))
@@ -108,7 +114,7 @@
     (call (address asset-address) (check-transfer (address sender) (address receiver) quantity)))
 
   (defn balance
-    ^{:doc {:description "Returns asset balance for a specified owner.",
+    ^{:doc {:description "Returns asset balance for a specified owner. Return value will be in the quantity format as specified by the asset type.",
             :examples [{:code "(balance asset-address owner)"}]
             :type :function
             :signature [{:params [asset-address owner]}]}}

@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.AMap;
 import convex.core.data.Address;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
@@ -93,6 +94,11 @@ public class TestFungible {
 		assertTrue(evalB(ctx,"(asset/owns? "+TestState.VILLAIN+" [token 1000])"));
 		assertTrue(evalB(ctx,"(asset/owns? "+TestState.VILLAIN+" [token 2000])"));
 		assertFalse(evalB(ctx,"(asset/owns? "+TestState.VILLAIN+" [token 2001])"));
+		
+		// transfer using map argument
+		ctx=step(ctx,"(asset/transfer "+TestState.VILLAIN+" {token 100})");
+		assertTrue(ctx.getResult() instanceof AMap);
+		assertTrue(evalB(ctx,"(asset/owns? "+TestState.VILLAIN+" [token 2100])"));
 		
 		// test offer
 		ctx=step(ctx,"(asset/offer "+TestState.VILLAIN+" [token 1337])");
