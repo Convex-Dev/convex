@@ -279,5 +279,5 @@
               curr-price (or (call market2 (price)) (return nil))]
           (/ cvx-price curr-price))))
   
-    (export get-market create-market buy-cvx sell-cvx buy-tokens sell-tokens sell buy price)
+    (export get-market create-market)
   )
