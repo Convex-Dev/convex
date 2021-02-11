@@ -33,7 +33,6 @@ public class TorusTest {
 			
 			// Deploy currencies for testing (10m each, 2 decimal places)
 			ctx=step(ctx,"(def USD (deploy (fun/build-token {:supply 1000000000})))");
-			assertNotError(ctx);
 			USD=(Address) ctx.getResult();
 			//System.out.println("USD deployed Address = "+USD);
 			ctx=step(ctx,"(def GBP (deploy (fun/build-token {:supply 1000000000})))");
@@ -87,6 +86,13 @@ public class TorusTest {
 		assertEquals(1.0,evalD(ctx,"(torus/price GBP GBP)"));
 		assertEquals(0.5,evalD(ctx,"(torus/price USD GBP)"));
 		assertEquals(2.0,evalD(ctx,"(torus/price GBP USD)"));
+
+		// ============================================================
+		// SECOND TEST: Check marginal trades for $1 / £1
+		assertEquals(100,evalL(ctx,"(torus/buy GBP 100 GBP)"));
+		assertEquals(50,evalL(ctx,"(torus/buy USD 100 GBP)"));
+		assertEquals(200,evalL(ctx,"(torus/buy GBP 100 USD)"));
+
 	}
 	
 	@Test public void testInitialTokenMarket() {

@@ -223,7 +223,7 @@
    (defn buy-cvx [token amt] 
      (let [market (or (get-market token) (fail (str "Torus: market does not exist for token: " token)))]
        ;; Note we can offer all tokens, market will accept what it needs to complete order
-       (asset/offer market [token (fungible/balance token *caller*)]) 
+       (asset/offer market [token (fungible/balance token *address*)]) 
        (call market *balance* (buy-cvx amt))))
     
     (defn sell-cvx [token amt] 
@@ -248,7 +248,7 @@
     
     (defn buy [of-token amt with-token]
       (let [market (or (get-market of-token) (fail (str "Torus: market does not exist for token: " of-token)))
-            cvx-amt (call market (buy-tokens-qoute of-token amt))
+            cvx-amt (call market (buy-tokens-quote amt))
             sold (buy-cvx with-token cvx-amt)]
         (buy-tokens of-token amt)
         sold))
