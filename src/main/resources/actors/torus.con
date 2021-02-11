@@ -45,6 +45,8 @@
          :signature [{:params [config]}]}
 	  }
     ([token] 
+      ;; ensure we are calling this in the actor's environment, that that "def" works
+      (if (not (= *address* ~*address*)) (return (call ~*address* (create-market token))))
       (let [existing-market (get markets token)]
         (if existing-market (return existing-market))
         (let [token (address token)
