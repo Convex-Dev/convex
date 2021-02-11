@@ -506,7 +506,7 @@ public class RT {
 	}
 
 	/**
-	 * Converts any collection into a sequence data structure.
+	 * Converts any collection of cells into a sequence data structure. Handles Java arrays.
 	 * 
 	 * Potentially O(n) in size of collection.
 	 * 
@@ -514,8 +514,8 @@ public class RT {
 	 * 
 	 * Returns null if conversion is not possible.
 	 * 
-	 * @param <T>
-	 * @param o
+	 * @param <T> Type of cell in collection
+	 * @param o An object that contains a collection of cells
 	 * @return An ASequence instance, or null if the argument cannot be converted to
 	 *         a sequence
 	 */
