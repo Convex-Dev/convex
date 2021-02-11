@@ -45,25 +45,47 @@ public class TorusTest {
 			TORUS=(Address)ctx.getResult();
 			assertNotNull(ctx.getAccountStatus(TORUS));
 			ctx= step(ctx,"(def TORUS "+TORUS+")");
+			ctx= step(ctx,"(import "+TORUS+" :as torus)");
 			//System.out.println("Torus deployed Address = "+TORUS);
 			
 			// Deploy USD market. No market for GBP yet!
 			ctx= step(ctx,"(call TORUS (create-market USD))");
 			USD_MARKET=(Address)ctx.getResult();
-			CONTEXT= ctx.withResult(TORUS);
+			CONTEXT= ctx.withResult(TORUS).withJuice(INITIAL_JUICE);
 		} catch (Throwable e) {
 			e.printStackTrace();
 			throw Utils.sneakyThrow(e);
 		}
 	}
 	
-	@Test public void testInitialMarket() {
+	@Test public void testTorusAPI() {
 		Context<?> ctx=CONTEXT.fork();
+		
+		// Deploy GBP market.
+		ctx= step(ctx,"(def GBPM (call TORUS (create-market GBP)))");
+		Address GBP_MARKET=(Address)ctx.getResult();
+		assertNotNull(GBP_MARKET);
 		
 		// Check we can access the USD market
 		ctx= step(ctx,"(def USDM (call TORUS (get-market USD)))");
 		assertEquals(USD_MARKET,ctx.getResult());
 		
+		// ============================================================
+		// FIRST TEST: Initial deposit of $100k USD liquidity, £50k GBP liquidity
+		// Deposit some liquidity $100,000 for 1000 Gold = $100 price = 100000 CVX / US Cent
+		ctx=step(ctx,"(torus/add-liquidity USD 10000000 1000000000000)");
+		assertEquals(1.0,Math.sqrt(10000000.0*1000000000000.0)/(long)RT.jvm(ctx.getResult()),0.00001);
+		ctx=step(ctx,"(torus/add-liquidity GBP  5000000 1000000000000)");
+		assertEquals(1.0,Math.sqrt(5000000.0*1000000000000.0)/(long)RT.jvm(ctx.getResult()),0.00001);
+	}
+	
+	@Test public void testInitialTokenMarket() {
+		Context<?> ctx=CONTEXT.fork();
+		
+		// Check we can access the USD market
+		ctx= step(ctx,"(def USDM (call TORUS (get-market USD)))");
+		assertEquals(USD_MARKET,ctx.getResult());
+
 		// should be no price for initial market with zero liquidity
 		assertNull(eval(ctx,"(call USDM (price))"));
 		
