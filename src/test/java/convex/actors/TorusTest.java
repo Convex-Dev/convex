@@ -40,6 +40,7 @@ public class TorusTest {
 			GBP=(Address) ctx.getResult();
 			
 			// Deploy Torus actor itself
+			ctx=ctx.withJuice(INITIAL_JUICE);
 			ctx= ctx.deployActor(Reader.readResource("actors/torus.con"));
 			assertNotError(ctx);
 			TORUS=(Address)ctx.getResult();
@@ -77,6 +78,15 @@ public class TorusTest {
 		assertEquals(1.0,Math.sqrt(10000000.0*1000000000000.0)/(long)RT.jvm(ctx.getResult()),0.00001);
 		ctx=step(ctx,"(torus/add-liquidity GBP  5000000 1000000000000)");
 		assertEquals(1.0,Math.sqrt(5000000.0*1000000000000.0)/(long)RT.jvm(ctx.getResult()),0.00001);
+	
+		// ============================================================
+		// SECOND TEST: Check prices 
+		assertEquals(100000.0,evalD(ctx,"(torus/price USD)"));
+		assertEquals(200000.0,evalD(ctx,"(torus/price GBP)"));
+	
+		assertEquals(1.0,evalD(ctx,"(torus/price GBP GBP)"));
+		assertEquals(0.5,evalD(ctx,"(torus/price USD GBP)"));
+		assertEquals(2.0,evalD(ctx,"(torus/price GBP USD)"));
 	}
 	
 	@Test public void testInitialTokenMarket() {

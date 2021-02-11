@@ -82,7 +82,7 @@
          
          ;; price is convex amount per token, or nil if there are no tokens in liquidity pool
          (defn price []
-           (if (> token-balance 0) (/ (double *balance*) token-balance)))
+           (if (> token-balance 0) (/ (double *balance*) token-balance) nil))
          
          (defn add-liquidity [amt]
            (let [amt (long amt)                                        ;; amount of tokens deposited
@@ -257,7 +257,24 @@
       (let [market (or (get-market token) (fail (str "Torus: market does not exist for token: " token)))]
         (asset/offer market [token token-amount])
         (call market cvx-amount (add-liquidity token-amount))))
-
+    
+    (defn price 
+	    ^{:doc {:description "Gets the current price for a token, in CVX or an optional given currency. Returns nil if a market with liquidity does not exist."
+	         :examples [{:code "(price USD)"}
+	                    {:code "(price GBP USD)"}]
+	         :type :function
+	         :signature [{:params [token]}
+	                     {:params [token currency]}]}
+		  }
+      ([token]
+        (let [market (or (get-market token) (return nil))]
+          (call market (price))))
+      ([token currency]
+        (let [market (or (get-market token) (return nil))
+              cvx-price (or (call market (price)) (return nil))
+              market2 (or (get-market currency) (return nil))
+              curr-price (or (call market2 (price)) (return nil))]
+          (/ cvx-price curr-price))))
   
-    (export get-market create-market buy-cvx sell-cvx buy-tokens sell-tokens sell buy)
+    (export get-market create-market buy-cvx sell-cvx buy-tokens sell-tokens sell buy price)
   )
