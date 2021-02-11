@@ -341,7 +341,11 @@
         (def offers (assoc-in offers [sender receiver] (difference offered-id-set accepted-id-set))))
       (perform-transfer sender receiver accepted-id-set)))
 
-  (export create-token destroy-token get-token-owner get-token-creator get-token-data get-token-class balance get-offers get-offer check-trusted? set-token-data merge-token-data check-transfer direct-transfer offer accept owns? get-uri))
+  (def quantity-add union)
+  
+  (def quantity-sub difference)
+  
+  (export create-token quantity-add quantity-sub destroy-token get-token-owner get-token-creator get-token-data get-token-class balance get-offers get-offer check-trusted? set-token-data merge-token-data check-transfer direct-transfer offer accept owns? get-uri))
 
 
 

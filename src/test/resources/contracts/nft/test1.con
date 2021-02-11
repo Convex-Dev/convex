@@ -27,3 +27,15 @@
   (assert (not (asset/owns? *address* [nft t1])))
   (assert (not (subset? #{t1} (asset/balance nft *address*))))
   (assert (nil? (get nft/token-records t1))))
+
+;; Testing quantities
+(do 
+  (assert (= #{} (asset/quantity-zero nft)))
+  (assert (= #{1 2 3 4} (asset/quantity-add nft #{1 2} #{3 4})))
+  (assert (= #{1 2 3 4} (asset/quantity-add nft #{1 2 3} #{2 3 4})))
+  (assert (= #{1 2} (asset/quantity-sub nft #{1 2 3} #{3 4 5})))
+  
+  (assert (asset/quantity-contains? nft #{1 2 3} #{2 3}))
+  (assert (not (asset/quantity-contains? nft #{1 2 3} #{3 4})))
+  (assert (not (asset/quantity-contains? nft #{1 2 3} #{4 5 6})))
+  )

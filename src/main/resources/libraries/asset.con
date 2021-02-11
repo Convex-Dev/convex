@@ -115,8 +115,45 @@
     ([asset-address owner]
      (call (address asset-address) (balance (address owner)))))
   
+  (defn quantity-add
+    ^{:doc {:description "Adds two quantities for a given asset. Quantities must be specified in the format required by the asset type. nil may be used to indicate the 'zero' quantity.",
+            :examples [{:code "(quantity-add fungible-token 100 1000)"}
+                       {:code "(quantity-add non-fungible-token #{1 2} #{3 4})"}]
+            :type :function
+            :signature [{:params [asset-address a b]}]}}
+    [asset-address a b]
+    (call (address asset-address) (quantity-add a b)))
+  
+  (defn quantity-sub 
+    ^{:doc {:description "Subracts a quantity from another quantity for a given asset. Quantities must be specified in the format required by the asset type. Subtracting a larger amount from a smaller amount should return 'zero' or equivalent, although the exact meaning of this operation may be asset-specific. nil may be used to indicate the 'zero' quantity.",
+            :examples [{:code "(quantity-sub fungible-token 500 300)"}
+                       {:code "(quantity-sub non-fungible-token #{1 2 3 4} #{2 3})"}]
+            :type :function
+            :signature [{:params [asset-address a b]}]}}
+    [asset-address a b]
+    (call (address asset-address) (quantity-sub a b)))
+  
+  (defn quantity-zero 
+    ^{:doc {:description "Returns the unique 'zero' quantity for the given asset.",
+            :examples [{:code "(quantity-zero fungible-token)" :result 0}
+                       {:code "(quantity-zero non-fungible-token)" :result #{}}]
+            :type :function
+            :signature [{:params [asset-address a b]}]}}
+    [asset-address]
+    (call (address asset-address) (quantity-add nil nil)))
+  
+  (defn quantity-contains?
+    ^{:doc {:description "Returns true if the first quantity 'contains' the second quantity in its entirety. Any valid quantity must contain the 'zero' quantity.",
+            :examples [{:code "(quantity-contains? fungible-token 100 60)" :result true}
+                       {:code "(quantity-contains? non-fungible-token #{1 2} #{2 3})" :result false}]
+            :type :function
+            :signature [{:params [asset a b]}]}}
+    [asset-address a b]
+    (let [asset-address (address asset-address)]  
+      (= (call asset-address (quantity-add nil nil)) (call asset-address (quantity-sub b a)))))
+  
   (defn owns?
-    ^{:doc {:description "Tests whether owner owns a given quantity of an asset",
+    ^{:doc {:description "Tests whether owner owns at least a given quantity of an asset",
             :examples [{:code "(owns? owner 1000)"}
                        {:code "(owns? owner [fungible-token-address 1000])"}
                        {:code "(owns? owner [non-fungible-token-address #{1 4 6}])"}]

@@ -110,7 +110,16 @@
          (defn check-transfer [sender receiver quantity]
            nil)
          
-         (export direct-transfer balance owns? offer accept get-offer check-transfer))))
+         (defn quantity-add [a b]
+           (let [a (if a (long a) 0)
+                 b (if b (long b) 0)] (+ a b)))
+         
+         (defn quantity-sub [a b]
+           (let [a (if a (long a) 0)
+                 b (if b (long b) 0)] 
+             (if (> a b) (- a b) 0)))
+         
+         (export direct-transfer quantity-add quantity-sub balance owns? offer accept get-offer check-transfer))))
   
   (defn add-mint 
     ^{:doc {:description "Creates deployable code that, when added to a fungible token actor, allows priviledged accounts to mint and burn tokens. The :minter may be a single address, or a Trust Monitor."

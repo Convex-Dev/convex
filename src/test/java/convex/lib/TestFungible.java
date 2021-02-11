@@ -83,6 +83,13 @@ public class TestFungible {
 		assertEquals(998000L,evalL(ctx,"(asset/balance token *address*)"));
 		assertEquals(2000L,evalL(ctx,"(asset/balance token "+TestState.VILLAIN+")"));
 		
+		assertEquals(0L,evalL(ctx,"(asset/quantity-zero token)"));
+		assertEquals(110L,evalL(ctx,"(asset/quantity-add token 100 10)"));
+		assertEquals(110L,evalL(ctx,"(asset/quantity-sub token 120 10)"));
+		assertEquals(110L,evalL(ctx,"(asset/quantity-sub token 110 nil)"));
+		assertEquals(0L,evalL(ctx,"(asset/quantity-sub token 100 1000)"));
+
+		
 		assertTrue(evalB(ctx,"(asset/owns? "+TestState.VILLAIN+" [token 1000])"));
 		assertTrue(evalB(ctx,"(asset/owns? "+TestState.VILLAIN+" [token 2000])"));
 		assertFalse(evalB(ctx,"(asset/owns? "+TestState.VILLAIN+" [token 2001])"));
