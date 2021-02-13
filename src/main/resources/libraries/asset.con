@@ -151,6 +151,8 @@
             :examples [{:code "(balance asset-address owner)"}]
             :type :function
             :signature [{:params [asset-address owner]}]}}
+    ([asset-address]
+      (recur asset-address *address*))
     ([asset-address owner]
      (call (address asset-address) (balance (address owner)))))
   
