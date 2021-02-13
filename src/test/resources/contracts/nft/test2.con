@@ -306,7 +306,7 @@
   (eval-as p2 '(asset/accept ~*address* [nft ~t2])) ;; does accept as p2
   (assert (asset/owns? p2 [nft t2]))
 
-(do
+
   (def a2 (deploy '(do
                           (import convex.asset :as asset)
                           (defn receive-asset [asset data]
@@ -316,6 +316,6 @@
   (asset/offer a2 [nft t4])
   (assert (asset/owns? *address* [nft t4]))
   (call a2 (receive-asset [nft t4] nil))
-  (assert (asset/owns? a2 [nft t4])))
+  (assert (asset/owns? a2 [nft t4]))
   
 :OK  

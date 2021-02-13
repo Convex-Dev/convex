@@ -125,12 +125,6 @@
   (defn balance [owner]
     (or (get-holding (address owner)) #{}))
 
-  ;; Implements the owns? function for convex.asset.
-  (defn owns? [owner id-set]
-    (let [owner (address owner)
-          id-set (num->set id-set)]
-      (subset? id-set (balance owner))))
-
   ;; check-trusted? determines whether a given address has certain rights.
 
   ;; A policy-key is either:
@@ -345,7 +339,12 @@
   
   (def quantity-sub difference)
   
-  (export create-token quantity-add quantity-sub destroy-token get-token-owner get-token-creator get-token-data get-token-class balance get-offers get-offer check-trusted? set-token-data merge-token-data check-transfer direct-transfer offer accept owns? get-uri))
+  (defn quantity-subset? [a b]
+    ;; hack - treat longs as singleton set
+    (if (long? a) (contains-key? b a) (subset? a b)))
+
+  
+  (export create-token quantity-add quantity-sub quantity-subset? destroy-token get-token-owner get-token-creator get-token-data get-token-class balance get-offers get-offer check-trusted? set-token-data merge-token-data check-transfer direct-transfer offer accept  get-uri))
 
 
 

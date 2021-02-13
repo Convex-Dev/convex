@@ -57,8 +57,6 @@
     ([receiver asset data]
      (let [receiver (address receiver)]
        (cond
-         ;; long asset is just an amount of convex
-         (long? asset) (core/transfer receiver asset)
          (vector? asset)
            (let [[asset-address quantity] asset
                  asset-address (address asset-address)]
@@ -90,7 +88,6 @@
             :signature [{:params [receiver [asset-address quantity]]}]}}
     [receiver asset]
     (cond 
-      (long? asset) (fail "Can't establish an open offer of convex coins.")
       (vector? asset)
       (let [asset-address (first asset)
             quantity (second asset)]
@@ -110,7 +107,7 @@
             :type :function
             :signature [{:params [asset-address sender receiver]}]}}
     [asset-address sender receiver]
-    (call (address asset-address) (get-offer (address sender) (address receiver))))
+    (call asset-address (get-offer (address sender) (address receiver))))
   
   (defn accept
     ^{:doc {:description "Accepts asset from sender.",
@@ -119,9 +116,6 @@
             :signature [{:params [sender [asset-address quantity]]}]}}
     [sender asset]
     (cond 
-      (long? asset) 
-        (core/accept asset)
-        
       (vector? asset)
         (let [asset-address (first asset)
               quantity (second asset)]
@@ -147,14 +141,14 @@
     (call (address asset-address) (check-transfer (address sender) (address receiver) quantity)))
 
   (defn balance
-    ^{:doc {:description "Returns asset balance for a specified owner. Return value will be in the quantity format as specified by the asset type.",
+    ^{:doc {:description "Returns asset balance for a specified owner, or the current address if not supplied. Return value will be in the quantity format as specified by the asset type.",
             :examples [{:code "(balance asset-address owner)"}]
             :type :function
             :signature [{:params [asset-address owner]}]}}
     ([asset-address]
       (recur asset-address *address*))
     ([asset-address owner]
-     (call (address asset-address) (balance (address owner)))))
+     (call asset-address (balance (address owner)))))
   
   (defn quantity-add
     ^{:doc {:description "Adds two quantities for a given asset. Quantities must be specified in the format required by the asset type. nil may be used to indicate the 'zero' quantity.",
@@ -194,27 +188,25 @@
   
   (defn owns?
     ^{:doc {:description "Tests whether owner owns at least a given quantity of an asset",
-            :examples [{:code "(owns? owner 1000)"}
-                       {:code "(owns? owner [fungible-token-address 1000])"}
+            :examples [{:code "(owns? owner [fungible-token-address 1000])"}
                        {:code "(owns? owner [non-fungible-token-address #{1 4 6}])"}]
             :type :function
             :signature [{:params [asset-address owner]}]}}
     [owner asset]
-    (let [owner (address owner)]
-      (cond
-        (long? asset) (<= asset (core/balance owner))
-        (vector? asset)
-          (let [[asset-address quantity] asset]
-            (call (address asset-address) (owns? owner quantity)))
+    (cond
+      (vector? asset)
+        (let [[asset-address quantity] asset
+               bal (call asset-address (balance owner))]
+            (call asset-address (quantity-subset? quantity bal)))
           
-        (map? asset) 
-          (reduce 
+      (map? asset) 
+        (reduce 
            (fn [result [asset-address quantity]]
-             (if (call asset-address (owns? receiver quantity)) true (reduced false)))
+             (if (call asset-address (quantity-subset? quantity (call asset-address (balance owner)))) true (reduced false)))
            true
            asset)
         
-        ;; interpret nil as the 'zero' asset, which everybody owns
-        (nil? asset) true)))
+      ;; interpret nil as the 'zero' asset, which everybody owns
+      (nil? asset) true))
   
   )

@@ -89,6 +89,12 @@
   (defn owns? [owner boxes]
     (subset? boxes (get ownership owner)))
   
+  (def quantity-add union)
   
-  (export balance create-box burn owns? offer accept direct-transfer)
+  (def quantity-sub difference)
+  
+  (def quantity-subset? subset?)
+  
+  
+  (export balance create-box burn quantity-add quantity-sub quantity-subset? offer accept direct-transfer)
   )
