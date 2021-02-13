@@ -53,7 +53,7 @@
     ([receiver asset data]
      (let [receiver (address receiver)]
        (cond
-         ;; asset is just an amount of convex
+         ;; long asset is just an amount of convex
          (long? asset) (core/transfer receiver asset)
          (vector? asset)
            (let [[asset-address quantity] asset
@@ -170,5 +170,10 @@
       (cond
         (long? asset) (<= asset (core/balance owner))
         (vector? asset)
-        (let [[asset-address quantity] asset]
-          (call (address asset-address) (owns? owner quantity)))))))
+          (let [[asset-address quantity] asset]
+            (call (address asset-address) (owns? owner quantity)))
+        
+        ;; interpret nil as the 'zero' asset, which everybody owns
+        (nil? asset) true)))
+  
+  )
