@@ -190,8 +190,7 @@
             :type :function
             :signature [{:params [asset a b]}]}}
     [asset-address a b]
-    (let [asset-address (address asset-address)]  
-      (= (call asset-address (quantity-add nil nil)) (call asset-address (quantity-sub b a)))))
+    (= (call asset-address (quantity-add nil nil)) (call asset-address (quantity-sub b a))))
   
   (defn owns?
     ^{:doc {:description "Tests whether owner owns at least a given quantity of an asset",

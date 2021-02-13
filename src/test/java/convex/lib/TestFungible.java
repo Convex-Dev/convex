@@ -90,6 +90,8 @@ public class TestFungible {
 		assertEquals(110L,evalL(ctx,"(asset/quantity-sub token 110 nil)"));
 		assertEquals(0L,evalL(ctx,"(asset/quantity-sub token 100 1000)"));
 
+		assertTrue(evalB(ctx,"(asset/quantity-contains? token 1000 999)"));
+
 		
 		assertTrue(evalB(ctx,"(asset/owns? "+TestState.VILLAIN+" [token 1000])"));
 		assertTrue(evalB(ctx,"(asset/owns? "+TestState.VILLAIN+" [token 2000])"));
