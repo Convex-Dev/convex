@@ -5,8 +5,12 @@
   ;;
   ;; import with (import convex.asset :as asset)
   ;;
-  ;; An asset is described by either a long (indicating a quantity of convex), or
-  ;; an [asset-address quantity] vector, where quantity is interpreted
+  ;; An asset is described by either:
+  ;; - a Long (indicating a quantity of convex coins), or
+  ;; - [asset-address quantity] vector, indicating an asset managed by an Actor 
+  ;; - A {asset-address quantity} map, indicating assets owned managed by zero or more Actors
+  ;;
+  ;; In each case quantities of an asset are are interpreted
   ;; in an asset-specific manner. For example, for fungible currencies, quantity is the amount,
   ;; whereas for non-fungible-tokens, quantity may be represented as a set of token ids.
   ;;
@@ -79,16 +83,29 @@
   
   ;; For smart contract assets, you can offer and accept separately if you choose
   (defn offer
-    ^{:doc {:description "Offers asset to receiver.",
+    ^{:doc {:description "Opens an offer of an asset to a receiver, which makes it possible for the receiver to 'accept' up to this quantity. May result in an error if the asset does not support open offers.",
             :examples [{:code "(offer receiver [fungible-token-address 1000])"}
                        {:code "(offer receiver [non-fungible-token-address #{1 4 6}])"}]
             :type :function
             :signature [{:params [receiver [asset-address quantity]]}]}}
-    [receiver [asset-address quantity]]
-    (call (address asset-address) (offer (address receiver) quantity)))
+    [receiver asset]
+    (cond 
+      (long? asset) (fail "Can't establish an open offer of convex coins.")
+      (vector? asset)
+      (let [asset-address (first asset)
+            quantity (second asset)]
+         (call asset-address (offer receiver quantity)))
+      
+      (map? asset)
+         (reduce 
+           (fn [m [asset-address quantity]]
+             (assoc m asset-address (call asset-address (offer receiver quantity))))
+           {}
+           asset))
+    )
 
   (defn get-offer
-    ^{:doc {:description "Gets the current offer from sender to receiver",
+    ^{:doc {:description "Gets the current offer from sender to receiver for a given asset. Returns the quantity representing the current offer. Will be the 'zero' quantity if no open offer exists.",
             :examples [{:code "(get-offer asset-address sender receiver)"}]
             :type :function
             :signature [{:params [asset-address sender receiver]}]}}
@@ -100,8 +117,24 @@
             :examples [{:code "(accept sender [fungible-token-address 1000])"}]
             :type :function
             :signature [{:params [sender [asset-address quantity]]}]}}
-    [sender [asset-address quantity]]
-    (call (address asset-address) (accept (address sender) quantity)))
+    [sender asset]
+    (cond 
+      (long? asset) 
+        (core/accept asset)
+        
+      (vector? asset)
+        (let [asset-address (first asset)
+              quantity (second asset)]
+           (call asset-address (accept sender quantity)))
+    
+      (map? asset)
+        (reduce 
+           (fn [m [asset-address quantity]]
+             (assoc m asset-address (call asset-address (accept sender quantity))))
+           {}
+           asset)
+      )
+    )
   
   ;; Also, independently of general transfer, you can test whether there are restrictions on transferring
   (defn check-transfer
@@ -172,6 +205,13 @@
         (vector? asset)
           (let [[asset-address quantity] asset]
             (call (address asset-address) (owns? owner quantity)))
+          
+        (map? asset) 
+          (reduce 
+           (fn [result [asset-address quantity]]
+             (if (call asset-address (owns? receiver quantity)) true (reduced false)))
+           true
+           asset)
         
         ;; interpret nil as the 'zero' asset, which everybody owns
         (nil? asset) true)))
