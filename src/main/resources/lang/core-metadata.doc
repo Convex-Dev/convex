@@ -130,7 +130,7 @@
  
   call
 	{
-	 :doc {:description "Calls an Actor function. address must be valid. offer is optional, if provided must cast to Long. call-form must be a valid expression calling an exported function in the Actor."
+	 :doc {:description "Calls an function in another Account. The specified address must be valid, and refer to an existing account. offer is optional, if provided must cast to Long. call-form must be a valid expression calling an exported function in the target Account."
          :examples [{:code "(call some-contract 1000 (contract-fn arg1 arg2))"}]
          :type :macro
          :signature [{:params [address call-form]}
