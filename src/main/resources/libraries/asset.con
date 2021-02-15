@@ -106,10 +106,10 @@
             :type :function
             :signature [{:params [asset-address sender receiver]}]}}
     [asset-address sender receiver]
-    (call asset-address (get-offer (address sender) (address receiver))))
+    (query (call asset-address (get-offer (address sender) (address receiver)))))
   
   (defn accept
-    ^{:doc {:description "Accepts asset from sender.",
+    ^{:doc {:description "Accepts asset from sender. If asset argument contains multiple assets, accepts each in turn.",
             :examples [{:code "(accept sender [fungible-token-address 1000])"}]
             :type :function
             :signature [{:params [sender [asset-address quantity]]}]}}
@@ -137,7 +137,7 @@
             :type :function
             :signature [{:params [sender receiver [asset-address quantity]]}]}}
     [sender receiver [asset-address quantity]]
-    (call (address asset-address) (check-transfer (address sender) (address receiver) quantity)))
+      (query (call (address asset-address) (check-transfer (address sender) (address receiver) quantity))))
 
   (defn balance
     ^{:doc {:description "Returns asset balance for a specified owner, or the current address if not supplied. Return value will be in the quantity format as specified by the asset type.",
@@ -147,7 +147,7 @@
     ([asset-address]
       (recur asset-address *address*))
     ([asset-address owner]
-     (call asset-address (balance (address owner)))))
+      (query (call asset-address (balance (address owner))))))
   
   (defn quantity-add
     ^{:doc {:description "Adds two asset quantities. Quantities must be specified in the format required by the asset type. nil may be used to indicate the 'zero' quantity.",
@@ -156,7 +156,7 @@
             :type :function
             :signature [{:params [asset-address a b]}]}}
     ([asset-address a b]
-    (call asset-address (quantity-add a b))))
+    (query (call asset-address (quantity-add a b)))))
   
   (defn quantity-sub 
     ^{:doc {:description "Subracts a quantity from another quantity for a given asset. Quantities must be specified in the format required by the asset type. Subtracting a larger amount from a smaller amount should return 'zero' or equivalent, although the exact meaning of this operation may be asset-specific. nil may be used to indicate the 'zero' quantity in inputs.",
@@ -165,7 +165,7 @@
             :type :function
             :signature [{:params [asset-address a b]}]}}
     ([asset-address a b]
-    (call asset-address (quantity-sub a b))))
+      (query (call asset-address (quantity-sub a b)))))
   
   (defn quantity-zero 
     ^{:doc {:description "Returns the unique 'zero' quantity for the given asset.",
@@ -174,7 +174,7 @@
             :type :function
             :signature [{:params [asset-address a b]}]}}
     [asset-address]
-    (call asset-address (quantity-add nil nil)))
+    (query (call asset-address (quantity-add nil nil))))
   
   (defn quantity-contains?
     ^{:doc {:description "Returns true if the first quantity 'contains' the second quantity in its entirety. Any valid quantity must contain the 'zero' quantity.",
@@ -183,7 +183,7 @@
             :type :function
             :signature [{:params [asset a b]}]}}
     ([asset-address a b]
-      (= (call asset-address (quantity-add nil nil)) (call asset-address (quantity-sub b a)))))
+      (query (= (call asset-address (quantity-add nil nil)) (call asset-address (quantity-sub b a))))))
   
   (defn owns?
     ^{:doc {:description "Tests whether owner owns at least a given quantity of an asset",
@@ -192,20 +192,21 @@
             :type :function
             :signature [{:params [asset-address owner]}]}}
     [owner asset]
-    (cond
-      (vector? asset)
-        (let [[asset-address quantity] asset
-               bal (call asset-address (balance owner))]
+    (query 
+      (cond
+        (vector? asset)
+          (let [[asset-address quantity] asset
+                   bal (call asset-address (balance owner))]
             (call asset-address (quantity-subset? quantity bal)))
           
-      (map? asset) 
-        (reduce 
-           (fn [result [asset-address quantity]]
-             (if (call asset-address (quantity-subset? quantity (call asset-address (balance owner)))) true (reduced false)))
-           true
-           asset)
+          (map? asset) 
+            (reduce 
+              (fn [result [asset-address quantity]]
+                (if (call asset-address (quantity-subset? quantity (call asset-address (balance owner)))) true (reduced false)))
+              true
+             asset)
         
-      ;; interpret nil as the 'zero' asset, which everybody owns
-      (nil? asset) true))
+        ;; interpret nil as the 'zero' asset, which everybody owns
+        (nil? asset) true)))
   
   )
