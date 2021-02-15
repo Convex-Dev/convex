@@ -34,6 +34,7 @@ import convex.core.lang.ops.Invoke;
 import convex.core.lang.ops.Lambda;
 import convex.core.lang.ops.Let;
 import convex.core.lang.ops.Lookup;
+import convex.core.lang.ops.Query;
 import convex.core.util.Utils;
 
 /**
@@ -342,6 +343,14 @@ public class Compiler {
 				Do<R> op = Do.create((AVector<AOp<ACell>>) context.getResult());
 				return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
 			}
+			
+			if (sym.equals(Symbols.QUERY)) {
+				context = context.compileAll(list.next());
+				if (context.isExceptional()) return (Context<T>) context;
+				Query<R> op = Query.create((AVector<AOp<ACell>>) context.getResult());
+				return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
+			}
+
 
 			if (sym.equals(Symbols.LET)) return compileLet(list, context, false);
 			if (sym.equals(Symbols.LOOP)) return compileLet(list, context, true);

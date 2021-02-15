@@ -28,8 +28,10 @@ public class Ops {
 	public static final byte LOOKUP = 5;
 	public static final byte LAMBDA = 7;
 	public static final byte LET = 8;
+	public static final byte QUERY = 9;
 	// public static final byte CALL = 9;
 	// public static final byte RETURN = 10;
+	
 
 	/**
 	 * Reads an Op from the given ByteBuffer. Assumes Message tag already read.

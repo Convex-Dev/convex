@@ -2412,7 +2412,7 @@ public class CoreTest {
 	
 	@Test
 	public void testQuery() {
-		Context<AVector<ACell>> ctx=step("(query '(do (def a 10) [*address* *origin* *caller* 10]))");
+		Context<AVector<ACell>> ctx=step("(query (def a 10) [*address* *origin* *caller* 10])");
 		assertEquals(Vectors.of(Init.HERO,Init.HERO,null,10L), ctx.getResult());
 		
 		// shouldn't be any def in the environment
@@ -2424,34 +2424,26 @@ public class CoreTest {
 	
 	@Test
 	public void testQueryError() {
-		Context<CVMLong> ctx=step("(query '(fail :FOO))");
+		Context<CVMLong> ctx=step("(query (fail :FOO))");
 		assertAssertError(ctx);
 		
 		// some juice should be consumed
 		assertTrue(INITIAL_CONTEXT.getJuice()>ctx.getJuice());
 	}
 	
-	@Test
-	public void testQueryAs() {
-		Context<AVector<ACell>> ctx=step("(query-as "+Init.VILLAIN+" '(do (def a 10) [*address* *origin* *caller* 10]))");
-		assertEquals(Vectors.of(Init.VILLAIN,Init.VILLAIN,null,10L), ctx.getResult());
-		
-		// shouldn't be any def in the environment
-		assertSame(INITIAL,ctx.getState());
-		assertSame(INITIAL_CONTEXT.getLocalBindings(),ctx.getLocalBindings());
-		
-		// some juice should be consumed
-		assertTrue(INITIAL_CONTEXT.getJuice()>ctx.getJuice());
-	}
-	
-	@Test
-	public void testQueryAsError() {
-		Context<CVMLong> ctx=step("(query '(fail :FOO))");
-		assertAssertError(ctx);
-		
-		// some juice should be consumed
-		assertTrue(INITIAL_CONTEXT.getJuice()>ctx.getJuice());
-	}
+// TODO: probably needs Op level support?
+//	@Test
+//	public void testQueryAs() {
+//		Context<AVector<ACell>> ctx=step("(query-as "+Init.VILLAIN+" '(do (def a 10) [*address* *origin* *caller* 10]))");
+//		assertEquals(Vectors.of(Init.VILLAIN,Init.VILLAIN,null,10L), ctx.getResult());
+//		
+//		// shouldn't be any def in the environment
+//		assertSame(INITIAL,ctx.getState());
+//		assertSame(INITIAL_CONTEXT.getLocalBindings(),ctx.getLocalBindings());
+//		
+//		// some juice should be consumed
+//		assertTrue(INITIAL_CONTEXT.getJuice()>ctx.getJuice());
+//	}
 	
 	@Test
 	public void testEvalAsNotWhitelistedUser() {

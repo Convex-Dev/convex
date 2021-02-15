@@ -252,6 +252,8 @@ public class Juice {
 
 	public static final long CREATE_ACCOUNT = 100;
 
+	public static final long QUERY = Juice.CHEAP_OP;
+
 	/**
 	 * Saturating multiply and add result = a + b * c
 	 * 

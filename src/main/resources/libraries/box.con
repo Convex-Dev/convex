@@ -15,20 +15,19 @@
   ;; map of owner -> #{<box ids>}}
   (def ownership {})
   
-  ;; map of box-id -> {asset-addr -> quantity}
+  ;; map of box-id -> asset-quantity
   (def boxes {})
   
   ;; map of {owner -> {recipient-address -> id-set}}
   (def offers {})
 
   (defn insert [box-id asset]
-    (or (contains-key? (ownership *caller*) box-id) (fail :TRUST (str "Box not owned: " box-id)))
-    (cond 
-      (vector? asset)
-        (let [[asset-actor quantity] asset]
-          (fail "TODO accept"))
-      (fail :ASSERT "Not a valid asset"))
-    )
+     (let [box-id (long box-id)
+           current-asset (get boxes box-id)]
+        (asset/accept asset)
+        (or (contains-key? (ownership *caller*) box-id) (fail :TRUST (str "Box not owned: " box-id)))
+        (def boxes (assoc boxes box-id (asset/add))))
+  )
   
   (defn offer [receiver quantity]
     (let [caller-offers (get offers *caller* {})]

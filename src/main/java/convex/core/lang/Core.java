@@ -395,37 +395,6 @@ public class Core {
 			return rctx.consumeJuice(Juice.EVAL);
 		}
 	});
-	
-	public static final CoreFn<ACell> QUERY = reg(new CoreFn<>(Symbols.QUERY) {
-
-		@SuppressWarnings("unchecked")
-		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
-			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-
-			ACell form = (ACell) args[0];
-			Context<ACell> rctx = context.query(form);
-			return rctx.consumeJuice(Juice.EVAL);
-		}
-
-	});
-	
-	public static final CoreFn<ACell> QUERY_AS = reg(new CoreFn<>(Symbols.QUERY_AS) {
-
-		@SuppressWarnings("unchecked")
-		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
-			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
-
-			Address address = RT.address(args[0]);
-			if (address==null) return context.withCastError(args[0], Address.class);
-			
-			ACell form = (ACell) args[1];
-			Context<ACell> rctx = context.queryAs(address,form);
-			return rctx.consumeJuice(Juice.EVAL);
-		}
-
-	});
 
 	public static final CoreFn<CVMLong> SCHEDULE_STAR = reg(new CoreFn<>(Symbols.SCHEDULE_STAR) {
 		@SuppressWarnings("unchecked")

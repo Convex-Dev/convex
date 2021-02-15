@@ -700,6 +700,15 @@
           :signature [{:params [x y]}]}
   }
   
+  query
+  {
+    :doc {:description "Runs forms in query mode. Results will be retained, but any state changes will be rolled back."
+          :examples [{:code "(query (def a 10) a)"}
+                     {:code "(query (call unsafe-actor (do-something)))"}]
+          :type :special
+          :signature [{:params [& forms]}]}
+  }
+  
   quote
   {
     :doc {:description "Returns the quoted value of a form, without evaluating it. For example, you can quote a symbol to get the symbol itself rather than the value in the environment that it refers to."
