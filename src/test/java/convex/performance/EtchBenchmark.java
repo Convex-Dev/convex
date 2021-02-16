@@ -17,7 +17,7 @@ public class EtchBenchmark {
 	
 	static final EtchStore store=EtchStore.createTemp();
 	
-	static long ix=0;
+	static long nonce=0;
 	
 	@SuppressWarnings("unchecked")
 	static Ref<ACell>[] refs=new Ref[1000];
@@ -30,14 +30,14 @@ public class EtchBenchmark {
 			Ref<ACell> r=v.getRef();
 			refs[i]=r;
 			r.getHash();
-			store.persistRef(r, null);
+			store.storeTopRef(r, Ref.STORED, null);
 		}
 	}
 	
 	@Benchmark
 	public void writeData() {
-		AVector<CVMLong> v=Vectors.of(1L,ix++);
-		store.persistRef(v.getRef(), null);
+		AVector<CVMLong> v=Vectors.of(1L,nonce++);
+		store.storeTopRef(v.getRef(), Ref.STORED, null);
 	}
 	
 	@Benchmark

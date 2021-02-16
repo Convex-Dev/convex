@@ -2010,8 +2010,8 @@ public class CoreTest {
 		AVector<Syntax> vals = ALL_CORE_DEFS;
 		assertFalse(vals.isEmpty());
 		for (Syntax syndef : vals) {
-			ICoreDef def = syndef.getValue();
-			Symbol sym = def.getSymbol();
+			ACell def = syndef.getValue();
+			Symbol sym = ((ICoreDef)def).getSymbol();
 			assertSame(def, Core.CORE_NAMESPACE.get(sym).getValue());
 
 			Blob b = Format.encodedBlob(def);
@@ -2795,25 +2795,25 @@ public class CoreTest {
 	@Test
 	public void testCoreFormatRoundTrip() throws BadFormatException {
 		{ // a core function
-			Object c = eval("count");
+			ACell c = eval("count");
 			Blob b = Format.encodedBlob(c);
 			assertSame(c, Format.read(b));
 		}
 
 		{ // a core macro
-			Object c = eval("if");
+			ACell c = eval("if");
 			Blob b = Format.encodedBlob(c);
 			assertSame(c, Format.read(b));
 		}
 
 		{ // a basic lambda expression
-			Object c = eval("(fn [x] x)");
+			ACell c = eval("(fn [x] x)");
 			Blob b = Format.encodedBlob(c);
 			assertEquals(c, Format.read(b));
 		}
 
 		{ // a basic lambda expression
-			Object c = eval("(expander (fn [x e] x))");
+			ACell c = eval("(expander (fn [x e] x))");
 			Blob b = Format.encodedBlob(c);
 			assertEquals(c, Format.read(b));
 		}

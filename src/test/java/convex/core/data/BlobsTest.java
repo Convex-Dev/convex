@@ -101,7 +101,11 @@ public class BlobsTest {
 		assertEquals(16, b.commonHexPrefixLength(bb));
 		assertEquals(10, b.commonHexPrefixLength(bb.slice(0, 5)));
 		assertEquals(8, bb.commonHexPrefixLength(b.slice(0, 4)));
-		assertEquals(bb, b);
+		
+		// Longblobs considered as Blob type
+		assertEquals(bb, b); 
+		assertEquals(b, bb); 
+		
 		assertEquals(bb, b.toBlob());
 		assertEquals(bb.hashCode(), b.hashCode());
 
@@ -115,6 +119,8 @@ public class BlobsTest {
 		assertEquals(0L,blob.toLong());
 		assertSame(blob,blob.getChunk(0));
 		assertSame(blob,blob.slice(0,0));
+		
+		doBlobTests(Blob.EMPTY);
 	}
 
 	@Test

@@ -64,6 +64,9 @@ public class Format {
 	 */
 	public static final int MAX_EMBEDDED_LENGTH=140; // TODO: reconsider
 	
+	public static final int NULL_ENCODING_LENGTH = 1;
+
+	
 	/**
 	 * Maximum length in bytes of a Ref encoding (may be an embedded data object)
 	 */
@@ -476,6 +479,7 @@ public class Format {
 		}
 	};
 
+
 	/**
 	 * Reads a UTF-8 String from a ByteBuffer. Assumes the object tag has already been
 	 * read
@@ -810,13 +814,12 @@ public class Format {
 	 * Determines if an object should be embedded directly in the encoding rather
 	 * than referenced with a Ref / hash. Defined to be true for most small objects.
 	 * 
-	 * @param o
+	 * @param cell
 	 * @return true if object is embedded, false otherwise
 	 */
-	public static boolean isEmbedded(ACell o) {
-		// TODO: should just be ACell.isEmbedded?
-		if (o == null) return true;
-		return o.isEmbedded();
+	public static boolean isEmbedded(ACell cell) {
+		if (cell == null) return true;
+		return cell.isEmbedded();
 	}
 
 	/**
@@ -825,11 +828,9 @@ public class Format {
 	 * @param o The object to encode
 	 * @return Encoded data as a blob
 	 */
-	public static Blob encodedBlob(Object o) {
+	public static Blob encodedBlob(ACell o) {
 		if (o==null) return Blob.NULL_ENCODING;
-		if (o instanceof AObject) return ((AObject) o).getEncoding();
-		
-		throw new IllegalArgumentException("Can't get encoded blob for class:" + o.getClass());
+		return o.getEncoding();
 	}
 
 	/**

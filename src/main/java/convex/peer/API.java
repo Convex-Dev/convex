@@ -13,7 +13,11 @@ import convex.core.util.Utils;
 /**
  * Class providing a simple API to a peer Server.
  * 
- * Hopefully suitable for library usage.
+ * Suitable for library usage, e.g. if a usr application wants to
+ * instantiate a local network peer.
+ * 
+ * "If you don't believe it or don't get it , I don't have time to convince you"
+ * - Satoshi Nakamoto
  */
 public class API {
 

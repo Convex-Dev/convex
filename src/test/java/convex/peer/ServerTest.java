@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
@@ -19,18 +20,25 @@ import java.util.logging.Logger;
 import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
+import convex.core.Belief;
 import convex.core.ErrorCodes;
 import convex.core.Init;
+import convex.core.State;
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.Hash;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
+import convex.core.data.Ref;
+import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadSignatureException;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
+import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.Call;
 import convex.core.transactions.Invoke;
@@ -39,7 +47,11 @@ import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.net.Message;
 import convex.net.ResultConsumer;
+import etch.EtchStore;
 
+/**
+ * Tests for a fresh standalone server instance
+ */
 public class ServerTest {
 
 	public static final Server server;
@@ -49,8 +61,9 @@ public class ServerTest {
 		keyPair = Init.KEYPAIRS[0];
 
 		Map<Keyword, Object> config = new HashMap<>();
-		config.put(Keywords.PORT, 0);
+		config.put(Keywords.PORT, 0); // create new port
 		config.put(Keywords.STATE, Init.STATE);
+		config.put(Keywords.STORE, EtchStore.createTemp("server-test-store"));
 		config.put(Keywords.KEYPAIR, Init.KEYPAIRS[0]); // use first peer keypair
 
 		server = API.launchPeer(config);
@@ -118,6 +131,43 @@ public class ServerTest {
 		
 		assertEquals(Init.VILLAIN,f2.getValue());
 		assertCVMEquals(Init.STATE.getBalance(Init.VILLAIN),f.get().getValue());
+	}
+	
+	@Test
+	public void testMissingData() throws IOException, InterruptedException {
+		
+		InetSocketAddress hostAddress=server.getHostAddress();
+		
+		// Connect to Peer Server using the current store for the client
+		AStore store=Stores.current();
+		Connection pc = Connection.connect(hostAddress, handler, store);
+		State s=server.getPeer().getConsensusState();
+		Hash h=s.getHash();
+		
+		boolean sent=pc.sendMissingData(h);
+		assertTrue(sent);
+		
+		Thread.sleep(200);
+		Ref<State> ref=Ref.forHash(h);
+		assertNotNull(ref);
+	}
+	
+	@Test
+	public void testAcquireBelief() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
+		
+		InetSocketAddress hostAddress=server.getHostAddress();
+		
+		// Connect to Peer Server using the current store for the client
+		SignedData<Belief> s=server.getPeer().getSignedBelief();
+		Hash h=s.getHash();
+		System.out.println("SignedBelief Hash="+h);
+		System.out.println("testAcquireBelief store="+Stores.current());
+		
+		Convex convex=Convex.connect(hostAddress, Init.HERO, Init.HERO_KP);
+		
+		Future<SignedData<Belief>> acquiror=convex.acquire(h);
+		SignedData<Belief> ab=acquiror.get(500,TimeUnit.MILLISECONDS);
+		assertTrue(ab.getValue() instanceof Belief);
 	}
 	
 	@Test

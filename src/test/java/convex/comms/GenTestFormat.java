@@ -35,9 +35,9 @@ public class GenTestFormat {
 	}
 
 	@Property
-	public void primitiveRoundTrip(@From(PrimitiveGen.class) Object prim) throws BadFormatException {
+	public void primitiveRoundTrip(@From(PrimitiveGen.class) ACell prim) throws BadFormatException {
 		Blob b = Format.encodedBlob(prim);
-		Object o = Format.read(b);
+		ACell o = Format.read(b);
 		assertEquals(prim, o);
 		assertEquals(b, Format.encodedBlob(o));
 
@@ -48,7 +48,7 @@ public class GenTestFormat {
 	public void dataRoundTrip(@From(ValueGen.class) ACell value) throws BadFormatException {
 		Ref<ACell> pref = Ref.createPersisted(value); // ensure persisted
 		Blob b = Format.encodedBlob(value);
-		Object o = Format.read(b);
+		ACell o = Format.read(b);
 
 		// TODO: think about this exception
 		if (!(value instanceof LongBlob)) assertEquals(Utils.getClass(value), Utils.getClass(o));

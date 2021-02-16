@@ -1,7 +1,6 @@
 package convex.core.data;
 
 import java.lang.ref.SoftReference;
-import java.nio.ByteBuffer;
 
 import convex.core.crypto.Hash;
 import convex.core.exceptions.InvalidDataException;
@@ -27,29 +26,36 @@ import convex.core.util.Utils;
  * @param <T>
  */
 public class RefSoft<T extends ACell> extends Ref<T> {
-
-	static final int ENCODING_LENGTH = Ref.INDIRECT_ENCODING_LENGTH;
 	
 	/**
 	 * SoftReference to value. Might get updated to a fresh instance.
 	 */
 	protected SoftReference<T> softRef;
 	
-	protected RefSoft(SoftReference<T> ref, Hash hash, int status) {
-		super(hash, status);
+	protected RefSoft(SoftReference<T> ref, Hash hash, int flags) {
+		super(hash, flags);
 		this.softRef = ref;
 	}
 
-	protected RefSoft(T value, Hash hash, int status) {
-		this(new SoftReference<T>(value), hash, status);
+	protected RefSoft(T value, Hash hash, int flags) {
+		this(new SoftReference<T>(value), hash, flags);
 	}
 
 	protected RefSoft(Hash hash) {
+		// We don't know anything about this Ref.
 		this(new SoftReference<T>(null), hash, UNKNOWN);
 	}
+	
 
-	public static <T extends ACell> RefSoft<T> create(T value, Hash hash, int status) {
-		return new RefSoft<T>(value, hash, status);
+	@Override
+	protected RefSoft<T> withFlags(int newFlags) {
+		return new RefSoft<T>(softRef,hash,flags);
+	}
+
+	public static <T extends ACell> RefSoft<T> create(T value, int status) {
+		Hash hash=Hash.compute(value);
+		int flags=status&Ref.STATUS_MASK;
+		return new RefSoft<T>(value, hash, flags);
 	}
 
 	/**
@@ -62,7 +68,7 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	 * @param hash Hash ID of value.
 	 * @return New RefSoft instance
 	 */
-	public static <T extends ACell> RefSoft<T> create(Hash hash) {
+	public static <T extends ACell> RefSoft<T> createForHash(Hash hash) {
 		return new RefSoft<T>(hash);
 	}
 
@@ -74,8 +80,8 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 			if (storeRef == null) throw Utils.sneakyThrow(new MissingDataException(hash));
 			result = storeRef.getValue();
 
-			// Update soft reference to the fresh version. No point keeping old one....
 			if (storeRef instanceof RefSoft) {
+				// Update soft reference to the fresh version. No point keeping old one....
 				this.softRef = ((RefSoft<T>) storeRef).softRef;
 			} else {
 				this.softRef = new SoftReference<T>(result);
@@ -83,41 +89,22 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 		}
 		return result;
 	}
-
-	@Override
-	protected Ref<T> updateStatus(int newStatus) {
-		if (status == newStatus) return this;
-		if ((status >= VERIFIED) && (newStatus < status)) {
-			throw new IllegalArgumentException("Shouldn't be able to downgrade status if already verified");
-		}
-		switch (newStatus) {
-		case UNKNOWN:
-			throw new IllegalArgumentException("Shouldn't be able to downgrade status to unknown");
-		case STORED:
-			return new RefSoft<T>(softRef, hash, STORED);
-		case PERSISTED:
-			return new RefSoft<T>(softRef, hash, PERSISTED);
-		case VERIFIED:
-			return new RefSoft<T>(softRef, hash, VERIFIED);
-		case ANNOUNCED:
-			return new RefSoft<T>(softRef, hash, ANNOUNCED);
-		case INVALID:
-			return new RefSoft<T>(softRef, hash, INVALID);
-		default:
-			throw new IllegalArgumentException("Ref status not recognised: " + newStatus);
-		}
-	}
-
-	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		bb=bb.put(Tag.REF);
-		return getHash().writeToBuffer(bb);
-	}
 	
 	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.REF;
-		return getHash().encodeRaw(bs, pos);
+	protected boolean isMissing() {
+		T result = softRef.get();
+		if (result == null) {
+			Ref<T> storeRef = Stores.current().refForHash(hash);
+			if (storeRef == null) return true;
+
+			// Update soft reference to the fresh version. No point keeping old one....
+			if (storeRef instanceof RefSoft) {
+				this.softRef = ((RefSoft<T>) storeRef).softRef;
+			} else {
+				this.softRef = new SoftReference<T>(storeRef.getValue());
+			}
+		}
+		return false;
 	}
 
 	@Override
@@ -137,45 +124,26 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 		return hash;
 	}
 
-	@Override
-	public boolean isEmbedded() {
-		// Shouldn't be able to store soft references to embedded values
-		return false;
-	}
 
 	@Override
 	public void validate() throws InvalidDataException {
 		super.validate();
 		if (hash == null) throw new InvalidDataException("Hash should never be null in soft ref", this);
 		ACell val = softRef.get();
-		if (Format.isEmbedded(val)) {
-			throw new InvalidDataException("Soft Ref should not contain embedded value", this);
+		boolean embedded=isEmbedded();
+		if (embedded!=Format.isEmbedded(val)) {
+			throw new InvalidDataException("Embedded flag ["+embedded+"] inconsistent with value", this);
 		}
 	}
 
 	@Override
 	public Ref<T> withValue(T newValue) {
-		if (softRef.get()!=newValue) return new RefSoft<T>(newValue,hash,status);
+		if (softRef.get()!=newValue) return new RefSoft<T>(newValue,hash,flags);
 		return this;
 	}
 
 	@Override
 	public int estimatedEncodingSize() {
-		return ENCODING_LENGTH;
+		return isEmbedded()?Format.MAX_EMBEDDED_LENGTH: INDIRECT_ENCODING_LENGTH;
 	}
-
-	@Override
-	protected Blob createEncoding() {
-		byte[] bs=new byte[ENCODING_LENGTH];
-		int pos=encode(bs,0);
-		return Blob.wrap(bs,0,pos);
-	}
-
-	@Override
-	public long getEncodingLength() {
-		return ENCODING_LENGTH;
-	}
-	
-
-
 }

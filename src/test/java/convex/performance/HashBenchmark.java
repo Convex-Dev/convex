@@ -8,19 +8,20 @@ import convex.core.crypto.Hash;
 import convex.core.data.AArrayBlob;
 import convex.core.data.Blob;
 import convex.core.data.Format;
+import convex.core.data.prim.CVMLong;
 
 public class HashBenchmark {
 
 	@Benchmark
 	public void longHash_KECCAK_256() {
-		Long l = 17L;
+		CVMLong l = CVMLong.create(17L);
 		AArrayBlob d = Format.encodedBlob(l);
 		d.getContentHash();
 	}
 
 	@Benchmark
 	public void longHash_SHA_256() {
-		Long l = 17L;
+		CVMLong l = CVMLong.create(17L);
 		AArrayBlob d = Format.encodedBlob(l);
 		Hash.sha256(d.getInternalArray());
 	}

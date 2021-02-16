@@ -9,6 +9,7 @@ import java.util.logging.Logger;
 
 import convex.core.Result;
 import convex.core.crypto.Hash;
+import convex.core.data.ACell;
 import convex.core.data.Ref;
 import convex.core.exceptions.MissingDataException;
 import convex.core.store.Stores;
@@ -35,10 +36,13 @@ public abstract class ResultConsumer implements Consumer<Message> {
 				case DATA: {
 					// Just store the data, can't guarantee full persistence yet
 					try {
-						Object o = m.getPayload();
+						ACell o = m.getPayload();
 						Ref<?> r = Ref.get(o);
 						r.persistShallow();
-						unbuffer(r.getHash());
+						Hash h=r.getHash();
+						// TODO: lower this level
+						log.log(LEVEL_MISSING,"Recieved DATA for hash "+h);
+						unbuffer(h);
 					} catch (MissingDataException e) {
 						// ignore?
 					}

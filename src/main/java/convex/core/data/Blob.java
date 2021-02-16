@@ -105,19 +105,19 @@ public class Blob extends AArrayBlob {
 	}
 
 	@Override
-	public boolean equals(Object a) {
-		if (a instanceof ABlob) return equals((ABlob) a);
+	public boolean equals(ABlob a) {
+		if (a instanceof Blob) return equals((Blob) a);
+		if (a instanceof LongBlob) {
+			if (length!=LongBlob.LENGTH) return false;
+			LongBlob b= (LongBlob)a;
+			return longValue()==b.longValue();
+		}
 		return false;
 	}
 
-	@Override
-	public boolean equals(ABlob b) {
-		if (b instanceof AArrayBlob) return equals((AArrayBlob) b);
-		if (b instanceof LongBlob) {
-			if (length != 8) return false;
-			return ((LongBlob) b).longValue() == Utils.readLong(store, offset);
-		}
-		return false;
+	public boolean equals(Blob b) {
+		if (length!=b.length) return false;
+		return Arrays.equals(store, offset, offset+length, b.store, b.offset, b.offset+length);
 	}
 
 	/**

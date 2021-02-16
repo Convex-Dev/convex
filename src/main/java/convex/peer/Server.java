@@ -104,7 +104,11 @@ public class Server implements Closeable {
 	 */
 	protected ConnectionManager manager;
 
+	/**
+	 * Store to use for all threads associated with this server instance
+	 */
 	private final AStore store;
+	
 	private final HashMap<Keyword, Object> config;
 
 	private boolean running = false;
@@ -143,19 +147,29 @@ public class Server implements Closeable {
 	private HashMap<AccountKey, SignedData<Belief>> newBeliefs = new HashMap<>();
 
 	private Server(HashMap<Keyword, Object> config) {
-		this.config = config;
-		this.manager = new ConnectionManager(config);
-
 		AStore configStore = (AStore) config.get(Keywords.STORE);
-		store = (configStore == null) ? Stores.getGlobalStore() : configStore;
-		AKeyPair keyPair = (AKeyPair) config.get(Keywords.KEYPAIR);
-
-		this.peer = establishPeer(keyPair, config);
-
-		nio = NIOServer.create(this, receiveQueue);
+		this.store = (configStore == null) ? Stores.getGlobalStore() : configStore;
+		
+		// Switch to use the configured store, saving the caller store
+		final AStore savedStore=Stores.current();
+		try {
+			Stores.setCurrent(store);
+			this.config = config;
+			this.manager = new ConnectionManager(config);
+	
+			AKeyPair keyPair = (AKeyPair) config.get(Keywords.KEYPAIR);
+	
+			this.peer = establishPeer(keyPair, config);
+	
+			nio = NIOServer.create(this, receiveQueue);
+		} finally {
+			Stores.setCurrent(savedStore);
+		}
 	}
 
 	private Peer establishPeer(AKeyPair keyPair, Map<Keyword, Object> config2) {
+		log.info("Establishing Peer with store: "+Stores.current());
+
 		if (RT.bool(config.get(Keywords.RESTORE))) {
 			try {
 				Hash hash = store.getRootHash();

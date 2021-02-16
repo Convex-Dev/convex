@@ -501,6 +501,19 @@ public class Utils {
 		if (a == null) return false; // b can't be null because of above line
 		return a.equals(b); // fall back to Object equality
 	}
+	
+	/**
+	 * Equality method allowing for nulls
+	 * 
+	 * @param a
+	 * @param b
+	 * @return true if arguments are equal, false otherwise
+	 */
+	public static boolean equals(ACell a, ACell b) {
+		if (a == b) return true;
+		if (a == null) return false; // b can't be null because of above line
+		return a.equals(b); // fall back to Object equality
+	}
 
 	/**
 	 * Gets a hex digit as an integer 0-15 value from a Data object

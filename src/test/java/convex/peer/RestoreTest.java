@@ -33,7 +33,8 @@ public class RestoreTest {
 		AStore store=EtchStore.createTemp();
 		Map<Keyword, Object> config = Maps.hashMapOf(
 				Keywords.KEYPAIR,kp,
-				Keywords.STORE,store
+				Keywords.STORE,store,
+				Keywords.PERSIST,true
 		);
 		Server s1=API.launchPeer(config);
 		

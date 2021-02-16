@@ -62,7 +62,7 @@ public class GenTestAnyValue {
 	}
 	
 	@Property
-	public void testFuzzing(@From(ValueGen.class) Object o) throws InvalidDataException  {
+	public void testFuzzing(@From(ValueGen.class) ACell o) throws InvalidDataException  {
 		Blob b=Format.encodedBlob(o);
 		FuzzTestFormat.doMutationTest(b);
 		
@@ -95,13 +95,13 @@ public class GenTestAnyValue {
 			// when we persist a ref to an embedded object, should be the object itself
 			Ref<ACell> ref=Ref.get(o);
 			assertTrue(ref.isDirect()); 
-			assertEquals(data,Format.encodedBlob(ref)); // should encode ref same as value
+			assertEquals(data,ref.getEncoding()); // should encode ref same as value
 		} else {
 			// when we persist a ref to non-embedeed object, should be a ref type
 			Ref<?> ref=Ref.get(o);
-			Blob b=Format.encodedBlob(ref);
+			Blob b=ref.getEncoding();
 			assertEquals(Tag.REF,b.get(0));
-			assertEquals(33,b.length());
+			assertEquals(Ref.INDIRECT_ENCODING_LENGTH,b.length());
 		}
 	}
 	
@@ -132,7 +132,7 @@ public class GenTestAnyValue {
 		// simulate retrieval via hash
 		Ref<ACell> dataRef2=Stores.current().refForHash(hash);
 		if (dataRef2==null) {
-			assertTrue(Format.isEmbedded(o));
+			assertTrue(Format.isEmbedded(o),"Expected embedded value for "+o);
 		} else {
 			// should be in store if not embedded
 			assertFalse(Format.isEmbedded(o));

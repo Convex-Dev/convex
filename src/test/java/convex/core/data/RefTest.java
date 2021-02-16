@@ -135,6 +135,14 @@ public class RefTest {
 		assertEquals(4,zvv.getRefCount());
 
 	}
+	
+	@Test 
+	public void testMissing() {
+		Hash bad=Hash.fromHex("0000000000000000000000000000000000000000000000000000000000000000");
+		Ref<?> ref=Ref.forHash(bad);
+		assertTrue(ref.isMissing());
+		
+	}
 
 	@Test
 	public void testDiabolicalDeep() {
@@ -158,5 +166,7 @@ public class RefTest {
 		Ref<?> nullRef = Ref.get(null);
 		assertNotNull(nullRef);
 		assertSame(nullRef.getHash(), Hash.NULL_HASH);
+		assertTrue(nullRef.isEmbedded());
+		assertFalse(nullRef.isMissing());
 	}
 }

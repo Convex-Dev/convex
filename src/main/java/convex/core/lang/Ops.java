@@ -12,6 +12,7 @@ import convex.core.lang.ops.Invoke;
 import convex.core.lang.ops.Lambda;
 import convex.core.lang.ops.Let;
 import convex.core.lang.ops.Lookup;
+import convex.core.lang.ops.Query;
 
 /**
  * Static utility class for coded operations.
@@ -61,7 +62,10 @@ public class Ops {
 		case Ops.LAMBDA:
 			return (AOp<T>) Lambda.read(bb);
 		case Ops.LET:
-			return (AOp<T>) Let.read(bb);
+			return Let.read(bb);
+		case Ops.QUERY:
+			return Query.read(bb);
+
 		// case Ops.RETURN: return (AOp<T>) Return.read(bb);
 		default:
 			throw new BadFormatException("Invalide OpCode: " + opCode);

@@ -188,7 +188,7 @@ public class Connection {
 	 * @throws IOException
 	 */
 	public boolean sendMissingData(Hash value) throws IOException {
-		log.info("Requested missing data for hash: "+value.toHexString()+" with store "+Stores.current());
+		log.finer("Requested missing data for hash: "+value.toHexString()+" with store "+Stores.current());
 		return sendObject(MessageType.MISSING_DATA, value);
 	}
 

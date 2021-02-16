@@ -209,9 +209,7 @@ public class VectorTree<T extends ACell> extends ASizedVector<T> {
 		int n = computeArraySize(count);
 		Ref<AVector<T>>[] items = (Ref<AVector<T>>[]) new Ref<?>[n];
 		for (int i = 0; i < n; i++) {
-			// TODO: this needs cleanup!
 			Ref<AVector<T>> ref = Format.readRef(bb);
-			
 			items[i] = ref;
 		}
 

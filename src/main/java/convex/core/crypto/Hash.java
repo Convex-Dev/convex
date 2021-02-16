@@ -11,7 +11,6 @@ import convex.core.data.AArrayBlob;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
-import convex.core.data.Format;
 import convex.core.data.Tag;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Errors;
@@ -295,25 +294,6 @@ public class Hash extends AArrayBlob {
 
 	public static Hash wrap(AArrayBlob data, int offset, int length) {
 		return data.extractHash(offset, length);
-	}
-
-	/**
-	 * Computes the Hash for any value.
-	 * 
-	 * May return a cached Hash if available in memory
-	 * 
-	 * @param value
-	 * @return Hash of the encoded data for the given value
-	 */
-	public static Hash compute(Object value) {
-		if (value == null) return NULL_HASH;
-		if (value instanceof ACell) return ((ACell) value).getHash();
-
-		AArrayBlob d = Format.encodedBlob(value);
-		// SECURITY: make sure we use content hash, and not the d.getHash() (which is the
-		// hash of the serialisation of the serialisation of the object!)
-		Hash h = d.getContentHash();
-		return h;
 	}
 	
 	/**

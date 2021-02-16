@@ -30,7 +30,7 @@ import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
-import convex.core.data.prim.CVMLong;
+import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.Symbols;
 import convex.core.store.AStore;
@@ -193,21 +193,22 @@ public class EtchStoreTest {
 		ArrayList<Ref<ACell>> al = new ArrayList<>();
 		try {
 			Stores.setCurrent(store);
-			AVector<CVMLong> data = Samples.INT_VECTOR_300;
+			// create a random item that shouldn't already be in the store
+			AVector<Blob> data = Vectors.of(Blob.createRandom(new Random(), 100),Blob.createRandom(new Random(), 100));
 
 			// handler that records added refs
 			Consumer<Ref<ACell>> handler = r -> al.add(r);
 
-			Ref<AVector<CVMLong>> dataRef = data.getRef();
+			Ref<AVector<Blob>> dataRef = data.getRef();
 			Hash dataHash = dataRef.getHash();
 			assertNull(store.refForHash(dataHash));
 
-			dataRef.persist(handler);
+			Ref.createPersisted(data,handler);
 			int num=al.size(); // number of novel cells persisted
 			assertTrue(num>0); // got new novelty
 			assertEquals(data, al.get(num-1).getValue());
 
-			Samples.INT_VECTOR_300.getRef().persist();
+			data.getRef().persist();
 			assertEquals(num, al.size()); // no new novelty transmitted
 		} finally {
 			Stores.setCurrent(oldStore);

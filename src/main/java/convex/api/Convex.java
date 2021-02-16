@@ -3,6 +3,7 @@ package convex.api;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -14,15 +15,19 @@ import java.util.logging.Logger;
 import convex.core.Constants;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.Hash;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
 import convex.core.lang.ops.Lookup;
+import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.core.util.Utils;
@@ -361,6 +366,73 @@ public class Convex {
 	 */
 	public Future<Result> query(ACell query) throws IOException {
 		return query(query,getAddress());
+	}
+	
+	/**
+	 * Attempts to acquire a complete persistent data structure for the given hash from 
+	 * the remote peer. Uses the store configured for the calling thread.
+	 * 
+	 * @param hash Hash of value to acquire.
+	 * @return Future for the cell being acquired
+	 */
+	public <T extends ACell> Future<T> acquire(Hash hash) {
+		CompletableFuture<T> f=new CompletableFuture<T>();
+		AStore store=Stores.current();
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				Stores.setCurrent(store); // use store for calling thread
+				try {
+					Ref<T> ref=Ref.forHash(hash);
+					HashSet<Hash> missingSet=new HashSet<>();
+					while (!f.isDone()) {
+						missingSet.clear();
+	
+						if (ref==null) {
+							missingSet.add(hash);
+						} else {
+							if (ref.getStatus()>=Ref.PERSISTED) {
+								// we have everything!
+								f.complete(ref.getValue());
+								return;
+							}
+							ref.findMissing(missingSet);
+						}
+						for (Hash h:missingSet) {
+							// send missing data requests until we fill pipeline
+							log.info("Request missing: "+h);
+							boolean sent=connection.sendMissingData(h);
+							if (!sent) {
+								log.info("Queue full!");
+								break;
+							}
+						}
+						Thread.sleep(10);
+						ref=Ref.forHash(hash);
+						if (ref!=null) {
+							if (ref.getStatus()>=Ref.PERSISTED) {
+								// we have everything!
+								f.complete(ref.getValue());
+								return;
+							}
+							// maybe complete, but not sure
+							try {
+								ref=ref.persist();
+								f.complete(ref.getValue());
+							} catch (MissingDataException e) {
+								Hash missing=e.getMissingHash();
+								log.info("Still missing: "+missing);
+								connection.sendMissingData(missing);
+							}
+						}
+					}
+				} catch (Throwable t) {
+					// catch any errors, probably IO?
+					f.completeExceptionally(t);
+				}
+			}
+		}).start();
+		return f;
 	}
 	
 	/**

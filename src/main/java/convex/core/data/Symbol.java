@@ -101,7 +101,7 @@ public class Symbol extends ASymbolic {
 
 
 	@Override
-	public boolean equals(Object o) {
+	public boolean equals(ACell o) {
 		if (o instanceof Symbol) return equals((Symbol) o);
 		return false;
 	}

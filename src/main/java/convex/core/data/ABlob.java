@@ -199,10 +199,21 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	 * values are equal
 	 */
 	@Override
-	public boolean equals(Object o) {
-		if (o instanceof ABlob) return equals((ABlob) o);
-		return false;
+	public final boolean equals(ACell o) {
+		if (!(o instanceof ABlob)) return false;
+		return equals((ABlob)o);
 	}
+	
+	/**
+	 * Determines if this Blob is equal to another Blob.
+	 * 
+	 * Blobs are defined to be equal if they have the same on-chain representation,
+	 * i.e. if and only if all of the following are true:
+	 * 
+	 * - Blob is of the same general type - Blobs are of the same length - All byte
+	 * values are equal
+	 */
+	public abstract boolean equals(ABlob o);
 
 	/**
 	 * Compares this blob to another blob, in lexographic order sorting by first
@@ -226,20 +237,6 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 		if (blength > compareLength) return -1; // b is bigger
 		return 0;
 	}
-
-	/**
-	 * Determines if this Blob is equal to another Blob.
-	 * 
-	 * Blobs are defined to be equal if they have the same on-chain representation,
-	 * i.e. if and only if all of the following are true:
-	 * 
-	 * - Blob is of the same general type - Blobs are of the same length - All byte
-	 * values are equal
-	 * 
-	 * @param a
-	 * @return True if the blobs are equal, false otherwise.
-	 */
-	public abstract boolean equals(ABlob a);
 
 	/**
 	 * Writes the raw byte contents of this blob to a ByteBuffer.

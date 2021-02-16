@@ -15,7 +15,7 @@ import convex.core.util.Utils;
 public class LongBlob extends ABlob {
 	private final long value;
 
-	private static final long LENGTH = 8;
+	static final long LENGTH = 8;
 
 	private LongBlob(long value) {
 		this.value = value;
@@ -117,10 +117,12 @@ public class LongBlob extends ABlob {
 	@Override
 	public boolean equals(ABlob a) {
 		if (a instanceof LongBlob) return (((LongBlob) a).value == value);
-		return toBlob().equals(a);
+		if (a instanceof Blob) {
+			Blob b=(Blob)a;
+			return ((b.length()==LENGTH)&& (b.longValue()== value));
+		}
+		return false;
 	}
-
-
 
 	@Override
 	public Blob getChunk(long i) {

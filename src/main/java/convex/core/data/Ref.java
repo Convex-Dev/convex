@@ -72,6 +72,16 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 
 	public static final int MAX_STATUS = ANNOUNCED;
 	
+	protected static final int STATUS_MASK = 0xF;
+	
+	// mask bit for a proven embedded value
+	protected static final int KNOWN_EMBEDDED_MASK = 0x10;
+	
+	// mask bit for a proven non-embedded value
+	protected static final int NON_EMBEDDED_MASK = 0x20;
+
+	protected static final int EMBEDDING_MASK = 0x30;
+	
 	/**
 	 * Ref status indicating that the Ref refers to data that has been proven to be invalid
 	 */
@@ -81,10 +91,10 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * Ref for null value. Important because we can't persist this, since null
 	 * collides with the result of an empty soft reference.
 	 */
-	public static final RefDirect<?> NULL_VALUE = RefDirect.create(null, Hash.NULL_HASH, MAX_STATUS);
+	public static final RefDirect<?> NULL_VALUE = RefDirect.create(null, Hash.NULL_HASH, KNOWN_EMBEDDED_MASK|MAX_STATUS);
 
-	public static final RefDirect<CVMBool> TRUE_VALUE = RefDirect.create(CVMBool.TRUE, Hash.TRUE_HASH, MAX_STATUS);
-	public static final RefDirect<CVMBool> FALSE_VALUE = RefDirect.create(CVMBool.FALSE, Hash.FALSE_HASH, MAX_STATUS);
+	public static final RefDirect<CVMBool> TRUE_VALUE = RefDirect.create(CVMBool.TRUE, Hash.TRUE_HASH, KNOWN_EMBEDDED_MASK|MAX_STATUS);
+	public static final RefDirect<CVMBool> FALSE_VALUE = RefDirect.create(CVMBool.FALSE, Hash.FALSE_HASH, KNOWN_EMBEDDED_MASK|MAX_STATUS);
 
 	public static final RefDirect<AList<?>> EMPTY_LIST = RefDirect.create(Lists.empty());
 	public static final RefDirect<AVector<?>> EMPTY_VECTOR = RefDirect.create(Vectors.empty());
@@ -106,11 +116,11 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * 
 	 * May be incremented atomically in the event of validation, proven storage.
 	 */
-	protected int status;
+	protected int flags;
 
-	protected Ref(Hash hash, int status) {
+	protected Ref(Hash hash, int flags) {
 		this.hash = hash;
-		this.status = status;
+		this.flags = flags;
 	}
 
 	/**
@@ -120,25 +130,32 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 *         constants
 	 */
 	public int getStatus() {
-		return status;
+		return flags&STATUS_MASK;
 	}
-
-	/**
-	 * Updates the status of this Ref to the specified value. Assumes any necessary
-	 * changes to storage will be made separately. SECURITY: Dangerous if misused
-	 * since may invalidate storage assumptions
-	 */
-	protected abstract Ref<T> updateStatus(int newStatus);
 
 	/**
 	 * Ensures the Ref has the given status, at minimum
+	 * 
+	 * Assumes any necessary changes to storage will be made separately. 
+	 * SECURITY: Dangerous if misused since may invalidate storage assumptions
 	 */
 	public Ref<T> withMinimumStatus(int newStatus) {
-		if (status < newStatus) {
-			return updateStatus(newStatus);
+		newStatus&=STATUS_MASK;
+		int status=getStatus();
+		if (status >= newStatus) return this;
+		if (status > MAX_STATUS) {
+			throw new IllegalArgumentException("Ref status not recognised: " + newStatus);
 		}
-		return this;
+		flags=(flags&~STATUS_MASK)|newStatus;
+		return withFlags(flags);
 	}
+
+	/**
+	 * Create a new Ref of the same type with updated flags
+	 * @param newFlags
+	 * @return
+	 */
+	protected abstract Ref<T> withFlags(int newFlags);
 
 	/**
 	 * Gets the value from this Ref.
@@ -160,8 +177,8 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public void ednString(StringBuilder sb) {
 		sb.append("#ref {:hash ");
 		sb.append(Utils.ednString(hash));
-		sb.append(", :status ");
-		sb.append(status);
+		sb.append(", :flags ");
+		sb.append(flags);
 		sb.append("}");
 	}
 	
@@ -240,7 +257,8 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	}
 
 	/**
-	 * Creates a persisted Ref with the given value in the current store..
+	 * Creates a persisted Ref with the given value in the current store. Returns
+	 * the current Ref if already persisted
 	 * 
 	 * @param value Any CVM value to persist
 	 * @return Ref to the given value
@@ -259,8 +277,9 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * @return Persisted Ref
 	 */
 	public static <T extends ACell> Ref<T> createPersisted(T value, Consumer<Ref<ACell>> noveltyHandler) {
-		Ref<T> ref = RefDirect.create(value, null, Ref.UNKNOWN);
-		return (Ref<T>) Stores.current().persistRef(ref, noveltyHandler);
+		Ref<T> ref = Ref.get(value);
+		AStore store=Stores.current();
+		return (Ref<T>) store.storeTopRef(ref, Ref.PERSISTED,noveltyHandler);
 	}
 	
 	/**
@@ -273,56 +292,53 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * @return Persisted Ref
 	 */
 	public static <T extends ACell> Ref<T> createAnnounced(T value, Consumer<Ref<ACell>> noveltyHandler) {
-		if (Format.isEmbedded(value)) {
-			return RefDirect.create(value, null, Ref.ANNOUNCED);
-		}
-		Ref<T> ref = RefDirect.create(value, null, Ref.UNKNOWN);
+		Ref<T> ref = Ref.get(value);
 		AStore store=Stores.current();
-		return (Ref<T>) store.announceRef(ref, noveltyHandler);
+		return (Ref<T>) store.storeTopRef(ref, Ref.ANNOUNCED,noveltyHandler);
 	}
 
 	/**
-	 * Creates a Ref using a specific Hash. Fetches the actual value lazily from the
+	 * Creates a RefSoft using a specific Hash. Fetches the actual value lazily from the
 	 * store on demand.
 	 * 
 	 * Internal soft reference may be initially empty: This Ref might not have
 	 * available data in the store, in which case calls to getValue() may result in
 	 * a MissingDataException
 	 * 
+	 * WARNING: Does not mark as either embedded or non-embedded, as this might be a top level 
+	 * entry in the store. isEmbedded() will query the store to determine status.
+	 * 
 	 * @param hash The hash value for this Ref to refer to
 	 * @return Ref for the specific hash.
 	 */
-	public static <T extends ACell> Ref<T> forHash(Hash hash) {
-		return RefSoft.create(hash);
+	public static <T extends ACell> RefSoft<T> forHash(Hash hash) {
+		return RefSoft.createForHash(hash);
+	}
+	
+	public Ref<T> markEmbedded(boolean isEmbedded) {
+		int newFlags=(flags&STATUS_MASK)|(isEmbedded?KNOWN_EMBEDDED_MASK:NON_EMBEDDED_MASK);
+		flags=newFlags;
+		return this;
 	}
 
 	/**
-	 * Creates a Ref by reading a raw hash value from the specified offset in a Blob
+	 * Reads a ref from the given ByteBuffer. Assumes no tag.
 	 * 
-	 * @param src
-	 * @param offset
-	 * @return Ref read from blob data
-	 */
-	public static Ref<ABlob> readRaw(Blob src, int offset) {
-		Hash hash = Hash.wrap(src.getInternalArray(), src.offset + offset, BYTE_LENGTH);
-		return forHash(hash);
-	}
-
-	/**
-	 * Reads a ref from the given ByteBuffer Assumes no tag.
+	 * Marks as non-embedded
 	 * 
 	 * @param data ByteBuffer containing the data to read at the current position
 	 * @return Ref read from ByteBuffer
 	 */
 	public static <T extends ACell> Ref<T> readRaw(ByteBuffer data) {
 		Hash h = Hash.read(data);
-		return Ref.forHash(h);
+		Ref<T> ref=Ref.forHash(h);
+		return ref.markEmbedded(false);
 	}
 
 	public void validate() throws InvalidDataException {
 		if (hash != null) hash.validate();
 		// TODO is this sane?
-		if (status < VERIFIED) {
+		if (getStatus() < VERIFIED) {
 			T o = getValue();
 			o.validate();
 		}
@@ -346,7 +362,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * @return true if this Ref has a status of PERSISTED or above, false otherwise
 	 */
 	public boolean isPersisted() {
-		return status >= PERSISTED;
+		return getStatus() >= PERSISTED;
 	}
 	
 	/**
@@ -367,7 +383,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		int status = getStatus();
 		if (status >= PERSISTED) return (Ref<R>) this; // already persisted in some form
 		AStore store=Stores.current();
-		return (Ref<R>) store.persistRef(this, noveltyHandler);
+		return (Ref<R>) store.storeRef(this, Ref.PERSISTED,noveltyHandler);
 	}
 	
 	/**
@@ -384,10 +400,8 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	}
 	
 	/**
-	 * Persists this Ref in the current store if not embedded and not already
-	 * persisted.
-	 * 
-	 * This may convert the Ref from a direct reference to a soft reference.
+	 * Persists this Ref in the current store, ensuring that it is ANNOUNCED status
+	 * at minimum. Always stores the top level hash in the store.
 	 * 
 	 * If the persisted Ref represents novelty, will trigger the specified novelty
 	 * handler 
@@ -401,7 +415,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		int status = getStatus();
 		if (status >= ANNOUNCED) return this; // already announced
 		AStore store=Stores.current();
-		return (Ref<T>) store.announceRef((Ref<ACell>)this, noveltyHandler);
+		return (Ref<T>) store.storeTopRef((Ref<ACell>)this, Ref.ANNOUNCED, noveltyHandler);
 	}
 	
 	/**
@@ -515,14 +529,20 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * 
 	 * @return true if embedded, false otherwise
 	 */
-	public abstract boolean isEmbedded();
+	public final boolean isEmbedded() {
+		if ((flags&KNOWN_EMBEDDED_MASK)!=0) return true; 
+		if ((flags&NON_EMBEDDED_MASK)!=0) return false;
+		boolean em= Format.isEmbedded(getValue());
+		flags=flags|(em?KNOWN_EMBEDDED_MASK:NON_EMBEDDED_MASK);
+		return em;
+	}
 
 	/**
 	 * Converts this Ref to a RefDirect
 	 * @return
 	 */
 	public Ref<T> toDirect() {
-		return RefDirect.create(getValue(), hash, status);
+		return RefDirect.create(getValue(), hash, flags);
 	}
 
 	/**
@@ -532,10 +552,8 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * 
 	 * @return Ref with status of STORED or above
 	 */
-	@SuppressWarnings("unchecked")
 	public <R extends ACell> Ref<R> persistShallow() {
-		AStore store=Stores.current();
-		return (Ref<R>) store.storeRef((Ref<ACell>)this, null);
+		return persistShallow(null);
 	}
 	
 	/**
@@ -549,7 +567,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Ref<R> persistShallow(Consumer<Ref<ACell>> noveltyHandler) {
 		AStore store=Stores.current();
-		return (Ref<R>) store.storeRef((Ref<ACell>)this, noveltyHandler);
+		return (Ref<R>) store.storeRef((Ref<ACell>)this, Ref.STORED, noveltyHandler);
 	}
 
 	/**
@@ -562,28 +580,64 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public abstract Ref<T> withValue(T newValue);
 	
 	/**
-	 * Writes the ref to a byte array. Embdeds embedded values as necessary.
+	 * Writes the ref to a byte array. Embeds embedded values as necessary.
 	 * @param bb
-	 * @return
+	 * @return Updated position
 	 */
-	public abstract int encode(byte[] bs,int pos);
+	@Override
+	public final int encode(byte[] bs, int pos) {
+		if (isEmbedded()) {
+			T value=getValue();
+			if (value==null) {
+				bs[pos++]=Tag.NULL;
+				return pos;
+			}
+			return value.encode(bs, pos);
+		} else {
+			bs[pos++]=Tag.REF;
+			return getHash().encodeRaw(bs, pos);
+		}
+	}
 	
-	/**
-	 * Writes the raw ref Hash to the given ByteBuffer
-	 * @param bb
-	 * @return
-	 */
-	public int writeRawHash(byte[] bs,int pos) {
-		return getHash().encodeRaw(bs,pos);
+	@Override
+	public final ByteBuffer write(ByteBuffer bb) {
+		if (isEmbedded()) {
+			return Format.write(bb, getValue());
+		} else {
+			bb=bb.put(Tag.REF);
+			return getHash().writeToBuffer(bb);
+		}
+	}
+	
+	@Override
+	protected Blob createEncoding() {
+		if (isEmbedded()) {
+			return Format.encodedBlob(getValue());
+		}
+		
+		byte[] bs=new byte[Ref.INDIRECT_ENCODING_LENGTH];	
+		Hash h=getHash();
+		int pos=0;
+		bs[pos++]=Tag.REF;
+		pos=h.encodeRaw(bs, pos);
+		return Blob.wrap(bs,0,pos);
 	}
 
 	/**
 	 * Gets the encoding length for writing this Ref. Will be equal to the encoding length
-	 * of the Ref's value if embedded.
+	 * of the Ref's value if embedded, otherwise INDIRECT_ENCODING_LENGTH
 	 *  
 	 * @return
 	 */
-	public abstract long getEncodingLength();
+	public final long getEncodingLength() {
+		if (isEmbedded()) {
+			T value=getValue();
+			if (value==null) return 1;
+			return value.getEncodingLength();
+		} else {
+			return Ref.INDIRECT_ENCODING_LENGTH;
+		}
+	}
 
 	/**
 	 * Gets the indirect memory size for this Ref
@@ -594,5 +648,32 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		if (value==null) return 0;
 		return value.getMemorySize();
 	}
+
+	/**
+	 * Finds all instances of missing data in this Ref, and adds them to the missing set
+	 * @param missingSet
+	 */
+	public void findMissing(HashSet<Hash> missingSet) {
+		if (getStatus()>=Ref.PERSISTED) return;
+		if (isMissing()) {
+			missingSet.add(getHash());
+		} else {
+			// Should be OK to get value, since non-missing!
+			T val=getValue();
+			
+			// recursively scan for missing children
+			int n=val.getRefCount();
+			for (int i=0; i<n; i++) {
+				Ref<?> r=val.getRef(i);
+				r.findMissing(missingSet);
+			}
+		}
+	}
+
+	/**
+	 * Returns true if this Ref refers to missing data, false otherwise
+	 * @return
+	 */
+	protected abstract boolean isMissing();
 
 }

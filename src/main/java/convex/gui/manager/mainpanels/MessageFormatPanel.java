@@ -9,6 +9,7 @@ import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 
+import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.exceptions.ParseException;
@@ -117,7 +118,7 @@ public class MessageFormatPanel extends JPanel {
 		hashLabel.setText(HASHLABEL + " <invalid>");
 		if (!data.isBlank()) try {
 			messageArea.setEnabled(false);
-			Object o = Reader.read(data);
+			ACell o = Reader.read(data);
 			Blob b = Format.encodedBlob(o);
 			hashLabel.setText(HASHLABEL + b.getContentHash().toHexString());
 			msg = b.toHexString();

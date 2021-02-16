@@ -35,17 +35,17 @@ public class MemoryStore extends AStore {
 	}
 	
 	@Override
-	public <T extends ACell> Ref<T> announceRef(Ref<T> r2, Consumer<Ref<ACell>> noveltyHandler) {
-		return persistRef(r2,noveltyHandler,Ref.ANNOUNCED); 
+	public <T extends ACell> Ref<T> storeRef(Ref<T> r2, int status, Consumer<Ref<ACell>> noveltyHandler) {
+		return persistRef(r2,noveltyHandler,status,false); 
 	}
 
 	@Override
-	public <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
-		return persistRef(ref,noveltyHandler,Ref.PERSISTED);
+	public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status,Consumer<Ref<ACell>> noveltyHandler) {
+		return persistRef(ref,noveltyHandler,status,true); 
 	}
 	
 	@SuppressWarnings("unchecked")
-	public <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus) {
+	public <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus, boolean topLevel) {
 		// Convert to direct Ref. Don't want to store a soft ref!
 		ref = ref.toDirect();
 
@@ -75,19 +75,15 @@ public class MemoryStore extends AStore {
 		
 		ref=ref.withValue((T)cell);
 		final ACell oTemp=cell;
-		final Hash fHash=hash;
-		log.log(Stores.PERSIST_LOG_LEVEL,()->"Persisting ref 0x"+fHash.toHexString()+" of class "+Utils.getClassName(oTemp)+" with store "+this);
 
-		if (!embedded) {
-			hashRefs.put(hash, (Ref<ACell>) ref);
+		if (topLevel||!embedded) {
+			final Hash fHash = (hash!=null)?hash:ref.getHash();
+			log.log(Stores.PERSIST_LOG_LEVEL,()->"Persisting ref 0x"+fHash.toHexString()+" of class "+Utils.getClassName(oTemp)+" with store "+this);
+
+			hashRefs.put(fHash, (Ref<ACell>) ref);
 			if (noveltyHandler != null) noveltyHandler.accept((Ref<ACell>) ref);
 		}
 		return ref.withMinimumStatus(requiredStatus);
-	}
-
-	@Override
-	public <T extends ACell> Ref<T> storeRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
-		return persistRef(ref,noveltyHandler,Ref.STORED);
 	}
 
 	@Override

@@ -42,8 +42,23 @@ public class ObjectsTest {
 			doRefContainerTests(a);
 		}
 		
+		doCellRefTests(a);
 
 		doAnyValueTests(a);
+	}
+
+	private static void doCellRefTests(ACell a) {
+		Ref<ACell> cachedRef=a.cachedRef;
+		Ref<ACell> ref=a.getRef();
+		if (cachedRef!=null) assertSame(ref,cachedRef);
+		assertSame(ref,a.getRef());
+		
+		assertEquals(a.isEmbedded(),ref.isEmbedded());
+		
+		Ref<ACell> refD=ref.toDirect();
+		assertTrue(ref.equalsValue(refD));
+		assertTrue(refD.equalsValue(ref));
+		
 	}
 
 	private static void doCellStorageTest(ACell a) throws InvalidDataException {
@@ -65,16 +80,11 @@ public class ObjectsTest {
 			// retrieve from store
 			Ref<ACell> rr=ms.refForHash(hash);
 			
-			if (r.isEmbedded()) {
-				// nothing should be persisted
-				assertNull(rr);
-			} else {
-				// should be able to retrieve and validate complete structure
-				assertNotNull(rr,()->"Failed to retrieve from store with "+Utils.getClassName(a) + " = "+a);
-				ACell b=rr.getValue();
-				b.validate();
-				assertEquals(a,b);
-			}
+			// should be able to retrieve and validate complete structure
+			assertNotNull(rr,()->"Failed to retrieve from store with "+Utils.getClassName(a) + " = "+a);
+			ACell b=rr.getValue();
+			b.validate();
+			assertEquals(a,b);
 		} finally {
 			Stores.setCurrent(temp);
 		}
@@ -86,10 +96,13 @@ public class ObjectsTest {
 	 * @param a
 	 */
 	public static void doAnyValueTests(ACell a) {
+		Hash h=Hash.compute(a);
+		
 		boolean embedded=Format.isEmbedded(a);
 		assertTrue(Format.isCanonical(a));
 
 		Ref<ACell> r = Ref.get(a).persist();
+		assertEquals(h,r.getHash());
 		assertEquals(a, r.getValue());
 
 		Blob b = Format.encodedBlob(a);
@@ -99,7 +112,7 @@ public class ObjectsTest {
 		} 
 		
 		// tests for memory size
-		if (!embedded) {
+		if (a!=null) {
 			long memorySize=a.getMemorySize();
 			long encodingSize=a.getEncodingLength();
 			int rc=a.getRefCount();
@@ -109,7 +122,11 @@ public class ObjectsTest {
 				long cms=childRef.getMemorySize();
 				childMem+=cms;
 			}
-			assertEquals(memorySize,encodingSize+childMem+Constants.MEMORY_OVERHEAD);
+			if (embedded) {
+				assertEquals(memorySize,childMem);
+			} else {
+				assertEquals(memorySize,encodingSize+childMem+Constants.MEMORY_OVERHEAD);
+			}
 		}
 
 		assertTrue(b.length <= Format.LIMIT_ENCODING_LENGTH);
@@ -119,7 +136,7 @@ public class ObjectsTest {
 		}
 
 		try {
-			Object a2;
+			ACell a2;
 			a2 = Format.read(b);
 			assertEquals(a, a2);
 		} catch (BadFormatException e) {

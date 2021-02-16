@@ -264,7 +264,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public final boolean equals(Object a) {
+	public final boolean equals(ACell a) {
 		if (!(a instanceof AMap)) return false;
 		return equals((AMap<K, V>) a);
 	}

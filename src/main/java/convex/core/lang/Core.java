@@ -1500,7 +1500,7 @@ public class Core {
 		public  Context<ABlob> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Object a = args[0];
+			ACell a = args[0];
 			ABlob encoding=Format.encodedBlob(a);
 
 			long juice=Juice.addMul(Juice.BLOB, encoding.length(), Juice.BLOB_PER_BYTE);

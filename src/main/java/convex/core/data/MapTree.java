@@ -454,7 +454,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		Ref<AHashMap<K, V>>[] blocks = (Ref<AHashMap<K, V>>[]) new Ref<?>[ilength];
 
 		for (int i = 0; i < ilength; i++) {
-			// need to rad as a Ref
+			// need to read as a Ref
 			Ref<AHashMap<K, V>> ref = Format.readRef(bb);
 			blocks[i] = ref;
 		}
@@ -505,7 +505,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			}
 		}
 		if (newChildren == children) return this;
-		// Note: we assume no key hashes have changed, so sturcture is the same
+		// Note: we assume no key hashes have changed, so structure is the same
 		return new MapTree<>(newChildren, shift, mask, count);
 	}
 

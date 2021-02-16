@@ -1,7 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
-
 import convex.core.crypto.Hash;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
@@ -21,20 +19,27 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 	 */
 	private final T value;
 	
-	/**
-	 * Flag for known embedded status. Unknown if false.
-	 */
-	private boolean embedded=false;
-	
-	private RefDirect(T value, Hash hash, int status) {
-		super(hash, status);
+	private RefDirect(T value, Hash hash, int flags) {
+		super(hash, flags);
+
 		this.value = value;
 	}
 
 	public static <T extends ACell> RefDirect<T> create(T value, Hash hash, int status) {
-		return new RefDirect<T>(value, hash, status);
+		int flags=status&Ref.STATUS_MASK;
+		if (value==null) {
+			flags|=KNOWN_EMBEDDED_MASK;
+		}
+		return new RefDirect<T>(value, hash, flags);
 	}
 
+	/**
+	 * Creates a direct ref to the given value
+	 * @param <T>
+	 * @param value
+	 * @param hash Hash of value, or null if not known
+	 * @return
+	 */
 	public static <T extends ACell> RefDirect<T> create(T value, Hash hash) {
 		return create(value, hash, UNKNOWN);
 	}
@@ -45,33 +50,8 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 	 * @param value
 	 * @return
 	 */
-	@SuppressWarnings("unchecked")
 	public static <T extends ACell> RefDirect<T> create(T value) {
-		if (value == null) return (RefDirect<T>) Ref.NULL_VALUE;
-		return create(value, null);
-	}
-
-	protected Ref<T> updateStatus(int newStatus) {
-		if (status == newStatus) return this;
-		if ((status >= VERIFIED) && (newStatus < status)) {
-			throw new IllegalArgumentException("Shouldn't be able to downgrade status if already verified");
-		}
-		switch (newStatus) {
-		case UNKNOWN:
-			throw new IllegalArgumentException("Shouldn't be able to downgrade status to unknown");
-		case STORED:
-			return create(value, hash, STORED);
-		case PERSISTED:
-			return create(value, hash, PERSISTED);
-		case VERIFIED:
-			return create(value, hash, VERIFIED);
-		case ANNOUNCED:
-			return create(value, hash, ANNOUNCED);
-		case INVALID:
-			return create(value, hash, INVALID);
-		default:
-			throw new IllegalArgumentException("Ref status not recognised: " + newStatus);
-		}
+		return create(value, null, UNKNOWN);
 	}
 
 	public T getValue() {
@@ -84,41 +64,11 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 	}
 
 	@Override
-	public boolean isEmbedded() {
-		if (value==null) return true;
-		if (embedded) return true;
-		return value.isEmbedded();
-	}
-
-	@Override
 	public Hash getHash() {
-		if (value==null) return Hash.NULL_HASH;
-		return value.getHash();
-	}
-
-	@Override
-	public int encode(byte[] bs, int pos) {
-		if (value==null) {
-			bs[pos++]=Tag.NULL;
-			return pos;
-		}
-		if (isEmbedded()) {
-			// embedded, so write embedded representation directly instead of Ref
-			return  Format.write(bs,pos, value);
-		} else {
-			bs[pos++]=Tag.REF;;
-			return writeRawHash(bs,pos);
-		}
-	}
-	
-	@Override
-	public ByteBuffer write(ByteBuffer bb) {
-		if (isEmbedded()) {
-			return Format.write(bb, value);
-		} else {
-			bb=bb.put(Tag.REF);
-			return getHash().writeToBuffer(bb);
-		}
+		if (hash!=null) return hash;
+		Hash newHash=(value==null)?Hash.NULL_HASH:value.getHash();
+		hash=newHash;
+		return newHash;
 	}
 
 	@Override
@@ -131,7 +81,7 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 		if (a == this) return true;
 		if (this.hash != null) {
 			// use hash if available
-			if ((a.hash != null) && (this.hash.equals(a.hash))) return true;
+			if (a.hash != null) return this.hash.equals(a.hash);
 		}
 		if (a instanceof RefDirect) {
 			// fast non-hashing check for direct objects
@@ -152,38 +102,29 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 
 	@Override
 	public Ref<T> withValue(T newValue) {
-		if (newValue!=value) return new RefDirect<T>(newValue,hash,status);
+		if (newValue!=value) return new RefDirect<T>(newValue,hash,flags);
 		return this;
 	}
 
 	@Override
 	public int estimatedEncodingSize() {
-		// TODO improve estimate?
-		return 64;
+		if(value==null) return Format.NULL_ENCODING_LENGTH;
+		return isEmbedded()?value.estimatedEncodingSize():Ref.INDIRECT_ENCODING_LENGTH;
+	}
+
+
+
+
+
+	@Override
+	protected boolean isMissing() {
+		// Never missing, since we have the value at hand
+		return false;
 	}
 
 	@Override
-	protected Blob createEncoding() {
-		if (isEmbedded()) {
-			return Format.encodedBlob(value);
-		}
-		
-		byte[] bs=new byte[RefSoft.ENCODING_LENGTH];	
-		Hash h=getHash();
-		int pos=0;
-		bs[pos++]=Tag.REF;
-		pos=h.encodeRaw(bs, pos);
-		return Blob.wrap(bs,0,pos);
-	}
-
-	@Override
-	public long getEncodingLength() {
-		if (value==null) return 1;
-		if (isEmbedded()) {
-			return value.getEncodingLength();
-		} else {
-			return Ref.INDIRECT_ENCODING_LENGTH;
-		}
+	protected RefDirect<T> withFlags(int newFlags) {
+		return new RefDirect<T>(value,hash,flags);
 	}
 
 

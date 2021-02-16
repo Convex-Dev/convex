@@ -220,15 +220,9 @@ public class BlobTree extends ABlob {
 	}
 
 	@Override
-	public boolean equals(Object a) {
+	public boolean equals(ABlob a) {
 		if (!(a instanceof BlobTree)) return false;
 		return equals((BlobTree) a);
-	}
-
-	@Override
-	public boolean equals(ABlob o) {
-		if (!(o instanceof BlobTree)) return false;
-		return equals((BlobTree) o);
 	}
 
 	public boolean equals(BlobTree b) {
@@ -252,8 +246,7 @@ public class BlobTree extends ABlob {
 		pos = Format.writeVLCLong(bs,pos, count);
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
-			// TODO: embed?
-			pos = children[i].writeRawHash(bs,pos);
+			pos = children[i].encode(bs,pos);
 		}
 		return pos;
 	}
@@ -262,7 +255,7 @@ public class BlobTree extends ABlob {
 	public ByteBuffer writeToBuffer(ByteBuffer bb) {
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
-			bb = children[i].getValue().writeToBuffer(bb);
+			bb = children[i].write(bb);
 		}
 		return bb;
 	}
@@ -306,7 +299,7 @@ public class BlobTree extends ABlob {
 		@SuppressWarnings("unchecked")
 		Ref<ABlob>[] children = (Ref<ABlob>[]) new Ref[numChildren];
 		for (int i = 0; i < numChildren; i++) {
-			Ref<ABlob> ref = Ref.readRaw(bb);
+			Ref<ABlob> ref = Format.readRef(bb);
 			children[i] = ref;
 		}
 
@@ -319,15 +312,13 @@ public class BlobTree extends ABlob {
 		int shift = calcShift(chunks);
 		int numChildren = Utils.checkedInt(((chunks - 1) >> shift) + 1);
 
-		if (src.length != (headerLength + numChildren * Ref.BYTE_LENGTH)) {
-			throw new BadFormatException("Invalid number of children [" + numChildren
-					+ "] in BlobTree representation with length; " + src.length);
-		}
-
 		@SuppressWarnings("unchecked")
 		Ref<ABlob>[] children = (Ref<ABlob>[]) new Ref<?>[numChildren];
+		
+		ByteBuffer bb=src.getByteBuffer();
+		bb.position(headerLength);
 		for (int i = 0; i < numChildren; i++) {
-			Ref<ABlob> ref = Ref.readRaw(src, headerLength + i * Ref.BYTE_LENGTH);
+			Ref<ABlob> ref = Format.readRef(bb);
 			children[i] = ref;
 		}
 
@@ -336,7 +327,7 @@ public class BlobTree extends ABlob {
 
 	@Override
 	public int estimatedEncodingSize() {
-		return 1 + Format.MAX_VLC_LONG_LENGTH + Ref.BYTE_LENGTH * children.length;
+		return 1 + Format.MAX_VLC_LONG_LENGTH + Ref.INDIRECT_ENCODING_LENGTH * children.length;
 	}
 
 	@Override

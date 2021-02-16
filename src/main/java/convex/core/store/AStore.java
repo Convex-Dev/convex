@@ -17,35 +17,26 @@ import convex.core.data.Ref;
 public abstract class AStore {
 	
 	/**
-	 * Announces a @Ref in long term storage as defined by this store implementation.
-	 * Ensures all nested Refs are also ANNOUNCED.
-	 * 
-	 * If the persisted Ref represents novelty (i.e. not previously persisted) Will
-	 * call the provided noveltyHandler
-	 * 
-	 * @param ref A Ref to the given object. Should be either DIRECT or STORED at
-	 *            minimum to present risk of MissingDataException.
-	 * @return The persisted Ref, of status ANNOUNCED at minimum
-	 */
-	public abstract <T extends ACell> Ref<T> announceRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler);
-	
-
-	/**
-	 * Persists a @Ref in long term storage as defined by this store implementation.
-	 * Ensures all nested Refs are also persisted.
-	 * 
-	 * If the persisted Ref represents novelty (i.e. not previously persisted) Will
-	 * call the provided noveltyHandler
-	 * 
-	 * @param ref A Ref to the given object. Should be either DIRECT or STORED at
-	 *            minimum to present risk of MissingDataException.
-	 * @return The persisted Ref, of status PERSISTED at minimum
-	 */
-	public abstract <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler);
-
-	/**
 	 * Stores a @Ref in long term storage as defined by this store implementation.
-	 * Does not deference or otherwise do anything with nested Refs.
+	 * 
+	 * Will store nested Refs if required.
+	 * 
+	 * Does not store embedded values. If it is necessary to persist an embedded value
+	 * deliberately in the sture, use storeTopRef(...) instead.
+	 * 
+	 * If the persisted Ref represents novelty (i.e. not previously stored) Will
+	 * call the provided noveltyHandler.
+	 * 
+	 * @param ref A Ref to the given object. Should be either Direct or STORED at
+	 *            minimum to present risk of MissingDataException.
+	 * @return The persisted Ref, of status STORED at minimum
+	 */
+	public abstract <T extends ACell> Ref<T> storeRef(Ref<T> ref, int status,Consumer<Ref<ACell>> noveltyHandler);
+
+	/**
+	 * Stores a top level @Ref in long term storage as defined by this store implementation.
+	 * 
+	 * Will store nested Refs if required.
 	 * 
 	 * If the persisted Ref represents novelty (i.e. not previously stored) Will
 	 * call the provided noveltyHandler
@@ -54,8 +45,9 @@ public abstract class AStore {
 	 *            minimum to present risk of MissingDataException.
 	 * @return The persisted Ref, of status STORED at minimum
 	 */
-	public abstract <T extends ACell> Ref<T> storeRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler);
+	public abstract <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status,Consumer<Ref<ACell>> noveltyHandler);
 
+	
 	/**
 	 * Gets the stored Ref for a given hash value, or null if not found.
 	 * 

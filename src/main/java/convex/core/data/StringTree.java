@@ -87,7 +87,7 @@ public class StringTree extends AString {
 		pos=Format.writeVLCLong(bs,pos, length);
 		int n=children.length;
 		for (int i=0; i<n; i++) {
-			pos = children[i].writeRawHash(bs,pos);
+			pos = children[i].encode(bs,pos);
 		}
 		return pos;
 	}
@@ -99,7 +99,7 @@ public class StringTree extends AString {
 		
 		Ref<AString>[] children = (Ref<AString>[]) new Ref[n];
 		for (int i = 0; i < n; i++) {
-			Ref<AString> ref = Ref.readRaw(bb);
+			Ref<AString> ref = Format.readRef(bb);
 			children[i] = ref;
 		}
 

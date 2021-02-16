@@ -123,7 +123,7 @@ public class StringShort extends AString {
 	}
 
 	@Override 
-	public boolean equals(Object a) {
+	public boolean equals(ACell a) {
 		if (a instanceof StringShort) {
 			return equals((StringShort)a);
 		}

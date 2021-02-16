@@ -106,7 +106,19 @@ public class Peer {
 	public static Peer create(AKeyPair peerKP, State initialState) {
 		Belief belief = Belief.createSingleOrder(peerKP);
 		SignedData<Belief> sb = peerKP.signData(belief);
-		return new Peer(peerKP, sb, Vectors.of(initialState), Vectors.empty(), initialState.getTimeStamp().longValue());
+		AVector<State> states=Vectors.of(initialState);
+		
+		// Ensure initial belief and states are persisted in current store
+		Ref.createPersisted(sb);
+		Ref.createPersisted(states);
+		
+		// Check belief persistence
+		Ref<SignedData<Belief>> sbr=Ref.forHash(sb.getHash());
+		if (sbr==null) {
+			throw new Error("Belief not correctly persisted! "+sb.getHash());
+		}
+		
+		return new Peer(peerKP, sb, states, Vectors.empty(), initialState.getTimeStamp().longValue());
 	}
 	
 	/**
@@ -115,9 +127,9 @@ public class Peer {
 	 * @return Peer instance, or null if root hash was not found
 	 */
 	public static Peer restorePeer(AStore store,Hash root, AKeyPair keyPair) throws IOException {
+		// temporarily set current store
 		AStore tempStore=Stores.current();
 		try {
-			// temporarily set current store
 			Stores.setCurrent(store);
 			Ref<ACell> ref=store.refForHash(root);
 			if (ref==null) return null; // not found case
@@ -133,7 +145,7 @@ public class Peer {
 
 	/**
 	 * Creates a new Peer instance at server startup using the provided
-	 * configuration
+	 * configuration. Current store must be set to store for server.
 	 * 
 	 * @param config
 	 * @return A new Peer instance

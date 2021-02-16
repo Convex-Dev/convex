@@ -141,7 +141,7 @@ public class FormatTest {
 	
 	@Test
 	public void testBadMessageTooLong() throws BadFormatException {
-		Object o=Samples.FOO;
+		ACell o=Samples.FOO;
 		Blob data=Format.encodedBlob(o).append(Blob.fromHex("ff")).toBlob();
 		assertThrows(BadFormatException.class,()->Format.read(data));
 	}

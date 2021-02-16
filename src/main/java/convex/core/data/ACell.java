@@ -95,7 +95,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	@Override
-	public boolean equals(Object a) {
+	public final boolean equals(Object a) {
 		if (!(a instanceof ACell)) return false;
 		return equals((ACell)a);
 	}
@@ -112,7 +112,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	
 	/**
 	 * Checks for equality with another object. In general, data objects should be considered equal
-	 * if they have the same canonical representation, i.e. the same hash value.
+	 * if they have the same canonical representation, i.e. an identical encoding with the same hash value.
 	 * 
 	 * Subclasses should override this if they have a more efficient equals implementation.
 	 * 
@@ -123,7 +123,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		if (this==a) return true; // important optimisation for e.g. hashmap equality
 		if (a==null) return false;
 		if (!(a.getClass()==this.getClass())) return false;
-		return getHash().equals(a.getHash());
+		return getEncoding().equals(a.getEncoding());
 	}
 
 	/**
@@ -305,6 +305,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return The Ref at the specified index
 	 */
 	public <R extends ACell> Ref<R> getRef(int i) {
+		// This will always be an error if not overridden
 		if (getRefCount()==0) {
 			throw new IndexOutOfBoundsException("No Refs to get in "+Utils.getClassName(this));
 		} else {

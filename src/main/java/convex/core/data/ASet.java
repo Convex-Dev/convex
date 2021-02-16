@@ -90,7 +90,7 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	
 	@SuppressWarnings("unchecked")
 	@Override
-	public final boolean equals(Object o) {
+	public final boolean equals(ACell o) {
 		if (o instanceof ASet) return equals((ASet<T>)o);
 		return false;
 	}

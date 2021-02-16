@@ -172,7 +172,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public boolean equals(Object o) {
+	public boolean equals(ACell o) {
 		if (o instanceof MapEntry) return equals((MapEntry<K, V>) o);
 		return false;
 	}

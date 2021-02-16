@@ -90,29 +90,30 @@ public class EtchStore extends AStore {
 	}
 
 	@Override
-	public <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
-		return persistRef(ref, noveltyHandler, Ref.PERSISTED);
+	public <T extends ACell> Ref<T> storeRef(Ref<T> ref, int status, Consumer<Ref<ACell>> noveltyHandler) {
+		return storeRef(ref, noveltyHandler, status, false);
 	}
 
 	@Override
-	public <T extends ACell> Ref<T> announceRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
-		return persistRef(ref, noveltyHandler, Ref.ANNOUNCED);
+	public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status, Consumer<Ref<ACell>> noveltyHandler) {
+		return storeRef(ref, noveltyHandler, status, true);
 	}
 
 	@SuppressWarnings("unchecked")
-	public <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus) {
+	public <T extends ACell> Ref<T> storeRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus,
+			boolean topLevel) {
 		// first check if the Ref is already persisted to required level
 		if (ref.getStatus() >= requiredStatus) return ref;
 
 		final ACell cell = ref.getValue();
-
+		// Quick handling for null
 		if (cell == null) return (Ref<T>) Ref.NULL_VALUE;
 
 		// check store for existing ref first.
 		boolean embedded = cell.isEmbedded();
 		Hash hash = null;
+		// if not embedded, worth checking store first for existing value
 		if (!embedded) {
-			;
 			hash = ref.getHash();
 			Ref<T> existing = refForHash(hash);
 			if (existing != null) {
@@ -121,10 +122,10 @@ public class EtchStore extends AStore {
 			}
 		}
 
-		// beyond STORED level, need to recursively persist child refs
-		if (requiredStatus > Ref.STORED) {
+		// beyond STORED level, need to recursively persist child refs if they exist
+		if ((requiredStatus > Ref.STORED)&&(cell.getRefCount()>0)) {
 			IRefFunction func = r -> {
-				return persistRef((Ref<ACell>) r, noveltyHandler, requiredStatus);
+				return storeRef((Ref<ACell>) r, noveltyHandler, requiredStatus, false);
 			};
 
 			// need to do recursive persistence
@@ -135,8 +136,9 @@ public class EtchStore extends AStore {
 			if (cell != newObject) ref = ref.withValue((T) newObject);
 		}
 
-		if (!embedded) {
-			final Hash fHash = hash;
+		if (topLevel || !embedded) {
+			// Do actual write to store
+			final Hash fHash = (hash != null) ? hash : ref.getHash();
 			log.log(Stores.PERSIST_LOG_LEVEL, () -> "Etch persisting at status=" + requiredStatus + " hash = 0x"
 					+ fHash.toHexString() + " ref of class " + Utils.getClassName(cell) + " with store " + this);
 
@@ -144,20 +146,18 @@ public class EtchStore extends AStore {
 			try {
 				// ensure status is set when we write to store
 				ref = ref.withMinimumStatus(requiredStatus);
-				result = etch.write(hash, (Ref<ACell>) ref);
+				result = etch.write(fHash, (Ref<ACell>) ref);
 			} catch (IOException e) {
 				throw Utils.sneakyThrow(e);
 			}
 
 			// call novelty handler if newly persisted
 			if (noveltyHandler != null) noveltyHandler.accept(result);
+			return (Ref<T>) result;
+		} else {
+			// no need to write, just tag updated status
+			return ref.withMinimumStatus(requiredStatus);
 		}
-		return ref.withMinimumStatus(requiredStatus);
-	}
-
-	@Override
-	public <T extends ACell> Ref<T> storeRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler) {
-		return persistRef(ref, noveltyHandler, Ref.STORED);
 	}
 
 	@Override

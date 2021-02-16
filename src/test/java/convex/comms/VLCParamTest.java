@@ -9,17 +9,19 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.FuzzTestFormat;
 import convex.core.data.Tag;
 import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 
 @RunWith(Parameterized.class)
 public class VLCParamTest {
-	private Object value;
+	private ACell value;
 
 	public VLCParamTest(Object value) {
 		// create using CVM-coerced values
@@ -40,12 +42,13 @@ public class VLCParamTest {
 	@Test
 	public void testRoundTrip() throws BadFormatException {
 		Blob b = Format.encodedBlob(value);
-		Object v2 = Format.read(b);
+		ACell v2 = Format.read(b);
 		assertEquals(value, v2);
 
-		if (value instanceof Long) {
+		if (value instanceof CVMLong) {
+			CVMLong cl=(CVMLong) value;
 			assertEquals(Tag.LONG, b.get(0)); // check correct tag
-			assertEquals(1 + Format.getVLCLength((long) value), b.length()); // check length after tag
+			assertEquals(1 + Format.getVLCLength(cl.longValue()), b.length()); // check length after tag
 		}
 
 		FuzzTestFormat.doMutationTest(b);
