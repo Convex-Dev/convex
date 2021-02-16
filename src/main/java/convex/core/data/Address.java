@@ -294,7 +294,10 @@ public class Address extends ABlob {
 		return 0;
 	}
 
-
+	@Override
+	public byte getTag() {
+		return Tag.ADDRESS;
+	}
 
 
 }

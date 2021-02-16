@@ -297,6 +297,10 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		// TODO: is there really Nothing to do?
 	}
 
-
+	@Override
+	public byte getTag() {
+		// TODO: should this be vector?
+		return Tag.MAP_ENTRY;
+	}
 
 }

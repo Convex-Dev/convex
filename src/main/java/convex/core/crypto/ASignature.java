@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
+import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.util.Utils;
 
@@ -51,6 +52,11 @@ public abstract class ASignature extends ACell {
 	@Override
 	public boolean isEmbedded() {
 		return true;
+	}
+	
+	@Override
+	public byte getTag() {
+		return Tag.SIGNATURE;
 	}
 
 }

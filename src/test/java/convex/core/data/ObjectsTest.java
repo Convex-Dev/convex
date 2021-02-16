@@ -106,10 +106,21 @@ public class ObjectsTest {
 		assertEquals(a, r.getValue());
 
 		Blob b = Format.encodedBlob(a);
-		if (a!=null) {
-			assertSame(b,a.getEncoding());
+		if (a==null) {
+			assertEquals(Blob.NULL_ENCODING,b);
+		} else {
+			assertEquals(a.getTag(),b.get(0)); // Correct Tag
+			assertSame(b,a.getEncoding()); // should be same cached encoding
 			assertEquals(b.length,a.getEncodingLength());
-		} 
+		}
+
+		// Any encoding should be less than or equal to the limit
+		assertTrue(b.length <= Format.LIMIT_ENCODING_LENGTH);
+		
+		// If length exceeds MAX_EMBEDDED_LENGTH, cannot be an embedded value
+		if (b.length > Format.MAX_EMBEDDED_LENGTH) {
+			assertFalse(Format.isEmbedded(a),()->"Testing: "+Utils.getClassName(a)+ " = "+Utils.toString(a));
+		}
 		
 		// tests for memory size
 		if (a!=null) {
@@ -129,11 +140,6 @@ public class ObjectsTest {
 			}
 		}
 
-		assertTrue(b.length <= Format.LIMIT_ENCODING_LENGTH);
-		
-		if (b.length > Format.MAX_EMBEDDED_LENGTH) {
-			assertFalse(Format.isEmbedded(a),()->"Testing: "+Utils.getClassName(a)+ " = "+Utils.toString(a));
-		}
 
 		try {
 			ACell a2;

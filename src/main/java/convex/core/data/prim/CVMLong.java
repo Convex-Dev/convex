@@ -72,5 +72,10 @@ public final class CVMLong extends APrimitive {
 	public static CVMLong parse(String s) {
 		return create(Long.parseLong(s));
 	}
+	
+	@Override
+	public byte getTag() {
+		return Tag.LONG;
+	}
 
 }

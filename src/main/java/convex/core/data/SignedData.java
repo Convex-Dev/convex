@@ -262,4 +262,8 @@ public class SignedData<T extends ACell> extends ACell {
 		return signature.verify(valueRef.getHash(), address);
 	}
 
+	@Override
+	public byte getTag() {
+		return Tag.SIGNED_DATA;
+	}
 }

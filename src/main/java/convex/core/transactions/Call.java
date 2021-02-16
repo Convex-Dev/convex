@@ -150,5 +150,8 @@ public class Call extends ATransaction {
 		return create(newAddress,sequence,target,offer,functionName,args);
 	}
 
-
+	@Override
+	public byte getTag() {
+		return Tag.CALL;
+	}
 }

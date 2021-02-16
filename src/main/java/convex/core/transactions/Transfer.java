@@ -149,4 +149,9 @@ public class Transfer extends ATransaction {
 		if (newAddress==this.address) return this;
 		return create(newAddress,sequence,target,amount);
 	}
+	
+	@Override
+	public byte getTag() {
+		return Tag.TRANSFER;
+	}
 }

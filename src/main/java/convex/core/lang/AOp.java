@@ -70,4 +70,9 @@ public abstract class AOp<T extends ACell> extends ACell {
 	
 	@Override
 	public abstract AOp<T> updateRefs(IRefFunction func);
+	
+	@Override
+	public byte getTag() {
+		return Tag.OP;
+	}
 }

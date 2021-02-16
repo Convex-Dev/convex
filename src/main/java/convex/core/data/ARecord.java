@@ -135,7 +135,8 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	 * 
 	 * @return Record tag byte
 	 */
-	public abstract byte getRecordTag();
+	@Override
+	public abstract byte getTag();
 	
 	@Override
 	public int getRefCount() {

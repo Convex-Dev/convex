@@ -120,7 +120,7 @@ public class State extends ARecord {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=getRecordTag();
+		bs[pos++]=getTag();
 		return encodeRaw(bs,pos);
 	}
 
@@ -536,7 +536,7 @@ public class State extends ARecord {
 	}
 
 	@Override
-	public byte getRecordTag() {
+	public byte getTag() {
 		return Tag.STATE;
 	}
 

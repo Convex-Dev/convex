@@ -296,6 +296,11 @@ public class AccountKey extends AArrayBlob {
 		return false;
 	}
 
+	@Override
+	public byte getTag() {
+		return Tag.ACCOUNT_KEY;
+	}
+
 
 
 }

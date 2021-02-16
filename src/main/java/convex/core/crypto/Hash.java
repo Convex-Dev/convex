@@ -368,4 +368,8 @@ public class Hash extends AArrayBlob {
 		return false;
 	}
 
+	@Override
+	public byte getTag() {
+		return Tag.HASH;
+	}
 }

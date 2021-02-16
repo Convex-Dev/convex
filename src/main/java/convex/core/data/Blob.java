@@ -247,7 +247,10 @@ public class Blob extends AArrayBlob {
 		return true;
 	}
 
-
+	@Override
+	public byte getTag() {
+		return Tag.BLOB;
+	}
 	
 
 

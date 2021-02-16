@@ -51,4 +51,9 @@ public abstract class AString extends ACell implements CharSequence, Comparable<
 		bs[pos++]=Tag.STRING;
 		return encodeRaw(bs,pos);
 	}
+	
+	@Override
+	public final byte getTag() {
+		return Tag.STRING;
+	}
 }

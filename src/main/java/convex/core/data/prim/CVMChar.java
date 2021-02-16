@@ -74,5 +74,9 @@ public final class CVMChar extends APrimitive {
 	public char charValue() {
 		return value;
 	}
-
+	
+	@Override
+	public byte getTag() {
+		return Tag.CHAR;
+	}
 }

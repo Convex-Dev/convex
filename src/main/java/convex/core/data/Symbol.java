@@ -211,5 +211,8 @@ public class Symbol extends ASymbolic {
 	}
 
 
-
+	@Override
+	public byte getTag() {
+		return Tag.SYMBOL;
+	}
 }

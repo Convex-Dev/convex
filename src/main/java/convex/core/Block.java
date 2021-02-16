@@ -135,7 +135,7 @@ public class Block extends ARecord {
 	
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=getRecordTag();
+		bs[pos++]=getTag();
 		// generic record writeRaw, handles all fields in declared order
 		return encodeRaw(bs,pos);
 	}
@@ -187,7 +187,7 @@ public class Block extends ARecord {
 	}
 
 	@Override
-	public byte getRecordTag() {
+	public byte getTag() {
 		return Tag.BLOCK;
 	}
 
@@ -200,4 +200,5 @@ public class Block extends ARecord {
 	public void validateCell() throws InvalidDataException {
 		transactions.validateCell();
 	}
+	
 }

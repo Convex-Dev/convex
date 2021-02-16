@@ -722,11 +722,11 @@ public class Format {
 
 	/**
 	 * <p>
-	 * Reads an complete data object from a ByteBuffer.
+	 * Reads one complete Cell from a ByteBuffer.
 	 * </p>
 	 * 
 	 * <p>
-	 * May return any valid data object (including null, and non), or a Ref
+	 * May return any valid Cell (including null)
 	 * </p>
 	 * 
 	 * <p>

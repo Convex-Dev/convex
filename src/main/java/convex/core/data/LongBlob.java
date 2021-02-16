@@ -210,5 +210,10 @@ public class LongBlob extends ABlob {
 		Utils.writeLong(bs, pos, value);
 		return pos+8;
 	}
+	
+	@Override
+	public byte getTag() {
+		return Tag.BLOB;
+	}
 
 }

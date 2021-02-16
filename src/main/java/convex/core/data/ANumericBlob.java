@@ -2,6 +2,7 @@ package convex.core.data;
 
 import java.util.Arrays;
 
+import convex.core.exceptions.TODOException;
 import convex.core.util.Utils;
 
 /**
@@ -64,4 +65,8 @@ public class ANumericBlob extends AArrayBlob {
 		return false;
 	}
 
+	@Override
+	public byte getTag() {
+		throw new TODOException();
+	}
 }

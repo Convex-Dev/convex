@@ -71,5 +71,10 @@ public final class CVMDouble extends APrimitive {
 	public static CVMDouble parse(String s) {
 		return create(Double.parseDouble(s));
 	}
+	
+	@Override
+	public byte getTag() {
+		return Tag.DOUBLE;
+	}
 
 }

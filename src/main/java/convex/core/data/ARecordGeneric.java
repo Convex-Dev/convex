@@ -38,7 +38,7 @@ public abstract class ARecordGeneric extends ARecord {
 	}
 
 	@Override
-	public abstract byte getRecordTag();
+	public abstract byte getTag();
 	
 	@Override
 	public int getRefCount() {

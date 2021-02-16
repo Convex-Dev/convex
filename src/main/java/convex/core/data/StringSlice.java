@@ -79,6 +79,4 @@ public class StringSlice extends AString {
 	}
 
 
-
-
 }

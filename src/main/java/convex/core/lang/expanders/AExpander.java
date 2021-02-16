@@ -2,6 +2,7 @@ package convex.core.lang.expanders;
 
 import convex.core.data.ACell;
 import convex.core.data.Syntax;
+import convex.core.data.Tag;
 import convex.core.lang.Context;
 
 /**
@@ -26,4 +27,9 @@ public abstract class AExpander extends ACell {
 	 * @throws ExecutionException
 	 */
 	public abstract Context<Syntax> expand(ACell form, AExpander ex, Context<?> context);
+	
+	@Override
+	public byte getTag() {
+		return Tag.EXPANDER;
+	}
 }

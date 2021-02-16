@@ -378,5 +378,8 @@ public class List<T extends ACell> extends AList<T> {
 		return new List<T>(data.subVector(0, newLen));
 	}
 
-
+	@Override
+	public byte getTag() {
+		return Tag.LIST;
+	}
 }

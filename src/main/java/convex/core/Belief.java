@@ -596,7 +596,7 @@ public class Belief extends ARecord {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=getRecordTag();
+		bs[pos++]=getTag();
 		// generic record writeRaw, handles all fields in declared order
 		return encodeRaw(bs,pos);
 	}
@@ -615,7 +615,7 @@ public class Belief extends ARecord {
 	}
 
 	@Override
-	public byte getRecordTag() {
+	public byte getTag() {
 		return Tag.BELIEF;
 	}
 
@@ -655,5 +655,5 @@ public class Belief extends ARecord {
 	public long getTimestamp() {
 		return timestamp;
 	}
-
+	
 }

@@ -185,4 +185,8 @@ public class Invoke extends ATransaction {
 		return create(newAddress,sequence,command);
 	}
 
+	@Override
+	public byte getTag() {
+		return Tag.INVOKE;
+	}
 }

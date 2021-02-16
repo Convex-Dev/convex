@@ -472,21 +472,21 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * @return Array of updated Refs
 	 */
 	public static <T extends ACell> Ref<T>[] updateRefs(Ref<T>[] refs, IRefFunction func) {
-		Ref<T>[] newRefs = null;
+		Ref<T>[] newRefs = refs;
 		int n = refs.length;
 		for (int i = 0; i < n; i++) {
 			Ref<T> ref = refs[i];
 			@SuppressWarnings("unchecked")
 			Ref<T> newRef = (Ref<T>) func.apply(ref);
 			if (ref != newRef) {
-				if (newRefs == null) {
+				// Ensure newRefs is a new copy since we are making at least one change
+				if (newRefs == refs) {
 					newRefs = refs.clone();
 				}
 				newRefs[i] = newRef;
 			}
 		}
-		if (newRefs != null) return newRefs;
-		return refs;
+		return newRefs;
 	}
 
 	@SuppressWarnings("unchecked")

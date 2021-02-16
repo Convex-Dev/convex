@@ -2,6 +2,7 @@ package convex.core.lang;
 
 import convex.core.data.ACell;
 import convex.core.data.IRefFunction;
+import convex.core.data.Tag;
 
 /**
  * Base class for functions expressed as values
@@ -34,4 +35,9 @@ public abstract class AFn<T extends ACell> extends ACell implements IFn<T> {
 	 * Tests if this function supports the given arity.
 	 */
 	public abstract boolean hasArity(int n);
+	
+	@Override
+	public byte getTag() {
+		return Tag.FN;
+	}
 }

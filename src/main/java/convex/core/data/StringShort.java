@@ -143,4 +143,5 @@ public class StringShort extends AString {
 	protected void appendToStringBuffer(StringBuilder sb, int start, int length) {
 		sb.append(data.substring(start, start+length));
 	}
+	
 }

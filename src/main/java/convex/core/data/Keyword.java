@@ -169,6 +169,9 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		return true;
 	}
 
-
+	@Override
+	public byte getTag() {
+		return Tag.KEYWORD;
+	}
 
 }

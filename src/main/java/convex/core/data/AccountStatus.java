@@ -366,7 +366,7 @@ public class AccountStatus extends ARecord {
 	}
 
 	@Override
-	public byte getRecordTag() {
+	public byte getTag() {
 		return Tag.ACCOUNT_STATUS;
 	}
 
@@ -422,7 +422,5 @@ public class AccountStatus extends ARecord {
 	public AccountKey getAccountKey() {
 		return publicKey;
 	}
-
-
 
 }

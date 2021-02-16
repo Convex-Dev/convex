@@ -257,4 +257,9 @@ public class Order extends ACell {
 		AVector<Block> newBlocks = blocks.updateRefs(func);
 		return this.withBlocks(newBlocks);
 	}
+	
+	@Override
+	public byte getTag() {
+		return Tag.ORDER;
+	}
 }

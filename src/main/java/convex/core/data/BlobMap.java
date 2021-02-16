@@ -481,7 +481,9 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 
 		byte[] pbs = Format.readHexDigits(bb, depth, prefixLength);
 		Blob prefix = Blob.wrap(pbs);
-		MapEntry<K, V> me = Format.read(bb); // might be null
+		
+		// Get entry at this node, might be null
+		MapEntry<K, V> me = Format.read(bb); 
 
 		// single entry map
 		if (count == 1) return new BlobMap<K, V>(prefix, depth, prefixLength, me, EMPTY_CHILDREN, (short) 0, 1L);
@@ -611,6 +613,9 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		return bm;
 	}
 
-
+	@Override
+	public byte getTag() {
+		return Tag.BLOBMAP;
+	}
 
 }

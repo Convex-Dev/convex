@@ -756,5 +756,8 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return true;
 	}
 
-
+	@Override
+	public byte getTag() {
+		return Tag.MAP;
+	}
 }

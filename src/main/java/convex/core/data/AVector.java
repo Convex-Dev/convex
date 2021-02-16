@@ -273,4 +273,9 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	 */
 	// public abstract AVector<T> mergeWith(AVector<T> b, MergeFunction<T> func)
 	// ;
+	
+	@Override
+	public byte getTag() {
+		return Tag.VECTOR;
+	}
 }

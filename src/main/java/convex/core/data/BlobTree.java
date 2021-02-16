@@ -461,6 +461,9 @@ public class BlobTree extends ABlob {
 		return true;
 	}
 
-
+	@Override
+	public byte getTag() {
+		return Tag.BLOB;
+	}
 
 }

@@ -76,6 +76,9 @@ public final class CVMByte extends APrimitive {
 		return (double)value;
 	}
 
-
+	@Override
+	public byte getTag() {
+		return Tag.BYTE;
+	}
 
 }

@@ -170,7 +170,7 @@ public class PeerStatus extends ARecord {
 	}
 
 	@Override
-	public byte getRecordTag() {
+	public byte getTag() {
 		return Tag.PEER_STATUS;
 	}
 
@@ -193,5 +193,4 @@ public class PeerStatus extends ARecord {
 		long ds = stakes.reduceValues((acc, e)->acc+e.longValue(), 0L);
 		return ds;
 	}
-
 }

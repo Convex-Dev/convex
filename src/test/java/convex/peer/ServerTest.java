@@ -160,8 +160,8 @@ public class ServerTest {
 		// Connect to Peer Server using the current store for the client
 		SignedData<Belief> s=server.getPeer().getSignedBelief();
 		Hash h=s.getHash();
-		System.out.println("SignedBelief Hash="+h);
-		System.out.println("testAcquireBelief store="+Stores.current());
+		//System.out.println("SignedBelief Hash="+h);
+		//System.out.println("testAcquireBelief store="+Stores.current());
 		
 		Convex convex=Convex.connect(hostAddress, Init.HERO, Init.HERO_KP);
 		

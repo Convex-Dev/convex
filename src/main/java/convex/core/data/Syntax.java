@@ -307,6 +307,9 @@ public class Syntax extends ACell {
 		}
 	}
 
-
+	@Override
+	public byte getTag() {
+		return Tag.SYNTAX;
+	}
 
 }

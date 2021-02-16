@@ -350,5 +350,8 @@ public class Set<T extends ACell> extends ASet<T> {
 		return wrap(newMap);
 	}
 
-
+	@Override
+	public byte getTag() {
+		return Tag.SET;
+	}
 }
