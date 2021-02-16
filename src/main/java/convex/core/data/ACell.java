@@ -288,7 +288,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	public abstract int getRefCount();
 
 	/**
-	 * Gets the Ref for this Cell
+	 * Gets the Ref for this Cell, creating a new direct reference if necessary
 	 */
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Ref<R> getRef() {

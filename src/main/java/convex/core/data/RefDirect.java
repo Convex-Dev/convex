@@ -34,9 +34,9 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 	}
 
 	/**
-	 * Creates a direct ref to the given value
+	 * Creates a direct Ref to the given value
 	 * @param <T>
-	 * @param value
+	 * @param value Any value (may be embedded or otherwise)
 	 * @param hash Hash of value, or null if not known
 	 * @return
 	 */
