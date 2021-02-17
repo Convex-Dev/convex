@@ -95,7 +95,7 @@ public class ServerTest {
 		Connection pc = Connection.connect(hostAddress, handler, Stores.current());
 		AVector<CVMLong> v = Vectors.of(1l, 2l, 3l);
 		long id1 = pc.sendQuery(v,Init.HERO);
-		Utils.timeout(200, () -> results.get(id1) != null);
+		Utils.timeout(500, () -> results.get(id1) != null);
 		assertEquals(v, results.get(id1));
 	}
 	
@@ -166,7 +166,7 @@ public class ServerTest {
 		Convex convex=Convex.connect(hostAddress, Init.HERO, Init.HERO_KP);
 		
 		Future<SignedData<Belief>> acquiror=convex.acquire(h);
-		SignedData<Belief> ab=acquiror.get(500,TimeUnit.MILLISECONDS);
+		SignedData<Belief> ab=acquiror.get(2000,TimeUnit.MILLISECONDS);
 		assertTrue(ab.getValue() instanceof Belief);
 	}
 	

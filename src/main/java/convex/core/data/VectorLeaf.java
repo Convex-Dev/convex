@@ -287,6 +287,20 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 		// ref
 		return 1 + 9 + Format.MAX_EMBEDDED_LENGTH * items.length + ((count > 16) ? 33 : 00);
 	}
+	
+	@Override
+	public long getEncodingLength() {
+		if (encoding!=null) return encoding.length();
+		
+		// tag and count
+		long length=1+Format.getVLCLength(count);
+		int n = items.length;
+		if (prefix!=null) length+=prefix.getEncodingLength();
+		for (int i = 0; i < n; i++) {
+			length+=items[i].getEncodingLength();
+		}
+		return length;
+	}
 
 	/**
 	 * Returns true if this ListVector has a prefix AVector.
