@@ -1,7 +1,6 @@
 package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -131,14 +130,11 @@ public class GenTestAnyValue {
 		
 		// simulate retrieval via hash
 		Ref<ACell> dataRef2=Stores.current().refForHash(hash);
-		if (dataRef2==null) {
-			assertTrue(Format.isEmbedded(o),"Expected embedded value for "+o);
-		} else {
-			// should be in store if not embedded
-			assertFalse(Format.isEmbedded(o));
+		if (dataRef2!=null) {
+			// Have in store
 			assertEquals(dataRef,dataRef2);
 			Ref<ACell> r2=Ref.forHash(hash);
-			Object o3=r2.getValue();
+			ACell o3=r2.getValue();
 			assertEquals(o,o3);
 		}
 	}

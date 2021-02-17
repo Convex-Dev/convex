@@ -82,8 +82,8 @@ public class State extends ARecord {
 		super(FORMAT);
 		this.accounts = accounts;
 		this.peers = peers;
-		this.globals = globals;
 		this.store = store;
+		this.globals = globals;
 		this.schedule = schedule;
 	}
 

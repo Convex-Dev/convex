@@ -29,6 +29,21 @@ public class RestoreTest {
 
 	@Test 
 	public void restoreTest() throws IOException, InterruptedException, ExecutionException, TimeoutException {
+//		 {
+//		   System.out.println("Test store = "+Stores.current());
+//		   
+//		   State s=Init.STATE;
+//		   System.out.println("Init Ref = "+s.getRef());
+//		   
+//		   Ref<State> ref=Ref.forHash(s.getHash());
+//		   if (ref.isMissing()) { 
+//			   System.out.println("State not stored");
+//		   } else {
+//			   State s2=ref.getValue();
+//			   System.out.println("Store ref: "+s2.getRef());
+//		   } 
+//		}
+		
 		AKeyPair kp=Init.KEYPAIRS[0];
 		AStore store=EtchStore.createTemp();
 		Map<Keyword, Object> config = Maps.hashMapOf(

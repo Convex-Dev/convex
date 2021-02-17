@@ -49,9 +49,14 @@ public class StateTest {
 		// TODO: fix this
 		// s=s.store(Keywords.STATE);
 		// assertEquals(1,s.getStore().size());
+		
+		assertEquals(0,s.getRef().getStatus());
 
-		Ref<State> rs = s.getRef().persist();
+		Ref<State> rs = Ref.createPersisted(s);
 		assertEquals(Ref.PERSISTED, rs.getStatus());
+		
+		// Initial ref should not have changed status
+		assertEquals(0,s.getRef().getStatus());
 
 		Blob b = Format.encodedBlob(s);
 		State s2 = Format.read(b);

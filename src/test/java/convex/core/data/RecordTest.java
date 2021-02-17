@@ -3,9 +3,22 @@ package convex.core.data;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+import org.junit.jupiter.api.Test;
+
+import convex.core.Belief;
+import convex.core.Init;
 import convex.core.lang.impl.RecordFormat;
 
 public class RecordTest {
+	
+	@Test 
+	public void testBelief() {
+		Belief b=Belief.createSingleOrder(Init.FIRST_PEER_KP);
+		assertEquals(b.getRefCount(),b.getOrders().getRefCount());
+		
+		doRecordTests(b);
+		
+	}
 
 	public static void doRecordTests(ARecord r) {
 		
@@ -39,6 +52,11 @@ public class RecordTest {
 			MapEntry<Keyword,ACell> me=r.entryAt(i);
 			assertEquals(k,me.getKey());
 			assertEquals(v,me.getValue());
+		}
+		
+		int rc=r.getRefCount();
+		for (int i=0; i<rc; i++) {
+			r.getRef(i);
 		}
 		
 		assertSame(r,r.updateAll(r.getValuesArray()));

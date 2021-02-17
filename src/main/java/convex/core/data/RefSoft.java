@@ -49,7 +49,7 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 
 	@Override
 	protected RefSoft<T> withFlags(int newFlags) {
-		return new RefSoft<T>(softRef,hash,flags);
+		return new RefSoft<T>(softRef,hash,newFlags);
 	}
 
 	public static <T extends ACell> RefSoft<T> create(T value, int status) {
@@ -91,7 +91,7 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	}
 	
 	@Override
-	protected boolean isMissing() {
+	public boolean isMissing() {
 		T result = softRef.get();
 		if (result == null) {
 			Ref<T> storeRef = Stores.current().refForHash(hash);

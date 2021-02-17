@@ -146,8 +146,8 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		if (status > MAX_STATUS) {
 			throw new IllegalArgumentException("Ref status not recognised: " + newStatus);
 		}
-		flags=(flags&~STATUS_MASK)|newStatus;
-		return withFlags(flags);
+		int newFlags=(flags&(~STATUS_MASK))|newStatus;
+		return withFlags(newFlags);
 	}
 
 	/**
@@ -246,7 +246,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> Ref<T> get(T value) {
 		if (value==null) return (Ref<T>) NULL_VALUE;
-		return ((T)value).getRef();
+		return value.getRef();
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -674,6 +674,6 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * Returns true if this Ref refers to missing data, false otherwise
 	 * @return
 	 */
-	protected abstract boolean isMissing();
+	public abstract boolean isMissing();
 
 }

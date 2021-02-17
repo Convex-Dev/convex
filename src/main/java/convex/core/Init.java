@@ -76,6 +76,8 @@ public class Init {
 
 	public static AKeyPair[] KEYPAIRS = new AKeyPair[NUM_PEERS + NUM_USERS];
 
+	public static final AKeyPair FIRST_PEER_KP;
+
 	public static final AKeyPair HERO_KP;
 	public static final AKeyPair VILLAIN_KP;
 
@@ -152,7 +154,9 @@ public class Init {
 				accts = addAccount(accts, peerAddress, peerKey, peerFunds - stakedFunds);
 			}
 			
-			FIRST_PEER_KEY=KEYPAIRS[0].getAccountKey();
+			FIRST_PEER_KP=KEYPAIRS[0];
+			FIRST_PEER_KEY=FIRST_PEER_KP.getAccountKey();
+			
 			if (accts.count()!=FIRST_PEER.longValue()+NUM_PEERS) {
 				throw new Error("Unexpected number of accounts after adding peers: "+accts.count());
 			}

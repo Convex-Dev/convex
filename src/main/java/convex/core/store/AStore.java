@@ -22,7 +22,7 @@ public abstract class AStore {
 	 * Will store nested Refs if required.
 	 * 
 	 * Does not store embedded values. If it is necessary to persist an embedded value
-	 * deliberately in the sture, use storeTopRef(...) instead.
+	 * deliberately in the store, use storeTopRef(...) instead.
 	 * 
 	 * If the persisted Ref represents novelty (i.e. not previously stored) Will
 	 * call the provided noveltyHandler.
@@ -36,7 +36,9 @@ public abstract class AStore {
 	/**
 	 * Stores a top level @Ref in long term storage as defined by this store implementation.
 	 * 
-	 * Will store nested Refs if required.
+	 * Will store nested Refs if required. 
+	 * 
+	 * Will only store an embedded Ref if it is the top level item.
 	 * 
 	 * If the persisted Ref represents novelty (i.e. not previously stored) Will
 	 * call the provided noveltyHandler
@@ -71,7 +73,6 @@ public abstract class AStore {
 	/**
 	 * Sets the root hash for this Store
 	 * @param h
-	 * @return
 	 * @throws IOException 
 	 */
 	public abstract void setRootHash(Hash h) throws IOException;

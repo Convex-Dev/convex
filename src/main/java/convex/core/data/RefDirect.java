@@ -112,19 +112,15 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 		return isEmbedded()?value.estimatedEncodingSize():Ref.INDIRECT_ENCODING_LENGTH;
 	}
 
-
-
-
-
 	@Override
-	protected boolean isMissing() {
+	public boolean isMissing() {
 		// Never missing, since we have the value at hand
 		return false;
 	}
 
 	@Override
 	protected RefDirect<T> withFlags(int newFlags) {
-		return new RefDirect<T>(value,hash,flags);
+		return new RefDirect<T>(value,hash,newFlags);
 	}
 
 

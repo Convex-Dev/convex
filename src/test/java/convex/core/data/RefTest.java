@@ -55,8 +55,12 @@ public class RefTest {
 
 	@Test
 	public void testShallowPersist() {
-		Blob bb = Blob.createRandom(new Random(), 100); // unique blob too big to embed
+		Blob bb = Blob.createRandom(new Random(), 100); // unique blob but embedded
+		assertTrue(bb.isEmbedded());
+		
 		AVector<ACell> v = Vectors.of(bb,bb,bb,bb); // vector containing big blob four times. Shouldn't be embedded.
+		assertFalse(v.isEmbedded());
+		
 		Hash bh = bb.getHash();
 		Hash vh = v.getHash();
 		

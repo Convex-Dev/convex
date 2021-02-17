@@ -114,6 +114,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 
 	@Override
 	public boolean isCanonical() {
+		// TODO: rethink canonical definition
 		// only canonical if depth is zero (May have a prefix)
 		return depth == 0;
 	}
