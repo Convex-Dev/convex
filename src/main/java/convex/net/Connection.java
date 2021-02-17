@@ -223,6 +223,25 @@ public class Connection {
 		}
 
 	}
+	
+	/**
+	 * Sends a STATUS Request Message on this connection.
+	 * 
+	 * @return The ID of the message sent, or -1 if send buffer is full.
+	 * @throws IOException
+	 */
+	public long sendStatusRequest() throws IOException {
+		AStore temp=Stores.current();
+		try {
+			long id = ++idCounter;
+			CVMLong idPayload=CVMLong.create(id);
+			sendObject(MessageType.STATUS, idPayload);
+			return id;
+		} finally {
+			Stores.setCurrent(temp);
+		}
+
+	}
 
 	/**
 	 * Sends a transaction if possible, returning the message ID (greater than zero)
@@ -253,12 +272,12 @@ public class Connection {
 	/**
 	 * Sends a RESULT Message on this connection with no error code (i.e. a success)
 	 * 
-	 * @param result Any data object
+	 * @param value Any data object
 	 * @return True if buffered for sending successfully, false otherwise
 	 * @throws IOException
 	 */
-	public boolean sendResult(CVMLong id, ACell result) throws IOException {
-		return sendResult(id, result,null);
+	public boolean sendResult(CVMLong id, ACell value) throws IOException {
+		return sendResult(id, value,null);
 	}
 
 	/**
@@ -269,9 +288,9 @@ public class Connection {
 	 * @return True if buffered for sending successfully, false otherwise
 	 * @throws IOException
 	 */
-	public boolean sendResult(CVMLong id, ACell result, ACell errorCode) throws IOException {
-		Result value = Result.create(id, result, errorCode);
-		return sendObject(MessageType.RESULT, value);
+	public boolean sendResult(CVMLong id, ACell value, ACell errorCode) throws IOException {
+		Result result = Result.create(id, value, errorCode);
+		return sendObject(MessageType.RESULT, result);
 	}
 	
 	/**

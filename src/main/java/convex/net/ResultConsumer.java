@@ -26,7 +26,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	
 	private static final Level LEVEL_RESULT= Level.FINER;
 	private static final Level LEVEL_ERROR = Level.FINER;
-	private static final Level LEVEL_MISSING = Level.WARNING;
+	private static final Level LEVEL_MISSING = Level.INFO;
 		
 	@Override
 	public void accept(Message m) {

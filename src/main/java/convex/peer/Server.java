@@ -33,6 +33,7 @@ import convex.core.data.Keywords;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
@@ -284,7 +285,11 @@ public class Server implements Closeable {
 			case GOODBYE:
 				m.getPeerConnection().close();
 				break;
+			case STATUS:
+				processStatus(m);
+				break;
 			}
+			
 		} catch (MissingDataException e) {
 			Hash missingHash = e.getMissingHash();
 			log.log(LEVEL_PARTIAL, "Missing data: " + missingHash.toHexString() + " in message of type " + type);
@@ -528,6 +533,27 @@ public class Server implements Closeable {
 			// Shouldn't happen if Beliefs are already validated
 			// e.printStackTrace();
 			throw new Error("Invalid data in belief update!", e);
+		}
+	}
+	
+	private void processStatus(Message m) {
+		try {
+			// We can ignore payload
+
+			Connection pc = m.getPeerConnection();
+			log.info("Processing status request from: " + pc.getRemoteAddress());
+			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
+			// address);
+			
+			Peer peer=this.getPeer();
+			Hash beliefHash=peer.getSignedBelief().getHash();
+			Hash stateHash=peer.getStates().getHash();
+
+			AVector<ACell> reply=Vectors.of(beliefHash,stateHash);
+			
+			pc.sendResult(m.getID(), reply);
+		} catch (Throwable t) {
+			log.warning("Status Request Error: " + t);
 		}
 	}
 

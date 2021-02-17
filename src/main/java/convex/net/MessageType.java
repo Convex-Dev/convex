@@ -90,7 +90,14 @@ public enum MessageType {
 	/**
 	 * Communication of an intention to shutdown.
 	 */
-	GOODBYE(10)
+	GOODBYE(10),
+	
+	/**
+	 * Request for a peer status update.
+	 * 
+	 * Expected Result is a Vector: [belief-hash states-hash]
+	 */
+	STATUS(11)
 
 	;
 
@@ -122,6 +129,8 @@ public enum MessageType {
 			return BELIEF;
 		case 10:
 			return GOODBYE;
+		case 11:
+			return STATUS;
 		}
 		throw new BadFormatException("Invalid message code: " + i);
 	}

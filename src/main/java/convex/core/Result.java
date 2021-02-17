@@ -63,8 +63,9 @@ public class Result extends ARecordGeneric {
 	 * 
 	 * @return ID from this result
 	 */
-	public ACell getValue() {
-		return values.get(1);
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> T getValue() {
+		return (T)values.get(1);
 	}
 	
 	/**

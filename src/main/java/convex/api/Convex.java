@@ -383,7 +383,7 @@ public class Convex {
 			public void run() {
 				Stores.setCurrent(store); // use store for calling thread
 				try {
-					Ref<T> ref=Ref.forHash(hash);
+					Ref<T> ref=store.refForHash(hash);
 					HashSet<Hash> missingSet=new HashSet<>();
 					while (!f.isDone()) {
 						missingSet.clear();
@@ -408,7 +408,7 @@ public class Convex {
 							}
 						}
 						Thread.sleep(10);
-						ref=Ref.forHash(hash);
+						ref=store.refForHash(hash);
 						if (ref!=null) {
 							if (ref.getStatus()>=Ref.PERSISTED) {
 								// we have everything!
@@ -433,6 +433,31 @@ public class Convex {
 			}
 		}).start();
 		return f;
+	}
+	
+	/**
+	 * Submits a status to the Convex network peer,
+	 * returning a Future once the request 
+	 * has been successfully queued.
+	 * 
+	 * @param query Query to execute, as a Form or Op
+	 * @return A Future for the result of the query
+	 * @throws IOException If the connection is broken, or the send buffer is full
+	 */
+	public Future<Result> requestStatus() throws IOException {
+		CompletableFuture<Result> cf=new CompletableFuture<Result>();
+		
+		synchronized (awaiting) {
+			long id=connection.sendStatusRequest();
+			if (id<0) {
+				throw new IOException("Failed to send query due to full buffer");
+			}
+		
+			// Store future for completion by result message
+			awaiting.put(id,cf);
+		}
+		
+		return cf;
 	}
 	
 	/**

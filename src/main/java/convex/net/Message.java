@@ -84,7 +84,10 @@ public class Message {
 			
 			// Result is a special record type
 			case RESULT: return (CVMLong)((Result)payload).getID(); 
-			
+
+			// Status ID is the single value
+			case STATUS: return (CVMLong)(payload); 
+
 			default: return null;
 		}
 	}

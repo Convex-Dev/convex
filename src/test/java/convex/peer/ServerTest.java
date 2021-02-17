@@ -23,6 +23,7 @@ import convex.api.Convex;
 import convex.core.Belief;
 import convex.core.ErrorCodes;
 import convex.core.Init;
+import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Hash;
@@ -154,20 +155,27 @@ public class ServerTest {
 	
 	@Test
 	public void testAcquireBelief() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
-		
+		// Stores.setCurrent(Stores.getGlobalStore()); // not needed?
 		InetSocketAddress hostAddress=server.getHostAddress();
 		
 		// Connect to Peer Server using the current store for the client
-		SignedData<Belief> s=server.getPeer().getSignedBelief();
-		Hash h=s.getHash();
+		// SignedData<Belief> s=server.getPeer().getSignedBelief();
+		// Hash h=s.getHash();
 		//System.out.println("SignedBelief Hash="+h);
 		//System.out.println("testAcquireBelief store="+Stores.current());
 		
 		Convex convex=Convex.connect(hostAddress, Init.HERO, Init.HERO_KP);
 		
+		Future<Result> statusFuture=convex.requestStatus();
+		Result status=statusFuture.get(500,TimeUnit.MILLISECONDS);
+		assertFalse(status.isError());
+		AVector<?> v=status.getValue();
+		Hash h=(Hash)v.get(0);
+		
 		Future<SignedData<Belief>> acquiror=convex.acquire(h);
 		SignedData<Belief> ab=acquiror.get(2000,TimeUnit.MILLISECONDS);
 		assertTrue(ab.getValue() instanceof Belief);
+		assertEquals(h,ab.getHash());
 	}
 	
 	@Test

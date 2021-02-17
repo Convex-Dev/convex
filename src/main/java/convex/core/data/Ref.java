@@ -567,7 +567,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Ref<R> persistShallow(Consumer<Ref<ACell>> noveltyHandler) {
 		AStore store=Stores.current();
-		return (Ref<R>) store.storeRef((Ref<ACell>)this, Ref.STORED, noveltyHandler);
+		return (Ref<R>) store.storeTopRef((Ref<ACell>)this, Ref.STORED, noveltyHandler);
 	}
 
 	/**
