@@ -13,9 +13,8 @@
   ;;   import with (import <address of trust> :as trust)
   ;;
   ;; Key usage:
-  ;;   (trust/trusted? trust-store address)                        ;; Checks if subject is trusted
-
-  (call *registry* (register {:name "Trust Library"}))
+  ;;   (trust/trusted? trust-store address)                        
+  ;; Checks if subject is trusted
   
   ;; save current actor address, we will want it later to give to new actors
   (def trust *address*)

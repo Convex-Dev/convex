@@ -72,8 +72,6 @@ public class TestTrust {
 
 		// check alias is set up correctly
 		assertEquals(trusted, eval(ctx, "(get *aliases* 'trust)"));
-
-		assertEquals("Trust Library", eval(ctx,"(:name (call *registry* (lookup " + trusted + ")))").toString());
 	}
 
 	@Test

@@ -67,8 +67,8 @@ public class Init {
 
 
 	// Addresses for initial Actors
-	public static final Address REGISTRY_ADDRESS; // 19
-	public static final Address TRUST_ADDRESS; // 20
+	public static final Address TRUST_ADDRESS; // 19
+	public static final Address REGISTRY_ADDRESS; // 20
 	public static final Address ORACLE_ADDRESS; // 21
 	public static final Address FUNGIBLE_ADDRESS; // 22 
 	public static final Address ASSET_ADDRESS; // 23
@@ -173,6 +173,14 @@ public class Init {
 
 			// At this point we have a raw initial state with accounts
 			
+			{ // Deploy Trust library 
+				Context<?> ctx = Context.createFake(s, INIT);
+				ACell form=Reader.readResource("libraries/trust.con");
+				ctx = ctx.deployActor(form);
+				TRUST_ADDRESS=(Address) ctx.getResult();;
+				s = ctx.getState();
+			}
+			
 			{ // Deploy Registry Actor to fixed Address
 				Context<Address> ctx = Context.createFake(s, INIT);
 				ACell form=Reader.readResource("actors/registry.con");
@@ -185,20 +193,12 @@ public class Init {
 			{ // Register core libraries now that registry exists
 				Context<?> ctx = Context.createFake(s, INIT);
 				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'convex.core "+CORE_ADDRESS+"))"));
+				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'convex.trust "+TRUST_ADDRESS+"))"));
+				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'convex.registry "+REGISTRY_ADDRESS+"))"));
 				s=ctx.getState();
 				s = register(s,CORE_ADDRESS,"Convex Core Library");
+				s = register(s,TRUST_ADDRESS,"Trust Monitor Library");
 				s = register(s,MEMORY_EXCHANGE,"Memory Exchange Pool");
-			}
-			
-			{ // Deploy Trust library and register with CNS
-				Context<?> ctx = Context.createFake(s, INIT);
-				ACell form=Reader.readResource("libraries/trust.con");
-				ctx = ctx.deployActor(form);
-				Address addr=(Address) ctx.getResult();
-				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'convex.trust "+addr+"))"));
-				TRUST_ADDRESS=addr;
-				// Note the Registry registers itself upon creation
-				s = ctx.getState();
 			}
 			
 			{ // Deploy Fungible library and register with CNS
