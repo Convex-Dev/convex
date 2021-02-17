@@ -14,7 +14,7 @@ public class MessageTest {
 	@Test
 	public void testTypes() throws BadFormatException {
 		MessageType[] types = MessageType.values();
-		assertEquals(10, types.length);
+		assertEquals(11, types.length);
 
 		for (MessageType t : types) {
 			assertSame(t, MessageType.decode(t.getMessageCode()));
