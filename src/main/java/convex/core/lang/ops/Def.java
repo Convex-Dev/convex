@@ -61,7 +61,7 @@ public class Def<T extends ACell> extends AOp<T> {
 		T opResult = ctx.getResult();
 
 		// TODO: defined syntax metadata
-		ctx = ctx.define(symbol.getValue(), Syntax.create(opResult).withMeta(symbol.getMeta()));
+		ctx = ctx.define(symbol.getValue(), Syntax.create(opResult,symbol.getMeta()));
 		return ctx.withResult(Juice.DEF, opResult);
 	}
 
