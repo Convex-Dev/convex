@@ -18,7 +18,7 @@ public class Constants {
 
 	public static final double PROPOSAL_THRESHOLD = 0.50;
 
-	public static final double CONSENSUS_THRESHOLD = 0.70;
+	public static final double CONSENSUS_THRESHOLD = 0.67;
 
 	public static final long INITIAL_TIMESTAMP = Instant.parse("2020-02-02T00:20:20.0202Z").toEpochMilli();
 
