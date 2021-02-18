@@ -968,4 +968,8 @@ public class Format {
 		return cell.estimatedEncodingSize();
 	}
 
+	static boolean canEncodeUFT8(CharSequence s) {
+		return UTF8_ENCODERS.get().canEncode(s);
+	}
+
 }

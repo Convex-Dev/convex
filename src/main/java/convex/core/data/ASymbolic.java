@@ -36,7 +36,7 @@ public abstract class ASymbolic extends ACell {
 		if ((n < 1) || (n > (Constants.MAX_NAME_LENGTH))) {
 			return false;
 		}
-		if (Format.UTF8_ENCODERS.get().canEncode(name2)) return true;
+		if (Format.canEncodeUFT8(name2)) return true;
 		
 		// can't encode, so not a valid name
 		return false;

@@ -62,7 +62,12 @@ public class Constants {
 	public static final AHashMap<Symbol, ACell> INITIAL_GLOBALS = Maps.of(Symbols.TIMESTAMP,
 			Constants.INITIAL_TIMESTAMP, Symbols.FEES, 0L, Symbols.JUICE_PRICE, Constants.INITIAL_JUICE_PRICE);
 
-	public static final int MAX_NAME_LENGTH = 64;
+	/**
+	 * Maximum length of a symbolic name in characters (keywords and symbols)
+	 * 
+	 * Note: Chosen so that small qualified symbolic values are always embedded
+	 */
+	public static final int MAX_NAME_LENGTH = 32;
 
 
 }
