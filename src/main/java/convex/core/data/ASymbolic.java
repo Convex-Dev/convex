@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import convex.core.Constants;
 import convex.core.exceptions.InvalidDataException;
 
 /**
@@ -8,8 +9,6 @@ import convex.core.exceptions.InvalidDataException;
 public abstract class ASymbolic extends ACell {
 
 	protected final AString name;
-
-	public static final int MAX_LENGTH = 32;
 
 	protected ASymbolic(AString name) {
 		this.name = name;
@@ -34,7 +33,7 @@ public abstract class ASymbolic extends ACell {
 	protected static boolean validateName(CharSequence name2) {
 		if (name2 == null) return false;
 		int n = name2.length();
-		if ((n < 1) || (n > (MAX_LENGTH))) {
+		if ((n < 1) || (n > (Constants.MAX_NAME_LENGTH))) {
 			return false;
 		}
 		if (Format.UTF8_ENCODERS.get().canEncode(name2)) return true;

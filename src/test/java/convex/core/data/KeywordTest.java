@@ -9,6 +9,7 @@ import java.nio.ByteBuffer;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
 import convex.core.util.Text;
 import convex.test.Samples;
@@ -17,15 +18,15 @@ public class KeywordTest {
 
 	@Test
 	public void testBadKeywords() {
-		assertNotNull(Keyword.create(Text.whiteSpace(32)));
+		assertNotNull(Keyword.create(Text.whiteSpace(Constants.MAX_NAME_LENGTH)));
 
 		// null return for invalid names
-		assertNull(Keyword.create(Text.whiteSpace(33)));
+		assertNull(Keyword.create(Text.whiteSpace(Constants.MAX_NAME_LENGTH+1)));
 		assertNull(Keyword.create(""));
 		assertNull(Keyword.create((String)null));
 
 		// exception for invalid names using createChecked
-		assertThrows(IllegalArgumentException.class, () -> Keyword.createChecked(Text.whiteSpace(33)));
+		assertThrows(IllegalArgumentException.class, () -> Keyword.createChecked(Text.whiteSpace(Constants.MAX_NAME_LENGTH+1)));
 		assertThrows(IllegalArgumentException.class, () -> Keyword.createChecked(""));
 		assertThrows(IllegalArgumentException.class, () -> Keyword.createChecked((AString)null));
 		assertThrows(IllegalArgumentException.class, () -> Keyword.createChecked((String)null));

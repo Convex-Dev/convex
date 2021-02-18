@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.Symbols;
 import convex.core.util.Text;
@@ -15,9 +16,9 @@ public class SymbolTest {
 
 	@Test
 	public void testBadSymbols() {
-		assertNotNull(Symbol.create(Text.whiteSpace(32)));
+		assertNotNull(Symbol.create(Text.whiteSpace(Constants.MAX_NAME_LENGTH)));
 
-		assertNull(Symbol.create(Text.whiteSpace(33)));
+		assertNull(Symbol.create(Text.whiteSpace(Constants.MAX_NAME_LENGTH+1)));
 		assertNull(Symbol.create(""));
 		assertNull(Symbol.create((String)null));
 	}
