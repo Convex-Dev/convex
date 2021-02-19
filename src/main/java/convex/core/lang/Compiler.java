@@ -514,7 +514,7 @@ public class Compiler {
 		Syntax symbolSyntax = list.get(1);
 
 		{// check we are actually defining a symbol
-			Object so = symbolSyntax.getValue();
+			ACell so = symbolSyntax.getValue();
 			if (!(so instanceof Symbol)) return context.withCompileError("def requires a symbol as first argument but got: " + so);
 		}
 		
