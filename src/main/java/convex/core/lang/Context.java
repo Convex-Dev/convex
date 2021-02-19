@@ -1230,10 +1230,10 @@ public final class Context<T extends ACell> extends AObject {
 //	}
 	
 	/**
-	 * Changes the depth of this context. Returns excepional result if depth limit exceeded.
+	 * Changes the depth of this context. Returns exceptional result if depth limit exceeded.
 	 * @param <R>
 	 * @param newDepth
-	 * @return
+	 * @return Updated context with new depth set
 	 */
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> withDepth(int newDepth) {
