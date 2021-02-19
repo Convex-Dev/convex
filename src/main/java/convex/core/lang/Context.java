@@ -74,10 +74,10 @@ public final class Context<T extends ACell> extends AObject {
 	 */
 	
 	private long juice;
-	private Object result;
+	private T result;
+	private AExceptional exception;
 	private int depth;
 	private AHashMap<Symbol, ACell> localBindings;	
-	private boolean isExceptional;
 	private ChainState chainState;
 	
 	/**
@@ -158,18 +158,19 @@ public final class Context<T extends ACell> extends AObject {
 		}
 	}
 
-	private Context(ChainState chainState, long juice, AHashMap<Symbol, ACell> localBindings2, Object result,int depth, boolean isExceptional) {
+	private Context(ChainState chainState, long juice, AHashMap<Symbol, ACell> localBindings2, T result,int depth, AExceptional exception) {
 		this.chainState=chainState;
 		this.juice=juice;
 		this.localBindings=localBindings2;
 		this.result=result;
 		this.depth=depth;
-		this.isExceptional=isExceptional;
+		this.exception=exception;
 	}
 	
-	private static <T extends ACell> Context<T> create(ChainState cs, long juice, AHashMap<Symbol, ACell> localBindings, Object result, int depth) {
+	@SuppressWarnings("unchecked")
+	private static <T extends ACell> Context<T> create(ChainState cs, long juice, AHashMap<Symbol, ACell> localBindings, ACell result, int depth) {
 		if (juice<0) throw new IllegalArgumentException("Negative juice! "+juice);
-		return new Context<T>(cs,juice,localBindings,result,depth,(result instanceof AExceptional));
+		return new Context<T>(cs,juice,localBindings,(T)result,depth,null);
 	}
 	
 	private static <T extends ACell> Context<T> create(State state, long juice,AHashMap<Symbol, ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer) {
@@ -631,10 +632,9 @@ public final class Context<T extends ACell> extends AObject {
 	 * 
 	 * @return Result value from this Context.
 	 */
-	@SuppressWarnings("unchecked")
 	public T getResult() {
-		if (isExceptional) {
-			throw new Error("Can't get result with exceptional value: "+result);
+		if (exception!=null) {
+			throw new Error("Can't get result with exceptional value: "+exception);
 		}
 		return (T) result;
 	}
@@ -644,6 +644,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return Either the normal result, or an AExceptional instance
 	 */
 	public Object getValue() {
+		if (exception!=null) return exception;
 		return result;
 	}
 	
@@ -652,8 +653,8 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return an AExceptional instance
 	 */
 	public AExceptional getExceptional() {
-		if (!isExceptional) throw new Error("Can't get exceptional value for context with result: "+result);
-		return (AExceptional) result;
+		if (exception==null) throw new Error("Can't get exceptional value for context with result: "+exception);
+		return exception;
 	}
 
 	/**
@@ -668,14 +669,25 @@ public final class Context<T extends ACell> extends AObject {
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> withResult(R value) {
 		result=(T)value;
-		isExceptional=false;
+		exception=null;
 		return (Context<R>) this;
 	}
 	
+	/**
+	 * Updates this context with a given value, which may either be a normal result or exceptional value
+	 * @param <R>
+	 * @param value
+	 * @return Context updated with the specified result value.
+	 */
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> withValue(Object value) {
-		result=value;
-		isExceptional=(value instanceof AExceptional);
+		if (value instanceof AExceptional) {
+			exception=(AExceptional)value;
+			result=null;
+		} else {
+			result = (T)value;
+			exception=null;
+		}
 		return (Context<R>) this;
 	}
 	
@@ -702,8 +714,8 @@ public final class Context<T extends ACell> extends AObject {
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> withException(AExceptional exception) {
 		//return (Context<R>) new Context<AExceptional>(chainState,juice,localBindings,exception,depth,true);
-		this.isExceptional=true;
-		this.result=exception;
+		this.exception=exception;
+		this.result=null;
 		return (Context<R>) this;
 	}
 	
@@ -751,7 +763,7 @@ public final class Context<T extends ACell> extends AObject {
 		// execute op with adjusted depth
 		int savedDepth=getDepth();
 		Context<AOp<R>> ctx =this.withDepth(savedDepth+1);
-		if (ctx.isExceptional) return (Context<R>) ctx; // depth error, won't have modified depth
+		if (ctx.isExceptional()) return (Context<R>) ctx; // depth error, won't have modified depth
 		
 		Context<R> rctx=op.execute(ctx);
 		
@@ -1007,7 +1019,7 @@ public final class Context<T extends ACell> extends AObject {
 		// run compiler with adjusted depth
 		int saveDepth=getDepth();
 		Context<AOp<R>> rctx =this.withDepth(saveDepth+1);
-		if (rctx.isExceptional) return rctx; // depth error, won't have modified depth
+		if (rctx.isExceptional()) return rctx; // depth error, won't have modified depth
 		
 		// EXPAND AND COMPILE
 		rctx = Compiler.expandCompile(form, rctx);
@@ -1043,7 +1055,7 @@ public final class Context<T extends ACell> extends AObject {
 			}
 		} 
 		
-		// restore depth nd return
+		// restore depth and return
 		rctx=rctx.withDepth(saveDepth);		
 		return rctx;
 	}
@@ -1059,7 +1071,7 @@ public final class Context<T extends ACell> extends AObject {
 		// run expansion phase with adjusted depth
 		int saveDepth=getDepth();
 		Context<Syntax> rctx =this.withDepth(saveDepth+1);
-		if (rctx.isExceptional) return rctx; // depth error, won't have modified depth
+		if (rctx.isExceptional()) return rctx; // depth error, won't have modified depth
 		
 		AExpander ex = Core.INITIAL_EXPANDER;
 		rctx = rctx.expand(form,ex,ex);
@@ -1079,7 +1091,7 @@ public final class Context<T extends ACell> extends AObject {
 		// Adjusted depth
 		int saveDepth=getDepth();
 		Context<Syntax> rctx =this.withDepth(saveDepth+1);
-		if (rctx.isExceptional) return rctx; // depth error, won't have modified depth
+		if (rctx.isExceptional()) return rctx; // depth error, won't have modified depth
 		
 		// EXPAND
 		rctx = expander.expand(form, cont, rctx);
@@ -1244,7 +1256,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return true if context has an exceptional value, false otherwise
 	 */
 	public boolean isExceptional() {
-		return isExceptional;
+		return exception!=null;
 	}
 
 	/**
@@ -1474,10 +1486,10 @@ public final class Context<T extends ACell> extends AObject {
 	@SuppressWarnings("unchecked")
 	private <R extends ACell> Context<R> handleStateResults(Context<R> returnContext, boolean rollback) {
 		/** Return value */
-		Object rv=returnContext.getValue();
-		if (rv instanceof AExceptional) {
+		Object rv;
+		if (returnContext.isExceptional()) {
 			// SECURITY: need to handle exceptional states correctly
-			AExceptional ex=(AExceptional) rv;
+			AExceptional ex=returnContext.getExceptional();
 			if (ex instanceof RollbackValue) {
 				// roll back state to before Actor call
 				// Note: this will also refund unused offer.
@@ -1488,6 +1500,7 @@ public final class Context<T extends ACell> extends AObject {
 			} else if (ex instanceof ErrorValue) {
 				// OK to pass through error, but need to roll back state changes
 				rollback=true;
+				rv=ex;
 			} else if (ex instanceof ReturnValue) {
 				// Normally doesn't happen (invoke catches this)
 				// but might in a user transaction. Treat as a Halt. 
@@ -1496,6 +1509,8 @@ public final class Context<T extends ACell> extends AObject {
 				rollback=true;
 				rv=ErrorValue.create(ErrorCodes.UNEXPECTED, "Unexpected actor return of type:"+Utils.getClassName(ex));
 			}
+		} else {
+			rv=returnContext.getResult();
 		}
 		
 		final Address address=getAddress(); // address we are returning to
@@ -1609,9 +1624,9 @@ public final class Context<T extends ACell> extends AObject {
 	 * 
 	 * @return The ErrorType of the current exceptional value, or null if there is no error.
 	 */
-	public Object getErrorCode() {
-		if (isExceptional) {
-			return ((AExceptional)result).getCode();
+	public ACell getErrorCode() {
+		if (exception!=null) {
+			return exception.getCode();
 		}
 		return null;
 	}
@@ -1754,8 +1769,9 @@ public final class Context<T extends ACell> extends AObject {
 	 * @param <R> Result type of new Context
 	 * @return A new forked Context
 	 */
+	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> fork() {
-		return new Context<R>(chainState, juice, localBindings, result,depth, isExceptional);
+		return new Context<R>(chainState, juice, localBindings, (R)result,depth, exception);
 	}
 
 	@Override

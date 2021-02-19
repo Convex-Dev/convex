@@ -300,7 +300,7 @@ public class State extends ARecord {
 				if (ctx.isExceptional()) {
 					// TODO: what to do here? probably ignore
 					// we maybe need to think about reporting scheduled results?
-					log.log(LEVEL_SCHEDULE,"Scheduled transaction error: " + ctx.getValue());
+					log.log(LEVEL_SCHEDULE,"Scheduled transaction error: " + ctx.getExceptional());
 				} else {
 					state = ctx.getState();
 					log.log(LEVEL_SCHEDULE,"Scheduled transaction succeeded");
