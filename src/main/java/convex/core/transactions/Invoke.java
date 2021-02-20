@@ -13,7 +13,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
-import convex.core.lang.RT;
+import convex.core.lang.Reader;
 import convex.core.lang.impl.AExceptional;
 import convex.core.lang.impl.HaltValue;
 import convex.core.lang.impl.ReturnValue;
@@ -44,8 +44,15 @@ public class Invoke extends ATransaction {
 		return new Invoke(address,nonce, command);
 	}
 	
-	public static Invoke create(Address address,long nonce, Object command) {
-		return create(address,nonce, RT.cvm(command));
+	/**
+	 * Creates an Invoke transaction
+	 * @param address
+	 * @param nonce
+	 * @param command Command as a string, which will be read as Convex Lisp code
+	 * @return New Invoke transaction instance
+	 */
+	public static Invoke create(Address address,long nonce, String command) {
+		return create(address,nonce, Reader.read(command));
 	}
 
 	@Override

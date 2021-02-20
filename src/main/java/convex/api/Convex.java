@@ -30,6 +30,8 @@ import convex.core.lang.ops.Lookup;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
+import convex.core.transactions.Invoke;
+import convex.core.transactions.Transfer;
 import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.net.Message;
@@ -57,7 +59,7 @@ public class Convex {
 	/**
 	 * Key pair for this Client
 	 */
-	protected final AKeyPair keyPair;
+	protected AKeyPair keyPair;
 	
 	/**
 	 * Current address for this Client
@@ -140,8 +142,20 @@ public class Convex {
 	 * Sets the Address for this connection. This will be used by default for subsequent transactions and queries
 	 * @param address Address to use 
 	 */
-	public void setAddress(Address address) {
+	public synchronized void setAddress(Address address) {
+		if (this.address==address) return;
 		this.address=address;
+		// clear sequence, since we don't know the new account sequence number yet
+		sequence=null;
+	}
+	
+	public synchronized void setAddress(Address addr, AKeyPair kp) {
+		setAddress(addr);
+		setKeyPair(kp);
+	}
+	
+	public synchronized void setKeyPair(AKeyPair kp) {
+		this.keyPair=kp;
 	}
 
 	/**
@@ -206,6 +220,21 @@ public class Convex {
 	public InetSocketAddress getRemoteAddress() {
 		return connection.getRemoteAddress();
 	}
+	
+	/**
+	 * Creates a new account with the gievn public key
+	 * @param publicKey Public key to set for the new account
+	 * @return Address of account created
+	 * @throws TimeoutException
+	 * @throws IOException
+	 */
+	public synchronized Address createAccount(AccountKey publicKey) throws TimeoutException, IOException {
+		Invoke trans=Invoke.create(address, 0, "(create-account 0x"+publicKey.toHexString()+")");
+		Result r=transactSync(trans);
+		if (r.isError()) throw new Error("Error creating account: "+r);
+		return (Address)r.getValue();
+	}
+
 	
 	/**
 	 * Checks if this Convex client instance has an open connection.
@@ -280,6 +309,34 @@ public class Convex {
 		}
 		
 		return cf;
+	}
+	
+	/**
+	 * Submits a transfer transaction to the Convex network, returning a future once the transaction 
+	 * has been successfully queued.
+	 * 
+	 * @param target Destination address for transfer
+	 * @param amount Amount of Convex Coins to transfer
+	 * @return A Future for the result of the transaction
+	 * @throws IOException If the connection is broken, or the send buffer is full
+	 */	
+	public CompletableFuture<Result> transfer(Address target, long amount) throws IOException {
+		ATransaction trans=Transfer.create(getAddress(), 0, target, amount);
+		return transact(trans);
+	}
+	
+	/**
+	 * Submits a transfer transaction to the Convex network peer, and waits for confirmation of the result
+	 * 
+	 * @param target Destination address for transfer
+	 * @param amount Amount of Convex Coins to transfer
+	 * @return Result of the transaction
+	 * @throws IOException If the connection is broken, or the send buffer is full
+	 * @throws TimeoutException If the transaction times out
+	 */	
+	public Result transferSynce(Address target, long amount) throws IOException, TimeoutException {
+		ATransaction trans=Transfer.create(getAddress(), 0, target, amount);
+		return transactSync(trans);
 	}
 
 	/**
@@ -597,6 +654,8 @@ public class Convex {
 			throw new IOException("Unable to query balance",ex);
 		}
 	}
+
+
 
 
 

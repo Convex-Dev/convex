@@ -224,23 +224,23 @@
       ]))
   
    (defn buy-cvx [token amt] 
-     (let [market (or (get-market token) (fail (str "Torus: market does not exist for token: " token)))]
+     (let [market (or (get-market token) (fail :LIQUIDITY (str "Torus: market does not exist for token: " token)))]
        ;; Note we can offer all tokens, market will accept what it needs to complete order
        (asset/offer market [token (fungible/balance token *address*)]) 
        (call market *balance* (buy-cvx amt))))
     
     (defn sell-cvx [token amt] 
-      (let [market (or (get-market token) (fail (str "Torus: market does not exist for token: " token)))]
+      (let [market (or (get-market token) (fail :LIQUIDITY (str "Torus: market does not exist for token: " token)))]
         ;; offer the amount of CVX being sold
         (call market amt (sell-cvx amt))))
   
     (defn buy-tokens [token amt ] 
-      (let [market (or (get-market token) (fail (str "Torus: market does not exist for token: " token)))]
+      (let [market (or (get-market token) (fail :LIQUIDITY (str "Torus: market does not exist for token: " token)))]
         ;; Note we can offer all CVX
         (call market *balance* (buy-tokens amt))))
     
     (defn sell-tokens [token amt ] 
-      (let [market (or (get-market token) (fail (str "Torus: market does not exist for token: " token)))]
+      (let [market (or (get-market token) (fail :LIQUIDITY (str "Torus: market does not exist for token: " token)))]
         ;; offer the amount of tokens being sold
         (asset/offer market [token amt]) 
         (call market (sell-tokens amt))))
@@ -251,7 +251,7 @@
     
     (defn buy [of-token amt with-token]
       (let [market (or (get-market of-token) (fail (str "Torus: market does not exist for token: " of-token)))
-            cvx-amt (call market (buy-tokens-quote amt))
+            cvx-amt (or (call market (buy-tokens-quote amt)) (fail :LIQUIDITY "No liquidity available to buy token"))
             sold (buy-cvx with-token cvx-amt)]
         (buy-tokens of-token amt)
         sold))

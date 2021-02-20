@@ -433,7 +433,7 @@ public class State extends ARecord {
 		long sequence=t.getSequence();
 		AccountStatus newAccount = account.updateSequence(sequence);
 		if (newAccount == null) {
-			return Context.createFake(this,origin).withError(ErrorCodes.SEQUENCE, "Last = "+Long.toString(account.getSequence()));
+			return Context.createFake(this,origin).withError(ErrorCodes.SEQUENCE, "Received = "+sequence+" & Expected = "+(account.getSequence()+1));
 		}
 		State preparedState = this.putAccount(origin, newAccount);
 		
