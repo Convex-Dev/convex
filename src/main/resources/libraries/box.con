@@ -58,7 +58,8 @@
           ]
       (def ownership (assoc ownership 
                              sender new-sender-balance
-                             receiver new-receiver-balance))))
+                             receiver new-receiver-balance))
+      quantity))
   
   ;; Create a new box, with a fresh ID
   (defn create-box []
@@ -83,7 +84,7 @@
       :OK))
   
   (defn balance [owner]
-    (get ownership owner))
+    (or (get ownership owner) #{}))
   
   (defn owns? [owner boxes]
     (subset? boxes (get ownership owner)))
