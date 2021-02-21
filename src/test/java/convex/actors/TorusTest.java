@@ -9,10 +9,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Init;
 import convex.core.data.Address;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
-import convex.core.lang.Reader;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
 import convex.lib.TestFungible;
@@ -29,6 +29,8 @@ public class TorusTest {
 		try {
 			Context<?> ctx=INITIAL;
 			ctx=step(ctx,"(import convex.fungible :as fun)");
+			assertEquals(Init.FUNGIBLE_ADDRESS,ctx.getResult());
+			
 			ctx=step(ctx,"(import convex.asset :as asset)");
 			
 			// Deploy currencies for testing (10m each, 2 decimal places)
@@ -40,12 +42,10 @@ public class TorusTest {
 			
 			// Deploy Torus actor itself
 			ctx=ctx.withJuice(INITIAL_JUICE);
-			ctx= ctx.deployActor(Reader.readResource("actors/torus.con"));
-			assertNotError(ctx);
+
+			ctx= step(ctx,"(def TORUS (import torus.exchange :as torus))");
 			TORUS=(Address)ctx.getResult();
 			assertNotNull(ctx.getAccountStatus(TORUS));
-			ctx= step(ctx,"(def TORUS "+TORUS+")");
-			ctx= step(ctx,"(import "+TORUS+" :as torus)");
 			//System.out.println("Torus deployed Address = "+TORUS);
 			
 			// Deploy USD market. No market for GBP yet!
@@ -70,6 +70,10 @@ public class TorusTest {
 		ctx= step(ctx,"(def USDM (call TORUS (get-market USD)))");
 		assertEquals(USD_MARKET,ctx.getResult());
 		
+		// Prices should be null with no markets
+		assertNull(eval(ctx,"(torus/price USD)"));
+		assertNull(eval(ctx,"(torus/price GBP)"));
+		
 		// ============================================================
 		// FIRST TEST: Initial deposit of $100k USD liquidity, £50k GBP liquidity
 		// Deposit some liquidity $100,000 for 1000 Gold = $100 price = 100000 CVX / US Cent
@@ -93,6 +97,8 @@ public class TorusTest {
 		assertEquals(50,evalL(ctx,"(torus/buy USD 100 GBP)"));
 		assertEquals(200,evalL(ctx,"(torus/buy GBP 100 USD)"));
 
+		// Trade too big
+		assertError(step(ctx,"(torus/buy USD 10000000)"));
 	}
 	
 	@Test public void testInitialTokenMarket() {

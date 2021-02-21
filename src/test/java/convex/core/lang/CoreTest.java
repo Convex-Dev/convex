@@ -1320,10 +1320,13 @@ public class CoreTest {
 	
 	@Test
 	public void testImport() {
-		Context<?> ctx = step("(def lib (deploy '(do (def foo 100))))");
+		Context<Address> ctx = step("(def lib (deploy '(do (def foo 100))))");
+		Address libAddress=ctx.getResult();
 		
 		{ // tests with a typical import
 			Context<?> ctx2=step(ctx,"(import ~lib :as mylib)");
+			assertEquals(libAddress,ctx2.getResult());
+			
 			assertEquals(100L, evalL(ctx2, "mylib/foo"));
 			assertUndeclaredError(step(ctx2, "mylib/bar"));
 			assertTrue(evalB(ctx2,"(syntax? (lookup-syntax 'mylib/foo))"));

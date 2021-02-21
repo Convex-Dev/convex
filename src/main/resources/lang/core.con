@@ -220,7 +220,7 @@
     '(undef* (quote ~sym)))
 
 (defmacro import
-  ^{:doc {:description "Import a library for use in the current environment. Creates an alias to the library so that symbols defined in the library can be addressed directly in the form 'alias/symbol-name'."
+  ^{:doc {:description "Import a library for use in the current environment. Creates an alias to the library so that symbols defined in the library can be addressed directly in the form 'alias/symbol-name'. Returns the Address of the imported account."
           :examples [{:code "(import some.library :as alias)"}]
           :type :macro
           :signature [{:params [& args]}]}}
@@ -230,14 +230,15 @@
                (or (symbol? addr) (keyword? addr)) 
                   (or (call* *registry* 0 'cns-resolve addr) 
                       (fail :NOBODY (str "Could not resolve library name for import: " addr)))
-               '(address ~addr))
+               addr)
         sym (unsyntax sym)
         sym (cond (symbol? sym) sym
                   (= :default sym) nil
                   (fail "import: alias must be a symbol or :default"))] 
     (assert (= :as (unsyntax as)))
-    '(def *aliases*
-       (assoc *aliases* (quote ~sym) ~addr))))
+    '(let [addr (address ~addr)] 
+       (def *aliases* (assoc *aliases* (quote ~sym) addr))
+       addr)))
 
 
 (defmacro actor
