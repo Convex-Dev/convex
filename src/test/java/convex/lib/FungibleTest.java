@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.crypto.AKeyPair;
 import convex.core.data.AMap;
 import convex.core.data.Address;
 import convex.core.data.Symbol;
@@ -23,6 +24,9 @@ import static convex.test.Assertions.*;
 
 public class FungibleTest {
 	private static final Symbol fSym=Symbol.create("fun-actor");
+	
+	static final AKeyPair TEST_KP=AKeyPair.generate();
+
 	
 	private static Context<?> loadFungible() {
 		Context<?> ctx=TestState.INITIAL_CONTEXT.fork();
@@ -213,5 +217,16 @@ public class FungibleTest {
 		ctx=step(ctx,"(asset/transfer *address* [token nil])");
 		assertEquals(0L,(long)RT.jvm(ctx.getResult()));
 		assertEquals(BAL, evalL(ctx,"(asset/balance token *address*)"));
+		
+		// Run generic asset tests, giving 1/3 the balance to a new user account
+		{
+			Context<?> c=ctx.fork();
+			c=c.createAccount(TEST_KP.getAccountKey());
+			Address user2=(Address) c.getResult();
+			Long smallBal=BAL/3;
+			c=step(c,"(asset/transfer "+user2+" [token "+smallBal+"])");
+			
+			AssetTest.doAssetTests(c, token, user, user2);
+		}
 	}
 }
