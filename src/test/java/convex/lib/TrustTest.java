@@ -26,7 +26,7 @@ import convex.core.lang.TestState;
 import convex.core.util.Utils;
 import convex.test.Samples;
 
-public class TestTrust {
+public class TrustTest {
 	private static final Symbol tSym = Symbol.create("trust-actor");
 
 	private static Context<?> loadTrust() {
@@ -76,7 +76,7 @@ public class TestTrust {
 
 	@Test
 	public void testSelfTrust() {
-		Context<?> ctx = TestTrust.ctx.fork();
+		Context<?> ctx = TrustTest.ctx.fork();
 
 		assertTrue(evalB(ctx, "(trust/trusted? *address* *address*)"));
 		assertFalse(evalB(ctx, "(trust/trusted? *address* nil)"));
@@ -87,7 +87,7 @@ public class TestTrust {
 
 	@Test
 	public void testUpgradeWhitelist() {
-		Context<?> ctx = TestTrust.ctx.fork();
+		Context<?> ctx = TrustTest.ctx.fork();
 
 		// deploy a whitelist with default config and upgradable capability
 		ctx = step(ctx, "(def wlist (deploy [(trust/build-whitelist nil) (trust/add-trusted-upgrade nil)]))");
@@ -124,7 +124,7 @@ public class TestTrust {
 	@Test
 	public void testWhitelist() {
 		// check our alias is right
-		Context<?> ctx = TestTrust.ctx;
+		Context<?> ctx = TrustTest.ctx;
 
 		// deploy a whitelist with default config
 		ctx = step(ctx, "(def wlist (deploy (trust/build-whitelist nil)))");
@@ -179,7 +179,7 @@ public class TestTrust {
 
 	@Test
 	public void testBlacklist() {
-		Context<?> ctx = TestTrust.ctx;
+		Context<?> ctx = TrustTest.ctx;
 
 		// deploy a blacklist with default config
 		ctx = step(ctx, "(def blist (deploy (trust/build-blacklist {:blacklist [" + VILLAIN + "]})))");
@@ -237,7 +237,7 @@ public class TestTrust {
 
 	@Test
 	public void testWhitelistController() {
-		Context<?> ctx = TestTrust.ctx;
+		Context<?> ctx = TrustTest.ctx;
 
 		// deploy an initially empty whitelist
 		ctx = step(ctx, "(def wlist (deploy (trust/build-whitelist {:whitelist []})))");

@@ -15,7 +15,7 @@ import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
-import convex.lib.TestFungible;
+import convex.lib.FungibleTest;
 
 public class TorusTest {
 	static Address USD = null;
@@ -160,7 +160,7 @@ public class TorusTest {
 		assertEquals(1000000000000L,evalL(ctx,"(balance USDM)")); // Convex balance back to start
 		
 		// Generic fungible test on shares
-		TestFungible.doFungibleTests(ctx,USD_MARKET,ctx.getAddress());
+		FungibleTest.doFungibleTests(ctx,USD_MARKET,ctx.getAddress());
 		
 		// ============================================================
 		// FORTH TEST - buy half of all tokens ($50k)

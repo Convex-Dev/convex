@@ -21,7 +21,7 @@ import convex.core.util.Utils;
 import convex.test.Assertions;
 import convex.test.Testing;
 
-public class TestNFT {
+public class NFTTest {
 	private static final Symbol nSym=Symbol.create("nft");
 
 	private static Context<?> loadNFT() {

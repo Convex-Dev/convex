@@ -21,7 +21,7 @@ import convex.core.util.Utils;
 
 import static convex.test.Assertions.*;
 
-public class TestFungible {
+public class FungibleTest {
 	private static final Symbol fSym=Symbol.create("fun-actor");
 	
 	private static Context<?> loadFungible() {
@@ -64,7 +64,7 @@ public class TestFungible {
 	}
 	
 	@Test public void testAssetAPI() {
-		Context<?> ctx=TestFungible.ctx.fork();
+		Context<?> ctx=FungibleTest.ctx.fork();
 		ctx=step(ctx,"(def token (deploy (fungible/build-token {:supply 1000000})))");
 		Address token = (Address) ctx.getResult();
 		assertNotNull(token);
@@ -109,7 +109,7 @@ public class TestFungible {
 	
 	@Test public void testBuildToken() {
 		// check our alias is right
-		Context<?> ctx=TestFungible.ctx.fork();
+		Context<?> ctx=FungibleTest.ctx.fork();
 		assertEquals(fungible,eval(ctx,"(get *aliases* 'fungible)"));
 		
 		// deploy a token with default config
@@ -143,7 +143,7 @@ public class TestFungible {
 	
 	@Test public void testMint() {
 		// check our alias is right
-		Context<?> ctx=TestFungible.ctx.fork();
+		Context<?> ctx=FungibleTest.ctx.fork();
 		
 		// deploy a token with default config
 		ctx=step(ctx,"(def token (deploy [(fungible/build-token {:supply 100}) (fungible/add-mint {:max-supply 1000})]))");

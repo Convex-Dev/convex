@@ -18,7 +18,7 @@ import convex.core.util.Utils;
 import convex.test.Assertions;
 import convex.test.Testing;
 
-public class TestBox {
+public class BoxTest {
 	private static final Symbol nSym=Symbol.create("box");
 
 	private static Context<?> loadBox() {
