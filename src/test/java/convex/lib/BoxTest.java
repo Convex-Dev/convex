@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import static convex.test.Assertions.*;
+
 import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
@@ -85,18 +87,10 @@ public class BoxTest {
 		assertEquals(Set.of(b0,b1,b2,b3),eval(ctx,"(asset/balance box *address*)"));
 		assertEquals(Sets.empty(),eval(ctx,"(asset/balance box box)"));
 		
-		// Create test Users
-		ctx=ctx.createAccount(KP1.getAccountKey());
-		Address user1=(Address) ctx.getResult();
-		ctx=ctx.createAccount(KP2.getAccountKey());
-		Address user2=(Address) ctx.getResult();
-		
-		ctx=step(ctx,"(asset/transfer "+user1+" [box (set (next total))])");
-		ctx=step(ctx,"(asset/transfer "+user2+" [box #{"+b0+"}])");
-		assertEquals(Sets.of(b0),ctx.getResult());
-		
-		AssetTest.doAssetTests(ctx, BOX, user1, user2);
-
+		// Try to put a box into itself
+		ctx=step(ctx,"(box/insert "+b0+" [box #{"+b0+"}])");
+		assertError(ctx);
+		assertEquals(Set.of(b0,b1,b2,b3),eval(ctx,"(asset/balance box *address*)"));
 	}
 	
 	

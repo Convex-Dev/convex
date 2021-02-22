@@ -110,7 +110,7 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 		if (isLoop&&ctx.isExceptional()) {
 			// check for recur if this Let form is a loop
 			// other exceptionals we can just let slip
-			Object o = ctx.getValue();
+			Object o = ctx.getExceptional();
 			while (o instanceof RecurValue) {
 				RecurValue rv = (RecurValue) o;
 				ACell[] newArgs = rv.getValues();

@@ -957,7 +957,7 @@ public final class Context<T extends ACell> extends AObject {
 	}
 
 	/**
-	 * Updates this Context with new local bindings.
+	 * Updates this Context with new local bindings. Doesn't affact result state (exceptional or otherwise)
 	 * @param <R> Return type of Context
 	 * @param newBindings New local bindings map to use.
 	 * @return Updated context
@@ -1459,7 +1459,7 @@ public final class Context<T extends ACell> extends AObject {
 		if (as==null) return this.withError(ErrorCodes.STATE,"Actor does not exist: "+target);
 		
 		// Handling for non-zero offers. 
-		// SECURITY: Subtract from balance first so we don't have double-spend issues!
+		// SECURITY: Subtract offer from balance first so we don't have double-spend issues!
 		if (offer>0L) {
 			Address senderAddress=getAddress();
 			AccountStatus cas=state.getAccount(senderAddress);
@@ -1776,9 +1776,8 @@ public final class Context<T extends ACell> extends AObject {
 	 * @param <R> Result type of new Context
 	 * @return A new forked Context
 	 */
-	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> fork() {
-		return new Context<R>(chainState, juice, localBindings, (R)result,depth, exception);
+		return new Context<R>(chainState, juice, localBindings, null,depth, null);
 	}
 
 	@Override

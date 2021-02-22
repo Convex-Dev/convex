@@ -29,6 +29,7 @@ import convex.core.data.Blob;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Format;
+import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.List;
 import convex.core.data.Lists;
@@ -1173,6 +1174,19 @@ public class CoreTest {
 		assertArgumentError(step("(fail nil \"Hello\")"));
 		
 		assertArityError(step("(fail 1 \"Message\" 3)"));
+	}
+	
+	@Test
+	public void testFailContract() {
+		Context<?> ctx=step("(def act (deploy '(do (defn set-and-fail [x] (def foo x) (fail :NOPE (str x))) (export set-and-fail))))");
+		Address act=(Address) ctx.getResult();
+		assertNotNull(act);
+		
+		ctx=step(ctx,"(call act (set-and-fail 100))");
+		assertError(Keyword.create("NOPE"),ctx);
+		
+		// Foo shouldn't be defined
+		assertNull(ctx.getAccountStatus(act).getEnvironmentValue(Symbols.FOO));
 	}
 
 	@Test

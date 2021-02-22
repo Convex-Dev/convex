@@ -97,6 +97,7 @@ public class TestState {
 	}
 
 	public static <T extends ACell> T eval(Context<?> c, String source) {
+		c=c.fork();
 		try {
 			AOp<T> op = compile(c, source);
 			Context<T> rc = c.execute(op);

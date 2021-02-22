@@ -43,11 +43,11 @@
   (defn receive-asset 
     ([asset box-id]
       (let [box-id (long box-id)]
+	      (asset/accept *caller* asset) ;; accept first. Solve problem of putting box into itself
 	      (cond
 	        (not (contains-key? boxes box-id)) (fail "Target box does not exist")
-	        (not (contains-key? (ownership *caller*) box-id)) (fail "Box not owned")
+	        (not (contains-key? (ownership *caller*) box-id)) (fail (str "Box " box-id " not owned"))
 	        )
-	      (asset/accept *caller* asset) 
 	      (def boxes (assoc boxes box-id (asset/quantity-add (get boxes box-id) asset))))))
 
   

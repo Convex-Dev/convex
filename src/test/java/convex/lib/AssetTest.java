@@ -54,11 +54,13 @@ public class AssetTest {
 		assertEquals(empty,eval(ctx,"(asset/quantity-zero token)"));
 		
 		// Get user balances and total balance, ensure they are not empty
-		ACell balance1=eval(ctx,"(def bal1 (asset/balance token user1))");
+		ctx=step(ctx,"(def bal1 (asset/balance token user1))");
+		ACell balance1=ctx.getResult();
 		assertNotNull(balance1);
 		assertNotEquals(empty,balance1);
-		ACell balance2=eval(ctx,"(def bal2 (asset/balance token user2))");
-		assertNotNull(balance1);
+		ctx=step(ctx,"(def bal2 (asset/balance token user2))");
+		ACell balance2=ctx.getResult();
+		assertNotNull(balance2);
 		assertNotEquals(empty,balance2);
 		ACell total=eval(ctx,"(asset/quantity-add token bal1 bal2)");
 		assertNotNull(total);
