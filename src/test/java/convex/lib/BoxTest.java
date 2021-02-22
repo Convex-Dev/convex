@@ -65,6 +65,42 @@ public class BoxTest {
 	}
 	
 	@SuppressWarnings("unchecked")
+	@Test public void testContents() {
+		Context<?> ctx=CTX.fork();
+		ctx=step(ctx,"(def total (map (fn [v] (box/create)) [1 2 3 4]))");
+		AVector<CVMLong> v=(AVector<CVMLong>) ctx.getResult();
+		assertEquals(4,v.count());
+		CVMLong b0=v.get(0);
+		CVMLong b1=v.get(1);
+		CVMLong b2=v.get(2);
+		CVMLong b3=v.get(3);
+		
+		// Put b1 and b2 in b0
+		ctx=step(ctx,"(box/insert "+b0+" [box #{"+b1+" "+b2+"}])");
+		assertEquals(Set.of(b0,b3),eval(ctx,"(asset/balance box *address*)"));
+		assertEquals(Set.of(b1,b2),eval(ctx,"(asset/balance box box)"));
+		
+		// Take b1 and b2 out of b0
+		ctx=step(ctx,"(box/remove "+b0+" [box #{"+b1+" "+b2+"}])");
+		assertEquals(Set.of(b0,b1,b2,b3),eval(ctx,"(asset/balance box *address*)"));
+		assertEquals(Sets.empty(),eval(ctx,"(asset/balance box box)"));
+		
+		// Create test Users
+		ctx=ctx.createAccount(KP1.getAccountKey());
+		Address user1=(Address) ctx.getResult();
+		ctx=ctx.createAccount(KP2.getAccountKey());
+		Address user2=(Address) ctx.getResult();
+		
+		ctx=step(ctx,"(asset/transfer "+user1+" [box (set (next total))])");
+		ctx=step(ctx,"(asset/transfer "+user2+" [box #{"+b0+"}])");
+		assertEquals(Sets.of(b0),ctx.getResult());
+		
+		AssetTest.doAssetTests(ctx, BOX, user1, user2);
+
+	}
+	
+	
+	@SuppressWarnings("unchecked")
 	@Test public void testAssetAPI() {
 		Context<?> ctx=CTX.fork();
 		ctx=step(ctx,"(def total (map (fn [v] (call box (create-box))) [1 2 3 4]))");

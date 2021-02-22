@@ -81,7 +81,7 @@
          (defn accept [sender quantity]
            (let [sender (address sender)
                  quantity (if quantity (long quantity) 0)
-                 om (get offers sender)
+                 om (or (get offers sender) 0)
                  sendbal (or (get-holding sender) 0)
                  offer (get om *caller*)]
                (cond 

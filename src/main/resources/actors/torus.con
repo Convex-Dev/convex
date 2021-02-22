@@ -196,8 +196,8 @@
            (let [amt (long amt)
                  gained-tokens (or (sell-cvx-quote amt) (fail "Cannot sell this amount into pool"))
                  ]
-             (core/accept required-cvx) 
-             (def token-balance (+ token-balance amt))
+             (core/accept amt) 
+             (def token-balance (- token-balance gained-tokens))
              (asset/transfer *caller* [token gained-tokens]) ;; do this last!
              gained-tokens))
 

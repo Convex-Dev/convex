@@ -10,6 +10,7 @@ import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Constants;
 import convex.core.Init;
 import convex.core.data.Address;
 import convex.core.data.Symbol;
@@ -63,6 +64,7 @@ public class NFTTest {
 				+ "(def nft (get *aliases* 'nft))"
 				+ "(set-controller "+TestState.HERO+"))");
 		
+		c=c.withJuice(Constants.MAX_TRANSACTION_JUICE); //ensure enough juice
 		c=Testing.runTests(c,"contracts/nft/test2.con");
 		Assertions.assertNotError(c);
 		

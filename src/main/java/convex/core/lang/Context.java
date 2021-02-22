@@ -863,12 +863,12 @@ public final class Context<T extends ACell> extends AObject {
 	 * 
 	 * @param bindingForm
 	 * @param args
-	 * @return Context with local bindings updated
-	 * @throws ExecutionException
+	 * @return Non-exceptional Context with local bindings updated, or an exceptional result if bindings fail
 	 */
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> updateBindings(ACell bindingForm, Object args) {
-		Context<R> ctx=(Context<R>) this;
+		// Clear any exceptional status
+		Context<R> ctx=this.withValue(null);
 		
 		if (bindingForm instanceof Syntax) bindingForm=((Syntax)bindingForm).getValue();
 		
@@ -910,6 +910,7 @@ public final class Context<T extends ACell> extends AObject {
 					long argIndex=foundAmpersand?(argCount-(bindCount-i)):i;
 					if (argIndex>=argCount) return ctx.withArityError("Insufficient arguments ("+argCount+") for binding form: "+bindingForm);
 					ctx=ctx.updateBindings(bf,RT.nth(args, argIndex));
+					if(ctx.isExceptional()) return ctx;
 				}
 			}
 			
@@ -922,8 +923,8 @@ public final class Context<T extends ACell> extends AObject {
 		} else {
 			return ctx.withCompileError("Don't understand binding form: "+bindingForm);
 		}
-		// return after clearing result. Don't want to be exceptional....
-		return ctx.withResult(null);
+		// return 
+		return ctx;
 	}
 
 	@Override
@@ -955,6 +956,12 @@ public final class Context<T extends ACell> extends AObject {
 		return localBindings;
 	}
 
+	/**
+	 * Updates this Context with new local bindings.
+	 * @param <R> Return type of Context
+	 * @param newBindings New local bindings map to use.
+	 * @return Updated context
+	 */
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> withLocalBindings(AHashMap<Symbol, ACell> newBindings) {
 		//if (localBindings==newBindings) return (Context<R>) this;

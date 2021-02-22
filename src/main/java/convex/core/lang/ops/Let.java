@@ -94,29 +94,30 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 		if (ctx.isExceptional()) return (Context<T>) ctx;
 
 		AHashMap<Symbol, ACell> savedEnv = ctx.getLocalBindings();
-		// execute each operation in turn
-		// TODO: early return
+		
+		// execute each operation for bound values in turn
 		for (int i = 0; i < bindingCount; i++) {
 			AOp<?> op = ops.get(i);
 			ctx = ctx.executeLocalBinding(symbols.get(i), op);
 			if (ctx.isExceptional()) {
-				// return if exception during initial binding. No chance to recur.
+				// return if exception during initial binding. 
+				// No chance to recur since we didn't enter loop body
 				return ctx.withLocalBindings(savedEnv);
 			}
 		}
 
 		ctx = executeBody(ctx);
-		if (isLoop) {
+		if (isLoop&&ctx.isExceptional()) {
 			// check for recur if this Let form is a loop
 			// other exceptionals we can just let slip
 			Object o = ctx.getValue();
 			while (o instanceof RecurValue) {
 				RecurValue rv = (RecurValue) o;
-				Object[] newArgs = rv.getValues();
+				ACell[] newArgs = rv.getValues();
 				if (newArgs.length != bindingCount) {
 					// recur arity is wrong, need to break loop with exceptional result
-					ctx = ctx
-							.withArityError("Expected " + bindingCount + " vales for recur but got: " + newArgs.length);
+					String message="Expected " + bindingCount + " value(s) for recur but got: " + newArgs.length;
+					ctx = ctx.withArityError(message);
 					break;
 				}
 

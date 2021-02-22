@@ -2030,7 +2030,7 @@ public class Core {
 			if (args.length != 3) return ctx.withArityError(exactArityMessage(3, args.length));
 
 			// check and cast first argument to a function
-			Object fnArg = args[0];
+			ACell fnArg = args[0];
 			IFn<?> fn = RT.function(fnArg);
 			if (fn == null) return ctx.withCastError(fnArg, IFn.class);
 

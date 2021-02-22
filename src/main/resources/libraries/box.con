@@ -15,19 +15,41 @@
   ;; map of owner -> #{<box ids>}}
   (def ownership {})
   
-  ;; map of box-id -> asset-quantity
+  ;; map of box-id -> asset-quantity (always a map)
   (def boxes {})
   
   ;; map of {owner -> {recipient-address -> id-set}}
   (def offers {})
 
+  ;; Library function to insert an asset into a box
   (defn insert [box-id asset]
+    (asset/transfer ~*address* asset box-id))
+  
+  ;; Library function to remove an asset from a box
+  (defn remove [box-id asset] 
+    (call ~*address* (remove-asset box-id asset)))
+  
+  ;; Remove asset implementation intended to be called
+  (defn remove-asset [box-id asset]
      (let [box-id (long box-id)
            current-asset (get boxes box-id)]
-        (asset/accept asset)
+        (if (not (asset/quantity-contains? current-asset asset)) (fail "Box does not contain quantity of asset specified for removal"))
         (or (contains-key? (ownership *caller*) box-id) (fail :TRUST (str "Box not owned: " box-id)))
-        (def boxes (assoc boxes box-id (asset/add))))
-  )
+        (def boxes (assoc boxes box-id (asset/quantity-sub current-asset asset)))
+        (asset/transfer *caller* asset) ;; deliver the asset to the caller
+        ))
+  
+  ;; Receive-asset implementation inserts into box specified by data value, if it exists, otherwise errors
+  (defn receive-asset 
+    ([asset box-id]
+      (let [box-id (long box-id)]
+	      (cond
+	        (not (contains-key? boxes box-id)) (fail "Target box does not exist")
+	        (not (contains-key? (ownership *caller*) box-id)) (fail "Box not owned")
+	        )
+	      (asset/accept *caller* asset) 
+	      (def boxes (assoc boxes box-id (asset/quantity-add (get boxes box-id) asset))))))
+
   
   (defn offer [receiver quantity]
     (let [caller-offers (get offers *caller* {})]
@@ -61,7 +83,11 @@
                              receiver new-receiver-balance))
       quantity))
   
-  ;; Create a new box, with a fresh ID
+  ;; Library function to create a box
+  (defn create []
+    (call ~*address* (create-box)))
+  
+  ;; Contract to create a new box, with a fresh ID
   (defn create-box []
     (let [id counter
           owner *caller*
@@ -96,5 +122,5 @@
   (def quantity-subset? subset?)
   
   
-  (export balance create-box burn quantity-add quantity-sub quantity-subset? offer accept direct-transfer)
+  (export balance create-box burn quantity-add quantity-sub quantity-subset? offer accept direct-transfer receive-asset remove-asset )
   )

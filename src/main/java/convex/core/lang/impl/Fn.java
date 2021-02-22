@@ -99,6 +99,7 @@ public class Fn<T extends ACell> extends AClosure<T> {
 
 		// update to correct lexical environment, then bind function parameters
 		context = context.withLocalBindings(lexicalEnv);
+		context=context.withResult(null); // make sure no exception values
 		Context<T> boundContext = context.updateBindings(params, args);
 		if (boundContext.isExceptional()) return boundContext.withLocalBindings(savedBindings);
 

@@ -573,12 +573,9 @@ public class RT {
 		if (o instanceof ASequence) return ((ASequence<T>) o).get(i);
 		if (o instanceof ABlob) return (T) CVMByte.create(((ABlob) o).get(i));
 		if (o instanceof AString) return (T) CVMChar.create(((AString) o).charAt(Utils.checkedInt(i)));
+		if (o instanceof AMap) return (T) ((AMap<?,?>)o).entryAt(i);
 
-		ASequence<?> seq = sequence(o);
-		if (seq == null)
-			throw new ClassCastException("Can't get nth element from object of class: " + Utils.getClassName(o));
-
-		return (T) seq.get(i);
+		throw new ClassCastException("Don't know how to get nth item of cell "+Utils.getClassName(o));
 	}
 	
 	/**
