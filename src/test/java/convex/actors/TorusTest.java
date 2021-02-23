@@ -58,6 +58,17 @@ public class TorusTest {
 		}
 	}
 	
+	@Test public void testMissingMarket() {
+		Context<?> ctx=CONTEXT.fork();
+		
+		assertNull(eval(ctx,"(torus/get-market GBP)"));
+		
+		// price should be null for missing markets, regardless of whether or not a token exists
+		assertNull(eval(ctx,"(torus/price GBP)"));
+		assertNull(eval(ctx,"(torus/price #789798789)"));
+
+	}
+	
 	@Test public void testTorusAPI() {
 		Context<?> ctx=CONTEXT.fork();
 		
@@ -67,7 +78,7 @@ public class TorusTest {
 		assertNotNull(GBP_MARKET);
 		
 		// Check we can access the USD market
-		ctx= step(ctx,"(def USDM (call TORUS (get-market USD)))");
+		ctx= step(ctx,"(def USDM (torus/get-market USD))");
 		assertEquals(USD_MARKET,ctx.getResult());
 		
 		// Prices should be null with no markets
@@ -105,7 +116,7 @@ public class TorusTest {
 		Context<?> ctx=CONTEXT.fork();
 		
 		// Check we can access the USD market
-		ctx= step(ctx,"(def USDM (call TORUS (get-market USD)))");
+		ctx= step(ctx,"(def USDM (torus/get-market USD))");
 		assertEquals(USD_MARKET,ctx.getResult());
 
 		// should be no price for initial market with zero liquidity

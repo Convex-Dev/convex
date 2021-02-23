@@ -243,20 +243,27 @@ public class Init {
 				TORUS_ADDRESS = addr;
 				s=ctx.getState();
 			}
-			
-
-			
-			
 
 			{ // Deploy NFT Actor
-				Context<?> ctx = Context.createFake(s, HERO);
-				Object form = Reader.readResource("libraries/nft-tokens.con");
-				ctx = ctx.deployActor(form, true);
+				Context<?> ctx = Context.createFake(s, INIT);
+				ACell form = Reader.readResource("libraries/nft-tokens.con");
+				ctx = ctx.deployActor(form);
 				if (ctx.isExceptional()) {
 					log.severe("Failure to deploy convex.nft-tokens: " + ctx.getExceptional());
 				}
 				s = ctx.getState();
 			}
+			
+			{ // Deploy Box Actor
+				Context<?> ctx = Context.createFake(s, HERO);
+				ACell form = Reader.readResource("libraries/box.con");
+				ctx = ctx.deployActor(form);
+				if (ctx.isExceptional()) {
+					log.severe("Failure to deploy convex.box: " + ctx.getExceptional());
+				}
+				s = ctx.getState();
+			}
+
 
 			STATE = s;
 		} catch (Throwable e) {
