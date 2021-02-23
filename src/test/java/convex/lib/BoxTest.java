@@ -1,7 +1,6 @@
 package convex.lib;
 
-import static convex.core.lang.TestState.eval;
-import static convex.core.lang.TestState.step;
+import static convex.core.lang.TestState.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -54,6 +53,7 @@ public class BoxTest {
 			throw new Error(e);
 		}
 		ctx=step(ctx,"(import convex.asset :as asset)");
+		ctx=step(ctx,"(import convex.fungible :as fun)");
 		CTX=ctx;
 	}
 	
@@ -82,15 +82,37 @@ public class BoxTest {
 		assertEquals(Set.of(b0,b3),eval(ctx,"(asset/balance box *address*)"));
 		assertEquals(Set.of(b1,b2),eval(ctx,"(asset/balance box box)"));
 		
+		// Try to put b0 in b1 - should fail since b1 not directly owned
+		ctx=step(ctx,"(box/insert "+b1+" [box #{"+b0+"}])");
+		assertError(ctx);
+		
 		// Take b1 and b2 out of b0
 		ctx=step(ctx,"(box/remove "+b0+" [box #{"+b1+" "+b2+"}])");
 		assertEquals(Set.of(b0,b1,b2,b3),eval(ctx,"(asset/balance box *address*)"));
 		assertEquals(Sets.empty(),eval(ctx,"(asset/balance box box)"));
 		
-		// Try to put a box into itself
+		// Try to put a box into itself - should fail because b0 acceptance makes it no longer owned
 		ctx=step(ctx,"(box/insert "+b0+" [box #{"+b0+"}])");
 		assertError(ctx);
 		assertEquals(Set.of(b0,b1,b2,b3),eval(ctx,"(asset/balance box *address*)"));
+		
+		// Use a fungible token
+		ctx=step(ctx,"(def FOOCOIN (deploy (fun/build-token {:supply 1000000})))");
+		ctx=step(ctx,"(box/insert "+b1+" [FOOCOIN 1000])");
+		ctx=step(ctx,"(box/insert "+b2+" [FOOCOIN 2000])");
+		assertEquals(3000L,evalL(ctx, "(asset/balance FOOCOIN box)"));
+		
+		// removing too much should fail
+		assertError(step(ctx,"(box/remove "+b1+" [FOOCOIN 1001])"));
+		
+		// remove a reasonable amount (500) from b1
+		ctx=step(ctx,"(box/remove "+b1+" [FOOCOIN 500])");
+		assertEquals(2500L,evalL(ctx, "(asset/balance FOOCOIN box)"));
+		assertEquals(997500L,evalL(ctx, "(asset/balance FOOCOIN *address*)"));
+		
+		// removing more than remaining amount in b1 should fail
+		assertError(step(ctx,"(box/remove "+b1+" [FOOCOIN 501])"));
+
 	}
 	
 	
