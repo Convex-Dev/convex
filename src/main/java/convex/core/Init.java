@@ -21,6 +21,7 @@ import convex.core.data.Vectors;
 import convex.core.lang.Context;
 import convex.core.lang.Core;
 import convex.core.lang.Reader;
+import convex.core.util.Utils;
 
 /**
  * Static functionality for generating the initial Convex State
@@ -72,7 +73,9 @@ public class Init {
 	public static final Address ORACLE_ADDRESS; // 21
 	public static final Address FUNGIBLE_ADDRESS; // 22 
 	public static final Address ASSET_ADDRESS; // 23
-	public static final Address TORUS_ADDRESS; // 23
+	public static final Address TORUS_ADDRESS; // 24
+	public static final Address NFT_ADDRESS; // 26
+	public static final Address BOX_ADDRESS; // 26
 
 	public static AKeyPair[] KEYPAIRS = new AKeyPair[NUM_PEERS + NUM_USERS];
 
@@ -244,23 +247,28 @@ public class Init {
 				s=ctx.getState();
 			}
 
+
 			{ // Deploy NFT Actor
-				Context<?> ctx = Context.createFake(s, INIT);
-				ACell form = Reader.readResource("libraries/nft-tokens.con");
+				Context<Address> ctx = Context.createFake(s, INIT);
+				ACell form = Reader.read(Utils.readResourceAsString("libraries/nft-tokens.con"));
 				ctx = ctx.deployActor(form);
 				if (ctx.isExceptional()) {
 					log.severe("Failure to deploy convex.nft-tokens: " + ctx.getExceptional());
 				}
+				Address addr=ctx.getResult();
+				NFT_ADDRESS = addr;
 				s = ctx.getState();
 			}
 			
 			{ // Deploy Box Actor
-				Context<?> ctx = Context.createFake(s, HERO);
-				ACell form = Reader.readResource("libraries/box.con");
+				Context<Address> ctx = Context.createFake(s, HERO);
+				ACell form = Reader.read(Utils.readResourceAsString("libraries/box.con"));
 				ctx = ctx.deployActor(form);
 				if (ctx.isExceptional()) {
 					log.severe("Failure to deploy convex.box: " + ctx.getExceptional());
 				}
+				Address addr=ctx.getResult();
+				BOX_ADDRESS = addr;
 				s = ctx.getState();
 			}
 

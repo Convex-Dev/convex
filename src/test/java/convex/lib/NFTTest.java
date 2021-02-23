@@ -6,8 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static convex.test.Assertions.*;
 
-import java.io.IOException;
-
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
@@ -16,7 +14,6 @@ import convex.core.data.Address;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.lang.Context;
-import convex.core.lang.Reader;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
 import convex.test.Assertions;
@@ -28,15 +25,14 @@ public class NFTTest {
 	private static Context<?> loadNFT() {
 		Context<?> ctx=TestState.INITIAL_CONTEXT.fork();
 		try {
-			ctx=ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/nft-tokens.con")));
-			Address nft=(Address) ctx.getResult();
-			String importS="(import "+nft+" :as "+nSym.getName()+")";
+			String importS="(import convex.nft-tokens :as "+nSym.getName()+")";
 			ctx=step(ctx,importS);
+			Address nft=(Address) ctx.getResult();
 			assertFalse(ctx.isExceptional());
 			
 			ctx=ctx.define(nSym, Syntax.create(nft));
-		} catch (IOException e) {
-			throw new Error(e);
+		} catch (Throwable e) {
+			throw Utils.sneakyThrow(e);
 		}
 		ctx=step(ctx,"(import convex.asset :as asset)");
 		return ctx;
