@@ -248,6 +248,16 @@ public class Init {
 			
 			
 
+			{ // Deploy NFT Actor
+				Context<?> ctx = Context.createFake(s, HERO);
+				Object form = Reader.readResource("libraries/nft-tokens.con");
+				ctx = ctx.deployActor(form, true);
+				if (ctx.isExceptional()) {
+					log.severe("Failure to deploy convex.nft-tokens: " + ctx.getExceptional());
+				}
+				s = ctx.getState();
+			}
+
 			STATE = s;
 		} catch (Throwable e) {
 			log.severe("Error in Init initialiser!");
