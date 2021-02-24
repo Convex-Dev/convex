@@ -632,6 +632,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public boolean equalsKeys(AMap<K, V> a) {
 		if (a instanceof MapLeaf) return equalsKeys((MapLeaf<K, V>) a);
+		// different map type cannot possibly be equal
 		return false;
 	}
 

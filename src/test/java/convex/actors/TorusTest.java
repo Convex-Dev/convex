@@ -114,8 +114,12 @@ public class TorusTest {
 		assertEquals(49,evalL(ctx,"(torus/sell USD 100 GBP)"));
 		assertEquals(199,evalL(ctx,"(torus/sell GBP 100 USD)"));
 
-		// Trade too big
+		// Trades too big
+		assertError(step(ctx,"(torus/buy USD "+Long.MAX_VALUE+")"));
 		assertError(step(ctx,"(torus/buy USD 10000000)"));
+		
+		// Too expensive for pool
+		assertError(step(ctx,"(torus/buy USD 9999999)"));
 	}
 	
 	@Test public void testInitialTokenMarket() {

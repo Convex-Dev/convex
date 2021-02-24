@@ -687,6 +687,7 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public void validate() throws InvalidDataException {
+		// TODO: Needs to ensure children are validated?
 		super.validate();
 		if (prefix != null) {
 			// if we have a prefix, should be 1..15 elements only

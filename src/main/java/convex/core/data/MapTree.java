@@ -713,6 +713,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public boolean equalsKeys(AMap<K, V> a) {
 		if (a instanceof MapTree) return equalsKeys((MapTree<K, V>) a);
+		// different map type cannot possibly be equal
 		return false;
 	}
 
@@ -788,7 +789,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			if (children[i] == null)
 				throw new InvalidDataException("Null child ref at " + prefix + Utils.toHexChar(digitForIndex(i, mask)),
 						this);
-			Object o = children[i].getValue();
+			ACell o = children[i].getValue();
 			if (!(o instanceof AHashMap)) {
 				throw new InvalidDataException(
 						"Expected map child at " + prefix + Utils.toHexChar(digitForIndex(i, mask)), this);
