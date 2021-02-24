@@ -145,7 +145,7 @@
                  pool (* (double token-balance) cvx-balance)
                  rate (calc-rate)]
              ;; Compute required payment in Tokens
-             (long (* (+ 1.0 rate) (- (/ pool (- cvx-balance amt)) token-balance)))))
+             (long (ceil (* (+ 1.0 rate) (- (/ pool (- cvx-balance amt)) token-balance))))))
 
          (defn sell-cvx-quote [amt]
            (let [;; SECURITY: check amount is positive
@@ -168,7 +168,7 @@
                  pool (* (double token-balance) cvx-balance)
                  rate (calc-rate)]
              ;; Compute required payment in CVX
-             (long (* (+ 1.0 rate) (- (/ pool (- token-balance amt)) cvx-balance)))))
+             (long (ceil (* (+ 1.0 rate) (- (/ pool (- token-balance amt)) cvx-balance))))))
 
          (defn sell-tokens-quote [amt]
            (let [;; SECURITY: check amount is positive
