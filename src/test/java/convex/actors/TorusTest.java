@@ -103,10 +103,16 @@ public class TorusTest {
 		assertEquals(2.0,evalD(ctx,"(torus/price GBP USD)"));
 
 		// ============================================================
-		// SECOND TEST: Check marginal trades for $1 / £1
+		// SECOND TEST: Check marginal buy trades for $1 / £1
 		assertEquals(101,evalL(ctx,"(torus/buy GBP 100 GBP)"));
 		assertEquals(51,evalL(ctx,"(torus/buy USD 100 GBP)"));
 		assertEquals(201,evalL(ctx,"(torus/buy GBP 100 USD)"));
+		
+		// ============================================================
+		// SECOND TEST: Check marginal sell trades for $1 / £1
+		assertEquals(99,evalL(ctx,"(torus/sell GBP 100 GBP)"));
+		assertEquals(49,evalL(ctx,"(torus/sell USD 100 GBP)"));
+		assertEquals(199,evalL(ctx,"(torus/sell GBP 100 USD)"));
 
 		// Trade too big
 		assertError(step(ctx,"(torus/buy USD 10000000)"));
