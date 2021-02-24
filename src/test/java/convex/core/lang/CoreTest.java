@@ -489,6 +489,52 @@ public class CoreTest {
 
 	
 	@Test
+	public void testCeil() {
+		// Double cases
+		assertEquals(1.0,evalD("(ceil 0.001)"));
+		assertEquals(-1.0,evalD("(ceil -1.25)"));
+		
+		// Integral cases
+		assertEquals(-1.0,evalD("(ceil -1)"));
+		assertEquals(0.0,evalD("(ceil 0)"));
+		assertEquals(1.0,evalD("(ceil 1)"));
+		
+		// Special cases
+		assertEquals(Double.NaN,evalD("(ceil NaN)"));
+		assertEquals(Double.POSITIVE_INFINITY,evalD("(ceil (/ 1 0))"));
+		assertEquals(Double.NEGATIVE_INFINITY,evalD("(ceil (/ -1 0))"));
+		
+		assertArityError(step("(ceil)"));
+		assertArityError(step("(ceil :foo :bar)")); // arity > cast
+		assertCastError(step("(ceil :foo)"));
+		assertCastError(step("(ceil nil)"));
+		assertCastError(step("(ceil [])"));
+	}
+	
+	@Test
+	public void testFloor() {
+		// Double cases
+		assertEquals(0.0,evalD("(floor 0.001)"));
+		assertEquals(-2.0,evalD("(floor -1.25)"));
+		
+		// Integral cases
+		assertEquals(-1.0,evalD("(floor -1)"));
+		assertEquals(0.0,evalD("(floor 0)"));
+		assertEquals(1.0,evalD("(floor 1)"));
+		
+		// Special cases
+		assertEquals(Double.NaN,evalD("(floor NaN)"));
+		assertEquals(Double.POSITIVE_INFINITY,evalD("(floor (/ 1 0))"));
+		assertEquals(Double.NEGATIVE_INFINITY,evalD("(floor (/ -1 0))"));
+		
+		assertArityError(step("(floor)"));
+		assertArityError(step("(floor :foo :bar)")); // arity > cast
+		assertCastError(step("(floor :foo)"));
+		assertCastError(step("(floor nil)"));
+		assertCastError(step("(floor [])"));
+	}
+	
+	@Test
 	public void testAbs() {
 		// Integer cases
 		assertEquals(1L,evalL("(abs 1)"));

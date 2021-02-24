@@ -284,6 +284,30 @@ public class RT {
 		double a = doubleValue(arg);
 		return CVMDouble.create(StrictMath.exp(a));
 	}
+	
+	/**
+	 * Gets the floor a number after casting to a double. Equivalent to java.lang.StrictMath.floor(...)
+	 * 
+	 * @param a
+	 * @return The floor of the number, or null if cast fails
+	 */
+	public static CVMDouble floor(Object a) {
+		CVMDouble d = RT.toDouble(a);
+		if (d == null) return null;
+		return CVMDouble.create(StrictMath.floor(d.doubleValue()));
+	}
+	
+	/**
+	 * Gets the ceiling a number after casting to a double. Equivalent to java.lang.StrictMath.ceil(...)
+	 * 
+	 * @param a
+	 * @return The ceiling of the number, or null if cast fails
+	 */
+	public static CVMDouble ceil(Object a) {
+		CVMDouble d = RT.toDouble(a);
+		if (d == null) return null;
+		return CVMDouble.create(StrictMath.ceil(d.doubleValue()));
+	}
 
 	/**
 	 * Gets the exact positive square root of a number after casting to a double.

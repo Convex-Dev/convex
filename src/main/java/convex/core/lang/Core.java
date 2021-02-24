@@ -1608,6 +1608,30 @@ public class Core {
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
+	
+	public static final CoreFn<CVMDouble> FLOOR = reg(new CoreFn<>(Symbols.FLOOR) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+			CVMDouble result = RT.floor(args[0]);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args), Number.class);
+			return context.withResult(Juice.ARITHMETIC, result);
+		}
+	});
+
+	
+	public static final CoreFn<CVMDouble> CEIL = reg(new CoreFn<>(Symbols.CEIL) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+			CVMDouble result = RT.ceil(args[0]);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args), Number.class);
+			return context.withResult(Juice.ARITHMETIC, result);
+		}
+	});
+
 
 	public static final CoreFn<CVMDouble> SQRT = reg(new CoreFn<>(Symbols.SQRT) {
 		@SuppressWarnings("unchecked")

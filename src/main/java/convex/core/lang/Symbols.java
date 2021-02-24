@@ -127,6 +127,9 @@ public class Symbols {
 	public static final Symbol SQRT = Symbol.create("sqrt");
 	public static final Symbol EXP = Symbol.create("exp");
 	public static final Symbol POW = Symbol.create("pow");
+	
+	public static final Symbol FLOOR = Symbol.create("floor");
+	public static final Symbol CEIL = Symbol.create("ceil");
 
 	public static final Symbol NAN = Symbol.create("NaN");
 
@@ -268,6 +271,7 @@ public class Symbols {
 	
 	public static final Symbol CREATE_ACCOUNT = Symbol.create("create-account");
 	public static final Symbol SET_KEY = Symbol.create("set-key");
+	
 
 
 
