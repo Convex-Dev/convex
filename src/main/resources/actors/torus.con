@@ -279,6 +279,10 @@
         (asset/offer market [token token-amount])
         (call market cvx-amount (add-liquidity token-amount))))
     
+    (defn withdraw-liquidity [token shares]
+      (let [market (or (get-market token) (fail "No market exists to withdraw liquidity"))]
+        (call market (withdraw-liquidity shares))))
+    
     (defn price 
 	    ^{:doc {:description "Gets the current price for a token, in CVX or an optional given currency. Returns nil if a market with liquidity does not exist."
 	         :examples [{:code "(price USD)"}

@@ -209,7 +209,16 @@ public class TorusTest {
 		assertEquals( 10000000L,evalL(ctx,"(asset/balance USD USDM)"));
 		assertEquals(990000000L,evalL(ctx,"(asset/balance USD *address*)"));
 		assertEquals(INITIAL_SHARES,evalL(ctx,"(asset/balance USDM *address*)"));
-
+		
+		// ============================================================
+		// FINAL TEST - Withdraw all liquidity
+		long shares=evalL(ctx,"(asset/balance USDM *address*)");
+		assertTrue(shares>0);
+		ctx=step(ctx,"(torus/withdraw-liquidity USD "+shares+")");
+		assertNotError(ctx);
+		assertEquals(0L,evalL(ctx,"(asset/balance USDM *address*)")); // should have no shares left
+		assertEquals(0L,evalL(ctx,"(asset/balance USD USDM)")); // should be no USD left in liquidity pool
+		assertEquals(0L,evalL(ctx,"(balance USDM)")); // should be no CVX left in liquidity pool
 	}
 
 	@Test public void testSetup() {
