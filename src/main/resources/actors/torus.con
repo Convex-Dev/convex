@@ -256,6 +256,24 @@
         (buy-tokens of-token amt)
         sold))
     
+    (defn sell-quote 
+      ([of-token amt]
+        (let [market (or (get-market of-token) (return nil))]
+          (call market (sell-tokens-quote amt))))
+      ([of-token amt with-token]
+        (let [market (or (get-market with-token) (return nil))
+              cvx-amt (or (sell-quote of-token amt) (return nil))]
+          (call market (sell-cvx-quote cvx-amt)))))
+    
+    (defn buy-quote 
+      ([of-token amt]
+        (let [market (or (get-market of-token) (return nil))]
+          (call market (buy-tokens-quote amt))))
+      ([of-token amt with-token]
+        (let [market (or (get-market with-token) (return nil))
+              cvx-amt (or (buy-quote of-token amt) (return nil))]
+          (call market (buy-cvx-quote cvx-amt)))))
+    
     (defn add-liquidity [token token-amount cvx-amount]
       (let [market (create-market token)]
         (asset/offer market [token token-amount])
