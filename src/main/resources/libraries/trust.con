@@ -30,7 +30,7 @@
     ([trust-monitor subject action object]
 	    (let [trust-monitor (address trust-monitor)] 
 	      (if (actor? trust-monitor) 
-	        (call trust-monitor (check-trusted? subject action object))
+	        (query (call trust-monitor (check-trusted? subject action object)))
 	        (= trust-monitor subject))))
     
     ([trust-monitor subject]
@@ -52,7 +52,7 @@
          (import ~trust :as trust)
          
          ;; a whitelist of subjects that will be accepted
-         (def whitelist ~whitelist)
+         (def whitelist (set ~whitelist))
          
          ;; controller determines who can modify the whitelist
          (def controller ~(address controller))
@@ -67,6 +67,7 @@
        
          (export check-trusted? set-trusted)))) 
   
+  
     (defn build-blacklist
     ^{:doc {:description "Creates deployable code for a new blacklist. An optional config may be provided, where ':controller' is the user or trust monitor that has the ability to modify the blacklist, and ':blacklist' is a collection of addresses to put on the initial blacklist."
          :examples [{:code "(deploy (build-blacklist {:controller *address* :blacklist [my-foe-1 my-foe-2]}))"}]
@@ -80,10 +81,10 @@
          (import ~trust :as trust)
          
          ;; a blacklist of subjects that will be denied
-         (def blacklist ~blacklist)
+           (def blacklist ~blacklist)
          
          ;; controller determines who can modify the blacklist
-         (def controller ~controller)
+           (def controller ~controller)
        
          (defn check-trusted? [subject action object]
            (not (contains-key? blacklist (address subject))))
