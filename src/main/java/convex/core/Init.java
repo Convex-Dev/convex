@@ -74,7 +74,7 @@ public class Init {
 	public static final Address FUNGIBLE_ADDRESS; // 22 
 	public static final Address ASSET_ADDRESS; // 23
 	public static final Address TORUS_ADDRESS; // 24
-	public static final Address NFT_ADDRESS; // 26
+	public static final Address NFT_ADDRESS; // 25
 	public static final Address BOX_ADDRESS; // 26
 
 	public static AKeyPair[] KEYPAIRS = new AKeyPair[NUM_PEERS + NUM_USERS];

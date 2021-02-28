@@ -167,13 +167,13 @@ public class ServerTest {
 		Convex convex=Convex.connect(hostAddress, Init.HERO, Init.HERO_KP);
 		
 		Future<Result> statusFuture=convex.requestStatus();
-		Result status=statusFuture.get(500,TimeUnit.MILLISECONDS);
+		Result status=statusFuture.get(1000,TimeUnit.MILLISECONDS);
 		assertFalse(status.isError());
 		AVector<?> v=status.getValue();
 		Hash h=(Hash)v.get(0);
 		
 		Future<SignedData<Belief>> acquiror=convex.acquire(h);
-		SignedData<Belief> ab=acquiror.get(2000,TimeUnit.MILLISECONDS);
+		SignedData<Belief> ab=acquiror.get(10000,TimeUnit.MILLISECONDS);
 		assertTrue(ab.getValue() instanceof Belief);
 		assertEquals(h,ab.getHash());
 	}
