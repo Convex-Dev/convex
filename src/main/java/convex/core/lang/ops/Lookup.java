@@ -54,8 +54,11 @@ public class Lookup<T extends ACell> extends AOp<T> {
 
 	@Override
 	public <I extends ACell> Context<T> execute(Context<I> context) {
-		MapEntry<Symbol, T> le = context.lookupLocalEntry(symbol);
-		if (le != null) return context.withResult(Juice.LOOKUP, le.getValue());
+		// Lookup local values first
+		if (!symbol.isQualified()) {
+			MapEntry<Symbol, T> le = context.lookupLocalEntry(symbol);
+			if (le != null) return context.withResult(Juice.LOOKUP, le.getValue());
+		}
 		
 		// Do a dynamic lookup, with address if specified or address from current context otherwise
 		Address namespaceAddress=(address==null)?context.getAddress():address;
