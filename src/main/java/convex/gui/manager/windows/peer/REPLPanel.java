@@ -77,7 +77,7 @@ public class REPLPanel extends JPanel {
 		if (r.isError()) {
 			handleError(r.getErrorCode(),r.getValue(),r.getTrace());
 		} else {
-			handleResult(r.getValue());
+			handleResult((Object)r.getValue());
 		}
 	}
 
@@ -218,6 +218,7 @@ public class REPLPanel extends JPanel {
 			} catch (Throwable t) {
 				outputArea.append(" SEND ERROR: ");
 				outputArea.append(t.getMessage() + "\n");
+				t.printStackTrace();
 			}
 			inputArea.setText("");
 		});
