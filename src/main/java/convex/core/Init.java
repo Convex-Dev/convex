@@ -213,7 +213,6 @@ public class Init {
 			{ // Deploy Fungible library and register with CNS
 				Context<Address> ctx = doActorDeploy(s,"convex.fungible","libraries/fungible.con");
 				Address addr=ctx.getResult();
-				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'convex.fungible "+addr+"))"));
 				FUNGIBLE_ADDRESS=addr;
 				// Note the Registry registers itself upon creation
 				s = ctx.getState();
@@ -276,8 +275,11 @@ public class Init {
 		try {
 			form = Reader.read(Utils.readResourceAsString(resource));
 			ctx = ctx.deployActor(form);
+			Address addr=ctx.getResult();
+			ctx=ctx.eval(Reader.read("(call *registry* (cns-update '"+name+" "+addr+"))"));
+
 			if (ctx.isExceptional()) throw new Error("Error deploying actor: "+ctx.getValue());
-			return ctx;
+			return ctx.withResult(addr);
 		} catch (IOException e) {
 			throw Utils.sneakyThrow(e);
 		}
