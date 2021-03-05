@@ -211,10 +211,8 @@ public class Init {
 			// Standard library deployment
 			
 			{ // Deploy Fungible library and register with CNS
-				Context<Address> ctx = Context.createFake(s, INIT);
-				ACell form=Reader.readResource("libraries/fungible.con");
-				ctx = ctx.deployActor(form);
-				Address addr=(Address) ctx.getResult();
+				Context<Address> ctx = doActorDeploy(s,"convex.fungible","libraries/fungible.con");
+				Address addr=ctx.getResult();
 				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'convex.fungible "+addr+"))"));
 				FUNGIBLE_ADDRESS=addr;
 				// Note the Registry registers itself upon creation
@@ -222,25 +220,21 @@ public class Init {
 			}
 			
 			{ // Deploy Oracle Actor
-				Context<Address> ctx = Context.createFake(s, INIT);
-				ACell form=Reader.readResource("actors/oracle-trusted.con");
-				ctx = ctx.deployActor(form);
-				ORACLE_ADDRESS = (Address) ctx.getResult();
+				Context<Address> ctx = doActorDeploy(s,"convex.trusted-oracle","actors/oracle-trusted.con");
+				Address addr=ctx.getResult();
+				ORACLE_ADDRESS = addr;
 				s = register(ctx.getState(),ORACLE_ADDRESS,"Oracle Actor (default)");
 			}
 			
 			{ // Deploy Asset Actor
-				Context<Address> ctx = Context.createFake(s, INIT);
-				ACell form=Reader.readResource("libraries/asset.con");
-				ctx = ctx.deployActor(form);
-				ASSET_ADDRESS = ctx.getResult();
+				Context<Address> ctx = doActorDeploy(s,"convex.asset","libraries/asset.con");
+				Address addr=ctx.getResult();
+				ASSET_ADDRESS = addr;
 				s=ctx.getState();
 			}
 			
 			{ // Deploy Torus Actor
-				Context<Address> ctx = Context.createFake(s, INIT);
-				ACell form=Reader.readResource("actors/torus.con");
-				ctx = ctx.deployActor(form);
+				Context<Address> ctx = doActorDeploy(s,"torus.exchange","actors/torus.con");
 				Address addr=ctx.getResult();
 				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'torus.exchange "+addr+"))"));
 				TORUS_ADDRESS = addr;
@@ -249,9 +243,7 @@ public class Init {
 
 
 			{ // Deploy NFT Actor
-				Context<Address> ctx = Context.createFake(s, INIT);
-				ACell form = Reader.read(Utils.readResourceAsString("libraries/nft-tokens.con"));
-				ctx = ctx.deployActor(form);
+				Context<Address> ctx = doActorDeploy(s,"asset.nft-tokens","libraries/nft-tokens.con");
 				Address addr=ctx.getResult();
 				NFT_ADDRESS = addr;
 				s = ctx.getState();
