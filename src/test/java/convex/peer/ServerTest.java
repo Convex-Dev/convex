@@ -167,7 +167,7 @@ public class ServerTest {
 		Convex convex=Convex.connect(hostAddress, Init.HERO, Init.HERO_KP);
 		
 		Future<Result> statusFuture=convex.requestStatus();
-		Result status=statusFuture.get(1000,TimeUnit.MILLISECONDS);
+		Result status=statusFuture.get(10000,TimeUnit.MILLISECONDS);
 		assertFalse(status.isError());
 		AVector<?> v=status.getValue();
 		Hash h=(Hash)v.get(0);
@@ -196,7 +196,7 @@ public class ServerTest {
 		assertTrue(!pc.isClosed());
 		
 		// wait for results to come back
-		assertFalse(Utils.timeout(1000, () -> results.containsKey(id5)));
+		assertFalse(Utils.timeout(10000, () -> results.containsKey(id5)));
 		
 		AVector<CVMLong> v = Vectors.of(1l, 2l, 3l);
 		assertCVMEquals(v, results.get(id1));
