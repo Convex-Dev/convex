@@ -66,16 +66,18 @@ public class Init {
 	
 	public static final AccountKey FIRST_PEER_KEY;
 
-
 	// Addresses for initial Actors
 	public static final Address TRUST_ADDRESS; // 19
 	public static final Address REGISTRY_ADDRESS; // 20
-	public static final Address ORACLE_ADDRESS; // 21
-	public static final Address FUNGIBLE_ADDRESS; // 22 
-	public static final Address ASSET_ADDRESS; // 23
-	public static final Address TORUS_ADDRESS; // 24
-	public static final Address NFT_ADDRESS; // 25
-	public static final Address BOX_ADDRESS; // 26
+	
+	// Standard library addresses
+	public static final Address ORACLE_ADDRESS; 
+	public static final Address FUNGIBLE_ADDRESS; 
+	public static final Address ASSET_ADDRESS; 
+	public static final Address TORUS_ADDRESS; 
+	public static final Address NFT_ADDRESS; 
+	public static final Address SIMPLE_NFT_ADDRESS;
+	public static final Address BOX_ADDRESS;
 
 	public static AKeyPair[] KEYPAIRS = new AKeyPair[NUM_PEERS + NUM_USERS];
 
@@ -204,6 +206,9 @@ public class Init {
 				s = register(s,MEMORY_EXCHANGE,"Memory Exchange Pool");
 			}
 			
+			// ============================================================
+			// Standard library deployment
+			
 			{ // Deploy Fungible library and register with CNS
 				Context<Address> ctx = Context.createFake(s, INIT);
 				ACell form=Reader.readResource("libraries/fungible.con");
@@ -227,10 +232,7 @@ public class Init {
 				Context<Address> ctx = Context.createFake(s, INIT);
 				ACell form=Reader.readResource("libraries/asset.con");
 				ctx = ctx.deployActor(form);
-				if (ctx.isExceptional()) {
-					log.severe("Failure to deploy convex.asset: "+ctx.getExceptional());
-				}
-				ASSET_ADDRESS = (Address) ctx.getResult();
+				ASSET_ADDRESS = ctx.getResult();
 				s=ctx.getState();
 			}
 			
@@ -239,9 +241,6 @@ public class Init {
 				ACell form=Reader.readResource("actors/torus.con");
 				ctx = ctx.deployActor(form);
 				Address addr=ctx.getResult();
-				if (ctx.isExceptional()) {
-					log.severe("Failure to deploy convex.asset: "+ctx.getExceptional());
-				}
 				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'torus.exchange "+addr+"))"));
 				TORUS_ADDRESS = addr;
 				s=ctx.getState();
@@ -252,11 +251,17 @@ public class Init {
 				Context<Address> ctx = Context.createFake(s, INIT);
 				ACell form = Reader.read(Utils.readResourceAsString("libraries/nft-tokens.con"));
 				ctx = ctx.deployActor(form);
-				if (ctx.isExceptional()) {
-					log.severe("Failure to deploy convex.nft-tokens: " + ctx.getExceptional());
-				}
 				Address addr=ctx.getResult();
 				NFT_ADDRESS = addr;
+				s = ctx.getState();
+			}
+			
+			{ // Deploy Simple NFT Actor
+				Context<Address> ctx = Context.createFake(s, INIT);
+				ACell form = Reader.read(Utils.readResourceAsString("libraries/simple-nft.con"));
+				ctx = ctx.deployActor(form);
+				Address addr=ctx.getResult();
+				SIMPLE_NFT_ADDRESS = addr;
 				s = ctx.getState();
 			}
 			
@@ -264,9 +269,6 @@ public class Init {
 				Context<Address> ctx = Context.createFake(s, HERO);
 				ACell form = Reader.read(Utils.readResourceAsString("libraries/box.con"));
 				ctx = ctx.deployActor(form);
-				if (ctx.isExceptional()) {
-					log.severe("Failure to deploy convex.box: " + ctx.getExceptional());
-				}
 				Address addr=ctx.getResult();
 				BOX_ADDRESS = addr;
 				s = ctx.getState();
