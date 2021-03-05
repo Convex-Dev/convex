@@ -1,5 +1,6 @@
 package convex.core;
 
+import java.io.IOException;
 import java.util.logging.Logger;
 
 import convex.core.crypto.AKeyPair;
@@ -257,20 +258,14 @@ public class Init {
 			}
 			
 			{ // Deploy Simple NFT Actor
-				Context<Address> ctx = Context.createFake(s, INIT);
-				ACell form = Reader.read(Utils.readResourceAsString("libraries/simple-nft.con"));
-				ctx = ctx.deployActor(form);
-				Address addr=ctx.getResult();
-				SIMPLE_NFT_ADDRESS = addr;
+				Context<Address> ctx = doActorDeploy(s,"asset.simple-nft","libraries/simple-nft.con");
+				SIMPLE_NFT_ADDRESS = ctx.getResult();
 				s = ctx.getState();
 			}
 			
 			{ // Deploy Box Actor
-				Context<Address> ctx = Context.createFake(s, HERO);
-				ACell form = Reader.read(Utils.readResourceAsString("libraries/box.con"));
-				ctx = ctx.deployActor(form);
-				Address addr=ctx.getResult();
-				BOX_ADDRESS = addr;
+				Context<Address> ctx = doActorDeploy(s,"asset.box","libraries/box.con");
+				BOX_ADDRESS = ctx.getResult();
 				s = ctx.getState();
 			}
 
@@ -280,6 +275,19 @@ public class Init {
 			log.severe("Error in Init initialiser!");
 			e.printStackTrace();
 			throw new Error(e);
+		}
+	}
+	
+	private static Context<Address> doActorDeploy(State s,String name, String resource) {
+		Context<Address> ctx = Context.createFake(s, INIT);
+		ACell form;
+		try {
+			form = Reader.read(Utils.readResourceAsString(resource));
+			ctx = ctx.deployActor(form);
+			if (ctx.isExceptional()) throw new Error("Error deploying actor: "+ctx.getValue());
+			return ctx;
+		} catch (IOException e) {
+			throw Utils.sneakyThrow(e);
 		}
 	}
 	
