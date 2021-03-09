@@ -96,7 +96,7 @@ public class ServerTest {
 		Connection pc = Connection.connect(hostAddress, handler, Stores.current());
 		AVector<CVMLong> v = Vectors.of(1l, 2l, 3l);
 		long id1 = pc.sendQuery(v,Init.HERO);
-		Utils.timeout(500, () -> results.get(id1) != null);
+		Utils.timeout(5000, () -> results.get(id1) != null);
 		assertEquals(v, results.get(id1));
 	}
 	
