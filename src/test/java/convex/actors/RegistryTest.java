@@ -63,7 +63,7 @@ public class RegistryTest {
 			Context<?> c=ctx.forkWithAddress(Init.VILLAIN);
 
 			// VILLAIN shouldn't be able to use update on existing CNS mapping
-			assertTrustError(step(c,"(call *registry* (cns-update :convex.test.foo *address*))"));
+			assertTrustError(step(c,"(call *registry* (cns-update 'convex.test.foo *address*))"));
 			
 			// original mapping should be held
 			assertEquals(realAddr,eval(c,"(call *registry* (cns-resolve :convex.test.foo))"));

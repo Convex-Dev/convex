@@ -235,7 +235,6 @@ public class Init {
 			{ // Deploy Torus Actor
 				Context<Address> ctx = doActorDeploy(s,"torus.exchange","actors/torus.con");
 				Address addr=ctx.getResult();
-				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'torus.exchange "+addr+"))"));
 				TORUS_ADDRESS = addr;
 				s=ctx.getState();
 			}
