@@ -69,6 +69,22 @@ public class RegistryTest {
 			assertEquals(realAddr,eval(c,"(call *registry* (cns-resolve :convex.test.foo))"));
 		}
 		
+		{ // Check Transfer of control to VILLAIN
+			Context<?> c=step(ctx,"(call *registry* (cns-control 'convex.test.foo "+Init.VILLAIN+"))");
+
+			// HERO shouldn't be able to use update or control any more
+			assertTrustError(step(c,"(call *registry* (cns-update 'convex.test.foo *address*))"));
+			assertTrustError(step(c,"(call *registry* (cns-control 'convex.test.foo *address*))"));
+			
+			// Switch to VILLAIN
+			c=c.forkWithAddress(Init.VILLAIN);
+			
+			// Change mapping
+			c=step(c,"(call *registry* (cns-update 'convex.test.foo *address*))");
+			assertNotError(c);
+			assertEquals(Init.VILLAIN,eval(c,"(call *registry* (cns-resolve :convex.test.foo))"));
+		}
+		
 		{ // Check VILLAIN can create new mapping
 			// TODO probably shouldn't be free-for-all?
 			
