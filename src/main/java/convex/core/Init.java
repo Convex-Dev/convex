@@ -299,8 +299,15 @@ public class Init {
 	private static Context<Address> doCurrencyDeploy(State s, AVector<ACell> row) {
 		String symbol=row.get(0).toString();
 		double usdValue=RT.jvm(row.get(6));
-		double liquidity=(Long)RT.jvm(row.get(4));
-		double cvx=liquidity*usdValue*1.0;
+		long decimals=RT.jvm(row.get(5));
+		
+		// currency liquidity in lowest currency division
+		double liquidity=(Long)RT.jvm(row.get(4))*Math.pow(10, decimals);
+		
+		// cvx price for unit
+		double price=usdValue*1000;
+		double cvx=price * liquidity / Math.pow(10, decimals);
+		
 		long supply = 1000000000000L;
 		Context<Address> ctx = Context.createFake(s, MAINBANK);
 		ctx=ctx.eval(Reader.read("(do (import convex.fungible :as fun) (deploy (fun/build-token {:supply "+supply+"})))"));
