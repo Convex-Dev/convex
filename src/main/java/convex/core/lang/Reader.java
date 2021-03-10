@@ -611,6 +611,13 @@ public class Reader extends BaseParser<ACell> {
 		reader.tempSource = source;
 		return doParse(new ReportingParseRunner<ACell>(reader.ExpressionInput()), source);
 	}
+	
+	public static ACell readResourceAsData(String path) throws IOException {
+		String source = Utils.readResourceAsString(path);
+		Reader reader = formReader.get(); 
+		reader.tempSource = source;
+		return doParse(new ReportingParseRunner<ACell>(reader.ExpressionInput()), source);
+	}
 
 	/**
 	 * Parses an expression list and returns a list of syntax objects

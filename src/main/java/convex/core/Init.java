@@ -21,6 +21,7 @@ import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.lang.Context;
 import convex.core.lang.Core;
+import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.Utils;
 
@@ -258,6 +259,17 @@ public class Init {
 				BOX_ADDRESS = ctx.getResult();
 				s = ctx.getState();
 			}
+			
+			{ // Deploy Currencies
+				@SuppressWarnings("unchecked")
+				AVector<AVector<ACell>> table=(AVector<AVector<ACell>>) Reader.readResourceAsData("torus/currencies.con");
+				for (AVector<ACell> row:table) {
+					Context<Address> ctx = doCurrencyDeploy(s,row);
+					// Address addr = ctx.getResult();
+					s = ctx.getState();
+				}
+			}
+
 
 
 			STATE = s;
@@ -284,6 +296,20 @@ public class Init {
 		}
 	}
 	
+	private static Context<Address> doCurrencyDeploy(State s, AVector<ACell> row) {
+		String symbol=row.get(0).toString();
+		double usdValue=RT.jvm(row.get(6));
+		double liquidity=(Long)RT.jvm(row.get(4));
+		double cvx=liquidity*usdValue/100.0;
+		long supply = 1000000000000L;
+		Context<Address> ctx = Context.createFake(s, MAINBANK);
+		ctx=ctx.eval(Reader.read("(do (import convex.fungible :as fun) (deploy (fun/build-token {:supply "+supply+"})))"));
+		Address addr=ctx.getResult();
+		ctx=ctx.eval(Reader.read("(do (import torus.exchange :as torus) (torus/add-liquidity "+addr+" "+liquidity+" "+cvx+"))"));
+		ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'currency."+symbol+" "+addr+"))"));
+		return ctx.withResult(addr);
+	}
+
 	private static State register(State state,Address origin, String name) {
 		Context<?> ctx = Context.createFake(state, origin);
 		ctx = ctx.actorCall(REGISTRY_ADDRESS, 0, "register",
