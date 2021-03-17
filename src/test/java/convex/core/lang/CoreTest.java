@@ -374,7 +374,7 @@ public class CoreTest {
 	public void testLogInActor() {
 		AVector<ACell> v0=Vectors.of(1L, 2L);
 
-		Context<?> c=step("(deploy '(do (defn event [& args] (apply log args)) (export event)))");
+		Context<?> c=step("(deploy '(do (defn event [& args] (apply log args)) (defn non-event [& args] (rollback (apply log args))) (export non-event event)))");
 		Address actor=(Address) c.getResult();
 		
 		assertEquals(0,c.getLog().count()); // Nothing logged so far
@@ -386,6 +386,13 @@ public class CoreTest {
 		AVector<AVector<ACell>> alog = log.get(actor);
 		assertEquals(1,alog.count()); // should be one entry by the actor
 		assertEquals(v0,alog.get(0));
+		
+		// call actor function which rolls back - should also roll back log
+		c=step(c,"(call "+actor+" (non-event 3 4))");
+		alog = log.get(actor);
+		assertEquals(1,alog.count()); // should be one entry by the actor
+		assertEquals(v0,alog.get(0));
+
 	}
 
 	@Test
