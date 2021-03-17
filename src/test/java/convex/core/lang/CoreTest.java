@@ -368,6 +368,25 @@ public class CoreTest {
 		assertEquals(v0,alog.get(0));
 		assertEquals(v1,alog.get(1));
 	}
+	
+	
+	@Test
+	public void testLogInActor() {
+		AVector<ACell> v0=Vectors.of(1L, 2L);
+
+		Context<?> c=step("(deploy '(do (defn event [& args] (apply log args)) (export event)))");
+		Address actor=(Address) c.getResult();
+		
+		assertEquals(0,c.getLog().count()); // Nothing logged so far
+	
+		// call actor function
+		c=step(c,"(call "+actor+" (event 1 2))");
+		ABlobMap<Address, AVector<AVector<ACell>>> log = c.getLog();
+		
+		AVector<AVector<ACell>> alog = log.get(actor);
+		assertEquals(1,alog.count()); // should be one entry by the actor
+		assertEquals(v0,alog.get(0));
+	}
 
 	@Test
 	public void testVector() {

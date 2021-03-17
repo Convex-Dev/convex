@@ -106,13 +106,13 @@ public class ContextTest {
 	@Test
 	public void testLog() {
 		Context<?> c = CTX.fork();
-		assertNull(c.getLog());
+		assertTrue(c.getLog().isEmpty());
 		
 		AVector<ACell> v=Vectors.of(1,2,3);
 		c.appendLog(v);
 		
 		ABlobMap<Address,AVector<AVector<ACell>>> log=c.getLog();
-		assertNotNull(log);
+		assertFalse(c.getLog().isEmpty());
 		
 		
 		AVector<AVector<ACell>> alog=log.get(c.getAddress());

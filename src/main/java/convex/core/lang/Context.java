@@ -18,6 +18,7 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.BlobMap;
+import convex.core.data.BlobMaps;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.MapEntry;
@@ -1841,7 +1842,19 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return BlobMap of addresses to log entries created in the course of current execution context.
 	 */
 	public ABlobMap<Address,AVector<AVector<ACell>>> getLog() {
+		if (log==null) return BlobMaps.empty();
 		return log;
+	}
+
+	/**
+	 * Gets the log for the specified address.
+	 * @param address
+	 * @return Vector of log entries for the given address
+	 */
+	public AVector<AVector<ACell>> getLog(Address address) {
+		AVector<AVector<ACell>> logs= getLog().get(address);
+		if (logs==null) return Vectors.empty();
+		return logs;
 	}
 
 
