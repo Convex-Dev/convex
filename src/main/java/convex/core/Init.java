@@ -173,8 +173,11 @@ public class Init {
 
 			State s = State.create(accts, peers, Sets.empty(), globals, BlobMaps.empty());
 
-			long total = s.computeTotalFunds();
-			if (total != Constants.MAX_SUPPLY) throw new Error("Bad total amount: " + total);
+			{ // Test total funds after creating user / peer accounts
+				long total = s.computeTotalFunds();
+			    if (total != Constants.MAX_SUPPLY) throw new Error("Bad total amount: " + total);
+			}
+			
 			if (s.getPeers().size() != NUM_PEERS) throw new Error("Bad peer count: " + s.getPeers().size());
 			if (s.getAccounts().size() != NUM_PEERS + NUM_USERS + NUM_GOVERNANCE) throw new Error("Bad account count");
 
@@ -187,6 +190,7 @@ public class Init {
 				TRUST_ADDRESS=(Address) ctx.getResult();;
 				s = ctx.getState();
 			}
+		
 			
 			{ // Deploy Registry Actor to fixed Address
 				Context<Address> ctx = Context.createFake(s, INIT);
@@ -197,6 +201,7 @@ public class Init {
 				s = ctx.getState();
 			}
 			
+				
 			{ // Register core libraries now that registry exists
 				Context<?> ctx = Context.createFake(s, INIT);
 				ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'convex.core "+CORE_ADDRESS+"))"));
@@ -207,6 +212,12 @@ public class Init {
 				s = register(s,TRUST_ADDRESS,"Trust Monitor Library");
 				s = register(s,MEMORY_EXCHANGE,"Memory Exchange Pool");
 			}
+			
+			{ // Test total funds after creating core libraries
+				long total = s.computeTotalFunds();
+			    if (total != Constants.MAX_SUPPLY) throw new Error("Bad total amount: " + total);
+			}
+
 			
 			// ============================================================
 			// Standard library deployment
@@ -270,7 +281,9 @@ public class Init {
 				}
 			}
 
-
+			// Final funds check
+			long finalTotal=s.computeTotalFunds();
+			if (finalTotal != Constants.MAX_SUPPLY) throw new Error("Bad total funds in init state amount: " + finalTotal);
 
 			STATE = s;
 		} catch (Throwable e) {
@@ -319,7 +332,7 @@ public class Init {
 
 	private static State register(State state,Address origin, String name) {
 		Context<?> ctx = Context.createFake(state, origin);
-		ctx = ctx.actorCall(REGISTRY_ADDRESS, 0, "register",
+		ctx = ctx.actorCall(REGISTRY_ADDRESS, 0L, "register",
 				Maps.of(Keywords.NAME, Strings.create(name)));
 		return ctx.getState();
 	}

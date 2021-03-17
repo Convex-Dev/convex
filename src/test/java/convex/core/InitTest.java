@@ -20,6 +20,8 @@ public class InitTest {
 		assertEquals(0,TestState.INITIAL_CONTEXT.getDepth());
 		assertNull(TestState.INITIAL_CONTEXT.getResult());
 		
+		assertEquals(TestState.TOTAL_FUNDS, s.computeTotalFunds());
+		
 		assertNotNull(Init.FIRST_PEER_KEY);
 	}
 	

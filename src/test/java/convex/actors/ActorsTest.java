@@ -141,19 +141,21 @@ public class ActorsTest {
 	
 	@Test public void testFundingContract() throws IOException {
 		Context<?> ctx=TestState.step("(do )");
+		
 		Address addr=ctx.getAddress();
-		long initialBalance=ctx.getBalance(addr);
 		
 		String contractString=Utils.readResourceAsString("contracts/funding.con");
 		ctx=TestState.step(ctx,"(def funcon (deploy '"+contractString+"))");
 		assertFalse(ctx.isExceptional());
 		Address caddr=(Address) ctx.getResult();
+		long initialBalance=ctx.getBalance(addr);
 		
 		{
 			// just test return of the correct *offer* value
 			ctx=TestState.step(ctx,"(call funcon 1234 (echo-offer))");
 			assertCVMEquals(1234,ctx.getResult());
 			assertEquals(initialBalance,ctx.getBalance(addr));
+			assertEquals(TestState.TOTAL_FUNDS,ctx.getState().computeTotalFunds());
 		} 
 		
 		{

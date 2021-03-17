@@ -259,6 +259,8 @@ public class TestState {
 		assertEquals(0,INITIAL_CONTEXT.getDepth());
 		assertFalse(INITIAL_CONTEXT.isExceptional());
 		assertNull(INITIAL_CONTEXT.getResult());
+		assertEquals(TestState.TOTAL_FUNDS, INITIAL.computeTotalFunds());
+
 	}
 
 	public static void main(String[] args) {

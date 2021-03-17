@@ -640,6 +640,24 @@ public class Core {
 			return context.withResult(juice, ref.getHash());
 		}
 	});
+	
+	public static final CoreFn<Hash> LOG = reg(new CoreFn<>(Symbols.LOG) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<Hash> invoke(Context context, ACell[] args) {
+			// any arity fine
+			int n=args.length;
+			long juice = Juice.LOG+Juice.BUILD_DATA+n*Juice.BUILD_PER_ELEMENT;
+			if (!context.checkJuice(juice)) {
+				return context.withJuiceError();
+			}
+			AVector<ACell> values=Vectors.create(args);
+			
+			context=context.appendLog(values);
+
+			return context.withResult(juice, values);
+		}
+	});
 
 	public static final CoreFn<ACell> FETCH = reg(new CoreFn<>(Symbols.FETCH) {
 		@SuppressWarnings("unchecked")

@@ -20,6 +20,7 @@ import convex.core.Init;
 import convex.core.State;
 import convex.core.crypto.Hash;
 import convex.core.data.ABlob;
+import convex.core.data.ABlobMap;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -341,6 +342,31 @@ public class CoreTest {
 
 		assertArityError(step("(store)"));
 		assertArityError(step("(store 1 2)"));
+	}
+	
+	@Test
+	public void testLog() {
+		AVector<ACell> v0=Vectors.of(1L, 2L);
+
+		Context<?> c=step("(log 1 2)");
+		assertEquals(v0,c.getResult());
+		ABlobMap<Address,AVector<AVector<ACell>>> log=c.getLog();
+		assertEquals(1,log.count()); // only one address did a log
+		assertNotNull(log);
+		
+		AVector<AVector<ACell>> alog=log.get(c.getAddress());
+		assertEquals(1,alog.count()); // one log entry only
+		assertEquals(v0,alog.get(0));
+		
+		// do second log in same context
+		AVector<ACell> v1=Vectors.of(3L, 4L);
+		c=step(c,"(log 3 4)");
+		log=c.getLog();
+		
+		alog=log.get(c.getAddress());
+		assertEquals(2,alog.count()); // should be two entries now
+		assertEquals(v0,alog.get(0));
+		assertEquals(v1,alog.get(1));
 	}
 
 	@Test

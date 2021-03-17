@@ -272,6 +272,8 @@ public class Symbols {
 	public static final Symbol CREATE_ACCOUNT = Symbol.create("create-account");
 	public static final Symbol SET_KEY = Symbol.create("set-key");
 	
+	public static final Symbol LOG = Symbol.create("log");
+	
 
 
 

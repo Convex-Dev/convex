@@ -17,6 +17,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Blob;
+import convex.core.data.BlobMap;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.MapEntry;
@@ -25,6 +26,7 @@ import convex.core.data.PeerStatus;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.expanders.AExpander;
@@ -64,6 +66,14 @@ import convex.core.util.Utils;
  * - Alan Perlis
  */
 public final class Context<T extends ACell> extends AObject {
+	private static final long INITIAL_JUICE = 0;
+	
+	// Default values
+	private static final ABlobMap<Address,AVector<AVector<ACell>>> DEFAULT_LOG = null;
+	private static int DEFAULT_DEPTH = 0;
+	private static final AExceptional DEFAULT_EXCEPTION = null;
+	private static final long DEFAULT_OFFER = 0L;
+	
 	// private static final Logger log=Logger.getLogger(Context.class.getName());
 
 	/*
@@ -79,6 +89,8 @@ public final class Context<T extends ACell> extends AObject {
 	private int depth;
 	private AHashMap<Symbol, ACell> localBindings;	
 	private ChainState chainState;
+	private ABlobMap<Address,AVector<AVector<ACell>>> log;
+
 	
 	/**
 	 * Inner class for less-frequently changing state related to Actor execution
@@ -158,29 +170,25 @@ public final class Context<T extends ACell> extends AObject {
 		}
 	}
 
-	private Context(ChainState chainState, long juice, AHashMap<Symbol, ACell> localBindings2, T result,int depth, AExceptional exception) {
+	private Context(ChainState chainState, long juice, AHashMap<Symbol, ACell> localBindings2, T result,int depth, AExceptional exception, ABlobMap<Address,AVector<AVector<ACell>>> log) {
 		this.chainState=chainState;
 		this.juice=juice;
 		this.localBindings=localBindings2;
 		this.result=result;
 		this.depth=depth;
 		this.exception=exception;
+		this.log=log;
 	}
 	
 	@SuppressWarnings("unchecked")
-	private static <T extends ACell> Context<T> create(ChainState cs, long juice, AHashMap<Symbol, ACell> localBindings, ACell result, int depth) {
+	private static <T extends ACell> Context<T> create(ChainState cs, long juice, AHashMap<Symbol, ACell> localBindings, ACell result, int depth,ABlobMap<Address,AVector<AVector<ACell>>> log) {
 		if (juice<0) throw new IllegalArgumentException("Negative juice! "+juice);
-		return new Context<T>(cs,juice,localBindings,(T)result,depth,null);
+		return new Context<T>(cs,juice,localBindings,(T)result,depth,DEFAULT_EXCEPTION,log);
 	}
 	
-	private static <T extends ACell> Context<T> create(State state, long juice,AHashMap<Symbol, ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer) {
+	private static <T extends ACell> Context<T> create(State state, long juice,AHashMap<Symbol, ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer, ABlobMap<Address,AVector<AVector<ACell>>> log) {
 		ChainState chainState=ChainState.create(state,origin,caller,address,offer);
-		return create(chainState,juice,localBindings,result,depth);
-	}
-	
-	private static <T extends ACell> Context<T> create(State state, long juice,AHashMap<Symbol, ACell> localBindings, T result, int depth, Address origin,Address caller, Address address) {
-		ChainState chainState=ChainState.create(state,origin,caller,address,0L);
-		return create(chainState,juice,localBindings,result,depth);
+		return create(chainState,juice,localBindings,result,depth,log);
 	}
 		
 	/**
@@ -207,7 +215,7 @@ public final class Context<T extends ACell> extends AObject {
 	 */
 	public static <R extends ACell> Context<R> createFake(State state, Address actor) {
 		if (actor==null) throw new Error("Null actor address!");
-		return create(state,Constants.MAX_TRANSACTION_JUICE,Maps.empty(),null,0,actor,null,actor);
+		return create(state,Constants.MAX_TRANSACTION_JUICE,Maps.empty(),null,0,actor,null,actor, 0, DEFAULT_LOG);
 	}
 	
 	/**
@@ -240,7 +248,7 @@ public final class Context<T extends ACell> extends AObject {
 		long newBalance=balance-reserve;
 		as=as.withBalance(newBalance);
 		state=state.putAccount(origin, as);
-		return create(state,juice,Maps.empty(),null,0,origin,null,origin);
+		return create(state,juice,Maps.empty(),null,DEFAULT_DEPTH,origin,null,origin,INITIAL_JUICE,DEFAULT_LOG);
 	}
 	
 
@@ -1160,7 +1168,7 @@ public final class Context<T extends ACell> extends AObject {
 			if (controlAccount==null) return ctx.withError(ErrorCodes.TRUST,"Cannot control address because controller does not exist: "+controller);
 			if (controlAccount.isActor()) {
 				// (call target amount (receive-coin source amount nil))
-				ctx=ctx.actorCall(controller,0,Symbols.CHECK_TRUSTED_Q,caller,null,address);
+				ctx=ctx.actorCall(controller,DEFAULT_OFFER,Symbols.CHECK_TRUSTED_Q,caller,null,address);
 				if (ctx.isExceptional()) return ctx;
 				canControl=RT.bool(ctx.getResult());
 			}
@@ -1169,7 +1177,7 @@ public final class Context<T extends ACell> extends AObject {
 		if (!canControl) return ctx.withError(ErrorCodes.TRUST,"Cannot control address: "+address);
 		
 		// SECURITY: eval with a context switch
-		final Context<R> exContext=Context.create(getState(), juice, Maps.empty(), null, depth+1, getOrigin(),caller, address,0);	
+		final Context<R> exContext=Context.create(getState(), juice, Maps.empty(), null, depth+1, getOrigin(),caller, address,0,log);	
 		
 		final Context<R> rContext=exContext.eval(form);
 		// SECURITY: must handle results as if returning from an actor call
@@ -1205,12 +1213,18 @@ public final class Context<T extends ACell> extends AObject {
 	 */
 	public <R extends ACell> Context<R> queryAs(Address address, ACell form) {
 		// chainstate with the target address as origin.
-		ChainState cs=ChainState.create(getState(),address,null,address,0L);
-		Context<R> ctx=Context.create(cs, juice, Maps.empty(), null, depth);
+		ChainState cs=ChainState.create(getState(),address,null,address,DEFAULT_OFFER);
+		Context<R> ctx=Context.create(cs, juice, Maps.empty(), null, depth,log);
 		ctx=ctx.evalAs(address, form);
 		return handleQueryResult(ctx);
 	}
 
+	/**
+	 * Just take result and juice from query. Log and state not kept.
+	 * @param <R>
+	 * @param ctx
+	 * @return
+	 */
 	protected <R extends ACell> Context<R> handleQueryResult(Context<R> ctx) {	
 		this.juice=ctx.getJuice();
 		return this.withValue(ctx.result);
@@ -1476,18 +1490,30 @@ public final class Context<T extends ACell> extends AObject {
 		IFn<R> fn=as.getExportedFunction(sym);
 		if (fn==null) return this.withError(ErrorCodes.STATE,"Account "+target+" does not have exported function: "+sym);
 
-		// Create new forked Context for execution of Actor call. 
-		// SECURITY: Increments depth, will be restored in handleStateResults
-		// SECURITY: Must change address to the target Actor address.
-		// SECURITY: Must change caller to current address.
-		final Context<R> exContext=Context.create(state, juice, Maps.empty(), null, depth+1, getOrigin(),getAddress(), target,offer);
+		// 
+		final Context<R> exContext=forkActorCall(state, target, offer);
 		
 		// INVOKE ACTOR FUNCTION
-		final Context<R> ctx=exContext.invoke(fn,args);
+		final Context<R> rctx=exContext.invoke(fn,args);
 		
 		// SECURITY: must handle state transitions in results correctly
 		// calling handleStateReturns on 'this' to ensure original values are restored
-		return handleStateResults(ctx,false);
+		return handleStateResults(rctx,false);
+	}
+
+	/**
+	 * Create new forked Context for execution of Actor call. 
+	 * SECURITY: Increments depth, will be restored in handleStateResults
+	 * SECURITY: Must change address to the target Actor address.
+	 * SECURITY: Must change caller to current address.
+	 * @param <R>
+	 * @param state for forked context.
+	 * @param target Target actor call address, will become new *address* for context
+	 * @param offer Offer amount for actor call. Must have been pre-subtracted from caller account.
+	 * @return
+	 */
+	private <R extends ACell> Context<R> forkActorCall(State state, Address target, long offer) {
+		return Context.create(state, juice, Maps.empty(), (R)null, depth+1, getOrigin(),getAddress(), target,offer, log);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -1529,6 +1555,9 @@ public final class Context<T extends ACell> extends AObject {
 			// take state from the returning context
 			returnState=returnContext.getState();
 			
+			// Take log from returning context
+			log=returnContext.getLog();
+			
 			// Refund offer
 			// Not necessary if rolling back to initial context before offer was subtracted
 			long refund=returnContext.getOffer();
@@ -1555,10 +1584,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * Argument argument must be an Actor generation code, which will be evaluated in the new Actor account 
 	 * to initialise the Actor
 	 * 
-	 * An Actor may be generated with a deterministic Address, in which case a repeated call with 
-	 * the same Actor generation code will always return the same Actor, without re-running the generation.
-	 * 
-	 * Result will contain the new Actor address if successful.
+	 * Result will contain the new Actor address if successful, an exception otherwise.
 	 * 
 	 * @param code Actor initialisation code
 	 * @return Updated Context with Actor deployed, or an exceptional result
@@ -1572,7 +1598,7 @@ public final class Context<T extends ACell> extends AObject {
 		if (stateSetup==null) return withError(ErrorCodes.STATE,"Contract deployment address conflict: "+address);
 		
 		// Deployment execution context with forked context and incremented depth
-		final Context<Address> exContext=Context.create(stateSetup, juice, Maps.empty(), null, depth+1, getOrigin(),getAddress(), address);
+		final Context<Address> exContext=Context.create(stateSetup, juice, Maps.empty(), null, depth+1, getOrigin(),getAddress(), address,DEFAULT_OFFER,log);
 		final Context<Address> rctx=exContext.eval(code);
 		
 		Context<Address> result=this.handleStateResults(rctx,false);
@@ -1671,7 +1697,7 @@ public final class Context<T extends ACell> extends AObject {
 	public Context<CVMLong> schedule(long time, AOp<ACell> op) {
 		// check vs current timestamp
 		long timestamp=getTimeStamp().longValue();
-		if (timestamp<0) return withError(ErrorCodes.ARGUMENT);
+		if (timestamp<0L) return withError(ErrorCodes.ARGUMENT);
 		if (time<timestamp) time=timestamp;
 		
 		long juice=(time-timestamp)/Juice.SCHEDULE_MILLIS_PER_JUICE_UNIT;
@@ -1777,12 +1803,45 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return A new forked Context
 	 */
 	public <R extends ACell> Context<R> fork() {
-		return new Context<R>(chainState, juice, localBindings, null,depth, null);
+		return new Context<R>(chainState, juice, localBindings, null,depth, null,log);
 	}
 
 	@Override
 	public Blob createEncoding() {
 		throw new TODOException();
+	}
+
+	/**
+	 * Appends a log entry for the current address.
+	 * @param values
+	 * @return Updated Context
+	 */
+	public Context<T> appendLog(AVector<ACell> values) {
+		Address addr=getAddress();
+		ABlobMap<Address,AVector<AVector<ACell>>> log=this.log;
+		if (log==null) {
+			log=BlobMap.create(addr, Vectors.of(values));
+		} else {
+			AVector<AVector<ACell>> vec=log.get(addr);
+			if (vec==null) {
+				vec=Vectors.of(values);
+			} else {
+				vec=vec.conj(values);
+			}
+			log=log.assoc(addr, vec);
+		}
+		
+		this.log=log;
+		return this;
+	}
+	
+	/**
+	 * Gets the log map for the current context.
+	 * 
+	 * @return BlobMap of addresses to log entries created in the course of current execution context.
+	 */
+	public ABlobMap<Address,AVector<AVector<ACell>>> getLog() {
+		return log;
 	}
 
 

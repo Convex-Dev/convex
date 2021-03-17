@@ -29,7 +29,6 @@ public class StakingTest {
 		Context<ACell> ctx1 = ctx0.setStake(Init.FIRST_PEER_KEY, 1000);
 		PeerStatus ps1 = ctx1.getState().getPeer(Init.FIRST_PEER_KEY);
 		assertEquals(1000L, ps1.getDelegatedStake());
-		assertEquals(TestState.TOTAL_FUNDS, ctx1.getState().computeTotalFunds());
 
 		// round tripping this should return to initial state precisely
 		// since we are not consuming any juice here, or adjusting anything other than
