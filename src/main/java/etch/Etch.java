@@ -67,9 +67,9 @@ public class Etch {
 	 */
 	private static final int INDEX_BLOCK_SIZE=POINTER_SIZE*256;
 	
-	// constants for memory mapping buffers
-	private static final int MAX_BUFFER_SIZE=1<<30; // 1GB seems reasonable
-	private static final int BUFFER_MARGIN=65536; // 64k margin for writes past end of current buffer
+	// constants for memory mapping buffers into manageable regions
+	private static final int MAX_REGION_SIZE=1<<30; // 1GB seems reasonable
+	private static final int REGION_MARGIN=65536; // 64k margin for writes past end of current buffer
 	
 	/**
 	 * Magic number for Etch files, must be first 2 bytes
@@ -128,7 +128,12 @@ public class Etch {
 
 	private final File file;
 	private final RandomAccessFile data;
-	private final ArrayList<MappedByteBuffer> dataMap=new ArrayList<>();
+	
+	/**
+	 * List of MappedByteBuffers for each region of the database file.
+	 */
+	private final ArrayList<MappedByteBuffer> regionMap=new ArrayList<>();
+	
 	private long dataLength=0;
 	
 	private boolean BUILD_CHAINS=true;
@@ -235,31 +240,49 @@ public class Etch {
 		position=slotPointer(position); // ensure we don't have any pesky type bits
 		
 		if ((position<0)||(position>dataLength)) {
-			throw new Error("Seek out of range in Etch file: "+Utils.toHexString(position)+ " file = "+file.getName());
+			throw new Error("Seek out of range in Etch file: position="+Utils.toHexString(position)+ " dataLength="+Utils.toHexString(dataLength)+" file="+file.getName());
 		}
-		int mapIndex=Utils.checkedInt(position/MAX_BUFFER_SIZE); // 1GB chunks
+		int mapIndex=Utils.checkedInt(position/MAX_REGION_SIZE); // 1GB chunks
 		
 		MappedByteBuffer mbb=(MappedByteBuffer) getBuffer(mapIndex).duplicate();
-		mbb.position(Utils.checkedInt(position-MAX_BUFFER_SIZE*(long)mapIndex));
+		mbb.position(Utils.checkedInt(position-MAX_REGION_SIZE*(long)mapIndex));
 		return mbb;
 	}
 
-	private MappedByteBuffer getBuffer(int mapIndex) throws IOException {
-		while(dataMap.size()<=mapIndex) dataMap.add(null);
-		MappedByteBuffer mbb=dataMap.get(mapIndex);
-		if ((mbb==null)||(mbb.capacity()<dataLength+BUFFER_MARGIN)) mbb=createBuffer(mapIndex);
+	private MappedByteBuffer getBuffer(int regionIndex) throws IOException {
+		// Get current mapped region, or null if out of range
+		int regionMapSize=regionMap.size();
+		MappedByteBuffer mbb=(regionIndex<regionMapSize)?regionMap.get(regionIndex):null;
+		
+		// Call createBuffer if mapped region does not exist, or is too small
+		if ((mbb==null)||(mbb.capacity()<dataLength+REGION_MARGIN)) mbb=createBuffer(regionIndex);
+		
 		return mbb;
 	}
 
-	private MappedByteBuffer createBuffer(int mapIndex) throws IOException {
-		long pos=mapIndex*(long)MAX_BUFFER_SIZE;
+	/**
+	 * Create a MappedByteBuffer at the specified region index position. 
+	 * 
+	 * CONCURRENCY: should be the only place where regionMap is modified.
+	 * 
+	 * @param regionIndex Index of database file region
+	 * @return
+	 * @throws IOException
+	 */
+	private synchronized MappedByteBuffer createBuffer(int regionIndex) throws IOException {
+		while(regionMap.size()<=regionIndex) regionMap.add(null);
+		
+		long pos=regionIndex*(long)MAX_REGION_SIZE;
+		
+		// Expand region size until big enough for current database plus appropriate margin
 		int length=1<<16;
-		while((length<MAX_BUFFER_SIZE)&&((pos+length)<(dataLength+BUFFER_MARGIN))) {
+		while((length<MAX_REGION_SIZE)&&((pos+length)<(dataLength+REGION_MARGIN))) {
 			length*=2;
 		}
-		length+=BUFFER_MARGIN; // include margin
+		
+		length+=REGION_MARGIN; // include margin in buffer length
 		MappedByteBuffer mbb= data.getChannel().map(MapMode.READ_WRITE, pos, length);
-		dataMap.set(mapIndex, mbb);
+		regionMap.set(regionIndex, mbb);
 		return mbb;
 	}
 
@@ -532,10 +555,10 @@ public class Etch {
 			mbb=null;
 			
 			// Force writes to disk. Probably useful.
-			for (MappedByteBuffer m: dataMap) {
+			for (MappedByteBuffer m: regionMap) {
 				m.force();
 			}
-			dataMap.clear();
+			regionMap.clear();
 			System.gc();
 			
 			data.close();
@@ -648,7 +671,7 @@ public class Etch {
 	 * @throws IOException
 	 */
 	public synchronized void flush() throws IOException {
-		for (MappedByteBuffer mbb: dataMap) {
+		for (MappedByteBuffer mbb: regionMap) {
 			if (mbb!=null) mbb.force();
 		}
 		data.getChannel().force(false);
