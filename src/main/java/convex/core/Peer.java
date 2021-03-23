@@ -2,6 +2,7 @@ package convex.core;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Hash;
@@ -328,6 +329,27 @@ public class Peer {
 		}
 		SignedData<Belief> sb = keyPair.signData(newBelief);
 		return new Peer(keyPair, sb, newStates, newResults, timestamp);
+	}
+	
+	/**
+	 * Persist the state of the Peer to the current store
+	 * @param noveltyHandler 
+	 * @return Updates Peer
+	 */
+	public Peer persistState(Consumer<Ref<ACell>> noveltyHandler) {
+		// Peer Belief must be announced using novelty handler
+		SignedData<Belief> sb=this.belief;
+		sb=Ref.createAnnounced(sb, noveltyHandler).getValue();
+		
+		// Persist states
+		AVector<State> newStates = this.states;
+		newStates=Ref.createPersisted(newStates).getValue();
+		
+		// Persist results
+		AVector<BlockResult> newResults = this.blockResults;
+		newResults=Ref.createPersisted(newResults).getValue();
+		
+		return new Peer(this.keyPair, sb, newStates, newResults, this.timestamp);
 	}
 
 	public AVector<State> getStates() {

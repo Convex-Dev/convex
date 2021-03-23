@@ -444,11 +444,15 @@ public class Server implements Closeable {
 			manager.broadcast(msg);
 		};
 
-		Ref.createAnnounced(belief, noveltyHandler);
+		// persist the state of the Peer, announcing the new Belief
+		peer=peer.persistState(noveltyHandler);
+		
+		// Broadcast latest Belief to connected Peers
 		SignedData<Belief> sb = peer.getSignedBelief();
 		Message msg = Message.createBelief(sb);
 		manager.broadcast(msg);
 
+		// Report transaction results
 		long newConsensusPoint = peer.getConsensusPoint();
 		if (newConsensusPoint > oldConsensusPoint) {
 			log.log(LEVEL_BELIEF, "Consenus update from " + oldConsensusPoint + " to " + newConsensusPoint);
