@@ -271,7 +271,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * Creates a persisted Ref with the given value in the current store.
 	 * 
 	 * Novelty handler is called for all new Refs that are persisted (recursively),
-	 * starting from lowest levels.
+	 * starting from lowest levels (depth first order)
 	 * 
 	 * @param value Any CVM value to persist
 	 * @return Persisted Ref

@@ -93,7 +93,7 @@ public class RefTest {
 
 	@Test
 	public void testPersistEmbeddedLong() {
-		Object val=RT.cvm(10001L);
+		ACell val=RT.cvm(10001L);
 		Ref<ACell> nr = Ref.get(val);
 		assertSame(nr.getValue(), nr.persist().getValue());
 		assertTrue(nr.isEmbedded());
