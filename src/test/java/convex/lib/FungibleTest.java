@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Init;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AMap;
 import convex.core.data.Address;
@@ -177,24 +178,38 @@ public class FungibleTest {
 			assertEquals(0L,evalL(c,"(fungible/balance token *address*)"));
 		}
 		
-		// Mint up to max and back down to zero
+		// Mint up to max and burn down to zero
 		{
 			Context<?> c=step(ctx,"(fungible/mint token 900)");
 			assertEquals(1000L,evalL(c,"(fungible/balance token *address*)"));
 	
-			c=step(c,"(fungible/burn token 800)");
-			assertEquals(200L,evalL(c,"(fungible/balance token *address*)"));
+			c=step(c,"(fungible/burn token 900)");
+			assertEquals(100L,evalL(c,"(fungible/balance token *address*)"));
+			
+			assertAssertError(step(c,"(fungible/burn token 101)")); // Fails, not held
 
-			c=step(c,"(fungible/burn token 200)");
+			c=step(c,"(fungible/burn token 100)");
 			assertEquals(0L,evalL(c,"(fungible/balance token *address*)"));
 			
-			c=step(c,"(fungible/burn token 200)");
-			assertAssertError(c);
+			assertAssertError(step(c,"(fungible/burn token 1)")); // Fails, not held
+		}
+
+		
+		// Shouldn't be possible to burn tokens in supply but not held
+		{
+			Context<?> c=step(ctx,"(fungible/mint token 900)");
+			assertEquals(1000L,evalL(c,"(fungible/balance token *address*)"));
+	
+			c=step(c,"(fungible/transfer token "+Init.VILLAIN+" 800)");
+			assertEquals(200L,evalL(c,"(fungible/balance token *address*)"));
+
+			assertAssertError(step(c,"(fungible/burn token 201)")); // Fails, not held
+			assertNotError(step(c,"(fungible/burn token 200)")); // OK since held
 		}
 		
 		// Illegal Minting amounts
 		{
-			assertError(step(ctx,"(fungible/mint token 901)")); // too much
+			assertError(step(ctx,"(fungible/mint token 901)")); // too much (exceeds max supply)
 			assertError(step(ctx,"(fungible/mint token -101)")); // too little
 		}
 		
