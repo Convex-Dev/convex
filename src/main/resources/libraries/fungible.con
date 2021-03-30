@@ -44,6 +44,15 @@
     [token amount]
     (call token (mint amount))) 
   
+  (defn burn 
+    ^{:doc {:description "Burns an amount of tokens for the given token. User must have minting privileges. Amount must be non-negative and no greater than the caller's balance."
+            :examples [{:code "(mint my-token-address 1000)"}]
+            :type :function
+            :signature [{:params [token amount]}]}
+      }
+    [token amount]
+    (call token (burn amount))) 
+  
   (defn build-token 
     ^{:doc {:description "Creates deployable code for a new fungible token. An optional config map can be provided"
             :examples [{:code "(deploy (build-token {:supply 1000000 :initial-holder *address*}))"}]
@@ -147,13 +156,24 @@
            (when-not (trust/trusted? minter *caller*) (fail :TRUST "No rights to mint"))
            (let [amount (long amount)
                  new-supply (+ supply amount)
-                 bal (balance *caller*)]
+                 bal (balance *caller*)
+                 new-bal (+ bal amount)]
+             (assert (<= 0 new-bal max-supply)) ;; mint amount
              (assert (<= 0 new-supply max-supply)) ;; new supply must be in valid range
-             (set-holding *caller* (+ bal amount))
+             (set-holding *caller* new-bal)
              (def supply new-supply)
              ))
          
-         (export mint))))
+         (defn burn [amount]
+           (when-not (trust/trusted? minter *caller*) (fail :TRUST "No rights to burn"))
+           (let [amount (long amount)
+                 bal (balance *caller*)]
+             (assert (<= 0 amount bal)) ;; burn amount must be less than or equal to caller's balance
+             (set-holding *caller* (- bal amount))
+             (def supply (- supply amount))
+             ))
+         
+         (export mint burn))))
   
   
   )

@@ -177,13 +177,28 @@ public class FungibleTest {
 			assertEquals(0L,evalL(c,"(fungible/balance token *address*)"));
 		}
 		
+		// Mint up to max and back down to zero
+		{
+			Context<?> c=step(ctx,"(fungible/mint token 900)");
+			assertEquals(1000L,evalL(c,"(fungible/balance token *address*)"));
+	
+			c=step(c,"(fungible/burn token 800)");
+			assertEquals(200L,evalL(c,"(fungible/balance token *address*)"));
+
+			c=step(c,"(fungible/burn token 200)");
+			assertEquals(0L,evalL(c,"(fungible/balance token *address*)"));
+			
+			c=step(c,"(fungible/burn token 200)");
+			assertAssertError(c);
+		}
+		
 		// Illegal Minting amounts
 		{
 			assertError(step(ctx,"(fungible/mint token 901)")); // too much
 			assertError(step(ctx,"(fungible/mint token -101)")); // too little
 		}
 		
-		// Villain shouldn't be able to mint
+		// Villain shouldn't be able to mint or burn
 		{
 			Context<?> c=ctx.forkWithAddress(VILLAIN);
 			c=step(c,"(def token "+token+")");
@@ -191,6 +206,8 @@ public class FungibleTest {
 			
 			assertTrustError(step(c,"(fungible/mint token 100)"));
 			assertTrustError(step(c,"(fungible/mint token 10000)")); // trust before amount checks
+
+			assertTrustError(step(c,"(fungible/burn token 100)"));
 		}
 	}
 	
