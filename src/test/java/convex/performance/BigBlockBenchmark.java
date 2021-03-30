@@ -13,9 +13,9 @@ import convex.core.Init;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519KeyPair;
+import convex.core.data.ACell;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.transactions.ATransaction;
@@ -56,7 +56,7 @@ public class BigBlockBenchmark {
 	@Benchmark
 	public void benchmark() throws BadSignatureException {
 		BlockResult br=state.applyBlock(block);
-		Ref.createPersisted(br.getState());
+		ACell.createPersisted(br.getState());
 	}
 
 	public static void main(String[] args) throws Exception {

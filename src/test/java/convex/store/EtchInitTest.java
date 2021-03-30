@@ -22,7 +22,7 @@ public class EtchInitTest {
 			Stores.setCurrent(EtchStore.createTemp());
 			
 			State s=Init.STATE;
-			Ref<State> sr=Ref.createPersisted(s);
+			Ref<State> sr=ACell.createPersisted(s);
 			
 			Hash hash=sr.getHash();
 			

@@ -257,47 +257,6 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	}
 
 	/**
-	 * Creates a persisted Ref with the given value in the current store. Returns
-	 * the current Ref if already persisted
-	 * 
-	 * @param value Any CVM value to persist
-	 * @return Ref to the given value
-	 */
-	public static <T extends ACell> Ref<T> createPersisted(T value) {
-		return createPersisted(value, null);
-	}
-
-	/**
-	 * Creates a persisted Ref with the given value in the current store.
-	 * 
-	 * Novelty handler is called for all new Refs that are persisted (recursively),
-	 * starting from lowest levels (depth first order)
-	 * 
-	 * @param value Any CVM value to persist
-	 * @return Persisted Ref
-	 */
-	public static <T extends ACell> Ref<T> createPersisted(T value, Consumer<Ref<ACell>> noveltyHandler) {
-		Ref<T> ref = Ref.get(value);
-		AStore store=Stores.current();
-		return (Ref<T>) store.storeTopRef(ref, Ref.PERSISTED,noveltyHandler);
-	}
-	
-	/**
-	 * Creates an ANNOUNCED Ref with the given value in the current store.
-	 * 
-	 * Novelty handler is called for all new Refs that are persisted (recursively),
-	 * starting from lowest levels.
-	 * 
-	 * @param value
-	 * @return Persisted Ref
-	 */
-	public static <T extends ACell> Ref<T> createAnnounced(T value, Consumer<Ref<ACell>> noveltyHandler) {
-		Ref<T> ref = Ref.get(value);
-		AStore store=Stores.current();
-		return (Ref<T>) store.storeTopRef(ref, Ref.ANNOUNCED,noveltyHandler);
-	}
-
-	/**
 	 * Creates a RefSoft using a specific Hash. Fetches the actual value lazily from the
 	 * store on demand.
 	 * 

@@ -46,7 +46,7 @@ public class GenTestFormat {
 
 	@Property
 	public void dataRoundTrip(@From(ValueGen.class) ACell value) throws BadFormatException {
-		Ref<ACell> pref = Ref.createPersisted(value); // ensure persisted
+		Ref<ACell> pref = ACell.createPersisted(value); // ensure persisted
 		Blob b = Format.encodedBlob(value);
 		ACell o = Format.read(b);
 

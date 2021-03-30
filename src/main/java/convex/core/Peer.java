@@ -110,8 +110,8 @@ public class Peer {
 		AVector<State> states=Vectors.of(initialState);
 		
 		// Ensure initial belief and states are persisted in current store
-		Ref.createPersisted(sb);
-		Ref.createPersisted(states);
+		ACell.createPersisted(sb);
+		ACell.createPersisted(states);
 		
 		// Check belief persistence
 		Ref<SignedData<Belief>> sbr=Ref.forHash(sb.getHash());
@@ -339,15 +339,15 @@ public class Peer {
 	public Peer persistState(Consumer<Ref<ACell>> noveltyHandler) {
 		// Peer Belief must be announced using novelty handler
 		SignedData<Belief> sb=this.belief;
-		sb=Ref.createAnnounced(sb, noveltyHandler).getValue();
+		sb=ACell.createAnnounced(sb, noveltyHandler).getValue();
 		
 		// Persist states
 		AVector<State> newStates = this.states;
-		newStates=Ref.createPersisted(newStates).getValue();
+		newStates=ACell.createPersisted(newStates).getValue();
 		
 		// Persist results
 		AVector<BlockResult> newResults = this.blockResults;
-		newResults=Ref.createPersisted(newResults).getValue();
+		newResults=ACell.createPersisted(newResults).getValue();
 		
 		return new Peer(this.keyPair, sb, newStates, newResults, this.timestamp);
 	}

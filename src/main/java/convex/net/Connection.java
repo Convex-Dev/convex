@@ -26,7 +26,6 @@ import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
-import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -351,7 +350,7 @@ public class Connection {
 		// Need to ensure message is persisted at least, so we can respond to missing data messages
 		// using the current threat store
 		ACell sendVal = payload;
-		Ref.createPersisted(sendVal, r -> {
+		ACell.createPersisted(sendVal, r -> {
 			try {
 				ACell data=r.getValue();
 				boolean sent = sendData(data);

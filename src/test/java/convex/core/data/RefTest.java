@@ -119,7 +119,7 @@ public class RefTest {
 
 	@Test
 	public void testCompare() {
-		assertEquals(0, Ref.get(RT.cvm(1L)).compareTo(Ref.createPersisted(RT.cvm(1L))));
+		assertEquals(0, Ref.get(RT.cvm(1L)).compareTo(ACell.createPersisted(RT.cvm(1L))));
 		assertEquals(1, Ref.get(RT.cvm(1L)).compareTo(
 				Ref.forHash(Hash.fromHex("0000000000000000000000000000000000000000000000000000000000000000"))));
 		assertEquals(-1, Ref.get(RT.cvm(1L)).compareTo(

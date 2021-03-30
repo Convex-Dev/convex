@@ -203,7 +203,7 @@ public class EtchStoreTest {
 			Hash dataHash = dataRef.getHash();
 			assertNull(store.refForHash(dataHash));
 
-			Ref.createPersisted(data,handler);
+			ACell.createPersisted(data,handler);
 			int num=al.size(); // number of novel cells persisted
 			assertTrue(num>0); // got new novelty
 			assertEquals(data, al.get(num-1).getValue());

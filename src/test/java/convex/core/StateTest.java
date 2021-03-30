@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Blob;
@@ -52,7 +53,7 @@ public class StateTest {
 		
 		assertEquals(0,s.getRef().getStatus());
 
-		Ref<State> rs = Ref.createPersisted(s);
+		Ref<State> rs = ACell.createPersisted(s);
 		assertEquals(Ref.PERSISTED, rs.getStatus());
 		
 		// Initial ref should not have changed status

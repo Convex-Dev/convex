@@ -341,7 +341,7 @@ public class Server implements Closeable {
 		SignedData<ATransaction> sd = (SignedData<ATransaction>) v.get(1);
 
 		// TODO: this should throw MissingDataException?
-		Ref.createPersisted(sd);
+		ACell.createPersisted(sd);
 
 		if (!sd.checkSignature()) {
 			// terminate the connection, dishonest client?
@@ -479,7 +479,7 @@ public class Server implements Closeable {
 			long timestamp = Utils.getCurrentTimestamp();
 			Block block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions, peer.getPeerKey());
 
-			Ref.createPersisted(block);
+			ACell.createPersisted(block);
 
 			try {
 				Peer newPeer = peer.proposeBlock(block);
@@ -776,7 +776,7 @@ public class Server implements Closeable {
 		try {
 			Stores.setCurrent(store);
 			ACell peerData = peer.toData();
-			Ref<?> peerRef = Ref.createPersisted(peerData);
+			Ref<?> peerRef = ACell.createPersisted(peerData);
 			Hash peerHash = peerRef.getHash();
 			store.setRootHash(peerHash);
 			log.info("Stored peer data for Server: " + peerHash.toHexString());

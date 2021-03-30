@@ -168,7 +168,7 @@ public class BlobsTest {
 
 		bb.validate();
 
-		Ref<BlobTree> rb = Ref.createPersisted(bb);
+		Ref<BlobTree> rb = ACell.createPersisted(bb);
 		BlobTree bbb = Format.read(bb.getEncoding());
 		bbb.validate();
 		assertEquals(bb, bbb);

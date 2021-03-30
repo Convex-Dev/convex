@@ -41,7 +41,7 @@ public class ParamTestNodes {
 
 	@Test
 	public void testHexRoundTrip() throws InvalidDataException, ValidationException {
-		Ref.createPersisted(data);
+		ACell.createPersisted(data);
 		String hex = data.getEncoding().toHexString();
 		Blob d2 = Blob.fromHex(hex);
 		ACell rec = Format.read(d2);

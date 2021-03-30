@@ -132,7 +132,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	protected void handleResultMessage(Message m) {
 		Result result = m.getPayload();
 		try {
-			Ref.createPersisted(result);
+			ACell.createPersisted(result);
 
 			// we now have the full result, so notify those interested
 			Object rv = result.getValue();

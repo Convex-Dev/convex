@@ -75,7 +75,7 @@ public class ObjectsTest {
 			assertNull(ms.refForHash(hash));
 			
 			// persist the Ref
-			Ref.createPersisted(a);
+			ACell.createPersisted(a);
 			
 			// retrieve from store
 			Ref<ACell> rr=ms.refForHash(hash);
