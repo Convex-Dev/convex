@@ -1,13 +1,13 @@
-package convex.api;
+package convex.cli;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * COnvex CLI implementation
+ * Convex CLI implementation
  */
-public class CLI {
+public class Main {
 	/**
 	 * Extracts config parameters and populates a config map. Removes handled parameters from arg list.
 	 * @return
