@@ -27,44 +27,46 @@ public class Main {
 		return config;
 	}
 	
-	public static void buildHelp(StringBuilder sb, List<String> commands) {
-		if (commands.size()==0) {
-			sb.append("Usage: convex [OPTIONS] COMMAND ... \n");
-			sb.append('\n');
-			
-			sb.append("Commands:\n");
-			sb.append("    peer                   "+"Operate a local peer.");
-			sb.append("    transact               "+"Executes a transaction on the network via the current peer.");
-			sb.append("    query                  "+"Executes a query on the current peer.");
-			sb.append("    status                 "+"Reports on the current status of the network.");
-			sb.append('\n');
-			
-			sb.append("Options:\n");
-			sb.append("    -h, --help             "+"Display help for the given command.");
-			sb.append("    -s, --server URL       "+"Specifies a peer server to use as current peer. Overrides configured peer if any.");
-			sb.append("    -c, --config FILE      "+"Use the specified config file. Defaults to ~/.convex/config");
-			sb.append("    -a, --address ADDRESS  "+"Use the specified user account address. Overrides configured Address if any.");
-		} else {
-			String cmd=commands.get(0);
-			switch (cmd) {
-			case "peer": {
-				break;
-			}
-			
-			default: sb.append("Command not known: "+cmd+"\n");
-			}
-		}
-	}
-	
 	public static void main(String[] args) {
 		List<String> argList=List.of(args);
 		Map<String,Object> config = parseConfig(argList);
-		StringBuilder sb= new StringBuilder();
 		
 		if (args.length==0 ||config.get("help")!=null) {
-			buildHelp(sb,argList);
+			runHelp(argList);
+		} else {
+			String cmd=argList.get(0);
+			if ("key".equals(cmd)) {
+				runKey(argList);
+			} else {
+				runUnknown(cmd);
+			}
+ 			
 		}
 		
+	}
+
+	private static void runKey(List<String> argList) {
+		int n=argList.size();
+		if (n==1) {
+			runHelp(argList);
+			return;
+		} 
+		
+		String cmd=argList.get(1);
+		if ("gen".equals(cmd)) {
+			
+		}
+	}
+
+	static void runUnknown(String cmd) {
+		System.out.println("Unrecognised command: "+cmd);
+		System.out.println("Expected key, peer, transact, query");
+		System.out.println("Use 'convex --help' for more information");
+	}
+
+	static void runHelp(List<String> argList) {
+		StringBuilder sb= new StringBuilder();
+		Help.buildHelp(sb,argList);
 		System.out.println(sb.toString());
 	}
 }
