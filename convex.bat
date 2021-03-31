@@ -1,0 +1,1 @@
+java -jar target/convex.jar %*

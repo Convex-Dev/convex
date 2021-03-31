@@ -10,17 +10,20 @@ public class Help {
 			sb.append('\n');
 			
 			sb.append("Commands:\n");
-			sb.append("    peer                   "+"Operate a local peer.");
-			sb.append("    transact               "+"Executes a transaction on the network via the current peer.");
-			sb.append("    query                  "+"Executes a query on the current peer.");
-			sb.append("    status                 "+"Reports on the current status of the network.");
+			sb.append(CLIUtils.buildTable(
+					"key",     "Manage local Convex key store.",
+					"peer",    "Operate a local peer.",
+					"transact","Execute a transaction on the network via the current peer.",
+					"query",   "Execute a query on the current peer.",
+					"status",  "Reports on the current status of the network."));
 			sb.append('\n');
 			
 			sb.append("Options:\n");
-			sb.append("    -h, --help             "+"Display help for the given command.");
-			sb.append("    -s, --server URL       "+"Specifies a peer server to use as current peer. Overrides configured peer if any.");
-			sb.append("    -c, --config FILE      "+"Use the specified config file. Defaults to ~/.convex/config");
-			sb.append("    -a, --address ADDRESS  "+"Use the specified user account address. Overrides configured Address if any.");
+			sb.append(CLIUtils.buildTable(
+					"-h, --help",           "Display help for the given command.",
+					"-s, --server URL",     "Specifies a peer server to use as current peer. Overrides configured peer if any.",
+					"-c, --config FILE",    "Use the specified config file. Defaults to ~/.convex/config",
+					"-a, --address ADDRESS","Use the specified user account address. Overrides configured Address if any."));
 		} else {
 			String cmd=commands.get(0);
 			switch (cmd) {
