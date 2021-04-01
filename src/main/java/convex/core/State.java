@@ -235,6 +235,11 @@ public class State extends ARecord {
 		return state.applyTransactions(block);
 	}
 
+	/**
+	 * Apply state updates consistent with time advancing to a given timestamp
+	 * @param b
+	 * @return
+	 */
 	private State applyTimeUpdates(Block b) {
 		State state = this;
 		long ts = ((CVMLong) state.globals.get(Symbols.TIMESTAMP)).longValue();
