@@ -18,6 +18,7 @@ import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
@@ -424,6 +425,43 @@ public class Peer {
 		return getBelief().getOrder(a);
 	}
 
+	/**
+	 * Returns State as-of timestamp.
+	 *
+	 * Useful for analytics.
+	 *
+	 * @param timestamp Timestamp in milliseconds.
+	 * @return State or null.
+	 */
+	public State asOf(CVMLong timestamp) {
+		return asOfSearch(0, getStates().count(), timestamp);
+	}
 
+	/**
+	 * (Binary) Search to find a State in a particular timestamp.
+	 *
+	 * @param start Start position of states.
+	 * @param end End position of states.
+	 * @param timestamp Timestamp in milliseconds we are looking for.
+	 * @return State or null if a State can't be found.
+	 */
+	public State asOfSearch(long start, long end, CVMLong timestamp) {
+		if (start >= end) {
+			return null;
+		}
+
+		long midpoint = (start + end) / 2;
+
+		State state = states.get(midpoint);
+
+		// FIXME Timestamp doesn't need to match.
+		if (state.getTimeStamp().longValue() == timestamp.longValue()) {
+			return state;
+		} else if (state.getTimeStamp().longValue() < timestamp.longValue()) {
+			return asOfSearch(midpoint + 1, end, timestamp);
+		} else {
+			return asOfSearch(start, midpoint, timestamp);
+		}
+	}
 
 }

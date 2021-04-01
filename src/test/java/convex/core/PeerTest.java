@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+import convex.core.data.prim.CVMLong;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
@@ -79,5 +80,21 @@ public class PeerTest {
 		assertEquals(1234L, ps2.getDelegatedStake(Init.HERO));
 		assertEquals(initialStake + 1234, ps2.getTotalStake());
 		assertEquals(initialStake, ps2.getOwnStake());
+	}
+
+	@Test
+	public void testAsOf() {
+		AKeyPair PEER0 = Init.KEYPAIRS[0];
+		Peer p = Peer.create(PEER0, TestState.INITIAL);
+
+		var timestamp = p.getStates().get(0).getTimeStamp();
+
+		// Find with an exact timestamp.
+		assertNotNull(p.asOf(timestamp));
+
+		// It searchs for an exact timestamp, therefore,
+		// neither of these timestamps are valid.
+		assertNull(p.asOf(CVMLong.create(timestamp.longValue() + 1)));
+		assertNull(p.asOf(CVMLong.create(timestamp.longValue() - 1)));
 	}
 }
