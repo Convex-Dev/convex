@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+import convex.core.data.AVector;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import org.junit.jupiter.api.Test;
 
@@ -89,12 +91,14 @@ public class PeerTest {
 
 		var timestamp = p.getStates().get(0).getTimeStamp();
 
-		// Find with an exact timestamp.
+		// Exact match.
 		assertNotNull(p.asOf(timestamp));
 
-		// It searchs for an exact timestamp, therefore,
-		// neither of these timestamps are valid.
-		assertNull(p.asOf(CVMLong.create(timestamp.longValue() + 1)));
+		// Approximate match.
+		assertNotNull(p.asOf(CVMLong.create(timestamp.longValue() + 1)));
+
+		// No match; timestamp is too old.
 		assertNull(p.asOf(CVMLong.create(timestamp.longValue() - 1)));
 	}
+
 }

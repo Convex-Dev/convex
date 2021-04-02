@@ -434,33 +434,34 @@ public class Peer {
 	 * @return State or null.
 	 */
 	public State asOf(CVMLong timestamp) {
-		return asOfSearch(0, getStates().count(), timestamp);
+		return asOfSearchLeftmost(timestamp);
 	}
 
-	/**
-	 * (Binary) Search to find a State in a particular timestamp.
-	 *
-	 * @param start Start position of states.
-	 * @param end End position of states.
-	 * @param timestamp Timestamp in milliseconds we are looking for.
-	 * @return State or null if a State can't be found.
-	 */
-	public State asOfSearch(long start, long end, CVMLong timestamp) {
-		if (start >= end) {
-			return null;
+	// TODO Extract to a generic leftmost binary search method.
+	public State asOfSearchLeftmost(CVMLong timestamp) {
+		long min = 0;
+		long max = states.count();
+
+		while (min < max) {
+			long midpoint = (min + max) / 2;
+
+			if (states.get(midpoint).getTimeStamp().longValue() < timestamp.longValue())
+				min = midpoint + 1;
+			else
+				max = midpoint;
 		}
 
-		long midpoint = (start + end) / 2;
-
-		State state = states.get(midpoint);
-
-		// FIXME Timestamp doesn't need to match.
-		if (state.getTimeStamp().longValue() == timestamp.longValue()) {
-			return state;
-		} else if (state.getTimeStamp().longValue() < timestamp.longValue()) {
-			return asOfSearch(midpoint + 1, end, timestamp);
+		// An 'as-of' match can be exact or approximate.
+		// In case there isn't an exact match,
+		// a leftmost search returns a rank (min)
+		// which is used to get the leftmost value.
+		if (min < states.count() && states.get(min).getTimeStamp().longValue() == timestamp.longValue()) {
+			return states.get(min);
 		} else {
-			return asOfSearch(start, midpoint, timestamp);
+			if (min - 1 == -1)
+				return null;
+
+			return states.get(min - 1);
 		}
 	}
 
