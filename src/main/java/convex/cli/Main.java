@@ -1,5 +1,6 @@
 package convex.cli;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +19,7 @@ public class Main {
 		while (i<args.size()) {
 			String arg=args.get(i);
 			if ("-h".equals(arg)||"--help".equals(arg)) {
-				config.put("help",true);
+				config.put("help","true");
 				args.remove(i);
 			} else {
 				i++;
@@ -27,8 +28,8 @@ public class Main {
 		return config;
 	}
 	
-	public static void main(String[] args) {
-		List<String> argList=List.of(args);
+	public static void main(String... args) {
+		List<String> argList=new ArrayList<>(List.of(args));
 		Map<String,Object> config = parseConfig(argList);
 		
 		if (args.length==0 ||config.get("help")!=null) {
