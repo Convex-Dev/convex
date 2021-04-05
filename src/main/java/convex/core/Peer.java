@@ -1,6 +1,7 @@
 package convex.core;
 
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -26,6 +27,7 @@ import convex.core.lang.Context;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
+import convex.core.util.Utils;
 
 /**
  * <p>
@@ -434,35 +436,7 @@ public class Peer {
 	 * @return State or null.
 	 */
 	public State asOf(CVMLong timestamp) {
-		return asOfSearchLeftmost(timestamp);
-	}
-
-	// TODO Extract to a generic leftmost binary search method.
-	public State asOfSearchLeftmost(CVMLong timestamp) {
-		long min = 0;
-		long max = states.count();
-
-		while (min < max) {
-			long midpoint = (min + max) / 2;
-
-			if (states.get(midpoint).getTimeStamp().longValue() < timestamp.longValue())
-				min = midpoint + 1;
-			else
-				max = midpoint;
-		}
-
-		// An 'as-of' match can be exact or approximate.
-		// In case there isn't an exact match,
-		// a leftmost search returns a rank (min)
-		// which is used to get the leftmost value.
-		if (min < states.count() && states.get(min).getTimeStamp().longValue() == timestamp.longValue()) {
-			return states.get(min);
-		} else {
-			if (min - 1 == -1)
-				return null;
-
-			return states.get(min - 1);
-		}
+		return Utils.binarySearchLeftmost(states, State::getTimeStamp, Comparator.comparingLong(CVMLong::longValue), timestamp);
 	}
 
 }

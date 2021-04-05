@@ -10,7 +10,12 @@ import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.function.Function;
 
+import convex.core.data.AVector;
+import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import org.junit.Test;
 
 import convex.core.data.Blob;
@@ -267,5 +272,26 @@ public class UtilsTest {
 
 		assertThrows(Error.class, () -> Utils.ednString(ByteBuffer.allocate(3)));
 
+	}
+
+	@Test
+	public void testBinarySearchLeftmost() {
+		AVector<CVMLong> L = Vectors.of(
+				CVMLong.create(1),
+				CVMLong.create(2),
+				CVMLong.create(3)
+		);
+
+		assertNull(Utils.binarySearchLeftmost(L, Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(0)));
+
+		assertEquals(
+				CVMLong.create(3),
+				Utils.binarySearchLeftmost(L, Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(3))
+		);
+
+		assertEquals(
+				CVMLong.create(3),
+				Utils.binarySearchLeftmost(L, Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(1000))
+		);
 	}
 }

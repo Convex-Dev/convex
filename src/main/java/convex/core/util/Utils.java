@@ -23,15 +23,9 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import convex.core.data.*;
 import org.apache.commons.text.StringEscapeUtils;
 
-import convex.core.data.AArrayBlob;
-import convex.core.data.ABlob;
-import convex.core.data.ACell;
-import convex.core.data.AObject;
-import convex.core.data.Blob;
-import convex.core.data.IRefFunction;
-import convex.core.data.Ref;
 import convex.core.exceptions.TODOException;
 
 public class Utils {
@@ -1216,6 +1210,34 @@ public class Utils {
 	
 	public static String escapeString(String s) {
 		return StringEscapeUtils.escapeJava(s);
+	}
+
+	public static <T extends ACell, U> T binarySearchLeftmost(AVector<T> L, Function<T, U> value, Comparator<U> comparator, U target) {
+		long min = 0;
+		long max = L.count();
+
+		while (min < max) {
+			long midpoint = (min + max) / 2;
+
+			if (comparator.compare(value.apply(L.get(midpoint)), target) < 0)
+				min = midpoint + 1;
+			else
+				max = midpoint;
+		}
+
+		// Match can be exact or approximate.
+		// In case there isn't an exact match,
+		// a leftmost search returns a rank (min)
+		// which is used to get the leftmost value.
+		if (min < L.count() && comparator.compare(value.apply(L.get(min)), target) == 0) {
+			return L.get(min);
+		} else {
+			if (min - 1 == -1)
+				return null;
+
+			return L.get(min - 1);
+		}
+
 	}
 
 }
