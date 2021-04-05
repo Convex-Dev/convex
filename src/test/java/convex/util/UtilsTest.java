@@ -279,6 +279,7 @@ public class UtilsTest {
 		AVector<CVMLong> L = Vectors.of(
 				CVMLong.create(1),
 				CVMLong.create(2),
+				CVMLong.create(2),
 				CVMLong.create(3)
 		);
 
@@ -286,6 +287,11 @@ public class UtilsTest {
 		assertNull(Utils.binarySearchLeftmost(L, Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(0)));
 
 		// Exact match.
+		assertEquals(
+				CVMLong.create(2),
+				Utils.binarySearchLeftmost(L, Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(2))
+		);
+
 		assertEquals(
 				CVMLong.create(3),
 				Utils.binarySearchLeftmost(L, Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(3))
@@ -297,4 +303,33 @@ public class UtilsTest {
 				Utils.binarySearchLeftmost(L, Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(1000))
 		);
 	}
+
+	@Test
+	public void testBinarySearchLeftmost2() {
+		AVector<AVector<CVMLong>> L = Vectors.of(
+				Vectors.of(1, 1),
+				Vectors.of(1, 2),
+				Vectors.of(2, 1),
+				Vectors.of(2, 2),
+				Vectors.of(2, 3),
+				Vectors.of(3, 1)
+		);
+
+		assertEquals(
+				Vectors.of(2, 1),
+				Utils.binarySearchLeftmost(L, a -> a.get(0), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(2))
+		);
+
+		assertEquals(
+				Vectors.of(1, 1),
+				Utils.binarySearchLeftmost(L, a -> a.get(0), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(1))
+		);
+
+	}
+
+	@Test
+	public void testBinarySearchLeftmost3() {
+		assertNull(Utils.binarySearchLeftmost(Vectors.empty(), Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(2)));
+	}
+
 }

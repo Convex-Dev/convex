@@ -430,7 +430,7 @@ public class Peer {
 	/**
 	 * Returns State as-of timestamp.
 	 *
-	 * Useful for analytics.
+	 * Timestamp doesn't need to be an exact match; a leftmost State will be returned - unless timestamp is too old.
 	 *
 	 * @param timestamp Timestamp in milliseconds.
 	 * @return State or null.

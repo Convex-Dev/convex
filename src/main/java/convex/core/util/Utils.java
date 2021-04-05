@@ -1230,7 +1230,7 @@ public class Utils {
 	 * @param <U> Type of the target value.
 	 * @return Target, or leftmost value, or null if there isn't a match.
 	 */
-	public static <T extends ACell, U> T binarySearchLeftmost(AVector<T> L, Function<T, U> value, Comparator<U> comparator, U target) {
+	public static <T extends ACell, U> T binarySearchLeftmost(ASequence<T> L, Function<T, U> value, Comparator<U> comparator, U target) {
 		long min = 0;
 		long max = L.count();
 
