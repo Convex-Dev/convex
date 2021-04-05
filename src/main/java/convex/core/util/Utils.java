@@ -1212,6 +1212,24 @@ public class Utils {
 		return StringEscapeUtils.escapeJava(s);
 	}
 
+	/**
+	 * Leftmost Binary Search.
+	 *
+	 * Generic method to search for an exact or approximate (leftmost) value.
+	 *
+	 * Examples:
+	 * Given a vector [1, 2, 3] and target 2: returns 2.
+	 * Given a vector [1, 2, 3] and target 5: returns 3.
+	 * Given a vector [1, 2, 3] and target 0: returns null.
+	 *
+	 * @param L Items.
+	 * @param value Function to get the value for comparison with target.
+	 * @param comparator How to compare value with target.
+	 * @param target Value being searched for.
+	 * @param <T> Type of the elements in L.
+	 * @param <U> Type of the target value.
+	 * @return Target, or leftmost value, or null if there isn't a match.
+	 */
 	public static <T extends ACell, U> T binarySearchLeftmost(AVector<T> L, Function<T, U> value, Comparator<U> comparator, U target) {
 		long min = 0;
 		long max = L.count();

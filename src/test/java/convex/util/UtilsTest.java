@@ -282,13 +282,16 @@ public class UtilsTest {
 				CVMLong.create(3)
 		);
 
+		// No match.
 		assertNull(Utils.binarySearchLeftmost(L, Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(0)));
 
+		// Exact match.
 		assertEquals(
 				CVMLong.create(3),
 				Utils.binarySearchLeftmost(L, Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(3))
 		);
 
+		// Approximate match: 3 is the leftmost element.
 		assertEquals(
 				CVMLong.create(3),
 				Utils.binarySearchLeftmost(L, Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(1000))
