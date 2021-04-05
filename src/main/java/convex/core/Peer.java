@@ -439,4 +439,24 @@ public class Peer {
 		return Utils.binarySearchLeftmost(states, State::getTimeStamp, Comparator.comparingLong(CVMLong::longValue), timestamp);
 	}
 
+	/**
+	 * Construct a vector of States starting at specified timestamp, and with a given interval in milliseconds.
+	 *
+	 * @param timestamp Timestamp in milliseconds.
+	 * @param interval Interval in milliseconds.
+	 * @param count Number of times to query.
+	 * @return Vector of States.
+	 */
+	public AVector<State> asOfRange(CVMLong timestamp, long interval, int count) {
+		AVector<State> v = Vectors.empty();
+
+		for (int i = 0; i < count; i++) {
+			v = v.conj(asOf(timestamp));
+
+			timestamp = CVMLong.create(timestamp.longValue() + interval);
+		}
+
+		return v;
+	}
+
 }
