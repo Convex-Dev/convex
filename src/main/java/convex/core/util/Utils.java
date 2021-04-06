@@ -23,7 +23,9 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import convex.core.State;
 import convex.core.data.*;
+import convex.core.data.prim.CVMLong;
 import org.apache.commons.text.StringEscapeUtils;
 
 import convex.core.exceptions.TODOException;
@@ -1256,6 +1258,22 @@ public class Utils {
 			return L.get(min - 1);
 		}
 
+	}
+
+	public static State stateAsOf(AVector<State> states, CVMLong timestamp) {
+		return binarySearchLeftmost(states, State::getTimeStamp, Comparator.comparingLong(CVMLong::longValue), timestamp);
+	}
+
+	public static AVector<State> statesAsOfRange(AVector<State> states, CVMLong timestamp, long interval, int count) {
+		AVector<State> v = Vectors.empty();
+
+		for (int i = 0; i < count; i++) {
+			v = v.conj(stateAsOf(states, timestamp));
+
+			timestamp = CVMLong.create(timestamp.longValue() + interval);
+		}
+
+		return v;
 	}
 
 }

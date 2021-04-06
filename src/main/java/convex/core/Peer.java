@@ -1,7 +1,6 @@
 package convex.core;
 
 import java.io.IOException;
-import java.util.Comparator;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -436,7 +435,7 @@ public class Peer {
 	 * @return State or null.
 	 */
 	public State asOf(CVMLong timestamp) {
-		return Utils.binarySearchLeftmost(states, State::getTimeStamp, Comparator.comparingLong(CVMLong::longValue), timestamp);
+		return Utils.stateAsOf(states, timestamp);
 	}
 
 	/**
@@ -448,15 +447,7 @@ public class Peer {
 	 * @return Vector of States.
 	 */
 	public AVector<State> asOfRange(CVMLong timestamp, long interval, int count) {
-		AVector<State> v = Vectors.empty();
-
-		for (int i = 0; i < count; i++) {
-			v = v.conj(asOf(timestamp));
-
-			timestamp = CVMLong.create(timestamp.longValue() + interval);
-		}
-
-		return v;
+		return Utils.statesAsOfRange(states, timestamp, interval, count);
 	}
 
 }
