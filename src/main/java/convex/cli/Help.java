@@ -40,4 +40,11 @@ public class Help {
 		}
 	}
 
+	static int runHelp(List<String> argList) {
+		StringBuilder sb= new StringBuilder();
+		buildHelp(sb,argList);
+		System.out.println(sb.toString());
+		return 0;
+	}
+
 }
