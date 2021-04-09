@@ -1,5 +1,6 @@
 package convex.util;
 
+import static convex.core.lang.TestState.INITIAL;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -13,9 +14,14 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.function.Function;
 
+import convex.core.Block;
+import convex.core.BlockResult;
+import convex.core.Init;
+import convex.core.State;
 import convex.core.data.AVector;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadSignatureException;
 import org.junit.Test;
 
 import convex.core.data.Blob;
@@ -330,6 +336,37 @@ public class UtilsTest {
 	@Test
 	public void testBinarySearchLeftmost3() {
 		assertNull(Utils.binarySearchLeftmost(Vectors.empty(), Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(2)));
+	}
+
+	@Test
+	public void testStatesAsOfRange() throws BadSignatureException {
+		AVector<State> states = Vectors.of(INITIAL);
+
+		for (int i = 0; i < 10; i++) {
+			State state0 = states.get(states.count() - 1);
+
+			long timestamp = state0.getTimeStamp().longValue() + 100;
+
+			Block block = Block.of(timestamp, Init.FIRST_PEER_KEY);
+
+			State state1 = state0.applyBlock(block).getState();
+
+			states = states.conj(state1);
+		}
+
+		AVector<State> statesInRange = Utils.statesAsOfRange(states, INITIAL.getTimeStamp(), 1000, 2);
+
+		assertEquals(2, statesInRange.count());
+
+		// First State in range must be the INITIAL value.
+		assertEquals(INITIAL, statesInRange.get(0));
+
+		// Since each iteration to create a snapshot of State is advanced 100 milliseconds,
+		// the last State's timestamp in range is the same as the initial timestamp + 1000 milliseconds.
+		assertEquals(
+				CVMLong.create(INITIAL.getTimeStamp().longValue() + 1000),
+				statesInRange.get(statesInRange.count() - 1).getTimeStamp()
+		);
 	}
 
 }
