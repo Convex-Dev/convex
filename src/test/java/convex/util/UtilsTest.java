@@ -361,8 +361,8 @@ public class UtilsTest {
 		// First State in range must be the INITIAL value.
 		assertEquals(INITIAL, statesInRange.get(0));
 
-		// Since each iteration to create a snapshot of State is advanced 100 milliseconds,
-		// the last State's timestamp in range is the same as the initial timestamp + 1000 milliseconds.
+		// Since each iteration creates a snapshot of State advances by 100 milliseconds,
+		// the last State's timestamp in the range is the same as the initial timestamp + 1000 milliseconds.
 		assertEquals(
 				CVMLong.create(INITIAL.getTimeStamp().longValue() + 1000),
 				statesInRange.get(statesInRange.count() - 1).getTimeStamp()
