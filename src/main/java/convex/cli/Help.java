@@ -34,6 +34,15 @@ public class Help {
 				Key.buildKeyHelp(sb, commands);
 				break;
 			}
+			case "transact": {
+				CLIClient.buildTransactHelp(sb, commands);
+				break;
+			}
+			case "query": {
+				CLIClient.buildQueryHelp(sb, commands);
+				break;
+			}
+			
 			
 			default: sb.append("Command not known: "+cmd+"\n");
 			}

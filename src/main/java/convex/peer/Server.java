@@ -218,8 +218,8 @@ public class Server implements Closeable {
 		Integer port = (p == null) ? null : Utils.toInt(p);
 
 		try {
-			nio.launch();
-			port = nio.getPort();
+			nio.launch(port);
+			port = nio.getPort(); // get the actual port (may be auto-allocated)
 
 			// set running status now, so that loops don't terminate
 			running = true;

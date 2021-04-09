@@ -38,6 +38,10 @@ public class Main {
 					cmdConfig.put("address",args.get(i+1));
 					args.remove(i);
 					args.remove(i);
+			} else if ("--port".equals(arg)) {
+				cmdConfig.put("port",args.get(i+1));
+				args.remove(i);
+				args.remove(i);
 			} else if ("-k".equals(arg)||"--keystore".equals(arg)) {
 				cmdConfig.put("keystore",args.get(i+1));
 				args.remove(i);
@@ -85,6 +89,10 @@ public class Main {
 				retVal=Key.runKey(argList,config);
 			} else if ("peer".equals(cmd)) {
 				retVal=Peer.runPeer(argList,config);
+			} else if ("transact".equals(cmd)) {
+				retVal=CLIClient.runTransact(argList,config);
+			} else if ("query".equals(cmd)) {
+				retVal=CLIClient.runQuery(argList,config);
 			} else{
 				retVal=runUnknown(cmd);
 			}

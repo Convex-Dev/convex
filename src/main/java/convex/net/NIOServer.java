@@ -57,8 +57,8 @@ public class NIOServer implements Closeable {
 		return new NIOServer(server,receiveQueue);
 	}
 	
-	public void launch() {
-		Integer port=server.getPort();
+	public void launch(Integer port) {
+		if (port==null) port=0;
 		
 		try {
 			ssc=ServerSocketChannel.open();

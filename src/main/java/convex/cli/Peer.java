@@ -7,6 +7,7 @@ import java.util.Properties;
 
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.util.Utils;
 import convex.peer.API;
 import convex.peer.Server;
 
@@ -46,11 +47,13 @@ public class Peer {
 
 	private static int runStart(Properties config) {
 		System.out.println("Starting peer...");
+		
+		// Parse peer config
 		Map<Keyword,Object> pc=new HashMap<>();
 		
 		String port=config.getProperty("port");
 		if (port!=null) {
-			pc.put(Keywords.PORT, Integer.parseInt(port));
+			pc.put(Keywords.PORT, Utils.toInt(port));
 		}
 		
 		Server s = API.launchPeer(pc);
