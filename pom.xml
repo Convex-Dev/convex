@@ -10,7 +10,7 @@
 		<maven.compiler.target>11</maven.compiler.target>
 		<maven.compiler.source>11</maven.compiler.source>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<jmh.version>1.27</jmh.version>
+		<jmh.version>1.29</jmh.version>
 		<slf4j.version>1.7.30</slf4j.version>
 
 		<!--Freeze this for reproducible builds. -->
@@ -206,7 +206,7 @@
 		<dependency>
 			<groupId>io.github.vincenzopalazzo</groupId>
 			<artifactId>material-ui-swing</artifactId>
-			<version>1.1.1-rc4</version>
+			<version>1.1.2-rc2</version>
 			<exclusions>
 				<exclusion>
 					<groupId>ch.qos.logback</groupId>
@@ -223,7 +223,7 @@
 		<dependency>
 			<groupId>org.apache.logging.log4j</groupId>
 			<artifactId>log4j-to-slf4j</artifactId>
-			<version>2.0</version>
+			<version>2.14.1</version>
 		</dependency>
 
 	</dependencies>
