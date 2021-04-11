@@ -24,6 +24,28 @@ This repository contains the core Convex distribution including:
 
 ## Running Convex
 
+### Command Line Interface (CLI)
+
+Convex is available to run as a CLI application out of the box. After building (with e.g. `mvn install`) it can be run directly as an executable `jar` file:
+
+```
+java -jar target/convex.jar <args>
+```
+
+Or using the convenience batch / shell scripts:
+
+```
+convex <args>
+```
+
+A common usage of the CLI would be to start a Convex peer:
+
+```
+convex peer start
+```
+
+Which initiates a peer server using the current local configuration.
+
 ### Peer manager
 
 The convex Peer Manager (GUI application) can be used to run a local test network.
