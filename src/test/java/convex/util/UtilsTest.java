@@ -1,5 +1,6 @@
 package convex.util;
 
+import static convex.core.lang.TestState.INITIAL;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -10,11 +11,19 @@ import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.function.Function;
 
+import convex.core.*;
+import convex.core.crypto.AKeyPair;
+import convex.core.data.*;
+import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadSignatureException;
+import convex.core.lang.TestState;
+import convex.core.transactions.ATransaction;
+import convex.core.transactions.Invoke;
 import org.junit.Test;
 
-import convex.core.data.Blob;
-import convex.core.data.Maps;
 import convex.core.util.Bits;
 import convex.core.util.Utils;
 
@@ -268,4 +277,100 @@ public class UtilsTest {
 		assertThrows(Error.class, () -> Utils.ednString(ByteBuffer.allocate(3)));
 
 	}
+
+	@Test
+	public void testBinarySearchLeftmost() {
+		AVector<CVMLong> L = Vectors.of(
+				CVMLong.create(1),
+				CVMLong.create(2),
+				CVMLong.create(2),
+				CVMLong.create(3)
+		);
+
+		// No match.
+		assertNull(Utils.binarySearchLeftmost(L, Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(0)));
+
+		// Exact match.
+		assertEquals(
+				CVMLong.create(2),
+				Utils.binarySearchLeftmost(L, Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(2))
+		);
+
+		assertEquals(
+				CVMLong.create(3),
+				Utils.binarySearchLeftmost(L, Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(3))
+		);
+
+		// Approximate match: 3 is the leftmost element.
+		assertEquals(
+				CVMLong.create(3),
+				Utils.binarySearchLeftmost(L, Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(1000))
+		);
+	}
+
+	@Test
+	public void testBinarySearchLeftmost2() {
+		AVector<AVector<CVMLong>> L = Vectors.of(
+				Vectors.of(1, 1),
+				Vectors.of(1, 2),
+				Vectors.of(2, 1),
+				Vectors.of(2, 2),
+				Vectors.of(2, 3),
+				Vectors.of(3, 1)
+		);
+
+		assertEquals(
+				Vectors.of(2, 1),
+				Utils.binarySearchLeftmost(L, a -> a.get(0), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(2))
+		);
+
+		assertEquals(
+				Vectors.of(1, 1),
+				Utils.binarySearchLeftmost(L, a -> a.get(0), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(1))
+		);
+
+	}
+
+	@Test
+	public void testBinarySearchLeftmost3() {
+		assertNull(Utils.binarySearchLeftmost(Vectors.empty(), Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(2)));
+	}
+
+	@Test
+	public void testStatesAsOfRange() throws BadSignatureException {
+		Peer peer = Peer.create(Init.KEYPAIRS[0], TestState.INITIAL);
+
+		AVector<State> states = Vectors.of(INITIAL);
+
+		for (int i = 0; i < 10; i++) {
+			State state0 = states.get(states.count() - 1);
+
+			long timestamp = state0.getTimeStamp().longValue() + 100;
+
+			String command = "(def x " + timestamp + ")";
+
+			SignedData<ATransaction> data = peer.sign(Invoke.create(Init.HERO, timestamp, command));
+
+			Block block = Block.of(timestamp, Init.FIRST_PEER_KEY, data);
+
+			State state1 = state0.applyBlock(block).getState();
+
+			states = states.conj(state1);
+		}
+
+		AVector<State> statesInRange = Utils.statesAsOfRange(states, INITIAL.getTimeStamp(), 1000, 2);
+
+		assertEquals(2, statesInRange.count());
+
+		// First State in range must be the INITIAL value.
+		assertEquals(INITIAL, statesInRange.get(0));
+
+		// Since each iteration creates a snapshot of State advances by 100 milliseconds,
+		// the last State's timestamp in the range is the same as the initial timestamp + 1000 milliseconds.
+		assertEquals(
+				CVMLong.create(INITIAL.getTimeStamp().longValue() + 1000),
+				statesInRange.get(statesInRange.count() - 1).getTimeStamp()
+		);
+	}
+
 }

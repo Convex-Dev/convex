@@ -18,6 +18,7 @@ import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
@@ -25,6 +26,7 @@ import convex.core.lang.Context;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
+import convex.core.util.Utils;
 
 /**
  * <p>
@@ -424,6 +426,28 @@ public class Peer {
 		return getBelief().getOrder(a);
 	}
 
+	/**
+	 * Returns State as-of timestamp.
+	 *
+	 * Timestamp doesn't need to be an exact match; a leftmost State will be returned - unless timestamp is too old.
+	 *
+	 * @param timestamp Timestamp in milliseconds.
+	 * @return State or null.
+	 */
+	public State asOf(CVMLong timestamp) {
+		return Utils.stateAsOf(states, timestamp);
+	}
 
+	/**
+	 * Construct a vector of States starting at specified timestamp, and with a given interval in milliseconds.
+	 *
+	 * @param timestamp Timestamp in milliseconds.
+	 * @param interval Interval in milliseconds.
+	 * @param count Number of times to query.
+	 * @return Vector of States.
+	 */
+	public AVector<State> asOfRange(CVMLong timestamp, long interval, int count) {
+		return Utils.statesAsOfRange(states, timestamp, interval, count);
+	}
 
 }

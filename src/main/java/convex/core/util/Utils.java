@@ -23,15 +23,11 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import convex.core.State;
+import convex.core.data.*;
+import convex.core.data.prim.CVMLong;
 import org.apache.commons.text.StringEscapeUtils;
 
-import convex.core.data.AArrayBlob;
-import convex.core.data.ABlob;
-import convex.core.data.ACell;
-import convex.core.data.AObject;
-import convex.core.data.Blob;
-import convex.core.data.IRefFunction;
-import convex.core.data.Ref;
 import convex.core.exceptions.TODOException;
 
 public class Utils {
@@ -1216,6 +1212,68 @@ public class Utils {
 	
 	public static String escapeString(String s) {
 		return StringEscapeUtils.escapeJava(s);
+	}
+
+	/**
+	 * Leftmost Binary Search.
+	 *
+	 * Generic method to search for an exact or approximate (leftmost) value.
+	 *
+	 * Examples:
+	 * Given a vector [1, 2, 3] and target 2: returns 2.
+	 * Given a vector [1, 2, 3] and target 5: returns 3.
+	 * Given a vector [1, 2, 3] and target 0: returns null.
+	 *
+	 * @param L Items.
+	 * @param value Function to get the value for comparison with target.
+	 * @param comparator How to compare value with target.
+	 * @param target Value being searched for.
+	 * @param <T> Type of the elements in L.
+	 * @param <U> Type of the target value.
+	 * @return Target, or leftmost value, or null if there isn't a match.
+	 */
+	public static <T extends ACell, U> T binarySearchLeftmost(ASequence<T> L, Function<T, U> value, Comparator<U> comparator, U target) {
+		long min = 0;
+		long max = L.count();
+
+		while (min < max) {
+			long midpoint = (min + max) / 2;
+
+			if (comparator.compare(value.apply(L.get(midpoint)), target) < 0)
+				min = midpoint + 1;
+			else
+				max = midpoint;
+		}
+
+		// Match can be exact or approximate.
+		// In case there isn't an exact match,
+		// a leftmost search returns a rank (min)
+		// which is used to get the leftmost value.
+		if (min < L.count() && comparator.compare(value.apply(L.get(min)), target) == 0) {
+			return L.get(min);
+		} else {
+			if (min - 1 == -1)
+				return null;
+
+			return L.get(min - 1);
+		}
+
+	}
+
+	public static State stateAsOf(AVector<State> states, CVMLong timestamp) {
+		return binarySearchLeftmost(states, State::getTimeStamp, Comparator.comparingLong(CVMLong::longValue), timestamp);
+	}
+
+	public static AVector<State> statesAsOfRange(AVector<State> states, CVMLong timestamp, long interval, int count) {
+		AVector<State> v = Vectors.empty();
+
+		for (int i = 0; i < count; i++) {
+			v = v.conj(stateAsOf(states, timestamp));
+
+			timestamp = CVMLong.create(timestamp.longValue() + interval);
+		}
+
+		return v;
 	}
 
 }

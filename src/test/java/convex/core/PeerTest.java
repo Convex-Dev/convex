@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+import convex.core.data.AVector;
+import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
@@ -80,4 +83,41 @@ public class PeerTest {
 		assertEquals(initialStake + 1234, ps2.getTotalStake());
 		assertEquals(initialStake, ps2.getOwnStake());
 	}
+
+	@Test
+	public void testAsOf() {
+		AKeyPair PEER0 = Init.KEYPAIRS[0];
+		Peer p = Peer.create(PEER0, TestState.INITIAL);
+
+		CVMLong timestamp = p.getStates().get(0).getTimeStamp();
+
+		// Exact match.
+		assertNotNull(p.asOf(timestamp));
+
+		// Approximate match.
+		assertNotNull(p.asOf(CVMLong.create(timestamp.longValue() + 1)));
+
+		// No match; timestamp is too old.
+		assertNull(p.asOf(CVMLong.create(timestamp.longValue() - 1)));
+	}
+
+	@Test
+	public void testAsOfRange() {
+		AKeyPair PEER0 = Init.KEYPAIRS[0];
+		Peer p = Peer.create(PEER0, TestState.INITIAL);
+
+		CVMLong initialTimestamp = p.getStates().get(0).getTimeStamp();
+
+		assertEquals(0, p.asOfRange(CVMLong.create(0), 0, 0).count());
+		assertEquals(0, p.asOfRange(initialTimestamp, 0, 0).count());
+		assertEquals(1, p.asOfRange(initialTimestamp, 0, 1).count());
+
+		// It's important to notice that timestamp can be in the future,
+		// and that is fine because 'asOf' returns the leftmost value.
+		//
+		// Peer 'p' has a single State but we are asking to query every minute (5x):
+		// timestamp, timestamp + 1 min, timestamp + 2 min, timestamp + 3 min, timestamp + 4 min.
+		assertEquals(5, p.asOfRange(initialTimestamp, 1000 * 60, 5).count());
+	}
+
 }
