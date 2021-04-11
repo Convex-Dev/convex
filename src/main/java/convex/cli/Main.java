@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 /**
  * Convex CLI implementation
@@ -54,12 +55,15 @@ public class Main {
 		// Merge into default properties
 		Properties config=new Properties();
 		
+		// Config file name commed from command line first, then default
 		String fname=cmdConfig.getProperty("config");
 		if (fname==null) fname=DEFAULT_CONFIG_FILE;
 		File f=new File(fname);
+		
 		if (f.exists()) {
 			try(FileInputStream input = new FileInputStream(f)) {
 				config.load(new FileInputStream(f));
+				config.setProperty("config", fname); // Set if successfully loaded
 			} catch (IOException e) {
 				e.printStackTrace();
 				System.out.println("Failed to read config file: "+f);
@@ -85,7 +89,9 @@ public class Main {
 			retVal=Help.runHelp(argList);
 		} else {
 			String cmd=argList.get(0);
-			if ("help".equals(cmd)) {
+			if ("config".equals(cmd)) {
+				retVal=runConfig(argList,config);
+			} else if ("help".equals(cmd)) {
 				argList.remove(0);
 				retVal=Help.runHelp(argList);
 			} else if ("key".equals(cmd)) {
@@ -104,9 +110,31 @@ public class Main {
 		System.exit(retVal);
 	}
 
+	@SuppressWarnings("rawtypes")
+	private static int runConfig(List<String> argList, Properties config) {
+		// Print source config file. Note this works as a .propertioes file comment so output can be piped to a new properties file if desired.
+		String configFile=config.getProperty("config");
+		if (configFile!=null) {
+			System.out.println("# Using configuration file: "+config.getProperty("config"));
+		} else {
+			System.out.println("# Note: Config file not found");
+		}
+		
+		Set<Map.Entry<Object,Object>> configEntries=config.entrySet();
+		if (configEntries.size()==0)  {
+			System.out.println("# Note: No config entries set");
+		} else {
+			// Display individual entries
+			for (Map.Entry e:configEntries) {
+				System.out.println(e.getKey()+" = "+e.getValue());
+			}
+		}
+		return 0;
+	}
+
 	static int runUnknown(String cmd) {
 		System.out.println("Unrecognised command: "+cmd);
-		System.out.println("Expected key, peer, transact, query, help");
+		System.out.println("Expected key, peer, transact, query, config, help");
 		System.out.println("Use 'convex --help' for more information");
 		return 1;
 	}

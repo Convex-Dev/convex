@@ -33,6 +33,12 @@ public class CLIClient {
 		sb.append('\n');
 		sb.append("Where:");
 		sb.append("  <code>  = A valid Convex Lisp expression");
+		sb.append('\n');
+		sb.append("Executes a transaction on the Convex network, submitted via a Convex Peer server.");
+		sb.append('\n');
+		sb.append("To execute a transaction sucessfully:\n");
+		sb.append(" A) The Peer Server must be accessible and accepting client transactions.\n");
+		sb.append(" B) The transaction must be signed using the correct private key for the Account.\n");
 		sb.append('\n');		
 		sb.append("Options:\n");
 		sb.append(optionTable);
@@ -113,7 +119,7 @@ public class CLIClient {
 	/**
 	 * Create a Convex client connection using the given configuration properties
 	 * @param config
-	 * @return
+	 * @return Convex client connection instance
 	 */
 	public static Convex connect(Properties config) {
 		String server=config.getProperty("server");
@@ -121,10 +127,11 @@ public class CLIClient {
 		
 		Integer port=null;
 		String ps=config.getProperty("port");
-		try {
+		if (ps!=null) try {
 			port=Utils.toInt(ps);
 		} catch (Throwable t) {
-			// ignore
+			System.out.println("Bad port specified: "+ps);
+			return null;
 		}
 		if (port==null) port=43579;
 		
