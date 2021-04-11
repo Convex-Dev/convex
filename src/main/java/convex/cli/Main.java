@@ -85,7 +85,10 @@ public class Main {
 			retVal=Help.runHelp(argList);
 		} else {
 			String cmd=argList.get(0);
-			if ("key".equals(cmd)) {
+			if ("help".equals(cmd)) {
+				argList.remove(0);
+				retVal=Help.runHelp(argList);
+			} else if ("key".equals(cmd)) {
 				retVal=Key.runKey(argList,config);
 			} else if ("peer".equals(cmd)) {
 				retVal=Peer.runPeer(argList,config);
@@ -103,7 +106,7 @@ public class Main {
 
 	static int runUnknown(String cmd) {
 		System.out.println("Unrecognised command: "+cmd);
-		System.out.println("Expected key, peer, transact, query");
+		System.out.println("Expected key, peer, transact, query, help");
 		System.out.println("Use 'convex --help' for more information");
 		return 1;
 	}
