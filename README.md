@@ -2,7 +2,13 @@
 
 Convex is an decentralised network and execution engine for the Internet of Value.
 
-It is designed as a foundational layer for decentralised application and economic systems that manage digital assets, where asset ownership is cryptographically secured.
+It is designed as a foundational layer for decentralised application and economic systems that manage digital assets, where asset ownership is cryptographically secured. It can be considered functionally similar to a decentralised public blockchain, but offers some significant advantages:
+
+- High transaction throughput (tens of thousands of transactions per second)
+- Low latency for transaction confirmation (a couple of second for global consensus)
+- Energy efficiency using the the Convergent Proof of Stake consensus algorithm
+- Smart contract capability with Turing Complete, atomic transactions
+- Integrated on-chain compiler
 
 ## About this repository
 
@@ -15,6 +21,14 @@ This repository contains the core Convex distribution including:
 - JMH Benchmarking suite
 - Java Client API
 
+The repository also contains core "on-chain" libraries providing key full-stack functionality and tools for decentralised applications, including:
+
+- Fungible Tokens
+- Non-fungible tokens
+- `convex.asset` - library for managing arbitrary digital assets using a common abstraction
+- `convex.trust` - library for access control and trusted operations
+- `torus.exchange` - decentralised exchange for trading fungible tokens and currencies
+- Example code and templates for various forms of smrt contracts
 
 ## Key features
 
