@@ -14,16 +14,22 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.function.Function;
 
-import convex.core.*;
-import convex.core.crypto.AKeyPair;
-import convex.core.data.*;
+import org.junit.Test;
+
+import convex.core.Block;
+import convex.core.Init;
+import convex.core.Peer;
+import convex.core.State;
+import convex.core.data.AVector;
+import convex.core.data.Blob;
+import convex.core.data.Maps;
+import convex.core.data.SignedData;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.lang.TestState;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
-import org.junit.Test;
-
 import convex.core.util.Bits;
 import convex.core.util.Utils;
 

@@ -6,14 +6,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
-import convex.core.data.AVector;
-import convex.core.data.Vectors;
-import convex.core.data.prim.CVMLong;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.data.PeerStatus;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
