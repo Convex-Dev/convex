@@ -1111,6 +1111,9 @@ public class CoreTest {
 	public void testMacro() {
 		assertTrue(eval("(macro [x] x)") instanceof AExpander);
 		assertCastError(step("((macro [x] x) 42)"));
+		
+		// TODO: is this sane?
+		assertCastError(step("(let [m (macro [x] x)] (m 42))"));
 	}
 
 	@Test
