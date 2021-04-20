@@ -46,6 +46,7 @@ import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
+import convex.core.lang.expanders.AExpander;
 import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.CorePred;
 import convex.core.lang.impl.ICoreDef;
@@ -1104,6 +1105,12 @@ public class CoreTest {
 		assertArityError(step("(dotimes [i])"));
 		assertArityError(step("(dotimes [i 2 3])"));
 
+	}
+	
+	@Test
+	public void testMacro() {
+		assertTrue(eval("(macro [x] x)") instanceof AExpander);
+		assertCastError(step("((macro [x] x) 42)"));
 	}
 
 	@Test

@@ -518,6 +518,9 @@ public class Core {
 
 			AFn<ACell> fn = (AFn<ACell>) RT.function(args[0]);
 
+			// check cast to function
+			if (fn == null) return context.withCastError(args[1], AFn.class);
+			
 			Expander expander = Expander.wrap(fn);
 			long juice = Juice.SIMPLE_FN;
 
