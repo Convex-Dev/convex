@@ -307,7 +307,7 @@ public class Compiler {
 		if (n == 0) return (Context<T>) context.withResult(Juice.COMPILE_CONSTANT, Constant.EMPTY_LIST);
 
 		// first entry in list should be syntax
-		Object first = list.get(0);
+		ACell first = list.get(0);
 		if (!(first instanceof Syntax)) {
 			throw new Error("Expected Syntax in first position of: " + list);
 		}
