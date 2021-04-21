@@ -1765,6 +1765,10 @@ public class CoreTest {
 		assertFalse(evalB(ctx,"(actor? nil)"));
 		assertFalse(evalB(ctx,"(actor? [ctr])"));
 		assertFalse(evalB(ctx,"(actor? 'ctr)"));
+
+		// non-existant account is not an actor
+		assertFalse(evalB(ctx,"(actor? 99999999)"));
+
 	}
 	
 	@Test

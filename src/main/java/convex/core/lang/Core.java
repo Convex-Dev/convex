@@ -845,6 +845,8 @@ public class Core {
 			if (address == null) return context.withResult(juice, CVMBool.FALSE);
 
 			AccountStatus as = context.getAccountStatus(address);
+			if (as == null) return context.withResult(juice, CVMBool.FALSE);
+			
 			CVMBool result = CVMBool.create(as.isActor());
 
 			return context.withResult(juice, result);
