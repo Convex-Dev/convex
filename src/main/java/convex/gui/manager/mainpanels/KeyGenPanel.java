@@ -13,6 +13,7 @@ import javax.swing.JTextArea;
 import javax.swing.border.EmptyBorder;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.Ed25519KeyPair;
 import convex.core.crypto.Hash;
 import convex.core.crypto.Mnemonic;
 import convex.core.crypto.WalletEntry;
@@ -75,7 +76,7 @@ public class KeyGenPanel extends JPanel {
 		String s = privateKeyArea.getText();
 		try {
 			Blob b = Blob.fromHex(Utils.stripWhiteSpace(s));
-			AKeyPair kp = AKeyPair.create(b);
+			AKeyPair kp = Ed25519KeyPair.create(b.getBytes());
 			// String pk=Utils.toHexString(kp.getPrivateKey(),64);
 			addressArea.setText(kp.getAccountKey().toChecksumHex());
 			publicKeyArea.setText(hexKeyFormat(kp.getAccountKey().toChecksumHex()));

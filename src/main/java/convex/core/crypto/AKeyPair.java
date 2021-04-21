@@ -79,10 +79,6 @@ public abstract class AKeyPair {
 		return Ed25519KeyPair.create(keyMaterial);
 	}
 
-	public static AKeyPair create(Blob encodedKeyPair) {
-		return Ed25519KeyPair.create(encodedKeyPair);
-	}
-
 	public abstract PrivateKey getPrivate();
 
 	public abstract PublicKey getPublic();
