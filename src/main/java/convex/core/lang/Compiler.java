@@ -545,9 +545,9 @@ public class Compiler {
 		public Context<Syntax> expand(ACell x, AExpander cont, Context<?> context) {
 			// Ensure x is wrapped as Syntax Object. This will preserve metadata if present.
 			Syntax formSyntax=Syntax.create(x);
-			Object form = formSyntax.getValue();
+			ACell form = formSyntax.getValue();
 
-			// Return the Syntax Object immediately for symbols, keywords, literals etc.
+			// Return the Syntax Object immediately for symbols, keywords, literals, Ops etc.
 			// Remember to preserve metadata on symbols in particular!
 			if (!(form instanceof ADataStructure)) {
 				// TODO: handle symbol macros?
@@ -652,11 +652,6 @@ public class Compiler {
 					updated = updated.assoc(newKey, newValue);
 				}
 				return ctx.withResult(Juice.EXPAND_SEQUENCE, Syntax.create(updated).withMeta(formSyntax.getMeta()));
-			}
-			
-			// If it's an Op, leave unchanged. Effectively a constant from expander POV.
-			if (form instanceof AOp) {
-				return context.withResult(Juice.EXPAND_CONSTANT, formSyntax);
 			}
 
 			throw new TODOException("Don't know how to expand: " + Utils.getClass(form));

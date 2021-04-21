@@ -545,15 +545,15 @@ public final class Context<T extends ACell> extends AObject {
 	@SuppressWarnings("unchecked")
 	private AccountStatus getAliasedAccount(AHashMap<Symbol, Syntax> env, Symbol alias) {
 		// Check for *aliases* entry. Might not exist.
-		Object maybeAliases=env.get(Symbols.STAR_ALIASES);
+		Syntax maybeAliases=env.get(Symbols.STAR_ALIASES);
 		
 		// if *aliases* does not exist, use null as alias for core account
 		if (maybeAliases==null) {
 			return (alias==null)?Init.CORE_ACCOUNT:null;
 		}
 		
-		Object aliasesValue=((Syntax)maybeAliases).getValue();
-		if ((env==null)||(!(aliasesValue instanceof AHashMap))) return null; 
+		ACell aliasesValue=((Syntax)maybeAliases).getValue();
+		if (!(aliasesValue instanceof AHashMap)) return null; 
 		
 		AHashMap<Symbol,ACell> aliasMap=((AHashMap<Symbol,ACell>)aliasesValue);
 		MapEntry<Symbol,ACell> aliasEntry=aliasMap.getEntry(alias);
@@ -832,13 +832,9 @@ public final class Context<T extends ACell> extends AObject {
 			// unwrap return value if necessary
 			if ((v instanceof ReturnValue)&&(!(fn==Core.RETURN))) {
 				v = ((ReturnValue<T>) v).getValue();
-				if (v instanceof AExceptional) {
-					// return exceptional value
-					ctx = ctx.withException((AExceptional) v);
-				} else {
-					// normal result, so simply unwrap
-					return ctx.withResult((R)v);
-				}
+				
+				// unwrap result
+				return ctx.withResult((R)v);
 			}
 			
 			if (v instanceof ErrorValue) {

@@ -33,7 +33,7 @@ public class ANumericBlob extends AArrayBlob {
 	@Override
 	public boolean equals(ABlob a) {
 		if (a instanceof ANumericBlob) {
-			return equals((ANumericBlob)this);
+			return equals((ANumericBlob)a);
 		}
 		return false;
 	}

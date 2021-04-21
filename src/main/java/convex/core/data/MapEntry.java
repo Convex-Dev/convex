@@ -38,6 +38,14 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		return new MapEntry<K, V>((Ref<K>) keyRef, (Ref<V>) valueRef);
 	}
 
+	/**
+	 * Creates a new MapEntry with the provided key and value
+	 * @param <K> Type of Key
+	 * @param <V> Type of value
+	 * @param key Key to use for MapEntry
+	 * @param value Value to use for MapEntry
+	 * @return New MapEntry instance
+	 */
 	public static <K extends ACell, V extends ACell> MapEntry<K, V> create(K key, V value) {
 		return createRef(Ref.get(key), Ref.get(value));
 	}

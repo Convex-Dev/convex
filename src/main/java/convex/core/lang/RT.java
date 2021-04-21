@@ -74,6 +74,8 @@ public class RT {
 	/**
 	 * Check if the values passed are a short (length 0 or 1) array of numbers which
 	 * is a special case for comparison operations.
+	 * 
+	 * @return Boolean result, or null if the values are not comparable
 	 */
 	private static Boolean checkShortCompare(Object[] values) {
 		int len = values.length;

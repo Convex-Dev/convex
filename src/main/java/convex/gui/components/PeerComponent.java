@@ -70,8 +70,6 @@ public class PeerComponent extends BaseListComponent {
 		description.setBorder(null);
 		description.setBackground(null);
 		panel.add(description, BorderLayout.CENTER);
-		
-
 
 		// Setup popup menu for peer
 		JPopupMenu popupMenu = new JPopupMenu();

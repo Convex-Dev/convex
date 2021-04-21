@@ -66,9 +66,9 @@ public class WalletEntry {
 		return new WalletEntry(null,data, keyPair);
 	}
 
-
 	public WalletEntry lock() {
 		if (keyPair == null) throw new IllegalStateException("Wallet already locked!");
+		// Clear keypair
 		return this.withKeyPair(null);
 	}
 
