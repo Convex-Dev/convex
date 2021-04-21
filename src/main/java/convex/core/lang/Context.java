@@ -552,7 +552,7 @@ public final class Context<T extends ACell> extends AObject {
 			return (alias==null)?Init.CORE_ACCOUNT:null;
 		}
 		
-		ACell aliasesValue=((Syntax)maybeAliases).getValue();
+		ACell aliasesValue=maybeAliases.getValue();
 		if (!(aliasesValue instanceof AHashMap)) return null; 
 		
 		AHashMap<Symbol,ACell> aliasMap=((AHashMap<Symbol,ACell>)aliasesValue);
