@@ -1,5 +1,7 @@
 package convex.core;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -403,27 +405,38 @@ public class State extends ARecord {
 	public <T extends ACell> Context<T> applyTransaction(ATransaction t) {
 		Address origin = t.getAddress();
 		
-		// Create prepared context (juice subtracted, sequence updated, transaction entry checks)
-		Context<T> ctx = prepareTransaction(origin,t);
-		final long totalJuice = ctx.getJuice();
-		
-		if (ctx.isExceptional()) {
-			// We hit some error while preparing transaction. Return context with no state change,
-			// i.e. before executing the transaction
+		try {
+			// Create prepared context (juice subtracted, sequence updated, transaction entry checks)
+			Context<T> ctx = prepareTransaction(origin,t);
+			final long totalJuice = ctx.getJuice();
+			
+			if (ctx.isExceptional()) {
+				// We hit some error while preparing transaction. Return context with no state change,
+				// i.e. before executing the transaction
+				return ctx;
+			}
+			
+			State preparedState=ctx.getState();
+	
+	
+			// apply transaction. This may result in an error!
+			ctx = t.apply(ctx);
+	
+			// complete transaction
+			// NOTE: completeTransaction handles error cases as well
+			ctx = ctx.completeTransaction(preparedState, totalJuice);
+	
 			return ctx;
+		} catch (Throwable ex) {
+			// SECURITY: This should never happen!
+			// But catching right now to prevent CVM overall crash
+			StringWriter s=new StringWriter();
+			ex.printStackTrace(new PrintWriter(s));
+			String message=s.toString();
+			Context<T> fCtx=Context.createInitial(this, origin, 0);
+			fCtx=fCtx.withError(ErrorCodes.FATAL, message);
+			return fCtx;
 		}
-		
-		State preparedState=ctx.getState();
-
-
-		// apply transaction. This may result in an error!
-		ctx = t.apply(ctx);
-
-		// complete transaction
-		// NOTE: completeTransaction handles error cases as well
-		ctx = ctx.completeTransaction(preparedState, totalJuice);
-
-		return ctx;
 	}
 	
 	@SuppressWarnings("unchecked")
