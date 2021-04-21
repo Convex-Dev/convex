@@ -36,11 +36,17 @@ public class Blobs {
 		return BlobTree.create(a);
 	}
 
+	/**
+	 * Creates a blob from a hex string
+	 * @param a
+	 * @return Blob created, or null if String not valid hex
+	 */
 	public static ABlob fromHex(String a) {
 		long slength = a.length();
-		if ((slength & 1) != 0) throw new IllegalArgumentException("byte hex string must have even length");
-		long length = slength / 2;
+		if ((slength & 1) != 0) return null;
 		Blob fullBlob = Blob.fromHex(a);
+		
+		long length = slength / 2;
 		if (length <= Blob.CHUNK_LENGTH) return fullBlob;
 		return BlobTree.create(fullBlob);
 	}

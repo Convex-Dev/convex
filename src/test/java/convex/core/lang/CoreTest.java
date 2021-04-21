@@ -108,6 +108,7 @@ public class CoreTest {
 		assertArityError(step("(blob 1 2)"));
 		assertArityError(step("(blob)"));
 
+		assertCastError(step("(blob \"f\")"));
 		assertCastError(step("(blob :foo)"));
 		assertCastError(step("(blob nil)"));
 	}
