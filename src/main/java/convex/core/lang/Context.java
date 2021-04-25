@@ -904,7 +904,7 @@ public final class Context<T extends ACell> extends AObject {
 					
 					// bind variadic form at position i+1 to all args except nLeft
 					long consumeCount=(argCount-i)-nLeft;
-					if (consumeCount<0) return ctx.withCompileError("Insufficient arguments to allow variadic binding");
+					if (consumeCount<0) return ctx.withArityError("Insufficient arguments to allow variadic binding");
 					AVector<ACell> rest=RT.vec(args).slice(i,consumeCount);
 					ctx= ctx.updateBindings(v.get(i+1), rest);
 					if(ctx.isExceptional()) return ctx;

@@ -393,11 +393,20 @@ public class CompilerTest {
 	
 	@Test
 	public void testBindingError() {
+		// this should fail because of insufficient arguments
+		assertArityError(step("(let [[a b] [1]] a)"));
+
+		// this should fail because of too many arguments
+		assertArityError(step("(let [[a b] [1 2 3]] a)"));
+
 		// this should fail because of bad ampersand usage
 		assertCompileError(step("((fn [a &]) 1 2)"));
 		
+		// this should fail because of multiple ampersand usage
+		assertCompileError(step("(let [[a & b & c] [1 2 3 4]] b)"));
+
 		// insufficient arguments for variadic binding
-		assertCompileError(step("(let [[a & b c d] [1 2]])"));
+		assertArityError(step("(let [[a & b c d] [1 2]])"));
 	}
 	
 	@Test
