@@ -1695,7 +1695,10 @@ public class Core {
 		@Override
 		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+			
 			CVMDouble result = RT.pow(args);
+			if (result==null) return context.withCastError(args, CVMDouble.class);
+			
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1705,7 +1708,10 @@ public class Core {
 		@Override
 		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+			
 			CVMDouble result = RT.exp(args[0]);
+			if (result==null) return context.withCastError(args, CVMDouble.class);
+			
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});

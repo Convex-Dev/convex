@@ -1769,6 +1769,8 @@ public class CoreTest {
 
 		// non-existant account is not an actor
 		assertFalse(evalB(ctx,"(actor? 99999999)"));
+		assertFalse(evalB(ctx,"(actor? #4512)"));
+		assertFalse(evalB(ctx,"(actor? -1234)"));
 
 	}
 	
@@ -2065,6 +2067,33 @@ public class CoreTest {
 		assertEquals(4L, evalL("(max 4 3 2)"));
 
 		assertArityError(step("(max)"));
+	}
+	
+	@Test
+	public void testPow() {
+		assertEquals(4.0, evalD("(pow 2 2)"));
+		
+		assertCastError(step("(pow :a 7)"));
+		assertCastError(step("(pow 7 :a)"));
+		
+		assertArityError(step("(pow)"));
+		assertArityError(step("(pow 1)"));	
+		assertArityError(step("(pow 1 2 3)"));	
+	}
+	
+	@Test
+	public void testExp() {
+		assertEquals(1.0, evalD("(exp 0)"));
+		assertEquals(1.0, evalD("(exp -0)"));
+		assertEquals(StrictMath.exp(1.0), evalD("(exp 1)"));
+		assertEquals(0.0, evalD("(exp (/ -1 0))"));
+		assertEquals(Double.POSITIVE_INFINITY, evalD("(exp (/ 1 0))"));
+		
+		assertCastError(step("(exp :a)"));
+		assertCastError(step("(exp nil)"));
+		
+		assertArityError(step("(exp)"));
+		assertArityError(step("(exp 1 2)"));	
 	}
 
 	@Test

@@ -276,15 +276,27 @@ public class RT {
 		return CVMDouble.create(result);
 	}
 
-	public static CVMDouble pow(Object[] args) {
-		double a = doubleValue(args[0]);
-		double b = doubleValue(args[1]);
-		return CVMDouble.create(StrictMath.pow(a, b));
+	/**
+	 * Computes the result of a pow operation. Returns null if a cast fails.
+	 * @param args
+	 * @return
+	 */
+	public static CVMDouble pow(ACell[] args) {
+		CVMDouble a = toDouble(args[0]);
+		CVMDouble b = toDouble(args[1]);
+		if ((a==null)||(b==null)) return null;
+		return CVMDouble.create(StrictMath.pow(a.doubleValue(), b.doubleValue()));
 	}
 
-	public static CVMDouble exp(Object arg) {
-		double a = doubleValue(arg);
-		return CVMDouble.create(StrictMath.exp(a));
+	/**
+	 * Computes the result of a exp operation. Returns null if a cast fails.
+	 * @param args
+	 * @return
+	 */	
+	public static CVMDouble exp(ACell arg) {
+		CVMDouble a = toDouble(arg);
+		if (a==null) return null;
+		return CVMDouble.create(StrictMath.exp(a.doubleValue()));
 	}
 	
 	/**
