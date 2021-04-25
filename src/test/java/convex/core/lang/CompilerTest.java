@@ -396,8 +396,8 @@ public class CompilerTest {
 		// this should fail because of bad ampersand usage
 		assertCompileError(step("((fn [a &]) 1 2)"));
 		
-		// TODO: Fix
-		// assertError(step("(let [[a & b c d] [1 2]])"));
+		// insufficient arguments for variadic binding
+		assertCompileError(step("(let [[a & b c d] [1 2]])"));
 	}
 	
 	@Test

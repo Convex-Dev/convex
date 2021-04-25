@@ -887,7 +887,7 @@ public final class Context<T extends ACell> extends AObject {
 			AVector<Syntax> v=(AVector<Syntax>)bindingForm;
 			long bindCount=v.count(); // count of binding form symbols (may include & etc.)
 			
-			// Count the arguments, with a CAST error if args are not sequential
+			// Count the arguments, exit with a CAST error if args are not sequential
 			Long argCount=RT.count(args);
 			if (argCount==null) return ctx.withCastError(args, ASequence.class); 
 						
@@ -903,7 +903,9 @@ public final class Context<T extends ACell> extends AObject {
 					if (nLeft<0) return ctx.withCompileError("Can't bind ampersand at end of binding form");
 					
 					// bind variadic form at position i+1 to all args except nLeft
-					AVector<ACell> rest=RT.vec(args).slice(i,(argCount - i)-nLeft);
+					long consumeCount=(argCount-i)-nLeft;
+					if (consumeCount<0) return ctx.withCompileError("Insufficient arguments to allow variadic binding");
+					AVector<ACell> rest=RT.vec(args).slice(i,consumeCount);
 					ctx= ctx.updateBindings(v.get(i+1), rest);
 					if(ctx.isExceptional()) return ctx;
 					
