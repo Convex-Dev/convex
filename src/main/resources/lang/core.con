@@ -212,7 +212,7 @@
     '(set* (quote ~sym) ~value))
  
 (defmacro undef
-    ^{:doc {:description "Undefines a symbol, removing the mapping from the surrent environment if it exists."
+    ^{:doc {:description "Undefines a symbol, removing the mapping from the current environment if it exists."
           :examples [{:code "(do (def foo 1) (undef foo))"}]
           :type :macro	 
           :signature [{:params [sym]}]}}
@@ -320,7 +320,7 @@
 (defmacro if-let 
   ^{
     :doc {:description "Binds a symbol to the result of evaluating a given expression, and executes a true expression or false expression depending on the result in the same manner as 'if'"
-          :examples [{:code "(when-let [addr  (get-address)] (transfer addr 1000))"}]
+          :examples [{:code "(if-let [addr  (get-address)] (transfer addr 1000))"}]
           :type :macro
           :signature [{:params [[sym exp] & body]}] }}
   [[sym exp] & body]
