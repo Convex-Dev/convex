@@ -118,6 +118,10 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		// only canonical if depth is zero (May have a prefix)
 		return depth == 0;
 	}
+	
+	@Override public final boolean isCVMValue() {
+		return true;
+	}
 
 	@SuppressWarnings("unchecked")
 	@Override

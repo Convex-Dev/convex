@@ -113,6 +113,8 @@ public class PeerStatus extends ARecord {
 	public boolean isCanonical() {
 		return true;
 	}
+	
+
 
 	/**
 	 * Gets the delegated stake on this peer for the given delegator.

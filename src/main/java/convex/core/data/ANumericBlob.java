@@ -64,6 +64,10 @@ public class ANumericBlob extends AArrayBlob {
 	public boolean isCanonical() {
 		return false;
 	}
+	
+	@Override public final boolean isCVMValue() {
+		return true;
+	}
 
 	@Override
 	public byte getTag() {

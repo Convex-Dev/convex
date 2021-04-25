@@ -91,6 +91,11 @@ public abstract class ATransaction extends ACell {
 		return false;
 	}
 	
+	@Override public final boolean isCVMValue() {
+		// Transactions exist outside CVM only
+		return false;
+	}
+	
 	/**
 	 * Updates this transaction with the specified sequence number
 	 * @param newSequence New sequence number

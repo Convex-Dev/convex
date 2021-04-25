@@ -188,6 +188,10 @@ public class Address extends ABlob {
 		return true;
 	}
 	
+	@Override public final boolean isCVMValue() {
+		return true;
+	}
+	
 	@Override
 	protected long calcMemorySize() {	
 		// always embedded and no child Refs, so memory size == 0

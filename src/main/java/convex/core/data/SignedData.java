@@ -201,6 +201,10 @@ public class SignedData<T extends ACell> extends ACell {
 	public boolean isCanonical() {
 		return true;
 	}
+	
+	@Override public final boolean isCVMValue() {
+		return false;
+	}
 
 	@Override
 	public int getRefCount() {

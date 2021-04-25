@@ -65,6 +65,10 @@ public class StringSlice extends AString {
 	public boolean isCanonical() {
 		return false;
 	}
+	
+	@Override public final boolean isCVMValue() {
+		return false;
+	}
 
 	@Override
 	public int getRefCount() {

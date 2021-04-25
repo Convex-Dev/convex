@@ -194,6 +194,10 @@ public class Set<T extends ACell> extends ASet<T> {
 	public boolean isCanonical() {
 		return map.isCanonical();
 	}
+	
+	@Override public final boolean isCVMValue() {
+		return map.isCVMValue();
+	}
 
 	@Override
 	public int encode(byte[] bs, int pos) {

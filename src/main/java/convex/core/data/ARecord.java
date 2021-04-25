@@ -39,6 +39,10 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 		return true;
 	}
 	
+	@Override public final boolean isCVMValue() {
+		return true;
+	}
+	
 	/**
 	 * Writes the raw fields of this record in declared order
 	 * @param b ByteBuffer to write to

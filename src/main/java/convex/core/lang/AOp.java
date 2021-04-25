@@ -42,6 +42,10 @@ public abstract class AOp<T extends ACell> extends ACell {
 	public boolean isCanonical() {
 		return true;
 	}
+	
+	@Override public final boolean isCVMValue() {
+		return true;
+	}
 
 	/**
 	 * Returns the opcode for this op

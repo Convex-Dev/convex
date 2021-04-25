@@ -476,6 +476,10 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		if (count <= MapLeaf.MAX_ENTRIES) return false;
 		return true;
 	}
+	
+	@Override public final boolean isCVMValue() {
+		return shift==0;
+	}
 
 	@Override
 	public int getRefCount() {

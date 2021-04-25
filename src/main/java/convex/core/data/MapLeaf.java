@@ -403,6 +403,10 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		// validation for both key uniqueness and sort order
 		return isValidOrder(entries);
 	}
+	
+	@Override public final boolean isCVMValue() {
+		return true;
+	}
 
 	private static <K extends ACell, V extends ACell> boolean isValidOrder(MapEntry<K, V>[] entries) {
 		long count = entries.length;

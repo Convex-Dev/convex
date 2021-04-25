@@ -84,6 +84,10 @@ public class StringShort extends AString {
 		return true;
 	}
 	
+	@Override public final boolean isCVMValue() {
+		return true;
+	}
+	
 	@Override
 	public boolean isEmbedded() {
 		return length<=MAX_EMBEDDED_STRING_LENGTH;

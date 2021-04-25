@@ -339,6 +339,10 @@ public class Hash extends AArrayBlob {
 		// always canonical, since class invariants are maintained
 		return true;
 	}
+	
+	@Override public final boolean isCVMValue() {
+		return true;
+	}
 
 	@Override
 	public int estimatedEncodingSize() {

@@ -35,6 +35,10 @@ public class LongBlob extends ABlob {
 	public boolean isCanonical() {
 		return true;
 	}
+	
+	@Override public final boolean isCVMValue() {
+		return true;
+	}
 
 	@Override
 	public void getBytes(byte[] dest, int destOffset) {

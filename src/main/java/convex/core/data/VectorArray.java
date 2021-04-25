@@ -116,6 +116,10 @@ public class VectorArray<T extends ACell> extends ASizedVector<T> {
 		// Not a canonical vector!
 		return false;
 	}
+	
+	@Override public final boolean isCVMValue() {
+		return false;
+	}
 
 	@Override
 	public AVector<T> updateRefs(IRefFunction func) {

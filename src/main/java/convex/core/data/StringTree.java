@@ -120,6 +120,10 @@ public class StringTree extends AString {
 	public boolean isCanonical() {
 		return true;
 	}
+	
+	@Override public final boolean isCVMValue() {
+		return true;
+	}
 
 	@Override
 	public int getRefCount() {

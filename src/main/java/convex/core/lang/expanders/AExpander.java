@@ -28,6 +28,10 @@ public abstract class AExpander extends ACell {
 	 */
 	public abstract Context<Syntax> expand(ACell form, AExpander ex, Context<?> context);
 	
+	@Override public final boolean isCVMValue() {
+		return true;
+	}
+	
 	@Override
 	public byte getTag() {
 		return Tag.EXPANDER;

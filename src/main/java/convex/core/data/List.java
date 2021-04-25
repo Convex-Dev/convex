@@ -212,6 +212,10 @@ public class List<T extends ACell> extends AList<T> {
 	public boolean isCanonical() {
 		return true;
 	}
+	
+	@Override public final boolean isCVMValue() {
+		return data.isCVMValue();
+	}
 
 	@Override
 	public void ednString(StringBuilder sb) {

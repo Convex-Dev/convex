@@ -285,6 +285,13 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return true if the object is in canonical format, false otherwise
 	 */
 	public abstract boolean isCanonical();
+	
+	/**
+	 * Returns true if this object represents a first class CVM Value.
+	 * 
+	 * @return true if the object is a CVM Value, false otherwise
+	 */
+	public abstract boolean isCVMValue();
 
 	/**
 	 * Gets the number of Refs contained within this Cell. This number is

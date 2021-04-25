@@ -99,6 +99,11 @@ public class Order extends ACell {
 		// Always canonical?
 		return true;
 	}
+	
+	@Override public final boolean isCVMValue() {
+		// Orders exist outside CVM only
+		return false;
+	}
 
 	@Override
 	public void ednString(StringBuilder sb) {

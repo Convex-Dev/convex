@@ -39,6 +39,10 @@ public class Ed25519Signature extends ASignature {
 		return true;
 	}
 	
+	@Override public final boolean isCVMValue() {
+		return false;
+	}
+	
 	
 	public static Ed25519Signature read(ByteBuffer bb) throws BadFormatException {
 		byte[] sigData=new byte[SIGNATURE_LENGTH];

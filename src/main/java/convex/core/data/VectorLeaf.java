@@ -566,6 +566,10 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 		if ((count > MAX_SIZE) && (prefix == null)) throw new Error("Invalid Listvector!");
 		return true;
 	}
+	
+	@Override public final boolean isCVMValue() {
+		return true;
+	}
 
 	@Override
 	public int getRefCount() {

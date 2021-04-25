@@ -135,6 +135,10 @@ public class Syntax extends ACell {
 	public boolean isCanonical() {
 		return true;
 	}
+	
+	@Override public final boolean isCVMValue() {
+		return true;
+	}
 
 	public static Syntax read(ByteBuffer bb) throws BadFormatException {
 		Ref<ACell> datum = Format.readRef(bb);

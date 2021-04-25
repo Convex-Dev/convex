@@ -261,6 +261,11 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	public boolean isCanonical() {
 		return true;
 	}
+	
+	@Override public final boolean isCVMValue() {
+		// TODO: reconsider?
+		return true;
+	}
 
 	@Override
 	public int estimatedEncodingSize() {

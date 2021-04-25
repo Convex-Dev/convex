@@ -20,6 +20,10 @@ public abstract class ASymbolic extends ACell {
 		return true;
 	}
 	
+	@Override public final boolean isCVMValue() {
+		return true;
+	}
+	
 	@Override
 	protected long calcMemorySize() {	
 		// always embedded and no child Refs, so memory size == 0

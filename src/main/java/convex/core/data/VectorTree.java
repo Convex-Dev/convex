@@ -554,6 +554,10 @@ public class VectorTree<T extends ACell> extends ASizedVector<T> {
 		if (count < MINIMUM_SIZE) return false;
 		return true;
 	}
+	
+	@Override public final boolean isCVMValue() {
+		return true;
+	}
 
 	@SuppressWarnings("unchecked")
 	@Override

@@ -36,6 +36,10 @@ public abstract class AFn<T extends ACell> extends ACell implements IFn<T> {
 	 */
 	public abstract boolean hasArity(int n);
 	
+	@Override public final boolean isCVMValue() {
+		return true;
+	}
+	
 	@Override
 	public byte getTag() {
 		return Tag.FN;

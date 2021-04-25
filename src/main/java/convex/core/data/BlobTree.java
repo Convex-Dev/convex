@@ -150,6 +150,10 @@ public class BlobTree extends ABlob {
 		// BlobTree is always canonical
 		return true;
 	}
+	
+	@Override public final boolean isCVMValue() {
+		return true;
+	}
 
 	@Override
 	public void getBytes(byte[] dest, int destOffset) {
