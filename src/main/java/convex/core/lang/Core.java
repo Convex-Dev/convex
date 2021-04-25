@@ -1289,7 +1289,7 @@ public class Core {
 			long juice = Juice.BUILD_DATA + Juice.BUILD_PER_ELEMENT * numAdditions;
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
-			ADataStructure<ACell> result = RT.collection(args[0]);
+			ADataStructure<ACell> result = RT.dataStructure(args[0]);
 			if (result == null) return context.withCastError(args[0], ADataStructure.class);
 
 			for (int i = 0; i < numAdditions; i++) {
@@ -1775,20 +1775,22 @@ public class Core {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			// First argument must be a Long index
-			ACell coll = (ACell) args[0];
+			ACell arg = (ACell) args[0];
 			CVMLong ix = RT.toLong(args[1]);
 			if (ix == null) return context.withCastError(args[1], Long.class);
 			
-			// Second arg must be a countable collection
-			Long n = RT.count(coll);
-			if (n == null) return context.withCastError(coll, ASequence.class);
+			// Second arg should be a countable data structure
+			Long n = RT.count(arg);
+			if (n == null) return context.withCastError(arg, ASequence.class);
 			
 			long i=ix.longValue();
 			
 			// BOUNDS error if access is out of bounds
 			if ((i < 0) || (i >= n)) return context.withBoundsError(i);
 
-			ACell result = RT.nth(coll, i);
+			// We know the object is a countable collection
+			ACell result = RT.nth(arg, i);
+			
 			return context.withResult(Juice.SIMPLE_FN, result);
 		}
 	});

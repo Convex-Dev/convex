@@ -4,8 +4,18 @@ package convex.core.data;
  * Abstract base class for Persistent data structures. Each can be regarded as a
  * countable, immutable collection of elements.
  * 
+ * Data structures in general support:
+ * <ul>
+ * <li> Immutability</li>
+ * <li> Count of elements</li>
+ * <li> Addition of an element of appropriate type </li>
+ * <li> Construction of an empty (zero) element </li>
+ * </ul>
+ * 
+ * <p>
  * "When you know your data can never change out from underneath you, everything
  * is different." - Rich Hickey
+ * </p>
  */
 public abstract class ADataStructure<E extends ACell> extends ACell {
 

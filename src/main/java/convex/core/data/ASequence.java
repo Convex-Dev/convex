@@ -91,12 +91,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 		return get((long) index);
 	}
 
-	/**
-	 * Gets the element at the specified index
-	 * 
-	 * @param index Index of element to get
-	 * @return Element at the specified index
-	 */
+	@Override
 	public abstract T get(long index);
 
 	/**

@@ -390,11 +390,24 @@ public class CompilerTest {
 		assertUndeclaredError(step("(let [f (fn [x] (g x)) g (fn [y] (inc y))] (f 3))"));
 	}
 	
+	@Test
+	public void testBindings() {
+		assertEquals (2L,evalL("(let [[a] #{2}] a)"));
+		assertEquals (Sets.of(1L, 2L),eval("(into #{} (let [[a b] #{1 2}] [a b]))"));
+	}
 	
 	@Test
 	public void testBindingError() {
+		
 		// this should fail because of insufficient arguments
 		assertArityError(step("(let [[a b] [1]] a)"));
+		
+		// this should fail because of insufficient arguments
+		assertArityError(step("(let [[a b] #{2}] a)"));
+
+		// these should fail because of incorrect argument type
+		assertArityError(step("(let [[a b] nil] a)")); // treated as empty sequence
+		assertCastError(step("(let [[a b] :foo] a)"));
 
 		// this should fail because of too many arguments
 		assertArityError(step("(let [[a b] [1 2 3]] a)"));

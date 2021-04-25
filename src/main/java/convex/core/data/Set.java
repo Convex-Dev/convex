@@ -358,4 +358,11 @@ public class Set<T extends ACell> extends ASet<T> {
 	public byte getTag() {
 		return Tag.SET;
 	}
+	
+
+	@Override
+	public T get(long i) {
+		return map.entryAt(i).getKey();
+	}
+
 }

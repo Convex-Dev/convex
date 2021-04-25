@@ -585,7 +585,9 @@ public class RT {
 	}
 
 	/**
-	 * Gets the nth element from a sequential collection
+	 * Gets the nth element from a sequential collection.
+	 * 
+	 * Throws an exception if access is out of bounds - caller responsibility to check bounds first
 	 * 
 	 * @param <T> Type of element in collection
 	 * @param o
@@ -596,7 +598,7 @@ public class RT {
 		// special case, we treat nil as empty sequence
 		if (o == null) throw new IndexOutOfBoundsException("Can't get nth element from null");
 
-		if (o instanceof ASequence) return ((ASequence<T>) o).get(i);
+		if (o instanceof ACollection) return ((ACollection<T>) o).get(i);
 		if (o instanceof ABlob) return (T) CVMByte.create(((ABlob) o).get(i));
 		if (o instanceof AString) return (T) CVMChar.create(((AString) o).charAt(Utils.checkedInt(i)));
 		if (o instanceof AMap) return (T) ((AMap<?,?>)o).entryAt(i);
@@ -780,7 +782,21 @@ public class RT {
 	 * @return Collection object, or null if coercion failed.
 	 */
 	@SuppressWarnings("unchecked")
-	static <E extends ACell> ADataStructure<E> collection(Object a) {
+	static <E extends ACell> ACollection<E> collection(Object a) {
+		if (a == null) return Vectors.empty();
+		if (a instanceof ACollection) return (ACollection<E>) a;
+		return null;
+	}
+	
+	/**
+	 * Coerces any object to a data structure type, or returns null if not possible.
+	 * Null is converted to an empty vector.
+	 * 
+	 * @param a Object to coerce to collection type.
+	 * @return Collection object, or null if coercion failed.
+	 */
+	@SuppressWarnings("unchecked")
+	static <E extends ACell> ADataStructure<E> dataStructure(Object a) {
 		if (a == null) return Vectors.empty();
 		if (a instanceof ADataStructure) return (ADataStructure<E>) a;
 		return null;
