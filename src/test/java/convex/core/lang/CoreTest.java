@@ -100,6 +100,8 @@ public class CoreTest {
 
 		assertEquals("cafebabe", evalS("(str (blob \"Cafebabe\"))"));
 
+		assertEquals(eval("0x"),eval("(blob (str))")); // blob literal
+		
 		assertEquals((Object)eval("*address*"),eval("(address (blob *address*))"));
 		
 		// round trip back to Blob
@@ -108,7 +110,7 @@ public class CoreTest {
 		assertArityError(step("(blob 1 2)"));
 		assertArityError(step("(blob)"));
 
-		assertCastError(step("(blob \"f\")"));
+		assertCastError(step("(blob \"f\")")); // odd length hex string bug #54 special case
 		assertCastError(step("(blob :foo)"));
 		assertCastError(step("(blob nil)"));
 	}
