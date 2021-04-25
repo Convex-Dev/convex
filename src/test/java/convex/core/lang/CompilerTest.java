@@ -402,7 +402,7 @@ public class CompilerTest {
 		assertEquals (2L,evalL("(let [[a] #{2}] a)"));
 		assertEquals (Sets.of(1L, 2L),eval("(into #{} (let [[a b] #{1 2}] [a b]))"));
 		
-		// TODO: should we allow this?
+		// TODO: should we allow this? Technically just one vararg...
 		assertEquals (Vectors.of(1,2,3),eval("(let [[& &] [1 2 3]] &)"));
 
 	}
