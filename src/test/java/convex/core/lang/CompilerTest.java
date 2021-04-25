@@ -392,12 +392,25 @@ public class CompilerTest {
 	
 	@Test
 	public void testBindings() {
+		assertEquals (2L,evalL("(let [[] nil] 2)")); // nil acts like empty sequence here?
+		assertEquals (2L,evalL("(let [[] []] 2)")); // empty binding vector is OK
+		
+		// empty binding vector (vararg length zero)
+		assertEquals (Vectors.empty(),eval("(let [[& more] []] more)")); 
+		assertEquals (Vectors.empty(),eval("(let [[& more] nil] more)")); // nil acts like empty sequence?
+		
 		assertEquals (2L,evalL("(let [[a] #{2}] a)"));
 		assertEquals (Sets.of(1L, 2L),eval("(into #{} (let [[a b] #{1 2}] [a b]))"));
+		
+		// TODO: should we allow this?
+		assertEquals (Vectors.of(1,2,3),eval("(let [[& &] [1 2 3]] &)"));
+
 	}
 	
 	@Test
 	public void testBindingError() {
+
+
 		
 		// this should fail because of insufficient arguments
 		assertArityError(step("(let [[a b] [1]] a)"));
