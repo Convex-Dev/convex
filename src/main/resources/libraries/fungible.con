@@ -92,7 +92,7 @@
                  quantity (if quantity (long quantity) 0)
                  om (or (get offers sender) 0)
                  sendbal (or (get-holding sender) 0)
-                 offer (get om *caller*)]
+                 offer (or (get om *caller*) 0)]
                (cond 
                  (< quantity 0) (fail "Can't accept a negative quantity of fungible tokens.")
                  (< offer quantity) (fail "Offer is insufficient")
