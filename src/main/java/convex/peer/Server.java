@@ -116,6 +116,7 @@ public class Server implements Closeable {
 	
 	/**
 	 * Flag to indicate if there are any new things for the server to process (Beliefs, transactions)
+	 * can safely sleep a bit if nothing to do
 	 */
 	private boolean newThings = false;
 
@@ -234,7 +235,7 @@ public class Server implements Closeable {
 			updateThread.setDaemon(true);
 			updateThread.start();
 
-			// Close server on shutdown, before Etch stores
+			// Close server on shutdown, must be before Etch stores
 			Shutdown.addHook(Shutdown.SERVER, new Runnable() {
 				@Override
 				public void run() {
