@@ -123,7 +123,9 @@ public class Server implements Closeable {
 	private Thread receiverThread = null;
 	private Thread updateThread = null;
 
-	/** The Peer instance current state of this server */
+	/** 
+	 * The Peer instance current state for this server. Will be updated based on peer events. 
+	 */
 	private Peer peer;
 
 	/**
@@ -799,7 +801,6 @@ public class Server implements Closeable {
 		if (updateThread != null) updateThread.interrupt();
 		if (receiverThread != null) receiverThread.interrupt();
 		nio.close();
-		peer = null;
 		// Note we don't do store.close(); because we don't own the store.
 	}
 

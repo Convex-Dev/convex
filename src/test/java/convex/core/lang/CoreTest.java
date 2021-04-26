@@ -102,7 +102,7 @@ public class CoreTest {
 
 		assertEquals(eval("0x"),eval("(blob (str))")); // blob literal
 		
-		assertEquals((Object)eval("*address*"),eval("(address (blob *address*))"));
+		assertEquals(eval("*address*"),eval("(address (blob *address*))"));
 		
 		// round trip back to Blob
 		assertTrue(evalB("(blob? (blob (hash (encoding [1 2 3]))))"));
