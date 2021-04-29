@@ -12,6 +12,7 @@ import java.util.TreeMap;
  */
 public class Shutdown {
 	
+	public static final int CLIENTHTTP = 60;
 	public static final int SERVER = 80;
 	public static final int ETCH = 100;
 	
