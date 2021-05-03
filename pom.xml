@@ -33,6 +33,12 @@
 		</developer>
 	</developers>
 
+	<scm>
+		<connection>scm:git:git://github.com/Convex-Dev/convex.git</connection>
+		<developerConnection>scm:git:ssh://github.com:Convex-Dev/convex.git</developerConnection>
+		<url>https://github.com/Convex-Dev/convex.git</url>
+	</scm>
+
 	<build>
 		<finalName>convex</finalName>
 
