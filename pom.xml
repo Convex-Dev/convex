@@ -17,6 +17,22 @@
 		<project.build.outputTimestamp>2020-02-02T00:00:00Z</project.build.outputTimestamp>
 	</properties>
 
+	<licenses>
+		<license>
+			<name>Convex Public License</name>
+			<url>http://www.opensource.org/licenses/mit-license.php</url>
+		</license>
+	</licenses>
+
+	<developers>
+		<developer>
+			<name>Miek Anderson</name>
+			<email>mike@convex.world</email>
+			<organization>Convex Foundation</organization>
+			<organizationUrl>https://convex.world</organizationUrl>
+		</developer>
+	</developers>
+
 	<build>
 		<finalName>convex</finalName>
 
@@ -81,7 +97,7 @@
 				<artifactId>maven-assembly-plugin</artifactId>
 				<version>3.3.0</version>
 				<configuration>
-				    <outputDirectory>${project.directory}</outputDirectory>
+					<outputDirectory>${project.directory}</outputDirectory>
 					<archive>
 						<manifest>
 							<mainClass>convex.cli.Main</mainClass>
