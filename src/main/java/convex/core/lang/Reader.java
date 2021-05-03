@@ -487,7 +487,12 @@ public class Reader extends BaseParser<ACell> {
 	}
 
 	public Rule Double() {
-		return Sequence(Sequence(Optional(AnyOf("+-")), Optional(Digits()), '.', Digits(), Optional(ExponentPart())),
+		return Sequence(Sequence(
+				Optional(AnyOf("+-")), 
+				Digits(), 
+				'.',
+				Digits(), 
+				Optional(ExponentPart())),
 				push(prepare(CVMDouble.parse(match()))));
 	}
 
