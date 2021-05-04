@@ -71,6 +71,11 @@ public abstract class AKeyPair {
 		Providers.init();
 	}
 
+	/**
+	 * Generates a new, secure random key pair. Uses a Java SecureRandom instance.
+	 * 
+	 * @return New Key Pair instance.
+	 */
 	public static AKeyPair generate() {
 		return Ed25519KeyPair.generate();
 	}

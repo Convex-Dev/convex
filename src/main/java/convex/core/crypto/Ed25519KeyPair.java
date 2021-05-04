@@ -41,6 +41,11 @@ public class Ed25519KeyPair extends AKeyPair {
 		this.publicKey=address;
 	}
 
+	/**
+	 * Generates a new, secure random key pair. Uses a Java SecureRandom instance.
+	 * 
+	 * @return New Key Pair instance.
+	 */
 	public static Ed25519KeyPair generate() {
 		return generate(new SecureRandom());
 	}
