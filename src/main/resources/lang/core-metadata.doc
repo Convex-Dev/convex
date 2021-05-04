@@ -33,8 +33,8 @@
  
  	address 
 	{
-	 :doc {:description "Casts the argument to an Address. Valid arguments include hex Strings, Addresses and Blobs with the correct length (32 bytes)."
-         :examples [{:code "(address \"1Ba377262D7637068C8a84b732e30d3Ff62bA891\")"}]
+	 :doc {:description "Casts the argument to an Address. Valid arguments include hex Strings, Longs, Addresses and Blobs with the correct length (8 bytes)."
+         :examples [{:code "(address 451)"}]
          :type :function
          :signature [{:params [a]}]}
 	}
