@@ -2698,10 +2698,12 @@ public class CoreTest {
 		
 		assertArityError(step("(expand)"));
 		assertArityError(step("(expand 1 (fn [x e] x) :blah)"));
+		
+		// arity error calling expander function
 		assertArityError(step("(expand 1 (fn [x] x))"));
 
 		// arity error in expansion execution
-		assertArityError(step("(expand 1 (fn [x x] (count)))"));
+		assertArityError(step("(expand 1 (fn [x e] (count)))"));
 	}
 
 	@Test
