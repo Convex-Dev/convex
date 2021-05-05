@@ -2322,7 +2322,8 @@ public class Core {
 	}
 
 	private static AHashMap<Symbol, Syntax> registerSpecials(AHashMap<Symbol, Syntax> env) {
-		env = env.assoc(Symbols.NAN, Syntax.create(CVMDouble.create(Double.NaN)));
+		// Replaced with ##NaN
+		// env = env.assoc(Symbols.NAN, Syntax.create(CVMDouble.create(Double.NaN)));
 		return env;
 	}
 

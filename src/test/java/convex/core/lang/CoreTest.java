@@ -1,7 +1,28 @@
 package convex.core.lang;
 
-import static convex.core.lang.TestState.*;
-import static convex.test.Assertions.*;
+import static convex.core.lang.TestState.eval;
+import static convex.core.lang.TestState.evalB;
+import static convex.core.lang.TestState.evalD;
+import static convex.core.lang.TestState.evalL;
+import static convex.core.lang.TestState.evalS;
+import static convex.core.lang.TestState.step;
+import static convex.test.Assertions.assertArgumentError;
+import static convex.test.Assertions.assertArityError;
+import static convex.test.Assertions.assertAssertError;
+import static convex.test.Assertions.assertBoundsError;
+import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertCastError;
+import static convex.test.Assertions.assertCompileError;
+import static convex.test.Assertions.assertDepthError;
+import static convex.test.Assertions.assertError;
+import static convex.test.Assertions.assertFundsError;
+import static convex.test.Assertions.assertJuiceError;
+import static convex.test.Assertions.assertMemoryError;
+import static convex.test.Assertions.assertNobodyError;
+import static convex.test.Assertions.assertNotError;
+import static convex.test.Assertions.assertStateError;
+import static convex.test.Assertions.assertTrustError;
+import static convex.test.Assertions.assertUndeclaredError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -556,7 +577,7 @@ public class CoreTest {
 		assertEquals(1.0,evalD("(ceil 1)"));
 		
 		// Special cases
-		assertEquals(Double.NaN,evalD("(ceil NaN)"));
+		assertEquals(Double.NaN,evalD("(ceil ##NaN)"));
 		assertEquals(Double.POSITIVE_INFINITY,evalD("(ceil (/ 1 0))"));
 		assertEquals(Double.NEGATIVE_INFINITY,evalD("(ceil (/ -1 0))"));
 		
@@ -579,7 +600,7 @@ public class CoreTest {
 		assertEquals(1.0,evalD("(floor 1)"));
 		
 		// Special cases
-		assertEquals(Double.NaN,evalD("(floor NaN)"));
+		assertEquals(Double.NaN,evalD("(floor ##NaN)"));
 		assertEquals(Double.POSITIVE_INFINITY,evalD("(floor (/ 1 0))"));
 		assertEquals(Double.NEGATIVE_INFINITY,evalD("(floor (/ -1 0))"));
 		
@@ -604,7 +625,7 @@ public class CoreTest {
 		assertEquals(Math.pow(10,100),evalD("(abs (pow 10 100))"));
 		
 		// Fun Double cases
-		assertEquals(Double.NaN,evalD("(abs NaN)"));
+		assertEquals(Double.NaN,evalD("(abs ##NaN)"));
 		assertEquals(Double.POSITIVE_INFINITY,evalD("(abs (/ 1 0))"));
 		assertEquals(Double.POSITIVE_INFINITY,evalD("(abs (/ -1 0))"));
 		
@@ -633,9 +654,9 @@ public class CoreTest {
 		assertEquals(1L,evalL("(signum (pow 10 100))"));
 		
 		// Fun Double cases
-		assertCastError(step("(signum NaN)"));
-		assertEquals(1L,evalL("(signum (/ 1 0))"));
-		assertEquals(-1L,evalL("(signum (/ -1 0))"));
+		assertCastError(step("(signum ##NaN)"));
+		assertEquals(1L,evalL("(signum ##Inf)"));
+		assertEquals(-1L,evalL("(signum ##-Inf)"));
 		
 		assertArityError(step("(signum)"));
 		assertArityError(step("(signum :foo :bar)")); // arity > cast

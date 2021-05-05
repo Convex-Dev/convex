@@ -660,12 +660,6 @@
           :type :function
           :signature [{:params [named-object]}]}
   }
-  
-  NaN
-  {:doc {:description "Not-a-Number double value, as defined by IEEE 754, and implemented on the JVM"
-          :examples [{:code "(double? NaN)"}]
-          :type :value}
-  }
 
   next
   {
@@ -818,6 +812,14 @@
   {
     :doc {:description "Tests if the agument is a Set."
           :examples [{:code "(set? #{1 2 3})"}]
+          :type :function
+          :signature [{:params [a]}]}
+  }
+  
+  signum
+  {
+    :doc {:description "Returns the signum of a numeric value, defined to be -1, 0 or 1. Results in a cast error if the argument is not a number (including ##NaN)."
+          :examples [{:code "(signum -1)"}]
           :type :function
           :signature [{:params [a]}]}
   }

@@ -111,7 +111,7 @@ public class NumericsTest {
 		assertEquals(1.0, evalD("1.0"));
 		assertEquals(1.0, evalD("(double 1)"));
 		assertEquals(-1.0, evalD("-1.0"));
-		assertEquals(Double.NaN, evalD("(double NaN)"));
+		assertEquals(Double.NaN, evalD("(double ##NaN)"));
 	}
 
 	@Test
@@ -184,7 +184,7 @@ public class NumericsTest {
 		assertEquals(2.0, evalD("(sqrt 4.0)"), 0);
 		assertEquals(0.0, evalD("(sqrt 0.0)"), 0);
 		assertEquals(Double.NaN, evalD("(sqrt -3)"), 0);
-		assertEquals(Double.NaN, evalD("(sqrt NaN)"), 0);
+		assertEquals(Double.NaN, evalD("(sqrt ##NaN)"), 0);
 
 		assertArityError(step("(sqrt)"));
 		assertArityError(step("(sqrt :foo :bar)")); // arity before cast error
