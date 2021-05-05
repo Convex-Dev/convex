@@ -488,23 +488,26 @@ public class Core {
 		@Override
 		public  Context<Syntax> invoke(Context context, ACell[] args) {
 			int n = args.length;
+			if ((n<1)||(n>2)) {
+				return context.withArityError(name() + " requires a form argument and optional expander (arity 1 or 2)");
+			}
 
 			context = context.lookup(Symbols.STAR_INITIAL_EXPANDER);
 			if (context.isExceptional()) return (Context<Syntax>) context;
-			AExpander initialExpander = (AExpander) context.getResult();
-
-			AExpander expander;
-			if (n == 1) {
-				// use initial expander as continuation expander
-				expander = initialExpander;
-			} else if (n == 2) {
-				Object exArg = args[1];
-				expander = (exArg instanceof AExpander) ? (AExpander) exArg : Expander.wrap((AFn<ACell>) exArg);
-			} else {
-				return context
-						.withArityError(name() + " requires a form argument and optional expander (arity 1 or 2)");
+			ACell maybeEx=context.getResult();
+			if (!(maybeEx instanceof AExpander)) {
+				return context.withError(ErrorCodes.CAST,name()+" requires a valid *initial-expander*, not found in enviornment");
 			}
-			ACell form = (ACell) args[0];
+			AExpander initialExpander = (AExpander) maybeEx;
+
+			AExpander expander=initialExpander;
+			if (n == 2) {
+				// use provided expander
+				ACell exArg = args[1];
+				expander=Expander.wrap(exArg);
+			}
+			if (expander==null) return context.withCastError(ErrorCodes.CAST, AExpander.class);
+			ACell form = args[0];
 			Context<Syntax> rctx = expander.expand(form, initialExpander, context);
 			return rctx;
 		}

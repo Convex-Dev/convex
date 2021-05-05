@@ -35,9 +35,28 @@ public class Expander extends AExpander {
 		return true;
 	}
 
+	/**
+	 * Returns a new expander wrapping the given expansion function
+	 * @param expansionFunction
+	 * @return Expander instance, or null if conversion not possible
+	 */
 	public static Expander wrap(AFn<ACell> expansionFunction) {
+		if (expansionFunction==null) return null;
 		return new Expander(expansionFunction);
 	}
+	
+	/**
+	 * Returns a new expander wrapping the given expansion function
+	 * @param expansionFunction
+	 * @return Expander instance, or null if conversion not possible
+	 */
+	@SuppressWarnings("unchecked")
+	public static Expander wrap(ACell expansionFunction) {
+		if (expansionFunction instanceof Expander) return (Expander) expansionFunction;
+		if (!(expansionFunction instanceof AFn)) return null;
+		return wrap((AFn<ACell>)expansionFunction);
+	}
+
 
 	@Override
 	public void ednString(StringBuilder sb) {

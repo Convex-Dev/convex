@@ -1,6 +1,6 @@
 package convex.core.lang;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 
@@ -15,6 +15,6 @@ public class ExpanderTest {
 		e1.validate();
 
 		Expander e2 = Expander.wrap(null);
-		assertThrows(InvalidDataException.class, () -> e2.validate());
+		assertNull(e2);
 	}
 }

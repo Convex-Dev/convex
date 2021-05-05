@@ -2690,10 +2690,18 @@ public class CoreTest {
 	public void testExpand() {
 		assertEquals(Syntax.of(Strings.create("foo")), eval("(expand (name :foo) (fn [x e] x))"));
 		assertEquals(Syntax.of(3L), eval("(expand '[1 2 3] (fn [x e] (nth x 2)))"));
+		
+		assertNull(Syntax.unwrap(eval("(expand nil)")));
 
+		assertCastError(step("(expand 1 :foo)"));
+		assertCastError(step("(expand { 888 227 723 560} [75 561 258 833])"));
+		
 		assertArityError(step("(expand)"));
 		assertArityError(step("(expand 1 (fn [x e] x) :blah)"));
 		assertArityError(step("(expand 1 (fn [x] x))"));
+
+		// arity error in expansion execution
+		assertArityError(step("(expand 1 (fn [x x] (count)))"));
 	}
 
 	@Test

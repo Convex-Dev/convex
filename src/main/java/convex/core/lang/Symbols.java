@@ -188,6 +188,8 @@ public class Symbols {
 
 	public static final Symbol X = Symbol.create("x");
 	public static final Symbol E = Symbol.create("e");
+	
+	public static final Symbol NIL = Symbol.create("nil");
 
 	public static final Symbol NIL_Q = Symbol.create("nil?");
 	public static final Symbol LIST_Q = Symbol.create("list?");
