@@ -2026,7 +2026,8 @@ public class CoreTest {
 		assertFalse(evalB("(== 1.0 2.0)"));
 
 		assertTrue(evalB("(== 3 3)"));
-		assertTrue(evalB("(== 0.0 -0.0)"));
+		assertTrue(evalB("(== 0.0 -0.0)")); // IEE754 defines as equals
+		assertFalse(evalB("(= 0.0 -0.0)")); // Not identical values
 		assertTrue(evalB("(== 7.0000 7.0)"));
 		assertTrue(evalB("(== -1.00E0 -1.0)"));
 

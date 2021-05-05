@@ -18,6 +18,7 @@ import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMDouble;
 import convex.core.exceptions.ParseException;
 import convex.test.Samples;
 
@@ -113,6 +114,13 @@ public class ReaderTest {
 
 		// metadata ignored
 		assertCVMEquals(3.23, Reader.read("^:foo 3.23"));
+	}
+	
+	@Test
+	public void testSpecialNumbers() {
+		assertEquals(CVMDouble.NaN, Reader.read("##NaN"));
+		assertEquals(CVMDouble.POSITIVE_INFINITY, Reader.read("##Inf "));
+		assertEquals(CVMDouble.NEGATIVE_INFINITY, Reader.read(" ##-Inf"));
 	}
 	
 	@Test

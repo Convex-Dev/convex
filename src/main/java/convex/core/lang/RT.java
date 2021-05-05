@@ -92,7 +92,7 @@ public class RT {
 		if (check == null) return null;
 		if (check) return true;
 		for (int i = 0; i < values.length - 1; i++) {
-			Long comp = RT.compare(values[i], values[i + 1]);
+			Long comp = RT.compare(values[i], values[i + 1],Long.MAX_VALUE);
 			if (comp == null) return null; // cast error
 			if (comp != 0) return false;
 		}
@@ -104,7 +104,7 @@ public class RT {
 		if (check == null) return null;
 		if (check) return true;
 		for (int i = 0; i < values.length - 1; i++) {
-			Long comp = RT.compare(values[i], values[i + 1]);
+			Long comp = RT.compare(values[i], values[i + 1],Long.MIN_VALUE);
 			if (comp == null) return null; // cast error
 			if (comp < 0) return false;
 		}
@@ -116,7 +116,7 @@ public class RT {
 		if (check == null) return null;
 		if (check) return true;
 		for (int i = 0; i < values.length - 1; i++) {
-			Long comp = RT.compare(values[i], values[i + 1]);
+			Long comp = RT.compare(values[i], values[i + 1],Long.MIN_VALUE);
 			if (comp == null) return null; // cast error
 			if (comp <= 0) return false;
 		}
@@ -128,7 +128,7 @@ public class RT {
 		if (check == null) return null;
 		if (check) return true;
 		for (int i = 0; i < values.length - 1; i++) {
-			Long comp = RT.compare(values[i], values[i + 1]);
+			Long comp = RT.compare(values[i], values[i + 1],Long.MAX_VALUE);
 			if (comp == null) return null; // cast error
 			if (comp > 0) return false;
 		}
@@ -140,7 +140,7 @@ public class RT {
 		if (check == null) return null;
 		if (check) return true;
 		for (int i = 0; i < values.length - 1; i++) {
-			Long comp = RT.compare(values[i], values[i + 1]);
+			Long comp = RT.compare(values[i], values[i + 1],Long.MAX_VALUE);
 			if (comp == null) return null; // cast error
 			if (comp >= 0) return false;
 		}
@@ -372,7 +372,7 @@ public class RT {
 	 * @return Less than 0 if a is smaller, greater than 0 if a is larger, 0 if a
 	 *         equals b
 	 */
-	public static Long compare(Object a, Object b) {
+	public static Long compare(Object a, Object b,Long nanValue) {
 		Class<?> ca = numericType(a);
 		if (ca == null) return null;
 		Class<?> cb = numericType(b);
@@ -380,23 +380,13 @@ public class RT {
 
 		if ((ca == Long.class) && (cb == Long.class)) return RT.compare(longValue(a), longValue(b));
 
-		return RT.compare(doubleValue(a), doubleValue(b));
-	}
+		double da=doubleValue(a);		
+		double db=doubleValue(b);
+		if (da==db) return 0L;
+		if (da<db) return -1L;
+		if (da>db) return 1L;
 
-	/**
-	 * Compares two double values numerically, according to Java primitive
-	 * comparisons. Note: slight difference from Double.compare(...) due to signed
-	 * zeros and NAN
-	 * 
-	 * @param a
-	 * @param b
-	 * @return negative if first argument is smaller, positive if second argument is
-	 *         smaller, 0 otherwise
-	 */
-	public static long compare(double a, double b) {
-		if (a < b) return -1;
-		if (a > b) return 1;
-		return 0;
+		return nanValue;
 	}
 
 	/**

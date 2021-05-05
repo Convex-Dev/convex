@@ -322,8 +322,17 @@ public class Reader extends BaseParser<ACell> {
 				NilLiteral(), 
 				BooleanLiteral(), 
 				CharLiteral(),
-				AddressLiteral()
+				AddressLiteral(),
+				SpecialLiteral()
+
 				);
+	}
+	
+	public Rule SpecialLiteral() {
+		return FirstOf(
+				Sequence("##NaN", TestNot(FollowingSymbolCharacter()), push(prepare(CVMDouble.NaN))),
+				Sequence("##Inf", TestNot(FollowingSymbolCharacter()), push(prepare(CVMDouble.POSITIVE_INFINITY))),
+				Sequence("##-Inf", TestNot(FollowingSymbolCharacter()), push(prepare(CVMDouble.NEGATIVE_INFINITY))));
 	}
 
 	public Rule NilLiteral() {

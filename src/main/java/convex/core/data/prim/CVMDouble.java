@@ -1,5 +1,6 @@
 package convex.core.data.prim;
 
+import convex.core.data.ACell;
 import convex.core.data.Tag;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
@@ -11,6 +12,11 @@ import convex.core.util.Utils;
  */
 public final class CVMDouble extends APrimitive {
 
+	public static final ACell ZERO = CVMDouble.create(0.0);
+	public static final ACell NaN = CVMDouble.create(Double.NaN);
+	public static final ACell POSITIVE_INFINITY = CVMDouble.create(Double.POSITIVE_INFINITY);
+	public static final ACell NEGATIVE_INFINITY = CVMDouble.create(Double.NEGATIVE_INFINITY);
+	
 	private final double value;
 	
 	public CVMDouble(double value) {
@@ -50,7 +56,22 @@ public final class CVMDouble extends APrimitive {
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		sb.append(value);
+		sb.append(toString());
+	}
+	
+	@Override
+	public String toString() {
+		if (Double.isInfinite(value)) {
+			if (value>0.0) {
+				return "##Inf";
+			} else {
+				return "##-Inf";
+			}
+		} else if (Double.isNaN(value)) {
+			return "##NaN";
+		} else {
+			return Double.toString(value);
+		}
 	}
 
 	@Override

@@ -3,12 +3,14 @@ package convex.core.lang;
 import static convex.core.lang.TestState.*;
 import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMDouble;
 
 /**
  * 
@@ -133,10 +135,40 @@ public class NumericsTest {
 
 	@Test
 	public void testNaNPropagation() {
-		assertEquals(Double.NaN, evalD("NaN"), 0);
-		assertEquals(Double.NaN, evalD("(+ 1 NaN)"), 0);
-		assertEquals(Double.NaN, evalD("(/ NaN 2)"), 0);
-		assertEquals(Double.NaN, evalD("(* 1 NaN 3.0)"), 0);
+		assertEquals(Double.NaN, evalD("##NaN"), 0);
+		assertEquals(Double.NaN, evalD("(+ 1 ##NaN)"), 0);
+		assertEquals(Double.NaN, evalD("(/ ##NaN 2)"), 0);
+		assertEquals(Double.NaN, evalD("(* 1 ##NaN 3.0)"), 0);
+	}
+	
+	@Test
+	public void testNaNBehaviour() {
+		assertEquals(Double.NaN, evalD("##NaN"), 0);
+		assertTrue(evalB("(= ##NaN ##NaN)"));
+		
+		// match Java primitives for equality as IEE754. All NaN comparisons should be false
+		assertFalse(Double.NaN==Double.NaN);
+		assertFalse(evalB("(== ##NaN ##NaN)"));
+		assertFalse(evalB("(< ##NaN ##NaN)"));
+		assertFalse(evalB("(>= ##NaN ##NaN)"));
+		assertFalse(evalB("(>= ##NaN 1.0)"));
+		assertFalse(evalB("(< 1 ##NaN)"));
+		
+		// TODO: should this be in core? NaN is not equal to itself
+		// assertTrue(evalB("(!= ##NaN ##NaN)"));
+
+	}
+	
+	@Test
+	public void testInfinity() {
+		assertEquals(CVMDouble.POSITIVE_INFINITY, eval("(/ 1 0)"));
+		assertEquals(CVMDouble.NEGATIVE_INFINITY, eval("(/ -1 0)"));
+		
+		assertEquals(CVMDouble.NEGATIVE_INFINITY, eval("(- ##Inf)"));
+		assertEquals(CVMDouble.POSITIVE_INFINITY, eval("(- ##-Inf)"));
+
+		assertTrue(evalB("(== ##Inf ##Inf)"));
+		assertFalse(evalB("(== ##Inf ##-Inf)"));
 	}
 
 	@Test
