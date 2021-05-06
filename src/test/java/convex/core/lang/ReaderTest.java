@@ -36,6 +36,10 @@ public class ReaderTest {
 	public void testKeywords() {
 		assertEquals(Samples.FOO, Reader.read(":foo"));
 		assertEquals(Keyword.create("foo.bar"), Reader.read(":foo.bar"));
+		
+		// : is currently a valid symbol character
+		assertEquals(Keyword.create("foo:bar"), Reader.read(":foo:bar"));
+
 	}
 
 	@Test
@@ -111,6 +115,12 @@ public class ReaderTest {
 	public void testNumbers() {
 		assertCVMEquals(1L, Reader.read("1"));
 		assertCVMEquals(2.0, Reader.read("2.0"));
+		assertCVMEquals(2.0, Reader.read("2.0e0"));
+		assertCVMEquals(20.0, Reader.read("2.0e1"));
+		assertCVMEquals(0.2, Reader.read("2.0e-1"));
+		
+		assertThrows(Error.class, () -> Reader.read("2.0e0.1234"));
+		assertThrows(Error.class, () -> Reader.read("[2.0e0.1234]")); // Issue #70
 
 		// metadata ignored
 		assertCVMEquals(3.23, Reader.read("^:foo 3.23"));

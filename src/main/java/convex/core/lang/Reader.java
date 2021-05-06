@@ -182,11 +182,21 @@ public class Reader extends BaseParser<ACell> {
 	 * Leaves the value of expression on stack
 	 */
 	public Rule UndelimitedExpression() {
+		return Sequence(
+				FirstOf(
+						Constant(), 
+						Symbol(), 
+						Keyword(), 
+						Quoted(UndelimitedExpression())),
+				Test(UndelimitedExpressionEnd()));
+	}
+	
+	public Rule UndelimitedExpressionEnd() {
 		return FirstOf(
-				Constant(), 
-				Symbol(), 
-				Keyword(), 
-				Quoted(UndelimitedExpression()));
+				OneOrMore(WhiteSpaceComponent()),
+				Test(AnyOf("({[]})")),
+				EOI
+				);
 	}
 
 	public class AddAction implements Action<ACell> {
@@ -222,11 +232,10 @@ public class Reader extends BaseParser<ACell> {
 							Expression(),
 							Spacing(),
 							ListAddAction(expVar))), 
-				Optional(
-						Sequence( // final expression without whitespace
-								Expression(), ListAddAction(expVar))),
 				push(prepare(Lists.create(expVar.get()))));
 	}
+	
+
 
 	// QUOTING and UNQUOTING
 
