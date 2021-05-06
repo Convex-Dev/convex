@@ -152,6 +152,7 @@ public class CoreTest {
 	
 	@Test
 	public void testLet() {
+		
 		assertCastError(step("(let [[a b] :foo] b)"));
 		
 		assertArityError(step("(let [[a b] nil] b)"));
@@ -160,6 +161,12 @@ public class CoreTest {
 		assertEquals(2L,evalL("(let [[a b] '(1 2)] b)"));
 
 		assertCompileError(step("(let ['(a b) '(1 2)] b)"));
+		
+		// badly formed lets - Issue #80 related
+		assertCompileError(step("(let)"));
+		assertCompileError(step("(let :foo)"));
+		assertCompileError(step("(let [a])"));
+
 
 	}
 
