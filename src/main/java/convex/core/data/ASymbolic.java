@@ -14,12 +14,6 @@ public abstract class ASymbolic extends ACell {
 		this.name = name;
 	}
 	
-	@Override
-	public boolean isEmbedded() {
-		// Symbolic objects are always embedded
-		return true;
-	}
-	
 	@Override public final boolean isCVMValue() {
 		return true;
 	}

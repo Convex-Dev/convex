@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -21,6 +22,13 @@ public class SymbolTest {
 		assertNull(Symbol.create(Text.whiteSpace(Constants.MAX_NAME_LENGTH+1)));
 		assertNull(Symbol.create(""));
 		assertNull(Symbol.create((String)null));
+	}
+	
+	@Test
+	public void testEmbedded() {
+		// max length Symbol should be embedded
+		Symbol s=Symbol.create(Text.whiteSpace(Constants.MAX_NAME_LENGTH));
+		assertTrue(s.isEmbedded());
 	}
 
 	@Test

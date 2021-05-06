@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
 
+import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 
@@ -21,7 +22,7 @@ import convex.core.exceptions.InvalidDataException;
 public class Keyword extends ASymbolic implements Comparable<Keyword> {
 
 	/** Maximum size of a Keyword in UTF-16 chars representation */
-	public static final int MAX_CHARS = 32;
+	public static final int MAX_CHARS = Constants.MAX_NAME_LENGTH;
 
 	/** Minimum size of a Keyword in UTF-16 chars representation */
 	public static final int MIN_CHARS = 1;

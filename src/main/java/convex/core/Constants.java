@@ -67,7 +67,7 @@ public class Constants {
 	 * 
 	 * Note: Chosen so that small qualified symbolic values are always embedded
 	 */
-	public static final int MAX_NAME_LENGTH = 32;
+	public static final int MAX_NAME_LENGTH = 64;
 
 
 }
