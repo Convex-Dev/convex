@@ -2747,6 +2747,7 @@ public class CoreTest {
 	public void testExpander() {
 		assertCastError(step("(expander `(export test))")); // Issue #88
 		assertCastError(step("(expander :foo)")); // Issue #88
+		assertCastError(step("(expander *offer*)")); // Issue #83
 		
 		assertArityError(step("(expander)"));
 		assertArityError(step("(expander (fn[]) (fn[]))"));
@@ -2988,6 +2989,8 @@ public class CoreTest {
 		assertNull(eval("(get-holding *address*)"));
 		assertEquals(BlobMaps.of(HERO,1L),eval("(do (set-holding *address* 1) *holdings*)"));
 		
+		assertNull(eval("(*holdings* { :PuSg 650989 })"));
+		assertEquals(Keywords.FOO,eval("(*holdings* { :PuSg 650989 } :foo )"));
 	}
 	
 	@Test public void testHoldings() {
