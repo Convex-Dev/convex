@@ -133,7 +133,7 @@ public class Core {
 			
 			// initial juice is a load of null
 			long juice = Juice.CONSTANT;
-			for (Object a : args) {
+			for (ACell a : args) {
 				if (a == null) continue;
 				ASequence<?> seq = RT.sequence(a);
 				if (seq == null) return context.withCastError(a, ASequence.class);
@@ -153,7 +153,7 @@ public class Core {
 		public Context<AVector<ACell>> invoke(Context context, ACell[] args) {
 			// Arity 1 exactly
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-			Object o = args[0];
+			ACell o = args[0];
 			
 			// Need to compute juice before building potentially big vector
 			Long n = RT.count(o);
@@ -171,7 +171,7 @@ public class Core {
 		@Override
 		public Context<ASet<ACell>> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-			Object o = args[0];
+			ACell o = args[0];
 			
 			// Need to compute juice before building a potentially big set
 			Long n = RT.count(o);
@@ -196,9 +196,7 @@ public class Core {
 			long juice=Juice.BUILD_DATA;
 			
 			for (int i=0; i<n; i++) {
-				Object arg=args[i];
-				if (arg==null) continue; // nil is empty set, can skip (no elements)
-				
+				ACell arg=args[i];
 				Set<ACell> set=RT.ensureSet(arg);
 				if (set==null) return context.withCastError(arg, ASet.class);
 				
@@ -250,15 +248,15 @@ public class Core {
 			if (args.length <1) return context.withArityError(minArityMessage(1, args.length));
 
 			int n=args.length;
-			Object arg0=args[0];
+			ACell arg0=args[0];
 			Set<ACell> result=(arg0==null)?Sets.empty():RT.ensureSet(arg0);
 			if (result==null) return context.withCastError(arg0, ASet.class);
 			
 			long juice=Juice.BUILD_DATA;
 			
 			for (int i=1; i<n; i++) {
-				Object arg=args[i];
-				Set<ACell> set=(arg==null)?Sets.empty():RT.ensureSet(args[i]);
+				ACell arg=args[i];
+				Set<ACell> set=RT.ensureSet(arg);
 				if (set==null) return context.withCastError(args[i], ASet.class);
 				long size=set.count();
 				
@@ -308,9 +306,9 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			// Check can get as a String name
-			Object named = args[0];
-			AString result = RT.getName(named);
-			if (result == null) return context.withCastError(named, String.class);
+			ACell arg = args[0];
+			AString result = RT.name(arg);
+			if (result == null) return context.withCastError(arg, String.class);
 
 			long juice = Juice.SIMPLE_FN;
 			return context.withResult(juice, result);
@@ -409,7 +407,7 @@ public class Core {
 			long scheduleTimestamp = tso.longValue();
 
 			// get operation
-			Object opo = args[1];
+			ACell opo = args[1];
 			if (!(opo instanceof AOp)) return context.withCastError(opo,AOp.class);
 			AOp<?> op = (AOp<?>) opo;
 
@@ -462,7 +460,7 @@ public class Core {
 		public  Context<AHashMap<ACell,ACell>> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Object a=args[0];
+			ACell a=args[0];
 
 			AHashMap<ACell,ACell> result;
 			if (a instanceof Syntax) {
@@ -564,13 +562,13 @@ public class Core {
 			int n = form.size();
 			if (n < 1) return context.withError(ErrorCodes.COMPILE, "export form not valid?: " + form);
 			for (int i = 1; i < n; i++) {
-				Object so = Syntax.unwrap(form.get(i));
+				ACell so = Syntax.unwrap(form.get(i));
 				if (!(so instanceof Symbol)) return context.withError(ErrorCodes.COMPILE,
 						"export requires a list of symbols but got: " + Utils.getClass(so));
 			}
 
 			ASequence<ACell> syms = form.next();
-			Object quotedSyms = (syms == null) ? Vectors.empty() : syms.map(sym -> Lists.of(Symbols.QUOTE, sym));
+			ASequence<ACell> quotedSyms = (syms == null) ? Vectors.empty() : syms.map(sym -> Lists.of(Symbols.QUOTE, sym));
 			AList<Syntax> newForm = Lists.of(Syntax.create(Symbols.DEF), Syntax.create(Symbols.STAR_EXPORTS),
 					Syntax.create(RT.cons(Symbols.CONJ, Symbols.STAR_EXPORTS, quotedSyms)));
 			return context.withResult(Juice.SIMPLE_MACRO, Syntax.create(newForm));
@@ -795,7 +793,7 @@ public class Core {
 		public  Context<Address> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Object o = args[0];
+			ACell o = args[0];
 			AccountKey key = RT.accountKey(o);
 			if ((o!=null)&&(key == null)) {
 				return context.withCastError(o, AccountKey.class);
@@ -1008,7 +1006,7 @@ public class Core {
 		public  Context<AVector<ACell>> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Object a = args[0];
+			ACell a = args[0];
 			if (!(a instanceof AMap)) return context.withCastError(a, AMap.class);
 
 			AMap<ACell, ACell> m = (AMap<ACell,ACell>) a;
@@ -1027,7 +1025,7 @@ public class Core {
 		public  Context<AVector<ACell>> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Object a = args[0];
+			ACell a = args[0];
 			if (!(a instanceof AMap)) return context.withCastError(a, AMap.class);
 
 			AMap<ACell, ACell> m = (AMap<ACell, ACell>) a;
@@ -1052,7 +1050,7 @@ public class Core {
 			long juice = Juice.BUILD_DATA + (n - 1) * Juice.BUILD_PER_ELEMENT;
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
-			Object o = args[0];
+			ACell o = args[0];
 
 			// preserve a single nil, with no elements to assoc
 			if ((o == null) && (n == 1)) return context.withResult(juice, null);
@@ -1250,7 +1248,7 @@ public class Core {
 			if (n != 2) return context.withArityError(exactArityMessage(2, n));
 
 			CVMBool result;
-			Object coll = args[0];
+			ACell coll = args[0];
 			if (coll == null) {
 				result = CVMBool.FALSE; // treat nil as empty collection
 			} else {
@@ -1372,7 +1370,7 @@ public class Core {
 		public  Context<ACell> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Object coll = args[0];
+			ACell coll = args[0];
 			ASequence<?> seq = RT.sequence(coll);
 			if (seq == null) return context.withCastError(coll, ASequence.class);
 			if (seq.count()<1) return context.withBoundsError(0);
@@ -1408,7 +1406,8 @@ public class Core {
 		public  Context<ACell> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Object a = args[0];
+			ACell a = args[0];
+			// TODO: make O(1) with count?
 			ASequence<?> seq = RT.sequence(a);
 			if (seq == null) return context.withCastError(a, ASequence.class);
 			if (seq.isEmpty()) return context.withBoundsError(-1);
@@ -1785,7 +1784,7 @@ public class Core {
 		public  Context<ACell> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Object o = args[0];
+			ACell o = args[0];
 
 			// emptying nil is still nil
 			if (o == null) return context.withResult(Juice.SIMPLE_FN, null);
@@ -1877,7 +1876,7 @@ public class Core {
 			ACell body = form.get(2);
 
 			// expansion function is: (fn [x e] (let [<paramForm> (next (unsyntax x))] <body>))
-			Object expansionFn = List.create(new ACell[] {
+			List expansionFn = List.create(new ACell[] {
 					Symbols.FN, Vectors.of(Symbols.X, Symbols.E),
 					Lists.of(Symbols.LET, Vectors.of(paramForm, Lists.of(Symbols.NEXT, Lists.of(Symbols.UNSYNTAX,Symbols.X))), 
 							body)});
@@ -2001,12 +2000,12 @@ public class Core {
 		public  Context<ADataStructure<ACell>> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			Object a0 = args[0];
+			ACell a0 = args[0];
 			ADataStructure<ACell> result = RT.ensureDataStructure(a0);
 			if ((a0 != null) && (result == null)) return context.withCastError(args[0], ADataStructure.class);
 
 			long juice = Juice.BUILD_DATA;
-			Object a1 = args[1];
+			ACell a1 = args[1];
 			if (a0 == null) {
 				// just keep second arg as complete data structure
 				result = RT.ensureDataStructure(a1);
@@ -2038,13 +2037,13 @@ public class Core {
 			
 			// TODO: handle blobmaps?
 			
-			Object arg0=args[0];
+			ACell arg0=args[0];
 			AHashMap<ACell,ACell> result=RT.ensureHashMap(arg0);
 			if (result == null) return context.withCastError(arg0, AHashMap.class);
 			
 			long juice=Juice.BUILD_DATA;
 			for (int i=1; i<n; i++) {
-				Object argi=args[i];
+				ACell argi=args[i];
 				AHashMap<ACell,ACell> argMap=RT.ensureHashMap(argi);
 				if (argMap == null) return context.withCastError(argi, AHashMap.class);
 				
@@ -2068,7 +2067,7 @@ public class Core {
 			if (args.length < 2) return context.withArityError(minArityMessage(2, args.length));
 
 			// check and cast first argument to a function
-			Object fnArg = args[0];
+			ACell fnArg = args[0];
 			IFn<?> f = RT.function(fnArg);
 			if (f == null) return context.withCastError(fnArg, IFn.class);
 
@@ -2079,7 +2078,7 @@ public class Core {
 
 			int length = Integer.MAX_VALUE;
 			for (int i = 0; i < fnArity; i++) {
-				Object maybeSeq = args[1 + i];
+				ACell maybeSeq = args[1 + i];
 				ASequence<?> seq = RT.sequence(maybeSeq);
 				if (seq == null) return context.withCastError(maybeSeq, ASequence.class);
 				seqs[i] = seq;
@@ -2089,14 +2088,14 @@ public class Core {
 			final long juice = Juice.addMul(Juice.MAP, Juice.BUILD_DATA , length);
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
-			ArrayList<Object> al = new ArrayList<>();
+			ArrayList<ACell> al = new ArrayList<>();
 			for (int i = 0; i < length; i++) {
 				for (int j = 0; j < fnArity; j++) {
 					xs[j] = seqs[j].get(i);
 				}
 				context = (Context) context.invoke(f, xs);
 				if (context.isExceptional()) return (Context<ASequence<?>>) context;
-				Object r = context.getResult();
+				ACell r = context.getResult();
 				al.add(r);
 			}
 
@@ -2299,7 +2298,7 @@ public class Core {
 	static Symbol symbolFor(ACell o) {
 		if (o instanceof CoreFn) return ((CoreFn<?>) o).getSymbol();
 		if (o instanceof CoreExpander) return ((CoreExpander) o).getSymbol();
-		throw new Error("Cant get symbol for Object of type " + o.getClass());
+		throw new Error("Cant get symbol for object of type " + o.getClass());
 	}
 
 	private static AHashMap<Symbol, Syntax> register(AHashMap<Symbol, Syntax> env, ACell o) {

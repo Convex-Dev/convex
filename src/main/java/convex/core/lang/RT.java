@@ -550,19 +550,41 @@ public class RT {
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> ASequence<T> sequence(Object o) {
 		if (o == null) return Vectors.empty();
-		if (o instanceof ASequence) return (ASequence<T>) o;
-		if (o instanceof ACollection) return ((ACollection<T>) o).toVector();
-		if (o instanceof AMap) {
-			// TODO: probably needs fixing! SECURITY
-			return sequence(((AMap<?, ?>) o).entryVector());
-		}
-
+		if (o instanceof ACell) return sequence((ACell)o);
+		
 		if (o.getClass().isArray()) {
 			ACell[] arr = Utils.toCellArray(o);
 			return Vectors.create(arr);
 		}
 
 		if (o instanceof java.util.List) return Vectors.create((java.util.List<T>) o);
+
+		return null;
+	}
+	
+	/**
+	 * Converts any collection of cells into a sequence data structure. 
+	 * 
+	 * Potentially O(n) in size of collection.
+	 * 
+	 * Nulls are converted to an empty vector.
+	 * 
+	 * Returns null if conversion is not possible.
+	 * 
+	 * @param <T> Type of cell in collection
+	 * @param o An object that contains a collection of cells
+	 * @return An ASequence instance, or null if the argument cannot be converted to
+	 *         a sequence
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> ASequence<T> sequence(ACell o) {
+		if (o == null) return Vectors.empty();
+		if (o instanceof ASequence) return (ASequence<T>) o;
+		if (o instanceof ACollection) return ((ACollection<T>) o).toVector();
+		if (o instanceof AMap) {
+			// TODO: probably needs fixing! SECURITY
+			return sequence(((AMap<?, ?>) o).entryVector());
+		}
 
 		return null;
 	}
@@ -646,7 +668,7 @@ public class RT {
 		if (o instanceof ASequence) return ((ASequence<T>) o).next();
 		throw new IllegalArgumentException("Not a sequence: " + Utils.getClassName(o));
 	}
-
+	
 	/**
 	 * Gets the count of elements in a collection
 	 * 
@@ -655,15 +677,30 @@ public class RT {
 	 */
 	public static Long count(Object o) {
 		if (o == null) return 0L;
-		if (o instanceof ADataStructure) return ((ADataStructure<?>) o).count();
+		if (o instanceof ACell) return count((ACell)o);
 		if (o instanceof CharSequence) {
 			return (long) ((CharSequence) o).length();
 		}
+		if (o.getClass().isArray()) {
+			return (long) Array.getLength(o);
+		}
+		return null;
+	}
+
+	/**
+	 * Gets the count of elements in a collection
+	 * 
+	 * @param o An object representing a collection of items to be counted
+	 * @return The count of elements in the collection, or null if not countable
+	 */
+	public static Long count(ACell o) {
+		if (o == null) return 0L;
+		if (o instanceof ADataStructure) return ((ADataStructure<?>) o).count();
 		if (o instanceof ABlob) {
 			return ((ABlob) o).length();
 		}
-		if (o.getClass().isArray()) {
-			return (long) Array.getLength(o);
+		if (o instanceof AString) {
+			return (long) ((AString) o).length();
 		}
 		return null;
 	}
@@ -813,7 +850,7 @@ public class RT {
 	 * 
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> IFn<T> function(Object a) {
+	public static <T extends ACell> IFn<T> function(ACell a) {
 		if (a instanceof AFn) return (IFn<T>) a;
 		if (a instanceof AMap) return MapFn.wrap((AMap<?, T>) a);
 		if (a instanceof ASequence) return SeqFn.wrap((ASequence<?>) a);
@@ -1039,18 +1076,7 @@ public class RT {
 		return Symbol.create(name);
 	}
 
-	/**
-	 * Gets the canonical String name for a String, Symbol or Keyword
-	 * 
-	 * @param a
-	 * @return Name from the Object, or null if not a named object
-	 */
-	public static AString getName(Object a) {
-		if (a instanceof Keyword) return ((Keyword) a).getName();
-		if (a instanceof Symbol) return ((Symbol) a).getName();
-		if (a instanceof AString) return (AString) a;
-		return null;
-	}
+
 
 	/**
 	 * Casts to an ADataStructure instance
@@ -1210,7 +1236,7 @@ public class RT {
 	 * @return
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> Set<T> ensureSet(Object a) {
+	public static <T extends ACell> Set<T> ensureSet(ACell a) {
 		if (a==null) return Sets.empty();
 		if (!(a instanceof Set)) return null;
 		return (Set<T>) a;
@@ -1224,7 +1250,7 @@ public class RT {
 	 * @return AHashMap instance, or null if not a hash map
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K extends ACell,V extends ACell> AHashMap<K, V> ensureHashMap(Object a) {
+	public static <K extends ACell,V extends ACell> AHashMap<K, V> ensureHashMap(ACell a) {
 		if (a==null) return Maps.empty();
 		if (a instanceof AHashMap) return (AHashMap<K, V>) a;
 		return null;

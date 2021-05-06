@@ -63,7 +63,7 @@ public class Invoke<T extends ACell> extends AMultiOp<T> {
 		Context<T> ctx = (Context<T>) context.execute(fnOp);
 		if (ctx.isExceptional()) return ctx;
 
-		Object rf = ctx.getResult();
+		ACell rf = ctx.getResult();
 		IFn<T> fn = RT.function(rf);
 		if (fn == null) return context.withCastError(rf, IFn.class);
 
