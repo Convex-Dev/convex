@@ -115,9 +115,12 @@ public class ReaderTest {
 	public void testNumbers() {
 		assertCVMEquals(1L, Reader.read("1"));
 		assertCVMEquals(2.0, Reader.read("2.0"));
+		
+		// scientific notation
 		assertCVMEquals(2.0, Reader.read("2.0e0"));
 		assertCVMEquals(20.0, Reader.read("2.0e1"));
 		assertCVMEquals(0.2, Reader.read("2.0e-1"));
+		assertCVMEquals(12.0, Reader.read("12e0"));
 		
 		assertThrows(Error.class, () -> Reader.read("2.0e0.1234"));
 		assertThrows(Error.class, () -> Reader.read("[2.0e0.1234]")); // Issue #70

@@ -508,9 +508,9 @@ public class Reader extends BaseParser<ACell> {
 		return Sequence(Sequence(
 				Optional(AnyOf("+-")), 
 				Digits(), 
-				'.',
-				Digits(), 
-				Optional(ExponentPart())),
+				FirstOf(
+						Sequence('.',Digits(),Optional(ExponentPart())), 
+						ExponentPart())),
 				push(prepare(CVMDouble.parse(match()))));
 	}
 
