@@ -45,13 +45,13 @@ public class RTTest {
 		assertSame(za, RT.address(za));
 
 		// reading a hex address
-		assertEquals(Address.create(18),RT.address("0000000000000012")); // OK, hex string
-		assertNull(RT.address("0012")); // too short
+		assertEquals(Address.create(18),RT.address(Strings.create("0000000000000012"))); // OK, hex string
+		assertNull(RT.address(Strings.create("0012"))); // too short
 		
 		// Check null return values for invalid addresses
 		assertNull(RT.address(null)); // null not allowed
-		assertNull(RT.address(-1)); // negative ints not allowed
-		assertNull(RT.address("xyz2030405060708090a0b0c0d0e0f1011121314")); // bad format
+		assertNull(RT.address(CVMLong.create(-1))); // negative ints not allowed
+		assertNull(RT.address(Strings.create("xyz2030405060708090a0b0c0d0e0f1011121314"))); // bad format
 	}
 
 	@Test

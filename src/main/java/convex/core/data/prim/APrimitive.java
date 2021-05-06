@@ -42,7 +42,7 @@ public abstract  class APrimitive extends ACell {
 
 	/**
 	 * Gets the numeric type that this primitive should be used as for calculations
-	 * @return Double.class or Long.class
+	 * @return Double.class or Long.class, or null if not a numeric type
 	 */
 	public abstract Class<?> numericType();
 

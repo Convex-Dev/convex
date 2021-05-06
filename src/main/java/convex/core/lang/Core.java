@@ -776,7 +776,7 @@ public class Core {
 		public  Context<Address> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Object o = args[0];
+			ACell o = args[0];
 			Address address = RT.address(o);
 			if (address == null) {
 				if (o instanceof AString) return context.withArgumentError("String not convertible to a valid Address: " + o);
@@ -841,7 +841,7 @@ public class Core {
 		public  Context<CVMBool> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Object a0 = args[0];
+			ACell a0 = args[0];
 			Address address = RT.address(a0);
 
 			// return false if the argument is not an address
@@ -863,7 +863,7 @@ public class Core {
 		public  Context<AccountStatus> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Object a0 = args[0];
+			ACell a0 = args[0];
 			Address address = RT.address(a0);
 			if (address == null) return context.withCastError(a0, Address.class);
 
@@ -1479,7 +1479,7 @@ public class Core {
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Object a = args[0];
+			ACell a = args[0];
 			CVMLong result = RT.inc(a);
 			if (result == null) return context.withCastError(a, Long.class);
 			return context.withResult(Juice.ARITHMETIC, result);
@@ -1492,7 +1492,7 @@ public class Core {
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Object a = args[0];
+			ACell a = args[0];
 			CVMLong result = RT.dec(a);
 			if (result == null) return context.withCastError(a, Long.class);
 
@@ -1541,7 +1541,7 @@ public class Core {
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Object a = args[0];
+			ACell a = args[0];
 			CVMLong result = RT.toLong(a);
 			if (result == null) return context.withCastError(a, Long.class);
 
@@ -1555,7 +1555,7 @@ public class Core {
 		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Object a = args[0];
+			ACell a = args[0];
 			CVMDouble result = RT.toDouble(a);
 			if (result == null) return context.withCastError(a, Double.class);
 
@@ -1569,7 +1569,7 @@ public class Core {
 		public  Context<CVMChar> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Object a = args[0];
+			ACell a = args[0];
 			CVMChar result = RT.toCharacter(a);
 			if (result == null) return context.withCastError(a, Character.class);
 
@@ -1583,7 +1583,7 @@ public class Core {
 		public  Context<CVMByte> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Object a = args[0];
+			ACell a = args[0];
 			CVMByte result = RT.toByte(a);
 			if (result == null) return context.withCastError(a, Byte.class);
 			return context.withResult(Juice.ARITHMETIC, result);

@@ -62,7 +62,7 @@ public final class CVMBool extends APrimitive {
 
 	@Override
 	public Class<?> numericType() {
-		return Long.class;
+		return null;
 	}
 
 	@Override

@@ -59,7 +59,7 @@ public final class CVMChar extends APrimitive {
 
 	@Override
 	public Class<?> numericType() {
-		return Long.class;
+		return null;
 	}
 
 	@Override

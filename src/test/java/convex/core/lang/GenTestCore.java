@@ -165,14 +165,13 @@ public class GenTestCore {
 	public void testLongFunctions(@From(LongGenerator.class) Long a) {
 		CVMLong ca=CVMLong.create(a);
 		assertEquals(ca,RT.toLong(a));
-		assertCVMEquals(a,RT.number(a));
 		
 		long v=a;
 		assertEquals(Long.toString(v),RT.str(a).toString());
-		assertSame(CVMByte.create(v),RT.toByte(a));
-		assertCVMEquals((char)v,RT.toCharacter(a));
-		assertCVMEquals(v+1,RT.inc(a));
-		assertCVMEquals(v-1,RT.dec(a));
+		assertSame(CVMByte.create(v),RT.toByte(ca));
+		assertCVMEquals((char)v,RT.toCharacter(ca));
+		assertCVMEquals(v+1,RT.inc(ca));
+		assertCVMEquals(v-1,RT.dec(ca));
 		assertCVMEquals(0,RT.compare(a,(Long)v));
 		assertCVMEquals(-1,RT.compare((long)a,v+10));
 		assertCVMEquals(1,RT.compare((long)a,v-10));

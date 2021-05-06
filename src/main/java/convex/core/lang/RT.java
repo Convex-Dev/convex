@@ -77,7 +77,7 @@ public class RT {
 	 * 
 	 * @return Boolean result, or null if the values are not comparable
 	 */
-	private static Boolean checkShortCompare(Object[] values) {
+	private static Boolean checkShortCompare(ACell[] values) {
 		int len = values.length;
 		if (len == 0) return true;
 		if (len == 1) {
@@ -255,7 +255,7 @@ public class RT {
 		return CVMDouble.create(result);
 	}
 
-	public static CVMDouble divide(Object[] args) {
+	public static CVMDouble divide(ACell[] args) {
 		int n = args.length;
 		CVMDouble arg0 = toDouble(args[0]);
 		if (arg0 == null) return null;
@@ -299,7 +299,7 @@ public class RT {
 	 * @param a
 	 * @return The floor of the number, or null if cast fails
 	 */
-	public static CVMDouble floor(Object a) {
+	public static CVMDouble floor(ACell a) {
 		CVMDouble d = RT.toDouble(a);
 		if (d == null) return null;
 		return CVMDouble.create(StrictMath.floor(d.doubleValue()));
@@ -311,7 +311,7 @@ public class RT {
 	 * @param a
 	 * @return The ceiling of the number, or null if cast fails
 	 */
-	public static CVMDouble ceil(Object a) {
+	public static CVMDouble ceil(ACell a) {
 		CVMDouble d = RT.toDouble(a);
 		if (d == null) return null;
 		return CVMDouble.create(StrictMath.ceil(d.doubleValue()));
@@ -324,7 +324,7 @@ public class RT {
 	 * @param a
 	 * @return The square root of the number, or null if cast fails
 	 */
-	public static CVMDouble sqrt(Object a) {
+	public static CVMDouble sqrt(ACell a) {
 		CVMDouble d = RT.toDouble(a);
 		if (d == null) return null;
 		return CVMDouble.create(StrictMath.sqrt(d.doubleValue()));
@@ -336,7 +336,7 @@ public class RT {
 	 * @param a Numeric CVM value
 	 * @return
 	 */
-	public static APrimitive abs(Object a) {
+	public static APrimitive abs(ACell a) {
 		Number x=RT.number(a);
 		if (x==null) return null;
 		if (x instanceof Long) return CVMLong.create( Math.abs((Long)x));
@@ -349,7 +349,7 @@ public class RT {
 	 * @param a Numeric value
 	 * @return Long value of -1, 0 or 1, or null if the argument is not numeric
 	 */
-	public static CVMLong signum(Object a) {
+	public static CVMLong signum(ACell a) {
 		Number x=RT.number(a);
 		if (x==null) return null;
 		if (x instanceof Long) return CVMLong.create(Long.signum((Long)x));
@@ -407,19 +407,12 @@ public class RT {
 	 * @param a
 	 * @return The number value, or null if cannot be converted
 	 */
-	public static Number number(Object a) {
+	public static Number number(ACell a) {
 		if (a == null) return null;
 		
-		// TODO: handle double primitives
 		if (a instanceof APrimitive) {
 			if (a instanceof CVMDouble) return ((CVMDouble)a).doubleValue();
 			return ((APrimitive)a).longValue();
-		}
-
-		if (a instanceof Character) return (long) ((Character) a);
-		
-		if (a instanceof Number) {
-			return ((Number)a).longValue();
 		}
 		
 		if (a instanceof ABlob) {
@@ -429,19 +422,19 @@ public class RT {
 		return null;
 	}
 
-	public static CVMLong inc(Object object) {
+	public static CVMLong inc(ACell object) {
 		CVMLong n = toLong(object);
 		if (n == null) return null;
 		return CVMLong.create(n.longValue() + 1L);
 	}
 
-	public static CVMLong dec(Object object) {
+	public static CVMLong dec(ACell object) {
 		CVMLong n = toLong(object);
 		if (n == null) return null;
 		return CVMLong.create(n.longValue() - 1L);
 	}
 
-	public static CVMDouble toDouble(Object a) {
+	public static CVMDouble toDouble(ACell a) {
 		if (a instanceof CVMDouble) return (CVMDouble) a;
 		Number n = number(a);
 		if (n == null) return null;
@@ -454,6 +447,19 @@ public class RT {
 	 * @return Long value, or null if not convertible
 	 */
 	public static CVMLong toLong(Object a) {
+		if (a instanceof ACell) return toLong((ACell)a);
+		if (a instanceof Number) {
+			return CVMLong.create(((Number)a).longValue());
+		}
+		return null;
+	}
+	
+	/**
+	 * Converts a numerical value to a CVM Long. Doubles and floats will be converted if possible.
+	 * @param a
+	 * @return Long value, or null if not convertible
+	 */
+	public static CVMLong toLong(ACell a) {
 		if (a instanceof CVMLong) return (CVMLong) a;
 		Number n = number(a);
 		if (n == null) return null;
@@ -465,14 +471,14 @@ public class RT {
 	 * @param a
 	 * @return Long value, or null if not convertible
 	 */
-	public static CVMByte toByte(Object a) {
+	public static CVMByte toByte(ACell a) {
 		if (a instanceof CVMByte) return (CVMByte) a;
 		Number n = number(a);
 		if (n == null) return null;
 		return CVMByte.create((byte)n.longValue());
 	}
 
-	public static CVMChar toCharacter(Object a) {
+	public static CVMChar toCharacter(ACell a) {
 		if (a instanceof CVMChar) return (CVMChar) a;
 		Number n = number(a);
 		if (n == null) return null;
@@ -828,11 +834,10 @@ public class RT {
 	 * @param a
 	 * @return Address value or null if not a valid address
 	 */
-	public static Address address(Object a) {
+	public static Address address(ACell a) {
 		if (a instanceof Address) return (Address) a;
 		if (a instanceof ABlob) return Address.create((ABlob)a);
 		if (a instanceof AString) return Address.fromHexOrNull(a.toString());
-		if (a instanceof String) return Address.fromHexOrNull(a.toString());
 		CVMLong value=RT.toLong(a);
 		if (value==null) return null;
 		return Address.create(value.longValue());
