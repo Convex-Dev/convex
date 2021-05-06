@@ -519,12 +519,13 @@ public class Core {
 		public  Context<ACell> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			AFn<ACell> fn = (AFn<ACell>) RT.function(args[0]);
+			IFn<ACell> fn = RT.function(args[0]);
 
 			// check cast to function
-			if (fn == null) return context.withCastError(args[1], AFn.class);
+			if (!(fn instanceof AFn)) return context.withCastError(args[0], AFn.class);
 			
-			Expander expander = Expander.wrap(fn);
+			Expander expander = Expander.wrap((AFn)fn);
+			if (expander==null) return context.withError(ErrorCodes.CAST, "Expander requires a valid function");
 			long juice = Juice.SIMPLE_FN;
 
 			return context.withResult(juice, expander);

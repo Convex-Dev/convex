@@ -2742,6 +2742,15 @@ public class CoreTest {
 		// arity error in expansion execution
 		assertArityError(step("(expand 1 (fn [x e] (count)))"));
 	}
+	
+	@Test
+	public void testExpander() {
+		assertCastError(step("(expander `(export test))")); // Issue #88
+		assertCastError(step("(expander :foo)")); // Issue #88
+		
+		assertArityError(step("(expander)"));
+		assertArityError(step("(expander (fn[]) (fn[]))"));
+	}
 
 	@Test
 	public void testSyntax() {
