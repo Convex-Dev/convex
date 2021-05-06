@@ -1940,7 +1940,7 @@ public class Core {
 			int alen = args.length;
 			if (alen < 2) return context.withArityError(minArityMessage(2, alen));
 
-			AFn<ACell> fn = (AFn<ACell>) args[0];
+			IFn<ACell> fn = RT.function(args[0]);
 
 			ACell lastArg = args[alen - 1];
 			ASequence<ACell> coll = RT.ensureSequence(lastArg);
@@ -1964,6 +1964,8 @@ public class Core {
 			} else {
 				applyArgs = coll.toCellArray();
 			}
+			
+			if (fn==null ) return context.withCastError(args[0], IFn.class);
 
 			Context<ACell> rctx = context.invoke(fn, applyArgs);
 			return rctx.consumeJuice(Juice.APPLY);

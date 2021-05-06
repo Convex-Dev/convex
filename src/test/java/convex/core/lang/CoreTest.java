@@ -1630,10 +1630,19 @@ public class CoreTest {
 		assertEquals(Vectors.of(1L, 2L, 3L, 4L), eval("(apply vector 1 2 (list 3 4))"));
 		assertEquals(List.of(1L, 2L, 3L, 4L), eval("(apply list 1 2 [3 4])"));
 		assertEquals(List.of(1L, 2L), eval("(apply list 1 2 nil)"));
+		
+		// Bad function type
+		assertCastError(step("(apply 666 1 2 [3 4])"));
+
+		// Keyword works as a function lookup wrong arity (#79)
+		assertArityError(step("(apply :n 1 2 [3 4])"));
 
 		// Insufficient args to apply itself
 		assertArityError(step("(apply)"));
 		assertArityError(step("(apply vector)"));
+		
+		// Arity failure before cast
+		assertArityError(step("(apply 666)"));
 		
 		// Insufficient args to applied function
 		assertArityError(step("(apply assoc nil)")); 
