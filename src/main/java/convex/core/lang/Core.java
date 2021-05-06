@@ -844,7 +844,7 @@ public class Core {
 			ACell a0 = args[0];
 			Address address = RT.address(a0);
 
-			// return false if the argument is not an address
+			// return false if the argument is not castable to an address
 			long juice = Juice.SIMPLE_FN;
 			if (address == null) return context.withResult(juice, CVMBool.FALSE);
 
@@ -854,6 +854,27 @@ public class Core {
 			CVMBool result = CVMBool.create(as.isActor());
 
 			return context.withResult(juice, result);
+		}
+	});
+	
+	public static final CoreFn<CVMBool> ACCOUNT_Q = reg(new CoreFn<>(Symbols.ACCOUNT_Q) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<CVMBool> invoke(Context context, ACell[] args) {
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+
+			long juice = Juice.SIMPLE_FN;
+			ACell a0 = args[0];
+			
+			// Return false if argument is not an Address
+			if (!(a0 instanceof Address)) return context.withResult(juice, CVMBool.FALSE);
+			Address address = (Address)a0;
+
+			// return false if the address does not refer to an existing account
+			if (context.getAccountStatus(address) == null) return context.withResult(juice, CVMBool.FALSE);
+
+			// We have proved it is a valid account
+			return context.withResult(juice,  CVMBool.TRUE);
 		}
 	});
 	

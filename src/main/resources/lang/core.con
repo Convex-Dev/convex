@@ -327,13 +327,4 @@
     '(let [~sym ~exp]
        ~(cons 'if sym body)))
 
-(defn account?
-  ^{
-    :doc {:description "Tests if the given address refers to a valid existing acount (which may be either an Actor or User account)."
-          :examples [{:code "(account? *caller*)"}]
-          :type :fn 
-          :signature [{:params [address] }]}}
-  [address]
-  (boolean (account address)))
-
 

@@ -87,7 +87,9 @@ public class Symbols {
 	public static final Symbol BALANCE = Symbol.create("balance");
 	public static final Symbol TRANSFER = Symbol.create("transfer");
 	public static final Symbol ACCEPT = Symbol.create("accept");
-	public static final Symbol ACCOUNT = Symbol.create("account");;
+	public static final Symbol ACCOUNT = Symbol.create("account");
+	
+	public static final Symbol ACCOUNT_Q = Symbol.create("account?");
 
 	public static final Symbol STAKE = Symbol.create("stake");
 	public static final Symbol CREATE_PEER = Symbol.create("create-peer");
@@ -275,6 +277,7 @@ public class Symbols {
 	public static final Symbol SET_KEY = Symbol.create("set-key");
 	
 	public static final Symbol LOG = Symbol.create("log");
+
 	
 
 

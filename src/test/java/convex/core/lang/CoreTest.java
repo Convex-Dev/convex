@@ -1842,16 +1842,19 @@ public class CoreTest {
 		// standard actors are accounts
 		assertTrue(evalB(ctx,"(account? *registry*)"));
 		
+		// standard actors are accounts
+		assertTrue(evalB(ctx,"(account? "+Init.HERO+")"));
+		
 		// a fake address
 		assertFalse(evalB(ctx,"(account? 77777777)"));
 		
-		// hero address is an account
+		// current hero address is an account
 		assertTrue(evalB(ctx,"(account? *address*)"));
 		
-		assertCastError(step("(account? :foo)"));
-		assertCastError(step("(account? nil)"));
-		assertCastError(step("(account? [])"));
-		assertCastError(step("(account? 'foo)"));
+		assertFalse(evalB("(account? :foo)"));
+		assertFalse(evalB("(account? nil)"));
+		assertFalse(evalB("(account? [])"));
+		assertFalse(evalB("(account? 'foo)"));
 		
 		assertArityError(step("(account?)"));
 		assertArityError(step("(account? 1 2)")); // ARITY before CAST
@@ -2344,7 +2347,7 @@ public class CoreTest {
 	public void testAddressPred() {
 		assertTrue(evalB("(address? *origin*)"));
 		assertFalse(evalB("(address? nil)"));
-		assertFalse(evalB("(address? 12345)"));
+		assertFalse(evalB("(address? 1)"));
 		assertFalse(evalB("(address? \"0a1b2c3d\")"));
 		assertFalse(evalB("(address? (blob *origin*))"));
 	}

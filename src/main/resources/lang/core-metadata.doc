@@ -23,6 +23,13 @@
          :signature [{:params [address]}]}
 	}
  
+  account?
+  {
+    :doc {:description "Tests if the given Address refers to a valid existing acount (which may be either an Actor or User account). Returns false for any non-Address argument, or any Address that does not refer to a currently existing Account."
+          :examples [{:code "(account? *caller*)"}]
+          :type :fn 
+          :signature [{:params [address] }]}}
+ 
   actor?
 	{
 	 :doc {:description "Tests if the given Address refers to an Actor. Argument must be castable to Address"
