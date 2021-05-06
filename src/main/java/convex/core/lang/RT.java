@@ -62,7 +62,7 @@ public class RT {
 	 * @param values
 	 * @return True i
 	 */
-	public static <T> Boolean allEqual(T[] values) {
+	public static <T extends ACell> Boolean allEqual(T[] values) {
 		for (int i = 0; i < values.length - 1; i++) {
 			if (!Utils.equals(values[i], values[i + 1])) return false;
 		}
@@ -87,7 +87,7 @@ public class RT {
 		return false;
 	}
 
-	public static Boolean eq(Object[] values) {
+	public static Boolean eq(ACell[] values) {
 		Boolean check = checkShortCompare(values);
 		if (check == null) return null;
 		if (check) return true;
@@ -99,7 +99,7 @@ public class RT {
 		return true;
 	}
 
-	public static Boolean ge(Object[] values) {
+	public static Boolean ge(ACell[] values) {
 		Boolean check = checkShortCompare(values);
 		if (check == null) return null;
 		if (check) return true;
@@ -111,7 +111,7 @@ public class RT {
 		return true;
 	}
 
-	public static Boolean gt(Object[] values) {
+	public static Boolean gt(ACell[] values) {
 		Boolean check = checkShortCompare(values);
 		if (check == null) return null;
 		if (check) return true;
@@ -123,7 +123,7 @@ public class RT {
 		return true;
 	}
 
-	public static Boolean le(Object[] values) {
+	public static Boolean le(ACell[] values) {
 		Boolean check = checkShortCompare(values);
 		if (check == null) return null;
 		if (check) return true;
@@ -135,7 +135,7 @@ public class RT {
 		return true;
 	}
 
-	public static Boolean lt(Object[] values) {
+	public static Boolean lt(ACell[] values) {
 		Boolean check = checkShortCompare(values);
 		if (check == null) return null;
 		if (check) return true;
@@ -155,14 +155,15 @@ public class RT {
 	 * 
 	 * @return The target numeric type, or null if there is a non-numeric argument
 	 */
-	public static Class<?> commonNumericType(Object[] args) {
+	public static Class<?> commonNumericType(ACell[] args) {
+		Class<?> highestFound=Long.class;
 		for (int i = 0; i < args.length; i++) {
-			Object a = args[i];
+			ACell a = args[i];
 			Class<?> klass = numericType(a);
-			if (klass == null) return null;
-			if (klass == Double.class) return Double.class;
+			if (klass == null) return null; // break if non-numeric
+			if (klass == Double.class) highestFound=Double.class;
 		}
-		return Long.class;
+		return highestFound;
 	}
 
 	/**
@@ -171,9 +172,9 @@ public class RT {
 	 * @param args
 	 * @return First non-numeric value, or null if not found.
 	 */
-	public static Object findNonNumeric(Object[] args) {
+	public static Object findNonNumeric(ACell[] args) {
 		for (int i = 0; i < args.length; i++) {
-			Object a = args[i];
+			ACell a = args[i];
 			Class<?> klass = numericType(a);
 			if (klass == null) return a;
 		}
@@ -186,21 +187,14 @@ public class RT {
 	 * @param a
 	 * @return Long.class or Double.class if cast possible, or null if not numeric.
 	 */
-	public static Class<?> numericType(Object a) {
+	public static Class<?> numericType(ACell a) {
 		if (a instanceof APrimitive) {
 			return ((APrimitive)a).numericType();
 		}
-		if (!(a instanceof Number)) {
-			if (a instanceof Character) return Long.class; // Only non-number we allow, can upcast to long
-			return null;
-		}
-		if (a instanceof Long || a instanceof Integer || a instanceof Short || a instanceof Byte) {
-			return Long.class;
-		}
-		return Double.class;
+		return null;
 	}
 
-	public static APrimitive plus(Object[] args) {
+	public static APrimitive plus(ACell[] args) {
 		Class<?> type = commonNumericType(args);
 		if (type == null) return null;
 		if (type == Double.class) return plusDouble(args);
@@ -211,7 +205,7 @@ public class RT {
 		return CVMLong.create(result);
 	}
 
-	public static CVMDouble plusDouble(Object[] args) {
+	public static CVMDouble plusDouble(ACell[] args) {
 		double result = 0;
 		for (int i = 0; i < args.length; i++) {
 			result += RT.doubleValue(args[i]);
@@ -219,7 +213,7 @@ public class RT {
 		return CVMDouble.create(result);
 	}
 
-	public static APrimitive minus(Object[] args) {
+	public static APrimitive minus(ACell[] args) {
 		Class<?> type = commonNumericType(args);
 		if (type == null) return null;
 		if (type == Double.class) return minusDouble(args);
@@ -232,7 +226,7 @@ public class RT {
 		return CVMLong.create(result);
 	}
 
-	public static APrimitive minusDouble(Object[] args) {
+	public static APrimitive minusDouble(ACell[] args) {
 		int n = args.length;
 		double result = doubleValue(args[0]);
 		if (n == 1) result= -result;
@@ -242,7 +236,7 @@ public class RT {
 		return CVMDouble.create(result);
 	}
 
-	public static APrimitive times(Object[] args) {
+	public static APrimitive times(ACell[] args) {
 		Class<?> type = commonNumericType(args);
 		if (type == null) return null;
 		if (type == Double.class) return timesDouble(args);
@@ -253,7 +247,7 @@ public class RT {
 		return CVMLong.create(result);
 	}
 
-	public static APrimitive timesDouble(Object[] args) {
+	public static APrimitive timesDouble(ACell[] args) {
 		double result = 1;
 		for (int i = 0; i < args.length; i++) {
 			result *= RT.doubleValue(args[i]);
@@ -372,7 +366,7 @@ public class RT {
 	 * @return Less than 0 if a is smaller, greater than 0 if a is larger, 0 if a
 	 *         equals b
 	 */
-	public static Long compare(Object a, Object b,Long nanValue) {
+	public static Long compare(ACell a, ACell b,Long nanValue) {
 		Class<?> ca = numericType(a);
 		if (ca == null) return null;
 		Class<?> cb = numericType(b);

@@ -1,7 +1,13 @@
 package convex.core.lang;
 
-import static convex.core.lang.TestState.*;
-import static convex.test.Assertions.*;
+import static convex.core.lang.TestState.eval;
+import static convex.core.lang.TestState.evalB;
+import static convex.core.lang.TestState.evalD;
+import static convex.core.lang.TestState.evalL;
+import static convex.core.lang.TestState.step;
+import static convex.test.Assertions.assertArityError;
+import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertCastError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -48,6 +54,7 @@ public class NumericsTest {
 		// long wrap round 64-bit signed
 		assertEquals(-2, evalL("(+ 9223372036854775807 9223372036854775807)"));
 		assertEquals(0, evalL("(+ -9223372036854775808 -9223372036854775808)"));
+		
 	}
 
 	@Test
@@ -58,6 +65,8 @@ public class NumericsTest {
 		assertEquals(4.0, evalD("(+ 0 1 2.0 1)"));
 
 		assertCastError(step("(+ nil)"));
+		assertCastError(step("(+ 1.0 :foo)"));
+		assertCastError(step("(+ 1.0 nil 2)"));
 	}
 
 	@Test
@@ -68,6 +77,7 @@ public class NumericsTest {
 		assertEquals(4L, evalL("(- 10 1 -2 7)"));
 
 		assertCastError(step("(- nil)"));
+		assertCastError(step("(- 1 [])"));
 	}
 
 	@Test
@@ -103,6 +113,9 @@ public class NumericsTest {
 	public void testTimesDouble() {
 		assertEquals(0.0, evalD("(* 0 10.0)"));
 		assertEquals(5.0, evalD("(* 0.5 10)"));
+		
+		assertEquals(50.0, evalD("(* 10 2.5 2)"));
+
 		assertEquals(2.25, evalD("(* -1.5 -1.5)"));
 	}
 
@@ -177,6 +190,8 @@ public class NumericsTest {
 		assertTrue(evalB("(== 0.0 -0.0)"));
 		assertTrue(evalB("(== 0 -0.0)"));
 		assertTrue(evalB("(<= 0 -0)"));
+		assertTrue(evalB("(>= 0 0)"));
+
 	}
 
 	@Test
