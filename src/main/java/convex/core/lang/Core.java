@@ -344,7 +344,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			// Check argument is valid name
-			Object symArg=args[0];
+			ACell symArg=args[0];
 			Symbol sym = RT.toSymbol(symArg);
 			if (sym == null) return context.withCastError(symArg, Symbol.class);
 
@@ -734,7 +734,7 @@ public class Core {
 			if (address==null) return context.withCastError(args[0], Address.class);
 			
 			// ensure argument converts to a Symbol correctly.
-			Object symArg=args[n-1];
+			ACell symArg=args[n-1];
 			Symbol sym = RT.toSymbol(symArg);
 			if (sym == null) return context.withCastError(symArg,Symbol.class);
 
@@ -758,7 +758,7 @@ public class Core {
 			if (address==null) return context.withCastError(args[0], Address.class);
 			
 			// ensure argument converts to a Symbol correctly.
-			Object symArg=args[n-1];
+			ACell symArg=args[n-1];
 			Symbol sym = RT.toSymbol(symArg);
 			if (sym == null) return context.withCastError(symArg,Symbol.class);
 

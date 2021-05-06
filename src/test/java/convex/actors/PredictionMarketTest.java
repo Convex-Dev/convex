@@ -28,13 +28,13 @@ import convex.core.util.Utils;
 public class PredictionMarketTest {
 
 	@SuppressWarnings("rawtypes")
-	private <T> T evalCall(Context<?> ctx,Address addr, long offer, Object name, Object... args) {
+	private <T> T evalCall(Context<?> ctx,Address addr, long offer, String name, Object... args) {
 		Context rctx=doCall(ctx,addr, offer, name, args);
 		return RT.jvm(rctx.getResult());
 	}
 	
 	@SuppressWarnings("unchecked")
-	private <T extends ACell> Context<T> doCall(Context<?> ctx,Address addr, long offer, Object name, Object... args) {
+	private <T extends ACell> Context<T> doCall(Context<?> ctx,Address addr, long offer, String name, Object... args) {
 		int n=args.length;
 		ACell[] cvmArgs=new ACell[n];
 		for (int i=0; i<n; i++) {

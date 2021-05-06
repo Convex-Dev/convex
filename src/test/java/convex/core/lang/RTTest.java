@@ -31,11 +31,9 @@ public class RTTest {
 	public void testName() {
 		assertEquals("foo", RT.name(Symbol.create("foo")).toString());
 		assertEquals("foo", RT.name(Keyword.create("foo")).toString());
-		assertEquals("foo", RT.name("foo").toString());
+		assertEquals("foo", RT.name(Strings.create("foo")).toString());
 
 		assertNull(RT.name(null));
-		assertNull(RT.name(1));
-		assertNull(RT.name(10L));
 	}
 
 	@Test

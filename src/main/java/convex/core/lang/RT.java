@@ -721,11 +721,10 @@ public class RT {
 	 * @param a
 	 * @return Name of the argument, or null if not Named
 	 */
-	public static AString name(Object a) {
+	public static AString name(ACell a) {
 		if (a instanceof AString) return (AString) a;
 		if (a instanceof Keyword) return ((Keyword) a).getName();
 		if (a instanceof Symbol) return ((Symbol) a).getName();
-		if (a instanceof String) return Strings.create((String)a);
 		return null;
 	}
 
@@ -1019,21 +1018,21 @@ public class RT {
 	 * @param a
 	 * @return Keyword if correctly constructed, or null if a failure occurs
 	 */
-	public static Keyword toKeyword(Object a) {
+	public static Keyword toKeyword(ACell a) {
 		if (a instanceof Keyword) return (Keyword) a;
 		AString name = name(a);
 		if (name == null) return null;
 		Keyword k = Keyword.create(name);
 		return k;
 	}
-
+	
 	/**
 	 * Coerces an named argument to a Symbol.
 	 * 
 	 * @param a
 	 * @return Symbol if correctly constructed, or null if a failure occurs
 	 */
-	public static Symbol toSymbol(Object a) {
+	public static Symbol toSymbol(ACell a) {
 		if (a instanceof Symbol) return (Symbol) a;
 		AString name = name(a);
 		if (name == null) return null;

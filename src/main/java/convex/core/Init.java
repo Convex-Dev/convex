@@ -332,7 +332,7 @@ public class Init {
 
 	private static State register(State state,Address origin, String name) {
 		Context<?> ctx = Context.createFake(state, origin);
-		ctx = ctx.actorCall(REGISTRY_ADDRESS, 0L, "register",
+		ctx = ctx.actorCall(REGISTRY_ADDRESS, 0L, Strings.create("register"),
 				Maps.of(Keywords.NAME, Strings.create(name)));
 		return ctx.getState();
 	}

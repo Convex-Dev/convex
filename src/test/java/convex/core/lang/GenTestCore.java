@@ -191,7 +191,6 @@ public class GenTestCore {
 		assertTrue(RT.bool(a)); // longs are always truthy
 		
 		assertNull(RT.count(a));
-		assertNull(RT.name(a));
 		assertNull(RT.sequence(a));
 	}
 	

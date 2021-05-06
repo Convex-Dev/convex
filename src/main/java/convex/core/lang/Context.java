@@ -1456,6 +1456,19 @@ public final class Context<T extends ACell> extends AObject {
 	}
 	
 	/**
+	 * Executes a call to an Actor. Utility function which convert a java String function name
+	 * 
+	 * @param <R> Return type of Actor call
+	 * @param target Target Actor address
+	 * @param sym Name of function defined by Actor
+	 * @param args Arguments to Actor function invocation
+	 * @return Context with result of Actor call (may be exceptional)
+	 */
+	public <R extends ACell> Context<R> actorCall(Address target, long offer, String functionName, ACell... args) {
+		return actorCall(target,offer,Symbol.create(functionName),args);
+	}
+	
+	/**
 	 * Executes a call to an Actor.
 	 * 
 	 * @param <R> Return type of Actor call
@@ -1464,7 +1477,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * @param args Arguments to Actor function invocation
 	 * @return Context with result of Actor call (may be exceptional)
 	 */
-	public <R extends ACell> Context<R> actorCall(Address target, long offer, Object functionName, ACell... args) {
+	public <R extends ACell> Context<R> actorCall(Address target, long offer, ACell functionName, ACell... args) {
 		// SECURITY: set up state for actor call
 		State state=getState();
 		Symbol sym=RT.toSymbol(functionName);
