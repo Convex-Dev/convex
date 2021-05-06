@@ -377,8 +377,11 @@ public class Compiler {
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileLet(ASequence<Syntax> list, Context<?> context,
 			boolean isLoop) {
 		// list = (let [...] a b c ...)
+		int n=list.size();
+		if (n<2) return context.withCompileError(list.get(0) + " requires a binding form vector at minimum");
+				
 		Syntax bindingSyntax = list.get(1);
-		Object bo = bindingSyntax.getValue();
+		ACell bo = bindingSyntax.getValue();
 
 		if (!(bo instanceof AVector))
 			return context.withCompileError(list.get(0) + " requires a vector of binding forms but got: " + bo);
@@ -398,7 +401,7 @@ public class Compiler {
 			AOp<ACell> op = (AOp<ACell>) context.getResult();
 			ops = ops.conj(op);
 		}
-		int exs = list.size() - 2; // expressions in let after binding vector
+		int exs = n - 2; // expressions in let after binding vector
 		for (int i = 2; i < 2 + exs; i++) {
 			context = context.expandCompile(list.get(i));
 			if (context.isExceptional()) return (Context<T>) context;

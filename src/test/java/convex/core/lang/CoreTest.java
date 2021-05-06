@@ -1250,6 +1250,17 @@ public class CoreTest {
 	}
 
 	@Test
+	public void testLoop() {
+		assertNull(eval("(loop [])"));
+		assertEquals(Keywords.FOO,eval("(loop [] :foo)"));
+		assertEquals(Keywords.FOO,eval("(loop [] 1 2 3 :foo)"));
+		assertEquals(Keywords.FOO,eval("(loop [a :foo] :bar a)"));
+		
+		assertCompileError(step("(loop)")); // Issue #80
+		assertCompileError(step("(loop :foo)")); // Not a binting vector
+	}
+	
+	@Test
 	public void testRecur() {
 		// test factorial with accumulator
 		assertEquals(120L, evalL("(let [f (fn [a x] (if (> x 1) (recur (* a x) (dec x)) a))] (f 1 5))"));
