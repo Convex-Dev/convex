@@ -1407,12 +1407,12 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
-			// TODO: make O(1) with count?
-			ASequence<?> seq = RT.sequence(a);
-			if (seq == null) return context.withCastError(a, ASequence.class);
-			if (seq.isEmpty()) return context.withBoundsError(-1);
+
+			Long n = RT.count(a);
+			if (n == null) return context.withCastError(a, ASequence.class);
+			if (n==0) return context.withBoundsError(-1);
 			
-			ACell result = seq.get(seq.count() - 1);
+			ACell result = RT.nth(a,n-1);
 
 			long juice = Juice.SIMPLE_FN;
 			return context.withResult(juice, result);
