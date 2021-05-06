@@ -20,7 +20,7 @@ public abstract class ABlobMap<K extends ABlob, V extends ACell> extends AMap<K,
 	}
 
 	@Override
-	public final V get(Object key) {
+	public final V get(ACell key) {
 		if (!(key instanceof ABlob)) return null;
 		return get((ABlob) key);
 	}
@@ -79,14 +79,18 @@ public abstract class ABlobMap<K extends ABlob, V extends ACell> extends AMap<K,
 	public abstract ABlobMap<K, V> dissoc(K key);
 
 	@Override
-	public MapEntry<K, V> getKeyRefEntry(Ref<K> ref) {
+	public MapEntry<K, V> getKeyRefEntry(Ref<ACell> ref) {
 		return getEntry(ref.getValue());
 	}
 
 	@Override
 	public abstract MapEntry<K, V> entryAt(long i);
 
-	@Override
+	public MapEntry<K, V> getEntry(ACell key) {
+		if (key instanceof ABlob) return getEntry((ABlob)key);
+		return null;
+	}
+	
 	public abstract MapEntry<K, V> getEntry(ABlob key);
 
 	@Override

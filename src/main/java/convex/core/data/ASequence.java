@@ -101,7 +101,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	 * @return The value at the specified index, or null if not valid
 	 */
 	@Override
-	public T get(Object key) {
+	public T get(ACell key) {
 		if (key instanceof CVMLong) {
 			long ix = ((CVMLong) key).longValue();
 			if ((ix >= 0) && (ix < count())) return get(ix);
@@ -111,7 +111,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	
 	@SuppressWarnings("unchecked")
 	@Override
-	public T get(Object key, Object notFound) {
+	public ACell get(ACell key, ACell notFound) {
 		if (key instanceof CVMLong) {
 			long ix = ((CVMLong) key).longValue();
 			if ((ix >= 0) && (ix < count())) return get(ix);

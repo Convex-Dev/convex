@@ -1268,6 +1268,15 @@ public class CoreTest {
 	}
 	
 	@Test
+	public void testRecordLookup() {
+		assertEquals(INITIAL.getAccounts(),eval("(*state* :accounts)"));
+		assertEquals(Keywords.FOO,eval("(*state* [ 982788 ] :foo )"));
+		assertNull(eval("(*state* [1 2 3])")); // Issue #85
+		
+		assertArityError(step("(*state* :accounts :foo :bar)"));
+	}
+	
+	@Test
 	public void testRecur() {
 		// test factorial with accumulator
 		assertEquals(120L, evalL("(let [f (fn [a x] (if (> x 1) (recur (* a x) (dec x)) a))] (f 1 5))"));
@@ -2722,6 +2731,7 @@ public class CoreTest {
 
 		assertCastError(step("(expand 1 :foo)"));
 		assertCastError(step("(expand { 888 227 723 560} [75 561 258 833])"));
+		assertCastError(step("(expand { :CIWh 155578 } :nth )"));
 		
 		assertArityError(step("(expand)"));
 		assertArityError(step("(expand 1 (fn [x e] x) :blah)"));

@@ -87,11 +87,10 @@ public class BlockResult extends ARecord {
 		return "blockresult";
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <V> V get(Keyword key) {
-		if (Keywords.STATE.equals(key)) return (V) state;
-		if (Keywords.RESULTS.equals(key)) return (V) results;
+	public ACell get(ACell key) {
+		if (Keywords.STATE.equals(key)) return state;
+		if (Keywords.RESULTS.equals(key)) return results;
 		return null;
 	}
 

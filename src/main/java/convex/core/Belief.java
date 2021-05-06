@@ -17,7 +17,6 @@ import convex.core.data.ARecord;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Format;
-import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
@@ -66,11 +65,10 @@ public class Belief extends ARecord {
 		this.timestamp = timestamp;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <V> V get(Keyword k) {
-		if (Keywords.ORDERS.equals(k)) return (V) orders;
-		if (Keywords.TIMESTAMP.equals(k)) return (V) CVMLong.create(timestamp);
+	public ACell get(ACell k) {
+		if (Keywords.ORDERS.equals(k)) return orders;
+		if (Keywords.TIMESTAMP.equals(k)) return CVMLong.create(timestamp);
 		return null;
 	}
 

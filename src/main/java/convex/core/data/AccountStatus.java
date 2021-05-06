@@ -352,15 +352,14 @@ public class AccountStatus extends ARecord {
 		return "#account";
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <V> V get(Keyword key) {
-		if (Keywords.SEQUENCE.equals(key)) return (V) CVMLong.create(sequence);
-		if (Keywords.BALANCE.equals(key)) return (V) CVMLong.create(balance);
-		if (Keywords.ALLOWANCE.equals(key)) return (V) CVMLong.create(allowance);
-		if (Keywords.ENVIRONMENT.equals(key)) return (V) environment;
-		if (Keywords.HOLDINGS.equals(key)) return (V) holdings;
-		if (Keywords.KEY.equals(key)) return (V) publicKey;
+	public ACell get(ACell key) {
+		if (Keywords.SEQUENCE.equals(key)) return CVMLong.create(sequence);
+		if (Keywords.BALANCE.equals(key)) return CVMLong.create(balance);
+		if (Keywords.ALLOWANCE.equals(key)) return CVMLong.create(allowance);
+		if (Keywords.ENVIRONMENT.equals(key)) return environment;
+		if (Keywords.HOLDINGS.equals(key)) return holdings;
+		if (Keywords.KEY.equals(key)) return publicKey;
 		
 		return null;
 	}

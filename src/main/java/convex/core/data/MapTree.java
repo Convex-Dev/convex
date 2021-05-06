@@ -167,19 +167,18 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return new MapTree<K, V>(children, shift, mask, count);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public boolean containsKey(ACell key) {
-		return containsKeyRef((Ref<K>) Ref.get(key));
+		return containsKeyRef(Ref.get(key));
 	}
 
 	@Override
-	public MapEntry<K, V> getEntry(K k) {
+	public MapEntry<K, V> getEntry(ACell k) {
 		return getKeyRefEntry(Ref.get(k));
 	}
 
 	@Override
-	public MapEntry<K, V> getKeyRefEntry(Ref<K> ref) {
+	public MapEntry<K, V> getKeyRefEntry(Ref<ACell> ref) {
 		int digit = Utils.extractDigit(ref.getHash(), shift);
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) return null; // -1 case indicates not found
@@ -194,10 +193,9 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return false;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public V get(Object key) {
-		MapEntry<K, V> me = getKeyRefEntry((Ref<K>) Ref.get((K) key));
+	public V get(ACell key) {
+		MapEntry<K, V> me = getKeyRefEntry(Ref.get(key));
 		if (me == null) return null;
 		return me.getValue();
 	}
@@ -828,6 +826,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		if (!isValidStructure()) throw new InvalidDataException("Bad structure", this);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public boolean containsAllKeys(AHashMap<K, V> map) {
 		if (map instanceof MapTree) {
@@ -837,7 +836,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		long n=map.count;
 		for (long i=0; i<n; i++) {
 			MapEntry<K,V> me=map.entryAt(i);
-			if (!this.containsKeyRef(me.getKeyRef())) return false;
+			if (!this.containsKeyRef((Ref<ACell>) me.getKeyRef())) return false;
 		}
 		return true;
 	}

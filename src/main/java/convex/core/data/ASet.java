@@ -69,14 +69,14 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	
 	@SuppressWarnings("unchecked")
 	@Override
-	public T get(Object key) {
+	public T get(ACell key) {
 		if (contains(key)) return (T) key;
 		return null;
 	}
 	
 	@SuppressWarnings("unchecked")
 	@Override
-	public T get(Object key, Object notFound) {
+	public T get(ACell key, ACell notFound) {
 		if (contains(key)) return (T) key;
 		return (T) notFound;
 	}

@@ -12,7 +12,7 @@ public interface IGet<V> {
 	 * @param key
 	 * @return Value from collection, or null if not found
 	 */
-	public V get(Object key);
+	public V get(ACell key);
 
 	/**
 	 * Get the value associated with a given key.
@@ -20,7 +20,7 @@ public interface IGet<V> {
 	 * @param key
 	 * @return Value from collection, or notFound value if not found
 	 */
-	public V get(Object key, Object notFound);
+	public ACell get(ACell key, ACell notFound);
 
 	/**
 	 * Checks if the data structure contains the specified key

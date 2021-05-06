@@ -58,12 +58,11 @@ public class Block extends ARecord {
 		if (peerKey==null) throw new Error("Trying to construct block with null peer key");
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <V> V get(Keyword k) {
-		if (Keywords.TIMESTAMP.equals(k)) return (V) CVMLong.create(timestamp);
-		if (Keywords.TRANSACTIONS.equals(k)) return (V) transactions;
-		if (Keywords.PEER.equals(k)) return (V) peerKey;
+	public ACell get(ACell k) {
+		if (Keywords.TIMESTAMP.equals(k)) return CVMLong.create(timestamp);
+		if (Keywords.TRANSACTIONS.equals(k)) return transactions;
+		if (Keywords.PEER.equals(k)) return peerKey;
 		return null;
 	}
 

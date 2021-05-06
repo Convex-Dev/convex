@@ -160,13 +160,12 @@ public class PeerStatus extends ARecord {
 		return "#peer-status";
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <V> V get(Keyword key) {
-		if (Keywords.STAKE.equals(key)) return (V) CVMLong.create(stake);
-		if (Keywords.STAKES.equals(key)) return (V) stakes;
-		if (Keywords.DELEGATED_STAKE.equals(key)) return (V) CVMLong.create(delegatedStake);
-		if (Keywords.URL.equals(key)) return (V) hostAddress;
+	public ACell get(ACell key) {
+		if (Keywords.STAKE.equals(key)) return CVMLong.create(stake);
+		if (Keywords.STAKES.equals(key)) return stakes;
+		if (Keywords.DELEGATED_STAKE.equals(key)) return CVMLong.create(delegatedStake);
+		if (Keywords.URL.equals(key)) return hostAddress;
 		
 		return null;
 	}

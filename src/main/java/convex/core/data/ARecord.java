@@ -121,7 +121,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	 * @param key Key to look up in this record
 	 * @return Field value for the given key
 	 */
-	public ACell get(Object key) {
+	public final ACell get(Object key) {
 		if (!(key instanceof Keyword)) return null;
 		return get((Keyword)key);
 	}
@@ -131,7 +131,8 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	 * @param key Key to look up in this record
 	 * @return Field value for the given key
 	 */
-	public abstract <V> V get(Keyword key);
+	@Override
+	public abstract ACell get(ACell key);
 
 	/**
 	 * Gets the tag byte for this record type. The Tag is the byte used to identify the
@@ -233,8 +234,9 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	}
 
 	@Override
-	public MapEntry<Keyword, ACell> getKeyRefEntry(Ref<Keyword> ref) {
-		return MapEntry.createRef(ref, Ref.get(get(ref.getValue())));
+	public MapEntry<Keyword, ACell> getKeyRefEntry(Ref<ACell> ref) {
+		// TODO: could maybe be more efficient?
+		return getEntry(ref.getValue());
 	}
 
 	@Override
@@ -275,9 +277,9 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	}
 
 	@Override
-	public MapEntry<Keyword, ACell> getEntry(Keyword k) {
+	public MapEntry<Keyword, ACell> getEntry(ACell k) {
 		if (!containsKey(k)) return null;
-		return MapEntry.create(k,get(k));
+		return MapEntry.create((Keyword)k,get(k));
 	}
 
 	@Override

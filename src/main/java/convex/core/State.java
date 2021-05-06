@@ -89,14 +89,13 @@ public class State extends ARecord {
 		this.schedule = schedule;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <V> V get(Keyword k) {
-		if (Keywords.ACCOUNTS.equals(k)) return (V) accounts;
-		if (Keywords.PEERS.equals(k)) return (V) peers;
-		if (Keywords.STORE.equals(k)) return (V) store;
-		if (Keywords.GLOBALS.equals(k)) return (V) globals;
-		if (Keywords.SCHEDULE.equals(k)) return (V) schedule;
+	public ACell get(ACell k) {
+		if (Keywords.ACCOUNTS.equals(k)) return accounts;
+		if (Keywords.PEERS.equals(k)) return peers;
+		if (Keywords.STORE.equals(k)) return store;
+		if (Keywords.GLOBALS.equals(k)) return globals;
+		if (Keywords.SCHEDULE.equals(k)) return schedule;
 		return null;
 	}
 

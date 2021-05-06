@@ -29,12 +29,11 @@ public abstract class ARecordGeneric extends ARecord {
 		return MapEntry.create(format.getKey(Utils.checkedInt(i)), values.get(i));
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <V> V get(Keyword key) {
+	public ACell get(ACell key) {
 		Long ix=format.indexFor(key);
 		if (ix==null) return null;
-		return (V) values.get((long)ix);
+		return values.get((long)ix);
 	}
 
 	@Override

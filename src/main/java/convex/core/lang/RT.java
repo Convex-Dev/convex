@@ -916,7 +916,7 @@ public class RT {
 	 * @param key
 	 * @return Object from collection with the specified key, or null if not found.
 	 */
-	public static Object get(IGet<?> coll, Object key) {
+	public static Object get(IGet<?> coll, ACell key) {
 		if (coll == null) return null;
 		return coll.get(key);
 	}

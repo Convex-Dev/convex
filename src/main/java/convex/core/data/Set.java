@@ -252,7 +252,7 @@ public class Set<T extends ACell> extends ASet<T> {
 	@Override
 	public <R extends ACell> Set<R> includeRef(Ref<R> ref) {
 		AHashMap<R, ACell> mymap=(AHashMap<R, ACell>) map;
-		if (mymap.containsKeyRef(ref)) return (Set<R>) this;
+		if (mymap.containsKeyRef((Ref<ACell>)ref)) return (Set<R>) this;
 		return wrap(mymap.assocRef(ref, DUMMY));
 	}
 	

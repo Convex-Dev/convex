@@ -84,7 +84,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 */
 	public abstract AMap<K, V> dissoc(K key);
 
-	public final boolean containsKeyRef(Ref<K> ref) {
+	public final boolean containsKeyRef(Ref<ACell> ref) {
 		return getKeyRefEntry(ref) != null;
 	}
 	
@@ -109,7 +109,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 * @param ref
 	 * @return MapEntry for the given key ref
 	 */
-	public abstract MapEntry<K, V> getKeyRefEntry(Ref<K> ref);
+	public abstract MapEntry<K, V> getKeyRefEntry(Ref<ACell> ref);
 
 	/**
 	 * Accumulate all entries from this map in the given HashSet.
@@ -208,7 +208,13 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 * @param k
 	 * @return The map entry, or null if the key is not found
 	 */
-	public abstract MapEntry<K, V> getEntry(K k);
+	public abstract MapEntry<K, V> getEntry(ACell k);
+	
+	@Override
+	public V get(Object key) {
+		if (key instanceof ACell) return get((ACell)key);
+		return null;
+	}
 
 	/**
 	 * Gets the value at a specified key, or returns the fallback value if not found
@@ -218,7 +224,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 * @return Value for the specified key, or the notFound value.
 	 */
 	@SuppressWarnings("unchecked")
-	public final V get(Object key, Object notFound) {
+	public final V get(ACell key, ACell notFound) {
 		MapEntry<K, V> me = getEntry((K) key);
 		if (me == null) {
 			return (V) notFound;
