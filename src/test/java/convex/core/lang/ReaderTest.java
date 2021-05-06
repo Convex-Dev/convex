@@ -173,6 +173,11 @@ public class ReaderTest {
 		assertEquals(Maps.of(1L, 2L), Reader.read("{1,2}"));
 		assertEquals(Maps.of(Samples.FOO, Samples.BAR), Reader.read("{:foo :bar}"));
 	}
+	
+	@Test
+	public void testMapError() {
+		assertThrows(ParseException.class,()->Reader.read("{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}"));
+	}
 
 	@Test
 	public void testQuote() {
