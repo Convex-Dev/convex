@@ -42,7 +42,7 @@ public class ContextTest {
 	
 	@Test
 	public void testSymbolLookup() {
-		Symbol sym1=Symbol.create("count").withPath(null);
+		Symbol sym1=Symbol.create("count");
 		assertEquals(Core.COUNT,CTX.lookup(sym1).getResult());
 
 		Symbol sym2=Symbol.create("count").withPath(Init.CORE_ADDRESS);

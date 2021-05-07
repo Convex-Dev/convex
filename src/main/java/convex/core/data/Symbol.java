@@ -112,14 +112,20 @@ public class Symbol extends ASymbolic {
 	
 	/**
 	 * Returns the Symbol with an updated path
-	 * @return Namespace Symbol or null
+	 * @return Updated Symbol, or this Symbol if no change
 	 */
 	public Symbol withPath(ACell newPath) {
 		if (path==newPath) return this;
 		return new Symbol(newPath,name);
 	}
 
-
+	/**
+	 * Returns the Symbol with an updated path
+	 * @return Updated Symbol, or this Symbol if no change
+	 */
+	public Object withPath(String newPath) {
+		return withPath(Symbol.create(newPath));
+	}
 
 	@Override
 	public boolean equals(ACell o) {
@@ -239,4 +245,6 @@ public class Symbol extends ASymbolic {
 	public byte getTag() {
 		return Tag.SYMBOL;
 	}
+
+
 }

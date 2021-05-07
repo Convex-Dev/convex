@@ -148,8 +148,8 @@ public class Address extends ABlob {
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		sb.append("#addr 0x");
-		sb.append(toHexString());
+		sb.append("#");
+		sb.append(value);
 	}
 	
 	@Override

@@ -31,7 +31,12 @@ public class SymbolTest {
 		assertTrue(s.isEmbedded());
 	}
 	
-
+	@Test
+	public void testToString() {
+		assertEquals("foo",Symbols.FOO.toString());
+		assertEquals("bar/foo",Symbols.FOO.withPath("bar").toString());
+		assertEquals("#13/foo",Symbols.FOO.withPath(Address.create(13)).toString());
+	}
 
 	@Test
 	public void testBadFormat() {
