@@ -2388,10 +2388,15 @@ public class CoreTest {
 		assertTrue(evalB("(number? 0)"));
 		assertTrue(evalB("(number? (byte 0))"));
 		assertTrue(evalB("(number? 0.5)"));
+		assertTrue(evalB("(number? ##NaN)")); // Sane? Is numeric double type....
+		
 		assertFalse(evalB("(number? nil)"));
 		assertFalse(evalB("(number? :foo)"));
 		assertFalse(evalB("(number? 0xFF)"));
 		assertFalse(evalB("(number? [1 2])"));
+		
+		assertFalse(evalB("(number? true)"));
+
 	}
 
 	@Test

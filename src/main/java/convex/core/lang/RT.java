@@ -1268,9 +1268,8 @@ public class RT {
 		return ((amount>=0)&&(amount<Constants.MAX_SUPPLY));
 	}
 	
-	public static boolean isNumber(Object val) {
-		// TODO: handle other numerics
-		return (val instanceof Number)||(val instanceof APrimitive);
+	public static boolean isNumber(ACell val) {
+		return (val instanceof APrimitive)&&(((APrimitive)val).numericType()!=null);
 	}
 
 	/**
