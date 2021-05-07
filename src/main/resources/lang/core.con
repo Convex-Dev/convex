@@ -2,6 +2,14 @@
 ;;
 ;; Ordering matters! Later definitions may require earlier ones.
 
+; TODO: Experimental 'macro' definition in Convex Lisp
+;(def macro2 
+;  (expander (fn [x e] ;; x is (macro & spec)
+;              (let [spec (next (unsyntax x))]
+;                (expand 
+;                  '(let [f ~(cons 'fn spec)]
+;                     (expander (fn [x e] (expand (f x) e)))) e)))))
+
 (def defmacro 
   ^{:doc {:description "Defines a macro in the current environment."
           :examples [{:code "(defmacro foo [x] '(if (good? x) x (fix x)))"}]
@@ -225,20 +233,20 @@
           :type :macro
           :signature [{:params [& args]}]}}
   [addr as sym]
-  (let [addr (unsyntax addr)
-        addr (cond
-               (or (symbol? addr) (keyword? addr)) 
-                  (or (call* *registry* 0 'cns-resolve addr) 
-                      (fail :NOBODY (str "Could not resolve library name for import: " addr)))
-               addr)
-        sym (unsyntax sym)
-        sym (cond (symbol? sym) sym
-                  (= :default sym) nil
-                  (fail "import: alias must be a symbol or :default"))] 
-    (assert (= :as (unsyntax as)))
-    '(let [addr (address ~addr)] 
-       (def *aliases* (assoc *aliases* (quote ~sym) addr))
-       addr)))
+	  (let [addr (unsyntax addr)
+	        addr (cond
+	               (or (symbol? addr) (keyword? addr)) 
+	                  (or (call* *registry* 0 'cns-resolve addr) 
+	                      (fail :NOBODY (str "Could not resolve library name for import: " addr)))
+	               addr)
+	        sym (unsyntax sym)
+	        sym (cond (symbol? sym) sym
+	                  (= :default sym) nil
+	                  (fail "import: alias must be a symbol or :default"))] 
+	    (assert (= :as (unsyntax as)))
+	    '(let [addr (address ~addr)] 
+	       (def *aliases* (assoc *aliases* (quote ~sym) addr))
+	       addr)))
 
 
 (defmacro actor
