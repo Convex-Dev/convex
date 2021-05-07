@@ -186,6 +186,7 @@ public class Reader extends BaseParser<ACell> {
 				FirstOf(
 						Constant(), 
 						Symbol(), 
+						AddressLiteral(),
 						Keyword(), 
 						Quoted(UndelimitedExpression())),
 				Test(UndelimitedExpressionEnd()));
@@ -331,7 +332,6 @@ public class Reader extends BaseParser<ACell> {
 				NilLiteral(), 
 				BooleanLiteral(), 
 				CharLiteral(),
-				AddressLiteral(),
 				SpecialLiteral()
 
 				);
@@ -401,9 +401,16 @@ public class Reader extends BaseParser<ACell> {
 	// Results are stored in a Constant node
 
 	protected Symbol popSymbol() {
-		Object o = pop();
+		ACell o = pop();
 		if (o instanceof Syntax) o = ((Syntax) o).getValue();
 		return (Symbol) o;
+	}
+	
+	@SuppressWarnings("unchecked")
+	protected <T extends ACell> T popValue() {
+		ACell o = pop();
+		if (o instanceof Syntax) o = ((Syntax) o).getValue();
+		return (T) o;
 	}
 
 	public Rule Symbol() {
@@ -415,11 +422,14 @@ public class Reader extends BaseParser<ACell> {
 	}
 
 	/**
-	 * Rule for parsing a qualified symbol with a namespace
+	 * Rule for parsing a qualified symbol with a namespace path
 	 */
 	public Rule QualifiedSymbol() {
-		return Sequence(UnqualifiedSymbol(), '/', UnqualifiedSymbol(),
-				push(prepare(Symbol.createWithNamespace(popSymbol().getName(), popSymbol().getName()))));
+		return Sequence(
+				FirstOf(AddressLiteral(),UnqualifiedSymbol()), 
+				'/', 
+				UnqualifiedSymbol(),
+				push(prepare(Symbol.createWithPath(popSymbol().getName(), popValue()))));
 	}
 
 	/**

@@ -114,12 +114,14 @@ public class Symbol extends ASymbolic {
 	 * @param ns A valid Symbol name for the namespace
 	 * @return Symbol instance, or null if the name or namespace is invalid for a Symbol.
 	 */
-	public static Symbol createWithNamespace(AString name, AString ns) {
-		return create(Symbol.create(ns),name);
+	public static Symbol createWithPath(AString name, ACell ns) {
+		return create(name).withPath(ns);
 	}
 	
-	public static Symbol createWithNamespace(String name, String ns) {
-		return createWithNamespace(Strings.create(name),Strings.create(ns));
+	public static Symbol createWithPath(String name, String ns) {
+		Symbol nsym=Symbol.create(ns);
+		if (nsym==null) return null;
+		return createWithPath(Strings.create(name),nsym);
 	}
 	
 	/**

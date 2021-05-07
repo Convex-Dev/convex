@@ -8,6 +8,7 @@ import org.parboiled.Parboiled;
 
 import convex.core.data.AList;
 import convex.core.data.AVector;
+import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Keyword;
@@ -72,10 +73,12 @@ public class ReaderTest {
 	@Test
 	public void testSymbols() {
 		assertEquals(Symbols.FOO, Reader.read("foo"));
+		assertEquals(Symbols.FOO.withPath(Address.create(666)), Reader.read("#666/foo"));
+		
 		assertEquals(Lists.of(Symbol.create("+"), 1L), Reader.read("(+ 1)"));
 		assertEquals(Lists.of(Symbol.create("+a")), Reader.read("( +a )"));
 		assertEquals(Lists.of(Symbol.create("/")), Reader.read("(/)"));
-		assertEquals(Symbol.createWithNamespace("b","a"), Reader.read("a/b"));
+		assertEquals(Symbol.createWithPath("b","a"), Reader.read("a/b"));
 		assertEquals(Symbol.create("a*+!-_?<>=!"), Reader.read("a*+!-_?<>=!"));
 		assertEquals(Symbol.create("foo.bar"), Reader.read("foo.bar"));
 		assertEquals(Symbol.create(".bar"), Reader.read(".bar"));
@@ -86,6 +89,9 @@ public class ReaderTest {
 		
 		// namespaces cannot themselves be qualified
 		assertThrows(ParseException.class,()->Reader.read("a/b/c"));
+		
+		// Bad address parsing
+		assertThrows(ParseException.class,()->Reader.read("#-1/foo"));
 		
 		// too long symbol names
 		assertThrows(ParseException.class,()->Reader.read("abcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnop"));
