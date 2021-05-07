@@ -106,7 +106,7 @@ public class Symbol extends ASymbolic {
 	 * Returns the namespace alias component of a Symbol, or null if not present
 	 * @return Namespace Symbol or null
 	 */
-	public ACell getNamespace() {
+	public ACell getPath() {
 		return path;
 	}
 
@@ -123,7 +123,7 @@ public class Symbol extends ASymbolic {
 	 * @return
 	 */
 	public boolean equals(Symbol sym) {
-		return sym.name.equals(name)&&Utils.equals(path,sym.getNamespace());
+		return sym.name.equals(name)&&Utils.equals(path,sym.getPath());
 	}
 
 	@Override

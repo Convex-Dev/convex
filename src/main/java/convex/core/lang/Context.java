@@ -505,10 +505,11 @@ public final class Context<T extends ACell> extends AObject {
 		// Get environment for Address, or default to initial environment
 		AHashMap<Symbol, Syntax> env = (as==null)?Core.ENVIRONMENT:as.getEnvironment();
 		
+		
 		MapEntry<Symbol,Syntax> result=env.getEntry(sym);
 		
 		if (result==null) {
-			ACell path=sym.getNamespace();
+			ACell path=sym.getPath();
 			AccountStatus aliasAccount=getAliasedAccount(env,path);
 			result = lookupAliasedEntry(aliasAccount,sym);
 		} 
@@ -539,7 +540,7 @@ public final class Context<T extends ACell> extends AObject {
 	/**
 	 * Looks up the account for an Symbol alias in the given environment.
 	 * @param env
-	 * @param path 
+	 * @param path An alias path 
 	 * @return AccountStatus for the alias, or null if not present
 	 */
 	@SuppressWarnings("unchecked")
