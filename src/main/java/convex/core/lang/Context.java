@@ -569,7 +569,7 @@ public final class Context<T extends ACell> extends AObject {
 			return (path==null)?Init.CORE_ACCOUNT:null;
 		}
 		
-		Object aValue=aliasEntry.getValue();
+		ACell aValue=aliasEntry.getValue();
 		// return null if the alias isn't a valid address 
 		if (!(aValue instanceof Address)) return null;
 		
