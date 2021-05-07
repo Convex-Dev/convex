@@ -545,6 +545,11 @@ public final class Context<T extends ACell> extends AObject {
 	 */
 	@SuppressWarnings("unchecked")
 	private AccountStatus getAliasedAccount(AHashMap<Symbol, Syntax> env, ACell path) {
+		// First check for an Address. If so, don't go via aliases
+		if (path instanceof Address) {
+			return getAccountStatus((Address)path);
+		}
+		
 		// Check for *aliases* entry. Might not exist.
 		Syntax maybeAliases=env.get(Symbols.STAR_ALIASES);
 		

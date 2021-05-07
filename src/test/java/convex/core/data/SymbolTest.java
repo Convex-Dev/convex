@@ -30,6 +30,8 @@ public class SymbolTest {
 		Symbol s=Symbol.create(Text.whiteSpace(Constants.MAX_NAME_LENGTH));
 		assertTrue(s.isEmbedded());
 	}
+	
+
 
 	@Test
 	public void testBadFormat() {

@@ -109,6 +109,16 @@ public class Symbol extends ASymbolic {
 	public ACell getPath() {
 		return path;
 	}
+	
+	/**
+	 * Returns the Symbol with an updated path
+	 * @return Namespace Symbol or null
+	 */
+	public Symbol withPath(ACell newPath) {
+		if (path==newPath) return this;
+		return new Symbol(newPath,name);
+	}
+
 
 
 	@Override

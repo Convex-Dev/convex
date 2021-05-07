@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
 import convex.core.ErrorCodes;
+import convex.core.Init;
 import convex.core.data.ABlobMap;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
@@ -37,6 +38,18 @@ public class ContextTest {
 		assertCVMEquals("buffy", c2.lookup(sym).getResult());
 
 		assertUndeclaredError(c2.lookup(Symbol.create("some-bad-symbol")));
+	}
+	
+	@Test
+	public void testSymbolLookup() {
+		Symbol sym1=Symbol.create("count").withPath(null);
+		assertEquals(Core.COUNT,CTX.lookup(sym1).getResult());
+
+		Symbol sym2=Symbol.create("count").withPath(Init.CORE_ADDRESS);
+		assertEquals(Core.COUNT,CTX.lookup(sym2).getResult());
+
+		Symbol sym3=Symbol.create("count").withPath(Init.HERO);
+		assertUndeclaredError(CTX.lookup(sym3));
 	}
 	
 	@Test
