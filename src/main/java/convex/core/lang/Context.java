@@ -508,8 +508,8 @@ public final class Context<T extends ACell> extends AObject {
 		MapEntry<Symbol,Syntax> result=env.getEntry(sym);
 		
 		if (result==null) {
-			Symbol alias=sym.getNamespace();
-			AccountStatus aliasAccount=getAliasedAccount(env,alias);
+			ACell path=sym.getNamespace();
+			AccountStatus aliasAccount=getAliasedAccount(env,path);
 			result = lookupAliasedEntry(aliasAccount,sym);
 		} 
 		return result;
@@ -539,28 +539,28 @@ public final class Context<T extends ACell> extends AObject {
 	/**
 	 * Looks up the account for an Symbol alias in the given environment.
 	 * @param env
-	 * @param alias 
+	 * @param path 
 	 * @return AccountStatus for the alias, or null if not present
 	 */
 	@SuppressWarnings("unchecked")
-	private AccountStatus getAliasedAccount(AHashMap<Symbol, Syntax> env, Symbol alias) {
+	private AccountStatus getAliasedAccount(AHashMap<Symbol, Syntax> env, ACell path) {
 		// Check for *aliases* entry. Might not exist.
 		Syntax maybeAliases=env.get(Symbols.STAR_ALIASES);
 		
 		// if *aliases* does not exist, use null as alias for core account
 		if (maybeAliases==null) {
-			return (alias==null)?Init.CORE_ACCOUNT:null;
+			return (path==null)?Init.CORE_ACCOUNT:null;
 		}
 		
 		ACell aliasesValue=maybeAliases.getValue();
 		if (!(aliasesValue instanceof AHashMap)) return null; 
 		
 		AHashMap<Symbol,ACell> aliasMap=((AHashMap<Symbol,ACell>)aliasesValue);
-		MapEntry<Symbol,ACell> aliasEntry=aliasMap.getEntry(alias);
+		MapEntry<Symbol,ACell> aliasEntry=aliasMap.getEntry(path);
 		
 		if (aliasEntry==null) {
 			// no alias entry. Default to core iff alias is null.
-			return (alias==null)?Init.CORE_ACCOUNT:null;
+			return (path==null)?Init.CORE_ACCOUNT:null;
 		}
 		
 		Object aValue=aliasEntry.getValue();

@@ -35,11 +35,11 @@ public class Symbol extends ASymbolic {
 	/**
 	 * Namespace component of the Symbol. Must not itself have a namespace. May be null.
 	 */
-	private final Symbol namespace;
+	private final ACell path;
 	
-	private Symbol(Symbol ns,AString name) {
+	private Symbol(ACell path,AString name) {
 		super(name);
-		this.namespace=ns;
+		this.path=path;
 	}
 	
 	protected static final WeakHashMap<Symbol,Symbol> cache=new WeakHashMap<>(100);
@@ -79,10 +79,21 @@ public class Symbol extends ASymbolic {
 		return create(null,Strings.create(name));
 	}
 	
+	/**
+	 * Create an unqualified symbol with the given name.
+	 * @param name A valid Symbol name.
+	 * @return Symbol instance, or null if the name is invalid for a Symbol.
+	 */
 	public static Symbol create(AString name) {
 		return create(null,name);
 	}
 	
+	/**
+	 * Create an qualified symbol with the given namespace symbol.
+	 * @param name A valid Symbol name.
+	 * @param ns A valid Symbol name for the namespace
+	 * @return Symbol instance, or null if the name or namespace is invalid for a Symbol.
+	 */
 	public static Symbol createWithNamespace(AString name, AString ns) {
 		return create(Symbol.create(ns),name);
 	}
@@ -95,8 +106,8 @@ public class Symbol extends ASymbolic {
 	 * Returns the namespace alias component of a Symbol, or null if not present
 	 * @return Namespace Symbol or null
 	 */
-	public Symbol getNamespace() {
-		return namespace;
+	public ACell getNamespace() {
+		return path;
 	}
 
 
@@ -112,12 +123,12 @@ public class Symbol extends ASymbolic {
 	 * @return
 	 */
 	public boolean equals(Symbol sym) {
-		return sym.name.equals(name)&&Utils.equals(namespace,sym.getNamespace());
+		return sym.name.equals(name)&&Utils.equals(path,sym.getNamespace());
 	}
 
 	@Override
 	public int hashCode() {
-		return name.hashCode()+119*((namespace==null)?0:namespace.hashCode());
+		return name.hashCode()+119*((path==null)?0:path.hashCode());
 	}
 
 	@Override
@@ -128,7 +139,7 @@ public class Symbol extends ASymbolic {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = Format.write(bs,pos, namespace);
+		pos = Format.write(bs,pos, path);
 		pos = Format.writeRawUTF8String(bs, pos, name.toString());
 		return pos;
 	}
@@ -149,7 +160,7 @@ public class Symbol extends ASymbolic {
 	}
 	
 	public boolean isQualified() {
-		return namespace!=null;
+		return path!=null;
 	}
 
 	@Override
@@ -165,8 +176,8 @@ public class Symbol extends ASymbolic {
 	
 	@Override
 	public void print(StringBuilder sb) {
-		if (namespace!=null) {
-			namespace.ednString(sb);
+		if (path!=null) {
+			path.ednString(sb);
 			sb.append('/');
 		}
 		sb.append(getName());
@@ -180,9 +191,12 @@ public class Symbol extends ASymbolic {
 	@Override
 	public void validateCell() throws InvalidDataException {
 		super.validateCell();
-		if (namespace!=null) {
-			if (namespace.isQualified()) throw new InvalidDataException("Invalid namespace, cannot be qualified: " + namespace, this);
-			namespace.validateCell();
+		if (path!=null) {
+			if (path instanceof Symbol) {
+				if (((Symbol)path).isQualified()) throw new InvalidDataException("Invalid symbol path, cannot be qualified: " + path, this);
+			}
+			// TODO: vector and address paths?
+			path.validateCell();
 		}
 	}
 
@@ -191,7 +205,7 @@ public class Symbol extends ASymbolic {
 	 * @return An unqualified Symbol with the same name as this Symbol.
 	 */
 	public Symbol toUnqualified() {
-		if (namespace==null) return this;
+		if (path==null) return this;
 		return Symbol.create(getName());
 	}
 
