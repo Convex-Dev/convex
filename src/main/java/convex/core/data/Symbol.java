@@ -69,12 +69,12 @@ public class Symbol extends ASymbolic {
 	}
 	
 	/**
-	 * Creates a Symbol with the given Address path and name
+	 * Creates a Symbol with the given path and name
 	 * @param path Address path, which may be null for an unqualified Symbol
 	 * @param name Unqualified Symbol name
 	 * @return Symbol instance, or null if the Symbol is invalid
 	 */
-	public static Symbol create(Address path, AString name) {
+	public static Symbol create(ACell path, AString name) {
 		if (!validateName(name)) return null;
 		Symbol sym= new Symbol(path,name);
 		
@@ -190,7 +190,7 @@ public class Symbol extends ASymbolic {
 	 * @throws BadFormatException If a Symbol could not be read correctly.
 	 */
 	public static Symbol read(ByteBuffer bb) throws BadFormatException {
-		Symbol namespace=Format.read(bb);
+		ACell namespace=Format.read(bb);
 		String name=Format.readUTF8String(bb);
 		Symbol sym = Symbol.create(namespace,Strings.create(name));
 		if (sym == null) throw new BadFormatException("Can't read symbol");
