@@ -1712,6 +1712,28 @@ public class Core {
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
+	
+	public static final CoreFn<CVMLong> MOD = reg(new CoreFn<>(Symbols.MOD) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+			
+			CVMLong la=RT.toLong(args[0]);
+			CVMLong lb=RT.toLong(args[1]);
+			if ((lb==null)||(la==null)) return context.withCastError(args, CVMLong.class);
+			
+			long num = la.longValue();
+			long denom = lb.longValue();
+			if (denom==0) return context.withArgumentError("Divsion by zero in "+name());
+			
+			long m = num % denom;
+			if (m<0) m+=Math.abs(denom);
+			CVMLong result=CVMLong.create(m);
+			
+			return context.withResult(Juice.ARITHMETIC, result);
+		}
+	});
 
 
 	public static final CoreFn<CVMDouble> POW = reg(new CoreFn<>(Symbols.POW) {

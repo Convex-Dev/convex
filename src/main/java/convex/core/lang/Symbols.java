@@ -129,6 +129,8 @@ public class Symbols {
 	public static final Symbol SQRT = Symbol.create("sqrt");
 	public static final Symbol EXP = Symbol.create("exp");
 	public static final Symbol POW = Symbol.create("pow");
+	public static final Symbol MOD = Symbol.create("mod");
+
 	
 	public static final Symbol FLOOR = Symbol.create("floor");
 	public static final Symbol CEIL = Symbol.create("ceil");

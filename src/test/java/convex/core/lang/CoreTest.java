@@ -2150,6 +2150,28 @@ public class CoreTest {
 	}
 	
 	@Test
+	public void testMod() {
+		assertEquals(4L, evalL("(mod 4 10)"));
+		assertEquals(4L, evalL("(mod 14 10)"));
+		assertEquals(6L, evalL("(mod -1 7)"));
+		assertEquals(0L, evalL("(mod 7 7)"));
+		assertEquals(0L, evalL("(mod 0 -1)"));
+		
+		// TODO: determine correct behaviour?
+		// assertEquals(6L, evalL("(mod -1 -7)"));
+
+		
+		assertArgumentError(step("(mod 10 0)"));
+		
+		assertCastError(step("(mod :a 7)"));
+		assertCastError(step("(mod 7 nil)"));
+		
+		assertArityError(step("(mod)"));
+		assertArityError(step("(mod 1)"));	
+		assertArityError(step("(mod 1 2 3)"));	
+	}
+	
+	@Test
 	public void testExp() {
 		assertEquals(1.0, evalD("(exp 0)"));
 		assertEquals(1.0, evalD("(exp -0)"));
