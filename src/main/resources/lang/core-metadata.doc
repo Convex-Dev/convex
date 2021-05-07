@@ -461,7 +461,7 @@
   hash?
   {
 	 :doc {:description "Tests if the given value is a Hash. A Hash is a specialised type of Blob"
-         :examples [{:code "(hash? (hash *state*))"}]
+         :examples [{:code "(hash? (hash 0x1234))"}]
          :type :function
          :signature [{:params [a]}]}
 	}

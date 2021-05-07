@@ -80,6 +80,10 @@ public class ReaderTest {
 		assertEquals(Symbol.create("foo.bar"), Reader.read("foo.bar"));
 		assertEquals(Symbol.create(".bar"), Reader.read(".bar"));
 		
+		// Interpret leading dot as symbols always. Addresses Issue #65
+		assertEquals(Symbol.create(".56"), Reader.read(".56"));
+
+		
 		// namespaces cannot themselves be qualified
 		assertThrows(ParseException.class,()->Reader.read("a/b/c"));
 		
@@ -122,6 +126,7 @@ public class ReaderTest {
 		assertCVMEquals(0.2, Reader.read("2.0e-1"));
 		assertCVMEquals(12.0, Reader.read("12e0"));
 		
+
 		assertThrows(Error.class, () -> Reader.read("2.0e0.1234"));
 		assertThrows(Error.class, () -> Reader.read("[2.0e0.1234]")); // Issue #70
 
