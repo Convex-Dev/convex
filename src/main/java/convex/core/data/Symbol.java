@@ -69,6 +69,26 @@ public class Symbol extends ASymbolic {
 	}
 	
 	/**
+	 * Creates a Symbol with the given Address path and name
+	 * @param path Address path, which may be null for an unqualified Symbol
+	 * @param name Unqualified Symbol name
+	 * @return Symbol instance, or null if the Symbol is invalid
+	 */
+	public static Symbol create(Address path, AString name) {
+		if (!validateName(name)) return null;
+		Symbol sym= new Symbol(path,name);
+		
+		synchronized (cache) {
+			// TODO: figure out if caching Symbols is a net win or not
+			Symbol cached=cache.get(sym);
+			if (cached!=null) return cached;
+			cache.put(sym,sym);
+		}
+		
+		return sym;
+	}
+	
+	/**
 	 * Creates a Symbol with the given name. Must be an unqualified name.
 	 * 
 	 * @param name
@@ -76,7 +96,7 @@ public class Symbol extends ASymbolic {
 	 */
 	public static Symbol create(String name) {
 		if (name==null) return null;
-		return create(null,Strings.create(name));
+		return create((Address)null,Strings.create(name));
 	}
 	
 	/**
@@ -85,7 +105,7 @@ public class Symbol extends ASymbolic {
 	 * @return Symbol instance, or null if the name is invalid for a Symbol.
 	 */
 	public static Symbol create(AString name) {
-		return create(null,name);
+		return create((Address)null,name);
 	}
 	
 	/**
