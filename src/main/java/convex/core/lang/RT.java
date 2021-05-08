@@ -726,18 +726,16 @@ public class RT {
 	}
 
 	/**
-	 * Converts an value to a String representation. Required to work for all valid
+	 * Converts a value to a String representation. Required to work for all valid
 	 * types.
 	 * 
-	 * @param a
+	 * @param a Value to convert to a String
 	 * @return String representation of object
 	 */
 	public static AString str(ACell a) {
 		if (a == null) return Strings.NIL;
-		if (a instanceof AString) return (AString) a;
-		if (a instanceof ABlob) return Strings.create(((ABlob) a).toHexString());
-		if (a instanceof ACell) return Strings.create(((ACell) a).ednString());
-		throw new UnsupportedOperationException("No str implementation for type: "+Utils.getClassName(a));
+		String s = a.toString();
+		return Strings.create(s);
 	}
 
 	/**

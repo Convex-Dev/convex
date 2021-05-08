@@ -190,6 +190,7 @@ public class AccountKey extends AArrayBlob {
 		}
 		return sb.toString();
 	}
+	
 
 	/**
 	 * Computes an Address from the Keccak256 hash of a 512 bit public key.
@@ -245,7 +246,7 @@ public class AccountKey extends AArrayBlob {
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		sb.append("#addr 0x");
+		sb.append("0x");
 		sb.append(toHexString());
 	}
 	
@@ -254,6 +255,12 @@ public class AccountKey extends AArrayBlob {
 		sb.append("0x");
 		sb.append(toChecksumHex());
 	}
+	
+	@Override
+	public String toString() {
+		return ednString();
+	}
+
 
 	@Override
 	public boolean isCanonical() {

@@ -213,6 +213,11 @@ public class Address extends ABlob {
 	public long length() {
 		return 8;
 	}
+	
+	@Override
+	public String toString() {
+		return ednString();
+	}
 
 	@Override
 	public String toHexString() {
