@@ -31,7 +31,7 @@ public class GenTestRT {
 	}
 
 	@Property
-	public void strTest(@From(ValueGen.class) Object b) {
+	public void strTest(@From(ValueGen.class) ACell b) {
 		AString s = RT.str(b);
 		assertNotNull(s);
 	}

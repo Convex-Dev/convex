@@ -122,7 +122,7 @@ public class GenTestCore {
 		
 		Blob b=a.toBlob();
 		assertEquals(b,RT.castBlob(a));
-		assertEquals(a.toHexString(),RT.str(a).toString());
+		assertEquals(a.toHexString(),b.toHexString());
 		
 		// Check a byte in the Address
 		assertSame(CVMByte.create(a.get(6)),RT.nth(a, 6));
@@ -168,7 +168,7 @@ public class GenTestCore {
 		assertEquals(ca,RT.toLong(a));
 		
 		long v=a;
-		assertEquals(Long.toString(v),RT.str(a).toString());
+		assertEquals(Long.toString(v),RT.str(ca).toString());
 		assertSame(CVMByte.create(v),RT.toByte(ca));
 		assertCVMEquals((char)v,RT.toCharacter(ca));
 		assertCVMEquals(v+1,RT.inc(ca));

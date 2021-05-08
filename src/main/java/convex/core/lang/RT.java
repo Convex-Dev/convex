@@ -717,9 +717,9 @@ public class RT {
 	 * 
 	 * @param args
 	 */
-	public static AString str(Object[] args) {
+	public static AString str(ACell[] args) {
 		StringBuilder sb = new StringBuilder();
-		for (Object o : args) {
+		for (ACell o : args) {
 			sb.append(RT.str(o));
 		}
 		return Strings.create(sb.toString());
@@ -732,13 +732,11 @@ public class RT {
 	 * @param a
 	 * @return String representation of object
 	 */
-	public static AString str(Object a) {
+	public static AString str(ACell a) {
 		if (a == null) return Strings.NIL;
 		if (a instanceof AString) return (AString) a;
-		if (a instanceof Number) return Strings.create(a.toString());
 		if (a instanceof ABlob) return Strings.create(((ABlob) a).toHexString());
 		if (a instanceof ACell) return Strings.create(((ACell) a).ednString());
-		if (a instanceof Boolean || a instanceof Character) return Strings.create(a.toString());
 		throw new UnsupportedOperationException("No str implementation for type: "+Utils.getClassName(a));
 	}
 
