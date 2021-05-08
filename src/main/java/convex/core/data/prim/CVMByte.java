@@ -91,5 +91,11 @@ public final class CVMByte extends APrimitive implements INumeric {
 	public CVMDouble toDouble() {
 		return CVMDouble.create(doubleValue());
 	}
+	
+	@Override
+	public CVMLong signum() {
+		if (value==0) return CVMLong.ZERO;
+		return CVMLong.ONE;
+	}
 
 }

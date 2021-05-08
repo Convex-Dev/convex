@@ -20,5 +20,11 @@ public interface INumeric {
 	 * @return Double.class or Long.class, or null if not a numeric type
 	 */
 	public Class<?> numericType();
+
+	/**
+	 * Gets the signum of this numerical value. Will be a Long -1, 0 or 1
+	 * @return
+	 */
+	public CVMLong signum();
 	
 }

@@ -354,10 +354,7 @@ public class RT {
 	public static CVMLong signum(ACell a) {
 		INumeric x=RT.number(a);
 		if (x==null) return null;
-		if (x instanceof CVMLong) return CVMLong.create(Long.signum(((CVMLong)x).longValue()));
-		double xd=x.toDouble().doubleValue();
-		if (Double.isNaN(xd)) return null;
-		return CVMLong.create((long)Math.signum(xd));
+		return x.signum();
 	}
 
 	/**

@@ -44,6 +44,14 @@ public final class CVMDouble extends APrimitive implements INumeric {
 	}
 	
 	@Override
+	public CVMLong signum() {
+		if (value>0.0) return CVMLong.ONE;
+		if (value<0.0) return CVMLong.MINUS_ONE;
+		if (Double.isNaN(value)) return null; // NaN special case
+		return CVMLong.ZERO;
+	}
+	
+	@Override
 	public int estimatedEncodingSize() {
 		return 1+8;
 	}

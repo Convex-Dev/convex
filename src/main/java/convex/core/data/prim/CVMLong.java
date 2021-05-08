@@ -13,6 +13,8 @@ import convex.core.exceptions.InvalidDataException;
 public final class CVMLong extends APrimitive implements INumeric {
 
 	public static final CVMLong ZERO = CVMLong.create(0L);
+	public static final CVMLong ONE = CVMLong.create(1L);
+	public static final CVMLong MINUS_ONE = CVMLong.create(-1L);
 	
 	private final long value;
 	
@@ -87,6 +89,13 @@ public final class CVMLong extends APrimitive implements INumeric {
 	@Override
 	public byte getTag() {
 		return Tag.LONG;
+	}
+
+	@Override
+	public CVMLong signum() {
+		if (value>0) return CVMLong.ONE;
+		if (value<0) return CVMLong.MINUS_ONE;
+		return CVMLong.ZERO;
 	}
 
 }
