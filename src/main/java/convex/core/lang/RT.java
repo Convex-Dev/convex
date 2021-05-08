@@ -472,11 +472,14 @@ public class RT {
 	}
 	
 	/**
-	 * Converts a numerical value to a CVM Byte. Doubles and floats will be converted if possible.
+	 * Explicitly converts a numerical value to a CVM Byte. 
+	 * 
+	 * Doubles and floats will be converted if possible.
+	 * 
 	 * @param a
 	 * @return Long value, or null if not convertible
 	 */
-	public static CVMByte toByte(ACell a) {
+	public static CVMByte castByte(ACell a) {
 		if (a instanceof CVMByte) return (CVMByte) a;
 		Number n = number(a);
 		if (n == null) return null;

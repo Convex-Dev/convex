@@ -169,7 +169,7 @@ public class GenTestCore {
 		
 		long v=a;
 		assertEquals(Long.toString(v),RT.str(ca).toString());
-		assertSame(CVMByte.create(v),RT.toByte(ca));
+		assertSame(CVMByte.create(v),RT.castByte(ca));
 		assertCVMEquals((char)v,RT.toCharacter(ca));
 		assertCVMEquals(v+1,RT.inc(ca));
 		assertCVMEquals(v-1,RT.dec(ca));

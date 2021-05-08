@@ -1605,7 +1605,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
-			CVMByte result = RT.toByte(a);
+			CVMByte result = RT.castByte(a);
 			if (result == null) return context.withCastError(a, Byte.class);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
