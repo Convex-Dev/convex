@@ -215,7 +215,7 @@ public class Symbol extends ASymbolic {
 	@Override
 	public void print(StringBuilder sb) {
 		if (path!=null) {
-			path.ednString(sb);
+			path.print(sb);
 			sb.append('/');
 		}
 		sb.append(getName());

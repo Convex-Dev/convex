@@ -19,6 +19,7 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.IAssociative;
 import convex.core.data.IGet;
@@ -712,7 +713,7 @@ public class RT {
 	 * <li>CVM Strings (unchanged)</li>
 	 * <li>Blobs (converted to hex)</li>
 	 * <li>Numbers (converted to canonical numeric representation)</li>
-	 * <li>Other Objects (represented as edn)
+	 * <li>Other Objects (printed in canonical format)
 	 * </ul>
 	 * 
 	 * @param args
@@ -720,22 +721,24 @@ public class RT {
 	public static AString str(ACell[] args) {
 		StringBuilder sb = new StringBuilder();
 		for (ACell o : args) {
-			sb.append(RT.str(o));
+			String s=RT.str(o);
+			sb.append(s);
 		}
 		return Strings.create(sb.toString());
 	}
 
 	/**
-	 * Converts a value to a String representation. Required to work for all valid
+	 * Converts a value to a CVM String representation. Required to work for all valid
 	 * types.
 	 * 
 	 * @param a Value to convert to a String
 	 * @return String representation of object
 	 */
-	public static AString str(ACell a) {
-		if (a == null) return Strings.NIL;
+	public static String str(ACell a) {
+		if (a == null) return "nil";
+		if (a instanceof Blob) return ((Blob)a).toHexString();
 		String s = a.toString();
-		return Strings.create(s);
+		return s;
 	}
 
 	/**

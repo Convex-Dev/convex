@@ -246,7 +246,7 @@ public class AccountKey extends AArrayBlob {
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		sb.append("0x");
+		sb.append("#public-key 0x");
 		sb.append(toHexString());
 	}
 	
@@ -255,12 +255,6 @@ public class AccountKey extends AArrayBlob {
 		sb.append("0x");
 		sb.append(toChecksumHex());
 	}
-	
-	@Override
-	public String toString() {
-		return ednString();
-	}
-
 
 	@Override
 	public boolean isCanonical() {

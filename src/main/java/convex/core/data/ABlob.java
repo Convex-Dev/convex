@@ -41,11 +41,6 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	 * Converts this data object to a lowercase hex string representation
 	 */
 	public abstract String toHexString();
-	
-	@Override
-	public String toString() {
-		return toHexString();
-	}
 
 	/**
 	 * Converts this blob to a readable byte buffer

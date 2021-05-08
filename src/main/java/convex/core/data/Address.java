@@ -148,7 +148,7 @@ public class Address extends ABlob {
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		sb.append("#");
+		sb.append("#addr ");
 		sb.append(value);
 	}
 	
@@ -213,11 +213,7 @@ public class Address extends ABlob {
 	public long length() {
 		return 8;
 	}
-	
-	@Override
-	public String toString() {
-		return ednString();
-	}
+
 
 	@Override
 	public String toHexString() {

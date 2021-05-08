@@ -293,6 +293,8 @@ public class Core {
 		public Context<AString> invoke(Context context, ACell[] args) {
 			// TODO: pre-check juice? String rendering definitions?
 			AString result = RT.str(args);
+			if (result==null) return context.withCastError(AString.class);
+			
 			long juice = Juice.STR + result.length() * Juice.STR_PER_CHAR;
 			return context.withResult(juice, result);
 		}
