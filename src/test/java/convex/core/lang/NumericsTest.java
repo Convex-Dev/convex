@@ -269,6 +269,13 @@ public class NumericsTest {
 		// take low order bytes of big long
 		assertEquals(-1L, evalL("(long 0x0000000000000000FFFFFFFFFFFFFFFF)"));
 	}
+	
+	@Test
+	public void testBadArgs() {
+		// Regression check for issue #89
+		assertCastError(step("(+ 1 #42)"));
+		assertCastError(step("(+ #42 1.0)"));
+	}
 
 	@Test
 	public void testCasts() {

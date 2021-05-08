@@ -1663,8 +1663,13 @@ public final class Context<T extends ACell> extends AObject {
 	}
 	
 	public <R extends ACell> Context<R> withCastError(Object a, Class<?> klass) {
-		return withError(ErrorCodes.CAST,"Can't convert "+a+" of class "+Utils.getClassName(a)+" to class "+klass);
+		return withError(ErrorCodes.CAST,"Can't convert "+a+" of class "+Utils.getClassName(a)+" to type "+klass);
 	}
+	
+	public <R extends ACell> Context<R> withCastError(Class<?> klass) {
+		return withError(ErrorCodes.CAST,"Can't convert argument(s) to type "+klass);
+	}
+
 	
 	public <R extends ACell> Context<R> withCastError(Object a, String message) {
 		return withError(ErrorCodes.CAST,message);

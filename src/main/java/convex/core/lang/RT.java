@@ -398,10 +398,10 @@ public class RT {
 	}
 
 	/**
-	 * Coerces a CVM value to a Java numeric value ready for maths operations. Result will be one of: 
+	 * Converts a CVM value to a Java numeric value ready for maths operations. Result will be one of: 
 	 * <ul> 
-	 * <li>Long for Byte, Integer, Short, Long, Amount, Character, Blob</li>
-	 * <li>Double for Double, Float </li>
+	 * <li>Long for Byte, Long</li>
+	 * <li>Double for Double</li>
 	 * </ul>
 	 * 
 	 * @param a
@@ -420,6 +420,10 @@ public class RT {
 		}
 
 		return null;
+	}
+	
+	public static boolean isNumber(ACell val) {
+		return (val instanceof APrimitive)&&(((APrimitive)val).numericType()!=null);
 	}
 
 	public static CVMLong inc(ACell object) {
@@ -485,18 +489,13 @@ public class RT {
 		return CVMChar.create(n.longValue());
 	}
 
-	private static long longValue(Object a) {
+	private static long longValue(ACell a) {
 		if (a instanceof APrimitive) return ((APrimitive) a).longValue();
-		if (a instanceof Long) return (Long) a;
-		if (a instanceof Number) return ((Number) a).longValue();
-		if (a instanceof Character) return (long) ((char) a);
 		throw new IllegalArgumentException("Can't convert to long: " + Utils.getClassName(a));
 	}
 
-	private static double doubleValue(Object a) {
+	private static double doubleValue(ACell a) {
 		if (a instanceof APrimitive) return ((APrimitive) a).doubleValue();
-		if (a instanceof Double) return (Double) a;
-		if (a instanceof Number) return ((Number) a).doubleValue();
 		throw new IllegalArgumentException("Can't convert to double: " + Utils.getClassName(a));
 	}
 
@@ -1268,9 +1267,6 @@ public class RT {
 		return ((amount>=0)&&(amount<Constants.MAX_SUPPLY));
 	}
 	
-	public static boolean isNumber(ACell val) {
-		return (val instanceof APrimitive)&&(((APrimitive)val).numericType()!=null);
-	}
 
 	/**
 	 * Converts a Java value to a CVM type

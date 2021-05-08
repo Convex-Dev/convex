@@ -2463,6 +2463,8 @@ public class CoreTest {
 
 		assertFalse(0.0 > -0.0); // check we are living in a sane universe
 		assertTrue(evalB("(zero? -0.0)"));
+		
+		assertFalse(evalB("(zero? \\c)"));
 
 		assertFalse(evalB("(zero? nil)"));
 		assertFalse(evalB("(zero? :foo)"));
