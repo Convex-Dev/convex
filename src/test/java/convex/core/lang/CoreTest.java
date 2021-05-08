@@ -588,11 +588,13 @@ public class CoreTest {
 		assertEquals(Double.POSITIVE_INFINITY,evalD("(ceil (/ 1 0))"));
 		assertEquals(Double.NEGATIVE_INFINITY,evalD("(ceil (/ -1 0))"));
 		
-		assertArityError(step("(ceil)"));
-		assertArityError(step("(ceil :foo :bar)")); // arity > cast
+		assertCastError(step("(ceil #3)"));
 		assertCastError(step("(ceil :foo)"));
 		assertCastError(step("(ceil nil)"));
 		assertCastError(step("(ceil [])"));
+		
+		assertArityError(step("(ceil)"));
+		assertArityError(step("(ceil :foo :bar)")); // arity > cast
 	}
 	
 	@Test
@@ -611,11 +613,13 @@ public class CoreTest {
 		assertEquals(Double.POSITIVE_INFINITY,evalD("(floor (/ 1 0))"));
 		assertEquals(Double.NEGATIVE_INFINITY,evalD("(floor (/ -1 0))"));
 		
-		assertArityError(step("(floor)"));
-		assertArityError(step("(floor :foo :bar)")); // arity > cast
+		assertCastError(step("(floor #666)"));
 		assertCastError(step("(floor :foo)"));
 		assertCastError(step("(floor nil)"));
 		assertCastError(step("(floor [])"));
+		
+		assertArityError(step("(floor)"));
+		assertArityError(step("(floor :foo :bar)")); // arity > cast
 	}
 	
 	@Test
@@ -2231,6 +2235,7 @@ public class CoreTest {
 		assertEquals(Double.POSITIVE_INFINITY, evalD("(exp (/ 1 0))"));
 		
 		assertCastError(step("(exp :a)"));
+		assertCastError(step("(exp #3)"));
 		assertCastError(step("(exp nil)"));
 		
 		assertArityError(step("(exp)"));

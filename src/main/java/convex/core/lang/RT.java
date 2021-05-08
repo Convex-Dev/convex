@@ -278,8 +278,8 @@ public class RT {
 	 * @return
 	 */
 	public static CVMDouble pow(ACell[] args) {
-		CVMDouble a = castDouble(args[0]);
-		CVMDouble b = castDouble(args[1]);
+		CVMDouble a = ensureDouble(args[0]);
+		CVMDouble b = ensureDouble(args[1]);
 		if ((a==null)||(b==null)) return null;
 		return CVMDouble.create(StrictMath.pow(a.doubleValue(), b.doubleValue()));
 	}
@@ -290,7 +290,7 @@ public class RT {
 	 * @return
 	 */	
 	public static CVMDouble exp(ACell arg) {
-		CVMDouble a = castDouble(arg);
+		CVMDouble a = ensureDouble(arg);
 		if (a==null) return null;
 		return CVMDouble.create(StrictMath.exp(a.doubleValue()));
 	}
@@ -302,7 +302,7 @@ public class RT {
 	 * @return The floor of the number, or null if cast fails
 	 */
 	public static CVMDouble floor(ACell a) {
-		CVMDouble d = RT.castDouble(a);
+		CVMDouble d = RT.ensureDouble(a);
 		if (d == null) return null;
 		return CVMDouble.create(StrictMath.floor(d.doubleValue()));
 	}
@@ -314,7 +314,7 @@ public class RT {
 	 * @return The ceiling of the number, or null if cast fails
 	 */
 	public static CVMDouble ceil(ACell a) {
-		CVMDouble d = RT.castDouble(a);
+		CVMDouble d = RT.ensureDouble(a);
 		if (d == null) return null;
 		return CVMDouble.create(StrictMath.ceil(d.doubleValue()));
 	}
@@ -327,7 +327,7 @@ public class RT {
 	 * @return The square root of the number, or null if cast fails
 	 */
 	public static CVMDouble sqrt(ACell a) {
-		CVMDouble d = RT.castDouble(a);
+		CVMDouble d = RT.ensureDouble(a);
 		if (d == null) return null;
 		return CVMDouble.create(StrictMath.sqrt(d.doubleValue()));
 	}
@@ -454,6 +454,19 @@ public class RT {
 		INumeric n = number(a);
 		if (n == null) return null;
 		return n.toDouble();
+	}
+	
+	/**
+	 * Ensures the argument is a CVM Long value. 
+	 * @param a
+	 * @return CVMDouble value, or null if not convertible
+	 */
+	public static CVMDouble ensureDouble(ACell a) {
+		if (a instanceof INumeric) {
+			INumeric ap=(INumeric)a;
+			return ap.toDouble();
+		}
+		return null;
 	}
 	
 	/**
