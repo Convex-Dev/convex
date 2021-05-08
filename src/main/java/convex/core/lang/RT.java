@@ -172,7 +172,7 @@ public class RT {
 	 * @param args
 	 * @return First non-numeric value, or null if not found.
 	 */
-	public static Object findNonNumeric(ACell[] args) {
+	public static ACell findNonNumeric(ACell[] args) {
 		for (int i = 0; i < args.length; i++) {
 			ACell a = args[i];
 			Class<?> klass = numericType(a);
@@ -911,14 +911,14 @@ public class RT {
 	 * 
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K extends ACell, V extends ACell> AMap<K, V> toMap(Object a) {
+	public static <K extends ACell, V extends ACell> AMap<K, V> toMap(ACell a) {
 		if (a == null) return Maps.empty();
 		if (a instanceof AMap) return (AMap<K, V>) a;
 		return null;
 	}
 	
 	@SuppressWarnings("unchecked")
-	public static <K extends ACell, V extends ACell> AHashMap<K, V> toHashMap(Object a) {
+	public static <K extends ACell, V extends ACell> AHashMap<K, V> toHashMap(ACell a) {
 		if (a == null) return Maps.empty();
 		AMap<K, V> m=RT.toMap(a);
 		if (m instanceof AHashMap) return (AHashMap<K, V>) a;
@@ -933,7 +933,7 @@ public class RT {
 	 * @return A set instance, or null if the argument cannot be converted to a set
 	 */
 	@SuppressWarnings("unchecked")
-	public static <V extends ACell> ASet<V> toSet(Object a) {
+	public static <V extends ACell> ASet<V> toSet(ACell a) {
 		if (a == null) return Sets.empty();
 		if (a instanceof ASet) return (ASet<V>) a;
 		return null;
@@ -999,7 +999,7 @@ public class RT {
 	 * @return MapEntry instance, or null if conversion fails
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K extends ACell, V extends ACell> MapEntry<K, V> toMapEntry(Object x) {
+	public static <K extends ACell, V extends ACell> MapEntry<K, V> toMapEntry(ACell x) {
 		MapEntry<K, V> me;
 		if (x instanceof MapEntry) {
 			me = (MapEntry<K, V>) x;
@@ -1019,7 +1019,7 @@ public class RT {
 	 * @param o
 	 * @return Hash instance, or null if conversion not possible
 	 */
-	public static Hash toHash(Object o) {
+	public static Hash toHash(ACell o) {
 		if (o instanceof Hash) return ((Hash) o);
 		if (o instanceof ABlob) {
 			ABlob blob=(ABlob)o;
@@ -1067,7 +1067,7 @@ public class RT {
 	 * @return ADataStructure instance, or null if not a data structure
 	 */
 	@SuppressWarnings("unchecked")
-	public static <E extends ACell> ADataStructure<E> ensureDataStructure(Object a) {
+	public static <E extends ACell> ADataStructure<E> ensureDataStructure(ACell a) {
 		if (a instanceof ADataStructure) return (ADataStructure<E>) a;
 		return null;
 	}
@@ -1097,7 +1097,7 @@ public class RT {
 	}
 
 	/**
-	 * Validates an object.
+	 * Validates an object. Might be a Cell or Ref
 	 * 
 	 * @param o
 	 * @throws InvalidDataException For any miscellaneous validation failure @ If
@@ -1150,7 +1150,7 @@ public class RT {
 	 * @return Vector of keys in the map
 	 */
 	@SuppressWarnings("unchecked")
-	public static <R extends ACell> AVector<R> keys(Object a) {
+	public static <R extends ACell> AVector<R> keys(ACell a) {
 		if (!(a instanceof AMap)) return null;
 		AMap<R, ACell> m = (AMap<R, ACell>) a;
 		return m.reduceEntries(new BiFunction<>() {
@@ -1168,7 +1168,7 @@ public class RT {
 	 * @return VEctor of values from a map, or null if the object is not a map
 	 */
 	@SuppressWarnings("unchecked")
-	public static <R extends ACell> AVector<R> values(Object a) {
+	public static <R extends ACell> AVector<R> values(ACell a) {
 		if (!(a instanceof AMap)) return null;
 		AMap<ACell, R> m = (AMap<ACell, R>) a;
 		return m.reduceValues(new BiFunction<AVector<R>, R, AVector<R>>() {
@@ -1187,7 +1187,7 @@ public class RT {
 	 * @return IGet instance, or null if conversion is not possible
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> IGet<T> toGettable(Object o) {
+	public static <T extends ACell> IGet<T> toGettable(ACell o) {
 		if (o==null) return Maps.empty();
 		if (o instanceof IGet) return (IGet<T>) o;
 		return null;
@@ -1201,7 +1201,7 @@ public class RT {
 	 * @return IAssociative instance, or null if conversion is not possible
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K extends ACell,V extends ACell> IAssociative<K,V> ensureAssociative(Object o) {
+	public static <K extends ACell,V extends ACell> IAssociative<K,V> ensureAssociative(ACell o) {
 		if (o==null) return Maps.empty();
 		if (o instanceof IGet) return (IAssociative<K,V>) o;
 		return null;
@@ -1240,7 +1240,7 @@ public class RT {
 	/**
 	 * Casts the argument to a Blob
 	 */
-	public static ABlob ensureBlob(Object object) {
+	public static ABlob ensureBlob(ACell object) {
 		if (object instanceof ABlob) return ((ABlob)object);
 		return null;
 	}
@@ -1276,7 +1276,7 @@ public class RT {
 	 * @return Java value, or unchanged input
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T> T jvm(Object o) {
+	public static <T> T jvm(ACell o) {
 		if (o instanceof AString) return (T) o.toString();
 		if (o instanceof CVMLong) return (T)(Long)((CVMLong)o).longValue();
 		if (o instanceof CVMDouble) return (T)(Double)((CVMDouble)o).doubleValue();
