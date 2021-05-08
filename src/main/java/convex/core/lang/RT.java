@@ -190,8 +190,8 @@ public class RT {
 	 * @return Long.class or Double.class if cast possible, or null if not numeric.
 	 */
 	public static Class<?> numericType(ACell a) {
-		if (a instanceof APrimitive) {
-			return ((APrimitive)a).numericType();
+		if (a instanceof INumeric) {
+			return ((INumeric)a).numericType();
 		}
 		return null;
 	}
@@ -429,7 +429,7 @@ public class RT {
 	}
 	
 	public static boolean isNumber(ACell val) {
-		return (val instanceof APrimitive)&&(((APrimitive)val).numericType()!=null);
+		return (val instanceof INumeric);
 	}
 
 	public static CVMLong inc(ACell x) {
@@ -475,9 +475,9 @@ public class RT {
 	 */
 	public static CVMLong ensureLong(ACell a) {
 		if (a instanceof CVMLong) return (CVMLong) a;
-		if (a instanceof APrimitive) {
-			APrimitive ap=(APrimitive)a;
-			if (ap.numericType()==Long.class) return CVMLong.create(ap.longValue());
+		if (a instanceof INumeric) {
+			INumeric ap=(INumeric)a;
+			if (ap.numericType()==Long.class) return ap.toLong();
 		}
 		return null;
 	}

@@ -58,11 +58,6 @@ public final class CVMChar extends APrimitive {
 	}
 
 	@Override
-	public Class<?> numericType() {
-		return null;
-	}
-
-	@Override
 	public double doubleValue() {
 		return (double)value;
 	}
