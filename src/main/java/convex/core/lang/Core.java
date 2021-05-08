@@ -1079,7 +1079,7 @@ public class Core {
 		public  Context<ACell> invoke(Context context, ACell[] args) {
 			if (args.length != 3) return context.withArityError(exactArityMessage(3, args.length));
 
-			ASequence<ACell> ixs = RT.sequence(args[1]);
+			ASequence<ACell> ixs = RT.ensureSequence(args[1]);
 			if (ixs == null) return context.withCastError(args[1], ASequence.class);
 
 			int n = ixs.size();

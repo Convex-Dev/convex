@@ -601,7 +601,7 @@ public class RT {
 	 *         a sequence
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> ASequence<T> ensureSequence(Object o) {
+	public static <T extends ACell> ASequence<T> ensureSequence(ACell o) {
 		if (o == null) return Vectors.empty();
 		if (o instanceof ASequence) return (ASequence<T>) o;
 		return null;

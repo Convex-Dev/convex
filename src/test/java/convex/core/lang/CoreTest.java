@@ -779,6 +779,10 @@ public class CoreTest {
 		assertCastError(step("(assoc-in 1 [2] 3)"));
 		assertCastError(step("(assoc-in [1] [:foo] 3)"));
 		
+		// cast errors - paths not sequences
+		assertCastError(step("(assoc-in {} #{:a :b} 42)")); // See Issue 95
+		assertCastError(step("(assoc-in {} :foo 42)")); // See Issue 95
+		
 		// Arity error
 		assertArityError(step("(assoc-in)"));
 		assertArityError(step("(assoc-in nil)"));
