@@ -23,6 +23,16 @@ public final class CVMBool extends APrimitive {
 		return value?TRUE:FALSE;
 	}
 	
+	/**
+	 * Get the canonical CVMBool value for true or false
+	 * 
+	 * @param b Boolean specifying 
+	 * @return CVMBool value representing false or true
+	 */
+	public static CVMBool of(boolean b) {
+		return b?TRUE:FALSE;
+	}
+	
 	
 	@Override
 	public long longValue() {
@@ -78,5 +88,7 @@ public final class CVMBool extends APrimitive {
 	public byte getTag() {
 		return (value)?Tag.TRUE:Tag.FALSE;
 	}
+
+
 
 }

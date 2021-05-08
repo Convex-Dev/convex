@@ -121,7 +121,7 @@ public class GenTestCore {
 		long n=RT.count(a);
 		
 		Blob b=a.toBlob();
-		assertEquals(b,RT.blob(a));
+		assertEquals(b,RT.castBlob(a));
 		assertEquals(a.toHexString(),RT.str(a).toString());
 		
 		// Check a byte in the Address

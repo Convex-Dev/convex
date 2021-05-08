@@ -547,7 +547,7 @@ public class Core {
 			AccountStatus as = context.getState().getAccount(addr);
 			if (as == null) return context.withResult(Juice.LOOKUP, CVMBool.FALSE);
 
-			CVMBool result = RT.toBoolean(as.getExportedFunction(sym) != null);
+			CVMBool result = CVMBool.of(as.getExportedFunction(sym) != null);
 
 			return context.withResult(Juice.LOOKUP, result);
 		}
@@ -794,7 +794,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell o = args[0];
-			AccountKey key = RT.accountKey(o);
+			AccountKey key = RT.castAccountKey(o);
 			if ((o!=null)&&(key == null)) {
 				return context.withCastError(o, AccountKey.class);
 			}
@@ -812,7 +812,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			// TODO: probably need to pre-cost this?
-			ABlob blob = RT.blob(args[0]);
+			ABlob blob = RT.castBlob(args[0]);
 			if (blob == null) return context.withCastError(args[0], ABlob.class);
 
 			long juice = Juice.BLOB + Juice.BLOB_PER_BYTE * blob.length();
@@ -965,7 +965,7 @@ public class Core {
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			AccountKey address = RT.accountKey(args[0]);
+			AccountKey address = RT.castAccountKey(args[0]);
 			if (address == null) return context.withCastError(args[0], AccountKey.class);
 
 			CVMLong amount = RT.toLong(args[1]);
@@ -1179,7 +1179,7 @@ public class Core {
 			if (n !=1) return context.withArityError(exactArityMessage(1, n));
 			
 			// Get requested controller. Must be a valid address or null
-			AccountKey publicKey=RT.accountKey(args[0]);
+			AccountKey publicKey=RT.castAccountKey(args[0]);
 			if ((publicKey == null)&&(args[0]!=null)) return context.withCastError(args[0], AccountKey.class);
 			
 			context=(Context) context.setAccountKey(publicKey);
@@ -1254,7 +1254,7 @@ public class Core {
 			} else {
 				IGet<ACell> gettable = RT.toGettable(args[0]);
 				if (gettable == null) return context.withCastError(args[0], IGet.class);
-				result = RT.toBoolean(gettable.containsKey((ACell) args[1]));
+				result = CVMBool.of(gettable.containsKey((ACell) args[1]));
 			}
 
 			long juice = Juice.GET;
@@ -1278,7 +1278,7 @@ public class Core {
 			Set<ACell> s1=RT.ensureSet(args[1]);
 			if (s1==null) return context.withCastError(args[1], ASet.class);
 
-			CVMBool result=RT.toBoolean(s0.isSubset(s1));
+			CVMBool result=CVMBool.of(s0.isSubset(s1));
 			return context.withResult(juice, result);
 		}
 	});
@@ -1425,7 +1425,7 @@ public class Core {
 		public  Context<CVMBool> invoke(Context context, ACell[] args) {
 
 			// all arities OK, all args OK
-			CVMBool result = RT.toBoolean(RT.allEqual(args));
+			CVMBool result = CVMBool.of(RT.allEqual(args));
 			return context.withResult(Juice.EQUALS, result);
 		}
 	});
@@ -1809,7 +1809,7 @@ public class Core {
 		public  Context<CVMBool> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			CVMBool result = RT.toBoolean(!RT.bool(args[0]));
+			CVMBool result = CVMBool.of(!RT.bool(args[0]));
 			return context.withResult(Juice.SIMPLE_FN, result);
 		}
 	});

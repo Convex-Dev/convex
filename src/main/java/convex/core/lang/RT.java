@@ -780,7 +780,7 @@ public class RT {
 	 * @param xs  Any sequential object, or null (will be treated as empty sequence)
 	 * @return A new list with the cons'ed elements at the start
 	 */
-	public static <T extends ACell> AList<T> cons(T x, T y, Object xs) {
+	public static <T extends ACell> AList<T> cons(T x, T y, ACell xs) {
 		ASequence<T> nxs = RT.sequence(xs);
 		if (xs == null) return Lists.of(x, y);
 		return nxs.cons(y).cons(x);
@@ -797,7 +797,7 @@ public class RT {
 	 * @param xs  Any sequential object
 	 * @return A new list with the cons'ed elements at the start
 	 */
-	public static <T extends ACell> AList<T> cons(T x, T y, T z, Object xs) {
+	public static <T extends ACell> AList<T> cons(T x, T y, T z, ACell xs) {
 		ASequence<T> nxs = RT.sequence(xs);
 		return nxs.cons(y).cons(x).cons(z);
 	}
@@ -806,11 +806,11 @@ public class RT {
 	 * Coerces any object to a collection type, or returns null if not possible.
 	 * Null is converted to an empty vector.
 	 * 
-	 * @param a Object to coerce to collection type.
+	 * @param a value to coerce to collection type.
 	 * @return Collection object, or null if coercion failed.
 	 */
 	@SuppressWarnings("unchecked")
-	static <E extends ACell> ACollection<E> collection(Object a) {
+	static <E extends ACell> ACollection<E> collection(ACell a) {
 		if (a == null) return Vectors.empty();
 		if (a instanceof ACollection) return (ACollection<E>) a;
 		return null;
@@ -820,11 +820,11 @@ public class RT {
 	 * Coerces any object to a data structure type, or returns null if not possible.
 	 * Null is converted to an empty vector.
 	 * 
-	 * @param a Object to coerce to collection type.
+	 * @param a value to coerce to collection type.
 	 * @return Collection object, or null if coercion failed.
 	 */
 	@SuppressWarnings("unchecked")
-	static <E extends ACell> ADataStructure<E> dataStructure(Object a) {
+	static <E extends ACell> ADataStructure<E> dataStructure(ACell a) {
 		if (a == null) return Vectors.empty();
 		if (a instanceof ADataStructure) return (ADataStructure<E>) a;
 		return null;
@@ -874,10 +874,10 @@ public class RT {
 	 * @param a
 	 * @return AccountKey instance, or null if coercion fails
 	 */
-	public static AccountKey accountKey(Object a) {
+	public static AccountKey castAccountKey(ACell a) {
 		if (a==null) return null;
 		if (a instanceof AccountKey) return (AccountKey) a;
-		if (a instanceof AString) return accountKey(AccountKey.fromHexOrNull((AString)a));
+		if (a instanceof AString) return AccountKey.fromHexOrNull((AString)a);
 		if (a instanceof ABlob) {
 			ABlob b = (ABlob) a;
 			return AccountKey.create(b);
@@ -893,11 +893,10 @@ public class RT {
 	 * @param a Object to convert to a Blob
 	 * @return Blob value, or null if not convertable to a blob
 	 */
-	public static ABlob blob(Object a) {
+	public static ABlob castBlob(ACell a) {
 		// handle address, hash, blob instances
 		if (a instanceof ABlob) return Blobs.canonical((ABlob) a);
 		if (a instanceof AString) return Blobs.fromHex(a.toString());
-		if (a instanceof String) return Blobs.fromHex((String) a);
 		return null;
 	}
 
@@ -991,16 +990,6 @@ public class RT {
 		return !((a == null) || (a == CVMBool.FALSE));
 	}
 	
-	/**
-	 * Convert any value to a Boolean object.
-	 * 
-	 * @param o
-	 * @return A boolean value representing false or true
-	 */
-	public static CVMBool toBoolean(boolean b) {
-		return b?CVMBool.TRUE:CVMBool.FALSE;
-	}
-
 	/**
 	 * Converts an object to a map entry. Handles MapEntries and length 2 vectors.
 	 * 
@@ -1219,7 +1208,7 @@ public class RT {
 	}
 
 	/**
-	 * Coerces to a set. null is converted to the empty set. 
+	 * Ensures the value is a set. null is converted to the empty set. 
 	 * 
 	 * Returns null if the argument is not a set.
 	 * 
