@@ -67,7 +67,7 @@ public class Cond<T extends ACell> extends AMultiOp<T> {
 			// bail out from exceptional result in test
 			if (ctx.isExceptional()) return (Context<T>) ctx;
 			
-			Object test=ctx.getResult();
+			ACell test=ctx.getResult();
 			if (RT.bool(test)) {
 				return (Context<T>) ctx.execute(ops.get(i+1));
 			}

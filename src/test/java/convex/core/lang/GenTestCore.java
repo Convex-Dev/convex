@@ -33,6 +33,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.Utils;
 import convex.test.generators.AddressGen;
 import convex.test.generators.ListGen;
 import convex.test.generators.SetGen;
@@ -188,7 +189,7 @@ public class GenTestCore {
 		assertTrue(RT.ge(args));
 		assertTrue(RT.eq(args));
 		
-		assertTrue(RT.bool(a)); // longs are always truthy
+		assertTrue(Utils.bool(a)); // longs are always truthy
 		
 		assertNull(RT.count(a));
 		assertNull(RT.sequence(a));

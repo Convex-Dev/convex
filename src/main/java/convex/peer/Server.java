@@ -40,7 +40,6 @@ import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.Context;
-import convex.core.lang.RT;
 import convex.core.lang.impl.AExceptional;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
@@ -174,7 +173,7 @@ public class Server implements Closeable {
 	private Peer establishPeer(AKeyPair keyPair, Map<Keyword, Object> config2) {
 		log.info("Establishing Peer with store: "+Stores.current());
 
-		if (RT.bool(config.get(Keywords.RESTORE))) {
+		if (Utils.bool(config.get(Keywords.RESTORE))) {
 			try {
 				Hash hash = store.getRootHash();
 				Peer peer = Peer.restorePeer(store, hash, keyPair);
@@ -794,7 +793,7 @@ public class Server implements Closeable {
 	@Override
 	public synchronized void close() {
 		// persist peer state if necessary
-		if ((peer != null) && RT.bool(config.get(Keywords.PERSIST))) {
+		if ((peer != null) && Utils.bool(config.get(Keywords.PERSIST))) {
 			persistPeerData();
 		}
 

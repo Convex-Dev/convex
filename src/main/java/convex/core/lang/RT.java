@@ -711,8 +711,8 @@ public class RT {
 	 * @param a Object to convert to boolean value
 	 * @return true if object is truthy, false otherwise
 	 */
-	public static boolean bool(Object a) {
-		return !((a == null) || (a == CVMBool.FALSE) || (a==Boolean.FALSE));
+	public static boolean bool(ACell a) {
+		return !((a == null) || (a == CVMBool.FALSE));
 	}
 
 	/**
@@ -993,7 +993,7 @@ public class RT {
 	 * @param o
 	 * @return A boolean value representing false or true
 	 */
-	public static CVMBool toBoolean(Object o) {
+	public static CVMBool toBoolean(ACell o) {
 		if (RT.bool(o)) return CVMBool.TRUE;
 		return CVMBool.FALSE;
 	}
@@ -1284,7 +1284,7 @@ public class RT {
 		if (o instanceof Double) return (T)CVMDouble.create(((Double)o));
 		if (o instanceof Number) return (T)CVMLong.create(((Number)o).longValue());
 		if (o instanceof Character) return (T)CVMChar.create((Character)o);
-		if (o instanceof Boolean) return (T)RT.toBoolean(o);
+		if (o instanceof Boolean) return (T)CVMBool.create((Boolean)o);
 		throw new IllegalArgumentException("Can't convert to CVM type with class: "+Utils.getClassName(o));
 	}
 

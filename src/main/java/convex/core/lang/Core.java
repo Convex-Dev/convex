@@ -1784,7 +1784,7 @@ public class Core {
 		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 			
-			CVMDouble result = RT.pow(args);
+			CVMDouble result = RT.pow(args); 
 			if (result==null) return context.withCastError(CVMDouble.class);
 			
 			return context.withResult(Juice.ARITHMETIC, result);

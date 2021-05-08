@@ -29,6 +29,7 @@ import convex.core.data.prim.CVMLong;
 import org.apache.commons.text.StringEscapeUtils;
 
 import convex.core.exceptions.TODOException;
+import convex.core.lang.RT;
 
 public class Utils {
 	public static final byte[] EMPTY_BYTES = new byte[0];
@@ -1274,6 +1275,13 @@ public class Utils {
 		}
 
 		return v;
+	}
+
+	public static boolean bool(Object a) {
+		if (a==null) return false;
+		if (a instanceof ACell) return (RT.bool((ACell)a));
+		if (a instanceof Boolean) return ((Boolean)a);
+		return true; // consider other values truthy
 	}
 
 }
