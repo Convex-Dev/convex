@@ -669,9 +669,9 @@ public class RT {
 	}
 	
 	/**
-	 * Gets the count of elements in a collection
+	 * Gets the count of elements in a collection. Null is considered an empty collection.
 	 * 
-	 * @param o An object representing a collection of items to be counted
+	 * @param o An Object representing a collection of items to be counted
 	 * @return The count of elements in the collection, or null if not countable
 	 */
 	public static Long count(Object o) {
@@ -687,33 +687,24 @@ public class RT {
 	}
 
 	/**
-	 * Gets the count of elements in a collection
+	 * Gets the count of elements in a collection. Null is considered an empty collection.
 	 * 
-	 * @param o An object representing a collection of items to be counted
+	 * @param a Any Cell potentially representing a collection of items to be counted
 	 * @return The count of elements in the collection, or null if not countable
 	 */
-	public static Long count(ACell o) {
-		if (o == null) return 0L;
-		if (o instanceof ADataStructure) return ((ADataStructure<?>) o).count();
-		if (o instanceof ABlob) {
-			return ((ABlob) o).length();
+	public static Long count(ACell a) {
+		if (a == null) return 0L;
+		if (a instanceof ADataStructure) return ((ADataStructure<?>) a).count();
+		if (a instanceof ABlob) {
+			return ((ABlob) a).length();
 		}
-		if (o instanceof AString) {
-			return (long) ((AString) o).length();
+		if (a instanceof AString) {
+			return (long) ((AString) a).length();
 		}
 		return null;
 	}
 
-	/**
-	 * Coerces any object to a boolean value. An object is considered falsey if null
-	 * or equals to Boolean.FALSE, truthy otherwise
-	 * 
-	 * @param a Object to convert to boolean value
-	 * @return true if object is truthy, false otherwise
-	 */
-	public static boolean bool(ACell a) {
-		return !((a == null) || (a == CVMBool.FALSE));
-	}
+
 
 	/**
 	 * Converts arguments to a AString representation. Handles:
@@ -987,15 +978,17 @@ public class RT {
 		throw new Error("Can't get from an object of type: " + Utils.getClass(coll));
 	}
 
+
+	
 	/**
-	 * Convert any value to a Boolean object.
+	 * Converts any CVM value to a boolean value. An value is considered falsey if null
+	 * or equal to CVMBool.FALSE, truthy otherwise
 	 * 
-	 * @param o
-	 * @return A boolean value representing false or true
+	 * @param a Object to convert to boolean value
+	 * @return true if object is truthy, false otherwise
 	 */
-	public static CVMBool toBoolean(ACell o) {
-		if (RT.bool(o)) return CVMBool.TRUE;
-		return CVMBool.FALSE;
+	public static boolean bool(ACell a) {
+		return !((a == null) || (a == CVMBool.FALSE));
 	}
 	
 	/**
@@ -1091,12 +1084,12 @@ public class RT {
 	}
 
 	/**
-	 * Tests is the object is one of the canonical boolean values 'true' or 'false'
+	 * Tests if a value is one of the canonical boolean values 'true' or 'false'
 	 * 
 	 * @param value Value to test
 	 * @return True if the value is a canonical boolean value.
 	 */
-	public static boolean isBoolean(Object value) {
+	public static boolean isBoolean(ACell value) {
 		return (value == CVMBool.TRUE) || (value == CVMBool.FALSE);
 	}
 

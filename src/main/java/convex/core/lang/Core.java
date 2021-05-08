@@ -1526,8 +1526,8 @@ public class Core {
 		public  Context<CVMBool> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			// always works for any value
-			CVMBool result = RT.toBoolean(args[0]);
+			// Boolean cast always works for any value
+			CVMBool result = (RT.bool(args[0])) ? CVMBool.TRUE : CVMBool.FALSE;
 
 			return context.withResult(Juice.SIMPLE_FN, result);
 		}
@@ -1536,7 +1536,6 @@ public class Core {
 	public static final CorePred BOOLEAN_Q = reg(new CorePred(Symbols.BOOLEAN_Q) {
 		@Override
 		public boolean test(ACell val) {
-			// TODO Auto-generated method stub
 			return RT.isBoolean(val);
 		}
 	});
