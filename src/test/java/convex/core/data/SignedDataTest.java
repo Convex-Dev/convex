@@ -3,6 +3,7 @@ package convex.core.data;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -44,6 +45,13 @@ public class SignedDataTest {
 		assertEquals(cl, sd.getValue());
 		
 		assertTrue(sd.getDataRef().isEmbedded());
+	}
+	
+	@Test
+	public void testNullValueSignings() throws BadSignatureException {
+		SignedData<ACell> sd = SignedData.create(TestState.HERO_PAIR, null);
+		assertNull(sd.getValue());
+		assertTrue(sd.checkSignature());
 	}
 
 	@Test

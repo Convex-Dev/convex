@@ -15,6 +15,8 @@ public final class CVMLong extends APrimitive implements INumeric {
 	public static final CVMLong ZERO = CVMLong.create(0L);
 	public static final CVMLong ONE = CVMLong.create(1L);
 	public static final CVMLong MINUS_ONE = CVMLong.create(-1L);
+	public static final CVMLong MAX_VALUE = CVMLong.create(Long.MAX_VALUE);
+	public static final CVMLong MIN_VALUE = CVMLong.create(Long.MIN_VALUE);
 	
 	private final long value;
 	
