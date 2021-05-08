@@ -1728,7 +1728,49 @@ public class Core {
 			if (denom==0) return context.withArgumentError("Divsion by zero in "+name());
 			
 			long m = num % denom;
-			if (m<0) m+=Math.abs(denom);
+			if (m<0) m+=Math.abs(denom); // Correct for Euclidean modular function
+			CVMLong result=CVMLong.create(m);
+			
+			return context.withResult(Juice.ARITHMETIC, result);
+		}
+	});
+	
+	public static final CoreFn<CVMLong> REM = reg(new CoreFn<>(Symbols.REM) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+			
+			CVMLong la=RT.toLong(args[0]);
+			CVMLong lb=RT.toLong(args[1]);
+			if ((lb==null)||(la==null)) return context.withCastError(args, CVMLong.class);
+			
+			long num = la.longValue();
+			long denom = lb.longValue();
+			if (denom==0) return context.withArgumentError("Divsion by zero in "+name());
+			
+			long m = num % denom;
+			CVMLong result=CVMLong.create(m);
+			
+			return context.withResult(Juice.ARITHMETIC, result);
+		}
+	});
+	
+	public static final CoreFn<CVMLong> QUOT = reg(new CoreFn<>(Symbols.QUOT) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+			
+			CVMLong la=RT.toLong(args[0]);
+			CVMLong lb=RT.toLong(args[1]);
+			if ((lb==null)||(la==null)) return context.withCastError(args, CVMLong.class);
+			
+			long num = la.longValue();
+			long denom = lb.longValue();
+			if (denom==0) return context.withArgumentError("Divsion by zero in "+name());
+			
+			long m = num / denom;
 			CVMLong result=CVMLong.create(m);
 			
 			return context.withResult(Juice.ARITHMETIC, result);

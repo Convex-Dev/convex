@@ -659,6 +659,14 @@
           :type :function
           :signature [{:params [syntax]}]}
   }
+  
+  mod
+  {
+    :doc {:description "Returns the integer modulus of a numerator divided by a divisor. The result will always be positive, in consistent with Euclidean Divsion."
+          :examples [{:code "(mod 13 5)"}]
+          :type :function
+          :signature [{:params [num div]}]}
+  }
  
   name
   {
@@ -726,6 +734,14 @@
           :signature [{:params [& forms]}]}
   }
   
+  quot
+  {
+    :doc {:description "Returns the quotient of a numerator divided by a divisor. Performs truncated division, i.e. rounds towards zero."
+          :examples [{:code "(quot 13 5)"}]
+          :type :function
+          :signature [{:params [num div]}]}
+  }
+  
   quote
   {
     :doc {:description "Returns the quoted value of a form, without evaluating it. For example, you can quote a symbol to get the symbol itself rather than the value in the environment that it refers to."
@@ -757,6 +773,14 @@
           :examples [{:code "(reduce (fn [acc x] (reduced :exit)) 1 [1 2 3 4 5])"}]
           :type :function
           :signature [{:params [result]}]}
+  }
+  
+  rem
+  {
+    :doc {:description "Returns the remainder of a numerator divided by a divisor, consistent with division performed by 'quot'. The remainder will therefore have the same sign as the numerator."
+          :examples [{:code "(rem 13 5)"}]
+          :type :function
+          :signature [{:params [num div]}]}
   }
   
   return

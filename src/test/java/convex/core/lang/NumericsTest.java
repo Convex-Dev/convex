@@ -5,9 +5,7 @@ import static convex.core.lang.TestState.evalB;
 import static convex.core.lang.TestState.evalD;
 import static convex.core.lang.TestState.evalL;
 import static convex.core.lang.TestState.step;
-import static convex.test.Assertions.assertArityError;
-import static convex.test.Assertions.assertCVMEquals;
-import static convex.test.Assertions.assertCastError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -78,6 +76,15 @@ public class NumericsTest {
 
 		assertCastError(step("(- nil)"));
 		assertCastError(step("(- 1 [])"));
+	}
+	
+	@Test
+	public void testDivisionConsistency() {
+		// Check consistency of quot and rem
+		assertNotError(step("(map (fn [[a b]] (or (== a (+ (* b (quot a b)) (rem a b) ) ) (fail [a b])) ) [[10 3] [-10 3] [10 -3] [-10 -3] [10000000 1] [1 10000000]])"));
+
+	    // Check modular behaviour (mod a b) == (mod (mod a b) b)
+		assertNotError(step("(map (fn [[a b]] (or (== (mod a b) (mod (mod a b) b)) (fail [a b])) ) [[10 3] [-10 3] [10 -3] [-10 -3] [10000000 1] [1 10000000]])"));
 	}
 
 	@Test

@@ -130,6 +130,8 @@ public class Symbols {
 	public static final Symbol EXP = Symbol.create("exp");
 	public static final Symbol POW = Symbol.create("pow");
 	public static final Symbol MOD = Symbol.create("mod");
+	public static final Symbol QUOT = Symbol.create("quot");
+	public static final Symbol REM = Symbol.create("rem");
 
 	
 	public static final Symbol FLOOR = Symbol.create("floor");

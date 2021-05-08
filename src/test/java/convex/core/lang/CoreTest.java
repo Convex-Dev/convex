@@ -2150,6 +2150,20 @@ public class CoreTest {
 	}
 	
 	@Test
+	public void testQuot() {
+		assertEquals(0L, evalL("(quot 4 10)"));
+		assertEquals(2L, evalL("(quot 10 4)"));
+		assertEquals(-2L, evalL("(quot -10 4)"));
+		
+		assertCastError(step("(quot :a 7)"));
+		assertCastError(step("(quot 7 nil)"));
+		
+		assertArityError(step("(quot)"));
+		assertArityError(step("(quot 1)"));	
+		assertArityError(step("(quot 1 2 3)"));	
+	}
+	
+	@Test
 	public void testMod() {
 		assertEquals(4L, evalL("(mod 4 10)"));
 		assertEquals(4L, evalL("(mod 14 10)"));
@@ -2157,9 +2171,7 @@ public class CoreTest {
 		assertEquals(0L, evalL("(mod 7 7)"));
 		assertEquals(0L, evalL("(mod 0 -1)"));
 		
-		// TODO: determine correct behaviour?
-		// assertEquals(6L, evalL("(mod -1 -7)"));
-
+		assertEquals(6L, evalL("(mod -1 -7)"));
 		
 		assertArgumentError(step("(mod 10 0)"));
 		
@@ -2169,6 +2181,26 @@ public class CoreTest {
 		assertArityError(step("(mod)"));
 		assertArityError(step("(mod 1)"));	
 		assertArityError(step("(mod 1 2 3)"));	
+	}
+	
+	@Test
+	public void testRem() {
+		assertEquals(4L, evalL("(rem 4 10)"));
+		assertEquals(4L, evalL("(rem 14 10)"));
+		assertEquals(-1L, evalL("(rem -1 7)"));
+		assertEquals(0L, evalL("(rem 7 7)"));
+		assertEquals(0L, evalL("(rem 0 -1)"));
+		
+		assertEquals(-1L, evalL("(rem -1 -7)"));
+		
+		assertArgumentError(step("(rem 10 0)"));
+		
+		assertCastError(step("(rem :a 7)"));
+		assertCastError(step("(rem 7 nil)"));
+		
+		assertArityError(step("(rem)"));
+		assertArityError(step("(rem 1)"));	
+		assertArityError(step("(rem 1 2 3)"));	
 	}
 	
 	@Test
