@@ -23,6 +23,7 @@ import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.IAssociative;
 import convex.core.data.IGet;
+import convex.core.data.INumeric;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
 import convex.core.data.MapEntry;
@@ -258,13 +259,13 @@ public class RT {
 
 	public static CVMDouble divide(ACell[] args) {
 		int n = args.length;
-		CVMDouble arg0 = toDouble(args[0]);
+		CVMDouble arg0 = castDouble(args[0]);
 		if (arg0 == null) return null;
 		double result=arg0.doubleValue();
 
 		if (n == 1) return CVMDouble.create(1.0 / result);
 		for (int i = 1; i < args.length; i++) {
-			CVMDouble v = toDouble(args[i]);
+			CVMDouble v = castDouble(args[i]);
 			if (v == null) return null;
 			result = result / v.doubleValue();
 		}
@@ -277,8 +278,8 @@ public class RT {
 	 * @return
 	 */
 	public static CVMDouble pow(ACell[] args) {
-		CVMDouble a = toDouble(args[0]);
-		CVMDouble b = toDouble(args[1]);
+		CVMDouble a = castDouble(args[0]);
+		CVMDouble b = castDouble(args[1]);
 		if ((a==null)||(b==null)) return null;
 		return CVMDouble.create(StrictMath.pow(a.doubleValue(), b.doubleValue()));
 	}
@@ -289,7 +290,7 @@ public class RT {
 	 * @return
 	 */	
 	public static CVMDouble exp(ACell arg) {
-		CVMDouble a = toDouble(arg);
+		CVMDouble a = castDouble(arg);
 		if (a==null) return null;
 		return CVMDouble.create(StrictMath.exp(a.doubleValue()));
 	}
@@ -301,7 +302,7 @@ public class RT {
 	 * @return The floor of the number, or null if cast fails
 	 */
 	public static CVMDouble floor(ACell a) {
-		CVMDouble d = RT.toDouble(a);
+		CVMDouble d = RT.castDouble(a);
 		if (d == null) return null;
 		return CVMDouble.create(StrictMath.floor(d.doubleValue()));
 	}
@@ -313,7 +314,7 @@ public class RT {
 	 * @return The ceiling of the number, or null if cast fails
 	 */
 	public static CVMDouble ceil(ACell a) {
-		CVMDouble d = RT.toDouble(a);
+		CVMDouble d = RT.castDouble(a);
 		if (d == null) return null;
 		return CVMDouble.create(StrictMath.ceil(d.doubleValue()));
 	}
@@ -326,7 +327,7 @@ public class RT {
 	 * @return The square root of the number, or null if cast fails
 	 */
 	public static CVMDouble sqrt(ACell a) {
-		CVMDouble d = RT.toDouble(a);
+		CVMDouble d = RT.castDouble(a);
 		if (d == null) return null;
 		return CVMDouble.create(StrictMath.sqrt(d.doubleValue()));
 	}
@@ -338,10 +339,10 @@ public class RT {
 	 * @return
 	 */
 	public static APrimitive abs(ACell a) {
-		Number x=RT.number(a);
+		INumeric x=RT.number(a);
 		if (x==null) return null;
-		if (x instanceof Long) return CVMLong.create( Math.abs((Long)x));
-		return CVMDouble.create(Math.abs((Double)x));
+		if (x instanceof CVMLong) return CVMLong.create( Math.abs(((CVMLong) x).longValue()));
+		return CVMDouble.create(Math.abs(x.toDouble().doubleValue()));
 	}
 	
 	/**
@@ -351,10 +352,10 @@ public class RT {
 	 * @return Long value of -1, 0 or 1, or null if the argument is not numeric
 	 */
 	public static CVMLong signum(ACell a) {
-		Number x=RT.number(a);
+		INumeric x=RT.number(a);
 		if (x==null) return null;
-		if (x instanceof Long) return CVMLong.create(Long.signum((Long)x));
-		double xd=(Double)x;
+		if (x instanceof CVMLong) return CVMLong.create(Long.signum(((CVMLong)x).longValue()));
+		double xd=x.toDouble().doubleValue();
 		if (Double.isNaN(xd)) return null;
 		return CVMLong.create((long)Math.signum(xd));
 	}
@@ -408,16 +409,20 @@ public class RT {
 	 * @param a
 	 * @return The number value, or null if cannot be converted
 	 */
-	public static Number number(ACell a) {
+	public static INumeric number(ACell a) {
 		if (a == null) return null;
 		
+		if (a instanceof INumeric) {
+			return (INumeric)a;
+		}
+		
 		if (a instanceof APrimitive) {
-			if (a instanceof CVMDouble) return ((CVMDouble)a).doubleValue();
-			return ((APrimitive)a).longValue();
+			return CVMLong.create(((APrimitive)a).longValue());
 		}
 		
 		if (a instanceof ABlob) {
-			return (Long)((ABlob)a).toLong();
+			long lv=((ABlob)a).toLong();
+			return CVMLong.create(lv);
 		}
 
 		return null;
@@ -439,11 +444,16 @@ public class RT {
 		return CVMLong.create(n.longValue() - 1L);
 	}
 
-	public static CVMDouble toDouble(ACell a) {
+	/**
+	 * Converts a numerical value to a CVM Double. 
+	 * @param a
+	 * @return Double value, or null if not convertible
+	 */
+	public static CVMDouble castDouble(ACell a) {
 		if (a instanceof CVMDouble) return (CVMDouble) a;
-		Number n = number(a);
+		INumeric n = number(a);
 		if (n == null) return null;
-		return CVMDouble.create(n.doubleValue());
+		return n.toDouble();
 	}
 	
 	/**
@@ -453,9 +463,9 @@ public class RT {
 	 */
 	public static CVMLong castLong(ACell a) {
 		if (a instanceof CVMLong) return (CVMLong) a;
-		Number n = number(a);
+		INumeric n = number(a);
 		if (n == null) return null;
-		return CVMLong.create(n.longValue());
+		return n.toLong();
 	}
 	
 	/**
@@ -482,16 +492,16 @@ public class RT {
 	 */
 	public static CVMByte castByte(ACell a) {
 		if (a instanceof CVMByte) return (CVMByte) a;
-		Number n = number(a);
-		if (n == null) return null;
-		return CVMByte.create((byte)n.longValue());
+		CVMLong l=castLong(a);
+		if (l == null) return null;
+		return CVMByte.create((byte)l.longValue());
 	}
 
 	public static CVMChar toCharacter(ACell a) {
 		if (a instanceof CVMChar) return (CVMChar) a;
-		Number n = number(a);
-		if (n == null) return null;
-		return CVMChar.create(n.longValue());
+		CVMLong l=castLong(a);
+		if (l == null) return null;
+		return CVMChar.create(l.longValue());
 	}
 
 	private static long longValue(ACell a) {

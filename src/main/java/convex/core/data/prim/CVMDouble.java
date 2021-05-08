@@ -1,6 +1,7 @@
 package convex.core.data.prim;
 
 import convex.core.data.ACell;
+import convex.core.data.INumeric;
 import convex.core.data.Tag;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
@@ -10,7 +11,7 @@ import convex.core.util.Utils;
  * 
  * Follows the Java standard / IEEE 784 spec.
  */
-public final class CVMDouble extends APrimitive {
+public final class CVMDouble extends APrimitive implements INumeric {
 
 	public static final ACell ZERO = CVMDouble.create(0.0);
 	public static final ACell NaN = CVMDouble.create(Double.NaN);
@@ -30,6 +31,16 @@ public final class CVMDouble extends APrimitive {
 	@Override
 	public long longValue() {
 		return (long)value;
+	}
+	
+	@Override
+	public CVMLong toLong() {
+		return CVMLong.create(longValue());
+	}
+
+	@Override
+	public CVMDouble toDouble() {
+		return this;
 	}
 	
 	@Override

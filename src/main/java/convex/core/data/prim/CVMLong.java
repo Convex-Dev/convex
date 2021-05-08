@@ -1,6 +1,7 @@
 package convex.core.data.prim;
 
 import convex.core.data.Format;
+import convex.core.data.INumeric;
 import convex.core.data.Tag;
 import convex.core.exceptions.InvalidDataException;
 
@@ -9,7 +10,7 @@ import convex.core.exceptions.InvalidDataException;
  * 
  * Longs are signed 64-bit integers, and are the primary fixed point integer type on the CVM.
  */
-public final class CVMLong extends APrimitive {
+public final class CVMLong extends APrimitive implements INumeric {
 
 	public static final CVMLong ZERO = CVMLong.create(0L);
 	
@@ -26,6 +27,16 @@ public final class CVMLong extends APrimitive {
 	@Override
 	public long longValue() {
 		return value;
+	}
+	
+	@Override
+	public CVMLong toLong() {
+		return this;
+	}
+
+	@Override
+	public CVMDouble toDouble() {
+		return CVMDouble.create(doubleValue());
 	}
 	
 	@Override

@@ -1,5 +1,6 @@
 package convex.core.data.prim;
 
+import convex.core.data.INumeric;
 import convex.core.data.Tag;
 import convex.core.exceptions.InvalidDataException;
 
@@ -9,7 +10,7 @@ import convex.core.exceptions.InvalidDataException;
  * Bytes are unsigned 8-bit integers which upcast to long for numerical operations.
  * 
  */
-public final class CVMByte extends APrimitive {
+public final class CVMByte extends APrimitive implements INumeric {
 
 	private final byte value;
 	
@@ -73,12 +74,22 @@ public final class CVMByte extends APrimitive {
 
 	@Override
 	public double doubleValue() {
-		return (double)value;
+		return (double)longValue();
 	}
 
 	@Override
 	public byte getTag() {
 		return Tag.BYTE;
+	}
+
+	@Override
+	public CVMLong toLong() {
+		return CVMLong.create(longValue());
+	}
+
+	@Override
+	public CVMDouble toDouble() {
+		return CVMDouble.create(doubleValue());
 	}
 
 }

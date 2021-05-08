@@ -29,6 +29,7 @@ import convex.core.data.BlobMaps;
 import convex.core.data.Format;
 import convex.core.data.IAssociative;
 import convex.core.data.IGet;
+import convex.core.data.INumeric;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.List;
@@ -1577,7 +1578,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
-			CVMDouble result = RT.toDouble(a);
+			CVMDouble result = RT.castDouble(a);
 			if (result == null) return context.withCastError(a, Double.class);
 
 			return context.withResult(Juice.ARITHMETIC, result);
@@ -2346,7 +2347,7 @@ public class Core {
 		@Override
 		public boolean test(ACell val) {
 			if (!RT.isNumber(val)) return false;
-			Number n = RT.number(val);
+			INumeric n = RT.number(val);
 
 			// According to the IEEE 754 standard, negative zero and positive zero should
 			// compare as equal with the usual (numerical) comparison operators

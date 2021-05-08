@@ -1143,6 +1143,20 @@ public class CoreTest {
 	}
 	
 	@Test
+	public void testDoouble() {
+		assertEquals(-13.0,evalD("(double -13)")); 
+		assertEquals(1.0,evalD("(double true)")); // ?? cast OK?
+		
+		assertEquals(255.0,evalD("(double (byte -1))")); // byte should be 0-255
+
+		
+		assertCastError(step("(double :foo)"));
+		
+		assertArityError(step("(double)"));
+		assertArityError(step("(double :foo :bar)"));
+	}
+	
+	@Test
 	public void testMacro() {
 		assertTrue(eval("(macro [x] x)") instanceof AExpander);
 		assertCastError(step("((macro [x] x) 42)"));
