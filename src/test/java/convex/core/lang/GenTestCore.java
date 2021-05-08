@@ -165,7 +165,6 @@ public class GenTestCore {
 	@Property 
 	public void testLongFunctions(@From(LongGenerator.class) Long a) {
 		CVMLong ca=CVMLong.create(a);
-		assertEquals(ca,RT.toLong(a));
 		
 		long v=a;
 		assertEquals(Long.toString(v),RT.str(ca).toString());

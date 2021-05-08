@@ -3,7 +3,7 @@
   
   ;; function that accepts quarter of all funds offered
   (defn accept-quarter [] 
-    (accept (* 0.25 *offer*)))
+    (accept (long (* 0.25 *offer*))))
   
   ;; function that accepts half all funds offered
   (defn accept-all [] 

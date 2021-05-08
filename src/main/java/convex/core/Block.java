@@ -69,7 +69,7 @@ public class Block extends ARecord {
 	@SuppressWarnings("unchecked")
 	@Override
 	protected Block updateAll(ACell[] newVals) {
-		long newTimestamp = RT.toLong(newVals[0]).longValue();		
+		long newTimestamp = RT.ensureLong(newVals[0]).longValue();		
 		AVector<SignedData<ATransaction>> newTransactions = (AVector<SignedData<ATransaction>>) newVals[1];
 		AccountKey newPeer = (AccountKey) newVals[2];
 		if ((this.transactions == newTransactions) && (this.timestamp == newTimestamp) && (peerKey==newPeer)) {

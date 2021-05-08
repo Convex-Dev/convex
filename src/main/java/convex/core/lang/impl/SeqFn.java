@@ -30,14 +30,14 @@ public class SeqFn<T extends ACell> implements IFn<T> {
 	public Context<T> invoke(Context context, ACell[] args) {
 		int n = args.length;
 		if (n == 1) {
-			CVMLong key = RT.toLong(args[0]);
+			CVMLong key = RT.ensureLong(args[0]);
 			if (key==null) return context.withCastError(args[0], Long.class);
 			long ix=key.longValue();
 			if ((ix < 0) || (ix >= seq.count())) return (Context<T>) context.withBoundsError(ix);
 			T result = (T) seq.get(key);
 			return context.withResult(result);
 		} else if (n == 2) {
-			CVMLong key = RT.toLong(args[0]);
+			CVMLong key = RT.ensureLong(args[0]);
 			if (key==null) return context.withCastError(args[0], Long.class);
 			long ix=key.longValue();
 			if ((ix < 0) || (ix >= seq.count())) return (Context<T>) context.withResult((T)args[1]);

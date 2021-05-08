@@ -1718,12 +1718,13 @@ public class CoreTest {
 	@Test
 	public void testAccept() {
 		assertEquals(0L, evalL("(accept 0)"));
-		assertEquals(0L, evalL("(accept 0.0)"));
-		assertEquals(0L, evalL("(accept *offer*)")); // offer should be initially zero
+		assertEquals(0L, evalL("(accept *offer*)"));  // offer should be initially zero
+		assertEquals(0L, evalL("(accept (byte 0))")); // byte should widen to Long
 
-		// accepting non-numeric value -> CAST error
+		// accepting non-integer value -> CAST error
 		assertCastError(step("(accept :foo)"));
 		assertCastError(step("(accept :foo)"));
+		assertCastError(step("(accept 0.3)"));
 
 		// accepting negative -> ARGUMENT error
 		assertArgumentError(step("(accept -1)"));
@@ -1987,7 +1988,7 @@ public class CoreTest {
 		}
 		
 		{ // transfer to an Actor that accepts half
-			Context<?> ctx=step("(deploy '(do (defn receive-coin [sender amount data] (accept (/ amount 2))) (export receive-coin)))");
+			Context<?> ctx=step("(deploy '(do (defn receive-coin [sender amount data] (accept (long (/ amount 2)))) (export receive-coin)))");
 			Address receiver=(Address) ctx.getResult();
 			
 			// should be OK with a Blob Address
@@ -2913,6 +2914,8 @@ public class CoreTest {
 		assertCastError(step("(dec nil)"));
 		assertCastError(step("(dec :foo)"));
 		assertCastError(step("(dec [1])"));
+		assertCastError(step("(dec #666)"));
+		assertCastError(step("(dec 3.0)"));
 
 		assertArityError(step("(dec)"));
 		assertArityError(step("(dec 1 2)"));
@@ -2924,7 +2927,10 @@ public class CoreTest {
 		assertEquals(2L, evalL("(inc (byte 1))"));
 		// assertEquals(98L,(long)eval("(inc \\a)")); // TODO: think about this
 
+		assertCastError(step("(inc #42)")); // Issue #89
 		assertCastError(step("(inc nil)"));
+		assertCastError(step("(inc \\c)")); // Issue #89
+		assertCastError(step("(inc true)")); // Issue #89
 
 		assertArityError(step("(inc)"));
 		assertArityError(step("(inc 1 2)"));

@@ -236,7 +236,7 @@
  
   dec
 	{
-	 :doc {:description "Decrements the given number by 1. Converts to Long if necessary."
+	 :doc {:description "Decrements the given number by 1. Result is a Long."
          :examples [{:code "(dec 10)"}]
          :type :function
          :signature [{:params [num]}]}

@@ -87,11 +87,11 @@
              (if (> token-balance 0) (/ (double *balance*) token-balance) nil))
          
            (defn add-liquidity [amt]
-             (let [amt (long amt)                                        ;; amount of tokens deposited
-                   price (price)                                         ;; (double) price of token in CVX, nil if no current liquidity
-                   initial-cvx-balance *balance*                         ;; initial CVX balance
-                   cvx (core/accept (if price (* price amt) *offer*))    ;; accept amount of CVX required (all if initial deposit)
-                   _ (asset/accept *caller* [token amt])                 ;; ensure tokens are transferred from caller to market actor
+             (let [amt (long amt)                                            ;; amount of tokens deposited
+                   price (price)                                             ;; (double) price of token in CVX, nil if no current liquidity
+                   initial-cvx-balance *balance*                             ;; initial CVX balance
+                   cvx (core/accept (if price (long (* price amt)) *offer*)) ;; accept amount of CVX required (all if initial deposit)
+                   _ (asset/accept *caller* [token amt])                     ;; ensure tokens are transferred from caller to market actor
                  
                    ;; compute new total balances for actor
                    new-token-balance (+ token-balance amt)

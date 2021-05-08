@@ -190,11 +190,11 @@ public class TestState {
 	}
 
 	public static long evalL(Context<?> ctx, String source) {
-		return RT.toLong(eval(ctx, source)).longValue();
+		return RT.castLong(eval(ctx, source)).longValue();
 	}
 
 	public static long evalL(String source) {
-		return RT.toLong(eval(source)).longValue();
+		return RT.castLong(eval(source)).longValue();
 	}
 	
 	public static String evalS(String source) {

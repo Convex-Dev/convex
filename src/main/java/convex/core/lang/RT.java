@@ -427,14 +427,14 @@ public class RT {
 		return (val instanceof APrimitive)&&(((APrimitive)val).numericType()!=null);
 	}
 
-	public static CVMLong inc(ACell object) {
-		CVMLong n = toLong(object);
+	public static CVMLong inc(ACell x) {
+		CVMLong n = ensureLong(x);
 		if (n == null) return null;
 		return CVMLong.create(n.longValue() + 1L);
 	}
 
-	public static CVMLong dec(ACell object) {
-		CVMLong n = toLong(object);
+	public static CVMLong dec(ACell x) {
+		CVMLong n = ensureLong(x);
 		if (n == null) return null;
 		return CVMLong.create(n.longValue() - 1L);
 	}
@@ -445,30 +445,31 @@ public class RT {
 		if (n == null) return null;
 		return CVMDouble.create(n.doubleValue());
 	}
-
-	/**
-	 * Converts a numerical value to a CVM Long. Doubles and floats will be converted if possible.
-	 * @param a
-	 * @return Long value, or null if not convertible
-	 */
-	public static CVMLong toLong(Object a) {
-		if (a instanceof ACell) return toLong((ACell)a);
-		if (a instanceof Number) {
-			return CVMLong.create(((Number)a).longValue());
-		}
-		return null;
-	}
 	
 	/**
 	 * Converts a numerical value to a CVM Long. Doubles and floats will be converted if possible.
 	 * @param a
 	 * @return Long value, or null if not convertible
 	 */
-	public static CVMLong toLong(ACell a) {
+	public static CVMLong castLong(ACell a) {
 		if (a instanceof CVMLong) return (CVMLong) a;
 		Number n = number(a);
 		if (n == null) return null;
 		return CVMLong.create(n.longValue());
+	}
+	
+	/**
+	 * Ensures the argument is a CVM Long value. 
+	 * @param a
+	 * @return CVMLong value, or null if not convertible
+	 */
+	public static CVMLong ensureLong(ACell a) {
+		if (a instanceof CVMLong) return (CVMLong) a;
+		if (a instanceof APrimitive) {
+			APrimitive ap=(APrimitive)a;
+			if (ap.numericType()==Long.class) return CVMLong.create(ap.longValue());
+		}
+		return null;
 	}
 	
 	/**
@@ -866,7 +867,7 @@ public class RT {
 		if (a instanceof Address) return (Address) a;
 		if (a instanceof ABlob) return Address.create((ABlob)a);
 		if (a instanceof AString) return Address.fromHexOrNull(a.toString());
-		CVMLong value=RT.toLong(a);
+		CVMLong value=RT.castLong(a);
 		if (value==null) return null;
 		return Address.create(value.longValue());
 	}
@@ -1294,10 +1295,10 @@ public class RT {
 	 * @return Mod value or null if cast fails
 	 */
 	public static CVMLong mod(ACell a , ACell b) {
-		CVMLong la=RT.toLong(a);
+		CVMLong la=RT.castLong(a);
 		if (la==null) return null;
 		
-		CVMLong lb=RT.toLong(b);
+		CVMLong lb=RT.castLong(b);
 		if (lb==null) return null;
 
 		long num = la.longValue();

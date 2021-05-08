@@ -404,7 +404,7 @@ public class Core {
 			if (n != 2) return context.withArityError(this.exactArityMessage(3, n));
 
 			// get timestamp target
-			CVMLong tso = RT.toLong(args[0]);
+			CVMLong tso = RT.ensureLong(args[0]);
 			if (tso==null) return context.withCastError(args[0],Long.class);
 			long scheduleTimestamp = tso.longValue();
 
@@ -596,7 +596,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			// must cast to Long
-			CVMLong amount = RT.toLong(args[0]);
+			CVMLong amount = RT.ensureLong(args[0]);
 			if (amount == null) return context.withCastError(args[0], Long.class);
 
 			return context.acceptFunds(amount.longValue());
@@ -616,7 +616,7 @@ public class Core {
 			Address target = RT.address(args[0]);
 			if (target == null) return ctx.withCastError(args[0], Address.class);
 
-			CVMLong sendAmount = RT.toLong(args[1]);
+			CVMLong sendAmount = RT.ensureLong(args[1]);
 			if (sendAmount == null) return ctx.withCastError(args[1], Long.class);
 
 			Symbol sym = RT.toSymbol(args[2]);
@@ -924,7 +924,7 @@ public class Core {
 			Address address = RT.address(args[0]);
 			if (address == null) return context.withCastError(args[0], Address.class);
 
-			CVMLong amount = RT.toLong(args[1]);
+			CVMLong amount = RT.ensureLong(args[1]);
 			if (amount == null) return context.withCastError(args[1], Long.class);
 
 			return context.transfer(address, amount.longValue()).consumeJuice(Juice.TRANSFER);
@@ -938,7 +938,7 @@ public class Core {
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			CVMLong amount = RT.toLong(args[0]);
+			CVMLong amount = RT.ensureLong(args[0]);
 			if (amount == null) return context.withCastError(args[0], Long.class);
 
 			return context.setMemory(amount.longValue()).consumeJuice(Juice.TRANSFER);
@@ -954,7 +954,7 @@ public class Core {
 			Address address = RT.address(args[0]);
 			if (address == null) return context.withCastError(args[0], Address.class);
 
-			CVMLong amount = RT.toLong(args[1]);
+			CVMLong amount = RT.ensureLong(args[1]);
 			if (amount == null) return context.withCastError(args[1], Long.class);
 
 			return context.transferAllowance(address, amount.longValue()).consumeJuice(Juice.TRANSFER);
@@ -970,7 +970,7 @@ public class Core {
 			AccountKey address = RT.castAccountKey(args[0]);
 			if (address == null) return context.withCastError(args[0], AccountKey.class);
 
-			CVMLong amount = RT.toLong(args[1]);
+			CVMLong amount = RT.ensureLong(args[1]);
 			if (amount == null) return context.withCastError(args[0], Long.class);
 
 			return context.setStake(address, amount.longValue()).consumeJuice(Juice.TRANSFER);
@@ -1563,7 +1563,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
-			CVMLong result = RT.toLong(a);
+			CVMLong result = RT.castLong(a);
 			if (result == null) return context.withCastError(a, Long.class);
 
 			return context.withResult(Juice.ARITHMETIC, result);
@@ -1720,8 +1720,8 @@ public class Core {
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 			
-			CVMLong la=RT.toLong(args[0]);
-			CVMLong lb=RT.toLong(args[1]);
+			CVMLong la=RT.ensureLong(args[0]);
+			CVMLong lb=RT.ensureLong(args[1]);
 			if ((lb==null)||(la==null)) return context.withCastError(args, CVMLong.class);
 			
 			long num = la.longValue();
@@ -1742,8 +1742,8 @@ public class Core {
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 			
-			CVMLong la=RT.toLong(args[0]);
-			CVMLong lb=RT.toLong(args[1]);
+			CVMLong la=RT.ensureLong(args[0]);
+			CVMLong lb=RT.ensureLong(args[1]);
 			if ((lb==null)||(la==null)) return context.withCastError(args, CVMLong.class);
 			
 			long num = la.longValue();
@@ -1763,8 +1763,8 @@ public class Core {
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 			
-			CVMLong la=RT.toLong(args[0]);
-			CVMLong lb=RT.toLong(args[1]);
+			CVMLong la=RT.ensureLong(args[0]);
+			CVMLong lb=RT.ensureLong(args[1]);
 			if ((lb==null)||(la==null)) return context.withCastError(args, CVMLong.class);
 			
 			long num = la.longValue();
@@ -1871,7 +1871,7 @@ public class Core {
 
 			// First argument must be a Long index
 			ACell arg = (ACell) args[0];
-			CVMLong ix = RT.toLong(args[1]);
+			CVMLong ix = RT.ensureLong(args[1]);
 			if (ix == null) return context.withCastError(args[1], Long.class);
 			
 			// Second arg should be a countable data structure
