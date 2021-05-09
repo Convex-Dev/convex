@@ -1907,6 +1907,16 @@ public class CoreTest {
 		// a fake address
 		assertFalse(evalB(ctx,"(account? 77777777)"));
 		
+		// String with and without hex. See Issue #90
+		assertFalse(evalB(ctx,"(account? \"deadbeef\")"));
+		assertFalse(evalB(ctx,"(account? \"zzz\")"));
+
+		// a blob that is wrong length for an address. See Issue #90
+		assertFalse(evalB(ctx,"(account? 0x1234)"));
+		
+		// a blob that actually refers to a valid account. But it isn't an Address...
+		assertFalse(evalB(ctx,"(account? 0x0000000000000008)"));
+		
 		// current hero address is an account
 		assertTrue(evalB(ctx,"(account? *address*)"));
 		
