@@ -291,6 +291,7 @@ public class ScryptNext extends Reader {
                 NilLiteral(),
                 NumberLiteral(),
                 BooleanLiteral(),
+                AddressLiteral(),
                 Keyword()
         );
     }

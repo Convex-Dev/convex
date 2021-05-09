@@ -521,7 +521,7 @@ public class State extends ARecord {
 	 */
 	public AccountStatus getAccount(Address target) {
 		long ix=target.longValue();
-		if (ix>=accounts.count()) return null;
+		if ((ix<0)||(ix>=accounts.count())) return null;
 		return accounts.get(ix);
 	}
 

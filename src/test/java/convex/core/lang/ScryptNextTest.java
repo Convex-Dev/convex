@@ -83,7 +83,9 @@ public class ScryptNextTest {
         assertEquals(Reader.read("(call \"<Address>\" (+ 1 (* 2 3)) (buy \"Something\"))"), parse("call \"<Address>\" offer 1 + (2 * 3) buy(\"Something\")"));
 
         // ErrorValue[:STATE] : Actor does not exist
-        assertStateError(step("call 6666666 buy(\"Something\")"));
+        assertStateError(step("call #6666666 buy(\"Something\")"));
+        
+        assertCastError(step("call 6666666 buy(\"Something\")"));
 
         // Can't call without a function name
         assertThrows(ParserRuntimeException.class, () -> parse("call \"ABC\""));

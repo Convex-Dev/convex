@@ -19,6 +19,12 @@ public class AddressTest {
 	}
 	
 	@Test
+	public void testAddress2() {
+		Address a1=Address.create(13);
+		assertEquals("#13",a1.toString());
+	}
+	
+	@Test
 	public void testParse() {
 		assertEquals("#1",Address.parse("#1").toString());
 		assertEquals("#2",Address.parse("2").toString());

@@ -876,20 +876,33 @@ public class RT {
 	/**
 	 * Casts the argument to a valid Address.
 	 * 
-	 * Handles - Strings, which are interpreted as 16-character hex strings -
-	 * Addresses, which are returned unchanged - Blobs, which are converted to
-	 * addresses if and only if they are of the correct length (8 bytes)
+	 * Handles:
+	 * <li>Strings, which are interpreted as 16-character hex strings</li>
+	 * <li>Addresses, which are returned unchanged </li>
+	 * <li>Blobs, which are converted to addresses if and only if they are of the correct length (8 bytes)</li>
+	 * <li>Numeric Longs, which are converted to the equivalent Address</li>
+	 * 
+	 * @param a Vaue to cast to an Address
+	 * @return Address value or null if not castable to a valid address
+	 */
+	public static Address castAddress(ACell a) {
+		if (a instanceof Address) return (Address) a;
+		if (a instanceof ABlob) return Address.create((ABlob)a);
+		if (a instanceof AString) return Address.fromHexOrNull(a.toString());
+		CVMLong value=RT.ensureLong(a);
+		if (value==null) return null;
+		return Address.create(value.longValue());
+	}
+	
+	/**
+	 * Ensures the argument is a valid Address.
 	 * 
 	 * @param a
 	 * @return Address value or null if not a valid address
 	 */
-	public static Address address(ACell a) {
+	public static Address ensureAddress(ACell a) {
 		if (a instanceof Address) return (Address) a;
-		if (a instanceof ABlob) return Address.create((ABlob)a);
-		if (a instanceof AString) return Address.fromHexOrNull(a.toString());
-		CVMLong value=RT.castLong(a);
-		if (value==null) return null;
-		return Address.create(value.longValue());
+		return null;
 	}
 	
 	/**

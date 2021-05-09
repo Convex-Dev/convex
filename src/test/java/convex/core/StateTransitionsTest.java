@@ -265,14 +265,14 @@ public class StateTransitionsTest {
 	public void testScheduleOps() throws BadSignatureException {
 		State s = Init.STATE;
 		Address TARGET = Init.VILLAIN;
-		String taddr=TARGET.toHexString();
+		String taddr=TARGET.toString();
 
 		long INITIAL_TS = s.getTimeStamp().longValue();
 		AKeyPair kp = convex.core.lang.TestState.HERO_PAIR;
 		long BAL2 = s.getBalance(TARGET);
 
 		ATransaction t1 = Invoke.create(Init.HERO,1,
-				Reader.read("(transfer \""+taddr+"\" 10000000)"));
+				Reader.read("(transfer "+taddr+" 10000000)"));
 		Block b1 = Block.of(s.getTimeStamp().longValue() + 100,Init.FIRST_PEER_KEY, kp.signData(t1));
 		s = s.applyBlock(b1).getState();
 		assertEquals(BAL2 + 10000000, s.getBalance(TARGET));
@@ -280,7 +280,7 @@ public class StateTransitionsTest {
 		
 		// schedule 200ms later for 1s time
 		ATransaction t2 = Invoke.create(Init.HERO,2, Reader.read(
-				"(schedule (+ *timestamp* 1000) (transfer \""+taddr+"\" 10000000))"));
+				"(schedule (+ *timestamp* 1000) (transfer "+taddr+" 10000000))"));
 		Block b2 = Block.of(s.getTimeStamp().longValue() + 200,Init.FIRST_PEER_KEY, kp.signData(t2));
 		BlockResult br2 = s.applyBlock(b2);
 		assertNull(br2.getErrorCode(0),br2.getResult(0).toString());

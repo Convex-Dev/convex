@@ -32,7 +32,7 @@
  
   actor?
 	{
-	 :doc {:description "Tests if the given Address refers to an Actor. Argument must be castable to Address"
+	 :doc {:description "Tests if the given Address refers to an Actor. Argument must be castable to Address."
          :examples [{:code "(actor? #1345"}]
          :type :function
          :signature [{:params [address]}]}
@@ -73,7 +73,7 @@
  
   balance
 	{
-	 :doc {:description "Returns the coin balance of the specified account, which must cast to Address."
+	 :doc {:description "Returns the coin balance of the specified account, which must be a valid Address."
          :examples [{:code "(balance *caller*)"}]
          :type :function
          :signature [{:params [address]}]}

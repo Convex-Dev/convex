@@ -388,7 +388,7 @@ public class Core {
 		public  Context<ACell> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			Address address = RT.address(args[0]);
+			Address address = RT.ensureAddress(args[0]);
 			if (address==null) return context.withCastError(args[0], Address.class);
 			
 			ACell form = (ACell) args[1];
@@ -541,7 +541,7 @@ public class Core {
 		public Context<CVMBool> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			Address addr = RT.address(args[0]);
+			Address addr = RT.ensureAddress(args[0]);
 			if (addr == null) return context.withCastError(args[1], Address.class);
 
 			Symbol sym = RT.toSymbol(args[1]);
@@ -614,7 +614,7 @@ public class Core {
 			Context<ACell> ctx = context.consumeJuice(Juice.CALL_OP);
 			if (ctx.isExceptional()) return ctx;
 
-			Address target = RT.address(args[0]);
+			Address target = RT.ensureAddress(args[0]);
 			if (target == null) return ctx.withCastError(args[0], Address.class);
 
 			CVMLong sendAmount = RT.ensureLong(args[1]);
@@ -731,7 +731,7 @@ public class Core {
 			if ((n<1)||(n>2)) return context.withArityError(rangeArityMessage(1,2, args.length));
 
 			// get Address to perform lookup
-			Address address=(n==1)?context.getAddress():RT.address(args[0]);
+			Address address=(n==1)?context.getAddress():RT.ensureAddress(args[0]);
 			if (address==null) return context.withCastError(args[0], Address.class);
 			
 			// ensure argument converts to a Symbol correctly.
@@ -755,7 +755,7 @@ public class Core {
 			if ((n<1)||(n>2)) return context.withArityError(rangeArityMessage(1,2, args.length));
 
 			// get Address to perform lookup
-			Address address=(n==1)?context.getAddress():RT.address(args[0]);
+			Address address=(n==1)?context.getAddress():RT.ensureAddress(args[0]);
 			if (address==null) return context.withCastError(args[0], Address.class);
 			
 			// ensure argument converts to a Symbol correctly.
@@ -778,7 +778,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell o = args[0];
-			Address address = RT.address(o);
+			Address address = RT.castAddress(o);
 			if (address == null) {
 				if (o instanceof AString) return context.withArgumentError("String not convertible to a valid Address: " + o);
 				if (o instanceof ABlob) return context.withArgumentError("Blob not convertiable a valid Address: " + o);
@@ -843,7 +843,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a0 = args[0];
-			Address address = RT.address(a0);
+			Address address = RT.castAddress(a0);
 
 			// return false if the argument is not castable to an address
 			long juice = Juice.SIMPLE_FN;
@@ -886,7 +886,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a0 = args[0];
-			Address address = RT.address(a0);
+			Address address = RT.castAddress(a0);
 			if (address == null) return context.withCastError(a0, Address.class);
 
 			// Note: returns null if the argument is not an address
@@ -902,7 +902,7 @@ public class Core {
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			Address address = RT.address(args[0]);
+			Address address = RT.ensureAddress(args[0]);
 			if (address == null) return context.withCastError(args[0], Address.class);
 
 			AccountStatus as = context.getAccountStatus(address);
@@ -922,7 +922,7 @@ public class Core {
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			Address address = RT.address(args[0]);
+			Address address = RT.ensureAddress(args[0]);
 			if (address == null) return context.withCastError(args[0], Address.class);
 
 			CVMLong amount = RT.ensureLong(args[1]);
@@ -952,7 +952,7 @@ public class Core {
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			Address address = RT.address(args[0]);
+			Address address = RT.ensureAddress(args[0]);
 			if (address == null) return context.withCastError(args[0], Address.class);
 
 			CVMLong amount = RT.ensureLong(args[1]);
@@ -1120,7 +1120,7 @@ public class Core {
 			int n = args.length;
 			if (n !=1) return context.withArityError(exactArityMessage(1, n));
 			
-			Address address=RT.address(args[0]);
+			Address address=RT.ensureAddress(args[0]);
 			if (address == null) return context.withCastError(args[0], Address.class);
 			
 			AccountStatus as=context.getAccountStatus(address);
@@ -1141,7 +1141,7 @@ public class Core {
 			int n = args.length;
 			if (n !=2) return context.withArityError(exactArityMessage(2, n));
 			
-			Address address=RT.address(args[0]);
+			Address address=RT.ensureAddress(args[0]);
 			if (address == null) return context.withCastError(args[0], Address.class);
 						
 			// result is specified by second arg
@@ -1164,7 +1164,7 @@ public class Core {
 			if (n !=1) return context.withArityError(exactArityMessage(1, n));
 			
 			// Get requested controller. Must be a valid address or null
-			Address controller=RT.address(args[0]);
+			Address controller=RT.ensureAddress(args[0]);
 			if ((controller == null)&&(args[0]!=null)) return context.withCastError(args[0], Address.class);
 			
 			context=(Context) context.setController(controller);

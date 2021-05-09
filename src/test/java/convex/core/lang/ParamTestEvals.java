@@ -26,8 +26,6 @@ public class ParamTestEvals {
 
 	private static final Address TEST_CONTRACT = TestState.CONTRACTS[0];
 
-	private static String TC_HEX = TEST_CONTRACT.toHexString();
-
 	@Parameterized.Parameters(name = "{index}: {0}")
 	public static Collection<Object[]> dataExamples() {
 		return Arrays.asList(new Object[][] { 
@@ -42,10 +40,10 @@ public class ParamTestEvals {
 				{ "*address*", TestState.HERO }, 
 				{ "(do 1 *result*)", 1L },
 
-				{ "(call \"" + TC_HEX + "\" (:my-address))", TEST_CONTRACT },
-				{ "(call \"" + TC_HEX + "\" (\"foo\"))", Keyword.create("bar") },
+				{ "(call " + TEST_CONTRACT + " (:my-address))", TEST_CONTRACT },
+				{ "(call " + TEST_CONTRACT + " (\"foo\"))", Keyword.create("bar") },
 
-				{ "(let [a (address \"" + TC_HEX + "\")]" + "(call a (write :bar))" + "(call a (read)))",
+				{ "(let [a (address " + TEST_CONTRACT + ")]" + "(call a (write :bar))" + "(call a (read)))",
 						Keyword.create("bar") },
 
 				{ "*depth*", 1L }, // lookup
@@ -109,7 +107,7 @@ public class ParamTestEvals {
 		Blob b2 = Format.encodedBlob(op2);
 		assertEquals(b, b2);
 
-		Object result = eval(op2).getResult();
+		ACell result = eval(op2).getResult();
 		assertCVMEquals(expectedResult, result);
 	}
 

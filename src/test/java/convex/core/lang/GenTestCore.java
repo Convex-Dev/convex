@@ -117,7 +117,7 @@ public class GenTestCore {
 	}
 	
 	private void doAddressTests(Address a) {
-		assertSame(a,RT.address(a));
+		assertSame(a,RT.castAddress(a));
 		long n=RT.count(a);
 		
 		Blob b=a.toBlob();

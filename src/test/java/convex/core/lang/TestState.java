@@ -1,6 +1,7 @@
 package convex.core.lang;
 
-import static convex.test.Assertions.*;
+import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertStateError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -17,7 +18,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
-import convex.core.data.Strings;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -231,18 +231,6 @@ public class TestState {
 		rctx=(Context<T>) rctx.run(op);
 		assert(rctx.getDepth()==0):"Invalid depth after step: "+rctx.getDepth();
 		return rctx;
-	}
-
-	/**
-	 * Runs an execution step as a different address. Returns value after restoring
-	 * the original address.
-	 */
-	public static <T extends ACell> Context<T> stepAs(String address, Context<?> ctx, String source) {
-		try {
-			return stepAs(RT.address(Strings.create(address)), ctx, source);
-		} catch (Exception e) {
-			throw new Error(e);
-		}
 	}
 
 	/**

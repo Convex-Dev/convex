@@ -1582,8 +1582,8 @@ public class CoreTest {
 		assertEquals(1L,evalL("(do (def foo 1) (lookup *address* :foo))"));
 		
 		// Lookups in non-existent environment
-		assertNull(eval("(lookup 77777777 'count)"));
-		assertNull(eval("(do (def foo 1) (lookup 66666666 'foo))"));
+		assertNull(eval("(lookup #77777777 'count)"));
+		assertNull(eval("(do (def foo 1) (lookup #66666666 'foo))"));
 
 
 		// invalid name string
@@ -1602,21 +1602,27 @@ public class CoreTest {
 	@Test
 	public void testLookupSyntax() {
 		assertSame(Core.COUNT, ((Syntax)eval("(lookup-syntax :count)")).getValue());
+		assertSame(Core.COUNT, ((Syntax)eval("(lookup-syntax "+Init.CORE_ADDRESS+ " :count)")).getValue());
 		
 		assertNull(eval("(lookup-syntax 'non-existent-symbol)"));
 		
 		assertEquals(Syntax.of(1L),eval("(do (def foo 1) (lookup-syntax :foo))"));
 		assertEquals(Syntax.of(1L),eval("(do (def foo 1) (lookup-syntax *address* :foo))"));
-		assertNull(eval("(do (def foo 1) (lookup-syntax 0 :foo))"));
+		assertNull(eval("(do (def foo 1) (lookup-syntax #0 :foo))"));
 
 		// invalid name string (too long)
 		assertCastError(
 				step("(lookup-syntax \"cdiubcidciuecgieufgvuifeviufegviufeviuefbviufegviufevguiefvgfiuevgeufigv\")"));
 
+		// bad symbols
 		assertCastError(step("(lookup-syntax count)"));
 		assertCastError(step("(lookup-syntax nil)"));
 		assertCastError(step("(lookup-syntax 10)"));
 		assertCastError(step("(lookup-syntax [])"));
+		
+		// Bad addresses
+		assertCastError(step("(lookup-syntax :foo 'bar)"));
+		assertCastError(step("(lookup-syntax 8 'count)"));
 
 		assertArityError(step("(lookup-syntax)"));
 		assertArityError(step("(lookup-syntax 1 2 3)"));
@@ -1809,11 +1815,11 @@ public class CoreTest {
 		assertCastError(step(ctx, "(call ctr :foo (bad-fn 1 2))")); // cast fail on offered value
 		assertStateError(step(ctx, "(call ctr 12 (bad-fn 1 2))")); // bad function
 
-		assertStateError(step(ctx, "(call 666666 12 (bad-fn 1 2))")); // bad actor
+		assertStateError(step(ctx, "(call #666666 12 (bad-fn 1 2))")); // bad actor
 		assertArgumentError(step(ctx, "(call ctr -12 (bad-fn 1 2))")); // negative offer
 
 		// bad actor takes precedence over bad offer
-		assertStateError(step(ctx, "(call 666666 -12 (bad-fn 1 2))")); 
+		assertStateError(step(ctx, "(call #666666 -12 (bad-fn 1 2))")); 
 
 	}
 	
@@ -1880,7 +1886,7 @@ public class CoreTest {
 		assertFalse(evalB(ctx,"(actor? -1234)"));
 
 		assertArityError(step("(actor?)"));
-		assertArityError(step("(actor? 1 2)")); // ARITY before CAST
+		assertArityError(step("(actor? :foo :bar)")); // ARITY before CAST
 
 	}
 	
@@ -1989,9 +1995,9 @@ public class CoreTest {
 
 		assertEquals(ALL, step("(transfer-memory *address* 1337)").getAccountStatus(HERO).getAllowance());
 		
-		assertEquals(ALL-1337, step("(transfer-memory 0x"+Init.VILLAIN.toHexString()+" 1337)").getAccountStatus(HERO).getAllowance());
+		assertEquals(ALL-1337, step("(transfer-memory "+Init.VILLAIN+" 1337)").getAccountStatus(HERO).getAllowance());
 
-		assertEquals(0L, step("(transfer-memory 0x"+Init.VILLAIN.toHexString()+" "+ALL+")").getAccountStatus(HERO).getAllowance());
+		assertEquals(0L, step("(transfer-memory "+Init.VILLAIN+" "+ALL+")").getAccountStatus(HERO).getAllowance());
  
 		assertArgumentError(step("(transfer-memory *address* -1000)"));	
 		assertMemoryError(step("(transfer-memory *address* (+ 1 "+ALL+"))"));
@@ -2013,7 +2019,7 @@ public class CoreTest {
 		Address CORE=Init.CORE_ADDRESS;
 		
 		// should fail transferring to an account with no receive-coins export
-		assertStateError(step("(transfer 0x"+CORE.toHexString()+" 1337)"));
+		assertStateError(step("(transfer "+CORE+" 1337)"));
 		
 		{ // transfer to an Actor that accepts everything
 			Context<?> ctx=step("(deploy '(do (defn receive-coin [sender amount data] (accept amount)) (export receive-coin)))");
@@ -2038,7 +2044,7 @@ public class CoreTest {
 			Address receiver=(Address) ctx.getResult();
 			
 			// should be OK with a Blob Address
-			ctx=step(ctx,"(transfer 0x"+receiver.toHexString()+" 100)");
+			ctx=step(ctx,"(transfer "+receiver+" 100)");
 			assertCVMEquals(50L,ctx.getResult());
 			assertCVMEquals(50L,ctx.getBalance(receiver));
 		}

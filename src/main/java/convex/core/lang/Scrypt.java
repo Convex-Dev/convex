@@ -196,6 +196,7 @@ public class Scrypt extends Reader {
                 NilLiteral(),
                 NumberLiteral(),
                 StringLiteral(),
+                AddressLiteral(),
                 BooleanLiteral(),
                 Keyword(),
                 Symbol(),

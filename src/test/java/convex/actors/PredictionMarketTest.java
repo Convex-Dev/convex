@@ -56,7 +56,7 @@ public class PredictionMarketTest {
 		
 		Address addr = (Address) ctx.getResult();
 		assertNotNull(addr);
-		ctx = step(ctx, "(def caddr (address 0x" + addr.toHexString() + "))");
+		ctx = step(ctx, "(def caddr " + addr + ")");
 		assertFalse(ctx.isExceptional());
 
 		// tests of bonding curve function with empty stakes
@@ -118,16 +118,16 @@ public class PredictionMarketTest {
 	@Test
 	public void testPayouts() throws IOException {
 		// setup address for this little play
-		String VILLAIN = TestState.VILLAIN.toHexString();
-		String HERO = TestState.HERO.toHexString();
-		Context<?> ctx = step("(do (def HERO (address 0x" + HERO + ")) (def VILLAIN (address 0x" + VILLAIN + ")))");
+		Address VILLAIN = TestState.VILLAIN;
+		Address HERO = TestState.HERO;
+		Context<?> ctx = step("(do (def HERO " + HERO + ") (def VILLAIN " + VILLAIN + ") )");
 
 		// deploy an oracle contract.
 		String oracleString = Utils.readResourceAsString("actors/oracle-trusted.con");
 		ctx=step("(def oaddr (deploy '"+oracleString+"))");
 		Address oaddr=(Address) ctx.getResult();
 		
-		ctx = step(ctx, "(def oaddr 0x" + oaddr.toHexString() + ")");
+		ctx = step(ctx, "(def oaddr" + oaddr + ")");
 		
 		// call to create oracle with key :bar and current address (HERO) trusted
 		ctx = step(ctx, "(call oaddr (register :bar {:trust #{*address*}}))");
@@ -136,8 +136,8 @@ public class PredictionMarketTest {
 		String contractString = Utils.readResourceAsString("actors/prediction-market.con");
 		ctx=step(ctx,"(deploy ("+contractString+" oaddr :bar #{true,false}))");
 		Address pmaddr = (Address) ctx.getResult();
-		ctx = step(ctx, "(def pmaddr " + pmaddr.toString() + ")");
-		ctx = stepAs(VILLAIN, ctx, "(def pmaddr "+pmaddr.toString()+")");
+		ctx = step(ctx, "(def pmaddr " + pmaddr + ")");
+		ctx = stepAs(VILLAIN, ctx, "(def pmaddr "+pmaddr+")");
 
 		// initial state checks
 		assertEquals(false,evalB(ctx, "(call pmaddr (finalised?))"));
