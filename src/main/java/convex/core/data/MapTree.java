@@ -305,9 +305,11 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		throw new IllegalArgumentException("Index " + index + " not available in mask map: " + Utils.toHexString(mask));
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public MapTree<K, V> assoc(K key, V value) {
-		Ref<K> keyRef = Ref.get(key);
+	public MapTree<K, V> assoc(ACell key, V value) {
+		K k= (K)key;
+		Ref<K> keyRef = Ref.get(k);
 		return assocRef(keyRef, value, shift);
 	}
 

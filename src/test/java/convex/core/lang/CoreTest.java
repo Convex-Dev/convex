@@ -500,6 +500,8 @@ public class CoreTest {
 	public void testBlobMap() {
 		assertEquals(BlobMaps.empty(), eval("(blob-map)"));
 		
+		assertCastError(step("(assoc (blob-map) :foo 10)")); // bad key types cause cast errors. See Issue #101
+		
 		assertArityError(step("(blob-map 1)"));
 	}
 
@@ -785,6 +787,9 @@ public class CoreTest {
 		assertEquals(Vectors.of(1L, 5L),eval("(assoc-in [1] [1] 5)"));
 		assertEquals(Vectors.of(1L, 2L, 5L),eval("(assoc-in (first {1 2}) [2] 5)"));
 		
+		// Cast error - wrong key types
+		assertCastError(step("(assoc-in (blob-map) :foo :bar)"));
+		
 		// Cast errors - not associative collections
 		assertCastError(step("(assoc-in 1 [2] 3)"));
 		assertCastError(step("(assoc-in [1] [:foo] 3)"));
@@ -806,6 +811,9 @@ public class CoreTest {
 		assertCastError(step("(assoc 1 1 2)"));
 		assertCastError(step("(assoc :foo)"));
 		assertCastError(step("(assoc #{} :foo true)"));
+		
+		assertCastError(step("(assoc [1 2 3] 1.4 :foo)"));
+		assertCastError(step("(assoc [1 2 3] nil :foo)"));
 
 		// Arity error
 		assertArityError(step("(assoc)"));

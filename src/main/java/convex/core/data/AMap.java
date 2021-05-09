@@ -65,15 +65,15 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	//		return reduceValues((v,e)->((AVector<V>)v).append(e), Vectors.empty());
 	//	}
 	
-
 	/**
 	 * Associates the given key with the specified value.
 	 * 
 	 * @param key
 	 * @param value
-	 * @return An updated map with the new association
+	 * @return An updated map with the new association, or null if the association fails
 	 */
-	public abstract AMap<K,V> assoc(K key, V value);
+	public abstract AMap<K,V> assoc(ACell key, V value);
+
 
 	/**
 	 * Dissociates a key from this map, returning an updated map if the key was

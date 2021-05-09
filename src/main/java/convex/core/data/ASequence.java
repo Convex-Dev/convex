@@ -7,6 +7,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
@@ -144,8 +145,10 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	}
 	
 	@Override
-	public ASequence<T> assoc(CVMLong key, T value) {
-		return assoc(key.longValue(),value);
+	public ASequence<T> assoc(ACell key, T value) {
+		CVMLong ix=RT.ensureLong(key);
+		if (ix==null) return null;
+		return assoc(ix.longValue(),value);
 	}
 
 	/**

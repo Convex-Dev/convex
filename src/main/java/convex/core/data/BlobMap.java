@@ -195,11 +195,11 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		if (i < cl) return (Ref<R>) children[i];
 		throw new IndexOutOfBoundsException("No ref for index:" + i);
 	}
-
-	@Override
-	public BlobMap<K, V> assoc(K key, V value) {
+	
+	@SuppressWarnings("unchecked")
+	public BlobMap<K, V> assoc(ACell key, V value) {
 		if (!(key instanceof ABlob)) return null;
-		return assocEntry(MapEntry.create(key, value));
+		return assocEntry(MapEntry.create((K)key, value));
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })

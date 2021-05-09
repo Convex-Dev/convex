@@ -223,7 +223,8 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	}
 
 	@Override
-	public AMap<Keyword, ACell> assoc(Keyword key, ACell value) {
+	public AMap<Keyword, ACell> assoc(ACell key, ACell value) {
+		// TODO: OK to convert records to hashmaps?
 		return toHashMap().assoc(key, value);
 	}
 

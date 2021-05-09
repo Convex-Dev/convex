@@ -26,7 +26,7 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	public abstract AHashMap<K, V> assocRef(Ref<K> keyRef, V value);
 
 	@Override
-	public abstract AHashMap<K, V> assoc(K key, V value);
+	public abstract AHashMap<K, V> assoc(ACell key, V value);
 
 	@Override
 	public abstract AHashMap<K, V> dissoc(K key);

@@ -225,9 +225,10 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public AHashMap<K, V> assoc(K key, V value) {
-		return assoc(key, value, 0);
+	public AHashMap<K, V> assoc(ACell key, V value) {
+		return assoc((K)key, value, 0);
 	}
 
 	protected AHashMap<K, V> assoc(K key, V value, int shift) {

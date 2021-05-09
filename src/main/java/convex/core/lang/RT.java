@@ -1152,12 +1152,12 @@ public class RT {
 	 * @param coll Any associative data structure
 	 * @param key Key to update or add
 	 * @param value Value to associate with key
-	 * @return Updated data structure
+	 * @return Updated data structure, or null if cast fails
 	 */
 	@SuppressWarnings("unchecked")
 	public static <R extends ACell,K extends ACell, V extends ACell> ADataStructure<R> assoc(Object coll, K key, V value) {
 		if (coll == null) return (ADataStructure<R>) Maps.create(key, value);
-		if (coll instanceof AMap) {
+		if (coll instanceof AMap) { 
 			return (ADataStructure<R>) ((AMap<K, V>) coll).assoc(key, value);
 		} else if (coll instanceof ASequence) {
 			if (!(key instanceof CVMLong)) return null;
