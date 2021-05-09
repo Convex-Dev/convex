@@ -31,6 +31,10 @@ public class CollectionsTest {
 			assertSame(a, a.assoc(0, first));
 			assertSame(a, a.assoc(n - 1, last));
 		}
+		
+		// Out of range assocs should return null
+		assertNull( a.assoc(-2, null));
+		assertNull( a.assoc(n + 2, null));
 
 		ListIterator<T> it = a.listIterator();
 		assertThrows(UnsupportedOperationException.class, () -> it.set(null));
@@ -39,8 +43,6 @@ public class CollectionsTest {
 		assertThrows(NoSuchElementException.class, () -> a.listIterator(-1));
 		assertThrows(NoSuchElementException.class, () -> a.listIterator(n + 1));
 
-		assertThrows(IndexOutOfBoundsException.class, () -> a.assoc(-2, null));
-		assertThrows(IndexOutOfBoundsException.class, () -> a.assoc(n + 2, null));
 		assertThrows(IndexOutOfBoundsException.class, () -> a.getElementRef(-1));
 		assertThrows(IndexOutOfBoundsException.class, () -> a.getElementRef(n));
 

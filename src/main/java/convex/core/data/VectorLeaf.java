@@ -201,10 +201,7 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
 	public <R  extends ACell> AVector<R> assoc(long i, R value) {
-		if ((i < 0) || (i > count)) throw new IndexOutOfBoundsException("Index: " + i);
-		
-		// allow assoc to conj new final element
-		if (i==count) return conj(value);
+		if ((i < 0) || (i >= count)) return null;
 		
 		long ix = i - prefixLength();
 		if (ix >= 0) {

@@ -793,8 +793,8 @@ public class CoreTest {
 		
 		// vector cases
 		assertEquals(Vectors.of(1L, 5L, 3L),eval("(assoc-in [1 2 3] [1] 5)"));
-		assertEquals(Vectors.of(1L, 5L),eval("(assoc-in [1] [1] 5)"));
-		assertEquals(Vectors.of(1L, 2L, 5L),eval("(assoc-in (first {1 2}) [2] 5)"));
+		assertEquals(Vectors.of(5L),eval("(assoc-in [1] [0] 5)"));
+		assertEquals(MapEntry.of(1L, 5L),eval("(assoc-in (first {1 2}) [1] 5)"));
 		
 		// Cast error - wrong key types
 		assertCastError(step("(assoc-in (blob-map) :foo :bar)"));
@@ -824,6 +824,9 @@ public class CoreTest {
 		
 		assertCastError(step("(assoc [1 2 3] 1.4 :foo)"));
 		assertCastError(step("(assoc [1 2 3] nil :foo)"));
+		
+		assertCastError(step("(assoc [] 2 :foo)"));
+		assertCastError(step("(assoc (list) 2 :fail)"));
 
 		// Arity error
 		assertArityError(step("(assoc)"));
@@ -837,8 +840,8 @@ public class CoreTest {
 		assertEquals(Vectors.empty(), eval("(assoc [])"));
 		assertEquals(Vectors.of(2L, 1L), eval("(assoc [1 2] 0 2 1 1)"));
 
-		assertThrows(IndexOutOfBoundsException.class, () -> eval("(assoc [] 1 7)"));
-		assertThrows(IndexOutOfBoundsException.class, () -> eval("(assoc [] -1 7)"));
+		assertCastError(step("(assoc [] 1 7)"));
+		assertCastError(step("(assoc [] -1 7)"));
 
 		assertCastError(step("(assoc [1 2] :a 2)"));
 

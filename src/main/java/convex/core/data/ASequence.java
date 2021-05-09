@@ -156,7 +156,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	 * 
 	 * @param i     Index of element to update
 	 * @param value New element value
-	 * @return Updated sequence
+	 * @return Updated sequence, or null if index is out of range
 	 */
 	public abstract <R extends ACell> ASequence<R> assoc(long i, R value);
 

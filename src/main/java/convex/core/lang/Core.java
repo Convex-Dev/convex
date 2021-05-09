@@ -1069,7 +1069,7 @@ public class Core {
 			for (int i = 1; i < n; i += 2) {
 				ACell key=(ACell)args[i];
 				result = RT.assoc(result, key, (ACell)args[i + 1]);
-				if (result == null) return context.withCastError(key, "Cannot assoc value - invalid map key type");
+				if (result == null) return context.withCastError(key, "Cannot assoc value - invalid key");
 			}
 
 			return context.withResult(juice, result);

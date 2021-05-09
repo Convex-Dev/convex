@@ -91,6 +91,7 @@ public class List<T extends ACell> extends AList<T> {
 		AVector<R> newData;
 		newData = data.assoc(count - 1 - i, value);
 		if (data == newData) return (AList<R>) this;
+		if (newData==null) return null;
 		return new List<>(newData);
 	}
 

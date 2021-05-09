@@ -73,8 +73,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	public <R extends ACell> AVector<R> assoc(long i, R a) {
 		if (i == 0) return (AVector<R>) withKey((K) a);
 		if (i == 1) return (AVector<R>) withValue((V) a);
-		if (i== 2) return conj(a);
-		throw Utils.sneakyThrow(new IndexOutOfBoundsException("Index: i"));
+		return null;
 	}
 
 	@Override

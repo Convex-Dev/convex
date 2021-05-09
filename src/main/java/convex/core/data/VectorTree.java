@@ -140,8 +140,7 @@ public class VectorTree<T extends ACell> extends ASizedVector<T> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <R extends ACell> AVector<R> assoc(long i, R value) {
-		if ((i < 0) || (i > count)) throw new IndexOutOfBoundsException("Index: " + i);
-		if (i==count) return conj(value);
+		if ((i < 0) || (i >= count)) return null;
 		
 		Ref<AVector<R>>[] rchildren=(Ref[])children;
 

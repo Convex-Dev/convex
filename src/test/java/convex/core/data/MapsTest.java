@@ -289,13 +289,16 @@ public class MapsTest {
 		MapEntry<CVMLong, CVMLong> me = m.getEntry(RT.cvm(1L));
 		assertCVMEquals(1L, me.getKey());
 		assertCVMEquals(2L, me.getValue());
-		assertEquals(Vectors.of(1L,2L,3L), me.assoc(2, RT.cvm(3L)));
+		
+		// out of range assocs
+		assertNull( me.assoc(2, RT.cvm(3L))); 
+		assertNull( me.assoc(-1, RT.cvm(0L)));
 
 		assertThrows(UnsupportedOperationException.class, () -> me.setValue(RT.cvm(6L)));
 
 		assertEquals(me, me.assoc(0, RT.cvm(1L)));
 		assertEquals(me, me.assoc(1, RT.cvm(2L)));
-		assertThrows(IndexOutOfBoundsException.class, () -> me.assoc(-1, RT.cvm(0L)));
+		
 
 		assertTrue(me.contains(RT.cvm(1L)));
 		assertTrue(me.contains(RT.cvm(2L)));
