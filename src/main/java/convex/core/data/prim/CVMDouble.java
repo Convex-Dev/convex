@@ -1,6 +1,5 @@
 package convex.core.data.prim;
 
-import convex.core.data.ACell;
 import convex.core.data.INumeric;
 import convex.core.data.Tag;
 import convex.core.exceptions.InvalidDataException;
@@ -13,10 +12,14 @@ import convex.core.util.Utils;
  */
 public final class CVMDouble extends APrimitive implements INumeric {
 
-	public static final ACell ZERO = CVMDouble.create(0.0);
-	public static final ACell NaN = CVMDouble.create(Double.NaN);
-	public static final ACell POSITIVE_INFINITY = CVMDouble.create(Double.POSITIVE_INFINITY);
-	public static final ACell NEGATIVE_INFINITY = CVMDouble.create(Double.NEGATIVE_INFINITY);
+	public static final CVMDouble ZERO = CVMDouble.create(0.0);
+	public static final CVMDouble NEGATIVE_ZERO = CVMDouble.create(-0.0);
+	public static final CVMDouble ONE = CVMDouble.create(1.0);
+	public static final CVMDouble MINUS_ONE = CVMDouble.create(-1.0);
+
+	public static final CVMDouble NaN = CVMDouble.create(Double.NaN);
+	public static final CVMDouble POSITIVE_INFINITY = CVMDouble.create(Double.POSITIVE_INFINITY);
+	public static final CVMDouble NEGATIVE_INFINITY = CVMDouble.create(Double.NEGATIVE_INFINITY);
 	
 	private final double value;
 	
@@ -44,11 +47,11 @@ public final class CVMDouble extends APrimitive implements INumeric {
 	}
 	
 	@Override
-	public CVMLong signum() {
-		if (value>0.0) return CVMLong.ONE;
-		if (value<0.0) return CVMLong.MINUS_ONE;
-		if (Double.isNaN(value)) return null; // NaN special case
-		return CVMLong.ZERO;
+	public CVMDouble signum() {
+		if (value>0.0) return CVMDouble.ONE;
+		if (value<0.0) return CVMDouble.MINUS_ONE;
+		if (Double.isNaN(value)) return NaN; // NaN special case
+		return CVMDouble.ZERO;
 	}
 	
 	@Override

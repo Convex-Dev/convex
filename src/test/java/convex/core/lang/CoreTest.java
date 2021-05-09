@@ -669,15 +669,15 @@ public class CoreTest {
 		assertEquals(-1L,evalL("(signum -9223372036854775808)"));
 		
 		// Double cases
-		assertEquals(0L,evalL("(signum 0.0)"));
-		assertEquals(1L,evalL("(signum 1.0)"));
-		assertEquals(-1L,evalL("(signum (double -13))"));
-		assertEquals(1L,evalL("(signum (pow 10 100))"));
+		assertEquals(0.0,evalD("(signum 0.0)"));
+		assertEquals(1.0,evalD("(signum 1.0)"));
+		assertEquals(-1.0,evalD("(signum (double -13))"));
+		assertEquals(1.0,evalD("(signum (pow 10 100))"));
 		
 		// Fun Double cases
-		assertCastError(step("(signum ##NaN)"));
-		assertEquals(1L,evalL("(signum ##Inf)"));
-		assertEquals(-1L,evalL("(signum ##-Inf)"));
+		assertEquals(Double.NaN,evalD("(signum ##NaN)"));
+		assertEquals(1.0,evalD("(signum ##Inf)"));
+		assertEquals(-1.0,evalD("(signum ##-Inf)"));
 		
 		assertArityError(step("(signum)"));
 		assertArityError(step("(signum :foo :bar)")); // arity > cast

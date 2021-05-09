@@ -349,9 +349,9 @@ public class RT {
 	 * Gets the signum of a numeric value
 	 * 
 	 * @param a Numeric value
-	 * @return Long value of -1, 0 or 1, or null if the argument is not numeric
+	 * @return value of -1, 0 or 1, NaN is argument is NaN, or null if the argument is not numeric
 	 */
-	public static CVMLong signum(ACell a) {
+	public static ACell signum(ACell a) {
 		INumeric x=RT.number(a);
 		if (x==null) return null;
 		return x.signum();

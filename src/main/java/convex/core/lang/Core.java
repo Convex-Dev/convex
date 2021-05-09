@@ -1724,7 +1724,7 @@ public class Core {
 		@Override
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-			CVMLong result = RT.signum(args[0]);
+			ACell result = RT.signum(args[0]);
 			if (result == null) return context.withCastError(args[0], Number.class);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}

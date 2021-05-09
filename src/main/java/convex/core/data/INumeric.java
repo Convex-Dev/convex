@@ -22,9 +22,9 @@ public interface INumeric {
 	public Class<?> numericType();
 
 	/**
-	 * Gets the signum of this numerical value. Will be a Long -1, 0 or 1
+	 * Gets the signum of this numerical value. Will be -1, 0 or 1 for Longs, -1.0, 0.0 , 1.0 or ##NaN for doubles.
 	 * @return
 	 */
-	public CVMLong signum();
+	public ACell signum();
 	
 }
