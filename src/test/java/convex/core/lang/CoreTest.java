@@ -212,6 +212,7 @@ public class CoreTest {
 		assertEquals(4L, evalL("(get-in {1 {2 4} 3 5} [1 2])"));
 		assertEquals(1L, evalL("(get-in #{1 2} [1])"));
 		assertEquals(2L, evalL("(get-in [1 2 3] [1])"));
+		assertEquals(2L, evalL("(get-in [1 2 3] [1] :foo)"));
 		assertEquals(3L, evalL("(get-in [1 2 3] '(2))"));
 		assertEquals(3L, evalL("(get-in (list 1 2 3) [2])"));
 		assertEquals(4L, evalL("(get-in [1 2 {:foo 4} 3 5] [2 :foo])"));
@@ -225,6 +226,9 @@ public class CoreTest {
 		assertEquals(Vectors.empty(), eval("(get-in [] [])"));
 		assertEquals(Lists.empty(), eval("(get-in (list) nil)"));
 
+		assertEquals(Keywords.FOO, eval("(get-in {1 2} [3] :foo)"));
+		assertEquals(Keywords.FOO, eval("(get-in nil [3] :foo)"));
+
 		assertNull(eval("(get-in nil nil)"));
 		assertNull(eval("(get-in [1 2 3] [:foo])"));
 		assertNull(eval("(get-in nil [])"));
@@ -232,10 +236,11 @@ public class CoreTest {
 		assertNull(eval("(get-in #{} [1 2 3])"));
 
 		assertArityError(step("(get-in 1)")); // arity > cast
-		assertArityError(step("(get-in 1 2 3)")); // arity > cast
-
+		
+		assertCastError(step("(get-in 1 2 3)")); 
 		assertCastError(step("(get-in 1 [1])"));
 		assertCastError(step("(get-in [1] [0 2])"));
+		assertCastError(step("(get-in 1 {1 2})")); // keys not a sequence
 
 		assertCastError(step("(get-in [1] 1)"));
 	}

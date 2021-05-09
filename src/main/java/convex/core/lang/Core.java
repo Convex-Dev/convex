@@ -1225,19 +1225,34 @@ public class Core {
 		@SuppressWarnings("unchecked")
 		@Override
 		public  Context<ACell> invoke(Context context, ACell[] args) {
-			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+			int n = args.length;
+			if ((n < 2) || (n > 3)) {
+				return context.withArityError(name() + " requires exactly 2 or 3 arguments");
+			}
 
-			ASequence<ACell> ixs = RT.sequence(args[1]);
+			ASequence<ACell> ixs = RT.ensureSequence(args[1]);
 			if (ixs == null) return context.withCastError(args[1], ASequence.class);
+			
+			ACell notFound=(n<3)?null:args[2];
 
 			int il = ixs.size();
 			long juice = Juice.GET * (1L + il);
 			ACell result = (ACell) args[0];
 			for (int i = 0; i < il; i++) {
-				if (result == null) break; // gets in nil produce nil
+				if (result == null) { 
+					result=notFound;
+					break; // gets in nil produce not-found
+				}
 				IGet<ACell> gettable = RT.toGettable(result);
 				if (gettable == null) return context.withCastError(result, IGet.class);
-				result = gettable.get(ixs.get(i));
+				
+				ACell k=ixs.get(i);
+				if (gettable.containsKey(k)) {
+					result = gettable.get(k);
+				} else {
+					return context.withResult(juice, notFound);
+				}
+				
 			}
 			return context.withResult(juice, result);
 		}
