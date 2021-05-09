@@ -236,6 +236,7 @@ public class CoreTest {
 		assertNull(eval("(get-in #{} [1 2 3])"));
 
 		assertArityError(step("(get-in 1)")); // arity > cast
+		assertArityError(step("(get-in 1 2 3 4)")); // arity > cast
 		
 		assertCastError(step("(get-in 1 2 3)")); 
 		assertCastError(step("(get-in 1 [1])"));
@@ -1290,6 +1291,7 @@ public class CoreTest {
 		assertEquals(Keywords.FOO,eval("(loop [] 1 2 3 :foo)"));
 		assertEquals(Keywords.FOO,eval("(loop [a :foo] :bar a)"));
 		
+		assertCompileError(step("(loop [a])")); 
 		assertCompileError(step("(loop)")); // Issue #80
 		assertCompileError(step("(loop :foo)")); // Not a binting vector
 	}
@@ -1858,6 +1860,9 @@ public class CoreTest {
 		assertFalse(evalB(ctx,"(actor? 99999999)"));
 		assertFalse(evalB(ctx,"(actor? #4512)"));
 		assertFalse(evalB(ctx,"(actor? -1234)"));
+
+		assertArityError(step("(actor?)"));
+		assertArityError(step("(actor? 1 2)")); // ARITY before CAST
 
 	}
 	
