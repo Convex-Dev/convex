@@ -1239,7 +1239,7 @@ public class RT {
 	@SuppressWarnings("unchecked")
 	public static <K extends ACell,V extends ACell> IAssociative<K,V> ensureAssociative(ACell o) {
 		if (o==null) return Maps.empty();
-		if (o instanceof IGet) return (IAssociative<K,V>) o;
+		if (o instanceof IAssociative) return (IAssociative<K,V>) o;
 		return null;
 	}
 

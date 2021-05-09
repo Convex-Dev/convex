@@ -801,6 +801,7 @@ public class CoreTest {
 		// Cast errors - not associative collections
 		assertCastError(step("(assoc-in 1 [2] 3)"));
 		assertCastError(step("(assoc-in [1] [:foo] 3)"));
+		assertCastError(step("(assoc-in #{3} [2] :fail)"));
 		
 		// cast errors - paths not sequences
 		assertCastError(step("(assoc-in {} #{:a :b} 42)")); // See Issue 95
