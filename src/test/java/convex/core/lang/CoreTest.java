@@ -64,6 +64,7 @@ import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
@@ -2179,20 +2180,30 @@ public class CoreTest {
 		assertEquals(7L, evalL("(min 7)"));
 		assertEquals(2L, evalL("(min 4 3 2)"));
 		
-		// TODO: Consider in context of issue #68
-		//assertCastError(step("(min true)"));
-		//assertCastError(step("(min \\c)"));
+		assertEquals(1.0, evalD("(min 2.0 1.0 3.0)"));
+		assertEquals(-0.0, evalD("(min 2.0 ##NaN -0.0 ##Inf)"));
+		assertEquals(CVMDouble.NaN, eval("(min ##NaN)"));
 
-		assertArityError(step("(min)"));
+		// TODO: Figure out how this should behave. See issue https://github.com/Convex-Dev/convex/issues/99
+		// assertEquals(CVMLong.ONE, eval("(min ##NaN 1 ##NaN)"));
+
+		assertCastError(step("(min true)"));
+		assertCastError(step("(min \\c)"));
+
+		// assertArityError(step("(min)")); // TODO: consider this?
+		assertEquals(CVMDouble.NaN, eval("(min)"));
+
 	}
 
 	@Test
 	public void testMax() {
 		assertEquals(4L, evalL("(max 1 2 3 4)"));
+		assertEquals(4L, evalL("(max 1 ##-Inf 3 ##NaN 4)"));
 		assertEquals(7L, evalL("(max 7)"));
-		assertEquals(4L, evalL("(max 4 3 2)"));
+		assertEquals(4.0, evalD("(max 4.0 3 2)"));
 
-		assertArityError(step("(max)"));
+		// assertArityError(step("(max)")); // TODO: consider this?
+		assertEquals(CVMDouble.NaN, eval("(max)"));
 	}
 	
 	@Test

@@ -132,29 +132,29 @@
   ^{:doc {:description "Returns the numerical maximum of the given values."
          :examples [{:code "(max 1 2 3)"}]
          :type :function	 
-         :signature [{:params [fst & vals]}]}
+         :signature [{:params [& vals]}]}
 	}
-  [fst & vals]
+  [& vals]
   (let [n (count vals)]
-    (loop [max fst i 0]
+    (loop [max ##NaN i 0]
       (if (>= i n) 
         max
         (let [v (nth vals i)]
-          (recur (if (> v max) v max) (inc i)))))))
+          (recur (if (>= max v) max v) (inc i)))))))
 
 (defn min 
   ^{:doc {:description "Returns the numerical minimum of the given values."
          :examples [{:code "(min 1 2 3)"}]
          :type :function	 
-         :signature [{:params [fst & vals]}]}
+         :signature [{:params [& vals]}]}
 	}
-  [fst & vals]
+  [& vals]
   (let [n (count vals)]
-    (loop [min fst i 0]
+    (loop [min ##NaN i 0]
       (if (>= i n) 
         min
         (let [v (nth vals i)]
-          (recur (if (< v min) v min) (inc i)))))))
+          (recur (if (<= min v) min v) (inc i)))))))
 
 (defn mapv 
   ^{:doc {:description "Maps a function over the given collections as with map, and returns the resturn as a vector."
