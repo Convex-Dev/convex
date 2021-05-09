@@ -192,6 +192,8 @@ public class CoreTest {
 		assertNull(eval("(get [1 2] 10)"));
 		assertNull(eval("(get [1 2] -1)"));
 		assertNull(eval("(get [1 2] 1.0)"));
+		
+		assertNull(eval("(get [1 2 3] (byte 1))")); // TODO: is this sane?
 
 		assertNull(eval("(get nil nil)"));
 		assertNull(eval("(get nil 10)"));
@@ -696,6 +698,7 @@ public class CoreTest {
 	@Test
 	public void testNth() {
 		assertEquals(2L, evalL("(nth [1 2] 1)"));
+		assertEquals(2L, evalL("(nth [1 2] (byte 1))"));
 		assertCVMEquals('c', eval("(nth \"abc\" 2)"));
 
 		assertArityError(step("(nth)"));
@@ -707,8 +710,13 @@ public class CoreTest {
 		assertCastError(step("(nth [] :foo)"));
 		assertCastError(step("(nth [] nil)"));
 		
-		// BOUNDS error because nil treated as empty sequence
+		// cast errors for non-sequential objects
+		assertCastError(step("(nth :foo 0)"));
+		assertCastError(step("(nth 12 13)"));
+		
+		// BOUNDS error because treated as empty sequence
 		assertBoundsError(step("(nth nil 10)"));
+		assertBoundsError(step("(nth {} 10)"));
 
 		assertBoundsError(step("(nth [1 2] 10)"));
 		assertBoundsError(step("(nth [1 2] -1)"));
@@ -1646,6 +1654,8 @@ public class CoreTest {
 	@Test
 	public void testVectorAsFunction() {
 		assertEquals(5L, evalL("([1 3 5 7] 2)"));
+
+		assertEquals(5L, evalL("([1 3 5 7] (byte 2))")); // TODO: is this sane? Implicit cast to Long is OK?
 
 		// bounds checks get applied
 		assertBoundsError(step("([] 0)"));
