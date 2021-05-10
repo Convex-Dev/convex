@@ -1528,6 +1528,8 @@ public class CoreTest {
 		assertEquals(Symbols.COUNT, eval("(symbol (str 'count))"));
 		assertEquals(Symbols.COUNT, eval("(symbol (name :count))"));
 		assertEquals(Symbols.COUNT, eval("(symbol (name \"count\"))"));
+		
+		assertEquals(Symbol.create(Address.create(8),Strings.create("foo")),eval("'#8/foo"));
 
 		// too short or too long results in CAST error
 		assertCastError(step("(symbol (str))"));
