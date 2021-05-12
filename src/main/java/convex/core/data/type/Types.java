@@ -32,6 +32,7 @@ public class Types {
 	public static final StringType STRING = StringType.INSTANCE;
 	
 	public static final Record RECORD = Record.INSTANCE;
+	public static final Map MAP = Map.INSTANCE;
 
 	
 	public static AType[] ALL_TYPES=new AType[] {
