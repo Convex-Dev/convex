@@ -14,7 +14,7 @@ import java.util.Set;
  */
 public class Main {
 	public static final String DEFAULT_CONFIG_FILE="~/.convex/config";
-	
+
 	/**
 	 * Extracts config parameters and populates a config map. Removes handled parameters from arg list.
 	 * @return
@@ -22,6 +22,8 @@ public class Main {
 	public static Properties parseConfig(List<String> args) {
 		Properties cmdConfig=new Properties();
 		int i=0;
+        cmdConfig.put("keystore", "~/.convex/keystore");
+
 		while (i<args.size()) {
 			String arg=args.get(i);
 			if ("-h".equals(arg)||"--help".equals(arg)) {
@@ -51,15 +53,15 @@ public class Main {
 				i++;
 			}
 		}
-		
+
 		// Merge into default properties
 		Properties config=new Properties();
-		
+
 		// Config file name commed from command line first, then default
 		String fname=cmdConfig.getProperty("config");
 		if (fname==null) fname=DEFAULT_CONFIG_FILE;
 		File f=new File(fname);
-		
+
 		if (f.exists()) {
 			try(FileInputStream input = new FileInputStream(f)) {
 				config.load(new FileInputStream(f));
@@ -71,19 +73,19 @@ public class Main {
 				System.out.println("Bad format in config file: "+f);
 			}
  		}
-		
+
 		// copy config
 		for (Map.Entry<Object,Object> e: cmdConfig.entrySet()) {
 			config.put(e.getKey(),e.getValue());
 		}
-		
+
 		return config;
 	}
-	
+
 	public static void main(String... args) {
 		List<String> argList=new ArrayList<>(List.of(args));
 		Properties config = parseConfig(argList);
-		
+
 		int retVal=2;
 		if (args.length==0 ||config.get("help")!=null) {
 			retVal=Help.runHelp(argList);
@@ -105,7 +107,7 @@ public class Main {
 			} else{
 				retVal=runUnknown(cmd);
 			}
- 			
+
 		}
 		System.exit(retVal);
 	}
@@ -119,7 +121,7 @@ public class Main {
 		} else {
 			System.out.println("# Note: Config file not found");
 		}
-		
+
 		Set<Map.Entry<Object,Object>> configEntries=config.entrySet();
 		if (configEntries.size()==0)  {
 			System.out.println("# Note: No config entries set");

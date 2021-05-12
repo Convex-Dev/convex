@@ -1,8 +1,12 @@
 package convex.cli;
 
 import java.io.File;
+import java.security.KeyStore;
+import java.security.Provider;
+import java.security.Security;
 import java.util.List;
 import java.util.Properties;
+import java.util.Scanner;
 
 import convex.core.crypto.PFXTools;
 
@@ -10,14 +14,14 @@ public class Key {
 
 	static void buildKeyHelp(StringBuilder sb, List<String> commands) {
 		String cmd=commands.get(0);
-		
+
 		sb.append("Usage: convex [OPTIONS] "+cmd+" COMMAND ... \n");
 		sb.append('\n');
 		sb.append("Commands:\n");
 		sb.append(CLIUtils.buildTable(
 				"gen",     "Generate a new private key pair.",
 				"list",    "List available key pairs."));
-		sb.append('\n');		
+		sb.append('\n');
 		sb.append("Options:\n");
 		sb.append(CLIUtils.buildTable(
 				"-h, --help",           "Display help for the command '"+cmd+"'.",
@@ -30,7 +34,7 @@ public class Key {
 		if (commands.size()<=1) {
 			return Help.runHelp(commands);
 		}
-		
+
 		String cmd=commands.get(1);
 		if ("gen".equals(cmd)) {
 			return runKeyGen(config);
@@ -41,10 +45,18 @@ public class Key {
 	}
 
 	private static int runKeyGen(Properties config) {
-		String keyPath=config.getProperty("keystore");
+		String keyPath=CLIUtils.expandTilde(config.getProperty("keystore"));
 		String passPhrase=config.getProperty("passphrase");
-		File keyFile=new File(keyPath);
+		File keyFile = new File(keyPath);
+		for ( Provider provider : Security.getProviders()) {
+            System.out.println(provider.getName());
+		}
 		if (!keyFile.exists()) {
+            if (passPhrase == null) {
+                System.out.print("Enter in your pass phrase: ");
+                Scanner scanner = new Scanner(System.in);
+                passPhrase=scanner.nextLine();
+            }
 			System.out.println("Creating key store: "+keyFile);
 			try {
 				PFXTools.createStore(keyFile, passPhrase);
