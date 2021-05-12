@@ -13,6 +13,9 @@ public class Types {
 	
 	// Collection types
 	public static final Collection COLLECTION=Collection.INSTANCE;
+	public static final Vector VECTOR=Vector.INSTANCE;
+	public static final List LIST=List.INSTANCE;
+	public static final Set SET=Set.INSTANCE;
 	
 	// Numeric types
 	public static final Long LONG=Long.INSTANCE;

@@ -1,22 +1,22 @@
 package convex.core.data.type;
 
 import convex.core.data.ACell;
-import convex.core.data.ACollection;
+import convex.core.data.AList;
 
 /**
  * Type that represents any CVM collection
  */
-public class Collection extends AType {
+public class List extends AType {
 
-	public static final Collection INSTANCE = new Collection();
+	public static final List INSTANCE = new List();
 	
-	private Collection() {
+	private List() {
 		
 	}
 
 	@Override
 	public boolean check(ACell value) {
-		return (value instanceof ACollection);
+		return (value instanceof AList);
 	}
 
 	@Override
@@ -26,7 +26,7 @@ public class Collection extends AType {
 
 	@Override
 	public String toString() {
-		return "Collection";
+		return "List";
 	}
 
 }
