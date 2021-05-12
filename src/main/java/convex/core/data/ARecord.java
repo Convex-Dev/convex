@@ -7,7 +7,10 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
+import convex.core.Block;
 import convex.core.crypto.Hash;
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 import convex.core.lang.impl.RecordFormat;
 import convex.core.util.Utils;
 
@@ -22,10 +25,17 @@ import convex.core.util.Utils;
 public abstract class ARecord extends AMap<Keyword,ACell> {
 
 	protected final RecordFormat format;
+	
+	// TODO: need a better default value?
+	public static final ARecord DEFAULT_VALUE=Block.create(0, AccountKey.ZERO, Vectors.empty());
 
 	protected ARecord(RecordFormat format) {
 		super(format.count());
 		this.format=format;
+	}
+	
+	public AType getType() {
+		return Types.RECORD;
 	}
 	
 	@Override

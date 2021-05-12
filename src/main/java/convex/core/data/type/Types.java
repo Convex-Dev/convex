@@ -31,6 +31,8 @@ public class Types {
 	public static final SymbolType SYMBOL = SymbolType.INSTANCE;
 	public static final StringType STRING = StringType.INSTANCE;
 	
+	public static final Record RECORD = Record.INSTANCE;
+
 	
 	public static AType[] ALL_TYPES=new AType[] {
 		NIL,
