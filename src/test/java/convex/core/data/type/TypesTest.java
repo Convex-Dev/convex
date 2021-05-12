@@ -4,11 +4,16 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ArgumentsSource;
 
+import convex.core.data.ACell;
 import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.test.Samples;
+import convex.test.Samples.ValueArgumentsProvider;
 
 public class TypesTest {
 
@@ -84,5 +89,13 @@ public class TypesTest {
 		assertTrue(t.check(CVMLong.ONE));
 		assertTrue(t.check(CVMByte.ONE));
 		assertTrue(t.check(CVMDouble.ONE));
+	}
+	
+	@ParameterizedTest
+	@ArgumentsSource(ValueArgumentsProvider.class)
+	public void testSampleValues(ACell a) {
+		AType t=RT.getType(a);
+		assertTrue(t.check(a));
+		
 	}
 }

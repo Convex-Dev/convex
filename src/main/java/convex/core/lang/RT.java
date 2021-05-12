@@ -40,6 +40,8 @@ import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.impl.KeyFn;
 import convex.core.lang.impl.MapFn;
@@ -1340,6 +1342,16 @@ public class RT {
 		if (result<0) result+=denom;
 		
 		return CVMLong.create(result);
+	}
+
+	/**
+	 * Get the runtime Type of any CVM value
+	 * @param a Any CVM value
+	 * @return Type of CVM value
+	 */
+	public static AType getType(ACell a) {
+		if (a==null) return Types.NIL;
+		return a.getType();
 	}
 
 

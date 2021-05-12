@@ -3,8 +3,12 @@ package convex.test;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Random;
+import java.util.stream.Stream;
 
 import org.junit.Test;
+import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.ArgumentsProvider;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
@@ -38,6 +42,8 @@ import convex.core.data.StringTree;
 import convex.core.data.VectorLeaf;
 import convex.core.data.VectorTree;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
@@ -220,7 +226,31 @@ public class Samples {
 		BAD_HASH.validate();
 	}
 
-	public static void main(String[] args) {
-
+	public static Stream<ACell> VALUE_STREAM=Stream.of(
+			null,
+			FOO,
+			FULL_BLOB,
+			MAX_EMBEDDED_BLOB,
+			INT_LIST_10,
+			Lists.empty(),
+			INT_VECTOR_300,
+			Vectors.empty(),
+			LONG_MAP_100,
+			Maps.empty(),
+			LONG_SET_10,
+			Sets.empty(),
+			CVMDouble.ONE,
+			CVMDouble.NaN,
+			CVMLong.MAX_VALUE,
+			CVMByte.ZERO,
+			MAX_SHORT_STRING,
+			BAD_HASH
+			);
+	
+	public static class ValueArgumentsProvider implements ArgumentsProvider {
+	    @Override
+	    public Stream<? extends Arguments> provideArguments(ExtensionContext context) {
+	    	return VALUE_STREAM.map(cell -> Arguments.of(cell));
+	    }
 	}
 }
