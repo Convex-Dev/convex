@@ -3,14 +3,14 @@ package convex.core.data.type;
 import convex.core.data.ACell;
 import convex.core.data.prim.CVMLong;
 
-public final class Int64 extends ANumericType {
+public final class Long extends ANumericType {
 
 	/**
 	 * Singleton runtime instance
 	 */
-	public static final Int64 INSTANCE = new Int64();
+	public static final Long INSTANCE = new Long();
 
-	private Int64() {
+	private Long() {
 		
 	}
 	

@@ -20,7 +20,7 @@ public class TypesTest {
 	
 	@Test
 	public void testLong() {
-		AType t=Types.INT64;
+		AType t=Types.LONG;
 		assertFalse(t.check(null));
 		assertTrue(t.check(CVMLong.ONE));
 		assertFalse(t.check(CVMDouble.ONE));
