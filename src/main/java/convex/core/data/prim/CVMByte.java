@@ -15,8 +15,12 @@ public final class CVMByte extends APrimitive implements INumeric {
 	private final byte value;
 	
 	private static final CVMByte[] CACHE= new CVMByte[256];
+
+	public static final CVMByte ZERO;
+	public static final CVMByte ONE;
 	
-	public CVMByte(byte value) {
+	// Private constructor to enforce singleton instances
+	private CVMByte(byte value) {
 		this.value=value;
 	}
 
@@ -28,6 +32,8 @@ public final class CVMByte extends APrimitive implements INumeric {
 		for (int i=0; i<256; i++) {
 			CACHE[i]=new CVMByte((byte)i);
 		}
+		ZERO=CACHE[0];
+		ONE=CACHE[1];
 	}
 	
 	@Override

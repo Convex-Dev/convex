@@ -11,6 +11,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
@@ -32,6 +34,8 @@ public class ParamTestValues {
 			{ "Keyword :foo", Samples.FOO }, 
 			{ "Empty Vector", Vectors.empty() },
 			{ "Long", CVMLong.ONE },
+			{ "Double", CVMDouble.ONE },
+			{ "Byte", CVMByte.ZERO },
 			{ "Single value map", Maps.of(7, 8) },
 			{ "Account status", AccountStatus.create(1000L,Samples.ACCOUNT_KEY) },
 			{ "Peer status", PeerStatus.create(1000L, Strings.create("http://www.google.com:18888")) },
