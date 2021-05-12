@@ -1,31 +1,29 @@
 package convex.core.data.type;
 
 import convex.core.data.ACell;
+import convex.core.lang.RT;
 
-/**
- * Type that represents any CVM value
- */
-public class Any extends AType {
-
-	public static final Any INSTANCE = new Any();
+public class Number extends ANumericType {
 	
-	private Any() {
+	public static final Number INSTANCE = new Number();
+	
+	private Number() {
 		
 	}
 
 	@Override
 	public boolean check(ACell value) {
-		return true;
+		return RT.isNumber(value);
 	}
 
 	@Override
 	public boolean allowsNull() {
-		return true;
+		return false;
 	}
 
 	@Override
 	public String toString() {
-		return "Any";
+		return "Number";
 	}
 
 }

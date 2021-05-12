@@ -20,4 +20,7 @@ public abstract class AType {
 	 * @return
 	 */
 	public abstract boolean allowsNull();
+	
+	@Override
+	public abstract String toString();
 }

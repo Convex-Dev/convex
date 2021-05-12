@@ -2,6 +2,8 @@ package convex.core.data.prim;
 
 import convex.core.data.INumeric;
 import convex.core.data.Tag;
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
 
@@ -29,6 +31,10 @@ public final class CVMDouble extends APrimitive implements INumeric {
 
 	public static CVMDouble create(double value) {
 		return new CVMDouble(value);
+	}
+	
+	public AType getType() {
+		return Types.DOUBLE;
 	}
 	
 	@Override

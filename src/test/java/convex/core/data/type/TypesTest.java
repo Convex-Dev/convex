@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 
@@ -31,6 +32,15 @@ public class TypesTest {
 		AType t=Types.ANY;
 		assertTrue(t.check(null));
 		assertTrue(t.check(CVMLong.ONE));
+		assertTrue(t.check(CVMDouble.ONE));
+	}
+	
+	@Test
+	public void testNumber() {
+		AType t=Types.NUMBER;
+		assertFalse(t.check(null));
+		assertTrue(t.check(CVMLong.ONE));
+		assertTrue(t.check(CVMByte.ONE));
 		assertTrue(t.check(CVMDouble.ONE));
 	}
 }

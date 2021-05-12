@@ -14,4 +14,10 @@ public class Types {
 	public static final Nil NIL=Nil.INSTANCE;
 
 	public static final Any ANY = Any.INSTANCE;
+
+	public static final Byte BYTE = Byte.INSTANCE;
+	
+	public static final Double DOUBLE = Double.INSTANCE;
+
+	public static final Number NUMBER = Number.INSTANCE;
 }

@@ -23,4 +23,9 @@ public class Nil extends AType {
 		return true;
 	}
 
+	@Override
+	public String toString() {
+		return "Nil";
+	}
+
 }

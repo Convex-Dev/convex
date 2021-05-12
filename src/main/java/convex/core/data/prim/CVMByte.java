@@ -2,6 +2,8 @@ package convex.core.data.prim;
 
 import convex.core.data.INumeric;
 import convex.core.data.Tag;
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 
 /**
@@ -34,6 +36,10 @@ public final class CVMByte extends APrimitive implements INumeric {
 		}
 		ZERO=CACHE[0];
 		ONE=CACHE[1];
+	}
+	
+	public AType getType() {
+		return Types.BYTE;
 	}
 	
 	@Override
