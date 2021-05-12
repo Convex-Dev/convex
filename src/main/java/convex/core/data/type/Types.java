@@ -34,7 +34,8 @@ public class Types {
 	public static final Record RECORD = Record.INSTANCE;
 	public static final Map MAP = Map.INSTANCE;
 
-	
+	public static final Blob BLOB = Blob.INSTANCE;
+
 	public static AType[] ALL_TYPES=new AType[] {
 		NIL,
 		ANY,
@@ -49,6 +50,8 @@ public class Types {
 		BOOLEAN,
 		STRING,
 		KEYWORD,
-		SYMBOL
+		SYMBOL,
+		MAP,
+		BLOB
 	};
 }

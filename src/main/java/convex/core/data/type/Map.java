@@ -2,7 +2,6 @@ package convex.core.data.type;
 
 import convex.core.data.ACell;
 import convex.core.data.AMap;
-import convex.core.data.ARecord;
 import convex.core.data.Maps;
 
 /**
@@ -18,7 +17,7 @@ public class Map extends AType {
 
 	@Override
 	public boolean check(ACell value) {
-		return (value instanceof ARecord);
+		return (value instanceof AMap);
 	}
 
 	@Override
