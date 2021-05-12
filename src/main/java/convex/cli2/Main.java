@@ -13,6 +13,9 @@ import picocli.CommandLine.Parameters;
     subcommands = {
         Peer.class,
         Key.class,
+        Query.class,
+        Transact.class,
+        Status.class,
         CommandLine.HelpCommand.class
     },
     mixinStandardHelpOptions=true,
@@ -20,9 +23,9 @@ import picocli.CommandLine.Parameters;
 
 public class Main {
 
-    @Option(names={ "-s", "--server"},
-        defaultValue=Constants.SERVER_HOSTNAME,
-        description="Specifies a peer server to use as current peer. Default: ${DEFAULT-VALUE}")
+    @Option(names={ "-c", "--config"},
+        defaultValue=Constants.CONFIG_FILENAME,
+        description="Use the specified config file. Default: ${DEFAULT-VALUE}")
     String server;
 
 	public static void main(String[] args) {
