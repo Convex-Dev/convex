@@ -32,4 +32,9 @@ public final class Double extends ANumericType {
 		return false;
 	}
 
+	@Override
+	protected CVMDouble defaultValue() {
+		return CVMDouble.ZERO;
+	}
+
 }

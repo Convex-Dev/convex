@@ -28,4 +28,9 @@ public class Nil extends AType {
 		return "Nil";
 	}
 
+	@Override
+	protected ACell defaultValue() {
+		return null;
+	}
+
 }

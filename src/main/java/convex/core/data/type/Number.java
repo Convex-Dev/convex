@@ -1,6 +1,8 @@
 package convex.core.data.type;
 
 import convex.core.data.ACell;
+import convex.core.data.prim.APrimitive;
+import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 
 public class Number extends ANumericType {
@@ -24,6 +26,11 @@ public class Number extends ANumericType {
 	@Override
 	public String toString() {
 		return "Number";
+	}
+
+	@Override
+	protected APrimitive defaultValue() {
+		return CVMLong.ZERO;
 	}
 
 }

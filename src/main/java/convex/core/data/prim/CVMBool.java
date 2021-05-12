@@ -1,6 +1,7 @@
 package convex.core.data.prim;
 
 import convex.core.data.Tag;
+import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 
 /**
@@ -21,6 +22,10 @@ public final class CVMBool extends APrimitive {
 
 	public static CVMBool create(boolean value) {
 		return value?TRUE:FALSE;
+	}
+	
+	public convex.core.data.type.Boolean getType() {
+		return Types.BOOLEAN;
 	}
 	
 	/**

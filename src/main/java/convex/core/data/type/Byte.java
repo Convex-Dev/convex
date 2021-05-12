@@ -32,4 +32,9 @@ public final class Byte extends ANumericType {
 		return false;
 	}
 
+	@Override
+	protected CVMByte defaultValue() {
+		return CVMByte.ZERO;
+	}
+
 }

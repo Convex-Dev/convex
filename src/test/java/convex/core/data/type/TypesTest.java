@@ -3,8 +3,13 @@ package convex.core.data.type;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.stream.Stream;
+
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.ArgumentsProvider;
 import org.junit.jupiter.params.provider.ArgumentsSource;
 
 import convex.core.data.ACell;
@@ -97,5 +102,20 @@ public class TypesTest {
 		AType t=RT.getType(a);
 		assertTrue(t.check(a));
 		
+	}
+	
+	@ParameterizedTest
+	@ArgumentsSource(TypeArgumentsProvider.class)
+	public void testAllTypes(AType t) {
+		ACell a=t.defaultValue();
+		assertTrue(t.check(a));
+	}
+	
+	
+	public static class TypeArgumentsProvider implements ArgumentsProvider {
+	    @Override
+	    public Stream<? extends Arguments> provideArguments(ExtensionContext context) {
+	    	return Stream.of(Types.ALL_TYPES).map(t -> Arguments.of(t));
+	    }
 	}
 }

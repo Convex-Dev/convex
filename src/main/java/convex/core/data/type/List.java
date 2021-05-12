@@ -2,6 +2,7 @@ package convex.core.data.type;
 
 import convex.core.data.ACell;
 import convex.core.data.AList;
+import convex.core.data.Lists;
 
 /**
  * Type that represents any CVM collection
@@ -27,6 +28,11 @@ public class List extends AType {
 	@Override
 	public String toString() {
 		return "List";
+	}
+
+	@Override
+	protected AList<?> defaultValue() {
+		return Lists.empty();
 	}
 
 }

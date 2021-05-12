@@ -17,10 +17,16 @@ public abstract class AType {
 	/**
 	 * Checks if this type allows a null value.
 	 * 
-	 * @return
+	 * @return True if this type allows null values, false otherwise
 	 */
 	public abstract boolean allowsNull();
 	
 	@Override
 	public abstract String toString();
+
+	/**
+	 * Gets the default value for this type. May return null.
+	 * @return
+	 */
+	protected abstract ACell defaultValue();
 }

@@ -1,30 +1,30 @@
 package convex.core.data.type;
 
 import convex.core.data.ACell;
-import convex.core.data.prim.CVMLong;
+import convex.core.data.prim.CVMBool;
 
 /**
  * Type that represents CVM Long values
  */
-public final class Long extends ANumericType {
+public final class Boolean extends AType {
 
 	/**
 	 * Singleton runtime instance
 	 */
-	public static final Long INSTANCE = new Long();
+	public static final Boolean INSTANCE = new Boolean();
 
-	private Long() {
+	private Boolean() {
 		
 	}
 	
 	@Override
 	public boolean check(ACell value) {
-		return value instanceof CVMLong;
+		return value instanceof CVMBool;
 	}
 	
 	@Override
 	public String toString () {
-		return "Long";
+		return "Boolean";
 	}
 
 	@Override
@@ -33,8 +33,8 @@ public final class Long extends ANumericType {
 	}
 
 	@Override
-	protected CVMLong defaultValue() {
-		return CVMLong.ZERO;
+	protected CVMBool defaultValue() {
+		return CVMBool.FALSE;
 	}
 
 }

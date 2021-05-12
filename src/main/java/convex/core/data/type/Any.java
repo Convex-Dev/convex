@@ -28,4 +28,9 @@ public class Any extends AType {
 		return "Any";
 	}
 
+	@Override
+	protected ACell defaultValue() {
+		return null;
+	}
+
 }

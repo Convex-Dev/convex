@@ -42,6 +42,7 @@ import convex.core.data.StringTree;
 import convex.core.data.VectorLeaf;
 import convex.core.data.VectorTree;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -226,7 +227,7 @@ public class Samples {
 		BAD_HASH.validate();
 	}
 
-	public static Stream<ACell> VALUE_STREAM=Stream.of(
+	public static ACell[] VALUES=new ACell[] {
 			null,
 			FOO,
 			FULL_BLOB,
@@ -243,14 +244,16 @@ public class Samples {
 			CVMDouble.NaN,
 			CVMLong.MAX_VALUE,
 			CVMByte.ZERO,
+			CVMBool.TRUE,
+			CVMBool.FALSE,
 			MAX_SHORT_STRING,
 			BAD_HASH
-			);
+	};
 	
 	public static class ValueArgumentsProvider implements ArgumentsProvider {
 	    @Override
 	    public Stream<? extends Arguments> provideArguments(ExtensionContext context) {
-	    	return VALUE_STREAM.map(cell -> Arguments.of(cell));
+	    	return Stream.of(VALUES).map(cell -> Arguments.of(cell));
 	    }
 	}
 }

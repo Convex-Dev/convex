@@ -22,4 +22,22 @@ public class Types {
 	public static final Byte BYTE = Byte.INSTANCE;
 	public static final Double DOUBLE = Double.INSTANCE;
 	public static final Number NUMBER = Number.INSTANCE;
+	
+	// Atomic types
+	public static final Boolean BOOLEAN = Boolean.INSTANCE;
+	
+	
+	public static AType[] ALL_TYPES=new AType[] {
+		NIL,
+		ANY,
+		COLLECTION,
+		VECTOR,
+		LIST,
+		SET,
+		LONG,
+		BYTE,
+		DOUBLE,
+		NUMBER,
+		BOOLEAN
+	};
 }
