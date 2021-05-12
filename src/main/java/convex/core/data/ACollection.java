@@ -5,16 +5,30 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.function.Function;
 
+import convex.core.data.type.Types;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
 /**
  * Abstract base class for Persistent Merkle Collections
  * 
+ * <p>
+ * A Collection is a data structure that contains zero or more elements. Possible collection subtypes include:
+ * </p>
+ * <ul>
+ * <li>Sequential collections (Lists, Vectors)</li>
+ * <li>Sets (with unique elements)</li> 
+ * </ul>
+ * 
  * @param <T> Type of elements in this collection
  */
 public abstract class ACollection<T extends ACell> extends ADataStructure<T> implements Collection<T> {
 
+	@Override
+	public convex.core.data.type.Collection getType() {
+		return Types.COLLECTION;
+	}
+	
 	@Override
 	public abstract int encode(byte[] bs, int pos);
 
