@@ -39,6 +39,7 @@ import convex.core.data.Set;
 import convex.core.data.Sets;
 import convex.core.data.StringShort;
 import convex.core.data.StringTree;
+import convex.core.data.Strings;
 import convex.core.data.VectorLeaf;
 import convex.core.data.VectorTree;
 import convex.core.data.Vectors;
@@ -49,6 +50,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
 import convex.core.lang.RT;
+import convex.core.lang.Symbols;
 
 /**
  * Miscellaneous value objects for testing purposes
@@ -247,7 +249,10 @@ public class Samples {
 			CVMBool.TRUE,
 			CVMBool.FALSE,
 			MAX_SHORT_STRING,
-			BAD_HASH
+			BAD_HASH,
+			Symbols.FOO,
+			Strings.EMPTY,
+			MAX_EMBEDDED_STRING
 	};
 	
 	public static class ValueArgumentsProvider implements ArgumentsProvider {

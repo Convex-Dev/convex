@@ -102,7 +102,7 @@ public class TypesTest {
 	public void testSampleValues(ACell a) {
 		AType t=RT.getType(a);
 		assertTrue(t.check(a));
-		
+		assertSame(a,t.implicitCast(a));
 	}
 	
 	@ParameterizedTest

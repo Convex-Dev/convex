@@ -26,6 +26,11 @@ public class Types {
 	// Atomic types
 	public static final Boolean BOOLEAN = Boolean.INSTANCE;
 	
+	// Named types
+	public static final KeywordType KEYWORD = KeywordType.INSTANCE;
+	public static final SymbolType SYMBOL = SymbolType.INSTANCE;
+	public static final StringType STRING = StringType.INSTANCE;
+	
 	
 	public static AType[] ALL_TYPES=new AType[] {
 		NIL,
@@ -38,6 +43,9 @@ public class Types {
 		BYTE,
 		DOUBLE,
 		NUMBER,
-		BOOLEAN
+		BOOLEAN,
+		STRING,
+		KEYWORD,
+		SYMBOL
 	};
 }
