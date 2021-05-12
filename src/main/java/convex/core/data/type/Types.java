@@ -12,4 +12,6 @@ public class Types {
 	public static final Long LONG=Long.INSTANCE;
 	
 	public static final Nil NIL=Nil.INSTANCE;
+
+	public static final Any ANY = Any.INSTANCE;
 }

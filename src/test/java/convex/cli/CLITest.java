@@ -47,7 +47,7 @@ public class CLITest {
 
 	}
 	
-	@Test
+	// @Test
 	public void testBadCommand() {
 		assumeTrue(false);
 		Process p;
@@ -57,7 +57,7 @@ public class CLITest {
 		assertEquals(1,p.exitValue());
 	}
 	
-	@Test
+	// @Test
 	public void testHelp() {
 		assumeTrue(false);
 		Process p;

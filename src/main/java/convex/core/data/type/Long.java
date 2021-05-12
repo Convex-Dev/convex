@@ -3,6 +3,9 @@ package convex.core.data.type;
 import convex.core.data.ACell;
 import convex.core.data.prim.CVMLong;
 
+/**
+ * Type that represents CVM Long values
+ */
 public final class Long extends ANumericType {
 
 	/**

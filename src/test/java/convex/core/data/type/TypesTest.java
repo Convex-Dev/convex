@@ -25,4 +25,12 @@ public class TypesTest {
 		assertTrue(t.check(CVMLong.ONE));
 		assertFalse(t.check(CVMDouble.ONE));
 	}
+	
+	@Test
+	public void testAny() {
+		AType t=Types.ANY;
+		assertTrue(t.check(null));
+		assertTrue(t.check(CVMLong.ONE));
+		assertTrue(t.check(CVMDouble.ONE));
+	}
 }

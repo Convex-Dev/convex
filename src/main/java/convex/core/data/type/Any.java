@@ -3,19 +3,19 @@ package convex.core.data.type;
 import convex.core.data.ACell;
 
 /**
- * The Type representing the single value 'nil'
+ * Type that represents any CVM value
  */
-public class Nil extends AType {
+public class Any extends AType {
 
-	public static final Nil INSTANCE = new Nil();
+	public static final Any INSTANCE = new Any();
 	
-	private Nil() {
+	private Any() {
 		
 	}
 
 	@Override
 	public boolean check(ACell value) {
-		return value==null;
+		return true;
 	}
 
 	@Override
