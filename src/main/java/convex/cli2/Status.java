@@ -7,22 +7,22 @@ import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 
 /**
- *
- * Convex Status sub command
- *
- */
+*
+* Convex Status sub command
+*
+*/
 @Command(name="status",
 	mixinStandardHelpOptions=true,
-    description="Reports on the current status of the network.")
+	description="Reports on the current status of the network.")
 public class Status implements Runnable {
 
-    @ParentCommand
-    private Main parent;
+	@ParentCommand
+	private Main parent;
 
 
 	public void run() {
-        // sub command run with no command provided
-        System.out.println("status command");
+		// sub command run with no command provided
+		System.out.println("status command");
 	}
 
 }
