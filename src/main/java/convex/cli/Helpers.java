@@ -1,4 +1,4 @@
-package convex.cli2;
+package convex.cli;
 
 /*
  *

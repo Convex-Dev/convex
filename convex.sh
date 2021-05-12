@@ -1,4 +1,3 @@
 #!/bin/bash
 
-java -cp target/convex.jar convex.cli2.Main $@
-# java -cp target/convex.jar $@ 
+java -jar target/convex.jar $@
