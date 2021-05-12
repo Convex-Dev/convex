@@ -35,4 +35,10 @@ public class Collection extends AType {
 		return Vectors.empty();
 	}
 
+	@Override
+	protected ACollection<?> implicitCast(ACell a) {
+		if (a instanceof ACollection) return (ACollection<?>)a;
+		return null;
+	}
+
 }

@@ -37,4 +37,10 @@ public final class Byte extends ANumericType {
 		return CVMByte.ZERO;
 	}
 
+	@Override
+	protected CVMByte implicitCast(ACell a) {
+		if (a instanceof CVMByte) return (CVMByte)a;
+		return null;
+	}
+
 }

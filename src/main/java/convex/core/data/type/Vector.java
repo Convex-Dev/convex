@@ -34,5 +34,11 @@ public class Vector extends AType {
 	protected AVector<?> defaultValue() {
 		return Vectors.empty();
 	}
+	
+	@Override
+	protected AVector<?> implicitCast(ACell a) {
+		if (a instanceof AVector) return (AVector<?>)a;
+		return null;
+	}
 
 }

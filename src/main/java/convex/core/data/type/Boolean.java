@@ -2,6 +2,7 @@ package convex.core.data.type;
 
 import convex.core.data.ACell;
 import convex.core.data.prim.CVMBool;
+import convex.core.lang.RT;
 
 /**
  * Type that represents CVM Long values
@@ -35,6 +36,12 @@ public final class Boolean extends AType {
 	@Override
 	protected CVMBool defaultValue() {
 		return CVMBool.FALSE;
+	}
+
+	@Override
+	protected ACell implicitCast(ACell a) {
+		// TODO Auto-generated method stub
+		return RT.bool(a)?CVMBool.TRUE:CVMBool.FALSE;
 	}
 
 }

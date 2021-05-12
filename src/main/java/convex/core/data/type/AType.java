@@ -29,4 +29,10 @@ public abstract class AType {
 	 * @return
 	 */
 	protected abstract ACell defaultValue();
+	
+	/**
+	 * Gets the default value for this type. Returns null if the cast fails.
+	 * @return
+	 */
+	protected abstract ACell implicitCast(ACell a);
 }

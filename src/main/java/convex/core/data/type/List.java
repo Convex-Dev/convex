@@ -35,4 +35,10 @@ public class List extends AType {
 		return Lists.empty();
 	}
 
+	@Override
+	protected AList<?> implicitCast(ACell a) {
+		if (a instanceof AList) return (AList<?>)a;
+		return null;
+	}
+
 }

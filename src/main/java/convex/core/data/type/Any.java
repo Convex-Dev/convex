@@ -33,4 +33,9 @@ public class Any extends AType {
 		return null;
 	}
 
+	@Override
+	protected ACell implicitCast(ACell a) {
+		return a;
+	}
+
 }

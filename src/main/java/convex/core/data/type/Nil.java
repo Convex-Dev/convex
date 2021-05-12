@@ -33,4 +33,10 @@ public class Nil extends AType {
 		return null;
 	}
 
+	@Override
+	protected ACell implicitCast(ACell a) {
+		// TODO: confirm anything can cast to null?
+		return null;
+	}
+
 }

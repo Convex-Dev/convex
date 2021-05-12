@@ -2,6 +2,7 @@ package convex.core.data.type;
 
 import convex.core.data.ACell;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 
 /**
  * Type that represents CVM Long values
@@ -35,6 +36,11 @@ public final class Long extends ANumericType {
 	@Override
 	protected CVMLong defaultValue() {
 		return CVMLong.ZERO;
+	}
+
+	@Override
+	protected CVMLong implicitCast(ACell a) {
+		return RT.ensureLong(a);
 	}
 
 }

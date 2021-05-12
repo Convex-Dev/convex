@@ -1,6 +1,7 @@
 package convex.core.data.type;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.stream.Stream;
@@ -109,6 +110,7 @@ public class TypesTest {
 	public void testAllTypes(AType t) {
 		ACell a=t.defaultValue();
 		assertTrue(t.check(a));
+		assertSame(a,t.implicitCast(a));
 	}
 	
 	

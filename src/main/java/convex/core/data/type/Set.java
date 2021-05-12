@@ -35,4 +35,10 @@ public class Set extends AType {
 		return Sets.empty();
 	}
 
+	@Override
+	protected ASet<?> implicitCast(ACell a) {
+		if (a instanceof ASet) return (ASet<?>)a;
+		return null;
+	}
+
 }
