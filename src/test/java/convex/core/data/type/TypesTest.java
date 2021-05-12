@@ -1,6 +1,7 @@
 package convex.core.data.type;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -114,6 +115,10 @@ public class TypesTest {
 		ACell a=t.defaultValue();
 		assertTrue(t.check(a));
 		assertSame(a,t.implicitCast(a));
+		
+		Class<? extends ACell> klass=t.getJavaClass();
+		assertNotNull(klass);
+		assertTrue((a==null)||klass.isInstance(a));
 	}
 	
 	
