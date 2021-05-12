@@ -5,6 +5,8 @@ import java.util.function.Consumer;
 
 import convex.core.Constants;
 import convex.core.crypto.Hash;
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.TODOException;
 import convex.core.store.AStore;
@@ -361,6 +363,14 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 			refs[i] = getRef(i);
 		}
 		return refs;
+	}
+	
+	/**
+	 * Gets the most specific known runtime Type for this Cell.
+	 * @return The Type of this Call
+	 */
+	public AType getType() {
+		return Types.ANY;
 	}
 
 	/**

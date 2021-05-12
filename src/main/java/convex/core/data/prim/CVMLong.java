@@ -3,6 +3,8 @@ package convex.core.data.prim;
 import convex.core.data.Format;
 import convex.core.data.INumeric;
 import convex.core.data.Tag;
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 
 /**
@@ -26,6 +28,10 @@ public final class CVMLong extends APrimitive implements INumeric {
 
 	public static CVMLong create(long value) {
 		return new CVMLong(value);
+	}
+	
+	public AType getType() {
+		return Types.LONG;
 	}
 	
 	@Override
