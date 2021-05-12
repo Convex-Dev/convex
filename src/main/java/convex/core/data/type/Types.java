@@ -10,4 +10,6 @@ public class Types {
 
 	
 	public static final Int64 INT64=Int64.INSTANCE;
+	
+	public static final Nil NIL=Nil.INSTANCE;
 }

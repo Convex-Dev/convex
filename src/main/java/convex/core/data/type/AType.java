@@ -13,4 +13,11 @@ public abstract class AType {
 	 * @return true if value is an instance of this Type, false otherwise
 	 */
 	public abstract boolean check(ACell value);
+	
+	/**
+	 * Checks if this type allows a null value.
+	 * 
+	 * @return
+	 */
+	public abstract boolean allowsNull();
 }

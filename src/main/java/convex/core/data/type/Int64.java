@@ -24,4 +24,9 @@ public final class Int64 extends ANumericType {
 		return "Long";
 	}
 
+	@Override
+	public boolean allowsNull() {
+		return false;
+	}
+
 }
