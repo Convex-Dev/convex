@@ -23,7 +23,6 @@ import convex.core.data.Address;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.PeerStatus;
-import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
@@ -74,7 +73,7 @@ public class BeliefMergeTest {
 
 		AHashMap<Symbol, ACell> globals = Constants.INITIAL_GLOBALS;
 		globals = globals.assoc(Symbols.JUICE_PRICE, RT.cvm(1L)); // cheap juice for simplicity. USe CVM long
-		INITIAL_STATE = State.create(accounts, peers, Sets.empty(), globals, BlobMaps.empty());
+		INITIAL_STATE = State.create(accounts, peers, globals, BlobMaps.empty());
 		TOTAL_VALUE = INITIAL_STATE.computeTotalFunds();
 	}
 

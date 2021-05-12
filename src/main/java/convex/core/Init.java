@@ -15,7 +15,6 @@ import convex.core.data.BlobMaps;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
-import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
@@ -171,7 +170,7 @@ public class Init {
 			// Build globals
 			AHashMap<Symbol, ACell> globals = Constants.INITIAL_GLOBALS;
 
-			State s = State.create(accts, peers, Sets.empty(), globals, BlobMaps.empty());
+			State s = State.create(accts, peers, globals, BlobMaps.empty());
 
 			{ // Test total funds after creating user / peer accounts
 				long total = s.computeTotalFunds();

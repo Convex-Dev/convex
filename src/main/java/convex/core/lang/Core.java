@@ -36,7 +36,6 @@ import convex.core.data.List;
 import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
-import convex.core.data.Ref;
 import convex.core.data.Set;
 import convex.core.data.Sets;
 import convex.core.data.Symbol;
@@ -45,9 +44,9 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.APrimitive;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
-import convex.core.data.prim.CVMChar;
 import convex.core.lang.expanders.AExpander;
 import convex.core.lang.expanders.CoreExpander;
 import convex.core.lang.expanders.Expander;
@@ -630,24 +629,6 @@ public class Core {
 			return ctx.actorCall(target, sendAmount.longValue(), sym, callArgs);
 		}
 	});
-
-	public static final CoreFn<Hash> STORE = reg(new CoreFn<>(Symbols.STORE) {
-		@SuppressWarnings("unchecked")
-		@Override
-		public  Context<Hash> invoke(Context context, ACell[] args) {
-			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-
-			ASet<ACell> store = context.getState().getStore();
-
-			Ref<ACell> ref = Ref.get(args[0]);
-			ASet<ACell> newStore = store.includeRef(ref);
-			context = context.withStore(newStore);
-
-			long juice = Juice.STORE;
-
-			return context.withResult(juice, ref.getHash());
-		}
-	});
 	
 	public static final CoreFn<Hash> LOG = reg(new CoreFn<>(Symbols.LOG) {
 		@SuppressWarnings("unchecked")
@@ -664,24 +645,6 @@ public class Core {
 			context=context.appendLog(values);
 
 			return context.withResult(juice, values);
-		}
-	});
-
-	public static final CoreFn<ACell> FETCH = reg(new CoreFn<>(Symbols.FETCH) {
-		@SuppressWarnings("unchecked")
-		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
-			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-
-			Hash hash = RT.toHash(args[0]);
-			if (hash == null) return context.withCastError(args[0], Hash.class);
-
-			ASet<ACell> store = context.getState().getStore();
-			ACell result = store.getByHash(hash);
-
-			long juice = Juice.FETCH;
-
-			return context.withResult(juice, result);
 		}
 	});
 	

@@ -18,7 +18,6 @@ import convex.core.data.BlobMaps;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.PeerStatus;
-import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.util.Utils;
@@ -72,7 +71,7 @@ public class PeerCluster {
 			accts = accts.conj(as);
 		}
 
-		return State.create(accts, peers, Sets.empty(), Constants.INITIAL_GLOBALS, BlobMaps.empty());
+		return State.create(accts, peers, Constants.INITIAL_GLOBALS, BlobMaps.empty());
 	}
 
 	public static void main(String... args) {

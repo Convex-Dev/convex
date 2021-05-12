@@ -11,7 +11,6 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AObject;
 import convex.core.data.ASequence;
-import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
@@ -131,11 +130,6 @@ public final class Context<T extends ACell> extends AObject {
 			return new ChainState(state,origin,caller,address,environment,offer);
 		}
 
-		private ChainState withStore(ASet<ACell> store) {
-			State newState=state.withStore(store);
-			return withState(newState);
-		}
-		
 		public ChainState withStateOffer(State newState,long newOffer) {
 			if ((state==newState)&&(offer==newOffer)) return this;
 			return create(newState,origin,caller,address,newOffer);
@@ -752,11 +746,6 @@ public final class Context<T extends ACell> extends AObject {
 	private Context<T> withEnvironment(AHashMap<Symbol, Syntax> newEnvironment)  {
 		ChainState cs=chainState.withEnvironment(newEnvironment);
 		return withChainState(cs);	
-	}
-	
-	public Context<T> withStore(ASet<ACell> store) {
-		ChainState cs=chainState.withStore(store);
-		return withChainState(cs);
 	}
 	
 	private Context<T> withChainState(ChainState newChainState) {

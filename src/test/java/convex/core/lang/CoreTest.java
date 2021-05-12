@@ -367,23 +367,6 @@ public class CoreTest {
 		// assertCastError(step("(>= 1 2 3 '*balance*)"));
 		assertFalse(evalB("(>= 1 2 3 '*balance*)"));
 	}
-
-	@Test
-	public void testStore() {
-		assertNull(eval("(let [a {1 2} h (hash (encoding a))] (fetch h))"));
-		assertEquals(Vectors.of(1L, 2L), eval("(let [a [1 2] h (hash (encoding a))] (store a) (fetch h))"));
-
-		// Blob should work with fetch
-		assertEquals(Vectors.of(1L, 2L,3L), eval("(let [a [1 2 3] h (hash (encoding a))] (store a) (fetch (blob h)))"));
-
-		assertEquals(Keywords.STORE, eval("(let [a :store h (hash (encoding a))] (store a) (fetch h))"));
-		
-		// storing a parent should *not* store child objects
-		assertNull(eval("(let [a [1 2] b [a a] h (hash (encoding a))] (store b) (fetch h))"));
-
-		assertArityError(step("(store)"));
-		assertArityError(step("(store 1 2)"));
-	}
 	
 	@Test
 	public void testLog() {

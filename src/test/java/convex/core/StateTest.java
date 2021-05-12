@@ -13,7 +13,6 @@ import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.RecordTest;
 import convex.core.data.Ref;
-import convex.core.data.Sets;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 
@@ -27,7 +26,6 @@ public class StateTest {
 		State s = State.EMPTY;
 		AVector<AccountStatus> accts = s.getAccounts();
 		assertEquals(0, accts.count());
-		assertEquals(Sets.empty(), s.getStore());
 		
 		RecordTest.doRecordTests(s);
 	}
@@ -35,7 +33,6 @@ public class StateTest {
 	@Test
 	public void testInitialState() throws InvalidDataException {
 		State s = Init.STATE;
-		assertSame(s, s.withStore(s.getStore()));
 		assertSame(s, s.withAccounts(s.getAccounts()));
 		assertSame(s, s.withPeers(s.getPeers()));
 

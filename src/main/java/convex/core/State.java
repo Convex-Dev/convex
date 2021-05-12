@@ -15,7 +15,6 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.ARecord;
-import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
@@ -28,7 +27,6 @@ import convex.core.data.Keywords;
 import convex.core.data.LongBlob;
 import convex.core.data.MapEntry;
 import convex.core.data.PeerStatus;
-import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
@@ -59,12 +57,12 @@ import convex.core.util.Counters;
  *
  */
 public class State extends ARecord {
-	private static final Keyword[] STATE_KEYS = new Keyword[] { Keywords.ACCOUNTS, Keywords.PEERS, Keywords.STORE,
+	private static final Keyword[] STATE_KEYS = new Keyword[] { Keywords.ACCOUNTS, Keywords.PEERS,
 			Keywords.GLOBALS, Keywords.SCHEDULE };
 
 	private static final RecordFormat FORMAT = RecordFormat.of(STATE_KEYS);
 
-	public static final State EMPTY = create(Vectors.empty(), BlobMaps.empty(), Sets.empty(), Constants.INITIAL_GLOBALS,
+	public static final State EMPTY = create(Vectors.empty(), BlobMaps.empty(), Constants.INITIAL_GLOBALS,
 			BlobMaps.empty());
 
 	private static final Logger log = Logger.getLogger(State.class.getName());
@@ -75,16 +73,14 @@ public class State extends ARecord {
 	
 	private final AVector<AccountStatus> accounts;
 	private final BlobMap<AccountKey, PeerStatus> peers;
-	private final ASet<ACell> store;
 	private final AHashMap<Symbol, ACell> globals;
 	private final BlobMap<ABlob, AVector<ACell>> schedule;
 
-	private State(AVector<AccountStatus> accounts, BlobMap<AccountKey, PeerStatus> peers, ASet<ACell> store,
+	private State(AVector<AccountStatus> accounts, BlobMap<AccountKey, PeerStatus> peers,
 			AHashMap<Symbol, ACell> globals, BlobMap<ABlob, AVector<ACell>> schedule) {
 		super(FORMAT);
 		this.accounts = accounts;
 		this.peers = peers;
-		this.store = store;
 		this.globals = globals;
 		this.schedule = schedule;
 	}
@@ -93,7 +89,6 @@ public class State extends ARecord {
 	public ACell get(ACell k) {
 		if (Keywords.ACCOUNTS.equals(k)) return accounts;
 		if (Keywords.PEERS.equals(k)) return peers;
-		if (Keywords.STORE.equals(k)) return store;
 		if (Keywords.GLOBALS.equals(k)) return globals;
 		if (Keywords.SCHEDULE.equals(k)) return schedule;
 		return null;
@@ -104,19 +99,18 @@ public class State extends ARecord {
 	protected State updateAll(ACell[] newVals) {
 		AVector<AccountStatus> accounts = (AVector<AccountStatus>) newVals[0];
 		BlobMap<AccountKey, PeerStatus> peers = (BlobMap<AccountKey, PeerStatus>) newVals[1];
-		ASet<ACell> store = (ASet<ACell>) newVals[2];
-		AHashMap<Symbol, ACell> globals = (AHashMap<Symbol, ACell>) newVals[3];
-		BlobMap<ABlob, AVector<ACell>> schedule = (BlobMap<ABlob, AVector<ACell>>) newVals[4];
-		if ((this.accounts == accounts) && (this.peers == peers) && (this.store == store) && (this.globals == globals)
+		AHashMap<Symbol, ACell> globals = (AHashMap<Symbol, ACell>) newVals[2];
+		BlobMap<ABlob, AVector<ACell>> schedule = (BlobMap<ABlob, AVector<ACell>>) newVals[3];
+		if ((this.accounts == accounts) && (this.peers == peers) && (this.globals == globals)
 				&& (this.schedule == schedule)) {
 			return this;
 		}
-		return new State(accounts, peers, store, globals, schedule);
+		return new State(accounts, peers, globals, schedule);
 	}
 
 	public static State create(AVector<AccountStatus> accounts, BlobMap<AccountKey, PeerStatus> peers,
-			ASet<ACell> store, AHashMap<Symbol, ACell> globals, BlobMap<ABlob, AVector<ACell>> schedule) {
-		return new State(accounts, peers, store, globals, schedule);
+			AHashMap<Symbol, ACell> globals, BlobMap<ABlob, AVector<ACell>> schedule) {
+		return new State(accounts, peers, globals, schedule);
 	}
 
 	@Override
@@ -129,7 +123,6 @@ public class State extends ARecord {
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = accounts.write(bs,pos);
 		pos = peers.write(bs,pos);
-		pos = store.write(bs,pos);
 		pos = globals.write(bs,pos);
 		pos = schedule.write(bs,pos);
 		return pos;
@@ -140,7 +133,6 @@ public class State extends ARecord {
 		long length=1;
 		length+=accounts.getEncodingLength();
 		length+=peers.getEncodingLength();
-		length+=store.getEncodingLength();
 		length+=globals.getEncodingLength();
 		length+=schedule.getEncodingLength();
 		return length;
@@ -151,7 +143,6 @@ public class State extends ARecord {
 		int est=1;
 		est+=accounts.estimatedEncodingSize();
 		est+=peers.estimatedEncodingSize();
-		est+=store.estimatedEncodingSize();
 		est+=globals.estimatedEncodingSize();
 		est+=schedule.estimatedEncodingSize();
 		return est;
@@ -168,10 +159,9 @@ public class State extends ARecord {
 		try {
 			AVector<AccountStatus> accounts = Format.read(bb);
 			BlobMap<AccountKey, PeerStatus> peers = Format.read(bb);
-			ASet<ACell> store = Format.read(bb);
 			AHashMap<Symbol, ACell> globals = Format.read(bb);
 			BlobMap<ABlob, AVector<ACell>> schedule = Format.read(bb);
-			return create(accounts, peers, store, globals, schedule);
+			return create(accounts, peers, globals, schedule);
 		} catch (ClassCastException ex) {
 			throw new BadFormatException("Can't read state", ex);
 		}
@@ -179,10 +169,6 @@ public class State extends ARecord {
 
 	public AVector<AccountStatus> getAccounts() {
 		return accounts;
-	}
-
-	public ASet<ACell> getStore() {
-		return store;
 	}
 
 	public long getFees() {
@@ -323,12 +309,12 @@ public class State extends ARecord {
 
 	private State withSchedule(BlobMap<ABlob, AVector<ACell>> newSchedule) {
 		if (schedule == newSchedule) return this;
-		return new State(accounts, peers, store, globals, newSchedule);
+		return new State(accounts, peers, globals, newSchedule);
 	}
 
 	private State withGlobals(AHashMap<Symbol, ACell> newGlobals) {
 		if (newGlobals == globals) return this;
-		return new State(accounts, peers, store, newGlobals, schedule);
+		return new State(accounts, peers, newGlobals, schedule);
 	}
 
 	private BlockResult applyTransactions(Block block) throws BadSignatureException {
@@ -485,7 +471,7 @@ public class State extends ARecord {
 
 	public State withAccounts(AVector<AccountStatus> newAccounts) {
 		if (newAccounts == accounts) return this;
-		return create(newAccounts, peers, store, globals, schedule);
+		return create(newAccounts, peers,globals, schedule);
 	}
 
 	/**
@@ -537,19 +523,10 @@ public class State extends ARecord {
 		return as.getEnvironment();
 	}
 
-	public State withStore(ASet<ACell> store2) {
-		if (store == store2) return this;
-		return create(accounts, peers, store2, globals, schedule);
-	}
 
 	public State withPeers(BlobMap<AccountKey, PeerStatus> newPeers) {
 		if (peers == newPeers) return this;
-		return create(accounts, newPeers, store, globals, schedule);
-	}
-
-	public State store(ACell a) {
-		ASet<ACell> newStore = store.include(a);
-		return withStore(newStore);
+		return create(accounts, newPeers, globals, schedule);
 	}
 
 	@Override
@@ -601,7 +578,6 @@ public class State extends ARecord {
 	public void validateCell() throws InvalidDataException {
 		accounts.validateCell();
 		peers.validateCell();
-		store.validateCell();
 		globals.validateCell();
 		schedule.validateCell();
 	}
