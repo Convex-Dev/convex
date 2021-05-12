@@ -43,4 +43,9 @@ public final class Double extends ANumericType {
 		return RT.ensureDouble(a);
 	}
 
+	@Override
+	protected Class<? extends ACell> getJavaClass() {
+		return CVMDouble.class;
+	}
+
 }

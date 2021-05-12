@@ -43,4 +43,9 @@ public final class Byte extends ANumericType {
 		return null;
 	}
 
+	@Override
+	protected Class<? extends ACell> getJavaClass() {
+		return CVMByte.class;
+	}
+
 }

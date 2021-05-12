@@ -39,5 +39,10 @@ public class Number extends ANumericType {
 		if (a instanceof INumeric) return (APrimitive)a;
 		return null;
 	}
+	
+	@Override
+	protected Class<? extends ACell> getJavaClass() {
+		return APrimitive.class;
+	}
 
 }

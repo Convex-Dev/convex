@@ -40,5 +40,10 @@ public class Set extends AType {
 		if (a instanceof ASet) return (ASet<?>)a;
 		return null;
 	}
+	
+	@Override
+	protected Class<? extends ACell> getJavaClass() {
+		return ASet.class;
+	}
 
 }

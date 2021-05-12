@@ -40,5 +40,10 @@ public class List extends AType {
 		if (a instanceof AList) return (AList<?>)a;
 		return null;
 	}
+	
+	@Override
+	protected Class<? extends ACell> getJavaClass() {
+		return AList.class;
+	}
 
 }

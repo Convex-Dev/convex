@@ -44,4 +44,8 @@ public final class KeywordType extends AType {
 		return null;
 	}
 
+	@Override
+	protected Class<? extends ACell> getJavaClass() {
+		return Keyword.class;
+	}
 }

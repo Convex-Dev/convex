@@ -43,5 +43,10 @@ public final class SymbolType extends AType {
 		if (a instanceof Symbol) return (Symbol)a;
 		return null;
 	}
+	
+	@Override
+	protected Class<? extends ACell> getJavaClass() {
+		return Symbol.class;
+	}
 
 }

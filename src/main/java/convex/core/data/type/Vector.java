@@ -40,5 +40,11 @@ public class Vector extends AType {
 		if (a instanceof AVector) return (AVector<?>)a;
 		return null;
 	}
+	
+	@SuppressWarnings("rawtypes")
+	@Override
+	protected Class<AVector> getJavaClass() {
+		return AVector.class;
+	}
 
 }

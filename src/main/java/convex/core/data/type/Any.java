@@ -38,4 +38,9 @@ public class Any extends AType {
 		return a;
 	}
 
+	@Override
+	protected Class<? extends ACell> getJavaClass() {
+		return ACell.class;
+	}
+
 }

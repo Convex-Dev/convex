@@ -103,6 +103,9 @@ public class TypesTest {
 		AType t=RT.getType(a);
 		assertTrue(t.check(a));
 		assertSame(a,t.implicitCast(a));
+		
+		Class<? extends ACell> klass=t.getJavaClass();
+		assertTrue((a==null)||klass.isInstance(a));
 	}
 	
 	@ParameterizedTest

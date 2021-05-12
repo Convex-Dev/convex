@@ -38,5 +38,10 @@ public class Nil extends AType {
 		// TODO: confirm anything can cast to null?
 		return null;
 	}
+	
+	@Override
+	protected Class<? extends ACell> getJavaClass() {
+		return ACell.class;
+	}
 
 }

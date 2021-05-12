@@ -44,4 +44,9 @@ public final class Boolean extends AType {
 		return RT.bool(a)?CVMBool.TRUE:CVMBool.FALSE;
 	}
 
+	@Override
+	protected Class<? extends ACell> getJavaClass() {
+		return CVMBool.class;
+	}
+
 }

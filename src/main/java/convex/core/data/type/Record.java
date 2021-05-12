@@ -39,5 +39,10 @@ public class Record extends AType {
 		if (a instanceof ARecord) return (ARecord)a;
 		return null;
 	}
+	
+	@Override
+	protected Class<? extends ACell> getJavaClass() {
+		return ARecord.class;
+	}
 
 }

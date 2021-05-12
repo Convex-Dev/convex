@@ -43,5 +43,10 @@ public final class StringType extends AType {
 		if (a instanceof AString) return (AString)a;
 		return null;
 	}
+	
+	@Override
+	protected Class<? extends ACell> getJavaClass() {
+		return AString.class;
+	}
 
 }

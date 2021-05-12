@@ -42,5 +42,10 @@ public class Map extends AType {
 		if (a instanceof AMap) return (AMap)a;
 		return null;
 	}
+	
+	@Override
+	protected Class<? extends ACell> getJavaClass() {
+		return AMap.class;
+	}
 
 }

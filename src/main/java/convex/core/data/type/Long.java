@@ -42,5 +42,10 @@ public final class Long extends ANumericType {
 	protected CVMLong implicitCast(ACell a) {
 		return RT.ensureLong(a);
 	}
+	
+	@Override
+	protected Class<? extends ACell> getJavaClass() {
+		return CVMLong.class;
+	}
 
 }

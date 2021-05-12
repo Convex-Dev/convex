@@ -35,4 +35,10 @@ public abstract class AType {
 	 * @return
 	 */
 	protected abstract ACell implicitCast(ACell a);
+	
+	/**
+	 * Gets the Java base class for all instances of this type.
+	 * @return
+	 */
+	protected abstract Class<? extends ACell> getJavaClass();
 }
