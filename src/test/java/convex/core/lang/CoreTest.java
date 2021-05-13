@@ -2628,7 +2628,19 @@ public class CoreTest {
 	
 	@Test
 	public void testDef() {
+		// Def returns defined value
+		assertEquals(Keywords.FOO, eval("(def v :foo)"));
+		
+		// Def establishes mapping in environment
+		assertEquals(CVMLong.ONE, step("(def foo 1)").getEnvironment().get(Symbols.FOO).getValue());
+		
+		// Def creates valid dynamic variables
 		assertEquals(Vectors.of(2L, 3L), eval("(do (def v [2 3]) v)"));
+		assertNull(eval("(do (def v nil) v)"));
+		
+		// def overwrites existing bindings
+		assertEquals(Vectors.of(2L, 3L), eval("(do (def v nil) (def v [2 3]) v)"));
+		assertEquals(Vectors.of(2L, 3L), eval("(do (def count [2 3]) count)")); // overwriting core
 		
 		// TODO: are these error types logical?
 		assertCompileError(step("(def)"));
