@@ -2,8 +2,6 @@ package convex.cli;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.List;
-import java.util.Properties;
 import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
@@ -11,10 +9,6 @@ import convex.core.Init;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.lang.Reader;
-import convex.core.transactions.Invoke;
-import convex.core.util.Utils;
-
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
