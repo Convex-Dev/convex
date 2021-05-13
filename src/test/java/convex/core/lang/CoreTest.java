@@ -2561,7 +2561,18 @@ public class CoreTest {
 	public void testFn() {
 		assertEquals(1L,evalL("((fn [] 1))"));
 		assertEquals(2L,evalL("((fn [x] 2) 1)"));
+		assertEquals(3L,evalL("((fn [x] 2 3) 1)"));
 		// TODO: more cases!
+		
+		// test closing over lexical scope
+		assertEquals(3L,evalL("(let [a 3 f (fn [x] a)] (f 0))"));
+		
+		assertArityError(step("(fn)"));
+		assertCompileError(step("(fn 1)"));
+		
+		// MultiFn printing
+		assertCVMEquals("(fn [x y] 0)",eval("(str (fn [x y] 0))"));
+
 	}
 	
 	@Test
