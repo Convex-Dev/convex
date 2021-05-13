@@ -2579,6 +2579,9 @@ public class CoreTest {
 		// variadic match
 		assertEquals(2L,evalL("((fn ([x] 1) ([x & more] 2)) 3 4 5 6)"));
 		assertEquals(2L,evalL("((fn ([x] 1) ([x y & more] 2)) 3 4)"));
+		
+		// MultiFn printing
+		assertCVMEquals("(fn ([] 0) ([x] 1))",eval("(str (fn ([]0) ([x] 1) ))"));
 
 		// arity errors
 		assertArityError(step("((fn ([x] 1) ([x & more] 2)))")); 

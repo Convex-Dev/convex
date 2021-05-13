@@ -19,21 +19,21 @@ import convex.core.lang.Context;
 
 public class MultiFn<T extends ACell> extends AClosure<T> {
 
-	private final AVector<AFn<T>> fns;
+	private final AVector<AClosure<T>> fns;
 	private final int num;
 	
-	private MultiFn(AVector<AFn<T>> fns, AHashMap<Symbol, ACell> env) {
+	private MultiFn(AVector<AClosure<T>> fns, AHashMap<Symbol, ACell> env) {
 		super(env);
 		this.fns=fns;
 		this.num=fns.size();
 	}
 	
-	private MultiFn(AVector<AFn<T>> fns) {
+	private MultiFn(AVector<AClosure<T>> fns) {
 		this(fns,Maps.empty());
 	}
 	
 
-	public static <R extends ACell> MultiFn<R> create(AVector<AFn<R>> fns) {
+	public static <R extends ACell> MultiFn<R> create(AVector<AClosure<R>> fns) {
 		return new MultiFn<>(fns);
 	}
 	
@@ -54,18 +54,25 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 
 	@Override
 	public void print(StringBuilder sb) {
-		sb.append("(fn");
-		for (AFn<T> fn:fns) {
-			sb.append(' ');
-			fn.print(sb);
-		}
+		sb.append("(fn ");
+		printInternal(sb);
 		sb.append(')');
+	}
+	
+	@Override
+	public void printInternal(StringBuilder sb) {
+		for (long i=0; i<num; i++) {
+			if (i>0) sb.append(' ');
+			sb.append('(');
+			fns.get(i).printInternal(sb);
+			sb.append(')');
+		}
 	}
 
 	@Override
 	public Context<T> invoke(Context<ACell> context, ACell[] args) {
 		for (int i=0; i<num; i++) {
-			AFn<T> fn=fns.get(i);
+			AClosure<T> fn=fns.get(i);
 			if (fn.supportsArgs(args)) {
 				return fn.invoke((Context<ACell>) context, args);
 			}
@@ -87,13 +94,14 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 
 	@Override
 	public AFn<T> updateRefs(IRefFunction func) {
-		AVector<AFn<T>> newFns=fns.updateRefs(func);
+		AVector<AClosure<T>> newFns=fns.updateRefs(func);
 		if (fns==newFns) return this;
 		return new MultiFn<T>(newFns);
 	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {
+		if (num<=0) throw new InvalidDataException("MultiFn must contain at least one function",this);
 		fns.validateCell();
 	}
 
@@ -110,7 +118,7 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 	}
 	
 	public static <T extends ACell> MultiFn<T> read(ByteBuffer bb) throws BadFormatException, BufferUnderflowException {
-		AVector<AFn<T>> fns=Format.read(bb);
+		AVector<AClosure<T>> fns=Format.read(bb);
 		if (fns==null) throw new BadFormatException("Null fns!");
 		return new MultiFn<T>(fns);
 	}
@@ -137,6 +145,8 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 		if (env==this.lexicalEnv) return (F) this;
 		return (F) new MultiFn(fns,env);
 	}
+
+
 
 
 

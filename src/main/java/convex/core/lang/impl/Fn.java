@@ -158,16 +158,16 @@ public class Fn<T extends ACell> extends AClosure<T> {
 	@Override
 	public void print(StringBuilder sb) {
 		sb.append("(fn ");
-		printParamBody(sb);
+		printInternal(sb);
 		sb.append(')');
 	}
 	
-	public void printParamBody(StringBuilder sb) {
+	@Override
+	public void printInternal(StringBuilder sb) {
 		params.print(sb);
 		sb.append(' ');
 		body.print(sb);
 	}
-
 
 	/**
 	 * Returns the declared param names for a function.
@@ -213,6 +213,9 @@ public class Fn<T extends ACell> extends AClosure<T> {
 		body.validateCell();
 		lexicalEnv.validateCell();
 	}
+
+
+	
 
 
 }

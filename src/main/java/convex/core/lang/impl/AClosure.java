@@ -27,4 +27,11 @@ public abstract class AClosure<T extends ACell> extends AFn<T> {
 	 * @return Closure updated with new lexical environment
 	 */
 	public abstract <F extends AClosure<T>> F withEnvironment(AHashMap<Symbol, ACell> env);
+	
+
+	/**
+	 * Print the "internal" representation of a closure e.g. "[x] 1", excluding the 'fn' symbol.
+	 * @param sb
+	 */
+	public abstract void printInternal(StringBuilder sb);
 }

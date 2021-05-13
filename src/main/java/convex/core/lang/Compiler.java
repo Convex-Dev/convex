@@ -25,6 +25,7 @@ import convex.core.data.Vectors;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.expanders.AExpander;
 import convex.core.lang.expanders.CoreExpander;
+import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.MultiFn;
 import convex.core.lang.ops.Cond;
 import convex.core.lang.ops.Constant;
@@ -441,7 +442,7 @@ public class Compiler {
 	
 	@SuppressWarnings({ "unchecked"})
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileMultiFn(AList<Syntax> list, Context<?> context) {
-		AVector<AFn<R>> fns=Vectors.empty();
+		AVector<AClosure<R>> fns=Vectors.empty();
 		
 		int num=list.size();
 		for (int i=0; i<num; i++) {
@@ -453,7 +454,7 @@ public class Compiler {
 			context= compileFnInstance((AList<Syntax>) o,context);
 			if (context.isExceptional()) return (Context<T>) context;
 			
-			AFn<R> compiledFn=((Lambda<R>) context.getResult()).getFunction();
+			AClosure<R> compiledFn=((Lambda<R>) context.getResult()).getFunction();
 			fns=fns.conj(compiledFn);
 		}
 			

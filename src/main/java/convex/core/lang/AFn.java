@@ -44,4 +44,5 @@ public abstract class AFn<T extends ACell> extends ACell implements IFn<T> {
 	public byte getTag() {
 		return Tag.FN;
 	}
+
 }
