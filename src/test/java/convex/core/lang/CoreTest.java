@@ -1344,9 +1344,21 @@ public class CoreTest {
 		assertNull(eval("(do (halt) (assert false))"));
 
 		// halt should not roll back state changes
-		Context<?> ctx = step("(do (def a 13) (halt 2))");
-		assertCVMEquals(2L, ctx.getResult());
-		assertEquals(13L, evalL(ctx, "a"));
+		{
+			Context<?> ctx = step("(do (def a 13) (halt 2))");
+			assertCVMEquals(2L, ctx.getResult());
+			assertEquals(13L, evalL(ctx, "a"));
+		}
+		
+		// Halt should return from a smart contract call but still have state changes
+		{
+			Context<?> ctx=step("(def act (deploy '(do (def g :foo) (defn f [] (def g 3) (halt 2) 1) (export f))))");
+			assertTrue(ctx.getResult() instanceof Address);
+			assertEquals(Keywords.FOO, eval(ctx,"(lookup act 'g)")); // initial value of g
+			ctx=step(ctx,"(call act (f))");
+			assertCVMEquals(2L, ctx.getResult()); // halt value returned
+			assertCVMEquals(3L, eval(ctx,"(lookup act 'g)")); // g has been updated
+		}
 
 		assertArityError(step("(halt 1 2)"));
 	}
@@ -1807,6 +1819,9 @@ public class CoreTest {
 
 		assertCastError(step(ctx, "(call ctr :foo (bad-fn 1 2))")); // cast fail on offered value
 		assertStateError(step(ctx, "(call ctr 12 (bad-fn 1 2))")); // bad function
+		
+		// bad format for call
+		assertCompileError(step(ctx,"(call ctr foo)"));
 
 		assertStateError(step(ctx, "(call #666666 12 (bad-fn 1 2))")); // bad actor
 		assertArgumentError(step(ctx, "(call ctr -12 (bad-fn 1 2))")); // negative offer

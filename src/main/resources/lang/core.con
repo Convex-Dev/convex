@@ -178,6 +178,7 @@
 	  (if (empty? more) (fail :ARITY "Insufficient arguments to call")) ;; TODO remove magic number
 	  (let [n (count more)
 	        fnargs (unsyntax (last more))
+          _ (or (list? fnargs) (fail :COMPILE "'call' must have function call list form as last argument."))
           sym (unsyntax (first fnargs))
 	        fnlist (cons (list 'quote sym) (next fnargs))]
 	    (cond
