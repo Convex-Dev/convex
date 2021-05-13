@@ -1238,6 +1238,9 @@ public class CoreTest {
 		assertEquals(100.0, evalD(
 				"(reduce (fn [acc [k v]] (let [x (double (v nil))] (+ acc (* x x)))) 0.0 {true {nil 10}})"));
 
+		assertEquals(Lists.of(3,2,1), eval("(reduce conj '() '(1 2 3))"));
+
+		
 		assertCastError(step("(reduce 1 2 [])"));
 		assertCastError(step("(reduce + 2 :foo)"));
 

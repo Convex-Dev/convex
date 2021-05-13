@@ -33,7 +33,7 @@
   actor?
 	{
 	 :doc {:description "Tests if the given Address refers to an Actor. Argument must be castable to Address."
-         :examples [{:code "(actor? #1345"}]
+         :examples [{:code "(actor? #1345)"}]
          :type :function
          :signature [{:params [address]}]}
 	}

@@ -194,7 +194,10 @@ public class TestState {
 	}
 
 	public static long evalL(String source) {
-		return RT.castLong(eval(source)).longValue();
+		ACell r=eval(source);
+		CVMLong rl=RT.castLong(r);
+		if (rl==null) throw new Error("Can't cast result to Long: "+r);
+		return rl.longValue();
 	}
 	
 	public static String evalS(String source) {
