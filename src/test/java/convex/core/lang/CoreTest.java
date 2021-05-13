@@ -2567,11 +2567,17 @@ public class CoreTest {
 		// test closing over lexical scope
 		assertEquals(3L,evalL("(let [a 3 f (fn [x] a)] (f 0))"));
 		
+		// Bad arity fn execution
+		assertArityError(step("((fn [x] 0))"));
+		assertArityError(step("((fn [] 0) 1)"));
+		
+		// Bad fn forms
 		assertArityError(step("(fn)"));
 		assertCompileError(step("(fn 1)"));
 		
-		// MultiFn printing
+		// fn printing
 		assertCVMEquals("(fn [x y] 0)",eval("(str (fn [x y] 0))"));
+		assertCVMEquals("(fn [x y] (do 0 1))",eval("(str (fn [x y] 0 1))"));
 
 	}
 	
