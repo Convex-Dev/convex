@@ -81,5 +81,13 @@ public abstract class ADataStructure<E extends ACell> extends ACell {
 		}
 		return result;
 	}
+	
+	/**
+	 * Gets the element at the specified index in this collection
+	 * 
+	 * @param index Index of element to get
+	 * @return Element at the specified index
+	 */
+	public abstract E get(long i);
 
 }

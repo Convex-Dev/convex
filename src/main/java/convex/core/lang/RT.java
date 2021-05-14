@@ -648,10 +648,9 @@ public class RT {
 		// special case, we treat nil as empty sequence
 		if (o == null) throw new IndexOutOfBoundsException("Can't get nth element from null");
 
-		if (o instanceof ACollection) return ((ACollection<T>) o).get(i);
+		if (o instanceof ADataStructure) return ((ADataStructure<T>) o).get(i); // maps and collections
 		if (o instanceof ABlob) return (T) CVMByte.create(((ABlob) o).get(i));
 		if (o instanceof AString) return (T) CVMChar.create(((AString) o).charAt(Utils.checkedInt(i)));
-		if (o instanceof AMap) return (T) ((AMap<?,?>)o).entryAt(i);
 
 		throw new ClassCastException("Don't know how to get nth item of cell "+Utils.getClassName(o));
 	}

@@ -106,11 +106,5 @@ public abstract class ACollection<T extends ACell> extends ADataStructure<T> imp
 	
 	public abstract <R extends ACell> ACollection<R> map(Function<? super T, ? extends R> mapper);
 
-	/**
-	 * Gets the element at the specified index in this collection
-	 * 
-	 * @param index Index of element to get
-	 * @return Element at the specified index
-	 */
-	public abstract T get(long i);
+
 }

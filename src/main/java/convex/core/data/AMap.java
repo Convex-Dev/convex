@@ -208,6 +208,11 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 * @throws IndexOutOfBoundsException If this index is not valid
 	 */
 	public abstract MapEntry<K, V> entryAt(long i);
+	
+	@Override
+	public final MapEntry<K, V> get(long i) {
+		return entryAt(i);
+	}
 
 	/**
 	 * Gets the MapEntry for the given key
