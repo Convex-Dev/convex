@@ -7,15 +7,14 @@ import convex.core.lang.RT;
 /**
  * Type that represents CVM Long values
  */
-public final class Boolean extends AType {
-
+public final class Boolean extends AStandardType<CVMBool> {
 	/**
 	 * Singleton runtime instance
 	 */
 	public static final Boolean INSTANCE = new Boolean();
 
 	private Boolean() {
-		
+		super(CVMBool.class);
 	}
 	
 	@Override
@@ -29,24 +28,13 @@ public final class Boolean extends AType {
 	}
 
 	@Override
-	public boolean allowsNull() {
-		return false;
-	}
-
-	@Override
-	protected CVMBool defaultValue() {
+	public CVMBool defaultValue() {
 		return CVMBool.FALSE;
 	}
 
 	@Override
-	protected ACell implicitCast(ACell a) {
-		// TODO Auto-generated method stub
+	public CVMBool implicitCast(ACell a) {
 		return RT.bool(a)?CVMBool.TRUE:CVMBool.FALSE;
-	}
-
-	@Override
-	protected Class<? extends ACell> getJavaClass() {
-		return CVMBool.class;
 	}
 
 }

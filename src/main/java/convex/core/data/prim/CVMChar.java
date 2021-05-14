@@ -11,6 +11,8 @@ import convex.core.util.Utils;
  */
 public final class CVMChar extends APrimitive {
 
+	public static final CVMChar A = CVMChar.create('a');
+	
 	private final char value;
 	
 	public CVMChar(char value) {

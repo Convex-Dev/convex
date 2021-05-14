@@ -43,7 +43,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.impl.KeyFn;
+import convex.core.lang.impl.KeywordFn;
 import convex.core.lang.impl.MapFn;
 import convex.core.lang.impl.SeqFn;
 import convex.core.lang.impl.SetFn;
@@ -870,7 +870,7 @@ public class RT {
 		if (a instanceof AMap) return MapFn.wrap((AMap<?, T>) a);
 		if (a instanceof ASequence) return SeqFn.wrap((ASequence<?>) a);
 		if (a instanceof ASet) return (AFn<T>) SetFn.wrap((ASet<?>) a);
-		if (a instanceof Keyword) return KeyFn.wrap((Keyword) a);
+		if (a instanceof Keyword) return KeywordFn.wrap((Keyword) a);
 
 		return null;
 	}

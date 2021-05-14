@@ -6,7 +6,7 @@ import convex.core.data.prim.CVMByte;
 /**
  * Type that represents CVM Byte values
  */
-public final class Byte extends ANumericType {
+public final class Byte extends ANumericType<CVMByte> {
 
 	/**
 	 * Singleton runtime instance
@@ -14,7 +14,7 @@ public final class Byte extends ANumericType {
 	public static final Byte INSTANCE = new Byte();
 
 	private Byte() {
-		
+		super (CVMByte.class);
 	}
 	
 	@Override
@@ -28,24 +28,13 @@ public final class Byte extends ANumericType {
 	}
 
 	@Override
-	public boolean allowsNull() {
-		return false;
-	}
-
-	@Override
-	protected CVMByte defaultValue() {
+	public CVMByte defaultValue() {
 		return CVMByte.ZERO;
 	}
 
 	@Override
-	protected CVMByte implicitCast(ACell a) {
+	public CVMByte implicitCast(ACell a) {
 		if (a instanceof CVMByte) return (CVMByte)a;
 		return null;
 	}
-
-	@Override
-	protected Class<? extends ACell> getJavaClass() {
-		return CVMByte.class;
-	}
-
 }

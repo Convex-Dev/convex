@@ -25,18 +25,27 @@ public class Types {
 	
 	// Atomic types
 	public static final Boolean BOOLEAN = Boolean.INSTANCE;
-	
+	public static final CharacterType CHARACTER = CharacterType.INSTANCE;
+
 	// Named types
 	public static final KeywordType KEYWORD = KeywordType.INSTANCE;
 	public static final SymbolType SYMBOL = SymbolType.INSTANCE;
 	public static final StringType STRING = StringType.INSTANCE;
 	
+	// Data Structures
+	public static final DataStructure DATA_STRUCTURE = DataStructure.INSTANCE;
 	public static final Record RECORD = Record.INSTANCE;
 	public static final Map MAP = Map.INSTANCE;
+	public static final Sequence SEQUENCE = Sequence.INSTANCE;
+
 
 	public static final Blob BLOB = Blob.INSTANCE;
+	public static final AddressType ADDRESS = AddressType.INSTANCE;
+	public static final KeyType KEY = KeyType.INSTANCE;
+
 	
 	public static final Function FUNCTION = Function.INSTANCE;
+	public static final OpCode OP = OpCode.INSTANCE;
 
 
 	public static AType[] ALL_TYPES=new AType[] {
@@ -56,6 +65,8 @@ public class Types {
 		SYMBOL,
 		MAP,
 		BLOB,
+		ADDRESS,
+		KEY,
 		FUNCTION
 
 	};

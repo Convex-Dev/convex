@@ -6,7 +6,7 @@ import convex.core.data.prim.APrimitive;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 
-public class Number extends ANumericType {
+public class Number extends AType {
 	
 	public static final Number INSTANCE = new Number();
 	
@@ -30,18 +30,18 @@ public class Number extends ANumericType {
 	}
 
 	@Override
-	protected APrimitive defaultValue() {
+	public APrimitive defaultValue() {
 		return CVMLong.ZERO;
 	}
 
 	@Override
-	protected APrimitive implicitCast(ACell a) {
+	public APrimitive implicitCast(ACell a) {
 		if (a instanceof INumeric) return (APrimitive)a;
 		return null;
 	}
 	
 	@Override
-	protected Class<? extends ACell> getJavaClass() {
+	public Class<? extends ACell> getJavaClass() {
 		return APrimitive.class;
 	}
 

@@ -7,12 +7,13 @@ import convex.core.data.Sets;
 /**
  * Type that represents any CVM collection
  */
-public class Set extends AType {
+@SuppressWarnings("rawtypes")
+public class Set extends AStandardType<ASet> {
 
 	public static final Set INSTANCE = new Set();
 	
 	private Set() {
-		
+		super(ASet.class);
 	}
 
 	@Override
@@ -21,29 +22,18 @@ public class Set extends AType {
 	}
 
 	@Override
-	public boolean allowsNull() {
-		return false;
-	}
-
-	@Override
 	public String toString() {
 		return "Set";
 	}
 
 	@Override
-	protected ASet<?> defaultValue() {
+	public ASet<?> defaultValue() {
 		return Sets.empty();
 	}
 
 	@Override
-	protected ASet<?> implicitCast(ACell a) {
+	public ASet<?> implicitCast(ACell a) {
 		if (a instanceof ASet) return (ASet<?>)a;
 		return null;
 	}
-	
-	@Override
-	protected Class<? extends ACell> getJavaClass() {
-		return ASet.class;
-	}
-
 }

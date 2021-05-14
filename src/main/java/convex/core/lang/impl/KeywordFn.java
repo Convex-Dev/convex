@@ -3,18 +3,19 @@ package convex.core.lang.impl;
 import convex.core.data.ACell;
 import convex.core.data.IGet;
 import convex.core.data.Keyword;
+import convex.core.data.type.Types;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 
-public class KeyFn<T extends ACell> extends ADataFn<T> {
+public class KeywordFn<T extends ACell> extends ADataFn<T> {
 	private Keyword key;
 
-	public KeyFn(Keyword k) {
+	public KeywordFn(Keyword k) {
 		this.key = k;
 	}
 
-	public static <T extends ACell> KeyFn<T> wrap(Keyword k) {
-		return new KeyFn<T>(k);
+	public static <T extends ACell> KeywordFn<T> wrap(Keyword k) {
+		return new KeywordFn<T>(k);
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
@@ -24,7 +25,7 @@ public class KeyFn<T extends ACell> extends ADataFn<T> {
 		T result;
 		if (n == 1) {
 			IGet<T> gettable = RT.toGettable(args[0]);
-			if (gettable == null) return context.withCastError(args[0], IGet.class);
+			if (gettable == null) return context.withCastError(args[0], Types.DATA_STRUCTURE);
 			result = gettable.get(key);
 		} else if (n == 2) {
 			ACell ds = args[0];
@@ -33,7 +34,7 @@ public class KeyFn<T extends ACell> extends ADataFn<T> {
 				result = (T) notFound;
 			} else {
 				IGet<T> gettable = RT.toGettable(ds);
-				if (gettable == null) return context.withCastError(ds, IGet.class);
+				if (gettable == null) return context.withCastError(ds, Types.DATA_STRUCTURE);
 				result = (T) RT.get(gettable, key, notFound);
 			}
 		} else {

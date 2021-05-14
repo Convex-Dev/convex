@@ -7,12 +7,13 @@ import convex.core.data.Vectors;
 /**
  * Type that represents any CVM collection
  */
-public class Collection extends AType {
+@SuppressWarnings("rawtypes")
+public class Collection extends AStandardType<ACollection> {
 
 	public static final Collection INSTANCE = new Collection();
 	
 	private Collection() {
-		
+		super (ACollection.class);
 	}
 
 	@Override
@@ -21,29 +22,18 @@ public class Collection extends AType {
 	}
 
 	@Override
-	public boolean allowsNull() {
-		return false;
-	}
-
-	@Override
 	public String toString() {
 		return "Collection";
 	}
 
 	@Override
-	protected ACollection<?> defaultValue() {
+	public ACollection<?> defaultValue() {
 		return Vectors.empty();
 	}
 
 	@Override
-	protected ACollection<?> implicitCast(ACell a) {
+	public ACollection<?> implicitCast(ACell a) {
 		if (a instanceof ACollection) return (ACollection<?>)a;
 		return null;
 	}
-
-	@Override
-	protected Class<? extends ACell> getJavaClass() {
-		return ACollection.class;
-	}
-
 }

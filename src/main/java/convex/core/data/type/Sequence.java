@@ -1,26 +1,26 @@
 package convex.core.data.type;
 
 import convex.core.data.ACell;
+import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Vectors;
 
 /**
- * Type that represents any CVM collection
+ * Type that represents any CVM sequence
  */
 @SuppressWarnings("rawtypes")
-public class Vector extends AStandardType<AVector> {
+public class Sequence extends AStandardType<ASequence> {
 
-	public static final Vector INSTANCE = new Vector();
+	public static final Sequence INSTANCE = new Sequence();
 	
-	private Vector() {
-		super(AVector.class);
+	private Sequence() {
+		super (ASequence.class);
 	}
 
 	@Override
 	public boolean check(ACell value) {
-		return (value instanceof AVector);
+		return (value instanceof ASequence);
 	}
-
 
 	@Override
 	public String toString() {
@@ -33,8 +33,8 @@ public class Vector extends AStandardType<AVector> {
 	}
 	
 	@Override
-	public AVector implicitCast(ACell a) {
-		if (a instanceof AVector) return (AVector)a;
+	public ASequence<?> implicitCast(ACell a) {
+		if (a instanceof ASequence) return (ASequence<?>)a;
 		return null;
 	}
 }

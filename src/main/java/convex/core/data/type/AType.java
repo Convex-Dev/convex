@@ -26,19 +26,20 @@ public abstract class AType {
 
 	/**
 	 * Gets the default value for this type. May return null.
-	 * @return
+	 * @return Default value for the given Type
 	 */
-	protected abstract ACell defaultValue();
+	public abstract ACell defaultValue();
 	
 	/**
 	 * Gets the default value for this type. Returns null if the cast fails.
-	 * @return
+	 * @return Value cast to this Type, or null if the cast fails
 	 */
-	protected abstract ACell implicitCast(ACell a);
+	public abstract ACell implicitCast(ACell a);
 	
 	/**
-	 * Gets the Java base class for all instances of this type.
-	 * @return
+	 * Gets the Java common base class for all instances of this type.
+	 * 
+	 * @return Java Class representing this Type
 	 */
-	protected abstract Class<? extends ACell> getJavaClass();
+	public abstract Class<? extends ACell> getJavaClass();
 }

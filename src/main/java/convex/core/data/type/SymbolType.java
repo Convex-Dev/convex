@@ -7,7 +7,7 @@ import convex.core.lang.Symbols;
 /**
  * Type that represents CVM Byte values
  */
-public final class SymbolType extends AType {
+public final class SymbolType extends AStandardType<Symbol> {
 
 	/**
 	 * Singleton runtime instance
@@ -15,7 +15,7 @@ public final class SymbolType extends AType {
 	public static final SymbolType INSTANCE = new SymbolType();
 
 	private SymbolType() {
-		
+		super(Symbol.class);
 	}
 	
 	@Override
@@ -25,28 +25,17 @@ public final class SymbolType extends AType {
 	
 	@Override
 	public String toString () {
-		return "Keyword";
+		return "Symbol";
 	}
 
 	@Override
-	public boolean allowsNull() {
-		return false;
-	}
-
-	@Override
-	protected Symbol defaultValue() {
+	public Symbol defaultValue() {
 		return Symbols.FOO;
 	}
 
 	@Override
-	protected Symbol implicitCast(ACell a) {
+	public Symbol implicitCast(ACell a) {
 		if (a instanceof Symbol) return (Symbol)a;
 		return null;
 	}
-	
-	@Override
-	protected Class<? extends ACell> getJavaClass() {
-		return Symbol.class;
-	}
-
 }

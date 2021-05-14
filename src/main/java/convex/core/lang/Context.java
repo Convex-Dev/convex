@@ -28,6 +28,7 @@ import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.data.type.AType;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.expanders.AExpander;
 import convex.core.lang.impl.AExceptional;
@@ -884,7 +885,7 @@ public final class Context<T extends ACell> extends AObject {
 			
 			// Count the arguments, exit with a CAST error if args are not sequential
 			Long argCount=RT.count(args);
-			if (argCount==null) return ctx.withCastError(args, ASequence.class); 
+			if (argCount==null) return ctx.withError(ErrorCodes.CAST, "Trying to destructure an argument that is not a sequenctial collection"); 
 						
 			boolean foundAmpersand=false;
 			for (long i=0; i<bindCount; i++) {
@@ -1651,16 +1652,20 @@ public final class Context<T extends ACell> extends AObject {
 		return withError(ErrorCodes.BOUNDS,"Index: "+index);
 	}
 	
-	public <R extends ACell> Context<R> withCastError(Object a, Class<?> klass) {
-		return withError(ErrorCodes.CAST,"Can't convert "+a+" of class "+Utils.getClassName(a)+" to type "+klass);
+	public <R extends ACell> Context<R> withCastError(ACell a, AType klass) {
+		return withError(ErrorCodes.CAST,"Can't convert "+a+" of type "+RT.getType(a)+" to type "+klass);
 	}
 	
-	public <R extends ACell> Context<R> withCastError(Class<?> klass) {
+	public <R extends ACell> Context<R> withCastError(ACell[] a, AType klass) {
+		return withError(ErrorCodes.CAST,"Can't convert argument(s) to type "+klass);
+	}
+	
+	public <R extends ACell> Context<R> withCastError(AType klass) {
 		return withError(ErrorCodes.CAST,"Can't convert argument(s) to type "+klass);
 	}
 
 	
-	public <R extends ACell> Context<R> withCastError(Object a, String message) {
+	public <R extends ACell> Context<R> withCastError(ACell a, String message) {
 		return withError(ErrorCodes.CAST,message);
 	}
 

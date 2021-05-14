@@ -5,14 +5,15 @@ import convex.core.data.AMap;
 import convex.core.data.Maps;
 
 /**
- * Type that represents any CVM collection
+ * Type that represents any CVM map
  */
-public class Map extends AType {
+@SuppressWarnings("rawtypes")
+public class Map extends AStandardType<AMap> {
 
 	public static final Map INSTANCE = new Map();
 	
 	private Map() {
-		
+		super(AMap.class);
 	}
 
 	@Override
@@ -21,30 +22,19 @@ public class Map extends AType {
 	}
 
 	@Override
-	public boolean allowsNull() {
-		return false;
-	}
-
-	@Override
 	public String toString() {
 		return "Map";
 	}
 
 	@Override
-	protected AMap<?,?> defaultValue() {
+	public AMap<?,?> defaultValue() {
 		return Maps.empty();
 	}
 
-	@SuppressWarnings("rawtypes")
 	@Override
-	protected AMap implicitCast(ACell a) {
+	public AMap implicitCast(ACell a) {
 		if (a instanceof AMap) return (AMap)a;
 		return null;
-	}
-	
-	@Override
-	protected Class<? extends ACell> getJavaClass() {
-		return AMap.class;
 	}
 
 }

@@ -7,7 +7,7 @@ import convex.core.lang.RT;
 /**
  * Type that represents CVM Long values
  */
-public final class Long extends ANumericType {
+public final class Long extends ANumericType<CVMLong> {
 
 	/**
 	 * Singleton runtime instance
@@ -15,7 +15,7 @@ public final class Long extends ANumericType {
 	public static final Long INSTANCE = new Long();
 
 	private Long() {
-		
+		super (CVMLong.class);
 	}
 	
 	@Override
@@ -29,23 +29,12 @@ public final class Long extends ANumericType {
 	}
 
 	@Override
-	public boolean allowsNull() {
-		return false;
-	}
-
-	@Override
-	protected CVMLong defaultValue() {
+	public CVMLong defaultValue() {
 		return CVMLong.ZERO;
 	}
 
 	@Override
-	protected CVMLong implicitCast(ACell a) {
+	public CVMLong implicitCast(ACell a) {
 		return RT.ensureLong(a);
 	}
-	
-	@Override
-	protected Class<? extends ACell> getJavaClass() {
-		return CVMLong.class;
-	}
-
 }

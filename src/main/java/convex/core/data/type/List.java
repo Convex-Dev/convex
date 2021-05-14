@@ -7,12 +7,13 @@ import convex.core.data.Lists;
 /**
  * Type that represents any CVM collection
  */
-public class List extends AType {
+@SuppressWarnings("rawtypes")
+public class List extends AStandardType<AList> {
 
 	public static final List INSTANCE = new List();
 	
 	private List() {
-		
+		super(AList.class);
 	}
 
 	@Override
@@ -21,29 +22,18 @@ public class List extends AType {
 	}
 
 	@Override
-	public boolean allowsNull() {
-		return false;
-	}
-
-	@Override
 	public String toString() {
 		return "List";
 	}
 
 	@Override
-	protected AList<?> defaultValue() {
+	public AList<?> defaultValue() {
 		return Lists.empty();
 	}
 
 	@Override
-	protected AList<?> implicitCast(ACell a) {
+	public AList<?> implicitCast(ACell a) {
 		if (a instanceof AList) return (AList<?>)a;
 		return null;
 	}
-	
-	@Override
-	protected Class<? extends ACell> getJavaClass() {
-		return AList.class;
-	}
-
 }

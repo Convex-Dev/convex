@@ -7,12 +7,13 @@ import convex.core.lang.Core;
 /**
  * Type that represents any CVM collection
  */
-public class Function extends AType {
+@SuppressWarnings("rawtypes")
+public class Function extends AStandardType<AFn> {
 
 	public static final Function INSTANCE = new Function();
 	
 	private Function() {
-		
+		super(AFn.class);
 	}
 
 	@Override
@@ -21,30 +22,19 @@ public class Function extends AType {
 	}
 
 	@Override
-	public boolean allowsNull() {
-		return false;
-	}
-
-	@Override
 	public String toString() {
 		return "Function";
 	}
 
 	@Override
-	protected AFn<?> defaultValue() {
+	public AFn<?> defaultValue() {
 		return Core.VECTOR;
 	}
 
-	@SuppressWarnings("rawtypes")
 	@Override
-	protected AFn implicitCast(ACell a) {
+	public AFn implicitCast(ACell a) {
 		if (a instanceof AFn) return (AFn)a;
 		return null;
-	}
-	
-	@Override
-	protected Class<? extends ACell> getJavaClass() {
-		return AFn.class;
 	}
 
 }

@@ -29,17 +29,17 @@ public class Any extends AType {
 	}
 
 	@Override
-	protected ACell defaultValue() {
+	public ACell defaultValue() {
 		return null;
 	}
 
 	@Override
-	protected ACell implicitCast(ACell a) {
+	public ACell implicitCast(ACell a) {
 		return a;
 	}
 
 	@Override
-	protected Class<? extends ACell> getJavaClass() {
+	public Class<? extends ACell> getJavaClass() {
 		return ACell.class;
 	}
 

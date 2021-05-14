@@ -7,7 +7,7 @@ import convex.core.lang.RT;
 /**
  * Type that represents CVM Double values
  */
-public final class Double extends ANumericType {
+public final class Double extends ANumericType<CVMDouble> {
 
 	/**
 	 * Singleton runtime instance
@@ -15,7 +15,7 @@ public final class Double extends ANumericType {
 	public static final Double INSTANCE = new Double();
 
 	private Double() {
-		
+		super (CVMDouble.class);
 	}
 	
 	@Override
@@ -29,23 +29,12 @@ public final class Double extends ANumericType {
 	}
 
 	@Override
-	public boolean allowsNull() {
-		return false;
-	}
-
-	@Override
-	protected CVMDouble defaultValue() {
+	public CVMDouble defaultValue() {
 		return CVMDouble.ZERO;
 	}
 
 	@Override
-	protected CVMDouble implicitCast(ACell a) {
+	public CVMDouble implicitCast(ACell a) {
 		return RT.ensureDouble(a);
 	}
-
-	@Override
-	protected Class<? extends ACell> getJavaClass() {
-		return CVMDouble.class;
-	}
-
 }

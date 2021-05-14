@@ -24,6 +24,8 @@ import convex.core.lang.Ops;
  */
 public class Do<T extends ACell> extends AMultiOp<T> {
 
+	public static final Do<?> EMPTY = Do.create();
+
 	protected Do(AVector<AOp<ACell>> ops) {
 		super(ops);
 	}

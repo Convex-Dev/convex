@@ -7,15 +7,14 @@ import convex.core.data.Strings;
 /**
  * Type that represents CVM Byte values
  */
-public final class StringType extends AType {
-
+public final class StringType extends AStandardType<AString> {
 	/**
 	 * Singleton runtime instance
 	 */
 	public static final StringType INSTANCE = new StringType();
 
 	private StringType() {
-		
+		super (AString.class);
 	}
 	
 	@Override
@@ -28,25 +27,15 @@ public final class StringType extends AType {
 		return "String";
 	}
 
-	@Override
-	public boolean allowsNull() {
-		return false;
-	}
 
 	@Override
-	protected AString defaultValue() {
+	public AString defaultValue() {
 		return Strings.EMPTY;
 	}
 
 	@Override
-	protected AString implicitCast(ACell a) {
+	public AString implicitCast(ACell a) {
 		if (a instanceof AString) return (AString)a;
 		return null;
 	}
-	
-	@Override
-	protected Class<? extends ACell> getJavaClass() {
-		return AString.class;
-	}
-
 }

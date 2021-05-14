@@ -29,18 +29,18 @@ public class Nil extends AType {
 	}
 
 	@Override
-	protected ACell defaultValue() {
+	public ACell defaultValue() {
 		return null;
 	}
 
 	@Override
-	protected ACell implicitCast(ACell a) {
+	public ACell implicitCast(ACell a) {
 		// TODO: confirm anything can cast to null?
 		return null;
 	}
 	
 	@Override
-	protected Class<? extends ACell> getJavaClass() {
+	public Class<? extends ACell> getJavaClass() {
 		return ACell.class;
 	}
 

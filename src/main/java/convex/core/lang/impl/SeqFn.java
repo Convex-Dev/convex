@@ -3,6 +3,7 @@ package convex.core.lang.impl;
 import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.prim.CVMLong;
+import convex.core.data.type.Types;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 
@@ -30,14 +31,14 @@ public class SeqFn<T extends ACell> extends ADataFn<T> {
 		int n = args.length;
 		if (n == 1) {
 			CVMLong key = RT.ensureLong(args[0]);
-			if (key==null) return context.withCastError(args[0], Long.class);
+			if (key==null) return context.withCastError(args[0], Types.LONG);
 			long ix=key.longValue();
 			if ((ix < 0) || (ix >= seq.count())) return (Context<T>) context.withBoundsError(ix);
 			T result = (T) seq.get(key);
 			return context.withResult(result);
 		} else if (n == 2) {
 			CVMLong key = RT.ensureLong(args[0]);
-			if (key==null) return context.withCastError(args[0], Long.class);
+			if (key==null) return context.withCastError(args[0], Types.LONG);
 			long ix=key.longValue();
 			if ((ix < 0) || (ix >= seq.count())) return (Context<T>) context.withResult((T)args[1]);
 			T result = (T) seq.get(key);

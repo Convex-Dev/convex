@@ -6,12 +6,12 @@ import convex.core.data.ARecord;
 /**
  * Type that represents any CVM collection
  */
-public class Record extends AType {
+public class Record extends AStandardType<ARecord> {
 
 	public static final Record INSTANCE = new Record();
 	
 	private Record() {
-		
+		super(ARecord.class);
 	}
 
 	@Override
@@ -20,29 +20,19 @@ public class Record extends AType {
 	}
 
 	@Override
-	public boolean allowsNull() {
-		return false;
-	}
-
-	@Override
 	public String toString() {
 		return "Record";
 	}
 
 	@Override
-	protected ARecord defaultValue() {
+	public ARecord defaultValue() {
 		return ARecord.DEFAULT_VALUE;
 	}
 
 	@Override
-	protected ARecord implicitCast(ACell a) {
+	public ARecord implicitCast(ACell a) {
 		if (a instanceof ARecord) return (ARecord)a;
 		return null;
-	}
-	
-	@Override
-	protected Class<? extends ACell> getJavaClass() {
-		return ARecord.class;
 	}
 
 }

@@ -7,7 +7,7 @@ import convex.core.data.Keywords;
 /**
  * Type that represents CVM Byte values
  */
-public final class KeywordType extends AType {
+public final class KeywordType extends AStandardType<Keyword> {
 
 	/**
 	 * Singleton runtime instance
@@ -15,7 +15,7 @@ public final class KeywordType extends AType {
 	public static final KeywordType INSTANCE = new KeywordType();
 
 	private KeywordType() {
-		
+		super(Keyword.class);
 	}
 	
 	@Override
@@ -29,23 +29,13 @@ public final class KeywordType extends AType {
 	}
 
 	@Override
-	public boolean allowsNull() {
-		return false;
-	}
-
-	@Override
-	protected Keyword defaultValue() {
+	public Keyword defaultValue() {
 		return Keywords.FOO;
 	}
 
 	@Override
-	protected Keyword implicitCast(ACell a) {
+	public Keyword implicitCast(ACell a) {
 		if (a instanceof Keyword) return (Keyword)a;
 		return null;
-	}
-
-	@Override
-	protected Class<? extends ACell> getJavaClass() {
-		return Keyword.class;
 	}
 }
