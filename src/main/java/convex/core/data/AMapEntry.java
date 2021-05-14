@@ -1,7 +1,6 @@
 package convex.core.data;
 
 import java.util.Iterator;
-import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Spliterator;
@@ -12,7 +11,7 @@ import convex.core.exceptions.TODOException;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
-public abstract class AMapEntry<K extends ACell, V extends ACell> extends AVector<ACell> implements List<ACell>, Map.Entry<K, V> {
+public abstract class AMapEntry<K extends ACell, V extends ACell> extends AVector<ACell> implements Map.Entry<K, V> {
 
 	@Override
 	public abstract ACell get(long i);

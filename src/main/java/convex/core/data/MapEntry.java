@@ -60,7 +60,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	}
 	
 	/**
-	 * Create a map entry, coerving key and value to correct CVM types.
+	 * Create a map entry, converting key and value to correct CVM types.
 	 * @param <K> Type of Keys
 	 * @param <V> Type of Values
 	 * @param key Key to use for map entry
