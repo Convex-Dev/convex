@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
@@ -116,7 +117,25 @@ public class TypesTest {
 		Stream.of(Types.ALL_TYPES).forEach(t -> {
 			String name=t.toString();
 			assertFalse(names.containsKey(name),"Name clash "+t+" has same name ("+name+" ) as type "+names.get(name));
+			names.put(name, t);
 		});
+	}
+	
+	@Test
+	public void testTypeCoverage() {
+		HashSet<AType> types=new HashSet<>();
+		Stream.of(Types.ALL_TYPES).forEach(t -> {
+			assertFalse(types.contains(t),"Duplicate type: "+t);
+			types.add(t);
+		});
+		
+		Stream.of(Samples.VALUES).forEach(v -> {
+			AType t=RT.getType(v);
+			types.remove(t);
+		});
+		
+		// TODO: differentiate between concrete types and superclasses
+		// assertTrue(types.isEmpty(),"Types not covered with test values: "+types);
 	}
 	
 	@ParameterizedTest

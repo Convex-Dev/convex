@@ -45,12 +45,14 @@ import convex.core.data.VectorTree;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
+import convex.core.lang.ops.Do;
 
 /**
  * Miscellaneous value objects for testing purposes
@@ -252,7 +254,11 @@ public class Samples {
 			BAD_HASH,
 			Symbols.FOO,
 			Strings.EMPTY,
-			MAX_EMBEDDED_STRING
+			MAX_EMBEDDED_STRING,
+			Do.EMPTY,
+			Address.ZERO,
+			AccountKey.ZERO,
+			CVMChar.A
 	};
 	
 	public static class ValueArgumentsProvider implements ArgumentsProvider {
