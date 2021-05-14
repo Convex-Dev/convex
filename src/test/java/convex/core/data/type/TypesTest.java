@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.HashMap;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
@@ -109,9 +110,19 @@ public class TypesTest {
 		assertTrue((a==null)||klass.isInstance(a));
 	}
 	
+	@Test
+	public void testTypeNames() {
+		HashMap<String,AType> names=new HashMap<>();
+		Stream.of(Types.ALL_TYPES).forEach(t -> {
+			String name=t.toString();
+			assertFalse(names.containsKey(name),"Name clash "+t+" has same name ("+name+" ) as type "+names.get(name));
+		});
+	}
+	
 	@ParameterizedTest
 	@ArgumentsSource(TypeArgumentsProvider.class)
 	public void testAllTypes(AType t) {
+		
 		ACell a=t.defaultValue();
 		assertTrue(t.check(a));
 		assertSame(a,t.implicitCast(a));

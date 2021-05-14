@@ -51,23 +51,33 @@ public class Types {
 	public static AType[] ALL_TYPES=new AType[] {
 		NIL,
 		ANY,
+		
 		COLLECTION,
+		DATA_STRUCTURE,
+		RECORD,
+		SEQUENCE,
 		VECTOR,
+		MAP,
 		LIST,
 		SET,
+		
+		NUMBER,
 		LONG,
 		BYTE,
 		DOUBLE,
-		NUMBER,
+		
 		BOOLEAN,
+		CHARACTER,
 		STRING,
 		KEYWORD,
 		SYMBOL,
-		MAP,
+		
 		BLOB,
 		ADDRESS,
 		KEY,
-		FUNCTION
+		
+		FUNCTION,
+		OP
 
 	};
 }
