@@ -525,6 +525,26 @@ public class RT {
 		if (a instanceof APrimitive) return ((APrimitive) a).doubleValue();
 		throw new IllegalArgumentException("Can't convert to double: " + Utils.getClassName(a));
 	}
+	
+	/**
+	 * Converts any data structure to a vector
+	 * 
+	 * @return AVector instance, or null if not convertible
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> AVector<T> vec(Object o) {
+		if (o==null) return Vectors.empty();
+		if (o instanceof ACell) return vec((ACell) o);
+		
+		if (o.getClass().isArray()) {
+			ACell[] arr = Utils.toCellArray(o);
+			return Vectors.create(arr);
+		}
+
+		if (o instanceof java.util.List) return Vectors.create((java.util.List<T>) o);
+
+		return null;
+	}
 
 	/**
 	 * Converts any data structure to a vector
@@ -532,7 +552,7 @@ public class RT {
 	 * @return AVector instance
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> AVector<T> vec(Object o) {
+	public static <T extends ACell> AVector<T> vec(ACell o) {
 		if (o == null) return Vectors.empty();
 		if (o instanceof ACollection) return vec((ACollection<T>) o);
 		return vec(sequence(o));
@@ -542,7 +562,7 @@ public class RT {
 	 * Converts any collection to a set
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> ASet<T> set(Object o) {
+	public static <T extends ACell> ASet<T> set(ACell o) {
 		if (o == null) return Sets.empty();
 		if (o instanceof ASet) return (ASet<T>) o;
 		if (o instanceof Collection) return Sets.create((Collection<T>) o);
@@ -559,34 +579,6 @@ public class RT {
 		return coll.toVector();
 	}
 
-	/**
-	 * Converts any collection of cells into a sequence data structure. Handles Java arrays.
-	 * 
-	 * Potentially O(n) in size of collection.
-	 * 
-	 * Nulls are converted to an empty vector.
-	 * 
-	 * Returns null if conversion is not possible.
-	 * 
-	 * @param <T> Type of cell in collection
-	 * @param o An object that contains a collection of cells
-	 * @return An ASequence instance, or null if the argument cannot be converted to
-	 *         a sequence
-	 */
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> ASequence<T> sequence(Object o) {
-		if (o == null) return Vectors.empty();
-		if (o instanceof ACell) return sequence((ACell)o);
-		
-		if (o.getClass().isArray()) {
-			ACell[] arr = Utils.toCellArray(o);
-			return Vectors.create(arr);
-		}
-
-		if (o instanceof java.util.List) return Vectors.create((java.util.List<T>) o);
-
-		return null;
-	}
 	
 	/**
 	 * Converts any collection of cells into a sequence data structure. 
@@ -677,21 +669,6 @@ public class RT {
 		}
 
 		throw new ClassCastException("Can't get nth element from object of class: " + Utils.getClassName(o));
-	}
-
-	/**
-	 * Gets the remainder of a sequence after the first element, or null if there
-	 * are no more elements.
-	 * 
-	 * @param <T>
-	 * @param o
-	 * @return The remaining sequence, or null if no more elements
-	 */
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> ASequence<T> next(Object o) {
-		if (o == null) return null;
-		if (o instanceof ASequence) return ((ASequence<T>) o).next();
-		throw new IllegalArgumentException("Not a sequence: " + Utils.getClassName(o));
 	}
 	
 	/**

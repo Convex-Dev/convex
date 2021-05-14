@@ -56,15 +56,22 @@ public class RTTest {
 	public void testSequence() {
 		AVector<CVMLong> v = Vectors.of(1L, 2L, 3L);
 		AList<CVMLong> l = Lists.of(1L, 2L, 3L);
-		assertEquals(Vectors.of(1L, 2L,3L), RT.sequence(l.toCellArray()));
-		assertEquals(v, RT.sequence(new java.util.ArrayList<>(v)));
 		assertSame(v, RT.sequence(v));
 		assertSame(l, RT.sequence(l));
 		assertSame(Vectors.empty(), RT.sequence(null));
 
 		// null return values if cast fails
-		assertNull(RT.sequence(1)); // ints not allowed
 		assertNull(RT.sequence(Keywords.FOO)); // keywords not allowed
+	}
+	
+	@Test
+	public void testVec() {
+		AVector<CVMLong> v = Vectors.of(1L, 2L, 3L);
+		AList<CVMLong> l = Lists.of(1L, 2L, 3L);
+		assertEquals(Vectors.of(1L, 2L,3L), RT.vec(l.toCellArray()));
+		assertEquals(v, RT.vec(new java.util.ArrayList<>(v)));
+		
+		assertNull(RT.vec(1)); // ints not allowed
 	}
 	
 	@Test 

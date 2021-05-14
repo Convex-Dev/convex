@@ -2,8 +2,8 @@ package convex.core.lang.impl;
 
 import convex.core.ErrorCodes;
 import convex.core.data.ACell;
-import convex.core.data.ASequence;
-import convex.core.lang.RT;
+import convex.core.data.AVector;
+import convex.core.data.Vectors;
 
 /**
  * Class representing a function return value.
@@ -43,7 +43,7 @@ public class RecurValue extends AReturn {
 
 	@Override
 	public String toString() {
-		ASequence<?> seq = RT.sequence(values); // should always convert OK
+		AVector<?> seq = Vectors.create(values); // should always convert OK
 		return "RecurValue: " + seq;
 	}
 

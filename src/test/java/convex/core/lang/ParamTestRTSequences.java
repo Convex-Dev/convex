@@ -12,6 +12,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import convex.core.data.ACell;
+import convex.core.data.ACollection;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.List;
@@ -35,12 +36,12 @@ public class ParamTestRTSequences {
 				{ 3, Sets.of(null, 1L, 1.0) } });
 	}
 
-	private ASequence<?> data;
+	private ACollection<?> data;
 	private long expectedCount;
 
 	public ParamTestRTSequences(int expectedCount, Object data) {
 		this.expectedCount = expectedCount;
-		this.data = RT.sequence(data);
+		this.data = (ACollection<?>)data;
 	}
 
 	@Test
@@ -64,7 +65,7 @@ public class ParamTestRTSequences {
 
 	@Test
 	public void testCons() {
-		ASequence<ACell> a = RT.cons(RT.cvm("foo"), data);
+		ASequence<ACell> a = RT.cons(RT.cvm("foo"), RT.sequence(data));
 		assertCVMEquals("foo", a.get(0));
 		assertCVMEquals("foo", RT.nth(a, 0));
 	}
@@ -72,21 +73,10 @@ public class ParamTestRTSequences {
 	@Test
 	public void testFirst() {
 		if (expectedCount > 0) {
-			Object fst = data.get(0);
+			ACell fst = data.get(0);
 			assertEquals(RT.nth(data, 0), fst);
 		} else {
-			assertThrows(IndexOutOfBoundsException.class, () -> data.get(0));
-		}
-	}
-
-	@Test
-	public void testNext() {
-		if (expectedCount > 0) {
-			ASequence<?> nxt = RT.next(data);
-			assertEquals(expectedCount - 1, nxt.count());
-			if (expectedCount > 1) {
-				assertEquals((Object)RT.nth(data, 1), RT.nth(nxt, 0));
-			}
+			if (data!=null) assertThrows(IndexOutOfBoundsException.class, () -> data.get(0));
 		}
 	}
 }
