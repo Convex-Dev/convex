@@ -2,6 +2,7 @@ package convex.core.data.type;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -106,7 +107,9 @@ public class TypesTest {
 	public void testSampleValues(ACell a) {
 		AType t=RT.getType(a);
 		assertTrue(t.check(a));
-		assertSame(a,t.implicitCast(a));
+		assertSame(a,t.implicitCast(a),"Implicit cast to same runtime type should not change a value");
+		
+		assertNotSame(t,Types.ANY,"Runtime type of a value should not be Any");
 		
 		Class<? extends ACell> klass=t.getJavaClass();
 		assertTrue((a==null)||klass.isInstance(a));
@@ -146,6 +149,12 @@ public class TypesTest {
 		ACell a=t.defaultValue();
 		assertTrue(t.check(a));
 		assertSame(a,t.implicitCast(a));
+		
+		if (t.allowsNull()) {
+			assertTrue(t.check(null));
+		} else {
+			assertFalse(t.check(null));
+		}
 		
 		Class<? extends ACell> klass=t.getJavaClass();
 		assertNotNull(klass);
