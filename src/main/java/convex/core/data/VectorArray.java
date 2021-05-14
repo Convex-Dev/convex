@@ -29,8 +29,7 @@ public class VectorArray<T extends ACell> extends ASizedVector<T> {
 	
 	@Override
 	public ListIterator<T> listIterator() {
-		// TODO Auto-generated method stub
-		return null;
+		throw new UnsupportedOperationException();
 	}
 
 	@Override

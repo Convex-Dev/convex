@@ -1395,7 +1395,7 @@ public class Core {
 
 			Long n = RT.count(a);
 			if (n == null) return context.withCastError(0,args, Types.SEQUENCE);
-			if (n==0) return context.withBoundsError(-1);
+			if (n<=0) return context.withBoundsError(-1);
 			
 			ACell result = RT.nth(a,n-1);
 

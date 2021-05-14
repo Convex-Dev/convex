@@ -885,7 +885,7 @@ public final class Context<T extends ACell> extends AObject {
 			
 			// Count the arguments, exit with a CAST error if args are not sequential
 			Long argCount=RT.count(args);
-			if (argCount==null) return ctx.withError(ErrorCodes.CAST, "Trying to destructure an argument that is not a sequenctial collection"); 
+			if (argCount==null) return ctx.withError(ErrorCodes.CAST, "Trying to destructure an argument that is not a sequential collection"); 
 						
 			boolean foundAmpersand=false;
 			for (long i=0; i<bindCount; i++) {
@@ -901,7 +901,7 @@ public final class Context<T extends ACell> extends AObject {
 					// bind variadic form at position i+1 to all args except nLeft
 					long consumeCount=(argCount-i)-nLeft;
 					if (consumeCount<0) return ctx.withArityError("Insufficient arguments to allow variadic binding");
-					AVector<ACell> rest=RT.vec(args).slice(i,consumeCount);
+					AVector<ACell> rest=RT.vec(args).slice(i,consumeCount); // TODO: cost of this?
 					ctx= ctx.updateBindings(v.get(i+1), rest);
 					if(ctx.isExceptional()) return ctx;
 					
