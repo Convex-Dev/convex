@@ -2932,8 +2932,12 @@ public class CoreTest {
 	
 	@Test
 	public void testExpander() {
-		assertCastError(step("(expander `(export test))")); // Issue #88
-		assertCastError(step("(expander :foo)")); // Issue #88
+		assertCastError(step("(expander 1)")); // not a function
+		
+		// These probably OK, since can be cast to functions?
+		// assertCastError(step("(expander `(export test))")); // Issue #88
+		// assertCastError(step("(expander :foo)")); // Issue #88
+		
 		assertCastError(step("(expander *offer*)")); // Issue #83
 		
 		assertArityError(step("(expander)"));

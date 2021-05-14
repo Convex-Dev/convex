@@ -41,21 +41,22 @@ public class ParamTestCasts {
 	@ParameterizedTest
 	@ValueSource(strings = { "long","boolean","double","byte","char","blob","str","vec","set","blob","address"})
 	public void testIdempotent(String name) {
-		ACell fn=eval(name);
+		ACell namedFn=eval(name);
 		
-		assertTrue(fn instanceof AFn);
+		assertTrue(namedFn instanceof AFn);
+		AFn<ACell> fn=(AFn<ACell>)namedFn;
 		
 		Context<ACell> ctx=TestState.INITIAL_CONTEXT.fork();
 		
 		for (ACell x: values) {
 			ACell[] args= new ACell[] {x};
-			Context<ACell> r = ctx.fork().invoke((IFn<ACell>)fn, args);
+			Context<ACell> r = ctx.fork().invoke(fn, args);
 			if (r.isExceptional()) {
 				ACell code=r.getExceptional().getCode();
 				assertTrue(Sets.of(ErrorCodes.CAST,ErrorCodes.ARGUMENT).contains(code));
 			} else {
 				ACell result=r.getResult();
-				ACell result2=r.invoke((IFn<ACell>)fn, args).getResult();
+				ACell result2=r.invoke(fn, args).getResult();
 				assertEquals(result,result2);
 			}
 		}

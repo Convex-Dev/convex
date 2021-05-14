@@ -865,12 +865,12 @@ public class RT {
 	 * 
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> IFn<T> function(ACell a) {
-		if (a instanceof AFn) return (IFn<T>) a;
+	public static <T extends ACell> AFn<T> function(ACell a) {
+		if (a instanceof AFn) return (AFn<T>) a;
 		if (a instanceof AMap) return MapFn.wrap((AMap<?, T>) a);
 		if (a instanceof ASequence) return SeqFn.wrap((ASequence<?>) a);
-		if (a instanceof ASet) return (IFn<T>) SetFn.wrap((ASet<?>) a);
-		if (a instanceof Keyword) return (IFn<T>) KeyFn.wrap((Keyword) a);
+		if (a instanceof ASet) return (AFn<T>) SetFn.wrap((ASet<?>) a);
+		if (a instanceof Keyword) return KeyFn.wrap((Keyword) a);
 
 		return null;
 	}

@@ -4,10 +4,9 @@ import convex.core.data.ACell;
 import convex.core.data.IGet;
 import convex.core.data.Keyword;
 import convex.core.lang.Context;
-import convex.core.lang.IFn;
 import convex.core.lang.RT;
 
-public class KeyFn<T extends ACell> implements IFn<T> {
+public class KeyFn<T extends ACell> extends ADataFn<T> {
 	private Keyword key;
 
 	public KeyFn(Keyword k) {
@@ -41,5 +40,15 @@ public class KeyFn<T extends ACell> implements IFn<T> {
 			return context.withArityError("Expected arity 1 or 2 for keyword lookup but got: " + n);
 		}
 		return context.withResult(result);
+	}
+
+	@Override
+	public void ednString(StringBuilder sb) {
+		key.ednString(sb);
+	}
+
+	@Override
+	public void print(StringBuilder sb) {
+		key.print(sb);
 	}
 }

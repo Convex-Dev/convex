@@ -3,6 +3,8 @@ package convex.core.lang;
 import convex.core.data.ACell;
 import convex.core.data.IRefFunction;
 import convex.core.data.Tag;
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 
 /**
  * Base class for functions expressed as values
@@ -19,6 +21,11 @@ public abstract class AFn<T extends ACell> extends ACell implements IFn<T> {
 	
 	@Override
 	public abstract AFn<T> updateRefs(IRefFunction func);
+	
+	@Override
+	public AType getType() {
+		return Types.FUNCTION;
+	}
 
 	/**
 	 * Tests if this function supports the given argument list
@@ -27,7 +34,7 @@ public abstract class AFn<T extends ACell> extends ACell implements IFn<T> {
 	 * 
 	 * TODO: intention is to override this to include dynamic type checks etc.
 	 */
-	public boolean supportsArgs(Object[] args) {
+	public boolean supportsArgs(ACell[] args) {
 		return hasArity(args.length);
 	}
 	

@@ -805,7 +805,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return Updated Context
 	 */
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> invoke(IFn<R> fn, ACell[] args) {
+	public <R extends ACell> Context<R> invoke(AFn<R> fn, ACell[] args) {
 		// Note: we don't adjust depth here because execute(...) does it for us in the function body
 		Context<R> ctx = fn.invoke((Context<ACell>) this,args);
 
@@ -1494,7 +1494,7 @@ public final class Context<T extends ACell> extends AObject {
 			return this.withError(ErrorCodes.ARGUMENT, "Cannot make negative offer in Actor call: "+offer);
 		}
 		
-		IFn<R> fn=as.getExportedFunction(sym);
+		AFn<R> fn=as.getExportedFunction(sym);
 		if (fn==null) return this.withError(ErrorCodes.STATE,"Account "+target+" does not have exported function: "+sym);
 
 		// 

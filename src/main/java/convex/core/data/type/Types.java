@@ -35,6 +35,9 @@ public class Types {
 	public static final Map MAP = Map.INSTANCE;
 
 	public static final Blob BLOB = Blob.INSTANCE;
+	
+	public static final Function FUNCTION = Function.INSTANCE;
+
 
 	public static AType[] ALL_TYPES=new AType[] {
 		NIL,
@@ -52,6 +55,8 @@ public class Types {
 		KEYWORD,
 		SYMBOL,
 		MAP,
-		BLOB
+		BLOB,
+		FUNCTION
+
 	};
 }

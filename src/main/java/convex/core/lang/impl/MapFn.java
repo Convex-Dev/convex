@@ -3,9 +3,8 @@ package convex.core.lang.impl;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.lang.Context;
-import convex.core.lang.IFn;
 
-public class MapFn<K extends ACell, T  extends ACell> implements IFn<T> {
+public class MapFn<K extends ACell, T  extends ACell> extends ADataFn<T> {
 
 	private AMap<K, T> map;
 
@@ -32,6 +31,16 @@ public class MapFn<K extends ACell, T  extends ACell> implements IFn<T> {
 			return context.withArityError("Expected arity 1 or 2 for map lookup but got: " + n);
 		}
 		return context.withResult(result);
+	}
+
+	@Override
+	public void ednString(StringBuilder sb) {
+		map.ednString();
+	}
+
+	@Override
+	public void print(StringBuilder sb) {
+		map.print(sb);
 	}
 
 }

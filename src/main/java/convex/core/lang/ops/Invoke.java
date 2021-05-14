@@ -8,9 +8,9 @@ import convex.core.data.AVector;
 import convex.core.data.Format;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
+import convex.core.lang.AFn;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
-import convex.core.lang.IFn;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
 
@@ -64,8 +64,8 @@ public class Invoke<T extends ACell> extends AMultiOp<T> {
 		if (ctx.isExceptional()) return ctx;
 
 		ACell rf = ctx.getResult();
-		IFn<T> fn = RT.function(rf);
-		if (fn == null) return context.withCastError(rf, IFn.class);
+		AFn<T> fn = RT.function(rf);
+		if (fn == null) return context.withCastError(rf, AFn.class);
 
 		int arity = ops.size() - 1;
 		ACell[] args = new ACell[arity];

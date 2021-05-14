@@ -6,8 +6,8 @@ import convex.core.Constants;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.AFn;
 import convex.core.lang.Core;
-import convex.core.lang.IFn;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.core.lang.impl.RecordFormat;
@@ -160,7 +160,7 @@ public class AccountStatus extends ARecord {
 	 *         found/exported.
 	 * @throws BadStateException
 	 */
-	public <R extends ACell> IFn<R> getExportedFunction(Symbol sym) {
+	public <R extends ACell> AFn<R> getExportedFunction(Symbol sym) {
 		ASet<Symbol> exports = getExports();
 		if (exports==null) return null;
 		if (!exports.contains(sym)) return null;
@@ -170,7 +170,7 @@ public class AccountStatus extends ARecord {
 		
 		if (functionSyn==null) return null; // check in case exported definition is not declared
 		
-		IFn<R> fn = RT.function(functionSyn.getValue());
+		AFn<R> fn = RT.function(functionSyn.getValue());
 		return fn;
 	}
 

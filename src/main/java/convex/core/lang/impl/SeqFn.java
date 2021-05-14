@@ -4,7 +4,6 @@ import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.Context;
-import convex.core.lang.IFn;
 import convex.core.lang.RT;
 
 /**
@@ -13,7 +12,7 @@ import convex.core.lang.RT;
  * 
  * @param <T> Type of values to return
  */
-public class SeqFn<T extends ACell> implements IFn<T> {
+public class SeqFn<T extends ACell> extends ADataFn<T> {
 
 	private ASequence<?> seq;
 
@@ -46,6 +45,16 @@ public class SeqFn<T extends ACell> implements IFn<T> {
 		} else {
 			return context.withArityError("Expected arity 1 or 2 for sequence lookup");
 		}
+	}
+
+	@Override
+	public void ednString(StringBuilder sb) {
+		seq.ednString(sb);
+	}
+
+	@Override
+	public void print(StringBuilder sb) {
+		seq.print(sb);
 	}
 
 }

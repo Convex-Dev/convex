@@ -519,12 +519,12 @@ public class Core {
 		public  Context<ACell> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			IFn<ACell> fn = RT.function(args[0]);
+			AFn<ACell> fn = RT.function(args[0]);
 
 			// check cast to function
-			if (!(fn instanceof AFn)) return context.withCastError(args[0], AFn.class);
+			if (fn==null) return context.withCastError(args[0], AFn.class);
 			
-			Expander expander = Expander.wrap((AFn)fn);
+			Expander expander = Expander.wrap(fn);
 			if (expander==null) return context.withError(ErrorCodes.CAST, "Expander requires a valid function");
 			long juice = Juice.SIMPLE_FN;
 
@@ -2005,8 +2005,9 @@ public class Core {
 			int alen = args.length;
 			if (alen < 2) return context.withArityError(minArityMessage(2, alen));
 
-			IFn<ACell> fn = RT.function(args[0]);
-
+			final AFn<ACell> fn = RT.function(args[0]);
+			if (fn==null ) return context.withCastError(args[0], AFn.class);
+			
 			ACell lastArg = args[alen - 1];
 			ASequence<ACell> coll = RT.ensureSequence(lastArg);
 			if (coll == null) return context.withCastError(lastArg, ASequence.class);
@@ -2029,8 +2030,6 @@ public class Core {
 			} else {
 				applyArgs = coll.toCellArray();
 			}
-			
-			if (fn==null ) return context.withCastError(args[0], IFn.class);
 
 			Context<ACell> rctx = context.invoke(fn, applyArgs);
 			return rctx.consumeJuice(Juice.APPLY);
@@ -2112,8 +2111,8 @@ public class Core {
 
 			// check and cast first argument to a function
 			ACell fnArg = args[0];
-			IFn<?> f = RT.function(fnArg);
-			if (f == null) return context.withCastError(fnArg, IFn.class);
+			AFn<?> f = RT.function(fnArg);
+			if (f == null) return context.withCastError(fnArg, AFn.class);
 
 			// remaining arguments determine function arity to use
 			int fnArity = args.length - 1;
@@ -2156,8 +2155,8 @@ public class Core {
 
 			// check and cast first argument to a function
 			ACell fnArg = args[0];
-			IFn<?> fn = RT.function(fnArg);
-			if (fn == null) return ctx.withCastError(fnArg, IFn.class);
+			AFn<?> fn = RT.function(fnArg);
+			if (fn == null) return ctx.withCastError(fnArg, AFn.class);
 
 			// Initial value
 			ACell result = (ACell) args[1];
@@ -2317,7 +2316,7 @@ public class Core {
 	public static final CorePred FN_Q = reg(new CorePred(Symbols.FN_Q) {
 		@Override
 		public boolean test(ACell val) {
-			return val instanceof IFn;
+			return val instanceof AFn;
 		}
 	});
 

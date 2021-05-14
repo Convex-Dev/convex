@@ -4,9 +4,8 @@ import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.prim.CVMBool;
 import convex.core.lang.Context;
-import convex.core.lang.IFn;
 
-public class SetFn<T  extends ACell> implements IFn<CVMBool> {
+public class SetFn<T extends ACell> extends ADataFn<CVMBool> {
 
 	private ASet<T> set;
 
@@ -29,6 +28,16 @@ public class SetFn<T  extends ACell> implements IFn<CVMBool> {
 		} else {
 			return context.withArityError("Expected arity 1 for set lookup but got: " + n + " in set: " + set);
 		}
+	}
+
+	@Override
+	public void ednString(StringBuilder sb) {
+		set.ednString(sb);
+	}
+
+	@Override
+	public void print(StringBuilder sb) {
+		set.print(sb);
 	}
 
 }

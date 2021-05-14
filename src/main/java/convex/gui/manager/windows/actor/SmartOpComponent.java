@@ -27,7 +27,7 @@ import convex.core.data.Lists;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
-import convex.core.lang.IFn;
+import convex.core.lang.AFn;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
@@ -58,7 +58,6 @@ public class SmartOpComponent extends BaseListComponent {
 
 	private static final Logger log = Logger.getLogger(SmartOpComponent.class.getName());
 
-	@SuppressWarnings("rawtypes")
 	public SmartOpComponent(ActorInvokePanel parent, Address contract, Symbol sym) {
 		this.parent = parent;
 		this.sym = sym;
@@ -75,7 +74,7 @@ public class SmartOpComponent extends BaseListComponent {
 
 		AccountStatus as = PeerManager.getLatestState().getAccount(contract);
 
-		IFn fn = (IFn) as.getExportedFunction(sym);
+		AFn<?> fn = as.getExportedFunction(sym);
 
 		// Function might be a map or set
 		AVector<Syntax> params = (fn instanceof Fn) ? ((Fn<?>) fn).getParams()
