@@ -130,13 +130,15 @@ public class Core {
 		@Override
 		public Context<ASequence<ACell>> invoke(Context context, ACell[] args) {
 			ASequence<?> result = null;
+			int n=args.length;
 			
 			// initial juice is a load of null
 			long juice = Juice.CONSTANT;
-			for (ACell a : args) {
+			for (int ix=0; ix<n; ix++) {
+				ACell a=args[ix];
 				if (a == null) continue;
 				ASequence<?> seq = RT.sequence(a);
-				if (seq == null) return context.withCastError(a, Types.SEQUENCE);
+				if (seq == null) return context.withCastError(ix,args, Types.SEQUENCE);
 				
 				// check juice per element of concatenated sequences
 				juice += Juice.BUILD_DATA+ seq.count() * Juice.BUILD_PER_ELEMENT;
@@ -157,7 +159,7 @@ public class Core {
 			
 			// Need to compute juice before building potentially big vector
 			Long n = RT.count(o);
-			if (n == null) return context.withCastError(o, Types.VECTOR);
+			if (n == null) return context.withCastError(0,args, Types.VECTOR);
 			long juice = Juice.BUILD_DATA + n * Juice.BUILD_PER_ELEMENT;
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 			
@@ -175,12 +177,12 @@ public class Core {
 			
 			// Need to compute juice before building a potentially big set
 			Long n = RT.count(o);
-			if (n == null) return context.withCastError(o, Types.SEQUENCE);
+			if (n == null) return context.withCastError(0,args, Types.SEQUENCE);
 			long juice = Juice.addMul(Juice.BUILD_DATA ,n,Juice.BUILD_PER_ELEMENT);
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
 			ASet<?> result = RT.set(o);
-			if (result == null) return context.withCastError(o, Types.SET);
+			if (result == null) return context.withCastError(0,args, Types.SET);
 
 			return context.withResult(juice, result);
 		}
@@ -198,7 +200,7 @@ public class Core {
 			for (int i=0; i<n; i++) {
 				ACell arg=args[i];
 				Set<ACell> set=RT.ensureSet(arg);
-				if (set==null) return context.withCastError(arg, Types.SET);
+				if (set==null) return context.withCastError(i,args, Types.SET);
 				
 				// check juice before expensive operation
 				long size=set.count();
@@ -221,14 +223,14 @@ public class Core {
 			int n=args.length;
 			ACell arg0=(ACell) args[0];
 			Set<ACell> result=(arg0==null)?Sets.empty():RT.ensureSet(arg0);
-			if (result==null) return context.withCastError(arg0, Types.SET);
+			if (result==null) return context.withCastError(0,args, Types.SET);
 			
 			long juice=Juice.BUILD_DATA;
 			
 			for (int i=1; i<n; i++) {
 				ACell arg=(ACell) args[i];
 				Set<ACell> set=(arg==null)?Sets.empty():RT.ensureSet(args[i]);
-				if (set==null) return context.withCastError(args[i], Types.SET);
+				if (set==null) return context.withCastError(i,args, Types.SET);
 				long size=set.count();
 				
 				juice = Juice.addMul(juice, size, Juice.BUILD_PER_ELEMENT);
@@ -250,14 +252,14 @@ public class Core {
 			int n=args.length;
 			ACell arg0=args[0];
 			Set<ACell> result=(arg0==null)?Sets.empty():RT.ensureSet(arg0);
-			if (result==null) return context.withCastError(arg0, Types.SET);
+			if (result==null) return context.withCastError(0,args, Types.SET);
 			
 			long juice=Juice.BUILD_DATA;
 			
 			for (int i=1; i<n; i++) {
 				ACell arg=args[i];
 				Set<ACell> set=RT.ensureSet(arg);
-				if (set==null) return context.withCastError(args[i], Types.SET);
+				if (set==null) return context.withCastError(i,args, Types.SET);
 				long size=set.count();
 				
 				juice = Juice.addMul(juice, size, Juice.BUILD_PER_ELEMENT);
@@ -310,7 +312,7 @@ public class Core {
 			// Check can get as a String name
 			ACell arg = args[0];
 			AString result = RT.name(arg);
-			if (result == null) return context.withCastError(arg, Types.STRING);
+			if (result == null) return context.withCastError(0,args, Types.STRING);
 
 			long juice = Juice.SIMPLE_FN;
 			return context.withResult(juice, result);
@@ -326,7 +328,7 @@ public class Core {
 
 			// Check argument is valid name
 			AString name = RT.name(args[0]);
-			if (name == null) return context.withCastError(args[0], Types.KEYWORD);
+			if (name == null) return context.withCastError(0,args, Types.KEYWORD);
 
 			// Check name converts to Keyword 
 			Keyword result = Keyword.create(name);
@@ -346,7 +348,7 @@ public class Core {
 			// Check argument is valid name
 			ACell symArg=args[0];
 			Symbol sym = RT.toSymbol(symArg);
-			if (sym == null) return context.withCastError(symArg, Types.SYMBOL);
+			if (sym == null) return context.withCastError(0,args, Types.SYMBOL);
 
 			long juice = Juice.SYMBOL;
 			return context.withResult(juice, sym);
@@ -388,7 +390,7 @@ public class Core {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			Address address = RT.ensureAddress(args[0]);
-			if (address==null) return context.withCastError(args[0], Types.ADDRESS);
+			if (address==null) return context.withCastError(0,args, Types.ADDRESS);
 			
 			ACell form = (ACell) args[1];
 			Context<ACell> rctx = context.evalAs(address,form);
@@ -405,12 +407,12 @@ public class Core {
 
 			// get timestamp target
 			CVMLong tso = RT.ensureLong(args[0]);
-			if (tso==null) return context.withCastError(args[0],Types.LONG);
+			if (tso==null) return context.withCastError(0,args,Types.LONG);
 			long scheduleTimestamp = tso.longValue();
 
 			// get operation
 			ACell opo = args[1];
-			if (!(opo instanceof AOp)) return context.withCastError(opo,Types.OP);
+			if (!(opo instanceof AOp)) return context.withCastError(1,args,Types.OP);
 			AOp<?> op = (AOp<?>) opo;
 
 			return context.schedule(scheduleTimestamp, op);
@@ -430,7 +432,7 @@ public class Core {
 				result=Syntax.create((ACell)args[0]);
 			} else {
 				AHashMap<ACell,ACell> meta=RT.toHashMap(args[1]);
-				if (meta==null) return context.withCastError(args[1], Types.MAP);
+				if (meta==null) return context.withCastError(1,args, Types.MAP);
 				result = Syntax.create((ACell) args[0],meta);
 			}
 
@@ -505,8 +507,8 @@ public class Core {
 				// use provided expander
 				ACell exArg = args[1];
 				expander=Expander.wrap(exArg);
+				if (expander==null) return context.withCastError(1,args, Types.FUNCTION);
 			}
-			if (expander==null) return context.withCastError(ErrorCodes.CAST, Types.FUNCTION);
 			ACell form = args[0];
 			Context<Syntax> rctx = expander.expand(form, initialExpander, context);
 			return rctx;
@@ -522,7 +524,7 @@ public class Core {
 			AFn<ACell> fn = RT.function(args[0]);
 
 			// check cast to function
-			if (fn==null) return context.withCastError(args[0], Types.FUNCTION);
+			if (fn==null) return context.withCastError(0,args, Types.FUNCTION);
 			
 			Expander expander = Expander.wrap(fn);
 			if (expander==null) return context.withError(ErrorCodes.CAST, "Expander requires a valid function");
@@ -541,10 +543,10 @@ public class Core {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			Address addr = RT.ensureAddress(args[0]);
-			if (addr == null) return context.withCastError(args[1], Types.ADDRESS);
+			if (addr == null) return context.withCastError(1,args, Types.ADDRESS);
 
 			Symbol sym = RT.toSymbol(args[1]);
-			if (sym == null) return context.withCastError(args[1], Types.SYMBOL);
+			if (sym == null) return context.withCastError(1,args, Types.SYMBOL);
 
 			AccountStatus as = context.getState().getAccount(addr);
 			if (as == null) return context.withResult(Juice.LOOKUP, CVMBool.FALSE);
@@ -597,7 +599,7 @@ public class Core {
 
 			// must cast to Long
 			CVMLong amount = RT.ensureLong(args[0]);
-			if (amount == null) return context.withCastError(args[0], Types.LONG);
+			if (amount == null) return context.withCastError(0,args, Types.LONG);
 
 			return context.acceptFunds(amount.longValue());
 		}
@@ -614,13 +616,13 @@ public class Core {
 			if (ctx.isExceptional()) return ctx;
 
 			Address target = RT.ensureAddress(args[0]);
-			if (target == null) return ctx.withCastError(args[0], Types.ADDRESS);
+			if (target == null) return ctx.withCastError(0,args, Types.ADDRESS);
 
 			CVMLong sendAmount = RT.ensureLong(args[1]);
-			if (sendAmount == null) return ctx.withCastError(args[1], Types.LONG);
+			if (sendAmount == null) return ctx.withCastError(1,args, Types.LONG);
 
 			Symbol sym = RT.toSymbol(args[2]);
-			if (sym == null) return ctx.withCastError(args[2], Types.SYMBOL);
+			if (sym == null) return ctx.withCastError(2,args, Types.SYMBOL);
 
 			// prepare contract call arguments
 			int arity = args.length - 3;
@@ -655,7 +657,7 @@ public class Core {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			Symbol sym = RT.toSymbol(args[0]);
-			if (sym == null) return context.withCastError(args[0], Types.SYMBOL);
+			if (sym == null) return context.withCastError(0,args, Types.SYMBOL);
 
 			if (sym.isQualified()) {
 				return context.withArgumentError("Cannot set local binding with qualified symbol: " + sym);
@@ -695,12 +697,12 @@ public class Core {
 
 			// get Address to perform lookup
 			Address address=(n==1)?context.getAddress():RT.ensureAddress(args[0]);
-			if (address==null) return context.withCastError(args[0], Types.ADDRESS);
+			if (address==null) return context.withCastError(0,args, Types.ADDRESS);
 			
 			// ensure argument converts to a Symbol correctly.
 			ACell symArg=args[n-1];
 			Symbol sym = RT.toSymbol(symArg);
-			if (sym == null) return context.withCastError(symArg,Types.SYMBOL);
+			if (sym == null) return context.withCastError(n-1,args,Types.SYMBOL);
 
 			MapEntry<Symbol, Syntax> me = context.lookupDynamicEntry(address,sym);
 
@@ -719,12 +721,12 @@ public class Core {
 
 			// get Address to perform lookup
 			Address address=(n==1)?context.getAddress():RT.ensureAddress(args[0]);
-			if (address==null) return context.withCastError(args[0], Types.ADDRESS);
+			if (address==null) return context.withCastError(0,args, Types.ADDRESS);
 			
 			// ensure argument converts to a Symbol correctly.
 			ACell symArg=args[n-1];
 			Symbol sym = RT.toSymbol(symArg);
-			if (sym == null) return context.withCastError(symArg,Types.SYMBOL);
+			if (sym == null) return context.withCastError(n-1,args,Types.SYMBOL);
 
 			MapEntry<Symbol, Syntax> me = context.lookupDynamicEntry(address,sym);
 
@@ -745,7 +747,7 @@ public class Core {
 			if (address == null) {
 				if (o instanceof AString) return context.withArgumentError("String not convertible to a valid Address: " + o);
 				if (o instanceof ABlob) return context.withArgumentError("Blob not convertiable a valid Address: " + o);
-				return context.withCastError(o, Types.ADDRESS);
+				return context.withCastError(0,args, Types.ADDRESS);
 			}
 			long juice = Juice.ADDRESS;
 
@@ -762,7 +764,7 @@ public class Core {
 			ACell o = args[0];
 			AccountKey key = RT.castAccountKey(o);
 			if ((o!=null)&&(key == null)) {
-				return context.withCastError(o, Types.KEY);
+				return context.withCastError(0,args, Types.KEY);
 			}
 			long juice = Juice.CREATE_ACCOUNT;
 			
@@ -779,7 +781,7 @@ public class Core {
 
 			// TODO: probably need to pre-cost this?
 			ABlob blob = RT.castBlob(args[0]);
-			if (blob == null) return context.withCastError(args[0], Types.BLOB);
+			if (blob == null) return context.withCastError(0,args, Types.BLOB);
 
 			long juice = Juice.BLOB + Juice.BLOB_PER_BYTE * blob.length();
 
@@ -850,7 +852,7 @@ public class Core {
 
 			ACell a0 = args[0];
 			Address address = RT.castAddress(a0);
-			if (address == null) return context.withCastError(a0, Types.ADDRESS);
+			if (address == null) return context.withCastError(0,args, Types.ADDRESS);
 
 			// Note: returns null if the argument is not an address
 			AccountStatus as = context.getAccountStatus(address);
@@ -866,7 +868,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			Address address = RT.ensureAddress(args[0]);
-			if (address == null) return context.withCastError(args[0], Types.ADDRESS);
+			if (address == null) return context.withCastError(0,args, Types.ADDRESS);
 
 			AccountStatus as = context.getAccountStatus(address);
 			CVMLong balance = null;
@@ -886,10 +888,10 @@ public class Core {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			Address address = RT.ensureAddress(args[0]);
-			if (address == null) return context.withCastError(args[0], Types.ADDRESS);
+			if (address == null) return context.withCastError(0,args, Types.ADDRESS);
 
 			CVMLong amount = RT.ensureLong(args[1]);
-			if (amount == null) return context.withCastError(args[1], Types.LONG);
+			if (amount == null) return context.withCastError(1,args, Types.LONG);
 
 			return context.transfer(address, amount.longValue()).consumeJuice(Juice.TRANSFER);
 
@@ -903,7 +905,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			CVMLong amount = RT.ensureLong(args[0]);
-			if (amount == null) return context.withCastError(args[0], Types.LONG);
+			if (amount == null) return context.withCastError(0,args, Types.LONG);
 
 			return context.setMemory(amount.longValue()).consumeJuice(Juice.TRANSFER);
 		}
@@ -916,10 +918,10 @@ public class Core {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			Address address = RT.ensureAddress(args[0]);
-			if (address == null) return context.withCastError(args[0], Types.ADDRESS);
+			if (address == null) return context.withCastError(0,args, Types.ADDRESS);
 
 			CVMLong amount = RT.ensureLong(args[1]);
-			if (amount == null) return context.withCastError(args[1], Types.LONG);
+			if (amount == null) return context.withCastError(1,args, Types.LONG);
 
 			return context.transferAllowance(address, amount.longValue()).consumeJuice(Juice.TRANSFER);
 		}
@@ -932,10 +934,10 @@ public class Core {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			AccountKey address = RT.castAccountKey(args[0]);
-			if (address == null) return context.withCastError(args[0], Types.KEY);
+			if (address == null) return context.withCastError(0,args, Types.KEY);
 
 			CVMLong amount = RT.ensureLong(args[1]);
-			if (amount == null) return context.withCastError(args[0], Types.LONG);
+			if (amount == null) return context.withCastError(1,args, Types.LONG);
 
 			return context.setStake(address, amount.longValue()).consumeJuice(Juice.TRANSFER);
 
@@ -973,7 +975,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
-			if (!(a instanceof AMap)) return context.withCastError(a, Types.MAP);
+			if (!(a instanceof AMap)) return context.withCastError(0,args, Types.MAP);
 
 			AMap<ACell, ACell> m = (AMap<ACell,ACell>) a;
 			long juice = Juice.BUILD_DATA + m.count() * Juice.BUILD_PER_ELEMENT;
@@ -992,7 +994,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
-			if (!(a instanceof AMap)) return context.withCastError(a, Types.MAP);
+			if (!(a instanceof AMap)) return context.withCastError(0,args, Types.MAP);
 
 			AMap<ACell, ACell> m = (AMap<ACell, ACell>) a;
 			long juice = Juice.BUILD_DATA + m.count() * Juice.BUILD_PER_ELEMENT;
@@ -1025,7 +1027,7 @@ public class Core {
 			ADataStructure<ACell> result = RT.ensureDataStructure(o);
 
 			// values that are non-null but not a data structure are a cast error
-			if ((o != null) && (result == null)) return context.withCastError(o, Types.DATA_STRUCTURE);
+			if ((o != null) && (result == null)) return context.withCastError(0,args, Types.DATA_STRUCTURE);
 
 			// assoc additional elements. Must produce a valid non-null data structure after
 			// each assoc
@@ -1046,7 +1048,7 @@ public class Core {
 			if (args.length != 3) return context.withArityError(exactArityMessage(3, args.length));
 
 			ASequence<ACell> ixs = RT.ensureSequence(args[1]);
-			if (ixs == null) return context.withCastError(args[1], Types.SEQUENCE);
+			if (ixs == null) return context.withCastError(1,args, Types.SEQUENCE);
 
 			int n = ixs.size();
 			long juice = (Juice.GET+Juice.ASSOC) * (1L + n);
@@ -1059,7 +1061,7 @@ public class Core {
 			ACell[] ks=new ACell[n];
 			for (int i = 0; i < n; i++) {
 				IAssociative<ACell,ACell> struct = RT.ensureAssociative(data);
-				if (struct == null) return context.withCastError(data, Types.DATA_STRUCTURE); // TODO: Associative type?
+				if (struct == null) return context.withCastError((ACell)struct,Types.DATA_STRUCTURE); // TODO: Associative type?
 				ass[i]=struct;
 				ACell k=ixs.get(i);
 				ks[i]=k;
@@ -1070,7 +1072,7 @@ public class Core {
 				IAssociative<ACell,ACell> struct=ass[i];
 				ACell k=ks[i];
 				value=RT.assoc(struct, k, value);
-				if (value==null) return context.withCastError((ACell)ass[i], Types.DATA_STRUCTURE); // TODO: Associative type?
+				if (value==null) return context.withCastError((ACell)struct,Types.DATA_STRUCTURE); // TODO: Associative type?
 			}
 			return context.withResult(juice, value);
 		}
@@ -1417,7 +1419,7 @@ public class Core {
 		public  Context<CVMBool> invoke(Context context, ACell[] args) {
 			// all arities OK, but need to watch for non-numeric arguments
 			Boolean result = RT.eq(args);
-			if (result == null) return context.withCastError(RT.findNonNumeric(args), Types.NUMBER);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 
 			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
 		}
@@ -1429,7 +1431,7 @@ public class Core {
 		public  Context<CVMBool> invoke(Context context, ACell[] args) {
 			// all arities OK
 			Boolean result = RT.ge(args);
-			if (result == null) return context.withCastError(RT.findNonNumeric(args), Types.NUMBER);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 
 			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
 		}
@@ -1442,7 +1444,7 @@ public class Core {
 			// all arities OK
 
 			Boolean result = RT.gt(args);
-			if (result == null) return context.withCastError(RT.findNonNumeric(args), Types.NUMBER);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 
 			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
 		}
@@ -1455,7 +1457,7 @@ public class Core {
 			// all arities OK
 
 			Boolean result = RT.le(args);
-			if (result == null) return context.withCastError(RT.findNonNumeric(args), Types.NUMBER);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 
 			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
 		}
@@ -1468,7 +1470,7 @@ public class Core {
 			// all arities OK
 
 			Boolean result = RT.lt(args);
-			if (result == null) return context.withCastError(RT.findNonNumeric(args), Types.NUMBER);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 
 			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
 		}
@@ -1482,7 +1484,7 @@ public class Core {
 
 			ACell a = args[0];
 			CVMLong result = RT.inc(a);
-			if (result == null) return context.withCastError(a, Types.LONG);
+			if (result == null) return context.withCastError(0,args, Types.LONG);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1495,7 +1497,7 @@ public class Core {
 
 			ACell a = args[0];
 			CVMLong result = RT.dec(a);
-			if (result == null) return context.withCastError(a, Types.LONG);
+			if (result == null) return context.withCastError(0,args, Types.LONG);
 
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
@@ -1597,7 +1599,7 @@ public class Core {
 			// All arities OK
 
 			APrimitive result = RT.plus(args);
-			if (result == null) return context.withCastError(RT.findNonNumeric(args), Types.NUMBER);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1608,7 +1610,7 @@ public class Core {
 		public  Context<APrimitive> invoke(Context context, ACell[] args) {
 			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
 			APrimitive result = RT.minus(args);
-			if (result == null) return context.withCastError(RT.findNonNumeric(args), Types.NUMBER);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1619,7 +1621,7 @@ public class Core {
 		public  Context<APrimitive> invoke(Context context, ACell[] args) {
 			// All arities OK
 			APrimitive result = RT.times(args);
-			if (result == null) return context.withCastError(RT.findNonNumeric(args), Types.NUMBER);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1631,7 +1633,7 @@ public class Core {
 			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
 
 			CVMDouble result = RT.divide(args);
-			if (result == null) return context.withCastError(RT.findNonNumeric(args), Types.NUMBER);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1642,7 +1644,7 @@ public class Core {
 		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			CVMDouble result = RT.floor(args[0]);
-			if (result == null) return context.withCastError(RT.findNonNumeric(args), Types.NUMBER);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1654,7 +1656,7 @@ public class Core {
 		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			CVMDouble result = RT.ceil(args[0]);
-			if (result == null) return context.withCastError(RT.findNonNumeric(args), Types.NUMBER);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1666,7 +1668,7 @@ public class Core {
 		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			CVMDouble result = RT.sqrt(args[0]);
-			if (result == null) return context.withCastError(RT.findNonNumeric(args), Types.NUMBER);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1677,7 +1679,7 @@ public class Core {
 		public  Context<APrimitive> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			APrimitive result = RT.abs(args[0]);
-			if (result == null) return context.withCastError(RT.findNonNumeric(args), Types.NUMBER);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1701,7 +1703,7 @@ public class Core {
 			
 			CVMLong la=RT.ensureLong(args[0]);
 			CVMLong lb=RT.ensureLong(args[1]);
-			if ((lb==null)||(la==null)) return context.withCastError(args, Types.LONG);
+			if ((lb==null)||(la==null)) return context.withCastError(Types.LONG);
 			
 			long num = la.longValue();
 			long denom = lb.longValue();
@@ -1723,7 +1725,7 @@ public class Core {
 			
 			CVMLong la=RT.ensureLong(args[0]);
 			CVMLong lb=RT.ensureLong(args[1]);
-			if ((lb==null)||(la==null)) return context.withCastError(args, Types.LONG);
+			if ((lb==null)||(la==null)) return context.withCastError(Types.LONG);
 			
 			long num = la.longValue();
 			long denom = lb.longValue();
@@ -1744,7 +1746,7 @@ public class Core {
 			
 			CVMLong la=RT.ensureLong(args[0]);
 			CVMLong lb=RT.ensureLong(args[1]);
-			if ((lb==null)||(la==null)) return context.withCastError(args, Types.LONG);
+			if ((lb==null)||(la==null)) return context.withCastError(Types.LONG);
 			
 			long num = la.longValue();
 			long denom = lb.longValue();
@@ -1778,7 +1780,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			
 			CVMDouble result = RT.exp(args[0]);
-			if (result==null) return context.withCastError(Types.DOUBLE);
+			if (result==null) return context.withCastError(0,Types.DOUBLE);
 			
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
@@ -1802,7 +1804,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
  
 			ABlob blob=RT.ensureBlob(args[0]);
-			if (blob==null) return context.withCastError(args[0], Types.BLOB);
+			if (blob==null) return context.withCastError(0,args, Types.BLOB);
 			
 			Hash result = blob.getContentHash();
 			return context.withResult(Juice.HASH, result);
@@ -1816,7 +1818,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			Long result = RT.count(args[0]);
-			if (result == null) return context.withCastError(args[0], Types.DATA_STRUCTURE);
+			if (result == null) return context.withCastError(0,args, Types.DATA_STRUCTURE);
 
 			return context.withResult(Juice.SIMPLE_FN, CVMLong.create(result));
 		}
@@ -1834,7 +1836,7 @@ public class Core {
 			if (o == null) return context.withResult(Juice.SIMPLE_FN, null);
 
 			ADataStructure<?> coll = RT.ensureDataStructure(o);
-			if (coll == null) return context.withCastError(o, Types.DATA_STRUCTURE);
+			if (coll == null) return context.withCastError(0,args, Types.DATA_STRUCTURE);
 
 			ACell result = coll.empty();
 			return context.withResult(Juice.SIMPLE_FN, result);
@@ -1851,7 +1853,7 @@ public class Core {
 			// First argument must be a Long index
 			ACell arg = (ACell) args[0];
 			CVMLong ix = RT.ensureLong(args[1]);
-			if (ix == null) return context.withCastError(args[1], Types.LONG);
+			if (ix == null) return context.withCastError(1,args, Types.LONG);
 			
 			// Second arg should be a countable data structure
 			Long n = RT.count(arg);
@@ -1876,7 +1878,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ASequence<ACell> seq = RT.sequence(args[0]);
-			if (seq == null) return context.withCastError(args[0], Types.SEQUENCE);
+			if (seq == null) return context.withCastError(0,args, Types.SEQUENCE);
 
 			ASequence<ACell> result = seq.next();
 			// TODO: probably needs to cost a lot?
@@ -2006,7 +2008,7 @@ public class Core {
 			if (alen < 2) return context.withArityError(minArityMessage(2, alen));
 
 			final AFn<ACell> fn = RT.function(args[0]);
-			if (fn==null ) return context.withCastError(args[0], Types.FUNCTION);
+			if (fn==null ) return context.withCastError(0,args, Types.FUNCTION);
 			
 			ACell lastArg = args[alen - 1];
 			ASequence<ACell> coll = RT.ensureSequence(lastArg);
@@ -2045,7 +2047,7 @@ public class Core {
 
 			ACell a0 = args[0];
 			ADataStructure<ACell> result = RT.ensureDataStructure(a0);
-			if ((a0 != null) && (result == null)) return context.withCastError(args[0], Types.DATA_STRUCTURE);
+			if ((a0 != null) && (result == null)) return context.withCastError(0,args, Types.DATA_STRUCTURE);
 
 			long juice = Juice.BUILD_DATA;
 			ACell a1 = args[1];

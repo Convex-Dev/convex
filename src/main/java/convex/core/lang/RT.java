@@ -171,18 +171,18 @@ public class RT {
 	}
 
 	/**
-	 * Finds the first non-numeric value in an array. USed for error reporting.
+	 * Finds the first non-numeric value in an array. Used for error reporting.
 	 * 
 	 * @param args
 	 * @return First non-numeric value, or null if not found.
 	 */
-	public static ACell findNonNumeric(ACell[] args) {
+	public static int findNonNumeric(ACell[] args) {
 		for (int i = 0; i < args.length; i++) {
 			ACell a = args[i];
 			Class<?> klass = numericType(a);
-			if (klass == null) return a;
+			if (klass == null) return i;
 		}
-		return null;
+		return -1;
 	}
 
 	/**
@@ -1353,11 +1353,6 @@ public class RT {
 		if (a==null) return Types.NIL;
 		return a.getType();
 	}
-
-
-
-
-
 
 
 }

@@ -25,7 +25,7 @@ public class KeywordFn<T extends ACell> extends ADataFn<T> {
 		T result;
 		if (n == 1) {
 			IGet<T> gettable = RT.toGettable(args[0]);
-			if (gettable == null) return context.withCastError(args[0], Types.DATA_STRUCTURE);
+			if (gettable == null) return context.withCastError(0, Types.DATA_STRUCTURE);
 			result = gettable.get(key);
 		} else if (n == 2) {
 			ACell ds = args[0];
@@ -34,7 +34,7 @@ public class KeywordFn<T extends ACell> extends ADataFn<T> {
 				result = (T) notFound;
 			} else {
 				IGet<T> gettable = RT.toGettable(ds);
-				if (gettable == null) return context.withCastError(ds, Types.DATA_STRUCTURE);
+				if (gettable == null) return context.withCastError(0, Types.DATA_STRUCTURE);
 				result = (T) RT.get(gettable, key, notFound);
 			}
 		} else {

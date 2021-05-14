@@ -66,7 +66,7 @@ public class Invoke<T extends ACell> extends AMultiOp<T> {
 
 		ACell rf = ctx.getResult();
 		AFn<T> fn = RT.function(rf);
-		if (fn == null) return context.withCastError(rf, Types.FUNCTION);
+		if (fn == null) return context.withCastError(0, Types.FUNCTION);
 
 		int arity = ops.size() - 1;
 		ACell[] args = new ACell[arity];

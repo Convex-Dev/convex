@@ -1652,18 +1652,21 @@ public final class Context<T extends ACell> extends AObject {
 		return withError(ErrorCodes.BOUNDS,"Index: "+index);
 	}
 	
-	public <R extends ACell> Context<R> withCastError(ACell a, AType klass) {
-		return withError(ErrorCodes.CAST,"Can't convert "+a+" of type "+RT.getType(a)+" to type "+klass);
+	public <R extends ACell> Context<R> withCastError(int argIndex, AType klass) {
+		return withError(ErrorCodes.CAST,"Can't convert argument at position "+(argIndex+1)+" to type "+klass);
 	}
 	
-	public <R extends ACell> Context<R> withCastError(ACell[] a, AType klass) {
-		return withError(ErrorCodes.CAST,"Can't convert argument(s) to type "+klass);
+	public <R extends ACell> Context<R> withCastError(int argIndex, ACell[] args, AType klass) {
+		return withError(ErrorCodes.CAST,"Can't convert argument at position "+(argIndex+1)+" (with type "+RT.getType(args[argIndex])+ ") to type "+klass);
+	}
+	
+	public <R extends ACell> Context<R> withCastError(ACell a, AType klass) {
+		return withError(ErrorCodes.CAST,"Can't convert value of type "+RT.getType(a)+ " to type "+klass);
 	}
 	
 	public <R extends ACell> Context<R> withCastError(AType klass) {
-		return withError(ErrorCodes.CAST,"Can't convert argument(s) to type "+klass);
+		return withError(ErrorCodes.CAST,"Can't convert value(s) to type "+klass);
 	}
-
 	
 	public <R extends ACell> Context<R> withCastError(ACell a, String message) {
 		return withError(ErrorCodes.CAST,message);

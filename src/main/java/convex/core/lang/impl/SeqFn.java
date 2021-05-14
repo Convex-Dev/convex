@@ -31,14 +31,14 @@ public class SeqFn<T extends ACell> extends ADataFn<T> {
 		int n = args.length;
 		if (n == 1) {
 			CVMLong key = RT.ensureLong(args[0]);
-			if (key==null) return context.withCastError(args[0], Types.LONG);
+			if (key==null) return context.withCastError(0,args, Types.LONG);
 			long ix=key.longValue();
 			if ((ix < 0) || (ix >= seq.count())) return (Context<T>) context.withBoundsError(ix);
 			T result = (T) seq.get(key);
 			return context.withResult(result);
 		} else if (n == 2) {
 			CVMLong key = RT.ensureLong(args[0]);
-			if (key==null) return context.withCastError(args[0], Types.LONG);
+			if (key==null) return context.withCastError(0,args, Types.LONG);
 			long ix=key.longValue();
 			if ((ix < 0) || (ix >= seq.count())) return (Context<T>) context.withResult((T)args[1]);
 			T result = (T) seq.get(key);
