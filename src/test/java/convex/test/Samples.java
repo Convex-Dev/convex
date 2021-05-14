@@ -30,6 +30,7 @@ import convex.core.data.BlobTree;
 import convex.core.data.Blobs;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.data.List;
 import convex.core.data.Lists;
 import convex.core.data.MapLeaf;
@@ -40,6 +41,7 @@ import convex.core.data.Sets;
 import convex.core.data.StringShort;
 import convex.core.data.StringTree;
 import convex.core.data.Strings;
+import convex.core.data.Syntax;
 import convex.core.data.VectorLeaf;
 import convex.core.data.VectorTree;
 import convex.core.data.Vectors;
@@ -233,7 +235,7 @@ public class Samples {
 
 	public static ACell[] VALUES=new ACell[] {
 			null,
-			FOO,
+			Keywords.FOO,
 			FULL_BLOB,
 			MAX_EMBEDDED_BLOB,
 			INT_LIST_10,
@@ -241,12 +243,15 @@ public class Samples {
 			INT_VECTOR_300,
 			Vectors.empty(),
 			LONG_MAP_100,
+			Syntax.create(1),
+			Syntax.create(Vectors.empty(),Maps.of(1,2)),
 			Maps.empty(),
 			LONG_SET_10,
 			Sets.empty(),
 			CVMDouble.ONE,
 			CVMDouble.NaN,
 			CVMLong.MAX_VALUE,
+			CVMLong.MIN_VALUE,
 			CVMByte.ZERO,
 			CVMBool.TRUE,
 			CVMBool.FALSE,

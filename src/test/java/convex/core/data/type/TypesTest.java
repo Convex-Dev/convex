@@ -21,6 +21,7 @@ import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
+import convex.core.util.Utils;
 import convex.test.Samples;
 import convex.test.Samples.ValueArgumentsProvider;
 
@@ -116,7 +117,7 @@ public class TypesTest {
 		HashMap<String,AType> names=new HashMap<>();
 		Stream.of(Types.ALL_TYPES).forEach(t -> {
 			String name=t.toString();
-			assertFalse(names.containsKey(name),"Name clash "+t+" has same name ("+name+" ) as type "+names.get(name));
+			assertFalse(names.containsKey(name),"Name clash "+Utils.getClassName(t)+" has same name ("+name+" ) as type "+Utils.getClassName(names.get(name)));
 			names.put(name, t);
 		});
 	}

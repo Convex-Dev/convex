@@ -3,6 +3,8 @@ package convex.core.data;
 import java.nio.ByteBuffer;
 
 import convex.core.data.prim.CVMLong;
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
@@ -24,6 +26,8 @@ import convex.core.util.Utils;
  * 
  */
 public class Syntax extends ACell {
+	public static final Syntax EMPTY = create(null, null);
+
 	/**
 	 * Ref to the unwrapped datum value. Cannot refer to another Syntax object
 	 */
@@ -38,6 +42,10 @@ public class Syntax extends ACell {
 	private Syntax(Ref<ACell> datumRef, AHashMap<ACell, ACell> props) {
 		this.datumRef = datumRef;
 		this.meta = props;
+	}
+	
+	public AType getType() {
+		return Types.SYNTAX;
 	}
 	
 	public static Syntax createUnchecked(ACell value, AHashMap<ACell, ACell> meta) {
