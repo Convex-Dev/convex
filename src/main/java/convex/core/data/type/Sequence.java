@@ -24,7 +24,7 @@ public class Sequence extends AStandardType<ASequence> {
 
 	@Override
 	public String toString() {
-		return "Vector";
+		return "Sequence";
 	}
 
 	@Override

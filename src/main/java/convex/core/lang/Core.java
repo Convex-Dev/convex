@@ -1296,12 +1296,13 @@ public class Core {
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
 			ADataStructure<ACell> result = RT.dataStructure(args[0]);
-			if (result == null) return context.withCastError(args[0], Types.DATA_STRUCTURE);
+			if (result == null) return context.withCastError(0,args, Types.DATA_STRUCTURE);
 
 			for (int i = 0; i < numAdditions; i++) {
-				ACell val = (ACell) args[i + 1];
+				int argIndex=i+1;
+				ACell val = (ACell) args[argIndex];
 				result = result.conj(val);
-				if (result == null) return context.withCastError(val, Types.VECTOR); // must be a failed map conj?
+				if (result == null) return context.withCastError(argIndex,args, Types.VECTOR); // must be a failed map conj?
 			}
 			return context.withResult(juice, result);
 		}
@@ -1314,7 +1315,7 @@ public class Core {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			ASet<ACell> result = RT.toSet(args[0]);
-			if (result == null) return context.withCastError(args[0], Types.SET);
+			if (result == null) return context.withCastError(0,args, Types.SET);
 
 			result = result.exclude((ACell) args[1]);
 			long juice = Juice.BUILD_DATA + Juice.BUILD_PER_ELEMENT;
@@ -1333,8 +1334,9 @@ public class Core {
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
 			// get sequence from last argument
-			ASequence<?> seq = RT.sequence(args[n - 1]);
-			if (seq == null) return context.withCastError(seq, Types.SEQUENCE);
+			int lastIndex=n-1;
+			ASequence<?> seq = RT.sequence(args[lastIndex]);
+			if (seq == null) return context.withCastError(lastIndex,args, Types.SEQUENCE);
 
 			AList<ACell> list = RT.cons((ACell) args[n - 2], seq);
 
@@ -1353,11 +1355,11 @@ public class Core {
 		public  Context<ACell> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			ACell coll = args[0];
-			ASequence<?> seq = RT.sequence(coll);
-			if (seq == null) return context.withCastError(coll, Types.SEQUENCE);
-			if (seq.count()<1) return context.withBoundsError(0);
-			ACell result = seq.get(0);
+			ACell maybeColl = args[0];
+			Long n= RT.count(maybeColl);
+			if (n == null) return context.withCastError(0,args, Types.SEQUENCE);
+			if (n<1) return context.withBoundsError(0);
+			ACell result = RT.nth(maybeColl,0);
 
 			long juice = Juice.SIMPLE_FN;
 			return context.withResult(juice, result);
@@ -1372,11 +1374,11 @@ public class Core {
 		public  Context<ACell> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			ACell a = (ACell) args[0];
-			ASequence<?> seq = RT.sequence(a);
-			if (seq == null) return context.withCastError(a, Types.SEQUENCE);
-			if (seq.count()<2) return context.withBoundsError(1);
-			ACell result = seq.get(1);
+			ACell maybeColl = (ACell) args[0];
+			Long n= RT.count(maybeColl);
+			if (n == null) return context.withCastError(0,args, Types.SEQUENCE);
+			if (n<2) return context.withBoundsError(1);
+			ACell result = RT.nth(maybeColl,1);
 
 			long juice = Juice.SIMPLE_FN;
 			return context.withResult(juice, result);
@@ -1392,7 +1394,7 @@ public class Core {
 			ACell a = args[0];
 
 			Long n = RT.count(a);
-			if (n == null) return context.withCastError(a, Types.SEQUENCE);
+			if (n == null) return context.withCastError(0,args, Types.SEQUENCE);
 			if (n==0) return context.withBoundsError(-1);
 			
 			ACell result = RT.nth(a,n-1);
@@ -1545,7 +1547,7 @@ public class Core {
 
 			ACell a = args[0];
 			CVMLong result = RT.castLong(a);
-			if (result == null) return context.withCastError(a, Types.LONG);
+			if (result == null) return context.withCastError(0, args,Types.LONG);
 
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
@@ -1559,7 +1561,7 @@ public class Core {
 
 			ACell a = args[0];
 			CVMDouble result = RT.castDouble(a);
-			if (result == null) return context.withCastError(a, Types.DOUBLE);
+			if (result == null) return context.withCastError(0, args,Types.DOUBLE);
 
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
@@ -1573,7 +1575,7 @@ public class Core {
 
 			ACell a = args[0];
 			CVMChar result = RT.toCharacter(a);
-			if (result == null) return context.withCastError(a, Types.CHARACTER);
+			if (result == null) return context.withCastError(0,args, Types.CHARACTER);
 
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
@@ -1587,7 +1589,7 @@ public class Core {
 
 			ACell a = args[0];
 			CVMByte result = RT.castByte(a);
-			if (result == null) return context.withCastError(a, Types.BYTE);
+			if (result == null) return context.withCastError(0,args, Types.BYTE);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -2010,9 +2012,10 @@ public class Core {
 			final AFn<ACell> fn = RT.function(args[0]);
 			if (fn==null ) return context.withCastError(0,args, Types.FUNCTION);
 			
-			ACell lastArg = args[alen - 1];
+			int lastIndex=alen-1;
+			ACell lastArg = args[lastIndex];
 			ASequence<ACell> coll = RT.ensureSequence(lastArg);
-			if (coll == null) return context.withCastError(lastArg, Types.SEQUENCE);
+			if (coll == null) return context.withCastError(lastIndex,args, Types.SEQUENCE);
 
 			int vlen = coll.size(); // variable arg length
 
@@ -2158,14 +2161,14 @@ public class Core {
 			// check and cast first argument to a function
 			ACell fnArg = args[0];
 			AFn<?> fn = RT.function(fnArg);
-			if (fn == null) return ctx.withCastError(fnArg, Types.FUNCTION);
+			if (fn == null) return ctx.withCastError(0,args, Types.FUNCTION);
 
-			// Initial value
+			// Initial value, can be anything
 			ACell result = (ACell) args[1];
 
 			ACell maybeSeq = (ACell) args[2];
 			ASequence<?> seq = RT.sequence(maybeSeq);
-			if (seq == null) return ctx.withCastError(maybeSeq, Types.SEQUENCE);
+			if (seq == null) return ctx.withCastError(2,args, Types.SEQUENCE);
 
 			long c = seq.count();
 			ACell[] xs = new ACell[2]; // accumulator, next element
@@ -2180,8 +2183,9 @@ public class Core {
 				 	if (ex instanceof Reduced) {
 				 		result=((Reduced)ex).getValue();
 				 		break;
+				 	} else {
+				 		return rc; // bail out with exception
 				 	}
-				 	return rc;
 				} else {
 					result=rc.getResult();
 				}
