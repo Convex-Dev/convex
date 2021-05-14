@@ -6,6 +6,8 @@ import convex.core.data.ACell;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Tag;
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 
 /**
  * Abstract base class for operations
@@ -33,6 +35,11 @@ public abstract class AOp<T extends ACell> extends ACell {
 	 */
 	public abstract <I extends ACell> Context<T> execute(Context<I> context);
 
+	@Override
+	public final AType getType() {
+		return Types.OP;
+	}
+	
 	@Override
 	public int estimatedEncodingSize() {
 		return 10+Format.MAX_EMBEDDED_LENGTH;

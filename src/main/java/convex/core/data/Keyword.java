@@ -6,6 +6,8 @@ import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
 
 import convex.core.Constants;
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 
@@ -29,6 +31,10 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 
 	private Keyword(AString name) {
 		super(name);
+	}
+	
+	public AType getType() {
+		return Types.KEYWORD;
 	}
 
 	/**

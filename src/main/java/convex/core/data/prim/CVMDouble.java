@@ -33,6 +33,7 @@ public final class CVMDouble extends APrimitive implements INumeric {
 		return new CVMDouble(value);
 	}
 	
+	@Override
 	public AType getType() {
 		return Types.DOUBLE;
 	}

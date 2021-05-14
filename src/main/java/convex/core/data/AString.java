@@ -1,5 +1,8 @@
 package convex.core.data;
 
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
+
 /**
  * Class representing a CVM String
  */
@@ -10,6 +13,12 @@ public abstract class AString extends ACell implements CharSequence, Comparable<
 	protected AString(int length) {
 		this.length=length;
 	}
+	
+	@Override
+	public AType getType() {
+		return Types.STRING;
+	}
+
 	
 	@Override
 	public void ednString(StringBuilder sb) {

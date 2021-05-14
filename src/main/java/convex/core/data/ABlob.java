@@ -4,6 +4,8 @@ import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 
 import convex.core.crypto.Hash;
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
 
@@ -22,6 +24,11 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	 */
 	protected Hash contentHash = null;
 
+	@Override
+	public AType getType() {
+		return Types.BLOB;
+	}
+	
 	/**
 	 * Copies the bytes from this blob to a given destination
 	 * 

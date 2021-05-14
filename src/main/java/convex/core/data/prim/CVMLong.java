@@ -30,6 +30,7 @@ public final class CVMLong extends APrimitive implements INumeric {
 		return new CVMLong(value);
 	}
 	
+	@Override
 	public AType getType() {
 		return Types.LONG;
 	}

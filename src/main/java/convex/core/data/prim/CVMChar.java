@@ -1,6 +1,8 @@
 package convex.core.data.prim;
 
 import convex.core.data.Tag;
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
 
@@ -18,6 +20,12 @@ public final class CVMChar extends APrimitive {
 	public CVMChar(char value) {
 		this.value=value;
 	}
+	
+	@Override
+	public AType getType() {
+		return Types.CHARACTER;
+	}
+
 
 	public static CVMChar create(long value) {
 		return new CVMChar((char)value);

@@ -35,6 +35,7 @@ public class List<T extends ACell> extends AList<T> {
 		this.count = data.count();
 	}
 
+
 	/**
 	 * Creates a List containing the elements of the provided vector in reverse
 	 * order

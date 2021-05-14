@@ -3,6 +3,8 @@ package convex.core.data;
 import java.nio.ByteBuffer;
 import java.util.WeakHashMap;
 
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
@@ -40,6 +42,10 @@ public class Symbol extends ASymbolic {
 	private Symbol(ACell path,AString name) {
 		super(name);
 		this.path=path;
+	}
+	
+	public AType getType() {
+		return Types.SYMBOL;
 	}
 	
 	protected static final WeakHashMap<Symbol,Symbol> cache=new WeakHashMap<>(100);

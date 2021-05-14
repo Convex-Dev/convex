@@ -9,6 +9,8 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 import convex.core.util.Utils;
 
 /**
@@ -40,6 +42,12 @@ import convex.core.util.Utils;
  */
 public abstract class AVector<T extends ACell> extends ASequence<T> {
 
+	
+	@Override
+	public AType getType() {
+		return Types.VECTOR;
+	}
+	
 	/**
 	 * Gets the element at the specified index in this vector
 	 * 

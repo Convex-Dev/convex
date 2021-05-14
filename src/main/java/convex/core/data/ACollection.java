@@ -5,7 +5,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.function.Function;
 
-import convex.core.data.type.Types;
+import convex.core.data.type.AType;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
@@ -25,9 +25,7 @@ import convex.core.util.Utils;
 public abstract class ACollection<T extends ACell> extends ADataStructure<T> implements Collection<T> {
 
 	@Override
-	public convex.core.data.type.Collection getType() {
-		return Types.COLLECTION;
-	}
+	public abstract AType getType();
 	
 	@Override
 	public abstract int encode(byte[] bs, int pos);

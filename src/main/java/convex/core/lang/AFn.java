@@ -23,7 +23,7 @@ public abstract class AFn<T extends ACell> extends ACell implements IFn<T> {
 	public abstract AFn<T> updateRefs(IRefFunction func);
 	
 	@Override
-	public AType getType() {
+	public final AType getType() {
 		return Types.FUNCTION;
 	}
 

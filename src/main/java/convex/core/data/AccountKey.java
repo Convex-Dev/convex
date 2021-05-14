@@ -4,6 +4,8 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 
 import convex.core.crypto.Hash;
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
@@ -27,6 +29,11 @@ public class AccountKey extends AArrayBlob {
 	private AccountKey(byte[] data, int offset, int length) {
 		super(data, offset, length);
 		if (length != LENGTH) throw new IllegalArgumentException("AccountKey length must be " + LENGTH + " bytes");
+	}
+	
+	@Override
+	public AType getType() {
+		return Types.KEY;
 	}
 
 	/**

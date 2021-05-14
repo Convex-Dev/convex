@@ -1,6 +1,8 @@
 package convex.core.data;
 
 import convex.core.crypto.Hash;
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 
 /**
  * Abstract based class for sets.
@@ -14,6 +16,11 @@ import convex.core.crypto.Hash;
  * @param <T> Type of set elements
  */
 public abstract class ASet<T extends ACell> extends ACollection<T> implements java.util.Set<T>, IGet<T> {
+	
+	@Override
+	public final AType getType() {
+		return Types.SET;
+	}
 	
 	@Override
 	public abstract void ednString(StringBuilder sb) ;

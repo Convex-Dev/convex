@@ -8,6 +8,8 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
 import convex.core.crypto.Hash;
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 import convex.core.lang.RT;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
@@ -30,6 +32,11 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 
 	protected AMap(long count) {
 		this.count = count;
+	}
+	
+	@Override
+	public AType getType() {
+		return Types.MAP;
 	}
 
 	@Override

@@ -2,6 +2,9 @@ package convex.core.data;
 
 import java.util.function.Function;
 
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
+
 /**
  * Abstract base class for lists.
  * 
@@ -24,6 +27,11 @@ import java.util.function.Function;
  */
 public abstract class AList<T extends ACell> extends ASequence<T> {
 
+	@Override
+	public final AType getType() {
+		return Types.LIST;
+	}
+	
 	@Override
 	public abstract AList<T> cons(T x);
 

@@ -6,6 +6,8 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import convex.core.crypto.Hash;
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
@@ -30,6 +32,13 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	private MapEntry(Ref<K> key, Ref<V> value) {
 		this.keyRef = key;
 		this.valueRef = value;
+	}
+	
+	
+	@Override
+	public AType getType() {
+		// TODO: do we want a more specific MapEntry type?
+		return Types.VECTOR;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -314,5 +323,4 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		// TODO: should this be vector?
 		return Tag.MAP_ENTRY;
 	}
-
 }
