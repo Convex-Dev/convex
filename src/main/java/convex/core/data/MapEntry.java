@@ -34,7 +34,6 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		this.valueRef = value;
 	}
 	
-	
 	@Override
 	public AType getType() {
 		// TODO: do we want a more specific MapEntry type?
@@ -136,8 +135,6 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	public Ref<V> getValueRef() {
 		return valueRef;
 	}
-
-
 
 	public static <K extends ACell, V extends ACell> MapEntry<K, V> read(ByteBuffer bb) throws BadFormatException {
 		Ref<K> kr = Format.readRef(bb);
@@ -289,14 +286,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 
 	@Override
 	public <R  extends ACell> AVector<R> concat(ASequence<R> b) {
-		long bLen = b.count();
-		AVector<R> result = this.toVector();
-		long i = 0;
-		while (i < bLen) {
-			result = result.conj(b.get(i));
-			i++;
-		}
-		return result;
+		return toVector().concat(b);
 	}
 
 	@Override
