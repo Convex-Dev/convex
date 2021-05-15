@@ -57,6 +57,12 @@ public class List<T extends ACell> extends AList<T> {
 		return new List<T>(Vectors.of(elements));
 	}
 	
+	/***
+	 * Creates a list wrapping the given array. May destructively alter the array
+	 * @param <T>
+	 * @param args
+	 * @return
+	 */
 	public static <T extends ACell> List<T> create(ACell... args) {
 		Utils.reverse(args);
 		return new List<T>(Vectors.create(args));

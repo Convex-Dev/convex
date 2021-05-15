@@ -34,7 +34,7 @@ public class ContextTest {
 	public void testDefine() {
 		Symbol sym = Symbol.create("the-test-symbol");
 
-		final Context<?> c2 = CTX.fork().define(sym, Syntax.create("buffy"));
+		final Context<?> c2 = CTX.fork().define(sym, Syntax.of("buffy"));
 		assertCVMEquals("buffy", c2.lookup(sym).getResult());
 
 		assertUndeclaredError(c2.lookup(Symbol.create("some-bad-symbol")));
@@ -56,7 +56,7 @@ public class ContextTest {
 	public void testUndefine() {
 		Symbol sym = Symbol.create("the-test-symbol");
 
-		final Context<?> c2 = CTX.fork().define(sym, Syntax.create("vampire"));
+		final Context<?> c2 = CTX.fork().define(sym, Syntax.of("vampire"));
 		assertCVMEquals("vampire", c2.lookup(sym).getResult());
 
 		final Context<?> c3 = c2.undefine(sym);

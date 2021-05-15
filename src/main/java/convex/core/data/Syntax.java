@@ -87,8 +87,8 @@ public class Syntax extends ACell {
 	 * @param value Any value, will be converted to valid CVM type
 	 * @return Syntax instance
 	 */
-	public static Syntax create(Object value) {
-		return create(RT.cvm(value));
+	public static Syntax of(ACell value) {
+		return create(value);
 	}
 	
 	/**
@@ -290,7 +290,7 @@ public class Syntax extends ACell {
 	 * @return The unwrapped value
 	 */
 	@SuppressWarnings("unchecked")
-	public static <R> R unwrap(Object x) {
+	public static <R> R unwrap(ACell x) {
 		return (x instanceof Syntax) ? ((Syntax) x).getValue() : (R) x;
 	}
 
@@ -301,7 +301,7 @@ public class Syntax extends ACell {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <R extends ACell> R unwrapAll(ACell maybeSyntax) {
-		Object a = unwrap(maybeSyntax);
+		ACell a = unwrap(maybeSyntax);
 
 		if (a instanceof ADataStructure) {
 			if (a instanceof ACollection) {

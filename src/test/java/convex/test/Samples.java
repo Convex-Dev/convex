@@ -243,7 +243,7 @@ public class Samples {
 			INT_VECTOR_300,
 			Vectors.empty(),
 			LONG_MAP_100,
-			Syntax.create(1),
+			Syntax.of(1),
 			Syntax.create(Vectors.empty(),Maps.of(1,2)),
 			Maps.empty(),
 			LONG_SET_10,

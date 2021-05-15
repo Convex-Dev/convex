@@ -14,7 +14,6 @@ import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.List;
-import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Set;
@@ -166,14 +165,14 @@ public class Compiler {
 
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileMap(AMap<Syntax, Syntax> form, Context<?> context) {
 		int n = form.size();
-		Object[] vs = new Object[1 + n * 2];
+		ACell[] vs = new ACell[1 + n * 2];
 		vs[0] = Syntax.create(Symbols.HASH_MAP);
 		for (int i = 0; i < n; i++) {
 			MapEntry<Syntax, Syntax> me = form.entryAt(i);
 			vs[1 + i * 2] = me.getKey();
 			vs[1 + i * 2 + 1] = me.getValue();
 		}
-		return compileList(Lists.of(vs), context);
+		return compileList(List.create(vs), context);
 	}
 
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileSet(ASet<Syntax> form, Context<?> context) {
@@ -298,7 +297,7 @@ public class Compiler {
 		if (!(form instanceof AList)) return false;
 		AList<Syntax> list = (AList<Syntax>) form;
 		if (list.count() == 0) return false;
-		Object firstElement=list.get(0);
+		ACell firstElement=list.get(0);
 		return Utils.equals(element, Syntax.unwrap(firstElement));
 	}
 
@@ -570,7 +569,7 @@ public class Compiler {
 					if (n == 0) return context.withResult(Juice.EXPAND_CONSTANT, formSyntax);
 	
 					// we need to check if the form itself starts with an expander
-					Object first = Syntax.unwrap(listForm.get(0));
+					ACell first = Syntax.unwrap(listForm.get(0));
 	
 					// check for macro / expander in initial position.
 					if (first instanceof Symbol) {
@@ -587,7 +586,7 @@ public class Compiler {
 						MapEntry<Symbol, Syntax> me = context.lookupDynamicEntry(sym);
 						if (me != null) {
 							// TODO: examine syntax object for expander details?
-							Object v = me.getValue().getValue();
+							ACell v = me.getValue().getValue();
 							if (v instanceof AExpander) {
 								// expand form using specified expander and continuation expander
 								AExpander expander = (AExpander) v;
