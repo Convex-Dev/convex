@@ -2169,6 +2169,8 @@ public class CoreTest {
 		assertFalse(evalB("(= 0.0 -0.0)")); // Not identical values
 		assertTrue(evalB("(== 7.0000 7.0)"));
 		assertTrue(evalB("(== -1.00E0 -1.0)"));
+		assertTrue(evalB("(== 7 7.0)"));
+		assertTrue(evalB("(== 7.0 7)"));
 
 		assertTrue(evalB("(<)"));
 		assertTrue(evalB("(>)"));
