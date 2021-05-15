@@ -276,7 +276,7 @@
       (defn add-liquidity [token token-amount cvx-amount]
         (let [market (create-market token)]
           (asset/offer market [token token-amount])
-          (call market cvx-amount (add-liquidity token-amount))))
+          (call market (long cvx-amount) (add-liquidity token-amount))))
     
       (defn withdraw-liquidity [token shares]
       (let [market (or (get-market token) (fail "No market exists to withdraw liquidity"))]

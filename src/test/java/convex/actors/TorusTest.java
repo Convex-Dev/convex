@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Init;
 import convex.core.data.Address;
+import convex.core.data.prim.CVMDouble;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.lang.TestState;
@@ -68,6 +69,17 @@ public class TorusTest {
 		assertNull(eval(ctx,"(torus/price #789798789)"));
 
 	}
+	
+	@Test public void testDeployedCurrencies() {
+		Context<?> ctx=TestState.INITIAL_CONTEXT.fork(); // Initial test context
+		ctx=step(ctx,"(import torus.exchange :as torus)");
+		ctx= step(ctx,"(def GBP (import currency.GBP :as GBP))");
+		ctx= step(ctx,"(def USD (import currency.USD :as USD))");
+		assertNotNull(ctx.getResult());
+		ctx= step(ctx,"(torus/price GBP USD)");
+		assertTrue(ctx.getResult() instanceof CVMDouble);
+	}
+
 	
 	@Test public void testTorusAPI() {
 		Context<?> ctx=CONTEXT.fork();
