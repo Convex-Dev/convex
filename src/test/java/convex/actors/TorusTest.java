@@ -78,6 +78,9 @@ public class TorusTest {
 		assertNotNull(ctx.getResult());
 		ctx= step(ctx,"(torus/price GBP USD)");
 		assertTrue(ctx.getResult() instanceof CVMDouble);
+		
+		ctx= step(ctx,"(torus/price GBP USD)");
+
 	}
 
 	

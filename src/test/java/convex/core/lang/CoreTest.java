@@ -486,7 +486,7 @@ public class CoreTest {
 	public void testBlobMap() {
 		assertEquals(BlobMaps.empty(), eval("(blob-map)"));
 		
-		assertCastError(step("(assoc (blob-map) :foo 10)")); // bad key types cause cast errors. See Issue #101
+		assertArgumentError(step("(assoc (blob-map) :foo 10)")); // bad key types cause argument errors. See Issue #101
 		
 		assertArityError(step("(blob-map 1)"));
 	}
@@ -784,9 +784,12 @@ public class CoreTest {
 		
 		// Cast errors - not associative collections
 		assertCastError(step("(assoc-in 1 [2] 3)"));
-		assertCastError(step("(assoc-in [1] [:foo] 3)"));
 		assertCastError(step("(assoc-in #{3} [2] :fail)"));
 		
+		// Invalid keys
+		assertArgumentError(step("(assoc-in [1] [:foo] 3)"));
+		assertArgumentError(step("(assoc-in [] [42] :foo)")); // Issue #119
+
 		// cast errors - paths not sequences
 		assertCastError(step("(assoc-in {} #{:a :b} 42)")); // See Issue 95
 		assertCastError(step("(assoc-in {} :foo 42)")); // See Issue 95
@@ -805,11 +808,12 @@ public class CoreTest {
 		assertCastError(step("(assoc :foo)"));
 		assertCastError(step("(assoc #{} :foo true)"));
 		
-		assertCastError(step("(assoc [1 2 3] 1.4 :foo)"));
-		assertCastError(step("(assoc [1 2 3] nil :foo)"));
-		
-		assertCastError(step("(assoc [] 2 :foo)"));
-		assertCastError(step("(assoc (list) 2 :fail)"));
+		// Invalid keys
+		assertArgumentError(step("(assoc [1 2 3] 1.4 :foo)"));
+		assertArgumentError(step("(assoc [1 2 3] nil :foo)"));
+		assertArgumentError(step("(assoc [] 2 :foo)"));
+		assertArgumentError(step("(assoc (list) 2 :fail)"));
+		assertArgumentError(step("(assoc (blob-map) 2 :fail)"));
 
 		// Arity error
 		assertArityError(step("(assoc)"));
@@ -823,10 +827,10 @@ public class CoreTest {
 		assertEquals(Vectors.empty(), eval("(assoc [])"));
 		assertEquals(Vectors.of(2L, 1L), eval("(assoc [1 2] 0 2 1 1)"));
 
-		assertCastError(step("(assoc [] 1 7)"));
-		assertCastError(step("(assoc [] -1 7)"));
-
-		assertCastError(step("(assoc [1 2] :a 2)"));
+		// Invalid keys
+		assertArgumentError(step("(assoc [] 1 7)"));
+		assertArgumentError(step("(assoc [] -1 7)"));
+		assertArgumentError(step("(assoc [1 2] :a 2)"));
 
 		assertArityError(step("(assoc [] 1 2 3)"));
 		assertArityError(step("(assoc [] 1)"));
