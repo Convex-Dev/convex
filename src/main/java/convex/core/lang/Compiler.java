@@ -429,7 +429,7 @@ public class Compiler {
 		if (n < 2) return context.withArityError("fn requires parameter vector and body in form: " + list);
 
 		// check if we have a vector, in which case we have a single function definition
-		Object firstObject = list.get(1).getValue();
+		ACell firstObject = list.get(1).getValue();
 		if (firstObject instanceof AVector) {
 			AVector<Syntax> paramsVector=(AVector<Syntax>) firstObject;
 			AList<Syntax> bodyList=list.drop(2); 
@@ -445,7 +445,7 @@ public class Compiler {
 		
 		int num=list.size();
 		for (int i=0; i<num; i++) {
-			Object o=list.get(i).getValue();
+			ACell o=list.get(i).getValue();
 			if (!(o instanceof AList)) {
 				return context.withError(ErrorCodes.COMPILE,"multi-function requires instances of form: ([args] ...)");
 			}
@@ -476,7 +476,7 @@ public class Compiler {
 		int n = list.size();
 		if (n < 1) return context.withArityError("fn requires parameter vector and body in form: " + list);
 
-		Object firstObject = list.get(0).getValue();
+		ACell firstObject = list.get(0).getValue();
 		if (firstObject instanceof AVector) {
 			AVector<Syntax> paramsVector=(AVector<Syntax>) firstObject;
 			AList<Syntax> bodyList=list.drop(1); 

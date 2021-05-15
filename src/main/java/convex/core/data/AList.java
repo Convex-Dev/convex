@@ -58,7 +58,7 @@ public abstract class AList<T extends ACell> extends ASequence<T> {
 	public abstract <R extends ACell> AList<R> assoc(long i, R value);
 
 	/**
-	 * Drops elements from the front of the list
+	 * Drops elements from the front of the list, Guarnteed O(1).
 	 * @param n Number of elements to drop
 	 * @return List with n elements removed, or null if not possible
 	 */
