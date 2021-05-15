@@ -4,7 +4,7 @@ import convex.core.data.ACell;
 import convex.core.data.Syntax;
 
 /**
- * Type that represents CVM Byte values
+ * Type that represents CVM Syntax Object values
  */
 public final class SyntaxType extends AStandardType<Syntax> {
 
