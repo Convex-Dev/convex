@@ -1,16 +1,8 @@
 package convex.cli;
 
 import java.io.IOException;
-import java.io.File;
 import java.net.InetSocketAddress;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.SignatureException;
-import java.security.InvalidKeyException;
-import java.security.cert.CertificateException;
 import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.HashMap;
 import java.util.logging.Logger;
@@ -20,7 +12,6 @@ import java.util.Map;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.PFXTools;
 import convex.core.Init;
 import convex.core.store.Stores;
 import convex.peer.API;

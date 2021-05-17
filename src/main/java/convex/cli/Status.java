@@ -9,7 +9,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.HashMap;
 
 import convex.api.Convex;
-import convex.core.Init;
 import convex.core.Result;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;

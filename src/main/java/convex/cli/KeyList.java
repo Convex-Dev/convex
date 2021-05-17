@@ -5,9 +5,7 @@ import java.security.KeyStore;
 import java.util.Enumeration;
 import java.util.logging.Logger;
 
-import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
 
