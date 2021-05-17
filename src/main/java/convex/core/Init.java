@@ -5,7 +5,6 @@ import java.util.logging.Logger;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
@@ -16,7 +15,6 @@ import convex.core.data.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
 import convex.core.data.Strings;
-import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.lang.Context;
 import convex.core.lang.Core;
@@ -168,7 +166,7 @@ public class Init {
 			}
 
 			// Build globals
-			AHashMap<Symbol, ACell> globals = Constants.INITIAL_GLOBALS;
+			AVector<ACell> globals = Constants.INITIAL_GLOBALS;
 
 			State s = State.create(accts, peers, globals, BlobMaps.empty());
 

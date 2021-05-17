@@ -15,7 +15,6 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import convex.core.crypto.Ed25519KeyPair;
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
@@ -24,14 +23,12 @@ import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
-import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Juice;
 import convex.core.lang.RT;
-import convex.core.lang.Symbols;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Transfer;
 import convex.core.util.Text;
@@ -71,8 +68,8 @@ public class BeliefMergeTest {
 			peers = peers.assoc(key, peerStatus);
 		}
 
-		AHashMap<Symbol, ACell> globals = Constants.INITIAL_GLOBALS;
-		globals = globals.assoc(Symbols.JUICE_PRICE, RT.cvm(1L)); // cheap juice for simplicity. USe CVM long
+		AVector<ACell> globals = Constants.INITIAL_GLOBALS;
+		globals = globals.assoc(State.GLOBAL_JUICE_PRICE, RT.cvm(1L)); // cheap juice for simplicity. USe CVM long
 		INITIAL_STATE = State.create(accounts, peers, globals, BlobMaps.empty());
 		TOTAL_VALUE = INITIAL_STATE.computeTotalFunds();
 	}

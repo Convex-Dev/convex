@@ -334,9 +334,9 @@ public final class Context<T extends ACell> extends AObject {
 		// maybe add used juice to miner fees
 		if (usedJuice>0L) {
 			long transactionFees = usedJuice*juicePrice;
-			long oldFees=((CVMLong)(state.getGlobal(Symbols.FEES))).longValue();
+			long oldFees=state.getGlobalFees().longValue();
 			long newFees=oldFees+transactionFees;
-			state=state.withGlobal(Symbols.FEES,CVMLong.create(newFees));
+			state=state.withGlobalFees(CVMLong.create(newFees));
 		}
 		
 		// final state update and result reporting

@@ -3,10 +3,8 @@ package convex.core;
 import java.time.Instant;
 
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
-import convex.core.data.Maps;
-import convex.core.data.Symbol;
-import convex.core.lang.Symbols;
+import convex.core.data.AVector;
+import convex.core.data.Vectors;
 
 /**
  * Static class for global configuration constants that affect protocol
@@ -59,8 +57,8 @@ public class Constants {
 
 	public static final long MAX_DEPTH = 256;
 
-	public static final AHashMap<Symbol, ACell> INITIAL_GLOBALS = Maps.of(Symbols.TIMESTAMP,
-			Constants.INITIAL_TIMESTAMP, Symbols.FEES, 0L, Symbols.JUICE_PRICE, Constants.INITIAL_JUICE_PRICE);
+	public static final AVector<ACell> INITIAL_GLOBALS = Vectors.of(
+			Constants.INITIAL_TIMESTAMP, 0L, Constants.INITIAL_JUICE_PRICE);
 
 	/**
 	 * Maximum length of a symbolic name in characters (keywords and symbols)

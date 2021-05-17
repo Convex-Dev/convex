@@ -61,7 +61,13 @@ public class State extends ARecord {
 			Keywords.GLOBALS, Keywords.SCHEDULE };
 
 	private static final RecordFormat FORMAT = RecordFormat.of(STATE_KEYS);
+	
+	public static final AVector<Symbol> GLOBAL_SYMBOLS=Vectors.of(Symbols.TIMESTAMP, Symbols.FEES, Symbols.JUICE_PRICE);
 
+	public static final int GLOBAL_TIMESTAMP=0;
+	public static final int GLOBAL_FEES=1;
+	public static final int GLOBAL_JUICE_PRICE=2;
+	
 	public static final State EMPTY = create(Vectors.empty(), BlobMaps.empty(), Constants.INITIAL_GLOBALS,
 			BlobMaps.empty());
 
@@ -73,11 +79,11 @@ public class State extends ARecord {
 	
 	private final AVector<AccountStatus> accounts;
 	private final BlobMap<AccountKey, PeerStatus> peers;
-	private final AHashMap<Symbol, ACell> globals;
+	private final AVector<ACell> globals;
 	private final BlobMap<ABlob, AVector<ACell>> schedule;
 
 	private State(AVector<AccountStatus> accounts, BlobMap<AccountKey, PeerStatus> peers,
-			AHashMap<Symbol, ACell> globals, BlobMap<ABlob, AVector<ACell>> schedule) {
+			AVector<ACell> globals, BlobMap<ABlob, AVector<ACell>> schedule) {
 		super(FORMAT);
 		this.accounts = accounts;
 		this.peers = peers;
@@ -99,7 +105,7 @@ public class State extends ARecord {
 	protected State updateAll(ACell[] newVals) {
 		AVector<AccountStatus> accounts = (AVector<AccountStatus>) newVals[0];
 		BlobMap<AccountKey, PeerStatus> peers = (BlobMap<AccountKey, PeerStatus>) newVals[1];
-		AHashMap<Symbol, ACell> globals = (AHashMap<Symbol, ACell>) newVals[2];
+		AVector<ACell> globals = (AVector<ACell>) newVals[2];
 		BlobMap<ABlob, AVector<ACell>> schedule = (BlobMap<ABlob, AVector<ACell>>) newVals[3];
 		if ((this.accounts == accounts) && (this.peers == peers) && (this.globals == globals)
 				&& (this.schedule == schedule)) {
@@ -109,7 +115,7 @@ public class State extends ARecord {
 	}
 
 	public static State create(AVector<AccountStatus> accounts, BlobMap<AccountKey, PeerStatus> peers,
-			AHashMap<Symbol, ACell> globals, BlobMap<ABlob, AVector<ACell>> schedule) {
+			AVector<ACell> globals, BlobMap<ABlob, AVector<ACell>> schedule) {
 		return new State(accounts, peers, globals, schedule);
 	}
 
@@ -159,7 +165,7 @@ public class State extends ARecord {
 		try {
 			AVector<AccountStatus> accounts = Format.read(bb);
 			BlobMap<AccountKey, PeerStatus> peers = Format.read(bb);
-			AHashMap<Symbol, ACell> globals = Format.read(bb);
+			AVector<ACell> globals = Format.read(bb);
 			BlobMap<ABlob, AVector<ACell>> schedule = Format.read(bb);
 			return create(accounts, peers, globals, schedule);
 		} catch (ClassCastException ex) {
@@ -169,12 +175,6 @@ public class State extends ARecord {
 
 	public AVector<AccountStatus> getAccounts() {
 		return accounts;
-	}
-
-	public long getFees() {
-		CVMLong fees = (CVMLong) globals.get(Symbols.FEES);
-		if (fees == null) return 0L;
-		return fees.longValue();
 	}
 
 	/**
@@ -229,10 +229,12 @@ public class State extends ARecord {
 	 */
 	private State applyTimeUpdates(Block b) {
 		State state = this;
-		long ts = ((CVMLong) state.globals.get(Symbols.TIMESTAMP)).longValue();
+		AVector<ACell> glbs = state.globals;
+		long ts=((CVMLong)glbs.get(0)).longValue();
 		long bts = b.getTimeStamp();
 		if (bts > ts) {
-			state = state.withGlobal(Symbols.TIMESTAMP, CVMLong.create(bts));
+			AVector<ACell> newGlbs=glbs.assoc(0,CVMLong.create(bts));
+			state = state.withGlobals(newGlbs);
 		}
 
 		state = state.applyScheduledTransactions(b);
@@ -312,7 +314,7 @@ public class State extends ARecord {
 		return new State(accounts, peers, globals, newSchedule);
 	}
 
-	private State withGlobals(AHashMap<Symbol, ACell> newGlobals) {
+	private State withGlobals(AVector<ACell> newGlobals) {
 		if (newGlobals == globals) return this;
 		return new State(accounts, peers, newGlobals, schedule);
 	}
@@ -565,7 +567,7 @@ public class State extends ARecord {
 	public long computeTotalFunds() {
 		long total = accounts.reduce((Long acc,AccountStatus as) -> acc + as.getBalance(), (Long)0L);
 		total += peers.reduceValues((Long acc, PeerStatus ps) -> acc + ps.getTotalStake(), 0L);
-		total += getFees();
+		total += getGlobalFees().longValue();
 		return total;
 	}
 
@@ -588,11 +590,11 @@ public class State extends ARecord {
 	 * @return The timestamp from this state.
 	 */
 	public CVMLong getTimeStamp() {
-		return (CVMLong) globals.get(Symbols.TIMESTAMP);
+		return (CVMLong) globals.get(GLOBAL_TIMESTAMP);
 	}
 
 	public CVMLong getJuicePrice() {
-		return (CVMLong) globals.get(Symbols.JUICE_PRICE);
+		return (CVMLong) globals.get(GLOBAL_JUICE_PRICE);
 	}
 
 	/**
@@ -625,22 +627,14 @@ public class State extends ARecord {
 		return schedule;
 	}
 
-	@SuppressWarnings("unchecked")
-	public <R> R getGlobal(Symbol sym) {
-		return (R) globals.get(sym);
+	public CVMLong getGlobalFees() {
+		return (CVMLong) globals.get(GLOBAL_FEES);
 	}
 	
-	/**
-	 * Gets the global value map
-	 * @return Map of global values
-	 */
-	public  AHashMap<Symbol, ACell> getGlobals() {
-		return globals;
+	public State withGlobalFees(CVMLong newFees) {
+		return withGlobals(globals.assoc(GLOBAL_FEES,newFees));
 	}
 
-	public State withGlobal(Symbol sym, ACell value) {
-		return this.withGlobals(globals.assoc(sym, value));
-	}
 
 	/**
 	 * Gets the PeerStatus record for the given Address, or null if it does not

@@ -69,7 +69,7 @@ public class AboutPanel extends JPanel {
 		sb.append("  # Peers:            " + lpad(s.getPeers().count()) + "\n");
 		sb.append("\n");
 		sb.append("Globals\n");
-		sb.append("  fees:               " + lpad(Text.toFriendlyBalance(s.getFees())) + "\n");
+		sb.append("  fees:               " + lpad(Text.toFriendlyBalance(s.getGlobalFees().longValue())) + "\n");
 		sb.append("  juice-price:        " + lpad(Text.toFriendlyBalance(s.getJuicePrice().longValue())) + "\n");
 		sb.append("\n");
 		sb.append("Total funds:          " + lpad(Text.toFriendlyBalance(s.computeTotalFunds())) + "\n");
