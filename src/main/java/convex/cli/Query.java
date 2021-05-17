@@ -2,6 +2,9 @@ package convex.cli;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.util.logging.Logger;
 
 import convex.api.Convex;
 import convex.core.Result;
@@ -22,11 +25,14 @@ import picocli.CommandLine.ParentCommand;
 	description="Execute a query on the current peer.")
 public class Query implements Runnable {
 
+	private static final Logger log = Logger.getLogger(Query.class.getName());
+
 	@ParentCommand
 	protected Main mainParent;
 
 
 	@Option(names={"-p", "--port"},
+		defaultValue="0",
 		description="Port address to peer.")
 	private int port;
 
@@ -41,25 +47,39 @@ public class Query implements Runnable {
 	@Override
 	public void run() {
 		// sub command run with no command provided
-		System.out.printf("query command %s\n", queryCommand);
+		log.info("query command: "+queryCommand);
+		if (port == 0) {
+			Session session = new Session();
+			File sessionFile = new File(mainParent.getSessionFilename());
+			try {
+				session.load(sessionFile);
+			} catch (IOException e) {
+				log.warning("Cannot load the session control file");
+			}
+			port = session.getPort(1);
+		}
+		if (port == 0) {
+			log.warning("Cannot find port value");
+			return;
+		}
+
 		Convex convex = Helpers.connect(hostname, port);
 		if (convex==null) {
-			System.out.println("Aborting query");
+			log.severe("Cannot connect to a peer");
 			return;
 		}
 		try {
 			System.out.printf("Executing query: %s\n", queryCommand);
 			ACell exp=Reader.read(queryCommand);
 			Result result=convex.querySync(exp, 5000);
-			System.out.println("Result received:");
 			System.out.println(result);
 		} catch (IOException e) {
-			System.out.printf("Query Error: %s\n", e.getMessage());
+			log.severe("Query Error: "+e.getMessage());
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 			return;
 		}  catch (TimeoutException e) {
-			System.out.println("Query timeout");
+			log.severe("Query timeout");
 		}
 	}
 

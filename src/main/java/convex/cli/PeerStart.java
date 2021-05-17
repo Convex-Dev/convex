@@ -54,7 +54,7 @@ public class PeerStart implements Runnable {
 		// shutdown hook to remove/update the session file
 		convex.api.Shutdown.addHook(Shutdown.CLI,new Runnable() {
 		    public void run() {
-				System.out.println("peers stopping");
+				// System.out.println("peers stopping");
 				// remove session file
 		    }
 		});
