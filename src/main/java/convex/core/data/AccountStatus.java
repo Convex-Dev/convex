@@ -389,7 +389,7 @@ public class AccountStatus extends ARecord {
 
 	/**
 	 * Gets the memory allowance for this account
-	 * @return
+	 * @return Memory allowance in bytes
 	 */
 	public long getAllowance() {
 		return allowance;
@@ -407,7 +407,7 @@ public class AccountStatus extends ARecord {
 	 * Adds a change in balance to this account. Must not cause an illegal balance. Returns this instance unchanged
 	 * if the delta is zero
 	 * @param delta
-	 * @return
+	 * @return Updates account record
 	 */
 	public AccountStatus addBalance(long delta) {
 		if (delta==0) return this;
