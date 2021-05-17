@@ -325,7 +325,9 @@ public class Init {
 		ctx=ctx.eval(Reader.read("(do (import convex.fungible :as fun) (deploy (fun/build-token {:supply "+supply+"})))"));
 		Address addr=ctx.getResult();
 		ctx=ctx.eval(Reader.read("(do (import torus.exchange :as torus) (torus/add-liquidity "+addr+" "+liquidity+" "+cvx+"))"));
+		if (ctx.isExceptional()) throw new Error("Error adding market liquidity: "+ctx.getValue());
 		ctx=ctx.eval(Reader.read("(call *registry* (cns-update 'currency."+symbol+" "+addr+"))"));
+		if (ctx.isExceptional()) throw new Error("Error registering currency in CNS: "+ctx.getValue());
 		return ctx.withResult(addr);
 	}
 

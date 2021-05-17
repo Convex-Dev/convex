@@ -2,6 +2,7 @@ package convex.core.data.type;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -21,6 +22,7 @@ import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
+import convex.core.util.Utils;
 import convex.test.Samples;
 import convex.test.Samples.ValueArgumentsProvider;
 
@@ -105,7 +107,9 @@ public class TypesTest {
 	public void testSampleValues(ACell a) {
 		AType t=RT.getType(a);
 		assertTrue(t.check(a));
-		assertSame(a,t.implicitCast(a));
+		assertSame(a,t.implicitCast(a),"Implicit cast to same runtime type should not change a value");
+		
+		assertNotSame(t,Types.ANY,"Runtime type of a value should not be Any");
 		
 		Class<? extends ACell> klass=t.getJavaClass();
 		assertTrue((a==null)||klass.isInstance(a));
@@ -116,7 +120,7 @@ public class TypesTest {
 		HashMap<String,AType> names=new HashMap<>();
 		Stream.of(Types.ALL_TYPES).forEach(t -> {
 			String name=t.toString();
-			assertFalse(names.containsKey(name),"Name clash "+t+" has same name ("+name+" ) as type "+names.get(name));
+			assertFalse(names.containsKey(name),"Name clash "+Utils.getClassName(t)+" has same name ("+name+" ) as type "+Utils.getClassName(names.get(name)));
 			names.put(name, t);
 		});
 	}
@@ -145,6 +149,12 @@ public class TypesTest {
 		ACell a=t.defaultValue();
 		assertTrue(t.check(a));
 		assertSame(a,t.implicitCast(a));
+		
+		if (t.allowsNull()) {
+			assertTrue(t.check(null));
+		} else {
+			assertFalse(t.check(null));
+		}
 		
 		Class<? extends ACell> klass=t.getJavaClass();
 		assertNotNull(klass);

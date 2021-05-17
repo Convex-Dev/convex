@@ -1024,7 +1024,7 @@ public class Core {
 			if ((o == null) && (n == 1)) return context.withResult(juice, null);
 
 			// convert to data structure
-			ADataStructure<ACell> result = RT.ensureDataStructure(o);
+			IAssociative<ACell,ACell> result = RT.ensureAssociative(o);
 
 			// values that are non-null but not a data structure are a cast error
 			if ((o != null) && (result == null)) return context.withCastError(0,args, Types.DATA_STRUCTURE);
@@ -1033,11 +1033,11 @@ public class Core {
 			// each assoc
 			for (int i = 1; i < n; i += 2) {
 				ACell key=(ACell)args[i];
-				result = RT.assoc(result, key, (ACell)args[i + 1]);
-				if (result == null) return context.withCastError(key, "Cannot assoc value - invalid key");
+				result = (IAssociative<ACell, ACell>) RT.assoc(result, key, (ACell)args[i + 1]);
+				if (result == null) return context.withError(ErrorCodes.ARGUMENT, "Cannot assoc value - invalid key of type "+RT.getType(key));
 			}
 
-			return context.withResult(juice, result);
+			return context.withResult(juice, (ACell) result);
 		}
 	});
 	
@@ -1072,7 +1072,10 @@ public class Core {
 				IAssociative<ACell,ACell> struct=ass[i];
 				ACell k=ks[i];
 				value=RT.assoc(struct, k, value);
-				if (value==null) return context.withCastError((ACell)struct,Types.DATA_STRUCTURE); // TODO: Associative type?
+				if (value==null) {
+					// assoc failed, so key type must be invlid
+					return context.withError(ErrorCodes.ARGUMENT,"Invalid key of type "+RT.getType(k)+" for " +name()); 
+				}
 			}
 			return context.withResult(juice, value);
 		}
