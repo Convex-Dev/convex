@@ -29,39 +29,22 @@ public class Query implements Runnable {
 
 
 	@Option(names={"-p", "--port"},
-		defaultValue="" + Constants.PORT_PEER_LOCAL,
-		description="Port address to peer. Default: ${DEFAULT-VALUE}")
-	int port;
+		description="Port address to peer.")
+	private int port;
 
 	@Option(names={"--host"},
 		defaultValue=Constants.HOSTNAME_PEER,
 		description="Hostname to local peer. Default: ${DEFAULT-VALUE}")
-	String hostname;
+	private String hostname;
 
 	@Parameters(paramLabel="queryCommand", description="Query Command")
 	private String queryCommand;
-
-
-	protected Convex connect() {
-		InetSocketAddress host=new InetSocketAddress(hostname, port);
-		System.out.printf("Connecting to peer: %s\n", host);
-		Convex convex;
-		try {
-			convex=Convex.connect(host, Init.HERO, Init.HERO_KP);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-			System.out.printf("Failed to connect to peer at: %s\n", host);
-			return null;
-		}
-		return convex;
-	}
 
 	@Override
 	public void run() {
 		// sub command run with no command provided
 		System.out.printf("query command %s\n", queryCommand);
-		Convex convex = connect();
+		Convex convex = Helpers.connect(hostname, port);
 		if (convex==null) {
 			System.out.println("Aborting query");
 			return;
