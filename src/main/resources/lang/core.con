@@ -296,7 +296,7 @@
           :signature [{:params [[sym count] & body]}] }}
   [[sym count] & body]
   (let [n (long count)
-        sym (symbol sym)] ;; Dubious: allows strings and keywords?
+        sym (if (symbol? (unsyntax sym)) sym (fail :CAST "dotimes requires a symbol for loop binding"))] ;; Dubious: allows strings and keywords?
     '(loop [~sym 0]
        (if (< ~sym ~n)
          (do 

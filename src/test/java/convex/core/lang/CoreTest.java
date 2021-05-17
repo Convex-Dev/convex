@@ -1151,7 +1151,7 @@ public class CoreTest {
 		
 		assertCastError(step("(dotimes [1 10])"));
 		assertCastError(step("(dotimes [i :foo])"));
-		
+		assertCastError(step("(dotimes [:foo 10])"));
 		assertCastError(step("(dotimes :foo)"));
 		
 		assertArityError(step("(dotimes)"));
