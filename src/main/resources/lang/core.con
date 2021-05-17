@@ -296,7 +296,7 @@
           :signature [{:params [[sym count] & body]}] }}
   [[sym count] & body]
   (let [n (long count)
-        sym (symbol sym)] 
+        sym (symbol sym)] ;; Dubious: allows strings and keywords?
     '(loop [~sym 0]
        (if (< ~sym ~n)
          (do 
