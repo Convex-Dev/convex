@@ -14,9 +14,10 @@ import picocli.CommandLine.ParentCommand;
 public class Transact implements Runnable {
 
 	@ParentCommand
-	private Main parent;
+	protected Main mainParent;
 
 
+	@Override
 	public void run() {
 		// sub command run with no command provided
 		System.out.println("transact command");

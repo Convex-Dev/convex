@@ -7,15 +7,16 @@ import java.util.TreeMap;
 
 /**
  * So the JVM doesn't give us a nice way to run shutdown hooks in a defined order.
- * 
+ *
  * This class enables us to do just that!
  */
 public class Shutdown {
-	
+
 	public static final int CLIENTHTTP = 60;
 	public static final int SERVER = 80;
 	public static final int ETCH = 100;
-	
+	public static final int CLI = 120;
+
 	static {
 		Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
 			@Override
@@ -24,7 +25,7 @@ public class Shutdown {
 			}
 		}));
 	}
-	
+
 	private static class Group {
 		private final IdentityHashMap<Runnable, Runnable> hookSet=new IdentityHashMap<>();
 
@@ -39,15 +40,15 @@ public class Shutdown {
 			});
 			hookSet.clear();
 		}
-		
+
 	}
-	
+
 	private static final TreeMap<Integer, Group> order=new TreeMap<>();
 
 	/**
-	 * Add a Runnable shutdown hook with the given priority. Lower priority numbers will 
+	 * Add a Runnable shutdown hook with the given priority. Lower priority numbers will
 	 * be executed first.
-	 * 
+	 *
 	 * @param priority Priority number for shutdown hook
 	 * @param r
 	 */

@@ -9,16 +9,14 @@ import java.util.logging.Logger;
 import java.util.Map;
 
 
-import convex.core.crypto.AKeyPair;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.crypto.AKeyPair;
 import convex.core.Init;
-import convex.core.Order;
-import convex.core.State;
 import convex.core.store.Stores;
 import convex.peer.API;
 import convex.peer.Server;
+import etch.EtchStore;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -30,6 +28,10 @@ import picocli.CommandLine.ParentCommand;
 *
 */
 @Command(name="peer",
+	subcommands = {
+		PeerStart.class,
+		CommandLine.HelpCommand.class
+	},
 	mixinStandardHelpOptions=true,
 	description="Operates a local peer.")
 public class Peer implements Runnable {
@@ -39,63 +41,14 @@ public class Peer implements Runnable {
 	static public List<Server> peerServerList = new ArrayList<Server>();
 
 	@ParentCommand
-	private Main parent;
+	protected Main mainParent;
 
 	@Option(names={"-p", "--port"},
 		description="Specify a port to run the local peer.")
-	private int port;
-
-	@Option(names={"--count"},
-		defaultValue = ""+Init.NUM_PEERS,
-		description="Peer count, number of peers to start. Default: ${DEFAULT-VALUE}")
-	private int count;
+	protected int port;
 
 
-	// peer start command
-	@Command(name="start",
-		mixinStandardHelpOptions=true,
-		description="Starts a peer server.")
-	void start() {
-		System.out.println("Starting peer...");
-
-		// Parse peer config
-		Map<Keyword,Object> peerConfig=new HashMap<>();
-
-		if (port!=0) {
-			peerConfig.put(Keywords.PORT, port);
-		}
-
-		long consensusPoint = 0;
-		long maxBlock = 0;
-		log.info("Starting "+count+" peers");
-		launchAllPeers(count);
-		while (true) {
-			try {
-				Thread.sleep(30);
-				for (Server peerServer: peerServerList) {
-					convex.core.Peer peer = peerServer.getPeer();
-					if (peer==null) continue;
-
-					State state = peer.getConsensusState();
-					// System.out.println("state " + state);
-					Order order=peer.getPeerOrder();
-					if (order==null) continue; // not an active peer?
-					maxBlock = Math.max(maxBlock, order.getBlockCount());
-
-					long peerConsensusPoint = peer.getConsensusPoint();
-					if (peerConsensusPoint > consensusPoint) {
-						consensusPoint = peerConsensusPoint;
-						System.err.printf("Consenus State update detected at depth %d\n", consensusPoint);
-						// System.out.printf("Consensus state %s\n", consensusPoint);
-					}
-				}
-			} catch (InterruptedException e) {
-				System.out.println("Peer manager interrupted!");
-				return;
-			}
-		}
-	}
-
+	@Override
 	public void run() {
 		// sub command run with no command provided
 		CommandLine.usage(new Peer(), System.out);
@@ -109,7 +62,11 @@ public class Peer implements Runnable {
 		peerServerList.clear();
 
 		for (int i = 0; i < count; i++) {
-			launchPeer(Init.KEYPAIRS[i]);
+			Server peerServer = launchPeer(Init.KEYPAIRS[i]);
+			InetSocketAddress peerHostAddress = peerServer.getHostAddress();
+			System.out.println("Peer address: " + peerHostAddress.getAddress() + " port: " + peerHostAddress.getPort());
+			EtchStore store = (EtchStore) peerServer.getStore();
+			System.out.println("Peer store name " + store.getFileName());
 		}
 
 		/*

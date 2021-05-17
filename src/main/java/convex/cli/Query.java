@@ -25,7 +25,7 @@ import picocli.CommandLine.ParentCommand;
 public class Query implements Runnable {
 
 	@ParentCommand
-	private Main parent;
+	protected Main mainParent;
 
 
 	@Option(names={"-p", "--port"},
@@ -57,6 +57,7 @@ public class Query implements Runnable {
 		return convex;
 	}
 
+	@Override
 	public void run() {
 		// sub command run with no command provided
 		System.out.printf("query command %s\n", queryCommand);
