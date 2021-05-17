@@ -6,7 +6,6 @@ import java.security.KeyStore;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;

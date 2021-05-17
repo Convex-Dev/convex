@@ -1,6 +1,5 @@
 package convex.cli;
 
-import java.lang.Math;
 import java.util.HashMap;
 import java.util.logging.Logger;
 import java.util.Map;

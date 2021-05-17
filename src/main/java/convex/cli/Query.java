@@ -1,11 +1,9 @@
 package convex.cli;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
-import convex.core.Init;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.lang.Reader;
