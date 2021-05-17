@@ -2580,6 +2580,8 @@ public class CoreTest {
 		// Bad fn forms
 		assertArityError(step("(fn)"));
 		assertCompileError(step("(fn 1)"));
+		assertCompileError(step("(fn {})"));
+		assertCompileError(step("(fn '())"));
 		
 		// fn printing
 		assertCVMEquals("(fn [x y] 0)",eval("(str (fn [x y] 0))"));
