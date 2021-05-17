@@ -1,6 +1,8 @@
 package convex.cli;
 
 import java.io.IOException;
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,7 +49,6 @@ public class Peer implements Runnable {
 		description="Specify a port to run the local peer.")
 	protected int port;
 
-
 	@Override
 	public void run() {
 		// sub command run with no command provided
@@ -61,6 +62,17 @@ public class Peer implements Runnable {
 	protected void launchAllPeers(int count) {
 		peerServerList.clear();
 
+		Session session = new Session();
+		File sessionFile = new File(mainParent.getSessionFilename());
+		/*
+		 *	Currently we do not read the session on start, for add we should read this
+		 *
+		try {
+			session.load(sessionFile);
+		} catch (IOException e) {
+			log.severe("Cannot load the session control file");
+		}
+		*/
 		for (int i = 0; i < count; i++) {
 			AKeyPair keyPair = Init.KEYPAIRS[i];
 			Server peerServer = launchPeer(keyPair);
@@ -68,7 +80,17 @@ public class Peer implements Runnable {
 			System.out.println("Peer address: " + peerHostAddress.getAddress() + " port: " + peerHostAddress.getPort());
 			EtchStore store = (EtchStore) peerServer.getStore();
 			System.out.println("Peer store name " + store.getFileName());
+
+			session.addPeer(peerHostAddress, store.getFileName());
 		}
+
+		try {
+			Helpers.createPath(sessionFile);
+			session.store(sessionFile);
+		} catch (IOException e) {
+			log.severe("Cannot store the session control data");
+		}
+
 		/*
 			Go through each started peer server connection and make sure
 			that each peer is connected to the other peer.
