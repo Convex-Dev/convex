@@ -1,5 +1,6 @@
 package convex.cli;
 
+import java.lang.Math;
 import java.util.HashMap;
 import java.util.logging.Logger;
 import java.util.Map;
@@ -33,7 +34,7 @@ public class PeerStart implements Runnable {
 	@Parameters(paramLabel="count",
 		defaultValue = ""+Init.NUM_PEERS,
 		description="Number of peers to start. Default: ${DEFAULT-VALUE}")
-	int count;
+	private int count;
 
 	@Override
 	public void run() {
@@ -43,7 +44,7 @@ public class PeerStart implements Runnable {
 		Map<Keyword,Object> peerConfig=new HashMap<>();
 
 		if (peerParent.port!=0) {
-			peerConfig.put(Keywords.PORT, peerParent.port);
+			peerConfig.put(Keywords.PORT, Math.abs(peerParent.port));
 		}
 
 		long consensusPoint = 0;
@@ -51,7 +52,7 @@ public class PeerStart implements Runnable {
 		log.info("Starting "+count+" peers");
 		peerParent.launchAllPeers(count);
 
-		// shutdown hook to close file / release lock
+		// shutdown hook to remove/update the session file
 		convex.api.Shutdown.addHook(Shutdown.CLI,new Runnable() {
 		    public void run() {
 				System.out.println("peers stopping");

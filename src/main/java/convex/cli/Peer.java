@@ -1,8 +1,16 @@
 package convex.cli;
 
 import java.io.IOException;
+import java.io.File;
 import java.net.InetSocketAddress;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SignatureException;
+import java.security.InvalidKeyException;
+import java.security.cert.CertificateException;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.HashMap;
 import java.util.logging.Logger;
@@ -12,6 +20,7 @@ import java.util.Map;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.PFXTools;
 import convex.core.Init;
 import convex.core.store.Stores;
 import convex.peer.API;
@@ -62,13 +71,13 @@ public class Peer implements Runnable {
 		peerServerList.clear();
 
 		for (int i = 0; i < count; i++) {
-			Server peerServer = launchPeer(Init.KEYPAIRS[i]);
+			AKeyPair keyPair = Init.KEYPAIRS[i];
+			Server peerServer = launchPeer(keyPair);
 			InetSocketAddress peerHostAddress = peerServer.getHostAddress();
 			System.out.println("Peer address: " + peerHostAddress.getAddress() + " port: " + peerHostAddress.getPort());
 			EtchStore store = (EtchStore) peerServer.getStore();
 			System.out.println("Peer store name " + store.getFileName());
 		}
-
 		/*
 			Go through each started peer server connection and make sure
 			that each peer is connected to the other peer.
@@ -104,6 +113,7 @@ public class Peer implements Runnable {
 		Server peerServer = API.launchPeer(config);
 
 		addPeerServer(peerServer);
+
 		return peerServer;
 	}
 
