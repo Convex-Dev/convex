@@ -15,7 +15,7 @@ import picocli.CommandLine.ParentCommand;
 public class Key implements Runnable {
 
 	@ParentCommand
-	private Main parent;
+	protected Main mainParent;
 
 	// key generate command
 	@Command(name="generate",
@@ -35,6 +35,7 @@ public class Key implements Runnable {
 		System.out.println("key list");
 	}
 
+	@Override
 	public void run() {
 		// sub command run with no command provided
 		CommandLine.usage(new Key(), System.out);

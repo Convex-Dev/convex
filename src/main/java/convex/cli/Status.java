@@ -14,9 +14,10 @@ import picocli.CommandLine.ParentCommand;
 public class Status implements Runnable {
 
 	@ParentCommand
-	private Main parent;
+	protected Main mainParent;
 
 
+	@Override
 	public void run() {
 		// sub command run with no command provided
 		System.out.println("status command");
