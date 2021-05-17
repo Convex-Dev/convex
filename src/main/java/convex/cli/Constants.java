@@ -15,4 +15,5 @@ public class Constants {
 	public static final String CONFIG_FILENAME = "~/.convex/config";
 
 	public static final int PORT_PEER_LOCAL = 43579;
+
 }
