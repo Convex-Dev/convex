@@ -32,10 +32,11 @@ import picocli.CommandLine.ParentCommand;
 @Command(name="peer",
 	subcommands = {
 		PeerStart.class,
+		PeerManager.class,
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=true,
-	description="Operates a local peer.")
+	description="Operates a local peer(s).")
 public class Peer implements Runnable {
 
 	private static final Logger log = Logger.getLogger(Peer.class.getName());
@@ -46,7 +47,7 @@ public class Peer implements Runnable {
 	protected Main mainParent;
 
 	@Option(names={"-p", "--port"},
-		description="Specify a port to run the local peer.")
+		description="Specify a port to run the local peer (not used at the moment).")
 	protected int port;
 
 	@Override

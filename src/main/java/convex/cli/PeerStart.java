@@ -37,7 +37,6 @@ public class PeerStart implements Runnable {
 
 	@Override
 	public void run() {
-		System.out.println("Starting peer...");
 
 		// Parse peer config
 		Map<Keyword,Object> peerConfig=new HashMap<>();
@@ -48,7 +47,7 @@ public class PeerStart implements Runnable {
 
 		long consensusPoint = 0;
 		long maxBlock = 0;
-		log.info("Starting "+count+" peers");
+		log.info("Starting "+count+" peer(s)");
 		peerParent.launchPeers(count);
 		// write the launched peer details to a session file
 		peerParent.openSession();
@@ -79,7 +78,6 @@ public class PeerStart implements Runnable {
 					if (peerConsensusPoint > consensusPoint) {
 						consensusPoint = peerConsensusPoint;
 						System.err.printf("Consenus State update detected at depth %d\n", consensusPoint);
-						// System.out.printf("Consensus state %s\n", consensusPoint);
 					}
 				}
 			} catch (InterruptedException e) {
