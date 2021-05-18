@@ -66,17 +66,17 @@ public class PeersListPanel extends JPanel {
 	public static PeerView getFirst() {
 		return peerList.elementAt(0);
 	}
-	
+
 	public PeerView launchPeer(PeerManager manager, AKeyPair keyPair) {
 		Map<Keyword, Object> config = new HashMap<>();
 
 		config.put(Keywords.PORT, null);
 		config.put(Keywords.KEYPAIR, keyPair);
 		config.put(Keywords.STATE, Init.STATE);
-		
+
 		// Use a different fresh store for each peer
 		// config.put(Keywords.STORE, EtchStore.createTemp());
-		
+
 		// Or Use a shared store
 		config.put(Keywords.STORE, Stores.getGlobalStore());
 
@@ -85,14 +85,14 @@ public class PeersListPanel extends JPanel {
 		PeerView peer = new PeerView();
 		peer.peerServer = ps;
 		InetSocketAddress sa = ps.getHostAddress();
-		
+
 		addPeer(peer);
 		return peer;
 	}
 
 	/**
 	 * Gets a list of all locally operating Servers from the current peer list.
-	 * 
+	 *
 	 * @return List of local PeerView objects
 	 */
 	public List<PeerView> getPeerViews() {

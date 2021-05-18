@@ -359,6 +359,7 @@ public class AccountStatus extends ARecord {
 		if (Keywords.ALLOWANCE.equals(key)) return CVMLong.create(allowance);
 		if (Keywords.ENVIRONMENT.equals(key)) return environment;
 		if (Keywords.HOLDINGS.equals(key)) return holdings;
+		if (Keywords.CONTROLLER.equals(key)) return controller;
 		if (Keywords.KEY.equals(key)) return publicKey;
 		
 		return null;
