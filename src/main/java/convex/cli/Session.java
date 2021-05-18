@@ -6,6 +6,7 @@ import java.io.FileOutputStream;
 import java.io.FileNotFoundException;
 import java.io.File;
 import java.net.InetSocketAddress;
+import java.util.Enumeration;
 import java.util.Properties;
 
 
@@ -21,13 +22,13 @@ public class Session {
 		}
 	}
 
-	public void addPeer(InetSocketAddress address, String etchFilename){
-		int count = Integer.parseInt(values.getProperty("count", "0"));
-		count ++;
-		values.setProperty("count", String.valueOf(count));
-		values.setProperty("address-"+count, address.getHostName());
-		values.setProperty("port-"+count, String.valueOf(address.getPort()));
-		values.setProperty("etchFilename-"+count, etchFilename);
+	public void addPeer(String address, String hostname, int port, String etchFilename){
+		String[] items = new String[] {hostname, String.valueOf(port), etchFilename};
+		values.setProperty(address, String.join(",", items));
+	}
+
+	public void removePeer(String address) {
+		values.remove(address);
 	}
 
 	public void store(File filename) throws IOException {
@@ -35,7 +36,20 @@ public class Session {
 		values.store(stream, "Convex Peer Session");
 	}
 
+	public int size() {
+		return values.size();
+	}
+
 	public int getPort(int index) {
-		return Integer.parseInt(values.getProperty("port-"+index, "0"));
+		int count = 1;
+		for (String name: values.stringPropertyNames()) {
+			if (count == index) {
+				String line = values.getProperty(name, "");
+				String[] items = line.split(",");
+				return Integer.parseInt(items[1]);
+			}
+			count ++;
+		}
+		return 0;
 	}
 }

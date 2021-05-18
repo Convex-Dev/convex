@@ -49,13 +49,16 @@ public class PeerStart implements Runnable {
 		long consensusPoint = 0;
 		long maxBlock = 0;
 		log.info("Starting "+count+" peers");
-		peerParent.launchAllPeers(count);
+		peerParent.launchPeers(count);
+		// write the launched peer details to a session file
+		peerParent.openSession();
 
 		// shutdown hook to remove/update the session file
 		convex.api.Shutdown.addHook(Shutdown.CLI,new Runnable() {
 		    public void run() {
 				// System.out.println("peers stopping");
 				// remove session file
+				peerParent.closeSession();
 		    }
 		});
 
