@@ -34,7 +34,7 @@ The repository also contains core "on-chain" libraries providing key full-stack 
 
 * *Virtual Machine* - The Convex Virtual Machine provides a secure execution environment based on the Lambda Calculus and capable of acting as the execution layer for smart contracts and autonomous agents.
 * *Decentralised Consensus* - Similar to Blockchain technology, Convex incorporates a consensus mechanism that ensures all nodes ultimately agree on true values in the system without the control of any single entity. This property means that it is inherently tamper-proof and censorship-resistant.
-* *Performance and Scalability* - Convex is capable of executing large volumes of transactions (tens of thousands of transactions per second) with low latency (a second or two for global consensus) 
+* *Performance and Scalability* - Convex is capable of executing large volumes of transactions (tens of thousands of transactions per second) with low latency (a second or two for global consensus)
 
 ## Running Convex
 
@@ -46,11 +46,18 @@ Convex is available to run as a CLI application out of the box. After building (
 java -jar target/convex.jar <args>
 ```
 
-Or using the convenience batch / shell scripts:
+Or using the convenience batch script in windows:
 
 ```
 convex <args>
 ```
+
+or in linux/mac you can use the shell script:
+
+```
+./convex.sh <args>
+```
+
 
 A common usage of the CLI would be to start a Convex peer:
 
@@ -58,7 +65,7 @@ A common usage of the CLI would be to start a Convex peer:
 convex peer start
 ```
 
-Which initiates a peer server using the current local configuration.
+Which initiates a local convex network with 8 peers using the current local configuration.
 
 ### Peer manager
 
@@ -66,7 +73,13 @@ The convex Peer Manager (GUI application) can be used to run a local test networ
 
 This can be invoked by running `convex.gui.manager.PeerManager` as the main class, e.g. with the following command:
 
-`java -jar convex.jar convex.gui.manager.PeerManager`
+`java -cp convex.jar convex.gui.manager.PeerManager`
+
+or you can run this from the command line by using the `peer manager` command:
+
+```
+convex peer manager
+```
 
 ### Benchmarking
 
@@ -117,4 +130,4 @@ We use Discord as the primary means for discussing Convex - you can join the pub
 
 ## Copyright
 
-Copyright 2017-2021 The Convex Foundation 
+Copyright 2017-2021 The Convex Foundation

@@ -31,7 +31,7 @@ public class CLITest {
 		} else if (OS.contains("linux")) {
 			try {
 				Runtime rt = Runtime.getRuntime();
-				Process pr = rt.exec(command.replaceAll("^convex", "./convex.sh"));
+				Process pr = rt.exec(command.replaceAll("^convex", "./convex"));
 				return pr;
 			} catch (IOException e) {
 				throw Utils.sneakyThrow(e);
