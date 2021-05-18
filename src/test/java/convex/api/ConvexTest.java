@@ -14,13 +14,13 @@ import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.Test;
 
 import convex.core.ErrorCodes;
-import convex.core.Init;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.lang.Reader;
+import convex.core.lang.TestState;
 import convex.core.lang.ops.Constant;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
@@ -36,7 +36,7 @@ public class ConvexTest {
 	
 	static {
 		try {
-			cv=Convex.connect(ServerTest.server.getHostAddress(), Init.HERO,Init.HERO_KP);
+			cv=Convex.connect(ServerTest.server.getHostAddress(), TestState.HERO,TestState.HERO_KP);
 			ADDR=cv.createAccount(KP.getAccountKey());
 			cv.transfer(ADDR, 1000000000L);
 			cv.setAddress(ADDR,KP);
@@ -47,7 +47,7 @@ public class ConvexTest {
 	}
 	
 	@Test public void testConnection() throws IOException {
-		Convex convex=Convex.connect(ServerTest.server.getHostAddress(), Init.HERO,Init.HERO_KP);
+		Convex convex=Convex.connect(ServerTest.server.getHostAddress(), TestState.HERO,TestState.HERO_KP);
 		assertTrue(convex.isConnected());
 		convex.close();
 		assertFalse(convex.isConnected());

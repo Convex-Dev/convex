@@ -5,12 +5,10 @@ import java.awt.BorderLayout;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
-import convex.core.Init;
 import convex.gui.manager.PeerManager;
 import convex.gui.manager.mainpanels.actors.DeployPanel;
 import convex.gui.manager.mainpanels.actors.MarketsPanel;
 import convex.gui.manager.mainpanels.actors.OraclePanel;
-import convex.gui.manager.windows.actor.ActorInvokePanel;
 
 /**
  * Top level panel that displays some standard Actors
@@ -27,7 +25,8 @@ public class ActorsPanel extends JPanel {
 
 		typePane.add("Oracle", new OraclePanel());
 
-		typePane.add("Registry", new ActorInvokePanel(manager, Init.REGISTRY_ADDRESS));
+		// TODO: fix registry address
+		// typePane.add("Registry", new ActorInvokePanel(manager, ...));
 
 		typePane.add("Prediction Markets", new MarketsPanel(manager));
 

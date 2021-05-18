@@ -15,6 +15,7 @@ import convex.core.data.Vectors;
 import convex.core.lang.Context;
 import convex.core.lang.Core;
 import convex.core.lang.Symbols;
+import convex.core.lang.TestState;
 import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Lookup;
 import convex.core.transactions.ATransaction;
@@ -32,8 +33,8 @@ public class CVMBenchmark {
 	
 	@Benchmark
 	public void smallTransfer() {
-		State s=Init.STATE;
-		Address addr=Init.HERO;
+		State s=TestState.STATE;
+		Address addr=TestState.HERO;
 		ATransaction trans=Transfer.create(addr,1, Init.VILLAIN, 1000);
 		Context<ACell>  ctx=s.applyTransaction(trans);
 		ctx.getValue();
@@ -41,8 +42,8 @@ public class CVMBenchmark {
 	 
 	@Benchmark
 	public void simpleCalculationStatic() {
-		State s=Init.STATE;
-		Address addr=Init.HERO;
+		State s=TestState.STATE;
+		Address addr=TestState.HERO;
 		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Invoke.create(Constant.create(Core.PLUS),Constant.of(1L),Constant.of(2L)));
 		Context<ACell>  ctx=s.applyTransaction(trans);
 		ctx.getValue();
@@ -50,8 +51,8 @@ public class CVMBenchmark {
 	
 	@Benchmark
 	public void simpleCalculationDynamic() {
-		State s=Init.STATE;
-		Address addr=Init.HERO;
+		State s=TestState.STATE;
+		Address addr=TestState.HERO;
 		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Invoke.create(Lookup.create("+"),Constant.of(1L),Constant.of(2L)));
 		Context<ACell> ctx=s.applyTransaction(trans);
 		ctx.getValue();
@@ -59,8 +60,8 @@ public class CVMBenchmark {
 	
 	@Benchmark
 	public void defInEnvironment() {
-		State s=Init.STATE;
-		Address addr=Init.HERO;
+		State s=TestState.STATE;
+		Address addr=TestState.HERO;
 		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Def.create("a", Constant.of(13L)));
 		Context<ACell>  ctx=s.applyTransaction(trans);
 		ctx.getValue();
@@ -68,8 +69,8 @@ public class CVMBenchmark {
 	
 	@Benchmark
 	public void contractCall() {
-		State s=Init.STATE;
-		Address addr=Init.HERO;
+		State s=TestState.STATE;
+		Address addr=TestState.HERO;
 		ATransaction trans=Call.create(addr,1L, Init.REGISTRY_ADDRESS, Symbols.REGISTER, Vectors.of(Maps.of(Keywords.NAME,Strings.create("Bob"))));
 		Context<ACell>  ctx=s.applyTransaction(trans);
 		ctx.getValue();

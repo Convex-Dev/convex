@@ -159,7 +159,7 @@ public class StressPanel extends JPanel {
 					// Use client store
 					// Stores.setCurrent(Stores.CLIENT_STORE);
 					ArrayList<Future<Result>> frs=new ArrayList<>();
-					Convex pc = Convex.connect(sa, address,Init.HERO_KP);
+					Convex pc = Convex.connect(sa, address,null); // TODO: fix KP
 					
 					for (int i = 0; i < transCount; i++) {
 						StringBuilder tsb = new StringBuilder();

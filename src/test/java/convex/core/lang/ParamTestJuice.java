@@ -69,7 +69,7 @@ public class ParamTestJuice {
 		this.expectedResult = expectedResult;
 	}
 
-	private static final State INITIAL = TestState.INITIAL;
+	private static final State INITIAL = TestState.STATE;
 	private static final long INITIAL_JUICE = 10000;
 	private static final Context<?> INITIAL_CONTEXT;
 

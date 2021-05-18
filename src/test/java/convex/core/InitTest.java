@@ -21,8 +21,6 @@ public class InitTest {
 		assertNull(TestState.INITIAL_CONTEXT.getResult());
 		
 		assertEquals(TestState.TOTAL_FUNDS, s.computeTotalFunds());
-		
-		assertNotNull(Init.FIRST_PEER_KEY);
 	}
 	
 	@Test 
@@ -30,11 +28,6 @@ public class InitTest {
 		AccountStatus as=s.getAccount(Init.MEMORY_EXCHANGE);
 		assertNotNull(as);
 		assertTrue(as.getAllowance()>0L);
-	}
-	
-	@Test public void testCoreAccount() {
-		// core environment should be the same as when first created
-		assertEquals(Init.CORE_ACCOUNT.getEnvironment(),s.getAccount(Init.CORE_ADDRESS).getEnvironment());
 	}
 	
 	@Test 

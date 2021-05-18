@@ -133,7 +133,7 @@ public class PeersListPanel extends JPanel {
 			Convex pc;
 			try {
 				// TODO: we want to receive anything?
-				pc = Convex.connect(hostAddress, Init.HERO,Init.HERO_KP);
+				pc = Convex.connect(hostAddress, Init.HERO,null);
 				PeerView pv = new PeerView();
 				pv.peerConnection = pc;
 				addPeer(pv);

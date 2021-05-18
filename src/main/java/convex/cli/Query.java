@@ -47,7 +47,7 @@ public class Query implements Runnable {
 		System.out.printf("Connecting to peer: %s\n", host);
 		Convex convex;
 		try {
-			convex=Convex.connect(host, Init.HERO, Init.HERO_KP);
+			convex=Convex.connect(host, Init.HERO, null);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

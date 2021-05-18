@@ -13,6 +13,7 @@ import org.openjdk.jmh.runner.options.Options;
 import convex.api.Convex;
 import convex.core.Init;
 import convex.core.Result;
+import convex.core.lang.TestState;
 import convex.core.lang.ops.Constant;
 import convex.core.transactions.Invoke;
 import convex.peer.API;
@@ -29,8 +30,8 @@ public class LatencyBenchmark {
 	static {
 		server=API.launchPeer();
 		try {
-			client=Convex.connect(server.getHostAddress(), Init.HERO,Init.HERO_KP);
-			client2=Convex.connect(server.getHostAddress(), Init.VILLAIN,Init.VILLAIN_KP);
+			client=Convex.connect(server.getHostAddress(), TestState.HERO,TestState.HERO_KP);
+			client2=Convex.connect(server.getHostAddress(), TestState.VILLAIN,TestState.VILLAIN_KP);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

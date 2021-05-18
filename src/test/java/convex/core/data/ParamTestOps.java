@@ -31,7 +31,7 @@ public class ParamTestOps {
 	private AOp<?> op;
 	private Object expected;
 
-	private static final State INITIAL_STATE = TestState.INITIAL;
+	private static final State INITIAL_STATE = TestState.STATE;
 
 	public ParamTestOps(String label, AOp<?> v, Object expected) {
 		this.op = v;

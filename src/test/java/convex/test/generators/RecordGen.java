@@ -7,8 +7,8 @@ import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 import convex.core.Belief;
 import convex.core.Block;
 import convex.core.Constants;
-import convex.core.Init;
 import convex.core.data.ARecord;
+import convex.core.lang.TestState;
 
 /**
  * Generator for binary Blobs
@@ -25,11 +25,11 @@ public class RecordGen extends Generator<ARecord> {
 		int type = r.nextInt();
 		switch (type % 8) {
 		case 0:
-			return Belief.createSingleOrder(Init.HERO_KP);
+			return Belief.createSingleOrder(TestState.HERO_KP);
 		case 1:
-			return Init.STATE;
+			return TestState.STATE;
 		default:
-			return Block.of(Constants.INITIAL_TIMESTAMP,Init.FIRST_PEER_KEY);
+			return Block.of(Constants.INITIAL_TIMESTAMP,TestState.FIRST_PEER_KEY);
 		}
 	}
 }

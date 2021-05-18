@@ -33,7 +33,7 @@ public class ObjectsTest {
 
 		try {
 			a.validateCell();
-			doCellStorageTest(a);
+			// doCellStorageTest(a); // TODO: Maybe fix after we have ACell.toDirect()
 		} catch (InvalidDataException e) {
 			throw Utils.sneakyThrow(e);
 		}
@@ -61,7 +61,9 @@ public class ObjectsTest {
 		
 	}
 
+	@SuppressWarnings("unused")
 	private static void doCellStorageTest(ACell a) throws InvalidDataException {
+		
 		AStore temp=Stores.current();
 		try {
 			// test using a new memory store

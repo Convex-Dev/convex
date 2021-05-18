@@ -423,10 +423,14 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @param value Any CVM value to persist
 	 * @return Persisted Ref
 	 */
+	@SuppressWarnings("unchecked")
 	public static <T extends ACell> Ref<T> createPersisted(T value, Consumer<Ref<ACell>> noveltyHandler) {
 		Ref<T> ref = Ref.get(value);
+		if (ref.isPersisted()) return ref;
 		AStore store=Stores.current();
-		return (Ref<T>) store.storeTopRef(ref, Ref.PERSISTED,noveltyHandler);
+		ref = (Ref<T>) store.storeTopRef(ref, Ref.PERSISTED,noveltyHandler);
+		value.cachedRef=(Ref<ACell>)ref;
+		return ref;
 	}
 
 	/**

@@ -39,6 +39,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
+import convex.core.lang.TestState;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.Call;
@@ -56,16 +57,18 @@ import etch.EtchStore;
 public class ServerTest {
 
 	public static final Server server;
+	static final AKeyPair peerKeyPair;
 	static final AKeyPair keyPair;
 	
 	static {
-		keyPair = Init.KEYPAIRS[0];
-
+		peerKeyPair = TestState.FIRST_PEER_KEYPAIR;
+		keyPair=TestState.HERO_KP;
+		
 		Map<Keyword, Object> config = new HashMap<>();
 		config.put(Keywords.PORT, 0); // create new port
 		config.put(Keywords.STATE, Init.STATE);
 		config.put(Keywords.STORE, EtchStore.createTemp("server-test-store"));
-		config.put(Keywords.KEYPAIR, Init.KEYPAIRS[0]); // use first peer keypair
+		config.put(Keywords.KEYPAIR, peerKeyPair); // use first peer keypair
 
 		server = API.launchPeer(config);
 	}
@@ -117,7 +120,7 @@ public class ServerTest {
 //	}
 	
 	@Test public void testBadMessage() throws IOException {
-		Convex convex=Convex.connect(server.getHostAddress(),Init.VILLAIN,Init.VILLAIN_KP);
+		Convex convex=Convex.connect(server.getHostAddress(),TestState.VILLAIN,TestState.VILLAIN_KP);
 		
 		// test the connection is still working
 		assertNotNull(convex.getBalance(Init.VILLAIN));
@@ -125,7 +128,7 @@ public class ServerTest {
 	
 	@Test
 	public void testConvexAPI() throws IOException, InterruptedException, ExecutionException, TimeoutException {
-		Convex convex=Convex.connect(server.getHostAddress(),Init.VILLAIN,Init.VILLAIN_KP);
+		Convex convex=Convex.connect(server.getHostAddress(),TestState.VILLAIN,TestState.VILLAIN_KP);
 		
 		Future<convex.core.Result> f=convex.query(Symbols.STAR_BALANCE);
 		convex.core.Result f2=convex.querySync(Symbols.STAR_ADDRESS);
@@ -164,7 +167,7 @@ public class ServerTest {
 		//System.out.println("SignedBelief Hash="+h);
 		//System.out.println("testAcquireBelief store="+Stores.current());
 		
-		Convex convex=Convex.connect(hostAddress, Init.HERO, Init.HERO_KP);
+		Convex convex=Convex.connect(hostAddress, TestState.HERO, TestState.HERO_KP);
 		
 		Future<Result> statusFuture=convex.requestStatus();
 		Result status=statusFuture.get(10000,TimeUnit.MILLISECONDS);
@@ -184,13 +187,14 @@ public class ServerTest {
 		
 		// Connect to Peer Server using the current store for the client
 		Connection pc = Connection.connect(hostAddress, handler, Stores.current());
-		Address addr=Init.FIRST_PEER;
-		long id1 = pc.sendTransaction(keyPair.signData(Invoke.create(addr, 1, Reader.read("[1 2 3]"))));
-		long id2 = pc.sendTransaction(keyPair.signData(Invoke.create(addr, 2, Reader.read("(return 2)"))));
-		long id2a = pc.sendTransaction(keyPair.signData(Invoke.create(addr, 2, Reader.read("22"))));
-		long id3 = pc.sendTransaction(keyPair.signData(Invoke.create(addr, 3, Reader.read("(rollback 3)"))));
-		long id4 = pc.sendTransaction(keyPair.signData(Transfer.create(addr, 4, Init.HERO, 1000)));
-		long id5 = pc.sendTransaction(keyPair.signData(Call.create(addr, 5, Init.REGISTRY_ADDRESS, Symbols.FOO, Vectors.of(Maps.empty()))));
+		Address addr=TestState.HERO;
+		AKeyPair kp=keyPair;
+		long id1 = pc.sendTransaction(kp.signData(Invoke.create(addr, 1, Reader.read("[1 2 3]"))));
+		long id2 = pc.sendTransaction(kp.signData(Invoke.create(addr, 2, Reader.read("(return 2)"))));
+		long id2a = pc.sendTransaction(kp.signData(Invoke.create(addr, 2, Reader.read("22"))));
+		long id3 = pc.sendTransaction(kp.signData(Invoke.create(addr, 3, Reader.read("(rollback 3)"))));
+		long id4 = pc.sendTransaction(kp.signData(Transfer.create(addr, 4, TestState.HERO, 1000)));
+		long id5 = pc.sendTransaction(kp.signData(Call.create(addr, 5, Init.REGISTRY_ADDRESS, Symbols.FOO, Vectors.of(Maps.empty()))));
 		
 		assertTrue(id5>=0);
 		assertTrue(!pc.isClosed());
