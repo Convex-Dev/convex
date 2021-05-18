@@ -61,6 +61,10 @@ public class PeerStart implements Runnable {
 		    }
 		});
 
+		Server firstServer = peerParent.peerServerList.get(0);
+		State lastState = firstServer.getPeer().getConsensusState();
+		System.out.println("state hash: "+lastState.getHash());
+
 		while (true) {
 			try {
 				Thread.sleep(30);

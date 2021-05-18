@@ -1,8 +1,10 @@
 package convex.cli;
 
 import java.io.IOException;
+import java.lang.Exception;
 import java.util.logging.Logger;
 
+import convex.api.Applications;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -22,20 +24,13 @@ public class PeerManager implements Runnable {
 	@ParentCommand
 	protected Peer peerParent;
 
-	@Option(names={"-j", "--java"},
-		defaultValue="java",
-		description="Path to java runtime file. Default: ${DEFAULT-VALUE}")
-	String javaPath;
-
 	@Override
 	public void run() {
 		// sub command to launch peer manager
 		try {
-			Runtime runtime = Runtime.getRuntime();
-			Process process = runtime.exec(javaPath + " -cp target/convex.jar convex.gui.manager.PeerManager");
-			process.waitFor();
-		} catch (IOException | InterruptedException e) {
-			System.err.println("cannot start PeerManager "+e);
+			Applications.launchApp(convex.gui.manager.PeerManager.class);
+		} catch (Throwable t) {
+			System.err.println("cannot start PeerManager "+t);
 		}
 	}
 }

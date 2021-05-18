@@ -48,17 +48,14 @@ public class Query implements Runnable {
 		// sub command run with no command provided
 		log.info("query command: "+queryCommand);
 		if (port == 0) {
-			Session session = new Session();
-			File sessionFile = new File(mainParent.getSessionFilename());
 			try {
-				session.load(sessionFile);
+				port = Helpers.getSessionPort(mainParent.getSessionFilename());
 			} catch (IOException e) {
 				log.warning("Cannot load the session control file");
 			}
-			port = session.getPort(1);
 		}
 		if (port == 0) {
-			log.warning("Cannot find port value");
+			log.warning("Cannot find a local port or you have not set a valid port number");
 			return;
 		}
 

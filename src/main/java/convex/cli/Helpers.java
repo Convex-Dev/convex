@@ -3,6 +3,7 @@ package convex.cli;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.Random;
 
 import convex.api.Convex;
 import convex.core.Init;
@@ -38,6 +39,18 @@ public class Helpers {
 			return null;
 		}
 		return convex;
+	}
+
+	public static int getSessionPort(String sessionFilename) throws IOException {
+		int port = 0;
+		Session session = new Session();
+		Random random = new Random();
+		File sessionFile = new File(sessionFilename);
+		session.load(sessionFile);
+		if (session.size() > 0) {
+			port = session.getPort(random.nextInt(session.size() - 1));
+		}
+		return port;
 	}
 }
 
