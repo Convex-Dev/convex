@@ -1,19 +1,10 @@
 package convex.cli;
 
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.lang.InterruptedException;
 import java.util.logging.Logger;
 
-import convex.api.Convex;
-import convex.core.Result;
-import convex.core.data.ACell;
-import convex.core.lang.Reader;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 
 /**

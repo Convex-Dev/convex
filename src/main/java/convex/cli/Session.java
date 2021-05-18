@@ -3,10 +3,7 @@ package convex.cli;
 import java.io.IOException;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileNotFoundException;
 import java.io.File;
-import java.net.InetSocketAddress;
-import java.util.Enumeration;
 import java.util.Properties;
 
 

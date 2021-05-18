@@ -22,7 +22,7 @@ import picocli.CommandLine.ParentCommand;
 
 @Command(name="start",
 	mixinStandardHelpOptions=true,
-	description="Starts a peer server.")
+	description="Starts one or more peer servers.")
 public class PeerStart implements Runnable {
 
 	private static final Logger log = Logger.getLogger(PeerStart.class.getName());

@@ -3,7 +3,6 @@ package convex.cli;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.util.logging.Logger;
 
 import convex.api.Convex;
