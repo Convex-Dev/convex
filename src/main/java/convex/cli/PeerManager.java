@@ -1,12 +1,9 @@
 package convex.cli;
 
-import java.io.IOException;
-import java.lang.Exception;
 import java.util.logging.Logger;
 
 import convex.api.Applications;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 
 /**

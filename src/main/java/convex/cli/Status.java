@@ -2,10 +2,7 @@ package convex.cli;
 
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.HashMap;
 import java.util.logging.Logger;
 
@@ -16,18 +13,14 @@ import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.AVector;
-import convex.core.data.Blob;
 import convex.core.data.BlobMap;
-import convex.core.data.MapLeaf;
 import convex.core.data.PeerStatus;
 import convex.core.data.VectorLeaf;
 import convex.core.Result;
 import convex.core.State;
-import convex.core.util.Utils;
 import convex.core.util.Text;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 
 /**
