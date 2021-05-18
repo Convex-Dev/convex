@@ -3,6 +3,7 @@ package convex.cli;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
+import picocli.CommandLine.Option;
 
 /**
 *
@@ -10,34 +11,38 @@ import picocli.CommandLine.ParentCommand;
 *
 */
 @Command(name="key",
+	subcommands = {
+		KeyGenerate.class,
+		KeyList.class,
+		CommandLine.HelpCommand.class
+	},
 	mixinStandardHelpOptions=true,
 	description="Manage local Convex key store.")
 public class Key implements Runnable {
 
 	@ParentCommand
-	private Main parent;
+	protected Main mainParent;
 
-	// key generate command
-	@Command(name="generate",
-		aliases={"g","gen"},
-		mixinStandardHelpOptions=true,
-		description="Generate a new private key pair.")
-	void generate() {
-		System.out.println("key generate");
-	}
+	@Option(names={"-k", "--keystore"},
+		defaultValue=Constants.KEYSTORE_FILENAME,
+		description="keystore filename. Default: ${DEFAULT-VALUE}")
+	private String keyStoreFilename;
 
-	// key list command
-	@Command(name="list",
-		aliases={"l","li"},
-		mixinStandardHelpOptions=true,
-		description="List available key pairs.")
-	void list() {
-		System.out.println("key list");
-	}
+	@Option(names={"-p", "--password"},
+		description="Password to read/write to the Keystore")
+	private String password;
 
+	@Override
 	public void run() {
 		// sub command run with no command provided
 		CommandLine.usage(new Key(), System.out);
 	}
 
+	public String getPassword() {
+		return password;
+	}
+
+	public String getKeyStoreFilename() {
+		return Helpers.expandTilde(keyStoreFilename);
+	}
 }
