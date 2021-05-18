@@ -59,36 +59,12 @@ public class Peer implements Runnable {
 		peerServerList.add(peerServer);
 	}
 
-	protected void launchAllPeers(int count) {
+	protected void launchPeers(int count) {
 		peerServerList.clear();
 
-		Session session = new Session();
-		File sessionFile = new File(mainParent.getSessionFilename());
-		/*
-		 *	Currently we do not read the session on start, for add we should read this
-		 *
-		try {
-			session.load(sessionFile);
-		} catch (IOException e) {
-			log.severe("Cannot load the session control file");
-		}
-		*/
 		for (int i = 0; i < count; i++) {
 			AKeyPair keyPair = Init.KEYPAIRS[i];
 			Server peerServer = launchPeer(keyPair);
-			InetSocketAddress peerHostAddress = peerServer.getHostAddress();
-			System.out.println("Peer address: " + peerHostAddress.getAddress() + " port: " + peerHostAddress.getPort());
-			EtchStore store = (EtchStore) peerServer.getStore();
-			System.out.println("Peer store name " + store.getFileName());
-
-			session.addPeer(peerHostAddress, store.getFileName());
-		}
-
-		try {
-			Helpers.createPath(sessionFile);
-			session.store(sessionFile);
-		} catch (IOException e) {
-			log.severe("Cannot store the session control data");
 		}
 
 		/*
@@ -107,6 +83,57 @@ public class Peer implements Runnable {
 					System.out.println("Connect failed to: "+addr);
 				}
 			}
+		}
+	}
+
+	protected void openSession() {
+		Session session = new Session();
+		File sessionFile = new File(mainParent.getSessionFilename());
+		try {
+			session.load(sessionFile);
+		} catch (IOException e) {
+			log.severe("Cannot load the session control file");
+		}
+		for (Server peerServer: peerServerList) {
+			InetSocketAddress peerHostAddress = peerServer.getHostAddress();
+			EtchStore store = (EtchStore) peerServer.getStore();
+
+			session.addPeer(
+				peerServer.getAddress().toHexString(),
+				peerHostAddress.getHostName(),
+				peerHostAddress.getPort(),
+				store.getFileName()
+			);
+		}
+		try {
+			Helpers.createPath(sessionFile);
+			session.store(sessionFile);
+		} catch (IOException e) {
+			log.severe("Cannot store the session control data");
+		}
+	}
+
+	protected void closeSession() {
+		Session session = new Session();
+		File sessionFile = new File(mainParent.getSessionFilename());
+		try {
+			session.load(sessionFile);
+		} catch (IOException e) {
+			log.severe("Cannot load the session control file");
+		}
+
+		for (Server peerServer: peerServerList) {
+			session.removePeer(peerServer.getAddress().toHexString());
+		}
+		try {
+			if (session.size() > 0) {
+				session.store(sessionFile);
+			}
+			else {
+				sessionFile.delete();
+			}
+		} catch (IOException e) {
+			log.severe("Cannot store the session control data");
 		}
 	}
 
