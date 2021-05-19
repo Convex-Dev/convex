@@ -5,8 +5,11 @@ import java.security.KeyStore;
 import java.util.Enumeration;
 import java.util.logging.Logger;
 
+
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
+import convex.core.store.AStore;
+import etch.EtchStore;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
@@ -82,8 +85,17 @@ public class PeerStart implements Runnable {
 			port = Math.abs(mainParent.getPort());
 		}
 
-		log.info("Starting peer");
-		peerParent.launchPeer(keyPair, port);
-		peerParent.waitForPeers();
+		try {
+			AStore store = null;
+			String etchStoreFilename = mainParent.getEtchStoreFilename();
+			if (etchStoreFilename != null && !etchStoreFilename.isEmpty()) {
+				store = EtchStore.create(new File(etchStoreFilename));
+			}
+			log.info("Starting peer");
+			peerParent.launchPeer(keyPair, port, store);
+			peerParent.waitForPeers();
+		} catch (Throwable t) {
+			System.out.println("Unable to launch peer "+t);
+		}
 	}
 }

@@ -14,6 +14,7 @@ import convex.api.Shutdown;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.crypto.AKeyPair;
+import convex.core.store.AStore;
 import convex.core.Init;
 import convex.core.store.Stores;
 import convex.core.Order;
@@ -141,6 +142,10 @@ public class Peer implements Runnable {
 	}
 
 	protected Server launchPeer(AKeyPair keyPair, int port) {
+		return launchPeer(keyPair, 0, null);
+	}
+
+	protected Server launchPeer(AKeyPair keyPair, int port, AStore store) {
 		Map<Keyword, Object> config = new HashMap<>();
 
 		config.put(Keywords.PORT, null);
@@ -153,8 +158,11 @@ public class Peer implements Runnable {
 		// Use a different fresh store for each peer
 		// config.put(Keywords.STORE, EtchStore.createTemp());
 
-		// Or Use a shared store
-		config.put(Keywords.STORE, Stores.getGlobalStore());
+		if (store==null) {
+			// Use a shared store
+			store = Stores.getGlobalStore();
+		}
+		config.put(Keywords.STORE, store);
 
 		log.info("launch peer: "+keyPair.getAccountKey().toHexString());
 

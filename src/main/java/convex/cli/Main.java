@@ -44,6 +44,11 @@ public class Main {
 		description="Password to read/write to the Keystore")
 	private String password;
 
+	@Option(names={"-e", "--etch"},
+		scope = ScopeType.INHERIT,
+		description="Convex state storage filename. The default is to use a temporary storage filename in the /tmp folder.")
+	private String etchStoreFilename;
+
 	@Option(names={"--port"},
 		scope = ScopeType.INHERIT,
 		description="Port number to connect or create a peer.")
@@ -82,4 +87,8 @@ public class Main {
 	public String getHostname() {
 		return hostname;
 	}
+	public String getEtchStoreFilename() {
+		return Helpers.expandTilde(etchStoreFilename);
+	}
+
 }
