@@ -1,16 +1,12 @@
 package convex.cli;
 
-import java.util.HashMap;
+import java.io.File;
+import java.security.KeyStore;
+import java.util.Enumeration;
 import java.util.logging.Logger;
-import java.util.Map;
 
-import convex.api.Shutdown;
-import convex.core.data.Keyword;
-import convex.core.data.Keywords;
-import convex.core.Init;
-import convex.core.Order;
-import convex.core.State;
-import convex.peer.Server;
+import convex.core.crypto.AKeyPair;
+import convex.core.crypto.PFXTools;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
@@ -30,64 +26,64 @@ public class PeerStart implements Runnable {
 	@ParentCommand
 	private Peer peerParent;
 
-	@Parameters(paramLabel="count",
-		defaultValue = ""+Init.NUM_PEERS,
-		description="Number of peers to start. Default: ${DEFAULT-VALUE}")
-	private int count;
+	@Parameters(paramLabel="index",
+		description="Keystore index or public address to use for the peer.")
+	private String keystoreIndex;
+
 
 	@Override
 	public void run() {
 
-		// Parse peer config
-		Map<Keyword,Object> peerConfig=new HashMap<>();
+		Main mainParent = peerParent.mainParent;
+		AKeyPair keyPair = null;
+		int port = 0;
+		int index = Integer.parseInt(keystoreIndex);
 
-		if (peerParent.port!=0) {
-			peerConfig.put(Keywords.PORT, Math.abs(peerParent.port));
+		String password = mainParent.getPassword();
+		if (password == null) {
+			log.severe("You need to provide a keystore password");
+			return;
 		}
-
-		long consensusPoint = 0;
-		long maxBlock = 0;
-		log.info("Starting "+count+" peer(s)");
-		peerParent.launchPeers(count);
-		// write the launched peer details to a session file
-		peerParent.openSession();
-
-		// shutdown hook to remove/update the session file
-		convex.api.Shutdown.addHook(Shutdown.CLI,new Runnable() {
-		    public void run() {
-				// System.out.println("peers stopping");
-				// remove session file
-				peerParent.closeSession();
-		    }
-		});
-
-		Server firstServer = peerParent.peerServerList.get(0);
-		State lastState = firstServer.getPeer().getConsensusState();
-		System.out.println("state hash: "+lastState.getHash());
-
-		while (true) {
-			try {
-				Thread.sleep(30);
-				for (Server peerServer: peerParent.peerServerList) {
-					convex.core.Peer peer = peerServer.getPeer();
-					if (peer==null) continue;
-
-					State state = peer.getConsensusState();
-					// System.out.println("state " + state);
-					Order order=peer.getPeerOrder();
-					if (order==null) continue; // not an active peer?
-					maxBlock = Math.max(maxBlock, order.getBlockCount());
-
-					long peerConsensusPoint = peer.getConsensusPoint();
-					if (peerConsensusPoint > consensusPoint) {
-						consensusPoint = peerConsensusPoint;
-						System.err.printf("Consenus State update detected at depth %d\n", consensusPoint);
-					}
-				}
-			} catch (InterruptedException e) {
-				System.out.println("Peer manager interrupted!");
+		File keyFile = new File(mainParent.getKeyStoreFilename());
+		try {
+			if (!keyFile.exists()) {
+				log.severe("Cannot find keystore file "+keyFile.getCanonicalPath());
 				return;
 			}
+			KeyStore keyStore = PFXTools.loadStore(keyFile, password);
+
+			if ( index < 1 || index > keyStore.size()) {
+				log.severe("Keystore index is out of range");
+				return;
+			}
+			int counter = 1;
+			Enumeration<String> aliases = keyStore.aliases();
+
+			while (aliases.hasMoreElements()) {
+				String alias = aliases.nextElement();
+				if (counter == index) {
+					System.out.println(alias);
+					keyPair = PFXTools.getKeyPair(keyStore, alias, password);
+					break;
+				}
+				counter ++;
+			}
+		} catch (Throwable t) {
+			System.out.println("Cannot load key store "+t);
+			t.printStackTrace();
 		}
+
+		if (keyPair==null) {
+			log.severe("Cannot find key in keystore");
+			return;
+		}
+
+		if (mainParent.getPort()!=0) {
+			port = Math.abs(mainParent.getPort());
+		}
+
+		log.info("Starting peer");
+		peerParent.launchPeer(keyPair, port);
+		peerParent.waitForPeers();
 	}
 }

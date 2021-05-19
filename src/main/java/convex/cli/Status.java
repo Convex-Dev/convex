@@ -22,7 +22,6 @@ import convex.core.Result;
 import convex.core.State;
 import convex.core.util.Text;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 
 /**
@@ -42,18 +41,10 @@ private static final Logger log = Logger.getLogger(Status.class.getName());
 	@ParentCommand
 	protected Main mainParent;
 
-	@Option(names={"-p", "--port"},
-		description="Specify a port for peer.")
-	private int port;
-
-	@Option(names={"--host"},
-		defaultValue=Constants.HOSTNAME_PEER,
-		description="Hostname to peer. Default: ${DEFAULT-VALUE}")
-	private String hostname;
-
 	@Override
 	public void run() {
 
+		int port = mainParent.getPort();
 		if (port == 0) {
 			try {
 				port = Helpers.getSessionPort(mainParent.getSessionFilename());
@@ -66,7 +57,7 @@ private static final Logger log = Logger.getLogger(Status.class.getName());
 			return;
 		}
 
-		Convex convex = Helpers.connect(hostname, port);
+		Convex convex = Helpers.connect(mainParent.getHostname(), port);
 		if (convex==null) {
 			System.out.println("Aborting query");
 			return;

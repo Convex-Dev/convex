@@ -27,6 +27,7 @@ public class KeyGenerate implements Runnable {
 	@ParentCommand
 	protected Key keyParent;
 
+
 	@Parameters(paramLabel="count",
 		defaultValue="" + Constants.KEY_GENERATE_COUNT,
 		description="Number of keys to generate. Default: ${DEFAULT-VALUE}")
@@ -35,17 +36,18 @@ public class KeyGenerate implements Runnable {
 	@Override
 	public void run() {
 		// sub command to generate keys
+		Main mainParent = keyParent.mainParent;
 		if (count <= 0) {
 			log.severe("You to provide 1 or more count of keys to generate");
 			return;
 		}
 		log.info("will generate "+count+" keys");
-		String password = keyParent.getPassword();
+		String password = mainParent.getPassword();
 		if (password == null) {
 			log.severe("You need to provide a keystore password");
 			return;
 		}
-		File keyFile = new File(keyParent.getKeyStoreFilename());
+		File keyFile = new File(mainParent.getKeyStoreFilename());
 
 		KeyStore keyStore = null;
 		try {
