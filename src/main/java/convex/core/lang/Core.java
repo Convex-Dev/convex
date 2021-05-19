@@ -498,7 +498,7 @@ public class Core {
 			if (context.isExceptional()) return (Context<Syntax>) context;
 			ACell maybeEx=context.getResult();
 			if (!(maybeEx instanceof AExpander)) {
-				return context.withError(ErrorCodes.CAST,name()+" requires a valid *initial-expander*, not found in enviornment");
+				return context.withError(ErrorCodes.CAST,name()+" requires a valid *initial-expander*, not found in environment");
 			}
 			AExpander initialExpander = (AExpander) maybeEx;
 
