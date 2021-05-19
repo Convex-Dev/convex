@@ -77,6 +77,10 @@ public class CLITest {
 		p=awaitExit(p);
 		assertEquals(0,p.exitValue());
 
+		p=runCLI("convex -h");
+		p=awaitExit(p);
+		assertEquals(0,p.exitValue());
+
 		p=runCLI("convex help");
 		p=awaitExit(p);
 		assertEquals(0,p.exitValue());
