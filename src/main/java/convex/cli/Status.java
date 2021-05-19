@@ -1,13 +1,26 @@
 package convex.cli;
 
 import java.io.IOException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
+
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.HashMap;
+import java.util.logging.Logger;
+
 
 import convex.api.Convex;
+import convex.core.crypto.Hash;
+import convex.core.data.ABlob;
+import convex.core.data.ACell;
+import convex.core.data.AccountKey;
+import convex.core.data.AccountStatus;
+import convex.core.data.AVector;
+import convex.core.data.BlobMap;
+import convex.core.data.PeerStatus;
+import convex.core.data.VectorLeaf;
 import convex.core.Result;
+import convex.core.State;
+import convex.core.util.Text;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -22,22 +35,37 @@ import picocli.CommandLine.ParentCommand;
 	description="Reports on the current status of the network.")
 public class Status implements Runnable {
 
+private static final Logger log = Logger.getLogger(Status.class.getName());
+
+	private HashMap<Long, CompletableFuture<Result>> awaiting = new HashMap<>();
+
 	@ParentCommand
 	protected Main mainParent;
 
 	@Option(names={"-p", "--port"},
-		description="Specify a port of a local peer.")
-	protected int port;
+		description="Specify a port for peer.")
+	private int port;
 
 	@Option(names={"--host"},
 		defaultValue=Constants.HOSTNAME_PEER,
-		description="Hostname to local peer. Default: ${DEFAULT-VALUE}")
-	String hostname;
+		description="Hostname to peer. Default: ${DEFAULT-VALUE}")
+	private String hostname;
 
 	@Override
 	public void run() {
-		// sub command run with no command provided
-		System.out.println("status command");
+
+		if (port == 0) {
+			try {
+				port = Helpers.getSessionPort(mainParent.getSessionFilename());
+			} catch (IOException e) {
+				log.warning("Cannot load the session control file");
+			}
+		}
+		if (port == 0) {
+			log.warning("Cannot find a local port or you have not set a valid port number");
+			return;
+		}
+
 		Convex convex = Helpers.connect(hostname, port);
 		if (convex==null) {
 			System.out.println("Aborting query");
@@ -45,11 +73,28 @@ public class Status implements Runnable {
 		}
 
 		try {
-			Future<Result> cf = convex.requestStatus();
-			Result result = cf.get(50000, TimeUnit.MILLISECONDS);
-			System.out.println(result);
-		} catch (ExecutionException | InterruptedException | TimeoutException | IOException e) {
-			throw new Error("Not possible? Since there is no Thread for the future....", e);
+			Result result = convex.requestStatus().get(3000, TimeUnit.MILLISECONDS);
+			AVector<ACell> resultVector = (AVector<ACell>) result.getValue();
+			ABlob stateHash = (ABlob) resultVector.get(1);
+			System.out.println("State hash: " + stateHash.toString());
+			Hash hash = Hash.wrap(stateHash.getBytes());
+			VectorLeaf stateWrapper = (VectorLeaf) convex.acquire(hash).get(3000,TimeUnit.MILLISECONDS);
+			State state = (State) stateWrapper.get(0);
+
+			state.validate();
+			AVector<AccountStatus> accountList = state.getAccounts();
+			BlobMap<AccountKey, PeerStatus> peerList = state.getPeers();
+
+			System.out.println("State hash: " + stateHash.toString());
+			System.out.println("Timestamp: " + state.getTimeStamp());
+			System.out.println("Timestamp: " + Text.dateFormat(state.getTimeStamp().longValue()));
+			System.out.println("Global Fees: " + Text.toFriendlyBalance(state.getGlobalFees().longValue()));
+			System.out.println("Juice Price: " + Text.toFriendlyBalance(state.getJuicePrice().longValue()));
+			System.out.println("Total Funds: " + Text.toFriendlyBalance(state.computeTotalFunds()));
+			System.out.println("Number of accounts: " + accountList.size());
+			System.out.println("Number of peers: " + peerList.size());
+		} catch (Throwable t) {
+			throw new Error("Not possible to get status information: ", t);
 		}
 	}
 

@@ -42,11 +42,11 @@ import convex.peer.Server;
  * Class representing the client API to the Convex network when connected
  * directly using the binary protocol. This can be more efficient than using a
  * REST API.
- * 
+ *
  * An Object of the type Convex represents a stateful client connection to the
  * Convex network that can issue transactions both synchronously and
  * asynchronously. This can be used by both peers and JVM-based clients.
- * 
+ *
  * "I'm doing a (free) operating system (just a hobby, won't be big and
  * professional like gnu)" - Linus Torvalds
  */
@@ -143,7 +143,7 @@ public class Convex {
 	/**
 	 * Sets the Address for this connection. This will be used by default for
 	 * subsequent transactions and queries
-	 * 
+	 *
 	 * @param address Address to use
 	 */
 	public synchronized void setAddress(Address address) {
@@ -165,7 +165,7 @@ public class Convex {
 	/**
 	 * Gets the next sequence number for this Client, which should be used for
 	 * building new signed transactions
-	 * 
+	 *
 	 * @return Sequence number as a Long value greater than zero
 	 */
 	private long getIncrementedSequence() {
@@ -185,7 +185,7 @@ public class Convex {
 	/**
 	 * Gets the current sequence number for this Client, which is the sequence
 	 * number of the last transaction observed for the current client's Account.
-	 * 
+	 *
 	 * @return Sequence number as a Long value, zero or positive
 	 */
 	public long getSequence() {
@@ -208,7 +208,7 @@ public class Convex {
 
 	/**
 	 * Signs a value on behalf of this client.
-	 * 
+	 *
 	 * @param <T>   Type of value to sign
 	 * @param value Value to sign
 	 * @return
@@ -219,7 +219,7 @@ public class Convex {
 
 	/**
 	 * Gets the Internet address of the currently connected remote
-	 * 
+	 *
 	 * @return
 	 */
 	public InetSocketAddress getRemoteAddress() {
@@ -228,7 +228,7 @@ public class Convex {
 
 	/**
 	 * Creates a new account with the gievn public key
-	 * 
+	 *
 	 * @param publicKey Public key to set for the new account
 	 * @return Address of account created
 	 * @throws TimeoutException
@@ -243,7 +243,7 @@ public class Convex {
 
 	/**
 	 * Checks if this Convex client instance has an open connection.
-	 * 
+	 *
 	 * @return true if connected, false otherwise
 	 */
 	public boolean isConnected() {
@@ -254,7 +254,7 @@ public class Convex {
 	/**
 	 * Gets the underlying Connection instance for this Client. May be null if not
 	 * connected.
-	 * 
+	 *
 	 * @return Connection instance or null
 	 */
 	public Connection getConnection() {
@@ -263,7 +263,7 @@ public class Convex {
 
 	/**
 	 * Updates the given transaction to have the next sequence number.
-	 * 
+	 *
 	 * @param t Any transaction, for which the correct next sequence number is
 	 *          desired
 	 * @return The updated transaction
@@ -281,7 +281,7 @@ public class Convex {
 	 * Submits a transaction to the Convex network, returning a future once the
 	 * transaction has been successfully queued. Signs the transaction with the
 	 * currently set key pair
-	 * 
+	 *
 	 * @param transaction Transaction to execute
 	 * @return A Future for the result of the transaction
 	 * @throws IOException If the connection is broken, or the send buffer is full
@@ -300,7 +300,7 @@ public class Convex {
 	/**
 	 * Submits a signed transaction to the Convex network, returning a future once
 	 * the transaction has been successfully queued.
-	 * 
+	 *
 	 * @param signed Signed transaction to execute
 	 * @return A Future for the result of the transaction
 	 * @throws IOException If the connection is broken, or the send buffer is full
@@ -324,7 +324,7 @@ public class Convex {
 	/**
 	 * Submits a transfer transaction to the Convex network, returning a future once
 	 * the transaction has been successfully queued.
-	 * 
+	 *
 	 * @param target Destination address for transfer
 	 * @param amount Amount of Convex Coins to transfer
 	 * @return A Future for the result of the transaction
@@ -338,7 +338,7 @@ public class Convex {
 	/**
 	 * Submits a transfer transaction to the Convex network peer, and waits for
 	 * confirmation of the result
-	 * 
+	 *
 	 * @param target Destination address for transfer
 	 * @param amount Amount of Convex Coins to transfer
 	 * @return Result of the transaction
@@ -353,7 +353,7 @@ public class Convex {
 
 	/**
 	 * Submits a transaction synchronously to the Convex network, returning a Result
-	 * 
+	 *
 	 * @param transaction Transaction to execute
 	 * @return The result of the transaction
 	 * @throws IOException      If the connection is broken
@@ -366,7 +366,7 @@ public class Convex {
 
 	/**
 	 * Submits a transaction synchronously to the Convex network, returning a Result
-	 * 
+	 *
 	 * @param transaction Transaction to execute
 	 * @return The result of the transaction
 	 * @throws IOException      If the connection is broken
@@ -380,7 +380,7 @@ public class Convex {
 	/**
 	 * Submits a signed transaction synchronously to the Convex network, returning a
 	 * Result
-	 * 
+	 *
 	 * @param transaction Transaction to execute
 	 * @param timeout     Number of milliseconds for timeout
 	 * @return The result of the transaction
@@ -407,7 +407,7 @@ public class Convex {
 	/**
 	 * Submits a signed transaction synchronously to the Convex network, returning a
 	 * Result
-	 * 
+	 *
 	 * @param transaction Transaction to execute
 	 * @param timeout     Number of milliseconds for timeout
 	 * @return The result of the transaction
@@ -435,7 +435,7 @@ public class Convex {
 	/**
 	 * Submits a query to the Convex network, returning a Future once the query has
 	 * been successfully queued.
-	 * 
+	 *
 	 * @param query Query to execute, as a Form or Op
 	 * @return A Future for the result of the query
 	 * @throws IOException If the connection is broken, or the send buffer is full
@@ -447,7 +447,7 @@ public class Convex {
 	/**
 	 * Attempts to acquire a complete persistent data structure for the given hash
 	 * from the remote peer. Uses the store configured for the calling thread.
-	 * 
+	 *
 	 * @param hash Hash of value to acquire.
 	 * @return Future for the cell being acquired
 	 */
@@ -483,7 +483,8 @@ public class Convex {
 								break;
 							}
 						}
-						Thread.sleep(10);
+						// if too low, can send mutliple requests, and then block the peer
+						Thread.sleep(100);
 						ref = store.refForHash(hash);
 						if (ref != null) {
 							if (ref.getStatus() >= Ref.PERSISTED) {
@@ -514,7 +515,7 @@ public class Convex {
 	/**
 	 * Submits a status to the Convex network peer, returning a Future once the
 	 * request has been successfully queued.
-	 * 
+	 *
 	 * @param query Query to execute, as a Form or Op
 	 * @return A Future for the result of the query
 	 * @throws IOException If the connection is broken, or the send buffer is full
@@ -538,7 +539,7 @@ public class Convex {
 	/**
 	 * Submits a query to the Convex network, returning a Future once the query has
 	 * been successfully queued.
-	 * 
+	 *
 	 * @param query   Query to execute, as a Form or Op
 	 * @param address Address to use for the query
 	 * @return A Future for the result of the query
@@ -562,7 +563,7 @@ public class Convex {
 
 	/**
 	 * Executes a query synchronously and waits for the Result
-	 * 
+	 *
 	 */
 	public Result querySync(ACell query) throws TimeoutException, IOException {
 		return querySync(query, getAddress());
@@ -570,7 +571,7 @@ public class Convex {
 
 	/**
 	 * Executes a query synchronously and waits for the Result
-	 * 
+	 *
 	 * @param timeoutMillis Timeout to wait for query result. Will throw
 	 *                      TimeoutException if not received in this time
 	 * @param query         Query to execute, as a Form or Op
@@ -583,7 +584,7 @@ public class Convex {
 
 	/**
 	 * Executes a query synchronously and waits for the Result
-	 * 
+	 *
 	 * @param address Address to use for the query
 	 * @param query   Query to execute, as a Form or Op
 	 * @return Result of query
@@ -595,7 +596,7 @@ public class Convex {
 
 	/**
 	 * Executes a query synchronously and waits for the Result
-	 * 
+	 *
 	 * @param timeoutMillis Timeout to wait for query result. Will throw
 	 *                      TimeoutException if not received in this time
 	 * @param address       Address to use for the query
@@ -614,7 +615,7 @@ public class Convex {
 
 	/**
 	 * Returns the current AcountKey for the client using the API.
-	 * 
+	 *
 	 * @return AcountKey instance
 	 */
 	public AccountKey getAccountKey() {
@@ -623,7 +624,7 @@ public class Convex {
 
 	/**
 	 * Returns the current Address for the client using the API.
-	 * 
+	 *
 	 * @return Address instance
 	 */
 	public Address getAddress() {
@@ -632,7 +633,7 @@ public class Convex {
 
 	/**
 	 * Sets the current Connection for this Client
-	 * 
+	 *
 	 * @param conn Connection value to use
 	 */
 	private void setConnection(Connection conn) {
@@ -656,7 +657,7 @@ public class Convex {
 	/**
 	 * Determines if this Client is configured to automatically generate sequence
 	 * numbers
-	 * 
+	 *
 	 * @return
 	 */
 	protected boolean isAutoSequence() {
@@ -665,7 +666,7 @@ public class Convex {
 
 	/**
 	 * Configures auto-generation of sequence numbers
-	 * 
+	 *
 	 * @param autoSequence true to enable auto-sequencing, false otherwise
 	 */
 	protected void setAutoSequence(boolean autoSequence) {
