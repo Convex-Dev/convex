@@ -31,7 +31,7 @@ public class Helpers {
 		System.out.printf("Connecting to peer: %s\n", host);
 		Convex convex;
 		try {
-			convex=Convex.connect(host, Init.HERO, Init.HERO_KP);
+			convex=Convex.connect(host, Init.HERO, null); // TODO: what should keypair be?
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

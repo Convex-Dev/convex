@@ -14,6 +14,7 @@ import convex.core.crypto.Ed25519KeyPair;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.BlobMap;
@@ -38,6 +39,9 @@ public class StateTransitionsTest {
 	final AKeyPair KEYPAIR_C = Ed25519KeyPair.createSeeded(1003);
 	final AKeyPair KEYPAIR_NIKI = Ed25519KeyPair.createSeeded(1004);
 	final AKeyPair KEYPAIR_ROBB = Ed25519KeyPair.createSeeded(1005);
+
+	final AKeyPair KEYPAIR_PEER = Ed25519KeyPair.createSeeded(1006);
+	final AccountKey FIRST_PEER_KEY=KEYPAIR_PEER.getAccountKey();
 
 	final Address ADDRESS_A = Address.create(0); // initial account
 	final Address ADDRESS_B = Address.create(1); // initial account
@@ -67,7 +71,7 @@ public class StateTransitionsTest {
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_B, 50);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			long nowTS = Utils.getCurrentTimestamp();
-			Block b = Block.of(nowTS,Init.FIRST_PEER_KEY, st);
+			Block b = Block.of(nowTS,FIRST_PEER_KEY, st);
 			BlockResult br = s.applyBlock(b);
 			AVector<Result> results = br.getResults();
 			assertEquals(1, results.count());
@@ -81,7 +85,7 @@ public class StateTransitionsTest {
 		{ // transfer from existing to non-existing account A -> C
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, 50);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
-			Block b = Block.of(System.currentTimeMillis(),Init.FIRST_PEER_KEY, st);
+			Block b = Block.of(System.currentTimeMillis(),FIRST_PEER_KEY, st);
 			State s2 = s.applyBlock(b).getState();
 			
 			// no transfer should have happened, although cost should have been paid
@@ -92,7 +96,7 @@ public class StateTransitionsTest {
 		{ // transfer from a non-existent address
 			Transfer t1 = Transfer.create(ADDRESS_C,1, ADDRESS_B, 50);
 			SignedData<ATransaction> st = KEYPAIR_C.signData(t1);
-			Block b = Block.of(System.currentTimeMillis(),Init.FIRST_PEER_KEY, st);
+			Block b = Block.of(System.currentTimeMillis(),FIRST_PEER_KEY, st);
 			BlockResult br=s.applyBlock(b);
 			assertEquals(ErrorCodes.NOBODY, br.getResult(0).getErrorCode());
 
@@ -104,7 +108,7 @@ public class StateTransitionsTest {
 			
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, 50);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
-			Block b = Block.of(System.currentTimeMillis(),Init.FIRST_PEER_KEY, st);
+			Block b = Block.of(System.currentTimeMillis(),FIRST_PEER_KEY, st);
 			State s2 = s0.applyBlock(b).getState();
 			
 			// Transfer should have happened
@@ -120,7 +124,7 @@ public class StateTransitionsTest {
 			SignedData<ATransaction> st1 = KEYPAIR_A.signData(t1);
 			Transfer t2 = Transfer.create(ADDRESS_A,2, ADDRESS_C, 150);
 			SignedData<ATransaction> st2 = KEYPAIR_A.signData(t2);
-			Block b = Block.of(System.currentTimeMillis(),Init.FIRST_PEER_KEY, st1, st2);
+			Block b = Block.of(System.currentTimeMillis(),FIRST_PEER_KEY, st1, st2);
 
 			BlockResult br = s0.applyBlock(b);
 			State s2 = br.getState();
@@ -137,7 +141,7 @@ public class StateTransitionsTest {
 			SignedData<ATransaction> st1 = KEYPAIR_A.signData(t1);
 			Transfer t2 = Transfer.create(ADDRESS_B,1, ADDRESS_C, 50);
 			SignedData<ATransaction> st2 = KEYPAIR_B.signData(t2);
-			Block b = Block.of(System.currentTimeMillis(),Init.FIRST_PEER_KEY, st1, st2);
+			Block b = Block.of(System.currentTimeMillis(),FIRST_PEER_KEY, st1, st2);
 
 			BlockResult br = s0.applyBlock(b);
 			State s2 = br.getState();
@@ -154,7 +158,7 @@ public class StateTransitionsTest {
 		{ // transfer with an incorrect sequence number
 			Transfer t1 = Transfer.create(ADDRESS_A,2, ADDRESS_C, 50);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
-			Block b = Block.of(System.currentTimeMillis(),Init.FIRST_PEER_KEY, st);
+			Block b = Block.of(System.currentTimeMillis(),FIRST_PEER_KEY, st);
 			BlockResult br = s.applyBlock(b);
 			AVector<Result> results = br.getResults();
 			assertEquals(1, results.count());
@@ -164,7 +168,7 @@ public class StateTransitionsTest {
 		{ // transfer amount greater than current balance
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, 50000);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
-			Block b = Block.of(System.currentTimeMillis(),Init.FIRST_PEER_KEY, st);
+			Block b = Block.of(System.currentTimeMillis(),FIRST_PEER_KEY, st);
 			BlockResult br = s.applyBlock(b);
 			assertEquals(ErrorCodes.FUNDS, br.getResult(0).getErrorCode());
 
@@ -187,7 +191,7 @@ public class StateTransitionsTest {
 
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_NIKI, AMT);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
-			Block b = Block.of(System.currentTimeMillis(),Init.FIRST_PEER_KEY, st);
+			Block b = Block.of(System.currentTimeMillis(),FIRST_PEER_KEY, st);
 			BlockResult br = s0.applyBlock(b);
 			// System.out.println("Transfer complete....");
 
@@ -203,8 +207,8 @@ public class StateTransitionsTest {
 	public void testDeploys() throws BadSignatureException {
 		State s = Init.STATE;
 		ATransaction t1 = Invoke.create(Init.HERO,1,Reader.read("(def my-lib-address (deploy '(defn foo [x] x)))"));
-		AKeyPair kp = convex.core.lang.TestState.HERO_PAIR;
-		Block b1 = Block.of(s.getTimeStamp().longValue(),Init.FIRST_PEER_KEY, kp.signData(t1));
+		AKeyPair kp = convex.core.lang.TestState.HERO_KP;
+		Block b1 = Block.of(s.getTimeStamp().longValue(),FIRST_PEER_KEY, kp.signData(t1));
 		BlockResult br=s.applyBlock(b1);
 		assertFalse(br.isError(0),br.getResult(0).toString());
 		
@@ -213,7 +217,7 @@ public class StateTransitionsTest {
 	}
 	
 	@Test public void testManyDeploysMemoryRegression() throws BadSignatureException {
-		State s=TestState.INITIAL;
+		State s=TestState.STATE;
 		long lastSize=s.getMemorySize();
 		assertTrue(lastSize>0);
 		
@@ -223,8 +227,8 @@ public class StateTransitionsTest {
 					+ "                     (defn get [] stored-data)\r\n"
 					+ "                     (defn set [x] (def stored-data x))\r\n"
 					+ "                     (export get set))))"));
-			AKeyPair kp = convex.core.lang.TestState.HERO_PAIR;
-			Block b=Block.of(s.getTimeStamp().longValue(),Init.FIRST_PEER_KEY,kp.signData(trans));
+			AKeyPair kp = convex.core.lang.TestState.HERO_KP;
+			Block b=Block.of(s.getTimeStamp().longValue(),FIRST_PEER_KEY,kp.signData(trans));
 			BlockResult br=s.applyBlock(b);
 			Result r=br.getResult(0);
 			assertFalse(r.isError(),r.toString());
@@ -243,12 +247,12 @@ public class StateTransitionsTest {
 	@Test
 	public void testMemoryAccounting() throws BadSignatureException {
 		State s = Init.STATE;
-		AKeyPair kp = convex.core.lang.TestState.HERO_PAIR;
+		AKeyPair kp = convex.core.lang.TestState.HERO_KP;
 		
 		long initialMem=s.getMemorySize();
 		
 		ATransaction t1 = Invoke.create(Init.HERO,1,Reader.read("(def a 1)"));
-		Block b1 = Block.of(s.getTimeStamp().longValue(),Init.FIRST_PEER_KEY, kp.signData(t1));
+		Block b1 = Block.of(s.getTimeStamp().longValue(),FIRST_PEER_KEY, kp.signData(t1));
 		BlockResult br=s.applyBlock(b1);
 		
 		// should not be an error
@@ -268,12 +272,12 @@ public class StateTransitionsTest {
 		String taddr=TARGET.toString();
 
 		long INITIAL_TS = s.getTimeStamp().longValue();
-		AKeyPair kp = convex.core.lang.TestState.HERO_PAIR;
+		AKeyPair kp = convex.core.lang.TestState.HERO_KP;
 		long BAL2 = s.getBalance(TARGET);
 
 		ATransaction t1 = Invoke.create(Init.HERO,1,
 				Reader.read("(transfer "+taddr+" 10000000)"));
-		Block b1 = Block.of(s.getTimeStamp().longValue() + 100,Init.FIRST_PEER_KEY, kp.signData(t1));
+		Block b1 = Block.of(s.getTimeStamp().longValue() + 100,FIRST_PEER_KEY, kp.signData(t1));
 		s = s.applyBlock(b1).getState();
 		assertEquals(BAL2 + 10000000, s.getBalance(TARGET));
 		assertCVMEquals(INITIAL_TS + 100, s.getTimeStamp());
@@ -281,7 +285,7 @@ public class StateTransitionsTest {
 		// schedule 200ms later for 1s time
 		ATransaction t2 = Invoke.create(Init.HERO,2, Reader.read(
 				"(schedule (+ *timestamp* 1000) (transfer "+taddr+" 10000000))"));
-		Block b2 = Block.of(s.getTimeStamp().longValue() + 200,Init.FIRST_PEER_KEY, kp.signData(t2));
+		Block b2 = Block.of(s.getTimeStamp().longValue() + 200,FIRST_PEER_KEY, kp.signData(t2));
 		BlockResult br2 = s.applyBlock(b2);
 		assertNull(br2.getErrorCode(0),br2.getResult(0).toString());
 		s = br2.getState();
@@ -292,7 +296,7 @@ public class StateTransitionsTest {
 
 		// advance 999ms
 		ATransaction t3 = Invoke.create(Init.HERO,3, Reader.read("1"));
-		Block b3 = Block.of(s.getTimeStamp().longValue() + 999,Init.FIRST_PEER_KEY, kp.signData(t3));
+		Block b3 = Block.of(s.getTimeStamp().longValue() + 999,FIRST_PEER_KEY, kp.signData(t3));
 		BlockResult br3 = s.applyBlock(b3);
 		assertNull(br3.getErrorCode(0));
 		s = br3.getState();
@@ -301,7 +305,7 @@ public class StateTransitionsTest {
 
 		// advance 1ms to trigger scheduled transfer
 		ATransaction t4 = Invoke.create(Init.HERO,4, Reader.read("1"));
-		Block b4 = Block.of(s.getTimeStamp().longValue() + 1,Init.FIRST_PEER_KEY, kp.signData(t4));
+		Block b4 = Block.of(s.getTimeStamp().longValue() + 1,FIRST_PEER_KEY, kp.signData(t4));
 		BlockResult br4 = s.applyBlock(b4);
 		assertNull(br4.getErrorCode(0));
 		s = br4.getState();

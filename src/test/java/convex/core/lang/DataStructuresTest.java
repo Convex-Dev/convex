@@ -18,7 +18,7 @@ import convex.core.util.Utils;
  */
 public class DataStructuresTest {
 
-	private static final State INITIAL = TestState.INITIAL;
+	private static final State INITIAL = TestState.STATE;
 	private static final long INITIAL_JUICE = 100000;
 	private static final Context<?> INITIAL_CONTEXT;
 

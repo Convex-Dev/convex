@@ -1,10 +1,12 @@
 package convex.cli;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.concurrent.TimeoutException;
 import java.util.logging.Logger;
 
 import convex.api.Convex;
+import convex.core.Init;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.lang.Reader;
@@ -41,6 +43,21 @@ public class Query implements Runnable {
 
 	@Parameters(paramLabel="queryCommand", description="Query Command")
 	private String queryCommand;
+
+	protected Convex connect() {
+		InetSocketAddress host=new InetSocketAddress(hostname, port);
+		System.out.printf("Connecting to peer: %s\n", host);
+		Convex convex;
+		try {
+			convex=Convex.connect(host, Init.HERO, null);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			System.out.printf("Failed to connect to peer at: %s\n", host);
+			return null;
+		}
+		return convex;
+	}
 
 	@Override
 	public void run() {

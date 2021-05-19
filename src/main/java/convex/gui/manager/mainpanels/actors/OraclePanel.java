@@ -35,7 +35,7 @@ public class OraclePanel extends JPanel {
 
 	public static final Logger log = Logger.getLogger(OraclePanel.class.getName());
 
-	Address oracleAddress = Init.ORACLE_ADDRESS;
+	Address oracleAddress ;
 
 	OracleTableModel tableModel = new OracleTableModel(PeerManager.getLatestState(), oracleAddress);
 	JTable table = new JTable(tableModel);
@@ -45,11 +45,12 @@ public class OraclePanel extends JPanel {
 	long key = 1;
 
 	public OraclePanel() {
+		oracleAddress= null;
 		this.setLayout(new BorderLayout());
 
 		// ===========================================
 		// Top label
-		add(new CodeLabel("Oracle at address: " + oracleAddress.toString() + "\n" + "Executing as user: "
+		add(new CodeLabel("Oracle at address: " + oracleAddress + "\n" + "Executing as user: "
 				+ Init.HERO.toString()), BorderLayout.NORTH);
 
 		// ===========================================
@@ -90,7 +91,7 @@ public class OraclePanel extends JPanel {
 			String desc = JOptionPane.showInputDialog(this, "Enter Oracle description as plain text:");
 			if ((desc == null) || (desc.isBlank())) return;
 
-			ACell code = Reader.read("(call \"" + oracleAddress.toHexString() + "\" " + "(register " + (key++)
+			ACell code = Reader.read("(call " + oracleAddress + " " + "(register " + (key++)
 					+ "  {:desc \"" + desc + "\" :trust #{*address*}}))");
 			execute(code);
 		});
@@ -105,7 +106,7 @@ public class OraclePanel extends JPanel {
 			MapEntry<ACell, ACell> me = tableModel.getList().entryAt(ix);
 
 			ACell code = Reader.read(
-					"(call \"" + oracleAddress.toHexString() + "\" " + "(provide " + me.getKey() + " " + value + "))");
+					"(call " + oracleAddress + " " + "(provide " + me.getKey() + " " + value + "))");
 			execute(code);
 		});
 

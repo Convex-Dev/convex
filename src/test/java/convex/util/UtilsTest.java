@@ -1,6 +1,6 @@
 package convex.util;
 
-import static convex.core.lang.TestState.INITIAL;
+import static convex.core.lang.TestState.STATE;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -344,9 +344,9 @@ public class UtilsTest {
 
 	@Test
 	public void testStatesAsOfRange() throws BadSignatureException {
-		Peer peer = Peer.create(Init.KEYPAIRS[0], TestState.INITIAL);
+		Peer peer = Peer.create(TestState.FIRST_PEER_KEYPAIR, TestState.STATE);
 
-		AVector<State> states = Vectors.of(INITIAL);
+		AVector<State> states = Vectors.of(STATE);
 
 		for (int i = 0; i < 10; i++) {
 			State state0 = states.get(states.count() - 1);
@@ -357,24 +357,24 @@ public class UtilsTest {
 
 			SignedData<ATransaction> data = peer.sign(Invoke.create(Init.HERO, timestamp, command));
 
-			Block block = Block.of(timestamp, Init.FIRST_PEER_KEY, data);
+			Block block = Block.of(timestamp, TestState.FIRST_PEER_KEYPAIR.getAccountKey(), data);
 
 			State state1 = state0.applyBlock(block).getState();
 
 			states = states.conj(state1);
 		}
 
-		AVector<State> statesInRange = Utils.statesAsOfRange(states, INITIAL.getTimeStamp(), 1000, 2);
+		AVector<State> statesInRange = Utils.statesAsOfRange(states, STATE.getTimeStamp(), 1000, 2);
 
 		assertEquals(2, statesInRange.count());
 
 		// First State in range must be the INITIAL value.
-		assertEquals(INITIAL, statesInRange.get(0));
+		assertEquals(STATE, statesInRange.get(0));
 
 		// Since each iteration creates a snapshot of State advances by 100 milliseconds,
 		// the last State's timestamp in the range is the same as the initial timestamp + 1000 milliseconds.
 		assertEquals(
-				CVMLong.create(INITIAL.getTimeStamp().longValue() + 1000),
+				CVMLong.create(STATE.getTimeStamp().longValue() + 1000),
 				statesInRange.get(statesInRange.count() - 1).getTimeStamp()
 		);
 	}

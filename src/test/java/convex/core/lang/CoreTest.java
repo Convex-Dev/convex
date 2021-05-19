@@ -82,7 +82,7 @@ import convex.core.lang.ops.Constant;
  */
 public class CoreTest {
 
-	private static final State INITIAL = TestState.INITIAL;
+	private static final State INITIAL = TestState.STATE;
 	private static final long INITIAL_JUICE = TestState.INITIAL_JUICE;
 	private static final Context<?> INITIAL_CONTEXT= TestState.INITIAL_CONTEXT.fork();
 
@@ -1977,9 +1977,9 @@ public class CoreTest {
 		assertNull(ctx.getResult());
 		assertNull(eval(ctx,"*key*"));
 		
-		ctx=step(ctx,"(set-key "+Init.HERO_KP.getAccountKey()+")");
-		assertEquals(Init.HERO_KP.getAccountKey(),ctx.getResult());
-		assertEquals(Init.HERO_KP.getAccountKey(),eval(ctx,"*key*"));
+		ctx=step(ctx,"(set-key "+TestState.HERO_KP.getAccountKey()+")");
+		assertEquals(TestState.HERO_KP.getAccountKey(),ctx.getResult());
+		assertEquals(TestState.HERO_KP.getAccountKey(),eval(ctx,"*key*"));
 	}
 	
 	@Test
@@ -2095,7 +2095,7 @@ public class CoreTest {
 		
 		
 		// String representing a new User Address
-		Context<Address> ctx=step("(create-account "+Init.HERO_KP.getAccountKey()+")");
+		Context<Address> ctx=step("(create-account "+TestState.HERO_KP.getAccountKey()+")");
 		Address naddr=ctx.getResult();
 
 		// transfers to a new address
@@ -2131,9 +2131,9 @@ public class CoreTest {
 	
 	@Test
 	public void testStake() {
-		Context<ACell> ctx=step(INITIAL_CONTEXT,"(def my-peer \""+Init.FIRST_PEER_KEY.toHexString()+"\")");
-		AccountKey MY_PEER=Init.FIRST_PEER_KEY;
-		long PS=ctx.getState().getPeer(Init.FIRST_PEER_KEY).getOwnStake();
+		Context<ACell> ctx=step(INITIAL_CONTEXT,"(def my-peer 0x"+TestState.FIRST_PEER_KEY.toHexString()+")");
+		AccountKey MY_PEER=TestState.FIRST_PEER_KEY;
+		long PS=ctx.getState().getPeer(TestState.FIRST_PEER_KEY).getOwnStake();
 		
 		{
 			// simple case of staking 1000000 on first peer of the realm
@@ -2909,7 +2909,7 @@ public class CoreTest {
 
 		assertTrue(step(ctx, "(do a)").isExceptional());
 
-		Block b = Block.of(expectedTS,Init.FIRST_PEER_KEY);
+		Block b = Block.of(expectedTS,TestState.FIRST_PEER_KEY);
 		BlockResult br = s.applyBlock(b);
 		State s2 = br.getState();
 
@@ -3162,7 +3162,7 @@ public class CoreTest {
 	
 	@Test
 	public void testSpecialKey() {
-		assertEquals(Init.HERO_KP.getAccountKey(), eval("*key*"));
+		assertEquals(TestState.HERO_KP.getAccountKey(), eval("*key*"));
 	}
 	
 	@Test

@@ -40,7 +40,7 @@ import convex.core.lang.ops.Lookup;
  */
 public class OpsTest {
 
-	private static final State INITIAL = TestState.INITIAL;
+	private static final State INITIAL = TestState.STATE;
 	private static final long INITIAL_JUICE = TestState.INITIAL_JUICE;
 	private static final Context<?> INITIAL_CONTEXT = TestState.INITIAL_CONTEXT.fork();
 

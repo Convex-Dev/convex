@@ -7,8 +7,6 @@ import java.security.PublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
 
-import convex.core.Init;
-
 public class PEMTools {
 	// private static String encryptionAlgorithm="AES-128-CBC";
 	
@@ -48,10 +46,11 @@ public class PEMTools {
 	}
 	
 	public static void main(String[] args) throws Exception {
-		String pem=writePEM(Init.HERO_KP);
+		AKeyPair kp=AKeyPair.createSeeded(1337);
+		String pem=writePEM(kp);
 		System.out.println(pem);
 		
-		AKeyPair kp=readPEM(pem);
-		System.out.println(kp);
+		AKeyPair kp2=readPEM(pem);
+		System.out.println(kp2);
 	}
 }

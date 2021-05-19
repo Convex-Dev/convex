@@ -1,10 +1,12 @@
 package convex.cli;
 
 import java.io.IOException;
+
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.logging.Logger;
+
 
 import convex.api.Convex;
 import convex.core.crypto.Hash;

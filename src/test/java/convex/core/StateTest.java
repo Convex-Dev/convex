@@ -3,6 +3,7 @@ package convex.core;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -20,6 +21,7 @@ import convex.core.exceptions.InvalidDataException;
  * Tests for the State data structure
  */
 public class StateTest {
+	State INIT_STATE=Init.createState();
 
 	@Test
 	public void testEmptyState() {
@@ -32,7 +34,7 @@ public class StateTest {
 
 	@Test
 	public void testInitialState() throws InvalidDataException {
-		State s = Init.STATE;
+		State s = INIT_STATE;
 		assertSame(s, s.withAccounts(s.getAccounts()));
 		assertSame(s, s.withPeers(s.getPeers()));
 
@@ -43,7 +45,7 @@ public class StateTest {
 
 	@Test
 	public void testRoundTrip() throws BadFormatException {
-		State s = Init.STATE;
+		State s = INIT_STATE;
 		// TODO: fix this
 		// s=s.store(Keywords.STATE);
 		// assertEquals(1,s.getStore().size());
@@ -53,8 +55,8 @@ public class StateTest {
 		Ref<State> rs = ACell.createPersisted(s);
 		assertEquals(Ref.PERSISTED, rs.getStatus());
 		
-		// Initial ref should not have changed status
-		assertEquals(0,s.getRef().getStatus());
+		// Initial ref should now have persisted status
+		assertTrue(s.getRef().isPersisted());
 
 		Blob b = Format.encodedBlob(s);
 		State s2 = Format.read(b);

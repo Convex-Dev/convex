@@ -1,7 +1,12 @@
 package convex.actors;
  
-import static convex.core.lang.TestState.*;
-import static convex.test.Assertions.*;
+import static convex.core.lang.TestState.INITIAL_JUICE;
+import static convex.core.lang.TestState.eval;
+import static convex.core.lang.TestState.evalD;
+import static convex.core.lang.TestState.evalL;
+import static convex.core.lang.TestState.step;
+import static convex.test.Assertions.assertError;
+import static convex.test.Assertions.assertNotError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -9,7 +14,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.Init;
 import convex.core.data.Address;
 import convex.core.data.prim.CVMDouble;
 import convex.core.lang.Context;
@@ -30,7 +34,6 @@ public class TorusTest {
 		try {
 			Context<?> ctx=INITIAL;
 			ctx=step(ctx,"(import convex.fungible :as fun)");
-			assertEquals(Init.FUNGIBLE_ADDRESS,ctx.getResult());
 			
 			ctx=step(ctx,"(import convex.asset :as asset)");
 			

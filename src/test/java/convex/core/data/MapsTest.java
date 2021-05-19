@@ -27,6 +27,9 @@ import convex.core.transactions.Transfer;
 import convex.core.util.Bits;
 import convex.test.Samples;
 
+/**
+ * Tests for CVM Map data structures.
+ */
 public class MapsTest {
 
 	@Test

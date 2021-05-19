@@ -153,6 +153,9 @@ public class Server implements Closeable {
 		AStore configStore = (AStore) config.get(Keywords.STORE);
 		this.store = (configStore == null) ? Stores.getGlobalStore() : configStore;
 		
+		AKeyPair keyPair = (AKeyPair) config.get(Keywords.KEYPAIR);
+		if (keyPair==null) throw new IllegalArgumentException("No Peer Key Pair provided in config");
+		
 		// Switch to use the configured store, saving the caller store
 		final AStore savedStore=Stores.current();
 		try {
@@ -160,7 +163,6 @@ public class Server implements Closeable {
 			this.config = config;
 			this.manager = new ConnectionManager(config);
 	
-			AKeyPair keyPair = (AKeyPair) config.get(Keywords.KEYPAIR);
 	
 			this.peer = establishPeer(keyPair, config);
 	

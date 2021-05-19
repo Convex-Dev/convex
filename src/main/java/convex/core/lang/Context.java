@@ -550,7 +550,7 @@ public final class Context<T extends ACell> extends AObject {
 		
 		// if *aliases* does not exist, use null as alias for core account
 		if (maybeAliases==null) {
-			return (path==null)?Init.CORE_ACCOUNT:null;
+			return (path==null)?getCoreAccount():null;
 		}
 		
 		ACell aliasesValue=maybeAliases.getValue();
@@ -561,7 +561,7 @@ public final class Context<T extends ACell> extends AObject {
 		
 		if (aliasEntry==null) {
 			// no alias entry. Default to core iff alias is null.
-			return (path==null)?Init.CORE_ACCOUNT:null;
+			return (path==null)?getCoreAccount():null;
 		}
 		
 		ACell aValue=aliasEntry.getValue();
@@ -569,6 +569,10 @@ public final class Context<T extends ACell> extends AObject {
 		if (!(aValue instanceof Address)) return null;
 		
 		return getAccountStatus((Address)aValue);
+	}
+
+	private AccountStatus getCoreAccount() {
+		return getState().getAccount(Init.CORE_ADDRESS);
 	}
 
 	/**

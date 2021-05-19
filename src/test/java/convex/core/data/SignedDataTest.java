@@ -36,7 +36,7 @@ public class SignedDataTest {
 	public void testEmbeddedSignature() throws BadSignatureException {
 		CVMLong cl=RT.cvm(158587);
 		
-		AKeyPair kp = TestState.HERO_PAIR;
+		AKeyPair kp = TestState.HERO_KP;
 		SignedData<CVMLong> sd = kp.signData(cl);
 		
 		assertTrue(sd.isValid());
@@ -49,14 +49,14 @@ public class SignedDataTest {
 	
 	@Test
 	public void testNullValueSignings() throws BadSignatureException {
-		SignedData<ACell> sd = SignedData.create(TestState.HERO_PAIR, null);
+		SignedData<ACell> sd = SignedData.create(TestState.HERO_KP, null);
 		assertNull(sd.getValue());
 		assertTrue(sd.checkSignature());
 	}
 
 	@Test
 	public void testDataStructureSignature() throws BadSignatureException {
-		AKeyPair kp = TestState.HERO_PAIR;
+		AKeyPair kp = TestState.HERO_KP;
 		AVector<CVMLong> v = Vectors.of(1L, 2L, 3L);
 		SignedData<AVector<CVMLong>> sd = kp.signData(v);
 		

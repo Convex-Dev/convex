@@ -661,5 +661,4 @@ public class State extends ARecord {
 	public Address nextAddress() {
 		return Address.create(accounts.count());
 	}
-
 }

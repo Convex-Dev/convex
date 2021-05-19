@@ -16,6 +16,7 @@ import convex.core.Init;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMBool;
@@ -31,20 +32,50 @@ import convex.core.util.Utils;
 public class TestState {
 	public static final int NUM_CONTRACTS = 5;
 
+	public static final Address INIT = Init.INIT;
+	
 	public static final Address HERO = Init.HERO;
-	public static final AKeyPair HERO_PAIR = Init.KEYPAIRS[Init.NUM_PEERS + 0];
+	public static final AKeyPair HERO_KP = Init.KEYPAIRS[Init.NUM_PEERS+0];
 
 	public static final Address VILLAIN = Init.VILLAIN;
-	public static final AKeyPair VILLAIN_PAIR = Init.KEYPAIRS[Init.NUM_PEERS + 1];
+	public static final AKeyPair VILLAIN_KP = Init.KEYPAIRS[Init.NUM_PEERS+1];
 
 	public static final Address[] CONTRACTS = new Address[NUM_CONTRACTS];
 
+	public static final AKeyPair FIRST_PEER_KEYPAIR=Init.KEYPAIRS[0];
+	public static final AccountKey FIRST_PEER_KEY=FIRST_PEER_KEYPAIR.getAccountKey();
 	
 	/**
 	 * A test state set up with a few accounts
 	 */
-	public static final State INITIAL = createInitialState();
+	public static final State STATE;
+	
+	static {
+		
+		try {
+			State s = Init.createState();
+			Context<?> ctx = Context.createFake(s, HERO);
+			for (int i = 0; i < NUM_CONTRACTS; i++) {
+				// Construct code for each contract
+				ACell contractCode = Reader.read(
+						"(do " + "(def my-data nil)" + "(defn write [x] (def my-data x)) "
+								+ "(defn read [] my-data)" + "(defn who-called-me [] *caller*)"
+								+ "(defn my-address [] *address*)" + "(defn my-number [] "+i+")" + "(defn foo [] :bar)"
+								+ "(export write read who-called-me my-address my-number foo)" + ")");
 
+				ctx = ctx.deployActor(contractCode);
+				CONTRACTS[i] = (Address) ctx.getResult();
+			}
+								
+			s= ctx.getState();
+			STATE = s;
+			INITIAL_CONTEXT = Context.createFake(STATE, TestState.HERO);
+		} catch (Throwable e) {
+			e.printStackTrace();
+			throw new Error(e);
+		}
+	}
+	
 	/**
 	 * Initial juice for TestState.INITIAL_CONTEXT
 	 */
@@ -53,7 +84,7 @@ public class TestState {
 	/**
 	 * Initial juice price
 	 */
-	public static final CVMLong JUICE_PRICE = INITIAL.getJuicePrice();
+	public static final CVMLong JUICE_PRICE = STATE.getJuicePrice();
 
 	/**
 	 * A test context set up with a few accounts
@@ -63,12 +94,12 @@ public class TestState {
 	/**
 	 * Balance of hero's account before spending any juice / funds
 	 */
-	public static final long HERO_BALANCE = INITIAL.getAccount(HERO).getBalance();
+	public static final long HERO_BALANCE = STATE.getAccount(HERO).getBalance();
 
 	/**
 	 * Balance of hero's account before spending any juice / funds
 	 */
-	public static final long VILLAIN_BALANCE = INITIAL.getAccount(VILLAIN).getBalance();
+	public static final long VILLAIN_BALANCE = STATE.getAccount(VILLAIN).getBalance();
 
 	/**
 	 * Total funds in the test state, minus those subtracted for juice in the
@@ -76,14 +107,7 @@ public class TestState {
 	 */
 	public static final Long TOTAL_FUNDS = Constants.MAX_SUPPLY;
 	
-	static {
-		try {
-			INITIAL_CONTEXT = Context.createFake(INITIAL, TestState.HERO);
-		} catch (Throwable e) {
-			e.printStackTrace();
-			throw new Error(e);
-		}
-	}
+
 
 	@SuppressWarnings("unchecked")
 	static <T extends ACell> AOp<T> compile(Context<?> c, String source) {
@@ -121,34 +145,11 @@ public class TestState {
 		return ctx;
 	}
 
-	private static State createInitialState() {
-		try {
-			State s = Init.STATE;
-			Context<?> ctx = Context.createFake(s, HERO);
-			for (int i = 0; i < NUM_CONTRACTS; i++) {
-				// Construct code for each contract
-				ACell contractCode = Reader.read(
-						"(do " + "(def my-data nil)" + "(defn write [x] (def my-data x)) "
-								+ "(defn read [] my-data)" + "(defn who-called-me [] *caller*)"
-								+ "(defn my-address [] *address*)" + "(defn my-number [] "+i+")" + "(defn foo [] :bar)"
-								+ "(export write read who-called-me my-address my-number foo)" + ")");
-
-				ctx = ctx.deployActor(contractCode);
-				CONTRACTS[i] = (Address) ctx.getResult();
-			}
-						
-			return ctx.getState();
-		} catch (Throwable t) {
-			t.printStackTrace();
-			throw new Error(t);
-		}
-	}
-
 	@Test
 	public void testInitial() {
-		Context<?> ctx = Context.createFake(INITIAL,Init.HERO);
+		Context<?> ctx = Context.createFake(STATE,Init.HERO);
 		State s = ctx.getState();
-		assertEquals(INITIAL, s);
+		assertEquals(STATE, s);
 		assertEquals(Init.HERO,ctx.computeSpecial(Symbols.STAR_ADDRESS).getResult());
 		assertSame(Core.COUNT, ctx.lookup(Symbols.COUNT).getResult());
 		assertCVMEquals(Constants.INITIAL_TIMESTAMP, ctx.lookup(Symbols.STAR_TIMESTAMP).getResult());
@@ -157,7 +158,7 @@ public class TestState {
 
 	@Test
 	public void testContractCall() {
-		Context<?> ctx0 = Context.createFake(INITIAL, HERO);
+		Context<?> ctx0 = Context.createFake(STATE, HERO);
 		Address TARGET = CONTRACTS[0];
 		ctx0 = ctx0.execute(compile(ctx0, "(def target (address \"" + TARGET.toHexString() + "\"))"));
 		ctx0 = ctx0.execute(compile(ctx0, "(def hero *address*)"));
@@ -251,12 +252,12 @@ public class TestState {
 		assertEquals(0,INITIAL_CONTEXT.getDepth());
 		assertFalse(INITIAL_CONTEXT.isExceptional());
 		assertNull(INITIAL_CONTEXT.getResult());
-		assertEquals(TestState.TOTAL_FUNDS, INITIAL.computeTotalFunds());
+		assertEquals(TestState.TOTAL_FUNDS, STATE.computeTotalFunds());
 
 	}
 
 	public static void main(String[] args) {
-		System.out.println(Utils.ednString(INITIAL));
+		System.out.println(Utils.ednString(STATE));
 	}
 	
 }
