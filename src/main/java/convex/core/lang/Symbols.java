@@ -281,6 +281,8 @@ public class Symbols {
 	public static final Symbol SET_KEY = Symbol.create("set-key");
 	
 	public static final Symbol LOG = Symbol.create("log");
+	
+	public static final Symbol CNS_RESOLVE = Symbol.create("cns-resolve");
 
 	
 

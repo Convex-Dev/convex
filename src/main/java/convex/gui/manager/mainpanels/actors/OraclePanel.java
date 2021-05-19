@@ -35,7 +35,7 @@ public class OraclePanel extends JPanel {
 
 	public static final Logger log = Logger.getLogger(OraclePanel.class.getName());
 
-	Address oracleAddress ;
+	Address oracleAddress = PeerManager.getLatestState().lookupCNS("convex.trusted-oracle");
 
 	OracleTableModel tableModel = new OracleTableModel(PeerManager.getLatestState(), oracleAddress);
 	JTable table = new JTable(tableModel);
@@ -45,7 +45,6 @@ public class OraclePanel extends JPanel {
 	long key = 1;
 
 	public OraclePanel() {
-		oracleAddress= null;
 		this.setLayout(new BorderLayout());
 
 		// ===========================================

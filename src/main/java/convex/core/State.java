@@ -661,4 +661,9 @@ public class State extends ARecord {
 	public Address nextAddress() {
 		return Address.create(accounts.count());
 	}
+
+	public Address lookupCNS(String name) {
+		Context<?> ctx=Context.createFake(this);
+		return (Address) ctx.lookupCNS(name).getResult();
+	}
 }

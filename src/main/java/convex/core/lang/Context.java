@@ -1880,6 +1880,13 @@ public final class Context<T extends ACell> extends AObject {
 		return logs;
 	}
 
+	public Context<?> lookupCNS(String name) {
+		Context<?> ctx=this.fork();
+		ctx=this.actorCall(Init.REGISTRY_ADDRESS, 0, Symbols.CNS_RESOLVE, Symbol.create(name));
+		
+		return ctx;
+	}
+
 
 
 
