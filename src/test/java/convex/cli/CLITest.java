@@ -5,102 +5,63 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.lang.Math;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
-
 import convex.core.util.Utils;
+import convex.cli.Main;
+import picocli.CommandLine;
+
 
 public class CLITest {
 
 	private static final String OS = System.getProperty("os.name").toLowerCase();
 	private static final Logger log = Logger.getLogger(CLITest.class.getName());
 
-	private static final long TIMEOUT = 3000;
-
-	public Process runCLI(String command) {
-		if (OS.contains("win")) {
-			try {
-				Runtime rt = Runtime.getRuntime();
-				Process pr = rt.exec("cmd /c "+command);
-				return pr;
-			} catch (IOException e) {
-				throw Utils.sneakyThrow(e);
-			}
-		} else if (OS.contains("linux")) {
-			try {
-				Runtime rt = Runtime.getRuntime();
-				Process pr = rt.exec(command.replaceAll("^convex", "./convex"));
-				return pr;
-			} catch (IOException e) {
-				throw Utils.sneakyThrow(e);
-			}
-		} else {
-			assumeTrue(false);
-			return null;
-		}
+	private void assertMatch(String patternText, StringWriter output, String[] args) {
+		Pattern regex = Pattern.compile(patternText, Pattern.MULTILINE + Pattern.DOTALL);
+		String outputText = output.toString();
+		Matcher matcher = regex.matcher(outputText);
+		String assertText = "convex " + String.join(" ", args) + " == '" + patternText + "'"
+			+ "\n But got ...\n" + outputText.substring(0, Math.min(132, outputText.length()));
+		assertEquals(true, matcher.matches(),  assertText);
 	}
 
-	private Process awaitExit(Process p) {
-		try {
-			Process result = p.onExit().get(TIMEOUT,TimeUnit.MILLISECONDS);
-			return result;
-		} catch (Throwable e) {
-			throw Utils.sneakyThrow(e);
-		}
+	private void assertCommandLineResult(int returnCode, String patternText, String ... args) {
+		StringWriter output = new StringWriter();
+		PrintWriter printWriter = new PrintWriter(output);
+		Main mainApp = new Main();
+
+		CommandLine commandLine = new CommandLine(mainApp);
+
+		commandLine.setOut(printWriter);
+		int result = commandLine.execute(args);
+		assertEquals(returnCode, result);
+		assertMatch(patternText, output, args);
 	}
 
-	// @Test
-	public void testMain() {
-		// TODO: Test main, need to catch System.exit(...)
-		// Disable testing, since the runtime java is only created **after** these tests are completed.
-		// Main.main("--help");
-		log.warning("os name " + OS);
-	}
-
-	// @Test
-	public void testBadCommand() {
-		// assumeTrue(false);
-		Process p;
-
-		p=runCLI("convex foo");
-		p=awaitExit(p);
-		assertNotEquals(0,p.exitValue());
-	}
-
-	// @Test
+	@Test
 	public void testHelp() {
-		// assumeTrue(false);
-		Process p;
-
-		p=runCLI("convex --help");
-		p=awaitExit(p);
-		assertEquals(0,p.exitValue());
-
-		p=runCLI("convex -h");
-		p=awaitExit(p);
-		assertEquals(0,p.exitValue());
-
-		p=runCLI("convex help");
-		p=awaitExit(p);
-		assertEquals(0,p.exitValue());
-
-		// TODO: figure out why these fail?
-
-		//p=runCLI("convex key help");
-		//p=awaitExit(p);
-		// assertEquals(0,p.exitValue());
-
-		//p=runCLI("convex peer help");
-		//p=awaitExit(p);
-		// assertEquals(0,p.exitValue());
-
-		//p=runCLI("convex query help");
-		//p=awaitExit(p);
-		// assertEquals(0,p.exitValue());
-
-}
+		assertCommandLineResult(0, "^Usage: convex \\[-hV\\] .*", "--help");
+		assertCommandLineResult(0, "^Usage: convex \\[-hV\\] .*", "-h");
+		assertCommandLineResult(0, "^Usage: convex \\[-hV\\] .*", "help");
+		assertCommandLineResult(0, "^Usage: convex key \\[-hV\\] .*", "key", "help");
+		assertCommandLineResult(0, "^Usage: convex key generate \\[-hV\\] .*", "key", "generate", "--help");
+		assertCommandLineResult(0, "^Usage: convex key list \\[-hV\\] .*", "key", "list", "--help");
+		assertCommandLineResult(0, "^Usage: convex peer \\[-hV\\] .*", "peer", "help");
+		assertCommandLineResult(0, "^Usage: convex peer local \\[-hV\\] .*", "peer", "local", "--help");
+		assertCommandLineResult(0, "^Usage: convex peer manager \\[-hV\\] .*", "peer", "manager", "--help");
+		assertCommandLineResult(0, "^Usage: convex peer start \\[-hrV\\] .*", "peer", "start", "--help");
+		assertCommandLineResult(0, "^Usage: convex query \\[-hV\\] .*", "query", "--help");
+		assertCommandLineResult(0, "^Usage: convex status \\[-hV\\] .*", "status", "--help");
+		assertCommandLineResult(0, "^Usage: convex transact \\[-hV\\] .*", "transact", "--help");
+	}
 
 
 }
