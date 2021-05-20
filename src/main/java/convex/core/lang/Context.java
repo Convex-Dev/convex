@@ -291,7 +291,7 @@ public final class Context<T extends ACell> extends AObject {
 		if (memUsed>0) {
 			long allowanceUsed=Math.min(allowance, memUsed);
 			if (allowanceUsed>0) {
-				account=account.withAllowance(allowance-allowanceUsed);
+				account=account.withMemory(allowance-allowanceUsed);
 			}
 			
 			// compute additional memory purchase requirement beyond allowance
@@ -322,7 +322,7 @@ public final class Context<T extends ACell> extends AObject {
 		} else {
 			// credit any unused memory back to allowance (may be zero)
 			long allowanceCredit=-memUsed;
-			account=account.withAllowance(allowance+allowanceCredit);
+			account=account.withMemory(allowance+allowanceCredit);
 		}
 		
 		// Make balance changes if needed for refund and memory purchase
@@ -1366,7 +1366,7 @@ public final class Context<T extends ACell> extends AObject {
 		}
 		
 		long newSourceBalance=currentBalance-amount;
-		AccountStatus newSourceAccount=sourceAccount.withAllowance(newSourceBalance);
+		AccountStatus newSourceAccount=sourceAccount.withMemory(newSourceBalance);
 		accounts=accounts.assoc(sourceIndex, newSourceAccount);
 
 		// new target account (note: could be source account, so we get from latest accounts)
@@ -1377,7 +1377,7 @@ public final class Context<T extends ACell> extends AObject {
 		AccountStatus targetAccount=accounts.get(targetIndex);	
 		
 		long newTargetBalance=targetAccount.getAllowance()+amount;
-		AccountStatus newTargetAccount=targetAccount.withAllowance(newTargetBalance);
+		AccountStatus newTargetAccount=targetAccount.withMemory(newTargetBalance);
 		accounts=accounts.assoc(targetIndex, newTargetAccount);
 
 		// SECURITY: new context with updated accounts

@@ -293,7 +293,7 @@ public class Init {
 	private static AVector<AccountStatus> addMemoryExchange(AVector<AccountStatus> accts, Address a, long balance,
 			long allowance) {
 		if (accts.count() != a.longValue()) throw new Error("Incorrect memory exchange address: " + a);
-		AccountStatus as = AccountStatus.createGovernance(balance).withAllowance(allowance);
+		AccountStatus as = AccountStatus.createGovernance(balance).withMemory(allowance);
 		accts = accts.conj(as);
 		return accts;
 	}
@@ -310,7 +310,7 @@ public class Init {
 			long balance) {
 		if (accts.count() != a.longValue()) throw new Error("Incorrect account address: " + a);
 		AccountStatus as = AccountStatus.create(0L, balance, key);
-		as = as.withAllowance(Constants.INITIAL_ACCOUNT_ALLOWANCE);
+		as = as.withMemory(Constants.INITIAL_ACCOUNT_ALLOWANCE);
 		accts = accts.conj(as);
 		return accts;
 	}

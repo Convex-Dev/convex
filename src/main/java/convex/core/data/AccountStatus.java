@@ -23,7 +23,7 @@ import convex.core.lang.impl.RecordFormat;
 public class AccountStatus extends ARecord {
 	private final long sequence;
 	private final long balance;
-	private final long allowance;
+	private final long memory;
 	private final AHashMap<Symbol, Syntax> environment;
 	private final ABlobMap<Address, ACell> holdings;
 	private final Address controller;
@@ -34,12 +34,12 @@ public class AccountStatus extends ARecord {
 
 	private static final RecordFormat FORMAT = RecordFormat.of(ACCOUNT_KEYS);
 
-	private AccountStatus(long sequence, long balance, long allowance,
+	private AccountStatus(long sequence, long balance, long memory,
 			AHashMap<Symbol, Syntax> environment, ABlobMap<Address, ACell> holdings,Address controller, AccountKey publicKey) {
 		super(FORMAT);
 		this.sequence = sequence;
 		this.balance = balance;
-		this.allowance = allowance;
+		this.memory = memory;
 		this.environment = environment;
 		this.holdings=holdings;
 		this.controller=controller;
@@ -111,7 +111,7 @@ public class AccountStatus extends ARecord {
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = Format.writeVLCLong(bs, pos,sequence);
 		pos = Format.writeVLCLong(bs,pos, balance);
-		pos = Format.writeVLCLong(bs,pos, allowance);
+		pos = Format.writeVLCLong(bs,pos, memory);
 		pos = Format.write(bs,pos, environment);
 		pos = Format.write(bs,pos, holdings);
 		pos = Format.write(bs,pos, controller);
@@ -207,22 +207,22 @@ public class AccountStatus extends ARecord {
 
 	public AccountStatus withBalance(long newBalance) {
 		if (balance==newBalance) return this;
-		return new AccountStatus(sequence, newBalance, allowance, environment,holdings,controller,publicKey);
+		return new AccountStatus(sequence, newBalance, memory, environment,holdings,controller,publicKey);
 	}
 	
 
 	public AccountStatus withAccountKey(AccountKey newKey) {
 		if (newKey==publicKey) return this;
-		return new AccountStatus(sequence, balance, allowance, environment,holdings,controller,newKey);
+		return new AccountStatus(sequence, balance, memory, environment,holdings,controller,newKey);
 	}
 	
-	public AccountStatus withAllowance(long newAllowance) {
-		if (allowance==newAllowance) return this;
-		return new AccountStatus(sequence, balance, newAllowance, environment,holdings,controller,publicKey);
+	public AccountStatus withMemory(long newMemory) {
+		if (memory==newMemory) return this;
+		return new AccountStatus(sequence, balance, newMemory, environment,holdings,controller,publicKey);
 	}
 	
 	public AccountStatus withBalances(long newBalance, long newAllowance) {
-		if ((balance==newBalance)&&(allowance==newAllowance)) return this;
+		if ((balance==newBalance)&&(memory==newAllowance)) return this;
 		return new AccountStatus(sequence, newBalance, newAllowance, environment,holdings,controller,publicKey);
 	}
 
@@ -231,7 +231,7 @@ public class AccountStatus extends ARecord {
 		if (newEnvironment==Core.ENVIRONMENT) newEnvironment=null;
 		
 		if (environment==newEnvironment) return this;
-		return new AccountStatus(sequence, balance, allowance,newEnvironment,holdings,controller,publicKey);
+		return new AccountStatus(sequence, balance, memory,newEnvironment,holdings,controller,publicKey);
 	}
 
 	/**
@@ -249,7 +249,7 @@ public class AccountStatus extends ARecord {
 			return null;
 		}
 
-		return new AccountStatus(newSequence, balance, allowance, environment,holdings,controller,publicKey);
+		return new AccountStatus(newSequence, balance, memory, environment,holdings,controller,publicKey);
 	}
 
 	@Override
@@ -302,11 +302,11 @@ public class AccountStatus extends ARecord {
 	private AccountStatus withHoldings(ABlobMap<Address, ACell> newHoldings) {
 		if (newHoldings.isEmpty()) newHoldings=null;
 		if (holdings==newHoldings) return this;
-		return new AccountStatus(sequence, balance, allowance, environment,newHoldings,controller,publicKey);
+		return new AccountStatus(sequence, balance, memory, environment,newHoldings,controller,publicKey);
 	}
 	
 	public AccountStatus withController(Address controllerAddress) {
-		return new AccountStatus(sequence, balance, allowance, environment,holdings,controllerAddress,publicKey);
+		return new AccountStatus(sequence, balance, memory, environment,holdings,controllerAddress,publicKey);
 	}
 
 	/**
@@ -357,7 +357,7 @@ public class AccountStatus extends ARecord {
 	public ACell get(ACell key) {
 		if (Keywords.SEQUENCE.equals(key)) return CVMLong.create(sequence);
 		if (Keywords.BALANCE.equals(key)) return CVMLong.create(balance);
-		if (Keywords.ALLOWANCE.equals(key)) return CVMLong.create(allowance);
+		if (Keywords.ALLOWANCE.equals(key)) return CVMLong.create(memory);
 		if (Keywords.ENVIRONMENT.equals(key)) return environment;
 		if (Keywords.HOLDINGS.equals(key)) return getHoldings();
 		if (Keywords.CONTROLLER.equals(key)) return controller;
@@ -395,7 +395,7 @@ public class AccountStatus extends ARecord {
 	 * @return Memory allowance in bytes
 	 */
 	public long getAllowance() {
-		return allowance;
+		return memory;
 	}
 
 	/**
