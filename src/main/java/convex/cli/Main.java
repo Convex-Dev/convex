@@ -1,8 +1,16 @@
 package convex.cli;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.logging.Logger;
+import java.util.Properties;
+
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.ParseResult;
+import picocli.CommandLine.PropertiesDefaultProvider;
 import picocli.CommandLine.ScopeType;
 
 /**
@@ -21,11 +29,15 @@ import picocli.CommandLine.ScopeType;
 	usageHelpAutoWidth=true,
 	description="Convex Command Line Interface")
 
-public class Main {
+public class Main implements Runnable {
+
+	private static final Logger log = Logger.getLogger(Main.class.getName());
+
+	private static CommandLine commandLine;
 
 	@Option(names={ "-c", "--config"},
-		defaultValue=Constants.CONFIG_FILENAME,
-		description="Use the specified config file. Default: ${DEFAULT-VALUE}")
+		scope = ScopeType.INHERIT,
+		description="Use the specified config file. All parameters to this app can be set by removing the leading '--'. ")
 	private String configFilename;
 
 	@Option(names={"-s", "--session"},
@@ -41,6 +53,7 @@ public class Main {
 
 	@Option(names={"-p", "--password"},
 		scope = ScopeType.INHERIT,
+		//defaultValue="",
 		description="Password to read/write to the Keystore")
 	private String password;
 
@@ -60,16 +73,36 @@ public class Main {
 		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
 	private String hostname;
 
+	@Override
+	public void run() {
+		// no command provided - so show help
+		CommandLine.usage(new Main(), System.out);
+	}
 
 	public static void main(String[] args) {
-		CommandLine commandLine = new CommandLine(new Main());
-		commandLine.setUsageHelpLongOptionsMaxWidth(40);
-		commandLine.setUsageHelpWidth(40 * 4);
+		Main mainApp = new Main();
+		commandLine = new CommandLine(mainApp)
+			.setUsageHelpLongOptionsMaxWidth(40)
+			.setUsageHelpWidth(40 * 4);
 
+		// do  a pre-parse to get the config filename. We need to load
+		// in the defaults before running the full execute
+		commandLine.parseArgs(args);
+		mainApp.loadConfig();
 		int retVal = commandLine.execute(args);
 		System.exit(retVal);
 	}
 
+	protected void loadConfig() {
+		if (configFilename != null && !configFilename.isEmpty()) {
+			String filename = Helpers.expandTilde(configFilename);
+			File configFile = new File(filename);
+			if (configFile.exists()) {
+				PropertiesDefaultProvider defaultProvider = new PropertiesDefaultProvider(configFile);
+				commandLine.setDefaultValueProvider(defaultProvider);
+			}
+		}
+	}
 	public String getSessionFilename() {
 		return Helpers.expandTilde(sessionFilename);
 	}

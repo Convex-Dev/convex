@@ -11,8 +11,14 @@ import convex.core.crypto.PFXTools;
 import convex.core.store.AStore;
 import etch.EtchStore;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Model.OptionSpec;
+import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
+import picocli.CommandLine.PropertiesDefaultProvider;
+import picocli.CommandLine.ParseResult;
+import picocli.CommandLine.Spec;
 
 /*
 	*  peer start command
@@ -29,10 +35,21 @@ public class PeerStart implements Runnable {
 	@ParentCommand
 	private Peer peerParent;
 
-	@Parameters(paramLabel="index",
-		description="Keystore index or public address to use for the peer.")
+	@Spec CommandSpec spec;
+
+	@Option(names={"-i", "--index"},
+		defaultValue="-1",
+		description="Keystore index of the public/private key to use for the peer.")
 	private String keystoreIndex;
 
+	@Option(names={"--public-key"},
+		defaultValue="",
+		description="Hex string of the public key in the Keystore to use for the peer. You only need to enter in the first distinct hex values of the public key. e.g. 0xf0234 or f0234")
+	private String keystorePublicKey;
+
+	@Option(names={"-r", "--reset"},
+		description="Reset and delete the etch database if it exists. Default: ${DEFAULT-VALUE}")
+	private boolean isReset;
 
 	@Override
 	public void run() {
@@ -41,31 +58,35 @@ public class PeerStart implements Runnable {
 		AKeyPair keyPair = null;
 		int port = 0;
 		int index = Integer.parseInt(keystoreIndex);
+		String publicKeyClean = keystorePublicKey.toLowerCase().replaceAll("^0x", "");
 
 		String password = mainParent.getPassword();
-		if (password == null) {
+
+		if (password == null || password.isEmpty()) {
 			log.severe("You need to provide a keystore password");
 			return;
 		}
+
+		if ( publicKeyClean.isEmpty() && index <= 0) {
+			log.severe("You need to provide a keystore public key identity via the --index or --public-key options");
+			return;
+		}
+
 		File keyFile = new File(mainParent.getKeyStoreFilename());
 		try {
 			if (!keyFile.exists()) {
 				log.severe("Cannot find keystore file "+keyFile.getCanonicalPath());
 				return;
 			}
+			log.info("reading keystore file: "+keyFile.getPath());
 			KeyStore keyStore = PFXTools.loadStore(keyFile, password);
 
-			if ( index < 1 || index > keyStore.size()) {
-				log.severe("Keystore index is out of range");
-				return;
-			}
 			int counter = 1;
 			Enumeration<String> aliases = keyStore.aliases();
 
 			while (aliases.hasMoreElements()) {
 				String alias = aliases.nextElement();
-				if (counter == index) {
-					System.out.println(alias);
+				if (counter == index || alias.indexOf(publicKeyClean) == 0) {
 					keyPair = PFXTools.getKeyPair(keyStore, alias, password);
 					break;
 				}
@@ -89,7 +110,12 @@ public class PeerStart implements Runnable {
 			AStore store = null;
 			String etchStoreFilename = mainParent.getEtchStoreFilename();
 			if (etchStoreFilename != null && !etchStoreFilename.isEmpty()) {
-				store = EtchStore.create(new File(etchStoreFilename));
+				File etchFile = new File(etchStoreFilename);
+				if ( isReset && etchFile.exists()) {
+					log.info("reset: removing old etch storage file " + etchStoreFilename);
+					etchFile.delete();
+				}
+				store = EtchStore.create(etchFile);
 			}
 			log.info("Starting peer");
 			peerParent.launchPeer(keyPair, port, store);
