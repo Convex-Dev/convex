@@ -69,6 +69,8 @@ public class Keywords {
 	public static final Keyword ERROR_CODE = Keyword.create("error-code");
 	public static final Keyword TRACE = Keyword.create("trace");
 	
+	public static final Keyword EXPANDER = Keyword.create("expander");
+	
 	
 
 

@@ -32,7 +32,6 @@ import convex.core.data.INumeric;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.List;
-import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Set;
@@ -47,9 +46,6 @@ import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.Types;
-import convex.core.lang.expanders.AExpander;
-import convex.core.lang.expanders.CoreExpander;
-import convex.core.lang.expanders.Expander;
 import convex.core.lang.impl.AExceptional;
 import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.CorePred;
@@ -496,45 +492,25 @@ public class Core {
 
 			context = context.lookup(Symbols.STAR_INITIAL_EXPANDER);
 			if (context.isExceptional()) return (Context<Syntax>) context;
-			ACell maybeEx=context.getResult();
-			if (!(maybeEx instanceof AExpander)) {
+			AFn<Syntax> initialExpander=RT.function(context.getResult());
+			if (initialExpander==null) {
 				return context.withError(ErrorCodes.CAST,name()+" requires a valid *initial-expander*, not found in environment");
 			}
-			AExpander initialExpander = (AExpander) maybeEx;
 
-			AExpander expander=initialExpander;
+			AFn<Syntax> expander=initialExpander;
 			if (n == 2) {
 				// use provided expander
 				ACell exArg = args[1];
-				expander=Expander.wrap(exArg);
+				expander=RT.function(exArg);
 				if (expander==null) return context.withCastError(1,args, Types.FUNCTION);
 			}
 			ACell form = args[0];
-			Context<Syntax> rctx = expander.expand(form, initialExpander, context);
+			Context<Syntax> rctx = context.invoke(expander,form, initialExpander);
 			return rctx;
 		}
 	});
 
-	public static final CoreFn<ACell> EXPANDER = reg(new CoreFn<>(Symbols.EXPANDER) {
-		@SuppressWarnings("unchecked")
-		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
-			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-
-			AFn<ACell> fn = RT.function(args[0]);
-
-			// check cast to function
-			if (fn==null) return context.withCastError(0,args, Types.FUNCTION);
-			
-			Expander expander = Expander.wrap(fn);
-			if (expander==null) return context.withError(ErrorCodes.CAST, "Expander requires a valid function");
-			long juice = Juice.SIMPLE_FN;
-
-			return context.withResult(juice, expander);
-		}
-	});
-
-	public static final CoreExpander INITIAL_EXPANDER = reg(Compiler.INITIAL_EXPANDER);
+	public static final AFn<Syntax> INITIAL_EXPANDER = reg(Compiler.INITIAL_EXPANDER);
 
 	public static final CoreFn<CVMBool> EXPORTS_Q = reg(new CoreFn<>(Symbols.EXPORTS_Q) {
 		@SuppressWarnings("unchecked")
@@ -554,28 +530,6 @@ public class Core {
 			CVMBool result = CVMBool.of(as.getExportedFunction(sym) != null);
 
 			return context.withResult(Juice.LOOKUP, result);
-		}
-	});
-
-	public static final CoreExpander EXPORT = reg(new CoreExpander(Symbols.EXPORT) {
-		@Override
-		public Context<Syntax> expand(ACell o, AExpander ex, Context<?> context) {
-			Syntax formSyntax=Syntax.create(o);
-			AList<ACell> form = formSyntax.getValue();
-			
-			int n = form.size();
-			if (n < 1) return context.withError(ErrorCodes.COMPILE, "export form not valid?: " + form);
-			for (int i = 1; i < n; i++) {
-				ACell so = Syntax.unwrap(form.get(i));
-				if (!(so instanceof Symbol)) return context.withError(ErrorCodes.COMPILE,
-						"export requires a list of symbols but got: " + Utils.getClass(so));
-			}
-
-			ASequence<ACell> syms = form.next();
-			ASequence<ACell> quotedSyms = (syms == null) ? Vectors.empty() : syms.map(sym -> Lists.of(Symbols.QUOTE, sym));
-			AList<Syntax> newForm = Lists.of(Syntax.create(Symbols.DEF), Syntax.create(Symbols.STAR_EXPORTS),
-					Syntax.create(RT.cons(Symbols.CONJ, Symbols.STAR_EXPORTS, quotedSyms)));
-			return context.withResult(Juice.SIMPLE_MACRO, Syntax.create(newForm));
 		}
 	});
 
@@ -1898,53 +1852,6 @@ public class Core {
 		}
 	});
 
-	public static final CoreExpander IF = reg(new CoreExpander(Symbols.IF) {
-		@Override
-		public Context<Syntax> expand(ACell o, AExpander cont, Context<?> context) {
-			if (o instanceof Syntax) {
-				o = ((Syntax) o).getValue();
-			}
-
-			@SuppressWarnings("unchecked")
-			AList<ACell> form = (AList<ACell>) o;
-			int n = form.size();
-			if (n < 3) return context.withArityError("if requires at least two expressions but got: " + form);
-			if (n > 4) return context.withArityError("if requires at most three expressions but got: " + form);
-
-			ACell newForm = RT.cons(Symbols.COND, form.next());
-			context = context.consumeJuice(Juice.SIMPLE_MACRO);
-			return context.expand(newForm, cont, cont);
-		}
-	});
-
-	public static final CoreExpander MACRO = reg(new CoreExpander(Symbols.MACRO) {
-		@SuppressWarnings("unchecked")
-		@Override
-		public Context<Syntax> expand(ACell o, AExpander cont, Context<?> context) {
-			// wrap form in Syntax object if needed
-			Syntax formSyntax=Syntax.create(o);
-			AList<ACell> form = (AList<ACell>) formSyntax.getValue();
-			
-			int n = form.size();
-			if (n != 3) {
-				return context.withCompileError("macro requires a binding form and expansion expression " + form);
-			}
-
-			ACell paramForm = form.get(1);
-			ACell body = form.get(2);
-
-			// expansion function is: (fn [x e] (let [<paramForm> (next (unsyntax x))] <body>))
-			List expansionFn = List.create(new ACell[] {
-					Symbols.FN, Vectors.of(Symbols.X, Symbols.E),
-					Lists.of(Symbols.LET, Vectors.of(paramForm, Lists.of(Symbols.NEXT, Lists.of(Symbols.UNSYNTAX,Symbols.X))), 
-							body)});
-
-			ACell newForm = Syntax.create(Lists.of(Symbols.EXPANDER, expansionFn)).withMeta(formSyntax.getMeta());
-			context = context.consumeJuice(Juice.SIMPLE_MACRO);
-			return context.expand(newForm, cont, cont);
-		}
-	});
-
 	public static final CoreFn<?> RECUR = reg(new CoreFn<>(Symbols.RECUR) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -2356,7 +2263,6 @@ public class Core {
 
 	static Symbol symbolFor(ACell o) {
 		if (o instanceof CoreFn) return ((CoreFn<?>) o).getSymbol();
-		if (o instanceof CoreExpander) return ((CoreExpander) o).getSymbol();
 		throw new Error("Cant get symbol for object of type " + o.getClass());
 	}
 

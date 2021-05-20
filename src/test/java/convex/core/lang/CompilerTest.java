@@ -28,7 +28,6 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
-import convex.core.lang.expanders.AExpander;
 import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Def;
 import convex.core.lang.ops.Do;
@@ -459,15 +458,9 @@ public class CompilerTest {
 	
 	@Test
 	public void testExpander()  {
-		Context<?> c=CONTEXT.fork();
-		AExpander ex=eval("(expander (fn [x e] x))");
-		assertCVMEquals("foo",ex.expand(RT.cvm("foo"), ex, c).getResult().getValue());
+		Context<?> c=CONTEXT.fork();	
 		
-		// Fails because function call compiled before macro is defined.... TODO verify if OK?
-		assertCastError(step("(do (def bex (expander (fn [x e] \"foo\"))) (bex 2))"));
-	
-		
-		c=c.execute(comp("(defexpander bex [x e] \"foo\")"));
+		c=c.execute(comp("(defexpander bex [x e] (syntax \"foo\"))"));
 		c=c.execute(comp("(bex 2)",c));
 		assertEquals("foo",c.getResult().toString());
 	}
@@ -488,18 +481,6 @@ public class CompilerTest {
 	public void testMacrosInSets() {
 		assertEquals(Sets.of(1L,2L),eval("(eval '#{(if true 1 2) (if false 1 2)})"));		
 		assertEquals(Sets.of(1L,2L),eval("(eval '#{(if true 1 2) ~(if false 1 2)})"));		
-	}
-	
-	@Test
-	public void testMacro()  {
-		Context<?> c=CONTEXT.fork();
-		AOp<?> defop=comp("(def c1 (macro [z] (str z)))");
-		c=c.execute(defop);
-		c=c.execute(comp("(c1 bar)",c));
-		assertEquals("bar",c.getResult().toString());
-		
-		// TODO: think about this.
-		// assertEquals(2L,(long)eval("((macro [x] 2) (return 3))"));
 	}
 	
 	@Test 
@@ -524,7 +505,7 @@ public class CompilerTest {
 		assertTrue(eval("list") instanceof AFn);
 		
 		// if should be a macro implemented as an expander
-		assertTrue(eval("if") instanceof AExpander);
+		//  assertTrue(eval("if") instanceof AExpander);
 		
 		// def should be a special form, and evaluate to a symbol
 		assertEquals(Symbols.DEF,eval("def"));

@@ -68,7 +68,6 @@ import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
-import convex.core.lang.expanders.AExpander;
 import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.CorePred;
 import convex.core.lang.impl.ICoreDef;
@@ -1172,15 +1171,6 @@ public class CoreTest {
 		
 		assertArityError(step("(double)"));
 		assertArityError(step("(double :foo :bar)"));
-	}
-	
-	@Test
-	public void testMacro() {
-		assertTrue(eval("(macro [x] x)") instanceof AExpander);
-		assertCastError(step("((macro [x] x) 42)"));
-		
-		// TODO: is this sane?
-		assertCastError(step("(let [m (macro [x] x)] (m 42))"));
 	}
 
 	@Test
@@ -2636,7 +2626,7 @@ public class CoreTest {
 		assertFalse(evalB("(fn? {})"));
 		assertTrue(evalB("(fn? count)"));
 		assertTrue(evalB("(fn? fn?)"));
-		assertFalse(evalB("(fn? if)"));
+		assertTrue(evalB("(fn? if)"));
 	}
 	
 	@Test
@@ -2737,7 +2727,7 @@ public class CoreTest {
 	
 	@Test
 	public void testDefExpander() {
-		Context<?> ctx=step("(defexpander expand-once [x e] (expand x (fn [x e] x)))");
+		Context<?> ctx=step("(defexpander expand-once [x e] (expand x (fn [x e] (syntax x))))");
 		
 		assertEquals(Syntax.of(42L),eval(ctx,"(expand 42 expand-once)"));
 	}
@@ -2933,14 +2923,13 @@ public class CoreTest {
 
 	@Test
 	public void testExpand() {
-		assertEquals(Syntax.of(Strings.create("foo")), eval("(expand (name :foo) (fn [x e] x))"));
-		assertEquals(Syntax.of(3L), eval("(expand '[1 2 3] (fn [x e] (nth x 2)))"));
+		assertEquals(Strings.create("foo"), eval("(expand (name :foo) (fn [x e] x))"));
+		assertEquals(CVMLong.create(3), eval("(expand '[1 2 3] (fn [x e] (nth x 2)))"));
 		
 		assertNull(Syntax.unwrap(eval("(expand nil)")));
 
 		assertCastError(step("(expand 1 :foo)"));
 		assertCastError(step("(expand { 888 227 723 560} [75 561 258 833])"));
-		assertCastError(step("(expand { :CIWh 155578 } :nth )"));
 		
 		assertArityError(step("(expand)"));
 		assertArityError(step("(expand 1 (fn [x e] x) :blah)"));
@@ -2950,20 +2939,6 @@ public class CoreTest {
 
 		// arity error in expansion execution
 		assertArityError(step("(expand 1 (fn [x e] (count)))"));
-	}
-	
-	@Test
-	public void testExpander() {
-		assertCastError(step("(expander 1)")); // not a function
-		
-		// These probably OK, since can be cast to functions?
-		// assertCastError(step("(expander `(export test))")); // Issue #88
-		// assertCastError(step("(expander :foo)")); // Issue #88
-		
-		assertCastError(step("(expander *offer*)")); // Issue #83
-		
-		assertArityError(step("(expander)"));
-		assertArityError(step("(expander (fn[]) (fn[]))"));
 	}
 
 	@Test
@@ -3265,19 +3240,13 @@ public class CoreTest {
 		}
 
 		{ // a core macro
-			ACell c = eval("if");
+			ACell c = eval("*initial-expander*");
 			Blob b = Format.encodedBlob(c);
 			assertSame(c, Format.read(b));
 		}
 
 		{ // a basic lambda expression
 			ACell c = eval("(fn [x] x)");
-			Blob b = Format.encodedBlob(c);
-			assertEquals(c, Format.read(b));
-		}
-
-		{ // a basic lambda expression
-			ACell c = eval("(expander (fn [x e] x))");
 			Blob b = Format.encodedBlob(c);
 			assertEquals(c, Format.read(b));
 		}

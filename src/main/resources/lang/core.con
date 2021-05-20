@@ -15,20 +15,34 @@
           :examples [{:code "(defmacro foo [x] '(if (good? x) x (fix x)))"}]
           :type :macro
           :signature [{:params [a]}]}
+    :expander true
    }
-  (macro [name params body] 
-     (let [mac '(macro ~params ~body)
-           mac (syntax mac (meta params))]
-       '(def ~name ~mac))))
+  (fn [x e] 
+     (let [[_ name & decl] (unsyntax x)
+           mac (cons 'fn decl)
+           mac (syntax mac (meta (first decl)))
+           form '(def ~(syntax name {:expander true}) 
+                   (let [m# ~mac]
+                     (fn [x e] (e (apply m# (next (unsyntax x))) e))))]
+       (e form e))))
 
 (def defexpander 
   ^{:doc {:description "Defines an expander in the current environment."
            :examples [{:code "(defexpander expand-once [x e] (e x (fn [x e] x)))"}]
            :type :macro
            :signature [{:params [a]}]}
+    :expander true
    }
-  (macro [name params body] 
-         '(def ~name (expander (fn ~params ~body)))))
+  (fn [x e] 
+      (let [[_ name & decl] (unsyntax x)
+            exp (cons 'fn decl)
+            form '(def ~(syntax name {:expander true}) ~exp)]
+         (e form e))))
+
+(defmacro if
+  [test & cases]
+  (cond (<= 1 (count cases) 2) nil (fail :ARITY "if requires 2 or 3 arguments"))
+  (cons 'cond test cases))
  
 (defmacro defn 
   ^{:doc {:description "Defines a function in the current environment."

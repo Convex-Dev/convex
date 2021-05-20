@@ -53,7 +53,7 @@ public class JuiceTest {
 	 */
 	public long expandJuice(String source) {
 		ACell form = Reader.read(source);
-		Context<?> jctx = Core.INITIAL_EXPANDER.expand(form, Core.INITIAL_EXPANDER, CONTEXT.fork());
+		Context<?> jctx = CONTEXT.fork().invoke(Core.INITIAL_EXPANDER,form, Core.INITIAL_EXPANDER);
 		return JUICE - jctx.getJuice();
 	}
 

@@ -13,6 +13,7 @@ import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.data.List;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
@@ -22,9 +23,8 @@ import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.exceptions.TODOException;
-import convex.core.lang.expanders.AExpander;
-import convex.core.lang.expanders.CoreExpander;
 import convex.core.lang.impl.AClosure;
+import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.MultiFn;
 import convex.core.lang.ops.Cond;
 import convex.core.lang.ops.Constant;
@@ -72,16 +72,19 @@ public class Compiler {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	static <T extends ACell> Context<AOp<T>> expandCompile(ACell form, Context context) {
 		// expand phase starts with initial expander
-		AExpander ex = INITIAL_EXPANDER;
+		AFn<Syntax> ex = INITIAL_EXPANDER;
 		
 		// use initial expander both as current and continuation expander
 		// call expand via context to get correct depth and exception handling
-		final Context<Syntax> ctx = context.expand(form, ex,ex);
+		final Context<Syntax> ctx = context.expand(ex, form,ex);
 		
 		if (ctx.isExceptional()) return (Context<AOp<T>>) (Object) ctx;
-
+		ACell c=ctx.getResult();
+		if (!(c instanceof Syntax)) {
+			return ctx.withError(ErrorCodes.CAST,"Expander must produce a Syntax Object but got "+RT.getType(c)+ " = "+c);
+		}
 		// compile phase
-		Syntax expandedForm = ctx.getResult();
+		Syntax expandedForm = (Syntax)c;
 		return compile(expandedForm, ctx);
 	}
 
@@ -542,10 +545,14 @@ public class Compiler {
 	 * 
 	 * Follows the "Expansion-Passing Style" approach of Dybvig, Friedman, and Haynes
 	 */
-	public static final CoreExpander INITIAL_EXPANDER =new CoreExpander(Symbols.STAR_INITIAL_EXPANDER) {
+	public static final AFn<Syntax> INITIAL_EXPANDER =new CoreFn<Syntax>(Symbols.STAR_INITIAL_EXPANDER) {
 		@SuppressWarnings("unchecked")
 		@Override
-		public Context<Syntax> expand(ACell x, AExpander cont, Context<?> context) {
+		public Context<Syntax> invoke(Context<ACell> context,ACell[] args ) {
+			if (args.length!=2) return context.withArityError(exactArityMessage(2, args.length));
+			ACell x = args[0];
+			AFn<Syntax> cont=RT.function(args[1]);
+			
 			// Ensure x is wrapped as Syntax Object. This will preserve metadata if present.
 			Syntax formSyntax=Syntax.create(x);
 			ACell form = formSyntax.getValue();
@@ -585,13 +592,14 @@ public class Compiler {
 						
 						MapEntry<Symbol, Syntax> me = context.lookupDynamicEntry(sym);
 						if (me != null) {
+							Syntax mstx=me.getValue();
 							// TODO: examine syntax object for expander details?
-							ACell v = me.getValue().getValue();
-							if (v instanceof AExpander) {
+							ACell v =mstx.getMeta().get(Keywords.EXPANDER);
+							if (RT.bool(v)) {
 								// expand form using specified expander and continuation expander
-								AExpander expander = (AExpander) v;
-								context = context.expand(formSyntax, expander, cont); // (exp x cont)
-								return (Context<Syntax>) context;
+								AFn<Syntax> expander = RT.function(mstx.getValue());
+								Context<Syntax> rctx = context.expand(expander,formSyntax, this); // (exp x cont)
+								return rctx;
 							}
 						}
 					}
@@ -609,7 +617,7 @@ public class Compiler {
 					if (ctx.isExceptional()) return null;
 
 					// Expand like: (cont x cont)
-					ctx = ctx.expand(elem, cont, cont);
+					ctx = ctx.expand(cont,elem, cont);
 
 					if (ctx.isExceptional()) {
 						ct[0] = ctx;
@@ -619,16 +627,17 @@ public class Compiler {
 					ct[0] = ctx;
 					return newElement;
 				});
-				context = ct[0];
-				if (context.isExceptional()) return (Context<Syntax>) context;
-				return context.withResult(Juice.EXPAND_SEQUENCE, Syntax.create(updated).withMeta(formSyntax.getMeta()));
+				Context<Syntax> rctx = ct[0];
+				if (context.isExceptional()) return rctx;
+				return rctx.withResult(Juice.EXPAND_SEQUENCE, Syntax.create(updated).withMeta(formSyntax.getMeta()));
 			}
 
 			if (form instanceof ASet) {
-				Context<Syntax> ctx = (Context<Syntax>) context;
+				@SuppressWarnings("rawtypes")
+				Context<Syntax> ctx =  (Context)context;
 				Set<Syntax> updated = Sets.empty();
 				for (ACell elem : ((ASet<ACell>) form)) {
-					ctx = ctx.expand(elem, cont, cont);
+					ctx = ctx.expand(cont, elem, cont);
 					if (ctx.isExceptional()) return ctx;
 
 					Syntax newElement = ctx.getResult();
@@ -638,17 +647,18 @@ public class Compiler {
 			}
 
 			if (form instanceof AMap) {
-				Context<Syntax> ctx = (Context<Syntax>) context;
+				@SuppressWarnings("rawtypes")
+				Context<Syntax> ctx =  (Context)context;
 				AMap<Syntax, Syntax> updated = Maps.empty();
 				for (Map.Entry<ACell, ACell> me : ((AMap<ACell, ACell>) form).entrySet()) {
 					// get new key
-					ctx = ctx.expand(me.getKey(), cont, cont);
+					ctx = ctx.expand(cont,me.getKey(), cont);
 					if (ctx.isExceptional()) return ctx;
 
 					Syntax newKey = ctx.getResult();
 
 					// get new value
-					ctx = ctx.expand(me.getValue(), cont, cont);
+					ctx = ctx.expand(cont,me.getValue(), cont);
 					if (ctx.isExceptional()) return ctx;
 					Syntax newValue = ctx.getResult();
 

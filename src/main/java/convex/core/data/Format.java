@@ -28,7 +28,6 @@ import convex.core.lang.AFn;
 import convex.core.lang.Core;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
-import convex.core.lang.expanders.Expander;
 import convex.core.lang.impl.Fn;
 import convex.core.lang.impl.MultiFn;
 import convex.core.transactions.ATransaction;
@@ -612,12 +611,6 @@ public class Format {
 		if (tag == Tag.FN) {
 			AFn<?> fn = Fn.read(bb);
 			return fn;
-		}
-
-		if (tag == Tag.EXPANDER) {
-			AFn<ACell> fn = read(bb);
-			if (fn == null) throw new BadFormatException("Can't create expander with null function");
-			return Expander.wrap(fn);
 		}
 
 		throw new BadFormatException("Can't read Op with tag byte: " + Utils.toHexString(tag));

@@ -30,7 +30,6 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.exceptions.TODOException;
-import convex.core.lang.expanders.AExpander;
 import convex.core.lang.impl.AExceptional;
 import convex.core.lang.impl.ErrorValue;
 import convex.core.lang.impl.HaltValue;
@@ -810,11 +809,12 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return Updated Context
 	 */
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> invoke(AFn<R> fn, ACell[] args) {
+	public <R extends ACell> Context<R> invoke(AFn<R> fn, ACell... args) {
 		// Note: we don't adjust depth here because execute(...) does it for us in the function body
 		Context<R> ctx = fn.invoke((Context<ACell>) this,args);
 
 		if (ctx.isExceptional()) {
+			// Need an Object because maybe mutating later
 			Object v=ctx.getExceptional();
 			
 			// recur as many times as needed
@@ -1071,54 +1071,6 @@ public final class Context<T extends ACell> extends AObject {
 		
 		// restore depth and return
 		rctx=rctx.withDepth(saveDepth);		
-		return rctx;
-	}
-	
-	/**
-	 * Expand a form in this context.
-	 * 
-	 * @param form
-	 * @return Updated Context with expanded form as result.
-	 * @throws ExecutionException
-	 */
-	public Context<Syntax> expand(ACell form) {
-		// run expansion phase with adjusted depth
-		int saveDepth=getDepth();
-		Context<Syntax> rctx =this.withDepth(saveDepth+1);
-		if (rctx.isExceptional()) return rctx; // depth error, won't have modified depth
-		
-		AExpander ex = Core.INITIAL_EXPANDER;
-		rctx = rctx.expand(form,ex,ex);
-		
-		rctx=rctx.withDepth(saveDepth);
-		return rctx;
-	}
-	
-	/**
-	 * Expand a form in this context, using the given expander and continuation expander
-	 * 
-	 * @param form
-	 * @return Context with expanded syntax as result
-	 * @throws ExecutionException
-	 */ 
-	public Context<Syntax> expand(ACell form, AExpander expander, AExpander cont) {
-		// Adjusted depth
-		int saveDepth=getDepth();
-		Context<Syntax> rctx =this.withDepth(saveDepth+1);
-		if (rctx.isExceptional()) return rctx; // depth error, won't have modified depth
-		
-		// EXPAND
-		rctx = expander.expand(form, cont, rctx);
-		
-		if (rctx.isExceptional()) {
-			AExceptional ex=rctx.getExceptional();
-			if (ex instanceof ErrorValue) {
-				ErrorValue ev=(ErrorValue)ex;
-				ev.addTrace("Expanding with: "+Utils.toString(expander));
-			}
-		} 
-		rctx=rctx.withDepth(saveDepth);
-		
 		return rctx;
 	}
 	
@@ -1887,6 +1839,25 @@ public final class Context<T extends ACell> extends AObject {
 		
 		return ctx;
 	}
+
+	public Context<Syntax> expand(ACell form) {
+		return expand(Core.INITIAL_EXPANDER, form, Core.INITIAL_EXPANDER);
+	}
+	
+	public Context<Syntax> expand(AFn<Syntax> expander, ACell form, AFn<Syntax> cont) {
+		// execute op with adjusted depth
+		int savedDepth=getDepth();
+		Context<Syntax> ctx =this.withDepth(savedDepth+1);
+		if (ctx.isExceptional()) return (Context<Syntax>) ctx; // depth error, won't have modified depth
+		
+		Context<Syntax> rctx= invoke(expander, form, cont);
+		
+		// reset depth after execution.
+		rctx=rctx.withDepth(savedDepth);
+		return rctx;
+
+	}
+	
 
 
 
