@@ -923,7 +923,7 @@ public class Core {
 			CVMLong amount = RT.ensureLong(args[1]);
 			if (amount == null) return context.withCastError(1,args, Types.LONG);
 
-			return context.transferAllowance(address, amount.longValue()).consumeJuice(Juice.TRANSFER);
+			return context.transferAllowance(address, amount).consumeJuice(Juice.TRANSFER);
 		}
 	});
 

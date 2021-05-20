@@ -2010,12 +2010,16 @@ public class CoreTest {
 	}
 	
 	@Test
-	public void testTransferAllowance() {
+	public void testTransferMemory() {
 		long ALL=Constants.INITIAL_ACCOUNT_ALLOWANCE;
 		Address HERO = TestState.HERO;
-		assertEquals(ALL, evalL(Symbols.STAR_ALLOWANCE.toString()));
+		assertEquals(ALL, evalL(Symbols.STAR_MEMORY.toString()));
 
-		assertEquals(ALL, step("(transfer-memory *address* 1337)").getAccountStatus(HERO).getAllowance());
+		{
+			Context<CVMLong> ctx=step("(transfer-memory *address* 1337)");
+			assertEquals(1337L, ctx.getResult().longValue());
+			assertEquals(ALL, ctx.getAccountStatus(HERO).getAllowance());
+		}
 		
 		assertEquals(ALL-1337, step("(transfer-memory "+Init.VILLAIN+" 1337)").getAccountStatus(HERO).getAllowance());
 

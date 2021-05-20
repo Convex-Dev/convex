@@ -587,7 +587,7 @@ public final class Context<T extends ACell> extends AObject {
 		if (sym.equals(Symbols.STAR_JUICE)) return (Context<R>) withResult(CVMLong.create(getJuice()));
 		if (sym.equals(Symbols.STAR_CALLER)) return (Context<R>) withResult(getCaller());
 		if (sym.equals(Symbols.STAR_ADDRESS)) return (Context<R>) withResult(getAddress());
-		if (sym.equals(Symbols.STAR_ALLOWANCE)) return (Context<R>) withResult(CVMLong.create(getAccountStatus().getAllowance()));
+		if (sym.equals(Symbols.STAR_MEMORY)) return (Context<R>) withResult(CVMLong.create(getAccountStatus().getAllowance()));
 		if (sym.equals(Symbols.STAR_BALANCE)) return (Context<R>) withResult(CVMLong.create(getBalance()));
 		if (sym.equals(Symbols.STAR_ORIGIN)) return (Context<R>) withResult(getOrigin());
 		if (sym.equals(Symbols.STAR_RESULT)) return (Context<R>) this;
@@ -1345,11 +1345,12 @@ public final class Context<T extends ACell> extends AObject {
 	 * Uses no juice
 	 * 
 	 * @param target Target Address, must already exist
-	 * @param amount Allowance to transfer, must be between 0 and Amount.MAX_VALUE inclusive
+	 * @param amount Amount of memory to transfer, must be between 0 and Amount.MAX_VALUE inclusive
 	 * @return Context with a null result if the transaction succeeds, or an exceptional value if the transfer fails
 	 * @throws ExecutionException
 	 */
-	public Context<CVMLong> transferAllowance(Address target, Long amount) {
+	public Context<CVMLong> transferAllowance(Address target, CVMLong amountToSend) {
+		long amount=amountToSend.longValue();
 		if (amount<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative aloowance amount");
 		if (amount>Constants.MAX_SUPPLY) return withError(ErrorCodes.ARGUMENT,"Can't transfer an allowance amount beyond maximum limit");
 		
@@ -1380,7 +1381,7 @@ public final class Context<T extends ACell> extends AObject {
 		accounts=accounts.assoc(targetIndex, newTargetAccount);
 
 		// SECURITY: new context with updated accounts
-		Context<CVMLong> result=withChainState(chainState.withAccounts(accounts)).withResult(null);
+		Context<CVMLong> result=withChainState(chainState.withAccounts(accounts)).withResult(amountToSend);
 		return result;
 	}
 	

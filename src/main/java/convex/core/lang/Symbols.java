@@ -148,7 +148,7 @@ public class Symbols {
 
 	public static final char SPECIAL_STAR = '*';
 	public static final Symbol STAR_ADDRESS = Symbol.create("*address*");
-	public static final Symbol STAR_ALLOWANCE = Symbol.create("*memory*");
+	public static final Symbol STAR_MEMORY = Symbol.create("*memory*");
 	public static final Symbol STAR_CALLER = Symbol.create("*caller*");
 	public static final Symbol STAR_ORIGIN = Symbol.create("*origin*");
 	public static final Symbol STAR_JUICE = Symbol.create("*juice*");
