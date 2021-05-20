@@ -815,6 +815,14 @@
           :signature [{:params [coll]}]}
   }
   
+  set-controller
+  {
+    :doc {:description "Sets the controller for the current Account. The controller account is granted powerful access privileges including the ability to run 'eval-as'. May set controller to 'nil' to disable such control (this is the default for new accounts)."
+          :examples [{:code "(set-controller #9)"}]
+          :type :function
+          :signature [{:params [addr]}]}
+  }
+  
   set-holding
  	{
 	 :doc {:description "Sets the holding value for a specified owner account address. Owner account must exist. Returns the new holding value."

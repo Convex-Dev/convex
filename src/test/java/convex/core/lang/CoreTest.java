@@ -2891,8 +2891,10 @@ public class CoreTest {
 		assertEquals(TestState.VILLAIN, eval("(set-controller (address "+TestState.VILLAIN+"))"));
 		assertEquals(null, (Address)eval("(set-controller nil)"));
 		
+		assertNobodyError(step("(set-controller #666666)")); // non-existent account
+		
 		assertCastError(step("(set-controller :foo)"));
-		assertCastError(step("(set-controller (address nil))"));
+		assertCastError(step("(set-controller (address nil))")); // Address cast fails
 		
 		assertArityError(step("(set-controller)")); 
 		assertArityError(step("(set-controller 1 2)")); // arity > cast

@@ -1132,8 +1132,15 @@ public class Core {
 			if (n !=1) return context.withArityError(exactArityMessage(1, n));
 			
 			// Get requested controller. Must be a valid address or null
-			Address controller=RT.ensureAddress(args[0]);
-			if ((controller == null)&&(args[0]!=null)) return context.withCastError(args[0], Types.ADDRESS);
+			ACell arg=args[0];
+			Address controller=null;
+			if (arg!=null) {
+				controller=RT.ensureAddress(arg);
+				if (controller == null) return context.withCastError(arg, Types.ADDRESS);
+				if (context.getAccountStatus(controller)==null) {
+					 return context.withError(ErrorCodes.NOBODY, name()+" must be passed an address for an existing account as controller.");
+				}
+			}
 			
 			context=(Context) context.setController(controller);
 			if (context.isExceptional()) return (Context<ACell>) context;
