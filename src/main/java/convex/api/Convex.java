@@ -513,7 +513,7 @@ public class Convex {
 	}
 
 	/**
-	 * Submits a status to the Convex network peer, returning a Future once the
+	 * Submits a status request to the Convex network peer, returning a Future once the
 	 * request has been successfully queued.
 	 *
 	 * @param query Query to execute, as a Form or Op

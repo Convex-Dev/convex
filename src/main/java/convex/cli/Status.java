@@ -1,25 +1,21 @@
 package convex.cli;
 
 import java.io.IOException;
-
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.HashMap;
 import java.util.logging.Logger;
 
-
 import convex.api.Convex;
+import convex.core.Result;
+import convex.core.State;
 import convex.core.crypto.Hash;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
-import convex.core.data.AVector;
 import convex.core.data.BlobMap;
 import convex.core.data.PeerStatus;
 import convex.core.data.VectorLeaf;
-import convex.core.Result;
-import convex.core.State;
 import convex.core.util.Text;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -36,8 +32,6 @@ import picocli.CommandLine.ParentCommand;
 public class Status implements Runnable {
 
 private static final Logger log = Logger.getLogger(Status.class.getName());
-
-	private HashMap<Long, CompletableFuture<Result>> awaiting = new HashMap<>();
 
 	@ParentCommand
 	protected Main mainParent;
