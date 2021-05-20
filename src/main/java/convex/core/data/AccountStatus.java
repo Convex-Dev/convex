@@ -282,7 +282,8 @@ public class AccountStatus extends ARecord {
 		return result;
 	}
 	
-	public Object getHolding(Address addr) {
+	public ACell getHolding(Address addr) {
+		if (holdings==null) return null;
 		return holdings.get(addr);
 	}
 	
@@ -358,7 +359,7 @@ public class AccountStatus extends ARecord {
 		if (Keywords.BALANCE.equals(key)) return CVMLong.create(balance);
 		if (Keywords.ALLOWANCE.equals(key)) return CVMLong.create(allowance);
 		if (Keywords.ENVIRONMENT.equals(key)) return environment;
-		if (Keywords.HOLDINGS.equals(key)) return holdings;
+		if (Keywords.HOLDINGS.equals(key)) return getHoldings();
 		if (Keywords.CONTROLLER.equals(key)) return controller;
 		if (Keywords.KEY.equals(key)) return publicKey;
 		
@@ -378,6 +379,7 @@ public class AccountStatus extends ARecord {
 		long newAllowance=((CVMLong)newVals[2]).longValue();
 		AHashMap<Symbol, Syntax> newEnv=(AHashMap<Symbol, Syntax>) newVals[3];
 		ABlobMap<Address, ACell> newHoldings=(ABlobMap<Address, ACell>) newVals[4];
+		if ((newHoldings!=null)&&newHoldings.isEmpty()) newHoldings=null; // switch empty maps to null
 		Address newController = (Address)newVals[5];
 		AccountKey newKey=(AccountKey)newVals[6];
 		

@@ -3216,6 +3216,9 @@ public class CoreTest {
 		assertTrue(eval(ctx,"VILLAIN") instanceof Address);
 		ctx=step(ctx,"(def NOONE (address 7777777))");
 		
+		// Basic empty holding should match empty blobmap in account record. See #131
+		assertTrue(evalB("(= *holdings* (:holdings (account *address*)) (blob-map))"));
+		
 		// initial holding behaviour
 		assertNull(eval(ctx,"(get-holding VILLAIN)"));
 		assertCastError(step(ctx,"(get-holding :foo)"));
@@ -3234,6 +3237,7 @@ public class CoreTest {
 		{ // test simple assign
 			Context<?> c2 = step(ctx,"(set-holding VILLAIN 123)");
 			assertEquals(123L,evalL(c2,"(get-holding VILLAIN)"));
+
 			assertTrue(c2.getAccountStatus(VILLAIN).getHoldings().containsKey(HERO));
 			assertCVMEquals(123L,c2.getAccountStatus(VILLAIN).getHolding(HERO));
 		}
