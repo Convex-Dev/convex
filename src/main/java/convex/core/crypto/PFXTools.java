@@ -41,6 +41,9 @@ public class PFXTools {
 	public static KeyStore createStore(File keyFile, String passPhrase) throws KeyStoreException, IOException, NoSuchAlgorithmException, CertificateException {
 		KeyStore ks = KeyStore.getInstance(KEYSTORE_TYPE);
 
+		// need to load in bouncy castle crypto providers to set/get keys from the keystore
+		Providers.init();
+
 		char[] pwdArray = (passPhrase==null)?null:passPhrase.toCharArray();
 		ks.load(null, pwdArray);
 
@@ -54,6 +57,10 @@ public class PFXTools {
 	 * Loads an existing PKCS12 Key store. Passphrase optional, may be blank or null.
 	 */
 	public static KeyStore loadStore(File keyFile, String passPhrase) throws KeyStoreException, IOException, NoSuchAlgorithmException, CertificateException {
+
+		// need to load in bouncy castle crypto providers to set/get keys from the keystore
+		Providers.init();
+
 		KeyStore ks = KeyStore.getInstance(KEYSTORE_TYPE);
 
 		char[] pwdArray = (passPhrase==null)?null:passPhrase.toCharArray();
@@ -112,9 +119,9 @@ public class PFXTools {
 		if (passPhrase==null) throw new IllegalArgumentException("Password is mandatory for private key");
 		char[] pwdArray = passPhrase.toCharArray();
 
+		String alias = kp.getAccountKey().toHexString();
 		Certificate cert =createSelfSignedCertificate(kp);
-
-		ks.setKeyEntry(kp.getAccountKey().toHexString(), kp.getPrivate(), pwdArray, new Certificate[] {cert});
+		ks.setKeyEntry(alias, kp.getPrivate(), pwdArray, new Certificate[] {cert});
 
 		return ks;
 	}

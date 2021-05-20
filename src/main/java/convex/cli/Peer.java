@@ -10,18 +10,22 @@ import java.util.logging.Logger;
 import java.util.Map;
 
 
+import convex.api.Shutdown;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.crypto.AKeyPair;
+import convex.core.store.AStore;
 import convex.core.Init;
 import convex.core.store.Stores;
+import convex.core.Order;
+import convex.core.State;
 import convex.peer.API;
 import convex.peer.Server;
 import etch.EtchStore;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
+
 
 /**
 *
@@ -30,24 +34,23 @@ import picocli.CommandLine.ParentCommand;
 */
 @Command(name="peer",
 	subcommands = {
-		PeerStart.class,
+		PeerLocal.class,
 		PeerManager.class,
+		PeerStart.class,
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=true,
-	description="Operates a local peer(s).")
+	description="Operates a local peer(s) or local convex network.")
 public class Peer implements Runnable {
 
 	private static final Logger log = Logger.getLogger(Peer.class.getName());
 
 	static public List<Server> peerServerList = new ArrayList<Server>();
 
+	protected Session session = new Session();
+
 	@ParentCommand
 	protected Main mainParent;
-
-	@Option(names={"-p", "--port"},
-		description="Specify a port to run the local peer (not used at the moment).")
-	protected int port;
 
 	@Override
 	public void run() {
@@ -55,77 +58,66 @@ public class Peer implements Runnable {
 		CommandLine.usage(new Peer(), System.out);
 	}
 
-	protected void addPeerServer(Server peerServer) {
-		peerServerList.add(peerServer);
-	}
-
-	protected void launchPeers(int count) {
+	protected void launchPeers(int count, AKeyPair[] keyPairs) {
 		peerServerList.clear();
 
 		for (int i = 0; i < count; i++) {
-			AKeyPair keyPair = Init.KEYPAIRS[i];
+			AKeyPair keyPair = keyPairs[i];
 			Server peerServer = launchPeer(keyPair);
 		}
+	}
 
-		/*
-			Go through each started peer server connection and make sure
-			that each peer is connected to the other peer.
-		*/
-		for (int i = 0; i < count; i++) {
-			Server peerServer = peerServerList.get(i);
-			for (int j = 0; j < count; j++) {
-				if (i == j) continue;
-				Server serverDestination = peerServerList.get(j);
-				InetSocketAddress addr = serverDestination.getHostAddress();
+	protected void connectToPeers(Server peerServer, InetSocketAddress[] addressList) {
+		InetSocketAddress peerAddress = peerServer.getHostAddress();
+		for (int index = 0; index < addressList.length; index++) {
+			InetSocketAddress address = addressList[index];
+			if (peerAddress != address) {
 				try {
-					peerServer.connectToPeer(addr);
+					peerServer.connectToPeer(address);
 				} catch (IOException e) {
-					System.out.println("Connect failed to: "+addr);
+					System.out.println("Connect failed to: "+address);
 				}
 			}
 		}
 	}
 
-	protected void openSession() {
-		Session session = new Session();
+	protected void loadSession() {
 		File sessionFile = new File(mainParent.getSessionFilename());
 		try {
 			session.load(sessionFile);
 		} catch (IOException e) {
 			log.severe("Cannot load the session control file");
-		}
-		for (Server peerServer: peerServerList) {
-			InetSocketAddress peerHostAddress = peerServer.getHostAddress();
-			EtchStore store = (EtchStore) peerServer.getStore();
-
-			session.addPeer(
-				peerServer.getAddress().toHexString(),
-				peerHostAddress.getHostName(),
-				peerHostAddress.getPort(),
-				store.getFileName()
-			);
-		}
-		try {
-			Helpers.createPath(sessionFile);
-			session.store(sessionFile);
-		} catch (IOException e) {
-			log.severe("Cannot store the session control data");
 		}
 	}
 
-	protected void closeSession() {
-		Session session = new Session();
-		File sessionFile = new File(mainParent.getSessionFilename());
-		try {
-			session.load(sessionFile);
-		} catch (IOException e) {
-			log.severe("Cannot load the session control file");
-		}
+	protected void addToSession(Server peerServer) {
+		InetSocketAddress peerHostAddress = peerServer.getHostAddress();
+		EtchStore store = (EtchStore) peerServer.getStore();
 
+		session.addPeer(
+			peerServer.getAddress().toHexString(),
+			peerHostAddress.getHostName(),
+			peerHostAddress.getPort(),
+			store.getFileName()
+		);
+	}
+
+	protected void addAllToSession() {
+		for (Server peerServer: peerServerList) {
+			addToSession(peerServer);
+		}
+	}
+
+	protected void removeAllFromSession() {
 		for (Server peerServer: peerServerList) {
 			session.removePeer(peerServer.getAddress().toHexString());
 		}
+	}
+
+	protected void storeSession() {
+		File sessionFile = new File(mainParent.getSessionFilename());
 		try {
+			Helpers.createPath(sessionFile);
 			if (session.size() > 0) {
 				session.store(sessionFile);
 			}
@@ -138,23 +130,97 @@ public class Peer implements Runnable {
 	}
 
 	protected Server launchPeer(AKeyPair keyPair) {
+		return launchPeer(keyPair, 0);
+	}
+
+	protected Server launchPeer(AKeyPair keyPair, int port) {
+		return launchPeer(keyPair, 0, null);
+
+	}
+
+	protected Server launchPeer(AKeyPair keyPair, int port, AStore store) {
 		Map<Keyword, Object> config = new HashMap<>();
 
 		config.put(Keywords.PORT, null);
+		if (port>0) {
+			config.put(Keywords.PORT, port);
+		}
 		config.put(Keywords.KEYPAIR, keyPair);
 		config.put(Keywords.STATE, Init.STATE);
 
 		// Use a different fresh store for each peer
 		// config.put(Keywords.STORE, EtchStore.createTemp());
 
-		// Or Use a shared store
-		config.put(Keywords.STORE, Stores.getGlobalStore());
+		if (store==null) {
+			// Use a shared store
+			store = Stores.getGlobalStore();
+		}
+		config.put(Keywords.STORE, store);
+
+		log.info("launch peer: "+keyPair.getAccountKey().toHexString());
 
 		Server peerServer = API.launchPeer(config);
 
-		addPeerServer(peerServer);
+		peerServerList.add(peerServer);
 
 		return peerServer;
 	}
 
+	protected void waitForPeers() {
+		long consensusPoint = 0;
+		long maxBlock = 0;
+
+		// write the launched peer details to a session file
+		loadSession();
+		addAllToSession();
+		storeSession();
+
+		/*
+			Go through each started peer server connection and make sure
+			that each peer is connected to the other peer.
+		*/
+		for (Server peerServer: peerServerList) {
+			connectToPeers(peerServer, session.getAddressList());
+		}
+
+		// shutdown hook to remove/update the session file
+		convex.api.Shutdown.addHook(Shutdown.CLI,new Runnable() {
+		    public void run() {
+				// System.out.println("peers stopping");
+				// remove session file
+				loadSession();
+				removeAllFromSession();
+				storeSession();
+		    }
+		});
+
+		Server firstServer = peerServerList.get(0);
+		State lastState = firstServer.getPeer().getConsensusState();
+		log.info("state hash: "+lastState.getHash());
+
+		while (true) {
+			try {
+				Thread.sleep(30);
+				for (Server peerServer: peerServerList) {
+					convex.core.Peer peer = peerServer.getPeer();
+					if (peer==null) continue;
+
+					State state = peer.getConsensusState();
+					// System.out.println("state " + state);
+					Order order=peer.getPeerOrder();
+					if (order==null) continue; // not an active peer?
+					maxBlock = Math.max(maxBlock, order.getBlockCount());
+
+					long peerConsensusPoint = peer.getConsensusPoint();
+					if (peerConsensusPoint > consensusPoint) {
+						consensusPoint = peerConsensusPoint;
+						System.err.printf("Consenus State update detected at depth %d\n", consensusPoint);
+					}
+				}
+			} catch (InterruptedException e) {
+				System.out.println("Peer manager interrupted!");
+				return;
+			}
+		}
+	}
 }

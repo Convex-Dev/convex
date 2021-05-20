@@ -26,13 +26,14 @@ public class KeyList implements Runnable {
 
 	@Override
 	public void run() {
+		Main mainParent = keyParent.mainParent;
 
-		String password = keyParent.getPassword();
+		String password = mainParent.getPassword();
 		if (password == null) {
 			log.severe("You need to provide a keystore password");
 			return;
 		}
-		File keyFile = new File(keyParent.getKeyStoreFilename());
+		File keyFile = new File(mainParent.getKeyStoreFilename());
 		try {
 			if (!keyFile.exists()) {
 				log.severe("Cannot find keystore file "+keyFile.getCanonicalPath());

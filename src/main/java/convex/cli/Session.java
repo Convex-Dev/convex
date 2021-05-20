@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.File;
+import java.net.InetSocketAddress;
 import java.util.Properties;
 
 
@@ -48,5 +49,16 @@ public class Session {
 			count ++;
 		}
 		return 0;
+	}
+	public InetSocketAddress[] getAddressList() {
+		InetSocketAddress[] result = new InetSocketAddress[size()];
+		int index = 0;
+		for (String name: values.stringPropertyNames()) {
+			String line = values.getProperty(name, "");
+			String[] items = line.split(",");
+			result[index] = new InetSocketAddress(items[0], Integer.parseInt(items[1]));
+			index ++;
+		}
+		return result;
 	}
 }
