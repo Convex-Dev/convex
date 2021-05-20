@@ -16,7 +16,10 @@ import convex.core.Init;
 public class Helpers {
 
 	public static String expandTilde(String path) {
-        return path.replaceFirst("^~", System.getProperty("user.home"));
+		if (path!=null) {
+			return path.replaceFirst("^~", System.getProperty("user.home"));
+		}
+		return null;
 	}
 
 	public static void createPath(File file) {
