@@ -1,15 +1,11 @@
 package convex.cli;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.util.logging.Logger;
-import java.util.Properties;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.ParseResult;
 import picocli.CommandLine.PropertiesDefaultProvider;
 import picocli.CommandLine.ScopeType;
 

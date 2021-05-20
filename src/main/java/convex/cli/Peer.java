@@ -25,7 +25,6 @@ import etch.EtchStore;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
-import picocli.CommandLine.PropertiesDefaultProvider;
 
 
 /**
@@ -48,6 +47,8 @@ public class Peer implements Runnable {
 
 	static public List<Server> peerServerList = new ArrayList<Server>();
 
+	protected Session session = new Session();
+
 	@ParentCommand
 	protected Main mainParent;
 
@@ -57,10 +58,6 @@ public class Peer implements Runnable {
 		CommandLine.usage(new Peer(), System.out);
 	}
 
-	protected void addPeerServer(Server peerServer) {
-		peerServerList.add(peerServer);
-	}
-
 	protected void launchPeers(int count, AKeyPair[] keyPairs) {
 		peerServerList.clear();
 
@@ -68,66 +65,59 @@ public class Peer implements Runnable {
 			AKeyPair keyPair = keyPairs[i];
 			Server peerServer = launchPeer(keyPair);
 		}
+	}
 
-		/*
-			Go through each started peer server connection and make sure
-			that each peer is connected to the other peer.
-		*/
-		for (int i = 0; i < count; i++) {
-			Server peerServer = peerServerList.get(i);
-			for (int j = 0; j < count; j++) {
-				if (i == j) continue;
-				Server serverDestination = peerServerList.get(j);
-				InetSocketAddress addr = serverDestination.getHostAddress();
+	protected void connectToPeers(Server peerServer, InetSocketAddress[] addressList) {
+		InetSocketAddress peerAddress = peerServer.getHostAddress();
+		for (int index = 0; index < addressList.length; index++) {
+			InetSocketAddress address = addressList[index];
+			if (peerAddress != address) {
 				try {
-					peerServer.connectToPeer(addr);
+					peerServer.connectToPeer(address);
 				} catch (IOException e) {
-					System.out.println("Connect failed to: "+addr);
+					System.out.println("Connect failed to: "+address);
 				}
 			}
 		}
 	}
 
-	protected void openSession() {
-		Session session = new Session();
+	protected void loadSession() {
 		File sessionFile = new File(mainParent.getSessionFilename());
 		try {
 			session.load(sessionFile);
 		} catch (IOException e) {
 			log.severe("Cannot load the session control file");
-		}
-		for (Server peerServer: peerServerList) {
-			InetSocketAddress peerHostAddress = peerServer.getHostAddress();
-			EtchStore store = (EtchStore) peerServer.getStore();
-
-			session.addPeer(
-				peerServer.getAddress().toHexString(),
-				peerHostAddress.getHostName(),
-				peerHostAddress.getPort(),
-				store.getFileName()
-			);
-		}
-		try {
-			Helpers.createPath(sessionFile);
-			session.store(sessionFile);
-		} catch (IOException e) {
-			log.severe("Cannot store the session control data");
 		}
 	}
 
-	protected void closeSession() {
-		Session session = new Session();
-		File sessionFile = new File(mainParent.getSessionFilename());
-		try {
-			session.load(sessionFile);
-		} catch (IOException e) {
-			log.severe("Cannot load the session control file");
-		}
+	protected void addToSession(Server peerServer) {
+		InetSocketAddress peerHostAddress = peerServer.getHostAddress();
+		EtchStore store = (EtchStore) peerServer.getStore();
 
+		session.addPeer(
+			peerServer.getAddress().toHexString(),
+			peerHostAddress.getHostName(),
+			peerHostAddress.getPort(),
+			store.getFileName()
+		);
+	}
+
+	protected void addAllToSession() {
+		for (Server peerServer: peerServerList) {
+			addToSession(peerServer);
+		}
+	}
+
+	protected void removeAllFromSession() {
 		for (Server peerServer: peerServerList) {
 			session.removePeer(peerServer.getAddress().toHexString());
 		}
+	}
+
+	protected void storeSession() {
+		File sessionFile = new File(mainParent.getSessionFilename());
 		try {
+			Helpers.createPath(sessionFile);
 			if (session.size() > 0) {
 				session.store(sessionFile);
 			}
@@ -145,6 +135,7 @@ public class Peer implements Runnable {
 
 	protected Server launchPeer(AKeyPair keyPair, int port) {
 		return launchPeer(keyPair, 0, null);
+
 	}
 
 	protected Server launchPeer(AKeyPair keyPair, int port, AStore store) {
@@ -170,7 +161,7 @@ public class Peer implements Runnable {
 
 		Server peerServer = API.launchPeer(config);
 
-		addPeerServer(peerServer);
+		peerServerList.add(peerServer);
 
 		return peerServer;
 	}
@@ -180,14 +171,26 @@ public class Peer implements Runnable {
 		long maxBlock = 0;
 
 		// write the launched peer details to a session file
-		openSession();
+		loadSession();
+		addAllToSession();
+		storeSession();
+
+		/*
+			Go through each started peer server connection and make sure
+			that each peer is connected to the other peer.
+		*/
+		for (Server peerServer: peerServerList) {
+			connectToPeers(peerServer, session.getAddressList());
+		}
 
 		// shutdown hook to remove/update the session file
 		convex.api.Shutdown.addHook(Shutdown.CLI,new Runnable() {
 		    public void run() {
 				// System.out.println("peers stopping");
 				// remove session file
-				closeSession();
+				loadSession();
+				removeAllFromSession();
+				storeSession();
 		    }
 		});
 

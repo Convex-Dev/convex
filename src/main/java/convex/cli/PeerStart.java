@@ -12,12 +12,8 @@ import convex.core.store.AStore;
 import etch.EtchStore;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Model.OptionSpec;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
-import picocli.CommandLine.PropertiesDefaultProvider;
-import picocli.CommandLine.ParseResult;
 import picocli.CommandLine.Spec;
 
 /*
