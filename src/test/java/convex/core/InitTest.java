@@ -27,13 +27,13 @@ public class InitTest {
 	public void testMemoryExchange() {
 		AccountStatus as=s.getAccount(Init.MEMORY_EXCHANGE);
 		assertNotNull(as);
-		assertTrue(as.getAllowance()>0L);
+		assertTrue(as.getMemory()>0L);
 	}
 	
 	@Test 
 	public void testHero() {
 		AccountStatus as=s.getAccount(Init.HERO);
 		assertNotNull(as);
-		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE,as.getAllowance());
+		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE,as.getMemory());
 	}
 }

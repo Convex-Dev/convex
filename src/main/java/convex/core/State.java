@@ -365,7 +365,8 @@ public class State extends ARecord {
 		if (as==null) {
 			return Context.createFake(this).withError(ErrorCodes.NOBODY,"Transaction for non-existent Account: "+addr);
 		} else {
-			AccountKey key=as.getAccountKey();
+			AccountKey key=as.getAccountKey(); 
+			if (key==null) return Context.createFake(this).withError(ErrorCodes.NOBODY,"Transaction for account that is an Actor: "+addr);
 			if (!Utils.equal(key, signedTransaction.getAccountKey())) {
 				return Context.createFake(this).withError(ErrorCodes.SIGNATURE,"Signature not valid for Account: "+addr+" expected public key: "+key);
 			}

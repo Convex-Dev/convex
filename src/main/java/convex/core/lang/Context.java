@@ -283,7 +283,7 @@ public final class Context<T extends ACell> extends AObject {
 		Address address=getAddress();
 		AccountStatus account=state.getAccount(address);
 		long memUsed=state.getMemorySize()-initialState.getMemorySize();
-		long allowance=account.getAllowance();
+		long allowance=account.getMemory();
 		long balanceLeft=account.getBalance();
 		boolean memoryFailure=false;
 		
@@ -301,7 +301,7 @@ public final class Context<T extends ACell> extends AObject {
 				// we do memory purchase if pool exists
 				if (pool!=null) {
 					long poolBalance=pool.getBalance();
-					long poolAllowance=pool.getAllowance();
+					long poolAllowance=pool.getMemory();
 					memorySpend=Economics.swapPrice(purchaseNeeded, poolAllowance, poolBalance);
 					
 					if ((refund+balanceLeft)>=memorySpend) {
@@ -587,7 +587,7 @@ public final class Context<T extends ACell> extends AObject {
 		if (sym.equals(Symbols.STAR_JUICE)) return (Context<R>) withResult(CVMLong.create(getJuice()));
 		if (sym.equals(Symbols.STAR_CALLER)) return (Context<R>) withResult(getCaller());
 		if (sym.equals(Symbols.STAR_ADDRESS)) return (Context<R>) withResult(getAddress());
-		if (sym.equals(Symbols.STAR_MEMORY)) return (Context<R>) withResult(CVMLong.create(getAccountStatus().getAllowance()));
+		if (sym.equals(Symbols.STAR_MEMORY)) return (Context<R>) withResult(CVMLong.create(getAccountStatus().getMemory()));
 		if (sym.equals(Symbols.STAR_BALANCE)) return (Context<R>) withResult(CVMLong.create(getBalance()));
 		if (sym.equals(Symbols.STAR_ORIGIN)) return (Context<R>) withResult(getOrigin());
 		if (sym.equals(Symbols.STAR_RESULT)) return (Context<R>) this;
@@ -1360,7 +1360,7 @@ public final class Context<T extends ACell> extends AObject {
 		long sourceIndex=source.longValue();
 		AccountStatus sourceAccount=accounts.get(sourceIndex);
 		
-		long currentBalance=sourceAccount.getAllowance();
+		long currentBalance=sourceAccount.getMemory();
 		if (currentBalance<amount) {
 			return withError(ErrorCodes.MEMORY,"Insufficient memory allowance for transfer");
 		}
@@ -1376,7 +1376,7 @@ public final class Context<T extends ACell> extends AObject {
 		}
 		AccountStatus targetAccount=accounts.get(targetIndex);	
 		
-		long newTargetBalance=targetAccount.getAllowance()+amount;
+		long newTargetBalance=targetAccount.getMemory()+amount;
 		AccountStatus newTargetAccount=targetAccount.withMemory(newTargetBalance);
 		accounts=accounts.assoc(targetIndex, newTargetAccount);
 
@@ -1400,7 +1400,7 @@ public final class Context<T extends ACell> extends AObject {
 		long sourceIndex=source.longValue();
 		AccountStatus sourceAccount=accounts.get(sourceIndex);
 		
-		long current=sourceAccount.getAllowance();
+		long current=sourceAccount.getMemory();
 		long balance=sourceAccount.getBalance();
 		long delta=allowance-current;
 		if (delta==0L) return this.withResult(CVMLong.ZERO);
@@ -1408,7 +1408,7 @@ public final class Context<T extends ACell> extends AObject {
 		AccountStatus pool=getState().getAccount(Init.MEMORY_EXCHANGE);
 		
 		try {
-			long poolAllowance=pool.getAllowance();
+			long poolAllowance=pool.getMemory();
 			long poolBalance=pool.getBalance();
 			long price = Economics.swapPrice(delta, poolAllowance,poolBalance);
 			if (price>balance) {

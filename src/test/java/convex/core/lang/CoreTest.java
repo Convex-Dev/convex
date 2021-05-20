@@ -2019,12 +2019,12 @@ public class CoreTest {
 		{
 			Context<CVMLong> ctx=step("(transfer-memory *address* 1337)");
 			assertEquals(1337L, ctx.getResult().longValue());
-			assertEquals(ALL, ctx.getAccountStatus(HERO).getAllowance());
+			assertEquals(ALL, ctx.getAccountStatus(HERO).getMemory());
 		}
 		
-		assertEquals(ALL-1337, step("(transfer-memory "+Init.VILLAIN+" 1337)").getAccountStatus(HERO).getAllowance());
+		assertEquals(ALL-1337, step("(transfer-memory "+Init.VILLAIN+" 1337)").getAccountStatus(HERO).getMemory());
 
-		assertEquals(0L, step("(transfer-memory "+Init.VILLAIN+" "+ALL+")").getAccountStatus(HERO).getAllowance());
+		assertEquals(0L, step("(transfer-memory "+Init.VILLAIN+" "+ALL+")").getAccountStatus(HERO).getMemory());
  
 		assertArgumentError(step("(transfer-memory *address* -1000)"));	
 		assertMemoryError(step("(transfer-memory *address* (+ 1 "+ALL+"))"));

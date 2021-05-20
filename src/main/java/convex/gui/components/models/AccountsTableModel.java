@@ -70,7 +70,7 @@ public class AccountsTableModel extends AbstractTableModel implements TableModel
 		case 5:
 			return as.getMemorySize();
 		case 6:
-			return as.getAllowance();
+			return as.getMemory();
 		default:
 			return "";
 		}

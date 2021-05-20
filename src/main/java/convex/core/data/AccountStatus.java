@@ -394,7 +394,7 @@ public class AccountStatus extends ARecord {
 	 * Gets the memory allowance for this account
 	 * @return Memory allowance in bytes
 	 */
-	public long getAllowance() {
+	public long getMemory() {
 		return memory;
 	}
 
