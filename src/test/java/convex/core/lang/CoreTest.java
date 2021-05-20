@@ -2730,6 +2730,13 @@ public class CoreTest {
 		assertEquals(130L,evalL(ctx,"(call ma (calc 10))"));
 	}
 	
+	@Test
+	public void testDefExpander() {
+		Context<?> ctx=step("(defexpander expand-once [x e] (expand x (fn [x e] x)))");
+		
+		assertEquals(Syntax.of(42L),eval(ctx,"(expand 42 expand-once)"));
+	}
+	
 	
 	
 	@Test

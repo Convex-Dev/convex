@@ -125,7 +125,7 @@ public class TestState {
 		c=c.fork();
 		try {
 			AOp<T> op = compile(c, source);
-			Context<T> rc = c.execute(op);
+			Context<T> rc = c.run(op);
 			return rc.getResult();
 		} catch (Exception e) {
 			throw Utils.sneakyThrow(e);
@@ -183,22 +183,25 @@ public class TestState {
 	}
 
 	public static double evalD(Context<?> ctx, String source) {
-		return ((CVMDouble) eval(ctx, source)).doubleValue();
+		ACell result=eval(ctx,source);
+		CVMDouble d=RT.castDouble(result);
+		if (d==null) throw new ClassCastException("Expected Double, but got: "+RT.getType(result));
+		return d.doubleValue();
 	}
 	
 	public static double evalD(String source) {
-		return ((CVMDouble) eval(source)).doubleValue();
+		return evalD(INITIAL_CONTEXT,source);
 	}
 
 	public static long evalL(Context<?> ctx, String source) {
-		return RT.castLong(eval(ctx, source)).longValue();
+		ACell result=eval(ctx,source);
+		CVMLong d=RT.castLong(result);
+		if (d==null) throw new ClassCastException("Expected Long, but got: "+RT.getType(result));
+		return d.longValue();
 	}
 
 	public static long evalL(String source) {
-		ACell r=eval(source);
-		CVMLong rl=RT.castLong(r);
-		if (rl==null) throw new Error("Can't cast result to Long: "+r);
-		return rl.longValue();
+		return evalL(INITIAL_CONTEXT,source);
 	}
 	
 	public static String evalS(String source) {
