@@ -598,7 +598,7 @@ public class Compiler {
 							if (RT.bool(v)) {
 								// expand form using specified expander and continuation expander
 								AFn<Syntax> expander = RT.function(mstx.getValue());
-								Context<Syntax> rctx = context.expand(expander,formSyntax, this); // (exp x cont)
+								Context<Syntax> rctx = context.expand(expander,formSyntax, cont); // (exp x cont)
 								return rctx;
 							}
 						}

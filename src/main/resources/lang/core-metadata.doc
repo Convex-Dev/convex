@@ -341,11 +341,12 @@
   
   expand
  	{
-	 :doc {:description "Expands the given form, including expansion of any macros. Uses the specified expander if provided, *initial-expander* otherwise."
+	 :doc {:description "Expands the given form, including expansion of any macros. Uses the specified expander if provided, *initial-expander* otherwise. A continuation expander will also be used if provided, passed as a continuation to the first expander."
          :examples [{:code "(expand '(if a :truthy :falsey))"}]
          :type :function
          :signature [{:params [form]}
-                     {:params [form expander]}]}
+                     {:params [form expander]}
+                     {:params [form expander cont]}]}
 	}
   
   expander

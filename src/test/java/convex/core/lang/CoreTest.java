@@ -2932,13 +2932,25 @@ public class CoreTest {
 		assertCastError(step("(expand { 888 227 723 560} [75 561 258 833])"));
 		
 		assertArityError(step("(expand)"));
-		assertArityError(step("(expand 1 (fn [x e] x) :blah)"));
+		assertArityError(step("(expand 1 (fn [x e] x) :blah :blah)"));
 		
 		// arity error calling expander function
 		assertArityError(step("(expand 1 (fn [x] x))"));
 
 		// arity error in expansion execution
 		assertArityError(step("(expand 1 (fn [x e] (count)))"));
+	}
+	
+	@Test
+	public void testExpandOnce()  {
+		// an expander that does nothing except wrap as syntax.
+		Context<?> c=step("(def identity-expand (fn [x e] (syntax x)))");
+		assertEquals(Syntax.of(Keywords.FOO),eval(c,"(identity-expand :foo nil)"));
+		
+		// function that expands once with initial-expander, then with identity
+		c=step(c,"(defn expand-once [x] (*initial-expander* x identity-expand))");
+		// TODO: fix macro expansion within quoted forms
+		//assertEquals("foo",eval(c,"(expand-once '(if (if 1 2) 3 4))"));
 	}
 
 	@Test

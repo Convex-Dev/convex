@@ -486,26 +486,35 @@ public class Core {
 		@Override
 		public  Context<Syntax> invoke(Context context, ACell[] args) {
 			int n = args.length;
-			if ((n<1)||(n>2)) {
-				return context.withArityError(name() + " requires a form argument and optional expander (arity 1 or 2)");
+			if ((n<1)||(n>3)) {
+				return context.withArityError(name() + " requires a form argument, optional expander and optional continuation expander (arity 1, 2 or 2)");
 			}
 
-			context = context.lookup(Symbols.STAR_INITIAL_EXPANDER);
-			if (context.isExceptional()) return (Context<Syntax>) context;
-			AFn<Syntax> initialExpander=RT.function(context.getResult());
-			if (initialExpander==null) {
-				return context.withError(ErrorCodes.CAST,name()+" requires a valid *initial-expander*, not found in environment");
-			}
+			//context = context.lookup(Symbols.STAR_INITIAL_EXPANDER);
+			//if (context.isExceptional()) return (Context<Syntax>) context;
+			//AFn<Syntax> initialExpander=RT.function(context.getResult());
+			//if (initialExpander==null) {
+			//	return context.withError(ErrorCodes.CAST,name()+" requires a valid *initial-expander*, not found in environment");
+			//}
 
-			AFn<Syntax> expander=initialExpander;
+			AFn<Syntax> expander=Compiler.INITIAL_EXPANDER;
 			if (n == 2) {
 				// use provided expander
 				ACell exArg = args[1];
 				expander=RT.function(exArg);
 				if (expander==null) return context.withCastError(1,args, Types.FUNCTION);
 			}
+			
+			AFn<Syntax> cont=expander; // use passed expander by default
+			if (n == 3) {
+				// use provided continuation expander
+				ACell contArg = args[2];
+				cont=RT.function(contArg);
+				if (cont==null) return context.withCastError(2,args, Types.FUNCTION);
+			}
+			
 			ACell form = args[0];
-			Context<Syntax> rctx = context.invoke(expander,form, initialExpander);
+			Context<Syntax> rctx = context.invoke(expander,form, cont);
 			return rctx;
 		}
 	});

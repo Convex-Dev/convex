@@ -1845,7 +1845,7 @@ public final class Context<T extends ACell> extends AObject {
 	}
 	
 	public Context<Syntax> expand(AFn<Syntax> expander, ACell form, AFn<Syntax> cont) {
-		// execute op with adjusted depth
+		// execute with adjusted depth
 		int savedDepth=getDepth();
 		Context<Syntax> ctx =this.withDepth(savedDepth+1);
 		if (ctx.isExceptional()) return (Context<Syntax>) ctx; // depth error, won't have modified depth
@@ -1854,8 +1854,13 @@ public final class Context<T extends ACell> extends AObject {
 		
 		// reset depth after execution.
 		rctx=rctx.withDepth(savedDepth);
-		return rctx;
-
+		if (rctx.isExceptional()) {
+			return rctx;
+		} else {
+			ACell r=rctx.getResult();
+			if (!(r instanceof Syntax)) return rctx.withError(ErrorCodes.CAST,"expander function must produce a Syntax Object");
+			return rctx;
+		}
 	}
 	
 

@@ -23,7 +23,7 @@ public class GenTestCode {
 		ctx = ctx.expand(form);
 		
 		if (!ctx.isExceptional()) {
-			Object expObject=ctx.getResult();
+			ACell expObject=ctx.getResult();
 			assertTrue(expObject instanceof Syntax);
 
 			ctx=ctx.compile((Syntax) expObject);
@@ -56,7 +56,7 @@ public class GenTestCode {
 		
 		try {
 			String source=sb.toString();
-			Object newForm=Reader.read(source);
+			ACell newForm=Reader.read(source);
 			Syntax newSyntax=Reader.readSyntax(source);
 		} catch (ParseException p) {
 			// OK, we broken the string
