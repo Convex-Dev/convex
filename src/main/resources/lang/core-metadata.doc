@@ -349,14 +349,6 @@
                      {:params [form expander cont]}]}
 	}
   
-  expander
- 	{
-	 :doc {:description "Creates an expander from the given function."
-         :examples [{:code "(expander (fn [form ex] (quote form)))"}]
-         :type :function
-         :signature [{:params [fn]}]}
-	}
-  
   exports?
  	{
 	 :doc {:description "Tests if a specified actor exports a given symbol name."
@@ -474,18 +466,7 @@
          :type :function
          :signature [{:params [& values]}]}
 	}
-  
-  if
-  {
-	 :doc {:description "Calculates the value of a test expression, then branches and returns the result of the true expression or false expression depending on whether the test expression is true or false respectively. The values 'false' and 'nil' are considered flase, all other values are true. Performs short-circuit evaluation, i.e. the expression in the unused branch is not evaluated. If the false branch is omitted, it will be assumed to evaluate to 'nil'. For a more general conditional expression that can handle multiple branches, consider 'cond' as an alternative."
-         :examples [{:code "(if true :true-value :false-value)"}]
-         :type :macro
-         :signature [
-                    {:params [test true-exp]}
-                    {:params [test true-exp false-exp]} 
-                    ] 
-         }
-	}
+ 
   
   inc
 	{

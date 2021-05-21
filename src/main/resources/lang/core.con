@@ -10,6 +10,21 @@
 ;                  '(let [f ~(cons 'fn spec)]
 ;                     (expander (fn [x e] (expand (f x) e)))) e)))))
 
+
+
+(def defexpander 
+  ^{:doc {:description "Defines an expander in the current environment."
+           :examples [{:code "(defexpander expand-once [x e] (e x (fn [x e] x)))"}]
+           :type :macro
+           :signature [{:params [a]}]}
+    :expander true
+   }
+  (fn [x e] 
+      (let [[_ name & decl] (unsyntax x)
+            exp (cons 'fn decl)
+            form '(def ~(syntax name {:expander true}) ~exp)]
+         (e form e))))
+
 (def defmacro 
   ^{:doc {:description "Defines a macro in the current environment."
           :examples [{:code "(defmacro foo [x] '(if (good? x) x (fix x)))"}]
@@ -26,20 +41,30 @@
                      (fn [x e] (e (apply m# (next (unsyntax x))) e))))]
        (e form e))))
 
-(def defexpander 
-  ^{:doc {:description "Defines an expander in the current environment."
-           :examples [{:code "(defexpander expand-once [x e] (e x (fn [x e] x)))"}]
-           :type :macro
-           :signature [{:params [a]}]}
+(defmacro macro 
+  ^{:doc {:description "Creates an anonymous macro function, suitable for use as an expander."
+          :examples [{:code "(macro [x] (if x :foo :bar))"}]
+          :type :macro
+          :signature [{:params [a]}]}
     :expander true
    }
-  (fn [x e] 
-      (let [[_ name & decl] (unsyntax x)
-            exp (cons 'fn decl)
-            form '(def ~(syntax name {:expander true}) ~exp)]
-         (e form e))))
+  [& decl]
+  (let [mac (cons 'fn decl)
+        form '(let [m# ~mac]
+                (fn [x e] (e (apply m# (next (unsyntax x))) e)))]
+    form))
 
 (defmacro if
+  ^{
+	 :doc {:description "Calculates the value of a test expression, then branches and returns the result of the true expression or false expression depending on whether the test expression is true or false respectively. The values 'false' and 'nil' are considered flase, all other values are true. Performs short-circuit evaluation, i.e. the expression in the unused branch is not evaluated. If the false branch is omitted, it will be assumed to evaluate to 'nil'. For a more general conditional expression that can handle multiple branches, consider 'cond' as an alternative."
+         :examples [{:code "(if true :true-value :false-value)"}]
+         :type :macro
+         :signature [
+                    {:params [test true-exp]}
+                    {:params [test true-exp false-exp]} 
+                    ] 
+         }
+	}
   [test & cases]
   (cond (<= 1 (count cases) 2) nil (fail :ARITY "if requires 2 or 3 arguments"))
   (cons 'cond test cases))

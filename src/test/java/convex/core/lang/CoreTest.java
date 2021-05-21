@@ -465,6 +465,7 @@ public class CoreTest {
 		assertCastError(step("(mapcat nil [1 2])"));
 	}
 
+
 	@Test
 	public void testHashMap() {
 		assertEquals(Maps.empty(), eval("(hash-map)"));
@@ -2951,6 +2952,13 @@ public class CoreTest {
 		c=step(c,"(defn expand-once [x] (*initial-expander* x identity-expand))");
 		// TODO: fix macro expansion within quoted forms
 		//assertEquals("foo",eval(c,"(expand-once '(if (if 1 2) 3 4))"));
+	}
+	
+	
+	@Test
+	public void testMacro() {
+		Context<?> c=step("(defmacro foo [] :foo)");
+		assertEquals(Keywords.FOO,eval(c,"(foo)"));
 	}
 
 	@Test
