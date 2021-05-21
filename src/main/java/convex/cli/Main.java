@@ -1,6 +1,7 @@
 package convex.cli;
 
 import java.io.File;
+import java.io.PrintWriter;
 import java.util.logging.Logger;
 
 import picocli.CommandLine;
@@ -77,16 +78,20 @@ public class Main implements Runnable {
 
 	public static void main(String[] args) {
 		Main mainApp = new Main();
-		commandLine = new CommandLine(mainApp)
-			.setUsageHelpLongOptionsMaxWidth(40)
-			.setUsageHelpWidth(40 * 4);
+		int result = mainApp.execute(args);
+		System.exit(result);
+	}
+
+	public int execute(String[] args) {
+		commandLine = new CommandLine(this)
+		.setUsageHelpLongOptionsMaxWidth(40)
+		.setUsageHelpWidth(40 * 4);
 
 		// do  a pre-parse to get the config filename. We need to load
 		// in the defaults before running the full execute
 		commandLine.parseArgs(args);
-		mainApp.loadConfig();
-		int retVal = commandLine.execute(args);
-		System.exit(retVal);
+		loadConfig();
+		return commandLine.execute(args);
 	}
 
 	protected void loadConfig() {
