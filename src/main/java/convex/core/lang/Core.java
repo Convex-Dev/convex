@@ -1264,20 +1264,20 @@ public class Core {
 		@Override
 		public  Context<ADataStructure<ACell>> invoke(Context context, ACell[] args) {
 			int numAdditions = args.length - 1;
-			if (args.length <= 0) return context.withArityError(name() + " requires a collection as first argument");
+			if (args.length <= 0) return context.withArityError(name() + " requires a data structure as first argument");
 
 			// compute juice up front
 			long juice = Juice.BUILD_DATA + Juice.BUILD_PER_ELEMENT * numAdditions;
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
-			ADataStructure<ACell> result = RT.dataStructure(args[0]);
+			ADataStructure<ACell> result = RT.castDataStructure(args[0]);
 			if (result == null) return context.withCastError(0,args, Types.DATA_STRUCTURE);
 
 			for (int i = 0; i < numAdditions; i++) {
 				int argIndex=i+1;
 				ACell val = (ACell) args[argIndex];
 				result = result.conj(val);
-				if (result == null) return context.withCastError(argIndex,args, Types.VECTOR); // must be a failed map conj?
+				if (result == null) return context.withError(ErrorCodes.CAST,"Failure to 'conj' argument at position "+argIndex+" (with Type "+RT.getType(val)+"). Probably not a legal value for this data structure?"); // must be a failed map conj?
 			}
 			return context.withResult(juice, result);
 		}
@@ -1289,7 +1289,7 @@ public class Core {
 		public  Context<ASet<ACell>> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			ASet<ACell> result = RT.toSet(args[0]);
+			ASet<ACell> result = RT.ensureSet(args[0]);
 			if (result == null) return context.withCastError(0,args, Types.SET);
 
 			result = result.exclude((ACell) args[1]);

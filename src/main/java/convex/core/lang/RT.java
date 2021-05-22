@@ -817,7 +817,7 @@ public class RT {
 	 * @return Collection object, or null if coercion failed.
 	 */
 	@SuppressWarnings("unchecked")
-	static <E extends ACell> ADataStructure<E> dataStructure(ACell a) {
+	static <E extends ACell> ADataStructure<E> castDataStructure(ACell a) {
 		if (a == null) return Vectors.empty();
 		if (a instanceof ADataStructure) return (ADataStructure<E>) a;
 		return null;
@@ -931,19 +931,7 @@ public class RT {
 		return null;
 	}
 
-	/**
-	 * Casts the argument to a non-null Set. Nulls are converted to the empty set.
-	 * 
-	 * @param <V>
-	 * @param a
-	 * @return A set instance, or null if the argument cannot be converted to a set
-	 */
-	@SuppressWarnings("unchecked")
-	public static <V extends ACell> ASet<V> toSet(ACell a) {
-		if (a == null) return Sets.empty();
-		if (a instanceof ASet) return (ASet<V>) a;
-		return null;
-	}
+
 
 	/**
 	 * Gets an element from a data structure using the given key.
@@ -1220,7 +1208,7 @@ public class RT {
 	 * 
 	 * @param <T>
 	 * @param a
-	 * @return
+	 * @return A set instance, or null if the argument cannot be converted to a set
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> Set<T> ensureSet(ACell a) {

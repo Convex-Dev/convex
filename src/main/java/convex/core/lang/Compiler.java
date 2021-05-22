@@ -5,7 +5,6 @@ import java.util.Map;
 import convex.core.ErrorCodes;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
-import convex.core.data.ADataStructure;
 import convex.core.data.AList;
 import convex.core.data.AMap;
 import convex.core.data.ASequence;
