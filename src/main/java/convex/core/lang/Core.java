@@ -728,7 +728,7 @@ public class Core {
 
 			ACell o = args[0];
 			AccountKey key = RT.castAccountKey(o);
-			if ((o!=null)&&(key == null)) {
+			if (key == null) {
 				return context.withCastError(0,args, Types.KEY);
 			}
 			long juice = Juice.CREATE_ACCOUNT;

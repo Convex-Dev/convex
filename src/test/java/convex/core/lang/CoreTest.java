@@ -1782,6 +1782,21 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(balance)"));
 		assertArityError(step("(balance 1 2)"));
 	}
+	
+	@Test
+	public void testCreateAccount() {
+		Context<Address> ctx=step("(create-account 0x817934590c058ee5b7f1265053eeb4cf77b869e14c33e7f85b2babc85d672bbc)");
+		Address addr=ctx.getResult();
+		assertEquals(addr.longValue()+1,ctx.getState().getAccounts().count()); // should be last Address added
+
+		assertCastError(step("(create-account :foo)"));
+		assertCastError(step("(create-account 1)"));
+		assertCastError(step("(create-account nil)"));
+		assertCastError(step("(create-account #666666)"));
+
+		assertArityError(step("(create-account)"));
+		assertArityError(step("(create-account 1 2)"));
+	}
 
 	@Test
 	public void testAccept() {
@@ -2345,14 +2360,17 @@ public class CoreTest extends ACVMTest {
 		assertEquals(0L, evalL("(count nil)"));
 		assertEquals(0L, evalL("(count [])"));
 		assertEquals(0L, evalL("(count ())"));
+		assertEquals(0L, evalL("(count 0x)"));
 		assertEquals(0L, evalL("(count \"\")"));
 		assertEquals(2L, evalL("(count (list :foo :bar))"));
 		assertEquals(2L, evalL("(count #{1 2 2})"));
 		assertEquals(3L, evalL("(count [1 2 3])"));
+		assertEquals(4L, evalL("(count 0xcafebabe)"));
 		
 		// Count of a map is the number of entries
 		assertEquals(2L, evalL("(count {1 2 2 3})")); 
 
+		// non-countable things fail with CAST
 		assertCastError(step("(count 1)"));
 		assertCastError(step("(count :foo)"));
 

@@ -234,6 +234,14 @@
          :signature [{:params [coll]}]}
 	}
  
+  create-account
+	{
+	 :doc {:description "Creates an account with the specified account public key. Returns the Address of the newly created Account."
+         :examples [{:code "(create-account 0x817934590c058ee5b7f1265053eeb4cf77b869e14c33e7f85b2babc85d672bbc)"}]
+         :type :function
+         :signature [{:params [account-key]}]}
+	}
+ 
   dec
 	{
 	 :doc {:description "Decrements the given number by 1. Result is a Long."
@@ -677,7 +685,7 @@
   
   nth
   {
-    :doc {:description "Gets the nth element of a sequential collection. Collection must be coercible to a sequence, and the index must be a valid long between 0 (inclusive) and the count of the collection (exclusive)."
+    :doc {:description "Gets the nth element of a countable data structure. The index must be a valid long between 0 (inclusive) and the element count of the collection (exclusive)."
           :examples [{:code "(nth [1 2 3] 2)"}]
           :type :function
           :signature [{:params [coll index]}]}
