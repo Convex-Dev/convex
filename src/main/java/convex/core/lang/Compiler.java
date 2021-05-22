@@ -608,6 +608,7 @@ public class Compiler {
 				ASequence<ACell> seq = (ASequence<ACell>) form;
 				if (seq.isEmpty()) return context.withResult(Juice.EXPAND_CONSTANT, formSyntax);
 				Context<Syntax>[] ct = new Context[] { context };
+				
 				ASequence<Syntax> updated;
 
 				updated = seq.map(elem -> {
