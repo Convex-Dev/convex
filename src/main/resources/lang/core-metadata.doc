@@ -49,7 +49,8 @@
  	address?
 	{
 	 :doc {:description "Tests if the argument is an Address. Returns true if and only if the argument is an actual Address, not merely castable to one."
-         :examples [{:code "(address? :foo)"}]
+         :examples [{:code "(address? #777)"}
+                    {:code "(address? :foo)"}]
          :type :function
          :signature [{:params [a]}]}
 	}
