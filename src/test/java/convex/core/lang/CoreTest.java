@@ -1907,11 +1907,19 @@ public class CoreTest extends ACVMTest {
 		Address ctr=ctx.getResult();
 		
 		assertTrue(evalB(ctx,"(actor? ctr)"));
-		assertTrue(evalB(ctx,"(actor? \""+ctr.toHexString()+"\")"));
+
 		assertTrue(evalB(ctx,"(actor? (address ctr))"));
 		
 		// hero address is not an Actor
 		assertFalse(evalB(ctx,"(actor? *address*)"));
+		
+		// Not an Actor Address, even though the given values string refer to one.
+		assertFalse(evalB(ctx,"(actor? \""+ctr.toHexString()+"\")"));
+		assertFalse(evalB(ctx,"(actor? 8)"));
+		
+		// Above are OK if cast to addresses explicitly
+		assertTrue(evalB(ctx,"(actor? (address \""+ctr.toHexString()+"\"))"));
+		assertTrue(evalB(ctx,"(actor? (address 8))"));
 		
 		assertFalse(evalB(ctx,"(actor? :foo)"));
 		assertFalse(evalB(ctx,"(actor? nil)"));
@@ -1919,7 +1927,7 @@ public class CoreTest extends ACVMTest {
 		assertFalse(evalB(ctx,"(actor? 'ctr)"));
 
 		// non-existant account is not an actor
-		assertFalse(evalB(ctx,"(actor? 99999999)"));
+		assertFalse(evalB(ctx,"(actor? (address 99999999))"));
 		assertFalse(evalB(ctx,"(actor? #4512)"));
 		assertFalse(evalB(ctx,"(actor? -1234)"));
 

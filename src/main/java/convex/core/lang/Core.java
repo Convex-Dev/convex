@@ -773,7 +773,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a0 = args[0];
-			Address address = RT.castAddress(a0);
+			Address address = RT.ensureAddress(a0);
 
 			// return false if the argument is not castable to an address
 			long juice = Juice.SIMPLE_FN;
