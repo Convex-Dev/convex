@@ -660,8 +660,15 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 
 		if (prefix == null) {
 			int len = Utils.checkedInt(length);
-			Ref<R>[] newItems = new Ref[len];
-			System.arraycopy(items, Utils.checkedInt(start), newItems, 0, len);
+			Ref<R>[] newItems;
+			//if (start==0) {
+				// can share items if starting from zero index
+			//	newItems=(Ref<R>[]) items;
+			//} else {
+				newItems= new Ref[len];
+				System.arraycopy(items, Utils.checkedInt(start), newItems, 0, len);
+			//}
+			
 			return new VectorLeaf<R>(newItems, null, length);
 		} else {
 			long tc = prefixLength();
