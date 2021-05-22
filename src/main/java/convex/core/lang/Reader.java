@@ -48,7 +48,7 @@ import convex.core.util.Utils;
  * Parboiled Parser implementation which reads source code and produces a tree
  * of parsed objects.
  * 
- * Supports reading in either raw mode or wrapping with Syntax Objects. The
+ * Supports reading in either raw form (ACell) mode or wrapping with Syntax Objects. The
  * latter is required for source references etc.
  *
  * "Talk is cheap. Show me the code." - Linus Torvalds
@@ -268,7 +268,7 @@ public class Reader extends BaseParser<ACell> {
 
 	@SuppressWarnings("unchecked")
 	protected <T extends ACell> ASequence<T> popNodeList() {
-		Object o = pop();
+		ACell o = pop();
 		if (o instanceof Syntax) o = ((Syntax) o).getValue();
 		return (ASequence<T>) o;
 	}
@@ -537,6 +537,7 @@ public class Reader extends BaseParser<ACell> {
 	protected ACell prepare(ACell a) {
 		if (wrapSyntax) {
 			IndexRange ir = matchRange();
+			
 			long start = ir.start;
 			//long end = ir.end;
 			AHashMap<ACell, ACell> props = Maps.of(Keywords.START, RT.cvm(start));
@@ -697,7 +698,7 @@ public class Reader extends BaseParser<ACell> {
 	 * @param source
 	 * @return Parsed form
 	 */
-	public static Object read(java.io.Reader source) throws IOException {
+	public static ACell read(java.io.Reader source) throws IOException {
 		char[] arr = new char[8 * 1024];
 		StringBuilder buffer = new StringBuilder();
 		int numCharsRead;
