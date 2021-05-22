@@ -2359,7 +2359,7 @@ public class Core {
 				Syntax newSyn = oldSyn.mergeMeta(newMeta);
 				env = env.assoc(sym, newSyn);
 			} catch (Throwable t) {
-				throw new Error("Error apply documentation: "+de,t);
+				throw new Error("Error applying documentation: "+de,t);
 			}
 		}
 

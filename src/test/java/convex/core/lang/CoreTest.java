@@ -2427,13 +2427,21 @@ public class CoreTest extends ACVMTest {
 		for (Syntax syndef : vals) {
 			ACell def = syndef.getValue();
 			Symbol sym = ((ICoreDef)def).getSymbol();
-			assertSame(def, Core.CORE_NAMESPACE.get(sym).getValue());
+			Syntax syntax=Core.CORE_NAMESPACE.get(sym);
+			assertSame(def, syntax.getValue());
 
 			Blob b = Format.encodedBlob(def);
 			assertSame(def, Format.read(b));
 
 			assertEquals(def.ednString(), sym.toString());
+			
+			doDocTests(sym, syntax);
 		}
+	}
+
+	private void doDocTests(Symbol sym, Syntax syntax) {
+		ACell dobj=syntax.getMeta().get(Keywords.DOC);
+		assertNotNull(dobj,"No documentation found for core definition: "+sym);
 	}
 
 	@Test

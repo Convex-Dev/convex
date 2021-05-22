@@ -7,6 +7,15 @@
 ;;  - metadata for Convex Lisp special forms
 ;;  - additional metadata for anything defined during core environment bootstrap (e.g. in core.con)
 {
+  abs
+  {
+	 :doc {:description "Computes the absolute value of a numerical argument. Supports Double and Long results."
+         :examples [{:code "(abs -1.5)"}
+                    {:code "(abs 100)"}]
+         :type :function
+         :signature [{:params [x]}]}
+	}
+ 
 	accept 
 	{
 	 :doc {:description "Accepts offered coins up to the amount of *offer* from *caller*. Amount must cast to Long. If successful, the amount will be added immediately to the *balance* of the current *address*. This is the recommended way of transferring balance between Actors, as it requires a positive action to confirm receipt. Returns the amount accepted if successful. Returns a STATE error if there are insufficient funds to accept."
@@ -69,7 +78,15 @@
 	 :doc {:description "Adds entries into an associative data structure, taking each two arguments as key/value pairs. A nil data structure is considered as an empty map."
          :examples [{:code "(assoc {1 2} 3 4)"}]
          :type :function
-         :signature [{:params [m & kvs]}]}
+         :signature [{:params [coll & kvs]}]}
+	}
+ 
+  assoc-in
+	{
+	 :doc {:description "Associates a value entries into an nested associative data structure, as if using 'assoc' at each level."
+         :examples [{:code "(assoc-in {1 [1 2 3]} [1 2] 4)"}]
+         :type :function
+         :signature [{:params [coll keys v]}]}
 	}
  
   balance
@@ -99,7 +116,7 @@
    blob?
 	{
 	 :doc {:description "Tests if the argument is a blob."
-         :examples [{:code "(blob? some-val)"}]
+         :examples [{:code "(blob? 0x1234)"}]
          :type :function
          :signature [{:params [a]}]}
 	}
@@ -340,6 +357,14 @@
          :signature [{:params [form]}]}
 	}
   
+  eval-as
+ 	{
+	 :doc {:description "Compiles and evaluates a form in the environment of the specifed Account. The current Account must have controller privileges to execute this operation."
+         :examples [{:code "(eval-as #666 '(+ 1 2))"}]
+         :type :function
+         :signature [{:params [address form]}]}
+	}
+  
   exp
  	{
 	 :doc {:description "Returns e raised to the power of the given numerical argument."
@@ -557,6 +582,14 @@
          :examples [{:code "(list? :foo)"}]
          :type :function
          :signature [{:params [a]}]}
+	}
+ 
+  log
+  {
+	 :doc {:description "Outputs a sequence of values to the Convex log for the current Account. Any valid CVM values can be logged."
+         :examples [{:code "(log :EVENT 123 [:some :data])"}]
+         :type :function
+         :signature [{:params [& values]}]}
 	}
  
   long
@@ -831,6 +864,23 @@
          :signature [{:params [owner value]}]}
 	}
   
+  set-key
+ 	{
+	 :doc {:description "Sets the public key for this Account. May set to 'nil' to turn this account into an Actor and disable future external transactions. WARNING: You may lose access to the Account if you do not have access to the associated private key."
+         :examples [{:code "(set-key *caller* 1000)"}]
+         :type :function
+         :signature [{:params [new-key]}]}
+	}
+ 
+  
+  set-memory
+ 	{
+	 :doc {:description "Sets the free memory allowance for the current Account address, in number of bytes. Increases in memory allowance may cost coin balance. Decreases in memory allowance may earn a coin refund."
+         :examples [{:code "(set-memory 10000)"}]
+         :type :function
+         :signature [{:params [mem]}]}
+	}
+  
   set*
   {
     :doc {:description "Sets or overwrites a value in the current local lexical bindings. Helper function for the 'set!', which should be preferred in most cases."
@@ -942,6 +992,22 @@
           :examples [{:code "(transfer my-friend-address 12345678)"}]
           :type :function
           :signature [{:params [address amount]}]}
+  }
+  
+  transfer-memory
+  {
+    :doc {:description "Transfers the specified amount of memory allowance to the target address. Returns the amount transferred if successful. Returns MEMORY error if there is insufficient balance in the sender's account."
+          :examples [{:code "(transfer-memory my-friend-address 100)"}]
+          :type :function
+          :signature [{:params [address amount]}]}
+  }
+  
+  undef* 
+  {
+     :doc {:description "Undefines a symbol, removing the mapping from the current environment if it exists. Helper function for the 'undef' macro."
+           :examples [{:code "(undef* 'a)"}
+           :type :function	 
+           :signature [{:params [sym]}]]}
   }
   
   union
