@@ -1983,17 +1983,19 @@ public class Core {
 			long juice = Juice.BUILD_DATA;
 			ACell a1 = args[1];
 			if (a0 == null) {
-				// just keep second arg as complete data structure
+				// First argument is null. Just keep second arg as complete data structure
 				result = RT.ensureDataStructure(a1);
 				if ((a1 != null) && (result == null)) return context.withCastError(a1, Types.DATA_STRUCTURE);
 			} else {
-				ASequence<ACell> seq = RT.sequence(a1);
-				if (seq == null) return context.withCastError(a1, Types.DATA_STRUCTURE);
-				long n = seq.count();
+				Long n=RT.count(a1);
+				if (n == null) return context.withCastError(a1, Types.DATA_STRUCTURE);
 				
-				// check juice before running expensive part
 				juice += Juice.BUILD_PER_ELEMENT * n;
 				if (!context.checkJuice(juice)) return context.withJuiceError();
+				
+				ASequence<ACell> seq = RT.sequence(a1);
+				
+				// check juice before running expensive part
 
 				result = result.conjAll(seq);
 				if (result == null) return context.withError(ErrorCodes.CAST,"Invalid element type for 'into'");

@@ -690,7 +690,7 @@ public class RT {
 	}
 
 	/**
-	 * Gets the count of elements in a collection. Null is considered an empty collection.
+	 * Gets the count of elements in a countable data structure. Null is considered an empty collection.
 	 * 
 	 * @param a Any Cell potentially representing a collection of items to be counted
 	 * @return The count of elements in the collection, or null if not countable
