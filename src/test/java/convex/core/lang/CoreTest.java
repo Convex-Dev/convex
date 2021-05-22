@@ -682,6 +682,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(2L, evalL("(nth [1 2] 1)"));
 		assertEquals(2L, evalL("(nth [1 2] (byte 1))"));
 		assertCVMEquals('c', eval("(nth \"abc\" 2)"));
+		assertEquals(CVMByte.create(10), eval("(nth 0xff0a0b 1)")); // Blob nth byte
 
 		assertArityError(step("(nth)"));
 		assertArityError(step("(nth [])"));
@@ -698,6 +699,10 @@ public class CoreTest extends ACVMTest {
 		
 		// BOUNDS error because treated as empty sequence
 		assertBoundsError(step("(nth nil 10)"));
+		
+		assertBoundsError(step("(nth 0x 0)"));
+		assertBoundsError(step("(nth nil 0)"));
+		assertBoundsError(step("(nth (str) 0)"));
 		assertBoundsError(step("(nth {} 10)"));
 
 		assertBoundsError(step("(nth [1 2] 10)"));
