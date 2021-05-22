@@ -858,7 +858,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Maps.empty(), eval("(dissoc {1 2 3 4} 1 3)"));
 		assertEquals(Maps.of(3L, 4L), eval("(dissoc {1 2 3 4} 1 2)"));
 		
-		// blob-map dissocs
+		// blob-map dissocs. Regression tests for #140 (fatal error in dissoc with non-blob keys)
 		assertSame(BlobMap.EMPTY,eval("(dissoc (blob-map) 1)"));
 		assertEquals(BlobMap.of(Blob.fromHex("a2"), Keywords.FOO),eval("(dissoc (into (blob-map) [[0xa2 :foo] [0xb3 :bar]]) 0xb3)"));
 		assertEquals(BlobMap.of(Blob.fromHex("a2"), Keywords.FOO),eval("(dissoc (into (blob-map) [[0xa2 :foo]]) :foo)"));
