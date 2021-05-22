@@ -172,7 +172,14 @@ public class StringTree extends AString {
 		}
 	}
 
-
+	@Override
+	protected AString append(char charValue) {
+		// TODO: SECURITY: needs to be O(1)
+		StringBuilder sb=new StringBuilder();
+		appendToStringBuffer(sb, 0, length);
+		sb.append(charValue);
+		return Strings.create(sb.toString());
+	}
 
 
 }

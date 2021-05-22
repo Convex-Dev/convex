@@ -82,5 +82,13 @@ public class StringSlice extends AString {
 		source.appendToStringBuffer(sb, sourceStart, length);
 	}
 
+	@Override
+	protected AString append(char charValue) {
+		StringBuilder sb=new StringBuilder();
+		appendToStringBuffer(sb, 0, length);
+		sb.append(charValue);
+		return Strings.create(sb.toString());
+	}
+
 
 }

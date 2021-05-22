@@ -641,7 +641,6 @@ public class RT {
 		if (o == null) throw new IndexOutOfBoundsException("Can't get nth element from null");
 
 		if (o instanceof ADataStructure) return ((ADataStructure<T>) o).get(i); // blobs, maps and collections
-		if (o instanceof AString) return (T) CVMChar.create(((AString) o).charAt(Utils.checkedInt(i)));
 
 		throw new ClassCastException("Don't know how to get nth item of cell "+Utils.getClassName(o));
 	}
@@ -697,9 +696,6 @@ public class RT {
 	public static Long count(ACell a) {
 		if (a == null) return 0L;
 		if (a instanceof ADataStructure) return ((ADataStructure<?>) a).count();
-		if (a instanceof AString) {
-			return (long) ((AString) a).length();
-		}
 		return null;
 	}
 

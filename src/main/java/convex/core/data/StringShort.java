@@ -147,5 +147,11 @@ public class StringShort extends AString {
 	protected void appendToStringBuffer(StringBuilder sb, int start, int length) {
 		sb.append(data.substring(start, start+length));
 	}
-	
+
+	@Override
+	protected AString append(char charValue) {
+		StringBuilder sb=new StringBuilder(data);
+		sb.append(charValue);
+		return Strings.create(sb.toString());
+	}
 }

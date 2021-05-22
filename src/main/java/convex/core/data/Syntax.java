@@ -310,18 +310,15 @@ public class Syntax extends ACell {
 	public static <R extends ACell> R unwrapAll(ACell maybeSyntax) {
 		ACell a = unwrap(maybeSyntax);
 
-		if (a instanceof ADataStructure) {
-			if (a instanceof ACollection) {
-				return (R) ((ACollection<?>) a).map(e -> unwrapAll(e));
-			} else if (a instanceof AMap) {
-				AMap<?, ?> m = (AMap<?, ?>) a;
-				return (R) m.reduceEntries((acc, e) -> {
-					return acc.assoc(unwrapAll(e.getKey()), unwrapAll(e.getValue()));
-				}, (AMap<ACell, ACell>) Maps.empty());
-			} else {
-				throw new Error("Don't know how to unrap data structure of type: "+Utils.getClassName(a));
-			}
+		if (a instanceof ACollection) {
+			return (R) ((ACollection<?>) a).map(e -> unwrapAll(e));
+		} else if (a instanceof AMap) {
+			AMap<?, ?> m = (AMap<?, ?>) a;
+			return (R) m.reduceEntries((acc, e) -> {
+				return acc.assoc(unwrapAll(e.getKey()), unwrapAll(e.getValue()));
+			}, (AMap<ACell, ACell>) Maps.empty());
 		} else {
+			// nothing else can contain Syntax objects, so just return normally
 			return (R) a;
 		}
 	}
