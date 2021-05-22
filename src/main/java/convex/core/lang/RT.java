@@ -534,7 +534,7 @@ public class RT {
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> AVector<T> vec(Object o) {
 		if (o==null) return Vectors.empty();
-		if (o instanceof ACell) return vec((ACell) o);
+		if (o instanceof ACell) return castVector((ACell) o);
 		
 		if (o.getClass().isArray()) {
 			ACell[] arr = Utils.toCellArray(o);
@@ -547,15 +547,24 @@ public class RT {
 	}
 
 	/**
-	 * Converts any data structure to a vector
+	 * Converts any countable data structure to a vector. Might be O(n)
 	 * 
-	 * @return AVector instance
+	 * @return AVector instance, or null if conversion fails
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> AVector<T> vec(ACell o) {
+	public static <T extends ACell> AVector<T> castVector(ACell o) {
 		if (o == null) return Vectors.empty();
 		if (o instanceof ACollection) return vec((ACollection<T>) o);
-		return vec(sequence(o));
+		if (o instanceof ADataStructure) {
+			ADataStructure<T> ds=(ADataStructure<T>) o;
+			long n=ds.count();
+			AVector<T> r=Vectors.empty();
+			for (int i=0; i<n; i++) {
+				r=r.conj(ds.get(i));
+			}
+			return r;
+ 		}
+		return null;
 	}
 
 	/**

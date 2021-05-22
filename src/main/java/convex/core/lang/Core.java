@@ -156,10 +156,11 @@ public class Core {
 			// Need to compute juice before building potentially big vector
 			Long n = RT.count(o);
 			if (n == null) return context.withCastError(0,args, Types.VECTOR);
+			
 			long juice = Juice.BUILD_DATA + n * Juice.BUILD_PER_ELEMENT;
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 			
-			AVector<?> result = RT.vec(o);
+			AVector<?> result = RT.castVector(o);
 			return context.withResult(juice, result);
 		}
 	});

@@ -40,7 +40,6 @@ import convex.core.data.ABlob;
 import convex.core.data.ABlobMap;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
-import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
@@ -262,6 +261,10 @@ public class CoreTest extends ACVMTest {
 		assertEquals(-1L, evalL("(long 0xffffffffffffffff)"));
 		assertEquals(255L, evalL("(long 0xff00000000000000ff)")); // only taking last 8 bytes
 		assertEquals(-1L, evalL("(long 0xcafebabeffffffffffffffff)")); // interpret as big endian big integer
+		
+		// Currently we allow bools to cast to longs like this. TODO: maybe reconsider?
+		assertEquals(1L, evalL("(long true)"));
+		assertEquals(0L, evalL("(long false)"));
 
 
 		assertArityError(step("(long)"));
@@ -728,6 +731,8 @@ public class CoreTest extends ACVMTest {
 		assertSame(Vectors.empty(), eval("(vec [])"));
 		assertSame(Vectors.empty(), eval("(vec {})"));
 		assertSame(Vectors.empty(), eval("(vec (blob-map))"));
+		
+		assertEquals( eval("[\\a \\b \\c]"), eval("(vec \"abc\")"));
 		
 		assertEquals(Vectors.of(1,2,3,4), eval("(vec (list 1 2 3 4))"));
 		assertEquals(Vectors.of(MapEntry.of(1,2)), eval("(vec {1,2})"));
