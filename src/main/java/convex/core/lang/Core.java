@@ -1827,21 +1827,21 @@ public class Core {
 			// Arity 2
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			// First argument must be a Long index
+			// First argument must be a countable data structure
 			ACell arg = (ACell) args[0];
-			CVMLong ix = RT.ensureLong(args[1]);
-			if (ix == null) return context.withCastError(1,args, Types.LONG);
-			
-			// Second arg should be a countable data structure
 			Long n = RT.count(arg);
 			if (n == null) return context.withCastError(arg, Types.SEQUENCE);
+			
+			// Second argument should be a Long index
+			CVMLong ix = RT.ensureLong(args[1]);
+			if (ix == null) return context.withCastError(1,args, Types.LONG);
 			
 			long i=ix.longValue();
 			
 			// BOUNDS error if access is out of bounds
 			if ((i < 0) || (i >= n)) return context.withBoundsError(i);
 
-			// We know the object is a countable collection
+			// We know the object is a countable collection, so safe to use 'nth'
 			ACell result = RT.nth(arg, i);
 			
 			return context.withResult(Juice.SIMPLE_FN, result);
