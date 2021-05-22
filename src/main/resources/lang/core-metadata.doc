@@ -36,7 +36,7 @@
   {
     :doc {:description "Tests if the given Address refers to a valid existing acount (which may be either an Actor or User account). Returns false for any non-Address argument, or any Address that does not refer to a currently existing Account."
           :examples [{:code "(account? *caller*)"}]
-          :type :fn 
+          :type :function 
           :signature [{:params [address] }]}}
  
   actor?
@@ -1005,9 +1005,9 @@
   undef* 
   {
      :doc {:description "Undefines a symbol, removing the mapping from the current environment if it exists. Helper function for the 'undef' macro."
-           :examples [{:code "(undef* 'a)"}
+           :examples [{:code "(undef* 'a)"}]
            :type :function	 
-           :signature [{:params [sym]}]]}
+           :signature [{:params [sym]}]}
   }
   
   union

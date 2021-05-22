@@ -70,7 +70,11 @@ public class Keywords {
 	public static final Keyword TRACE = Keyword.create("trace");
 	
 	public static final Keyword EXPANDER = Keyword.create("expander");
-	
+	public static final Keyword MACRO = Keyword.create("macro");
+
+	public static final Keyword VALUE = Keyword.create("value");
+	public static final Keyword FUNCTION = Keyword.create("function");
+
 	
 
 

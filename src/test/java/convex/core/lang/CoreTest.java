@@ -39,6 +39,8 @@ import convex.core.crypto.Hash;
 import convex.core.data.ABlob;
 import convex.core.data.ABlobMap;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
@@ -53,6 +55,7 @@ import convex.core.data.List;
 import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
+import convex.core.data.Set;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
@@ -2439,9 +2442,15 @@ public class CoreTest extends ACVMTest {
 		}
 	}
 
+	private static Set<Keyword> CORE_TYPES=Sets.of(Keywords.MACRO, Keywords.SPECIAL, Keywords.FUNCTION, Keywords.EXPANDER,Keywords.VALUE);
+	
+	@SuppressWarnings("unchecked")
 	private void doDocTests(Symbol sym, Syntax syntax) {
 		ACell dobj=syntax.getMeta().get(Keywords.DOC);
 		assertNotNull(dobj,"No documentation found for core definition: "+sym);
+		AHashMap<ACell,ACell> doc=(AHashMap<ACell, ACell>) dobj;
+		Keyword type=(Keyword) doc.get(Keywords.TYPE);
+		assertTrue(CORE_TYPES.containsKey(type), sym +" has unexpected type in documentation: "+type);
 	}
 
 	@Test
