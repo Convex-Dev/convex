@@ -923,13 +923,14 @@ public class Core {
 			if (Utils.isOdd(len)) return context.withArityError(name() + " requires an even number of arguments");
 
 			long juice = Juice.BUILD_DATA + len * Juice.BUILD_PER_ELEMENT;
+			if (!context.checkJuice(juice)) return context.withJuiceError();
 
 			BlobMap r=BlobMaps.empty();
 			int n=len/2;
 			for (int i=0; i<n; i++) {
 				int ix=i*2;
 				r=r.assoc(args[ix], args[ix+1]);
-				if (r==null) return context.withCastError(ix, args, Types.BLOB);
+				if (r==null) return context.withCastError(ix, args, Types.BLOB); // must be bad key type
 			}
 			
 			return context.withResult(juice, r);
@@ -943,6 +944,8 @@ public class Core {
 			// any arity is OK
 
 			long juice = Juice.BUILD_DATA + args.length * Juice.BUILD_PER_ELEMENT;
+			if (!context.checkJuice(juice)) return context.withJuiceError();
+			
 			return context.withResult(juice, Sets.create(args));
 		}
 	});

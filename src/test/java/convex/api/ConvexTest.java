@@ -28,6 +28,9 @@ import convex.core.util.Utils;
 import convex.peer.ServerTest;
 import convex.test.Samples;
 
+/**
+ * Tests for a Convex Client connection
+ */
 public class ConvexTest {
 
 	static final Convex cv;
@@ -35,15 +38,17 @@ public class ConvexTest {
 	static final AKeyPair KP=AKeyPair.generate();
 	
 	static {
-		try {
-			cv=Convex.connect(ServerTest.server.getHostAddress(), TestState.HERO,TestState.HERO_KP);
-			ADDR=cv.createAccount(KP.getAccountKey());
-			cv.transfer(ADDR, 1000000000L);
-			cv.setAddress(ADDR,KP);
-		} catch (Throwable e) {
-			e.printStackTrace();
-			throw Utils.sneakyThrow(e);
-		} 
+		synchronized(ServerTest.server) {
+			try {
+				cv=Convex.connect(ServerTest.server.getHostAddress(), TestState.HERO,TestState.HERO_KP);
+				ADDR=cv.createAccount(KP.getAccountKey());
+				cv.transfer(ADDR, 1000000000L);
+				cv.setAddress(ADDR,KP);
+			} catch (Throwable e) {
+				e.printStackTrace();
+				throw Utils.sneakyThrow(e);
+			} 
+		}
 	}
 	
 	@Test public void testConnection() throws IOException {
