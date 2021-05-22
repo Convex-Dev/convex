@@ -334,8 +334,8 @@ public class Compiler {
 			}
 
 			if (sym.equals(Symbols.UNQUOTE)) {
-				// execute the unquoted code to get a form to compile
-				if (list.size() != 2) return context.withCompileError(Symbols.QUOTE + " expects one argument.");
+				// execute the unquoted code directly to get a form to compile
+				if (list.size() != 2) return context.withCompileError(Symbols.UNQUOTE + " expects one argument.");
 				context = context.expandCompile(list.get(1));
 				AOp<T> quotedOp = (AOp<T>) context.getResult();
 

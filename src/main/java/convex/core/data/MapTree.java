@@ -220,8 +220,9 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return children[i].getValue().getEntryByHash(hash);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public AHashMap<K, V> dissoc(K key) {
+	public AHashMap<K, V> dissoc(ACell key) {
 		return dissocRef((Ref<K>) Ref.get(key));
 	}
 

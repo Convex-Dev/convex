@@ -164,9 +164,10 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return -1;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public MapLeaf<K, V> dissoc(K key) {
-		int i = seek(key);
+	public MapLeaf<K, V> dissoc(ACell key) {
+		int i = seek((K)key);
 		if (i < 0) return this; // not found
 		return dissocEntry(i);
 	}

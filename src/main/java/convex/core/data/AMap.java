@@ -89,7 +89,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 * @param key Key to remove.
 	 * @return Updated map
 	 */
-	public abstract AMap<K, V> dissoc(K key);
+	public abstract AMap<K, V> dissoc(ACell key);
 
 	public final boolean containsKeyRef(Ref<ACell> ref) {
 		return getKeyRefEntry(ref) != null;

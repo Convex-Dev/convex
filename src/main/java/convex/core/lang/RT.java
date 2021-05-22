@@ -916,7 +916,7 @@ public class RT {
 	}
 
 	/**
-	 * Converts the argument to a non-null Map. Nulls are converted to the empty
+	 * Converts the argument to a non-null Map. Nulls are implicitly converted to the empty
 	 * map.
 	 * 
 	 * @param <K>
@@ -926,21 +926,11 @@ public class RT {
 	 * 
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K extends ACell, V extends ACell> AMap<K, V> toMap(ACell a) {
+	public static <K extends ACell, V extends ACell> AMap<K, V> ensureMap(ACell a) {
 		if (a == null) return Maps.empty();
 		if (a instanceof AMap) return (AMap<K, V>) a;
 		return null;
 	}
-	
-	@SuppressWarnings("unchecked")
-	public static <K extends ACell, V extends ACell> AHashMap<K, V> toHashMap(ACell a) {
-		if (a == null) return Maps.empty();
-		AMap<K, V> m=RT.toMap(a);
-		if (m instanceof AHashMap) return (AHashMap<K, V>) a;
-		return null;
-	}
-
-
 
 	/**
 	 * Gets an element from a data structure using the given key.

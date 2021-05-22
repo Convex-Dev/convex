@@ -428,7 +428,7 @@ public class Core {
 			if (n==1) {
 				result=Syntax.create((ACell)args[0]);
 			} else {
-				AHashMap<ACell,ACell> meta=RT.toHashMap(args[1]);
+				AHashMap<ACell,ACell> meta=RT.ensureHashMap(args[1]);
 				if (meta==null) return context.withCastError(1,args, Types.MAP);
 				result = Syntax.create((ACell) args[0],meta);
 			}
@@ -1249,7 +1249,7 @@ public class Core {
 			int n = args.length;
 			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
 
-			AMap<ACell, ACell> result = RT.toMap(args[0]);
+			AMap<ACell, ACell> result = RT.ensureMap(args[0]);
 			if (result == null) return context.withCastError(args[0], Types.MAP);
 
 			for (int i = 1; i < n; i++) {

@@ -75,7 +75,15 @@ public abstract class ABlobMap<K extends ABlob, V extends ACell> extends AMap<K,
 	@Override
 	public abstract ABlobMap<K, V> assoc(ACell key, V value);
 
+	@SuppressWarnings("unchecked")
 	@Override
+	public final ABlobMap<K, V> dissoc(ACell key) {
+		if (key instanceof ABlob) {
+			return dissoc((K)key);
+		}
+		return this;
+	}
+	
 	public abstract ABlobMap<K, V> dissoc(K key);
 
 	@Override

@@ -237,9 +237,14 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 		// TODO: OK to convert records to hashmaps?
 		return toHashMap().assoc(key, value);
 	}
+	
+	public AMap<Keyword, ACell> dissoc(Keyword key) {
+		if (!containsKey(key)) return this;
+		return toHashMap().dissoc(key);
+	}
 
 	@Override
-	public AMap<Keyword, ACell> dissoc(Keyword key) {
+	public AMap<Keyword, ACell> dissoc(ACell key) {
 		if (!containsKey(key)) return this;
 		return toHashMap().dissoc(key);
 	}
