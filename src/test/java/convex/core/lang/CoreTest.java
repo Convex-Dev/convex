@@ -343,6 +343,7 @@ public class CoreTest extends ACVMTest {
 		assertFalse(evalB("(= :bar :bar :bar 2)"));
 		assertFalse(evalB("(= *juice* *juice*)"));
 		assertTrue(evalB("(=)"));
+		assertTrue(evalB("(= = =)"));
 		assertTrue(evalB("(= nil nil)"));
 	}
 
@@ -1448,6 +1449,10 @@ public class CoreTest extends ACVMTest {
 		assertEquals(3L,evalL("(if-let [a []] 3 4)"));
 		assertEquals(4L,evalL("(if-let [a nil] 3 4)"));
 		assertEquals(5L,evalL("(if-let [a false] 3 5)"));
+		
+		//  TODO: fix destructuring examples
+		//assertEquals(Vectors.of(2L,1L),eval("(if-let [[a b] [1 2]] [b a])"));
+		//assertNull(eval("(if-let [[a b] nil] [b a])")); 
 
 		assertNull(eval("(if-let [a false] 1)")); // null on false branch
 

@@ -378,9 +378,9 @@
     :doc {:description "Binds a symbol to the result of evaluating a given expression, and executes a true expression or false expression depending on the result in the same manner as 'if'"
           :examples [{:code "(if-let [addr  (get-address)] (transfer addr 1000))"}]
           :type :macro
-          :signature [{:params [[sym exp] & body]}] }}
-  [[sym exp] & body]
+          :signature [{:params [[sym exp] & branches]}] }}
+  [[sym exp] & branches]
     '(let [~sym ~exp]
-       ~(cons 'if sym body)))
+       ~(cons 'if sym branches)))
 
 
