@@ -88,7 +88,9 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	}
 
 	public static <K extends ABlob, V extends ACell> BlobMap<K, V> create(MapEntry<K, V> me) {
-		Blob prefix = me.getKey().toBlob();
+		ACell k=me.getKey();
+		if (!(k instanceof ABlob)) return null;
+		Blob prefix = ((ABlob)k).toBlob();
 		long hexLength = prefix.hexLength();
 		return new BlobMap<K, V>(prefix, 0, hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
 	}

@@ -192,7 +192,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	}
 
 	/**
-	 * Associate the given map entry into the map
+	 * Associate the given map entry into the map. May return null if the map entry is not valid for this map type.
 	 * 
 	 * @param e A map entry
 	 * @return The updated map
@@ -324,7 +324,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 */
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> ADataStructure<R> conj(R x) {
-		MapEntry<K, V> me = RT.toMapEntry(x);
+		MapEntry<K, V> me = RT.ensureMapEntry(x);
 		if (me == null) return null;
 		return (ADataStructure<R>) assocEntry(me);
 	}

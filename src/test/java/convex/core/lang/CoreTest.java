@@ -1047,19 +1047,37 @@ public class CoreTest extends ACVMTest {
 	public void testConj() {
 		assertEquals(Vectors.of(1L, 2L, 3L), eval("(conj [1 2] 3)"));
 		assertEquals(Lists.of(3L, 1L, 2L), eval("(conj (list 1 2) 3)"));
+		
+		// nil works like empty vector
+		assertEquals(Vectors.of(1L), eval("(conj nil 1)"));
 		assertEquals(Vectors.of(3L), eval("(conj nil 3)"));
 		assertEquals(Sets.of(3L), eval("(conj #{} 3)"));
 		assertEquals(Sets.of(3L), eval("(conj #{3} 3)"));
+		
+		// Maps conj with map entry vectors
 		assertEquals(Maps.of(1L, 2L), eval("(conj {} [1 2])"));
 		assertEquals(Maps.of(1L, 2L, 5L, 6L), eval("(conj {1 3 5 6} [1 2])"));
-		assertEquals(Vectors.of(1L), eval("(conj nil 1)"));
+
 		assertEquals(Lists.of(1L), eval("(conj (list) 1)"));
 		assertEquals(Lists.of(1L, 2L), eval("(conj (list 2) 1)"));
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(conj #{2 3} 1)"));
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(conj #{2 3 1} 1)"));
+		
+		// arity 1 OK, no change
+		assertEquals(Vectors.of(1L, 2L), eval("(conj [1 2])"));
+		
+		// Blobmaps
+		assertEquals(BlobMaps.create(Blob.fromHex("a1"), Blob.fromHex("a2")),eval("(conj (blob-map) [0xa1 0xa2])"));
 
+		// bad data structures
+		assertCastError(step("(conj :foo)")); 
+		assertCastError(step("(conj :foo 1)")); 
+		
+		// bad types of elements
 		assertCastError(step("(conj {} 2)")); // can't cast long to a map entry
 		assertCastError(step("(conj {} [1 2 3])")); // wrong size vector for a map entry
+		assertCastError(step("(conj {} '(1 2))")); // wrong type for a map entry
+		assertCastError(step("(conj (blob-map) [:foo 0xa2])")); // bad key type for blobmap
 
 		assertCastError(step("(conj 1 2)"));
 		assertCastError(step("(conj (str :foo) 2)"));

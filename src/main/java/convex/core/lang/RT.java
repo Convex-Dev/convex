@@ -993,7 +993,7 @@ public class RT {
 	 * @return MapEntry instance, or null if conversion fails
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K extends ACell, V extends ACell> MapEntry<K, V> toMapEntry(ACell x) {
+	public static <K extends ACell, V extends ACell> MapEntry<K, V> ensureMapEntry(ACell x) {
 		MapEntry<K, V> me;
 		if (x instanceof MapEntry) {
 			me = (MapEntry<K, V>) x;
@@ -1008,12 +1008,12 @@ public class RT {
 	}
 
 	/**
-	 * Coerces to Hash type
+	 * Coerces to Hash type. Converts blobs of correct length.
 	 * 
 	 * @param o
 	 * @return Hash instance, or null if conversion not possible
 	 */
-	public static Hash toHash(ACell o) {
+	public static Hash ensureHash(ACell o) {
 		if (o instanceof Hash) return ((Hash) o);
 		if (o instanceof ABlob) {
 			ABlob blob=(ABlob)o;
@@ -1030,7 +1030,7 @@ public class RT {
 	 * @param a
 	 * @return Keyword if correctly constructed, or null if a failure occurs
 	 */
-	public static Keyword toKeyword(ACell a) {
+	public static Keyword castKeyword(ACell a) {
 		if (a instanceof Keyword) return (Keyword) a;
 		AString name = name(a);
 		if (name == null) return null;
@@ -1044,7 +1044,7 @@ public class RT {
 	 * @param a
 	 * @return Symbol if correctly constructed, or null if a failure occurs
 	 */
-	public static Symbol toSymbol(ACell a) {
+	public static Symbol castSymbol(ACell a) {
 		if (a instanceof Symbol) return (Symbol) a;
 		AString name = name(a);
 		if (name == null) return null;

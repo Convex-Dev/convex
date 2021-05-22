@@ -343,7 +343,7 @@ public class Core {
 
 			// Check argument is valid name
 			ACell symArg=args[0];
-			Symbol sym = RT.toSymbol(symArg);
+			Symbol sym = RT.castSymbol(symArg);
 			if (sym == null) return context.withCastError(0,args, Types.SYMBOL);
 
 			long juice = Juice.SYMBOL;
@@ -532,7 +532,7 @@ public class Core {
 			Address addr = RT.ensureAddress(args[0]);
 			if (addr == null) return context.withCastError(1,args, Types.ADDRESS);
 
-			Symbol sym = RT.toSymbol(args[1]);
+			Symbol sym = RT.castSymbol(args[1]);
 			if (sym == null) return context.withCastError(1,args, Types.SYMBOL);
 
 			AccountStatus as = context.getState().getAccount(addr);
@@ -586,7 +586,7 @@ public class Core {
 			CVMLong sendAmount = RT.ensureLong(args[1]);
 			if (sendAmount == null) return ctx.withCastError(1,args, Types.LONG);
 
-			Symbol sym = RT.toSymbol(args[2]);
+			Symbol sym = RT.castSymbol(args[2]);
 			if (sym == null) return ctx.withCastError(2,args, Types.SYMBOL);
 
 			// prepare contract call arguments
@@ -621,7 +621,7 @@ public class Core {
 		public  Context<ACell> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			Symbol sym = RT.toSymbol(args[0]);
+			Symbol sym = RT.castSymbol(args[0]);
 			if (sym == null) return context.withCastError(0,args, Types.SYMBOL);
 
 			if (sym.isQualified()) {
@@ -640,7 +640,7 @@ public class Core {
 		@Override
 		public  Context<ACell> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-			Symbol sym=RT.toSymbol(args[0]);
+			Symbol sym=RT.castSymbol(args[0]);
 			if (sym == null) return context.withArgumentError("Invalid Symbol name for undef: " + Utils.toString(args[0]));
 			
 			Context<ACell> ctx=(Context<ACell>) context.undefine(sym);
@@ -666,7 +666,7 @@ public class Core {
 			
 			// ensure argument converts to a Symbol correctly.
 			ACell symArg=args[n-1];
-			Symbol sym = RT.toSymbol(symArg);
+			Symbol sym = RT.castSymbol(symArg);
 			if (sym == null) return context.withCastError(n-1,args,Types.SYMBOL);
 
 			MapEntry<Symbol, Syntax> me = context.lookupDynamicEntry(address,sym);
@@ -690,7 +690,7 @@ public class Core {
 			
 			// ensure argument converts to a Symbol correctly.
 			ACell symArg=args[n-1];
-			Symbol sym = RT.toSymbol(symArg);
+			Symbol sym = RT.castSymbol(symArg);
 			if (sym == null) return context.withCastError(n-1,args,Types.SYMBOL);
 
 			MapEntry<Symbol, Syntax> me = context.lookupDynamicEntry(address,sym);

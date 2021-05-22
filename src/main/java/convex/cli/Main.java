@@ -1,7 +1,6 @@
 package convex.cli;
 
 import java.io.File;
-import java.io.PrintWriter;
 import java.util.logging.Logger;
 
 import picocli.CommandLine;
