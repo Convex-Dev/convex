@@ -58,8 +58,7 @@ public class WalletEntry {
 	}
 
 	public WalletEntry withKeyPair(AKeyPair kp) {
-		// TODO: need an Address in new format
-		return new WalletEntry(Address.create(kp.getAccountKey()),data, kp);
+		return new WalletEntry(address,data, kp);
 	}
 	
 	public WalletEntry withAddress(Address address) {
@@ -78,7 +77,7 @@ public class WalletEntry {
 
 	@Override
 	public String toString() {
-		return getAccountKey().toChecksumHex();
+		return getAddress() +" : " +getAccountKey().toChecksumHex();
 	}
 
 	public <R extends ACell> SignedData<R> sign(R message) {

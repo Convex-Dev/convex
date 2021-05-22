@@ -66,7 +66,7 @@ public class WalletComponent extends BaseListComponent {
 		add(buttons, BorderLayout.EAST);
 
 		// identicon
-		JLabel identicon = new Identicon(address);
+		JLabel identicon = new Identicon(walletEntry.getAddress().getHash());
 		GridBagConstraints gbc_btnNewButton = new GridBagConstraints();
 		gbc_btnNewButton.insets = new Insets(0, 0, 5, 5);
 		gbc_btnNewButton.gridx = 0;
@@ -79,7 +79,7 @@ public class WalletComponent extends BaseListComponent {
 		// address field
 		JPanel cPanel = new JPanel();
 		cPanel.setLayout(new GridLayout(0, 1));
-		CodeLabel addressLabel = new CodeLabel("0x"+address.toString());
+		CodeLabel addressLabel = new CodeLabel(address.toString());
 		addressLabel.setFont(Toolkit.MONO_FONT);
 		cPanel.add(addressLabel);
 		CodeLabel infoLabel = new CodeLabel(getInfoString());
