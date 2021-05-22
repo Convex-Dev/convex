@@ -215,7 +215,11 @@ public class CompilerTest extends ACVMTest {
 	
 	@Test 
 	public void testUnquote() {
+		// Unquote used to execute code at compile time
 		assertEquals(RT.cvm(3L),eval("~(+ 1 2)"));
+		assertEquals(Constant.of(3L),comp("~(+ 1 2)"));
+		
+		assertEquals(RT.cvm(3L),eval("'~'~(+ 1 2)"));
 		
 		assertEquals(RT.cvm(2L),eval("~*depth*")); // depth in compiler
 		assertEquals(RT.cvm(3L),eval("~(do *depth*)")); // depth in compiler

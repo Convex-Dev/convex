@@ -149,6 +149,12 @@ public abstract class ACVMTest {
 		return (T) code;
 	}
 	
+	/**
+	 * Compiles source code to a CVM Op
+	 * @param <T>
+	 * @param source
+	 * @return CVM Op
+	 */
 	public <T extends AOp<?>> T comp(String source) {
 		return comp(source,CONTEXT);
 	}

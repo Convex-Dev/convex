@@ -1848,6 +1848,11 @@ public final class Context<T extends ACell> extends AObject {
 		return ctx;
 	}
 
+	/**
+	 * Expands a form with the default *initial-expander*
+	 * @param form
+	 * @return Syntax Object resulting from expansion.
+	 */
 	public Context<Syntax> expand(ACell form) {
 		return expand(Core.INITIAL_EXPANDER, form, Core.INITIAL_EXPANDER);
 	}

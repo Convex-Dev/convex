@@ -222,16 +222,18 @@ public class Compiler {
 			int n = seq.size();
 			if (n == 0) return compileConstant(context, seq);
 
-			if (depth==1) {
-				if (isListStarting(Symbols.UNQUOTE, form)) {
+			if (isListStarting(Symbols.UNQUOTE, form)) {
+				if (depth==1) {
 					if (n != 2) return context.withArityError("unquote requires 1 argument");
 					ACell unquoted=seq.get(1);
 					//if (!(unquoted instanceof Syntax)) return context.withCompileError("unquote expects an expanded Syntax Object");
 					Context<AOp<T>> opContext = expandCompile(unquoted, context);
 					return opContext;
-				} else if (isListStarting(Symbols.QUOTE, form)) {
-					depth+=1;
+				} else {
+					depth-=1;
 				}
+			} else if (isListStarting(Symbols.QUOTE, form)) {
+				depth+=1;
 			}
 
 			// compile quoted elements
