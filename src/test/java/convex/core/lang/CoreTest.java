@@ -1876,6 +1876,7 @@ public class CoreTest extends ACVMTest {
 		// bad format for call
 		assertCompileError(step(ctx,"(call ctr foo)"));
 		assertCompileError(step(ctx,"(call ctr [foo])")); // not a list
+		assertCompileError(step(ctx,"(call ctr #{some-func 42})")); // See #135
 
 		assertStateError(step(ctx, "(call #666666 12 (bad-fn 1 2))")); // bad actor
 		assertArgumentError(step(ctx, "(call ctr -12 (bad-fn 1 2))")); // negative offer
