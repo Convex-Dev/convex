@@ -24,6 +24,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Format;
 import convex.core.data.IAssociative;
@@ -755,17 +756,6 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<ABlobMap> BLOB_MAP = reg(new CoreFn<>(Symbols.BLOB_MAP) {
-		@SuppressWarnings("unchecked")
-		@Override
-		public  Context<ABlobMap> invoke(Context context, ACell[] args) {
-			if (args.length != 0) return context.withArityError(exactArityMessage(0, args.length));
-
-			long juice = Juice.BUILD_DATA;
-
-			return context.withResult(juice, BlobMaps.empty());
-		}
-	});
 
 	public static final CoreFn<CVMBool> ACTOR_Q = reg(new CoreFn<>(Symbols.ACTOR_Q) {
 		@SuppressWarnings("unchecked")
@@ -920,6 +910,29 @@ public class Core {
 
 			long juice = Juice.BUILD_DATA + len * Juice.BUILD_PER_ELEMENT;
 			return context.withResult(juice, Maps.create(args));
+		}
+	});
+	
+
+	public static final CoreFn<ABlobMap> BLOB_MAP = reg(new CoreFn<>(Symbols.BLOB_MAP) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<ABlobMap> invoke(Context context, ACell[] args) {
+			int len = args.length;
+			// specialised arity check since we need even length
+			if (Utils.isOdd(len)) return context.withArityError(name() + " requires an even number of arguments");
+
+			long juice = Juice.BUILD_DATA + len * Juice.BUILD_PER_ELEMENT;
+
+			BlobMap r=BlobMaps.empty();
+			int n=len/2;
+			for (int i=0; i<n; i++) {
+				int ix=i*2;
+				r=r.assoc(args[ix], args[ix+1]);
+				if (r==null) return context.withCastError(ix, args, Types.BLOB);
+			}
+			
+			return context.withResult(juice, r);
 		}
 	});
 
