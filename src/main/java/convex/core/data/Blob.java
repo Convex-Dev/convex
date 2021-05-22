@@ -186,7 +186,7 @@ public class Blob extends AArrayBlob {
 	public static AArrayBlob read(Blob source, long len) throws BadFormatException {
 		// compute data length, excluding tag and encoded length
 		int headerLength = (1 + Format.getVLCLength(len));
-		long rLen = source.length() - headerLength;
+		long rLen = source.count() - headerLength;
 		if (len != rLen) {
 			throw new BadFormatException("Invalid length for Blob, length field " + len + " but actual length " + rLen);
 		}

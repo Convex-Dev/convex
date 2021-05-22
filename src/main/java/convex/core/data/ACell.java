@@ -58,7 +58,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return The length of the encoded binary representation in bytes
 	 */
 	public final int encodedLength() {
-		return Utils.checkedInt(getEncoding().length());
+		return Utils.checkedInt(getEncoding().count());
 	}
 	
 	/**
@@ -253,7 +253,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return Exact encoding length of this Cell
 	 */
 	public long getEncodingLength() {
-		return getEncoding().length();
+		return getEncoding().count();
 	}
 
 	/**

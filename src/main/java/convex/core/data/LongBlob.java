@@ -46,7 +46,7 @@ public class LongBlob extends ABlob {
 	}
 
 	@Override
-	public long length() {
+	public long count() {
 		return LENGTH;
 	}
 
@@ -79,7 +79,7 @@ public class LongBlob extends ABlob {
 	}
 
 	@Override
-	public byte get(long i) {
+	public byte byteAt(long i) {
 		checkIndex(i);
 		return (byte) (value >> ((LENGTH - i - 1) * 8));
 	}
@@ -99,7 +99,7 @@ public class LongBlob extends ABlob {
 	public long commonHexPrefixLength(ABlob b) {
 		if (b == this) return LENGTH * 2;
 
-		long max = Math.min(LENGTH, b.length());
+		long max = Math.min(LENGTH, b.count());
 		for (long i = 0; i < max; i++) {
 			byte ai = getUnchecked(i);
 			byte bi = b.getUnchecked(i);
@@ -123,7 +123,7 @@ public class LongBlob extends ABlob {
 		if (a instanceof LongBlob) return (((LongBlob) a).value == value);
 		if (a instanceof Blob) {
 			Blob b=(Blob)a;
-			return ((b.length()==LENGTH)&& (b.longValue()== value));
+			return ((b.count()==LENGTH)&& (b.longValue()== value));
 		}
 		return false;
 	}

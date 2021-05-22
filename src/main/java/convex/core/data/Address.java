@@ -41,7 +41,7 @@ public class Address extends ABlob {
 	 * @return Address instance, or null if not valid
 	 */
 	public static Address create(ABlob b) {
-		if (b.length()!=8) return null;
+		if (b.count()!=8) return null;
 		return create(b.longValue());
 	}
 
@@ -210,7 +210,7 @@ public class Address extends ABlob {
 	}
 
 	@Override
-	public long length() {
+	public long count() {
 		return 8;
 	}
 

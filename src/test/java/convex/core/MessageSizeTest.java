@@ -13,19 +13,19 @@ import convex.test.Samples;
 public class MessageSizeTest {
 
 	@Test public void testMaxEmbedded() {
-		assertEquals(Format.MAX_EMBEDDED_LENGTH,Samples.MAX_EMBEDDED_BLOB.getEncoding().length());
+		assertEquals(Format.MAX_EMBEDDED_LENGTH,Samples.MAX_EMBEDDED_BLOB.getEncoding().count());
 		assertTrue(Samples.MAX_EMBEDDED_BLOB.isEmbedded());
 		
-		assertEquals(Format.MAX_EMBEDDED_LENGTH+1,Samples.NON_EMBEDDED_BLOB.getEncoding().length());
+		assertEquals(Format.MAX_EMBEDDED_LENGTH+1,Samples.NON_EMBEDDED_BLOB.getEncoding().count());
 		assertFalse(Samples.NON_EMBEDDED_BLOB.isEmbedded());
 	}
 	
 	@Test public void testEmbeddedStrings() {
-		assertTrue(Format.MAX_EMBEDDED_LENGTH>=Samples.MAX_EMBEDDED_STRING.getEncoding().length());
+		assertTrue(Format.MAX_EMBEDDED_LENGTH>=Samples.MAX_EMBEDDED_STRING.getEncoding().count());
 		assertEquals(StringShort.MAX_EMBEDDED_STRING_LENGTH,Samples.MAX_EMBEDDED_STRING.length());
 		assertTrue(Samples.MAX_EMBEDDED_STRING.isEmbedded());
 		
-		assertTrue(Format.MAX_EMBEDDED_LENGTH<Samples.NON_EMBEDDED_STRING.getEncoding().length());
+		assertTrue(Format.MAX_EMBEDDED_LENGTH<Samples.NON_EMBEDDED_STRING.getEncoding().count());
 		assertFalse(Samples.NON_EMBEDDED_STRING.isEmbedded());
 	}
 	

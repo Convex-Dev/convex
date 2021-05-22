@@ -40,7 +40,7 @@ public abstract class AArrayBlob extends ABlob {
 
 	@Override
 	public ABlob append(ABlob d) {
-		int dlength = Utils.checkedInt(d.length());
+		int dlength = Utils.checkedInt(d.count());
 		if (dlength == 0) return this;
 		int length = this.length;
 		if (length == 0) return d;
@@ -52,7 +52,7 @@ public abstract class AArrayBlob extends ABlob {
 
 	@Override
 	public Blob slice(long start) {
-		return slice(start, length() - start);
+		return slice(start, count() - start);
 	}
 
 	@Override
@@ -113,7 +113,7 @@ public abstract class AArrayBlob extends ABlob {
 	}
 
 	@Override
-	public final long length() {
+	public final long count() {
 		return length;
 	}
 
@@ -123,7 +123,7 @@ public abstract class AArrayBlob extends ABlob {
 	}
 
 	@Override
-	public final byte get(long i) {
+	public final byte byteAt(long i) {
 		int ix = (int) i;
 		if ((ix != i) || (ix < 0) || (ix >= length)) {
 			throw new IndexOutOfBoundsException("Index: " + i);
@@ -224,9 +224,9 @@ public abstract class AArrayBlob extends ABlob {
 
 	@Override
 	public long commonHexPrefixLength(ABlob b) {
-		if (b == this) return length() * 2;
+		if (b == this) return count() * 2;
 
-		long max = Math.min(length(), b.length());
+		long max = Math.min(count(), b.count());
 		for (long i = 0; i < max; i++) {
 			byte ai = getUnchecked(i);
 			byte bi = b.getUnchecked(i);

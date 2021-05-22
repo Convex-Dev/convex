@@ -261,7 +261,7 @@ public class MapsTest {
 		assertEquals(0L,m.count());
 		assertSame(m,Maps.empty());
 		
-		assertEquals(2L,m.getEncoding().length());
+		assertEquals(2L,m.getEncoding().count());
 	}
 
 	@Test

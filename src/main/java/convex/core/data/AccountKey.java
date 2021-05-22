@@ -67,7 +67,7 @@ public class AccountKey extends AArrayBlob {
 	 * @return AccountKey insatnce, or null if not valid
 	 */
 	public static AccountKey create(ABlob b) {
-		if (b.length()!=LENGTH) return null;
+		if (b.count()!=LENGTH) return null;
 		if (b instanceof AArrayBlob) {
 			AArrayBlob ab=(AArrayBlob)b;
 			return new AccountKey(ab.getInternalArray(),ab.getOffset(),LENGTH);

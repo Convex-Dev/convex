@@ -625,14 +625,14 @@ public class Format {
 	 * @throws BadFormatException
 	 */
 	public static <T extends ACell> T read(Blob blob) throws BadFormatException {
-		byte tag = blob.get(0);
+		byte tag = blob.byteAt(0);
 		return read(tag,blob);
 	}
 	
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T read(byte tag, Blob blob) throws BadFormatException {
 		if (tag == Tag.NULL) {
-			long len=blob.length();
+			long len=blob.count();
 			if (len!=1) throw new BadFormatException("Bad null encoding with length"+len);
 			return null;
 		}
@@ -648,7 +648,7 @@ public class Format {
 				if (bb.hasRemaining()) throw new BadFormatException(
 						"Blob with type " + Utils.getClass(result) + " has excess bytes: " + bb.remaining());
 			} catch (BufferUnderflowException e) {
-				throw new BadFormatException("Blob has insufficients bytes: " + blob.length(), e);
+				throw new BadFormatException("Blob has insufficients bytes: " + blob.count(), e);
 			} 
 
 			result.attachEncoding(blob);

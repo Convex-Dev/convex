@@ -45,7 +45,7 @@ public class BlobTree extends ABlob {
 	public static BlobTree create(ABlob blob) {
 		if (blob instanceof BlobTree) return (BlobTree) blob;
 
-		long length = blob.length();
+		long length = blob.count();
 		int chunks = Utils.checkedInt(calcChunks(length));
 		Blob[] blobs = new Blob[chunks];
 		for (int i = 0; i < chunks; i++) {
@@ -98,7 +98,7 @@ public class BlobTree extends ABlob {
 		Ref<ABlob>[] children = new Ref[chunkCount];
 		for (int i = 0; i < chunkCount; i++) {
 			Blob blob = blobs[offset + i];
-			long childLength = blob.length();
+			long childLength = blob.count();
 
 			if (childLength > Blob.CHUNK_LENGTH)
 				throw new IllegalArgumentException("BlobTree chunk too large: " + childLength);
@@ -142,7 +142,7 @@ public class BlobTree extends ABlob {
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		sb.append("#blobtree {:length " + length() + " :shift " + shift + "}");
+		sb.append("#blobtree {:length " + count() + " :shift " + shift + "}");
 	}
 
 	@Override
@@ -165,7 +165,7 @@ public class BlobTree extends ABlob {
 	}
 
 	@Override
-	public long length() {
+	public long count() {
 		return count;
 	}
 
@@ -193,7 +193,7 @@ public class BlobTree extends ABlob {
 
 	@Override
 	public Blob toBlob() {
-		int len = Utils.checkedInt(length());
+		int len = Utils.checkedInt(count());
 		byte[] data = new byte[len];
 		getBytes(data, 0);
 		return Blob.wrap(data);
@@ -362,7 +362,7 @@ public class BlobTree extends ABlob {
 			child = getChild(i);
 			child.validate();
 			
-			long cl = child.length();
+			long cl = child.count();
 			total += cl;
 			if (i == (n - 1)) {
 				if (cl > clen) throw new InvalidDataException(

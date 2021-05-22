@@ -31,7 +31,7 @@ public class Blobs {
 	}
 
 	public static ABlob canonical(ABlob a) {
-		long length = a.length();
+		long length = a.count();
 		if (length <= Blob.CHUNK_LENGTH) return a.toBlob();
 		return BlobTree.create(a);
 	}

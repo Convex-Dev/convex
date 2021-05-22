@@ -581,7 +581,7 @@ public class RT {
 
 	
 	/**
-	 * Converts any collection of cells into a sequence data structure. 
+	 * Converts any collection of cells into a Sequence data structure. 
 	 * 
 	 * Potentially O(n) in size of collection.
 	 * 
@@ -640,8 +640,7 @@ public class RT {
 		// special case, we treat nil as empty sequence
 		if (o == null) throw new IndexOutOfBoundsException("Can't get nth element from null");
 
-		if (o instanceof ADataStructure) return ((ADataStructure<T>) o).get(i); // maps and collections
-		if (o instanceof ABlob) return (T) CVMByte.create(((ABlob) o).get(i));
+		if (o instanceof ADataStructure) return ((ADataStructure<T>) o).get(i); // blobs, maps and collections
 		if (o instanceof AString) return (T) CVMChar.create(((AString) o).charAt(Utils.checkedInt(i)));
 
 		throw new ClassCastException("Don't know how to get nth item of cell "+Utils.getClassName(o));
@@ -698,9 +697,6 @@ public class RT {
 	public static Long count(ACell a) {
 		if (a == null) return 0L;
 		if (a instanceof ADataStructure) return ((ADataStructure<?>) a).count();
-		if (a instanceof ABlob) {
-			return ((ABlob) a).length();
-		}
 		if (a instanceof AString) {
 			return (long) ((AString) a).length();
 		}
@@ -1037,7 +1033,7 @@ public class RT {
 		if (o instanceof Hash) return ((Hash) o);
 		if (o instanceof ABlob) {
 			ABlob blob=(ABlob)o;
-			if (blob.length()!=Hash.LENGTH) return null;
+			if (blob.count()!=Hash.LENGTH) return null;
 			return Hash.wrap(blob.getBytes());
 		}
 			

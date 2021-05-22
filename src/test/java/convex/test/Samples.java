@@ -124,7 +124,7 @@ public class Samples {
 	public static final ASignature FAKE_SIGNATURE = Ed25519Signature.wrap(new byte[Ed25519Signature.SIGNATURE_LENGTH]);
 
 	public static final Blob MAX_EMBEDDED_BLOB = createTestBlob(Format.MAX_EMBEDDED_LENGTH-Format.getVLCLength(Format.MAX_EMBEDDED_LENGTH)-1);
-	public static final Blob NON_EMBEDDED_BLOB = createTestBlob(MAX_EMBEDDED_BLOB.length()+1);
+	public static final Blob NON_EMBEDDED_BLOB = createTestBlob(MAX_EMBEDDED_BLOB.count()+1);
 
 	public static final StringShort MAX_EMBEDDED_STRING= StringShort.create("[0x1234567812345678123456781234567812345678123456781234567812345678]");
 	public static final StringShort NON_EMBEDDED_STRING= StringShort.create(MAX_EMBEDDED_STRING.toString()+" ");

@@ -68,7 +68,7 @@ public class FuzzTestFormat {
 		Blob b2 = Format.encodedBlob(v);
 		assertEquals(v, Format.read(b2),
 				() -> "Expected to be able to regenerate value: " + v + " of type " + Utils.getClass(v));
-		assertEquals(bb.position(), b2.length(), () -> {
+		assertEquals(bb.position(), b2.count(), () -> {
 			return "Bad length re-reading " + Utils.getClass(v) + ": " + v + " with encoding " + b.toHexString()
 					+ " and re-encoding" + b2.toHexString();
 		});

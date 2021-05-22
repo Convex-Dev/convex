@@ -72,7 +72,7 @@ public class BlobsTest {
 		Blob b = Blob.createRandom(r, hclen);
 		BlobTree bt = BlobTree.create(a, b);
 
-		assertEquals(clen + hclen, bt.length());
+		assertEquals(clen + hclen, bt.count());
 		assertEquals(a, bt.getChunk(0));
 		assertEquals(b, bt.getChunk(1));
 
@@ -88,7 +88,7 @@ public class BlobsTest {
 		assertEquals(10, b.getHexDigit(1)); // 'a'
 
 		for (int i = 0; i < 8; i++) {
-			assertEquals(b.get(i), bb.get(i));
+			assertEquals(b.byteAt(i), bb.byteAt(i));
 		}
 
 		for (int i = 0; i < 16; i++) {
@@ -136,7 +136,7 @@ public class BlobsTest {
 		
 	@Test 
 	public void testEncodingSize() {
-		int el=(int) Samples.FULL_BLOB.getEncoding().length();
+		int el=(int) Samples.FULL_BLOB.getEncoding().count();
 		assertEquals(Blobs.MAX_ENCODING_LENGTH,el);
 		assertEquals(Blob.MAX_ENCODING_LENGTH,el);
 		
@@ -147,7 +147,7 @@ public class BlobsTest {
 	@Test
 	public void testBigBlob() throws InvalidDataException, BadFormatException {
 		BlobTree bb = Samples.BIG_BLOB_TREE;
-		long len = bb.length();
+		long len = bb.count();
 
 		assertEquals(Samples.BIG_BLOB_LENGTH, len);
 
@@ -155,13 +155,13 @@ public class BlobsTest {
 		assertSame(bb, bb.slice(0, len));
 
 		Blob firstChunk = bb.getChunk(0);
-		assertEquals(Blob.CHUNK_LENGTH, firstChunk.length());
-		assertEquals(bb.get(0), firstChunk.get(0));
+		assertEquals(Blob.CHUNK_LENGTH, firstChunk.count());
+		assertEquals(bb.byteAt(0), firstChunk.byteAt(0));
 
 		Blob blob = bb.toBlob();
-		assertEquals(bb.length(), blob.length());
-		assertEquals(bb.get(len - 1), blob.get(len - 1));
-		assertEquals(bb.get(0), blob.get(0));
+		assertEquals(bb.count(), blob.count());
+		assertEquals(bb.byteAt(len - 1), blob.byteAt(len - 1));
+		assertEquals(bb.byteAt(0), blob.byteAt(0));
 		assertEquals(bb.getChunk(1), blob.getChunk(1));
 
 		assertEquals(len * 2, bb.commonHexPrefixLength(bb));
@@ -173,14 +173,14 @@ public class BlobsTest {
 		bbb.validate();
 		assertEquals(bb, bbb);
 		assertEquals(bb, rb.getValue());
-		assertEquals(bb.length(), bb.hexMatchLength(bbb, 0, len));
+		assertEquals(bb.count(), bb.hexMatchLength(bbb, 0, len));
 
 		doBlobTests(bb);
 	}
 
 	@Test
 	public void testBlobTreeOutOfRange() {
-		assertThrows(IndexOutOfBoundsException.class, () -> Samples.BIG_BLOB_TREE.get(Samples.BIG_BLOB_LENGTH));
+		assertThrows(IndexOutOfBoundsException.class, () -> Samples.BIG_BLOB_TREE.byteAt(Samples.BIG_BLOB_LENGTH));
 		assertThrows(IndexOutOfBoundsException.class, () -> Samples.BIG_BLOB_TREE.slice(-1));
 		assertThrows(IndexOutOfBoundsException.class, () -> Samples.BIG_BLOB_TREE.slice(1, Samples.BIG_BLOB_LENGTH));
 	}
@@ -189,12 +189,12 @@ public class BlobsTest {
 	public void testBlobFormat() throws BadFormatException {
 		byte[] bf = new byte[] { Tag.BLOB, 0 };
 		Blob b = Format.read(Blob.wrap(bf));
-		assertEquals(0, b.length());
+		assertEquals(0, b.count());
 		assertNotEquals(b.getHash(), Hash.EMPTY_HASH);
 	}
 
 	public static void doBlobTests(ABlob a) {
-		long n = a.length();
+		long n = a.count();
 		assertTrue(n >= 0L);
 
 		ObjectsTest.doCellTests(a);

@@ -110,4 +110,8 @@ public final class CVMByte extends APrimitive implements INumeric {
 		return CVMLong.ONE;
 	}
 
+	public byte byteValue() {
+		return value;
+	}
+
 }

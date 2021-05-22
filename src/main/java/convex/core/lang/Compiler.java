@@ -563,14 +563,7 @@ public class Compiler {
 			Syntax formSyntax=Syntax.create(x);
 			ACell form = formSyntax.getValue();
 
-			// Return the Syntax Object immediately for symbols, keywords, literals, Ops etc.
-			// Remember to preserve metadata on symbols in particular!
-			if (!(form instanceof ADataStructure)) {
-				// TODO: handle symbol macros?
-				
-				return context.withResult(Juice.EXPAND_CONSTANT, formSyntax);
-			}
-
+	
 			// First check for sequences. This covers most cases.
 			if (form instanceof ASequence) {
 				
@@ -673,7 +666,9 @@ public class Compiler {
 				return ctx.withResult(Juice.EXPAND_SEQUENCE, Syntax.create(updated).withMeta(formSyntax.getMeta()));
 			}
 
-			return context.withCompileError("Don't know how to do expansion of: " + RT.getType(form));
+			// Return the Syntax Object directly for anything else
+			// Remember to preserve metadata on symbols in particular!
+			return context.withResult(Juice.EXPAND_CONSTANT, formSyntax);
 		}
 	};
 	
@@ -724,11 +719,6 @@ public class Compiler {
 			Syntax formSyntax=Syntax.create(x);
 			ACell form = formSyntax.getValue();
 			
-			// Return the Syntax Object immediately for symbols, keywords, literals, Ops etc.
-			// Remember to preserve metadata on symbols in particular!
-			if (!(form instanceof ADataStructure)) {
-				return context.withResult(Juice.EXPAND_CONSTANT, x);
-			}
 			
 			// First check for sequences. This covers most cases.
 			if (form instanceof ASequence) {
@@ -828,9 +818,9 @@ public class Compiler {
 				return ctx.withResult(Juice.EXPAND_SEQUENCE, r);
 			}
 
-
-			return context.withCompileError("Don't know how to do quoted expansion of: " + RT.getType(form));
-
+			// Return the Syntax Object directly for any other type
+			// Remember to preserve metadata on symbols in particular!
+			return context.withResult(Juice.EXPAND_CONSTANT, x);
 		}
 	};
 

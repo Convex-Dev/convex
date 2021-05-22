@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 
 import convex.core.crypto.Hash;
+import convex.core.data.prim.CVMByte;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
@@ -18,7 +19,7 @@ import convex.core.util.Utils;
  * lazily computed on demand
  * 
  */
-public abstract class ABlob extends ACell implements Comparable<ABlob> {
+public abstract class ABlob extends ADataStructure<CVMByte> implements Comparable<ABlob> {
 	/**
 	 * Cached hash of the Blob data. Might be null.
 	 */
@@ -38,11 +39,31 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	public abstract void getBytes(byte[] dest, int destOffset);
 
 	/**
-	 * Gets the length of this data object
+	 * Gets the length of this Blob
 	 * 
 	 * @return The length in bytes of this data object
 	 */
-	public abstract long length();
+	@Override
+	public abstract long count();
+	
+	@Override
+	public CVMByte get(long ix) {
+		return CVMByte.create(byteAt(ix));
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public <R extends ACell> ADataStructure<R> conj(R b) {
+		if (!(b instanceof CVMByte)) return null;
+		CVMByte bv=(CVMByte)b;
+		return (ADataStructure<R>) append(Blob.wrap(new byte[] {bv.byteValue()}));
+	}
+
+	
+	@Override
+	public Blob empty() {
+		return Blob.EMPTY;
+	}
 
 	/**
 	 * Converts this data object to a lowercase hex string representation
@@ -83,7 +104,7 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	 * same type as the original Blob
 	 */
 	public ABlob slice(long start) {
-		return slice(start, length() - start);
+		return slice(start, count() - start);
 	}
 
 	/**
@@ -132,8 +153,8 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	 * @param i Index of the byte to get
 	 * @return The byte at the specified position
 	 */
-	public byte get(long i) {
-		if ((i < 0) || (i >= length())) {
+	public byte byteAt(long i) {
+		if ((i < 0) || (i >= count())) {
 			throw new IndexOutOfBoundsException("Index: " + i);
 		}
 		return getUnchecked(i);
@@ -173,7 +194,7 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	 * @return A new byte array containing the contents of this blob.
 	 */
 	public byte[] getBytes() {
-		byte[] result = new byte[Utils.checkedInt(length())];
+		byte[] result = new byte[Utils.checkedInt(count())];
 		getBytes(result, 0);
 		return result;
 	}
@@ -232,8 +253,8 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	@Override
 	public int compareTo(ABlob b) {
 		if (this == b) return 0;
-		long alength = this.length();
-		long blength = b.length();
+		long alength = this.count();
+		long blength = b.count();
 		long compareLength = Math.min(alength, blength);
 		for (long i = 0; i < compareLength; i++) {
 			int c = (0xFF & getUnchecked(i)) - (0xFF & b.getUnchecked(i));
@@ -298,7 +319,7 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (length() < 0) throw new InvalidDataException("Negative blob length", this);
+		if (count() < 0) throw new InvalidDataException("Negative blob length", this);
 	}
 
 	/**
@@ -313,8 +334,8 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	public abstract long hexMatchLength(ABlob b, long start, long length);
 
 	public boolean hexEquals(ABlob b) {
-		long c = length();
-		if (b.length() != c) return false;
+		long c = count();
+		if (b.count() != c) return false;
 		return hexMatchLength(b, 0L, c) == c;
 	}
 
@@ -323,7 +344,7 @@ public abstract class ABlob extends ACell implements Comparable<ABlob> {
 	}
 
 	public long hexLength() {
-		return length() << 1;
+		return count() << 1;
 	}
 	
 	/**

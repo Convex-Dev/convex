@@ -844,7 +844,7 @@ public final class Context<T extends ACell> extends AObject {
 			
 			if (v instanceof ErrorValue) {
 				ErrorValue ev=(ErrorValue)v;
-				ev.addTrace("In function: "+fn.toString());
+				ev.addTrace("In function: "+RT.str(fn));
 			}
 		}
 		return ctx;

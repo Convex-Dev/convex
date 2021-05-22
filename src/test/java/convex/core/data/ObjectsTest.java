@@ -111,7 +111,7 @@ public class ObjectsTest {
 		if (a==null) {
 			assertEquals(Blob.NULL_ENCODING,b);
 		} else {
-			assertEquals(a.getTag(),b.get(0)); // Correct Tag
+			assertEquals(a.getTag(),b.byteAt(0)); // Correct Tag
 			assertSame(b,a.getEncoding()); // should be same cached encoding
 			assertEquals(b.length,a.getEncodingLength());
 		}

@@ -748,7 +748,7 @@ public class Core {
 			ABlob blob = RT.castBlob(args[0]);
 			if (blob == null) return context.withCastError(0,args, Types.BLOB);
 
-			long juice = Juice.BLOB + Juice.BLOB_PER_BYTE * blob.length();
+			long juice = Juice.BLOB + Juice.BLOB_PER_BYTE * blob.count();
 
 			return context.withResult(juice, blob);
 		}
@@ -1509,7 +1509,7 @@ public class Core {
 			ACell a = args[0];
 			ABlob encoding=Format.encodedBlob(a);
 
-			long juice=Juice.addMul(Juice.BLOB, encoding.length(), Juice.BLOB_PER_BYTE);
+			long juice=Juice.addMul(Juice.BLOB, encoding.count(), Juice.BLOB_PER_BYTE);
 			return context.withResult(juice, encoding);
 		}
 	});
@@ -1990,12 +1990,13 @@ public class Core {
 				Long n=RT.count(a1);
 				if (n == null) return context.withCastError(a1, Types.DATA_STRUCTURE);
 				
+				// check juice before running potentially expansive computation
 				juice += Juice.BUILD_PER_ELEMENT * n;
 				if (!context.checkJuice(juice)) return context.withJuiceError();
 				
 				ASequence<ACell> seq = RT.sequence(a1);
 				
-				// check juice before running expensive part
+				
 
 				result = result.conjAll(seq);
 				if (result == null) return context.withError(ErrorCodes.CAST,"Invalid element type for 'into'");

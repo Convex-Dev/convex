@@ -237,7 +237,7 @@ public class Hash extends AArrayBlob {
      */
 	public static Hash wrap(AArrayBlob data) {
 		if (data instanceof Hash) return (Hash)data;
-		return wrap(data.getInternalArray(),data.getOffset(),Utils.toInt(data.length()));
+		return wrap(data.getInternalArray(),data.getOffset(),Utils.toInt(data.count()));
 	}
 
 	/**

@@ -305,7 +305,7 @@ public class Etch {
 			throw new Error("Offset exceeded for key: "+key);
 		}
 		
-		final int digit=key.get(keyOffset)&0xFF;	
+		final int digit=key.byteAt(keyOffset)&0xFF;	
 		long slotValue=readSlot(indexPosition,digit);
 		long type=slotType(slotValue);
 		
@@ -388,7 +388,7 @@ public class Etch {
 			
 			// first we build a new index block, containing our new data
 			long newDataPointer=appendData(key,value);
-			long newIndexPos=appendLeafIndex(key.get(keyOffset+1),newDataPointer);
+			long newIndexPos=appendLeafIndex(key.byteAt(keyOffset+1),newDataPointer);
 			
 			// for each element in chain, move existing data to new index block. i is the length of chain
 			for (int j=0; j<i; j++) {
@@ -780,7 +780,7 @@ public class Etch {
 			throw new Error("Offset exceeded for key: "+key);
 		}
 
-		int digit=key.get(offset)&0xFF;	
+		int digit=key.byteAt(offset)&0xFF;	
 		long slotValue=readSlot(indexPosition,digit);
 		long type=(slotValue&TYPE_MASK);
 		if (slotValue==0) { 
@@ -841,7 +841,7 @@ public class Etch {
 	 * @throws IOException
 	 */
 	private long appendData(AArrayBlob key,Ref<ACell> value) throws IOException {
-		assert(key.length()==KEY_SIZE);
+		assert(key.count()==KEY_SIZE);
 		
 		// Get relevant values for writing
 		// probably need to call these first, might move mbb position?
@@ -868,7 +868,7 @@ public class Etch {
 		mbb.putLong(memorySize);
 		
 		// append blob length
-		short length=Utils.checkedShort(encoding.length());
+		short length=Utils.checkedShort(encoding.count());
 		if (length==0) {
 			// Blob b=cell.createEncoding();
 			throw new Error("Etch trying to write zero length encoding for: "+Utils.getClassName(cell));

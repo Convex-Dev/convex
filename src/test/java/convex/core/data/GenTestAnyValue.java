@@ -99,8 +99,8 @@ public class GenTestAnyValue {
 			// when we persist a ref to non-embedeed object, should be a ref type
 			Ref<?> ref=Ref.get(o);
 			Blob b=ref.getEncoding();
-			assertEquals(Tag.REF,b.get(0));
-			assertEquals(Ref.INDIRECT_ENCODING_LENGTH,b.length());
+			assertEquals(Tag.REF,b.byteAt(0));
+			assertEquals(Ref.INDIRECT_ENCODING_LENGTH,b.count());
 		}
 	}
 	

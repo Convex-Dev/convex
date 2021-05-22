@@ -47,8 +47,8 @@ public class VLCParamTest {
 
 		if (value instanceof CVMLong) {
 			CVMLong cl=(CVMLong) value;
-			assertEquals(Tag.LONG, b.get(0)); // check correct tag
-			assertEquals(1 + Format.getVLCLength(cl.longValue()), b.length()); // check length after tag
+			assertEquals(Tag.LONG, b.byteAt(0)); // check correct tag
+			assertEquals(1 + Format.getVLCLength(cl.longValue()), b.count()); // check length after tag
 		}
 
 		FuzzTestFormat.doMutationTest(b);

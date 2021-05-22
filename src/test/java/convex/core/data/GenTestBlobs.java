@@ -16,7 +16,7 @@ public class GenTestBlobs {
 
 	@Property
 	public void testToLong(@From(BlobGen.class) ABlob blob) {
-		long len=blob.length();
+		long len=blob.count();
 		long lv=blob.toLong();
 
 		int slen=Math.min(8,Utils.checkedInt(len));

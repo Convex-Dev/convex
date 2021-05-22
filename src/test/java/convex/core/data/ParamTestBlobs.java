@@ -52,13 +52,13 @@ public class ParamTestBlobs {
 
 	@Test
 	public void testSlice() {
-		ABlob d = data.slice(0, data.length());
+		ABlob d = data.slice(0, data.count());
 		assertEquals(data, d);
 	}
 
 	@Test
 	public void testCompare() {
-		long len = data.length();
+		long len = data.count();
 		assertEquals(0, data.compareTo(data));
 		assertEquals(0, data.compareTo(Blob.create(data.getBytes())));
 

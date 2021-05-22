@@ -125,7 +125,7 @@ public class GenTestCore {
 		assertEquals(a.toHexString(),b.toHexString());
 		
 		// Check a byte in the Address
-		assertSame(CVMByte.create(a.get(6)),RT.nth(a, 6));
+		assertSame(CVMByte.create(a.byteAt(6)),RT.nth(a, 6));
 		
 		assertThrows(IndexOutOfBoundsException.class,()->RT.nth(a,-1));
 		assertThrows(IndexOutOfBoundsException.class,()->RT.nth(a,n));

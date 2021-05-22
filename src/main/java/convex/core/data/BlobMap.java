@@ -536,7 +536,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 			ecount += c.count();
 		}
 
-		if (pDepth > prefix.length() * 2) {
+		if (pDepth > prefix.count() * 2) {
 			throw new InvalidDataException("Insufficient prefix size for prefix depth " + pDepth, this);
 		}
 

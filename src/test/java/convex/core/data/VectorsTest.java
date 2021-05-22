@@ -209,12 +209,12 @@ public class VectorsTest {
 		// should embed, little values
 		AVector<CVMLong> vec = Vectors.of(1, 2, 3, 4);
 		assertTrue(vec.isEmbedded());
-		assertEquals(10L,vec.getEncoding().length());
+		assertEquals(10L,vec.getEncoding().count());
 		
 		// should embed, small enough
 		AVector<ACell> vec2=Vectors.of(vec,vec);
 		assertTrue(vec2.isEmbedded());
-		assertEquals(22L,vec2.getEncoding().length());
+		assertEquals(22L,vec2.getEncoding().count());
 
 		AVector<ACell> vec3=Vectors.of(vec2,vec2,vec2,vec2,vec2,vec2,vec2,vec2);
 		assertFalse(vec3.isEmbedded());

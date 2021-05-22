@@ -72,7 +72,7 @@ public class BlockViewComponent extends JPanel {
 				State s = p.getStates().get(i + 1);
 				for (int j = 0; j < 6; j++) {
 					Hash h = s.getHash();
-					if (h.get(j) < 0) {
+					if (h.byteAt(j) < 0) {
 						g.fillRect(x + 2, 2 + j, 6, 1);
 					}
 				}
