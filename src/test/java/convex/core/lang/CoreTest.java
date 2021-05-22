@@ -3046,6 +3046,9 @@ public class CoreTest extends ACVMTest {
 	@Test 
 	public void testQuote() {
 		assertEquals(Vectors.of(1,2,3),eval("(quote [1 2 3])"));
+		assertEquals(Sets.of(42),eval("(quote #{42})")); // See Issue #109
+		assertFalse(evalB("(= (quote #{42}) (quote #{(syntax 42)}))")); // See Issue #109
+
 		assertEquals(Vectors.of(1,Lists.of(Symbols.IF,4,7),3),eval("(quote [1 (if 4 7) 3])"));
 	}
 
