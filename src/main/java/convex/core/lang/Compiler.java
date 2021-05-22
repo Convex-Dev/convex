@@ -15,6 +15,7 @@ import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.List;
+import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Set;
@@ -22,7 +23,6 @@ import convex.core.data.Sets;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
-import convex.core.exceptions.TODOException;
 import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.MultiFn;
@@ -212,40 +212,46 @@ public class Compiler {
 	 * 
 	 * @param <T>
 	 * @param context
-	 * @param form Quoted form Syntax Object
+	 * @param form Quoted form. May be a regular value or Syntax object.
 	 * @return Context with complied op as result
 	 */
 	@SuppressWarnings("unchecked")
-	private static <T extends ACell> Context<AOp<T>> compileQuoted(Context<?> context, Syntax aForm) {
-		ACell form = aForm.getValue();
+	private static <T extends ACell> Context<AOp<T>> compileQuoted(Context<?> context, ACell aForm, int depth) {
+		ACell form = Syntax.unwrap(aForm);
 		if (form instanceof ASequence) {
-			ASequence<Syntax> seq = (ASequence<Syntax>) form;
+			ASequence<ACell> seq = (ASequence<ACell>) form;
 			int n = seq.size();
 			if (n == 0) return compileConstant(context, seq);
 
-			if (isListStarting(Symbols.UNQUOTE, form)) {
-				if (n != 2) return context.withArityError("unquote requires 1 argument");
-				Context<AOp<T>> opContext = expandCompile(seq.get(1), context);
-				return opContext;
+			if (depth==1) {
+				if (isListStarting(Symbols.UNQUOTE, form)) {
+					if (n != 2) return context.withArityError("unquote requires 1 argument");
+					ACell unquoted=seq.get(1);
+					//if (!(unquoted instanceof Syntax)) return context.withCompileError("unquote expects an expanded Syntax Object");
+					Context<AOp<T>> opContext = expandCompile(unquoted, context);
+					return opContext;
+				} else if (isListStarting(Symbols.QUOTE, form)) {
+					depth+=1;
+				}
 			}
 
 			// compile quoted elements
-			context = compileAllQuoted(context, seq);
+			context = compileAllQuoted(context, seq, depth);
 			ASequence<AOp<ACell>> rSeq = (ASequence<AOp<ACell>>) context.getResult();
 
 			ACell fn = (seq instanceof AList) ? Core.LIST : Core.VECTOR;
 			Invoke<T> inv = Invoke.create( Constant.create(fn), rSeq);
 			return context.withResult(Juice.COMPILE_NODE, inv);
 		} else if (form instanceof AMap) {
-			AMap<Syntax, Syntax> map = (AMap<Syntax, Syntax>) form;
-			AVector<Syntax> rSeq = Vectors.empty();
-			for (Map.Entry<Syntax, Syntax> me : map.entrySet()) {
+			AMap<ACell, ACell> map = (AMap<ACell, ACell>) form;
+			AVector<ACell> rSeq = Vectors.empty();
+			for (Map.Entry<ACell, ACell> me : map.entrySet()) {
 				rSeq = rSeq.append(me.getKey());
 				rSeq = rSeq.append(me.getValue());
 			}
 
 			// compile quoted elements
-			context = compileAllQuoted(context, rSeq);
+			context = compileAllQuoted(context, rSeq,depth);
 			ASequence<AOp<ACell>> cSeq = (ASequence<AOp<ACell>>) context.getResult();
 
 			ACell fn = Core.HASHMAP;
@@ -265,21 +271,21 @@ public class Compiler {
 	 * @return Context with complied sequence of ops as result
 	 */
 	@SuppressWarnings("unchecked")
-	private static <T extends ACell> Context<ASequence<AOp<T>>> compileAllQuoted(Context<?> context, ASequence<Syntax> forms) {
+	private static <T extends ACell> Context<ASequence<AOp<T>>> compileAllQuoted(Context<?> context, ASequence<ACell> forms, int depth) {
 		int n = forms.size();
 		// create a list of ops producing each sub-element
 		ASequence<AOp<T>> rSeq = Vectors.empty();
 		for (int i = 0; i < n; i++) {
-			Syntax subSyntax = forms.get(i);
-			ACell subForm = subSyntax.getValue();
+			ACell subSyntax = forms.get(i);
+			ACell subForm = Syntax.unwrap(subSyntax);
 			if (isListStarting(Symbols.UNQUOTE_SPLICING, subForm)) {
 				AList<ACell> subList = (AList<ACell>) subForm;
 				int sn = subList.size();
 				if (sn != 2) return context.withArityError("unquote-splicing requires 1 argument");
 				// unquote-splicing looks like it needs flatmap
-				throw new TODOException();
+				return context.withError(ErrorCodes.TODO,"unquote-splicing not yet supported");
 			} else {
-				Context<AOp<T>> rctx= compileQuoted(context, subSyntax);
+				Context<AOp<T>> rctx= compileQuoted(context, subSyntax,depth);
 				rSeq = (ASequence<AOp<T>>) (rSeq.conj(rctx.getResult()));
 			}
 		}
@@ -323,7 +329,7 @@ public class Compiler {
 			// special form symbols
 			if (sym.equals(Symbols.QUOTE) || sym.equals(Symbols.SYNTAX_QUOTE)) {
 				if (list.size() != 2) return context.withCompileError(Symbols.QUOTE + " expects one argument.");
-				return (Context<T>) compileQuoted(context, list.get(1));
+				return (Context<T>) compileQuoted(context, list.get(1),1);
 			}
 
 			if (sym.equals(Symbols.UNQUOTE)) {
@@ -525,7 +531,7 @@ public class Compiler {
 		}
 		
 		Syntax expSyntax=list.get(2);
-		context = context.expandCompile(expSyntax);
+		context = context.compile(expSyntax);
 		if (context.isExceptional()) return (Context<T>) context;
 		
 		// merge in metadata from expression. TODO: do we need to expand this first?
@@ -667,7 +673,178 @@ public class Compiler {
 				return ctx.withResult(Juice.EXPAND_SEQUENCE, Syntax.create(updated).withMeta(formSyntax.getMeta()));
 			}
 
-			throw new TODOException("Don't know how to expand: " + Utils.getClass(form));
+			return context.withCompileError("Don't know how to do expansion of: " + RT.getType(form));
 		}
 	};
+	
+	/**
+	 * Expander used for expansion of `quote` forms.
+	 * 
+	 * Should work on both raw forms and syntax objects.
+	 * 
+	 * Follows the "Expansion-Passing Style" approach of Dybvig, Friedman, and Haynes
+	 */
+	public static final AFn<Syntax> QUOTE_EXPANDER =new CoreFn<Syntax>(Symbols.QUOTE) {
+		@Override
+		public Context<Syntax> invoke(Context<ACell> context,ACell[] args ) {
+			if (args.length!=2) return context.withArityError(exactArityMessage(2, args.length));
+			ACell x = Syntax.unwrap(args[0]);
+			AFn<?> cont=RT.function(args[1]);
+			
+			
+			if (!(x instanceof AList)) return context.withCompileError("quote expander expects a List form, but got: "+RT.getType(x));
+			@SuppressWarnings("unchecked")
+			AList<ACell> quoteForm=(AList<ACell>)x;
+			if (quoteForm.count()!=2) return context.withCompileError("quote expander expects exactly one argument, but was: "+quoteForm);
+			
+			Context<Syntax> ctx= context.expand(QUOTED_EXPANDER,quoteForm.get(1),cont);
+			if (ctx.isExceptional()) return ctx;
+			ACell quotedForm=ctx.getResult();
+			
+			Syntax r=Syntax.create(Lists.of(Syntax.create(quoteForm.get(0)),quotedForm));
+			return ctx.withResult(r);
+		}
+	};
+	
+	/**
+	 * Expander used for expansion of quoted forms.
+	 * 
+	 * Should work on both raw forms and syntax objects.
+	 * 
+	 * Follows the "Expansion-Passing Style" approach of Dybvig, Friedman, and Haynes
+	 */
+	public static final AFn<ACell> QUOTED_EXPANDER =new CoreFn<ACell>(null) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public Context<ACell> invoke(Context<ACell> context,ACell[] args ) {
+			if (args.length!=2) return context.withError(ErrorCodes.UNEXPECTED, "quoted expander requires exactly 1 argument");
+			ACell x = args[0];
+			AFn<?> cont=RT.function(args[1]);
+
+			Syntax formSyntax=Syntax.create(x);
+			ACell form = formSyntax.getValue();
+			
+			// Return the Syntax Object immediately for symbols, keywords, literals, Ops etc.
+			// Remember to preserve metadata on symbols in particular!
+			if (!(form instanceof ADataStructure)) {
+				return context.withResult(Juice.EXPAND_CONSTANT, x);
+			}
+			
+			// First check for sequences. This covers most cases.
+			if (form instanceof ASequence) {
+				
+				// first check for List
+				if (form instanceof AList) {
+					AList<ACell> listForm = (AList<ACell>) form;
+					int n = listForm.size();
+					// consider length 0 lists as constant
+					if (n == 0) return context.withResult(Juice.EXPAND_CONSTANT, formSyntax);
+	
+//	
+//					// check for quotation operators in initial position.
+//					ACell first = Syntax.unwrap(listForm.get(0));
+//					if (first instanceof Symbol) {
+//						Symbol sym = (Symbol) first;
+//						
+//						if (sym.equals(Symbols.UNQUOTE)) {
+//							// Maybe we are breaking out of quoted expansion here
+//							// If continuation expander is not 'this', use it. Else just treat as regular quoted form
+//							if (cont!=this) {
+//								if (n!=2) return context.withCompileError("unquote requires a single form (arity 1)");
+//								ACell unquotedForm=listForm.get(1);
+//								Context<ACell> rctx = context.expand(cont,unquotedForm, cont); 
+//								return rctx;
+//							}
+//						} else if (sym.equals(Symbols.QUOTE)) {
+//							// nested quote, may need to set expand using 'this' as continuation expander
+//							if (cont!=this) {
+//								Context<ACell> rctx = context.expand(this,listForm, this); 
+//								return rctx;
+//							}
+//						}
+//					}
+				}
+
+				// need to recursively expand collection elements
+				// OK for vectors and lists
+				ASequence<ACell> seq = (ASequence<ACell>) form;
+				if (seq.isEmpty()) return context.withResult(Juice.EXPAND_CONSTANT, formSyntax);
+				Context<ACell>[] ct = new Context[] { context };
+				ASequence<ACell> updated;
+
+				updated = seq.map(elem -> {
+					Context<ACell> ctx = ct[0];
+					if (ctx.isExceptional()) return null;
+
+					// Expand like: (cont x cont)
+					ctx = ctx.expand(this,elem, cont);
+
+					if (ctx.isExceptional()) {
+						ct[0] = ctx;
+						return null;
+					}
+					ACell newElement = ctx.getResult();
+					ct[0] = ctx;
+					return newElement;
+				});
+				Context<ACell> rctx = ct[0];
+				if (context.isExceptional()) return rctx;
+				ACell r=preserveMeta(updated,x);
+				return rctx.withResult(Juice.EXPAND_SEQUENCE, r);
+			}
+
+			if (form instanceof ASet) {
+				Context<ACell> ctx =  context;
+				Set<ACell> updated = Sets.empty();
+				for (ACell elem : ((ASet<ACell>) form)) {
+					ctx = ctx.expand(this, elem, cont);
+					if (ctx.isExceptional()) return ctx;
+
+					ACell newElement = ctx.getResult();
+					updated = updated.conj(newElement);
+				}
+				ACell r=preserveMeta(updated,x);
+				return ctx.withResult(Juice.EXPAND_SEQUENCE, r);
+			}
+
+			if (form instanceof AMap) {
+				Context<ACell> ctx =  context;
+				AMap<ACell, ACell> updated = Maps.empty();
+				for (Map.Entry<ACell, ACell> me : ((AMap<ACell, ACell>) form).entrySet()) {
+					// get new key
+					ctx = ctx.expand(this,me.getKey(), cont);
+					if (ctx.isExceptional()) return ctx;
+
+					ACell newKey = ctx.getResult();
+
+					// get new value
+					ctx = ctx.expand(this,me.getValue(), cont);
+					if (ctx.isExceptional()) return ctx;
+					ACell newValue = ctx.getResult();
+
+					updated = updated.assoc(newKey, newValue);
+				}
+				ACell r=preserveMeta(updated,x);
+				return ctx.withResult(Juice.EXPAND_SEQUENCE, r);
+			}
+
+
+			return context.withCompileError("Don't know how to do quoted expansion of: " + RT.getType(form));
+
+		}
+	};
+
+	/**
+	 * Preserve metadata if the original value was a Syntax object. Return value unchanged otherwise.
+	 * @param value
+	 * @param original
+	 * @return
+	 */
+	private static ACell preserveMeta(ACell value, ACell original) {
+		if (original instanceof Syntax) {
+			return Syntax.create(value).withMeta(((Syntax)original).getMeta());
+		} else {
+			return value;
+		}
+	}
 }

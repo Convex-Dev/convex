@@ -15,6 +15,7 @@ import convex.core.Init;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
+import convex.core.lang.TestState;
 import convex.test.Samples;
 
 public class BlobMapsTest {
@@ -183,7 +184,7 @@ public class BlobMapsTest {
 
 	@Test
 	public void testInitialPeersBlobMap() {
-		BlobMap<AccountKey, PeerStatus> bm = Init.STATE.getPeers();
+		BlobMap<AccountKey, PeerStatus> bm = TestState.STATE.getPeers();
 		doBlobMapTests(bm);
 	}
 

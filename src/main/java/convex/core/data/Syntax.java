@@ -190,12 +190,19 @@ public class Syntax extends ACell {
 	
 	@Override
 	public void print(StringBuilder sb) {
+		if (meta==null) {
+			sb.append("^{} ");
+		} else {
+			sb.append('^');
+			meta.print(sb);
+			sb.append(' ');
+		}
 		Utils.print(sb, datumRef.getValue());
 	}
 	
 	@Override
 	public String toString() {
-		return Utils.ednString(datumRef.getValue());
+		return print();
 	}
 
 	@Override

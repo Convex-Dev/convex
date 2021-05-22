@@ -46,7 +46,7 @@ public class ParamTestCasts {
 		assertTrue(namedFn instanceof AFn);
 		AFn<ACell> fn=(AFn<ACell>)namedFn;
 		
-		Context<ACell> ctx=TestState.INITIAL_CONTEXT.fork();
+		Context<ACell> ctx=TestState.CONTEXT.fork();
 		
 		for (ACell x: values) {
 			ACell[] args= new ACell[] {x};

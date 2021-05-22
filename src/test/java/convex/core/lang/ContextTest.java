@@ -28,7 +28,7 @@ import convex.core.data.Vectors;
  */
 public class ContextTest {
 
-	private final Context<?> CTX = TestState.INITIAL_CONTEXT.fork();
+	private final Context<?> CTX = TestState.CONTEXT.fork();
 
 	@Test
 	public void testDefine() {

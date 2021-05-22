@@ -36,7 +36,7 @@ public class SimpleNFTTest {
 	private static final Context<?> CTX;
 	
 	static {
-		Context<?> ctx=TestState.INITIAL_CONTEXT.fork();
+		Context<?> ctx=TestState.CONTEXT.fork();
 		try {
 			ctx=ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/simple-nft.con")));
 			Address nft=(Address) ctx.getResult();

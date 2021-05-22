@@ -19,16 +19,17 @@ import convex.core.lang.TestState;
 import convex.test.Samples;
 
 public class PeerTest {
+	static State STATE=Init.createState();
+	AKeyPair PEER0 = Init.KEYPAIRS[0];
 
 	@Test
 	public void testInitial() throws BadSignatureException {
-		AKeyPair PEER0 = TestState.FIRST_PEER_KEYPAIR;
-		Peer p = Peer.create(PEER0, TestState.STATE);
+		Peer p = Peer.create(PEER0, STATE);
 
 		// initial checks
 		long timestamp = p.getTimeStamp();
 		assertEquals(timestamp, Constants.INITIAL_TIMESTAMP);
-		assertSame(TestState.STATE, p.getConsensusState());
+		assertSame(STATE, p.getConsensusState());
 
 		// Belief check
 		AccountKey peerKey = p.getPeerKey();
@@ -51,13 +52,12 @@ public class PeerTest {
 
 	@Test
 	public void testNullPeers() {
-		assertNull(Init.STATE.getPeer(TestState.HERO_KP.getAccountKey())); // hero not a peer in initial state
+		assertNull(STATE.getPeer(TestState.HERO_KP.getAccountKey())); // hero not a peer in initial state
 	}
 	
 	@Test
 	public void testQuery() throws BadSignatureException {
-		AKeyPair PEER0 = TestState.FIRST_PEER_KEYPAIR;
-		Peer p = Peer.create(PEER0, TestState.STATE);
+		Peer p = Peer.create(PEER0, STATE);
 		
 		assertEquals(RT.cvm(3L),p.executeQuery(Reader.read("(+ 1 2)")).getResult());
 		assertEquals(Init.HERO,p.executeQuery(Reader.read("*address*"),Init.HERO).getResult());
@@ -69,7 +69,7 @@ public class PeerTest {
 	public void testStakeAccess() {
 		// use peer address from first peer for testing
 		AccountKey pa = TestState.FIRST_PEER_KEY;
-		PeerStatus ps = Init.STATE.getPeer(pa);
+		PeerStatus ps = STATE.getPeer(pa);
 		long initialStake = ps.getOwnStake();
 		assertEquals(initialStake, ps.getTotalStake());
 
@@ -84,8 +84,7 @@ public class PeerTest {
 
 	@Test
 	public void testAsOf() {
-		AKeyPair PEER0 = TestState.FIRST_PEER_KEYPAIR;
-		Peer p = Peer.create(PEER0, TestState.STATE);
+		Peer p = Peer.create(PEER0, STATE);
 
 		CVMLong timestamp = p.getStates().get(0).getTimeStamp();
 
@@ -101,8 +100,7 @@ public class PeerTest {
 
 	@Test
 	public void testAsOfRange() {
-		AKeyPair PEER0 = TestState.FIRST_PEER_KEYPAIR;
-		Peer p = Peer.create(PEER0, TestState.STATE);
+		Peer p = Peer.create(PEER0, STATE);
 
 		CVMLong initialTimestamp = p.getStates().get(0).getTimeStamp();
 

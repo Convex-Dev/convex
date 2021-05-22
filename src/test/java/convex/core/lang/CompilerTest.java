@@ -7,21 +7,19 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static convex.core.lang.TestState.*;
 
 import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
-
 import convex.core.Init;
-import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
+import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
@@ -37,51 +35,10 @@ import convex.core.lang.ops.Lookup;
 import convex.core.util.Utils;
 import convex.test.Samples;
 
-public class CompilerTest {
+public class CompilerTest extends ACVMTest {
 	
-	@SuppressWarnings("unchecked")
-	public <T extends AOp<?>> T comp(String source, Context<?> context) {
-		ACell form=Reader.read(source);
-		AOp<?> code = context.fork().expandCompile(form).getResult();
-		return (T) code;
-	}
-	
-	public <T extends AOp<?>> T comp(String source) {
-		return comp(source,CONTEXT);
-	}
-	
-	private static final Context<?> CONTEXT=TestState.INITIAL_CONTEXT.fork();
-	private static final State INITIAL=CONTEXT.getState();
-
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> Context<T> step(Context<?> c, String source) {
-		ACell form = Reader.readSyntax(source);
-		Context<AOp<ACell>> cctx=c.fork().expandCompile(form);
-		if (cctx.isExceptional()) return (Context<T>) cctx;
-		
-		AOp<?> op = (AOp<?>) cctx.getResult();
-		Context<T> rctx = (Context<T>) c.fork().execute(op);
-		return rctx;
-	}
-
-	public static <T extends ACell> Context<T> step(String source) {
-		return step(CONTEXT, source);
-	}
-
-	@SuppressWarnings("unchecked")
-	public static <T> T eval(String source) {
-		return (T) step(source).getValue();
-	}
-	
-	public Syntax expand(String source) {
-		try {
-			ACell form=Reader.read(source);
-			Syntax expanded =CONTEXT.fork().expand(form).getResult();
-			return expanded;
-		}
-		catch (Exception e) {
-			throw Utils.sneakyThrow(e);
-		}
+	protected CompilerTest() {
+		super(Init.createBaseAccounts());
 	}
 	
 	@Test 
@@ -179,12 +136,16 @@ public class CompilerTest {
 	
 	@Test public void testDefMetadataOnLiteral() {
 		Context<?> ctx=step("(def a ^:foo 2)");
+		assertNotError(ctx);
 		Syntax stx=ctx.getEnvironment().getEntry(Symbol.create("a")).getValue();
 		assertSame(CVMBool.TRUE,stx.getMeta().get(Keywords.FOO));
 	}
 	
 	@Test public void testDefMetadataOnForm() {
-		Context<?> ctx=step("(def a ^:foo (+ 1 2))");
+		String code="(def a ^:foo (+ 1 2))";
+		
+		Context<?> ctx=step(code);
+		assertNotError(ctx);
 		Syntax stx=ctx.getEnvironment().getEntry(Symbol.create("a")).getValue();
 		assertCVMEquals(3L,stx.getValue());
 		assertSame(CVMBool.TRUE,stx.getMeta().get(Keywords.FOO));
@@ -192,6 +153,7 @@ public class CompilerTest {
 	
 	@Test public void testDefMetadataOnSymbol() {
 		Context<?> ctx=step("(def ^{:foo true} a (+ 1 2))");
+		assertNotError(ctx);
 		Syntax stx=ctx.getEnvironment().getEntry(Symbol.create("a")).getValue();
 		assertCVMEquals(3L,stx.getValue());
 		assertSame(CVMBool.TRUE,stx.getMeta().get(Keywords.FOO));
@@ -227,7 +189,7 @@ public class CompilerTest {
 	@Test
 	public void testStackOverflow()  {
 		// fake state with default juice
-		Context<?> c=Context.createFake(INITIAL, TestState.HERO);
+		Context<?> c=CONTEXT.fork();
 		
 		AOp<CVMLong> op=Do.create(
 				    // define a nasty function that calls its argument recursively on itself
@@ -253,12 +215,20 @@ public class CompilerTest {
 	
 	@Test 
 	public void testUnquote() {
-		assertEquals(3L,evalL("~(+ 1 2)"));
+		assertEquals(RT.cvm(3L),eval("~(+ 1 2)"));
 		
-		assertEquals(2L,evalL("~*depth*")); // depth in compiler
-		assertEquals(3L,evalL("~(do *depth*)")); // depth in compiler
-		assertEquals(1L,evalL("'~*depth*")); // depth in expansion
-		assertEquals(2L,evalL("'~(do *depth*)")); // depth in expansion
+		assertEquals(RT.cvm(2L),eval("~*depth*")); // depth in compiler
+		assertEquals(RT.cvm(3L),eval("~(do *depth*)")); // depth in compiler
+		assertEquals(RT.cvm(1L),eval("'~*depth*")); // depth in expansion
+		assertEquals(RT.cvm(2L),eval("'~(do *depth*)")); // depth in expansion
+		
+		// Misc cases
+		assertNull(eval("'~nil"));
+		assertEquals(Keywords.STATE,eval("(let [a :state] '~a)"));
+		assertEquals(Vectors.of(1L,3L),eval("'[1 ~(+ 1 2)]"));
+		assertEquals(Lists.of(Symbols.INC,3L),eval("'(inc ~(+ 1 2))"));
+		assertUndeclaredError(step("'~undefined-1"));
+		assertUndeclaredError(step("~'undefined-1"));
 
 		// not we require compilation down to a single constant
 		assertEquals(Constant.of(7L),comp("~(+ 7)"));
@@ -283,29 +253,27 @@ public class CompilerTest {
 	
 	@Test 
 	public void testQuote() {
-		assertNull(eval("'~nil"));
-		assertNull(eval("'nil"));
+		assertEquals(Symbols.FOO,eval("(quote foo)"));
 		assertEquals(Symbols.COUNT,eval("'count"));
+		assertNull(eval("'nil"));
 		assertEquals(Lists.of(Symbols.QUOTE,Symbols.COUNT),eval("''count"));
-		assertEquals(Keywords.STATE,eval("':state"));
-		assertEquals(Keywords.STATE,eval("(let [a :state] '~a)"));
-		assertEquals(Vectors.of(Symbols.INC,Symbols.DEC),eval("'[inc dec]"));
-		assertEquals(Vectors.of(1L,3L),eval("'[1 ~(+ 1 2)]"));
-		assertEquals(Lists.of(Symbols.INC,3L),eval("'(inc 3)"));
-		assertEquals(Lists.of(Symbols.INC,3L),eval("'(inc ~(+ 1 2))"));
+		assertEquals(Lists.of(Symbols.QUOTE,Lists.of(Symbols.UNQUOTE,Symbols.COUNT)),eval("''~count"));
 		
-		assertTrue(evalB("(= (quote a/b) 'a/b)"));
+		assertEquals(Keywords.STATE,eval("':state"));
+		assertEquals(Lists.of(Symbols.INC,3L),eval("'(inc 3)"));
+		
+		assertEquals(Vectors.of(Symbols.INC,Symbols.DEC),eval("'[inc dec]"));
+		
+		assertSame(CVMBool.TRUE,eval("(= (quote a/b) 'a/b)"));
 		
 		assertEquals(Symbol.create("undefined-1"),eval("'undefined-1"));
-		assertUndeclaredError(step("'~undefined-1"));
-		assertUndeclaredError(step("~'undefined-1"));
 	}
 	
 	@Test 
 	public void testNestedQuote() {
-		assertEquals(10L,evalL("(+ (eval '(+ 1 ~2 ~(eval 3) ~(eval '(+ 0 4)))))"));
+		assertEquals(RT.cvm(10L),eval("(+ (eval '(+ 1 ~2 ~(eval 3) ~(eval '(+ 0 4)))))"));
 
-		assertEquals(10L,evalL("(let [a 2 b 3] (eval '(+ 1 ~a ~(+ b 4))))"));
+		assertEquals(RT.cvm(10L),eval("(let [a 2 b 3] (eval '(+ 1 ~a ~(+ b 4))))"));
 	}
 	
 	@Test 
@@ -457,12 +425,34 @@ public class CompilerTest {
 	}
 	
 	@Test
-	public void testExpander()  {
+	public void testDefExpander()  {
 		Context<?> c=CONTEXT.fork();	
 		
 		c=c.execute(comp("(defexpander bex [x e] (syntax \"foo\"))"));
 		c=c.execute(comp("(bex 2)",c));
-		assertEquals("foo",c.getResult().toString());
+		assertEquals(Strings.create("foo"),c.getResult());
+	}
+	
+	@Test public void testExpansion() {
+		assertEquals(Syntax.create(Keywords.FOO),expand(":foo"));
+		
+		assertEquals(Syntax.create(Keywords.FOO,Maps.of(Keywords.BAR,CVMBool.TRUE)),Reader.read("^:bar :foo"));
+		assertEquals(Syntax.create(Keywords.FOO,Maps.of(Keywords.BAR,CVMBool.TRUE)),expand("^:bar :foo"));
+	}
+	
+	@Test
+	public void testQuoteExpand()  {
+		assertEquals(Syntax.create(null),expand("nil"));
+		assertEquals(Syntax.create(Lists.of(Syntax.of(Symbols.QUOTE),Symbols.FOO)),expand("'foo"));
+		assertEquals(Syntax.create(Lists.of(Syntax.of(Symbols.QUOTE),Lists.of(Symbols.UNQUOTE,Symbols.FOO))),expand("'~foo"));
+		assertEquals(Syntax.create(Lists.of(Syntax.of(Symbols.QUOTE),Lists.of(Symbols.QUOTE,Lists.of(Symbols.UNQUOTE,Symbols.FOO)))),expand("''~foo"));
+	}
+	
+	@Test
+	public void testQuoteCompile()  {
+		assertEquals(Constant.create((ACell)null),comp("nil"));
+		assertEquals(Lookup.create(Init.HERO,Symbols.FOO),comp("foo"));
+		assertEquals(Lookup.create(Init.HERO,Symbols.FOO),comp("'~foo"));
 	}
 	
 	@Test 

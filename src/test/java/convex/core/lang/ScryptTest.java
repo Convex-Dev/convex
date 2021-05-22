@@ -20,7 +20,7 @@ import convex.core.data.prim.*;
 
 public class ScryptTest {
 
-    static final Context<?> CON = TestState.INITIAL_CONTEXT.fork();
+    static final Context<?> CON = TestState.CONTEXT.fork();
 
     static Scrypt scrypt() {
         return Parboiled.createParser(Scrypt.class);

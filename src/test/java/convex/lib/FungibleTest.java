@@ -30,7 +30,7 @@ public class FungibleTest {
 
 	
 	private static Context<?> loadFungible() {
-		Context<?> ctx=TestState.INITIAL_CONTEXT.fork();
+		Context<?> ctx=TestState.CONTEXT.fork();
 		assert(ctx.getDepth()==0):"Invalid depth: "+ctx.getDepth();
 		try {
 			ctx=ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/fungible.con")));

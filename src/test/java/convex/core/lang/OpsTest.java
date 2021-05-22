@@ -12,7 +12,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Init;
-import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
@@ -38,15 +37,17 @@ import convex.core.lang.ops.Lookup;
  * In general, focused on unit testing special op capabilities. General on-chain
  * behaviour should be covered elsewhere.
  */
-public class OpsTest {
+public class OpsTest extends ACVMTest {
 
-	private static final State INITIAL = TestState.STATE;
-	private static final long INITIAL_JUICE = TestState.INITIAL_JUICE;
-	private static final Context<?> INITIAL_CONTEXT = TestState.INITIAL_CONTEXT.fork();
+	protected OpsTest() {
+		super(Init.createBaseAccounts());
+	}
+
+	private final long INITIAL_JUICE = CONTEXT.getJuice();
 
 	@Test
 	public void testConstant() {
-		Context<?> c = INITIAL_CONTEXT.fork();
+		Context<?> c = CONTEXT.fork();
 
 		{// simple long constant
 			AOp<CVMLong> op = Constant.of(10L);
@@ -68,7 +69,7 @@ public class OpsTest {
 	@Test
 	public void testOutOfJuice() {
 		long JUICE = Juice.CONSTANT - 1; // insufficient juice to run operation
-		Context<?> c = Context.createInitial(INITIAL, TestState.HERO, JUICE);
+		Context<?> c = Context.createInitial(INITIAL, Init.HERO, JUICE);
 
 		AOp<CVMLong> op = Constant.of(10L);
 		assertJuiceError(c.execute(op));
@@ -76,10 +77,10 @@ public class OpsTest {
 
 	@Test
 	public void testDef() {
-		Context<?> c1 = INITIAL_CONTEXT.fork();
+		Context<?> c1 = CONTEXT.fork();
 
 		Symbol fooSym = Symbol.create("foo");
-		AOp<AString> op = Def.create(Syntax.create(fooSym), Constant.create("bar"));
+		AOp<AString> op = Def.create(Syntax.create(fooSym), Constant.createString("bar"));
 
 		AMap<Symbol, Syntax> env1 = c1.getEnvironment();
 		Context<AString> c2 = c1.execute(op);
@@ -104,16 +105,16 @@ public class OpsTest {
 
 	@Test
 	public void testUndeclaredLookup() {
-		Context<?> c = INITIAL_CONTEXT.fork();
+		Context<?> c = CONTEXT.fork();
 		AOp<AString> op = Lookup.create("missing-symbol");
 		assertUndeclaredError(c.execute(op));
 	}
 
 	@Test
 	public void testDo() {
-		Context<?> c = INITIAL_CONTEXT.fork();
+		Context<?> c = CONTEXT.fork();
 
-		AOp<AString> op = Do.create(Def.create("foo", Constant.create("bar")), Lookup.create("foo"));
+		AOp<AString> op = Do.create(Def.create("foo", Constant.createString("bar")), Lookup.create("foo"));
 
 		Context<AString> c2 = c.execute(op);
 		long expectedJuice = INITIAL_JUICE - (Juice.CONSTANT + Juice.DEF + Juice.LOOKUP_DYNAMIC + Juice.DO);
@@ -123,19 +124,19 @@ public class OpsTest {
 
 	@Test
 	public void testLet() {
-		Context<?> c = INITIAL_CONTEXT.fork();
+		Context<?> c = CONTEXT.fork();
 		AOp<AString> op = Let.create(Vectors.of(Syntax.create(Symbols.FOO)),
-				Vectors.of(Constant.create("bar"), Lookup.create("foo")), false);
+				Vectors.of(Constant.createString("bar"), Lookup.create("foo")), false);
 		Context<AString> c2 = c.execute(op);
 		assertEquals("bar", c2.getResult().toString());
 	}
 
 	@Test
 	public void testCondTrue() {
-		Context<?> c = INITIAL_CONTEXT.fork();
+		Context<?> c = CONTEXT.fork();
 
-		AOp<AString> op = Cond.create(Constant.of(true), Constant.create("trueResult"),
-				Constant.create("falseResult"));
+		AOp<AString> op = Cond.create(Constant.of(true), Constant.createString("trueResult"),
+				Constant.createString("falseResult"));
 
 		Context<AString> c2 = c.execute(op);
 
@@ -146,10 +147,10 @@ public class OpsTest {
 
 	@Test
 	public void testCondFalse() {
-		Context<?> c = INITIAL_CONTEXT.fork();
+		Context<?> c = CONTEXT.fork();
 
-		AOp<AString> op = Cond.create(Constant.of(false), Constant.create("trueResult"),
-				Constant.create("falseResult"));
+		AOp<AString> op = Cond.create(Constant.of(false), Constant.createString("trueResult"),
+				Constant.createString("falseResult"));
 
 		Context<AString> c2 = c.execute(op);
 
@@ -160,9 +161,9 @@ public class OpsTest {
 
 	@Test
 	public void testCondNoResult() {
-		Context<?> c = INITIAL_CONTEXT.fork();
+		Context<?> c = CONTEXT.fork();
 
-		AOp<AString> op = Cond.create(Constant.of(false), Constant.create("trueResult"));
+		AOp<AString> op = Cond.create(Constant.of(false), Constant.createString("trueResult"));
 
 		Context<AString> c2 = c.execute(op);
 
@@ -173,12 +174,12 @@ public class OpsTest {
 
 	@Test
 	public void testCondEnvironmentChange() {
-		Context<?> c = INITIAL_CONTEXT.fork();
+		Context<?> c = CONTEXT.fork();
 
 		Symbol sym = Symbol.create("val");
 
 		AOp<AString> op = Cond.create(Do.create(Def.create(sym, Constant.of(false)), Constant.of(false)),
-				Constant.create("1"), Lookup.create(sym), Constant.of("2"),
+				Constant.createString("1"), Lookup.create(sym), Constant.of("2"),
 				Do.create(Def.create(sym, Constant.of(true)), Constant.of(false)), Constant.of("3"),
 				Lookup.create(sym), Constant.of("4"), Constant.of("5"));
 
@@ -188,12 +189,12 @@ public class OpsTest {
 
 	@Test
 	public void testInvoke() {
-		Context<?> c = INITIAL_CONTEXT.fork();
+		Context<?> c = CONTEXT.fork();
 
 		Symbol sym = Symbol.create("arg0");
 
 		Invoke<AString> op = Invoke.create(Lambda.create(Vectors.of(Syntax.create(sym)), Lookup.create(sym)),
-				Constant.create("bar"));
+				Constant.createString("bar"));
 
 		Context<AString> c2 = c.execute(op);
 		assertEquals("bar", c2.getResult().toString());
@@ -212,7 +213,7 @@ public class OpsTest {
 
 	@Test
 	public void testLambda() {
-		Context<?> c = INITIAL_CONTEXT.fork();
+		Context<?> c = CONTEXT.fork();
 
 		Symbol sym = Symbol.create("arg0");
 

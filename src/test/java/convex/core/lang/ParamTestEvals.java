@@ -22,7 +22,7 @@ import convex.core.util.Utils;
 public class ParamTestEvals {
 
 	private static long INITIAL_JUICE = TestState.INITIAL_JUICE;
-	private static final Context<?> INITIAL_CONTEXT = TestState.INITIAL_CONTEXT.fork();
+	private static final Context<?> INITIAL_CONTEXT = TestState.CONTEXT.fork();
 
 	private static final Address TEST_CONTRACT = TestState.CONTRACTS[0];
 

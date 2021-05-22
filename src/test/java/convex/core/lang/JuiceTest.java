@@ -12,10 +12,13 @@ import convex.core.data.ACell;
  * These are not your regular example based tests. These are handcrafted,
  * artisinal juice tests.
  */
-public class JuiceTest {
+public class JuiceTest extends ACVMTest {
 
-	private static Context<?> CONTEXT = TestState.INITIAL_CONTEXT.fork();
-	private static long JUICE = CONTEXT.getJuice();
+	public JuiceTest() {
+		super(TestState.STATE);
+	}
+	
+	private long JUICE = CONTEXT.getJuice();
 
 	/**
 	 * Compute the precise juice consumed by executing the compiled source code

@@ -1,11 +1,5 @@
 package convex.core.lang;
 
-import static convex.core.lang.TestState.eval;
-import static convex.core.lang.TestState.evalB;
-import static convex.core.lang.TestState.evalD;
-import static convex.core.lang.TestState.evalL;
-import static convex.core.lang.TestState.evalS;
-import static convex.core.lang.TestState.step;
 import static convex.test.Assertions.assertArgumentError;
 import static convex.test.Assertions.assertArityError;
 import static convex.test.Assertions.assertAssertError;
@@ -30,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
@@ -79,11 +75,13 @@ import convex.core.lang.ops.Constant;
  * Needs completely deterministic, fully specified behaviour if we want
  * consistent results so we need to do a lot of negative testing here.
  */
-public class CoreTest {
+public class CoreTest extends ACVMTest {
 
-	private static final State INITIAL = TestState.STATE;
-	private static final long INITIAL_JUICE = TestState.INITIAL_JUICE;
-	private static final Context<?> INITIAL_CONTEXT= TestState.INITIAL_CONTEXT.fork();
+	protected CoreTest() throws IOException {
+		super(Init.createCoreLibraries());
+	}
+
+	private final Context<?> INITIAL_CONTEXT= CONTEXT.fork();
 
 	@Test
 	public void testAliases() {
@@ -93,7 +91,7 @@ public class CoreTest {
 	
 	@Test
 	public void testAddress() {
-		Address a = TestState.HERO;
+		Address a = Init.HERO;
 		assertEquals(a, eval("(address \"" + a.toHexString() + "\")"));
 		assertEquals(a, eval("(address 0x" + a.toHexString() + ")"));
 		assertEquals(a, eval("(address (address \"" + a.toHexString() + "\"))"));
@@ -1561,8 +1559,8 @@ public class CoreTest {
 	@Test
 	public void testImportCore() {
 		Context<?> ctx = step("(import convex.core :as cc)");
-		assertFalse(ctx.isExceptional());
-		assertEquals((Object)eval(ctx,"count"),eval(ctx,"cc/count"));
+		assertNotError(ctx);
+		assertEquals(eval(ctx,"count"),eval(ctx,"cc/count"));
 	}
 	
 
@@ -1747,14 +1745,12 @@ public class CoreTest {
 	public void testBalance() {
 
 		// hero balance, should reflect cost of initial juice
-		String a0 = TestState.HERO.toHexString();
-		Long expectedHeroBalance = TestState.HERO_BALANCE;
-		assertEquals(expectedHeroBalance, evalL("(let [a (address \"" + a0 + "\")] (balance a))"));
+		Long expectedHeroBalance = HERO_BALANCE;
+		assertEquals(expectedHeroBalance, evalL("(let [a (address " + Init.HERO + ")] (balance a))"));
 
 		// someone else's balance
-		String a1 = TestState.VILLAIN.toHexString();
-		Long expectedVillainBalance = TestState.VILLAIN_BALANCE;
-		assertEquals(expectedVillainBalance, evalL("(let [a (address \"" + a1 + "\")] (balance a))"));
+		Long expectedVillainBalance = VILLAIN_BALANCE;
+		assertEquals(expectedVillainBalance, evalL("(let [a (address " + Init.VILLAIN + ")] (balance a))"));
 
 		assertCastError(step("(balance nil)"));
 		assertCastError(step("(balance 0x00)"));
@@ -2075,7 +2071,7 @@ public class CoreTest {
 		// SECURITY: don't mess with these tests
 
 		// balance at start of transaction
-		long BAL = TestState.HERO_BALANCE;
+		long BAL = HERO_BALANCE;
 
 		Address HERO = TestState.HERO;
 
@@ -2091,7 +2087,7 @@ public class CoreTest {
 		
 		
 		// String representing a new User Address
-		Context<Address> ctx=step("(create-account "+TestState.HERO_KP.getAccountKey()+")");
+		Context<Address> ctx=step("(create-account "+Init.HERO_KP.getAccountKey()+")");
 		Address naddr=ctx.getResult();
 
 		// transfers to a new address
@@ -2127,9 +2123,10 @@ public class CoreTest {
 	
 	@Test
 	public void testStake() {
-		Context<ACell> ctx=step(INITIAL_CONTEXT,"(def my-peer 0x"+TestState.FIRST_PEER_KEY.toHexString()+")");
-		AccountKey MY_PEER=TestState.FIRST_PEER_KEY;
-		long PS=ctx.getState().getPeer(TestState.FIRST_PEER_KEY).getOwnStake();
+		AccountKey FIRST_PEER=Init.KEYPAIRS[0].getAccountKey();
+		Context<ACell> ctx=step(INITIAL_CONTEXT,"(def my-peer 0x"+FIRST_PEER.toHexString()+")");
+		AccountKey MY_PEER=FIRST_PEER;
+		long PS=ctx.getState().getPeer(FIRST_PEER).getOwnStake();
 		
 		{
 			// simple case of staking 1000000 on first peer of the realm
@@ -2733,8 +2730,6 @@ public class CoreTest {
 		assertEquals(Syntax.of(42L),eval(ctx,"(expand 42 expand-once)"));
 	}
 	
-	
-	
 	@Test
 	public void testSetStar() {
 		assertEquals(13L,evalL("(set* 'a 13)"));
@@ -2821,8 +2816,8 @@ public class CoreTest {
 		Address monitor = (Address) ctx.getResult();
 		ctx=step(ctx,"(set-controller "+monitor+")");
 		
-		ctx=ctx.forkWithAddress(TestState.VILLAIN);
-		ctx=step(ctx,"(def hero "+TestState.HERO+")");
+		ctx=ctx.forkWithAddress(Init.VILLAIN);
+		ctx=step(ctx,"(def hero "+Init.HERO+")");
 		
 		assertEquals(3L, evalL(ctx,"(eval-as hero '(+ 1 2))"));
 	}
@@ -2865,12 +2860,12 @@ public class CoreTest {
 	@Test
 	public void testEvalAsNotWhitelistedUser() {
 		// create trust monitor that allows HERO only
-		Context<?> ctx=step("(deploy '(do (defn check-trusted? [s a o] (= s (address "+TestState.HERO+"))) (export check-trusted?)))");
+		Context<?> ctx=step("(deploy '(do (defn check-trusted? [s a o] (= s (address "+Init.HERO+"))) (export check-trusted?)))");
 		Address monitor = (Address) ctx.getResult();
 		ctx=step(ctx,"(set-controller "+monitor+")");
 		
-		ctx=ctx.forkWithAddress(TestState.VILLAIN);
-		ctx=step(ctx,"(def hero "+TestState.HERO+")");
+		ctx=ctx.forkWithAddress(Init.VILLAIN);
+		ctx=step(ctx,"(def hero "+Init.HERO+")");
 		
 		assertTrustError(step(ctx,"(eval-as hero '(+ 1 2))"));
 	}
@@ -2878,8 +2873,8 @@ public class CoreTest {
 	@Test
 	public void testSetController() {
 		// set-controller returns new controller
-		assertEquals(TestState.VILLAIN, eval("(set-controller "+TestState.VILLAIN+")"));
-		assertEquals(TestState.VILLAIN, eval("(set-controller (address "+TestState.VILLAIN+"))"));
+		assertEquals(Init.VILLAIN, eval("(set-controller "+Init.VILLAIN+")"));
+		assertEquals(Init.VILLAIN, eval("(set-controller (address "+Init.VILLAIN+"))"));
 		assertEquals(null, (Address)eval("(set-controller nil)"));
 		
 		assertNobodyError(step("(set-controller #666666)")); // non-existent account
@@ -2914,11 +2909,11 @@ public class CoreTest {
 
 		assertTrue(step(ctx, "(do a)").isExceptional());
 
-		Block b = Block.of(expectedTS,TestState.FIRST_PEER_KEY);
+		Block b = Block.of(expectedTS,Init.KEYPAIRS[0].getAccountKey());
 		BlockResult br = s.applyBlock(b);
 		State s2 = br.getState();
 
-		Context<?> ctx2 = Context.createInitial(s2, TestState.HERO, INITIAL_JUICE);
+		Context<?> ctx2 = Context.createInitial(s2, Init.HERO, INITIAL_JUICE);
 		assertEquals(2L, evalL(ctx2, "a"));
 	}
 
@@ -2959,6 +2954,12 @@ public class CoreTest {
 	public void testMacro() {
 		Context<?> c=step("(defmacro foo [] :foo)");
 		assertEquals(Keywords.FOO,eval(c,"(foo)"));
+	}
+	
+	@Test 
+	public void testQuote() {
+		assertEquals(Vectors.of(1,2,3),eval("(quote [1 2 3])"));
+		assertEquals(Vectors.of(1,Lists.of(Symbols.IF,4,7),3),eval("(quote [1 (if 4 7) 3])"));
 	}
 
 	@Test
@@ -3126,7 +3127,7 @@ public class CoreTest {
 	@Test
 	public void testSpecialBalance() {
 		// balance should return exact balance of account after execution
-		Address HERO = TestState.HERO;
+		Address HERO = Init.HERO;
 		Context<?> ctx = step("(long *balance*)");
 		Long bal=ctx.getAccountStatus(HERO).getBalance();
 		assertCVMEquals(bal, ctx.getResult());
@@ -3144,7 +3145,7 @@ public class CoreTest {
 	
 	@Test
 	public void testSpecialCaller() {
-		Address HERO = TestState.HERO;
+		Address HERO = Init.HERO;
 		assertNull(eval("*caller*"));
 		assertEquals(HERO, eval("(do (def c (deploy '(do (defn f [] *caller*) (export f)))) (call c (f)))"));
 	}
@@ -3171,7 +3172,7 @@ public class CoreTest {
 	
 	@Test
 	public void testSpecialKey() {
-		assertEquals(TestState.HERO_KP.getAccountKey(), eval("*key*"));
+		assertEquals(Init.HERO_KP.getAccountKey(), eval("*key*"));
 	}
 	
 	@Test
@@ -3198,7 +3199,7 @@ public class CoreTest {
 		assertSame(BlobMaps.empty(),eval("*holdings*"));
 		
 		// Test set-holding modifies *holdings* as expected
-		Address HERO = TestState.HERO;
+		Address HERO = Init.HERO;
 		assertNull(eval("(get-holding *address*)"));
 		assertEquals(BlobMaps.of(HERO,1L),eval("(do (set-holding *address* 1) *holdings*)"));
 		
@@ -3207,8 +3208,8 @@ public class CoreTest {
 	}
 	
 	@Test public void testHoldings() {
-		Address VILLAIN = TestState.VILLAIN;
-		Address HERO = TestState.HERO;
+		Address VILLAIN = Init.VILLAIN;
+		Address HERO = Init.HERO;
 		Context<?> ctx = step("(def VILLAIN (address \""+VILLAIN.toHexString()+"\"))");
 		assertTrue(eval(ctx,"VILLAIN") instanceof Address);
 		ctx=step(ctx,"(def NOONE (address 7777777))");

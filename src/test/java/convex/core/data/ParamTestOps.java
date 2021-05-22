@@ -45,14 +45,14 @@ public class ParamTestOps {
 					    { "Constant", Constant.of(1L), RT.cvm(1L) },
 						{ "Lookup", Do.create(Def.create("foo", Constant.of(13)), 
 								Lookup.create("foo")), RT.cvm(13) },
-						{ "Def", Def.create("foo", Constant.create("bar")), Strings.create("bar") },
-						{ "Vector", Invoke.create("vector", Constant.create("foo"), Constant.create("bar")),
+						{ "Def", Def.create("foo", Constant.createString("bar")), Strings.create("bar") },
+						{ "Vector", Invoke.create("vector", Constant.createString("foo"), Constant.createString("bar")),
 								Vectors.of(Strings.create("foo"), Strings.create("bar")) },
 
-						{ "Do", Do.create(Constant.create("foo"), Constant.create("bar")), Strings.create("bar") },
+						{ "Do", Do.create(Constant.createString("foo"), Constant.createString("bar")), Strings.create("bar") },
 						{ "Cond",
-								Cond.create(Constant.of(CVMBool.TRUE), Constant.create("truthy"),
-										Constant.create("falsey")),
+								Cond.create(Constant.of(CVMBool.TRUE), Constant.createString("truthy"),
+										Constant.createString("falsey")),
 								Strings.create("truthy") },
 						{ "Def", Def.create("foo", Constant.of(1L)), 1L } });
 	}

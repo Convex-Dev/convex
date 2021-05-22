@@ -1,12 +1,8 @@
 package convex.actors;
 
-import static convex.core.lang.TestState.eval;
-import static convex.core.lang.TestState.evalB;
-import static convex.core.lang.TestState.evalD;
-import static convex.core.lang.TestState.evalL;
-import static convex.core.lang.TestState.step;
-import static convex.core.lang.TestState.stepAs;
-import static convex.test.Assertions.*;
+import static convex.test.Assertions.assertAssertError;
+import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertStateError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -20,12 +16,17 @@ import convex.core.Init;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Maps;
+import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
 
-public class PredictionMarketTest {
+public class PredictionMarketTest extends ACVMTest {
+
+	protected PredictionMarketTest() {
+		super(TestState.STATE);
+	}
 
 	@SuppressWarnings("rawtypes")
 	private <T> T evalCall(Context<?> ctx,Address addr, long offer, String name, Object... args) {
@@ -51,7 +52,7 @@ public class PredictionMarketTest {
 		String contractString = Utils.readResourceAsString("actors/prediction-market.con");
 			
 		// Run code to initialise actor with [oracle oracle-key outcomes]
-		Context ctx = TestState.INITIAL_CONTEXT.fork();
+		Context ctx = TestState.CONTEXT.fork();
 		ctx=step("(deploy ("+contractString+" *address* :bar #{true,false}))");
 		
 		Address addr = (Address) ctx.getResult();
@@ -118,8 +119,8 @@ public class PredictionMarketTest {
 	@Test
 	public void testPayouts() throws IOException {
 		// setup address for this little play
-		Address VILLAIN = TestState.VILLAIN;
-		Address HERO = TestState.HERO;
+		Address VILLAIN = Init.VILLAIN;
+		Address HERO = Init.HERO;
 		Context<?> ctx = step("(do (def HERO " + HERO + ") (def VILLAIN " + VILLAIN + ") )");
 
 		// deploy an oracle contract.
@@ -160,11 +161,11 @@ public class PredictionMarketTest {
 			// collect payouts
 			c = step(c, "(call pmaddr (payout))");
 			assertCVMEquals(0L, c.getResult());
-			assertEquals(TestState.HERO_BALANCE - 4000, c.getBalance(TestState.HERO));
+			assertEquals(HERO_BALANCE - 4000, c.getBalance(TestState.HERO));
 
 			c = stepAs(VILLAIN, c, "(call pmaddr (payout))");
 			assertCVMEquals(5000L, c.getResult());
-			assertEquals(TestState.HERO_BALANCE + 4000, c.getBalance(TestState.VILLAIN));
+			assertEquals(HERO_BALANCE + 4000, c.getBalance(TestState.VILLAIN));
 
 			assertEquals(0L, c.getBalance(pmaddr));
 			assertEquals(TestState.TOTAL_FUNDS, c.getState().computeTotalFunds());

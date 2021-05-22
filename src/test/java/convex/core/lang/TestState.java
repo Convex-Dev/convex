@@ -50,9 +50,12 @@ public class TestState {
 	 */
 	public static final State STATE;
 	
+
+	
 	static {
 		
 		try {
+			
 			State s = Init.createState();
 			Context<?> ctx = Context.createFake(s, HERO);
 			for (int i = 0; i < NUM_CONTRACTS; i++) {
@@ -69,7 +72,7 @@ public class TestState {
 								
 			s= ctx.getState();
 			STATE = s;
-			INITIAL_CONTEXT = Context.createFake(STATE, TestState.HERO);
+			CONTEXT = Context.createFake(STATE, TestState.HERO);
 		} catch (Throwable e) {
 			e.printStackTrace();
 			throw new Error(e);
@@ -89,23 +92,16 @@ public class TestState {
 	/**
 	 * A test context set up with a few accounts
 	 */
-	public static final Context<?> INITIAL_CONTEXT;
+	public static final Context<?> CONTEXT;
 
-	/**
-	 * Balance of hero's account before spending any juice / funds
-	 */
-	public static final long HERO_BALANCE = STATE.getAccount(HERO).getBalance();
 
-	/**
-	 * Balance of hero's account before spending any juice / funds
-	 */
-	public static final long VILLAIN_BALANCE = STATE.getAccount(VILLAIN).getBalance();
 
 	/**
 	 * Total funds in the test state, minus those subtracted for juice in the
 	 * initial context
 	 */
 	public static final Long TOTAL_FUNDS = Constants.MAX_SUPPLY;
+
 	
 
 
@@ -190,7 +186,7 @@ public class TestState {
 	}
 	
 	public static double evalD(String source) {
-		return evalD(INITIAL_CONTEXT,source);
+		return evalD(CONTEXT,source);
 	}
 
 	public static long evalL(Context<?> ctx, String source) {
@@ -201,7 +197,7 @@ public class TestState {
 	}
 
 	public static long evalL(String source) {
-		return evalL(INITIAL_CONTEXT,source);
+		return evalL(CONTEXT,source);
 	}
 	
 	public static String evalS(String source) {
@@ -214,7 +210,7 @@ public class TestState {
 	}
 
 	public static <T extends ACell> Context<T> step(String source) {
-		return step(INITIAL_CONTEXT, source);
+		return step(CONTEXT, source);
 	}
 
 	/**
@@ -252,9 +248,9 @@ public class TestState {
 	}
 	
 	@Test public void testStateSetup() {
-		assertEquals(0,INITIAL_CONTEXT.getDepth());
-		assertFalse(INITIAL_CONTEXT.isExceptional());
-		assertNull(INITIAL_CONTEXT.getResult());
+		assertEquals(0,CONTEXT.getDepth());
+		assertFalse(CONTEXT.isExceptional());
+		assertNull(CONTEXT.getResult());
 		assertEquals(TestState.TOTAL_FUNDS, STATE.computeTotalFunds());
 
 	}

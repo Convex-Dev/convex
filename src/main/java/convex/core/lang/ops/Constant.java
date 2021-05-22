@@ -50,7 +50,7 @@ public class Constant<T extends ACell> extends AOp<T> {
 		return create(RT.cvm(value));
 	}
 	
-	public static Constant<AString> create(String stringValue) {
+	public static Constant<AString> createString(String stringValue) {
 		return new Constant<AString>(Strings.create(stringValue).getRef());
 	}
 

@@ -33,7 +33,7 @@ public class ConvexClient extends JPanel {
 
 	private static JFrame frame;
 
-	private static StateModel<State> latestState = StateModel.create(Init.STATE);
+	private static StateModel<State> latestState = StateModel.create(Init.createState());
 
 	public static long maxBlock = 0;
 	

@@ -19,6 +19,7 @@ import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.exceptions.ParseException;
 import convex.test.Samples;
@@ -137,7 +138,7 @@ public class ReaderTest {
 		assertThrows(Error.class, () -> Reader.read("[2.0e0.1234]")); // Issue #70
 
 		// metadata ignored
-		assertCVMEquals(3.23, Reader.read("^:foo 3.23"));
+		assertEquals(Syntax.create(RT.cvm(3.23),Maps.of(Keywords.FOO, CVMBool.TRUE)), Reader.read("^:foo 3.23"));
 	}
 	
 	@Test
@@ -164,8 +165,8 @@ public class ReaderTest {
 	public void testNil() {
 		assertNull(Reader.read("nil"));
 
-		// metadata ignored
-		assertNull(Reader.read("^:foo nil"));
+		// metadata on null
+		assertEquals(Syntax.create(null),Reader.read("^{} nil"));
 	}
 
 	@Test
@@ -207,6 +208,9 @@ public class ReaderTest {
 	public void testQuote() {
 		assertEquals(Lists.of(Symbols.QUOTE, 1L), Reader.read("'1"));
 		assertEquals(Lists.of(Symbols.QUOTE, Lists.of(Symbols.QUOTE, Vectors.empty())), Reader.read("''[]"));
+		
+		assertEquals(Lists.of(Symbols.QUOTE,Lists.of(Symbols.UNQUOTE,Symbols.FOO)),Reader.read("'~foo"));
+
 	}
 
 	@Test
@@ -245,6 +249,12 @@ public class ReaderTest {
 
 		//assertEquals(src, s.getSource());
 	}
+	
+	@Test
+	public void testReadMetadata() {
+		assertEquals(Syntax.create(Keywords.FOO),Reader.read("^{} :foo"));
+	}
+
 
 	@Test
 	public void testMetadata() {

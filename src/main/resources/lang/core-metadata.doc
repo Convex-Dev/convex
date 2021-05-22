@@ -341,7 +341,7 @@
   
   expand
  	{
-	 :doc {:description "Expands the given form, including expansion of any macros. Uses the specified expander if provided, *initial-expander* otherwise. A continuation expander will also be used if provided, passed as a continuation to the first expander."
+	 :doc {:description "Expands the given form. Uses the specified expander (or macro) if provided, the default *initial-expander* otherwise. A continuation expander will also be used if provided, passed as a continuation to the first expander."
          :examples [{:code "(expand '(if a :truthy :falsey))"}]
          :type :function
          :signature [{:params [form]}
@@ -723,6 +723,7 @@
                      {:code "(eval (quote (+ 1 2 3)))"}]
           :type :special
           :signature [{:params [form]}]}
+    :expander true
   }
   
   recur
@@ -773,11 +774,19 @@
           :signature [{:params [val]}]}
   }
   
+  schedule
+  {
+    :doc {:description "Schedules a form for future execution under this account. Expands and compiles form now, but does not execute until the specified timestamp."
+          :examples [{:code "(schedule (+ *timestamp* 1000) (transfer my-friend 1000000))"}]
+          :type :macro
+          :signature [{:params [timestamp code]}]}
+  }
+  
   schedule*
   {
     :doc {:description "Schedules a form for future execution under this account. Expands and compiles form now, but does not execute until the specified timestamp."
           :examples [{:code "(schedule* (+ *timestamp* 1000) '(transfer my-friend 1000000))"}]
-          :type :macro
+          :type :function
           :signature [{:params [timestamp code]}]}
   }
   

@@ -1,10 +1,5 @@
 package convex.actors;
  
-import static convex.core.lang.TestState.INITIAL_JUICE;
-import static convex.core.lang.TestState.eval;
-import static convex.core.lang.TestState.evalD;
-import static convex.core.lang.TestState.evalL;
-import static convex.core.lang.TestState.step;
 import static convex.test.Assertions.assertError;
 import static convex.test.Assertions.assertNotError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -14,23 +9,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Init;
 import convex.core.data.Address;
 import convex.core.data.prim.CVMDouble;
+import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
-import convex.core.lang.TestState;
 import convex.core.util.Utils;
 import convex.lib.FungibleTest;
 
-public class TorusTest {
-	static Address USD = null;
-	static Address GBP = null;
-	static Address TORUS = null;
-	static Address USD_MARKET = null;
-	static Context<Address> CONTEXT = null;
-
-	static {
-		Context<?> INITIAL=TestState.INITIAL_CONTEXT.fork();
+public class TorusTest extends ACVMTest {
+	protected TorusTest() {
+		super(Init.createState());
+		
+		Context<?> INITIAL=CONTEXT.fork();
 		try {
 			Context<?> ctx=INITIAL;
 			ctx=step(ctx,"(import convex.fungible :as fun)");
@@ -61,6 +53,15 @@ public class TorusTest {
 			throw Utils.sneakyThrow(e);
 		}
 	}
+
+	Address USD = null;
+	Address GBP = null;
+	Address TORUS = null;
+	Address USD_MARKET = null;
+
+	static {
+
+	}
 	
 	@Test public void testMissingMarket() {
 		Context<?> ctx=CONTEXT.fork();
@@ -74,7 +75,7 @@ public class TorusTest {
 	}
 	
 	@Test public void testDeployedCurrencies() {
-		Context<?> ctx=TestState.INITIAL_CONTEXT.fork(); // Initial test context
+		Context<?> ctx=CONTEXT.fork(); // Initial test context
 		ctx=step(ctx,"(import torus.exchange :as torus)");
 		ctx= step(ctx,"(def GBP (import currency.GBP :as GBP))");
 		ctx= step(ctx,"(def USD (import currency.USD :as USD))");

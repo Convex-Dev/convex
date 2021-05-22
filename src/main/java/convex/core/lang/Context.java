@@ -647,7 +647,12 @@ public final class Context<T extends ACell> extends AObject {
 	 */
 	public T getResult() {
 		if (exception!=null) {
-			throw new Error("Can't get result with exceptional value: "+exception);
+			String msg = "Can't get result with exceptional value: "+exception;
+			if (exception instanceof ErrorValue) {
+				ErrorValue ev=(ErrorValue)exception;
+				msg=msg+"\n"+ev.getTrace();
+			}
+			throw new Error(msg);
 		}
 		return (T) result;
 	}
@@ -1065,7 +1070,10 @@ public final class Context<T extends ACell> extends AObject {
 			AExceptional ex=rctx.getExceptional();
 			if (ex instanceof ErrorValue) {
 				ErrorValue ev=(ErrorValue)ex;
-				ev.addTrace("Compiling: syntax object with datum of type "+Utils.getClassName(expandedForm.getValue()));
+				// TODO: SECURITY: DoS limits
+				String msg = "Compiling: Syntax Object with datum of type "+Utils.getClassName(expandedForm.getValue());
+				//String msg = "Compiling: "+expandedForm;
+				ev.addTrace(msg);
 			}
 		} 
 		
@@ -1453,7 +1461,7 @@ public final class Context<T extends ACell> extends AObject {
 		}
 		
 		AFn<R> fn=as.getExportedFunction(sym);
-		if (fn==null) return this.withError(ErrorCodes.STATE,"Account "+target+" does not have exported function: "+sym);
+		if (fn==null) return this.withError(ErrorCodes.STATE,"Account "+target+" does not have exported function: "+sym+" , *exports*="+as.getEnvironmentValue(Symbols.STAR_EXPORTS));
 
 		// 
 		final Context<R> exContext=forkActorCall(state, target, offer);
@@ -1844,23 +1852,19 @@ public final class Context<T extends ACell> extends AObject {
 		return expand(Core.INITIAL_EXPANDER, form, Core.INITIAL_EXPANDER);
 	}
 	
-	public Context<Syntax> expand(AFn<Syntax> expander, ACell form, AFn<Syntax> cont) {
+	@SuppressWarnings("unchecked")
+	public <R extends ACell> Context<R> expand(AFn<?> expander, ACell form, AFn<?> cont) {
 		// execute with adjusted depth
 		int savedDepth=getDepth();
-		Context<Syntax> ctx =this.withDepth(savedDepth+1);
-		if (ctx.isExceptional()) return (Context<Syntax>) ctx; // depth error, won't have modified depth
+		Context<R> ctx =(Context<R>) this.withDepth(savedDepth+1);
+		if (ctx.isExceptional()) return ctx; // depth error, won't have modified depth
 		
-		Context<Syntax> rctx= invoke(expander, form, cont);
+		Context<R> rctx= (Context<R>)invoke(expander, form, cont);
 		
 		// reset depth after execution.
 		rctx=rctx.withDepth(savedDepth);
-		if (rctx.isExceptional()) {
-			return rctx;
-		} else {
-			ACell r=rctx.getResult();
-			if (!(r instanceof Syntax)) return rctx.withError(ErrorCodes.CAST,"expander function must produce a Syntax Object");
-			return rctx;
-		}
+		return rctx;
+		//	if (!(r instanceof Syntax)) return rctx.withError(ErrorCodes.CAST,"expander function must produce a Syntax Object");
 	}
 	
 

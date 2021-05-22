@@ -136,12 +136,12 @@ public class Reader extends BaseParser<ACell> {
 				Sequence(Meta(), 
 						WhiteSpace(), 
 						r,
-						push((wrapSyntax) ? assocMeta((Syntax) pop(), (Syntax) pop()) : pop())));
+						push(assocMeta( pop(), pop()))));
 	}
 
-	public Syntax assocMeta(Syntax exp, Syntax meta) {
+	public Syntax assocMeta(ACell exp, ACell meta) {
 		AHashMap<ACell, ACell> metaMap = interpretMetadata(meta);
-		return exp.mergeMeta(metaMap);
+		return Syntax.create(exp).mergeMeta(metaMap);
 	}
 
 	/**
@@ -153,7 +153,7 @@ public class Reader extends BaseParser<ACell> {
 	 * @return Metadata map
 	 */
 	@SuppressWarnings("unchecked")
-	public AHashMap<ACell, ACell> interpretMetadata(Syntax metaNode) {
+	public AHashMap<ACell, ACell> interpretMetadata(ACell metaNode) {
 		ACell val = Syntax.unwrapAll(metaNode);
 		if (val instanceof AMap) return (AHashMap<ACell, ACell>) val;
 		if (val instanceof Keyword) return Maps.of(val, Boolean.TRUE);

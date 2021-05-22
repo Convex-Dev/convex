@@ -23,7 +23,7 @@ public class NFTTest {
 	private static final Symbol nSym=Symbol.create("nft");
 
 	private static Context<?> loadNFT() {
-		Context<?> ctx=TestState.INITIAL_CONTEXT.fork();
+		Context<?> ctx=TestState.CONTEXT.fork();
 		try {
 			String importS="(import convex.nft-tokens :as "+nSym.getName()+")";
 			ctx=step(ctx,importS);

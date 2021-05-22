@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class ScryptNextTest {
 
-    static final Context<?> CONTEXT = TestState.INITIAL_CONTEXT.fork();
+    static final Context<?> CONTEXT = TestState.CONTEXT.fork();
 
     static ScryptNext scrypt() {
         return Parboiled.createParser(ScryptNext.class);

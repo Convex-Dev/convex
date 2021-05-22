@@ -66,7 +66,7 @@ public class ServerTest {
 		
 		Map<Keyword, Object> config = new HashMap<>();
 		config.put(Keywords.PORT, 0); // create new port
-		config.put(Keywords.STATE, Init.STATE);
+		config.put(Keywords.STATE, Init.createState());
 		config.put(Keywords.STORE, EtchStore.createTemp("server-test-store"));
 		config.put(Keywords.KEYPAIR, peerKeyPair); // use first peer keypair
 
@@ -134,7 +134,7 @@ public class ServerTest {
 		convex.core.Result f2=convex.querySync(Symbols.STAR_ADDRESS);
 		
 		assertEquals(Init.VILLAIN,f2.getValue());
-		assertCVMEquals(Init.STATE.getBalance(Init.VILLAIN),f.get().getValue());
+		assertCVMEquals(TestState.STATE.getBalance(TestState.VILLAIN),f.get().getValue());
 	}
 	
 	@Test

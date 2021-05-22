@@ -2,9 +2,6 @@ package convex.lib;
 
 import static convex.core.lang.TestState.HERO;
 import static convex.core.lang.TestState.VILLAIN;
-import static convex.core.lang.TestState.eval;
-import static convex.core.lang.TestState.evalB;
-import static convex.core.lang.TestState.step;
 import static convex.test.Assertions.assertCastError;
 import static convex.test.Assertions.assertNotError;
 import static convex.test.Assertions.assertStateError;
@@ -14,23 +11,30 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+
 import org.junit.jupiter.api.Test;
 
+import convex.core.Init;
 import convex.core.data.Address;
 import convex.core.data.Keywords;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
+import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.Reader;
-import convex.core.lang.TestState;
 import convex.core.util.Utils;
 import convex.test.Samples;
 
-public class TrustTest {
-	private static final Symbol tSym = Symbol.create("trust-actor");
+public class TrustTest extends ACVMTest {
+	private final Symbol tSym = Symbol.create("trust-actor");
+	private Address trusted=null;
 
-	private static Context<?> loadTrust() {
-		Context<?> ctx = TestState.INITIAL_CONTEXT.fork();
+	
+	protected TrustTest() throws IOException {
+		super(Init.createCoreLibraries());
+		Context<?> ctx = CONTEXT.fork();
+		
 		assert(ctx.getDepth()==0):"Invalid depth: "+ctx.getDepth();
 		
 		try {
@@ -47,36 +51,27 @@ public class TrustTest {
 			throw new Error(e);
 		}
 
-		return ctx;
+		CONTEXT=ctx.fork();
+		INITIAL=ctx.getState();
+		trusted = (Address) ctx.lookup(tSym).getResult();
 	}
 
-	private static final Context<?> ctx;
-	private static final Address trusted;
 
-	static {
-		try {
-			ctx = loadTrust();
-			trusted = (Address) ctx.lookup(tSym).getResult();
-		} catch (Throwable e) {
-			e.printStackTrace();
-			throw new Error(e);
-		}
-	}
 	
 	/**
 	 * Test that re-deployment of Fungible matches what is expected
 	 */
 	@Test
 	public void testLibraryProperties() {
-		assertTrue(ctx.getAccountStatus(trusted).isActor());
+		assertTrue(CONTEXT.getAccountStatus(trusted).isActor());
 
 		// check alias is set up correctly
-		assertEquals(trusted, eval(ctx, "(get *aliases* 'trust)"));
+		assertEquals(trusted, eval(CONTEXT, "(get *aliases* 'trust)"));
 	}
 
 	@Test
 	public void testSelfTrust() {
-		Context<?> ctx = TrustTest.ctx.fork();
+		Context<?> ctx = CONTEXT.fork();
 
 		assertTrue(evalB(ctx, "(trust/trusted? *address* *address*)"));
 		assertFalse(evalB(ctx, "(trust/trusted? *address* nil)"));
@@ -87,7 +82,7 @@ public class TrustTest {
 
 	@Test
 	public void testUpgradeWhitelist() {
-		Context<?> ctx = TrustTest.ctx.fork();
+		Context<?> ctx = CONTEXT.fork();
 
 		// deploy a whitelist with default config and upgradable capability
 		ctx = step(ctx, "(def wlist (deploy [(trust/build-whitelist nil) (trust/add-trusted-upgrade nil)]))");
@@ -124,7 +119,7 @@ public class TrustTest {
 	@Test
 	public void testWhitelist() {
 		// check our alias is right
-		Context<?> ctx = TrustTest.ctx;
+		Context<?> ctx = CONTEXT.fork();
 
 		// deploy a whitelist with default config
 		ctx = step(ctx, "(def wlist (deploy (trust/build-whitelist nil)))");
@@ -179,7 +174,7 @@ public class TrustTest {
 
 	@Test
 	public void testBlacklist() {
-		Context<?> ctx = TrustTest.ctx;
+		Context<?> ctx = CONTEXT.fork();
 
 		// deploy a blacklist with default config
 		ctx = step(ctx, "(def blist (deploy (trust/build-blacklist {:blacklist [" + VILLAIN + "]})))");
@@ -237,7 +232,7 @@ public class TrustTest {
 
 	@Test
 	public void testWhitelistController() {
-		Context<?> ctx = TrustTest.ctx;
+		Context<?> ctx = CONTEXT.fork();
 
 		// deploy an initially empty whitelist
 		ctx = step(ctx, "(def wlist (deploy (trust/build-whitelist {:whitelist []})))");

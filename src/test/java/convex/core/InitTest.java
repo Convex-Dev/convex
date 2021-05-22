@@ -9,30 +9,33 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.AccountStatus;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.TestState;
+import convex.core.lang.ACVMTest;
 
-public class InitTest {
-	State s = Init.STATE;
+public class InitTest extends ACVMTest {
+	
+	protected InitTest() {
+		super( Init.createState());
+	}
 	
 	@Test
 	public void testInitState() throws InvalidDataException {
-		s.validate();
-		assertEquals(0,TestState.INITIAL_CONTEXT.getDepth());
-		assertNull(TestState.INITIAL_CONTEXT.getResult());
+		INITIAL.validate();
+		assertEquals(0,CONTEXT.getDepth());
+		assertNull(CONTEXT.getResult());
 		
-		assertEquals(TestState.TOTAL_FUNDS, s.computeTotalFunds());
+		assertEquals(Constants.MAX_SUPPLY, INITIAL.computeTotalFunds());
 	}
 	
 	@Test 
 	public void testMemoryExchange() {
-		AccountStatus as=s.getAccount(Init.MEMORY_EXCHANGE);
+		AccountStatus as=INITIAL.getAccount(Init.MEMORY_EXCHANGE);
 		assertNotNull(as);
 		assertTrue(as.getMemory()>0L);
 	}
 	
 	@Test 
 	public void testHero() {
-		AccountStatus as=s.getAccount(Init.HERO);
+		AccountStatus as=INITIAL.getAccount(Init.HERO);
 		assertNotNull(as);
 		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE,as.getMemory());
 	}

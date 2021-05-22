@@ -72,7 +72,7 @@ public class PeersListPanel extends JPanel {
 
 		config.put(Keywords.PORT, null);
 		config.put(Keywords.KEYPAIR, keyPair);
-		config.put(Keywords.STATE, Init.STATE);
+		config.put(Keywords.STATE, Init.createState());
 
 		// Use a different fresh store for each peer
 		// config.put(Keywords.STORE, EtchStore.createTemp());

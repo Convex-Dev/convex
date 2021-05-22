@@ -205,7 +205,7 @@ public class StateTransitionsTest {
 	
 	@Test
 	public void testDeploys() throws BadSignatureException {
-		State s = Init.STATE;
+		State s = TestState.STATE;
 		ATransaction t1 = Invoke.create(Init.HERO,1,Reader.read("(def my-lib-address (deploy '(defn foo [x] x)))"));
 		AKeyPair kp = convex.core.lang.TestState.HERO_KP;
 		Block b1 = Block.of(s.getTimeStamp().longValue(),FIRST_PEER_KEY, kp.signData(t1));
@@ -246,7 +246,7 @@ public class StateTransitionsTest {
 	
 	@Test
 	public void testMemoryAccounting() throws BadSignatureException {
-		State s = Init.STATE;
+		State s = TestState.STATE;
 		AKeyPair kp = convex.core.lang.TestState.HERO_KP;
 		
 		long initialMem=s.getMemorySize();
@@ -267,7 +267,7 @@ public class StateTransitionsTest {
 
 	@Test
 	public void testScheduleOps() throws BadSignatureException {
-		State s = Init.STATE;
+		State s = TestState.STATE;
 		Address TARGET = Init.VILLAIN;
 		String taddr=TARGET.toString();
 

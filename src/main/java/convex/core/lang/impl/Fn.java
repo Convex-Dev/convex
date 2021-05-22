@@ -17,6 +17,7 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Symbols;
+import convex.core.util.Utils;
 
 /**
  * Value class representing a instantiated closure / lambda function.
@@ -164,7 +165,15 @@ public class Fn<T extends ACell> extends AClosure<T> {
 	
 	@Override
 	public void printInternal(StringBuilder sb) {
-		params.print(sb);
+		// Custom param printing, avoid printing Syntax metadata for now
+		sb.append('[');
+		long size = params.count();
+		for (long i = 0; i < size; i++) {
+			if (i > 0) sb.append(' ');
+			Utils.print(sb,params.get(i).getValue());
+		}
+		sb.append(']');
+
 		sb.append(' ');
 		body.print(sb);
 	}

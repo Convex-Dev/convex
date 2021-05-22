@@ -1,5 +1,7 @@
 package convex.actors;
 
+import static convex.test.Assertions.assertNotError;
+import static convex.test.Assertions.assertTrustError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -14,17 +16,18 @@ import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Symbol;
+import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
-import convex.core.lang.TestState;
 import convex.test.Samples;
 
-import static convex.core.lang.TestState.*;
-import static convex.test.Assertions.*;
+public class RegistryTest extends ACVMTest {
+	protected RegistryTest() throws IOException {
+		super(Init.createCoreLibraries());
+	}
 
-public class RegistryTest {
 	static final Address REG = Init.REGISTRY_ADDRESS;
 
-	Context<?> INITIAL_CONTEXT=TestState.INITIAL_CONTEXT.fork();
+	Context<?> INITIAL_CONTEXT=CONTEXT.fork();
 	
 	@Test
 	public void testRegistryContract() throws IOException {
