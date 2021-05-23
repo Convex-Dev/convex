@@ -1,28 +1,22 @@
 package convex.cli;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.lang.Math;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
-import convex.core.util.Utils;
-import convex.cli.Main;
+
 import picocli.CommandLine;
 
 
 public class CLITest {
 
-	private static final String OS = System.getProperty("os.name").toLowerCase();
-	private static final Logger log = Logger.getLogger(CLITest.class.getName());
+	protected static final String OS = System.getProperty("os.name").toLowerCase();
+	protected static final Logger log = Logger.getLogger(CLITest.class.getName());
 
 	private void assertMatch(String patternText, StringWriter output, String[] args) {
 		Pattern regex = Pattern.compile(patternText, Pattern.MULTILINE + Pattern.DOTALL);
