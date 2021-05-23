@@ -3033,8 +3033,11 @@ public class CoreTest extends ACVMTest {
 		
 		// function that expands once with initial-expander, then with identity
 		c=step(c,"(defn expand-once [x] (*initial-expander* x identity-expand))");
-		// TODO: fix macro expansion within quoted forms
-		//assertEquals("foo",eval(c,"(expand-once '(if (if 1 2) 3 4))"));
+		// Should expand the outermost macro only
+		assertEquals(Syntax.of(read("(cond (if 1 2) 3 4)")),eval(c,"(expand-once '(if (if 1 2) 3 4))"));
+		
+		// Should be idempotent
+		assertEquals(eval(c,"(expand '(if (if 1 2) 3 4))"),eval(c,"(expand (expand-once '(if (if 1 2) 3 4)))"));
 	}
 	
 	
