@@ -52,8 +52,6 @@ public class ScryptNext extends Reader {
     public ScryptNext() {
         super(true);
     }
-    
-
 
     /**
      * Parses an expression and returns a Syntax object

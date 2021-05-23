@@ -1,21 +1,23 @@
 package convex.core.lang;
 
-import convex.core.data.ACell;
-import convex.core.data.Syntax;
+import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertCastError;
+import static convex.test.Assertions.assertStateError;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import org.junit.jupiter.api.Test;
-import org.parboiled.Parboiled;
 import org.parboiled.Rule;
 import org.parboiled.errors.ParserRuntimeException;
 import org.parboiled.parserunners.ReportingParseRunner;
 
-import static convex.test.Assertions.*;
-import static org.junit.jupiter.api.Assertions.*;
+import convex.core.data.ACell;
+import convex.core.data.Syntax;
 
 public class ScryptNextTest {
 
     static final Context<?> CONTEXT = TestState.CONTEXT.fork();
-
-
     
     static ScryptNext scrypt() {
         return ScryptNext.instance();
