@@ -2269,6 +2269,9 @@ public class CoreTest extends ACVMTest {
 		assertEquals(1L, evalL("(min 1 2 3 4)"));
 		assertEquals(7L, evalL("(min 7)"));
 		assertEquals(2L, evalL("(min 4 3 2)"));
+		assertEquals(1L, evalL("(min 1 2)"));
+		
+		assertEquals(1L, evalL("("+Init.CORE_ADDRESS+"/min 1 2)"));
 		
 		assertEquals(1.0, evalD("(min 2.0 1.0 3.0)"));
 		assertEquals(-0.0, evalD("(min 2.0 ##NaN -0.0 ##Inf)"));

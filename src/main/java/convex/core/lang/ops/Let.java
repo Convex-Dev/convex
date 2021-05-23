@@ -49,14 +49,6 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 		return new Let<T>(syms, ops, isLoop);
 	}
 
-	public static <T extends ACell> Let<T> createLet(AVector<Syntax> syms, AVector<AOp<ACell>> ops) {
-		return new Let<T>(syms, ops, false);
-	}
-
-	public static <T extends ACell> Let<T> createLoop(AVector<Syntax> syms, AVector<AOp<ACell>> ops) {
-		return new Let<T>(syms, ops, true);
-	}
-
 	@Override
 	public Let<T> updateRefs(IRefFunction func) {
 		ASequence<AOp<ACell>> newOps = ops.updateRefs(func);
@@ -186,7 +178,7 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 
 	@Override
 	public byte opCode() {
-		return Ops.LET;
+		return (isLoop)?Ops.LOOP:Ops.LET;
 	}
 
 	@Override
@@ -200,9 +192,9 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 		return super.estimatedEncodingSize()+symbols.estimatedEncodingSize();
 	}
 
-	public static <T extends ACell> Let<T> read(ByteBuffer b) throws BadFormatException {
+	public static <T extends ACell> Let<T> read(ByteBuffer b, boolean isLoop) throws BadFormatException {
 		AVector<Syntax> syms = Format.read(b);
 		AVector<AOp<?>> ops = Format.read(b);
-		return createLet(syms, ops.toVector());
+		return create(syms, ops.toVector(),isLoop);
 	}
 }

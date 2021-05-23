@@ -175,11 +175,11 @@
 	}
   [& vals]
   (let [n (count vals)]
-    (loop [max ##NaN i 0]
+    (loop [m ##NaN i 0]
       (if (>= i n) 
-        max
+        m
         (let [v (nth vals i)]
-          (recur (if (>= max v) max v) (inc i)))))))
+          (recur (if (>= m v) m v) (inc i)))))))
 
 (defn min 
   ^{:doc {:description "Returns the numerical minimum of the given values."
@@ -189,11 +189,11 @@
 	}
   [& vals]
   (let [n (count vals)]
-    (loop [min ##NaN i 0]
+    (loop [m ##NaN i 0]
       (if (>= i n) 
-        min
+        m
         (let [v (nth vals i)]
-          (recur (if (<= min v) min v) (inc i)))))))
+          (recur (if (<= m v) m v) (inc i)))))))
 
 (defn mapv 
   ^{:doc {:description "Maps a function over the given collections as with map, and returns the resturn as a vector."

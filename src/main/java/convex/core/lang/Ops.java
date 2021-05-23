@@ -30,6 +30,7 @@ public class Ops {
 	public static final byte LAMBDA = 7;
 	public static final byte LET = 8;
 	public static final byte QUERY = 9;
+	public static final byte LOOP = 10;
 	// public static final byte CALL = 9;
 	// public static final byte RETURN = 10;
 	
@@ -62,9 +63,11 @@ public class Ops {
 		case Ops.LAMBDA:
 			return (AOp<T>) Lambda.read(bb);
 		case Ops.LET:
-			return Let.read(bb);
+			return Let.read(bb,false);
 		case Ops.QUERY:
 			return Query.read(bb);
+		case Ops.LOOP:
+			return Let.read(bb,true);
 
 		// case Ops.RETURN: return (AOp<T>) Return.read(bb);
 		default:
