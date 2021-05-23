@@ -25,7 +25,6 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Format;
 import convex.core.data.IAssociative;
