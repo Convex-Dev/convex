@@ -275,6 +275,7 @@ public class CompilerTest extends ACVMTest {
 	
 	@Test 
 	public void testQuoteCases() {
+		// Tests from Racket / Scheme
 		Context<?> ctx=step("(def x 1)");
 		assertEquals(read("(a b c)"),eval(ctx,"`(a b c)"));
 		assertEquals(read("(a b 1)"),eval(ctx,"`(a b ~x)"));
@@ -283,6 +284,10 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(read("(a `(b ~1))"),eval(ctx,"`(a `(b ~~x))"));
 		assertEquals(read("(a `(b ~1))"),eval(ctx,"`(a `(b ~~`~x))"));
 		assertEquals(read("(a `(b ~x))"),eval(ctx,"`(a `(b ~~'x))"));
+		
+		// Unqoute does nothing inside a regular quote
+		assertEquals(read("(a b (unquote x))"),eval(ctx,"'(a b ~x)"));
+		
 	}
 
 	
