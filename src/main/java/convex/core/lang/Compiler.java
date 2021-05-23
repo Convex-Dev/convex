@@ -73,7 +73,7 @@ public class Compiler {
 		// expand phase starts with initial expander
 		AFn<Syntax> ex = INITIAL_EXPANDER;
 		
-		// use initial expander both as current and continuation expander
+		// Use initial expander both as current and continuation expander
 		// call expand via context to get correct depth and exception handling
 		final Context<Syntax> ctx = context.expand(ex, form,ex);
 		

@@ -786,7 +786,6 @@ public class Server implements Closeable {
 			log.info("Stored peer data for Server: " + peerHash.toHexString());
 		} catch (Throwable e) {
 			log.severe("Failed to persist peer state when closing server: " + e.getMessage());
-			e.printStackTrace();
 		} finally {
 			Stores.setCurrent(tempStore);
 		}

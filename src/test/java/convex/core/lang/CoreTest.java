@@ -70,6 +70,8 @@ import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.CorePred;
 import convex.core.lang.impl.ICoreDef;
 import convex.core.lang.ops.Constant;
+import convex.core.lang.ops.Do;
+import convex.core.lang.ops.Invoke;
 
 /**
  * Test class for core functions in the initial environment.
@@ -2415,9 +2417,10 @@ public class CoreTest extends ACVMTest {
 	public void testCompile() {
 		assertEquals(Constant.of(1L), eval("(compile 1)"));
 		
-		assertEquals(Constant.class, eval("(compile 1)").getClass());
-		assertEquals(Constant.class, eval("(compile nil)").getClass());
-		assertEquals(Constant.class, eval("(compile (+ 1 2))").getClass());
+		assertEquals(Constant.of(1L), eval("(compile 1)"));
+		assertEquals(Constant.of(null), eval("(compile nil)"));
+		assertEquals(Invoke.class, eval("(compile '(+ 1 2))").getClass());
+		assertEquals(Do.class, eval("(compile '(do a b))").getClass());
 
 		assertArityError(step("(compile)"));
 		assertArityError(step("(compile 1 2)"));
@@ -3028,13 +3031,13 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testExpandOnce()  {
 		// an expander that does nothing except wrap as syntax.
-		Context<?> c=step("(def identity-expand (fn [x e] (syntax x)))");
-		assertEquals(Syntax.of(Keywords.FOO),eval(c,"(identity-expand :foo nil)"));
+		Context<?> c=step("(def identity-expand (fn [x e] x))");
+		assertEquals(Keywords.FOO,eval(c,"(identity-expand :foo nil)"));
 		
 		// function that expands once with initial-expander, then with identity
 		c=step(c,"(defn expand-once [x] (*initial-expander* x identity-expand))");
 		// Should expand the outermost macro only
-		assertEquals(Syntax.of(read("(cond (if 1 2) 3 4)")),eval(c,"(expand-once '(if (if 1 2) 3 4))"));
+		assertEquals(read("(cond (if 1 2) 3 4)"),eval(c,"(expand-once '(if (if 1 2) 3 4))"));
 		
 		// Should be idempotent
 		assertEquals(eval(c,"(expand '(if (if 1 2) 3 4))"),eval(c,"(expand (expand-once '(if (if 1 2) 3 4)))"));

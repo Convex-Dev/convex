@@ -278,6 +278,7 @@ public class CompilerTest extends ACVMTest {
 		Context<?> ctx=step("(def x 1)");
 		assertEquals(read("(a b c)"),eval(ctx,"`(a b c)"));
 		assertEquals(read("(a b 1)"),eval(ctx,"`(a b ~x)"));
+		assertEquals(read("(a b 3)"),eval(ctx,"`(a b ~(+ x 2))"));
 		assertEquals(read("(a '(b ~x))"),eval(ctx,"'(a '(b ~x))"));
 		assertEquals(read("(a '(b ~1))"),eval(ctx,"'(a '(b ~~x))"));
 		assertEquals(read("(a '(b ~1))"),eval(ctx,"'(a '(b ~~'~x))"));
