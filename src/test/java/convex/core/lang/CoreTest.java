@@ -1411,7 +1411,7 @@ public class CoreTest extends ACVMTest {
 		assertAssertError(step("(fail)"));
 		
 		{ // need to double-step this: can't define macro and use it in the same expression?
-			Context<?> ctx=step("(defmacro check [condition reaction] '(if (not ~condition) ~reaction))");
+			Context<?> ctx=step("(defmacro check [condition reaction] `(if (not ~condition) ~reaction))");
 			assertAssertError(step(ctx,"(check (= (+ 2 2) 5) (fail \"Laws of arithmetic violated\"))"));
 		}
 		
@@ -2040,9 +2040,9 @@ public class CoreTest extends ACVMTest {
 		assertNull(ctx.getResult());
 		assertNull(eval(ctx,"*key*"));
 		
-		ctx=step(ctx,"(set-key "+TestState.HERO_KP.getAccountKey()+")");
-		assertEquals(TestState.HERO_KP.getAccountKey(),ctx.getResult());
-		assertEquals(TestState.HERO_KP.getAccountKey(),eval(ctx,"*key*"));
+		ctx=step(ctx,"(set-key "+Init.HERO_KP.getAccountKey()+")");
+		assertEquals(Init.HERO_KP.getAccountKey(),ctx.getResult());
+		assertEquals(Init.HERO_KP.getAccountKey(),eval(ctx,"*key*"));
 	}
 	
 	@Test
@@ -2075,7 +2075,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testTransferMemory() {
 		long ALL=Constants.INITIAL_ACCOUNT_ALLOWANCE;
-		Address HERO = TestState.HERO;
+		Address HERO = Init.HERO;
 		assertEquals(ALL, evalL(Symbols.STAR_MEMORY.toString()));
 
 		{
@@ -2148,7 +2148,7 @@ public class CoreTest extends ACVMTest {
 		// balance at start of transaction
 		long BAL = HERO_BALANCE;
 
-		Address HERO = TestState.HERO;
+		Address HERO = Init.HERO;
 
 		// transfer to self. Note juice already accounted for in context.
 		assertEquals(1337L, evalL("(transfer *address* 1337)")); // should return transfer amount
@@ -2209,7 +2209,7 @@ public class CoreTest extends ACVMTest {
 			assertNotError(rc);
 			assertEquals(PS+1000000,rc.getState().getPeer(MY_PEER).getTotalStake());
 			assertEquals(1000000,rc.getState().getPeer(MY_PEER).getDelegatedStake());
-			assertEquals(TestState.TOTAL_FUNDS, rc.getState().computeTotalFunds());
+			assertEquals(Constants.MAX_SUPPLY, rc.getState().computeTotalFunds());
 		}
 		
 		// staking on an account key that isn't a peer
@@ -2889,13 +2889,13 @@ public class CoreTest extends ACVMTest {
 	
 	@Test
 	public void testEvalAsTrustedUser() {
-		Context<ACell> ctx=step("(set-controller "+TestState.VILLAIN+")");
-		ctx=ctx.forkWithAddress(TestState.VILLAIN);
-		ctx=step(ctx,"(def hero "+TestState.HERO+")");
+		Context<ACell> ctx=step("(set-controller "+Init.VILLAIN+")");
+		ctx=ctx.forkWithAddress(Init.VILLAIN);
+		ctx=step(ctx,"(def hero "+Init.HERO+")");
 		
 		assertEquals(3L, evalL(ctx,"(eval-as hero '(+ 1 2))"));
-		assertEquals(TestState.HERO, eval(ctx,"(eval-as hero '*address*)"));
-		assertEquals(TestState.VILLAIN, eval(ctx,"(eval-as hero '*caller*)"));
+		assertEquals(Init.HERO, eval(ctx,"(eval-as hero '*address*)"));
+		assertEquals(Init.VILLAIN, eval(ctx,"(eval-as hero '*caller*)"));
 		assertEquals(Keywords.FOO, eval(ctx,"(eval-as hero '(return :foo))"));
 		assertEquals(Keywords.FOO, eval(ctx,"(eval-as hero '(halt :foo))"));
 		assertEquals(Keywords.FOO, eval(ctx,"(eval-as hero '(rollback :foo))"));
@@ -2906,8 +2906,8 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testEvalAsUntrustedUser() {
 		Context<?> ctx=step("(set-controller nil)");
-		ctx=ctx.forkWithAddress(TestState.VILLAIN);
-		ctx=step(ctx,"(def hero "+TestState.HERO+")");
+		ctx=ctx.forkWithAddress(Init.VILLAIN);
+		ctx=step(ctx,"(def hero "+Init.HERO+")");
 		
 		assertTrustError(step(ctx,"(eval-as hero '(+ 1 2))"));
 		assertTrustError(step(ctx,"(eval-as (address hero) '(+ 1 2))"));
@@ -2916,7 +2916,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testEvalAsWhitelistedUser() {
 		// create trust monitor that allows VILLAIN
-		Context<?> ctx=step("(deploy '(do (defn check-trusted? [s a o] (= s (address "+TestState.VILLAIN+"))) (export check-trusted?)))");
+		Context<?> ctx=step("(deploy '(do (defn check-trusted? [s a o] (= s (address "+Init.VILLAIN+"))) (export check-trusted?)))");
 		Address monitor = (Address) ctx.getResult();
 		ctx=step(ctx,"(set-controller "+monitor+")");
 		
@@ -3050,7 +3050,7 @@ public class CoreTest extends ACVMTest {
 		// function that expands once with initial-expander, then with identity
 		c=step(c,"(defn expand-once [x] (*initial-expander* x identity-expand))");
 		// Should expand the outermost macro only
-		assertEquals(read("(cond (if 1 2) 3 4)"),eval(c,"(expand-once '(if (if 1 2) 3 4))"));
+		assertEquals(read("(cond (if 1 2) 3 4)"),Syntax.unwrapAll(eval(c,"(expand-once '(if (if 1 2) 3 4))")));
 		
 		// Should be idempotent
 		assertEquals(eval(c,"(expand '(if (if 1 2) 3 4))"),eval(c,"(expand (expand-once '(if (if 1 2) 3 4)))"));
@@ -3225,7 +3225,7 @@ public class CoreTest extends ACVMTest {
 	
 	@Test
 	public void testSpecialAddress() {
-		Address HERO = TestState.HERO;
+		Address HERO = Init.HERO;
 		
 		// Hero should be address and origin in initial context
 		assertEquals(HERO, eval("*address*"));

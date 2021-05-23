@@ -29,7 +29,7 @@
   ^{:doc {:description "Defines a macro in the current environment. A macro is a special function that is executed at compile time, and produces valid Convex Lisp code for subsequent execution."
           :examples [{:code "(defmacro foo [x] '(if (good? x) x (fix x)))"}]
           :type :macro
-          :signature [{:params [a]}]}
+          :signature [{:params [name params & body]}]}
     :expander true
    }
   (fn [x e] 
@@ -106,8 +106,7 @@
          :signature [{:params [& exprs]}]}
 	}
   [& exprs]
-  (let [exprs (unsyntax exprs)
-        n (count exprs)] 
+  (let [n (count exprs)] 
     (cond 
       (== n 0) nil
       (== n 1) (first exprs)
@@ -121,8 +120,7 @@
          :signature [{:params [& exprs]}]}
 	}
   [& exprs]
-  (let [exprs (unsyntax exprs)
-        n (count exprs)] 
+  (let [n (count exprs)] 
     (cond 
       (== n 0) true
       (== n 1) (first exprs)
@@ -146,7 +144,7 @@
          :signature [{:params [test & body]}]}
 	}
   [test & body] 
-  '(cond ~test nil ~(cons 'do body)))
+  `(cond ~test nil ~(cons 'do body)))
 
 (defn mapcat 
   ^{:doc {:description "Maps a funcion across the given collections, then concatenates the results. nil is treated as an empty collection."
@@ -280,8 +278,8 @@
   [addr as sym]
 	  (let [addr (unsyntax addr)
 	        addr (cond
-	               (or (symbol? addr) (keyword? addr)) 
-	                  (or (call* *registry* 0 'cns-resolve addr) 
+	               (symbol? addr)
+	                  (or (call* *registry* 0 `cns-resolve addr) 
 	                      (fail :NOBODY (str "Could not resolve library name for import: " addr)))
 	               addr)
 	        sym (unsyntax sym)
@@ -303,7 +301,7 @@
   [params & body] 
   (let [bindlist (reduce (fn [v p] (conj (conj v p) (list 'unquote p))) [] params)
         code 
-        (list 'quote (cons 'let bindlist body))
+        (list 'quasiquote (cons 'let bindlist body))
        ] 
     `(fn ~params ~code)))
 

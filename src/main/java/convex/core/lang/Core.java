@@ -2328,15 +2328,15 @@ public class Core {
 				AccountStatus.createActor(env));
 		Context<?> ctx = Context.createFake(state, ADDR);
 
-		Syntax form = null;
+		ACell form = null;
 		
 		// Compile and execute forms in turn. Later definitions can use earlier macros!
-		AList<Syntax> forms = Reader.readAllSyntax(Utils.readResourceAsString("lang/core.con"));
-		for (Syntax f : forms) {
+		AList<ACell> forms = Reader.readAll(Utils.readResourceAsString("lang/core.con"));
+		for (ACell f : forms) {
 			form = f;
 			ctx=ctx.expandCompile(form);
 			if (ctx.isExceptional()) {
-				throw new Error("Error compiling form: "+ Syntax.unwrapAll(form)+ " : "+ ctx.getExceptional());
+				throw new Error("Error compiling form: "+ form+ " : "+ ctx.getExceptional());
 			}
 			AOp<?> op=(AOp<?>) ctx.getResult();
 			ctx = ctx.execute(op);

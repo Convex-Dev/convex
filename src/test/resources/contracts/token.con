@@ -4,7 +4,7 @@
      owner  ;; initial owner of all the tokens
      ] 
    (assert (address? owner) (long? supply) (> supply 0))
-  '(do
+  `(do
 		;; assets to set up the contract safely
 		
 				

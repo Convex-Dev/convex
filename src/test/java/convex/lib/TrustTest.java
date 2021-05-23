@@ -238,8 +238,8 @@ public class TrustTest extends ACVMTest {
 		ctx = step(ctx, "(def wlist (deploy (trust/build-whitelist {:whitelist []})))");
 
 		// deploy two actors
-		ctx = step(ctx, "(def alice (deploy '(set-controller ~*address*)))");
-		ctx = step(ctx, "(def bob (deploy '(set-controller ~wlist)))");
+		ctx = step(ctx, "(def alice (deploy `(set-controller ~*address*)))");
+		ctx = step(ctx, "(def bob (deploy `(set-controller ~wlist)))");
 
 		// check initial trust
 		assertEquals(Keywords.FOO, eval(ctx, "(eval-as alice :foo)"));
@@ -249,12 +249,12 @@ public class TrustTest extends ACVMTest {
 		ctx = step(ctx, "(call wlist (set-trusted alice true))");
 
 		// eval-as should work from alice to bob
-		assertEquals(eval(ctx, "bob"), (Object) eval(ctx, "(eval-as alice '(eval-as ~bob '*address*))"));
+		assertEquals(eval(ctx, "bob"), (Object) eval(ctx, "(eval-as alice `(eval-as ~bob '*address*))"));
 
 		// remove alice from the whitelist
 		ctx = step(ctx, "(call wlist (set-trusted alice false))");
 
 		// eval-as should now fail
-		assertTrustError(step(ctx, "(eval-as alice '(eval-as ~bob :foo))"));
+		assertTrustError(step(ctx, "(eval-as alice `(eval-as ~bob :foo))"));
 	}
 }

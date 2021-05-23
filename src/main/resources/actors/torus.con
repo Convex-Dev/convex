@@ -67,7 +67,7 @@
          (fungible/build-token {:supply 0})
        
          ;; Add code for market functionality
-        '(do
+        `(do
            (import convex.asset :as asset)
            (import convex.fungible :as fungible)
          (import convex.core :as core)

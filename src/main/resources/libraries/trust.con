@@ -48,7 +48,7 @@
     [config]
     (let [whitelist (reduce (fn [w x] (conj w (address x))) #{} (or (:whitelist config) [*address*]))  
           controller (or (:controller config)  *address*)]
-      '(do
+      `(do
          (import ~trust :as trust)
          
          ;; a whitelist of subjects that will be accepted
@@ -77,7 +77,7 @@
     [config]
     (let [blacklist (reduce (fn [w x] (conj w (address x))) #{} (or (:blacklist config) [*address*]))  
           controller (address (or (:controller config)  *address*))]
-      '(do
+      `(do
          (import ~trust :as trust)
          
          ;; a blacklist of subjects that will be denied
@@ -120,7 +120,7 @@
 	    }
       [config]
       (let [root (address (or (:root config)  *address*))]
-        '(do
+        `(do
            (import ~trust :as trust)
            
            (def upgradable-root ~root)

@@ -1071,7 +1071,8 @@ public final class Context<T extends ACell> extends AObject {
 			if (ex instanceof ErrorValue) {
 				ErrorValue ev=(ErrorValue)ex;
 				// TODO: SECURITY: DoS limits
-				String msg = "Compiling: Syntax Object with datum of type "+Utils.getClassName(expandedForm);
+				//String msg = "Compiling: Syntax Object with datum of type "+Utils.getClassName(expandedForm);
+				String msg = "Compiling:"+ expandedForm;
 				//String msg = "Compiling: "+expandedForm;
 				ev.addTrace(msg);
 			}

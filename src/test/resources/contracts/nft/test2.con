@@ -45,7 +45,7 @@
 
 ;; From acct 2
 (eval-as p2
-  '(do 
+  `(do 
      (call nft (merge-token-data ~t3 {:status true}))
      (assert (= (call nft (get-token-data ~t3)) {:name "Token3", :status true}))))
 
@@ -303,7 +303,7 @@
   (def t2 (call nft (create-token {:name "Token2"} nil)))
   (asset/offer p2 [nft t2]) ;; Offers but does not perform transfer
   (assert (not (asset/owns? p2 [nft t2])))
-  (eval-as p2 '(asset/accept ~*address* [nft ~t2])) ;; does accept as p2
+  (eval-as p2 `(asset/accept ~*address* [nft ~t2])) ;; does accept as p2
   (assert (asset/owns? p2 [nft t2]))
 
 

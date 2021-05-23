@@ -62,7 +62,7 @@
     [config]
     (let [supply (long (or (:supply config) 1000000))
           initial-holder (address (or (:initial-holder config) *address*))]
-      '(do
+      `(do
          (def supply ~supply)
          
          (set-holding ~initial-holder ~supply)
@@ -143,7 +143,7 @@
     (let [max-supply (long (or (:max-supply config) 1000000000000000000))
           minter (address (or (:minter config) *address*))]
       (assert (<= 0 max-supply 1000000000000000000))
-      '(do
+      `(do
          (import convex.trust :as trust)
          
          ;; Who is allowed to mint tokens?

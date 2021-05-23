@@ -227,7 +227,7 @@ public class Compiler {
 				} else {
 					depth-=1;
 				}
-			} else if (isListStarting(Symbols.QUOTE, form)) {
+			} else if (isListStarting(Symbols.QUASIQUOTE, form)) {
 				depth+=1;
 			}
 
@@ -319,7 +319,12 @@ public class Compiler {
 			Symbol sym = (Symbol) head;
 
 			// special form symbols
-			if (sym.equals(Symbols.QUOTE) || sym.equals(Symbols.QUASIQUOTE)) {
+			if (sym.equals(Symbols.QUOTE))  {
+				if (list.size() != 2) return context.withCompileError(sym + " expects one argument.");
+				return compileConstant(context,Syntax.unwrap(list.get(1)));
+			}
+				
+			if (sym.equals(Symbols.QUASIQUOTE)) {
 				if (list.size() != 2) return context.withCompileError(sym + " expects one argument.");
 				return (Context<T>) compileQuoted(context, list.get(1),1);
 			}

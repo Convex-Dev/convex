@@ -219,19 +219,19 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(RT.cvm(3L),eval("~(+ 1 2)"));
 		assertEquals(Constant.of(3L),comp("~(+ 1 2)"));
 		
-		assertEquals(RT.cvm(3L),eval("'~'~(+ 1 2)"));
+		assertEquals(RT.cvm(3L),eval("`~`~(+ 1 2)"));
 		
 		assertEquals(RT.cvm(2L),eval("~*depth*")); // depth in compiler
 		assertEquals(RT.cvm(3L),eval("~(do *depth*)")); // depth in compiler
-		assertEquals(RT.cvm(1L),eval("'~*depth*")); // depth in expansion
-		assertEquals(RT.cvm(2L),eval("'~(do *depth*)")); // depth in expansion
+		assertEquals(RT.cvm(1L),eval("`~*depth*")); // depth in expansion
+		assertEquals(RT.cvm(2L),eval("`~(do *depth*)")); // depth in expansion
 		
 		// Misc cases
-		assertNull(eval("'~nil"));
-		assertEquals(Keywords.STATE,eval("(let [a :state] '~a)"));
-		assertEquals(Vectors.of(1L,3L),eval("'[1 ~(+ 1 2)]"));
-		assertEquals(Lists.of(Symbols.INC,3L),eval("'(inc ~(+ 1 2))"));
-		assertUndeclaredError(step("'~undefined-1"));
+		assertNull(eval("`~nil"));
+		assertEquals(Keywords.STATE,eval("(let [a :state] `~a)"));
+		assertEquals(Vectors.of(1L,3L),eval("`[1 ~(+ 1 2)]"));
+		assertEquals(Lists.of(Symbols.INC,3L),eval("`(inc ~(+ 1 2))"));
+		assertUndeclaredError(step("`~undefined-1"));
 		assertUndeclaredError(step("~'undefined-1"));
 
 		// not we require compilation down to a single constant
@@ -279,10 +279,10 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(read("(a b c)"),eval(ctx,"`(a b c)"));
 		assertEquals(read("(a b 1)"),eval(ctx,"`(a b ~x)"));
 		assertEquals(read("(a b 3)"),eval(ctx,"`(a b ~(+ x 2))"));
-		assertEquals(read("(a '(b ~x))"),eval(ctx,"'(a '(b ~x))"));
-		assertEquals(read("(a '(b ~1))"),eval(ctx,"'(a '(b ~~x))"));
-		assertEquals(read("(a '(b ~1))"),eval(ctx,"'(a '(b ~~'~x))"));
-		assertEquals(read("(a '(b ~x))"),eval(ctx,"'(a '(b ~~'x))"));
+		assertEquals(read("(a `(b ~x))"),eval(ctx,"`(a `(b ~x))"));
+		assertEquals(read("(a `(b ~1))"),eval(ctx,"`(a `(b ~~x))"));
+		assertEquals(read("(a `(b ~1))"),eval(ctx,"`(a `(b ~~`~x))"));
+		assertEquals(read("(a `(b ~x))"),eval(ctx,"`(a `(b ~~'x))"));
 	}
 
 	
@@ -472,13 +472,13 @@ public class CompilerTest extends ACVMTest {
 	public void testQuoteCompile()  {
 		assertEquals(Constant.create((ACell)null),comp("nil"));
 		assertEquals(Lookup.create(Init.HERO,Symbols.FOO),comp("foo"));
-		assertEquals(Lookup.create(Init.HERO,Symbols.FOO),comp("'~foo"));
+		assertEquals(Lookup.create(Init.HERO,Symbols.FOO),comp("`~foo"));
 	}
 	
 	@Test 
 	public void testMacrosInMaps() {
 		assertEquals(Maps.of(1L,2L),eval("(eval '{(if true 1 2) (if false 1 2)})"));		
-		assertEquals(Maps.of(1L,2L),eval("(eval '{(if true 1 2) ~(if false 1 2)})"));		
+		assertEquals(Maps.of(1L,2L),eval("(eval `{(if true 1 2) ~(if false 1 2)})"));		
 	}
 	
 	@Test 
@@ -490,7 +490,7 @@ public class CompilerTest extends ACVMTest {
 	@Test 
 	public void testMacrosInSets() {
 		assertEquals(Sets.of(1L,2L),eval("(eval '#{(if true 1 2) (if false 1 2)})"));		
-		assertEquals(Sets.of(1L,2L),eval("(eval '#{(if true 1 2) ~(if false 1 2)})"));		
+		assertEquals(Sets.of(1L,2L),eval("(eval `#{(if true 1 2) ~(if false 1 2)})"));		
 	}
 	
 	@Test 

@@ -81,7 +81,7 @@ public class AliasTest {
 	
 	@Test
 	public void testBadImports() {
-		Context<?> ctx = step("(def lib (deploy '(def foo 100)))");
+		Context<?> ctx = step("(def lib (deploy `(def foo 100)))");
 		Address lib = (Address) ctx.getResult();
 		assertNotNull(lib);
 		
@@ -97,7 +97,7 @@ public class AliasTest {
 		assertAssertError(step(ctx,"(import ~lib :as nil)"));
 		
 		// can't have non-address first argument
-		assertNobodyError(step(ctx,"(import :foo :as mylib)"));
+		assertCastError(step(ctx,"(import :foo :as mylib)"));
 	}
 	
 	@Test void testBadSelfDefualtAlias() {
