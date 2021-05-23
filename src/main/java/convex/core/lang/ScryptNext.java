@@ -17,6 +17,15 @@ public class ScryptNext extends Reader {
 
     // Use a ThreadLocal reader because instances are not thread safe
     private static final ThreadLocal<ScryptNext> syntaxReader = ThreadLocal.withInitial(() -> Parboiled.createParser(ScryptNext.class));
+    
+    /**
+     * Gets a thread-local instance of the Scrypt Reader
+     * @return
+     */
+	public static ScryptNext instance() {
+		return syntaxReader.get();
+	}
+    
     public final Rule DEF = Keyword("def");
     public final Rule DEFN = Keyword("defn");
     public final Rule FN = Keyword("fn");
@@ -43,6 +52,8 @@ public class ScryptNext extends Reader {
     public ScryptNext() {
         super(true);
     }
+    
+
 
     /**
      * Parses an expression and returns a Syntax object
@@ -787,5 +798,8 @@ public class ScryptNext extends Reader {
                 push(prepare(Lists.create(expVar.get())))
         );
     }
+
+
+
 
 }

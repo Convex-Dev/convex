@@ -15,11 +15,13 @@ public class ScryptNextTest {
 
     static final Context<?> CONTEXT = TestState.CONTEXT.fork();
 
+
+    
     static ScryptNext scrypt() {
-        return Parboiled.createParser(ScryptNext.class);
+        return ScryptNext.instance();
     }
 
-    static Object parse(Rule rule, String source) {
+    static ACell parse(Rule rule, String source) {
         var result = new ReportingParseRunner<ACell>(rule).run(source);
 
         if (result.matched) {
@@ -29,7 +31,7 @@ public class ScryptNextTest {
         }
     }
 
-    static Object parse(String source) {
+    static ACell parse(String source) {
         return parse(scrypt().CompilationUnit(), source);
     }
 
