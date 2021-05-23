@@ -1502,6 +1502,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Keywords.STATE, eval("(keyword 'state)"));
 		assertEquals(Keywords.STATE, eval("(keyword (name :state))"));
 		assertEquals(Keywords.STATE, eval("(keyword (str 'state))"));
+		assertEquals(Keywords.STATE, eval("(keyword 'state)"));
 		
 		// keyword lookups
 		assertNull(eval("((keyword :foo) nil)"));
@@ -1571,9 +1572,9 @@ public class CoreTest extends ACVMTest {
 		
 		assertEquals(Symbol.create(Address.create(8),Strings.create("foo")),eval("'#8/foo"));
 
-		// too short or too long results in CAST error
-		assertCastError(step("(symbol (str))"));
-		assertCastError(
+		// too short or too long results in ARGUMENT error
+		assertArgumentError(step("(symbol (str))"));
+		assertArgumentError(
 				step("(symbol \"duicgidvgefiucefiuvfeiuvefiuvgifegvfuievgiuefgviuefgviufegvieufgviuefvgevevgi\")"));
 
 		assertCastError(step("(symbol nil)"));
@@ -1615,23 +1616,23 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testLookup() {
-		assertSame(Core.COUNT, eval("(lookup :count)"));
 		assertSame(Core.COUNT, eval("(lookup 'count)"));
-		assertSame(Core.COUNT, eval("(lookup \"count\")"));
 		
 		assertSame(Core.COUNT, eval("(lookup *address* 'count)"));
 
 		assertNull(eval("(lookup 'non-existent-symbol)"));
-		assertNull(eval("(lookup :non-existent-symbol)"));
 		
 		// Lookups after def
-		assertEquals(1L,evalL("(do (def foo 1) (lookup :foo))"));
-		assertEquals(1L,evalL("(do (def foo 1) (lookup *address* :foo))"));
+		assertEquals(1L,evalL("(do (def foo 1) (lookup 'foo))"));
+		assertEquals(1L,evalL("(do (def foo 1) (lookup *address* 'foo))"));
 		
 		// Lookups in non-existent environment
 		assertNull(eval("(lookup #77777777 'count)"));
 		assertNull(eval("(do (def foo 1) (lookup #66666666 'foo))"));
 
+		assertCastError(step("(lookup :count)"));
+		assertCastError(step("(lookup \"count\")"));
+		assertCastError(step("(lookup :non-existent-symbol)"));
 
 		// invalid name string
 		assertCastError(
@@ -1648,14 +1649,14 @@ public class CoreTest extends ACVMTest {
 	
 	@Test
 	public void testLookupSyntax() {
-		assertSame(Core.COUNT, ((Syntax)eval("(lookup-syntax :count)")).getValue());
-		assertSame(Core.COUNT, ((Syntax)eval("(lookup-syntax "+Init.CORE_ADDRESS+ " :count)")).getValue());
+		assertSame(Core.COUNT, ((Syntax)eval("(lookup-syntax 'count)")).getValue());
+		assertSame(Core.COUNT, ((Syntax)eval("(lookup-syntax "+Init.CORE_ADDRESS+ " 'count)")).getValue());
 		
 		assertNull(eval("(lookup-syntax 'non-existent-symbol)"));
 		
-		assertEquals(Syntax.of(1L),eval("(do (def foo 1) (lookup-syntax :foo))"));
-		assertEquals(Syntax.of(1L),eval("(do (def foo 1) (lookup-syntax *address* :foo))"));
-		assertNull(eval("(do (def foo 1) (lookup-syntax #0 :foo))"));
+		assertEquals(Syntax.of(1L),eval("(do (def foo 1) (lookup-syntax 'foo))"));
+		assertEquals(Syntax.of(1L),eval("(do (def foo 1) (lookup-syntax *address* 'foo))"));
+		assertNull(eval("(do (def foo 1) (lookup-syntax #0 'foo))"));
 
 		// invalid name string (too long)
 		assertCastError(
@@ -1902,7 +1903,8 @@ public class CoreTest extends ACVMTest {
 	public void testCallStar() {
 		Context<Address> ctx = step("(def ctr (deploy '(do :foo (defn f [x] (inc x)) (export f g) )))");
 
-		assertEquals(9L,evalL(ctx, "(call* ctr 0 :f 8)"));
+		assertEquals(9L,evalL(ctx, "(call* ctr 0 'f 8)"));
+		assertCastError(step(ctx, "(call* ctr 0 :f 8)")); // cast fail on keyword function name
 		
 		assertArityError(step(ctx, "(call*)"));
 		assertArityError(step(ctx, "(call* 12)"));
@@ -2744,15 +2746,15 @@ public class CoreTest extends ACVMTest {
 	}
 	
 	@Test
-	public void testDefined() {
+	public void testDefinedQ() {
 		assertFalse(evalB("(defined? foobar)"));
 		
 		assertTrue(evalB("(do (def foobar [2 3]) (defined? foobar))"));
 		assertTrue(evalB("(defined? count)"));
-		assertTrue(evalB("(defined? :count)"));
-		assertTrue(evalB("(defined? \"count\")"));
 		
 		// invalid names
+		assertCastError(step("(defined? :count)")); // not a Symbol
+		assertCastError(step("(defined? \"count\")")); // not a Symbol
 		assertCastError(step("(defined? nil)"));
 		assertCastError(step("(defined? 1)"));
 		assertCastError(step("(defined? 0x)"));
@@ -2824,9 +2826,17 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testSetStar() {
 		assertEquals(13L,evalL("(set* 'a 13)"));
-		assertEquals(13L,evalL("(do (set* \"a\" 13) a)"));
+		assertEquals(13L,evalL("(do (set* 'a 13) a)"));
+		
 		assertEquals(10L,evalL("(let [a 10] (let [] (set* 'a 13)) a)"));
+		
+		// set only valid in limited scope
 		assertUndeclaredError(step("(do (let [a 10] (set* 'a 20)) a)"));
+		
+		assertCastError(step("(set* :a 13)"));
+		assertCastError(step("(set* nil 13)"));
+		assertCastError(step("(set* ['a 'b] [1 2])")); // can't destructure
+
 		
 		assertArgumentError(step("(set* 'a/b 10)"));
 	}
@@ -3123,9 +3133,13 @@ public class CoreTest extends ACVMTest {
 		Address caddr = (Address) ctx.getResult();
 		assertNotNull(caddr);
 
-		assertTrue(evalB(ctx, "(exports? caddr :public)"));
-		assertFalse(evalB(ctx, "(exports? caddr :random-name)"));
-		assertFalse(evalB(ctx, "(exports? caddr :private)"));
+		assertTrue(evalB(ctx, "(exports? caddr 'public)")); // OK
+		assertFalse(evalB(ctx, "(exports? caddr 'private)")); // Defined, but not exported
+		assertFalse(evalB(ctx, "(exports? caddr 'random-symbol)")); // Doesn't exist
+		
+		assertCastError(step(ctx, "(exports? caddr :public)")); // not a Symbol
+		assertCastError(step(ctx, "(exports? caddr :random-name)"));
+		assertCastError(step(ctx, "(exports? caddr :private)"));
 
 		assertArityError(step(ctx, "(exports? 1)"));
 		assertArityError(step(ctx, "(exports? 1 2 3)"));

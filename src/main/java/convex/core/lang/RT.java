@@ -1043,11 +1043,9 @@ public class RT {
 	 * @param a
 	 * @return Symbol if correctly constructed, or null if a failure occurs
 	 */
-	public static Symbol castSymbol(ACell a) {
+	public static Symbol ensureSymbol(ACell a) {
 		if (a instanceof Symbol) return (Symbol) a;
-		AString name = name(a);
-		if (name == null) return null;
-		return Symbol.create(name);
+		return null;
 	}
 
 

@@ -1441,7 +1441,7 @@ public final class Context<T extends ACell> extends AObject {
 	public <R extends ACell> Context<R> actorCall(Address target, long offer, ACell functionName, ACell... args) {
 		// SECURITY: set up state for actor call
 		State state=getState();
-		Symbol sym=RT.castSymbol(functionName);
+		Symbol sym=RT.ensureSymbol(functionName);
 		AccountStatus as=state.getAccount(target);
 		if (as==null) return this.withError(ErrorCodes.STATE,"Actor does not exist: "+target);
 		

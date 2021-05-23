@@ -40,8 +40,8 @@ public class ParamTestEvals {
 				{ "*address*", TestState.HERO }, 
 				{ "(do 1 *result*)", 1L },
 
-				{ "(call " + TEST_CONTRACT + " (:my-address))", TEST_CONTRACT },
-				{ "(call " + TEST_CONTRACT + " (\"foo\"))", Keyword.create("bar") },
+				{ "(call " + TEST_CONTRACT + " (my-address))", TEST_CONTRACT },
+				{ "(call " + TEST_CONTRACT + " (foo))", Keyword.create("bar") },
 
 				{ "(let [a (address " + TEST_CONTRACT + ")]" + "(call a (write :bar))" + "(call a (read)))",
 						Keyword.create("bar") },

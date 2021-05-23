@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 
+import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.State;
 import convex.core.crypto.Hash;
@@ -324,13 +325,16 @@ public class Core {
 			// Arity 1
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
+			ACell arg=args[0];
+			if (arg instanceof Keyword) return context.withResult(Juice.KEYWORD, arg);
+			
 			// Check argument is valid name
-			AString name = RT.name(args[0]);
+			AString name = RT.name(arg);
 			if (name == null) return context.withCastError(0,args, Types.KEYWORD);
 
 			// Check name converts to Keyword 
 			Keyword result = Keyword.create(name);
-			if (result == null) return context.withArgumentError("Invalid Keyword name: " + name);
+			if (result == null) return context.withArgumentError("Invalid Keyword name, must be between 1 and "+Constants.MAX_NAME_LENGTH+ " characters");
 
 			return context.withResult(Juice.KEYWORD, result);
 		}
@@ -343,10 +347,16 @@ public class Core {
 			// Arity 1
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
+
+			ACell arg=args[0];
+			if (arg instanceof Symbol) return context.withResult(Juice.SYMBOL, arg);
+			
 			// Check argument is valid name
-			ACell symArg=args[0];
-			Symbol sym = RT.castSymbol(symArg);
-			if (sym == null) return context.withCastError(0,args, Types.SYMBOL);
+			AString name = RT.name(arg);
+			if (name == null) return context.withCastError(0,args, Types.SYMBOL);
+			
+			Symbol sym=Symbol.create(name);
+			if (sym == null) return context.withArgumentError("Invalid Symbol name, must be between 1 and "+Constants.MAX_NAME_LENGTH+ " characters");
 
 			long juice = Juice.SYMBOL;
 			return context.withResult(juice, sym);
@@ -534,7 +544,7 @@ public class Core {
 			Address addr = RT.ensureAddress(args[0]);
 			if (addr == null) return context.withCastError(1,args, Types.ADDRESS);
 
-			Symbol sym = RT.castSymbol(args[1]);
+			Symbol sym = RT.ensureSymbol(args[1]);
 			if (sym == null) return context.withCastError(1,args, Types.SYMBOL);
 
 			AccountStatus as = context.getState().getAccount(addr);
@@ -588,7 +598,7 @@ public class Core {
 			CVMLong sendAmount = RT.ensureLong(args[1]);
 			if (sendAmount == null) return ctx.withCastError(1,args, Types.LONG);
 
-			Symbol sym = RT.castSymbol(args[2]);
+			Symbol sym = RT.ensureSymbol(args[2]);
 			if (sym == null) return ctx.withCastError(2,args, Types.SYMBOL);
 
 			// prepare contract call arguments
@@ -623,7 +633,7 @@ public class Core {
 		public  Context<ACell> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			Symbol sym = RT.castSymbol(args[0]);
+			Symbol sym = RT.ensureSymbol(args[0]);
 			if (sym == null) return context.withCastError(0,args, Types.SYMBOL);
 
 			if (sym.isQualified()) {
@@ -642,7 +652,7 @@ public class Core {
 		@Override
 		public  Context<ACell> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-			Symbol sym=RT.castSymbol(args[0]);
+			Symbol sym=RT.ensureSymbol(args[0]);
 			if (sym == null) return context.withArgumentError("Invalid Symbol name for undef: " + Utils.toString(args[0]));
 			
 			Context<ACell> ctx=(Context<ACell>) context.undefine(sym);
@@ -668,7 +678,7 @@ public class Core {
 			
 			// ensure argument converts to a Symbol correctly.
 			ACell symArg=args[n-1];
-			Symbol sym = RT.castSymbol(symArg);
+			Symbol sym = RT.ensureSymbol(symArg);
 			if (sym == null) return context.withCastError(n-1,args,Types.SYMBOL);
 
 			MapEntry<Symbol, Syntax> me = context.lookupDynamicEntry(address,sym);
@@ -692,7 +702,7 @@ public class Core {
 			
 			// ensure argument converts to a Symbol correctly.
 			ACell symArg=args[n-1];
-			Symbol sym = RT.castSymbol(symArg);
+			Symbol sym = RT.ensureSymbol(symArg);
 			if (sym == null) return context.withCastError(n-1,args,Types.SYMBOL);
 
 			MapEntry<Symbol, Syntax> me = context.lookupDynamicEntry(address,sym);

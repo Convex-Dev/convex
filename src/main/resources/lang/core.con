@@ -324,6 +324,7 @@
          :signature [{:params [sym]}]}
 	}
   [sym]
+  (or (symbol? (unsyntax sym)) (fail :CAST "defined? requires a Symbol"))
   '(boolean (lookup-syntax ~(list 'quote sym))))
 
 (defmacro schedule
