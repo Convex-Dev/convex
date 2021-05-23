@@ -253,7 +253,7 @@ public class Reader extends BaseParser<ACell> {
 	}
 
 	public Rule SyntaxQuote(Rule r) {
-		return Sequence('`', r, push(prepare(Lists.of(Symbols.SYNTAX_QUOTE, pop()))));
+		return Sequence('`', r, push(prepare(Lists.of(Symbols.QUASIQUOTE, pop()))));
 	}
 
 	public Rule Unquote(Rule r) {

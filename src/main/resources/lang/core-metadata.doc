@@ -741,6 +741,17 @@
           :signature [{:params [x y]}]}
   }
   
+  quasiquote
+  {
+    :doc {:description "Returns the quoted value of a form, without evaluating it. Like 'quote', but elements within the form may be unquoted."
+          :examples [{:code "(quasiquote foo)"}
+                     {:code "`(:a : b ~(+ 2 3))"}]
+          :type :special
+          :signature [{:params [form]}]}
+    :expander true
+  }
+  
+  
   query
   {
     :doc {:description "Runs forms in query mode. Results will be retained, but any state changes will be rolled back."

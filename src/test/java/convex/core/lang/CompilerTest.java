@@ -460,9 +460,12 @@ public class CompilerTest extends ACVMTest {
 	@Test
 	public void testQuoteExpand()  {
 		assertEquals(Syntax.create(null),expand("nil"));
-		assertEquals(Syntax.create(Lists.of(Syntax.of(Symbols.QUOTE),Symbols.FOO)),expand("'foo"));
-		assertEquals(Syntax.create(Lists.of(Syntax.of(Symbols.QUOTE),Lists.of(Symbols.UNQUOTE,Symbols.FOO))),expand("'~foo"));
-		assertEquals(Syntax.create(Lists.of(Syntax.of(Symbols.QUOTE),Lists.of(Symbols.QUOTE,Lists.of(Symbols.UNQUOTE,Symbols.FOO)))),expand("''~foo"));
+		assertEquals(Syntax.create(Lists.of(Symbols.QUOTE,Symbols.FOO)),expand("'foo"));
+		assertEquals(Syntax.create(Lists.of(Symbols.QUOTE,Lists.of(Symbols.UNQUOTE,Symbols.FOO))),expand("'~foo"));
+		assertEquals(Syntax.create(Lists.of(Symbols.QUOTE,Lists.of(Symbols.QUOTE,Lists.of(Symbols.UNQUOTE,Symbols.FOO)))),expand("''~foo"));
+
+		assertEquals(Syntax.create(Lists.of(Symbols.QUASIQUOTE,Symbols.FOO)),expand("`foo"));
+
 	}
 	
 	@Test

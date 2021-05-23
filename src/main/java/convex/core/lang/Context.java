@@ -1057,7 +1057,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return Updated Context with compiled Op as result
 	 * @throws ExecutionException
 	 */
-	public <R extends ACell> Context<AOp<R>> compile(Syntax expandedForm) {
+	public <R extends ACell> Context<AOp<R>> compile(ACell expandedForm) {
 		// run compiler with adjusted depth
 		int saveDepth=getDepth();
 		Context<AOp<R>> rctx =this.withDepth(saveDepth+1);
@@ -1071,7 +1071,7 @@ public final class Context<T extends ACell> extends AObject {
 			if (ex instanceof ErrorValue) {
 				ErrorValue ev=(ErrorValue)ex;
 				// TODO: SECURITY: DoS limits
-				String msg = "Compiling: Syntax Object with datum of type "+Utils.getClassName(expandedForm.getValue());
+				String msg = "Compiling: Syntax Object with datum of type "+Utils.getClassName(expandedForm);
 				//String msg = "Compiling: "+expandedForm;
 				ev.addTrace(msg);
 			}

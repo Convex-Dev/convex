@@ -22,7 +22,7 @@
   (fn [x e] 
       (let [[_ name & decl] (unsyntax x)
             exp (cons 'fn decl)
-            form '(def ~(syntax name {:expander true}) ~exp)]
+            form `(def ~(syntax name {:expander true}) ~exp)]
          (e form e))))
 
 (def defmacro 
@@ -36,7 +36,7 @@
      (let [[_ name & decl] (unsyntax x)
            mac (cons 'fn decl)
            mac (syntax mac (meta (first decl)))
-           form '(def ~(syntax name {:expander true}) 
+           form `(def ~(syntax name {:expander true}) 
                    (let [m# ~mac]
                      (fn [x e] (e (apply m# (next (unsyntax x))) e))))]
        (e form e))))
@@ -50,7 +50,7 @@
    }
   [& decl]
   (let [mac (cons 'fn decl)
-        form '(let [m# ~mac]
+        form `(let [m# ~mac]
                 (fn [x e] (e (apply m# (next (unsyntax x))) e)))]
     form))
 
@@ -78,7 +78,7 @@
   [name params & body] 
   (let [fnform (cons 'fn params body)
        fnform (syntax fnform (meta params))] 
-    '(def ~name ~fnform)))
+    `(def ~name ~fnform)))
 
 (defmacro assert
 	^{
@@ -88,7 +88,7 @@
          :signature [{:params [& tests]}]}
 	}
  [& tests]
- (cons 'do (map (fn [test] '(cond ~test nil (fail :ASSERT ~(str "Assert failed: " (str test))))) tests)))
+ (cons 'do (map (fn [test] `(cond ~test nil (fail :ASSERT ~(str "Assert failed: " (str test))))) tests)))
 
 (defmacro doc
   ^{:doc {:description "Returns the documentation for a given definition."
@@ -97,7 +97,7 @@
          :signature [{:params [sym]}]}
 	}
   [sym]
-  '(:doc (meta (lookup-syntax (quote ~sym)))))
+  `(:doc (meta (lookup-syntax (quote ~sym)))))
 
 (defmacro or 
   ^{:doc {:description "Executes expressions in sequence, returning the first truthy value, or the last value if all were falsey. Does not evaluate later expressions, so can be used to short circuit execution. Returns nil with no expressions present."
@@ -111,7 +111,7 @@
     (cond 
       (== n 0) nil
       (== n 1) (first exprs)
-      :else '(let [v# ~(first exprs)]
+      :else `(let [v# ~(first exprs)]
                (if v# v# ~(cons 'or (next exprs)))))))
 
 (defmacro and 
@@ -126,7 +126,7 @@
     (cond 
       (== n 0) true
       (== n 1) (first exprs)
-      :else '(let [v# ~(first exprs)]
+      :else `(let [v# ~(first exprs)]
                (if v# ~(cons 'and (next exprs)) v#)))))
 
 
@@ -137,7 +137,7 @@
          :signature [{:params [test & body]}]}
 	}
   [test & body] 
-  '(cond ~test ~(cons 'do body)))
+  `(cond ~test ~(cons 'do body)))
 
 (defmacro when-not 
    ^{:doc {:description "Executes body expressions in an implicit do block if af and only if the test expression evaluates to a falsey value."
@@ -242,7 +242,7 @@
               (list 'quote esym)))
         qsyms (mapv f syms)
         vals (cons 'vector qsyms)]
-    '(def *exports* (into *exports* ~vals))))
+    `(def *exports* (into *exports* ~vals))))
   
 (def *aliases*
   ^{:doc {:description "A map of aliased symbols to Addresses that are imported in the current environment. Defaults to a single alias to the 'convex.core' core library."
@@ -262,7 +262,7 @@
           :type :macro	 
           :signature [{:params [sym value]}]}}
     [sym value]
-    '(set* ~(list 'quote sym) ~value))
+    `(set* ~(list 'quote sym) ~value))
  
 (defmacro undef
     ^{:doc {:description "Undefines a symbol, removing the mapping from the current environment if it exists."
@@ -270,7 +270,7 @@
           :type :macro	 
           :signature [{:params [sym]}]}}
     [sym]
-    '(undef* ~(list 'quote sym)))
+    `(undef* ~(list 'quote sym)))
 
 (defmacro import
   ^{:doc {:description "Import a library for use in the current environment. Creates an alias to the library so that symbols defined in the library can be addressed directly in the form 'alias/symbol-name'. Returns the Address of the imported account."
@@ -289,7 +289,7 @@
 	                  (= :default sym) nil
 	                  (fail "import: alias must be a symbol or :default"))] 
 	    (assert (= :as (unsyntax as)))
-	    '(let [addr (address ~addr)] 
+	    `(let [addr (address ~addr)] 
 	       (def *aliases* (assoc *aliases* ~(list 'quote sym) addr))
 	       addr)))
 
@@ -305,7 +305,7 @@
         code 
         (list 'quote (cons 'let bindlist body))
        ] 
-    '(fn ~params ~code)))
+    `(fn ~params ~code)))
 
 (defmacro defactor
   ^{:doc {:description "Defines an actor generation function in the environment. See 'actor' for more details on actor generation functions."
@@ -315,7 +315,7 @@
 	}
   [name params & body] 
   (let [actr (cons 'actor params body)]
-    '(def ~name ~actr)))
+    `(def ~name ~actr)))
 
 (defmacro defined?
     ^{:doc {:description "Tests if a given symbol name is defined in the current environment."
@@ -325,7 +325,7 @@
 	}
   [sym]
   (or (symbol? (unsyntax sym)) (fail :CAST "defined? requires a Symbol"))
-  '(boolean (lookup-syntax ~(list 'quote sym))))
+  `(boolean (lookup-syntax ~(list 'quote sym))))
 
 (defmacro schedule
     ^{
@@ -334,7 +334,7 @@
           :type :macro
           :signature [{:params [timestamp code]}] }}
     [timestamp code]
-  '(schedule* ~timestamp (compile ~(list 'quote code))))
+  `(schedule* ~timestamp (compile ~(list 'quote code))))
 
 (defmacro dotimes 
   ^{
@@ -345,7 +345,7 @@
   [[sym count] & body]
   (let [n (long count)
         sym (if (symbol? (unsyntax sym)) sym (fail :CAST "dotimes requires a symbol for loop binding"))] ;; Dubious: allows strings and keywords?
-    '(loop [~sym 0]
+    `(loop [~sym 0]
        (if (< ~sym ~n)
          (do 
            ~(cons do body)
@@ -360,7 +360,7 @@
           :signature [{:params [[sym exp] & body]}] }}
   [[sym exp] & body]
   (let [dobody (cons 'do body)]
-    '(let [~sym ~exp]
+    `(let [~sym ~exp]
        (if ~sym
          ~dobody
          nil))))
@@ -381,7 +381,7 @@
           :type :macro
           :signature [{:params [[sym exp] & branches]}] }}
   [[sym exp] & branches]
-    '(let [~sym ~exp]
+    `(let [~sym ~exp]
        ~(cons 'if sym branches)))
 
 

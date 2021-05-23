@@ -62,6 +62,8 @@ public class Symbols {
 	public static final Symbol HASH = Symbol.create("hash");
 
 	public static final Symbol QUOTE = Symbol.create("quote");
+	public static final Symbol QUASIQUOTE = Symbol.create("quasiquote");
+
 	public static final Symbol SYNTAX_QUOTE = Symbol.create("syntax-quote");
 	public static final Symbol UNQUOTE = Symbol.create("unquote");
 	public static final Symbol UNQUOTE_SPLICING = Symbol.create("unquote-splicing");

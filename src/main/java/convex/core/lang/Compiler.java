@@ -14,7 +14,6 @@ import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.List;
-import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Set;
@@ -75,16 +74,12 @@ public class Compiler {
 		
 		// Use initial expander both as current and continuation expander
 		// call expand via context to get correct depth and exception handling
-		final Context<Syntax> ctx = context.expand(ex, form,ex);
+		final Context<ACell> ctx = context.expand(ex, form,ex);
 		
 		if (ctx.isExceptional()) return (Context<AOp<T>>) (Object) ctx;
 		ACell c=ctx.getResult();
-		if (!(c instanceof Syntax)) {
-			return ctx.withError(ErrorCodes.CAST,"Expander must produce a Syntax Object but got "+RT.getType(c)+ " = "+c);
-		}
-		// compile phase
-		Syntax expandedForm = (Syntax)c;
-		return compile(expandedForm, ctx);
+		
+		return compile(c, ctx);
 	}
 
 	/**
@@ -98,8 +93,8 @@ public class Compiler {
 	 * @param context
 	 * @return Context with compiled Op as result
 	 */
-	static <T extends ACell> Context<AOp<T>> compile(Syntax expandedForm, Context<?> context) {
-		ACell form = expandedForm.getValue();
+	static <T extends ACell> Context<AOp<T>> compile(ACell expandedForm, Context<?> context) {
+		ACell form = Syntax.unwrap(expandedForm);
 		if (form==null) return compileConstant(context,null);
 		return compileCell(form, context);
 	}
@@ -120,7 +115,7 @@ public class Compiler {
 		int n = forms.size();
 		AVector<AOp<T>> obs = Vectors.empty();
 		for (int i = 0; i < n; i++) {
-			Syntax form = forms.get(i);
+			ACell form = forms.get(i);
 			context = context.compile(form);
 			if (context.isExceptional()) return (Context<AVector<AOp<T>>>) context;
 			obs = obs.conj((AOp<T>) context.getResult());
@@ -318,18 +313,14 @@ public class Compiler {
 
 		// first entry in list should be syntax
 		ACell first = list.get(0);
-		if (!(first instanceof Syntax)) {
-			throw new Error("Expected Syntax in first position of: " + list);
-		}
-
-		ACell head = ((Syntax) first).getValue();
+		ACell head = Syntax.unwrap(first);
 
 		if (head instanceof Symbol) {
 			Symbol sym = (Symbol) head;
 
 			// special form symbols
-			if (sym.equals(Symbols.QUOTE) || sym.equals(Symbols.SYNTAX_QUOTE)) {
-				if (list.size() != 2) return context.withCompileError(Symbols.QUOTE + " expects one argument.");
+			if (sym.equals(Symbols.QUOTE) || sym.equals(Symbols.QUASIQUOTE)) {
+				if (list.size() != 2) return context.withCompileError(sym + " expects one argument.");
 				return (Context<T>) compileQuoted(context, list.get(1),1);
 			}
 
@@ -486,7 +477,7 @@ public class Compiler {
 		int n = list.size();
 		if (n < 1) return context.withArityError("fn requires parameter vector and body in form: " + list);
 
-		ACell firstObject = list.get(0).getValue();
+		ACell firstObject = Syntax.unwrap(list.get(0));
 		if (firstObject instanceof AVector) {
 			AVector<Syntax> paramsVector=(AVector<Syntax>) firstObject;
 			AList<Syntax> bodyList=list.drop(1); 
@@ -674,161 +665,36 @@ public class Compiler {
 	 * 
 	 * Follows the "Expansion-Passing Style" approach of Dybvig, Friedman, and Haynes
 	 */
-	public static final AFn<Syntax> QUOTE_EXPANDER =new CoreFn<Syntax>(Symbols.QUOTE) {
+	public static final AFn<ACell> QUOTE_EXPANDER =new CoreFn<ACell>(Symbols.QUOTE) {
 		@Override
-		public Context<Syntax> invoke(Context<ACell> context,ACell[] args ) {
+		public Context<ACell> invoke(Context<ACell> context,ACell[] args ) {
 			if (args.length!=2) return context.withArityError(exactArityMessage(2, args.length));
 			ACell x = Syntax.unwrap(args[0]);
-			AFn<?> cont=RT.function(args[1]);
-			
-			if (!(x instanceof AList)) return context.withCompileError("quote expander expects a List form, but got: "+RT.getType(x));
-			@SuppressWarnings("unchecked")
-			AList<ACell> quoteForm=(AList<ACell>)x;
-			if (quoteForm.count()!=2) return context.withCompileError("quote expander expects exactly one argument, but was: "+quoteForm);
-			
-			Context<Syntax> ctx= context.expand(QUOTED_EXPANDER,quoteForm.get(1),cont);
-			if (ctx.isExceptional()) return ctx;
-			ACell quotedForm=ctx.getResult();
-			
-			Syntax r=Syntax.create(Lists.of(Syntax.create(quoteForm.get(0)),quotedForm));
-			return ctx.withResult(r);
+			//AFn<?> cont=RT.function(args[1]);
+			Syntax result=Syntax.create(x);
+		
+			return context.withResult(Juice.EXPAND_CONSTANT,result);
 		}
 	};
 	
 	/**
-	 * Expander used for expansion of quoted forms.
+	 * Expander used for expansion of `quasiquote` forms.
 	 * 
 	 * Should work on both raw forms and syntax objects.
 	 * 
 	 * Follows the "Expansion-Passing Style" approach of Dybvig, Friedman, and Haynes
 	 */
-	public static final AFn<ACell> QUOTED_EXPANDER =new CoreFn<ACell>(null) {
-		@SuppressWarnings("unchecked")
+	public static final AFn<ACell> QUASIQUOTE_EXPANDER =new CoreFn<ACell>(Symbols.QUASIQUOTE) {
 		@Override
 		public Context<ACell> invoke(Context<ACell> context,ACell[] args ) {
-			if (args.length!=2) return context.withError(ErrorCodes.UNEXPECTED, "quoted expander requires exactly 1 argument");
-			ACell x = args[0];
-			AFn<?> cont=RT.function(args[1]);
-
-			Syntax formSyntax=Syntax.create(x);
-			ACell form = formSyntax.getValue();
-			
-			
-			// First check for sequences. This covers most cases.
-			if (form instanceof ASequence) {
-				
-				// first check for List
-				if (form instanceof AList) {
-					AList<ACell> listForm = (AList<ACell>) form;
-					int n = listForm.size();
-					// consider length 0 lists as constant
-					if (n == 0) return context.withResult(Juice.EXPAND_CONSTANT, formSyntax);
-	
-//	
-//					// check for quotation operators in initial position.
-//					ACell first = Syntax.unwrap(listForm.get(0));
-//					if (first instanceof Symbol) {
-//						Symbol sym = (Symbol) first;
-//						
-//						if (sym.equals(Symbols.UNQUOTE)) {
-//							// Maybe we are breaking out of quoted expansion here
-//							// If continuation expander is not 'this', use it. Else just treat as regular quoted form
-//							if (cont!=this) {
-//								if (n!=2) return context.withCompileError("unquote requires a single form (arity 1)");
-//								ACell unquotedForm=listForm.get(1);
-//								Context<ACell> rctx = context.expand(cont,unquotedForm, cont); 
-//								return rctx;
-//							}
-//						} else if (sym.equals(Symbols.QUOTE)) {
-//							// nested quote, may need to set expand using 'this' as continuation expander
-//							if (cont!=this) {
-//								Context<ACell> rctx = context.expand(this,listForm, this); 
-//								return rctx;
-//							}
-//						}
-//					}
-				}
-
-				// need to recursively expand collection elements
-				// OK for vectors and lists
-				ASequence<ACell> seq = (ASequence<ACell>) form;
-				if (seq.isEmpty()) return context.withResult(Juice.EXPAND_CONSTANT, formSyntax);
-				Context<ACell>[] ct = new Context[] { context };
-				ASequence<ACell> updated;
-
-				updated = seq.map(elem -> {
-					Context<ACell> ctx = ct[0];
-					if (ctx.isExceptional()) return null;
-
-					// Expand like: (cont x cont)
-					ctx = ctx.expand(this,elem, cont);
-
-					if (ctx.isExceptional()) {
-						ct[0] = ctx;
-						return null;
-					}
-					ACell newElement = ctx.getResult();
-					ct[0] = ctx;
-					return newElement;
-				});
-				Context<ACell> rctx = ct[0];
-				if (context.isExceptional()) return rctx;
-				ACell r=preserveMeta(updated,x);
-				return rctx.withResult(Juice.EXPAND_SEQUENCE, r);
-			}
-
-			if (form instanceof ASet) {
-				Context<ACell> ctx =  context;
-				Set<ACell> updated = Sets.empty();
-				for (ACell elem : ((ASet<ACell>) form)) {
-					ctx = ctx.expand(this, elem, cont);
-					if (ctx.isExceptional()) return ctx;
-
-					ACell newElement = ctx.getResult();
-					updated = updated.conj(newElement);
-				}
-				ACell r=preserveMeta(updated,x);
-				return ctx.withResult(Juice.EXPAND_SEQUENCE, r);
-			}
-
-			if (form instanceof AMap) {
-				Context<ACell> ctx =  context;
-				AMap<ACell, ACell> updated = Maps.empty();
-				for (Map.Entry<ACell, ACell> me : ((AMap<ACell, ACell>) form).entrySet()) {
-					// get new key
-					ctx = ctx.expand(this,me.getKey(), cont);
-					if (ctx.isExceptional()) return ctx;
-
-					ACell newKey = ctx.getResult();
-
-					// get new value
-					ctx = ctx.expand(this,me.getValue(), cont);
-					if (ctx.isExceptional()) return ctx;
-					ACell newValue = ctx.getResult();
-
-					updated = updated.assoc(newKey, newValue);
-				}
-				ACell r=preserveMeta(updated,x);
-				return ctx.withResult(Juice.EXPAND_SEQUENCE, r);
-			}
-
-			// Return the Syntax Object directly for any other type
-			// Remember to preserve metadata on symbols in particular!
-			return context.withResult(Juice.EXPAND_CONSTANT, x);
+			if (args.length!=2) return context.withArityError(exactArityMessage(2, args.length));
+			ACell x = Syntax.unwrap(args[0]);
+			//AFn<?> cont=RT.function(args[1]);
+			Syntax result=Syntax.create(x);
+		
+			return context.withResult(Juice.EXPAND_CONSTANT,result);
 		}
 	};
+	
 
-	/**
-	 * Preserve metadata if the original value was a Syntax object. Return value unchanged otherwise.
-	 * @param value
-	 * @param original
-	 * @return
-	 */
-	private static ACell preserveMeta(ACell value, ACell original) {
-		if (original instanceof Syntax) {
-			return Syntax.create(value).withMeta(((Syntax)original).getMeta());
-		} else {
-			return value;
-		}
-	}
 }

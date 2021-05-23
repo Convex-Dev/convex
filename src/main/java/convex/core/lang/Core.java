@@ -532,7 +532,9 @@ public class Core {
 
 	public static final AFn<Syntax> INITIAL_EXPANDER = reg(Compiler.INITIAL_EXPANDER);
 	
-	public static final AFn<Syntax> QUOTE_EXPANDER = reg(Compiler.QUOTE_EXPANDER);
+	public static final AFn<ACell> QUOTE_EXPANDER = reg(Compiler.QUOTE_EXPANDER);
+
+	public static final AFn<ACell> QUASIQUOTE_EXPANDER = reg(Compiler.QUASIQUOTE_EXPANDER);
 
 	public static final CoreFn<CVMBool> EXPORTS_Q = reg(new CoreFn<>(Symbols.EXPORTS_Q) {
 		@SuppressWarnings("unchecked")
