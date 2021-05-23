@@ -935,7 +935,7 @@ public class Core {
 			long juice = Juice.BUILD_DATA + len * Juice.BUILD_PER_ELEMENT;
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
-			BlobMap r=BlobMaps.empty();
+			ABlobMap<ABlob,ACell> r=BlobMaps.empty();
 			int n=len/2;
 			for (int i=0; i<n; i++) {
 				int ix=i*2;
@@ -953,7 +953,7 @@ public class Core {
 		public  Context<ASet<?>> invoke(Context context, ACell[] args) {
 			// any arity is OK
 
-			long juice = Juice.BUILD_DATA + args.length * Juice.BUILD_PER_ELEMENT;
+			long juice = Juice.BUILD_DATA + (args.length * Juice.BUILD_PER_ELEMENT);
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 			
 			return context.withResult(juice, Sets.create(args));
