@@ -274,6 +274,18 @@ public class CompilerTest extends ACVMTest {
 	}
 	
 	@Test 
+	public void testQuoteCases() {
+		Context<?> ctx=step("(def x 1)");
+		assertEquals(read("(a b c)"),eval(ctx,"`(a b c)"));
+		assertEquals(read("(a b 1)"),eval(ctx,"`(a b ~x)"));
+		assertEquals(read("(a '(b ~x))"),eval(ctx,"'(a '(b ~x))"));
+		assertEquals(read("(a '(b ~1))"),eval(ctx,"'(a '(b ~~x))"));
+		assertEquals(read("(a '(b ~1))"),eval(ctx,"'(a '(b ~~'~x))"));
+		assertEquals(read("(a '(b ~x))"),eval(ctx,"'(a '(b ~~'x))"));
+	}
+
+	
+	@Test 
 	public void testNestedQuote() {
 		assertEquals(RT.cvm(10L),eval("(+ (eval '(+ 1 ~2 ~(eval 3) ~(eval '(+ 0 4)))))"));
 

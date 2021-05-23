@@ -87,6 +87,10 @@ public abstract class ACVMTest {
 			throw Utils.sneakyThrow(e);
 		}
 	}
+	
+	public <T extends ACell> T read(String source) {
+		return Reader.read(source);
+	}
 
 	/**
 	 * Runs an execution step as a different address. Returns value after restoring

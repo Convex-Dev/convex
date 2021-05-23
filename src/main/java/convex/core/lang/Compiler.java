@@ -579,16 +579,9 @@ public class Compiler {
 					ACell first = Syntax.unwrap(listForm.get(0));
 	
 					// check for macro / expander in initial position.
+					// Note that 'quote' is handled by this, via QUOTE_EXPANDER
 					if (first instanceof Symbol) {
 						Symbol sym = (Symbol) first;
-						
-						// TODO: handle quote
-						// if (sym.equals(Symbols.QUOTE)) {
-						//	if (listForm.size() != 2) return context.withCompileError(Symbols.QUOTE + " expects one argument.");
-						//	Syntax syn=Syntax.create(listForm.get(1));
-						//	Syntax quoteSyn=Syntax.create(Lists.of(Syntax.create(Symbols.QUOTE),syn));
-						//	return context.withResult(Juice.EXPAND_CONSTANT,quoteSyn);
-						// }
 						
 						MapEntry<Symbol, Syntax> me = context.lookupDynamicEntry(sym);
 						if (me != null) {
@@ -687,7 +680,6 @@ public class Compiler {
 			if (args.length!=2) return context.withArityError(exactArityMessage(2, args.length));
 			ACell x = Syntax.unwrap(args[0]);
 			AFn<?> cont=RT.function(args[1]);
-			
 			
 			if (!(x instanceof AList)) return context.withCompileError("quote expander expects a List form, but got: "+RT.getType(x));
 			@SuppressWarnings("unchecked")
