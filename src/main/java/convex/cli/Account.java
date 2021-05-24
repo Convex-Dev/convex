@@ -18,6 +18,7 @@ import picocli.CommandLine.ParentCommand;
 @Command(name="account",
 	subcommands = {
 		AccountCreate.class,
+		AccountFund.class,
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=true,

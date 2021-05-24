@@ -61,7 +61,8 @@ public class Transaction implements Runnable {
 	private long addressNumber;
 
 
-	@Parameters(paramLabel="transactionCommand", description="Transaction Command")
+	@Parameters(paramLabel="transactionCommand",
+		description="Transaction Command")
 	private String transactionCommand;
 
 	@Override
@@ -72,6 +73,11 @@ public class Transaction implements Runnable {
 			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
 		} catch (Error e) {
 			log.info(e.getMessage());
+			return;
+		}
+
+		if (addressNumber == 0) {
+			log.severe("--address. You need to provide a valid address number");
 			return;
 		}
 
