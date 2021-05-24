@@ -1572,19 +1572,25 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Symbols.COUNT, eval("(symbol (str 'count))"));
 		assertEquals(Symbols.COUNT, eval("(symbol (name :count))"));
 		assertEquals(Symbols.COUNT, eval("(symbol (name \"count\"))"));
-		
+
+		Symbol foobar = Symbol.create(Symbol.create(Strings.create("foo")), Strings.create("bar"));
+		assertEquals(foobar, eval("(symbol \"foo\" \"bar\")"));
+		assertEquals(foobar, eval("(symbol 'foo \"bar\")"));
+		assertEquals(foobar, eval("(symbol \"foo\" :bar)"));
+		assertEquals(foobar, eval("(symbol 'foo :bar)"));
+
 		assertEquals(Symbol.create(Address.create(8),Strings.create("foo")),eval("'#8/foo"));
 
 		// too short or too long results in ARGUMENT error
 		assertArgumentError(step("(symbol (str))"));
 		assertArgumentError(
-				step("(symbol \"duicgidvgefiucefiuvfeiuvefiuvgifegvfuievgiuefgviuefgviufegvieufgviuefvgevevgi\")"));
+			  step("(symbol \"duicgidvgefiucefiuvfeiuvefiuvgifegvfuievgiuefgviuefgviufegvieufgviuefvgevevgi\")"));
 
 		assertCastError(step("(symbol nil)"));
 		assertCastError(step("(symbol [])"));
 
 		assertArityError(step("(symbol)"));
-		assertArityError(step("(symbol 1 3)"));
+		assertArityError(step("(symbol 1 2 3)"));
 	}
 	
 	@Test
