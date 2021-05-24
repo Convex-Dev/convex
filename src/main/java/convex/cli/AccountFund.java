@@ -7,24 +7,25 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 
 /**
  *
- *  Convex account create command
+ *  Convex account fund command
  *
- *  convex.account.create
+ *  convex.account.fund
  *
  */
 
-@Command(name="create",
+@Command(name="fund",
 	mixinStandardHelpOptions=true,
-	description="Creates an account using a public/private key from the keystore.%n"
-		+ "You must provide a valid keystore password to the keystore.%n"
+	description="Transfers funds to account using a public/private key from the keystore.%n"
+		+ "You must provide a valid keystore password to the keystore and a valid address.%n"
 		+ "If the keystore is not at the default location also the keystore filename.")
-public class AccountCreate implements Runnable {
+public class AccountFund implements Runnable {
 
-	private static final Logger log = Logger.getLogger(AccountCreate.class.getName());
+	private static final Logger log = Logger.getLogger(AccountFund.class.getName());
 
 	@ParentCommand
 	private Account accountParent;
@@ -50,9 +51,15 @@ public class AccountCreate implements Runnable {
 		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
 	private String hostname;
 
-	@Option(names={"-f", "--fund"},
-		description="Fund the account with the default fund amount.")
-	private boolean isFund;
+	@Option(names={"-a", "--address"},
+		description="Account address to use to request funds.")
+	private long addressNumber;
+
+
+	@Parameters(paramLabel="amount",
+		defaultValue=""+Constants.ACCOUNT_FUND_AMOUNT,
+		description="Amount to fund the account")
+	private long amount;
 
 	@Override
 	public void run() {
@@ -67,19 +74,22 @@ public class AccountCreate implements Runnable {
 			return;
 		}
 
+		if (addressNumber == 0) {
+			log.severe("--address. You need to provide a valid address number");
+			return;
+		}
+
 		Convex convex = null;
+		Address address = Address.create(addressNumber);
 		try {
 			convex = mainParent.connectToSessionPeer(hostname, port);
-			Address address = convex.createAccount(keyPair.getAccountKey());
-			log.info("account address: " + address);
-			if (isFund) {
-				convex.transferSync(address, Constants.ACCOUNT_FUND_AMOUNT);
-				convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
-				Long balance = convex.getBalance(address);
-				log.info("account balance: " + balance);
-			}
+			convex.transferSync(address, amount);
+			convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
+			Long balance = convex.getBalance(address);
+			log.info("account balance: " + balance);
 		} catch (Throwable t) {
 			log.severe(t.getMessage());
+			t.printStackTrace();
 			return;
 		}
 
