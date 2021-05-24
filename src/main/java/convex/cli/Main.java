@@ -1,9 +1,17 @@
 package convex.cli;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintWriter;
+import java.security.KeyStore;
+import java.util.Enumeration;
 import java.util.logging.Logger;
 
+import convex.api.Convex;
+import convex.core.crypto.AKeyPair;
+import convex.core.crypto.PFXTools;
+import convex.core.data.Address;
+import convex.core.Init;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -15,6 +23,7 @@ import picocli.CommandLine.ScopeType;
 */
 @Command(name="convex",
 	subcommands = {
+		Account.class,
 		Key.class,
 		Local.class,
 		Peer.class,
@@ -88,7 +97,14 @@ public class Main implements Runnable {
 		// in the defaults before running the full execute
 		commandLine.parseArgs(args);
 		loadConfig();
-		return commandLine.execute(args);
+		int result = 0;
+		try {
+			result = commandLine.execute(args);
+		} catch (Throwable t) {
+			log.severe(t.getMessage());
+			return 2;
+		}
+		return result;
 	}
 
 	protected void loadConfig() {
@@ -101,6 +117,7 @@ public class Main implements Runnable {
 			}
 		}
 	}
+
 	public String getSessionFilename() {
 		return Helpers.expandTilde(sessionFilename);
 	}
@@ -117,4 +134,67 @@ public class Main implements Runnable {
 		return Helpers.expandTilde(etchStoreFilename);
 	}
 
+	public AKeyPair loadKeyFromStore(String keystorePublicKey, int keystoreIndex) throws Error {
+
+		AKeyPair keyPair = null;
+		String publicKeyClean = keystorePublicKey.toLowerCase().replaceAll("^0x", "");
+
+		if (password == null || password.isEmpty()) {
+			throw new Error("You need to provide a keystore password");
+		}
+
+		if ( publicKeyClean.isEmpty() && keystoreIndex <= 0) {
+			throw new Error("You need to provide a keystore public key identity via the --index or --public-key options");
+		}
+
+		File keyFile = new File(getKeyStoreFilename());
+		try {
+			if (!keyFile.exists()) {
+				throw new Error("Cannot find keystore file "+keyFile.getCanonicalPath());
+			}
+			KeyStore keyStore = PFXTools.loadStore(keyFile, password);
+
+			int counter = 1;
+			Enumeration<String> aliases = keyStore.aliases();
+
+			while (aliases.hasMoreElements()) {
+				String alias = aliases.nextElement();
+				if (counter == keystoreIndex || alias.indexOf(publicKeyClean) == 0) {
+					keyPair = PFXTools.getKeyPair(keyStore, alias, password);
+					break;
+				}
+				counter ++;
+			}
+		} catch (Throwable t) {
+			throw new Error("Cannot load key store "+t);
+		}
+
+		if (keyPair==null) {
+			throw new Error("Cannot find key in keystore");
+		}
+		return keyPair;
+	}
+
+	public Convex connectToSessionPeer(String hostname, int port) throws Error {
+		return connectToSessionPeer(hostname, port, Init.HERO, Init.HERO_KP);
+	}
+
+	public Convex connectToSessionPeer(String hostname, int port, Address address, AKeyPair keyPair) throws Error {
+		if (port == 0) {
+			try {
+				port = Helpers.getSessionPort(getSessionFilename());
+			} catch (IOException e) {
+				throw new Error("Cannot load the session control file");
+			}
+		}
+		if (port == 0) {
+			throw new Error("Cannot find a local port or you have not set a valid port number");
+		}
+
+		Convex convex = Helpers.connect(hostname, port, address, keyPair);
+		if (convex==null) {
+			throw new Error("Cannot connect to a peer");
+		}
+		return convex;
+	}
 }
