@@ -13,7 +13,7 @@ import picocli.CommandLine.ParentCommand;
 */
 @Command(name="manager",
 	mixinStandardHelpOptions=true,
-	description="Launch a local convex network manager gui.")
+	description="Starts a local convex test network using the peer manager gui application.")
 public class LocalManager implements Runnable {
 
 	private static final Logger log = Logger.getLogger(LocalManager.class.getName());

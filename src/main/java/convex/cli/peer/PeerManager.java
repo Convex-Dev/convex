@@ -23,9 +23,6 @@ import convex.core.State;
 import convex.peer.API;
 import convex.peer.Server;
 import etch.EtchStore;
-import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.ParentCommand;
 
 
 /**
