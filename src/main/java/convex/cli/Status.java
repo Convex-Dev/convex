@@ -22,10 +22,12 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 
 /**
-*
-* Convex Status sub command
-*
-*/
+ *
+ * Convex Status sub command
+ *
+ *		convex.status
+ *
+ */
 @Command(name="status",
 	mixinStandardHelpOptions=true,
 	description="Reports on the current status of the network.")

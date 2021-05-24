@@ -5,10 +5,12 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
 
 /**
-*
-* Convex key sub commands
-*
-*/
+ *
+ * Convex key sub commands
+ *
+ *		convex.key
+ *
+ */
 @Command(name="key",
 	subcommands = {
 		KeyGenerate.class,

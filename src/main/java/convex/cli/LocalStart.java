@@ -12,9 +12,11 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 
 /*
-	*  local start command
-	*
-*/
+ * 		local start command
+ *
+ *		convex.local.start
+ *
+ */
 
 @Command(name="start",
 	mixinStandardHelpOptions=true,
