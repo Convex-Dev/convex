@@ -346,7 +346,7 @@ public class Convex {
 	 *                          full
 	 * @throws TimeoutException If the transaction times out
 	 */
-	public Result transferSynce(Address target, long amount) throws IOException, TimeoutException {
+	public Result transferSync(Address target, long amount) throws IOException, TimeoutException {
 		ATransaction trans = Transfer.create(getAddress(), 0, target, amount);
 		return transactSync(trans);
 	}
