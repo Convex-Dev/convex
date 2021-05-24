@@ -9,7 +9,6 @@ import convex.api.Convex;
 import convex.cli.peer.Session;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
-import convex.core.Init;
 
 /*
  *

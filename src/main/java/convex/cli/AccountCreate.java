@@ -1,17 +1,10 @@
 package convex.cli;
 
-import java.io.IOException;
-import java.util.HashMap;
 import java.util.logging.Logger;
-import java.util.Map;
-import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
-import convex.cli.peer.PeerManager;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
-import convex.core.data.Keyword;
-import convex.core.Init;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;

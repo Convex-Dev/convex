@@ -1,13 +1,10 @@
 package convex.cli;
 
 import java.io.File;
-import java.security.KeyStore;
-import java.util.Enumeration;
 import java.util.logging.Logger;
 
 import convex.cli.peer.PeerManager;
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.PFXTools;
 import convex.core.store.AStore;
 import etch.EtchStore;
 import picocli.CommandLine.Command;

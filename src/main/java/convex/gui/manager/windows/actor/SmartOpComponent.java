@@ -51,7 +51,7 @@ public class SmartOpComponent extends BaseListComponent {
 
 	/**
 	 * Fields for each argument by position.
-	 * 
+	 *
 	 * Null entry used for funds offer
 	 */
 	private HashMap<Integer, JTextField> paramFields = new HashMap<>();
@@ -127,14 +127,14 @@ public class SmartOpComponent extends BaseListComponent {
 
 		try {
 			ACell message = RT.cons(Symbols.CALL, parent.contract, rest);
-			
+
 			AccountChooserPanel execPanel = parent.execPanel;
 			WalletEntry we = execPanel.getWalletEntry();
 			Address myAddress=we.getAddress();
-			
+
 			// connect to Peer as a client
 			Convex peerConnection = Convex.connect(addr, we.getAddress(),we.getKeyPair());
-			
+
 			String mode = execPanel.getMode();
 			Result r=null;
 			if (mode.equals("Query")) {
@@ -145,7 +145,7 @@ public class SmartOpComponent extends BaseListComponent {
 							"Please select an unlocked wallet address to use for transactions before sending");
 					return;
 				}
-				
+
 				ATransaction trans = Invoke.create(myAddress,-1, message);
 				r = peerConnection.transactSync(trans);
 			} else {
@@ -156,7 +156,7 @@ public class SmartOpComponent extends BaseListComponent {
 			} else {
 				showResult(r.getValue());
 			}
-			
+
 		} catch (Throwable e) {
 			log.warning(e.getMessage());
 			Toast.display(parent, "Unexpected Error: "+e.getMessage(), Toast.FAIL);

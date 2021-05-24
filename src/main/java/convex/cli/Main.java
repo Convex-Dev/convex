@@ -2,7 +2,6 @@ package convex.cli;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.security.KeyStore;
 import java.util.Enumeration;
 import java.util.logging.Logger;
@@ -29,7 +28,7 @@ import picocli.CommandLine.ScopeType;
 		Peer.class,
 		Query.class,
 		Status.class,
-		Transact.class,
+		Transaction.class,
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=true,

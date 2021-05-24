@@ -55,7 +55,8 @@ public class CLITest {
 		assertCommandLineResult(0, "^Usage: convex local manager \\[-hV\\] .*", "local", "manager", "--help");
 		assertCommandLineResult(0, "^Usage: convex query \\[-hV\\] .*", "query", "--help");
 		assertCommandLineResult(0, "^Usage: convex status \\[-hV\\] .*", "status", "--help");
-		assertCommandLineResult(0, "^Usage: convex transact \\[-hV\\] .*", "transact", "--help");
+		assertCommandLineResult(0, "^Usage: convex transaction \\[-hV\\] .*", "transaction", "--help");
+		assertCommandLineResult(0, "^Usage: convex transaction \\[-hV\\] .*", "transact", "--help");
 	}
 
 
