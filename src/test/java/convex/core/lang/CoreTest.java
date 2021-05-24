@@ -76,6 +76,9 @@ import convex.core.lang.ops.Invoke;
 /**
  * Test class for core functions in the initial environment.
  * 
+ * The state setup included core libraries such as the registry and trust monitors
+ * which require integration with core language features.
+ * 
  * Needs completely deterministic, fully specified behaviour if we want
  * consistent results so we need to do a lot of negative testing here.
  */

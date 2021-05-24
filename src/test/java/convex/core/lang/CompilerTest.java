@@ -35,6 +35,11 @@ import convex.core.lang.ops.Lookup;
 import convex.core.util.Utils;
 import convex.test.Samples;
 
+/**
+ * Tests for basic language features and compiler functionality. 
+ * 
+ * State setup includes only basic accounts and core library.
+ */
 public class CompilerTest extends ACVMTest {
 	
 	protected CompilerTest() {
@@ -296,7 +301,7 @@ public class CompilerTest extends ACVMTest {
 	
 	@Test 
 	public void testNestedQuote() {
-		assertEquals(RT.cvm(10L),eval("(+ (eval '(+ 1 ~2 ~(eval 3) ~(eval '(+ 0 4)))))"));
+		assertEquals(RT.cvm(10L),eval("(+ (eval `(+ 1 ~2 ~(eval 3) ~(eval `(+ 0 4)))))"));
 
 		assertEquals(RT.cvm(10L),eval("(let [a 2 b 3] (eval '(+ 1 ~a ~(+ b 4))))"));
 	}
@@ -466,7 +471,7 @@ public class CompilerTest extends ACVMTest {
 	}
 	
 	@Test
-	public void testQuoteExpand()  {
+	public void testExpandQuote()  {
 		assertEquals(Syntax.create(null),expand("nil"));
 		assertEquals(Syntax.create(Lists.of(Symbols.QUOTE,Symbols.FOO)),expand("'foo"));
 		assertEquals(Syntax.create(Lists.of(Symbols.QUOTE,Lists.of(Symbols.UNQUOTE,Symbols.FOO))),expand("'~foo"));
