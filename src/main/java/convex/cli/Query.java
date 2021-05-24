@@ -56,8 +56,8 @@ public class Query implements Runnable {
 		}
 		try {
 			System.out.printf("Executing query: %s\n", queryCommand);
-			ACell exp=Reader.read(queryCommand);
-			Result result=convex.querySync(exp, 5000);
+			ACell message = Reader.read(queryCommand);
+			Result result = convex.querySync(message, 5000);
 			System.out.println(result);
 		} catch (IOException e) {
 			log.severe("Query Error: "+e.getMessage());
