@@ -285,9 +285,12 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(read("(a `(b ~1))"),eval(ctx,"`(a `(b ~~`~x))"));
 		assertEquals(read("(a `(b ~x))"),eval(ctx,"`(a `(b ~~'x))"));
 		
-		// Unqoute does nothing inside a regular quote
+		// Unquote does nothing inside a regular quote
 		assertEquals(read("(a b (unquote x))"),eval(ctx,"'(a b ~x)"));
+		assertEquals(read("(unquote x)"),eval(ctx,"'~x"));
 		
+		// Unquote escapes surrounding quasiquote
+		assertEquals(read("(a b (quote 1))"),eval(ctx,"`(a b '~x)"));
 	}
 
 	
