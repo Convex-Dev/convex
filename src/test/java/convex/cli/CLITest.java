@@ -49,9 +49,10 @@ public class CLITest {
 		assertCommandLineResult(0, "^Usage: convex key generate \\[-hV\\] .*", "key", "generate", "--help");
 		assertCommandLineResult(0, "^Usage: convex key list \\[-hV\\] .*", "key", "list", "--help");
 		assertCommandLineResult(0, "^Usage: convex peer \\[-hV\\] .*", "peer", "help");
-		assertCommandLineResult(0, "^Usage: convex peer local \\[-hV\\] .*", "peer", "local", "--help");
-		assertCommandLineResult(0, "^Usage: convex peer manager \\[-hV\\] .*", "peer", "manager", "--help");
 		assertCommandLineResult(0, "^Usage: convex peer start \\[-hrV\\] .*", "peer", "start", "--help");
+		assertCommandLineResult(0, "^Usage: convex local \\[-hV\\] .*", "local", "--help");
+		assertCommandLineResult(0, "^Usage: convex local start \\[-hV\\] .*", "local", "start", "--help");
+		assertCommandLineResult(0, "^Usage: convex local manager \\[-hV\\] .*", "local", "manager", "--help");
 		assertCommandLineResult(0, "^Usage: convex query \\[-hV\\] .*", "query", "--help");
 		assertCommandLineResult(0, "^Usage: convex status \\[-hV\\] .*", "status", "--help");
 		assertCommandLineResult(0, "^Usage: convex transact \\[-hV\\] .*", "transact", "--help");

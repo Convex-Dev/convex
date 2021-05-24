@@ -13,13 +13,13 @@ import picocli.CommandLine.ParentCommand;
 */
 @Command(name="manager",
 	mixinStandardHelpOptions=true,
-	description="Launch the peer manager gui.")
-public class PeerManager implements Runnable {
+	description="Launch a local convex network manager gui.")
+public class LocalManager implements Runnable {
 
-	private static final Logger log = Logger.getLogger(PeerManager.class.getName());
+	private static final Logger log = Logger.getLogger(LocalManager.class.getName());
 
 	@ParentCommand
-	protected Peer peerParent;
+	protected Local localParent;
 
 	@Override
 	public void run() {

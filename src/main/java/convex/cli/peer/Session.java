@@ -1,4 +1,4 @@
-package convex.cli;
+package convex.cli.peer;
 
 import java.io.IOException;
 import java.io.FileInputStream;
