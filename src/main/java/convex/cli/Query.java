@@ -14,10 +14,12 @@ import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 
 /**
-*
-* Convex Query sub command
-*
-*/
+ *
+ * Convex Query sub command
+ *
+ * 		convex.query
+ *
+ */
 @Command(name="query",
 	mixinStandardHelpOptions=true,
 	description="Execute a query on the current peer.")

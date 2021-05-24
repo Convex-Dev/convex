@@ -16,10 +16,12 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Spec;
 
-/*
-	*  peer start command
-	*
-*/
+/**
+ *  peer start command
+ *
+ *		convex.peer.start
+ *
+ */
 
 @Command(name="start",
 	mixinStandardHelpOptions=true,

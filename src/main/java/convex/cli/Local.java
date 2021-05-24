@@ -12,10 +12,13 @@ import picocli.CommandLine.ParentCommand;
 
 
 /**
-*
-* Convex peer sub commands
-*
-*/
+ *
+ * Convex local sub commands
+ *
+ *		convex.local
+ *
+ *
+ */
 @Command(name="local",
 	subcommands = {
 		LocalManager.class,
@@ -27,8 +30,6 @@ import picocli.CommandLine.ParentCommand;
 public class Local implements Runnable {
 
 	private static final Logger log = Logger.getLogger(Local.class.getName());
-
-	static public List<Server> peerServerList = new ArrayList<Server>();
 
 	@ParentCommand
 	protected Main mainParent;

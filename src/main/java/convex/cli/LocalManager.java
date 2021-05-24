@@ -7,10 +7,13 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
 
 /**
-*
-* Convex Peer Manager sub command
-*
-*/
+ *
+ * Convex Local Manager sub command
+ *
+ *		convex.local.manager
+ *
+ *
+ */
 @Command(name="manager",
 	mixinStandardHelpOptions=true,
 	description="Starts a local convex test network using the peer manager gui application.")
@@ -27,7 +30,7 @@ public class LocalManager implements Runnable {
 		try {
 			Applications.launchApp(convex.gui.manager.PeerManager.class);
 		} catch (Throwable t) {
-			System.err.println("cannot start PeerManager "+t);
+			System.err.println("cannot start local PeerManager "+t);
 		}
 	}
 }

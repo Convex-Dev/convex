@@ -8,10 +8,12 @@ import picocli.CommandLine.ParentCommand;
 
 
 /**
-*
-* Convex peer sub commands
-*
-*/
+ *
+ * Convex peer sub commands
+ *
+ *		convex.peer
+ *
+ */
 @Command(name="peer",
 	subcommands = {
 		PeerStart.class,

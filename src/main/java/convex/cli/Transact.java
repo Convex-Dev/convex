@@ -5,10 +5,12 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 
 /**
-*
-* Convex Transact sub command
-*
-*/
+ *
+ * Convex Transact sub command
+ *
+ *		convex.transact
+ *
+ */
 @Command(name="transact",
 	mixinStandardHelpOptions=true,
 	description="Execute a transaction on the network via the current peer.")
