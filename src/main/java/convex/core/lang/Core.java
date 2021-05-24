@@ -339,26 +339,42 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Symbol> SYMBOL = reg(new CoreFn<>(Symbols.SYMBOL) {
+	public static final CoreFn<Symbol> SYMBOL = reg(new CoreFn<Symbol>(Symbols.SYMBOL) {
 		@SuppressWarnings("unchecked")
 		@Override
 		public Context<Symbol> invoke(Context context, ACell[] args) {
-			// Arity 1
-			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+			int n = args.length;
+			if (n == 2) {
+				// namespace
+				ACell ns = args[0];
+				AString nsname = RT.name(ns);
+				if (nsname == null) return context.withCastError(0, args, Types.SYMBOL);
+				// name
+				ACell name = args[1];
+				AString namename = RT.name(name);
+				if (nsname == null) return context.withCastError(1, args, Types.SYMBOL);
+				// build
+				Symbol sym = Symbol.create(Symbol.create(nsname), namename);
+				if (sym == null) return context.withArgumentError("Invalid Symbol name, must be between 1 and " + Constants.MAX_NAME_LENGTH + " characters");
+				// return
+				return context.withResult(Juice.SYMBOL, sym);
+			}
 
+			if (n == 1) {
+				ACell arg = args[0];
+				if (arg instanceof Symbol) return context.withResult(Juice.SYMBOL, arg);
 
-			ACell arg=args[0];
-			if (arg instanceof Symbol) return context.withResult(Juice.SYMBOL, arg);
-			
-			// Check argument is valid name
-			AString name = RT.name(arg);
-			if (name == null) return context.withCastError(0,args, Types.SYMBOL);
-			
-			Symbol sym=Symbol.create(name);
-			if (sym == null) return context.withArgumentError("Invalid Symbol name, must be between 1 and "+Constants.MAX_NAME_LENGTH+ " characters");
+				// Check argument is valid name
+				AString name = RT.name(arg);
+				if (name == null) return context.withCastError(0, args, Types.SYMBOL);
 
-			long juice = Juice.SYMBOL;
-			return context.withResult(juice, sym);
+				Symbol sym = Symbol.create(name);
+				if (sym == null) return context.withArgumentError("Invalid Symbol name, must be between 1 and " + Constants.MAX_NAME_LENGTH + " characters");
+
+				long juice = Juice.SYMBOL;
+				return context.withResult(juice, sym);
+			}
+			return context.withArityError(name() + " requires 1 or 2 arguments");
 		}
 	});
 
