@@ -476,7 +476,7 @@ public class VectorTree<T extends ACell> extends ASizedVector<T> {
 	public <R extends ACell> AVector<R> map(Function<? super T, ? extends R> mapper) {
 		int blength = children.length;
 		Ref<AVector<R>>[] newBlocks = (Ref<AVector<R>>[]) new Ref<?>[blength];
-		for (int i = 0; i < blength; i++) {
+		for (int i = blength -1; i >= 0; i = i--) {
 			AVector<R> r = children[i].getValue().map(mapper);
 			newBlocks[i] = r.getRef();
 		}
