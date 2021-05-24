@@ -16,6 +16,7 @@ import convex.core.data.AccountStatus;
 import convex.core.data.BlobMap;
 import convex.core.data.PeerStatus;
 import convex.core.data.VectorLeaf;
+import convex.core.Init;
 import convex.core.util.Text;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -64,10 +65,9 @@ private static final Logger log = Logger.getLogger(Status.class.getName());
 
 		Convex convex = null;
 		try {
-			convex = mainParent.connectToSessionPeer(hostname, port);
+			convex = mainParent.connectToSessionPeer(hostname, port, Init.HERO, Init.HERO_KP);
 		} catch (Throwable t) {
 			log.severe(t.getMessage());
-			t.printStackTrace();
 			return;
 		}
 

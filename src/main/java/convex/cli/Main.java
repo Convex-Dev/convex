@@ -10,7 +10,6 @@ import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.data.Address;
-import convex.core.Init;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -172,10 +171,6 @@ public class Main implements Runnable {
 			throw new Error("Cannot find key in keystore");
 		}
 		return keyPair;
-	}
-
-	public Convex connectToSessionPeer(String hostname, int port) throws Error {
-		return connectToSessionPeer(hostname, port, Init.HERO, Init.HERO_KP);
 	}
 
 	public Convex connectToSessionPeer(String hostname, int port, Address address, AKeyPair keyPair) throws Error {
