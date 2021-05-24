@@ -47,21 +47,11 @@ public class Query implements Runnable {
 		// sub command run with no command provided
 		log.info("query command: "+queryCommand);
 
-		if (port == 0) {
-			try {
-				port = Helpers.getSessionPort(mainParent.getSessionFilename());
-			} catch (IOException e) {
-				log.warning("Cannot load the session control file");
-			}
-		}
-		if (port == 0) {
-			log.warning("Cannot find a local port or you have not set a valid port number");
-			return;
-		}
-
-		Convex convex = Helpers.connect(hostname, port);
-		if (convex==null) {
-			log.severe("Cannot connect to a peer");
+		Convex convex = null;
+		try {
+			convex = mainParent.connectToSessionPeer(hostname, port);
+		} catch (Error e) {
+			log.severe(e.getMessage());
 			return;
 		}
 		try {

@@ -62,9 +62,12 @@ private static final Logger log = Logger.getLogger(Status.class.getName());
 			return;
 		}
 
-		Convex convex = Helpers.connect(hostname, port);
-		if (convex==null) {
-			System.out.println("Aborting query");
+		Convex convex = null;
+		try {
+			convex = mainParent.connectToSessionPeer(hostname, port);
+		} catch (Throwable t) {
+			log.severe(t.getMessage());
+			t.printStackTrace();
 			return;
 		}
 

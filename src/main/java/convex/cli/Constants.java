@@ -18,4 +18,6 @@ public class Constants {
 
 	public static final String SESSION_FILENAME = "~/.convex/session.conf";
 
+	public static final int ACCOUNT_FUND_AMOUNT = 100000000;
+
 }

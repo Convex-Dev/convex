@@ -12,10 +12,12 @@ import picocli.CommandLine.ParentCommand;
 
 
 /**
-*
-* Convex account sub commands
-*
-*/
+ *
+ * Convex account sub commands
+ *
+ *		convex.account
+ *
+ */
 @Command(name="account",
 	subcommands = {
 		AccountCreate.class,

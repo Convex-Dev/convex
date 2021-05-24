@@ -40,11 +40,13 @@ public class PeerStart implements Runnable {
 	@Option(names={"-i", "--index"},
 		defaultValue="-1",
 		description="Keystore index of the public/private key to use for the peer.")
-	private String keystoreIndex;
+	private int keystoreIndex;
 
 	@Option(names={"--public-key"},
 		defaultValue="",
-		description="Hex string of the public key in the Keystore to use for the peer. You only need to enter in the first distinct hex values of the public key. e.g. 0xf0234 or f0234")
+		description="Hex string of the public key in the Keystore to use for the peer.%n"
+			+ "You only need to enter in the first distinct hex values of the public key.%n"
+			+ "For example: 0xf0234 or f0234")
 	private String keystorePublicKey;
 
 	@Option(names={"-r", "--reset"},
@@ -64,50 +66,12 @@ public class PeerStart implements Runnable {
 	public void run() {
 
 		Main mainParent = peerParent.mainParent;
-		AKeyPair keyPair = null;
 		int port = 0;
-		int index = Integer.parseInt(keystoreIndex);
-		String publicKeyClean = keystorePublicKey.toLowerCase().replaceAll("^0x", "");
-
-		String password = mainParent.getPassword();
-
-		if (password == null || password.isEmpty()) {
-			log.severe("You need to provide a keystore password");
-			return;
-		}
-
-		if ( publicKeyClean.isEmpty() && index <= 0) {
-			log.severe("You need to provide a keystore public key identity via the --index or --public-key options");
-			return;
-		}
-
-		File keyFile = new File(mainParent.getKeyStoreFilename());
+		AKeyPair keyPair = null;
 		try {
-			if (!keyFile.exists()) {
-				log.severe("Cannot find keystore file "+keyFile.getCanonicalPath());
-				return;
-			}
-			log.info("reading keystore file: "+keyFile.getPath());
-			KeyStore keyStore = PFXTools.loadStore(keyFile, password);
-
-			int counter = 1;
-			Enumeration<String> aliases = keyStore.aliases();
-
-			while (aliases.hasMoreElements()) {
-				String alias = aliases.nextElement();
-				if (counter == index || alias.indexOf(publicKeyClean) == 0) {
-					keyPair = PFXTools.getKeyPair(keyStore, alias, password);
-					break;
-				}
-				counter ++;
-			}
-		} catch (Throwable t) {
-			System.out.println("Cannot load key store "+t);
-			t.printStackTrace();
-		}
-
-		if (keyPair==null) {
-			log.severe("Cannot find key in keystore");
+			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
+		} catch (Error e) {
+			log.info(e.getMessage());
 			return;
 		}
 
