@@ -8,6 +8,7 @@ import convex.api.Convex;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.lang.Reader;
+import convex.core.Init;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -49,7 +50,7 @@ public class Query implements Runnable {
 
 		Convex convex = null;
 		try {
-			convex = mainParent.connectToSessionPeer(hostname, port);
+			convex = mainParent.connectToSessionPeer(hostname, port, Init.HERO, null);
 		} catch (Error e) {
 			log.severe(e.getMessage());
 			return;
