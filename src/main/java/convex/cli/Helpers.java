@@ -6,6 +6,7 @@ import java.net.InetSocketAddress;
 import java.util.Random;
 
 import convex.api.Convex;
+import convex.cli.peer.Session;
 import convex.core.Init;
 
 /*

@@ -5,7 +5,7 @@ import java.security.KeyStore;
 import java.util.Enumeration;
 import java.util.logging.Logger;
 
-
+import convex.cli.peer.PeerManager;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.store.AStore;
@@ -28,6 +28,8 @@ public class PeerStart implements Runnable {
 
 	private static final Logger log = Logger.getLogger(PeerStart.class.getName());
 
+	private PeerManager peerManager = new PeerManager();
+
 	@ParentCommand
 	private Peer peerParent;
 
@@ -46,6 +48,15 @@ public class PeerStart implements Runnable {
 	@Option(names={"-r", "--reset"},
 		description="Reset and delete the etch database if it exists. Default: ${DEFAULT-VALUE}")
 	private boolean isReset;
+
+	@Option(names={"--port"},
+		description="Port number to connect or create a peer.")
+	private int port = 0;
+
+	@Option(names={"--host"},
+		defaultValue=Constants.HOSTNAME_PEER,
+		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
+	private String hostname;
 
 	@Override
 	public void run() {
@@ -98,8 +109,8 @@ public class PeerStart implements Runnable {
 			return;
 		}
 
-		if (mainParent.getPort()!=0) {
-			port = Math.abs(mainParent.getPort());
+		if (port!=0) {
+			port = Math.abs(port);
 		}
 
 		try {
@@ -114,8 +125,8 @@ public class PeerStart implements Runnable {
 				store = EtchStore.create(etchFile);
 			}
 			log.info("Starting peer");
-			peerParent.launchPeer(keyPair, port, store);
-			peerParent.waitForPeers();
+			peerManager.launchPeer(keyPair, port, store);
+			peerManager.waitForPeers(mainParent.getSessionFilename());
 		} catch (Throwable t) {
 			System.out.println("Unable to launch peer "+t);
 		}

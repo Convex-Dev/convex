@@ -15,15 +15,23 @@ import picocli.CommandLine.ScopeType;
 */
 @Command(name="convex",
 	subcommands = {
-		Peer.class,
 		Key.class,
+		Local.class,
+		Peer.class,
 		Query.class,
-		Transact.class,
 		Status.class,
+		Transact.class,
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=true,
 	usageHelpAutoWidth=true,
+	sortOptions = false,
+	// headerHeading = "Usage:",
+	// synopsisHeading = "%n",
+	descriptionHeading = "%nDescription:%n%n",
+	parameterListHeading = "%nParameters:%n",
+	optionListHeading = "%nOptions:%n",
+	commandListHeading = "%nCommands:%n",
 	description="Convex Command Line Interface")
 
 public class Main implements Runnable {
@@ -56,19 +64,8 @@ public class Main implements Runnable {
 
 	@Option(names={"-e", "--etch"},
 		scope = ScopeType.INHERIT,
-		description="Convex state storage filename. The default is to use a temporary storage filename in the /tmp folder.")
+		description="Convex state storage filename. The default is to use a temporary storage filename.")
 	private String etchStoreFilename;
-
-	@Option(names={"--port"},
-		scope = ScopeType.INHERIT,
-		description="Port number to connect or create a peer.")
-	private int port = 0;
-
-	@Option(names={"--host"},
-		defaultValue=Constants.HOSTNAME_PEER,
-		scope = ScopeType.INHERIT,
-		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
-	private String hostname;
 
 	@Override
 	public void run() {
@@ -115,12 +112,7 @@ public class Main implements Runnable {
 	public String getKeyStoreFilename() {
 		return Helpers.expandTilde(keyStoreFilename);
 	}
-	public int getPort() {
-		return port;
-	}
-	public String getHostname() {
-		return hostname;
-	}
+
 	public String getEtchStoreFilename() {
 		return Helpers.expandTilde(etchStoreFilename);
 	}
