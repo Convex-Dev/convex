@@ -8,7 +8,6 @@ import java.net.InetSocketAddress;
 import java.util.Properties;
 
 
-
 public class Session {
 
 	private Properties values = new Properties();
