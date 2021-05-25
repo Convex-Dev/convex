@@ -1507,6 +1507,9 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Keywords.STATE, eval("(keyword (str 'state))"));
 		assertEquals(Keywords.STATE, eval("(keyword 'state)"));
 		
+		// Note: paths ignored when converting from Symbol
+		assertEquals(Keywords.STATE, eval("(keyword 'foo/state)"));
+		
 		// keyword lookups
 		assertNull(eval("((keyword :foo) nil)"));
 
@@ -2890,7 +2893,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals("foo", evalS("(eval (list 'str \\f \\o \\o))"));
 		assertNull(eval("(eval 'nil)"));
 		assertEquals(10L, evalL("(eval '(+ 3 7))"));
-		assertEquals(40L, evalL("(eval '(* 2 4 5))"));
+		assertEquals(40L, evalL("(eval `(* 2 4 5))"));
 
 		assertArityError(step("(eval)"));
 		assertArityError(step("(eval 1 2)"));
@@ -2950,6 +2953,9 @@ public class CoreTest extends ACVMTest {
 	public void testQuery() {
 		Context<AVector<ACell>> ctx=step("(query (def a 10) [*address* *origin* *caller* 10])");
 		assertEquals(Vectors.of(Init.HERO,Init.HERO,null,10L), ctx.getResult());
+
+		// shouldn't be possible to mutate surrounding environment in query
+		assertEquals(10L,evalL("(let [a 3] (+ (query (set! a 5) (+ a 2)) a) )"));
 		
 		// shouldn't be any def in the environment
 		assertSame(INITIAL,ctx.getState());
