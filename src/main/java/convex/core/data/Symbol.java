@@ -7,6 +7,7 @@ import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
 import convex.core.util.Utils;
 
 /**
@@ -76,11 +77,12 @@ public class Symbol extends ASymbolic {
 	
 	/**
 	 * Creates a Symbol with the given path and name
-	 * @param path Address path, which may be null for an unqualified Symbol
+	 * @param path path, which may be null for an unqualified Symbol
 	 * @param name Unqualified Symbol name
 	 * @return Symbol instance, or null if the Symbol is invalid
 	 */
 	public static Symbol create(ACell path, AString name) {
+		if (!validatePath(path)) return null;
 		if (!validateName(name)) return null;
 		Symbol sym= new Symbol(path,name);
 		
@@ -94,6 +96,25 @@ public class Symbol extends ASymbolic {
 		return sym;
 	}
 	
+	/**
+	 * Validates if a path is appropriate for a Smbol
+	 * @param path
+	 * @return true if value is a valid Symbol path, false otherwise
+	 */
+	public static boolean validatePath(ACell path) {
+		if (path!=null) {
+			if (path instanceof Symbol) {
+				if (((Symbol)path).isQualified()) return false;
+				return true;
+			} else if (path instanceof Address) {
+				return true;
+			} else {
+				return false;
+			}
+		}
+		return true;
+	}
+
 	/**
 	 * Creates a Symbol with the given name. Must be an unqualified name.
 	 * 
@@ -235,12 +256,8 @@ public class Symbol extends ASymbolic {
 	@Override
 	public void validateCell() throws InvalidDataException {
 		super.validateCell();
-		if (path!=null) {
-			if (path instanceof Symbol) {
-				if (((Symbol)path).isQualified()) throw new InvalidDataException("Invalid symbol path, cannot be qualified: " + path, this);
-			}
-			// TODO: vector and address paths?
-			path.validateCell();
+		if (!validatePath(path)) {
+			throw new InvalidDataException("Invalid symbol path of type: " + RT.getType(path), this);
 		}
 	}
 
@@ -272,6 +289,18 @@ public class Symbol extends ASymbolic {
 	@Override
 	public byte getTag() {
 		return Tag.SYMBOL;
+	}
+
+	/**
+	 * Casts a non-null cell value to a valid path if possible.
+	 * @param path 
+	 * @return Valid path, or null if not possible
+	 */
+	public static ACell ensurePath(ACell path) {
+		if (validatePath(path)) return path; // Unqualified Symbol, Address or null
+		AString name=RT.name(path);
+		if (name==null) return null;
+		return create(name);
 	}
 
 

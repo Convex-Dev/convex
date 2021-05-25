@@ -1578,7 +1578,18 @@ public class CoreTest extends ACVMTest {
 		assertEquals(foobar, eval("(symbol 'foo \"bar\")"));
 		assertEquals(foobar, eval("(symbol \"foo\" :bar)"));
 		assertEquals(foobar, eval("(symbol 'foo :bar)"));
+		
+		// Symbol and path equivalence
+		assertEquals(read("#8/foo"),eval("(symbol #8 :foo)"));
+		assertEquals(read("foo"),eval("(symbol nil :foo)"));
+		assertEquals(read("foo/bar"),eval("(symbol :foo :bar)"));
+		
+		// Path overwrites
+		assertEquals(read("foo"),eval("(symbol nil 'baz/foo)"));
+		assertEquals(read("foo/bar"),eval("(symbol :foo 'baz/bar)"));
 
+		// Symbols with Address paths
+		assertEquals(Symbol.create(Address.create(8),Strings.create("foo")),eval("(symbol #8 'foo)"));
 		assertEquals(Symbol.create(Address.create(8),Strings.create("foo")),eval("'#8/foo"));
 
 		// too short or too long results in ARGUMENT error
