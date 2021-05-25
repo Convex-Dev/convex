@@ -958,10 +958,11 @@
   
   symbol
   {
-    :doc {:description "Coerces a named value to a Symbol. Supports Symbols, Keywords and short Strings."
+    :doc {:description "Creates a Symbol. Supports Symbols, Keywords and short Strings. An optional path may be provided, which must be a valid Symbol name, and Address, or null for an unqualified Symbol."
           :examples [{:code "(symbol :foo)"}]
           :type :function
-          :signature [{:params [name]}]}
+          :signature [{:params [name]}
+                      {:params [path name]}]}
   }
   
   str?
