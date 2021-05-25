@@ -2886,6 +2886,18 @@ public class CoreTest extends ACVMTest {
 		
 		// set! fails if trying to set a qualified argument name
 		assertArgumentError(step("(set! a/b 10)"));
+		
+		// set! cannot alter value across actor call boundary
+		{
+			Context<?> ctx=step("(def act (deploy `(do (defn sneaky [] (set! a 666)) (export sneaky))))");
+			assertEquals(5L,evalL(ctx,"(let [a 5] (call act (sneaky)) a)"));
+		}
+		
+		// set! cannot alter value within query
+		assertEquals(5L,evalL("(let [a 5] (query (set! a 6)) a)"));
+
+		// set! can alter value within eval??
+		assertEquals(7L,evalL("(let [a 5] (eval `(set! a 7)) a)"));
 	}
 
 	@Test
