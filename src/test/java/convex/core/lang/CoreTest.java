@@ -1411,6 +1411,10 @@ public class CoreTest extends ACVMTest {
 		assertAssertError(step("(fail :ASSERT \"Foo\")"));
 		assertAssertError(step("(fail :foo)"));
 		
+		assertError(step("(fail 1 :bar)"));
+		assertCastError(step("(fail :CAST :bar)"));
+
+		
 		assertAssertError(step("(fail)"));
 		
 		{ // need to double-step this: can't define macro and use it in the same expression?
