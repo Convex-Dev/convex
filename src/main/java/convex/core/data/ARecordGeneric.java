@@ -70,6 +70,11 @@ public abstract class ARecordGeneric extends ARecord {
 		AVector<ACell> newVector=Vectors.create(newVals);
 		return withValues(newVector);
 	}
+	
+	@Override
+	public AVector<ACell> values() {
+		return values;
+	}
 
 	/**
 	 * Updates the record with a new set of values. 

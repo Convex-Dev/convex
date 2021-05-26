@@ -117,7 +117,8 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	 * 
 	 * @return Vector of Values
 	 */
-	public AVector<ACell> getValues() {
+	@Override
+	public AVector<ACell> values() {
 		int n=size();
 		ACell[] os=new ACell[n];
 		for (int i=0; i<n; i++) {

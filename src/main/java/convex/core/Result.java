@@ -90,7 +90,7 @@ public class Result extends ARecordGeneric {
 	}
 	
 	@Override
-	public AVector<ACell> getValues() {
+	public AVector<ACell> values() {
 		return values;
 	}
 

@@ -27,7 +27,7 @@ public class RecordTest {
 		AVector<Keyword> keys=format.getKeys();
 		int n=(int) keys.count();
 		
-		AVector<ACell> vals=r.getValues();
+		AVector<ACell> vals=r.values();
 		assertEquals(n,vals.size());
 		
 		ACell[] vs=new ACell[n]; // new array to extract values
