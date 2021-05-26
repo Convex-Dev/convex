@@ -1105,19 +1105,15 @@ public class Utils {
 		return count[0];
 	}
 
-	public static <R extends ACell> Ref<R> getRef(Object o, int i) {
-		if (o instanceof ACell) {
-			return ((ACell) o).getRef(i);
-		}
-		throw new IllegalArgumentException("Bad ref index: " + i+ " on object of class "+getClassName(o));
+	public static <R extends ACell> Ref<R> getRef(ACell o, int i) {
+		if (o ==null) throw new IllegalArgumentException("Bad ref index: " + i+ " called on null");
+		return o.getRef(i);
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <T> T updateRefs(Object o, IRefFunction func) {
-		if (o instanceof ACell) {
-			return (T)((ACell) o).updateRefs(func);
-		}
-		return (T) o;
+	public static <T extends ACell> T updateRefs(T o, IRefFunction func) {
+		if (o==null) return o;
+		return (T) o.updateRefs(func);
 	}
 
 	public static int bitCount(short mask) {
