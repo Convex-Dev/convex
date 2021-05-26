@@ -10,6 +10,7 @@ import javax.swing.JTextArea;
 import javax.swing.border.EmptyBorder;
 
 import convex.core.Peer;
+import convex.core.data.ACell;
 import convex.gui.components.models.StateModel;
 import convex.gui.manager.PeerManager;
 import convex.gui.manager.windows.etch.EtchWindow;
@@ -38,7 +39,7 @@ public class PeerComponent extends BaseListComponent {
 
 	public void launchExploreWindow(PeerView peer) {
 		Server s = peer.peerServer;
-		Object p = s.getPeer().getConsensusState();
+		ACell p = s.getPeer().getConsensusState();
 		StateWindow pw = new StateWindow(manager, p);
 		pw.launch();
 	}

@@ -26,6 +26,7 @@ import convex.core.data.Keywords;
 import convex.core.data.LongBlob;
 import convex.core.data.MapEntry;
 import convex.core.data.PeerStatus;
+import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
@@ -96,6 +97,45 @@ public class State extends ARecord {
 		if (Keywords.GLOBALS.equals(k)) return globals;
 		if (Keywords.SCHEDULE.equals(k)) return schedule;
 		return null;
+	}
+	
+	@Override
+	public int getRefCount() {
+		int rc=accounts.getRefCount();
+		rc+=peers.getRefCount();
+		rc+=globals.getRefCount();
+		rc+=schedule.getRefCount();
+		return rc;
+	}
+	
+	public <R extends ACell> Ref<R> getRef(int i) {
+		if (i<0) throw new IndexOutOfBoundsException(i);
+		
+		{
+			int c=accounts.getRefCount();
+			if (i<c) return accounts.getRef(i);
+			i-=c;
+		}
+		
+		{
+			int c=peers.getRefCount();
+			if (i<c) return peers.getRef(i);
+			i-=c;
+		}
+
+		{
+			int c=globals.getRefCount();
+			if (i<c) return globals.getRef(i);
+			i-=c;
+		}
+		
+		{
+			int c=schedule.getRefCount();
+			if (i<c) return schedule.getRef(i);
+			i-=c;
+		}
+		
+		throw new IndexOutOfBoundsException(i);
 	}
 
 	@SuppressWarnings("unchecked")

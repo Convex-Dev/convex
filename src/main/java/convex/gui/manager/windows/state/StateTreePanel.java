@@ -23,20 +23,20 @@ import convex.core.util.Utils;
 @SuppressWarnings("serial")
 public class StateTreePanel extends JPanel {
 
-	private final Object state;
+	private final ACell state;
 
 	private static class Node extends DefaultMutableTreeNode {
 		private final boolean container;
 		private boolean loaded = false;
 		private final String name;
 
-		public Node(String name, Object val) {
+		public Node(String name, ACell val) {
 			super(val);
 			this.name = name;
 			container = Utils.refCount(val)>0;
 		}
 
-		public Node(Object val) {
+		public Node(ACell val) {
 			this(null, val);
 		}
 
@@ -68,7 +68,7 @@ public class StateTreePanel extends JPanel {
 			if (userObject instanceof ARecord) {
 				ARecord r = (ARecord) userObject;
 				for (Keyword k : r.getKeys()) {
-					Object c = r.get(k);
+					ACell c = r.get(k);
 					add(new Node(k + " = " + getString(c), c));
 				}
 				return;
@@ -76,7 +76,7 @@ public class StateTreePanel extends JPanel {
 				MapLeaf m = (MapLeaf) userObject;
 				for (Object oe : m.entrySet()) {
 					MapEntry e = (MapEntry) oe;
-					Object c = e.getValue();
+					ACell c = e.getValue();
 					add(new Node(getString(e.getKey()) + " = " + getString(c), c));
 				}
 				return;
@@ -86,7 +86,7 @@ public class StateTreePanel extends JPanel {
 			ACell rc = (ACell) userObject;
 			int n = rc.getRefCount();
 			for (int i = 0; i < n; i++) {
-				Object child = rc.getRef(i).getValue();
+				ACell child = rc.getRef(i).getValue();
 				add(new Node(child));
 			}
 
@@ -108,7 +108,7 @@ public class StateTreePanel extends JPanel {
 		}
 	};
 
-	public StateTreePanel(Object state) {
+	public StateTreePanel(ACell state) {
 		this.state = state;
 		setLayout(new BorderLayout());
 		setPreferredSize(new Dimension(600, 400));

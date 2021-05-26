@@ -10,7 +10,7 @@ import convex.core.data.Ref;
 import convex.core.data.ACell;
 import convex.core.util.Utils;
 
-public class StateTreeNode<T> implements TreeNode {
+public class StateTreeNode<T extends ACell> implements TreeNode {
 
 	private final T object;
 	private final boolean isContainer;
@@ -20,17 +20,16 @@ public class StateTreeNode<T> implements TreeNode {
 		this.isContainer = Utils.refCount(o)>0;
 	}
 
-	private static <R> StateTreeNode<R> create(R value) {
+	private static <R extends ACell> StateTreeNode<R> create(R value) {
 		return new StateTreeNode<R>(value);
 	}
 
 	@Override
-	public StateTreeNode<Object> getChildAt(int childIndex) {
+	public TreeNode getChildAt(int childIndex) {
 		if (isContainer) {
-			Object child = ((ACell) object).getRef(childIndex).getValue();
+			ACell child = object.getRef(childIndex).getValue();
 			return StateTreeNode.create(child);
 		}
-		;
 		return null;
 	}
 
@@ -65,7 +64,7 @@ public class StateTreeNode<T> implements TreeNode {
 	public Enumeration<? extends TreeNode> children() {
 
 		Ref<ACell>[] childRefs = (isContainer ? ((ACell) object).getChildRefs() : new Ref[0]);
-		ArrayList<StateTreeNode<Object>> tns = new ArrayList<>();
+		ArrayList<StateTreeNode<ACell>> tns = new ArrayList<>();
 		for (Ref<ACell> r : childRefs) {
 			tns.add(StateTreeNode.create(r.getValue()));
 		}

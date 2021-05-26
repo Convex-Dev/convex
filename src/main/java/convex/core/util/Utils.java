@@ -1076,10 +1076,9 @@ public class Utils {
 	 * @param eval
 	 * @return Number of Refs in the object.
 	 */
-	public static int refCount(Object a) {
-		if (!(a instanceof ACell)) return 0;
-		ACell ra = (ACell) a;
-		return ra.getRefCount();
+	public static int refCount(ACell a) {
+		if (a==null) return 0;
+		return a.getRefCount();
 	}
 
 	/**
