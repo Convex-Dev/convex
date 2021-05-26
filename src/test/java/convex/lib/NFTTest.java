@@ -1,10 +1,10 @@
 package convex.lib;
 
 import static convex.core.lang.TestState.step;
+import static convex.test.Assertions.assertAssertError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static convex.test.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 
@@ -12,7 +12,6 @@ import convex.core.Constants;
 import convex.core.Init;
 import convex.core.data.Address;
 import convex.core.data.Symbol;
-import convex.core.data.Syntax;
 import convex.core.lang.Context;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;

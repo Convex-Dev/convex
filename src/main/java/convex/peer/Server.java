@@ -579,17 +579,17 @@ public class Server implements Closeable {
 			log.info("Processing query: " + form + " with address: " + address);
 			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
 			// address);
-			Context<ACell> result = peer.executeQuery(form, address);
+			Context<ACell> resultContext = peer.executeQuery(form, address);
 			boolean resultReturned;
 
-			if (result.isExceptional()) {
-				AExceptional err = result.getExceptional();
+			if (resultContext.isExceptional()) {
+				AExceptional err = resultContext.getExceptional();
 				ACell code = err.getCode();
 				ACell message = err.getMessage();
 
 				resultReturned = pc.sendResult(id, message, code);
 			} else {
-				resultReturned = pc.sendResult(id, result.getResult());
+				resultReturned = pc.sendResult(id, resultContext.getResult());
 			}
 
 			if (!resultReturned) {

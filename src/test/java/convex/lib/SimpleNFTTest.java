@@ -17,7 +17,6 @@ import convex.core.data.Address;
 import convex.core.data.Set;
 import convex.core.data.Sets;
 import convex.core.data.Symbol;
-import convex.core.data.Syntax;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.Context;
 import convex.core.lang.Reader;

@@ -1,9 +1,12 @@
 package convex.core.lang;
 
-import static convex.test.Assertions.*;
+import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertJuiceError;
+import static convex.test.Assertions.assertUndeclaredError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -14,17 +17,15 @@ import org.junit.jupiter.api.Test;
 import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Init;
-import convex.core.State;
 import convex.core.data.ABlobMap;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.BlobMaps;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
-import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.lang.ops.Lookup;
 
 /**
  * Tests for basic execution Context mechanics and internals
@@ -46,6 +47,16 @@ public class ContextTest extends ACVMTest {
 		assertCVMEquals("buffy", c2.lookup(sym).getResult());
 
 		assertUndeclaredError(c2.lookup(Symbol.create("some-bad-symbol")));
+	}
+	
+	@Test
+	public void testQuery() {
+		final Context<?> c2 = CTX.fork().query(Symbols.STAR_ADDRESS);
+		assertNotSame(c2,CTX);
+		assertEquals(c2.getAddress(),c2.getResult());
+		assertEquals(CTX.getDepth(),c2.getDepth(),"Query should preserve context depth");
+
+		assertEquals(c2.getAddress(),c2.query(Lookup.create(Symbols.STAR_ADDRESS)).getResult());
 	}
 
 	@Test

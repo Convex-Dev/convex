@@ -338,16 +338,25 @@ public class AccountStatus extends ARecord {
 	@Override
 	public int getRefCount() {
 		int rc=(environment==null)?0:environment.getRefCount();
+		rc+=(metadata==null)?0:metadata.getRefCount();
 		rc+=(holdings==null)?0:holdings.getRefCount();
 		return rc;
 	}
 	
 	public <R extends ACell> Ref<R> getRef(int i) {
 		if (i<0) throw new IndexOutOfBoundsException(i);
+		
 		int ec=(environment==null)?0:environment.getRefCount();
 		if (i<ec) return environment.getRef(i);
+		i-=ec;
+		
+		int mc=(metadata==null)?0:metadata.getRefCount();
+		if (i<mc) return metadata.getRef(i);
+		i-=mc;
+
 		int hc=(holdings==null)?0:holdings.getRefCount();
-		if (i<hc+ec) return holdings.getRef(i-ec);
+		if (i<hc) return holdings.getRef(i);
+		
 		throw new IndexOutOfBoundsException(i);
 	}
 
@@ -362,6 +371,7 @@ public class AccountStatus extends ARecord {
 		if (Keywords.BALANCE.equals(key)) return CVMLong.create(balance);
 		if (Keywords.ALLOWANCE.equals(key)) return CVMLong.create(memory);
 		if (Keywords.ENVIRONMENT.equals(key)) return environment;
+		if (Keywords.METADATA.equals(key)) return metadata;
 		if (Keywords.HOLDINGS.equals(key)) return getHoldings();
 		if (Keywords.CONTROLLER.equals(key)) return controller;
 		if (Keywords.KEY.equals(key)) return publicKey;

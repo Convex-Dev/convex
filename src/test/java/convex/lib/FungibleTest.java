@@ -1,11 +1,18 @@
 package convex.lib;
 
-import static convex.core.lang.TestState.*;
+import static convex.core.lang.TestState.VILLAIN;
+import static convex.core.lang.TestState.eval;
+import static convex.core.lang.TestState.evalB;
+import static convex.core.lang.TestState.evalL;
+import static convex.core.lang.TestState.step;
+import static convex.test.Assertions.assertAssertError;
+import static convex.test.Assertions.assertError;
+import static convex.test.Assertions.assertNotError;
+import static convex.test.Assertions.assertTrustError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
 
 import org.junit.jupiter.api.Test;
 
@@ -14,14 +21,11 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.AMap;
 import convex.core.data.Address;
 import convex.core.data.Symbol;
-import convex.core.data.Syntax;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
-
-import static convex.test.Assertions.*;
 
 public class FungibleTest {
 	private static final Symbol fSym=Symbol.create("fun-actor");

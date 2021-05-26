@@ -194,7 +194,9 @@ public class Convex {
 				Future<Result> f = query(Lookup.create(Symbols.STAR_SEQUENCE));
 				Result r = f.get();
 				if (r.isError()) throw new Error("Error querying *sequence*: " + r.getErrorCode() + " " + r.getValue());
-				sequence = RT.jvm(r.getValue());
+				ACell result=r.getValue();
+				if (!(result instanceof CVMLong)) throw new Error("*sequence* query did not return Long, got: "+result);
+				sequence = RT.jvm(result);
 			} catch (IOException | InterruptedException | ExecutionException e) {
 				throw new Error("Error trying to get sequence number", e);
 			}
