@@ -45,7 +45,7 @@ public class FormGen extends Generator<ACell> {
 		case 5: {
 			// random form containing core symbol at head
 			List<ACell> subForms = this.times(r.nextInt(4)).generate(r, status);
-			AHashMap<Symbol, Syntax> env = Core.CORE_NAMESPACE;
+			AHashMap<Symbol, ACell> env = Core.ENVIRONMENT;
 			int n = (int) env.count();
 			Symbol sym = env.entryAt(r.nextInt(n)).getKey();
 			return RT.cons(sym, Lists.create(subForms));
@@ -53,7 +53,7 @@ public class FormGen extends Generator<ACell> {
 
 		case 6: {
 			// random core symbol
-			AHashMap<Symbol, Syntax> env = Core.CORE_NAMESPACE;
+			AHashMap<Symbol, ACell> env = Core.ENVIRONMENT;
 			int n = (int) env.count();
 			Symbol sym = env.entryAt(r.nextInt(n)).getKey();
 			return sym;

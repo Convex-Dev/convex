@@ -12,7 +12,6 @@ import org.parboiled.common.Utils;
 
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
@@ -30,7 +29,6 @@ import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
-import convex.core.data.Syntax;
 import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -520,7 +518,7 @@ public class State extends ARecord {
 	 * @param addr Address of account to obtain
 	 * @return The environment of the given account, or null if not found.
 	 */
-	public AMap<Symbol, Syntax> getEnvironment(Address addr) {
+	public AMap<Symbol, ACell> getEnvironment(Address addr) {
 		AccountStatus as = getAccount(addr);
 		if (as == null) return null;
 		return as.getEnvironment();
@@ -552,8 +550,8 @@ public class State extends ARecord {
 	 * @param environment Environment to use for new Actor Account. Can be null.
 	 * @return The updated state with the Actor deployed.
 	 */
-	public State tryAddActor(AHashMap<Symbol, Syntax> environment) {
-		AccountStatus as = AccountStatus.createActor(environment);
+	public State tryAddActor() {
+		AccountStatus as = AccountStatus.createActor();
 		AVector<AccountStatus> newAccounts = accounts.conj(as);
 		return withAccounts(newAccounts);
 	}

@@ -598,9 +598,9 @@ public class Format {
 		if (tag == Tag.CORE_DEF) {
 			Symbol sym = Symbol.read(bb);
 			// TODO: consider if dependency of format on core bad?
-			Syntax o = Core.CORE_NAMESPACE.get(sym);
+			ACell o = Core.ENVIRONMENT.get(sym);
 			if (o == null) throw new BadFormatException("Core definition not found [" + sym + "]");
-			return o.getValue();
+			return o;
 		}
 		
 		if (tag == Tag.FN_MULTI) {

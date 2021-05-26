@@ -72,6 +72,7 @@ import convex.core.lang.impl.ICoreDef;
 import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Do;
 import convex.core.lang.ops.Invoke;
+import convex.core.lang.ops.Lookup;
 
 /**
  * Test class for core functions in the initial environment.
@@ -1622,7 +1623,7 @@ public class CoreTest extends ACVMTest {
 			
 			assertEquals(100L, evalL(ctx2, "mylib/foo"));
 			assertUndeclaredError(step(ctx2, "mylib/bar"));
-			assertTrue(evalB(ctx2,"(syntax? (lookup-syntax 'mylib/foo))"));
+			assertTrue(evalB(ctx2,"(map? (lookup-meta 'mylib/foo))"));
 			assertTrue(evalB(ctx2,"(defined? mylib/foo)"));
 			assertFalse(evalB(ctx2,"(defined? mylib/bar)"));
 		}
@@ -1676,31 +1677,33 @@ public class CoreTest extends ACVMTest {
 	
 	@Test
 	public void testLookupSyntax() {
-		assertSame(Core.COUNT, ((Syntax)eval("(lookup-syntax 'count)")).getValue());
-		assertSame(Core.COUNT, ((Syntax)eval("(lookup-syntax "+Init.CORE_ADDRESS+ " 'count)")).getValue());
+		AHashMap<ACell,ACell> countMeta=Core.METADATA.get(Symbols.COUNT);
+		assertSame(countMeta, (eval("(lookup-meta 'count)")));
+		assertSame(countMeta, (eval("(lookup-meta "+Init.CORE_ADDRESS+ " 'count)")));
 		
-		assertNull(eval("(lookup-syntax 'non-existent-symbol)"));
+		assertNull(eval("(lookup-meta 'non-existent-symbol)"));
+		assertNull(eval("(lookup-meta #666666 'count)")); // invalid address
 		
-		assertEquals(Syntax.of(1L),eval("(do (def foo 1) (lookup-syntax 'foo))"));
-		assertEquals(Syntax.of(1L),eval("(do (def foo 1) (lookup-syntax *address* 'foo))"));
-		assertNull(eval("(do (def foo 1) (lookup-syntax #0 'foo))"));
+		assertSame(Maps.empty(),eval("(do (def foo 1) (lookup-meta 'foo))"));
+		assertSame(Maps.empty(),eval("(do (def foo 1) (lookup-meta  *address* 'foo))"));
+		assertNull(eval("(do (def foo 1) (lookup-meta #0 'foo))"));
 
 		// invalid name string (too long)
 		assertCastError(
-				step("(lookup-syntax \"cdiubcidciuecgieufgvuifeviufegviufeviuefbviufegviufevguiefvgfiuevgeufigv\")"));
+				step("(lookup-meta \"cdiubcidciuecgieufgvuifeviufegviufeviuefbviufegviufevguiefvgfiuevgeufigv\")"));
 
 		// bad symbols
-		assertCastError(step("(lookup-syntax count)"));
-		assertCastError(step("(lookup-syntax nil)"));
-		assertCastError(step("(lookup-syntax 10)"));
-		assertCastError(step("(lookup-syntax [])"));
+		assertCastError(step("(lookup-meta count)"));
+		assertCastError(step("(lookup-meta nil)"));
+		assertCastError(step("(lookup-meta 10)"));
+		assertCastError(step("(lookup-meta [])"));
 		
 		// Bad addresses
-		assertCastError(step("(lookup-syntax :foo 'bar)"));
-		assertCastError(step("(lookup-syntax 8 'count)"));
+		assertCastError(step("(lookup-meta :foo 'bar)"));
+		assertCastError(step("(lookup-meta 8 'count)"));
 
-		assertArityError(step("(lookup-syntax)"));
-		assertArityError(step("(lookup-syntax 1 2 3)"));
+		assertArityError(step("(lookup-meta)"));
+		assertArityError(step("(lookup-meta 1 2 3)"));
 	}
 
 	@Test
@@ -2459,21 +2462,21 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(if 1)"));
 	}
 
-	private AVector<Syntax> ALL_PREDICATES = Vectors
-			.create(Core.CORE_NAMESPACE.filterValues(e -> e.getValue() instanceof CorePred).values());
-	private AVector<Syntax> ALL_CORE_DEFS = Vectors
-			.create(Core.CORE_NAMESPACE.filterValues(e -> e.getValue() instanceof ICoreDef).values());
+	private AVector<ACell> ALL_PREDICATES = Vectors
+			.create(Core.ENVIRONMENT.filterValues(e -> e instanceof CorePred).values());
+	private AVector<ACell> ALL_CORE_DEFS = Vectors
+			.create(Core.ENVIRONMENT.filterValues(e -> e instanceof ICoreDef).values());
 
 	@Test
 	public void testPredArity() {
-		AVector<Syntax> pvals = ALL_PREDICATES;
+		AVector<ACell> pvals = ALL_PREDICATES;
 		assertFalse(pvals.isEmpty());
 		Context<?> C = INITIAL_CONTEXT.fork();
 		ACell[] a0 = new ACell[0];
 		ACell[] a1 = new ACell[1];
 		ACell[] a2 = new ACell[2];
-		for (Syntax psyntax : pvals) {
-			CorePred pred = psyntax.getValue();
+		for (ACell p : pvals) {
+			CorePred pred = (CorePred) p;
 			assertTrue(RT.isBoolean(pred.invoke(C, a1).getResult()), "Predicate: " + pred);
 			assertArityError(pred.invoke(C, a0));
 			assertArityError(pred.invoke(C, a2));
@@ -2482,28 +2485,29 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testCoreDefSymbols() throws BadFormatException {
-		AVector<Syntax> vals = ALL_CORE_DEFS;
+		AVector<ACell> vals = ALL_CORE_DEFS;
 		assertFalse(vals.isEmpty());
-		for (Syntax syndef : vals) {
-			ACell def = syndef.getValue();
+		for (ACell def : vals) {
 			Symbol sym = ((ICoreDef)def).getSymbol();
-			Syntax syntax=Core.CORE_NAMESPACE.get(sym);
-			assertSame(def, syntax.getValue());
+			ACell v=Core.ENVIRONMENT.get(sym);
+			assertSame(def, v);
 
 			Blob b = Format.encodedBlob(def);
 			assertSame(def, Format.read(b));
 
 			assertEquals(def.ednString(), sym.toString());
 			
-			doDocTests(sym, syntax);
+			AHashMap<ACell,ACell> meta= Core.METADATA.get(sym);
+			assertNotNull(meta,"Missing metadata for core symbol: "+sym);
+			doDocTests(sym,meta);
 		}
 	}
 
 	private static Set<Keyword> CORE_TYPES=Sets.of(Keywords.MACRO, Keywords.SPECIAL, Keywords.FUNCTION, Keywords.EXPANDER,Keywords.VALUE);
 	
 	@SuppressWarnings("unchecked")
-	private void doDocTests(Symbol sym, Syntax syntax) {
-		ACell dobj=syntax.getMeta().get(Keywords.DOC);
+	private void doDocTests(Symbol sym, AHashMap<ACell,ACell> meta) {
+		ACell dobj=meta.get(Keywords.DOC);
 		assertNotNull(dobj,"No documentation found for core definition: "+sym);
 		AHashMap<ACell,ACell> doc=(AHashMap<ACell, ACell>) dobj;
 		Keyword type=(Keyword) doc.get(Keywords.TYPE);
@@ -2756,7 +2760,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Keywords.FOO, eval("(def v :foo)"));
 		
 		// Def establishes mapping in environment
-		assertEquals(CVMLong.ONE, step("(def foo 1)").getEnvironment().get(Symbols.FOO).getValue());
+		assertEquals(CVMLong.ONE, step("(def foo 1)").getEnvironment().get(Symbols.FOO));
 		
 		// Def creates valid dynamic variables
 		assertEquals(Vectors.of(2L, 3L), eval("(do (def v [2 3]) v)"));
@@ -3296,7 +3300,7 @@ public class CoreTest extends ACVMTest {
 		
 		// test overrides in local any dynamic context
 		assertNull(eval("(let [*balance* nil] *balance*)"));
-		assertNull(eval("(do (def *balance* nil) *balance*)"));
+		assertEquals(Keywords.FOO,eval("(do (def *balance* :foo) *balance*)"));
 	}
 	
 	@Test
@@ -3345,10 +3349,17 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testSpecialEdgeCases() {
 
-		// TODO: are we happy about letting people trash special symbols?
+		// TODO: are we happy about letting people override special symbols?
 		assertEquals(Keywords.FOO, eval("(let [*balance* :foo] *balance*)"));
 		assertEquals(Keywords.FOO, eval("(do (def *balance* :foo) *balance*)"));
-
+		assertEquals(Symbols.STAR_HOLDINGS, eval("(do (def *holdings* '*holdings*) *holdings*)"));
+		
+		// TODO: consider this
+		//assertEquals(Init.HERO,eval(Init.CORE_ADDRESS+"/*balance*"));
+		
+		assertEquals(Core.ENVIRONMENT.get(Symbols.STAR_JUICE),eval("(lookup '*juice*)"));
+		
+		assertEquals(eval("*juice*"),CONTEXT.fork().execute(Lookup.create(Symbols.STAR_JUICE)).getResult());
 	}
 	
 	@Test public void testSpecialHoldings() {

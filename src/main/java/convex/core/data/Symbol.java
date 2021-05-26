@@ -97,7 +97,7 @@ public class Symbol extends ASymbolic {
 	}
 	
 	/**
-	 * Validates if a path is appropriate for a Smbol
+	 * Validates if a path is appropriate for a Symbol
 	 * @param path
 	 * @return true if value is a valid Symbol path, false otherwise
 	 */

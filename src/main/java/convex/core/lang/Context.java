@@ -110,24 +110,30 @@ public final class Context<T extends ACell> extends AObject {
 		/**
 		 * Cached copy of the current environment. Avoid looking up via Address each time.
 		 */
-		private final AHashMap<Symbol, Syntax> environment;
+		private final AHashMap<Symbol, ACell> environment;
+		private final AHashMap<Symbol, AHashMap<ACell,ACell>> metadata;
 		
-		private ChainState(State state, Address origin,Address caller, Address address,AHashMap<Symbol, Syntax> environment, long offer) {
+		private ChainState(State state, Address origin,Address caller, Address address,AHashMap<Symbol, ACell> environment, AHashMap<Symbol,AHashMap<ACell,ACell>> metadata, long offer) {
 			this.state=state;
 			this.origin=origin;
 			this.caller=caller;
 			this.address=address;	
 			this.environment=environment;
+			this.metadata=metadata;
 			this.offer=offer;
 		}
 		
 		public static ChainState create(State state, Address origin, Address caller, Address address, long offer) {
-			AHashMap<Symbol, Syntax> environment=Core.ENVIRONMENT;
+			AHashMap<Symbol, ACell> environment=Core.ENVIRONMENT;
+			AHashMap<Symbol, AHashMap<ACell,ACell>> metadata=Core.METADATA;
 			if (address!=null) {
 				AccountStatus as=state.getAccount(address);
-				if (as!=null) environment=as.getEnvironment();
+				if (as!=null) {
+					environment=as.getEnvironment();
+					metadata=as.getMetadata();
+				}
 			}
-			return new ChainState(state,origin,caller,address,environment,offer);
+			return new ChainState(state,origin,caller,address,environment,metadata,offer);
 		}
 
 		public ChainState withStateOffer(State newState,long newOffer) {
@@ -148,14 +154,24 @@ public final class Context<T extends ACell> extends AObject {
 		 * Gets the current defined environment
 		 * @return
 		 */
-		private AHashMap<Symbol, Syntax> getEnvironment() {
+		private AHashMap<Symbol, ACell> getEnvironment() {
+			if (environment==null) return Maps.empty();
 			return environment;
 		}
 
-		private ChainState withEnvironment(AHashMap<Symbol, Syntax> newEnvironment)  {
+		private ChainState withEnvironment(AHashMap<Symbol, ACell> newEnvironment)  {
 			if (environment==newEnvironment) return this;
 			AccountStatus as=state.getAccount(address);
 			AccountStatus nas=as.withEnvironment(newEnvironment);
+			State newState=state.putAccount(address,nas);
+			return withState(newState);
+		}
+		
+		public ChainState withEnvironment(AHashMap<Symbol, ACell> newEnvironment,
+				AHashMap<Symbol, AHashMap<ACell, ACell>> newMeta) {
+			if ((environment==newEnvironment)&&(metadata==newMeta)) return this;
+			AccountStatus as=state.getAccount(address);
+			AccountStatus nas=as.withEnvironment(newEnvironment).withMetadata(newMeta);
 			State newState=state.putAccount(address,nas);
 			return withState(newState);
 		}
@@ -163,6 +179,13 @@ public final class Context<T extends ACell> extends AObject {
 		private ChainState withAccounts(AVector<AccountStatus> newAccounts) {
 			return withState(state.withAccounts(newAccounts));
 		}
+
+		public AHashMap<Symbol, AHashMap<ACell, ACell>> getMetadata() {
+			if (metadata==null) return Maps.empty();
+			return metadata;
+		}
+
+	
 	}
 
 	private Context(ChainState chainState, long juice, AHashMap<Symbol, ACell> localBindings2, T result,int depth, AExceptional exception, ABlobMap<Address,AVector<AVector<ACell>>> log) {
@@ -367,8 +390,12 @@ public final class Context<T extends ACell> extends AObject {
 		return chainState.getOffer();
 	}
 	
-	public AHashMap<Symbol,Syntax> getEnvironment() {
+	public AHashMap<Symbol,ACell> getEnvironment() {
 		return chainState.getEnvironment();
+	}
+	
+	public AHashMap<Symbol,AHashMap<ACell,ACell>> getMetadata() {
+		return chainState.getMetadata();
 	}
 
 	/**
@@ -410,16 +437,18 @@ public final class Context<T extends ACell> extends AObject {
 	}
 	
 	/**
-	 * Looks up a symbol in the current execution context, without any effect on the Context (no juice consumed etc.)
+	 * Looks up a symbol's value in the current execution context, without any effect on the Context (no juice consumed etc.)
 	 * 
 	 * @param <R> Type of value associated with the given symbol
-	 * @param sym Symbol to look up
+	 * @param sym Symbol to look up. May be qualified
 	 * @return Context with the result of the lookup (may be an undeclared exception)
 	 */
 	public <R extends ACell> Context<R> lookup(Symbol symbol) {
 		// first try lookup in local bindings
-		MapEntry<Symbol,R> le=lookupLocalEntry(symbol);
-		if (le!=null) return (Context<R>) withResult(le.getValue());
+		if (!symbol.isQualified()) {
+			MapEntry<Symbol,R> le=lookupLocalEntry(symbol);
+			if (le!=null) return (Context<R>) withResult(le.getValue());
+		}
 		
 		// second try lookup in dynamic environment
 		return lookupDynamic(symbol);
@@ -435,52 +464,127 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return Updated Context
 	 */
 	public <R extends ACell> Context<R> lookupDynamic(Symbol symbol) {
-		return lookupDynamic(getAddress(),symbol);
+		Address address=getAddress();
+		return lookupDynamic(address,symbol);
 	}
 	
 	/**
 	 * Looks up a value in the dynamic environment. Consumes no juice.
-	 * 
 	 * Returns an UNDECLARED exception if the symbol cannot be resolved.
+	 * Returns a NOBODY exception if the specified Account does not exist
 	 * 
-	 * @param <R>
+	 * @param <R> Type of value result
+	 * @param address Address of account in which to look up value
 	 * @param symbol
 	 * @return Updated Context
 	 */
+	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> lookupDynamic(Address address, Symbol symbol) {
-		MapEntry<Symbol,Syntax> envEntry=lookupDynamicEntry(address,symbol);
+		AccountStatus as=getAccountStatus(address);
+		if (as==null) return withError(ErrorCodes.NOBODY,"No account found for: "+symbol.toString());
+		MapEntry<Symbol,ACell> envEntry=lookupDynamicEntry(as,symbol);
 		
 		// if not found, return UNDECLARED error
 		if (envEntry==null) return withError(ErrorCodes.UNDECLARED,symbol.toString());
 
-		Syntax syntax=envEntry.getValue();
-
 		// Check for special symbol
 		if (symbol.maybeSpecial()) {
-			if (RT.bool(syntax.getMeta().get(Keywords.SPECIAL_SYMBOL))) {
-				Context<R> rctx= computeSpecial(symbol);
-				if (rctx!=null) return rctx;
+			AccountStatus das=lookupDefiningAccount(address,symbol);
+			if (das!=null) {
+				AHashMap<ACell, ACell> symMeta = das.getMetadata().get(symbol.toUnqualified());
+				if ((symMeta!=null)&&RT.bool(symMeta.get(Keywords.SPECIAL_SYMBOL))) {
+					Context<R> rctx= computeSpecial(symbol);
+					if (rctx!=null) return rctx;
+				}
 			}
 		}
 		
 		// Result is whatever is defined as the datum value in the environment entry
-		R result=syntax.getValue();
+		ACell result = envEntry.getValue();
 		return (Context<R>) withResult(result);
 	}
 	
 	/**
-	 * Looks up an environment entry in the current dynamic environment without consuming juice.
-	 * 
-	 * If the symbol is qualified, try lookup via *aliases*
-	 * 
+	 * Looks up Metadata for the given symbol in this context
 	 * @param sym Symbol to look up
-	 * @return Environment map entry for symbol, or null if not found
+	 * @return Metadata for given symbol (may be empty) or null if undeclared 
 	 */
-	public MapEntry<Symbol,Syntax> lookupDynamicEntry(Symbol sym) {
-		AccountStatus as=getAccountStatus();
-		return lookupDynamicEntry(as,sym);
+	public AHashMap<ACell,ACell> lookupMeta(Symbol sym) {
+		AHashMap<Symbol, ACell> env=getEnvironment();
+		if (env.containsKey(sym)) {
+			return getMetadata().get(sym,Maps.empty());
+		}
+		AccountStatus as = getAliasedAccount(env,sym.getPath());
+		if (as==null) return null;
+		
+		sym=sym.toUnqualified(); // we followed a path alias, so unqualify symbol
+		env=as.getEnvironment();
+		if (env.containsKey(sym)) {
+			return as.getMetadata().get(sym,Maps.empty());
+		}
+		return null;
 	}
 	
+	/**
+	 * Looks up Metadata for the given symbol in this context
+	 * @param address Address to use for lookup (may pass null for current environment)
+	 * @param sym Symbol to look up
+	 * @return Metadata for given symbol (may be empty) or null if undeclared 
+	 */
+	public AHashMap<ACell,ACell> lookupMeta(Address address,Symbol sym) {
+		if (address==null) return lookupMeta(sym);
+		AccountStatus as=getAccountStatus(address);
+		if (as==null) return null;
+		AHashMap<Symbol, ACell> env=as.getEnvironment();
+		if (env.containsKey(sym)) {
+			return as.getMetadata().get(sym,Maps.empty());
+		}
+		return null;
+	}
+	
+	/**
+	 * Looks up the account the defines a given Symbol
+	 * @param sym Symbol to look up
+	 * @param address Address to look up in first instance (null for current address).
+	 * @return AccountStatus for given symbol (may be empty) or null if undeclared 
+	 */
+	public AccountStatus lookupDefiningAccount(Address address,Symbol sym) {
+		AccountStatus as=(address==null)?getAccountStatus():getAccountStatus(address);
+		if (as==null) return null;
+		AHashMap<Symbol, ACell> env=as.getEnvironment();
+		if (env.containsKey(sym)) {
+			return as;
+		}
+		as = getAliasedAccount(env,sym.getPath());
+		if (as==null) return null;
+		
+		sym=sym.toUnqualified(); // we followed a path alias, so unqualify symbol
+		env=as.getEnvironment();
+		if (env.containsKey(sym)) {
+			return as;
+		}
+		return null;
+	}
+	
+	/**
+	 * Looks up value for the given symbol in this context
+	 * @param sym Symbol to look up
+	 * @return Value for the given symbol or null if undeclared 
+	 */
+	public ACell lookupValue(Symbol sym) {
+		AHashMap<Symbol, ACell> env=getEnvironment();
+		
+		// Lookup in current environment first
+		MapEntry<Symbol,ACell> me=env.getEntry(sym);
+		if (me!=null) {
+			return me.getValue();
+		}
+		
+		AccountStatus as = getAliasedAccount(env,sym.getPath());
+		if (as==null) return null;
+		return as.getEnvironment().get(sym);
+	}
+
 	/**
 	 * Looks up an environment entry for a specific address without consuming juice.
 	 * 
@@ -489,18 +593,20 @@ public final class Context<T extends ACell> extends AObject {
 	 * @param sym Symbol to look up
 	 * @return
 	 */
-	public MapEntry<Symbol,Syntax> lookupDynamicEntry(Address address,Symbol sym) {
+	public MapEntry<Symbol,ACell> lookupDynamicEntry(Address address,Symbol sym) {
 		AccountStatus as=getAccountStatus(address);
 		if (as==null) return null;
 		return lookupDynamicEntry(as,sym);
 	}
 	
-	private MapEntry<Symbol,Syntax> lookupDynamicEntry(AccountStatus as,Symbol sym) {
+	
+	
+	private MapEntry<Symbol,ACell> lookupDynamicEntry(AccountStatus as,Symbol sym) {
 		// Get environment for Address, or default to initial environment
-		AHashMap<Symbol, Syntax> env = (as==null)?Core.ENVIRONMENT:as.getEnvironment();
+		AHashMap<Symbol, ACell> env = (as==null)?Core.ENVIRONMENT:as.getEnvironment();
 		
 		
-		MapEntry<Symbol,Syntax> result=env.getEntry(sym);
+		MapEntry<Symbol,ACell> result=env.getEntry(sym);
 		
 		if (result==null) {
 			ACell path=sym.getPath();
@@ -510,10 +616,10 @@ public final class Context<T extends ACell> extends AObject {
 		return result;
 	}
 	
-	private MapEntry<Symbol,Syntax> lookupAliasedEntry(AccountStatus as,Symbol sym) {
+	private MapEntry<Symbol,ACell> lookupAliasedEntry(AccountStatus as,Symbol sym) {
 		if (as==null) return null;
 		Symbol unqualified=sym.toUnqualified();
-		AHashMap<Symbol, Syntax> env = as.getEnvironment();
+		AHashMap<Symbol, ACell> env = as.getEnvironment();
 		return env.getEntry(unqualified);
 	}
 	
@@ -538,24 +644,23 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return AccountStatus for the alias, or null if not present
 	 */
 	@SuppressWarnings("unchecked")
-	private AccountStatus getAliasedAccount(AHashMap<Symbol, Syntax> env, ACell path) {
+	private AccountStatus getAliasedAccount(AHashMap<Symbol, ACell> env, ACell path) {
 		// First check for an Address. If so, don't go via aliases
 		if (path instanceof Address) {
 			return getAccountStatus((Address)path);
 		}
 		
 		// Check for *aliases* entry. Might not exist.
-		Syntax maybeAliases=env.get(Symbols.STAR_ALIASES);
+		ACell maybeAliases=env.get(Symbols.STAR_ALIASES);
 		
 		// if *aliases* does not exist, use null as alias for core account
 		if (maybeAliases==null) {
 			return (path==null)?getCoreAccount():null;
 		}
 		
-		ACell aliasesValue=maybeAliases.getValue();
-		if (!(aliasesValue instanceof AHashMap)) return null; 
+		if (!(maybeAliases instanceof AHashMap)) return null; 
 		
-		AHashMap<Symbol,ACell> aliasMap=((AHashMap<Symbol,ACell>)aliasesValue);
+		AHashMap<Symbol,ACell> aliasMap=((AHashMap<Symbol,ACell>)maybeAliases);
 		MapEntry<Symbol,ACell> aliasEntry=aliasMap.getEntry(path);
 		
 		if (aliasEntry==null) {
@@ -752,8 +857,20 @@ public final class Context<T extends ACell> extends AObject {
 	 * @param newEnvironment
 	 * @return Updated Context with the given dynamic environment
 	 */
-	private Context<T> withEnvironment(AHashMap<Symbol, Syntax> newEnvironment)  {
+	private Context<T> withEnvironment(AHashMap<Symbol, ACell> newEnvironment)  {
 		ChainState cs=chainState.withEnvironment(newEnvironment);
+		return withChainState(cs);	
+	}
+	
+	/**
+	 * Updates the environment of this execution context. This changes the environment stored in the
+	 * state for the current Address.
+	 * 
+	 * @param newEnvironment
+	 * @return Updated Context with the given dynamic environment
+	 */
+	private Context<T> withEnvironment(AHashMap<Symbol, ACell> newEnvironment, AHashMap<Symbol,AHashMap<ACell,ACell>> newMeta)  {
+		ChainState cs=chainState.withEnvironment(newEnvironment,newMeta);
 		return withChainState(cs);	
 	}
 	
@@ -880,7 +997,8 @@ public final class Context<T extends ACell> extends AObject {
 		// Clear any exceptional status
 		Context<R> ctx=this.withValue(null);
 		
-		if (bindingForm instanceof Syntax) bindingForm=((Syntax)bindingForm).getValue();
+		// TODO: is this needed?
+		bindingForm=Syntax.unwrapAll(bindingForm);
 		
 		if (bindingForm instanceof Symbol) {
 			Symbol sym=(Symbol)bindingForm;
@@ -889,7 +1007,7 @@ public final class Context<T extends ACell> extends AObject {
 			// TODO: confirm must be an ACell at this point?
 			return withLocalBindings( localBindings.assoc(sym,(ACell)args));
 		} else if (bindingForm instanceof AVector) {
-			AVector<Syntax> v=(AVector<Syntax>)bindingForm;
+			AVector<ACell> v=(AVector<ACell>)bindingForm;
 			long bindCount=v.count(); // count of binding form symbols (may include & etc.)
 			
 			// Count the arguments, exit with a CAST error if args are not sequential
@@ -899,7 +1017,7 @@ public final class Context<T extends ACell> extends AObject {
 			boolean foundAmpersand=false;
 			for (long i=0; i<bindCount; i++) {
 				// get datum for syntax element in binding form
-				ACell bf=v.get(i).getValue(); 
+				ACell bf=Syntax.unwrapAll(v.get(i)); 
 				
 				if (Symbols.AMPERSAND.equals(bf)) {
 					if (foundAmpersand) return ctx.withCompileError("Can't bind two or more ampersands in a single binding vector");
@@ -1006,11 +1124,26 @@ public final class Context<T extends ACell> extends AObject {
 	 * @param value
 	 * @return Updated context with symbol defined in environment
 	 */
-	public Context<T> define(Symbol key, Syntax value) {
-		AHashMap<Symbol, Syntax> m = getEnvironment();
-		AHashMap<Symbol, Syntax> newEnvironment = m.assoc(key, value);
+	public Context<T> define(Symbol key, ACell value) {
+		AHashMap<Symbol, ACell> m = getEnvironment();
+		AHashMap<Symbol, ACell> newEnvironment = m.assoc(key, value);
 		
 		return withEnvironment(newEnvironment);
+	}
+	
+	/**
+	 * Defines a value in the environment of the current address, updating the metadata
+	 * @param key Symbol of the mapping to create
+	 * @param value
+	 * @return Updated context with symbol defined in environment
+	 */
+	public Context<T> defineWithSyntax(Syntax syn, ACell value) {
+		Symbol key=syn.getValue();
+		AHashMap<Symbol, ACell> m = getEnvironment();
+		AHashMap<Symbol, ACell> newEnvironment = m.assoc(key, value);
+		AHashMap<Symbol, AHashMap<ACell,ACell>> newMeta = getMetadata().assoc(key, syn.getMeta());
+		
+		return withEnvironment(newEnvironment,newMeta);
 	}
 	
 
@@ -1020,10 +1153,11 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return Updated context with symbol definition removed from the environment, or this context if unchanged
 	 */
 	public Context<T> undefine(Symbol key) {
-		AHashMap<Symbol, Syntax> m = getEnvironment();
-		AHashMap<Symbol, Syntax> newEnvironment = m.dissoc(key);
+		AHashMap<Symbol, ACell> m = getEnvironment();
+		AHashMap<Symbol, ACell> newEnvironment = m.dissoc(key);
+		AHashMap<Symbol, AHashMap<ACell,ACell>> newMeta = getMetadata().dissoc(key);
 		
-		return withEnvironment(newEnvironment);
+		return withEnvironment(newEnvironment,newMeta);
 	}
 
 	/**
@@ -1200,7 +1334,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * @param forms A sequence of forms to compile
 	 * @return Updated context with vector of compiled forms
 	 */
-	public <R extends ACell> Context<AVector<AOp<R>>> compileAll(ASequence<Syntax> forms) {
+	public <R extends ACell> Context<AVector<AOp<R>>> compileAll(ASequence<ACell> forms) {
 		Context<AVector<AOp<R>>> rctx = Compiler.compileAll(forms, this);
 		return rctx;
 	}
@@ -1568,7 +1702,7 @@ public final class Context<T extends ACell> extends AObject {
 		
 		// deploy initial contract state to next address
 		Address address=initialState.nextAddress();
-		State stateSetup=initialState.tryAddActor(null);
+		State stateSetup=initialState.tryAddActor();
 		if (stateSetup==null) return withError(ErrorCodes.STATE,"Contract deployment address conflict: "+address);
 		
 		// Deployment execution context with forked context and incremented depth
@@ -1854,7 +1988,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * @param form
 	 * @return Syntax Object resulting from expansion.
 	 */
-	public Context<Syntax> expand(ACell form) {
+	public Context<ACell> expand(ACell form) {
 		return expand(Core.INITIAL_EXPANDER, form, Core.INITIAL_EXPANDER);
 	}
 	
@@ -1872,20 +2006,5 @@ public final class Context<T extends ACell> extends AObject {
 		return rctx;
 		//	if (!(r instanceof Syntax)) return rctx.withError(ErrorCodes.CAST,"expander function must produce a Syntax Object");
 	}
-	
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 }

@@ -82,14 +82,14 @@ public class OpsTest extends ACVMTest {
 		Symbol fooSym = Symbol.create("foo");
 		AOp<AString> op = Def.create(Syntax.create(fooSym), Constant.createString("bar"));
 
-		AMap<Symbol, Syntax> env1 = c1.getEnvironment();
+		AMap<Symbol, ACell> env1 = c1.getEnvironment();
 		Context<AString> c2 = c1.execute(op);
-		AMap<Symbol, Syntax> env2 = c2.getEnvironment();
+		AMap<Symbol, ACell> env2 = c2.getEnvironment();
 
 		assertNotEquals(env1, env2);
 
 		assertNull(env1.get(fooSym)); // initially no entry
-		assertEquals("bar", env2.get(fooSym).getValue().toString());
+		assertEquals("bar", env2.get(fooSym).toString());
 
 		long expectedJuice = INITIAL_JUICE - Juice.CONSTANT - Juice.DEF;
 		assertEquals(expectedJuice, c2.getJuice());

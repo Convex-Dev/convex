@@ -74,6 +74,7 @@ public class Keywords {
 
 	public static final Keyword VALUE = Keyword.create("value");
 	public static final Keyword FUNCTION = Keyword.create("function");
+	public static final Keyword METADATA = Keyword.create("metadata");
 
 	
 

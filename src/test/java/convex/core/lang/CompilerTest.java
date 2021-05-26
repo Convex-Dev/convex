@@ -14,6 +14,8 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Init;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.AList;
 import convex.core.data.AVector;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
@@ -71,10 +73,11 @@ public class CompilerTest extends ACVMTest {
 		Context<?> c=CONTEXT.fork();
 		String src=Utils.readResourceAsString("testsource/min.con");
 		ACell form=Reader.read(src);
-		Context<Syntax> exp=c.expand(form);
-		assertFalse(exp.isExceptional());
+		Context<ACell> exp=c.expand(form);
+		assertNotError(exp);
 		Context<AOp<ACell>> com=c.compile(exp.getResult());
-		assertFalse(com.isExceptional());
+		
+		assertNotError(com);
 	}
 	
 	@Test public void testFnCasting() {
@@ -142,26 +145,29 @@ public class CompilerTest extends ACVMTest {
 	@Test public void testDefMetadataOnLiteral() {
 		Context<?> ctx=step("(def a ^:foo 2)");
 		assertNotError(ctx);
-		Syntax stx=ctx.getEnvironment().getEntry(Symbol.create("a")).getValue();
-		assertSame(CVMBool.TRUE,stx.getMeta().get(Keywords.FOO));
+		AHashMap<ACell,ACell> m=ctx.getMetadata().get(Symbol.create("a"));
+		assertSame(CVMBool.TRUE,m.get(Keywords.FOO));
 	}
 	
 	@Test public void testDefMetadataOnForm() {
 		String code="(def a ^:foo (+ 1 2))";
+		Symbol sym=Symbol.create("a");
 		
 		Context<?> ctx=step(code);
 		assertNotError(ctx);
-		Syntax stx=ctx.getEnvironment().getEntry(Symbol.create("a")).getValue();
-		assertCVMEquals(3L,stx.getValue());
-		assertSame(CVMBool.TRUE,stx.getMeta().get(Keywords.FOO));
+		ACell v=ctx.getEnvironment().get(sym);
+		assertCVMEquals(3L,v);
+		assertSame(CVMBool.TRUE,ctx.getMetadata().get(sym).get(Keywords.FOO));
 	}
 	
 	@Test public void testDefMetadataOnSymbol() {
 		Context<?> ctx=step("(def ^{:foo true} a (+ 1 2))");
 		assertNotError(ctx);
-		Syntax stx=ctx.getEnvironment().getEntry(Symbol.create("a")).getValue();
-		assertCVMEquals(3L,stx.getValue());
-		assertSame(CVMBool.TRUE,stx.getMeta().get(Keywords.FOO));
+		
+		Symbol sym=Symbol.create("a");
+		ACell v=ctx.getEnvironment().get(sym);
+		assertCVMEquals(3L,v);
+		assertSame(CVMBool.TRUE,ctx.getMetadata().get(sym).get(Keywords.FOO));
 	}
 	
 	@Test public void testCond() {
@@ -173,6 +179,7 @@ public class CompilerTest extends ACVMTest {
 	}
 	
 	@Test public void testIf() {
+		assertEquals(read("(cond false 4)"),expand("(if false 4)"));
 		assertNull(eval("(if false 4)"));
 		assertEquals(4L,evalL("(if true 4)"));
 		assertEquals(2L,evalL("(if 1 2 3)"));
@@ -388,6 +395,12 @@ public class CompilerTest extends ACVMTest {
 	}
 	
 	@Test
+	public void testMultiFn() {
+		assertEquals(CVMLong.ZERO,eval("((fn ([] 0) ([x] 1)) )"));
+		assertEquals(CVMLong.ONE,eval("((fn ([] 0) ([x] 1)) :foo)"));
+	}
+	
+	@Test
 	public void testBindings() {
 		assertEquals (2L,evalL("(let [[] nil] 2)")); // nil acts like empty sequence here?
 		assertEquals (2L,evalL("(let [[] []] 2)")); // empty binding vector is OK
@@ -457,14 +470,24 @@ public class CompilerTest extends ACVMTest {
 	@Test
 	public void testDefExpander()  {
 		Context<?> c=CONTEXT.fork();	
+		String source="(defexpander bex [x e] (syntax \"foo\"))";
+		ACell exp=expand(source);
+		assertTrue(exp instanceof AList);
 		
-		c=c.execute(comp("(defexpander bex [x e] (syntax \"foo\"))"));
-		c=c.execute(comp("(bex 2)",c));
+		AOp<?> compiled=comp(exp,c);
+		
+		c=c.execute(compiled);
+		assertNotError(c);
+		assertTrue(c.getEnvironment().get(Symbol.create("bex")) instanceof AFn);
+		assertTrue(c.getMetadata().get(Symbol.create("bex")).containsKey(Keywords.EXPANDER));
+		
+		compiled=comp("(bex 2)",c);
+		c=c.execute(compiled);
 		assertEquals(Strings.create("foo"),c.getResult());
 	}
 	
 	@Test public void testExpansion() {
-		assertEquals(Syntax.create(Keywords.FOO),expand(":foo"));
+		assertEquals(Keywords.FOO,expand(":foo"));
 		
 		assertEquals(Syntax.create(Keywords.FOO,Maps.of(Keywords.BAR,CVMBool.TRUE)),Reader.read("^:bar :foo"));
 		assertEquals(Syntax.create(Keywords.FOO,Maps.of(Keywords.BAR,CVMBool.TRUE)),expand("^:bar :foo"));
@@ -472,12 +495,12 @@ public class CompilerTest extends ACVMTest {
 	
 	@Test
 	public void testExpandQuote()  {
-		assertEquals(Syntax.create(null),expand("nil"));
-		assertEquals(Syntax.create(Lists.of(Symbols.QUOTE,Symbols.FOO)),expand("'foo"));
-		assertEquals(Syntax.create(Lists.of(Symbols.QUOTE,Lists.of(Symbols.UNQUOTE,Symbols.FOO))),expand("'~foo"));
-		assertEquals(Syntax.create(Lists.of(Symbols.QUOTE,Lists.of(Symbols.QUOTE,Lists.of(Symbols.UNQUOTE,Symbols.FOO)))),expand("''~foo"));
+		assertEquals(null,expand("nil"));
+		assertEquals(Lists.of(Symbols.QUOTE,Symbols.FOO),expand("'foo"));
+		assertEquals(Lists.of(Symbols.QUOTE,Lists.of(Symbols.UNQUOTE,Symbols.FOO)),expand("'~foo"));
+		assertEquals(Lists.of(Symbols.QUOTE,Lists.of(Symbols.QUOTE,Lists.of(Symbols.UNQUOTE,Symbols.FOO))),expand("''~foo"));
 
-		assertEquals(Syntax.create(Lists.of(Symbols.QUASIQUOTE,Symbols.FOO)),expand("`foo"));
+		assertEquals(Lists.of(Symbols.QUASIQUOTE,Symbols.FOO),expand("`foo"));
 
 	}
 	
@@ -525,7 +548,8 @@ public class CompilerTest extends ACVMTest {
 	@Test 
 	public void testInitialEnvironment() {
 		// list should be a core function
-		assertTrue(eval("list") instanceof AFn);
+		ACell eval=eval("list");
+		assertTrue(eval instanceof AFn);
 		
 		// if should be a macro implemented as an expander
 		//  assertTrue(eval("if") instanceof AExpander);

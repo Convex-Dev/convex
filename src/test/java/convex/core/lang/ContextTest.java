@@ -14,32 +14,40 @@ import org.junit.jupiter.api.Test;
 import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Init;
+import convex.core.State;
 import convex.core.data.ABlobMap;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.BlobMaps;
+import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 
 /**
- * Tests for execution context mechanics and internals
+ * Tests for basic execution Context mechanics and internals
  */
-public class ContextTest {
+public class ContextTest extends ACVMTest {
 
-	private final Context<?> CTX = TestState.CONTEXT.fork();
+	protected ContextTest() {
+		super(Init.createBaseAccounts());
+	}
+
+	private final Context<?> CTX = super.CONTEXT.fork();
+	private final Address ADDR=CTX.getAddress();
 
 	@Test
 	public void testDefine() {
 		Symbol sym = Symbol.create("the-test-symbol");
 
-		final Context<?> c2 = CTX.fork().define(sym, Syntax.of("buffy"));
+		final Context<?> c2 = CTX.fork().define(sym, Strings.create("buffy"));
 		assertCVMEquals("buffy", c2.lookup(sym).getResult());
 
 		assertUndeclaredError(c2.lookup(Symbol.create("some-bad-symbol")));
 	}
-	
+
 	@Test
 	public void testSymbolLookup() {
 		Symbol sym1=Symbol.create("count");
@@ -48,7 +56,7 @@ public class ContextTest {
 		Symbol sym2=Symbol.create("count").withPath(Init.CORE_ADDRESS);
 		assertEquals(Core.COUNT,CTX.lookup(sym2).getResult());
 
-		Symbol sym3=Symbol.create("count").withPath(Init.HERO);
+		Symbol sym3=Symbol.create("count").withPath(ADDR);
 		assertUndeclaredError(CTX.lookup(sym3));
 	}
 	
@@ -56,7 +64,7 @@ public class ContextTest {
 	public void testUndefine() {
 		Symbol sym = Symbol.create("the-test-symbol");
 
-		final Context<?> c2 = CTX.fork().define(sym, Syntax.of("vampire"));
+		final Context<?> c2 = CTX.fork().define(sym, Strings.create("vampire"));
 		assertCVMEquals("vampire", c2.lookup(sym).getResult());
 
 		final Context<?> c3 = c2.undefine(sym);
@@ -95,14 +103,14 @@ public class ContextTest {
 	@Test
 	public void testSpecial() {
 		Context<?> ctx=CTX.fork();
-		assertEquals(TestState.HERO, ctx.computeSpecial(Symbols.STAR_ADDRESS).getResult());
-		assertEquals(TestState.HERO, ctx.computeSpecial(Symbols.STAR_ORIGIN).getResult());
+		assertEquals(ADDR, ctx.computeSpecial(Symbols.STAR_ADDRESS).getResult());
+		assertEquals(ADDR, ctx.computeSpecial(Symbols.STAR_ORIGIN).getResult());
 		assertNull(ctx.computeSpecial(Symbols.STAR_CALLER).getResult());
 		
 		assertNull(ctx.computeSpecial(Symbols.STAR_RESULT).getResult());
 		assertCVMEquals(ctx.getJuice(), ctx.computeSpecial(Symbols.STAR_JUICE).getResult());
 		assertCVMEquals(0L,ctx.computeSpecial(Symbols.STAR_DEPTH).getResult());
-		assertCVMEquals(ctx.getBalance(TestState.HERO),ctx.computeSpecial(Symbols.STAR_BALANCE).getResult());
+		assertCVMEquals(ctx.getBalance(ADDR),ctx.computeSpecial(Symbols.STAR_BALANCE).getResult());
 		assertCVMEquals(0L,ctx.computeSpecial(Symbols.STAR_OFFER).getResult());
 		
 		assertCVMEquals(0L,ctx.computeSpecial(Symbols.STAR_SEQUENCE).getResult());

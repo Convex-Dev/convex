@@ -7,7 +7,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AFn;
-import convex.core.lang.Core;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.core.lang.impl.RecordFormat;
@@ -24,23 +23,29 @@ public class AccountStatus extends ARecord {
 	private final long sequence;
 	private final long balance;
 	private final long memory;
-	private final AHashMap<Symbol, Syntax> environment;
+	private final AHashMap<Symbol, ACell> environment;
+	private final AHashMap<Symbol, AHashMap<ACell,ACell>> metadata;
 	private final ABlobMap<Address, ACell> holdings;
 	private final Address controller;
 	private final AccountKey publicKey;
 	
-	private static final Keyword[] ACCOUNT_KEYS = new Keyword[] { Keywords.SEQUENCE, Keywords.BALANCE,Keywords.ALLOWANCE,Keywords.ENVIRONMENT,
+	private static final Keyword[] ACCOUNT_KEYS = new Keyword[] { Keywords.SEQUENCE, Keywords.BALANCE,Keywords.ALLOWANCE,Keywords.ENVIRONMENT,Keywords.METADATA,
 			Keywords.HOLDINGS, Keywords.CONTROLLER, Keywords.KEY};
 
 	private static final RecordFormat FORMAT = RecordFormat.of(ACCOUNT_KEYS);
 
 	private AccountStatus(long sequence, long balance, long memory,
-			AHashMap<Symbol, Syntax> environment, ABlobMap<Address, ACell> holdings,Address controller, AccountKey publicKey) {
+			AHashMap<Symbol, ACell> environment, 
+			AHashMap<Symbol, AHashMap<ACell,ACell>> metadata, 
+			ABlobMap<Address, ACell> holdings,
+			Address controller, 
+			AccountKey publicKey) {
 		super(FORMAT);
 		this.sequence = sequence;
 		this.balance = balance;
 		this.memory = memory;
 		this.environment = environment;
+		this.metadata=metadata;
 		this.holdings=holdings;
 		this.controller=controller;
 		this.publicKey=publicKey;
@@ -54,7 +59,7 @@ public class AccountStatus extends ARecord {
 	 * @return New AccountStatus
 	 */
 	public static AccountStatus create(long sequence, long balance, AccountKey key) {
-		return new AccountStatus(sequence, balance, 0L, null,null,null,key);
+		return new AccountStatus(sequence, balance, 0L, null,null,null,null,key);
 	}
 
 	/**
@@ -65,11 +70,11 @@ public class AccountStatus extends ARecord {
 	 * @return New governance AccountStatus
 	 */
 	public static AccountStatus createGovernance(long balance) {
-		return new AccountStatus(Constants.INITIAL_SEQUENCE, balance, 0L, null,null,null,null);
+		return new AccountStatus(Constants.INITIAL_SEQUENCE, balance, 0L, null,null,null,null,null);
 	}
 
-	public static AccountStatus createActor(AHashMap<Symbol, Syntax> environment) {
-		return new AccountStatus(Constants.INITIAL_SEQUENCE, 0L, 0L,environment,null,null,null);
+	public static AccountStatus createActor() {
+		return new AccountStatus(Constants.INITIAL_SEQUENCE, 0L, 0L,null,null,null,null,null);
 	}
 
 	public static AccountStatus create(long balance, AccountKey key) {
@@ -113,6 +118,7 @@ public class AccountStatus extends ARecord {
 		pos = Format.writeVLCLong(bs,pos, balance);
 		pos = Format.writeVLCLong(bs,pos, memory);
 		pos = Format.write(bs,pos, environment);
+		pos = Format.write(bs,pos, metadata);
 		pos = Format.write(bs,pos, holdings);
 		pos = Format.write(bs,pos, controller);
 		pos = Format.write(bs,pos, publicKey);
@@ -123,11 +129,12 @@ public class AccountStatus extends ARecord {
 		long sequence = Format.readVLCLong(bb);
 		long balance = Format.readVLCLong(bb);
 		long allowance = Format.readVLCLong(bb);
-		AHashMap<Symbol, Syntax> environment = Format.read(bb);
+		AHashMap<Symbol, ACell> environment = Format.read(bb);
+		AHashMap<Symbol, AHashMap<ACell,ACell>> metadata = Format.read(bb);
 		ABlobMap<Address,ACell> holdings = Format.read(bb);
 		Address controller = Format.read(bb);
 		AccountKey publicKey = Format.read(bb);
-		return new AccountStatus(sequence, balance, allowance, environment,holdings,controller,publicKey);
+		return new AccountStatus(sequence, balance, allowance, environment,metadata,holdings,controller,publicKey);
 	}
 
 	@Override
@@ -166,25 +173,13 @@ public class AccountStatus extends ARecord {
 		if (!exports.contains(sym)) return null;
 
 		// get function from environment. Anything not a function results in null
-		Syntax functionSyn = environment.get(sym);
+		ACell maybeFn = environment.get(sym);
 		
-		if (functionSyn==null) return null; // check in case exported definition is not declared
-		
-		AFn<R> fn = RT.function(functionSyn.getValue());
+		AFn<R> fn = RT.function(maybeFn);
 		return fn;
 	}
 
-	/**
-	 * Gets the dynamic environment for this account. Defaults to the standard initial environment.
-	 * @return
-	 */
-	public AHashMap<Symbol, Syntax> getEnvironment() {
-		// default to standard environment
-		// needed to avoid circularity in static initialisation?
-		if (environment == null) return Core.ENVIRONMENT;
-		return environment;
-	}
-	
+
 	/**
 	 * Get the controller for this Account
 	 * @return Controller Address, or null if there is no controller
@@ -207,31 +202,35 @@ public class AccountStatus extends ARecord {
 
 	public AccountStatus withBalance(long newBalance) {
 		if (balance==newBalance) return this;
-		return new AccountStatus(sequence, newBalance, memory, environment,holdings,controller,publicKey);
+		return new AccountStatus(sequence, newBalance, memory, environment,metadata,holdings,controller,publicKey);
 	}
 	
 
 	public AccountStatus withAccountKey(AccountKey newKey) {
 		if (newKey==publicKey) return this;
-		return new AccountStatus(sequence, balance, memory, environment,holdings,controller,newKey);
+		return new AccountStatus(sequence, balance, memory, environment,metadata,holdings,controller,newKey);
 	}
 	
 	public AccountStatus withMemory(long newMemory) {
 		if (memory==newMemory) return this;
-		return new AccountStatus(sequence, balance, newMemory, environment,holdings,controller,publicKey);
+		return new AccountStatus(sequence, balance, newMemory, environment,metadata,holdings,controller,publicKey);
 	}
 	
 	public AccountStatus withBalances(long newBalance, long newAllowance) {
 		if ((balance==newBalance)&&(memory==newAllowance)) return this;
-		return new AccountStatus(sequence, newBalance, newAllowance, environment,holdings,controller,publicKey);
+		return new AccountStatus(sequence, newBalance, newAllowance, environment,metadata,holdings,controller,publicKey);
 	}
 
-	public AccountStatus withEnvironment(AHashMap<Symbol, Syntax> newEnvironment) {
-		// Core environment stored as null for efficiency
-		if (newEnvironment==Core.ENVIRONMENT) newEnvironment=null;
-		
+	public AccountStatus withEnvironment(AHashMap<Symbol, ACell> newEnvironment) {
+		if ((newEnvironment!=null)&&newEnvironment.isEmpty()) newEnvironment=null;
 		if (environment==newEnvironment) return this;
-		return new AccountStatus(sequence, balance, memory,newEnvironment,holdings,controller,publicKey);
+		return new AccountStatus(sequence, balance, memory,newEnvironment,metadata,holdings,controller,publicKey);
+	}
+	
+	public AccountStatus withMetadata(AHashMap<Symbol, AHashMap<ACell, ACell>> newMeta) {
+		if ((newMeta!=null)&&newMeta.isEmpty()) newMeta=null;
+		if (metadata==newMeta) return this;
+		return new AccountStatus(sequence, balance, memory,environment,newMeta,holdings,controller,publicKey);
 	}
 
 	/**
@@ -249,13 +248,19 @@ public class AccountStatus extends ARecord {
 			return null;
 		}
 
-		return new AccountStatus(newSequence, balance, memory, environment,holdings,controller,publicKey);
+		return new AccountStatus(newSequence, balance, memory, environment,metadata,holdings,controller,publicKey);
 	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (environment != null) environment.validateCell();
-		if (holdings != null) holdings.validateCell();
+		if (environment != null) {
+			if (environment.isEmpty()) throw new InvalidDataException("Account should not have empty map as environment",this);
+			environment.validateCell();
+		}
+		if (holdings != null) {
+			if (environment.isEmpty()) throw new InvalidDataException("Account should not have empty map as metadata",this);
+			holdings.validateCell();
+		}
 	}
 
 	/**
@@ -265,11 +270,11 @@ public class AccountStatus extends ARecord {
 	 * @param sym
 	 * @return The value from the environment, or null if not found
 	 */
+	@SuppressWarnings("unchecked")
 	public <R> R getEnvironmentValue(Symbol symbol) {
 		if (environment == null) return null;
-		Syntax syntax = environment.get(symbol);
-		if (syntax == null) return null;
-		return syntax.getValue();
+		ACell value = environment.get(symbol);
+		return (R) value;
 	}
 
 	/**
@@ -302,11 +307,11 @@ public class AccountStatus extends ARecord {
 	private AccountStatus withHoldings(ABlobMap<Address, ACell> newHoldings) {
 		if (newHoldings.isEmpty()) newHoldings=null;
 		if (holdings==newHoldings) return this;
-		return new AccountStatus(sequence, balance, memory, environment,newHoldings,controller,publicKey);
+		return new AccountStatus(sequence, balance, memory, environment,metadata,newHoldings,controller,publicKey);
 	}
 	
 	public AccountStatus withController(Address controllerAddress) {
-		return new AccountStatus(sequence, balance, memory, environment,holdings,controllerAddress,publicKey);
+		return new AccountStatus(sequence, balance, memory, environment,metadata,holdings,controllerAddress,publicKey);
 	}
 
 	/**
@@ -321,15 +326,13 @@ public class AccountStatus extends ARecord {
 	@SuppressWarnings("unchecked")
 	public ASet<Symbol> getExports() {
 		// get *exports* from environment, bail out if doesn't exist
-		Syntax exportSyn = getEnvironment().get(Symbols.STAR_EXPORTS);
-		if (exportSyn == null) return null;
+		ACell exports = getEnvironment().get(Symbols.STAR_EXPORTS);
+		if (exports == null) return null;
 
-		// examine *exports* value, bail out if not a set
-		Object s = exportSyn.getValue();
-		if (!(s instanceof ASet)) return null;
+		if (!(exports instanceof ASet)) return null;
 
-		ASet<Symbol> exports = (ASet<Symbol>) s;
-		return exports;
+		ASet<Symbol> result = (ASet<Symbol>) exports;
+		return result;
 	}
 
 	@Override
@@ -377,17 +380,18 @@ public class AccountStatus extends ARecord {
 		long newSeq=((CVMLong)newVals[0]).longValue();
 		long newBal=((CVMLong)newVals[1]).longValue();
 		long newAllowance=((CVMLong)newVals[2]).longValue();
-		AHashMap<Symbol, Syntax> newEnv=(AHashMap<Symbol, Syntax>) newVals[3];
-		ABlobMap<Address, ACell> newHoldings=(ABlobMap<Address, ACell>) newVals[4];
+		AHashMap<Symbol, ACell> newEnv=(AHashMap<Symbol, ACell>) newVals[3];
+		AHashMap<Symbol, AHashMap<ACell,ACell>> newMeta=(AHashMap<Symbol, AHashMap<ACell,ACell>>) newVals[4];
+		ABlobMap<Address, ACell> newHoldings=(ABlobMap<Address, ACell>) newVals[5];
 		if ((newHoldings!=null)&&newHoldings.isEmpty()) newHoldings=null; // switch empty maps to null
-		Address newController = (Address)newVals[5];
-		AccountKey newKey=(AccountKey)newVals[6];
+		Address newController = (Address)newVals[6];
+		AccountKey newKey=(AccountKey)newVals[7];
 		
-		if ((balance==newBal)&&(sequence==newSeq)&&(newEnv==environment)&&(newHoldings==holdings)&&(newController==controller)&&(newKey==publicKey)) {
+		if ((balance==newBal)&&(sequence==newSeq)&&(newEnv==environment)&&(newMeta==metadata)&&(newHoldings==holdings)&&(newController==controller)&&(newKey==publicKey)) {
 			return this;
 		}
 		
-		return new AccountStatus(newSeq,newBal,newAllowance,newEnv,newHoldings,newController,newKey);
+		return new AccountStatus(newSeq,newBal,newAllowance,newEnv,newMeta,newHoldings,newController,newKey);
 	}
 
 	/**
@@ -424,6 +428,23 @@ public class AccountStatus extends ARecord {
 	public AccountKey getAccountKey() {
 		return publicKey;
 	}
+
+	public AHashMap<Symbol,AHashMap<ACell,ACell>> getMetadata() {
+		if (metadata==null) return Maps.empty();
+		return metadata;
+	}
+	
+	/**
+	 * Gets the Environment for this account. Defaults to the an empty map if no Environment has been created.
+	 * @return
+	 */
+	public AHashMap<Symbol, ACell> getEnvironment() {
+		if (environment==null) return Maps.empty();
+		return environment;
+	}
+	
+
+
 
 
 

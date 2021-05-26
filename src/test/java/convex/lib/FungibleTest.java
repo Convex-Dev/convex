@@ -42,7 +42,7 @@ public class FungibleTest {
 			ctx=step(ctx,"(import convex.asset :as asset)");
 			assertFalse(ctx.isExceptional());
 			
-			ctx=ctx.define(fSym, Syntax.create(fun));
+			ctx=ctx.define(fSym, fun);
 		} catch (Throwable e) {
 			e.printStackTrace();
 			throw new Error(e);
@@ -56,7 +56,7 @@ public class FungibleTest {
 	
 	static {
 		ctx=loadFungible();
-		fungible=(Address) ctx.lookup(fSym).getResult();
+		fungible=(Address) ctx.lookupValue(fSym);
 	}
 	
 	/**

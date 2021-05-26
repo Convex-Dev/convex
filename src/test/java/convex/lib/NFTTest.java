@@ -30,7 +30,7 @@ public class NFTTest {
 			Address nft=(Address) ctx.getResult();
 			assertFalse(ctx.isExceptional());
 			
-			ctx=ctx.define(nSym, Syntax.create(nft));
+			ctx=ctx.define(nSym, nft);
 		} catch (Throwable e) {
 			throw Utils.sneakyThrow(e);
 		}
@@ -41,7 +41,7 @@ public class NFTTest {
 	private static final Context<?> ctx=loadNFT().fork();
 	
 	@Test public void testSetup() {
-		assertTrue(ctx.lookup(nSym).getValue() instanceof Address);
+		assertTrue(ctx.lookupValue(nSym) instanceof Address);
 	}
 	
 	@Test public void testOneAccount() {

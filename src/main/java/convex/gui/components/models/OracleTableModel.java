@@ -11,7 +11,6 @@ import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
 import convex.core.data.Symbol;
-import convex.core.data.Syntax;
 import convex.core.util.Utils;
 
 /**
@@ -63,17 +62,18 @@ public class OracleTableModel extends AbstractTableModel implements TableModel {
 		return false;
 	}
 	
+	@SuppressWarnings("unchecked")
 	public AMap<ACell,ACell> getList() {
-		AMap<Symbol,Syntax> env=state.getAccount(oracle).getEnvironment();
-		AMap<ACell,ACell> list=env.get(LIST_S).getValue(); 
+		AMap<Symbol,ACell> env=state.getAccount(oracle).getEnvironment();
+		AMap<ACell,ACell> list=(AMap<ACell, ACell>) env.get(LIST_S); 
 		return list;
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public Object getValueAt(int rowIndex, int columnIndex) {
-		AMap<Symbol,Syntax> env=state.getAccount(oracle).getEnvironment();
-		AMap<ACell,ACell> list=env.get(LIST_S).getValue(); 
+		AMap<Symbol,ACell> env=state.getAccount(oracle).getEnvironment();
+		AMap<ACell,ACell> list=(AMap<ACell, ACell>) env.get(LIST_S); 
 		MapEntry<ACell,ACell> me=list.entryAt(rowIndex);
 		ACell key=me.getKey();
 		switch (columnIndex) {
@@ -83,11 +83,11 @@ public class OracleTableModel extends AbstractTableModel implements TableModel {
 				return data.get(DESC_K);
 			}
 			case 2: {
-				boolean done=((AMap<ACell, ACell>) env.get(RESULTS_S).getValue()).containsKey(key);
+				boolean done=((AMap<ACell, ACell>) env.get(RESULTS_S)).containsKey(key);
 				return done?"Yes":"No";
 			}
 			case 3: {
-				AMap<ACell, ACell> results=((AMap<ACell, ACell>) env.get(RESULTS_S).getValue());
+				AMap<ACell, ACell> results=((AMap<ACell, ACell>) env.get(RESULTS_S));
 				MapEntry<ACell,ACell> rme=results.getEntry(key);
 				return (rme==null)?"":rme.getValue();
 			}

@@ -45,7 +45,7 @@ public class TrustTest extends ACVMTest {
 			ctx = step(ctx, importS);
 			assertNotError(ctx);
 
-			ctx = ctx.define(tSym, Syntax.create(trust));
+			ctx = ctx.define(tSym, trust);
 		} catch (Throwable e) {
 			e.printStackTrace();
 			throw new Error(e);
@@ -53,7 +53,7 @@ public class TrustTest extends ACVMTest {
 
 		CONTEXT=ctx.fork();
 		INITIAL=ctx.getState();
-		trusted = (Address) ctx.lookup(tSym).getResult();
+		trusted = (Address) ctx.lookupValue(tSym);
 	}
 
 

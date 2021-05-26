@@ -20,7 +20,7 @@
     :expander true
    }
   (fn [x e] 
-      (let [[_ name & decl] (unsyntax x)
+      (let [[_ name & decl] x
             exp (cons 'fn decl)
             form `(def ~(syntax name {:expander true}) ~exp)]
          (e form e))))
@@ -64,6 +64,7 @@
                     {:params [test true-exp false-exp]} 
                     ] 
          }
+    :expander true
 	}
   [test & cases]
   (cond (<= 1 (count cases) 2) nil (fail :ARITY "if requires 2 or 3 arguments"))
@@ -73,11 +74,14 @@
   ^{:doc {:description "Defines a function in the current environment."
          :examples [{:code "(defn my-square [x] (* x x))"}]
          :type :macro	 
-         :signature [{:params [name params & body]}]}
+         :signature [{:params [name params & body]}
+                     {:params [name & fn-decls]}]}
 	}
-  [name params & body] 
-  (let [fnform (cons 'fn params body)
-       fnform (syntax fnform (meta params))] 
+  [name & decl] 
+  (let [fnform (cons 'fn decl)
+        _ (cond (empty? decl) (fail :ARITY "defn requires at lest one function definition"))
+        fst (first decl)
+        name (cond (syntax fst) (syntax name (meta fst)) name)] 
     `(def ~name ~fnform)))
 
 (defmacro assert
@@ -97,7 +101,7 @@
          :signature [{:params [sym]}]}
 	}
   [sym]
-  `(:doc (meta (lookup-syntax (quote ~sym)))))
+  `(:doc (lookup-meta (quote ~sym))))
 
 (defmacro or 
   ^{:doc {:description "Executes expressions in sequence, returning the first truthy value, or the last value if all were falsey. Does not evaluate later expressions, so can be used to short circuit execution. Returns nil with no expressions present."
@@ -322,8 +326,8 @@
          :signature [{:params [sym]}]}
 	}
   [sym]
-  (or (symbol? (unsyntax sym)) (fail :CAST "defined? requires a Symbol"))
-  `(boolean (lookup-syntax ~(list 'quote sym))))
+  (or (symbol? sym) (fail :CAST "defined? requires a Symbol"))
+  `(boolean (lookup-meta (quote ~sym))))
 
 (defmacro schedule
     ^{

@@ -3,7 +3,7 @@ package convex.core.lang;
 import static convex.core.lang.TestState.step;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import java.util.Map;
+import java.util.Map.Entry;
 
 import org.junit.jupiter.api.Test;
 
@@ -12,16 +12,14 @@ import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.Keywords;
 import convex.core.data.Symbol;
-import convex.core.data.Syntax;
 
 public class DocsTest {
 	public static final boolean PRINT_MISSING=true;
 	
 	@Test public void testDocs() {
-		for (Map.Entry<Symbol,Syntax> me: Core.ENVIRONMENT.entrySet()) {
+		for (Entry<Symbol, AHashMap<ACell, ACell>> me: Core.METADATA.entrySet()) {
 			Symbol sym=me.getKey();
-			Syntax syntax=me.getValue();
-			AHashMap<ACell,ACell> meta = syntax.getMeta();
+			AHashMap<ACell,ACell> meta = me.getValue();
 			if (meta.isEmpty()) {
 				if (PRINT_MISSING) System.err.println("Empty metadata in Core: "+sym);
 			} else {

@@ -54,7 +54,7 @@ public class Lookup<T extends ACell> extends AOp<T> {
 
 	@Override
 	public <I extends ACell> Context<T> execute(Context<I> context) {
-		// Lookup local values first
+		// Lookup local lexical values first
 		if (!symbol.isQualified()) {
 			MapEntry<Symbol, T> le = context.lookupLocalEntry(symbol);
 			if (le != null) return context.withResult(Juice.LOOKUP, le.getValue());

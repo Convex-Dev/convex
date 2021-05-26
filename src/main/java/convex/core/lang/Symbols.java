@@ -248,7 +248,7 @@ public class Symbols {
 	public static final Symbol META = Symbol.create("meta");
 	public static final Symbol META_STAR = Symbol.create("*meta*");
 	
-	public static final Symbol LOOKUP_SYNTAX = Symbol.create("lookup-syntax");
+	public static final Symbol LOOKUP_META = Symbol.create("lookup-meta");
 
 	public static final Symbol GET_HOLDING = Symbol.create("get-holding");
 	public static final Symbol SET_HOLDING = Symbol.create("set-holding");

@@ -258,6 +258,21 @@ public class Syntax extends ACell {
 		mm = mm.merge(additionalMetadata);
 		return this.withMeta(mm);
 	}
+	
+	/** 
+	 * Merge metadata into a Cell, after wrapping as a Syntax Object
+	 * 
+	 * @param original Cell to enhance with merged metadata
+	 * @param additional Syntax Object containing additional metadata
+	 * @return
+	 */
+	public static Syntax mergeMeta(ACell original, Syntax additional) {
+		Syntax x=Syntax.create(original);
+		if (additional!=null) {
+			x=x.mergeMeta(additional.getMeta());
+		}
+		return x;
+	}
 
 	/**
 	 * Replaces metadata on this Syntax Object. Old metadata is discarded.
@@ -327,5 +342,7 @@ public class Syntax extends ACell {
 	public byte getTag() {
 		return Tag.SYNTAX;
 	}
+
+
 
 }

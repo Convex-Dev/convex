@@ -618,10 +618,10 @@
                       {:params [address name]}]}
   }
   
-  lookup-syntax
+  lookup-meta
   {
-    :doc {:description "Looks up the Syntax Object for a symbol in the current execution environment, or the account of the given address if specified. Name may be a symbol, keyword or String. Returns nil if not found."
-          :examples [{:code "(lookup-syntax 'count)"}]
+    :doc {:description "Looks up metadata for a symbol in the current execution environment, or the account of the given address if specified. Name may be a symbol, keyword or String. Returns nil if not found."
+          :examples [{:code "(lookup-meta 'count)"}]
           :type :function
           :signature [{:params [name]}
                       {:params [address name]}]}
@@ -745,7 +745,7 @@
   {
     :doc {:description "Returns the quoted value of a form, without evaluating it. Like 'quote', but elements within the form may be unquoted."
           :examples [{:code "(quasiquote foo)"}
-                     {:code "`(:a : b ~(+ 2 3))"}]
+                     {:code "`(:a :b ~(+ 2 3))"}]
           :type :special
           :signature [{:params [form]}]}
     :expander true

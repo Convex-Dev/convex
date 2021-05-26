@@ -1,11 +1,12 @@
 package convex.lib;
 
-import static convex.core.lang.TestState.*;
+import static convex.core.lang.TestState.eval;
+import static convex.core.lang.TestState.evalL;
+import static convex.core.lang.TestState.step;
+import static convex.test.Assertions.assertError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import static convex.test.Assertions.*;
 
 import java.io.IOException;
 
@@ -17,7 +18,6 @@ import convex.core.data.Address;
 import convex.core.data.Set;
 import convex.core.data.Sets;
 import convex.core.data.Symbol;
-import convex.core.data.Syntax;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.Context;
 import convex.core.lang.Reader;
@@ -47,7 +47,7 @@ public class BoxTest {
 			BOX=(Address)ctx.getResult();
 			assertNotNull(BOX);
 			
-			ctx=ctx.define(nSym, Syntax.create(nft));
+			ctx=ctx.define(nSym, nft);
 		} catch (IOException e) {
 			e.printStackTrace();
 			throw new Error(e);
@@ -58,7 +58,7 @@ public class BoxTest {
 	}
 	
 	@Test public void testSetup() {
-		assertTrue(CTX.lookup(nSym).getValue() instanceof Address);
+		assertTrue(CTX.lookupValue(nSym) instanceof Address);
 	}
 	
 	@Test public void testScript1() {

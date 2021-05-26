@@ -23,7 +23,6 @@ import convex.core.data.Keyword;
 import convex.core.data.List;
 import convex.core.data.Lists;
 import convex.core.data.Symbol;
-import convex.core.data.Syntax;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
@@ -55,18 +54,18 @@ public class MarketComponent extends BaseListComponent {
 		State state = PeerManager.getLatestState();
 
 		// prediction market data
-		AMap<Symbol, Syntax> pmEnv = state.getEnvironment(addr);
-		outcomes = RT.keys(pmEnv.get(Symbol.create("totals")).getValue());
+		AMap<Symbol, ACell> pmEnv = state.getEnvironment(addr);
+		outcomes = RT.keys(pmEnv.get(Symbol.create("totals")));
 
 		numOutcomes = outcomes.size();
 
 		// oracle data
-		Address oracleAddress = pmEnv.get(Symbol.create("oracle")).getValue();
+		Address oracleAddress = (Address) pmEnv.get(Symbol.create("oracle"));
 		if (oracleAddress == null) throw new Error("No oracle symbol in environment?");
-		Object key = pmEnv.get(Symbol.create("oracle-key")).getValue();
+		Object key = pmEnv.get(Symbol.create("oracle-key"));
 
-		AMap<Symbol, Syntax> oracleEnv = state.getEnvironment(oracleAddress);
-		AMap<ACell, ACell> fullList = oracleEnv.get(Symbol.create("full-list")).getValue();
+		AMap<Symbol, ACell> oracleEnv = state.getEnvironment(oracleAddress);
+		AMap<ACell, ACell> fullList = (AMap<ACell, ACell>) oracleEnv.get(Symbol.create("full-list"));
 		AMap<Keyword, ACell> oracleData = (AMap<Keyword, ACell>) fullList.get(key);
 		if (oracleData == null) throw new Error("No oracle data for key?");
 

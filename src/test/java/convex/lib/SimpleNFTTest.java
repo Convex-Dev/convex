@@ -46,7 +46,7 @@ public class SimpleNFTTest {
 			NFT=(Address)ctx.getResult();
 			assertNotNull(NFT);
 			
-			ctx=ctx.define(nSym, Syntax.create(nft));
+			ctx=ctx.define(nSym, nft);
 		} catch (IOException e) {
 			e.printStackTrace();
 			throw new Error(e);
@@ -56,7 +56,7 @@ public class SimpleNFTTest {
 	}
 	
 	@Test public void testSetup() {
-		assertTrue(CTX.lookup(nSym).getValue() instanceof Address);
+		assertTrue(CTX.lookupValue(nSym) instanceof Address);
 	}
 	
 	@Test public void testScript1() {

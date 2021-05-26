@@ -4,7 +4,6 @@ import convex.core.Init;
 import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.Address;
-import convex.core.data.Syntax;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -147,10 +146,14 @@ public abstract class ACVMTest {
 	}
 	
 	@SuppressWarnings("unchecked")
-	public <T extends AOp<?>> T comp(String source, Context<?> context) {
-		ACell form=Reader.read(source);
-		AOp<?> code = context.fork().expandCompile(form).getResult();
+	public <T extends AOp<?>> T comp(ACell form, Context<?> context) {
+		context=context.fork(); // fork to avoid corrupting original context
+		AOp<?> code = context.expandCompile(form).getResult();
 		return (T) code;
+	}
+	
+	public <T extends AOp<?>> T comp(String source, Context<?> context) {
+		return comp(Reader.read(source),context);
 	}
 	
 	/**
@@ -160,14 +163,29 @@ public abstract class ACVMTest {
 	 * @return CVM Op
 	 */
 	public <T extends AOp<?>> T comp(String source) {
-		return comp(source,CONTEXT);
+		return comp(Reader.read(source),CONTEXT);
 	}
 	
-	public Syntax expand(String source) {
+	/**
+	 * Compiles source code to a CVM Op
+	 * @param <T>
+	 * @param source
+	 * @return CVM Op
+	 */
+	public <T extends AOp<?>> T comp(ACell code) {
+		return comp(code,CONTEXT);
+	}
+	
+	public ACell expand(ACell form) {
+		Context<?> ctx=CONTEXT.fork();
+		ACell expanded =ctx.expand(form).getResult();
+		return expanded;
+	}
+	
+	public ACell expand(String source) {
 		try {
 			ACell form=Reader.read(source);
-			Syntax expanded =CONTEXT.fork().expand(form).getResult();
-			return expanded;
+			return expand(form);
 		}
 		catch (Exception e) {
 			throw Utils.sneakyThrow(e);

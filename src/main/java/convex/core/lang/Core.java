@@ -83,16 +83,17 @@ import convex.core.util.Utils;
  */
 @SuppressWarnings("rawtypes")
 public class Core {
-
-	/**
-	 * Core namespace
-	 */
-	public static final AHashMap<Symbol, Syntax> CORE_NAMESPACE;
 	
 	/**
 	 * Default initial environment importing core namespace
 	 */
-	public static final AHashMap<Symbol, Syntax> ENVIRONMENT;
+	public static final AHashMap<Symbol, ACell> ENVIRONMENT;
+	
+	/**
+	 * Default initial core metadata
+	 */
+	public static final AHashMap<Symbol, AHashMap<ACell,ACell>> METADATA;
+
 	
 	/**
 	 * Symbol for core namespace
@@ -506,10 +507,10 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Syntax> EXPAND = reg(new CoreFn<>(Symbols.EXPAND) {
+	public static final CoreFn<ACell> EXPAND = reg(new CoreFn<>(Symbols.EXPAND) {
 		@SuppressWarnings("unchecked")
 		@Override
-		public  Context<Syntax> invoke(Context context, ACell[] args) {
+		public  Context<ACell> invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if ((n<1)||(n>3)) {
 				return context.withArityError(name() + " requires a form argument, optional expander and optional continuation expander (arity 1, 2 or 2)");
@@ -522,7 +523,7 @@ public class Core {
 			//	return context.withError(ErrorCodes.CAST,name()+" requires a valid *initial-expander*, not found in environment");
 			//}
 
-			AFn<Syntax> expander=Compiler.INITIAL_EXPANDER;
+			AFn<ACell> expander=Compiler.INITIAL_EXPANDER;
 			if (n == 2) {
 				// use provided expander
 				ACell exArg = args[1];
@@ -530,7 +531,7 @@ public class Core {
 				if (expander==null) return context.withCastError(1,args, Types.FUNCTION);
 			}
 			
-			AFn<Syntax> cont=expander; // use passed expander by default
+			AFn<ACell> cont=expander; // use passed expander by default
 			if (n == 3) {
 				// use provided continuation expander
 				ACell contArg = args[2];
@@ -539,12 +540,12 @@ public class Core {
 			}
 			
 			ACell form = args[0];
-			Context<Syntax> rctx = context.invoke(expander,form, cont);
+			Context<ACell> rctx = context.invoke(expander,form, cont);
 			return rctx;
 		}
 	});
 
-	public static final AFn<Syntax> INITIAL_EXPANDER = reg(Compiler.INITIAL_EXPANDER);
+	public static final AFn<ACell> INITIAL_EXPANDER = reg(Compiler.INITIAL_EXPANDER);
 	
 	public static final AFn<ACell> QUOTE_EXPANDER = reg(Compiler.QUOTE_EXPANDER);
 
@@ -696,15 +697,15 @@ public class Core {
 			Symbol sym = RT.ensureSymbol(symArg);
 			if (sym == null) return context.withCastError(n-1,args,Types.SYMBOL);
 
-			MapEntry<Symbol, Syntax> me = context.lookupDynamicEntry(address,sym);
+			MapEntry<Symbol, ACell> me = context.lookupDynamicEntry(address,sym);
 
 			long juice = Juice.LOOKUP;
-			ACell result = (me == null) ? null : me.getValue().getValue();
+			ACell result = (me == null) ? null : me.getValue();
 			return context.withResult(juice, result);
 		}
 	});
 	
-	public static final CoreFn<Syntax> LOOKUP_SYNTAX = reg(new CoreFn<>(Symbols.LOOKUP_SYNTAX) {
+	public static final CoreFn<Syntax> LOOKUP_META = reg(new CoreFn<>(Symbols.LOOKUP_META) {
 		@SuppressWarnings("unchecked")
 		@Override
 		public  Context<Syntax> invoke(Context context, ACell[] args) {
@@ -712,18 +713,20 @@ public class Core {
 			if ((n<1)||(n>2)) return context.withArityError(rangeArityMessage(1,2, args.length));
 
 			// get Address to perform lookup
-			Address address=(n==1)?context.getAddress():RT.ensureAddress(args[0]);
-			if (address==null) return context.withCastError(0,args, Types.ADDRESS);
+			Address address=null;
+			if (n>1) {
+				address=RT.ensureAddress(args[0]);
+				if (address==null) return context.withCastError(0,args, Types.ADDRESS);
+			}
 			
 			// ensure argument converts to a Symbol correctly.
 			ACell symArg=args[n-1];
 			Symbol sym = RT.ensureSymbol(symArg);
 			if (sym == null) return context.withCastError(n-1,args,Types.SYMBOL);
 
-			MapEntry<Symbol, Syntax> me = context.lookupDynamicEntry(address,sym);
+			AHashMap<ACell, ACell> result = context.lookupMeta(address,sym);
 
 			long juice = Juice.LOOKUP;
-			Syntax result = (me == null) ? null : me.getValue();
 			return context.withResult(juice, result);
 		}
 	});
@@ -2322,10 +2325,10 @@ public class Core {
 		throw new Error("Cant get symbol for object of type " + o.getClass());
 	}
 
-	private static AHashMap<Symbol, Syntax> register(AHashMap<Symbol, Syntax> env, ACell o) {
+	private static AHashMap<Symbol, ACell> register(AHashMap<Symbol, ACell> env, ACell o) {
 		Symbol sym = symbolFor(o);
 		assert (!env.containsKey(sym)) : "Duplicate core declaration: " + sym;
-		return env.assoc(sym, Syntax.create(o));
+		return env.assoc(sym, o);
 	}
 
 	/**
@@ -2335,12 +2338,16 @@ public class Core {
 	 * @return Loaded environment map
 	 * @throws IOException
 	 */
-	private static AHashMap<Symbol, Syntax> registerCoreCode(AHashMap<Symbol, Syntax> env) throws IOException {
+	private static Context<?> registerCoreCode(AHashMap<Symbol, ACell> env) throws IOException {
 		// we use a fake State to build the initial environment with core address
 		Address ADDR=Address.ZERO;
-		State state = State.EMPTY.putAccount(ADDR,
-				AccountStatus.createActor(env));
+		State state = State.EMPTY.putAccount(ADDR,AccountStatus.createActor());
 		Context<?> ctx = Context.createFake(state, ADDR);
+		
+		// Map in forms from env
+		for (Map.Entry<Symbol,ACell> me : env.entrySet()) {
+			ctx=ctx.define(me.getKey(), me.getValue());
+		}
 
 		ACell form = null;
 		
@@ -2350,46 +2357,40 @@ public class Core {
 			form = f;
 			ctx=ctx.expandCompile(form);
 			if (ctx.isExceptional()) {
-				throw new Error("Error compiling form: "+ form+ " : "+ ctx.getExceptional());
+				throw new Error("Error compiling form: "+ form+ "\nException : "+ ctx.getExceptional());
 			}
 			AOp<?> op=(AOp<?>) ctx.getResult();
 			ctx = ctx.execute(op);
 			// System.out.println("Core compilation juice: "+ctx.getJuice());
-			assert (!ctx.isExceptional()) : "Error executing op: "+ op+ " : "+ ctx.getExceptional();
-			
-			try {
-				ctx.getEnvironment().getHash();
-			} catch (Throwable t) {
-				throw t;
-			}
+			assert (!ctx.isExceptional()) : "Error executing op: "+ op+ "\nException : "+ ctx.getExceptional().toString();
 			
 		}
 
-		return ctx.getAccountStatus(ADDR).getEnvironment();
-	}
-
-	private static AHashMap<Symbol, Syntax> registerSpecials(AHashMap<Symbol, Syntax> env) {
-		// Replaced with ##NaN
-		// env = env.assoc(Symbols.NAN, Syntax.create(CVMDouble.create(Double.NaN)));
-		return env;
+		return ctx;
 	}
 
 	@SuppressWarnings("unchecked")
-	private static AHashMap<Symbol, Syntax> applyDocumentation(AHashMap<Symbol, Syntax> env) throws IOException {
+	private static Context<?> applyDocumentation(Context<?> ctx) throws IOException {
 		AMap<Symbol, AHashMap<ACell, ACell>> m = Reader.read(Utils.readResourceAsString("lang/core-metadata.doc"));
 		for (Map.Entry<Symbol, AHashMap<ACell, ACell>> de : m.entrySet()) {
 			try {
 				Symbol sym = de.getKey();
-				AHashMap<ACell, ACell> newMeta = de.getValue();
-				MapEntry<Symbol, Syntax> me = env.getEntry(sym);
-				if (me == null) {
-					AHashMap<Keyword, ACell> doc=(AHashMap<Keyword, ACell>) newMeta.get(Keywords.DOC);
+				AHashMap<ACell, ACell> docMeta = de.getValue();
+				MapEntry<Symbol, AHashMap<ACell,ACell>> metaEntry=ctx.getMetadata().getEntry(sym);
+				MapEntry<Symbol, ACell> valueEntry=ctx.getEnvironment().getEntry(sym);
+				
+				if (valueEntry == null) {
+					// No existing value. Might be a special
+					AHashMap<Keyword, ACell> doc=(AHashMap<Keyword, ACell>) docMeta.get(Keywords.DOC);
 					if (doc==null) {
+						// no docs
 						System.err.println("CORE WARNING: Missing :doc tag in metadata for: " + sym);
-					} else if (me==null) {
+						continue;
+					} else {
 						if (Keywords.SPECIAL.equals(doc.get(Keywords.TYPE))) {
-							// create a fake entry
-							me=MapEntry.create(sym, Syntax.create(sym,newMeta));		
+							// create a fake entry for special symbols
+							ctx=ctx.define(sym, sym);	
+							valueEntry=MapEntry.create(sym, sym);
 						} else {
 							System.err.println("CORE WARNING: Documentation for non-existent core symbol: " + sym);
 							continue;
@@ -2397,20 +2398,23 @@ public class Core {
 					}
 				}
 	
-				Syntax oldSyn = me.getValue();
-				Syntax newSyn = oldSyn.mergeMeta(newMeta);
-				env = env.assoc(sym, newSyn);
+				AHashMap<ACell, ACell> oldMeta = (metaEntry==null)?null:metaEntry.getValue();
+				AHashMap<ACell, ACell> newMeta = (oldMeta==null)?docMeta:oldMeta.merge(docMeta);
+				ACell v=valueEntry.getValue();
+				Syntax newSyn=Syntax.create(sym,newMeta);
+				ctx = ctx.defineWithSyntax(newSyn, v);
 			} catch (Throwable t) {
 				throw new Error("Error applying documentation: "+de,t);
 			}
 		}
 
-		return env;
+		return ctx;
 	}
 
 	static {
 		// Set up convex.core environment
-		AHashMap<Symbol, Syntax> coreEnv = Maps.empty();
+		AHashMap<Symbol, ACell> coreEnv = Maps.empty();
+		AHashMap<Symbol, AHashMap<ACell,ACell>> coreMeta = Maps.empty();
 		
 		try {
 
@@ -2419,20 +2423,19 @@ public class Core {
 				coreEnv = register(coreEnv, o);
 			}
 
-			coreEnv = registerCoreCode(coreEnv);
-			coreEnv = registerSpecials(coreEnv);
+			Context<?> ctx = registerCoreCode(coreEnv);
+			ctx=applyDocumentation(ctx);
 			
-			coreEnv = applyDocumentation(coreEnv);
+			coreEnv = ctx.getEnvironment();
+			coreMeta = ctx.getMetadata();
+			
+			METADATA = coreMeta;
+			ENVIRONMENT = coreEnv;
 		} catch (Throwable e) {
 			e.printStackTrace();
 			throw new Error("Error initialising core!",e);
 		}
 		
-		CORE_NAMESPACE = coreEnv;
-
-		// Default environment is empty. Empty aliases resolve to CORE_NAMESPACE
-		AHashMap<Symbol, Syntax> defaultEnv = Maps.empty();
-		
-		ENVIRONMENT = defaultEnv;
+	
 	}
 }
