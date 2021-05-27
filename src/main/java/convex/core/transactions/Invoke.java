@@ -3,6 +3,7 @@ package convex.core.transactions;
 import java.nio.ByteBuffer;
 
 import convex.core.Constants;
+import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Format;
@@ -94,6 +95,7 @@ public class Invoke extends ATransaction {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> Context<T> apply(final Context<?> context) {
+		State initialState=context.getState();
 		Context<T> ctx=(Context<T>) context;
 		
 		// Run command
@@ -112,7 +114,7 @@ public class Invoke extends ATransaction {
 				ctx=ctx.withResult(((ReturnValue<T>)ex).getValue());
 			} else if (ex instanceof RollbackValue) {
 				ctx=ctx.withResult(((RollbackValue<T>)ex).getValue());
-				ctx=ctx.withState(context.getState());
+				ctx=ctx.withState(initialState);
 			}
 			// Other exceptional cases fall through
 		}

@@ -198,15 +198,19 @@ public class ServerTest {
 			long id1 = pc.sendTransaction(kp.signData(Invoke.create(addr, s+1, Reader.read("[1 2 3]"))));
 			long id2 = pc.sendTransaction(kp.signData(Invoke.create(addr, s+2, Reader.read("(return 2)"))));
 			long id2a = pc.sendTransaction(kp.signData(Invoke.create(addr, s+2, Reader.read("22"))));
-			long id3 = pc.sendTransaction(kp.signData(Invoke.create(addr, s+3, Reader.read("(rollback 3)"))));
+			long id3 = pc.sendTransaction(kp.signData(Invoke.create(addr, s+3, Reader.read("(do (def foo :bar) (rollback 3))"))));
 			long id4 = pc.sendTransaction(kp.signData(Transfer.create(addr, s+4, HERO, 1000)));
 			long id5 = pc.sendTransaction(kp.signData(Call.create(addr, s+5, Init.REGISTRY_ADDRESS, Symbols.FOO, Vectors.of(Maps.empty()))));
+			long id6bad = pc.sendTransaction(kp.signData(Invoke.create(Init.VILLAIN, s+6, Reader.read("(def a 1)"))));
+			long id6 = pc.sendTransaction(kp.signData(Invoke.create(addr, s+6, Reader.read("foo"))));
 			
-			assertTrue(id5>=0);
+			long last=id6;
+			
+			assertTrue(last>=0);
 			assertTrue(!pc.isClosed());
 			
 			// wait for results to come back
-			assertFalse(Utils.timeout(10000, () -> results.containsKey(id5)));
+			assertFalse(Utils.timeout(10000, () -> results.containsKey(last)));
 			
 			AVector<CVMLong> v = Vectors.of(1l, 2l, 3l);
 			assertCVMEquals(v, results.get(id1));
@@ -215,6 +219,8 @@ public class ServerTest {
 			assertCVMEquals(3L, results.get(id3));
 			assertCVMEquals(1000L, results.get(id4));
 			assertTrue( results.containsKey(id5));
+			assertEquals(ErrorCodes.SIGNATURE, results.get(id6bad));
+			assertEquals(ErrorCodes.UNDECLARED, results.get(id6));
 		}
 	}
 	

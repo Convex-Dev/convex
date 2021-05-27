@@ -1634,7 +1634,7 @@ public final class Context<T extends ACell> extends AObject {
 			if (ex instanceof RollbackValue) {
 				// roll back state to before Actor call
 				// Note: this will also refund unused offer.
-				rollback=true;; 
+				rollback=true; 
 				rv=((RollbackValue<R>)ex).getValue();
 			} else if (ex instanceof HaltValue) {
 				rv=((HaltValue<R>)ex).getValue();
