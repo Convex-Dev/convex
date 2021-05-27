@@ -40,20 +40,24 @@ public class KeyGenerate implements Runnable {
 	public void run() {
 		// sub command to generate keys
 		Main mainParent = keyParent.mainParent;
+		// check the number of keys to generate.
 		if (count <= 0) {
 			log.severe("You to provide 1 or more count of keys to generate");
 			return;
 		}
 		log.info("will generate "+count+" keys");
+		// get the password of the key store file
 		String password = mainParent.getPassword();
 		if (password == null) {
 			log.severe("You need to provide a keystore password");
 			return;
 		}
+        // get the key store file
 		File keyFile = new File(mainParent.getKeyStoreFilename());
 
 		KeyStore keyStore = null;
 		try {
+            // try to load the keystore file
 			if (keyFile.exists()) {
 				keyStore = PFXTools.loadStore(keyFile, password);
 			} else {
@@ -65,23 +69,25 @@ public class KeyGenerate implements Runnable {
 			System.out.println("Cannot load key store "+t);
 		}
 
+        // we have now the count, keystore-password, keystore-file
+        // generate keys
 		for (int index = 0; index < count; index ++) {
 			AKeyPair keyPair = AKeyPair.generate();
 
 			System.out.println("generated #"+(index+1)+" public key: " + keyPair.getAccountKey().toHexString());
 			try {
+                // save the key in the keystore
 				PFXTools.saveKey(keyStore, keyPair, password);
 			} catch (Throwable t) {
 				System.out.println("Cannot store the key to the key store "+t);
 			}
 		}
 
+        // save the keystore file
 		try {
 			PFXTools.saveStore(keyStore, keyFile, password);
 		} catch (Throwable t) {
 			System.out.println("Cannot save the key store file "+t);
 		}
-
 	}
-
 }

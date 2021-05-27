@@ -21,3 +21,4 @@
 .vscode/
 .DS_Store
 /peers-shared-db
+.metadata
