@@ -1041,6 +1041,12 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(difference :foo)"));
 		assertCastError(step("(difference [1] [2 3])"));
 	}
+	
+	@Test
+	public void testDifferenceRegression155() {
+		Context<?> c=step("(do  (def arg+ [#{nil #5 #4 #2 #0 #7 #6 #3 #1} #{nil 0x500360a6 :B2Qrb9d1U5WH00h6c \"1pC\" true \\Ñ (quote A/aHAb7K2) #5278509802049781 #515}])  (def u (apply union arg+))  (def d (apply difference arg+))  (= #{} (difference d u))  )");
+		assertEquals(CVMBool.TRUE,c.getResult());
+	}
 
 
 	@Test
