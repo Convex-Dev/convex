@@ -44,7 +44,6 @@ import convex.core.util.Utils;
  */
 public class Format {
 
-
 	/**
 	 * 8191 byte system-wide limit on the legal length of a data object encoding.
 	 * 
@@ -338,37 +337,14 @@ public class Format {
 	 * @param o Object value to write
 	 * @return The ByteBuffer after writing the specified object
 	 */
-	public static ByteBuffer write(ByteBuffer bb, Object o) {
+	public static ByteBuffer write(ByteBuffer bb, ACell o) {
 		// first check for null
 		if (o == null) {
 			return bb.put(Tag.NULL);
 		}
 		
 		// Generic handling for all non-null CVM types
-		if (o instanceof ACell) {
-			return ((ACell) o).write(bb);
-		}
-		throw new IllegalArgumentException("Can't write: "+o);
-	}
-	
-	/**
-	 * Writes a canonical object to a byte array, preceded by the appropriate tag
-	 * 
-	 * @param o Object value to write
-	 * @return The ByteBuffer after writing the specified object
-	 */
-	public static int write(byte[] bs, int pos, Object o) {
-		// first check for null
-		if (o == null) {
-			bs[pos++]=Tag.NULL;
-			return pos;
-		}
-		
-		// Generic handling for all non-null CVM types
-		if (o instanceof ACell) {
-			return ((ACell) o).write(bs,pos);
-		}
-		throw new IllegalArgumentException("Can't write: "+o);
+		return o.write(bb);
 	}
 	
 	/**
@@ -383,14 +359,6 @@ public class Format {
 			return pos;
 		}
 		return cell.write(bs,pos);
-	}
-
-	public static ByteBuffer writeNonCell(ByteBuffer bb, Object o) {
-		if (o == null) {
-			return bb.put(Tag.NULL);
-		}
-
-		throw new IllegalArgumentException("Can't encode to ByteBuffer: " + o.getClass());
 	}
 
 	public static ByteBuffer writeVLCBigDecimal(ByteBuffer bb, BigDecimal value) {
@@ -576,7 +544,7 @@ public class Format {
 	}
 
 	@SuppressWarnings("unchecked")
-	private static <T> T readDataStructure(ByteBuffer bb, byte tag) throws BadFormatException {
+	private static <T extends ACell> T readDataStructure(ByteBuffer bb, byte tag) throws BadFormatException {
 		if (tag == Tag.VECTOR) return (T) Vectors.read(bb);
 
 		if (tag == Tag.MAP) return (T) Maps.read(bb);
@@ -593,7 +561,7 @@ public class Format {
 		throw new BadFormatException("Can't read data structure with tag byte: " + tag);
 	}
 
-	private static Object readCode(ByteBuffer bb, byte tag) throws BadFormatException {
+	private static ACell readCode(ByteBuffer bb, byte tag) throws BadFormatException {
 		if (tag == Tag.OP) return Ops.read(bb);
 		if (tag == Tag.CORE_DEF) {
 			Symbol sym = Symbol.read(bb);
@@ -948,7 +916,7 @@ public class Format {
 	}
 	
 	/**
-	 * Gets a hex String representing an object's encoding
+	 * Gets a hex String representing an object's encoding. Used in testing only.
 	 * @param o Any object, will be cast to appropriate CVM type
 	 * @return Hex String
 	 */
