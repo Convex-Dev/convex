@@ -21,7 +21,6 @@ import convex.core.data.Address;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.lang.Reader;
-import convex.core.lang.TestState;
 import convex.core.lang.ops.Constant;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
