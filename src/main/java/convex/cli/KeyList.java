@@ -10,10 +10,13 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
 
 /**
-*
-* Convex key sub commands
-*
-*/
+ *
+ * Convex key sub commands
+ *
+ *		convex.key.list
+ *
+ *
+ */
 @Command(name="list",
 	mixinStandardHelpOptions=true,
 	description="List available key pairs.")

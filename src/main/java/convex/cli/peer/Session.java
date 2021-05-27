@@ -1,4 +1,4 @@
-package convex.cli;
+package convex.cli.peer;
 
 import java.io.IOException;
 import java.io.FileInputStream;
@@ -6,7 +6,6 @@ import java.io.FileOutputStream;
 import java.io.File;
 import java.net.InetSocketAddress;
 import java.util.Properties;
-
 
 
 public class Session {

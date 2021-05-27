@@ -2,6 +2,7 @@ package convex.cli;
 
 import java.util.logging.Logger;
 
+
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
@@ -9,21 +10,22 @@ import picocli.CommandLine.ParentCommand;
 
 /**
  *
- * Convex peer sub commands
+ * Convex account sub commands
  *
- *		convex.peer
+ *		convex.account
  *
  */
-@Command(name="peer",
+@Command(name="account",
 	subcommands = {
-		PeerStart.class,
+		AccountCreate.class,
+		AccountFund.class,
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=true,
-	description="Operates a local peer(s) or local convex network.")
-public class Peer implements Runnable {
+	description="Manages convex accounts.")
+public class Account implements Runnable {
 
-	private static final Logger log = Logger.getLogger(Peer.class.getName());
+	private static final Logger log = Logger.getLogger(Account.class.getName());
 
 	@ParentCommand
 	protected Main mainParent;
@@ -31,7 +33,6 @@ public class Peer implements Runnable {
 	@Override
 	public void run() {
 		// sub command run with no command provided
-		CommandLine.usage(new Peer(), System.out);
+		CommandLine.usage(new Account(), System.out);
 	}
-
 }

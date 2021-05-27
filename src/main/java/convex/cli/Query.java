@@ -8,15 +8,19 @@ import convex.api.Convex;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.lang.Reader;
+import convex.core.Init;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 
 /**
-*
-* Convex Query sub command
-*
-*/
+ *
+ * Convex Query sub command
+ *
+ * 		convex.query
+ *
+ */
 @Command(name="query",
 	mixinStandardHelpOptions=true,
 	description="Execute a query on the current peer.")
@@ -27,6 +31,15 @@ public class Query implements Runnable {
 	@ParentCommand
 	protected Main mainParent;
 
+	@Option(names={"--port"},
+		description="Port number to connect to a peer.")
+	private int port = 0;
+
+	@Option(names={"--host"},
+		defaultValue=Constants.HOSTNAME_PEER,
+		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
+	private String hostname;
+
 	@Parameters(paramLabel="queryCommand", description="Query Command")
 	private String queryCommand;
 
@@ -34,29 +47,18 @@ public class Query implements Runnable {
 	public void run() {
 		// sub command run with no command provided
 		log.info("query command: "+queryCommand);
-		int port = mainParent.getPort();
 
-		if (port == 0) {
-			try {
-				port = Helpers.getSessionPort(mainParent.getSessionFilename());
-			} catch (IOException e) {
-				log.warning("Cannot load the session control file");
-			}
-		}
-		if (port == 0) {
-			log.warning("Cannot find a local port or you have not set a valid port number");
-			return;
-		}
-
-		Convex convex = Helpers.connect(mainParent.getHostname(), port);
-		if (convex==null) {
-			log.severe("Cannot connect to a peer");
+		Convex convex = null;
+		try {
+			convex = mainParent.connectToSessionPeer(hostname, port, Init.HERO, null);
+		} catch (Error e) {
+			log.severe(e.getMessage());
 			return;
 		}
 		try {
 			System.out.printf("Executing query: %s\n", queryCommand);
-			ACell exp=Reader.read(queryCommand);
-			Result result=convex.querySync(exp, 5000);
+			ACell message = Reader.read(queryCommand);
+			Result result = convex.querySync(message, 5000);
 			System.out.println(result);
 		} catch (IOException e) {
 			log.severe("Query Error: "+e.getMessage());
