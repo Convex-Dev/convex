@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.security.KeyStore;
 import java.util.Enumeration;
 import java.util.logging.Logger;
+import java.util.logging.Level;
+import java.util.logging.Handler;
 
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
@@ -52,6 +54,11 @@ public class Main implements Runnable {
 		description="Use the specified config file. All parameters to this app can be set by removing the leading '--'. ")
 	private String configFilename;
 
+	@Option(names={ "-v", "--verbose"},
+		scope = ScopeType.INHERIT,
+		description="Show more verbose log information.")
+	private boolean verbose;
+
 	@Option(names={"-s", "--session"},
 	defaultValue=Constants.SESSION_FILENAME,
 	description="Session filename. Defaults ${DEFAULT-VALUE}")
@@ -95,6 +102,16 @@ public class Main implements Runnable {
 		// in the defaults before running the full execute
 		commandLine.parseArgs(args);
 		loadConfig();
+		if (verbose) {
+            Logger root = Logger.getLogger("");
+            Level targetLevel = Level.ALL;
+            root.setLevel(targetLevel);
+            for (Handler handler: root.getHandlers()) {
+                handler.setLevel(targetLevel);
+            }
+            log.log(targetLevel, "Set level", targetLevel);
+		}
+
 		int result = 0;
 		try {
 			result = commandLine.execute(args);

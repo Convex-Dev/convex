@@ -49,7 +49,17 @@ public class Helpers {
 	}
 
 	/*
-	 * Connect to the convex network
+	 * Connect to the convex network.
+	 *
+	 * @param hostname Hostname of the convex network.
+	 *
+	 * @param port Port of the network peer/connection.
+	 *
+	 * @param address Address of the account to connect as.
+	 *
+	 * @param keyPair Keypair to connect as.
+	 *
+	 * @return A valid convex connection object.
 	 *
 	 */
 	public static Convex connect(String hostname, int port, Address address, AKeyPair keyPair) {
