@@ -103,13 +103,13 @@ public class Main implements Runnable {
 		commandLine.parseArgs(args);
 		loadConfig();
 		if (verbose) {
-            Logger root = Logger.getLogger("");
-            Level targetLevel = Level.ALL;
-            root.setLevel(targetLevel);
-            for (Handler handler: root.getHandlers()) {
-                handler.setLevel(targetLevel);
-            }
-            log.log(targetLevel, "Set level", targetLevel);
+			Logger root = Logger.getLogger("");
+			Level targetLevel = Level.ALL;
+			root.setLevel(targetLevel);
+			for (Handler handler: root.getHandlers()) {
+				handler.setLevel(targetLevel);
+			}
+			log.log(targetLevel, "Set level ALL");
 		}
 
 		int result = 0;
