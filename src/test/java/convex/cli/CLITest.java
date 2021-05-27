@@ -42,21 +42,21 @@ public class CLITest {
 
 	@Test
 	public void testHelp() {
-		assertCommandLineResult(0, "^Usage: convex \\[-hV\\] .*", "--help");
-		assertCommandLineResult(0, "^Usage: convex \\[-hV\\] .*", "-h");
-		assertCommandLineResult(0, "^Usage: convex \\[-hV\\] .*", "help");
-		assertCommandLineResult(0, "^Usage: convex key \\[-hV\\] .*", "key", "help");
-		assertCommandLineResult(0, "^Usage: convex key generate \\[-hV\\] .*", "key", "generate", "--help");
-		assertCommandLineResult(0, "^Usage: convex key list \\[-hV\\] .*", "key", "list", "--help");
-		assertCommandLineResult(0, "^Usage: convex peer \\[-hV\\] .*", "peer", "help");
-		assertCommandLineResult(0, "^Usage: convex peer start \\[-hrV\\] .*", "peer", "start", "--help");
-		assertCommandLineResult(0, "^Usage: convex local \\[-hV\\] .*", "local", "--help");
-		assertCommandLineResult(0, "^Usage: convex local start \\[-hV\\] .*", "local", "start", "--help");
-		assertCommandLineResult(0, "^Usage: convex local manager \\[-hV\\] .*", "local", "manager", "--help");
-		assertCommandLineResult(0, "^Usage: convex query \\[-hV\\] .*", "query", "--help");
-		assertCommandLineResult(0, "^Usage: convex status \\[-hV\\] .*", "status", "--help");
-		assertCommandLineResult(0, "^Usage: convex transaction \\[-hV\\] .*", "transaction", "--help");
-		assertCommandLineResult(0, "^Usage: convex transaction \\[-hV\\] .*", "transact", "--help");
+		assertCommandLineResult(0, "^Usage: convex \\[-hvV\\] .*", "--help");
+		assertCommandLineResult(0, "^Usage: convex \\[-hvV\\] .*", "-h");
+		assertCommandLineResult(0, "^Usage: convex \\[-hvV\\] .*", "help");
+		assertCommandLineResult(0, "^Usage: convex key \\[-hvV\\] .*", "key", "help");
+		assertCommandLineResult(0, "^Usage: convex key generate \\[-hvV\\] .*", "key", "generate", "--help");
+		assertCommandLineResult(0, "^Usage: convex key list \\[-hvV\\] .*", "key", "list", "--help");
+		assertCommandLineResult(0, "^Usage: convex peer \\[-hvV\\] .*", "peer", "help");
+		assertCommandLineResult(0, "^Usage: convex peer start \\[-hrvV\\] .*", "peer", "start", "--help");
+		assertCommandLineResult(0, "^Usage: convex local \\[-hvV\\] .*", "local", "--help");
+		assertCommandLineResult(0, "^Usage: convex local start \\[-hvV\\] .*", "local", "start", "--help");
+		assertCommandLineResult(0, "^Usage: convex local manager \\[-hvV\\] .*", "local", "manager", "--help");
+		assertCommandLineResult(0, "^Usage: convex query \\[-hvV\\] .*", "query", "--help");
+		assertCommandLineResult(0, "^Usage: convex status \\[-hvV\\] .*", "status", "--help");
+		assertCommandLineResult(0, "^Usage: convex transaction \\[-hvV\\] .*", "transaction", "--help");
+		assertCommandLineResult(0, "^Usage: convex transaction \\[-hvV\\] .*", "transact", "--help");
 	}
 
 

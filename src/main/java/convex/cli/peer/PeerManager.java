@@ -39,6 +39,14 @@ public class PeerManager {
 
 	protected Session session = new Session();
 
+	/**
+	 * Launch a set of peers.
+	 *
+	 * @param count Number of peers to launch.
+	 *
+	 * @param keyPairs Array of keyPairs for each peer. The length of the array must be >= the count of peers to launch.
+	 *
+	 */
 	public void launchPeers(int count, AKeyPair[] keyPairs) {
 		peerServerList.clear();
 
@@ -48,6 +56,14 @@ public class PeerManager {
 		}
 	}
 
+	/**
+	 * Connect a peer server to a list of peer addresses.
+	 *
+	 * @param peerSerever The peer server that you wish to connect too.
+	 *
+	 * @param addressList The array list of addresses that you wish to have the peer server too connect too.
+	 *
+	 */
 	public void connectToPeers(Server peerServer, InetSocketAddress[] addressList) {
 		InetSocketAddress peerAddress = peerServer.getHostAddress();
 		for (int index = 0; index < addressList.length; index++) {
@@ -62,6 +78,12 @@ public class PeerManager {
 		}
 	}
 
+	/**
+	 * Load in a session from a session file.
+	 *
+	 * @param sessionFilename Filename to load.
+	 *
+	 */
 	protected void loadSession(String sessionFilename) {
 		File sessionFile = new File(sessionFilename);
 		try {
@@ -71,6 +93,12 @@ public class PeerManager {
 		}
 	}
 
+	/**
+	 * Add a peer to the session list of peers.
+	 *
+	 * @param peerServer Add the peerServer to the list of peers for this session.
+	 *
+	 */
 	protected void addToSession(Server peerServer) {
 		InetSocketAddress peerHostAddress = peerServer.getHostAddress();
 		EtchStore store = (EtchStore) peerServer.getStore();
@@ -83,23 +111,37 @@ public class PeerManager {
 		);
 	}
 
+	/**
+	 * Add all peers started in this session to the session list.
+	 *
+	 */
 	protected void addAllToSession() {
 		for (Server peerServer: peerServerList) {
 			addToSession(peerServer);
 		}
 	}
 
+	/**
+	 * Remove all peers added by this manager from the session list of peers.
+	 *
+	 */
 	protected void removeAllFromSession() {
 		for (Server peerServer: peerServerList) {
 			session.removePeer(peerServer.getAddress().toHexString());
 		}
 	}
 
+	/**
+	 * Store the session details to file.
+	 *
+	 * @param sessionFilename Fileneame to save the session.
+	 *
+	 */
 	protected void storeSession(String sessionFilename) {
 		File sessionFile = new File(sessionFilename);
 		try {
 			Helpers.createPath(sessionFile);
-			if (session.size() > 0) {
+			if (session.getPeerCount() > 0) {
 				session.store(sessionFile);
 			}
 			else {
@@ -110,15 +152,45 @@ public class PeerManager {
 		}
 	}
 
+	/**
+	 * Launch a local peer on a random port number.
+	 *
+	 * @param keyPair KeyPair to use for the lauched peer.
+	 *
+	 * @return Server object of the launched peer.
+	 *
+	 */
 	public Server launchPeer(AKeyPair keyPair) {
 		return launchPeer(keyPair, 0);
 	}
 
+	/**
+	 * Launch a pear for a given port number.
+	 *
+	 * @param keyPair KeyPair to use for the lauched peer.
+	 *
+	 * @param port Port number to use for the peer.
+	 *
+	 * @return Server object of the launched peer.
+	 *
+	 */
 	public Server launchPeer(AKeyPair keyPair, int port) {
 		return launchPeer(keyPair, 0, null);
 
 	}
 
+	/**
+	 * Launch a peer.
+	 *
+	 * @param keyPair KeyPair to use for the lauched peer.
+	 *
+	 * @param port Port number to use for the peer.
+	 *
+	 * @param store Store to use for the peer.
+	 *
+	 * @return Server object of the launched peer.
+	 *
+	*/
 	public Server launchPeer(AKeyPair keyPair, int port, AStore store) {
 		Map<Keyword, Object> config = new HashMap<>();
 
@@ -147,6 +219,13 @@ public class PeerManager {
 		return peerServer;
 	}
 
+	/**
+	 * Once the manager has launched 1 or more peers. The manager now needs too loop and wait for the peer(s)
+	 * to exit.
+	 *
+	 * @param sessionFilename filename of the session file to save the peer session details.
+	 *
+	 */
 	public void waitForPeers(String sessionFilename) {
 		long consensusPoint = 0;
 		long maxBlock = 0;
@@ -161,7 +240,7 @@ public class PeerManager {
 			that each peer is connected to the other peer.
 		*/
 		for (Server peerServer: peerServerList) {
-			connectToPeers(peerServer, session.getAddressList());
+			connectToPeers(peerServer, session.getPeerAddressList());
 		}
 
 		// shutdown hook to remove/update the session file
