@@ -2149,6 +2149,8 @@ public class CoreTest extends ACVMTest {
 		assertEquals(0L, step("(transfer-memory "+Init.VILLAIN+" "+ALL+")").getAccountStatus(HERO).getMemory());
  
 		assertArgumentError(step("(transfer-memory *address* -1000)"));	
+		assertNobodyError(step("(transfer-memory #88888888 0)"));	
+		
 		assertMemoryError(step("(transfer-memory *address* (+ 1 "+ALL+"))"));
 
 		// check bad arg types

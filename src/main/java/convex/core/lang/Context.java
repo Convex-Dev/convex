@@ -1467,7 +1467,7 @@ public final class Context<T extends ACell> extends AObject {
 		// new target account (note: could be source account, so we get from latest accounts)
 		long targetIndex=target.longValue();
 		if (targetIndex>=accounts.count()) {
-			return withError(ErrorCodes.STATE,"Cannot transfer memory allowance to non-existent account: "+target);
+			return withError(ErrorCodes.NOBODY,"Cannot transfer memory allowance to non-existent account: "+target);
 		}
 		AccountStatus targetAccount=accounts.get(targetIndex);	
 		
