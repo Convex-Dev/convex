@@ -87,13 +87,18 @@ public class Helpers {
 	 *
 	 */
 	public static int getSessionPort(String sessionFilename) throws IOException {
+		InetSocketAddress address;
 		int port = 0;
 		Session session = new Session();
 		Random random = new Random();
 		File sessionFile = new File(sessionFilename);
 		session.load(sessionFile);
-		if (session.size() > 0) {
-			port = session.getPort(random.nextInt(session.size() - 1));
+		int peerCount = session.getPeerCount();
+		if (peerCount > 0) {
+			address = session.getPeerAddressFromIndex(random.nextInt(peerCount - 1));
+			if ( address != null) {
+				port = address.getPort();
+			}
 		}
 		return port;
 	}
