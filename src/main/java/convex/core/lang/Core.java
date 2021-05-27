@@ -784,29 +784,6 @@ public class Core {
 		}
 	});
 	
-
-	public static final CoreFn<CVMBool> ACTOR_Q = reg(new CoreFn<>(Symbols.ACTOR_Q) {
-		@SuppressWarnings("unchecked")
-		@Override
-		public  Context<CVMBool> invoke(Context context, ACell[] args) {
-			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-
-			ACell a0 = args[0];
-			Address address = RT.ensureAddress(a0);
-
-			// return false if the argument is not castable to an address
-			long juice = Juice.SIMPLE_FN;
-			if (address == null) return context.withResult(juice, CVMBool.FALSE);
-
-			AccountStatus as = context.getAccountStatus(address);
-			if (as == null) return context.withResult(juice, CVMBool.FALSE);
-			
-			CVMBool result = CVMBool.create(as.isActor());
-
-			return context.withResult(juice, result);
-		}
-	});
-	
 	public static final CoreFn<AccountStatus> ACCOUNT = reg(new CoreFn<>(Symbols.ACCOUNT) {
 		@SuppressWarnings("unchecked")
 		@Override
