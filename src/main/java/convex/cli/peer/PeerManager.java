@@ -99,7 +99,7 @@ public class PeerManager {
 		File sessionFile = new File(sessionFilename);
 		try {
 			Helpers.createPath(sessionFile);
-			if (session.size() > 0) {
+			if (session.getPeerCount() > 0) {
 				session.store(sessionFile);
 			}
 			else {
@@ -161,7 +161,7 @@ public class PeerManager {
 			that each peer is connected to the other peer.
 		*/
 		for (Server peerServer: peerServerList) {
-			connectToPeers(peerServer, session.getAddressList());
+			connectToPeers(peerServer, session.getPeerAddressList());
 		}
 
 		// shutdown hook to remove/update the session file
