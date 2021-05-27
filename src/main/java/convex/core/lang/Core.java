@@ -807,27 +807,6 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<CVMBool> ACCOUNT_Q = reg(new CoreFn<>(Symbols.ACCOUNT_Q) {
-		@SuppressWarnings("unchecked")
-		@Override
-		public  Context<CVMBool> invoke(Context context, ACell[] args) {
-			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-
-			long juice = Juice.SIMPLE_FN;
-			ACell a0 = args[0];
-			
-			// Return false if argument is not an Address
-			if (!(a0 instanceof Address)) return context.withResult(juice, CVMBool.FALSE);
-			Address address = (Address)a0;
-
-			// return false if the address does not refer to an existing account
-			if (context.getAccountStatus(address) == null) return context.withResult(juice, CVMBool.FALSE);
-
-			// We have proved it is a valid account
-			return context.withResult(juice,  CVMBool.TRUE);
-		}
-	});
-	
 	public static final CoreFn<AccountStatus> ACCOUNT = reg(new CoreFn<>(Symbols.ACCOUNT) {
 		@SuppressWarnings("unchecked")
 		@Override

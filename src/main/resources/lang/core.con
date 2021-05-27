@@ -386,4 +386,18 @@
     `(let [~sym ~exp]
        ~(cons 'if sym branches)))
 
+(defn account? 
+  ^{
+    :doc {:description "Tests if the given Address refers to a valid existing acount (which may be either an Actor or User account). Returns false for any non-Address argument, or any Address that does not refer to a currently existing Account."
+          :examples [{:code "(account? *caller*)"}]
+          :type :function 
+          :signature [{:params [address]
+                       :return Boolean}]
+          :errors {:CAST "If the argument is not a valid Address"}}
+  }
+  [addr]
+  (cond
+    (address? addr) (boolean (account addr))
+    false))
+
 

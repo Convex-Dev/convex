@@ -13,15 +13,22 @@
          :examples [{:code "(abs -1.5)"}
                     {:code "(abs 100)"}]
          :type :function
-         :signature [{:params [x]}]}
+         :signature [{:params [x]
+                      :return Number}
+                     ]
+         :errors {:CAST "If the parameter is not a Number"}}
 	}
  
 	accept 
 	{
-	 :doc {:description "Accepts offered coins up to the amount of *offer* from *caller*. Amount must cast to Long. If successful, the amount will be added immediately to the *balance* of the current *address*. This is the recommended way of transferring balance between Actors, as it requires a positive action to confirm receipt. Returns the amount accepted if successful. Returns a STATE error if there are insufficient funds to accept."
+	 :doc {:description "Accepts offered coins up to the amount of *offer* from *caller*. Amount must cast to Long. If successful, the amount will be added immediately to the *balance* of the current *address*. This is the recommended way of transferring balance between Actors, as it requires a positive action to confirm receipt. Returns the amount accepted if successful."
          :examples [{:code "(accept *offer*)"}]
          :type :function
-         :signature [{:params [amount]}]}
+         :signature [{:params [amount]
+                      :return Number}]
+         :errors {:CAST "If the amount accepted is not a Long"
+                  :ARGUMENT "If the amount acccpeted is negative"
+                  :STATE "If the *caller* has not offered sufficient coins to fulfil the offer"}}
 	}
  
   account 
@@ -29,15 +36,10 @@
 	 :doc {:description "Returns the Account record for a given addess, or nil if the account does not exist. Argument must cast to Address."
          :examples [{:code "(account *address*)"}]
          :type :function
-         :signature [{:params [address]}]}
+         :signature [{:params [address]
+                      :return Account}]
+         :errors {:CAST "If the argument is not a valid Address"}} 
 	}
- 
-  account?
-  {
-    :doc {:description "Tests if the given Address refers to a valid existing acount (which may be either an Actor or User account). Returns false for any non-Address argument, or any Address that does not refer to a currently existing Account."
-          :examples [{:code "(account? *caller*)"}]
-          :type :function 
-          :signature [{:params [address] }]}}
  
   actor?
 	{
@@ -52,7 +54,9 @@
 	 :doc {:description "Casts the argument to an Address. Valid arguments include hex Strings, Longs, Addresses and Blobs with the correct length (8 bytes)."
          :examples [{:code "(address 451)"}]
          :type :function
-         :signature [{:params [a]}]}
+         :signature [{:params [a]
+                      :return Address}]
+         :errors {:CAST "If the argument is not castable to a valid Address."}}
 	}
  
  	address?
@@ -61,7 +65,8 @@
          :examples [{:code "(address? #777)"}
                     {:code "(address? :foo)"}]
          :type :function
-         :signature [{:params [a]}]}
+         :signature [{:params [a]
+                      :return Boolean}]}
 	}
  
   apply
@@ -70,7 +75,10 @@
          :examples [{:code "(apply + [1 2 3])"}
                     {:code "(apply + 1 2 [3 4 5])"}]
          :type :function
-         :signature [{:params [f & more-args]}]}
+         :signature [{:params [f & args more-args]
+                      :return Any}]
+         :errors {:CAST "If the first argument is not castable to a valid Function."
+                  :ARITY "If the additional arguments cause an arity error in the applied Function."}}
 	}
  
   assoc
@@ -78,7 +86,11 @@
 	 :doc {:description "Adds entries into an associative data structure, taking each two arguments as key/value pairs. A nil data structure is considered as an empty map."
          :examples [{:code "(assoc {1 2} 3 4)"}]
          :type :function
-         :signature [{:params [coll & kvs]}]}
+         :signature [{:params [coll & kvs]
+                      :return DataStructure}]
+         :errors {:CAST "If the first argument is not a valid DataStructure."
+                  :ARITY "If the additional arguments are not an even number (key and value pairs)."
+                  :ARGUMENT "If one or more of the supplied keys is invalid for the DataStructure."}}
 	}
  
   assoc-in
@@ -86,15 +98,20 @@
 	 :doc {:description "Associates a value entries into an nested associative data structure, as if using 'assoc' at each level."
          :examples [{:code "(assoc-in {1 [1 2 3]} [1 2] 4)"}]
          :type :function
-         :signature [{:params [coll keys v]}]}
+         :signature [{:params [coll keys v]
+                      :return DataStructure}]
+         :errors {:CAST "If the first argument is not a valid DataStructure, or the second argument is not a Sequence."
+                  :ARGUMENT "If one or more of the supplied keys is invalid for the DataStructure."}}
 	}
  
   balance
 	{
-	 :doc {:description "Returns the coin balance of the specified account, which must be a valid Address."
+	 :doc {:description "Returns the coin balance of the specified account, which must be an Address. Returns nil if and only the Account does not exist."
          :examples [{:code "(balance *caller*)"}]
          :type :function
-         :signature [{:params [address]}]}
+         :signature [{:params [address]
+                      :return Long}]
+         :errors {:CAST "If the argument is not a valid Address."}}
 	}
  
   blob
@@ -102,7 +119,9 @@
 	 :doc {:description "Casts the argument to a Blob. Handles Addresses, Hashes, existing blobs, and hex Strings"
          :examples [{:code "(blob \"1234abcd\")"}]
          :type :function
-         :signature [{:params [address]}]}
+         :signature [{:params [address]
+                      :return Blob}]
+         :errors {:CAST "If the argument is not castable to a Blob."}}
 	}
  
   blob-map
