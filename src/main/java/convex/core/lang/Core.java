@@ -1278,7 +1278,7 @@ public class Core {
 				int argIndex=i+1;
 				ACell val = (ACell) args[argIndex];
 				result = result.conj(val);
-				if (result == null) return context.withError(ErrorCodes.CAST,"Failure to 'conj' argument at position "+argIndex+" (with Type "+RT.getType(val)+"). Probably not a legal value for this data structure?"); // must be a failed map conj?
+				if (result == null) return context.withError(ErrorCodes.ARGUMENT,"Failure to 'conj' argument at position "+argIndex+" (with Type "+RT.getType(val)+"). Probably not a legal value for this data structure?"); // must be a failed map conj?
 			}
 			return context.withResult(juice, result);
 		}

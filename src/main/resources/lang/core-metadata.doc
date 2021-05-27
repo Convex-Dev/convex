@@ -41,8 +41,6 @@
          :errors {:CAST "If the argument is not a valid Address"}} 
 	}
  
-
- 
  	address 
 	{
 	 :doc {:description "Casts the argument to an Address. Valid arguments include hex Strings, Longs, Addresses and Blobs with the correct length (8 bytes)."
@@ -120,18 +118,22 @@
  
   blob-map
 	{
-	 :doc {:description "Creates an empty BlobMap. Blobmaps support blob types as keys only."
+	 :doc {:description "Creates a BlobMap. Blobmaps support blob types as keys only. Optional arguments must be pairs of Blob keys and values, to be included in the BlobMap."
          :examples [{:code "(blob-map)"}]
          :type :function
-         :signature [{:params []}]}
+         :signature [{:params [& kvs]
+                      :return BlobMap}]
+         :errors {:ARITY "If there are not an even number of arguments (key and value pairs)."
+                  :CAST "If any of the keys supplied is not castable to a Blob."}}
 	}
  
-   blob?
+  blob?
 	{
-	 :doc {:description "Tests if the argument is a blob."
+	 :doc {:description "Tests if the argument is a Blob."
          :examples [{:code "(blob? 0x1234)"}]
          :type :function
-         :signature [{:params [a]}]}
+         :signature [{:params [a]
+                      :return Boolean}]}
 	}
  
   boolean
@@ -139,7 +141,8 @@
 	 :doc {:description "Casts any value to a Boolean. Returns true if the value is truthy, false otherwise."
          :examples [{:code "(boolean 123)"}]
          :type :function
-         :signature [{:params [a]}]}
+         :signature [{:params [a]
+                      :return Boolean}]}
 	}
  
   boolean?
@@ -147,7 +150,8 @@
 	 :doc {:description "Tests if the argument is a boolean (either true or false)."
          :examples [{:code "(boolean? false)"}]
          :type :function
-         :signature [{:params [a]}]}
+         :signature [{:params [a]
+                      :return Boolean}]}
 	}
  
   byte
@@ -155,7 +159,9 @@
 	 :doc {:description "Casts a value to a Byte. Discards high bits of larger integer types."
          :examples [{:code "(byte 1234)"}]
          :type :function
-         :signature [{:params [a]}]}
+         :signature [{:params [a]
+                      :return Byte}]
+         :errors {:CAST "If the argument is not castable to a Byte."}}
 	}
  
   call*
@@ -163,7 +169,12 @@
 	 :doc {:description "Calls an Actor function. address must cast to Address. offer must cast to Long. (symbol fn-name) must identify an exported function in the target Actor. args must be valid arguments for the called function."
          :examples [{:code "(call* some-actor 1000 'actor-fn arg1 arg2)"}]
          :type :function
-         :signature [{:params [address offer fn-name & args]}]}
+         :signature [{:params [address offer fn-name & args]
+                      :return Any}]
+         :errors {:CAST "If the address argument is an Address, the offer is not a Long, or the function name is not a Symbol."
+                  :ARITY "If the supplied arguments are the wrong arity for the called function."
+                  :STATE "If the address does not refer to an Account with the callable function specified by fn-name."
+                  :ARGUMENT "If the offer is negative."}}
 	}
  
   call
@@ -171,8 +182,14 @@
 	 :doc {:description "Calls an function in another Account. The specified address must be valid, and refer to an existing account. offer is optional, if provided must cast to Long. call-form must be a valid expression calling an exported function in the target Account."
          :examples [{:code "(call some-contract 1000 (contract-fn arg1 arg2))"}]
          :type :macro
-         :signature [{:params [address call-form]}
-                     {:params [address offer call-form]}]}
+         :signature [{:params [address call-form]
+                      :return Any}
+                     {:params [address offer call-form]
+                      :return Any}]
+         :errors {:CAST "If the address argument is an Address, the offer is not a Long, or the function name is not a Symbol."
+                  :ARITY "If the supplied arguments are the wrong arity for the called function."
+                  :STATE "If the address does not refer to an Account with the callable function specified by fn-name."
+                  :ARGUMENT "If the offer is negative."}}
 	}
  
   ceil
@@ -180,7 +197,9 @@
     :doc {:description "Computes the mathematical ceiling (rounding up towards positive infinity) for a numerical argument. Uses double precision mathematics."
           :examples [{:code "(ceil 16.3)"}]
           :type :function
-          :signature [{:params [x]}]}
+          :signature [{:params [x]
+                       :return Double}]
+          :errors {:CAST "If the argument is not a Number."}}
   }
  
   char
@@ -188,7 +207,9 @@
 	 :doc {:description "Casts a value to a Char. Discards high bits of larger integer types."
          :examples [{:code "(char 97)"}]
          :type :function
-         :signature [{:params [a]}]}
+         :signature [{:params [a]
+                      :return Character}]
+         :errors {:CAST "If the argument is not castable to a Character."}}
 	}
  
   coll?
@@ -196,7 +217,8 @@
 	 :doc {:description "Tests if the argument is a Collection. Collections include maps, vectors, lists, sets."
          :examples [{:code "(coll? [1 2 3])"}]
          :type :function
-         :signature [{:params [a]}]}
+         :signature [{:params [a]
+                      :return Boolean}]}
 	}
  
   cond
@@ -217,7 +239,9 @@
 	 :doc {:description "Compiles a form, returning an op."
          :examples [{:code "(compile '(fn [x] (* x 2)))"}]
          :type :function
-         :signature [{:params [form]}]}
+         :signature [{:params [form]
+                      :return Op}]
+         :errors {:COMPILE "If a compiler error occurs."}}
 	}
  
   concat
@@ -225,7 +249,9 @@
 	 :doc {:description "Concatenates sequential objects, returning a new sequential object of the same type as the first non-nil argument. Nil is treated as an empty sequence."
          :examples [{:code "(concat [1 2] [3 4])"}]
          :type :function
-         :signature [{:params [& seqs]}]}
+         :signature [{:params [& seqs]
+                      :return DataStructure}]
+         :errors {:CAST "If any of the arguments is not a sequential data structure."}}
 	}
  
   conj
@@ -235,7 +261,10 @@
                     {:code "(conj {1 2} [3 4])"}
                     {:code "(conj #{1 2} 3)"}]
          :type :function
-         :signature [{:params [coll & elems]}]}
+         :signature [{:params [coll & elems]
+                      :return DataStructure}]
+         :errors {:CAST "If the first argument is not a DataStructure (or nil)."
+                  :ARGUMENT "If a provided element is not of correct type for the given data structure."}}
 	}
  
   cons
@@ -244,7 +273,8 @@
          :examples [{:code "(cons 1 '(2 3))"}
                     {:code "(cons 1 2 '(3 4))"}]
          :type :function
-         :signature [{:params [& args]}]}
+         :signature [{:params [arg & more-args coll]}]
+         :errors {:CAST "If the last argument is not a Sequence."}}
 	}
  
   contains-key?
@@ -252,17 +282,18 @@
 	 :doc {:description "Tests if the given asccoiative data structure contains the given key."
          :examples [{:code "(contains-key? {:foo 1 :bar 2} :foo)"}]
          :type :function
-         :signature [{:params [coll key]}]}
+         :signature [{:params [coll key]
+                      :return Boolean}]}
 	}
- 
-
  
   count
 	{
 	 :doc {:description "Counts the number of elements in the given collection. Returns the length of Blobs and Strings."
          :examples [{:code "(count [1 2 3])"}]
          :type :function
-         :signature [{:params [coll]}]}
+         :signature [{:params [coll]
+                      :return Long}]
+         :errors {:CAST "If the argument is not a countable object."}}
 	}
  
   create-account
@@ -270,7 +301,9 @@
 	 :doc {:description "Creates an account with the specified account public key. Returns the Address of the newly created Account."
          :examples [{:code "(create-account 0x817934590c058ee5b7f1265053eeb4cf77b869e14c33e7f85b2babc85d672bbc)"}]
          :type :function
-         :signature [{:params [account-key]}]}
+         :signature [{:params [account-key]
+                      :return Address}]
+         :errors {:CAST "If the argument is not a Blob or nil."}}
 	}
  
   dec
@@ -278,23 +311,28 @@
 	 :doc {:description "Decrements the given number by 1. Result is a Long."
          :examples [{:code "(dec 10)"}]
          :type :function
-         :signature [{:params [num]}]}
+         :signature [{:params [num]
+                      :return Long}]
+         :errors {:CAST "If the argument is not a Number."}}
 	}
  
   def
 	{
-	 :doc {:description "Creates a definition in the current environment. This value will persist in the environment owned by the current account."
+	 :doc {:description "Creates a definition in the current environment. This value will persist in the environment owned by the current account. The name argument must be a Symbol, or a Symbol wrapped in a Syntax Object with optional metadata."
          :examples [{:code "(def a 10)"}]
          :type :special
-         :signature [{:params [sym value]}]}
+         :signature [{:params [name value]}]
+         :errors {:CAST "If the argument is neither a valid Symbol name nor a Syntax containing a Symbol value."}}
 	}
  
   deploy
 	{
-	 :doc {:description "Deploys an actor. The code provided will be executed to initialise the Actor's account."
+	 :doc {:description "Deploys an actor. The code provided will be executed to initialise the Actor's account. Returns the Address of the deployed Actor."
          :examples [{:code "(deploy '(do (defn my-fn [x y] (+ x y)) (export my-fn)) )"}]
          :type :function
-         :signature [{:params [code]}]}
+         :signature [{:params [code]
+                      :return Address}]
+         :errors {:COMPILE "If a compiler error occurred deploying the given code."}}
 	}
  
   difference
@@ -302,7 +340,9 @@
     :doc {:description "Computes the difference of one or more sets. 'nil' is treated as the empty set."
           :examples [{:code "(difference #{1 2} #{2 3})"}]
           :type :function
-          :signature [{:params [set & more]}]}
+          :signature [{:params [set & more]
+                       :return Set}]
+          :errors {:CAST "If any of the arguments is neither a Set nor nil."}}
   }
  
   disj

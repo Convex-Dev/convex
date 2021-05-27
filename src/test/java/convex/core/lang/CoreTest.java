@@ -1159,10 +1159,10 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(conj :foo 1)")); 
 		
 		// bad types of elements
-		assertCastError(step("(conj {} 2)")); // can't cast long to a map entry
-		assertCastError(step("(conj {} [1 2 3])")); // wrong size vector for a map entry
-		assertCastError(step("(conj {} '(1 2))")); // wrong type for a map entry
-		assertCastError(step("(conj (blob-map) [:foo 0xa2])")); // bad key type for blobmap
+		assertArgumentError(step("(conj {} 2)")); // can't cast long to a map entry
+		assertArgumentError(step("(conj {} [1 2 3])")); // wrong size vector for a map entry
+		assertArgumentError(step("(conj {} '(1 2))")); // wrong type for a map entry
+		assertArgumentError(step("(conj (blob-map) [:foo 0xa2])")); // bad key type for blobmap
 
 		assertCastError(step("(conj 1 2)"));
 		assertCastError(step("(conj (str :foo) 2)"));
