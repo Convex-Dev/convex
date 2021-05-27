@@ -109,6 +109,7 @@ public class Main implements Runnable {
 			for (Handler handler: root.getHandlers()) {
 				handler.setLevel(targetLevel);
 			}
+			log.log(targetLevel, "Set level ALL");
 		}
 		int result = 0;
 		try {
