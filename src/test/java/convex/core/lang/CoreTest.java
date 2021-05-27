@@ -67,7 +67,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.CorePred;
 import convex.core.lang.impl.ICoreDef;
 import convex.core.lang.ops.Constant;
@@ -337,7 +336,6 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testEquals() {
-		assertTrue(eval("=") instanceof CoreFn);
 		assertTrue(evalB("(= \\a)"));
 		assertTrue(evalB("(= 1 1)"));
 		assertFalse(evalB("(= 1 2)"));
@@ -352,6 +350,22 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(=)"));
 		assertTrue(evalB("(= = =)"));
 		assertTrue(evalB("(= nil nil)"));
+		assertTrue(evalB("(= ##NaN ##NaN)")); // value equality, but not numeric equality
+
+	}
+	
+	@Test
+	public void testEqualsNumeric() {
+		assertTrue(evalB("(==)"));
+		assertTrue(evalB("(== ##Inf)"));
+		assertTrue(evalB("(== ##NaN)"));
+		assertTrue(evalB("(== 1 1.0)"));
+		assertFalse(evalB("(== ##NaN ##NaN)")); // value equality, but not numeric equality
+		
+		assertCastError(step("(== :foo)"));
+		assertCastError(step("(== 1 :foo)"));
+		assertCastError(step("(== #4)"));
+		assertCastError(step("(== [])"));
 	}
 
 	@Test
