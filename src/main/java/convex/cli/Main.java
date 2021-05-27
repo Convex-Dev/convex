@@ -103,6 +103,7 @@ public class Main implements Runnable {
 		commandLine.parseArgs(args);
 		loadConfig();
 		if (verbose) {
+<<<<<<< HEAD
 			Logger root = Logger.getLogger("");
 			Level targetLevel = Level.ALL;
 			root.setLevel(targetLevel);
@@ -110,6 +111,15 @@ public class Main implements Runnable {
 				handler.setLevel(targetLevel);
 			}
 			log.log(targetLevel, "Set level ALL");
+=======
+            Logger root = Logger.getLogger("");
+            Level targetLevel = Level.ALL;
+            root.setLevel(targetLevel);
+            for (Handler handler: root.getHandlers()) {
+                handler.setLevel(targetLevel);
+            }
+            log.log(targetLevel, "Set level", targetLevel);
+>>>>>>> 83aa36e (add verbose option)
 		}
 
 		int result = 0;
