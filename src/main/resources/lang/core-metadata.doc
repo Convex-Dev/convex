@@ -347,10 +347,11 @@
  
   disj
 	{
-	 :doc {:description "Removes a key from a set. If the key does not exist, returns the same set unchanged."
+	 :doc {:description "Removes a key from a set. If the key does not exist, returns the same set unchanged. nil is treated as the empty Set."
          :examples [{:code "(disj #{1 2 3} 1)"}]
          :type :function
-         :signature [{:params [coll key]}]}
+         :signature [{:params [coll key]}]
+         :errors {:CAST "If the first argument is not a Set."}}
 	}
  
   dissoc
@@ -358,12 +359,14 @@
 	 :doc {:description "Removes entries with the specified key(s) from a map. Returns the same map unchanged if the key is not present."
          :examples [{:code "(dissoc {1 2 3 4} 3)"}]
          :type :function
-         :signature [{:params [coll & keys]}]}
+         :signature [{:params [coll & keys]
+                      :return Map}]
+         :errors {:CAST "If the first argument is not a Map."}}
 	}
  
   do
 	{
-	 :doc {:description "Executes multiple expressions sequentially, and returns the value of the final expression.."
+	 :doc {:description "Executes multiple expressions sequentially, and returns the value of the final expression."
          :examples [{:code "(do (count [1 2 3]) :done)"}]
          :type :special
          :signature [{:params [& expressions]}]}
@@ -375,7 +378,9 @@
 	 :doc {:description "Casts any numerical value to a Double."
          :examples [{:code "(double 3)"}]
          :type :function
-         :signature [{:params [a]}]}
+         :signature [{:params [a]
+                      :return Double}]
+         :errors {:CAST "If the argument is not castable to Double."}}
 	}
   
   empty
@@ -383,7 +388,9 @@
 	 :doc {:description "Returns an empty collection of the same type as the argument. (empty nil) returns nil."
          :examples [{:code "(empty [1 2 3])"}]
          :type :function
-         :signature [{:params [coll]}]}
+         :signature [{:params [coll]
+                      :return DataStructure}]
+         :errors {:CAST "If the argument is neither nil nor a data structure."}}
 	}
   
   empty?
@@ -391,15 +398,18 @@
 	 :doc {:description "Checks if the argument is an empty collection. nil is considered empty. "
          :examples [{:code "(empty? [])"}]
          :type :function
-         :signature [{:params [coll]}]}
+         :signature [{:params [coll]
+                      :return Boolean}]
+         :errors {:CAST "If the argument is neither nil nor a data structure."}}
 	}
   
   encoding
  	{
-	 :doc {:description "Returns the byte encoding for a given value, as a Blob. The encoding is the unique canonical binary representation of a value. Encodings may change between Convex versions - it is unwise to rely on the exact representation."
+	 :doc {:description "Returns the byte encoding for a given value as a Blob. The encoding is the unique canonical binary representation of a value. Encodings may change between Convex versions - it is unwise to rely on the exact representation."
          :examples [{:code "(encoding {1 2})"}]
          :type :function
-         :signature [{:params [value]}]}
+         :signature [{:params [value]
+                      :return Blob}]}
 	}
   
   eval
@@ -407,7 +417,8 @@
 	 :doc {:description "Compiles and evaluates a form in the current context."
          :examples [{:code "(eval '(+ 1 2))"}]
          :type :function
-         :signature [{:params [form]}]}
+         :signature [{:params [form]}]
+         :error {:COMPILE "If a compiler error occurred evaluating the form."}}
 	}
   
   eval-as
