@@ -20,8 +20,8 @@ public class InitTest extends ACVMTest {
 	@Test
 	public void testInitState() throws InvalidDataException {
 		INITIAL.validate();
-		assertEquals(0,CONTEXT.getDepth());
-		assertNull(CONTEXT.getResult());
+		assertEquals(0,context().getDepth());
+		assertNull(context().getResult());
 		
 		assertEquals(Constants.MAX_SUPPLY, INITIAL.computeTotalFunds());
 	}

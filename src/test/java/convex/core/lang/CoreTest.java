@@ -66,6 +66,7 @@ import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
+import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.CorePred;
 import convex.core.lang.impl.ICoreDef;
@@ -89,7 +90,7 @@ public class CoreTest extends ACVMTest {
 		super(Init.createCoreLibraries());
 	}
 
-	private final Context<?> INITIAL_CONTEXT= CONTEXT.fork();
+	private final Context<?> INITIAL_CONTEXT= context();
 
 	@Test
 	public void testAliases() {
@@ -936,6 +937,25 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(set 1)"));
 	}
 	
+	@Test
+	public void testSetRegression153() throws InvalidDataException {
+		Set<ACell> a=Reader.read("#{#5477106 \\*}");
+		a.validate();
+		Set<ACell> b=Reader.read("#{#2 #0 true #3 0x61a049 #242411 #3478095 #9275832328719 #1489754187855142}");
+		b.validate();
+		
+		Set<ACell> u1=a.includeAll(b);
+		u1.validate();
+		
+		Set<ACell> u2=a.conjAll(List.create(b.toCellArray()));
+		u2.validate();
+		
+		Set<ACell> diff=u1.excludeAll(u2);
+		diff.validate();
+	}
+	
+	
+
 	@Test
 	public void testSubsetQ() {
 		assertTrue(evalB("(subset? #{} #{})"));
@@ -3359,7 +3379,7 @@ public class CoreTest extends ACVMTest {
 		
 		assertEquals(Core.ENVIRONMENT.get(Symbols.STAR_JUICE),eval("(lookup '*juice*)"));
 		
-		assertEquals(eval("*juice*"),CONTEXT.fork().execute(Lookup.create(Symbols.STAR_JUICE)).getResult());
+		assertEquals(eval("*juice*"),context().execute(Lookup.create(Symbols.STAR_JUICE)).getResult());
 	}
 	
 	@Test public void testSpecialHoldings() {

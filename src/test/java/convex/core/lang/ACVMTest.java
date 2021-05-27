@@ -17,7 +17,7 @@ import convex.core.util.Utils;
 public abstract class ACVMTest {
 
 	protected State INITIAL;
-	protected Context<?> CONTEXT;
+	private Context<?> CONTEXT;
 	protected long INITIAL_JUICE;
 	
 	/**
@@ -38,7 +38,10 @@ public abstract class ACVMTest {
 		VILLAIN_BALANCE = INITIAL.getAccount(Init.HERO).getBalance();
 	}
 	
-
+	@SuppressWarnings("unchecked")
+	protected <T extends ACell> Context<T> context() {
+		return (Context<T>) CONTEXT.fork();
+	}
 	
 	/**
 	 * Steps execution in a new forked Context

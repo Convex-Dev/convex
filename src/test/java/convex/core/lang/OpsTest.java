@@ -43,11 +43,11 @@ public class OpsTest extends ACVMTest {
 		super(Init.createBaseAccounts());
 	}
 
-	private final long INITIAL_JUICE = CONTEXT.getJuice();
+	private final long INITIAL_JUICE = context().getJuice();
 
 	@Test
 	public void testConstant() {
-		Context<?> c = CONTEXT.fork();
+		Context<?> c = context();
 
 		{// simple long constant
 			AOp<CVMLong> op = Constant.of(10L);
@@ -77,7 +77,7 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testDef() {
-		Context<?> c1 = CONTEXT.fork();
+		Context<?> c1 = context();
 
 		Symbol fooSym = Symbol.create("foo");
 		AOp<AString> op = Def.create(Syntax.create(fooSym), Constant.createString("bar"));
@@ -105,14 +105,14 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testUndeclaredLookup() {
-		Context<?> c = CONTEXT.fork();
+		Context<?> c = context();
 		AOp<AString> op = Lookup.create("missing-symbol");
 		assertUndeclaredError(c.execute(op));
 	}
 
 	@Test
 	public void testDo() {
-		Context<?> c = CONTEXT.fork();
+		Context<?> c = context();
 
 		AOp<AString> op = Do.create(Def.create("foo", Constant.createString("bar")), Lookup.create("foo"));
 
@@ -124,7 +124,7 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testLet() {
-		Context<?> c = CONTEXT.fork();
+		Context<?> c = context();
 		AOp<AString> op = Let.create(Vectors.of(Syntax.create(Symbols.FOO)),
 				Vectors.of(Constant.createString("bar"), Lookup.create("foo")), false);
 		Context<AString> c2 = c.execute(op);
@@ -133,7 +133,7 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testCondTrue() {
-		Context<?> c = CONTEXT.fork();
+		Context<?> c = context();
 
 		AOp<AString> op = Cond.create(Constant.of(true), Constant.createString("trueResult"),
 				Constant.createString("falseResult"));
@@ -147,7 +147,7 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testCondFalse() {
-		Context<?> c = CONTEXT.fork();
+		Context<?> c = context();
 
 		AOp<AString> op = Cond.create(Constant.of(false), Constant.createString("trueResult"),
 				Constant.createString("falseResult"));
@@ -161,7 +161,7 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testCondNoResult() {
-		Context<?> c = CONTEXT.fork();
+		Context<?> c = context();
 
 		AOp<AString> op = Cond.create(Constant.of(false), Constant.createString("trueResult"));
 
@@ -174,7 +174,7 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testCondEnvironmentChange() {
-		Context<?> c = CONTEXT.fork();
+		Context<?> c = context();
 
 		Symbol sym = Symbol.create("val");
 
@@ -189,7 +189,7 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testInvoke() {
-		Context<?> c = CONTEXT.fork();
+		Context<?> c = context();
 
 		Symbol sym = Symbol.create("arg0");
 
@@ -213,7 +213,7 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testLambda() {
-		Context<?> c = CONTEXT.fork();
+		Context<?> c = context();
 
 		Symbol sym = Symbol.create("arg0");
 

@@ -29,10 +29,10 @@ public class TrustTest extends ACVMTest {
 	private final Symbol tSym = Symbol.create("trust-actor");
 	private Address trusted=null;
 
-	
+	private Context<?> CONTEXT;
 	protected TrustTest() throws IOException {
 		super(Init.createCoreLibraries());
-		Context<?> ctx = CONTEXT.fork();
+		Context<?> ctx = context();
 		
 		assert(ctx.getDepth()==0):"Invalid depth: "+ctx.getDepth();
 		

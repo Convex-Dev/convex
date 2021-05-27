@@ -70,7 +70,7 @@ public class CompilerTest extends ACVMTest {
 	}
 	
 	@Test public void testMinCompileRegression() throws IOException {
-		Context<?> c=CONTEXT.fork();
+		Context<?> c=context();
 		String src=Utils.readResourceAsString("testsource/min.con");
 		ACell form=Reader.read(src);
 		Context<ACell> exp=c.expand(form);
@@ -201,7 +201,7 @@ public class CompilerTest extends ACVMTest {
 	@Test
 	public void testStackOverflow()  {
 		// fake state with default juice
-		Context<?> c=CONTEXT.fork();
+		Context<?> c=context();
 		
 		AOp<CVMLong> op=Do.create(
 				    // define a nasty function that calls its argument recursively on itself
@@ -462,14 +462,14 @@ public class CompilerTest extends ACVMTest {
 	@Test
 	public void testDiabolicals()  {
 		// 2^10000 map, too deep to expand
-		assertDepthError(CONTEXT.fork().expand(Samples.DIABOLICAL_MAP_2_10000));
+		assertDepthError(context().expand(Samples.DIABOLICAL_MAP_2_10000));
 		// 30^30 map, too much data to expand
-		assertJuiceError(CONTEXT.fork().expand(Samples.DIABOLICAL_MAP_30_30));
+		assertJuiceError(context().expand(Samples.DIABOLICAL_MAP_30_30));
 	}
 	
 	@Test
 	public void testDefExpander()  {
-		Context<?> c=CONTEXT.fork();	
+		Context<?> c=context();	
 		String source="(defexpander bex [x e] (syntax \"foo\"))";
 		ACell exp=expand(source);
 		assertTrue(exp instanceof AList);

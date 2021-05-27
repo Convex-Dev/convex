@@ -36,7 +36,7 @@ public class ContextTest extends ACVMTest {
 		super(Init.createBaseAccounts());
 	}
 
-	private final Context<?> CTX = super.CONTEXT.fork();
+	private final Context<?> CTX = context();
 	private final Address ADDR=CTX.getAddress();
 
 	@Test

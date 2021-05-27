@@ -19,10 +19,11 @@ import convex.core.util.Utils;
 import convex.lib.FungibleTest;
 
 public class TorusTest extends ACVMTest {
+	Context<?> INITIAL=context();
+	
 	protected TorusTest() {
 		super(Init.createState());
 		
-		Context<?> INITIAL=CONTEXT.fork();
 		try {
 			Context<?> ctx=INITIAL;
 			ctx=step(ctx,"(import convex.fungible :as fun)");
@@ -47,7 +48,7 @@ public class TorusTest extends ACVMTest {
 			// Deploy USD market. No market for GBP yet!
 			ctx= step(ctx,"(call TORUS (create-market USD))");
 			USD_MARKET=(Address)ctx.getResult();
-			CONTEXT= ctx.withResult(TORUS).withJuice(INITIAL_JUICE);
+			INITIAL= ctx.withResult(TORUS).withJuice(INITIAL_JUICE);
 		} catch (Throwable e) {
 			e.printStackTrace();
 			throw Utils.sneakyThrow(e);
@@ -64,7 +65,7 @@ public class TorusTest extends ACVMTest {
 	}
 	
 	@Test public void testMissingMarket() {
-		Context<?> ctx=CONTEXT.fork();
+		Context<?> ctx=INITIAL.fork();
 		
 		assertNull(eval(ctx,"(torus/get-market GBP)"));
 		
@@ -75,7 +76,7 @@ public class TorusTest extends ACVMTest {
 	}
 	
 	@Test public void testDeployedCurrencies() {
-		Context<?> ctx=CONTEXT.fork(); // Initial test context
+		Context<?> ctx=INITIAL.fork(); // Initial test context
 		ctx=step(ctx,"(import torus.exchange :as torus)");
 		ctx= step(ctx,"(def GBP (import currency.GBP :as GBP))");
 		ctx= step(ctx,"(def USD (import currency.USD :as USD))");
@@ -89,7 +90,7 @@ public class TorusTest extends ACVMTest {
 
 	
 	@Test public void testTorusAPI() {
-		Context<?> ctx=CONTEXT.fork();
+		Context<?> ctx=INITIAL.fork();
 		
 		// Deploy GBP market.
 		ctx= step(ctx,"(def GBPM (call TORUS (create-market GBP)))");
@@ -148,7 +149,7 @@ public class TorusTest extends ACVMTest {
 	}
 	
 	@Test public void testInitialTokenMarket() {
-		Context<?> ctx=CONTEXT.fork();
+		Context<?> ctx=INITIAL.fork();
 		
 		// Check we can access the USD market
 		ctx= step(ctx,"(def USDM (torus/get-market USD))");

@@ -27,7 +27,7 @@ public class RegistryTest extends ACVMTest {
 
 	static final Address REG = Init.REGISTRY_ADDRESS;
 
-	Context<?> INITIAL_CONTEXT=CONTEXT.fork();
+	Context<?> INITIAL_CONTEXT=context();
 	
 	@Test
 	public void testRegistryContract() throws IOException {

@@ -28,7 +28,7 @@ public class StakingTest extends ACVMTest {
 
 	@Test
 	public void testStake() {
-		Context<ACell> ctx0 =CONTEXT.fork();
+		Context<ACell> ctx0 =context();
 
 		Context<ACell> ctx1 = ctx0.setStake(FIRST_PEER_KEY, 1000);
 		PeerStatus ps1 = ctx1.getState().getPeer(FIRST_PEER_KEY);
@@ -51,13 +51,13 @@ public class StakingTest extends ACVMTest {
 
 	@Test
 	public void testStakeReturns() {
-		Context<ACell> ctx0 = CONTEXT.fork();
+		Context<ACell> ctx0 = context();
 		assertEquals(1000L, evalL(ctx0, "(stake " + FIRST_PEER_KEY + " 1000)"));
 	}
 
 	@Test
 	public void testBadStake() {
-		Context<ACell> ctx0 = CONTEXT.fork();
+		Context<ACell> ctx0 = context();
 
 		// not a peer, should be state error
 		assertStateError(ctx0.setStake(Init.HERO_KP.getAccountKey(), 1000));

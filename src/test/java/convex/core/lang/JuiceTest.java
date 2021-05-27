@@ -18,7 +18,7 @@ public class JuiceTest extends ACVMTest {
 		super(TestState.STATE);
 	}
 	
-	private long JUICE = CONTEXT.getJuice();
+	private long JUICE = context().getJuice();
 
 	/**
 	 * Compute the precise juice consumed by executing the compiled source code
@@ -29,8 +29,8 @@ public class JuiceTest extends ACVMTest {
 	 */
 	public long juice(String source) {
 		ACell form = Reader.read(source);
-		AOp<?> op = CONTEXT.fork().expandCompile(form).getResult();
-		Context<?> jctx = CONTEXT.fork().execute(op);
+		AOp<?> op = context().expandCompile(form).getResult();
+		Context<?> jctx = context().execute(op);
 		return JUICE - jctx.getJuice();
 	}
 
@@ -43,7 +43,7 @@ public class JuiceTest extends ACVMTest {
 	 */
 	public long compileJuice(String source) {
 		ACell form = Reader.read(source);
-		Context<?> jctx = CONTEXT.fork().expandCompile(form);
+		Context<?> jctx = context().expandCompile(form);
 		return JUICE - jctx.getJuice();
 	}
 
@@ -56,7 +56,7 @@ public class JuiceTest extends ACVMTest {
 	 */
 	public long expandJuice(String source) {
 		ACell form = Reader.read(source);
-		Context<?> jctx = CONTEXT.fork().invoke(Core.INITIAL_EXPANDER,form, Core.INITIAL_EXPANDER);
+		Context<?> jctx = context().invoke(Core.INITIAL_EXPANDER,form, Core.INITIAL_EXPANDER);
 		return JUICE - jctx.getJuice();
 	}
 
