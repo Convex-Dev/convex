@@ -2072,14 +2072,15 @@ public class CoreTest extends ACVMTest {
 		// standard actors are accounts
 		assertTrue(eval("(account *registry*)") instanceof AccountStatus);
 		
-		// a fake address
-		assertNull(eval(ctx,"(account 77777777)"));
+		// a non-existent address returns null
+		assertNull(eval(ctx,"(account #77777777)"));
 		
 		// current address is an account, and its balance is correct
 		assertTrue(evalB("(= *balance* (:balance (account *address*)))"));
 		
 		// invalid addresses
 		assertCastError(step("(account nil)"));
+		assertCastError(step("(account 8)"));
 		assertCastError(step("(account :foo)"));
 		assertCastError(step("(account [])"));
 		assertCastError(step("(account 'foo)"));

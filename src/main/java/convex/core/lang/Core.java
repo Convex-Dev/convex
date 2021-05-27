@@ -835,7 +835,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a0 = args[0];
-			Address address = RT.castAddress(a0);
+			Address address = RT.ensureAddress(a0);
 			if (address == null) return context.withCastError(0,args, Types.ADDRESS);
 
 			// Note: returns null if the argument is not an address
