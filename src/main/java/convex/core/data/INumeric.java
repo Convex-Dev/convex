@@ -26,5 +26,7 @@ public interface INumeric {
 	 * @return
 	 */
 	public ACell signum();
+
+	public INumeric toStandardNumber();
 	
 }

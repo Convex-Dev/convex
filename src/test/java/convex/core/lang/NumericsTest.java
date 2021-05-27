@@ -148,6 +148,7 @@ public class NumericsTest {
 
 		assertCastError(step("(/ nil)"));
 		assertCastError(step("(/ 1 :foo)"));
+		assertCastError(step("(/ #7 #0)"));
 		assertCastError(step("(/ 'foo 1)"));
 
 		assertArityError(step("(/)"));
@@ -280,6 +281,8 @@ public class NumericsTest {
 	@Test
 	public void testCasts() {
 		assertEquals(0L, evalL("(long (byte 256))"));
+		assertEquals(13L, evalL("(long #13)"));
+		assertEquals(255L, evalL("(long 0xff)"));
 		assertEquals(1L, evalL("(long 1)"));
 		assertCVMEquals('a', eval("(char 97)"));
 		assertEquals(97L, evalL("(long \\a)"));

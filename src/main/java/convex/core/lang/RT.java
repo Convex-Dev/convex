@@ -86,7 +86,7 @@ public class RT {
 		int len = values.length;
 		if (len == 0) return true;
 		if (len == 1) {
-			if (null == RT.number(values[0])) return null; // cast failure
+			if (null == RT.ensureNumber(values[0])) return null; // cast failure
 			return true;
 		}
 		return false;
@@ -262,13 +262,13 @@ public class RT {
 
 	public static CVMDouble divide(ACell[] args) {
 		int n = args.length;
-		CVMDouble arg0 = castDouble(args[0]);
+		CVMDouble arg0 = ensureDouble(args[0]);
 		if (arg0 == null) return null;
 		double result=arg0.doubleValue();
 
 		if (n == 1) return CVMDouble.create(1.0 / result);
 		for (int i = 1; i < args.length; i++) {
-			CVMDouble v = castDouble(args[i]);
+			CVMDouble v = ensureDouble(args[i]);
 			if (v == null) return null;
 			result = result / v.doubleValue();
 		}
@@ -342,7 +342,7 @@ public class RT {
 	 * @return
 	 */
 	public static APrimitive abs(ACell a) {
-		INumeric x=RT.number(a);
+		INumeric x=RT.ensureNumber(a);
 		if (x==null) return null;
 		if (x instanceof CVMLong) return CVMLong.create( Math.abs(((CVMLong) x).longValue()));
 		return CVMDouble.create(Math.abs(x.toDouble().doubleValue()));
@@ -355,7 +355,7 @@ public class RT {
 	 * @return value of -1, 0 or 1, NaN is argument is NaN, or null if the argument is not numeric
 	 */
 	public static ACell signum(ACell a) {
-		INumeric x=RT.number(a);
+		INumeric x=RT.ensureNumber(a);
 		if (x==null) return null;
 		return x.signum();
 	}
@@ -400,29 +400,21 @@ public class RT {
 	}
 
 	/**
-	 * Converts a CVM value to a Java numeric value ready for maths operations. Result will be one of: 
+	 * Converts a CVM value to the standard numeric representation. Result will be one of: 
 	 * <ul> 
 	 * <li>Long for Byte, Long</li>
 	 * <li>Double for Double</li>
+	 * <li>null for any non-numeric value</li>
 	 * </ul>
 	 * 
-	 * @param a
+	 * @param a Value to convert to numeric representation
 	 * @return The number value, or null if cannot be converted
 	 */
-	public static INumeric number(ACell a) {
+	public static INumeric ensureNumber(ACell a) {
 		if (a == null) return null;
 		
 		if (a instanceof INumeric) {
-			return (INumeric)a;
-		}
-		
-		if (a instanceof APrimitive) {
-			return CVMLong.create(((APrimitive)a).longValue());
-		}
-		
-		if (a instanceof ABlob) {
-			long lv=((ABlob)a).toLong();
-			return CVMLong.create(lv);
+			return ((INumeric)a).toStandardNumber();
 		}
 
 		return null;
@@ -451,9 +443,10 @@ public class RT {
 	 */
 	public static CVMDouble castDouble(ACell a) {
 		if (a instanceof CVMDouble) return (CVMDouble) a;
-		INumeric n = number(a);
-		if (n == null) return null;
-		return n.toDouble();
+				
+		CVMLong l=castLong(a);
+		if (l==null) return null;
+		return l.toDouble();
 	}
 	
 	/**
@@ -476,9 +469,21 @@ public class RT {
 	 */
 	public static CVMLong castLong(ACell a) {
 		if (a instanceof CVMLong) return (CVMLong) a;
-		INumeric n = number(a);
-		if (n == null) return null;
-		return n.toLong();
+		INumeric n = ensureNumber(a);
+		if (n != null) {
+			return n.toLong();
+		};
+		
+		if (a instanceof APrimitive) {
+			return CVMLong.create(((APrimitive)a).longValue());
+		}
+		
+		if (a instanceof ABlob) {
+			long lv=((ABlob)a).toLong();
+			return CVMLong.create(lv);
+		}
+		
+		return null;
 	}
 	
 	/**

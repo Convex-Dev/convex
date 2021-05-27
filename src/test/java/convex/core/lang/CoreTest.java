@@ -655,10 +655,15 @@ public class CoreTest extends ACVMTest {
 		// long overflow case
 		assertEquals(Long.MIN_VALUE,evalL("(abs -9223372036854775808)"));
 		assertEquals(Long.MAX_VALUE,evalL("(abs -9223372036854775807)"));
+
+		// Needs a numeric type, else CAST error
+		assertCastError(step("(abs :foo)"));
+		assertCastError(step("(abs nil)"));
+		assertCastError(step("(abs #78)"));
+		assertCastError(step("(abs [1])"));
 		
 		assertArityError(step("(abs)"));
 		assertArityError(step("(abs :foo :bar)")); // arity > cast
-		assertCastError(step("(abs :foo)"));
 	}
 	
 	@Test
@@ -676,6 +681,12 @@ public class CoreTest extends ACVMTest {
 		assertEquals(-1.0,evalD("(signum (double -13))"));
 		assertEquals(1.0,evalD("(signum (pow 10 100))"));
 		
+		// Needs a numeric type, else cast error
+		assertCastError(step("(signum #1)"));
+		assertCastError(step("(signum 0xabab)"));
+		assertCastError(step("(signum nil)"));
+		assertCastError(step("(signum :foo)"));
+		
 		// Fun Double cases
 		assertEquals(Double.NaN,evalD("(signum ##NaN)"));
 		assertEquals(1.0,evalD("(signum ##Inf)"));
@@ -683,7 +694,6 @@ public class CoreTest extends ACVMTest {
 		
 		assertArityError(step("(signum)"));
 		assertArityError(step("(signum :foo :bar)")); // arity > cast
-		assertCastError(step("(signum :foo)"));
 	}
 
 	@Test

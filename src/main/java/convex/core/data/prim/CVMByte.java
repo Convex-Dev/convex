@@ -114,4 +114,9 @@ public final class CVMByte extends APrimitive implements INumeric {
 		return value;
 	}
 
+	@Override
+	public INumeric toStandardNumber() {
+		return toLong();
+	}
+
 }

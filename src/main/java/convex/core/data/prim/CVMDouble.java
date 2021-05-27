@@ -127,4 +127,9 @@ public final class CVMDouble extends APrimitive implements INumeric {
 		return Tag.DOUBLE;
 	}
 
+	@Override
+	public INumeric toStandardNumber() {
+		return this;
+	}
+
 }

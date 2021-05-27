@@ -107,4 +107,9 @@ public final class CVMLong extends APrimitive implements INumeric {
 		return CVMLong.ZERO;
 	}
 
+	@Override
+	public INumeric toStandardNumber() {
+		return this;
+	}
+
 }

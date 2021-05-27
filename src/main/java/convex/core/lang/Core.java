@@ -2305,7 +2305,7 @@ public class Core {
 		@Override
 		public boolean test(ACell val) {
 			if (!RT.isNumber(val)) return false;
-			INumeric n = RT.number(val);
+			INumeric n = RT.ensureNumber(val);
 
 			// According to the IEEE 754 standard, negative zero and positive zero should
 			// compare as equal with the usual (numerical) comparison operators
