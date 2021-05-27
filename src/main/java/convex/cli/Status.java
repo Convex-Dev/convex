@@ -16,15 +16,19 @@ import convex.core.data.AccountStatus;
 import convex.core.data.BlobMap;
 import convex.core.data.PeerStatus;
 import convex.core.data.VectorLeaf;
+import convex.core.Init;
 import convex.core.util.Text;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 
 /**
-*
-* Convex Status sub command
-*
-*/
+ *
+ * Convex Status sub command
+ *
+ *		convex.status
+ *
+ */
 @Command(name="status",
 	mixinStandardHelpOptions=true,
 	description="Reports on the current status of the network.")
@@ -35,10 +39,18 @@ private static final Logger log = Logger.getLogger(Status.class.getName());
 	@ParentCommand
 	protected Main mainParent;
 
+	@Option(names={"--port"},
+		description="Port number to connect or create a peer.")
+	private int port = 0;
+
+	@Option(names={"--host"},
+		defaultValue=Constants.HOSTNAME_PEER,
+		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
+	private String hostname;
+
 	@Override
 	public void run() {
 
-		int port = mainParent.getPort();
 		if (port == 0) {
 			try {
 				port = Helpers.getSessionPort(mainParent.getSessionFilename());
@@ -51,9 +63,11 @@ private static final Logger log = Logger.getLogger(Status.class.getName());
 			return;
 		}
 
-		Convex convex = Helpers.connect(mainParent.getHostname(), port);
-		if (convex==null) {
-			System.out.println("Aborting query");
+		Convex convex = null;
+		try {
+			convex = mainParent.connectToSessionPeer(hostname, port, Init.HERO, Init.HERO_KP);
+		} catch (Throwable t) {
+			log.severe(t.getMessage());
 			return;
 		}
 

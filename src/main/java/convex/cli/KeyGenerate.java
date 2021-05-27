@@ -12,10 +12,13 @@ import picocli.CommandLine.ParentCommand;
 
 
 /**
-*
-* Convex key sub commands
-*
-*/
+ *
+ * Convex key sub commands
+ *
+ *		convex.key.generate
+ *
+ *
+ */
 @Command(name="generate",
 	aliases={"g","gen"},
 	mixinStandardHelpOptions=true,

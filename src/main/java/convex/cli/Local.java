@@ -9,21 +9,23 @@ import picocli.CommandLine.ParentCommand;
 
 /**
  *
- * Convex peer sub commands
+ * Convex local sub commands
  *
- *		convex.peer
+ *		convex.local
+ *
  *
  */
-@Command(name="peer",
+@Command(name="local",
 	subcommands = {
-		PeerStart.class,
+		LocalManager.class,
+		LocalStart.class,
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=true,
-	description="Operates a local peer(s) or local convex network.")
-public class Peer implements Runnable {
+	description="Operates a local convex network.")
+public class Local implements Runnable {
 
-	private static final Logger log = Logger.getLogger(Peer.class.getName());
+	private static final Logger log = Logger.getLogger(Local.class.getName());
 
 	@ParentCommand
 	protected Main mainParent;
@@ -31,7 +33,6 @@ public class Peer implements Runnable {
 	@Override
 	public void run() {
 		// sub command run with no command provided
-		CommandLine.usage(new Peer(), System.out);
+		CommandLine.usage(new Local(), System.out);
 	}
-
 }

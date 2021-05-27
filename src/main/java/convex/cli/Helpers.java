@@ -6,13 +6,15 @@ import java.net.InetSocketAddress;
 import java.util.Random;
 
 import convex.api.Convex;
-import convex.core.Init;
+import convex.cli.peer.Session;
+import convex.core.crypto.AKeyPair;
+import convex.core.data.Address;
 
 /*
  *
  * Helpers
  *
-*/
+ */
 public class Helpers {
 
 	public static String expandTilde(String path) {
@@ -28,15 +30,13 @@ public class Helpers {
 			path.mkdir();
 		}
 	}
-
-	public static Convex connect(String hostname, int port) {
+	public static Convex connect(String hostname, int port, Address address, AKeyPair keyPair) {
 		InetSocketAddress host=new InetSocketAddress(hostname, port);
 		System.out.printf("Connecting to peer: %s\n", host);
 		Convex convex;
 		try {
-			convex=Convex.connect(host, Init.HERO, null); // TODO: what should keypair be?
+			convex=Convex.connect(host, address, keyPair);
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 			System.out.printf("Failed to connect to peer at: %s\n", host);
 			return null;

@@ -1,8 +1,15 @@
 package convex.cli;
 
 import java.io.File;
+import java.io.IOException;
+import java.security.KeyStore;
+import java.util.Enumeration;
 import java.util.logging.Logger;
 
+import convex.api.Convex;
+import convex.core.crypto.AKeyPair;
+import convex.core.crypto.PFXTools;
+import convex.core.data.Address;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -14,15 +21,24 @@ import picocli.CommandLine.ScopeType;
 */
 @Command(name="convex",
 	subcommands = {
-		Peer.class,
+		Account.class,
 		Key.class,
+		Local.class,
+		Peer.class,
 		Query.class,
-		Transact.class,
 		Status.class,
+		Transaction.class,
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=true,
 	usageHelpAutoWidth=true,
+	sortOptions = false,
+	// headerHeading = "Usage:",
+	// synopsisHeading = "%n",
+	descriptionHeading = "%nDescription:%n%n",
+	parameterListHeading = "%nParameters:%n",
+	optionListHeading = "%nOptions:%n",
+	commandListHeading = "%nCommands:%n",
 	description="Convex Command Line Interface")
 
 public class Main implements Runnable {
@@ -55,19 +71,8 @@ public class Main implements Runnable {
 
 	@Option(names={"-e", "--etch"},
 		scope = ScopeType.INHERIT,
-		description="Convex state storage filename. The default is to use a temporary storage filename in the /tmp folder.")
+		description="Convex state storage filename. The default is to use a temporary storage filename.")
 	private String etchStoreFilename;
-
-	@Option(names={"--port"},
-		scope = ScopeType.INHERIT,
-		description="Port number to connect or create a peer.")
-	private int port = 0;
-
-	@Option(names={"--host"},
-		defaultValue=Constants.HOSTNAME_PEER,
-		scope = ScopeType.INHERIT,
-		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
-	private String hostname;
 
 	@Override
 	public void run() {
@@ -90,7 +95,14 @@ public class Main implements Runnable {
 		// in the defaults before running the full execute
 		commandLine.parseArgs(args);
 		loadConfig();
-		return commandLine.execute(args);
+		int result = 0;
+		try {
+			result = commandLine.execute(args);
+		} catch (Throwable t) {
+			log.severe(t.getMessage());
+			return 2;
+		}
+		return result;
 	}
 
 	protected void loadConfig() {
@@ -103,6 +115,7 @@ public class Main implements Runnable {
 			}
 		}
 	}
+
 	public String getSessionFilename() {
 		return Helpers.expandTilde(sessionFilename);
 	}
@@ -114,14 +127,68 @@ public class Main implements Runnable {
 	public String getKeyStoreFilename() {
 		return Helpers.expandTilde(keyStoreFilename);
 	}
-	public int getPort() {
-		return port;
-	}
-	public String getHostname() {
-		return hostname;
-	}
+
 	public String getEtchStoreFilename() {
 		return Helpers.expandTilde(etchStoreFilename);
 	}
 
+	public AKeyPair loadKeyFromStore(String keystorePublicKey, int keystoreIndex) throws Error {
+
+		AKeyPair keyPair = null;
+		String publicKeyClean = keystorePublicKey.toLowerCase().replaceAll("^0x", "");
+
+		if (password == null || password.isEmpty()) {
+			throw new Error("You need to provide a keystore password");
+		}
+
+		if ( publicKeyClean.isEmpty() && keystoreIndex <= 0) {
+			throw new Error("You need to provide a keystore public key identity via the --index or --public-key options");
+		}
+
+		File keyFile = new File(getKeyStoreFilename());
+		try {
+			if (!keyFile.exists()) {
+				throw new Error("Cannot find keystore file "+keyFile.getCanonicalPath());
+			}
+			KeyStore keyStore = PFXTools.loadStore(keyFile, password);
+
+			int counter = 1;
+			Enumeration<String> aliases = keyStore.aliases();
+
+			while (aliases.hasMoreElements()) {
+				String alias = aliases.nextElement();
+				if (counter == keystoreIndex || alias.indexOf(publicKeyClean) == 0) {
+					keyPair = PFXTools.getKeyPair(keyStore, alias, password);
+					break;
+				}
+				counter ++;
+			}
+		} catch (Throwable t) {
+			throw new Error("Cannot load key store "+t);
+		}
+
+		if (keyPair==null) {
+			throw new Error("Cannot find key in keystore");
+		}
+		return keyPair;
+	}
+
+	public Convex connectToSessionPeer(String hostname, int port, Address address, AKeyPair keyPair) throws Error {
+		if (port == 0) {
+			try {
+				port = Helpers.getSessionPort(getSessionFilename());
+			} catch (IOException e) {
+				throw new Error("Cannot load the session control file");
+			}
+		}
+		if (port == 0) {
+			throw new Error("Cannot find a local port or you have not set a valid port number");
+		}
+
+		Convex convex = Helpers.connect(hostname, port, address, keyPair);
+		if (convex==null) {
+			throw new Error("Cannot connect to a peer");
+		}
+		return convex;
+	}
 }
