@@ -114,6 +114,14 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		}
 	}
 
+	/**
+	 * Create a MapTree with a full compliment of children.
+	 * @param <K>
+	 * @param <V>
+	 * @param newChildren
+	 * @param shift
+	 * @return
+	 */
 	private static <K extends ACell, V extends ACell> AHashMap<K, V> createFull(Ref<AHashMap<K, V>>[] newChildren, int shift) {
 		return createFull(newChildren, shift, computeCount(newChildren));
 	}
@@ -602,19 +610,24 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@Override
 	public AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func) {
+		return mergeDifferences(b, func,0);
+	}
+	
+	@Override
+	protected AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func,int shift) {
 		if ((b instanceof MapTree)) {
 			MapTree<K, V> bt = (MapTree<K, V>) b;
 			// this is OK, top levels should both have shift 0 and be aligned down the tree.
 			if (this.shift != bt.shift) throw new Error("Misaligned shifts!");
-			return mergeDifferences(bt, func);
+			return mergeDifferences(bt, func,shift);
 		} else {
 			// must be ListMap
-			return mergeDifferences((MapLeaf<K, V>) b, func);
+			return mergeDifferences((MapLeaf<K, V>) b, func,shift);
 		}
 	}
 
 	@SuppressWarnings("unchecked")
-	private AHashMap<K, V> mergeDifferences(MapTree<K, V> b, MergeFunction<V> func) {
+	private AHashMap<K, V> mergeDifferences(MapTree<K, V> b, MergeFunction<V> func, int shift) {
 		// assume two treemaps with identical prefix and shift
 		if (this.equals(b)) return this; // no differences to merge
 		int fullMask = mask | b.mask;
@@ -627,7 +640,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			if (aref.equalsValue(bref)) continue; // identical children, no differences
 			AHashMap<K, V> ac = aref.getValue();
 			AHashMap<K, V> bc = bref.getValue();
-			AHashMap<K, V> newChild = ac.mergeDifferences(bc, func);
+			AHashMap<K, V> newChild = ac.mergeDifferences(bc, func,shift+1);
 			if (newChild != ac) {
 				if (newChildren == null) {
 					newChildren = (Ref<AHashMap<K, V>>[]) new Ref<?>[16];
@@ -644,7 +657,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@SuppressWarnings("unchecked")
-	private AHashMap<K, V> mergeDifferences(MapLeaf<K, V> b, MergeFunction<V> func) {
+	private AHashMap<K, V> mergeDifferences(MapLeaf<K, V> b, MergeFunction<V> func, int shift) {
 		Ref<AHashMap<K, V>>[] newChildren = null;
 		int ix = 0;
 		for (int i = 0; i < 16; i++) {
@@ -653,7 +666,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			Ref<AHashMap<K, V>> cref = children[ix++];
 			AHashMap<K, V> child = cref.getValue();
 			MapLeaf<K, V> bSubset = b.filterHexDigits(shift, imask); // filter only relevant elements in b
-			AHashMap<K, V> newChild = child.mergeDifferences(bSubset, func);
+			AHashMap<K, V> newChild = child.mergeDifferences(bSubset, func,shift+1);
 			if (child != newChild) {
 				if (newChildren == null) {
 					newChildren = (Ref<AHashMap<K, V>>[]) new Ref<?>[16];

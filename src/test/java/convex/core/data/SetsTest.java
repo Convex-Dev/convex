@@ -14,7 +14,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
-import convex.core.lang.Reader;
 import convex.test.Samples;
 
 public class SetsTest {

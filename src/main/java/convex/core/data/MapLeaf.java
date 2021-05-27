@@ -568,12 +568,17 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@Override
 	public AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func) {
-		if (b instanceof MapLeaf) return mergeDifferences((MapLeaf<K, V>) b, func);
+		return mergeDifferences(b,func,0);
+	}
+	
+	@Override
+	protected AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func, int shift) {
+		if (b instanceof MapLeaf) return mergeDifferences((MapLeaf<K, V>) b, func,shift);
 		if (b instanceof MapTree) return b.mergeWith(this, func.reverse());
 		throw new TODOException("Unhandled map type: " + b.getClass());
 	}
 
-	public AHashMap<K, V> mergeDifferences(MapLeaf<K, V> b, MergeFunction<V> func) {
+	public AHashMap<K, V> mergeDifferences(MapLeaf<K, V> b, MergeFunction<V> func,int shift) {
 		if (this.equals(b)) return this; // no change in identical case
 		int al = this.size();
 		int bl = b.size();
@@ -612,7 +617,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			if ((results != null) && (newE != null)) results.add(newE);
 		}
 		if (results == null) return this;
-		return Maps.create(results);
+		return Maps.createWithShift(shift,results);
 	}
 
 	@Override

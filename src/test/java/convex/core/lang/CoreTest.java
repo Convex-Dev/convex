@@ -937,21 +937,25 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(set 1)"));
 	}
 	
+	@SuppressWarnings("unchecked")
 	@Test
 	public void testSetRegression153() throws InvalidDataException {
-		Set<ACell> a=Reader.read("#{#5477106 \\*}");
-		a.validate();
-		Set<ACell> b=Reader.read("#{#2 #0 true #3 0x61a049 #242411 #3478095 #9275832328719 #1489754187855142}");
-		b.validate();
+		// See issue #153
+		Context<?> c=context();
+		c=step(c, "(def s1 #{#5477106 \\*})");
+		Set<ACell> s1=(Set<ACell>) c.getResult();
+		s1.validate();
+		c=step(c, "(def s2 #{#2 #0 true #3 0x61a049 #242411 #3478095 #9275832328719 #1489754187855142})");
+		Set<ACell> s2=(Set<ACell>) c.getResult();
+		s2.validate();
 		
-		Set<ACell> u1=a.includeAll(b);
+		Set<ACell> u1=s2.includeAll(s1);
 		u1.validate();
-		
-		Set<ACell> u2=a.conjAll(List.create(b.toCellArray()));
+
+		c=step(c, "(def union1 (union s2 s1))");
+		Set<ACell> u2=(Set<ACell>) c.getResult();
 		u2.validate();
 		
-		Set<ACell> diff=u1.excludeAll(u2);
-		diff.validate();
 	}
 	
 	

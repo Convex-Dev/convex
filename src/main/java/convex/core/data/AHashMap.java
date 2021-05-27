@@ -69,6 +69,8 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	 */
 	public abstract AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func);
 
+	protected abstract AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func, int shift);
+
 	/**
 	 * Merge this map with another map, using the given function for each key that
 	 * is present in either map. The function is applied to the corresponding values
