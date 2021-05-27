@@ -22,6 +22,7 @@ import convex.core.data.Sets;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.type.Types;
 import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.MultiFn;
@@ -566,6 +567,7 @@ public class Compiler {
 			if (args.length!=2) return context.withArityError(exactArityMessage(2, args.length));
 			ACell x = args[0];
 			AFn<ACell> cont=RT.function(args[1]);
+			if (cont==null) return context.withCastError(1, args,Types.FUNCTION);
 			
 			// If x is a Syntax object, need to compile the datum
 			if (x instanceof Syntax) {
@@ -579,10 +581,7 @@ public class Compiler {
 				return context.withResult(Juice.EXPAND_CONSTANT, result);
 			}
 			
-			
-			
 			ACell form = x;
-
 	
 			// First check for sequences. This covers most cases.
 			if (form instanceof ASequence) {

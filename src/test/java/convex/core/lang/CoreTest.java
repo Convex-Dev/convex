@@ -3216,6 +3216,15 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(syntax?)"));
 		assertArityError(step("(syntax? 2 3)"));
 	}
+	
+	@Test
+	public void testInitialExpander() {
+		// bad continuation expanders
+		assertCastError(step("(*initial-expander* (list #0) #0)"));		
+	
+		assertArityError(step("(*initial-expander* 1 2 3)"));
+		assertArityError(step("(*initial-expander* 1)"));
+	}
 
 	@Test
 	public void testExports() {
