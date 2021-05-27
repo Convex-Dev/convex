@@ -3126,6 +3126,7 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(expand 1 :foo)"));
 		assertCastError(step("(expand { 888 227 723 560} [75 561 258 833])"));
 		
+		
 		assertArityError(step("(expand)"));
 		assertArityError(step("(expand 1 (fn [x e] x) :blah :blah)"));
 		
@@ -3134,6 +3135,19 @@ public class CoreTest extends ACVMTest {
 
 		// arity error in expansion execution
 		assertArityError(step("(expand 1 (fn [x e] (count)))"));
+	}
+	
+	@Test
+	public void testExpandEdgeCases() {
+		// BAd functions
+		assertCastError(step("(expand 123 #0 :foo)"));
+		assertCastError(step("(expand 123 #0)"));
+		
+		// psuedo-function application, not valid for expand
+		assertCastError(step("(expand 'foo 'bar 'baz)"));
+		assertCastError(step("(expand {} :foo)")); 
+		assertCastError(step("(expand {:bar 1 :bax 2} :bar :baz)"));
+		assertCastError(step("(expand {:foo 1 :bax 2} :bar :baz)"));
 	}
 	
 	@Test

@@ -839,22 +839,37 @@ public class RT {
 	}
 
 	/**
-	 * Coerces an argument to a function interface
+	 * Coerces an argument to a function interface. Certain values e.g. Keywords can
+	 * be used / applied in function position.
 	 * 
-	 * @param <T>
-	 * @param a
-	 * @return IFn instance, or null if the argument cannot be coerced to a
+	 * @param <T> Function return type
+	 * @param a Value to cast to a function
+	 * @return AFn instance, or null if the argument cannot be coerced to a
 	 *         function.
 	 * 
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> AFn<T> function(ACell a) {
+	public static <T extends ACell> AFn<T> castFunction(ACell a) {
 		if (a instanceof AFn) return (AFn<T>) a;
 		if (a instanceof AMap) return MapFn.wrap((AMap<?, T>) a);
 		if (a instanceof ASequence) return SeqFn.wrap((ASequence<?>) a);
 		if (a instanceof ASet) return (AFn<T>) SetFn.wrap((ASet<?>) a);
 		if (a instanceof Keyword) return KeywordFn.wrap((Keyword) a);
-
+		return null;
+	}
+	
+	/**
+	 * Ensure the argument is a valid CVM function. Returns null otherwise.
+	 * 
+	 * @param <T> Function return type
+	 * @param a Value to cast to a function
+	 * @return IFn instance, or null if the argument cannot be coerced to a
+	 *         function.
+	 * 
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> AFn<T> ensureFunction(ACell a) {
+		if (a instanceof AFn) return (AFn<T>) a;
 		return null;
 	}
 

@@ -25,6 +25,8 @@ public class Keywords {
 	// for testing and suchlike
 	public static final Keyword FOO = Keyword.create("foo");
 	public static final Keyword BAR = Keyword.create("bar");
+	public static final Keyword BAZ = Keyword.create("baz");
+
 
 	public static final Keyword SALT = Keyword.create("salt");
 	public static final Keyword IV = Keyword.create("iv");

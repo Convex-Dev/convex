@@ -524,23 +524,23 @@ public class Core {
 			//}
 
 			AFn<ACell> expander=Compiler.INITIAL_EXPANDER;
-			if (n == 2) {
+			if (n >= 2) {
 				// use provided expander
 				ACell exArg = args[1];
-				expander=RT.function(exArg);
+				expander=RT.ensureFunction(exArg);
 				if (expander==null) return context.withCastError(1,args, Types.FUNCTION);
 			}
 			
 			AFn<ACell> cont=expander; // use passed expander by default
-			if (n == 3) {
+			if (n >= 3) {
 				// use provided continuation expander
 				ACell contArg = args[2];
-				cont=RT.function(contArg);
+				cont=RT.ensureFunction(contArg);
 				if (cont==null) return context.withCastError(2,args, Types.FUNCTION);
 			}
 			
 			ACell form = args[0];
-			Context<ACell> rctx = context.invoke(expander,form, cont);
+			Context<ACell> rctx = context.expand(expander,form, cont);
 			return rctx;
 		}
 	});
@@ -1982,7 +1982,7 @@ public class Core {
 			int alen = args.length;
 			if (alen < 2) return context.withArityError(minArityMessage(2, alen));
 
-			final AFn<ACell> fn = RT.function(args[0]);
+			final AFn<ACell> fn = RT.castFunction(args[0]);
 			if (fn==null ) return context.withCastError(0,args, Types.FUNCTION);
 			
 			int lastIndex=alen-1;
@@ -2091,7 +2091,7 @@ public class Core {
 
 			// check and cast first argument to a function
 			ACell fnArg = args[0];
-			AFn<?> f = RT.function(fnArg);
+			AFn<?> f = RT.castFunction(fnArg);
 			if (f == null) return context.withCastError(fnArg, Types.FUNCTION);
 
 			// remaining arguments determine function arity to use
@@ -2135,7 +2135,7 @@ public class Core {
 
 			// check and cast first argument to a function
 			ACell fnArg = args[0];
-			AFn<?> fn = RT.function(fnArg);
+			AFn<?> fn = RT.castFunction(fnArg);
 			if (fn == null) return ctx.withCastError(0,args, Types.FUNCTION);
 
 			// Initial value, can be anything

@@ -175,7 +175,7 @@ public class AccountStatus extends ARecord {
 		// get function from environment. Anything not a function results in null
 		ACell maybeFn = environment.get(sym);
 		
-		AFn<R> fn = RT.function(maybeFn);
+		AFn<R> fn = RT.castFunction(maybeFn);
 		return fn;
 	}
 

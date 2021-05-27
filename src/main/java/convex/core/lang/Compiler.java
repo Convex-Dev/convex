@@ -566,7 +566,7 @@ public class Compiler {
 		public Context<ACell> invoke(Context<ACell> context,ACell[] args ) {
 			if (args.length!=2) return context.withArityError(exactArityMessage(2, args.length));
 			ACell x = args[0];
-			AFn<ACell> cont=RT.function(args[1]);
+			AFn<ACell> cont=RT.ensureFunction(args[1]);
 			if (cont==null) return context.withCastError(1, args,Types.FUNCTION);
 			
 			// If x is a Syntax object, need to compile the datum
@@ -608,7 +608,7 @@ public class Compiler {
 							if (RT.bool(expBool)) {
 								// expand form using specified expander and continuation expander
 								ACell v=context.lookupValue(sym);
-								AFn<ACell> expander = RT.function(v);
+								AFn<ACell> expander = RT.castFunction(v);
 								if (expander==null) {
 									return context.withError(ErrorCodes.COMPILE,"Expander for ["+sym+"] not a function, got: "+v);
 								}
