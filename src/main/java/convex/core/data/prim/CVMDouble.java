@@ -58,7 +58,7 @@ public final class CVMDouble extends APrimitive implements INumeric {
 		if (value>0.0) return CVMDouble.ONE;
 		if (value<0.0) return CVMDouble.MINUS_ONE;
 		if (Double.isNaN(value)) return NaN; // NaN special case
-		return CVMDouble.ZERO;
+		return this;
 	}
 	
 	@Override

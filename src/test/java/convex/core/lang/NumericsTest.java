@@ -201,6 +201,17 @@ public class NumericsTest {
 		assertTrue(evalB("(>= 0 0)"));
 
 	}
+	
+	@Test
+	public void testSignum() {
+		assertEquals(CVMDouble.NEGATIVE_ZERO,eval("(signum -0.0)"));
+		assertEquals(CVMDouble.ZERO,eval("(signum 0.0)"));
+		assertEquals(CVMDouble.ONE,eval("(signum 13.3)"));
+		assertEquals(CVMDouble.MINUS_ONE,eval("(signum (/ -1 0))"));
+		assertEquals(CVMDouble.ONE,eval("(signum ##Inf)"));
+		assertEquals(CVMDouble.NaN,eval("(signum (sqrt -1))"));
+	}
+
 
 	@Test
 	public void testSqrt() {
