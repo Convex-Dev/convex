@@ -6,8 +6,8 @@ import convex.core.exceptions.BadFormatException;
 
 public class Strings {
 
-	public static final AString EMPTY = StringShort.create("");
-	public static final AString NIL = StringShort.create("nil");
+	public static final StringShort EMPTY = StringShort.create("");
+	public static final StringShort NIL = StringShort.create("nil");
 
 	/**
 	 * Reads a CVM String value from a bytebuffer. Assumes tag already read.

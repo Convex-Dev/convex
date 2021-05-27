@@ -2040,9 +2040,8 @@ public class Core {
 				if (!context.checkJuice(juice)) return context.withJuiceError();
 				
 				ASequence<ACell> seq = RT.sequence(a1);
+				if (seq == null) return context.withCastError(a1, Types.DATA_STRUCTURE);
 				
-				
-
 				result = result.conjAll(seq);
 				if (result == null) return context.withError(ErrorCodes.CAST,"Invalid element type for 'into'");
 			}

@@ -7,7 +7,7 @@ import convex.core.data.type.Types;
 /**
  * Class representing a CVM String
  */
-public abstract class AString extends ADataStructure<CVMChar> implements CharSequence, Comparable<AString> {
+public abstract class AString extends ACountable<CVMChar> implements CharSequence, Comparable<AString> {
 
 	protected int length;
 	
@@ -44,17 +44,8 @@ public abstract class AString extends ADataStructure<CVMChar> implements CharSeq
 		return length;
 	}
 	
-	@Override
-	public ADataStructure<CVMChar> empty() {
+	public StringShort empty() {
 		return Strings.EMPTY;
-	}
-
-	@SuppressWarnings("unchecked")
-	@Override
-	public <R extends ACell> ADataStructure<R> conj(R x) {
-		if (!(x instanceof CVMChar)) return null;
-		CVMChar ch=(CVMChar)x;
-		return (ADataStructure<R>) append(ch.charValue());
 	}
 
 	protected abstract AString append(char charValue);

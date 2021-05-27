@@ -19,7 +19,7 @@ import convex.core.util.Utils;
  * lazily computed on demand
  * 
  */
-public abstract class ABlob extends ADataStructure<CVMByte> implements Comparable<ABlob> {
+public abstract class ABlob extends ACountable<CVMByte> implements Comparable<ABlob> {
 	/**
 	 * Cached hash of the Blob data. Might be null.
 	 */
@@ -51,16 +51,6 @@ public abstract class ABlob extends ADataStructure<CVMByte> implements Comparabl
 		return CVMByte.create(byteAt(ix));
 	}
 	
-	@SuppressWarnings("unchecked")
-	@Override
-	public <R extends ACell> ADataStructure<R> conj(R b) {
-		if (!(b instanceof CVMByte)) return null;
-		CVMByte bv=(CVMByte)b;
-		return (ADataStructure<R>) append(Blob.wrap(new byte[] {bv.byteValue()}));
-	}
-
-	
-	@Override
 	public Blob empty() {
 		return Blob.EMPTY;
 	}

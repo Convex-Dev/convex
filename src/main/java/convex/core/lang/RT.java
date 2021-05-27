@@ -9,6 +9,7 @@ import convex.core.crypto.Hash;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.ACollection;
+import convex.core.data.ACountable;
 import convex.core.data.ADataStructure;
 import convex.core.data.AHashMap;
 import convex.core.data.AList;
@@ -555,8 +556,8 @@ public class RT {
 	public static <T extends ACell> AVector<T> castVector(ACell o) {
 		if (o == null) return Vectors.empty();
 		if (o instanceof ACollection) return vec((ACollection<T>) o);
-		if (o instanceof ADataStructure) {
-			ADataStructure<T> ds=(ADataStructure<T>) o;
+		if (o instanceof ACountable) {
+			ACountable<T> ds=(ACountable<T>) o;
 			long n=ds.count();
 			AVector<T> r=Vectors.empty();
 			for (int i=0; i<n; i++) {
@@ -649,9 +650,9 @@ public class RT {
 		// special case, we treat nil as empty sequence
 		if (o == null) throw new IndexOutOfBoundsException("Can't get nth element from null");
 
-		if (o instanceof ADataStructure) return ((ADataStructure<T>) o).get(i); // blobs, maps and collections
+		if (o instanceof ACountable) return ((ACountable<T>) o).get(i); // blobs, maps and collections
 
-		throw new ClassCastException("Don't know how to get nth item of cell "+Utils.getClassName(o));
+		throw new ClassCastException("Don't know how to get nth item of type "+RT.getType(o));
 	}
 	
 	/**
@@ -704,7 +705,7 @@ public class RT {
 	 */
 	public static Long count(ACell a) {
 		if (a == null) return 0L;
-		if (a instanceof ADataStructure) return ((ADataStructure<?>) a).count();
+		if (a instanceof ACountable) return ((ACountable<?>) a).count();
 		return null;
 	}
 
@@ -1060,6 +1061,19 @@ public class RT {
 	@SuppressWarnings("unchecked")
 	public static <E extends ACell> ADataStructure<E> ensureDataStructure(ACell a) {
 		if (a instanceof ADataStructure) return (ADataStructure<E>) a;
+		return null;
+	}
+	
+	/**
+	 * Casts to an ACountable instance
+	 * 
+	 * @param <E>
+	 * @param a
+	 * @return ADataStructure instance, or null if not a data structure
+	 */
+	@SuppressWarnings("unchecked")
+	public static <E extends ACell> ACountable<E> ensureCountable(ACell a) {
+		if (a instanceof ACountable) return (ACountable<E>) a;
 		return null;
 	}
 

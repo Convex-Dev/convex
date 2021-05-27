@@ -1184,6 +1184,12 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(into 1 [2 3])")); // long is not a conjable data structure
 		assertCastError(step("(into nil :foo)")); // keyword is not a sequence of elements
 		
+		// See #151
+		assertCastError(step("(into (list) #0)")); // Address is not a sequential data structure
+		assertCastError(step("(into #0 [])")); // Address is not a conjable data structure
+		assertCastError(step("(into #0 [1 2])")); // Address is not a conjable data structure
+		assertCastError(step("(into 0 [])")); // Long is not a conjable data structure
+		
 		assertCastError(step("(into {} [nil])")); // nil is not a MapEntry
 		assertCastError(step("(into {} [[:foo]])")); // length 1 vector shouldn't convert to MapEntry
 		assertCastError(step("(into {} [[:foo :bar :baz]])")); // length 1 vector shouldn't convert to MapEntry
