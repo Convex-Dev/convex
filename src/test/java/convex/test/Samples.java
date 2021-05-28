@@ -102,9 +102,9 @@ public class Samples {
 			Blob.fromHex("01"), 2, Blob.fromHex("010000"), 3, Blob.fromHex("010001"), 4, Blob.fromHex("ff0000"), 5,
 			Blob.fromHex("ff0101"), 6);
 
-	public static final ASet<CVMLong> LONG_SET_5 = Sets.create(LONG_MAP_5.keySet());
-	public static final ASet<CVMLong> LONG_SET_10 = Sets.create(LONG_MAP_10.keySet());
-	public static final ASet<CVMLong> LONG_SET_100 = Sets.create(LONG_MAP_100.keySet());
+	public static final ASet<CVMLong> LONG_SET_5 = Sets.of(1,2,3,4,5);
+	public static final ASet<CVMLong> LONG_SET_10 = Sets.create(INT_VECTOR_10);
+	public static final ASet<CVMLong> LONG_SET_100 = Sets.create(INT_VECTOR_300);
 
 	public static final Blob ONE_ZERO_BYTE_DATA = Blob.fromHex("00");
 

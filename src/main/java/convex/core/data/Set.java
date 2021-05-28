@@ -90,8 +90,9 @@ public class Set<T extends ACell> extends ASet<T> {
 	
 	public static <T extends ACell> Set<T> create(ACell[] elements) {
 		AHashMap<T, ACell> m = Maps.empty();
-		for (Object o : elements) {
-			T e = RT.cvm(o);
+		for (ACell o : elements) {
+			@SuppressWarnings("unchecked")
+			T e = (T)o;
 			MapEntry<T, ACell> me = MapEntry.createRef(Ref.get(e), Ref.TRUE_VALUE);
 			m = m.assocEntry(me);
 		}

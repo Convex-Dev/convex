@@ -180,7 +180,7 @@ public class Core {
 			long juice = Juice.addMul(Juice.BUILD_DATA ,n,Juice.BUILD_PER_ELEMENT);
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
-			ASet<?> result = RT.set(o);
+			ASet<?> result = RT.castSet(o);
 			if (result == null) return context.withCastError(0,args, Types.SET);
 
 			return context.withResult(juice, result);
@@ -930,7 +930,7 @@ public class Core {
 			long juice = Juice.BUILD_DATA + (args.length * Juice.BUILD_PER_ELEMENT);
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 			
-			return context.withResult(juice, Sets.create(args));
+			return context.withResult(juice, Set.create(args));
 		}
 	});
 

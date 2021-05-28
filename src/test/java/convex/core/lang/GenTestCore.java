@@ -53,7 +53,7 @@ public class GenTestCore {
 
 		assertTrue(RT.bool(a));
 		
-		ASet<ACell> uniqueVals=RT.set(a);
+		ASet<ACell> uniqueVals=RT.castSet(a);
 		long ucount=RT.count(uniqueVals);
 		assertTrue(ucount<=n);
 		
@@ -143,10 +143,10 @@ public class GenTestCore {
 	public void testSetFunctions(@From(SetGen.class) ASet a) {
 		doSequenceableTests(a);
 		
-		assertSame(a,RT.set(a));
+		assertSame(a,RT.castSet(a));
 		assertSame(Sets.empty(),a.empty());
 	
-		assertEquals(a,RT.set(RT.sequence(a)));
+		assertEquals(a,RT.castSet(RT.sequence(a)));
 
 		long n=RT.count(a);
 		AString key=Strings.create("newkey1");

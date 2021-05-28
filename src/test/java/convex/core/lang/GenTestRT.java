@@ -22,7 +22,7 @@ public class GenTestRT {
 	@Property
 	public void setConversion(@From(CollectionGen.class) ACollection a) {
 		long ac = a.count();
-		ASet<ACell> set = RT.set(a);
+		ASet<ACell> set = RT.castSet(a);
 		assertTrue(set.count() <= ac);
 		for (Object o : a) {
 			assertTrue(set.contains(o));

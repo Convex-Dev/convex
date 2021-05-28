@@ -47,7 +47,7 @@ public class DataStructuresTest {
 		assertEquals(10, a.count());
 		ASequence<CVMLong> b = RT.sequence(a);
 		assertEquals(10, b.count());
-		ASet<CVMLong> c = RT.set(b);
+		ASet<CVMLong> c = RT.castSet(b);
 		assertEquals(a, c);
 	}
 

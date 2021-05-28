@@ -1,7 +1,6 @@
 package convex.core.lang;
 
 import java.lang.reflect.Array;
-import java.util.Collection;
 import java.util.function.BiFunction;
 
 import convex.core.Constants;
@@ -577,10 +576,10 @@ public class RT {
 	 * Converts any collection to a set
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> ASet<T> set(ACell o) {
+	public static <T extends ACell> ASet<T> castSet(ACell o) {
 		if (o == null) return Sets.empty();
 		if (o instanceof ASet) return (ASet<T>) o;
-		if (o instanceof Collection) return Sets.create((Collection<T>) o);
+		if (o instanceof ADataStructure) return Sets.create((ADataStructure<T>) o);
 		return null;
 	}
 
