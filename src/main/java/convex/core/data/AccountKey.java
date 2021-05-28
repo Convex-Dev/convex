@@ -14,7 +14,7 @@ import convex.core.util.Utils;
  * <p>
  * Using Ed25519:
  * </p>
- * <li>Addresses are the Public Key (32 bytes)</li>
+ * <li>AccountKey is the Public Key (32 bytes)</li>
  * 
  */
 public class AccountKey extends AArrayBlob {
@@ -35,7 +35,7 @@ public class AccountKey extends AArrayBlob {
 	}
 
 	/**
-	 * Wraps the specified bytes as an Address object Warning: underlying bytes are
+	 * Wraps the specified bytes as an AccountKey object. Warning: underlying bytes are
 	 * used directly. Use only if no external references to the byte array will be
 	 * retained.
 	 * 
@@ -47,7 +47,7 @@ public class AccountKey extends AArrayBlob {
 	}
 
 	/**
-	 * Wraps the specified bytes as an Address object Warning: underlying bytes are
+	 * Wraps the specified bytes as an AccountKey object. Warning: underlying bytes are
 	 * used directly. Use only if no external references to the byte array will be
 	 * retained.
 	 * 
@@ -71,10 +71,6 @@ public class AccountKey extends AArrayBlob {
 			return new AccountKey(ab.getInternalArray(),ab.getOffset(),LENGTH);
 		}
 		return wrap(b.getBytes());
-	}
-
-	private static AccountKey wrap(AArrayBlob source) {
-		return new AccountKey(source.store, source.offset, source.length);
 	}
 
 	/**
@@ -101,7 +97,7 @@ public class AccountKey extends AArrayBlob {
 
 	@Override
 	public int hashCode() {
-		// note: We use the first bytes as the hashcode for an Address.
+		// note: We use the first bytes as the hashcode for an AccountKey.
 		// effectively randomly distributed for public keys
 		// avoids collisions with different nonces for dummy addresses
 		return Utils.readInt(store, offset);
@@ -119,10 +115,10 @@ public class AccountKey extends AArrayBlob {
 	}
 
 	/**
-	 * Constructs an Address object from a hex string
+	 * Constructs an AccountKey object from a hex string
 	 * 
 	 * @param hexString
-	 * @return An Address constructed from the hex string, or null if not a valid
+	 * @return An AccountKey constructed from the hex string, or null if not a valid
 	 *         hex string
 	 */
 	public static AccountKey fromHex(String hexString) {
@@ -132,7 +128,7 @@ public class AccountKey extends AArrayBlob {
 	}
 
 	/**
-	 * Constructs an Address object from a hex string
+	 * Constructs an AccountKey object from a hex string
 	 * 
 	 * @param hexString
 	 * @return An Address constructed from the hex string, or null if not a valid
@@ -152,7 +148,7 @@ public class AccountKey extends AArrayBlob {
 
 
 	/**
-	 * Constructs an Address object from a checksummed hex string.
+	 * Constructs an AccountKey object from a checksummed hex string.
 	 * 
 	 * Throws an exception if checksum is not valid
 	 * 
@@ -175,7 +171,7 @@ public class AccountKey extends AArrayBlob {
 	}
 
 	/**
-	 * Converts this Address to a checksummed hex string.
+	 * Converts this AccountKey to a checksummed hex string.
 	 * 
 	 * @return A String containing the checksummed hex representation of this
 	 *         Address
@@ -194,19 +190,6 @@ public class AccountKey extends AArrayBlob {
 			}
 		}
 		return sb.toString();
-	}
-
-	/**
-	 * Create a synthetic Address from a Hash value.
-	 * 
-	 * SECURITY: Will be a usable user Address if and only if the Hash is of the
-	 * ECDSA 64 byte public key.
-	 * 
-	 * @param hash The hash of the ECDSA public key.
-	 * @return Address generated from hash
-	 */
-	public static AccountKey fromHash(Hash hash) {
-		return wrap(hash.slice(Hash.LENGTH - LENGTH, LENGTH)); // take last bytes of hash, in case Address is shorter
 	}
 
 	public static AccountKey readRaw(ByteBuffer data) {
