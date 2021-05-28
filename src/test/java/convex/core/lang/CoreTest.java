@@ -1220,12 +1220,14 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(into #0 [1 2])")); // Address is not a conjable data structure
 		assertCastError(step("(into 0 [])")); // Long is not a conjable data structure
 		
-		assertCastError(step("(into {} [nil])")); // nil is not a MapEntry
-		assertCastError(step("(into {} [[:foo]])")); // length 1 vector shouldn't convert to MapEntry
-		assertCastError(step("(into {} [[:foo :bar :baz]])")); // length 1 vector shouldn't convert to MapEntry
-		assertCastError(step("(into {1 2} [2 3])")); // longs are not map entries
-		assertCastError(step("(into {1 2} [[] []])")); // empty vectors are not map entries
-
+		// bad element types
+		assertArgumentError(step("(into {} [nil])")); // nil is not a MapEntry
+		assertArgumentError(step("(into {} [[:foo]])")); // length 1 vector shouldn't convert to MapEntry
+		assertArgumentError(step("(into {} [[:foo :bar :baz]])")); // length 1 vector shouldn't convert to MapEntry
+		assertArgumentError(step("(into {1 2} [2 3])")); // longs are not map entries
+		assertArgumentError(step("(into {1 2} [[] []])")); // empty vectors are not map entries
+		assertArgumentError(step("(into (blob-map) [[1 2]])"));
+		
 		assertArityError(step("(into)"));
 		assertArityError(step("(into inc)"));
 		assertArityError(step("(into 1 2 3)")); // arity > cast

@@ -1999,7 +1999,7 @@ public class Core {
 				if (seq == null) return context.withCastError(a1, Types.DATA_STRUCTURE);
 				
 				result = result.conjAll(seq);
-				if (result == null) return context.withError(ErrorCodes.CAST,"Invalid element type for 'into'");
+				if (result == null) return context.withError(ErrorCodes.ARGUMENT,"Invalid element type for 'into'");
 			}
 
 			return context.withResult(juice, result);
