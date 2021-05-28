@@ -95,7 +95,7 @@ public enum MessageType {
 	/**
 	 * Request for a peer status update.
 	 * 
-	 * Expected Result is a Vector: [belief-hash states-hash]
+	 * Expected Result is a Vector: [belief-hash states-hash initial-state-hash]
 	 */
 	STATUS(11)
 
