@@ -1587,7 +1587,7 @@ public final class Context<T extends ACell> extends AObject {
 		State state=getState();
 		Symbol sym=RT.ensureSymbol(functionName);
 		AccountStatus as=state.getAccount(target);
-		if (as==null) return this.withError(ErrorCodes.STATE,"Actor does not exist: "+target);
+		if (as==null) return this.withError(ErrorCodes.NOBODY,"Actor Account does not exist: "+target);
 		
 		// Handling for non-zero offers. 
 		// SECURITY: Subtract offer from balance first so we don't have double-spend issues!

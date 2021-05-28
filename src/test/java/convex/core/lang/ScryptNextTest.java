@@ -1,8 +1,6 @@
 package convex.core.lang;
 
-import static convex.test.Assertions.assertCVMEquals;
-import static convex.test.Assertions.assertCastError;
-import static convex.test.Assertions.assertStateError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -87,7 +85,7 @@ public class ScryptNextTest {
         assertEquals(Reader.read("(call \"<Address>\" (+ 1 (* 2 3)) (buy \"Something\"))"), parse("call \"<Address>\" offer 1 + (2 * 3) buy(\"Something\")"));
 
         // ErrorValue[:STATE] : Actor does not exist
-        assertStateError(step("call #6666666 buy(\"Something\")"));
+        assertNobodyError(step("call #6666666 buy(\"Something\")"));
         
         assertCastError(step("call 6666666 buy(\"Something\")"));
 

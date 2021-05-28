@@ -1979,11 +1979,11 @@ public class CoreTest extends ACVMTest {
 		assertCompileError(step(ctx,"(call ctr [foo])")); // not a list
 		assertCompileError(step(ctx,"(call ctr #{some-func 42})")); // See #135
 
-		assertStateError(step(ctx, "(call #666666 12 (bad-fn 1 2))")); // bad actor
+		assertNobodyError(step(ctx, "(call #666666 12 (bad-fn 1 2))")); // bad actor
 		assertArgumentError(step(ctx, "(call ctr -12 (bad-fn 1 2))")); // negative offer
 
 		// bad actor takes precedence over bad offer
-		assertStateError(step(ctx, "(call #666666 -12 (bad-fn 1 2))")); 
+		assertNobodyError(step(ctx, "(call #666666 -12 (bad-fn 1 2))")); 
 
 	}
 	
