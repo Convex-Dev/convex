@@ -45,6 +45,11 @@ public class CLITest {
 		assertCommandLineResult(0, "^Usage: convex \\[-hvV\\] .*", "--help");
 		assertCommandLineResult(0, "^Usage: convex \\[-hvV\\] .*", "-h");
 		assertCommandLineResult(0, "^Usage: convex \\[-hvV\\] .*", "help");
+		assertCommandLineResult(0, "^Usage: convex account \\[-hvV\\] .*", "account", "help");
+		assertCommandLineResult(0, "^Usage: convex account balance \\[-hvV\\] .*", "account",  "balance", "--help");
+		assertCommandLineResult(0, "^Usage: convex account create \\[-fhvV\\] .*", "account",  "create", "--help");
+		assertCommandLineResult(0, "^Usage: convex account information \\[-hvV\\] .*", "account",  "information", "--help");
+		assertCommandLineResult(0, "^Usage: convex account fund \\[-hvV\\] .*", "account",  "fund", "--help");
 		assertCommandLineResult(0, "^Usage: convex key \\[-hvV\\] .*", "key", "help");
 		assertCommandLineResult(0, "^Usage: convex key generate \\[-hvV\\] .*", "key", "generate", "--help");
 		assertCommandLineResult(0, "^Usage: convex key list \\[-hvV\\] .*", "key", "list", "--help");

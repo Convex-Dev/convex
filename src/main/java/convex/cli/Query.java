@@ -5,10 +5,10 @@ import java.util.concurrent.TimeoutException;
 import java.util.logging.Logger;
 
 import convex.api.Convex;
-import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.lang.Reader;
 import convex.core.Init;
+import convex.core.Result;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -22,7 +22,7 @@ import picocli.CommandLine.ParentCommand;
  *
  */
 @Command(name="query",
-    aliases={"qu"},
+	aliases={"qu"},
 	mixinStandardHelpOptions=true,
 	description="Execute a query on the current peer.")
 public class Query implements Runnable {
