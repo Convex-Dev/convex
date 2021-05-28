@@ -1057,7 +1057,8 @@
     :doc {:description "Coerces values to Strings and concatenates them."
           :examples [{:code "(str \"Hello \" name)"}]
           :type :function
-          :signature [{:params [& args]}]}
+          :signature [{:params [& args]
+                       :return String}]}
   }
   
   str?
@@ -1065,7 +1066,8 @@
     :doc {:description "Tests if the argument is a String."
           :examples [{:code "(str? name)"}]
           :type :function
-          :signature [{:params [a]}]}
+          :signature [{:params [a]
+                       :return Boolean}]}
   }
   
   subset?
@@ -1073,7 +1075,8 @@
     :doc {:description "Tests if a set is a subset of a second set. Both arguments must be sets. nil is considered as an empty set."
           :examples [{:code "(subset? #{1} #{1 2 3})"}]
           :type :function
-          :signature [{:params [set1 set2]}]}
+          :signature [{:params [set1 set2]
+                       :return Boolean}]}
   }
   
   symbol
@@ -1081,8 +1084,10 @@
     :doc {:description "Creates a Symbol. Supports Symbols, Keywords and short Strings. An optional path may be provided, which must be a valid Symbol name, and Address, or null for an unqualified Symbol."
           :examples [{:code "(symbol :foo)"}]
           :type :function
-          :signature [{:params [name]}
-                      {:params [path name]}]}
+          :signature [{:params [name]
+                       :return Symbol}
+                      {:params [path name]
+                       :return Symbol}]}
   }
   
   str?
@@ -1090,7 +1095,8 @@
     :doc {:description "Tests if the argument is a String."
           :examples [{:code "(str? \"foo\")"}]
           :type :function
-          :signature [{:params [a]}]}
+          :signature [{:params [a]
+                       :return Boolean}]}
   }
   
   symbol?
@@ -1098,7 +1104,8 @@
     :doc {:description "Tests if the argument is a Symbol."
           :examples [{:code "(symbol? 'foo)"}]
           :type :function
-          :signature [{:params [a]}]}
+          :signature [{:params [a]
+                       :return Boolean}]}
   }
   
   syntax
@@ -1106,8 +1113,10 @@
     :doc {:description "Wraps a value as a Syntax Object, if it is not already a Syntax Object. If metadata is provided, merge the metadata into the resulting Syntax Object."
           :examples [{:code "(syntax 'bar)"}]
           :type :function
-          :signature [{:params [value]}
-                      {:params [value meta]}]}
+          :signature [{:params [value]
+                       :return Syntax}
+                      {:params [value meta]
+                       :return Syntax}]}
   }
   
   syntax?
@@ -1115,7 +1124,8 @@
     :doc {:description "Tests if the argument is a Syntax Object."
           :examples [{:code "(syntax? form)"}]
           :type :function
-          :signature [{:params [a]}]}
+          :signature [{:params [a]
+                       :return Boolean}]}
   }
   
   transfer
@@ -1123,7 +1133,8 @@
     :doc {:description "Transfers the specified amount of coins to the target-address. Returns the amount transferred if successful. Returns FUNDS error if there is insufficient balance in the sender's account. Returns STATE error if the reciever is an Actor that is unable to accept funds."
           :examples [{:code "(transfer my-friend-address 12345678)"}]
           :type :function
-          :signature [{:params [address amount]}]}
+          :signature [{:params [address amount]
+                       :return Long}]}
   }
   
   transfer-memory
@@ -1131,7 +1142,8 @@
     :doc {:description "Transfers the specified amount of memory allowance to the target address. Returns the amount transferred if successful. Returns MEMORY error if there is insufficient balance in the sender's account."
           :examples [{:code "(transfer-memory my-friend-address 100)"}]
           :type :function
-          :signature [{:params [address amount]}]}
+          :signature [{:params [address amount]
+                       :return Long}]}
   }
   
   undef* 
@@ -1147,7 +1159,8 @@
     :doc {:description "Computes the union of zero or more sets. 'nil' is treated as the empty set."
           :examples [{:code "(union #{1 2} #{2 3})"}]
           :type :function
-          :signature [{:params [& sets]}]}
+          :signature [{:params [& sets]
+                       :return Set}]}
   }
   
   unsyntax
@@ -1163,7 +1176,8 @@
     :doc {:description "Gets the values from a map data structure."
           :examples [{:code "(values {1 2 3 4})"}]
           :type :function
-          :signature [{:params [m]}]}
+          :signature [{:params [m]
+                       :return Vector}]}
   }
   
   vec
@@ -1171,7 +1185,8 @@
     :doc {:description "Coerces the argument to a Vector. Arguement must be coercible to a sequence."
           :examples [{:code "(vec #{1 2 3 4})"}]
           :type :function
-          :signature [{:params [coll]}]}
+          :signature [{:params [coll]
+                       :return Vector}]}
   }
   
   vector
@@ -1179,7 +1194,8 @@
     :doc {:description "Creates a Vector with the given elements."
           :examples [{:code "(vector 1 2 3)"}]
           :type :function
-          :signature [{:params [& elements]}]}
+          :signature [{:params [& elements]
+                       :return Vector}]}
   }
   
   vector?
@@ -1187,7 +1203,8 @@
     :doc {:description "Tests if the argument is a Vector."
           :examples [{:code "(vector? [1 2 3])"}]
           :type :function
-          :signature [{:params [a]}]}
+          :signature [{:params [a]
+                       :return Boolean}]}
   }
   
   zero?
@@ -1195,7 +1212,8 @@
     :doc {:description "Tests if the argument has the numeric value zero. Returns false for any non-numeric values."
           :examples [{:code "(zero? 0.1)"}]
           :type :function
-          :signature [{:params [x]}]}
+          :signature [{:params [x]
+                       :return Boolean}]}
   }
   
   *initial-expander*
@@ -1211,7 +1229,8 @@
      :doc {:description "Tests if numeric arguments are in strict increasing order. Reads as 'less-than'."
            :examples [{:code "(< 1 2 3)"}]
            :type :function
-           :signature [{:params [& xs]}]}
+           :signature [{:params [& xs]
+                        :return Boolean}]}
   }
   
   >
@@ -1219,7 +1238,8 @@
      :doc {:description "Tests if numeric arguments are in strict decreasing order. Reads as 'greater-than'."
            :examples [{:code "(> 3 2 1)"}]
            :type :function
-           :signature [{:params [& xs]}]}
+           :signature [{:params [& xs]
+                        :return Boolean}]}
   }
   
   <= 
@@ -1227,7 +1247,8 @@
      :doc {:description "Tests if numeric arguments are in increasing order. Reads as 'less-than-or-equal'."
            :examples [{:code "(<= 1 1 3)"}]
            :type :function
-           :signature [{:params [& xs]}]}
+           :signature [{:params [& xs]
+                        :return Boolean}]}
   }
   
   >=
@@ -1235,7 +1256,8 @@
      :doc {:description "Tests if numeric arguments are in decreasing order. Reads as 'greater-than-or-equal'."
            :examples [{:code "(>= 3 2 2)"}]
            :type :function
-           :signature [{:params [& xs]}]}
+           :signature [{:params [& xs]
+                        :return Boolean}]}
   }
   
   ==
@@ -1243,7 +1265,8 @@
      :doc {:description "Tests if arguments are equal in numerical value."
            :examples [{:code "(== 2 2.0)"}]
            :type :function
-           :signature [{:params [& xs]}]}
+           :signature [{:params [& xs]
+                        :return Boolean}]}
   }
   
   =
@@ -1251,7 +1274,8 @@
      :doc {:description "Tests if arguments are equal in value."
            :examples [{:code "(= :foo :foo)"}]
            :type :function
-           :signature [{:params [& vals]}]}
+           :signature [{:params [& vals]
+                        :return Boolean}]}
   }
   
   +
