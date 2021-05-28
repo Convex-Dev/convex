@@ -51,18 +51,15 @@ public class Main implements Runnable {
 
 	@Option(names={ "-c", "--config"},
 		scope = ScopeType.INHERIT,
-		description="Use the specified config file. All parameters to this app can be set by removing the leading '--'. ")
+		description="Use the specified config file.%n All parameters to this app can be set by removing the leading '--', and adding"
+			+ " a leading 'convex.'.%n So to set the keystore filename you can write 'convex.keystore=my_keystore_filename.dat'%n"
+			+ "To set a sub command such as `./convex peer start index=4` index parameter you need to write 'convex.peer.start.index=4'")
 	private String configFilename;
 
-	@Option(names={ "-v", "--verbose"},
+    @Option(names={"-e", "--etch"},
 		scope = ScopeType.INHERIT,
-		description="Show more verbose log information.")
-	private boolean verbose;
-
-	@Option(names={"-s", "--session"},
-	defaultValue=Constants.SESSION_FILENAME,
-	description="Session filename. Defaults ${DEFAULT-VALUE}")
-	private String sessionFilename;
+		description="Convex state storage filename. The default is to use a temporary storage filename.")
+	private String etchStoreFilename;
 
 	@Option(names={"-k", "--keystore"},
 		defaultValue=Constants.KEYSTORE_FILENAME,
@@ -76,10 +73,16 @@ public class Main implements Runnable {
 		description="Password to read/write to the Keystore")
 	private String password;
 
-	@Option(names={"-e", "--etch"},
+	@Option(names={"-s", "--session"},
+	defaultValue=Constants.SESSION_FILENAME,
+	description="Session filename. Defaults ${DEFAULT-VALUE}")
+	private String sessionFilename;
+
+    @Option(names={ "-v", "--verbose"},
 		scope = ScopeType.INHERIT,
-		description="Convex state storage filename. The default is to use a temporary storage filename.")
-	private String etchStoreFilename;
+		description="Show more verbose log information.")
+	private boolean verbose;
+
 
 	@Override
 	public void run() {
