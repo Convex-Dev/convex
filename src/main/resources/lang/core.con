@@ -33,12 +33,12 @@
     :expander true
    }
   (fn [x e] 
-     (let [[_ name & decl] (unsyntax x)
+     (let [[_ name & decl] x
            mac (cons 'fn decl)
-           mac (syntax mac (meta (first decl)))
-           form `(def ~(syntax name {:expander true}) 
+           mmeta (meta (first decl))
+           form `(def ~(syntax name (merge mmeta {:expander true})) 
                    (let [m# ~mac]
-                     (fn [x e] (e (apply m# (next (unsyntax x))) e))))]
+                     (fn [x e] (e (apply m# (next x)) e))))]
        (e form e))))
 
 (defmacro macro 
