@@ -574,6 +574,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals("", evalS("(str)"));
 		assertEquals("1", evalS("(str 1)"));
 		assertEquals("12", evalS("(str 1 2)"));
+		assertEquals("255", evalS("(str (byte 0xff))"));
 		assertEquals("baz", evalS("(str \"baz\")"));
 		assertEquals("bazbar", evalS("(str \"baz\" \"bar\")"));
 		assertEquals("baz", evalS("(str \\b \\a \\z)"));
@@ -733,6 +734,11 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(nth [] 1 2)"));
 		assertArityError(step("(nth 1 1 2)")); // arity > cast
 
+		// nth on Blobs
+		assertEquals(CVMByte.create(255),eval("(nth 0xFF 0)"));
+		assertFalse (evalB("(= 16 (nth 0x0010 1))"));
+		assertTrue(evalB("(== 16 (nth 0x0010 1))"));
+		
 		// cast errors for bad indexes
 		assertCastError(step("(nth [] :foo)"));
 		assertCastError(step("(nth [] nil)"));
