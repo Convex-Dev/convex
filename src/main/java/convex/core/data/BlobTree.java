@@ -214,6 +214,10 @@ public class BlobTree extends ABlob {
 		return getChild(ci).getUnchecked(i - ci * childLength);
 	}
 
+	/**
+	 * Gets the length in bytes of each full child of this BlobTree
+	 * @return
+	 */
 	private int childLength() {
 		return 1 << (shift + Blobs.CHUNK_SHIFT);
 	}
@@ -235,6 +239,15 @@ public class BlobTree extends ABlob {
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
 			if (!children[i].equals(b.children[i])) return false;
+		}
+		return true;
+	}
+	
+	@Override
+	public boolean equalsBytes(byte[] bytes, int byteOffset) {
+		int clen=childLength();
+		for (int i=0; i<children.length; i++) {
+			if (!(getChild(i).equalsBytes(bytes, byteOffset+i*clen))) return false;
 		}
 		return true;
 	}

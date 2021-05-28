@@ -220,4 +220,9 @@ public class LongBlob extends ABlob {
 		return Tag.BLOB;
 	}
 
+	@Override
+	public boolean equalsBytes(byte[] bytes, int byteOffset) {
+		return value==Utils.readLong(bytes, byteOffset);
+	}
+
 }

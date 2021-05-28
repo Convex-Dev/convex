@@ -234,6 +234,14 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	public abstract boolean equals(ABlob o);
 
 	/**
+	 * Tests if this Blob is equal to a subset of a byte array
+	 * @param bytes
+	 * @param byteOffset
+	 * @return true if exactly equal, false otherwise
+	 */
+	public abstract boolean equalsBytes(byte[] bytes, int byteOffset);
+	
+	/**
 	 * Compares this blob to another blob, in lexographic order sorting by first
 	 * bytes.
 	 * 

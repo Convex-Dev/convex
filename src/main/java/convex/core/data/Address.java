@@ -278,6 +278,11 @@ public class Address extends ABlob {
 	public long hexMatchLength(ABlob b, long start, long length) {
 		return toBlob().hexMatchLength(b,start,length);
 	}
+	
+	@Override
+	public boolean equalsBytes(byte[] bytes, int byteOffset) {
+		return value==Utils.readLong(bytes, byteOffset);
+	}
 
 	@Override
 	public long toLong() {
