@@ -22,6 +22,7 @@ import picocli.CommandLine.ParentCommand;
  *
  */
 @Command(name="query",
+    aliases={"qu"},
 	mixinStandardHelpOptions=true,
 	description="Execute a query on the current peer.")
 public class Query implements Runnable {
