@@ -970,7 +970,7 @@
           :type :function
           :signature [{:params [coll]
                        :return Set}]
-          :errors {:CAST "If the argument is not a countable collection."}}
+          :errors {:CAST "If the argument is not a countable data structure."}}
   }
   
   set-controller
@@ -978,7 +978,9 @@
     :doc {:description "Sets the controller for the current Account. The controller account is granted powerful access privileges including the ability to run 'eval-as'. May set controller to 'nil' to disable such control (this is the default for new accounts)."
           :examples [{:code "(set-controller #9)"}]
           :type :function
-          :signature [{:params [addr]}]}
+          :signature [{:params [addr]}]
+          :errors {:CAST "If the argument is neither a valid Address nor nil"
+                   :NOBODY "If the address does nott refer to an existing Account."}}
   }
   
   set-holding
@@ -986,7 +988,8 @@
 	 :doc {:description "Sets the holding value for a specified owner account address. Owner account must exist. Returns the new holding value."
          :examples [{:code "(set-holding *caller* 1000)"}]
          :type :function
-         :signature [{:params [owner value]}]}
+         :signature [{:params [owner value]}]
+         :errors {:CAST "If the first argument is not an Address."}}
 	}
   
   set-key
