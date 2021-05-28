@@ -4,7 +4,6 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Random;
 
-import convex.core.crypto.Hash;
 import convex.core.exceptions.BadFormatException;
 import convex.core.util.Errors;
 import convex.core.util.Utils;

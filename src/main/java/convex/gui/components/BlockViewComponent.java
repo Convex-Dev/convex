@@ -10,8 +10,8 @@ import convex.core.Block;
 import convex.core.Order;
 import convex.core.Peer;
 import convex.core.State;
-import convex.core.crypto.Hash;
 import convex.core.data.AVector;
+import convex.core.data.Hash;
 import convex.gui.components.models.StateModel;
 import convex.gui.manager.PeerManager;
 

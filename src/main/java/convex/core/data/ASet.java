@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import convex.core.crypto.Hash;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 

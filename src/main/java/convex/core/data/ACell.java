@@ -4,7 +4,6 @@ import java.nio.ByteBuffer;
 import java.util.function.Consumer;
 
 import convex.core.Constants;
-import convex.core.crypto.Hash;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;

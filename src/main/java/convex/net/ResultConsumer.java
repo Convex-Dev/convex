@@ -8,8 +8,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import convex.core.Result;
-import convex.core.crypto.Hash;
 import convex.core.data.ACell;
+import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.MissingDataException;
 import convex.core.store.Stores;

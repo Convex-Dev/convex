@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.Blob;
 import convex.core.data.Format;
+import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
@@ -21,19 +22,19 @@ public class HashTest {
 	@Test
 	public void testBasicSHA256() {
 		// empty bytes
-		Hash h1 = Hash.sha256(Utils.EMPTY_BYTES);
+		Hash h1 = Hashing.sha256(Utils.EMPTY_BYTES);
 		assertEquals("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", h1.toHexString());
 
 		// 32 empty bytes
-		Hash h1_32 = Hash.sha256(new byte[32]);
+		Hash h1_32 = Hashing.sha256(new byte[32]);
 		assertEquals("66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925", h1_32.toHexString());
 
 		// Hash from https://www.freeformatter.com/sha256-generator.html
-		Hash h2 = Hash.sha256("Hello");
+		Hash h2 = Hashing.sha256("Hello");
 		assertEquals("185f8db32271fe25f561a6fc938b2e264306ec304eda518007d1764826381969", h2.toHexString());
 
 		// Hash from https://passwordsgenerator.net/sha256-hash-generator/
-		Hash h3 = Hash.sha256("Boo");
+		Hash h3 = Hashing.sha256("Boo");
 		assertEquals("BF66F3E41E470B7D073DB8C5FB82E737962D63080EDBCC4F9EF3C3CE735472EA",
 				h3.toHexString().toUpperCase());
 	}
@@ -43,25 +44,25 @@ public class HashTest {
 		// empty bytes Keccak256
 		// note that SHA-3 is
 		// "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a"
-		Hash h1 = Hash.keccak256(Utils.EMPTY_BYTES);
+		Hash h1 = Hashing.keccak256(Utils.EMPTY_BYTES);
 		assertEquals("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470", h1.toHexString());
 
 		// from https://leventozturk.com/engineering/sha3/
-		Hash h2 = Hash.keccak256("abc");
+		Hash h2 = Hashing.keccak256("abc");
 		assertEquals("4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45", h2.toHexString());
 
 		// from web3j test suite
-		Hash h3 = Hash.keccak256("EVWithdraw(address,uint256,bytes32)");
+		Hash h3 = Hashing.keccak256("EVWithdraw(address,uint256,bytes32)");
 		assertEquals("953d0c27f84a9649b0e121099ffa9aeb7ed83e65eaed41d3627f895790c72d41", h3.toHexString());
 
 		// Random name hash
-		Hash h4 = Hash.keccak256("Poland");
+		Hash h4 = Hashing.keccak256("Poland");
 		assertEquals("62812097841d5ae3dd00c7fbe3157fad0b8118c15b2f5816f6831069f6056f82", h4.toHexString());
 	}
 	
 	@Test 
 	public void testBuiltinHashes() {
-		Hash h1 = Hash.sha3(Utils.EMPTY_BYTES);
+		Hash h1 = Hashing.sha3(Utils.EMPTY_BYTES);
 		assertEquals("a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a", h1.toHexString());
 		assertEquals(Hash.EMPTY_HASH, h1);
 		
@@ -102,9 +103,9 @@ public class HashTest {
 		byte[] genesisHeader = Utils.hexToBytes(GENESIS_HEADER);
 		assertEquals(80, genesisHeader.length);
 		// genesisHeader=Arrays.reverse(genesisHeader);
-		Hash h1 = Hash.sha256(genesisHeader);
+		Hash h1 = Hashing.sha256(genesisHeader);
 		assertEquals("af42031e805ff493a07341e2f74ff58149d22ab9ba19f61343e2c86c71c5d66d", h1.toHexString());
-		Hash h2 = h1.computeHash(Hash.getSHA256Digest());
+		Hash h2 = h1.computeHash(Hashing.getSHA256Digest());
 		assertEquals("6fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000", h2.toHexString());
 		// reversed bytes for little-endian format
 		assertEquals("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
@@ -114,7 +115,7 @@ public class HashTest {
 	@Test
 	public void testEquality() {
 		Hash h = Hash.NULL_HASH;
-		assertEquals(h, Hash.sha3(new byte[] { Tag.NULL }));
+		assertEquals(h, Hashing.sha3(new byte[] { Tag.NULL }));
 		assertNotEquals(h, h.toBlob());
 
 		assertEquals(0, h.compareTo(h.toBlob()));

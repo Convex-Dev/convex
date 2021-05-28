@@ -12,7 +12,6 @@ import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.crypto.Hash;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;

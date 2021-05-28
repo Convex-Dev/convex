@@ -12,7 +12,6 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.crypto.Hash;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.test.Samples;

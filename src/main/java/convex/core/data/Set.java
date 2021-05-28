@@ -5,7 +5,6 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.function.Function;
 
-import convex.core.crypto.Hash;
 import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;

@@ -4,7 +4,6 @@ import java.nio.ByteBuffer;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
-import convex.core.crypto.Hash;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;

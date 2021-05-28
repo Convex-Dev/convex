@@ -8,6 +8,7 @@ import java.security.Signature;
 import java.security.SignatureException;
 
 import convex.core.data.AccountKey;
+import convex.core.data.Hash;
 import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;

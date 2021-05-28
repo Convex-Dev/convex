@@ -5,8 +5,8 @@ import java.io.IOException;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
-import convex.core.crypto.Hash;
 import convex.core.data.ACell;
+import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.store.AStore;

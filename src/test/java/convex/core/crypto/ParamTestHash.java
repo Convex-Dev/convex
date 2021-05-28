@@ -11,6 +11,7 @@ import org.junit.runners.Parameterized;
 
 import convex.core.data.ABlob;
 import convex.core.data.Blob;
+import convex.core.data.Hash;
 import convex.core.util.Utils;
 
 @RunWith(Parameterized.class)
@@ -23,11 +24,11 @@ public class ParamTestHash {
 
 	@Parameterized.Parameters(name = "{index}: {0}")
 	public static Collection<Object[]> dataExamples() {
-		return Arrays.asList(new Object[][] { { "Empty bytes", Hash.sha256(Utils.EMPTY_BYTES) },
-				{ "Short string data", Hash.sha256("Hello World") },
-				{ "Length 2 strict sublist of byte data", Hash.sha256(new byte[] { 1, 2, 3, 4 }) },
-				{ "Bitcoin genesis header block",
-						Blob.fromHex(HashTest.GENESIS_HEADER).computeHash(Hash.getSHA256Digest()) } });
+		return Arrays.asList(new Object[][] { 
+				{ "Empty bytes", Hashing.sha256(Utils.EMPTY_BYTES) },
+				{ "Short string data", Hashing.sha256("Hello World") },
+				{ "Length 2 strict sublist of byte data", Hashing.sha256(new byte[] { 1, 2, 3, 4 }) },
+				{ "Bitcoin genesis header block", Blob.fromHex(HashTest.GENESIS_HEADER).computeHash(Hashing.getSHA256Digest()) } });
 	}
 
 	@Test

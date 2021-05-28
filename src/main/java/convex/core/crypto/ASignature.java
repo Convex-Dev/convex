@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
+import convex.core.data.Hash;
 import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.util.Utils;

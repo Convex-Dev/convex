@@ -1,9 +1,7 @@
 package convex.core.data;
 
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 
-import convex.core.crypto.Hash;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
@@ -197,22 +195,6 @@ public class AccountKey extends AArrayBlob {
 		}
 		return sb.toString();
 	}
-	
-
-	/**
-	 * Computes an Address from the Keccak256 hash of a 512 bit public key.
-	 * 
-	 * Method as used in Bitcoin / Ethereum. Not relevant in Ed25519 mode.
-	 * 
-	 * @param publicKey
-	 * @return The Address representing the given public key.
-	 */
-	public static AccountKey fromPublicKey(byte[] publicKey) {
-		if (publicKey.length != 64)
-			throw new IllegalArgumentException("Address creation requires a 512 bit public key");
-		Hash hash = Hash.keccak256(publicKey);
-		return fromHash(hash); // Take last bytes of 256bit hash, up to the required Address length
-	}
 
 	/**
 	 * Create a synthetic Address from a Hash value.
@@ -225,18 +207,6 @@ public class AccountKey extends AArrayBlob {
 	 */
 	public static AccountKey fromHash(Hash hash) {
 		return wrap(hash.slice(Hash.LENGTH - LENGTH, LENGTH)); // take last bytes of hash, in case Address is shorter
-	}
-
-	/**
-	 * Computes an Address from a BigInteger public key
-	 * 
-	 * @param pubKey The public key from which to compute the Address
-	 * @return The Address representing the given public key.
-	 */
-	public static AccountKey fromPublicKey(BigInteger pubKey) {
-		byte[] publicKey = new byte[64];
-		Utils.writeUInt(pubKey, publicKey, 0, 64);
-		return fromPublicKey(publicKey);
 	}
 
 	public static AccountKey readRaw(ByteBuffer data) {

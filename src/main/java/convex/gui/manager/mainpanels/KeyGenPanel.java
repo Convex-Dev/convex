@@ -14,10 +14,10 @@ import javax.swing.border.EmptyBorder;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519KeyPair;
-import convex.core.crypto.Hash;
 import convex.core.crypto.Mnemonic;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.Blob;
+import convex.core.data.Hash;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
 import convex.gui.manager.PeerManager;

@@ -5,13 +5,13 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.Hash;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;

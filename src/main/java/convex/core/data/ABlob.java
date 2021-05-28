@@ -3,7 +3,7 @@ package convex.core.data;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 
-import convex.core.crypto.Hash;
+import convex.core.crypto.Hashing;
 import convex.core.data.prim.CVMByte;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
@@ -120,7 +120,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 */
 	public final Hash getContentHash() {
 		if (contentHash == null) {
-			contentHash = computeHash(Hash.getDigest());
+			contentHash = computeHash(Hashing.getDigest());
 		}
 		return contentHash;
 	}

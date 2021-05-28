@@ -4,7 +4,6 @@ import java.lang.reflect.Array;
 import java.util.function.BiFunction;
 
 import convex.core.Constants;
-import convex.core.crypto.Hash;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.ACollection;
@@ -21,6 +20,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
+import convex.core.data.Hash;
 import convex.core.data.IAssociative;
 import convex.core.data.IGet;
 import convex.core.data.INumeric;

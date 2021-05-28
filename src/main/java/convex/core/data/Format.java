@@ -17,7 +17,6 @@ import convex.core.BlockResult;
 import convex.core.Order;
 import convex.core.Result;
 import convex.core.State;
-import convex.core.crypto.Hash;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMChar;

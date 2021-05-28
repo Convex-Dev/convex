@@ -16,11 +16,11 @@ import java.util.logging.Logger;
 
 import convex.api.Shutdown;
 import convex.core.Constants;
-import convex.core.crypto.Hash;
 import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Format;
+import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.RefSoft;
 import convex.core.util.Counters;

@@ -6,8 +6,8 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Init;
 import convex.core.State;
-import convex.core.crypto.Hash;
 import convex.core.data.ACell;
+import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.store.AStore;

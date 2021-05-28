@@ -8,8 +8,8 @@ import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
 import convex.core.Init;
-import convex.core.crypto.Hash;
 import convex.core.data.ACell;
+import convex.core.data.Hash;
 
 public class AcquireState {
 

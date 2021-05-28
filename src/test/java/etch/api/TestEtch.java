@@ -8,9 +8,9 @@ import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.crypto.Hash;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;

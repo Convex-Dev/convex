@@ -11,7 +11,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
-import convex.core.crypto.Hash;
 import convex.core.crypto.HashTest;
 import convex.test.Samples;
 

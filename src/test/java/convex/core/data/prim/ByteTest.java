@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.crypto.Hash;
+import convex.core.data.Hash;
 import convex.core.data.ObjectsTest;
 import convex.core.lang.RT;
 

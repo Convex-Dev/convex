@@ -1,6 +1,6 @@
 package convex.core.exceptions;
 
-import convex.core.crypto.Hash;
+import convex.core.data.Hash;
 import convex.core.store.Stores;
 
 /**

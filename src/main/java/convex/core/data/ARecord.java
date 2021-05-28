@@ -8,7 +8,6 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
 import convex.core.Block;
-import convex.core.crypto.Hash;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.lang.impl.RecordFormat;

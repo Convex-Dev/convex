@@ -2,7 +2,6 @@ package convex.core.data;
 
 import java.lang.ref.SoftReference;
 
-import convex.core.crypto.Hash;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.store.Stores;
