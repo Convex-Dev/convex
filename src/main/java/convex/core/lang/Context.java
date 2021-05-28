@@ -1365,13 +1365,22 @@ public final class Context<T extends ACell> extends AObject {
 	}
 	
 	/**
-	 * Tests if this context holds an exceptional result.
+	 * Tests if this Context holds an exceptional result.
 	 * 
 	 * Ops should cancel and return exceptional results unchanged, unless they can handle them.
 	 * @return true if context has an exceptional value, false otherwise
 	 */
 	public boolean isExceptional() {
 		return exception!=null;
+	}
+	
+	/**
+	 * Tests if this Context's current status contains an Error. Errors are an uncatchable subset of Exceptions.
+	 * 
+	 * @return true if context has an Error value, false otherwise
+	 */
+	public boolean isError() {
+		return (exception!=null)&&(exception instanceof ErrorValue);
 	}
 
 	/**
@@ -1587,7 +1596,7 @@ public final class Context<T extends ACell> extends AObject {
 			AccountStatus cas=state.getAccount(senderAddress);
 			long balance=cas.getBalance();
 			if (balance<offer) {
-				return this.withFundsError("Insufficient funds for offer: "+offer);
+				return this.withFundsError("Insufficient funds for offer: "+offer +" trying to call Actor "+target+ " function ("+sym+" ...)");
 			}
 			cas=cas.withBalance(balance-offer);
 			state=state.putAccount(senderAddress, cas);
@@ -1598,11 +1607,16 @@ public final class Context<T extends ACell> extends AObject {
 		AFn<R> fn=as.getExportedFunction(sym);
 		if (fn==null) return this.withError(ErrorCodes.STATE,"Account "+target+" does not have exported function: "+sym+" , *exports*="+as.getEnvironmentValue(Symbols.STAR_EXPORTS));
 
-		// 
+		// Ensure we create a forked Context for the Actor call
 		final Context<R> exContext=forkActorCall(state, target, offer);
 		
 		// INVOKE ACTOR FUNCTION
 		final Context<R> rctx=exContext.invoke(fn,args);
+		
+		ErrorValue ev=rctx.getError();
+		if (ev!=null) {
+			ev.addTrace("Calling Actor "+target+" with function ("+sym+" ...)");
+		}
 		
 		// SECURITY: must handle state transitions in results correctly
 		// calling handleStateReturns on 'this' to ensure original values are restored
@@ -1780,6 +1794,18 @@ public final class Context<T extends ACell> extends AObject {
 	public ACell getErrorCode() {
 		if (exception!=null) {
 			return exception.getCode();
+		}
+		return null;
+	}
+	
+	/**
+	 * Gets the Error from this Context, or null if not an Error
+	 * 
+	 * @return The ErrorType of the current exceptional value, or null if there is no error.
+	 */
+	public ErrorValue getError() {
+		if (exception instanceof ErrorValue) {
+			return (ErrorValue)exception;
 		}
 		return null;
 	}

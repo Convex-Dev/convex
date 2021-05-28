@@ -10,7 +10,14 @@ import convex.core.data.AString;
 import convex.core.data.Strings;
 
 /**
- * Class representing a function error value
+ * Class representing a function error value.
+ * 
+ * Contains:
+ * <ul>
+ * <li>An immutable Error Code</li>
+ * <li>An immutable Error Message</li>
+ * <li>A mutable error trace (for information purposes outside the CVM)</li>
+ * </ul>
  * 
  * "Computers are useless. They can only give you answers."
  * - Pablo Picasso
