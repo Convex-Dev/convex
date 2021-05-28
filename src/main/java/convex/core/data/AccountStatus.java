@@ -33,6 +33,15 @@ public class AccountStatus extends ARecord {
 			Keywords.HOLDINGS, Keywords.CONTROLLER, Keywords.KEY};
 
 	private static final RecordFormat FORMAT = RecordFormat.of(ACCOUNT_KEYS);
+	
+	private static final int HAS_SEQUENCE=1<<FORMAT.indexFor(Keywords.SEQUENCE);
+	private static final int HAS_BALANCE=1<<FORMAT.indexFor(Keywords.BALANCE);
+	private static final int HAS_ALLOWANCE=1<<FORMAT.indexFor(Keywords.ALLOWANCE);
+	private static final int HAS_ENVIRONMENT=1<<FORMAT.indexFor(Keywords.ENVIRONMENT);
+	private static final int HAS_METADATA=1<<FORMAT.indexFor(Keywords.METADATA);
+	private static final int HAS_HOLDINGS=1<<FORMAT.indexFor(Keywords.HOLDINGS);
+	private static final int HAS_CONTROLLER=1<<FORMAT.indexFor(Keywords.CONTROLLER);
+	private static final int HAS_KEY=1<<FORMAT.indexFor(Keywords.KEY);
 
 	private AccountStatus(long sequence, long balance, long memory,
 			AHashMap<Symbol, ACell> environment, 
@@ -111,29 +120,46 @@ public class AccountStatus extends ARecord {
 		bs[pos++]=Tag.ACCOUNT_STATUS;
 		return encodeRaw(bs,pos);
 	}
+	
+	private int getInclusion() {
+		int included=0;
+		if (sequence!=0L) included|=HAS_SEQUENCE;
+		if (balance!=0L) included|=HAS_BALANCE;
+		if (memory!=0L) included|=HAS_ALLOWANCE;
+		if (environment!=null) included|=HAS_ENVIRONMENT;
+		if (metadata!=null) included|=HAS_METADATA;
+		if (holdings!=null) included|=HAS_HOLDINGS;
+		if (controller!=null) included|=HAS_CONTROLLER;
+		if (publicKey!=null) included|=HAS_KEY;
+		return included;
+		
+	}
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = Format.writeVLCLong(bs, pos,sequence);
-		pos = Format.writeVLCLong(bs,pos, balance);
-		pos = Format.writeVLCLong(bs,pos, memory);
-		pos = Format.write(bs,pos, environment);
-		pos = Format.write(bs,pos, metadata);
-		pos = Format.write(bs,pos, holdings);
-		pos = Format.write(bs,pos, controller);
-		pos = Format.write(bs,pos, publicKey);
+		int included=getInclusion();
+		bs[pos++]=(byte)included;
+		if ((included&HAS_SEQUENCE)!=0) pos = Format.writeVLCLong(bs, pos,sequence);
+		if ((included&HAS_BALANCE)!=0) pos = Format.writeVLCLong(bs,pos, balance);
+		if ((included&HAS_ALLOWANCE)!=0) pos = Format.writeVLCLong(bs,pos, memory);
+		if ((included&HAS_ENVIRONMENT)!=0) pos = Format.write(bs,pos, environment);
+		if ((included&HAS_METADATA)!=0) pos = Format.write(bs,pos, metadata);
+		if ((included&HAS_HOLDINGS)!=0) pos = Format.write(bs,pos, holdings);
+		if ((included&HAS_CONTROLLER)!=0) pos = Format.write(bs,pos, controller);
+		if ((included&HAS_KEY)!=0) pos = Format.write(bs,pos, publicKey);
 		return pos;
 	}
 
 	public static AccountStatus read(ByteBuffer bb) throws BadFormatException {
-		long sequence = Format.readVLCLong(bb);
-		long balance = Format.readVLCLong(bb);
-		long allowance = Format.readVLCLong(bb);
-		AHashMap<Symbol, ACell> environment = Format.read(bb);
-		AHashMap<Symbol, AHashMap<ACell,ACell>> metadata = Format.read(bb);
-		ABlobMap<Address,ACell> holdings = Format.read(bb);
-		Address controller = Format.read(bb);
-		AccountKey publicKey = Format.read(bb);
+		int included=bb.get();
+		long sequence = ((included&HAS_SEQUENCE)!=0) ? Format.readVLCLong(bb) : 0L;
+		long balance = ((included&HAS_BALANCE)!=0) ? Format.readVLCLong(bb) : 0L;
+		long allowance = ((included&HAS_ALLOWANCE)!=0) ? Format.readVLCLong(bb) : 0L;
+		AHashMap<Symbol, ACell> environment = ((included&HAS_ENVIRONMENT)!=0) ? Format.read(bb):null;
+		AHashMap<Symbol, AHashMap<ACell,ACell>> metadata = ((included&HAS_METADATA)!=0) ? Format.read(bb) : null;
+		ABlobMap<Address,ACell> holdings = ((included&HAS_HOLDINGS)!=0) ? Format.read(bb) : null;
+		Address controller = ((included&HAS_CONTROLLER)!=0) ? Format.read(bb) : null;
+		AccountKey publicKey = ((included&HAS_KEY)!=0) ? Format.read(bb) : null;
 		return new AccountStatus(sequence, balance, allowance, environment,metadata,holdings,controller,publicKey);
 	}
 
@@ -310,8 +336,9 @@ public class AccountStatus extends ARecord {
 		return new AccountStatus(sequence, balance, memory, environment,metadata,newHoldings,controller,publicKey);
 	}
 	
-	public AccountStatus withController(Address controllerAddress) {
-		return new AccountStatus(sequence, balance, memory, environment,metadata,holdings,controllerAddress,publicKey);
+	public AccountStatus withController(Address newController) {
+		if (controller==newController) return this;
+		return new AccountStatus(sequence, balance, memory, environment,metadata,holdings,newController,publicKey);
 	}
 
 	/**
