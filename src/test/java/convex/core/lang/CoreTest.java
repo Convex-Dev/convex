@@ -515,9 +515,9 @@ public class CoreTest extends ACVMTest {
 		assertEquals(eval("(blob-map 0xa2 :foo)"),eval("(assoc (blob-map) 0xa2 :foo)"));
 		assertEquals(eval("(blob-map 0xa2 :foo 0xb3 :bar)"),eval("(assoc (blob-map) 0xa2 :foo 0xb3 :bar)"));
 		
-		assertCastError(step("(blob-map :foo :bar)"));
-		
-		assertArgumentError(step("(assoc (blob-map) :foo 10)")); // bad key types cause argument errors. See Issue #101
+		// Bad key types should result in argument errors
+		assertArgumentError(step("(blob-map :foo :bar)")); // See issue #162
+		assertArgumentError(step("(assoc (blob-map) :foo 10)")); // See Issue #101
 		
 		assertArityError(step("(blob-map 0xabcd)"));
 		assertArityError(step("(blob-map 0xa2 :foo 0xb3)"));

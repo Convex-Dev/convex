@@ -913,8 +913,10 @@ public class Core {
 			int n=len/2;
 			for (int i=0; i<n; i++) {
 				int ix=i*2;
-				r=r.assoc(args[ix], args[ix+1]);
-				if (r==null) return context.withCastError(ix, args, Types.BLOB); // must be bad key type
+				ACell k=args[ix];
+				ACell v=args[ix+1];
+				r=r.assoc(k, v);
+				if (r==null) return context.withArgumentError("Cannot have a key of Type "+RT.getType(k) +" in blob-map"); // must be bad key type
 			}
 			
 			return context.withResult(juice, r);
