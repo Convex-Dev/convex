@@ -149,6 +149,9 @@ public class Init {
 		return s;
 	}
 	
+	static final ACell TRUST_CODE=Reader.readResource("libraries/trust.con");
+	static final ACell REGISTRY_CODE=Reader.readResource("actors/registry.con");
+	
 	public static State createCoreLibraries() throws IOException {
 		State s=createBaseAccounts();
 		
@@ -156,16 +159,14 @@ public class Init {
 
 		{ // Deploy Trust library
 			Context<?> ctx = Context.createFake(s, INIT);
-			ACell form = Reader.readResource("libraries/trust.con");
-			ctx = ctx.deployActor(form);
+			ctx = ctx.deployActor(TRUST_CODE);
 			if (!TRUST_ADDRESS .equals(ctx.getResult())) throw new Error("Wrong trust address!");
 			s = ctx.getState();
 		}
 
 		{ // Deploy Registry Actor to fixed Address
 			Context<Address> ctx = Context.createFake(s, INIT);
-			ACell form = Reader.readResource("actors/registry.con");
-			ctx = ctx.deployActor(form);
+			ctx = ctx.deployActor(REGISTRY_CODE);
 			if (!REGISTRY_ADDRESS .equals(ctx.getResult())) throw new Error("Wrong registry address!");
 			// Note the Registry registers itself upon creation
 			s = ctx.getState();

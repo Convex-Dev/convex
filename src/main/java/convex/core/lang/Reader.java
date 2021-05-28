@@ -639,8 +639,13 @@ public class Reader extends BaseParser<ACell> {
 		return (Syntax) doParse(new ReportingParseRunner<ACell>(reader.ExpressionInput()), source);
 	}
 
-	public static ACell readResource(String path) throws IOException {
-		String source = Utils.readResourceAsString(path);
+	public static ACell readResource(String path)  {
+		String source;
+		try {
+			source = Utils.readResourceAsString(path);
+		} catch (IOException e) {
+			throw Utils.sneakyThrow(e);
+		}
 		Reader reader = formReader.get(); 
 		reader.tempSource = source;
 		return doParse(new ReportingParseRunner<ACell>(reader.ExpressionInput()), source);
