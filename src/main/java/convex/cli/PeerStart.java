@@ -21,7 +21,7 @@ import picocli.CommandLine.Spec;
  */
 
 @Command(name="start",
-    aliases={"st"},
+	aliases={"st"},
 	mixinStandardHelpOptions=true,
 	description="Starts a local peer.")
 public class PeerStart implements Runnable {

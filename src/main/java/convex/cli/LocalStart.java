@@ -19,7 +19,7 @@ import picocli.CommandLine.ParentCommand;
  */
 
 @Command(name="start",
-    aliases={"st"},
+	aliases={"st"},
 	mixinStandardHelpOptions=true,
 	description="Starts a local convex test network.")
 public class LocalStart implements Runnable {
