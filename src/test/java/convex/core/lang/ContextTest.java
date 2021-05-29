@@ -1,16 +1,7 @@
 package convex.core.lang;
 
-import static convex.test.Assertions.assertCVMEquals;
-import static convex.test.Assertions.assertJuiceError;
-import static convex.test.Assertions.assertUndeclaredError;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static convex.test.Assertions.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 
@@ -25,6 +16,7 @@ import convex.core.data.BlobMaps;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
+import convex.core.lang.ops.Do;
 import convex.core.lang.ops.Special;
 
 /**
@@ -133,6 +125,19 @@ public class ContextTest extends ACVMTest {
 		assertEquals(evalL("*depth*"),evalL("`~*depth*")); 
 		assertEquals(evalL("(do *depth*)"),evalL("`~(do *depth*)")); 
 
+	}
+	
+	@Test
+	public void testDepthLimit() {
+		Context<?> c=context().withDepth(Constants.MAX_DEPTH-1);
+		assertEquals(Constants.MAX_DEPTH-1,c.getDepth());
+		
+		// Can run 1 deep at this depth
+		assertEquals(Constants.MAX_DEPTH-1,evalL(c,"*depth*")); 
+		assertNull(c.execute(comp("(do)")).getResult()); 
+		
+		// Shouldn't be possible to execute any Op beyond max depth
+		assertDepthError(c.execute(comp("(do *depth*)"))); 
 	}
 
 
