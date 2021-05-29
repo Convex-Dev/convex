@@ -1314,8 +1314,8 @@ public final class Context<T extends ACell> extends AObject {
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> withDepth(int newDepth) {
 		if (newDepth==depth) return (Context<R>) this;
-		depth=newDepth;
 		if ((newDepth<0)||(newDepth>Constants.MAX_DEPTH)) return withError(ErrorCodes.DEPTH,"Invalid depth: "+newDepth);
+		depth=newDepth;
 		return (Context<R>)this;
 	}
 	

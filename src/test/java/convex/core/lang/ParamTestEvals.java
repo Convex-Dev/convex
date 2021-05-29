@@ -46,10 +46,10 @@ public class ParamTestEvals {
 				{ "(let [a (address " + TEST_CONTRACT + ")]" + "(call a (write :bar))" + "(call a (read)))",
 						Keyword.create("bar") },
 
-				{ "*depth*", 1L }, // lookup
-				{ "(do *depth*)", 2L }, // do, lookup
-				{ "(let [a *depth*] a)", 2L }, // let, lookup
-				{ "(let [f (fn [] *depth*)] (f))", 3L }, // let, invoke, lookup
+				{ "*depth*", 0L }, // *depth*
+				{ "(do *depth*)", 1L }, // do, *depth* 
+				{ "(let [a *depth*] a)", 1L }, // let, *depth*
+				{ "(let [f (fn [] *depth*)] (f))", 2L }, // let, invoke, *depth*
 
 				{ "(let [])", null }, { "(let [a 1])", null }, { "(let [a 1] a)", 1L },
 				{ "(do (def a 2) (let [a 13] a))", 13L }, { "*juice*", INITIAL_JUICE },

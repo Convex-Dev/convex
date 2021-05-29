@@ -65,8 +65,8 @@ public class CompilerTest extends ACVMTest {
 	
 	@Test public void testDo() {
 		assertEquals(1L,evalL("(do 2 1)"));
-		assertEquals(2L,evalL("(do *depth*)"));
-		assertEquals(3L,evalL("(do (do *depth*))"));
+		assertEquals(1L,evalL("(do *depth*)")); // Adds one level to initial depth
+		assertEquals(2L,evalL("(do (do *depth*))"));
 	}
 	
 	@Test public void testMinCompileRegression() throws IOException {
@@ -123,7 +123,8 @@ public class CompilerTest extends ACVMTest {
 	@Test public void testLambda() {
 		assertEquals(2L,evalL("((fn [a] 2) 3)"));
 		assertEquals(3L,evalL("((fn [a] a) 3)"));
-		assertEquals(2L,evalL("((fn [a] *depth*) 3)"));
+		
+		assertEquals(1L,evalL("((fn [a] *depth*) 3)")); // Level of invoke depth
 	}
 
 	
@@ -185,7 +186,7 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(2L,evalL("(if 1 2 3)"));
 		assertEquals(3L,evalL("(if nil 2 3)"));
 		assertEquals(7L,evalL("(if :foo 7)"));
-		assertEquals(2L,evalL("(if true *depth*)"));
+		assertEquals(1L,evalL("(if true *depth*)"));
 		
 		// test that if macro expansion happens correctly inside vector
 		assertEquals(Vectors.of(3L,2L),eval("[(if nil 2 3) (if 1 2 3)]"));
@@ -232,12 +233,7 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(Constant.of(3L),comp("~(+ 1 2)"));
 		
 		assertEquals(RT.cvm(3L),eval("`~`~(+ 1 2)"));
-		
-		assertEquals(RT.cvm(2L),eval("~*depth*")); // depth in compiler
-		assertEquals(RT.cvm(3L),eval("~(do *depth*)")); // depth in compiler
-		assertEquals(RT.cvm(1L),eval("`~*depth*")); // depth in expansion
-		assertEquals(RT.cvm(2L),eval("`~(do *depth*)")); // depth in expansion
-		
+				
 		// Misc cases
 		assertNull(eval("`~nil"));
 		assertEquals(Keywords.STATE,eval("(let [a :state] `~a)"));

@@ -94,7 +94,7 @@ public class Special<T extends ACell> extends AOp<T> {
 		case S_ORIGIN: ctx= ctx.withResult(ctx.getOrigin()); break;
 		case S_RESULT: break; // unchanged context with current result
 		case S_TIMESTAMP: ctx= ctx.withResult(ctx.getState().getTimeStamp()); break;
-		case S_DEPTH: ctx= ctx.withResult(CVMLong.create(ctx.getDepth())); break;
+		case S_DEPTH: ctx= ctx.withResult(CVMLong.create(ctx.getDepth()-1)); break; // Depth before executing this Op
 		case S_OFFER: ctx= ctx.withResult(CVMLong.create(ctx.getOffer())); break;
 		case S_STATE: ctx= ctx.withResult(ctx.getState()); break;
 		case S_HOLDINGS: ctx= ctx.withResult(ctx.getHoldings()); break;

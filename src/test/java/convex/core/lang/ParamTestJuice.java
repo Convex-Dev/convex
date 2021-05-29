@@ -55,7 +55,7 @@ public class ParamTestJuice {
 																														// this
 																														// is
 																														// constant
-				{ "*depth*", 1L, Juice.SPECIAL },
+				{ "*depth*", 0L, Juice.SPECIAL },
 				{ "(= true true)", true, (1 * Juice.LOOKUP_DYNAMIC) + (2 * Juice.CONSTANT) + Juice.EQUALS } });
 	}
 

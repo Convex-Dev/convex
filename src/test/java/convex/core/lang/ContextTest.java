@@ -25,7 +25,6 @@ import convex.core.data.BlobMaps;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
-import convex.core.lang.ops.Lookup;
 import convex.core.lang.ops.Special;
 
 /**
@@ -37,14 +36,13 @@ public class ContextTest extends ACVMTest {
 		super(Init.createBaseAccounts());
 	}
 
-	private final Context<?> CTX = context();
-	private final Address ADDR=CTX.getAddress();
+	private final Address ADDR=context().getAddress();
 
 	@Test
 	public void testDefine() {
 		Symbol sym = Symbol.create("the-test-symbol");
 
-		final Context<?> c2 = CTX.fork().define(sym, Strings.create("buffy"));
+		final Context<?> c2 = context().define(sym, Strings.create("buffy"));
 		assertCVMEquals("buffy", c2.lookup(sym).getResult());
 
 		assertUndeclaredError(c2.lookup(Symbol.create("some-bad-symbol")));
@@ -52,11 +50,11 @@ public class ContextTest extends ACVMTest {
 	
 	@Test
 	public void testQuery() {
-		Context<?> c2 = CTX.fork();
+		Context<?> c2 = context();
 		c2=c2.query(Reader.read("(+ 1 2)"));
-		assertNotSame(c2,CTX);
+		assertNotSame(c2,context());
 		assertCVMEquals(3L,c2.getResult());
-		assertEquals(CTX.getDepth(),c2.getDepth(),"Query should preserve context depth");
+		assertEquals(context().getDepth(),c2.getDepth(),"Query should preserve context depth");
 		
 		c2=c2.query(Reader.read("*address*"));
 		assertEquals(c2.getAddress(),c2.getResult());
@@ -64,6 +62,7 @@ public class ContextTest extends ACVMTest {
 
 	@Test
 	public void testSymbolLookup() {
+		Context<?> CTX=context();
 		Symbol sym1=Symbol.create("count");
 		assertEquals(Core.COUNT,CTX.lookup(sym1).getResult());
 
@@ -78,7 +77,7 @@ public class ContextTest extends ACVMTest {
 	public void testUndefine() {
 		Symbol sym = Symbol.create("the-test-symbol");
 
-		final Context<?> c2 = CTX.fork().define(sym, Strings.create("vampire"));
+		final Context<?> c2 = context().define(sym, Strings.create("vampire"));
 		assertCVMEquals("vampire", c2.lookup(sym).getResult());
 
 		final Context<?> c3 = c2.undefine(sym);
@@ -90,7 +89,7 @@ public class ContextTest extends ACVMTest {
 	
 	@Test
 	public void testExceptionalState() {
-		Context<?> ctx=CTX.fork();
+		Context<?> ctx=context();
 		
 		assertFalse(ctx.isExceptional());
 		assertTrue(ctx.withError(ErrorCodes.ASSERT).isExceptional());
@@ -103,20 +102,43 @@ public class ContextTest extends ACVMTest {
 
 	@Test
 	public void testJuice() {
-		Context<?> c=CTX.fork();
+		Context<?> c=context();
 		assertTrue(c.checkJuice(1000));
 		
 		// get a juice error if too much juice consumed
 		assertJuiceError(c.consumeJuice(c.getJuice() + 1));
 		
 		// no error if all juice is consumed
-		c=CTX.fork();
+		c=context();
 		assertFalse(c.consumeJuice(c.getJuice()).isExceptional());
 	}
+	
+	@Test
+	public void testDepth() {
+		Context<?> c=context();
+		assertEquals(0L,c.getDepth());
+		assertEquals(0L,evalL("*depth*"));
+		assertEquals(1L,evalL("(do *depth*)"));
+		assertEquals(2L,evalL("(do (do *depth*))"));
+		
+		// functions should add one level of depth
+		assertEquals(1L,evalL("((fn [] *depth*))")); // invoke only
+		assertEquals(2L,evalL("(do (defn f [] *depth*) (f))")); // do + invoke
+		
+		// In compiler unquote
+		assertEquals(1L,evalL("~*depth*")); // unquote
+		assertEquals(2L,evalL("~(do *depth*)")); // unquote + do
+		
+		// In expansion, should be equivalent to expanded code
+		assertEquals(evalL("*depth*"),evalL("`~*depth*")); 
+		assertEquals(evalL("(do *depth*)"),evalL("`~(do *depth*)")); 
+
+	}
+
 
 	@Test
 	public void testSpecial() {
-		Context<?> ctx=CTX.fork();
+		Context<?> ctx=context();
 		assertEquals(ADDR, eval(Symbols.STAR_ADDRESS));
 		assertEquals(ADDR, eval(Symbols.STAR_ORIGIN));
 		assertNull(eval(Symbols.STAR_CALLER));
@@ -126,7 +148,7 @@ public class ContextTest extends ACVMTest {
 		
 		assertNull(eval(Symbols.STAR_RESULT));
 		assertCVMEquals(ctx.getJuice(), eval(Symbols.STAR_JUICE));
-		assertCVMEquals(1L,eval(Symbols.STAR_DEPTH));
+		assertCVMEquals(0L,eval(Symbols.STAR_DEPTH));
 		assertCVMEquals(ctx.getBalance(ADDR),eval(Symbols.STAR_BALANCE));
 		assertCVMEquals(0L,eval(Symbols.STAR_OFFER));
 		
@@ -142,7 +164,7 @@ public class ContextTest extends ACVMTest {
 	
 	@Test
 	public void testLog() {
-		Context<?> c = CTX.fork();
+		Context<?> c = context();
 		assertTrue(c.getLog().isEmpty());
 		
 		AVector<ACell> v=Vectors.of(1,2,3);
@@ -159,14 +181,14 @@ public class ContextTest extends ACVMTest {
 
 	@Test
 	public void testEdn() {
-		Context<?> ctx=CTX.fork();
+		Context<?> ctx=context();
 		String s = ctx.ednString();
 		assertNotNull(s);
 	}
 
 	@Test
 	public void testReturn() {
-		Context<?> ctx=CTX.fork();
+		Context<?> ctx=context();
 		ctx = ctx.withResult(RT.cvm(100));
 		assertEquals(ctx.getDepth(), ctx.getDepth());
 	}
