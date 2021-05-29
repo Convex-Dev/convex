@@ -9,6 +9,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
+import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 import convex.core.lang.Symbols;
 
@@ -58,7 +59,7 @@ public class Special<T extends ACell> extends AOp<T> {
 	private static byte reg(byte opCode, Symbol sym) {
 		int i=opCode-BASE;
 		symbols[i]=sym;
-		Special<?> special=create(opCode);
+		Special<?> special=new Special<>(opCode);
 		specials[i]=special;
 		opcodes.put(sym,Integer.valueOf(opCode));
 		return opCode;
@@ -102,7 +103,7 @@ public class Special<T extends ACell> extends AOp<T> {
 		default:
 			throw new Error("Bad Opcode"+opCode);
 		}
-		return ctx;
+		return ctx.consumeJuice(Juice.SPECIAL);
 	}
 
 	@Override

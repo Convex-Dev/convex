@@ -19,7 +19,6 @@ import convex.core.data.Blob;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Keyword;
-import convex.core.data.Keywords;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
@@ -486,18 +485,6 @@ public final class Context<T extends ACell> extends AObject {
 		
 		// if not found, return UNDECLARED error
 		if (envEntry==null) return withError(ErrorCodes.UNDECLARED,symbol.toString());
-
-		// Check for special symbol
-		if (symbol.maybeSpecial()) {
-			AccountStatus das=lookupDefiningAccount(address,symbol);
-			if (das!=null) {
-				AHashMap<ACell, ACell> symMeta = das.getMetadata().get(symbol.toUnqualified());
-				if ((symMeta!=null)&&RT.bool(symMeta.get(Keywords.SPECIAL_SYMBOL))) {
-					Context<R> rctx= computeSpecial(symbol);
-					if (rctx!=null) return rctx;
-				}
-			}
-		}
 		
 		// Result is whatever is defined as the datum value in the environment entry
 		ACell result = envEntry.getValue();
@@ -677,32 +664,6 @@ public final class Context<T extends ACell> extends AObject {
 
 	private AccountStatus getCoreAccount() {
 		return getState().getAccount(Init.CORE_ADDRESS);
-	}
-
-	/**
-	 * Computes the value special symbol in the environment. Consumes no juice.
-	 * 
-	 * @param <R>
-	 * @param sym
-	 * @return Context with value of special symbol, or null if not defined
-	 */
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> computeSpecial(Symbol sym)  {
-		if (sym.equals(Symbols.STAR_JUICE)) return (Context<R>) withResult(CVMLong.create(getJuice()));
-		if (sym.equals(Symbols.STAR_CALLER)) return (Context<R>) withResult(getCaller());
-		if (sym.equals(Symbols.STAR_ADDRESS)) return (Context<R>) withResult(getAddress());
-		if (sym.equals(Symbols.STAR_MEMORY)) return (Context<R>) withResult(CVMLong.create(getAccountStatus().getMemory()));
-		if (sym.equals(Symbols.STAR_BALANCE)) return (Context<R>) withResult(CVMLong.create(getBalance()));
-		if (sym.equals(Symbols.STAR_ORIGIN)) return (Context<R>) withResult(getOrigin());
-		if (sym.equals(Symbols.STAR_RESULT)) return (Context<R>) this;
-		if (sym.equals(Symbols.STAR_TIMESTAMP)) return (Context<R>) withResult(getState().getTimeStamp());
-		if (sym.equals(Symbols.STAR_DEPTH)) return (Context<R>) withResult(CVMLong.create(getDepth()));
-		if (sym.equals(Symbols.STAR_OFFER)) return (Context<R>) withResult(CVMLong.create(getOffer()));
-		if (sym.equals(Symbols.STAR_STATE)) return (Context<R>) withResult(getState());
-		if (sym.equals(Symbols.STAR_HOLDINGS)) return (Context<R>) withResult(getHoldings());
-		if (sym.equals(Symbols.STAR_SEQUENCE)) return (Context<R>) withResult(CVMLong.create(getAccountStatus().getSequence()));
-		if (sym.equals(Symbols.STAR_KEY)) return (Context<R>) withResult(getAccountStatus().getAccountKey());
-		return null;
 	}
 
 	/**

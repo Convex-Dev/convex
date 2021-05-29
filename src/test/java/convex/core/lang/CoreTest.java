@@ -3392,9 +3392,14 @@ public class CoreTest extends ACVMTest {
 		// check balance as single expression
 		assertEquals(bal, evalL("*balance*"));
 		
-		// test overrides in local any dynamic context
-		assertNull(eval("(let [*balance* nil] *balance*)"));
-		assertEquals(Keywords.FOO,eval("(do (def *balance* :foo) *balance*)"));
+		// Specials are implemented by compiler with higher priority than Symbol lookup
+		// TODO: Reconsider this
+		assertEquals(eval(Symbols.STAR_BALANCE),eval("(let [*balance* nil] *balance*)"));
+		assertCVMEquals(ctx.getOffer(),eval("(do (def *offer* :foo) *offer*)"));
+		
+		// Alternative behaviour
+		//assertNull(eval("(let [*balance* nil] *balance*)"));
+		//assertEquals(Keywords.FOO,eval("(do (def *balance* :foo) *balance*)"));
 	}
 	
 	@Test
@@ -3442,18 +3447,15 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testSpecialEdgeCases() {
-
-		// TODO: are we happy about letting people override special symbols?
-		assertEquals(Keywords.FOO, eval("(let [*balance* :foo] *balance*)"));
-		assertEquals(Keywords.FOO, eval("(do (def *balance* :foo) *balance*)"));
-		assertEquals(Symbols.STAR_HOLDINGS, eval("(do (def *holdings* '*holdings*) *holdings*)"));
 		
 		// TODO: consider this
 		//assertEquals(Init.HERO,eval(Init.CORE_ADDRESS+"/*balance*"));
 		
-		assertEquals(Core.ENVIRONMENT.get(Symbols.STAR_JUICE),eval("(lookup '*juice*)"));
+		// TODO: consider this
+		// Lookup in core environment of special returns the Symbol
+		assertEquals(Symbols.STAR_JUICE,eval("(lookup '*juice*)"));
 		
-		assertEquals(eval("*juice*"),context().execute(Lookup.create(Symbols.STAR_JUICE)).getResult());
+		assertEquals(Symbols.STAR_JUICE,eval(Lookup.create(Symbols.STAR_JUICE)));
 	}
 	
 	@Test public void testSpecialHoldings() {

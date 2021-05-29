@@ -254,7 +254,9 @@ public class Juice {
 
 	public static final long QUERY = Juice.CHEAP_OP;
 
-	protected static final long LOG = 100;
+	public static final long LOG = 100;
+
+	public static final long SPECIAL = Juice.CHEAP_OP;
 
 	/**
 	 * Saturating multiply and add result = a + b * c

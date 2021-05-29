@@ -53,7 +53,7 @@ public class ParamTestEvals {
 
 				{ "(let [])", null }, { "(let [a 1])", null }, { "(let [a 1] a)", 1L },
 				{ "(do (def a 2) (let [a 13] a))", 13L }, { "*juice*", INITIAL_JUICE },
-				{ "(- *juice* *juice*)", Juice.LOOKUP_DYNAMIC }, 
+				{ "(- *juice* *juice*)", Juice.SPECIAL }, 
 				{ "((fn [a] a) 4)", 4L }, { "(do (def a 3) a)", 3L },
 				{ "(do (let [a 1] (def f (fn [] a))) (f))", 1L }, { "1", 1L }, { "(not true)", false },
 				{ "(= true true)", true } });

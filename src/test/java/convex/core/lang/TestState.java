@@ -146,9 +146,10 @@ public class TestState {
 		Context<?> ctx = Context.createFake(STATE,Init.HERO);
 		State s = ctx.getState();
 		assertEquals(STATE, s);
-		assertEquals(Init.HERO,ctx.computeSpecial(Symbols.STAR_ADDRESS).getResult());
 		assertSame(Core.COUNT, ctx.lookup(Symbols.COUNT).getResult());
-		assertCVMEquals(Constants.INITIAL_TIMESTAMP, ctx.lookup(Symbols.STAR_TIMESTAMP).getResult());
+		
+		assertCVMEquals(Symbols.STAR_TIMESTAMP, ctx.lookup(Symbols.STAR_TIMESTAMP).getResult());
+		
 		assertCVMEquals(Constants.INITIAL_TIMESTAMP, s.getTimeStamp());
 	}
 

@@ -26,6 +26,7 @@ import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.lang.ops.Lookup;
+import convex.core.lang.ops.Special;
 
 /**
  * Tests for basic execution Context mechanics and internals
@@ -51,12 +52,14 @@ public class ContextTest extends ACVMTest {
 	
 	@Test
 	public void testQuery() {
-		final Context<?> c2 = CTX.fork().query(Symbols.STAR_ADDRESS);
+		Context<?> c2 = CTX.fork();
+		c2=c2.query(Reader.read("(+ 1 2)"));
 		assertNotSame(c2,CTX);
-		assertEquals(c2.getAddress(),c2.getResult());
+		assertCVMEquals(3L,c2.getResult());
 		assertEquals(CTX.getDepth(),c2.getDepth(),"Query should preserve context depth");
-
-		assertEquals(c2.getAddress(),c2.query(Lookup.create(Symbols.STAR_ADDRESS)).getResult());
+		
+		c2=c2.query(Reader.read("*address*"));
+		assertEquals(c2.getAddress(),c2.getResult());
 	}
 
 	@Test
@@ -114,25 +117,27 @@ public class ContextTest extends ACVMTest {
 	@Test
 	public void testSpecial() {
 		Context<?> ctx=CTX.fork();
-		assertEquals(ADDR, ctx.computeSpecial(Symbols.STAR_ADDRESS).getResult());
-		assertEquals(ADDR, ctx.computeSpecial(Symbols.STAR_ORIGIN).getResult());
-		assertNull(ctx.computeSpecial(Symbols.STAR_CALLER).getResult());
+		assertEquals(ADDR, eval(Symbols.STAR_ADDRESS));
+		assertEquals(ADDR, eval(Symbols.STAR_ORIGIN));
+		assertNull(eval(Symbols.STAR_CALLER));
 		
-		assertNull(ctx.computeSpecial(Symbols.STAR_RESULT).getResult());
-		assertCVMEquals(ctx.getJuice(), ctx.computeSpecial(Symbols.STAR_JUICE).getResult());
-		assertCVMEquals(0L,ctx.computeSpecial(Symbols.STAR_DEPTH).getResult());
-		assertCVMEquals(ctx.getBalance(ADDR),ctx.computeSpecial(Symbols.STAR_BALANCE).getResult());
-		assertCVMEquals(0L,ctx.computeSpecial(Symbols.STAR_OFFER).getResult());
+		// Compiler returns Special Op
+		assertEquals(Special.forSymbol(Symbols.STAR_BALANCE),comp("*balance*"));
 		
-		assertCVMEquals(0L,ctx.computeSpecial(Symbols.STAR_SEQUENCE).getResult());
+		assertNull(eval(Symbols.STAR_RESULT));
+		assertCVMEquals(ctx.getJuice(), eval(Symbols.STAR_JUICE));
+		assertCVMEquals(1L,eval(Symbols.STAR_DEPTH));
+		assertCVMEquals(ctx.getBalance(ADDR),eval(Symbols.STAR_BALANCE));
+		assertCVMEquals(0L,eval(Symbols.STAR_OFFER));
+		
+		assertCVMEquals(0L,eval(Symbols.STAR_SEQUENCE));
 
-		assertCVMEquals(Constants.INITIAL_TIMESTAMP,ctx.computeSpecial(Symbols.STAR_TIMESTAMP).getResult());
+		assertCVMEquals(Constants.INITIAL_TIMESTAMP,eval(Symbols.STAR_TIMESTAMP));
 		
-		assertSame(ctx.getState(), ctx.computeSpecial(Symbols.STAR_STATE).getResult());
-		assertSame(BlobMaps.empty(),ctx.computeSpecial(Symbols.STAR_HOLDINGS).getResult());
+		assertSame(ctx.getState(), eval(Symbols.STAR_STATE));
+		assertSame(BlobMaps.empty(),eval(Symbols.STAR_HOLDINGS));
 		
 		assertUndeclaredError(ctx.eval(Symbol.create("*bad-special-symbol*")));
-		assertNull(ctx.computeSpecial(Symbol.create("count")));
 	}
 	
 	@Test

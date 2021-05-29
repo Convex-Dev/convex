@@ -15,6 +15,7 @@ import convex.core.Init;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.Address;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
@@ -30,6 +31,7 @@ import convex.core.lang.ops.Invoke;
 import convex.core.lang.ops.Lambda;
 import convex.core.lang.ops.Let;
 import convex.core.lang.ops.Lookup;
+import convex.core.lang.ops.Special;
 
 /**
  * Tests for ops functionality.
@@ -120,6 +122,17 @@ public class OpsTest extends ACVMTest {
 		long expectedJuice = INITIAL_JUICE - (Juice.CONSTANT + Juice.DEF + Juice.LOOKUP_DYNAMIC + Juice.DO);
 		assertEquals(expectedJuice, c2.getJuice());
 		assertEquals("bar", c2.getResult().toString());
+	}
+	
+	@Test
+	public void testSpecial() {
+		Context<?> c = context();
+
+		AOp<Address> op = Special.forSymbol(Symbols.STAR_ADDRESS);
+		assertEquals(op,Special.forSymbol(Symbol.create("*address*"))); // double check lookup in hash map
+
+		Context<Address> c2 = c.execute(op);
+		assertEquals(c2.getAddress(), c2.getResult());
 	}
 
 	@Test

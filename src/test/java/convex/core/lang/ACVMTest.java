@@ -66,6 +66,28 @@ public abstract class ACVMTest {
 		return rctx;
 	}
 	
+	/**
+	 * Steps execution in a new forked Context
+	 * @param <T>
+	 * @param ctx Initial context to fork
+	 * @param source
+	 * @return New forked context containing step result
+	 */
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> Context<T> step(Context<?> ctx, ACell form) {
+		// Compile form in forked context
+		Context<AOp<ACell>> cctx=ctx.fork();
+		cctx = cctx.compile(form);
+		if (cctx.isExceptional()) return (Context<T>) cctx;
+		AOp<ACell> op = cctx.getResult();
+
+		// Run form in separate forked context to get result context
+		Context<T> rctx = ctx.fork();
+		rctx=(Context<T>) rctx.run(op);
+		assert(rctx.getDepth()==0):"Invalid depth after step: "+rctx.getDepth();
+		return rctx;
+	}
+	
 
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> AOp<T> compile(Context<?> c, String source) {
@@ -142,6 +164,11 @@ public abstract class ACVMTest {
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> T eval(String source) {
 		return (T) step(source).getResult();
+	}
+	
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> T eval(ACell form) {
+		return (T) step(CONTEXT,form).getResult();
 	}
 
 	public <T extends ACell> Context<T> step(String source) {

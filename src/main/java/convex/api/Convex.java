@@ -27,6 +27,7 @@ import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
 import convex.core.lang.ops.Lookup;
+import convex.core.lang.ops.Special;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
@@ -191,7 +192,7 @@ public class Convex {
 	public long getSequence() {
 		if (sequence == null) {
 			try {
-				Future<Result> f = query(Lookup.create(Symbols.STAR_SEQUENCE));
+				Future<Result> f = query(Special.forSymbol(Symbols.STAR_SEQUENCE));
 				Result r = f.get();
 				if (r.isError()) throw new Error("Error querying *sequence*: " + r.getErrorCode() + " " + r.getValue());
 				ACell result=r.getValue();

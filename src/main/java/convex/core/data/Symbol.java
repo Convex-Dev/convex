@@ -285,7 +285,6 @@ public class Symbol extends ASymbolic {
 		return name.charAt(0)=='*';
 	}
 
-
 	@Override
 	public byte getTag() {
 		return Tag.SYMBOL;
