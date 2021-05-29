@@ -35,6 +35,7 @@ import convex.core.lang.ops.Lambda;
 import convex.core.lang.ops.Let;
 import convex.core.lang.ops.Lookup;
 import convex.core.lang.ops.Query;
+import convex.core.lang.ops.Special;
 import convex.core.util.Utils;
 
 /**
@@ -143,7 +144,7 @@ public class Compiler {
 		}
 
 		if (form instanceof Symbol) {
-			return compileSymbolLookup((Symbol) form, context);
+			return compileSymbol((Symbol) form, context);
 		}
 		
 		if (form instanceof AOp) {
@@ -162,7 +163,13 @@ public class Compiler {
 	}
 
 	@SuppressWarnings("unchecked")
-	private static <R extends ACell, T extends AOp<R>> Context<T> compileSymbolLookup(Symbol sym, Context<?> context) {
+	private static <R extends ACell, T extends AOp<R>> Context<T> compileSymbol(Symbol sym, Context<?> context) {
+		// First check for special values
+		Special<T> maybeSpecial=Special.forSymbol(sym);
+		if (maybeSpecial!=null) {
+			return context.withResult(maybeSpecial);
+		}
+		
 		// Get address of compilation environment to use for lookup resolution.
 		Address address=context.getAddress();
 		

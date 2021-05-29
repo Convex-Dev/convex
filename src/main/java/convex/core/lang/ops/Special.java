@@ -60,7 +60,7 @@ public class Special<T extends ACell> extends AOp<T> {
 		symbols[i]=sym;
 		Special<?> special=create(opCode);
 		specials[i]=special;
-		opcodes.put(sym,i);
+		opcodes.put(sym,Integer.valueOf(opCode));
 		return opCode;
 	}
 
@@ -141,5 +141,18 @@ public class Special<T extends ACell> extends AOp<T> {
 	@Override
 	public void print(StringBuilder sb) {
 		symbols[opCode-BASE].print(sb);
+	}
+
+	/**
+	 * Gets the special Op for a given Symbol, or null if not found
+	 * @param <R>
+	 * @param sym Symbol to look up
+	 * @return Special Op or null
+	 */
+	@SuppressWarnings("unchecked")
+	public static <R extends ACell> Special<R> forSymbol(Symbol sym) {
+		Integer special=opcodes.get(sym);
+		if (special==null) return null;
+		return (Special<R>) specials[special-BASE];
 	}
 }
