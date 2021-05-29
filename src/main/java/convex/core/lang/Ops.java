@@ -13,6 +13,8 @@ import convex.core.lang.ops.Lambda;
 import convex.core.lang.ops.Let;
 import convex.core.lang.ops.Lookup;
 import convex.core.lang.ops.Query;
+import convex.core.lang.ops.Special;
+import convex.core.util.Utils;
 
 /**
  * Static utility class for coded operations.
@@ -33,6 +35,9 @@ public class Ops {
 	public static final byte LOOP = 10;
 	// public static final byte CALL = 9;
 	// public static final byte RETURN = 10;
+	
+	public static final byte SPECIAL_BASE = 64;
+
 	
 
 	/**
@@ -71,6 +76,13 @@ public class Ops {
 
 		// case Ops.RETURN: return (AOp<T>) Return.read(bb);
 		default:
+			// range 64-127 is special ops
+			if ((opCode&0xC0) == 0x40) {
+				Special<T> special=(Special<T>) Special.create(opCode);
+				if (special==null) throw new BadFormatException("Bad OpCode for special value: "+Utils.toHexString((byte)opCode));
+				return special;
+			}
+			
 			throw new BadFormatException("Invalide OpCode: " + opCode);
 		}
 	}

@@ -447,7 +447,7 @@ public final class Context<T extends ACell> extends AObject {
 		// first try lookup in local bindings
 		if (!symbol.isQualified()) {
 			MapEntry<Symbol,R> le=lookupLocalEntry(symbol);
-			if (le!=null) return (Context<R>) withResult(le.getValue());
+			if (le!=null) return withResult(le.getValue());
 		}
 		
 		// second try lookup in dynamic environment
@@ -790,7 +790,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return Context updated with the specified result.
 	 */
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> withResult(R value) {
+	public <R extends ACell> Context<R> withResult(ACell value) {
 		result=(T)value;
 		exception=null;
 		return (Context<R>) this;
