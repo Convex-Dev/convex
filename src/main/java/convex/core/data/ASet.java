@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import convex.core.data.prim.CVMBool;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 
@@ -14,7 +15,7 @@ import convex.core.data.type.Types;
  *
  * @param <T> Type of set elements
  */
-public abstract class ASet<T extends ACell> extends ACollection<T> implements java.util.Set<T>, IGet<T> {
+public abstract class ASet<T extends ACell> extends ACollection<T> implements java.util.Set<T>, IAssociative<T,CVMBool> {
 	
 	@Override
 	public final AType getType() {
@@ -72,19 +73,15 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	 */
 	public abstract ASet<T> intersectAll(ASet<T> xs);
 
-	
-	@SuppressWarnings("unchecked")
 	@Override
-	public T get(ACell key) {
-		if (contains(key)) return (T) key;
-		return null;
+	public CVMBool get(ACell key) {
+		return CVMBool.of(contains(key));
 	}
 	
-	@SuppressWarnings("unchecked")
 	@Override
-	public T get(ACell key, ACell notFound) {
-		if (contains(key)) return (T) key;
-		return (T) notFound;
+	public ACell get(ACell key, ACell notFound) {
+		if (contains(key)) return CVMBool.TRUE;
+		return notFound;
 	}
 	
 	@Override

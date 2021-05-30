@@ -262,7 +262,7 @@ public class Set<T extends ACell> extends ASet<T> {
 	}
 
 	@Override
-	public ASet<T> exclude(T a) {
+	public Set<T> exclude(T a) {
 		return wrap(map.dissoc(a));
 	}
 
@@ -364,5 +364,12 @@ public class Set<T extends ACell> extends ASet<T> {
 	public T get(long i) {
 		return map.entryAt(i).getKey();
 	}
+	
+	@SuppressWarnings("unchecked")
+	public Set<T> assoc(ACell key, ACell value) {
+		if (!(value instanceof CVMBool)) return null;		
+		return (value==CVMBool.TRUE)?include((T)key):exclude((T) key);
+	}
+
 
 }

@@ -31,6 +31,7 @@ import convex.core.data.MapEntry;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
@@ -156,7 +157,7 @@ public class GenTestCore {
 		}
 		
 		ASet<ACell> ca=a.conj(key);
-		assertEquals(key,RT.get(ca, key));
+		assertSame(CVMBool.TRUE,RT.get(ca, key));
 		assertEquals(n+1, RT.count(ca));
 		assertFalse(a.containsKey(key));
 		assertTrue(ca.containsKey(key));

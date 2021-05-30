@@ -23,10 +23,10 @@ public class MapFn<K extends ACell, T  extends ACell> extends ADataFn<T> {
 		T result;
 		if (n == 1) {
 			ACell key = args[0];
-			result = map.get(key);
+			result = (T) map.get(key);
 		} else if (n == 2) {
 			K key = (K) args[0];
-			result = map.get(key, (T) args[1]);
+			result = (T) map.get(key, args[1]);
 		} else {
 			return context.withArityError("Expected arity 1 or 2 for map lookup but got: " + n);
 		}

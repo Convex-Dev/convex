@@ -25,7 +25,7 @@ import convex.core.util.Utils;
  * @param <V> Type of values
  */
 public abstract class AMap<K extends ACell, V extends ACell> extends ADataStructure<MapEntry<K, V>>
-		implements Map<K, V>, IAssociative<K,V> {
+		implements Map<K, V> {
 
 	protected long count;
 
@@ -78,7 +78,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 * @param value
 	 * @return An updated map with the new association, or null if the association fails
 	 */
-	public abstract AMap<K,V> assoc(ACell key, V value);
+	public abstract AMap<K,V> assoc(ACell key, ACell value);
 
 
 	/**
@@ -223,9 +223,11 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	
 	@Override
 	public V get(Object key) {
-		if (key instanceof ACell) return get((ACell)key);
+		if (key instanceof ACell) return (V) get((ACell)key);
 		return null;
 	}
+	
+	public abstract V get(ACell key); 
 
 	/**
 	 * Gets the value at a specified key, or returns the fallback value if not found

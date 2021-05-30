@@ -260,7 +260,7 @@ public class CompilerTest extends ACVMTest {
 		
 		// get returns value or nil
 		assertEquals(1L,evalL("(get #{1 2} 1)"));
-		assertNull(eval("(get #{1 2} 3)"));
+		assertSame(CVMBool.FALSE,eval("(get #{1 2} 3)"));
 	}
 	
 	@Test 

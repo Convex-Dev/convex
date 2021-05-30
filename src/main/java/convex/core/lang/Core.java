@@ -27,8 +27,6 @@ import convex.core.data.Address;
 import convex.core.data.BlobMaps;
 import convex.core.data.Format;
 import convex.core.data.Hash;
-import convex.core.data.IAssociative;
-import convex.core.data.IGet;
 import convex.core.data.INumeric;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -970,8 +968,8 @@ public class Core {
 
 			ACell o = args[0];
 
-			// convert to data structure
-			IAssociative<ACell,ACell> result = RT.ensureAssociative(o);
+			// convert to associative data structure. nil-> empty map
+			ADataStructure result = RT.ensureAssociative(o);
 
 			// values that are non-null but not a data structure are a cast error
 			if ((o != null) && (result == null)) return context.withCastError(0,args, Types.DATA_STRUCTURE);
@@ -979,8 +977,8 @@ public class Core {
 			// assoc additional elements. Must produce a valid non-null data structure after
 			// each assoc
 			for (int i = 1; i < n; i += 2) {
-				ACell key=(ACell)args[i];
-				result = (IAssociative<ACell, ACell>) RT.assoc(result, key, (ACell)args[i + 1]);
+				ACell key=args[i];
+				result = RT.assoc(result, key, args[i + 1]);
 				if (result == null) return context.withError(ErrorCodes.ARGUMENT, "Cannot assoc value - invalid key of type "+RT.getType(key));
 			}
 
@@ -1004,10 +1002,10 @@ public class Core {
 			// simply substitute value if key sequence is empty
 			if (n==0) return context.withResult(juice, value);
 			
-			IAssociative<ACell,ACell>[] ass=new IAssociative[n];
+			ADataStructure[] ass=new ADataStructure[n];
 			ACell[] ks=new ACell[n];
 			for (int i = 0; i < n; i++) {
-				IAssociative<ACell,ACell> struct = RT.ensureAssociative(data);
+				ADataStructure struct = RT.ensureAssociative(data);  // nil-> empty map
 				if (struct == null) return context.withCastError((ACell)struct,Types.DATA_STRUCTURE); // TODO: Associative type?
 				ass[i]=struct;
 				ACell k=ixs.get(i);
@@ -1016,12 +1014,12 @@ public class Core {
 			}
 			
 			for (int i = n-1; i >=0; i--) {
-				IAssociative<ACell,ACell> struct=ass[i];
+				ADataStructure struct=ass[i];
 				ACell k=ks[i];
 				value=RT.assoc(struct, k, value);
 				if (value==null) {
-					// assoc failed, so key type must be invlid
-					return context.withError(ErrorCodes.ARGUMENT,"Invalid key of type "+RT.getType(k)+" for " +name()); 
+					// assoc failed, so key or value type must be invlid
+					return context.withError(ErrorCodes.ARGUMENT,"Invalid key of type "+RT.getType(k)+" or value of type "+RT.getType(value)+" for " +name()); 
 				}
 			}
 			return context.withResult(juice, value);
@@ -1132,11 +1130,11 @@ public class Core {
 				// Treat nil as empty collection with no keys
 				result = (n == 3) ? (ACell)args[2] : null;
 			} else if (n == 2) {
-				IGet<ACell> gettable = RT.toGettable(coll);
+				ADataStructure<?> gettable = RT.ensureDataStructure(coll);
 				if (gettable == null) return context.withCastError(coll, Types.DATA_STRUCTURE);
 				result = gettable.get(args[1]);
 			} else {
-				IGet<ACell> gettable = RT.toGettable(coll);
+				ADataStructure<?> gettable = RT.ensureDataStructure(coll);
 				if (gettable == null) return context.withCastError(coll, Types.DATA_STRUCTURE);
 				result = gettable.get(args[1], args[2]);
 			}
@@ -1167,7 +1165,7 @@ public class Core {
 					result=notFound;
 					break; // gets in nil produce not-found
 				}
-				IGet<ACell> gettable = RT.toGettable(result);
+				ADataStructure<?> gettable = RT.ensureDataStructure(result);
 				if (gettable == null) return context.withCastError(result, Types.DATA_STRUCTURE);
 				
 				ACell k=ixs.get(i);
@@ -1194,7 +1192,7 @@ public class Core {
 			if (coll == null) {
 				result = CVMBool.FALSE; // treat nil as empty collection
 			} else {
-				IGet<ACell> gettable = RT.toGettable(args[0]);
+				ADataStructure<?> gettable = RT.ensureDataStructure(args[0]);
 				if (gettable == null) return context.withCastError(args[0], Types.DATA_STRUCTURE);
 				result = CVMBool.of(gettable.containsKey((ACell) args[1]));
 			}

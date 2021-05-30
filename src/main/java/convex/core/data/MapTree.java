@@ -315,10 +315,10 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public MapTree<K, V> assoc(ACell key, V value) {
+	public MapTree<K, V> assoc(ACell key, ACell value) {
 		K k= (K)key;
 		Ref<K> keyRef = Ref.get(k);
-		return assocRef(keyRef, value, shift);
+		return assocRef(keyRef, (V) value, shift);
 	}
 
 	@Override

@@ -575,7 +575,7 @@ public class Belief extends ARecord {
 	 */
 	private Order getMyOrder(MergeContext mc) throws BadSignatureException {
 		AccountKey myAddress = mc.getAccountKey();
-		SignedData<Order> signed = orders.get(myAddress);
+		SignedData<Order> signed = (SignedData<Order>) orders.get(myAddress);
 		if (signed == null) return null;
 		assert (signed.getAccountKey().equals(myAddress));
 		return signed.getValue();

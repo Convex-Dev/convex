@@ -184,9 +184,9 @@ public class CoreTest extends ACVMTest {
 		assertNull(eval("(get {1 2} 2)")); // null if not present
 		assertEquals(7L, evalL("(get {1 2 3 4} 5 7)")); // fallback arg
 
-		assertEquals(1L, evalL("(get #{1 2} 1)"));
-		assertEquals(2L, evalL("(get #{1 2} 2)"));
-		assertNull(eval("(get #{1 2} 3)")); // null if not present
+		assertSame(CVMBool.TRUE, eval("(get #{1 2} 1)"));
+		assertSame(CVMBool.TRUE, eval("(get #{1 2} 2)"));
+		assertSame(CVMBool.FALSE, eval("(get #{1 2} 3)")); // null if not present
 		assertEquals(4L, evalL("(get #{1 2} 3 4)")); // fallback
 
 		assertEquals(2L, evalL("(get [1 2 3] 1)"));
@@ -844,12 +844,18 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Vectors.of(5L),eval("(assoc-in [1] [0] 5)"));
 		assertEquals(MapEntry.of(1L, 5L),eval("(assoc-in (first {1 2}) [1] 5)"));
 		
+		// Set cases
+		assertEquals(Sets.of(1L),eval("(assoc-in #{} [1] true)"));
+		assertEquals(Sets.of(1L),eval("(assoc-in #{1} [1] true)"));
+		assertEquals(Sets.of(1L,2L),eval("(assoc-in #{1} [2] true)"));
+		assertArgumentError(step("(assoc-in #{3} [2] :fail)")); // bad value type
+		assertCastError(step("(assoc-in #{3} [3 2] :fail)")); // 'true' is not a data structure
+		
 		// Cast error - wrong key types
 		assertCastError(step("(assoc-in (blob-map) :foo :bar)"));
 		
 		// Cast errors - not associative collections
 		assertCastError(step("(assoc-in 1 [2] 3)"));
-		assertCastError(step("(assoc-in #{3} [2] :fail)"));
 		
 		// Invalid keys
 		assertArgumentError(step("(assoc-in [1] [:foo] 3)"));
@@ -871,7 +877,9 @@ public class CoreTest extends ACVMTest {
 	public void testAssocFailures() {
 		assertCastError(step("(assoc 1 1 2)"));
 		assertCastError(step("(assoc :foo)"));
-		assertCastError(step("(assoc #{} :foo true)"));
+		
+		
+		// assertCastError(step("(assoc #{} :foo true)"));
 		
 		// Invalid keys
 		assertArgumentError(step("(assoc [1 2 3] 1.4 :foo)"));
@@ -1615,10 +1623,11 @@ public class CoreTest extends ACVMTest {
 		assertEquals(1L,evalL("(:foo {:foo 1} 2)"));
 		
 		// lookups in sets
-		assertNull(eval("(:foo #{})"));
-		assertNull(eval("(:foo #{:bar} nil)"));
+		assertSame(CVMBool.FALSE,eval("(:foo #{})"));
 		assertEquals(1L,evalL("(:foo #{} 1)"));
-		assertEquals(Keywords.FOO,eval("(:foo #{:foo} 2)"));
+		assertSame(CVMBool.TRUE,eval("(:foo #{:foo})"));
+		assertNull(eval("(:foo #{:bar} nil)"));
+		assertSame(CVMBool.TRUE,eval("(:foo #{:foo} 2)"));
 
 		// lookups in vectors
 		assertNull(eval("(:foo [])"));

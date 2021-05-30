@@ -21,8 +21,6 @@ import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Hash;
-import convex.core.data.IAssociative;
-import convex.core.data.IGet;
 import convex.core.data.INumeric;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
@@ -969,7 +967,7 @@ public class RT {
 	 * @param key
 	 * @return Object from collection with the specified key, or null if not found.
 	 */
-	public static Object get(IGet<?> coll, ACell key) {
+	public static ACell get(ADataStructure<?> coll, ACell key) {
 		if (coll == null) return null;
 		return coll.get(key);
 	}
@@ -983,24 +981,10 @@ public class RT {
 	 * @return Object from collection with the specified key, or notFound argument
 	 *         if not found.
 	 */
-	@SuppressWarnings("unchecked")
-	public static ACell get(IGet<?> coll, ACell key, ACell notFound) {
+	public static ACell get(ADataStructure<?> coll, ACell key, ACell notFound) {
 		if (coll == null) return notFound;
-		if (coll instanceof AMap) return ((AMap<ACell, ACell>) coll).get(key, notFound);
-		if (coll instanceof ASet) return ((ASet<ACell>) coll).contains(key) ? key : notFound;
-		if (coll instanceof ASequence) {
-			// we consider Long keys only to be included
-			if (key instanceof CVMLong) {
-				ASequence<ACell> seq = (ASequence<ACell>) coll;
-				long ix = ((CVMLong) key).longValue();
-				if ((ix >= 0) && (ix < seq.count())) return seq.get(ix);
-			}
-			return notFound;
-		}
-		throw new Error("Can't get from an object of type: " + Utils.getClass(coll));
+		return coll.get(key,notFound);
 	}
-
-
 	
 	/**
 	 * Converts any CVM value to a boolean value. An value is considered falsey if null
@@ -1166,15 +1150,9 @@ public class RT {
 	 * @return Updated data structure, or null if cast fails
 	 */
 	@SuppressWarnings("unchecked")
-	public static <R extends ACell,K extends ACell, V extends ACell> ADataStructure<R> assoc(Object coll, K key, V value) {
+	public static <R extends ACell> ADataStructure<R> assoc(ADataStructure<R> coll, ACell key, ACell value) {
 		if (coll == null) return (ADataStructure<R>) Maps.create(key, value);
-		if (coll instanceof AMap) { 
-			return (ADataStructure<R>) ((AMap<K, V>) coll).assoc(key, value);
-		} else if (coll instanceof ASequence) {
-			if (!(key instanceof CVMLong)) return null;
-			return (ADataStructure<R>) ((ASequence<V>) coll).assoc(((CVMLong) key).longValue(), value);
-		}
-		return null;
+		return coll.assoc(key, value);
 	}
 
 	/**
@@ -1212,32 +1190,16 @@ public class RT {
 			}
 		}, Vectors.empty());
 	}
-
-	/**
-	 * Converts the argument to an IGet instance. A null argument is considered an empty map.
-	 * 
-	 * @param <T>
-	 * @param o
-	 * @return IGet instance, or null if conversion is not possible
-	 */
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> IGet<T> toGettable(ACell o) {
-		if (o==null) return Maps.empty();
-		if (o instanceof IGet) return (IGet<T>) o;
-		return null;
-	}
 	
 	/**
 	 * Ensures the argument is an IAssociative instance. A null argument is considered an empty map.
 	 * 
-	 * @param <T>
 	 * @param o
 	 * @return IAssociative instance, or null if conversion is not possible
 	 */
-	@SuppressWarnings("unchecked")
-	public static <K extends ACell,V extends ACell> IAssociative<K,V> ensureAssociative(ACell o) {
+	public static ADataStructure<?> ensureAssociative(ACell o) {
 		if (o==null) return Maps.empty();
-		if (o instanceof IAssociative) return (IAssociative<K,V>) o;
+		if (o instanceof ADataStructure) return (ADataStructure<?>) o;
 		return null;
 	}
 

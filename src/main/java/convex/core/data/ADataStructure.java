@@ -52,6 +52,40 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 		return result;
 	}
 	
+	/**
+	 * Associates a key with a value in this associative data structure.
+	 * 
+	 * May return null if the Key or Value is incompatible with the data structure.
+	 * 
+	 * @param key
+	 * @param value
+	 * @return Updates data structure, or null if data types are invalid
+	 */
+	public abstract ADataStructure<E> assoc(ACell key,ACell value);
+	
+	/**
+	 * Get the value associated with a given key.
+	 * 
+	 * @param key
+	 * @return Value from collection, or null if not found
+	 */
+	public abstract ACell get(ACell key);
+	
+	/**
+	 * Get the value associated with a given key.
+	 * 
+	 * @param key
+	 * @return Value from collection, or notFound value if not found
+	 */
+	public abstract ACell get(ACell key, ACell notFound);
 
+	
+	/**
+	 * Checks if the data structure contains the specified key
+	 * 
+	 * @param key
+	 * @return true if the data structure contains the key, false otherwise
+	 */
+	public abstract boolean containsKey(ACell key);
 
 }

@@ -73,7 +73,7 @@ public abstract class ABlobMap<K extends ABlob, V extends ACell> extends AMap<K,
 	 * Returns null if the key is not a valid BlobMap key
 	 */
 	@Override
-	public abstract ABlobMap<K, V> assoc(ACell key, V value);
+	public abstract ABlobMap<K, V> assoc(ACell key, ACell value);
 
 	@SuppressWarnings("unchecked")
 	@Override

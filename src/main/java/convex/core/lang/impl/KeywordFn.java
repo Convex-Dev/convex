@@ -1,7 +1,7 @@
 package convex.core.lang.impl;
 
 import convex.core.data.ACell;
-import convex.core.data.IGet;
+import convex.core.data.ADataStructure;
 import convex.core.data.Keyword;
 import convex.core.data.type.Types;
 import convex.core.lang.Context;
@@ -24,16 +24,16 @@ public class KeywordFn<T extends ACell> extends ADataFn<T> {
 		int n = args.length;
 		T result;
 		if (n == 1) {
-			IGet<T> gettable = RT.toGettable(args[0]);
+			ADataStructure<?> gettable = RT.ensureAssociative(args[0]);
 			if (gettable == null) return context.withCastError(0, Types.DATA_STRUCTURE);
-			result = gettable.get(key);
+			result = (T) gettable.get(key);
 		} else if (n == 2) {
 			ACell ds = args[0];
 			ACell notFound = args[1];
 			if (ds == null) {
 				result = (T) notFound;
 			} else {
-				IGet<T> gettable = RT.toGettable(ds);
+				ADataStructure<?> gettable = RT.ensureAssociative(ds);
 				if (gettable == null) return context.withCastError(0, Types.DATA_STRUCTURE);
 				result = (T) RT.get(gettable, key, notFound);
 			}

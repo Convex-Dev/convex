@@ -144,11 +144,12 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 		throw new UnsupportedOperationException(Errors.immutable(this));
 	}
 	
+	@SuppressWarnings("unchecked")
 	@Override
-	public ASequence<T> assoc(ACell key, T value) {
+	public ASequence<T> assoc(ACell key, ACell value) {
 		CVMLong ix=RT.ensureLong(key);
 		if (ix==null) return null;
-		return assoc(ix.longValue(),value);
+		return assoc(ix.longValue(),(T)value);
 	}
 
 	/**

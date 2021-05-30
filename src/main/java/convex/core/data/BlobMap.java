@@ -198,9 +198,9 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	}
 	
 	@SuppressWarnings("unchecked")
-	public BlobMap<K, V> assoc(ACell key, V value) {
+	public BlobMap<K, V> assoc(ACell key, ACell value) {
 		if (!(key instanceof ABlob)) return null;
-		return assocEntry(MapEntry.create((K)key, value));
+		return assocEntry(MapEntry.create((K)key, (V)value));
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
