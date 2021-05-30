@@ -23,12 +23,12 @@ import convex.core.util.Utils;
  * effectively considered as "bytecode" for the decentralised state machine.
  */
 public class Ops {
-	public static final byte INVOKE = 2;
-	public static final byte COND = 4;
 	public static final byte CONSTANT = 1;
-	public static final byte DEF = 6;
+	public static final byte INVOKE = 2;
 	public static final byte DO = 3;
+	public static final byte COND = 4;
 	public static final byte LOOKUP = 5;
+	public static final byte DEF = 6;
 	public static final byte LAMBDA = 7;
 	public static final byte LET = 8;
 	public static final byte QUERY = 9;

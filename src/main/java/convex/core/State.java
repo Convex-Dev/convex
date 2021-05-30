@@ -256,7 +256,7 @@ public class State extends ARecord {
 	 */
 	public BlockResult applyBlock(Block block) throws BadSignatureException {
 		Counters.applyBlock++;
-		State state = applyTimeUpdates(block);
+		State state = prepareBlock(block);
 		return state.applyTransactions(block);
 	}
 
@@ -265,7 +265,7 @@ public class State extends ARecord {
 	 * @param b
 	 * @return
 	 */
-	private State applyTimeUpdates(Block b) {
+	private State prepareBlock(Block b) {
 		State state = this;
 		AVector<ACell> glbs = state.globals;
 		long ts=((CVMLong)glbs.get(0)).longValue();
@@ -287,7 +287,7 @@ public class State extends ARecord {
 		CVMLong timestamp = this.getTimeStamp();
 
 		// ArrayList to accumulate the transactions to apply. Null until we need it
-		ArrayList<Object> al = null;
+		ArrayList<ACell> al = null;
 
 		// walk schedule entries to determine how many there are
 		// and remove from the current schedule
