@@ -63,7 +63,9 @@ public class List<T extends ACell> extends AList<T> {
 	 * @param args
 	 * @return
 	 */
+	@SuppressWarnings("unchecked")
 	public static <T extends ACell> List<T> create(ACell... args) {
+		if (args.length==0) return (List<T>) EMPTY;
 		Utils.reverse(args);
 		return new List<T>(Vectors.create(args));
 	}

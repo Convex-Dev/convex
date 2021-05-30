@@ -988,9 +988,6 @@ public class Core {
 
 			ACell o = args[0];
 
-			// preserve a single nil, with no elements to assoc
-			if ((o == null) && (n == 1)) return context.withResult(juice, null);
-
 			// convert to data structure
 			IAssociative<ACell,ACell> result = RT.ensureAssociative(o);
 

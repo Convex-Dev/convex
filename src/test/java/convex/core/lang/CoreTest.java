@@ -800,12 +800,12 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testAssocNull() {
-		assertNull(eval("(assoc nil)")); // null is preserved
-		assertEquals(Maps.of(1L, 2L), eval("(assoc nil 1 2)")); // assoc promotes nil to maps
-		assertEquals(Maps.of(1L, 2L, 3L, 4L), eval("(assoc nil 1 2 3 4)")); // assoc promotes nil to maps
+		// nil is treated as an empty map
+		assertSame(Maps.empty(),eval("(assoc nil)")); 
 		
-		// No values to assoc, retain initial nil
-		assertNull(eval("(assoc nil)"));
+		// assoc promotes nil to maps
+		assertEquals(Maps.of(1L, 2L), eval("(assoc nil 1 2)")); 
+		assertEquals(Maps.of(1L, 2L, 3L, 4L), eval("(assoc nil 1 2 3 4)"));
 	}
 
 	@Test
@@ -1855,9 +1855,12 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testApply() {
-		assertNull(eval("(apply assoc [nil])"));
-		assertEquals(Vectors.empty(), eval("(apply vector ())"));
-		assertEquals(Lists.empty(), eval("(apply list [])"));
+		// Basic data structure application
+		assertSame(Maps.empty(),eval("(apply assoc [nil])"));
+		assertSame(Vectors.empty(), eval("(apply vector ())"));
+		assertSame(BlobMaps.empty(), eval("(apply blob-map ())"));
+		assertSame(Lists.empty(), eval("(apply list [])"));
+		
 		assertEquals("foo", evalS("(apply str [\\f \\o \\o])"));
 		
 		assertEquals(10L,evalL("(apply + 1 2 [3 4])"));
