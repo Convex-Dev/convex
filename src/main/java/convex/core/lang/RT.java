@@ -716,7 +716,7 @@ public class RT {
 
 
 	/**
-	 * Converts arguments to a AString representation. Handles:
+	 * Converts arguments to an AString representation. Handles:
 	 * <ul>
 	 * <li>CVM Strings (unchanged)</li>
 	 * <li>Blobs (converted to hex)</li>
@@ -750,7 +750,7 @@ public class RT {
 	}
 
 	/**
-	 * Gets the name from an Object. Supports Strings, Keywords and Symbols.
+	 * Gets the name from a CVM value. Supports Strings, Keywords and Symbols.
 	 *
 	 * @param a
 	 * @return Name of the argument, or null if not Named
