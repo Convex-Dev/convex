@@ -130,6 +130,11 @@ public class ContextTest extends ACVMTest {
 		assertEquals(1L,evalL("~*depth*")); // unquote
 		assertEquals(2L,evalL("~(do *depth*)")); // unquote + do
 		
+		// in custom expander
+		assertEquals(2L,evalL("(expand :foo (fn [x e] *depth*))")); // in expand, invoke
+		assertEquals(1L,evalL("(expand *depth* (fn [x e] x))")); // in expand arg
+
+		
 		// In expansion, should be equivalent to expanded code
 		assertEquals(evalL("*depth*"),evalL("`~*depth*")); 
 		assertEquals(evalL("(do *depth*)"),evalL("`~(do *depth*)")); 
