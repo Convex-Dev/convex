@@ -1873,7 +1873,7 @@ public class CoreTest extends ACVMTest {
 		// Bad function type
 		assertCastError(step("(apply 666 1 2 [3 4])"));
 
-		// Keyword works as a function lookup wrong arity (#79)
+		// Keyword works as a function lookup, but wrong arity (#79)
 		assertArityError(step("(apply :n 1 2 [3 4])"));
 
 		// Insufficient args to apply itself
