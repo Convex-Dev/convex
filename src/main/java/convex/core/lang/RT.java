@@ -905,20 +905,30 @@ public class RT {
 	}
 	
 	/**
-	 * Coerce to an AccountKey. Accepts strings and blobs of correct length
+	 * Implicit cast to an AccountKey. Accepts blobs of correct length
 	 * @param a
 	 * @return AccountKey instance, or null if coercion fails
 	 */
-	public static AccountKey castAccountKey(ACell a) {
+	public static AccountKey ensureAccountKey(ACell a) {
 		if (a==null) return null;
 		if (a instanceof AccountKey) return (AccountKey) a;
-		if (a instanceof AString) return AccountKey.fromHexOrNull((AString)a);
 		if (a instanceof ABlob) {
 			ABlob b = (ABlob) a;
 			return AccountKey.create(b);
 		}
 
 		return null;
+	}
+	
+	/**
+	 * Coerce to an AccountKey. Accepts strings and blobs of correct length
+	 * @param a
+	 * @return AccountKey instance, or null if coercion fails
+	 */
+	public static AccountKey castAccountKey(ACell a) {
+		if (a==null) return null;
+		if (a instanceof AString) return AccountKey.fromHexOrNull((AString)a);
+		return ensureAccountKey(a);
 	}
 
 	/**

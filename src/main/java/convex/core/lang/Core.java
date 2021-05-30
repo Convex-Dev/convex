@@ -68,7 +68,7 @@ import convex.core.util.Utils;
  * </ul>
  * 
  * In general, core functions defined in this class are thin Java wrappers over
- * functions available in the runtime, but also need to account for:
+ * functions available in the CVM implementation, but also need to account for:
  * <ul>
  * <li>Argument checking </li>
  * <li>Exceptional case handling</li>
@@ -855,7 +855,7 @@ public class Core {
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			AccountKey address = RT.castAccountKey(args[0]);
+			AccountKey address = RT.ensureAccountKey(args[0]);
 			if (address == null) return context.withCastError(0,args, Types.KEY);
 
 			CVMLong amount = RT.ensureLong(args[1]);
@@ -1103,9 +1103,11 @@ public class Core {
 			int n = args.length;
 			if (n !=1) return context.withArityError(exactArityMessage(1, n));
 			
-			// Get requested controller. Must be a valid address or null
-			AccountKey publicKey=RT.castAccountKey(args[0]);
-			if ((publicKey == null)&&(args[0]!=null)) return context.withCastError(args[0], Types.KEY);
+			ACell arg=args[0];
+			
+			// Check an account key is being used as argument. nil is permitted
+			AccountKey publicKey=RT.ensureAccountKey(arg);
+			if ((publicKey == null)&&(arg!=null)) return context.withCastError(arg, Types.KEY);
 			
 			context=(Context) context.setAccountKey(publicKey);
 			if (context.isExceptional()) return (Context<AccountKey>) context;
