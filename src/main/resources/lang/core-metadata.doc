@@ -442,7 +442,7 @@
   
   expand
  	{
-	 :doc {:description "Expands the given form. Uses the specified expander (or macro) if provided, the default *initial-expander* otherwise. A continuation expander will also be used if provided, passed as a continuation to the first expander."
+	 :doc {:description "Expands the given form. Uses the specified expander (including macros) as the primary expander if provided, the default *initial-expander* otherwise. If also provided, a continuation expander will be passed to the primary expander, otherwise the primary will be used as its own continuation."
          :examples [{:code "(expand '(if a :truthy :falsey))"}]
          :type :function
          :signature [{:params [form]}
@@ -1046,7 +1046,7 @@
   
   stake
   {
-    :doc {:description "Sets the stake on a given peer. Peer must exist, and funds must be available to set the stake to the specified level."
+    :doc {:description "Sets the stake on a given peer. Peer must exist, and funds must be available to set the stake to the specified level. Setting stake to zero removes the stake entirely."
           :examples [{:code "(stake trusted-peer-address 7000000000)"}]
           :type :function
           :signature [{:params [address amount]}]}
