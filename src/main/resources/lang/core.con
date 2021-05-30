@@ -169,19 +169,31 @@
   [a] 
   a)
 
+(defn nan? 
+   ^{:doc {:description "Tests if the value provided is ##NaN. Returns false for any other value (including non-numerical arguments)."
+         :examples [{:code "(nan? ##NaN)"}]
+         :type :function	 
+         :signature [{:params [x]
+                      :return Boolean}]
+         }
+	}
+  [x]
+  (= ##NaN x))
+
 (defn max 
   ^{:doc {:description "Returns the numerical maximum of the given values."
          :examples [{:code "(max 1 2 3)"}]
          :type :function	 
          :signature [{:params [& vals]}]}
 	}
-  [& vals]
-  (let [n (count vals)]
-    (loop [m ##NaN i 0]
-      (if (>= i n) 
-        m
-        (let [v (nth vals i)]
-          (recur (if (>= m v) m v) (inc i)))))))
+  [fst & more]
+  (let [n (count more)]
+    (loop [m (+ fst 0) i 0] ;; add zero to ensure number
+      (cond 
+        (>= i n) m
+        (let [v (nth more i)]
+          (and (nan? v) (return v))
+          (recur (cond (> v m) v m) (inc i)))))))
 
 (defn min 
   ^{:doc {:description "Returns the numerical minimum of the given values."
@@ -189,13 +201,14 @@
          :type :function	 
          :signature [{:params [& vals]}]}
 	}
-  [& vals]
-  (let [n (count vals)]
-    (loop [m ##NaN i 0]
-      (if (>= i n) 
+  [fst & more]
+  (let [n (count more)]
+    (loop [m (+ fst 0) i 0] ;; add zero to ensure number
+      (cond (>= i n) 
         m
-        (let [v (nth vals i)]
-          (recur (if (<= m v) m v) (inc i)))))))
+        (let [v (nth more i)]
+          (and (nan? v) (return v))
+          (recur (cond (< v m) v m) (inc i)))))))
 
 (defn mapv 
   ^{:doc {:description "Maps a function over the given collections as with map, and returns the resturn as a vector."

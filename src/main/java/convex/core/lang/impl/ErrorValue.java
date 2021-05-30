@@ -10,7 +10,9 @@ import convex.core.data.AString;
 import convex.core.data.Strings;
 
 /**
- * Class representing a function error value.
+ * Class representing an Error value produced by the CVM.
+ * 
+ * See "Error Handling" CAD.
  * 
  * Contains:
  * <ul>
@@ -106,8 +108,14 @@ public class ErrorValue extends AExceptional {
 		return sb.toString();
 	}
 
+	/**
+	 * Gets the trace for this Error.
+	 * 
+	 * The trace List is mutable, and may be used to implement accumulation of additional trace entries.
+	 * 
+	 * @return List of trace entries.
+	 */
 	public List<AString> getTrace() {
-		// TODO Auto-generated method stub
 		return trace;
 	}
 

@@ -177,7 +177,6 @@ public class NumericsTest {
 		
 		// TODO: should this be in core? NaN is not equal to itself
 		// assertTrue(evalB("(!= ##NaN ##NaN)"));
-
 	}
 	
 	@Test

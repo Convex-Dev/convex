@@ -387,6 +387,16 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(< 1 :foo)"));
 		assertCastError(step("(<= 1 3 \"hello\")"));
 		assertCastError(step("(>= nil 1.0)"));
+		
+		// ##NaN behaviour
+		assertFalse(evalB("(<= ##NaN ##NaN)"));
+		assertFalse(evalB("(<= ##NaN 42)"));
+		assertFalse(evalB("(< ##NaN 42)"));
+		assertFalse(evalB("(> 42 ##NaN)"));
+		assertFalse(evalB("(<= 42 ##NaN)"));
+		assertFalse(evalB("(== ##NaN 42)"));
+		assertFalse(evalB("(== ##NaN ##NaN)"));
+		assertFalse(evalB("(>= ##NaN 42)"));
 
 		// TODO: decide if we want short-circuiting behaviour on casts? Probably not?
 		// assertCastError(step("(>= 1 2 3 '*balance*)"));
@@ -2375,7 +2385,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(1L, evalL("("+Init.CORE_ADDRESS+"/min 1 2)"));
 		
 		assertEquals(1.0, evalD("(min 2.0 1.0 3.0)"));
-		assertEquals(-0.0, evalD("(min 2.0 ##NaN -0.0 ##Inf)"));
+		assertEquals(CVMDouble.NaN, eval("(min 2.0 ##NaN -0.0 ##Inf)"));
 		assertEquals(CVMDouble.NaN, eval("(min ##NaN)"));
 
 		// TODO: Figure out how this should behave. See issue https://github.com/Convex-Dev/convex/issues/99
@@ -2383,21 +2393,25 @@ public class CoreTest extends ACVMTest {
 
 		assertCastError(step("(min true)"));
 		assertCastError(step("(min \\c)"));
+		assertCastError(step("(min ##NaN true)"));
+		assertCastError(step("(min true ##NaN)"));
 
-		// assertArityError(step("(min)")); // TODO: consider this?
-		assertEquals(CVMDouble.NaN, eval("(min)"));
+		
+		// #NaNs should get ignored
+		assertEquals(CVMDouble.NaN,eval("(min ##NaN 42)"));
+		assertEquals(CVMDouble.NaN,eval("(min 42 ##NaN)"));
 
+		assertArityError(step("(min)")); 
 	}
 
 	@Test
 	public void testMax() {
 		assertEquals(4L, evalL("(max 1 2 3 4)"));
-		assertEquals(4L, evalL("(max 1 ##-Inf 3 ##NaN 4)"));
+		assertEquals(CVMDouble.NaN, eval("(max 1 ##-Inf 3 ##NaN 4)"));
 		assertEquals(7L, evalL("(max 7)"));
 		assertEquals(4.0, evalD("(max 4.0 3 2)"));
 
-		// assertArityError(step("(max)")); // TODO: consider this?
-		assertEquals(CVMDouble.NaN, eval("(max)"));
+		assertArityError(step("(max)"));
 	}
 	
 	@Test
