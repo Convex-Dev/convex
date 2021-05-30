@@ -1340,5 +1340,9 @@ public class RT {
 		return a.getType();
 	}
 
+	public static boolean isNaN(ACell val) {
+		return CVMDouble.NaN.equals(val);
+	}
+
 
 }

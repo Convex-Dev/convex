@@ -2248,6 +2248,13 @@ public class Core {
 			return RT.isNumber(val);
 		}
 	});
+	
+	public static final CorePred NAN_Q = reg(new CorePred(Symbols.NAN_Q) {
+		@Override
+		public boolean test(ACell val) {
+			return RT.isNaN(val);
+		}
+	});
 
 	public static final CorePred FN_Q = reg(new CorePred(Symbols.FN_Q) {
 		@Override

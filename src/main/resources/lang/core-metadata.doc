@@ -782,6 +782,14 @@
           :type :function
           :signature [{:params [num div]}]}
   }
+  
+  nan?
+  {:doc {:description "Tests if the value provided is ##NaN. Returns false for any other value (including non-numerical arguments)."
+         :examples [{:code "(nan? ##NaN)"}]
+         :type :function	 
+         :signature [{:params [x]
+                      :return Boolean}]
+         }}
  
   name
   {

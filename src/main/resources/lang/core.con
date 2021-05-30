@@ -169,17 +169,6 @@
   [a] 
   a)
 
-(defn nan? 
-   ^{:doc {:description "Tests if the value provided is ##NaN. Returns false for any other value (including non-numerical arguments)."
-         :examples [{:code "(nan? ##NaN)"}]
-         :type :function	 
-         :signature [{:params [x]
-                      :return Boolean}]
-         }
-	}
-  [x]
-  (= ##NaN x))
-
 (defn max 
   ^{:doc {:description "Returns the numerical maximum of the given values."
          :examples [{:code "(max 1 2 3)"}]
@@ -189,10 +178,10 @@
   [fst & more]
   (let [n (count more)]
     (loop [m (+ fst 0) i 0] ;; add zero to ensure number
-      (cond 
-        (>= i n) m
+  (cond 
+    (>= i n) m
         (let [v (nth more i)]
-          (and (nan? v) (return v))
+      (and (nan? v) (return v))
           (recur (cond (> v m) v m) (inc i)))))))
 
 (defn min 

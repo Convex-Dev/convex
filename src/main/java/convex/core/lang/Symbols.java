@@ -285,6 +285,8 @@ public class Symbols {
 	public static final Symbol LOG = Symbol.create("log");
 	
 	public static final Symbol CNS_RESOLVE = Symbol.create("cns-resolve");
+	
+	public static final Symbol NAN_Q = Symbol.create("nan?");
 
 	
 
