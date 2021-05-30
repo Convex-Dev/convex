@@ -749,24 +749,6 @@ public class Core {
 			return context.withResult(juice, address);
 		}
 	});
-	
-	public static final CoreFn<Address> CREATE_ACCOUNT = reg(new CoreFn<>(Symbols.CREATE_ACCOUNT) {
-		@SuppressWarnings("unchecked")
-		@Override
-		public  Context<Address> invoke(Context context, ACell[] args) {
-			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-
-			ACell o = args[0];
-			AccountKey key = RT.castAccountKey(o);
-			if (key == null) {
-				return context.withCastError(0,args, Types.KEY);
-			}
-			long juice = Juice.CREATE_ACCOUNT;
-			
-			Context<Address> rctx=context.createAccount(key);
-			return rctx.consumeJuice(juice);
-		}
-	});
 
 	public static final CoreFn<ABlob> BLOB = reg(new CoreFn<>(Symbols.BLOB) {
 		@SuppressWarnings("unchecked")

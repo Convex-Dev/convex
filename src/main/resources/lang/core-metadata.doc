@@ -296,16 +296,6 @@
          :errors {:CAST "If the argument is not a countable object."}}
 	}
  
-  create-account
-	{
-	 :doc {:description "Creates an account with the specified account public key. Returns the Address of the newly created Account."
-         :examples [{:code "(create-account 0x817934590c058ee5b7f1265053eeb4cf77b869e14c33e7f85b2babc85d672bbc)"}]
-         :type :function
-         :signature [{:params [account-key]
-                      :return Address}]
-         :errors {:CAST "If the argument is not a Blob or nil."}}
-	}
- 
   dec
 	{
 	 :doc {:description "Decrements the given number by 1. Result is a Long."
