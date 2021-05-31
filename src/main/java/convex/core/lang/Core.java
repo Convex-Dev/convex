@@ -2088,44 +2088,61 @@ public class Core {
 		@Override
 		public  Context<ACell> invoke(Context ctx, ACell[] args) {
 			int ac=args.length;
-			if (ac != 3) return ctx.withArityError(exactArityMessage(3, ac));
+			if ((ac<2)||(ac > 3)) return ctx.withArityError(exactArityMessage(3, ac));
 
 			// check and cast first argument to a function
 			ACell fnArg = args[0];
 			AFn<?> fn = RT.castFunction(fnArg);
 			if (fn == null) return ctx.withCastError(0,args, Types.FUNCTION);
 
-			// Initial value, can be anything
-			ACell result = (ACell) args[1];
 
-			ACell maybeSeq = (ACell) args[2];
+			// last arg must be a data structure
+			ACell maybeSeq = (ACell) args[ac-1]; 
 			ADataStructure<ACell> seq = (maybeSeq==null)?Vectors.empty():RT.ensureDataStructure(maybeSeq);
-			if (seq == null) return ctx.withCastError(2,args, Types.SEQUENCE);
-
-			long n = seq.count();
+			if (seq == null) return ctx.withCastError(ac-1,args, Types.SEQUENCE);
+			long n = seq.count();		
+			
+			ACell result; // Initial value, can be anything
+			long start=0; // first element for reduction
+			if (ac==3) {
+				result=args[1];
+			} else {
+				// 2 arg form of reduce must apply function directly to 0 or 1 elements
+				int initial=(int)Math.min(2,n); // number of initial arguments to consume
+				if (initial==0) {
+					return reduceResult(ctx.invoke(fn, ACell.EMPTY_ARRAY));
+				} else if (initial==1) {
+					return reduceResult(ctx.invoke(fn, new ACell[] {seq.get(0)}));
+				}
+				result=seq.get(0);
+				start = 1;
+			}
+			
+			// Need to reduce over remaining elements
 			ACell[] xs = new ACell[2]; // accumulator, next element
-
-			Context<ACell> rc=(Context<ACell>) ctx;
-			for (long i = 0; i < n; i++) {
+			for (long i = start; i < n; i++) {
 				xs[0] = result;
 				xs[1] = seq.get(i);
-				rc = (Context<ACell>) rc.invoke(fn, xs);
-				if (rc.isExceptional()) {
-					AExceptional ex=rc.getExceptional();
-				 	if (ex instanceof Reduced) {
-				 		result=((Reduced)ex).getValue();
-				 		break;
-				 	} else {
-				 		return rc; // bail out with exception
-				 	}
+				ctx = ctx.invoke(fn, xs);
+				if (ctx.isExceptional()) {
+					return reduceResult(ctx);
 				} else {
-					result=rc.getResult();
+					result=ctx.getResult();
 				}
 			}
 
-			return rc.withResult(Juice.REDUCE, result);
+			return ctx.withResult(Juice.REDUCE, result);
 		}
 	});
+	
+	// Helper function for reduce
+	private static final Context<ACell> reduceResult(Context<?> ctx) {
+		Object ex=ctx.getValue(); // might be an ACell or Exception. We need to check for a Reduced result only
+	 	if (ex instanceof Reduced) {
+	 		ctx=ctx.withResult(((Reduced)ex).getValue());
+	 	} 
+	 	return ctx.consumeJuice(Juice.REDUCE); // bail out with exception
+	}
 	
 	public static final CoreFn<ACell> REDUCED = reg(new CoreFn<>(Symbols.REDUCED) {
 		@SuppressWarnings("unchecked")

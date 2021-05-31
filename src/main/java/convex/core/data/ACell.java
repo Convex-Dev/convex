@@ -26,6 +26,8 @@ import convex.core.util.Utils;
 public abstract class ACell extends AObject implements IWriteable, IValidated {
 
 	
+	public static final ACell[] EMPTY_ARRAY = new ACell[0];
+
 	/**
 	 * We cache the computed memorySize. May be 0 for embedded objects
 	 * -1 is initial value for when size is not calculated

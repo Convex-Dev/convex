@@ -1400,12 +1400,23 @@ public class CoreTest extends ACVMTest {
 
 		assertEquals(Lists.of(3,2,1), eval("(reduce conj '() '(1 2 3))"));
 
+		// 2-arg reduce forms
+		assertEquals(24L, evalL("(reduce * [1 2 3 4])"));
+		assertEquals(1L, evalL("(reduce * nil)"));
+		assertEquals(1L, evalL("(reduce + [1])"));
+		assertEquals(Keywords.FOO, eval("(reduce (fn [] :foo) [])")); // 0 arity
+		assertEquals(Keywords.FOO, eval("(reduce (fn [v] :foo) [:bar])")); // 1 arity
+		assertEquals(Keywords.FOO, eval("(reduce (fn [a b] :foo) [:bar :baz])")); // 2 arity
+
+		// Errors in reduce function
+		assertCastError(step("(reduce + [:foo])"));
+		assertCastError(step("(reduce + 1 [:foo])"));
 		
 		assertCastError(step("(reduce 1 2 [])"));
 		assertCastError(step("(reduce + 2 :foo)"));
+		assertCastError(step("(reduce + 1)"));
 
 		assertArityError(step("(reduce +)"));
-		assertArityError(step("(reduce + 1)"));
 		assertArityError(step("(reduce + 1 [2] [3])"));
 	}
 	
@@ -1420,6 +1431,13 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testReduced() {
 		assertEquals(Vectors.of(2L,3L), eval("(reduce (fn [i v] (if (== v 3) (reduced [i v]) v)) 1 [1 2 3 4 5])"));
+		
+		// 2 arg reduce
+		assertEquals(Vectors.of(2L,3L), eval("(reduce (fn [i v] (if (== v 3) (reduced [i v]) v)) [1 2 3 4 5])"));
+		assertEquals(CVMLong.create(5L), eval("(reduce (fn [a b] (if (== b 1) (reduced :foo) b)) [1 2 3 4 5])")); // b is never 1
+		assertEquals(CVMLong.create(1L), eval("(reduce (fn [v] (reduced v)) [1])")); // fn called with arity 1
+		assertEquals(Keywords.FOO, eval("(reduce (fn [] (reduced :foo)) [])")); // fn called with arity 0
+
 	
 		assertArityError(step("(reduced)"));
 		assertArityError(step("(reduced 1 2)"));

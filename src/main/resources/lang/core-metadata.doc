@@ -896,10 +896,11 @@
   
   reduce
   {
-    :doc {:description "Reduces over a sequential collection, calling the function with the accumulated value and each element."
+    :doc {:description "Reduces over a collection data structure, calling an arity 2 function with the accumulated value and each element. If an initial accumulator value is not supplied, the initial value will be determined by calling the function on the first 0, 1 or 2 elements of the collection (however many are available)."
           :examples [{:code "(reduce (fn [acc x] (* acc x)) 1 [1 2 3 4 5])"}]
           :type :function
-          :signature [{:params [f init coll]}]
+          :signature [{:params [f coll]}
+                      {:params [f init coll]}]
           :errors {:CAST "If the first argument is not a function, or the final argument is not a sequential collection."}}
   }
   
