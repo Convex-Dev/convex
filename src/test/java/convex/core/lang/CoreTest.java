@@ -1404,6 +1404,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(24L, evalL("(reduce * [1 2 3 4])"));
 		assertEquals(1L, evalL("(reduce * nil)"));
 		assertEquals(1L, evalL("(reduce + [1])"));
+		assertEquals(0L, evalL("(reduce + [])"));
 		assertEquals(Keywords.FOO, eval("(reduce (fn [] :foo) [])")); // 0 arity
 		assertEquals(Keywords.FOO, eval("(reduce (fn [v] :foo) [:bar])")); // 1 arity
 		assertEquals(Keywords.FOO, eval("(reduce (fn [a b] :foo) [:bar :baz])")); // 2 arity
