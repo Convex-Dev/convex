@@ -443,4 +443,19 @@
     (empty coll) 
     (cond (list? coll) (reverse coll) coll))) ;; must reverse list to that elements are handled in correct order for conj
 
+(defn comp 
+   ^{
+	 :doc {:description "Composes a sequence of functions, returning a function that is the composition of these functions. The rightmost function may take a variable number of arguments. The other functions will be passed a single argument (the result of the next function to the right)"
+         :examples [{:code "((comp inc inc) 1)"}]
+         :type :function
+         :signature [{:params [f & more]
+                      :return Function}]
+         :errors {}}
+	}
+  ([f] f)
+  ([f g] (fn [& args] (f (apply g args))))
+  ([f g h] (fn [& args] (f (g (apply h args)))))
+  ([f g h & more]
+    (apply recur (comp f g h) more)))
+
 
