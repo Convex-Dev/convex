@@ -2087,7 +2087,8 @@ public class Core {
 		@SuppressWarnings("unchecked")
 		@Override
 		public  Context<ACell> invoke(Context ctx, ACell[] args) {
-			if (args.length != 3) return ctx.withArityError(exactArityMessage(3, args.length));
+			int ac=args.length;
+			if (ac != 3) return ctx.withArityError(exactArityMessage(3, ac));
 
 			// check and cast first argument to a function
 			ACell fnArg = args[0];
@@ -2098,14 +2099,14 @@ public class Core {
 			ACell result = (ACell) args[1];
 
 			ACell maybeSeq = (ACell) args[2];
-			ASequence<?> seq = RT.sequence(maybeSeq);
+			ADataStructure<ACell> seq = (maybeSeq==null)?Vectors.empty():RT.ensureDataStructure(maybeSeq);
 			if (seq == null) return ctx.withCastError(2,args, Types.SEQUENCE);
 
-			long c = seq.count();
+			long n = seq.count();
 			ACell[] xs = new ACell[2]; // accumulator, next element
 
 			Context<ACell> rc=(Context<ACell>) ctx;
-			for (long i = 0; i < c; i++) {
+			for (long i = 0; i < n; i++) {
 				xs[0] = result;
 				xs[1] = seq.get(i);
 				rc = (Context<ACell>) rc.invoke(fn, xs);
