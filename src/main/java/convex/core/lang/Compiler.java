@@ -270,7 +270,18 @@ public class Compiler {
 			ACell fn = Core.HASHMAP;
 			Invoke<T> inv = Invoke.create(Constant.create(fn), cSeq);
 			return context.withResult(Juice.COMPILE_NODE, inv);
-		} else {
+		} else if (form instanceof ASet) {
+			ASet<ACell> set = (ASet<ACell>) form;
+			AVector<ACell> rSeq = set.toVector();
+
+			// compile quoted elements
+			context = compileAllQuoted(context, rSeq,depth);
+			ASequence<AOp<ACell>> cSeq = (ASequence<AOp<ACell>>) context.getResult();
+
+			ACell fn = Core.HASHSET;
+			Invoke<T> inv = Invoke.create(Constant.create(fn), cSeq);
+			return context.withResult(Juice.COMPILE_NODE, inv);
+		}else {
 			return compileConstant(context, form);
 		}
 	}

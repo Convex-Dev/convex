@@ -282,6 +282,14 @@ public class CompilerTest extends ACVMTest {
 	}
 	
 	@Test 
+	public void testQuoteDataStructures() {
+		assertEquals(Maps.of(1,2,3,4), eval("`{~(inc 0) 2 3 ~(dec 5)}"));
+		assertEquals(Sets.of(1,2,3),eval("`#{1 2 ~(dec 4)}"));
+		
+		// TODO: unquote-splicing in data structures.
+	}
+	
+	@Test 
 	public void testQuoteCases() {
 		// Tests from Racket / Scheme
 		Context<?> ctx=step("(def x 1)");
