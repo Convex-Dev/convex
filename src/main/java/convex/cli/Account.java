@@ -16,9 +16,12 @@ import picocli.CommandLine.ParentCommand;
  *
  */
 @Command(name="account",
+	aliases={"ac"},
 	subcommands = {
+		AccountBalance.class,
 		AccountCreate.class,
 		AccountFund.class,
+		AccountInformation.class,
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=true,

@@ -18,6 +18,7 @@ import picocli.CommandLine.ParentCommand;
  *
  */
 @Command(name="list",
+	aliases={"li"},
 	mixinStandardHelpOptions=true,
 	description="List available key pairs.")
 public class KeyList implements Runnable {

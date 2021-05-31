@@ -20,7 +20,7 @@ import picocli.CommandLine.ParentCommand;
  *
  */
 @Command(name="generate",
-	aliases={"g","gen"},
+	aliases={"ge"},
 	mixinStandardHelpOptions=true,
 	description="Generate 1 or more private key pairs.")
 public class KeyGenerate implements Runnable {

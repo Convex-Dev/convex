@@ -20,6 +20,7 @@ import picocli.CommandLine.ParentCommand;
  */
 
 @Command(name="fund",
+    aliases={"fu"},
 	mixinStandardHelpOptions=true,
 	description="Transfers funds to account using a public/private key from the keystore.%n"
 		+ "You must provide a valid keystore password to the keystore and a valid address.%n"
