@@ -425,7 +425,22 @@
          :errors {:CAST "If the argument is not a Blob key value."}}
 	}
   [key]
-  (or (blob? key) (fail :CAST "create-account requires a Blob key"))
+  (or (blob? key) (fail :CAST "create-account requires a non-nil Blob key"))
   (deploy `(set-key ~key)))
+
+(defn filter 
+   ^{
+	 :doc {:description "Filters a collection by applying the given predicate to each element, and including it in the new collection if and only if the predicate returns true."
+         :examples [{:code "(filter (fn [x] (> 2 x)) [1 2 3 4])"}]
+         :type :function
+         :signature [{:params [key]
+                      :return Address}]
+         :errors {:CAST "If the coll argeument is not a Data Structure."}}
+	}
+  [pred coll]
+  (reduce 
+    (fn [acc e] (cond (pred e) (conj acc e) acc)) 
+    (empty coll) 
+    (cond (list? coll) (reverse coll) coll))) ;; must reverse list to that elements are handled in correct order for conj
 
 

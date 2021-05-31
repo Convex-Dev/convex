@@ -927,6 +927,15 @@
           :signature [{:params [value]}]}
   }
   
+  reverse
+  {
+    :doc {:description "Reverses a Sequence. Lists are converted to Vector, and vice versa for efficieny reasons. nil is treated as an empty Vector."
+          :examples [{:code "(reverse [1 2 3])"}]
+          :type :special
+          :signature [{:params [value]
+                       :return Sequence}]}
+  }
+  
   rollback
   {
     :doc {:description "Escapes from the currently executing smart contract. Rolls back any state changes. Returns the given value."

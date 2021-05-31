@@ -263,6 +263,11 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	public AVector<T> empty() {
 		return Vectors.empty();
 	}
+	
+	@Override
+	public AList<T> reverse() {
+		return convex.core.data.List.reverse(this);
+	}
 
 	/**
 	 * Merges this vector with another vector, using the provided merge function.

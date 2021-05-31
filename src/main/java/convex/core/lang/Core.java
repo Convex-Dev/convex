@@ -164,6 +164,25 @@ public class Core {
 			return context.withResult(juice, result);
 		}
 	});
+	
+	public static final CoreFn<AVector<ACell>> REVERSE = reg(new CoreFn<>(Symbols.REVERSE) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public Context<AVector<ACell>> invoke(Context context, ACell[] args) {
+			// Arity 1 exactly
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+			ACell o = args[0];
+			
+			// Need to compute juice before building potentially big vector
+			ASequence<ACell> seq = RT.ensureSequence(o);
+			if (seq == null) return context.withCastError(0,args, Types.SEQUENCE);
+			
+			long juice = Juice.BUILD_DATA;
+			
+			ASequence<ACell> result = seq.reverse();
+			return context.withResult(juice, result);
+		}
+	});
 
 	public static final CoreFn<ASet<ACell>> SET = reg(new CoreFn<>(Symbols.SET) {
 		@SuppressWarnings("unchecked")

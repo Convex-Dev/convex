@@ -190,6 +190,7 @@ public class Symbols {
 	public static final Symbol SECOND = Symbol.create("second");
 	public static final Symbol LAST = Symbol.create("last");
 	public static final Symbol NEXT = Symbol.create("next");
+	public static final Symbol REVERSE = Symbol.create("reverse");
 
 	public static final Symbol AMPERSAND = Symbol.create("&");
 	public static final Symbol UNDERSCORE = Symbol.create("_");
@@ -287,6 +288,7 @@ public class Symbols {
 	public static final Symbol CNS_RESOLVE = Symbol.create("cns-resolve");
 	
 	public static final Symbol NAN_Q = Symbol.create("nan?");
+
 
 	
 

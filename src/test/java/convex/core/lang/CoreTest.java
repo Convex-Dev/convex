@@ -797,6 +797,22 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(vec)"));
 		assertArityError(step("(vec 1 2)"));
 	}
+	
+	@Test
+	public void testReverse() {
+		assertSame(Lists.empty(), eval("(reverse nil)"));
+		assertSame(Lists.empty(), eval("(reverse [])"));
+		assertSame(Vectors.empty(), eval("(reverse ())"));
+		assertEquals(Vectors.of(1,2,3), eval("(reverse '(3 2 1))"));
+		assertEquals(Lists.of(1,2,3), eval("(reverse [3 2 1])"));
+		
+		assertCastError(step("(reverse #{})"));
+		assertCastError(step("(reverse {:foo :bar})"));
+		assertCastError(step("(reverse 0x1234)"));
+
+		assertArityError(step("(reverse)"));
+		assertArityError(step("(reverse 1 2)"));
+	}
 
 	@Test
 	public void testAssocNull() {
@@ -1352,6 +1368,22 @@ public class CoreTest extends ACVMTest {
 
 		assertArityError(step("(mapv)"));
 		assertArityError(step("(mapv inc)"));
+	}
+	
+	@Test
+	public void testFilter() {
+		assertEquals(Vectors.of(1,2,3), eval("(filter number? [1 :foo 2 :bar 3])"));
+		assertEquals(Lists.of(Keywords.FOO), eval("(filter #{:foo} '(:foo 2 3))"));
+		assertNull(eval("(filter keyword? nil)"));
+		assertEquals(Maps.empty(), eval("(filter nil? {1 2 3 4})"));
+		assertEquals(Maps.of(Keywords.FOO,1), eval("(filter (fn [[k v]] (keyword? k)) {:foo 1 'bar 2})"));
+		assertEquals(Sets.of(1,2,3), eval("(filter number? #{1 2 3 :foo})"));
+
+		assertCastError(step("(filter nil? 1)"));
+		assertCastError(step("(filter 1 [1 2 3])"));
+
+		assertArityError(step("(filter +)"));
+		assertArityError(step("(filter 1 2 3)"));
 	}
 
 	@Test

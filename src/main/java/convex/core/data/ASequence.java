@@ -247,4 +247,10 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	 * @return ListIterator instance.
 	 */
 	protected abstract ListIterator<T> listIterator(long l);
+
+	/**
+	 * Reverses a sequence, converting Lists to Vectors and vice versa
+	 * @return
+	 */
+	public abstract ASequence<T> reverse();
 }
