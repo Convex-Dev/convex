@@ -119,12 +119,12 @@
   blob-map
 	{
 	 :doc {:description "Creates a BlobMap. Blobmaps support blob types as keys only. Optional arguments must be pairs of Blob keys and values, to be included in the BlobMap."
-         :examples [{:code "(blob-map)"}]
+         :examples [{:code "(blob-map 0x1234 :foo)"}]
          :type :function
          :signature [{:params [& kvs]
                       :return BlobMap}]
          :errors {:ARITY "If there are not an even number of arguments (key and value pairs)."
-                  :CAST "If any of the keys supplied is not castable to a Blob."}}
+                  :ARGUMENT "If any of the keys supplied is not castable to a Blob."}}
 	}
  
   blob?
