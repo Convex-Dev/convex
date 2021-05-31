@@ -1765,6 +1765,11 @@ public class CoreTest extends ACVMTest {
 			assertFalse(evalB(ctx2,"(defined? mylib/bar)"));
 		}
 		
+		{ // test deploy and CNS import in a single form. See #107
+			Context<?> ctx2=step(ctx,"(do (let [addr (deploy nil)] (call *registry* (cns-update 'foo addr)) (import foo :as foo2)))");
+			assertNotError(ctx2);
+		}
+		
 		assertArityError(step(ctx,"(import)"));
 		assertArityError(step(ctx,"(import ~lib)"));	
 		assertArityError(step(ctx,"(import ~lib :as)"));	

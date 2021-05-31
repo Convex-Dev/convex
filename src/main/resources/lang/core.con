@@ -282,21 +282,18 @@
           :type :macro
           :signature [{:params [& args]}]}}
   [addr as sym]
-	  (let [addr (unsyntax addr)
-	        addr (cond
+	  (let [code (cond
 	               (symbol? addr)
-	                  (or (call* *registry* 0 `cns-resolve addr) 
-	                      (fail :NOBODY (str "Could not resolve library name for import: " addr)))
-	               addr)
-	        sym (unsyntax sym)
+	                  `(or (call* *registry* 0 'cns-resolve (quote ~addr)) 
+	                      (fail :NOBODY (str "Could not resolve library name for import: " (quote ~addr))))
+	               `(address ~addr))
 	        sym (cond (symbol? sym) sym
 	                  (= :default sym) nil
 	                  (fail "import: alias must be a symbol or :default"))] 
 	    (assert (= :as (unsyntax as)))
-	    `(let [addr (address ~addr)] 
+	    `(let [addr ~code] 
 	       (def *aliases* (assoc *aliases* ~(list 'quote sym) addr))
 	       addr)))
-
 
 (defmacro actor
   ^{:doc {:description "Creates an actor generation function. This function generates depolyable code when called, and may take optional arguments to configure the deployed actor. The resulting code can be used with either 'deploy' or 'deploy-once'."
