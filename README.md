@@ -78,8 +78,14 @@ This can be invoked by running `convex.gui.manager.PeerManager` as the main clas
 or you can run this from the command line by using the `peer manager` command:
 
 ```
-convex peer manager
+./convex local manager
 ```
+or
+
+```
+./convex local start
+```
+
 
 ### Benchmarking
 

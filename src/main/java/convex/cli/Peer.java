@@ -15,12 +15,13 @@ import picocli.CommandLine.ParentCommand;
  *
  */
 @Command(name="peer",
+	aliases={"pe"},
 	subcommands = {
 		PeerStart.class,
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=true,
-	description="Operates a local peer(s) or local convex network.")
+	description="Operates a local peer.")
 public class Peer implements Runnable {
 
 	private static final Logger log = Logger.getLogger(Peer.class.getName());

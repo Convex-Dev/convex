@@ -21,8 +21,9 @@ import picocli.CommandLine.Spec;
  */
 
 @Command(name="start",
+	aliases={"st"},
 	mixinStandardHelpOptions=true,
-	description="Starts one or more peer server(s).")
+	description="Starts a local peer.")
 public class PeerStart implements Runnable {
 
 	private static final Logger log = Logger.getLogger(PeerStart.class.getName());
