@@ -116,6 +116,11 @@ public class ErrorCodes {
 	public static final Keyword TRUST = Keyword.create("TRUST");
 
 	public static final Keyword UNEXPECTED = Keyword.create("UNEXPECTED");
+	
+	/**
+	 * Error code for unhandled exceptions
+	 */
+	public static final Keyword EXCEPTION = Keyword.create("EXCEPTION");
 
 	// Error codes for non-error values
 	

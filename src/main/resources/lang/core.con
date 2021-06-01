@@ -228,7 +228,7 @@
 	      (== n 2) (cons 'call* addr (first more) fnlist)))))
 
 (defmacro tailcall 
-   ^{:doc {:description "Calls a function as a tail call."
+   ^{:doc {:description "Calls a function as a tail call. Will return from the current function with the result of the tail call, without consuming additional stack depth."
           :examples [{:code "(tailcall (some-function 1 2 3))"}]
           :type :macro	 
           :signature [{:params [[f & args]] }]}

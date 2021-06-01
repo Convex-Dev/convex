@@ -1632,7 +1632,7 @@ public final class Context<T extends ACell> extends AObject {
 				rv=((ReturnValue<R>)ex).getValue();
 			} else {
 				rollback=true;
-				rv=ErrorValue.create(ErrorCodes.UNEXPECTED, "Unexpected actor return of type:"+Utils.getClassName(ex));
+				rv=ErrorValue.create(ErrorCodes.EXCEPTION, "Unhandled Exception with Code:"+ex.getCode());
 			}
 		} else {
 			rv=returnContext.getResult();

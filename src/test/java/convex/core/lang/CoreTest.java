@@ -1450,7 +1450,7 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(reduced 1 2)"));
 		
 		// reduced on its own is an exceptional result
-		assertError(ErrorCodes.UNEXPECTED,step("(reduced 1)"));
+		assertError(ErrorCodes.EXCEPTION,step("(reduced 1)"));
 	}
 
 	@Test
@@ -1510,7 +1510,7 @@ public class CoreTest extends ACVMTest {
 		assertDepthError(step("(do   (def f (fn [x] (recur (f x))))   (f 1))"));
 
 		// basic return mechanics
-		assertError(ErrorCodes.UNEXPECTED,step("(recur 1)"));
+		assertError(ErrorCodes.EXCEPTION,step("(recur 1)"));
 	}
 	
 	@Test
@@ -1527,10 +1527,10 @@ public class CoreTest extends ACVMTest {
 	public void testTailcall() {
 
 		assertArityError(step("(do (def f (fn [x] (tailcall (f)))) (f 1))"));
-		assertJuiceError(step("(do (def f (fn [x] (tailcall (f x)))) (f 1))"));
+		assertJuiceError(step("(do (def f (fn [x] (tailcall (f x)))) (f 1))")); // check we aren't consuming stack!
 
 		// basic return mechanics
-		assertError(ErrorCodes.UNEXPECTED,step("(tailcall (count 1))"));
+		assertError(ErrorCodes.EXCEPTION,step("(tailcall (count 1))"));
 	}
 
 	@Test

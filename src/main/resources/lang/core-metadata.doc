@@ -1137,9 +1137,9 @@
   }
   
   tailcall*
-  {:doc {:description "Calls a function as a tail call."
+  {:doc {:description "Calls a function as a tail call. Will return from the current function with the result of the tail call, without consuming additional stack depth."
           :examples [{:code "(tailcall* + 1 2 3)"}]
-          :type :macro	 
+          :type :function 
           :signature [{:params [f & args] }]} 
   }
   
