@@ -83,7 +83,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	}
 
 	@Override
-	protected AMapEntry<K, V> withKey(K key) {
+	protected MapEntry<K, V> withKey(K key) {
 		if (key == getKey()) return this;
 		return new MapEntry<K, V>(Ref.get(key), valueRef);
 	}
@@ -135,7 +135,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	}
 
 	/**
-	 * REads a MapEntry from a ByteBuffer. Assumes Tag already handled.
+	 * Reads a MapEntry from a ByteBuffer. Assumes Tag already handled.
 	 * @param bb
 	 * @return MapEntry instance
 	 * @throws BadFormatException

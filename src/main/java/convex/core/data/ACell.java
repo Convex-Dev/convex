@@ -127,7 +127,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * 
 	 * Subclasses should override this if they have a more efficient equals implementation.
 	 * 
-	 * @param a
+	 * @param a Cell to compare with. May be null??
 	 * @return True if this cell is equal to the other object
 	 */
 	public boolean equals(ACell a) {

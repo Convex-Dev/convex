@@ -150,11 +150,6 @@ public abstract class AMapEntry<K extends ACell, V extends ACell> extends AVecto
 	}
 
 	@Override
-	public Object[] toArray() {
-		return new Object[] { getKey(), getValue() };
-	}
-
-	@Override
 	public <T> T[] toArray(T[] a) {
 		throw new TODOException();
 	}
