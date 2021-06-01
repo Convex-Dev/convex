@@ -282,7 +282,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Returns true if this object is in a canonical format for message writing.
+	 * Returns true if this Cell is in a canonical format for message writing.
 	 * Reading or writing a non-canonical value should be considered illegal
 	 * 
 	 * @return true if the object is in canonical format, false otherwise
@@ -290,7 +290,8 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	public abstract boolean isCanonical();
 	
 	/**
-	 * Returns true if this object represents a first class CVM Value.
+	 * Returns true if this object represents a first class CVM Value. Sub-structural cells that are not themselves first class values
+	 * should return false.
 	 * 
 	 * @return true if the object is a CVM Value, false otherwise
 	 */

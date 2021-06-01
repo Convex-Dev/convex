@@ -14,9 +14,13 @@ import convex.core.util.Errors;
 import convex.core.util.Utils;
 
 /**
- * BlobMap node implementation supporting: - An optional prefix string - An
- * optional entry with this prefix - Up to 16 child entries at the next level of
- * depth
+ * BlobMap node implementation supporting: 
+ * 
+ * <ul>
+ * <li>An optional prefix string</li>
+ * <li>An optional entry with this prefix </li>
+ * <li>Up to 16 child entries at the next level of depth</li>
+ * </ul>
  *
  * @param <V>
  */
@@ -115,13 +119,11 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 
 	@Override
 	public boolean isCanonical() {
-		// TODO: rethink canonical definition
-		// only canonical if depth is zero (May have a prefix)
-		return depth == 0;
+		return true;
 	}
 	
 	@Override public final boolean isCVMValue() {
-		return true;
+		return (depth==0);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -469,7 +471,14 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	}
 	
 	private int encodeChild(byte[] bs, int pos, int i) {
-		pos = children[i].encode(bs,pos);
+		Ref<ABlobMap<K, V>> cref = children[i];
+		ABlobMap<K, V> c=cref.getValue();
+		if (c.count==1) {
+			MapEntry<K,V> me=c.entryAt(0);
+			pos = me.getRef().encode(bs, pos);
+		} else {
+			pos = cref.encode(bs,pos);
+		}
 		return pos;
 	}
 	
@@ -501,16 +510,28 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		short mask = bb.getShort();
 		int n = Utils.bitCount(mask);
 		Ref<ABlobMap>[] children = new Ref[n];
+		long childDepth=depth+prefixLength+1; // depth for children = this prefixDepth plus one extra hex digit
 		for (int i = 0; i < n; i++) {
-			children[i] = readChild(bb);
+			children[i] = readChild(bb,childDepth);
 		}
 		return new BlobMap<K, V>(prefix, depth, prefixLength, me, children, mask, count);
 	}
 	
-	@SuppressWarnings("rawtypes")
-	private static Ref<ABlobMap> readChild(ByteBuffer bb) throws BadFormatException {
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	private static Ref<ABlobMap> readChild(ByteBuffer bb, long childDepth) throws BadFormatException {
 		Ref<ABlobMap> ref = Format.readRef(bb);
-		return ref;
+		ACell c=ref.getValue();
+		if (c instanceof BlobMap) {
+			return ref;
+		} else if (c instanceof AVector) {
+			AVector v=(AVector)c;
+			MapEntry me=MapEntry.convertOrNull(v);
+			if (me==null) throw new BadFormatException("Invalid MApEntry vector as BlobMap child");
+
+			return createAtDepth(me,childDepth).getRef();
+		} else {
+			throw new BadFormatException("Bad BlobMap child Type: "+RT.getType(c));
+		}
 	}
 
 	@Override
@@ -527,7 +548,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		int n = children.length;
 		long pDepth = prefixDepth();
 		for (int i = 0; i < n; i++) {
-			Object o = children[i].getValue();
+			ACell o = children[i].getValue();
 			if (!(o instanceof BlobMap))
 				throw new InvalidDataException("Illegal BlobMap child type: " + Utils.getClass(o), this);
 			BlobMap<K, V> c = (BlobMap<K, V>) o;

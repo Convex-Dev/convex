@@ -13,12 +13,10 @@ import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.FuzzTestFormat;
-import convex.core.data.LongBlob;
 import convex.core.data.Ref;
 import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
-import convex.core.util.Utils;
 import convex.test.generators.PrimitiveGen;
 import convex.test.generators.ValueGen;
 

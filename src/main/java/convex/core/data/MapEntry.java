@@ -337,4 +337,10 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	public byte getTag() {
 		return Tag.VECTOR;
 	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public static MapEntry convertOrNull(AVector v) {
+		if (v.count()!=2) return null;
+		return createRef(v.getElementRef(0),v.getElementRef(1));
+	}
 }

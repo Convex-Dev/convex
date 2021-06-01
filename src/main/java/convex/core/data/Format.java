@@ -527,7 +527,7 @@ public class Format {
 	/**
 	 * Reads a Ref<T> from the ByteBuffer.
 	 * 
-	 * Converts embedded objects to RefDirects automatically.
+	 * Converts Embedded objects to Refs automatically.
 	 * 
 	 * @param bb ByteBuffer containing a ref to read
 	 * @throws BadFormatException If the data is badly formatted, or a non-embedded
