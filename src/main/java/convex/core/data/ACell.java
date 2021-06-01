@@ -96,9 +96,9 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * 
 	 * Default is the first bytes (big-endian) of the Cell encoding hash, since this is consistent with
 	 * encoding-based equality. However, subclasses may provide more efficient hashcodes provided that
-	 * the usual invarients are preserved
+	 * the usual invariants are preserved
 	 * 
-	 * @return int hash code.
+	 * @return integer hash code.
 	 */
 	@Override
 	public int hashCode() {
@@ -324,7 +324,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return The Ref at the specified index
 	 */
 	public <R extends ACell> Ref<R> getRef(int i) {
-		// This will always be an error if not overridden
+		// This will always be an error if not overridden. Provided for warning purposes if accidentally used.
 		if (getRefCount()==0) {
 			throw new IndexOutOfBoundsException("No Refs to get in "+Utils.getClassName(this));
 		} else {
@@ -349,7 +349,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 
 	/**
-	 * Gets an array of child refs for this object, in the order accessible by
+	 * Gets an array of child refs for this Cell, in the same order as order accessible by
 	 * getRef. 
 	 * 
 	 * Concrete implementations may override this to optimise performance.

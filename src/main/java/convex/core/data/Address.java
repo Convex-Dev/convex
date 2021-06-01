@@ -54,7 +54,7 @@ public class Address extends ABlob {
 	@Override
 	public boolean equals(ABlob o) {
 		if (!(o instanceof Address)) return false;
-		return equals((Address) o);
+		return value==((Address) o).value;
 	}
 
 	public boolean equals(Address o) {

@@ -197,13 +197,6 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 */
 	public abstract ABlob append(ABlob d);
 
-	/**
-	 * Abstract hashCode used to force subtypes to implement a meaningful Java hash
-	 * function
-	 * 
-	 * Must be consistent with equals, but otherwise can have arbitrary
-	 * implementations.
-	 */
 	@Override
 	public abstract int hashCode();
 
