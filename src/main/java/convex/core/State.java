@@ -705,4 +705,14 @@ public class State extends ARecord {
 		Context<?> ctx=Context.createFake(this);
 		return (Address) ctx.lookupCNS(name).getResult();
 	}
+
+	/**
+	 * Gets globals.
+	 * 
+	 * @return Vector of global values
+	 */
+	public AVector<ACell> getGlobals() {
+		return globals;
+	}
+
 }
