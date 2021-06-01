@@ -189,20 +189,6 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append("#entry [" + Utils.ednString(getKey()) + "," + Utils.ednString(getValue()) + "]");
-	}
-	
-	@Override
-	public void print(StringBuilder sb) {
-		sb.append('[');
-		Utils.print(sb,getKey());
-		sb.append(',');
-		Utils.print(sb,getValue());
-		sb.append(']');
-	}
-
-	@Override
 	public boolean equals(ACell o) {
 		if (o==null) return false;
 		if (o.getTag()!=Tag.VECTOR) return false;

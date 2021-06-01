@@ -17,6 +17,7 @@ import convex.core.data.LongBlob;
 import convex.core.data.Ref;
 import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
+import convex.core.lang.RT;
 import convex.core.util.Utils;
 import convex.test.generators.PrimitiveGen;
 import convex.test.generators.ValueGen;
@@ -50,8 +51,7 @@ public class GenTestFormat {
 		Blob b = Format.encodedBlob(value);
 		ACell o = Format.read(b);
 
-		// TODO: think about this exception
-		if (!(value instanceof LongBlob)) assertEquals(Utils.getClass(value), Utils.getClass(o));
+		assertEquals(RT.getType(value), RT.getType(o));
 		assertEquals(value, o);
 		assertEquals(b, Format.encodedBlob(o));
 		assertEquals(pref.getValue(), o);
