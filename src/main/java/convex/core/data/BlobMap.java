@@ -463,9 +463,13 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		pos = Utils.writeShort(bs,pos,mask);
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
-			pos = children[i].encode(bs,pos);
+			pos = encodeChild(bs,pos,i);
 		}
-
+		return pos;
+	}
+	
+	private int encodeChild(byte[] bs, int pos, int i) {
+		pos = children[i].encode(bs,pos);
 		return pos;
 	}
 	
@@ -498,10 +502,15 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		int n = Utils.bitCount(mask);
 		Ref<ABlobMap>[] children = new Ref[n];
 		for (int i = 0; i < n; i++) {
-			Ref<ABlobMap> ref = Format.readRef(bb);
-			children[i] = ref;
+			children[i] = readChild(bb);
 		}
 		return new BlobMap<K, V>(prefix, depth, prefixLength, me, children, mask, count);
+	}
+	
+	@SuppressWarnings("rawtypes")
+	private static Ref<ABlobMap> readChild(ByteBuffer bb) throws BadFormatException {
+		Ref<ABlobMap> ref = Format.readRef(bb);
+		return ref;
 	}
 
 	@Override
