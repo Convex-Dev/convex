@@ -362,11 +362,11 @@ public class List<T extends ACell> extends AList<T> {
 		checkRange(start, length);
 
 		// Create using an Object array. Probably fastest?
-		Object[] arr = new Object[Utils.checkedInt(length)];
+		ACell[] arr = new ACell[Utils.checkedInt(length)];
 		for (int i = 0; i < length; i++) {
 			arr[i] = get(start + i);
 		}
-		return (AVector<T>) Vectors.of(arr);
+		return (AVector<T>) Vectors.create(arr);
 	}
 
 	@Override

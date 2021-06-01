@@ -40,7 +40,7 @@ public class Vectors {
 	 * @param length
 	 * @return A vector, which must consist of a positive number of complete chunks.
 	 */
-	static <T extends ACell> AVector<T> createChunked(Object[] elements, int offset, int length) {
+	static <T extends ACell> AVector<T> createChunked(ACell[] elements, int offset, int length) {
 		if ((length == 0) || (length & BITMASK) != 0)
 			throw new IllegalArgumentException("Invalid vector length: " + length);
 		if (length == CHUNK_SIZE) return VectorLeaf.create(elements, offset, length);

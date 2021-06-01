@@ -215,12 +215,6 @@ public class AccountKey extends AArrayBlob {
 		sb.append("0x");
 		sb.append(toChecksumHex());
 	}
-
-	@Override
-	public boolean isCanonical() {
-		// always canonical, since class invariants are maintained
-		return true;
-	}
 	
 	@Override public final boolean isCVMValue() {
 		return true;
@@ -264,6 +258,11 @@ public class AccountKey extends AArrayBlob {
 	@Override
 	public byte getTag() {
 		return Tag.ACCOUNT_KEY;
+	}
+
+	@Override
+	public boolean isCanonical() {
+		return true;
 	}
 
 

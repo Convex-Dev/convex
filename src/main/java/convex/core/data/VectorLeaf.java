@@ -11,7 +11,6 @@ import java.util.function.Predicate;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.RT;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
@@ -64,13 +63,13 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 	 * @return New ListVector
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> VectorLeaf<T> create(Object[] things, int offset, int length) {
+	public static <T extends ACell> VectorLeaf<T> create(ACell[] things, int offset, int length) {
 		if (length == 0) return (VectorLeaf<T>) VectorLeaf.EMPTY;
 		if (length > Vectors.CHUNK_SIZE)
 			throw new IllegalArgumentException("Too many elements for ListVector: " + length);
 		Ref<T>[] items = new Ref[length];
 		for (int i = 0; i < length; i++) {
-			T value=RT.cvm(things[i + offset]);
+			T value=(T) things[i + offset];
 			items[i] = Ref.get(value);
 		}
 		return new VectorLeaf<T>(items);
@@ -85,14 +84,14 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 	 * @return The updated ListVector
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> VectorLeaf<T> create(Object[] things, int offset, int length, AVector<T> tail) {
+	public static <T extends ACell> VectorLeaf<T> create(ACell[] things, int offset, int length, AVector<T> tail) {
 		if (length == 0)
 			throw new IllegalArgumentException("ListVector with tail cannot be created with zero head elements");
 		if (length > Vectors.CHUNK_SIZE)
 			throw new IllegalArgumentException("Too many elements for ListVector: " + length);
 		Ref<T>[] items = new Ref[length];
 		for (int i = 0; i < length; i++) {
-			T value=RT.cvm(things[i + offset]);
+			T value=(T) things[i + offset];
 			items[i] = Ref.get(value);
 		}
 		return new VectorLeaf<T>(items, tail.getRef(), tail.count() + length);

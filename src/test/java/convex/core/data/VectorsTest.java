@@ -61,9 +61,6 @@ public class VectorsTest {
 	public void testCreateSpecialCases() {
 		assertSame(Vectors.empty(), VectorLeaf.create(new ACell[0]));
 		assertSame(Vectors.empty(), VectorLeaf.create(new ACell[10], 3, 0));
-
-		assertThrows(IllegalArgumentException.class, () -> VectorLeaf.create(new Object[0], 0, 0, null));
-		assertThrows(IllegalArgumentException.class, () -> VectorLeaf.create(new Object[20], 1, 18, null));
 	}
 
 	@Test
