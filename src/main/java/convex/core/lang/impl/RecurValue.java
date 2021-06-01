@@ -29,7 +29,7 @@ public class RecurValue extends AReturn {
 		return new RecurValue(values);
 	}
 
-	public Object getValue(int i) {
+	public ACell getValue(int i) {
 		return values[i];
 	}
 

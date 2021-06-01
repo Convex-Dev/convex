@@ -595,7 +595,7 @@ public class Core {
 		public  Context<Address> invoke(Context context, ACell[] args) {
 			if (args.length !=1) return context.withArityError(exactArityMessage(1, args.length));
 
-			return context.deployActor((ACell) args[0]);
+			return context.deployActor(args[0]);
 		}
 	});
 
@@ -673,7 +673,7 @@ public class Core {
 				return context.withArgumentError("Cannot set local binding with qualified symbol: " + sym);
 			}
 			
-			ACell value=(ACell) args[1];
+			ACell value=args[1];
 			
 			context= context.withLocalBindings(context.getLocalBindings().assoc(sym, value));
 			return context.withResult(Juice.ASSOC,value);
@@ -1016,8 +1016,8 @@ public class Core {
 
 			int n = ixs.size();
 			long juice = (Juice.GET+Juice.ASSOC) * (1L + n);
-			ACell data = (ACell) args[0];
-			ACell value=(ACell)args[2];
+			ACell data = args[0];
+			ACell value= args[2];
 			// simply substitute value if key sequence is empty
 			if (n==0) return context.withResult(juice, value);
 			
@@ -1077,7 +1077,7 @@ public class Core {
 			if (address == null) return context.withCastError(args[0], Types.ADDRESS);
 						
 			// result is specified by second arg
-			ACell result=(ACell) args[1];
+			ACell result= args[1];
 			
 			// we set the target account holdings for the currently executing account
 			// might return NOBODY if account does not exist
@@ -1144,7 +1144,7 @@ public class Core {
 			}
 
 			ACell result;
-			ACell coll = (ACell) args[0];
+			ACell coll = args[0];
 			if (coll == null) {
 				// Treat nil as empty collection with no keys
 				result = (n == 3) ? (ACell)args[2] : null;

@@ -18,14 +18,14 @@ import convex.core.data.ACell;
 public abstract class AExceptional {
 
 	/**
-	 * Returns the Error code for this exceptional value
-	 * @return
+	 * Returns the Exception code for this exceptional value
+	 * @return Exception Code
 	 */
 	public abstract ACell getCode();
 
 	/**
 	 * Gets the message for an exceptional value. May or may not be meaningful.
-	 * @return
+	 * @return Exception Message
 	 */
 	public abstract ACell getMessage();
 

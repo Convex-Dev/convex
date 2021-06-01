@@ -6,7 +6,7 @@ import convex.core.data.Symbol;
 import convex.core.lang.AFn;
 
 /**
- * Abstract base class for functions that can close over a lexical enviornment.
+ * Abstract base class for functions that can close over a lexical environment.
  *
  * @param <T> Return type of function
  */

@@ -53,6 +53,16 @@ public abstract class ADataFn<T extends ACell> extends AFn<T> {
 	public boolean isCanonical() {
 		return false;
 	}
+	
+	@Override
+	public boolean isCVMValue() {
+		return false;
+	}
+	
+	@Override
+	public byte getTag() {
+		throw new UnsupportedOperationException();
+	}
 
 	@Override
 	public int getRefCount() {

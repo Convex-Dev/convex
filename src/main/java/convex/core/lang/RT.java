@@ -682,7 +682,7 @@ public class RT {
 	}
 	
 	/**
-	 * Gets the count of elements in a collection. Null is considered an empty collection.
+	 * Gets the count of elements in a collection or Java array. Null is considered an empty collection.
 	 * 
 	 * @param o An Object representing a collection of items to be counted
 	 * @return The count of elements in the collection, or null if not countable
@@ -690,9 +690,6 @@ public class RT {
 	public static Long count(Object o) {
 		if (o == null) return 0L;
 		if (o instanceof ACell) return count((ACell)o);
-		if (o instanceof CharSequence) {
-			return (long) ((CharSequence) o).length();
-		}
 		if (o.getClass().isArray()) {
 			return (long) Array.getLength(o);
 		}

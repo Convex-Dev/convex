@@ -595,7 +595,6 @@ public class Belief extends ARecord {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=getTag();
-		// generic record writeRaw, handles all fields in declared order
 		return encodeRaw(bs,pos);
 	}
 	

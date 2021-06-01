@@ -1012,7 +1012,7 @@ public final class Context<T extends ACell> extends AObject {
 				}
 			}
 		} else {
-			return ctx.withCompileError("Don't understand binding form: "+bindingForm);
+			return ctx.withCompileError("Don't understand binding form of type: "+RT.getType(bindingForm));
 		}
 		// return 
 		return ctx;
