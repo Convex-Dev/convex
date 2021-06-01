@@ -17,7 +17,7 @@ import convex.test.generators.PrimitiveGen;
 @RunWith(JUnitQuickcheck.class)
 public class GenTestMap {
 
-	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@SuppressWarnings({ "rawtypes" })
 	@Property
 	public void primitiveAssoc(@From(MapGen.class) AHashMap m, @From(PrimitiveGen.class) ACell prim) {
 		long n = m.count();
