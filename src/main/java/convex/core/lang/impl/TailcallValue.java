@@ -4,6 +4,7 @@ import convex.core.ErrorCodes;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Vectors;
+import convex.core.lang.AFn;
 
 /**
  * Class representing a function return value.
@@ -11,35 +12,38 @@ import convex.core.data.Vectors;
  * Contains argument values for each parameter to be substituted in the
  * surrounding function / loop
  */
-public class RecurValue extends ATrampoline {
+public class TailcallValue extends ATrampoline {
 
-	private RecurValue(ACell[] values) {
+	private AFn<?> function;
+
+	private TailcallValue(AFn<?> f, ACell[] values) {
 		super(values);
+		this.function=f;
 	}
- 
-	/**
-	 * Wraps an object array as a RecurValue
-	 * 
-	 * @param values
-	 * @return new RecurValue
-	 */
-	public static RecurValue wrap(ACell... values) {
-		return new RecurValue(values);
+	
+	public static TailcallValue wrap(AFn<?> f, ACell[] args) {
+		return new TailcallValue(f,args);
 	}
 
 	@Override
 	public String toString() {
 		AVector<?> seq = Vectors.create(args); // should always convert OK
-		return "RecurValue: " + seq;
+		return "Tailcall: " + seq;
 	}
 
 	@Override
 	public ACell getCode() {
-		return ErrorCodes.RECUR;
+		return ErrorCodes.TAILCALL;
 	}
 
 	@Override
 	public ACell getMessage() {
 		return null;
 	}
+
+	public AFn<?> getFunction() {
+		return function;
+	}
+
+
 }

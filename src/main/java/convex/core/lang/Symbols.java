@@ -143,6 +143,8 @@ public class Symbols {
 
 	public static final Symbol LOOP = Symbol.create("loop");
 	public static final Symbol RECUR = Symbol.create("recur");
+	public static final Symbol TAILCALL_STAR = Symbol.create("tailcall*");
+
 	public static final Symbol RETURN = Symbol.create("return");
 	public static final Symbol BREAK = Symbol.create("break");
 	public static final Symbol REDUCED = Symbol.create("reduced");

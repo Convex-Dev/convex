@@ -135,6 +135,14 @@ public class ErrorCodes {
 	public static final Keyword RECUR = Keyword.create("RECUR");
 	
 	/**
+	 * Exceptional Condition indicating a tailcall operation has been executed
+	 * 
+	 * This will return execution to the surrounding loop or function binding, which will be 
+	 * re-executed with new bindings provided to the recur operation.
+	 */
+	public static final Keyword TAILCALL = Keyword.create("TAILCALL");
+
+	/**
 	 * Exceptional Condition indicating a return operation was executed
 	 * 
 	 * This will return execution to the caller of surrounding function binding, with whatever

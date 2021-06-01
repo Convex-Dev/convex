@@ -1522,6 +1522,16 @@ public class CoreTest extends ACVMTest {
 		assertEquals(13L,evalL(ctx,"(f :foo)"));
 		assertArityError(step(ctx,"(f 1 2)"));
 	}
+	
+	@Test
+	public void testTailcall() {
+
+		assertArityError(step("(do (def f (fn [x] (tailcall (f)))) (f 1))"));
+		assertJuiceError(step("(do (def f (fn [x] (tailcall (f x)))) (f 1))"));
+
+		// basic return mechanics
+		assertError(ErrorCodes.UNEXPECTED,step("(tailcall (count 1))"));
+	}
 
 	@Test
 	public void testHalt() {

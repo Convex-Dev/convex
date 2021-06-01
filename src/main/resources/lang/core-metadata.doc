@@ -1136,6 +1136,13 @@
                        :return Boolean}]}
   }
   
+  tailcall*
+  {:doc {:description "Calls a function as a tail call."
+          :examples [{:code "(tailcall* + 1 2 3)"}]
+          :type :macro	 
+          :signature [{:params [f & args] }]} 
+  }
+  
   transfer
   {
     :doc {:description "Transfers the specified amount of coins to the target-address. Returns the amount transferred if successful. Returns FUNDS error if there is insufficient balance in the sender's account. Returns STATE error if the reciever is an Actor that is unable to accept funds."

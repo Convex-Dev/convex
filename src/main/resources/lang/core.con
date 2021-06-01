@@ -227,6 +227,19 @@
 	      (== n 1) (cons 'call* addr 0 fnlist)
 	      (== n 2) (cons 'call* addr (first more) fnlist)))))
 
+(defmacro tailcall 
+   ^{:doc {:description "Calls a function as a tail call."
+          :examples [{:code "(tailcall (some-function 1 2 3))"}]
+          :type :macro	 
+          :signature [{:params [[f & args]] }]}
+    }
+  [callspec] 
+  (let []
+	  (or (list? callspec) (fail :ARGUMENT "Tailcall requires a list representing function invocation")) 
+	  (let [n (count callspec)]
+      (cond (== n 0) (fail :ARGUMENT "Tailcall requires at least a function argument in call list"))
+	    (cons 'tailcall* callspec))))
+
 (def *exports* 
   ^{:doc {:description "A set of functions that are exported by the current smart contract. Exported functions may be called by any acount: suitable precautions should be applied."
           :examples [{:code "(assert (set? *exports*))"}]

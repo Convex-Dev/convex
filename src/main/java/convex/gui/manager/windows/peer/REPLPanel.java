@@ -88,7 +88,7 @@ public class REPLPanel extends JPanel {
 	
 	protected void handleError(Object code, Object msg, AVector<AString> trace) {
 		outputArea.append(" Exception: " + code + " "+ msg+"\n");
-		for (AString s: trace) {
+		if (trace!=null) for (AString s: trace) {
 			outputArea.append(" - "+s.toString()+"\n");
 		}
 	}

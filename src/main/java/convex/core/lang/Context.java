@@ -30,11 +30,13 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.impl.AExceptional;
+import convex.core.lang.impl.ATrampoline;
 import convex.core.lang.impl.ErrorValue;
 import convex.core.lang.impl.HaltValue;
 import convex.core.lang.impl.RecurValue;
 import convex.core.lang.impl.ReturnValue;
 import convex.core.lang.impl.RollbackValue;
+import convex.core.lang.impl.TailcallValue;
 import convex.core.util.Economics;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
@@ -901,15 +903,22 @@ public final class Context<T extends ACell> extends AObject {
 			Object v=ctx.getExceptional();
 			
 			// recur as many times as needed
-			while (v instanceof RecurValue) {
+			while (v instanceof ATrampoline) {
 				// don't recur if this is the recur function itself
-				if (fn==Core.RECUR) break;
 
-				RecurValue rv = (RecurValue) v;
-				ACell[] newArgs = rv.getValues();
-
-				ctx = fn.invoke((Context<ACell>) ctx,newArgs);
-				v = ctx.getValue();
+				if (v instanceof RecurValue) {
+					if (fn==Core.RECUR) break;
+					RecurValue rv = (RecurValue) v;
+					ACell[] newArgs = rv.getValues();
+					ctx = fn.invoke((Context<ACell>) ctx,newArgs);
+					v = ctx.getValue();
+				} else if (v instanceof TailcallValue) {
+					if (fn==Core.TAILCALL_STAR) break;
+					TailcallValue rv=(TailcallValue)v;
+					ACell[] newArgs = rv.getValues();
+					ctx = fn.invoke((Context<ACell>) ctx,newArgs);
+					v = ctx.getValue();
+				}
 			}
 			
 			// unwrap return value if necessary

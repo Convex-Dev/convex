@@ -54,6 +54,7 @@ import convex.core.lang.impl.RecurValue;
 import convex.core.lang.impl.Reduced;
 import convex.core.lang.impl.ReturnValue;
 import convex.core.lang.impl.RollbackValue;
+import convex.core.lang.impl.TailcallValue;
 import convex.core.util.Utils;
 
 /**
@@ -1871,6 +1872,23 @@ public class Core {
 			// any arity OK?
 
 			AExceptional result = RecurValue.wrap(args);
+
+			return context.withException(Juice.RECUR, result);
+		}
+	});
+	
+	public static final CoreFn<?> TAILCALL_STAR = reg(new CoreFn<>(Symbols.TAILCALL_STAR) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<ACell> invoke(Context context, ACell[] args) {
+			int n=args.length;
+			if (n < 1) return context.withArityError(this.minArityMessage(1, n));
+
+			AFn f=RT.ensureFunction(args[0]);
+			if (f==null) return context.withCastError(0, args, Types.FUNCTION);
+			
+			ACell[] tailArgs=Arrays.copyOfRange(args, 1, args.length);
+			AExceptional result = TailcallValue.wrap(f,tailArgs);
 
 			return context.withException(Juice.RECUR, result);
 		}
