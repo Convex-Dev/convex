@@ -28,13 +28,7 @@ public class EtchInitTest {
 			
 			Ref<State> sr2=Ref.forHash(hash);
 			State s2=sr2.getValue();
-			s2.validate();
-			
-			Hash hTest=Hash.fromHex("9bbdc2efd5b93eef6b379820a5888e80f91401b18020459862b3270a0c781ba4");
-			Ref<?> rTest=Ref.forHash(hTest);
-			ACell c=rTest.getValue();
-			assertNotNull(c);
-			
+			s2.validate();			
 		} finally {
 			Stores.setCurrent(temp);
 		}

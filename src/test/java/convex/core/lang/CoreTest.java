@@ -459,6 +459,12 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Vectors.of(1L, 2L), eval("(vector 1 2)"));
 		assertEquals(Vectors.empty(), eval("(vector)"));
 	}
+	
+	@Test
+	public void testVectorTypes() {
+		assertEquals(Vectors.of(1L, 2L).getEncoding(),MapEntry.of(1L, 2L).getEncoding()); // should be same Hash / Encoding
+		assertEquals(Vectors.of(1L, 2L), eval("(first {1 2})")); // map entry is a vector
+	}
 
 	@Test
 	public void testIdentity() {

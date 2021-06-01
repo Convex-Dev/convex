@@ -1,13 +1,12 @@
 package convex.core.data;
 
+import static convex.test.Assertions.assertCVMEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static convex.test.Assertions.*;
 
 import java.util.ListIterator;
 import java.util.Spliterator;
@@ -186,7 +185,7 @@ public class VectorsTest {
 		AVector<CVMLong> v1 = Vectors.of(1L, 2L);
 		
 		MapEntry<CVMLong,CVMLong> me=MapEntry.create(RT.cvm(1L), RT.cvm(2L));
-		assertNotEquals(v1, me);
+		assertEquals(v1, me);
 		assertEquals(v1, me.toVector());
 	}
 

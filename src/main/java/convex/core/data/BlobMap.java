@@ -456,7 +456,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		if (count == 0) return pos; // nothing more to know... this is the empty singleton
 
 		pos = Format.writeHexDigits(bs,pos, prefix, depth, prefixLength);
-		pos = Format.write(bs,pos, entry); // entry may be null
+		pos = MapEntry.encodeCompressed(entry,bs,pos); // entry may be null
 		if (count == 1) return pos; // must be a single entry
 
 		// finally write children
@@ -489,7 +489,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		Blob prefix = Blob.wrap(pbs);
 		
 		// Get entry at this node, might be null
-		MapEntry<K, V> me = Format.read(bb); 
+		MapEntry<K, V> me = MapEntry.readCompressed(bb); 
 
 		// single entry map
 		if (count == 1) return new BlobMap<K, V>(prefix, depth, prefixLength, me, EMPTY_CHILDREN, (short) 0, 1L);

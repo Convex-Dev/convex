@@ -547,7 +547,6 @@ public class Format {
 		if (tag == Tag.VECTOR) return (T) Vectors.read(bb);
 
 		if (tag == Tag.MAP) return (T) Maps.read(bb);
-		if (tag == Tag.MAP_ENTRY) return (T) MapEntry.read(bb);
 
 		if (tag == Tag.SYNTAX) return (T) Syntax.read(bb);
 		

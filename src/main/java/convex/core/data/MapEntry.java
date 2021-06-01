@@ -35,7 +35,6 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	
 	@Override
 	public AType getType() {
-		// TODO: do we want a more specific MapEntry type?
 		return Types.VECTOR;
 	}
 
@@ -135,7 +134,28 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		return valueRef;
 	}
 
+	/**
+	 * REads a MapEntry from a ByteBuffer. Assumes Tag already handled.
+	 * @param bb
+	 * @return MapEntry instance
+	 * @throws BadFormatException
+	 */
 	public static <K extends ACell, V extends ACell> MapEntry<K, V> read(ByteBuffer bb) throws BadFormatException {
+		Ref<K> kr = Format.readRef(bb);
+		Ref<V> vr = Format.readRef(bb);
+		return new MapEntry<K, V>(kr, vr);
+	}
+	
+	/**
+	 * Reads a MapEntry or null from a ByteBuffer. Assumes no Tag.
+	 * @param bb
+	 * @return MapEntry instance, or null
+	 * @throws BadFormatException
+	 */
+	public static <K extends ACell, V extends ACell> MapEntry<K, V> readCompressed(ByteBuffer bb) throws BadFormatException {
+		byte b=bb.get();
+		if (b==Tag.NULL) return null;
+		if (b!=Tag.VECTOR) throw new BadFormatException("Bad header byte for compressed MapEntry: "+Utils.toHexString(b));
 		Ref<K> kr = Format.readRef(bb);
 		Ref<V> vr = Format.readRef(bb);
 		return new MapEntry<K, V>(kr, vr);
@@ -182,11 +202,13 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		sb.append(']');
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public boolean equals(ACell o) {
-		if (o instanceof MapEntry) return equals((MapEntry<K, V>) o);
-		return false;
+		if (o==null) return false;
+		if (o.getTag()!=Tag.VECTOR) return false;
+		AVector<?> v=(AVector<?>) o;
+		if (v.count()!=2) return false;
+		return getEncoding().equals(o.getEncoding());
 	}
 
 	public boolean equals(MapEntry<K, V> b) {
@@ -243,7 +265,8 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.MAP_ENTRY;
+		bs[pos++]=Tag.VECTOR;
+		pos = Format.writeVLCLong(bs,pos, 2); // Size of 2, to match VectorLeaf encoding
 		return encodeRaw(bs,pos);
 	}
 	
@@ -251,13 +274,30 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	 * Writes the raw MapEntry content. Puts the key and value Refs onto the given
 	 * ByteBuffer
 	 * 
-	 * @param bb ByteBuffer to write to
-	 * @return Updated ByteBuffer after writing
+	 * @param bs Byte array to write to
+	 * @return Updated position after writing
 	 */
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = keyRef.encode(bs,pos);
 		pos = valueRef.encode(bs,pos);
+		return pos;
+	}
+	
+	/**
+	 * Writes a MapEntry or null content in compressed format (no count)
+	 * 
+	 * @param bs Byte array to write to
+	 * @return Updated position after writing
+	 */
+	public static int encodeCompressed(MapEntry<?,?> me,byte[] bs, int pos) {
+		if (me==null) {
+			bs[pos++]=Tag.NULL;
+		} else {
+			bs[pos++]=Tag.VECTOR;
+			pos = me.keyRef.encode(bs,pos);
+			pos = me.valueRef.encode(bs,pos);
+		}
 		return pos;
 	}
 
@@ -309,7 +349,6 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 
 	@Override
 	public byte getTag() {
-		// TODO: should this be vector?
-		return Tag.MAP_ENTRY;
+		return Tag.VECTOR;
 	}
 }

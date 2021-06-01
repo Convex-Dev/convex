@@ -133,7 +133,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	public boolean equals(ACell a) {
 		if (this==a) return true; // important optimisation for e.g. hashmap equality
 		if (a==null) return false;
-		if (!(a.getClass()==this.getClass())) return false;
+		if (!(a.getTag()==this.getTag())) return false;
 		return getEncoding().equals(a.getEncoding());
 	}
 

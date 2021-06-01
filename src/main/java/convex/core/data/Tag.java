@@ -51,7 +51,6 @@ public class Tag {
 
 	public static final byte BLOBMAP = (byte) 0x84;
 
-	public static final byte MAP_ENTRY = (byte) 0x87;
 	public static final byte SYNTAX = (byte) 0x88;
 
 	// special data structure

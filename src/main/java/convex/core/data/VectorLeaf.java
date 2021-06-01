@@ -607,8 +607,11 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public boolean equals(ACell a) {
-		if (!(a instanceof VectorLeaf)) return false;
-		return equals((VectorLeaf<T>) a);
+		if (a instanceof VectorLeaf) return equals((VectorLeaf<T>)a);
+		if (!(a instanceof AVector)) return false;
+		AVector<T> v=(AVector<T>) a;
+		if (v.count()!=count) return false;
+		return a.getEncoding().equals(this.getEncoding());
 	}
 
 	public boolean equals(VectorLeaf<T> v) {
