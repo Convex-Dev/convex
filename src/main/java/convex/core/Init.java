@@ -49,7 +49,7 @@ public class Init {
 	public static final Address VILLAIN = Address.create(10);
 
 	public static final Address FIRST_PEER = Address.create(11);
-	
+
 	public static final Address TRUST_ADDRESS = Address.create(19);
 	public static final Address REGISTRY_ADDRESS = Address.create(20);
 
@@ -57,28 +57,28 @@ public class Init {
 
 	public static final int NUM_PEERS = 8;
 	public static final int NUM_USERS = 2;
-	
+
 	public static AKeyPair[] KEYPAIRS = new AKeyPair[NUM_PEERS + NUM_USERS];
-	
+
 	public static final AKeyPair HERO_KP;
 	public static final AKeyPair VILLAIN_KP;
 
-	
+
 	static {
 		for (int i = 0; i < NUM_USERS; i++) {
 			AKeyPair kp = AKeyPair.createSeeded(543212345 + i);
 			KEYPAIRS[NUM_PEERS + i] = kp;
 		}
-		
+
 		for (int i = 0; i < NUM_PEERS; i++) {
 			AKeyPair kp = AKeyPair.createSeeded(123454321 + i);
 			KEYPAIRS[i] = kp;
 		}
-		
+
 		HERO_KP=KEYPAIRS[NUM_PEERS+0];
 		VILLAIN_KP=KEYPAIRS[NUM_PEERS+1];
 	}
-	
+
 	public static State createBaseAccounts() {
 		// accumulators for initial state maps
 		BlobMap<AccountKey, PeerStatus> peers = BlobMaps.empty();
@@ -140,7 +140,7 @@ public class Init {
 		AVector<ACell> globals = Constants.INITIAL_GLOBALS;
 
 		State s = State.create(accts, peers, globals, BlobMaps.empty());
-		
+
 		{ // Test total funds after creating user / peer accounts
 			long total = s.computeTotalFunds();
 			if (total != Constants.MAX_SUPPLY) throw new Error("Bad total amount: " + total);
@@ -148,13 +148,13 @@ public class Init {
 
 		return s;
 	}
-	
+
 	static final ACell TRUST_CODE=Reader.readResource("libraries/trust.con");
 	static final ACell REGISTRY_CODE=Reader.readResource("actors/registry.con");
-	
+
 	public static State createCoreLibraries() throws IOException {
 		State s=createBaseAccounts();
-		
+
 		// At this point we have a raw initial state with accounts
 
 		{ // Deploy Trust library
@@ -187,7 +187,7 @@ public class Init {
 			long total = s.computeTotalFunds();
 			if (total != Constants.MAX_SUPPLY) throw new Error("Bad total amount: " + total);
 		}
-		
+
 		return s;
 	}
 
