@@ -79,7 +79,7 @@ public class Ops {
 			// range 64-127 is special ops
 			if ((opCode&0xC0) == 0x40) {
 				Special<T> special=(Special<T>) Special.create(opCode);
-				if (special==null) throw new BadFormatException("Bad OpCode for special value: "+Utils.toHexString((byte)opCode));
+				if (special==null) throw new BadFormatException("Bad OpCode for Special value: "+Utils.toHexString((byte)opCode));
 				return special;
 			}
 			

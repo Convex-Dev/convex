@@ -11,14 +11,12 @@ import convex.core.data.Vectors;
  * Contains argument values for each parameter to be substituted in the
  * surrounding function / loop
  */
-public class RecurValue extends AReturn {
-
-	private final ACell[] values;
+public class RecurValue extends ATrampoline {
 
 	private RecurValue(ACell[] values) {
-		this.values = values;
+		super(values);
 	}
-
+ 
 	/**
 	 * Wraps an object array as a RecurValue
 	 * 
@@ -29,21 +27,10 @@ public class RecurValue extends AReturn {
 		return new RecurValue(values);
 	}
 
-	public ACell getValue(int i) {
-		return values[i];
-	}
-
-	public ACell[] getValues() {
-		return values;
-	}
-
-	public int arity() {
-		return values.length;
-	}
 
 	@Override
 	public String toString() {
-		AVector<?> seq = Vectors.create(values); // should always convert OK
+		AVector<?> seq = Vectors.create(args); // should always convert OK
 		return "RecurValue: " + seq;
 	}
 
