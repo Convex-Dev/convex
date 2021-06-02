@@ -126,13 +126,13 @@ public class Server implements Closeable {
 
 	private final HashMap<Keyword, Object> config;
 
-	private boolean running = false;
+	private boolean isRunning = false;
 
 	/**
 	 * Flag to indicate if there are any new things for the server to process (Beliefs, transactions)
 	 * can safely sleep a bit if nothing to do
 	 */
-	private boolean newThings = false;
+	private boolean hasNewMessages = false;
 
 	private NIOServer nio;
 	private Thread receiverThread = null;
@@ -257,7 +257,6 @@ public class Server implements Closeable {
 		Object p = config.get(Keywords.PORT);
 		Integer port = (p == null) ? null : Utils.toInt(p);
 
-
 		try {
 			nio.launch(port);
 			port = nio.getPort(); // get the actual port (may be auto-allocated)
@@ -269,7 +268,7 @@ public class Server implements Closeable {
 			}
 
 			// set running status now, so that loops don't terminate
-			running = true;
+			isRunning = true;
 
 			receiverThread = new Thread(receiverLoop, "Receive queue worker loop serving port: " + port);
 			receiverThread.setDaemon(true);
@@ -292,7 +291,7 @@ public class Server implements Closeable {
 			});
 
 			log.log(LEVEL_SERVER, "Peer Server started with Peer Address: " + getAddress().toChecksumHex());
-		} catch (Exception e) {
+		} catch (Throwable e) {
 			throw new Error("Failed to launch Server on port: " + port, e);
 		}
 	}
@@ -448,7 +447,7 @@ public class Server implements Closeable {
 		}
 
 		synchronized (newTransactions) {
-			newThings=true;
+			hasNewMessages=true;
 			newTransactions.add(sd);
 			registerInterest(sd.getHash(), m);
 		}
@@ -734,7 +733,7 @@ public class Server implements Closeable {
 					newBeliefs.put(addr, signedBelief);
 
 					// Notify the update thread that there is something new to handle
-					newThings=true;
+					hasNewMessages=true;
 				}
 			}
 			log.log(LEVEL_BELIEF, "Valid belief received by peer at " + getHostAddress() + ": "
@@ -761,7 +760,7 @@ public class Server implements Closeable {
 			try {
 				log.log(LEVEL_SERVER, "Reciever thread started for peer at " + getHostAddress());
 
-				while (running) { // loop until server terminated
+				while (isRunning) { // loop until server terminated
 					Message m = receiveQueue.poll(100, TimeUnit.MILLISECONDS);
 					if (m != null) {
 						processMessage(m);
@@ -796,7 +795,7 @@ public class Server implements Closeable {
 				Thread.sleep(10);
 
 				// loop while the server is running
-				while (running) {
+				while (isRunning) {
 					// Update Peer timestamp first. This determines what we might accept.
 					peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
 
@@ -804,8 +803,8 @@ public class Server implements Closeable {
 					maybeUpdateBelief();
 
 					// Maybe sleep a bit, wait for some belief updates to accumulate
-					if (newThings) {
-						newThings=false;
+					if (hasNewMessages) {
+						hasNewMessages=false;
 					} else {
 						try {
 							Thread.sleep(SERVER_UPDATE_PAUSE);
@@ -838,9 +837,10 @@ public class Server implements Closeable {
 				// loop while the server is running
 				long lastConsensusPoint = peer.getConsensusPoint();
                 Order lastOrder = null;
-				while (running) {
+				while (isRunning) {
 
 					Order order=peer.getPeerOrder();
+					// TODO: think about behaviour when the Peer leaves or joins. Should Server continue running?
 					if (order==null && lastOrder!=null) {
 						// System.out.println(getHostname() + " has left the network");
 					}
@@ -956,7 +956,7 @@ public class Server implements Closeable {
 			persistPeerData();
 		}
 
-		running = false;
+		isRunning = false;
 		if (updateThread != null) updateThread.interrupt();
 		if (receiverThread != null) receiverThread.interrupt();
 		if (connectionThread != null) connectionThread.interrupt();
