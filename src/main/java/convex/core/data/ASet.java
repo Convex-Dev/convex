@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import convex.core.Constants;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
@@ -75,12 +76,12 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 
 	@Override
 	public CVMBool get(ACell key) {
-		return CVMBool.of(contains(key));
+		return contains(key)?Constants.SET_INCLUDED:Constants.SET_EXCLUDED;
 	}
 	
 	@Override
 	public ACell get(ACell key, ACell notFound) {
-		if (contains(key)) return CVMBool.TRUE;
+		if (contains(key)) return Constants.SET_INCLUDED;
 		return notFound;
 	}
 	

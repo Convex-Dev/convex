@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.function.Function;
 
+import convex.core.Constants;
 import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -20,21 +21,17 @@ import convex.core.util.Utils;
  * 
  * Encoding:
  * 
- * 0    : Tag.SET
- * 1..n : Equivalent map encoding with true keys (exc. MAP tag)
- *
+ * <ul>
+ * <li>0    : Tag.SET </li>
+ * <li>1..n : Equivalent map encoding with true keys (exc. MAP tag)</li>
+ * </ul>
  * @param <T> The type of set elements
  */
 public class Set<T extends ACell> extends ASet<T> {
 
 	static final Set<?> EMPTY = new Set<ACell>(Maps.empty());
 
-	/**
-	 * Dummy value used in underlying maps. Not important what this is, but should be small, efficient and non-null
-	 * so we use Boolean.TRUE
-	 */
-	public static final CVMBool DUMMY = CVMBool.TRUE;
-	public static final Ref<CVMBool> DUMMY_REF = Ref.TRUE_VALUE;
+	public static final Ref<CVMBool> DUMMY_REF = Constants.SET_INCLUDED.getRef();
 
 	/**
 	 * Internal map used to represent the set
@@ -245,7 +242,7 @@ public class Set<T extends ACell> extends ASet<T> {
 	public <R extends ACell> Set<R> include(R a) {
 		AHashMap<R, ACell> mymap=(AHashMap<R, ACell>) map;
 		if (mymap.containsKey(a)) return (Set<R>) this;
-		return wrap(mymap.assocRef(Ref.get(a), DUMMY));
+		return wrap(mymap.assocRef(Ref.get(a), Constants.SET_INCLUDED));
 	}
 
 	@SuppressWarnings("unchecked")
@@ -253,7 +250,7 @@ public class Set<T extends ACell> extends ASet<T> {
 	public <R extends ACell> Set<R> includeRef(Ref<R> ref) {
 		AHashMap<R, ACell> mymap=(AHashMap<R, ACell>) map;
 		if (mymap.containsKeyRef((Ref<ACell>)ref)) return (Set<R>) this;
-		return wrap(mymap.assocRef(ref, DUMMY));
+		return wrap(mymap.assocRef(ref, Constants.SET_INCLUDED));
 	}
 	
 	@Override
@@ -320,8 +317,9 @@ public class Set<T extends ACell> extends ASet<T> {
 	public void validate() throws InvalidDataException {
 		super.validate();
 		map.validate();
+		// TODO: fix complexity
 		map.mapEntries(e -> {
-			if (e.getValue() != DUMMY) {
+			if (e.getValue() != Constants.SET_INCLUDED) {
 				throw Utils.sneakyThrow(new InvalidDataException(
 						"Set must have cureect DUMMY entries in underlying map", this));
 			}
@@ -366,9 +364,10 @@ public class Set<T extends ACell> extends ASet<T> {
 	}
 	
 	@SuppressWarnings("unchecked")
-	public Set<T> assoc(ACell key, ACell value) {
-		if (!(value instanceof CVMBool)) return null;		
-		return (value==CVMBool.TRUE)?include((T)key):exclude((T) key);
+	public Set<T> assoc(ACell key, ACell value) {	
+		if (value==Constants.SET_INCLUDED) return include((T)key);
+		if (value==Constants.SET_EXCLUDED) return exclude((T) key);
+		return null;
 	}
 
 

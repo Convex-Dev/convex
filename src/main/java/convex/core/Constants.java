@@ -5,6 +5,7 @@ import java.time.Instant;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBool;
 
 /**
  * Static class for global configuration constants that affect protocol
@@ -67,5 +68,13 @@ public class Constants {
 	 */
 	public static final int MAX_NAME_LENGTH = 64;
 
-
+	/**
+	 * Value used to indicate inclusion of a key in a Set. Must be a singleton instance
+	 */
+	public static final CVMBool SET_INCLUDED = CVMBool.TRUE;
+	
+	/**
+	 * Value used to indicate exclusion of a key from a Set. Must be a singleton instance
+	 */
+	public static final CVMBool SET_EXCLUDED = CVMBool.FALSE;
 }

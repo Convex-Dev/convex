@@ -999,6 +999,10 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(set [3 2 1 2])"));
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(set #{1 2 3})"));
 		
+		// equivalent of get with set-as-function
+		assertEquals(eval("(#{2 3} 2)"),eval("(get #{2 3} 2)"));
+		assertEquals(eval("(#{2 3} 1)"),eval("(get #{2 3} 1)"));
+		
 		assertEquals(Sets.empty(), eval("(set nil)")); // nil treated as empty set of elements
 
 		assertArityError(step("(set)"));
