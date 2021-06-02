@@ -4,7 +4,7 @@ import convex.core.data.Symbol;
 
 /**
  * Static class for Symbol constants.
- * 
+ *
  * "If you have more things than names, your design is broken" - Stuart Halloway
  */
 public class Symbols {
@@ -90,10 +90,11 @@ public class Symbols {
 	public static final Symbol TRANSFER = Symbol.create("transfer");
 	public static final Symbol ACCEPT = Symbol.create("accept");
 	public static final Symbol ACCOUNT = Symbol.create("account");
-	
+
 	public static final Symbol ACCOUNT_Q = Symbol.create("account?");
 
 	public static final Symbol STAKE = Symbol.create("stake");
+	public static final Symbol SET_PEER_HOSTNAME = Symbol.create("set-peer-hostname");
 	public static final Symbol CREATE_PEER = Symbol.create("create-peer");
 
 	public static final Symbol CALL = Symbol.create("call");
@@ -106,7 +107,7 @@ public class Symbols {
 	public static final Symbol EXPORTS_Q = Symbol.create("exports?");
 	public static final Symbol DEPLOY = Symbol.create("deploy");
 	public static final Symbol DEPLOY_ONCE = Symbol.create("deploy-once");
-	
+
 	public static final Symbol BLOB = Symbol.create("blob");
 
 	public static final Symbol INC = Symbol.create("inc");
@@ -120,7 +121,7 @@ public class Symbols {
 
 	public static final Symbol BOOLEAN = Symbol.create("boolean");
 	public static final Symbol BOOLEAN_Q = Symbol.create("boolean?");
-	
+
 	public static final Symbol PLUS = Symbol.create("+");
 	public static final Symbol MINUS = Symbol.create("-");
 	public static final Symbol TIMES = Symbol.create("*");
@@ -135,7 +136,7 @@ public class Symbols {
 	public static final Symbol QUOT = Symbol.create("quot");
 	public static final Symbol REM = Symbol.create("rem");
 
-	
+
 	public static final Symbol FLOOR = Symbol.create("floor");
 	public static final Symbol CEIL = Symbol.create("ceil");
 
@@ -169,7 +170,7 @@ public class Symbols {
 
 
 	public static final Symbol STAR_ALIASES = Symbol.create("*aliases*");
-	
+
 	public static final Symbol STAR_INITIAL_EXPANDER = Symbol.create("*initial-expander*");
 
 	public static final Symbol HERO = Symbol.create("hero");
@@ -178,11 +179,11 @@ public class Symbols {
 	public static final Symbol READ = Symbol.create("read");
 	public static final Symbol EVAL = Symbol.create("eval");
 	public static final Symbol EVAL_AS = Symbol.create("eval-as");
-	
+
 	public static final Symbol QUERY = Symbol.create("query");
 	public static final Symbol QUERY_AS = Symbol.create("query-as");
 
-	
+
 	public static final Symbol EXPAND = Symbol.create("expand");
 
 	public static final Symbol SCHEDULE = Symbol.create("schedule");
@@ -199,7 +200,7 @@ public class Symbols {
 
 	public static final Symbol X = Symbol.create("x");
 	public static final Symbol E = Symbol.create("e");
-	
+
 	public static final Symbol NIL = Symbol.create("nil");
 
 	public static final Symbol NIL_Q = Symbol.create("nil?");
@@ -246,11 +247,11 @@ public class Symbols {
 	public static final Symbol SYNTAX = Symbol.create("syntax");
 	public static final Symbol GET_META = Symbol.create("get-meta");
 	public static final Symbol UNSYNTAX = Symbol.create("unsyntax");
-	
+
 	public static final Symbol DOC = Symbol.create("doc");
 	public static final Symbol META = Symbol.create("meta");
 	public static final Symbol META_STAR = Symbol.create("*meta*");
-	
+
 	public static final Symbol LOOKUP_META = Symbol.create("lookup-meta");
 
 	public static final Symbol GET_HOLDING = Symbol.create("get-holding");
@@ -262,7 +263,7 @@ public class Symbols {
 
 	public static final Symbol SET_MEMORY = Symbol.create("set-memory");
 	public static final Symbol TRANSFER_MEMORY = Symbol.create("transfer-memory");
-	
+
 	public static final Symbol RECEIVE_ALLOWANCE = Symbol.create("receive-allowance");
 	public static final Symbol RECEIVE_COIN = Symbol.create("receive-coin");
 	public static final Symbol RECEIVE_ASSET = Symbol.create("receive-asset");
@@ -270,33 +271,33 @@ public class Symbols {
 
 	public static final Symbol SET_BANG = Symbol.create("set!");
 	public static final Symbol SET_STAR = Symbol.create("set*");
-	
+
 	public static final Symbol REGISTER = Symbol.create("register");
-	
+
 	public static final Symbol SUBSET_Q = Symbol.create("subset?");
 	public static final Symbol UNION = Symbol.create("union");
 	public static final Symbol INTERSECTION = Symbol.create("intersection");
 	public static final Symbol DIFFERENCE = Symbol.create("difference");
-	
+
 	public static final Symbol MERGE = Symbol.create("merge");
-	
+
 	public static final Symbol ENCODING = Symbol.create("encoding");
-	
+
 	public static final Symbol CREATE_ACCOUNT = Symbol.create("create-account");
 	public static final Symbol SET_KEY = Symbol.create("set-key");
-	
+
 	public static final Symbol LOG = Symbol.create("log");
-	
+
 	public static final Symbol CNS_RESOLVE = Symbol.create("cns-resolve");
-	
+
 	public static final Symbol NAN_Q = Symbol.create("nan?");
 
 
-	
 
 
 
-	
+
+
 
 
 }

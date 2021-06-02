@@ -12,6 +12,7 @@ import java.util.Map;
 
 import convex.api.Shutdown;
 import convex.cli.Helpers;
+import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.crypto.AKeyPair;
@@ -47,13 +48,29 @@ public class PeerManager {
 	 * @param keyPairs Array of keyPairs for each peer. The length of the array must be >= the count of peers to launch.
 	 *
 	 */
-	public void launchPeers(int count, AKeyPair[] keyPairs) {
+	public void launchLocalPeers(int count, AKeyPair[] keyPairs, Address peerAddress) {
 		peerServerList.clear();
+
+		Server otherServer;
+		String remotePeerHostname;
 
 		for (int i = 0; i < count; i++) {
 			AKeyPair keyPair = keyPairs[i];
 			Server peerServer = launchPeer(keyPair);
 		}
+
+		for (int repeat = 0; repeat < 2; repeat++) {
+			for (int i = 1; i < count; i++) {
+				AKeyPair keyPair = keyPairs[i];
+				otherServer = peerServerList.get(0);
+				remotePeerHostname = otherServer.getHostname();
+				Address address = Address.create(peerAddress.toLong() + i);
+				peerServerList.get(i).joinNetwork(keyPair, address, remotePeerHostname);
+			}
+		}
+		otherServer = peerServerList.get(count - 1);
+		remotePeerHostname = otherServer.getHostname();
+		peerServerList.get(0).joinNetwork(keyPairs[0], peerAddress, remotePeerHostname);
 	}
 
 	/**
@@ -70,7 +87,7 @@ public class PeerManager {
 			InetSocketAddress address = addressList[index];
 			if (peerAddress != address) {
 				try {
-					peerServer.connectToPeer(address);
+					peerServer.connectToPeer(address.toString(), address);
 				} catch (IOException e) {
 					System.out.println("Connect failed to: "+address);
 				}
@@ -210,7 +227,7 @@ public class PeerManager {
 		}
 		config.put(Keywords.STORE, store);
 
-		log.info("launch peer: "+keyPair.getAccountKey().toHexString());
+		// log.info("launch peer: "+keyPair.getAccountKey().toHexString());
 
 		Server peerServer = API.launchPeer(config);
 
@@ -239,9 +256,11 @@ public class PeerManager {
 			Go through each started peer server connection and make sure
 			that each peer is connected to the other peer.
 		*/
+		/*
 		for (Server peerServer: peerServerList) {
 			connectToPeers(peerServer, session.getPeerAddressList());
 		}
+		*/
 
 		// shutdown hook to remove/update the session file
 		convex.api.Shutdown.addHook(Shutdown.CLI,new Runnable() {
@@ -256,7 +275,6 @@ public class PeerManager {
 
 		Server firstServer = peerServerList.get(0);
 		State lastState = firstServer.getPeer().getConsensusState();
-		log.info("state hash: "+lastState.getHash());
 
 		while (true) {
 			try {

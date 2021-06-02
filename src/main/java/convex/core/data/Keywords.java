@@ -18,7 +18,7 @@ public class Keywords {
 	public static final Keyword RESULTS = Keyword.create("results");
 	public static final Keyword PERSIST = Keyword.create("persist");
 
-	
+
 	public static final Keyword STORE = Keyword.create("store");
 	public static final Keyword RESTORE = Keyword.create("restore");
 
@@ -50,14 +50,14 @@ public class Keywords {
 	public static final Keyword TYPE = Keyword.create("type");
 	public static final Keyword SPECIAL = Keyword.create("special");
 	public static final Keyword SPECIAL_SYMBOL = Keyword.create("special-symbol");
-	
+
 	public static final Keyword PEER = Keyword.create("peer");
 	public static final Keyword STAKE = Keyword.create("stake");
 	public static final Keyword STAKES = Keyword.create("stakes");
 	public static final Keyword DELEGATED_STAKE = Keyword.create("delegated-stake");
-	
+
 	public static final Keyword URL = Keyword.create("url");
-	
+
 	public static final Keyword SEQUENCE = Keyword.create("sequence");
 	public static final Keyword BALANCE = Keyword.create("balance");
 	public static final Keyword ENVIRONMENT = Keyword.create("environment");
@@ -65,12 +65,12 @@ public class Keywords {
 	public static final Keyword ALLOWANCE = Keyword.create("allowance");
 	public static final Keyword CONTROLLER = Keyword.create("controller");
 	public static final Keyword KEY = Keyword.create("key");
-	
+
 	public static final Keyword ID = Keyword.create("id");
 	public static final Keyword RESULT = Keyword.create("result");
 	public static final Keyword ERROR_CODE = Keyword.create("error-code");
 	public static final Keyword TRACE = Keyword.create("trace");
-	
+
 	public static final Keyword EXPANDER = Keyword.create("expander");
 	public static final Keyword MACRO = Keyword.create("macro");
 
@@ -78,7 +78,7 @@ public class Keywords {
 	public static final Keyword FUNCTION = Keyword.create("function");
 	public static final Keyword METADATA = Keyword.create("metadata");
 
-	
+
 
 
 }

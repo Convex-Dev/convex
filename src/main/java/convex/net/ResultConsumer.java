@@ -17,17 +17,17 @@ import convex.core.util.Utils;
 
 /**
  * Consumer<Message> abstract base class for awaiting results.
- * 
+ *
  * Provides basic buffering of results until all data is available.
  */
 public abstract class ResultConsumer implements Consumer<Message> {
 
 	private static final Logger log = Logger.getLogger(ResultConsumer.class.getName());
-	
+
 	private static final Level LEVEL_RESULT= Level.FINER;
 	private static final Level LEVEL_ERROR = Level.FINER;
 	private static final Level LEVEL_MISSING = Level.INFO;
-		
+
 	@Override
 	public void accept(Message m) {
 		try {
@@ -40,8 +40,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 						Ref<?> r = Ref.get(o);
 						r.persistShallow();
 						Hash h=r.getHash();
-						// TODO: lower this level
-						log.log(LEVEL_MISSING,"Recieved DATA for hash "+h);
+						log.log(LEVEL_RESULT,"Recieved DATA for hash "+h);
 						unbuffer(h);
 					} catch (MissingDataException e) {
 						// ignore?
@@ -64,7 +63,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 					break;
 				}
 				default: {
-					log.info("Message type ignored: " + type);
+					log.log(LEVEL_ERROR, "Message type ignored: " + type);
 				}
 			}
 		} catch (Throwable t) {
@@ -86,7 +85,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 
 	/**
 	 * Unbuffer and replay messages for a given hash
-	 * 
+	 *
 	 * @param hash
 	 */
 	protected synchronized void unbuffer(Hash hash) {
@@ -101,10 +100,10 @@ public abstract class ResultConsumer implements Consumer<Message> {
 
 	/**
 	 * Method called when a normal (non-error) result is received.
-	 * 
+	 *
 	 * If this method throws a MissingDataException, missing data is requested and
 	 * the result handling may be retried later.
-	 * 
+	 *
 	 * @param id The ID of the original message to which this result corresponds
 	 * @param value The result value
 	 */
@@ -114,19 +113,19 @@ public abstract class ResultConsumer implements Consumer<Message> {
 
 	/**
 	 * Method called when a normal (non-error) result is received.
-	 * 
+	 *
 	 * If this method throws a MissingDataException, missing data is requested and
 	 * the result handling may be retried later.
-	 * 
+	 *
 	 * @param value The result value
 	 */
 	protected void handleResult(Object value) {
 		log.log(LEVEL_RESULT,"RESULT RECEIVED: " + value);
 	}
-	
+
 	/**
 	 * Method called when a result is received.
-	 * 
+	 *
 	 * By default, delegates to handleResult and handleError
 	 */
 	protected void handleResultMessage(Message m) {
@@ -161,15 +160,15 @@ public abstract class ResultConsumer implements Consumer<Message> {
 			return;
 		}
 	}
-	
+
 	/**
 	 * Method called when an error result is received.
-	 * 
+	 *
 	 * Default behaviour is simply to log the error.
-	 * 
+	 *
 	 * If this method throws a MissingDataException, missing data is requested and
 	 * the result handling may be retried later.
-	 * 
+	 *
 	 * @param id The ID of the original message to which this result corresponds
 	 * @param code The error code received. May not be null, and is usually a Keyword
 	 * @param errorMessage The error message associated with the result (may be null)
@@ -177,18 +176,18 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	protected void handleError(long id, Object code, Object errorMessage) {
 		handleError(code,errorMessage);
 	}
-	
+
 	/**
 	 * Method called when an error result is received.
-	 * 
+	 *
 	 * Default behaviour is simply to log the error.
-	 * 
+	 *
 	 * If this method throws a MissingDataException, missing data is requested and
 	 * the result handling may be retried later.
-	 * 
+	 *
 	 * @param code The error code received. May not be null, and is usually a Keyword
 	 * @param errorMessage The error message associated with the result (may be null)
-	 */	
+	 */
 	protected void handleError(Object code, Object errorMessage) {
 		log.log(LEVEL_ERROR,"Error received: " + code + " : " + errorMessage);
 	}

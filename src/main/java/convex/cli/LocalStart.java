@@ -47,7 +47,7 @@ public class LocalStart implements Runnable {
 			log.severe("Number of peers " + count + " is greater than " + Init.NUM_PEERS);
 		}
 		log.info("Starting local network with "+count+" peer(s)");
-		peerManager.launchPeers(count, Init.KEYPAIRS);
+		peerManager.launchLocalPeers(count, Init.KEYPAIRS, Init.FIRST_PEER);
 		peerManager.waitForPeers(mainParent.getSessionFilename());
 	}
 }

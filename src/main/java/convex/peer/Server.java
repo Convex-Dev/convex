@@ -5,15 +5,20 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import convex.api.Convex;
 import convex.api.Shutdown;
 import convex.core.Belief;
 import convex.core.Block;
@@ -21,16 +26,19 @@ import convex.core.BlockResult;
 import convex.core.ErrorCodes;
 import convex.core.Peer;
 import convex.core.Result;
+import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.data.AString;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Ref;
+import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
@@ -41,9 +49,11 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.Context;
 import convex.core.lang.impl.AExceptional;
+import convex.core.lang.Reader;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
+import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.net.Message;
@@ -52,11 +62,11 @@ import convex.net.NIOServer;
 
 /**
  * A self contained server that can be launched with a config.
- * 
+ *
  * Server creates the following threads:
  * - A ReceiverThread that precesses message from the Server's receive Queue
  * - An UpdateThreat that handles Belief updates and transaction processing
- * 
+ *
  * "Programming is a science dressed up as art, because most of us don't
  * understand the physics of software and it's rarely, if ever, taught. The
  * physics of software is not algorithms, data structures, languages, and
@@ -73,16 +83,20 @@ public class Server implements Closeable {
 
 	private static final int RECEIVE_QUEUE_SIZE = 10000;
 
-	// MAximum Pause for each iteration of Server update loop.
+	// Maximum Pause for each iteration of Server update loop.
 	private static final long SERVER_UPDATE_PAUSE = 1L;
+
+	// Maximum Pause for each iteration of Server connection loop.
+	private static final long SERVER_CONNECTION_PAUSE = (1000 * 2);
 
 	private static final Logger log = Logger.getLogger(Server.class.getName());
 	private static final Level LEVEL_BELIEF = Level.FINER;
 	private static final Level LEVEL_SERVER = Level.FINER;
 	private static final Level LEVEL_DATA = Level.FINEST;
 	private static final Level LEVEL_PARTIAL = Level.WARNING;
+	private static final Level LEVEL_INFO = Level.FINER;
 	// private static final Level LEVEL_MESSAGE = Level.FINER;
-	
+
 	/**
 	 * Queue for received messages to be processed by this Peer Server
 	 */
@@ -108,11 +122,11 @@ public class Server implements Closeable {
 	 * Store to use for all threads associated with this server instance
 	 */
 	private final AStore store;
-	
+
 	private final HashMap<Keyword, Object> config;
 
 	private boolean running = false;
-	
+
 	/**
 	 * Flag to indicate if there are any new things for the server to process (Beliefs, transactions)
 	 * can safely sleep a bit if nothing to do
@@ -122,23 +136,24 @@ public class Server implements Closeable {
 	private NIOServer nio;
 	private Thread receiverThread = null;
 	private Thread updateThread = null;
+	private Thread connectionThread = null;
 
-	/** 
-	 * The Peer instance current state for this server. Will be updated based on peer events. 
+	/**
+	 * The Peer instance current state for this server. Will be updated based on peer events.
 	 */
 	private Peer peer;
 
 	/**
 	 * The list of transactions for the block being created Should only modify with
 	 * the lock for this Server held.
-	 * 
+	 *
 	 * Must all have been fully persisted.
 	 */
 	private ArrayList<SignedData<ATransaction>> newTransactions = new ArrayList<>();
 
 	/**
 	 * The set of queued partial messages pending missing data.
-	 * 
+	 *
 	 * Delivery will be re-attempted when missing data is provided
 	 */
 	private HashMap<Hash, Message> partialMessages = new HashMap<Hash, Message>();
@@ -149,31 +164,36 @@ public class Server implements Closeable {
 	 */
 	private HashMap<AccountKey, SignedData<Belief>> newBeliefs = new HashMap<>();
 
+	private HashMap<Hash, AString> remotePeerURLList = new HashMap<>();
+
+	private String hostname;
+
 	private Server(HashMap<Keyword, Object> config) {
 		AStore configStore = (AStore) config.get(Keywords.STORE);
 		this.store = (configStore == null) ? Stores.getGlobalStore() : configStore;
-		
+
 		AKeyPair keyPair = (AKeyPair) config.get(Keywords.KEYPAIR);
 		if (keyPair==null) throw new IllegalArgumentException("No Peer Key Pair provided in config");
-		
+
 		// Switch to use the configured store, saving the caller store
 		final AStore savedStore=Stores.current();
 		try {
 			Stores.setCurrent(store);
 			this.config = config;
 			this.manager = new ConnectionManager(config);
-	
-	
+
+
 			this.peer = establishPeer(keyPair, config);
-	
+
 			nio = NIOServer.create(this, receiveQueue);
+
 		} finally {
 			Stores.setCurrent(savedStore);
 		}
 	}
 
 	private Peer establishPeer(AKeyPair keyPair, Map<Keyword, Object> config2) {
-		log.info("Establishing Peer with store: "+Stores.current());
+		log.log(LEVEL_INFO, "Establishing Peer with store: "+Stores.current());
 
 		if (Utils.bool(config.get(Keywords.RESTORE))) {
 			try {
@@ -184,14 +204,14 @@ public class Server implements Closeable {
 				log.warning("Can't restore Peer from store: " + e.getMessage());
 			}
 		}
-		log.info("Defaulting to standard Peer startup.");
+		log.log(LEVEL_INFO, "Defaulting to standard Peer startup.");
 		return Peer.createStartupPeer(config);
 	}
 
 	/**
 	 * Creates a Server with a given config. Reference to config is kept: don't
 	 * mutate elsewhere.
-	 * 
+	 *
 	 * @param config
 	 * @return
 	 */
@@ -201,7 +221,7 @@ public class Server implements Closeable {
 
 	/**
 	 * Gets the current Belief held by this PeerServer
-	 * 
+	 *
 	 * @return Current Belief
 	 */
 	public Belief getBelief() {
@@ -210,20 +230,44 @@ public class Server implements Closeable {
 
 	/**
 	 * Gets the current Belief held by this PeerServer
-	 * 
+	 *
 	 * @return Current Belief
 	 */
 	public Peer getPeer() {
 		return peer;
 	}
 
+	public String getHostname() {
+		return hostname;
+	}
+
+	public AVector<AString> getHostnameList() {
+		ArrayList<AString> result = new ArrayList<AString>();
+		State state = peer.getConsensusState();
+		for (AccountKey peerKey: state.getPeers().keySet()) {
+			PeerStatus peerStatus = state.getPeer(peerKey);
+			AString hostname = peerStatus.getHostname();
+			if (hostname != null) {
+				result.add(hostname);
+			}
+		}
+		return Vectors.of(result.toArray());
+	}
+
 	public synchronized void launch() {
 		Object p = config.get(Keywords.PORT);
 		Integer port = (p == null) ? null : Utils.toInt(p);
 
+
 		try {
 			nio.launch(port);
 			port = nio.getPort(); // get the actual port (may be auto-allocated)
+
+
+			hostname = String.format("localhost:%d", port);
+			if (config.containsKey(Keywords.URL)) {
+				hostname = (String) config.get(Keywords.URL);
+			}
 
 			// set running status now, so that loops don't terminate
 			running = true;
@@ -235,6 +279,10 @@ public class Server implements Closeable {
 			updateThread = new Thread(updateLoop, "Server Belief update loop for port: " + port);
 			updateThread.setDaemon(true);
 			updateThread.start();
+
+			connectionThread = new Thread(connectionLoop, "Dynamicaly connect to other peers: " + port);
+			connectionThread.setDaemon(true);
+			connectionThread.start();
 
 			// Close server on shutdown, must be before Etch stores
 			Shutdown.addHook(Shutdown.SERVER, new Runnable() {
@@ -250,12 +298,54 @@ public class Server implements Closeable {
 		}
 	}
 
+	public void joinNetwork(AKeyPair keyPair, Address address, String remoteHostname) {
+		Connection connection = null;
+
+		if (remoteHostname != null) {
+			InetSocketAddress remotePeerAddress = Utils.toInetSocketAddress(remoteHostname);
+			try {
+				Convex convex = Convex.connect(remotePeerAddress, address, keyPair);
+				Future<Result> cf =  convex.requestStatus();
+				Result result = cf.get(5000, TimeUnit.MILLISECONDS);
+				AVector<ACell> values = result.getValue();
+				Hash beliefHash = (Hash) values.get(0);
+				Hash stateHash = (Hash) values.get(1);
+
+				// TODO
+				// check the initStateHash to see if this is the network we want to join?
+
+				Hash initialStateHash = (Hash) values.get(2);
+
+				AVector<AString> statusPeerHostnameList = (AVector<AString>) values.get(3);
+
+				// set our peer hostname on the network
+				String transactionCommand = String.format("(set-peer-hostname %s \"%s\")", keyPair.getAccountKey(), getHostname());
+				ACell message = Reader.read(transactionCommand);
+				ATransaction transaction = Invoke.create(address, -1, message);
+				result = convex.transactSync(transaction, 50000);
+				// TODO
+				// check result to see if it the peer hostname was set
+				convex.close();
+
+				// connect to the only peer we know exists
+				connectToPeer(remoteHostname, remotePeerAddress);
+
+				// now use the remote peer host name list returned from the status call
+				// to connect to the peers
+				connectToRemotePeers(statusPeerHostnameList);
+
+			} catch (IOException | InterruptedException | ExecutionException | TimeoutException e ) {
+				log.severe(getHostname() + " is unable to connect to remote peer at " + remoteHostname + " " + e);
+			}
+		}
+	}
+
 	/**
 	 * Process a message received from a peer or client. We know at this point that the
 	 * message parsed successfully, not much else.....
-	 * 
+	 *
 	 * If the message is partial, will be queued pending delivery of missing data
-	 * 
+	 *
 	 * @param m
 	 */
 	private void processMessage(Message m) {
@@ -293,7 +383,7 @@ public class Server implements Closeable {
 				processStatus(m);
 				break;
 			}
-			
+
 		} catch (MissingDataException e) {
 			Hash missingHash = e.getMissingHash();
 			log.log(LEVEL_PARTIAL, "Missing data: " + missingHash.toHexString() + " in message of type " + type);
@@ -313,7 +403,7 @@ public class Server implements Closeable {
 	/**
 	 * Respond to a request for missing data, on a best-efforts basis. Requests for
 	 * missing data we do not hold are ignored.
-	 * 
+	 *
 	 * @param m
 	 * @throws BadFormatException
 	 */
@@ -327,10 +417,10 @@ public class Server implements Closeable {
 			try {
 				ACell data = r.getValue();
 				m.getPeerConnection().sendData(data);
-				log.info(() -> "Sent missing data for hash: " + h.toHexString() + " with type "
+				log.log(LEVEL_INFO, "Sent missing data for hash: " + h.toHexString() + " with type "
 						+ Utils.getClassName(data));
 			} catch (IOException e) {
-				log.info(() -> "Unable to deliver missing data for " + h.toHexString() + " due to: " + e.getMessage());
+				log.log(LEVEL_INFO, "Unable to deliver missing data for " + h.toHexString() + " due to: " + e.getMessage());
 			}
 		} else {
 			log.warning(
@@ -369,7 +459,7 @@ public class Server implements Closeable {
 	/**
 	 * Checks if received data fulfils the requirement for a partial message If so,
 	 * process the message again.
-	 * 
+	 *
 	 * @param hash
 	 * @return true if the data request resulted in a re-queued message, false
 	 *         otherwise
@@ -395,7 +485,7 @@ public class Server implements Closeable {
 
 	/**
 	 * Stores a partial message for potential later handling.
-	 * 
+	 *
 	 * @param missingHash Hash of missing data dependency
 	 * @param m           Message to re-attempt later when missing data is received.
 	 */
@@ -417,7 +507,7 @@ public class Server implements Closeable {
 
 	/**
 	 * Handle general Belief update, taking belief registered in newBeliefs
-	 * 
+	 *
 	 * @throws InterruptedException
 	 */
 	protected boolean maybeUpdateBelief() throws InterruptedException {
@@ -450,7 +540,7 @@ public class Server implements Closeable {
 
 		// persist the state of the Peer, announcing the new Belief
 		peer=peer.persistState(noveltyHandler);
-		
+
 		// Broadcast latest Belief to connected Peers
 		SignedData<Belief> sb = peer.getSignedBelief();
 		Message msg = Message.createBelief(sb);
@@ -472,7 +562,7 @@ public class Server implements Closeable {
 
 	/**
 	 * Checks for pending transactions, and if found propose them as a new Block.
-	 * 
+	 *
 	 * @return True if a new block is published, false otherwise.
 	 */
 	protected boolean maybePublishBlock() {
@@ -501,7 +591,7 @@ public class Server implements Closeable {
 	/**
 	 * Checks for mergeable remote beliefs, and if found merge and update own
 	 * belief.
-	 * 
+	 *
 	 * @return True if peer Belief was updated, false otherwise.
 	 */
 	protected boolean maybeMergeBeliefs() {
@@ -543,23 +633,24 @@ public class Server implements Closeable {
 			throw new Error("Invalid data in belief update!", e);
 		}
 	}
-	
+
 	private void processStatus(Message m) {
 		try {
 			// We can ignore payload
 
 			Connection pc = m.getPeerConnection();
-			log.info("Processing status request from: " + pc.getRemoteAddress());
+			log.log(LEVEL_INFO, "Processing status request from: " + pc.getRemoteAddress());
 			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
 			// address);
-			
+
 			Peer peer=this.getPeer();
 			Hash beliefHash=peer.getSignedBelief().getHash();
 			Hash stateHash=peer.getStates().getHash();
 			Hash initialStateHash=peer.getStates().get(0).getHash();
+			AVector<AString> peerHostnameList = getHostnameList();
 
-			AVector<ACell> reply=Vectors.of(beliefHash,stateHash,initialStateHash);
-			
+			AVector<ACell> reply=Vectors.of(beliefHash,stateHash,initialStateHash,peerHostnameList);
+
 			pc.sendResult(m.getID(), reply);
 		} catch (Throwable t) {
 			log.warning("Status Request Error: " + t);
@@ -577,7 +668,7 @@ public class Server implements Closeable {
 			Address address = (Address) v.get(2);
 
 			Connection pc = m.getPeerConnection();
-			log.info("Processing query: " + form + " with address: " + address);
+			log.log(LEVEL_INFO, "Processing query: " + form + " with address: " + address);
 			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
 			// address);
 			Context<ACell> resultContext = peer.executeQuery(form, address);
@@ -619,7 +710,7 @@ public class Server implements Closeable {
 
 	/**
 	 * Process an incoming message that represents a Belief
-	 * 
+	 *
 	 * @param m
 	 */
 	private void processBelief(Message m) {
@@ -643,7 +734,7 @@ public class Server implements Closeable {
 				if ((current == null) || (current.getValueUnchecked().getTimestamp() >= signedBelief.getValueUnchecked()
 						.getTimestamp())) {
 					newBeliefs.put(addr, signedBelief);
-					
+
 					// Notify the update thread that there is something new to handle
 					newThings=true;
 				}
@@ -713,7 +804,7 @@ public class Server implements Closeable {
 
 					// Try belief update
 					maybeUpdateBelief();
-					
+
 					// Maybe sleep a bit, wait for some belief updates to accumulate
 					if (newThings) {
 						newThings=false;
@@ -736,6 +827,45 @@ public class Server implements Closeable {
 		}
 	};
 
+	/*
+	 * Runnable loop for managing server connections
+	 */
+	private Runnable connectionLoop = new Runnable() {
+		@Override
+		public void run() {
+			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
+
+			try {
+
+				Thread.sleep(100);
+				State state = peer.getConsensusState();
+
+				// loop while the server is running
+				long lastConsensusPoint = peer.getConsensusPoint();
+				while (running) {
+					if ( lastConsensusPoint != peer.getConsensusPoint()) {
+						// only update the peer connection lists if the state has changed
+						lastConsensusPoint = peer.getConsensusPoint();
+						connectToRemotePeers(getHostnameList());
+					}
+					// System.out.println(getHostname() + " " + manager.getConnections().size());
+					try {
+						Thread.sleep(SERVER_CONNECTION_PAUSE);
+					} catch (InterruptedException e) {
+						// continue
+					}
+				}
+			} catch (Throwable e) {
+				log.severe("Unexpected exception in server connection loop: " + e.toString());
+				log.severe("Terminating Server connection");
+				e.printStackTrace();
+			} finally {
+				// clear thread from Server as we terminate
+				connectionThread = null;
+			}
+		}
+	};
+
 	private void reportTransactions(Block block, BlockResult br) {
 		// TODO: consider culling old interests after some time period
 		int nTrans = block.length();
@@ -745,7 +875,7 @@ public class Server implements Closeable {
 			Message m = interests.get(h);
 			if (m != null) {
 				try {
-					log.info("Returning transaction result to " + m.getPeerConnection().getRemoteAddress());
+					log.log(LEVEL_INFO, "Returning transaction result to " + m.getPeerConnection().getRemoteAddress());
 
 					Connection pc = m.getPeerConnection();
 					if ((pc == null) || pc.isClosed()) continue;
@@ -753,7 +883,7 @@ public class Server implements Closeable {
 					Result res = br.getResults().get(j).withID(id);
 					pc.sendResult(res);
 				} catch (Throwable e) {
-					System.err.println("Error sending Result: " + e.getMessage());
+					log.severe("Error sending Result: " + e.getMessage());
 					e.printStackTrace();
 					// ignore
 				}
@@ -761,6 +891,28 @@ public class Server implements Closeable {
 			}
 		}
 	}
+
+	protected void connectToRemotePeers(AVector<AString> remotePeerHostnameList) {
+		// now connect to all remote host names returned from the status call
+
+		Iterator<AString> iterator = remotePeerHostnameList.iterator();
+
+		while (iterator.hasNext()) {
+			AString peerHostname = iterator.next();
+			if (hostname.toString() != peerHostname.toString() ) {
+				InetSocketAddress peerAddress = Utils.toInetSocketAddress(peerHostname.toString());
+				if ( !isConnectedToPeer(peerHostname.toString())) {
+					try {
+						log.log(LEVEL_SERVER, getHostname() + ": connecting too " + peerHostname.toString());
+						connectToPeer(peerHostname.toString(), peerAddress);
+					} catch (IOException e) {
+						log.warning("cannot connect to peer " + peerHostname.toString());
+					}
+				}
+			}
+		}
+	}
+
 
 	public int getPort() {
 		return nio.getPort();
@@ -773,7 +925,7 @@ public class Server implements Closeable {
 
 	/**
 	 * Writes the Peer data to the configured store.
-	 * 
+	 *
 	 * This will overwrite the previously persisted peer state.
 	 */
 	public void persistPeerData() {
@@ -784,7 +936,7 @@ public class Server implements Closeable {
 			Ref<?> peerRef = ACell.createPersisted(peerData);
 			Hash peerHash = peerRef.getHash();
 			store.setRootHash(peerHash);
-			log.info("Stored peer data for Server: " + peerHash.toHexString());
+			log.log(LEVEL_INFO, "Stored peer data for Server: " + peerHash.toHexString());
 		} catch (Throwable e) {
 			log.severe("Failed to persist peer state when closing server: " + e.getMessage());
 		} finally {
@@ -802,13 +954,14 @@ public class Server implements Closeable {
 		running = false;
 		if (updateThread != null) updateThread.interrupt();
 		if (receiverThread != null) receiverThread.interrupt();
+		if (connectionThread != null) connectionThread.interrupt();
 		nio.close();
 		// Note we don't do store.close(); because we don't own the store.
 	}
 
 	/**
 	 * Gets the host address for this Server (including port), or null if closed
-	 * 
+	 *
 	 * @return Host Address
 	 */
 	public InetSocketAddress getHostAddress() {
@@ -817,7 +970,7 @@ public class Server implements Closeable {
 
 	/**
 	 * Returns the Keypair for this peer server
-	 * 
+	 *
 	 * SECURITY: Be careful with this!
 	 */
 	private AKeyPair getKeyPair() {
@@ -826,7 +979,7 @@ public class Server implements Closeable {
 
 	/**
 	 * Gets the public key of the peer account
-	 * 
+	 *
 	 * @return AccountKey of this Peer
 	 */
 	public AccountKey getAddress() {
@@ -838,15 +991,19 @@ public class Server implements Closeable {
 	/**
 	 * Connects this Peer to a target Peer, adding the Connection to this Server's
 	 * Manager
-	 * 
+	 *
 	 * @param hostAddress
 	 * @return The newly created connection
 	 * @throws IOException
 	 */
-	public Connection connectToPeer(InetSocketAddress hostAddress) throws IOException {
+	public Connection connectToPeer(String hostname, InetSocketAddress hostAddress) throws IOException {
 		Connection pc = Connection.connect(hostAddress, peerReceiveAction, getStore());
-		manager.addConnection(pc);
+		manager.setConnection(hostname, pc);
 		return pc;
+	}
+
+	public boolean isConnectedToPeer(String hostname) {
+		return  manager.getConnections().containsKey(hostname);
 	}
 
 	public AStore getStore() {

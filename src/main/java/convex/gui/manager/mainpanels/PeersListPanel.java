@@ -55,7 +55,7 @@ public class PeersListPanel extends JPanel {
 				Server dest = peerList.get(j).peerServer;
 				InetSocketAddress addr = dest.getHostAddress();
 				try {
-					s.connectToPeer(addr);
+					s.connectToPeer(dest.getHostname(), addr);
 				} catch (IOException e) {
 					log.info("Connect failed to: " + addr);
 				}
