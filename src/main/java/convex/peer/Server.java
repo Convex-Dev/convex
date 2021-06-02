@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -167,7 +168,7 @@ public class Server implements Closeable {
 
 	private HashMap<Hash, AString> remotePeerURLList = new HashMap<>();
 
-	private String peerURL;
+	private String hostname;
 
 	private Server(HashMap<Keyword, Object> config) {
 		AStore configStore = (AStore) config.get(Keywords.STORE);
@@ -238,6 +239,23 @@ public class Server implements Closeable {
 		return peer;
 	}
 
+	public String getHostname() {
+		return hostname;
+	}
+
+	public AVector<AString> getHostnameList() {
+		ArrayList<AString> result = new ArrayList<AString>();
+		State state = peer.getConsensusState();
+		for (AccountKey peerKey: state.getPeers().keySet()) {
+			PeerStatus peerStatus = state.getPeer(peerKey);
+			AString hostname = peerStatus.getHostname();
+			if (hostname != null) {
+				result.add(hostname);
+			}
+		}
+		return Vectors.of(result.toArray());
+	}
+
 	public synchronized void launch() {
 		Object p = config.get(Keywords.PORT);
 		Integer port = (p == null) ? null : Utils.toInt(p);
@@ -246,6 +264,12 @@ public class Server implements Closeable {
 		try {
 			nio.launch(port);
 			port = nio.getPort(); // get the actual port (may be auto-allocated)
+
+
+			hostname = String.format("localhost:%d", port);
+			if (config.containsKey(Keywords.URL)) {
+				hostname = (String) config.get(Keywords.URL);
+			}
 
 			// set running status now, so that loops don't terminate
 			running = true;
@@ -276,12 +300,11 @@ public class Server implements Closeable {
 		}
 	}
 
-	public synchronized void joinNetwork(AKeyPair keyPair, Address address, String remotePeerURL) {
+	public void joinNetwork(AKeyPair keyPair, Address address, String remoteHostname) {
 		Connection connection = null;
-		if (!config.containsKey(Keywords.URL)) config.put(Keywords.URL, String.format("localhost:%d", getPort()));
 
-		if (remotePeerURL != null) {
-			InetSocketAddress remotePeerAddress = Utils.toInetSocketAddress(remotePeerURL);
+		if (remoteHostname != null) {
+			InetSocketAddress remotePeerAddress = Utils.toInetSocketAddress(remoteHostname);
 			try {
 				Convex convex = Convex.connect(remotePeerAddress, address, keyPair);
 				Future<Result> cf =  convex.requestStatus();
@@ -289,35 +312,32 @@ public class Server implements Closeable {
 				AVector<ACell> values = result.getValue();
 				Hash beliefHash = (Hash) values.get(0);
 				Hash stateHash = (Hash) values.get(1);
-				Hash initialStateHash = (Hash) values.get(2);
-				// log.info("initial state hash: " + initialStateHash.toString());
-				AVector<AString> statusPeerURLList = (AVector<AString>) values.get(3);
-				synchronized(remotePeerURLList) {
-					for (AString statusPeerURL : statusPeerURLList) {
-						log.info("add status hostname " + statusPeerURL);
-						remotePeerURLList.putIfAbsent(statusPeerURL.getHash(), statusPeerURL);
-					}
-					AString remotePeerURLValue = Strings.create(remotePeerURL);
-					log.info("add remote hostname " + remotePeerURL);
-					remotePeerURLList.putIfAbsent(remotePeerURLValue.getHash(), remotePeerURLValue);
-				}
 
-				String transactionCommand = String.format("(stake 994000000000 '%s')", config.get(Keywords.URL));
+				// TODO
+				// check the initStateHash to see if this is the network we want to join?
+
+				Hash initialStateHash = (Hash) values.get(2);
+
+				AVector<AString> statusPeerHostnameList = (AVector<AString>) values.get(3);
+
+				// set our peer hostname on the network
+				String transactionCommand = String.format("(set-peer-hostname %s \"%s\")", keyPair.getAccountKey(), getHostname());
 				ACell message = Reader.read(transactionCommand);
 				ATransaction transaction = Invoke.create(address, -1, message);
 				result = convex.transactSync(transaction, 50000);
-				System.out.println(result);
+				// TODO
+				// check result to see if it the peer hostname was set
 				convex.close();
-				for (AString remoteURL: remotePeerURLList.values()) {
-					InetSocketAddress peerAddress = Utils.toInetSocketAddress(remoteURL.toString());
-					if (peerAddress.getPort() != remotePeerAddress.getPort() ) {
-						log.info("connecting too " + peerAddress.toString());
-						connectToPeer(peerAddress);
-					}
-				}
+
+				// connect to the only peer we know exists
+				connectToPeer(remoteHostname, remotePeerAddress);
+
+				// now use the remote peer host name list returned from the status call
+				// to connect to the peers
+				connectToRemotePeers(statusPeerHostnameList);
 
 			} catch (IOException | InterruptedException | ExecutionException | TimeoutException e ) {
-				log.severe("unable to connection information from the peer at " + remotePeerURL + " " + e);
+				log.severe(getHostname() + " is unable to connect to remote peer at " + remoteHostname + " " + e);
 			}
 		}
 	}
@@ -629,9 +649,9 @@ public class Server implements Closeable {
 			Hash beliefHash=peer.getSignedBelief().getHash();
 			Hash stateHash=peer.getStates().getHash();
 			Hash initialStateHash=peer.getStates().get(0).getHash();
-			AVector<AString> peerURLList = Vectors.create(remotePeerURLList.values());
+			AVector<AString> peerHostnameList = getHostnameList();
 
-			AVector<ACell> reply=Vectors.of(beliefHash,stateHash,initialStateHash,peerURLList);
+			AVector<ACell> reply=Vectors.of(beliefHash,stateHash,initialStateHash,peerHostnameList);
 
 			pc.sendResult(m.getID(), reply);
 		} catch (Throwable t) {
@@ -818,46 +838,24 @@ public class Server implements Closeable {
 			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
 
 			try {
-				// short initial sleep before we start managing connections. Give stuff time to
-				// ramp up.
-
-				// TODO: move this up to the init part of the class, to get a config value
-				// for the hostname/port if we want this peer client to be public.
-				// The default is to use the localhost address /port number once connected.
 
 				Thread.sleep(100);
 				State state = peer.getConsensusState();
-				AString hostname = Strings.create(getHostAddress().getHostName() + ":" + getHostAddress().getPort());
-				if (hostname != null) {
-					log.info("hostname: " + hostname);
-				}
-				/*
-				AccountKey peerKey = peer.getPeerKey();
-
-				long stake = state.getPeer(peerKey).getOwnStake();
-				state.withPeer(peerKey, PeerStatus.create(stake, hostname));
-				*/
 
 				// loop while the server is running
+				long lastConsensusPoint = peer.getConsensusPoint();
 				while (running) {
-					/*
-					state = peer.getConsensusState();
-					BlobMap<AccountKey, PeerStatus> peerList = state.getPeers();
-
-					Set<AccountKey> keySet = peerList.keySet();
-					int index = 0;
-					for (AccountKey accountKey : keySet ) {
-						PeerStatus peerStatus = peerList.get(accountKey);
-						log.info(index + ":" + peerStatus.getHostString());
-						index ++;
+					if ( lastConsensusPoint != peer.getConsensusPoint()) {
+						// only update the peer connection lists if the state has changed
+						lastConsensusPoint = peer.getConsensusPoint();
+						connectToRemotePeers(getHostnameList());
 					}
-					*/
+					// System.out.println(getHostname() + " " + manager.getConnections().size());
 					try {
 						Thread.sleep(SERVER_CONNECTION_PAUSE);
 					} catch (InterruptedException e) {
 						// continue
 					}
-
 				}
 			} catch (Throwable e) {
 				log.severe("Unexpected exception in server connection loop: " + e.toString());
@@ -887,7 +885,7 @@ public class Server implements Closeable {
 					Result res = br.getResults().get(j).withID(id);
 					pc.sendResult(res);
 				} catch (Throwable e) {
-					System.err.println("Error sending Result: " + e.getMessage());
+					log.severe("Error sending Result: " + e.getMessage());
 					e.printStackTrace();
 					// ignore
 				}
@@ -895,6 +893,28 @@ public class Server implements Closeable {
 			}
 		}
 	}
+
+	protected void connectToRemotePeers(AVector<AString> remotePeerHostnameList) {
+		// now connect to all remote host names returned from the status call
+
+		Iterator<AString> iterator = remotePeerHostnameList.iterator();
+
+		while (iterator.hasNext()) {
+			AString peerHostname = iterator.next();
+			if (hostname.toString() != peerHostname.toString() ) {
+				InetSocketAddress peerAddress = Utils.toInetSocketAddress(peerHostname.toString());
+				if ( !isConnectedToPeer(peerHostname.toString())) {
+					try {
+						log.log(LEVEL_SERVER, getHostname() + ": connecting too " + peerHostname.toString());
+						connectToPeer(peerHostname.toString(), peerAddress);
+					} catch (IOException e) {
+						log.warning("cannot connect to peer " + peerHostname.toString());
+					}
+				}
+			}
+		}
+	}
+
 
 	public int getPort() {
 		return nio.getPort();
@@ -978,10 +998,14 @@ public class Server implements Closeable {
 	 * @return The newly created connection
 	 * @throws IOException
 	 */
-	public Connection connectToPeer(InetSocketAddress hostAddress) throws IOException {
+	public Connection connectToPeer(String hostname, InetSocketAddress hostAddress) throws IOException {
 		Connection pc = Connection.connect(hostAddress, peerReceiveAction, getStore());
-		manager.addConnection(pc);
+		manager.setConnection(hostname, pc);
 		return pc;
+	}
+
+	public boolean isConnectedToPeer(String hostname) {
+		return  manager.getConnections().containsKey(hostname);
 	}
 
 	public AStore getStore() {

@@ -76,10 +76,10 @@ import convex.core.lang.ops.Lookup;
 
 /**
  * Test class for core functions in the initial environment.
- * 
+ *
  * The state setup included core libraries such as the registry and trust monitors
  * which require integration with core language features.
- * 
+ *
  * Needs completely deterministic, fully specified behaviour if we want
  * consistent results so we need to do a lot of negative testing here.
  */
@@ -96,7 +96,7 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(map? *aliases*)"));
 		assertEquals(Maps.empty(),eval("*aliases*"));
 	}
-	
+
 	@Test
 	public void testAddress() {
 		Address a = Init.HERO;
@@ -128,9 +128,9 @@ public class CoreTest extends ACVMTest {
 		assertEquals("cafebabe", evalS("(str (blob \"Cafebabe\"))"));
 
 		assertEquals(eval("0x"),eval("(blob (str))")); // blob literal
-		
+
 		assertEquals(eval("*address*"),eval("(address (blob *address*))"));
-		
+
 		// round trip back to Blob
 		assertTrue(evalB("(blob? (blob (hash (encoding [1 2 3]))))"));
 
@@ -155,19 +155,19 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(byte)"));
 		assertArityError(step("(byte nil nil)")); // arity before cast
 	}
-	
+
 	@Test
 	public void testLet() {
-		
+
 		assertCastError(step("(let [[a b] :foo] b)"));
-		
+
 		assertArityError(step("(let [[a b] nil] b)"));
 		assertArityError(step("(let [[a b] [1]] b)"));
 		assertEquals(2L,evalL("(let [[a b] [1 2]] b)"));
 		assertEquals(2L,evalL("(let [[a b] '(1 2)] b)"));
 
 		assertCompileError(step("(let ['(a b) '(1 2)] b)"));
-		
+
 		// badly formed lets - Issue #80 related
 		assertCompileError(step("(let)"));
 		assertCompileError(step("(let :foo)"));
@@ -198,7 +198,7 @@ public class CoreTest extends ACVMTest {
 		assertNull(eval("(get [1 2] 10)"));
 		assertNull(eval("(get [1 2] -1)"));
 		assertNull(eval("(get [1 2] 1.0)"));
-		
+
 		assertNull(eval("(get [1 2 3] (byte 1))")); // TODO: is this sane?
 
 		assertNull(eval("(get nil nil)"));
@@ -245,8 +245,8 @@ public class CoreTest extends ACVMTest {
 
 		assertArityError(step("(get-in 1)")); // arity > cast
 		assertArityError(step("(get-in 1 2 3 4)")); // arity > cast
-		
-		assertCastError(step("(get-in 1 2 3)")); 
+
+		assertCastError(step("(get-in 1 2 3)"));
 		assertCastError(step("(get-in 1 [1])"));
 		assertCastError(step("(get-in [1] [0 2])"));
 		assertCastError(step("(get-in 1 {1 2})")); // keys not a sequence
@@ -260,14 +260,14 @@ public class CoreTest extends ACVMTest {
 		assertEquals(128L, evalL("(long (byte 128))"));
 		assertEquals(97L, evalL("(long \\a)"));
 		assertEquals(2147483648L, evalL("(long 2147483648)"));
-		
+
 		assertEquals(4096L, evalL("(long 0x1000)"));
 		assertEquals(255L, evalL("(long 0xff)"));
 		assertEquals(4294967295L, evalL("(long 0xffffffff)"));
 		assertEquals(-1L, evalL("(long 0xffffffffffffffff)"));
 		assertEquals(255L, evalL("(long 0xff00000000000000ff)")); // only taking last 8 bytes
 		assertEquals(-1L, evalL("(long 0xcafebabeffffffffffffffff)")); // interpret as big endian big integer
-		
+
 		// Currently we allow bools to cast to longs like this. TODO: maybe reconsider?
 		assertEquals(1L, evalL("(long true)"));
 		assertEquals(0L, evalL("(long false)"));
@@ -314,7 +314,7 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(boolean)"));
 		assertArityError(step("(boolean 1 2)"));
 	}
-	
+
 	@Test public void testIf() {
 		// basic branching
 		assertEquals(1L,evalL("(if true 1 2)"));
@@ -324,10 +324,10 @@ public class CoreTest extends ACVMTest {
 		assertEquals(6L,evalL("(if (= 1 1) (* 2 3) (* 3 4))"));
 		assertEquals(12L,evalL("(if (nil? false) (* 2 3) (* 3 4))"));
 
-		
+
 		// null return for missing false branch
 		assertNull(eval("(if false 1)"));
-		
+
 		// TODO: should these be arity errors?
 		assertArityError(step("(if)"));
 		assertArityError(step("(if 1)"));
@@ -353,7 +353,7 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(= ##NaN ##NaN)")); // value equality, but not numeric equality
 
 	}
-	
+
 	@Test
 	public void testEqualsNumeric() {
 		assertTrue(evalB("(==)"));
@@ -361,7 +361,7 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(== ##NaN)"));
 		assertTrue(evalB("(== 1 1.0)"));
 		assertFalse(evalB("(== ##NaN ##NaN)")); // value equality, but not numeric equality
-		
+
 		assertCastError(step("(== :foo)"));
 		assertCastError(step("(== 1 :foo)"));
 		assertCastError(step("(== #4)"));
@@ -387,7 +387,7 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(< 1 :foo)"));
 		assertCastError(step("(<= 1 3 \"hello\")"));
 		assertCastError(step("(>= nil 1.0)"));
-		
+
 		// ##NaN behaviour
 		assertFalse(evalB("(<= ##NaN ##NaN)"));
 		assertFalse(evalB("(<= ##NaN 42)"));
@@ -402,7 +402,7 @@ public class CoreTest extends ACVMTest {
 		// assertCastError(step("(>= 1 2 3 '*balance*)"));
 		assertFalse(evalB("(>= 1 2 3 '*balance*)"));
 	}
-	
+
 	@Test
 	public void testLog() {
 		AVector<ACell> v0=Vectors.of(1L, 2L);
@@ -412,40 +412,40 @@ public class CoreTest extends ACVMTest {
 		ABlobMap<Address,AVector<AVector<ACell>>> log=c.getLog();
 		assertEquals(1,log.count()); // only one address did a log
 		assertNotNull(log);
-		
+
 		AVector<AVector<ACell>> alog=log.get(c.getAddress());
 		assertEquals(1,alog.count()); // one log entry only
 		assertEquals(v0,alog.get(0));
-		
+
 		// do second log in same context
 		AVector<ACell> v1=Vectors.of(3L, 4L);
 		c=step(c,"(log 3 4)");
 		log=c.getLog();
-		
+
 		alog=log.get(c.getAddress());
 		assertEquals(2,alog.count()); // should be two entries now
 		assertEquals(v0,alog.get(0));
 		assertEquals(v1,alog.get(1));
 	}
-	
-	
+
+
 	@Test
 	public void testLogInActor() {
 		AVector<ACell> v0=Vectors.of(1L, 2L);
 
 		Context<?> c=step("(deploy '(do (defn event [& args] (apply log args)) (defn non-event [& args] (rollback (apply log args))) (export non-event event)))");
 		Address actor=(Address) c.getResult();
-		
+
 		assertEquals(0,c.getLog().count()); // Nothing logged so far
-	
+
 		// call actor function
 		c=step(c,"(call "+actor+" (event 1 2))");
 		ABlobMap<Address, AVector<AVector<ACell>>> log = c.getLog();
-		
+
 		AVector<AVector<ACell>> alog = log.get(actor);
 		assertEquals(1,alog.count()); // should be one entry by the actor
 		assertEquals(v0,alog.get(0));
-		
+
 		// call actor function which rolls back - should also roll back log
 		c=step(c,"(call "+actor+" (non-event 3 4))");
 		alog = log.get(actor);
@@ -459,7 +459,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Vectors.of(1L, 2L), eval("(vector 1 2)"));
 		assertEquals(Vectors.empty(), eval("(vector)"));
 	}
-	
+
 	@Test
 	public void testVectorTypes() {
 		assertEquals(Vectors.of(1L, 2L).getEncoding(),MapEntry.of(1L, 2L).getEncoding()); // should be same Hash / Encoding
@@ -485,7 +485,7 @@ public class CoreTest extends ACVMTest {
 		assertSame(Vectors.empty(), eval("(concat nil [])"));
 		assertSame(Lists.empty(), eval("(concat () nil)"));
 		assertSame(Lists.empty(), eval("(concat nil ())"));
-		
+
 		assertCastError(step("(concat 1 2)"));
 		assertCastError(step("(concat \"Foo\" \"Bar\")"));
 
@@ -514,7 +514,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Maps.of(1L, 2L), eval("(hash-map 1 2)"));
 		assertEquals(Maps.of(null, null), eval("(hash-map nil nil)"));
 		assertEquals(Maps.of(1L, 2L, 3L, 4L), eval("(hash-map 3 4 1 2)"));
-		
+
 		// Check last value of equal keys is used
 		assertEquals(Maps.of(1L, 4L), eval("(hash-map 1 2 1 3 1 4)"));
 		assertEquals(Maps.of(1L, 2L), eval("(hash-map 1 4 1 3 1 2)"));
@@ -523,18 +523,18 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(hash-map 1 2 3)"));
 		assertArityError(step("(hash-map 1 2 3 4 5)"));
 	}
-	
+
 	@Test
 	public void testBlobMap() {
 		assertSame(BlobMaps.empty(), eval("(blob-map)"));
-		
+
 		assertEquals(eval("(blob-map 0xa2 :foo)"),eval("(assoc (blob-map) 0xa2 :foo)"));
 		assertEquals(eval("(blob-map 0xa2 :foo 0xb3 :bar)"),eval("(assoc (blob-map) 0xa2 :foo 0xb3 :bar)"));
-		
+
 		// Bad key types should result in argument errors
 		assertArgumentError(step("(blob-map :foo :bar)")); // See issue #162
 		assertArgumentError(step("(assoc (blob-map) :foo 10)")); // See Issue #101
-		
+
 		assertArityError(step("(blob-map 0xabcd)"));
 		assertArityError(step("(blob-map 0xa2 :foo 0xb3)"));
 	}
@@ -547,7 +547,7 @@ public class CoreTest extends ACVMTest {
 
 		assertEquals(Vectors.empty(),RT.keys(BlobMaps.empty()));
 		assertEquals(Vectors.of(Init.HERO),RT.keys(BlobMap.of(Init.HERO, 1L)));
-		
+
 		assertCastError(step("(keys 1)"));
 		assertCastError(step("(keys [])"));
 		assertCastError(step("(keys nil)")); // TODO: maybe empty set?
@@ -576,12 +576,12 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Sets.of(1L, 2L), eval("(hash-set 1 2)"));
 		assertEquals(Sets.of((Object) null), eval("(hash-set nil nil)"));
 		assertEquals(Sets.of(1L, 2L, 3L, 4L), eval("(hash-set 3 4 1 2)"));
-		
+
 		// de-duplication
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(hash-set 1 2 3 1)"));
 		assertEquals(Sets.of((Long)null), eval("(hash-set nil nil nil)"));
 		assertEquals(Sets.of(Sets.empty()), eval("(hash-set (hash-set) (hash-set))"));
-		
+
 		assertEquals(Sets.of((Object) null), eval("(hash-set nil)"));
 	}
 
@@ -599,7 +599,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals("true", evalS("(str true)"));
 		assertEquals("cafebabe", evalS("(str (blob \"CAFEBABE\"))"));
 	}
-	
+
 	@Test
 	public void testAssert() {
 		assertNull(eval("(assert)"));
@@ -608,63 +608,63 @@ public class CoreTest extends ACVMTest {
 		assertNull(eval("(assert '(= 1 2))")); // form itself is truthy, not evaluated
 		assertNull(eval("(assert '(assert false))")); // form itself is truthy, not evaluated
 		assertNull(eval("(assert 1 2 3)"));
-		
+
 		assertAssertError(step("(assert false)"));
 		assertAssertError(step("(assert true false)"));
 		assertAssertError(step("(assert (= 1 2))"));
 	}
 
-	
+
 	@Test
 	public void testCeil() {
 		// Double cases
 		assertEquals(1.0,evalD("(ceil 0.001)"));
 		assertEquals(-1.0,evalD("(ceil -1.25)"));
-		
+
 		// Integral cases
 		assertEquals(-1.0,evalD("(ceil -1)"));
 		assertEquals(0.0,evalD("(ceil 0)"));
 		assertEquals(1.0,evalD("(ceil 1)"));
-		
+
 		// Special cases
 		assertEquals(Double.NaN,evalD("(ceil ##NaN)"));
 		assertEquals(Double.POSITIVE_INFINITY,evalD("(ceil (/ 1 0))"));
 		assertEquals(Double.NEGATIVE_INFINITY,evalD("(ceil (/ -1 0))"));
-		
+
 		assertCastError(step("(ceil #3)"));
 		assertCastError(step("(ceil :foo)"));
 		assertCastError(step("(ceil nil)"));
 		assertCastError(step("(ceil [])"));
-		
+
 		assertArityError(step("(ceil)"));
 		assertArityError(step("(ceil :foo :bar)")); // arity > cast
 	}
-	
+
 	@Test
 	public void testFloor() {
 		// Double cases
 		assertEquals(0.0,evalD("(floor 0.001)"));
 		assertEquals(-2.0,evalD("(floor -1.25)"));
-		
+
 		// Integral cases
 		assertEquals(-1.0,evalD("(floor -1)"));
 		assertEquals(0.0,evalD("(floor 0)"));
 		assertEquals(1.0,evalD("(floor 1)"));
-		
+
 		// Special cases
 		assertEquals(Double.NaN,evalD("(floor ##NaN)"));
 		assertEquals(Double.POSITIVE_INFINITY,evalD("(floor (/ 1 0))"));
 		assertEquals(Double.NEGATIVE_INFINITY,evalD("(floor (/ -1 0))"));
-		
+
 		assertCastError(step("(floor #666)"));
 		assertCastError(step("(floor :foo)"));
 		assertCastError(step("(floor nil)"));
 		assertCastError(step("(floor [])"));
-		
+
 		assertArityError(step("(floor)"));
 		assertArityError(step("(floor :foo :bar)")); // arity > cast
 	}
-	
+
 	@Test
 	public void testAbs() {
 		// Integer cases
@@ -672,17 +672,17 @@ public class CoreTest extends ACVMTest {
 		assertEquals(10L,evalL("(abs (byte 10))"));
 		assertEquals(17L,evalL("(abs -17)"));
 		assertEquals(Long.MAX_VALUE,evalL("(abs 9223372036854775807)"));
-		
+
 		// Double cases
 		assertEquals(1.0,evalD("(abs 1.0)"));
 		assertEquals(13.0,evalD("(abs (double -13))"));
 		assertEquals(Math.pow(10,100),evalD("(abs (pow 10 100))"));
-		
+
 		// Fun Double cases
 		assertEquals(Double.NaN,evalD("(abs ##NaN)"));
 		assertEquals(Double.POSITIVE_INFINITY,evalD("(abs (/ 1 0))"));
 		assertEquals(Double.POSITIVE_INFINITY,evalD("(abs (/ -1 0))"));
-		
+
 		// long overflow case
 		assertEquals(Long.MIN_VALUE,evalL("(abs -9223372036854775808)"));
 		assertEquals(Long.MAX_VALUE,evalL("(abs -9223372036854775807)"));
@@ -692,11 +692,11 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(abs nil)"));
 		assertCastError(step("(abs #78)"));
 		assertCastError(step("(abs [1])"));
-		
+
 		assertArityError(step("(abs)"));
 		assertArityError(step("(abs :foo :bar)")); // arity > cast
 	}
-	
+
 	@Test
 	public void testSignum() {
 		// Integer cases
@@ -705,24 +705,24 @@ public class CoreTest extends ACVMTest {
 		assertEquals(-1L,evalL("(signum -17)"));
 		assertEquals(1L,evalL("(signum 9223372036854775807)"));
 		assertEquals(-1L,evalL("(signum -9223372036854775808)"));
-		
+
 		// Double cases
 		assertEquals(0.0,evalD("(signum 0.0)"));
 		assertEquals(1.0,evalD("(signum 1.0)"));
 		assertEquals(-1.0,evalD("(signum (double -13))"));
 		assertEquals(1.0,evalD("(signum (pow 10 100))"));
-		
+
 		// Needs a numeric type, else cast error
 		assertCastError(step("(signum #1)"));
 		assertCastError(step("(signum 0xabab)"));
 		assertCastError(step("(signum nil)"));
 		assertCastError(step("(signum :foo)"));
-		
+
 		// Fun Double cases
 		assertEquals(Double.NaN,evalD("(signum ##NaN)"));
 		assertEquals(1.0,evalD("(signum ##Inf)"));
 		assertEquals(-1.0,evalD("(signum ##-Inf)"));
-		
+
 		assertArityError(step("(signum)"));
 		assertArityError(step("(signum :foo :bar)")); // arity > cast
 	}
@@ -754,18 +754,18 @@ public class CoreTest extends ACVMTest {
 		assertEquals(CVMByte.create(255),eval("(nth 0xFF 0)"));
 		assertFalse (evalB("(= 16 (nth 0x0010 1))"));
 		assertTrue(evalB("(== 16 (nth 0x0010 1))"));
-		
+
 		// cast errors for bad indexes
 		assertCastError(step("(nth [] :foo)"));
 		assertCastError(step("(nth [] nil)"));
-		
+
 		// cast errors for non-sequential objects
 		assertCastError(step("(nth :foo 0)"));
 		assertCastError(step("(nth 12 13)"));
-		
+
 		// BOUNDS error because treated as empty sequence
 		assertBoundsError(step("(nth nil 10)"));
-		
+
 		assertBoundsError(step("(nth 0x 0)"));
 		assertBoundsError(step("(nth nil 0)"));
 		assertBoundsError(step("(nth (str) 0)"));
@@ -791,9 +791,9 @@ public class CoreTest extends ACVMTest {
 		assertSame(Vectors.empty(), eval("(vec [])"));
 		assertSame(Vectors.empty(), eval("(vec {})"));
 		assertSame(Vectors.empty(), eval("(vec (blob-map))"));
-		
+
 		assertEquals( eval("[\\a \\b \\c]"), eval("(vec \"abc\")"));
-		
+
 		assertEquals(Vectors.of(1,2,3,4), eval("(vec (list 1 2 3 4))"));
 		assertEquals(Vectors.of(MapEntry.of(1,2)), eval("(vec {1,2})"));
 
@@ -803,7 +803,7 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(vec)"));
 		assertArityError(step("(vec 1 2)"));
 	}
-	
+
 	@Test
 	public void testReverse() {
 		assertSame(Lists.empty(), eval("(reverse nil)"));
@@ -811,7 +811,7 @@ public class CoreTest extends ACVMTest {
 		assertSame(Vectors.empty(), eval("(reverse ())"));
 		assertEquals(Vectors.of(1,2,3), eval("(reverse '(3 2 1))"));
 		assertEquals(Lists.of(1,2,3), eval("(reverse [3 2 1])"));
-		
+
 		assertCastError(step("(reverse #{})"));
 		assertCastError(step("(reverse {:foo :bar})"));
 		assertCastError(step("(reverse 0x1234)"));
@@ -823,10 +823,10 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testAssocNull() {
 		// nil is treated as an empty map
-		assertSame(Maps.empty(),eval("(assoc nil)")); 
-		
+		assertSame(Maps.empty(),eval("(assoc nil)"));
+
 		// assoc promotes nil to maps
-		assertEquals(Maps.of(1L, 2L), eval("(assoc nil 1 2)")); 
+		assertEquals(Maps.of(1L, 2L), eval("(assoc nil 1 2)"));
 		assertEquals(Maps.of(1L, 2L, 3L, 4L), eval("(assoc nil 1 2 3 4)"));
 	}
 
@@ -834,7 +834,7 @@ public class CoreTest extends ACVMTest {
 	public void testAssocMaps() {
 		// no key/values is OK
 		assertEquals(Maps.empty(), eval("(assoc {})"));
-		
+
 		assertEquals(Maps.of(1L, 2L), eval("(assoc {} 1 2)"));
 		assertEquals(Maps.of(1L, 2L), eval("(assoc {1 2})"));
 		assertEquals(Maps.of(1L, 2L, 3L, 4L), eval("(assoc {} 1 2 3 4)"));
@@ -846,7 +846,7 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(assoc {} 1)"));
 
 	}
-	
+
 	@Test
 	public void testAssocIn() {
 		// empty index cases - type of first arg not checked since no idexing happens
@@ -854,31 +854,31 @@ public class CoreTest extends ACVMTest {
 		assertEquals(2L, evalL("(assoc-in nil [] 2)")); // empty indexes returns value
 		assertEquals(2L, evalL("(assoc-in :old [] 2)")); // empty indexes returns value
 		assertEquals(2L, evalL("(assoc-in 13 nil 2)")); // empty indexes returns value (nil considered empty seq)
-		
+
 		// map cases
 		assertEquals(Maps.of(1L,2L), eval("(assoc-in {} [1] 2)"));
 		assertEquals(Maps.of(1L,2L,3L,4L), eval("(assoc-in {3 4} [1] 2)"));
 		assertEquals(Maps.of(1L,2L), eval("(assoc-in nil [1] 2)"));
 		assertEquals(Maps.of(1L,Maps.of(5L,6L),3L,4L), eval("(assoc-in {3 4} [1 5] 6)"));
-		
+
 		// vector cases
 		assertEquals(Vectors.of(1L, 5L, 3L),eval("(assoc-in [1 2 3] [1] 5)"));
 		assertEquals(Vectors.of(5L),eval("(assoc-in [1] [0] 5)"));
 		assertEquals(MapEntry.of(1L, 5L),eval("(assoc-in (first {1 2}) [1] 5)"));
-		
+
 		// Set cases
 		assertEquals(Sets.of(1L),eval("(assoc-in #{} [1] true)"));
 		assertEquals(Sets.of(1L),eval("(assoc-in #{1} [1] true)"));
 		assertEquals(Sets.of(1L,2L),eval("(assoc-in #{1} [2] true)"));
 		assertArgumentError(step("(assoc-in #{3} [2] :fail)")); // bad value type
 		assertCastError(step("(assoc-in #{3} [3 2] :fail)")); // 'true' is not a data structure
-		
+
 		// Cast error - wrong key types
 		assertCastError(step("(assoc-in (blob-map) :foo :bar)"));
-		
+
 		// Cast errors - not associative collections
 		assertCastError(step("(assoc-in 1 [2] 3)"));
-		
+
 		// Invalid keys
 		assertArgumentError(step("(assoc-in [1] [:foo] 3)"));
 		assertArgumentError(step("(assoc-in [] [42] :foo)")); // Issue #119
@@ -886,7 +886,7 @@ public class CoreTest extends ACVMTest {
 		// cast errors - paths not sequences
 		assertCastError(step("(assoc-in {} #{:a :b} 42)")); // See Issue 95
 		assertCastError(step("(assoc-in {} :foo 42)")); // See Issue 95
-		
+
 		// Arity error
 		assertArityError(step("(assoc-in)"));
 		assertArityError(step("(assoc-in nil)"));
@@ -899,10 +899,10 @@ public class CoreTest extends ACVMTest {
 	public void testAssocFailures() {
 		assertCastError(step("(assoc 1 1 2)"));
 		assertCastError(step("(assoc :foo)"));
-		
-		
+
+
 		// assertCastError(step("(assoc #{} :foo true)"));
-		
+
 		// Invalid keys
 		assertArgumentError(step("(assoc [1 2 3] 1.4 :foo)"));
 		assertArgumentError(step("(assoc [1 2 3] nil :foo)"));
@@ -940,7 +940,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Maps.empty(), eval("(dissoc nil 1)"));
 		assertEquals(Maps.empty(), eval("(dissoc {1 2 3 4} 1 3)"));
 		assertEquals(Maps.of(3L, 4L), eval("(dissoc {1 2 3 4} 1 2)"));
-		
+
 		// blob-map dissocs. Regression tests for #140 (fatal error in dissoc with non-blob keys)
 		assertSame(BlobMap.EMPTY,eval("(dissoc (blob-map) 1)"));
 		assertEquals(BlobMap.of(Blob.fromHex("a2"), Keywords.FOO),eval("(dissoc (into (blob-map) [[0xa2 :foo] [0xb3 :bar]]) 0xb3)"));
@@ -984,7 +984,7 @@ public class CoreTest extends ACVMTest {
 		assertSame(Sets.empty(), eval("(reduce disj #{1 2} [1 2])"));
 		assertEquals(Sets.empty(), eval("(disj #{} 1)"));
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(disj (set [3 2 1 2 4]) 4)"));
-		
+
 		// nil is treated as empty set
 		assertSame(Sets.empty(), eval("(disj nil 1)"));
 		assertSame(Sets.empty(), eval("(disj nil nil)"));
@@ -998,11 +998,11 @@ public class CoreTest extends ACVMTest {
 	public void testSet() {
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(set [3 2 1 2])"));
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(set #{1 2 3})"));
-		
+
 		// equivalent of get with set-as-function
 		assertEquals(eval("(#{2 3} 2)"),eval("(get #{2 3} 2)"));
 		assertEquals(eval("(#{2 3} 1)"),eval("(get #{2 3} 1)"));
-		
+
 		assertEquals(Sets.empty(), eval("(set nil)")); // nil treated as empty set of elements
 
 		assertArityError(step("(set)"));
@@ -1010,7 +1010,7 @@ public class CoreTest extends ACVMTest {
 
 		assertCastError(step("(set 1)"));
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	@Test
 	public void testSetRegression153() throws InvalidDataException {
@@ -1022,35 +1022,35 @@ public class CoreTest extends ACVMTest {
 		c=step(c, "(def s2 #{#2 #0 true #3 0x61a049 #242411 #3478095 #9275832328719 #1489754187855142})");
 		Set<ACell> s2=(Set<ACell>) c.getResult();
 		s2.validate();
-		
+
 		Set<ACell> u1=s2.includeAll(s1);
 		u1.validate();
 
 		c=step(c, "(def union1 (union s2 s1))");
 		Set<ACell> u2=(Set<ACell>) c.getResult();
 		u2.validate();
-		
+
 	}
-	
-	
+
+
 
 	@Test
 	public void testSubsetQ() {
 		assertTrue(evalB("(subset? #{} #{})"));
 		assertTrue(evalB("(subset? #{} #{1 2 3})"));
 		assertTrue(evalB("(subset? #{2 3} #{1 2 3 4})"));
-		
+
 		// check nil is handled as empty set
 		assertTrue(evalB("(subset? nil #{})"));
 		assertTrue(evalB("(subset? #{} nil)"));
 		assertTrue(evalB("(subset? nil #{1 2 3})"));
 		assertFalse(evalB("(subset? #{1 2 3} nil)"));
 
-		
+
 		assertFalse(evalB("(subset? #{2 3} #{1 2})"));
 		assertFalse(evalB("(subset? #{1 2 3} #{0})"));
 		assertFalse(evalB("(subset? #{#{}} #{#{1}})"));
-		
+
 		assertArityError(step("(subset?)"));
 		assertArityError(step("(subset? 1)"));
 		assertArityError(step("(subset? 1 2 3)"));
@@ -1058,7 +1058,7 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(subset? 1 2)"));
 		assertCastError(step("(subset? #{} [2])"));
 	}
-	
+
 	@Test
 	public void testSetUnion() {
 		assertEquals(Sets.empty(),eval("(union)"));
@@ -1066,19 +1066,19 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Sets.empty(),eval("(union nil)"));
 		assertEquals(Sets.empty(),eval("(union #{})"));
 		assertEquals(Sets.of(1L,2L),eval("(union #{1 2})"));
-		
+
 		// nil treated as empty set in all cases
 		assertEquals(Sets.of(1L,2L),eval("(union nil #{1 2})"));
 		assertEquals(Sets.of(1L,2L),eval("(union #{1 2} nil)"));
 
 		assertEquals(Sets.of(1L,2L,3L),eval("(union #{1 2} #{3})"));
-		
+
 		assertEquals(Sets.of(1L,2L,3L,4L,5L),eval("(union #{1 2} #{3} #{4 5})"));
-		
+
 		assertCastError(step("(union :foo)"));
 		assertCastError(step("(union [1] [2 3])"));
 	}
-	
+
 	@Test
 	public void testSetIntersection() {
 		assertEquals(Sets.empty(),eval("(intersection nil)"));
@@ -1087,17 +1087,17 @@ public class CoreTest extends ACVMTest {
 
 		assertEquals(Sets.empty(),eval("(intersection #{1 2} #{3})"));
 		assertEquals(Sets.empty(),eval("(intersection #{1 2 3} nil)"));
-		
+
 		assertEquals(Sets.of(2L,3L),eval("(intersection #{1 2 3} #{2 3 4})"));
-		
+
 		assertEquals(Sets.of(3L),eval("(intersection #{1 2 3} #{2 3 4} #{3 4 5})"));
 
 		assertArityError(step("(intersection)"));
-		
+
 		assertCastError(step("(intersection :foo)"));
 		assertCastError(step("(intersection [1] [2 3])"));
 	}
-	
+
 	@Test
 	public void testSetDifference() {
 		assertEquals(Sets.empty(),eval("(difference nil)"));
@@ -1105,17 +1105,17 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Sets.of(1L,2L),eval("(difference #{1 2})"));
 
 		assertEquals(Sets.of(1L,2L),eval("(difference #{1 2} #{3})"));
-		
+
 		assertEquals(Sets.of(2L,3L),eval("(difference #{1 2 3} #{1 4})"));
-		
+
 		assertEquals(Sets.of(3L),eval("(difference #{1 2 3} #{2 4} #{1 5})"));
 
 		assertArityError(step("(difference)"));
-		
+
 		assertCastError(step("(difference :foo)"));
 		assertCastError(step("(difference [1] [2 3])"));
 	}
-	
+
 	@Test
 	public void testDifferenceRegression155() {
 		Context<?> c=step("(do  (def arg+ [#{nil #5 #4 #2 #0 #7 #6 #3 #1} #{nil 0x500360a6 :B2Qrb9d1U5WH00h6c \"1pC\" true \\Ñ (quote A/aHAb7K2) #5278509802049781 #515}])  (def u (apply union arg+))  (def d (apply difference arg+))  (= #{} (difference d u))  )");
@@ -1166,7 +1166,7 @@ public class CoreTest extends ACVMTest {
 	public void testNext() {
 		assertEquals(Vectors.of(2L, 3L), eval("(next [1 2 3])"));
 		assertEquals(Lists.of(2L, 3L), eval("(next '(1 2 3))"));
-		
+
 		assertNull(eval("(next nil)"));
 		assertNull(eval("(next [1])"));
 		assertNull(eval("(next {1 2})"));
@@ -1182,13 +1182,13 @@ public class CoreTest extends ACVMTest {
 	public void testConj() {
 		assertEquals(Vectors.of(1L, 2L, 3L), eval("(conj [1 2] 3)"));
 		assertEquals(Lists.of(3L, 1L, 2L), eval("(conj (list 1 2) 3)"));
-		
+
 		// nil works like empty vector
 		assertEquals(Vectors.of(1L), eval("(conj nil 1)"));
 		assertEquals(Vectors.of(3L), eval("(conj nil 3)"));
 		assertEquals(Sets.of(3L), eval("(conj #{} 3)"));
 		assertEquals(Sets.of(3L), eval("(conj #{3} 3)"));
-		
+
 		// Maps conj with map entry vectors
 		assertEquals(Maps.of(1L, 2L), eval("(conj {} [1 2])"));
 		assertEquals(Maps.of(1L, 2L, 5L, 6L), eval("(conj {1 3 5 6} [1 2])"));
@@ -1197,17 +1197,17 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Lists.of(1L, 2L), eval("(conj (list 2) 1)"));
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(conj #{2 3} 1)"));
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(conj #{2 3 1} 1)"));
-		
+
 		// arity 1 OK, no change
 		assertEquals(Vectors.of(1L, 2L), eval("(conj [1 2])"));
-		
+
 		// Blobmaps
 		assertEquals(BlobMaps.create(Blob.fromHex("a1"), Blob.fromHex("a2")),eval("(conj (blob-map) [0xa1 0xa2])"));
 
 		// bad data structures
-		assertCastError(step("(conj :foo)")); 
-		assertCastError(step("(conj :foo 1)")); 
-		
+		assertCastError(step("(conj :foo)"));
+		assertCastError(step("(conj :foo 1)"));
+
 		// bad types of elements
 		assertArgumentError(step("(conj {} 2)")); // can't cast long to a map entry
 		assertArgumentError(step("(conj {} [1 2 3])")); // wrong size vector for a map entry
@@ -1246,30 +1246,30 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Maps.of(1L,2L),eval("(into nil {1 2})"));
 		assertEquals(Vectors.empty(), eval("(into nil [])"));
 		assertEquals(Vectors.of(1L, 2L, 3L), eval("(into nil [1 2 3])"));
-		
+
 		assertEquals(Vectors.of(1L, 2L, 3L), eval("(into [1 2] [3])"));
 		assertEquals(Vectors.of(1L, 2L, 3L), eval("(into [1 2 3] nil)"));
 		assertEquals(Vectors.of(1L, 2L, 3L), eval("(into nil [1 2 3])"));
 
 		assertEquals(Lists.of(2L, 1L, 3L, 4L), eval("(into '(3 4) '(1 2))"));
-		
+
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(into #{} [1 2 1 2 3])"));
-		
+
 		// map as data structure
 		assertEquals(Maps.empty(), eval("(into {} [])"));
 		assertEquals(Maps.of(1L, 2L, 3L, 4L), eval("(into {} [[1 2] [3 4] [1 2]])"));
-		
+
 		assertEquals(Vectors.of(MapEntry.of(1L, 2L)), eval("(into [] {1 2})"));
 
 		assertCastError(step("(into 1 [2 3])")); // long is not a conjable data structure
 		assertCastError(step("(into nil :foo)")); // keyword is not a sequence of elements
-		
+
 		// See #151
 		assertCastError(step("(into (list) #0)")); // Address is not a sequential data structure
 		assertCastError(step("(into #0 [])")); // Address is not a conjable data structure
 		assertCastError(step("(into #0 [1 2])")); // Address is not a conjable data structure
 		assertCastError(step("(into 0 [])")); // Long is not a conjable data structure
-		
+
 		// bad element types
 		assertArgumentError(step("(into {} [nil])")); // nil is not a MapEntry
 		assertArgumentError(step("(into {} [[:foo]])")); // length 1 vector shouldn't convert to MapEntry
@@ -1277,18 +1277,18 @@ public class CoreTest extends ACVMTest {
 		assertArgumentError(step("(into {1 2} [2 3])")); // longs are not map entries
 		assertArgumentError(step("(into {1 2} [[] []])")); // empty vectors are not map entries
 		assertArgumentError(step("(into (blob-map) [[1 2]])"));
-		
+
 		assertArityError(step("(into)"));
 		assertArityError(step("(into inc)"));
 		assertArityError(step("(into 1 2 3)")); // arity > cast
 	}
-	
+
 	@Test
 	public void testMerge() {
 		assertEquals(Maps.empty(),eval("(merge)"));
 		assertEquals(Maps.empty(),eval("(merge nil)"));
 		assertEquals(Maps.empty(),eval("(merge nil nil)"));
-		
+
 		assertEquals(Maps.of(1L,2L,3L,4L),eval("(merge {1 2} {3 4})"));
 		assertEquals(Maps.of(1L,2L,3L,4L),eval("(merge {1 2 3 4} {})"));
 		assertEquals(Maps.of(1L,2L,3L,4L),eval("(merge nil {1 2 3 4})"));
@@ -1300,35 +1300,35 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(merge {} [1 2 3])"));
 		assertCastError(step("(merge nil :foo)"));
 	}
-	
+
 	@Test
 	public void testDotimes() {
 		assertEquals(Vectors.of(0L, 1L, 2L), eval("(do (def a []) (dotimes [i 3] (def a (conj a i))) a)"));
 		assertEquals(Vectors.empty(), eval("(do (def a []) (dotimes [i 0] (def a (conj a i))) a)"));
 		assertEquals(Vectors.empty(), eval("(do (def a []) (dotimes [i -1.5] (def a (conj a i))) a)"));
 		assertEquals(Vectors.empty(), eval("(do (def a []) (dotimes [i -1.5]) a)"));
-		
+
 		assertCastError(step("(dotimes [1 10])"));
 		assertCastError(step("(dotimes [i :foo])"));
 		assertCastError(step("(dotimes [:foo 10])"));
 		assertCastError(step("(dotimes :foo)"));
-		
+
 		assertArityError(step("(dotimes)"));
 		assertArityError(step("(dotimes [i])"));
 		assertArityError(step("(dotimes [i 2 3])"));
 
 	}
-	
+
 	@Test
 	public void testDoouble() {
-		assertEquals(-13.0,evalD("(double -13)")); 
+		assertEquals(-13.0,evalD("(double -13)"));
 		assertEquals(1.0,evalD("(double true)")); // ?? cast OK?
-		
+
 		assertEquals(255.0,evalD("(double (byte -1))")); // byte should be 0-255
 
-		
+
 		assertCastError(step("(double :foo)"));
-		
+
 		assertArityError(step("(double)"));
 		assertArityError(step("(double :foo :bar)"));
 	}
@@ -1350,16 +1350,16 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(map inc)"));
 		assertArityError(step("(map 1)")); // arity > cast
 	}
-	
+
 	@Test
 	public void testFor() {
 		assertEquals(Vectors.empty(), eval("(for [x nil] (inc x))"));
 		assertEquals(Vectors.empty(), eval("(for [x []] (inc x))"));
 		assertEquals(Vectors.of(2L,3L), eval("(for [x '(1 2)] (inc x))"));
 		assertEquals(Vectors.of(2L,3L), eval("(for [x [1 2]] (inc x))"));
-		
+
 		// TODO: maybe dubious error types?
-		
+
 		assertCastError(step("(for 1 1)")); // bad binding form
 		assertArityError(step("(for [x] 1)")); // bad binding form
 		assertArityError(step("(for [x [1 2] [2 3]] 1)")); // bad binding form length
@@ -1379,7 +1379,7 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(mapv)"));
 		assertArityError(step("(mapv inc)"));
 	}
-	
+
 	@Test
 	public void testFilter() {
 		assertEquals(Vectors.of(1,2,3), eval("(filter number? [1 :foo 2 :bar 3])"));
@@ -1422,7 +1422,7 @@ public class CoreTest extends ACVMTest {
 		// Errors in reduce function
 		assertCastError(step("(reduce + [:foo])"));
 		assertCastError(step("(reduce + 1 [:foo])"));
-		
+
 		assertCastError(step("(reduce 1 2 [])"));
 		assertCastError(step("(reduce + 2 :foo)"));
 		assertCastError(step("(reduce + 1)"));
@@ -1430,29 +1430,29 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(reduce +)"));
 		assertArityError(step("(reduce + 1 [2] [3])"));
 	}
-	
+
 	@Test public void testReduceFail() {
 		// shouldn't fail because function never called
 		assertEquals(2L,evalL("(reduce address 2 [])"));
-		
+
 		assertArityError(step("(reduce address 2 [:foo :bar])"));
 		assertCastError(step("(reduce (fn [a x] (address x)) 2 [:foo :bar])"));
 	}
-	
+
 	@Test
 	public void testReduced() {
 		assertEquals(Vectors.of(2L,3L), eval("(reduce (fn [i v] (if (== v 3) (reduced [i v]) v)) 1 [1 2 3 4 5])"));
-		
+
 		// 2 arg reduce
 		assertEquals(Vectors.of(2L,3L), eval("(reduce (fn [i v] (if (== v 3) (reduced [i v]) v)) [1 2 3 4 5])"));
 		assertEquals(CVMLong.create(5L), eval("(reduce (fn [a b] (if (== b 1) (reduced :foo) b)) [1 2 3 4 5])")); // b is never 1
 		assertEquals(CVMLong.create(1L), eval("(reduce (fn [v] (reduced v)) [1])")); // fn called with arity 1
 		assertEquals(Keywords.FOO, eval("(reduce (fn [] (reduced :foo)) [])")); // fn called with arity 0
 
-	
+
 		assertArityError(step("(reduced)"));
 		assertArityError(step("(reduced 1 2)"));
-		
+
 		// reduced on its own is an exceptional result
 		assertError(ErrorCodes.EXCEPTION,step("(reduced 1)"));
 	}
@@ -1486,21 +1486,21 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Keywords.FOO,eval("(loop [] :foo)"));
 		assertEquals(Keywords.FOO,eval("(loop [] 1 2 3 :foo)"));
 		assertEquals(Keywords.FOO,eval("(loop [a :foo] :bar a)"));
-		
-		assertCompileError(step("(loop [a])")); 
+
+		assertCompileError(step("(loop [a])"));
 		assertCompileError(step("(loop)")); // Issue #80
 		assertCompileError(step("(loop :foo)")); // Not a binting vector
 	}
-	
+
 	@Test
 	public void testRecordLookup() {
 		assertEquals(INITIAL.getAccounts(),eval("(*state* :accounts)"));
 		assertEquals(Keywords.FOO,eval("(*state* [ 982788 ] :foo )"));
 		assertNull(eval("(*state* [1 2 3])")); // Issue #85
-		
+
 		assertArityError(step("(*state* :accounts :foo :bar)"));
 	}
-	
+
 	@Test
 	public void testRecur() {
 		// test factorial with accumulator
@@ -1516,7 +1516,7 @@ public class CoreTest extends ACVMTest {
 		// basic return mechanics
 		assertError(ErrorCodes.EXCEPTION,step("(recur 1)"));
 	}
-	
+
 	@Test
 	public void testRecurMultiFn() {
 		// test function that should exit on recur with value 13
@@ -1526,7 +1526,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(13L,evalL(ctx,"(f :foo)"));
 		assertArityError(step(ctx,"(f 1 2)"));
 	}
-	
+
 	@Test
 	public void testTailcall() {
 
@@ -1548,7 +1548,7 @@ public class CoreTest extends ACVMTest {
 			assertCVMEquals(2L, ctx.getResult());
 			assertEquals(13L, evalL(ctx, "a"));
 		}
-		
+
 		// Halt should return from a smart contract call but still have state changes
 		{
 			Context<?> ctx=step("(def act (deploy '(do (def g :foo) (defn f [] (def g 3) (halt 2) 1) (export f))))");
@@ -1561,40 +1561,40 @@ public class CoreTest extends ACVMTest {
 
 		assertArityError(step("(halt 1 2)"));
 	}
-	
+
 	@Test
 	public void testFail() {
 		assertAssertError(step("(fail)"));
 		assertAssertError(step("(fail \"Foo\")"));
 		assertAssertError(step("(fail :ASSERT \"Foo\")"));
 		assertAssertError(step("(fail :foo)"));
-		
+
 		assertError(step("(fail 1 :bar)"));
 		assertCastError(step("(fail :CAST :bar)"));
 
-		
+
 		assertAssertError(step("(fail)"));
-		
+
 		{ // need to double-step this: can't define macro and use it in the same expression?
 			Context<?> ctx=step("(defmacro check [condition reaction] `(if (not ~condition) ~reaction))");
 			assertAssertError(step(ctx,"(check (= (+ 2 2) 5) (fail \"Laws of arithmetic violated\"))"));
 		}
-		
+
 		// cannot have null error code
 		assertArgumentError(step("(fail nil \"Hello\")"));
-		
+
 		assertArityError(step("(fail 1 \"Message\" 3)"));
 	}
-	
+
 	@Test
 	public void testFailContract() {
 		Context<?> ctx=step("(def act (deploy '(do (defn set-and-fail [x] (def foo x) (fail :NOPE (str x))) (export set-and-fail))))");
 		Address act=(Address) ctx.getResult();
 		assertNotNull(act);
-		
+
 		ctx=step(ctx,"(call act (set-and-fail 100))");
 		assertError(Keyword.create("NOPE"),ctx);
-		
+
 		// Foo shouldn't be defined
 		assertNull(ctx.getAccountStatus(act).getEnvironmentValue(Symbols.FOO));
 	}
@@ -1619,7 +1619,7 @@ public class CoreTest extends ACVMTest {
 		// TODO: needs to fix / check?
 		assertArityError(step("(when)"));
 	}
-	
+
 	@Test
 	public void testIfLet() {
 		assertEquals(1L,evalL("(if-let [a 1] a)"));
@@ -1627,10 +1627,10 @@ public class CoreTest extends ACVMTest {
 		assertEquals(3L,evalL("(if-let [a []] 3 4)"));
 		assertEquals(4L,evalL("(if-let [a nil] 3 4)"));
 		assertEquals(5L,evalL("(if-let [a false] 3 5)"));
-		
+
 		//  TODO: fix destructuring examples
 		//assertEquals(Vectors.of(2L,1L),eval("(if-let [[a b] [1 2]] [b a])"));
-		//assertNull(eval("(if-let [[a b] nil] [b a])")); 
+		//assertNull(eval("(if-let [[a b] nil] [b a])"));
 
 		assertNull(eval("(if-let [a false] 1)")); // null on false branch
 
@@ -1643,13 +1643,13 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(if-let [])"));
 		assertArityError(step("(if-let [foo] 1)"));
 	}
-	
+
 	@Test
 	public void testWhenLet() {
 		assertEquals(1L,evalL("(when-let [a 1] a)"));
 		assertEquals(2L,evalL("(when-let [a true] 2)"));
 		assertEquals(3L,evalL("(when-let [a 1] 2 3)"));
-		
+
 		assertNull(eval("(when-let [a true])")); // empty trye branch
 		assertNull(eval("(when-let [a false] 1)")); // null on false branch
 		assertNull(eval("(when-let [a false])")); // null on false branch
@@ -1668,10 +1668,10 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Keywords.STATE, eval("(keyword (name :state))"));
 		assertEquals(Keywords.STATE, eval("(keyword (str 'state))"));
 		assertEquals(Keywords.STATE, eval("(keyword 'state)"));
-		
+
 		// Note: paths ignored when converting from Symbol
 		assertEquals(Keywords.STATE, eval("(keyword 'foo/state)"));
-		
+
 		// keyword lookups
 		assertNull(eval("((keyword :foo) nil)"));
 
@@ -1684,7 +1684,7 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(keyword)"));
 		assertArityError(step("(keyword 1 3)"));
 	}
-	
+
 	@Test
 	public void testKeywordAsFunction() {
 		// lookups in maps
@@ -1692,7 +1692,7 @@ public class CoreTest extends ACVMTest {
 		assertNull(eval("(:foo {:bar 1} nil)"));
 		assertEquals(1L,evalL("(:foo {} 1)"));
 		assertEquals(1L,evalL("(:foo {:foo 1} 2)"));
-		
+
 		// lookups in sets
 		assertSame(CVMBool.FALSE,eval("(:foo #{})"));
 		assertEquals(1L,evalL("(:foo #{} 1)"));
@@ -1704,7 +1704,7 @@ public class CoreTest extends ACVMTest {
 		assertNull(eval("(:foo [])"));
 		assertNull(eval("(:foo [] nil)"));
 		assertEquals(1L,evalL("(:foo [1 2 3] 1)"));
-		
+
 		// lookups on nil
 		assertNull(eval("((keyword :foo) nil)"));
 		assertNull(eval("(:foo nil)"));
@@ -1716,10 +1716,10 @@ public class CoreTest extends ACVMTest {
 		assertEquals("count", evalS("(name :count)"));
 		assertEquals("count", evalS("(name 'count)"));
 		assertEquals("foo", evalS("(name \"foo\")"));
-		
+
 		// should extract symbol name, exluding namespace alias
 		assertEquals("bar", evalS("(name 'foo/bar)"));
-		
+
 		// longer strings OK for name
 		assertEquals("duicgidvgefiucefiuvfeiuvefiuvgifegvfuievgiuefgviuefgviufegvieufgviuefvgevevgi", evalS("(name \"duicgidvgefiucefiuvfeiuvefiuvgifegvfuievgiuefgviuefgviufegvieufgviuefvgevevgi\")"));
 
@@ -1744,12 +1744,12 @@ public class CoreTest extends ACVMTest {
 		assertEquals(foobar, eval("(symbol 'foo \"bar\")"));
 		assertEquals(foobar, eval("(symbol \"foo\" :bar)"));
 		assertEquals(foobar, eval("(symbol 'foo :bar)"));
-		
+
 		// Symbol and path equivalence
 		assertEquals(read("#8/foo"),eval("(symbol #8 :foo)"));
 		assertEquals(read("foo"),eval("(symbol nil :foo)"));
 		assertEquals(read("foo/bar"),eval("(symbol :foo :bar)"));
-		
+
 		// Path overwrites
 		assertEquals(read("foo"),eval("(symbol nil 'baz/foo)"));
 		assertEquals(read("foo/bar"),eval("(symbol :foo 'baz/bar)"));
@@ -1769,54 +1769,54 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(symbol)"));
 		assertArityError(step("(symbol 1 2 3)"));
 	}
-	
+
 	@Test
 	public void testImport() {
 		Context<Address> ctx = step("(def lib (deploy '(do (def foo 100))))");
 		Address libAddress=ctx.getResult();
-		
+
 		{ // tests with a typical import
 			Context<?> ctx2=step(ctx,"(import ~lib :as mylib)");
 			assertEquals(libAddress,ctx2.getResult());
-			
+
 			assertEquals(100L, evalL(ctx2, "mylib/foo"));
 			assertUndeclaredError(step(ctx2, "mylib/bar"));
 			assertTrue(evalB(ctx2,"(map? (lookup-meta 'mylib/foo))"));
 			assertTrue(evalB(ctx2,"(defined? mylib/foo)"));
 			assertFalse(evalB(ctx2,"(defined? mylib/bar)"));
 		}
-		
+
 		{ // test deploy and CNS import in a single form. See #107
 			Context<?> ctx2=step(ctx,"(do (let [addr (deploy nil)] (call *registry* (cns-update 'foo addr)) (import foo :as foo2)))");
 			assertNotError(ctx2);
 		}
-		
+
 		assertArityError(step(ctx,"(import)"));
-		assertArityError(step(ctx,"(import ~lib)"));	
-		assertArityError(step(ctx,"(import ~lib :as)"));	
-		assertArityError(step(ctx,"(import ~lib :as mylib :blah)"));	
+		assertArityError(step(ctx,"(import ~lib)"));
+		assertArityError(step(ctx,"(import ~lib :as)"));
+		assertArityError(step(ctx,"(import ~lib :as mylib :blah)"));
 	}
-	
+
 	@Test
 	public void testImportCore() {
 		Context<?> ctx = step("(import convex.core :as cc)");
 		assertNotError(ctx);
 		assertEquals(eval(ctx,"count"),eval(ctx,"cc/count"));
 	}
-	
+
 
 	@Test
 	public void testLookup() {
 		assertSame(Core.COUNT, eval("(lookup 'count)"));
-		
+
 		assertSame(Core.COUNT, eval("(lookup *address* 'count)"));
 
 		assertNull(eval("(lookup 'non-existent-symbol)"));
-		
+
 		// Lookups after def
 		assertEquals(1L,evalL("(do (def foo 1) (lookup 'foo))"));
 		assertEquals(1L,evalL("(do (def foo 1) (lookup *address* 'foo))"));
-		
+
 		// Lookups in non-existent environment
 		assertNull(eval("(lookup #77777777 'count)"));
 		assertNull(eval("(do (def foo 1) (lookup #66666666 'foo))"));
@@ -1837,16 +1837,16 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(lookup)"));
 		assertArityError(step("(lookup 1 2 3)"));
 	}
-	
+
 	@Test
 	public void testLookupSyntax() {
 		AHashMap<ACell,ACell> countMeta=Core.METADATA.get(Symbols.COUNT);
 		assertSame(countMeta, (eval("(lookup-meta 'count)")));
 		assertSame(countMeta, (eval("(lookup-meta "+Init.CORE_ADDRESS+ " 'count)")));
-		
+
 		assertNull(eval("(lookup-meta 'non-existent-symbol)"));
 		assertNull(eval("(lookup-meta #666666 'count)")); // invalid address
-		
+
 		assertSame(Maps.empty(),eval("(do (def foo 1) (lookup-meta 'foo))"));
 		assertSame(Maps.empty(),eval("(do (def foo 1) (lookup-meta  *address* 'foo))"));
 		assertNull(eval("(do (def foo 1) (lookup-meta #0 'foo))"));
@@ -1860,7 +1860,7 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(lookup-meta nil)"));
 		assertCastError(step("(lookup-meta 10)"));
 		assertCastError(step("(lookup-meta [])"));
-		
+
 		// Bad addresses
 		assertCastError(step("(lookup-meta :foo 'bar)"));
 		assertCastError(step("(lookup-meta 8 'count)"));
@@ -1912,7 +1912,7 @@ public class CoreTest extends ACVMTest {
 		// Bad index types
 		assertCastError(step("([] nil)"));
 		assertCastError(step("([] :foo)"));
-		
+
 		// bad arity
 		assertArityError(step("([])"));
 		assertArityError(step("([] 1 2 3 4)"));
@@ -1932,7 +1932,7 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(() :foo)"));
 		assertCastError(step("(() {})"));
 
-		
+
 		// bad arity
 		assertArityError(step("(())"));
 		assertArityError(step("(() 1 2 3 4)"));
@@ -1945,16 +1945,16 @@ public class CoreTest extends ACVMTest {
 		assertSame(Vectors.empty(), eval("(apply vector ())"));
 		assertSame(BlobMaps.empty(), eval("(apply blob-map ())"));
 		assertSame(Lists.empty(), eval("(apply list [])"));
-		
+
 		assertEquals("foo", evalS("(apply str [\\f \\o \\o])"));
-		
+
 		assertEquals(10L,evalL("(apply + 1 2 [3 4])"));
 		assertEquals(3L,evalL("(apply + 1 2 nil)"));
 
 		assertEquals(Vectors.of(1L, 2L, 3L, 4L), eval("(apply vector 1 2 (list 3 4))"));
 		assertEquals(List.of(1L, 2L, 3L, 4L), eval("(apply list 1 2 [3 4])"));
 		assertEquals(List.of(1L, 2L), eval("(apply list 1 2 nil)"));
-		
+
 		// Bad function type
 		assertCastError(step("(apply 666 1 2 [3 4])"));
 
@@ -1964,17 +1964,17 @@ public class CoreTest extends ACVMTest {
 		// Insufficient args to apply itself
 		assertArityError(step("(apply)"));
 		assertArityError(step("(apply vector)"));
-		
+
 		// Arity failure before cast
 		assertArityError(step("(apply 666)"));
-		
+
 		// Insufficient args to applied function
-		assertArityError(step("(apply assoc nil)")); 
+		assertArityError(step("(apply assoc nil)"));
 
 		// Cast error if not applied to collection
 		assertCastError(step("(apply inc 1)"));
 		assertCastError(step("(apply inc :foo)"));
-		
+
 		// not a sequential collection
 		assertCastError(step("(apply + 1 2 {})"));
 	}
@@ -1986,7 +1986,7 @@ public class CoreTest extends ACVMTest {
 		long addr=7777777777L;
 		assertNull(eval("(let [a (address "+addr+")] (balance a))"));
 	}
-	
+
 	@Test
 	public void testBalance() {
 
@@ -2005,7 +2005,7 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(balance)"));
 		assertArityError(step("(balance 1 2)"));
 	}
-	
+
 	@Test
 	public void testCreateAccount() {
 		Context<Address> ctx=step("(create-account 0x817934590c058ee5b7f1265053eeb4cf77b869e14c33e7f85b2babc85d672bbc)");
@@ -2041,22 +2041,22 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(accept)"));
 		assertArityError(step("(accept 1 2)"));
 	}
-	
+
 	@Test
 	public void testAcceptInActor() {
 		Context<?> ctx=INITIAL_CONTEXT.fork();
 		ctx=step(ctx,"(def act (deploy '(do (defn receive-coin [sender amount data] (accept amount))  (defn echo-offer [] *offer*) (export echo-offer receive-coin))))");
-		
+
 		ctx=step(ctx,"(transfer act 100)");
 		assertEquals(100L, (long)RT.jvm(ctx.getResult()));
 		assertEquals(100L,evalL(ctx,"(balance act)"));
 		assertEquals(999L,evalL(ctx,"(call act 999 (echo-offer))"));
-		
+
 		// send via contract call
 		ctx=step(ctx,"(call act 666 (receive-coin *address* 350 nil))");
 		assertEquals(350L, (long)RT.jvm(ctx.getResult()));
 		assertEquals(450L,evalL(ctx,"(balance act)"));
-		
+
 	}
 
 	@Test
@@ -2065,13 +2065,13 @@ public class CoreTest extends ACVMTest {
 
 		assertEquals(Keywords.BAR,eval(ctx,"(call ctr (foo))")); // regular call
 		assertEquals(Keywords.BAR,eval(ctx,"(call ctr 100 (foo))")); // call with offer
-		
+
 		assertArityError(step(ctx, "(call)"));
 		assertArityError(step(ctx, "(call 12)"));
 
 		assertCastError(step(ctx, "(call ctr :foo (bad-fn 1 2))")); // cast fail on offered value
 		assertStateError(step(ctx, "(call ctr 12 (bad-fn 1 2))")); // bad function
-		
+
 		// bad format for call
 		assertCompileError(step(ctx,"(call ctr foo)"));
 		assertCompileError(step(ctx,"(call ctr [foo])")); // not a list
@@ -2081,10 +2081,10 @@ public class CoreTest extends ACVMTest {
 		assertArgumentError(step(ctx, "(call ctr -12 (bad-fn 1 2))")); // negative offer
 
 		// bad actor takes precedence over bad offer
-		assertNobodyError(step(ctx, "(call #666666 -12 (bad-fn 1 2))")); 
+		assertNobodyError(step(ctx, "(call #666666 -12 (bad-fn 1 2))"));
 
 	}
-	
+
 	@Test
 	public void testCallSelf() {
 		Context<Address> ctx = step("(def ctr (deploy '(do (defn foo [] (call *address* (bar))) (defn bar [] (= *address* *caller*)) (export foo bar))))");
@@ -2101,7 +2101,7 @@ public class CoreTest extends ACVMTest {
 
 		assertEquals(9L,evalL(ctx, "(call* ctr 0 'f 8)"));
 		assertCastError(step(ctx, "(call* ctr 0 :f 8)")); // cast fail on keyword function name
-		
+
 		assertArityError(step(ctx, "(call*)"));
 		assertArityError(step(ctx, "(call* 12)"));
 		assertArityError(step(ctx, "(call* 1 2)")); // no function
@@ -2121,31 +2121,31 @@ public class CoreTest extends ACVMTest {
 
 		// initial deployed state
 		assertEquals(0L, as.getBalance());
-		
+
 		// double-deploy should get different addresses
 		assertFalse(evalB("(let [cfn '(do 1)] (= (deploy cfn) (deploy cfn)))"));
 	}
-	
+
 	@Test
 	public void testActorQ() {
 		Context<Address> ctx = step("(def ctr (deploy '(fn [] :foo :bar)))");
 		Address ctr=ctx.getResult();
-		
+
 		assertTrue(evalB(ctx,"(actor? ctr)"));
 
 		assertTrue(evalB(ctx,"(actor? (address ctr))"));
-		
+
 		// hero address is not an Actor
 		assertFalse(evalB(ctx,"(actor? *address*)"));
-		
+
 		// Not an Actor Address, even though the given values string refer to one.
 		assertFalse(evalB(ctx,"(actor? \""+ctr.toHexString()+"\")"));
 		assertFalse(evalB(ctx,"(actor? 8)"));
-		
+
 		// Above are OK if cast to addresses explicitly
 		assertTrue(evalB(ctx,"(actor? (address \""+ctr.toHexString()+"\"))"));
 		assertTrue(evalB(ctx,"(actor? (address 8))"));
-		
+
 		assertFalse(evalB(ctx,"(actor? :foo)"));
 		assertFalse(evalB(ctx,"(actor? nil)"));
 		assertFalse(evalB(ctx,"(actor? [ctr])"));
@@ -2160,115 +2160,115 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(actor? :foo :bar)")); // ARITY before CAST
 
 	}
-	
+
 	@Test
 	public void testAccountQ() {
 		// a new Actor is an account
 		Context<Address> ctx = step("(def ctr (deploy '(fn [] :foo :bar)))");
 		assertTrue(evalB(ctx,"(account? ctr)"));
-		
+
 		// standard actors are accounts
 		assertTrue(evalB(ctx,"(account? *registry*)"));
-		
+
 		// standard actors are accounts
 		assertTrue(evalB(ctx,"(account? "+Init.HERO+")"));
-		
+
 		// a fake address
 		assertFalse(evalB(ctx,"(account? 77777777)"));
-		
+
 		// String with and without hex. See Issue #90
 		assertFalse(evalB(ctx,"(account? \"deadbeef\")"));
 		assertFalse(evalB(ctx,"(account? \"zzz\")"));
 
 		// a blob that is wrong length for an address. See Issue #90
 		assertFalse(evalB(ctx,"(account? 0x1234)"));
-		
+
 		// a blob that actually refers to a valid account. But it isn't an Address...
 		assertFalse(evalB(ctx,"(account? 0x0000000000000008)"));
-		
+
 		// current hero address is an account
 		assertTrue(evalB(ctx,"(account? *address*)"));
-		
+
 		assertFalse(evalB("(account? :foo)"));
 		assertFalse(evalB("(account? nil)"));
 		assertFalse(evalB("(account? [])"));
 		assertFalse(evalB("(account? 'foo)"));
-		
+
 		assertArityError(step("(account?)"));
 		assertArityError(step("(account? 1 2)")); // ARITY before CAST
 	}
-	
+
 	@Test
 	public void testAccount() {
 		// a new Actor is an account
 		Context<Address> ctx = step("(def ctr (deploy '(fn [] :foo :bar)))");
 		AccountStatus as=eval(ctx,"(account ctr)");
 		assertNotNull(as);
-		
+
 		// standard actors are accounts
 		assertTrue(eval("(account *registry*)") instanceof AccountStatus);
-		
+
 		// a non-existent address returns null
 		assertNull(eval(ctx,"(account #77777777)"));
-		
+
 		// current address is an account, and its balance is correct
 		assertTrue(evalB("(= *balance* (:balance (account *address*)))"));
-		
+
 		// invalid addresses
 		assertCastError(step("(account nil)"));
 		assertCastError(step("(account 8)"));
 		assertCastError(step("(account :foo)"));
 		assertCastError(step("(account [])"));
 		assertCastError(step("(account 'foo)"));
-		
+
 		assertArityError(step("(account)"));
 		assertArityError(step("(account 1 2)")); // ARITY before CAST
 	}
-	
+
 	@Test
 	public void testSetKey() {
 		Context<?> ctx=INITIAL_CONTEXT;
-		
+
 		ctx=step(ctx,"(set-key 0x0000000000000000000000000000000000000000000000000000000000000000)");
 		assertEquals(AccountKey.ZERO,ctx.getResult());
 		assertEquals(AccountKey.ZERO,eval(ctx,"*key*"));
-		
+
 		ctx=step(ctx,"(set-key nil)");
 		assertNull(ctx.getResult());
 		assertNull(eval(ctx,"*key*"));
-		
+
 		ctx=step(ctx,"(set-key "+Init.HERO_KP.getAccountKey()+")");
 		assertEquals(Init.HERO_KP.getAccountKey(),ctx.getResult());
 		assertEquals(Init.HERO_KP.getAccountKey(),eval(ctx,"*key*"));
 	}
-	
+
 	@Test
 	public void testSetAllowance() {
-		
+
 		// zero price for unchanged allowance
 		assertEquals(0L, evalL("(set-memory *memory*)"));
-		
+
 		// sell whole allowance
 		assertEquals(0L, evalL("(do (set-memory 0) *memory*)"));
-		
+
 		// buy allowance reduces balance
 		assertTrue(evalL("(let [b *balance*] (set-memory (inc *memory*)) (- *balance* b))")<0);
-		
+
 		// sell allowance increases balance
 		assertTrue(evalL("(let [b *balance*] (set-memory (dec *memory*)) (- *balance* b))")>0);
-		
+
 		// trying to buy too much is a funds error
 		assertFundsError(step("(set-memory 1000000000000000000)"));
 
-		
+
 		assertCastError(step("(set-memory :foo)"));
 		assertCastError(step("(set-memory nil)"));
-		
+
 		assertArityError(step("(set-memory)"));
 		assertArityError(step("(set-memory 1 2)"));
 
 	}
-	
+
 	@Test
 	public void testTransferMemory() {
 		long ALL=Constants.INITIAL_ACCOUNT_ALLOWANCE;
@@ -2280,57 +2280,57 @@ public class CoreTest extends ACVMTest {
 			assertEquals(1337L, ctx.getResult().longValue());
 			assertEquals(ALL, ctx.getAccountStatus(HERO).getMemory());
 		}
-		
+
 		assertEquals(ALL-1337, step("(transfer-memory "+Init.VILLAIN+" 1337)").getAccountStatus(HERO).getMemory());
 
 		assertEquals(0L, step("(transfer-memory "+Init.VILLAIN+" "+ALL+")").getAccountStatus(HERO).getMemory());
- 
-		assertArgumentError(step("(transfer-memory *address* -1000)"));	
-		assertNobodyError(step("(transfer-memory #88888888 0)"));	
-		
+
+		assertArgumentError(step("(transfer-memory *address* -1000)"));
+		assertNobodyError(step("(transfer-memory #88888888 0)"));
+
 		assertMemoryError(step("(transfer-memory *address* (+ 1 "+ALL+"))"));
 
 		// check bad arg types
 		assertCastError(step("(transfer-memory -1000 1000)"));
 		assertCastError(step("(transfer-memory *address* :foo)"));
-		
+
 		// check bad arities
 		assertArityError(step("(transfer-memory -1000)"));
 		assertArityError(step("(transfer-memory)"));
 		assertArityError(step("(transfer-memory *address* 100 100)"));
 
 	}
-	
+
 	@Test
 	public void testTransferToActor() {
 		// SECURITY: be careful with these tests
 		Address CORE=Init.CORE_ADDRESS;
-		
+
 		// should fail transferring to an account with no receive-coins export
 		assertStateError(step("(transfer "+CORE+" 1337)"));
-		
+
 		{ // transfer to an Actor that accepts everything
 			Context<?> ctx=step("(deploy '(do (defn receive-coin [sender amount data] (accept amount)) (export receive-coin)))");
 			Address receiver=(Address) ctx.getResult();
-			
+
 			ctx=step(ctx,"(transfer "+receiver.toString()+" 100)");
 			assertCVMEquals(100L,ctx.getResult());
 			assertCVMEquals(100L,ctx.getBalance(receiver));
 		}
-		
+
 		{ // transfer to an Actor that accepts nothing
 			Context<?> ctx=step("(deploy '(do (defn receive-coin [sender amount data] (accept 0)) (export receive-coin)))");
 			Address receiver=(Address) ctx.getResult();
-			
+
 			ctx=step(ctx,"(transfer "+receiver.toString()+" 100)");
 			assertCVMEquals(0L,ctx.getResult());
 			assertCVMEquals(0L,ctx.getBalance(receiver));
 		}
-		
+
 		{ // transfer to an Actor that accepts half
 			Context<?> ctx=step("(deploy '(do (defn receive-coin [sender amount data] (accept (long (/ amount 2)))) (export receive-coin)))");
 			Address receiver=(Address) ctx.getResult();
-			
+
 			// should be OK with a Blob Address
 			ctx=step(ctx,"(transfer "+receiver+" 100)");
 			assertCVMEquals(50L,ctx.getResult());
@@ -2352,14 +2352,14 @@ public class CoreTest extends ACVMTest {
 		// transfer to self. Note juice already accounted for in context.
 		assertEquals(1337L, evalL("(transfer *address* 1337)")); // should return transfer amount
 		assertEquals(BAL, step("(transfer *address* 1337)").getBalance(HERO));
-		
+
 		// transfers to an address that doesn't exist
 		{
 			Context<?> nc1=step("(transfer (address 666666) 1337)");
 			assertNobodyError(nc1);
 		}
-		
-		
+
+
 		// String representing a new User Address
 		Context<Address> ctx=step("(create-account "+Init.HERO_KP.getAccountKey()+")");
 		Address naddr=ctx.getResult();
@@ -2371,7 +2371,7 @@ public class CoreTest extends ACVMTest {
 			assertEquals(BAL - 1337,nc1.getBalance(HERO));
 			assertEquals(1337L, evalL(nc1,"(balance "+naddr+")"));
 		}
-		
+
 		assertTrue(() -> evalB(ctx,"(let [a "+naddr+"]"
 				+ "   (not (= *balance* (transfer a 1337))))"));
 
@@ -2394,14 +2394,14 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(transfer 1)"));
 		assertArityError(step("(transfer 1 2 3)"));
 	}
-	
+
 	@Test
 	public void testStake() {
 		AccountKey FIRST_PEER=Init.KEYPAIRS[0].getAccountKey();
 		Context<ACell> ctx=step(INITIAL_CONTEXT,"(def my-peer 0x"+FIRST_PEER.toHexString()+")");
 		AccountKey MY_PEER=FIRST_PEER;
 		long PS=ctx.getState().getPeer(FIRST_PEER).getOwnStake();
-		
+
 		{
 			// simple case of staking 1000000 on first peer of the realm
 			Context<ACell> rc=step(ctx,"(stake my-peer 1000000)");
@@ -2410,20 +2410,36 @@ public class CoreTest extends ACVMTest {
 			assertEquals(1000000,rc.getState().getPeer(MY_PEER).getDelegatedStake());
 			assertEquals(Constants.MAX_SUPPLY, rc.getState().computeTotalFunds());
 		}
-		
+
 		// staking on an account key that isn't a peer
 		assertStateError(step(ctx,"(stake 0x1234567812345678123456781234567812345678123456781234567812345678 1234)"));
 
 		// staking on an address
 		assertCastError(step(ctx,"(stake *address* 1234)"));
-		
+
 		// bad arg types
 		assertCastError(step(ctx,"(stake :foo 1234)"));
 		assertCastError(step(ctx,"(stake my-peer :foo)"));
 		assertCastError(step(ctx,"(stake my-peer nil)"));
-		
+
 		assertArityError(step(ctx,"(stake my-peer)"));
 		assertArityError(step(ctx,"(stake my-peer 1000 :foo)"));
+	}
+
+	@Test
+	public void testSetPeerHostname() {
+		AccountKey FIRST_PEER=Init.KEYPAIRS[0].getAccountKey();
+		Context<ACell> ctx=step(INITIAL_CONTEXT,"(def my-peer 0x"+FIRST_PEER.toHexString()+")");
+		AccountKey MY_PEER=FIRST_PEER;
+		String newHostname = "new_hostname:1234";
+		{
+			Context<ACell> rc=step(ctx,"(set-peer-hostname my-peer \"" + newHostname + "\")");
+			assertNotError(rc);
+			assertEquals(newHostname,rc.getState().getPeer(MY_PEER).getHostname().toString());
+		}
+
+		// set a peer account key that isn't a peer
+		assertStateError(step(ctx,"(set-peer-hostname 0x1234567812345678123456781234567812345678123456781234567812345678 \"localhost\")"));
 	}
 
 	@Test
@@ -2452,7 +2468,7 @@ public class CoreTest extends ACVMTest {
 		assertFalse(evalB("(> 3.0 3.0)"));
 		assertFalse(evalB("(> 3.0 1.0 7.0)"));
 		assertTrue(evalB("(>= 3.0 3.0)"));
-		
+
 		// assertTrue(evalB("(>= \\b \\a)")); // TODO: do we want this to work?
 
 		// juice should go down in order of evaluation
@@ -2469,9 +2485,9 @@ public class CoreTest extends ACVMTest {
 		assertEquals(7L, evalL("(min 7)"));
 		assertEquals(2L, evalL("(min 4 3 2)"));
 		assertEquals(1L, evalL("(min 1 2)"));
-		
+
 		assertEquals(1L, evalL("("+Init.CORE_ADDRESS+"/min 1 2)"));
-		
+
 		assertEquals(1.0, evalD("(min 2.0 1.0 3.0)"));
 		assertEquals(CVMDouble.NaN, eval("(min 2.0 ##NaN -0.0 ##Inf)"));
 		assertEquals(CVMDouble.NaN, eval("(min ##NaN)"));
@@ -2484,12 +2500,12 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(min ##NaN true)"));
 		assertCastError(step("(min true ##NaN)"));
 
-		
+
 		// #NaNs should get ignored
 		assertEquals(CVMDouble.NaN,eval("(min ##NaN 42)"));
 		assertEquals(CVMDouble.NaN,eval("(min 42 ##NaN)"));
 
-		assertArityError(step("(min)")); 
+		assertArityError(step("(min)"));
 	}
 
 	@Test
@@ -2501,33 +2517,33 @@ public class CoreTest extends ACVMTest {
 
 		assertArityError(step("(max)"));
 	}
-	
+
 	@Test
 	public void testPow() {
 		assertEquals(4.0, evalD("(pow 2 2)"));
-		
+
 		assertCastError(step("(pow :a 7)"));
 		assertCastError(step("(pow 7 :a)"));
-		
+
 		assertArityError(step("(pow)"));
-		assertArityError(step("(pow 1)"));	
-		assertArityError(step("(pow 1 2 3)"));	
+		assertArityError(step("(pow 1)"));
+		assertArityError(step("(pow 1 2 3)"));
 	}
-	
+
 	@Test
 	public void testQuot() {
 		assertEquals(0L, evalL("(quot 4 10)"));
 		assertEquals(2L, evalL("(quot 10 4)"));
 		assertEquals(-2L, evalL("(quot -10 4)"));
-		
+
 		assertCastError(step("(quot :a 7)"));
 		assertCastError(step("(quot 7 nil)"));
-		
+
 		assertArityError(step("(quot)"));
-		assertArityError(step("(quot 1)"));	
-		assertArityError(step("(quot 1 2 3)"));	
+		assertArityError(step("(quot 1)"));
+		assertArityError(step("(quot 1 2 3)"));
 	}
-	
+
 	@Test
 	public void testMod() {
 		assertEquals(4L, evalL("(mod 4 10)"));
@@ -2535,19 +2551,19 @@ public class CoreTest extends ACVMTest {
 		assertEquals(6L, evalL("(mod -1 7)"));
 		assertEquals(0L, evalL("(mod 7 7)"));
 		assertEquals(0L, evalL("(mod 0 -1)"));
-		
+
 		assertEquals(6L, evalL("(mod -1 -7)"));
-		
+
 		assertArgumentError(step("(mod 10 0)"));
-		
+
 		assertCastError(step("(mod :a 7)"));
 		assertCastError(step("(mod 7 nil)"));
-		
+
 		assertArityError(step("(mod)"));
-		assertArityError(step("(mod 1)"));	
-		assertArityError(step("(mod 1 2 3)"));	
+		assertArityError(step("(mod 1)"));
+		assertArityError(step("(mod 1 2 3)"));
 	}
-	
+
 	@Test
 	public void testRem() {
 		assertEquals(4L, evalL("(rem 4 10)"));
@@ -2555,19 +2571,19 @@ public class CoreTest extends ACVMTest {
 		assertEquals(-1L, evalL("(rem -1 7)"));
 		assertEquals(0L, evalL("(rem 7 7)"));
 		assertEquals(0L, evalL("(rem 0 -1)"));
-		
+
 		assertEquals(-1L, evalL("(rem -1 -7)"));
-		
+
 		assertArgumentError(step("(rem 10 0)"));
-		
+
 		assertCastError(step("(rem :a 7)"));
 		assertCastError(step("(rem 7 nil)"));
-		
+
 		assertArityError(step("(rem)"));
-		assertArityError(step("(rem 1)"));	
-		assertArityError(step("(rem 1 2 3)"));	
+		assertArityError(step("(rem 1)"));
+		assertArityError(step("(rem 1 2 3)"));
 	}
-	
+
 	@Test
 	public void testExp() {
 		assertEquals(1.0, evalD("(exp 0)"));
@@ -2575,23 +2591,23 @@ public class CoreTest extends ACVMTest {
 		assertEquals(StrictMath.exp(1.0), evalD("(exp 1)"));
 		assertEquals(0.0, evalD("(exp (/ -1 0))"));
 		assertEquals(Double.POSITIVE_INFINITY, evalD("(exp (/ 1 0))"));
-		
+
 		assertCastError(step("(exp :a)"));
 		assertCastError(step("(exp #3)"));
 		assertCastError(step("(exp nil)"));
-		
+
 		assertArityError(step("(exp)"));
-		assertArityError(step("(exp 1 2)"));	
+		assertArityError(step("(exp 1 2)"));
 	}
 
 	@Test
 	public void testHash() {
 		assertEquals(Hash.fromHex("a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a"),eval("(hash 0x)"));
-		
+
 		assertEquals(Hash.NULL_HASH, eval("(hash (encoding nil))"));
 		assertEquals(Hash.TRUE_HASH, eval("(hash (encoding true))"));
 		assertEquals(Maps.empty().getHash(), eval("(hash (encoding {}))"));
-		
+
 		assertTrue(evalB("(= (hash 0x12) (hash 0x12))"));
 
 		assertArityError(step("(hash)"));
@@ -2609,9 +2625,9 @@ public class CoreTest extends ACVMTest {
 		assertEquals(2L, evalL("(count #{1 2 2})"));
 		assertEquals(3L, evalL("(count [1 2 3])"));
 		assertEquals(4L, evalL("(count 0xcafebabe)"));
-		
+
 		// Count of a map is the number of entries
-		assertEquals(2L, evalL("(count {1 2 2 3})")); 
+		assertEquals(2L, evalL("(count {1 2 2 3})"));
 
 		// non-countable things fail with CAST
 		assertCastError(step("(count 1)"));
@@ -2624,7 +2640,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testCompile() {
 		assertEquals(Constant.of(1L), eval("(compile 1)"));
-		
+
 		assertEquals(Constant.of(1L), eval("(compile 1)"));
 		assertEquals(Constant.of(null), eval("(compile nil)"));
 		assertEquals(Invoke.class, eval("(compile '(+ 1 2))").getClass());
@@ -2669,7 +2685,7 @@ public class CoreTest extends ACVMTest {
 			assertSame(def, Format.read(b));
 
 			assertEquals(def.ednString(), sym.toString());
-			
+
 			AHashMap<ACell,ACell> meta= Core.METADATA.get(sym);
 			assertNotNull(meta,"Missing metadata for core symbol: "+sym);
 			doDocTests(sym,meta);
@@ -2677,7 +2693,7 @@ public class CoreTest extends ACVMTest {
 	}
 
 	private static Set<Keyword> CORE_TYPES=Sets.of(Keywords.MACRO, Keywords.SPECIAL, Keywords.FUNCTION, Keywords.EXPANDER,Keywords.VALUE);
-	
+
 	@SuppressWarnings("unchecked")
 	private void doDocTests(Symbol sym, AHashMap<ACell,ACell> meta) {
 		ACell dobj=meta.get(Keywords.DOC);
@@ -2796,7 +2812,7 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(blob? (blob *origin*))"));
 		assertTrue(evalB("(blob? 0xFF)"));
 		assertTrue(evalB("(blob? (blob 0x17))"));
-		
+
 		assertFalse(evalB("(blob? 17)"));
 		assertFalse(evalB("(blob? nil)"));
 		assertFalse(evalB("(blob? *address*)"));
@@ -2828,12 +2844,12 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(number? (byte 0))"));
 		assertTrue(evalB("(number? 0.5)"));
 		assertTrue(evalB("(number? ##NaN)")); // Sane? Is numeric double type....
-		
+
 		assertFalse(evalB("(number? nil)"));
 		assertFalse(evalB("(number? :foo)"));
 		assertFalse(evalB("(number? 0xFF)"));
 		assertFalse(evalB("(number? [1 2])"));
-		
+
 		assertFalse(evalB("(number? true)"));
 
 	}
@@ -2848,73 +2864,73 @@ public class CoreTest extends ACVMTest {
 
 		assertFalse(0.0 > -0.0); // check we are living in a sane universe
 		assertTrue(evalB("(zero? -0.0)"));
-		
+
 		assertFalse(evalB("(zero? \\c)"));
 
 		assertFalse(evalB("(zero? nil)"));
 		assertFalse(evalB("(zero? :foo)"));
 		assertFalse(evalB("(zero? [1 2])"));
 	}
-	
+
 	@Test
 	public void testFn() {
 		assertEquals(1L,evalL("((fn [] 1))"));
 		assertEquals(2L,evalL("((fn [x] 2) 1)"));
 		assertEquals(3L,evalL("((fn [x] 2 3) 1)"));
 		// TODO: more cases!
-		
+
 		// test closing over lexical scope
 		assertEquals(3L,evalL("(let [a 3 f (fn [x] a)] (f 0))"));
-		
+
 		// Bad arity fn execution
 		assertArityError(step("((fn [x] 0))"));
 		assertArityError(step("((fn [] 0) 1)"));
-		
+
 		// Bad fn forms
 		assertArityError(step("(fn)"));
 		assertCompileError(step("(fn 1)"));
 		assertCompileError(step("(fn {})"));
 		assertCompileError(step("(fn '())"));
-		
+
 		// fn printing
 		assertCVMEquals("(fn [x y] 0)",eval("(str (fn [x y] 0))"));
 		assertCVMEquals("(fn [x y] (do 0 1))",eval("(str (fn [x y] 0 1))"));
 
 	}
-	
+
 	@Test
 	public void testFnMulti() {
 		assertEquals(1L,evalL("((fn ([] 1)))"));
 		assertEquals(2L,evalL("((fn ([x] 2)) 1)"));
-		
+
 		// dispatch by arity
 		assertEquals(1L,evalL("((fn ([x] 1) ([x y] 2)) 3)"));
 		assertEquals(2L,evalL("((fn ([x] 1) ([x y] 2)) 3 4)"));
-		
+
 		// first matching impl chosen
 		assertEquals(1L,evalL("((fn ([x] 1) ([x] 2)) 3)"));
 
 		// variadic match
 		assertEquals(2L,evalL("((fn ([x] 1) ([x & more] 2)) 3 4 5 6)"));
 		assertEquals(2L,evalL("((fn ([x] 1) ([x y & more] 2)) 3 4)"));
-		
+
 		// MultiFn printing
 		assertCVMEquals("(fn ([] 0) ([x] 1))",eval("(str (fn ([]0) ([x] 1) ))"));
 
 		// arity errors
-		assertArityError(step("((fn ([x] 1) ([x & more] 2)))")); 
-		assertArityError(step("((fn ([x] 1) ([x y] 2)))")); 
-		assertArityError(step("((fn ([x] 1) ([x y z] 2)) 2 3)")); 
-		assertArityError(step("((fn ([x] 1) ([x y z & more] 2)) 2 3)")); 
+		assertArityError(step("((fn ([x] 1) ([x & more] 2)))"));
+		assertArityError(step("((fn ([x] 1) ([x y] 2)))"));
+		assertArityError(step("((fn ([x] 1) ([x y z] 2)) 2 3)"));
+		assertArityError(step("((fn ([x] 1) ([x y z & more] 2)) 2 3)"));
 	}
-	
+
 	@Test
 	public void testFnMultiRecur() {
 		assertEquals(7L,evalL("((fn ([x] x) ([x y] (recur 7))) 1 2)"));
-		
-		assertArityError(step("((fn ([x] x) ([x y] (recur))) 1 2)")); 
-		
-		assertJuiceError(step("((fn ([x] (recur 3 4)) ([x y] (recur 5))) 1 2)")); 
+
+		assertArityError(step("((fn ([x] x) ([x y] (recur))) 1 2)"));
+
+		assertJuiceError(step("((fn ([x] (recur 3 4)) ([x y] (recur 5))) 1 2)"));
 	}
 
 	@Test
@@ -2926,154 +2942,154 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(fn? fn?)"));
 		assertTrue(evalB("(fn? if)"));
 	}
-	
+
 	@Test
 	public void testDef() {
 		// Def returns defined value
 		assertEquals(Keywords.FOO, eval("(def v :foo)"));
-		
+
 		// Def establishes mapping in environment
 		assertEquals(CVMLong.ONE, step("(def foo 1)").getEnvironment().get(Symbols.FOO));
-		
+
 		// Def creates valid dynamic variables
 		assertEquals(Vectors.of(2L, 3L), eval("(do (def v [2 3]) v)"));
 		assertNull(eval("(do (def v nil) v)"));
-		
+
 		// def overwrites existing bindings
 		assertEquals(Vectors.of(2L, 3L), eval("(do (def v nil) (def v [2 3]) v)"));
 		assertEquals(Vectors.of(2L, 3L), eval("(do (def count [2 3]) count)")); // overwriting core
-		
+
 		// TODO: are these error types logical?
 		assertCompileError(step("(def)"));
 		assertCompileError(step("(def a b c)"));
-		
+
 		assertUndeclaredError(step("(def a b)"));
-		
+
 		assertUndeclaredError(step("(def a a)"));
 	}
-	
+
 	@Test
 	public void testDefinedQ() {
 		assertFalse(evalB("(defined? foobar)"));
-		
+
 		assertTrue(evalB("(do (def foobar [2 3]) (defined? foobar))"));
 		assertTrue(evalB("(defined? count)"));
-		
+
 		// invalid names
 		assertCastError(step("(defined? :count)")); // not a Symbol
 		assertCastError(step("(defined? \"count\")")); // not a Symbol
 		assertCastError(step("(defined? nil)"));
 		assertCastError(step("(defined? 1)"));
 		assertCastError(step("(defined? 0x)"));
-		
+
 		assertArityError(step("(defined?)"));
 		assertArityError(step("(defined? foo bar)"));
 	}
-	
+
 	@Test
 	public void testUndef() {
 		assertNull(eval("(undef count)"));
 		assertNull(eval("(undef foo)"));
 		assertNull(eval("(undef *balance*)"));
 		assertNull(eval("(undef foo/bar)"));
-		
+
 		assertEquals(Vectors.of(1L, 2L), eval("(do (def a 1) (def v [a 2]) (undef a) v)"));
-		
+
 		assertFalse(evalB("(do (def a 1) (undef a) (defined? a))"));
-		
+
 		assertUndeclaredError(step("(do (def a 1) (undef a) a)"));
-		
+
 		assertArityError(step("(undef a b)"));
 		assertArityError(step("(undef)"));
 	}
-	
+
 
 	@Test
 	public void testDefn() {
 		assertTrue(evalB("(do (defn f [a] a) (fn? f))"));
 		assertEquals(Vectors.of(2L, 3L), eval("(do (defn f [a & more] more) (f 1 2 3))"));
-	
+
 		// multiple expressions in body
 		assertEquals(2L,evalL("(do (defn f [a] 1 2) (f 3))"));
 
 		// arity problems
 		assertArityError(step("(defn)"));
 		assertArityError(step("(defn f)"));
-		
+
 		// bad function construction
 		assertCompileError(step("(defn f b)"));
-		
+
 	}
-	
+
 	@Test
 	public void testDefnMulti() {
 		assertEquals(2L,evalL("(do (defn f ([a] 1 2)) (f 3))"));
 		assertEquals(2L,evalL("(do (defn f ([] 4) ([a] 1 2)) (f 3))"));
-		
+
 		assertArityError(step("(do (defn f ([] nil)) (f 3))"));
 	}
-	
+
 	@Test
 	public void testDefactor() {
 		Context<?> ctx=step("(let [agf (defactor multiply-actor [x] (defn calc [y] (* x y)) (export calc))] (def ma (deploy (agf 13))))");
-		
+
 		Address ma=(Address) ctx.getResult();
 		assertNotNull(ma);
-		
+
 		assertEquals(130L,evalL(ctx,"(call ma (calc 10))"));
 	}
-	
+
 	@Test
 	public void testDefExpander() {
 		Context<?> ctx=step("(defexpander expand-once [x e] (expand x (fn [x e] (syntax x))))");
-		
+
 		assertEquals(Syntax.of(42L),eval(ctx,"(expand 42 expand-once)"));
 	}
-	
+
 	@Test
 	public void testSetStar() {
 		assertEquals(13L,evalL("(set* 'a 13)"));
 		assertEquals(13L,evalL("(do (set* 'a 13) a)"));
-		
+
 		assertEquals(10L,evalL("(let [a 10] (let [] (set* 'a 13)) a)"));
-		
+
 		// set only valid in limited scope
 		assertUndeclaredError(step("(do (let [a 10] (set* 'a 20)) a)"));
-		
+
 		assertCastError(step("(set* :a 13)"));
 		assertCastError(step("(set* nil 13)"));
 		assertCastError(step("(set* ['a 'b] [1 2])")); // can't destructure
 
-		
+
 		assertArgumentError(step("(set* 'a/b 10)"));
 	}
-	
+
 	@Test
 	public void testSetBang() {
 		// set returns its value
 		assertEquals(13L,evalL("(set! a 13)"));
-		
+
 		// set! works without a binding expression
 		assertEquals(13L,evalL("(do (set! a 13) a)"));
-		
+
 		// set! works in a function body
 		assertEquals(35L,evalL("(let [a 13 f (fn [x] (set! a 25) (+ x a))] (f 10))"));
-		
+
 		// set! only works in the scope of the immediate surrounding binding expression
 		assertEquals(10L,evalL("(let [a 10] (let [] (set! a 13)) a)"));
-		
+
 		// set! binding does not escape current form, still undeclared in enclosing local context
 		assertUndeclaredError(step("(do (let [a 10] (set! a 20)) a)"));
-		
+
 		// set! fails if trying to set a qualified argument name
 		assertArgumentError(step("(set! a/b 10)"));
-		
+
 		// set! cannot alter value across actor call boundary
 		{
 			Context<?> ctx=step("(def act (deploy `(do (defn sneaky [] (set! a 666)) (export sneaky))))");
 			assertEquals(5L,evalL(ctx,"(let [a 5] (call act (sneaky)) a)"));
 		}
-		
+
 		// set! cannot alter value within query
 		assertEquals(5L,evalL("(let [a 5] (query (set! a 6)) a)"));
 
@@ -3091,57 +3107,57 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(eval)"));
 		assertArityError(step("(eval 1 2)"));
 	}
-	
+
 	@Test
 	public void testEvalAs() {
 		assertEquals("foo", evalS("(eval-as *address* (list 'str \\f \\o \\o))"));
-		
+
 		assertTrustError(step("(eval-as *registry* '1)"));
-		
+
 		assertCastError(step("(eval-as :foo 2)"));
 		assertArityError(step("(eval-as 1)")); // arity > cast
 		assertArityError(step("(eval-as 1 2 3)"));
 	}
-	
+
 	@Test
 	public void testEvalAsTrustedUser() {
 		Context<ACell> ctx=step("(set-controller "+Init.VILLAIN+")");
 		ctx=ctx.forkWithAddress(Init.VILLAIN);
 		ctx=step(ctx,"(def hero "+Init.HERO+")");
-		
+
 		assertEquals(3L, evalL(ctx,"(eval-as hero '(+ 1 2))"));
 		assertEquals(Init.HERO, eval(ctx,"(eval-as hero '*address*)"));
 		assertEquals(Init.VILLAIN, eval(ctx,"(eval-as hero '*caller*)"));
 		assertEquals(Keywords.FOO, eval(ctx,"(eval-as hero '(return :foo))"));
 		assertEquals(Keywords.FOO, eval(ctx,"(eval-as hero '(halt :foo))"));
 		assertEquals(Keywords.FOO, eval(ctx,"(eval-as hero '(rollback :foo))"));
-		
+
 		assertAssertError(step(ctx,"(eval-as hero '(assert false))"));
 	}
-	
+
 	@Test
 	public void testEvalAsUntrustedUser() {
 		Context<?> ctx=step("(set-controller nil)");
 		ctx=ctx.forkWithAddress(Init.VILLAIN);
 		ctx=step(ctx,"(def hero "+Init.HERO+")");
-		
+
 		assertTrustError(step(ctx,"(eval-as hero '(+ 1 2))"));
 		assertTrustError(step(ctx,"(eval-as (address hero) '(+ 1 2))"));
 	}
-	
+
 	@Test
 	public void testEvalAsWhitelistedUser() {
 		// create trust monitor that allows VILLAIN
 		Context<?> ctx=step("(deploy '(do (defn check-trusted? [s a o] (= s (address "+Init.VILLAIN+"))) (export check-trusted?)))");
 		Address monitor = (Address) ctx.getResult();
 		ctx=step(ctx,"(set-controller "+monitor+")");
-		
+
 		ctx=ctx.forkWithAddress(Init.VILLAIN);
 		ctx=step(ctx,"(def hero "+Init.HERO+")");
-		
+
 		assertEquals(3L, evalL(ctx,"(eval-as hero '(+ 1 2))"));
 	}
-	
+
 	@Test
 	public void testQuery() {
 		Context<AVector<ACell>> ctx=step("(query (def a 10) [*address* *origin* *caller* 10])");
@@ -3149,73 +3165,73 @@ public class CoreTest extends ACVMTest {
 
 		// shouldn't be possible to mutate surrounding environment in query
 		assertEquals(10L,evalL("(let [a 3] (+ (query (set! a 5) (+ a 2)) a) )"));
-		
+
 		// shouldn't be any def in the environment
 		assertSame(INITIAL,ctx.getState());
-		
+
 		// some juice should be consumed
 		assertTrue(INITIAL_CONTEXT.getJuice()>ctx.getJuice());
 	}
-	
+
 	@Test
 	public void testQueryError() {
 		Context<CVMLong> ctx=step("(query (fail :FOO))");
 		assertAssertError(ctx);
-		
+
 		// some juice should be consumed
 		assertTrue(INITIAL_CONTEXT.getJuice()>ctx.getJuice());
 	}
-	
+
 // TODO: probably needs Op level support?
 //	@Test
 //	public void testQueryAs() {
 //		Context<AVector<ACell>> ctx=step("(query-as "+Init.VILLAIN+" '(do (def a 10) [*address* *origin* *caller* 10]))");
 //		assertEquals(Vectors.of(Init.VILLAIN,Init.VILLAIN,null,10L), ctx.getResult());
-//		
+//
 //		// shouldn't be any def in the environment
 //		assertSame(INITIAL,ctx.getState());
 //		assertSame(INITIAL_CONTEXT.getLocalBindings(),ctx.getLocalBindings());
-//		
+//
 //		// some juice should be consumed
 //		assertTrue(INITIAL_CONTEXT.getJuice()>ctx.getJuice());
 //	}
-	
+
 	@Test
 	public void testEvalAsNotWhitelistedUser() {
 		// create trust monitor that allows HERO only
 		Context<?> ctx=step("(deploy '(do (defn check-trusted? [s a o] (= s (address "+Init.HERO+"))) (export check-trusted?)))");
 		Address monitor = (Address) ctx.getResult();
 		ctx=step(ctx,"(set-controller "+monitor+")");
-		
+
 		ctx=ctx.forkWithAddress(Init.VILLAIN);
 		ctx=step(ctx,"(def hero "+Init.HERO+")");
-		
+
 		assertTrustError(step(ctx,"(eval-as hero '(+ 1 2))"));
 	}
-	
+
 	@Test
 	public void testSetController() {
 		// set-controller returns new controller
 		assertEquals(Init.VILLAIN, eval("(set-controller "+Init.VILLAIN+")"));
 		assertEquals(Init.VILLAIN, eval("(set-controller (address "+Init.VILLAIN+"))"));
 		assertEquals(null, (Address)eval("(set-controller nil)"));
-		
+
 		assertNobodyError(step("(set-controller #666666)")); // non-existent account
-		
+
 		assertCastError(step("(set-controller :foo)"));
 		assertCastError(step("(set-controller (address nil))")); // Address cast fails
-		
-		assertArityError(step("(set-controller)")); 
+
+		assertArityError(step("(set-controller)"));
 		assertArityError(step("(set-controller 1 2)")); // arity > cast
 	}
-	
+
 	@Test
 	public void testScheduleFailures() {
 		assertArityError(step("(schedule)"));
 		assertArityError(step("(schedule 1)"));
 		assertArityError(step("(schedule 1 2 3)"));
 		assertArityError(step("(schedule :foo 2 3)")); // ARITY error before CAST
-		
+
 		assertCastError(step("(schedule :foo (def a 2))"));
 		assertCastError(step("(schedule nil (def a 2))"));
 	}
@@ -3244,59 +3260,59 @@ public class CoreTest extends ACVMTest {
 	public void testExpand() {
 		assertEquals(Strings.create("foo"), eval("(expand (name :foo) (fn [x e] x))"));
 		assertEquals(CVMLong.create(3), eval("(expand '[1 2 3] (fn [x e] (nth x 2)))"));
-		
+
 		assertNull(Syntax.unwrap(eval("(expand nil)")));
 
 		assertCastError(step("(expand 1 :foo)"));
 		assertCastError(step("(expand { 888 227 723 560} [75 561 258 833])"));
-		
-		
+
+
 		assertArityError(step("(expand)"));
 		assertArityError(step("(expand 1 (fn [x e] x) :blah :blah)"));
-		
+
 		// arity error calling expander function
 		assertArityError(step("(expand 1 (fn [x] x))"));
 
 		// arity error in expansion execution
 		assertArityError(step("(expand 1 (fn [x e] (count)))"));
 	}
-	
+
 	@Test
 	public void testExpandEdgeCases() {
 		// BAd functions
 		assertCastError(step("(expand 123 #0 :foo)"));
 		assertCastError(step("(expand 123 #0)"));
-		
+
 		// psuedo-function application, not valid for expand
 		assertCastError(step("(expand 'foo 'bar 'baz)"));
-		assertCastError(step("(expand {} :foo)")); 
+		assertCastError(step("(expand {} :foo)"));
 		assertCastError(step("(expand {:bar 1 :bax 2} :bar :baz)"));
 		assertCastError(step("(expand {:foo 1 :bax 2} :bar :baz)"));
 	}
-	
+
 	@Test
 	public void testExpandOnce()  {
 		// an expander that does nothing except wrap as syntax.
 		Context<?> c=step("(def identity-expand (fn [x e] x))");
 		assertEquals(Keywords.FOO,eval(c,"(identity-expand :foo nil)"));
-		
+
 		// function that expands once with initial-expander, then with identity
 		c=step(c,"(defn expand-once [x] (*initial-expander* x identity-expand))");
 		// Should expand the outermost macro only
 		assertEquals(read("(cond (if 1 2) 3 4)"),Syntax.unwrapAll(eval(c,"(expand-once '(if (if 1 2) 3 4))")));
-		
+
 		// Should be idempotent
 		assertEquals(eval(c,"(expand '(if (if 1 2) 3 4))"),eval(c,"(expand (expand-once '(if (if 1 2) 3 4)))"));
 	}
-	
-	
+
+
 	@Test
 	public void testMacro() {
 		Context<?> c=step("(defmacro foo [] :foo)");
 		assertEquals(Keywords.FOO,eval(c,"(foo)"));
 	}
-	
-	@Test 
+
+	@Test
 	public void testQuote() {
 		assertEquals(Vectors.of(1,2,3),eval("(quote [1 2 3])"));
 		assertEquals(Sets.of(42),eval("(quote #{42})")); // See Issue #109
@@ -3317,9 +3333,9 @@ public class CoreTest extends ACVMTest {
 		// Syntax with null / empty metadata should equal basic syntax
 		assertCVMEquals(eval("(syntax 10)"), eval("(syntax 10 nil)"));
 		assertCVMEquals(eval("(syntax 10)"), eval("(syntax 10 {})"));
-		
+
 		assertCastError(step("(syntax 2 3)"));
-		
+
 		assertArityError(step("(syntax)"));
 		assertArityError(step("(syntax 2 3 4)"));
 	}
@@ -3334,7 +3350,7 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(unsyntax)"));
 		assertArityError(step("(unsyntax 2 3)"));
 	}
-	
+
 	@Test
 	public void testMeta() {
 		assertEquals(Maps.empty(),eval("(meta (syntax nil))"));
@@ -3354,12 +3370,12 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(syntax?)"));
 		assertArityError(step("(syntax? 2 3)"));
 	}
-	
+
 	@Test
 	public void testInitialExpander() {
 		// bad continuation expanders
-		assertCastError(step("(*initial-expander* (list #0) #0)"));		
-	
+		assertCastError(step("(*initial-expander* (list #0) #0)"));
+
 		assertArityError(step("(*initial-expander* 1 2 3)"));
 		assertArityError(step("(*initial-expander* 1)"));
 	}
@@ -3381,7 +3397,7 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB(ctx, "(exports? caddr 'public)")); // OK
 		assertFalse(evalB(ctx, "(exports? caddr 'private)")); // Defined, but not exported
 		assertFalse(evalB(ctx, "(exports? caddr 'random-symbol)")); // Doesn't exist
-		
+
 		assertCastError(step(ctx, "(exports? caddr :public)")); // not a Symbol
 		assertCastError(step(ctx, "(exports? caddr :random-name)"));
 		assertCastError(step(ctx, "(exports? caddr :private)"));
@@ -3462,23 +3478,23 @@ public class CoreTest extends ACVMTest {
 		// arity error if fails before first falsey value
 		assertArityError(step("(and true (count) nil)"));
 	}
-	
-	
-	
+
+
+
 	@Test
 	public void testSpecialAddress() {
 		Address HERO = Init.HERO;
-		
+
 		// Hero should be address and origin in initial context
 		assertEquals(HERO, eval("*address*"));
 		assertEquals(HERO, eval("*origin*"));
 	}
-	
+
 	@Test
 	public void testSpecialAllowance() {
 		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE, evalL("*memory*"));
 	}
-	
+
 
 	@Test
 	public void testSpecialBalance() {
@@ -3487,61 +3503,61 @@ public class CoreTest extends ACVMTest {
 		Context<?> ctx = step("(long *balance*)");
 		Long bal=ctx.getAccountStatus(HERO).getBalance();
 		assertCVMEquals(bal, ctx.getResult());
-		
+
 		// throwing it all away....
 		assertEquals(0L, evalL("(do (transfer "+Init.VILLAIN+" *balance*) *balance*)"));
-		
+
 		// check balance as single expression
 		assertEquals(bal, evalL("*balance*"));
-		
+
 		// Specials are implemented by compiler with higher priority than Symbol lookup
 		// TODO: Reconsider this
 		assertEquals(eval(Symbols.STAR_BALANCE),eval("(let [*balance* nil] *balance*)"));
 		assertCVMEquals(ctx.getOffer(),eval("(do (def *offer* :foo) *offer*)"));
-		
+
 		// Alternative behaviour
 		//assertNull(eval("(let [*balance* nil] *balance*)"));
 		//assertEquals(Keywords.FOO,eval("(do (def *balance* :foo) *balance*)"));
 	}
-	
+
 	@Test
 	public void testSpecialCaller() {
 		Address HERO = Init.HERO;
 		assertNull(eval("*caller*"));
 		assertEquals(HERO, eval("(do (def c (deploy '(do (defn f [] *caller*) (export f)))) (call c (f)))"));
 	}
-	
+
 	@Test
 	public void testSpecialResult() {
 		// initial context result should be null
 		assertNull(eval("*result*"));
-		
+
 		// Result should get value of last completed expression
 		assertEquals(Keywords.FOO, eval("(do :foo *result*)"));
 		assertNull(eval("(do (do) *result*)"));
-		
+
 		// *result* should be cleared to nil in an Actor call.
 		assertNull(eval("(do (def c (deploy '(do (defn f [] *result*) (export f)))) (call c (f)))"));
 
 	}
-	
+
 	@Test
 	public void testSpecialState() {
 		assertSame(INITIAL, eval("*state*"));
 		assertSame(INITIAL.getAccounts(), eval("(:accounts *state*)"));
 	}
-	
+
 	@Test
 	public void testSpecialKey() {
 		assertEquals(Init.HERO_KP.getAccountKey(), eval("*key*"));
 	}
-	
+
 	@Test
 	public void testSpecialJuice() {
 		// TODO: semantics of returning juice before lookup complete is OK?
 		// seems sensible, represents "juice left at this position".
 		assertEquals(INITIAL_JUICE, evalL("*juice*"));
-		
+
 		// juice gets consumed before returning a value
 		assertEquals(INITIAL_JUICE-Juice.DO - Juice.CONSTANT, evalL("(do 1 *juice*)"));
 	}
@@ -3549,54 +3565,54 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testSpecialEdgeCases() {
-		
+
 		// TODO: consider this
 		//assertEquals(Init.HERO,eval(Init.CORE_ADDRESS+"/*balance*"));
-		
+
 		// TODO: consider this
 		// Lookup in core environment of special returns the Symbol
 		assertEquals(Symbols.STAR_JUICE,eval("(lookup '*juice*)"));
-		
+
 		assertEquals(Symbols.STAR_JUICE,eval(Lookup.create(Symbols.STAR_JUICE)));
 	}
-	
+
 	@Test public void testSpecialHoldings() {
 		assertSame(BlobMaps.empty(),eval("*holdings*"));
-		
+
 		// Test set-holding modifies *holdings* as expected
 		Address HERO = Init.HERO;
 		assertNull(eval("(get-holding *address*)"));
 		assertEquals(BlobMaps.of(HERO,1L),eval("(do (set-holding *address* 1) *holdings*)"));
-		
+
 		assertNull(eval("(*holdings* { :PuSg 650989 })"));
 		assertEquals(Keywords.FOO,eval("(*holdings* { :PuSg 650989 } :foo )"));
 	}
-	
+
 	@Test public void testHoldings() {
 		Address VILLAIN = Init.VILLAIN;
 		Address HERO = Init.HERO;
 		Context<?> ctx = step("(def VILLAIN (address \""+VILLAIN.toHexString()+"\"))");
 		assertTrue(eval(ctx,"VILLAIN") instanceof Address);
 		ctx=step(ctx,"(def NOONE (address 7777777))");
-		
+
 		// Basic empty holding should match empty blobmap in account record. See #131
 		assertTrue(evalB("(= *holdings* (:holdings (account *address*)) (blob-map))"));
-		
+
 		// initial holding behaviour
 		assertNull(eval(ctx,"(get-holding VILLAIN)"));
 		assertCastError(step(ctx,"(get-holding :foo)"));
 		assertCastError(step(ctx,"(get-holding nil)"));
 		assertNobodyError(step(ctx,"(get-holding NOONE)"));
-		
+
 		// OK to set holding for a real owner account
 	    assertEquals(100L,evalL(ctx,"(set-holding VILLAIN 100)"));
-	    
+
 		// error to set holding for a non-existent owner account
 		assertNobodyError(step(ctx,"(set-holding NOONE 200)"));
 
 		// trying to set holding for the wrong type
 		assertCastError(step(ctx,"(set-holding :foo 300)"));
-		
+
 		{ // test simple assign
 			Context<?> c2 = step(ctx,"(set-holding VILLAIN 123)");
 			assertEquals(123L,evalL(c2,"(get-holding VILLAIN)"));
@@ -3604,7 +3620,7 @@ public class CoreTest extends ACVMTest {
 			assertTrue(c2.getAccountStatus(VILLAIN).getHoldings().containsKey(HERO));
 			assertCVMEquals(123L,c2.getAccountStatus(VILLAIN).getHolding(HERO));
 		}
-		
+
 		{ // test null assign
 			Context<?> c2 = step(ctx,"(set-holding VILLAIN nil)");
 			assertFalse(c2.getAccountStatus(VILLAIN).getHoldings().containsKey(HERO));

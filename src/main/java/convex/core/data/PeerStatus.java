@@ -9,7 +9,7 @@ import convex.core.lang.impl.RecordFormat;
 
 /**
  * Class describing the on-chain state of a Peer declared on the network.
- * 
+ *
  * State includes: - Stake placed by this Peer - A host address for peer
  * connections / client requests
  *
@@ -19,19 +19,19 @@ public class PeerStatus extends ARecord {
 			Keywords.URL};
 
 	private static final RecordFormat FORMAT = RecordFormat.of(PEER_KEYS);
-	
+
 	private final long stake;
 	private final long delegatedStake;
 
 	private final ABlobMap<Address, CVMLong> stakes;
 
-	private final AString hostAddress;
+	private final AString hostname;
 
 	private PeerStatus(long stake, ABlobMap<Address, CVMLong> stakes, long delegatedStake, AString host) {
 		super(FORMAT);
 		this.stake = stake;
 		this.delegatedStake = delegatedStake;
-		this.hostAddress = host;
+		this.hostname = host;
 		this.stakes = stakes;
 	}
 
@@ -44,7 +44,7 @@ public class PeerStatus extends ARecord {
 	}
 	/**
 	 * Gets the stake of this peer
-	 * 
+	 *
 	 * @return Total stake, including own stake + delegated stake
 	 */
 	public long getTotalStake() {
@@ -53,7 +53,7 @@ public class PeerStatus extends ARecord {
 
 	/**
 	 * Gets the self-owned stake of this peer
-	 * 
+	 *
 	 * @return Own stake, excluding delegated stake
 	 */
 	public long getOwnStake() {
@@ -62,7 +62,7 @@ public class PeerStatus extends ARecord {
 
 	/**
 	 * Gets the delegated stake of this peer
-	 * 
+	 *
 	 * @return Total of delegated stake
 	 */
 	public long getDelegatedStake() {
@@ -71,12 +71,12 @@ public class PeerStatus extends ARecord {
 
 	/**
 	 * Gets the String representation of the host address, or null if not specified
-	 * 
+	 *
 	 * @return Host String
 	 */
-	public AString getHostString() {
-		if (hostAddress == null) return null;
-		return hostAddress;
+	public AString getHostname() {
+		if (hostname == null) return null;
+		return hostname;
 	}
 
 	@Override
@@ -90,7 +90,7 @@ public class PeerStatus extends ARecord {
 		pos = Format.writeVLCLong(bs,pos, stake);
 		pos = Format.write(bs,pos, stakes);
 		pos = Format.writeVLCLong(bs,pos, delegatedStake);
-		pos = Format.write(bs,pos, getHostString());
+		pos = Format.write(bs,pos, getHostname());
 		return pos;
 	}
 
@@ -98,9 +98,9 @@ public class PeerStatus extends ARecord {
 		long stake = Format.readVLCLong(data);
 		ABlobMap<Address, CVMLong> stakes = Format.read(data);
 		long delegatedStake = Format.readVLCLong(data);
-		
+
 		AString hostString = Format.read(data);
-		
+
 		return new PeerStatus(stake,stakes,delegatedStake,hostString);
 	}
 
@@ -113,14 +113,14 @@ public class PeerStatus extends ARecord {
 	public boolean isCanonical() {
 		return true;
 	}
-	
+
 
 
 	/**
 	 * Gets the delegated stake on this peer for the given delegator.
-	 * 
+	 *
 	 * Returns 0 if the delegator has no stake.
-	 * 
+	 *
 	 * @param delegator Address of delegator
 	 * @return Value of delegated stake
 	 */
@@ -132,9 +132,9 @@ public class PeerStatus extends ARecord {
 
 	/**
 	 * Sets the delegated stake on this peer for the given delegator.
-	 * 
+	 *
 	 * A value of 0 will remove the delegator's stake entirely
-	 * 
+	 *
 	 * @param delegator Address of delegator
 	 * @return Value of delegated stake
 	 */
@@ -147,8 +147,12 @@ public class PeerStatus extends ARecord {
 
 		ABlobMap<Address, CVMLong> newStakes = (newStake == 0L) ? stakes.dissoc(delegator)
 				: stakes.assoc(delegator, CVMLong.create(newStake));
-		return new PeerStatus(stake, newStakes, newDelegatedStake, hostAddress);
+		return new PeerStatus(stake, newStakes, newDelegatedStake, hostname);
 	}
+
+	public PeerStatus withHostname(AString hostname) {
+		return new PeerStatus(stake, stakes, delegatedStake, hostname);
+    }
 
 	@Override
 	public void validateCell() throws InvalidDataException {
@@ -165,8 +169,8 @@ public class PeerStatus extends ARecord {
 		if (Keywords.STAKE.equals(key)) return CVMLong.create(stake);
 		if (Keywords.STAKES.equals(key)) return stakes;
 		if (Keywords.DELEGATED_STAKE.equals(key)) return CVMLong.create(delegatedStake);
-		if (Keywords.URL.equals(key)) return hostAddress;
-		
+		if (Keywords.URL.equals(key)) return hostname;
+
 		return null;
 	}
 
@@ -181,13 +185,13 @@ public class PeerStatus extends ARecord {
 		long newStake = ((CVMLong) newVals[0]).longValue();
 		ABlobMap<Address, CVMLong> newStakes = (ABlobMap<Address, CVMLong>) newVals[1];
 		long newDelStake = ((CVMLong) newVals[2]).longValue();
-		AString newHostAddress = (AString) newVals[3];
-		
+		AString newHostname = (AString) newVals[3];
+
 		if ((this.stake==newStake)&&(this.stakes==newStakes)
-				&&(this.hostAddress==newHostAddress)&&(this.delegatedStake==newDelStake)) {
+				&&(this.hostname==newHostname)&&(this.delegatedStake==newDelStake)) {
 			return this;
 		}
-		return new PeerStatus(newStake, newStakes, newDelStake, newHostAddress);
+		return new PeerStatus(newStake, newStakes, newDelStake, newHostname);
 	}
 
 	protected static long computeDelegatedStake(ABlobMap<Address, CVMLong> stakes) {

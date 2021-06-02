@@ -38,24 +38,24 @@ import convex.core.util.Utils;
 
 /**
  * <p>Class representing a Connection between network participants.</p>
- * 
+ *
  * <p>Sent messages are sent asynchronously via the shared client selector.</p>
- * 
- * <p>Received messages are read by the shared client selector, converted into Message instances, 
+ *
+ * <p>Received messages are read by the shared client selector, converted into Message instances,
  * and passed to a Consumer for handling.</p>
- * 
+ *
  * <p>A Connection "owns" the ByteChannel associated with this Peer connection</p>
  */
 @SuppressWarnings("unused")
 public class Connection {
 
 	final ByteChannel channel;
-	
+
 	/**
 	 * Counter for IDs of messages sent from this JVM
 	 */
 	private static long idCounter = 0;
-	
+
 	/**
 	 * Store to use for this connection. Required for responding to incoming messages.
 	 */
@@ -67,7 +67,9 @@ public class Connection {
 	// Log level for send events
 	private static final Level LEVEL_SEND = Level.FINER;
 
-	
+	// log lever for client events
+	private static final Level LEVEL_CLIENT = Level.FINER;
+
 	/**
 	 * Pre-allocated direct buffer for message sending TODO: is one per connection
 	 * OK? Users should synchronise on this briefly while building message.
@@ -85,9 +87,9 @@ public class Connection {
 	}
 
 	/**
-	 * Create a PeerConnection using an existing channel. Does not perform any connection 
+	 * Create a PeerConnection using an existing channel. Does not perform any connection
 	 * initialisation: channel should already be connected.
-	 * 
+	 *
 	 * @param channel
 	 * @param receiveAction Consumer to be called when a Message is received
 	 * @param store Store to use when receiving messages.
@@ -97,10 +99,10 @@ public class Connection {
 	public static Connection create(ByteChannel channel, Consumer<Message> receiveAction, AStore store) throws IOException {
 		return new Connection(channel, receiveAction, store);
 	}
-	
+
 	/**
 	 * Create a PeerConnection by connecting to a remote address
-	 * 
+	 *
 	 * @param receiveAction A callback Consumer to be called for any received messages on this connection
 	 * @return New Connection instance
 	 * @throws IOException If connection fails because of any IO problem
@@ -134,7 +136,7 @@ public class Connection {
 	/**
 	 * Returns the remote SocketAddress associated with this connection, or null if
 	 * not available
-	 * 
+	 *
 	 * @return An InetSocketAddress if associated, otherwise null
 	 * @throws IOException
 	 */
@@ -151,7 +153,7 @@ public class Connection {
 	/**
 	 * Returns the local SocketAddress associated with this connection, or null if
 	 * not available
-	 * 
+	 *
 	 * @return A SocketAddress if associated, otherwise null
 	 * @throws IOException
 	 */
@@ -168,7 +170,7 @@ public class Connection {
 
 	/**
 	 * Sends a DATA Message on this connection.
-	 * 
+	 *
 	 * @param value Any data object, which will be encoded and sent as a single cell
 	 * @return true if buffered successfully, false otherwise (not sent)
 	 * @throws IOException
@@ -181,7 +183,7 @@ public class Connection {
 
 	/**
 	 * Sends a DATA Message on this connection.
-	 * 
+	 *
 	 * @param value Any data object
 	 * @return true if buffered successfully, false otherwise (not sent)
 	 * @throws IOException
@@ -193,7 +195,7 @@ public class Connection {
 
 	/**
 	 * Sends a QUERY Message on this connection with a null Address
-	 * 
+	 *
 	 * @param form A data object representing the query form
 	 * @return The ID of the message sent, or -1 if send buffer is full.
 	 * @throws IOException
@@ -204,7 +206,7 @@ public class Connection {
 
 	/**
 	 * Sends a QUERY Message on this connection.
-	 * 
+	 *
 	 * @param form    A data object representing the query form
 	 * @param address The address with which to run the query, which may be null
 	 * @return The ID of the message sent, or -1 if send buffer is full.
@@ -222,10 +224,10 @@ public class Connection {
 		}
 
 	}
-	
+
 	/**
 	 * Sends a STATUS Request Message on this connection.
-	 * 
+	 *
 	 * @return The ID of the message sent, or -1 if send buffer is full.
 	 * @throws IOException
 	 */
@@ -244,13 +246,13 @@ public class Connection {
 
 	/**
 	 * Sends a transaction if possible, returning the message ID (greater than zero)
-	 * if successful. 
-	 * 
+	 * if successful.
+	 *
 	 * Uses the configured CLIENT_STORE to store the transaction, so that any missing data requests from the server
 	 * can be honoured.
-	 * 
+	 *
 	 * Returns -1 if the message could not be sent because of a full buffer.
-	 * 
+	 *
 	 * @param signed
 	 * @return Message ID of the transaction request, or -1 if send buffer is full.
 	 * @throws IOException In the event of an IO error, e.g. closed connection
@@ -270,7 +272,7 @@ public class Connection {
 
 	/**
 	 * Sends a RESULT Message on this connection with no error code (i.e. a success)
-	 * 
+	 *
 	 * @param value Any data object
 	 * @return True if buffered for sending successfully, false otherwise
 	 * @throws IOException
@@ -281,7 +283,7 @@ public class Connection {
 
 	/**
 	 * Sends a RESULT Message on this connection.
-	 * 
+	 *
 	 * @param result Any data object
 	 * @param errorCode Error code for this result. May be null to indicate success
 	 * @return True if buffered for sending successfully, false otherwise
@@ -291,10 +293,10 @@ public class Connection {
 		Result result = Result.create(id, value, errorCode);
 		return sendObject(MessageType.RESULT, result);
 	}
-	
+
 	/**
 	 * Sends a RESULT Message on this connection.
-	 * 
+	 *
 	 * @param result Result data structure
 	 * @throws IOException
 	 */
@@ -310,7 +312,7 @@ public class Connection {
 		// TODO: halt conditions to prevent sending the whole universe
 		ACell o = r.getValue();
 		if (o==null) return r;
-		
+
 		// send children first
 		o.updateRefs(sender());
 
@@ -328,7 +330,7 @@ public class Connection {
 
 	/**
 	 * Sends a message over this connection
-	 * 
+	 *
 	 * @return true if message buffered successfully, false if failed
 	 */
 	public boolean sendMessage(Message msg) throws IOException {
@@ -336,9 +338,9 @@ public class Connection {
 	}
 
 	/**
-	 * Sends a payload for the given message type. Should be called on the thread that 
+	 * Sends a payload for the given message type. Should be called on the thread that
 	 * responds to missing data messages from the destination.
-	 * 
+	 *
 	 * @param type Type of message
 	 * @param payload Payload value for message
 	 * @return
@@ -358,7 +360,7 @@ public class Connection {
 				throw Utils.sneakyThrow(e);
 			}
 		});
-		
+
 		ByteBuffer buf = Format.encodedBuffer(sendVal);
 		log.log(LEVEL_SEND, () -> "Sending message: " + type + " :: " + payload + " to " + getRemoteAddress() + " format: "
 				+ Format.encodedBlob(payload).toHexString());
@@ -368,7 +370,7 @@ public class Connection {
 
 	/**
 	 * Sends a message with the given message type and data buffer.
-	 * 
+	 *
 	 * @param type MessageType value
 	 * @param buf  Buffer containing raw wire data for the message
 	 * @return true if message sent, false otherwise
@@ -434,7 +436,7 @@ public class Connection {
 
 	/**
 	 * Checks if this connection is closed (i.e. the underlying channel is closed)
-	 * 
+	 *
 	 * @return true if the channel is closed, false otherwise.
 	 */
 	public boolean isClosed() {
@@ -444,7 +446,7 @@ public class Connection {
 	/**
 	 * Starts listening for received events with this given peer connection.
 	 * PeerConnection must have a selectable SocketChannel associated
-	 * 
+	 *
 	 * @param peer
 	 */
 	public void startClientListening() throws IOException {
@@ -491,8 +493,8 @@ public class Connection {
 	private static Runnable selectorLoop = new Runnable() {
 		@Override
 		public void run() {
-			
-			log.info("Client selector loop started");
+
+			log.log(LEVEL_CLIENT, "Client selector loop started");
 			while (true) {
 				try {
 					selector.select(1000);
@@ -518,7 +520,7 @@ public class Connection {
 							log.log(LEVEL_SEND, "Unexpected ChannelClosedException, cancelling key: " + e.getMessage());
 							key.cancel();
 						} catch (IOException e) {
-							log.warning("Unexpected IOException, cancelling key: " + e.getMessage());
+							log.log(LEVEL_SEND, "Unexpected IOException, cancelling key: " + e.getMessage());
 							e.printStackTrace();
 							key.cancel();
 						}
@@ -533,35 +535,35 @@ public class Connection {
 
 	/**
 	 * Handles channel reads from a SelectionKey for the client listener
-	 * 
+	 *
 	 * SECURITY: Called on Connection Selector Thread
-	 * 
+	 *
 	 * @param key
 	 * @throws IOException
 	 */
 	protected static void selectRead(SelectionKey key) throws IOException {
 		Connection conn = (Connection) key.attachment();
 		if (conn == null) throw new Error("No PeerConnection specified");
-		
+
 		try {
 			int n = conn.handleChannelRecieve();
 			// log.finest("Received bytes: " + n);
 		} catch (ClosedChannelException e) {
-			log.info("Channel closed from: " + conn.getRemoteAddress());
+			log.log(LEVEL_CLIENT, "Channel closed from: " + conn.getRemoteAddress());
 			key.cancel();
 		} catch (BadFormatException e) {
 			log.log(NIOServer.LEVEL_BAD_CONNECTION,"Cancelled connection to Peer: Bad data format from: " + conn.getRemoteAddress() + " " + e.getMessage());
 			key.cancel();
-		} 
+		}
 	}
 
 	/**
 	 * Handles receipt of bytes from the channel on this Connection.
-	 * 
+	 *
 	 * Will switch the current store to the Connection-specific store if required.
-	 * 
+	 *
 	 * SECURITY: Called on NIO Thread (Server or client Connection)
-	 * 
+	 *
 	 * @return The number of bytes read from channel
 	 * @throws IOException
 	 * @throws BadFormatException
@@ -579,9 +581,9 @@ public class Connection {
 
 	/**
 	 * Handles writes to the channel.
-	 * 
+	 *
 	 * SECURITY: Called on Connection Selector Thread
-	 * 
+	 *
 	 * @param key
 	 */
 	public static void selectWrite(SelectionKey key) {

@@ -11,6 +11,7 @@ import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.data.AString;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -32,20 +33,20 @@ import convex.core.util.Utils;
  * <p>
  * Immutable class representing the encapsulated state of a Peer
  * </p>
- * 
+ *
  * SECURITY:
  * <ul>
  * <li>Needs to contain the Peer's unlocked private key for online signing.</li>
  * <li>Manages Peer state transitions given external events. Must do so
  * correctly.</li>
  * </ul>
- * 
+ *
  * <p>
  * Must have at least one state, the initial state. New states will be added as
  * consensus updates happen.
  * </p>
- * 
- * 
+ *
+ *
  * "Don't worry about what anybody else is going to do. The best way to predict
  * the future is to invent it." - Alan Kay
  */
@@ -97,7 +98,7 @@ public class Peer {
 			throw new Error("Bad signature restoring Peer",bse);
 		}
 	}
-	
+
 	public AMap<Keyword, ACell> toData() {
 		return Maps.of(
 			Keywords.BELIEF,belief,
@@ -110,20 +111,20 @@ public class Peer {
 		Belief belief = Belief.createSingleOrder(peerKP);
 		SignedData<Belief> sb = peerKP.signData(belief);
 		AVector<State> states=Vectors.of(initialState);
-		
+
 		// Ensure initial belief and states are persisted in current store
 		ACell.createPersisted(sb);
 		ACell.createPersisted(states);
-		
+
 		// Check belief persistence
 		Ref<SignedData<Belief>> sbr=Ref.forHash(sb.getHash());
 		if (sbr==null) {
 			throw new Error("Belief not correctly persisted! "+sb.getHash());
 		}
-		
+
 		return new Peer(peerKP, sb, states, Vectors.empty(), initialState.getTimeStamp().longValue());
 	}
-	
+
 	/**
 	 * Restores a Peer from the Etch database specified in Config
 	 * @param config
@@ -138,7 +139,7 @@ public class Peer {
 			if (ref==null) return null; // not found case
 			@SuppressWarnings("unchecked")
 			AMap<Keyword,ACell> peerData=(AMap<Keyword, ACell>) ref.getValue();
-			
+
 			Peer peer=Peer.fromData(keyPair,peerData);
 			return peer;
 		} finally {
@@ -149,7 +150,7 @@ public class Peer {
 	/**
 	 * Creates a new Peer instance at server startup using the provided
 	 * configuration. Current store must be set to store for server.
-	 * 
+	 *
 	 * @param config
 	 * @return A new Peer instance
 	 */
@@ -168,7 +169,7 @@ public class Peer {
 
 	/**
 	 * Updates the timestamp to the specified time, going forwards only
-	 * 
+	 *
 	 * @param newTimestamp
 	 * @return This peer upated with the given timestamp
 	 */
@@ -178,8 +179,8 @@ public class Peer {
 	}
 
 	/**
-	 * Compiles and executes a query on the current consensus state of this Peer. 
-	 * 
+	 * Compiles and executes a query on the current consensus state of this Peer.
+	 *
 	 * @param <T> Type of result
 	 * @param form Form to compile and execute.
 	 * @param address Address to use for query execution
@@ -188,13 +189,13 @@ public class Peer {
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> Context<T> executeQuery(ACell form, Address address) {
 		State state=getConsensusState();
-		
+
 		if (address==null) {
 			return  Context.createFake(state).withError(ErrorCodes.NOBODY,"Null Address provided for query");
 		}
-		
+
 		Context<?> ctx= Context.createFake(state, address);
-		
+
 		if (state.getAccount(address)==null) {
 			return ctx.withError(ErrorCodes.NOBODY,"Account does not exist for query: "+address);
 		}
@@ -203,17 +204,17 @@ public class Peer {
 		if (ectx.isExceptional()) {
 			return (Context<T>) ectx;
 		}
-		
+
 		AOp<T> op = ectx.getResult();
 		Context<T> rctx = ctx.execute(op);
 		return rctx;
 	}
-	
+
 	/**
 	 * Estimates the coin cost of a executing a given transaction by performing a "dry run".
-	 * 
+	 *
 	 * This will be exact if no intermediate transactions affect the state, and if no time-dependent functionality is used.
-	 * 
+	 *
 	 * @param address Address for which to execute the transaction
 	 * @param trans Transaction to test
 	 * @return
@@ -224,10 +225,10 @@ public class Peer {
 		Context<?> ctx=executeDryRun(trans);
 		return state.getBalance(address)-ctx.getState().getBalance(address);
 	}
-	
-	/** 
+
+	/**
 	 * Executes a query on the current consensus state of this Peer.
-	 * 
+	 *
 	 * @param <T>
 	 * @param origin Address with which to execute the transaction
 	 * @param transaction Transaction to execute
@@ -237,9 +238,9 @@ public class Peer {
 		Context<T> ctx=getConsensusState().applyTransaction(transaction);
 		return ctx;
 	}
-	
+
 	/**
-	 * Executes a query in this 
+	 * Executes a query in this
 	 * @param <T>
 	 * @param form
 	 * @return
@@ -253,7 +254,7 @@ public class Peer {
 	}
 
 	/**
-	 * Gets the Peer Key of this Peer. 
+	 * Gets the Peer Key of this Peer.
 	 * @return Address of Peer.
 	 */
 	public AccountKey getPeerKey() {
@@ -278,7 +279,7 @@ public class Peer {
 
 	/**
 	 * Gets the current consensus state for this chain
-	 * 
+	 *
 	 * @return Consensus state for this chain (initial state if no block consensus)
 	 */
 	public State getConsensusState() {
@@ -288,11 +289,11 @@ public class Peer {
 	/**
 	 * Merges a set of new Beliefs into this Peer's belief. Beliefs may be null, in
 	 * which case they are ignored.
-	 * 
+	 *
 	 * @param beliefs An array of Beliefs. May contain nulls, which will be ignored.
 	 * @throws InvalidDataException
 	 * @throws BadSignatureException
-	 * 
+	 *
 	 */
 	public Peer mergeBeliefs(Belief... beliefs) throws BadSignatureException, InvalidDataException {
 		Belief belief = getBelief();
@@ -304,7 +305,7 @@ public class Peer {
 
 	/**
 	 * Update this belief with a new Belief
-	 * 
+	 *
 	 * @param newBelief
 	 * @return
 	 * @throws BadSignatureException
@@ -332,25 +333,25 @@ public class Peer {
 		SignedData<Belief> sb = keyPair.signData(newBelief);
 		return new Peer(keyPair, sb, newStates, newResults, timestamp);
 	}
-	
+
 	/**
 	 * Persist the state of the Peer to the current store
-	 * @param noveltyHandler 
+	 * @param noveltyHandler
 	 * @return Updates Peer
 	 */
 	public Peer persistState(Consumer<Ref<ACell>> noveltyHandler) {
 		// Peer Belief must be announced using novelty handler
 		SignedData<Belief> sb=this.belief;
 		sb=ACell.createAnnounced(sb, noveltyHandler).getValue();
-		
+
 		// Persist states
 		AVector<State> newStates = this.states;
 		newStates=ACell.createPersisted(newStates).getValue();
-		
+
 		// Persist results
 		AVector<BlockResult> newResults = this.blockResults;
 		newResults=ACell.createPersisted(newResults).getValue();
-		
+
 		return new Peer(this.keyPair, sb, newStates, newResults, this.timestamp);
 	}
 
@@ -366,7 +367,7 @@ public class Peer {
 	public Object getResult(long blockIndex, long txIndex) {
 		return blockResults.get(blockIndex).getResult(txIndex);
 	}
-	
+
 	/**
 	 * Gets the BlockResult of a specific block index
 	 * @param i
@@ -379,7 +380,7 @@ public class Peer {
 	/**
 	 * Propose a new Block. Adds the block to the current proposed chain for this
 	 * Peer.
-	 * 
+	 *
 	 * @throws BadSignatureException
 	 */
 	public Peer proposeBlock(Block block) throws BadSignatureException {
@@ -403,9 +404,9 @@ public class Peer {
 
 	/**
 	 * Gets the current Order for this Peer
-	 * 
+	 *
 	 * @return The Order for this peer in its current Belief. Will return null if the Peer is not a peer in the current consensus state
-	 * 
+	 *
 	 * @throws BadSignatureException
 	 */
 	public Order getPeerOrder() {
@@ -418,7 +419,7 @@ public class Peer {
 
 	/**
 	 * Gets the current chain this Peer sees for a given peer address
-	 * 
+	 *
 	 * @return The current Order for the specified peer
 	 * @throws BadSignatureException
 	 */
@@ -449,5 +450,4 @@ public class Peer {
 	public AVector<State> asOfRange(CVMLong timestamp, long interval, int count) {
 		return Utils.statesAsOfRange(states, timestamp, interval, count);
 	}
-
 }

@@ -35,6 +35,7 @@ import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Set;
 import convex.core.data.Sets;
+import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
@@ -65,7 +66,7 @@ import convex.core.util.Utils;
  * <li>Data structures</li>
  * <li>Interaction with on-chain state and execution context</li>
  * </ul>
- * 
+ *
  * In general, core functions defined in this class are thin Java wrappers over
  * functions available in the CVM implementation, but also need to account for:
  * <ul>
@@ -73,27 +74,27 @@ import convex.core.util.Utils;
  * <li>Exceptional case handling</li>
  * <li>Appropriate juice costs</li>
  * </ul>
- * 
+ *
  * Where possible, we implement core functions in Convex Lisp itself, see
  * resources/lang/core.con
- * 
+ *
  * "Java is the most distressing thing to hit computing since MS-DOS." - Alan
  * Kay
  */
 @SuppressWarnings("rawtypes")
 public class Core {
-	
+
 	/**
 	 * Default initial environment importing core namespace
 	 */
 	public static final AHashMap<Symbol, ACell> ENVIRONMENT;
-	
+
 	/**
 	 * Default initial core metadata
 	 */
 	public static final AHashMap<Symbol, AHashMap<ACell,ACell>> METADATA;
 
-	
+
 	/**
 	 * Symbol for core namespace
 	 */
@@ -112,10 +113,10 @@ public class Core {
 			// Need to charge juice on per-element basis
 			long juice = Juice.BUILD_DATA + args.length * Juice.BUILD_PER_ELEMENT;
 
-			// Check juice before building a big vector. 
+			// Check juice before building a big vector.
 			// OK to fail early since will fail with JUICE anyway if vector is too big.
 			if (!context.checkJuice(juice)) return context.withJuiceError();
-			
+
 			// Build and return requested vector
 			AVector<ACell> result = Vectors.create(args);
 			return context.withResult(juice, result);
@@ -128,7 +129,7 @@ public class Core {
 		public Context<ASequence<ACell>> invoke(Context context, ACell[] args) {
 			ASequence<?> result = null;
 			int n=args.length;
-			
+
 			// initial juice is a load of null
 			long juice = Juice.CONSTANT;
 			for (int ix=0; ix<n; ix++) {
@@ -136,7 +137,7 @@ public class Core {
 				if (a == null) continue;
 				ASequence<?> seq = RT.sequence(a);
 				if (seq == null) return context.withCastError(ix,args, Types.SEQUENCE);
-				
+
 				// check juice per element of concatenated sequences
 				juice += Juice.BUILD_DATA+ seq.count() * Juice.BUILD_PER_ELEMENT;
 				if (!context.checkJuice(juice)) return context.withJuiceError();
@@ -153,19 +154,19 @@ public class Core {
 			// Arity 1 exactly
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			ACell o = args[0];
-			
+
 			// Need to compute juice before building potentially big vector
 			Long n = RT.count(o);
 			if (n == null) return context.withCastError(0,args, Types.VECTOR);
-			
+
 			long juice = Juice.BUILD_DATA + n * Juice.BUILD_PER_ELEMENT;
 			if (!context.checkJuice(juice)) return context.withJuiceError();
-			
+
 			AVector<?> result = RT.castVector(o);
 			return context.withResult(juice, result);
 		}
 	});
-	
+
 	public static final CoreFn<AVector<ACell>> REVERSE = reg(new CoreFn<>(Symbols.REVERSE) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -173,13 +174,13 @@ public class Core {
 			// Arity 1 exactly
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			ACell o = args[0];
-			
+
 			// Need to compute juice before building potentially big vector
 			ASequence<ACell> seq = RT.ensureSequence(o);
 			if (seq == null) return context.withCastError(0,args, Types.SEQUENCE);
-			
+
 			long juice = Juice.BUILD_DATA;
-			
+
 			ASequence<ACell> result = seq.reverse();
 			return context.withResult(juice, result);
 		}
@@ -191,7 +192,7 @@ public class Core {
 		public Context<ASet<ACell>> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			ACell o = args[0];
-			
+
 			// Need to compute juice before building a potentially big set
 			Long n = RT.count(o);
 			if (n == null) return context.withCastError(0,args, Types.SEQUENCE);
@@ -204,33 +205,33 @@ public class Core {
 			return context.withResult(juice, result);
 		}
 	});
-	
+
 	public static final CoreFn<ASet<ACell>> UNION = reg(new CoreFn<>(Symbols.UNION) {
 		@SuppressWarnings("unchecked")
 		@Override
 		public Context<ASet<ACell>> invoke(Context context, ACell[] args) {
 			int n=args.length;
 			Set<ACell> result=Sets.empty();
-			
+
 			long juice=Juice.BUILD_DATA;
-			
+
 			for (int i=0; i<n; i++) {
 				ACell arg=args[i];
 				Set<ACell> set=RT.ensureSet(arg);
 				if (set==null) return context.withCastError(i,args, Types.SET);
-				
+
 				// check juice before expensive operation
 				long size=set.count();
 				juice = Juice.addMul(juice, size, Juice.BUILD_PER_ELEMENT);
 				if (!context.checkJuice(juice)) return context.withJuiceError();
-			
+
 				result=result.includeAll(set);
 			}
 
 			return context.withResult(juice, result);
 		}
 	});
-	
+
 	public static final CoreFn<ASet<ACell>> INTERSECTION = reg(new CoreFn<>(Symbols.INTERSECTION) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -241,25 +242,25 @@ public class Core {
 			ACell arg0=(ACell) args[0];
 			Set<ACell> result=(arg0==null)?Sets.empty():RT.ensureSet(arg0);
 			if (result==null) return context.withCastError(0,args, Types.SET);
-			
+
 			long juice=Juice.BUILD_DATA;
-			
+
 			for (int i=1; i<n; i++) {
 				ACell arg=(ACell) args[i];
 				Set<ACell> set=(arg==null)?Sets.empty():RT.ensureSet(args[i]);
 				if (set==null) return context.withCastError(i,args, Types.SET);
 				long size=set.count();
-				
+
 				juice = Juice.addMul(juice, size, Juice.BUILD_PER_ELEMENT);
 				if (!context.checkJuice(juice)) return context.withJuiceError();
-			
+
 				result=result.intersectAll(set);
 			}
 
 			return context.withResult(juice, result);
 		}
 	});
-	
+
 	public static final CoreFn<ASet<ACell>> DIFFERENCE = reg(new CoreFn<>(Symbols.DIFFERENCE) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -270,18 +271,18 @@ public class Core {
 			ACell arg0=args[0];
 			Set<ACell> result=(arg0==null)?Sets.empty():RT.ensureSet(arg0);
 			if (result==null) return context.withCastError(0,args, Types.SET);
-			
+
 			long juice=Juice.BUILD_DATA;
-			
+
 			for (int i=1; i<n; i++) {
 				ACell arg=args[i];
 				Set<ACell> set=RT.ensureSet(arg);
 				if (set==null) return context.withCastError(i,args, Types.SET);
 				long size=set.count();
-				
+
 				juice = Juice.addMul(juice, size, Juice.BUILD_PER_ELEMENT);
 				if (!context.checkJuice(juice)) return context.withJuiceError();
-			
+
 				result=result.excludeAll(set);
 			}
 
@@ -300,7 +301,7 @@ public class Core {
 			// Need to compute juice before building a potentially big list
 			long juice = Juice.BUILD_DATA + args.length * Juice.BUILD_PER_ELEMENT;
 			if (!context.checkJuice(juice)) return context.withJuiceError();
-			
+
 			AList<ACell> result = List.create(args);
 			return context.withResult(juice, result);
 		}
@@ -313,7 +314,7 @@ public class Core {
 			// TODO: pre-check juice? String rendering definitions?
 			AString result = RT.str(args);
 			if (result==null) return context.withCastError(Types.STRING);
-			
+
 			long juice = Juice.STR + result.length() * Juice.STR_PER_CHAR;
 			return context.withResult(juice, result);
 		}
@@ -345,12 +346,12 @@ public class Core {
 
 			ACell arg=args[0];
 			if (arg instanceof Keyword) return context.withResult(Juice.KEYWORD, arg);
-			
+
 			// Check argument is valid name
 			AString name = RT.name(arg);
 			if (name == null) return context.withCastError(0,args, Types.KEYWORD);
 
-			// Check name converts to Keyword 
+			// Check name converts to Keyword
 			Keyword result = Keyword.create(name);
 			if (result == null) return context.withArgumentError("Invalid Keyword name, must be between 1 and "+Constants.MAX_NAME_LENGTH+ " characters");
 
@@ -367,13 +368,13 @@ public class Core {
 
 			ACell path=null;
 			ACell maybeName=args[n-1];
-			
+
 			if (n == 2) {
 				// We have a path, need to check it is valid
 				path = args[0];
 				if (path!=null) {
 					path=Symbol.ensurePath(path);
-					if (path == null) return context.withArgumentError("Invalid Symbol path, must be an Address, nil or unqualified Symbol name"); 
+					if (path == null) return context.withArgumentError("Invalid Symbol path, must be an Address, nil or unqualified Symbol name");
 				}
 			} else {
 				// Fast path for existing Symbol
@@ -388,8 +389,8 @@ public class Core {
 			if (name == null) return context.withCastError(0, args, Types.SYMBOL);
 
 			Symbol sym = Symbol.create(path,name);
-			if (sym == null) return context.withArgumentError("Invalid Symbol name, must be between 1 and " + Constants.MAX_NAME_LENGTH + " characters"); 
-			
+			if (sym == null) return context.withArgumentError("Invalid Symbol name, must be between 1 and " + Constants.MAX_NAME_LENGTH + " characters");
+
 			long juice = Juice.SYMBOL;
 			return context.withResult(juice, sym);
 		}
@@ -421,7 +422,7 @@ public class Core {
 		}
 
 	});
-	
+
 	public static final CoreFn<ACell> EVAL_AS = reg(new CoreFn<>(Symbols.EVAL_AS) {
 
 		@SuppressWarnings("unchecked")
@@ -431,7 +432,7 @@ public class Core {
 
 			Address address = RT.ensureAddress(args[0]);
 			if (address==null) return context.withCastError(0,args, Types.ADDRESS);
-			
+
 			ACell form = (ACell) args[1];
 			Context<ACell> rctx = context.evalAs(address,form);
 			return rctx.consumeJuice(Juice.EVAL);
@@ -481,7 +482,7 @@ public class Core {
 			return context.withResult(juice, result);
 		}
 	});
-	
+
 	public static final CoreFn<ACell> UNSYNTAX = reg(new CoreFn<>(Symbols.UNSYNTAX) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -497,7 +498,7 @@ public class Core {
 			return context.withResult(juice, result);
 		}
 	});
-	
+
 	public static final CoreFn<AHashMap<ACell,ACell>> META = reg(new CoreFn<>(Symbols.META) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -548,7 +549,7 @@ public class Core {
 				expander=RT.ensureFunction(exArg);
 				if (expander==null) return context.withCastError(1,args, Types.FUNCTION);
 			}
-			
+
 			AFn<ACell> cont=expander; // use passed expander by default
 			if (n >= 3) {
 				// use provided continuation expander
@@ -556,7 +557,7 @@ public class Core {
 				cont=RT.ensureFunction(contArg);
 				if (cont==null) return context.withCastError(2,args, Types.FUNCTION);
 			}
-			
+
 			ACell form = args[0];
 			Context<ACell> rctx = context.expand(expander,form, cont);
 			return rctx;
@@ -564,7 +565,7 @@ public class Core {
 	});
 
 	public static final AFn<ACell> INITIAL_EXPANDER = reg(Compiler.INITIAL_EXPANDER);
-	
+
 	public static final AFn<ACell> QUOTE_EXPANDER = reg(Compiler.QUOTE_EXPANDER);
 
 	public static final AFn<ACell> QUASIQUOTE_EXPANDER = reg(Compiler.QUASIQUOTE_EXPANDER);
@@ -642,7 +643,7 @@ public class Core {
 			return ctx.actorCall(target, sendAmount.longValue(), sym, callArgs);
 		}
 	});
-	
+
 	public static final CoreFn<Hash> LOG = reg(new CoreFn<>(Symbols.LOG) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -654,13 +655,13 @@ public class Core {
 				return context.withJuiceError();
 			}
 			AVector<ACell> values=Vectors.create(args);
-			
+
 			context=context.appendLog(values);
 
 			return context.withResult(juice, values);
 		}
 	});
-	
+
 	public static final CoreFn<ACell> SET_STAR = reg(new CoreFn<>(Symbols.SET_STAR) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -673,14 +674,14 @@ public class Core {
 			if (sym.isQualified()) {
 				return context.withArgumentError("Cannot set local binding with qualified symbol: " + sym);
 			}
-			
+
 			ACell value=args[1];
-			
+
 			context= context.withLocalBindings(context.getLocalBindings().assoc(sym, value));
 			return context.withResult(Juice.ASSOC,value);
 		}
 	});
-	
+
 	public static final CoreFn<ACell> UNDEF_STAR = reg(new CoreFn<>(Symbols.UNDEF_STAR) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -688,16 +689,16 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			Symbol sym=RT.ensureSymbol(args[0]);
 			if (sym == null) return context.withArgumentError("Invalid Symbol name for undef: " + Utils.toString(args[0]));
-			
+
 			Context<ACell> ctx=(Context<ACell>) context.undefine(sym);
-			
+
 			// return nil
 			return ctx.withResult(Juice.DEF, null);
 
 		}
 	});
-	
-	
+
+
 
 	public static final CoreFn<ACell> LOOKUP = reg(new CoreFn<>(Symbols.LOOKUP) {
 		@SuppressWarnings("unchecked")
@@ -709,7 +710,7 @@ public class Core {
 			// get Address to perform lookup
 			Address address=(n==1)?context.getAddress():RT.ensureAddress(args[0]);
 			if (address==null) return context.withCastError(0,args, Types.ADDRESS);
-			
+
 			// ensure argument converts to a Symbol correctly.
 			ACell symArg=args[n-1];
 			Symbol sym = RT.ensureSymbol(symArg);
@@ -722,7 +723,7 @@ public class Core {
 			return context.withResult(juice, result);
 		}
 	});
-	
+
 	public static final CoreFn<Syntax> LOOKUP_META = reg(new CoreFn<>(Symbols.LOOKUP_META) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -736,7 +737,7 @@ public class Core {
 				address=RT.ensureAddress(args[0]);
 				if (address==null) return context.withCastError(0,args, Types.ADDRESS);
 			}
-			
+
 			// ensure argument converts to a Symbol correctly.
 			ACell symArg=args[n-1];
 			Symbol sym = RT.ensureSymbol(symArg);
@@ -783,7 +784,7 @@ public class Core {
 			return context.withResult(juice, blob);
 		}
 	});
-	
+
 	public static final CoreFn<AccountStatus> ACCOUNT = reg(new CoreFn<>(Symbols.ACCOUNT) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -837,7 +838,7 @@ public class Core {
 
 		}
 	});
-	
+
 	public static final CoreFn<CVMLong> SET_MEMORY = reg(new CoreFn<>(Symbols.SET_MEMORY) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -850,7 +851,7 @@ public class Core {
 			return context.setMemory(amount.longValue()).consumeJuice(Juice.TRANSFER);
 		}
 	});
-	
+
 	public static final CoreFn<CVMLong> TRANSFER_MEMORY = reg(new CoreFn<>(Symbols.TRANSFER_MEMORY) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -873,16 +874,34 @@ public class Core {
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			AccountKey address = RT.ensureAccountKey(args[0]);
-			if (address == null) return context.withCastError(0,args, Types.KEY);
+			AccountKey accountKey = RT.ensureAccountKey(args[0]);
+			if (accountKey == null) return context.withCastError(0,args, Types.KEY);
 
 			CVMLong amount = RT.ensureLong(args[1]);
 			if (amount == null) return context.withCastError(1,args, Types.LONG);
 
-			return context.setStake(address, amount.longValue()).consumeJuice(Juice.TRANSFER);
+			return context.setStake(accountKey, amount.longValue()).consumeJuice(Juice.TRANSFER);
 
 		}
 	});
+
+	public static final CoreFn<CVMLong> SET_PEER_HOSTNAME = reg(new CoreFn<>(Symbols.SET_PEER_HOSTNAME) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+
+            AccountKey accountKey = RT.ensureAccountKey(args[0]);
+			if (accountKey == null) return context.withCastError(0,args, Types.KEY);
+
+			AString hostname = Strings.create(RT.str(args[1]));
+			if (hostname == null) return context.withCastError(1,args, Types.STRING);
+
+			return context.setPeerHostname(accountKey, hostname).consumeJuice(Juice.TRANSFER);
+
+		}
+	});
+
 
 	public static final CoreFn<AMap<?, ?>> HASHMAP = reg(new CoreFn<>(Symbols.HASH_MAP) {
 		@SuppressWarnings("unchecked")
@@ -896,7 +915,7 @@ public class Core {
 			return context.withResult(juice, Maps.create(args));
 		}
 	});
-	
+
 
 	public static final CoreFn<ABlobMap> BLOB_MAP = reg(new CoreFn<>(Symbols.BLOB_MAP) {
 		@SuppressWarnings("unchecked")
@@ -918,7 +937,7 @@ public class Core {
 				r=r.assoc(k, v);
 				if (r==null) return context.withArgumentError("Cannot have a key of Type "+RT.getType(k) +" in blob-map"); // must be bad key type
 			}
-			
+
 			return context.withResult(juice, r);
 		}
 	});
@@ -931,7 +950,7 @@ public class Core {
 
 			long juice = Juice.BUILD_DATA + (args.length * Juice.BUILD_PER_ELEMENT);
 			if (!context.checkJuice(juice)) return context.withJuiceError();
-			
+
 			return context.withResult(juice, Set.create(args));
 		}
 	});
@@ -1005,7 +1024,7 @@ public class Core {
 			return context.withResult(juice, (ACell) result);
 		}
 	});
-	
+
 	public static final CoreFn<ACell> ASSOC_IN = reg(new CoreFn<>(Symbols.ASSOC_IN) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -1021,7 +1040,7 @@ public class Core {
 			ACell value= args[2];
 			// simply substitute value if key sequence is empty
 			if (n==0) return context.withResult(juice, value);
-			
+
 			ADataStructure[] ass=new ADataStructure[n];
 			ACell[] ks=new ACell[n];
 			for (int i = 0; i < n; i++) {
@@ -1032,70 +1051,70 @@ public class Core {
 				ks[i]=k;
 				data=struct.get(k);
 			}
-			
+
 			for (int i = n-1; i >=0; i--) {
 				ADataStructure struct=ass[i];
 				ACell k=ks[i];
 				value=RT.assoc(struct, k, value);
 				if (value==null) {
 					// assoc failed, so key or value type must be invlid
-					return context.withError(ErrorCodes.ARGUMENT,"Invalid key of type "+RT.getType(k)+" or value of type "+RT.getType(value)+" for " +name()); 
+					return context.withError(ErrorCodes.ARGUMENT,"Invalid key of type "+RT.getType(k)+" or value of type "+RT.getType(value)+" for " +name());
 				}
 			}
 			return context.withResult(juice, value);
 		}
 	});
-	
+
 	public static final CoreFn<ACell> GET_HOLDING = reg(new CoreFn<>(Symbols.GET_HOLDING) {
 		@SuppressWarnings("unchecked")
 		@Override
 		public  Context<ACell> invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if (n !=1) return context.withArityError(exactArityMessage(1, n));
-			
+
 			Address address=RT.ensureAddress(args[0]);
 			if (address == null) return context.withCastError(args[0], Types.ADDRESS);
-			
+
 			AccountStatus as=context.getAccountStatus(address);
 			if (as==null) return context.withError(ErrorCodes.NOBODY,"Account with holdings does not exist.");
 			ABlobMap<Address,ACell> holdings=as.getHoldings();
-			
+
 			// we get the target accounts holdings for the currently executing account
 			ACell result=holdings.get(context.getAddress());
-			
+
 			return context.withResult(Juice.LOOKUP, result);
 		}
 	});
-	
+
 	public static final CoreFn<ACell> SET_HOLDING = reg(new CoreFn<>(Symbols.SET_HOLDING) {
 		@SuppressWarnings("unchecked")
 		@Override
 		public  Context<ACell> invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if (n !=2) return context.withArityError(exactArityMessage(2, n));
-			
+
 			Address address=RT.ensureAddress(args[0]);
 			if (address == null) return context.withCastError(args[0], Types.ADDRESS);
-						
+
 			// result is specified by second arg
 			ACell result= args[1];
-			
+
 			// we set the target account holdings for the currently executing account
 			// might return NOBODY if account does not exist
 			context=(Context) context.setHolding(address,result);
 			if (context.isExceptional()) return (Context<ACell>) context;
-			
+
 			return context.withResult(Juice.ASSOC, result);
 		}
 	});
-	
+
 	public static final CoreFn<ACell> SET_CONTROLLER = reg(new CoreFn<>(Symbols.SET_CONTROLLER) {
 		@SuppressWarnings("unchecked")
 		@Override
 		public  Context<ACell> invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if (n !=1) return context.withArityError(exactArityMessage(1, n));
-			
+
 			// Get requested controller. Must be a valid address or null
 			ACell arg=args[0];
 			Address controller=null;
@@ -1106,30 +1125,30 @@ public class Core {
 					 return context.withError(ErrorCodes.NOBODY, name()+" must be passed an address for an existing account as controller.");
 				}
 			}
-			
+
 			context=(Context) context.setController(controller);
 			if (context.isExceptional()) return (Context<ACell>) context;
-			
+
 			return context.withResult(Juice.ASSOC, controller);
 		}
 	});
-	
+
 	public static final CoreFn<AccountKey> SET_KEY = reg(new CoreFn<>(Symbols.SET_KEY) {
 		@SuppressWarnings("unchecked")
 		@Override
 		public  Context<AccountKey> invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if (n !=1) return context.withArityError(exactArityMessage(1, n));
-			
+
 			ACell arg=args[0];
-			
+
 			// Check an account key is being used as argument. nil is permitted
 			AccountKey publicKey=RT.ensureAccountKey(arg);
 			if ((publicKey == null)&&(arg!=null)) return context.withCastError(arg, Types.KEY);
-			
+
 			context=(Context) context.setAccountKey(publicKey);
 			if (context.isExceptional()) return (Context<AccountKey>) context;
-			
+
 			return context.withResult(Juice.ASSOC, publicKey);
 		}
 	});
@@ -1174,27 +1193,27 @@ public class Core {
 
 			ASequence<ACell> ixs = RT.ensureSequence(args[1]);
 			if (ixs == null) return context.withCastError(args[1], Types.SEQUENCE);
-			
+
 			ACell notFound=(n<3)?null:args[2];
 
 			int il = ixs.size();
 			long juice = Juice.GET * (1L + il);
 			ACell result = (ACell) args[0];
 			for (int i = 0; i < il; i++) {
-				if (result == null) { 
+				if (result == null) {
 					result=notFound;
 					break; // gets in nil produce not-found
 				}
 				ADataStructure<?> gettable = RT.ensureDataStructure(result);
 				if (gettable == null) return context.withCastError(result, Types.DATA_STRUCTURE);
-				
+
 				ACell k=ixs.get(i);
 				if (gettable.containsKey(k)) {
 					result = gettable.get(k);
 				} else {
 					return context.withResult(juice, notFound);
 				}
-				
+
 			}
 			return context.withResult(juice, result);
 		}
@@ -1221,7 +1240,7 @@ public class Core {
 			return context.withResult(juice, result);
 		}
 	});
-	
+
 	public static final CoreFn<CVMBool> SUBSET_Q = reg(new CoreFn<>(Symbols.SUBSET_Q) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -1231,10 +1250,10 @@ public class Core {
 
 			Set<ACell> s0=RT.ensureSet(args[0]);
 			if (s0==null) return context.withCastError(args[0], Types.SET);
-			
+
 			long juice = Juice.SET_COMPARE_PER_ELEMENT*s0.count();
 			if (!context.checkJuice(juice)) return context.withJuiceError();
-			
+
 			Set<ACell> s1=RT.ensureSet(args[1]);
 			if (s1==null) return context.withCastError(args[1], Types.SET);
 
@@ -1326,7 +1345,7 @@ public class Core {
 
 	public static final CoreFn<ACell> FIRST = reg(new CoreFn<>(Symbols.FIRST) {
 		// note we could define this as (nth coll 0) but this is more efficient
-		
+
 		@SuppressWarnings("unchecked")
 		@Override
 		public  Context<ACell> invoke(Context context, ACell[] args) {
@@ -1345,7 +1364,7 @@ public class Core {
 
 	public static final CoreFn<ACell> SECOND = reg(new CoreFn<>(Symbols.SECOND) {
 		// note we could define this as (nth coll 1) but this is more efficient
-		
+
 		@SuppressWarnings("unchecked")
 		@Override
 		public  Context<ACell> invoke(Context context, ACell[] args) {
@@ -1373,7 +1392,7 @@ public class Core {
 			Long n = RT.count(a);
 			if (n == null) return context.withCastError(0,args, Types.SEQUENCE);
 			if (n<=0) return context.withBoundsError(-1);
-			
+
 			ACell result = RT.nth(a,n-1);
 
 			long juice = Juice.SIMPLE_FN;
@@ -1494,14 +1513,14 @@ public class Core {
 			return context.withResult(Juice.SIMPLE_FN, result);
 		}
 	});
-	
+
 	public static final CorePred BOOLEAN_Q = reg(new CorePred(Symbols.BOOLEAN_Q) {
 		@Override
 		public boolean test(ACell val) {
 			return RT.isBoolean(val);
 		}
 	});
-	
+
 	public static final CoreFn<ABlob> ENCODING = reg(new CoreFn<>(Symbols.ENCODING) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -1616,7 +1635,7 @@ public class Core {
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
-	
+
 	public static final CoreFn<CVMDouble> FLOOR = reg(new CoreFn<>(Symbols.FLOOR) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -1628,7 +1647,7 @@ public class Core {
 		}
 	});
 
-	
+
 	public static final CoreFn<CVMDouble> CEIL = reg(new CoreFn<>(Symbols.CEIL) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -1651,7 +1670,7 @@ public class Core {
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
-	
+
 	public static final CoreFn<APrimitive> ABS = reg(new CoreFn<>(Symbols.ABS) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -1662,7 +1681,7 @@ public class Core {
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
-	
+
 	public static final CoreFn<CVMLong> SIGNUM = reg(new CoreFn<>(Symbols.SIGNUM) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -1673,67 +1692,67 @@ public class Core {
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
-	
+
 	public static final CoreFn<CVMLong> MOD = reg(new CoreFn<>(Symbols.MOD) {
 		@SuppressWarnings("unchecked")
 		@Override
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
-			
+
 			CVMLong la=RT.ensureLong(args[0]);
 			CVMLong lb=RT.ensureLong(args[1]);
 			if ((lb==null)||(la==null)) return context.withCastError(Types.LONG);
-			
+
 			long num = la.longValue();
 			long denom = lb.longValue();
 			if (denom==0) return context.withArgumentError("Divsion by zero in "+name());
-			
+
 			long m = num % denom;
 			if (m<0) m+=Math.abs(denom); // Correct for Euclidean modular function
 			CVMLong result=CVMLong.create(m);
-			
+
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
-	
+
 	public static final CoreFn<CVMLong> REM = reg(new CoreFn<>(Symbols.REM) {
 		@SuppressWarnings("unchecked")
 		@Override
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
-			
+
 			CVMLong la=RT.ensureLong(args[0]);
 			CVMLong lb=RT.ensureLong(args[1]);
 			if ((lb==null)||(la==null)) return context.withCastError(Types.LONG);
-			
+
 			long num = la.longValue();
 			long denom = lb.longValue();
 			if (denom==0) return context.withArgumentError("Divsion by zero in "+name());
-			
+
 			long m = num % denom;
 			CVMLong result=CVMLong.create(m);
-			
+
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
-	
+
 	public static final CoreFn<CVMLong> QUOT = reg(new CoreFn<>(Symbols.QUOT) {
 		@SuppressWarnings("unchecked")
 		@Override
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
-			
+
 			CVMLong la=RT.ensureLong(args[0]);
 			CVMLong lb=RT.ensureLong(args[1]);
 			if ((lb==null)||(la==null)) return context.withCastError(Types.LONG);
-			
+
 			long num = la.longValue();
 			long denom = lb.longValue();
 			if (denom==0) return context.withArgumentError("Divsion by zero in "+name());
-			
+
 			long m = num / denom;
 			CVMLong result=CVMLong.create(m);
-			
+
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1744,10 +1763,10 @@ public class Core {
 		@Override
 		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
-			
-			CVMDouble result = RT.pow(args); 
+
+			CVMDouble result = RT.pow(args);
 			if (result==null) return context.withCastError(Types.DOUBLE);
-			
+
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1757,10 +1776,10 @@ public class Core {
 		@Override
 		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-			
+
 			CVMDouble result = RT.exp(args[0]);
 			if (result==null) return context.withCastError(0,Types.DOUBLE);
-			
+
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1781,10 +1800,10 @@ public class Core {
 		@Override
 		public  Context<Hash> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
- 
+
 			ABlob blob=RT.ensureBlob(args[0]);
 			if (blob==null) return context.withCastError(0,args, Types.BLOB);
-			
+
 			Hash result = blob.getContentHash();
 			return context.withResult(Juice.HASH, result);
 		}
@@ -1833,19 +1852,19 @@ public class Core {
 			ACell arg = (ACell) args[0];
 			Long n = RT.count(arg);
 			if (n == null) return context.withCastError(arg, Types.SEQUENCE);
-			
+
 			// Second argument should be a Long index
 			CVMLong ix = RT.ensureLong(args[1]);
 			if (ix == null) return context.withCastError(1,args, Types.LONG);
-			
+
 			long i=ix.longValue();
-			
+
 			// BOUNDS error if access is out of bounds
 			if ((i < 0) || (i >= n)) return context.withBoundsError(i);
 
 			// We know the object is a countable collection, so safe to use 'nth'
 			ACell result = RT.nth(arg, i);
-			
+
 			return context.withResult(Juice.SIMPLE_FN, result);
 		}
 	});
@@ -1876,7 +1895,7 @@ public class Core {
 			return context.withException(Juice.RECUR, result);
 		}
 	});
-	
+
 	public static final CoreFn<?> TAILCALL_STAR = reg(new CoreFn<>(Symbols.TAILCALL_STAR) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -1886,7 +1905,7 @@ public class Core {
 
 			AFn f=RT.ensureFunction(args[0]);
 			if (f==null) return context.withCastError(0, args, Types.FUNCTION);
-			
+
 			ACell[] tailArgs=Arrays.copyOfRange(args, 1, args.length);
 			AExceptional result = TailcallValue.wrap(f,tailArgs);
 
@@ -1958,7 +1977,7 @@ public class Core {
 
 			final AFn<ACell> fn = RT.castFunction(args[0]);
 			if (fn==null ) return context.withCastError(0,args, Types.FUNCTION);
-			
+
 			int lastIndex=alen-1;
 			ACell lastArg = args[lastIndex];
 			ASequence<ACell> coll = RT.ensureSequence(lastArg);
@@ -2008,14 +2027,14 @@ public class Core {
 			} else {
 				Long n=RT.count(a1);
 				if (n == null) return context.withCastError(a1, Types.DATA_STRUCTURE);
-				
+
 				// check juice before running potentially expansive computation
 				juice += Juice.BUILD_PER_ELEMENT * n;
 				if (!context.checkJuice(juice)) return context.withJuiceError();
-				
+
 				ASequence<ACell> seq = RT.sequence(a1);
 				if (seq == null) return context.withCastError(a1, Types.DATA_STRUCTURE);
-				
+
 				result = result.conjAll(seq);
 				if (result == null) return context.withError(ErrorCodes.ARGUMENT,"Invalid element type for 'into'");
 			}
@@ -2023,7 +2042,7 @@ public class Core {
 			return context.withResult(juice, result);
 		}
 	});
-	
+
 	public static final CoreFn<AHashMap<ACell,ACell>> MERGE = reg(new CoreFn<>(Symbols.MERGE) {
 
 		@SuppressWarnings("unchecked")
@@ -2031,30 +2050,30 @@ public class Core {
 		public  Context<AHashMap<ACell, ACell>> invoke(Context context, ACell[] args) {
 			int n=args.length;
 			if (n==0) return context.withResult(Juice.BUILD_DATA,Maps.empty());
-			
+
 			// TODO: handle blobmaps?
-			
+
 			ACell arg0=args[0];
 			AHashMap<ACell,ACell> result=RT.ensureHashMap(arg0);
 			if (result == null) return context.withCastError(arg0, Types.MAP);
-			
+
 			long juice=Juice.BUILD_DATA;
 			for (int i=1; i<n; i++) {
 				ACell argi=args[i];
 				AHashMap<ACell,ACell> argMap=RT.ensureHashMap(argi);
 				if (argMap == null) return context.withCastError(argi, Types.MAP);
-				
+
 				long size=argMap.count();
 				juice=Juice.addMul(juice,size,Juice.BUILD_PER_ELEMENT);
-				
+
 				if (!context.checkJuice(juice)) return context.withJuiceError();
-				
+
 				result=result.merge(argMap);
 			}
-			
+
 			return context.withResult(juice, result);
 		}
-		
+
 	});
 
 	public static final CoreFn<ASequence<?>> MAP = reg(new CoreFn<>(Symbols.MAP) {
@@ -2115,11 +2134,11 @@ public class Core {
 
 
 			// last arg must be a data structure
-			ACell maybeSeq = (ACell) args[ac-1]; 
+			ACell maybeSeq = (ACell) args[ac-1];
 			ADataStructure<ACell> seq = (maybeSeq==null)?Vectors.empty():RT.ensureDataStructure(maybeSeq);
 			if (seq == null) return ctx.withCastError(ac-1,args, Types.SEQUENCE);
-			long n = seq.count();		
-			
+			long n = seq.count();
+
 			ACell result; // Initial value, can be anything
 			long start=0; // first element for reduction
 			if (ac==3) {
@@ -2135,7 +2154,7 @@ public class Core {
 				result=seq.get(0);
 				start = 1;
 			}
-			
+
 			// Need to reduce over remaining elements
 			ACell[] xs = new ACell[2]; // accumulator, next element
 			for (long i = start; i < n; i++) {
@@ -2152,16 +2171,16 @@ public class Core {
 			return ctx.withResult(Juice.REDUCE, result);
 		}
 	});
-	
+
 	// Helper function for reduce
 	private static final Context<ACell> reduceResult(Context<?> ctx) {
 		Object ex=ctx.getValue(); // might be an ACell or Exception. We need to check for a Reduced result only
 	 	if (ex instanceof Reduced) {
 	 		ctx=ctx.withResult(((Reduced)ex).getValue());
-	 	} 
+	 	}
 	 	return ctx.consumeJuice(Juice.REDUCE); // bail out with exception
 	}
-	
+
 	public static final CoreFn<ACell> REDUCED = reg(new CoreFn<>(Symbols.REDUCED) {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -2257,7 +2276,7 @@ public class Core {
 			return val instanceof Address;
 		}
 	});
-	
+
 	public static final CorePred HASH_Q = reg(new CorePred(Symbols.HASH_Q) {
 		@Override
 		public boolean test(ACell val) {
@@ -2285,7 +2304,7 @@ public class Core {
 			return RT.isNumber(val);
 		}
 	});
-	
+
 	public static final CorePred NAN_Q = reg(new CorePred(Symbols.NAN_Q) {
 		@Override
 		public boolean test(ACell val) {
@@ -2331,7 +2350,7 @@ public class Core {
 
 	/**
 	 * Bootstrap procedure to load the core.con library
-	 * 
+	 *
 	 * @param env Initial environment map
 	 * @return Loaded environment map
 	 * @throws IOException
@@ -2341,14 +2360,14 @@ public class Core {
 		Address ADDR=Address.ZERO;
 		State state = State.EMPTY.putAccount(ADDR,AccountStatus.createActor());
 		Context<?> ctx = Context.createFake(state, ADDR);
-		
+
 		// Map in forms from env
 		for (Map.Entry<Symbol,ACell> me : env.entrySet()) {
 			ctx=ctx.define(me.getKey(), me.getValue());
 		}
 
 		ACell form = null;
-		
+
 		// Compile and execute forms in turn. Later definitions can use earlier macros!
 		AList<ACell> forms = Reader.readAll(Utils.readResourceAsString("lang/core.con"));
 		for (ACell f : forms) {
@@ -2361,7 +2380,7 @@ public class Core {
 			ctx = ctx.execute(op);
 			// System.out.println("Core compilation juice: "+ctx.getJuice());
 			assert (!ctx.isExceptional()) : "Error executing op: "+ op+ "\nException : "+ ctx.getExceptional().toString();
-			
+
 		}
 
 		return ctx;
@@ -2376,7 +2395,7 @@ public class Core {
 				AHashMap<ACell, ACell> docMeta = de.getValue();
 				MapEntry<Symbol, AHashMap<ACell,ACell>> metaEntry=ctx.getMetadata().getEntry(sym);
 				MapEntry<Symbol, ACell> valueEntry=ctx.getEnvironment().getEntry(sym);
-				
+
 				if (valueEntry == null) {
 					// No existing value. Might be a special
 					AHashMap<Keyword, ACell> doc=(AHashMap<Keyword, ACell>) docMeta.get(Keywords.DOC);
@@ -2387,7 +2406,7 @@ public class Core {
 					} else {
 						if (Keywords.SPECIAL.equals(doc.get(Keywords.TYPE))) {
 							// create a fake entry for special symbols
-							ctx=ctx.define(sym, sym);	
+							ctx=ctx.define(sym, sym);
 							valueEntry=MapEntry.create(sym, sym);
 						} else {
 							System.err.println("CORE WARNING: Documentation for non-existent core symbol: " + sym);
@@ -2395,7 +2414,7 @@ public class Core {
 						}
 					}
 				}
-	
+
 				AHashMap<ACell, ACell> oldMeta = (metaEntry==null)?null:metaEntry.getValue();
 				AHashMap<ACell, ACell> newMeta = (oldMeta==null)?docMeta:oldMeta.merge(docMeta);
 				ACell v=valueEntry.getValue();
@@ -2413,7 +2432,7 @@ public class Core {
 		// Set up convex.core environment
 		AHashMap<Symbol, ACell> coreEnv = Maps.empty();
 		AHashMap<Symbol, AHashMap<ACell,ACell>> coreMeta = Maps.empty();
-		
+
 		try {
 
 			// Register all objects from registered runtime
@@ -2423,17 +2442,17 @@ public class Core {
 
 			Context<?> ctx = registerCoreCode(coreEnv);
 			ctx=applyDocumentation(ctx);
-			
+
 			coreEnv = ctx.getEnvironment();
 			coreMeta = ctx.getMetadata();
-			
+
 			METADATA = coreMeta;
 			ENVIRONMENT = coreEnv;
 		} catch (Throwable e) {
 			e.printStackTrace();
 			throw new Error("Error initialising core!",e);
 		}
-		
-	
+
+
 	}
 }

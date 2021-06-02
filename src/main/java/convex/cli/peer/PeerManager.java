@@ -51,20 +51,26 @@ public class PeerManager {
 	public void launchLocalPeers(int count, AKeyPair[] keyPairs, Address peerAddress) {
 		peerServerList.clear();
 
-		int lastPeerServerPort = 0;
+		Server otherServer;
+		String remotePeerHostname;
+
 		for (int i = 0; i < count; i++) {
 			AKeyPair keyPair = keyPairs[i];
 			Server peerServer = launchPeer(keyPair);
-			String remotePeerURL = null;
-            if (lastPeerServerPort > 0) {
-                remotePeerURL = String.format("localhost:%d", lastPeerServerPort);
-            }
-			peerServer.joinNetwork(keyPair, peerAddress, remotePeerURL);
-			peerAddress = Address.create(peerAddress.toLong() + 1);
-			if (lastPeerServerPort == 0) {
-                lastPeerServerPort = peerServer.getPort();
+		}
+
+		for (int repeat = 0; repeat < 2; repeat++) {
+			for (int i = 1; i < count; i++) {
+				AKeyPair keyPair = keyPairs[i];
+				otherServer = peerServerList.get(0);
+				remotePeerHostname = otherServer.getHostname();
+				Address address = Address.create(peerAddress.toLong() + i);
+				peerServerList.get(i).joinNetwork(keyPair, address, remotePeerHostname);
 			}
 		}
+		otherServer = peerServerList.get(count - 1);
+		remotePeerHostname = otherServer.getHostname();
+		peerServerList.get(0).joinNetwork(keyPairs[0], peerAddress, remotePeerHostname);
 	}
 
 	/**
@@ -81,7 +87,7 @@ public class PeerManager {
 			InetSocketAddress address = addressList[index];
 			if (peerAddress != address) {
 				try {
-					peerServer.connectToPeer(address);
+					peerServer.connectToPeer(address.toString(), address);
 				} catch (IOException e) {
 					System.out.println("Connect failed to: "+address);
 				}
