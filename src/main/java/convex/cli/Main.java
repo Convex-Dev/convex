@@ -2,6 +2,7 @@ package convex.cli;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.security.KeyStore;
 import java.util.Enumeration;
 import java.util.logging.Logger;

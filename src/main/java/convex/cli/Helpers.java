@@ -9,7 +9,7 @@ import convex.api.Convex;
 import convex.cli.peer.Session;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
-
+import convex.core.util.Utils;
 /**
  *
  * Helpers
@@ -34,7 +34,7 @@ public class Helpers {
 		return null;
 	}
 
-	/*
+	/**
 	 * Create a path from a File object. This is to provide a feature to add the
 	 * default `.convex` folder if it does not exist.
 	 *
@@ -48,7 +48,7 @@ public class Helpers {
 		}
 	}
 
-	/*
+	/**
 	 * Connect to the convex network.
 	 *
 	 * @param hostname Hostname of the convex network.
@@ -76,31 +76,39 @@ public class Helpers {
 		return convex;
 	}
 
-	/*
-	 * Return a random session port, by looking at the session file.
+	/**
+	 * Return a random session hostname, by looking at the session file.
 	 * The session file has a list of local peers open.
-	 * This helper will find a random peer in the collection and returns it port number.
+	 * This helper will find a random peer in the collection and returns hostname.
 	 *
 	 * @param sessionFilename Session filename to open and get the random port nummber.
 	 *
-	 * @return A random port, if none found return 0
+	 * @return A random hostname or null if none can be found
 	 *
 	 */
-	public static int getSessionPort(String sessionFilename) throws IOException {
-		InetSocketAddress address;
-		int port = 0;
+	public static String getSessionHostname(String sessionFilename) throws IOException {
+        String hostname = null;
 		Session session = new Session();
 		Random random = new Random();
 		File sessionFile = new File(sessionFilename);
 		session.load(sessionFile);
 		int peerCount = session.getPeerCount();
 		if (peerCount > 0) {
-			address = session.getPeerAddressFromIndex(random.nextInt(peerCount - 1));
-			if ( address != null) {
-				port = address.getPort();
-			}
+			hostname = session.getPeerHostnameFromIndex(random.nextInt(peerCount - 1));
 		}
-		return port;
+		return hostname;
+	}
+
+	/**
+	 * Return a random session port from the local running network.
+	 */
+	public static int getSessionPort(String sessionFilename) throws IOException {
+	String hostname = Helpers.getSessionHostname(sessionFilename);
+	if ( hostname != null) {
+		InetSocketAddress address = Utils.toInetSocketAddress(hostname);
+		return address.getPort();
+	}
+	return 0;
 	}
 }
 

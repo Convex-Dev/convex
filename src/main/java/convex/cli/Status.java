@@ -1,6 +1,7 @@
 package convex.cli;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
@@ -54,7 +55,7 @@ private static final Logger log = Logger.getLogger(Status.class.getName());
 
 		if (port == 0) {
 			try {
-				port = Helpers.getSessionPort(mainParent.getSessionFilename());
+                port = Helpers.getSessionPort(mainParent.getSessionFilename());
 			} catch (IOException e) {
 				log.warning("Cannot load the session control file");
 			}
