@@ -1529,6 +1529,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testTailcall() {
+		assertEquals(Keywords.FOO,eval("(do (defn f [x] :foo) (defn g [] (tailcall (f 1))) (g))"));
 
 		assertArityError(step("(do (def f (fn [x] (tailcall (f)))) (f 1))"));
 		assertJuiceError(step("(do (def f (fn [x] (tailcall (f x)))) (f 1))")); // check we aren't consuming stack!

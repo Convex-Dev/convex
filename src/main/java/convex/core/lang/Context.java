@@ -917,6 +917,9 @@ public final class Context<T extends ACell> extends AObject {
 					if (fn==Core.TAILCALL_STAR) break;
 					TailcallValue rv=(TailcallValue)v;
 					ACell[] newArgs = rv.getValues();
+					
+					// redirect function and invoke
+					fn = (AFn<R>) rv.getFunction();
 					ctx = fn.invoke((Context<ACell>) ctx,newArgs);
 					v = ctx.getValue();
 				}
