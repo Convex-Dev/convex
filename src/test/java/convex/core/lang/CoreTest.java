@@ -1530,9 +1530,16 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testTailcall() {
 		assertEquals(Keywords.FOO,eval("(do (defn f [x] :foo) (defn g [] (tailcall (f 1))) (g))"));
+		assertEquals(RT.cvm(3L),eval("((fn [] (tailcall (+ 1 2))))"));
 
-		assertArityError(step("(do (def f (fn [x] (tailcall (f)))) (f 1))"));
-		assertJuiceError(step("(do (def f (fn [x] (tailcall (f x)))) (f 1))")); // check we aren't consuming stack!
+		// Undeclared function in tailcall
+		assertUndeclaredError(step("(do (defn f [x] :foo) (defn g [] (tailcall (h 1))) (g))"));
+		
+		// Arity error in tailcall
+		assertArityError(step("(do (defn g [] :foo) (defn f [x] (tailcall (g 1))) (f 1))"));
+		
+		// check we aren't consuming stack, should fail with :JUICE not :DEPTH
+		assertJuiceError(step("(do (def f (fn [x] (tailcall (f x)))) (f 1))")); 
 
 		// basic return mechanics
 		assertError(ErrorCodes.EXCEPTION,step("(tailcall (count 1))"));
