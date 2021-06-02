@@ -1231,10 +1231,18 @@ public class RT {
 	}
 
 	/**
-	 * Casts the argument to a Blob
+	 * Implicitly casts the argument to a Blob
 	 */
 	public static ABlob ensureBlob(ACell object) {
 		if (object instanceof ABlob) return ((ABlob)object);
+		return null;
+	}
+	
+	/**
+	 * Casts the argument to a CVM String
+	 */
+	public static AString ensureString(ACell a) {
+		if (a instanceof AString) return ((AString)a);
 		return null;
 	}
 
@@ -1312,6 +1320,7 @@ public class RT {
 	public static boolean isNaN(ACell val) {
 		return CVMDouble.NaN.equals(val);
 	}
+
 
 
 }

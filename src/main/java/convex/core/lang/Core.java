@@ -894,7 +894,7 @@ public class Core {
             AccountKey accountKey = RT.ensureAccountKey(args[0]);
 			if (accountKey == null) return context.withCastError(0,args, Types.KEY);
 
-			AString hostname = Strings.create(RT.str(args[1]));
+			AString hostname = RT.ensureString(args[1]);
 			if (hostname == null) return context.withCastError(1,args, Types.STRING);
 
 			return context.setPeerHostname(accountKey, hostname).consumeJuice(Juice.TRANSFER);
