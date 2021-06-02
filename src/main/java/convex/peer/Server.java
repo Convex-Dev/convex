@@ -164,8 +164,6 @@ public class Server implements Closeable {
 	 */
 	private HashMap<AccountKey, SignedData<Belief>> newBeliefs = new HashMap<>();
 
-	private HashMap<Hash, AString> remotePeerURLList = new HashMap<>();
-
 	private String hostname;
 
 	private Server(HashMap<Keyword, Object> config) {
@@ -298,9 +296,8 @@ public class Server implements Closeable {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
 	public void joinNetwork(AKeyPair keyPair, Address address, String remoteHostname) {
-		Connection connection = null;
-
 		if (remoteHostname != null) {
 			InetSocketAddress remotePeerAddress = Utils.toInetSocketAddress(remoteHostname);
 			try {
@@ -308,13 +305,12 @@ public class Server implements Closeable {
 				Future<Result> cf =  convex.requestStatus();
 				Result result = cf.get(5000, TimeUnit.MILLISECONDS);
 				AVector<ACell> values = result.getValue();
-				Hash beliefHash = (Hash) values.get(0);
-				Hash stateHash = (Hash) values.get(1);
+				//Hash beliefHash = (Hash) values.get(0);
+				//Hash stateHash = (Hash) values.get(1);
 
 				// TODO
 				// check the initStateHash to see if this is the network we want to join?
-
-				Hash initialStateHash = (Hash) values.get(2);
+				// Hash initialStateHash = (Hash) values.get(2);
 
 				AVector<AString> statusPeerHostnameList = (AVector<AString>) values.get(3);
 
@@ -335,7 +331,8 @@ public class Server implements Closeable {
 				connectToRemotePeers(statusPeerHostnameList);
 
 			} catch (IOException | InterruptedException | ExecutionException | TimeoutException e ) {
-				log.severe(getHostname() + " is unable to connect to remote peer at " + remoteHostname + " " + e);
+				// TODO: maybe abort trying to connect to this Peer?
+				log.info(getHostname() + " is unable to connect to remote peer at " + remoteHostname + " " + e);
 			}
 		}
 	}
@@ -834,11 +831,8 @@ public class Server implements Closeable {
 		@Override
 		public void run() {
 			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
-
 			try {
-
 				Thread.sleep(100);
-				State state = peer.getConsensusState();
 
 				// loop while the server is running
 				long lastConsensusPoint = peer.getConsensusPoint();
@@ -855,12 +849,12 @@ public class Server implements Closeable {
 						// continue
 					}
 				}
-			} catch (Throwable e) {
-				log.severe("Unexpected exception in server connection loop: " + e.toString());
-				log.severe("Terminating Server connection");
+			} catch (InterruptedException e) {
+				/* OK? Close the thread normally */			
+			} catch (Throwable e) {	
+				log.severe("Unexpected exception, Terminating Server connection loop");
 				e.printStackTrace();
 			} finally {
-				// clear thread from Server as we terminate
 				connectionThread = null;
 			}
 		}

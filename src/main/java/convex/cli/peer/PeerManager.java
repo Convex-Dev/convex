@@ -57,6 +57,7 @@ public class PeerManager {
 		for (int i = 0; i < count; i++) {
 			AKeyPair keyPair = keyPairs[i];
 			Server peerServer = launchPeer(keyPair);
+			// TODO should we be adding these to peerServerList?
 		}
 
 		for (int repeat = 0; repeat < 2; repeat++) {

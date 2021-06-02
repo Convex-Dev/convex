@@ -1868,13 +1868,11 @@ public final class Context<T extends ACell> extends AObject {
 	 * @param url url for the peer
 	 * @return Context with final take set
 	 */
-	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> setPeerHostname(AccountKey accountKey, AString hostname) {
 		State s=getState();
 		PeerStatus ps=s.getPeer(accountKey);
 		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for Public Key: "+accountKey.toChecksumHex());
 		// if (url==null) return this.withArgumentError("Cannot set an empty url");
-		Address peerAddress=getAddress();
 
 		PeerStatus updatedPeer=ps.withHostname(hostname);
 		s=s.withPeer(accountKey, updatedPeer); // adjust peer
@@ -1899,7 +1897,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * Sets the controller for the current Account
 	 * @param <R>
 	 * @param address
-	 * @return
+	 * @return Context with current Account controller set
 	 */
 	public <R extends ACell> Context<R> setController(Address address) {
 		AccountStatus as=getAccountStatus();
@@ -1912,14 +1910,13 @@ public final class Context<T extends ACell> extends AObject {
 	 * Sets the public key for the current account
 	 * @param <R>
 	 * @param address
-	 * @return
+	 * @return Context with current Account Key set
 	 */
 	public <R extends ACell> Context<R> setAccountKey(AccountKey publicKey) {
 		AccountStatus as=getAccountStatus();
 		as=as.withAccountKey(publicKey);
 		return withAccountStatus(getAddress(),as);
 	}
-
 
 	protected <R extends ACell> Context<R> withAccountStatus(Address target, AccountStatus accountStatus) {
 		return withState(getState().putAccount(target, accountStatus));

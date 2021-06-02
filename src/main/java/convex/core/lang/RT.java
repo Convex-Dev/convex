@@ -935,7 +935,7 @@ public class RT {
 	 */
 	public static ABlob castBlob(ACell a) {
 		// handle address, hash, blob instances
-		if (a instanceof ABlob) return Blobs.canonical((ABlob) a);
+		if (a instanceof ABlob) return Blobs.toCanonical((ABlob) a);
 		if (a instanceof AString) return Blobs.fromHex(a.toString());
 		return null;
 	}

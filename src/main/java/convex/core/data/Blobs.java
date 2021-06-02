@@ -30,7 +30,7 @@ public class Blobs {
 		return (T) BlobTree.create(blobs);
 	}
 
-	public static ABlob canonical(ABlob a) {
+	public static ABlob toCanonical(ABlob a) {
 		long length = a.count();
 		if (length <= Blob.CHUNK_LENGTH) return a.toBlob();
 		return BlobTree.create(a);
