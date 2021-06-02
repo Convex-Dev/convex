@@ -36,10 +36,19 @@ public class PeerManager {
 
 	private static final Logger log = Logger.getLogger(PeerManager.class.getName());
 
-	static public List<Server> peerServerList = new ArrayList<Server>();
+	protected List<Server> peerServerList = new ArrayList<Server>();
 
 	protected Session session = new Session();
 
+	protected String sessionFilename;
+
+	private PeerManager(String sessionFilename) {
+        this.sessionFilename = sessionFilename;
+	}
+
+	public static PeerManager create(String sessionFilename) {
+        return new PeerManager(sessionFilename);
+	}
 	/**
 	 * Launch a set of peers.
 	 *
@@ -57,8 +66,10 @@ public class PeerManager {
 		for (int i = 0; i < count; i++) {
 			AKeyPair keyPair = keyPairs[i];
 			Server peerServer = launchPeer(keyPair);
-			// TODO should we be adding these to peerServerList?
 		}
+
+		// go through 1..count-1 peers and join them all to peer #0
+		// do this twice to allow for all of the peers to get all of the address in the group of peers
 
 		for (int repeat = 0; repeat < 2; repeat++) {
 			for (int i = 1; i < count; i++) {
@@ -66,34 +77,17 @@ public class PeerManager {
 				otherServer = peerServerList.get(0);
 				remotePeerHostname = otherServer.getHostname();
 				Address address = Address.create(peerAddress.toLong() + i);
+				// join a peer to the peer #0
 				peerServerList.get(i).joinNetwork(keyPair, address, remotePeerHostname);
 			}
+			// wait for the peers to sync
+			waitForNetworkReady();
 		}
+		// now join the first peer #0, to the rest of the network
 		otherServer = peerServerList.get(count - 1);
 		remotePeerHostname = otherServer.getHostname();
 		peerServerList.get(0).joinNetwork(keyPairs[0], peerAddress, remotePeerHostname);
-	}
-
-	/**
-	 * Connect a peer server to a list of peer addresses.
-	 *
-	 * @param peerSerever The peer server that you wish to connect too.
-	 *
-	 * @param addressList The array list of addresses that you wish to have the peer server too connect too.
-	 *
-	 */
-	public void connectToPeers(Server peerServer, InetSocketAddress[] addressList) {
-		InetSocketAddress peerAddress = peerServer.getHostAddress();
-		for (int index = 0; index < addressList.length; index++) {
-			InetSocketAddress address = addressList[index];
-			if (peerAddress != address) {
-				try {
-					peerServer.connectToPeer(address.toString(), address);
-				} catch (IOException e) {
-					System.out.println("Connect failed to: "+address);
-				}
-			}
-		}
+		System.out.println("done");
 	}
 
 	/**
@@ -102,7 +96,7 @@ public class PeerManager {
 	 * @param sessionFilename Filename to load.
 	 *
 	 */
-	protected void loadSession(String sessionFilename) {
+	protected void loadSession() {
 		File sessionFile = new File(sessionFilename);
 		try {
 			session.load(sessionFile);
@@ -123,8 +117,7 @@ public class PeerManager {
 
 		session.addPeer(
 			peerServer.getAddress().toHexString(),
-			peerHostAddress.getHostName(),
-			peerHostAddress.getPort(),
+			peerServer.getHostname(),
 			store.getFileName()
 		);
 	}
@@ -155,7 +148,7 @@ public class PeerManager {
 	 * @param sessionFilename Fileneame to save the session.
 	 *
 	 */
-	protected void storeSession(String sessionFilename) {
+	protected void storeSession() {
 		File sessionFile = new File(sessionFilename);
 		try {
 			Helpers.createPath(sessionFile);
@@ -232,11 +225,33 @@ public class PeerManager {
 
 		Server peerServer = API.launchPeer(config);
 
+		// add to list so we can remove from the session file when this app closes
 		peerServerList.add(peerServer);
 
 		return peerServer;
 	}
 
+	protected void waitForNetworkReady() {
+		try {
+			boolean isNetworkReady = false;
+			long lastTimeStamp = 0;
+			while (!isNetworkReady) {
+				isNetworkReady = true;
+				for (int index = 1; index < peerServerList.size(); index ++) {
+					Server peerServer = peerServerList.get(index);
+					convex.core.Peer peer = peerServer.getPeer();
+					if ( peer.getTimeStamp() != lastTimeStamp) {
+						lastTimeStamp = peer.getTimeStamp();
+						isNetworkReady = false;
+						break;
+					}
+				}
+				Thread.sleep(1000);
+			}
+		} catch ( InterruptedException e) {
+			return;
+		}
+	}
 	/**
 	 * Once the manager has launched 1 or more peers. The manager now needs too loop and wait for the peer(s)
 	 * to exit.
@@ -244,14 +259,13 @@ public class PeerManager {
 	 * @param sessionFilename filename of the session file to save the peer session details.
 	 *
 	 */
-	public void waitForPeers(String sessionFilename) {
+	public void waitForPeers() {
 		long consensusPoint = 0;
 		long maxBlock = 0;
 
-		// write the launched peer details to a session file
-		loadSession(sessionFilename);
+		loadSession();
 		addAllToSession();
-		storeSession(sessionFilename);
+		storeSession();
 
 		/*
 			Go through each started peer server connection and make sure
@@ -268,15 +282,14 @@ public class PeerManager {
 		    public void run() {
 				// System.out.println("peers stopping");
 				// remove session file
-				loadSession(sessionFilename);
+				loadSession();
 				removeAllFromSession();
-				storeSession(sessionFilename);
+				storeSession();
 		    }
 		});
 
 		Server firstServer = peerServerList.get(0);
 		State lastState = firstServer.getPeer().getConsensusState();
-
 		while (true) {
 			try {
 				Thread.sleep(30);

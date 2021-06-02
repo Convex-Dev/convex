@@ -50,6 +50,7 @@ public class Query implements Runnable {
 		log.info("query command: "+queryCommand);
 
 		Convex convex = null;
+
 		try {
 			convex = mainParent.connectToSessionPeer(hostname, port, Init.HERO, null);
 		} catch (Error e) {

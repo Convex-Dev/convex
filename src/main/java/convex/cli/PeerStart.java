@@ -1,11 +1,14 @@
 package convex.cli;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.logging.Logger;
 
 import convex.cli.peer.PeerManager;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.Address;
 import convex.core.store.AStore;
+import convex.peer.Server;
 import etch.EtchStore;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
@@ -27,8 +30,6 @@ import picocli.CommandLine.Spec;
 public class PeerStart implements Runnable {
 
 	private static final Logger log = Logger.getLogger(PeerStart.class.getName());
-
-	private PeerManager peerManager = new PeerManager();
 
 	@ParentCommand
 	private Peer peerParent;
@@ -60,10 +61,16 @@ public class PeerStart implements Runnable {
 		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
 	private String hostname;
 
+	@Option(names={"-a", "--address"},
+	description="Account address to use for the peer.")
+	private long addressNumber;
+
 	@Override
 	public void run() {
 
 		Main mainParent = peerParent.mainParent;
+		PeerManager peerManager = PeerManager.create(mainParent.getSessionFilename());
+
 		int port = 0;
 		AKeyPair keyPair = null;
 		try {
@@ -75,6 +82,23 @@ public class PeerStart implements Runnable {
 
 		if (port!=0) {
 			port = Math.abs(port);
+		}
+		if ( addressNumber == 0) {
+			log.warning("please provide an account address to run the peer from.");
+			return;
+		}
+		Address peerAddress = Address.create(addressNumber);
+
+		if (hostname == null) {
+			try {
+				hostname = Helpers.getSessionHostname(mainParent.getSessionFilename());
+			} catch (IOException e) {
+				log.warning("Cannot load the session control file");
+			}
+		}
+		if (hostname == null) {
+			log.warning("Cannot find a local peer running, start the local network, or use the --hostname option");
+			return;
 		}
 
 		try {
@@ -89,8 +113,12 @@ public class PeerStart implements Runnable {
 				store = EtchStore.create(etchFile);
 			}
 			log.info("Starting peer");
-			peerManager.launchPeer(keyPair, port, store);
-			peerManager.waitForPeers(mainParent.getSessionFilename());
+			Server peerServer = peerManager.launchPeer(keyPair, port, store);
+
+			log.info("joining network at "+ hostname);
+			peerServer.joinNetwork(keyPair, peerAddress, hostname);
+
+			peerManager.waitForPeers();
 		} catch (Throwable t) {
 			System.out.println("Unable to launch peer "+t);
 		}

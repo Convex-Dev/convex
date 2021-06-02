@@ -4,9 +4,9 @@ import java.io.IOException;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.File;
-import java.net.InetSocketAddress;
 import java.util.Properties;
 
+import convex.core.util.Utils;
 
 public class Session {
 
@@ -32,7 +32,7 @@ public class Session {
 	/**
 	 * Add a peer to the list of peers kept in the session data.
 	 *
-	 * @param address Address sttring of the peer, this is the public key in hex without a leading 0x.
+	 * @param addressKey Address sttring of the peer, this is the public key in hex without a leading 0x.
 	 *
 	 * @param hostname Hostname of the peer. At the moment this will be localhost.
 	 *
@@ -41,19 +41,19 @@ public class Session {
 	 * @param etchFilename Filename that the peer is using to store the peer's state.
 	 *
 	 */
-	public void addPeer(String address, String hostname, int port, String etchFilename){
-		String[] items = new String[] {hostname, String.valueOf(port), etchFilename};
-		values.setProperty(PEER_HEADER_NAME + address, String.join(",", items));
+	public void addPeer(String addressKey, String hostname, String etchFilename){
+		String[] items = new String[] {hostname, etchFilename};
+		values.setProperty(PEER_HEADER_NAME + addressKey, String.join(",", items));
 	}
 
 	/**
 	 * Remove a peer from the list of peers held by this session.
 	 *
-	 * @param address Address of the peer, this is the public key used by the peer.
+	 * @param addressKey Address of the peer, this is the public key used by the peer.
 	 *
 	 */
-	public void removePeer(String address) {
-		values.remove(PEER_HEADER_NAME + address);
+	public void removePeer(String addressKey) {
+		values.remove(PEER_HEADER_NAME + addressKey);
 	}
 
 	/**
@@ -106,10 +106,10 @@ public class Session {
 	 *
 	 * @param index Index of the peer list to get an address.
 	 *
-	 * @return InetSocketAddress of the peer. If index is out of range return null.
+	 * @return Hostname of the peer. If index is out of range return null.
 	 *
 	 */
-	public InetSocketAddress getPeerAddressFromIndex(int index) {
+	public String getPeerHostnameFromIndex(int index) {
 		int count = 1;
 		for (String name: values.stringPropertyNames()) {
 			if ( name.matches(PEER_HEADER_NAME_MATCH)) {
@@ -117,7 +117,7 @@ public class Session {
 					String line = values.getProperty(name, "");
 					if (line.length() > 0) {
 						String[] items = line.split(",");
-						return new InetSocketAddress(items[0], Integer.parseInt(items[1]));
+						return items[0];
 					}
 				}
 				count ++;
@@ -131,33 +131,33 @@ public class Session {
 	 *
 	 * @param name Name of the peer to get an address.
 	 *
-	 * @return InetSocketAddress of the peer. If the peer name cannot be found return null.
+	 * @return Hostname of the peer. If the peer name cannot be found return null.
 	 *
 	 */
-	public InetSocketAddress getPeerAddressFromName(String name) {
+	public String getPeerHostnameFromName(String name) {
 		String line = values.getProperty(PEER_HEADER_NAME + name, "");
 		if (line.length() > 1) {
 			String[] items = line.split(",");
-			return new InetSocketAddress(items[0], Integer.parseInt(items[1]));
+			return items[0];
 		}
 		return null;
 	}
 
 	/**
-	 * Get a list of peer addresses.
+	 * Get a list of peer hostnames.
 	 *
-	 * @return List<InetSockAddress> items for each stored peer.
+	 * @return List<String> hostname item for each stored peer.
 	 *
 	 */
-	public InetSocketAddress[] getPeerAddressList() {
-		InetSocketAddress[] result = new InetSocketAddress[getPeerCount()];
+	public String[] getPeerHostnameList() {
+		String[] result = new String[getPeerCount()];
 		int index = 0;
 		for (String name: values.stringPropertyNames()) {
 			if ( name.matches(PEER_HEADER_NAME_MATCH)) {
 				String line = values.getProperty(name, "");
 				if (line.length() > 0){
 					String[] items = line.split(",");
-					result[index] = new InetSocketAddress(items[0], Integer.parseInt(items[1]));
+					result[index] = items[0];
 				}
 				index ++;
 			}
