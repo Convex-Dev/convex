@@ -26,8 +26,6 @@ public class LocalStart implements Runnable {
 
 	private static final Logger log = Logger.getLogger(LocalStart.class.getName());
 
-	private PeerManager peerManager = new PeerManager();
-
 	@ParentCommand
 	private Local localParent;
 
@@ -38,8 +36,8 @@ public class LocalStart implements Runnable {
 
 	@Override
 	public void run() {
-
 		Main mainParent = localParent.mainParent;
+		PeerManager peerManager = PeerManager.create(mainParent.getSessionFilename());
 		// Parse peer config
 		Map<Keyword,Object> peerConfig=new HashMap<>();
 
@@ -48,6 +46,6 @@ public class LocalStart implements Runnable {
 		}
 		log.info("Starting local network with "+count+" peer(s)");
 		peerManager.launchLocalPeers(count, Init.KEYPAIRS, Init.FIRST_PEER);
-		peerManager.waitForPeers(mainParent.getSessionFilename());
+		peerManager.waitForPeers();
 	}
 }

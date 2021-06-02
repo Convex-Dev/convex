@@ -24,6 +24,7 @@ import convex.core.Belief;
 import convex.core.Block;
 import convex.core.BlockResult;
 import convex.core.ErrorCodes;
+import convex.core.Order;
 import convex.core.Peer;
 import convex.core.Result;
 import convex.core.State;
@@ -836,13 +837,23 @@ public class Server implements Closeable {
 
 				// loop while the server is running
 				long lastConsensusPoint = peer.getConsensusPoint();
+                Order lastOrder = null;
 				while (running) {
+
+					Order order=peer.getPeerOrder();
+					if (order==null && lastOrder!=null) {
+						// System.out.println(getHostname() + " has left the network");
+					}
+					if (order!=null && lastOrder==null) {
+						// System.out.println(getHostname() + " has joined the network");
+					}
+					lastOrder = order;
 					if ( lastConsensusPoint != peer.getConsensusPoint()) {
 						// only update the peer connection lists if the state has changed
 						lastConsensusPoint = peer.getConsensusPoint();
 						connectToRemotePeers(getHostnameList());
+						// System.out.println(getHostname() + " " + manager.getConnections().size());
 					}
-					// System.out.println(getHostname() + " " + manager.getConnections().size());
 					try {
 						Thread.sleep(SERVER_CONNECTION_PAUSE);
 					} catch (InterruptedException e) {
@@ -850,8 +861,8 @@ public class Server implements Closeable {
 					}
 				}
 			} catch (InterruptedException e) {
-				/* OK? Close the thread normally */			
-			} catch (Throwable e) {	
+				/* OK? Close the thread normally */
+			} catch (Throwable e) {
 				log.severe("Unexpected exception, Terminating Server connection loop");
 				e.printStackTrace();
 			} finally {

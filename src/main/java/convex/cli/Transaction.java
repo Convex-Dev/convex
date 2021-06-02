@@ -60,7 +60,6 @@ public class Transaction implements Runnable {
 		description="Account address to use for the transaction request.")
 	private long addressNumber;
 
-
 	@Parameters(paramLabel="transactionCommand",
 		description="Transaction Command")
 	private String transactionCommand;
