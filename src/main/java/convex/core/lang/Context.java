@@ -22,6 +22,7 @@ import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
@@ -1886,10 +1887,9 @@ public final class Context<T extends ACell> extends AObject {
 
 		Hash lastStateHash = s.getHash();
 		// at the moment only :url is used in the data map
-		Keyword KEY_URL = Keyword.create("url");
 		for (ACell key: data.keySet()) {
-			if (KEY_URL.equals((Keyword) key)) {
-				AString url = (AString) data.get(KEY_URL);
+			if (Keywords.URL.equals((Keyword) key)) {
+				AString url = (AString) data.get(Keywords.URL);
 				PeerStatus updatedPeer=ps.withHostname(url);
 				s=s.withPeer(ak, updatedPeer); // adjust peer
 			}
