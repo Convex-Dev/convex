@@ -891,9 +891,6 @@ public class Core {
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			ACell a = args[0];
-			if (!(a instanceof AMap)) return context.withCastError(0,args, Types.MAP);
-
 			AMap<ACell, ACell> data = RT.ensureMap(args[0]);
 			if (data == null) return context.withCastError(0,args, Types.MAP);
 
