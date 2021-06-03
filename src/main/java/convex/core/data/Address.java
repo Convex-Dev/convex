@@ -3,6 +3,8 @@ package convex.core.data;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Errors;
@@ -44,6 +46,12 @@ public class Address extends ABlob {
 		if (b.count()!=8) return null;
 		return create(b.longValue());
 	}
+	
+	@Override
+	public AType getType() {
+		return Types.ADDRESS;
+	}
+	
 
 	@Override
 	public int hashCode() {

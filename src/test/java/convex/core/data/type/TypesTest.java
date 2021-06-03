@@ -18,6 +18,7 @@ import org.junit.jupiter.params.provider.ArgumentsProvider;
 import org.junit.jupiter.params.provider.ArgumentsSource;
 
 import convex.core.data.ACell;
+import convex.core.data.Address;
 import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -43,6 +44,14 @@ public class TypesTest {
 		assertFalse(t.check(null));
 		assertTrue(t.check(CVMLong.ONE));
 		assertFalse(t.check(CVMDouble.ONE));
+	}
+	
+	@Test
+	public void testAddress() {
+		AType t=Types.ADDRESS;
+		assertFalse(t.check(null));
+		assertFalse(t.check(convex.core.data.Blob.EMPTY));
+		assertTrue(t.check(Address.ZERO));
 	}
 	
 	@Test
