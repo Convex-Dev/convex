@@ -1881,9 +1881,10 @@ public final class Context<T extends ACell> extends AObject {
 		AccountStatus as = getAccountStatus(address);
 
 		AccountKey ak = as.getAccountKey();
-		if (ak == null) return withError(ErrorCodes.STATE,"The peer account cannot must have a public key");
+		if (ak == null) return withError(ErrorCodes.STATE,"The account signing this transaction must have a public key");
 		PeerStatus ps=s.getPeer(ak);
 		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for this account and account key: "+ak.toChecksumHex());
+		if (!ps.getOwner().equals(address)) return withError(ErrorCodes.STATE,"You are not the owner of this peer account");
 
 		Hash lastStateHash = s.getHash();
 		// at the moment only :url is used in the data map
