@@ -1534,12 +1534,12 @@ public class CoreTest extends ACVMTest {
 
 		// Undeclared function in tailcall
 		assertUndeclaredError(step("(do (defn f [x] :foo) (defn g [] (tailcall (h 1))) (g))"));
-		
+
 		// Arity error in tailcall
 		assertArityError(step("(do (defn g [] :foo) (defn f [x] (tailcall (g 1))) (f 1))"));
-		
+
 		// check we aren't consuming stack, should fail with :JUICE not :DEPTH
-		assertJuiceError(step("(do (def f (fn [x] (tailcall (f x)))) (f 1))")); 
+		assertJuiceError(step("(do (def f (fn [x] (tailcall (f x)))) (f 1))"));
 
 		// basic return mechanics
 		assertError(ErrorCodes.EXCEPTION,step("(tailcall (count 1))"));
@@ -2435,19 +2435,27 @@ public class CoreTest extends ACVMTest {
 	}
 
 	@Test
-	public void testSetPeerHostname() {
-		AccountKey FIRST_PEER=Init.KEYPAIRS[0].getAccountKey();
-		Context<ACell> ctx=step(INITIAL_CONTEXT,"(def my-peer 0x"+FIRST_PEER.toHexString()+")");
-		AccountKey MY_PEER=FIRST_PEER;
+	public void testSetPeerData() {
+		AccountKey FIRST_PEER_KEY=Init.KEYPAIRS[0].getAccountKey();
 		String newHostname = "new_hostname:1234";
+		Context<?> ctx=INITIAL_CONTEXT;
+		// make sure we are using the FIRST_PPER adderss
+		ctx=ctx.forkWithAddress(Init.FIRST_PEER);
 		{
-			Context<ACell> rc=step(ctx,"(set-peer-hostname my-peer \"" + newHostname + "\")");
-			assertNotError(rc);
-			assertEquals(newHostname,rc.getState().getPeer(MY_PEER).getHostname().toString());
-		}
+			ctx=step(ctx,"(set-peer-data {:url \"" + newHostname + "\"})");
+			assertNotError(ctx);
+			assertEquals(newHostname,ctx.getState().getPeer(FIRST_PEER_KEY).getHostname().toString());
+			ctx=step(ctx,"(set-peer-data {})");
+			assertNotError(ctx);
+			// no change to data
+			assertEquals(newHostname,ctx.getState().getPeer(FIRST_PEER_KEY).getHostname().toString());
+        }
 
-		// set a peer account key that isn't a peer
-		assertStateError(step(ctx,"(set-peer-hostname 0x1234567812345678123456781234567812345678123456781234567812345678 \"localhost\")"));
+		assertCastError(step(ctx,"(set-peer-data 0x1234567812345678123456781234567812345678123456781234567812345678)"));
+		assertCastError(step(ctx,"(set-peer-data :bad-key)"));
+		assertArityError(step(ctx,"(set-peer-data {:url \"test\" :bad-key 1234})"));
+
+
 	}
 
 	@Test

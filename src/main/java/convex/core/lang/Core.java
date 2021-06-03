@@ -885,20 +885,19 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMLong> SET_PEER_HOSTNAME = reg(new CoreFn<>(Symbols.SET_PEER_HOSTNAME) {
+	public static final CoreFn<CVMLong> SET_PEER_DATA = reg(new CoreFn<>(Symbols.SET_PEER_DATA) {
 		@SuppressWarnings("unchecked")
 		@Override
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
-			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-            AccountKey accountKey = RT.ensureAccountKey(args[0]);
-			if (accountKey == null) return context.withCastError(0,args, Types.KEY);
+			ACell a = args[0];
+			if (!(a instanceof AMap)) return context.withCastError(0,args, Types.MAP);
 
-			AString hostname = RT.ensureString(args[1]);
-			if (hostname == null) return context.withCastError(1,args, Types.STRING);
+			AMap<ACell, ACell> data = RT.ensureMap(args[0]);
+			if (data == null) return context.withCastError(0,args, Types.MAP);
 
-			return context.setPeerHostname(accountKey, hostname).consumeJuice(Juice.TRANSFER);
-
+			return context.setPeerData(data).consumeJuice(Juice.TRANSFER);
 		}
 	});
 

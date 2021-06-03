@@ -315,7 +315,7 @@ public class Server implements Closeable {
 				AVector<AString> statusPeerHostnameList = (AVector<AString>) values.get(3);
 
 				// set our peer hostname on the network
-				String transactionCommand = String.format("(set-peer-hostname %s \"%s\")", keyPair.getAccountKey(), getHostname());
+				String transactionCommand = String.format("(set-peer-data {:url \"%s\"})", getHostname());
 				ACell message = Reader.read(transactionCommand);
 				ATransaction transaction = Invoke.create(address, -1, message);
 				result = convex.transactSync(transaction, 50000);
