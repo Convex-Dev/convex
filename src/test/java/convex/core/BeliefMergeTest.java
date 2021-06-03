@@ -63,7 +63,7 @@ public class BeliefMergeTest {
 			KEYS[i] = key;
 			ADDRESSES[i] = address;
 			AccountStatus accStatus = AccountStatus.create((i + 1) * 1000000,key);
-			PeerStatus peerStatus = PeerStatus.create((i + 1) * 100000);
+			PeerStatus peerStatus = PeerStatus.create(address,(i + 1) * 100000);
 			accounts = accounts.conj(accStatus);
 			peers = peers.assoc(key, peerStatus);
 		}
@@ -195,7 +195,7 @@ public class BeliefMergeTest {
 		long INITIAL_BALANCE_RECEIVER = INITIAL_STATE.getBalance(RADDRESS);
 		long TRANSFER_AMOUNT = 100;
 		long TJUICE=Juice.TRANSFER;
-		
+
 		ATransaction trans = Transfer.create(PADDRESS, 1, RADDRESS, TRANSFER_AMOUNT); // note 1 = first sequence number required
 		Peer[] bs3 = proposeTransactions(bs2, PROPOSER, trans);
 		if (ANALYSIS) printAnalysis(bs3, "Make proposal");
@@ -251,7 +251,7 @@ public class BeliefMergeTest {
 	 * round of peers updates is gossipped simultaneously and the results checked at
 	 * each stage To validate correct propagation of the new block across the
 	 * network
-	 * 
+	 *
 	 * @throws BoundsException
 	 */
 	@Test
@@ -277,7 +277,7 @@ public class BeliefMergeTest {
 		Long INITIAL_BALANCE_PROPOSER = INITIAL_STATE.getBalance(PADDRESS);
 		Long INITIAL_BALANCE_RECEIVER = INITIAL_STATE.getBalance(RADDRESS);
 		long TJUICE=Juice.TRANSFER;
-		
+
 		Peer[] bs3 = bs2;
 		for (int i = 0; i < NUM_PEERS; i++) {
 			long TRANSFER_AMOUNT = 100L;
@@ -341,7 +341,7 @@ public class BeliefMergeTest {
 	 * This test creates a set of peers, and one transaction for each peer Each
 	 * round of peers updates is gossipped partially To validate correct propagation
 	 * of the new block across the network
-	 * 
+	 *
 	 * @throws BoundsException
 	 */
 	@Test
@@ -372,7 +372,7 @@ public class BeliefMergeTest {
 		long INITIAL_BALANCE_RECEIVER = INITIAL_STATE.getBalance(RADDRESS);
 		long TJUICE=Juice.TRANSFER*NUM_INITIAL_TRANS;
 
-		
+
 		Peer[] bs3 = bs2;
 		for (int i = 0; i < NUM_PEERS; i++) {
 			// propose initial transactions

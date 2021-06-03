@@ -2439,9 +2439,9 @@ public class CoreTest extends ACVMTest {
 		AccountKey FIRST_PEER_KEY=Init.KEYPAIRS[0].getAccountKey();
 		String newHostname = "new_hostname:1234";
 		Context<?> ctx=INITIAL_CONTEXT;
-		// make sure we are using the FIRST_PPER adderss
 		ctx=ctx.forkWithAddress(Init.FIRST_PEER);
 		{
+			// make sure we are using the FIRST_PPER adderss
 			ctx=step(ctx,"(set-peer-data {:url \"" + newHostname + "\"})");
 			assertNotError(ctx);
 			assertEquals(newHostname,ctx.getState().getPeer(FIRST_PEER_KEY).getHostname().toString());
@@ -2451,6 +2451,13 @@ public class CoreTest extends ACVMTest {
 			assertEquals(newHostname,ctx.getState().getPeer(FIRST_PEER_KEY).getHostname().toString());
         }
 
+		ctx=ctx.forkWithAddress(Init.VILLAIN);
+		{
+			newHostname = "set-key-hijack";
+			ctx=step(ctx,"(do (set-key 0x" + FIRST_PEER_KEY.toHexString() + ")(set-peer-data {:url \"" + newHostname + "\"}))");
+			assertStateError(ctx);
+		}
+		ctx=ctx.forkWithAddress(Init.FIRST_PEER);
 		assertCastError(step(ctx,"(set-peer-data 0x1234567812345678123456781234567812345678123456781234567812345678)"));
 		assertCastError(step(ctx,"(set-peer-data :bad-key)"));
 		assertArityError(step(ctx,"(set-peer-data {:url \"test\" :bad-key 1234})"));
