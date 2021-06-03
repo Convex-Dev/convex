@@ -9,6 +9,7 @@ import convex.core.State;
 import convex.core.data.ABlobMap;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AMap;
 import convex.core.data.AObject;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
@@ -19,7 +20,9 @@ import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
+import convex.core.data.Hash;
 import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
@@ -917,7 +920,7 @@ public final class Context<T extends ACell> extends AObject {
 					if (fn==Core.TAILCALL_STAR) break;
 					TailcallValue rv=(TailcallValue)v;
 					ACell[] newArgs = rv.getValues();
-					
+
 					// redirect function and invoke
 					fn = (AFn<R>) rv.getFunction();
 					ctx = fn.invoke((Context<ACell>) ctx,newArgs);
@@ -1865,20 +1868,39 @@ public final class Context<T extends ACell> extends AObject {
 	}
 
 	/**
-	 * Sets peer url.
+	 * Sets peer data.
 	 *
-	 * @param peerAddress Peer Address on which to stake
-	 * @param url url for the peer
-	 * @return Context with final take set
+	 * @param data Map of data to set for the peer
+	 * @return Context with final peer data set
 	 */
-	public <R extends ACell> Context<R> setPeerHostname(AccountKey accountKey, AString hostname) {
+	public <R extends ACell> Context<R> setPeerData(AMap<ACell, ACell> data) {
 		State s=getState();
-		PeerStatus ps=s.getPeer(accountKey);
-		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for Public Key: "+accountKey.toChecksumHex());
-		// if (url==null) return this.withArgumentError("Cannot set an empty url");
 
-		PeerStatus updatedPeer=ps.withHostname(hostname);
-		s=s.withPeer(accountKey, updatedPeer); // adjust peer
+		// get the callers account and account status
+		Address address = getAddress();
+		AccountStatus as = getAccountStatus(address);
+
+		AccountKey ak = as.getAccountKey();
+		if (ak == null) return withError(ErrorCodes.STATE,"The peer account cannot must have a public key");
+		PeerStatus ps=s.getPeer(ak);
+		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for this account and account key: "+ak.toChecksumHex());
+
+		Hash lastStateHash = s.getHash();
+		// at the moment only :url is used in the data map
+		for (ACell key: data.keySet()) {
+			if (Keywords.URL.equals((Keyword) key)) {
+				AString url = (AString) data.get(Keywords.URL);
+				PeerStatus updatedPeer=ps.withHostname(url);
+				s=s.withPeer(ak, updatedPeer); // adjust peer
+			}
+			else {
+				return withArityError("invalid key name " + key.toString());
+			}
+		}
+		// if no change just return the current context
+		if (lastStateHash.equals(s.getHash())){
+			return (Context<R>) this;
+		}
 		return withState(s);
 	}
 

@@ -1017,12 +1017,13 @@
          :signature [{:params [mem]}]}
 	}
 
-  set-peer-hostname
+  set-peer-data
   {
     :doc {:description "Sets the hostname on a given peer. Peer must exist, with a public account key. Setting hostname to null will remove the peer from the network."
-          :examples [{:code "(set-peer-hostname trusted-peer-account-key \"my-peer.com:4242\")"}]
+          :examples [{:code "(set-peer-data {:url \"my-peer.com:4242\"})"}]
           :type :function
-          :signature [{:params [account-key hostname]}]}
+          :signature [{:params [map]}]
+          :errors {:CAST "If the first argument is not a map."}}
   }
 
   set*
