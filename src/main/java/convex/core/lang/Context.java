@@ -1897,7 +1897,7 @@ public final class Context<T extends ACell> extends AObject {
 				return withArityError("invalid key name " + key.toString());
 			}
 		}
-		// if no change just return the state
+		// if no change just return the current context
 		if (lastStateHash.equals(s.getHash())){
 			return (Context<R>) this;
 		}
