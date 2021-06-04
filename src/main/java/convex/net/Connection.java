@@ -21,6 +21,7 @@ import java.util.logging.Logger;
 
 import convex.core.Result;
 import convex.core.data.ACell;
+import convex.core.data.AccountKey;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Format;
@@ -61,6 +62,10 @@ public class Connection {
 	 */
 	private final AStore store;
 
+	/**
+		* If trusted the account key of the remote peer
+		*/
+	private AccountKey trustedKey;
 
 	private static final Logger log = Logger.getLogger(Connection.class.getName());
 
@@ -604,6 +609,16 @@ public class Connection {
 		}
 	}
 
+	/*
+	 * TODO better way to make this field final and immutable, will to re-create the connection
+	 * class as a new object, but this will lose the connection.
+	 */
+	public Connection withTrustedKey(AccountKey accountKey) {
+		// set the private value
+		trustedKey = accountKey;
+		return this;
+	}
+
 	public boolean sendBytes() throws IOException {
 		return sender.maybeSendBytes();
 	}
@@ -611,5 +626,13 @@ public class Connection {
 	@Override
 	public String toString() {
 		return "PeerConnection: " + channel;
+	}
+
+	public AccountKey trustedKey() {
+		return trustedKey;
+	}
+
+	public boolean isTrusted() {
+		return trustedKey != null;
 	}
 }

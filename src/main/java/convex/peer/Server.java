@@ -533,7 +533,8 @@ public class Server implements Closeable {
 			ACell o = r.getValue();
 			if (o == belief) return; // skip sending data for belief cell itself, will be BELIEF payload
 			Message msg = Message.createData(o);
-			manager.broadcast(msg);
+            // broadcast to all peers trusted or not
+			manager.broadcast(msg, false);
 		};
 
 		// persist the state of the Peer, announcing the new Belief
@@ -542,7 +543,8 @@ public class Server implements Closeable {
 		// Broadcast latest Belief to connected Peers
 		SignedData<Belief> sb = peer.getSignedBelief();
 		Message msg = Message.createBelief(sb);
-		manager.broadcast(msg);
+        // at the moment broadcast to all peers trusted or not
+		manager.broadcast(msg, false);
 
 		// Report transaction results
 		long newConsensusPoint = peer.getConsensusPoint();

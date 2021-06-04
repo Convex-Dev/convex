@@ -48,10 +48,19 @@ public class ConnectionManager {
 		return connections;
 	}
 
-	public void broadcast(Message msg) {
+	/**
+	 *
+	 * @param msg Message to broadcast
+	 *
+	 * @param isTrusted Only broadcast to trusted peers
+	 *
+	 */
+	public void broadcast(Message msg, boolean isTrusted) {
 		for (Connection pc : connections.values()) {
 			try {
-				pc.sendMessage(msg);
+				if ( isTrusted && pc.isTrusted() | !isTrusted) {
+					pc.sendMessage(msg);
+				}
 			} catch (IOException e) {
 				log.warning("Error in broadcast: " + e.getMessage());
 			}
