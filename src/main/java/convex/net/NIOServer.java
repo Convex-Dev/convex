@@ -203,12 +203,12 @@ public class NIOServer implements Closeable {
 				log.warning("Interrupted while attempting to add to receive queue");
 				Thread.currentThread().interrupt();
 			}
-		},store);
+		},store, null);
 	}
 
 	protected void selectRead(SelectionKey key) throws IOException {
 
-		// Log.info("Connection read from: "+sc.getRemoteAddress()+" with key:"+key);
+		// log.info("Connection read from: "+sc.getRemoteAddress()+" with key:"+key);
 		Connection conn=ensurePeerConnection(key);
 		if (conn==null) throw new Error("No PeerConnection specified");
 		try {
@@ -222,7 +222,7 @@ public class NIOServer implements Closeable {
 			key.cancel();
 		}
 		catch (BadFormatException e) {
-			log.log(LEVEL_BAD_CONNECTION,"Cancelled connection: Bad data format from: "+conn.getRemoteAddress()+" message: "+e.getMessage());
+			log.log(LEVEL_BAD_CONNECTION,"Cancelled connection: Bad data format from: "+conn.getRemoteAddress()+" message: " +e.getMessage());
 			// TODO: blacklist peer?
 			key.cancel();
 		}

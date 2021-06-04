@@ -44,7 +44,7 @@ public class Message {
 		return create(null,MessageType.BELIEF,sb);
 	}
 
-	public static Message createChallenge(ACell challenge) {
+	public static Message createChallenge(SignedData<ACell> challenge) {
 		return create(null,MessageType.CHALLENGE, challenge);
 	}
 
