@@ -781,7 +781,6 @@ public class Server implements Closeable {
 
 		} catch (Throwable t) {
 			log.warning("Challenge Error: " + t);
-			// t.printStackTrace();
 		}
 	}
 
@@ -1306,4 +1305,5 @@ public class Server implements Closeable {
 	public ServerInformation getServerInformation() {
 		return ServerInformation.create(this, manager);
 	}
+
 }
