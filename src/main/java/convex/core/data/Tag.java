@@ -7,7 +7,7 @@ package convex.core.data;
  * 
  * This is the gospel. The whole truth, and nothing but the truth.
  * 
- * Hack here at your peril.
+ * Hack here at your peril. Changes will break every single database, most immutable Value IDs, and probably your heart.
  */
 public class Tag {
 	// Basic Types: Primitive values and numerics
@@ -75,7 +75,6 @@ public class Tag {
 	// Code
 	public static final byte OP = (byte) 0xCC;
 	public static final byte CORE_DEF = (byte) 0xCD;
-	public static final byte EXPANDER = (byte) 0xCE;
 	public static final byte FN = (byte) 0xCF;
 	public static final byte FN_MULTI = (byte) 0xCB;
 	
