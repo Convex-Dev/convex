@@ -13,7 +13,7 @@ public class Tag {
 	// Basic Types: Primitive values and numerics
 	// we might add unsigned primitives at some point?
 	public static final byte NULL = (byte) 0x00;
-	public static final byte BYTE = (byte) 0x03;
+	public static final byte BYTE = (byte) 0x01;
 	//public static final byte SHORT = (byte) 0x05;
 	//public static final byte INT = (byte) 0x07;
 	public static final byte LONG = (byte) 0x09;
