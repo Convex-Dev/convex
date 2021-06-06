@@ -142,7 +142,7 @@ public class Hash extends AArrayBlob {
 	 * @param bb
 	 * @return Hash object read from ByteBuffer
 	 */
-	public static Hash read(ByteBuffer bb) {
+	public static Hash readRaw(ByteBuffer bb) {
 		byte[] bs = new byte[Hash.LENGTH];
 		bb.get(bs);
 		return Hash.wrap(bs);

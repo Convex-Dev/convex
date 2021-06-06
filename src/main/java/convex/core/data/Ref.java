@@ -288,7 +288,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * @return Ref read from ByteBuffer
 	 */
 	public static <T extends ACell> Ref<T> readRaw(ByteBuffer data) {
-		Hash h = Hash.read(data);
+		Hash h = Hash.readRaw(data);
 		Ref<T> ref=Ref.forHash(h);
 		return ref.markEmbedded(false);
 	}

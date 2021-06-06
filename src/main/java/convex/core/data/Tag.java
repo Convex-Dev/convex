@@ -14,19 +14,19 @@ public class Tag {
 	// we might add unsigned primitives at some point?
 	public static final byte NULL = (byte) 0x00;
 	public static final byte BYTE = (byte) 0x03;
-	public static final byte SHORT = (byte) 0x05;
-	public static final byte INT = (byte) 0x07;
+	//public static final byte SHORT = (byte) 0x05;
+	//public static final byte INT = (byte) 0x07;
 	public static final byte LONG = (byte) 0x09;
 
-	public static final byte BIG_INTEGER = (byte) 0x0a; // Arbitrary length integer
+	//public static final byte BIG_INTEGER = (byte) 0x0a; // Arbitrary length integer
 	public static final byte CHAR = (byte) 0x0c;
 	public static final byte DOUBLE = (byte) 0x0d;
-	public static final byte FLOAT = (byte) 0x0f;
-	public static final byte BIG_DECIMAL = (byte) 0x0e; // E notation precise decimal
+	//public static final byte FLOAT = (byte) 0x0f;
+	//public static final byte BIG_DECIMAL = (byte) 0x0e; // E notation precise decimal
 
 	// Amounts of tokens
 	// Note: Amounts use the low 4 bits of the tag for decimal scale factor
-	public static final byte AMOUNT = (byte) 0x10; // Financial amount
+	//public static final byte AMOUNT = (byte) 0x10; // Financial amount
 
 	// crypto and security primitives
 	public static final byte REF = (byte) 0x20;
