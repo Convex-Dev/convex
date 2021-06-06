@@ -15,11 +15,12 @@ import convex.core.lang.impl.RecordFormat;
  *
  */
 public class PeerStatus extends ARecord {
-	private static final Keyword[] PEER_KEYS = new Keyword[] { Keywords.STAKE, Keywords.STAKES,Keywords.DELEGATED_STAKE,
+	private static final Keyword[] PEER_KEYS = new Keyword[] { Keywords.OWNER, Keywords.STAKE, Keywords.STAKES,Keywords.DELEGATED_STAKE,
 			Keywords.URL};
 
 	private static final RecordFormat FORMAT = RecordFormat.of(PEER_KEYS);
 
+    private final Address owner;
 	private final long stake;
 	private final long delegatedStake;
 
@@ -27,20 +28,21 @@ public class PeerStatus extends ARecord {
 
 	private final AString hostname;
 
-	private PeerStatus(long stake, ABlobMap<Address, CVMLong> stakes, long delegatedStake, AString host) {
+	private PeerStatus(Address owner, long stake, ABlobMap<Address, CVMLong> stakes, long delegatedStake, AString host) {
 		super(FORMAT);
+        this.owner = owner;
 		this.stake = stake;
 		this.delegatedStake = delegatedStake;
 		this.hostname = host;
 		this.stakes = stakes;
 	}
 
-	public static PeerStatus create(long stake) {
-		return create(stake, null);
+	public static PeerStatus create(Address owner, long stake) {
+		return create(owner, stake, null);
 	}
 
-	public static PeerStatus create(long stake, AString hostString) {
-		return new PeerStatus(stake, BlobMaps.empty(), 0L, hostString);
+	public static PeerStatus create(Address owner, long stake, AString hostString) {
+		return new PeerStatus(owner, stake, BlobMaps.empty(), 0L, hostString);
 	}
 	/**
 	 * Gets the stake of this peer
@@ -59,6 +61,16 @@ public class PeerStatus extends ARecord {
 	public long getOwnStake() {
 		return stake;
 	}
+
+    /**
+	 * Gets the self-owned stake of this peer
+	 *
+	 * @return Own the owner of this peer
+	 */
+	public Address getOwner() {
+		return owner;
+	}
+
 
 	/**
 	 * Gets the delegated stake of this peer
@@ -87,6 +99,7 @@ public class PeerStatus extends ARecord {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
+		pos = Format.write(bs,pos, owner);
 		pos = Format.writeVLCLong(bs,pos, stake);
 		pos = Format.write(bs,pos, stakes);
 		pos = Format.writeVLCLong(bs,pos, delegatedStake);
@@ -95,13 +108,14 @@ public class PeerStatus extends ARecord {
 	}
 
 	public static PeerStatus read(ByteBuffer data) throws BadFormatException {
+        Address owner = Format.read(data);
 		long stake = Format.readVLCLong(data);
 		ABlobMap<Address, CVMLong> stakes = Format.read(data);
 		long delegatedStake = Format.readVLCLong(data);
 
 		AString hostString = Format.read(data);
 
-		return new PeerStatus(stake,stakes,delegatedStake,hostString);
+		return new PeerStatus(owner, stake,stakes,delegatedStake,hostString);
 	}
 
 	@Override
@@ -113,7 +127,6 @@ public class PeerStatus extends ARecord {
 	public boolean isCanonical() {
 		return true;
 	}
-
 
 
 	/**
@@ -147,11 +160,11 @@ public class PeerStatus extends ARecord {
 
 		ABlobMap<Address, CVMLong> newStakes = (newStake == 0L) ? stakes.dissoc(delegator)
 				: stakes.assoc(delegator, CVMLong.create(newStake));
-		return new PeerStatus(stake, newStakes, newDelegatedStake, hostname);
+		return new PeerStatus(owner, stake, newStakes, newDelegatedStake, hostname);
 	}
 
-	public PeerStatus withHostname(AString hostname) {
-		return new PeerStatus(stake, stakes, delegatedStake, hostname);
+	public PeerStatus withHostname(AString newHostname) {
+		return new PeerStatus(owner, stake, stakes, delegatedStake, newHostname);
     }
 
 	@Override
@@ -166,6 +179,7 @@ public class PeerStatus extends ARecord {
 
 	@Override
 	public ACell get(ACell key) {
+		if (Keywords.OWNER.equals(key)) return owner;
 		if (Keywords.STAKE.equals(key)) return CVMLong.create(stake);
 		if (Keywords.STAKES.equals(key)) return stakes;
 		if (Keywords.DELEGATED_STAKE.equals(key)) return CVMLong.create(delegatedStake);
@@ -182,16 +196,17 @@ public class PeerStatus extends ARecord {
 	@SuppressWarnings("unchecked")
 	@Override
 	protected PeerStatus updateAll(ACell[] newVals) {
-		long newStake = ((CVMLong) newVals[0]).longValue();
-		ABlobMap<Address, CVMLong> newStakes = (ABlobMap<Address, CVMLong>) newVals[1];
-		long newDelStake = ((CVMLong) newVals[2]).longValue();
-		AString newHostname = (AString) newVals[3];
+        Address newOwner = (Address) newVals[0];
+		long newStake = ((CVMLong) newVals[1]).longValue();
+		ABlobMap<Address, CVMLong> newStakes = (ABlobMap<Address, CVMLong>) newVals[2];
+		long newDelStake = ((CVMLong) newVals[3]).longValue();
+		AString newHostname = (AString) newVals[4];
 
 		if ((this.stake==newStake)&&(this.stakes==newStakes)
 				&&(this.hostname==newHostname)&&(this.delegatedStake==newDelStake)) {
 			return this;
 		}
-		return new PeerStatus(newStake, newStakes, newDelStake, newHostname);
+		return new PeerStatus(newOwner, newStake, newStakes, newDelStake, newHostname);
 	}
 
 	protected static long computeDelegatedStake(ABlobMap<Address, CVMLong> stakes) {

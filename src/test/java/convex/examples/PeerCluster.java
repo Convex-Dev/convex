@@ -13,6 +13,7 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
+import convex.core.data.Address;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Keyword;
@@ -64,9 +65,10 @@ public class PeerCluster {
 			Map<Keyword, Object> config = PEER_CONFIGS.get(i);
 			int port = Utils.toInt(config.get(Keywords.PORT));
 			AString sa = Strings.create("http://localhost"+ port);
-			PeerStatus ps = PeerStatus.create(1000000000, sa);
+			Address address = Address.create(i);
+			PeerStatus ps = PeerStatus.create(address, 1000000000, sa);
 			peers = peers.assoc(peerKey, ps);
-			
+
 			AccountStatus as = AccountStatus.create(1000000000,peerKey);
 			accts = accts.conj(as);
 		}

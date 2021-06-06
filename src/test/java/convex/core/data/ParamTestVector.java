@@ -13,11 +13,12 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import convex.core.exceptions.BadFormatException;
+import convex.core.data.Address;
 import convex.test.Samples;
 
 /**
  * Parameterised test class for a bunch of vectors.
- * 
+ *
  */
 @RunWith(Parameterized.class)
 public class ParamTestVector {
@@ -33,7 +34,7 @@ public class ParamTestVector {
 				.asList(new Object[][] { { "Empty Vector", Vectors.empty() }, { "Single value vector", Vectors.of(7L) },
 						{ "MapEntry vector", MapEntry.of(1L, 2L) }, { "Nested vector", Vectors.of(Vectors.empty()) },
 						{ "Vector with Account status", Vectors.of(AccountStatus.create(1000L,Samples.ACCOUNT_KEY)) },
-						{ "Vector with Peer status", Vectors.of(PeerStatus.create(1000L)) },
+						{ "Vector with Peer status", Vectors.of(PeerStatus.create(Address.create(11), 1000L)) },
 						{ "Length 10 vector", Samples.INT_VECTOR_10 }, { "Length 16 vector", Samples.INT_VECTOR_16 },
 						{ "Length 23 vector", Samples.INT_VECTOR_23 }, { "Length 32 vector", Samples.INT_VECTOR_32 },
 						{ "Length 300 vector", Samples.INT_VECTOR_300 },

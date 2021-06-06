@@ -129,11 +129,12 @@ public class Init {
 			// set a staked fund such that the first peer starts with super-majority
 			long stakedFunds = (long) (((i == 0) ? 0.75 : 0.01) * peerFunds);
 
-			// split peer funds between stake and account
-			peers = addPeer(peers, peerKey, stakedFunds);
-
+            // create the peer account first
 			Address peerAddress = Address.create(accts.count());
 			accts = addAccount(accts, peerAddress, peerKey, peerFunds - stakedFunds);
+
+            // split peer funds between stake and account
+			peers = addPeer(peers, peerKey, peerAddress, stakedFunds);
 		}
 
 		// Build globals
@@ -298,8 +299,8 @@ public class Init {
 	}
 
 	private static BlobMap<AccountKey, PeerStatus> addPeer(BlobMap<AccountKey, PeerStatus> peers, AccountKey peerKey,
-			long initialStake) {
-		PeerStatus ps = PeerStatus.create(initialStake, null);
+			Address owner, long initialStake) {
+		PeerStatus ps = PeerStatus.create(owner, initialStake, null);
 		return peers.assoc(peerKey, ps);
 	}
 
