@@ -219,9 +219,9 @@ public class OpsTest extends ACVMTest {
 		l1.validateCell();
 		assertNull(l1.getAddress());
 		
-		Lookup<?> l2=Lookup.create(Init.CORE_ADDRESS,"count");
+		Lookup<?> l2=Lookup.create(Constant.of(Init.CORE_ADDRESS),"count");
 		l2.validateCell();
-		assertSame(Init.CORE_ADDRESS,l2.getAddress());
+		assertEquals(Constant.of(Init.CORE_ADDRESS),l2.getAddress());
 	}
 
 	@Test

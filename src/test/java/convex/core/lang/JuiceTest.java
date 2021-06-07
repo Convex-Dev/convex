@@ -74,13 +74,13 @@ public class JuiceTest extends ACVMTest {
 	@Test
 	public void testSimpleValues() {
 		assertEquals(Juice.CONSTANT, juice("1"));
-		assertEquals(Juice.LOOKUP_DYNAMIC, juice("count"));
+		assertEquals(Juice.LOOKUP_SYM, juice("count"));
 		assertEquals(Juice.DO, juice("(do)"));
 	}
 
 	@Test
 	public void testFunctionCalls() {
-		assertEquals(Juice.LOOKUP_DYNAMIC + Juice.EQUALS, juice("(=)"));
+		assertEquals(Juice.LOOKUP_SYM + Juice.EQUALS, juice("(=)"));
 	}
 
 	@Test
@@ -104,7 +104,7 @@ public class JuiceTest extends ACVMTest {
 	public void testEval() {
 		{// eval for a single constant
 			long j = juice("(eval 1)");
-			assertEquals((Juice.EVAL + Juice.LOOKUP_DYNAMIC + Juice.CONSTANT) + Juice.EXPAND_CONSTANT + Juice.COMPILE_CONSTANT
+			assertEquals((Juice.EVAL + Juice.LOOKUP_SYM + Juice.CONSTANT) + Juice.EXPAND_CONSTANT + Juice.COMPILE_CONSTANT
 					+ Juice.CONSTANT, j);
 
 			// expand list with symbol and number literal
@@ -125,7 +125,7 @@ public class JuiceTest extends ACVMTest {
 
 		{// eval for a small vector
 			long j = juice("(eval [1])");
-			long exParams = (Juice.LOOKUP_DYNAMIC + oneElemVectorJuice); // prepare call (lookup 'eval', build 1-vector arg)
+			long exParams = (Juice.LOOKUP_SYM + oneElemVectorJuice); // prepare call (lookup 'eval', build 1-vector arg)
 			long exCompile = compileJuice("[1]"); // cost of compiling [1]
 			long exInvoke = (Juice.EVAL + oneElemVectorJuice); // cost of eval plus cost of running [1]
 			assertEquals(exParams + exCompile + exInvoke, j);
@@ -150,24 +150,24 @@ public class JuiceTest extends ACVMTest {
 
 	@Test
 	public void testReturn() {
-		assertEquals(Juice.RETURN + Juice.CONSTANT + Juice.LOOKUP_DYNAMIC, juice("(return :foo)"));
+		assertEquals(Juice.RETURN + Juice.CONSTANT + Juice.LOOKUP_SYM, juice("(return :foo)"));
 	}
 
 	@Test
 	public void testHalt() {
-		assertEquals(Juice.HALT + Juice.CONSTANT + Juice.LOOKUP_DYNAMIC, juice("(halt 123)"));
+		assertEquals(Juice.HALT + Juice.CONSTANT + Juice.LOOKUP_SYM, juice("(halt 123)"));
 	}
 
 	@Test
 	public void testRollback() {
-		assertEquals(Juice.ROLLBACK + Juice.CONSTANT + Juice.LOOKUP_DYNAMIC, juice("(rollback 123)"));
+		assertEquals(Juice.ROLLBACK + Juice.CONSTANT + Juice.LOOKUP_SYM, juice("(rollback 123)"));
 	}
 
 	@Test
 	public void testLoopIteration() {
 		long j1 = juice("(loop [i 2] (cond (> i 0) (recur (dec i)) :end))");
 		long j2 = juice("(loop [i 3] (cond (> i 0) (recur (dec i)) :end))");
-		assertEquals(Juice.COND_OP + (Juice.LOOKUP_DYNAMIC * 3) + (Juice.LOOKUP*2) + Juice.CONSTANT * 1 + Juice.ARITHMETIC + Juice.NUMERIC_COMPARE
+		assertEquals(Juice.COND_OP + (Juice.LOOKUP_SYM * 3) + ((Juice.LOOKUP+Juice.CONSTANT)*2) + Juice.CONSTANT * 1 + Juice.ARITHMETIC + Juice.NUMERIC_COMPARE
 				+ Juice.RECUR, j2 - j1);
 	}
 }

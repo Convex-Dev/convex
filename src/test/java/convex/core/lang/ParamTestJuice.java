@@ -24,7 +24,9 @@ import convex.core.util.Utils;
 @RunWith(Parameterized.class)
 public class ParamTestJuice {
 
-	private static final long JUICE_EMPTY_MAP = (Juice.BUILD_DATA + Juice.LOOKUP_DYNAMIC); // consider: (hash-map)
+	private static final long JUICE_SYM_LOOKUP = Juice.LOOKUP_SYM;
+	private static final long JUICE_LOCAL_LOOKUP = Juice.LOOKUP+Juice.CONSTANT;
+	private static final long JUICE_EMPTY_MAP = (Juice.BUILD_DATA + JUICE_SYM_LOOKUP); // consider: (hash-map)
 	private static final long JUICE_IDENTITY_FN = (Juice.LAMBDA);
 
 	@Parameterized.Parameters(name = "{index}: {0}")
@@ -35,18 +37,18 @@ public class ParamTestJuice {
 				{ "{}", Maps.empty(), JUICE_EMPTY_MAP }, // (hash-map)
 				{ "(hash-map)", Maps.empty(), JUICE_EMPTY_MAP }, // (hash-map)
 				{ "(eval 1)", 1L,
-						(Juice.EVAL + Juice.LOOKUP_DYNAMIC + Juice.CONSTANT) + Juice.EXPAND_CONSTANT + Juice.COMPILE_CONSTANT
+						(Juice.EVAL + JUICE_SYM_LOOKUP + Juice.CONSTANT) + Juice.EXPAND_CONSTANT + Juice.COMPILE_CONSTANT
 								+ Juice.CONSTANT },
 				{ "(do)", null, Juice.DO }, { "({} 0 1)", 1L, JUICE_EMPTY_MAP + Juice.CONSTANT * 2 },
 				{ "(do (do :foo))", Keyword.create("foo"), Juice.DO * 2 + Juice.CONSTANT },
 				{ "(let [])", null, Juice.LET }, { "(cond)", null, Juice.COND_OP },
 				{ "(if 1 2 3)", 2L, Juice.COND_OP + 2 * Juice.CONSTANT },
 				{ "(fn [x] x)", eval("(fn [x] x)").getResult(), JUICE_IDENTITY_FN },
-				{ "(do (def a 3) a)", 3L, Juice.DO + Juice.CONSTANT + Juice.LOOKUP_DYNAMIC + Juice.DEF },
+				{ "(do (def a 3) a)", 3L, Juice.DO + Juice.CONSTANT + JUICE_SYM_LOOKUP + Juice.DEF },
 				{ "(do (let [a 1] (def f (fn [] a))) (f))", 1L,
-						Juice.DO + Juice.LET + Juice.CONSTANT * 1 + Juice.LOOKUP_DYNAMIC + Juice.LOOKUP+ JUICE_IDENTITY_FN
+						Juice.DO + Juice.LET + Juice.CONSTANT * 1 + JUICE_SYM_LOOKUP + JUICE_LOCAL_LOOKUP + JUICE_IDENTITY_FN
 								+ Juice.DEF },
-				{ "(let [a 1] a)", 1L, Juice.LET + Juice.LOOKUP + Juice.CONSTANT }, { "~(+ 1 2)", 3L, Juice.CONSTANT }, // compiler
+				{ "(let [a 1] a)", 1L, Juice.LET + JUICE_LOCAL_LOOKUP + Juice.CONSTANT }, { "~(+ 1 2)", 3L, Juice.CONSTANT }, // compiler
 																														// executes
 																														// +
 																														// in
@@ -56,7 +58,7 @@ public class ParamTestJuice {
 																														// is
 																														// constant
 				{ "*depth*", 0L, Juice.SPECIAL },
-				{ "(= true true)", true, (1 * Juice.LOOKUP_DYNAMIC) + (2 * Juice.CONSTANT) + Juice.EQUALS } });
+				{ "(= true true)", true, (1 * JUICE_SYM_LOOKUP) + (2 * Juice.CONSTANT) + Juice.EQUALS } });
 	}
 
 	private String source;

@@ -173,7 +173,7 @@ public class Compiler {
 		// Get address of compilation environment to use for lookup resolution.
 		Address address=context.getAddress();
 		
-		Lookup<T> lookUp=Lookup.create(address,sym);
+		Lookup<T> lookUp=Lookup.create(Constant.of(address),sym);
 		return (Context<T>) context.withResult(Juice.COMPILE_LOOKUP, lookUp);
 	}
 

@@ -15,6 +15,7 @@ import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
+import convex.core.lang.RT;
 import convex.core.util.Errors;
 
 /**
@@ -28,41 +29,55 @@ import convex.core.util.Errors;
  * @param <T>
  */
 public class Lookup<T extends ACell> extends AOp<T> {
-	private final Address address;
+	private final AOp<Address> address;
 	private final Symbol symbol;
 
-	private Lookup(Address address,Symbol symbol) {
+	private Lookup(AOp<Address> address,Symbol symbol) {
 		this.address=address;
 		this.symbol = symbol;
 	}
 
-	public static <T extends ACell> Lookup<T> create(Address address, Symbol form) {
+	public static <T extends ACell> Lookup<T> create(AOp<Address> address, Symbol form) {
 		return new Lookup<T>(address,form);
 	}
 	
-	public static <T extends ACell> Lookup<T> create(Address address, String name) {
+	public static <T extends ACell> Lookup<T> create(AOp<Address> address, String name) {
 		return create(address,Symbol.create(name));
+	}
+	
+	public static <T extends ACell> Lookup<T> create(Address addr, Symbol sym) {
+		return create(Constant.of(addr),sym);
 	}
 
 	public static <T extends ACell> Lookup<T> create(Symbol symbol) {
-		return create(null,symbol);
+		return create((AOp<Address>)null,symbol);
 	}
 
 	public static <T extends ACell> Lookup<T> create(String name) {
 		return create(Symbol.create(name));
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public <I extends ACell> Context<T> execute(Context<I> context) {
+		Context<T> rctx=(Context<T>) context;
+		Address namespaceAddress=null;
+		if (address!=null) {
+			rctx=(Context<T>) rctx.execute(address);
+			if (rctx.isExceptional()) return rctx;
+			namespaceAddress=RT.ensureAddress(rctx.getResult());
+			if (namespaceAddress==null) return rctx.withArgumentError("Lookup Op failed to produce an Address");
+		}
+		
 		// Lookup local lexical values first
 		if (!symbol.isQualified()) {
-			MapEntry<Symbol, T> le = context.lookupLocalEntry(symbol);
-			if (le != null) return context.withResult(Juice.LOOKUP, le.getValue());
+			MapEntry<Symbol, T> le = rctx.lookupLocalEntry(symbol);
+			if (le != null) return rctx.withResult(Juice.LOOKUP, le.getValue());
 		}
 		
 		// Do a dynamic lookup, with address if specified or address from current context otherwise
-		Address namespaceAddress=(address==null)?context.getAddress():address;
-		return context.lookupDynamic(namespaceAddress,symbol).consumeJuice(Juice.LOOKUP_DYNAMIC);
+		namespaceAddress=(address==null)?context.getAddress():namespaceAddress;
+		return rctx.lookupDynamic(namespaceAddress,symbol).consumeJuice(Juice.LOOKUP_DYNAMIC);
 	}
 
 	@Override
@@ -90,7 +105,7 @@ public class Lookup<T extends ACell> extends AOp<T> {
 	public static <T extends ACell> Lookup<T> read(ByteBuffer bb) throws BadFormatException {
 		Symbol sym = Format.read(bb);
 		if (sym==null) throw new BadFormatException("Lookup symbol cannot be null");
-		Address address = Format.read(bb);
+		AOp<Address> address = Format.read(bb);
 		return create(address,sym);
 	}
 
@@ -115,13 +130,9 @@ public class Lookup<T extends ACell> extends AOp<T> {
 		symbol.validateCell();
 	}
 
-	/**
-	 * Gets the Account Address associated with this Lookup. May be null TODO: check this?
-	 * @return Address for this Lookup
-	 */
-	public Address getAddress() {
+	public AOp<Address> getAddress() {
 		return address;
 	}
-	
+
 
 }

@@ -9,6 +9,13 @@ package convex.core.lang;
  */
 public class Juice {
 	/**
+	 * Juice required to resolve a constant value
+	 * 
+	 * Very cheap, no allocs / lookup.
+	 */
+	public static final long CONSTANT = 10;
+	
+	/**
 	 * Juice required to define a value in the current environment.
 	 * 
 	 * We make this somewhat expensive - we want to discourage over-use as a general rule
@@ -28,6 +35,11 @@ public class Juice {
 	 * Potentially a bit pricey since read only, but might hit storage so.....
 	 */
 	public static final long LOOKUP_DYNAMIC = 40;
+	
+	/**
+	 * Juice required to look up a symbol with a regular Address
+	 */
+	public static final long LOOKUP_SYM = LOOKUP_DYNAMIC+CONSTANT;
 
 	/**
 	 * Juice required to execute a Do block
@@ -51,12 +63,7 @@ public class Juice {
 	 */
 	public static final long LET = 30;
 
-	/**
-	 * Juice required to resolve a constant value
-	 * 
-	 * Very cheap, no allocs / lookup.
-	 */
-	public static final long CONSTANT = 10;
+
 
 	/**
 	 * Juice required to execute a Cond expression

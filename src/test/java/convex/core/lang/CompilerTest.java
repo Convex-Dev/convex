@@ -375,7 +375,7 @@ public class CompilerTest extends ACVMTest {
 	@Test
 	public void testLookupAddress() {
 		Lookup<?> l=comp("foo");
-		assertEquals(Init.HERO,l.getAddress());
+		assertEquals(Constant.of(Init.HERO),l.getAddress());
 	}
 	
 	@Test
