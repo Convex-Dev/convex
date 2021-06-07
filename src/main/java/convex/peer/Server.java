@@ -49,6 +49,7 @@ import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.Context;
+import convex.core.lang.RT;
 import convex.core.lang.impl.AExceptional;
 import convex.core.lang.Reader;
 import convex.core.store.AStore;
@@ -406,7 +407,7 @@ public class Server implements Closeable {
 	 */
 	private void processMissingData(Message m) throws BadFormatException {
 		// payload for a missing data request should be a valid Hash
-		Hash h = m.getPayload();
+		Hash h = RT.ensureHash(m.getPayload());
 		if (h == null) throw new BadFormatException("Hash required for missing data message");
 
 		Ref<?> r = store.refForHash(h);
@@ -646,6 +647,7 @@ public class Server implements Closeable {
 			Hash initialStateHash=peer.getStates().get(0).getHash();
 			AVector<AString> peerHostnameList = getHostnameList();
 
+			// TODO Revisit
 			AVector<ACell> reply=Vectors.of(beliefHash,stateHash,initialStateHash,peerHostnameList);
 
 			pc.sendResult(m.getID(), reply);

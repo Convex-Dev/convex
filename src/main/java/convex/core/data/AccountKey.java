@@ -101,14 +101,6 @@ public class AccountKey extends AArrayBlob {
 	}
 
 	@Override
-	public int hashCode() {
-		// note: We use the first bytes as the hashcode for an AccountKey.
-		// effectively randomly distributed for public keys
-		// avoids collisions with different nonces for dummy addresses
-		return Utils.readInt(store, offset);
-	}
-
-	@Override
 	public boolean equals(ABlob o) {
 		if (o==null) return false;
 		if (o instanceof AccountKey) return equals((AccountKey)o);

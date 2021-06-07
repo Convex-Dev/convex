@@ -35,12 +35,6 @@ public class GenTestMap {
 
 	}
 
-	@SuppressWarnings("rawtypes")
-	@Property
-	public void testHashCodes(@From(MapGen.class) AMap m) {
-		assertEquals(m.hashCode(), m.getHash().hashCode());
-	}
-
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Property
 	public void mapToIdentity(@From(MapGen.class) AHashMap m) {

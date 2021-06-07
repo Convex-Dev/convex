@@ -114,11 +114,6 @@ public class LongBlob extends ABlob {
 	}
 
 	@Override
-	public int hashCode() {
-		return getHash().hashCode();
-	}
-
-	@Override
 	public boolean equals(ABlob a) {
 		if (a instanceof LongBlob) return (((LongBlob) a).value == value);
 		if (a instanceof Blob) {

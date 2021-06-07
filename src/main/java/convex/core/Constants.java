@@ -82,4 +82,9 @@ public class Constants {
 	 * Length for public keys
 	 */
 	public static final int KEY_LENGTH = 32;
+
+	/**
+	 * Length for HAsh values
+	 */
+	public static final int HASH_LENGTH = 32;
 }

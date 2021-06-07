@@ -117,11 +117,6 @@ public abstract class AArrayBlob extends ABlob {
 	}
 
 	@Override
-	public int hashCode() {
-		return getHash().hashCode();
-	}
-
-	@Override
 	public final byte byteAt(long i) {
 		int ix = (int) i;
 		if ((ix != i) || (ix < 0) || (ix >= length)) {
@@ -149,7 +144,7 @@ public abstract class AArrayBlob extends ABlob {
 	}
 
 	public Hash extractHash(int offset, int length) {
-		return Hash.wrap(store, this.offset + offset, length);
+		return Hash.wrap(store, this.offset + offset);
 	}
 
 	public byte[] getInternalArray() {

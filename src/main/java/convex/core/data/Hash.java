@@ -2,7 +2,10 @@ package convex.core.data;
 
 import java.nio.ByteBuffer;
 
+import convex.core.Constants;
 import convex.core.crypto.Hashing;
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
@@ -24,14 +27,19 @@ public class Hash extends AArrayBlob {
 	/**
 	 * Standard length of a Hash in bytes
 	 */
-	public static final int LENGTH = 32;
+	public static final int LENGTH = Constants.HASH_LENGTH;
+	
+	/**
+	 * Type of Hash values
+	 */
+	public static final AType TYPE = Types.BLOB;
 
-	private Hash(byte[] hashBytes) {
-		super(hashBytes, 0, hashBytes.length);
+	private Hash(byte[] hashBytes, int offset) {
+		super(hashBytes, offset, LENGTH);
 	}
 
-	private Hash(byte[] hashBytes, int offset, int length) {
-		super(hashBytes, offset, length);
+	private Hash(byte[] hashBytes) {
+		super(hashBytes, 0, LENGTH);
 	}
 
 	/*
@@ -58,12 +66,12 @@ public class Hash extends AArrayBlob {
 	
     /**
      * Wraps the specified blob data as a Hash, sharing the underlying byte array.
-     * @param data Blob data of correct size for a Hash
+     * @param data Blob data of correct size for a Hash. Must have at least enough bytes for a Hash
      * @return
      */
 	public static Hash wrap(AArrayBlob data) {
 		if (data instanceof Hash) return (Hash)data;
-		return wrap(data.getInternalArray(),data.getOffset(),Utils.toInt(data.count()));
+		return wrap(data.getInternalArray(),data.getOffset());
 	}
 
 	/**
@@ -74,24 +82,19 @@ public class Hash extends AArrayBlob {
 	 * @param hashBytes
 	 * @return Hash wrapping the given byte array segment
 	 */
-	public static Hash wrap(byte[] hashBytes, int offset, int length) {
-		if ((offset < 0) || (offset + length > hashBytes.length))
-			throw new IllegalArgumentException(Errors.badRange(offset, length));
-		return new Hash(hashBytes, offset, length);
-	}
-
-	/**
-	 * We use the first bytes as the hashcode for a Hash
-	 */
-	@Override
-	public int hashCode() {
-		return Utils.readInt(store, offset);
+	public static Hash wrap(byte[] hashBytes, int offset) {
+		if ((offset < 0) || (offset + LENGTH > hashBytes.length))
+			throw new IllegalArgumentException(Errors.badRange(offset, LENGTH));
+		return new Hash(hashBytes, offset);
 	}
 
 	@Override
 	public boolean equals(ABlob other) {
-		if (!(other instanceof Hash)) return false;
-		return equals((Hash) other);
+		if (other==null) return false;
+		if (other instanceof Hash) return equals((Hash)other);
+		if (other.count()!=LENGTH) return false;
+		if (other.getType()!=TYPE) return false;
+		return other.equalsBytes(this.store, this.offset);
 	}
 
 	/**
@@ -102,8 +105,15 @@ public class Hash extends AArrayBlob {
 	 */
 	public boolean equals(Hash other) {
 		if (other == this) return true;
-		assert (this.length == other.length);
-		return Utils.arrayEquals(other.store, other.offset, this.store, this.offset, this.length);
+		return Utils.arrayEquals(other.store, other.offset, this.store, this.offset, LENGTH);
+	}
+	
+	/**
+	 * Get the first 32 bits of this Hash. Used for Java hashCodes
+	 * @return
+	 */
+	public int firstInt() {
+		return Utils.readInt(this.store, this.offset);
 	}
 
 	/**
@@ -150,7 +160,8 @@ public class Hash extends AArrayBlob {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.HASH;
+		bs[pos++]=Tag.BLOB;
+		bs[pos++]=LENGTH;
 		return encodeRaw(bs,pos);
 	}
 
@@ -200,6 +211,6 @@ public class Hash extends AArrayBlob {
 
 	@Override
 	public byte getTag() {
-		return Tag.HASH;
+		return Tag.BLOB;
 	}
 }

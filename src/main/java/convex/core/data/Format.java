@@ -710,8 +710,6 @@ public class Format {
 			if (tag == Tag.BLOB) return (T) Blobs.read(bb);
 			if (tag == Tag.SYMBOL) return (T) readSymbol(bb);
 			if (tag == Tag.KEYWORD) return (T) Keyword.read(bb);
-			
-			if (tag == Tag.HASH) return (T) Hash.readRaw(bb);
 
 			if (tag == Tag.TRUE) return (T) CVMBool.TRUE;
 			if (tag == Tag.FALSE) return (T) CVMBool.FALSE;
