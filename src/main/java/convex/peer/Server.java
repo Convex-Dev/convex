@@ -781,6 +781,7 @@ public class Server implements Closeable {
 
 		} catch (Throwable t) {
 			log.warning("Challenge Error: " + t);
+			// t.printStackTrace();
 		}
 	}
 
@@ -859,6 +860,7 @@ public class Server implements Closeable {
 			// log.log(LEVEL_CHALLENGE_RESPONSE, "Processing response request from: " + pc.getRemoteAddress());
 
 			pc.setTrustedPeerKey(fromPeer);
+
 			// raiseServerMessage(" now trusts peer: " + Utils.toFriendlyHexString(fromPeer.toHexString()));
 
 			// remove from list incase this fails, we can generate another challenge
@@ -1306,4 +1308,12 @@ public class Server implements Closeable {
 		return ServerInformation.create(this, manager);
 	}
 
+	public void setNetworkId(Hash value) {
+		networkId = value;
+	}
+
+	public String friendlyNetworkId() {
+		if (networkId == null) return "None";
+		return Utils.toFriendlyHexString(networkId.toHexString());
+	}
 }
