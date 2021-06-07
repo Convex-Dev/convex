@@ -90,9 +90,9 @@ public class ConnectionManager {
 	public void broadcast(Message msg, boolean isTrusted) {
 		for (Connection pc : connections.values()) {
 			try {
-				// if ( isTrusted && pc.isTrusted() | !isTrusted) {
-				pc.sendMessage(msg);
-				//}
+				if ( (isTrusted && pc.isTrusted()) || !isTrusted) {
+					pc.sendMessage(msg);
+				}
 			} catch (IOException e) {
 				log.warning("Error in broadcast: " + e.getMessage());
 			}
