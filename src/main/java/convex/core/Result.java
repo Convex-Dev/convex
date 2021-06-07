@@ -37,7 +37,7 @@ public class Result extends ARecordGeneric {
 		return new Result(values);
 	}
 	
-	public static Result create(CVMLong id, ACell value, ACell errorCode, Object trace) {
+	public static Result create(CVMLong id, ACell value, ACell errorCode, ACell trace) {
 		return create(Vectors.of(id,value,errorCode,trace));
 	}
 	
@@ -137,7 +137,7 @@ public class Result extends ARecordGeneric {
 	public static Result fromContext(CVMLong id,Context<?> ctx) {
 		Object result=ctx.getValue();
 		ACell code=null;
-		Object trace=null;
+		ACell trace=null;
 		if (result instanceof AExceptional) {
 			AExceptional ex=(AExceptional)result;
 			result=ex.getMessage();

@@ -41,7 +41,6 @@ public class Types {
 
 	public static final Blob BLOB = Blob.INSTANCE;
 	public static final AddressType ADDRESS = AddressType.INSTANCE;
-	public static final KeyType KEY = KeyType.INSTANCE;
 
 	
 	public static final Function FUNCTION = Function.INSTANCE;
@@ -75,7 +74,6 @@ public class Types {
 		
 		BLOB,
 		ADDRESS,
-		KEY,
 		
 		FUNCTION,
 		OP,

@@ -43,13 +43,6 @@ public class ParamTestBlobs {
 	}
 
 	@Test
-	public void testHashCache() {
-		// hashcode should be based on hash of blob representation
-		Hash hash = data.getEncoding().getContentHash();
-		assertEquals(data.hashCode(), hash.hashCode());
-	}
-
-	@Test
 	public void testSlice() {
 		ABlob d = data.slice(0, data.count());
 		assertEquals(data, d);

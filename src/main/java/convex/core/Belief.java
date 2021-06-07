@@ -10,15 +10,17 @@ import java.util.Map;
 import java.util.function.Function;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.BlobMap;
+import convex.core.data.BlobMaps;
 import convex.core.data.Format;
 import convex.core.data.Keywords;
-import convex.core.data.Maps;
+import convex.core.data.MapEntry;
 import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
 import convex.core.data.Tag;
@@ -28,7 +30,6 @@ import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.impl.RecordFormat;
 import convex.core.util.Counters;
-import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 
 /**
@@ -50,7 +51,7 @@ public class Belief extends ARecord {
 	/**
 	 * The latest view of signed Orders held by other Peers
 	 */
-	private final AHashMap<AccountKey, SignedData<Order>> orders;
+	private final BlobMap<AccountKey,SignedData<Order>> orders;
 
 	/**
 	 * The timestamp at which this belief was created
@@ -59,7 +60,7 @@ public class Belief extends ARecord {
 
 	// private final long timeStamp;
 
-	private Belief(AHashMap<AccountKey, SignedData<Order>> orders, long timestamp) {
+	private Belief(BlobMap<AccountKey,SignedData<Order>> orders, long timestamp) {
 		super(BELIEF_KEYS);
 		this.orders = orders;
 		this.timestamp = timestamp;
@@ -75,7 +76,7 @@ public class Belief extends ARecord {
 	@SuppressWarnings("unchecked")
 	@Override
 	protected Belief updateAll(ACell[] newVals) {
-		AHashMap<AccountKey, SignedData<Order>> newOrders = (AHashMap<AccountKey, SignedData<Order>>) newVals[0];
+		BlobMap<AccountKey, SignedData<Order>> newOrders = (BlobMap<AccountKey, SignedData<Order>>) newVals[0];
 		long newTimestamp = ((CVMLong) newVals[1]).longValue();
 		if ((this.orders == newOrders)&&(this.timestamp==newTimestamp)) {
 			return this;
@@ -84,7 +85,7 @@ public class Belief extends ARecord {
 	}
 
 	public static Belief initial() {
-		return create(Maps.empty());
+		return create(BlobMaps.empty());
 	}
 	
 	/**
@@ -94,23 +95,23 @@ public class Belief extends ARecord {
 	 * @return new Belief representing the isolated belief of a single Peer.
 	 */
 	public static Belief create(AKeyPair kp, Order order) {
-		AHashMap<AccountKey, SignedData<Order>> orders=Maps.of(kp.getAccountKey(),kp.signData(order));
+		BlobMap<AccountKey, SignedData<Order>> orders=BlobMap.of(kp.getAccountKey(),kp.signData(order));
 		return create(orders);
 	}
 
 
-	private static Belief create(AHashMap<AccountKey, SignedData<Order>> orders, long timestamp) {
+	private static Belief create(BlobMap<AccountKey, SignedData<Order>> orders, long timestamp) {
 		return new Belief(orders, timestamp);
 	}
 
-	private static Belief create(AHashMap<AccountKey, SignedData<Order>> orders) {
+	private static Belief create(BlobMap<AccountKey, SignedData<Order>> orders) {
 		return create(orders, Constants.INITIAL_TIMESTAMP);
 	}
 
 	public static Belief createSingleOrder(AKeyPair kp) {
 		AccountKey address = kp.getAccountKey();
 		SignedData<Order> order = kp.signData(Order.create());
-		return create(Maps.of(address, order));
+		return create(BlobMap.of(address, order));
 	}
 
 	/**
@@ -148,10 +149,10 @@ public class Belief extends ARecord {
 		}
 
 		// accumulate combined list of latest chains for all peers
-		final AHashMap<AccountKey, SignedData<Order>> accOrders = accumulateOrders(mc, mySignedOrder, beliefs);
+		final BlobMap<AccountKey, SignedData<Order>> accOrders = accumulateOrders(mc, mySignedOrder, beliefs);
 
 		// vote for new proposed chain
-		final AHashMap<AccountKey, SignedData<Order>> resultOrders = vote(mc, accOrders);
+		final BlobMap<AccountKey, SignedData<Order>> resultOrders = vote(mc, accOrders);
 		if (resultOrders == null) return this;
 
 		// update my belief with the resulting chains
@@ -162,53 +163,55 @@ public class Belief extends ARecord {
 		return result;
 	}
 
-	private AHashMap<AccountKey, SignedData<Order>> accumulateOrders(MergeContext mc, SignedData<Order> mySignedChain,
+	private BlobMap<AccountKey, SignedData<Order>> accumulateOrders(MergeContext mc, SignedData<Order> mySignedChain,
 			Belief[] beliefs) {
-		AHashMap<AccountKey, SignedData<Order>> result = this.orders;
+		BlobMap<AccountKey, SignedData<Order>> result = this.orders;
 		// assemble the latest list of orders from all peers
-		for (Belief b : beliefs) {
-			if (b == null) continue; // ignore null beliefs, might happen if invalidated
-			if (b.equals(this)) continue; // ignore an identical belief. Nothing to update.
-			AHashMap<AccountKey, SignedData<Order>> bchains = b.orders;
-			result = result.mergeWith(bchains, new MergeFunction<SignedData<Order>>() {
-				@Override
-				public SignedData<Order> merge(SignedData<Order> a, SignedData<Order> b) {
-					if (a == null) return b;
-					if (b == null) return a;
-					if (a.equals(b)) return a; // PERF: fast path for no changes
-					if (!(a.getAccountKey().equals(b.getAccountKey()))) throw new Error("Mismatched addresses!");
+		for (Belief belief : beliefs) {
+			if (belief == null) continue; // ignore null beliefs, might happen if invalidated
+			if (belief.equals(this)) continue; // ignore an identical belief. Nothing to update.
+			BlobMap<AccountKey, SignedData<Order>> bchains = belief.orders;
+			
+			long bcount=bchains.count();
+			for (long i=0; i<bcount; i++) {
+				MapEntry<AccountKey,SignedData<Order>> be=bchains.entryAt(i);
+				ABlob key=be.getKey();
+				SignedData<Order> a=result.get(key);
+				if (a == null) {result=result.assocEntry(be); continue;}
+				SignedData<Order> b=be.getValue();
+				
+				if (b == null) continue;
+				if (a.equals(b)) continue; // PERF: fast path for no changes
 
-					try {
-						Order ac = a.getValue();
-						Order bc = b.getValue();
+				try {
+					Order ac = a.getValue();
+					Order bc = b.getValue();
 
-						// shouldn't be possible for orders to be the same
-						assert (!a.equals(b));
-						// if (ac.equals(bc)) return a; // if equal, no change required
+					// shouldn't be possible for orders to be the same
+					assert (!a.equals(b));
+					// if (ac.equals(bc)) return a; // if equal, no change required
 
-						// TODO: penalise inconsistency?
-						// TODO: check for forks / inconsistent values?
-						// TODO: check logic?
+					// TODO: penalise inconsistency?
+					// TODO: check for forks / inconsistent values?
+					// TODO: check logic?
 
-						// prefer advanced consensus first!
-						if (bc.getConsensusPoint() > ac.getConsensusPoint()) return b;
+					// prefer advanced consensus first!
+					if (bc.getConsensusPoint() > ac.getConsensusPoint()) {result=result.assocEntry(be); continue;};
 
-						// prefer longer orders, must be later?
-						if (bc.getBlockCount() > ac.getBlockCount()) return b;
+					// prefer longer orders, must be later?
+					if (bc.getBlockCount() > ac.getBlockCount()) {result=result.assocEntry(be); continue;};
 
-						// prefer advanced proposals
-						if (bc.getProposalPoint() > ac.getProposalPoint()) return b;
+					// prefer advanced proposals
+					if (bc.getProposalPoint() > ac.getProposalPoint()) {result=result.assocEntry(be); continue;};
 
-						// keep current view (more stable?)
-						return a;
-					} catch (BadSignatureException e) {
-						// TODO: figure out when this can happen?
-						throw Utils.sneakyThrow(e);
-					}
-
-					// throw new TODOException();
+					// keep current view (more stable?)
+				} catch (BadSignatureException e) {
+					// TODO: figure out when this can happen?
+					throw Utils.sneakyThrow(e);
 				}
-			});
+
+				// throw new TODOException();
+			}
 		}
 		// Keep this peer's current signed order
 		return result.assoc(mc.getAccountKey(), mySignedChain);
@@ -223,7 +226,7 @@ public class Belief extends ARecord {
 	 * @return
 	 * @throws BadSignatureException @
 	 */
-	private AHashMap<AccountKey, SignedData<Order>> vote(MergeContext mc, AHashMap<AccountKey, SignedData<Order>> accOrders)
+	private BlobMap<AccountKey, SignedData<Order>> vote(MergeContext mc, BlobMap<AccountKey, SignedData<Order>> accOrders)
 			throws BadSignatureException {
 		AccountKey myAddress = mc.getAccountKey();
 
@@ -233,7 +236,7 @@ public class Belief extends ARecord {
 
 		// filter chains for compatibility with current chain
 		// TODO: figure out what to do with new blocks filtered out?
-		final AHashMap<AccountKey, SignedData<Order>> filteredOrders = accOrders.filterValues(signedOrder -> {
+		final BlobMap<AccountKey, SignedData<Order>> filteredOrders = accOrders.filterValues(signedOrder -> {
 			try {
 				Order otherChain = signedOrder.getValue();
 				return myOrder.isConsistent(otherChain);
@@ -277,7 +280,7 @@ public class Belief extends ARecord {
 		final Order consensusOrder = updateConsensus(proposedOrder, stakedOrders, C_THRESHOLD);
 
 		final SignedData<Order> signedOrder = mc.sign(consensusOrder);
-		final AHashMap<AccountKey, SignedData<Order>> resultOrders = filteredOrders.assoc(myAddress, signedOrder);
+		final BlobMap<AccountKey, SignedData<Order>> resultOrders = filteredOrders.assoc(myAddress, signedOrder);
 		return resultOrders;
 	}
 
@@ -587,7 +590,7 @@ public class Belief extends ARecord {
 	 * @param newOrders
 	 * @return The updated belief, or the same Belief if no change.
 	 */
-	public Belief withOrders(AHashMap<AccountKey, SignedData<Order>> newOrders) {
+	public Belief withOrders(BlobMap<AccountKey, SignedData<Order>> newOrders) {
 		if (newOrders == orders) return this;
 		return Belief.create(newOrders);
 	}
@@ -604,7 +607,7 @@ public class Belief extends ARecord {
 	}
 
 	public static Belief read(ByteBuffer bb) throws BadFormatException {
-		AHashMap<AccountKey, SignedData<Order>> chains = Format.read(bb);
+		BlobMap<AccountKey, SignedData<Order>> chains = Format.read(bb);
 		if (chains == null) throw new BadFormatException("Null orders in Belief");
 		CVMLong timestamp = Format.read(bb);
 		if (timestamp == null) throw new BadFormatException("Null timestamp");
@@ -629,7 +632,7 @@ public class Belief extends ARecord {
 		return sc.getValue();
 	}
 
-	public AHashMap<AccountKey, SignedData<Order>> getOrders() {
+	public BlobMap<AccountKey, SignedData<Order>> getOrders() {
 		return orders;
 	}
 

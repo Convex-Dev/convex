@@ -37,6 +37,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
+import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
 import convex.core.lang.TestState;
@@ -176,7 +177,7 @@ public class ServerTest {
 			Result status=statusFuture.get(10000,TimeUnit.MILLISECONDS);
 			assertFalse(status.isError());
 			AVector<?> v=status.getValue();
-			Hash h=(Hash)v.get(0);
+			Hash h=RT.ensureHash(v.get(0));
 			
 			Future<SignedData<Belief>> acquiror=convex.acquire(h);
 			SignedData<Belief> ab=acquiror.get(10000,TimeUnit.MILLISECONDS);

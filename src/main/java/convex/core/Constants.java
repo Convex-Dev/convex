@@ -77,4 +77,14 @@ public class Constants {
 	 * Value used to indicate exclusion of a key from a Set. Must be a singleton instance
 	 */
 	public static final CVMBool SET_EXCLUDED = CVMBool.FALSE;
+
+	/**
+	 * Length for public keys
+	 */
+	public static final int KEY_LENGTH = 32;
+
+	/**
+	 * Length for HAsh values
+	 */
+	public static final int HASH_LENGTH = 32;
 }

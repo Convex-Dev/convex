@@ -6,11 +6,11 @@ import java.util.function.Consumer;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.data.BlobMap;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -384,14 +384,14 @@ public class Peer {
 	 */
 	public Peer proposeBlock(Block block) throws BadSignatureException {
 		Belief b = getBelief();
-		AHashMap<AccountKey, SignedData<Order>> orders = b.getOrders();
+		BlobMap<AccountKey, SignedData<Order>> orders = b.getOrders();
 
 		Order myOrder = b.getOrder(peerKey);
 		if (myOrder==null) myOrder=Order.create();
 
 		Order newChain = myOrder.propose(block);
 		SignedData<Order> newSignedChain = sign(newChain);
-		AHashMap<AccountKey, SignedData<Order>> newChains = orders.assoc(peerKey, newSignedChain);
+		BlobMap<AccountKey, SignedData<Order>> newChains = orders.assoc(peerKey, newSignedChain);
 		return updateBelief(b.withOrders(newChains));
 	}
 

@@ -94,15 +94,15 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	/**
 	 * Gets the Java hashCode for this cell. Must be consistent with equals. 
 	 * 
-	 * Default is the first bytes (big-endian) of the Cell encoding hash, since this is consistent with
-	 * encoding-based equality. However, subclasses may provide more efficient hashcodes provided that
+	 * Default is the first bytes (big-endian) of the Cell Encoding's hash, since this is consistent with
+	 * encoding-based equality. However, different Types may provide more efficient hashcodes provided that
 	 * the usual invariants are preserved
 	 * 
 	 * @return integer hash code.
 	 */
 	@Override
 	public int hashCode() {
-		return getHash().hashCode();
+		return getHash().firstInt();
 	}
 	
 	@Override

@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.Predicate;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -32,7 +33,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 			(short) 0, 0L);
 
 	/**
-	 * Child entries, i.e. nodes with keys where this node is a common prefix
+	 * Child entries, i.e. nodes with keys where this node is a common prefix. Only contains children where mask is set.
 	 */
 	private final Ref<ABlobMap<K, V>>[] children;
 
@@ -444,6 +445,19 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 			initial = children[i].getValue().reduceEntries(func, initial);
 		}
 		return initial;
+	}
+	
+	@Override
+	public BlobMap<K, V> filterValues(Predicate<V> pred) {
+		BlobMap<K, V> r=this;
+		if ((entry!=null)&&!pred.test(entry.getValue())) r=r.dissoc(entry.getKey());
+		for (int i=0; i<16; i++) {
+			BlobMap<K,V> c=getChild(i);
+			if (c==null) continue;
+			BlobMap<K,V> nc=c.filterValues(pred);
+			r=r.withChild(i, c, nc);
+		}
+		return r;
 	}
 
 	@Override

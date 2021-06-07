@@ -35,7 +35,6 @@ import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Set;
 import convex.core.data.Sets;
-import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
@@ -875,7 +874,7 @@ public class Core {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			AccountKey accountKey = RT.ensureAccountKey(args[0]);
-			if (accountKey == null) return context.withCastError(0,args, Types.KEY);
+			if (accountKey == null) return context.withCastError(0,args, Types.BLOB);
 
 			CVMLong amount = RT.ensureLong(args[1]);
 			if (amount == null) return context.withCastError(1,args, Types.LONG);
@@ -1140,7 +1139,7 @@ public class Core {
 
 			// Check an account key is being used as argument. nil is permitted
 			AccountKey publicKey=RT.ensureAccountKey(arg);
-			if ((publicKey == null)&&(arg!=null)) return context.withCastError(arg, Types.KEY);
+			if ((publicKey == null)&&(arg!=null)) return context.withCastError(arg, Types.BLOB);
 
 			context=(Context) context.setAccountKey(publicKey);
 			if (context.isExceptional()) return (Context<AccountKey>) context;

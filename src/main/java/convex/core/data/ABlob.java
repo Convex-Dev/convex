@@ -197,9 +197,6 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 */
 	public abstract ABlob append(ABlob d);
 
-	@Override
-	public abstract int hashCode();
-
 	/**
 	 * Determines if this Blob is equal to another Object.
 	 * 

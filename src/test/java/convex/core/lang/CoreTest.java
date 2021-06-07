@@ -130,6 +130,10 @@ public class CoreTest extends ACVMTest {
 		assertEquals(eval("0x"),eval("(blob (str))")); // blob literal
 
 		assertEquals(eval("*address*"),eval("(address (blob *address*))"));
+		
+		// Account key should be a Blob
+		assertEquals(eval("*key*"),eval("(blob *key*)"));
+
 
 		// round trip back to Blob
 		assertTrue(evalB("(blob? (blob (hash (encoding [1 2 3]))))"));
@@ -2537,6 +2541,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(CVMDouble.NaN, eval("(max 1 ##-Inf 3 ##NaN 4)"));
 		assertEquals(7L, evalL("(max 7)"));
 		assertEquals(4.0, evalD("(max 4.0 3 2)"));
+		assertEquals(CVMDouble.NaN, eval("(max 1 2.5 ##NaN)"));
 
 		assertArityError(step("(max)"));
 	}

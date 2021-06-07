@@ -2,6 +2,7 @@ package convex.core.data;
 
 import java.nio.ByteBuffer;
 
+import convex.core.Constants;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
@@ -18,7 +19,10 @@ import convex.core.util.Utils;
  * 
  */
 public class AccountKey extends AArrayBlob {
-	public static final int LENGTH = 32;
+	public static final int LENGTH = Constants.KEY_LENGTH;
+	
+	public static final AType TYPE = Types.BLOB;
+
 
 	public static final int LENGTH_BITS = LENGTH * 8;
 
@@ -31,7 +35,7 @@ public class AccountKey extends AArrayBlob {
 	
 	@Override
 	public AType getType() {
-		return Types.KEY;
+		return TYPE;
 	}
 
 	/**
@@ -66,6 +70,7 @@ public class AccountKey extends AArrayBlob {
 	 */
 	public static AccountKey create(ABlob b) {
 		if (b.count()!=LENGTH) return null;
+		if (b instanceof AccountKey) return (AccountKey) b;
 		if (b instanceof AArrayBlob) {
 			AArrayBlob ab=(AArrayBlob)b;
 			return new AccountKey(ab.getInternalArray(),ab.getOffset(),LENGTH);
@@ -96,17 +101,12 @@ public class AccountKey extends AArrayBlob {
 	}
 
 	@Override
-	public int hashCode() {
-		// note: We use the first bytes as the hashcode for an AccountKey.
-		// effectively randomly distributed for public keys
-		// avoids collisions with different nonces for dummy addresses
-		return Utils.readInt(store, offset);
-	}
-
-	@Override
 	public boolean equals(ABlob o) {
-		if (!(o instanceof AccountKey)) return false;
-		return equals((AccountKey) o);
+		if (o==null) return false;
+		if (o instanceof AccountKey) return equals((AccountKey)o);
+		if (o.getType()!=TYPE) return false;
+		if (o.count()!=LENGTH) return false;
+		return o.equalsBytes(this.store, this.offset);
 	}
 
 	public boolean equals(AccountKey o) {
@@ -200,20 +200,9 @@ public class AccountKey extends AArrayBlob {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.ACCOUNT_KEY;
+		bs[pos++]=Tag.BLOB;
+		bs[pos++]=Constants.KEY_LENGTH;
 		return encodeRaw(bs,pos);
-	}
-
-	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append("#public-key 0x");
-		sb.append(toHexString());
-	}
-	
-	@Override
-	public void print(StringBuilder sb) {
-		sb.append("0x");
-		sb.append(toChecksumHex());
 	}
 	
 	@Override public final boolean isCVMValue() {
@@ -252,12 +241,12 @@ public class AccountKey extends AArrayBlob {
 
 	@Override
 	public boolean isRegularBlob() {
-		return false;
+		return true;
 	}
 
 	@Override
 	public byte getTag() {
-		return Tag.ACCOUNT_KEY;
+		return Tag.BLOB;
 	}
 
 	@Override

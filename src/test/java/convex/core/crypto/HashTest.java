@@ -1,7 +1,6 @@
 package convex.core.crypto;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -80,7 +79,7 @@ public class HashTest {
 
 	@Test
 	public void testDataLength() {
-		assertEquals(33, Hash.NULL_HASH.encodedLength());
+		assertEquals(34, Hash.NULL_HASH.encodedLength());
 	}
 
 	@Test
@@ -89,7 +88,7 @@ public class HashTest {
 		assertTrue(h.isCanonical());
 		Blob b = Format.encodedBlob(h);
 		byte[] bs = b.getBytes();
-		Hash h2 = Hash.wrap(bs, 1, Hash.LENGTH); // all bytes except the initial tag byte
+		Hash h2 = Hash.wrap(bs, 2); // all bytes except the initial tag byte and count
 		assertEquals(h, h2);
 	}
 
@@ -116,7 +115,7 @@ public class HashTest {
 	public void testEquality() {
 		Hash h = Hash.NULL_HASH;
 		assertEquals(h, Hashing.sha3(new byte[] { Tag.NULL }));
-		assertNotEquals(h, h.toBlob());
+		assertEquals(h, h.toBlob());
 
 		assertEquals(0, h.compareTo(h.toBlob()));
 	}
