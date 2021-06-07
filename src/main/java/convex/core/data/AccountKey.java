@@ -2,6 +2,7 @@ package convex.core.data;
 
 import java.nio.ByteBuffer;
 
+import convex.core.Constants;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
@@ -18,7 +19,7 @@ import convex.core.util.Utils;
  * 
  */
 public class AccountKey extends AArrayBlob {
-	public static final int LENGTH = 32;
+	public static final int LENGTH = Constants.KEY_LENGTH;
 
 	public static final int LENGTH_BITS = LENGTH * 8;
 
