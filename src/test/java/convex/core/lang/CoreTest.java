@@ -2541,6 +2541,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(CVMDouble.NaN, eval("(max 1 ##-Inf 3 ##NaN 4)"));
 		assertEquals(7L, evalL("(max 7)"));
 		assertEquals(4.0, evalD("(max 4.0 3 2)"));
+		assertEquals(CVMDouble.NaN, eval("(max 1 2.5 ##NaN)"));
 
 		assertArityError(step("(max)"));
 	}
