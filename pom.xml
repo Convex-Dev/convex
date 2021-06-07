@@ -21,13 +21,13 @@
 	<licenses>
 		<license>
 			<name>Convex Public License</name>
-			<url>http://www.opensource.org/licenses/mit-license.php</url>
+			<url></url>
 		</license>
 	</licenses>
 
 	<developers>
 		<developer>
-			<name>Miek Anderson</name>
+			<name>Mike Anderson</name>
 			<email>mike@convex.world</email>
 			<organization>Convex Foundation</organization>
 			<organizationUrl>https://convex.world</organizationUrl>
