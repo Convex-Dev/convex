@@ -427,8 +427,13 @@ public class Compiler {
 		AVector<AOp<ACell>> ops = Vectors.empty();
 
 		for (int i = 0; i < bn; i += 2) {
+			// Get a binding form
 			ACell bf = bv.get(i);
-			bindingForms = bindingForms.conj(bf);
+			context=compileBinding(bf,context);
+			if (context.isExceptional()) return (Context<T>) context;
+			bindingForms = bindingForms.conj(context.getResult());
+			
+			// Get corresponding op
 			context = context.expandCompile(bv.get(i + 1));
 			if (context.isExceptional()) return (Context<T>) context;
 			AOp<ACell> op = (AOp<ACell>) context.getResult();
@@ -444,6 +449,10 @@ public class Compiler {
 		AOp<R> op = Let.create(bindingForms.map(x->Syntax.create(x)), ops, isLoop);
 
 		return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
+	}
+
+	private static Context<ACell> compileBinding(ACell bf,Context<?> context) {
+		return context.withResult(bf);
 	}
 
 	/**
@@ -522,6 +531,10 @@ public class Compiler {
 		
 	@SuppressWarnings("unchecked")
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileFnInstance(AVector<ACell> paramsVector, AList<ACell> bodyList,Context<?> context) {
+		context=compileBinding(paramsVector,context);
+		if (context.isExceptional()) return (Context<T>) context;
+		paramsVector=(AVector<ACell>) context.getResult();
+		
 		context = context.compileAll(bodyList);
 		if (context.isExceptional()) return (Context<T>) context;
 
