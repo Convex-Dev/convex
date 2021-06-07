@@ -6,9 +6,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.Predicate;
 
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
+import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
@@ -255,6 +257,18 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 * @return The final reduction value
 	 */
 	public abstract <R> R reduceValues(BiFunction<? super R, ? super V, ? extends R> func, R initial);
+
+	
+	/**
+	 * Filters all values in this map with the given predicate.
+	 * 
+	 * @param pred A predicate specifying which elements to retain.
+	 * @return The updated map containing those entries where the predicate returned
+	 *         true.
+	 */
+	public AMap<K, V> filterValues(Predicate<V> pred) {
+		throw new TODOException();
+	}
 
 	/**
 	 * Reduce over all map entries in this map

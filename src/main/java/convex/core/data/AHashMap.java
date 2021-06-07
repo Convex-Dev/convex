@@ -96,13 +96,7 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 
 	protected abstract AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func, int shift);
 
-	/**
-	 * Filters all values in this map with the given predicate.
-	 * 
-	 * @param pred A predicate specifying which elements to retain.
-	 * @return The updated map containing those entries where the predicate returned
-	 *         true.
-	 */
+	@Override
 	public AHashMap<K, V> filterValues(Predicate<V> pred) {
 		// TODO make more efficient?
 		return mergeWith(this, (a, b) -> pred.test(a) ? a : null);
