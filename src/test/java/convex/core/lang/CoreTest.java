@@ -130,6 +130,10 @@ public class CoreTest extends ACVMTest {
 		assertEquals(eval("0x"),eval("(blob (str))")); // blob literal
 
 		assertEquals(eval("*address*"),eval("(address (blob *address*))"));
+		
+		// Account key should be a Blob
+		assertEquals(eval("*key*"),eval("(blob *key*)"));
+
 
 		// round trip back to Blob
 		assertTrue(evalB("(blob? (blob (hash (encoding [1 2 3]))))"));
