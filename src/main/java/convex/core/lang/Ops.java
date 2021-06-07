@@ -11,6 +11,7 @@ import convex.core.lang.ops.Do;
 import convex.core.lang.ops.Invoke;
 import convex.core.lang.ops.Lambda;
 import convex.core.lang.ops.Let;
+import convex.core.lang.ops.Local;
 import convex.core.lang.ops.Lookup;
 import convex.core.lang.ops.Query;
 import convex.core.lang.ops.Special;
@@ -33,6 +34,7 @@ public class Ops {
 	public static final byte LET = 8;
 	public static final byte QUERY = 9;
 	public static final byte LOOP = 10;
+	public static final byte LOCAL=11;
 	// public static final byte CALL = 9;
 	// public static final byte RETURN = 10;
 	
@@ -73,6 +75,8 @@ public class Ops {
 			return Query.read(bb);
 		case Ops.LOOP:
 			return Let.read(bb,true);
+		case Ops.LOCAL:
+			return Local.read(bb);
 
 		// case Ops.RETURN: return (AOp<T>) Return.read(bb);
 		default:
