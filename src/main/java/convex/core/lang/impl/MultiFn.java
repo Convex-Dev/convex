@@ -142,8 +142,9 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Override
 	public <F extends AClosure<T>> F withEnvironment(AHashMap<Symbol, ACell> env) {
+		// TODO: Can make environment update more efficient?
 		if (env==this.lexicalEnv) return (F) this;
-		return (F) new MultiFn(fns,env);
+		return (F) new MultiFn(fns.map(fn->fn.withEnvironment(env)),env);
 	}
 
 

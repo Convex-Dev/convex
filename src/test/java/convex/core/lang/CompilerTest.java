@@ -402,6 +402,9 @@ public class CompilerTest extends ACVMTest {
 	public void testMultiFn() {
 		assertEquals(CVMLong.ZERO,eval("((fn ([] 0) ([x] 1)) )"));
 		assertEquals(CVMLong.ONE,eval("((fn ([] 0) ([x] 1)) :foo)"));
+		
+		// Test closing over lexical environment in MultiFn
+		assertEquals(43L,evalL("(let [a 42 f (fn ([b] (+ a b)) ([] 666)) ] (f 1))"));
 	}
 	
 	@Test
