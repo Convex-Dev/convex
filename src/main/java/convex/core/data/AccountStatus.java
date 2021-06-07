@@ -146,7 +146,7 @@ public class AccountStatus extends ARecord {
 		if ((included&HAS_METADATA)!=0) pos = Format.write(bs,pos, metadata);
 		if ((included&HAS_HOLDINGS)!=0) pos = Format.write(bs,pos, holdings);
 		if ((included&HAS_CONTROLLER)!=0) pos = Format.write(bs,pos, controller);
-		if ((included&HAS_KEY)!=0) pos = Format.write(bs,pos, publicKey);
+		if ((included&HAS_KEY)!=0) pos = publicKey.writeToBuffer(bs, pos);
 		return pos;
 	}
 
@@ -159,7 +159,7 @@ public class AccountStatus extends ARecord {
 		AHashMap<Symbol, AHashMap<ACell,ACell>> metadata = ((included&HAS_METADATA)!=0) ? Format.read(bb) : null;
 		ABlobMap<Address,ACell> holdings = ((included&HAS_HOLDINGS)!=0) ? Format.read(bb) : null;
 		Address controller = ((included&HAS_CONTROLLER)!=0) ? Format.read(bb) : null;
-		AccountKey publicKey = ((included&HAS_KEY)!=0) ? Format.read(bb) : null;
+		AccountKey publicKey = ((included&HAS_KEY)!=0) ? AccountKey.readRaw(bb) : null;
 		return new AccountStatus(sequence, balance, allowance, environment,metadata,holdings,controller,publicKey);
 	}
 

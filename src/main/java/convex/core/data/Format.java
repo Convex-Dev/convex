@@ -717,7 +717,6 @@ public class Format {
 			if (tag == Tag.FALSE) return (T) CVMBool.FALSE;
 
 			if (tag == Tag.ADDRESS) return (T) Address.readRaw(bb);
-			if (tag == Tag.ACCOUNT_KEY) return (T) AccountKey.readRaw(bb);
 			if (tag == Tag.SIGNED_DATA) return (T) SignedData.read(bb);
 
 			// need to product compound objects since they may get ClassCastExceptions

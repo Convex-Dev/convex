@@ -503,7 +503,7 @@ public class State extends ARecord {
 		HashMap<AccountKey, Double> hm = new HashMap<>(peers.size());
 		Double totalStake = peers.reduceEntries((acc, e) -> {
 			double stake = (double) (e.getValue().getTotalStake());
-			hm.put(e.getKey(), stake);
+			hm.put(AccountKey.create(e.getKey()), stake);
 			return stake + acc;
 		}, 0.0);
 		hm.put(null, totalStake);

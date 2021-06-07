@@ -13,7 +13,7 @@ public class AccountKeyTest {
 	@Test public void testEncoding() throws BadFormatException {
 		AccountKey ak=AccountKey.dummy("1234");
 		Blob b=ak.getEncoding();
-		AccountKey ak2=Format.read(b);
+		AccountKey ak2=AccountKey.create(Format.read(b));
 		
 		assertEquals(ak,ak2);
 	}

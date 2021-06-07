@@ -37,7 +37,7 @@ public class AccountKeyTest {
 
 		// AccountKey should not be equal to Blob with same byte content
 		Blob b = a.toBlob();
-		assertNotEquals(a, b);
+		assertEquals(a, b);
 
 		// AccountKey has comparison equality with Blob
 		assertEquals(0, a.compareTo(b));

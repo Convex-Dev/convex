@@ -143,7 +143,7 @@ public class Block extends ARecord {
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = Utils.writeLong(bs,pos, timestamp);
 		pos = transactions.write(bs,pos);
-		pos = Format.write(bs,pos,peerKey);
+		pos = peerKey.writeToBuffer(bs, pos);
 		return pos;
 	}
 	
@@ -165,8 +165,8 @@ public class Block extends ARecord {
 			AVector<SignedData<ATransaction>> transactions = Format.read(bb);
 			if (transactions==null) throw new BadFormatException("Null transactions");
 			
-			AccountKey peer=Format.read(bb);
-			if (peer==null) throw new BadFormatException("Null peer key in Block");
+			AccountKey peer=AccountKey.readRaw(bb);
+			if (peer==null) throw new BadFormatException("Bad peer key in Block");
 			return Block.create(timestamp, peer,transactions);
 		} catch (ClassCastException e) {
 			throw new BadFormatException("Error reading Block format", e);
