@@ -1873,6 +1873,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * @param data Map of data to set for the peer
 	 * @return Context with final peer data set
 	 */
+	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> setPeerData(AMap<ACell, ACell> data) {
 		State s=getState();
 

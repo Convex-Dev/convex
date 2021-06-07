@@ -12,7 +12,6 @@ import java.util.function.Function;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
@@ -22,7 +21,6 @@ import convex.core.data.BlobMaps;
 import convex.core.data.Format;
 import convex.core.data.Keywords;
 import convex.core.data.MapEntry;
-import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
 import convex.core.data.Tag;
@@ -32,7 +30,6 @@ import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.impl.RecordFormat;
 import convex.core.util.Counters;
-import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 
 /**
