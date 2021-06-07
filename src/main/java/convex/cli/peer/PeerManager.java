@@ -16,6 +16,8 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.data.Hash;
+import convex.core.crypto.AKeyPair;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.peer.API;
@@ -65,21 +67,24 @@ public class PeerManager {
 			launchPeer(keyPair);
 		}
 
+		Server genesisServer = peerServerList.get(0);
+		Hash networkId = genesisServer.getPeer().getStates().get(0).getHash();
+		genesisServer.setNetworkId(networkId);
+
 		// go through 1..count-1 peers and join them all to peer #0
 		// do this twice to allow for all of the peers to get all of the address in the group of peers
 
-		for (int repeat = 0; repeat < 2; repeat++) {
-			for (int i = 1; i < count; i++) {
-				AKeyPair keyPair = keyPairs[i];
-				otherServer = peerServerList.get(0);
-				remotePeerHostname = otherServer.getHostname();
-				Address address = Address.create(peerAddress.toLong() + i);
-				// join a peer to the peer #0
-				peerServerList.get(i).joinNetwork(keyPair, address, remotePeerHostname);
-			}
-			// wait for the peers to sync
-			waitForNetworkReady();
+		for (int i = 1; i < count; i++) {
+			AKeyPair keyPair = keyPairs[i];
+			otherServer = peerServerList.get(0);
+			remotePeerHostname = otherServer.getHostname();
+			Address address = Address.create(peerAddress.toLong() + i);
+			// join a peer to the peer #0
+			peerServerList.get(i).joinNetwork(keyPair, address, remotePeerHostname);
 		}
+		// wait for the peers to sync
+		waitForNetworkReady();
+
 		// now join the first peer #0, to the rest of the network
 		otherServer = peerServerList.get(count - 1);
 		remotePeerHostname = otherServer.getHostname();
