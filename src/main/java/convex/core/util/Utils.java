@@ -119,7 +119,8 @@ public class Utils {
 	public static String toFriendlyHexString(String hexString) {
 		int size = 4;
 		String cleanHexString = hexString.replaceAll("^0[Xx]", "");
-		String result = "0x" + cleanHexString.substring(0, size) + ".." + cleanHexString.substring(cleanHexString.length() - size);
+		String result = "0x" + cleanHexString.substring(0, size);
+		// + ".." + cleanHexString.substring(cleanHexString.length() - size);
 		return result;
 	}
 	/**
