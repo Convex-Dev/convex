@@ -639,8 +639,8 @@ public class Compiler {
 		Syntax symbolSyntax = Syntax.create(symArg);
 
 		{// check we are actually defining a symbol
-			ACell so = symbolSyntax.getValue();
-			if (!(so instanceof Symbol)) return context.withCompileError("def requires a symbol as first argument but got: " + so);
+			ACell sym = symbolSyntax.getValue();
+			if (!(sym instanceof Symbol)) return context.withCompileError("def requires a Symbol as first argument but got: " + RT.getType(sym));
 		}
 		
 		ACell exp=list.get(2);
