@@ -192,6 +192,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	
 	/**
 	 * Gets an array containing all values in this record, in format-defined key order.
+	 * @return Array of Values in this record
 	 */
 	public ACell[] getValuesArray() {
 		int n=size();

@@ -15,6 +15,8 @@ package convex.core.data;
  * "When you know your data can never change out from underneath you, everything
  * is different." - Rich Hickey
  * </p>
+ * 
+ * @param <E> Type of Data Structure elements
  */
 public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	/**
@@ -74,7 +76,8 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	/**
 	 * Get the value associated with a given key.
 	 * 
-	 * @param key
+	 * @param key Key to look up in data structure
+	 * @param notFound Value to retun if key is not found
 	 * @return Value from collection, or notFound value if not found
 	 */
 	public abstract ACell get(ACell key, ACell notFound);

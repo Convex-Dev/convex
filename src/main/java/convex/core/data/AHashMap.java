@@ -20,6 +20,8 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 
 	/**
 	 * Dissoc given a Ref to the key value.
+	 * @param key Ref of key to remove
+	 * @return Map with specified key removed.
 	 */
 	public abstract AHashMap<K, V> dissocRef(Ref<K> key);
 
@@ -42,6 +44,9 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	 * different
 	 * 
 	 * O(n) in size of map to merge.
+	 * 
+	 * @param m HashMap to merge into this HashMap 
+	 * @return Merged HashMap
 	 */
 	public AHashMap<K, V> merge(AHashMap<K, V> m) {
 		AHashMap<K, V> result = this;

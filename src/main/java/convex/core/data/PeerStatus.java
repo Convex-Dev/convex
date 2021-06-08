@@ -149,6 +149,7 @@ public class PeerStatus extends ARecord {
 	 * A value of 0 will remove the delegator's stake entirely
 	 *
 	 * @param delegator Address of delegator
+	 * @param newStake New Delegated stake for the given Address
 	 * @return Value of delegated stake
 	 */
 	public PeerStatus withDelegatedStake(Address delegator, long newStake) {

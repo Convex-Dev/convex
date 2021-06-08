@@ -450,6 +450,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * 
 	 * @param bb
 	 * @param count
+	 * @param includeValues If values should be included
 	 * @return TreeMap instance as read from ByteBuffer
 	 * @throws BadFormatException
 	 */

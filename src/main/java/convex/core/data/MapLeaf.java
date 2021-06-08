@@ -356,10 +356,10 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * Reads a MapLeaf from the provided ByteBuffer Assumes the header byte is
 	 * already read.
 	 * 
-	 * @param data
-	 * @param count
+	 * @param bb ByteBuffer to read from
+	 * @param count Count of map elements
 	 * @param includeValues True to include values, false otherwise (i.e. this is a Set)
-	 * @return A ListMap as deserialised from the provided ByteBuffer
+	 * @return A Map as deserialised from the provided ByteBuffer
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
