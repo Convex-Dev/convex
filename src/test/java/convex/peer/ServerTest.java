@@ -177,11 +177,8 @@ public class ServerTest {
 			Result status=statusFuture.get(10000,TimeUnit.MILLISECONDS);
 			assertFalse(status.isError());
 			AVector<?> v=status.getValue();
-<<<<<<< HEAD
 			Hash h=RT.ensureHash(v.get(0));
-=======
-			Hash h=(Hash)v.get(0);
->>>>>>> f1b753a3109bca22531df39c1353f91ccc5f7343
+
 
 			Future<SignedData<Belief>> acquiror=convex.acquire(h);
 			SignedData<Belief> ab=acquiror.get(10000,TimeUnit.MILLISECONDS);
