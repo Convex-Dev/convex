@@ -1016,21 +1016,21 @@ public final class Context<T extends ACell> extends AObject {
 			return withLocalBindings( localBindings.assoc(sym,(ACell)args));
 		} else if (bindingForm instanceof AVector) {
 			AVector<ACell> v=(AVector<ACell>)bindingForm;
-			long bindCount=v.count(); // count of binding form symbols (may include & etc.)
+			long vcount=v.count(); // count of binding form symbols (may include & etc.)
 
 			// Count the arguments, exit with a CAST error if args are not sequential
 			Long argCount=RT.count(args);
 			if (argCount==null) return ctx.withError(ErrorCodes.CAST, "Trying to destructure an argument that is not a sequential collection");
 
 			boolean foundAmpersand=false;
-			for (long i=0; i<bindCount; i++) {
+			for (long i=0; i<vcount; i++) {
 				// get datum for syntax element in binding form
 				ACell bf=Syntax.unwrapAll(v.get(i));
 
 				if (Symbols.AMPERSAND.equals(bf)) {
 					if (foundAmpersand) return ctx.withCompileError("Can't bind two or more ampersands in a single binding vector");
 
-					long nLeft=bindCount-i-2; // number of following bindings should be zero in usual usage [... & more]
+					long nLeft=vcount-i-2; // number of following bindings should be zero in usual usage [... & more]
 					if (nLeft<0) return ctx.withCompileError("Can't bind ampersand at end of binding form");
 
 					// bind variadic form at position i+1 to all args except nLeft
@@ -1045,7 +1045,7 @@ public final class Context<T extends ACell> extends AObject {
 					i++;
 				} else {
 					// just a regular binding
-					long argIndex=foundAmpersand?(argCount-(bindCount-i)):i;
+					long argIndex=foundAmpersand?(argCount-(vcount-i)):i;
 					if (argIndex>=argCount) return ctx.withArityError("Insufficient arguments ("+argCount+") for binding form: "+bindingForm);
 					ctx=ctx.updateBindings(bf,RT.nth(args, argIndex));
 					if(ctx.isExceptional()) return ctx;
@@ -1054,8 +1054,8 @@ public final class Context<T extends ACell> extends AObject {
 
 			// at this point, should have consumed all bindings
 			if (!foundAmpersand) {
-				if (bindCount!=argCount) {
-					return ctx.withArityError("Expected "+bindCount+" arguments but got "+argCount+" for binding form: "+bindingForm);
+				if (vcount!=argCount) {
+					return ctx.withArityError("Expected "+vcount+" arguments but got "+argCount+" for binding form: "+bindingForm);
 				}
 			}
 		} else {

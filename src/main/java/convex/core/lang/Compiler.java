@@ -452,11 +452,44 @@ public class Compiler {
 		return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
 	}
 
-	private static Context<ACell> compileBinding(ACell bf,Context<?> context) {
+	private static Context<ACell> compileBinding(ACell bindingForm,Context<?> context) {
 		CompilerState cs=context.getCompilerState();
 		if (cs==null) cs=CompilerState.EMPTY;
+		
+		cs=updateBinding(bindingForm,cs);
+		if (cs==null) return context.withCompileError("Bad binding form");
+		
 		context=context.withCompilerState(cs);
-		return context.withResult(bf);
+		return context.withResult(bindingForm);
+	}
+	
+	@SuppressWarnings("unchecked")
+	private static CompilerState updateBinding(ACell bindingForm,CompilerState cs) {
+		if (bindingForm instanceof Symbol) {
+			Symbol sym=(Symbol)bindingForm;
+			if (!sym.equals(Symbols.UNDERSCORE)) {
+				cs=cs.define(sym, null); // TODO: metadata?
+			}
+		} else if (bindingForm instanceof AVector) {
+			AVector<ACell> v=(AVector<ACell>)bindingForm;
+			boolean foundAmpersand=false;
+			long vcount=v.count(); // count of binding form symbols (may include & etc.)
+			for (long i=0; i<vcount; i++) {
+				ACell bf=v.get(i);
+				if (Symbols.AMPERSAND.equals(bf)) {
+					if (foundAmpersand) return null; // double ampersand
+					
+					// skip to next element for binding
+					if (i>=(vcount-1)) return null; // trailing ampersand
+					foundAmpersand=true;
+					bf=v.get(i++);
+				} 
+				cs=updateBinding(bf,cs);
+			}
+		} else {
+			cs=null;
+		}
+		return cs;
 	}
 
 	/**
