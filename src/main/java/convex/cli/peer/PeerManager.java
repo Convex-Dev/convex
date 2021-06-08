@@ -3,6 +3,9 @@ package convex.cli.peer;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.List;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,14 +17,20 @@ import convex.core.Init;
 import convex.core.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
+import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Hash;
 import convex.core.crypto.AKeyPair;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
+import convex.core.Order;
+import convex.core.State;
+import convex.core.util.Utils;
 import convex.peer.API;
+import convex.peer.IServerEvent;
 import convex.peer.Server;
+import convex.peer.ServerInformation;
 import etch.EtchStore;
 
 
@@ -31,7 +40,7 @@ import etch.EtchStore;
 *
 */
 
-public class PeerManager {
+public class PeerManager implements IServerEvent {
 
 	private static final Logger log = Logger.getLogger(PeerManager.class.getName());
 
@@ -40,6 +49,9 @@ public class PeerManager {
 	protected Session session = new Session();
 
 	protected String sessionFilename;
+
+	protected BlockingQueue<ServerInformation> serverEventQueue = new ArrayBlockingQueue<ServerInformation>(100);
+
 
 	private PeerManager(String sessionFilename) {
         this.sessionFilename = sessionFilename;
@@ -89,7 +101,7 @@ public class PeerManager {
 		otherServer = peerServerList.get(count - 1);
 		remotePeerHostname = otherServer.getHostname();
 		peerServerList.get(0).joinNetwork(keyPairs[0], peerAddress, remotePeerHostname);
-		System.out.println("done");
+//		System.out.println("done");
 	}
 
 	/**
@@ -222,9 +234,7 @@ public class PeerManager {
 		}
 		config.put(Keywords.STORE, store);
 
-		// log.info("launch peer: "+keyPair.getAccountKey().toHexString());
-
-		Server peerServer = API.launchPeer(config);
+		Server peerServer = API.launchPeer(config, this);
 
 		// add to list so we can remove from the session file when this app closes
 		peerServerList.add(peerServer);
@@ -289,28 +299,75 @@ public class PeerManager {
 		    }
 		});
 
+		Server firstServer = peerServerList.get(0);
+		System.out.println("Starting network Id: "+ firstServer.getNetworkId().toString());
 		while (true) {
 			try {
-				Thread.sleep(30);
-				for (Server peerServer: peerServerList) {
-					convex.core.Peer peer = peerServer.getPeer();
-					if (peer==null) continue;
-
-					// System.out.println("state " + state);
-					Order order=peer.getPeerOrder();
-					if (order==null) continue; // not an active peer?
-					maxBlock = Math.max(maxBlock, order.getBlockCount());
-
-					long peerConsensusPoint = peer.getConsensusPoint();
-					if (peerConsensusPoint > consensusPoint) {
-						consensusPoint = peerConsensusPoint;
-						System.err.printf("Consenus State update detected at depth %d\n", consensusPoint);
-					}
+				ServerInformation serverInformation = serverEventQueue.take();
+				int index = getServerIndex(serverInformation.getPeerKey());
+				if (index >=0) {
+					String item = toServerInformationText(serverInformation);
+					System.out.println(String.format("#%d: %s", index + 1, item));
 				}
 			} catch (InterruptedException e) {
 				System.out.println("Peer manager interrupted!");
 				return;
 			}
+		}
+	}
+
+	protected String toServerInformationText(ServerInformation serverInformation) {
+		String shortName = Utils.toFriendlyHexString(serverInformation.getPeerKey().toHexString()).replaceAll("^0x", "");
+		String hostname = serverInformation.getHostname();
+		String joined = "NJ";
+		String synced = "NS";
+		if (serverInformation.isJoined()) {
+			joined = " J";
+		}
+		if (serverInformation.isSynced()) {
+			synced = " S";
+		}
+		long blockCount = serverInformation.getBlockCount();
+		int connectionCount = serverInformation.getConnectionCount();
+		int trustedConnectionCount = serverInformation.getTrustedConnectionCount();
+		long consensusPoint = serverInformation.getConsensusPoint();
+		String item = String.format("Peer:%s URL: %s Status:%s %s Connections:%2d/%2d Level:%4d Block:%4d",
+				shortName,
+				hostname,
+				joined,
+				synced,
+				connectionCount,
+				trustedConnectionCount,
+				consensusPoint,
+				blockCount
+		);
+
+		return item;
+	}
+
+	protected int getServerIndex(AccountKey peerKey) {
+		for (int index = 0; index < peerServerList.size(); index ++) {
+			Server server = peerServerList.get(index);
+			if (server.getPeer().getPeerKey().equals(peerKey)) {
+				return index;
+			}
+		}
+		return -1;
+	}
+
+	/**
+	 * Implements for IServerEvent
+	 *
+	 */
+	public void onServerMessage(Server server, String message) {
+		String shortName = Utils.toFriendlyHexString(server.getPeer().getPeerKey().toHexString());
+		// System.out.println(shortName + ": " + message);
+	}
+
+	public void onServerChange(ServerInformation serverInformation) {
+		try {
+			serverEventQueue.put(serverInformation);
+		} catch (InterruptedException e) {
 		}
 	}
 }

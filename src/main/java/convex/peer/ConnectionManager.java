@@ -79,6 +79,26 @@ public class ConnectionManager {
 		return connections.get(peerKey);
 	}
 
+	/**
+	 * Returns the number of active connections
+	 */
+	public int getConnectionCount() {
+		return connections.size();
+	}
+
+	/**
+	 * Returns the number of trusted connections
+	 *
+	 */
+	public int getTrustedConnectionCount() {
+		int result = 0;
+		for (Connection connection : connections.values()) {
+			if (connection.isTrusted()) {
+				result ++;
+			}
+		}
+		return result;
+	}
 
 	/**
 	 *
