@@ -65,7 +65,7 @@ public class Connection {
 	/**
 		* If trusted the account key of the remote peer
 		*/
-	private AccountKey trustedKey;
+	private AccountKey trustedPeerKey;
 
 	private static final Logger log = Logger.getLogger(Connection.class.getName());
 
@@ -84,11 +84,12 @@ public class Connection {
 	private final MessageReceiver receiver;
 	private final MessageSender sender;
 
-	private Connection(ByteChannel clientChannel, Consumer<Message> receiveAction, AStore store) {
+	private Connection(ByteChannel clientChannel, Consumer<Message> receiveAction, AStore store, AccountKey trustedPeerKey) {
 		this.channel = clientChannel;
 		receiver = new MessageReceiver(receiveAction, this);
 		sender = new MessageSender(clientChannel);
 		this.store=store;
+		this.trustedPeerKey = trustedPeerKey;
 	}
 
 	/**
@@ -101,8 +102,19 @@ public class Connection {
 	 * @return New Connection instance
 	 * @throws IOException
 	 */
-	public static Connection create(ByteChannel channel, Consumer<Message> receiveAction, AStore store) throws IOException {
-		return new Connection(channel, receiveAction, store);
+	public static Connection create(ByteChannel channel, Consumer<Message> receiveAction, AStore store, AccountKey trustedPeerKey) throws IOException {
+		return new Connection(channel, receiveAction, store, trustedPeerKey);
+	}
+
+	/**
+	 * Create an untrusted PeerConnection by connecting to a remote address
+	 *
+	 * @param receiveAction A callback Consumer to be called for any received messages on this connection
+	 * @return New Connection instance
+	 * @throws IOException If connection fails because of any IO problem
+	 */
+	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store) throws IOException {
+		return connect(hostAddress, receiveAction, store, null);
 	}
 
 	/**
@@ -112,7 +124,7 @@ public class Connection {
 	 * @return New Connection instance
 	 * @throws IOException If connection fails because of any IO problem
 	 */
-	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store)
+	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store, AccountKey trustedPeerKey)
 			throws IOException {
 		if (store==null) throw new Error("Connection requires a store");
 		SocketChannel clientChannel = SocketChannel.open(hostAddress);
@@ -128,7 +140,7 @@ public class Connection {
 		// clientChannel.setOption(StandardSocketOptions.SO_KEEPALIVE,true);
 		// clientChannel.setOption(StandardSocketOptions.TCP_NODELAY,true);
 
-		Connection pc = create(clientChannel, receiveAction, store);
+		Connection pc = create(clientChannel, receiveAction, store, trustedPeerKey);
 		pc.startClientListening();
 		log.log(LEVEL_SEND, "Connect succeeded for host: " + hostAddress);
 		return pc;
@@ -246,7 +258,50 @@ public class Connection {
 		} finally {
 			Stores.setCurrent(temp);
 		}
+	}
 
+	/**
+	 * Sends a CHALLENGE Request Message on this connection.
+	 *
+	 * @param challeng Challenge a Vector that has been signed by the sending peer.
+	 *
+	 * @return The ID of the message sent, or -1 if the message cannot be sent.
+	 *
+	 * @throws IOException
+	 *
+	 */
+	public long sendChallenge(SignedData<ACell> challenge) throws IOException {
+		AStore temp=Stores.current();
+		try {
+			long id = ++idCounter;
+			boolean sent = sendObject(MessageType.CHALLENGE, challenge);
+			return (sent) ? id: -1;
+		} finally {
+			Stores.setCurrent(temp);
+		}
+	}
+
+	/**
+	 * Sends a RESPONSE Request Message on this connection.
+	 *
+	 * @param responseHash Hash for the remote peer to sign.
+	 *
+	 * @param accountKey AccountKey of the remote peer.
+	 *
+	 * @return The ID of the message sent, or -1 if the message cannot be sent.
+	 *
+	 * @throws IOException
+	 *
+	 */
+	public long sendResponse(SignedData<ACell> response) throws IOException {
+		AStore temp=Stores.current();
+		try {
+			long id = ++idCounter;
+			boolean sent = sendObject(MessageType.RESPONSE, response);
+			return (sent) ? id: -1;
+		} finally {
+			Stores.setCurrent(temp);
+		}
 	}
 
 	/**
@@ -609,14 +664,25 @@ public class Connection {
 		}
 	}
 
-	/*
-	 * TODO better way to make this field final and immutable, will to re-create the connection
-	 * class as a new object, but this will lose the connection.
+	/**
+	 * Return a new trusted connection
+	 *
+	 * @param trustedPeerKey Peer key of the trusted remote peer.
+	 *
+	 * @param receiveAction A callback Consumer to be called for any received messages on this connection
+	 *
+	 * @return a new connection
+	 *
+	 * TODO: enable bigger buffers for this trusted connection
+	 *
 	 */
-	public Connection withTrustedKey(AccountKey accountKey) {
-		// set the private value
-		trustedKey = accountKey;
-		return this;
+	public Connection connectWithTrustedKey(AccountKey trustedPeerKey, Consumer<Message> receiveAction) throws IOException {
+		InetSocketAddress remotePeerAddress = getRemoteAddress();
+		return connect(remotePeerAddress, receiveAction, store, trustedPeerKey);
+	}
+
+	public void setTrustedPeerKey(AccountKey trustedPeerKey) {
+		this.trustedPeerKey = trustedPeerKey;
 	}
 
 	public boolean sendBytes() throws IOException {
@@ -628,11 +694,11 @@ public class Connection {
 		return "PeerConnection: " + channel;
 	}
 
-	public AccountKey trustedKey() {
-		return trustedKey;
+	public AccountKey getTrustedPeerKey() {
+		return trustedPeerKey;
 	}
 
 	public boolean isTrusted() {
-		return trustedKey != null;
+		return trustedPeerKey != null;
 	}
 }

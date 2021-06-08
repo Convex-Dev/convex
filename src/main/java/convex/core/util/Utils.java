@@ -36,9 +36,9 @@ public class Utils {
 
 	/**
 	 * Converts an array of bytes into an unsigned BigInteger
-	 * 
+	 *
 	 * Assumes big-endian format as per new BigInteger(int, byte[]);
-	 * 
+	 *
 	 * @param data Array of bytes containing an unsigned integer (big-endian)
 	 * @return A new non-negative BigInteger
 	 */
@@ -48,10 +48,10 @@ public class Utils {
 
 	/**
 	 * Converts an array of bytes into a signed BigInteger
-	 * 
+	 *
 	 * Assumes two's-complement big-endian binary representation format as per new
 	 * BigInteger(byte[]);
-	 * 
+	 *
 	 * @param data
 	 * @return A signed BigInteger
 	 */
@@ -61,7 +61,7 @@ public class Utils {
 
 	/**
 	 * Converts an int to a hex string e.g. "80cafe80"
-	 * 
+	 *
 	 * @param val
 	 * @return Lowercase hex string
 	 */
@@ -83,7 +83,7 @@ public class Utils {
 
 	/**
 	 * Converts a byte to a two-character hex string
-	 * 
+	 *
 	 * @param value
 	 * @return Lowercase hex string
 	 */
@@ -96,7 +96,7 @@ public class Utils {
 
 	/**
 	 * Converts a long value to a 16 character hex string
-	 * 
+	 *
 	 * @param x
 	 * @return Hex string for the given long
 	 */
@@ -109,9 +109,23 @@ public class Utils {
 	}
 
 	/**
+	 * Converts a hex string to a friendly version ( first x chars).
+	 * SECURITY; do not use this output for any comparison.
+	 *
+	 * @param hexString String to show in friendly format.
+	 *
+	 */
+
+	public static String toFriendlyHexString(String hexString) {
+		int size = 4;
+		String cleanHexString = hexString.replaceAll("^0[Xx]", "");
+		String result = "0x" + cleanHexString.substring(0, size) + ".." + cleanHexString.substring(cleanHexString.length() - size);
+		return result;
+	}
+	/**
 	 * Reads an int from a specified location in a byte array Assumes 4-byte
 	 * big-endian representation
-	 * 
+	 *
 	 * @param data Byte array from which to read the 4-byte int representation
 	 * @return int value from array
 	 */
@@ -134,7 +148,7 @@ public class Utils {
 	/**
 	 * Reads a short from a specified location in a byte array Assumes 2-byte
 	 * big-endian representation
-	 * 
+	 *
 	 * @param data Byte array from which to read the 2-byte short representation
 	 * @return short value from array
 	 */
@@ -142,10 +156,10 @@ public class Utils {
 		int result = ((data[offset] & 0xFF) << 8) + (data[offset + 1] & 0xFF);
 		return (short) result;
 	}
-	
+
 	/**
 	 * Writes an char to a byte array in 2 byte big-endian representation
-	 * 
+	 *
 	 * @param value  int value to write to the array
 	 * @param data   Byte array into which to write the given int
 	 * @param offset Offset into the array at which the int will be written
@@ -156,10 +170,10 @@ public class Utils {
 		data[offset++]=(byte)(value);
 		return offset;
 	}
-	
+
 	/**
 	 * Writes an char to a byte array in 2 byte big-endian representation
-	 * 
+	 *
 	 * @param value  int value to write to the array
 	 * @param data   Byte array into which to write the given int
 	 * @param offset Offset into the array at which the int will be written
@@ -173,7 +187,7 @@ public class Utils {
 
 	/**
 	 * Writes an int to a byte array in 4 byte big-endian representation
-	 * 
+	 *
 	 * @param value  int value to write to the array
 	 * @param data   Byte array into which to write the given int
 	 * @param offset Offset into the array at which the int will be written
@@ -188,11 +202,11 @@ public class Utils {
 
 	/**
 	 * Writes a long to a byte array in 8 byte big-endian representation.
-	 * 
+	 *
 	 * @param value  long value to write to the array
 	 * @param data   Byte array into which to write the given long
 	 * @param offset Offset into the array at which the long will be written
-	 * 
+	 *
 	 * @throws IndexOutOfBoundsException If long reaches outside the destination
 	 *                                   byte array
 	 * @return Offset after writing 8 bytes
@@ -206,7 +220,7 @@ public class Utils {
 
 	/**
 	 * Reads ByteBuffer contents into a new byte array
-	 * 
+	 *
 	 * @param b
 	 */
 	public static byte[] toByteArray(ByteBuffer b) {
@@ -218,7 +232,7 @@ public class Utils {
 
 	/**
 	 * Reads ByteBuffer contents into a new Data object
-	 * 
+	 *
 	 * @param b
 	 */
 	public static AArrayBlob toData(ByteBuffer b) {
@@ -227,7 +241,7 @@ public class Utils {
 
 	/**
 	 * Converts an int value in the range 0..15 to a hexadecimal character
-	 * 
+	 *
 	 * @param i
 	 * @return Hex digit value (lowercase)
 	 */
@@ -242,7 +256,7 @@ public class Utils {
 	/**
 	 * Converts a hex string to a byte array. Must contain an even number of hex
 	 * digits, or else null will be returned
-	 * 
+	 *
 	 * @param hex String containing Hex digits
 	 * @return byte array with the given hex value, or null if string is not valid
 	 */
@@ -254,7 +268,7 @@ public class Utils {
 	/**
 	 * Converts a hex string to a byte array. Must contain an the expected number of
 	 * hex digits, or else null will be returned
-	 * 
+	 *
 	 * @param hex          String containing Hex digits
 	 * @param stringLength number of hex digits in the string to use
 	 * @return byte array with the given hex value, or null if not valud
@@ -284,7 +298,7 @@ public class Utils {
 
 	/**
 	 * Converts a hex string to an unsigned big Integer
-	 * 
+	 *
 	 * @param hex
 	 * @return BigInteger
 	 */
@@ -294,7 +308,7 @@ public class Utils {
 
 	/**
 	 * Gets the value of a single hex car e.g. hexVal('c') => 12
-	 * 
+	 *
 	 * @param c Character representing a hex digit
 	 * @return int in the range 0..15 inclusive, or -1 if not a hex char
 	 */
@@ -310,7 +324,7 @@ public class Utils {
 
 	/**
 	 * Converts a byte array of length N to a hex string of length 2N
-	 * 
+	 *
 	 * @param data Array of bytes
 	 * @return Hex String
 	 */
@@ -320,7 +334,7 @@ public class Utils {
 
 	/**
 	 * Converts a byte array of length N to a hex string of length 2N
-	 * 
+	 *
 	 * @param data Array of bytes
 	 * @return Hex String
 	 */
@@ -336,9 +350,9 @@ public class Utils {
 
 	/**
 	 * Gets the Java hashCode of any value.
-	 * 
+	 *
 	 * The hashCode of null is defined as zero
-	 * 
+	 *
 	 * @return hash code
 	 */
 	public static int hashCode(Object a) {
@@ -348,7 +362,7 @@ public class Utils {
 
 	/**
 	 * Tests if two byte array regions are identical
-	 * 
+	 *
 	 * @param a
 	 * @param aOffset
 	 * @param b
@@ -363,7 +377,7 @@ public class Utils {
 	/**
 	 * Compares two byte arrays on an unsigned basis. Shorter arrays will be
 	 * considered "smaller" if they match in all other positions.
-	 * 
+	 *
 	 * @param a
 	 * @param aOffset
 	 * @param b
@@ -390,7 +404,7 @@ public class Utils {
 	/**
 	 * Converts an unsigned BigInteger to a hex string with the given number of
 	 * digits Truncates any high bytes beyond the given digits.
-	 * 
+	 *
 	 * @param a
 	 * @param digits
 	 * @return String containing the hex representation
@@ -414,7 +428,7 @@ public class Utils {
 	/**
 	 * Writes an unsigned big integer to a specific segment of a byte[] array Pads
 	 * with zeros if necessary to fill the specified length
-	 * 
+	 *
 	 * @param a
 	 * @param dest
 	 * @param offset
@@ -447,7 +461,7 @@ public class Utils {
 
 	/**
 	 * Converts a String to a byte array using UTF-8 encoding
-	 * 
+	 *
 	 * @param s Any String
 	 * @return Byte array
 	 */
@@ -457,7 +471,7 @@ public class Utils {
 
 	/**
 	 * Converts any array to an Object[] array
-	 * 
+	 *
 	 * @param anyArray
 	 * @return Object[] array
 	 */
@@ -470,10 +484,10 @@ public class Utils {
 		}
 		return result;
 	}
-	
+
 	/**
 	 * Converts any array to an ACell[] array. Elements must be Cells.
-	 * 
+	 *
 	 * @param anyArray
 	 * @return ACell[] array
 	 */
@@ -488,7 +502,7 @@ public class Utils {
 
 	/**
 	 * Equality method allowing for nulls
-	 * 
+	 *
 	 * @param a
 	 * @param b
 	 * @return true if arguments are equal, false otherwise
@@ -498,10 +512,10 @@ public class Utils {
 		if (a == null) return false; // b can't be null because of above line
 		return a.equals(b); // fall back to Object equality
 	}
-	
+
 	/**
 	 * Equality method allowing for nulls
-	 * 
+	 *
 	 * @param a
 	 * @param b
 	 * @return true if arguments are equal, false otherwise
@@ -514,7 +528,7 @@ public class Utils {
 
 	/**
 	 * Gets a hex digit as an integer 0-15 value from a Data object
-	 * 
+	 *
 	 * @param data     Blob containing byte values
 	 * @param hexDigit Position of hex digit to extract (from start of blob)
 	 * @return Hex digit value as an integer 0..15 inclusive
@@ -525,7 +539,7 @@ public class Utils {
 
 	/**
 	 * Gets the class of an Object, or null if the value is null
-	 * 
+	 *
 	 * @param o
 	 * @return Class of the object
 	 */
@@ -536,7 +550,7 @@ public class Utils {
 
 	/**
 	 * Gets the class name of an Object, or "null" if the value is null
-	 * 
+	 *
 	 * @param o
 	 * @return Class name of the object
 	 */
@@ -547,7 +561,7 @@ public class Utils {
 
 	/**
 	 * Converts a long to an int, throws error if out of allowable range.
-	 * 
+	 *
 	 * @param a
 	 * @return int value of the long if in valid Integer range
 	 */
@@ -559,7 +573,7 @@ public class Utils {
 
 	/**
 	 * Converts a long to a short, throws error if out of allowable range.
-	 * 
+	 *
 	 * @param a
 	 * @return short value of the long if in valid Short range
 	 */
@@ -571,7 +585,7 @@ public class Utils {
 
 	/**
 	 * Converts a long to a byte, throws error if out of allowable range.
-	 * 
+	 *
 	 * @param a
 	 * @return byte value of the long if in valid Byte range
 	 */
@@ -583,7 +597,7 @@ public class Utils {
 
 	/**
 	 * Writes an unsigned BigInteger as 32 bytes into a ByteBuffer
-	 * 
+	 *
 	 * @param b A ByteBuffer with at least 32 bytes capacity
 	 * @param v A BigInteger in the unsigned 256 bit integer range
 	 * @return The ByteBuffer with 32 bytes written
@@ -606,7 +620,7 @@ public class Utils {
 
 	/**
 	 * Reads an unsigned BigInteger as 32 bytes from a ByteBuffer
-	 * 
+	 *
 	 * @param b ByteBuffer from which to extract 32 bytes
 	 * @return A non-negative BigInteger containing the unsigned big-endian value
 	 *         from the 32 bytes read
@@ -620,7 +634,7 @@ public class Utils {
 	/**
 	 * Returns the minimal number of bits to represent the signed twos complement
 	 * long value. Return value will be at least 1, max 64
-	 * 
+	 *
 	 * @param x
 	 * @return Number of bits required for representation, in the range 1..64
 	 *         inclusive
@@ -655,7 +669,7 @@ public class Utils {
 
 	/**
 	 * Gets a resource as a String.
-	 * 
+	 *
 	 * @param path Path to resource, e.g "actors/token.con"
 	 * @return String content of resource file
 	 * @throws IOException
@@ -753,7 +767,7 @@ public class Utils {
 		buffer.get(bytes);
 		return Blob.wrap(bytes);
 	}
-	
+
 	/**
 	 * Prints an Object in readable String representation
 	 * @param v
@@ -764,7 +778,7 @@ public class Utils {
 		print(sb,v);
 		return sb.toString();
 	}
-	
+
 	/**
 	 * Prints an Object in readable String representation
 	 * @param v
@@ -778,9 +792,9 @@ public class Utils {
 		} else if (v instanceof Boolean||v instanceof Number){
 			sb.append(v.toString());
 		} else if (v instanceof String) {
-			sb.append('"');	
+			sb.append('"');
 			sb.append((String)v);
-			sb.append('"');				
+			sb.append('"');
 		} else if (v instanceof Instant) {
 			sb.append(((Instant)v).toEpochMilli());
 		} else if (v instanceof Character) {
@@ -789,7 +803,7 @@ public class Utils {
 			throw new TODOException("Can't print: "+Utils.getClass(v));
 		}
 	}
-	
+
 
 	/**
 	 * Converts an Object to an edn String.
@@ -855,7 +869,7 @@ public class Utils {
 
 	/**
 	 * Converts a String to an InetSocketAddress
-	 * 
+	 *
 	 * @param s A string in the format "http://myhost.com:17888"
 	 * @return A valid InetSocketAddress
 	 */
@@ -872,7 +886,7 @@ public class Utils {
 	 * Filters the array, returning an array containing only the elements where the
 	 * predicate returns true. May return the same array if all elements are
 	 * included.
-	 * 
+	 *
 	 * @param arr
 	 * @param predicate
 	 * @return Filtered array.
@@ -886,7 +900,7 @@ public class Utils {
 	 * Return a list of values, sorted according to the score computed using the
 	 * provided function, in ascending order. Ignores elements where score is null
 	 * (will not be included in the resulting list)
-	 * 
+	 *
 	 * @param scorer a Function mapping collection elements to Long values
 	 * @param coll   Collection of values to compare
 	 * @return The sorted collection values as an ArrayList, in ascending score
@@ -916,9 +930,9 @@ public class Utils {
 	 * Filters the array, returning an array containing only the elements where the
 	 * predicate returns true. May return the same array if all elements are
 	 * included.
-	 * 
+	 *
 	 * Array must have a maximum of 32 elements
-	 * 
+	 *
 	 * @param arr
 	 * @param predicate
 	 * @return
@@ -954,9 +968,9 @@ public class Utils {
 	/**
 	 * Computes a bit mask of up to 16 bits by scanning a full array for which
 	 * elements are included in the subset, comparing using object identity
-	 * 
+	 *
 	 * Subset must be an ordered subset of of the full array
-	 * 
+	 *
 	 * @param set
 	 * @param subset
 	 * @return Bit mask as a short
@@ -980,7 +994,7 @@ public class Utils {
 
 	/**
 	 * Hack to convert a checked exception into an unchecked exception.
-	 * 
+	 *
 	 * @param <T> Type of exception to return
 	 * @param t   Any Throwable instance
 	 * @return Throwable instance
@@ -1033,7 +1047,7 @@ public class Utils {
 
 	/**
 	 * Reads the full contents of an input stream into a new byte array.
-	 * 
+	 *
 	 * @param is An arbitrary InputStream
 	 * @return A byte array containing the full contents of the given InputStream
 	 * @throws IOException
@@ -1054,9 +1068,9 @@ public class Utils {
 
 	/**
 	 * Displays a String representing the given Object.
-	 * 
+	 *
 	 * SECURITY: should *not* be used in Actor code, use RT.str(...) instead.
-	 * 
+	 *
 	 * @param o
 	 * @return String representation of object
 	 */
@@ -1072,7 +1086,7 @@ public class Utils {
 	/**
 	 * Gets the number of Refs directly contained in an object (will be zero if the
 	 * object is not a Ref container)
-	 * 
+	 *
 	 * @param eval
 	 * @return Number of Refs in the object.
 	 */
@@ -1084,7 +1098,7 @@ public class Utils {
 	/**
 	 * Counts the total number of Refs contained in a data object recursively. Will
 	 * count duplicate children multiple times.
-	 * 
+	 *
 	 * @param eval
 	 * @return Total number of Refs
 	 */
@@ -1121,7 +1135,7 @@ public class Utils {
 
 	/**
 	 * Runs test repeatedly, until it returns true or the timeout has elapsed
-	 * 
+	 *
 	 * @param timeoutMillis
 	 * @param test
 	 * @return True if the operation timed out, false otherwise
@@ -1130,14 +1144,14 @@ public class Utils {
 		long start = getTimeMillis();
 		long end=start+timeoutMillis;
 		long now = start;
-		
+
 		// loop until either test succeeds (return false) or the timeout happens (return true)
 		while (true) {
 			if (test.get()) return false;
-			
+
 			// test failed, so sleep
 			try {
-				// compute sleep time 
+				// compute sleep time
 				long nextInterval=(long) ((now - start) * 0.3 + 1);
 				long sleepTime=Math.min(nextInterval, end-now);
 				if (sleepTime<0L) return true;
@@ -1155,11 +1169,11 @@ public class Utils {
 
 	/**
 	 * Gets the current system timestamp. Guaranteed monotonic within this JVM.
-	 * 
+	 *
 	 * Should be used for timestamps that need to be persisted or communicated
 	 * Should not be used for timing - use Utils.getTimeMillis() instead
-	 * 
-	 * 
+	 *
+	 *
 	 * @return Long representation of Timestamp
 	 */
 	public static long getCurrentTimestamp() {
@@ -1172,16 +1186,16 @@ public class Utils {
 			return lastTimestamp;
 		}
 	}
-	
+
 	private static final long startupTimestamp=getCurrentTimestamp();
 	private static final long startupNanos=System.nanoTime();
-	
+
 	/**
 	 * Gets the a millisecond accurate time suitable for use in timing.
-	 * 
+	 *
 	 * Should not be used for timestamps
-	 * 
-	 * 
+	 *
+	 *
 	 * @return long
 	 */
 	public static long getTimeMillis() {
@@ -1192,7 +1206,7 @@ public class Utils {
 
 	/**
 	 * Test if the first hex digits of two bytes match
-	 * 
+	 *
 	 * @param a Any byte value
 	 * @param b Any byte value
 	 * @return true if the first hex digit (high nibble) of the two bytes is equal,
@@ -1205,7 +1219,7 @@ public class Utils {
 	public static String unescapeString(String s) {
 		return StringEscapeUtils.unescapeJava(s);
 	}
-	
+
 	public static String escapeString(String s) {
 		return StringEscapeUtils.escapeJava(s);
 	}

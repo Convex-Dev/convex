@@ -3,12 +3,14 @@ package convex.net;
 import convex.core.exceptions.BadFormatException;
 
 public enum MessageType {
-	
+
 	/**
 	 * A message that requests the remote endpoint to respond with a signed
 	 * response.
-	 * 
+	 *
 	 * The challenge must be signed to authenticate the challenger.
+     *
+     * The challenge is sent with a vector of [hash accountKey-of-the-challenged]
 	 */
 	CHALLENGE(1),
 
@@ -20,7 +22,7 @@ public enum MessageType {
 
 	/**
 	 * A message relaying data.
-	 * 
+	 *
 	 * Data is presented "as-is", and may be: - the result of a missing data request
 	 * - data sent ahead of another message requiring composite data
 	 */
@@ -28,7 +30,7 @@ public enum MessageType {
 
 	/**
 	 * A control command to a peer.
-	 * 
+	 *
 	 * Should only be accepted and acted upon when originating from trusted,
 	 * authenticated senders.
 	 */
@@ -38,12 +40,12 @@ public enum MessageType {
 	 * A request to provide missing data. Peers should not send this message unless
 	 * both: a) they are unable to locate the given data in their local store b)
 	 * They have reason to believe the targeted peer may be able to provide it
-	 * 
+	 *
 	 * Excessive invalid missing data requests may be considered a DoS attack by
 	 * peers. Peers under load may need to ignore missing data requests.
-	 * 
+	 *
 	 * Payload is the missing data hash.
-	 * 
+	 *
 	 * Receiver should respond with a DATA message if the specified data is
 	 * available in their store.
 	 */
@@ -51,9 +53,9 @@ public enum MessageType {
 
 	/**
 	 * A request to perform the specified query and return results.
-	 * 
+	 *
 	 * Payload is: [id form address?]
-	 * 
+	 *
 	 * Receiver may may determine policies regarding whether to accept or reject
 	 * queries, typically receiver will want to authenticate the sender and ensure
 	 * good standing?
@@ -63,7 +65,7 @@ public enum MessageType {
 	/**
 	 * A message requesting a transaction be performed by the receiving peer and
 	 * included in the next available block.
-	 * 
+	 *
 	 * Payload is: [id signed-data]
 	 */
 	TRANSACT(7),
@@ -71,9 +73,9 @@ public enum MessageType {
 	/**
 	 * Message containing the result for a corresponding COMMAND, QUERY or TRANSACT
 	 * message.
-	 * 
+	 *
 	 * Payload is: [id result error-flag]
-	 * 
+	 *
 	 * Where:
 	 * - Result is the result of the request, or the message if an error occurred
 	 * - error-flag is nil if the transaction succeeded, or error code if it failed
@@ -82,7 +84,7 @@ public enum MessageType {
 
 	/**
 	 * Communication of a latest Belief by a Peer.
-	 * 
+	 *
 	 * Payload is a SignedData<Belief>
 	 */
 	BELIEF(9),
@@ -91,11 +93,11 @@ public enum MessageType {
 	 * Communication of an intention to shutdown.
 	 */
 	GOODBYE(10),
-	
+
 	/**
 	 * Request for a peer status update.
-	 * 
-	 * Expected Result is a Vector: [belief-hash states-hash initial-state-hash]
+	 *
+	 * Expected Result is a Vector: [belief-hash states-hash initial-state-hash vector-of-peer-hostnames]
 	 */
 	STATUS(11)
 
