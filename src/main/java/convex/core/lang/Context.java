@@ -99,14 +99,25 @@ public final class Context<T extends ACell> extends AObject {
 	
 
 	/**
-	 * Inner class compiler state
+	 * Inner class compiler state.
+	 * 
+	 * Maintains a mapping of Symbols to positions in a definition vector corresponding to lexical scope.
 	 *
-	 * SECURITY: security critical, since it determines the current *address* and *caller*
-	 * which in turn controls access to most account resources and rights.
 	 */
-	private static final class CompilerState {
-		private CompilerState() {
-			
+	public static final class CompilerState {
+		private AVector<Syntax> definitions;
+		private AHashMap<Symbol,CVMLong> mappings;
+		
+		private CompilerState(AVector<Syntax> definitions, AHashMap<Symbol,CVMLong> mappings) {
+			this.definitions=definitions;
+			this.mappings=mappings;
+		}
+		
+		public CompilerState define(Symbol sym, Syntax syn) {
+			long position=definitions.count();
+			AVector<Syntax> newDefs=definitions.conj(syn);
+			AHashMap<Symbol,CVMLong> newMaps=mappings.assoc(sym, CVMLong.create(position));
+			return new CompilerState(newDefs,newMaps);
 		}
 	}
 
