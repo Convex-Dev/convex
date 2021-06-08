@@ -229,7 +229,7 @@ public class OpsTest extends ACVMTest {
 
 		Symbol sym = Symbol.create("arg0");
 
-		Invoke<AString> op = Invoke.create(Lambda.create(Vectors.of(Syntax.create(sym)), Lookup.create(sym)),
+		Invoke<AString> op = Invoke.create(Lambda.create(Vectors.of(sym), Lookup.create(sym)),
 				Constant.createString("bar"));
 
 		Context<AString> c2 = c.execute(op);

@@ -1022,7 +1022,7 @@ public final class Context<T extends ACell> extends AObject {
 			boolean foundAmpersand=false;
 			for (long i=0; i<vcount; i++) {
 				// get datum for syntax element in binding form
-				ACell bf=Syntax.unwrapAll(v.get(i));
+				ACell bf=v.get(i);
 
 				if (Symbols.AMPERSAND.equals(bf)) {
 					if (foundAmpersand) return ctx.withCompileError("Can't bind two or more ampersands in a single binding vector");

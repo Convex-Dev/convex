@@ -207,7 +207,7 @@ public class CompilerTest extends ACVMTest {
 		AOp<CVMLong> op=Do.create(
 				    // define a nasty function that calls its argument recursively on itself
 					Def.create("fubar", 
-							Lambda.create(Vectors.of(Syntax.create(Symbol.create("func"))), 
+							Lambda.create(Vectors.of(Symbol.create("func")), 
 											Invoke.create(Lookup.create("func"),Lookup.create("func")))),
 					// call the nasty function on itself
 					Invoke.create(Invoke.create(Lookup.create("fubar"),Lookup.create("fubar")))
