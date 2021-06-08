@@ -15,6 +15,7 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Address;
+import convex.core.data.ObjectsTest;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
@@ -31,6 +32,7 @@ import convex.core.lang.ops.Lambda;
 import convex.core.lang.ops.Let;
 import convex.core.lang.ops.Lookup;
 import convex.core.lang.ops.Special;
+import convex.core.util.Utils;
 
 /**
  * Tests for ops functionality.
@@ -56,6 +58,7 @@ public class OpsTest extends ACVMTest {
 
 			assertEquals(INITIAL_JUICE - Juice.CONSTANT, c2.getJuice());
 			assertEquals(CVMLong.create(10L), c2.getResult());
+			doOpTest(op);
 		}
 
 		{// null constant
@@ -64,6 +67,7 @@ public class OpsTest extends ACVMTest {
 
 			assertEquals(INITIAL_JUICE - Juice.CONSTANT, c2.getJuice());
 			assertNull(c2.getResult());
+			doOpTest(op);
 		}
 	}
 
@@ -74,6 +78,8 @@ public class OpsTest extends ACVMTest {
 
 		AOp<CVMLong> op = Constant.of(10L);
 		assertJuiceError(c.execute(op));
+		
+		doOpTest(op);
 	}
 
 	@Test
@@ -101,7 +107,9 @@ public class OpsTest extends ACVMTest {
 		expectedJuice -= Juice.LOOKUP_DYNAMIC;
 		assertEquals(expectedJuice, c3.getJuice());
 		assertEquals("bar", c3.getResult().toString());
-
+		
+		doOpTest(op);
+		doOpTest(lookupOp);
 	}
 
 	@Test
@@ -109,6 +117,8 @@ public class OpsTest extends ACVMTest {
 		Context<?> c = context();
 		AOp<AString> op = Lookup.create("missing-symbol");
 		assertUndeclaredError(c.execute(op));
+		
+		doOpTest(op);
 	}
 
 	@Test
@@ -121,6 +131,8 @@ public class OpsTest extends ACVMTest {
 		long expectedJuice = INITIAL_JUICE - (Juice.CONSTANT + Juice.DEF + Juice.LOOKUP_DYNAMIC + Juice.DO);
 		assertEquals(expectedJuice, c2.getJuice());
 		assertEquals("bar", c2.getResult().toString());
+		
+		doOpTest(op);
 	}
 	
 	@Test
@@ -132,6 +144,8 @@ public class OpsTest extends ACVMTest {
 
 		Context<Address> c2 = c.execute(op);
 		assertEquals(c2.getAddress(), c2.getResult());
+		
+		doOpTest(op);
 	}
 
 	@Test
@@ -141,6 +155,8 @@ public class OpsTest extends ACVMTest {
 				Vectors.of(Constant.createString("bar"), Lookup.create("foo")), false);
 		Context<AString> c2 = c.execute(op);
 		assertEquals("bar", c2.getResult().toString());
+		
+		doOpTest(op);
 	}
 
 	@Test
@@ -155,6 +171,8 @@ public class OpsTest extends ACVMTest {
 		assertEquals("trueResult", c2.getResult().toString());
 		long expectedJuice = INITIAL_JUICE - (Juice.COND_OP + Juice.CONSTANT + Juice.CONSTANT);
 		assertEquals(expectedJuice, c2.getJuice());
+		
+		doOpTest(op);
 	}
 
 	@Test
@@ -169,6 +187,8 @@ public class OpsTest extends ACVMTest {
 		assertEquals("falseResult", c2.getResult().toString());
 		long expectedJuice = INITIAL_JUICE - (Juice.COND_OP + Juice.CONSTANT + Juice.CONSTANT);
 		assertEquals(expectedJuice, c2.getJuice());
+		
+		doOpTest(op);
 	}
 
 	@Test
@@ -182,6 +202,8 @@ public class OpsTest extends ACVMTest {
 		assertNull(c2.getResult());
 		long expectedJuice = INITIAL_JUICE - (Juice.COND_OP + Juice.CONSTANT);
 		assertEquals(expectedJuice, c2.getJuice());
+		
+		doOpTest(op);
 	}
 
 	@Test
@@ -197,6 +219,8 @@ public class OpsTest extends ACVMTest {
 
 		Context<AString> c2 = c.execute(op);
 		assertEquals("4", c2.getResult().toString());
+		
+		doOpTest(op);
 	}
 
 	@Test
@@ -210,17 +234,19 @@ public class OpsTest extends ACVMTest {
 
 		Context<AString> c2 = c.execute(op);
 		assertEquals("bar", c2.getResult().toString());
+		
+		doOpTest(op);
 	}
 	
 	@Test
 	public void testLookup() throws InvalidDataException {
 		Lookup<?> l1=Lookup.create("foo");
-		l1.validateCell();
 		assertNull(l1.getAddress());
+		doOpTest(l1);
 		
 		Lookup<?> l2=Lookup.create(Constant.of(Init.CORE_ADDRESS),"count");
-		l2.validateCell();
 		assertEquals(Constant.of(Init.CORE_ADDRESS),l2.getAddress());
+		doOpTest(l2);
 	}
 
 	@Test
@@ -235,12 +261,27 @@ public class OpsTest extends ACVMTest {
 		AClosure<ACell> fn = c2.getResult();
 		assertTrue(fn.hasArity(1));
 		assertFalse(fn.hasArity(2));
+		
+		doOpTest(lam);
 	}
 	
 	@Test
 	public void testLambdaString() {
 		Fn<ACell> fn = Fn.create(Vectors.empty(), Constant.nil());
 		assertEquals("(fn [] nil)",fn.toString());
+	}
+	
+	public <T extends ACell> void doOpTest(AOp<T> op) {
+		// Executing any Op should not throw
+		context().execute(op);
+		
+		try {
+			op.validate();
+		} catch (InvalidDataException e) {
+			throw Utils.sneakyThrow(e);
+		}
+		
+		ObjectsTest.doAnyValueTests(op);
 	}
 
 }
