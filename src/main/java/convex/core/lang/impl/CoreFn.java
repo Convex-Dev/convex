@@ -34,6 +34,10 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 	public Symbol getSymbol() {
 		return symbol;
 	}
+	
+	public byte getTag() {
+		return Tag.CORE_DEF;
+	}
 
 	protected String name() {
 		return symbol.getName().toString();

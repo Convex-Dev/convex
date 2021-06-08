@@ -58,7 +58,7 @@ public class CollectionsTest {
 			assertSame(a.empty(), a);
 		}
 
-		ObjectsTest.doCellTests(a);
+		ObjectsTest.doAnyValueTests(a);
 	}
 
 	/**

@@ -73,6 +73,6 @@ public class ParamTestOps {
 
 	@Test
 	public void testGeneric() throws InvalidDataException, ValidationException {
-		ObjectsTest.doCellTests(op);
+		ObjectsTest.doAnyValueTests(op);
 	}
 }

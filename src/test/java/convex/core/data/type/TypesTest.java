@@ -19,6 +19,7 @@ import org.junit.jupiter.params.provider.ArgumentsSource;
 
 import convex.core.data.ACell;
 import convex.core.data.Address;
+import convex.core.data.ObjectsTest;
 import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -154,8 +155,8 @@ public class TypesTest {
 	@ParameterizedTest
 	@ArgumentsSource(TypeArgumentsProvider.class)
 	public void testAllTypes(AType t) {
-		
 		ACell a=t.defaultValue();
+		
 		assertTrue(t.check(a));
 		assertSame(a,t.implicitCast(a));
 		
@@ -168,6 +169,8 @@ public class TypesTest {
 		Class<? extends ACell> klass=t.getJavaClass();
 		assertNotNull(klass);
 		assertTrue((a==null)||klass.isInstance(a));
+		
+		ObjectsTest.doAnyValueTests(a);
 	}
 	
 	

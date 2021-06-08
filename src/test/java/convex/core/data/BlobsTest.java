@@ -196,6 +196,6 @@ public class BlobsTest {
 		long n = a.count();
 		assertTrue(n >= 0L);
 
-		ObjectsTest.doCellTests(a);
+		ObjectsTest.doAnyValueTests(a);
 	}
 }

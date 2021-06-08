@@ -21,12 +21,14 @@ import convex.core.util.Utils;
 public class ObjectsTest {
 
 	/**
-	 * Generic tests for an Cell
+	 * Generic tests for a Cell
 	 * 
 	 * @param a
 	 * @throws InvalidDataException
 	 */
 	public static void doCellTests(ACell a) {
+		if (a==null) return;
+		
 		String edn = a.ednString();
 		assertNotNull(edn);
 
@@ -42,8 +44,6 @@ public class ObjectsTest {
 		}
 		
 		doCellRefTests(a);
-
-		doAnyValueTests(a);
 	}
 
 	private static void doCellRefTests(ACell a) {
@@ -92,7 +92,7 @@ public class ObjectsTest {
 	}
 
 	/**
-	 * Generic tests for any data object.
+	 * Generic tests for any Value
 	 * 
 	 * @param a
 	 */
@@ -149,6 +149,8 @@ public class ObjectsTest {
 		} catch (BadFormatException e) {
 			throw new Error("Can't read encoding: " + b.toHexString(), e);
 		}
+		
+		doCellTests(a);
 	}
 
 	/**

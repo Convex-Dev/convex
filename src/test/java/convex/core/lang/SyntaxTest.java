@@ -14,6 +14,6 @@ public class SyntaxTest {
 		Syntax s = Syntax.create(RT.cvm(1L));
 		assertCVMEquals(1L, s.getValue());
 
-		ObjectsTest.doCellTests(s);
+		ObjectsTest.doAnyValueTests(s);
 	}
 }
