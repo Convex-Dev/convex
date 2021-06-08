@@ -14,8 +14,19 @@ import convex.core.exceptions.InvalidDataException;
  */
 public final class CVMLong extends APrimitive implements INumeric {
 
-	public static final CVMLong ZERO = CVMLong.create(0L);
-	public static final CVMLong ONE = CVMLong.create(1L);
+	private static final int CACHE_SIZE = 256;
+	private static final CVMLong[] CACHE= new CVMLong[CACHE_SIZE];
+
+	static {
+		for (int i=0; i<256; i++) {
+			CACHE[i]=new CVMLong(i);
+		}
+		ZERO=CACHE[0];
+		ONE=CACHE[1];
+	}
+	
+	public static final CVMLong ZERO;
+	public static final CVMLong ONE;
 	public static final CVMLong MINUS_ONE = CVMLong.create(-1L);
 	public static final CVMLong MAX_VALUE = CVMLong.create(Long.MAX_VALUE);
 	public static final CVMLong MIN_VALUE = CVMLong.create(Long.MIN_VALUE);
@@ -27,6 +38,9 @@ public final class CVMLong extends APrimitive implements INumeric {
 	}
 
 	public static CVMLong create(long value) {
+		if ((value<CACHE_SIZE)&&(value>=0)) {
+			return CACHE[(int)value];
+		}
 		return new CVMLong(value);
 	}
 	
