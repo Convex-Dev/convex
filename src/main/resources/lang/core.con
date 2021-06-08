@@ -458,6 +458,6 @@
   ([f g] (fn [& args] (f (apply g args))))
   ([f g h] (fn [& args] (f (g (apply h args)))))
   ([f g h & more]
-    (apply recur (comp f g h) more)))
+    (apply comp (fn [x] (f (g (h x)))) more)))
 
 

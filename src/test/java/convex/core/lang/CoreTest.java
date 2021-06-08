@@ -1242,6 +1242,19 @@ public class CoreTest extends ACVMTest {
 
 		assertCastError(step("(cons 1 2 3 4 5)"));
 	}
+	
+	@Test 
+	public void testComp() {
+		assertEquals(43L, evalL("((comp inc) 42)"));
+		assertEquals(44L, evalL("((comp inc inc) 42)"));
+		assertEquals(45L, evalL("((comp inc inc inc) 42)"));
+		assertEquals(46L, evalL("((comp inc inc inc inc) 42)"));
+		
+		assertEquals(3.0, evalD("((comp sqrt +) 4 5)"));
+		
+		assertArityError(step("(comp)"));
+
+	}
 
 	@Test
 	public void testInto() {
