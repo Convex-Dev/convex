@@ -23,6 +23,7 @@ import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.type.Types;
+import convex.core.lang.Context.CompilerState;
 import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.MultiFn;
@@ -452,6 +453,9 @@ public class Compiler {
 	}
 
 	private static Context<ACell> compileBinding(ACell bf,Context<?> context) {
+		CompilerState cs=context.getCompilerState();
+		if (cs==null) cs=CompilerState.EMPTY;
+		context=context.withCompilerState(cs);
 		return context.withResult(bf);
 	}
 

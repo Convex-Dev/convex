@@ -105,6 +105,8 @@ public final class Context<T extends ACell> extends AObject {
 	 *
 	 */
 	public static final class CompilerState {
+		public static final CompilerState EMPTY = new CompilerState(Vectors.empty(),Maps.empty());
+		
 		private AVector<Syntax> definitions;
 		private AHashMap<Symbol,CVMLong> mappings;
 		
