@@ -1198,10 +1198,13 @@ public final class Context<T extends ACell> extends AObject {
 	 * @throws ExecutionException
 	 */
 	public <R extends ACell> Context<AOp<R>> compile(ACell expandedForm) {
-		// run compiler with adjusted depth
+		// Save an adjust depth
 		int saveDepth=getDepth();
 		Context<AOp<R>> rctx =this.withDepth(saveDepth+1);
 		if (rctx.isExceptional()) return rctx; // depth error
+		
+		// Save Compiler state
+		CompilerState savedCompilerState=getCompilerState();
 
 		// COMPILE
 		rctx = Compiler.compile(expandedForm, rctx);
@@ -1220,6 +1223,7 @@ public final class Context<T extends ACell> extends AObject {
 
 		// restore depth and return
 		rctx=rctx.withDepth(saveDepth);
+		rctx=rctx.withCompilerState(savedCompilerState);
 		return rctx;
 	}
 
