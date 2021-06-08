@@ -16,7 +16,6 @@ import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
-import convex.core.util.Errors;
 
 /**
  * Op to look up a symbol in the current execution context.
@@ -111,17 +110,22 @@ public class Lookup<T extends ACell> extends AOp<T> {
 
 	@Override
 	public int getRefCount() {
-		return 0;
+		if (address==null) return 0;
+		return address.getRefCount();
 	}
 
 	@Override
 	public <R extends ACell> Ref<R> getRef(int i) {
-		throw new IndexOutOfBoundsException(Errors.badIndex(i));
+		if (address==null) throw new IndexOutOfBoundsException();
+		return address.getRef(i);
 	}
 
 	@Override
 	public Lookup<T> updateRefs(IRefFunction func) {
-		return this;
+		if (address==null) return this;
+		AOp<Address> newAddress=address.updateRefs(func);
+		if (address==newAddress) return this;
+		return create(newAddress,symbol);
 	}
 
 	@Override
