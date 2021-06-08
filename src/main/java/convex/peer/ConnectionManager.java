@@ -5,7 +5,13 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
 
+import convex.core.data.AccountKey;
+import convex.core.data.ACell;
+import convex.core.data.Hash;
 import convex.core.data.Keyword;
+import convex.core.data.SignedData;
+import convex.core.data.Vectors;
+import convex.core.Peer;
 import convex.net.Message;
 import convex.net.Connection;
 
@@ -21,7 +27,7 @@ public class ConnectionManager {
 	private static final Logger log = Logger.getLogger(ConnectionManager.class.getName());
 
 	private Map<Keyword, Object> config;
-	private final HashMap<String,Connection> connections = new HashMap<>();
+	private final HashMap<AccountKey,Connection> connections = new HashMap<>();
 
 	public ConnectionManager(Map<Keyword, Object> config) {
 		this.config = config;
@@ -31,12 +37,18 @@ public class ConnectionManager {
 		return config;
 	}
 
-	public void setConnection(String hostname, Connection peerConnection) {
-		connections.putIfAbsent(hostname, peerConnection);
+	public void setConnection(AccountKey peerKey, Connection peerConnection) {
+		if (connections.containsKey(peerKey)) {
+			connections.get(peerKey).close();
+			connections.replace(peerKey, peerConnection);
+		}
+		else {
+			connections.put(peerKey, peerConnection);
+		}
 	}
 
-	public void removeConnection(String hostname) {
-		connections.remove(hostname);
+	public void removeConnection(AccountKey peerKey) {
+		connections.remove(peerKey);
 	}
 
 	/**
@@ -44,9 +56,29 @@ public class ConnectionManager {
 	 *
 	 * @return Set of connections
 	 */
-	public HashMap<String,Connection> getConnections() {
+	public HashMap<AccountKey,Connection> getConnections() {
 		return connections;
 	}
+
+	/**
+	 * Return true if this hostname is connected
+	 *
+	 */
+	public boolean isConnected(AccountKey peerKey) {
+		return connections.containsKey(peerKey);
+	}
+
+
+	/**
+	 * Gets a connection based on the peers public key
+	 *
+	 * @return Set of connections
+	 */
+	public Connection getConnection(AccountKey peerKey) {
+		if (!connections.containsKey(peerKey)) return null;
+		return connections.get(peerKey);
+	}
+
 
 	/**
 	 *
@@ -58,9 +90,9 @@ public class ConnectionManager {
 	public void broadcast(Message msg, boolean isTrusted) {
 		for (Connection pc : connections.values()) {
 			try {
-				if ( isTrusted && pc.isTrusted() | !isTrusted) {
-					pc.sendMessage(msg);
-				}
+				// if ( isTrusted && pc.isTrusted() | !isTrusted) {
+				pc.sendMessage(msg);
+				//}
 			} catch (IOException e) {
 				log.warning("Error in broadcast: " + e.getMessage());
 			}

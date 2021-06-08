@@ -256,7 +256,7 @@ public class Peer {
 	 * Gets the Peer Key of this Peer.
 	 * @return Address of Peer.
 	 */
-	public AccountKey getPeerKey() {
+ 	public AccountKey getPeerKey() {
 		return peerKey;
 	}
 
