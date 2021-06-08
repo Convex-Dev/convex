@@ -18,7 +18,7 @@ import convex.core.lang.Ops;
 import convex.core.util.Errors;
 
 /**
- * Op to look up a symbol in the current execution context.
+ * Op to look up a Symbol in the current execution context.
  * 
  * Holds an optional Address to specify lookup in another Account environment. If null, the Lookup will be performed in
  * the current environment.

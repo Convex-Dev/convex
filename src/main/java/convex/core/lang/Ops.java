@@ -35,6 +35,7 @@ public class Ops {
 	public static final byte QUERY = 9;
 	public static final byte LOOP = 10;
 	public static final byte LOCAL=11;
+	public static final byte SET = 12;
 	// public static final byte CALL = 9;
 	// public static final byte RETURN = 10;
 	
