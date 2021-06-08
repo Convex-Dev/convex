@@ -33,9 +33,15 @@ public abstract  class APrimitive extends ACell {
 		return 0;
 	}
 	
+	/**
+	 * @return long value representing primitive
+	 */
 	public abstract long longValue();
 	
 	
+	/**
+	 * @return double value representing primitive
+	 */
 	public abstract double doubleValue();
 	
 

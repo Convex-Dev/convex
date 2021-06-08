@@ -119,8 +119,8 @@ public class Address extends ABlob {
 		}
 		
 		try {
-			Long l=Long.parseLong(s);
-			if (l!=null) return Address.create(l);
+			long l=Long.parseLong(s);
+			return Address.create(l);
 		} catch (NumberFormatException e) {
 			// fall through
 		}

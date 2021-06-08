@@ -310,9 +310,8 @@ public class State extends ARecord {
 			// remove schedule entries taken. Delete key if no more entries remaining
 			trans = trans.subVector(take, numScheduled - take);
 			if (trans.isEmpty()) sched = sched.dissoc(key);
-			tcount += take;
 		}
-		if (tcount == 0) return this; // nothing to do if no transactions to execute
+		if (al==null) return this; // nothing to do if no transactions to execute
 
 		// update state with amended schedule
 		State state = this.withSchedule(sched);

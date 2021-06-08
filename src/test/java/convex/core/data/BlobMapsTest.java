@@ -97,7 +97,7 @@ public class BlobMapsTest {
 
 	@Test
 	public void testBlobMapConstruction() throws InvalidDataException {
-		BlobMap<ABlob, CVMLong> m = BlobMap.create();
+		BlobMap<ABlob, CVMLong> m = BlobMaps.empty();
 		for (int i = 0; i < 100; i++) {
 			Long l = (long) Integer.hashCode(i);
 			CVMLong cl = RT.cvm(l);
@@ -116,12 +116,12 @@ public class BlobMapsTest {
 			m = m.dissoc(lb);
 			assertFalse(m.containsKey(lb), "Index: " + lb.toHexString());
 		}
-		assertSame(BlobMap.create(), m);
+		assertSame(BlobMaps.empty(), m);
 	}
 
 	@Test
 	public void testBlobMapRandomConstruction() throws InvalidDataException {
-		BlobMap<ABlob, CVMLong> m = BlobMap.create();
+		BlobMap<ABlob, CVMLong> m = BlobMaps.empty();
 		for (int i = 0; i < 100; i++) {
 			Long l = (Long.MAX_VALUE / 91 * i * 18);
 			CVMLong cl=RT.cvm(l);
@@ -140,7 +140,7 @@ public class BlobMapsTest {
 			m = m.dissoc(lb);
 			assertFalse(m.containsKey(lb), "Index: " + lb.toHexString());
 		}
-		assertSame(BlobMap.create(), m);
+		assertSame(BlobMaps.empty(), m);
 	}
 
 	@Test
