@@ -186,8 +186,10 @@ public class Server implements Closeable {
 	 */
 	private Hash networkId;         // or intialStateHash of the network
 
+	private IServerEvent event;
 
-	private Server(HashMap<Keyword, Object> config) {
+	private Server(HashMap<Keyword, Object> config, IServerEvent event) {
+		this.event = event;
 		AStore configStore = (AStore) config.get(Keywords.STORE);
 		this.store = (configStore == null) ? Stores.getGlobalStore() : configStore;
 
@@ -235,7 +237,20 @@ public class Server implements Closeable {
 	 * @return
 	 */
 	public static Server create(HashMap<Keyword, Object> config) {
-		return new Server(config);
+		return create(config, null);
+	}
+
+	/**
+	 * Creates a Server with a given config. Reference to config is kept: don't
+	 * mutate elsewhere.
+	 *
+	 * @param config
+	 *
+	 * @param event Event interface where the server will send information about the peer
+	 * @return
+	 */
+	public static Server create(HashMap<Keyword, Object> config, IServerEvent event) {
+		return new Server(config, event);
 	}
 
 	/**
@@ -335,7 +350,7 @@ public class Server implements Closeable {
 				result = cf.get(2000, TimeUnit.MILLISECONDS);
 				retryCount = 0;
 			} catch (IOException | InterruptedException | ExecutionException | TimeoutException e ) {
-				// showServerMessage("unable to connect to remote peer at " + remoteHostname + ". Retrying " + e);
+				// raiseServerMessage("unable to connect to remote peer at " + remoteHostname + ". Retrying " + e);
 				retryCount --;
 			}
 		}
@@ -365,19 +380,21 @@ public class Server implements Closeable {
 				result = convex.transactSync(transaction, 2000);
 				retryCount = 0;
 			} catch (IOException | TimeoutException e ) {
-				// showServerMessage("retrying to register this peer with the network " + e);
+				// raiseServerMessage("retrying to register this peer with the network " + e);
 				retryCount --;
 			}
 		}
 		convex.close();
 
 		if ( result == null) {
-			showServerMessage("unable to register this peer with the network");
+			raiseServerMessage("unable to register this peer with the network");
 			return false;
 		}
 		// now use the remote peer host name list returned from the status call
 		// to connect to the peers
 		connectToPeers(statusPeerList);
+
+		raiseServerChange();
 
 		return (networkId != null);
 	}
@@ -842,10 +859,11 @@ public class Server implements Closeable {
 			// log.log(LEVEL_CHALLENGE_RESPONSE, "Processing response request from: " + pc.getRemoteAddress());
 
 			pc.setTrustedPeerKey(fromPeer);
-			// showServerMessage(" now trusts peer: " + Utils.toFriendlyHexString(fromPeer.toHexString()));
+			// raiseServerMessage(" now trusts peer: " + Utils.toFriendlyHexString(fromPeer.toHexString()));
 
 			// remove from list incase this fails, we can generate another challenge
 			challengeList.remove(fromPeer);
+			raiseServerChange();
 
 		} catch (Throwable t) {
 			log.warning("Response Error: " + t);
@@ -1036,7 +1054,7 @@ public class Server implements Closeable {
 					Thread.sleep(1000);
 				}
 
-				showServerMessage("joined network " + hostname);
+				raiseServerMessage("joined network " + hostname);
 				// loop while the server is running
 				long lastConsensusPoint = 0;
                 Order lastOrder = null;
@@ -1045,17 +1063,17 @@ public class Server implements Closeable {
 					Order order=peer.getPeerOrder();
 					// TODO: think about behaviour when the Peer leaves or joins. Should Server continue running?
 					if (order==null && lastOrder!=null) {
-						// showServerMessage("is out of sync with the network");
+						// raiseServerMessage("is out of sync with the network");
 					}
 					if (order!=null && lastOrder==null) {
 						// System.out.println(getHostname() + " has joined the network");
-						///showServerMessage("is in sync with the network");
+						///raiseServerMessage("is in sync with the network");
 					}
 					lastOrder = order;
 					if ( lastConsensusPoint != peer.getConsensusPoint()) {
 						// only update the peer connection lists if the state has changed
 						lastConsensusPoint = peer.getConsensusPoint();
-						// showServerMessage("reconnect peers");
+						// raiseServerMessage("reconnect peers");
 						connectToPeers(getPeerStatusConnectList());
 
 						// System.out.println(getHostname() + " " + manager.getConnections().size());
@@ -1066,7 +1084,7 @@ public class Server implements Closeable {
 							challengeList.clear();
 							requestChallenges();
 						}
-
+						raiseServerChange();
 					}
 					try {
 						Thread.sleep(SERVER_CONNECTION_PAUSE);
@@ -1235,7 +1253,7 @@ public class Server implements Closeable {
 			values = Vectors.of(token, networkId, peerKey);
 			SignedData<ACell> challenge = peer.sign(values);
 			connection.sendChallenge(challenge);
-			// showServerMessage("sending challenge to: " + Utils.toFriendlyHexString(peerKey.toHexString()));
+			// raiseServerMessage("sending challenge to: " + Utils.toFriendlyHexString(peerKey.toHexString()));
 		} catch (IOException e) {
 			log.log(LEVEL_CHALLENGE_RESPONSE,"Cannot send challenge to remote peer at " + connection.getRemoteAddress());
 			values = null;
@@ -1264,19 +1282,27 @@ public class Server implements Closeable {
 		}
 	}
 
-	public String getPeerFriendlyAddress() {
-		return Utils.toFriendlyHexString(peer.getPeerKey().toString());
+	public void raiseServerMessage(String text) {
+		if (event != null) {
+			event.onServerMessage(this, text);
+		}
 	}
-	public void showServerMessage(String text) {
-		System.out.println(getPeerFriendlyAddress() + " "+ text);
+
+	public void raiseServerChange() {
+		if (event != null) {
+			event.onServerChange(this.getServerInformation());
+		}
+	}
+
+	public Hash getNetworkId() {
+		return networkId;
 	}
 
 	public void setNetworkId(Hash value) {
 		networkId = value;
 	}
 
-	public String friendlyNetworkId() {
-		if (networkId == null) return "None";
-		return Utils.toFriendlyHexString(networkId.toHexString());
+	public ServerInformation getServerInformation() {
+		return ServerInformation.create(this, manager);
 	}
 }

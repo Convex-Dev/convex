@@ -12,10 +12,10 @@ import convex.core.util.Utils;
 
 /**
  * Class providing a simple API to a peer Server.
- * 
+ *
  * Suitable for library usage, e.g. if a usr application wants to
  * instantiate a local network peer.
- * 
+ *
  * "If you don't believe it or don't get it , I don't have time to convince you"
  * - Satoshi Nakamoto
  */
@@ -25,14 +25,18 @@ public class API {
 
 	public static Server launchPeer() {
 		Map<Keyword, Object> config = new HashMap<>();
-		return launchPeer(config);
+		return launchPeer(config, null);
 	}
-	
+
+	public static Server launchPeer(Map<Keyword, Object> config) {
+		return launchPeer(config, null);
+	}
+
 	/**
 	 * <p>Launches a Peer Server with a default configuration.</p>
-	 * 
+	 *
 	 * <p>Config keys are:</p>
-	 * 
+	 *
 	 * <ul>
 	 * <li>:port (optional) - Integer port number to use for incoming connections. Defaults to random.
 	 * <li>:store (optional) - AStore instance. Defaults to the configured global store
@@ -41,10 +45,10 @@ public class API {
 	 * <li>:restore (optional) - Boolean Flag to restore from existing store. Default to true
 	 * <li>:persist (optional) - Boolean flag to determine if peer state should be persisted in store at server close. Default true.
 	 * </ul>
-	 * 
+	 *
 	 * @return New Server instance
 	 */
-	public static Server launchPeer(Map<Keyword, Object> peerConfig) {
+	public static Server launchPeer(Map<Keyword, Object> peerConfig, IServerEvent event) {
 		HashMap<Keyword,Object> config=new HashMap<>(peerConfig);
 		try {
 			if (!config.containsKey(Keywords.PORT)) config.put(Keywords.PORT, null);
@@ -54,7 +58,7 @@ public class API {
 			if (!config.containsKey(Keywords.RESTORE)) config.put(Keywords.RESTORE, true);
 			if (!config.containsKey(Keywords.PERSIST)) config.put(Keywords.PERSIST, true);
 
-			Server server = Server.create(config);
+			Server server = Server.create(config, event);
 			server.launch();
 			return server;
 		} catch (Throwable t) {
