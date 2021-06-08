@@ -41,6 +41,7 @@ public class ConvexClient extends JPanel {
 
 	/**
 	 * Launch the application.
+	 * @param args Command line argument
 	 */
 	public static void main(String[] args) {
 		log.info("Running Convex Client");
