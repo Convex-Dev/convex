@@ -1307,12 +1307,4 @@ public class Server implements Closeable {
 	public ServerInformation getServerInformation() {
 		return ServerInformation.create(this, manager);
 	}
-
-	public void setNetworkId(Hash value) {
-		networkId = value;
-	}
-
-	public ServerInformation getServerInformation() {
-		return ServerInformation.create(this, manager);
-	}
 }
