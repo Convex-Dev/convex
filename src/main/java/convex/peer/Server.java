@@ -1312,8 +1312,7 @@ public class Server implements Closeable {
 		networkId = value;
 	}
 
-	public String friendlyNetworkId() {
-		if (networkId == null) return "None";
-		return Utils.toFriendlyHexString(networkId.toHexString());
+	public ServerInformation getServerInformation() {
+		return ServerInformation.create(this, manager);
 	}
 }
