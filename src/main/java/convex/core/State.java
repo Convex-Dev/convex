@@ -425,6 +425,7 @@ public class State extends ARecord {
 	 * 
 	 * SECURITY: Assumes digital signature already checked.
 	 * 
+	 * @param t Transaction to apply
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
 	public <T extends ACell> Context<T> applyTransaction(ATransaction t) {
@@ -638,7 +639,10 @@ public class State extends ARecord {
 	/**
 	 * Schedules an operation with the given timestamp and Op in this state
 	 * 
-	 * @param v
+	 * @param time Timestamp at which to execute the scheduled op
+	 * 
+	 * @param address AccountAddress to schedule op for
+	 * @param op Op to execute in schedule
 	 * @return The updated State
 	 */
 	public State scheduleOp(long time, Address address, AOp<?> op) {

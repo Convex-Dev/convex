@@ -32,6 +32,7 @@ public abstract class AType {
 	
 	/**
 	 * Gets the default value for this type. Returns null if the cast fails.
+	 * @param a Value to cast
 	 * @return Value cast to this Type, or null if the cast fails
 	 */
 	public abstract ACell implicitCast(ACell a);

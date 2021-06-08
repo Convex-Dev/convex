@@ -11,8 +11,9 @@ import convex.core.exceptions.TODOException;
  * 
  * Primary benefits: - Provide sorted orderings for indexes - Support Schedule
  * data structure
- *
- * @param <V>
+ * 
+ * @param <K> Type of BlobMap keys
+ * @param <V> Type of BlobMap values
  */
 public abstract class ABlobMap<K extends ABlob, V extends ACell> extends AMap<K, V> {
 	protected ABlobMap(long count) {

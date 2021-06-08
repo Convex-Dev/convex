@@ -75,6 +75,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	
 	/**
 	 * Gets the tag byte for this cell. The tag byte will be the first byte of the encoding
+	 * @return Tag byte for this Cell
 	 */
 	public abstract byte getTag();
 	
@@ -308,6 +309,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 
 	/**
 	 * Gets the Ref for this Cell, creating a new direct reference if necessary
+	 * @return Ref for this Cell
 	 */
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Ref<R> getRef() {
@@ -335,13 +337,15 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	/**
 	 * Updates all Refs in this object using the given function.
 	 * 
-	 * The function *must not* change the hash value of refs, in order to ensure
+	 * The function *must not* change the hash value of Refs, in order to ensure
 	 * structural integrity of modified data structures.
 	 * 
 	 * This is a building block for a very sneaky trick that enables use to do a lot
 	 * of efficient operations on large trees of smart references.
 	 * 
 	 * Must return the same object if no Refs are altered.
+	 * @param func Ref update function
+	 * @return Cell with updated Refs
 	 */
 	public ACell updateRefs(IRefFunction func) {
 		if (getRefCount()==0) return this;
@@ -408,6 +412,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * starting from lowest levels.
 	 * 
 	 * @param value
+	 * @param noveltyHandler Novelty handler to call for any Novelty (may be null)
 	 * @return Persisted Ref
 	 */
 	public static <T extends ACell> Ref<T> createAnnounced(T value, Consumer<Ref<ACell>> noveltyHandler) {
@@ -423,6 +428,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * starting from lowest levels (depth first order)
 	 * 
 	 * @param value Any CVM value to persist
+	 * @param noveltyHandler Novelty handler to call for any Novelty (may be null)
 	 * @return Persisted Ref
 	 */
 	@SuppressWarnings("unchecked")

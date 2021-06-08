@@ -126,8 +126,11 @@ public class Peer {
 
 	/**
 	 * Restores a Peer from the Etch database specified in Config
-	 * @param config
+	 * @param store Store to restore from
+	 * @param root Root Hash of Peer data
+	 * @param keyPair Key Pair to use for restored Peer
 	 * @return Peer instance, or null if root hash was not found
+	 * @throws IOException If store reading failed
 	 */
 	public static Peer restorePeer(AStore store,Hash root, AKeyPair keyPair) throws IOException {
 		// temporarily set current store
@@ -214,9 +217,8 @@ public class Peer {
 	 *
 	 * This will be exact if no intermediate transactions affect the state, and if no time-dependent functionality is used.
 	 *
-	 * @param address Address for which to execute the transaction
 	 * @param trans Transaction to test
-	 * @return
+	 * @return Estimated cost
 	 */
 	public long estimateCost(ATransaction trans) {
 		Address address=trans.getAddress();
@@ -226,12 +228,11 @@ public class Peer {
 	}
 
 	/**
-	 * Executes a query on the current consensus state of this Peer.
+	 * Executes a transaction on the current consensus state of this Peer.
 	 *
 	 * @param <T>
-	 * @param origin Address with which to execute the transaction
 	 * @param transaction Transaction to execute
-	 * @returnThe Context containing the query results.
+	 * @return The Context containing the transaction results.
 	 */
 	public <T extends ACell> Context<T> executeDryRun(ATransaction transaction) {
 		Context<T> ctx=getConsensusState().applyTransaction(transaction);
@@ -242,7 +243,7 @@ public class Peer {
 	 * Executes a query in this
 	 * @param <T>
 	 * @param form
-	 * @return
+	 * @return Context after executing query
 	 */
 	public <T extends ACell> Context<T> executeQuery(ACell form) {
 		return executeQuery(form,Init.HERO);
@@ -290,6 +291,7 @@ public class Peer {
 	 * which case they are ignored.
 	 *
 	 * @param beliefs An array of Beliefs. May contain nulls, which will be ignored.
+	 * @return Updated Peer after Belief Merge
 	 * @throws InvalidDataException
 	 * @throws BadSignatureException
 	 *
@@ -360,17 +362,18 @@ public class Peer {
 
 	/**
 	 * Gets the result of a specific transaction
-	 * @param i
-	 * @return
+	 * @param blockIndex Index of Block in Order
+	 * @param txIndex Index of transaction in block
+	 * @return Result from transaction
 	 */
-	public Object getResult(long blockIndex, long txIndex) {
+	public Result getResult(long blockIndex, long txIndex) {
 		return blockResults.get(blockIndex).getResult(txIndex);
 	}
 
 	/**
 	 * Gets the BlockResult of a specific block index
-	 * @param i
-	 * @return
+	 * @param i Index of Block
+	 * @return BlockResult
 	 */
 	public BlockResult getBlockResult(long i) {
 		return blockResults.get(i);
@@ -379,7 +382,9 @@ public class Peer {
 	/**
 	 * Propose a new Block. Adds the block to the current proposed chain for this
 	 * Peer.
-	 *
+	 * 
+	 * @param block Block to publish
+	 * @return Peer after proposing new Block in Peer's own Order
 	 * @throws BadSignatureException
 	 */
 	public Peer proposeBlock(Block block) throws BadSignatureException {
@@ -406,7 +411,6 @@ public class Peer {
 	 *
 	 * @return The Order for this peer in its current Belief. Will return null if the Peer is not a peer in the current consensus state
 	 *
-	 * @throws BadSignatureException
 	 */
 	public Order getPeerOrder() {
 		try {
@@ -418,12 +422,13 @@ public class Peer {
 
 	/**
 	 * Gets the current chain this Peer sees for a given peer address
-	 *
+	 * 
+	 * @param peerKey Peer Key
 	 * @return The current Order for the specified peer
 	 * @throws BadSignatureException
 	 */
-	public Order getOrder(AccountKey a) throws BadSignatureException {
-		return getBelief().getOrder(a);
+	public Order getOrder(AccountKey peerKey) throws BadSignatureException {
+		return getBelief().getOrder(peerKey);
 	}
 
 	/**

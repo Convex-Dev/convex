@@ -79,7 +79,8 @@ public class Hash extends AArrayBlob {
 	 * directly. Use only if no external references to the byte array will be
 	 * retained.
 	 * 
-	 * @param hashBytes
+	 * @param hashBytes Byte array containing hash value
+	 * @param offset Offset into byte array for start of hash value
 	 * @return Hash wrapping the given byte array segment
 	 */
 	public static Hash wrap(byte[] hashBytes, int offset) {

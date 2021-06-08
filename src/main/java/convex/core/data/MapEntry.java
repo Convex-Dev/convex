@@ -273,7 +273,9 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	/**
 	 * Writes a MapEntry or null content in compressed format (no count)
 	 * 
+	 * @param me MapEntry to encode
 	 * @param bs Byte array to write to
+	 * @param pos Starting position for encoding in byte array
 	 * @return Updated position after writing
 	 */
 	public static int encodeCompressed(MapEntry<?,?> me,byte[] bs, int pos) {

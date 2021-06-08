@@ -262,6 +262,9 @@ public class List<T extends ACell> extends AList<T> {
 	
 	/**
 	 * Reads a List from the specified bytebuffer. Assumes Tag byte already consumed.
+	 * @param bb ByteBuffer to read from
+	 * @return List instance read from ByteBuffer
+	 * @throws BadFormatException If Encoding is invalid
 	 * 
 	 */
 	public static <T extends ACell> List<T> read(ByteBuffer bb) throws BadFormatException {

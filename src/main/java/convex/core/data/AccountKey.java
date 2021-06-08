@@ -86,7 +86,7 @@ public class AccountKey extends AArrayBlob {
 	 * construction makes it possible to examine an Address and assess whether it is (plausibly) 
 	 * a dummy address.
 	 * 
-	 * @param string Hex string to repeat to produce a visible dummy address
+	 * @param nonce Hex string to repeat to produce a visible dummy address
 	 * @return An Address that cannot be used to sign transactions.
 	 */
 	public static AccountKey dummy(String nonce) {
