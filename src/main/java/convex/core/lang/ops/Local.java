@@ -12,6 +12,11 @@ import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 
+/**
+ * Op to look up a local value from the lexical environment
+ *
+ * @param <T>
+ */
 public class Local<T extends ACell> extends AOp<T> {
 	
 	/**

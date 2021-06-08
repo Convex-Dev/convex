@@ -100,7 +100,7 @@ public class Lambda<T extends ACell> extends AOp<AClosure<T>> {
 	public void validate() throws InvalidDataException {
 		super.validate();
 		
-		Object fn=function.getValue();
+		ACell fn=function.getValue();
 		if (!(fn instanceof AClosure)) {
 			throw new InvalidDataException("Lambda child must be a closure but got: "+Utils.getClassName(fn),this);
 		}
