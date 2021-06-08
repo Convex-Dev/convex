@@ -102,8 +102,10 @@ public class Connection {
 
 	/**
 	 * Create a PeerConnection by connecting to a remote address
-	 *
+	 * 
+	 * @param hostAddress Internet Address to connect to
 	 * @param receiveAction A callback Consumer to be called for any received messages on this connection
+	 * @param store Store to use for this Connection
 	 * @return New Connection instance
 	 * @throws IOException If connection fails because of any IO problem
 	 */

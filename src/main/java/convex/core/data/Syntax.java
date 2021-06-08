@@ -55,8 +55,8 @@ public class Syntax extends ACell {
 	/**
 	 * Wraps a value as a Syntax Object, adding the given new metadata
 	 * 
-	 * @param value
-	 * @param metadata to merge, may be null
+	 * @param value Value to wrap in Syntax Object
+	 * @param meta Metadata to merge, may be null
 	 * @return Syntax instance
 	 */
 	public static Syntax create(ACell value, AHashMap<ACell, ACell> meta) {
@@ -319,6 +319,7 @@ public class Syntax extends ACell {
 	/**
 	 * Recursively unwraps a Syntax object
 	 * 
+	 * @param maybeSyntax Syntax Object to unwrap
 	 * @return Unwrapped object
 	 */
 	@SuppressWarnings("unchecked")

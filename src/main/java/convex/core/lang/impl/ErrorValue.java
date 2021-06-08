@@ -63,7 +63,7 @@ public class ErrorValue extends AExceptional {
 	
 	/**
 	 * Creates an ErrorValue with the specified type and message. Message may be null.
-	 * @param value Type of error
+	 * @param code Code of error
 	 * @param message Off-chain message as Java String
 	 * @return New ErrorValue instance
 	 */
@@ -87,7 +87,6 @@ public class ErrorValue extends AExceptional {
 	
 	/**
 	 * Gets the optional message associated with this error value, or null if not supplied.
-	 * @param <T>
 	 * @return The message carried with this error
 	 */
 	public ACell getMessage() {

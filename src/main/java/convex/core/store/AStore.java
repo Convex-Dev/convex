@@ -29,6 +29,8 @@ public abstract class AStore {
 	 * 
 	 * @param ref A Ref to the given object. Should be either Direct or STORED at
 	 *            minimum to present risk of MissingDataException.
+	 * @param status Status to store at
+	 * @param noveltyHandler Novelty Handler function for Novelty detected. May be null.
 	 * @return The persisted Ref, of status STORED at minimum
 	 */
 	public abstract <T extends ACell> Ref<T> storeRef(Ref<T> ref, int status,Consumer<Ref<ACell>> noveltyHandler);
@@ -45,6 +47,8 @@ public abstract class AStore {
 	 * 
 	 * @param ref A Ref to the given object. Should be either Direct or STORED at
 	 *            minimum to present risk of MissingDataException.
+	 * @param status Status to store at
+	 * @param noveltyHandler Novelty Handler function for Novelty detected. May be null.
 	 * @return The persisted Ref, of status STORED at minimum
 	 */
 	public abstract <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status,Consumer<Ref<ACell>> noveltyHandler);
