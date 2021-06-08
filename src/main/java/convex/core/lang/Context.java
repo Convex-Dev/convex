@@ -95,14 +95,27 @@ public final class Context<T extends ACell> extends AObject {
 	private AHashMap<Symbol, ACell> localBindings;
 	private ChainState chainState;
 	private ABlobMap<Address,AVector<AVector<ACell>>> log;
+	private CompilerState compilerState;
+	
 
+	/**
+	 * Inner class compiler state
+	 *
+	 * SECURITY: security critical, since it determines the current *address* and *caller*
+	 * which in turn controls access to most account resources and rights.
+	 */
+	private static final class CompilerState {
+		private CompilerState() {
+			
+		}
+	}
 
 	/**
 	 * Inner class for less-frequently changing state related to Actor execution
 	 * Should save some allocation / GC on average, since it will change less
-	 * frequently than the surrounding context and can be cheaply copied by reference.
+	 * frequently than the surrounding Context and can be cheaply copied by reference.
 	 *
-	 * SECURITY: security critical, since it determines the current address
+	 * SECURITY: security critical, since it determines the current *address* and *caller*
 	 * which in turn controls access to most account resources and rights.
 	 */
 	private static final class ChainState {
@@ -193,7 +206,7 @@ public final class Context<T extends ACell> extends AObject {
 
 	}
 
-	private Context(ChainState chainState, long juice, AHashMap<Symbol, ACell> localBindings2, T result,int depth, AExceptional exception, ABlobMap<Address,AVector<AVector<ACell>>> log) {
+	private Context(ChainState chainState, long juice, AHashMap<Symbol, ACell> localBindings2, T result,int depth, AExceptional exception, ABlobMap<Address,AVector<AVector<ACell>>> log, CompilerState comp) {
 		this.chainState=chainState;
 		this.juice=juice;
 		this.localBindings=localBindings2;
@@ -201,17 +214,18 @@ public final class Context<T extends ACell> extends AObject {
 		this.depth=depth;
 		this.exception=exception;
 		this.log=log;
+		this.compilerState=comp;
 	}
 
 	@SuppressWarnings("unchecked")
-	private static <T extends ACell> Context<T> create(ChainState cs, long juice, AHashMap<Symbol, ACell> localBindings, ACell result, int depth,ABlobMap<Address,AVector<AVector<ACell>>> log) {
+	private static <T extends ACell> Context<T> create(ChainState cs, long juice, AHashMap<Symbol, ACell> localBindings, ACell result, int depth,ABlobMap<Address,AVector<AVector<ACell>>> log, CompilerState comp) {
 		if (juice<0) throw new IllegalArgumentException("Negative juice! "+juice);
-		return new Context<T>(cs,juice,localBindings,(T)result,depth,DEFAULT_EXCEPTION,log);
+		return new Context<T>(cs,juice,localBindings,(T)result,depth,DEFAULT_EXCEPTION,log,comp);
 	}
 
-	private static <T extends ACell> Context<T> create(State state, long juice,AHashMap<Symbol, ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer, ABlobMap<Address,AVector<AVector<ACell>>> log) {
+	private static <T extends ACell> Context<T> create(State state, long juice,AHashMap<Symbol, ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer, ABlobMap<Address,AVector<AVector<ACell>>> log, CompilerState comp) {
 		ChainState chainState=ChainState.create(state,origin,caller,address,offer);
-		return create(chainState,juice,localBindings,result,depth,log);
+		return create(chainState,juice,localBindings,result,depth,log,comp);
 	}
 
 	/**
@@ -238,7 +252,7 @@ public final class Context<T extends ACell> extends AObject {
 	 */
 	public static <R extends ACell> Context<R> createFake(State state, Address actor) {
 		if (actor==null) throw new Error("Null actor address!");
-		return create(state,Constants.MAX_TRANSACTION_JUICE,Maps.empty(),null,0,actor,null,actor, 0, DEFAULT_LOG);
+		return create(state,Constants.MAX_TRANSACTION_JUICE,Maps.empty(),null,0,actor,null,actor, 0, DEFAULT_LOG,null);
 	}
 
 	/**
@@ -271,7 +285,7 @@ public final class Context<T extends ACell> extends AObject {
 		long newBalance=balance-reserve;
 		as=as.withBalance(newBalance);
 		state=state.putAccount(origin, as);
-		return create(state,juice,Maps.empty(),null,DEFAULT_DEPTH,origin,null,origin,INITIAL_JUICE,DEFAULT_LOG);
+		return create(state,juice,Maps.empty(),null,DEFAULT_DEPTH,origin,null,origin,INITIAL_JUICE,DEFAULT_LOG,null);
 	}
 
 
@@ -1248,7 +1262,7 @@ public final class Context<T extends ACell> extends AObject {
 		if (!canControl) return ctx.withError(ErrorCodes.TRUST,"Cannot control address: "+address);
 
 		// SECURITY: eval with a context switch
-		final Context<R> exContext=Context.create(getState(), juice, Maps.empty(), null, depth+1, getOrigin(),caller, address,0,log);
+		final Context<R> exContext=Context.create(getState(), juice, Maps.empty(), null, depth+1, getOrigin(),caller, address,0,log,null);
 
 		final Context<R> rContext=exContext.eval(form);
 		// SECURITY: must handle results as if returning from an actor call
@@ -1285,7 +1299,7 @@ public final class Context<T extends ACell> extends AObject {
 	public <R extends ACell> Context<R> queryAs(Address address, ACell form) {
 		// chainstate with the target address as origin.
 		ChainState cs=ChainState.create(getState(),address,null,address,DEFAULT_OFFER);
-		Context<R> ctx=Context.create(cs, juice, Maps.empty(), null, depth,log);
+		Context<R> ctx=Context.create(cs, juice, Maps.empty(), null, depth,log,null);
 		ctx=ctx.evalAs(address, form);
 		return handleQueryResult(ctx);
 	}
@@ -1612,7 +1626,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return
 	 */
 	private <R extends ACell> Context<R> forkActorCall(State state, Address target, long offer) {
-		return Context.create(state, juice, Maps.empty(), (R)null, depth+1, getOrigin(),getAddress(), target,offer, log);
+		return Context.create(state, juice, Maps.empty(), (R)null, depth+1, getOrigin(),getAddress(), target,offer, log,null);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -1697,7 +1711,7 @@ public final class Context<T extends ACell> extends AObject {
 		if (stateSetup==null) return withError(ErrorCodes.STATE,"Contract deployment address conflict: "+address);
 
 		// Deployment execution context with forked context and incremented depth
-		final Context<Address> exContext=Context.create(stateSetup, juice, Maps.empty(), null, depth+1, getOrigin(),getAddress(), address,DEFAULT_OFFER,log);
+		final Context<Address> exContext=Context.create(stateSetup, juice, Maps.empty(), null, depth+1, getOrigin(),getAddress(), address,DEFAULT_OFFER,log,null);
 		final Context<Address> rctx=exContext.eval(code);
 
 		Context<Address> result=this.handleStateResults(rctx,false);
@@ -1965,7 +1979,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return A new forked Context
 	 */
 	public <R extends ACell> Context<R> fork() {
-		return new Context<R>(chainState, juice, localBindings, null,depth, null,log);
+		return new Context<R>(chainState, juice, localBindings, null,depth, null,log,compilerState);
 	}
 
 	@Override
