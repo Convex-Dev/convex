@@ -1005,9 +1005,6 @@ public final class Context<T extends ACell> extends AObject {
 		// Clear any exceptional status
 		Context<R> ctx=this.withValue(null);
 
-		// TODO: is this needed?
-		bindingForm=Syntax.unwrapAll(bindingForm);
-
 		if (bindingForm instanceof Symbol) {
 			Symbol sym=(Symbol)bindingForm;
 			if (sym.equals(Symbols.UNDERSCORE)) return ctx;

@@ -447,7 +447,7 @@ public class Compiler {
 			AOp<ACell> op = (AOp<ACell>) context.getResult();
 			ops = ops.conj(op);
 		}
-		AOp<R> op = Let.create(bindingForms.map(x->Syntax.create(x)), ops, isLoop);
+		AOp<R> op = Let.create(bindingForms, ops, isLoop);
 
 		return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
 	}
@@ -526,7 +526,7 @@ public class Compiler {
 		for (int i=0; i<num; i++) {
 			ACell o=Syntax.unwrap(list.get(i));
 			if (!(o instanceof AList)) {
-				return context.withError(ErrorCodes.COMPILE,"multi-function requires instances of form: ([args] ...) but got "+o);
+				return context.withError(ErrorCodes.COMPILE,"multi-function requires instances of form: ([args] ...) but got "+list);
 			}
 			
 			context= compileFnInstance((AList<ACell>) o,context);
@@ -588,7 +588,7 @@ public class Compiler {
 			body = Do.create(((ASequence<AOp<ACell>>) context.getResult()));
 		}
 
-		Lambda<T> op = Lambda.create(paramsVector.map(x->Syntax.create(x)), body);
+		Lambda<T> op = Lambda.create(paramsVector, body);
 		return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
 	}
 
@@ -606,13 +606,16 @@ public class Compiler {
 		}
 		
 		ACell exp=list.get(2);
-		context = context.compile(exp);
-		if (context.isExceptional()) return (Context<T>) context;
 		
-		// merge in metadata from expression. TODO: do we need to expand this first?
+		// move metadata from expression. TODO: do we need to expand this first?
 		if (exp instanceof Syntax) {
 			symbolSyntax=symbolSyntax.mergeMeta(((Syntax)exp).getMeta());
+			exp=Syntax.unwrap(exp);
 		}
+		
+		context = context.compile(exp);
+		if (context.isExceptional()) return (Context<T>) context;
+
 		
 		Def<R> op = Def.create(symbolSyntax, (AOp<R>) context.getResult());
 		return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);

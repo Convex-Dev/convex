@@ -25,7 +25,6 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Lists;
 import convex.core.data.Symbol;
-import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.lang.AFn;
 import convex.core.lang.RT;
@@ -77,12 +76,12 @@ public class SmartOpComponent extends BaseListComponent {
 		AFn<?> fn = as.getExportedFunction(sym);
 
 		// Function might be a map or set
-		AVector<Syntax> params = (fn instanceof Fn) ? ((Fn<?>) fn).getParams()
-				: Vectors.of(Syntax.create(Symbols.FOO));
+		AVector<ACell> params = (fn instanceof Fn) ? ((Fn<?>) fn).getParams()
+				: Vectors.of(Symbols.FOO);
 		paramCount = params.size();
 
 		for (int i = 0; i < paramCount; i++) {
-			Symbol paramSym = params.get(i).getValue();
+			ACell paramSym = params.get(i);
 			paramPanel.add(new ParamLabel(Utils.toString(paramSym)));
 			JTextField argBox = new ArgBox();
 			paramPanel.add(argBox);

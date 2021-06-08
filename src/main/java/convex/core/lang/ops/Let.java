@@ -10,7 +10,6 @@ import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
-import convex.core.data.Syntax;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
@@ -33,26 +32,26 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 	/**
 	 * Vector of binding forms. Can be destructuring forms
 	 */
-	protected final AVector<Syntax> symbols;
+	protected final AVector<ACell> symbols;
 
 	protected final int bindingCount;
 	protected final boolean isLoop;
 
-	protected Let(AVector<Syntax> syms, AVector<AOp<ACell>> ops, boolean isLoop) {
+	protected Let(AVector<ACell> syms, AVector<AOp<ACell>> ops, boolean isLoop) {
 		super(ops);
 		symbols = syms;
 		bindingCount = syms.size();
 		this.isLoop = isLoop;
 	}
 
-	public static <T extends ACell> Let<T> create(AVector<Syntax> syms, AVector<AOp<ACell>> ops, boolean isLoop) {
+	public static <T extends ACell> Let<T> create(AVector<ACell> syms, AVector<AOp<ACell>> ops, boolean isLoop) {
 		return new Let<T>(syms, ops, isLoop);
 	}
 
 	@Override
 	public Let<T> updateRefs(IRefFunction func) {
 		ASequence<AOp<ACell>> newOps = ops.updateRefs(func);
-		AVector<Syntax> newSymbols = symbols.updateRefs(func);
+		AVector<ACell> newSymbols = symbols.updateRefs(func);
 
 		return recreate(newOps, newSymbols);
 	}
@@ -74,7 +73,7 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 		return recreate(newOps, symbols);
 	}
 
-	protected Let<T> recreate(ASequence<AOp<ACell>> newOps, AVector<Syntax> newSymbols) {
+	protected Let<T> recreate(ASequence<AOp<ACell>> newOps, AVector<ACell> newSymbols) {
 		if ((ops == newOps) && (symbols == newSymbols)) return this;
 		return new Let<T>(newSymbols, newOps.toVector(), isLoop);
 	}
@@ -193,7 +192,7 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 	}
 
 	public static <T extends ACell> Let<T> read(ByteBuffer b, boolean isLoop) throws BadFormatException {
-		AVector<Syntax> syms = Format.read(b);
+		AVector<ACell> syms = Format.read(b);
 		AVector<AOp<?>> ops = Format.read(b);
 		return create(syms, ops.toVector(),isLoop);
 	}

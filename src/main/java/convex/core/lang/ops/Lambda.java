@@ -2,18 +2,17 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
+import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
-import convex.core.data.Syntax;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
-import convex.core.data.ACell;
 import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.Fn;
 import convex.core.util.Errors;
@@ -36,7 +35,7 @@ public class Lambda<T extends ACell> extends AOp<AClosure<T>> {
 		this.function=newFunction;
 	}
 	
-	public static <T extends ACell> Lambda<T> create(AVector<Syntax> params, AOp<T> body) {
+	public static <T extends ACell> Lambda<T> create(AVector<ACell> params, AOp<T> body) {
 		return new Lambda<T>(Fn.create(params,body).getRef());
 	}
 

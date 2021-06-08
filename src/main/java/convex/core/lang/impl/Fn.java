@@ -10,7 +10,6 @@ import convex.core.data.IRefFunction;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
-import convex.core.data.Syntax;
 import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -36,24 +35,18 @@ public class Fn<T extends ACell> extends AClosure<T> {
 	// note: embedding these fields directly for efficiency rather than going by
 	// Refs.
 
-	private final AVector<Syntax> params;
+	private final AVector<ACell> params;
 	private final AOp<T> body;
 	
 	private Long variadic=null;
 
-	private Fn(AVector<Syntax> params, AOp<T> body, AHashMap<Symbol, ACell> lexicalEnv) {
+	private Fn(AVector<ACell> params, AOp<T> body, AHashMap<Symbol, ACell> lexicalEnv) {
 		super(lexicalEnv);
 		this.params = params;
 		this.body = body;
 	}
-
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static <T extends ACell> Fn<T> create(AVector<Syntax> params, AOp<T> body, Context context) {
-		AHashMap<Symbol, ACell> binds = context.getLocalBindings();
-		return new Fn<T>(params, body, binds);
-	}
 	
-	public static <T extends ACell, I> Fn<T> create(AVector<Syntax> params, AOp<T> body) {
+	public static <T extends ACell, I> Fn<T> create(AVector<ACell> params, AOp<T> body) {
 		AHashMap<Symbol, ACell> binds = Maps.empty();
 		return new Fn<T>(params, body, binds);
 	}
@@ -82,8 +75,8 @@ public class Fn<T extends ACell> extends AClosure<T> {
 		if (variadic!=null) return variadic;
 		long pc=params.count();
 		for (int i=0; i<pc-1; i++) {
-			Syntax syn=params.get(i);
-			if (Symbols.AMPERSAND.equals(syn.getValue())) {
+			ACell param=params.get(i);
+			if (Symbols.AMPERSAND.equals(param)) {
 				variadic=(long) (i+1);
 				return variadic;
 			}
@@ -136,7 +129,7 @@ public class Fn<T extends ACell> extends AClosure<T> {
 
 	public static <T extends ACell> Fn<T> read(ByteBuffer bb) throws BadFormatException {
 		try {
-			AVector<Syntax> params = Format.read(bb);
+			AVector<ACell> params = Format.read(bb);
 			if (params==null) throw new BadFormatException("Null parameters to Fn");
 			AOp<T> body = Format.read(bb);
 			if (body==null) throw new BadFormatException("Null body in Fn");
@@ -170,7 +163,7 @@ public class Fn<T extends ACell> extends AClosure<T> {
 		long size = params.count();
 		for (long i = 0; i < size; i++) {
 			if (i > 0) sb.append(' ');
-			Utils.print(sb,params.get(i).getValue());
+			Utils.print(sb,params.get(i));
 		}
 		sb.append(']');
 
@@ -183,7 +176,7 @@ public class Fn<T extends ACell> extends AClosure<T> {
 	 * 
 	 * @return A binding vector describing the parameters for this function
 	 */
-	public AVector<Syntax> getParams() {
+	public AVector<ACell> getParams() {
 		return params;
 	}
 
@@ -209,7 +202,7 @@ public class Fn<T extends ACell> extends AClosure<T> {
 
 	@Override
 	public Fn<T> updateRefs(IRefFunction func) {
-		AVector<Syntax> newParams = params.updateRefs(func);
+		AVector<ACell> newParams = params.updateRefs(func);
 		AOp<T> newBody = body.updateRefs(func);
 		AHashMap<Symbol, ACell> newLexicalEnv = lexicalEnv.updateRefs(func);
 		if ((params == newParams) && (body == newBody) && (lexicalEnv == newLexicalEnv)) return this;

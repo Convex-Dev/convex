@@ -151,7 +151,7 @@ public class OpsTest extends ACVMTest {
 	@Test
 	public void testLet() {
 		Context<?> c = context();
-		AOp<AString> op = Let.create(Vectors.of(Syntax.create(Symbols.FOO)),
+		AOp<AString> op = Let.create(Vectors.of(Symbols.FOO),
 				Vectors.of(Constant.createString("bar"), Lookup.create("foo")), false);
 		Context<AString> c2 = c.execute(op);
 		assertEquals("bar", c2.getResult().toString());
