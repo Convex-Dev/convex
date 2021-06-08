@@ -1,7 +1,5 @@
 package convex.cli;
 
-import java.util.logging.Logger;
-
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
@@ -24,7 +22,7 @@ import picocli.CommandLine.ParentCommand;
 	description="Operates a local peer.")
 public class Peer implements Runnable {
 
-	private static final Logger log = Logger.getLogger(Peer.class.getName());
+	// private static final Logger log = Logger.getLogger(Peer.class.getName());
 
 	@ParentCommand
 	protected Main mainParent;

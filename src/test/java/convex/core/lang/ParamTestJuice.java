@@ -25,7 +25,6 @@ import convex.core.util.Utils;
 public class ParamTestJuice {
 
 	private static final long JUICE_SYM_LOOKUP = Juice.LOOKUP_SYM;
-	private static final long JUICE_LOCAL_LOOKUP = Juice.LOOKUP+Juice.CONSTANT;
 	private static final long JUICE_EMPTY_MAP = (Juice.BUILD_DATA + JUICE_SYM_LOOKUP); // consider: (hash-map)
 	private static final long JUICE_IDENTITY_FN = (Juice.LAMBDA);
 

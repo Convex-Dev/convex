@@ -1,26 +1,23 @@
 package convex.cli.peer;
 
-import java.io.IOException;
 import java.io.File;
-import java.net.InetSocketAddress;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.HashMap;
-import java.util.logging.Logger;
+import java.util.List;
 import java.util.Map;
-
+import java.util.logging.Logger;
 
 import convex.api.Shutdown;
 import convex.cli.Helpers;
+import convex.core.Init;
+import convex.core.Order;
+import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
-import convex.core.crypto.AKeyPair;
 import convex.core.store.AStore;
-import convex.core.Init;
 import convex.core.store.Stores;
-import convex.core.Order;
-import convex.core.State;
 import convex.peer.API;
 import convex.peer.Server;
 import etch.EtchStore;
@@ -65,7 +62,7 @@ public class PeerManager {
 
 		for (int i = 0; i < count; i++) {
 			AKeyPair keyPair = keyPairs[i];
-			Server peerServer = launchPeer(keyPair);
+			launchPeer(keyPair);
 		}
 
 		// go through 1..count-1 peers and join them all to peer #0
@@ -112,7 +109,6 @@ public class PeerManager {
 	 *
 	 */
 	protected void addToSession(Server peerServer) {
-		InetSocketAddress peerHostAddress = peerServer.getHostAddress();
 		EtchStore store = (EtchStore) peerServer.getStore();
 
 		session.addPeer(
@@ -288,8 +284,6 @@ public class PeerManager {
 		    }
 		});
 
-		Server firstServer = peerServerList.get(0);
-		State lastState = firstServer.getPeer().getConsensusState();
 		while (true) {
 			try {
 				Thread.sleep(30);
@@ -297,7 +291,6 @@ public class PeerManager {
 					convex.core.Peer peer = peerServer.getPeer();
 					if (peer==null) continue;
 
-					State state = peer.getConsensusState();
 					// System.out.println("state " + state);
 					Order order=peer.getPeerOrder();
 					if (order==null) continue; // not an active peer?

@@ -1,11 +1,11 @@
 package convex.cli;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 import convex.api.Convex;
+import convex.core.Init;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.data.ABlob;
@@ -16,8 +16,6 @@ import convex.core.data.AccountStatus;
 import convex.core.data.BlobMap;
 import convex.core.data.Hash;
 import convex.core.data.PeerStatus;
-import convex.core.data.VectorLeaf;
-import convex.core.Init;
 import convex.core.util.Text;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -50,6 +48,7 @@ private static final Logger log = Logger.getLogger(Status.class.getName());
 		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
 	private String hostname;
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public void run() {
 
@@ -79,7 +78,7 @@ private static final Logger log = Logger.getLogger(Status.class.getName());
 			ABlob stateHash = (ABlob) resultVector.get(1);
 			System.out.println("State hash: " + stateHash.toString());
 			Hash hash = Hash.wrap(stateHash.getBytes());
-			VectorLeaf stateWrapper = (VectorLeaf) convex.acquire(hash).get(3000,TimeUnit.MILLISECONDS);
+			AVector<ACell> stateWrapper = (AVector<ACell>) convex.acquire(hash).get(3000,TimeUnit.MILLISECONDS);
 			State state = (State) stateWrapper.get(0);
 
 			state.validate();

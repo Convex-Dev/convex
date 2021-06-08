@@ -3,12 +3,10 @@ package convex.cli;
 import java.util.logging.Logger;
 
 import convex.api.Convex;
-import convex.core.crypto.AKeyPair;
-import convex.core.data.Address;
-import convex.core.data.ACell;
-import convex.core.lang.Reader;
-import convex.core.Init;
 import convex.core.Result;
+import convex.core.data.ACell;
+import convex.core.data.Address;
+import convex.core.lang.Reader;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;

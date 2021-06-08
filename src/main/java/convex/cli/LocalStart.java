@@ -1,11 +1,8 @@
 package convex.cli;
 
-import java.util.HashMap;
 import java.util.logging.Logger;
-import java.util.Map;
 
 import convex.cli.peer.PeerManager;
-import convex.core.data.Keyword;
 import convex.core.Init;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -38,8 +35,9 @@ public class LocalStart implements Runnable {
 	public void run() {
 		Main mainParent = localParent.mainParent;
 		PeerManager peerManager = PeerManager.create(mainParent.getSessionFilename());
-		// Parse peer config
-		Map<Keyword,Object> peerConfig=new HashMap<>();
+		
+		// TODO: Parse peer config
+		// Map<Keyword,Object> peerConfig=new HashMap<>();
 
 		if (count > Init.NUM_PEERS) {
 			log.severe("Number of peers " + count + " is greater than " + Init.NUM_PEERS);

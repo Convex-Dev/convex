@@ -1,8 +1,5 @@
 package convex.cli;
 
-import java.util.logging.Logger;
-
-
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
@@ -28,7 +25,7 @@ import picocli.CommandLine.ParentCommand;
 	description="Manages convex accounts.")
 public class Account implements Runnable {
 
-	private static final Logger log = Logger.getLogger(Account.class.getName());
+	// private static final Logger log = Logger.getLogger(Account.class.getName());
 
 	@ParentCommand
 	protected Main mainParent;
