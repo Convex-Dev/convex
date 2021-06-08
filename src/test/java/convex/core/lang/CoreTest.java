@@ -2957,6 +2957,9 @@ public class CoreTest extends ACVMTest {
 
 		// MultiFn printing
 		assertCVMEquals("(fn ([] 0) ([x] 1))",eval("(str (fn ([]0) ([x] 1) ))"));
+		
+		// Issue #193 Error test
+		assertEquals(Vectors.of(1,2,3),eval("(do (defn f ([[a b] c] [a b c])) (f [1 2] 3))"));
 
 		// arity errors
 		assertArityError(step("((fn ([x] 1) ([x & more] 2)))"));
