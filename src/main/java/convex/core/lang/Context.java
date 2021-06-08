@@ -412,6 +412,10 @@ public final class Context<T extends ACell> extends AObject {
 	public AHashMap<Symbol,ACell> getEnvironment() {
 		return chainState.getEnvironment();
 	}
+	
+	public CompilerState getCompilerState() {
+		return compilerState;
+	}
 
 	public AHashMap<Symbol,AHashMap<ACell,ACell>> getMetadata() {
 		return chainState.getMetadata();
@@ -1352,6 +1356,12 @@ public final class Context<T extends ACell> extends AObject {
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> withJuice(long newJuice) {
 		juice=newJuice;
+		return (Context<R>) this;
+	}
+	
+	@SuppressWarnings("unchecked")
+	public <R extends ACell> Context<R> withCompilerState(CompilerState comp) {
+		compilerState=comp;
 		return (Context<R>) this;
 	}
 
