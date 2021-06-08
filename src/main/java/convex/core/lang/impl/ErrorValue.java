@@ -43,7 +43,7 @@ public class ErrorValue extends AExceptional {
 	
 	/**
 	 * Creates an ErrorValue with the specified type and message. Message may be null.
-	 * @param value Type of error
+	 * @param code Type of error
 	 * @param message Off-chain message as CVM String
 	 * @return New ErrorValue instance
 	 */
@@ -53,7 +53,7 @@ public class ErrorValue extends AExceptional {
 	
 	/**
 	 * Creates an ErrorValue with the specified type and message. Message may be null.
-	 * @param value Type of error
+	 * @param code Type of error
 	 * @param message Off-chain message, must be valid CVM Value
 	 * @return New ErrorValue instance
 	 */

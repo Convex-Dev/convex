@@ -54,6 +54,7 @@ import convex.core.util.Utils;
  * "Talk is cheap. Show me the code." - Linus Torvalds
  */
 @BuildParseTree
+@SuppressWarnings("javadoc")
 public class Reader extends BaseParser<ACell> {
 
 	// OVERALL PARSING INPUT RULES

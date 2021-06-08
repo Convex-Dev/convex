@@ -81,6 +81,7 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 	 * @param things
 	 * @param offset
 	 * @param length
+	 * @param tail 
 	 * @return The updated ListVector
 	 */
 	@SuppressWarnings("unchecked")

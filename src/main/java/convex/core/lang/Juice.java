@@ -272,10 +272,10 @@ public class Juice {
 	 * 
 	 * Returns Long.MAX_VALUE on overflow.
 	 * 
-	 * @param juice
-	 * @param size
-	 * @param buildPerElement
-	 * @return
+	 * @param a
+	 * @param b
+	 * @param c
+	 * @return long result, capped at Long.MAX_VALUE
 	 */
 	public static final long addMul(long a, long b, long c) {
 		return add(a,mul(b,c));
@@ -285,7 +285,7 @@ public class Juice {
 	 * Saturating multiply. Returns Long.MAX_VALUE on overflow.
 	 * @param a
 	 * @param b
-	 * @return
+	 * @return long result, capped at Long.MAX_VALUE
 	 */
 	public static final long mul(long a, long b) {
 		if ((a<0)||(b<0)) return Long.MAX_VALUE;
@@ -297,7 +297,7 @@ public class Juice {
 	 * Saturating addition. Returns Long.MAX_VALUE on overflow.
 	 * @param a
 	 * @param b
-	 * @return
+	 * @return long result, capped at Long.MAX_VALUE
 	 */
 	public static final long add(long a, long b) {
 		if ((a<0)||(b<0)) return Long.MAX_VALUE;

@@ -286,8 +286,8 @@ public class RT {
 
 	/**
 	 * Computes the result of a exp operation. Returns null if a cast fails.
-	 * @param args
-	 * @return
+	 * @param arg Numeric value
+	 * @return Numeric result, or null
 	 */	
 	public static CVMDouble exp(ACell arg) {
 		CVMDouble a = ensureDouble(arg);
@@ -362,6 +362,7 @@ public class RT {
 	 * 
 	 * @param a First numeric value
 	 * @param b Second numeric value
+	 * @param nanValue Value to return in case of a NaN result
 	 * @return Less than 0 if a is smaller, greater than 0 if a is larger, 0 if a
 	 *         equals b
 	 */
@@ -532,6 +533,7 @@ public class RT {
 	/**
 	 * Converts any data structure to a vector
 	 * 
+	 * @param o Object to attemptto convert to a Vector
 	 * @return AVector instance, or null if not convertible
 	 */
 	@SuppressWarnings("unchecked")
@@ -552,6 +554,7 @@ public class RT {
 	/**
 	 * Converts any countable data structure to a vector. Might be O(n)
 	 * 
+	 * @param o Value to convert
 	 * @return AVector instance, or null if conversion fails
 	 */
 	@SuppressWarnings("unchecked")
@@ -572,6 +575,8 @@ public class RT {
 
 	/**
 	 * Converts any collection to a set
+	 * @param o Value to cast
+	 * @return Set instance, or null if cast fails
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> ASet<T> castSet(ACell o) {
@@ -582,9 +587,11 @@ public class RT {
 	}
 
 	/**
-	 * Converts any collection to a vector.
+	 * Converts any collection to a vector. Always succeeds, but may have O(n) cost
 	 * 
 	 * Null values are converted to empty vector (considered as empty sequence)
+	 * @param coll Collection to convert to a Vector
+	 * @return Vector instance
 	 */
 	public static <T extends ACell> AVector<T> vec(ACollection<T> coll) {
 		if (coll == null) return Vectors.empty();
@@ -644,7 +651,8 @@ public class RT {
 	 * Throws an exception if access is out of bounds - caller responsibility to check bounds first
 	 * 
 	 * @param <T> Type of element in collection
-	 * @param o
+	 * @param o Countable Value
+	 * @param i Index of element to get
 	 * @return Element from collection at the specified position
 	 */
 	@SuppressWarnings("unchecked")
@@ -663,7 +671,7 @@ public class RT {
 	 * @param <T> Return type
 	 * @param o Object to check for indexed element
 	 * @param i Index to check
-	 * @return
+	 * @return Element at specified index
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T nth(Object o, long i) {
@@ -720,8 +728,10 @@ public class RT {
 	 * </ul>
 	 * 
 	 * @param args
+	 * @return AString value
 	 */
 	public static AString str(ACell[] args) {
+		// TODO: execution cost limits??
 		StringBuilder sb = new StringBuilder();
 		for (ACell o : args) {
 			String s=RT.str(o);
@@ -975,7 +985,8 @@ public class RT {
 	 * 
 	 * @param coll
 	 * @param key
-	 * @return Object from collection with the specified key, or notFound argument
+	 * @param notFound Value to return if the lookup failed
+	 * @return Value from collection with the specified key, or notFound argument
 	 *         if not found.
 	 */
 	public static ACell get(ADataStructure<?> coll, ACell key, ACell notFound) {
@@ -1103,6 +1114,7 @@ public class RT {
 	 * @param a First sequence. Will be used to determine the type of the result if
 	 *          not null.
 	 * @param b Second sequence. Will be the result if the first parameter is null.
+	 * @return Concatenated Sequence
 	 */
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static ASequence<?> concat(ASequence<?> a, ASequence<?> b) {
@@ -1155,7 +1167,7 @@ public class RT {
 	/**
 	 * Returns the vector of keys of a map, or null if the object is not a map
 	 * 
-	 * @param object
+	 * @param a Value to extract keys from (i.e. a Map)
 	 * @return Vector of keys in the map
 	 */
 	@SuppressWarnings("unchecked")
@@ -1173,8 +1185,8 @@ public class RT {
 	/**
 	 * Returns the vector of values of a map, or null if the object is not a map
 	 * 
-	 * @param object
-	 * @return VEctor of values from a map, or null if the object is not a map
+	 * @param a Value to extract values from (i.e. a Map)
+	 * @return Vector of values from a map, or null if the object is not a map
 	 */
 	@SuppressWarnings("unchecked")
 	public static <R extends ACell> AVector<R> values(ACell a) {
@@ -1232,6 +1244,8 @@ public class RT {
 
 	/**
 	 * Implicitly casts the argument to a Blob
+	 * @param object Value to cast to Blob
+	 * @return Blob instance, or null if cast fails
 	 */
 	public static ABlob ensureBlob(ACell object) {
 		if (object instanceof ABlob) return ((ABlob)object);
@@ -1239,7 +1253,10 @@ public class RT {
 	}
 	
 	/**
-	 * Casts the argument to a CVM String
+	 * Implicitly casts the argument to a CVM String
+	 * 
+	 * @param a Value to cast to a String 
+	 * @return AString instance, or null if cast fails
 	 */
 	public static AString ensureString(ACell a) {
 		if (a instanceof AString) return ((AString)a);
@@ -1289,8 +1306,9 @@ public class RT {
 
 	/**
 	 * Compute mode. 
-	 * @param args
-	 * @return Mod value or null if cast fails
+	 * @param a First numeric argument (numerator)
+	 * @param b First numeric argument (divisor)
+	 * @return Numeric value or null if cast fails
 	 */
 	public static CVMLong mod(ACell a , ACell b) {
 		CVMLong la=RT.castLong(a);

@@ -60,8 +60,8 @@ public abstract class AKeyPair {
 	/**
 	 * Create a key pair with the given Address and encoded private key
 	 * 
-	 * SECURITY: Never use this for valuable keys or real assets: intended for deterministic testing only.
-	 * @param seed Any long value. The same seed will produce the same key pair.
+	 * @param address Public Key
+	 * @param encodedPrivateKey Encoded private key
 	 * @return New key pair
 	 */
 	public static AKeyPair create(AccountKey address, Blob encodedPrivateKey) {
