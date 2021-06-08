@@ -127,8 +127,8 @@ public class ContextTest extends ACVMTest {
 		assertEquals(2L,evalL("(do (defn f [] *depth*) (f))")); // do + invoke
 		
 		// In compiler unquote
-		assertEquals(1L,evalL("~*depth*")); // unquote
-		assertEquals(2L,evalL("~(do *depth*)")); // unquote + do
+		assertEquals(2L,evalL("~*depth*")); // compile, unquote
+		assertEquals(3L,evalL("~(do *depth*)")); // compile+ unquote + do
 		
 		// in custom expander
 		assertEquals(2L,evalL("(expand :foo (fn [x e] *depth*))")); // in expand, invoke
@@ -147,7 +147,7 @@ public class ContextTest extends ACVMTest {
 		assertEquals(Constants.MAX_DEPTH-1,c.getDepth());
 		
 		// Can run 1 deep at this depth
-		assertEquals(Constants.MAX_DEPTH-1,evalL(c,"*depth*")); 
+		assertEquals(RT.cvm(Constants.MAX_DEPTH-1),c.execute(comp("*depth*")).getResult()); 
 		assertNull(c.execute(comp("(do)")).getResult()); 
 		
 		// Shouldn't be possible to execute any Op beyond max depth

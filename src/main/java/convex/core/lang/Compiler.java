@@ -82,7 +82,7 @@ public class Compiler {
 		if (ctx.isExceptional()) return (Context<AOp<T>>) (Object) ctx;
 		ACell c=ctx.getResult();
 		
-		return compile(c, ctx);
+		return ctx.compile(c);
 	}
 
 	/**
