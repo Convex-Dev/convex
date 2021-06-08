@@ -22,6 +22,7 @@ import convex.core.data.Sets;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.data.type.Types;
 import convex.core.lang.Context.CompilerState;
 import convex.core.lang.impl.AClosure;
@@ -34,6 +35,7 @@ import convex.core.lang.ops.Do;
 import convex.core.lang.ops.Invoke;
 import convex.core.lang.ops.Lambda;
 import convex.core.lang.ops.Let;
+import convex.core.lang.ops.Local;
 import convex.core.lang.ops.Lookup;
 import convex.core.lang.ops.Query;
 import convex.core.lang.ops.Special;
@@ -97,10 +99,32 @@ public class Compiler {
 	 * @param context
 	 * @return Context with compiled Op as result
 	 */
-	static <T extends ACell> Context<AOp<T>> compile(ACell expandedForm, Context<?> context) {
-		ACell form = expandedForm;
+	@SuppressWarnings("unchecked")
+	static <T extends ACell> Context<AOp<T>> compile(ACell form, Context<?> context) {
 		if (form==null) return compileConstant(context,null);
-		return compileCell(form, context);
+
+		if (form instanceof AList) return compileList((AList<ACell>) form, context);
+
+		if (form instanceof Syntax) return compileSyntax((Syntax) form, context);
+		if (form instanceof AVector) return compileVector((AVector<ACell>) form, context);
+		if (form instanceof AMap) return compileMap((AMap<ACell, ACell>) form, context);
+		if (form instanceof ASet) return compileSet((ASet<ACell>) form, context);
+
+		if ((form instanceof Keyword) || (form instanceof ABlob)) {
+			return compileConstant(context, form);
+		}
+
+		if (form instanceof Symbol) {
+			return compileSymbol((Symbol) form, context);
+		}
+		
+		if (form instanceof AOp) {
+			// already compiled, just return as constant
+			return context.withResult(Juice.COMPILE_CONSTANT, (AOp<T>)form);
+		}
+
+		// return as a constant literal
+		return compileConstant(context,form);
 	}
 
 	/**
@@ -128,36 +152,6 @@ public class Compiler {
 	}
 
 	@SuppressWarnings("unchecked")
-	private static <R extends ACell, T extends AOp<R>> Context<T> compileCell(ACell form, Context<?> context) {
-		if (!form.isCanonical()) {
-			return context.withCompileError("Form not canonical: " + form.getClass());
-		}
-		
-		if (form instanceof Syntax) return compileSyntax((Syntax) form, context);
-
-		if (form instanceof AList) return compileList((AList<ACell>) form, context);
-		if (form instanceof AVector) return compileVector((AVector<ACell>) form, context);
-		if (form instanceof AMap) return compileMap((AMap<ACell, ACell>) form, context);
-		if (form instanceof ASet) return compileSet((ASet<ACell>) form, context);
-
-		if ((form instanceof Keyword) || (form instanceof ABlob)) {
-			return compileConstant(context, form);
-		}
-
-		if (form instanceof Symbol) {
-			return compileSymbol((Symbol) form, context);
-		}
-		
-		if (form instanceof AOp) {
-			// already compiled, just return as constant
-			return context.withResult(Juice.COMPILE_CONSTANT, (T)form);
-		}
-
-		// return as a constant literal
-		return compileConstant(context,form);
-	}
-
-	@SuppressWarnings("unchecked")
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileSyntax(Syntax s, Context<?> context) {
 		context=compile(s.getValue(),context);
 		return (Context<T>) context;
@@ -165,7 +159,17 @@ public class Compiler {
 
 	@SuppressWarnings("unchecked")
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileSymbol(Symbol sym, Context<?> context) {
-		// First check for special values
+		// First check for lexically defined Symbols
+		CompilerState cs=context.getCompilerState();
+		if (cs!=null) {
+			CVMLong position=cs.getPosition(sym);
+			if (position!=null) {
+				Local<R> op=Local.create(position.longValue());
+				return (Context<T>) context.withResult(Juice.COMPILE_LOOKUP,op);
+			}
+		}
+		
+		// Next check for special values
 		Special<T> maybeSpecial=Special.forSymbol(sym);
 		if (maybeSpecial!=null) {
 			return context.withResult(maybeSpecial);
@@ -177,6 +181,27 @@ public class Compiler {
 		Lookup<T> lookUp=Lookup.create(Constant.of(address),sym);
 		return (Context<T>) context.withResult(Juice.COMPILE_LOOKUP, lookUp);
 	}
+	
+	@SuppressWarnings("unchecked")
+	private static <R extends ACell, T extends AOp<R>> Context<T> compileSetBang(AList<ACell> list, Context<?> context) {
+		if (list.count()!=3) return context.withArityError("set! requires two arguments, a symbol and an expression");
+
+		ACell a1=list.get(1);
+		if (!(a1 instanceof Symbol)) return context.withCompileError("set! requires a symbol as first argument");
+		Symbol sym=(Symbol)a1;
+		
+		CompilerState cs=context.getCompilerState();
+		CVMLong position=(cs==null)?null:context.getCompilerState().getPosition(sym);
+		if (position==null) return context.withCompileError("Trying to set! an undeclared symbol: "+sym);
+		
+		context=context.compile(list.get(2));
+		if (context.isExceptional()) return (Context<T>)context;
+		AOp<R> exp=(AOp<R>) context.getResult();
+		
+		T op=(T) convex.core.lang.ops.Set.create(position.longValue(), exp);
+		return context.withResult(Juice.COMPILE_NODE,op);
+	}
+
 
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileMap(AMap<ACell, ACell> form, Context<?> context) {
 		int n = form.size();
@@ -389,6 +414,7 @@ public class Compiler {
 
 			if (sym.equals(Symbols.LET)) return compileLet(list, context, false);
 			if (sym.equals(Symbols.LOOP)) return compileLet(list, context, true);
+			if (sym.equals(Symbols.SET_BANG)) return compileSetBang(list, context);
 
 			if (sym.equals(Symbols.COND)) {
 				context = context.compileAll(list.next());
@@ -407,6 +433,7 @@ public class Compiler {
 
 		return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
 	}
+
 
 	@SuppressWarnings("unchecked")
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileLet(ASequence<ACell> list, Context<?> context,
@@ -427,18 +454,18 @@ public class Compiler {
 		AVector<ACell> bindingForms = Vectors.empty();
 		AVector<AOp<ACell>> ops = Vectors.empty();
 
-		for (int i = 0; i < bn; i += 2) {
-			// Get a binding form
-			ACell bf = bv.get(i);
-			context=compileBinding(bf,context);
-			if (context.isExceptional()) return (Context<T>) context;
-			bindingForms = bindingForms.conj(context.getResult());
-			
+		for (int i = 0; i < bn; i += 2) {		
 			// Get corresponding op
 			context = context.expandCompile(bv.get(i + 1));
 			if (context.isExceptional()) return (Context<T>) context;
 			AOp<ACell> op = (AOp<ACell>) context.getResult();
 			ops = ops.conj(op);
+			
+			// Get a binding form. Note binding happens *after* op
+			ACell bf = bv.get(i);
+			context=compileBinding(bf,context);
+			if (context.isExceptional()) return (Context<T>) context;
+			bindingForms = bindingForms.conj(context.getResult());
 		}
 		int exs = n - 2; // expressions in let after binding vector
 		for (int i = 2; i < 2 + exs; i++) {
@@ -452,6 +479,12 @@ public class Compiler {
 		return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
 	}
 
+	/**
+	 * Compiles a binding form. Updates the current CompilerState. Should save compiler state if used
+	 * @param bindingForm
+	 * @param context
+	 * @return
+	 */
 	private static Context<ACell> compileBinding(ACell bindingForm,Context<?> context) {
 		CompilerState cs=context.getCompilerState();
 		if (cs==null) cs=CompilerState.EMPTY;
@@ -482,7 +515,8 @@ public class Compiler {
 					// skip to next element for binding
 					if (i>=(vcount-1)) return null; // trailing ampersand
 					foundAmpersand=true;
-					bf=v.get(i++);
+					bf=v.get(i+1);
+					i++;
 				} 
 				cs=updateBinding(bf,cs);
 			}
@@ -568,12 +602,15 @@ public class Compiler {
 		
 	@SuppressWarnings("unchecked")
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileFnInstance(AVector<ACell> paramsVector, AList<ACell> bodyList,Context<?> context) {
+		// need to save compiler state, since we are compiling bindings
+		CompilerState savedCompilerState=context.getCompilerState();
+		
 		context=compileBinding(paramsVector,context);
-		if (context.isExceptional()) return (Context<T>) context;
+		if (context.isExceptional()) return context.withCompilerState(savedCompilerState); // restore before return
 		paramsVector=(AVector<ACell>) context.getResult();
 		
 		context = context.compileAll(bodyList);
-		if (context.isExceptional()) return (Context<T>) context;
+		if (context.isExceptional()) return context.withCompilerState(savedCompilerState); // restore before return
 
 		int n=bodyList.size();
 		AOp<T> body;
@@ -589,6 +626,7 @@ public class Compiler {
 		}
 
 		Lambda<T> op = Lambda.create(paramsVector, body);
+		context=context.withCompilerState(savedCompilerState);
 		return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
 	}
 

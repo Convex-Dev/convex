@@ -661,26 +661,6 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ACell> SET_STAR = reg(new CoreFn<>(Symbols.SET_STAR) {
-		@SuppressWarnings("unchecked")
-		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
-			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
-
-			Symbol sym = RT.ensureSymbol(args[0]);
-			if (sym == null) return context.withCastError(0,args, Types.SYMBOL);
-
-			if (sym.isQualified()) {
-				return context.withArgumentError("Cannot set local binding with qualified symbol: " + sym);
-			}
-
-			ACell value=args[1];
-
-			context= context.withLocalBindings(context.getLocalBindings().assoc(sym, value));
-			return context.withResult(Juice.ASSOC,value);
-		}
-	});
-
 	public static final CoreFn<ACell> UNDEF_STAR = reg(new CoreFn<>(Symbols.UNDEF_STAR) {
 		@SuppressWarnings("unchecked")
 		@Override

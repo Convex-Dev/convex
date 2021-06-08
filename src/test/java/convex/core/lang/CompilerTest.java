@@ -33,6 +33,7 @@ import convex.core.lang.ops.Def;
 import convex.core.lang.ops.Do;
 import convex.core.lang.ops.Invoke;
 import convex.core.lang.ops.Lambda;
+import convex.core.lang.ops.Local;
 import convex.core.lang.ops.Lookup;
 import convex.core.util.Utils;
 import convex.test.Samples;
@@ -208,7 +209,7 @@ public class CompilerTest extends ACVMTest {
 				    // define a nasty function that calls its argument recursively on itself
 					Def.create("fubar", 
 							Lambda.create(Vectors.of(Symbol.create("func")), 
-											Invoke.create(Lookup.create("func"),Lookup.create("func")))),
+											Invoke.create(Local.create(0),Local.create(0)))),
 					// call the nasty function on itself
 					Invoke.create(Invoke.create(Lookup.create("fubar"),Lookup.create("fubar")))
 				);
@@ -314,7 +315,7 @@ public class CompilerTest extends ACVMTest {
 	public void testNestedQuote() {
 		assertEquals(RT.cvm(10L),eval("(+ (eval `(+ 1 ~2 ~(eval 3) ~(eval `(+ 0 4)))))"));
 
-		assertEquals(RT.cvm(10L),eval("(let [a 2 b 3] (eval '(+ 1 ~a ~(+ b 4))))"));
+		assertEquals(RT.cvm(10L),eval("(let [a 2 b 3] (eval `(+ 1 ~a ~(+ b 4))))"));
 	}
 	
 	@Test 
@@ -363,13 +364,14 @@ public class CompilerTest extends ACVMTest {
 	
 	@Test
 	public void testLoopRecur() {
-		assertEquals(Vectors.of(3L,2L,1L),eval ("(loop [v [] n 3] (if (> n 0) (recur (conj v n) (dec n)) v))"));
-		
 		// infinite loop should run out of juice
 		assertJuiceError(step("(loop [] (recur))"));
 		
 		// infinite loop with wrong arity should fail with arity error first
 		assertArityError(step("(loop [] (recur 1))"));		
+
+		assertEquals(Vectors.of(3L,2L,1L),eval ("(loop [v [] n 3] (cond (> n 0) (recur (conj v n) (dec n)) v))"));
+		
 	}
 	
 	@Test

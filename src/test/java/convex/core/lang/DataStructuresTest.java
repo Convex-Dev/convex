@@ -55,8 +55,7 @@ public class DataStructuresTest {
 	public void testRefCounts() {
 		assertEquals(0, Utils.totalRefCount(Vectors.empty()));
 		assertEquals(2, Utils.totalRefCount(Vectors.of(1, 2)));
-		assertEquals(2, Utils.totalRefCount(eval("(fn [a] a)"))); // 1 Ref in params [symbol] + lookup
-																	// embedded
+		assertEquals(1, Utils.totalRefCount(eval("(fn [a] a)"))); // 1 Ref in params [symbol]
 		assertEquals(6, Utils.totalRefCount(eval("[[1 2] [3 4]]"))); // 6 vector element Refs
 	}
 

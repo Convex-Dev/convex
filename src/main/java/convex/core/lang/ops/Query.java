@@ -4,11 +4,9 @@ import java.nio.ByteBuffer;
 
 import convex.core.State;
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Format;
-import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.AOp;
@@ -56,7 +54,7 @@ public class Query<T extends ACell> extends AMultiOp<T> {
 		Context<T> ctx = (Context<T>) context.consumeJuice(Juice.QUERY);
 		if (ctx.isExceptional()) return ctx;
 		
-		AHashMap<Symbol, ACell> savedBindings=context.getLocalBindings();
+		AVector<ACell> savedBindings=context.getLocalBindings();
 
 		// execute each operation in turn
 		// TODO: early return

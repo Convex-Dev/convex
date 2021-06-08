@@ -2,7 +2,9 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
+import convex.core.ErrorCodes;
 import convex.core.data.ACell;
+import convex.core.data.AVector;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.exceptions.BadFormatException;
@@ -44,7 +46,13 @@ public class Local<T extends ACell> extends AOp<T> {
 	@Override
 	public <R extends ACell> Context<T> execute(Context<R> context) {
 		Context<T> ctx=(Context<T>) context;
-		return ctx.consumeJuice(Juice.LOOKUP);
+		AVector<ACell> env=ctx.getLocalBindings();
+		long ec=env.count();
+		if ((position<0)||(position>=ec)) {
+			return ctx.withError(ErrorCodes.BOUNDS,"Bad position for Local: "+position);
+		}
+		T result = (T)env.get(position);
+		return (Context<T>) ctx.withResult(Juice.LOOKUP,result);
 	}
 
 	@Override

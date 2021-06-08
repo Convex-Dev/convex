@@ -167,7 +167,7 @@ public class JuiceTest extends ACVMTest {
 	public void testLoopIteration() {
 		long j1 = juice("(loop [i 2] (cond (> i 0) (recur (dec i)) :end))");
 		long j2 = juice("(loop [i 3] (cond (> i 0) (recur (dec i)) :end))");
-		assertEquals(Juice.COND_OP + (Juice.LOOKUP_SYM * 3) + ((Juice.LOOKUP+Juice.CONSTANT)*2) + Juice.CONSTANT * 1 + Juice.ARITHMETIC + Juice.NUMERIC_COMPARE
+		assertEquals(Juice.COND_OP + (Juice.LOOKUP_SYM * 3) + ((Juice.LOOKUP)*2) + Juice.CONSTANT * 1 + Juice.ARITHMETIC + Juice.NUMERIC_COMPARE
 				+ Juice.RECUR, j2 - j1);
 	}
 }

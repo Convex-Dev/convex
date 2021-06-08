@@ -115,7 +115,7 @@
       (== n 0) nil
       (== n 1) (first exprs)
       :else `(let [v# ~(first exprs)]
-               (if v# v# ~(cons 'or (next exprs)))))))
+               (cond v# v# ~(cons 'or (next exprs)))))))
 
 (defmacro and 
   ^{:doc {:description "Executes expressions in sequence, returning the first falsey value, or the last value if all were truthy. Does not evaluate later expressions, so can be used to short circuit execution. Returns true with no expressions present."
@@ -129,7 +129,7 @@
       (== n 0) true
       (== n 1) (first exprs)
       :else `(let [v# ~(first exprs)]
-               (if v# ~(cons 'and (next exprs)) v#)))))
+               (cond v# ~(cons 'and (next exprs)) v#)))))
 
 
 (defmacro when 
@@ -272,14 +272,6 @@
           :examples [{:code "(call *registry* (register {:name \"My name\"}))"}]
           :type :value}}
   (address 20))
-  
- (defmacro set!
-    ^{:doc {:description "Sets a local binding identified by an unqualified symbol to the given value. This local change will be be visible until the scope leaves the current binding form (e.g. let binding, function body or recur). Fails with an ARGUMENT error if the symbol is qualified. This is probably most useful for updating a local variable in imperative style. Returns the value assigned to the local binding if successful."
-          :examples [{:code "(let [a 10] (set! a 20) a)"}]
-          :type :macro	 
-          :signature [{:params [sym value]}]}}
-    [sym value]
-    `(set* ~(list 'quote sym) ~value))
  
 (defmacro undef
     ^{:doc {:description "Undefines a symbol, removing the mapping from the current environment if it exists."

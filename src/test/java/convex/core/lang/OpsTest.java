@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Init;
+import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
@@ -30,6 +31,7 @@ import convex.core.lang.ops.Do;
 import convex.core.lang.ops.Invoke;
 import convex.core.lang.ops.Lambda;
 import convex.core.lang.ops.Let;
+import convex.core.lang.ops.Local;
 import convex.core.lang.ops.Lookup;
 import convex.core.lang.ops.Special;
 import convex.core.util.Utils;
@@ -152,7 +154,7 @@ public class OpsTest extends ACVMTest {
 	public void testLet() {
 		Context<?> c = context();
 		AOp<AString> op = Let.create(Vectors.of(Symbols.FOO),
-				Vectors.of(Constant.createString("bar"), Lookup.create("foo")), false);
+				Vectors.of(Constant.createString("bar"), Local.create(0)), false);
 		Context<AString> c2 = c.execute(op);
 		assertEquals("bar", c2.getResult().toString());
 		
@@ -229,7 +231,7 @@ public class OpsTest extends ACVMTest {
 
 		Symbol sym = Symbol.create("arg0");
 
-		Invoke<AString> op = Invoke.create(Lambda.create(Vectors.of(sym), Lookup.create(sym)),
+		Invoke<AString> op = Invoke.create(Lambda.create(Vectors.of(sym), Local.create(0)),
 				Constant.createString("bar"));
 
 		Context<AString> c2 = c.execute(op);
@@ -247,6 +249,18 @@ public class OpsTest extends ACVMTest {
 		Lookup<?> l2=Lookup.create(Constant.of(Init.CORE_ADDRESS),"count");
 		assertEquals(Constant.of(Init.CORE_ADDRESS),l2.getAddress());
 		doOpTest(l2);
+	}
+	
+	@Test
+	public void testLocal() throws InvalidDataException {
+		Context<?> c=Context.createFake(State.EMPTY);
+		c=c.withLocalBindings(Vectors.of(1337L));
+		
+		Local<?> op=Local.create(0);
+		c=c.execute(op);
+		assertEquals(RT.cvm(1337),c.getResult());
+		
+		doOpTest(op);
 	}
 
 	@Test

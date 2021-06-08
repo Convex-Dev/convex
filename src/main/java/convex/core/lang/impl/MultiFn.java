@@ -4,13 +4,10 @@ import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
-import convex.core.data.Maps;
 import convex.core.data.Ref;
-import convex.core.data.Symbol;
 import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -22,14 +19,14 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 	private final AVector<AClosure<T>> fns;
 	private final int num;
 	
-	private MultiFn(AVector<AClosure<T>> fns, AHashMap<Symbol, ACell> env) {
+	private MultiFn(AVector<AClosure<T>> fns, AVector<ACell> env) {
 		super(env);
 		this.fns=fns;
 		this.num=fns.size();
 	}
 	
 	private MultiFn(AVector<AClosure<T>> fns) {
-		this(fns,Maps.empty());
+		this(fns,Context.EMPTY_BINDINGS);
 	}
 	
 
@@ -141,7 +138,7 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Override
-	public <F extends AClosure<T>> F withEnvironment(AHashMap<Symbol, ACell> env) {
+	public <F extends AClosure<T>> F withEnvironment(AVector<ACell> env) {
 		// TODO: Can make environment update more efficient?
 		if (env==this.lexicalEnv) return (F) this;
 		return (F) new MultiFn(fns.map(fn->fn.withEnvironment(env)),env);

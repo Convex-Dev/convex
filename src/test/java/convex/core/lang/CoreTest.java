@@ -3075,30 +3075,10 @@ public class CoreTest extends ACVMTest {
 	}
 
 	@Test
-	public void testSetStar() {
-		assertEquals(13L,evalL("(set* 'a 13)"));
-		assertEquals(13L,evalL("(do (set* 'a 13) a)"));
-
-		assertEquals(10L,evalL("(let [a 10] (let [] (set* 'a 13)) a)"));
-
-		// set only valid in limited scope
-		assertUndeclaredError(step("(do (let [a 10] (set* 'a 20)) a)"));
-
-		assertCastError(step("(set* :a 13)"));
-		assertCastError(step("(set* nil 13)"));
-		assertCastError(step("(set* ['a 'b] [1 2])")); // can't destructure
-
-
-		assertArgumentError(step("(set* 'a/b 10)"));
-	}
-
-	@Test
 	public void testSetBang() {
-		// set returns its value
-		assertEquals(13L,evalL("(set! a 13)"));
-
-		// set! works without a binding expression
-		assertEquals(13L,evalL("(do (set! a 13) a)"));
+		// set! fails on undeclared values
+		assertCompileError(step("(set! a 13)"));
+		assertCompileError(step("(do (set! a 13) a)"));
 
 		// set! works in a function body
 		assertEquals(35L,evalL("(let [a 13 f (fn [x] (set! a 25) (+ x a))] (f 10))"));
@@ -3109,20 +3089,17 @@ public class CoreTest extends ACVMTest {
 		// set! binding does not escape current form, still undeclared in enclosing local context
 		assertUndeclaredError(step("(do (let [a 10] (set! a 20)) a)"));
 
-		// set! fails if trying to set a qualified argument name
-		assertArgumentError(step("(set! a/b 10)"));
-
-		// set! cannot alter value across actor call boundary
+		// set! cannot alter value across closure boundary
 		{
-			Context<?> ctx=step("(def act (deploy `(do (defn sneaky [] (set! a 666)) (export sneaky))))");
-			assertEquals(5L,evalL(ctx,"(let [a 5] (call act (sneaky)) a)"));
+			assertEquals(5L,evalL("(let [a 5] ((fn [] (set! a 666))) a)"));
 		}
 
 		// set! cannot alter value within query
 		assertEquals(5L,evalL("(let [a 5] (query (set! a 6)) a)"));
 
-		// set! can alter value within eval??
-		assertEquals(7L,evalL("(let [a 5] (eval `(set! a 7)) a)"));
+		// TODO: reconsider this
+		// set! doesn't work outside eval boundary?
+		assertCompileError(step ("(let [a 5] (eval `(set! a 7)) a)"));
 	}
 
 	@Test
@@ -3538,9 +3515,10 @@ public class CoreTest extends ACVMTest {
 		// check balance as single expression
 		assertEquals(bal, evalL("*balance*"));
 
-		// Specials are implemented by compiler with higher priority than Symbol lookup
-		// TODO: Reconsider this
-		assertEquals(eval(Symbols.STAR_BALANCE),eval("(let [*balance* nil] *balance*)"));
+		// Local values override specials
+		assertNull(eval("(let [*balance* nil] *balance*)"));
+		
+		// TODO: reconsider this, special take priority over enviornment?
 		assertCVMEquals(ctx.getOffer(),eval("(do (def *offer* :foo) *offer*)"));
 
 		// Alternative behaviour

@@ -6,7 +6,6 @@ import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
-import convex.core.data.MapEntry;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
 import convex.core.exceptions.BadFormatException;
@@ -66,12 +65,6 @@ public class Lookup<T extends ACell> extends AOp<T> {
 			if (rctx.isExceptional()) return rctx;
 			namespaceAddress=RT.ensureAddress(rctx.getResult());
 			if (namespaceAddress==null) return rctx.withArgumentError("Lookup Op failed to produce an Address");
-		}
-		
-		// Lookup local lexical values first
-		if (!symbol.isQualified()) {
-			MapEntry<Symbol, T> le = rctx.lookupLocalEntry(symbol);
-			if (le != null) return rctx.withResult(Juice.LOOKUP, le.getValue());
 		}
 		
 		// Do a dynamic lookup, with address if specified or address from current context otherwise

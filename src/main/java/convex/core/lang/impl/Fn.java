@@ -3,13 +3,10 @@ package convex.core.lang.impl;
 import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
-import convex.core.data.Maps;
 import convex.core.data.Ref;
-import convex.core.data.Symbol;
 import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -40,20 +37,20 @@ public class Fn<T extends ACell> extends AClosure<T> {
 	
 	private Long variadic=null;
 
-	private Fn(AVector<ACell> params, AOp<T> body, AHashMap<Symbol, ACell> lexicalEnv) {
+	private Fn(AVector<ACell> params, AOp<T> body, AVector<ACell> lexicalEnv) {
 		super(lexicalEnv);
 		this.params = params;
 		this.body = body;
 	}
 	
 	public static <T extends ACell, I> Fn<T> create(AVector<ACell> params, AOp<T> body) {
-		AHashMap<Symbol, ACell> binds = Maps.empty();
+		AVector<ACell> binds = Context.EMPTY_BINDINGS;
 		return new Fn<T>(params, body, binds);
 	}
 	
 	@SuppressWarnings("unchecked")
 	@Override
-	public <F extends AClosure<T>> F withEnvironment(AHashMap<Symbol, ACell> env) {
+	public <F extends AClosure<T>> F withEnvironment(AVector<ACell> env) {
 		if (this.lexicalEnv==env) return (F) this;
 		return (F) new Fn<T>(params, body, env);
 	}
@@ -89,7 +86,7 @@ public class Fn<T extends ACell> extends AClosure<T> {
 	@Override
 	public Context<T> invoke(Context context, ACell[] args) {
 		// update local bindings for the duration of this function call
-		final AHashMap<Symbol, ACell> savedBindings = context.getLocalBindings();
+		final AVector<ACell> savedBindings = context.getLocalBindings();
 
 		// update to correct lexical environment, then bind function parameters
 		context = context.withLocalBindings(lexicalEnv);
@@ -133,7 +130,7 @@ public class Fn<T extends ACell> extends AClosure<T> {
 			if (params==null) throw new BadFormatException("Null parameters to Fn");
 			AOp<T> body = Format.read(bb);
 			if (body==null) throw new BadFormatException("Null body in Fn");
-			AHashMap<Symbol, ACell> lexicalEnv = Format.read(bb);
+			AVector<ACell> lexicalEnv = Format.read(bb);
 			return new Fn<>(params, body, lexicalEnv);
 		} catch (ClassCastException e) {
 			throw new BadFormatException("Bad Fn format", e);
@@ -204,7 +201,7 @@ public class Fn<T extends ACell> extends AClosure<T> {
 	public Fn<T> updateRefs(IRefFunction func) {
 		AVector<ACell> newParams = params.updateRefs(func);
 		AOp<T> newBody = body.updateRefs(func);
-		AHashMap<Symbol, ACell> newLexicalEnv = lexicalEnv.updateRefs(func);
+		AVector<ACell> newLexicalEnv = lexicalEnv.updateRefs(func);
 		if ((params == newParams) && (body == newBody) && (lexicalEnv == newLexicalEnv)) return this;
 		return new Fn<>(newParams, newBody, lexicalEnv);
 	}

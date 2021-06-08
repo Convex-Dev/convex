@@ -78,7 +78,7 @@ public final class Context<T extends ACell> extends AObject {
 	private static int DEFAULT_DEPTH = 0;
 	private static final AExceptional DEFAULT_EXCEPTION = null;
 	private static final long DEFAULT_OFFER = 0L;
-
+	public static final AVector<ACell> EMPTY_BINDINGS=Vectors.empty();
 	// private static final Logger log=Logger.getLogger(Context.class.getName());
 
 	/*
@@ -92,7 +92,7 @@ public final class Context<T extends ACell> extends AObject {
 	private T result;
 	private AExceptional exception;
 	private int depth;
-	private AHashMap<Symbol, ACell> localBindings;
+	private AVector<ACell> localBindings;
 	private ChainState chainState;
 	private ABlobMap<Address,AVector<AVector<ACell>>> log;
 	private CompilerState compilerState;
@@ -120,6 +120,10 @@ public final class Context<T extends ACell> extends AObject {
 			AVector<Syntax> newDefs=definitions.conj(syn);
 			AHashMap<Symbol,CVMLong> newMaps=mappings.assoc(sym, CVMLong.create(position));
 			return new CompilerState(newDefs,newMaps);
+		}
+
+		public CVMLong getPosition(Symbol sym) {
+			return mappings.get(sym);
 		}
 	}
 
@@ -219,7 +223,7 @@ public final class Context<T extends ACell> extends AObject {
 
 	}
 
-	private Context(ChainState chainState, long juice, AHashMap<Symbol, ACell> localBindings2, T result,int depth, AExceptional exception, ABlobMap<Address,AVector<AVector<ACell>>> log, CompilerState comp) {
+	private Context(ChainState chainState, long juice, AVector<ACell> localBindings2, T result,int depth, AExceptional exception, ABlobMap<Address,AVector<AVector<ACell>>> log, CompilerState comp) {
 		this.chainState=chainState;
 		this.juice=juice;
 		this.localBindings=localBindings2;
@@ -231,12 +235,12 @@ public final class Context<T extends ACell> extends AObject {
 	}
 
 	@SuppressWarnings("unchecked")
-	private static <T extends ACell> Context<T> create(ChainState cs, long juice, AHashMap<Symbol, ACell> localBindings, ACell result, int depth,ABlobMap<Address,AVector<AVector<ACell>>> log, CompilerState comp) {
+	private static <T extends ACell> Context<T> create(ChainState cs, long juice, AVector<ACell> localBindings, ACell result, int depth,ABlobMap<Address,AVector<AVector<ACell>>> log, CompilerState comp) {
 		if (juice<0) throw new IllegalArgumentException("Negative juice! "+juice);
 		return new Context<T>(cs,juice,localBindings,(T)result,depth,DEFAULT_EXCEPTION,log,comp);
 	}
 
-	private static <T extends ACell> Context<T> create(State state, long juice,AHashMap<Symbol, ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer, ABlobMap<Address,AVector<AVector<ACell>>> log, CompilerState comp) {
+	private static <T extends ACell> Context<T> create(State state, long juice,AVector<ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer, ABlobMap<Address,AVector<AVector<ACell>>> log, CompilerState comp) {
 		ChainState chainState=ChainState.create(state,origin,caller,address,offer);
 		return create(chainState,juice,localBindings,result,depth,log,comp);
 	}
@@ -265,7 +269,7 @@ public final class Context<T extends ACell> extends AObject {
 	 */
 	public static <R extends ACell> Context<R> createFake(State state, Address actor) {
 		if (actor==null) throw new Error("Null actor address!");
-		return create(state,Constants.MAX_TRANSACTION_JUICE,Maps.empty(),null,0,actor,null,actor, 0, DEFAULT_LOG,null);
+		return create(state,Constants.MAX_TRANSACTION_JUICE,EMPTY_BINDINGS,null,0,actor,null,actor, 0, DEFAULT_LOG,null);
 	}
 
 	/**
@@ -298,7 +302,7 @@ public final class Context<T extends ACell> extends AObject {
 		long newBalance=balance-reserve;
 		as=as.withBalance(newBalance);
 		state=state.putAccount(origin, as);
-		return create(state,juice,Maps.empty(),null,DEFAULT_DEPTH,origin,null,origin,INITIAL_JUICE,DEFAULT_LOG,null);
+		return create(state,juice,EMPTY_BINDINGS,null,DEFAULT_DEPTH,origin,null,origin,INITIAL_JUICE,DEFAULT_LOG,null);
 	}
 
 
@@ -460,19 +464,6 @@ public final class Context<T extends ACell> extends AObject {
 	}
 
 	/**
-	 * Looks up a local entry in the current execution context.
-	 *
-	 * @param <R> Type of value associated with the given symbol
-	 * @param sym
-	 * @return MapEntry for the given symbol in the current context, or null if not defined as a local
-	 */
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> MapEntry<Symbol,R> lookupLocalEntry(Symbol sym) {
-		MapEntry<Symbol,R> me = (MapEntry<Symbol, R>) localBindings.getEntry(sym);
-		return me;
-	}
-
-	/**
 	 * Looks up a symbol's value in the current execution context, without any effect on the Context (no juice consumed etc.)
 	 *
 	 * @param <R> Type of value associated with the given symbol
@@ -480,13 +471,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return Context with the result of the lookup (may be an undeclared exception)
 	 */
 	public <R extends ACell> Context<R> lookup(Symbol symbol) {
-		// first try lookup in local bindings
-		if (!symbol.isQualified()) {
-			MapEntry<Symbol,R> le=lookupLocalEntry(symbol);
-			if (le!=null) return withResult(le.getValue());
-		}
-
-		// second try lookup in dynamic environment
+		// try lookup in dynamic environment
 		return lookupDynamic(symbol);
 	}
 
@@ -521,7 +506,9 @@ public final class Context<T extends ACell> extends AObject {
 		MapEntry<Symbol,ACell> envEntry=lookupDynamicEntry(as,symbol);
 
 		// if not found, return UNDECLARED error
-		if (envEntry==null) return withError(ErrorCodes.UNDECLARED,symbol.toString());
+		if (envEntry==null) {
+			return withError(ErrorCodes.UNDECLARED,symbol.toString());
+		}
 
 		// Result is whatever is defined as the datum value in the environment entry
 		ACell result = envEntry.getValue();
@@ -1010,7 +997,7 @@ public final class Context<T extends ACell> extends AObject {
 			if (sym.equals(Symbols.UNDERSCORE)) return ctx;
 			if (sym.isQualified()) return ctx.withCompileError("Can't create local binding for qualified symbol: "+sym);
 			// TODO: confirm must be an ACell at this point?
-			return withLocalBindings( localBindings.assoc(sym,(ACell)args));
+			return withLocalBindings(localBindings.conj((ACell)args));
 		} else if (bindingForm instanceof AVector) {
 			AVector<ACell> v=(AVector<ACell>)bindingForm;
 			long vcount=v.count(); // count of binding form symbols (may include & etc.)
@@ -1087,7 +1074,7 @@ public final class Context<T extends ACell> extends AObject {
 		sb.append("}");
 	}
 
-	public convex.core.data.AHashMap<Symbol, ACell> getLocalBindings() {
+	public AVector<ACell> getLocalBindings() {
 		return localBindings;
 	}
 
@@ -1098,7 +1085,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return Updated context
 	 */
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> withLocalBindings(AHashMap<Symbol, ACell> newBindings) {
+	public <R extends ACell> Context<R> withLocalBindings(AVector<ACell> newBindings) {
 		//if (localBindings==newBindings) return (Context<R>) this;
 		//return create(chainState,juice,newBindings,(R)result,depth);
 		localBindings=newBindings;
@@ -1280,7 +1267,7 @@ public final class Context<T extends ACell> extends AObject {
 		if (!canControl) return ctx.withError(ErrorCodes.TRUST,"Cannot control address: "+address);
 
 		// SECURITY: eval with a context switch
-		final Context<R> exContext=Context.create(getState(), juice, Maps.empty(), null, depth+1, getOrigin(),caller, address,0,log,null);
+		final Context<R> exContext=Context.create(getState(), juice, EMPTY_BINDINGS, null, depth+1, getOrigin(),caller, address,0,log,null);
 
 		final Context<R> rContext=exContext.eval(form);
 		// SECURITY: must handle results as if returning from an actor call
@@ -1317,7 +1304,7 @@ public final class Context<T extends ACell> extends AObject {
 	public <R extends ACell> Context<R> queryAs(Address address, ACell form) {
 		// chainstate with the target address as origin.
 		ChainState cs=ChainState.create(getState(),address,null,address,DEFAULT_OFFER);
-		Context<R> ctx=Context.create(cs, juice, Maps.empty(), null, depth,log,null);
+		Context<R> ctx=Context.create(cs, juice, EMPTY_BINDINGS, null, depth,log,null);
 		ctx=ctx.evalAs(address, form);
 		return handleQueryResult(ctx);
 	}
@@ -1650,7 +1637,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return
 	 */
 	private <R extends ACell> Context<R> forkActorCall(State state, Address target, long offer) {
-		return Context.create(state, juice, Maps.empty(), (R)null, depth+1, getOrigin(),getAddress(), target,offer, log,null);
+		return Context.create(state, juice, EMPTY_BINDINGS, (R)null, depth+1, getOrigin(),getAddress(), target,offer, log,null);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -1735,7 +1722,7 @@ public final class Context<T extends ACell> extends AObject {
 		if (stateSetup==null) return withError(ErrorCodes.STATE,"Contract deployment address conflict: "+address);
 
 		// Deployment execution context with forked context and incremented depth
-		final Context<Address> exContext=Context.create(stateSetup, juice, Maps.empty(), null, depth+1, getOrigin(),getAddress(), address,DEFAULT_OFFER,log,null);
+		final Context<Address> exContext=Context.create(stateSetup, juice, EMPTY_BINDINGS, null, depth+1, getOrigin(),getAddress(), address,DEFAULT_OFFER,log,null);
 		final Context<Address> rctx=exContext.eval(code);
 
 		Context<Address> result=this.handleStateResults(rctx,false);
@@ -2078,13 +2065,15 @@ public final class Context<T extends ACell> extends AObject {
 		int savedDepth=getDepth();
 		Context<R> ctx =(Context<R>) this.withDepth(savedDepth+1);
 		if (ctx.isExceptional()) return ctx; // depth error, won't have modified depth
+		
+		//AVector<ACell> savedEnv=getLocalBindings();
 
 		Context<R> rctx= (Context<R>)invoke(expander, form, cont);
 
 		// reset depth after execution.
+		//rctx=rctx.withLocalBindings(savedEnv);
 		rctx=rctx.withDepth(savedDepth);
 		return rctx;
-		//	if (!(r instanceof Syntax)) return rctx.withError(ErrorCodes.CAST,"expander function must produce a Syntax Object");
 	}
 
 }

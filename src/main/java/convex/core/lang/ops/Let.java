@@ -3,13 +3,11 @@ package convex.core.lang.ops;
 import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
-import convex.core.data.Symbol;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
@@ -84,7 +82,7 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 		Context<?> ctx = context.consumeJuice(Juice.LET);
 		if (ctx.isExceptional()) return (Context<T>) ctx;
 
-		AHashMap<Symbol, ACell> savedEnv = ctx.getLocalBindings();
+		AVector<ACell> savedEnv = ctx.getLocalBindings();
 		
 		// execute each operation for bound values in turn
 		for (int i = 0; i < bindingCount; i++) {
@@ -112,6 +110,8 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 					break;
 				}
 
+				// restore old lexical environment, then add back new ones
+				ctx=ctx.withLocalBindings(savedEnv);
 				ctx = ctx.updateBindings(symbols, newArgs);
 				if (ctx.isExceptional()) break;
 

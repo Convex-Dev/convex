@@ -2,7 +2,9 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
+import convex.core.ErrorCodes;
 import convex.core.data.ACell;
+import convex.core.data.AVector;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
@@ -20,38 +22,49 @@ import convex.core.util.Errors;
  * @param <T>
  */
 public class Set<T extends ACell> extends AOp<T> {
-	
+
 	/**
 	 * Stack position in lexical stack
 	 */
 	private final long position;
-	
+
 	/**
 	 * Op to compute new value
 	 */
 	private final Ref<AOp<T>> op;
 
 	private Set(long position, Ref<AOp<T>> op) {
-		this.position=position;
-		this.op=op;
+		this.position = position;
+		this.op = op;
 	}
-	
 
 	/**
 	 * Creates special Op for the given opCode
+	 * 
 	 * @param opCode
 	 * @return Special instance, or null if not found
 	 */
 	public static final <R extends ACell> Set<R> create(long position, AOp<R> op) {
-		if (position<0) return null;
-		return new Set<R>(position,op.getRef());
+		if (position < 0) return null;
+		return new Set<R>(position, op.getRef());
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	@Override
 	public <R extends ACell> Context<T> execute(Context<R> context) {
-		Context<T> ctx=(Context<T>) context;
-		return ctx.consumeJuice(Juice.LOOKUP);
+		Context<T> ctx = (Context<T>) context;
+		AVector<ACell> env = ctx.getLocalBindings();
+		long ec = env.count();
+		if ((position < 0) || (position >= ec))
+			return context.withError(ErrorCodes.BOUNDS, "Bad position for set!: " + position);
+
+		ctx = ctx.execute(op.getValue());
+		if (ctx.isExceptional()) return ctx;
+		ACell value = ctx.getResult();
+
+		AVector<ACell> newEnv = env.assoc(position, value);
+		ctx = ctx.withLocalBindings(newEnv);
+		return ctx.consumeJuice(Juice.SET_BANG);
 	}
 
 	@Override
@@ -61,31 +74,31 @@ public class Set<T extends ACell> extends AOp<T> {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos=Format.writeVLCLong(bs, pos, position);
+		pos = Format.writeVLCLong(bs, pos, position);
 		return pos;
 	}
-	
+
 	public static <R extends ACell> Set<R> read(ByteBuffer bb) throws BadFormatException {
-		long position=Format.readVLCLong(bb);
+		long position = Format.readVLCLong(bb);
 		AOp<R> op = Format.read(bb);
-		return create(position,op);
+		return create(position, op);
 	}
 
 	@Override
 	public Set<T> updateRefs(IRefFunction func) {
 		@SuppressWarnings("unchecked")
-		Ref<AOp<T>> newOp=(Ref<AOp<T>>) func.apply(op);
-		if (op==newOp) return this;
-		return new Set<T>(position,newOp);
+		Ref<AOp<T>> newOp = (Ref<AOp<T>>) func.apply(op);
+		if (op == newOp) return this;
+		return new Set<T>(position, newOp);
 	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (op==null) {
+		if (op == null) {
 			throw new InvalidDataException("Null Set op ", this);
 		}
-		if (position<0) {
-			throw new InvalidDataException("Invalid Local position "+position, this);
+		if (position < 0) {
+			throw new InvalidDataException("Invalid Local position " + position, this);
 		}
 	}
 
@@ -93,7 +106,7 @@ public class Set<T extends ACell> extends AOp<T> {
 	public int getRefCount() {
 		return 1;
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	@Override
 	public Ref<AOp<T>> getRef(int i) {
@@ -110,10 +123,10 @@ public class Set<T extends ACell> extends AOp<T> {
 	public void print(StringBuilder sb) {
 		sb.append(toString());
 	}
-	
+
 	@Override
 	public String toString() {
-		return "(set! %"+position +" "+op.getValue()+")";
+		return "(set! %" + position + " " + op.getValue() + ")";
 	}
 
 }

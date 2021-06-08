@@ -265,6 +265,8 @@ public class Juice {
 
 	public static final long SPECIAL = Juice.CHEAP_OP;
 
+	public static final long SET_BANG = 20;
+
 	/**
 	 * Saturating multiply and add result = a + b * c
 	 * 

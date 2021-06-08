@@ -980,6 +980,13 @@
                        :return Set}]
           :errors {:CAST "If the argument is not a countable data structure."}}
   }
+  
+  set!
+  {:doc {:description "Sets a local binding identified by an unqualified symbol to the given value. This local change will be be visible until the scope leaves the current binding form (e.g. let binding, function body or recur). Fails with an ARGUMENT error if the symbol is qualified. This is probably most useful for updating a local variable in imperative style. Returns the value assigned to the local binding if successful."
+          :examples [{:code "(let [a 10] (set! a 20) a)"}]
+          :type :special	 
+          :signature [{:params [sym value]}]}
+  }
 
   set-controller
   {
@@ -1024,14 +1031,6 @@
           :type :function
           :signature [{:params [map]}]
           :errors {:CAST "If the first argument is not a map."}}
-  }
-
-  set*
-  {
-    :doc {:description "Sets or overwrites a value in the current local lexical bindings. Helper function for the 'set!', which should be preferred in most cases."
-          :examples [{:code "(set* 'a 10)"}]
-          :type :function
-          :signature [{:params [symbol value]}]}
   }
 
   set?

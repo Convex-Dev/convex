@@ -46,9 +46,9 @@ public class ParamTestJuice {
 				{ "(fn [x] x)", eval("(fn [x] x)").getResult(), JUICE_IDENTITY_FN },
 				{ "(do (def a 3) a)", 3L, Juice.DO + Juice.CONSTANT + JUICE_SYM_LOOKUP + Juice.DEF },
 				{ "(do (let [a 1] (def f (fn [] a))) (f))", 1L,
-						Juice.DO + Juice.LET + Juice.CONSTANT * 1 + JUICE_SYM_LOOKUP + JUICE_LOCAL_LOOKUP + JUICE_IDENTITY_FN
+						Juice.DO + Juice.LET + Juice.CONSTANT * 1 + JUICE_SYM_LOOKUP + Juice.LOOKUP + JUICE_IDENTITY_FN
 								+ Juice.DEF },
-				{ "(let [a 1] a)", 1L, Juice.LET + JUICE_LOCAL_LOOKUP + Juice.CONSTANT }, { "~(+ 1 2)", 3L, Juice.CONSTANT }, // compiler
+				{ "(let [a 1] a)", 1L, Juice.LET + Juice.LOOKUP + Juice.CONSTANT }, { "~(+ 1 2)", 3L, Juice.CONSTANT }, // compiler
 																														// executes
 																														// +
 																														// in

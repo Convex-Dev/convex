@@ -1,8 +1,7 @@
 package convex.core.lang.impl;
 
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
-import convex.core.data.Symbol;
+import convex.core.data.AVector;
 import convex.core.lang.AFn;
 
 /**
@@ -14,9 +13,9 @@ public abstract class AClosure<T extends ACell> extends AFn<T> {
 	/**
 	 * Lexical environment saved for this closure
 	 */
-	protected final AHashMap<Symbol, ACell> lexicalEnv;
+	protected final AVector<ACell> lexicalEnv;
 
-	protected AClosure(AHashMap<Symbol, ACell> lexicalEnv) {
+	protected AClosure(AVector<ACell> lexicalEnv) {
 		this.lexicalEnv=lexicalEnv;
 	}
 	
@@ -26,7 +25,7 @@ public abstract class AClosure<T extends ACell> extends AFn<T> {
 	 * @param env New lexical environment to use for this closure
 	 * @return Closure updated with new lexical environment
 	 */
-	public abstract <F extends AClosure<T>> F withEnvironment(AHashMap<Symbol, ACell> env);
+	public abstract <F extends AClosure<T>> F withEnvironment(AVector<ACell> env);
 	
 
 	/**
