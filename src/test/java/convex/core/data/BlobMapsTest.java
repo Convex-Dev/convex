@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import static convex.test.Assertions.assertCVMEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -7,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static convex.test.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 
@@ -141,6 +141,15 @@ public class BlobMapsTest {
 			assertFalse(m.containsKey(lb), "Index: " + lb.toHexString());
 		}
 		assertSame(BlobMaps.empty(), m);
+	}
+	
+	@Test
+	public void testIdentity() {
+		Blob bb = Blob.fromHex("000000000000cafe");
+		LongBlob bl = LongBlob.create(0xcafe);
+		Address ba=Address.create(0xcafe);
+		assertNotEquals(BlobMap.create(bb, bl), BlobMap.create(ba,bl)); // different entry key types
+		assertEquals(BlobMap.create(bb, bl), BlobMap.create(bl,bl)); // same entry key types
 	}
 
 	@Test
