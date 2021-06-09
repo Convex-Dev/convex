@@ -128,11 +128,6 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	}
 
 	@Override
-	public int hashCode() {
-		return name.hashCode();
-	}
-
-	@Override
 	public int compareTo(Keyword k) {
 		return name.compareTo(k.name);
 	}

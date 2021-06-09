@@ -38,6 +38,11 @@ public abstract class ASymbolic extends ACell {
 		// We have a valid name
 		return true;
 	}
+	
+	@Override
+	public final int hashCode() {
+		return name.hashCode();
+	}
 
 	/**
 	 * Validates the name of this Symbolic value

@@ -84,11 +84,6 @@ public class Symbol extends ASymbolic {
 	}
 
 	@Override
-	public int hashCode() {
-		return name.hashCode();
-	}
-
-	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.SYMBOL;
 		return encodeRaw(bs,pos);
@@ -143,15 +138,6 @@ public class Symbol extends ASymbolic {
 	@Override
 	public int getRefCount() {
 		return 0;
-	}
-
-	/**
-	 * Returns true if the symbol starts with an asterisk '*' and is therefore potentially a special symbol.
-	 * 
-	 * @return True is potentially special, false otherwise.
-	 */
-	public boolean maybeSpecial() {
-		return name.charAt(0)=='*';
 	}
 
 	@Override
