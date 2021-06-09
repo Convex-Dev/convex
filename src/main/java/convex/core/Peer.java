@@ -454,4 +454,8 @@ public class Peer {
 	public AVector<State> asOfRange(CVMLong timestamp, long interval, int count) {
 		return Utils.statesAsOfRange(states, timestamp, interval, count);
 	}
+
+	public Hash getNetworkID() {
+		return getStates().get(0).getHash();
+	}
 }

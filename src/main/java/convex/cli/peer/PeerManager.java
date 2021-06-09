@@ -181,7 +181,7 @@ public class PeerManager implements IServerEvent {
 		});
 
 		Server firstServer = peerServerList.get(0);
-		System.out.println("Starting network Id: "+ firstServer.getNetworkId().toString());
+		System.out.println("Starting network Id: "+ firstServer.getNetworkID().toString());
 		while (true) {
 			try {
 				ServerInformation serverInformation = serverEventQueue.take();

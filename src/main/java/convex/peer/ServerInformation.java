@@ -39,7 +39,7 @@ public class ServerInformation {
 		connectionCount = manager.getConnectionCount();
 		trustedConnectionCount = manager.getTrustedConnectionCount();
 		isSynced =  order != null;
-		networkId = server.getNetworkId();
+		networkId = server.getNetworkID();
 		isJoined = networkId != null;
 		consensusPoint = peer.getConsensusPoint();
 		stateHash = peer.getConsensusState().getHash();

@@ -9,13 +9,11 @@ import java.util.logging.Logger;
 import convex.core.Init;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
-import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
-import convex.peer.IServerEvent;
 
 
 /**
@@ -110,8 +108,6 @@ public class API {
 		}
 
 		Server genesisServer = serverList.get(0);
-		Hash networkId = genesisServer.getNetworkId();
-		genesisServer.setNetworkId(networkId);
 
 		// go through 1..count-1 peers and join them all to peer #0
 		// do this twice to allow for all of the peers to get all of the address in the group of peers

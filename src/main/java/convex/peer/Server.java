@@ -185,7 +185,7 @@ public class Server implements Closeable {
 	/**
 	 * Network Id or the initialStateHash of the network. This is unique to all networks
 	 */
-	private Hash networkId;         // or intialStateHash of the network
+	private final Hash networkID;         // or intialStateHash of the network
 
 	private IServerEvent event = null;
 
@@ -208,6 +208,8 @@ public class Server implements Closeable {
 			this.peer = establishPeer(keyPair, config);
 
 			nio = NIOServer.create(this, receiveQueue);
+			
+			this.networkID=peer.getNetworkID();
 
 		} finally {
 			Stores.setCurrent(savedStore);
@@ -365,10 +367,11 @@ public class Server implements Closeable {
 		//Hash beliefHash = (Hash) values.get(0);
 		//Hash stateHash = (Hash) values.get(1);
 
-		// TODO
 		// check the initStateHash to see if this is the network we want to join?
-		networkId = RT.ensureHash(values.get(2));
-		// networkId = Hash.wrap((Blob) values.get(2));
+		Hash remoteNetworkID = RT.ensureHash(values.get(2));
+		if (!Utils.equals(getNetworkID(),remoteNetworkID)) {
+			throw new Error("Failed to join network, we want Network ID "+getNetworkID()+" but remote Peer repoerted "+remoteNetworkID);
+		}
 
 
 		AHashMap<ABlob, AString> buildPeerList = (AHashMap<ABlob, AString>) values.get(3);
@@ -407,7 +410,7 @@ public class Server implements Closeable {
 
 		raiseServerChange();
 
-		return (networkId != null);
+		return (networkID != null);
 	}
 
 	/**
@@ -761,11 +764,11 @@ public class Server implements Closeable {
 
 			// check to see if we are both want to connect to the same network
 			Hash networkId = RT.ensureHash(challengeValues.get(1));
-			if (networkId == null || this.networkId == null) {
+			if (networkId == null || this.networkID == null) {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge data has no networkId");
 				return;
 			}
-			if ( !networkId.equals(this.networkId)) {
+			if ( !networkId.equals(this.networkID)) {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge data has incorrect networkId");
 				return;
 			}
@@ -816,7 +819,7 @@ public class Server implements Closeable {
 
 			// check to see if we are both want to connect to the same network
 			Hash networkId = RT.ensureHash(responseValues.get(1));
-			if ( networkId == null || !networkId.equals(this.networkId)) {
+			if ( networkId == null || !networkId.equals(this.networkID)) {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "response data has incorrect networkId");
 				return;
 			}
@@ -1066,7 +1069,7 @@ public class Server implements Closeable {
 			try {
 
 				// wait for server to join network
-				while(networkId == null && isRunning) {
+				while(networkID == null && isRunning) {
 					Thread.sleep(1000);
 				}
 
@@ -1095,7 +1098,7 @@ public class Server implements Closeable {
 						// System.out.println(getHostname() + " " + manager.getConnections().size());
 
 						// send out a challenge to a peer that is not yet trusted, only if we have a valid networkId
-						if (networkId != null) {
+						if (networkID != null) {
 							// clear out any old challenges
 							challengeList.clear();
 							// requestChallenges();
@@ -1267,7 +1270,7 @@ public class Server implements Closeable {
 			byte bytes[] = new byte[120];
 			random.nextBytes(bytes);
 			Hash token = Blob.create(bytes).getHash();
-			values = Vectors.of(token, networkId, peerKey);
+			values = Vectors.of(token, networkID, peerKey);
 			SignedData<ACell> challenge = peer.sign(values);
 			connection.sendChallenge(challenge);
 			// raiseServerMessage("sending challenge to: " + Utils.toFriendlyHexString(peerKey.toHexString()));
@@ -1311,12 +1314,8 @@ public class Server implements Closeable {
 		}
 	}
 
-	public Hash getNetworkId() {
-		return getPeer().getStates().get(0).getHash();
-	}
-
-	public void setNetworkId(Hash value) {
-		networkId = value;
+	public Hash getNetworkID() {
+		return networkID;
 	}
 
 	public ServerInformation getServerInformation() {
