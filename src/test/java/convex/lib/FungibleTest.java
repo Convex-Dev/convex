@@ -232,8 +232,9 @@ public class FungibleTest {
 	
 	/**
 	 * Generic tests for a fungible token. User account should have some of fungible token and sufficient coins.
-	 * @param ctx
-	 * @param fun
+	 * @param ctx Initial Context. Will be forked.
+	 * @param token Fungible token Address
+	 * @param user User Address
 	 */
 	public static void doFungibleTests (Context<?> ctx, Address token, Address user) {
 		ctx=ctx.forkWithAddress(user);

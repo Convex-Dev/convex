@@ -240,6 +240,10 @@ public class TestState {
 	/**
 	 * Runs an execution step as a different address. Returns value after restoring
 	 * the original address.
+	 * @param address Address to run as
+	 * @param c Initial Context. Will not be modified.
+	 * @param source Source form to execute
+	 * @return Updated context
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> Context<T> stepAs(Address address, Context<?> c, String source) {

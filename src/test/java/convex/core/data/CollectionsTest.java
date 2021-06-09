@@ -18,6 +18,7 @@ public class CollectionsTest {
 
 	/**
 	 * Generic tests for any sequence
+	 * @param a Any Sequence Value
 	 */
 	public static <T extends ACell> void doSequenceTests(ASequence<T> a) {
 		long n = a.count();
@@ -51,6 +52,7 @@ public class CollectionsTest {
 
 	/**
 	 * Generic tests for any data structure
+	 * @param a Any Data Structure
 	 */
 	public static <T extends ACell> void doDataStructureTests(ADataStructure<T> a) {
 		long n = a.count();
@@ -63,6 +65,7 @@ public class CollectionsTest {
 
 	/**
 	 * Generic tests for any collection
+	 * @param a Any Collection
 	 */
 	public static <T extends ACell> void doCollectionTests(ACollection<T> a) {
 		Iterator<T> it = a.iterator();
@@ -73,6 +76,7 @@ public class CollectionsTest {
 
 	/**
 	 * Generic tests for any map
+	 * @param a Any Map
 	 */
 	public static <K extends ACell, V extends ACell> void doMapTests(AMap<K, V> a) {
 		long n = a.count();
@@ -113,6 +117,7 @@ public class CollectionsTest {
 
 	/**
 	 * Generic tests for any set
+	 * @param a Any Set
 	 */
 	public static <V extends ACell> void doSetTests(ASet<V> a) {
 		doCollectionTests(a);

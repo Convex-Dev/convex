@@ -52,7 +52,7 @@ public class PeerManager {
 	 * @param count Number of peers to launch.
 	 *
 	 * @param keyPairs Array of keyPairs for each peer. The length of the array must be >= the count of peers to launch.
-	 *
+	 * @param peerAddress Address to use to manage Peers
 	 */
 	public void launchLocalPeers(int count, AKeyPair[] keyPairs, Address peerAddress) {
 		peerServerList.clear();

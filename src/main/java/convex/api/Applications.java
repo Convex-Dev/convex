@@ -5,8 +5,10 @@ public class Applications {
 	/**
 	 * Helper function to launch a different JVM process with the same classpath.
 	 * 
+	 * @param c Main class to launch
+	 * @param args Command line args for launched process
 	 * @return Process instance that can be used to observe exit value etc.
-	 * 
+	 * @throws Exception 
 	 */
 	public static Process launchApp(Class<?> c, String... args) throws Exception {
 		// construct path to java executable

@@ -206,7 +206,7 @@ public class Etch {
 	
 	/**
 	 * Create an Etch instance using a temporary file with a specific file prefix.
-	 * @param temporary file prefix to use
+	 * @param prefix temporary file prefix to use
 	 * @return The new Etch instance
 	 * @throws IOException
 	 */	
@@ -293,6 +293,7 @@ public class Etch {
 	 * 
 	 * @param key A key value (typically the Hash)
 	 * @param value Value data to associate with the key
+	 * @return Ref after writing to store
 	 * @throws IOException
 	 */
 	public synchronized Ref<ACell> write(AArrayBlob key, Ref<ACell> value) throws IOException {

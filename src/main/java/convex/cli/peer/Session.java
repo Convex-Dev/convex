@@ -18,7 +18,7 @@ public class Session {
 	 * Load a session data from file.
 	 *
 	 * @param filename Filename of the session file to load.
-	 *
+	 * @throws IOException 
 	 */
 	public void load(File filename) throws IOException  {
 		if (filename.exists()) {

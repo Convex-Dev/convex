@@ -27,6 +27,7 @@ public class VLCEncodingTest {
 	/**
 	 * Test the assumption that MAX_MESSAGE_LENGTH is the largest length that can be
 	 * VLC encoded in 2 bytes
+	 * @throws BadFormatException 
 	 */
 	@Test
 	public void testVLCLength() throws BadFormatException {
