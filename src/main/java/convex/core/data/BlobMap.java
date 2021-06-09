@@ -232,7 +232,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 				return new BlobMap(c.getPrefix(), depth, (c.depth + c.prefixLength) - depth, c.entry, c.children, c.mask,
 						count - 1);
 			} else {
-				// Clearing current entry, keeping existing children
+				// Clearing current entry, keeping existing children (must be 2+)
 				return new BlobMap(prefix, depth, prefixLength, null, children, mask, count - 1);
 			}
 		}
@@ -420,7 +420,9 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 						return null;
 					}
 				}
-
+				if (n==0) {
+					System.out.print("BlobMap Bad!");
+				}
 				newChildren = new Ref[n - 1];
 				short newMask = (short) (mask & ~(1 << childDigit));
 				System.arraycopy(children, 0, newChildren, 0, delPos); // earlier entries
@@ -463,14 +465,14 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		BlobMap<K, V> r=this;
 		if ((entry!=null)&&!pred.test(entry.getValue())) r=r.dissoc(entry.getKey());
 		for (int i=0; i<16; i++) {
-			BlobMap<K,V> oldChild=getChild(i);
+			if (r==null) break; // might be null from dissoc
+			BlobMap<K,V> oldChild=r.getChild(i);
 			if (oldChild==null) continue;
 			BlobMap<K,V> newChild=oldChild.filterValues(pred);
 			r=r.withChild(i, oldChild, newChild);
-			if (r==null) break;
 		}
 		// check if whole blobmap was emptied
-		if ((r==null)&&(depth==0)) r= empty();
+		if ((r==null)&&(depth==0)) r=empty();
 		return r;
 	}
 

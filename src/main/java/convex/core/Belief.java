@@ -246,7 +246,7 @@ public class Belief extends ARecord {
 		});
 		assert (filteredOrders.get(myAddress).getValue() == myOrder);
 
-		// get the consensus state from my current chain
+		// get the consensus state from this Peer's current chain
 		// this is needed for peer weights: we only trust peers who have stake in the
 		// current consensus!
 		State votingState = mc.getConsensusState();
@@ -392,6 +392,7 @@ public class Belief extends ARecord {
 		HashSet<Block> newBlocks = new HashSet<>();
 		ArrayList<Block> newBlocksOrdered = new ArrayList<>();
 		for (AVector<Block> blks : orders) {
+			if (blks.count()<=consensusPoint) continue;
 			Iterator<Block> it = blks.listIterator(consensusPoint);
 			while (it.hasNext()) {
 				Block b = it.next();
@@ -429,8 +430,8 @@ public class Belief extends ARecord {
 			for (Map.Entry<AVector<Block>, Double> me : votingOrders.entrySet()) {
 				AVector<Block> blocks = me.getKey();
 				long cCount = blocks.count();
-				assert (cCount >= point); // shouldn't be possible for a Order to be behind the current point
-				if (cCount == point) continue; // skip chain with no more blocks: cannot win this round
+
+				if (cCount <= point) continue; // skip chain with no more blocks: cannot win this round
 
 				Block b = blocks.get(point);
 
