@@ -520,8 +520,7 @@ public class Convex {
 	 * Submits a status request to the Convex network peer, returning a Future once the
 	 * request has been successfully queued.
 	 *
-	 * @param query Query to execute, as a Form or Op
-	 * @return A Future for the result of the query
+	 * @return A Future for the result of the requestStatus
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
 	public Future<Result> requestStatus() throws IOException {
@@ -539,6 +538,35 @@ public class Convex {
 
 		return cf;
 	}
+
+	/**
+	 * Request a challenge. This is request is made by any peer that needs to find out
+	 * if another peer can be trusted.
+	 *
+	 * @param data Signed data to send to the peer for the challenge.
+	 *
+	 * @return A Future for the result of the requestChallenge
+	 *
+	 * @throws IOException if the connection fails.
+	 *
+	 */
+	public Future<Result> requestChallenge(SignedData<ACell> data) throws IOException {
+
+		CompletableFuture<Result> cf = new CompletableFuture<Result>();
+
+		synchronized (awaiting) {
+			long id = connection.sendChallenge(data);
+			if (id < 0) {
+				throw new IOException("Failed to send challenge due to full buffer");
+			}
+
+			// Store future for completion by result message
+			awaiting.put(id, cf);
+		}
+
+		return cf;
+	}
+
 
 	/**
 	 * Submits a query to the Convex network, returning a Future once the query has

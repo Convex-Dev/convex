@@ -11,31 +11,31 @@ import convex.core.transactions.ATransaction;
 
 /**
  * Node representing a signed data object.
- * 
+ *
  * A signed data object encapsulates:
  * <ul>
  * <li>An Address that identifies the signer</li>
  * <li>A digital signature </li>
  * <li>An underlying data data object that has been signed.</li>
  * </ul>
- * 
+ *
  * The SignedData instance is considered <b>valid</b> if the signature can be successfully validated for
  * the given Address and data object, and if so can be taken as a cryptographic proof that the signature
  * was created by someone in possession of the corresponding private key.
- * 
+ *
  * Note we currently go via a Ref here for a few reasons: - It guarantees we
  * have a hash for signing - It makes the SignedData object
  * implementation/representation independent of the value type - It creates a
  * possibility of structural sharing for transaction values excluding signatures
- * 
- * Binary representation: 
+ *
+ * Binary representation:
  * <ol>
  * <li>1 byte - Message.SIGNED_DATA tag </li>
  * <li>20/32 bytes - Address of signer</li>
  * <li>64 bytes - raw Signature data</li>
  * <li>32 bytes - Data hash (raw Ref)</li>
  * </ol>
- * 
+ *
  * SECURITY: signing requires presence of a local keypair TODO: SECURITY: any
  * persistence forces validation of Signature??
  *
@@ -45,7 +45,7 @@ public class SignedData<T extends ACell> extends ACell {
 	private final Ref<T> valueRef;
 	private final ASignature signature;
 	private final AccountKey address;
-	
+
 	/**
 	 * Validated flag. Not part of data representation: serves to avoid unnecessary re-validation.
 	 */
@@ -57,14 +57,14 @@ public class SignedData<T extends ACell> extends ACell {
 		signature = sig;
 		this.validated=validated;
 	}
-	
+
 	private SignedData(Ref<T> ref, AccountKey address, ASignature sig) {
 		this(ref,address,sig,false); // SECURITY: assume not validated unless specified
 	}
 
 	/**
 	 * Signs a data value Ref with the given keypair.
-	 * 
+	 *
 	 * @param keyPair The public/private key pair of the signer.
 	 * @param ref     Ref to the data to sign
 	 * @return SignedData object signed with the given key-pair
@@ -82,7 +82,7 @@ public class SignedData<T extends ACell> extends ACell {
 
 	/**
 	 * Creates a SignedData object with the given parameters. Not assumed to be valid.
-	 * 
+	 *
 	 * @param address Public Address of the signer
 	 * @param sig     Signature of the supplied data
 	 * @param ref     Ref to the data that has been signed
@@ -93,7 +93,7 @@ public class SignedData<T extends ACell> extends ACell {
 		// if (!check) throw new ValidationException("Invalid signature: "+sig);
 		return new SignedData<T>(ref, address, sig);
 	}
-	
+
 
 	public static SignedData<ATransaction> create(AKeyPair kp, ASignature sig, Ref<ATransaction> ref) {
 
@@ -103,7 +103,7 @@ public class SignedData<T extends ACell> extends ACell {
 
 	/**
 	 * Gets the signed value object encapsulated by this SignedData object.
-	 * 
+	 *
 	 * @return Data value that has been signed
 	 * @throws BadSignatureException
 	 */
@@ -115,7 +115,7 @@ public class SignedData<T extends ACell> extends ACell {
 	/**
 	 * Gets the value object encapsulated by this SignedData object, without
 	 * checking if the signature is correct
-	 * 
+	 *
 	 * @return Data value that has been signed
 	 */
 	public T getValueUnchecked() {
@@ -126,7 +126,7 @@ public class SignedData<T extends ACell> extends ACell {
 	 * Gets the public key of the signer. If the signature is valid, this
 	 * represents a cryptographic proof that the signer was in possession of the
 	 * private key of this address.
-	 * 
+	 *
 	 * @return Public Key of signer.
 	 */
 	public AccountKey getAccountKey() {
@@ -135,7 +135,7 @@ public class SignedData<T extends ACell> extends ACell {
 
 	/**
 	 * Gets the Signature that formed part of this SignedData object
-	 * 
+	 *
 	 * @return Signature instance
 	 */
 	public ASignature getSignature() {
@@ -155,16 +155,16 @@ public class SignedData<T extends ACell> extends ACell {
 		pos = valueRef.encode(bs,pos);
 		return pos;
 	}
-	
+
 	@Override
 	public int estimatedEncodingSize() {
-		
+
 		return 10+AccountKey.LENGTH+64+Format.MAX_EMBEDDED_LENGTH;
 	}
 
 	/**
 	 * Reads a SignedData instance from the given ByteBuffer
-	 * 
+	 *
 	 * @param data A ByteBuffer containing
 	 * @return A SignedData object
 	 * @throws BadFormatException
@@ -178,8 +178,8 @@ public class SignedData<T extends ACell> extends ACell {
 	}
 
 	/**
-	 * Validates the signature in this SignedData instance. 
-	 * 
+	 * Validates the signature in this SignedData instance.
+	 *
 	 * @return true if valid, false otherwise
 	 */
 	public boolean checkSignature() {
@@ -200,7 +200,7 @@ public class SignedData<T extends ACell> extends ACell {
 	public boolean isCanonical() {
 		return true;
 	}
-	
+
 	@Override public final boolean isCVMValue() {
 		return false;
 	}
@@ -232,7 +232,7 @@ public class SignedData<T extends ACell> extends ACell {
 		sb.append(":data "+valueRef.getHash().toString());
 		sb.append("}");
 	}
-	
+
 	@Override
 	public void print(StringBuilder sb) {
 		sb.append("{");
@@ -255,10 +255,10 @@ public class SignedData<T extends ACell> extends ACell {
 	public Ref<T> getDataRef() {
 		return valueRef;
 	}
-	
+
 	/**
 	 * Checks if this SignedData has a valid signature.
-	 * 
+	 *
 	 * @return true if the Signature is valid for the given data, false otherwise.
 	 */
 	public boolean isValid() {

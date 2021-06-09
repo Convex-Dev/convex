@@ -3,6 +3,7 @@ package convex.peer;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -33,11 +34,19 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.data.ABlob;
+import convex.core.data.ABlobMap;
+import convex.core.data.AHashMap;
+import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.Blob;
+import convex.core.data.ABlobMap;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.data.MapLeaf;
+import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
@@ -96,6 +105,7 @@ public class Server implements Closeable {
 	private static final Level LEVEL_SERVER = Level.FINER;
 	private static final Level LEVEL_DATA = Level.FINEST;
 	private static final Level LEVEL_PARTIAL = Level.WARNING;
+	private static final Level LEVEL_CHALLENGE_RESPONSE = Level.FINEST;
 	private static final Level LEVEL_INFO = Level.FINER;
 	// private static final Level LEVEL_MESSAGE = Level.FINER;
 
@@ -166,9 +176,25 @@ public class Server implements Closeable {
 	 */
 	private HashMap<AccountKey, SignedData<Belief>> newBeliefs = new HashMap<>();
 
+	/**
+	 * The list of challenges that are being made to remote peers
+	 */
+	private HashMap<AccountKey, AVector<ACell>> challengeList = new HashMap<>();
+
+	/**
+	 * Hostname of the peer server.
+	 */
 	private String hostname;
 
-	private Server(HashMap<Keyword, Object> config) {
+	/**
+	 * Network Id or the initialStateHash of the network. This is unique to all networks
+	 */
+	private Hash networkId;         // or intialStateHash of the network
+
+	private IServerEvent event = null;
+
+	private Server(HashMap<Keyword, Object> config, IServerEvent event) {
+		this.event = event;
 		AStore configStore = (AStore) config.get(Keywords.STORE);
 		this.store = (configStore == null) ? Stores.getGlobalStore() : configStore;
 
@@ -180,8 +206,8 @@ public class Server implements Closeable {
 		try {
 			Stores.setCurrent(store);
 			this.config = config;
+			// now setup the connection manager
 			this.manager = new ConnectionManager(config);
-
 
 			this.peer = establishPeer(keyPair, config);
 
@@ -216,7 +242,20 @@ public class Server implements Closeable {
 	 * @return
 	 */
 	public static Server create(HashMap<Keyword, Object> config) {
-		return new Server(config);
+		return create(config, null);
+	}
+
+	/**
+	 * Creates a Server with a given config. Reference to config is kept: don't
+	 * mutate elsewhere.
+	 *
+	 * @param config
+	 *
+	 * @param event Event interface where the server will send information about the peer
+	 * @return
+	 */
+	public static Server create(HashMap<Keyword, Object> config, IServerEvent event) {
+		return new Server(config, event);
 	}
 
 	/**
@@ -241,17 +280,21 @@ public class Server implements Closeable {
 		return hostname;
 	}
 
-	public AVector<AString> getHostnameList() {
-		ArrayList<AString> result = new ArrayList<AString>();
+	public AHashMap<AccountKey, AString> getPeerStatusConnectList() {
+		AMap<AccountKey, AString> result = Maps.empty();
+		if (getHostname() != null) {
+			result = result.assoc(peer.getPeerKey(), Strings.create(getHostname()));
+		}
 		State state = peer.getConsensusState();
-		for (AccountKey peerKey: state.getPeers().keySet()) {
+		for ( ABlob key: state.getPeers().keySet()) {
+			AccountKey peerKey = RT.ensureAccountKey(key);
 			PeerStatus peerStatus = state.getPeer(peerKey);
 			AString hostname = peerStatus.getHostname();
 			if (hostname != null) {
-				result.add(hostname);
+				result = result.assoc(peerKey, hostname);
 			}
 		}
-		return Vectors.of(result.toArray());
+		return (AHashMap<AccountKey, AString>) result;
 	}
 
 	public synchronized void launch() {
@@ -298,44 +341,77 @@ public class Server implements Closeable {
 	}
 
 	@SuppressWarnings("unchecked")
-	public void joinNetwork(AKeyPair keyPair, Address address, String remoteHostname) {
-		if (remoteHostname != null) {
-			InetSocketAddress remotePeerAddress = Utils.toInetSocketAddress(remoteHostname);
+	public boolean joinNetwork(AKeyPair keyPair, Address address, String remoteHostname) {
+		if (remoteHostname == null) {
+			return false;
+		}
+		InetSocketAddress remotePeerAddress = Utils.toInetSocketAddress(remoteHostname);
+		int retryCount = 5;
+		Convex convex = null;
+		Result result = null;
+		while (retryCount > 0) {
 			try {
-				Convex convex = Convex.connect(remotePeerAddress, address, keyPair);
+				convex = Convex.connect(remotePeerAddress, address, keyPair);
 				Future<Result> cf =  convex.requestStatus();
-				Result result = cf.get(5000, TimeUnit.MILLISECONDS);
-				AVector<ACell> values = result.getValue();
-				//Hash beliefHash = (Hash) values.get(0);
-				//Hash stateHash = (Hash) values.get(1);
+				result = cf.get(2000, TimeUnit.MILLISECONDS);
+				retryCount = 0;
+			} catch (IOException | InterruptedException | ExecutionException | TimeoutException e ) {
+				// raiseServerMessage("unable to connect to remote peer at " + remoteHostname + ". Retrying " + e);
+				retryCount --;
+			}
+		}
+		if (result == null) {
+			log.log(LEVEL_SERVER, "Failed to join network: Cannot connect to another remote peer.");
+			return false;
+		}
 
-				// TODO
-				// check the initStateHash to see if this is the network we want to join?
-				// Hash initialStateHash = (Hash) values.get(2);
+		AVector<ACell> values = result.getValue();
+		//Hash beliefHash = (Hash) values.get(0);
+		//Hash stateHash = (Hash) values.get(1);
 
-				AVector<AString> statusPeerHostnameList = (AVector<AString>) values.get(3);
+		// TODO
+		// check the initStateHash to see if this is the network we want to join?
+		networkId = RT.ensureHash(values.get(2));
+		// networkId = Hash.wrap((Blob) values.get(2));
 
+
+		AHashMap<ABlob, AString> buildPeerList = (AHashMap<ABlob, AString>) values.get(3);
+
+		AHashMap<AccountKey, AString> statusPeerList = Maps.empty();
+
+		for ( ABlob key: buildPeerList.keySet()) {
+			AccountKey accountKey = RT.ensureAccountKey(key);
+			statusPeerList = statusPeerList.assoc(accountKey, buildPeerList.get(key));
+		}
+
+		retryCount = 5;
+		result = null;
+		while ( retryCount > 0) {
+			try {
 				// set our peer hostname on the network
 				String transactionCommand = String.format("(set-peer-data {:url \"%s\"})", getHostname());
 				ACell message = Reader.read(transactionCommand);
 				ATransaction transaction = Invoke.create(address, -1, message);
-				result = convex.transactSync(transaction, 50000);
-				// TODO
-				// check result to see if it the peer hostname was set
-				convex.close();
-
-				// connect to the only peer we know exists
-				connectToPeer(remoteHostname, remotePeerAddress);
-
-				// now use the remote peer host name list returned from the status call
-				// to connect to the peers
-				connectToRemotePeers(statusPeerHostnameList);
-
-			} catch (IOException | InterruptedException | ExecutionException | TimeoutException e ) {
-				// TODO: maybe abort trying to connect to this Peer?
-				log.info(getHostname() + " is unable to connect to remote peer at " + remoteHostname + " " + e);
+				result = convex.transactSync(transaction, 2000);
+				retryCount = 0;
+			} catch (IOException | TimeoutException e ) {
+				// raiseServerMessage("retrying to register this peer with the network " + e);
+				retryCount --;
 			}
 		}
+		convex.close();
+
+		if ( result == null) {
+			raiseServerMessage("unable to register this peer with the network");
+			return false;
+		}
+		// now use the remote peer host name list returned from the status call
+		// to connect to the peers
+		connectToPeers(statusPeerList);
+
+		raiseServerChange();
+
+		return (networkId != null);
 	}
 
 	/**
@@ -355,6 +431,7 @@ public class Server implements Closeable {
 				processBelief(m);
 				break;
 			case CHALLENGE:
+				processChallenge(m);
 				break;
 			case COMMAND:
 				break;
@@ -368,6 +445,7 @@ public class Server implements Closeable {
 				processQuery(m);
 				break;
 			case RESPONSE:
+				processResponse(m);
 				break;
 			case RESULT:
 				break;
@@ -533,7 +611,8 @@ public class Server implements Closeable {
 			ACell o = r.getValue();
 			if (o == belief) return; // skip sending data for belief cell itself, will be BELIEF payload
 			Message msg = Message.createData(o);
-			manager.broadcast(msg);
+            // broadcast to all peers trusted or not
+			manager.broadcast(msg, false);
 		};
 
 		// persist the state of the Peer, announcing the new Belief
@@ -542,7 +621,8 @@ public class Server implements Closeable {
 		// Broadcast latest Belief to connected Peers
 		SignedData<Belief> sb = peer.getSignedBelief();
 		Message msg = Message.createBelief(sb);
-		manager.broadcast(msg);
+        // at the moment broadcast to all peers trusted or not
+		manager.broadcast(msg, false);
 
 		// Report transaction results
 		long newConsensusPoint = peer.getConsensusPoint();
@@ -645,14 +725,168 @@ public class Server implements Closeable {
 			Hash beliefHash=peer.getSignedBelief().getHash();
 			Hash stateHash=peer.getStates().getHash();
 			Hash initialStateHash=peer.getStates().get(0).getHash();
-			AVector<AString> peerHostnameList = getHostnameList();
+			AHashMap<AccountKey, AString> peerList = getPeerStatusConnectList();
 
-			// TODO Revisit
-			AVector<ACell> reply=Vectors.of(beliefHash,stateHash,initialStateHash,peerHostnameList);
+			AVector<ACell> reply=Vectors.of(beliefHash,stateHash,initialStateHash,peerList);
 
 			pc.sendResult(m.getID(), reply);
 		} catch (Throwable t) {
 			log.warning("Status Request Error: " + t);
+		}
+	}
+
+	private void processChallenge(Message m) {
+		try {
+			SignedData<ACell> signedData = m.getPayload();
+			if ( signedData == null) {
+				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge bad message data sent");
+				return;
+			}
+			AVector<ACell> challengeValues = (AVector<ACell>) signedData.getValue();
+
+			if (challengeValues == null || challengeValues.size() != 3) {
+				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge data incorrect number of items should be 3 not " + challengeValues.size());
+				return;
+			}
+			Connection pc = m.getPeerConnection();
+			if ( pc == null) {
+				log.log(LEVEL_CHALLENGE_RESPONSE, "No remote peer connection from challenge");
+				return;
+			}
+			log.log(LEVEL_CHALLENGE_RESPONSE, "Processing challenge request from: " + pc.getRemoteAddress());
+
+
+			// get the token to respond with
+			Hash token = RT.ensureHash(challengeValues.get(0));
+			if (token == null) {
+				log.log(LEVEL_CHALLENGE_RESPONSE, "no challenge token provided");
+				return;
+			}
+
+			// check to see if we are both want to connect to the same network
+			Hash networkId = RT.ensureHash(challengeValues.get(1));
+			if (networkId == null || this.networkId == null) {
+				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge data has no networkId");
+				return;
+			}
+			if ( !networkId.equals(this.networkId)) {
+				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge data has incorrect networkId");
+				return;
+			}
+			// check to see if the challenge is for this peer
+			AccountKey toPeer = RT.ensureAccountKey(challengeValues.get(2));
+			if (toPeer == null) {
+				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge data has no toPeer address");
+				return;
+			}
+			if ( !toPeer.equals(peer.getPeerKey())) {
+				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge data has incorrect addressed peer");
+				return;
+			}
+
+			// get who sent this challenge
+			AccountKey fromPeer = signedData.getAccountKey();
+
+			// send the signed response back
+			AVector<ACell> responseValues = Vectors.of(token, networkId, fromPeer, signedData.getHash());
+
+			SignedData<ACell> response = peer.sign(responseValues);
+			pc.sendResponse(response);
+
+		} catch (Throwable t) {
+			log.warning("Challenge Error: " + t);
+			// t.printStackTrace();
+		}
+	}
+
+	private void processResponse(Message m) {
+		try {
+			SignedData<ACell> signedData = m.getPayload();
+
+			AVector<ACell> responseValues = (AVector<ACell>) signedData.getValue();
+
+			if (responseValues.size() != 4) {
+				log.log(LEVEL_CHALLENGE_RESPONSE, "response data incorrect number of items should be 4 not " + responseValues.size());
+				return;
+			}
+
+
+			// get the signed token
+			Hash token = RT.ensureHash(responseValues.get(0));
+			if (token == null) {
+				log.log(LEVEL_CHALLENGE_RESPONSE, "no response token provided");
+				return;
+			}
+
+			// check to see if we are both want to connect to the same network
+			Hash networkId = RT.ensureHash(responseValues.get(1));
+			if ( networkId == null || !networkId.equals(this.networkId)) {
+				log.log(LEVEL_CHALLENGE_RESPONSE, "response data has incorrect networkId");
+				return;
+			}
+			// check to see if the challenge is for this peer
+			AccountKey toPeer = RT.ensureAccountKey(responseValues.get(2));
+			if ( toPeer == null || !toPeer.equals(peer.getPeerKey())) {
+				log.log(LEVEL_CHALLENGE_RESPONSE, "response data has incorrect addressed peer");
+				return;
+			}
+
+			// hash sent by the response
+			Hash challengeHash = RT.ensureHash(responseValues.get(3));
+
+			// get who sent this challenge
+			AccountKey fromPeer = signedData.getAccountKey();
+
+
+			if ( !challengeList.containsKey(fromPeer)) {
+				log.log(LEVEL_CHALLENGE_RESPONSE, "response from an unkown challenge");
+				return;
+			}
+			synchronized(challengeList) {
+
+				// get the challenge data we sent out for this peer
+				AVector<ACell> challengeValues = (AVector<ACell>) challengeList.get(fromPeer);
+
+				Hash challengeToken = RT.ensureHash(challengeValues.get(0));
+				if (!challengeToken.equals(token)) {
+					log.log(LEVEL_CHALLENGE_RESPONSE, "invalid response token sent");
+					return;
+				}
+
+				Hash challengeNetworkId = RT.ensureHash(challengeValues.get(1));
+				if (!challengeNetworkId.equals(networkId)) {
+					log.log(LEVEL_CHALLENGE_RESPONSE, "invalid response networkId");
+					return;
+				}
+
+				AccountKey challengeFromPeer = RT.ensureAccountKey(challengeValues.get(2));
+				if (!signedData.getAccountKey().equals(challengeFromPeer)) {
+					log.warning("response key does not match requested key, sent from a different peer");
+					return;
+				}
+
+				// hash sent by this peer for the challenge
+				Hash challengeSourceHash = challengeValues.getHash();
+				if ( !challengeHash.equals(challengeHash)) {
+					log.log(LEVEL_CHALLENGE_RESPONSE, "response hash of the challenge does not match");
+					return;
+				}
+
+				Connection pc = m.getPeerConnection();
+				// log.log(LEVEL_CHALLENGE_RESPONSE, "Processing response request from: " + pc.getRemoteAddress());
+
+				pc.setTrustedPeerKey(fromPeer);
+
+				// raiseServerMessage(" now trusts peer: " + Utils.toFriendlyHexString(fromPeer.toHexString()));
+
+				// remove from list incase this fails, we can generate another challenge
+				challengeList.remove(fromPeer);
+
+			}
+			raiseServerChange();
+
+		} catch (Throwable t) {
+			log.warning("Response Error: " + t);
 		}
 	}
 
@@ -834,27 +1068,43 @@ public class Server implements Closeable {
 		public void run() {
 			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
 			try {
-				Thread.sleep(100);
 
+				// wait for server to join network
+				while(networkId == null && isRunning) {
+					Thread.sleep(1000);
+				}
+
+				raiseServerMessage("joined network " + hostname);
 				// loop while the server is running
-				long lastConsensusPoint = peer.getConsensusPoint();
+				long lastConsensusPoint = 0;
                 Order lastOrder = null;
 				while (isRunning) {
 
 					Order order=peer.getPeerOrder();
 					// TODO: think about behaviour when the Peer leaves or joins. Should Server continue running?
 					if (order==null && lastOrder!=null) {
-						// System.out.println(getHostname() + " has left the network");
+						// raiseServerMessage("is out of sync with the network");
 					}
 					if (order!=null && lastOrder==null) {
 						// System.out.println(getHostname() + " has joined the network");
+						///raiseServerMessage("is in sync with the network");
 					}
 					lastOrder = order;
 					if ( lastConsensusPoint != peer.getConsensusPoint()) {
 						// only update the peer connection lists if the state has changed
 						lastConsensusPoint = peer.getConsensusPoint();
-						connectToRemotePeers(getHostnameList());
+						// raiseServerMessage("reconnect peers");
+						connectToPeers(getPeerStatusConnectList());
+
 						// System.out.println(getHostname() + " " + manager.getConnections().size());
+
+						// send out a challenge to a peer that is not yet trusted, only if we have a valid networkId
+						if (networkId != null) {
+							// clear out any old challenges
+							challengeList.clear();
+							// requestChallenges();
+						}
+						raiseServerChange();
 					}
 					try {
 						Thread.sleep(SERVER_CONNECTION_PAUSE);
@@ -898,28 +1148,6 @@ public class Server implements Closeable {
 			}
 		}
 	}
-
-	protected void connectToRemotePeers(AVector<AString> remotePeerHostnameList) {
-		// now connect to all remote host names returned from the status call
-
-		Iterator<AString> iterator = remotePeerHostnameList.iterator();
-
-		while (iterator.hasNext()) {
-			AString peerHostname = iterator.next();
-			if (hostname.toString() != peerHostname.toString() ) {
-				InetSocketAddress peerAddress = Utils.toInetSocketAddress(peerHostname.toString());
-				if ( !isConnectedToPeer(peerHostname.toString())) {
-					try {
-						log.log(LEVEL_SERVER, getHostname() + ": connecting too " + peerHostname.toString());
-						connectToPeer(peerHostname.toString(), peerAddress);
-					} catch (IOException e) {
-						log.warning("cannot connect to peer " + peerHostname.toString());
-					}
-				}
-			}
-		}
-	}
-
 
 	public int getPort() {
 		return nio.getPort();
@@ -995,6 +1223,10 @@ public class Server implements Closeable {
 		return kp.getAccountKey();
 	}
 
+	public AStore getStore() {
+		return store;
+	}
+
 	/**
 	 * Connects this Peer to a target Peer, adding the Connection to this Server's
 	 * Manager
@@ -1004,17 +1236,94 @@ public class Server implements Closeable {
 	 * @return The newly created connection
 	 * @throws IOException
 	 */
-	public Connection connectToPeer(String hostname, InetSocketAddress hostAddress) throws IOException {
+	public Connection connectToPeer(AccountKey peerKey, InetSocketAddress hostAddress) throws IOException {
 		Connection pc = Connection.connect(hostAddress, peerReceiveAction, getStore());
-		manager.setConnection(hostname, pc);
+		manager.setConnection(peerKey, pc);
 		return pc;
 	}
 
-	public boolean isConnectedToPeer(String hostname) {
-		return  manager.getConnections().containsKey(hostname);
+	protected void connectToPeers(AHashMap<AccountKey, AString>peerList) {
+		// connect to the other peers returned from the status call, or in the state list of peers
+
+		for (AccountKey peerKey: peerList.keySet()) {
+			AString peerHostname = peerList.get(peerKey);
+			if (hostname.toString() != peerHostname.toString() ) {
+				InetSocketAddress peerAddress = Utils.toInetSocketAddress(peerHostname.toString());
+				if ( !manager.isConnected(peerKey)) {
+					try {
+						log.log(LEVEL_SERVER, getHostname() + ": connecting too " + peerHostname.toString());
+						connectToPeer(peerKey, peerAddress);
+					} catch (IOException e) {
+						log.warning("cannot connect to peer " + peerHostname.toString());
+					}
+				}
+			}
+		}
 	}
 
-	public AStore getStore() {
-		return store;
+	/**
+	 * Sends out a single challenge to the remote peer.
+	 */
+	public AVector<ACell> sendChallenge(Connection connection, AccountKey peerKey) {
+		AVector<ACell> values = null;
+		try {
+			SecureRandom random = new SecureRandom();
+			byte bytes[] = new byte[120];
+			random.nextBytes(bytes);
+			Hash token = Blob.create(bytes).getHash();
+			values = Vectors.of(token, networkId, peerKey);
+			SignedData<ACell> challenge = peer.sign(values);
+			connection.sendChallenge(challenge);
+			// raiseServerMessage("sending challenge to: " + Utils.toFriendlyHexString(peerKey.toHexString()));
+		} catch (IOException e) {
+			log.log(LEVEL_CHALLENGE_RESPONSE,"Cannot send challenge to remote peer at " + connection.getRemoteAddress());
+			values = null;
+		}
+		return values;
+	}
+
+	/**
+	 * Sends out challenges to any connections that are not trusted.
+	 *
+	 */
+	public void requestChallenges() {
+		for (AccountKey peerKey: manager.getConnections().keySet()) {
+			Connection connection = manager.getConnection(peerKey);
+			if (connection.isTrusted()) {
+				continue;
+			}
+			// skip if a challeng is already being sent
+			if (challengeList.containsValue(peerKey)) {
+				continue;
+			}
+			AVector<ACell> values = sendChallenge(connection, peerKey);
+			if (values != null) {
+				challengeList.put(peerKey, values);
+			}
+		}
+	}
+
+	public void raiseServerMessage(String text) {
+		if (event != null) {
+			event.onServerMessage(this, text);
+		}
+	}
+
+	public void raiseServerChange() {
+		if (event != null) {
+			event.onServerChange(this.getServerInformation());
+		}
+	}
+
+	public Hash getNetworkId() {
+		return networkId;
+	}
+
+	public void setNetworkId(Hash value) {
+		networkId = value;
+	}
+
+	public ServerInformation getServerInformation() {
+		return ServerInformation.create(this, manager);
 	}
 }
