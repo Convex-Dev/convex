@@ -61,7 +61,8 @@ public class PeerGUI extends JPanel {
 	 * @throws IOException 
 	 */
 	public static void main(String[] args) throws IOException {
-		Stores.setGlobalStore(EtchStore.create(new File("peers-shared-db")));
+		// TODO: Store config
+		// Stores.setGlobalStore(EtchStore.create(new File("peers-shared-db")));
 			
 		// call to set up Look and Feel
 		convex.gui.utils.Toolkit.init();
@@ -76,6 +77,7 @@ public class PeerGUI extends JPanel {
 							.getImage(PeerGUI.class.getResource("/images/Convex.png")));
 					frame.setBounds(100, 100, 1024, 768);
 					frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+									
 					PeerGUI window = new PeerGUI();
 					frame.getContentPane().add(window, BorderLayout.CENTER);
 					frame.pack();
@@ -87,6 +89,7 @@ public class PeerGUI extends JPanel {
 				    		window.peerPanel.closePeers();
 				        }
 				    });
+					
 				} catch (Exception e) {
 					e.printStackTrace();
 				}

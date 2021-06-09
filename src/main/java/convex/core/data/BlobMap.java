@@ -395,7 +395,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 					count + newChild.count());
 		} else {
 			if (newChild == null) {
-				// need to delete a child
+				// need to delete an existing child
 				int delPos = Bits.positionForDigit(childDigit, mask);
 
 				// handle special case where we need to promote the remaining child

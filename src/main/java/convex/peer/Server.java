@@ -383,34 +383,34 @@ public class Server implements Closeable {
 			statusPeerList = statusPeerList.assoc(accountKey, buildPeerList.get(key));
 		}
 
-		retryCount = 5;
-		result = null;
-		while ( retryCount > 0) {
-			try {
-				// set our peer hostname on the network
-				String transactionCommand = String.format("(set-peer-data {:url \"%s\"})", getHostname());
-				ACell message = Reader.read(transactionCommand);
-				ATransaction transaction = Invoke.create(address, -1, message);
-				result = convex.transactSync(transaction, 2000);
-				retryCount = 0;
-			} catch (IOException | TimeoutException e ) {
-				// raiseServerMessage("retrying to register this peer with the network " + e);
-				retryCount --;
-			}
-		}
-		convex.close();
-
-		if ( result == null) {
-			raiseServerMessage("unable to register this peer with the network");
-			return false;
-		}
+//		retryCount = 5;
+//		result = null;
+//		while ( retryCount > 0) {
+//			try {
+//				// set our peer hostname on the network
+//				String transactionCommand = String.format("(set-peer-data {:url \"%s\"})", getHostname());
+//				ACell message = Reader.read(transactionCommand);
+//				ATransaction transaction = Invoke.create(address, -1, message);
+//				result = convex.transactSync(transaction, 2000);
+//				retryCount = 0;
+//			} catch (IOException | TimeoutException e ) {
+//				// raiseServerMessage("retrying to register this peer with the network " + e);
+//				retryCount --;
+//			}
+//		}
+//		convex.close();
+//
+//		if ( result == null) {
+//			raiseServerMessage("unable to register this peer with the network");
+//			return false;
+//		}
 		// now use the remote peer host name list returned from the status call
 		// to connect to the peers
 		connectToPeers(statusPeerList);
 
 		raiseServerChange();
 
-		return (networkID != null);
+		return true;
 	}
 
 	/**
@@ -1073,6 +1073,7 @@ public class Server implements Closeable {
 					Thread.sleep(1000);
 				}
 
+				log.info("Connection loop started for peer at "+hostname);
 				raiseServerMessage("joined network " + hostname);
 				// loop while the server is running
 				long lastConsensusPoint = 0;

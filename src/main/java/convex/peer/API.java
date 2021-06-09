@@ -1,5 +1,6 @@
 package convex.peer;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -84,6 +85,7 @@ public class API {
 	 * @param count Number of peers to launch.
 	 *
 	 * @param keyPairs Array of keyPairs for each peer. The length of the array must be >= the count of peers to launch.
+	 * @throws IOException 
 	 *
 	 */
 	public static List<Server> launchLocalPeers(int count, AKeyPair[] keyPairs, Address peerAddress, IServerEvent event) {
@@ -114,20 +116,21 @@ public class API {
 		// do this twice to allow for all of the peers to get all of the address in the group of peers
 
 		for (int i = 1; i < count; i++) {
-			AKeyPair keyPair = keyPairs[i];
-			otherServer = serverList.get(0);
-			remotePeerHostname = otherServer.getHostname();
-			Address address = Address.create(peerAddress.toLong() + i);
-			// join a peer to the peer #0
-			serverList.get(i).joinNetwork(keyPair, address, remotePeerHostname);
+			Server server=serverList.get(i);
+			remotePeerHostname = genesisServer.getHostname();
+			
+			try {
+				// Join this Server to the Seer #0
+				serverList.get(i).connectToPeer(genesisServer.getAddress(), genesisServer.getHostAddress());
+				// Join server #0 to this server
+				genesisServer.connectToPeer(server.getAddress(), server.getHostAddress());
+			} catch (IOException e) {
+				log.severe("Failed to connect peers" +e.getMessage());
+			}
 		}
+		
 		// wait for the peers to sync upto 10 seconds
-		API.waitForNetworkReady(serverList, 10);
-
-		// now join the first peer #0, to the rest of the network
-		otherServer = serverList.get(count - 1);
-		remotePeerHostname = otherServer.getHostname();
-		serverList.get(0).joinNetwork(keyPairs[0], peerAddress, remotePeerHostname);
+		//API.waitForNetworkReady(serverList, 10);
 		return serverList;
 	}
 
