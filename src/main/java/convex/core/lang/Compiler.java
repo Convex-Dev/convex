@@ -201,6 +201,26 @@ public class Compiler {
 		T op=(T) convex.core.lang.ops.Set.create(position.longValue(), exp);
 		return context.withResult(Juice.COMPILE_NODE,op);
 	}
+	
+	@SuppressWarnings("unchecked")
+	private static <R extends ACell, T extends AOp<R>> Context<T> compileLookup(AList<ACell> list, Context<?> context) {
+		long n=list.count();
+		if ((n<2)||(n>3)) return context.withArityError("lookup requires one or two arguments, an optional expression and a Symbol");
+
+		AOp<Address> exp=null;
+		if (n==3) {
+			context=context.compile(list.get(1));
+			if (context.isExceptional()) return (Context<T>)context;
+			exp=(AOp<Address>) context.getResult();
+		}
+		
+		ACell a1=list.get(n-1);
+		if (!(a1 instanceof Symbol)) return context.withCompileError("lookup requires a Symbol as last argument");
+		Symbol sym=(Symbol)a1;
+		
+		T op=(T) Lookup.create(exp,sym);
+		return context.withResult(Juice.COMPILE_NODE,op);
+	}
 
 
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileMap(AMap<ACell, ACell> form, Context<?> context) {
@@ -371,8 +391,26 @@ public class Compiler {
 
 		if (head instanceof Symbol) {
 			Symbol sym = (Symbol) head;
+			
+			if (sym.equals(Symbols.DO)) {
+				context = context.compileAll(list.next());
+				if (context.isExceptional()) return (Context<T>) context;
+				Do<R> op = Do.create((AVector<AOp<ACell>>) context.getResult());
+				return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
+			}
+			
+			if (sym.equals(Symbols.LET)) return compileLet(list, context, false);
 
-			// special form symbols
+			if (sym.equals(Symbols.COND)) {
+				context = context.compileAll(list.next());
+				if (context.isExceptional()) return (Context<T>) context;
+				Cond<R> op = Cond.create((AVector<AOp<ACell>>) (context.getResult()));
+				return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
+			}
+			
+			if (sym.equals(Symbols.DEF)) return compileDef(list, context);
+			if (sym.equals(Symbols.FN)) return compileFn(list, context);
+			
 			if (sym.equals(Symbols.QUOTE))  {
 				if (list.size() != 2) return context.withCompileError(sym + " expects one argument.");
 				return compileConstant(context,list.get(1));
@@ -397,13 +435,6 @@ public class Compiler {
 				return (Context<T>) expandCompile(resultForm, context);
 			}
 
-			if (sym.equals(Symbols.DO)) {
-				context = context.compileAll(list.next());
-				if (context.isExceptional()) return (Context<T>) context;
-				Do<R> op = Do.create((AVector<AOp<ACell>>) context.getResult());
-				return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
-			}
-			
 			if (sym.equals(Symbols.QUERY)) {
 				context = context.compileAll(list.next());
 				if (context.isExceptional()) return (Context<T>) context;
@@ -411,19 +442,11 @@ public class Compiler {
 				return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
 			}
 
-
-			if (sym.equals(Symbols.LET)) return compileLet(list, context, false);
 			if (sym.equals(Symbols.LOOP)) return compileLet(list, context, true);
 			if (sym.equals(Symbols.SET_BANG)) return compileSetBang(list, context);
+			
+			if (sym.equals(Symbols.LOOKUP)) return compileLookup(list, context);
 
-			if (sym.equals(Symbols.COND)) {
-				context = context.compileAll(list.next());
-				if (context.isExceptional()) return (Context<T>) context;
-				Cond<R> op = Cond.create((AVector<AOp<ACell>>) (context.getResult()));
-				return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
-			}
-			if (sym.equals(Symbols.DEF)) return compileDef(list, context);
-			if (sym.equals(Symbols.FN)) return compileFn(list, context);
 		}
 		
 		// must be a regular function call

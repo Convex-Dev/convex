@@ -1578,10 +1578,10 @@ public class CoreTest extends ACVMTest {
 		{
 			Context<?> ctx=step("(def act (deploy '(do (def g :foo) (defn f [] (def g 3) (halt 2) 1) (export f))))");
 			assertTrue(ctx.getResult() instanceof Address);
-			assertEquals(Keywords.FOO, eval(ctx,"(lookup act 'g)")); // initial value of g
+			assertEquals(Keywords.FOO, eval(ctx,"(lookup act g)")); // initial value of g
 			ctx=step(ctx,"(call act (f))");
 			assertCVMEquals(2L, ctx.getResult()); // halt value returned
-			assertCVMEquals(3L, eval(ctx,"(lookup act 'g)")); // g has been updated
+			assertCVMEquals(3L, eval(ctx,"(lookup act g)")); // g has been updated
 		}
 
 		assertArityError(step("(halt 1 2)"));
@@ -1832,32 +1832,33 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testLookup() {
-		assertSame(Core.COUNT, eval("(lookup 'count)"));
+		assertSame(Core.COUNT, eval("(lookup count)"));
 
-		assertSame(Core.COUNT, eval("(lookup *address* 'count)"));
+		assertSame(Core.COUNT, eval("(lookup *address* count)"));
 
-		assertNull(eval("(lookup 'non-existent-symbol)"));
+		// Lookup throws UNDECLARED if not declared
+		assertUndeclaredError(step("(lookup non-existent-symbol)"));
 
 		// Lookups after def
-		assertEquals(1L,evalL("(do (def foo 1) (lookup 'foo))"));
-		assertEquals(1L,evalL("(do (def foo 1) (lookup *address* 'foo))"));
+		assertEquals(1L,evalL("(do (def foo 1) (lookup foo))"));
+		assertEquals(1L,evalL("(do (def foo 1) (lookup *address* foo))"));
 
-		// Lookups in non-existent environment
-		assertNull(eval("(lookup #77777777 'count)"));
-		assertNull(eval("(do (def foo 1) (lookup #66666666 'foo))"));
+		// Lookups in non-existent environment throw NOBOOY
+		assertNobodyError(step("(lookup #77777777 count)"));
+		assertNobodyError(step("(do (def foo 1) (lookup #66666666 foo))"));
 
-		assertCastError(step("(lookup :count)"));
-		assertCastError(step("(lookup \"count\")"));
-		assertCastError(step("(lookup :non-existent-symbol)"));
-
-		// invalid name string
-		assertCastError(
+		// COMPILE Errors for bad symbols
+		assertCompileError(step("(lookup :count)"));
+		assertCompileError(step("(lookup \"count\")"));
+		assertCompileError(step("(lookup :non-existent-symbol)"));
+		assertCompileError(
 				step("(lookup \"cdiubcidciuecgieufgvuifeviufegviufeviuefbviufegviufevguiefvgfiuevgeufigv\")"));
+		assertCompileError(step("(lookup nil)"));
+		assertCompileError(step("(lookup 10)"));
+		assertCompileError(step("(lookup [])"));
+		
+		// CAST Errors for bad symbols
 
-		assertCastError(step("(lookup count)"));
-		assertCastError(step("(lookup nil)"));
-		assertCastError(step("(lookup 10)"));
-		assertCastError(step("(lookup [])"));
 
 		assertArityError(step("(lookup)"));
 		assertArityError(step("(lookup 1 2 3)"));
@@ -3593,7 +3594,7 @@ public class CoreTest extends ACVMTest {
 
 		// TODO: consider this
 		// Lookup in core environment of special returns the Symbol
-		assertEquals(Symbols.STAR_JUICE,eval("(lookup '*juice*)"));
+		assertEquals(Symbols.STAR_JUICE,eval("(lookup *juice*)"));
 
 		assertEquals(Symbols.STAR_JUICE,eval(Lookup.create(Symbols.STAR_JUICE)));
 	}
