@@ -158,16 +158,18 @@ public class Belief extends ARecord {
 
 	private BlobMap<AccountKey, SignedData<Order>> accumulateOrders(MergeContext mc,
 			Belief[] beliefs) {
+		// Initialise result with existing Orders from this Belief
 		BlobMap<AccountKey, SignedData<Order>> result = this.orders;
+		
 		// assemble the latest list of orders from all peers
 		for (Belief belief : beliefs) {
 			if (belief == null) continue; // ignore null beliefs, might happen if invalidated
 			if (belief.equals(this)) continue; // ignore an identical belief. Nothing to update.
-			BlobMap<AccountKey, SignedData<Order>> bchains = belief.orders;
+			BlobMap<AccountKey, SignedData<Order>> bOrders = belief.orders;
 			
-			long bcount=bchains.count();
+			long bcount=bOrders.count();
 			for (long i=0; i<bcount; i++) {
-				MapEntry<AccountKey,SignedData<Order>> be=bchains.entryAt(i);
+				MapEntry<AccountKey,SignedData<Order>> be=bOrders.entryAt(i);
 				ABlob key=be.getKey();
 				
 				// Skip merging own Key
@@ -211,20 +213,26 @@ public class Belief extends ARecord {
 	 * Conducts a stake-weighted vote across a map of consistent chains, in the
 	 * given merge context
 	 * 
+	 * @param accOrders Accumulated map for latest Orders received from all Peer Beliefs
 	 * @param mc
 	 * @param filteredChains
 	 * @return
 	 * @throws BadSignatureException @
 	 */
-	private BlobMap<AccountKey, SignedData<Order>> vote(MergeContext mc, BlobMap<AccountKey, SignedData<Order>> accOrders)
+	private BlobMap<AccountKey, SignedData<Order>> vote(final MergeContext mc, final BlobMap<AccountKey, SignedData<Order>> accOrders)
 			throws BadSignatureException {
 		AccountKey myAddress = mc.getAccountKey();
 
-		// get current chain for this peer.
+		// get current Order for this peer.
 		final Order myOrder = getMyOrder(mc);
-		assert (myOrder != null); // we should always have a chain!
+		assert (myOrder != null); // we should always have a Order!
+		
+		// get the Consensus state from this Peer's current perspective
+		// this is needed for peer weights: we only trust peers who have stake in the
+		// current consensus!
+		State votingState = mc.getConsensusState();
 
-		// filter chains for compatibility with current chain
+		// filter chains for compatibility with current chain for inclusion in Initial Voting Set
 		// TODO: figure out what to do with new blocks filtered out?
 		final BlobMap<AccountKey, SignedData<Order>> filteredOrders = accOrders.filterValues(signedOrder -> {
 			try {
@@ -236,10 +244,7 @@ public class Belief extends ARecord {
 		});
 		assert (filteredOrders.get(myAddress).getValue() == myOrder);
 
-		// get the consensus state from this Peer's current chain
-		// this is needed for peer weights: we only trust peers who have stake in the
-		// current consensus!
-		State votingState = mc.getConsensusState();
+		// Current Consensus Point
 		long consensusPoint = myOrder.getConsensusPoint();
 
 		// Compute stake for all peers in consensus state
@@ -565,7 +570,7 @@ public class Belief extends ARecord {
 	 * Belief
 	 * 
 	 * @param mc
-	 * @return
+	 * @return Order for current Peer, or null if not found
 	 * @throws BadSignatureException 
 	 */
 	private Order getMyOrder(MergeContext mc) throws BadSignatureException {
