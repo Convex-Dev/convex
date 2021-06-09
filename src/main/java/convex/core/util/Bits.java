@@ -36,6 +36,8 @@ public class Bits {
 
 	/**
 	 * Get the number of leading zeros in the binary representation of an int
+	 * @param x int value to check
+	 * @return Number of leading zeros (0-32)
 	 */
 	public static int leadingZeros(int x) {
 		if (x == 0) return 32;
@@ -70,6 +72,8 @@ public class Bits {
 
 	/**
 	 * Get the number of leading zeros in the binary representation of a long
+	 * @param x long value to check
+	 * @return Number of leading zeros (0-64)
 	 */
 	public static int leadingZeros(long x) {
 		int highWord = (int) (x >>> 32); // high 4 bytes, unsigned

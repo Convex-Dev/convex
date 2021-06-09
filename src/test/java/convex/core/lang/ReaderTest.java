@@ -30,6 +30,9 @@ public class ReaderTest {
 	public void testVectors() {
 		assertSame(Vectors.empty(), Reader.read("[]"));
 		assertSame(Vectors.empty(), Reader.read(" [ ] "));
+		
+		assertEquals(Vectors.of(1L,-2L), Reader.read("[1 -2]"));
+
 		assertEquals(Vectors.of(Samples.FOO), Reader.read(" [ :foo ] "));
 		assertEquals(Vectors.of(Vectors.empty()), Reader.read(" [ [] ] "));
 	}
@@ -74,12 +77,12 @@ public class ReaderTest {
 	@Test
 	public void testSymbols() {
 		assertEquals(Symbols.FOO, Reader.read("foo"));
-		assertEquals(Symbols.FOO.withPath(Address.create(666)), Reader.read("#666/foo"));
+		assertEquals(Lists.of(Symbols.LOOKUP,Address.create(666),Symbols.FOO), Reader.read("#666/foo"));
 		
 		assertEquals(Lists.of(Symbol.create("+"), 1L), Reader.read("(+ 1)"));
 		assertEquals(Lists.of(Symbol.create("+a")), Reader.read("( +a )"));
 		assertEquals(Lists.of(Symbol.create("/")), Reader.read("(/)"));
-		assertEquals(Symbol.createWithPath("b","a"), Reader.read("a/b"));
+		assertEquals(Lists.of(Symbols.LOOKUP,Symbols.FOO,Symbols.BAR), Reader.read("foo/bar"));
 		assertEquals(Symbol.create("a*+!-_?<>=!"), Reader.read("a*+!-_?<>=!"));
 		assertEquals(Symbol.create("foo.bar"), Reader.read("foo.bar"));
 		assertEquals(Symbol.create(".bar"), Reader.read(".bar"));
@@ -133,8 +136,8 @@ public class ReaderTest {
 		assertCVMEquals(0.2, Reader.read("2.0e-1"));
 		assertCVMEquals(12.0, Reader.read("12e0"));
 		
-
 		assertThrows(Error.class, () -> Reader.read("2.0e0.1234"));
+		// assertNull( Reader.read("[2.0e0.1234]"));
 		assertThrows(Error.class, () -> Reader.read("[2.0e0.1234]")); // Issue #70
 
 		// metadata ignored

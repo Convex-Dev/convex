@@ -28,6 +28,7 @@ public class SyntaxTest {
 	
 	/**
 	 * A Syntax wrapped in another Syntax should not be a valid encoding
+	 * @throws BadFormatException 
 	 */
 	@Test public void testNoDoubleWrapping() throws BadFormatException {
 		// A valid Syntax Object

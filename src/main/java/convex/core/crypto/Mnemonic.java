@@ -192,7 +192,8 @@ public class Mnemonic {
 	/**
 	 * Encode bytes as a mnemonic string
 	 * 
-	 * @param data
+	 * @param x Bytes to encode
+	 * @param bitLength Length of key to encode
 	 * @return Mnemonic String
 	 */
 	public static String encode(BigInteger x, int bitLength) {

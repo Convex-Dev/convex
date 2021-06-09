@@ -697,12 +697,15 @@
 
   lookup
   {
-    :doc {:description "Looks up the value of a symbol in the current execution environment, or the account of the given address if specified. Name may be a symbol, keyword or String. Returns nil if not found."
-          :examples [{:code "(lookup 'count)"}]
-          :type :function
-          :signature [{:params [name]}
-                      {:params [address name]}]
-          :errors {:CAST "If the name is not a Symbol, or the optional Address is not a valid Address."}}
+    :doc {:description "Looks up the value of a Symbol in the current execution environment, or the account of the given address if specified."
+          :examples [{:code "(do (def a 13) (lookup a))"}
+                     {:code "(lookup #8 count)"}]
+          :type :special
+          :signature [{:params [sym]}
+                      {:params [address sym]}]
+          :errors {:COMPILE "If the last argument is not a Symbol."
+                   :CAST "If the optional Address expression does not produce a valid Address."
+                   :NOBODY "If the target Account for lookup does not exist."}}
   }
 
   lookup-meta

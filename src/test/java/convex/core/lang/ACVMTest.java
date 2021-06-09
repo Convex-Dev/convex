@@ -70,7 +70,7 @@ public abstract class ACVMTest {
 	 * Steps execution in a new forked Context
 	 * @param <T>
 	 * @param ctx Initial context to fork
-	 * @param source
+	 * @param form Form to compile and execute execute
 	 * @return New forked context containing step result
 	 */
 	@SuppressWarnings("unchecked")
@@ -119,6 +119,10 @@ public abstract class ACVMTest {
 	/**
 	 * Runs an execution step as a different address. Returns value after restoring
 	 * the original address.
+	 * @param address Address to run as
+	 * @param c Initial Context. Will not be modified.
+	 * @param source Source form
+	 * @return Updates Context
 	 */
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> Context<T> stepAs(Address address, Context<?> c, String source) {
@@ -199,7 +203,7 @@ public abstract class ACVMTest {
 	/**
 	 * Compiles source code to a CVM Op
 	 * @param <T>
-	 * @param source
+	 * @param code Source code to compile as a form
 	 * @return CVM Op
 	 */
 	public <T extends AOp<?>> T comp(ACell code) {

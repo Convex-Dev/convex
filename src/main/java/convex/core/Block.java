@@ -110,7 +110,10 @@ public class Block extends ARecord {
 
 	/**
 	 * Creates a block with the given transactions
-	 * @param transactions
+	 * 
+	 * @param timestamp Timestamp of block creation, according to Peer
+	 * @param peerKey Public key of Peer producing Block
+	 * @param transactions Vector of transactions to include in Block
 	 * 
 	 * @return A new Block containing the specified signed transactions
 	 */

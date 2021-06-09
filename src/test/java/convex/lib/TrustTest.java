@@ -65,7 +65,7 @@ public class TrustTest extends ACVMTest {
 		assertTrue(CONTEXT.getAccountStatus(trusted).isActor());
 
 		// check alias is set up correctly
-		assertEquals(trusted, eval(CONTEXT, "(get *aliases* 'trust)"));
+		assertEquals(trusted, eval(CONTEXT, "trust"));
 	}
 
 	@Test

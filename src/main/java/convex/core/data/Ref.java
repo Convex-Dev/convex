@@ -137,6 +137,8 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * 
 	 * Assumes any necessary changes to storage will be made separately. 
 	 * SECURITY: Dangerous if misused since may invalidate storage assumptions
+	 * @param newStatus New status to apply to Ref
+	 * @return Updated Ref
 	 */
 	public Ref<T> withMinimumStatus(int newStatus) {
 		newStatus&=STATUS_MASK;
@@ -332,6 +334,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * If the persisted Ref represents novelty, will trigger the specified novelty
 	 * handler 
 	 * 
+	 * @param noveltyHandler Novelty handler to call (may be null)
 	 * @return the persisted Ref 
 	 * @throws MissingDataException If the Ref's value does not exist or has been
 	 *         garbage collected before being persisted 
@@ -364,6 +367,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * If the persisted Ref represents novelty, will trigger the specified novelty
 	 * handler 
 	 * 
+	 * @param noveltyHandler Novelty handler to call (may be null)
 	 * @return the persisted Ref 
 	 * @throws MissingDataException If the Ref's value does not exist or has been
 	 *         garbage collected before being persisted 
@@ -427,6 +431,8 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * Returns the original array unchanged if no refs were changed, otherwise
 	 * returns a new array.
 	 * 
+	 * @param refs Array of Refs to update
+	 * @param func Ref update function
 	 * @return Array of updated Refs
 	 */
 	public static <T extends ACell> Ref<T>[] updateRefs(Ref<T>[] refs, IRefFunction func) {
@@ -518,8 +524,9 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * Persists a Ref shallowly in the current store.
 	 * 
 	 * Status will be updated STORED or higher. Novelty handler will be called exactly once if and only if
-	 * the ref was not previously stored.
+	 * the ref was not previously stored
 	 * 
+	 * @param noveltyHandler Novelty handler to call (may be null)
 	 * @return Ref with status of STORED or above
 	 */
 	@SuppressWarnings("unchecked")
@@ -539,7 +546,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	
 	/**
 	 * Writes the ref to a byte array. Embeds embedded values as necessary.
-	 * @param bb
+	 * @param bs Byte array to encode to
 	 * @return Updated position
 	 */
 	@Override

@@ -29,6 +29,7 @@ public class EtchExplorer extends JPanel {
 
 	/**
 	 * Launch the application.
+	 * @param args Command line args
 	 */
 	public static void main(String[] args) {
 		// call to set up Look and Feel

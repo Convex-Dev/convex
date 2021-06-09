@@ -33,6 +33,7 @@ public class PFXTools {
 	 * Creates a new PKCS12 Key store. Passphrase optional, may be blank or null.
 	 * @param keyFile
 	 * @param passPhrase
+	 * @return New KeyStore instance
 	 * @throws KeyStoreException
 	 * @throws IOException
 	 * @throws NoSuchAlgorithmException
@@ -55,6 +56,13 @@ public class PFXTools {
 
 	/**
 	 * Loads an existing PKCS12 Key store. Passphrase optional, may be blank or null.
+	 * @param keyFile File for existing KeyStore
+	 * @param passPhrase Passphrase for KeyStore. May be blank or null.
+	 * @return KeyStore instance
+	 * @throws KeyStoreException 
+	 * @throws IOException 
+	 * @throws NoSuchAlgorithmException 
+	 * @throws CertificateException 
 	 */
 	public static KeyStore loadStore(File keyFile, String passPhrase) throws KeyStoreException, IOException, NoSuchAlgorithmException, CertificateException {
 
@@ -71,6 +79,14 @@ public class PFXTools {
 
 	/**
 	 * Saves a PKCS12 Key store to disk. Passphrase optional, may be blank or null.
+	 * @param ks KeyStore to save
+	 * @param keyFile Target KeyStore file
+	 * @param passPhrase Passphrase for KeyStore. May be blank or null.
+	 * @return KeyStore instance
+	 * @throws KeyStoreException 
+	 * @throws IOException 
+	 * @throws NoSuchAlgorithmException 
+	 * @throws CertificateException 
 	 */
 	public static KeyStore saveStore(KeyStore ks, File keyFile, String passPhrase) throws KeyStoreException, IOException, NoSuchAlgorithmException, CertificateException {
 
@@ -83,6 +99,8 @@ public class PFXTools {
 	}
 
 	/**
+	 * @param kpToSign Key Pair
+	 * @return New Certificate
 	 * @throws SignatureException
 	 * @throws SecurityException
 	 * @throws InvalidKeyException
@@ -111,6 +129,13 @@ public class PFXTools {
 
 	/**
 	 * Adds a key to a key store
+	 * @param ks 
+	 * @param kp 
+	 * @param passPhrase 
+	 * @return Updated KeyStore
+	 * @throws KeyStoreException 
+	 * @throws IOException 
+	 * @throws NoSuchAlgorithmException 
 	 * @throws SignatureException
 	 * @throws SecurityException
 	 * @throws InvalidKeyException

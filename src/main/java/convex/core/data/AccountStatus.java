@@ -63,8 +63,9 @@ public class AccountStatus extends ARecord {
 	/**
 	 * Create a regular account, with the specified balance and zero allowance
 	 * 
-	 * @param sequence
-	 * @param balance
+	 * @param sequence Sequence number
+	 * @param balance Convex Coin balance of Account
+	 * @param key Public Key of new Account
 	 * @return New AccountStatus
 	 */
 	public static AccountStatus create(long sequence, long balance, AccountKey key) {
@@ -219,6 +220,7 @@ public class AccountStatus extends ARecord {
 	 * specified amount.
 	 * 
 	 * @param amt minimum amount that must be present in the specified balance
+	 * @return true if Account has at least the balance specified, false otherwise
 	 */
 	public boolean hasBalance(long amt) {
 		if (amt < 0) return false;
@@ -293,7 +295,7 @@ public class AccountStatus extends ARecord {
 	 * Gets the value in the Account's environment for the given symbol.
 	 * 
 	 * @param <R>
-	 * @param sym
+	 * @param symbol Symbol to get in Environment
 	 * @return The value from the environment, or null if not found
 	 */
 	@SuppressWarnings("unchecked")

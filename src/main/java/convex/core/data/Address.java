@@ -28,13 +28,14 @@ public class Address extends ABlob {
 	}
 	
 	/**
-	 * Creates an Address from a blob. Must be a valid long value
-	 * @param b
+	 * Creates an Address from a blob. Number be a valid non-negative long value.
+	 * 
+	 * @param number Account number
 	 * @return Address instance, or null if not valid
 	 */
-	public static Address create(long value) {
-		if (value<0) return null;
-		return new Address(value);
+	public static Address create(long number) {
+		if (number<0) return null;
+		return new Address(number);
 	}
 
 	/**
@@ -104,7 +105,7 @@ public class Address extends ABlob {
 	
 	/**
 	 * Constructs an Address from an arbitrary String, attempting to parse different possible formats
-	 * @param bb
+	 * @param s String to parse
 	 * @return Address parsed, or null if not valid
 	 */
 	public static Address parse(String s) {
@@ -119,25 +120,12 @@ public class Address extends ABlob {
 		}
 		
 		try {
-			Long l=Long.parseLong(s);
-			if (l!=null) return Address.create(l);
+			long l=Long.parseLong(s);
+			return Address.create(l);
 		} catch (NumberFormatException e) {
 			// fall through
 		}
 		
-		return null;
-	}
-	
-	/**
-	 * Constructs an Address from an arbitrary Object, attempting to parse different possible formats
-	 * @param bb
-	 * @return Address parsed, or null if not valid
-	 */
-	public static Address parse(Object o) {
-		if (o instanceof Address) return (Address) o;
-		if (o instanceof String) return parse((String)o);
-		if (o instanceof Number) return create(((Number)o).longValue());
-		if (o instanceof ABlob) return create((ABlob)o);
 		return null;
 	}
 

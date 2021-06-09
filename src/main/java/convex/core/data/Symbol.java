@@ -53,7 +53,7 @@ public class Symbol extends ASymbolic {
 
 	/**
 	 * Creates a Symbol with the given unqualified namespace Symbol and name
-	 * @param nameSpace Namespace Symbol, which may be null for an unqualified Symbol
+	 * @param namespace Namespace Symbol, which may be null for an unqualified Symbol
 	 * @param name Unqualified Symbol name
 	 * @return Symbol instance, or null if the Symbol is invalid
 	 */
@@ -161,6 +161,7 @@ public class Symbol extends ASymbolic {
 	
 	/**
 	 * Returns the Symbol with an updated path
+	 * @param newPath New path
 	 * @return Updated Symbol, or this Symbol if no change
 	 */
 	public Symbol withPath(ACell newPath) {
@@ -170,6 +171,7 @@ public class Symbol extends ASymbolic {
 
 	/**
 	 * Returns the Symbol with an updated path
+	 * @param newPath New path
 	 * @return Updated Symbol, or this Symbol if no change
 	 */
 	public Object withPath(String newPath) {

@@ -13,7 +13,8 @@ import convex.core.lang.AOp;
  * Abstract base class for Ops with multiple nested operations
  * 
  * MultiOps may selectively evaluate sub-expressions.
- *
+ * 
+ * @param <T> Type of function return
  */
 public abstract class AMultiOp<T extends ACell> extends AOp<T> {
 	protected final AVector<AOp<ACell>> ops;

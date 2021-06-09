@@ -13,6 +13,7 @@ public class Hashing {
 	/**
 	 * Computes the SHA-256 hash of a string
 	 * 
+	 * @param message Message to hash (in UTF-8 encoding)
 	 * @return Hash of UTF-8 encoded string
 	 */
 	public static Hash sha3(String message) {
@@ -123,6 +124,7 @@ public class Hashing {
 	/**
 	 * Computes the SHA-256 hash of a string
 	 * 
+	 * @param message Message to Hash (in UTF8 encoding)
 	 * @return Hash of UTF-8 encoded string
 	 */
 	public static Hash sha256(String message) {

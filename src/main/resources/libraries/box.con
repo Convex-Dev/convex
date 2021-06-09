@@ -8,7 +8,7 @@
   ;;
   ;; deploy with: (deploy-once box-code)
   
-  (import convex.asset :as asset)
+  (import convex.asset :as asset-lib)
   
   (def counter 0)
   
@@ -23,7 +23,7 @@
 
   ;; Library function to insert an asset into a box
   (defn insert [box-id asset]
-    (asset/transfer ~*address* asset box-id))
+    (asset-lib/transfer ~*address* asset box-id))
   
   ;; Library function to remove an asset from a box
   (defn remove [box-id asset] 
@@ -33,22 +33,22 @@
   (defn remove-asset [box-id asset]
      (let [box-id (long box-id)
            current-asset (get boxes box-id)]
-        (if (not (asset/quantity-contains? current-asset asset)) (fail "Box does not contain quantity of asset specified for removal"))
+        (if (not (asset-lib/quantity-contains? current-asset asset)) (fail "Box does not contain quantity of asset specified for removal"))
         (or (contains-key? (ownership *caller*) box-id) (fail :TRUST (str "Box not owned: " box-id)))
-        (def boxes (assoc boxes box-id (asset/quantity-sub current-asset asset)))
-        (asset/transfer *caller* asset) ;; deliver the asset to the caller
+        (def boxes (assoc boxes box-id (asset-lib/quantity-sub current-asset asset)))
+        (asset-lib/transfer *caller* asset) ;; deliver the asset to the caller
         ))
   
   ;; Receive-asset implementation inserts into box specified by data value, if it exists, otherwise errors
   (defn receive-asset 
     ([asset box-id]
       (let [box-id (long box-id)]
-	      (asset/accept *caller* asset) ;; accept first. Solve problem of putting box into itself
+	      (asset-lib/accept *caller* asset) ;; accept first. Solve problem of putting box into itself
 	      (cond
 	        (not (contains-key? boxes box-id)) (fail "Target box does not exist")
 	        (not (contains-key? (ownership *caller*) box-id)) (fail (str "Box " box-id " not owned"))
 	        )
-	      (def boxes (assoc boxes box-id (asset/quantity-add (get boxes box-id) asset))))))
+	      (def boxes (assoc boxes box-id (asset-lib/quantity-add (get boxes box-id) asset))))))
 
   
   (defn offer [receiver quantity]

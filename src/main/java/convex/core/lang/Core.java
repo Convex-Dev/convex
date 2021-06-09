@@ -678,7 +678,6 @@ public class Core {
 	});
 
 
-
 	public static final CoreFn<ACell> LOOKUP = reg(new CoreFn<>(Symbols.LOOKUP) {
 		@SuppressWarnings("unchecked")
 		@Override

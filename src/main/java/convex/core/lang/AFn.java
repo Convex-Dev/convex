@@ -33,6 +33,8 @@ public abstract class AFn<T extends ACell> extends ACell implements IFn<T> {
 	 * By default, checks if the function supports the given arity only.
 	 * 
 	 * TODO: intention is to override this to include dynamic type checks etc.
+	 * @param args Array of arguments
+	 * @return true if function supports the specified args array
 	 */
 	public boolean supportsArgs(ACell[] args) {
 		return hasArity(args.length);
@@ -40,8 +42,10 @@ public abstract class AFn<T extends ACell> extends ACell implements IFn<T> {
 	
 	/**
 	 * Tests if this function supports the given arity.
+	 * @param arity Arity to check
+	 * @return true if function supports the given arity, false otherwise
 	 */
-	public abstract boolean hasArity(int n);
+	public abstract boolean hasArity(int arity);
 	
 	@Override 
 	public boolean isCVMValue() {

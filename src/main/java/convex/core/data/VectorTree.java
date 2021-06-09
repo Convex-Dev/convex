@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
@@ -191,7 +190,7 @@ public class VectorTree<T extends ACell> extends ASizedVector<T> {
 	}
 
 	/**
-	 * Reads a BlockVector from the provided ByteBuffer 
+	 * Reads a VectorTree from the provided ByteBuffer 
 	 * 
 	 * Assumes the header byte and count is already read.
 	 * 
@@ -202,7 +201,7 @@ public class VectorTree<T extends ACell> extends ASizedVector<T> {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> VectorTree<T> read(ByteBuffer bb, long count)
-			throws BadFormatException, BufferUnderflowException {
+			throws BadFormatException {
 		if (count < 0) throw new BadFormatException("Negative count?");
 		int n = computeArraySize(count);
 		Ref<AVector<T>>[] items = (Ref<AVector<T>>[]) new Ref<?>[n];

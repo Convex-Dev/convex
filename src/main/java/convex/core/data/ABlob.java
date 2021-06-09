@@ -57,11 +57,13 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 
 	/**
 	 * Converts this data object to a lowercase hex string representation
+	 * @return Hex String representation
 	 */
 	public abstract String toHexString();
 
 	/**
 	 * Converts this blob to a readable byte buffer
+	 * @return ByteBuffer with position zero (ready to read)
 	 */
 	public ByteBuffer toByteBuffer() {
 		return ByteBuffer.wrap(getBytes());
@@ -70,6 +72,8 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	/**
 	 * Converts this data object to a hex string representation of the given length.
 	 * Equivalent to truncating the full String representation.
+	 * @param length Length to truncate String to (in hex characters)
+	 * @return String representation of hex values in Blob
 	 */
 	public String toHexString(int length) {
 		return toHexString().substring(0, length);
@@ -92,6 +96,8 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 * 
 	 * Shares underlying backing data where possible. Returned Blob may not be the
 	 * same type as the original Blob
+	 * @param start Start position to slice from
+	 * @return Slice of Blob
 	 */
 	public ABlob slice(long start) {
 		return slice(start, count() - start);
@@ -107,6 +113,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	/**
 	 * Computes the length of the longest common hex prefix between two blobs
 	 * 
+	 * @param b Blob to compare with 
 	 * @return The length of the longest common prefix in hex digits
 	 */
 	public abstract long commonHexPrefixLength(ABlob b);
@@ -128,6 +135,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	/**
 	 * Computes the hash of the byte data stored in this Blob, using the given MessageDigest.
 	 * 
+	 * @param digest MessageDigest instance
 	 * @return The hash
 	 */
 	public final Hash computeHash(MessageDigest digest) {
@@ -220,6 +228,9 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 * 
 	 * - Blob is of the same general type - Blobs are of the same length - All byte
 	 * values are equal
+	 * 
+	 * @param o Blob to compare with
+	 * @return true if Blobs are equal, false otherwise
 	 */
 	public abstract boolean equals(ABlob o);
 
@@ -257,7 +268,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	/**
 	 * Writes the raw byte contents of this blob to a ByteBuffer.
 	 * 
-	 * @param b
+	 * @param bb ByteBuffer to write to
 	 * @return The passed ByteBuffer, after writing byte content
 	 */
 	public abstract ByteBuffer writeToBuffer(ByteBuffer bb);
@@ -265,7 +276,8 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	/**
 	 * Writes the raw byte contents of this blob to a byte array
 	 * 
-	 * @param b
+	 * @param bs Byte array to write to
+	 * @param pos Starting position in byte array to write to
 	 * @return The position in the array after writing
 	 */
 	public abstract int writeToBuffer(byte[] bs, int pos);
@@ -316,7 +328,9 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 * 
 	 * Returns length if this Blob is exactly equal to the specified hex range.
 	 * 
-	 * @param key
+	 * @param start Start position (in hex digits)
+	 * @param length Length to compare (in hex digits)
+	 * @param b Blob to compare with
 	 * @return The number of matching hex characters
 	 */
 	public abstract long hexMatchLength(ABlob b, long start, long length);

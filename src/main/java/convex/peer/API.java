@@ -54,6 +54,10 @@ public class API {
 	 * <li>:persist (optional) - Boolean flag to determine if peer state should be persisted in store at server close. Default true.
 	 * </ul>
 	 *
+	 * @param peerConfig Config map for the new Peer
+     *
+     * @param event Optional event object that implements the IServerEvent interface
+     *
 	 * @return New Server instance
 	 */
 	public static Server launchPeer(Map<Keyword, Object> peerConfig, IServerEvent event) {

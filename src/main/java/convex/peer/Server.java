@@ -1230,7 +1230,8 @@ public class Server implements Closeable {
 	/**
 	 * Connects this Peer to a target Peer, adding the Connection to this Server's
 	 * Manager
-	 *
+	 * 
+	 * @param hostname 
 	 * @param hostAddress
 	 * @return The newly created connection
 	 * @throws IOException

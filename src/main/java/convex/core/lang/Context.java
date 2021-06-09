@@ -69,6 +69,8 @@ import convex.core.util.Utils;
  *
  * "If you have a procedure with 10 parameters, you probably missed some"
  * - Alan Perlis
+ * 
+ * @param <T> Result type of Context
  */
 public final class Context<T extends ACell> extends AObject {
 	private static final long INITIAL_JUICE = 0;
@@ -258,13 +260,13 @@ public final class Context<T extends ACell> extends AObject {
 	}
 
 	/**
-	 * Creates a "fake" execution context for the given actor address.
+	 * Creates a "fake" execution context for the given address.
 	 *
 	 * Not valid for use in real transactions, but can be used to
 	 * compute stuff off-chain "as-if" the actor made the call.
 	 *
 	 * @param state
-	 * @param oracleAddress
+	 * @param actor
 	 * @return Fake context
 	 */
 	public static <R extends ACell> Context<R> createFake(State state, Address actor) {
@@ -278,8 +280,8 @@ public final class Context<T extends ACell> extends AObject {
 	 *
 	 * Juice reserve is extracted from the actor's current balance.
 	 *
-	 * @param <T>
-	 * @param state
+	 * @param state Initial State for Context
+	 * @param origin Origin Address for Context
 	 * @param juice
 	 * @return Initial execution context with reserved juice.
 	 */
@@ -467,7 +469,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * Looks up a symbol's value in the current execution context, without any effect on the Context (no juice consumed etc.)
 	 *
 	 * @param <R> Type of value associated with the given symbol
-	 * @param sym Symbol to look up. May be qualified
+	 * @param symbol Symbol to look up. May be qualified
 	 * @return Context with the result of the lookup (may be an undeclared exception)
 	 */
 	public <R extends ACell> Context<R> lookup(Symbol symbol) {
@@ -600,9 +602,10 @@ public final class Context<T extends ACell> extends AObject {
 	 * Looks up an environment entry for a specific address without consuming juice.
 	 *
 	 * If the symbol is qualified, try lookup via *aliases*
-	 *
+	 * 
+	 * @param address Address of Account in which to look up entry
 	 * @param sym Symbol to look up
-	 * @return
+	 * @return Environment entry
 	 */
 	public MapEntry<Symbol,ACell> lookupDynamicEntry(Address address,Symbol sym) {
 		AccountStatus as=getAccountStatus(address);
@@ -913,6 +916,7 @@ public final class Context<T extends ACell> extends AObject {
 	 *
 	 * @param <R> Return type of the function
 	 * @param fn Function to execute
+	 * @param args Arguments for function
 	 * @return Updated Context
 	 */
 	@SuppressWarnings("unchecked")
@@ -1125,8 +1129,9 @@ public final class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Defines a value in the environment of the current address, updating the metadata
-	 * @param key Symbol of the mapping to create
-	 * @param value
+	 * 
+	 * @param syn Syntax Object to define, containing a Symbol value
+	 * @param value Value to set of the given Symbol
 	 * @return Updated context with symbol defined in environment
 	 */
 	public Context<T> defineWithSyntax(Syntax syn, ACell value) {
@@ -1298,6 +1303,7 @@ public final class Context<T extends ACell> extends AObject {
 	/**
 	 * Executes code as if run in the specified account, but always discarding state changes.
 	 * @param <R> Result type
+	 * @param address Address of Account in which to execute the query
 	 * @param form Code to execute.
 	 * @return Context updated with only query result and juice consumed
 	 */
@@ -1451,9 +1457,8 @@ public final class Context<T extends ACell> extends AObject {
 	 * Uses no juice
 	 *
 	 * @param target Target Address, must already exist
-	 * @param amount Amount of memory to transfer, must be between 0 and Amount.MAX_VALUE inclusive
+	 * @param amountToSend Amount of memory to transfer, must be between 0 and Amount.MAX_VALUE inclusive
 	 * @return Context with a null result if the transaction succeeds, or an exceptional value if the transfer fails
-	 * @throws ExecutionException
 	 */
 	public Context<CVMLong> transferAllowance(Address target, CVMLong amountToSend) {
 		long amount=amountToSend.longValue();
@@ -1567,7 +1572,8 @@ public final class Context<T extends ACell> extends AObject {
 	 *
 	 * @param <R> Return type of Actor call
 	 * @param target Target Actor address
-	 * @param sym Name of function defined by Actor
+	 * @param offer Amount of Convex Coins to offer in Actor call
+	 * @param functionName Symbol of function name defined by Actor
 	 * @param args Arguments to Actor function invocation
 	 * @return Context with result of Actor call (may be exceptional)
 	 */
@@ -1580,7 +1586,8 @@ public final class Context<T extends ACell> extends AObject {
 	 *
 	 * @param <R> Return type of Actor call
 	 * @param target Target Actor address
-	 * @param sym Symbol of function name defined by Actor
+	 * @param offer Amount of Convex Coins to offer in Actor call
+	 * @param functionName Symbol of function name defined by Actor
 	 * @param args Arguments to Actor function invocation
 	 * @return Context with result of Actor call (may be exceptional)
 	 */
@@ -1961,7 +1968,7 @@ public final class Context<T extends ACell> extends AObject {
 	/**
 	 * Sets the public key for the current account
 	 * @param <R>
-	 * @param address
+	 * @param publicKey New Account Public Key
 	 * @return Context with current Account Key set
 	 */
 	public <R extends ACell> Context<R> setAccountKey(AccountKey publicKey) {

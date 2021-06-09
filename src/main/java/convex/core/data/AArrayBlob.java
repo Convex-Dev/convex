@@ -182,10 +182,10 @@ public abstract class AArrayBlob extends ABlob {
 	}
 	
 	/**
-	 * Tests if a specific range of bytes are exactly equal.
-	 * @param key
-	 * @param start
-	 * @param end
+	 * Tests if a specific range of bytes are exactly equal from this Blob with another Blob
+	 * @param b Blob with which to compare
+	 * @param start Start index in both Blobs
+	 * @param end End index in both Blobs
 	 * @return true if digits are equal, false otherwise
 	 */
 	public boolean rangeMatches(AArrayBlob b, int start, int end) {

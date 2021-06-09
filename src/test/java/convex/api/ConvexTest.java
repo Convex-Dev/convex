@@ -52,6 +52,7 @@ public class ConvexTest {
 	}
 	
 	@Test public void testConnection() throws IOException {
+		// Don't need locking
 		Convex convex=Convex.connect(ServerTest.server.getHostAddress(), Init.HERO,Init.HERO_KP);
 		assertTrue(convex.isConnected());
 		convex.close();
@@ -59,30 +60,34 @@ public class ConvexTest {
 	}
 	
 	@Test public void testConvex() throws IOException, TimeoutException {
-		Result r=cv.transactSync(Invoke.create(ADDR,0,Reader.read("*address*")),1000);
-		assertNull(r.getErrorCode(),"Error:" +r.toString());
-		assertEquals(ADDR,r.getValue());
-		
+		synchronized (ServerTest.server) {  
+			Result r=cv.transactSync(Invoke.create(ADDR,0,Reader.read("*address*")),1000);
+			assertNull(r.getErrorCode(),"Error:" +r.toString());
+			assertEquals(ADDR,r.getValue());
+		}	
 	}
 	
 	@Test public void testBadSignature() throws IOException, TimeoutException, InterruptedException, ExecutionException {
-		Ref<ATransaction> tr=Invoke.create(ADDR,0,Reader.read("*address*")).getRef();
-		Result r=cv.transact(SignedData.create(KP, Samples.FAKE_SIGNATURE,tr)).get();
-		assertEquals(ErrorCodes.SIGNATURE,r.getErrorCode());
-		
+		synchronized (ServerTest.server) {  
+			Ref<ATransaction> tr=Invoke.create(ADDR,0,Reader.read("*address*")).getRef();
+			Result r=cv.transact(SignedData.create(KP, Samples.FAKE_SIGNATURE,tr)).get();
+			assertEquals(ErrorCodes.SIGNATURE,r.getErrorCode());
+		}
 	}
 	
 	@SuppressWarnings("unchecked")
 	@Test public void testManyTransactions() throws IOException, TimeoutException, InterruptedException, ExecutionException {
-		int n=100;
-		Future<Result>[] rs=new Future[n];
-		for (int i=0; i<n; i++) {
-			Future<Result> f=cv.transact(Invoke.create(ADDR, 0,Constant.of(i)));
-			rs[i]=f;
-		}
-		for (int i=0; i<n; i++) {
-			Result r=rs[i].get(1000,TimeUnit.MILLISECONDS);
-			assertNull(r.getErrorCode(),"Error:" +r.toString());
+		synchronized (ServerTest.server) {  
+			int n=100;
+			Future<Result>[] rs=new Future[n];
+			for (int i=0; i<n; i++) {
+				Future<Result> f=cv.transact(Invoke.create(ADDR, 0,Constant.of(i)));
+				rs[i]=f;
+			}
+			for (int i=0; i<n; i++) {
+				Result r=rs[i].get(1000,TimeUnit.MILLISECONDS);
+				assertNull(r.getErrorCode(),"Error:" +r.toString());
+			}
 		}
 	}
 

@@ -43,6 +43,7 @@ public class EtchStore extends AStore {
 	 * @param file File to use for storage. Will be created it it does not already
 	 *             exist.
 	 * @return EtchStore instance
+	 * @throws IOException 
 	 */
 	public static EtchStore create(File file) throws IOException {
 		Etch etch = Etch.create(file);
@@ -52,6 +53,7 @@ public class EtchStore extends AStore {
 	/**
 	 * Create an Etch store using a new temporary file with the given prefix
 	 * 
+	 * @param prefix String prefix for temporary file
 	 * @return New EtchStore instance
 	 */
 	public static EtchStore createTemp(String prefix) {

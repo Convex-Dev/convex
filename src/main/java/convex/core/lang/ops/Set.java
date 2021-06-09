@@ -41,7 +41,8 @@ public class Set<T extends ACell> extends AOp<T> {
 	/**
 	 * Creates special Op for the given opCode
 	 * 
-	 * @param opCode
+	 * @param position Position in lexical value vector
+	 * @param op Op to calculate new value
 	 * @return Special instance, or null if not found
 	 */
 	public static final <R extends ACell> Set<R> create(long position, AOp<R> op) {

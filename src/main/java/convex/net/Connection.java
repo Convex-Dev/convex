@@ -119,8 +119,10 @@ public class Connection {
 
 	/**
 	 * Create a PeerConnection by connecting to a remote address
-	 *
+	 * 
+	 * @param hostAddress Internet Address to connect to
 	 * @param receiveAction A callback Consumer to be called for any received messages on this connection
+	 * @param store Store to use for this Connection
 	 * @return New Connection instance
 	 * @throws IOException If connection fails because of any IO problem
 	 */
@@ -332,7 +334,8 @@ public class Connection {
 
 	/**
 	 * Sends a RESULT Message on this connection with no error code (i.e. a success)
-	 *
+	 * 
+	 * @param id ID for result message
 	 * @param value Any data object
 	 * @return True if buffered for sending successfully, false otherwise
 	 * @throws IOException
@@ -344,7 +347,8 @@ public class Connection {
 	/**
 	 * Sends a RESULT Message on this connection.
 	 *
-	 * @param result Any data object
+	 * @param id ID for result message
+	 * @param value Any data object
 	 * @param errorCode Error code for this result. May be null to indicate success
 	 * @return True if buffered for sending successfully, false otherwise
 	 * @throws IOException
@@ -358,6 +362,7 @@ public class Connection {
 	 * Sends a RESULT Message on this connection.
 	 *
 	 * @param result Result data structure
+	 * @return true if message queued successfully, false otherwise
 	 * @throws IOException
 	 */
 	public boolean sendResult(Result result) throws IOException {
@@ -390,8 +395,10 @@ public class Connection {
 
 	/**
 	 * Sends a message over this connection
-	 *
+	 * 
+	 * @param msg Message to send
 	 * @return true if message buffered successfully, false if failed
+	 * @throws IOException 
 	 */
 	public boolean sendMessage(Message msg) throws IOException {
 		return sendObject(msg.getType(), msg.getPayload());
@@ -403,7 +410,7 @@ public class Connection {
 	 *
 	 * @param type Type of message
 	 * @param payload Payload value for message
-	 * @return
+	 * @return true if message queued successfully, false otherwise
 	 * @throws IOException
 	 */
 	public boolean sendObject(MessageType type, ACell payload) throws IOException {
@@ -507,7 +514,7 @@ public class Connection {
 	 * Starts listening for received events with this given peer connection.
 	 * PeerConnection must have a selectable SocketChannel associated
 	 *
-	 * @param peer
+	 * @throws IOException 
 	 */
 	public void startClientListening() throws IOException {
 		SocketChannel chan = (SocketChannel) channel;

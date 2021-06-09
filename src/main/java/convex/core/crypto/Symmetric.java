@@ -111,6 +111,7 @@ public class Symmetric {
 	 * prepended to the cipherText
 	 * 
 	 * @param key
+	 * @param bis InputStream of data to decrypt
 	 * @return A new byte array containing the decrypted data
 	 * @throws IOException
 	 */

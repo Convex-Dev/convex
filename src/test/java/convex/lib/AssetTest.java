@@ -28,8 +28,10 @@ public class AssetTest {
 	 * 
 	 * Both users must have a non-empty balance.
 	 * 
-	 * @param ctx
-	 * @param fun
+	 * @param ctx Context to execute in
+	 * @param asset Address of asset
+	 * @param user1 First user
+	 * @param user2 Second user
 	 */
 	public static void doAssetTests (Context<?> ctx, Address asset, Address user1, Address user2) {
 		// Set up test user

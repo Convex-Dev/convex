@@ -14,6 +14,8 @@ public class PBE {
 	 * function
 	 * 
 	 * @param password Password stored in a char array.
+	 * @param salt 
+	 * @param bitLength 
 	 * @return Decrypted key
 	 */
 	public static byte[] deriveKey(char[] password, byte[] salt, int bitLength) {

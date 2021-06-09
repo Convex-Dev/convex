@@ -21,7 +21,7 @@
                        'convex.trust [trust-addr *caller*]})
   
     ;; do manual alias for trust since CNS isn't available yet!
-    (def *aliases* (assoc *aliases* 'trust trust-addr)))
+    (def trust trust-addr))
   
   
   ;; =============================================================

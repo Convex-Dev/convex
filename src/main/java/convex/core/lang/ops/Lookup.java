@@ -2,6 +2,7 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
+import convex.core.ErrorCodes;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Format;
@@ -63,8 +64,9 @@ public class Lookup<T extends ACell> extends AOp<T> {
 		if (address!=null) {
 			rctx=(Context<T>) rctx.execute(address);
 			if (rctx.isExceptional()) return rctx;
-			namespaceAddress=RT.ensureAddress(rctx.getResult());
-			if (namespaceAddress==null) return rctx.withArgumentError("Lookup Op failed to produce an Address");
+			ACell maybeAddress=rctx.getResult();
+			namespaceAddress=RT.ensureAddress(maybeAddress);
+			if (namespaceAddress==null) return rctx.withError(ErrorCodes.CAST,"Lookup requires Address but got: "+RT.getType(maybeAddress));
 		}
 		
 		// Do a dynamic lookup, with address if specified or address from current context otherwise

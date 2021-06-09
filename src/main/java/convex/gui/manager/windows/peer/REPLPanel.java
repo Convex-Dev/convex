@@ -95,6 +95,7 @@ public class REPLPanel extends JPanel {
 
 	/**
 	 * Create the panel.
+	 * @param peerView 
 	 */
 	public REPLPanel(PeerView peerView) {
 		setLayout(new BorderLayout(0, 0));

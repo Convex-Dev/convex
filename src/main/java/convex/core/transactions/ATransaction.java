@@ -59,15 +59,14 @@ public abstract class ATransaction extends ACell {
 	 * <li>Does not finalise memory/juice accounting (will be completed afterwards)</li>
 	 * </ul>
 	 * 
-	 * @param state  The initial chain state
-	 * @param source The source account that has signed the transaction
+	 * @param ctx Context for which to apply this Transaction
 	 * @return The updated chain state
 	 */
 	public abstract <T extends ACell> Context<T> apply(Context<?> ctx);
 
 	/**
-	 * Gets the Address for this transaction
-	 * @return
+	 * Gets the *origin* Address for this transaction
+	 * @return Address for this Transaction
 	 */
 	public Address getAddress() {
 		return address;
@@ -105,7 +104,7 @@ public abstract class ATransaction extends ACell {
 
 	/**
 	 * Updates this transaction with the specified address
-	 * @param newSequence New address
+	 * @param newAddress New address
 	 * @return Updated transaction, or this transaction if unchanged.
 	 */
 	public abstract ATransaction withAddress(Address newAddress);

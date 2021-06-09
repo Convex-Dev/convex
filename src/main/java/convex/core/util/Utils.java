@@ -128,6 +128,7 @@ public class Utils {
 	 * big-endian representation
 	 *
 	 * @param data Byte array from which to read the 4-byte int representation
+	 * @param offset Offset into byte array to read
 	 * @return int value from array
 	 */
 	public static int readInt(byte[] data, int offset) {
@@ -151,6 +152,7 @@ public class Utils {
 	 * big-endian representation
 	 *
 	 * @param data Byte array from which to read the 2-byte short representation
+	 * @param offset Offset into byte array to read
 	 * @return short value from array
 	 */
 	public static short readShort(byte[] data, int offset) {
@@ -222,22 +224,24 @@ public class Utils {
 	/**
 	 * Reads ByteBuffer contents into a new byte array
 	 *
-	 * @param b
+	 * @param bb
+	 * @return New byte array
 	 */
-	public static byte[] toByteArray(ByteBuffer b) {
-		int len = b.remaining();
+	public static byte[] toByteArray(ByteBuffer bb) {
+		int len = bb.remaining();
 		byte[] bytes = new byte[len];
-		b.get(bytes);
+		bb.get(bytes);
 		return bytes;
 	}
 
 	/**
 	 * Reads ByteBuffer contents into a new Data object
 	 *
-	 * @param b
+	 * @param bb ByteBuffer
+	 * @return Blob extracted from ByteBuffer
 	 */
-	public static AArrayBlob toData(ByteBuffer b) {
-		return Blob.wrap(toByteArray(b));
+	public static AArrayBlob toData(ByteBuffer bb) {
+		return Blob.wrap(toByteArray(bb));
 	}
 
 	/**
@@ -334,9 +338,11 @@ public class Utils {
 	}
 
 	/**
-	 * Converts a byte array of length N to a hex string of length 2N
+	 * Converts a slice of a byte array to a hex string of length 2N
 	 *
 	 * @param data Array of bytes
+	 * @param offset Start offset to read from byte array
+	 * @param length Length in bytes to read from byte array
 	 * @return Hex String
 	 */
 	public static String toHexString(byte[] data, int offset, int length) {
@@ -354,6 +360,7 @@ public class Utils {
 	 *
 	 * The hashCode of null is defined as zero
 	 *
+	 * @param a Any Java Object, may be null
 	 * @return hash code
 	 */
 	public static int hashCode(Object a) {
@@ -687,7 +694,11 @@ public class Utils {
 
 	/**
 	 * Extract a number of bits (up to 32) from a big-endian byte array, shifting
-	 * right be the specified amount. Sign extends for bits beyond range of array.
+	 * right by the specified amount. Sign extends for bits beyond range of array.
+	 * @param bs Source byte array
+	 * @param numBits Number of bits to extract (0-32)
+	 * @param shift Number of bits to shift
+	 * @return Bits returned
 	 */
 	public static int extractBits(byte[] bs, int numBits, int shift) {
 		if ((numBits < 0) || (numBits > 32)) throw new IllegalArgumentException("Invalid number of bits: " + numBits);
@@ -720,6 +731,10 @@ public class Utils {
 	/**
 	 * Sets a number of bits (up to 32) in a big-endian byte array, shifting by the
 	 * specified amount Ignores bits set outside the byte array
+	 * @param bs Target byte array
+	 * @param numBits Number of bits to set (0-32)
+	 * @param shift Number of bits to shift
+	 * @param bits Bits to set
 	 */
 	public static void setBits(byte[] bs, int numBits, int shift, int bits) {
 		if ((numBits < 0) || (numBits > 32)) {
@@ -782,8 +797,8 @@ public class Utils {
 
 	/**
 	 * Prints an Object in readable String representation
+	 * @param sb StringBuilder to append to
 	 * @param v
-	 * @return
 	 */
 	public static void print(StringBuilder sb,Object v) {
 		if (v == null) {
@@ -1030,6 +1045,7 @@ public class Utils {
 
 	/**
 	 * Reverse an array in place
+	 * @param arr Array to reverse
 	 */
 	public static <T> void reverse(T[] arr) {
 		reverse(arr, arr.length);
@@ -1037,6 +1053,8 @@ public class Utils {
 
 	/**
 	 * Reverse the first n elements of an array in place
+	 * @param arr Array to reverse
+	 * @param n Number of elements to reverse
 	 */
 	public static <T> void reverse(T[] arr, int n) {
 		for (int i = 0; i < (n / 2); i++) {
@@ -1085,10 +1103,10 @@ public class Utils {
 	}
 
 	/**
-	 * Gets the number of Refs directly contained in an object (will be zero if the
-	 * object is not a Ref container)
+	 * Gets the number of Refs directly contained in a Cell (will be zero if the
+	 * Cell is not a Ref container)
 	 *
-	 * @param eval
+	 * @param a Cell to check (may be null)
 	 * @return Number of Refs in the object.
 	 */
 	public static int refCount(ACell a) {
@@ -1100,8 +1118,8 @@ public class Utils {
 	 * Counts the total number of Refs contained in a data object recursively. Will
 	 * count duplicate children multiple times.
 	 *
-	 * @param eval
-	 * @return Total number of Refs
+	 * @param a Object to count Refs in
+	 * @return Total number of Refs found
 	 */
 	public static long totalRefCount(Object a) {
 		if (!(a instanceof ACell)) return 0;

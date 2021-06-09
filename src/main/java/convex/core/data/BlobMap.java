@@ -22,13 +22,16 @@ import convex.core.util.Utils;
  * <li>An optional entry with this prefix </li>
  * <li>Up to 16 child entries at the next level of depth</li>
  * </ul>
- *
- * @param <V>
+ * @param <K> Type of Keys
+ * @param <V> Type of values
  */
 public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private static final Ref<ABlobMap>[] EMPTY_CHILDREN = new Ref[0];
 
+	/**
+	 * Empty BlobMap singleton
+	 */
 	public static final BlobMap<ABlob, ACell> EMPTY = new BlobMap<ABlob, ACell>(Blob.EMPTY, 0, 0, null, EMPTY_CHILDREN,
 			(short) 0, 0L);
 
@@ -84,11 +87,6 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 				"Illegal mask: " + Utils.toHexString(mask) + " for given number of children: " + cn);
 		this.children = (Ref[]) entries;
 		this.mask = mask;
-	}
-
-	@SuppressWarnings("unchecked")
-	public static <K extends ABlob, V extends ACell> BlobMap<K, V> create() {
-		return (BlobMap<K, V>) EMPTY;
 	}
 
 	public static <K extends ABlob, V extends ACell> BlobMap<K, V> create(MapEntry<K, V> me) {
@@ -376,7 +374,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	 * @param newChild
 	 * @return
 	 */
-	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@SuppressWarnings({ "rawtypes", "unchecked", "null" })
 	private BlobMap<K, V> withChild(int childDigit, BlobMap<K, V> oldChild, BlobMap<K, V> newChild) {
 		// consider empty children as null
 		if (oldChild == EMPTY) oldChild = null;

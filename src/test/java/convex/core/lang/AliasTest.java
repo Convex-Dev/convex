@@ -15,14 +15,6 @@ import convex.core.data.AMap;
 import convex.core.data.Address;
 
 public class AliasTest {
-	@Test public void testInitialAlias() {
-		assertTrue(evalB("(empty? *aliases*)"));
-	}
-	
-	@Test public void testWipeAlias() {
-		Context<?> ctx=step("(def *aliases* {nil nil})");
-		assertUndeclaredError(step(ctx,"count"));
-	}
 	
 	@Test public void testLibraryAlias() {
 		Context<?> ctx=step("(def lib (deploy '(do (def foo 100) (defn bar [] (inc foo)) (defn baz [f] (f foo)))))");
@@ -33,7 +25,7 @@ public class AliasTest {
 		assertUndeclaredError(step(ctx,"foo"));
 		assertUndeclaredError(step(ctx,"mylib/foo"));
 		
-		ctx=step(ctx,"(def *aliases* (assoc *aliases* 'mylib lib))");
+		ctx=step(ctx,"(def mylib lib)");
 		
 		// Alias should now work
 		assertEquals(100L,evalL(ctx,"mylib/foo"));
@@ -67,19 +59,6 @@ public class AliasTest {
 	}
 	
 	@Test
-	public void testDefaultImport() {
-		Context<?> ctx = step("(def lib (deploy '(def foo 100)))");
-
-		ctx = step(ctx, "(import ~lib :as :default)");
-
-		// Alias should now work for default lookups
-		assertEquals(100L, evalL(ctx, "foo"));
-		
-		// core lookups should now be broken, sadly....
-		assertUndeclaredError(step(ctx, "count"));
-	}
-	
-	@Test
 	public void testBadImports() {
 		Context<?> ctx = step("(def lib (deploy `(def foo 100)))");
 		Address lib = (Address) ctx.getResult();
@@ -98,15 +77,6 @@ public class AliasTest {
 		
 		// can't have non-address first argument
 		assertCastError(step(ctx,"(import :foo :as mylib)"));
-	}
-	
-	@Test void testBadSelfDefualtAlias() {
-		// should be possible to create a defualt alias to self
-		Context<?> ctx = step("(def *aliases* (assoc *aliases* nil *address*))");
-		assertTrue(ctx.getResult() instanceof AMap);
-		
-		// we don't want infinite recursion to happen here!
-		assertUndeclaredError(step(ctx,"foo"));
 	}
 	
 	@Test

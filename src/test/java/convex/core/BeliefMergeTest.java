@@ -170,6 +170,9 @@ public class BeliefMergeTest {
 	 * from the first peers to the last peer Each round of peers updates is
 	 * gossipped simultaneously and the results checked at each stage To validate
 	 * correct propagation of the new block across the network
+	 * @throws BadSignatureException 
+	 * @throws InvalidDataException 
+	 * @throws BadFormatException 
 	 */
 	@Test
 	public void testSingleBlockConsensus() throws BadSignatureException, InvalidDataException, BadFormatException {
@@ -251,8 +254,9 @@ public class BeliefMergeTest {
 	 * round of peers updates is gossipped simultaneously and the results checked at
 	 * each stage To validate correct propagation of the new block across the
 	 * network
-	 *
-	 * @throws BoundsException
+	 * @throws BadSignatureException 
+	 * @throws InvalidDataException 
+	 * @throws BadFormatException 
 	 */
 	@Test
 	public void testMultiBlockConsensus() throws BadSignatureException, InvalidDataException, BadFormatException {
@@ -341,8 +345,9 @@ public class BeliefMergeTest {
 	 * This test creates a set of peers, and one transaction for each peer Each
 	 * round of peers updates is gossipped partially To validate correct propagation
 	 * of the new block across the network
-	 *
-	 * @throws BoundsException
+	 * @throws BadSignatureException 
+	 * @throws InvalidDataException 
+	 * @throws BadFormatException 
 	 */
 	@Test
 	public void testGossipConsensus() throws BadSignatureException, InvalidDataException, BadFormatException {

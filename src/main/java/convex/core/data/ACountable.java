@@ -22,7 +22,7 @@ public abstract class ACountable<E extends ACell> extends ACell {
 	 * @param index Index of element to get
 	 * @return Element at the specified index
 	 */
-	public abstract E get(long i);
+	public abstract E get(long index);
 	
 	/**
 	 * Checks if this data structure is empty, i.e. has a count of zero elements.

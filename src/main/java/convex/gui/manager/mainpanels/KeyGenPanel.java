@@ -92,6 +92,7 @@ public class KeyGenPanel extends JPanel {
 
 	/**
 	 * Create the panel.
+	 * @param manager 
 	 */
 	public KeyGenPanel(PeerManager manager) {
 		setLayout(new BorderLayout(0, 0));

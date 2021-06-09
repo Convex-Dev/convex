@@ -71,6 +71,8 @@ public class Format {
 
 	/**
 	 * Gets the length in bytes of VLC encoding for the given long value
+	 * @param x Long value to encode
+	 * @return Length of VLC encoding
 	 */
 	public static int getVLCLength(long x) {
 		if ((x < 64) && (x >= -64)) {
@@ -90,6 +92,9 @@ public class Format {
 	 * <li>Following MSB, 7 bits of integer representation for each octet</li>
 	 * <li>Second highest bit of first byte is interpreted as the sign</li> 
 	 * </ul>
+	 * @param bb ByteBuffer to write to
+	 * @param x Value to VLC encode
+	 * @return Updated ByteBuffer
 	 */
 	public static ByteBuffer writeVLCLong(ByteBuffer bb, long x) {
 		if ((x < 64) && (x >= -64)) {
@@ -117,7 +122,10 @@ public class Format {
 	 * <li>Second highest bit of first byte is interpreted as the sign</li> 
 	 * </ul>
 	 * 
-	 * @return - end position in byte array after writing VLC long
+	 * @param bs Byte array to write to
+	 * @param pos Initial position in byte array
+	 * @param x Long value to write
+	 * @return end position in byte array after writing VLC long
 	 */
 	public static int writeVLCLong(byte[] bs, int pos, long x) {
 		if ((x < 64) && (x >= -64)) {
@@ -139,8 +147,10 @@ public class Format {
 	}
 
 	/**
-	 * Reads a VLC encoded long from the given bytebuffer. Assumes no tag
+	 * Reads a VLC encoded long from the given ByteBuffer. Assumes no tag
 	 * 
+	 * @param bb ByteBuffer from which to read
+	 * @return Long value from ByteBuffer
 	 * @throws BadFormatException
 	 */
 	public static long readVLCLong(ByteBuffer bb) throws BadFormatException {
@@ -183,18 +193,20 @@ public class Format {
 	/**
 	 * Reads a VLC encoded long as a long from the given location in a byte byte
 	 * array. Assumes no tag
-	 * 
+	 * @param data Byte array
+	 * @param pos Position from which to read in byte array
+	 * @return long value from byte array
 	 * @throws BadFormatException If format is invalid, or reading beyond end of
 	 *                            array
 	 */
-	public static long readVLCLong(byte[] data, int i) throws BadFormatException {
-		byte octet = data[i++];
+	public static long readVLCLong(byte[] data, int pos) throws BadFormatException {
+		byte octet = data[pos++];
 		long result = (((long) octet) << 57) >> 57; // sign extend 7th bit to 64th bit
 		int bits = 7;
 		while ((octet & 0x80) != 0) {
-			if (i >= data.length) throw new BadFormatException("VLC encoding beyong end of array");
+			if (pos >= data.length) throw new BadFormatException("VLC encoding beyong end of array");
 			if (bits > 64) throw new BadFormatException("VLC encoding too long for long value");
-			octet = data[i++];
+			octet = data[pos++];
 			// continue while high bit of byte set
 			result = (result << 7) | (octet & 0x7F); // shift and set next 7 lowest bits
 			bits += 7;
@@ -333,24 +345,26 @@ public class Format {
 	/**
 	 * Writes a canonical object to a ByteBuffer, preceded by the appropriate tag
 	 * 
-	 * @param o Object value to write
+	 * @param bb ByteBuffer to write to
+	 * @param cell Cell to write (may be null)
 	 * @return The ByteBuffer after writing the specified object
 	 */
-	public static ByteBuffer write(ByteBuffer bb, ACell o) {
+	public static ByteBuffer write(ByteBuffer bb, ACell cell) {
 		// first check for null
-		if (o == null) {
+		if (cell == null) {
 			return bb.put(Tag.NULL);
 		}
-		
 		// Generic handling for all non-null CVM types
-		return o.write(bb);
+		return cell.write(bb);
 	}
 	
 	/**
 	 * Writes a canonical object to a byte array, preceded by the appropriate tag
 	 * 
-	 * @param o Object value to write (may be null)
-	 * @return The ByteBuffer after writing the specified object
+	 * @param bs Byte array to write to
+	 * @param pos Starting position to write in byte array
+	 * @param cell Cell to write (may be null)
+	 * @return Position in byte array after writing the specified object
 	 */
 	public static int write(byte[] bs, int pos, ACell cell) {
 		if (cell==null) {
@@ -407,9 +421,10 @@ public class Format {
 	 * Writes a raw string without tag to the byte array. Includes length in bytes
 	 * of UTF-8 representation
 	 * 
-	 * @param bb
-	 * @param s
-	 * @return ByteBuffer after writing
+	 * @param bs Byte array
+	 * @param pos Starting position to write in byte array
+	 * @param s String to write
+	 * @return Position in byte array after writing
 	 */
 	public static int writeRawUTF8String(byte[] bs, int pos, String s) {
 		if (s.length() == 0) {
@@ -508,6 +523,7 @@ public class Format {
 	/**
 	 * Writes a 64-bit long as 8 bytes to the ByteBuffer provided
 	 * 
+	 * @param bb Destination ByteBuffer
 	 * @param value
 	 * @return ByteBuffer after writing
 	 */
@@ -518,6 +534,7 @@ public class Format {
 	/**
 	 * Reads a 64-bit long as 8 bytes from the ByteBuffer provided
 	 * 
+	 * @param bb Destination ByteBuffer
 	 * @return long value
 	 */
 	public static long readLong(ByteBuffer bb) {
@@ -530,6 +547,7 @@ public class Format {
 	 * Converts Embedded objects to Refs automatically.
 	 * 
 	 * @param bb ByteBuffer containing a ref to read
+	 * @return Ref as read from ByteBuffer
 	 * @throws BadFormatException If the data is badly formatted, or a non-embedded
 	 *                            object is found.
 	 */
@@ -630,7 +648,12 @@ public class Format {
 	/**
 	 * Reads a basic type (primitives and numerics) with the given tag
 	 * 
+	 * @param bb ByteBuffer to read from
+	 * @param tag Tag byte indicating type to read
+	 * @return Cell value read
+
 	 * @throws BadFormatException
+	 * @throws BufferUnderflowException if the ByteBuffer contains insufficent bytes for Encoding
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T readBasicType(ByteBuffer bb, byte tag) throws BadFormatException, BufferUnderflowException {
@@ -650,6 +673,9 @@ public class Format {
 	/**
 	 * Reads a basic type (primitives and numerics) with the given tag
 	 * 
+	 * @param bb ByteBuffer to read from
+	 * @param tag Tag byte indicating type to read
+	 * @return Record value read
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
@@ -696,13 +722,13 @@ public class Format {
 	 * @return Value read from the ByteBuffer
 	 * @throws BadFormatException
 	 */
-	public static <T extends ACell> T read(ByteBuffer bb) throws BadFormatException, BufferUnderflowException {
+	public static <T extends ACell> T read(ByteBuffer bb) throws BadFormatException {
 		byte tag = bb.get();
 		return read(tag,bb);
 	}
 	
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> T read(byte tag,ByteBuffer bb) throws BadFormatException, BufferUnderflowException {
+	public static <T extends ACell> T read(byte tag,ByteBuffer bb) throws BadFormatException {
 		try {
 			if ((tag & 0xF0) == 0x00) return readBasicType(bb, tag);
 
@@ -790,9 +816,9 @@ public class Format {
 	}
 
 	/**
-	 * Gets an new encoded ByteBuffer for an object in wire format
+	 * Gets an new encoded ByteBuffer for an Cell in wire format
 	 * 
-	 * @param o The object to encode
+	 * @param cell The Cell to encode
 	 * @return A ByteBuffer ready to read (i.e. already flipped)
 	 */
 	public static ByteBuffer encodedBuffer(ACell cell) {
@@ -828,9 +854,9 @@ public class Format {
 	 * Writes hex digits from digit position start, total length
 	 * 
 	 * @param bb
-	 * @param prefix
-	 * @param start
-	 * @param length
+	 * @param src Blob containing hex digits
+	 * @param start Start position (in hex digits)
+	 * @param length Length (in hex digits)
 	 * @return ByteBuffer after writing
 	 */
 	public static ByteBuffer writeHexDigits(ByteBuffer bb, ABlob src, long start, long length) {
@@ -876,7 +902,11 @@ public class Format {
 	 * Reads hex digits from ByteBuffer into the specified range of a new byte
 	 * array. Needed for BlobMap encoding.
 	 * 
+	 * @param start Start position (in hex digits)
+	 * @param length Length (in hex digits)
 	 * @param bb
+	 * @return byte array containing hex digits
+	 * @throws BadFormatException In case of bad Encoding format
 	 */
 	public static byte[] readHexDigits(ByteBuffer bb, long start, long length) throws BadFormatException {
 		int nBytes = Utils.checkedInt((length + 1) >> 1);

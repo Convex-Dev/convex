@@ -356,10 +356,10 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * Reads a MapLeaf from the provided ByteBuffer Assumes the header byte is
 	 * already read.
 	 * 
-	 * @param data
-	 * @param count
+	 * @param bb ByteBuffer to read from
+	 * @param count Count of map elements
 	 * @param includeValues True to include values, false otherwise (i.e. this is a Set)
-	 * @return A ListMap as deserialised from the provided ByteBuffer
+	 * @return A Map as deserialised from the provided ByteBuffer
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
@@ -519,6 +519,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		throw new TODOException("Unhandled map type: " + b.getClass());
 	}
 
+	@SuppressWarnings("null")
 	private AHashMap<K, V> mergeWith(MapLeaf<K, V> b, MergeFunction<V> func, int shift) {
 		int al = this.size();
 		int bl = b.size();
@@ -577,6 +578,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		throw new TODOException("Unhandled map type: " + b.getClass());
 	}
 
+	@SuppressWarnings("null")
 	public AHashMap<K, V> mergeDifferences(MapLeaf<K, V> b, MergeFunction<V> func,int shift) {
 		if (this.equals(b)) return this; // no change in identical case
 		int al = this.size();

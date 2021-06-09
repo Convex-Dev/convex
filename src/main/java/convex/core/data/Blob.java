@@ -78,7 +78,9 @@ public class Blob extends AArrayBlob {
 	 * directly. Use only if no other references to the byte array are kept which
 	 * might be mutated.
 	 * 
-	 * @param data
+	 * @param data Byte array
+	 * @param offset Offset into byte array
+	 * @param length Length of byte array to wrap
 	 * @return Blob wrapping the given byte array segment
 	 */
 	public static Blob wrap(byte[] data, int offset, int length) {
@@ -179,6 +181,7 @@ public class Blob extends AArrayBlob {
 	 * retention of source Blob object as encoded data.
 	 * 
 	 * @param source Source Blob object.
+	 * @param len Length in bytes to take from the source Blob
 	 * @return Blob read from the source
 	 * @throws BadFormatException
 	 */

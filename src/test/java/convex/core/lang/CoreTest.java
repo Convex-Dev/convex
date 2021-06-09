@@ -92,12 +92,6 @@ public class CoreTest extends ACVMTest {
 	private final Context<?> INITIAL_CONTEXT= context();
 
 	@Test
-	public void testAliases() {
-		assertTrue(evalB("(map? *aliases*)"));
-		assertEquals(Maps.empty(),eval("*aliases*"));
-	}
-
-	@Test
 	public void testAddress() {
 		Address a = Init.HERO;
 		assertEquals(a, eval("(address \"" + a.toHexString() + "\")"));
@@ -1242,6 +1236,19 @@ public class CoreTest extends ACVMTest {
 
 		assertCastError(step("(cons 1 2 3 4 5)"));
 	}
+	
+	@Test 
+	public void testComp() {
+		assertEquals(43L, evalL("((comp inc) 42)"));
+		assertEquals(44L, evalL("((comp inc inc) 42)"));
+		assertEquals(45L, evalL("((comp inc inc inc) 42)"));
+		assertEquals(46L, evalL("((comp inc inc inc inc) 42)"));
+		
+		assertEquals(3.0, evalD("((comp sqrt +) 4 5)"));
+		
+		assertArityError(step("(comp)"));
+
+	}
 
 	@Test
 	public void testInto() {
@@ -1565,10 +1572,10 @@ public class CoreTest extends ACVMTest {
 		{
 			Context<?> ctx=step("(def act (deploy '(do (def g :foo) (defn f [] (def g 3) (halt 2) 1) (export f))))");
 			assertTrue(ctx.getResult() instanceof Address);
-			assertEquals(Keywords.FOO, eval(ctx,"(lookup act 'g)")); // initial value of g
+			assertEquals(Keywords.FOO, eval(ctx,"(lookup act g)")); // initial value of g
 			ctx=step(ctx,"(call act (f))");
 			assertCVMEquals(2L, ctx.getResult()); // halt value returned
-			assertCVMEquals(3L, eval(ctx,"(lookup act 'g)")); // g has been updated
+			assertCVMEquals(3L, eval(ctx,"(lookup act g)")); // g has been updated
 		}
 
 		assertArityError(step("(halt 1 2)"));
@@ -1681,9 +1688,6 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Keywords.STATE, eval("(keyword (str 'state))"));
 		assertEquals(Keywords.STATE, eval("(keyword 'state)"));
 
-		// Note: paths ignored when converting from Symbol
-		assertEquals(Keywords.STATE, eval("(keyword 'foo/state)"));
-
 		// keyword lookups
 		assertNull(eval("((keyword :foo) nil)"));
 
@@ -1729,8 +1733,8 @@ public class CoreTest extends ACVMTest {
 		assertEquals("count", evalS("(name 'count)"));
 		assertEquals("foo", evalS("(name \"foo\")"));
 
-		// should extract symbol name, exluding namespace alias
-		assertEquals("bar", evalS("(name 'foo/bar)"));
+		// should extract symbol name
+		assertEquals("bar", evalS("(name 'bar)"));
 
 		// longer strings OK for name
 		assertEquals("duicgidvgefiucefiuvfeiuvefiuvgifegvfuievgiuefgviuefgviufegvieufgviuefvgevevgi", evalS("(name \"duicgidvgefiucefiuvfeiuvefiuvgifegvfuievgiuefgviuefgviufegvieufgviuefvgevevgi\")"));
@@ -1750,26 +1754,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Symbols.COUNT, eval("(symbol (str 'count))"));
 		assertEquals(Symbols.COUNT, eval("(symbol (name :count))"));
 		assertEquals(Symbols.COUNT, eval("(symbol (name \"count\"))"));
-
-		Symbol foobar = Symbol.create(Symbol.create(Strings.create("foo")), Strings.create("bar"));
-		assertEquals(foobar, eval("(symbol \"foo\" \"bar\")"));
-		assertEquals(foobar, eval("(symbol 'foo \"bar\")"));
-		assertEquals(foobar, eval("(symbol \"foo\" :bar)"));
-		assertEquals(foobar, eval("(symbol 'foo :bar)"));
-
-		// Symbol and path equivalence
-		assertEquals(read("#8/foo"),eval("(symbol #8 :foo)"));
-		assertEquals(read("foo"),eval("(symbol nil :foo)"));
-		assertEquals(read("foo/bar"),eval("(symbol :foo :bar)"));
-
-		// Path overwrites
-		assertEquals(read("foo"),eval("(symbol nil 'baz/foo)"));
-		assertEquals(read("foo/bar"),eval("(symbol :foo 'baz/bar)"));
-
-		// Symbols with Address paths
-		assertEquals(Symbol.create(Address.create(8),Strings.create("foo")),eval("(symbol #8 'foo)"));
-		assertEquals(Symbol.create(Address.create(8),Strings.create("foo")),eval("'#8/foo"));
-
+		
 		// too short or too long results in ARGUMENT error
 		assertArgumentError(step("(symbol (str))"));
 		assertArgumentError(
@@ -1793,9 +1778,7 @@ public class CoreTest extends ACVMTest {
 
 			assertEquals(100L, evalL(ctx2, "mylib/foo"));
 			assertUndeclaredError(step(ctx2, "mylib/bar"));
-			assertTrue(evalB(ctx2,"(map? (lookup-meta 'mylib/foo))"));
-			assertTrue(evalB(ctx2,"(defined? mylib/foo)"));
-			assertFalse(evalB(ctx2,"(defined? mylib/bar)"));
+			assertTrue(evalB(ctx2,"(map? (lookup-meta mylib 'foo))"));
 		}
 
 		{ // test deploy and CNS import in a single form. See #107
@@ -1819,32 +1802,34 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testLookup() {
-		assertSame(Core.COUNT, eval("(lookup 'count)"));
-
-		assertSame(Core.COUNT, eval("(lookup *address* 'count)"));
-
-		assertNull(eval("(lookup 'non-existent-symbol)"));
+		assertSame(Core.COUNT, eval("(lookup count)"));
+		assertSame(Core.COUNT, eval("(lookup *address* count)"));
+		assertSame(Core.COUNT, eval("(lookup "+Init.CORE_ADDRESS+" count)"));
 
 		// Lookups after def
-		assertEquals(1L,evalL("(do (def foo 1) (lookup 'foo))"));
-		assertEquals(1L,evalL("(do (def foo 1) (lookup *address* 'foo))"));
+		assertEquals(1L,evalL("(do (def foo 1) (lookup foo))"));
+		assertEquals(1L,evalL("(do (def foo 1) (lookup *address* foo))"));
+		
+		// UNDECLARED if not declared
+		assertUndeclaredError(step("(lookup non-existent-symbol)"));
 
-		// Lookups in non-existent environment
-		assertNull(eval("(lookup #77777777 'count)"));
-		assertNull(eval("(do (def foo 1) (lookup #66666666 'foo))"));
+		// NOBODY for lookups in non-existent environment 
+		assertNobodyError(step("(lookup #77777777 count)"));
+		assertNobodyError(step("(do (def foo 1) (lookup #66666666 foo))"));
 
-		assertCastError(step("(lookup :count)"));
-		assertCastError(step("(lookup \"count\")"));
-		assertCastError(step("(lookup :non-existent-symbol)"));
-
-		// invalid name string
-		assertCastError(
+		// COMPILE Errors for bad symbols
+		assertCompileError(step("(lookup :count)"));
+		assertCompileError(step("(lookup \"count\")"));
+		assertCompileError(step("(lookup :non-existent-symbol)"));
+		assertCompileError(
 				step("(lookup \"cdiubcidciuecgieufgvuifeviufegviufeviuefbviufegviufevguiefvgfiuevgeufigv\")"));
-
-		assertCastError(step("(lookup count)"));
-		assertCastError(step("(lookup nil)"));
-		assertCastError(step("(lookup 10)"));
-		assertCastError(step("(lookup [])"));
+		assertCompileError(step("(lookup nil)"));
+		assertCompileError(step("(lookup 10)"));
+		assertCompileError(step("(lookup [])"));
+		
+		// CAST Errors for bad Addresses
+		assertCastError(step("(lookup 8 count)"));
+		assertCastError(step("(lookup :foo count)"));
 
 		assertArityError(step("(lookup)"));
 		assertArityError(step("(lookup 1 2 3)"));
@@ -2944,6 +2929,9 @@ public class CoreTest extends ACVMTest {
 
 		// MultiFn printing
 		assertCVMEquals("(fn ([] 0) ([x] 1))",eval("(str (fn ([]0) ([x] 1) ))"));
+		
+		// Issue #193 Error test
+		assertEquals(Vectors.of(1,2,3),eval("(do (defn f ([[a b] c] [a b c])) (f [1 2] 3))"));
 
 		// arity errors
 		assertArityError(step("((fn ([x] 1) ([x & more] 2)))"));
@@ -3019,7 +3007,7 @@ public class CoreTest extends ACVMTest {
 		assertNull(eval("(undef count)"));
 		assertNull(eval("(undef foo)"));
 		assertNull(eval("(undef *balance*)"));
-		assertNull(eval("(undef foo/bar)"));
+		assertNull(eval("(undef bar)"));
 
 		assertEquals(Vectors.of(1L, 2L), eval("(do (def a 1) (def v [a 2]) (undef a) v)"));
 
@@ -3577,7 +3565,7 @@ public class CoreTest extends ACVMTest {
 
 		// TODO: consider this
 		// Lookup in core environment of special returns the Symbol
-		assertEquals(Symbols.STAR_JUICE,eval("(lookup '*juice*)"));
+		assertEquals(Symbols.STAR_JUICE,eval("(lookup *juice*)"));
 
 		assertEquals(Symbols.STAR_JUICE,eval(Lookup.create(Symbols.STAR_JUICE)));
 	}

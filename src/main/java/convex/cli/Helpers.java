@@ -84,6 +84,7 @@ public class Helpers {
 	 * @param sessionFilename Session filename to open and get the random port nummber.
 	 *
 	 * @return A random hostname or null if none can be found
+	 * @throws IOException 
 	 *
 	 */
 	public static String getSessionHostname(String sessionFilename) throws IOException {
@@ -101,6 +102,9 @@ public class Helpers {
 
 	/**
 	 * Return a random session port from the local running network.
+	 * @param sessionFilename 
+	 * @return Port number (may be zero)
+	 * @throws IOException 
 	 */
 	public static int getSessionPort(String sessionFilename) throws IOException {
 	String hostname = Helpers.getSessionHostname(sessionFilename);

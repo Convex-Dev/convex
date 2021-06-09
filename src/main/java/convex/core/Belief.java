@@ -117,9 +117,9 @@ public class Belief extends ARecord {
 	/**
 	 * The Belief merge function
 	 * 
+	 * @param mc MergeContext for Belief Merge
 	 * @param beliefs An array of Beliefs. May contain nulls, which will be ignored.
 	 * @return The updated merged belief, or the same Belief if there is no change.
-	 * 
 	 * @throws BadSignatureException
 	 * @throws InvalidDataException
 	 */
@@ -411,7 +411,7 @@ public class Belief extends ARecord {
 	 * @param stakedOrders
 	 * @param consensusPoint
 	 * @param initialTotalStake
-	 * @return @
+	 * @return Vector of Blocks in wiing Order
 	 */
 	public static AVector<Block> computeWinningOrder(HashMap<Order, Double> stakedOrders, long consensusPoint,
 			double initialTotalStake) {
@@ -462,6 +462,7 @@ public class Belief extends ARecord {
 				}
 			}
 
+			if (winningResult==null) throw new Error("This shouldn't happen!");
 			votingOrders = winningResult.getValue(); // chains to be included in next round
 			totalStake = winningVote; // total stake among winning chains
 			point++; // advance to next block position for next round

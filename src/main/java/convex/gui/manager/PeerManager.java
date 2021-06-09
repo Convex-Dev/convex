@@ -57,6 +57,7 @@ public class PeerManager extends JPanel {
 
 	/**
 	 * Launch the application.
+	 * @param args Command line args
 	 * @throws IOException 
 	 */
 	public static void main(String[] args) throws IOException {
@@ -203,6 +204,9 @@ public class PeerManager extends JPanel {
 
 	/**
 	 * Builds a connection to the peer network
+	 * @param address Address for connection
+	 * @param kp Key Pair for connection
+	 * @return Convex connection instance
 	 * @throws IOException 
 	 */
 	public static Convex makeConnection(Address address,AKeyPair kp) throws IOException {
@@ -213,8 +217,9 @@ public class PeerManager extends JPanel {
 	/**
 	 * Executes a transaction using the given Wallet
 	 * 
-	 * @param code
-	 * @param receiveAction
+	 * @param code Code to execute
+	 * @param we Wallet to use
+	 * @return Future for Result
 	 */
 	public static CompletableFuture<Result> execute(WalletEntry we, ACell code) {
 		Address address = we.getAddress();
@@ -227,8 +232,9 @@ public class PeerManager extends JPanel {
 	/**
 	 * Executes a transaction using the given Wallet
 	 * 
-	 * @param code
-	 * @param receiveAction
+	 * @param we Wallet to use
+	 * @param trans Transaction to execute
+	 * @return Future for Result
 	 */
 	public static CompletableFuture<Result> execute(WalletEntry we, ATransaction trans) {
 		try {
@@ -245,7 +251,8 @@ public class PeerManager extends JPanel {
 	/**
 	 * Executes a transaction using the given Wallet
 	 * 
-	 * @param code
+	 * @param we Wallet to use
+	 * @param trans Transaction to execute
 	 * @param receiveAction
 	 */
 	public static void execute(WalletEntry we, ATransaction trans, Consumer<Result> receiveAction) {

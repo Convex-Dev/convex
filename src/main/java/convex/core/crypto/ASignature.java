@@ -24,7 +24,8 @@ public abstract class ASignature extends ACell {
 	 * 
 	 * Uses Ed25519 or ECDSA as configured.
 	 * 
-	 * @param bb
+	 * @param bb ByteBuffer to read from
+	 * @return Signature instance
 	 * @throws BadFormatException
 	 */
 	public static ASignature read(ByteBuffer bb) throws BadFormatException {
@@ -33,7 +34,7 @@ public abstract class ASignature extends ACell {
 	
 	/**
 	 * Gets the content of this Signature as a hex string
-	 * @return
+	 * @return Hex String represenation of Signature
 	 */
 	public abstract String toHexString();
 	
@@ -42,7 +43,8 @@ public abstract class ASignature extends ACell {
 	 * 
 	 * Uses Ed25519 or ECDSA as configured.
 	 * 
-	 * @param bb
+	 * @param hex Hex String to read from
+	 * @return Signature instance
 	 * @throws BadFormatException
 	 */
 	public static ASignature fromHex(String hex) throws BadFormatException {

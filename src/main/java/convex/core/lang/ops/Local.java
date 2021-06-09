@@ -33,8 +33,9 @@ public class Local<T extends ACell> extends AOp<T> {
 	
 
 	/**
-	 * Creates special Op for the given opCode
-	 * @param opCode
+	 * Creates Local to look up a lexical value in the given position
+	 * 
+	 * @param position Position in lexical value vector
 	 * @return Special instance, or null if not found
 	 */
 	public static final <R extends ACell> Local<R> create(long position) {

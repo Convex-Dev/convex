@@ -41,6 +41,8 @@ public class BlobTree extends ABlob {
 	 * Create a BlobTree from an arbitrary Blob.
 	 * 
 	 * Must be of sufficient size to convert to BlobTree
+	 * @param blob Source of BlobTree data
+	 * @return New BolobTree instance
 	 */
 	public static BlobTree create(ABlob blob) {
 		if (blob instanceof BlobTree) return (BlobTree) blob;

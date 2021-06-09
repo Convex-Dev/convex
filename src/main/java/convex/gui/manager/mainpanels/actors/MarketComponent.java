@@ -194,7 +194,7 @@ public class MarketComponent extends BaseListComponent {
 				@SuppressWarnings("unchecked")
 				AMap<Address, CVMLong> stks = (AMap<Address, CVMLong>) ctx.actorCall(address, 0, "stakes", outcome)
 						.getResult();
-				Long stk = stks.get(caller).longValue();
+				CVMLong stk = stks.get(caller);
 				String ownStake = (stk == null) ? "0" : stk.toString();
 				osLabels.get(outcome).setText(ownStake);
 			}

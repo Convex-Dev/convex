@@ -186,6 +186,9 @@ public class Order extends ACell {
 	/**
 	 * Updates this Order with a new proposal position. It is an error to set the
 	 * proposal point before the consensus point, or beyond the last block.
+	 * 
+	 * @param newProposalPoint New Proposal Point in Order 
+	 * @return Updated Order 
 	 */
 	public Order withProposalPoint(long newProposalPoint) {
 		if (this.proposalPoint == newProposalPoint) return this;
