@@ -1833,17 +1833,17 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testLookup() {
 		assertSame(Core.COUNT, eval("(lookup count)"));
-
 		assertSame(Core.COUNT, eval("(lookup *address* count)"));
-
-		// Lookup throws UNDECLARED if not declared
-		assertUndeclaredError(step("(lookup non-existent-symbol)"));
+		assertSame(Core.COUNT, eval("(lookup "+Init.CORE_ADDRESS+" count)"));
 
 		// Lookups after def
 		assertEquals(1L,evalL("(do (def foo 1) (lookup foo))"));
 		assertEquals(1L,evalL("(do (def foo 1) (lookup *address* foo))"));
+		
+		// UNDECLARED if not declared
+		assertUndeclaredError(step("(lookup non-existent-symbol)"));
 
-		// Lookups in non-existent environment throw NOBOOY
+		// NOBODY for lookups in non-existent environment 
 		assertNobodyError(step("(lookup #77777777 count)"));
 		assertNobodyError(step("(do (def foo 1) (lookup #66666666 foo))"));
 
@@ -1857,8 +1857,9 @@ public class CoreTest extends ACVMTest {
 		assertCompileError(step("(lookup 10)"));
 		assertCompileError(step("(lookup [])"));
 		
-		// CAST Errors for bad symbols
-
+		// CAST Errors for bad Addresses
+		assertCastError(step("(lookup 8 count)"));
+		assertCastError(step("(lookup :foo count)"));
 
 		assertArityError(step("(lookup)"));
 		assertArityError(step("(lookup 1 2 3)"));

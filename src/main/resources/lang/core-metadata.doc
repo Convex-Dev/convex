@@ -697,7 +697,7 @@
 
   lookup
   {
-    :doc {:description "Looks up the value of a symbol in the current execution environment, or the account of the given address if specified. Name may be a symbol, keyword or String. Returns nil if not found."
+    :doc {:description "Looks up the value of a Symbol in the current execution environment, or the account of the given address if specified."
           :examples [{:code "(do (def a 13) (lookup a))"}
                      {:code "(lookup #8 count)"}]
           :type :special
