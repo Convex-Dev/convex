@@ -963,12 +963,16 @@ public class Server implements Closeable {
 			@SuppressWarnings("unchecked")
 			SignedData<Belief> signedBelief = (SignedData<Belief>) o;
 			signedBelief.validateSignature();
+			
+			// TODO: validate trusted connection?
+			// TODO: can drop Beliefs if under pressure?
 
 			synchronized (newBeliefs) {
 				AccountKey addr = signedBelief.getAccountKey();
 				SignedData<Belief> current = newBeliefs.get(addr);
 				if ((current == null) || (current.getValueUnchecked().getTimestamp() >= signedBelief.getValueUnchecked()
 						.getTimestamp())) {
+					// Add to map of new Beliefs recieved for each Peer
 					newBeliefs.put(addr, signedBelief);
 
 					// Notify the update thread that there is something new to handle

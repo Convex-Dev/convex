@@ -327,8 +327,8 @@ public class Belief extends ARecord {
 	}
 
 	/**
-	 * Updates the proposal point for the winning chain, given an overall map of
-	 * staked orders and consensus threshold.
+	 * Updates the proposal point for the winning Order, given an overall map of
+	 * staked Orders and consensus threshold.
 	 */
 	private Order updateProposal(Order winningOrder, HashMap<Order, Double> stakedOrders, double THRESHOLD) {
 		AVector<Block> winningBlocks = winningOrder.getBlocks();
@@ -412,44 +412,53 @@ public class Belief extends ARecord {
 	public static AVector<Block> computeWinningOrder(HashMap<Order, Double> stakedOrders, long consensusPoint,
 			double initialTotalStake) {
 		assert (!stakedOrders.isEmpty());
-		HashMap<AVector<Block>, Double> votingOrders = combineToBlocks(stakedOrders);
+		// Get the Voting Set. Will be updated each round to winners of previous round.
+		HashMap<AVector<Block>, Double> votingSet = combineToBlocks(stakedOrders);
 
 		// Accumulate new blocks.
-		ArrayList<Block> newBlocksOrdered = collectNewBlocks(votingOrders.keySet(), consensusPoint);
+		ArrayList<Block> newBlocksOrdered = collectNewBlocks(votingSet.keySet(), consensusPoint);
 
 		double totalStake = initialTotalStake;
 		long point = consensusPoint;
-		while (votingOrders.size() > 1) {
-			// accumulate candidate winning chains for this round, indexed by next block
-			HashMap<Block, HashMap<AVector<Block>, Double>> blockOrders = new HashMap<>();
-			for (Map.Entry<AVector<Block>, Double> me : votingOrders.entrySet()) {
+		
+		findWinner:
+		while (votingSet.size() > 1) {
+			// Accumulate candidate winning Blocks for this round, indexed by next Block
+			HashMap<Block, HashMap<AVector<Block>, Double>> blockVotes = new HashMap<>();
+			
+			for (Map.Entry<AVector<Block>, Double> me : votingSet.entrySet()) {
 				AVector<Block> blocks = me.getKey();
 				long cCount = blocks.count();
 
-				if (cCount <= point) continue; // skip chain with no more blocks: cannot win this round
+				if (cCount <= point) continue; // skip Ordering with insufficient blocks: cannot win this round
 
 				Block b = blocks.get(point);
 
-				// update hashmap of Orders voting for each block
-				HashMap<AVector<Block>, Double> agreedOrders = blockOrders.get(b);
+				// update hashmap of Orders voting for each block (i.e. agreed on current Block)
+				HashMap<AVector<Block>, Double> agreedOrders = blockVotes.get(b);
 				if (agreedOrders == null) {
 					agreedOrders = new HashMap<>();
-					blockOrders.put(b, agreedOrders);
+					blockVotes.put(b, agreedOrders);
 				}
 				Double stake = me.getValue();
 				agreedOrders.put(blocks, stake);
-				if (stake >= totalStake * 0.5) break; // have a winner for sure, no point continuing....
+				if (stake >= totalStake * 0.5) {
+					// have a winner for sure, no point continuing so pupulate final Voting set and break
+					votingSet.clear();
+					votingSet.put(blocks, stake);
+					break findWinner; 
+				}
 			}
 
-			if (blockOrders.size() == 0) {
+			if (blockVotes.size() == 0) {
 				// we have multiple chains, but no more blocks - so they should be all equal
 				// we can break loop and continue with an arbitrary choice
-				break;
+				break findWinner;
 			}
 
 			Map.Entry<Block, HashMap<AVector<Block>, Double>> winningResult = null;
 			double winningVote = Double.NEGATIVE_INFINITY;
-			for (Map.Entry<Block, HashMap<AVector<Block>, Double>> me : blockOrders.entrySet()) {
+			for (Map.Entry<Block, HashMap<AVector<Block>, Double>> me : blockVotes.entrySet()) {
 				HashMap<AVector<Block>, Double> agreedChains = me.getValue();
 				double blockVote = computeVote(agreedChains);
 				if (blockVote > winningVote) {
@@ -459,16 +468,19 @@ public class Belief extends ARecord {
 			}
 
 			if (winningResult==null) throw new Error("This shouldn't happen!");
-			votingOrders = winningResult.getValue(); // chains to be included in next round
-			totalStake = winningVote; // total stake among winning chains
-			point++; // advance to next block position for next round
+			votingSet = winningResult.getValue(); // Update Orderings to be included in next round
+			totalStake = winningVote; // Total Stake among winning Orderings
+			
+			// advance to next block position for next round
+			point++; 
 		}
-		if (votingOrders.size() == 0) {
+		
+		if (votingSet.size() == 0) {
 			// no vote for any chain. Might happen if the peer doesn't have any stake
 			// and doesn't have any chains from other peers with stake?
 			return null;
 		}
-		AVector<Block> winningBlocks = votingOrders.keySet().iterator().next();
+		AVector<Block> winningBlocks = votingSet.keySet().iterator().next();
 
 		// add new blocks back to winning chain if not already included
 		AVector<Block> fullWinningBlocks = appendNewBlocks(winningBlocks, newBlocksOrdered, consensusPoint);
@@ -498,10 +510,10 @@ public class Belief extends ARecord {
 	}
 
 	/**
-	 * Get a map of block vectors to total stake, given a map of ORders with stake for each.
+	 * Combine stakes from multiple orders to a single stake for each distinct Block ordering.
 	 * 
 	 * @param stakedOrders
-	 * @return
+	 * @return Map of AVector<Block> to total stake
 	 */
 	private static HashMap<AVector<Block>, Double> combineToBlocks(HashMap<Order, Double> stakedOrders) {
 		HashMap<AVector<Block>, Double> result = new HashMap<>();

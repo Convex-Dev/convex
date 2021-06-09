@@ -300,27 +300,31 @@ public class Peer {
 		Belief belief = getBelief();
 		MergeContext mc = MergeContext.create(keyPair, timestamp, getConsensusState());
 		Belief newBelief = belief.merge(mc, beliefs);
+		
+		long ocp=getConsensusPoint(); 
+		Order newOrder=newBelief.getOrder(peerKey);
+		if (ocp>newBelief.getOrder(peerKey).getConsensusPoint()) {
+			System.err.println("Receding consensus? Old CP="+ocp +", New CP="+newOrder.getConsensusPoint());
+			Belief newBelief2 = belief.merge(mc, beliefs);
 
-		return updateBelief(newBelief);
+		}
+
+		return updateConsensus(newBelief);
 	}
 
 	/**
-	 * Update this Peer with a new Belief
+	 * Update this Peer with Consensus State for an updated Belief
 	 *
 	 * @param newBelief
 	 * @return
 	 * @throws BadSignatureException
 	 */
-	private Peer updateBelief(Belief newBelief) throws BadSignatureException {
+	private Peer updateConsensus(Belief newBelief) throws BadSignatureException {
 		if (belief.getValue() == newBelief) return this;
 		Order myOrder = newBelief.getOrder(peerKey); // this peer's chain from new belief
 		long consensusPoint = myOrder.getConsensusPoint();
 		long stateIndex = states.count() - 1; // index of last state
 		AVector<Block> blocks = myOrder.getBlocks();
-
-		if (stateIndex > consensusPoint) {
-			throw new Error("Receding consensus? consensusPoint="+consensusPoint +", last state= "+stateIndex);
-		}
 
 		// need to advance states
 		AVector<State> newStates = this.states;
@@ -399,7 +403,7 @@ public class Peer {
 		Order newChain = myOrder.propose(block);
 		SignedData<Order> newSignedChain = sign(newChain);
 		BlobMap<AccountKey, SignedData<Order>> newChains = orders.assoc(peerKey, newSignedChain);
-		return updateBelief(b.withOrders(newChains));
+		return updateConsensus(b.withOrders(newChains));
 	}
 
 	public long getConsensusPoint() {
