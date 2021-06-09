@@ -52,12 +52,12 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	private final short mask;
 
 	/**
-	 * Depth of radix tree in number of hex digits. Top level is 0.
+	 * Depth of radix tree in number of hex digits. Top level is 0. Next level is 1 etc.
 	 */
 	private final long depth;
 
 	/**
-	 * Length of prefix. 0 = no prefix.
+	 * Length of prefix, where the tree branches beyond depth. 0 = no prefix.
 	 */
 	private final long prefixLength;
 
@@ -482,14 +482,17 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	
 	private int encodeChild(byte[] bs, int pos, int i) {
 		Ref<ABlobMap<K, V>> cref = children[i];
-		ABlobMap<K, V> c=cref.getValue();
-		if (c.count==1) {
-			MapEntry<K,V> me=c.entryAt(0);
-			pos = me.getRef().encode(bs, pos);
-		} else {
-			pos = cref.encode(bs,pos);
-		}
-		return pos;
+		return cref.encode(bs, pos);
+		
+		// TODO: maybe compress single entries?
+//		ABlobMap<K, V> c=cref.getValue();
+//		if (c.count==1) {
+//			MapEntry<K,V> me=c.entryAt(0);
+//			pos = me.getRef().encode(bs, pos);
+//		} else {
+//			pos = cref.encode(bs,pos);
+//		}
+//		return pos;
 	}
 	
 	@Override
@@ -527,21 +530,23 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		return new BlobMap<K, V>(prefix, depth, prefixLength, me, children, mask, count);
 	}
 	
-	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@SuppressWarnings({ "rawtypes" })
 	private static Ref<ABlobMap> readChild(ByteBuffer bb, long childDepth) throws BadFormatException {
 		Ref<ABlobMap> ref = Format.readRef(bb);
-		ACell c=ref.getValue();
-		if (c instanceof BlobMap) {
-			return ref;
-		} else if (c instanceof AVector) {
-			AVector v=(AVector)c;
-			MapEntry me=MapEntry.convertOrNull(v);
-			if (me==null) throw new BadFormatException("Invalid MApEntry vector as BlobMap child");
-
-			return createAtDepth(me,childDepth).getRef();
-		} else {
-			throw new BadFormatException("Bad BlobMap child Type: "+RT.getType(c));
-		}
+		return ref;
+		// TODO: compression of single entries?
+//		ACell c=ref.getValue();
+//		if (c instanceof BlobMap) {
+//			return ref;
+//		} else if (c instanceof AVector) {
+//			AVector v=(AVector)c;
+//			MapEntry me=MapEntry.convertOrNull(v);
+//			if (me==null) throw new BadFormatException("Invalid MApEntry vector as BlobMap child");
+//
+//			return createAtDepth(me,childDepth).getRef();
+//		} else {
+//			throw new BadFormatException("Bad BlobMap child Type: "+RT.getType(c));
+//		}
 	}
 
 	@Override

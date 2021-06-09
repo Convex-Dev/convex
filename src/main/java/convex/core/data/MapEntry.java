@@ -283,8 +283,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 			bs[pos++]=Tag.NULL;
 		} else {
 			bs[pos++]=Tag.VECTOR;
-			pos = me.keyRef.encode(bs,pos);
-			pos = me.valueRef.encode(bs,pos);
+			pos = me.encodeRaw(bs,pos);
 		}
 		return pos;
 	}
