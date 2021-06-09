@@ -8,9 +8,9 @@ import convex.core.exceptions.InvalidDataException;
  */
 public abstract class ASymbolic extends ACell {
 
-	protected final AString name;
+	protected final String name;
 
-	protected ASymbolic(AString name) {
+	protected ASymbolic(String name) {
 		this.name = name;
 	}
 	
@@ -24,20 +24,19 @@ public abstract class ASymbolic extends ACell {
 		return 0;
 	}
 	
-	public AString getName() {
+	public String getName() {
 		return name;
 	}
 
-	protected static boolean validateName(CharSequence name2) {
+	protected static boolean validateName(String name2) {
 		if (name2 == null) return false;
 		int n = name2.length();
 		if ((n < 1) || (n > (Constants.MAX_NAME_LENGTH))) {
 			return false;
 		}
-		if (Format.canEncodeUFT8(name2)) return true;
 		
-		// can't encode, so not a valid name
-		return false;
+		// We have a valid name
+		return true;
 	}
 
 	@Override

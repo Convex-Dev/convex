@@ -29,7 +29,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	/** Minimum size of a Keyword in UTF-16 chars representation */
 	public static final int MIN_CHARS = 1;
 
-	private Keyword(AString name) {
+	private Keyword(String name) {
 		super(name);
 	}
 	
@@ -47,12 +47,11 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		if (!validateName(name)) {
 			return null;
 		}
-
-		return new Keyword(Strings.create(name));
+		return new Keyword(name);
 	}
 	
 	public static Keyword create(AString name) {
-		if (name==null) throw new IllegalArgumentException("Invalid keyword name: null");
+		if (name==null) return null;
 		return create(name.toString());
 	}
 
@@ -139,7 +138,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 
 	@Override
 	public int estimatedEncodingSize() {
-		return name.length*2+3;
+		return name.length()*2+3;
 	}
 
 	@Override

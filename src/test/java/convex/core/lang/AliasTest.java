@@ -1,17 +1,18 @@
 package convex.core.lang;
 
 import static convex.core.lang.TestState.eval;
-import static convex.core.lang.TestState.evalB;
 import static convex.core.lang.TestState.evalL;
 import static convex.core.lang.TestState.step;
-import static convex.test.Assertions.*;
+import static convex.test.Assertions.assertArityError;
+import static convex.test.Assertions.assertAssertError;
+import static convex.test.Assertions.assertCastError;
+import static convex.test.Assertions.assertStateError;
+import static convex.test.Assertions.assertUndeclaredError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.data.AMap;
 import convex.core.data.Address;
 
 public class AliasTest {

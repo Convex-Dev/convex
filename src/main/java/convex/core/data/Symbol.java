@@ -19,11 +19,6 @@ import convex.core.exceptions.InvalidDataException;
  * <p>
  * A Symbol comprises:
  * - A name
- * - An optional namespace
- * </p>
- * 
- * <p>
- * A Symbol with a namespace is said to be "qualified", accordingly a Symbol with no namespace is "unqualified".
  * </p>
  *
  * <p>
@@ -33,7 +28,7 @@ import convex.core.exceptions.InvalidDataException;
  */
 public class Symbol extends ASymbolic {
 	
-	private Symbol(AString name) {
+	private Symbol(String name) {
 		super(name);
 	}
 	
@@ -44,20 +39,19 @@ public class Symbol extends ASymbolic {
 	protected static final WeakHashMap<String,Symbol> cache=new WeakHashMap<>(100);
 
 	/**
-	 * Creates a Symbol with the given unqualified namespace Symbol and name
-	 * @param namespace Namespace Symbol, which may be null for an unqualified Symbol
-	 * @param name Unqualified Symbol name
+	 * Creates a Symbol with the given name
+	 * @param name Symbol name
 	 * @return Symbol instance, or null if the Symbol is invalid
 	 */
-	public static Symbol create(AString name) {
+	public static Symbol create(String name) {
 		if (!validateName(name)) return null;
 		Symbol sym= new Symbol(name);
 		
 		synchronized (cache) {
 			// TODO: figure out if caching Symbols is a net win or not
-			Symbol cached=cache.get(sym.toString());
+			Symbol cached=cache.get(name);
 			if (cached!=null) return cached;
-			cache.put(sym.toString(),sym);
+			cache.put(name,sym);
 		}
 		
 		return sym;
@@ -69,9 +63,9 @@ public class Symbol extends ASymbolic {
 	 * @param name
 	 * @return Symbol instance, or null if the name is invalid for a Symbol.
 	 */
-	public static Symbol create(String name) {
+	public static Symbol create(AString name) {
 		if (name==null) return null;
-		return create(Strings.create(name));
+		return create(name.toString());
 	}
 
 	@Override

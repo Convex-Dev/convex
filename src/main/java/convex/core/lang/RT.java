@@ -762,8 +762,8 @@ public class RT {
 	 */
 	public static AString name(ACell a) {
 		if (a instanceof AString) return (AString) a;
-		if (a instanceof Keyword) return ((Keyword) a).getName();
-		if (a instanceof Symbol) return ((Symbol) a).getName();
+		if (a instanceof Keyword) return Strings.create(((Keyword) a).getName());
+		if (a instanceof Symbol) return Strings.create(((Symbol) a).getName());
 		return null;
 	}
 
