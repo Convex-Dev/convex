@@ -20,7 +20,7 @@ import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
-import convex.gui.manager.PeerManager;
+import convex.gui.manager.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
@@ -94,7 +94,7 @@ public class KeyGenPanel extends JPanel {
 	 * Create the panel.
 	 * @param manager 
 	 */
-	public KeyGenPanel(PeerManager manager) {
+	public KeyGenPanel(PeerGUI manager) {
 		setLayout(new BorderLayout(0, 0));
 
 		JPanel actionPanel = new ActionPanel();

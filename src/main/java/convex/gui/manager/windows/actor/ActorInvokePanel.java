@@ -11,24 +11,24 @@ import convex.core.data.Address;
 import convex.core.data.Symbol;
 import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ScrollyList;
-import convex.gui.manager.PeerManager;
+import convex.gui.manager.PeerGUI;
 
 @SuppressWarnings("serial")
 public class ActorInvokePanel extends JPanel {
 
-	protected PeerManager manager;
+	protected PeerGUI manager;
 	protected Address contract;
 	AccountChooserPanel execPanel = new AccountChooserPanel();
 
 	DefaultListModel<Symbol> exportList = new DefaultListModel<Symbol>();
 
-	public ActorInvokePanel(PeerManager manager, Address contract) {
+	public ActorInvokePanel(PeerGUI manager, Address contract) {
 		this.manager = manager;
 		this.contract = contract;
 
 		setLayout(new BorderLayout());
 
-		AccountStatus as = PeerManager.getLatestState().getAccount(contract);
+		AccountStatus as = PeerGUI.getLatestState().getAccount(contract);
 		ASet<Symbol> exports = as.getExports();
 		for (Symbol s : exports) {
 			exportList.addElement(s);

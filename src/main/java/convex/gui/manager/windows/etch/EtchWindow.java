@@ -6,7 +6,7 @@ import javax.swing.JTabbedPane;
 
 import convex.gui.components.PeerComponent;
 import convex.gui.components.PeerView;
-import convex.gui.manager.PeerManager;
+import convex.gui.manager.PeerGUI;
 import convex.gui.manager.windows.BaseWindow;
 import etch.EtchStore;
 
@@ -23,7 +23,7 @@ public class EtchWindow extends BaseWindow {
 	
 	JTabbedPane tabbedPane = new JTabbedPane(JTabbedPane.TOP);
 
-	public EtchWindow(PeerManager manager, PeerView peer) {
+	public EtchWindow(PeerGUI manager, PeerView peer) {
 		super(manager);
 		this.peer=peer;
 		this.store=(EtchStore) peer.peerServer.getStore();

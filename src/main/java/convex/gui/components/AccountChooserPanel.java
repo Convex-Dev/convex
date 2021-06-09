@@ -13,7 +13,7 @@ import convex.core.State;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.Address;
 import convex.core.util.Text;
-import convex.gui.manager.PeerManager;
+import convex.gui.manager.PeerGUI;
 import convex.gui.manager.mainpanels.WalletPanel;
 
 /**
@@ -56,15 +56,15 @@ public class AccountChooserPanel extends JPanel {
 		balanceLabel = new JLabel("Balance: ");
 		add(balanceLabel);
 
-		PeerManager.getStateModel().addPropertyChangeListener(pc -> {
+		PeerGUI.getStateModel().addPropertyChangeListener(pc -> {
 			updateBalance((State) pc.getNewValue(), getSelectedAddress());
 		});
 
 		addressCombo.addItemListener(e -> {
-			updateBalance(PeerManager.getLatestState(), getSelectedAddress());
+			updateBalance(PeerGUI.getLatestState(), getSelectedAddress());
 		});
 
-		updateBalance(PeerManager.getLatestState(), getSelectedAddress());
+		updateBalance(PeerGUI.getLatestState(), getSelectedAddress());
 	}
 
 	public Address getSelectedAddress() {

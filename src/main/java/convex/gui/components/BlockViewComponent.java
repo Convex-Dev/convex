@@ -13,7 +13,7 @@ import convex.core.State;
 import convex.core.data.AVector;
 import convex.core.data.Hash;
 import convex.gui.components.models.StateModel;
-import convex.gui.manager.PeerManager;
+import convex.gui.manager.PeerGUI;
 
 /**
  * Panel presenting a summary graphic of the most recent blocks for a given
@@ -53,7 +53,7 @@ public class BlockViewComponent extends JPanel {
 
 
 		int W = 10;
-		long tw = W * PeerManager.maxBlock;
+		long tw = W * PeerGUI.maxBlock;
 		long offset = Math.max(0, tw - pw);
 
 		for (int i = (int) (offset / W); i < n; i++) {

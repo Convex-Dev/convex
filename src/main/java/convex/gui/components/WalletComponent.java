@@ -16,7 +16,7 @@ import convex.core.State;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.Address;
 import convex.core.util.Text;
-import convex.gui.manager.PeerManager;
+import convex.gui.manager.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
@@ -86,13 +86,13 @@ public class WalletComponent extends BaseListComponent {
 		cPanel.add(infoLabel);
 		add(cPanel, BorderLayout.CENTER);
 
-		PeerManager.getStateModel().addPropertyChangeListener(e -> {
+		PeerGUI.getStateModel().addPropertyChangeListener(e -> {
 			infoLabel.setText(getInfoString());
 		});
 	}
 
 	private String getInfoString() {
-		State s = PeerManager.getLatestState();
+		State s = PeerGUI.getLatestState();
 		Long bal=s.getBalance(address);
 		return "Balance: " + ((bal==null)?"Null":Text.toFriendlyBalance(s.getBalance(address)));
 	}

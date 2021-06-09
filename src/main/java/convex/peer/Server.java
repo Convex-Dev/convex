@@ -359,7 +359,7 @@ public class Server implements Closeable {
 			}
 		}
 		if ((convex==null)||(result == null)) {
-			log.log(LEVEL_SERVER, "Failed to join network: Cannot connect to another remote peer.");
+			log.log(LEVEL_SERVER, "Failed to join network: Cannot connect to remote peer at "+remoteHostname);
 			return false;
 		}
 

@@ -5,7 +5,7 @@ import java.awt.BorderLayout;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
-import convex.gui.manager.PeerManager;
+import convex.gui.manager.PeerGUI;
 import convex.gui.manager.mainpanels.actors.DeployPanel;
 import convex.gui.manager.mainpanels.actors.MarketsPanel;
 import convex.gui.manager.mainpanels.actors.OraclePanel;
@@ -18,7 +18,7 @@ public class ActorsPanel extends JPanel {
 
 	private JTabbedPane typePane;
 
-	public ActorsPanel(PeerManager manager) {
+	public ActorsPanel(PeerGUI manager) {
 		setLayout(new BorderLayout(0, 0));
 
 		typePane = new JTabbedPane();

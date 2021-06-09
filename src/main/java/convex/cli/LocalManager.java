@@ -27,7 +27,7 @@ public class LocalManager implements Runnable {
 	public void run() {
 		// sub command to launch peer manager
 		try {
-			Applications.launchApp(convex.gui.manager.PeerManager.class);
+			Applications.launchApp(convex.gui.manager.PeerGUI.class);
 		} catch (Throwable t) {
 			System.err.println("cannot start local PeerManager "+t);
 		}

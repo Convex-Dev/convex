@@ -22,13 +22,13 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.models.AccountsTableModel;
-import convex.gui.manager.PeerManager;
+import convex.gui.manager.PeerGUI;
 import convex.gui.manager.windows.actor.ActorWindow;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
 public class AccountsPanel extends JPanel {
-	AccountsTableModel tableModel = new AccountsTableModel(PeerManager.getLatestState());
+	AccountsTableModel tableModel = new AccountsTableModel(PeerGUI.getLatestState());
 	JTable table = new JTable(tableModel);
 
 	static class ActorRenderer extends DefaultTableCellRenderer {
@@ -41,10 +41,10 @@ public class AccountsPanel extends JPanel {
 		}
 	}
 
-	public AccountsPanel(PeerManager manager) {
+	public AccountsPanel(PeerGUI manager) {
 		setLayout(new BorderLayout());
 
-		PeerManager.getStateModel().addPropertyChangeListener(pc -> {
+		PeerGUI.getStateModel().addPropertyChangeListener(pc -> {
 			State newState = (State) pc.getNewValue();
 			tableModel.setState(newState);
 		});

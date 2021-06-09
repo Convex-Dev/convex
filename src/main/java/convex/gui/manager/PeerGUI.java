@@ -45,9 +45,9 @@ import convex.peer.Server;
 import etch.EtchStore;
 
 @SuppressWarnings("serial")
-public class PeerManager extends JPanel {
+public class PeerGUI extends JPanel {
 
-	private static final Logger log = Logger.getLogger(PeerManager.class.getName());
+	private static final Logger log = Logger.getLogger(PeerGUI.class.getName());
 
 	private static JFrame frame;
 
@@ -70,13 +70,13 @@ public class PeerManager extends JPanel {
 			@Override
 			public void run() {
 				try {
-					PeerManager.frame = new JFrame();
+					PeerGUI.frame = new JFrame();
 					frame.setTitle("Convex Peer Manager");
 					frame.setIconImage(Toolkit.getDefaultToolkit()
-							.getImage(PeerManager.class.getResource("/images/Convex.png")));
+							.getImage(PeerGUI.class.getResource("/images/Convex.png")));
 					frame.setBounds(100, 100, 1024, 768);
 					frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-					PeerManager window = new PeerManager();
+					PeerGUI window = new PeerGUI();
 					frame.getContentPane().add(window, BorderLayout.CENTER);
 					frame.pack();
 					frame.setVisible(true);
@@ -112,7 +112,7 @@ public class PeerManager extends JPanel {
 	/**
 	 * Create the application.
 	 */
-	public PeerManager() {
+	public PeerGUI() {
 		peerPanel= new PeersListPanel(this);
 		
 		setLayout(new BorderLayout());

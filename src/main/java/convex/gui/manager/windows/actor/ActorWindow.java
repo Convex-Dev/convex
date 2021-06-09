@@ -6,7 +6,7 @@ import javax.swing.JTabbedPane;
 
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.gui.manager.PeerManager;
+import convex.gui.manager.PeerGUI;
 import convex.gui.manager.windows.BaseWindow;
 import convex.gui.manager.windows.state.StateTreePanel;
 
@@ -16,12 +16,12 @@ public class ActorWindow extends BaseWindow {
 
 	JTabbedPane tabbedPane = new JTabbedPane(JTabbedPane.TOP);
 
-	public ActorWindow(PeerManager manager, Address contract) {
+	public ActorWindow(PeerGUI manager, Address contract) {
 		super(manager);
 		this.contract = contract;
-		AccountStatus as = PeerManager.getLatestState().getAccount(contract);
+		AccountStatus as = PeerGUI.getLatestState().getAccount(contract);
 
-		PeerManager.getStateModel().addPropertyChangeListener(e -> {
+		PeerGUI.getStateModel().addPropertyChangeListener(e -> {
 
 		});
 

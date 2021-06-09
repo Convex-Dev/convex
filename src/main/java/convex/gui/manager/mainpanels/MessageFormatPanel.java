@@ -16,7 +16,7 @@ import convex.core.exceptions.ParseException;
 import convex.core.lang.Reader;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
-import convex.gui.manager.PeerManager;
+import convex.gui.manager.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
@@ -25,7 +25,7 @@ public class MessageFormatPanel extends JPanel {
 	final JTextArea dataArea;
 	final JTextArea messageArea;
 	private JPanel buttonPanel;
-	protected PeerManager manager;
+	protected PeerGUI manager;
 	private JButton clearButton;
 	private JPanel upperPanel;
 	private JPanel instructionsPanel;
@@ -34,7 +34,7 @@ public class MessageFormatPanel extends JPanel {
 
 	private static String HASHLABEL = "Hash: ";
 
-	public MessageFormatPanel(PeerManager manager) {
+	public MessageFormatPanel(PeerGUI manager) {
 		this.manager = manager;
 		setLayout(new BorderLayout(0, 0));
 

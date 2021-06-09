@@ -26,7 +26,7 @@ import convex.gui.components.CodeLabel;
 import convex.gui.components.DefaultReceiveAction;
 import convex.gui.components.Toast;
 import convex.gui.components.models.OracleTableModel;
-import convex.gui.manager.PeerManager;
+import convex.gui.manager.PeerGUI;
 import convex.gui.manager.mainpanels.WalletPanel;
 import convex.gui.utils.Toolkit;
 
@@ -35,9 +35,9 @@ public class OraclePanel extends JPanel {
 
 	public static final Logger log = Logger.getLogger(OraclePanel.class.getName());
 
-	Address oracleAddress = PeerManager.getLatestState().lookupCNS("convex.trusted-oracle");
+	Address oracleAddress = PeerGUI.getLatestState().lookupCNS("convex.trusted-oracle");
 
-	OracleTableModel tableModel = new OracleTableModel(PeerManager.getLatestState(), oracleAddress);
+	OracleTableModel tableModel = new OracleTableModel(PeerGUI.getLatestState(), oracleAddress);
 	JTable table = new JTable(tableModel);
 
 	JScrollPane scrollPane = new JScrollPane(table);;
@@ -54,7 +54,7 @@ public class OraclePanel extends JPanel {
 
 		// ===========================================
 		// Central table
-		PeerManager.getStateModel().addPropertyChangeListener(pc -> {
+		PeerGUI.getStateModel().addPropertyChangeListener(pc -> {
 			State newState = (State) pc.getNewValue();
 			tableModel.setState(newState);
 		});
@@ -132,7 +132,7 @@ public class OraclePanel extends JPanel {
 				String source = "(let [pmc " + actorCode + " ] " + "(deploy (pmc " + " 0x"
 						+ oracleAddress.toString() + " " + key + " " + outcomeString + ")))";
 				ACell code = Reader.read(source);
-				PeerManager.execute(WalletPanel.HERO, code).thenAcceptAsync(createMarketAction);
+				PeerGUI.execute(WalletPanel.HERO, code).thenAcceptAsync(createMarketAction);
 			} catch (Exception e1) {
 				e1.printStackTrace();
 			}
@@ -140,7 +140,7 @@ public class OraclePanel extends JPanel {
 	}
 
 	private void execute(ACell code) {
-		PeerManager.execute(WalletPanel.HERO, code).thenAcceptAsync(receiveAction);
+		PeerGUI.execute(WalletPanel.HERO, code).thenAcceptAsync(receiveAction);
 	}
 
 	private final Consumer<Result> createMarketAction = new Consumer<Result>() {

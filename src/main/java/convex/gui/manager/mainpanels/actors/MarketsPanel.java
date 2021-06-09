@@ -11,7 +11,7 @@ import convex.core.data.Address;
 import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
-import convex.gui.manager.PeerManager;
+import convex.gui.manager.PeerGUI;
 
 /**
  * Panel displaying current prediction markets
@@ -24,7 +24,7 @@ public class MarketsPanel extends JPanel {
 
 	static DefaultListModel<Address> marketList = new DefaultListModel<Address>();
 
-	public MarketsPanel(PeerManager manager) {
+	public MarketsPanel(PeerGUI manager) {
 		this.setLayout(new BorderLayout());
 
 		// ===========================================

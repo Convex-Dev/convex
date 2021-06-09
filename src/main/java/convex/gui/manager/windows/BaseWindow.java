@@ -5,14 +5,14 @@ import java.awt.BorderLayout;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 
-import convex.gui.manager.PeerManager;
+import convex.gui.manager.PeerGUI;
 
 @SuppressWarnings("serial")
 public abstract class BaseWindow extends JPanel {
 
-	protected final PeerManager manager;
+	protected final PeerGUI manager;
 
-	public BaseWindow(PeerManager manager) {
+	public BaseWindow(PeerGUI manager) {
 		super();
 		this.manager = manager;
 		setLayout(new BorderLayout());
@@ -26,7 +26,7 @@ public abstract class BaseWindow extends JPanel {
 		f.pack();
 		f.setVisible(true);
 		f.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-		f.setLocationRelativeTo(PeerManager.getFrame());
+		f.setLocationRelativeTo(PeerGUI.getFrame());
 		return f;
 	}
 }

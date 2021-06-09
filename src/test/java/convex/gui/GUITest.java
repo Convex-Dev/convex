@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.State;
 import convex.core.exceptions.InvalidDataException;
-import convex.gui.manager.PeerManager;
+import convex.gui.manager.PeerGUI;
 
 /**
  * We can't test much of the GUI easily in unit tests, but we can at least test
@@ -15,11 +15,11 @@ public class GUITest {
 	 * Manager is the root panel of the GUI. Everything else is built in its
 	 * constructor.
 	 */
-	static final PeerManager manager = new PeerManager();
+	static final PeerGUI manager = new PeerGUI();
 
 	@Test
 	public void testState() throws InvalidDataException {
-		State s = PeerManager.getLatestState();
+		State s = PeerGUI.getLatestState();
 		s.validate();
 	}
 }

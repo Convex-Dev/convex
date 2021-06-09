@@ -31,7 +31,7 @@ import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.PeerView;
-import convex.gui.manager.PeerManager;
+import convex.gui.manager.PeerGUI;
 import convex.gui.utils.Toolkit;
 import convex.net.ResultConsumer;
 
@@ -182,7 +182,7 @@ public class StressPanel extends JPanel {
 					long endTime = Utils.getCurrentTimestamp();
 					
 					Thread.sleep(100); // wait for state update to be reflected
-					State endState = PeerManager.getLatestState();
+					State endState = PeerGUI.getLatestState();
 
 					
 					sb.append("Results for " + transCount + " transactions\n");

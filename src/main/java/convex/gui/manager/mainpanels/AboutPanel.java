@@ -11,7 +11,7 @@ import convex.core.State;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Text;
 import convex.gui.components.ActionPanel;
-import convex.gui.manager.PeerManager;
+import convex.gui.manager.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
@@ -37,7 +37,7 @@ public class AboutPanel extends JPanel {
 		textArea.setBackground(null);
 		textArea.setFont(Toolkit.SMALL_MONO_FONT);
 
-		PeerManager.getStateModel().addPropertyChangeListener(e -> {
+		PeerGUI.getStateModel().addPropertyChangeListener(e -> {
 			updateState((State) e.getNewValue());
 		});
 
@@ -48,7 +48,7 @@ public class AboutPanel extends JPanel {
 					"Credits", JOptionPane.PLAIN_MESSAGE);
 		});
 
-		updateState(PeerManager.getLatestState());
+		updateState(PeerGUI.getLatestState());
 	}
 
 	private String lpad(Object s) {
@@ -62,7 +62,7 @@ public class AboutPanel extends JPanel {
 		sb.append("Consensus state hash: " + s.getHash().toHexString() + "\n");
 		sb.append("Timestamp:            " + Text.dateFormat(timestamp.longValue()) + "   (" + timestamp + ")\n");
 		sb.append("\n");
-		sb.append("Max Blocks:           " + lpad(PeerManager.maxBlock) + "\n");
+		sb.append("Max Blocks:           " + lpad(PeerGUI.maxBlock) + "\n");
 		sb.append("\n");
 		sb.append("Account statistics\n");
 		sb.append("  # Accounts:         " + lpad(s.getAccounts().count()) + "\n");

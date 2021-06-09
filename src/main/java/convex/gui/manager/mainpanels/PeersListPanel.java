@@ -28,7 +28,7 @@ import convex.gui.components.ActionPanel;
 import convex.gui.components.PeerComponent;
 import convex.gui.components.PeerView;
 import convex.gui.components.ScrollyList;
-import convex.gui.manager.PeerManager;
+import convex.gui.manager.PeerGUI;
 import convex.peer.API;
 import convex.peer.Server;
 import etch.EtchStore;
@@ -44,7 +44,7 @@ public class PeersListPanel extends JPanel {
 
 	private static final Logger log = Logger.getLogger(PeersListPanel.class.getName());
 
-	public void launchAllPeers(PeerManager manager) {
+	public void launchAllPeers(PeerGUI manager) {
 		List<Server> serverList = API.launchLocalPeers(Init.NUM_PEERS, Init.KEYPAIRS, Init.FIRST_PEER, null);
 		for (Server server: serverList) {
 			PeerView peer = new PeerView();
@@ -81,7 +81,7 @@ public class PeersListPanel extends JPanel {
 	 * Create the panel.
 	 * @param manager 
 	 */
-	public PeersListPanel(PeerManager manager) {
+	public PeersListPanel(PeerGUI manager) {
 		setLayout(new BorderLayout(0, 0));
 
 		JPanel toolBar = new ActionPanel();

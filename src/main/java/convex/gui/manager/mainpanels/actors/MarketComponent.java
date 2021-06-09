@@ -30,7 +30,7 @@ import convex.core.lang.Symbols;
 import convex.gui.components.BaseListComponent;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.DefaultReceiveAction;
-import convex.gui.manager.PeerManager;
+import convex.gui.manager.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
@@ -51,7 +51,7 @@ public class MarketComponent extends BaseListComponent {
 	public MarketComponent(MarketsPanel marketsPanel, Address addr) {
 		this.marketsPanel = marketsPanel;
 		this.address = addr;
-		State state = PeerManager.getLatestState();
+		State state = PeerGUI.getLatestState();
 
 		// prediction market data
 		AMap<Symbol, ACell> pmEnv = state.getEnvironment(addr);
@@ -141,13 +141,13 @@ public class MarketComponent extends BaseListComponent {
 		// state updates
 		updateStatus(state);
 
-		PeerManager.getStateModel().addPropertyChangeListener(e -> {
+		PeerGUI.getStateModel().addPropertyChangeListener(e -> {
 			State s = (State) e.getNewValue();
 			updateStatus(s);
 		});
 
 		marketsPanel.acctChooser.addressCombo.addActionListener(e -> {
-			State s = PeerManager.getLatestState();
+			State s = PeerGUI.getLatestState();
 			updateStatus(s);
 		});
 	}
@@ -161,7 +161,7 @@ public class MarketComponent extends BaseListComponent {
 	}
 
 	private void changeStake(Object outcome, long delta) {
-		State state = PeerManager.getLatestState();
+		State state = PeerGUI.getLatestState();
 		Long stk = getStake(state, outcome);
 		if (stk == null) stk = 0L;
 		long newStake = Math.max(0L, stk + delta);
@@ -170,7 +170,7 @@ public class MarketComponent extends BaseListComponent {
 		WalletEntry we = marketsPanel.acctChooser.getWalletEntry();
 		AList<ACell> cc = Lists.of(Symbol.create("stake"), outcome, newStake);
 		AList<ACell> cmd = List.of(Symbols.CALL, address, offer, cc);
-		PeerManager.execute(we, cmd).thenAcceptAsync(new DefaultReceiveAction(marketsPanel));
+		PeerGUI.execute(we, cmd).thenAcceptAsync(new DefaultReceiveAction(marketsPanel));
 	}
 
 	static DecimalFormat probFormatter = new DecimalFormat("0.0");

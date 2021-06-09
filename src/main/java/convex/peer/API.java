@@ -98,6 +98,7 @@ public class API {
 
 		// TODO maybe have this as an option in the calling parameters
 		AStore store = Stores.getGlobalStore();
+		Stores.setCurrent(store);
 		config.put(Keywords.STORE, store);
 
 		for (int i = 0; i < count; i++) {

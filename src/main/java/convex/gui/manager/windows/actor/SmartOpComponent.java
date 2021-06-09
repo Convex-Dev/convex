@@ -37,7 +37,7 @@ import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.BaseListComponent;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.Toast;
-import convex.gui.manager.PeerManager;
+import convex.gui.manager.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 
@@ -71,7 +71,7 @@ public class SmartOpComponent extends BaseListComponent {
 		JPanel paramPanel = new JPanel();
 		paramPanel.setLayout(new GridLayout(0, 3, 4, 4)); // 3 columns, small hgap and vgap
 
-		AccountStatus as = PeerManager.getLatestState().getAccount(contract);
+		AccountStatus as = PeerGUI.getLatestState().getAccount(contract);
 
 		AFn<?> fn = as.getExportedFunction(sym);
 
@@ -107,7 +107,7 @@ public class SmartOpComponent extends BaseListComponent {
 	}
 
 	private void execute() {
-		InetSocketAddress addr = PeerManager.getDefaultPeer().getHostAddress();
+		InetSocketAddress addr = PeerGUI.getDefaultPeer().getHostAddress();
 
 		AVector<ACell> args = Vectors.empty();
 		for (int i = 0; i < paramCount; i++) {
