@@ -1,9 +1,6 @@
 package convex.core.data;
 
-import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
-import java.nio.charset.CharacterCodingException;
 
 import convex.core.Constants;
 import convex.core.data.type.AType;
@@ -89,27 +86,11 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	 * @throws BadFormatException If a Keyword could not be read correctly
 	 */
 	public static Keyword read(ByteBuffer bb) throws BadFormatException {
-		try {
-			int len = bb.get();
-			if (len < 0) throw new BadFormatException("Negative keyword length: " + len);
-			byte[] data = new byte[len + 2];
-			bb.get(data, 2, len);
-			data[0] = Tag.KEYWORD;
-			data[1] = (byte) len;
-			CharBuffer cs=Format.UTF8_DECODERS.get().decode(ByteBuffer.wrap(data, 2, len));
-			String name = cs.toString();
-			if (!validateName(name)) throw new BadFormatException("Invalid keyword name: " + name);
-			Keyword k = create(name);
-			// re-use the created array as the Blob for this Keyword
-			k.attachEncoding(Blob.wrap(data));
-			return k;
-		} catch (BufferUnderflowException e) {
-			throw new BadFormatException("Buffer underflow", e);
-		} catch (IllegalArgumentException e) {
-			throw new BadFormatException("Invalid keyword read", e);
-		} catch (CharacterCodingException e) {
-			throw new BadFormatException("Bad UTF8 encoding", e);
-		}
+		String name=Format.readUTF8String(bb);
+		Keyword kw = Keyword.create(name);
+		if (kw == null) throw new BadFormatException("Can't read symbol");
+		return kw;
+
 	}
 	
 	@Override
@@ -120,7 +101,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		return Format.writeRawUTF8String(bs, pos, name.toString());
+		return Format.writeRawUTF8String(bs, pos, name);
 	}
 
 	@Override
@@ -133,8 +114,6 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		sb.append(':');
 		sb.append(name);
 	}
-
-
 
 	@Override
 	public int estimatedEncodingSize() {
@@ -160,8 +139,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		// TODO Auto-generated method stub
-
+		super.validateCell();
 	}
 	
 	@Override

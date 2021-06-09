@@ -109,7 +109,7 @@ public class Symbol extends ASymbolic {
 	 */
 	public static Symbol read(ByteBuffer bb) throws BadFormatException {
 		String name=Format.readUTF8String(bb);
-		Symbol sym = Symbol.create(Strings.create(name));
+		Symbol sym = Symbol.create(name);
 		if (sym == null) throw new BadFormatException("Can't read symbol");
 		return sym;
 	}

@@ -39,6 +39,9 @@ public abstract class ASymbolic extends ACell {
 		return true;
 	}
 
+	/**
+	 * Validates the name of this Symbolic value
+	 */
 	@Override
 	public void validateCell() throws InvalidDataException {
 		if (!validateName(name)) throw new InvalidDataException("Invalid name: " + name, this);
