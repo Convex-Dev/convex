@@ -3,7 +3,7 @@ package convex.lib;
 import static convex.core.lang.TestState.eval;
 import static convex.core.lang.TestState.evalL;
 import static convex.core.lang.TestState.step;
-import static convex.test.Assertions.assertError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -79,6 +79,7 @@ public class BoxTest {
 		
 		// Put b1 and b2 in b0
 		ctx=step(ctx,"(box/insert "+b0+" [box #{"+b1+" "+b2+"}])");
+		assertNotError(ctx);
 		assertEquals(Set.of(b0,b3),eval(ctx,"(asset/balance box *address*)"));
 		assertEquals(Set.of(b1,b2),eval(ctx,"(asset/balance box box)"));
 		

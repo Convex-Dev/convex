@@ -128,8 +128,16 @@ public class Reader extends BaseParser<ACell> {
 	 */
 	public Rule Expression() {
 		return MaybeMeta(FirstOf(
-				DelimitedExpression(), 
-				UndelimitedExpression()));
+				Quoted(Expression()),
+				Sequence(Constant(),TestNot('/')),
+				Symbol(), 
+				ExpressionElement()));
+	}
+	
+	public Rule ExpressionElement() {
+		return FirstOf(
+				DataStructure(), 
+				Constant());
 	}
 
 	public Rule MaybeMeta(Rule r) {
@@ -171,26 +179,7 @@ public class Reader extends BaseParser<ACell> {
 	 * Leaves the value of expression on stack
 	 */
 	public Rule DelimitedExpression() {
-		return FirstOf(DataStructure(), Quoted(DelimitedExpression()));
-	}
-
-	/**
-	 * Matches an undelimited expression e.g. 10 or :foo
-	 * 
-	 * Undelimited expressions must be followed by either a delimiter or whitespace
-	 * if there are additional expressions following
-	 * 
-	 * Leaves the value of expression on stack
-	 */
-	public Rule UndelimitedExpression() {
-		return Sequence(
-				FirstOf(
-						Constant(), 
-						Symbol(), 
-						AddressLiteral(),
-						Keyword(), 
-						Quoted(UndelimitedExpression())),
-				Test(UndelimitedExpressionEnd()));
+		return DataStructure();
 	}
 	
 	public Rule UndelimitedExpressionEnd() {
@@ -330,11 +319,12 @@ public class Reader extends BaseParser<ACell> {
 				HexLiteral(),
 				NumberLiteral(), 
 				StringLiteral(), 
+				CharLiteral(),
 				NilLiteral(), 
 				BooleanLiteral(), 
-				CharLiteral(),
-				SpecialLiteral()
-
+				SpecialLiteral(),
+				AddressLiteral(),
+				Keyword()
 				);
 	}
 	
@@ -413,13 +403,15 @@ public class Reader extends BaseParser<ACell> {
 		if (o instanceof Syntax) o = ((Syntax) o).getValue();
 		return (T) o;
 	}
-
-	public Rule Symbol() {
-		return FirstOf(QualifiedSymbol(), UnqualifiedSymbol());
-	}
+	
 
 	public Rule Keyword() {
 		return Sequence(Sequence(':', Symbol()), push(prepare(Keyword.createChecked(popSymbol().getName()))));
+	}
+
+
+	public Rule Symbol() {
+		return FirstOf(QualifiedSymbol(), UnqualifiedSymbol());
 	}
 
 	/**
@@ -427,10 +419,14 @@ public class Reader extends BaseParser<ACell> {
 	 */
 	public Rule QualifiedSymbol() {
 		return Sequence(
-				FirstOf(AddressLiteral(),UnqualifiedSymbol()), 
+				FirstOf(ExpressionElement(),UnqualifiedSymbol()), 
 				'/', 
 				UnqualifiedSymbol(),
-				push(prepare(Symbol.createWithPath(popSymbol().getName(), popValue()))));
+				push(prepare(createSymbolWithPath(popSymbol(), popValue()))));
+	}
+
+	public AList<ACell> createSymbolWithPath(Symbol sym, ACell exp) {
+		return Lists.of(Symbols.LOOKUP, exp, sym);
 	}
 
 	/**
@@ -478,19 +474,7 @@ public class Reader extends BaseParser<ACell> {
 	}
 
 
-	// NUMBERS
 
-	public Rule NumberLiteral() {
-		return FirstOf(Double(), Long());
-	}
-
-	public Rule Digits() {
-		return OneOrMore(Digit());
-	}
-	
-	public Rule SignedInteger() {
-		return Sequence(Optional(AnyOf("+-")), Digits());
-	}
 	
 	// HEX
 	
@@ -509,25 +493,46 @@ public class Reader extends BaseParser<ACell> {
 	public Rule AddressLiteral() {
 		return Sequence("#", Digits(), push(prepare(Address.create(Long.parseLong(match())))));
 	}
-
-
-	public Rule Long() {
-		return Sequence(SignedInteger(), push(prepare(CVMLong.parse(match()))));
+	
+	// NUMBERS
+	public Rule Digits() {
+		return OneOrMore(Digit());
 	}
 
-	public Rule Double() {
-		return Sequence(Sequence(
+	public Rule SignedInteger() {
+		return Sequence(
 				Optional(AnyOf("+-")), 
-				Digits(), 
-				FirstOf(
-						Sequence('.',Digits(),Optional(ExponentPart())), 
-						ExponentPart())),
+				Digits());
+	}
+
+	public Rule NumberLiteral() {
+		return FirstOf(Double(), Long());
+	}
+	
+	public Rule Double() {
+		return Sequence(
+				Sequence(
+						Optional(AnyOf("+-")), 
+						Digits(), 
+						FirstOf(Sequence('.',Digits(),ExponentPart()),
+								Sequence('.',Digits()), 
+								ExponentPart()),
+						TestNot(FollowingSymbolCharacter())),
 				push(prepare(CVMDouble.parse(match()))));
 	}
-
+	
 	public Rule ExponentPart() {
 		return Sequence(AnyOf("eE"), SignedInteger());
 	}
+
+	public Rule Long() {
+		return Sequence(
+				Sequence(
+						SignedInteger(), 
+						TestNot(FollowingSymbolCharacter())),
+				push(prepare(CVMLong.parse(match()))));
+	}
+
 
 	/**
 	 * Prepare AST result Syntax Object

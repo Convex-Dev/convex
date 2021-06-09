@@ -260,12 +260,6 @@
         qsyms (mapv f syms)
         vals (cons 'vector qsyms)]
     `(def *exports* (into *exports* ~vals))))
-  
-(def *aliases*
-  ^{:doc {:description "A map of aliased symbols to Addresses that are imported in the current environment. Defaults to a single alias to the 'convex.core' core library."
-          :examples [{:code "(*aliases* 'my.library)"}]
-          :type :value}}
-  {})
 
 (def *registry*
   ^{:doc {:description "The address of the Convex registry Actor."
@@ -293,12 +287,9 @@
 	                      (fail :NOBODY (str "Could not resolve library name for import: " (quote ~addr))))
 	               `(address ~addr))
 	        sym (cond (symbol? sym) sym
-	                  (= :default sym) nil
-	                  (fail "import: alias must be a symbol or :default"))] 
-	    (assert (= :as (unsyntax as)))
-	    `(let [addr ~code] 
-	       (def *aliases* (assoc *aliases* ~(list 'quote sym) addr))
-	       addr)))
+	                  (fail "import: alias must be a symbol"))] 
+	    (assert (= :as as))
+	    `(def ~sym ~code)))
 
 (defmacro actor
   ^{:doc {:description "Creates an actor generation function. This function generates depolyable code when called, and may take optional arguments to configure the deployed actor. The resulting code can be used with either 'deploy' or 'deploy-once'."

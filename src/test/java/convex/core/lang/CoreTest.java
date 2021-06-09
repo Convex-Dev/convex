@@ -92,12 +92,6 @@ public class CoreTest extends ACVMTest {
 	private final Context<?> INITIAL_CONTEXT= context();
 
 	@Test
-	public void testAliases() {
-		assertTrue(evalB("(map? *aliases*)"));
-		assertEquals(Maps.empty(),eval("*aliases*"));
-	}
-
-	@Test
 	public void testAddress() {
 		Address a = Init.HERO;
 		assertEquals(a, eval("(address \"" + a.toHexString() + "\")"));
@@ -1694,9 +1688,6 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Keywords.STATE, eval("(keyword (str 'state))"));
 		assertEquals(Keywords.STATE, eval("(keyword 'state)"));
 
-		// Note: paths ignored when converting from Symbol
-		assertEquals(Keywords.STATE, eval("(keyword 'foo/state)"));
-
 		// keyword lookups
 		assertNull(eval("((keyword :foo) nil)"));
 
@@ -1742,8 +1733,8 @@ public class CoreTest extends ACVMTest {
 		assertEquals("count", evalS("(name 'count)"));
 		assertEquals("foo", evalS("(name \"foo\")"));
 
-		// should extract symbol name, exluding namespace alias
-		assertEquals("bar", evalS("(name 'foo/bar)"));
+		// should extract symbol name
+		assertEquals("bar", evalS("(name 'bar)"));
 
 		// longer strings OK for name
 		assertEquals("duicgidvgefiucefiuvfeiuvefiuvgifegvfuievgiuefgviuefgviufegvieufgviuefvgevevgi", evalS("(name \"duicgidvgefiucefiuvfeiuvefiuvgifegvfuievgiuefgviuefgviufegvieufgviuefvgevevgi\")"));
@@ -1763,26 +1754,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Symbols.COUNT, eval("(symbol (str 'count))"));
 		assertEquals(Symbols.COUNT, eval("(symbol (name :count))"));
 		assertEquals(Symbols.COUNT, eval("(symbol (name \"count\"))"));
-
-		Symbol foobar = Symbol.create(Symbol.create(Strings.create("foo")), Strings.create("bar"));
-		assertEquals(foobar, eval("(symbol \"foo\" \"bar\")"));
-		assertEquals(foobar, eval("(symbol 'foo \"bar\")"));
-		assertEquals(foobar, eval("(symbol \"foo\" :bar)"));
-		assertEquals(foobar, eval("(symbol 'foo :bar)"));
-
-		// Symbol and path equivalence
-		assertEquals(read("#8/foo"),eval("(symbol #8 :foo)"));
-		assertEquals(read("foo"),eval("(symbol nil :foo)"));
-		assertEquals(read("foo/bar"),eval("(symbol :foo :bar)"));
-
-		// Path overwrites
-		assertEquals(read("foo"),eval("(symbol nil 'baz/foo)"));
-		assertEquals(read("foo/bar"),eval("(symbol :foo 'baz/bar)"));
-
-		// Symbols with Address paths
-		assertEquals(Symbol.create(Address.create(8),Strings.create("foo")),eval("(symbol #8 'foo)"));
-		assertEquals(Symbol.create(Address.create(8),Strings.create("foo")),eval("'#8/foo"));
-
+		
 		// too short or too long results in ARGUMENT error
 		assertArgumentError(step("(symbol (str))"));
 		assertArgumentError(
@@ -1806,9 +1778,7 @@ public class CoreTest extends ACVMTest {
 
 			assertEquals(100L, evalL(ctx2, "mylib/foo"));
 			assertUndeclaredError(step(ctx2, "mylib/bar"));
-			assertTrue(evalB(ctx2,"(map? (lookup-meta 'mylib/foo))"));
-			assertTrue(evalB(ctx2,"(defined? mylib/foo)"));
-			assertFalse(evalB(ctx2,"(defined? mylib/bar)"));
+			assertTrue(evalB(ctx2,"(map? (lookup-meta mylib 'foo))"));
 		}
 
 		{ // test deploy and CNS import in a single form. See #107
@@ -3037,7 +3007,7 @@ public class CoreTest extends ACVMTest {
 		assertNull(eval("(undef count)"));
 		assertNull(eval("(undef foo)"));
 		assertNull(eval("(undef *balance*)"));
-		assertNull(eval("(undef foo/bar)"));
+		assertNull(eval("(undef bar)"));
 
 		assertEquals(Vectors.of(1L, 2L), eval("(do (def a 1) (def v [a 2]) (undef a) v)"));
 

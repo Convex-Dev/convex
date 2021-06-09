@@ -123,7 +123,7 @@ public class FungibleTest {
 	@Test public void testBuildToken() {
 		// check our alias is right
 		Context<?> ctx=FungibleTest.ctx.fork();
-		assertEquals(fungible,eval(ctx,"(get *aliases* 'fungible)"));
+		assertEquals(fungible,eval(ctx,"fungible"));
 		
 		// deploy a token with default config
 		ctx=step(ctx,"(def token (deploy (fungible/build-token {})))");

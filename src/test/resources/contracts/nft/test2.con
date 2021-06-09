@@ -1,6 +1,5 @@
 (import convex.asset :as asset)
 (import convex.nft-tokens :as nft)
-(def nft (get *aliases* 'nft))
 
 ;; Executed as HERO
 ;; Note p2 is configured as VILLAIN, with hero as controller
@@ -62,8 +61,8 @@
 
   (def a2 (deploy '(do
                           (import convex.asset :as asset)
-                          (defn receive-asset [asset data]
-                            (asset/accept *caller* asset))
+                          (defn receive-asset [a data]
+                            (asset/accept *caller* a))
                           (export receive-asset))))
   (def t4 (call nft (create-token {:name "Token4"} nil)))
   (asset/transfer a2 [nft t4] nil)
@@ -194,7 +193,6 @@
     (deploy
      '(do
         (import convex.nft-tokens :as nft)
-        (def nft (get *aliases* 'nft))
         (def token-history {})
         (defn get-token-history [id]
           (get token-history id))
@@ -264,7 +262,6 @@
     (deploy
      '(do
         (import convex.nft-tokens :as nft)
-        (def nft (get *aliases* 'nft))
         (def transfer-count {})
         (defn check-trusted? [addr policy-key id]
           (if (contains-key? #{:destroy :transfer} policy-key)
@@ -309,8 +306,8 @@
 
   (def a2 (deploy '(do
                           (import convex.asset :as asset)
-                          (defn receive-asset [asset data]
-                            (asset/accept *caller* asset))
+                          (defn receive-asset [a data]
+                            (asset/accept *caller* a))
                           (export receive-asset))))
   (def t4 (call nft (create-token {:name "Token4"} nil)))
   (asset/offer a2 [nft t4])

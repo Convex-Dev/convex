@@ -56,7 +56,6 @@ public class NFTTest {
 		c=TestState.stepAs(TestState.VILLAIN,c,"(do "
 				+ "(import convex.asset :as asset)\r\n"
 				+ "(import convex.nft-tokens :as nft)\r\n"
-				+ "(def nft (get *aliases* 'nft))"
 				+ "(set-controller "+TestState.HERO+"))");
 		
 		c=c.withJuice(Constants.MAX_TRANSACTION_JUICE); //ensure enough juice
