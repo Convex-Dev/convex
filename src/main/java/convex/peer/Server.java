@@ -34,14 +34,18 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.data.ABlob;
+import convex.core.data.ABlobMap;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Blob;
+import convex.core.data.ABlobMap;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.data.MapLeaf;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.PeerStatus;
@@ -187,7 +191,7 @@ public class Server implements Closeable {
 	 */
 	private Hash networkId;         // or intialStateHash of the network
 
-	private IServerEvent event;
+	private IServerEvent event = null;
 
 	private Server(HashMap<Keyword, Object> config, IServerEvent event) {
 		this.event = event;
@@ -282,7 +286,8 @@ public class Server implements Closeable {
 			result = result.assoc(peer.getPeerKey(), Strings.create(getHostname()));
 		}
 		State state = peer.getConsensusState();
-		for (AccountKey peerKey: state.getPeers().keySet()) {
+		for ( ABlob key: state.getPeers().keySet()) {
+			AccountKey peerKey = RT.ensureAccountKey(key);
 			PeerStatus peerStatus = state.getPeer(peerKey);
 			AString hostname = peerStatus.getHostname();
 			if (hostname != null) {
@@ -366,9 +371,18 @@ public class Server implements Closeable {
 
 		// TODO
 		// check the initStateHash to see if this is the network we want to join?
-		networkId = (Hash) values.get(2);
+		networkId = RT.ensureHash(values.get(2));
+		// networkId = Hash.wrap((Blob) values.get(2));
 
-		AHashMap<AccountKey, AString> statusPeerList = (AHashMap<AccountKey, AString>) values.get(3);
+
+		AHashMap<ABlob, AString> buildPeerList = (AHashMap<ABlob, AString>) values.get(3);
+
+		AHashMap<AccountKey, AString> statusPeerList = Maps.empty();
+
+		for ( ABlob key: buildPeerList.keySet()) {
+			AccountKey accountKey = RT.ensureAccountKey(key);
+			statusPeerList = statusPeerList.assoc(accountKey, buildPeerList.get(key));
+		}
 
 		retryCount = 5;
 		result = null;
@@ -743,14 +757,14 @@ public class Server implements Closeable {
 
 
 			// get the token to respond with
-			Hash token = (Hash) challengeValues.get(0);
+			Hash token = RT.ensureHash(challengeValues.get(0));
 			if (token == null) {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "no challenge token provided");
 				return;
 			}
 
 			// check to see if we are both want to connect to the same network
-			Hash networkId = (Hash) challengeValues.get(1);
+			Hash networkId = RT.ensureHash(challengeValues.get(1));
 			if (networkId == null || this.networkId == null) {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge data has no networkId");
 				return;
@@ -760,7 +774,7 @@ public class Server implements Closeable {
 				return;
 			}
 			// check to see if the challenge is for this peer
-			AccountKey toPeer = (AccountKey) challengeValues.get(2);
+			AccountKey toPeer = RT.ensureAccountKey(challengeValues.get(2));
 			if (toPeer == null) {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge data has no toPeer address");
 				return;
@@ -798,27 +812,27 @@ public class Server implements Closeable {
 
 
 			// get the signed token
-			Hash token = (Hash) responseValues.get(0);
+			Hash token = RT.ensureHash(responseValues.get(0));
 			if (token == null) {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "no response token provided");
 				return;
 			}
 
 			// check to see if we are both want to connect to the same network
-			Hash networkId = (Hash) responseValues.get(1);
+			Hash networkId = RT.ensureHash(responseValues.get(1));
 			if ( networkId == null || !networkId.equals(this.networkId)) {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "response data has incorrect networkId");
 				return;
 			}
 			// check to see if the challenge is for this peer
-			AccountKey toPeer = (AccountKey) responseValues.get(2);
+			AccountKey toPeer = RT.ensureAccountKey(responseValues.get(2));
 			if ( toPeer == null || !toPeer.equals(peer.getPeerKey())) {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "response data has incorrect addressed peer");
 				return;
 			}
 
 			// hash sent by the response
-			Hash challengeHash = (Hash) responseValues.get(3);
+			Hash challengeHash = RT.ensureHash(responseValues.get(3));
 
 			// get who sent this challenge
 			AccountKey fromPeer = signedData.getAccountKey();
@@ -828,43 +842,47 @@ public class Server implements Closeable {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "response from an unkown challenge");
 				return;
 			}
-			// get the challenge data we sent out for this peer
-			AVector<ACell> challengeValues = (AVector<ACell>) challengeList.get(fromPeer);
+			synchronized(challengeList) {
 
-			Hash challengeToken = (Hash) challengeValues.get(0);
-			if (!challengeToken.equals(token)) {
-				log.log(LEVEL_CHALLENGE_RESPONSE, "invalid response token sent");
-				return;
+				// get the challenge data we sent out for this peer
+				AVector<ACell> challengeValues = (AVector<ACell>) challengeList.get(fromPeer);
+
+				Hash challengeToken = RT.ensureHash(challengeValues.get(0));
+				if (!challengeToken.equals(token)) {
+					log.log(LEVEL_CHALLENGE_RESPONSE, "invalid response token sent");
+					return;
+				}
+
+				Hash challengeNetworkId = RT.ensureHash(challengeValues.get(1));
+				if (!challengeNetworkId.equals(networkId)) {
+					log.log(LEVEL_CHALLENGE_RESPONSE, "invalid response networkId");
+					return;
+				}
+
+				AccountKey challengeFromPeer = RT.ensureAccountKey(challengeValues.get(2));
+				if (!signedData.getAccountKey().equals(challengeFromPeer)) {
+					log.warning("response key does not match requested key, sent from a different peer");
+					return;
+				}
+
+				// hash sent by this peer for the challenge
+				Hash challengeSourceHash = challengeValues.getHash();
+				if ( !challengeHash.equals(challengeHash)) {
+					log.log(LEVEL_CHALLENGE_RESPONSE, "response hash of the challenge does not match");
+					return;
+				}
+
+				Connection pc = m.getPeerConnection();
+				// log.log(LEVEL_CHALLENGE_RESPONSE, "Processing response request from: " + pc.getRemoteAddress());
+
+				pc.setTrustedPeerKey(fromPeer);
+
+				// raiseServerMessage(" now trusts peer: " + Utils.toFriendlyHexString(fromPeer.toHexString()));
+
+				// remove from list incase this fails, we can generate another challenge
+				challengeList.remove(fromPeer);
+
 			}
-
-			Hash challengeNetworkId = (Hash) challengeValues.get(1);
-			if (!challengeNetworkId.equals(networkId)) {
-				log.log(LEVEL_CHALLENGE_RESPONSE, "invalid response networkId");
-				return;
-			}
-
-			AccountKey challengeFromPeer = (AccountKey) challengeValues.get(2);
-			if (!signedData.getAccountKey().equals(challengeFromPeer)) {
-				log.warning("response key does not match requested key, sent from a different peer");
-				return;
-			}
-
-			// hash sent by this peer for the challenge
-			Hash challengeSourceHash = (Hash) challengeValues.getHash();
-			if ( !challengeHash.equals(challengeHash)) {
-				log.log(LEVEL_CHALLENGE_RESPONSE, "response hash of the challenge does not match");
-				return;
-			}
-
-			Connection pc = m.getPeerConnection();
-			// log.log(LEVEL_CHALLENGE_RESPONSE, "Processing response request from: " + pc.getRemoteAddress());
-
-			pc.setTrustedPeerKey(fromPeer);
-
-			// raiseServerMessage(" now trusts peer: " + Utils.toFriendlyHexString(fromPeer.toHexString()));
-
-			// remove from list incase this fails, we can generate another challenge
-			challengeList.remove(fromPeer);
 			raiseServerChange();
 
 		} catch (Throwable t) {
@@ -1084,7 +1102,7 @@ public class Server implements Closeable {
 						if (networkId != null) {
 							// clear out any old challenges
 							challengeList.clear();
-							requestChallenges();
+							// requestChallenges();
 						}
 						raiseServerChange();
 					}

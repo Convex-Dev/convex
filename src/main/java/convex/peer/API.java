@@ -1,14 +1,22 @@
 package convex.peer;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
 import convex.core.Init;
+import convex.core.crypto.AKeyPair;
+import convex.core.data.Address;
+import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
+import convex.peer.IServerEvent;
+
 
 /**
  * Class providing a simple API to a peer Server.
@@ -65,6 +73,83 @@ public class API {
 			log.warning("Error launching peer: "+t.getMessage());
 			t.printStackTrace();
 			throw Utils.sneakyThrow(t);
+		}
+	}
+
+	/**
+	 * Launch a set of peers.
+	 *
+	 * @param count Number of peers to launch.
+	 *
+	 * @param keyPairs Array of keyPairs for each peer. The length of the array must be >= the count of peers to launch.
+	 *
+	 */
+	public static List<Server> launchLocalPeers(int count, AKeyPair[] keyPairs, Address peerAddress, IServerEvent event) {
+		List<Server> serverList = new ArrayList<Server>();
+		Server otherServer;
+		String remotePeerHostname;
+
+		Map<Keyword, Object> config = new HashMap<>();
+
+		config.put(Keywords.PORT, null);
+		config.put(Keywords.STATE, Init.createState());
+
+		// TODO maybe have this as an option in the calling parameters
+		AStore store = Stores.getGlobalStore();
+		config.put(Keywords.STORE, store);
+
+		for (int i = 0; i < count; i++) {
+			AKeyPair keyPair = keyPairs[i];
+			config.put(Keywords.KEYPAIR, keyPair);
+			Server server = API.launchPeer(config, event);
+			serverList.add(server);
+		}
+
+		Server genesisServer = serverList.get(0);
+		Hash networkId = genesisServer.getPeer().getStates().get(0).getHash();
+		genesisServer.setNetworkId(networkId);
+
+		// go through 1..count-1 peers and join them all to peer #0
+		// do this twice to allow for all of the peers to get all of the address in the group of peers
+
+		for (int i = 1; i < count; i++) {
+			AKeyPair keyPair = keyPairs[i];
+			otherServer = serverList.get(0);
+			remotePeerHostname = otherServer.getHostname();
+			Address address = Address.create(peerAddress.toLong() + i);
+			// join a peer to the peer #0
+			serverList.get(i).joinNetwork(keyPair, address, remotePeerHostname);
+		}
+		// wait for the peers to sync upto 10 seconds
+		API.waitForNetworkReady(serverList, 10);
+
+		// now join the first peer #0, to the rest of the network
+		otherServer = serverList.get(count - 1);
+		remotePeerHostname = otherServer.getHostname();
+		serverList.get(0).joinNetwork(keyPairs[0], peerAddress, remotePeerHostname);
+		return serverList;
+	}
+
+	public static void waitForNetworkReady(List<Server> serverList, long timeoutSeconds) {
+		try {
+			boolean isNetworkReady = false;
+			long lastTimeStamp = 0;
+			long timeoutMillis = System.currentTimeMillis() + (timeoutSeconds * 1000);
+			while (!isNetworkReady || (timeoutMillis > System.currentTimeMillis())) {
+				isNetworkReady = true;
+				for (int index = 1; index < serverList.size(); index ++) {
+					Server peerServer = serverList.get(index);
+					convex.core.Peer peer = peerServer.getPeer();
+					if ( peer.getTimeStamp() != lastTimeStamp) {
+						lastTimeStamp = peer.getTimeStamp();
+						isNetworkReady = false;
+						break;
+					}
+				}
+				Thread.sleep(1000);
+			}
+		} catch ( InterruptedException e) {
+			return;
 		}
 	}
 }

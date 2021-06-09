@@ -19,6 +19,8 @@ import javax.swing.JScrollPane;
 import convex.api.Convex;
 import convex.core.Init;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.Address;
+import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.store.Stores;
@@ -43,51 +45,17 @@ public class PeersListPanel extends JPanel {
 	private static final Logger log = Logger.getLogger(PeersListPanel.class.getName());
 
 	public void launchAllPeers(PeerManager manager) {
-		int n = Init.NUM_PEERS;
-		for (int i = 0; i < n; i++) {
-			launchPeer(manager, Init.KEYPAIRS[i]);
-		}
-
-		for (int i = 0; i < n; i++) {
-			Server s = peerList.get(i).peerServer;
-			for (int j = 0; j < n; j++) {
-				if (i == j) continue;
-				Server dest = peerList.get(j).peerServer;
-				InetSocketAddress addr = dest.getHostAddress();
-				try {
-					s.connectToPeer(dest.getPeer().getPeerKey(), addr);
-				} catch (IOException e) {
-					log.info("Connect failed to: " + addr);
-				}
-			}
+		List<Server> serverList = API.launchLocalPeers(Init.NUM_PEERS, Init.KEYPAIRS, Init.FIRST_PEER, null);
+		for (Server server: serverList) {
+			PeerView peer = new PeerView();
+			peer.peerServer = server;
+			// InetSocketAddress sa = server.getHostAddress();
+			addPeer(peer);
 		}
 	}
 
 	public static PeerView getFirst() {
 		return peerList.elementAt(0);
-	}
-
-	public PeerView launchPeer(PeerManager manager, AKeyPair keyPair) {
-		Map<Keyword, Object> config = new HashMap<>();
-
-		config.put(Keywords.PORT, null);
-		config.put(Keywords.KEYPAIR, keyPair);
-		config.put(Keywords.STATE, Init.createState());
-
-		// Use a different fresh store for each peer
-		// config.put(Keywords.STORE, EtchStore.createTemp());
-
-		// Or Use a shared store
-		config.put(Keywords.STORE, Stores.getGlobalStore());
-
-		Server ps = API.launchPeer(config);
-
-		PeerView peer = new PeerView();
-		peer.peerServer = ps;
-		InetSocketAddress sa = ps.getHostAddress();
-
-		addPeer(peer);
-		return peer;
 	}
 
 	/**

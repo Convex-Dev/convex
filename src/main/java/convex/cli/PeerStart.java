@@ -112,13 +112,8 @@ public class PeerStart implements Runnable {
 				}
 				store = EtchStore.create(etchFile);
 			}
-			log.info("Starting peer");
-			Server peerServer = peerManager.launchPeer(keyPair, port, store);
-
-			log.info("joining network at "+ hostname);
-			peerServer.joinNetwork(keyPair, peerAddress, hostname);
-
-			peerManager.waitForPeers();
+			peerManager.launchPeer(keyPair, peerAddress, hostname, port, store);
+			peerManager.showPeerEvents();
 		} catch (Throwable t) {
 			System.out.println("Unable to launch peer "+t);
 		}
