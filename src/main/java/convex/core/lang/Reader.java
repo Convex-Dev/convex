@@ -419,10 +419,14 @@ public class Reader extends BaseParser<ACell> {
 	 */
 	public Rule QualifiedSymbol() {
 		return Sequence(
-				FirstOf(ExpressionElement(),UnqualifiedSymbol()), 
+				Qualifier(), 
 				'/', 
 				UnqualifiedSymbol(),
 				push(prepare(createSymbolWithPath(popSymbol(), popValue()))));
+	}
+	
+	public Rule Qualifier() {
+		return FirstOf(UnqualifiedSymbol(),AddressLiteral());
 	}
 
 	public AList<ACell> createSymbolWithPath(Symbol sym, ACell exp) {
