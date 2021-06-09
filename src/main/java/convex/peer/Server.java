@@ -1312,7 +1312,7 @@ public class Server implements Closeable {
 	}
 
 	public Hash getNetworkId() {
-		return networkId;
+		return getPeer().getStates().get(0).getHash();
 	}
 
 	public void setNetworkId(Hash value) {

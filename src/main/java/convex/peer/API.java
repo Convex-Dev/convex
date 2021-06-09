@@ -110,7 +110,7 @@ public class API {
 		}
 
 		Server genesisServer = serverList.get(0);
-		Hash networkId = genesisServer.getPeer().getStates().get(0).getHash();
+		Hash networkId = genesisServer.getNetworkId();
 		genesisServer.setNetworkId(networkId);
 
 		// go through 1..count-1 peers and join them all to peer #0
