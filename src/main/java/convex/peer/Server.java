@@ -6,7 +6,6 @@ import java.net.InetSocketAddress;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -30,25 +29,22 @@ import convex.core.Peer;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
-import convex.core.data.ACell;
-import convex.core.data.AVector;
-import convex.core.data.AccountKey;
-import convex.core.data.Address;
 import convex.core.data.ABlob;
-import convex.core.data.ABlobMap;
+import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.AVector;
+import convex.core.data.AccountKey;
+import convex.core.data.Address;
 import convex.core.data.Blob;
-import convex.core.data.ABlobMap;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
-import convex.core.data.MapLeaf;
 import convex.core.data.Maps;
-import convex.core.data.Ref;
 import convex.core.data.PeerStatus;
+import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
@@ -59,8 +55,8 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
-import convex.core.lang.impl.AExceptional;
 import convex.core.lang.Reader;
+import convex.core.lang.impl.AExceptional;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
@@ -360,7 +356,7 @@ public class Server implements Closeable {
 				retryCount --;
 			}
 		}
-		if (result == null) {
+		if ((convex==null)||(result == null)) {
 			log.log(LEVEL_SERVER, "Failed to join network: Cannot connect to another remote peer.");
 			return false;
 		}
@@ -737,12 +733,12 @@ public class Server implements Closeable {
 
 	private void processChallenge(Message m) {
 		try {
-			SignedData<ACell> signedData = m.getPayload();
+			SignedData<AVector<ACell>> signedData = m.getPayload();
 			if ( signedData == null) {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge bad message data sent");
 				return;
 			}
-			AVector<ACell> challengeValues = (AVector<ACell>) signedData.getValue();
+			AVector<ACell> challengeValues = signedData.getValue();
 
 			if (challengeValues == null || challengeValues.size() != 3) {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge data incorrect number of items should be 3 not " + challengeValues.size());
@@ -1292,7 +1288,7 @@ public class Server implements Closeable {
 			if (connection.isTrusted()) {
 				continue;
 			}
-			// skip if a challeng is already being sent
+			// skip if a challenge is already being sent
 			if (challengeList.containsValue(peerKey)) {
 				continue;
 			}

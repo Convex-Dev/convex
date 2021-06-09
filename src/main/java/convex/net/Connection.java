@@ -38,14 +38,22 @@ import convex.core.util.Counters;
 import convex.core.util.Utils;
 
 /**
- * <p>Class representing a Connection between network participants.</p>
+ * <p>
+ * Class representing a Connection between network participants.
+ * </p>
  *
- * <p>Sent messages are sent asynchronously via the shared client selector.</p>
+ * <p>
+ * Sent messages are sent asynchronously via the shared client selector.
+ * </p>
  *
- * <p>Received messages are read by the shared client selector, converted into Message instances,
- * and passed to a Consumer for handling.</p>
+ * <p>
+ * Received messages are read by the shared client selector, converted into
+ * Message instances, and passed to a Consumer for handling.
+ * </p>
  *
- * <p>A Connection "owns" the ByteChannel associated with this Peer connection</p>
+ * <p>
+ * A Connection "owns" the ByteChannel associated with this Peer connection
+ * </p>
  */
 @SuppressWarnings("unused")
 public class Connection {
@@ -58,13 +66,14 @@ public class Connection {
 	private static long idCounter = 0;
 
 	/**
-	 * Store to use for this connection. Required for responding to incoming messages.
+	 * Store to use for this connection. Required for responding to incoming
+	 * messages.
 	 */
 	private final AStore store;
 
 	/**
-		* If trusted the account key of the remote peer
-		*/
+	 * If trusted the account key of the remote peer
+	 */
 	private AccountKey trustedPeerKey;
 
 	private static final Logger log = Logger.getLogger(Connection.class.getName());
@@ -84,51 +93,58 @@ public class Connection {
 	private final MessageReceiver receiver;
 	private final MessageSender sender;
 
-	private Connection(ByteChannel clientChannel, Consumer<Message> receiveAction, AStore store, AccountKey trustedPeerKey) {
+	private Connection(ByteChannel clientChannel, Consumer<Message> receiveAction, AStore store,
+			AccountKey trustedPeerKey) {
 		this.channel = clientChannel;
 		receiver = new MessageReceiver(receiveAction, this);
 		sender = new MessageSender(clientChannel);
-		this.store=store;
+		this.store = store;
 		this.trustedPeerKey = trustedPeerKey;
 	}
 
 	/**
-	 * Create a PeerConnection using an existing channel. Does not perform any connection
-	 * initialisation: channel should already be connected.
+	 * Create a PeerConnection using an existing channel. Does not perform any
+	 * connection initialisation: channel should already be connected.
 	 *
 	 * @param channel
 	 * @param receiveAction Consumer to be called when a Message is received
-	 * @param store Store to use when receiving messages.
+	 * @param store         Store to use when receiving messages.
 	 * @return New Connection instance
 	 * @throws IOException
 	 */
-	public static Connection create(ByteChannel channel, Consumer<Message> receiveAction, AStore store, AccountKey trustedPeerKey) throws IOException {
+	public static Connection create(ByteChannel channel, Consumer<Message> receiveAction, AStore store,
+			AccountKey trustedPeerKey) throws IOException {
 		return new Connection(channel, receiveAction, store, trustedPeerKey);
 	}
 
 	/**
 	 * Create an untrusted PeerConnection by connecting to a remote address
-	 *
-	 * @param receiveAction A callback Consumer to be called for any received messages on this connection
+	 * 
+	 * @param hostAddress   Address to connect to
+	 * @param receiveAction A callback Consumer to be called for any received
+	 *                      messages on this connection
+	 * @param store         Store to use for the connection
 	 * @return New Connection instance
 	 * @throws IOException If connection fails because of any IO problem
 	 */
-	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store) throws IOException {
+	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store)
+			throws IOException {
 		return connect(hostAddress, receiveAction, store, null);
 	}
 
 	/**
 	 * Create a PeerConnection by connecting to a remote address
 	 * 
-	 * @param hostAddress Internet Address to connect to
-	 * @param receiveAction A callback Consumer to be called for any received messages on this connection
-	 * @param store Store to use for this Connection
+	 * @param hostAddress   Internet Address to connect to
+	 * @param receiveAction A callback Consumer to be called for any received
+	 *                      messages on this connection
+	 * @param store         Store to use for this Connection
 	 * @return New Connection instance
 	 * @throws IOException If connection fails because of any IO problem
 	 */
-	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store, AccountKey trustedPeerKey)
-			throws IOException {
-		if (store==null) throw new Error("Connection requires a store");
+	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store,
+			AccountKey trustedPeerKey) throws IOException {
+		if (store == null) throw new Error("Connection requires a store");
 		SocketChannel clientChannel = SocketChannel.open(hostAddress);
 		clientChannel.configureBlocking(false);
 
@@ -136,7 +152,7 @@ public class Connection {
 			try {
 				Thread.sleep(100);
 			} catch (InterruptedException e) {
-				throw new IOException("Connect interrupted",e);
+				throw new IOException("Connect interrupted", e);
 			}
 		}
 		// clientChannel.setOption(StandardSocketOptions.SO_KEEPALIVE,true);
@@ -208,7 +224,7 @@ public class Connection {
 	 * @throws IOException
 	 */
 	public boolean sendMissingData(Hash value) throws IOException {
-		log.finer("Requested missing data for hash: "+value.toHexString()+" with store "+Stores.current());
+		log.finer("Requested missing data for hash: " + value.toHexString() + " with store " + Stores.current());
 		return sendObject(MessageType.MISSING_DATA, value);
 	}
 
@@ -232,7 +248,7 @@ public class Connection {
 	 * @throws IOException
 	 */
 	public long sendQuery(ACell form, Address address) throws IOException {
-		AStore temp=Stores.current();
+		AStore temp = Stores.current();
 		try {
 			long id = ++idCounter;
 			AVector<ACell> v = Vectors.of(id, form, address);
@@ -251,10 +267,10 @@ public class Connection {
 	 * @throws IOException
 	 */
 	public long sendStatusRequest() throws IOException {
-		AStore temp=Stores.current();
+		AStore temp = Stores.current();
 		try {
 			long id = ++idCounter;
-			CVMLong idPayload=CVMLong.create(id);
+			CVMLong idPayload = CVMLong.create(id);
 			sendObject(MessageType.STATUS, idPayload);
 			return id;
 		} finally {
@@ -265,7 +281,7 @@ public class Connection {
 	/**
 	 * Sends a CHALLENGE Request Message on this connection.
 	 *
-	 * @param challeng Challenge a Vector that has been signed by the sending peer.
+	 * @param challenge Challenge a Vector that has been signed by the sending peer.
 	 *
 	 * @return The ID of the message sent, or -1 if the message cannot be sent.
 	 *
@@ -273,11 +289,11 @@ public class Connection {
 	 *
 	 */
 	public long sendChallenge(SignedData<ACell> challenge) throws IOException {
-		AStore temp=Stores.current();
+		AStore temp = Stores.current();
 		try {
 			long id = ++idCounter;
 			boolean sent = sendObject(MessageType.CHALLENGE, challenge);
-			return (sent) ? id: -1;
+			return (sent) ? id : -1;
 		} finally {
 			Stores.setCurrent(temp);
 		}
@@ -286,21 +302,18 @@ public class Connection {
 	/**
 	 * Sends a RESPONSE Request Message on this connection.
 	 *
-	 * @param responseHash Hash for the remote peer to sign.
-	 *
-	 * @param accountKey AccountKey of the remote peer.
-	 *
+	 * @param response Signed response for the remote peer
 	 * @return The ID of the message sent, or -1 if the message cannot be sent.
 	 *
 	 * @throws IOException
 	 *
 	 */
 	public long sendResponse(SignedData<ACell> response) throws IOException {
-		AStore temp=Stores.current();
+		AStore temp = Stores.current();
 		try {
 			long id = ++idCounter;
 			boolean sent = sendObject(MessageType.RESPONSE, response);
-			return (sent) ? id: -1;
+			return (sent) ? id : -1;
 		} finally {
 			Stores.setCurrent(temp);
 		}
@@ -310,8 +323,8 @@ public class Connection {
 	 * Sends a transaction if possible, returning the message ID (greater than zero)
 	 * if successful.
 	 *
-	 * Uses the configured CLIENT_STORE to store the transaction, so that any missing data requests from the server
-	 * can be honoured.
+	 * Uses the configured CLIENT_STORE to store the transaction, so that any
+	 * missing data requests from the server can be honoured.
 	 *
 	 * Returns -1 if the message could not be sent because of a full buffer.
 	 *
@@ -320,7 +333,7 @@ public class Connection {
 	 * @throws IOException In the event of an IO error, e.g. closed connection
 	 */
 	public long sendTransaction(SignedData<ATransaction> signed) throws IOException {
-		AStore temp=Stores.current();
+		AStore temp = Stores.current();
 		try {
 			Stores.setCurrent(store);
 			long id = ++idCounter;
@@ -335,20 +348,20 @@ public class Connection {
 	/**
 	 * Sends a RESULT Message on this connection with no error code (i.e. a success)
 	 * 
-	 * @param id ID for result message
+	 * @param id    ID for result message
 	 * @param value Any data object
 	 * @return True if buffered for sending successfully, false otherwise
 	 * @throws IOException
 	 */
 	public boolean sendResult(CVMLong id, ACell value) throws IOException {
-		return sendResult(id, value,null);
+		return sendResult(id, value, null);
 	}
 
 	/**
 	 * Sends a RESULT Message on this connection.
 	 *
-	 * @param id ID for result message
-	 * @param value Any data object
+	 * @param id        ID for result message
+	 * @param value     Any data object
 	 * @param errorCode Error code for this result. May be null to indicate success
 	 * @return True if buffered for sending successfully, false otherwise
 	 * @throws IOException
@@ -376,7 +389,7 @@ public class Connection {
 	private final IRefFunction sendAll = (r -> {
 		// TODO: halt conditions to prevent sending the whole universe
 		ACell o = r.getValue();
-		if (o==null) return r;
+		if (o == null) return r;
 
 		// send children first
 		o.updateRefs(sender());
@@ -398,17 +411,17 @@ public class Connection {
 	 * 
 	 * @param msg Message to send
 	 * @return true if message buffered successfully, false if failed
-	 * @throws IOException 
+	 * @throws IOException
 	 */
 	public boolean sendMessage(Message msg) throws IOException {
 		return sendObject(msg.getType(), msg.getPayload());
 	}
 
 	/**
-	 * Sends a payload for the given message type. Should be called on the thread that
-	 * responds to missing data messages from the destination.
+	 * Sends a payload for the given message type. Should be called on the thread
+	 * that responds to missing data messages from the destination.
 	 *
-	 * @param type Type of message
+	 * @param type    Type of message
 	 * @param payload Payload value for message
 	 * @return true if message queued successfully, false otherwise
 	 * @throws IOException
@@ -416,12 +429,13 @@ public class Connection {
 	public boolean sendObject(MessageType type, ACell payload) throws IOException {
 		Counters.sendCount++;
 
-		// Need to ensure message is persisted at least, so we can respond to missing data messages
+		// Need to ensure message is persisted at least, so we can respond to missing
+		// data messages
 		// using the current threat store
 		ACell sendVal = payload;
 		ACell.createPersisted(sendVal, r -> {
 			try {
-				ACell data=r.getValue();
+				ACell data = r.getValue();
 				boolean sent = sendData(data);
 			} catch (IOException e) {
 				throw Utils.sneakyThrow(e);
@@ -429,8 +443,8 @@ public class Connection {
 		});
 
 		ByteBuffer buf = Format.encodedBuffer(sendVal);
-		log.log(LEVEL_SEND, () -> "Sending message: " + type + " :: " + payload + " to " + getRemoteAddress() + " format: "
-				+ Format.encodedBlob(payload).toHexString());
+		log.log(LEVEL_SEND, () -> "Sending message: " + type + " :: " + payload + " to " + getRemoteAddress()
+				+ " format: " + Format.encodedBlob(payload).toHexString());
 		boolean sent = sendBuffer(type, buf);
 		return sent;
 	}
@@ -485,8 +499,8 @@ public class Connection {
 			log.log(LEVEL_SEND, () -> "Sent message " + type + " of length: " + dataLength + " Connection ID: "
 					+ System.identityHashCode(this));
 		} else {
-			log.log(LEVEL_SEND, () -> "Failed to send message " + type + " of length: " + dataLength + " Connection ID: "
-					+ System.identityHashCode(this));
+			log.log(LEVEL_SEND, () -> "Failed to send message " + type + " of length: " + dataLength
+					+ " Connection ID: " + System.identityHashCode(this));
 		}
 		return sent;
 	}
@@ -514,7 +528,7 @@ public class Connection {
 	 * Starts listening for received events with this given peer connection.
 	 * PeerConnection must have a selectable SocketChannel associated
 	 *
-	 * @throws IOException 
+	 * @throws IOException
 	 */
 	public void startClientListening() throws IOException {
 		SocketChannel chan = (SocketChannel) channel;
@@ -619,7 +633,8 @@ public class Connection {
 			log.log(LEVEL_CLIENT, "Channel closed from: " + conn.getRemoteAddress());
 			key.cancel();
 		} catch (BadFormatException e) {
-			log.log(NIOServer.LEVEL_BAD_CONNECTION,"Cancelled connection to Peer: Bad data format from: " + conn.getRemoteAddress() + " " + e.getMessage());
+			log.log(NIOServer.LEVEL_BAD_CONNECTION, "Cancelled connection to Peer: Bad data format from: "
+					+ conn.getRemoteAddress() + " " + e.getMessage());
 			key.cancel();
 		}
 	}
@@ -636,7 +651,7 @@ public class Connection {
 	 * @throws BadFormatException
 	 */
 	public int handleChannelRecieve() throws IOException, BadFormatException {
-		AStore tempStore=Stores.current();
+		AStore tempStore = Stores.current();
 		try {
 			// set the current store for handling incoming messages
 			Stores.setCurrent(store);
@@ -666,7 +681,7 @@ public class Connection {
 			}
 		} catch (IOException e) {
 			// TODO: figure out cases here. Probably channel closed?
-			log.log(NIOServer.LEVEL_BAD_CONNECTION,e.getMessage());
+			log.log(NIOServer.LEVEL_BAD_CONNECTION, e.getMessage());
 			key.cancel();
 		}
 	}
@@ -676,14 +691,17 @@ public class Connection {
 	 *
 	 * @param trustedPeerKey Peer key of the trusted remote peer.
 	 *
-	 * @param receiveAction A callback Consumer to be called for any received messages on this connection
+	 * @param receiveAction  A callback Consumer to be called for any received
+	 *                       messages on this connection
 	 *
 	 * @return a new connection
 	 *
-	 * TODO: enable bigger buffers for this trusted connection
+	 *         TODO: enable bigger buffers for this trusted connection
+	 * @throws IOException 
 	 *
 	 */
-	public Connection connectWithTrustedKey(AccountKey trustedPeerKey, Consumer<Message> receiveAction) throws IOException {
+	public Connection connectWithTrustedKey(AccountKey trustedPeerKey, Consumer<Message> receiveAction)
+			throws IOException {
 		InetSocketAddress remotePeerAddress = getRemoteAddress();
 		return connect(remotePeerAddress, receiveAction, store, trustedPeerKey);
 	}
