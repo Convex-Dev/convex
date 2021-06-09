@@ -113,9 +113,8 @@ public class Utils {
 	 * SECURITY; do not use this output for any comparison.
 	 *
 	 * @param hexString String to show in friendly format.
-	 *
+	 * @return Hex String
 	 */
-
 	public static String toFriendlyHexString(String hexString) {
 		int size = 4;
 		String cleanHexString = hexString.replaceAll("^0[Xx]", "");

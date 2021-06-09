@@ -1,7 +1,5 @@
 package convex.peer;
 
-import convex.peer.Server;
-
 /**
  * Server Event Interface. The server will post events to this the callback.
  *
