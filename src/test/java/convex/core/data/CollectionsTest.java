@@ -9,7 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.util.Iterator;
 import java.util.ListIterator;
 import java.util.Map;
-import java.util.NoSuchElementException;
 
 /**
  * Tests for general collection types
@@ -41,8 +40,8 @@ public class CollectionsTest {
 		assertThrows(UnsupportedOperationException.class, () -> it.set(null));
 		assertThrows(UnsupportedOperationException.class, () -> it.add(null));
 
-		assertThrows(NoSuchElementException.class, () -> a.listIterator(-1));
-		assertThrows(NoSuchElementException.class, () -> a.listIterator(n + 1));
+		assertThrows(IndexOutOfBoundsException.class, () -> a.listIterator(-1));
+		assertThrows(IndexOutOfBoundsException.class, () -> a.listIterator(n + 1));
 
 		assertThrows(IndexOutOfBoundsException.class, () -> a.getElementRef(-1));
 		assertThrows(IndexOutOfBoundsException.class, () -> a.getElementRef(n));

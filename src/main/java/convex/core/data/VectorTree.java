@@ -348,39 +348,39 @@ public class VectorTree<T extends ACell> extends ASizedVector<T> {
 
 	@Override
 	public ListIterator<T> listIterator() {
-		return new TreeVectorIterator();
+		return new VectorTreeIterator();
 	}
 
 	@Override
 	public ListIterator<T> listIterator(long index) {
-		return new TreeVectorIterator(index);
+		return new VectorTreeIterator(index);
 	}
 
-	private class TreeVectorIterator implements ListIterator<T> {
+	private class VectorTreeIterator implements ListIterator<T> {
 		int bpos;
 		ListIterator<T> sub;
 
-		public TreeVectorIterator() {
+		public VectorTreeIterator() {
 			this(0);
 		}
 
-		public TreeVectorIterator(long index) {
-			if (index < 0L) throw new NoSuchElementException();
+		public VectorTreeIterator(final long index) {
+			long ix=index;
+			if (index < 0L) throw new IndexOutOfBoundsException((int)index);
 
 			bpos = 0;
 			for (int i = 0; i < children.length; i++) {
 				AVector<T> b = children[bpos].getValue();
 				long bc = b.count();
-				if (index <= bc) {
-					sub = b.listIterator(index);
+				if (ix <= bc) {
+					sub = b.listIterator(ix);
 					return;
 				}
-				index -= bc;
+				ix -= bc;
 				bpos++;
 			}
-			;
 			// appears to be beyond the end?
-			throw new NoSuchElementException();
+			throw new IndexOutOfBoundsException((int)index);
 		}
 
 		@Override

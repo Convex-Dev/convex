@@ -337,12 +337,12 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 		int pos;
 
 		public ListVectorIterator(long index) {
-			if (index < 0L) throw new NoSuchElementException();
+			if (index < 0L) throw new IndexOutOfBoundsException((int)index);
 
 			long tc = prefixLength();
 			if (index >= tc) {
 				// in the list head
-				if (index > count) throw new NoSuchElementException();
+				if (index > count) throw new IndexOutOfBoundsException((int)index);
 				pos = (int) (index - tc);
 				this.prefixIterator = (prefix == null) ? null : prefix.getValue().listIterator(tc);
 			} else {
