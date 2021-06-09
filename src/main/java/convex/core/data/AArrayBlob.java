@@ -165,6 +165,11 @@ public abstract class AArrayBlob extends ABlob {
 		return Utils.arrayEquals(store, offset, bytes, byteOffset, length);
 	}
 	
+	public boolean equalsBytes(ABlob k) {
+		if (k.count()!=this.count()) return false;
+		return k.equalsBytes(store,offset);
+	}
+	
 	/**
 	 * Tests if a specific range of bytes are exactly equal.
 	 * @param b

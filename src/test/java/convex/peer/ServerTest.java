@@ -43,6 +43,7 @@ import convex.core.lang.Symbols;
 import convex.core.lang.TestState;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
+import convex.core.transactions.ATransaction;
 import convex.core.transactions.Call;
 import convex.core.transactions.Invoke;
 import convex.core.transactions.Transfer;
@@ -186,6 +187,12 @@ public class ServerTest {
 		}
 	}
 
+	public long checkSent(Connection pc,SignedData<ATransaction> st) throws IOException {
+		long x=pc.sendTransaction(st);
+		assertTrue(x>=0);
+		return x;
+	}
+	
 	@Test
 	public void testServerTransactions() throws IOException, InterruptedException {
 		synchronized(ServerTest.server) {
@@ -196,14 +203,14 @@ public class ServerTest {
 			long s=server.getPeer().getConsensusState().getAccount(HERO).getSequence();
 			Address addr=HERO;
 			AKeyPair kp=keyPair;
-			long id1 = pc.sendTransaction(kp.signData(Invoke.create(addr, s+1, Reader.read("[1 2 3]"))));
-			long id2 = pc.sendTransaction(kp.signData(Invoke.create(addr, s+2, Reader.read("(return 2)"))));
-			long id2a = pc.sendTransaction(kp.signData(Invoke.create(addr, s+2, Reader.read("22"))));
-			long id3 = pc.sendTransaction(kp.signData(Invoke.create(addr, s+3, Reader.read("(do (def foo :bar) (rollback 3))"))));
-			long id4 = pc.sendTransaction(kp.signData(Transfer.create(addr, s+4, HERO, 1000)));
-			long id5 = pc.sendTransaction(kp.signData(Call.create(addr, s+5, Init.REGISTRY_ADDRESS, Symbols.FOO, Vectors.of(Maps.empty()))));
-			long id6bad = pc.sendTransaction(kp.signData(Invoke.create(Init.VILLAIN, s+6, Reader.read("(def a 1)"))));
-			long id6 = pc.sendTransaction(kp.signData(Invoke.create(addr, s+6, Reader.read("foo"))));
+			long id1 = checkSent(pc,kp.signData(Invoke.create(addr, s+1, Reader.read("[1 2 3]"))));
+			long id2 = checkSent(pc,kp.signData(Invoke.create(addr, s+2, Reader.read("(return 2)"))));
+			long id2a = checkSent(pc,kp.signData(Invoke.create(addr, s+2, Reader.read("22"))));
+			long id3 = checkSent(pc,kp.signData(Invoke.create(addr, s+3, Reader.read("(do (def foo :bar) (rollback 3))"))));
+			long id4 = checkSent(pc,kp.signData(Transfer.create(addr, s+4, HERO, 1000)));
+			long id5 = checkSent(pc,kp.signData(Call.create(addr, s+5, Init.REGISTRY_ADDRESS, Symbols.FOO, Vectors.of(Maps.empty()))));
+			long id6bad = checkSent(pc,kp.signData(Invoke.create(Init.VILLAIN, s+6, Reader.read("(def a 1)"))));
+			long id6 = checkSent(pc,kp.signData(Invoke.create(addr, s+6, Reader.read("foo"))));
 
 			long last=id6;
 

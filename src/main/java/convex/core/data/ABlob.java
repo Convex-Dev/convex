@@ -372,4 +372,8 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 */
 	public abstract boolean isRegularBlob();
 
+	public boolean equalsBytes(ABlob k) {
+		return compareTo(k)==0;
+	}
+
 }

@@ -223,6 +223,39 @@ public class BlobMapsTest {
 	}
 
 	@Test
+	public void testDissocEntries() throws InvalidDataException {
+		BlobMap<Blob, CVMLong> m = Samples.INT_BLOBMAP_7;
+		long n=m.count();
+		
+		for (int i=0; i<n; i++) {
+			MapEntry<Blob,CVMLong> me=m.entryAt(i);
+			BlobMap<Blob, CVMLong> dm=m.dissoc(me.getKey());
+			dm.validate();
+			assertEquals(n-1,dm.count());
+			BlobMap<Blob, CVMLong> m2=dm.assocEntry(me);
+			assertEquals(m,m2);
+		}
+	}
+	
+	@Test
+	public void testDissocAll() throws InvalidDataException {
+		BlobMap<Blob, CVMLong> m=BlobMaps.empty();
+		long n=100;
+		
+		for (long i=0; i<n; i++) {
+			m=m.assoc(Address.create(Math.abs(i*546546565954464911L)), CVMLong.create(i));
+		}
+		
+		assertEquals(n,m.count());
+		
+		for (long i=0; i<n; i++) {
+			m=m.dissoc(Address.create(Math.abs(i*546546565954464911L)));
+			m.validate();
+		}
+		assertSame(BlobMaps.empty(),m);
+	}
+	
+	@Test
 	public void testRemoveEntries() {
 		BlobMap<Blob, CVMLong> m = Samples.INT_BLOBMAP_7;
 

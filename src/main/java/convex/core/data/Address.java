@@ -201,8 +201,7 @@ public class Address extends ABlob {
 
 	@Override
 	public void getBytes(byte[] dest, int destOffset) {
-		// TODO Auto-generated method stub
-		
+		Utils.writeLong(dest, destOffset, value);
 	}
 
 	@Override
@@ -304,6 +303,8 @@ public class Address extends ABlob {
 	public byte getTag() {
 		return Tag.ADDRESS;
 	}
+
+
 
 
 }
