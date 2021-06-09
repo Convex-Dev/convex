@@ -7,25 +7,18 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.List;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
 import convex.api.Shutdown;
 import convex.cli.Helpers;
 import convex.core.Init;
-import convex.core.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
-import convex.core.data.Hash;
-import convex.core.crypto.AKeyPair;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
-import convex.core.Order;
-import convex.core.State;
 import convex.core.util.Utils;
 import convex.peer.API;
 import convex.peer.IServerEvent;
@@ -152,8 +145,6 @@ public class PeerManager implements IServerEvent {
 	 *
 	 */
 	public void showPeerEvents() {
-		long consensusPoint = 0;
-		long maxBlock = 0;
 
 		loadSession();
 		addAllToSession();
@@ -241,7 +232,7 @@ public class PeerManager implements IServerEvent {
 	 *
 	 */
 	public void onServerMessage(Server server, String message) {
-		String shortName = Utils.toFriendlyHexString(server.getPeer().getPeerKey().toHexString());
+		//String shortName = Utils.toFriendlyHexString(server.getPeer().getPeerKey().toHexString());
 		// System.out.println(shortName + ": " + message);
 	}
 

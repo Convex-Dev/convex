@@ -8,7 +8,6 @@ import convex.cli.peer.PeerManager;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.store.AStore;
-import convex.peer.Server;
 import etch.EtchStore;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
