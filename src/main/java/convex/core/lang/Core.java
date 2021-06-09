@@ -363,31 +363,21 @@ public class Core {
 		@Override
 		public Context<Symbol> invoke(Context context, ACell[] args) {
 			int n = args.length;
-			if ((n<1)||(n>2)) return context.withArityError(rangeArityMessage(1,2, args.length));
+			if (n!=1) return context.withArityError(exactArityMessage(1,args.length));
 
-			ACell path=null;
 			ACell maybeName=args[n-1];
 
-			if (n == 2) {
-				// We have a path, need to check it is valid
-				path = args[0];
-				if (path!=null) {
-					path=Symbol.ensurePath(path);
-					if (path == null) return context.withArgumentError("Invalid Symbol path, must be an Address, nil or unqualified Symbol name");
-				}
-			} else {
-				// Fast path for existing Symbol
-				if (maybeName instanceof Symbol) {
-					Symbol sym=(Symbol)maybeName;
-					return context.withResult(Juice.SYMBOL, sym);
-				}
+			// Fast path for existing Symbol
+			if (maybeName instanceof Symbol) {
+				Symbol sym=(Symbol)maybeName;
+				return context.withResult(Juice.SYMBOL, sym);
 			}
 
 			// Check argument is valid name for a Symbol
 			AString name = RT.name(maybeName);
 			if (name == null) return context.withCastError(0, args, Types.SYMBOL);
 
-			Symbol sym = Symbol.create(path,name);
+			Symbol sym = Symbol.create(name);
 			if (sym == null) return context.withArgumentError("Invalid Symbol name, must be between 1 and " + Constants.MAX_NAME_LENGTH + " characters");
 
 			long juice = Juice.SYMBOL;

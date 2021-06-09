@@ -7,8 +7,6 @@ import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.RT;
-import convex.core.util.Utils;
 
 /**
  * <p>Class representing a Symbol. Symbols are more commonly used in CVM code to refer to functions and values in the
@@ -34,22 +32,16 @@ import convex.core.util.Utils;
  * </p>
  */
 public class Symbol extends ASymbolic {
-
-	/**
-	 * Namespace component of the Symbol. Must not itself have a namespace. May be null.
-	 */
-	private final ACell path;
 	
-	private Symbol(ACell path,AString name) {
+	private Symbol(AString name) {
 		super(name);
-		this.path=path;
 	}
 	
 	public AType getType() {
 		return Types.SYMBOL;
 	}
 	
-	protected static final WeakHashMap<Symbol,Symbol> cache=new WeakHashMap<>(100);
+	protected static final WeakHashMap<String,Symbol> cache=new WeakHashMap<>(100);
 
 	/**
 	 * Creates a Symbol with the given unqualified namespace Symbol and name
@@ -57,62 +49,18 @@ public class Symbol extends ASymbolic {
 	 * @param name Unqualified Symbol name
 	 * @return Symbol instance, or null if the Symbol is invalid
 	 */
-	public static Symbol create(Symbol namespace, AString name) {
+	public static Symbol create(AString name) {
 		if (!validateName(name)) return null;
-		if (namespace!=null) {
-			// namespace can't currently be qualified itself
-			if (namespace.isQualified()) return null;
-		}
-		Symbol sym= new Symbol(namespace,name);
+		Symbol sym= new Symbol(name);
 		
 		synchronized (cache) {
 			// TODO: figure out if caching Symbols is a net win or not
-			Symbol cached=cache.get(sym);
+			Symbol cached=cache.get(sym.toString());
 			if (cached!=null) return cached;
-			cache.put(sym,sym);
+			cache.put(sym.toString(),sym);
 		}
 		
 		return sym;
-	}
-	
-	/**
-	 * Creates a Symbol with the given path and name
-	 * @param path path, which may be null for an unqualified Symbol
-	 * @param name Unqualified Symbol name
-	 * @return Symbol instance, or null if the Symbol is invalid
-	 */
-	public static Symbol create(ACell path, AString name) {
-		if (!validatePath(path)) return null;
-		if (!validateName(name)) return null;
-		Symbol sym= new Symbol(path,name);
-		
-		synchronized (cache) {
-			// TODO: figure out if caching Symbols is a net win or not
-			Symbol cached=cache.get(sym);
-			if (cached!=null) return cached;
-			cache.put(sym,sym);
-		}
-		
-		return sym;
-	}
-	
-	/**
-	 * Validates if a path is appropriate for a Symbol
-	 * @param path
-	 * @return true if value is a valid Symbol path, false otherwise
-	 */
-	public static boolean validatePath(ACell path) {
-		if (path!=null) {
-			if (path instanceof Symbol) {
-				if (((Symbol)path).isQualified()) return false;
-				return true;
-			} else if (path instanceof Address) {
-				return true;
-			} else {
-				return false;
-			}
-		}
-		return true;
 	}
 
 	/**
@@ -123,59 +71,7 @@ public class Symbol extends ASymbolic {
 	 */
 	public static Symbol create(String name) {
 		if (name==null) return null;
-		return create((Address)null,Strings.create(name));
-	}
-	
-	/**
-	 * Create an unqualified symbol with the given name.
-	 * @param name A valid Symbol name.
-	 * @return Symbol instance, or null if the name is invalid for a Symbol.
-	 */
-	public static Symbol create(AString name) {
-		return create((Address)null,name);
-	}
-	
-	/**
-	 * Create an qualified symbol with the given namespace symbol.
-	 * @param name A valid Symbol name.
-	 * @param ns A valid Symbol name for the namespace
-	 * @return Symbol instance, or null if the name or namespace is invalid for a Symbol.
-	 */
-	public static Symbol createWithPath(AString name, ACell ns) {
-		return create(name).withPath(ns);
-	}
-	
-	public static Symbol createWithPath(String name, String ns) {
-		Symbol nsym=Symbol.create(ns);
-		if (nsym==null) return null;
-		return createWithPath(Strings.create(name),nsym);
-	}
-	
-	/**
-	 * Returns the namespace alias component of a Symbol, or null if not present
-	 * @return Namespace Symbol or null
-	 */
-	public ACell getPath() {
-		return path;
-	}
-	
-	/**
-	 * Returns the Symbol with an updated path
-	 * @param newPath New path
-	 * @return Updated Symbol, or this Symbol if no change
-	 */
-	public Symbol withPath(ACell newPath) {
-		if (path==newPath) return this;
-		return new Symbol(newPath,name);
-	}
-
-	/**
-	 * Returns the Symbol with an updated path
-	 * @param newPath New path
-	 * @return Updated Symbol, or this Symbol if no change
-	 */
-	public Object withPath(String newPath) {
-		return withPath(Symbol.create(newPath));
+		return create(Strings.create(name));
 	}
 
 	@Override
@@ -187,15 +83,15 @@ public class Symbol extends ASymbolic {
 	/**
 	 * Tests if this Symbol is equal to another Symbol. Equality is defined by both namespace and name being equal.
 	 * @param sym
-	 * @return
+	 * @return true if Symbols are equal, false otherwise
 	 */
 	public boolean equals(Symbol sym) {
-		return sym.name.equals(name)&&Utils.equals(path,sym.getPath());
+		return sym.name.equals(name);
 	}
 
 	@Override
 	public int hashCode() {
-		return name.hashCode()+119*((path==null)?0:path.hashCode());
+		return name.hashCode();
 	}
 
 	@Override
@@ -206,7 +102,6 @@ public class Symbol extends ASymbolic {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = Format.write(bs,pos, path);
 		pos = Format.writeRawUTF8String(bs, pos, name.toString());
 		return pos;
 	}
@@ -219,15 +114,10 @@ public class Symbol extends ASymbolic {
 	 * @throws BadFormatException If a Symbol could not be read correctly.
 	 */
 	public static Symbol read(ByteBuffer bb) throws BadFormatException {
-		ACell namespace=Format.read(bb);
 		String name=Format.readUTF8String(bb);
-		Symbol sym = Symbol.create(namespace,Strings.create(name));
+		Symbol sym = Symbol.create(Strings.create(name));
 		if (sym == null) throw new BadFormatException("Can't read symbol");
 		return sym;
-	}
-	
-	public boolean isQualified() {
-		return path!=null;
 	}
 
 	@Override
@@ -243,10 +133,6 @@ public class Symbol extends ASymbolic {
 	
 	@Override
 	public void print(StringBuilder sb) {
-		if (path!=null) {
-			path.print(sb);
-			sb.append('/');
-		}
 		sb.append(getName());
 	}
 
@@ -258,20 +144,7 @@ public class Symbol extends ASymbolic {
 	@Override
 	public void validateCell() throws InvalidDataException {
 		super.validateCell();
-		if (!validatePath(path)) {
-			throw new InvalidDataException("Invalid symbol path of type: " + RT.getType(path), this);
-		}
 	}
-
-	/**
-	 * Converts to an unqualified Symbol by removing any namespace component
-	 * @return An unqualified Symbol with the same name as this Symbol.
-	 */
-	public Symbol toUnqualified() {
-		if (path==null) return this;
-		return Symbol.create(getName());
-	}
-
 
 	@Override
 	public int getRefCount() {
@@ -291,18 +164,4 @@ public class Symbol extends ASymbolic {
 	public byte getTag() {
 		return Tag.SYMBOL;
 	}
-
-	/**
-	 * Casts a non-null cell value to a valid path if possible.
-	 * @param path 
-	 * @return Valid path, or null if not possible
-	 */
-	public static ACell ensurePath(ACell path) {
-		if (validatePath(path)) return path; // Unqualified Symbol, Address or null
-		AString name=RT.name(path);
-		if (name==null) return null;
-		return create(name);
-	}
-
-
 }

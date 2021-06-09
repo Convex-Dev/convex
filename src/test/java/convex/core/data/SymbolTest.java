@@ -34,8 +34,6 @@ public class SymbolTest {
 	@Test
 	public void testToString() {
 		assertEquals("foo",Symbols.FOO.toString());
-		assertEquals("bar/foo",Symbols.FOO.withPath("bar").toString());
-		assertEquals("#13/foo",Symbols.FOO.withPath(Address.create(13)).toString());
 	}
 
 	@Test
@@ -51,7 +49,7 @@ public class SymbolTest {
 
 		assertEquals("count", k.getName().toString());
 		assertEquals("count", k.toString());
-		assertEquals(8, k.getEncoding().length); // tag(1) + null namespace(1) + length(1) + name(5)
+		assertEquals(7, k.getEncoding().length); // tag(1) + length(1) + name(5)
 
 	}
 }

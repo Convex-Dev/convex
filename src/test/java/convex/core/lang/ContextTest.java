@@ -67,11 +67,6 @@ public class ContextTest extends ACVMTest {
 		Symbol sym1=Symbol.create("count");
 		assertEquals(Core.COUNT,CTX.lookup(sym1).getResult());
 
-		Symbol sym2=Symbol.create("count").withPath(Init.CORE_ADDRESS);
-		assertEquals(Core.COUNT,CTX.lookup(sym2).getResult());
-
-		Symbol sym3=Symbol.create("count").withPath(ADDR);
-		assertUndeclaredError(CTX.lookup(sym3));
 	}
 	
 	@Test

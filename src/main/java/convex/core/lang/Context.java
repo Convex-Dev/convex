@@ -527,10 +527,9 @@ public final class Context<T extends ACell> extends AObject {
 		if (env.containsKey(sym)) {
 			return getMetadata().get(sym,Maps.empty());
 		}
-		AccountStatus as = getAliasedAccount(env,sym.getPath());
+		AccountStatus as = getAliasedAccount(env);
 		if (as==null) return null;
 
-		sym=sym.toUnqualified(); // we followed a path alias, so unqualify symbol
 		env=as.getEnvironment();
 		if (env.containsKey(sym)) {
 			return as.getMetadata().get(sym,Maps.empty());
@@ -568,10 +567,10 @@ public final class Context<T extends ACell> extends AObject {
 		if (env.containsKey(sym)) {
 			return as;
 		}
-		as = getAliasedAccount(env,sym.getPath());
+		
+		as = getAliasedAccount(env);
 		if (as==null) return null;
 
-		sym=sym.toUnqualified(); // we followed a path alias, so unqualify symbol
 		env=as.getEnvironment();
 		if (env.containsKey(sym)) {
 			return as;
@@ -593,7 +592,7 @@ public final class Context<T extends ACell> extends AObject {
 			return me.getValue();
 		}
 
-		AccountStatus as = getAliasedAccount(env,sym.getPath());
+		AccountStatus as = getAliasedAccount(env);
 		if (as==null) return null;
 		return as.getEnvironment().get(sym);
 	}
@@ -623,8 +622,7 @@ public final class Context<T extends ACell> extends AObject {
 		MapEntry<Symbol,ACell> result=env.getEntry(sym);
 
 		if (result==null) {
-			ACell path=sym.getPath();
-			AccountStatus aliasAccount=getAliasedAccount(env,path);
+			AccountStatus aliasAccount=getAliasedAccount(env);
 			result = lookupAliasedEntry(aliasAccount,sym);
 		}
 		return result;
@@ -632,9 +630,8 @@ public final class Context<T extends ACell> extends AObject {
 
 	private MapEntry<Symbol,ACell> lookupAliasedEntry(AccountStatus as,Symbol sym) {
 		if (as==null) return null;
-		Symbol unqualified=sym.toUnqualified();
 		AHashMap<Symbol, ACell> env = as.getEnvironment();
-		return env.getEntry(unqualified);
+		return env.getEntry(sym);
 	}
 
 	/**
@@ -657,36 +654,9 @@ public final class Context<T extends ACell> extends AObject {
 	 * @param path An alias path
 	 * @return AccountStatus for the alias, or null if not present
 	 */
-	@SuppressWarnings("unchecked")
-	private AccountStatus getAliasedAccount(AHashMap<Symbol, ACell> env, ACell path) {
-		// First check for an Address. If so, don't go via aliases
-		if (path instanceof Address) {
-			return getAccountStatus((Address)path);
-		}
-
-		// Check for *aliases* entry. Might not exist.
-		ACell maybeAliases=env.get(Symbols.STAR_ALIASES);
-
-		// if *aliases* does not exist, use null as alias for core account
-		if (maybeAliases==null) {
-			return (path==null)?getCoreAccount():null;
-		}
-
-		if (!(maybeAliases instanceof AHashMap)) return null;
-
-		AHashMap<Symbol,ACell> aliasMap=((AHashMap<Symbol,ACell>)maybeAliases);
-		MapEntry<Symbol,ACell> aliasEntry=aliasMap.getEntry(path);
-
-		if (aliasEntry==null) {
-			// no alias entry. Default to core iff alias is null.
-			return (path==null)?getCoreAccount():null;
-		}
-
-		ACell aValue=aliasEntry.getValue();
-		// return null if the alias isn't a valid address
-		if (!(aValue instanceof Address)) return null;
-
-		return getAccountStatus((Address)aValue);
+	private AccountStatus getAliasedAccount(AHashMap<Symbol, ACell> env) {
+		// TODO: alternative core accounts
+		return getCoreAccount();
 	}
 
 	private AccountStatus getCoreAccount() {
@@ -999,7 +969,6 @@ public final class Context<T extends ACell> extends AObject {
 		if (bindingForm instanceof Symbol) {
 			Symbol sym=(Symbol)bindingForm;
 			if (sym.equals(Symbols.UNDERSCORE)) return ctx;
-			if (sym.isQualified()) return ctx.withCompileError("Can't create local binding for qualified symbol: "+sym);
 			// TODO: confirm must be an ACell at this point?
 			return withLocalBindings(localBindings.conj((ACell)args));
 		} else if (bindingForm instanceof AVector) {
