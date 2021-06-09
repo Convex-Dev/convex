@@ -128,20 +128,19 @@ public class Order extends ACell {
 	}
 
 	/**
-	 * Checks if an Order is consistent with this Order.
+	 * Checks if another Order is consistent with this Order.
 	 * 
 	 * Order is defined as consistent iff: 
 	 * <ul>
-	 * <li> Blocks are equal up to the consensus
-	 * point of this Order
+	 * <li> Blocks are equal up to the Consensus
+	 * Point of this Order
 	 * </li>
 	 * </ul>
 	 * 
 	 * @param bc
 	 * @return True if chains are consistent, false otherwise.
 	 */
-	public boolean isConsistent(Order bc) {
-		if (blocks.equals(bc.blocks)) return true;
+	public boolean checkConsistent(Order bc) {
 		long commonPrefix = blocks.commonPrefixLength(bc.blocks);
 		return commonPrefix >= consensusPoint;
 	}

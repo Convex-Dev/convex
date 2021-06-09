@@ -305,7 +305,7 @@ public class Peer {
 	}
 
 	/**
-	 * Update this belief with a new Belief
+	 * Update this Peer with a new Belief
 	 *
 	 * @param newBelief
 	 * @return
@@ -313,12 +313,14 @@ public class Peer {
 	 */
 	private Peer updateBelief(Belief newBelief) throws BadSignatureException {
 		if (belief.getValue() == newBelief) return this;
-		Order myChain = newBelief.getOrder(peerKey); // this peer's chain from new belief
-		long consensusPoint = myChain.getConsensusPoint();
+		Order myOrder = newBelief.getOrder(peerKey); // this peer's chain from new belief
+		long consensusPoint = myOrder.getConsensusPoint();
 		long stateIndex = states.count() - 1; // index of last state
-		AVector<Block> blocks = myChain.getBlocks();
+		AVector<Block> blocks = myOrder.getBlocks();
 
-		if (stateIndex > consensusPoint) throw new Error("Receding consenus?");
+		if (stateIndex > consensusPoint) {
+			throw new Error("Receding consensus? consensusPoint="+consensusPoint +", last state= "+stateIndex);
+		}
 
 		// need to advance states
 		AVector<State> newStates = this.states;

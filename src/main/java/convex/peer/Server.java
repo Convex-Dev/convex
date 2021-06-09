@@ -583,12 +583,11 @@ public class Server implements Closeable {
 	/**
 	 * Handle general Belief update, taking belief registered in newBeliefs
 	 *
+	 * @return true if Peer Belief changed, false otherwise
 	 * @throws InterruptedException
 	 */
 	protected boolean maybeUpdateBelief() throws InterruptedException {
 		long oldConsensusPoint = peer.getConsensusPoint();
-
-		Belief initialBelief = peer.getBelief();
 
 		// published new blocks if needed. Guaranteed to change belief if this happens
 		boolean published = maybePublishBlock();
@@ -596,13 +595,16 @@ public class Server implements Closeable {
 		// only do belief merge if needed: either after publishing a new block or with
 		// incoming beliefs
 		if ((!published) && newBeliefs.isEmpty()) return false;
+		
+		// Update Peer timestamp first. This determines what we might accept.
+		peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
 
-		maybeMergeBeliefs();
+		boolean updated = maybeMergeBeliefs();
+		if (!updated) return false;
 
 		// Need to check if belief changed from initial state
 		// It is possible that incoming beliefs don't change current belief.
 		final Belief belief = peer.getBelief();
-		if (belief == initialBelief) return false;
 
 		// At this point we know something updated our belief, so we want to rebroadcast
 		// belief to network
@@ -626,7 +628,7 @@ public class Server implements Closeable {
 		// Report transaction results
 		long newConsensusPoint = peer.getConsensusPoint();
 		if (newConsensusPoint > oldConsensusPoint) {
-			log.log(LEVEL_BELIEF, "Consenus update from " + oldConsensusPoint + " to " + newConsensusPoint);
+			log.log(LEVEL_BELIEF, "Consensus update from " + oldConsensusPoint + " to " + newConsensusPoint);
 			for (long i = oldConsensusPoint; i < newConsensusPoint; i++) {
 				Block block = peer.getPeerOrder().getBlock(i);
 				BlockResult br = peer.getBlockResult(i);
@@ -690,7 +692,9 @@ public class Server implements Closeable {
 				newBeliefs.clear();
 			}
 			Peer newPeer = peer.mergeBeliefs(beliefs);
-			if (newPeer.getBelief() == peer.getBelief()) return false;
+			
+			// Check for substantive change (i.e. Orders updated, can ignore timestamp)
+			if (newPeer.getBelief().getOrders().equals(peer.getBelief().getOrders())) return false;
 
 			log.log(LEVEL_BELIEF, "New merged Belief update: " + newPeer.getBelief().getHash().toHexString());
 			// we merged successfully, so clear pending beliefs and update Peer
@@ -1031,8 +1035,6 @@ public class Server implements Closeable {
 
 				// loop while the server is running
 				while (isRunning) {
-					// Update Peer timestamp first. This determines what we might accept.
-					peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
 
 					// Try belief update
 					maybeUpdateBelief();

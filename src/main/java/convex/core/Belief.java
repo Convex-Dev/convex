@@ -141,21 +141,14 @@ public class Belief extends ARecord {
 
 		Counters.beliefMerge++;
 
-		final AccountKey myAddress = mc.getAccountKey();
-		SignedData<Order> mySignedOrder = orders.get(myAddress);
-		if (mySignedOrder==null) {
-			// we don't have a current order, so start with an empty order
-			mySignedOrder=mc.sign(Order.create());
-		}
-
 		// accumulate combined list of latest chains for all peers
-		final BlobMap<AccountKey, SignedData<Order>> accOrders = accumulateOrders(mc, mySignedOrder, beliefs);
+		final BlobMap<AccountKey, SignedData<Order>> accOrders = accumulateOrders(mc, beliefs);
 
 		// vote for new proposed chain
 		final BlobMap<AccountKey, SignedData<Order>> resultOrders = vote(mc, accOrders);
 		if (resultOrders == null) return this;
 
-		// update my belief with the resulting chains
+		// update my belief with the resulting Orders
 		long newTimestamp = mc.getTimeStamp();
 		if ((orders == resultOrders) && (timestamp == newTimestamp)) return this;
 		final Belief result = new Belief(resultOrders, newTimestamp);
@@ -163,7 +156,7 @@ public class Belief extends ARecord {
 		return result;
 	}
 
-	private BlobMap<AccountKey, SignedData<Order>> accumulateOrders(MergeContext mc, SignedData<Order> mySignedChain,
+	private BlobMap<AccountKey, SignedData<Order>> accumulateOrders(MergeContext mc,
 			Belief[] beliefs) {
 		BlobMap<AccountKey, SignedData<Order>> result = this.orders;
 		// assemble the latest list of orders from all peers
@@ -176,6 +169,10 @@ public class Belief extends ARecord {
 			for (long i=0; i<bcount; i++) {
 				MapEntry<AccountKey,SignedData<Order>> be=bchains.entryAt(i);
 				ABlob key=be.getKey();
+				
+				// Skip merging own Key
+				if(key.equalsBytes(mc.getAccountKey())) continue; 
+				
 				SignedData<Order> a=result.get(key);
 				if (a == null) {result=result.assocEntry(be); continue;}
 				SignedData<Order> b=be.getValue();
@@ -186,10 +183,6 @@ public class Belief extends ARecord {
 				try {
 					Order ac = a.getValue();
 					Order bc = b.getValue();
-
-					// shouldn't be possible for orders to be the same
-					assert (!a.equals(b));
-					// if (ac.equals(bc)) return a; // if equal, no change required
 
 					// TODO: penalise inconsistency?
 					// TODO: check for forks / inconsistent values?
@@ -206,15 +199,12 @@ public class Belief extends ARecord {
 
 					// keep current view (more stable?)
 				} catch (BadSignatureException e) {
-					// TODO: figure out when this can happen?
+					// TODO: figure out if/when this can happen?
 					throw Utils.sneakyThrow(e);
 				}
-
-				// throw new TODOException();
 			}
 		}
-		// Keep this peer's current signed order
-		return result.assoc(mc.getAccountKey(), mySignedChain);
+		return result;
 	}
 
 	/**
@@ -239,7 +229,7 @@ public class Belief extends ARecord {
 		final BlobMap<AccountKey, SignedData<Order>> filteredOrders = accOrders.filterValues(signedOrder -> {
 			try {
 				Order otherChain = signedOrder.getValue();
-				return myOrder.isConsistent(otherChain);
+				return myOrder.checkConsistent(otherChain);
 			} catch (Exception e) {
 				throw Utils.sneakyThrow(e);
 			}
@@ -488,7 +478,7 @@ public class Belief extends ARecord {
 
 		// exclude new blocks already in the base Order
 		// TODO: what about blocks already in consensus?
-		Iterator<Block> it = blocks.listIterator(consensusPoint);
+		Iterator<Block> it = blocks.listIterator(Math.min(blocks.count(), consensusPoint));
 		while (it.hasNext()) {
 			newBlocks.remove(it.next());
 		}
