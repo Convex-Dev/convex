@@ -64,8 +64,6 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	/**
 	 * Prefix blob, must contain hex digits in the range [depth,depth+prefixLength).
 	 * 
-	 * Can be null in 
-	 * 
 	 * May contain more hex digits in memory, this is irrelevant from the
 	 * perspective of serialisation.
 	 * 
