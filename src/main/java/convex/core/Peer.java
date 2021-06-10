@@ -304,7 +304,9 @@ public class Peer {
 		long ocp=getConsensusPoint(); 
 		Order newOrder=newBelief.getOrder(peerKey);
 		if (ocp>newBelief.getOrder(peerKey).getConsensusPoint()) {
+			// This probably shouldn't happen, but just in case.....
 			System.err.println("Receding consensus? Old CP="+ocp +", New CP="+newOrder.getConsensusPoint());
+			@SuppressWarnings("unused")
 			Belief newBelief2 = belief.merge(mc, beliefs);
 
 		}

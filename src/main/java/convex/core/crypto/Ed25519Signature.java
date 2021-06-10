@@ -82,13 +82,13 @@ public class Ed25519Signature extends ASignature {
 	
 	public boolean verify(Hash hash, PublicKey publicKey) {
 		try {
-			Signature verifier = Signature.getInstance("Ed25519","SunEC");
+			Signature verifier = Signature.getInstance("Ed25519");
 		    verifier.initVerify(publicKey);
 		    verifier.update(hash.getInternalArray(),hash.getOffset(),Hash.LENGTH);
 			return verifier.verify(signatureBytes);
 		} catch (SignatureException | InvalidKeyException e) {	
 			return false;
-		} catch (NoSuchAlgorithmException | NoSuchProviderException e) {
+		} catch (NoSuchAlgorithmException e) {
 			throw new Error(e);
 		} 
 	}
