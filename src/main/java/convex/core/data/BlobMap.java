@@ -463,7 +463,6 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	@Override
 	public BlobMap<K, V> filterValues(Predicate<V> pred) {
 		BlobMap<K, V> r=this;
-		if ((entry!=null)&&!pred.test(entry.getValue())) r=r.dissoc(entry.getKey());
 		for (int i=0; i<16; i++) {
 			if (r==null) break; // might be null from dissoc
 			BlobMap<K,V> oldChild=r.getChild(i);
@@ -471,8 +470,17 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 			BlobMap<K,V> newChild=oldChild.filterValues(pred);
 			r=r.withChild(i, oldChild, newChild);
 		}
+		
+		// check entry at this level. A child might have moved here during the above loop!
+		if (r!=null) {
+			if ((r.entry!=null)&&!pred.test(r.entry.getValue())) r=r.dissoc(r.entry.getKey());
+		}
+		
 		// check if whole blobmap was emptied
-		if ((r==null)&&(depth==0)) r=empty();
+		if (r==null) {
+			// everything deleted, but need 
+			if (depth==0) r=empty();
+		}
 		return r;
 	}
 

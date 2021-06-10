@@ -195,6 +195,9 @@ public class BlobMapsTest {
 	public void testInitialPeersBlobMap() {
 		BlobMap<AccountKey, PeerStatus> bm = TestState.STATE.getPeers();
 		doBlobMapTests(bm);
+		
+		BlobMap<AccountKey, PeerStatus> fm =bm.filterValues(ps -> ps==bm.get(Init.KEYPAIRS[0].getAccountKey()));
+		assertEquals(1L,fm.count());
 	}
 
 	@Test

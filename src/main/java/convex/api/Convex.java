@@ -19,6 +19,7 @@ import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Hash;
+import convex.core.data.Keywords;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
@@ -89,6 +90,11 @@ public class Convex {
 		@Override
 		protected synchronized void handleResultMessage(Message m) {
 			Result v = m.getPayload();
+			
+			if ((v!=null)&&(Keywords.SEQUENCE.equals(v.getErrorCode()))) {
+				// We probably got a wrong sequence number. Kill the stored value.
+				sequence=null;
+			}
 			long id = m.getID().longValue();
 			synchronized (awaiting) {
 				CompletableFuture<Result> cf = awaiting.get(id);

@@ -164,8 +164,8 @@ public class PeerGUI extends JPanel {
 						long pcp = p.getConsensusPoint();
 						if (pcp > cp) {
 							cp = pcp;
-							String ls="PeerGUI Consensus State update detected at depth "+cp;
-							System.err.println(ls);
+							//String ls="PeerGUI Consensus State update detected at depth "+cp;
+							//System.err.println(ls);
 							latest = p.getConsensusState();
 							latestState.setValue(latest);
 						}
