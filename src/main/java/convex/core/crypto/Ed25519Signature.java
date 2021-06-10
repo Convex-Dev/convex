@@ -3,6 +3,7 @@ package convex.core.crypto;
 import java.nio.ByteBuffer;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
@@ -81,15 +82,15 @@ public class Ed25519Signature extends ASignature {
 	
 	public boolean verify(Hash hash, PublicKey publicKey) {
 		try {
-			Signature verifier = Signature.getInstance("Ed25519");
+			Signature verifier = Signature.getInstance("Ed25519","SunEC");
 		    verifier.initVerify(publicKey);
 		    verifier.update(hash.getInternalArray(),hash.getOffset(),Hash.LENGTH);
 			return verifier.verify(signatureBytes);
 		} catch (SignatureException | InvalidKeyException e) {	
 			return false;
-		} catch (NoSuchAlgorithmException e) {
+		} catch (NoSuchAlgorithmException | NoSuchProviderException e) {
 			throw new Error(e);
-		}
+		} 
 	}
 
 	@Override

@@ -93,7 +93,7 @@ Convex includes a wide set of benchmarks, which are used to evaluate performance
 
 #### Preparing to run benchmarks
 
-To run benchmarks, it is easiest to build the `convex-testing.jar` which includes all benchmarks, tests and dependencies. This can be done with the following commend:
+To run benchmarks, it is easiest to build the full `convex.jar` which includes all benchmarks, tests and dependencies. This can be done with the following commend:
 
 `mvn package`
 
@@ -101,13 +101,13 @@ To run benchmarks, it is easiest to build the `convex-testing.jar` which include
 
 After building the testing `.jar`, you can launch benchmarks as main classes in the `convex.performance` package, e.g.
 
-`java -cp target/convex-testing.jar convex.performance.EtchBenchmark`
+`java -cp target/convex.jar convex.performance.EtchBenchmark`
 
 #### Running with Java Flight Recorder
 
 If you want to analyse profiling results for the benchmarks, you can run using JFR to produce a profiling output file `flight.jfr`
 
-`java -cp target/convex-testing.jar -XX:+FlightRecorder -XX:StartFlightRecording=duration=200s,filename=flight.jfr -Djava.util.logging.config.file=logging.properties convex.performance.CVMBenchmark`
+`java -cp target/convex.jar -XX:+FlightRecorder -XX:StartFlightRecording=duration=200s,filename=flight.jfr -Djava.util.logging.config.file=logging.properties convex.performance.CVMBenchmark`
 
 The resulting `flight.jfr` can the be opened in tools such as JDK Mission Control which enables detailed analysis and visualisation of profiling results. This is a useful approach that the Convex team use to identify performance bottlenecks.
 
