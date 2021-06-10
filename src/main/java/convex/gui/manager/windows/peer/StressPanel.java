@@ -8,7 +8,10 @@ import java.net.InetSocketAddress;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -113,20 +116,7 @@ public class StressPanel extends JPanel {
 	}
 
 	long errors = 0;
-	long results = 0;
-
-	public final ResultConsumer resultHandler = new ResultConsumer() {
-		@Override
-		protected void handleResult(Object result) {
-			results++;
-		}
-
-		@Override
-		protected void handleError(long id, Object code, Object msg) {
-			errors++;
-		}
-		
-	};
+	long values = 0;
 	
 	private JSplitPane splitPane;
 	private JPanel resultPanel;
@@ -137,7 +127,7 @@ public class StressPanel extends JPanel {
 	
 	private synchronized void runStressTest() {
 		errors = 0;
-		results = 0;
+		values = 0;
 			Address address=Init.HERO;
 
 			int transCount = (Integer) transactionCountSpinner.getValue();
@@ -158,8 +148,8 @@ public class StressPanel extends JPanel {
 
 					// Use client store
 					// Stores.setCurrent(Stores.CLIENT_STORE);
-					ArrayList<Future<Result>> frs=new ArrayList<>();
-					Convex pc = Convex.connect(sa, address,null); // TODO: fix KP
+					ArrayList<CompletableFuture<Result>> frs=new ArrayList<>();
+					Convex pc = Convex.connect(sa, address,Init.HERO_KP);
 					
 					for (int i = 0; i < transCount; i++) {
 						StringBuilder tsb = new StringBuilder();
@@ -170,23 +160,29 @@ public class StressPanel extends JPanel {
 						tsb.append("))");
 						String source = tsb.toString();
 						ATransaction t = Invoke.create(Init.HERO,-1, Reader.read(source));
-						Future<Result> fr = pc.transact(t);
+						CompletableFuture<Result> fr = pc.transact(t);
 						frs.add(fr);
 					}
 					
 					long sendTime = Utils.getCurrentTimestamp();
 
-					while ((results < transCount) && (Utils.getCurrentTimestamp() < sendTime + 1000)) {
-						Thread.sleep(1);
-					}
+					List<Result> results=Utils.completeAll(frs).get(10000, TimeUnit.MILLISECONDS);
 					long endTime = Utils.getCurrentTimestamp();
+					
+					for (Result r:results) {
+						if (r.isError()) {
+							errors++;
+						} else {
+							values++;
+						}
+					}
 					
 					Thread.sleep(100); // wait for state update to be reflected
 					State endState = PeerGUI.getLatestState();
 
 					
 					sb.append("Results for " + transCount + " transactions\n");
-					sb.append(results + " responses received\n");
+					sb.append(values + " values received\n");
 					sb.append(errors + " errors received\n");
 					sb.append("\n");
 					sb.append("Send time:     " + formatter.format((sendTime - startTime) * 0.001) + "s\n");

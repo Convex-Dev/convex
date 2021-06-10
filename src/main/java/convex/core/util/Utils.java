@@ -18,6 +18,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -1286,6 +1287,16 @@ public class Utils {
 			return L.get(min - 1);
 		}
 
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static <T> CompletableFuture<java.util.List<T>> completeAll(java.util.List<CompletableFuture<T>> futures) {
+	    CompletableFuture<T>[] fs = futures.toArray(new CompletableFuture[futures.size()]);
+
+	    return CompletableFuture.allOf(fs).thenApply(e -> futures.stream()
+	    				.map(CompletableFuture::join)
+	    				.collect(Collectors.toList())
+	    				);
 	}
 
 	public static State stateAsOf(AVector<State> states, CVMLong timestamp) {
