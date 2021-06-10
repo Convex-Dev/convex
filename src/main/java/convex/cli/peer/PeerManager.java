@@ -93,7 +93,7 @@ public class PeerManager implements IServerEvent {
 		EtchStore store = (EtchStore) peerServer.getStore();
 
 		session.addPeer(
-			peerServer.getAddress().toHexString(),
+			peerServer.getPeerKey().toHexString(),
 			peerServer.getHostname(),
 			store.getFileName()
 		);
@@ -115,7 +115,7 @@ public class PeerManager implements IServerEvent {
 	 */
 	protected void removeAllFromSession() {
 		for (Server peerServer: peerServerList) {
-			session.removePeer(peerServer.getAddress().toHexString());
+			session.removePeer(peerServer.getPeerKey().toHexString());
 		}
 	}
 

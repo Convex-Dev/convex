@@ -29,7 +29,7 @@ public class PeerView {
 		StringBuilder sb=new StringBuilder();
 		if (peerServer != null) {
 			State state=PeerGUI.getLatestState();
-			AccountKey paddr=peerServer.getAddress();
+			AccountKey paddr=peerServer.getPeerKey();
 			sb.append("0x"+paddr.toChecksumHex()+"\n");
 			sb.append("Local peer on: " + peerServer.getHostAddress() + " with store "+peerServer.getStore()+"\n");
 			

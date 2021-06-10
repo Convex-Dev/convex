@@ -121,9 +121,9 @@ public class API {
 			
 			try {
 				// Join this Server to the Seer #0
-				serverList.get(i).connectToPeer(genesisServer.getAddress(), genesisServer.getHostAddress());
+				serverList.get(i).connectToPeer(genesisServer.getPeerKey(), genesisServer.getHostAddress());
 				// Join server #0 to this server
-				genesisServer.connectToPeer(server.getAddress(), server.getHostAddress());
+				genesisServer.connectToPeer(server.getPeerKey(), server.getHostAddress());
 			} catch (IOException e) {
 				log.severe("Failed to connect peers" +e.getMessage());
 			}

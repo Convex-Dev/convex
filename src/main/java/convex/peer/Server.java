@@ -36,6 +36,7 @@ import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Format;
@@ -332,7 +333,7 @@ public class Server implements Closeable {
 				}
 			});
 
-			log.log(LEVEL_SERVER, "Peer Server started with Peer Address: " + getAddress().toChecksumHex());
+			log.log(LEVEL_SERVER, "Peer Server started with Peer Address: " + getPeerKey().toChecksumHex());
 		} catch (Throwable e) {
 			throw new Error("Failed to launch Server on port: " + port, e);
 		}
@@ -383,27 +384,7 @@ public class Server implements Closeable {
 			statusPeerList = statusPeerList.assoc(accountKey, buildPeerList.get(key));
 		}
 
-//		retryCount = 5;
-//		result = null;
-//		while ( retryCount > 0) {
-//			try {
-//				// set our peer hostname on the network
-//				String transactionCommand = String.format("(set-peer-data {:url \"%s\"})", getHostname());
-//				ACell message = Reader.read(transactionCommand);
-//				ATransaction transaction = Invoke.create(address, -1, message);
-//				result = convex.transactSync(transaction, 2000);
-//				retryCount = 0;
-//			} catch (IOException | TimeoutException e ) {
-//				// raiseServerMessage("retrying to register this peer with the network " + e);
-//				retryCount --;
-//			}
-//		}
-//		convex.close();
-//
-//		if ( result == null) {
-//			raiseServerMessage("unable to register this peer with the network");
-//			return false;
-//		}
+
 		// now use the remote peer host name list returned from the status call
 		// to connect to the peers
 		connectToPeers(statusPeerList);
@@ -645,7 +626,9 @@ public class Server implements Closeable {
 	 * @return True if a new block is published, false otherwise.
 	 */
 	protected boolean maybePublishBlock() {
-		synchronized (newTransactions) {
+		synchronized (newTransactions) {	
+			maybePostOwnTransactions(newTransactions);
+			
 			int n = newTransactions.size();
 			if (n == 0) return false;
 			// TODO: smaller block if too many transactions?
@@ -664,6 +647,49 @@ public class Server implements Closeable {
 				// TODO what to do here?
 				return false;
 			}
+		}
+	}
+
+	private long lastOwnTransactionTimestamp=0;
+	private static final long OWN_TRANSACTIONS_DELAY=2000;
+	
+	/**
+	 * Check if the Peer want to send any of its own transactions
+	 * @param transactionList List of transactions to add to.
+	 */
+	private void maybePostOwnTransactions(ArrayList<SignedData<ATransaction>> transactionList) {
+		State s=getPeer().getConsensusState();
+		long ts=s.getTimeStamp().longValue();
+		
+		// If we already did this recently, don't try again
+		if (ts<(lastOwnTransactionTimestamp+OWN_TRANSACTIONS_DELAY)) return;
+		
+		lastOwnTransactionTimestamp=ts; // mark this timestamp
+		
+		String desiredHostname=getHostname(); // Intended hostname
+		PeerStatus ps=s.getPeer(getPeerKey());
+		AString chn=ps.getHostname();
+		String currentHostname=(chn==null)?null:chn.toString();
+
+		// Try to set hostname if not correctly set
+		trySetHostname:
+		if (!Utils.equals(desiredHostname, currentHostname)) {
+			Address address=ps.getOwner();
+			if (address==null) break trySetHostname;
+			AccountStatus as=s.getAccount(address);
+			if (as==null) break trySetHostname;
+			if (!Utils.equals(getPeerKey(), as.getAccountKey())) break trySetHostname;
+			
+			String code;
+			if (desiredHostname==null) {
+				code = "(set-peer-data {:url nil})";
+			} else {
+				code = String.format("(set-peer-data {:url \"%s\"})", desiredHostname);
+			}
+			ACell message = Reader.read(code);
+			ATransaction transaction = Invoke.create(address, as.getSequence()+1, message);
+			SignedData<ATransaction> signedTransaction = getKeyPair().signData(transaction);
+			transactionList.add(signedTransaction);
 		}
 	}
 
@@ -1223,7 +1249,7 @@ public class Server implements Closeable {
 	 *
 	 * @return AccountKey of this Peer
 	 */
-	public AccountKey getAddress() {
+	public AccountKey getPeerKey() {
 		AKeyPair kp = getKeyPair();
 		if (kp == null) return null;
 		return kp.getAccountKey();
