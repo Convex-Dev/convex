@@ -676,11 +676,13 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 		} else {
 			long tc = prefixLength();
 			if (start >= tc) {
+				// range is in tail of vector
 				return this.withPrefix(null).subVector(start - tc, length);
 			}
 
 			AVector<T> tv = prefix.getValue();
 			if ((start + length) <= tc) {
+				// Range is entirely in prefix
 				return tv.subVector(start, length);
 			} else {
 				long split = tc - start;

@@ -61,6 +61,8 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 
 	/**
 	 * Concatenates the elements from another sequence to the end of this sequence.
+	 * Potentially O(n) in size of resulting sequence
+	 * 
 	 * @param vals A sequence of values to concatenate.
 	 * @return The concatenated sequence, of the same type as this sequence.
 	 */
