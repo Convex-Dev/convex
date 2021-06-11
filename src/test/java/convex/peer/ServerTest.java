@@ -192,7 +192,7 @@ public class ServerTest {
 		assertTrue(x>=0);
 		return x;
 	}
-	
+
 	@Test
 	public void testServerTransactions() throws IOException, InterruptedException {
 		synchronized(ServerTest.server) {
