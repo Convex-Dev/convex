@@ -6,8 +6,7 @@ package convex.peer;
  */
 public interface IServerEvent {
 
-    void onServerMessage(Server server, String message);       // sent when a message needs to be displayed
-    void onServerChange(ServerInformation serverInformation);                       // sent on a peer change status or connection
+    void onServerChange(ServerEvent serverEvent);         // sent on server change status, connections, consensus
 
 
 }

@@ -16,7 +16,7 @@ public class ServerInformation {
 	private int trustedConnectionCount;
 	private boolean isSynced;
 	private boolean isJoined;
-	private Hash networkId;
+	private Hash networkID;
 	private long consensusPoint;
 	private Hash stateHash;
 	private long blockCount;
@@ -39,9 +39,9 @@ public class ServerInformation {
 		connectionCount = manager.getConnectionCount();
 		trustedConnectionCount = manager.getTrustedConnectionCount();
 		isSynced =  order != null;
-		networkId = server.getNetworkID();
-		isJoined = networkId != null;
+		networkID = peer.getNetworkID();
 		consensusPoint = peer.getConsensusPoint();
+        isJoined = connectionCount > 1;
 		stateHash = peer.getConsensusState().getHash();
 		blockCount = 0;
 		if (order != null ) {
@@ -67,8 +67,8 @@ public class ServerInformation {
 	public boolean isJoined() {
 		return isJoined;
 	}
-	public Hash getNetworkId() {
-		return networkId;
+	public Hash getNetworkID() {
+		return networkID;
 	}
 	public long getConsensusPoint() {
 		return consensusPoint;
