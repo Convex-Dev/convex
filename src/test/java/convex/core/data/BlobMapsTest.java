@@ -22,7 +22,7 @@ public class BlobMapsTest {
 	@Test
 	public void testEmpty() throws InvalidDataException {
 		BlobMap<ABlob, ACell> m = BlobMaps.empty();
-		
+
 		assertFalse(m.containsKey(Blob.EMPTY));
 		assertFalse(m.containsKey(null));
 		assertFalse(m.containsValue(RT.cvm(1L)));
@@ -34,13 +34,13 @@ public class BlobMapsTest {
 
 		doBlobMapTests(m);
 	}
-	
+
 	@Test
 	public void testBadAssoc() throws InvalidDataException {
 		BlobMap<ABlob, CVMLong> m =BlobMaps.create(Init.HERO, RT.cvm(1L));
 		m=m.assoc(Init.VILLAIN, RT.cvm(2L));
 		assertEquals(2L,m.count());
-		
+
 		assertNull(m.assoc(null, null));
 	}
 
@@ -53,7 +53,7 @@ public class BlobMapsTest {
 		BlobMap<ABlob, CVMLong> m = BlobMaps.create(k1, RT.cvm(17L));
 
 		doBlobMapTests(m);
-		
+
 		assertTrue(m.containsKey(k1));
 		assertTrue(m.containsValue(RT.cvm(17L)));
 		assertFalse(m.containsKey(k2));
@@ -78,10 +78,10 @@ public class BlobMapsTest {
 		assertEquals(RT.cvm(34L), e3.getValue());
 
 		doBlobMapTests(m);
-		
+
 		assertEquals(Vectors.of(17L,23L,34L),m.values());
 	}
-	
+
 	@SuppressWarnings("unlikely-arg-type")
 	@Test
 	public void testGet() throws InvalidDataException {
@@ -89,7 +89,7 @@ public class BlobMapsTest {
 		BlobMap<ABlob, CVMLong> m = BlobMaps.of(k1, 17L);
 		assertNull(m.get("cafe")); // needs a blob. String counts as non-existent key
 		assertCVMEquals(17L,m.get(k1));
-		
+
 		assertNull(m.get((Object)null)); // Null counts as non-existent key when used as an Object arg
 
 	}
@@ -142,7 +142,7 @@ public class BlobMapsTest {
 		}
 		assertSame(BlobMaps.empty(), m);
 	}
-	
+
 	@Test
 	public void testIdentity() {
 		Blob bb = Blob.fromHex("000000000000cafe");
@@ -195,7 +195,7 @@ public class BlobMapsTest {
 	public void testInitialPeersBlobMap() {
 		BlobMap<AccountKey, PeerStatus> bm = TestState.STATE.getPeers();
 		doBlobMapTests(bm);
-		
+
 		BlobMap<AccountKey, PeerStatus> fm =bm.filterValues(ps -> ps==bm.get(Init.KEYPAIRS[0].getAccountKey()));
 		assertEquals(1L,fm.count());
 	}
@@ -229,35 +229,35 @@ public class BlobMapsTest {
 	public void testDissocEntries() throws InvalidDataException {
 		BlobMap<Blob, CVMLong> m = Samples.INT_BLOBMAP_7;
 		long n=m.count();
-		
+
 		for (int i=0; i<n; i++) {
 			MapEntry<Blob,CVMLong> me=m.entryAt(i);
-			BlobMap<Blob, CVMLong> dm=m.dissoc(me.getKey());
+			BlobMap<Blob, CVMLong> dm= (BlobMap<Blob, CVMLong>)m.dissoc(me.getKey());
 			dm.validate();
 			assertEquals(n-1,dm.count());
 			BlobMap<Blob, CVMLong> m2=dm.assocEntry(me);
 			assertEquals(m,m2);
 		}
 	}
-	
+
 	@Test
 	public void testDissocAll() throws InvalidDataException {
 		BlobMap<Blob, CVMLong> m=BlobMaps.empty();
 		long n=100;
-		
+
 		for (long i=0; i<n; i++) {
 			m=m.assoc(Address.create(Math.abs(i*546546565954464911L)), CVMLong.create(i));
 		}
-		
+
 		assertEquals(n,m.count());
-		
+
 		for (long i=0; i<n; i++) {
 			m=m.dissoc(Address.create(Math.abs(i*546546565954464911L)));
 			m.validate();
 		}
 		assertSame(BlobMaps.empty(),m);
 	}
-	
+
 	@Test
 	public void testRemoveEntries() {
 		BlobMap<Blob, CVMLong> m = Samples.INT_BLOBMAP_7;
