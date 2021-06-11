@@ -23,6 +23,7 @@ import convex.core.util.Utils;
 import convex.peer.API;
 import convex.peer.IServerEvent;
 import convex.peer.Server;
+import convex.peer.ServerEvent;
 import convex.peer.ServerInformation;
 import etch.EtchStore;
 
@@ -43,7 +44,7 @@ public class PeerManager implements IServerEvent {
 
 	protected String sessionFilename;
 
-	protected BlockingQueue<ServerInformation> serverEventQueue = new ArrayBlockingQueue<ServerInformation>(100);
+	protected BlockingQueue<ServerEvent> serverEventQueue = new ArrayBlockingQueue<ServerEvent>(1024);
 
 
 	private PeerManager(String sessionFilename) {
@@ -175,11 +176,12 @@ public class PeerManager implements IServerEvent {
 		System.out.println("Starting network Id: "+ firstServer.getNetworkID().toString());
 		while (true) {
 			try {
-				ServerInformation serverInformation = serverEventQueue.take();
-				int index = getServerIndex(serverInformation.getPeerKey());
+				ServerEvent event = serverEventQueue.take();
+                ServerInformation information = event.getInformation();
+				int index = getServerIndex(information.getPeerKey());
 				if (index >=0) {
-					String item = toServerInformationText(serverInformation);
-					System.out.println(String.format("#%d: %s", index + 1, item));
+					String item = toServerInformationText(information);
+					System.out.println(String.format("#%d: %s %s", index + 1, item, event.getReason()));
 				}
 			} catch (InterruptedException e) {
 				System.out.println("Peer manager interrupted!");
@@ -231,15 +233,9 @@ public class PeerManager implements IServerEvent {
 	 * Implements for IServerEvent
 	 *
 	 */
-	public void onServerMessage(Server server, String message) {
-		//String shortName = Utils.toFriendlyHexString(server.getPeer().getPeerKey().toHexString());
-		// System.out.println(shortName + ": " + message);
-	}
 
-	public void onServerChange(ServerInformation serverInformation) {
-		try {
-			serverEventQueue.put(serverInformation);
-		} catch (InterruptedException e) {
-		}
+	public void onServerChange(ServerEvent serverEvent) {
+		// add in queue if space available
+		serverEventQueue.offer(serverEvent);
 	}
 }

@@ -3,7 +3,6 @@ package convex.peer;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -176,7 +175,7 @@ public class Server implements Closeable {
 	/**
 	 * The list of challenges that are being made to remote peers
 	 */
-	private HashMap<AccountKey, AVector<ACell>> challengeList = new HashMap<>();
+	private HashMap<AccountKey, ChallengeRequest> challengeList = new HashMap<>();
 
 	/**
 	 * Hostname of the peer server.
@@ -209,7 +208,7 @@ public class Server implements Closeable {
 			this.peer = establishPeer(keyPair, config);
 
 			nio = NIOServer.create(this, receiveQueue);
-			
+
 			this.networkID=peer.getNetworkID();
 
 		} finally {
@@ -321,10 +320,6 @@ public class Server implements Closeable {
 			updateThread.setDaemon(true);
 			updateThread.start();
 
-			connectionThread = new Thread(connectionLoop, "Dynamicaly connect to other peers: " + port);
-			connectionThread.setDaemon(true);
-			connectionThread.start();
-
 			// Close server on shutdown, must be before Etch stores
 			Shutdown.addHook(Shutdown.SERVER, new Runnable() {
 				@Override
@@ -389,7 +384,12 @@ public class Server implements Closeable {
 		// to connect to the peers
 		connectToPeers(statusPeerList);
 
-		raiseServerChange();
+		// start connection thread
+		connectionThread = new Thread(connectionLoop, "Dynamicaly connect to other peers");
+		connectionThread.setDaemon(true);
+		connectionThread.start();
+
+		raiseServerChange("join network");
 
 		return true;
 	}
@@ -576,7 +576,7 @@ public class Server implements Closeable {
 		// only do belief merge if needed: either after publishing a new block or with
 		// incoming beliefs
 		if ((!published) && newBeliefs.isEmpty()) return false;
-		
+
 		// Update Peer timestamp first. This determines what we might accept.
 		peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
 
@@ -626,9 +626,9 @@ public class Server implements Closeable {
 	 * @return True if a new block is published, false otherwise.
 	 */
 	protected boolean maybePublishBlock() {
-		synchronized (newTransactions) {	
+		synchronized (newTransactions) {
 			maybePostOwnTransactions(newTransactions);
-			
+
 			int n = newTransactions.size();
 			if (n == 0) return false;
 			// TODO: smaller block if too many transactions?
@@ -652,7 +652,7 @@ public class Server implements Closeable {
 
 	private long lastOwnTransactionTimestamp=0;
 	private static final long OWN_TRANSACTIONS_DELAY=2000;
-	
+
 	/**
 	 * Check if the Peer want to send any of its own transactions
 	 * @param transactionList List of transactions to add to.
@@ -660,12 +660,12 @@ public class Server implements Closeable {
 	private void maybePostOwnTransactions(ArrayList<SignedData<ATransaction>> transactionList) {
 		State s=getPeer().getConsensusState();
 		long ts=s.getTimeStamp().longValue();
-		
+
 		// If we already did this recently, don't try again
 		if (ts<(lastOwnTransactionTimestamp+OWN_TRANSACTIONS_DELAY)) return;
-		
+
 		lastOwnTransactionTimestamp=ts; // mark this timestamp
-		
+
 		String desiredHostname=getHostname(); // Intended hostname
 		PeerStatus ps=s.getPeer(getPeerKey());
 		AString chn=ps.getHostname();
@@ -679,7 +679,7 @@ public class Server implements Closeable {
 			AccountStatus as=s.getAccount(address);
 			if (as==null) break trySetHostname;
 			if (!Utils.equals(getPeerKey(), as.getAccountKey())) break trySetHostname;
-			
+
 			String code;
 			if (desiredHostname==null) {
 				code = "(set-peer-data {:url nil})";
@@ -718,7 +718,7 @@ public class Server implements Closeable {
 				newBeliefs.clear();
 			}
 			Peer newPeer = peer.mergeBeliefs(beliefs);
-			
+
 			// Check for substantive change (i.e. Orders updated, can ignore timestamp)
 			if (newPeer.getBelief().getOrders().equals(peer.getBelief().getOrders())) return false;
 
@@ -874,28 +874,22 @@ public class Server implements Closeable {
 			synchronized(challengeList) {
 
 				// get the challenge data we sent out for this peer
-				AVector<ACell> challengeValues = (AVector<ACell>) challengeList.get(fromPeer);
+				ChallengeRequest challengeRequest = challengeList.get(fromPeer);
 
-				Hash challengeToken = RT.ensureHash(challengeValues.get(0));
+				Hash challengeToken = challengeRequest.getToken();
 				if (!challengeToken.equals(token)) {
 					log.log(LEVEL_CHALLENGE_RESPONSE, "invalid response token sent");
 					return;
 				}
 
-				Hash challengeNetworkId = RT.ensureHash(challengeValues.get(1));
-				if (!challengeNetworkId.equals(networkId)) {
-					log.log(LEVEL_CHALLENGE_RESPONSE, "invalid response networkId");
-					return;
-				}
-
-				AccountKey challengeFromPeer = RT.ensureAccountKey(challengeValues.get(2));
+				AccountKey challengeFromPeer = challengeRequest.getPeerKey();
 				if (!signedData.getAccountKey().equals(challengeFromPeer)) {
 					log.warning("response key does not match requested key, sent from a different peer");
 					return;
 				}
 
 				// hash sent by this peer for the challenge
-				Hash challengeSourceHash = challengeValues.getHash();
+				Hash challengeSourceHash = challengeRequest.getSendHash();
 				if ( !challengeHash.equals(challengeHash)) {
 					log.log(LEVEL_CHALLENGE_RESPONSE, "response hash of the challenge does not match");
 					return;
@@ -912,7 +906,7 @@ public class Server implements Closeable {
 				challengeList.remove(fromPeer);
 
 			}
-			raiseServerChange();
+			raiseServerChange("trusted connection");
 
 		} catch (Throwable t) {
 			log.warning("Response Error: " + t);
@@ -989,7 +983,7 @@ public class Server implements Closeable {
 			@SuppressWarnings("unchecked")
 			SignedData<Belief> signedBelief = (SignedData<Belief>) o;
 			signedBelief.validateSignature();
-			
+
 			// TODO: validate trusted connection?
 			// TODO: can drop Beliefs if under pressure?
 
@@ -1100,13 +1094,12 @@ public class Server implements Closeable {
 			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
 			try {
 
+				/*
 				// wait for server to join network
 				while(networkID == null && isRunning) {
-					Thread.sleep(1000);
+					Thread.sleep(2000);
 				}
-
-				log.info("Connection loop started for peer at "+hostname);
-				raiseServerMessage("joined network " + hostname);
+				*/
 				// loop while the server is running
 				long lastConsensusPoint = 0;
                 Order lastOrder = null;
@@ -1127,22 +1120,11 @@ public class Server implements Closeable {
 						lastConsensusPoint = peer.getConsensusPoint();
 						// raiseServerMessage("reconnect peers");
 						connectToPeers(getPeerStatusConnectList());
-
-						// System.out.println(getHostname() + " " + manager.getConnections().size());
-
-						// send out a challenge to a peer that is not yet trusted, only if we have a valid networkId
-						if (networkID != null) {
-							// clear out any old challenges
-							challengeList.clear();
-							// requestChallenges();
-						}
-						raiseServerChange();
+						// send out a challenge to a peer that is not yet trusted
+						// requestChallenges();
+						raiseServerChange("consensus change");
 					}
-					try {
-						Thread.sleep(SERVER_CONNECTION_PAUSE);
-					} catch (InterruptedException e) {
-						// continue
-					}
+					Thread.sleep(SERVER_CONNECTION_PAUSE);
 				}
 			} catch (InterruptedException e) {
 				/* OK? Close the thread normally */
@@ -1262,8 +1244,8 @@ public class Server implements Closeable {
 	/**
 	 * Connects this Peer to a target Peer, adding the Connection to this Server's
 	 * Manager
-	 * 
-	 * @param hostname 
+	 *
+	 * @param hostname
 	 * @param hostAddress
 	 * @return The newly created connection
 	 * @throws IOException
@@ -1279,39 +1261,20 @@ public class Server implements Closeable {
 
 		for (AccountKey peerKey: peerList.keySet()) {
 			AString peerHostname = peerList.get(peerKey);
-			if (hostname.toString() != peerHostname.toString() ) {
+			if (hostname.toString() == peerHostname.toString() ) {
+				continue;
+			}
+			if ( manager.isConnected(peerKey)) {
+				continue;
+			}
+			try {
+				log.log(LEVEL_SERVER, getHostname() + ": connecting too " + peerHostname.toString());
 				InetSocketAddress peerAddress = Utils.toInetSocketAddress(peerHostname.toString());
-				if ( !manager.isConnected(peerKey)) {
-					try {
-						log.log(LEVEL_SERVER, getHostname() + ": connecting too " + peerHostname.toString());
-						connectToPeer(peerKey, peerAddress);
-					} catch (IOException e) {
-						log.warning("cannot connect to peer " + peerHostname.toString());
-					}
-				}
+				connectToPeer(peerKey, peerAddress);
+			} catch (IOException e) {
+				log.warning("cannot connect to peer " + peerHostname.toString());
 			}
 		}
-	}
-
-	/**
-	 * Sends out a single challenge to the remote peer.
-	 */
-	public AVector<ACell> sendChallenge(Connection connection, AccountKey peerKey) {
-		AVector<ACell> values = null;
-		try {
-			SecureRandom random = new SecureRandom();
-			byte bytes[] = new byte[120];
-			random.nextBytes(bytes);
-			Hash token = Blob.create(bytes).getHash();
-			values = Vectors.of(token, networkID, peerKey);
-			SignedData<ACell> challenge = peer.sign(values);
-			connection.sendChallenge(challenge);
-			// raiseServerMessage("sending challenge to: " + Utils.toFriendlyHexString(peerKey.toHexString()));
-		} catch (IOException e) {
-			log.log(LEVEL_CHALLENGE_RESPONSE,"Cannot send challenge to remote peer at " + connection.getRemoteAddress());
-			values = null;
-		}
-		return values;
 	}
 
 	/**
@@ -1319,31 +1282,32 @@ public class Server implements Closeable {
 	 *
 	 */
 	public void requestChallenges() {
-		for (AccountKey peerKey: manager.getConnections().keySet()) {
-			Connection connection = manager.getConnection(peerKey);
-			if (connection.isTrusted()) {
-				continue;
-			}
-			// skip if a challenge is already being sent
-			if (challengeList.containsValue(peerKey)) {
-				continue;
-			}
-			AVector<ACell> values = sendChallenge(connection, peerKey);
-			if (values != null) {
-				challengeList.put(peerKey, values);
+		synchronized(challengeList) {
+			for (AccountKey peerKey: manager.getConnections().keySet()) {
+				Connection connection = manager.getConnection(peerKey);
+				if (connection.isTrusted()) {
+					continue;
+				}
+				// skip if a challenge is already being sent
+				if (challengeList.containsValue(peerKey)) {
+					if (!challengeList.get(peerKey).isTimedout()) {
+						// not timed out, then continue to wait
+						continue;
+					}
+					// remove the old timed out request
+					challengeList.remove(peerKey);
+				}
+				ChallengeRequest request = ChallengeRequest.create(peerKey);
+				request.send(connection, peer);
+				challengeList.put(peerKey, request);
 			}
 		}
 	}
 
-	public void raiseServerMessage(String text) {
+	public void raiseServerChange(String reason) {
 		if (event != null) {
-			event.onServerMessage(this, text);
-		}
-	}
-
-	public void raiseServerChange() {
-		if (event != null) {
-			event.onServerChange(this.getServerInformation());
+			ServerEvent serverEvent = ServerEvent.create(this.getServerInformation(), reason);
+			event.onServerChange(serverEvent);
 		}
 	}
 
