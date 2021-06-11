@@ -173,7 +173,7 @@ public class PeerManager implements IServerEvent {
 		});
 
 		Server firstServer = peerServerList.get(0);
-		System.out.println("Starting network Id: "+ firstServer.getNetworkID().toString());
+		System.out.println("Starting network Id: "+ firstServer.getPeer().getNetworkID().toString());
 		while (true) {
 			try {
 				ServerEvent event = serverEventQueue.take();
@@ -181,7 +181,7 @@ public class PeerManager implements IServerEvent {
 				int index = getServerIndex(information.getPeerKey());
 				if (index >=0) {
 					String item = toServerInformationText(information);
-					System.out.println(String.format("#%d: %s %s", index + 1, item, event.getReason()));
+					System.out.println(String.format("#%d: %s Msg: %s", index + 1, item, event.getReason()));
 				}
 			} catch (InterruptedException e) {
 				System.out.println("Peer manager interrupted!");

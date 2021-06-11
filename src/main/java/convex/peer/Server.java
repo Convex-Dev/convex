@@ -182,11 +182,6 @@ public class Server implements Closeable {
 	 */
 	private String hostname;
 
-	/**
-	 * Network Id or the initialStateHash of the network. This is unique to all networks
-	 */
-	private final Hash networkID;         // or intialStateHash of the network
-
 	private IServerEvent event = null;
 
 	private Server(HashMap<Keyword, Object> config, IServerEvent event) {
@@ -208,8 +203,6 @@ public class Server implements Closeable {
 			this.peer = establishPeer(keyPair, config);
 
 			nio = NIOServer.create(this, receiveQueue);
-
-			this.networkID=peer.getNetworkID();
 
 		} finally {
 			Stores.setCurrent(savedStore);
@@ -320,6 +313,11 @@ public class Server implements Closeable {
 			updateThread.setDaemon(true);
 			updateThread.start();
 
+			// start connection thread
+			connectionThread = new Thread(connectionLoop, "Dynamicaly connect to other peers");
+			connectionThread.setDaemon(true);
+			connectionThread.start();
+
 			// Close server on shutdown, must be before Etch stores
 			Shutdown.addHook(Shutdown.SERVER, new Runnable() {
 				@Override
@@ -365,8 +363,8 @@ public class Server implements Closeable {
 
 		// check the initStateHash to see if this is the network we want to join?
 		Hash remoteNetworkID = RT.ensureHash(values.get(2));
-		if (!Utils.equals(getNetworkID(),remoteNetworkID)) {
-			throw new Error("Failed to join network, we want Network ID "+getNetworkID()+" but remote Peer repoerted "+remoteNetworkID);
+		if (!Utils.equals(peer.getNetworkID(),remoteNetworkID)) {
+			throw new Error("Failed to join network, we want Network ID "+peer.getNetworkID()+" but remote Peer repoerted "+remoteNetworkID);
 		}
 
 
@@ -383,12 +381,6 @@ public class Server implements Closeable {
 		// now use the remote peer host name list returned from the status call
 		// to connect to the peers
 		connectToPeers(statusPeerList);
-
-		// start connection thread
-		connectionThread = new Thread(connectionLoop, "Dynamicaly connect to other peers");
-		connectionThread.setDaemon(true);
-		connectionThread.start();
-
 		raiseServerChange("join network");
 
 		return true;
@@ -794,11 +786,11 @@ public class Server implements Closeable {
 
 			// check to see if we are both want to connect to the same network
 			Hash networkId = RT.ensureHash(challengeValues.get(1));
-			if (networkId == null || this.networkID == null) {
+			if (networkId == null) {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge data has no networkId");
 				return;
 			}
-			if ( !networkId.equals(this.networkID)) {
+			if ( !networkId.equals(peer.getNetworkID())) {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge data has incorrect networkId");
 				return;
 			}
@@ -817,7 +809,7 @@ public class Server implements Closeable {
 			AccountKey fromPeer = signedData.getAccountKey();
 
 			// send the signed response back
-			AVector<ACell> responseValues = Vectors.of(token, networkId, fromPeer, signedData.getHash());
+			AVector<ACell> responseValues = Vectors.of(token, peer.getNetworkID(), fromPeer, signedData.getHash());
 
 			SignedData<ACell> response = peer.sign(responseValues);
 			pc.sendResponse(response);
@@ -849,7 +841,7 @@ public class Server implements Closeable {
 
 			// check to see if we are both want to connect to the same network
 			Hash networkId = RT.ensureHash(responseValues.get(1));
-			if ( networkId == null || !networkId.equals(this.networkID)) {
+			if ( networkId == null || !networkId.equals(peer.getNetworkID())) {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "response data has incorrect networkId");
 				return;
 			}
@@ -906,7 +898,7 @@ public class Server implements Closeable {
 				challengeList.remove(fromPeer);
 
 			}
-			raiseServerChange("trusted connection");
+			raiseServerChange("new trusted connection");
 
 		} catch (Throwable t) {
 			log.warning("Response Error: " + t);
@@ -1121,7 +1113,7 @@ public class Server implements Closeable {
 						// raiseServerMessage("reconnect peers");
 						connectToPeers(getPeerStatusConnectList());
 						// send out a challenge to a peer that is not yet trusted
-						// requestChallenges();
+						requestChallenges();
 						raiseServerChange("consensus change");
 					}
 					Thread.sleep(SERVER_CONNECTION_PAUSE);
@@ -1309,10 +1301,6 @@ public class Server implements Closeable {
 			ServerEvent serverEvent = ServerEvent.create(this.getServerInformation(), reason);
 			event.onServerChange(serverEvent);
 		}
-	}
-
-	public Hash getNetworkID() {
-		return networkID;
 	}
 
 	public ServerInformation getServerInformation() {
