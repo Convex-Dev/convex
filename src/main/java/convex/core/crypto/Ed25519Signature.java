@@ -74,24 +74,30 @@ public class Ed25519Signature extends ASignature {
 		sb.append("{:signature 0x"+Utils.toHexString(signatureBytes)+"}");
 	}
 
+	//@Override
+	//public boolean verify(Hash hash, AccountKey address) {
+	//    PublicKey pk=Ed25519KeyPair.publicKeyFromBytes(address.getBytes());
+	//    return verify(hash,pk);
+	//}
+	
 	@Override
 	public boolean verify(Hash hash, AccountKey address) {
-	    PublicKey pk=Ed25519KeyPair.publicKeyFromBytes(address.getBytes());
-	    return verify(hash,pk);
+	    boolean verified = Providers.SODIUM_SIGN.cryptoSignVerifyDetached(signatureBytes, hash.getBytes(), 32, address.getBytes());
+	    return verified;
 	}
 	
-	public boolean verify(Hash hash, PublicKey publicKey) {
-		try {
-			Signature verifier = Signature.getInstance("Ed25519");
-		    verifier.initVerify(publicKey);
-		    verifier.update(hash.getInternalArray(),hash.getOffset(),Hash.LENGTH);
-			return verifier.verify(signatureBytes);
-		} catch (SignatureException | InvalidKeyException e) {	
-			return false;
-		} catch (NoSuchAlgorithmException e) {
-			throw new Error(e);
-		} 
-	}
+//	private boolean verify(Hash hash, PublicKey publicKey) {
+//		try {
+//			Signature verifier = Signature.getInstance("Ed25519");
+//		    verifier.initVerify(publicKey);
+//		    verifier.update(hash.getInternalArray(),hash.getOffset(),Hash.LENGTH);
+//			return verifier.verify(signatureBytes);
+//		} catch (SignatureException | InvalidKeyException e) {	
+//			return false;
+//		} catch (NoSuchAlgorithmException e) {
+//			throw new Error(e);
+//		} 
+//	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {
