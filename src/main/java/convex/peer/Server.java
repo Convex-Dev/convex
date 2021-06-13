@@ -575,8 +575,7 @@ public class Server implements Closeable {
 		boolean updated = maybeMergeBeliefs();
 		if (!updated) return false;
 
-		// Need to check if belief changed from initial state
-		// It is possible that incoming beliefs don't change current belief.
+		// At this point we know our Order changed
 		final Belief belief = peer.getBelief();
 
 		// At this point we know something updated our belief, so we want to rebroadcast
@@ -689,7 +688,7 @@ public class Server implements Closeable {
 	 * Checks for mergeable remote beliefs, and if found merge and update own
 	 * belief.
 	 *
-	 * @return True if peer Belief was updated, false otherwise.
+	 * @return True if Peer Belief Order was changed, false otherwise.
 	 */
 	protected boolean maybeMergeBeliefs() {
 		try {
