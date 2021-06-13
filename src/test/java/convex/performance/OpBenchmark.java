@@ -43,7 +43,7 @@ public class OpBenchmark {
 	// sum without dynamic core lookup (much faster!!)
 	static final AOp<ACell> simpleSum2=Invoke.create(Constant.create(Core.PLUS),Constant.of(1L),Constant.of(2));
 	@Benchmark
-	public void simpleSum2() {
+	public void simpleSumPrecompiled() {
 		runOp(simpleSum2);
 	}
 	 

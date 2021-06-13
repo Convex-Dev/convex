@@ -30,10 +30,10 @@ import convex.core.transactions.ATransaction;
  *
  * Binary representation:
  * <ol>
- * <li>1 byte - Message.SIGNED_DATA tag </li>
- * <li>20/32 bytes - Address of signer</li>
+ * <li>1 byte - Tag.SIGNED_DATA tag </li>
+ * <li>32 bytes - Public Key of signer</li>
  * <li>64 bytes - raw Signature data</li>
- * <li>32 bytes - Data hash (raw Ref)</li>
+ * <li>1+ bytes - Data Value Ref (may be embedded)</li>
  * </ol>
  *
  * SECURITY: signing requires presence of a local keypair TODO: SECURITY: any
@@ -44,7 +44,7 @@ import convex.core.transactions.ATransaction;
 public class SignedData<T extends ACell> extends ACell {
 	private final Ref<T> valueRef;
 	private final ASignature signature;
-	private final AccountKey address;
+	private final AccountKey publicKey;
 
 	/**
 	 * Validated flag. Not part of data representation: serves to avoid unnecessary re-validation.
@@ -53,7 +53,7 @@ public class SignedData<T extends ACell> extends ACell {
 
 	private SignedData(Ref<T> ref, AccountKey address, ASignature sig, boolean validated) {
 		this.valueRef = ref;
-		this.address = address;
+		this.publicKey = address;
 		signature = sig;
 		this.validated=validated;
 	}
@@ -130,7 +130,7 @@ public class SignedData<T extends ACell> extends ACell {
 	 * @return Public Key of signer.
 	 */
 	public AccountKey getAccountKey() {
-		return address;
+		return publicKey;
 	}
 
 	/**
@@ -150,7 +150,7 @@ public class SignedData<T extends ACell> extends ACell {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = address.encodeRaw(bs,pos);
+		pos = publicKey.encodeRaw(bs,pos);
 		pos = signature.encodeRaw(bs,pos);
 		pos = valueRef.encode(bs,pos);
 		return pos;
@@ -185,7 +185,7 @@ public class SignedData<T extends ACell> extends ACell {
 	public boolean checkSignature() {
 		if (validated) return true;
 		Hash hash=valueRef.getHash();
-		boolean check = signature.verify(hash, address);
+		boolean check = signature.verify(hash, publicKey);
 		validated=check;
 		return check;
 	}
@@ -223,7 +223,7 @@ public class SignedData<T extends ACell> extends ACell {
 		Ref<T> newValueRef = (Ref<T>) func.apply(valueRef);
 		if (valueRef == newValueRef) return this;
 		// SECURITY: preserve validated flag
-		return new SignedData<T>(newValueRef, address, signature, validated);
+		return new SignedData<T>(newValueRef, publicKey, signature, validated);
 	}
 
 	@Override
@@ -247,7 +247,7 @@ public class SignedData<T extends ACell> extends ACell {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		address.validate();
+		publicKey.validate();
 		signature.validate();
 		valueRef.validate();
 	}
@@ -262,7 +262,7 @@ public class SignedData<T extends ACell> extends ACell {
 	 * @return true if the Signature is valid for the given data, false otherwise.
 	 */
 	public boolean isValid() {
-		return signature.verify(valueRef.getHash(), address);
+		return signature.verify(valueRef.getHash(), publicKey);
 	}
 
 	@Override
