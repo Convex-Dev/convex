@@ -7,12 +7,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
-import convex.core.Init;
-import convex.core.InitConfigTest;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.init.AInitConfig;
+import convex.core.init.Init;
+import convex.core.init.InitConfigTest;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
@@ -62,12 +63,13 @@ public class API {
 	 */
 	public static Server launchPeer(Map<Keyword, Object> peerConfig, IServerEvent event) {
 		HashMap<Keyword,Object> config=new HashMap<>(peerConfig);
+
 		InitConfigTest initConfigTest = InitConfigTest.create();
 
 		try {
 			if (!config.containsKey(Keywords.PORT)) config.put(Keywords.PORT, null);
 			if (!config.containsKey(Keywords.STORE)) config.put(Keywords.STORE, Stores.getGlobalStore());
-			if (!config.containsKey(Keywords.KEYPAIR)) config.put(Keywords.KEYPAIR, Init.KEYPAIRS[0]);
+			if (!config.containsKey(Keywords.KEYPAIR)) config.put(Keywords.KEYPAIR, initConfigTest.getUserKeyPair(0));
 			if (!config.containsKey(Keywords.STATE)) config.put(Keywords.STATE, Init.createState(initConfigTest));
 			if (!config.containsKey(Keywords.RESTORE)) config.put(Keywords.RESTORE, true);
 			if (!config.containsKey(Keywords.PERSIST)) config.put(Keywords.PERSIST, true);
@@ -91,16 +93,15 @@ public class API {
 	 * @throws IOException
 	 *
 	 */
-	public static List<Server> launchLocalPeers(int count, AKeyPair[] keyPairs, Address peerAddress, IServerEvent event) {
+	public static List<Server> launchLocalPeers(int count, AInitConfig initConfig, IServerEvent event) {
 		List<Server> serverList = new ArrayList<Server>();
 		Server otherServer;
 		String remotePeerHostname;
 
 		Map<Keyword, Object> config = new HashMap<>();
-		InitConfigTest initConfigTest = InitConfigTest.create();
 
 		config.put(Keywords.PORT, null);
-		config.put(Keywords.STATE, Init.createState(initConfigTest));
+		config.put(Keywords.STATE, Init.createState(initConfig));
 
 		// TODO maybe have this as an option in the calling parameters
 		AStore store = Stores.getGlobalStore();
@@ -108,7 +109,7 @@ public class API {
 		config.put(Keywords.STORE, store);
 
 		for (int i = 0; i < count; i++) {
-			AKeyPair keyPair = keyPairs[i];
+			AKeyPair keyPair = initConfig.getPeerKeyPair(i);
 			config.put(Keywords.KEYPAIR, keyPair);
 			Server server = API.launchPeer(config, event);
 			serverList.add(server);

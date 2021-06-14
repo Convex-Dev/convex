@@ -23,7 +23,6 @@ import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 
 import convex.api.Convex;
-import convex.core.Init;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.data.Address;
@@ -124,17 +123,19 @@ public class StressPanel extends JPanel {
 	private synchronized void runStressTest() {
 		errors = 0;
 		values = 0;
-		Address address = Init.HERO;
+			Address address=PeerGUI.initConfigTest.HERO_ADDRESS;
 
-		int transCount = (Integer) transactionCountSpinner.getValue();
-		int opCount = (Integer) opCountSpinner.getValue();
-		// TODO: enable multiple clients
-		int clientCount = (Integer) opCountSpinner.getValue();
+			int transCount = (Integer) transactionCountSpinner.getValue();
+			int opCount = (Integer) opCountSpinner.getValue();
+			// TODO: enable multiple clients
+			// int clientCount = (Integer) opCountSpinner.getValue();
 
-		new SwingWorker<String, Object>() {
-			@Override
-			protected String doInBackground() throws Exception {
-				StringBuilder sb = new StringBuilder();
+			new SwingWorker<String,Object>() {
+				@Override
+				protected String doInBackground() throws Exception {
+					StringBuilder sb = new StringBuilder();
+
+					try {
 
 				try {
 
@@ -143,8 +144,8 @@ public class StressPanel extends JPanel {
 
 					// Use client store
 					// Stores.setCurrent(Stores.CLIENT_STORE);
-					ArrayList<CompletableFuture<Result>> frs = new ArrayList<>();
-					Convex pc = Convex.connect(sa, address, Init.HERO_KP);
+					ArrayList<CompletableFuture<Result>> frs=new ArrayList<>();
+					Convex pc = Convex.connect(sa, address,PeerGUI.initConfigTest.HERO_KEYPAIR);
 
 					for (int i = 0; i < transCount; i++) {
 						StringBuilder tsb = new StringBuilder();
@@ -154,7 +155,7 @@ public class StressPanel extends JPanel {
 						}
 						tsb.append("))");
 						String source = tsb.toString();
-						ATransaction t = Invoke.create(Init.HERO, -1, Reader.read(source));
+						ATransaction t = Invoke.create(PeerGUI.initConfigTest.HERO_ADDRESS,-1, Reader.read(source));
 						CompletableFuture<Result> fr = pc.transact(t);
 						frs.add(fr);
 					}
@@ -174,6 +175,7 @@ public class StressPanel extends JPanel {
 
 					Thread.sleep(100); // wait for state update to be reflected
 					State endState = PeerGUI.getLatestState();
+
 
 					sb.append("Results for " + transCount + " transactions\n");
 					sb.append(values + " values received\n");
@@ -203,6 +205,5 @@ public class StressPanel extends JPanel {
 				}
 			}
 		}.execute();
-
 	}
 }

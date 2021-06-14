@@ -3,13 +3,13 @@ package convex.gui.components.models;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableModel;
 
-import convex.core.Init;
 import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
+import convex.core.init.Init;
 import convex.core.util.Utils;
 
 @SuppressWarnings("serial")

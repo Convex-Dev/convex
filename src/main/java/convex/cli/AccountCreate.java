@@ -5,7 +5,6 @@ import java.util.logging.Logger;
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
-import convex.core.Init;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -71,7 +70,7 @@ public class AccountCreate implements Runnable {
 
 		Convex convex = null;
 		try {
-			convex = mainParent.connectToSessionPeer(hostname, port, Init.HERO, Init.HERO_KP);
+			convex = mainParent.connectToSessionPeer(hostname, port, Main.initConfigTest.HERO_ADDRESS, Main.initConfigTest.HERO_KEYPAIR);
 			Address address = convex.createAccount(keyPair.getAccountKey());
 			log.info("account address: " + address);
 			if (isFund) {

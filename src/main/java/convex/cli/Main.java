@@ -12,6 +12,7 @@ import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.data.Address;
+import convex.core.init.InitConfigTest;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -48,6 +49,8 @@ public class Main implements Runnable {
 	private static final Logger log = Logger.getLogger(Main.class.getName());
 
 	private static CommandLine commandLine;
+    public static InitConfigTest initConfigTest = InitConfigTest.create();
+
 
 	@Option(names={ "-c", "--config"},
 		scope = ScopeType.INHERIT,
