@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
+import convex.core.crypto.Ed25519Signature;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
@@ -42,9 +43,10 @@ import convex.core.transactions.ATransaction;
  * @param <T> The type of the signed object
  */
 public class SignedData<T extends ACell> extends ACell {
-	private final Ref<T> valueRef;
-	private final ASignature signature;
+	// Encoded fields
 	private final AccountKey publicKey;
+	private final ASignature signature;
+	private final Ref<T> valueRef;
 
 	/**
 	 * Validated flag. Not part of data representation: serves to avoid unnecessary re-validation.
@@ -158,8 +160,7 @@ public class SignedData<T extends ACell> extends ACell {
 
 	@Override
 	public int estimatedEncodingSize() {
-
-		return 10+AccountKey.LENGTH+64+Format.MAX_EMBEDDED_LENGTH;
+		return 1+AccountKey.LENGTH+Ed25519Signature.SIGNATURE_LENGTH+Format.MAX_EMBEDDED_LENGTH;
 	}
 
 	/**
@@ -207,6 +208,7 @@ public class SignedData<T extends ACell> extends ACell {
 
 	@Override
 	public int getRefCount() {
+		// Value Ref only
 		return 1;
 	}
 
