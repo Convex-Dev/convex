@@ -213,6 +213,11 @@ public class EncodingTest {
 		// Blobs
 		Blob maxBlob=Blob.create(new byte[Blob.CHUNK_LENGTH]);
 		assertEquals(Blob.MAX_ENCODING_LENGTH,maxBlob.getEncodingLength());
+		assertEquals(Blob.MAX_ENCODING_LENGTH,Blobs.MAX_ENCODING_LENGTH);
 		
+		// Address
+		Address maxAddress=Address.create(Long.MAX_VALUE);
+		assertEquals(1+Format.MAX_VLC_LONG_LENGTH,Address.MAX_ENCODING_LENGTH);
+		assertEquals(Address.MAX_ENCODING_LENGTH,maxAddress.getEncodingLength());
 	}
 }

@@ -24,7 +24,6 @@ public class ObjectsTest {
 	 * Generic tests for a Cell
 	 * 
 	 * @param a
-	 * @throws InvalidDataException
 	 */
 	public static void doCellTests(ACell a) {
 		if (a==null) return;
