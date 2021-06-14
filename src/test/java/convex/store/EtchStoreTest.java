@@ -17,7 +17,6 @@ import org.junit.Test;
 
 import convex.core.Belief;
 import convex.core.Block;
-import convex.core.Init;
 import convex.core.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
@@ -68,7 +67,7 @@ public class EtchStoreTest {
 			if (!data.isEmbedded()) {
 				Ref<AMap<ACell, ACell>> recRef = store.refForHash(goodHash);
 				assertNotNull(recRef);
-	
+
 				assertEquals(data, recRef.getValue());
 			}
 		} finally {
@@ -91,11 +90,11 @@ public class EtchStoreTest {
 			Ref<Blob> initialRef = randomBlob.getRef();
 			assertEquals(Ref.UNKNOWN, initialRef.getStatus());
 			assertNull(Stores.current().refForHash(hash));
-			
+
 			// shallow persistence first
 			Ref<Blob> refShallow=initialRef.persistShallow();
 			assertEquals(Ref.STORED, refShallow.getStatus());
-			
+
 			Ref<Blob> ref = initialRef.persist();
 			assertEquals(Ref.PERSISTED, ref.getStatus());
 			assertTrue(ref.isPersisted());
@@ -107,34 +106,34 @@ public class EtchStoreTest {
 			Stores.setCurrent(oldStore);
 		}
 	}
-	
+
 	@Test
 	public void testBeliefAnnounce() {
 		AStore oldStore = Stores.current();
 		AtomicLong counter=new AtomicLong(0L);
-		
-		AKeyPair kp=TestState.HERO_KP;
+
+		AKeyPair kp=TestState.HERO_KEYPAIR;
 		try {
 			Stores.setCurrent(store);
-			
-			ATransaction t1=Invoke.create(Init.HERO,0, Lists.of(Symbols.PLUS, Symbols.STAR_BALANCE, 1000L));
-			ATransaction t2=Transfer.create(Init.HERO,1, Init.VILLAIN,1000000);
-			Block b=Block.of(Utils.getCurrentTimestamp(),TestState.FIRST_PEER_KEY,kp.signData(t1),kp.signData(t2));
+
+			ATransaction t1=Invoke.create(TestState.HERO_ADDRESS,0, Lists.of(Symbols.PLUS, Symbols.STAR_BALANCE, 1000L));
+			ATransaction t2=Transfer.create(TestState.HERO_ADDRESS,1, TestState.VILLAIN_ADDRESS,1000000);
+			Block b=Block.of(Utils.getCurrentTimestamp(),TestState.FIRST_PEER_KEYPAIR.getAccountKey(),kp.signData(t1),kp.signData(t2));
 			assertNotNull(b.getPeer());
-			
+
 			Order ord=Order.create().propose(b);
-			
+
 			Belief belief=Belief.create(kp,ord);
-			
+
 			Ref<Belief> rb=belief.getRef();
 			Ref<ATransaction> rt=t1.getRef();
 			assertEquals(Ref.UNKNOWN,rb.getStatus());
 			assertEquals(Ref.UNKNOWN,rt.getStatus());
-			
+
 			assertEquals(3,Utils.refCount(t1));
 			assertEquals(0,Utils.refCount(t2));
 			assertEquals(11,Utils.totalRefCount(belief));
-			
+
 
 			Consumer<Ref<ACell>> noveltyHandler=r-> {
 				counter.incrementAndGet();
@@ -145,39 +144,39 @@ public class EtchStoreTest {
 			Ref<Belief> srb=rb.persistShallow(noveltyHandler);
 			assertEquals(Ref.STORED,srb.getStatus());
 			assertEquals(1L,counter.get()); // One cell persisted
-			
+
 			// assertEquals(srb,store.refForHash(rb.getHash()));
 			assertNull(store.refForHash(t1.getRef().getHash()));
-			
+
 			// Persist belief
 			counter.set(0L);
 			Ref<Belief> prb=srb.persist(noveltyHandler);
 			assertEquals(4L,counter.get());
-			
+
 			// Persist again. Should be no new novelty
 			counter.set(0L);
 			Ref<Belief> prb2=srb.persist(noveltyHandler);
 			assertEquals(prb2,prb);
 			assertEquals(0L,counter.get()); // Nothing new persisted
-			
+
 			// Announce belief
 			counter.set(0L);
 			Ref<Belief> arb=srb.announce(noveltyHandler);
 			assertEquals(srb,arb);
-			assertEquals(4L,counter.get()); 
-			
+			assertEquals(4L,counter.get());
+
 			// Announce again. Should be no new novelty
 			counter.set(0L);
 			Ref<Belief> arb2=srb.announce(noveltyHandler);
 			assertEquals(srb,arb2);
 			assertEquals(0L,counter.get()); // Nothing new announced
-			
+
 			// Check re-stored ref has correct status
 			counter.set(0L);
 			Ref<Belief> arb3=srb.persistShallow(noveltyHandler);
 			assertEquals(0L,counter.get()); // Nothing new persisted
 			assertTrue(Ref.STORED<=arb3.getStatus());
-			
+
 			if (!belief.isEmbedded()) {
 				// Recover Belief from store
 				Belief recb=(Belief) store.refForHash(belief.getHash()).getValue();
@@ -215,14 +214,14 @@ public class EtchStoreTest {
 			Stores.setCurrent(oldStore);
 		}
 	}
-	
+
 	@Test
 	public void testReopen() throws IOException {
 		File file=File.createTempFile("etch",null);
 		EtchStore es=EtchStore.create(file);
 		es.setRootHash(Hash.NULL_HASH);
 		es.close();
-		
+
 		EtchStore es2=EtchStore.create(file);
 		assertEquals(Hash.NULL_HASH,es2.getRootHash());
 	}

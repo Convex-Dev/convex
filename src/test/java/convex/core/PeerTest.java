@@ -13,14 +13,23 @@ import convex.core.data.AccountKey;
 import convex.core.data.PeerStatus;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
+import convex.core.init.Init;
+import convex.core.init.InitConfigTest;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.TestState;
 import convex.test.Samples;
 
 public class PeerTest {
-	static State STATE=Init.createState();
-	AKeyPair PEER0 = Init.KEYPAIRS[0];
+	static State STATE=Init.createState(InitConfigTest.create());
+
+	InitConfigTest initConfigTest;
+	AKeyPair PEER0;
+
+	protected PeerTest() {
+		initConfigTest = InitConfigTest.create();
+		PEER0 = initConfigTest.getPeerKeyPair(0);
+	}
 
 	@Test
 	public void testInitial() throws BadSignatureException {
@@ -52,32 +61,32 @@ public class PeerTest {
 
 	@Test
 	public void testNullPeers() {
-		assertNull(STATE.getPeer(TestState.HERO_KP.getAccountKey())); // hero not a peer in initial state
+		assertNull(STATE.getPeer(TestState.HERO_KEYPAIR.getAccountKey())); // hero not a peer in initial state
 	}
-	
+
 	@Test
 	public void testQuery() throws BadSignatureException {
 		Peer p = Peer.create(PEER0, STATE);
-		
+
 		assertEquals(RT.cvm(3L),p.executeQuery(Reader.read("(+ 1 2)")).getResult());
-		assertEquals(Init.HERO,p.executeQuery(Reader.read("*address*"),Init.HERO).getResult());
-		
+		assertEquals(initConfigTest.getHeroAddress(),p.executeQuery(Reader.read("*address*"),initConfigTest.getHeroAddress()).getResult());
+
 		assertNobodyError(p.executeQuery(Reader.read("(+ 2 3)"),Samples.BAD_ADDRESS));
 	}
 
 	@Test
 	public void testStakeAccess() {
 		// use peer address from first peer for testing
-		AccountKey pa = TestState.FIRST_PEER_KEY;
+		AccountKey pa = TestState.FIRST_PEER_KEYPAIR.getAccountKey();
 		PeerStatus ps = STATE.getPeer(pa);
 		long initialStake = ps.getOwnStake();
 		assertEquals(initialStake, ps.getTotalStake());
 
-		assertEquals(0, ps.getDelegatedStake(Init.HERO));
+		assertEquals(0, ps.getDelegatedStake(initConfigTest.getHeroAddress()));
 
 		// add a delegated stake
-		PeerStatus ps2 = ps.withDelegatedStake(Init.HERO, 1234);
-		assertEquals(1234L, ps2.getDelegatedStake(Init.HERO));
+		PeerStatus ps2 = ps.withDelegatedStake(initConfigTest.getHeroAddress(), 1234);
+		assertEquals(1234L, ps2.getDelegatedStake(initConfigTest.getHeroAddress()));
 		assertEquals(initialStake + 1234, ps2.getTotalStake());
 		assertEquals(initialStake, ps2.getOwnStake());
 	}

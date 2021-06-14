@@ -17,7 +17,6 @@ import java.util.function.Function;
 import org.junit.Test;
 
 import convex.core.Block;
-import convex.core.Init;
 import convex.core.Peer;
 import convex.core.State;
 import convex.core.data.AVector;
@@ -354,8 +353,7 @@ public class UtilsTest {
 			long timestamp = state0.getTimeStamp().longValue() + 100;
 
 			String command = "(def x " + timestamp + ")";
-
-			SignedData<ATransaction> data = peer.sign(Invoke.create(Init.HERO, timestamp, command));
+			SignedData<ATransaction> data = peer.sign(Invoke.create(TestState.HERO_ADDRESS, timestamp, command));
 
 			Block block = Block.of(timestamp, TestState.FIRST_PEER_KEYPAIR.getAccountKey(), data);
 

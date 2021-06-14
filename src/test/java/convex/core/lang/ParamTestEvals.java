@@ -28,16 +28,16 @@ public class ParamTestEvals {
 
 	@Parameterized.Parameters(name = "{index}: {0}")
 	public static Collection<Object[]> dataExamples() {
-		return Arrays.asList(new Object[][] { 
-				{ "(do)", null }, 
+		return Arrays.asList(new Object[][] {
+				{ "(do)", null },
 				{ "(do (do :foo))", Keyword.create("foo") },
-				{ "(do 1 2)", 2L }, 
-				{ "(do 1 *result*)", 1L }, 
+				{ "(do 1 2)", 2L },
+				{ "(do 1 *result*)", 1L },
 				{ "(do (do :foo) (do))", null },
-				{ "*result*", null }, 
-				{ "*origin*", TestState.HERO }, 
+				{ "*result*", null },
+				{ "*origin*", TestState.HERO_ADDRESS },
 				{ "*caller*", null },
-				{ "*address*", TestState.HERO }, 
+				{ "*address*", TestState.HERO_ADDRESS },
 				{ "(do 1 *result*)", 1L },
 
 				{ "(call " + TEST_CONTRACT + " (my-address))", TEST_CONTRACT },
@@ -47,13 +47,13 @@ public class ParamTestEvals {
 						Keyword.create("bar") },
 
 				{ "*depth*", 0L }, // *depth*
-				{ "(do *depth*)", 1L }, // do, *depth* 
+				{ "(do *depth*)", 1L }, // do, *depth*
 				{ "(let [a *depth*] a)", 1L }, // let, *depth*
 				{ "(let [f (fn [] *depth*)] (f))", 2L }, // let, invoke, *depth*
 
 				{ "(let [])", null }, { "(let [a 1])", null }, { "(let [a 1] a)", 1L },
 				{ "(do (def a 2) (let [a 13] a))", 13L }, { "*juice*", INITIAL_JUICE },
-				{ "(- *juice* *juice*)", Juice.SPECIAL }, 
+				{ "(- *juice* *juice*)", Juice.SPECIAL },
 				{ "((fn [a] a) 4)", 4L }, { "(do (def a 3) a)", 3L },
 				{ "(do (let [a 1] (def f (fn [] a))) (f))", 1L }, { "1", 1L }, { "(not true)", false },
 				{ "(= true true)", true } });

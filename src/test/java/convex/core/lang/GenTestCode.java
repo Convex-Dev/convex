@@ -18,33 +18,33 @@ public class GenTestCode {
 
 	@Property
 	public void testExpand(@From(FormGen.class) ACell form) {
-		Context<?> ctx = Context.createFake(TestState.STATE, TestState.HERO);
+		Context<?> ctx = Context.createFake(TestState.STATE, TestState.HERO_ADDRESS);
 		ctx = ctx.expand(form);
-		
+
 		if (!ctx.isExceptional()) {
 			ACell expObject=ctx.getResult();
 			assertTrue(expObject instanceof Syntax);
 
 			ctx=ctx.compile((Syntax) expObject);
-			
+
 			if (!ctx.isExceptional()) {
 				Object compObject=ctx.getResult();
 				assertTrue(compObject instanceof AOp);
-				
+
 				ctx=ctx.execute((AOp<?>) compObject);
 			}
 		}
-		
+
 		String s=Utils.toString(form);
 		doMutateTest(s);
 	}
-	
-	
+
+
 	@SuppressWarnings("unused")
 	public void doMutateTest(String original) {
 		StringBuffer sb=new StringBuffer(original);
 		Random r=new Random(original.hashCode());
-		
+
 		int n=r.nextInt(3);
 		switch (n) {
 			case 0: sb.deleteCharAt(r.nextInt(sb.length())); break;
@@ -52,7 +52,7 @@ public class GenTestCode {
 			case 2: sb.setCharAt(r.nextInt(sb.length()),sb.charAt(r.nextInt(sb.length()))); break;
 			default:
 		}
-		
+
 		try {
 			String source=sb.toString();
 			ACell newForm=Reader.read(source);

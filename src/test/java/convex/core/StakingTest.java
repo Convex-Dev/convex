@@ -10,17 +10,19 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.PeerStatus;
+import convex.core.init.Init;
+import convex.core.init.InitConfigTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 
 public class StakingTest extends ACVMTest {
 
+    protected AccountKey FIRST_PEER_KEY;
 	protected StakingTest() {
-		super(Init.createState());
+		super(Init.createState(InitConfigTest.create()));
+        FIRST_PEER_KEY = FIRST_PEER_KEYPAIR.getAccountKey();
 	}
 
-	AccountKey FIRST_PEER_KEY=Init.KEYPAIRS[0].getAccountKey();
-	
 	@Test
 	public void testDelegatedStaking() {
 
@@ -42,8 +44,8 @@ public class StakingTest extends ACVMTest {
 
 		// test putting entire balance on stake
 		Context<ACell> ctx3 = step(ctx0, "(stake " + FIRST_PEER_KEY + " *balance*)");
-		assertEquals(0L, ctx3.getBalance(Init.HERO));
-		assertEquals(HERO_BALANCE, ctx3.getState().getPeer(FIRST_PEER_KEY).getDelegatedStake(Init.HERO));
+		assertEquals(0L, ctx3.getBalance(HERO_ADDRESS));
+		assertEquals(HERO_BALANCE, ctx3.getState().getPeer(FIRST_PEER_KEY).getDelegatedStake(HERO_ADDRESS));
 
 		// test putting too much balance
 		assertFundsError(step(ctx0, "(stake " + FIRST_PEER_KEY + " (inc *balance*))"));
@@ -60,7 +62,7 @@ public class StakingTest extends ACVMTest {
 		Context<ACell> ctx0 = context();
 
 		// not a peer, should be state error
-		assertStateError(ctx0.setStake(Init.HERO_KP.getAccountKey(), 1000));
+		assertStateError(ctx0.setStake(HERO_KEYPAIR.getAccountKey(), 1000));
 
 		// bad arguments, out of range
 		assertArgumentError(ctx0.setStake(FIRST_PEER_KEY, -1));
@@ -68,6 +70,6 @@ public class StakingTest extends ACVMTest {
 
 		// insufficient funds for stake
 		assertFundsError(ctx0.setStake(FIRST_PEER_KEY, Constants.MAX_SUPPLY));
-		assertFundsError(ctx0.setStake(FIRST_PEER_KEY, ctx0.getBalance(Init.HERO) + 1));
+		assertFundsError(ctx0.setStake(FIRST_PEER_KEY, ctx0.getBalance(HERO_ADDRESS) + 1));
 	}
 }

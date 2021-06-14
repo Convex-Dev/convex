@@ -12,7 +12,6 @@ import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.Init;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Maps;
@@ -33,7 +32,7 @@ public class PredictionMarketTest extends ACVMTest {
 		Context rctx=doCall(ctx,addr, offer, name, args);
 		return RT.jvm(rctx.getResult());
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	private <T extends ACell> Context<T> doCall(Context<?> ctx,Address addr, long offer, String name, Object... args) {
 		int n=args.length;
@@ -41,20 +40,20 @@ public class PredictionMarketTest extends ACVMTest {
 		for (int i=0; i<n; i++) {
 			cvmArgs[i]=RT.cvm(args[i]);
 		}
-		
+
 		Context<?> rctx=ctx.actorCall(addr, offer, name, cvmArgs);
 		return (Context<T>) rctx;
 	}
-	
+
 	@SuppressWarnings("rawtypes")
 	@Test
 	public void testPredictionContract() throws IOException {
 		String contractString = Utils.readResourceAsString("actors/prediction-market.con");
-			
+
 		// Run code to initialise actor with [oracle oracle-key outcomes]
 		Context ctx = TestState.CONTEXT.fork();
 		ctx=step("(deploy ("+contractString+" *address* :bar #{true,false}))");
-		
+
 		Address addr = (Address) ctx.getResult();
 		assertNotNull(addr);
 		ctx = step(ctx, "(def caddr " + addr + ")");
@@ -69,12 +68,12 @@ public class PredictionMarketTest extends ACVMTest {
 		// two staked outcomes
 		assertEquals(5.0, evalCall(ctx,addr, 0L, "bond", Maps.of(true, 3L, false, 4L)), 0.01);
 
-		long initalBal=ctx.getBalance(Init.HERO);
+		long initalBal=ctx.getBalance(HERO_ADDRESS);
 		{ // stake on, stake off.....
 			// first we stake on the 'true' outcome
 			Context<?> rctx1 = doCall(ctx,addr, 10L, "stake", true, 10L);
 			assertCVMEquals(10L, rctx1.getResult());
-			assertEquals(10L,  initalBal- rctx1.getBalance(Init.HERO));
+			assertEquals(10L,  initalBal- rctx1.getBalance(HERO_ADDRESS));
 			assertEquals(1.0, evalD(rctx1, "(call caddr (price true))")); // should be exact price 100%
 			assertEquals(0.0, evalD(rctx1, "(call caddr (price false))")); // should be exact price 0%
 
@@ -82,54 +81,52 @@ public class PredictionMarketTest extends ACVMTest {
 			// accepted so no issue.
 			Context<?> rctx2 = doCall(rctx1,addr, 10L, "stake", false, 10L);
 			assertCVMEquals(4L, rctx2.getResult());
-			assertEquals(14L, initalBal - rctx2.getBalance(Init.HERO));
+			assertEquals(14L, initalBal - rctx2.getBalance(HERO_ADDRESS));
 			assertEquals(TestState.TOTAL_FUNDS, rctx2.getState().computeTotalFunds());
 
 			// halve stakes
 			Context<?> rctx3 = doCall(rctx2,addr, 10L, "stake", false, 5L);
 			rctx3 = doCall(rctx3,addr, 10L, "stake", true, 5L);
-			assertEquals(7L, initalBal - rctx3.getBalance(Init.HERO));
+			assertEquals(7L, initalBal - rctx3.getBalance(HERO_ADDRESS));
 			assertEquals(0.5, evalD(rctx3, "(call caddr (price true))"), 0.1); // approx price given rounding
 
 			// zero one stake
 			Context<?> rctx4 = doCall(rctx3,addr, 10L, "stake", false, 0L);
 			assertCVMEquals(-2L, rctx4.getResult()); // refund of 2
-			assertEquals(5L, initalBal - rctx4.getBalance(Init.HERO));
+			assertEquals(5L, initalBal - rctx4.getBalance(HERO_ADDRESS));
 
 			// Exit market
 			Context<?> rctx5 =doCall(rctx4,addr, 10L, "stake", true, 0L);
 			assertCVMEquals(-5L, rctx5.getResult()); // refund of 5
-			assertEquals(0L, initalBal - rctx5.getBalance(Init.HERO));
+			assertEquals(0L, initalBal - rctx5.getBalance(HERO_ADDRESS));
 			assertEquals(TestState.TOTAL_FUNDS, rctx2.getState().computeTotalFunds());
 		}
 
 		{ // underfunded stake request
 			Context<?> rctx1 = doCall(ctx,addr, 5L, "stake", true, 10L);
 			assertStateError(rctx1); // TODO: what is right error type?
-			assertEquals(0L, initalBal - rctx1.getBalance(Init.HERO));
+			assertEquals(0L, initalBal - rctx1.getBalance(HERO_ADDRESS));
 		}
 
 		{ // negative stake request
 			Context<?> rctx1 = doCall(ctx,addr, 5L, "stake", true, -10L);
 			assertAssertError(rctx1); // TODO: what is right error type?
-			assertEquals(0L, initalBal - rctx1.getBalance(Init.HERO));
+			assertEquals(0L, initalBal - rctx1.getBalance(HERO_ADDRESS));
 		}
 	}
 
 	@Test
 	public void testPayouts() throws IOException {
 		// setup address for this little play
-		Address VILLAIN = Init.VILLAIN;
-		Address HERO = Init.HERO;
-		Context<?> ctx = step("(do (def HERO " + HERO + ") (def VILLAIN " + VILLAIN + ") )");
+		Context<?> ctx = step("(do (def HERO " + HERO_ADDRESS + ") (def VILLAIN " + VILLAIN_ADDRESS + ") )");
 
 		// deploy an oracle contract.
 		String oracleString = Utils.readResourceAsString("actors/oracle-trusted.con");
 		ctx=step("(def oaddr (deploy '"+oracleString+"))");
 		Address oaddr=(Address) ctx.getResult();
-		
+
 		ctx = step(ctx, "(def oaddr" + oaddr + ")");
-		
+
 		// call to create oracle with key :bar and current address (HERO) trusted
 		ctx = step(ctx, "(call oaddr (register :bar {:trust #{*address*}}))");
 
@@ -138,7 +135,7 @@ public class PredictionMarketTest extends ACVMTest {
 		ctx=step(ctx,"(deploy ("+contractString+" oaddr :bar #{true,false}))");
 		Address pmaddr = (Address) ctx.getResult();
 		ctx = step(ctx, "(def pmaddr " + pmaddr + ")");
-		ctx = stepAs(VILLAIN, ctx, "(def pmaddr "+pmaddr+")");
+		ctx = stepAs(VILLAIN_ADDRESS, ctx, "(def pmaddr "+pmaddr+")");
 
 		// initial state checks
 		assertEquals(false,evalB(ctx, "(call pmaddr (finalised?))"));
@@ -147,7 +144,7 @@ public class PredictionMarketTest extends ACVMTest {
 		{ // Act 1. Two players stake. our Villain wins this time....
 			Context<?> c = ctx;
 			c = step(c, "(call pmaddr 5000 (stake true 4000))");
-			c = stepAs(VILLAIN, c, "(call pmaddr 5000 (stake false 3000))");
+			c = stepAs(VILLAIN_ADDRESS, c, "(call pmaddr 5000 (stake false 3000))");
 			assertEquals(5000L, c.getBalance(pmaddr));
 
 			assertFalse(evalB(c, "(call pmaddr (finalised?))"));
@@ -161,11 +158,11 @@ public class PredictionMarketTest extends ACVMTest {
 			// collect payouts
 			c = step(c, "(call pmaddr (payout))");
 			assertCVMEquals(0L, c.getResult());
-			assertEquals(HERO_BALANCE - 4000, c.getBalance(TestState.HERO));
+			assertEquals(HERO_BALANCE - 4000, c.getBalance(TestState.HERO_ADDRESS));
 
-			c = stepAs(VILLAIN, c, "(call pmaddr (payout))");
+			c = stepAs(VILLAIN_ADDRESS, c, "(call pmaddr (payout))");
 			assertCVMEquals(5000L, c.getResult());
-			assertEquals(HERO_BALANCE + 4000, c.getBalance(TestState.VILLAIN));
+			assertEquals(HERO_BALANCE + 4000, c.getBalance(TestState.VILLAIN_ADDRESS));
 
 			assertEquals(0L, c.getBalance(pmaddr));
 			assertEquals(TestState.TOTAL_FUNDS, c.getState().computeTotalFunds());

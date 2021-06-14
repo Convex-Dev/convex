@@ -127,7 +127,7 @@ public class StressPanel extends JPanel {
 	private synchronized void runStressTest() {
 		errors = 0;
 		values = 0;
-			Address address=PeerGUI.initConfigTest.HERO_ADDRESS;
+			Address address=PeerGUI.initConfigTest.getHeroAddress();
 
 			int transCount = (Integer) transactionCountSpinner.getValue();
 			int opCount = (Integer) opCountSpinner.getValue();
@@ -148,7 +148,7 @@ public class StressPanel extends JPanel {
 					// Use client store
 					// Stores.setCurrent(Stores.CLIENT_STORE);
 					ArrayList<CompletableFuture<Result>> frs=new ArrayList<>();
-					Convex pc = Convex.connect(sa, address,PeerGUI.initConfigTest.HERO_KEYPAIR);
+					Convex pc = Convex.connect(sa, address,PeerGUI.initConfigTest.getHeroKeyPair());
 
 					for (int i = 0; i < transCount; i++) {
 						StringBuilder tsb = new StringBuilder();
@@ -158,7 +158,7 @@ public class StressPanel extends JPanel {
 						}
 						tsb.append("))");
 						String source = tsb.toString();
-						ATransaction t = Invoke.create(PeerGUI.initConfigTest.HERO_ADDRESS,-1, Reader.read(source));
+						ATransaction t = Invoke.create(PeerGUI.initConfigTest.getHeroAddress(),-1, Reader.read(source));
 						CompletableFuture<Result> fr = pc.transact(t);
 						frs.add(fr);
 					}
