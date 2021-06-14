@@ -31,6 +31,7 @@ public class Init {
 
 
 	// Governance accounts
+
 	public static final Address NULL = Address.create(0);
 	public static final Address INIT = Address.create(1);
 
@@ -50,8 +51,8 @@ public class Init {
 
 	public static final Address FIRST_PEER = Address.create(11);
 
-	public static final Address TRUST_ADDRESS = Address.create(19);
-	public static final Address REGISTRY_ADDRESS = Address.create(20);
+	// public static final Address TRUST_ADDRESS = Address.create(19);
+	// public static final Address REGISTRY_ADDRESS = Address.create(20);
 
 	private static final Logger log = Logger.getLogger(Init.class.getName());
 
@@ -63,6 +64,9 @@ public class Init {
 	public static final AKeyPair HERO_KP;
 	public static final AKeyPair VILLAIN_KP;
 
+
+	public static Address TRUST_ADDRESS;
+	public static Address REGISTRY_ADDRESS;
 
 	static {
 		for (int i = 0; i < NUM_USERS; i++) {
@@ -79,50 +83,50 @@ public class Init {
 		VILLAIN_KP=KEYPAIRS[NUM_PEERS+1];
 	}
 
-	public static State createBaseAccounts() {
+	public static State createBaseAccounts(AInitConfig config) {
 		// accumulators for initial state maps
 		BlobMap<AccountKey, PeerStatus> peers = BlobMaps.empty();
 		AVector<AccountStatus> accts = Vectors.empty();
 
 		// governance accounts
-		accts = addGovernanceAccount(accts, NULL, 0L); // Null account
-		accts = addGovernanceAccount(accts, INIT, 0L); // Initialisation Account
+		accts = addGovernanceAccount(accts, config.NULL_ADDRESS, 0L); // Null account
+		accts = addGovernanceAccount(accts, config.INIT_ADDRESS, 0L); // Initialisation Account
 
-		accts = addGovernanceAccount(accts, RESERVED, 750 * Coin.EMERALD); // 75% for investors
+		accts = addGovernanceAccount(accts, config.RESERVED_ADDRESS, 750 * Coin.EMERALD); // 75% for investors
 
-		accts = addGovernanceAccount(accts, MAINBANK, 240 * Coin.EMERALD); // 24% Foundation
+		accts = addGovernanceAccount(accts, config.MAINBANK_ADDRESS, 240 * Coin.EMERALD); // 24% Foundation
 
 		// Pools for network rewards
-		accts = addGovernanceAccount(accts, MAINPOOL, 1 * Coin.EMERALD); // 0.1% distribute 5% / year ~= 0.0003% //
+		accts = addGovernanceAccount(accts, config.MAINPOOL_ADDRESS, 1 * Coin.EMERALD); // 0.1% distribute 5% / year ~= 0.0003% //
 																			// /day
-		accts = addGovernanceAccount(accts, LIVEPOOL, 5 * Coin.DIAMOND); // 0.0005% = approx 2 days of mainpool feed
+		accts = addGovernanceAccount(accts, config.LIVEPOOL_ADDRESS, 5 * Coin.DIAMOND); // 0.0005% = approx 2 days of mainpool feed
 
-		accts = addGovernanceAccount(accts, ROOTFUND, 8 * Coin.EMERALD); // 0.8% Long term net rewards
+		accts = addGovernanceAccount(accts, config.ROOTFUND_ADDRESS, 8 * Coin.EMERALD); // 0.8% Long term net rewards
 
 		// set up memory exchange. Initially 1GB available at 1000 per byte. (one
 		// diamond coin liquidity)
 		{
-			accts = addMemoryExchange(accts, MEMORY_EXCHANGE, 1 * Coin.DIAMOND, 1000000000L);
+			accts = addMemoryExchange(accts, config.MEMORY_EXCHANGE_ADDRESS, 1 * Coin.DIAMOND, 1000000000L);
 		}
 
 		long USER_ALLOCATION = 994 * Coin.DIAMOND; // remaining allocation to divide between initial user accounts
 
 		// Core library
-		accts = addCoreLibrary(accts, CORE_ADDRESS);
+		accts = addCoreLibrary(accts, config.CORE_ADDRESS);
 		// Core Account should now be fully initialised
 
 		// Set up initial user accounts
-		for (int i = 0; i < NUM_USERS; i++) {
+		for (int i = 0; i < config.getUserCount(); i++) {
 			// TODO: construct addresses
-			AKeyPair kp = KEYPAIRS[NUM_PEERS+i];
-			Address address = Address.create(HERO.longValue() + i);
+			AKeyPair kp = config.getUserKeyPair(i);
+			Address address = config.getUserAddress(i);
 			accts = addAccount(accts, address, kp.getAccountKey(), USER_ALLOCATION / 10);
 		}
 
 		// Finally add peers
 		// Set up initial peers
-		for (int i = 0; i < NUM_PEERS; i++) {
-			AKeyPair kp = KEYPAIRS[i];
+		for (int i = 0; i < config.getPeerCount(); i++) {
+			AKeyPair kp = config.getPeerKeyPair(i);
 			AccountKey peerKey = kp.getAccountKey();
 			long peerFunds = USER_ALLOCATION / 10;
 
@@ -130,7 +134,7 @@ public class Init {
 			long stakedFunds = (long) (((i == 0) ? 0.75 : 0.01) * peerFunds);
 
             // create the peer account first
-			Address peerAddress = Address.create(accts.count());
+			Address peerAddress = config.getPeerAddress(i);
 			accts = addAccount(accts, peerAddress, peerKey, peerFunds - stakedFunds);
 
             // split peer funds between stake and account
@@ -146,18 +150,19 @@ public class Init {
 			long total = s.computeTotalFunds();
 			if (total != Constants.MAX_SUPPLY) throw new Error("Bad total amount: " + total);
 		}
-
 		return s;
 	}
 
 	static final ACell TRUST_CODE=Reader.readResource("libraries/trust.con");
 	static final ACell REGISTRY_CODE=Reader.readResource("actors/registry.con");
 
-	public static State createCoreLibraries() throws IOException {
-		State s=createBaseAccounts();
+	public static State createCoreLibraries(AInitConfig config) throws IOException {
+		State s=createBaseAccounts(config);
 
 		// At this point we have a raw initial state with accounts
 
+		TRUST_ADDRESS = config.getLibraryAddress(0);
+		REGISTRY_ADDRESS = config.getLibraryAddress(1);
 		{ // Deploy Trust library
 			Context<?> ctx = Context.createFake(s, INIT);
 			ctx = ctx.deployActor(TRUST_CODE);
@@ -192,50 +197,52 @@ public class Init {
 		return s;
 	}
 
-	public static State createState() {
+	public static State createState(AInitConfig config) {
 		try {
-			State s=createCoreLibraries();
+			State s=createCoreLibraries(config);
 
-			// ============================================================
-			// Standard library deployment
+			if (config.isStandardLibrary()) {
 
-			{ // Deploy Fungible library and register with CNS
-				s = doActorDeploy(s, "convex.fungible", "libraries/fungible.con");
-			}
+				// ============================================================
+				// Standard library deployment
 
-			{ // Deploy Oracle Actor
-				s = doActorDeploy(s, "convex.trusted-oracle", "actors/oracle-trusted.con");
-			}
+				{ // Deploy Fungible library and register with CNS
+					s = doActorDeploy(s, "convex.fungible", "libraries/fungible.con");
+				}
 
-			{ // Deploy Asset Actor
-				s = doActorDeploy(s, "convex.asset", "libraries/asset.con");
-			}
+				{ // Deploy Oracle Actor
+					s = doActorDeploy(s, "convex.trusted-oracle", "actors/oracle-trusted.con");
+				}
 
-			{ // Deploy Torus Actor
-				s = doActorDeploy(s, "torus.exchange", "actors/torus.con");
-			}
+				{ // Deploy Asset Actor
+					s = doActorDeploy(s, "convex.asset", "libraries/asset.con");
+				}
 
-			{ // Deploy NFT Actor
-				s = doActorDeploy(s, "asset.nft-tokens", "libraries/nft-tokens.con");
-			}
+				{ // Deploy Torus Actor
+					s = doActorDeploy(s, "torus.exchange", "actors/torus.con");
+				}
 
-			{ // Deploy Simple NFT Actor
-				s = doActorDeploy(s, "asset.simple-nft", "libraries/simple-nft.con");
-			}
+				{ // Deploy NFT Actor
+					s = doActorDeploy(s, "asset.nft-tokens", "libraries/nft-tokens.con");
+				}
 
-			{ // Deploy Box Actor
-				s = doActorDeploy(s, "asset.box", "libraries/box.con");
-			}
+				{ // Deploy Simple NFT Actor
+					s = doActorDeploy(s, "asset.simple-nft", "libraries/simple-nft.con");
+				}
 
-			{ // Deploy Currencies
-				@SuppressWarnings("unchecked")
-				AVector<AVector<ACell>> table = (AVector<AVector<ACell>>) Reader
-						.readResourceAsData("torus/currencies.con");
-				for (AVector<ACell> row : table) {
-					s = doCurrencyDeploy(s, row);
+				{ // Deploy Box Actor
+					s = doActorDeploy(s, "asset.box", "libraries/box.con");
+				}
+
+				{ // Deploy Currencies
+					@SuppressWarnings("unchecked")
+					AVector<AVector<ACell>> table = (AVector<AVector<ACell>>) Reader
+							.readResourceAsData("torus/currencies.con");
+					for (AVector<ACell> row : table) {
+						s = doCurrencyDeploy(s, row);
+					}
 				}
 			}
-
 			// Final funds check
 			long finalTotal = s.computeTotalFunds();
 			if (finalTotal != Constants.MAX_SUPPLY)
