@@ -1,5 +1,5 @@
 package convex.gui.manager;
-
+ 
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.EventQueue;
@@ -18,7 +18,6 @@ import javax.swing.JTabbedPane;
 
 import convex.api.Convex;
 import convex.core.Init;
-import convex.core.InitConfigTest;
 import convex.core.Order;
 import convex.core.Peer;
 import convex.core.Result;
@@ -52,23 +51,22 @@ public class PeerGUI extends JPanel {
 
 	private static JFrame frame;
 
-	private static InitConfigTest config = InitConfigTest.create();
-	private static StateModel<State> latestState = StateModel.create(Init.createState(config));
+	private static StateModel<State> latestState = StateModel.create(Init.createState());
 
 	public static long maxBlock = 0;
 
 	/**
 	 * Launch the application.
 	 * @param args Command line args
-	 * @throws IOException
+	 * @throws IOException 
 	 */
 	public static void main(String[] args) throws IOException {
 		// TODO: Store config
 		// Stores.setGlobalStore(EtchStore.create(new File("peers-shared-db")));
-
+			
 		// call to set up Look and Feel
 		convex.gui.utils.Toolkit.init();
-
+		
 		EventQueue.invokeLater(new Runnable() {
 			@Override
 			public void run() {
@@ -79,19 +77,19 @@ public class PeerGUI extends JPanel {
 							.getImage(PeerGUI.class.getResource("/images/Convex.png")));
 					frame.setBounds(100, 100, 1024, 768);
 					frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
+									
 					PeerGUI window = new PeerGUI();
 					frame.getContentPane().add(window, BorderLayout.CENTER);
 					frame.pack();
 					frame.setVisible(true);
-
+					
 					frame.addWindowListener(new java.awt.event.WindowAdapter() {
 				        public void windowClosing(WindowEvent winEvt) {
 				        	// shut down peers gracefully
 				    		window.peerPanel.closePeers();
 				        }
 				    });
-
+					
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -119,7 +117,7 @@ public class PeerGUI extends JPanel {
 	 */
 	public PeerGUI() {
 		peerPanel= new PeersListPanel(this);
-
+		
 		setLayout(new BorderLayout());
 		this.add(tabs, BorderLayout.CENTER);
 
@@ -152,10 +150,10 @@ public class PeerGUI extends JPanel {
 					State latest = latestState.getValue();
 					for (PeerView s : peerViews) {
 						s.checkPeer();
-
+						
 						Server serv=s.peerServer;
 						if (serv==null) continue;
-
+						
 						Peer p = serv.getPeer();
 						if (p==null) continue;
 
@@ -172,7 +170,7 @@ public class PeerGUI extends JPanel {
 							latestState.setValue(latest);
 						}
 					}
-
+					
 				} catch (InterruptedException e) {
 					//
 					log.warning("Update thread interrupted abnormally: "+e.getMessage());
@@ -212,7 +210,7 @@ public class PeerGUI extends JPanel {
 	 * @param address Address for connection
 	 * @param kp Key Pair for connection
 	 * @return Convex connection instance
-	 * @throws IOException
+	 * @throws IOException 
 	 */
 	public static Convex makeConnection(Address address,AKeyPair kp) throws IOException {
 		InetSocketAddress host = getDefaultPeer().getHostAddress();
@@ -221,7 +219,7 @@ public class PeerGUI extends JPanel {
 
 	/**
 	 * Executes a transaction using the given Wallet
-	 *
+	 * 
 	 * @param code Code to execute
 	 * @param we Wallet to use
 	 * @return Future for Result
@@ -233,10 +231,10 @@ public class PeerGUI extends JPanel {
 		ATransaction trans = Invoke.create(address,sequence, code);
 		return execute(we,trans);
 	}
-
+	
 	/**
 	 * Executes a transaction using the given Wallet
-	 *
+	 * 
 	 * @param we Wallet to use
 	 * @param trans Transaction to execute
 	 * @return Future for Result
@@ -255,7 +253,7 @@ public class PeerGUI extends JPanel {
 
 	/**
 	 * Executes a transaction using the given Wallet
-	 *
+	 * 
 	 * @param we Wallet to use
 	 * @param trans Transaction to execute
 	 * @param receiveAction

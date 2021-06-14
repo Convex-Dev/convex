@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import convex.core.Init;
-import convex.core.InitConfigTest;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
@@ -62,15 +61,11 @@ public class API {
 	 */
 	public static Server launchPeer(Map<Keyword, Object> peerConfig, IServerEvent event) {
 		HashMap<Keyword,Object> config=new HashMap<>(peerConfig);
-
-		// TODO move this up to the calling function
-		InitConfigTest initConfigTest = InitConfigTest.create();
-
 		try {
 			if (!config.containsKey(Keywords.PORT)) config.put(Keywords.PORT, null);
 			if (!config.containsKey(Keywords.STORE)) config.put(Keywords.STORE, Stores.getGlobalStore());
 			if (!config.containsKey(Keywords.KEYPAIR)) config.put(Keywords.KEYPAIR, Init.KEYPAIRS[0]);
-			if (!config.containsKey(Keywords.STATE)) config.put(Keywords.STATE, Init.createState(initConfigTest));
+			if (!config.containsKey(Keywords.STATE)) config.put(Keywords.STATE, Init.createState());
 			if (!config.containsKey(Keywords.RESTORE)) config.put(Keywords.RESTORE, true);
 			if (!config.containsKey(Keywords.PERSIST)) config.put(Keywords.PERSIST, true);
 
@@ -90,7 +85,7 @@ public class API {
 	 * @param count Number of peers to launch.
 	 *
 	 * @param keyPairs Array of keyPairs for each peer. The length of the array must be >= the count of peers to launch.
-	 * @throws IOException
+	 * @throws IOException 
 	 *
 	 */
 	public static List<Server> launchLocalPeers(int count, AKeyPair[] keyPairs, Address peerAddress, IServerEvent event) {
@@ -100,11 +95,8 @@ public class API {
 
 		Map<Keyword, Object> config = new HashMap<>();
 
-		// TODO move this up to the calling function
-		InitConfigTest initConfigTest = InitConfigTest.create();
-
 		config.put(Keywords.PORT, null);
-		config.put(Keywords.STATE, Init.createState(initConfigTest));
+		config.put(Keywords.STATE, Init.createState());
 
 		// TODO maybe have this as an option in the calling parameters
 		AStore store = Stores.getGlobalStore();
@@ -126,7 +118,7 @@ public class API {
 		for (int i = 1; i < count; i++) {
 			Server server=serverList.get(i);
 			remotePeerHostname = genesisServer.getHostname();
-
+			
 			try {
 				// Join this Server to the Seer #0
 				serverList.get(i).connectToPeer(genesisServer.getPeerKey(), genesisServer.getHostAddress());
@@ -136,7 +128,7 @@ public class API {
 				log.severe("Failed to connect peers" +e.getMessage());
 			}
 		}
-
+		
 		// wait for the peers to sync upto 10 seconds
 		//API.waitForNetworkReady(serverList, 10);
 		return serverList;

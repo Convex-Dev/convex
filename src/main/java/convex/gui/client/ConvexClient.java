@@ -11,7 +11,6 @@ import javax.swing.JTabbedPane;
 
 import convex.api.Convex;
 import convex.core.Init;
-import convex.core.InitConfigTest;
 import convex.core.State;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
@@ -22,7 +21,7 @@ import convex.gui.utils.Toolkit;
 
 /**
  * A Client application for the Convex Network.
- *
+ * 
  * Doesn't run a Peer. Connects to convex.world.
  */
 @SuppressWarnings("serial")
@@ -34,12 +33,10 @@ public class ConvexClient extends JPanel {
 
 	private static JFrame frame;
 
-	private static InitConfigTest config = InitConfigTest.create();
-
-	private static StateModel<State> latestState = StateModel.create(Init.createState(config));
+	private static StateModel<State> latestState = StateModel.create(Init.createState());
 
 	public static long maxBlock = 0;
-
+	
 	protected Convex convex=null;
 
 	/**
@@ -50,7 +47,7 @@ public class ConvexClient extends JPanel {
 		log.info("Running Convex Client");
 		// call to set up Look and Feel
 		Toolkit.init();
-
+ 
 		EventQueue.invokeLater(new Runnable() {
 			@Override
 			public void run() {
