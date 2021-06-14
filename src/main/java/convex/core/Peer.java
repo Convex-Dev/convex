@@ -21,6 +21,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.init.Init;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.store.AStore;
@@ -246,7 +247,7 @@ public class Peer {
 	 * @return Context after executing query
 	 */
 	public <T extends ACell> Context<T> executeQuery(ACell form) {
-		return executeQuery(form,Init.HERO);
+		return executeQuery(form,Init.BASE_FIRST_ADDRESS);
 	}
 
 	public long getTimeStamp() {
@@ -300,8 +301,8 @@ public class Peer {
 		Belief belief = getBelief();
 		MergeContext mc = MergeContext.create(keyPair, timestamp, getConsensusState());
 		Belief newBelief = belief.merge(mc, beliefs);
-		
-		long ocp=getConsensusPoint(); 
+
+		long ocp=getConsensusPoint();
 		Order newOrder=newBelief.getOrder(peerKey);
 		if (ocp>newBelief.getOrder(peerKey).getConsensusPoint()) {
 			// This probably shouldn't happen, but just in case.....
@@ -390,7 +391,7 @@ public class Peer {
 	/**
 	 * Propose a new Block. Adds the block to the current proposed chain for this
 	 * Peer.
-	 * 
+	 *
 	 * @param block Block to publish
 	 * @return Peer after proposing new Block in Peer's own Order
 	 * @throws BadSignatureException
@@ -430,7 +431,7 @@ public class Peer {
 
 	/**
 	 * Gets the current chain this Peer sees for a given peer address
-	 * 
+	 *
 	 * @param peerKey Peer Key
 	 * @return The current Order for the specified peer
 	 * @throws BadSignatureException

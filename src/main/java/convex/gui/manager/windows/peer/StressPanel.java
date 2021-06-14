@@ -24,7 +24,6 @@ import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 
 import convex.api.Convex;
-import convex.core.Init;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.data.Address;
@@ -92,7 +91,7 @@ public class StressPanel extends JPanel {
 		opCountSpinner = new JSpinner();
 		opCountSpinner.setModel(new SpinnerNumberModel(1, 1, 1000, 10));
 		optionPanel.add(opCountSpinner);
-		
+
 		JLabel lblNewLabel3 = new JLabel("Clients");
 		optionPanel.add(lblNewLabel3);
 		clientCountSpinner = new JSpinner();
@@ -117,29 +116,29 @@ public class StressPanel extends JPanel {
 
 	long errors = 0;
 	long values = 0;
-	
+
 	private JSplitPane splitPane;
 	private JPanel resultPanel;
 	private JTextArea resultArea;
 
 	NumberFormat formatter = new DecimalFormat("#0.000");
 
-	
+
 	private synchronized void runStressTest() {
 		errors = 0;
 		values = 0;
-			Address address=Init.HERO;
+			Address address=PeerGUI.initConfigTest.HERO_ADDRESS;
 
 			int transCount = (Integer) transactionCountSpinner.getValue();
 			int opCount = (Integer) opCountSpinner.getValue();
 			// TODO: enable multiple clients
 			// int clientCount = (Integer) opCountSpinner.getValue();
-			
+
 			new SwingWorker<String,Object>() {
 				@Override
 				protected String doInBackground() throws Exception {
 					StringBuilder sb = new StringBuilder();
-					
+
 					try {
 
 
@@ -149,8 +148,8 @@ public class StressPanel extends JPanel {
 					// Use client store
 					// Stores.setCurrent(Stores.CLIENT_STORE);
 					ArrayList<CompletableFuture<Result>> frs=new ArrayList<>();
-					Convex pc = Convex.connect(sa, address,Init.HERO_KP);
-					
+					Convex pc = Convex.connect(sa, address,PeerGUI.initConfigTest.HERO_KEYPAIR);
+
 					for (int i = 0; i < transCount; i++) {
 						StringBuilder tsb = new StringBuilder();
 						tsb.append("(def a (do ");
@@ -159,16 +158,16 @@ public class StressPanel extends JPanel {
 						}
 						tsb.append("))");
 						String source = tsb.toString();
-						ATransaction t = Invoke.create(Init.HERO,-1, Reader.read(source));
+						ATransaction t = Invoke.create(PeerGUI.initConfigTest.HERO_ADDRESS,-1, Reader.read(source));
 						CompletableFuture<Result> fr = pc.transact(t);
 						frs.add(fr);
 					}
-					
+
 					long sendTime = Utils.getCurrentTimestamp();
 
 					List<Result> results=Utils.completeAll(frs).get(10000, TimeUnit.MILLISECONDS);
 					long endTime = Utils.getCurrentTimestamp();
-					
+
 					for (Result r:results) {
 						if (r.isError()) {
 							errors++;
@@ -176,11 +175,11 @@ public class StressPanel extends JPanel {
 							values++;
 						}
 					}
-					
+
 					Thread.sleep(100); // wait for state update to be reflected
 					State endState = PeerGUI.getLatestState();
 
-					
+
 					sb.append("Results for " + transCount + " transactions\n");
 					sb.append(values + " values received\n");
 					sb.append(errors + " errors received\n");
@@ -188,17 +187,17 @@ public class StressPanel extends JPanel {
 					sb.append("Send time:     " + formatter.format((sendTime - startTime) * 0.001) + "s\n");
 					sb.append("End time:      " + formatter.format((endTime - startTime) * 0.001) + "s\n");
 					sb.append("Consensus time: " + formatter.format((endState.getTimeStamp().longValue() - startTime) * 0.001) + "s\n");
-				
+
 					} catch (IOException e) {
 						e.printStackTrace();
 					} finally {
 						btnRun.setEnabled(true);
 					}
-					
+
 					String report=sb.toString();
 					return report;
 				}
-				
+
 				@Override
 				protected void done() {
 					try {
@@ -208,7 +207,7 @@ public class StressPanel extends JPanel {
 					}
 				}
 			}.execute();
-			
+
 
 	}
 }

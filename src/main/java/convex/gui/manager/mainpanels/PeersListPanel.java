@@ -17,7 +17,6 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 
 import convex.api.Convex;
-import convex.core.Init;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.data.Hash;
@@ -45,7 +44,7 @@ public class PeersListPanel extends JPanel {
 	private static final Logger log = Logger.getLogger(PeersListPanel.class.getName());
 
 	public void launchAllPeers(PeerGUI manager) {
-		List<Server> serverList = API.launchLocalPeers(Init.NUM_PEERS, Init.KEYPAIRS, Init.FIRST_PEER, null);
+		List<Server> serverList = API.launchLocalPeers(PeerGUI.initConfigTest.NUM_PEERS, PeerGUI.initConfigTest, null);
 		for (Server server: serverList) {
 			PeerView peer = new PeerView();
 			peer.peerServer = server;
@@ -79,7 +78,7 @@ public class PeersListPanel extends JPanel {
 
 	/**
 	 * Create the panel.
-	 * @param manager 
+	 * @param manager
 	 */
 	public PeersListPanel(PeerGUI manager) {
 		setLayout(new BorderLayout(0, 0));
@@ -102,7 +101,7 @@ public class PeersListPanel extends JPanel {
 			Convex pc;
 			try {
 				// TODO: we want to receive anything?
-				pc = Convex.connect(hostAddress, Init.HERO,null);
+				pc = Convex.connect(hostAddress, PeerGUI.initConfigTest.HERO_ADDRESS,null);
 				PeerView pv = new PeerView();
 				pv.peerConnection = pc;
 				addPeer(pv);

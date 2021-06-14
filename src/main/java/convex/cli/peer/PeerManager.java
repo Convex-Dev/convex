@@ -12,7 +12,7 @@ import java.util.logging.Logger;
 
 import convex.api.Shutdown;
 import convex.cli.Helpers;
-import convex.core.Init;
+import convex.cli.Main;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.data.AccountKey;
@@ -56,7 +56,7 @@ public class PeerManager implements IServerEvent {
 	}
 
 	public void launchLocalPeers(int count) {
-		peerServerList = API.launchLocalPeers(count, Init.KEYPAIRS, Init.FIRST_PEER, this);
+		peerServerList = API.launchLocalPeers(count, Main.initConfigTest, this);
 	}
 
     public void launchPeer(AKeyPair keyPair, Address peerAddress, String hostname, int port, AStore store) {

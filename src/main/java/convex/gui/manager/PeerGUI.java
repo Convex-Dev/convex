@@ -17,8 +17,6 @@ import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
 import convex.api.Convex;
-import convex.core.Init;
-import convex.core.InitConfigTest;
 import convex.core.Order;
 import convex.core.Peer;
 import convex.core.Result;
@@ -28,6 +26,8 @@ import convex.core.crypto.WalletEntry;
 import convex.core.data.ACell;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.core.init.Init;
+import convex.core.init.InitConfigTest;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
@@ -52,7 +52,7 @@ public class PeerGUI extends JPanel {
 
 	private static JFrame frame;
 
-	private static InitConfigTest initConfigTest = InitConfigTest.create();
+	public static InitConfigTest initConfigTest = InitConfigTest.create();
 	private static StateModel<State> latestState = StateModel.create(Init.createState(initConfigTest));
 
 	public static long maxBlock = 0;

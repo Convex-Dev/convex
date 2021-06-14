@@ -12,7 +12,6 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.table.DefaultTableCellRenderer;
 
-import convex.core.Init;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.data.ACell;
@@ -50,7 +49,7 @@ public class OraclePanel extends JPanel {
 		// ===========================================
 		// Top label
 		add(new CodeLabel("Oracle at address: " + oracleAddress + "\n" + "Executing as user: "
-				+ Init.HERO.toString()), BorderLayout.NORTH);
+				+ PeerGUI.initConfigTest.HERO_ADDRESS.toString()), BorderLayout.NORTH);
 
 		// ===========================================
 		// Central table

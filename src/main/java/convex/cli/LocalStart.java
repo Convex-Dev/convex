@@ -3,7 +3,6 @@ package convex.cli;
 import java.util.logging.Logger;
 
 import convex.cli.peer.PeerManager;
-import convex.core.Init;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -27,7 +26,7 @@ public class LocalStart implements Runnable {
 	private Local localParent;
 
 	@Option(names={"--count"},
-		defaultValue = ""+Init.NUM_PEERS,
+		// defaultValue = "" + Main.initConfig.NUM_PEERS,
 		description="Number of local peers to start this can be from 1 to ${DEFAULT-VALUE} peers. Default: ${DEFAULT-VALUE}")
 	private int count;
 
@@ -39,8 +38,8 @@ public class LocalStart implements Runnable {
 		// TODO: Parse peer config
 		// Map<Keyword,Object> peerConfig=new HashMap<>();
 
-		if (count > Init.NUM_PEERS) {
-			log.severe("Number of peers " + count + " is greater than " + Init.NUM_PEERS);
+		if (count > Main.initConfigTest.getPeerCount()) {
+			log.severe("Number of peers " + count + " is greater than " + Main.initConfigTest.getPeerCount());
 		}
 		log.info("Starting local network with "+count+" peer(s)");
 		peerManager.launchLocalPeers(count);

@@ -4,7 +4,6 @@ import java.util.concurrent.ExecutionException;
 
 import convex.core.Constants;
 import convex.core.ErrorCodes;
-import convex.core.Init;
 import convex.core.State;
 import convex.core.data.ABlobMap;
 import convex.core.data.ACell;
@@ -33,6 +32,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.exceptions.TODOException;
+import convex.core.init.Init;
 import convex.core.lang.impl.AExceptional;
 import convex.core.lang.impl.ATrampoline;
 import convex.core.lang.impl.ErrorValue;
@@ -69,7 +69,7 @@ import convex.core.util.Utils;
  *
  * "If you have a procedure with 10 parameters, you probably missed some"
  * - Alan Perlis
- * 
+ *
  * @param <T> Result type of Context
  */
 public final class Context<T extends ACell> extends AObject {
@@ -98,25 +98,25 @@ public final class Context<T extends ACell> extends AObject {
 	private ChainState chainState;
 	private ABlobMap<Address,AVector<AVector<ACell>>> log;
 	private CompilerState compilerState;
-	
+
 
 	/**
 	 * Inner class compiler state.
-	 * 
+	 *
 	 * Maintains a mapping of Symbols to positions in a definition vector corresponding to lexical scope.
 	 *
 	 */
 	public static final class CompilerState {
 		public static final CompilerState EMPTY = new CompilerState(Vectors.empty(),Maps.empty());
-		
+
 		private AVector<Syntax> definitions;
 		private AHashMap<Symbol,CVMLong> mappings;
-		
+
 		private CompilerState(AVector<Syntax> definitions, AHashMap<Symbol,CVMLong> mappings) {
 			this.definitions=definitions;
 			this.mappings=mappings;
 		}
-		
+
 		public CompilerState define(Symbol sym, Syntax syn) {
 			long position=definitions.count();
 			AVector<Syntax> newDefs=definitions.conj(syn);
@@ -357,7 +357,7 @@ public final class Context<T extends ACell> extends AObject {
 			// compute additional memory purchase requirement beyond allowance
 			long purchaseNeeded=memUsed-allowanceUsed;
 			if (purchaseNeeded>0) {
-				AccountStatus pool=state.getAccount(Init.MEMORY_EXCHANGE);
+				AccountStatus pool=state.getAccount(Init.MEMORY_EXCHANGE_ADDRESS);
 				// we do memory purchase if pool exists
 				if (pool!=null) {
 					long poolBalance=pool.getBalance();
@@ -368,7 +368,7 @@ public final class Context<T extends ACell> extends AObject {
 						// enough to cover memory price, so automatically buy from pool
 						// System.out.println("Buying "+purchaseNeeded+" memory for: "+price);
 						pool=pool.withBalances(poolBalance+memorySpend, poolAllowance-purchaseNeeded);
-						state=state.putAccount(Init.MEMORY_EXCHANGE,pool);
+						state=state.putAccount(Init.MEMORY_EXCHANGE_ADDRESS,pool);
 					} else {
 						// Insufficient memory, so need to roll back state to before transaction
 						// origin should still pay transaction fees, but no memory costs
@@ -431,7 +431,7 @@ public final class Context<T extends ACell> extends AObject {
 	public AHashMap<Symbol,ACell> getEnvironment() {
 		return chainState.getEnvironment();
 	}
-	
+
 	public CompilerState getCompilerState() {
 		return compilerState;
 	}
@@ -567,7 +567,7 @@ public final class Context<T extends ACell> extends AObject {
 		if (env.containsKey(sym)) {
 			return as;
 		}
-		
+
 		as = getAliasedAccount(env);
 		if (as==null) return null;
 
@@ -601,7 +601,7 @@ public final class Context<T extends ACell> extends AObject {
 	 * Looks up an environment entry for a specific address without consuming juice.
 	 *
 	 * If the symbol is qualified, try lookup via *aliases*
-	 * 
+	 *
 	 * @param address Address of Account in which to look up entry
 	 * @param sym Symbol to look up
 	 * @return Environment entry
@@ -1098,7 +1098,7 @@ public final class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Defines a value in the environment of the current address, updating the metadata
-	 * 
+	 *
 	 * @param syn Syntax Object to define, containing a Symbol value
 	 * @param value Value to set of the given Symbol
 	 * @return Updated context with symbol defined in environment
@@ -1162,7 +1162,7 @@ public final class Context<T extends ACell> extends AObject {
 		int saveDepth=getDepth();
 		Context<AOp<R>> rctx =this.withDepth(saveDepth+1);
 		if (rctx.isExceptional()) return rctx; // depth error
-		
+
 		// Save Compiler state
 		CompilerState savedCompilerState=getCompilerState();
 
@@ -1334,7 +1334,7 @@ public final class Context<T extends ACell> extends AObject {
 		juice=newJuice;
 		return (Context<R>) this;
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> withCompilerState(CompilerState comp) {
 		compilerState=comp;
@@ -1485,7 +1485,7 @@ public final class Context<T extends ACell> extends AObject {
 		long delta=allowance-current;
 		if (delta==0L) return this.withResult(CVMLong.ZERO);
 
-		AccountStatus pool=getState().getAccount(Init.MEMORY_EXCHANGE);
+		AccountStatus pool=getState().getAccount(Init.MEMORY_EXCHANGE_ADDRESS);
 
 		try {
 			long poolAllowance=pool.getMemory();
@@ -1499,7 +1499,7 @@ public final class Context<T extends ACell> extends AObject {
 
 			// Update accounts
 			AVector<AccountStatus> newAccounts=accounts.assoc(sourceIndex, sourceAccount);
-			newAccounts=newAccounts.assoc(Init.MEMORY_EXCHANGE.longValue(),pool);
+			newAccounts=newAccounts.assoc(Init.MEMORY_EXCHANGE_ADDRESS.longValue(),pool);
 
 			return withChainState(chainState.withAccounts(newAccounts)).withResult(null);
 		} catch (IllegalArgumentException e) {
@@ -2041,7 +2041,7 @@ public final class Context<T extends ACell> extends AObject {
 		int savedDepth=getDepth();
 		Context<R> ctx =(Context<R>) this.withDepth(savedDepth+1);
 		if (ctx.isExceptional()) return ctx; // depth error, won't have modified depth
-		
+
 		//AVector<ACell> savedEnv=getLocalBindings();
 
 		Context<R> rctx= (Context<R>)invoke(expander, form, cont);
