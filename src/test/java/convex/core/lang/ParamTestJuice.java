@@ -30,8 +30,8 @@ public class ParamTestJuice {
 
 	@Parameterized.Parameters(name = "{index}: {0}")
 	public static Collection<Object[]> dataExamples() {
-		return Arrays.asList(new Object[][] { 
-			    { "3", 3L, Juice.CONSTANT }, 
+		return Arrays.asList(new Object[][] {
+			    { "3", 3L, Juice.CONSTANT },
 			    { "'()", Lists.empty(), Juice.CONSTANT },
 				{ "{}", Maps.empty(), JUICE_EMPTY_MAP }, // (hash-map)
 				{ "(hash-map)", Maps.empty(), JUICE_EMPTY_MAP }, // (hash-map)
@@ -76,7 +76,7 @@ public class ParamTestJuice {
 
 	static {
 		try {
-			INITIAL_CONTEXT = Context.createInitial(INITIAL, TestState.HERO, INITIAL_JUICE);
+			INITIAL_CONTEXT = Context.createInitial(INITIAL, TestState.HERO_ADDRESS, INITIAL_JUICE);
 		} catch (Throwable e) {
 			throw new Error(e);
 		}

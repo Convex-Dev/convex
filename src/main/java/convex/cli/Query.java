@@ -51,7 +51,7 @@ public class Query implements Runnable {
 		Convex convex = null;
 
 		try {
-			convex = mainParent.connectToSessionPeer(hostname, port, Main.initConfigTest.HERO_ADDRESS, null);
+			convex = mainParent.connectToSessionPeer(hostname, port, Main.initConfigTest.getHeroAddress(), null);
 		} catch (Error e) {
 			log.severe(e.getMessage());
 			return;

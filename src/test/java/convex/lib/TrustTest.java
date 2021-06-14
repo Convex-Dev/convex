@@ -1,7 +1,7 @@
 package convex.lib;
 
-import static convex.core.lang.TestState.HERO;
-import static convex.core.lang.TestState.VILLAIN;
+import static convex.core.lang.TestState.HERO_ADDRESS;
+import static convex.core.lang.TestState.VILLAIN_ADDRESS;
 import static convex.test.Assertions.assertCastError;
 import static convex.test.Assertions.assertNotError;
 import static convex.test.Assertions.assertStateError;
@@ -15,10 +15,11 @@ import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.Init;
 import convex.core.data.Address;
 import convex.core.data.Keywords;
 import convex.core.data.Symbol;
+import convex.core.init.Init;
+import convex.core.init.InitConfigTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.Reader;
@@ -31,11 +32,11 @@ public class TrustTest extends ACVMTest {
 
 	private Context<?> CONTEXT;
 	protected TrustTest() throws IOException {
-		super(Init.createCoreLibraries());
+		super(Init.createCoreLibraries(InitConfigTest.create()));
 		Context<?> ctx = context();
-		
+
 		assert(ctx.getDepth()==0):"Invalid depth: "+ctx.getDepth();
-		
+
 		try {
 			ctx = ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/trust.con")));
 			assert(ctx.getDepth()==0):"Invalid depth: "+ctx.getDepth();
@@ -56,7 +57,7 @@ public class TrustTest extends ACVMTest {
 	}
 
 
-	
+
 	/**
 	 * Test that re-deployment of Fungible matches what is expected
 	 */
@@ -95,7 +96,7 @@ public class TrustTest extends ACVMTest {
 
 		{
 			// check our villain cannot upgrade the actor!
-			Address a1 = VILLAIN;
+			Address a1 = VILLAIN_ADDRESS;
 			;
 			Context<?> c = ctx.forkWithAddress(a1);
 			c = step(c, "(do (import " + trusted + " :as trust) (def wlist " + wl + "))");
@@ -153,9 +154,9 @@ public class TrustTest extends ACVMTest {
 		}
 
 		{ // check the villain is excluded
-			Address a1 = VILLAIN;
+			Address a1 = VILLAIN_ADDRESS;
 			;
-			Address a2 = HERO;
+			Address a2 = HERO_ADDRESS;
 			;
 			Context<?> c = ctx.forkWithAddress(a1);
 			c = step(c, "(do (import " + trusted + " :as trust) (def wlist (address " + wl + ")))");
@@ -176,7 +177,7 @@ public class TrustTest extends ACVMTest {
 		Context<?> ctx = CONTEXT.fork();
 
 		// deploy a blacklist with default config
-		ctx = step(ctx, "(def blist (deploy (trust/build-blacklist {:blacklist [" + VILLAIN + "]})))");
+		ctx = step(ctx, "(def blist (deploy (trust/build-blacklist {:blacklist [" + VILLAIN_ADDRESS + "]})))");
 		Address wl = (Address) ctx.getResult();
 		assertNotNull(wl);
 
@@ -184,7 +185,7 @@ public class TrustTest extends ACVMTest {
 		assertTrue(evalB(ctx, "(trust/trusted? blist *address*)"));
 
 		// our villain should be on the blacklist
-		assertFalse(evalB(ctx, "(trust/trusted? blist " + VILLAIN + ")"));
+		assertFalse(evalB(ctx, "(trust/trusted? blist " + VILLAIN_ADDRESS + ")"));
 
 		assertCastError(step(ctx, "(trust/trusted? blist nil)"));
 		assertCastError(step(ctx, "(trust/trusted? blist [])"));
@@ -211,9 +212,9 @@ public class TrustTest extends ACVMTest {
 		}
 
 		{ // check the villain is excluded
-			Address a1 = VILLAIN;
+			Address a1 = VILLAIN_ADDRESS;
 			;
-			Address a2 = HERO;
+			Address a2 = HERO_ADDRESS;
 			;
 			Context<?> c = ctx.forkWithAddress(a1);
 			c = step(c, "(do (import " + trusted + " :as trust) (def blist (address " + wl + ")))");

@@ -132,6 +132,8 @@ public class Init {
 
 		// At this point we have a raw initial state with accounts
 
+        // TODO need to fix this as these static vars are changed during this call
+
         TRUST_ADDRESS = config.getLibraryAddress(0);
 		{ // Deploy Trust library
 			Context<?> ctx = Context.createFake(s, INIT_ADDRESS);
@@ -140,7 +142,7 @@ public class Init {
 			s = ctx.getState();
 		}
 
-		// TODO need to fix this as this static var is changed during this call
+
 		REGISTRY_ADDRESS = config.getLibraryAddress(1);
 		{ // Deploy Registry Actor to fixed Address
 			Context<Address> ctx = Context.createFake(s, INIT_ADDRESS);

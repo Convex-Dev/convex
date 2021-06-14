@@ -14,10 +14,10 @@ import convex.core.lang.TestState;
 public class SigSamples {
 
 	public static void main(String[] args) {
-		
-		AKeyPair kp=TestState.HERO_KP;
+
+		AKeyPair kp=TestState.HERO_KEYPAIR;
 		AccountKey a=kp.getAccountKey();
-		
+
 		AVector<CVMLong> v=Vectors.of(1L,2L);
 		SignedData<AVector<CVMLong>> sd=kp.signData(v);
 	    System.out.println("Address: "+a);

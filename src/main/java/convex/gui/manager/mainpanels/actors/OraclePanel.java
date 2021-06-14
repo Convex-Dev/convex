@@ -49,7 +49,7 @@ public class OraclePanel extends JPanel {
 		// ===========================================
 		// Top label
 		add(new CodeLabel("Oracle at address: " + oracleAddress + "\n" + "Executing as user: "
-				+ PeerGUI.initConfigTest.HERO_ADDRESS.toString()), BorderLayout.NORTH);
+				+ PeerGUI.initConfigTest.getHeroAddress().toString()), BorderLayout.NORTH);
 
 		// ===========================================
 		// Central table

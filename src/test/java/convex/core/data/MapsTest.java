@@ -15,13 +15,13 @@ import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.Init;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
 import convex.core.lang.RT;
+import convex.core.lang.TestState;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Transfer;
 import convex.core.util.Bits;
@@ -138,24 +138,24 @@ public class MapsTest {
 		// merges.
 		assertEquals(m, m1.mergeDifferences(m2, (a, b) -> (a == null) ? b : a));
 	}
-	
+
 	@Test
 	public void regressionEmbeddedTransfer() throws BadFormatException {
-		ATransaction trans=Transfer.create(Init.HERO,0, Init.HERO, 58);
+		ATransaction trans=Transfer.create(TestState.HERO_ADDRESS,0, TestState.HERO_ADDRESS, 58);
 		CVMLong key=CVMLong.create(23771L);
 		AMap<CVMLong,ATransaction> m=Maps.create(key,trans);
 		MapEntry<CVMLong,ATransaction> me=m.entryAt(0);
 		assertEquals(key,me.getKey());
 		assertEquals(trans,me.getValue());
-		
+
 		// transaction should never be embedded
 		assertEquals(trans.isEmbedded(),me.getValueRef().isEmbedded());
-		
+
 		Blob b=m.getEncoding();
 		AMap<CVMLong,ATransaction> m2=Format.read(b);
-		
+
 		assertEquals(m,m2);
-		
+
 		Blob b2=m2.getEncoding();
 		assertEquals(b,b2);
 	}
@@ -228,10 +228,10 @@ public class MapsTest {
 	public void testFilterHex() {
 		MapLeaf<CVMLong, ACell> m = Maps.of(1, true, 2, true, 3, true, -1000, true);
 		assertEquals(4L,m.count());
-		
+
 		// TODO: selective filter
 		//assertEquals(Maps.of(3L, true), m.filterHexDigits(0, 64)); // hex digit 0 = 6 only
-		
+
 		assertSame(m, m.filterHexDigits(0, 0xFFFF)); // all digits selected
 		assertSame(Maps.empty(), m.filterHexDigits(0, 0)); // all digits selected
 	}
@@ -254,13 +254,13 @@ public class MapsTest {
 		assertEquals(50, m2.size());
 
 	}
-	
-	@Test 
+
+	@Test
 	public void testEmpty() {
 		AMap<Keyword,Keyword> m=Maps.empty();
 		assertEquals(0L,m.count());
 		assertSame(m,Maps.empty());
-		
+
 		assertEquals(2L,m.getEncoding().count());
 	}
 
@@ -292,16 +292,16 @@ public class MapsTest {
 		MapEntry<CVMLong, CVMLong> me = m.getEntry(RT.cvm(1L));
 		assertCVMEquals(1L, me.getKey());
 		assertCVMEquals(2L, me.getValue());
-		
+
 		// out of range assocs
-		assertNull( me.assoc(2, RT.cvm(3L))); 
+		assertNull( me.assoc(2, RT.cvm(3L)));
 		assertNull( me.assoc(-1, RT.cvm(0L)));
 
 		assertThrows(UnsupportedOperationException.class, () -> me.setValue(RT.cvm(6L)));
 
 		assertEquals(me, me.assoc(0, RT.cvm(1L)));
 		assertEquals(me, me.assoc(1, RT.cvm(2L)));
-		
+
 
 		assertTrue(me.contains(RT.cvm(1L)));
 		assertTrue(me.contains(RT.cvm(2L)));
@@ -346,7 +346,7 @@ public class MapsTest {
 
 		AHashMap<ACell, ACell> bm = Maps.coerce(Samples.LONG_MAP_100);
 		AHashMap<ACell, ACell> sm = Maps.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
-		
+
 		// change values in big map using small map
 		AHashMap<ACell, ACell> bm2 = bm.mergeWith(sm, (a, b) -> {
 			return (a == null) ? b : a;

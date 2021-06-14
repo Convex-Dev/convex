@@ -11,14 +11,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.Init;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.init.InitConfigTest;
 import convex.core.lang.RT;
 import convex.core.lang.TestState;
 import convex.test.Samples;
 
 public class BlobMapsTest {
+
+	protected InitConfigTest initConfigTest;
+
+	public BlobMapsTest() {
+		initConfigTest = InitConfigTest.create();
+	}
+
 	@Test
 	public void testEmpty() throws InvalidDataException {
 		BlobMap<ABlob, ACell> m = BlobMaps.empty();
@@ -37,8 +44,8 @@ public class BlobMapsTest {
 
 	@Test
 	public void testBadAssoc() throws InvalidDataException {
-		BlobMap<ABlob, CVMLong> m =BlobMaps.create(Init.HERO, RT.cvm(1L));
-		m=m.assoc(Init.VILLAIN, RT.cvm(2L));
+		BlobMap<ABlob, CVMLong> m =BlobMaps.create(initConfigTest.getHeroAddress(), RT.cvm(1L));
+		m=m.assoc(initConfigTest.getVillainAddress(), RT.cvm(2L));
 		assertEquals(2L,m.count());
 
 		assertNull(m.assoc(null, null));
@@ -196,7 +203,7 @@ public class BlobMapsTest {
 		BlobMap<AccountKey, PeerStatus> bm = TestState.STATE.getPeers();
 		doBlobMapTests(bm);
 
-		BlobMap<AccountKey, PeerStatus> fm =bm.filterValues(ps -> ps==bm.get(Init.KEYPAIRS[0].getAccountKey()));
+		BlobMap<AccountKey, PeerStatus> fm =bm.filterValues(ps -> ps==bm.get(initConfigTest.getPeerKeyPair(0).getAccountKey()));
 		assertEquals(1L,fm.count());
 	}
 

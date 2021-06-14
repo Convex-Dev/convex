@@ -14,6 +14,8 @@ import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.RecordTest;
 import convex.core.data.Ref;
+import convex.core.init.Init;
+import convex.core.init.InitConfigTest;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 
@@ -21,14 +23,15 @@ import convex.core.exceptions.InvalidDataException;
  * Tests for the State data structure
  */
 public class StateTest {
-	State INIT_STATE=Init.createState();
+	State INIT_STATE=Init.createState(InitConfigTest.create());
+    InitConfigTest initConfigTest = InitConfigTest.create();
 
 	@Test
 	public void testEmptyState() {
 		State s = State.EMPTY;
 		AVector<AccountStatus> accts = s.getAccounts();
 		assertEquals(0, accts.count());
-		
+
 		RecordTest.doRecordTests(s);
 	}
 
@@ -39,7 +42,7 @@ public class StateTest {
 		assertSame(s, s.withPeers(s.getPeers()));
 
 		s.validate();
-		
+
 		RecordTest.doRecordTests(s);
 	}
 
@@ -49,20 +52,20 @@ public class StateTest {
 		// TODO: fix this
 		// s=s.store(Keywords.STATE);
 		// assertEquals(1,s.getStore().size());
-		
+
 		assertEquals(0,s.getRef().getStatus());
 
 		Ref<State> rs = ACell.createPersisted(s);
 		assertEquals(Ref.PERSISTED, rs.getStatus());
-		
+
 		// Initial ref should now have persisted status
 		assertTrue(s.getRef().isPersisted());
 
 		Blob b = Format.encodedBlob(s);
 		State s2 = Format.read(b);
 		assertEquals(s, s2);
-		
-		AccountStatus as=s2.getAccount(Init.HERO);
+
+		AccountStatus as=s2.getAccount(initConfigTest.getHeroAddress());
 		assertNotNull(as);
 	}
 }

@@ -24,7 +24,7 @@ public class DataStructuresTest {
 
 	static {
 		try {
-			INITIAL_CONTEXT = Context.createInitial(INITIAL, TestState.HERO, INITIAL_JUICE);
+			INITIAL_CONTEXT = Context.createInitial(INITIAL, TestState.HERO_ADDRESS, INITIAL_JUICE);
 		} catch (Throwable e) {
 			throw new Error(e);
 		}
