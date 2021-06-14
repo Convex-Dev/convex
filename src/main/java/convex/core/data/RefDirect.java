@@ -6,9 +6,10 @@ import convex.core.util.Utils;
 /**
  * Ref subclass for direct in-memory references.
  * 
- * Direct Refs store the underlying value directly. As such, care must be taken
- * to ensure recursive structures do not exceed reasonable memory bounds. In
- * smart constract execution, juice limits serve this purpose.
+ * Direct Refs store the underlying value directly. 
+ * 
+ * <p>Care must be taken to ensure recursive structures do not exceed reasonable memory bounds. 
+ * In smart contract execution, juice limits serve this purpose. </p>
  * 
  * @param <T>
  */
@@ -23,12 +24,17 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 
 		this.value = value;
 	}
-
+	 
+    /**
+     * Construction function for a Direct Ref
+     * @param <T>
+     * @param value Value for the Ref
+     * @param hash Hash (may be null)
+     * @param status Status for the Ref
+     * @return New Direct Ref
+     */
 	public static <T extends ACell> RefDirect<T> create(T value, Hash hash, int status) {
 		int flags=status&Ref.STATUS_MASK;
-		if (value==null) {
-			flags|=KNOWN_EMBEDDED_MASK;
-		}
 		return new RefDirect<T>(value, hash, flags);
 	}
 
@@ -83,7 +89,7 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 			if (a.hash != null) return this.hash.equals(a.hash);
 		}
 		if (a instanceof RefDirect) {
-			// fast non-hashing check for direct objects
+			// faster, potentially non-hashing check for direct objects
 			return Utils.equals(this.value, a.getValue());
 		}
 		// fallback to computing hashes

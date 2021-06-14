@@ -98,9 +98,10 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public static final RefDirect<AList<?>> EMPTY_LIST = RefDirect.create(Lists.empty());
 	public static final RefDirect<AVector<?>> EMPTY_VECTOR = RefDirect.create(Vectors.empty());
 
-	public static final int BYTE_LENGTH = 32;
-
-	public static final int INDIRECT_ENCODING_LENGTH = 1+BYTE_LENGTH;
+	/**
+	 * Length of an external Reference encoding. Will be a tag byte plus the Hash length
+	 */
+	public static final int INDIRECT_ENCODING_LENGTH = 1+Hash.LENGTH;
 
 	
 
@@ -207,7 +208,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	}
 
 	/**
-	 * Checks if two Ref objects are equal. Equality is defined as referring to the
+	 * Checks if two Ref Values are equal. Equality is defined as referring to the
 	 * same data, i.e. have an identical hash.
 	 * 
 	 * @param a The Ref to compare with
@@ -536,8 +537,8 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	}
 
 	/**
-	 * Updates the value stored within this Ref. New value must be equal in value to the old value (identical hash), 
-	 * but may have updated internal refs etc.
+	 * Updates the value stored within this Ref. New value must be equal in value to the old value 
+	 * (identical hash), but may have updated internal refs etc.
 	 * 
 	 * @param newValue
 	 * @return Updated Ref
@@ -592,7 +593,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * Gets the encoding length for writing this Ref. Will be equal to the encoding length
 	 * of the Ref's value if embedded, otherwise INDIRECT_ENCODING_LENGTH
 	 *  
-	 * @return
+	 * @return Exact length of encoding
 	 */
 	public final long getEncodingLength() {
 		if (isEmbedded()) {
@@ -636,8 +637,10 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	}
 
 	/**
-	 * Returns true if this Ref refers to missing data, false otherwise
-	 * @return
+	 * Checks if this Ref refers to missing data, i.e. a Cell that does not exist in the
+	 * currect store.
+	 * 
+	 * @return true if this specific Ref has missing data, false otherwise.
 	 */
 	public abstract boolean isMissing();
 
