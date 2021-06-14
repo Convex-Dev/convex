@@ -6,12 +6,12 @@ import convex.core.util.Utils;
 /**
  * Ref subclass for direct in-memory references.
  * 
- * Direct Refs store the underlying value directly. 
+ * Direct Refs store the underlying value directly with a regular Java strong reference. 
  * 
  * <p>Care must be taken to ensure recursive structures do not exceed reasonable memory bounds. 
  * In smart contract execution, juice limits serve this purpose. </p>
  * 
- * @param <T>
+ * @param <T> Type of Value referenced
  */
 public class RefDirect<T extends ACell> extends Ref<T> {
 	/**
@@ -41,9 +41,9 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 	/**
 	 * Creates a direct Ref to the given value
 	 * @param <T>
-	 * @param value Any value (may be embedded or otherwise)
-	 * @param hash Hash of value, or null if not known
-	 * @return
+	 * @param value Any value (may be embedded or otherwise, but should not be null)
+	 * @param hash Hash of value's encoding, or null if not known
+	 * @return Direct Ref to Value
 	 */
 	public static <T extends ACell> RefDirect<T> create(T value, Hash hash) {
 		return create(value, hash, UNKNOWN);
@@ -51,11 +51,13 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 
 	/**
 	 * Creates a new Direct ref to the given value. Does not compute hash.
-	 * @param <T>
+	 * @param <T> Type of Value
 	 * @param value
-	 * @return
+	 * @return Direct Ref to Value
 	 */
+	@SuppressWarnings("unchecked")
 	public static <T extends ACell> RefDirect<T> create(T value) {
+		if (value==null) return (RefDirect<T>) Ref.NULL_VALUE;
 		return create(value, null, UNKNOWN);
 	}
 

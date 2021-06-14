@@ -443,6 +443,8 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		// allow space for tag, shift byte byte, 2 byte mask, embedded child refs
 		return 4 + Format.MAX_EMBEDDED_LENGTH * children.length;
 	}
+	
+	public static int MAX_ENCODING_LENGTH = 4 + Format.MAX_EMBEDDED_LENGTH * 16;
 
 	/**
 	 * Reads a ListMap from the provided ByteBuffer Assumes the header byte and count is

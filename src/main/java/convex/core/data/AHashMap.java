@@ -177,5 +177,6 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	
 	@Override
 	public abstract V get(ACell key);
+
 	
 }

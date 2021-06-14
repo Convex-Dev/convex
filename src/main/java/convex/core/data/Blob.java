@@ -24,11 +24,6 @@ public class Blob extends AArrayBlob {
 	public static final Blob NULL_ENCODING = Blob.wrap(new byte[] {Tag.NULL});
 	
 	public static final int CHUNK_LENGTH = 4096;
-	
-	/**
-	 * Maximim encoding size for a Blob
-	 */
-	public static final int MAX_ENCODING_LENGTH = 1+2+CHUNK_LENGTH;
 
 	private Blob(byte[] bytes, int offset, int length) {
 		super(bytes, offset, length);
@@ -208,6 +203,17 @@ public class Blob extends AArrayBlob {
 			return pos;
 		}
 	}
+	
+	@Override
+	public int estimatedEncodingSize() {
+		// space for tag, generous VLC length, plus raw data
+		return 1 + Format.MAX_VLC_LONG_LENGTH + length;
+	}
+	
+	/**
+	 * Maximum encoding size for a regular Blob
+	 */
+	public static int MAX_ENCODING_LENGTH=1+Format.getVLCLength(CHUNK_LENGTH)+CHUNK_LENGTH;
 
 	@Override
 	public boolean isCanonical() {
@@ -216,12 +222,6 @@ public class Blob extends AArrayBlob {
 	
 	@Override public final boolean isCVMValue() {
 		return true;
-	}
-
-	@Override
-	public int estimatedEncodingSize() {
-		// space for tag, generous VLC length, plus raw data
-		return 1 + Format.MAX_VLC_LONG_LENGTH + length;
 	}
 
 	/**
