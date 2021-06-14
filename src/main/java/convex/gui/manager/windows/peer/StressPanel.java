@@ -10,7 +10,6 @@ import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import javax.swing.JButton;
@@ -36,7 +35,6 @@ import convex.gui.components.ActionPanel;
 import convex.gui.components.PeerView;
 import convex.gui.manager.PeerGUI;
 import convex.gui.utils.Toolkit;
-import convex.net.ResultConsumer;
 
 @SuppressWarnings("serial")
 public class StressPanel extends JPanel {
@@ -92,13 +90,12 @@ public class StressPanel extends JPanel {
 		opCountSpinner = new JSpinner();
 		opCountSpinner.setModel(new SpinnerNumberModel(1, 1, 1000, 10));
 		optionPanel.add(opCountSpinner);
-		
+
 		JLabel lblNewLabel3 = new JLabel("Clients");
 		optionPanel.add(lblNewLabel3);
 		clientCountSpinner = new JSpinner();
 		clientCountSpinner.setModel(new SpinnerNumberModel(1, 1, 1, 1));
 		optionPanel.add(clientCountSpinner);
-
 
 		// =========================================
 		// Result Panel
@@ -117,40 +114,38 @@ public class StressPanel extends JPanel {
 
 	long errors = 0;
 	long values = 0;
-	
+
 	private JSplitPane splitPane;
 	private JPanel resultPanel;
 	private JTextArea resultArea;
 
 	NumberFormat formatter = new DecimalFormat("#0.000");
 
-	
 	private synchronized void runStressTest() {
 		errors = 0;
 		values = 0;
-			Address address=Init.HERO;
+		Address address = Init.HERO;
 
-			int transCount = (Integer) transactionCountSpinner.getValue();
-			int opCount = (Integer) opCountSpinner.getValue();
-			// TODO: enable multiple clients
-			// int clientCount = (Integer) opCountSpinner.getValue();
-			
-			new SwingWorker<String,Object>() {
-				@Override
-				protected String doInBackground() throws Exception {
-					StringBuilder sb = new StringBuilder();
-					
-					try {
+		int transCount = (Integer) transactionCountSpinner.getValue();
+		int opCount = (Integer) opCountSpinner.getValue();
+		// TODO: enable multiple clients
+		int clientCount = (Integer) opCountSpinner.getValue();
 
+		new SwingWorker<String, Object>() {
+			@Override
+			protected String doInBackground() throws Exception {
+				StringBuilder sb = new StringBuilder();
+
+				try {
 
 					InetSocketAddress sa = peerView.peerServer.getHostAddress();
 					long startTime = Utils.getCurrentTimestamp();
 
 					// Use client store
 					// Stores.setCurrent(Stores.CLIENT_STORE);
-					ArrayList<CompletableFuture<Result>> frs=new ArrayList<>();
-					Convex pc = Convex.connect(sa, address,Init.HERO_KP);
-					
+					ArrayList<CompletableFuture<Result>> frs = new ArrayList<>();
+					Convex pc = Convex.connect(sa, address, Init.HERO_KP);
+
 					for (int i = 0; i < transCount; i++) {
 						StringBuilder tsb = new StringBuilder();
 						tsb.append("(def a (do ");
@@ -159,56 +154,55 @@ public class StressPanel extends JPanel {
 						}
 						tsb.append("))");
 						String source = tsb.toString();
-						ATransaction t = Invoke.create(Init.HERO,-1, Reader.read(source));
+						ATransaction t = Invoke.create(Init.HERO, -1, Reader.read(source));
 						CompletableFuture<Result> fr = pc.transact(t);
 						frs.add(fr);
 					}
-					
+
 					long sendTime = Utils.getCurrentTimestamp();
 
-					List<Result> results=Utils.completeAll(frs).get(10000, TimeUnit.MILLISECONDS);
+					List<Result> results = Utils.completeAll(frs).get(10000, TimeUnit.MILLISECONDS);
 					long endTime = Utils.getCurrentTimestamp();
-					
-					for (Result r:results) {
+
+					for (Result r : results) {
 						if (r.isError()) {
 							errors++;
 						} else {
 							values++;
 						}
 					}
-					
+
 					Thread.sleep(100); // wait for state update to be reflected
 					State endState = PeerGUI.getLatestState();
 
-					
 					sb.append("Results for " + transCount + " transactions\n");
 					sb.append(values + " values received\n");
 					sb.append(errors + " errors received\n");
 					sb.append("\n");
 					sb.append("Send time:     " + formatter.format((sendTime - startTime) * 0.001) + "s\n");
 					sb.append("End time:      " + formatter.format((endTime - startTime) * 0.001) + "s\n");
-					sb.append("Consensus time: " + formatter.format((endState.getTimeStamp().longValue() - startTime) * 0.001) + "s\n");
-				
-					} catch (IOException e) {
-						e.printStackTrace();
-					} finally {
-						btnRun.setEnabled(true);
-					}
-					
-					String report=sb.toString();
-					return report;
+					sb.append("Consensus time: "
+							+ formatter.format((endState.getTimeStamp().longValue() - startTime) * 0.001) + "s\n");
+
+				} catch (IOException e) {
+					e.printStackTrace();
+				} finally {
+					btnRun.setEnabled(true);
 				}
-				
-				@Override
-				protected void done() {
-					try {
-						resultArea.setText(get());
-					} catch (Exception e) {
-						resultArea.setText(e.getMessage());
-					}
+
+				String report = sb.toString();
+				return report;
+			}
+
+			@Override
+			protected void done() {
+				try {
+					resultArea.setText(get());
+				} catch (Exception e) {
+					resultArea.setText(e.getMessage());
 				}
-			}.execute();
-			
+			}
+		}.execute();
 
 	}
 }
