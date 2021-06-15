@@ -10,18 +10,19 @@ import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
 import convex.api.Convex;
-import convex.core.Init;
+import convex.core.init.Init;
 import convex.core.State;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.gui.client.panels.HomePanel;
 import convex.gui.components.models.StateModel;
+import convex.gui.manager.PeerGUI;
 import convex.gui.manager.mainpanels.AboutPanel;
 import convex.gui.utils.Toolkit;
 
 /**
  * A Client application for the Convex Network.
- * 
+ *
  * Doesn't run a Peer. Connects to convex.world.
  */
 @SuppressWarnings("serial")
@@ -33,10 +34,10 @@ public class ConvexClient extends JPanel {
 
 	private static JFrame frame;
 
-	private static StateModel<State> latestState = StateModel.create(Init.createState());
+	private static StateModel<State> latestState = StateModel.create(Init.createState(PeerGUI.initConfig));
 
 	public static long maxBlock = 0;
-	
+
 	protected Convex convex=null;
 
 	/**
@@ -47,7 +48,7 @@ public class ConvexClient extends JPanel {
 		log.info("Running Convex Client");
 		// call to set up Look and Feel
 		Toolkit.init();
- 
+
 		EventQueue.invokeLater(new Runnable() {
 			@Override
 			public void run() {

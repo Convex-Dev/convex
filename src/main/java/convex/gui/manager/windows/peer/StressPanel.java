@@ -23,7 +23,6 @@ import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 
 import convex.api.Convex;
-import convex.core.Init;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.data.Address;
@@ -124,27 +123,25 @@ public class StressPanel extends JPanel {
 	private synchronized void runStressTest() {
 		errors = 0;
 		values = 0;
-		Address address = Init.HERO;
+		Address address=PeerGUI.initConfig.getUserAddress(0);
 
 		int transCount = (Integer) transactionCountSpinner.getValue();
 		int opCount = (Integer) opCountSpinner.getValue();
 		// TODO: enable multiple clients
-		int clientCount = (Integer) opCountSpinner.getValue();
+		// int clientCount = (Integer) opCountSpinner.getValue();
 
-		new SwingWorker<String, Object>() {
+		new SwingWorker<String,Object>() {
 			@Override
 			protected String doInBackground() throws Exception {
 				StringBuilder sb = new StringBuilder();
-
 				try {
-
 					InetSocketAddress sa = peerView.peerServer.getHostAddress();
 					long startTime = Utils.getCurrentTimestamp();
 
 					// Use client store
 					// Stores.setCurrent(Stores.CLIENT_STORE);
-					ArrayList<CompletableFuture<Result>> frs = new ArrayList<>();
-					Convex pc = Convex.connect(sa, address, Init.HERO_KP);
+					ArrayList<CompletableFuture<Result>> frs=new ArrayList<>();
+					Convex pc = Convex.connect(sa, address,PeerGUI.initConfig.getUserKeyPair(0));
 
 					for (int i = 0; i < transCount; i++) {
 						StringBuilder tsb = new StringBuilder();
@@ -154,7 +151,7 @@ public class StressPanel extends JPanel {
 						}
 						tsb.append("))");
 						String source = tsb.toString();
-						ATransaction t = Invoke.create(Init.HERO, -1, Reader.read(source));
+						ATransaction t = Invoke.create(PeerGUI.initConfig.getUserAddress(0),-1, Reader.read(source));
 						CompletableFuture<Result> fr = pc.transact(t);
 						frs.add(fr);
 					}
@@ -203,6 +200,5 @@ public class StressPanel extends JPanel {
 				}
 			}
 		}.execute();
-
 	}
 }

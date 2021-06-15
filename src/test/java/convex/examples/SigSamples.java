@@ -6,6 +6,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.init.InitConfigTest;
 import convex.core.lang.TestState;
 
 /**
@@ -14,10 +15,10 @@ import convex.core.lang.TestState;
 public class SigSamples {
 
 	public static void main(String[] args) {
-		
-		AKeyPair kp=TestState.HERO_KP;
+
+		AKeyPair kp=InitConfigTest.HERO_KEYPAIR;
 		AccountKey a=kp.getAccountKey();
-		
+
 		AVector<CVMLong> v=Vectors.of(1L,2L);
 		SignedData<AVector<CVMLong>> sd=kp.signData(v);
 	    System.out.println("Address: "+a);

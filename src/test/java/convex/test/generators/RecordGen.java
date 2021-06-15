@@ -9,6 +9,7 @@ import convex.core.Block;
 import convex.core.Constants;
 import convex.core.data.ARecord;
 import convex.core.lang.TestState;
+import convex.core.init.InitConfigTest;
 
 /**
  * Generator for binary Blobs
@@ -25,11 +26,11 @@ public class RecordGen extends Generator<ARecord> {
 		int type = r.nextInt();
 		switch (type % 8) {
 		case 0:
-			return Belief.createSingleOrder(TestState.HERO_KP);
+			return Belief.createSingleOrder(InitConfigTest.HERO_KEYPAIR);
 		case 1:
 			return TestState.STATE;
 		default:
-			return Block.of(Constants.INITIAL_TIMESTAMP,TestState.FIRST_PEER_KEY);
+			return Block.of(Constants.INITIAL_TIMESTAMP,InitConfigTest.FIRST_PEER_KEY);
 		}
 	}
 }

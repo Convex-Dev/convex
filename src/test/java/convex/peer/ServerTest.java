@@ -22,7 +22,6 @@ import org.junit.jupiter.api.Test;
 import convex.api.Convex;
 import convex.core.Belief;
 import convex.core.ErrorCodes;
-import convex.core.Init;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
@@ -37,6 +36,8 @@ import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
+import convex.core.init.Init;
+import convex.core.init.InitConfigTest;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
@@ -58,23 +59,23 @@ import etch.EtchStore;
  */
 public class ServerTest {
 
-	public static final Server server;
-	static final AKeyPair peerKeyPair;
-	static final AKeyPair keyPair;
-	static final Address HERO;
+	public static final Server SERVER;
 
 	static {
-		peerKeyPair = TestState.FIRST_PEER_KEYPAIR;
-		keyPair=TestState.HERO_KP;
-		HERO=Init.HERO;
 
 		Map<Keyword, Object> config = new HashMap<>();
 		config.put(Keywords.PORT, 0); // create new port
-		config.put(Keywords.STATE, Init.createState());
+		config.put(Keywords.STATE, Init.createState(InitConfigTest.create()));
 		config.put(Keywords.STORE, EtchStore.createTemp("server-test-store"));
-		config.put(Keywords.KEYPAIR, peerKeyPair); // use first peer keypair
+		config.put(Keywords.KEYPAIR, InitConfigTest.FIRST_PEER_KEYPAIR); // use first peer keypair
 
-		server = API.launchPeer(config);
+		SERVER = API.launchPeer(config);
+		// wait for server to be launched
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			// continue
+		}
 	}
 
 	private static final Logger log = Logger.getLogger(ServerTest.class.getName());
@@ -97,12 +98,12 @@ public class ServerTest {
 
 	@Test
 	public void testServerConnect() throws IOException, InterruptedException {
-		InetSocketAddress hostAddress=server.getHostAddress();
+		InetSocketAddress hostAddress=SERVER.getHostAddress();
 
 		// Connect to Peer Server using the current store for the client
 		Connection pc = Connection.connect(hostAddress, handler, Stores.current(), null);
 		AVector<CVMLong> v = Vectors.of(1l, 2l, 3l);
-		long id1 = pc.sendQuery(v,Init.HERO);
+		long id1 = pc.sendQuery(v,InitConfigTest.HERO_ADDRESS);
 		Utils.timeout(5000, () -> results.get(id1) != null);
 		assertEquals(v, results.get(id1));
 	}
@@ -113,43 +114,43 @@ public class ServerTest {
 //		InetSocketAddress hostAddress=server.getHostAddress();
 //		// This is a test of flooding a client connection with async messages. Should eventually throw an IOExcepion
 //		// from backpressure and *not* bring down the server.
-//		Convex convex=Convex.connect(hostAddress, Init.VILLAIN,Init.VILLAIN_KP);
+//		Convex convex=Convex.connect(hostAddress, VILLAIN_ADDRESS,Init.VILLAIN_KEYPAIR);
 //
 //		Object cmd=Reader.read("(def tmp (inc tmp))");
 //		assertThrows(IOException.class, ()-> {
 //			for (int i=0; i<1000000; i++) {
-//				convex.transact(Invoke.create(Init.VILLAIN, 0, cmd));
+//				convex.transact(Invoke.create(VILLAIN_ADDRESS, 0, cmd));
 //			}
 //		});
 //	}
 
 	@Test public void testBalanceQuery() throws IOException {
-		Convex convex=Convex.connect(server.getHostAddress(),TestState.VILLAIN,TestState.VILLAIN_KP);
+		Convex convex=Convex.connect(SERVER.getHostAddress(),InitConfigTest.VILLAIN_ADDRESS,InitConfigTest.VILLAIN_KEYPAIR);
 
 		// test the connection is still working
-		assertNotNull(convex.getBalance(Init.VILLAIN));
+		assertNotNull(convex.getBalance(InitConfigTest.VILLAIN_ADDRESS));
 	}
 
 	@Test
 	public void testConvexAPI() throws IOException, InterruptedException, ExecutionException, TimeoutException {
-		Convex convex=Convex.connect(server.getHostAddress(),TestState.VILLAIN,TestState.VILLAIN_KP);
+		Convex convex=Convex.connect(SERVER.getHostAddress(),InitConfigTest.VILLAIN_ADDRESS,InitConfigTest.VILLAIN_KEYPAIR);
 
 		Future<convex.core.Result> f=convex.query(Symbols.STAR_BALANCE);
 		convex.core.Result f2=convex.querySync(Symbols.STAR_ADDRESS);
 
-		assertEquals(Init.VILLAIN,f2.getValue());
-		assertCVMEquals(TestState.STATE.getBalance(TestState.VILLAIN),f.get().getValue());
+		assertEquals(InitConfigTest.VILLAIN_ADDRESS,f2.getValue());
+		assertCVMEquals(TestState.STATE.getBalance(InitConfigTest.VILLAIN_ADDRESS),f.get().getValue());
 	}
 
 	@Test
 	public void testMissingData() throws IOException, InterruptedException {
 
-		InetSocketAddress hostAddress=server.getHostAddress();
+		InetSocketAddress hostAddress=SERVER.getHostAddress();
 
 		// Connect to Peer Server using the current store for the client
 		AStore store=Stores.current();
 		Connection pc = Connection.connect(hostAddress, handler, store, null);
-		State s=server.getPeer().getConsensusState();
+		State s=SERVER.getPeer().getConsensusState();
 		Hash h=s.getHash();
 
 		boolean sent=pc.sendMissingData(h);
@@ -162,9 +163,9 @@ public class ServerTest {
 
 	@Test
 	public void testAcquireBelief() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
-		synchronized(ServerTest.server) {
+		synchronized(ServerTest.SERVER) {
 			// Stores.setCurrent(Stores.getGlobalStore()); // not needed?
-			InetSocketAddress hostAddress=server.getHostAddress();
+			InetSocketAddress hostAddress=SERVER.getHostAddress();
 
 			// Connect to Peer Server using the current store for the client
 			// SignedData<Belief> s=server.getPeer().getSignedBelief();
@@ -172,7 +173,7 @@ public class ServerTest {
 			//System.out.println("SignedBelief Hash="+h);
 			//System.out.println("testAcquireBelief store="+Stores.current());
 
-			Convex convex=Convex.connect(hostAddress, HERO, TestState.HERO_KP);
+			Convex convex=Convex.connect(hostAddress, InitConfigTest.HERO_ADDRESS, InitConfigTest.HERO_KEYPAIR);
 
 			Future<Result> statusFuture=convex.requestStatus();
 			Result status=statusFuture.get(10000,TimeUnit.MILLISECONDS);
@@ -195,21 +196,21 @@ public class ServerTest {
 
 	@Test
 	public void testServerTransactions() throws IOException, InterruptedException {
-		synchronized(ServerTest.server) {
-			InetSocketAddress hostAddress=server.getHostAddress();
+		synchronized(ServerTest.SERVER) {
+			InetSocketAddress hostAddress=SERVER.getHostAddress();
 
 			// Connect to Peer Server using the current store for the client
 			Connection pc = Connection.connect(hostAddress, handler, Stores.current(), null);
-			long s=server.getPeer().getConsensusState().getAccount(HERO).getSequence();
-			Address addr=HERO;
-			AKeyPair kp=keyPair;
+			long s=SERVER.getPeer().getConsensusState().getAccount(InitConfigTest.HERO_ADDRESS).getSequence();
+			Address addr=InitConfigTest.HERO_ADDRESS;
+			AKeyPair kp=InitConfigTest.HERO_KEYPAIR;
 			long id1 = checkSent(pc,kp.signData(Invoke.create(addr, s+1, Reader.read("[1 2 3]"))));
 			long id2 = checkSent(pc,kp.signData(Invoke.create(addr, s+2, Reader.read("(return 2)"))));
 			long id2a = checkSent(pc,kp.signData(Invoke.create(addr, s+2, Reader.read("22"))));
 			long id3 = checkSent(pc,kp.signData(Invoke.create(addr, s+3, Reader.read("(do (def foo :bar) (rollback 3))"))));
-			long id4 = checkSent(pc,kp.signData(Transfer.create(addr, s+4, HERO, 1000)));
+			long id4 = checkSent(pc,kp.signData(Transfer.create(addr, s+4, InitConfigTest.HERO_ADDRESS, 1000)));
 			long id5 = checkSent(pc,kp.signData(Call.create(addr, s+5, Init.REGISTRY_ADDRESS, Symbols.FOO, Vectors.of(Maps.empty()))));
-			long id6bad = checkSent(pc,kp.signData(Invoke.create(Init.VILLAIN, s+6, Reader.read("(def a 1)"))));
+			long id6bad = checkSent(pc,kp.signData(Invoke.create(InitConfigTest.VILLAIN_ADDRESS, s+6, Reader.read("(def a 1)"))));
 			long id6 = checkSent(pc,kp.signData(Invoke.create(addr, s+6, Reader.read("foo"))));
 
 			long last=id6;
@@ -218,7 +219,7 @@ public class ServerTest {
 			assertTrue(!pc.isClosed());
 
 			// wait for results to come back
-			assertFalse(Utils.timeout(10000, () -> results.containsKey(last)));
+			assertFalse(Utils.timeout(20000, () -> results.containsKey(last)));
 
 			AVector<CVMLong> v = Vectors.of(1l, 2l, 3l);
 			assertCVMEquals(v, results.get(id1));

@@ -7,17 +7,17 @@ import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.ListModel;
 
-import convex.core.Init;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.WalletEntry;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
 import convex.gui.components.WalletComponent;
+import convex.gui.manager.PeerGUI;
 
 @SuppressWarnings("serial")
 public class WalletPanel extends JPanel {
 
-	public static final WalletEntry HERO = WalletEntry.create(Init.HERO,Init.HERO_KP);
+	public static WalletEntry HERO;
 
 	private static DefaultListModel<WalletEntry> listModel = new DefaultListModel<>();;
 	ScrollyList<WalletEntry> walletList;
@@ -43,9 +43,10 @@ public class WalletPanel extends JPanel {
 		});
 
 		// inital list
+        HERO = WalletEntry.create(PeerGUI.initConfig.getUserAddress(0), PeerGUI.initConfig.getUserKeyPair(0));
 		addWalletEntry(HERO);
-		addWalletEntry(WalletEntry.create(Init.VILLAIN,Init.VILLAIN_KP));
-		addWalletEntry(WalletEntry.create(Init.FIRST_PEER,Init.KEYPAIRS[0]));
+		addWalletEntry(WalletEntry.create(PeerGUI.initConfig.getUserAddress(1), PeerGUI.initConfig.getUserKeyPair(1)));
+		addWalletEntry(WalletEntry.create(PeerGUI.initConfig.getPeerAddress(0),PeerGUI.initConfig.getPeerKeyPair(0)));
 
 		// create and add ScrollyList
 		walletList = new ScrollyList<WalletEntry>(listModel, we -> new WalletComponent(we));

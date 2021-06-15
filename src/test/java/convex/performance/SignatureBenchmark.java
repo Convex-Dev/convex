@@ -4,30 +4,31 @@ import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 
-import convex.core.Init;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.data.ABlob;
 import convex.core.data.Blobs;
 import convex.core.data.SignedData;
+import convex.core.init.InitConfigTest;
+import convex.core.lang.TestState;
 
 public class SignatureBenchmark {
 
-	private static final AKeyPair kp=Init.HERO_KP;
-	
+	private static final AKeyPair KEYPAIR=InitConfigTest.HERO_KEYPAIR;
+
 	@Benchmark
 	public void signData() {
 		ABlob b=Blobs.createRandom(16);
-		kp.signData(b);
+		KEYPAIR.signData(b);
 	}
-	
+
 	@Benchmark
 	public void signVerify() {
 		ABlob b=Blobs.createRandom(16);
-		SignedData<ABlob> sd=kp.signData(b);
+		SignedData<ABlob> sd=KEYPAIR.signData(b);
 		ASignature sig=sd.getSignature();
-		
-		sig.verify(sd.getHash(), kp.getAccountKey());
+
+		sig.verify(sd.getHash(), KEYPAIR.getAccountKey());
 	}
 
 	public static void main(String[] args) throws Exception {

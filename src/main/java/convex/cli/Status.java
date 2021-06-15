@@ -5,7 +5,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 import convex.api.Convex;
-import convex.core.Init;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.data.ABlob;
@@ -34,7 +33,7 @@ import picocli.CommandLine.ParentCommand;
 	description="Reports on the current status of the network.")
 public class Status implements Runnable {
 
-private static final Logger log = Logger.getLogger(Status.class.getName());
+	private static final Logger log = Logger.getLogger(Status.class.getName());
 
 	@ParentCommand
 	protected Main mainParent;
@@ -66,7 +65,7 @@ private static final Logger log = Logger.getLogger(Status.class.getName());
 
 		Convex convex = null;
 		try {
-			convex = mainParent.connectToSessionPeer(hostname, port, Init.HERO, Init.HERO_KP);
+			convex = mainParent.connectToSessionPeer(hostname, port, Main.initConfig.getUserAddress(0), Main.initConfig.getUserKeyPair(0));
 		} catch (Throwable t) {
 			log.severe(t.getMessage());
 			return;

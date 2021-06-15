@@ -5,7 +5,6 @@ import java.util.logging.Logger;
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
-import convex.core.Init;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -84,7 +83,7 @@ public class AccountFund implements Runnable {
 		Convex convex = null;
 		Address address = Address.create(addressNumber);
 		try {
-			convex = mainParent.connectToSessionPeer(hostname, port, Init.HERO, Init.HERO_KP);
+			convex = mainParent.connectToSessionPeer(hostname, port, Main.initConfig.getUserAddress(0), Main.initConfig.getUserKeyPair(0));
 			convex.transferSync(address, amount);
 			convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
 			Long balance = convex.getBalance(address);

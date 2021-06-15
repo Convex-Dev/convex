@@ -12,7 +12,6 @@ import java.io.IOException;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
-import convex.core.Init;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
@@ -22,42 +21,32 @@ import convex.core.data.Keyword;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
+import convex.core.init.Init;
+import convex.core.init.InitConfigTest;
 import convex.core.util.Utils;
 
 /**
  * Class for building and testing a State for the unit test suite.
- * 
+ *
  * Includes example smart contracts.
  */
 public class TestState {
 	public static final int NUM_CONTRACTS = 5;
 
-	public static final Address INIT = Init.INIT;
-	
-	public static final Address HERO = Init.HERO;
-	public static final AKeyPair HERO_KP = Init.KEYPAIRS[Init.NUM_PEERS+0];
-
-	public static final Address VILLAIN = Init.VILLAIN;
-	public static final AKeyPair VILLAIN_KP = Init.KEYPAIRS[Init.NUM_PEERS+1];
-
 	public static final Address[] CONTRACTS = new Address[NUM_CONTRACTS];
 
-	public static final AKeyPair FIRST_PEER_KEYPAIR=Init.KEYPAIRS[0];
-	public static final AccountKey FIRST_PEER_KEY=FIRST_PEER_KEYPAIR.getAccountKey();
-	
 	/**
 	 * A test state set up with a few accounts
 	 */
 	public static final State STATE;
-	
 
-	
+
 	static {
-		
+
 		try {
-			
-			State s = Init.createState();
-			Context<?> ctx = Context.createFake(s, HERO);
+
+			State s = Init.createState(InitConfigTest.create());
+			Context<?> ctx = Context.createFake(s, InitConfigTest.HERO_ADDRESS);
 			for (int i = 0; i < NUM_CONTRACTS; i++) {
 				// Construct code for each contract
 				ACell contractCode = Reader.read(
@@ -69,16 +58,16 @@ public class TestState {
 				ctx = ctx.deployActor(contractCode);
 				CONTRACTS[i] = (Address) ctx.getResult();
 			}
-								
+
 			s= ctx.getState();
 			STATE = s;
-			CONTEXT = Context.createFake(STATE, TestState.HERO);
+			CONTEXT = Context.createFake(STATE, InitConfigTest.HERO_ADDRESS);
 		} catch (Throwable e) {
 			e.printStackTrace();
 			throw new Error(e);
 		}
 	}
-	
+
 	/**
 	 * Initial juice for TestState.INITIAL_CONTEXT
 	 */
@@ -102,7 +91,7 @@ public class TestState {
 	 */
 	public static final Long TOTAL_FUNDS = Constants.MAX_SUPPLY;
 
-	
+
 
 
 	@SuppressWarnings("unchecked")
@@ -127,7 +116,7 @@ public class TestState {
 			throw Utils.sneakyThrow(e);
 		}
 	}
-	
+
 	// Deploy actor code directly into a Context
 	public static Context<?> deploy(Context<?> ctx,String actorResource) {
 		String source;
@@ -143,27 +132,27 @@ public class TestState {
 
 	@Test
 	public void testInitial() {
-		Context<?> ctx = Context.createFake(STATE,Init.HERO);
+		Context<?> ctx = Context.createFake(STATE,InitConfigTest.HERO_ADDRESS);
 		State s = ctx.getState();
 		assertEquals(STATE, s);
 		assertSame(Core.COUNT, ctx.lookup(Symbols.COUNT).getResult());
-		
+
 		assertCVMEquals(Symbols.STAR_TIMESTAMP, ctx.lookup(Symbols.STAR_TIMESTAMP).getResult());
-		
+
 		assertCVMEquals(Constants.INITIAL_TIMESTAMP, s.getTimeStamp());
 	}
 
 	@Test
 	public void testContractCall() {
-		Context<?> ctx0 = Context.createFake(STATE, HERO);
+		Context<?> ctx0 = Context.createFake(STATE, InitConfigTest.HERO_ADDRESS);
 		Address TARGET = CONTRACTS[0];
 		ctx0 = ctx0.execute(compile(ctx0, "(def target (address \"" + TARGET.toHexString() + "\"))"));
 		ctx0 = ctx0.execute(compile(ctx0, "(def hero *address*)"));
 		final Context<?> ctx = ctx0;
 
-		assertEquals(HERO, ctx.lookup(Symbols.HERO).getResult());
+		assertEquals(InitConfigTest.HERO_ADDRESS, ctx.lookup(Symbols.HERO).getResult());
 		assertEquals(Keyword.create("bar"), eval(ctx, "(call target (foo))"));
-		assertEquals(HERO, eval(ctx, "(call target (who-called-me))"));
+		assertEquals(InitConfigTest.HERO_ADDRESS, eval(ctx, "(call target (who-called-me))"));
 		assertEquals(TARGET, eval(ctx, "(call target (my-address))"));
 
 		assertEquals(0L, evalL(ctx, "(call target (my-number))"));
@@ -185,7 +174,7 @@ public class TestState {
 		if (d==null) throw new ClassCastException("Expected Double, but got: "+RT.getType(result));
 		return d.doubleValue();
 	}
-	
+
 	public static double evalD(String source) {
 		return evalD(CONTEXT,source);
 	}
@@ -200,7 +189,7 @@ public class TestState {
 	public static long evalL(String source) {
 		return evalL(CONTEXT,source);
 	}
-	
+
 	public static String evalS(String source) {
 		return eval(source).toString();
 	}
@@ -251,7 +240,7 @@ public class TestState {
 		rc = step(rc, source);
 		return (Context<T>) Context.createFake(rc.getState(), c.getAddress()).withValue(rc.getValue());
 	}
-	
+
 	@Test public void testStateSetup() {
 		assertEquals(0,CONTEXT.getDepth());
 		assertFalse(CONTEXT.isExceptional());
@@ -263,5 +252,5 @@ public class TestState {
 	public static void main(String[] args) {
 		System.out.println(Utils.ednString(STATE));
 	}
-	
+
 }

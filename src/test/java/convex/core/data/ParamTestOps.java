@@ -15,6 +15,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
+import convex.core.init.InitConfigTest;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
@@ -41,9 +42,9 @@ public class ParamTestOps {
 	@Parameterized.Parameters(name = "{index}: {0}")
 	public static Collection<Object[]> dataExamples() throws BadFormatException {
 		return Arrays
-				.asList(new Object[][] { 
+				.asList(new Object[][] {
 					    { "Constant", Constant.of(1L), RT.cvm(1L) },
-						{ "Lookup", Do.create(Def.create("foo", Constant.of(13)), 
+						{ "Lookup", Do.create(Def.create("foo", Constant.of(13)),
 								Lookup.create("foo")), RT.cvm(13) },
 						{ "Def", Def.create("foo", Constant.createString("bar")), Strings.create("bar") },
 						{ "Vector", Invoke.create("vector", Constant.createString("foo"), Constant.createString("bar")),
@@ -60,7 +61,7 @@ public class ParamTestOps {
 	@Test
 	public void testExpectedResult() {
 		long JUICE = 10000;
-		Context<?> c = Context.createInitial(INITIAL_STATE, TestState.HERO, JUICE);
+		Context<?> c = Context.createInitial(INITIAL_STATE, InitConfigTest.HERO_ADDRESS, JUICE);
 		Context<?> c2 = c.execute(op);
 
 		assertCVMEquals(expected, c2.getResult());
