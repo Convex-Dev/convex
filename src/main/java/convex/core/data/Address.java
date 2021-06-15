@@ -293,6 +293,8 @@ public class Address extends ABlob {
 	public int encodeRaw(byte[] bs, int pos) {
 		return Format.writeVLCLong(bs, pos, value);
 	}
+	
+	public static final int MAX_ENCODING_LENGTH = 1+Format.MAX_VLC_LONG_LENGTH;
 
 	@Override
 	public int getRefCount() {

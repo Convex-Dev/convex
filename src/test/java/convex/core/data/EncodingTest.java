@@ -16,7 +16,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.test.Samples;
 
-public class FormatTest {
+public class EncodingTest {
 
 	@Test public void testVLCLongLength() throws BadFormatException, BufferUnderflowException {
 		ByteBuffer bb=ByteBuffer.allocate(100);
@@ -190,5 +190,34 @@ public class FormatTest {
 		// shouldn't be allowed to write a Ref directly as a top-level message
 		// ByteBuffer b=ByteBuffer.allocate(10);
 		// assertThrows(IllegalArgumentException.class,()->Format.write(b, Ref.create("foo")));
+	}
+	
+	@Test
+	public void testMaxLengths() {
+		int ME=Format.MAX_EMBEDDED_LENGTH;
+		
+		Blob maxEmbedded=Blob.create(new byte[ME-3]); // Maximum embedded length
+		Blob notEmbedded=Blob.create(new byte[ME-2]); // Non-embedded length
+		assertTrue(maxEmbedded.isEmbedded());
+		assertFalse(notEmbedded.isEmbedded());
+		assertEquals(ME, maxEmbedded.getEncodingLength());
+		
+		// Maps
+		assertEquals(2+16*ME,MapLeaf.MAX_ENCODING_LENGTH);
+		assertEquals(4+16*ME,MapTree.MAX_ENCODING_LENGTH);
+		assertEquals(Maps.MAX_ENCODING_SIZE,MapTree.MAX_ENCODING_LENGTH);
+		
+		// Vectors
+		assertEquals(1+Format.MAX_VLC_LONG_LENGTH+17*ME,VectorLeaf.MAX_ENCODING_SIZE);
+		
+		// Blobs
+		Blob maxBlob=Blob.create(new byte[Blob.CHUNK_LENGTH]);
+		assertEquals(Blob.MAX_ENCODING_LENGTH,maxBlob.getEncodingLength());
+		assertEquals(Blob.MAX_ENCODING_LENGTH,Blobs.MAX_ENCODING_LENGTH);
+		
+		// Address
+		Address maxAddress=Address.create(Long.MAX_VALUE);
+		assertEquals(1+Format.MAX_VLC_LONG_LENGTH,Address.MAX_ENCODING_LENGTH);
+		assertEquals(Address.MAX_ENCODING_LENGTH,maxAddress.getEncodingLength());
 	}
 }

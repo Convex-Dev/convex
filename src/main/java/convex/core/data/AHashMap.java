@@ -136,15 +136,15 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	/**
 	 * Returns true if this map contains all the same keys as another map
 	 * @param map
-	 * @return
+	 * @return True if this map contains all the keys of the other
 	 */
 	public abstract boolean containsAllKeys(AHashMap<K, V> map);
 
 	/**
 	 * Writes this HashMap to a byte array. Will include values by default.
-	 * @param bs Byte array
-	 * @param pos Position to write in byte array
-	 * @return
+	 * @param bs Byte array to encode into
+	 * @param pos Start position to encode at
+	 * @return Updated position
 	 */
 	public abstract int encode(byte[] bs, int pos);
 	
@@ -153,7 +153,7 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	 * @param bs Byte array
 	 * @param pos Position to write in byte array
 	 * @param includeValues True to include values, false to exclude
-	 * @return
+	 * @return Updated position
 	 */
 	public abstract int write(byte[] bs, int pos, boolean includeValues);
 	
@@ -162,7 +162,7 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	 * @param bs Byte array
 	 * @param pos Position to write in byte array
 	 * @param includeValues True to include values, false to exclude
-	 * @return
+	 * @return Updated position
 	 */
 	public abstract int writeRaw(byte[] bs, int pos, boolean includeValues);
 
@@ -177,5 +177,6 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	
 	@Override
 	public abstract V get(ACell key);
+
 	
 }

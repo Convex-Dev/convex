@@ -6,11 +6,12 @@ import convex.core.util.Utils;
 /**
  * Ref subclass for direct in-memory references.
  * 
- * Direct Refs store the underlying value directly. As such, care must be taken
- * to ensure recursive structures do not exceed reasonable memory bounds. In
- * smart constract execution, juice limits serve this purpose.
+ * Direct Refs store the underlying value directly with a regular Java strong reference. 
  * 
- * @param <T>
+ * <p>Care must be taken to ensure recursive structures do not exceed reasonable memory bounds. 
+ * In smart contract execution, juice limits serve this purpose. </p>
+ * 
+ * @param <T> Type of Value referenced
  */
 public class RefDirect<T extends ACell> extends Ref<T> {
 	/**
@@ -23,21 +24,26 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 
 		this.value = value;
 	}
-
+	 
+    /**
+     * Construction function for a Direct Ref
+     * @param <T>
+     * @param value Value for the Ref
+     * @param hash Hash (may be null)
+     * @param status Status for the Ref
+     * @return New Direct Ref
+     */
 	public static <T extends ACell> RefDirect<T> create(T value, Hash hash, int status) {
 		int flags=status&Ref.STATUS_MASK;
-		if (value==null) {
-			flags|=KNOWN_EMBEDDED_MASK;
-		}
 		return new RefDirect<T>(value, hash, flags);
 	}
 
 	/**
 	 * Creates a direct Ref to the given value
 	 * @param <T>
-	 * @param value Any value (may be embedded or otherwise)
-	 * @param hash Hash of value, or null if not known
-	 * @return
+	 * @param value Any value (may be embedded or otherwise, but should not be null)
+	 * @param hash Hash of value's encoding, or null if not known
+	 * @return Direct Ref to Value
 	 */
 	public static <T extends ACell> RefDirect<T> create(T value, Hash hash) {
 		return create(value, hash, UNKNOWN);
@@ -45,11 +51,13 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 
 	/**
 	 * Creates a new Direct ref to the given value. Does not compute hash.
-	 * @param <T>
+	 * @param <T> Type of Value
 	 * @param value
-	 * @return
+	 * @return Direct Ref to Value
 	 */
+	@SuppressWarnings("unchecked")
 	public static <T extends ACell> RefDirect<T> create(T value) {
+		if (value==null) return (RefDirect<T>) Ref.NULL_VALUE;
 		return create(value, null, UNKNOWN);
 	}
 
@@ -83,7 +91,7 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 			if (a.hash != null) return this.hash.equals(a.hash);
 		}
 		if (a instanceof RefDirect) {
-			// fast non-hashing check for direct objects
+			// faster, potentially non-hashing check for direct objects
 			return Utils.equals(this.value, a.getValue());
 		}
 		// fallback to computing hashes

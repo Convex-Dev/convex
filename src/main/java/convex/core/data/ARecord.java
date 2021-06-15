@@ -344,8 +344,8 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	}
 
 	/**
-	 * Gets the RecordFromat instance that describes this Record's layout
-	 * @return
+	 * Gets the RecordFormat instance that describes this Record's layout
+	 * @return RecordFormat instance
 	 */
 	public RecordFormat getFormat() {
 		return format;

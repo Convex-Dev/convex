@@ -280,9 +280,10 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 
 	@Override
 	public int estimatedEncodingSize() {
-		// allow space for header, reasonable length, 33 bytes per element ref plus tail
-		// ref
-		return 1 + 9 + Format.MAX_EMBEDDED_LENGTH * items.length + ((count > 16) ? 33 : 00);
+		// allow space for header of reasonable length
+		// Estimate 64 bytes per element ref (plus space for tail/ other overhead)
+		int ESTIMATED_REF_SIZE=70;
+		return 1 + 9 + ESTIMATED_REF_SIZE * (items.length + 1);
 	}
 	
 	@Override
@@ -298,6 +299,8 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 		}
 		return length;
 	}
+	
+	public static int MAX_ENCODING_SIZE = 1 + Format.MAX_VLC_LONG_LENGTH + Format.MAX_EMBEDDED_LENGTH * (MAX_SIZE+1);
 
 	/**
 	 * Returns true if this ListVector has a prefix AVector.

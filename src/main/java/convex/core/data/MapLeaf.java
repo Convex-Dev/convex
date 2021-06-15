@@ -351,6 +351,8 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		// allow space for header, size byte, 2 refs per entry
 		return 2 + 2* Format.MAX_EMBEDDED_LENGTH * size();
 	}
+	
+	public static int MAX_ENCODING_LENGTH=  2 + 2 * MAX_ENTRIES * Format.MAX_EMBEDDED_LENGTH;
 
 	/**
 	 * Reads a MapLeaf from the provided ByteBuffer Assumes the header byte is

@@ -160,5 +160,8 @@ public class Maps {
 			return MapTree.read(bb, count,false);
 		}
 	}
+	
+	public static int MAX_ENCODING_SIZE = Math.max(MapTree.MAX_ENCODING_LENGTH, MapLeaf.MAX_ENCODING_LENGTH);
+
 
 }
