@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.Constants;
 import convex.core.data.Address;
 import convex.core.data.Symbol;
-import convex.core.init.Init;
+import convex.core.init.InitConfigTest;
 import convex.core.lang.Context;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
@@ -53,11 +53,11 @@ public class NFTTest {
 		Context<?> c=ctx.fork();
 		assertEquals(0L,ctx.getDepth());
 		// set up p2 as a zombie account
-		c=step(c,"(def p2 (address "+TestState.INIT_CONFIG_TEST.getVillainAddress()+"))");
-		c=TestState.stepAs(TestState.INIT_CONFIG_TEST.getVillainAddress(),c,"(do "
+		c=step(c,"(def p2 (address "+InitConfigTest.VILLAIN_ADDRESS+"))");
+		c=TestState.stepAs(InitConfigTest.VILLAIN_ADDRESS,c,"(do "
 				+ "(import convex.asset :as asset)\r\n"
 				+ "(import convex.nft-tokens :as nft)\r\n"
-				+ "(set-controller "+TestState.INIT_CONFIG_TEST.getHeroAddress()+"))");
+				+ "(set-controller "+InitConfigTest.HERO_ADDRESS+"))");
 
 		c=c.withJuice(Constants.MAX_TRANSACTION_JUICE); //ensure enough juice
 		c=Testing.runTests(c,"contracts/nft/test2.con");

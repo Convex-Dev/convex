@@ -24,7 +24,6 @@ import convex.core.exceptions.InvalidDataException;
  */
 public class StateTest {
 	State INIT_STATE=Init.createState(InitConfigTest.create());
-    InitConfigTest initConfigTest = InitConfigTest.create();
 
 	@Test
 	public void testEmptyState() {
@@ -65,7 +64,7 @@ public class StateTest {
 		State s2 = Format.read(b);
 		assertEquals(s, s2);
 
-		AccountStatus as=s2.getAccount(initConfigTest.getHeroAddress());
+		AccountStatus as=s2.getAccount(InitConfigTest.HERO_ADDRESS);
 		assertNotNull(as);
 	}
 }

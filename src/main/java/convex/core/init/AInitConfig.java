@@ -30,8 +30,9 @@ public abstract class AInitConfig {
 
 	private static final Logger log = Logger.getLogger(AInitConfig.class.getName());
 
-	protected AKeyPair userKeyPairs[]  = new AKeyPair[0];
-	protected AKeyPair peerKeyPairs[]  = new AKeyPair[0];
+	protected AKeyPair userKeyPairs[];
+	protected AKeyPair peerKeyPairs[];
+
 
 	public int getUserCount() {
 		return userKeyPairs.length;
@@ -52,11 +53,11 @@ public abstract class AInitConfig {
     }
 
 	public Address getUserAddress(int index) {
-		return Address.create(Init.BASE_FIRST_ADDRESS.longValue() + index);
+		return Init.calcAddress(0, 0, index);
 	}
 
 	public Address getPeerAddress(int index) {
-		return Address.create(Init.BASE_FIRST_ADDRESS.longValue() + getUserCount() + index);
+		return Init.calcAddress(getUserCount(), 0, index);
 	}
 
 	public Address[] getPeerAddressList() {
@@ -68,7 +69,7 @@ public abstract class AInitConfig {
 	}
 
 	public Address getLibraryAddress(int index) {
-		return Address.create(Init.BASE_FIRST_ADDRESS.longValue() + getUserCount() + getPeerCount() + index);
+		return Init.calcAddress(getUserCount(), getPeerCount(), index);
 	}
 
 }

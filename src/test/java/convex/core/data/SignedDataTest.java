@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
+import convex.core.init.InitConfigTest;
 import convex.core.lang.RT;
 import convex.core.lang.TestState;
 import convex.test.Samples;
@@ -36,7 +37,7 @@ public class SignedDataTest {
 	public void testEmbeddedSignature() throws BadSignatureException {
 		CVMLong cl=RT.cvm(158587);
 
-		AKeyPair kp = TestState.HERO_KEYPAIR;
+		AKeyPair kp = InitConfigTest.HERO_KEYPAIR;
 		SignedData<CVMLong> sd = kp.signData(cl);
 
 		assertTrue(sd.isValid());
@@ -49,14 +50,14 @@ public class SignedDataTest {
 
 	@Test
 	public void testNullValueSignings() throws BadSignatureException {
-		SignedData<ACell> sd = SignedData.create(TestState.HERO_KEYPAIR, null);
+		SignedData<ACell> sd = SignedData.create(InitConfigTest.HERO_KEYPAIR, null);
 		assertNull(sd.getValue());
 		assertTrue(sd.checkSignature());
 	}
 
 	@Test
 	public void testDataStructureSignature() throws BadSignatureException {
-		AKeyPair kp = TestState.HERO_KEYPAIR;
+		AKeyPair kp = InitConfigTest.HERO_KEYPAIR;
 		AVector<CVMLong> v = Vectors.of(1L, 2L, 3L);
 		SignedData<AVector<CVMLong>> sd = kp.signData(v);
 

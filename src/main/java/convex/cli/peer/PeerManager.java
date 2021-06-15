@@ -56,7 +56,7 @@ public class PeerManager implements IServerEvent {
 	}
 
 	public void launchLocalPeers(int count) {
-		peerServerList = API.launchLocalPeers(count, Main.initConfigTest, this);
+		peerServerList = API.launchLocalPeers(count, Main.initConfig, this);
 	}
 
     public void launchPeer(AKeyPair keyPair, Address peerAddress, String hostname, int port, AStore store) {

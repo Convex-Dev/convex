@@ -44,7 +44,7 @@ public class PeersListPanel extends JPanel {
 	private static final Logger log = Logger.getLogger(PeersListPanel.class.getName());
 
 	public void launchAllPeers(PeerGUI manager) {
-		List<Server> serverList = API.launchLocalPeers(PeerGUI.initConfigTest.NUM_PEERS, PeerGUI.initConfigTest, null);
+		List<Server> serverList = API.launchLocalPeers(PeerGUI.initConfig.getPeerCount(), PeerGUI.initConfig, null);
 		for (Server server: serverList) {
 			PeerView peer = new PeerView();
 			peer.peerServer = server;
@@ -101,7 +101,7 @@ public class PeersListPanel extends JPanel {
 			Convex pc;
 			try {
 				// TODO: we want to receive anything?
-				pc = Convex.connect(hostAddress, PeerGUI.initConfigTest.getHeroAddress(),null);
+				pc = Convex.connect(hostAddress, PeerGUI.initConfig.getUserAddress(0),null);
 				PeerView pv = new PeerView();
 				pv.peerConnection = pc;
 				addPeer(pv);

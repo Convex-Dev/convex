@@ -50,7 +50,14 @@ public class Init {
 
 	public static final Address BASE_FIRST_ADDRESS = Address.create(9);
 
-	public static Address TRUST_ADDRESS;
+	public static final int TRUST_LIBRARY_INDEX = 0;
+	public static final int REGISTRY_LIBRARY_INDEX = 1;
+
+	public static int BASE_USER_ADDRESS;
+	public static int BASE_PEER_ADDRESS;
+	public static int BASE_LIBRARY_ADDRESS;
+
+    public static Address TRUST_ADDRESS;
 	public static Address REGISTRY_ADDRESS;
 
 	public static State createBaseAccounts(AInitConfig config) {
@@ -84,6 +91,7 @@ public class Init {
 		// Core library
 		accts = addCoreLibrary(accts, CORE_ADDRESS);
 		// Core Account should now be fully initialised
+		BASE_USER_ADDRESS = accts.size();
 
 		// Set up initial user accounts
 		for (int i = 0; i < config.getUserCount(); i++) {
@@ -95,6 +103,9 @@ public class Init {
 
 		// Finally add peers
 		// Set up initial peers
+
+		BASE_PEER_ADDRESS = accts.size();
+
 		for (int i = 0; i < config.getPeerCount(); i++) {
 			AKeyPair kp = config.getPeerKeyPair(i);
 			AccountKey peerKey = kp.getAccountKey();
@@ -110,6 +121,8 @@ public class Init {
             // split peer funds between stake and account
 			peers = addPeer(peers, peerKey, peerAddress, stakedFunds);
 		}
+
+		BASE_LIBRARY_ADDRESS = accts.size();
 
 		// Build globals
 		AVector<ACell> globals = Constants.INITIAL_GLOBALS;
@@ -134,7 +147,8 @@ public class Init {
 
         // TODO need to fix this as these static vars are changed during this call
 
-        TRUST_ADDRESS = config.getLibraryAddress(0);
+
+        TRUST_ADDRESS = config.getLibraryAddress(TRUST_LIBRARY_INDEX);
 		{ // Deploy Trust library
 			Context<?> ctx = Context.createFake(s, INIT_ADDRESS);
 			ctx = ctx.deployActor(TRUST_CODE);
@@ -143,7 +157,7 @@ public class Init {
 		}
 
 
-		REGISTRY_ADDRESS = config.getLibraryAddress(1);
+		REGISTRY_ADDRESS = config.getLibraryAddress(REGISTRY_LIBRARY_INDEX);
 		{ // Deploy Registry Actor to fixed Address
 			Context<Address> ctx = Context.createFake(s, INIT_ADDRESS);
 			ctx = ctx.deployActor(REGISTRY_CODE);
@@ -228,6 +242,11 @@ public class Init {
 			throw new Error(e);
 		}
 	}
+
+	public static Address calcAddress(int userCount, int peerCount, int index) {
+		return Address.create(BASE_FIRST_ADDRESS.longValue() + userCount + peerCount + index);
+	}
+
 
 	private static State doActorDeploy(State s, String name, String resource) {
 		Context<Address> ctx = Context.createFake(s, INIT_ADDRESS);

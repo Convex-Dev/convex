@@ -71,10 +71,10 @@ public class AccountCreate implements Runnable {
 		Convex convex = null;
 		try {
 			convex = mainParent.connectToSessionPeer(
-                hostname,
-                port,
-                Main.initConfigTest.getHeroAddress(),
-                Main.initConfigTest.getHeroKeyPair());
+				hostname,
+				port,
+				Main.initConfig.getUserAddress(0),
+				Main.initConfig.getUserKeyPair(0));
 			Address address = convex.createAccount(keyPair.getAccountKey());
 			log.info("account address: " + address);
 			if (isFund) {

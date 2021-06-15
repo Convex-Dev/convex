@@ -97,7 +97,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testAddress() {
-		Address a = HERO_ADDRESS;
+		Address a = InitConfigTest.HERO_ADDRESS;
 		assertEquals(a, eval("(address \"" + a.toHexString() + "\")"));
 		assertEquals(a, eval("(address 0x" + a.toHexString() + ")"));
 		assertEquals(a, eval("(address (address \"" + a.toHexString() + "\"))"));
@@ -548,7 +548,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Sets.of(1L, 3L, 5L), eval("(set (keys {1 2 3 4 5 6}))"));
 
 		assertEquals(Vectors.empty(),RT.keys(BlobMaps.empty()));
-		assertEquals(Vectors.of(HERO_ADDRESS),RT.keys(BlobMap.of(HERO_ADDRESS, 1L)));
+		assertEquals(Vectors.of(InitConfigTest.HERO_ADDRESS),RT.keys(BlobMap.of(InitConfigTest.HERO_ADDRESS, 1L)));
 
 		assertCastError(step("(keys 1)"));
 		assertCastError(step("(keys [])"));
@@ -1993,11 +1993,11 @@ public class CoreTest extends ACVMTest {
 
 		// hero balance, should reflect cost of initial juice
 		Long expectedHeroBalance = HERO_BALANCE;
-		assertEquals(expectedHeroBalance, evalL("(let [a (address " + HERO_ADDRESS + ")] (balance a))"));
+		assertEquals(expectedHeroBalance, evalL("(let [a (address " + InitConfigTest.HERO_ADDRESS + ")] (balance a))"));
 
 		// someone else's balance
 		Long expectedVillainBalance = VILLAIN_BALANCE;
-		assertEquals(expectedVillainBalance, evalL("(let [a (address " + VILLAIN_ADDRESS + ")] (balance a))"));
+		assertEquals(expectedVillainBalance, evalL("(let [a (address " + InitConfigTest.VILLAIN_ADDRESS + ")] (balance a))"));
 
 		assertCastError(step("(balance nil)"));
 		assertCastError(step("(balance 0x00)"));
@@ -2172,7 +2172,7 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB(ctx,"(account? *registry*)"));
 
 		// standard actors are accounts
-		assertTrue(evalB(ctx,"(account? "+HERO_ADDRESS+")"));
+		assertTrue(evalB(ctx,"(account? "+InitConfigTest.HERO_ADDRESS+")"));
 
 		// a fake address
 		assertFalse(evalB(ctx,"(account? 77777777)"));
@@ -2238,9 +2238,9 @@ public class CoreTest extends ACVMTest {
 		assertNull(ctx.getResult());
 		assertNull(eval(ctx,"*key*"));
 
-		ctx=step(ctx,"(set-key "+HERO_KEYPAIR.getAccountKey()+")");
-		assertEquals(HERO_KEYPAIR.getAccountKey(),ctx.getResult());
-		assertEquals(HERO_KEYPAIR.getAccountKey(),eval(ctx,"*key*"));
+		ctx=step(ctx,"(set-key "+InitConfigTest.HERO_KEYPAIR.getAccountKey()+")");
+		assertEquals(InitConfigTest.HERO_KEYPAIR.getAccountKey(),ctx.getResult());
+		assertEquals(InitConfigTest.HERO_KEYPAIR.getAccountKey(),eval(ctx,"*key*"));
 	}
 
 	@Test
@@ -2278,12 +2278,12 @@ public class CoreTest extends ACVMTest {
 		{
 			Context<CVMLong> ctx=step("(transfer-memory *address* 1337)");
 			assertEquals(1337L, ctx.getResult().longValue());
-			assertEquals(ALL, ctx.getAccountStatus(HERO_ADDRESS).getMemory());
+			assertEquals(ALL, ctx.getAccountStatus(InitConfigTest.HERO_ADDRESS).getMemory());
 		}
 
-		assertEquals(ALL-1337, step("(transfer-memory "+VILLAIN_ADDRESS+" 1337)").getAccountStatus(HERO_ADDRESS).getMemory());
+		assertEquals(ALL-1337, step("(transfer-memory "+InitConfigTest.VILLAIN_ADDRESS+" 1337)").getAccountStatus(InitConfigTest.HERO_ADDRESS).getMemory());
 
-		assertEquals(0L, step("(transfer-memory "+VILLAIN_ADDRESS+" "+ALL+")").getAccountStatus(HERO_ADDRESS).getMemory());
+		assertEquals(0L, step("(transfer-memory "+InitConfigTest.VILLAIN_ADDRESS+" "+ALL+")").getAccountStatus(InitConfigTest.HERO_ADDRESS).getMemory());
 
 		assertArgumentError(step("(transfer-memory *address* -1000)"));
 		assertNobodyError(step("(transfer-memory #88888888 0)"));
@@ -2349,7 +2349,7 @@ public class CoreTest extends ACVMTest {
 
 		// transfer to self. Note juice already accounted for in context.
 		assertEquals(1337L, evalL("(transfer *address* 1337)")); // should return transfer amount
-		assertEquals(BAL, step("(transfer *address* 1337)").getBalance(HERO_ADDRESS));
+		assertEquals(BAL, step("(transfer *address* 1337)").getBalance(InitConfigTest.HERO_ADDRESS));
 
 		// transfers to an address that doesn't exist
 		{
@@ -2359,14 +2359,14 @@ public class CoreTest extends ACVMTest {
 
 
 		// String representing a new User Address
-		Context<Address> ctx=step("(create-account "+HERO_KEYPAIR.getAccountKey()+")");
+		Context<Address> ctx=step("(create-account "+InitConfigTest.HERO_KEYPAIR.getAccountKey()+")");
 		Address naddr=ctx.getResult();
 
 		// transfers to a new address
 		{
 			Context<?> nc1=step(ctx,"(transfer "+naddr+" 1337)");
 			assertCVMEquals(1337L, nc1.getResult());
-			assertEquals(BAL - 1337,nc1.getBalance(HERO_ADDRESS));
+			assertEquals(BAL - 1337,nc1.getBalance(InitConfigTest.HERO_ADDRESS));
 			assertEquals(1337L, evalL(nc1,"(balance "+naddr+")"));
 		}
 
@@ -2374,7 +2374,7 @@ public class CoreTest extends ACVMTest {
 				+ "   (not (= *balance* (transfer a 1337))))"));
 
 		// transfer it all!
-		assertEquals(0L,step(ctx,"(transfer "+naddr+" *balance*)").getBalance(HERO_ADDRESS));
+		assertEquals(0L,step(ctx,"(transfer "+naddr+" *balance*)").getBalance(InitConfigTest.HERO_ADDRESS));
 
 		// Should never be possible to transfer negative amounts
 		assertArgumentError(step("(transfer *address* -1000)"));
@@ -2395,10 +2395,9 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testStake() {
-		AccountKey FIRST_PEER=FIRST_PEER_KEYPAIR.getAccountKey();
-		Context<ACell> ctx=step(INITIAL_CONTEXT,"(def my-peer 0x"+FIRST_PEER.toHexString()+")");
-		AccountKey MY_PEER=FIRST_PEER;
-		long PS=ctx.getState().getPeer(FIRST_PEER).getOwnStake();
+		Context<ACell> ctx=step(INITIAL_CONTEXT,"(def my-peer 0x"+InitConfigTest.FIRST_PEER_KEY.toHexString()+")");
+		AccountKey MY_PEER=InitConfigTest.FIRST_PEER_KEY;
+		long PS=ctx.getState().getPeer(InitConfigTest.FIRST_PEER_KEY).getOwnStake();
 
 		{
 			// simple case of staking 1000000 on first peer of the realm
@@ -2426,28 +2425,27 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testSetPeerData() {
-		AccountKey FIRST_PEER_KEY=FIRST_PEER_KEYPAIR.getAccountKey();
 		String newHostname = "new_hostname:1234";
 		Context<?> ctx=INITIAL_CONTEXT;
-		ctx=ctx.forkWithAddress(FIRST_PEER_ADDRESS);
+		ctx=ctx.forkWithAddress(InitConfigTest.FIRST_PEER_ADDRESS);
 		{
 			// make sure we are using the FIRST_PPER adderss
 			ctx=step(ctx,"(set-peer-data {:url \"" + newHostname + "\"})");
 			assertNotError(ctx);
-			assertEquals(newHostname,ctx.getState().getPeer(FIRST_PEER_KEY).getHostname().toString());
+			assertEquals(newHostname,ctx.getState().getPeer(InitConfigTest.FIRST_PEER_KEY).getHostname().toString());
 			ctx=step(ctx,"(set-peer-data {})");
 			assertNotError(ctx);
 			// no change to data
-			assertEquals(newHostname,ctx.getState().getPeer(FIRST_PEER_KEY).getHostname().toString());
+			assertEquals(newHostname,ctx.getState().getPeer(InitConfigTest.FIRST_PEER_KEY).getHostname().toString());
         }
 
-		ctx=ctx.forkWithAddress(VILLAIN_ADDRESS);
+		ctx=ctx.forkWithAddress(InitConfigTest.VILLAIN_ADDRESS);
 		{
 			newHostname = "set-key-hijack";
-			ctx=step(ctx,"(do (set-key 0x" + FIRST_PEER_KEY.toHexString() + ")(set-peer-data {:url \"" + newHostname + "\"}))");
+			ctx=step(ctx,"(do (set-key 0x" + InitConfigTest.FIRST_PEER_KEY.toHexString() + ")(set-peer-data {:url \"" + newHostname + "\"}))");
 			assertStateError(ctx);
 		}
-		ctx=ctx.forkWithAddress(FIRST_PEER_ADDRESS);
+		ctx=ctx.forkWithAddress(InitConfigTest.FIRST_PEER_ADDRESS);
 		assertCastError(step(ctx,"(set-peer-data 0x1234567812345678123456781234567812345678123456781234567812345678)"));
 		assertCastError(step(ctx,"(set-peer-data :bad-key)"));
 		assertArityError(step(ctx,"(set-peer-data {:url \"test\" :bad-key 1234})"));
@@ -3115,13 +3113,13 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testEvalAsTrustedUser() {
-		Context<ACell> ctx=step("(set-controller "+VILLAIN_ADDRESS+")");
-		ctx=ctx.forkWithAddress(VILLAIN_ADDRESS);
-		ctx=step(ctx,"(def hero "+HERO_ADDRESS+")");
+		Context<ACell> ctx=step("(set-controller "+InitConfigTest.VILLAIN_ADDRESS+")");
+		ctx=ctx.forkWithAddress(InitConfigTest.VILLAIN_ADDRESS);
+		ctx=step(ctx,"(def hero "+InitConfigTest.HERO_ADDRESS+")");
 
 		assertEquals(3L, evalL(ctx,"(eval-as hero '(+ 1 2))"));
-		assertEquals(HERO_ADDRESS, eval(ctx,"(eval-as hero '*address*)"));
-		assertEquals(VILLAIN_ADDRESS, eval(ctx,"(eval-as hero '*caller*)"));
+		assertEquals(InitConfigTest.HERO_ADDRESS, eval(ctx,"(eval-as hero '*address*)"));
+		assertEquals(InitConfigTest.VILLAIN_ADDRESS, eval(ctx,"(eval-as hero '*caller*)"));
 		assertEquals(Keywords.FOO, eval(ctx,"(eval-as hero '(return :foo))"));
 		assertEquals(Keywords.FOO, eval(ctx,"(eval-as hero '(halt :foo))"));
 		assertEquals(Keywords.FOO, eval(ctx,"(eval-as hero '(rollback :foo))"));
@@ -3132,8 +3130,8 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testEvalAsUntrustedUser() {
 		Context<?> ctx=step("(set-controller nil)");
-		ctx=ctx.forkWithAddress(VILLAIN_ADDRESS);
-		ctx=step(ctx,"(def hero "+HERO_ADDRESS+")");
+		ctx=ctx.forkWithAddress(InitConfigTest.VILLAIN_ADDRESS);
+		ctx=step(ctx,"(def hero "+InitConfigTest.HERO_ADDRESS+")");
 
 		assertTrustError(step(ctx,"(eval-as hero '(+ 1 2))"));
 		assertTrustError(step(ctx,"(eval-as (address hero) '(+ 1 2))"));
@@ -3142,12 +3140,12 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testEvalAsWhitelistedUser() {
 		// create trust monitor that allows VILLAIN
-		Context<?> ctx=step("(deploy '(do (defn check-trusted? [s a o] (= s (address "+VILLAIN_ADDRESS+"))) (export check-trusted?)))");
+		Context<?> ctx=step("(deploy '(do (defn check-trusted? [s a o] (= s (address "+InitConfigTest.VILLAIN_ADDRESS+"))) (export check-trusted?)))");
 		Address monitor = (Address) ctx.getResult();
 		ctx=step(ctx,"(set-controller "+monitor+")");
 
-		ctx=ctx.forkWithAddress(VILLAIN_ADDRESS);
-		ctx=step(ctx,"(def hero "+HERO_ADDRESS+")");
+		ctx=ctx.forkWithAddress(InitConfigTest.VILLAIN_ADDRESS);
+		ctx=step(ctx,"(def hero "+InitConfigTest.HERO_ADDRESS+")");
 
 		assertEquals(3L, evalL(ctx,"(eval-as hero '(+ 1 2))"));
 	}
@@ -3155,7 +3153,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testQuery() {
 		Context<AVector<ACell>> ctx=step("(query (def a 10) [*address* *origin* *caller* 10])");
-		assertEquals(Vectors.of(HERO_ADDRESS,HERO_ADDRESS,null,10L), ctx.getResult());
+		assertEquals(Vectors.of(InitConfigTest.HERO_ADDRESS,InitConfigTest.HERO_ADDRESS,null,10L), ctx.getResult());
 
 		// shouldn't be possible to mutate surrounding environment in query
 		assertEquals(10L,evalL("(let [a 3] (+ (query (set! a 5) (+ a 2)) a) )"));
@@ -3193,12 +3191,12 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testEvalAsNotWhitelistedUser() {
 		// create trust monitor that allows HERO only
-		Context<?> ctx=step("(deploy '(do (defn check-trusted? [s a o] (= s (address "+HERO_ADDRESS+"))) (export check-trusted?)))");
+		Context<?> ctx=step("(deploy '(do (defn check-trusted? [s a o] (= s (address "+InitConfigTest.HERO_ADDRESS+"))) (export check-trusted?)))");
 		Address monitor = (Address) ctx.getResult();
 		ctx=step(ctx,"(set-controller "+monitor+")");
 
-		ctx=ctx.forkWithAddress(VILLAIN_ADDRESS);
-		ctx=step(ctx,"(def hero "+HERO_ADDRESS+")");
+		ctx=ctx.forkWithAddress(InitConfigTest.VILLAIN_ADDRESS);
+		ctx=step(ctx,"(def hero "+InitConfigTest.HERO_ADDRESS+")");
 
 		assertTrustError(step(ctx,"(eval-as hero '(+ 1 2))"));
 	}
@@ -3206,8 +3204,8 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testSetController() {
 		// set-controller returns new controller
-		assertEquals(VILLAIN_ADDRESS, eval("(set-controller "+VILLAIN_ADDRESS+")"));
-		assertEquals(VILLAIN_ADDRESS, eval("(set-controller (address "+VILLAIN_ADDRESS+"))"));
+		assertEquals(InitConfigTest.VILLAIN_ADDRESS, eval("(set-controller "+InitConfigTest.VILLAIN_ADDRESS+")"));
+		assertEquals(InitConfigTest.VILLAIN_ADDRESS, eval("(set-controller (address "+InitConfigTest.VILLAIN_ADDRESS+"))"));
 		assertEquals(null, (Address)eval("(set-controller nil)"));
 
 		assertNobodyError(step("(set-controller #666666)")); // non-existent account
@@ -3242,11 +3240,11 @@ public class CoreTest extends ACVMTest {
 
 		assertTrue(step(ctx, "(do a)").isExceptional());
 
-		Block b = Block.of(expectedTS,FIRST_PEER_KEYPAIR.getAccountKey());
+		Block b = Block.of(expectedTS,InitConfigTest.FIRST_PEER_KEY);
 		BlockResult br = s.applyBlock(b);
 		State s2 = br.getState();
 
-		Context<?> ctx2 = Context.createInitial(s2, HERO_ADDRESS, INITIAL_JUICE);
+		Context<?> ctx2 = Context.createInitial(s2, InitConfigTest.HERO_ADDRESS, INITIAL_JUICE);
 		assertEquals(2L, evalL(ctx2, "a"));
 	}
 
@@ -3479,8 +3477,8 @@ public class CoreTest extends ACVMTest {
 	public void testSpecialAddress() {
 
 		// Hero should be address and origin in initial context
-		assertEquals(HERO_ADDRESS, eval("*address*"));
-		assertEquals(HERO_ADDRESS, eval("*origin*"));
+		assertEquals(InitConfigTest.HERO_ADDRESS, eval("*address*"));
+		assertEquals(InitConfigTest.HERO_ADDRESS, eval("*origin*"));
 	}
 
 	@Test
@@ -3493,11 +3491,11 @@ public class CoreTest extends ACVMTest {
 	public void testSpecialBalance() {
 		// balance should return exact balance of account after execution
 		Context<?> ctx = step("(long *balance*)");
-		Long bal=ctx.getAccountStatus(HERO_ADDRESS).getBalance();
+		Long bal=ctx.getAccountStatus(InitConfigTest.HERO_ADDRESS).getBalance();
 		assertCVMEquals(bal, ctx.getResult());
 
 		// throwing it all away....
-		assertEquals(0L, evalL("(do (transfer "+VILLAIN_ADDRESS+" *balance*) *balance*)"));
+		assertEquals(0L, evalL("(do (transfer "+InitConfigTest.VILLAIN_ADDRESS+" *balance*) *balance*)"));
 
 		// check balance as single expression
 		assertEquals(bal, evalL("*balance*"));
@@ -3516,7 +3514,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testSpecialCaller() {
 		assertNull(eval("*caller*"));
-		assertEquals(HERO_ADDRESS, eval("(do (def c (deploy '(do (defn f [] *caller*) (export f)))) (call c (f)))"));
+		assertEquals(InitConfigTest.HERO_ADDRESS, eval("(do (def c (deploy '(do (defn f [] *caller*) (export f)))) (call c (f)))"));
 	}
 
 	@Test
@@ -3541,7 +3539,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testSpecialKey() {
-		assertEquals(HERO_KEYPAIR.getAccountKey(), eval("*key*"));
+		assertEquals(InitConfigTest.HERO_KEYPAIR.getAccountKey(), eval("*key*"));
 	}
 
 	@Test
@@ -3573,14 +3571,14 @@ public class CoreTest extends ACVMTest {
 
 		// Test set-holding modifies *holdings* as expected
 		assertNull(eval("(get-holding *address*)"));
-		assertEquals(BlobMaps.of(HERO_ADDRESS,1L),eval("(do (set-holding *address* 1) *holdings*)"));
+		assertEquals(BlobMaps.of(InitConfigTest.HERO_ADDRESS,1L),eval("(do (set-holding *address* 1) *holdings*)"));
 
 		assertNull(eval("(*holdings* { :PuSg 650989 })"));
 		assertEquals(Keywords.FOO,eval("(*holdings* { :PuSg 650989 } :foo )"));
 	}
 
 	@Test public void testHoldings() {
-		Context<?> ctx = step("(def VILLAIN (address \""+VILLAIN_ADDRESS.toHexString()+"\"))");
+		Context<?> ctx = step("(def VILLAIN (address \""+InitConfigTest.VILLAIN_ADDRESS.toHexString()+"\"))");
 		assertTrue(eval(ctx,"VILLAIN") instanceof Address);
 		ctx=step(ctx,"(def NOONE (address 7777777))");
 
@@ -3606,13 +3604,13 @@ public class CoreTest extends ACVMTest {
 			Context<?> c2 = step(ctx,"(set-holding VILLAIN 123)");
 			assertEquals(123L,evalL(c2,"(get-holding VILLAIN)"));
 
-			assertTrue(c2.getAccountStatus(VILLAIN_ADDRESS).getHoldings().containsKey(HERO_ADDRESS));
-			assertCVMEquals(123L,c2.getAccountStatus(VILLAIN_ADDRESS).getHolding(HERO_ADDRESS));
+			assertTrue(c2.getAccountStatus(InitConfigTest.VILLAIN_ADDRESS).getHoldings().containsKey(InitConfigTest.HERO_ADDRESS));
+			assertCVMEquals(123L,c2.getAccountStatus(InitConfigTest.VILLAIN_ADDRESS).getHolding(InitConfigTest.HERO_ADDRESS));
 		}
 
 		{ // test null assign
 			Context<?> c2 = step(ctx,"(set-holding VILLAIN nil)");
-			assertFalse(c2.getAccountStatus(VILLAIN_ADDRESS).getHoldings().containsKey(HERO_ADDRESS));
+			assertFalse(c2.getAccountStatus(InitConfigTest.VILLAIN_ADDRESS).getHoldings().containsKey(InitConfigTest.HERO_ADDRESS));
 		}
 	}
 

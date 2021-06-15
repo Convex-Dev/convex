@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Keywords;
+import convex.core.init.InitConfigTest;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
@@ -24,12 +25,12 @@ public class OracleTest {
 	@SuppressWarnings("rawtypes")
 	@Test
 	public void testOracleActor() throws IOException {
-		String VILLAIN_ADDRESS = TestState.VILLAIN_ADDRESS.toHexString();
-		String HERO_ADDRESS = TestState.HERO_ADDRESS.toHexString();
+		String VILLAIN_ADDRESS_TEXT = InitConfigTest.VILLAIN_ADDRESS.toHexString();
+		String HERO_ADDRESS_TEXT = InitConfigTest.HERO_ADDRESS.toHexString();
 
 		// setup address for this scene
 		Context ctx = TestState
-				.step("(do (def HERO (address \"" + HERO_ADDRESS + "\")) (def VILLAIN (address \"" + VILLAIN_ADDRESS + "\")))");
+				.step("(do (def HERO (address \"" + HERO_ADDRESS_TEXT + "\")) (def VILLAIN (address \"" + VILLAIN_ADDRESS_TEXT + "\")))");
 
 		ACell contractCode = Reader.readResource("actors/oracle-trusted.con");
 		ctx = ctx.deployActor(contractCode);
@@ -47,7 +48,7 @@ public class OracleTest {
 
 		{
 			// some tests for Actor safety pre-setting
-			final Context<?> fctx = Context.createInitial(ctx.getState(), TestState.VILLAIN_ADDRESS, TestState.INITIAL_JUICE);
+			final Context<?> fctx = Context.createInitial(ctx.getState(), InitConfigTest.VILLAIN_ADDRESS, TestState.INITIAL_JUICE);
 			assertFalse(fctx.isExceptional());
 			assertFalse(evalB(fctx, "(call (address \"" + o3_str + "\") (finalised? :foo))"));
 			assertAssertError(TestState.step(fctx, "(call (address \"" + o3_str + "\") (provide :foo :bad-value))"));
