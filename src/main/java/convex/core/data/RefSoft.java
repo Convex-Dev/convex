@@ -92,16 +92,18 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	@Override
 	public boolean isMissing() {
 		T result = softRef.get();
-		if (result == null) {
-			Ref<T> storeRef = Stores.current().refForHash(hash);
-			if (storeRef == null) return true;
+		if (result != null) return false; // still in memory, so not missing
+		
+		// check store
+		Ref<T> storeRef = Stores.current().refForHash(hash);
+		if (storeRef == null) return true; // must be missing, couldn't find in store
 
-			// Update soft reference to the fresh version. No point keeping old one....
-			if (storeRef instanceof RefSoft) {
-				this.softRef = ((RefSoft<T>) storeRef).softRef;
-			} else {
-				this.softRef = new SoftReference<T>(storeRef.getValue());
-			}
+		// We know we have in store.
+		// Update soft reference to the fresh version. No point keeping old one....
+		if (storeRef instanceof RefSoft) {
+			this.softRef = ((RefSoft<T>) storeRef).softRef;
+		} else {
+			this.softRef = new SoftReference<T>(storeRef.getValue());
 		}
 		return false;
 	}

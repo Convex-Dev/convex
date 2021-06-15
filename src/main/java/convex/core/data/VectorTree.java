@@ -185,9 +185,11 @@ public class VectorTree<T extends ACell> extends ASizedVector<T> {
 
 	@Override
 	public int estimatedEncodingSize() {
-		// Allow tag, long count, 33 bytes per child
-		return 12 + Format.MAX_EMBEDDED_LENGTH * children.length;
+		// Allow tag, long count, 80 bytes per child average plus some headroom
+		return 12 + (64 * (children.length+3));
 	}
+	
+	public static int MAX_ENCODING_SIZE= 1 + Format.MAX_VLC_LONG_LENGTH + (Format.MAX_EMBEDDED_LENGTH * Vectors.CHUNK_SIZE);
 
 	/**
 	 * Reads a VectorTree from the provided ByteBuffer 

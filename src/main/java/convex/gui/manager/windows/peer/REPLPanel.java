@@ -1,5 +1,5 @@
 package convex.gui.manager.windows.peer;
-
+		
 import java.awt.BorderLayout;
 import java.awt.Font;
 import java.awt.event.ComponentAdapter;
@@ -23,7 +23,7 @@ import javax.swing.JTextArea;
 import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.text.DefaultCaret;
+import javax.swing.text.*;
 
 import convex.api.Convex;
 import convex.core.Result;
@@ -123,8 +123,8 @@ public class REPLPanel extends JPanel {
 		outputArea.setEditable(false);
 		outputArea.setLineWrap(true);
 		outputArea.setFont(new Font("Monospaced", Font.PLAIN, 13));
-		DefaultCaret caret = (DefaultCaret)outputArea.getCaret();
-		caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
+		//DefaultCaret caret = (DefaultCaret)(outputArea.getCaret());
+		//caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
 		splitPane.setLeftComponent(new JScrollPane(outputArea));
 
 		inputArea = new JTextArea();

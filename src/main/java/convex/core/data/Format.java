@@ -54,6 +54,9 @@ public class Format {
 	 */
 	public static final int LIMIT_ENCODING_LENGTH = 0x1FFF; 
 	
+	/**
+	 * Maximum length for a VLC encoded Long
+	 */
 	public static final int MAX_VLC_LONG_LENGTH = 10; // 70 bits
 	
 	/**

@@ -151,9 +151,9 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	
 	/**
 	 * Writes this Cell's encoding to a byte array, including tag. USes cached encoding if available.
-	 * @param bs
-	 * @param pos
-	 * @return
+	 * @param bs Byte array to encode into
+	 * @param pos Start position to encode at
+	 * @return Updated position
 	 */
 	public int write(byte[] bs, int pos) {
 		return getEncoding().writeToBuffer(bs,pos);
@@ -239,7 +239,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		}
 		
 		if (!isEmbedded()) {
-			// We need to count this cell's encode length
+			// We need to count this cell's own encoding length
 			result+=getEncodingLength();
 			
 			// Add overhead for storage of non-embedded cell
@@ -267,14 +267,19 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return Memory Size of this Cell
 	 */
 	public final long getMemorySize() {
-		if (memorySize>=0) return memorySize;
-		memorySize=calcMemorySize();
-		return memorySize;
+		long ms=memorySize;
+		if (ms>=0) return ms;
+		ms=calcMemorySize();
+		this.memorySize=ms;
+		return ms;
 	}
 
 	/**
 	 * Determines if this Cell Represents an embedded object. Embedded objects are encoded directly into
 	 * the encoding of the containing Cell (avoiding the need for a hashed reference). 
+	 * 
+	 * Subclasses may override this if they have a cheap (preferably O(1) 
+	 * way to determine if they are embedded or otherwise. 
 	 * 
 	 * @return true if Cell is embedded, false otherwise
 	 */
@@ -300,8 +305,9 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 
 	/**
 	 * Gets the number of Refs contained within this Cell. This number is
-	 * final / immutable for any given instance. Contained Refs may be either
-	 * soft or embedded.
+	 * final / immutable for any given instance. 
+	 * 
+	 * Contained Refs may be either external or embedded.
 	 * 
 	 * @return The number of Refs in this Cell
 	 */
@@ -326,7 +332,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return The Ref at the specified index
 	 */
 	public <R extends ACell> Ref<R> getRef(int i) {
-		// This will always be an error if not overridden. Provided for warning purposes if accidentally used.
+		// This will always throw an error if not overridden. Provided for warning purposes if accidentally used.
 		if (getRefCount()==0) {
 			throw new IndexOutOfBoundsException("No Refs to get in "+Utils.getClassName(this));
 		} else {
@@ -353,7 +359,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 
 	/**
-	 * Gets an array of child refs for this Cell, in the same order as order accessible by
+	 * Gets an array of child Refs for this Cell, in the same order as order accessible by
 	 * getRef. 
 	 * 
 	 * Concrete implementations may override this to optimise performance.
@@ -390,8 +396,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		if (this.memorySize<0) {
 			this.memorySize=memorySize;
 		} else {
-			if (this.memorySize==memorySize) return;
-			throw new IllegalStateException("Attempting to attach memory size "+memorySize+" to object of class "+Utils.getClassName(this)+" which already has memorySize "+this.memorySize);
+			assert (this.memorySize==memorySize) : "Attempting to attach memory size "+memorySize+" to object of class "+Utils.getClassName(this)+" which already has memorySize "+this.memorySize;
 		}
 	}
 	
