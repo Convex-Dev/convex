@@ -38,7 +38,7 @@ public class InitTest extends ACVMTest {
 	@Test
 	public void testHero() {
         InitConfigTest initConfigTest = InitConfigTest.create();
-		AccountStatus as=INITIAL.getAccount(initConfigTest.getHeroAddress());
+		AccountStatus as=INITIAL.getAccount(InitConfigTest.HERO_ADDRESS);
 		assertNotNull(as);
 		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE,as.getMemory());
 	}

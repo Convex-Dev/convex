@@ -65,7 +65,7 @@ public class RegistryTest extends ACVMTest {
 		assertEquals(realAddr,eval(ctx,"(call *registry* (cns-resolve :convex.test.foo))"));
 
 		{ // Check VILLAIN can't steal CNS mapping
-			Context<?> c=ctx.forkWithAddress(VILLAIN_ADDRESS);
+			Context<?> c=ctx.forkWithAddress(InitConfigTest.VILLAIN_ADDRESS);
 
 			// VILLAIN shouldn't be able to use update on existing CNS mapping
 			assertTrustError(step(c,"(call *registry* (cns-update 'convex.test.foo *address*))"));
@@ -75,32 +75,32 @@ public class RegistryTest extends ACVMTest {
 		}
 
 		{ // Check Transfer of control to VILLAIN
-			Context<?> c=step(ctx,"(call *registry* (cns-control 'convex.test.foo "+VILLAIN_ADDRESS+"))");
+			Context<?> c=step(ctx,"(call *registry* (cns-control 'convex.test.foo "+InitConfigTest.VILLAIN_ADDRESS+"))");
 
 			// HERO shouldn't be able to use update or control any more
 			assertTrustError(step(c,"(call *registry* (cns-update 'convex.test.foo *address*))"));
 			assertTrustError(step(c,"(call *registry* (cns-control 'convex.test.foo *address*))"));
 
 			// Switch to VILLAIN
-			c=c.forkWithAddress(VILLAIN_ADDRESS);
+			c=c.forkWithAddress(InitConfigTest.VILLAIN_ADDRESS);
 
 			// Change mapping
 			c=step(c,"(call *registry* (cns-update 'convex.test.foo *address*))");
 			assertNotError(c);
-			assertEquals(VILLAIN_ADDRESS,eval(c,"(call *registry* (cns-resolve :convex.test.foo))"));
+			assertEquals(InitConfigTest.VILLAIN_ADDRESS,eval(c,"(call *registry* (cns-resolve :convex.test.foo))"));
 		}
 
 		{ // Check VILLAIN can create new mapping
 			// TODO probably shouldn't be free-for-all?
 
-			Context<?> c=ctx.forkWithAddress(VILLAIN_ADDRESS);
+			Context<?> c=ctx.forkWithAddress(InitConfigTest.VILLAIN_ADDRESS);
 
 			// VILLAIN shouldn't be able to use update on existing CNS mapping
 			c=step(c,"(call *registry* (cns-update :convex.villain *address*))");
 			assertNotError(c);
 
 			// original mapping should be held
-			assertEquals(VILLAIN_ADDRESS,eval(c,"(call *registry* (cns-resolve :convex.villain))"));
+			assertEquals(InitConfigTest.VILLAIN_ADDRESS,eval(c,"(call *registry* (cns-resolve :convex.villain))"));
 		}
 	}
 }

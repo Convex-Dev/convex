@@ -43,10 +43,10 @@ public class WalletPanel extends JPanel {
 		});
 
 		// inital list
-        HERO = WalletEntry.create(PeerGUI.initConfigTest.getHeroAddress(), PeerGUI.initConfigTest.getHeroKeyPair());
+        HERO = WalletEntry.create(PeerGUI.initConfig.getUserAddress(0), PeerGUI.initConfig.getUserKeyPair(0));
 		addWalletEntry(HERO);
-		addWalletEntry(WalletEntry.create(PeerGUI.initConfigTest.getVillainAddress(), PeerGUI.initConfigTest.getVillainKeyPair()));
-		addWalletEntry(WalletEntry.create(PeerGUI.initConfigTest.getPeerAddress(0),PeerGUI.initConfigTest.getPeerKeyPair(0)));
+		addWalletEntry(WalletEntry.create(PeerGUI.initConfig.getUserAddress(1), PeerGUI.initConfig.getUserKeyPair(1)));
+		addWalletEntry(WalletEntry.create(PeerGUI.initConfig.getPeerAddress(0),PeerGUI.initConfig.getPeerKeyPair(0)));
 
 		// create and add ScrollyList
 		walletList = new ScrollyList<WalletEntry>(listModel, we -> new WalletComponent(we));

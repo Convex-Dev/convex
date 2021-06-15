@@ -13,7 +13,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.init.AInitConfig;
 import convex.core.init.Init;
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitConfig;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
@@ -64,13 +64,13 @@ public class API {
 	public static Server launchPeer(Map<Keyword, Object> peerConfig, IServerEvent event) {
 		HashMap<Keyword,Object> config=new HashMap<>(peerConfig);
 
-		InitConfigTest initConfigTest = InitConfigTest.create();
+		InitConfig initConfig = InitConfig.create();
 
 		try {
 			if (!config.containsKey(Keywords.PORT)) config.put(Keywords.PORT, null);
 			if (!config.containsKey(Keywords.STORE)) config.put(Keywords.STORE, Stores.getGlobalStore());
-			if (!config.containsKey(Keywords.KEYPAIR)) config.put(Keywords.KEYPAIR, initConfigTest.getUserKeyPair(0));
-			if (!config.containsKey(Keywords.STATE)) config.put(Keywords.STATE, Init.createState(initConfigTest));
+			if (!config.containsKey(Keywords.KEYPAIR)) config.put(Keywords.KEYPAIR, initConfig.getUserKeyPair(0));
+			if (!config.containsKey(Keywords.STATE)) config.put(Keywords.STATE, Init.createState(initConfig));
 			if (!config.containsKey(Keywords.RESTORE)) config.put(Keywords.RESTORE, true);
 			if (!config.containsKey(Keywords.PERSIST)) config.put(Keywords.PERSIST, true);
 

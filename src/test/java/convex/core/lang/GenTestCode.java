@@ -12,13 +12,14 @@ import com.pholser.junit.quickcheck.Property;
 import convex.core.data.ACell;
 import convex.core.data.Syntax;
 import convex.core.exceptions.ParseException;
+import convex.core.init.InitConfigTest;
 import convex.test.generators.FormGen;
 
 public class GenTestCode {
 
 	@Property
 	public void testExpand(@From(FormGen.class) ACell form) {
-		Context<?> ctx = Context.createFake(TestState.STATE, TestState.HERO_ADDRESS);
+		Context<?> ctx = Context.createFake(TestState.STATE, InitConfigTest.HERO_ADDRESS);
 		ctx = ctx.expand(form);
 
 		if (!ctx.isExceptional()) {

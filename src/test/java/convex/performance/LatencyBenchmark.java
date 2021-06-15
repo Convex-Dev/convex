@@ -12,7 +12,7 @@ import org.openjdk.jmh.runner.options.Options;
 
 import convex.api.Convex;
 import convex.core.Result;
-import convex.core.init.Init;
+import convex.core.init.InitConfigTest;
 import convex.core.lang.TestState;
 import convex.core.lang.ops.Constant;
 import convex.core.transactions.Invoke;
@@ -30,8 +30,8 @@ public class LatencyBenchmark {
 	static {
 		server=API.launchPeer();
 		try {
-			client=Convex.connect(server.getHostAddress(), TestState.HERO_ADDRESS,TestState.HERO_KEYPAIR);
-			client2=Convex.connect(server.getHostAddress(), TestState.VILLAIN_ADDRESS,TestState.VILLAIN_KEYPAIR);
+			client=Convex.connect(server.getHostAddress(), InitConfigTest.HERO_ADDRESS,InitConfigTest.HERO_KEYPAIR);
+			client2=Convex.connect(server.getHostAddress(), InitConfigTest.VILLAIN_ADDRESS,InitConfigTest.VILLAIN_KEYPAIR);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -40,13 +40,13 @@ public class LatencyBenchmark {
 
 	@Benchmark
 	public void roundTripTransaction() throws TimeoutException, IOException {
-		client.transactSync(Invoke.create(TestState.HERO_ADDRESS,-1, Constant.of(1L)));
+		client.transactSync(Invoke.create(InitConfigTest.HERO_ADDRESS,-1, Constant.of(1L)));
 	}
 
 	@Benchmark
 	public void roundTripTwoTransactions() throws TimeoutException, IOException, InterruptedException, ExecutionException {
-		Future<Result> r1=client.transact(Invoke.create(TestState.HERO_ADDRESS,-1, Constant.of(1L)));
-		Future<Result> r2=client2.transact(Invoke.create(TestState.VILLAIN_ADDRESS,-1, Constant.of(1L)));
+		Future<Result> r1=client.transact(Invoke.create(InitConfigTest.HERO_ADDRESS,-1, Constant.of(1L)));
+		Future<Result> r2=client2.transact(Invoke.create(InitConfigTest.VILLAIN_ADDRESS,-1, Constant.of(1L)));
 		r1.get();
 		r2.get();
 	}
@@ -70,7 +70,7 @@ public class LatencyBenchmark {
 	private void doTransactions(int n) throws IOException, InterruptedException, ExecutionException, TimeoutException {
 		Future<Result>[] rs=new Future[n];
 		for (int i=0; i<n; i++) {
-			Future<Result> f=client.transact(Invoke.create(TestState.HERO_ADDRESS,-1, Constant.of(i)));
+			Future<Result> f=client.transact(Invoke.create(InitConfigTest.HERO_ADDRESS,-1, Constant.of(i)));
 			rs[i]=f;
 		}
 		for (int i=0; i<n; i++) {

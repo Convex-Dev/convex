@@ -83,7 +83,7 @@ public class AccountFund implements Runnable {
 		Convex convex = null;
 		Address address = Address.create(addressNumber);
 		try {
-			convex = mainParent.connectToSessionPeer(hostname, port, Main.initConfigTest.getHeroAddress(), Main.initConfigTest.getHeroKeyPair());
+			convex = mainParent.connectToSessionPeer(hostname, port, Main.initConfig.getUserAddress(0), Main.initConfig.getUserKeyPair(0));
 			convex.transferSync(address, amount);
 			convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
 			Long balance = convex.getBalance(address);

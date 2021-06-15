@@ -35,8 +35,8 @@ public class CVMBenchmark {
 	@Benchmark
 	public void smallTransfer() {
 		State s=TestState.STATE;
-		Address addr=TestState.HERO_ADDRESS;
-		ATransaction trans=Transfer.create(addr,1, TestState.VILLAIN_ADDRESS, 1000);
+		Address addr=InitConfigTest.HERO_ADDRESS;
+		ATransaction trans=Transfer.create(addr,1, InitConfigTest.VILLAIN_ADDRESS, 1000);
 		Context<ACell>  ctx=s.applyTransaction(trans);
 		ctx.getValue();
 	}
@@ -44,7 +44,7 @@ public class CVMBenchmark {
 	@Benchmark
 	public void simpleCalculationStatic() {
 		State s=TestState.STATE;
-		Address addr=TestState.HERO_ADDRESS;
+		Address addr=InitConfigTest.HERO_ADDRESS;
 		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Invoke.create(Constant.create(Core.PLUS),Constant.of(1L),Constant.of(2L)));
 		Context<ACell>  ctx=s.applyTransaction(trans);
 		ctx.getValue();
@@ -53,7 +53,7 @@ public class CVMBenchmark {
 	@Benchmark
 	public void simpleCalculationDynamic() {
 		State s=TestState.STATE;
-		Address addr=TestState.HERO_ADDRESS;
+		Address addr=InitConfigTest.HERO_ADDRESS;
 		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Invoke.create(Lookup.create("+"),Constant.of(1L),Constant.of(2L)));
 		Context<ACell> ctx=s.applyTransaction(trans);
 		ctx.getValue();
@@ -62,7 +62,7 @@ public class CVMBenchmark {
 	@Benchmark
 	public void defInEnvironment() {
 		State s=TestState.STATE;
-		Address addr=TestState.HERO_ADDRESS;
+		Address addr=InitConfigTest.HERO_ADDRESS;
 		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Def.create("a", Constant.of(13L)));
 		Context<ACell>  ctx=s.applyTransaction(trans);
 		ctx.getValue();
@@ -71,7 +71,7 @@ public class CVMBenchmark {
 	@Benchmark
 	public void contractCall() {
 		State s=TestState.STATE;
-		Address addr=TestState.HERO_ADDRESS;
+		Address addr=InitConfigTest.HERO_ADDRESS;
 		ATransaction trans=Call.create(addr,1L, Init.REGISTRY_ADDRESS, Symbols.REGISTER, Vectors.of(Maps.of(Keywords.NAME,Strings.create("Bob"))));
 		Context<ACell>  ctx=s.applyTransaction(trans);
 		ctx.getValue();

@@ -32,23 +32,8 @@ import convex.core.util.Utils;
  */
 public class TestState {
 	public static final int NUM_CONTRACTS = 5;
+
 	public static final Address[] CONTRACTS = new Address[NUM_CONTRACTS];
-
-	public static final InitConfigTest INIT_CONFIG_TEST = InitConfigTest.create();
-
-	public static final Address INIT_ADDRESS = Init.INIT_ADDRESS;
-
-	public static final Address HERO_ADDRESS = INIT_CONFIG_TEST.getHeroAddress();
-
-	public static final AKeyPair HERO_KEYPAIR = INIT_CONFIG_TEST.getHeroKeyPair();
-
-	public static final Address VILLAIN_ADDRESS = INIT_CONFIG_TEST.getVillainAddress();
-
-	public static final AKeyPair VILLAIN_KEYPAIR = INIT_CONFIG_TEST.getVillainKeyPair();
-
-	public static final Address FIRST_PEER_ADDRESS = INIT_CONFIG_TEST.getPeerAddress(0);
-
-	public static final AKeyPair FIRST_PEER_KEYPAIR = INIT_CONFIG_TEST.getPeerKeyPair(0);
 
 	/**
 	 * A test state set up with a few accounts
@@ -60,8 +45,8 @@ public class TestState {
 
 		try {
 
-			State s = Init.createState(INIT_CONFIG_TEST);
-			Context<?> ctx = Context.createFake(s, HERO_ADDRESS);
+			State s = Init.createState(InitConfigTest.create());
+			Context<?> ctx = Context.createFake(s, InitConfigTest.HERO_ADDRESS);
 			for (int i = 0; i < NUM_CONTRACTS; i++) {
 				// Construct code for each contract
 				ACell contractCode = Reader.read(
@@ -76,7 +61,7 @@ public class TestState {
 
 			s= ctx.getState();
 			STATE = s;
-			CONTEXT = Context.createFake(STATE, TestState.HERO_ADDRESS);
+			CONTEXT = Context.createFake(STATE, InitConfigTest.HERO_ADDRESS);
 		} catch (Throwable e) {
 			e.printStackTrace();
 			throw new Error(e);
@@ -147,7 +132,7 @@ public class TestState {
 
 	@Test
 	public void testInitial() {
-		Context<?> ctx = Context.createFake(STATE,HERO_ADDRESS);
+		Context<?> ctx = Context.createFake(STATE,InitConfigTest.HERO_ADDRESS);
 		State s = ctx.getState();
 		assertEquals(STATE, s);
 		assertSame(Core.COUNT, ctx.lookup(Symbols.COUNT).getResult());
@@ -159,15 +144,15 @@ public class TestState {
 
 	@Test
 	public void testContractCall() {
-		Context<?> ctx0 = Context.createFake(STATE, HERO_ADDRESS);
+		Context<?> ctx0 = Context.createFake(STATE, InitConfigTest.HERO_ADDRESS);
 		Address TARGET = CONTRACTS[0];
 		ctx0 = ctx0.execute(compile(ctx0, "(def target (address \"" + TARGET.toHexString() + "\"))"));
 		ctx0 = ctx0.execute(compile(ctx0, "(def hero *address*)"));
 		final Context<?> ctx = ctx0;
 
-		assertEquals(HERO_ADDRESS, ctx.lookup(Symbols.HERO).getResult());
+		assertEquals(InitConfigTest.HERO_ADDRESS, ctx.lookup(Symbols.HERO).getResult());
 		assertEquals(Keyword.create("bar"), eval(ctx, "(call target (foo))"));
-		assertEquals(HERO_ADDRESS, eval(ctx, "(call target (who-called-me))"));
+		assertEquals(InitConfigTest.HERO_ADDRESS, eval(ctx, "(call target (who-called-me))"));
 		assertEquals(TARGET, eval(ctx, "(call target (my-address))"));
 
 		assertEquals(0L, evalL(ctx, "(call target (my-number))"));

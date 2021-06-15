@@ -16,6 +16,7 @@ import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.exceptions.BadFormatException;
+import convex.core.init.InitConfigTest;
 import convex.core.util.Utils;
 
 @RunWith(Parameterized.class)
@@ -35,9 +36,9 @@ public class ParamTestEvals {
 				{ "(do 1 *result*)", 1L },
 				{ "(do (do :foo) (do))", null },
 				{ "*result*", null },
-				{ "*origin*", TestState.HERO_ADDRESS },
+				{ "*origin*", InitConfigTest.HERO_ADDRESS },
 				{ "*caller*", null },
-				{ "*address*", TestState.HERO_ADDRESS },
+				{ "*address*", InitConfigTest.HERO_ADDRESS },
 				{ "(do 1 *result*)", 1L },
 
 				{ "(call " + TEST_CONTRACT + " (my-address))", TEST_CONTRACT },

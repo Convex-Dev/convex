@@ -18,20 +18,6 @@ import convex.core.util.Utils;
  */
 public abstract class ACVMTest {
 
-    public static InitConfigTest INIT_CONFIG_TEST = InitConfigTest.create();
-
-	public static final Address HERO_ADDRESS = INIT_CONFIG_TEST.getHeroAddress();
-
-	public static final AKeyPair HERO_KEYPAIR = INIT_CONFIG_TEST.getHeroKeyPair();
-
-	public static final Address VILLAIN_ADDRESS = INIT_CONFIG_TEST.getVillainAddress();
-
-	public static final AKeyPair VILLAIN_KEYPAIR = INIT_CONFIG_TEST.getVillainKeyPair();
-
-	public static final Address FIRST_PEER_ADDRESS = INIT_CONFIG_TEST.getPeerAddress(0);
-
-	public static final AKeyPair FIRST_PEER_KEYPAIR = INIT_CONFIG_TEST.getPeerKeyPair(0);
-
     protected State INITIAL;
 	private Context<?> CONTEXT;
 	protected long INITIAL_JUICE;
@@ -50,8 +36,8 @@ public abstract class ACVMTest {
 		this.INITIAL=s;
 		CONTEXT=Context.createFake(s,Init.BASE_FIRST_ADDRESS);
 		INITIAL_JUICE=CONTEXT.getJuice();
-		HERO_BALANCE = INITIAL.getAccount(HERO_ADDRESS).getBalance();
-		VILLAIN_BALANCE = INITIAL.getAccount(VILLAIN_ADDRESS).getBalance();
+		HERO_BALANCE = INITIAL.getAccount(InitConfigTest.HERO_ADDRESS).getBalance();
+		VILLAIN_BALANCE = INITIAL.getAccount(InitConfigTest.VILLAIN_ADDRESS).getBalance();
 	}
 
 	@SuppressWarnings("unchecked")

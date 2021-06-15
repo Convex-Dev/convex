@@ -373,7 +373,7 @@ public class CompilerTest extends ACVMTest {
 	@Test
 	public void testLookupAddress() {
 		Lookup<?> l=comp("foo");
-		assertEquals(Constant.of(HERO_ADDRESS),l.getAddress());
+		assertEquals(Constant.of(InitConfigTest.HERO_ADDRESS),l.getAddress());
 	}
 
 	@Test
@@ -512,8 +512,8 @@ public class CompilerTest extends ACVMTest {
 	@Test
 	public void testQuoteCompile()  {
 		assertEquals(Constant.create((ACell)null),comp("nil"));
-		assertEquals(Lookup.create(HERO_ADDRESS,Symbols.FOO),comp("foo"));
-		assertEquals(Lookup.create(HERO_ADDRESS,Symbols.FOO),comp("`~foo"));
+		assertEquals(Lookup.create(InitConfigTest.HERO_ADDRESS,Symbols.FOO),comp("foo"));
+		assertEquals(Lookup.create(InitConfigTest.HERO_ADDRESS,Symbols.FOO),comp("`~foo"));
 	}
 
 	@Test

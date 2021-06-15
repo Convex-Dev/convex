@@ -65,7 +65,7 @@ public class Status implements Runnable {
 
 		Convex convex = null;
 		try {
-			convex = mainParent.connectToSessionPeer(hostname, port, Main.initConfigTest.getHeroAddress(), Main.initConfigTest.getHeroKeyPair());
+			convex = mainParent.connectToSessionPeer(hostname, port, Main.initConfig.getUserAddress(0), Main.initConfig.getUserKeyPair(0));
 		} catch (Throwable t) {
 			log.severe(t.getMessage());
 			return;

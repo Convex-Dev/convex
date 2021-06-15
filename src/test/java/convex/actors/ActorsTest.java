@@ -32,8 +32,6 @@ import convex.core.util.Utils;
 
 public class ActorsTest {
 
-	InitConfigTest initConfigTest = InitConfigTest.create();
-
 	@Test public void testDeployAndCall() {
 		Context<?> ctx=TestState.step("(def caddr (deploy '(let [n 10] (defn getter [] n) (defn hidden [] nil) (defn plus [x] (+ n x)) (export getter plus))))");
 
@@ -66,7 +64,7 @@ public class ActorsTest {
 
 	@Test public void testUserAsActor() {
 		Context<?> ctx=step("(do (defn foo [] *caller*) (defn bar [] nil) (def z 1) (export foo z))");
-		assertEquals(initConfigTest.getHeroAddress(),eval(ctx,"(call *address* (foo))"));
+		assertEquals(InitConfigTest.HERO_ADDRESS,eval(ctx,"(call *address* (foo))"));
 		assertStateError(step(ctx,"(call *address* (non-existent-function))"));
 		assertStateError(step(ctx,"(call *address* (bar))"));
 		assertStateError(step(ctx,"(call *address* (z))"));
@@ -90,8 +88,8 @@ public class ActorsTest {
 	}
 
 	@Test public void testTokenContract() throws IOException {
-		String VILLAIN=TestState.VILLAIN_ADDRESS.toHexString();
-		String HERO=TestState.HERO_ADDRESS.toHexString();
+		String VILLAIN=InitConfigTest.VILLAIN_ADDRESS.toHexString();
+		String HERO=InitConfigTest.HERO_ADDRESS.toHexString();
 
 		// setup address for this scene
 		Context<?> ctx=TestState.step("(do (def HERO (address \""+HERO+"\")) (def VILLAIN (address \""+VILLAIN+"\")))");
