@@ -123,22 +123,18 @@ public class StressPanel extends JPanel {
 	private synchronized void runStressTest() {
 		errors = 0;
 		values = 0;
-			Address address=PeerGUI.initConfig.getUserAddress(0);
+		Address address=PeerGUI.initConfig.getUserAddress(0);
 
-			int transCount = (Integer) transactionCountSpinner.getValue();
-			int opCount = (Integer) opCountSpinner.getValue();
-			// TODO: enable multiple clients
-			// int clientCount = (Integer) opCountSpinner.getValue();
+		int transCount = (Integer) transactionCountSpinner.getValue();
+		int opCount = (Integer) opCountSpinner.getValue();
+		// TODO: enable multiple clients
+		// int clientCount = (Integer) opCountSpinner.getValue();
 
-			new SwingWorker<String,Object>() {
-				@Override
-				protected String doInBackground() throws Exception {
-					StringBuilder sb = new StringBuilder();
-
-					try {
-
+		new SwingWorker<String,Object>() {
+			@Override
+			protected String doInBackground() throws Exception {
+				StringBuilder sb = new StringBuilder();
 				try {
-
 					InetSocketAddress sa = peerView.peerServer.getHostAddress();
 					long startTime = Utils.getCurrentTimestamp();
 
@@ -175,7 +171,6 @@ public class StressPanel extends JPanel {
 
 					Thread.sleep(100); // wait for state update to be reflected
 					State endState = PeerGUI.getLatestState();
-
 
 					sb.append("Results for " + transCount + " transactions\n");
 					sb.append(values + " values received\n");
