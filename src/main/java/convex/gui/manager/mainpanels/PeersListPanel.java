@@ -94,6 +94,8 @@ public class PeersListPanel extends JPanel {
 		toolBar.add(btnConnect);
 		btnConnect.addActionListener(e -> {
 			String input = JOptionPane.showInputDialog("Enter host address: ", "");
+			if (input==null) return; // no result?
+			
 			String[] ss = input.split(":");
 			String host = ss[0].trim();
 			int port = (ss.length > 1) ? Integer.parseInt(ss[1].trim()) : 0;

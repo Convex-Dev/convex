@@ -6,14 +6,9 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import convex.core.data.AccountKey;
-import convex.core.data.ACell;
-import convex.core.data.Hash;
 import convex.core.data.Keyword;
-import convex.core.data.SignedData;
-import convex.core.data.Vectors;
-import convex.core.Peer;
-import convex.net.Message;
 import convex.net.Connection;
+import convex.net.Message;
 
 /**
  * Class for managing the outbound connections from a Peer Server.
@@ -61,7 +56,9 @@ public class ConnectionManager {
 	}
 
 	/**
-	 * Return true if this hostname is connected
+	 * Return true if a specified Peer is connected
+	 * @param peerKey Public Key of Peer
+	 * @return True if connected
 	 *
 	 */
 	public boolean isConnected(AccountKey peerKey) {
@@ -71,8 +68,9 @@ public class ConnectionManager {
 
 	/**
 	 * Gets a connection based on the peers public key
+	 * @param peerKey Public key of Peer
 	 *
-	 * @return Set of connections
+	 * @return Connection instance, or null if not found
 	 */
 	public Connection getConnection(AccountKey peerKey) {
 		if (!connections.containsKey(peerKey)) return null;
@@ -81,6 +79,7 @@ public class ConnectionManager {
 
 	/**
 	 * Returns the number of active connections
+	 * @return Number of connections
 	 */
 	public int getConnectionCount() {
 		return connections.size();
@@ -88,6 +87,7 @@ public class ConnectionManager {
 
 	/**
 	 * Returns the number of trusted connections
+	 * @return Number of trusted connections
 	 *
 	 */
 	public int getTrustedConnectionCount() {

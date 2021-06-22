@@ -95,7 +95,6 @@ public class API {
 	 */
 	public static List<Server> launchLocalPeers(int count, AInitConfig initConfig, IServerEvent event) {
 		List<Server> serverList = new ArrayList<Server>();
-		Server otherServer;
 		String remotePeerHostname;
 
 		Map<Keyword, Object> config = new HashMap<>();
