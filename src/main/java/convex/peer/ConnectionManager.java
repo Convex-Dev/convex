@@ -32,7 +32,7 @@ public class ConnectionManager {
 	private final HashMap<AccountKey,Connection> connections = new HashMap<>();
 	
 	/**
-	 * The list of challenges that are being made to remote peers
+	 * The list of outgoing challenges that are being made to remote peers
 	 */
 	private HashMap<AccountKey, ChallengeRequest> challengeList = new HashMap<>();
 
@@ -220,8 +220,12 @@ public class ConnectionManager {
 					challengeList.remove(peerKey);
 				}
 				ChallengeRequest request = ChallengeRequest.create(peerKey);
-				request.send(connection, peer);
-				challengeList.put(peerKey, request);
+				if (request.send(connection, peer)>=0) {
+					challengeList.put(peerKey, request);
+				} else {
+					// TODO: check OK to do nothing and send later?
+				}
+				
 			}
 		}
 	}

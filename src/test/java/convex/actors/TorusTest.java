@@ -11,8 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.Address;
 import convex.core.data.prim.CVMDouble;
-import convex.core.init.Init;
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
@@ -23,7 +22,7 @@ public class TorusTest extends ACVMTest {
 	Context<?> INITIAL=context();
 
 	protected TorusTest() {
-		super(Init.createState(InitConfigTest.create()));
+		super(InitTest.STATE);
 
 		try {
 			Context<?> ctx=INITIAL;

@@ -21,7 +21,6 @@ import convex.core.data.Keywords;
 import convex.core.data.Maps;
 import convex.core.init.InitConfigTest;
 import convex.core.lang.Symbols;
-import convex.core.lang.TestState;
 import convex.core.store.AStore;
 import convex.core.transactions.Invoke;
 import etch.EtchStore;

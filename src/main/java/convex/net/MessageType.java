@@ -15,7 +15,7 @@ public enum MessageType {
 	CHALLENGE(1),
 
 	/**
-	 * A response to a challenge. The chalengee must sign the response as proof of
+	 * A response to a challenge. The challengee must sign the response as proof of
 	 * possession of the claimed address.
 	 */
 	RESPONSE(2),

@@ -140,7 +140,7 @@ public class Init {
 	static final ACell TRUST_CODE=Reader.readResource("libraries/trust.con");
 	static final ACell REGISTRY_CODE=Reader.readResource("actors/registry.con");
 
-	public static State createCoreLibraries(AInitConfig config) throws IOException {
+	public static State createCoreLibraries(AInitConfig config) {
 		State s=createBaseAccounts(config);
 
 		// At this point we have a raw initial state with accounts

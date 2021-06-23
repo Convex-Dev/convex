@@ -10,7 +10,6 @@ import convex.core.data.ABlob;
 import convex.core.data.Blobs;
 import convex.core.data.SignedData;
 import convex.core.init.InitConfigTest;
-import convex.core.lang.TestState;
 
 public class SignatureBenchmark {
 

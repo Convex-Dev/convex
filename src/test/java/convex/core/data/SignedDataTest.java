@@ -15,7 +15,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitConfigTest;
 import convex.core.lang.RT;
-import convex.core.lang.TestState;
 import convex.test.Samples;
 
 public class SignedDataTest {

@@ -34,7 +34,6 @@ import convex.core.BlockResult;
 import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.State;
-import convex.core.crypto.AKeyPair;
 import convex.core.data.ABlob;
 import convex.core.data.ABlobMap;
 import convex.core.data.ACell;
@@ -69,6 +68,7 @@ import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
 import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.lang.impl.CorePred;
 import convex.core.lang.impl.ICoreDef;
 import convex.core.lang.ops.Constant;
@@ -89,7 +89,7 @@ public class CoreTest extends ACVMTest {
 
 
 	protected CoreTest() throws IOException {
-		super(Init.createCoreLibraries(InitConfigTest.create()));
+		super(InitTest.CORE);
 	}
 
 

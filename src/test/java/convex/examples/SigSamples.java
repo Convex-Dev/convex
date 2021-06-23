@@ -7,7 +7,6 @@ import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.InitConfigTest;
-import convex.core.lang.TestState;
 
 /**
  * Test class for Ed25519 functionality

@@ -14,16 +14,16 @@ import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.RecordTest;
 import convex.core.data.Ref;
-import convex.core.init.Init;
-import convex.core.init.InitConfigTest;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 
 /**
  * Tests for the State data structure
  */
 public class StateTest {
-	State INIT_STATE=Init.createState(InitConfigTest.create());
+	State INIT_STATE=InitTest.STATE;
 
 	@Test
 	public void testEmptyState() {

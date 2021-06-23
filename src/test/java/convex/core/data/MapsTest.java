@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import static convex.test.Assertions.assertCVMEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -8,8 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import static convex.test.Assertions.*;
 
 import java.util.function.Predicate;
 
@@ -22,7 +21,6 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
 import convex.core.init.InitConfigTest;
 import convex.core.lang.RT;
-import convex.core.lang.TestState;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Transfer;
 import convex.core.util.Bits;

@@ -22,7 +22,6 @@ import convex.core.data.SignedData;
 import convex.core.init.InitConfigTest;
 import convex.core.lang.Reader;
 import convex.core.lang.ops.Constant;
-import convex.core.init.InitConfigTest;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
@@ -41,7 +40,6 @@ public class ConvexTest {
 
 	static {
 		synchronized(ServerTest.SERVER) {
-			InitConfigTest initConfigTest = InitConfigTest.create();
 			try {
 				CONVEX=Convex.connect(
 					ServerTest.SERVER.getHostAddress(),

@@ -8,20 +8,18 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.data.PeerStatus;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
-import convex.core.init.Init;
 import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
-import convex.core.lang.TestState;
 import convex.test.Samples;
 
 public class PeerTest {
-	static State STATE=Init.createState(InitConfigTest.create());
+	static State STATE=InitTest.STATE;
 
 
 	@Test

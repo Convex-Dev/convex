@@ -16,8 +16,8 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.Address;
 import convex.core.data.Keywords;
 import convex.core.data.Symbol;
-import convex.core.init.Init;
 import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.Reader;
@@ -30,7 +30,7 @@ public class TrustTest extends ACVMTest {
 
 	private Context<?> CONTEXT;
 	protected TrustTest() throws IOException {
-		super(Init.createCoreLibraries(InitConfigTest.create()));
+		super(InitTest.CORE);
 		Context<?> ctx = context();
 
 		assert(ctx.getDepth()==0):"Invalid depth: "+ctx.getDepth();

@@ -6,9 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Belief;
-import convex.core.lang.TestState;
-import convex.core.lang.impl.RecordFormat;
 import convex.core.init.InitConfigTest;
+import convex.core.lang.impl.RecordFormat;
 
 public class RecordTest {
 
