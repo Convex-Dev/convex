@@ -116,12 +116,12 @@ The resulting `flight.jfr` can the be opened in tools such as JDK Mission Contro
 After running benchmarks, you should see results similar to this:
 
 ```
-Benchmark                      Mode  Cnt         Score         Error  Units
-EtchBenchmark.readDataRandom  thrpt    5  40929172.124 ± 1760027.956  ops/s
-EtchBenchmark.writeData       thrpt    5  10923667.591 ± 1527754.917  ops/s
+Benchmark                      Mode  Cnt        Score        Error  Units
+EtchBenchmark.readDataRandom  thrpt    5  4848620.857 ± 110622.054  ops/s
+EtchBenchmark.writeData       thrpt    5   728486.145 ± 168739.491  ops/s
 ```
 
-For example, this can be interpreted as an indication that the Etch database layer is handling approximately 40 million reads and 10 million atomic writes per second in the testing environment. Usual benchmarking caveats apply and results may vary considerably based on your system setup (available RAM, disk performance etc.) - it is advisable to examine the benchmark source to determine precisely which operations are being performed.
+For example, this can be interpreted as an indication that the Etch database layer is handling approximately 4.8 million reads and 729k million atomic writes per second in the testing environment. Usual benchmarking caveats apply and results may vary considerably based on your system setup (available RAM, disk performance etc.) - it is advisable to examine the benchmark source to determine precisely which operations are being performed.
 
 
 ## Contributing
