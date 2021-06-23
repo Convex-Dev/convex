@@ -37,7 +37,6 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
@@ -562,7 +561,10 @@ public class Server implements Closeable {
 	protected boolean maybeUpdateBelief() throws InterruptedException {
 		long oldConsensusPoint = peer.getConsensusPoint();
 
-		// published new blocks if needed. Guaranteed to change belief if this happens
+		// possibly have own transactions to publish
+		maybePostOwnTransactions(newTransactions);
+		
+		// publish new blocks if needed. Guaranteed to change belief if this happens
 		boolean published = maybePublishBlock();
 
 		// only do belief merge if needed: either after publishing a new block or with
@@ -575,7 +577,7 @@ public class Server implements Closeable {
 		boolean updated = maybeMergeBeliefs();
 		if (!updated) return false;
 
-		// At this point we know our Order changed
+		// At this point we know our Order should have changed
 		final Belief belief = peer.getBelief();
 
 		// At this point we know something updated our belief, so we want to rebroadcast
@@ -618,7 +620,6 @@ public class Server implements Closeable {
 	 */
 	protected boolean maybePublishBlock() {
 		synchronized (newTransactions) {
-			maybePostOwnTransactions(newTransactions);
 
 			int n = newTransactions.size();
 			if (n == 0) return false;
@@ -649,38 +650,40 @@ public class Server implements Closeable {
 	 * @param transactionList List of transactions to add to.
 	 */
 	private void maybePostOwnTransactions(ArrayList<SignedData<ATransaction>> transactionList) {
-		State s=getPeer().getConsensusState();
-		long ts=s.getTimeStamp().longValue();
-
-		// If we already did this recently, don't try again
-		if (ts<(lastOwnTransactionTimestamp+OWN_TRANSACTIONS_DELAY)) return;
-
-		lastOwnTransactionTimestamp=ts; // mark this timestamp
-
-		String desiredHostname=getHostname(); // Intended hostname
-		PeerStatus ps=s.getPeer(getPeerKey());
-		AString chn=ps.getHostname();
-		String currentHostname=(chn==null)?null:chn.toString();
-
-		// Try to set hostname if not correctly set
-		trySetHostname:
-		if (!Utils.equals(desiredHostname, currentHostname)) {
-			Address address=ps.getOwner();
-			if (address==null) break trySetHostname;
-			AccountStatus as=s.getAccount(address);
-			if (as==null) break trySetHostname;
-			if (!Utils.equals(getPeerKey(), as.getAccountKey())) break trySetHostname;
-
-			String code;
-			if (desiredHostname==null) {
-				code = "(set-peer-data {:url nil})";
-			} else {
-				code = String.format("(set-peer-data {:url \"%s\"})", desiredHostname);
+		synchronized (transactionList) {
+			State s=getPeer().getConsensusState();
+			long ts=s.getTimeStamp().longValue();
+	
+			// If we already did this recently, don't try again
+			if (ts<(lastOwnTransactionTimestamp+OWN_TRANSACTIONS_DELAY)) return;
+	
+			lastOwnTransactionTimestamp=ts; // mark this timestamp
+	
+			String desiredHostname=getHostname(); // Intended hostname
+			PeerStatus ps=s.getPeer(getPeerKey());
+			AString chn=ps.getHostname();
+			String currentHostname=(chn==null)?null:chn.toString();
+	
+			// Try to set hostname if not correctly set
+			trySetHostname:
+			if (!Utils.equals(desiredHostname, currentHostname)) {
+				Address address=ps.getOwner();
+				if (address==null) break trySetHostname;
+				AccountStatus as=s.getAccount(address);
+				if (as==null) break trySetHostname;
+				if (!Utils.equals(getPeerKey(), as.getAccountKey())) break trySetHostname;
+	
+				String code;
+				if (desiredHostname==null) {
+					code = "(set-peer-data {:url nil})";
+				} else {
+					code = String.format("(set-peer-data {:url \"%s\"})", desiredHostname);
+				}
+				ACell message = Reader.read(code);
+				ATransaction transaction = Invoke.create(address, as.getSequence()+1, message);
+				SignedData<ATransaction> signedTransaction = getKeyPair().signData(transaction);
+				transactionList.add(signedTransaction);
 			}
-			ACell message = Reader.read(code);
-			ATransaction transaction = Invoke.create(address, as.getSequence()+1, message);
-			SignedData<ATransaction> signedTransaction = getKeyPair().signData(transaction);
-			transactionList.add(signedTransaction);
 		}
 	}
 
@@ -765,7 +768,7 @@ public class Server implements Closeable {
 			AVector<ACell> challengeValues = signedData.getValue();
 
 			if (challengeValues == null || challengeValues.size() != 3) {
-				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge data incorrect number of items should be 3 not " + challengeValues.size());
+				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge data incorrect number of items should be 3 not " + RT.count(challengeValues));
 				return;
 			}
 			Connection pc = m.getPeerConnection();
@@ -823,6 +826,7 @@ public class Server implements Closeable {
 		try {
 			SignedData<ACell> signedData = m.getPayload();
 
+			@SuppressWarnings("unchecked")
 			AVector<ACell> responseValues = (AVector<ACell>) signedData.getValue();
 
 			if (responseValues.size() != 4) {
@@ -881,7 +885,7 @@ public class Server implements Closeable {
 
 				// hash sent by this peer for the challenge
 				Hash challengeSourceHash = challengeRequest.getSendHash();
-				if ( !challengeHash.equals(challengeHash)) {
+				if ( !challengeHash.equals(challengeSourceHash)) {
 					log.log(LEVEL_CHALLENGE_RESPONSE, "response hash of the challenge does not match");
 					return;
 				}
@@ -1044,9 +1048,9 @@ public class Server implements Closeable {
 			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
 
 			try {
-				// short initial sleep before we start managing connections. Give stuff time to
+				// short initial sleep before we start managing updates. Give stuff time to
 				// ramp up.
-				Thread.sleep(10);
+				Thread.sleep(20);
 
 				// loop while the server is running
 				while (isRunning) {
@@ -1095,6 +1099,7 @@ public class Server implements Closeable {
 				long lastConsensusPoint = 0;
                 Order lastOrder = null;
 				while (isRunning) {
+					Thread.sleep(SERVER_CONNECTION_PAUSE);
 
 					Order order=peer.getPeerOrder();
 					// TODO: think about behaviour when the Peer leaves or joins. Should Server continue running?
@@ -1115,7 +1120,6 @@ public class Server implements Closeable {
 						requestChallenges();
 						raiseServerChange("consensus change");
 					}
-					Thread.sleep(SERVER_CONNECTION_PAUSE);
 				}
 			} catch (InterruptedException e) {
 				/* OK? Close the thread normally */
@@ -1236,7 +1240,7 @@ public class Server implements Closeable {
 	 * Connects this Peer to a target Peer, adding the Connection to this Server's
 	 * Manager
 	 *
-	 * @param hostname
+	 * @param peerKey
 	 * @param hostAddress
 	 * @return The newly created connection
 	 * @throws IOException
@@ -1247,7 +1251,7 @@ public class Server implements Closeable {
 		return pc;
 	}
 
-	protected void connectToPeers(AHashMap<AccountKey, AString>peerList) {
+	protected void connectToPeers(AHashMap<AccountKey, AString> peerList) {
 		// connect to the other peers returned from the status call, or in the state list of peers
 
 		for (AccountKey peerKey: peerList.keySet()) {
@@ -1280,7 +1284,7 @@ public class Server implements Closeable {
 					continue;
 				}
 				// skip if a challenge is already being sent
-				if (challengeList.containsValue(peerKey)) {
+				if (challengeList.containsKey(peerKey)) {
 					if (!challengeList.get(peerKey).isTimedout()) {
 						// not timed out, then continue to wait
 						continue;

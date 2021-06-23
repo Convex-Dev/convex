@@ -443,7 +443,7 @@ public class Belief extends ARecord {
 				Double stake = me.getValue();
 				agreedOrders.put(blocks, stake);
 				if (stake >= totalStake * 0.5) {
-					// have a winner for sure, no point continuing so pupulate final Voting set and break
+					// have a winner for sure, no point continuing so populate final Voting set and break
 					votingSet.clear();
 					votingSet.put(blocks, stake);
 					break findWinner; 
@@ -476,8 +476,8 @@ public class Belief extends ARecord {
 		}
 		
 		if (votingSet.size() == 0) {
-			// no vote for any chain. Might happen if the peer doesn't have any stake
-			// and doesn't have any chains from other peers with stake?
+			// no vote for any Order. Might happen if the peer doesn't have any stake
+			// and doesn't have any Orders from other peers with stake?
 			return null;
 		}
 		AVector<Block> winningBlocks = votingSet.keySet().iterator().next();
