@@ -85,6 +85,11 @@ public class Init {
 
 		long USER_ALLOCATION = 994 * Coin.DIAMOND; // remaining allocation to divide between initial user accounts
 
+		// always have at least one user and one peer setup
+		assert(config.getUserCount() > 0);
+		assert(config.getPeerCount() > 0);
+		int totalUserPeerCount = config.getUserCount() + config.getPeerCount();
+
 		// Core library
 		accts = addCoreLibrary(accts, CORE_ADDRESS);
 		// Core Account should now be fully initialised
@@ -95,7 +100,7 @@ public class Init {
 			// TODO: construct addresses
 			AKeyPair kp = config.getUserKeyPair(i);
 			Address address = config.getUserAddress(i);
-			accts = addAccount(accts, address, kp.getAccountKey(), USER_ALLOCATION / 10);
+			accts = addAccount(accts, address, kp.getAccountKey(), USER_ALLOCATION / totalUserPeerCount);
 		}
 
 		// Finally add peers
@@ -106,7 +111,7 @@ public class Init {
 		for (int i = 0; i < config.getPeerCount(); i++) {
 			AKeyPair kp = config.getPeerKeyPair(i);
 			AccountKey peerKey = kp.getAccountKey();
-			long peerFunds = USER_ALLOCATION / 10;
+			long peerFunds = USER_ALLOCATION / totalUserPeerCount;
 
 			// set a staked fund such that the first peer starts with super-majority
 			long stakedFunds = (long) (((i == 0) ? 0.75 : 0.01) * peerFunds);
