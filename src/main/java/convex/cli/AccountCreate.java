@@ -75,7 +75,6 @@ public class AccountCreate implements Runnable {
 				port,
 				Main.initConfig.getUserAddress(0),
 				Main.initConfig.getUserKeyPair(0));
-			System.out.println(keyPair.getAccountKey());
 			Address address = convex.createAccount(keyPair.getAccountKey());
 			log.info("account address: " + address);
 			if (isFund) {
