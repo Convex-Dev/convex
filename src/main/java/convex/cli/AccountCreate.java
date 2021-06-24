@@ -70,12 +70,15 @@ public class AccountCreate implements Runnable {
 
 		Convex convex = null;
 		try {
+
 			convex = mainParent.connectToSessionPeer(
 				hostname,
 				port,
 				Main.initConfig.getUserAddress(0),
 				Main.initConfig.getUserKeyPair(0));
+
 			Address address = convex.createAccount(keyPair.getAccountKey());
+
 			log.info("account address: " + address);
 			if (isFund) {
 				convex.transferSync(address, Constants.ACCOUNT_FUND_AMOUNT);
@@ -83,10 +86,10 @@ public class AccountCreate implements Runnable {
 				Long balance = convex.getBalance(address);
 				log.info("account balance: " + balance);
 			}
+
 		} catch (Throwable t) {
 			log.severe(t.getMessage());
 			return;
 		}
-
 	}
 }

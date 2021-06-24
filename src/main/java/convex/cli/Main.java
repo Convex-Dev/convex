@@ -154,6 +154,31 @@ public class Main implements Runnable {
 		return Helpers.expandTilde(etchStoreFilename);
 	}
 
+	public KeyStore loadKeyStore(boolean isCreate) throws Error {
+		KeyStore keyStore = null;
+		if (password == null || password.isEmpty()) {
+			throw new Error("You need to provide a keystore password");
+		}
+		File keyFile = new File(getKeyStoreFilename());
+		try {
+			if (keyFile.exists()) {
+				keyStore = PFXTools.loadStore(keyFile, password);
+			}
+			else {
+				if (isCreate) {
+					Helpers.createPath(keyFile);
+					keyStore = PFXTools.createStore(keyFile, password);
+				}
+				else {
+					throw new Error("Cannot find keystore file "+keyFile.getCanonicalPath());
+				}
+			}
+		} catch(Throwable t) {
+			new Error(t);
+		}
+		return keyStore;
+	}
+
 	public AKeyPair loadKeyFromStore(String keystorePublicKey, int keystoreIndex) throws Error {
 
 		AKeyPair keyPair = null;
