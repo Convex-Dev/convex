@@ -75,7 +75,7 @@ import convex.core.util.Utils;
  * </ul>
  *
  * Where possible, we implement core functions in Convex Lisp itself, see
- * resources/lang/core.con
+ * resources/lang/core.cvx
  *
  * "Java is the most distressing thing to hit computing since MS-DOS." - Alan
  * Kay
@@ -2313,7 +2313,7 @@ public class Core {
 	}
 
 	/**
-	 * Bootstrap procedure to load the core.con library
+	 * Bootstrap procedure to load the core.cvx library
 	 *
 	 * @param env Initial environment map
 	 * @return Loaded environment map
@@ -2333,7 +2333,7 @@ public class Core {
 		ACell form = null;
 
 		// Compile and execute forms in turn. Later definitions can use earlier macros!
-		AList<ACell> forms = Reader.readAll(Utils.readResourceAsString("lang/core.con"));
+		AList<ACell> forms = Reader.readAll(Utils.readResourceAsString("lang/core.cvx"));
 		for (ACell f : forms) {
 			form = f;
 			ctx=ctx.expandCompile(form);

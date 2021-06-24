@@ -14,13 +14,13 @@ public class InitConfigTest extends InitConfig {
 	public static final AKeyPair USER_KEYPAIRS[] = new Ed25519KeyPair[NUM_USERS];
 	public static final AKeyPair PEER_KEYPAIRS[] = new Ed25519KeyPair[NUM_PEERS];
 
-	public static final Address HERO_ADDRESS = Init.calcAddress(0, 0, 0);
+	public static final Address HERO_ADDRESS = Init.calcUserAddress(0);
 	public static final AKeyPair HERO_KEYPAIR;
 
-	public static final Address VILLAIN_ADDRESS = Init.calcAddress(0, 0, 1);
+	public static final Address VILLAIN_ADDRESS = Init.calcUserAddress(1);
 	public static final AKeyPair VILLAIN_KEYPAIR;
 
-	public static final Address FIRST_PEER_ADDRESS = Init.calcAddress(NUM_USERS, 0, 0);
+	public static final Address FIRST_PEER_ADDRESS = Init.calcPeerAddress(NUM_USERS, 0);
 	public static final AKeyPair FIRST_PEER_KEYPAIR;
 	public static final AccountKey FIRST_PEER_KEY;
 

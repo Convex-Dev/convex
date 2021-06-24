@@ -15,15 +15,14 @@ import convex.core.lang.ACVMTest;
 
 /**
  * Tests for Init functionality
- * 
+ *
  * Also includes static State instances for Testing
  */
 public class InitTest extends ACVMTest {
 
 	public static final State STATE=Init.createState(InitConfigTest.create());
-	public static final State BASE = Init.createBaseAccounts(InitConfigTest.create());
-	public static final State CORE = Init.createCoreLibraries(InitConfigTest.create());
-	
+	public static final State BASE = Init.createBaseState(InitConfigTest.create());
+
 	protected InitTest() {
 		super(STATE);
 	}

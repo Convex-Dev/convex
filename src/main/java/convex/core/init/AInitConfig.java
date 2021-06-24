@@ -30,11 +30,11 @@ public abstract class AInitConfig {
     }
 
 	public Address getUserAddress(int index) {
-		return Init.calcAddress(0, 0, index);
+		return Init.calcUserAddress(index);
 	}
 
 	public Address getPeerAddress(int index) {
-		return Init.calcAddress(getUserCount(), 0, index);
+		return Init.calcPeerAddress(getUserCount(), index);
 	}
 
 	public Address[] getPeerAddressList() {
@@ -43,10 +43,6 @@ public abstract class AInitConfig {
 			result[index] = getPeerAddress(index);
 		}
 		return result;
-	}
-
-	public Address getLibraryAddress(int index) {
-		return Init.calcAddress(getUserCount(), getPeerCount(), index);
 	}
 
 }

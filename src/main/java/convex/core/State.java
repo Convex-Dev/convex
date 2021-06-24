@@ -45,9 +45,9 @@ import convex.core.util.Counters;
 
 /**
  * Class representing the immutable state of the CVM
- * 
+ *
  * State transitions are represented by blocks of transactions, according to the logic: s[n+1] = s[n].applyBlock(b[n])
- * 
+ *
  * State contains the following elements - Map of AccountStatus for every
  * Address - Map of PeerStatus for every Peer Address - Global values - Schedule
  * data structure
@@ -60,13 +60,13 @@ public class State extends ARecord {
 			Keywords.GLOBALS, Keywords.SCHEDULE };
 
 	private static final RecordFormat FORMAT = RecordFormat.of(STATE_KEYS);
-	
+
 	public static final AVector<Symbol> GLOBAL_SYMBOLS=Vectors.of(Symbols.TIMESTAMP, Symbols.FEES, Symbols.JUICE_PRICE);
 
 	public static final int GLOBAL_TIMESTAMP=0;
 	public static final int GLOBAL_FEES=1;
 	public static final int GLOBAL_JUICE_PRICE=2;
-	
+
 	public static final State EMPTY = create(Vectors.empty(), BlobMaps.empty(), Constants.INITIAL_GLOBALS,
 			BlobMaps.empty());
 
@@ -75,7 +75,7 @@ public class State extends ARecord {
 
 	// Note: we are embedding these directly in the State cell.
 	// TODO: check we aren't at risk of hitting max encoding size limits
-	
+
 	private final AVector<AccountStatus> accounts;
 	private final BlobMap<AccountKey, PeerStatus> peers;
 	private final AVector<ACell> globals;
@@ -98,7 +98,7 @@ public class State extends ARecord {
 		if (Keywords.SCHEDULE.equals(k)) return schedule;
 		return null;
 	}
-	
+
 	@Override
 	public int getRefCount() {
 		int rc=accounts.getRefCount();
@@ -107,16 +107,16 @@ public class State extends ARecord {
 		rc+=schedule.getRefCount();
 		return rc;
 	}
-	
+
 	public <R extends ACell> Ref<R> getRef(int i) {
 		if (i<0) throw new IndexOutOfBoundsException(i);
-		
+
 		{
 			int c=accounts.getRefCount();
 			if (i<c) return accounts.getRef(i);
 			i-=c;
 		}
-		
+
 		{
 			int c=peers.getRefCount();
 			if (i<c) return peers.getRef(i);
@@ -128,13 +128,13 @@ public class State extends ARecord {
 			if (i<c) return globals.getRef(i);
 			i-=c;
 		}
-		
+
 		{
 			int c=schedule.getRefCount();
 			if (i<c) return schedule.getRef(i);
 			i-=c;
 		}
-		
+
 		throw new IndexOutOfBoundsException(i);
 	}
 
@@ -171,7 +171,7 @@ public class State extends ARecord {
 		pos = schedule.write(bs,pos);
 		return pos;
 	}
-	
+
 	@Override
 	public long getEncodingLength() {
 		long length=1;
@@ -181,7 +181,7 @@ public class State extends ARecord {
 		length+=schedule.getEncodingLength();
 		return length;
 	}
-	
+
 	@Override
 	public int estimatedEncodingSize() {
 		int est=1;
@@ -194,7 +194,7 @@ public class State extends ARecord {
 
 	/**
 	 * Reads a State from a ByteBuffer encoding. Assumes tag byte already read.
-	 * 
+	 *
 	 * @param bb
 	 * @return The State read
 	 * @throws BadFormatException If a State could not be read
@@ -217,7 +217,7 @@ public class State extends ARecord {
 
 	/**
 	 * Gets the map of Peers for this State
-	 * 
+	 *
 	 * @return A map of addresses to PeerStatus records
 	 */
 	public BlobMap<AccountKey, PeerStatus> getPeers() {
@@ -247,9 +247,9 @@ public class State extends ARecord {
 
 	/**
 	 * Block level state transition function
-	 * 
+	 *
 	 * Updates the state by applying a given block of transactions
-	 * 
+	 *
 	 * @param block
 	 * @return The BlockResult from applying the given Block to this State
 	 * @throws BadSignatureException If any transaction is not signed correctly
@@ -370,7 +370,7 @@ public class State extends ARecord {
 			try {
 				// execute the transaction using the *latest* state (not necessarily "this")
 				Context<?> ctx = state.applyTransaction(signed);
-				
+
 				// record results and state update
 				results[i] = Result.fromContext(CVMLong.create(i),ctx);
 				state = ctx.getState();
@@ -381,17 +381,17 @@ public class State extends ARecord {
 				log.severe(msg);
 			}
 		}
-		
+
 		// TODO: changes for complete block?
 		return BlockResult.create(state, results);
 	}
-	
+
 
 	/**
-	 * Applies a signed transaction to the State. 
-	 * 
+	 * Applies a signed transaction to the State.
+	 *
 	 * SECURITY: Checks digital signature and correctness of account key
-	 * 
+	 *
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
 	private <T extends ACell> Context<T> applyTransaction(SignedData<? extends ATransaction> signedTransaction) throws BadSignatureException {
@@ -402,56 +402,56 @@ public class State extends ARecord {
 		if (as==null) {
 			return Context.createFake(this).withError(ErrorCodes.NOBODY,"Transaction for non-existent Account: "+addr);
 		} else {
-			AccountKey key=as.getAccountKey(); 
+			AccountKey key=as.getAccountKey();
 			if (key==null) return Context.createFake(this).withError(ErrorCodes.NOBODY,"Transaction for account that is an Actor: "+addr);
 			if (!Utils.equal(key, signedTransaction.getAccountKey())) {
 				return Context.createFake(this).withError(ErrorCodes.SIGNATURE,"Signature not valid for Account: "+addr+" expected public key: "+key);
 			}
 		}
-		
+
 		Context<T> ctx=applyTransaction(t);
 		return ctx;
 	}
-	
+
 	/**
-	 * Applies a transaction to the State. 
-	 * 
+	 * Applies a transaction to the State.
+	 *
 	 * There are three phases in application of a transaction:
 	 * <ol>
 	 * <li>Preparation for accounting, with {@link #prepareTransaction(Address, ATransaction) prepareTransaction}</li>
 	 * <li>Functional application of the transaction with ATransaction.apply(....)</li>
 	 * <li>Completion of accounting, with completeTransaction</li>
 	 * </ol>
-	 * 
+	 *
 	 * SECURITY: Assumes digital signature already checked.
-	 * 
+	 *
 	 * @param t Transaction to apply
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
 	public <T extends ACell> Context<T> applyTransaction(ATransaction t) {
 		Address origin = t.getAddress();
-		
+
 		try {
 			// Create prepared context (juice subtracted, sequence updated, transaction entry checks)
 			Context<T> ctx = prepareTransaction(origin,t);
 			final long totalJuice = ctx.getJuice();
-			
+
 			if (ctx.isExceptional()) {
 				// We hit some error while preparing transaction. Return context with no state change,
 				// i.e. before executing the transaction
 				return ctx;
 			}
-			
+
 			State preparedState=ctx.getState();
-	
-	
+
+
 			// apply transaction. This may result in an error!
 			ctx = t.apply(ctx);
-	
+
 			// complete transaction
 			// NOTE: completeTransaction handles error cases as well
 			ctx = ctx.completeTransaction(preparedState, totalJuice);
-	
+
 			return ctx;
 		} catch (Throwable ex) {
 			// SECURITY: This should never happen!
@@ -464,7 +464,7 @@ public class State extends ARecord {
 			return fCtx;
 		}
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> Context<T> prepareTransaction(Address origin,ATransaction t) {
 		// Pre-transaction state updates (persisted even if transaction fails)
@@ -480,7 +480,7 @@ public class State extends ARecord {
 			return Context.createFake(this,origin).withError(ErrorCodes.SEQUENCE, "Received = "+sequence+" & Expected = "+(account.getSequence()+1));
 		}
 		State preparedState = this.putAccount(origin, newAccount);
-		
+
 		// Create context with juice subtracted
 		Long maxJuice=t.getMaxJuice();
 		long juiceLimit=Math.min(Constants.MAX_TRANSACTION_JUICE,(maxJuice==null)?account.getBalance():maxJuice);
@@ -496,7 +496,7 @@ public class State extends ARecord {
 	/**
 	 * Computes the weighted stake for each peer. Adds a single entry for the null
 	 * key, containing the total stake
-	 * 
+	 *
 	 * @return @
 	 */
 	public HashMap<AccountKey, Double> computeStakes() {
@@ -517,7 +517,7 @@ public class State extends ARecord {
 
 	/**
 	 * Returns this state after updating the given account
-	 * 
+	 *
 	 * @param address
 	 * @param accountStatus
 	 * @return Updates State, or this state if Account was unchanged
@@ -528,7 +528,7 @@ public class State extends ARecord {
 		if (ix>n) {
 			throw new IndexOutOfBoundsException("Trying to add an account beyond accounts array at position: "+ix);
 		}
-		
+
 		AVector<AccountStatus> newAccounts;
 		if (ix==n) {
 			// adding a new account in next position
@@ -536,13 +536,13 @@ public class State extends ARecord {
 		} else {
 			newAccounts = accounts.assoc(ix, accountStatus);
 		}
-		
+
 		return withAccounts(newAccounts);
 	}
 
 	/**
 	 * Gets the AccountStatus for a given account, or null if not found.
-	 * 
+	 *
 	 * @param target
 	 * @return The AccountStatus for the given account, or null.
 	 */
@@ -554,7 +554,7 @@ public class State extends ARecord {
 
 	/**
 	 * Gets the environment for a given account, or null if not found.
-	 * 
+	 *
 	 * @param addr Address of account to obtain
 	 * @return The environment of the given account, or null if not found.
 	 */
@@ -582,9 +582,9 @@ public class State extends ARecord {
 
 	/**
 	 * Deploys the specified Actor environment in the current state.
-	 * 
+	 *
 	 * Returns the updated state. The actor will be the last account.
-	 * 
+	 *
 	 * @param address
 	 * @param actorArgs
 	 * @param environment Environment to use for new Actor Account. Can be null.
@@ -598,9 +598,9 @@ public class State extends ARecord {
 
 	/**
 	 * Compute the total funds existing within this state.
-	 * 
+	 *
 	 * Should be constant! 1,000,000,000,000,000,000 in full deployment mode
-	 * 
+	 *
 	 * @return The total value of all funds
 	 */
 	public long computeTotalFunds() {
@@ -625,7 +625,7 @@ public class State extends ARecord {
 
 	/**
 	 * Gets the current global timestamp from this state.
-	 * 
+	 *
 	 * @return The timestamp from this state.
 	 */
 	public CVMLong getTimeStamp() {
@@ -638,9 +638,9 @@ public class State extends ARecord {
 
 	/**
 	 * Schedules an operation with the given timestamp and Op in this state
-	 * 
+	 *
 	 * @param time Timestamp at which to execute the scheduled op
-	 * 
+	 *
 	 * @param address AccountAddress to schedule op for
 	 * @param op Op to execute in schedule
 	 * @return The updated State
@@ -662,7 +662,7 @@ public class State extends ARecord {
 
 	/**
 	 * Gets the current schedule data structure for this state
-	 * 
+	 *
 	 * @return The schedule data structure.
 	 */
 	public BlobMap<ABlob, AVector<ACell>> getSchedule() {
@@ -672,7 +672,7 @@ public class State extends ARecord {
 	public CVMLong getGlobalFees() {
 		return (CVMLong) globals.get(GLOBAL_FEES);
 	}
-	
+
 	public State withGlobalFees(CVMLong newFees) {
 		return withGlobals(globals.assoc(GLOBAL_FEES,newFees));
 	}
@@ -681,7 +681,7 @@ public class State extends ARecord {
 	/**
 	 * Gets the PeerStatus record for the given Address, or null if it does not
 	 * exist
-	 * 
+	 *
 	 * @param peerAddress Address of Peer to check
 	 * @return PeerStatus
 	 */
@@ -691,7 +691,7 @@ public class State extends ARecord {
 
 	/**
 	 * Updates the specified peer status
-	 * 
+	 *
 	 * @param peerKey
 	 * @param updatedPeer
 	 * @return Updated state
@@ -711,7 +711,7 @@ public class State extends ARecord {
 
 	/**
 	 * Gets globals.
-	 * 
+	 *
 	 * @return Vector of global values
 	 */
 	public AVector<ACell> getGlobals() {

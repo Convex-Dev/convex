@@ -30,7 +30,7 @@ public class TrustTest extends ACVMTest {
 
 	private Context<?> CONTEXT;
 	protected TrustTest() throws IOException {
-		super(InitTest.CORE);
+		super(InitTest.BASE);
 		Context<?> ctx = context();
 
 		assert(ctx.getDepth()==0):"Invalid depth: "+ctx.getDepth();
