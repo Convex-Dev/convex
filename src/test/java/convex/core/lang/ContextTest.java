@@ -22,6 +22,7 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.BlobMaps;
+import convex.core.data.Keyword;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
@@ -91,7 +92,7 @@ public class ContextTest extends ACVMTest {
 		assertTrue(ctx.withError(ErrorCodes.ASSERT).isExceptional());
 		assertTrue(ctx.withError(ErrorCodes.ASSERT,"Assert Failed").isExceptional());
 
-		assertThrows(IllegalArgumentException.class,()->ctx.withError(null));
+		assertThrows(IllegalArgumentException.class,()->ctx.withError((Keyword)null));
 
 		assertThrows(Error.class,()->ctx.withError(ErrorCodes.ASSERT).getResult());
 	}

@@ -1928,7 +1928,7 @@ public class Core {
 			ACell message = (alen >0) ? (ACell)args[alen-1] : null;
 			ErrorValue error = ErrorValue.createRaw(code, message);
 
-			return context.withException(error);
+			return context.withError(error);
 		}
 	});
 

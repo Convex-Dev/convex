@@ -72,7 +72,7 @@ import convex.core.util.Utils;
  *
  * @param <T> Result type of Context
  */
-public final class Context<T extends ACell> extends AObject {
+public class Context<T extends ACell> extends AObject {
 	private static final long INITIAL_JUICE = 0;
 
 	// Default values
@@ -785,11 +785,9 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return Exceptional Context signalling JUICE error.
 	 */
 	public <R extends ACell> Context<R> withJuiceError() {
-		AExceptional err=ErrorValue.create(ErrorCodes.JUICE,Strings.create("Out of juice!"));
-
 		// set juice to zero. Can't consume more that we have!
 		this.juice=0;
-		return withException(err);
+		return withError(ErrorCodes.JUICE,"Out of juice!");
 	}
 
 	@SuppressWarnings("unchecked")
@@ -1725,12 +1723,19 @@ public final class Context<T extends ACell> extends AObject {
 
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> withError(Keyword error) {
-		return (Context<R>) withException(ErrorValue.create(error));
+		return (Context<R>) withError(ErrorValue.create(error));
 	}
 
 	public <R extends ACell> Context<R> withError(Keyword errorCode,String message) {
-		return withException(ErrorValue.create(errorCode,Strings.create(message)));
+		return withError(ErrorValue.create(errorCode,Strings.create(message)));
 	}
+	
+	@SuppressWarnings("unchecked")
+	public <R extends ACell> Context<R> withError(ErrorValue error) {
+		error.addLog(log);
+		return (Context<R>) withException(error);
+	}
+
 
 	public <R extends ACell> Context<R> withArityError(String message) {
 		return withError(ErrorCodes.ARITY,message);
