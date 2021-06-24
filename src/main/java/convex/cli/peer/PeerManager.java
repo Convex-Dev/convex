@@ -2,29 +2,39 @@ package convex.cli.peer;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Future;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
 
+import convex.api.Convex;
 import convex.api.Shutdown;
 import convex.cli.Helpers;
 import convex.cli.Main;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.data.AccountKey;
+import convex.core.data.ACell;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.init.AInitConfig;
+import convex.core.lang.Reader;
 import convex.core.store.AStore;
+import convex.core.transactions.ATransaction;
+import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
+import convex.core.Result;
 import convex.peer.API;
 import convex.peer.IServerEvent;
 import convex.peer.Server;
 import convex.peer.ServerEvent;
 import convex.peer.ServerInformation;
+
 import etch.EtchStore;
 
 
@@ -55,8 +65,26 @@ public class PeerManager implements IServerEvent {
         return new PeerManager(sessionFilename);
 	}
 
-	public void launchLocalPeers(int count) {
-		peerServerList = API.launchLocalPeers(count, Main.initConfig, this);
+	public void launchLocalPeers(int count, AInitConfig initConfig) {
+		peerServerList = API.launchLocalPeers(count, initConfig, this);
+
+		// we need to start doing the first invoke on a peer to start all the other
+		// peers to connect and sync with the consensus.
+
+		Server server = peerServerList.get(0);
+		InetSocketAddress hostAddress = server.getHostAddress();
+
+		Address peerAddress = initConfig.getUserAddress(0);
+		try {
+			Convex convex = Convex.connect(hostAddress, peerAddress, initConfig.getUserKeyPair(0));
+
+			// send a 'do' to wake up the other peers
+			ACell message = Reader.read("(do)");
+			ATransaction transaction = Invoke.create(peerAddress,-1, message);
+			Future<Result> future = convex.transact(transaction);
+		} catch (IOException e) {
+			log.severe("cannot connect to the first peer "+e);
+		}
 	}
 
     public void launchPeer(AKeyPair keyPair, Address peerAddress, String hostname, int port, AStore store) {

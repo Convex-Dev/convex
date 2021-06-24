@@ -37,12 +37,15 @@ public class LocalStart implements Runnable {
 
 		// TODO: Parse peer config
 		// Map<Keyword,Object> peerConfig=new HashMap<>();
+        if (count == 0) {
+            count = Main.initConfig.getPeerCount();
+        }
 
 		if (count > Main.initConfig.getPeerCount()) {
 			log.severe("Number of peers " + count + " is greater than " + Main.initConfig.getPeerCount());
 		}
 		log.info("Starting local network with "+count+" peer(s)");
-		peerManager.launchLocalPeers(count);
+		peerManager.launchLocalPeers(count, Main.initConfig);
 		peerManager.showPeerEvents();
 	}
 }
