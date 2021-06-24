@@ -178,7 +178,7 @@ public class Init {
 		}
 
 		/*
-		 * WARNING this test below does not correctly calculate the total funds of the state, since
+		 * This test below does not correctly calculate the total funds of the state, since
 		 * the peers have not yet been added.
 		 *
 		{ // Test total funds after creating core libraries
