@@ -17,7 +17,6 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
 import convex.core.ErrorCodes;
-import convex.core.data.ABlobMap;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
@@ -185,13 +184,12 @@ public class ContextTest extends ACVMTest {
 		AVector<ACell> v=Vectors.of(1,2,3);
 		c.appendLog(v);
 
-		ABlobMap<Address,AVector<AVector<ACell>>> log=c.getLog();
+		AVector<AVector<ACell>> log=c.getLog();
 		assertFalse(c.getLog().isEmpty());
 
 
-		AVector<AVector<ACell>> alog=log.get(c.getAddress());
-		assertEquals(1,alog.count());
-		assertEquals(v,alog.get(0));
+		assertEquals(1,log.count());
+		assertEquals(v,log.get(0).get(1));
 	}
 
 	@Test
