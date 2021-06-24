@@ -3,45 +3,45 @@
 ;; Ordering matters! Later definitions may require earlier ones.
 
 ; TODO: Experimental 'macro' definition in Convex Lisp
-;(def macro2 
+;(def macro2
 ;  (expander (fn [x e] ;; x is (macro & spec)
 ;              (let [spec (next (unsyntax x))]
-;                (expand 
+;                (expand
 ;                  '(let [f ~(cons 'fn spec)]
 ;                     (expander (fn [x e] (expand (f x) e)))) e)))))
 
 
 
-(def defexpander 
+(def defexpander
   ^{:doc {:description "Defines an expander in the current environment."
            :examples [{:code "(defexpander expand-once [x e] (e x (fn [x e] x)))"}]
            :type :macro
            :signature [{:params [a]}]}
     :expander true
    }
-  (fn [x e] 
+  (fn [x e]
       (let [[_ name & decl] x
             exp (cons 'fn decl)
             form `(def ~(syntax name {:expander true}) ~exp)]
          (e form e))))
 
-(def defmacro 
+(def defmacro
   ^{:doc {:description "Defines a macro in the current environment. A macro is a special function that is executed at compile time, and produces valid Convex Lisp code for subsequent execution."
           :examples [{:code "(defmacro foo [x] '(if (good? x) x (fix x)))"}]
           :type :macro
           :signature [{:params [name params & body]}]}
     :expander true
    }
-  (fn [x e] 
+  (fn [x e]
      (let [[_ name & decl] x
            mac (cons 'fn decl)
            mmeta (meta (first decl))
-           form `(def ~(syntax name (merge mmeta {:expander true})) 
+           form `(def ~(syntax name (merge mmeta {:expander true}))
                    (let [m# ~mac]
                      (fn [x e] (e (apply m# (next x)) e))))]
        (e form e))))
 
-(defmacro macro 
+(defmacro macro
   ^{:doc {:description "Creates an anonymous macro function, suitable for use as an expander."
           :examples [{:code "(macro [x] (if x :foo :bar))"}]
           :type :macro
@@ -61,27 +61,27 @@
          :type :macro
          :signature [
                     {:params [test true-exp]}
-                    {:params [test true-exp false-exp]} 
-                    ] 
+                    {:params [test true-exp false-exp]}
+                    ]
          }
     :expander true
 	}
   [test & cases]
   (cond (<= 1 (count cases) 2) nil (fail :ARITY "if requires 2 or 3 arguments"))
   (cons 'cond test cases))
- 
-(defmacro defn 
+
+(defmacro defn
   ^{:doc {:description "Defines a function in the current environment."
          :examples [{:code "(defn my-square [x] (* x x))"}]
-         :type :macro	 
+         :type :macro
          :signature [{:params [name params & body]}
                      {:params [name & fn-decls]}]}
 	}
-  [name & decl] 
+  [name & decl]
   (let [fnform (cons 'fn decl)
         _ (cond (empty? decl) (fail :ARITY "defn requires at lest one function definition"))
         fst (first decl)
-        name (cond (syntax fst) (syntax name (meta fst)) name)] 
+        name (cond (syntax fst) (syntax name (meta fst)) name)]
     `(def ~name ~fnform)))
 
 (defmacro assert
@@ -97,125 +97,125 @@
 (defmacro doc
   ^{:doc {:description "Returns the documentation for a given definition."
          :examples [{:code "(doc count)"}]
-         :type :macro	 
+         :type :macro
          :signature [{:params [sym]}]}
 	}
   [sym]
   `(:doc (lookup-meta (quote ~sym))))
 
-(defmacro or 
+(defmacro or
   ^{:doc {:description "Executes expressions in sequence, returning the first truthy value, or the last value if all were falsey. Does not evaluate later expressions, so can be used to short circuit execution. Returns nil with no expressions present."
          :examples [{:code "(or nil 1)"}]
-         :type :macro	 
+         :type :macro
          :signature [{:params [& exprs]}]}
 	}
   [& exprs]
-  (let [n (count exprs)] 
-    (cond 
+  (let [n (count exprs)]
+    (cond
       (== n 0) nil
       (== n 1) (first exprs)
       :else `(let [v# ~(first exprs)]
                (cond v# v# ~(cons 'or (next exprs)))))))
 
-(defmacro and 
+(defmacro and
   ^{:doc {:description "Executes expressions in sequence, returning the first falsey value, or the last value if all were truthy. Does not evaluate later expressions, so can be used to short circuit execution. Returns true with no expressions present."
          :examples [{:code "(and 1 2)"}]
-         :type :macro	 
+         :type :macro
          :signature [{:params [& exprs]}]}
 	}
   [& exprs]
-  (let [n (count exprs)] 
-    (cond 
+  (let [n (count exprs)]
+    (cond
       (== n 0) true
       (== n 1) (first exprs)
       :else `(let [v# ~(first exprs)]
                (cond v# ~(cons 'and (next exprs)) v#)))))
 
 
-(defmacro when 
+(defmacro when
   ^{:doc {:description "Executes body expressions in an implicit do block if af and only if the test expression evaluates to a truthy value."
          :examples [{:code "(when (some-condition) (rollback :this-went-wrong))"}]
-         :type :macro	 
+         :type :macro
          :signature [{:params [test & body]}]}
 	}
-  [test & body] 
+  [test & body]
   `(cond ~test ~(cons 'do body)))
 
-(defmacro when-not 
+(defmacro when-not
    ^{:doc {:description "Executes body expressions in an implicit do block if af and only if the test expression evaluates to a falsey value."
          :examples [{:code "(when-not (some-condition) (return :some-result))"}]
-         :type :macro	 
+         :type :macro
          :signature [{:params [test & body]}]}
 	}
-  [test & body] 
+  [test & body]
   `(cond ~test nil ~(cons 'do body)))
 
-(defn mapcat 
+(defn mapcat
   ^{:doc {:description "Maps a funcion across the given collections, then concatenates the results. nil is treated as an empty collection."
          :examples [{:code "(mapcat vector [:foo :bar :baz] [1 2 3])"}]
          :type :function
          :signature [{:params [test & body]}]}
 	}
-  [f coll & more] 
+  [f coll & more]
   (apply concat (empty coll) (apply map f coll more)))
 
-(defn identity 
+(defn identity
   ^{:doc {:description "An identity function which returns a single argument unchanged. Most useful when you want a 'do nothing' operation in higher order functions."
          :examples [{:code "(identity :foo)"}
                     {:code "(map identity [1 2 3])"}]
-         :type :function	 
+         :type :function
          :signature [{:params [a]}]}
 	}
-  [a] 
+  [a]
   a)
 
-(defn max 
+(defn max
   ^{:doc {:description "Returns the numerical maximum of the given values."
          :examples [{:code "(max 1 2 3)"}]
-         :type :function	 
+         :type :function
          :signature [{:params [& vals]}]}
 	}
   [fst & more]
   (let [n (count more)]
     (loop [m (+ fst 0) i 0] ;; add zero to ensure number
-  (cond 
+  (cond
     (>= i n) m
         (let [v (nth more i)]
       (and (nan? v) (return v))
           (recur (cond (> v m) v m) (inc i)))))))
 
-(defn min 
+(defn min
   ^{:doc {:description "Returns the numerical minimum of the given values."
          :examples [{:code "(min 1 2 3)"}]
-         :type :function	 
+         :type :function
          :signature [{:params [& vals]}]}
 	}
   [fst & more]
   (let [n (count more)]
     (loop [m (+ fst 0) i 0] ;; add zero to ensure number
-      (cond (>= i n) 
+      (cond (>= i n)
         m
         (let [v (nth more i)]
           (and (nan? v) (return v))
           (recur (cond (< v m) v m) (inc i)))))))
 
-(defn mapv 
+(defn mapv
   ^{:doc {:description "Maps a function over the given collections as with map, and returns the resturn as a vector."
           :examples [{:code "(mapv inc '(1 2 3))"}]
-          :type :function	 
+          :type :function
           :signature [{:params [f & colls] }]}
     }
-  [f & colls] 
+  [f & colls]
   (vec (apply map f colls)))
 
-(defmacro call 
+(defmacro call
    ^{:doc {:description "Calls a smart contract function. If offer is specified, offers this amount of coins."
           :examples [{:code "(call smart-contract (some-function 1 2 3))"}]
-          :type :macro	 
+          :type :macro
           :signature [{:params [addr funcall] }
                       {:params [addr offer funcall]}]}
     }
-  [addr & more] 
+  [addr & more]
   (let [addr (unsyntax addr)]
 	  (if (empty? more) (fail :ARITY "Insufficient arguments to call")) ;; TODO remove magic number
 	  (let [n (count more)
@@ -227,35 +227,35 @@
 	      (== n 1) (cons 'call* addr 0 fnlist)
 	      (== n 2) (cons 'call* addr (first more) fnlist)))))
 
-(defmacro tailcall 
+(defmacro tailcall
    ^{:doc {:description "Calls a function as a tail call. Will return from the current function with the result of the tail call, without consuming additional stack depth."
           :examples [{:code "(tailcall (some-function 1 2 3))"}]
-          :type :macro	 
+          :type :macro
           :signature [{:params [[f & args]] }]}
     }
-  [callspec] 
+  [callspec]
   (let []
-	  (or (list? callspec) (fail :ARGUMENT "Tailcall requires a list representing function invocation")) 
+	  (or (list? callspec) (fail :ARGUMENT "Tailcall requires a list representing function invocation"))
 	  (let [n (count callspec)]
       (cond (== n 0) (fail :ARGUMENT "Tailcall requires at least a function argument in call list"))
 	    (cons 'tailcall* callspec))))
 
-(def *exports* 
+(def *exports*
   ^{:doc {:description "A set of functions that are exported by the current smart contract. Exported functions may be called by any acount: suitable precautions should be applied."
           :examples [{:code "(assert (set? *exports*))"}]
           :type :value}}
   #{})
 
-(defmacro export 
+(defmacro export
   ^{:doc {:description "Exports symbols from the current actor. Exported symbols may be called by external parties. It is advised to carefully audit the security of usages of this function: normally, an actor's deployment code should have a single export statement that exports functions that have been validated as safe and intended to provide a public API to the actor."
           :examples [{:code "(export some-safe-function)"}]
           :type :macro
           :signature [{:params [& symbols]}]}
 	}
   [& syms]
-  (let [f (fn [s] 
-            (let [esym (unsyntax s)] 
-              (or (symbol? esym) (fail :CAST (str "Not a symbol: " esym))) 
+  (let [f (fn [s]
+            (let [esym (unsyntax s)]
+              (or (symbol? esym) (fail :CAST (str "Not a symbol: " esym)))
               (list 'quote esym)))
         qsyms (mapv f syms)
         vals (cons 'vector qsyms)]
@@ -265,12 +265,12 @@
   ^{:doc {:description "The address of the Convex registry Actor."
           :examples [{:code "(call *registry* (register {:name \"My name\"}))"}]
           :type :value}}
-  (address 20))
- 
+  (address 10))
+
 (defmacro undef
     ^{:doc {:description "Undefines a symbol, removing the mapping from the current environment if it exists."
           :examples [{:code "(do (def foo 1) (undef foo))"}]
-          :type :macro	 
+          :type :macro
           :signature [{:params [sym]}]}}
     [sym]
     `(undef* ~(list 'quote sym)))
@@ -283,41 +283,41 @@
   [addr as sym]
 	  (let [code (cond
 	               (symbol? addr)
-	                  `(or (call* *registry* 0 'cns-resolve (quote ~addr)) 
+	                  `(or (call* *registry* 0 'cns-resolve (quote ~addr))
 	                      (fail :NOBODY (str "Could not resolve library name for import: " (quote ~addr))))
 	               `(address ~addr))
 	        sym (cond (symbol? sym) sym
-	                  (fail "import: alias must be a symbol"))] 
+	                  (fail "import: alias must be a symbol"))]
 	    (assert (= :as as))
 	    `(def ~sym ~code)))
 
 (defmacro actor
   ^{:doc {:description "Creates an actor generation function. This function generates depolyable code when called, and may take optional arguments to configure the deployed actor. The resulting code can be used with either 'deploy' or 'deploy-once'."
          :examples [{:code "(let [agf (actor [x] (defn calc [y] (* x y)) (export calc))] (deploy (agf 13)))"}]
-         :type :macro	 
+         :type :macro
          :signature [{:params [name params & body]}]}
 	}
-  [params & body] 
+  [params & body]
   (let [bindlist (reduce (fn [v p] (conj (conj v p) (list 'unquote p))) [] params)
-        code 
+        code
         (list 'quasiquote (cons 'let bindlist body))
-       ] 
+       ]
     `(fn ~params ~code)))
 
 (defmacro defactor
   ^{:doc {:description "Defines an actor generation function in the environment. See 'actor' for more details on actor generation functions."
          :examples [{:code "(defactor multiply-actor [x] (defn calc [y] (* x y)) (export calc))"}]
-         :type :macro	 
+         :type :macro
          :signature [{:params [name params & body]}]}
 	}
-  [name params & body] 
+  [name params & body]
   (let [actr (cons 'actor params body)]
     `(def ~name ~actr)))
 
 (defmacro defined?
     ^{:doc {:description "Tests if a given symbol name is defined in the current environment."
          :examples [{:code "(defined? defined?)"}]
-         :type :macro	 
+         :type :macro
          :signature [{:params [sym]}]}
 	}
   [sym]
@@ -333,7 +333,7 @@
     [timestamp code]
   `(schedule* ~timestamp (compile ~(list 'quote code))))
 
-(defmacro dotimes 
+(defmacro dotimes
   ^{
     :doc {:description "Repeats execution of the body 'count' times, binding the specified symbol from 0 to (count-1) on successive iterations. Returns nil in all cases."
           :examples [{:code "(dotimes [i 10] (transfer *address* 10))"}]
@@ -344,12 +344,12 @@
         sym (if (symbol? (unsyntax sym)) sym (fail :CAST "dotimes requires a symbol for loop binding"))] ;; Dubious: allows strings and keywords?
     `(loop [~sym 0]
        (if (< ~sym ~n)
-         (do 
+         (do
            ~(cons do body)
            (recur (inc ~sym)))
          nil))))
 
-(defmacro when-let 
+(defmacro when-let
   ^{
     :doc {:description "Executes the body with the symbol bound to the value of evaluating a given expression, if and only if the result of the expression is truthy. Returns nil otherwise."
           :examples [{:code "(when-let [addr  (get-address)] (transfer addr 1000))"}]
@@ -362,7 +362,7 @@
          ~dobody
          nil))))
 
-(defmacro for 
+(defmacro for
   ^{
     :doc {:description "Executes the body with the symbol 'sym' bound to each value of the given sequence. Returns a vector of results."
           :examples [{:code "(for [x [1 2 3]] (inc x))"}]
@@ -371,7 +371,7 @@
   [[sym sequence] & body]
   `(map ~(cons 'fn (vector sym) body) (vec ~sequence)))
 
-(defmacro if-let 
+(defmacro if-let
   ^{
     :doc {:description "Binds a symbol to the result of evaluating a given expression, and executes a true expression or false expression depending on the result in the same manner as 'if'"
           :examples [{:code "(if-let [addr  (get-address)] (transfer addr 1000))"}]
@@ -381,11 +381,11 @@
     `(let [~sym ~exp]
        ~(cons 'if sym branches)))
 
-(defn account? 
+(defn account?
   ^{
     :doc {:description "Tests if the given Address refers to a valid existing acount (which may be either an Actor or User account). Returns false for any non-Address argument, or any Address that does not refer to a currently existing Account."
           :examples [{:code "(account? *caller*)"}]
-          :type :function 
+          :type :function
           :signature [{:params [address]
                        :return Boolean}]}
   }
@@ -394,7 +394,7 @@
     (address? addr) (boolean (account addr))
     false))
 
-(defn actor? 
+(defn actor?
   ^{
 	 :doc {:description "Tests if the given Address refers to an Actor. Argument must be a valid Address."
          :examples [{:code "(actor? #1345)"}]
@@ -404,7 +404,7 @@
 	}
   [addr]
     (cond
-      (address? addr) (let [act (account addr)] 
+      (address? addr) (let [act (account addr)]
                         (cond act (nil? (:key act)) false))
       false))
 
@@ -421,7 +421,7 @@
   (or (blob? key) (fail :CAST "create-account requires a non-nil Blob key"))
   (deploy `(set-key ~key)))
 
-(defn filter 
+(defn filter
    ^{
 	 :doc {:description "Filters a collection by applying the given predicate to each element, and including it in the new collection if and only if the predicate returns true."
          :examples [{:code "(filter (fn [x] (> 2 x)) [1 2 3 4])"}]
@@ -431,12 +431,12 @@
          :errors {:CAST "If the coll argeument is not a Data Structure."}}
 	}
   [pred coll]
-  (reduce 
-    (fn [acc e] (cond (pred e) (conj acc e) acc)) 
-    (empty coll) 
+  (reduce
+    (fn [acc e] (cond (pred e) (conj acc e) acc))
+    (empty coll)
     (cond (list? coll) (reverse coll) coll))) ;; must reverse list to that elements are handled in correct order for conj
 
-(defn comp 
+(defn comp
    ^{
 	 :doc {:description "Composes a sequence of functions, returning a function that is the composition of these functions. The rightmost function may take a variable number of arguments. The other functions will be passed a single argument (the result of the next function to the right)"
          :examples [{:code "((comp inc inc) 1)"}]

@@ -89,7 +89,7 @@ public class CoreTest extends ACVMTest {
 
 
 	protected CoreTest() throws IOException {
-		super(InitTest.CORE);
+		super(InitTest.BASE);
 	}
 
 

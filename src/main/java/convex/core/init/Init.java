@@ -44,20 +44,13 @@ public class Init {
 	// Built-in special accounts
 	public static final Address MEMORY_EXCHANGE_ADDRESS = Address.create(7);
 	public static final Address CORE_ADDRESS = Address.create(8);
+    public static final Address TRUST_ADDRESS = Address.create(9);
+	public static final Address REGISTRY_ADDRESS = Address.create(10);
 
-	public static final Address BASE_FIRST_ADDRESS = Address.create(9);
+	public static final Address BASE_FIRST_ADDRESS = Address.create(11);
 
-	public static final int TRUST_LIBRARY_INDEX = 0;
-	public static final int REGISTRY_LIBRARY_INDEX = 1;
 
-	public static int BASE_USER_ADDRESS;
-	public static int BASE_PEER_ADDRESS;
-	public static int BASE_LIBRARY_ADDRESS;
-
-    public static Address TRUST_ADDRESS;
-	public static Address REGISTRY_ADDRESS;
-
-	public static State createBaseAccounts(AInitConfig config) {
+	public static State createBaseState(AInitConfig config) {
 		// accumulators for initial state maps
 		BlobMap<AccountKey, PeerStatus> peers = BlobMaps.empty();
 		AVector<AccountStatus> accts = Vectors.empty();
@@ -90,10 +83,22 @@ public class Init {
 		assert(config.getPeerCount() > 0);
 		int totalUserPeerCount = config.getUserCount() + config.getPeerCount();
 
-		// Core library
+		// Core library at static address: CORE_ADDRESS
 		accts = addCoreLibrary(accts, CORE_ADDRESS);
 		// Core Account should now be fully initialised
-		BASE_USER_ADDRESS = accts.size();
+		// BASE_USER_ADDRESS = accts.size();
+
+		// Build globals
+		AVector<ACell> globals = Constants.INITIAL_GLOBALS;
+
+		// create the inital state
+		State s = State.create(accts, peers, globals, BlobMaps.empty());
+
+		// add the static defined libraries at addresses: TRUST_ADDRESS, REGISTRY_ADDRESS
+		s = createStaticLibraries(s, TRUST_ADDRESS, REGISTRY_ADDRESS);
+
+		// reload accounts with the libraries
+		accts = s.getAccounts();
 
 		// Set up initial user accounts
 		for (int i = 0; i < config.getUserCount(); i++) {
@@ -106,7 +111,7 @@ public class Init {
 		// Finally add peers
 		// Set up initial peers
 
-		BASE_PEER_ADDRESS = accts.size();
+		// BASE_PEER_ADDRESS = accts.size();
 
 		for (int i = 0; i < config.getPeerCount(); i++) {
 			AKeyPair kp = config.getPeerKeyPair(i);
@@ -124,12 +129,10 @@ public class Init {
 			peers = addPeer(peers, peerKey, peerAddress, stakedFunds);
 		}
 
-		BASE_LIBRARY_ADDRESS = accts.size();
-
-		// Build globals
-		AVector<ACell> globals = Constants.INITIAL_GLOBALS;
-
-		State s = State.create(accts, peers, globals, BlobMaps.empty());
+		// add the new accounts to the state
+		s = s.withAccounts(accts);
+		// add peers to the state
+		s = s.withPeers(peers);
 
 		{ // Test total funds after creating user / peer accounts
 			long total = s.computeTotalFunds();
@@ -142,28 +145,23 @@ public class Init {
 	static final ACell TRUST_CODE=Reader.readResource("libraries/trust.con");
 	static final ACell REGISTRY_CODE=Reader.readResource("actors/registry.con");
 
-	public static State createCoreLibraries(AInitConfig config) {
-		State s=createBaseAccounts(config);
+	public static State createStaticLibraries(State s, Address trustAddress, Address registryAddress) {
 
-		// At this point we have a raw initial state with accounts
-
-        // TODO need to fix this as these static vars are changed during this call
+		// At this point we have a raw initial state with no user or peer accounts
 
 
-        TRUST_ADDRESS = config.getLibraryAddress(TRUST_LIBRARY_INDEX);
 		{ // Deploy Trust library
 			Context<?> ctx = Context.createFake(s, INIT_ADDRESS);
 			ctx = ctx.deployActor(TRUST_CODE);
-			if (!TRUST_ADDRESS .equals(ctx.getResult())) throw new Error("Wrong trust address!");
+			if (!trustAddress .equals(ctx.getResult())) throw new Error("Wrong trust address!");
 			s = ctx.getState();
 		}
 
 
-		REGISTRY_ADDRESS = config.getLibraryAddress(REGISTRY_LIBRARY_INDEX);
 		{ // Deploy Registry Actor to fixed Address
 			Context<Address> ctx = Context.createFake(s, INIT_ADDRESS);
 			ctx = ctx.deployActor(REGISTRY_CODE);
-			if (!REGISTRY_ADDRESS .equals(ctx.getResult())) throw new Error("Wrong registry address!");
+			if (!registryAddress .equals(ctx.getResult())) throw new Error("Wrong registry address!");
 			// Note the Registry registers itself upon creation
 			s = ctx.getState();
 		}
@@ -171,25 +169,31 @@ public class Init {
 		{ // Register core libraries now that registry exists
 			Context<?> ctx = Context.createFake(s, INIT_ADDRESS);
 			ctx = ctx.eval(Reader.read("(call *registry* (cns-update 'convex.core " + CORE_ADDRESS + "))"));
-			ctx = ctx.eval(Reader.read("(call *registry* (cns-update 'convex.trust " + TRUST_ADDRESS + "))"));
-			ctx = ctx.eval(Reader.read("(call *registry* (cns-update 'convex.registry " + REGISTRY_ADDRESS + "))"));
+			ctx = ctx.eval(Reader.read("(call *registry* (cns-update 'convex.trust " + trustAddress + "))"));
+			ctx = ctx.eval(Reader.read("(call *registry* (cns-update 'convex.registry " + registryAddress + "))"));
 			s = ctx.getState();
 			s = register(s, CORE_ADDRESS, "Convex Core Library");
-			s = register(s, TRUST_ADDRESS, "Trust Monitor Library");
+			s = register(s, trustAddress, "Trust Monitor Library");
 			s = register(s, MEMORY_EXCHANGE_ADDRESS, "Memory Exchange Pool");
 		}
 
+		/*
+		 * This test below does not correctly calculate the total funds of the state, since
+		 * the peers have not yet been added.
+		 *
 		{ // Test total funds after creating core libraries
 			long total = s.computeTotalFunds();
-			if (total != Constants.MAX_SUPPLY) throw new Error("Bad total amount: " + total);
+			if (total != Constants.MAX_SUPPLY) throw new Error("Bad total amount: " + total + " should be " + Constants.MAX_SUPPLY);
 		}
+		*/
 
 		return s;
 	}
 
 	public static State createState(AInitConfig config) {
 		try {
-			State s=createCoreLibraries(config);
+			State s=createBaseState(config);
+
 
 			// ============================================================
 			// Standard library deployment
@@ -244,10 +248,13 @@ public class Init {
 		}
 	}
 
-	public static Address calcAddress(int userCount, int peerCount, int index) {
-		return Address.create(BASE_FIRST_ADDRESS.longValue() + userCount + peerCount + index);
+	public static Address calcPeerAddress(int userCount, int index) {
+		return Address.create(BASE_FIRST_ADDRESS.longValue() + userCount + index);
 	}
 
+	public static Address calcUserAddress(int index) {
+		return Address.create(BASE_FIRST_ADDRESS.longValue() + index);
+	}
 
 	private static State doActorDeploy(State s, String name, String resource) {
 		Context<Address> ctx = Context.createFake(s, INIT_ADDRESS);
