@@ -1,5 +1,8 @@
 package convex.core;
 
+/**
+ * Static Constants for Coin sizes and total supply
+ */
 public class Coin {
 	public static final long COPPER=1L;
 	public static final long BRONZE=1000*COPPER;

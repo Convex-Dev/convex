@@ -54,7 +54,7 @@ public class Constants {
 	 */
 	public static final long INITIAL_ACCOUNT_ALLOWANCE = 10000000;
 
-	public static final long MAX_SUPPLY = 1000000000000000000L;
+	public static final long MAX_SUPPLY = Coin.SUPPLY;
 
 	public static final int MAX_DEPTH = 256;
 
