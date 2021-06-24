@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.init.AInitConfig;
@@ -88,15 +87,14 @@ public class API {
 	 * Launch a set of peers.
 	 *
 	 * @param count Number of peers to launch.
+	 * @param initConfig 
+	 * @param event 
 	 *
-	 * @param keyPairs Array of keyPairs for each peer. The length of the array must be >= the count of peers to launch.
-	 * @throws IOException
+	 * @return List of Servers launched
 	 *
 	 */
 	public static List<Server> launchLocalPeers(int count, AInitConfig initConfig, IServerEvent event) {
 		List<Server> serverList = new ArrayList<Server>();
-		Server otherServer;
-		String remotePeerHostname;
 
 		Map<Keyword, Object> config = new HashMap<>();
 
@@ -122,7 +120,6 @@ public class API {
 
 		for (int i = 1; i < count; i++) {
 			Server server=serverList.get(i);
-			remotePeerHostname = genesisServer.getHostname();
 
 			try {
 				// Join this Server to the Seer #0

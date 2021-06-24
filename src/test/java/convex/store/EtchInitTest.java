@@ -20,6 +20,7 @@ public class EtchInitTest {
 		try {
 			Stores.setCurrent(EtchStore.createTemp());
 
+			// Use fresh State
 			State s=Init.createState(InitConfigTest.create());
 			Ref<State> sr=ACell.createPersisted(s);
 

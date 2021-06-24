@@ -13,7 +13,6 @@ import org.openjdk.jmh.runner.options.Options;
 import convex.api.Convex;
 import convex.core.Result;
 import convex.core.init.InitConfigTest;
-import convex.core.lang.TestState;
 import convex.core.lang.ops.Constant;
 import convex.core.transactions.Invoke;
 import convex.peer.API;

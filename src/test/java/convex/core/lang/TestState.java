@@ -13,16 +13,14 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
 import convex.core.State;
-import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
-import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
-import convex.core.init.Init;
 import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.util.Utils;
 
 /**
@@ -45,7 +43,7 @@ public class TestState {
 
 		try {
 
-			State s = Init.createState(InitConfigTest.create());
+			State s = InitTest.STATE;
 			Context<?> ctx = Context.createFake(s, InitConfigTest.HERO_ADDRESS);
 			for (int i = 0; i < NUM_CONTRACTS; i++) {
 				// Construct code for each contract

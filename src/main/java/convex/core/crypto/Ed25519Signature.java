@@ -1,12 +1,6 @@
 package convex.core.crypto;
 
 import java.nio.ByteBuffer;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
-import java.security.PublicKey;
-import java.security.Signature;
-import java.security.SignatureException;
 
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;

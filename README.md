@@ -7,8 +7,9 @@ It is designed as a foundational layer for decentralised application and economi
 - High transaction throughput (tens of thousands of transactions per second)
 - Low latency for transaction confirmation (a couple of second for global consensus)
 - Energy efficiency using the the Convergent Proof of Stake consensus algorithm
-- Smart contract capability with Turing Complete, atomic transactions
-- Integrated on-chain compiler
+- Global State model with immutable data structures and atomic transactions
+- Lambda Calculus based VM supporting Turing complete Smart Contracts
+- Integrated on-chain compiler (Convex Lisp)
 
 ## About this repository
 
@@ -16,6 +17,7 @@ This repository contains the core Convex distribution including:
 
 - The Convex Virtual Machine (CVM) including data structures and execution environment
 - The standard Convex Peer server implementation (NIO based) implementing Convergent Proof of Stake (CPoS) for consensus
+- CLI Tools
 - The Etch database for persistent data storage
 - A Swing GUI for managing local peers / exploring the network
 - JMH Benchmarking suite
@@ -28,13 +30,14 @@ The repository also contains core "on-chain" libraries providing key full-stack 
 - `convex.asset` - library for managing arbitrary digital assets using a common abstraction
 - `convex.trust` - library for access control and trusted operations
 - `torus.exchange` - decentralised exchange for trading fungible tokens and currencies
-- Example code and templates for various forms of smrt contracts
+- Example code and templates for various forms of smart contracts
 
 ## Key features
 
 * *Virtual Machine* - The Convex Virtual Machine provides a secure execution environment based on the Lambda Calculus and capable of acting as the execution layer for smart contracts and autonomous agents.
 * *Decentralised Consensus* - Similar to Blockchain technology, Convex incorporates a consensus mechanism that ensures all nodes ultimately agree on true values in the system without the control of any single entity. This property means that it is inherently tamper-proof and censorship-resistant.
-* *Performance and Scalability* - Convex is capable of executing large volumes of transactions (tens of thousands of transactions per second) with low latency (a second or two for global consensus)
+* *Performance and Scalability* - Convex is capable of executing large volumes of transactions (tens of thousands of transactions per second) with low latency (sub-second global consensus)
+* *100% Green* - No wasteful consumption of energy or computing resources
 
 ## Running Convex
 
@@ -116,12 +119,12 @@ The resulting `flight.jfr` can the be opened in tools such as JDK Mission Contro
 After running benchmarks, you should see results similar to this:
 
 ```
-Benchmark                      Mode  Cnt         Score         Error  Units
-EtchBenchmark.readDataRandom  thrpt    5  40929172.124 ± 1760027.956  ops/s
-EtchBenchmark.writeData       thrpt    5  10923667.591 ± 1527754.917  ops/s
+Benchmark                      Mode  Cnt        Score        Error  Units
+EtchBenchmark.readDataRandom  thrpt    5  4848620.857 ± 110622.054  ops/s
+EtchBenchmark.writeData       thrpt    5   728486.145 ± 168739.491  ops/s
 ```
 
-For example, this can be interpreted as an indication that the Etch database layer is handling approximately 40 million reads and 10 million atomic writes per second in the testing environment. Usual benchmarking caveats apply and results may vary considerably based on your system setup (available RAM, disk performance etc.) - it is advisable to examine the benchmark source to determine precisely which operations are being performed.
+For example, this can be interpreted as an indication that the Etch database layer is handling approximately 4.8 million reads and 729k million atomic writes per second in the testing environment. Usual benchmarking caveats apply and results may vary considerably based on your system setup (available RAM, disk performance etc.) - it is advisable to examine the benchmark source to determine precisely which operations are being performed.
 
 
 ## Contributing

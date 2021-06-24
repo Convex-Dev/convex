@@ -5,7 +5,6 @@ import java.awt.Component;
 import java.awt.EventQueue;
 import java.awt.Toolkit;
 import java.awt.event.WindowEvent;
-import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
@@ -28,7 +27,6 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.init.Init;
 import convex.core.init.InitConfig;
-import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
@@ -43,7 +41,6 @@ import convex.gui.manager.mainpanels.MessageFormatPanel;
 import convex.gui.manager.mainpanels.PeersListPanel;
 import convex.gui.manager.mainpanels.WalletPanel;
 import convex.peer.Server;
-import etch.EtchStore;
 
 @SuppressWarnings("serial")
 public class PeerGUI extends JPanel {

@@ -1,12 +1,11 @@
 package convex.core.init;
 
 import java.io.IOException;
-import java.util.logging.Logger;
 
 import convex.core.Coin;
 import convex.core.Constants;
-import convex.core.crypto.AKeyPair;
 import convex.core.State;
+import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -31,8 +30,6 @@ import convex.core.util.Utils;
  * "The beginning is the most important part of the work." - Plato, The Republic
  */
 public class Init {
-
-    private static final Logger log = Logger.getLogger(Init.class.getName());
 
 	// standard accounts numbers
 	public static final Address NULL_ADDRESS = Address.create(0);
@@ -140,7 +137,7 @@ public class Init {
 	static final ACell TRUST_CODE=Reader.readResource("libraries/trust.con");
 	static final ACell REGISTRY_CODE=Reader.readResource("actors/registry.con");
 
-	public static State createCoreLibraries(AInitConfig config) throws IOException {
+	public static State createCoreLibraries(AInitConfig config) {
 		State s=createBaseAccounts(config);
 
 		// At this point we have a raw initial state with accounts
@@ -237,9 +234,8 @@ public class Init {
 			return s;
 
 		} catch (Throwable e) {
-			log.severe("Error in Init initialiser!");
 			e.printStackTrace();
-			throw new Error(e);
+			throw Utils.sneakyThrow(e);
 		}
 	}
 

@@ -10,8 +10,8 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.PeerStatus;
-import convex.core.init.Init;
 import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 
@@ -19,7 +19,7 @@ public class StakingTest extends ACVMTest {
 
     protected AccountKey FIRST_PEER_KEY;
 	protected StakingTest() {
-		super(Init.createState(InitConfigTest.create()));
+		super(InitTest.STATE);
 	}
 
 	@Test

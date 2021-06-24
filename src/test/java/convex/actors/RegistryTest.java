@@ -17,6 +17,7 @@ import convex.core.data.Maps;
 import convex.core.data.Symbol;
 import convex.core.init.Init;
 import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.test.Samples;
@@ -24,7 +25,7 @@ import convex.test.Samples;
 public class RegistryTest extends ACVMTest {
 
 	protected RegistryTest() throws IOException {
-		super(Init.createCoreLibraries(InitConfigTest.create()));
+		super(InitTest.CORE);
 	}
 
 	static final Address REG = Init.REGISTRY_ADDRESS;

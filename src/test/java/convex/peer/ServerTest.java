@@ -62,10 +62,12 @@ public class ServerTest {
 	public static final Server SERVER;
 
 	static {
+		// Use fresh State
+		State s=Init.createState(InitConfigTest.create());
 
 		Map<Keyword, Object> config = new HashMap<>();
 		config.put(Keywords.PORT, 0); // create new port
-		config.put(Keywords.STATE, Init.createState(InitConfigTest.create()));
+		config.put(Keywords.STATE, s);
 		config.put(Keywords.STORE, EtchStore.createTemp("server-test-store"));
 		config.put(Keywords.KEYPAIR, InitConfigTest.FIRST_PEER_KEYPAIR); // use first peer keypair
 
@@ -101,7 +103,7 @@ public class ServerTest {
 		InetSocketAddress hostAddress=SERVER.getHostAddress();
 
 		// Connect to Peer Server using the current store for the client
-		Connection pc = Connection.connect(hostAddress, handler, Stores.current(), null);
+		Connection pc = Connection.connect(hostAddress, handler, Stores.current());
 		AVector<CVMLong> v = Vectors.of(1l, 2l, 3l);
 		long id1 = pc.sendQuery(v,InitConfigTest.HERO_ADDRESS);
 		Utils.timeout(5000, () -> results.get(id1) != null);
@@ -149,7 +151,7 @@ public class ServerTest {
 
 		// Connect to Peer Server using the current store for the client
 		AStore store=Stores.current();
-		Connection pc = Connection.connect(hostAddress, handler, store, null);
+		Connection pc = Connection.connect(hostAddress, handler, store);
 		State s=SERVER.getPeer().getConsensusState();
 		Hash h=s.getHash();
 
@@ -200,7 +202,7 @@ public class ServerTest {
 			InetSocketAddress hostAddress=SERVER.getHostAddress();
 
 			// Connect to Peer Server using the current store for the client
-			Connection pc = Connection.connect(hostAddress, handler, Stores.current(), null);
+			Connection pc = Connection.connect(hostAddress, handler, Stores.current());
 			long s=SERVER.getPeer().getConsensusState().getAccount(InitConfigTest.HERO_ADDRESS).getSequence();
 			Address addr=InitConfigTest.HERO_ADDRESS;
 			AKeyPair kp=InitConfigTest.HERO_KEYPAIR;

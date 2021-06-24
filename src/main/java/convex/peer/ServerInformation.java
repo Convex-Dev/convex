@@ -1,11 +1,10 @@
 package convex.peer;
 
 
-import convex.core.data.AccountKey;
-import convex.core.data.Hash;
 import convex.core.Order;
 import convex.core.Peer;
-import convex.peer.Server;
+import convex.core.data.AccountKey;
+import convex.core.data.Hash;
 
 
 public class ServerInformation {

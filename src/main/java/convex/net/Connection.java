@@ -61,7 +61,7 @@ public class Connection {
 	final ByteChannel channel;
 
 	/**
-	 * Counter for IDs of messages sent from this JVM
+	 * Counter for IDs of all messages sent from this JVM
 	 */
 	private static long idCounter = 0;
 
@@ -72,7 +72,8 @@ public class Connection {
 	private final AStore store;
 
 	/**
-	 * If trusted the account key of the remote peer
+	 * If trusted, the Account Key of the remote peer.
+	 * This is mutable so trust can be established after connection.
 	 */
 	private AccountKey trustedPeerKey;
 
@@ -112,24 +113,8 @@ public class Connection {
 	 * @return New Connection instance
 	 * @throws IOException
 	 */
-	public static Connection create(ByteChannel channel, Consumer<Message> receiveAction, AStore store,
-			AccountKey trustedPeerKey) throws IOException {
-		return new Connection(channel, receiveAction, store, trustedPeerKey);
-	}
-
-	/**
-	 * Create an untrusted PeerConnection by connecting to a remote address
-	 * 
-	 * @param hostAddress   Address to connect to
-	 * @param receiveAction A callback Consumer to be called for any received
-	 *                      messages on this connection
-	 * @param store         Store to use for the connection
-	 * @return New Connection instance
-	 * @throws IOException If connection fails because of any IO problem
-	 */
-	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store)
-			throws IOException {
-		return connect(hostAddress, receiveAction, store, null);
+	public static Connection create(ByteChannel channel, Consumer<Message> receiveAction, AStore store) throws IOException {
+		return new Connection(channel, receiveAction, store,null);
 	}
 
 	/**
@@ -142,8 +127,7 @@ public class Connection {
 	 * @return New Connection instance
 	 * @throws IOException If connection fails because of any IO problem
 	 */
-	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store,
-			AccountKey trustedPeerKey) throws IOException {
+	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store) throws IOException {
 		if (store == null) throw new Error("Connection requires a store");
 		SocketChannel clientChannel = SocketChannel.open(hostAddress);
 		clientChannel.configureBlocking(false);
@@ -158,7 +142,7 @@ public class Connection {
 		// clientChannel.setOption(StandardSocketOptions.SO_KEEPALIVE,true);
 		// clientChannel.setOption(StandardSocketOptions.TCP_NODELAY,true);
 
-		Connection pc = create(clientChannel, receiveAction, store, trustedPeerKey);
+		Connection pc = create(clientChannel, receiveAction, store);
 		pc.startClientListening();
 		log.log(LEVEL_SEND, "Connect succeeded for host: " + hostAddress);
 		return pc;
@@ -173,7 +157,6 @@ public class Connection {
 	 * not available
 	 *
 	 * @return An InetSocketAddress if associated, otherwise null
-	 * @throws IOException
 	 */
 	public InetSocketAddress getRemoteAddress() {
 		if (!(channel instanceof SocketChannel)) return null;
@@ -190,7 +173,6 @@ public class Connection {
 	 * not available
 	 *
 	 * @return A SocketAddress if associated, otherwise null
-	 * @throws IOException
 	 */
 	public InetSocketAddress getLocalAddress() {
 		if (!(channel instanceof SocketChannel)) return null;
@@ -252,8 +234,8 @@ public class Connection {
 		try {
 			long id = ++idCounter;
 			AVector<ACell> v = Vectors.of(id, form, address);
-			sendObject(MessageType.QUERY, v);
-			return id;
+			boolean sent = sendObject(MessageType.QUERY, v);
+			return sent?id:-1;
 		} finally {
 			Stores.setCurrent(temp);
 		}
@@ -431,7 +413,7 @@ public class Connection {
 
 		// Need to ensure message is persisted at least, so we can respond to missing
 		// data messages
-		// using the current threat store
+		// using the current thread store
 		ACell sendVal = payload;
 		ACell.createPersisted(sendVal, r -> {
 			try {
@@ -684,26 +666,6 @@ public class Connection {
 			log.log(NIOServer.LEVEL_BAD_CONNECTION, e.getMessage());
 			key.cancel();
 		}
-	}
-
-	/**
-	 * Return a new trusted connection
-	 *
-	 * @param trustedPeerKey Peer key of the trusted remote peer.
-	 *
-	 * @param receiveAction  A callback Consumer to be called for any received
-	 *                       messages on this connection
-	 *
-	 * @return a new connection
-	 *
-	 *         TODO: enable bigger buffers for this trusted connection
-	 * @throws IOException 
-	 *
-	 */
-	public Connection connectWithTrustedKey(AccountKey trustedPeerKey, Consumer<Message> receiveAction)
-			throws IOException {
-		InetSocketAddress remotePeerAddress = getRemoteAddress();
-		return connect(remotePeerAddress, receiveAction, store, trustedPeerKey);
 	}
 
 	public void setTrustedPeerKey(AccountKey trustedPeerKey) {

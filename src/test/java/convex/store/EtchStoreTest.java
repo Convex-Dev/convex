@@ -33,7 +33,6 @@ import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.init.InitConfigTest;
 import convex.core.lang.Symbols;
-import convex.core.lang.TestState;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;

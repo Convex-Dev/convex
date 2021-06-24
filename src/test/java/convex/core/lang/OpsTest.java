@@ -23,6 +23,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
 import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.Fn;
 import convex.core.lang.ops.Cond;
@@ -46,7 +47,7 @@ import convex.core.util.Utils;
 public class OpsTest extends ACVMTest {
 
 	protected OpsTest() {
-		super(Init.createBaseAccounts(InitConfigTest.create()));
+		super(InitTest.BASE);
 	}
 
 	private final long INITIAL_JUICE = context().getJuice();

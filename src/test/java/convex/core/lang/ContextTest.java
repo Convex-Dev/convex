@@ -25,8 +25,7 @@ import convex.core.data.BlobMaps;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
-import convex.core.init.Init;
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.lang.ops.Special;
 
 /**
@@ -35,7 +34,7 @@ import convex.core.lang.ops.Special;
 public class ContextTest extends ACVMTest {
 
 	protected ContextTest() {
-		super(Init.createBaseAccounts(InitConfigTest.create()));
+		super(InitTest.BASE);
 	}
 
 	private final Address ADDR=context().getAddress();

@@ -17,7 +17,6 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.init.InitConfigTest;
 import convex.core.lang.RT;
-import convex.core.lang.TestState;
 
 public class PFXTest {
 

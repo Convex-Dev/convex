@@ -1,14 +1,11 @@
 package convex.core.init;
 
-import java.util.logging.Logger;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 
 
 public abstract class AInitConfig {
-
-	private static final Logger log = Logger.getLogger(AInitConfig.class.getName());
 
 	protected AKeyPair userKeyPairs[];
 	protected AKeyPair peerKeyPairs[];

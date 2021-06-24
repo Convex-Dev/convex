@@ -1,7 +1,6 @@
 package convex.core.lang;
 
 import convex.core.State;
-import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.prim.CVMBool;

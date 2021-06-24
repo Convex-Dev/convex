@@ -20,7 +20,6 @@ public class AcquireState {
 
 		InetSocketAddress hostAddress = new InetSocketAddress("convex.world",  43579);
 
-		InitConfigTest initConfigTest = InitConfigTest.create();
 		Convex convex = Convex.connect(hostAddress, InitConfigTest.HERO_ADDRESS,null);
 
 		Hash h=Hash.fromHex("3c6c1968ea610b666434b532a27cb306a546fd24fa1e61b286605d213795b96e");

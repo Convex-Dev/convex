@@ -46,23 +46,29 @@ class ChallengeRequest {
 
 	/**
 	 * Sends out a single challenge to the remote peer.
+	 * @param connection 
+	 * @param peer 
+	 * @return ID of message sent, or negative value if sending fails
 	 */
-	public AVector<ACell> send(Connection connection, Peer peer) {
+	public long send(Connection connection, Peer peer) {
 		AVector<ACell> values = null;
 		try {
 			SecureRandom random = new SecureRandom();
+			
+			// Get 120 random bytes
 			byte bytes[] = new byte[120];
 			random.nextBytes(bytes);
 			token = Blob.create(bytes).getHash();
+			
 			values = Vectors.of(token, peer.getNetworkID(), peerKey);
 			SignedData<ACell> challenge = peer.sign(values);
 			sendHash = challenge.getHash();
-			connection.sendChallenge(challenge);
+			return connection.sendChallenge(challenge);
 		} catch (IOException e) {
 			log.log(LEVEL_CHALLENGE_RESPONSE,"Cannot send challenge to remote peer at " + connection.getRemoteAddress());
 			values = null;
 		}
-		return values;
+		return -1;
 	}
 
 	public AccountKey getPeerKey() {

@@ -9,7 +9,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitConfigTest;
-import convex.core.lang.TestState;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Transfer;
 

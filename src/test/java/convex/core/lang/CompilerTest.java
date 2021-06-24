@@ -1,6 +1,14 @@
 package convex.core.lang;
 
-import static convex.test.Assertions.*;
+import static convex.test.Assertions.assertArityError;
+import static convex.test.Assertions.assertBoundsError;
+import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertCastError;
+import static convex.test.Assertions.assertCompileError;
+import static convex.test.Assertions.assertDepthError;
+import static convex.test.Assertions.assertJuiceError;
+import static convex.test.Assertions.assertNotError;
+import static convex.test.Assertions.assertUndeclaredError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -27,6 +35,8 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
+import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Def;
 import convex.core.lang.ops.Do;
@@ -34,8 +44,6 @@ import convex.core.lang.ops.Invoke;
 import convex.core.lang.ops.Lambda;
 import convex.core.lang.ops.Local;
 import convex.core.lang.ops.Lookup;
-import convex.core.init.Init;
-import convex.core.init.InitConfigTest;
 import convex.core.util.Utils;
 import convex.test.Samples;
 
@@ -47,7 +55,7 @@ import convex.test.Samples;
 public class CompilerTest extends ACVMTest {
 
 	protected CompilerTest() {
-		super(Init.createBaseAccounts(InitConfigTest.create()));
+		super(InitTest.STATE);
 	}
 
 	@Test
