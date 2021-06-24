@@ -31,10 +31,11 @@ import convex.core.util.Utils;
  */
 public class Init {
 
-	// standard accounts numbers
+	// Standard accounts numbers
 	public static final Address NULL_ADDRESS = Address.create(0);
 	public static final Address INIT_ADDRESS = Address.create(1);
 
+	// Governance accounts and funding pools
 	public static final Address RESERVED_ADDRESS = Address.create(2);
 	public static final Address MAINBANK_ADDRESS = Address.create(3);
 	public static final Address MAINPOOL_ADDRESS = Address.create(4);
@@ -47,6 +48,7 @@ public class Init {
     public static final Address TRUST_ADDRESS = Address.create(9);
 	public static final Address REGISTRY_ADDRESS = Address.create(10);
 
+	// Base for user-specified addresses
 	public static final Address BASE_FIRST_ADDRESS = Address.create(11);
 
 

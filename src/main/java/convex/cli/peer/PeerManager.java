@@ -74,6 +74,7 @@ public class PeerManager implements IServerEvent {
 		Server server = peerServerList.get(0);
 		InetSocketAddress hostAddress = server.getHostAddress();
 
+		// TODO Remove this hack once we figure out why Peers need a kick to get started
 		Address peerAddress = initConfig.getUserAddress(0);
 		try {
 			Convex convex = Convex.connect(hostAddress, peerAddress, initConfig.getUserKeyPair(0));
