@@ -94,7 +94,7 @@ public class Context<T extends ACell> extends AObject {
 	private int depth;
 	private AVector<ACell> localBindings;
 	private ChainState chainState;
-	
+
 	/**
 	 * Local log is a [vector of [address values] entries]
 	 */
@@ -1731,7 +1731,7 @@ public class Context<T extends ACell> extends AObject {
 	public <R extends ACell> Context<R> withError(Keyword errorCode,String message) {
 		return withError(ErrorValue.create(errorCode,Strings.create(message)));
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> withError(ErrorValue error) {
 		error.addLog(log);
@@ -1876,6 +1876,42 @@ public class Context<T extends ACell> extends AObject {
 	}
 
 	/**
+	 * Creates a new peer with the specified stake.
+	 * The accountKey must not be in the list of peers.
+	 * The accountKey must be assigend to the current transaction address
+	 * Stake must be greater than 0.
+	 * Stake must be less than equal to the account balance.
+	 *
+	 * @param accountKey Peer Account key to create the PeerStatus
+	 * @param initialStake Initial stake amount
+	 * @return Context with final take set
+	 */
+	@SuppressWarnings("unchecked")
+	public <R extends ACell> Context<R> createPeer(AccountKey accountKey, long initialStake) {
+		State s=getState();
+		PeerStatus ps=s.getPeer(accountKey);
+		if (ps!=null) return withError(ErrorCodes.STATE,"Peer already exists for this account key: "+accountKey.toChecksumHex());
+		if (initialStake<0) return this.withArgumentError("Cannot set a negative stake");
+		if (initialStake>Constants.MAX_SUPPLY) return this.withArgumentError("Target stake out of valid Amount range");
+
+		Address myAddress=getAddress();
+		AccountStatus as=getAccountStatus(myAddress);
+
+		if (!as.getAccountKey().equals(accountKey)) return this.withArgumentError("Cannot create a peer with a different account-key");
+
+		long balance=getBalance(myAddress);
+		if (initialStake>balance) return this.withFundsError("Insufficient balance ("+balance+") to assign an initial stake of "+initialStake);
+
+		PeerStatus newPeer = PeerStatus.create(myAddress, initialStake);
+
+		// Final updates. Hopefully everything balances. SECURITY: test this. A lot.
+		s=s.withBalance(myAddress, balance-initialStake); // adjust own balance
+
+		s=s.withPeer(accountKey, newPeer); // add peer
+		return withState(s);
+	}
+
+	/**
 	 * Sets peer data.
 	 *
 	 * @param data Map of data to set for the peer
@@ -1991,7 +2027,7 @@ public class Context<T extends ACell> extends AObject {
 		AVector<AVector<ACell>> log=this.log;
 		if (log==null) {
 			log=Vectors.empty();
-		} 
+		}
 		AVector<ACell> entry = Vectors.of(addr,values);
 		log=log.conj(entry);
 
