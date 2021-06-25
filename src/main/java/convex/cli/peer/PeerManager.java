@@ -80,7 +80,7 @@ public class PeerManager implements IServerEvent {
 			// send a 'do' to wake up the other peers
 			ACell message = Reader.read("(do)");
 			ATransaction transaction = Invoke.create(peerAddress,-1, message);
-			
+
 			@SuppressWarnings("unused")
 			Future<Result> future = convex.transact(transaction);
 		} catch (IOException e) {
@@ -123,7 +123,7 @@ public class PeerManager implements IServerEvent {
 		EtchStore store = (EtchStore) peerServer.getStore();
 
 		session.addPeer(
-			peerServer.getPeerKey().toHexString(),
+			peerServer.getPeerKey(),
 			peerServer.getHostname(),
 			store.getFileName()
 		);
@@ -145,7 +145,7 @@ public class PeerManager implements IServerEvent {
 	 */
 	protected void removeAllFromSession() {
 		for (Server peerServer: peerServerList) {
-			session.removePeer(peerServer.getPeerKey().toHexString());
+			session.removePeer(peerServer.getPeerKey());
 		}
 	}
 
@@ -159,7 +159,7 @@ public class PeerManager implements IServerEvent {
 		File sessionFile = new File(sessionFilename);
 		try {
 			Helpers.createPath(sessionFile);
-			if (session.getPeerCount() > 0) {
+			if (session.getSize() > 0) {
 				session.store(sessionFile);
 			}
 			else {
