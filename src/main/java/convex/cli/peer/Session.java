@@ -4,44 +4,50 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
+
+import convex.core.data.AccountKey;
 
 public class Session {
 
-	private Properties values = new Properties();
 
-	private static final String PEER_HEADER_NAME = "peer.";
-
-	private static final String PEER_HEADER_NAME_MATCH = "^peer\\..*";
-
+    protected List<SessionItem> items = new ArrayList<SessionItem>();
 	/**
 	 * Load a session data from file.
 	 *
 	 * @param filename Filename of the session file to load.
-	 * @throws IOException 
+	 *
+	 * @throws IOException
 	 */
 	public void load(File filename) throws IOException  {
+		items.clear();
 		if (filename.exists()) {
 			FileInputStream stream = new FileInputStream(filename);
+			Properties values = new Properties();
 			values.load(stream);
+			for (String name: values.stringPropertyNames()) {
+				String line = values.getProperty(name, "");
+				SessionItem item = SessionItem.createFromString(line);
+				items.add(item);
+			}
 		}
 	}
 
 	/**
 	 * Add a peer to the list of peers kept in the session data.
 	 *
-	 * @param addressKey Address sttring of the peer, this is the public key in hex without a leading 0x.
+	 * @param addressKey AccountKey of the peer.
 	 *
-	 * @param hostname Hostname of the peer. At the moment this will be localhost.
-	 *
-	 * @param port Port number the peer is listening on.
+	 * @param hostname Hostname of the peer. This includes the port number.
 	 *
 	 * @param etchFilename Filename that the peer is using to store the peer's state.
 	 *
 	 */
-	public void addPeer(String addressKey, String hostname, String etchFilename){
-		String[] items = new String[] {hostname, etchFilename};
-		values.setProperty(PEER_HEADER_NAME + addressKey, String.join(",", items));
+	public void addPeer(AccountKey accountKey, String hostname, String etchFilename){
+		SessionItem item = SessionItem.create(accountKey, hostname, etchFilename);
+		items.add(item);
 	}
 
 	/**
@@ -50,12 +56,17 @@ public class Session {
 	 * @param addressKey Address of the peer, this is the public key used by the peer.
 	 *
 	 */
-	public void removePeer(String addressKey) {
-		values.remove(PEER_HEADER_NAME + addressKey);
+	public void removePeer(AccountKey accountKey) {
+		for (SessionItem item: items) {
+			if (item.getAccountKey().equals(accountKey)) {
+				items.remove(item);
+				return;
+			}
+		}
 	}
 
 	/**
-	* Store the session to a file.
+	* Store the session list to a file.
 	*
 	* @param filename Filename to save the session too.
 	*
@@ -64,23 +75,23 @@ public class Session {
 	*/
 	public void store(File filename) throws IOException {
 		FileOutputStream stream = new FileOutputStream(filename);
+		Properties values = new Properties();
+		int index = 0;
+		for (SessionItem item: items) {
+			values.setProperty(String.valueOf(index), item.toString());
+			index ++;
+		}
 		values.store(stream, "Convex Session");
 	}
 
 	/**
-	 * Return the number of peers added to this session.
+	 * Return the number of session items added to this session.
 	 *
-	 * @return number of peers found for this session.
+	 * @return number of items found for this session.
 	 *
 	 */
-	public int getPeerCount() {
-		int count = 0;
-		for (String name: values.stringPropertyNames()) {
-			if ( name.matches(PEER_HEADER_NAME_MATCH)) {
-				count ++;
-			}
-		}
-		return count;
+	public int getSize() {
+		return items.size();
 	}
 
 	/**
@@ -91,52 +102,36 @@ public class Session {
 	 * @return true if the peer name exists.
 	 *
 	 */
-	public boolean isPeer(String name) {
-		String line = values.getProperty(PEER_HEADER_NAME + name, "");
-		if (line.length() > 0) {
-			return true;
-		}
-		return false;
+	public boolean isPeer(AccountKey accountKey) {
+		SessionItem item = getItemFromAccountKey(accountKey);
+		return item != null;
 	}
 
 	/**
-	 * Return the socket address of the peer from a given index.
+	 * Return a session item based on the peer index.
 	 *
-	 * @param index Index of the peer list to get an address.
+	 * @param index The index of the peer in the list, starting from 0.
 	 *
-	 * @return Hostname of the peer. If index is out of range return null.
+	 * @return Session Item if the item is found at the index, if not then return null.
 	 *
 	 */
-	public String getPeerHostnameFromIndex(int index) {
-		int count = 1;
-		for (String name: values.stringPropertyNames()) {
-			if ( name.matches(PEER_HEADER_NAME_MATCH)) {
-				if (count == index) {
-					String line = values.getProperty(name, "");
-					if (line.length() > 0) {
-						String[] items = line.split(",");
-						return items[0];
-					}
-				}
-				count ++;
+	public SessionItem getItemFromIndex(int index) {
+		return items.get(index);
+	}
+
+	/**
+	 * Get a session item based on the peers AccountKey.
+	 *
+	 * @param accountKey AccountKey of the peer to get the session item for.
+	 *
+	 * @return SessionItem object or null if the peer account key cannot be found
+	 *
+	 */
+	public SessionItem getItemFromAccountKey(AccountKey accountKey) {
+		for (SessionItem item: items) {
+			if (item.getAccountKey().equals(accountKey)) {
+				return item;
 			}
-		}
-		return null;
-	}
-
-	/**
-	 * Return the socket address of the peer from a given peer name.
-	 *
-	 * @param name Name of the peer to get an address.
-	 *
-	 * @return Hostname of the peer. If the peer name cannot be found return null.
-	 *
-	 */
-	public String getPeerHostnameFromName(String name) {
-		String line = values.getProperty(PEER_HEADER_NAME + name, "");
-		if (line.length() > 1) {
-			String[] items = line.split(",");
-			return items[0];
 		}
 		return null;
 	}
@@ -148,17 +143,11 @@ public class Session {
 	 *
 	 */
 	public String[] getPeerHostnameList() {
-		String[] result = new String[getPeerCount()];
+		String[] result = new String[items.size()];
 		int index = 0;
-		for (String name: values.stringPropertyNames()) {
-			if ( name.matches(PEER_HEADER_NAME_MATCH)) {
-				String line = values.getProperty(name, "");
-				if (line.length() > 0){
-					String[] items = line.split(",");
-					result[index] = items[0];
-				}
-				index ++;
-			}
+		for (SessionItem item: items) {
+			result[index] = item.getHostname();
+			index ++;
 		}
 		return result;
 	}

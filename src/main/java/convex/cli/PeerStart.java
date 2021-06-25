@@ -90,7 +90,8 @@ public class PeerStart implements Runnable {
 
 		if (hostname == null) {
 			try {
-				hostname = Helpers.getSessionHostname(mainParent.getSessionFilename());
+				// TODO remove the 0 index in this param after the peer belief bug is fixed
+				hostname = Helpers.getSessionHostname(mainParent.getSessionFilename(), 0);
 			} catch (IOException e) {
 				log.warning("Cannot load the session control file");
 			}

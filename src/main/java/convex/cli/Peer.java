@@ -15,6 +15,7 @@ import picocli.CommandLine.ParentCommand;
 @Command(name="peer",
 	aliases={"pe"},
 	subcommands = {
+		PeerCreate.class,
 		PeerStart.class,
 		CommandLine.HelpCommand.class
 	},
