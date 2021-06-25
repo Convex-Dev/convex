@@ -106,8 +106,13 @@ public class Main implements Runnable {
 
 		// do  a pre-parse to get the config filename. We need to load
 		// in the defaults before running the full execute
-		commandLine.parseArgs(args);
-		loadConfig();
+		try {
+			commandLine.parseArgs(args);
+			loadConfig();
+		} catch (Throwable t) {
+			System.err.println("unable to parse arguments " + t);
+		}
+
 		if (verbose) {
 			Logger root = Logger.getLogger("");
 			Level targetLevel = Level.ALL;
