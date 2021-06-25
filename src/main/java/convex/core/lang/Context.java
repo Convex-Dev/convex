@@ -11,14 +11,12 @@ import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.AObject;
 import convex.core.data.ASequence;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.AString;
 import convex.core.data.Blob;
-import convex.core.data.BlobMap;
-import convex.core.data.BlobMaps;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -72,11 +70,11 @@ import convex.core.util.Utils;
  *
  * @param <T> Result type of Context
  */
-public final class Context<T extends ACell> extends AObject {
+public class Context<T extends ACell> extends AObject {
 	private static final long INITIAL_JUICE = 0;
 
 	// Default values
-	private static final ABlobMap<Address,AVector<AVector<ACell>>> DEFAULT_LOG = null;
+	private static final AVector<AVector<ACell>> DEFAULT_LOG = null;
 	private static int DEFAULT_DEPTH = 0;
 	private static final AExceptional DEFAULT_EXCEPTION = null;
 	private static final long DEFAULT_OFFER = 0L;
@@ -96,7 +94,11 @@ public final class Context<T extends ACell> extends AObject {
 	private int depth;
 	private AVector<ACell> localBindings;
 	private ChainState chainState;
-	private ABlobMap<Address,AVector<AVector<ACell>>> log;
+	
+	/**
+	 * Local log is a [vector of [address values] entries]
+	 */
+	private AVector<AVector<ACell>> log;
 	private CompilerState compilerState;
 
 
@@ -225,7 +227,7 @@ public final class Context<T extends ACell> extends AObject {
 
 	}
 
-	private Context(ChainState chainState, long juice, AVector<ACell> localBindings2, T result,int depth, AExceptional exception, ABlobMap<Address,AVector<AVector<ACell>>> log, CompilerState comp) {
+	private Context(ChainState chainState, long juice, AVector<ACell> localBindings2, T result,int depth, AExceptional exception, AVector<AVector<ACell>> log, CompilerState comp) {
 		this.chainState=chainState;
 		this.juice=juice;
 		this.localBindings=localBindings2;
@@ -237,12 +239,12 @@ public final class Context<T extends ACell> extends AObject {
 	}
 
 	@SuppressWarnings("unchecked")
-	private static <T extends ACell> Context<T> create(ChainState cs, long juice, AVector<ACell> localBindings, ACell result, int depth,ABlobMap<Address,AVector<AVector<ACell>>> log, CompilerState comp) {
+	private static <T extends ACell> Context<T> create(ChainState cs, long juice, AVector<ACell> localBindings, ACell result, int depth,AVector<AVector<ACell>> log, CompilerState comp) {
 		if (juice<0) throw new IllegalArgumentException("Negative juice! "+juice);
 		return new Context<T>(cs,juice,localBindings,(T)result,depth,DEFAULT_EXCEPTION,log,comp);
 	}
 
-	private static <T extends ACell> Context<T> create(State state, long juice,AVector<ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer, ABlobMap<Address,AVector<AVector<ACell>>> log, CompilerState comp) {
+	private static <T extends ACell> Context<T> create(State state, long juice,AVector<ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer, AVector<AVector<ACell>> log, CompilerState comp) {
 		ChainState chainState=ChainState.create(state,origin,caller,address,offer);
 		return create(chainState,juice,localBindings,result,depth,log,comp);
 	}
@@ -785,11 +787,9 @@ public final class Context<T extends ACell> extends AObject {
 	 * @return Exceptional Context signalling JUICE error.
 	 */
 	public <R extends ACell> Context<R> withJuiceError() {
-		AExceptional err=ErrorValue.create(ErrorCodes.JUICE,Strings.create("Out of juice!"));
-
 		// set juice to zero. Can't consume more that we have!
 		this.juice=0;
-		return withException(err);
+		return withError(ErrorCodes.JUICE,"Out of juice!");
 	}
 
 	@SuppressWarnings("unchecked")
@@ -1725,12 +1725,19 @@ public final class Context<T extends ACell> extends AObject {
 
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> withError(Keyword error) {
-		return (Context<R>) withException(ErrorValue.create(error));
+		return (Context<R>) withError(ErrorValue.create(error));
 	}
 
 	public <R extends ACell> Context<R> withError(Keyword errorCode,String message) {
-		return withException(ErrorValue.create(errorCode,Strings.create(message)));
+		return withError(ErrorValue.create(errorCode,Strings.create(message)));
 	}
+	
+	@SuppressWarnings("unchecked")
+	public <R extends ACell> Context<R> withError(ErrorValue error) {
+		error.addLog(log);
+		return (Context<R>) withException(error);
+	}
+
 
 	public <R extends ACell> Context<R> withArityError(String message) {
 		return withError(ErrorCodes.ARITY,message);
@@ -1981,18 +1988,12 @@ public final class Context<T extends ACell> extends AObject {
 	 */
 	public Context<T> appendLog(AVector<ACell> values) {
 		Address addr=getAddress();
-		ABlobMap<Address,AVector<AVector<ACell>>> log=this.log;
+		AVector<AVector<ACell>> log=this.log;
 		if (log==null) {
-			log=BlobMap.create(addr, Vectors.of(values));
-		} else {
-			AVector<AVector<ACell>> vec=log.get(addr);
-			if (vec==null) {
-				vec=Vectors.of(values);
-			} else {
-				vec=vec.conj(values);
-			}
-			log=log.assoc(addr, vec);
-		}
+			log=Vectors.empty();
+		} 
+		AVector<ACell> entry = Vectors.of(addr,values);
+		log=log.conj(entry);
 
 		this.log=log;
 		return this;
@@ -2003,20 +2004,9 @@ public final class Context<T extends ACell> extends AObject {
 	 *
 	 * @return BlobMap of addresses to log entries created in the course of current execution context.
 	 */
-	public ABlobMap<Address,AVector<AVector<ACell>>> getLog() {
-		if (log==null) return BlobMaps.empty();
+	public AVector<AVector<ACell>> getLog() {
+		if (log==null) return Vectors.empty();
 		return log;
-	}
-
-	/**
-	 * Gets the log for the specified address.
-	 * @param address
-	 * @return Vector of log entries for the given address
-	 */
-	public AVector<AVector<ACell>> getLog(Address address) {
-		AVector<AVector<ACell>> logs= getLog().get(address);
-		if (logs==null) return Vectors.empty();
-		return logs;
 	}
 
 	public Context<?> lookupCNS(String name) {

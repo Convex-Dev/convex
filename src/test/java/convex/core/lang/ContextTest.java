@@ -17,11 +17,11 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
 import convex.core.ErrorCodes;
-import convex.core.data.ABlobMap;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.BlobMaps;
+import convex.core.data.Keyword;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
@@ -91,7 +91,7 @@ public class ContextTest extends ACVMTest {
 		assertTrue(ctx.withError(ErrorCodes.ASSERT).isExceptional());
 		assertTrue(ctx.withError(ErrorCodes.ASSERT,"Assert Failed").isExceptional());
 
-		assertThrows(IllegalArgumentException.class,()->ctx.withError(null));
+		assertThrows(IllegalArgumentException.class,()->ctx.withError((Keyword)null));
 
 		assertThrows(Error.class,()->ctx.withError(ErrorCodes.ASSERT).getResult());
 	}
@@ -184,13 +184,12 @@ public class ContextTest extends ACVMTest {
 		AVector<ACell> v=Vectors.of(1,2,3);
 		c.appendLog(v);
 
-		ABlobMap<Address,AVector<AVector<ACell>>> log=c.getLog();
+		AVector<AVector<ACell>> log=c.getLog();
 		assertFalse(c.getLog().isEmpty());
 
 
-		AVector<AVector<ACell>> alog=log.get(c.getAddress());
-		assertEquals(1,alog.count());
-		assertEquals(v,alog.get(0));
+		assertEquals(1,log.count());
+		assertEquals(v,log.get(0).get(1));
 	}
 
 	@Test

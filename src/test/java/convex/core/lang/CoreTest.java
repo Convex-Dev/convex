@@ -35,7 +35,6 @@ import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.State;
 import convex.core.data.ABlob;
-import convex.core.data.ABlobMap;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AVector;
@@ -411,23 +410,21 @@ public class CoreTest extends ACVMTest {
 
 		Context<?> c=step("(log 1 2)");
 		assertEquals(v0,c.getResult());
-		ABlobMap<Address,AVector<AVector<ACell>>> log=c.getLog();
+		AVector<AVector<ACell>> log=c.getLog();
 		assertEquals(1,log.count()); // only one address did a log
 		assertNotNull(log);
 
-		AVector<AVector<ACell>> alog=log.get(c.getAddress());
-		assertEquals(1,alog.count()); // one log entry only
-		assertEquals(v0,alog.get(0));
+		assertEquals(1,log.count()); // one log entry only
+		assertEquals(v0,log.get(0).get(1));
 
 		// do second log in same context
 		AVector<ACell> v1=Vectors.of(3L, 4L);
 		c=step(c,"(log 3 4)");
 		log=c.getLog();
 
-		alog=log.get(c.getAddress());
-		assertEquals(2,alog.count()); // should be two entries now
-		assertEquals(v0,alog.get(0));
-		assertEquals(v1,alog.get(1));
+		assertEquals(2,log.count()); // should be two entries now
+		assertEquals(v0,log.get(0).get(1));
+		assertEquals(v1,log.get(1).get(1));
 	}
 
 
@@ -442,17 +439,16 @@ public class CoreTest extends ACVMTest {
 
 		// call actor function
 		c=step(c,"(call "+actor+" (event 1 2))");
-		ABlobMap<Address, AVector<AVector<ACell>>> log = c.getLog();
+		AVector<AVector<ACell>> log = c.getLog();
 
-		AVector<AVector<ACell>> alog = log.get(actor);
-		assertEquals(1,alog.count()); // should be one entry by the actor
-		assertEquals(v0,alog.get(0));
+		assertEquals(1,log.count()); // should be one entry by the actor
+		assertEquals(v0,log.get(0).get(1));
 
 		// call actor function which rolls back - should also roll back log
 		c=step(c,"(call "+actor+" (non-event 3 4))");
-		alog = log.get(actor);
-		assertEquals(1,alog.count()); // should be one entry by the actor
-		assertEquals(v0,alog.get(0));
+		log = c.getLog();
+		assertEquals(1,log.count()); // should be one entry by the actor
+		assertEquals(v0,log.get(0).get(1));
 
 	}
 

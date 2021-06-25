@@ -30,6 +30,7 @@ public class ErrorValue extends AExceptional {
 	private final ACell code;
 	private final ACell message;
 	private final ArrayList<AString> trace=new ArrayList<>();
+	private ACell log;
 
 	private ErrorValue(ACell code, ACell message) {
 		if (code==null) throw new IllegalArgumentException("Error code must not be null");
@@ -85,6 +86,10 @@ public class ErrorValue extends AExceptional {
 		trace.add(Strings.create(traceMessage));
 	}
 	
+	public void addLog(ACell log) {
+		this.log=log;
+	}
+	
 	/**
 	 * Gets the optional message associated with this error value, or null if not supplied.
 	 * @return The message carried with this error
@@ -116,6 +121,17 @@ public class ErrorValue extends AExceptional {
 	 */
 	public List<AString> getTrace() {
 		return trace;
+	}
+	
+	/**
+	 * Gets the CVM local log at the time of the Error.
+	 * 
+	 * The trace List is mutable, and may be used to implement accumulation of additional trace entries.
+	 * 
+	 * @return List of trace entries.
+	 */
+	public ACell getLog() {
+		return log;
 	}
 
 
