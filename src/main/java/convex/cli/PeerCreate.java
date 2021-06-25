@@ -10,7 +10,13 @@ import convex.cli.peer.PeerManager;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.data.Address;
+import convex.core.data.ACell;
+import convex.core.lang.Reader;
 import convex.core.store.AStore;
+import convex.core.transactions.ATransaction;
+import convex.core.transactions.Invoke;
+import convex.core.Result;
+
 import etch.EtchStore;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
@@ -62,6 +68,10 @@ public class PeerCreate implements Runnable {
 		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
 	private String hostname;
 
+	@Option(names={"-t", "--timeout"},
+		description="Timeout in miliseconds.")
+	private long timeout = 5000;
+
 
 	@Override
 	public void run() {
@@ -107,11 +117,25 @@ public class PeerCreate implements Runnable {
 
 			convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
 			long stakeBalance = convex.getBalance(address);
+			String accountKeyString = keyPair.getAccountKey().toHexString();
+			long stakeAmount = (long) (stakeBalance * 0.98);
+
+			String transactionCommand = String.format("(create-peer %s %d)", accountKeyString, stakeAmount);
+			ACell message = Reader.read(transactionCommand);
+			ATransaction transaction = Invoke.create(address, -1, message);
+			Result result = convex.transactSync(transaction, timeout);
+			System.out.println(result);
 
 			System.out.println("Created the following items:");
 			System.out.println("Keypair: " + keyPair.getAccountKey());
 			System.out.println("Account address: "+ address);
 			System.out.println("Stake balance of: " + stakeBalance);
+			String shortAccountKey = accountKeyString.substring(0, 6);
+			System.out.println("You can now start this peer by running:");
+			System.out.println("\t./convex peer start --password=your-secret-password " +
+				"--address=" + address.toLong() +
+				" --public-key=" + shortAccountKey
+			);
 
 		} catch (Throwable t) {
 			System.out.println("Unable to launch peer "+t);

@@ -88,13 +88,16 @@ public class PeerManager implements IServerEvent {
 		}
 	}
 
-    public void launchPeer(AKeyPair keyPair, Address peerAddress, String hostname, int port, AStore store) {
+    public void launchPeer(AKeyPair keyPair, Address peerAddress, String hostname, int port, AStore store, String localPeerHostname) {
 		Map<Keyword, Object> config = new HashMap<>();
-		config.put(Keywords.PORT, port);
+		if (port > 0 ) {
+			config.put(Keywords.PORT, port);
+		}
 		config.put(Keywords.STORE, store);
 		config.put(Keywords.KEYPAIR, keyPair);
 		Server server = API.launchPeer(config, this);
-		server.joinNetwork(keyPair, peerAddress, hostname);
+
+		server.joinNetwork(keyPair, peerAddress, localPeerHostname);
 		peerServerList.add(server);
 	}
 
