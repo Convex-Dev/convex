@@ -599,7 +599,7 @@ public class Context<T extends ACell> extends AObject {
 		if (as==null) return null;
 		return as.getEnvironment().get(sym);
 	}
-	
+
 	/**
 	 * Looks up value for the given symbol in this context
 	 * @param address Address to look up in (may be null for current environment)
@@ -2105,7 +2105,7 @@ public class Context<T extends ACell> extends AObject {
 		AHashMap<ACell,ACell> me=null;
 		Address addr;
 		Symbol sym;
-		
+
 		if (form instanceof Symbol) {
 			sym=(Symbol)form;
 			me=this.lookupMeta(sym);
@@ -2138,9 +2138,9 @@ public class Context<T extends ACell> extends AObject {
 		}  else {
 			return null;
 		}
-		
+
 		if (me==null) return null;
-		
+
 			// TODO: examine syntax object for expander details?
 		ACell expBool =me.get(Keywords.EXPANDER);
 		if (RT.bool(expBool)) {
