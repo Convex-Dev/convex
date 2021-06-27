@@ -154,6 +154,31 @@ public class Main implements Runnable {
 		return Helpers.expandTilde(etchStoreFilename);
 	}
 
+	public KeyStore loadKeyStore(boolean isCreate) throws Error {
+		KeyStore keyStore = null;
+		if (password == null || password.isEmpty()) {
+			throw new Error("You need to provide a keystore password");
+		}
+		File keyFile = new File(getKeyStoreFilename());
+		try {
+			if (keyFile.exists()) {
+				keyStore = PFXTools.loadStore(keyFile, password);
+			}
+			else {
+				if (isCreate) {
+					Helpers.createPath(keyFile);
+					keyStore = PFXTools.createStore(keyFile, password);
+				}
+				else {
+					throw new Error("Cannot find keystore file "+keyFile.getCanonicalPath());
+				}
+			}
+		} catch(Throwable t) {
+			new Error(t);
+		}
+		return keyStore;
+	}
+
 	public AKeyPair loadKeyFromStore(String keystorePublicKey, int keystoreIndex) throws Error {
 
 		AKeyPair keyPair = null;
@@ -198,7 +223,10 @@ public class Main implements Runnable {
 	public Convex connectToSessionPeer(String hostname, int port, Address address, AKeyPair keyPair) throws Error {
 		if (port == 0) {
 			try {
-				port = Helpers.getSessionPort(getSessionFilename());
+				// at the moment always return the first peer, since there is a bug
+				// that does not allow the other peers to submit their beliefs correctly.
+				// TODO remove the 0 index in this param after the peer belief bug is fixed
+				port = Helpers.getSessionPort(getSessionFilename(), 0);
 			} catch (IOException e) {
 				throw new Error("Cannot load the session control file");
 			}
