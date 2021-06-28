@@ -110,6 +110,7 @@ public class PeerStart implements Runnable {
 			peerManager.showPeerEvents();
 		} catch (Throwable t) {
 			System.out.println("Unable to launch peer "+t);
+			t.printStackTrace();
 		}
 	}
 }
