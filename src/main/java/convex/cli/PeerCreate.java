@@ -1,17 +1,13 @@
 package convex.cli;
 
 import java.io.File;
-import java.io.IOException;
 import java.security.KeyStore;
 import java.util.logging.Logger;
 
 import convex.api.Convex;
-import convex.cli.peer.PeerManager;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.data.Address;
-import convex.core.store.AStore;
-import etch.EtchStore;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
@@ -23,7 +19,7 @@ import picocli.CommandLine.Spec;
  *
  *		convex.peer.create
  *
- *  This creates an account and provieds enougth funds, for a new peer account
+ *  This creates an account and provides enougth funds, for a new peer account
  *
  *
  */

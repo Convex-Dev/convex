@@ -37,11 +37,9 @@ public class Session {
 
 	/**
 	 * Add a peer to the list of peers kept in the session data.
-	 *
-	 * @param addressKey AccountKey of the peer.
-	 *
+	 * 
+	 * @param accountKey Public key of Peer
 	 * @param hostname Hostname of the peer. This includes the port number.
-	 *
 	 * @param etchFilename Filename that the peer is using to store the peer's state.
 	 *
 	 */
@@ -53,7 +51,7 @@ public class Session {
 	/**
 	 * Remove a peer from the list of peers held by this session.
 	 *
-	 * @param addressKey Address of the peer, this is the public key used by the peer.
+	 * @param accountKey Address of the peer, this is the public key used by the peer.
 	 *
 	 */
 	public void removePeer(AccountKey accountKey) {
@@ -69,7 +67,6 @@ public class Session {
 	* Store the session list to a file.
 	*
 	* @param filename Filename to save the session too.
-	*
 	* @throws IOException if the file data cannot be writtern.
 	*
 	*/
@@ -97,10 +94,8 @@ public class Session {
 	/**
 	 * Return true of false if the peer name exists in the list of peers for this session
 	 *
-	 * @param name Name of the peer to check to see if it exists.
-	 *
-	 * @return true if the peer name exists.
-	 *
+	 * @param accountKey Public Key of the peer to check to see if it exists.
+	 * @return true if the peer name exists, flase otherwise
 	 */
 	public boolean isPeer(AccountKey accountKey) {
 		SessionItem item = getItemFromAccountKey(accountKey);
@@ -111,9 +106,7 @@ public class Session {
 	 * Return a session item based on the peer index.
 	 *
 	 * @param index The index of the peer in the list, starting from 0.
-	 *
 	 * @return Session Item if the item is found at the index, if not then return null.
-	 *
 	 */
 	public SessionItem getItemFromIndex(int index) {
 		return items.get(index);

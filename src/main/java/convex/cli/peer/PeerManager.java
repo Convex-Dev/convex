@@ -38,7 +38,7 @@ import etch.EtchStore;
 
 /**
 *
-* Convex PeerManager
+* Convex CLI PeerManager
 *
 */
 
