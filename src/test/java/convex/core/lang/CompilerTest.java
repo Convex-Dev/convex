@@ -11,6 +11,7 @@ import static convex.test.Assertions.assertNotError;
 import static convex.test.Assertions.assertUndeclaredError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -541,8 +542,13 @@ public class CompilerTest extends ACVMTest {
 	public void testMacrosInActor() {
 		Context<?> ctx=context();
 		ctx=step(ctx,"(def lib (deploy `(do (defmacro foo [x] :foo))))");
-		assertTrue(ctx.getResult() instanceof Address);
+		Address addr=(Address) ctx.getResult();
+		assertNotNull(addr);
+		
 		ctx=step(ctx,"(def baz (lib/foo 1))");
+		assertEquals(Keywords.FOO,ctx.getResult());
+		
+		ctx=step(ctx,"(def bar ("+addr+"/foo 2))");
 		assertEquals(Keywords.FOO,ctx.getResult());
 	}
 
