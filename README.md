@@ -2,11 +2,11 @@
 
 Convex is a decentralised network and execution engine for the Internet of Value.
 
-It is designed as a foundational layer for decentralised application and economic systems that manage digital assets, where asset ownership is cryptographically secured. It can be considered functionally similar to a decentralised public blockchain, but offers some significant advantages:
+It is designed as a full stack solution for decentralised application and economic systems that manage digital assets, where asset ownership is cryptographically secured and can be managed (optionally) with Smart Contracts. It can be considered functionally similar to a decentralised public blockchain, but offers some significant advantages:
 
-- High transaction throughput (tens of thousands of transactions per second)
-- Low latency for transaction confirmation (a couple of second for global consensus)
-- Energy efficiency using the the Convergent Proof of Stake consensus algorithm
+- High transaction throughput (tens of thousands of write transactions per second, potentially scaling to millions)
+- Low latency for transaction confirmation (milliseconds for global consensus, depending on network speed)
+- 100% Green - energy efficiency using the the Convergent Proof of Stake consensus algorithm
 - Global State model with immutable data structures and atomic transactions
 - Lambda Calculus based VM supporting Turing complete Smart Contracts
 - Integrated on-chain compiler (Convex Lisp)
@@ -17,7 +17,7 @@ This repository contains the core Convex distribution including:
 
 - The Convex Virtual Machine (CVM) including data structures and execution environment
 - The standard Convex Peer server implementation (NIO based) implementing Convergent Proof of Stake (CPoS) for consensus
-- CLI Tools
+- CLI Tools for operating Peers, scripting transactions and more
 - The Etch database for persistent data storage
 - A Swing GUI for managing local peers / exploring the network
 - JMH Benchmarking suite
