@@ -292,7 +292,7 @@
           :examples [{:code "(create-peer account-key 700000000)"}]
           :type :function
           :signature [{:params [account-key stake-amount]
-                       :return account-key}]
+                       :return stake-amount}]
           :errors {:CAST "If the first argument is not a valid account-key."}}
 	}
 

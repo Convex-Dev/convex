@@ -1880,7 +1880,7 @@ public class Context<T extends ACell> extends AObject {
 	 * The accountKey must not be in the list of peers.
 	 * The accountKey must be assigend to the current transaction address
 	 * Stake must be greater than 0.
-	 * Stake must be less than equal to the account balance.
+	 * Stake must be less than to the account balance.
 	 *
 	 * @param accountKey Peer Account key to create the PeerStatus
 	 * @param initialStake Initial stake amount
@@ -1892,6 +1892,7 @@ public class Context<T extends ACell> extends AObject {
 		PeerStatus ps=s.getPeer(accountKey);
 		if (ps!=null) return withError(ErrorCodes.STATE,"Peer already exists for this account key: "+accountKey.toChecksumHex());
 		if (initialStake<0) return this.withArgumentError("Cannot set a negative stake");
+		if (initialStake == 0) return this.withArgumentError("Cannot create a peer with zero stake");
 		if (initialStake>Constants.MAX_SUPPLY) return this.withArgumentError("Target stake out of valid Amount range");
 
 		Address myAddress=getAddress();
@@ -1900,14 +1901,13 @@ public class Context<T extends ACell> extends AObject {
 		if (!as.getAccountKey().equals(accountKey)) return this.withArgumentError("Cannot create a peer with a different account-key");
 
 		long balance=getBalance(myAddress);
-		if (initialStake>balance) return this.withFundsError("Insufficient balance ("+balance+") to assign an initial stake of "+initialStake);
+		if (initialStake>=balance) return this.withFundsError("Insufficient balance ("+balance+") to assign an initial stake of "+initialStake);
 
-		PeerStatus newPeer = PeerStatus.create(myAddress, initialStake);
+		PeerStatus newPeerStatus = PeerStatus.create(myAddress, initialStake);
 
 		// Final updates. Hopefully everything balances. SECURITY: test this. A lot.
 		s=s.withBalance(myAddress, balance-initialStake); // adjust own balance
-
-		s=s.withPeer(accountKey, newPeer); // add peer
+		s=s.withPeer(accountKey, newPeerStatus); // add peer
 		return withState(s);
 	}
 
