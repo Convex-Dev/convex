@@ -131,11 +131,15 @@ For example, this can be interpreted as an indication that the Etch database lay
 
 Open Source contributions are welcome under the terms of the Convex Public License. Contributors retain copyright to their work, but must accept the terms of the license.
 
+We are planning to institute a Contributors Agreement for all contributions to the core Convex repository.
+
 The Convex Foundation may, at its sole discretion, award contributors with Convex Coins as recognition of value contributed to the Convex ecosystem. Convex coins are the native coin of the Convex network, and function as a utility token that provides the right to make use of the services of the network. Convex coins may be exchangeable for other digital assets and currencies.
 
 ## Community
 
 We use Discord as the primary means for discussing Convex - you can join the public server at [https://discord.gg/5j2mPsk](https://discord.gg/5j2mPsk)
+
+Alternatively, email: info(at)convex.world
 
 ## Copyright
 
