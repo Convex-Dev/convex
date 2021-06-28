@@ -8,6 +8,7 @@ import convex.core.State;
 import convex.core.data.ABlobMap;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AList;
 import convex.core.data.AMap;
 import convex.core.data.AObject;
 import convex.core.data.ASequence;
@@ -597,6 +598,20 @@ public class Context<T extends ACell> extends AObject {
 		AccountStatus as = getAliasedAccount(env);
 		if (as==null) return null;
 		return as.getEnvironment().get(sym);
+	}
+	
+	/**
+	 * Looks up value for the given symbol in this context
+	 * @param address Address to look up in (may be null for current environment)
+	 * @param sym Symbol to look up
+	 * @return Value for the given symbol or null if undeclared
+	 */
+	public ACell lookupValue(Address address,Symbol sym) {
+		if (address==null) return lookupValue(sym);
+		AccountStatus as=getAccountStatus(address);
+		if (as==null) return null;
+		AHashMap<Symbol, ACell> env=as.getEnvironment();
+		return env.get(sym);
 	}
 
 	/**
@@ -2040,6 +2055,65 @@ public class Context<T extends ACell> extends AObject {
 		//rctx=rctx.withLocalBindings(savedEnv);
 		rctx=rctx.withDepth(savedDepth);
 		return rctx;
+	}
+
+	/**
+	 * Looks up an expander from a form in this context
+	 * @param form Form which might be an expander reference
+	 * @return Expander instance, or null if no expander found
+	 */
+	public AFn<ACell> lookupExpander(ACell form) {
+		/**
+		 * MapEntry for Expander metadata lookup
+		 */
+		AHashMap<ACell,ACell> me=null;
+		Address addr;
+		Symbol sym;
+		
+		if (form instanceof Symbol) {
+			sym=(Symbol)form;
+			me=this.lookupMeta(sym);
+			addr=null;
+		} else if (form instanceof AList) {
+			// Need to check for (lookup ....) as this could reference an expander
+			@SuppressWarnings("unchecked")
+			AList<ACell> listForm=(AList<ACell>)form;
+			int n=listForm.size();
+			if (n<=1) return null;
+			if (!Symbols.LOOKUP.equals(listForm.get(0))) return null;
+			ACell maybeSym=listForm.get(n-1);
+			if (!(maybeSym instanceof Symbol)) return null;
+			sym=(Symbol)maybeSym;
+			if (n==2) {
+				addr=null;
+				me=lookupMeta(sym);
+			} else if (n==3) {
+				ACell maybeAddress=listForm.get(1);
+				if (maybeAddress instanceof Symbol) {
+					// one lookup via Environment for alias
+					maybeAddress=lookupValue((Symbol)maybeAddress);
+				}
+				if (!(maybeAddress instanceof Address)) return null;
+				addr=(Address) maybeAddress;
+				me=lookupMeta((Address)maybeAddress,sym);
+			} else {
+				return null;
+			}
+		}  else {
+			return null;
+		}
+		
+		if (me==null) return null;
+		
+			// TODO: examine syntax object for expander details?
+		ACell expBool =me.get(Keywords.EXPANDER);
+		if (RT.bool(expBool)) {
+			// expand form using specified expander and continuation expander
+			ACell v=lookupValue(addr,sym);
+			AFn<ACell> expander = RT.castFunction(v);
+			if (expander!=null) return expander;
+		}
+		return null;
 	}
 
 }

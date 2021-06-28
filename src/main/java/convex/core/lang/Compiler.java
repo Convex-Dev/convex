@@ -5,7 +5,6 @@ import java.util.Map;
 import convex.core.ErrorCodes;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AList;
 import convex.core.data.AMap;
 import convex.core.data.ASequence;
@@ -13,7 +12,6 @@ import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
-import convex.core.data.Keywords;
 import convex.core.data.List;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
@@ -702,6 +700,7 @@ public class Compiler {
 			if (cont==null) return context.withCastError(1, args,Types.FUNCTION);
 			
 			// If x is a Syntax object, need to compile the datum
+			// TODO: check interactions with macros etc.
 			if (x instanceof Syntax) {
 				Syntax sx=(Syntax)x;
 				ACell[] nargs=args.clone();
@@ -730,25 +729,9 @@ public class Compiler {
 	
 					// check for macro / expander in initial position.
 					// Note that 'quote' is handled by this, via QUOTE_EXPANDER
-					if (first instanceof Symbol) {
-						Symbol sym = (Symbol) first;
-						
-						AHashMap<ACell,ACell> me = context.lookupMeta(sym);
-						if (me != null) {
-							// TODO: examine syntax object for expander details?
-							ACell expBool =me.get(Keywords.EXPANDER);
-							if (RT.bool(expBool)) {
-								// expand form using specified expander and continuation expander
-								ACell v=context.lookupValue(sym);
-								AFn<ACell> expander = RT.castFunction(v);
-								if (expander==null) {
-									return context.withError(ErrorCodes.COMPILE,"Expander for ["+sym+"] not a function, got: "+v);
-								}
-								
-								Context<ACell> rctx = context.expand(expander,x, cont); // (exp x cont)
-								return rctx;
-							}
-						}
+					AFn<ACell> expander = context.lookupExpander(first);
+					if (expander!=null) {
+						return context.expand(expander,x, cont); // (exp x cont)
 					}
 				}
 

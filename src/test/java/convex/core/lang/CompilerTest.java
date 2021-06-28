@@ -24,6 +24,7 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AList;
 import convex.core.data.AVector;
+import convex.core.data.Address;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
@@ -534,6 +535,15 @@ public class CompilerTest extends ACVMTest {
 	public void testMacrosNested() {
 		AVector<CVMLong> expected=Vectors.of(1L,2L);
 		assertEquals(expected,eval("(when (or nil true) (and [1 2]))"));
+	}
+	
+	@Test
+	public void testMacrosInActor() {
+		Context<?> ctx=context();
+		ctx=step(ctx,"(def lib (deploy `(do (defmacro foo [x] :foo))))");
+		assertTrue(ctx.getResult() instanceof Address);
+		ctx=step(ctx,"(def baz (lib/foo 1))");
+		assertEquals(Keywords.FOO,ctx.getResult());
 	}
 
 	@Test
