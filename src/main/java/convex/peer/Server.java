@@ -571,7 +571,8 @@ public class Server implements Closeable {
 		peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
 
 		boolean updated = maybeMergeBeliefs();
-		if (!updated) return false;
+		// Must skip broadcast if we haven't published a new Block or updated our own Order
+		if (!(updated||published)) return false;
 
 		// At this point we know our Order should have changed
 		final Belief belief = peer.getBelief();
