@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
@@ -41,6 +42,7 @@ import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
 import convex.core.data.Ref;
@@ -352,16 +354,17 @@ public class Server implements Closeable {
 			return false;
 		}
 
+
 		AVector<ACell> values = result.getValue();
+		System.out.println(values);
 		//Hash beliefHash = (Hash) values.get(0);
-		//Hash stateHash = (Hash) values.get(1);
+		Hash stateHash = RT.ensureHash(values.get(1));
 
 		// check the initStateHash to see if this is the network we want to join?
 		Hash remoteNetworkID = RT.ensureHash(values.get(2));
 		if (!Utils.equals(peer.getNetworkID(),remoteNetworkID)) {
 			throw new Error("Failed to join network, we want Network ID "+peer.getNetworkID()+" but remote Peer repoerted "+remoteNetworkID);
 		}
-
 
 		AHashMap<ABlob, AString> buildPeerList = (AHashMap<ABlob, AString>) values.get(3);
 
@@ -372,10 +375,32 @@ public class Server implements Closeable {
 			statusPeerList = statusPeerList.assoc(accountKey, buildPeerList.get(key));
 		}
 
-
 		// now use the remote peer host name list returned from the status call
 		// to connect to the peers
 		connectToPeers(statusPeerList);
+
+
+		String localHostname=getHostname();
+//		InetSocketAddress localPeerAddress = Utils.toInetSocketAddress(localHostname);
+		String messageText = String.format("(set-peer-data {:url \"%s\"})", localHostname);
+		ACell message = Reader.read(messageText);
+		ATransaction transaction = Invoke.create(address, -1, message);
+		try {
+			convex.transactSync(transaction, 3000);
+		} catch ( IOException | TimeoutException e) {
+			throw new Error("Failed to register peer network address with the convex network: " + e);
+		}
+
+
+		/*
+		try {
+			Set<AccountKey> peerKeys = manager.getConnections().keySet();
+			manager.getConnection((AccountKey) peerKeys.toArray()[0]).sendMissingData(stateHash.toBlob());
+		} catch (IOException e) {
+			throw new Error("cannot request for network sync: " + e);
+		}
+		*/
+
 		raiseServerChange("join network");
 
 		return true;
@@ -557,9 +582,11 @@ public class Server implements Closeable {
 	protected boolean maybeUpdateBelief() throws InterruptedException {
 		long oldConsensusPoint = peer.getConsensusPoint();
 
-		// possibly have own transactions to publish
-		maybePostOwnTransactions(newTransactions);
-		
+		if (oldConsensusPoint > 0) {
+			// possibly have own transactions to publish
+			maybePostOwnTransactions(newTransactions);
+		}
+
 		// publish new blocks if needed. Guaranteed to change belief if this happens
 		boolean published = maybePublishBlock();
 
@@ -650,17 +677,17 @@ public class Server implements Closeable {
 		synchronized (transactionList) {
 			State s=getPeer().getConsensusState();
 			long ts=s.getTimeStamp().longValue();
-	
+
 			// If we already did this recently, don't try again
 			if (ts<(lastOwnTransactionTimestamp+OWN_TRANSACTIONS_DELAY)) return;
-	
+
 			lastOwnTransactionTimestamp=ts; // mark this timestamp
-	
+
 			String desiredHostname=getHostname(); // Intended hostname
 			PeerStatus ps=s.getPeer(getPeerKey());
 			AString chn=ps.getHostname();
 			String currentHostname=(chn==null)?null:chn.toString();
-	
+
 			// Try to set hostname if not correctly set
 			trySetHostname:
 			if (!Utils.equals(desiredHostname, currentHostname)) {
@@ -669,7 +696,7 @@ public class Server implements Closeable {
 				AccountStatus as=s.getAccount(address);
 				if (as==null) break trySetHostname;
 				if (!Utils.equals(getPeerKey(), as.getAccountKey())) break trySetHostname;
-	
+
 				String code;
 				if (desiredHostname==null) {
 					code = "(set-peer-data {:url nil})";

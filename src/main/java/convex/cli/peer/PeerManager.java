@@ -88,7 +88,7 @@ public class PeerManager implements IServerEvent {
 		}
 	}
 
-    public void launchPeer(AKeyPair keyPair, Address peerAddress, String hostname, int port, AStore store, String localPeerHostname) {
+    public void launchPeer(AKeyPair keyPair, Address peerAddress, String hostname, int port, AStore store, String remotePeerHostname) {
 		Map<Keyword, Object> config = new HashMap<>();
 		if (port > 0 ) {
 			config.put(Keywords.PORT, port);
@@ -97,7 +97,7 @@ public class PeerManager implements IServerEvent {
 		config.put(Keywords.KEYPAIR, keyPair);
 		Server server = API.launchPeer(config, this);
 
-		server.joinNetwork(keyPair, peerAddress, localPeerHostname);
+		server.joinNetwork(keyPair, peerAddress, remotePeerHostname);
 		peerServerList.add(server);
 	}
 
