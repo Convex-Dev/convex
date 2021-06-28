@@ -2452,7 +2452,6 @@ public class CoreTest extends ACVMTest {
 		Context<ACell> ctx=step(INITIAL_CONTEXT,"(def hero-peer 0x"+InitConfigTest.HERO_KEYPAIR.getAccountKey().toHexString()+")");
 		ctx=ctx.forkWithAddress(InitConfigTest.HERO_ADDRESS);
 
-
 		Context<ACell> peerCTX = step(ctx,"(create-peer hero-peer 1000)");
 		// create a peer based on the HERO address and public key
 		assertNotError(peerCTX);
