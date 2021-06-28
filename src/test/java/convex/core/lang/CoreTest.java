@@ -2452,14 +2452,18 @@ public class CoreTest extends ACVMTest {
 		Context<ACell> ctx=step(INITIAL_CONTEXT,"(def hero-peer 0x"+InitConfigTest.HERO_KEYPAIR.getAccountKey().toHexString()+")");
 		ctx=ctx.forkWithAddress(InitConfigTest.HERO_ADDRESS);
 
-        ctx = step(ctx,"(create-peer  hero-peer 1000)");
+
+		Context<ACell> peerCTX = step(ctx,"(create-peer hero-peer 1000)");
 		// create a peer based on the HERO address and public key
-		assertNotError(ctx);
+		assertNotError(peerCTX);
 
 		// create a peer again on the same peer key and address
-		assertError(step(ctx,"(create-peer hero-peer 1000)"));
+		assertError(step(peerCTX,"(create-peer hero-peer 1000)"));
 
-        // creating a peer on an account key that isn't the signed account
+		// create a new peer with zero stake
+		assertError(step(ctx,"(create-peer hero-peer 0)"));
+
+		// creating a peer on an account key that isn't the hero account key
 		assertArgumentError(step(ctx,"(create-peer 0x1234567812345678123456781234567812345678123456781234567812345678 1234)"));
 
 		// creating a peer with invalid account key
