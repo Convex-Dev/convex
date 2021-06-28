@@ -74,7 +74,6 @@ public class PeerCreate implements Runnable {
 	public void run() {
 
 		Main mainParent = peerParent.mainParent;
-//		PeerManager peerManager = PeerManager.create(mainParent.getSessionFilename());
 
 		int port = 0;
 		long peerStake = 10000000000L;
@@ -117,23 +116,32 @@ public class PeerCreate implements Runnable {
 			String accountKeyString = keyPair.getAccountKey().toHexString();
 			long stakeAmount = (long) (stakeBalance * 0.98);
 
-			String transactionCommand = String.format("(create-peer %s %d)", accountKeyString, stakeAmount);
+			String transactionCommand = String.format("(create-peer 0x%s %d)", accountKeyString, stakeAmount);
 			ACell message = Reader.read(transactionCommand);
 			ATransaction transaction = Invoke.create(address, -1, message);
 			Result result = convex.transactSync(transaction, timeout);
-			System.out.println(result);
+			if (result.isError()) {
+				System.err.println("cannot create peer on the network: " + result.getErrorCode() + result.getTrace());
+				return;
+			}
+			long currentBalance = convex.getBalance(address);
 
 			System.out.println("Created the following items:");
-			System.out.println("Keypair: " + keyPair.getAccountKey());
+			System.out.println("Public Peer Key: " + keyPair.getAccountKey());
 			System.out.println("Account address: "+ address);
-			System.out.println("Stake balance of: " + stakeBalance);
+			System.out.println("Current balance: " + currentBalance);
+			System.out.println("Inital stake amount: " + stakeAmount);
 			String shortAccountKey = accountKeyString.substring(0, 6);
-			System.out.println("You can now start this peer by running:");
-			System.out.println("\t./convex peer start --password=your-secret-password " +
-				"--address=" + address.toLong() +
-				" --public-key=" + shortAccountKey
-			);
+			System.out.println("You can now start this peer by executing the following line:\n");
 
+			// WARNING not sure about showing the users password..
+			// to make the starting of peers easier, I have left it in for a simple copy/paste
+
+			System.out.println(String.format("\t./convex peer start --password=%s", mainParent.getPassword() )+
+				" --address=" + address.toLong() +
+				" --public-key=" + shortAccountKey +
+				"\n"
+			);
 		} catch (Throwable t) {
 			System.out.println("Unable to launch peer "+t);
 		}
