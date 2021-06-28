@@ -52,9 +52,10 @@ As such the license has been written based on the following principles:
 
 "Economic Assets" shall mean entities with economic or commercial value, or from which commercial or economic value may be derived through the exercise of exclusive control. An Economic Asset may be entirely digital, a legal right, an asset that exists in the physical world, or any combination of these.
 
-"Decentralised Economic System" shall mean any system where either of the following are true:
-- Consensus is determined between two or more Legal Entities
+"Decentralised Economic System" shall mean any system where any of the following are true:
+- Consensus over some information of economic interest is determined between two or more Legal Entities
 - Economic Assets are under the control of two or more Legal Entities
+- Transactions are executed that represent exchange of value between two or more Legal Entities
 
 "Convex Network" shall mean the union of all systems using the Work as part of a public utility network or operating a Decentralised Economic System. 
 
@@ -121,7 +122,7 @@ While redistributing the Work or Derivative Works thereof, You may choose to off
 
 ## 10. Relicensing. 
 
-Contributor grants to the Governing Body a perpetual, worldwide, no-charge, royalty-free, irrevocable right to re-distribute contributions under any future revision of this license approved by the Governing Body.
+Contributor grants to the Governing Body a perpetual, worldwide, no-charge, royalty-free, irrevocable right to re-distribute contributions under any future revision of this license approved by the Governing Body. The Convex Foundation will ensure that the main Convex distribution is always free and open source for anyone to use with the Convex Network.
 
 <--- Licence copyright --->
 
