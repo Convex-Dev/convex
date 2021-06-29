@@ -479,6 +479,19 @@ public class Convex {
 	 *
 	 * @return Future for the cell being acquired
 	 */
+	public <T extends ACell> Future<T> acquire(Hash hash) {
+		return acquire(hash, Stores.current());
+	}
+
+	/**
+	 * Attempts to acquire a complete persistent data structure for the given hash
+	 * from the remote peer. Uses the store configured for the calling thread.
+	 *
+	 * @param hash Hash of value to acquire.
+	 * @param store Store to aquire the persistent data too.
+	 *
+	 * @return Future for the cell being acquired
+	 */
 	public <T extends ACell> Future<T> acquire(Hash hash, AStore store) {
 		CompletableFuture<T> f = new CompletableFuture<T>();
 		new Thread(new Runnable() {
