@@ -13,6 +13,9 @@ import convex.core.lang.Juice;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Transfer;
 
+/**
+ * Tests for Transactions, especially when applied in isolation to a State
+ */
 public class TransactionTest extends ACVMTest {
 
 	protected TransactionTest() {

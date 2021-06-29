@@ -1901,7 +1901,6 @@ public class Context<T extends ACell> extends AObject {
 	 * @param initialStake Initial stake amount
 	 * @return Context with final take set
 	 */
-	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> createPeer(AccountKey accountKey, long initialStake) {
 		State s=getState();
 		PeerStatus ps=s.getPeer(accountKey);

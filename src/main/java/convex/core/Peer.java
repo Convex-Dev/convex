@@ -21,6 +21,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.TODOException;
 import convex.core.init.Init;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
@@ -128,24 +129,12 @@ public class Peer {
 	/**
 	 * Create a Peer instance from a remotely acquired Belief
 	 * @param peerKP
+	 * @param initialState Initial genesis State of the Network
 	 * @param remoteBelief
-	 * @return
+	 * @return New Peer instance
 	 */
 	public static Peer create(AKeyPair peerKP, State initialState, Belief remoteBelief) {
-		Belief belief = Belief.createSingleOrder(peerKP);
-		SignedData<Belief> sb = peerKP.signData(belief);
-		AVector<State> states=Vectors.of(initialState);
-
-		// Ensure initial belief and states are persisted in current store
-		ACell.createPersisted(remoteBelief);
-
-		// Check belief persistence
-		Ref<SignedData<Belief>> sbr=Ref.forHash(sb.getHash());
-		if (sbr==null) {
-			throw new Error("Belief not correctly persisted! "+sb.getHash());
-		}
-
-		return new Peer(peerKP, sb, states, Vectors.empty(), initialState.getTimeStamp().longValue());
+		throw new TODOException();
 	}
 
 	/**
