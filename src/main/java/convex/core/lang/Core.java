@@ -780,13 +780,9 @@ public class Core {
 			if (address == null) return context.withCastError(0,args, Types.ADDRESS);
 
 			AccountStatus as = context.getAccountStatus(address);
-			CVMLong balance = null;
-			if (as != null) {
-				balance = CVMLong.create(as.getBalance());
-			}
-			long juice = Juice.BALANCE;
+			CVMLong balance = (as != null) ? CVMLong.create(as.getBalance()) : null;
 
-			return context.withResult(juice, balance);
+			return context.withResult(Juice.BALANCE, balance);
 		}
 	});
 

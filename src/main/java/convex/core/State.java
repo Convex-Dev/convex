@@ -543,7 +543,7 @@ public class State extends ARecord {
 	/**
 	 * Gets the AccountStatus for a given account, or null if not found.
 	 *
-	 * @param target
+	 * @param target Address to look up. Must not be null
 	 * @return The AccountStatus for the given account, or null.
 	 */
 	public AccountStatus getAccount(Address target) {
