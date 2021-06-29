@@ -15,6 +15,7 @@ import convex.core.data.AccountStatus;
 import convex.core.data.BlobMap;
 import convex.core.data.Hash;
 import convex.core.data.PeerStatus;
+import convex.core.store.Stores;
 import convex.core.util.Text;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -77,7 +78,7 @@ public class Status implements Runnable {
 			ABlob stateHash = (ABlob) resultVector.get(1);
 			System.out.println("State hash: " + stateHash.toString());
 			Hash hash = Hash.wrap(stateHash.getBytes());
-			AVector<ACell> stateWrapper = (AVector<ACell>) convex.acquire(hash).get(3000,TimeUnit.MILLISECONDS);
+			AVector<ACell> stateWrapper = (AVector<ACell>) convex.acquire(hash, Stores.current()).get(3000,TimeUnit.MILLISECONDS);
 			State state = (State) stateWrapper.get(0);
 
 			state.validate();

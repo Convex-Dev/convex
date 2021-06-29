@@ -9,7 +9,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Logger;
 
 import convex.api.Convex;
@@ -18,12 +21,15 @@ import convex.cli.Helpers;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.init.AInitConfig;
 import convex.core.lang.Reader;
+import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
@@ -85,6 +91,48 @@ public class PeerManager implements IServerEvent {
 			Future<Result> future = convex.transact(transaction);
 		} catch (IOException e) {
 			log.severe("cannot connect to the first peer "+e);
+		}
+	}
+
+	public void aquireState(AKeyPair keyPair, Address address, AStore store, String remotePeerHostname) {
+		// sync the etch db with the network state
+
+		InetSocketAddress remotePeerAddress = Utils.toInetSocketAddress(remotePeerHostname);
+		int retryCount = 5;
+		Convex convex = null;
+		Result result = null;
+		while (retryCount > 0) {
+			try {
+				convex = Convex.connect(remotePeerAddress, address, keyPair, store);
+				Future<Result> cf =  convex.requestStatus();
+				result = cf.get(2000, TimeUnit.MILLISECONDS);
+				retryCount = 0;
+			} catch (IOException | InterruptedException | ExecutionException | TimeoutException e ) {
+				// raiseServerMessage("unable to connect to remote peer at " + remoteHostname + ". Retrying " + e);
+				retryCount --;
+			}
+		}
+		if ((convex==null)||(result == null)) {
+			throw new Error("Failed to join network: Cannot connect to remote peer at "+remotePeerHostname);
+		}
+
+
+		AVector<ACell> values = result.getValue();
+		// Hash beliefHash = RT.ensureHash(values.get(0));
+		Hash stateHash = RT.ensureHash(values.get(1));
+
+		long timeout = 20000;
+		try {
+			// convex = Convex.connect(localPeerAddress, address, keyPair);
+			long start = Utils.getTimeMillis();
+
+			Future<Result> cf = convex.acquire(stateHash, store);
+			// adjust timeout if time elapsed to submit transaction
+			long now = Utils.getTimeMillis();
+			timeout = Math.max(0L, timeout - (now - start));
+			cf.get(timeout, TimeUnit.MILLISECONDS);
+		} catch (InterruptedException | ExecutionException | TimeoutException e) {
+			throw new Error("cannot request for network sync: " + e);
 		}
 	}
 

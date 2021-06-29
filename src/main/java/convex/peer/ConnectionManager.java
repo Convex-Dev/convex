@@ -25,12 +25,12 @@ import convex.net.Message;
 public class ConnectionManager {
 
 	private static final Logger log = Logger.getLogger(ConnectionManager.class.getName());
-	
+
 	static final Level LEVEL_CHALLENGE_RESPONSE = Level.FINEST;
 
 	private final Server server;
 	private final HashMap<AccountKey,Connection> connections = new HashMap<>();
-	
+
 	/**
 	 * The list of outgoing challenges that are being made to remote peers
 	 */
@@ -108,8 +108,8 @@ public class ConnectionManager {
 		}
 		return result;
 	}
-	
-	
+
+
 	void processResponse(Message m, Peer thisPeer) {
 		try {
 			SignedData<ACell> signedData = m.getPayload();
@@ -195,9 +195,9 @@ public class ConnectionManager {
 			log.warning("Response Error: " + t);
 		}
 	}
-	
-	
-	
+
+
+
 	/**
 	 * Sends out challenges to any connections that are not trusted.
 	 * @param peer Peer state as basis from which to send challenges
@@ -225,11 +225,11 @@ public class ConnectionManager {
 				} else {
 					// TODO: check OK to do nothing and send later?
 				}
-				
+
 			}
 		}
 	}
-	
+
 
 	/**
 	 *

@@ -8,6 +8,7 @@ import convex.cli.peer.PeerManager;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.store.AStore;
+import convex.core.store.Stores;
 import etch.EtchStore;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
@@ -72,7 +73,7 @@ public class PeerStart implements Runnable {
 
 		int port = 0;
 		AKeyPair keyPair = null;
-		String localPeerHostname = null;
+		String remotePeerHostname = null;
 		try {
 			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
 		} catch (Error e) {
@@ -91,7 +92,7 @@ public class PeerStart implements Runnable {
 
 		try {
 			// TODO remove the 0 index in this param after the peer belief bug is fixed
-			localPeerHostname = Helpers.getSessionHostname(mainParent.getSessionFilename(), 0);
+			remotePeerHostname = Helpers.getSessionHostname(mainParent.getSessionFilename());
 		} catch (IOException e) {
 			log.warning("Cannot load the session control file");
 		}
@@ -106,7 +107,13 @@ public class PeerStart implements Runnable {
 				}
 				store = EtchStore.create(etchFile);
 			}
-			peerManager.launchPeer(keyPair, peerAddress, hostname, port, store, localPeerHostname);
+			else {
+				store = Stores.getDefaultStore();
+			}
+			System.out.println(String.format("using etch database %s", store.toString()));
+			Stores.setCurrent(store);
+			peerManager.aquireState(keyPair, peerAddress, store, remotePeerHostname);
+			peerManager.launchPeer(keyPair, peerAddress, hostname, port, store, remotePeerHostname);
 			peerManager.showPeerEvents();
 		} catch (Throwable t) {
 			System.out.println("Unable to launch peer "+t);

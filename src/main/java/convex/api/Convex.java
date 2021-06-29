@@ -10,6 +10,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import convex.core.Constants;
@@ -57,7 +58,7 @@ public class Convex {
 
 	private static final Logger log = Logger.getLogger(Convex.class.getName());
 
-	// private static final Logger log = Logger.getLogger(Convex.class.getName());
+	private static final Level LEVEL_AQUIRE = Level.FINER;
 
 	/**
 	 * Key pair for this Client
@@ -90,7 +91,7 @@ public class Convex {
 		@Override
 		protected synchronized void handleResultMessage(Message m) {
 			Result v = m.getPayload();
-			
+
 			if ((v!=null)&&(Keywords.SEQUENCE.equals(v.getErrorCode()))) {
 				// We probably got a wrong sequence number. Kill the stored value.
 				sequence=null;
@@ -143,8 +144,23 @@ public class Convex {
 	 * @throws IOException If connection fails
 	 */
 	public static Convex connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair) throws IOException {
+		return Convex.connect(peerAddress, address, keyPair, Stores.current());
+	}
+
+	/**
+	 * Create a Convex client by connecting to the specified Peer using the given
+	 * key pair and using a given store
+	 *
+	 * @param peerAddress Address of Peer
+	 * @param address Address of Account to use for Client
+	 * @param keyPair     Key pair to use for client transactions
+	 * @param store   Store to use for this connection
+	 * @return New Convex client instance
+	 * @throws IOException If connection fails
+	 */
+	public static Convex connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair, AStore store) throws IOException {
 		Convex convex = new Convex(address, keyPair);
-		convex.connectToPeer(peerAddress);
+		convex.connectToPeer(peerAddress, store);
 		return convex;
 	}
 
@@ -212,8 +228,8 @@ public class Convex {
 		return sequence;
 	}
 
-	private void connectToPeer(InetSocketAddress peerAddress) throws IOException {
-		setConnection(Connection.connect(peerAddress, internalHandler, Stores.current()));
+	private void connectToPeer(InetSocketAddress peerAddress, AStore store) throws IOException {
+		setConnection(Connection.connect(peerAddress, internalHandler, store));
 	}
 
 	/**
@@ -459,11 +475,12 @@ public class Convex {
 	 * from the remote peer. Uses the store configured for the calling thread.
 	 *
 	 * @param hash Hash of value to acquire.
+	 * @param store Store to aquire the persistent data too.
+	 *
 	 * @return Future for the cell being acquired
 	 */
-	public <T extends ACell> Future<T> acquire(Hash hash) {
+	public <T extends ACell> Future<T> acquire(Hash hash, AStore store) {
 		CompletableFuture<T> f = new CompletableFuture<T>();
-		AStore store = Stores.current();
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
@@ -486,10 +503,10 @@ public class Convex {
 						}
 						for (Hash h : missingSet) {
 							// send missing data requests until we fill pipeline
-							log.info("Request missing: " + h);
+							log.log(LEVEL_AQUIRE, "Request missing: " + h);
 							boolean sent = connection.sendMissingData(h);
 							if (!sent) {
-								log.info("Queue full!");
+								log.log(LEVEL_AQUIRE, "Queue full!");
 								break;
 							}
 						}
@@ -508,7 +525,7 @@ public class Convex {
 								f.complete(ref.getValue());
 							} catch (MissingDataException e) {
 								Hash missing = e.getMissingHash();
-								log.info("Still missing: " + missing);
+								log.log(LEVEL_AQUIRE, "Still missing: " + missing);
 								connection.sendMissingData(missing);
 							}
 						}

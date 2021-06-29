@@ -68,6 +68,7 @@ import convex.net.Message;
 import convex.net.MessageType;
 import convex.net.NIOServer;
 
+
 /**
  * A self contained server that can be launched with a config.
  *
@@ -356,9 +357,8 @@ public class Server implements Closeable {
 
 
 		AVector<ACell> values = result.getValue();
-		System.out.println(values);
-		//Hash beliefHash = (Hash) values.get(0);
-		Hash stateHash = RT.ensureHash(values.get(1));
+		// Hash beliefHash = RT.ensureHash(values.get(0));
+		// Hash stateHash = RT.ensureHash(values.get(1));
 
 		// check the initStateHash to see if this is the network we want to join?
 		Hash remoteNetworkID = RT.ensureHash(values.get(2));
@@ -378,29 +378,6 @@ public class Server implements Closeable {
 		// now use the remote peer host name list returned from the status call
 		// to connect to the peers
 		connectToPeers(statusPeerList);
-
-
-		String localHostname=getHostname();
-//		InetSocketAddress localPeerAddress = Utils.toInetSocketAddress(localHostname);
-		String messageText = String.format("(set-peer-data {:url \"%s\"})", localHostname);
-		ACell message = Reader.read(messageText);
-		ATransaction transaction = Invoke.create(address, -1, message);
-		try {
-			convex.transactSync(transaction, 3000);
-		} catch ( IOException | TimeoutException e) {
-			throw new Error("Failed to register peer network address with the convex network: " + e);
-		}
-
-
-		/*
-		try {
-			Set<AccountKey> peerKeys = manager.getConnections().keySet();
-			manager.getConnection((AccountKey) peerKeys.toArray()[0]).sendMissingData(stateHash.toBlob());
-		} catch (IOException e) {
-			throw new Error("cannot request for network sync: " + e);
-		}
-		*/
-
 		raiseServerChange("join network");
 
 		return true;
@@ -989,7 +966,6 @@ public class Server implements Closeable {
 		@Override
 		public void run() {
 			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
-
 			try {
 				// short initial sleep before we start managing updates. Give stuff time to
 				// ramp up.
