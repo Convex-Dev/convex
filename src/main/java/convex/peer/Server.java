@@ -668,7 +668,8 @@ public class Server implements Closeable {
 			lastOwnTransactionTimestamp=ts; // mark this timestamp
 
 			String desiredHostname=getHostname(); // Intended hostname
-			PeerStatus ps=s.getPeer(getPeerKey());
+			AccountKey peerKey=getPeerKey();
+			PeerStatus ps=s.getPeer(peerKey);
 			AString chn=ps.getHostname();
 			String currentHostname=(chn==null)?null:chn.toString();
 
@@ -685,7 +686,7 @@ public class Server implements Closeable {
 				if (desiredHostname==null) {
 					code = "(set-peer-data {:url nil})";
 				} else {
-					code = String.format("(set-peer-data {:url \"%s\"})", desiredHostname);
+					code = String.format("(set-peer-data "+peerKey+" {:url \"%s\"})", desiredHostname);
 				}
 				ACell message = Reader.read(code);
 				ATransaction transaction = Invoke.create(address, as.getSequence()+1, message);
