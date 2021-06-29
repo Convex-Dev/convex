@@ -375,7 +375,6 @@ public class Server implements Closeable {
 			statusPeerList = statusPeerList.assoc(accountKey, buildPeerList.get(key));
 		}
 
-
 		try {
 			if (signedBelief != null) {
 				this.peer = this.peer.mergeBeliefs(signedBelief.getValue());
