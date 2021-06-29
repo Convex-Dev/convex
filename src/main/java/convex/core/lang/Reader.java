@@ -406,7 +406,7 @@ public class Reader extends BaseParser<ACell> {
 	
 
 	public Rule Keyword() {
-		return Sequence(Sequence(':', Symbol()), push(prepare(Keyword.createChecked(popSymbol().getName()))));
+		return Sequence(Sequence(':', UnqualifiedSymbol()), push(prepare(Keyword.createChecked(popSymbol().getName()))));
 	}
 
 
