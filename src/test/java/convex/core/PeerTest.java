@@ -70,7 +70,7 @@ public class PeerTest {
 		// use peer address from first peer for testing
 		AccountKey pa = InitConfigTest.FIRST_PEER_KEY;
 		PeerStatus ps = STATE.getPeer(pa);
-		long initialStake = ps.getOwnStake();
+		long initialStake = ps.getPeerStake();
 		assertEquals(initialStake, ps.getTotalStake());
 
 		assertEquals(0, ps.getDelegatedStake(InitConfigTest.HERO_ADDRESS));
@@ -79,7 +79,7 @@ public class PeerTest {
 		PeerStatus ps2 = ps.withDelegatedStake(InitConfigTest.HERO_ADDRESS, 1234);
 		assertEquals(1234L, ps2.getDelegatedStake(InitConfigTest.HERO_ADDRESS));
 		assertEquals(initialStake + 1234, ps2.getTotalStake());
-		assertEquals(initialStake, ps2.getOwnStake());
+		assertEquals(initialStake, ps2.getPeerStake());
 	}
 
 	@Test

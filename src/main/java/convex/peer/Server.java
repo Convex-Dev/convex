@@ -675,7 +675,7 @@ public class Server implements Closeable {
 			// Try to set hostname if not correctly set
 			trySetHostname:
 			if (!Utils.equals(desiredHostname, currentHostname)) {
-				Address address=ps.getOwner();
+				Address address=ps.getController();
 				if (address==null) break trySetHostname;
 				AccountStatus as=s.getAccount(address);
 				if (as==null) break trySetHostname;

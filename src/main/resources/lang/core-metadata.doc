@@ -1039,11 +1039,20 @@
 
   set-peer-data
   {
-    :doc {:description "Sets metadata on a given peer. Metadata must be Map. Peer must exist, with a public account key. "
-          :examples [{:code "(set-peer-data {:url \"my-peer.com:4242\"})"}]
+    :doc {:description "Sets metadata on a given peer. Metadata must be a Map. Peer must exist, with a public account key. "
+          :examples [{:code "(set-peer-data peer-key {:url \"my-peer.com:4242\"})"}]
           :type :function
-          :signature [{:params [map]}]
-          :errors {:CAST "If the first argument is not a map."}}
+          :signature [{:params [peer map]}]
+          :errors {:CAST "If the first argument is not a valid Peer Key, or the second argument is not a map."}}
+  }
+  
+  set-peer-stake
+  {
+    :doc {:description "Sets the Peer Stake. Stake must be a Long. Peer must exist, with a public account key. "
+          :examples [{:code "(set-peer-data peer-key {:url \"my-peer.com:4242\"})"}]
+          :type :function
+          :signature [{:params [peer stake]}]
+          :errors {:CAST "If the first argument is not a valid Peer Key, or the second argument is not a Long."}}
   }
 
   set?

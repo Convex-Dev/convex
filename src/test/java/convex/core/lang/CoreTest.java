@@ -91,9 +91,6 @@ public class CoreTest extends ACVMTest {
 		super(InitTest.BASE);
 	}
 
-
-	private final Context<?> INITIAL_CONTEXT= context();
-
 	@Test
 	public void testAddress() {
 		Address a = InitConfigTest.HERO_ADDRESS;
@@ -2041,7 +2038,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testAcceptInActor() {
-		Context<?> ctx=INITIAL_CONTEXT.fork();
+		Context<?> ctx=context();
 		ctx=step(ctx,"(def act (deploy '(do (defn receive-coin [sender amount data] (accept amount))  (defn echo-offer [] *offer*) (export echo-offer receive-coin))))");
 
 		ctx=step(ctx,"(transfer act 100)");
@@ -2224,7 +2221,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testSetKey() {
-		Context<?> ctx=INITIAL_CONTEXT;
+		Context<?> ctx=context();
 
 		ctx=step(ctx,"(set-key 0x0000000000000000000000000000000000000000000000000000000000000000)");
 		assertEquals(AccountKey.ZERO,ctx.getResult());
@@ -2395,9 +2392,9 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testStake() {
-		Context<ACell> ctx=step(INITIAL_CONTEXT,"(def my-peer 0x"+InitConfigTest.FIRST_PEER_KEY.toHexString()+")");
+		Context<ACell> ctx=step(context(),"(def my-peer 0x"+InitConfigTest.FIRST_PEER_KEY.toHexString()+")");
 		AccountKey MY_PEER=InitConfigTest.FIRST_PEER_KEY;
-		long PS=ctx.getState().getPeer(InitConfigTest.FIRST_PEER_KEY).getOwnStake();
+		long PS=ctx.getState().getPeer(InitConfigTest.FIRST_PEER_KEY).getPeerStake();
 
 		{
 			// simple case of staking 1000000 on first peer of the realm
@@ -2426,14 +2423,16 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testSetPeerData() {
 		String newHostname = "new_hostname:1234";
-		Context<?> ctx=INITIAL_CONTEXT;
+		Context<?> ctx=context();
 		ctx=ctx.forkWithAddress(InitConfigTest.FIRST_PEER_ADDRESS);
+		AccountKey peerKey=InitConfigTest.FIRST_PEER_KEY;
+		ctx=step(ctx,"(def peer-key "+peerKey+")");
 		{
-			// make sure we are using the FIRST_PEER adderss
-			ctx=step(ctx,"(set-peer-data {:url \"" + newHostname + "\"})");
+			// make sure we are using the FIRST_PEER address
+			ctx=step(ctx,"(set-peer-data peer-key {:url \"" + newHostname + "\"})");
 			assertNotError(ctx);
 			assertEquals(newHostname,ctx.getState().getPeer(InitConfigTest.FIRST_PEER_KEY).getHostname().toString());
-			ctx=step(ctx,"(set-peer-data {})");
+			ctx=step(ctx,"(set-peer-data peer-key {})");
 			assertNotError(ctx);
 			// no change to data
 			assertEquals(newHostname,ctx.getState().getPeer(InitConfigTest.FIRST_PEER_KEY).getHostname().toString());
@@ -2442,18 +2441,23 @@ public class CoreTest extends ACVMTest {
 		ctx=ctx.forkWithAddress(InitConfigTest.VILLAIN_ADDRESS);
 		{
 			newHostname = "set-key-hijack";
-			ctx=step(ctx,"(do (set-key 0x" + InitConfigTest.FIRST_PEER_KEY.toHexString() + ")(set-peer-data {:url \"" + newHostname + "\"}))");
+			ctx=step(ctx,"(do (set-key "+peerKey+") (set-peer-data "+peerKey+" {:url \"" + newHostname + "\"}))");
 			assertStateError(ctx);
 		}
 		ctx=ctx.forkWithAddress(InitConfigTest.FIRST_PEER_ADDRESS);
-		assertCastError(step(ctx,"(set-peer-data 0x1234567812345678123456781234567812345678123456781234567812345678)"));
-		assertCastError(step(ctx,"(set-peer-data :bad-key)"));
-		assertArityError(step(ctx,"(set-peer-data {:url \"test\" :bad-key 1234})"));
+		assertCastError(step(ctx,"(set-peer-data peer-key 0x1234567812345678123456781234567812345678123456781234567812345678)"));
+		assertCastError(step(ctx,"(set-peer-data peer-key :bad-key)"));
+		assertCastError(step(ctx,"(set-peer-data 12 {})"));
+		assertCastError(step(ctx,"(set-peer-data nil {})"));
+		
+		assertArityError(step(ctx,"(set-peer-data)"));
+		assertArityError(step(ctx,"(set-peer-data peer-key)"));
+		assertArityError(step(ctx,"(set-peer-data peer-key {:url \"test\" :bad-key 1234} 2)"));
 	}
 
 	@Test
 	public void testCreatePeer() {
-		Context<ACell> ctx=step(INITIAL_CONTEXT,"(def hero-peer 0x"+InitConfigTest.HERO_KEYPAIR.getAccountKey().toHexString()+")");
+		Context<ACell> ctx=step(context(),"(def hero-peer 0x"+InitConfigTest.HERO_KEYPAIR.getAccountKey().toHexString()+")");
 		ctx=ctx.forkWithAddress(InitConfigTest.HERO_ADDRESS);
 
 		Context<ACell> peerCTX = step(ctx,"(create-peer hero-peer 1000)");
@@ -2700,7 +2704,7 @@ public class CoreTest extends ACVMTest {
 	public void testPredArity() {
 		AVector<ACell> pvals = ALL_PREDICATES;
 		assertFalse(pvals.isEmpty());
-		Context<?> C = INITIAL_CONTEXT.fork();
+		Context<?> C = context();
 		ACell[] a0 = new ACell[0];
 		ACell[] a1 = new ACell[1];
 		ACell[] a2 = new ACell[2];
@@ -3190,7 +3194,7 @@ public class CoreTest extends ACVMTest {
 		assertSame(INITIAL,ctx.getState());
 
 		// some juice should be consumed
-		assertTrue(INITIAL_CONTEXT.getJuice()>ctx.getJuice());
+		assertTrue(context().getJuice()>ctx.getJuice());
 	}
 
 	@Test
@@ -3199,7 +3203,7 @@ public class CoreTest extends ACVMTest {
 		assertAssertError(ctx);
 
 		// some juice should be consumed
-		assertTrue(INITIAL_CONTEXT.getJuice()>ctx.getJuice());
+		assertTrue(context().getJuice()>ctx.getJuice());
 	}
 
 // TODO: probably needs Op level support?

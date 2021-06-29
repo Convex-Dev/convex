@@ -828,7 +828,7 @@ public class Core {
 			CVMLong amount = RT.ensureLong(args[1]);
 			if (amount == null) return context.withCastError(1,args, Types.LONG);
 
-			return context.transferAllowance(address, amount).consumeJuice(Juice.TRANSFER);
+			return context.transferMemoryAllowance(address, amount).consumeJuice(Juice.TRANSFER);
 		}
 	});
 
@@ -861,7 +861,7 @@ public class Core {
 			CVMLong amount = RT.ensureLong(args[1]);
 			if (amount == null) return context.withCastError(1,args, Types.LONG);
 
-			return context.createPeer(accountKey, amount.longValue()).consumeJuice(Juice.TRANSFER);
+			return context.createPeer(accountKey, amount.longValue()).consumeJuice(Juice.PEER_UPDATE);
 		}
 	});
 
@@ -870,12 +870,38 @@ public class Core {
 		@SuppressWarnings("unchecked")
 		@Override
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+			if (args.length != 2) return context.withArityError(exactArityMessage(1, args.length));
+
+			AccountKey peerKey=RT.ensureAccountKey(args[0]);
+			if (peerKey == null) return context.withCastError(0,args, Types.BLOB);
+			
+			AMap<ACell, ACell> data = RT.ensureMap(args[1]);
+			if (data == null) return context.withCastError(1,args, Types.MAP);
+			
+			context=context.consumeJuice(Juice.PEER_UPDATE);
+			if (context.isExceptional()) return context;
+
+			return context.setPeerData(peerKey,data);
+		}
+	});
+	
+	public static final CoreFn<CVMLong> SET_PEER_STAKE = reg(new CoreFn<>(Symbols.SET_PEER_STAKE) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
-
-			AMap<ACell, ACell> data = RT.ensureMap(args[0]);
-			if (data == null) return context.withCastError(0,args, Types.MAP);
-
-			return context.setPeerData(data).consumeJuice(Juice.TRANSFER);
+			
+			AccountKey peerKey=RT.ensureAccountKey(args[0]);
+			if (peerKey == null) return context.withCastError(0,args, Types.BLOB);
+			
+			CVMLong newStake = RT.ensureLong(args[1]);
+			if (newStake == null) return context.withCastError(1,args, Types.LONG);
+			long targetStake=newStake.longValue();
+			
+			context=context.consumeJuice(Juice.PEER_UPDATE);
+			if (context.isExceptional()) return context;
+			
+			return context.setPeerStake(peerKey,targetStake);
 		}
 	});
 

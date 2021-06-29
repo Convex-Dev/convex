@@ -268,6 +268,11 @@ public class Juice {
 	public static final long SET_BANG = 20;
 
 	/**
+	 * Make this quite expensive. Discourage spamming Peer updates
+	 */
+	public static final long PEER_UPDATE = 1000;
+
+	/**
 	 * Saturating multiply and add result = a + b * c
 	 * 
 	 * Returns Long.MAX_VALUE on overflow.

@@ -704,7 +704,7 @@ public class Context<T extends ACell> extends AObject {
 	 * Gets the caller of the currently executing context.
 	 *
 	 * Will be null if this context was not called from elsewhere (e.g. is an origin context)
-	 * @return
+	 * @return Caller of the currently executing context
 	 */
 	public Address getCaller() {
 		return chainState.caller;
@@ -714,7 +714,7 @@ public class Context<T extends ACell> extends AObject {
 	 * Gets the address of the currently executing Account. May be the current actor, or the address of the
 	 * account that executed this transaction if no Actors have been called.
 	 *
-	 * @return Address of the current account, cannot be null
+	 * @return Address of the current account, cannot be null, must be a valid existing account
 	 */
 	public Address getAddress() {
 		return chainState.address;
@@ -1455,7 +1455,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param amountToSend Amount of memory to transfer, must be between 0 and Amount.MAX_VALUE inclusive
 	 * @return Context with a null result if the transaction succeeds, or an exceptional value if the transfer fails
 	 */
-	public Context<CVMLong> transferAllowance(Address target, CVMLong amountToSend) {
+	public Context<CVMLong> transferMemoryAllowance(Address target, CVMLong amountToSend) {
 		long amount=amountToSend.longValue();
 		if (amount<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative aloowance amount");
 		if (amount>Constants.MAX_SUPPLY) return withError(ErrorCodes.ARGUMENT,"Can't transfer an allowance amount beyond maximum limit");
@@ -1872,13 +1872,13 @@ public class Context<T extends ACell> extends AObject {
 	 *
 	 * @param peerKey Peer Account key on which to stake
 	 * @param newStake Amount to stake
-	 * @return Context with final take set
+	 * @return Context with amount of coins transferred to Peer as result (may be negative if stake withdrawn)
 	 */
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> setDelegatedStake(AccountKey peerKey, long newStake) {
 		State s=getState();
 		PeerStatus ps=s.getPeer(peerKey);
-		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for account key: "+peerKey.toChecksumHex());
+		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for account key: "+peerKey);
 		if (newStake<0) return this.withArgumentError("Cannot set a negative stake");
 		if (newStake>Constants.MAX_SUPPLY) return this.withArgumentError("Target stake out of valid Amount range");
 
@@ -1888,18 +1888,51 @@ public class Context<T extends ACell> extends AObject {
 		long delta=newStake-currentStake;
 
 		if (delta==0) return (Context<R>) this; // no change
-		if (delta>0) {
-			// we are increasing stake, so need to check sufficient balance
-			if (delta>balance) return this.withFundsError("Insufficient balance ("+balance+") to increase stake to "+newStake);
-		}
-
-		PeerStatus updatedPeer=ps.withDelegatedStake(myAddress, newStake);
+		
+		// need to check sufficient balance if increasing stake
+		if (delta>balance) return this.withFundsError("Insufficient balance ("+balance+") to increase Delegated Stake to "+newStake);
 
 		// Final updates. Hopefully everything balances. SECURITY: test this. A lot.
+		PeerStatus updatedPeer=ps.withDelegatedStake(myAddress, newStake);
 		s=s.withBalance(myAddress, balance-delta); // adjust own balance
 		s=s.withPeer(peerKey, updatedPeer); // adjust peer
-		return withState(s);
+		return withState(s).withResult(CVMLong.create(delta));
 	}
+	
+	/**
+	 * Sets the stake for a given Peer, transferring coins from the current address.
+	 * @param peerKey Peer Account Key for which to update Stake
+	 * @param newStake New stake for Peer
+	 * @return Updated Context
+	 */
+	@SuppressWarnings("unchecked")
+	public <R extends ACell> Context<R> setPeerStake(AccountKey peerKey, long newStake) {
+		State s=getState();
+		PeerStatus ps=s.getPeer(peerKey);
+		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for account key: "+peerKey);
+		if (newStake<0) return this.withArgumentError("Cannot set a negative stake");
+		if (newStake>Constants.MAX_SUPPLY) return this.withArgumentError("Target stake out of valid Amount range");
+	
+		Address myAddress=getAddress();
+		if (!ps.getController().equals(myAddress)) return withError(ErrorCodes.STATE,"Current address "+myAddress+" is not the controller of this peer account");
+		
+		long balance=getBalance(myAddress);
+		long currentStake=ps.getPeerStake();
+		long delta=newStake-currentStake;
+		
+		if (delta==0) return (Context<R>) this; // no change
+		
+		// need to check sufficient balance if increasing stake
+		if (delta>balance) return this.withFundsError("Insufficient balance ("+balance+") to increase Peer Stake to "+newStake);
+
+		// Final updates assuming everything OK. Hopefully everything balances. SECURITY: test this. A lot.
+		PeerStatus updatedPeer=ps.withPeerStake(newStake);
+		s=s.withBalance(myAddress, balance-delta); // adjust own balance
+		s=s.withPeer(peerKey, updatedPeer); // adjust peer
+
+		return withState(s).withResult(CVMLong.create(delta));
+	}
+
 
 	/**
 	 * Creates a new peer with the specified stake.
@@ -1939,12 +1972,13 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Sets peer data.
-	 *
+	 * 
+	 * @param peerKey Peer to set data for
 	 * @param data Map of data to set for the peer
 	 * @return Context with final peer data set
 	 */
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> setPeerData(AMap<ACell, ACell> data) {
+	public <R extends ACell> Context<R> setPeerData(AccountKey peerKey, AMap<ACell, ACell> data) {
 		State s=getState();
 
 		// get the callers account and account status
@@ -1955,7 +1989,7 @@ public class Context<T extends ACell> extends AObject {
 		if (ak == null) return withError(ErrorCodes.STATE,"The account signing this transaction must have a public key");
 		PeerStatus ps=s.getPeer(ak);
 		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for this account and account key: "+ak.toChecksumHex());
-		if (!ps.getOwner().equals(address)) return withError(ErrorCodes.STATE,"You are not the owner of this peer account");
+		if (!ps.getController().equals(address)) return withError(ErrorCodes.STATE,"Current address "+address+" is not the controller of this peer account");
 
 		Hash lastStateHash = s.getHash();
 		// at the moment only :url is used in the data map
@@ -1975,6 +2009,7 @@ public class Context<T extends ACell> extends AObject {
 		}
 		return withState(s);
 	}
+	
 
 
 	/**
@@ -2162,5 +2197,7 @@ public class Context<T extends ACell> extends AObject {
 		}
 		return null;
 	}
+
+
 
 }

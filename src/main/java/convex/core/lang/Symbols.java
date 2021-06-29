@@ -94,8 +94,9 @@ public class Symbols {
 	public static final Symbol ACCOUNT_Q = Symbol.create("account?");
 
 	public static final Symbol STAKE = Symbol.create("stake");
-	public static final Symbol SET_PEER_DATA = Symbol.create("set-peer-data");
 	public static final Symbol CREATE_PEER = Symbol.create("create-peer");
+	public static final Symbol SET_PEER_DATA = Symbol.create("set-peer-data");
+	public static final Symbol SET_PEER_STAKE = Symbol.create("set-peer-stake");
 
 	public static final Symbol CALL = Symbol.create("call");
 	public static final Symbol CALL_STAR = Symbol.create("call*");
