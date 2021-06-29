@@ -204,6 +204,7 @@ public class Server implements Closeable {
 
 		} finally {
 			Stores.setCurrent(savedStore);
+			System.out.println("server using store "+ savedStore.toString());
 		}
 	}
 

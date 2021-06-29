@@ -118,19 +118,21 @@ public class PeerManager implements IServerEvent {
 
 
 		AVector<ACell> values = result.getValue();
-		// Hash beliefHash = RT.ensureHash(values.get(0));
+		Hash beliefHash = RT.ensureHash(values.get(0));
 		Hash stateHash = RT.ensureHash(values.get(1));
 
+		System.out.println("Aquire to " + stateHash.toString() + " / " + beliefHash.toString() + " on db " + store.toString());
 		long timeout = 20000;
 		try {
 			// convex = Convex.connect(localPeerAddress, address, keyPair);
 			long start = Utils.getTimeMillis();
 
-			Future<Result> cf = convex.acquire(stateHash, store);
+			Future<Result> cf = convex.acquire(beliefHash, store);
 			// adjust timeout if time elapsed to submit transaction
 			long now = Utils.getTimeMillis();
 			timeout = Math.max(0L, timeout - (now - start));
-			cf.get(timeout, TimeUnit.MILLISECONDS);
+			ACell cell = cf.get(timeout, TimeUnit.MILLISECONDS);
+			System.out.println("final cell " + cell.toString());
 		} catch (InterruptedException | ExecutionException | TimeoutException e) {
 			throw new Error("cannot request for network sync: " + e);
 		}
@@ -271,7 +273,7 @@ public class PeerManager implements IServerEvent {
 	}
 
 	protected String toServerInformationText(ServerInformation serverInformation) {
-		String shortName = Utils.toFriendlyHexString(serverInformation.getPeerKey().toHexString()).replaceAll("^0x", "");
+		String shortName = Utils.toFriendlyHexString(serverInformation.getPeerKey().toHexString());
 		String hostname = serverInformation.getHostname();
 		String joined = "NJ";
 		String synced = "NS";
@@ -282,10 +284,12 @@ public class PeerManager implements IServerEvent {
 			synced = " S";
 		}
 		long blockCount = serverInformation.getBlockCount();
+		String stateHash =  Utils.toFriendlyHexString(serverInformation.getStateHash().toHexString());
+		String beliefHash =  Utils.toFriendlyHexString(serverInformation.getBeliefHash().toHexString());
 		int connectionCount = serverInformation.getConnectionCount();
 		int trustedConnectionCount = serverInformation.getTrustedConnectionCount();
 		long consensusPoint = serverInformation.getConsensusPoint();
-		String item = String.format("Peer:%s URL: %s Status:%s %s Connections:%2d/%2d Level:%4d Block:%4d",
+		String item = String.format("Peer:%s URL: %s Status:%s %s Connections:%2d/%2d Consensus:%4d State:%s Belief:%s",
 				shortName,
 				hostname,
 				joined,
@@ -293,7 +297,8 @@ public class PeerManager implements IServerEvent {
 				connectionCount,
 				trustedConnectionCount,
 				consensusPoint,
-				blockCount
+				stateHash,
+				beliefHash
 		);
 
 		return item;

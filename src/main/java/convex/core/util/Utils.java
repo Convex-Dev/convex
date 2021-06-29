@@ -119,7 +119,7 @@ public class Utils {
 	public static String toFriendlyHexString(String hexString) {
 		int size = 4;
 		String cleanHexString = hexString.replaceAll("^0[Xx]", "");
-		String result = "0x" + cleanHexString.substring(0, size);
+		String result = cleanHexString.substring(0, size);
 		// + ".." + cleanHexString.substring(cleanHexString.length() - size);
 		return result;
 	}
@@ -1288,7 +1288,7 @@ public class Utils {
 		}
 
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	public static <T> CompletableFuture<java.util.List<T>> completeAll(java.util.List<CompletableFuture<T>> futures) {
 	    CompletableFuture<T>[] fs = futures.toArray(new CompletableFuture[futures.size()]);
