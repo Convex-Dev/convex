@@ -84,6 +84,22 @@ public class Helpers {
 	 *
 	 * @param sessionFilename Session filename to open and get the random port nummber.
 	 *
+	 * @return A random hostname or null if none can be found
+	 * @throws IOException
+	 *
+	 */
+	public static String getSessionHostname(String sessionFilename) throws IOException {
+		return getSessionHostname(sessionFilename, -1);
+	}
+
+
+	/**
+	 * Return an indexed session hostname, by looking at the session file.
+	 * The session file has a list of local peers open.
+	 * This helper will find a random peer in the collection and returns hostname.
+	 *
+	 * @param sessionFilename Session filename to open and get the random port nummber.
+	 *
 	 * @param index The index of the peer in the session list or if -1 a random selection is made.
 	 *
 	 * @return A random hostname or null if none can be found
@@ -136,6 +152,7 @@ public class Helpers {
 	}
 	return 0;
 	}
+
 }
 
 

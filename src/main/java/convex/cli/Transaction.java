@@ -60,6 +60,10 @@ public class Transaction implements Runnable {
 		description="Account address to use for the transaction request.")
 	private long addressNumber;
 
+	@Option(names={"-t", "--timeout"},
+		description="Timeout in miliseconds.")
+	private long timeout = 5000;
+
 	@Parameters(paramLabel="transactionCommand",
 		description="Transaction Command")
 	private String transactionCommand;
@@ -89,7 +93,7 @@ public class Transaction implements Runnable {
 			ACell message = Reader.read(transactionCommand);
 			ATransaction transaction = Invoke.create(address, -1, message);
 
-			Result result = convex.transactSync(transaction, 5000);
+			Result result = convex.transactSync(transaction, timeout);
 			System.out.println(result);
 		} catch (Throwable t) {
 			log.severe(t.getMessage());

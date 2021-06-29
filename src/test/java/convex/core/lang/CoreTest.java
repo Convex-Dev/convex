@@ -2445,8 +2445,36 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step(ctx,"(set-peer-data 0x1234567812345678123456781234567812345678123456781234567812345678)"));
 		assertCastError(step(ctx,"(set-peer-data :bad-key)"));
 		assertArityError(step(ctx,"(set-peer-data {:url \"test\" :bad-key 1234})"));
+	}
 
+	@Test
+	public void testCreatePeer() {
+		Context<ACell> ctx=step(INITIAL_CONTEXT,"(def hero-peer 0x"+InitConfigTest.HERO_KEYPAIR.getAccountKey().toHexString()+")");
+		ctx=ctx.forkWithAddress(InitConfigTest.HERO_ADDRESS);
 
+		Context<ACell> peerCTX = step(ctx,"(create-peer hero-peer 1000)");
+		// create a peer based on the HERO address and public key
+		assertNotError(peerCTX);
+
+		// create a peer again on the same peer key and address
+		assertError(step(peerCTX,"(create-peer hero-peer 1000)"));
+
+		// create a new peer with zero stake
+		assertError(step(ctx,"(create-peer hero-peer 0)"));
+
+		// creating a peer on an account key that isn't the hero account key
+		assertArgumentError(step(ctx,"(create-peer 0x1234567812345678123456781234567812345678123456781234567812345678 1234)"));
+
+		// creating a peer with invalid account key
+		assertCastError(step(ctx,"(create-peer *address* 1234)"));
+
+		// bad arg types
+		assertCastError(step(ctx,"(create-peer :foo 1234)"));
+		assertCastError(step(ctx,"(create-peer hero-peer :foo)"));
+		assertCastError(step(ctx,"(create-peer hero-peer nil)"));
+
+		assertArityError(step(ctx,"(create-peer hero-peer)"));
+		assertArityError(step(ctx,"(create-peer hero-peer 1000 :foo)"));
 	}
 
 	@Test
