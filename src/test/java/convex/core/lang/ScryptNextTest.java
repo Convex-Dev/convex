@@ -154,7 +154,7 @@ public class ScryptNextTest {
         assertEquals(Reader.read("symbol?"), parse("symbol?"));
         assertEquals(Reader.read("symbol!"), parse("symbol!"));
         assertEquals(Reader.read(":keyword"), parse(":keyword"));
-        assertEquals(Reader.read(":keyword-abc"), parse(":keyword_abc"));
+        assertEquals(Reader.read(":keyword-abc"), parse(":keyword-abc"));
 
         // Compound Data Types
         // =====================

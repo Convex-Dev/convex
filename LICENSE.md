@@ -1,4 +1,4 @@
-LICENSE DRAFT IN PROGRESS NOT VALID FOR USE
+LICENSE DRAFT
 
 Convex Public Licence v0.1 (WIP DRAFT)
 
@@ -43,6 +43,7 @@ As such the license has been written based on the following principles:
   1. An individual
   2. A legally established company or organisation in any jurisdiction
   3. The union of the acting entity and all other entities that control, are controlled by, or are under common control with that entity. For the purposes of this definition, "control" means (i) the power, direct or indirect, to cause the direction or management of such entity, whether by contract or otherwise, or (ii) ownership of fifty percent (50%) or more of the outstanding shares, or (iii) beneficial ownership of such entity.
+  4. A decentralised entity operating either autonomously or under the control of one or more Legal Entities.
 
 <!--- From EPL v2.0 --->
 
@@ -50,11 +51,12 @@ As such the license has been written based on the following principles:
 
 ==== Extra definitions - TBC
 
-"Economic Assets" shall mean entities with economic or commercial value, or from which commercial or economic value may be derived through the exercise of exclusive control. An Economic Asset may be entirely digital, a legal right, an asset that exists in the physical world, or any combination of these.
+"Economic Assets" shall mean entities with economic or commercial value, or from which economic or commercial value may be derived, through the exercise of partial or exclusive control. An Economic Asset may be entirely digital, a legal right, an asset that exists in the physical world, or any combination of these.
 
-"Decentralised Economic System" shall mean any system where either of the following are true:
-- Consensus is determined between two or more Legal Entities
+"Decentralised Economic System" shall mean any system where any of the following are true:
+- Consensus over some information of economic interest is determined between two or more Legal Entities
 - Economic Assets are under the control of two or more Legal Entities
+- Transactions are executed that represent exchange of value between two or more Legal Entities
 
 "Convex Network" shall mean the union of all systems using the Work as part of a public utility network or operating a Decentralised Economic System. 
 
@@ -121,7 +123,7 @@ While redistributing the Work or Derivative Works thereof, You may choose to off
 
 ## 10. Relicensing. 
 
-Contributor grants to the Governing Body a perpetual, worldwide, no-charge, royalty-free, irrevocable right to re-distribute contributions under any future revision of this license approved by the Governing Body.
+Contributor grants to the Governing Body a perpetual, worldwide, no-charge, royalty-free, irrevocable right to re-distribute contributions under any future revision of this license approved by the Governing Body. The Convex Foundation will ensure that the main Convex distribution is always free and open source for anyone to use with the Convex Network.
 
 <--- Licence copyright --->
 
