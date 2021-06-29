@@ -475,7 +475,6 @@ public class Convex {
 	 * from the remote peer. Uses the store configured for the calling thread.
 	 *
 	 * @param hash Hash of value to acquire.
-	 * @param store Store to aquire the persistent data too.
 	 *
 	 * @return Future for the cell being acquired
 	 */
@@ -485,12 +484,12 @@ public class Convex {
 
 	/**
 	 * Attempts to acquire a complete persistent data structure for the given hash
-	 * from the remote peer. Uses the store configured for the calling thread.
+	 * from the remote peer. Uses the store provided as a destination.
 	 *
 	 * @param hash Hash of value to acquire.
-	 * @param store Store to aquire the persistent data too.
+	 * @param store Store to acquire the persistent data to.
 	 *
-	 * @return Future for the cell being acquired
+	 * @return Future for the Cell being acquired
 	 */
 	public <T extends ACell> Future<T> acquire(Hash hash, AStore store) {
 		CompletableFuture<T> f = new CompletableFuture<T>();
@@ -523,7 +522,7 @@ public class Convex {
 								break;
 							}
 						}
-						// if too low, can send mutliple requests, and then block the peer
+						// if too low, can send multiple requests, and then block the peer
 						Thread.sleep(100);
 						ref = store.refForHash(hash);
 						if (ref != null) {

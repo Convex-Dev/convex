@@ -627,6 +627,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 			// Should be OK to get value, since non-missing!
 			T val=getValue();
 			
+			// TODO: maybe needs to be non-stack-consuming?
 			// recursively scan for missing children
 			int n=val.getRefCount();
 			for (int i=0; i<n; i++) {
