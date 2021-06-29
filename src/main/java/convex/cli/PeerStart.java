@@ -8,6 +8,7 @@ import convex.cli.peer.PeerManager;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.store.AStore;
+import convex.core.store.Stores;
 import etch.EtchStore;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
@@ -52,13 +53,13 @@ public class PeerStart implements Runnable {
 	private boolean isReset;
 
 	@Option(names={"--port"},
-		description="Port number to connect or create a peer.")
+		description="Port number of this local peer.")
 	private int port = 0;
 
 	@Option(names={"--host"},
 		defaultValue=Constants.HOSTNAME_PEER,
 		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
-	private String hostname;
+	private String hostname = "localhost";
 
 	@Option(names={"-a", "--address"},
 	description="Account address to use for the peer.")
@@ -72,6 +73,7 @@ public class PeerStart implements Runnable {
 
 		int port = 0;
 		AKeyPair keyPair = null;
+		String remotePeerHostname = null;
 		try {
 			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
 		} catch (Error e) {
@@ -88,19 +90,12 @@ public class PeerStart implements Runnable {
 		}
 		Address peerAddress = Address.create(addressNumber);
 
-		if (hostname == null) {
-			try {
-				// TODO remove the 0 index in this param after the peer belief bug is fixed
-				hostname = Helpers.getSessionHostname(mainParent.getSessionFilename(), 0);
-			} catch (IOException e) {
-				log.warning("Cannot load the session control file");
-			}
+		try {
+			// TODO remove the 0 index in this param after the peer belief bug is fixed
+			remotePeerHostname = Helpers.getSessionHostname(mainParent.getSessionFilename());
+		} catch (IOException e) {
+			log.warning("Cannot load the session control file");
 		}
-		if (hostname == null) {
-			log.warning("Cannot find a local peer running, start the local network, or use the --hostname option");
-			return;
-		}
-
 		try {
 			AStore store = null;
 			String etchStoreFilename = mainParent.getEtchStoreFilename();
@@ -112,10 +107,17 @@ public class PeerStart implements Runnable {
 				}
 				store = EtchStore.create(etchFile);
 			}
-			peerManager.launchPeer(keyPair, peerAddress, hostname, port, store);
+			else {
+				store = Stores.getDefaultStore();
+			}
+			System.out.println(String.format("using etch database %s", store.toString()));
+			Stores.setCurrent(store);
+			peerManager.aquireState(keyPair, peerAddress, store, remotePeerHostname);
+			peerManager.launchPeer(keyPair, peerAddress, hostname, port, store, remotePeerHostname);
 			peerManager.showPeerEvents();
 		} catch (Throwable t) {
 			System.out.println("Unable to launch peer "+t);
+			t.printStackTrace();
 		}
 	}
 }

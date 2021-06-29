@@ -18,6 +18,7 @@ public class ServerInformation {
 	private Hash networkID;
 	private long consensusPoint;
 	private Hash stateHash;
+    private Hash beliefHash;
 	private long blockCount;
 
 
@@ -42,6 +43,7 @@ public class ServerInformation {
 		consensusPoint = peer.getConsensusPoint();
         isJoined = connectionCount > 1;
 		stateHash = peer.getConsensusState().getHash();
+        beliefHash = peer.getSignedBelief().getHash();
 		blockCount = 0;
 		if (order != null ) {
 			blockCount = order.getBlockCount();
@@ -74,6 +76,9 @@ public class ServerInformation {
 	}
 	public Hash getStateHash() {
 		return stateHash;
+	}
+	public Hash getBeliefHash() {
+		return beliefHash;
 	}
 	public long getBlockCount() {
 		return blockCount;

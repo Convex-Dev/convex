@@ -286,6 +286,16 @@
                       :return Boolean}]}
 	}
 
+  create-peer
+	{
+    :doc {:description "Creates a new peer on the network. The peer must have an account number and sufficient balance to place a stake amount"
+          :examples [{:code "(create-peer account-key 700000000)"}]
+          :type :function
+          :signature [{:params [account-key stake-amount]
+                       :return stake-amount}]
+          :errors {:CAST "If the first argument is not a valid account-key."}}
+	}
+
   count
 	{
 	 :doc {:description "Counts the number of elements in the given collection. Returns the length of Blobs and Strings."
@@ -983,11 +993,11 @@
                        :return Set}]
           :errors {:CAST "If the argument is not a countable data structure."}}
   }
-  
+
   set!
   {:doc {:description "Sets a local binding identified by an unqualified symbol to the given value. This local change will be be visible until the scope leaves the current binding form (e.g. let binding, function body or recur). Fails with an ARGUMENT error if the symbol is qualified. This is probably most useful for updating a local variable in imperative style. Returns the value assigned to the local binding if successful."
           :examples [{:code "(let [a 10] (set! a 20) a)"}]
-          :type :special	 
+          :type :special
           :signature [{:params [sym value]}]}
   }
 

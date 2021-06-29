@@ -853,6 +853,23 @@ public class Core {
 		}
 	});
 
+	public static final CoreFn<CVMLong> CREATE_PEER = reg(new CoreFn<>(Symbols.CREATE_PEER) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+
+			AccountKey accountKey = RT.ensureAccountKey(args[0]);
+			if (accountKey == null) return context.withCastError(0,args, Types.BLOB);
+
+			CVMLong amount = RT.ensureLong(args[1]);
+			if (amount == null) return context.withCastError(1,args, Types.LONG);
+
+			return context.createPeer(accountKey, amount.longValue()).consumeJuice(Juice.TRANSFER);
+		}
+	});
+
+
 	public static final CoreFn<CVMLong> SET_PEER_DATA = reg(new CoreFn<>(Symbols.SET_PEER_DATA) {
 		@SuppressWarnings("unchecked")
 		@Override
