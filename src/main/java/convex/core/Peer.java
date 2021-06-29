@@ -124,6 +124,29 @@ public class Peer {
 
 		return new Peer(peerKP, sb, states, Vectors.empty(), initialState.getTimeStamp().longValue());
 	}
+	
+	/**
+	 * Create a Peer instance from a remotely acquired Belief
+	 * @param peerKP
+	 * @param remoteBelief
+	 * @return
+	 */
+	public static Peer create(AKeyPair peerKP, State initialState, Belief remoteBelief) {
+		Belief belief = Belief.createSingleOrder(peerKP);
+		SignedData<Belief> sb = peerKP.signData(belief);
+		AVector<State> states=Vectors.of(initialState);
+
+		// Ensure initial belief and states are persisted in current store
+		ACell.createPersisted(remoteBelief);
+
+		// Check belief persistence
+		Ref<SignedData<Belief>> sbr=Ref.forHash(sb.getHash());
+		if (sbr==null) {
+			throw new Error("Belief not correctly persisted! "+sb.getHash());
+		}
+
+		return new Peer(peerKP, sb, states, Vectors.empty(), initialState.getTimeStamp().longValue());
+	}
 
 	/**
 	 * Restores a Peer from the Etch database specified in Config

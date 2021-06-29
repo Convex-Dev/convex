@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.Constants;
 import convex.core.State;
 import convex.core.data.AccountStatus;
+import convex.core.data.Address;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.ACVMTest;
 
@@ -22,6 +23,9 @@ public class InitTest extends ACVMTest {
 
 	public static final State STATE=Init.createState(InitConfigTest.create());
 	public static final State BASE = Init.createBaseState(InitConfigTest.create());
+	
+	public static Address HERO=InitConfigTest.HERO_ADDRESS;
+	public static Address VILLAIN=InitConfigTest.VILLAIN_ADDRESS;
 
 	protected InitTest() {
 		super(STATE);

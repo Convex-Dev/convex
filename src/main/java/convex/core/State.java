@@ -434,13 +434,13 @@ public class State extends ARecord {
 		try {
 			// Create prepared context (juice subtracted, sequence updated, transaction entry checks)
 			Context<T> ctx = prepareTransaction(origin,t);
-			final long totalJuice = ctx.getJuice();
-
 			if (ctx.isExceptional()) {
 				// We hit some error while preparing transaction. Return context with no state change,
 				// i.e. before executing the transaction
 				return ctx;
 			}
+			
+			final long totalJuice = ctx.getJuice();
 
 			State preparedState=ctx.getState();
 
