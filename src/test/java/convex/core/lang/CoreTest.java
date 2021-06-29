@@ -2245,7 +2245,7 @@ public class CoreTest extends ACVMTest {
 		// zero price for unchanged allowance
 		assertEquals(0L, evalL("(set-memory *memory*)"));
 
-		// sell whole allowance
+		// sell whole allowance, should zero memory
 		assertEquals(0L, evalL("(do (set-memory 0) *memory*)"));
 
 		// buy allowance reduces balance
@@ -2257,6 +2257,10 @@ public class CoreTest extends ACVMTest {
 		// trying to buy too much is a funds error
 		assertFundsError(step("(set-memory 1000000000000000000)"));
 
+		// trying to set memory negative is an ARGUMENT error
+		assertArgumentError(step("(set-memory -1)"));
+		assertArgumentError(step("(set-memory -10000000)"));
+		assertArgumentError(step("(set-memory "+Long.MIN_VALUE+")"));
 
 		assertCastError(step("(set-memory :foo)"));
 		assertCastError(step("(set-memory nil)"));
@@ -2425,7 +2429,7 @@ public class CoreTest extends ACVMTest {
 		Context<?> ctx=INITIAL_CONTEXT;
 		ctx=ctx.forkWithAddress(InitConfigTest.FIRST_PEER_ADDRESS);
 		{
-			// make sure we are using the FIRST_PPER adderss
+			// make sure we are using the FIRST_PEER adderss
 			ctx=step(ctx,"(set-peer-data {:url \"" + newHostname + "\"})");
 			assertNotError(ctx);
 			assertEquals(newHostname,ctx.getState().getPeer(InitConfigTest.FIRST_PEER_KEY).getHostname().toString());
@@ -3495,19 +3499,41 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(and true (count) nil)"));
 	}
 
-
-
 	@Test
 	public void testSpecialAddress() {
+		// Hero should be *address* initial context
+		assertEquals(InitTest.HERO, eval("*address*"));
 
-		// Hero should be address and origin in initial context
-		assertEquals(InitConfigTest.HERO_ADDRESS, eval("*address*"));
-		assertEquals(InitConfigTest.HERO_ADDRESS, eval("*origin*"));
+		// *address* MUST return Actor address within actor call
+		Context<?> ctx=step("(def act (deploy `(do (defn addr [] *address*) (export addr))))");
+		Address act=(Address) ctx.getResult();
+		assertEquals(act, eval(ctx,"(call act (addr))"));
+		
+		// *address* MUST be current address in library call
+		assertEquals(InitTest.HERO, eval(ctx,"(act/addr)"));
+	}
+	
+	@Test
+	public void testSpecialOrigin() {
+		// Hero should be *origin* in initial context
+		assertEquals(InitTest.HERO, eval("*origin*"));
+		
+		// *origin* MUST return original address within actor call
+		Context<?> ctx=step("(def act (deploy `(do (defn origin [] *origin*) (export origin))))");
+		assertEquals(InitTest.HERO, eval(ctx,"(call act (origin))"));
+		
+		// *origin* MUST be original address in library call
+		assertEquals(InitTest.HERO, eval(ctx,"(act/origin)"));
 	}
 
 	@Test
 	public void testSpecialAllowance() {
+		// Should have initial allowance at start
 		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE, evalL("*memory*"));
+		
+		// Buy some memory
+		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE, evalL("*memory*"));
+
 	}
 
 

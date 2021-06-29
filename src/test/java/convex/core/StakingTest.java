@@ -31,14 +31,14 @@ public class StakingTest extends ACVMTest {
 	public void testStake() {
 		Context<ACell> ctx0 =context();
 
-		Context<ACell> ctx1 = ctx0.setStake(InitConfigTest.FIRST_PEER_KEY, 1000);
+		Context<ACell> ctx1 = ctx0.setDelegatedStake(InitConfigTest.FIRST_PEER_KEY, 1000);
 		PeerStatus ps1 = ctx1.getState().getPeer(InitConfigTest.FIRST_PEER_KEY);
 		assertEquals(1000L, ps1.getDelegatedStake());
 
 		// round tripping this should return to initial state precisely
 		// since we are not consuming any juice here, or adjusting anything other than
 		// stake positions
-		Context<ACell> ctx2 = ctx1.setStake(InitConfigTest.FIRST_PEER_KEY, 0);
+		Context<ACell> ctx2 = ctx1.setDelegatedStake(InitConfigTest.FIRST_PEER_KEY, 0);
 		assertEquals(ctx0.getState(), ctx2.getState());
 
 		// test putting entire balance on stake
@@ -61,14 +61,14 @@ public class StakingTest extends ACVMTest {
 		Context<ACell> ctx0 = context();
 
 		// not a peer, should be state error
-		assertStateError(ctx0.setStake(InitConfigTest.HERO_KEYPAIR.getAccountKey(), 1000));
+		assertStateError(ctx0.setDelegatedStake(InitConfigTest.HERO_KEYPAIR.getAccountKey(), 1000));
 
 		// bad arguments, out of range
-		assertArgumentError(ctx0.setStake(InitConfigTest.FIRST_PEER_KEY, -1));
-		assertArgumentError(ctx0.setStake(InitConfigTest.FIRST_PEER_KEY, Long.MAX_VALUE));
+		assertArgumentError(ctx0.setDelegatedStake(InitConfigTest.FIRST_PEER_KEY, -1));
+		assertArgumentError(ctx0.setDelegatedStake(InitConfigTest.FIRST_PEER_KEY, Long.MAX_VALUE));
 
 		// insufficient funds for stake
-		assertFundsError(ctx0.setStake(InitConfigTest.FIRST_PEER_KEY, Constants.MAX_SUPPLY));
-		assertFundsError(ctx0.setStake(InitConfigTest.FIRST_PEER_KEY, ctx0.getBalance(InitConfigTest.HERO_ADDRESS) + 1));
+		assertFundsError(ctx0.setDelegatedStake(InitConfigTest.FIRST_PEER_KEY, Constants.MAX_SUPPLY));
+		assertFundsError(ctx0.setDelegatedStake(InitConfigTest.FIRST_PEER_KEY, ctx0.getBalance(InitConfigTest.HERO_ADDRESS) + 1));
 	}
 }

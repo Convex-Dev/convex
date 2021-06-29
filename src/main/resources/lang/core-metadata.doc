@@ -1039,7 +1039,7 @@
 
   set-peer-data
   {
-    :doc {:description "Sets the hostname on a given peer. Peer must exist, with a public account key. Setting hostname to null will remove the peer from the network."
+    :doc {:description "Sets metadata on a given peer. Metadata must be Map. Peer must exist, with a public account key. "
           :examples [{:code "(set-peer-data {:url \"my-peer.com:4242\"})"}]
           :type :function
           :signature [{:params [map]}]

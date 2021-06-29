@@ -294,7 +294,6 @@ public class PeerManager implements IServerEvent {
 		if (serverInformation.isSynced()) {
 			synced = " S";
 		}
-		long blockCount = serverInformation.getBlockCount();
 		String stateHash =  Utils.toFriendlyHexString(serverInformation.getStateHash().toHexString());
 		String beliefHash =  Utils.toFriendlyHexString(serverInformation.getBeliefHash().toHexString());
 		int connectionCount = serverInformation.getConnectionCount();

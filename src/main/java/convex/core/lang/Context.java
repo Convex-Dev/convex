@@ -1859,15 +1859,15 @@ public class Context<T extends ACell> extends AObject {
 	 * Sets the delegated stake on a specified peer to the specified level.
 	 * May set to zero to remove stake. Stake will be capped by current balance.
 	 *
-	 * @param accountKey Peer Account key on which to stake
+	 * @param peerKey Peer Account key on which to stake
 	 * @param newStake Amount to stake
 	 * @return Context with final take set
 	 */
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> setStake(AccountKey accountKey, long newStake) {
+	public <R extends ACell> Context<R> setDelegatedStake(AccountKey peerKey, long newStake) {
 		State s=getState();
-		PeerStatus ps=s.getPeer(accountKey);
-		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for account key: "+accountKey.toChecksumHex());
+		PeerStatus ps=s.getPeer(peerKey);
+		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for account key: "+peerKey.toChecksumHex());
 		if (newStake<0) return this.withArgumentError("Cannot set a negative stake");
 		if (newStake>Constants.MAX_SUPPLY) return this.withArgumentError("Target stake out of valid Amount range");
 
@@ -1886,7 +1886,7 @@ public class Context<T extends ACell> extends AObject {
 
 		// Final updates. Hopefully everything balances. SECURITY: test this. A lot.
 		s=s.withBalance(myAddress, balance-delta); // adjust own balance
-		s=s.withPeer(accountKey, updatedPeer); // adjust peer
+		s=s.withPeer(peerKey, updatedPeer); // adjust peer
 		return withState(s);
 	}
 
@@ -1912,6 +1912,7 @@ public class Context<T extends ACell> extends AObject {
 		Address myAddress=getAddress();
 		AccountStatus as=getAccountStatus(myAddress);
 
+		// TODO: SECURITY fix
 		if (!as.getAccountKey().equals(accountKey)) return this.withArgumentError("Cannot create a peer with a different account-key");
 
 		long balance=getBalance(myAddress);

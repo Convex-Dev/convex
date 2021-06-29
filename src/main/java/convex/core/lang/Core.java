@@ -848,7 +848,7 @@ public class Core {
 			CVMLong amount = RT.ensureLong(args[1]);
 			if (amount == null) return context.withCastError(1,args, Types.LONG);
 
-			return context.setStake(accountKey, amount.longValue()).consumeJuice(Juice.TRANSFER);
+			return context.setDelegatedStake(accountKey, amount.longValue()).consumeJuice(Juice.TRANSFER);
 
 		}
 	});
