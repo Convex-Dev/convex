@@ -5,8 +5,10 @@ import java.io.IOException;
 import java.util.logging.Logger;
 
 import convex.cli.peer.PeerManager;
+import convex.core.Belief;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
+import convex.core.data.SignedData;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import etch.EtchStore;
@@ -110,10 +112,8 @@ public class PeerStart implements Runnable {
 			else {
 				store = Stores.getDefaultStore();
 			}
-			System.out.println(String.format("using etch database %s", store.toString()));
-			Stores.setCurrent(store);
-			peerManager.aquireState(keyPair, peerAddress, store, remotePeerHostname);
-			peerManager.launchPeer(keyPair, peerAddress, hostname, port, store, remotePeerHostname);
+			SignedData<Belief> signedBelief = peerManager.aquireLatestBelief(keyPair, peerAddress, store, remotePeerHostname);
+			peerManager.launchPeer(keyPair, peerAddress, hostname, port, store, remotePeerHostname, signedBelief);
 			peerManager.showPeerEvents();
 		} catch (Throwable t) {
 			System.out.println("Unable to launch peer "+t);

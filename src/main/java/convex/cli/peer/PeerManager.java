@@ -18,6 +18,7 @@ import java.util.logging.Logger;
 import convex.api.Convex;
 import convex.api.Shutdown;
 import convex.cli.Helpers;
+import convex.core.Belief;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
@@ -27,6 +28,7 @@ import convex.core.data.Address;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.data.SignedData;
 import convex.core.init.AInitConfig;
 import convex.core.lang.Reader;
 import convex.core.lang.RT;
@@ -94,13 +96,14 @@ public class PeerManager implements IServerEvent {
 		}
 	}
 
-	public void aquireState(AKeyPair keyPair, Address address, AStore store, String remotePeerHostname) {
+	public SignedData<Belief> aquireLatestBelief(AKeyPair keyPair, Address address, AStore store, String remotePeerHostname) {
 		// sync the etch db with the network state
 
 		InetSocketAddress remotePeerAddress = Utils.toInetSocketAddress(remotePeerHostname);
 		int retryCount = 5;
 		Convex convex = null;
 		Result result = null;
+		SignedData<Belief> signedBelief = null;
 		while (retryCount > 0) {
 			try {
 				convex = Convex.connect(remotePeerAddress, address, keyPair, store);
@@ -127,18 +130,26 @@ public class PeerManager implements IServerEvent {
 			// convex = Convex.connect(localPeerAddress, address, keyPair);
 			long start = Utils.getTimeMillis();
 
-			Future<Result> cf = convex.acquire(beliefHash, store);
+			Future<SignedData<Belief>> cf = convex.acquire(beliefHash, store);
 			// adjust timeout if time elapsed to submit transaction
 			long now = Utils.getTimeMillis();
 			timeout = Math.max(0L, timeout - (now - start));
-			ACell cell = cf.get(timeout, TimeUnit.MILLISECONDS);
-			System.out.println("final cell " + cell.toString());
+			signedBelief = cf.get(timeout, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException | ExecutionException | TimeoutException e) {
 			throw new Error("cannot request for network sync: " + e);
 		}
+		return signedBelief;
 	}
 
-    public void launchPeer(AKeyPair keyPair, Address peerAddress, String hostname, int port, AStore store, String remotePeerHostname) {
+    public void launchPeer(
+		AKeyPair keyPair,
+		Address peerAddress,
+		String hostname,
+		int port,
+		AStore store,
+		String remotePeerHostname,
+		SignedData<Belief> signedBelief
+	) {
 		Map<Keyword, Object> config = new HashMap<>();
 		if (port > 0 ) {
 			config.put(Keywords.PORT, port);
@@ -147,7 +158,7 @@ public class PeerManager implements IServerEvent {
 		config.put(Keywords.KEYPAIR, keyPair);
 		Server server = API.launchPeer(config, this);
 
-		server.joinNetwork(keyPair, peerAddress, remotePeerHostname);
+		server.joinNetwork(keyPair, peerAddress, remotePeerHostname, signedBelief);
 		peerServerList.add(server);
 	}
 

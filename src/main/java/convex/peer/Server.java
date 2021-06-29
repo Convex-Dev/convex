@@ -204,7 +204,6 @@ public class Server implements Closeable {
 
 		} finally {
 			Stores.setCurrent(savedStore);
-			System.out.println("server using store "+ savedStore.toString());
 		}
 	}
 
@@ -332,7 +331,7 @@ public class Server implements Closeable {
 	}
 
 	@SuppressWarnings("unchecked")
-	public boolean joinNetwork(AKeyPair keyPair, Address address, String remoteHostname) {
+	public boolean joinNetwork(AKeyPair keyPair, Address address, String remoteHostname, SignedData<Belief> signedBelief) {
 		if (remoteHostname == null) {
 			return false;
 		}
@@ -376,9 +375,18 @@ public class Server implements Closeable {
 			statusPeerList = statusPeerList.assoc(accountKey, buildPeerList.get(key));
 		}
 
+		try {
+			if (signedBelief != null) {
+				this.peer = this.peer.mergeBeliefs(signedBelief.getValue());
+			}
+		} catch (BadSignatureException | InvalidDataException e) {
+			throw new Error("Cannot merge to latest belief " + e);
+		}
+
 		// now use the remote peer host name list returned from the status call
 		// to connect to the peers
 		connectToPeers(statusPeerList);
+
 		raiseServerChange("join network");
 
 		return true;
