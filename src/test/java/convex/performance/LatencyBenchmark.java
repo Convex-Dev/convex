@@ -47,8 +47,8 @@ public class LatencyBenchmark {
 	public void roundTripTwoTransactions() throws TimeoutException, IOException, InterruptedException, ExecutionException {
 		Future<Result> r1=client.transact(Invoke.create(InitConfigTest.HERO_ADDRESS,-1, Constant.of(1L)));
 		Future<Result> r2=client2.transact(Invoke.create(InitConfigTest.VILLAIN_ADDRESS,-1, Constant.of(1L)));
-		r1.get();
-		r2.get();
+		r1.get(1000,TimeUnit.MILLISECONDS);
+		r2.get(1000,TimeUnit.MILLISECONDS);
 	}
 
 	@Benchmark
@@ -73,7 +73,7 @@ public class LatencyBenchmark {
 			CompletableFuture<Result> f=client.transact(Invoke.create(InitConfigTest.HERO_ADDRESS,-1, Constant.of(i)));
 			rs[i]=f;
 		}
-		CompletableFuture.allOf(rs).get(2000,TimeUnit.MILLISECONDS);
+		CompletableFuture.allOf(rs).get(1000,TimeUnit.MILLISECONDS);
 	}
 
 	@Benchmark
