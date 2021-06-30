@@ -126,7 +126,7 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 	}
 
 	@Override
-	protected RefDirect<T> withFlags(int newFlags) {
+	public RefDirect<T> withFlags(int newFlags) {
 		return new RefDirect<T>(value,hash,newFlags);
 	}
 

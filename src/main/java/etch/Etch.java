@@ -730,28 +730,23 @@ public class Etch {
 		MappedByteBuffer mbb=seekMap(position+KEY_SIZE);
 		
 		// Get current stored values
-		byte currentStatus=mbb.get();
+		int currentFlags=mbb.get();
+		int newFlags=Ref.mergeFlags(currentFlags,ref.getFlags()); // idempotent flag merge
+		
 		long currentSize=mbb.getLong();
 		
-		byte targetStatus=(byte)ref.getStatus();
-		if (currentStatus<targetStatus) {
-			// need to increase status of store
-			mbb=seekMap(position+KEY_SIZE);
-			mbb.put(targetStatus);
-			
-			// maybe update size, if not already persisted
-			if ((currentSize==0L)&&(targetStatus>=Ref.PERSISTED)) {
-				mbb.putLong(ref.getValue().getMemorySize());
-			}
-			
-			return ref;
-		} else {
-			// possibly update value status to reflect current store
-			return ref.withMinimumStatus(currentStatus);
+		if (currentFlags==newFlags) return ref;
+		
+		// We have a status change, need to increase status of store
+		mbb=seekMap(position+KEY_SIZE);
+		mbb.put((byte)newFlags);
+		
+		// maybe update size, if not already persisted
+		if ((currentSize==0L)&&((newFlags&Ref.STATUS_MASK)>=Ref.PERSISTED)) {
+			mbb.putLong(ref.getValue().getMemorySize());
 		}
 		
-
-		
+		return ref.withFlags(newFlags);	// reflect merged flags
 	}
 
 	/**

@@ -47,7 +47,7 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	
 
 	@Override
-	protected RefSoft<T> withFlags(int newFlags) {
+	public RefSoft<T> withFlags(int newFlags) {
 		return new RefSoft<T>(softRef,hash,newFlags);
 	}
 

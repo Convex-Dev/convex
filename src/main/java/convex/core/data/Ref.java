@@ -71,7 +71,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 
 	public static final int MAX_STATUS = ANNOUNCED;
 	
-	protected static final int STATUS_MASK = 0xF;
+	public static final int STATUS_MASK = 0x0F;
 	
 	// mask bit for a proven embedded value
 	protected static final int KNOWN_EMBEDDED_MASK = 0x10;
@@ -185,7 +185,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * @param newFlags
 	 * @return
 	 */
-	protected abstract Ref<T> withFlags(int newFlags);
+	public abstract Ref<T> withFlags(int newFlags);
 
 	/**
 	 * Gets the value from this Ref.
@@ -672,6 +672,16 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * @return true if this specific Ref has missing data, false otherwise.
 	 */
 	public abstract boolean isMissing();
+
+	/**
+	 * Merges flags in an idempotent way. Assume flags are valid
+	 * @param a First set of flags
+	 * @param b Second set of flags
+	 * @return Merged flags
+	 */
+	public static int mergeFlags(int a, int b) {
+		return ((a|b)&~STATUS_MASK)|Math.max(a&STATUS_MASK, b& STATUS_MASK);
+	}
 
 
 
