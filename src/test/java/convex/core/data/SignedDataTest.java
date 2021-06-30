@@ -18,12 +18,19 @@ import convex.core.lang.RT;
 import convex.test.Samples;
 
 public class SignedDataTest {
+	@SuppressWarnings("unchecked")
 	@Test
 	public void testBadSignature() {
 		Ref<CVMLong> dref = Ref.get(RT.cvm(13L));
 		SignedData<CVMLong> sd = SignedData.create(Samples.BAD_ACCOUNTKEY, Samples.BAD_SIGNATURE, dref);
 
+		// should not yet be checked
+		assertFalse(sd.isSignatureChecked());
+		
 		assertFalse(sd.checkSignature());
+		
+		// should now be checked
+		assertTrue(sd.isSignatureChecked());
 
 		assertTrue((sd.getRef().getFlags()&Ref.BAD_MASK)!=0);
 		assertEquals(13L, sd.getValue().longValue());
@@ -31,6 +38,13 @@ public class SignedDataTest {
 		assertNotNull(sd.toString());
 
 		assertThrows(BadSignatureException.class, () -> sd.validateSignature());
+		
+		ACell.createPersisted(sd);
+		
+		SignedData<CVMLong> sd1 = (SignedData<CVMLong>) Ref.forHash(sd.getHash()).getValue();
+		// should have cached checked signature
+		assertTrue(sd1.isSignatureChecked());
+		assertFalse(sd1.checkSignature());
 	}
 
 	@Test
@@ -39,6 +53,9 @@ public class SignedDataTest {
 
 		AKeyPair kp = InitConfigTest.HERO_KEYPAIR;
 		SignedData<CVMLong> sd = kp.signData(cl);
+		
+		// should be checked by default
+		assertTrue(sd.isSignatureChecked());
 
 		assertTrue(sd.checkSignature());
 
@@ -48,9 +65,18 @@ public class SignedDataTest {
 		assertTrue(sd.getDataRef().isEmbedded());
 	}
 	
+	@SuppressWarnings("unchecked")
 	@Test 
 	public void testSignatureCache() {
+		CVMLong cl=RT.cvm(1585856457);
+		AKeyPair kp = InitConfigTest.HERO_KEYPAIR;
+		SignedData<CVMLong> sd = kp.signData(cl);
+		ACell.createPersisted(sd);
 		
+		SignedData<CVMLong> sd1 = (SignedData<CVMLong>) Ref.forHash(sd.getHash()).getValue();
+		// should have cached checked signature
+		assertTrue(sd1.isSignatureChecked());
+		assertTrue(sd1.checkSignature());
 	}
 
 	@Test

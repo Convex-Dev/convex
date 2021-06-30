@@ -205,6 +205,18 @@ public class SignedData<T extends ACell> extends ACell {
 		}
 		return check;
 	}
+	
+	/**
+	 * Checks if the signature has already gone through verification
+	 *
+	 * @return true if valid, false otherwise
+	 */
+	public boolean isSignatureChecked() {
+		Ref<SignedData<T>> sigRef=getRef();
+		if (sigRef==null) return false;
+		int flags=sigRef.getFlags();
+		return (flags&(Ref.BAD_MASK|Ref.VERIFIED_MASK))!=0;
+	}
 
 	public void validateSignature() throws BadSignatureException {
 		if (!checkSignature()) throw new BadSignatureException("Signature not valid!", this);
