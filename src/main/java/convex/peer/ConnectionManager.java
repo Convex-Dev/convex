@@ -51,10 +51,6 @@ public class ConnectionManager {
 		}
 	}
 
-	public synchronized void removeConnection(AccountKey peerKey) {
-		connections.remove(peerKey);
-	}
-
 	/**
 	 * Gets the current set of outbound peer connections from this server
 	 *

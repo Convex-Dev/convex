@@ -298,21 +298,26 @@ public class Server implements Closeable {
 				hostname = (String) config.get(Keywords.URL);
 			}
 
+			lastOwnTransactionTimestamp=Utils.getCurrentTimestamp();
+			
 			// set running status now, so that loops don't terminate
 			isRunning = true;
-
-			receiverThread = new Thread(receiverLoop, "Receive queue worker loop serving port: " + port);
-			receiverThread.setDaemon(true);
-			receiverThread.start();
-
-			updateThread = new Thread(updateLoop, "Server Belief update loop for port: " + port);
-			updateThread.setDaemon(true);
-			updateThread.start();
 
 			// start connection thread
 			connectionThread = new Thread(connectionLoop, "Dynamicaly connect to other peers");
 			connectionThread.setDaemon(true);
 			connectionThread.start();
+
+			
+			receiverThread = new Thread(receiverLoop, "Receive queue worker loop serving port: " + port);
+			receiverThread.setDaemon(true);
+			receiverThread.start();
+
+			// Start Peer update thread
+			updateThread = new Thread(updateLoop, "Server Belief update loop for port: " + port);
+			updateThread.setDaemon(true);
+			updateThread.start();
+
 
 			// Close server on shutdown, must be before Etch stores
 			Shutdown.addHook(Shutdown.SERVER, new Runnable() {
@@ -566,11 +571,9 @@ public class Server implements Closeable {
 	 */
 	protected boolean maybeUpdateBelief() throws InterruptedException {
 		long oldConsensusPoint = peer.getConsensusPoint();
-
-		if (oldConsensusPoint > 0) {
-			// possibly have own transactions to publish
-			maybePostOwnTransactions(newTransactions);
-		}
+		
+		// possibly have own transactions to publish
+		maybePostOwnTransactions(newTransactions);
 
 		// publish new blocks if needed. Guaranteed to change belief if this happens
 		boolean published = maybePublishBlock();
@@ -651,8 +654,8 @@ public class Server implements Closeable {
 		}
 	}
 
-	private long lastOwnTransactionTimestamp=0;
-	private static final long OWN_TRANSACTIONS_DELAY=2000;
+	private long lastOwnTransactionTimestamp;
+	private static final long OWN_TRANSACTIONS_DELAY=1000;
 
 	/**
 	 * Check if the Peer want to send any of its own transactions
@@ -661,7 +664,10 @@ public class Server implements Closeable {
 	private void maybePostOwnTransactions(ArrayList<SignedData<ATransaction>> transactionList) {
 		synchronized (transactionList) {
 			State s=getPeer().getConsensusState();
-			long ts=s.getTimeStamp().longValue();
+			long ts=Utils.getCurrentTimestamp();
+			
+			// If no connections yet, don't try this
+			if (manager.getConnectionCount()==0) return;
 
 			// If we already did this recently, don't try again
 			if (ts<(lastOwnTransactionTimestamp+OWN_TRANSACTIONS_DELAY)) return;
