@@ -26,11 +26,11 @@ public class SignedDataTest {
 		assertFalse(sd.checkSignature());
 
 		assertTrue((sd.getRef().getFlags()&Ref.BAD_MASK)!=0);
-		assertEquals(13L, sd.getValueUnchecked().longValue());
+		assertEquals(13L, sd.getValue().longValue());
 		assertSame(Samples.BAD_ACCOUNTKEY, sd.getAccountKey());
 		assertNotNull(sd.toString());
 
-		assertThrows(BadSignatureException.class, () -> sd.getValue());
+		assertThrows(BadSignatureException.class, () -> sd.validateSignature());
 	}
 
 	@Test

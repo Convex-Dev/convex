@@ -50,9 +50,7 @@ public class MemoryStore extends AStore {
 		ref = ref.toDirect();
 
 		final T o=ref.getValue();
-		if (!(o instanceof ACell)) {
-			return ref.withMinimumStatus(Ref.MAX_STATUS);
-		}
+		if (o==null) return (Ref<T>) Ref.NULL_VALUE;
 		
 		ACell cell = (ACell) o;
 		boolean embedded=cell.isEmbedded();
@@ -77,6 +75,7 @@ public class MemoryStore extends AStore {
 		final ACell oTemp=cell;
 
 		if (topLevel||!embedded) {
+			// Persist at top level
 			final Hash fHash = (hash!=null)?hash:ref.getHash();
 			log.log(Stores.PERSIST_LOG_LEVEL,()->"Persisting ref 0x"+fHash.toHexString()+" of class "+Utils.getClassName(oTemp)+" with store "+this);
 

@@ -120,24 +120,15 @@ public class SignedData<T extends ACell> extends ACell {
 
 	/**
 	 * Gets the signed value object encapsulated by this SignedData object.
+	 * 
+	 * Does not check Signature.
 	 *
 	 * @return Data value that has been signed
-	 * @throws BadSignatureException
 	 */
-	public T getValue() throws BadSignatureException {
-		validateSignature();
+	public T getValue()  {
 		return valueRef.getValue();
 	}
 
-	/**
-	 * Gets the value object encapsulated by this SignedData object, without
-	 * checking if the signature is correct
-	 *
-	 * @return Data value that has been signed
-	 */
-	public T getValueUnchecked() {
-		return valueRef.getValue();
-	}
 
 	/**
 	 * Gets the public key of the signer. If the signature is valid, this

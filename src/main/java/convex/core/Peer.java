@@ -89,15 +89,11 @@ public class Peer {
 
 	@SuppressWarnings("unchecked")
 	public static Peer fromData(AKeyPair keyPair,AMap<Keyword, ACell> peerData)  {
-		try {
-			SignedData<Belief> belief=(SignedData<Belief>) peerData.get(Keywords.BELIEF);
-			AVector<BlockResult> results=(AVector<BlockResult>) peerData.get(Keywords.RESULTS);
-			AVector<State> states=(AVector<State>) peerData.get(Keywords.STATES);
-			long timestamp=belief.getValue().getTimestamp();
-			return new Peer(keyPair,belief,states,results,timestamp);
-		} catch (BadSignatureException bse) {
-			throw new Error("Bad signature restoring Peer",bse);
-		}
+		SignedData<Belief> belief=(SignedData<Belief>) peerData.get(Keywords.BELIEF);
+		AVector<BlockResult> results=(AVector<BlockResult>) peerData.get(Keywords.RESULTS);
+		AVector<State> states=(AVector<State>) peerData.get(Keywords.STATES);
+		long timestamp=belief.getValue().getTimestamp();
+		return new Peer(keyPair,belief,states,results,timestamp);
 	}
 
 	public AMap<Keyword, ACell> toData() {
@@ -275,11 +271,7 @@ public class Peer {
 	}
 
 	public Belief getBelief() {
-		try {
-			return belief.getValue();
-		} catch (BadSignatureException e) {
-			throw new Error("Shouldn't have a badly signed Belief here!");
-		}
+		return belief.getValue();
 	}
 
 	public SignedData<Belief> getSignedBelief() {

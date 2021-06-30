@@ -305,7 +305,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	}
 	
 	public Ref<T> markEmbedded(boolean isEmbedded) {
-		int newFlags=(flags&STATUS_MASK)|(isEmbedded?KNOWN_EMBEDDED_MASK:NON_EMBEDDED_MASK);
+		int newFlags=mergeFlags(flags,(isEmbedded?KNOWN_EMBEDDED_MASK:NON_EMBEDDED_MASK));
 		flags=newFlags;
 		return this;
 	}

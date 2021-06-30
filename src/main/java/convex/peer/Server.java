@@ -913,7 +913,7 @@ public class Server implements Closeable {
 				AccountKey addr = signedBelief.getAccountKey();
 				SignedData<Belief> current = newBeliefs.get(addr);
 				// Make sure the Belief is the latest from a Peer
-				if ((current == null) || (current.getValueUnchecked().getTimestamp() >= signedBelief.getValueUnchecked()
+				if ((current == null) || (current.getValue().getTimestamp() >= signedBelief.getValue()
 						.getTimestamp())) {
 					// Add to map of new Beliefs received for each Peer
 					newBeliefs.put(addr, signedBelief);
