@@ -257,6 +257,15 @@ public class SignedData<T extends ACell> extends ACell {
 	public Ref<T> getDataRef() {
 		return valueRef;
 	}
+	
+	/**
+	 * SignedData is not embedded. We want to persist in store always to cache verification status
+	 *
+	 * @return Always false
+	 */
+	public boolean isEmbedded() {
+		return false;
+	}
 
 	/**
 	 * Checks if this SignedData has a valid signature.

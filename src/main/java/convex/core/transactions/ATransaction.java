@@ -84,11 +84,6 @@ public abstract class ATransaction extends ACell {
 	 * @return Juice limit
 	 */
 	public abstract Long getMaxJuice();
-
-	public final boolean isEmbedded() {
-		// don't embed transactions - we want them stored in their own right
-		return false;
-	}
 	
 	@Override public final boolean isCVMValue() {
 		// Transactions exist outside CVM only
