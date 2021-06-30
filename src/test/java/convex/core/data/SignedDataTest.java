@@ -23,8 +23,9 @@ public class SignedDataTest {
 		Ref<CVMLong> dref = Ref.get(RT.cvm(13L));
 		SignedData<CVMLong> sd = SignedData.create(Samples.BAD_ACCOUNTKEY, Samples.BAD_SIGNATURE, dref);
 
-		assertFalse(sd.isValid());
+		assertFalse(sd.checkSignature());
 
+		assertTrue((sd.getRef().getFlags()&Ref.BAD_MASK)!=0);
 		assertEquals(13L, sd.getValueUnchecked().longValue());
 		assertSame(Samples.BAD_ACCOUNTKEY, sd.getAccountKey());
 		assertNotNull(sd.toString());
@@ -39,12 +40,17 @@ public class SignedDataTest {
 		AKeyPair kp = InitConfigTest.HERO_KEYPAIR;
 		SignedData<CVMLong> sd = kp.signData(cl);
 
-		assertTrue(sd.isValid());
+		assertTrue(sd.checkSignature());
 
 		sd.validateSignature();
 		assertEquals(cl, sd.getValue());
 
 		assertTrue(sd.getDataRef().isEmbedded());
+	}
+	
+	@Test 
+	public void testSignatureCache() {
+		
 	}
 
 	@Test
@@ -60,7 +66,7 @@ public class SignedDataTest {
 		AVector<CVMLong> v = Vectors.of(1L, 2L, 3L);
 		SignedData<AVector<CVMLong>> sd = kp.signData(v);
 
-		assertTrue(sd.isValid());
+		assertTrue(sd.checkSignature());
 
 		sd.validateSignature();
 		assertEquals(v, sd.getValue());

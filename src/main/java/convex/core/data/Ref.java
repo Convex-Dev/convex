@@ -183,7 +183,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	/**
 	 * Create a new Ref of the same type with updated flags
 	 * @param newFlags
-	 * @return
+	 * @return Updated Ref
 	 */
 	public abstract Ref<T> withFlags(int newFlags);
 

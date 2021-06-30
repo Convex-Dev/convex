@@ -17,11 +17,11 @@ import convex.core.transactions.ATransaction;
  * <ul>
  * <li>An Address that identifies the signer</li>
  * <li>A digital signature </li>
- * <li>An underlying data data object that has been signed.</li>
+ * <li>An underlying Cell that has been signed.</li>
  * </ul>
  *
  * The SignedData instance is considered <b>valid</b> if the signature can be successfully validated for
- * the given Address and data object, and if so can be taken as a cryptographic proof that the signature
+ * the given Address and data value, and if so can be taken as a cryptographic proof that the signature
  * was created by someone in possession of the corresponding private key.
  *
  * Note we currently go via a Ref here for a few reasons: - It guarantees we
@@ -48,24 +48,16 @@ public class SignedData<T extends ACell> extends ACell {
 	private final ASignature signature;
 	private final Ref<T> valueRef;
 
-	/**
-	 * Validated flag. Not part of data representation: serves to avoid unnecessary re-validation.
-	 */
-	private boolean validated;
-
-	private SignedData(Ref<T> ref, AccountKey address, ASignature sig, boolean validated) {
-		this.valueRef = ref;
+	private SignedData(Ref<T> refToValue, AccountKey address, ASignature sig) {
+		this.valueRef = refToValue;
 		this.publicKey = address;
 		signature = sig;
-		this.validated=validated;
 	}
-
-	private SignedData(Ref<T> ref, AccountKey address, ASignature sig) {
-		this(ref,address,sig,false); // SECURITY: assume not validated unless specified
-	}
-
+	
 	/**
-	 * Signs a data value Ref with the given keypair.
+	 * Signs a data value Ref with the given keypair. 
+	 * 
+	 * SECURITY: Marks as already validated, since we just signed it.
 	 *
 	 * @param keyPair The public/private key pair of the signer.
 	 * @param ref     Ref to the data to sign
@@ -74,16 +66,39 @@ public class SignedData<T extends ACell> extends ACell {
 	public static <T extends ACell> SignedData<T> createWithRef(AKeyPair keyPair, Ref<T> ref) {
 		ASignature sig = keyPair.sign(ref.getHash());
 		SignedData<T> sd = new SignedData<T>(ref, keyPair.getAccountKey(), sig);
-		sd.validated = true; // validate stuff we have just signed by default
+		sd.markValidated();
 		return sd;
 	}
+
+	/**
+	 * Mark this SignedData as already verified as good - cache in Ref
+	 */
+	private void markValidated() {
+		Ref<ACell> ref=getRef();
+		int flags=ref.getFlags();
+		if ((flags&Ref.VERIFIED_MASK)!=0) return; // already done
+		cachedRef=ref.withFlags(flags|Ref.VERIFIED_MASK);
+	}
+	
+	/**
+	 * Mark this SignedData as a bad signature - cache in Ref
+	 */
+	private void markBadSignature() {
+		Ref<ACell> ref=getRef();
+		int flags=ref.getFlags();
+		if ((flags&Ref.BAD_MASK)!=0) return; // already done
+		cachedRef=ref.withFlags(flags|Ref.BAD_MASK);
+	}
+
 
 	public static <T extends ACell> SignedData<T> create(AKeyPair keyPair, T value2) {
 		return createWithRef(keyPair, Ref.get(value2));
 	}
 
 	/**
-	 * Creates a SignedData object with the given parameters. Not assumed to be valid.
+	 * Creates a SignedData object with the given parameters. 
+	 * 
+	 * SECURITY: Not assumed to be valid.
 	 *
 	 * @param address Public Address of the signer
 	 * @param sig     Signature of the supplied data
@@ -179,23 +194,30 @@ public class SignedData<T extends ACell> extends ACell {
 	}
 
 	/**
-	 * Validates the signature in this SignedData instance.
+	 * Validates the signature in this SignedData instance. Caches result
 	 *
 	 * @return true if valid, false otherwise
 	 */
 	public boolean checkSignature() {
-		if (validated) return true;
+		Ref<SignedData<T>> sigRef=getRef();
+		int flags=sigRef.getFlags();
+		if ((flags&Ref.BAD_MASK)!=0) return false;
+		if ((flags&Ref.VERIFIED_MASK)!=0) return true;
+
 		Hash hash=valueRef.getHash();
 		boolean check = signature.verify(hash, publicKey);
-		validated=check;
+
+		if (check) {
+			markValidated();
+		} else {
+			markBadSignature();
+		}
 		return check;
 	}
 
 	public void validateSignature() throws BadSignatureException {
 		if (!checkSignature()) throw new BadSignatureException("Signature not valid!", this);
 	}
-
-
 
 	@Override
 	public boolean isCanonical() {
@@ -224,8 +246,11 @@ public class SignedData<T extends ACell> extends ACell {
 		@SuppressWarnings("unchecked")
 		Ref<T> newValueRef = (Ref<T>) func.apply(valueRef);
 		if (valueRef == newValueRef) return this;
-		// SECURITY: preserve validated flag
-		return new SignedData<T>(newValueRef, publicKey, signature, validated);
+		
+		// SECURITY: preserve verification flags
+		SignedData<T> newSD= new SignedData<T>(newValueRef, publicKey, signature);
+		newSD.cachedRef=newSD.getRef().withFlags(getRef().getFlags());
+		return newSD;
 	}
 
 	@Override
@@ -265,15 +290,6 @@ public class SignedData<T extends ACell> extends ACell {
 	 */
 	public boolean isEmbedded() {
 		return false;
-	}
-
-	/**
-	 * Checks if this SignedData has a valid signature.
-	 *
-	 * @return true if the Signature is valid for the given data, false otherwise.
-	 */
-	public boolean isValid() {
-		return signature.verify(valueRef.getHash(), publicKey);
 	}
 
 	@Override
