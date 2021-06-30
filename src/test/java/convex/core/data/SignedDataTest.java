@@ -27,6 +27,7 @@ public class SignedDataTest {
 		// should not yet be checked
 		assertFalse(sd.isSignatureChecked());
 		
+		// Signature check should fail since bad signature
 		assertFalse(sd.checkSignature());
 		
 		// should now be checked
