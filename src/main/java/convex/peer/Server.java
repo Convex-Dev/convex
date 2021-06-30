@@ -684,9 +684,9 @@ public class Server implements Closeable {
 
 				String code;
 				if (desiredHostname==null) {
-					code = "(set-peer-data {:url nil})";
+					code = String.format("(set-peer-data %s {:url nil})", peerKey);
 				} else {
-					code = String.format("(set-peer-data "+peerKey+" {:url \"%s\"})", desiredHostname);
+					code = String.format("(set-peer-data %s {:url \"%s\"})", peerKey, desiredHostname);
 				}
 				ACell message = Reader.read(code);
 				ATransaction transaction = Invoke.create(address, as.getSequence()+1, message);
