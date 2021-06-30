@@ -73,9 +73,9 @@ public class Connection {
 
 	/**
 	 * If trusted, the Account Key of the remote peer.
-	 * This is mutable so trust can be established after connection.
+	 * This is immutable so trust can only be set on a new connection.
 	 */
-	private AccountKey trustedPeerKey;
+	private final AccountKey trustedPeerKey;
 
 	private static final Logger log = Logger.getLogger(Connection.class.getName());
 
@@ -108,18 +108,24 @@ public class Connection {
 	 * connection initialisation: channel should already be connected.
 	 *
 	 * @param channel
-	 * @param receiveAction Consumer to be called when a Message is received
-	 * @param store         Store to use when receiving messages.
+	 * @param receiveAction     Consumer to be called when a Message is received
+	 * @param store             Store to use when receiving messages.
+	 * @param trustedPeerKey    Trusted peer account key if this is a trusted conneciton, if not then null*
 	 * @return New Connection instance
 	 * @throws IOException
 	 */
-	public static Connection create(ByteChannel channel, Consumer<Message> receiveAction, AStore store) throws IOException {
-		return new Connection(channel, receiveAction, store,null);
+	public static Connection create(
+		ByteChannel channel,
+		Consumer<Message> receiveAction,
+		AStore store,
+		AccountKey trustedPeerKey
+	) throws IOException {
+		return new Connection(channel, receiveAction, store, trustedPeerKey);
 	}
 
 	/**
 	 * Create a PeerConnection by connecting to a remote address
-	 * 
+	 *
 	 * @param hostAddress   Internet Address to connect to
 	 * @param receiveAction A callback Consumer to be called for any received
 	 *                      messages on this connection
@@ -128,6 +134,26 @@ public class Connection {
 	 * @throws IOException If connection fails because of any IO problem
 	 */
 	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store) throws IOException {
+		return connect(hostAddress, receiveAction, store, null);
+	}
+
+	/**
+	 * Create a PeerConnection by connecting to a remote address
+	 *
+	 * @param hostAddress       Internet Address to connect to
+	 * @param receiveAction     A callback Consumer to be called for any received
+	 *                          messages on this connection
+	 * @param store             Store to use for this Connection
+	 * @param trustedPeerKey    Trusted peer account key if this is a trusted conneciton, if not then null
+	 * @return New Connection instance
+	 * @throws IOException If connection fails because of any IO problem
+	 */
+	public static Connection connect(
+		InetSocketAddress hostAddress,
+		Consumer<Message> receiveAction,
+		AStore store,
+		AccountKey trustedPeerKey
+	) throws IOException {
 		if (store == null) throw new Error("Connection requires a store");
 		SocketChannel clientChannel = SocketChannel.open(hostAddress);
 		clientChannel.configureBlocking(false);
@@ -142,7 +168,7 @@ public class Connection {
 		// clientChannel.setOption(StandardSocketOptions.SO_KEEPALIVE,true);
 		// clientChannel.setOption(StandardSocketOptions.TCP_NODELAY,true);
 
-		Connection pc = create(clientChannel, receiveAction, store);
+		Connection pc = create(clientChannel, receiveAction, store, trustedPeerKey);
 		pc.startClientListening();
 		log.log(LEVEL_SEND, "Connect succeeded for host: " + hostAddress);
 		return pc;
@@ -329,7 +355,7 @@ public class Connection {
 
 	/**
 	 * Sends a RESULT Message on this connection with no error code (i.e. a success)
-	 * 
+	 *
 	 * @param id    ID for result message
 	 * @param value Any data object
 	 * @return True if buffered for sending successfully, false otherwise
@@ -390,7 +416,7 @@ public class Connection {
 
 	/**
 	 * Sends a message over this connection
-	 * 
+	 *
 	 * @param msg Message to send
 	 * @return true if message buffered successfully, false if failed
 	 * @throws IOException
@@ -666,10 +692,6 @@ public class Connection {
 			log.log(NIOServer.LEVEL_BAD_CONNECTION, e.getMessage());
 			key.cancel();
 		}
-	}
-
-	public void setTrustedPeerKey(AccountKey trustedPeerKey) {
-		this.trustedPeerKey = trustedPeerKey;
 	}
 
 	public boolean sendBytes() throws IOException {

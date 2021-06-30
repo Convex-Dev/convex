@@ -87,8 +87,8 @@ public class API {
 	 * Launch a set of peers.
 	 *
 	 * @param count Number of peers to launch.
-	 * @param initConfig 
-	 * @param event 
+	 * @param initConfig
+	 * @param event
 	 *
 	 * @return List of Servers launched
 	 *
@@ -123,9 +123,9 @@ public class API {
 
 			try {
 				// Join this Server to the Seer #0
-				serverList.get(i).connectToPeer(genesisServer.getPeerKey(), genesisServer.getHostAddress());
+				serverList.get(i).connectToPeer(genesisServer.getPeerKey(), genesisServer.getHostAddress(), null);
 				// Join server #0 to this server
-				genesisServer.connectToPeer(server.getPeerKey(), server.getHostAddress());
+				genesisServer.connectToPeer(server.getPeerKey(), server.getHostAddress(), null);
 			} catch (IOException e) {
 				log.severe("Failed to connect peers" +e.getMessage());
 			}

@@ -54,6 +54,8 @@ public class PeerManager implements IServerEvent {
 
 	private static final Logger log = Logger.getLogger(PeerManager.class.getName());
 
+	private static final long TRANSACTION_TIMEOUT_MILLIS = 50000;
+
 	protected List<Server> peerServerList = new ArrayList<Server>();
 
 	protected Session session = new Session();
@@ -108,7 +110,7 @@ public class PeerManager implements IServerEvent {
 			try {
 				convex = Convex.connect(remotePeerAddress, address, keyPair, store);
 				Future<Result> cf =  convex.requestStatus();
-				result = cf.get(2000, TimeUnit.MILLISECONDS);
+				result = cf.get(TRANSACTION_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
 				retryCount = 0;
 			} catch (IOException | InterruptedException | ExecutionException | TimeoutException e ) {
 				// raiseServerMessage("unable to connect to remote peer at " + remoteHostname + ". Retrying " + e);
@@ -124,8 +126,7 @@ public class PeerManager implements IServerEvent {
 		Hash beliefHash = RT.ensureHash(values.get(0));
 		Hash stateHash = RT.ensureHash(values.get(1));
 
-		System.out.println("Aquire to " + stateHash.toString() + " / " + beliefHash.toString() + " on db " + store.toString());
-		long timeout = 20000;
+		long timeout = TRANSACTION_TIMEOUT_MILLIS;
 		try {
 			// convex = Convex.connect(localPeerAddress, address, keyPair);
 			long start = Utils.getTimeMillis();

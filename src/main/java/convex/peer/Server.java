@@ -429,7 +429,7 @@ public class Server implements Closeable {
 				processTransact(m);
 				break;
 			case GOODBYE:
-				m.getPeerConnection().close();
+				processClose(m);
 				break;
 			case STATUS:
 				processStatus(m);
@@ -505,6 +505,35 @@ public class Server implements Closeable {
 			hasNewMessages=true;
 			newTransactions.add(sd);
 			registerInterest(sd.getHash(), m);
+		}
+	}
+
+	/**
+	 * Called by a remote peer to close connections to the remote peer.
+	 *
+	 */
+	private void processClose(Message m) {
+		SignedData<AccountKey> signedPeerKey = m.getPayload();
+		try {
+			AccountKey remotePeerKey = RT.ensureAccountKey(signedPeerKey.getValue());
+			// we have to look for the trusted connection in the ConnectionManager, since
+			// the message connection is created by the NIOServer , and all message connections
+			// do not have trusted peer key.
+
+			Connection managerConnection = manager.getConnection(remotePeerKey);
+
+			if (!managerConnection.isTrusted()) {
+				// ignore non trusted peers, as they may be pretending to be someone else and try to close a valid peer connection.
+				return;
+			}
+			AccountKey trustedPeerKey = managerConnection.getTrustedPeerKey();
+			// only close down if the trusted peer has signed the peer key.
+			if ( trustedPeerKey.equals(remotePeerKey)) {
+				manager.closeConnection(remotePeerKey);
+				raiseServerChange("conection change");
+			}
+		} catch (BadSignatureException e) {
+			// do nothing since we received a bad sig for a goodbye
 		}
 	}
 
@@ -832,7 +861,19 @@ public class Server implements Closeable {
 	}
 
 	private void processResponse(Message m) {
-		manager.processResponse(m,peer);
+		AccountKey trustedPeerKey = manager.processResponse(m,peer);
+		if (trustedPeerKey != null) {
+			try {
+				InetSocketAddress hostAddress = manager.getConnection(trustedPeerKey).getRemoteAddress();
+				// manager.closeConnection(trustedPeerKey);
+				// reconnect as a trusted peer
+				connectToPeer(trustedPeerKey, hostAddress, trustedPeerKey);
+			} catch (IOException e) {
+				log.warning("Cannot connect to remote peer " + e);
+			}
+			raiseServerChange("new trusted connection");
+		}
+
 	}
 
 	private void processQuery(Message m) {
@@ -1122,6 +1163,12 @@ public class Server implements Closeable {
 			persistPeerData();
 		}
 
+		SignedData<ACell> signedPeerKey = peer.sign(peer.getPeerKey());
+		Message msg = Message.createGoodBye(signedPeerKey);
+
+		// broadcast GOODBYE message to all peers trusted or not
+		manager.broadcast(msg, false);
+
 		isRunning = false;
 		if (updateThread != null) updateThread.interrupt();
 		if (receiverThread != null) receiverThread.interrupt();
@@ -1169,11 +1216,12 @@ public class Server implements Closeable {
 	 *
 	 * @param peerKey
 	 * @param hostAddress
+	 * @param trustedPeerKey Peer account key of the trusted peer.
 	 * @return The newly created connection
 	 * @throws IOException
 	 */
-	public Connection connectToPeer(AccountKey peerKey, InetSocketAddress hostAddress) throws IOException {
-		Connection pc = Connection.connect(hostAddress, peerReceiveAction, getStore());
+	public Connection connectToPeer(AccountKey peerKey, InetSocketAddress hostAddress, AccountKey trustedPeerKey) throws IOException {
+		Connection pc = Connection.connect(hostAddress, peerReceiveAction, getStore(), trustedPeerKey);
 		manager.setConnection(peerKey, pc);
 		return pc;
 	}
@@ -1192,7 +1240,7 @@ public class Server implements Closeable {
 			try {
 				log.log(LEVEL_SERVER, getHostname() + ": connecting too " + peerHostname.toString());
 				InetSocketAddress peerAddress = Utils.toInetSocketAddress(peerHostname.toString());
-				connectToPeer(peerKey, peerAddress);
+				connectToPeer(peerKey, peerAddress, null);
 			} catch (IOException e) {
 				log.warning("cannot connect to peer " + peerHostname.toString());
 			}

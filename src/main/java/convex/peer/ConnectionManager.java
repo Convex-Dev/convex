@@ -51,8 +51,27 @@ public class ConnectionManager {
 		}
 	}
 
+	/**
+	 * Remove the connection, but do not close it.
+	 *
+	 * @param peerKey to remove from the list of connections
+	 *
+	 */
 	public synchronized void removeConnection(AccountKey peerKey) {
 		connections.remove(peerKey);
+	}
+
+	/**
+	 * Close and remove the connection
+	 *
+	 * @param peerKey Peer key linked to the connection to close and remove.
+	 *
+	 */
+	public synchronized void closeConnection(AccountKey peerKey) {
+		if (connections.containsKey(peerKey)) {
+			connections.get(peerKey).close();
+			connections.remove(peerKey);
+		}
 	}
 
 	/**
@@ -110,7 +129,7 @@ public class ConnectionManager {
 	}
 
 
-	void processResponse(Message m, Peer thisPeer) {
+	AccountKey processResponse(Message m, Peer thisPeer) {
 		try {
 			SignedData<ACell> signedData = m.getPayload();
 
@@ -119,7 +138,7 @@ public class ConnectionManager {
 
 			if (responseValues.size() != 4) {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "response data incorrect number of items should be 4 not " + responseValues.size());
-				return;
+				return null;
 			}
 
 
@@ -127,20 +146,20 @@ public class ConnectionManager {
 			Hash token = RT.ensureHash(responseValues.get(0));
 			if (token == null) {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "no response token provided");
-				return;
+				return null;
 			}
 
 			// check to see if we are both want to connect to the same network
 			Hash networkId = RT.ensureHash(responseValues.get(1));
 			if ( networkId == null || !networkId.equals(thisPeer.getNetworkID())) {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "response data has incorrect networkId");
-				return;
+				return null;
 			}
 			// check to see if the challenge is for this peer
 			AccountKey toPeer = RT.ensureAccountKey(responseValues.get(2));
 			if ( toPeer == null || !toPeer.equals(thisPeer.getPeerKey())) {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "response data has incorrect addressed peer");
-				return;
+				return null;
 			}
 
 			// hash sent by the response
@@ -152,7 +171,7 @@ public class ConnectionManager {
 
 			if ( !challengeList.containsKey(fromPeer)) {
 				log.log(LEVEL_CHALLENGE_RESPONSE, "response from an unkown challenge");
-				return;
+				return null;
 			}
 			synchronized(challengeList) {
 
@@ -162,38 +181,32 @@ public class ConnectionManager {
 				Hash challengeToken = challengeRequest.getToken();
 				if (!challengeToken.equals(token)) {
 					log.log(LEVEL_CHALLENGE_RESPONSE, "invalid response token sent");
-					return;
+					return null;
 				}
 
 				AccountKey challengeFromPeer = challengeRequest.getPeerKey();
 				if (!signedData.getAccountKey().equals(challengeFromPeer)) {
 					log.warning("response key does not match requested key, sent from a different peer");
-					return;
+					return null;
 				}
 
 				// hash sent by this peer for the challenge
 				Hash challengeSourceHash = challengeRequest.getSendHash();
 				if ( !challengeHash.equals(challengeSourceHash)) {
 					log.log(LEVEL_CHALLENGE_RESPONSE, "response hash of the challenge does not match");
-					return;
+					return null;
 				}
-
-				Connection pc = m.getPeerConnection();
-				// log.log(LEVEL_CHALLENGE_RESPONSE, "Processing response request from: " + pc.getRemoteAddress());
-
-				pc.setTrustedPeerKey(fromPeer);
-
-				// raiseServerMessage(" now trusts peer: " + Utils.toFriendlyHexString(fromPeer.toHexString()));
-
 				// remove from list incase this fails, we can generate another challenge
 				challengeList.remove(fromPeer);
 
+				// return the trusted peer key
+				return fromPeer;
 			}
-			server.raiseServerChange("new trusted connection");
 
 		} catch (Throwable t) {
 			log.warning("Response Error: " + t);
 		}
+		return null;
 	}
 
 
