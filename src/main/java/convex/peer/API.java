@@ -127,7 +127,7 @@ public class API {
 				serverList.get(i).connectToPeer(genesisServer.getPeerKey(), genesisServer.getHostAddress(), null);
 				// Join server #0 to this server
 				genesisServer.connectToPeer(server.getPeerKey(), server.getHostAddress(), null);
-			} catch (IOException e) {
+			} catch (IOException | TimeoutException e) {
 				log.severe("Failed to connect peers" +e.getMessage());
 			}
 		}

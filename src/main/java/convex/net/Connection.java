@@ -136,7 +136,11 @@ public class Connection {
 	 * @throws IOException If connection fails because of any IO problem
 	 * @throws TimeoutException If connection cannot be established within an acceptable time (~5s)
 	 */
-	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store) throws IOException {
+	public static Connection connect(
+		InetSocketAddress hostAddress,
+		Consumer<Message> receiveAction,
+		AStore store
+	) throws IOException, TimeoutException {
 		return connect(hostAddress, receiveAction, store, null);
 	}
 
@@ -156,7 +160,7 @@ public class Connection {
 		Consumer<Message> receiveAction,
 		AStore store,
 		AccountKey trustedPeerKey
-	) throws IOException {
+	) throws IOException, TimeoutException {
 		if (store == null) throw new Error("Connection requires a store");
 		SocketChannel clientChannel = SocketChannel.open();
 		clientChannel.configureBlocking(false);
