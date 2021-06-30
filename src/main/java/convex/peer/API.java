@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Logger;
 
 import convex.core.crypto.AKeyPair;
@@ -126,7 +127,7 @@ public class API {
 				serverList.get(i).connectToPeer(genesisServer.getPeerKey(), genesisServer.getHostAddress());
 				// Join server #0 to this server
 				genesisServer.connectToPeer(server.getPeerKey(), server.getHostAddress());
-			} catch (IOException e) {
+			} catch (IOException | TimeoutException e) {
 				log.severe("Failed to connect peers" +e.getMessage());
 			}
 		}

@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Random;
+import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
 import convex.cli.peer.Session;
@@ -69,7 +70,7 @@ public class Helpers {
 		Convex convex;
 		try {
 			convex=Convex.connect(host, address, keyPair);
-		} catch (IOException e) {
+		} catch (IOException | TimeoutException e) {
 			e.printStackTrace();
 			System.out.printf("Failed to connect to peer at: %s\n", host);
 			return null;

@@ -8,6 +8,7 @@ import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
@@ -210,8 +211,9 @@ public class PeerGUI extends JPanel {
 	 * @param kp Key Pair for connection
 	 * @return Convex connection instance
 	 * @throws IOException
+	 * @throws TimeoutException 
 	 */
-	public static Convex makeConnection(Address address,AKeyPair kp) throws IOException {
+	public static Convex makeConnection(Address address,AKeyPair kp) throws IOException, TimeoutException {
 		InetSocketAddress host = getDefaultPeer().getHostAddress();
 		return Convex.connect(host,address, kp);
 	}
@@ -245,7 +247,7 @@ public class PeerGUI extends JPanel {
 			CompletableFuture<Result> fr= convex.transact(trans);
 			log.finer("Sent transaction: "+trans.toString());
 			return fr;
-		} catch (IOException e) {
+		} catch (IOException | TimeoutException e) {
 			throw Utils.sneakyThrow(e);
 		}
 	}

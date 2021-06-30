@@ -142,8 +142,9 @@ public class Convex {
 	 * @param keyPair     Key pair to use for client transactions
 	 * @return New Convex client instance
 	 * @throws IOException If connection fails
+	 * @throws TimeoutException 
 	 */
-	public static Convex connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair) throws IOException {
+	public static Convex connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair) throws IOException, TimeoutException {
 		return Convex.connect(peerAddress, address, keyPair, Stores.current());
 	}
 
@@ -157,8 +158,9 @@ public class Convex {
 	 * @param store   Store to use for this connection
 	 * @return New Convex client instance
 	 * @throws IOException If connection fails
+	 * @throws TimeoutException 
 	 */
-	public static Convex connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair, AStore store) throws IOException {
+	public static Convex connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair, AStore store) throws IOException, TimeoutException {
 		Convex convex = new Convex(address, keyPair);
 		convex.connectToPeer(peerAddress, store);
 		return convex;
@@ -228,7 +230,7 @@ public class Convex {
 		return sequence;
 	}
 
-	private void connectToPeer(InetSocketAddress peerAddress, AStore store) throws IOException {
+	private void connectToPeer(InetSocketAddress peerAddress, AStore store) throws IOException, TimeoutException {
 		setConnection(Connection.connect(peerAddress, internalHandler, store));
 	}
 

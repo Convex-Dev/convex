@@ -486,7 +486,8 @@ public class Server implements Closeable {
 		AVector<ACell> v = m.getPayload();
 		SignedData<ATransaction> sd = (SignedData<ATransaction>) v.get(1);
 
-		// TODO: this should throw MissingDataException?
+		// Persist the signed transaction. Might throw MissingDataException?
+		// If we already have the transaction persisted, will get signature status
 		ACell.createPersisted(sd);
 
 		if (!sd.checkSignature()) {
@@ -1171,8 +1172,9 @@ public class Server implements Closeable {
 	 * @param hostAddress
 	 * @return The newly created connection
 	 * @throws IOException
+	 * @throws TimeoutException 
 	 */
-	public Connection connectToPeer(AccountKey peerKey, InetSocketAddress hostAddress) throws IOException {
+	public Connection connectToPeer(AccountKey peerKey, InetSocketAddress hostAddress) throws IOException, TimeoutException {
 		Connection pc = Connection.connect(hostAddress, peerReceiveAction, getStore());
 		manager.setConnection(peerKey, pc);
 		return pc;
@@ -1193,7 +1195,7 @@ public class Server implements Closeable {
 				log.log(LEVEL_SERVER, getHostname() + ": connecting too " + peerHostname.toString());
 				InetSocketAddress peerAddress = Utils.toInetSocketAddress(peerHostname.toString());
 				connectToPeer(peerKey, peerAddress);
-			} catch (IOException e) {
+			} catch (IOException | TimeoutException e) {
 				log.warning("cannot connect to peer " + peerHostname.toString());
 			}
 		}

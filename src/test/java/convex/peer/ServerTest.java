@@ -99,7 +99,7 @@ public class ServerTest {
 	};
 
 	@Test
-	public void testServerConnect() throws IOException, InterruptedException {
+	public void testServerConnect() throws IOException, InterruptedException, TimeoutException {
 		InetSocketAddress hostAddress=SERVER.getHostAddress();
 
 		// Connect to Peer Server using the current store for the client
@@ -126,7 +126,7 @@ public class ServerTest {
 //		});
 //	}
 
-	@Test public void testBalanceQuery() throws IOException {
+	@Test public void testBalanceQuery() throws IOException, TimeoutException {
 		Convex convex=Convex.connect(SERVER.getHostAddress(),InitConfigTest.VILLAIN_ADDRESS,InitConfigTest.VILLAIN_KEYPAIR);
 
 		// test the connection is still working
@@ -145,7 +145,7 @@ public class ServerTest {
 	}
 
 	@Test
-	public void testMissingData() throws IOException, InterruptedException {
+	public void testMissingData() throws IOException, InterruptedException, TimeoutException {
 
 		InetSocketAddress hostAddress=SERVER.getHostAddress();
 
@@ -197,7 +197,7 @@ public class ServerTest {
 	}
 
 	@Test
-	public void testServerTransactions() throws IOException, InterruptedException {
+	public void testServerTransactions() throws IOException, InterruptedException, TimeoutException {
 		synchronized(ServerTest.SERVER) {
 			InetSocketAddress hostAddress=SERVER.getHostAddress();
 
@@ -222,6 +222,7 @@ public class ServerTest {
 
 			// wait for results to come back
 			assertFalse(Utils.timeout(20000, () -> results.containsKey(last)));
+			Thread.sleep(100); // bit more time in case something out of order?
 
 			AVector<CVMLong> v = Vectors.of(1l, 2l, 3l);
 			assertCVMEquals(v, results.get(id1));
