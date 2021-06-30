@@ -58,10 +58,10 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public static final int PERSISTED = 2;
 
 	/**
-	 * Ref status indicating the Ref has been both persisted and verified as genuine
-	 * valid data.
+	 * Ref status indicating the Ref has been both persisted and validated as genuine
+	 * valid CVM data.
 	 */
-	public static final int VERIFIED = 3;
+	public static final int VALIDATED = 3;
 
 	/**
 	 * Ref status indicating the Ref has been shared by this peer in an announced
@@ -79,7 +79,17 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	// mask bit for a proven non-embedded value
 	protected static final int NON_EMBEDDED_MASK = 0x20;
 
-	protected static final int EMBEDDING_MASK = 0x30;
+	protected static final int EMBEDDING_MASK = KNOWN_EMBEDDED_MASK | NON_EMBEDDED_MASK;
+	
+	// mask bit for verified data, especially signatures
+	protected static final int VERIFIED_MASK = 0x40;
+
+	// mask bit for bad data, especially signatures
+	protected static final int BAD_MASK = 0x80;
+	
+	protected static final int VERIFICATION_MASK = VERIFIED_MASK | BAD_MASK;
+
+
 	
 	/**
 	 * Ref status indicating that the Ref refers to data that has been proven to be invalid
@@ -112,7 +122,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	protected Hash hash;
 
 	/**
-	 * Status of this Ref. See public Ref status constants.
+	 * Flag values including Status of this Ref. See public Ref status constants.
 	 * 
 	 * May be incremented atomically in the event of validation, proven storage.
 	 */
@@ -131,6 +141,24 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 */
 	public int getStatus() {
 		return flags&STATUS_MASK;
+	}
+	
+	/**
+	 * Gets flags with an updated status
+	 * @param newStatus New status to apply to flags
+	 * @return Updated flags (does not change this Ref)
+	 */
+	public int flagsWithStatus(int newStatus) {
+		return (flags&~STATUS_MASK)|(newStatus&STATUS_MASK);
+	}
+	
+	/**
+	 * Gets the flags for this Ref
+	 * 
+	 * @return flag int value
+	 */
+	public int getFlags() {
+		return flags;
 	}
 
 	/**
@@ -299,7 +327,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public void validate() throws InvalidDataException {
 		if (hash != null) hash.validate();
 		// TODO is this sane?
-		if (getStatus() < VERIFIED) {
+		if (getStatus() < VALIDATED) {
 			T o = getValue();
 			o.validate();
 		}
@@ -644,5 +672,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * @return true if this specific Ref has missing data, false otherwise.
 	 */
 	public abstract boolean isMissing();
+
+
 
 }

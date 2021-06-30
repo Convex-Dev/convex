@@ -51,9 +51,8 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 		return new RefSoft<T>(softRef,hash,newFlags);
 	}
 
-	public static <T extends ACell> RefSoft<T> create(T value, int status) {
+	public static <T extends ACell> RefSoft<T> create(T value, int flags) {
 		Hash hash=Hash.compute(value);
-		int flags=status&Ref.STATUS_MASK;
 		return new RefSoft<T>(value, hash, flags);
 	}
 

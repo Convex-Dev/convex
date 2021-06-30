@@ -636,8 +636,8 @@ public class Etch {
 		// seek to correct position, skipping over key
 		MappedByteBuffer mbb=seekMap(pointer+KEY_SIZE); 
 		
-		// get Status byte
-		byte status=mbb.get();
+		// get flags byte
+		byte flagByte=mbb.get();
 		
 		// Get memory size
 		long memorySize=mbb.getLong();
@@ -658,12 +658,12 @@ public class Etch {
 				cell.attachMemorySize(memorySize);
 			}
 			
-			Ref<ACell> ref=RefSoft.create(cell, status);
+			Ref<ACell> ref=RefSoft.create(cell, (int)flagByte);
 			cell.attachRef(ref);
 			
 			return ref;
 		} catch (Exception e) {
-			throw new Error("Failed to read data in etch store: "+data.toHexString()+" status = "+status+" length ="+length+" pointer = "+Utils.toHexString(pointer)+ " memorySize="+memorySize,e);
+			throw new Error("Failed to read data in etch store: "+data.toHexString()+" flags = "+Utils.toHexString(flagByte)+" length ="+length+" pointer = "+Utils.toHexString(pointer)+ " memorySize="+memorySize,e);
 		}
 	}
 
@@ -862,10 +862,11 @@ public class Etch {
 		// append key
 		mbb.put(key.getInternalArray(),key.getOffset(),KEY_SIZE);
 		
-		// append status label (1 byte)
-		mbb.put((byte)(Math.max(value.getStatus(),Ref.STORED)));
+		// append flags (1 byte)
+		int flags=value.flagsWithStatus(Math.max(value.getStatus(),Ref.STORED));
+		mbb.put((byte)(flags)); // currently all flags fit in one byte
 		
-		// append Memory Size (8 bytes). Initialised to 0L is STORED only.
+		// append Memory Size (8 bytes). Initialised to 0L if STORED only.
 		mbb.putLong(memorySize);
 		
 		// append blob length
