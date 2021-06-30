@@ -1,6 +1,7 @@
 package convex.performance;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -31,7 +32,7 @@ public class LatencyBenchmark {
 		try {
 			client=Convex.connect(server.getHostAddress(), InitConfigTest.HERO_ADDRESS,InitConfigTest.HERO_KEYPAIR);
 			client2=Convex.connect(server.getHostAddress(), InitConfigTest.VILLAIN_ADDRESS,InitConfigTest.VILLAIN_KEYPAIR);
-		} catch (IOException e) {
+		} catch (IOException | TimeoutException e) {
 			e.printStackTrace();
 		}
 
@@ -67,14 +68,12 @@ public class LatencyBenchmark {
 
 	@SuppressWarnings("unchecked")
 	private void doTransactions(int n) throws IOException, InterruptedException, ExecutionException, TimeoutException {
-		Future<Result>[] rs=new Future[n];
+		CompletableFuture<Result>[] rs=new CompletableFuture[n];
 		for (int i=0; i<n; i++) {
-			Future<Result> f=client.transact(Invoke.create(InitConfigTest.HERO_ADDRESS,-1, Constant.of(i)));
+			CompletableFuture<Result> f=client.transact(Invoke.create(InitConfigTest.HERO_ADDRESS,-1, Constant.of(i)));
 			rs[i]=f;
 		}
-		for (int i=0; i<n; i++) {
-			rs[i].get(1000,TimeUnit.MILLISECONDS);
-		}
+		CompletableFuture.allOf(rs).get(2000,TimeUnit.MILLISECONDS);
 	}
 
 	@Benchmark

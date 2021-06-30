@@ -486,7 +486,8 @@ public class Server implements Closeable {
 		AVector<ACell> v = m.getPayload();
 		SignedData<ATransaction> sd = (SignedData<ATransaction>) v.get(1);
 
-		// TODO: this should throw MissingDataException?
+		// Persist the signed transaction. Might throw MissingDataException?
+		// If we already have the transaction persisted, will get signature status
 		ACell.createPersisted(sd);
 
 		if (!sd.checkSignature()) {
@@ -713,9 +714,9 @@ public class Server implements Closeable {
 
 				String code;
 				if (desiredHostname==null) {
-					code = "(set-peer-data {:url nil})";
+					code = String.format("(set-peer-data %s {:url nil})", peerKey);
 				} else {
-					code = String.format("(set-peer-data "+peerKey+" {:url \"%s\"})", desiredHostname);
+					code = String.format("(set-peer-data %s {:url \"%s\"})", peerKey, desiredHostname);
 				}
 				ACell message = Reader.read(code);
 				ATransaction transaction = Invoke.create(address, as.getSequence()+1, message);
@@ -954,7 +955,7 @@ public class Server implements Closeable {
 				AccountKey addr = signedBelief.getAccountKey();
 				SignedData<Belief> current = newBeliefs.get(addr);
 				// Make sure the Belief is the latest from a Peer
-				if ((current == null) || (current.getValueUnchecked().getTimestamp() >= signedBelief.getValueUnchecked()
+				if ((current == null) || (current.getValue().getTimestamp() >= signedBelief.getValue()
 						.getTimestamp())) {
 					// Add to map of new Beliefs received for each Peer
 					newBeliefs.put(addr, signedBelief);
@@ -1219,6 +1220,7 @@ public class Server implements Closeable {
 	 * @param trustedPeerKey Peer account key of the trusted peer.
 	 * @return The newly created connection
 	 * @throws IOException
+	 * @throws TimeoutException
 	 */
 	public Connection connectToPeer(AccountKey peerKey, InetSocketAddress hostAddress, AccountKey trustedPeerKey) throws IOException {
 		Connection pc = Connection.connect(hostAddress, peerReceiveAction, getStore(), trustedPeerKey);

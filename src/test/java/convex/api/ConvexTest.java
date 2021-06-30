@@ -56,7 +56,7 @@ public class ConvexTest {
 		}
 	}
 
-	@Test public void testConnection() throws IOException {
+	@Test public void testConnection() throws IOException, TimeoutException {
 		// Don't need locking
 		Convex convex=Convex.connect(
 			ServerTest.SERVER.getHostAddress(),
@@ -94,7 +94,7 @@ public class ConvexTest {
 				rs[i]=f;
 			}
 			for (int i=0; i<n; i++) {
-				Result r=rs[i].get(1000,TimeUnit.MILLISECONDS);
+				Result r=rs[i].get(3000,TimeUnit.MILLISECONDS);
 				assertNull(r.getErrorCode(),"Error:" +r.toString());
 			}
 		}

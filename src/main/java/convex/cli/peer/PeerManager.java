@@ -93,7 +93,7 @@ public class PeerManager implements IServerEvent {
 
 			@SuppressWarnings("unused")
 			Future<Result> future = convex.transact(transaction);
-		} catch (IOException e) {
+		} catch (IOException | TimeoutException e) {
 			log.severe("cannot connect to the first peer "+e);
 		}
 	}

@@ -136,19 +136,24 @@ public class Result extends ARecordGeneric {
 
 	public static Result fromContext(CVMLong id,Context<?> ctx) {
 		Object result=ctx.getValue();
-		ACell code=null;
+		ACell errorCode=null;
 		ACell trace=null;
 		if (result instanceof AExceptional) {
 			AExceptional ex=(AExceptional)result;
 			result=ex.getMessage();
-			code=ex.getCode();
+			errorCode=ex.getCode();
 			if (ex instanceof ErrorValue) {
 				trace=Vectors.create(((ErrorValue)ex).getTrace());
 			}
 		}
-		return create(id,(ACell)result,code,trace);
+		return create(id,(ACell)result,errorCode,trace);
 	}
 
+	/**
+	 * Updates result with a given message ID. Used to tag Results for return to Clients
+	 * @param id New Result message ID
+	 * @return Updated Result
+	 */
 	public Result withID(ACell id) {
 		return create(values.assoc(0, id));
 	}

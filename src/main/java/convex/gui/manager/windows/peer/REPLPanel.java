@@ -6,7 +6,6 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.concurrent.Future;
@@ -107,7 +106,7 @@ public class REPLPanel extends JPanel {
 		try {
 			// Connect to peer as a client
 			convex = Convex.connect(addr, getAddress(),getKeyPair());
-		} catch (IOException ex) {
+		} catch (Exception ex) {
 			throw Utils.sneakyThrow(ex);
 		}
 

@@ -18,18 +18,34 @@ import convex.core.lang.RT;
 import convex.test.Samples;
 
 public class SignedDataTest {
+	@SuppressWarnings("unchecked")
 	@Test
 	public void testBadSignature() {
 		Ref<CVMLong> dref = Ref.get(RT.cvm(13L));
 		SignedData<CVMLong> sd = SignedData.create(Samples.BAD_ACCOUNTKEY, Samples.BAD_SIGNATURE, dref);
 
-		assertFalse(sd.isValid());
+		// should not yet be checked
+		assertFalse(sd.isSignatureChecked());
+		
+		// Signature check should fail since bad signature
+		assertFalse(sd.checkSignature());
+		
+		// should now be checked
+		assertTrue(sd.isSignatureChecked());
 
-		assertEquals(13L, sd.getValueUnchecked().longValue());
+		assertTrue((sd.getRef().getFlags()&Ref.BAD_MASK)!=0);
+		assertEquals(13L, sd.getValue().longValue());
 		assertSame(Samples.BAD_ACCOUNTKEY, sd.getAccountKey());
 		assertNotNull(sd.toString());
 
-		assertThrows(BadSignatureException.class, () -> sd.getValue());
+		assertThrows(BadSignatureException.class, () -> sd.validateSignature());
+		
+		ACell.createPersisted(sd);
+		
+		SignedData<CVMLong> sd1 = (SignedData<CVMLong>) Ref.forHash(sd.getHash()).getValue();
+		// should have cached checked signature
+		assertTrue(sd1.isSignatureChecked());
+		assertFalse(sd1.checkSignature());
 	}
 
 	@Test
@@ -38,13 +54,30 @@ public class SignedDataTest {
 
 		AKeyPair kp = InitConfigTest.HERO_KEYPAIR;
 		SignedData<CVMLong> sd = kp.signData(cl);
+		
+		// should be checked by default
+		assertTrue(sd.isSignatureChecked());
 
-		assertTrue(sd.isValid());
+		assertTrue(sd.checkSignature());
 
 		sd.validateSignature();
 		assertEquals(cl, sd.getValue());
 
 		assertTrue(sd.getDataRef().isEmbedded());
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Test 
+	public void testSignatureCache() {
+		CVMLong cl=RT.cvm(1585856457);
+		AKeyPair kp = InitConfigTest.HERO_KEYPAIR;
+		SignedData<CVMLong> sd = kp.signData(cl);
+		ACell.createPersisted(sd);
+		
+		SignedData<CVMLong> sd1 = (SignedData<CVMLong>) Ref.forHash(sd.getHash()).getValue();
+		// should have cached checked signature
+		assertTrue(sd1.isSignatureChecked());
+		assertTrue(sd1.checkSignature());
 	}
 
 	@Test
@@ -60,7 +93,7 @@ public class SignedDataTest {
 		AVector<CVMLong> v = Vectors.of(1L, 2L, 3L);
 		SignedData<AVector<CVMLong>> sd = kp.signData(v);
 
-		assertTrue(sd.isValid());
+		assertTrue(sd.checkSignature());
 
 		sd.validateSignature();
 		assertEquals(v, sd.getValue());

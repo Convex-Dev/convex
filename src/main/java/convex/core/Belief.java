@@ -172,38 +172,39 @@ public class Belief extends ARecord {
 				MapEntry<AccountKey,SignedData<Order>> be=bOrders.entryAt(i);
 				ABlob key=be.getKey();
 				
-				// Skip merging own Key
+				// Skip merging own Key. We should always have our own latest Order
 				if(key.equalsBytes(mc.getAccountKey())) continue; 
 				
 				SignedData<Order> a=result.get(key);
 				if (a == null) {result=result.assocEntry(be); continue;}
 				SignedData<Order> b=be.getValue();
-				
 				if (b == null) continue;
+				
+				// Check signature
+				if (!b.checkSignature()) {
+					// TODO: Better handling than just ignoring, e.g. slashing?
+					continue;
+				};
+				
 				if (a.equals(b)) continue; // PERF: fast path for no changes
 
-				try {
-					Order ac = a.getValue();
-					Order bc = b.getValue();
+				Order ac = a.getValue();
+				Order bc = b.getValue();
 
-					// TODO: penalise inconsistency?
-					// TODO: check for forks / inconsistent values?
-					// TODO: check logic?
+				// TODO: penalise inconsistency?
+				// TODO: check for forks / inconsistent values?
+				// TODO: check logic?
 
-					// prefer advanced consensus first!
-					if (bc.getConsensusPoint() > ac.getConsensusPoint()) {result=result.assocEntry(be); continue;};
+				// prefer advanced consensus first!
+				if (bc.getConsensusPoint() > ac.getConsensusPoint()) {result=result.assocEntry(be); continue;};
 
-					// prefer longer orders, must be later?
-					if (bc.getBlockCount() > ac.getBlockCount()) {result=result.assocEntry(be); continue;};
+				// prefer longer orders, must be later?
+				if (bc.getBlockCount() > ac.getBlockCount()) {result=result.assocEntry(be); continue;};
 
-					// prefer advanced proposals
-					if (bc.getProposalPoint() > ac.getProposalPoint()) {result=result.assocEntry(be); continue;};
+				// prefer advanced proposals
+				if (bc.getProposalPoint() > ac.getProposalPoint()) {result=result.assocEntry(be); continue;};
 
-					// keep current view (more stable?)
-				} catch (BadSignatureException e) {
-					// TODO: figure out if/when this can happen?
-					throw Utils.sneakyThrow(e);
-				}
+				// keep current view (more stable?)
 			}
 		}
 		return result;

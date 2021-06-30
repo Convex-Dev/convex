@@ -67,7 +67,7 @@ public class Ed25519Test {
 		
 		ACell data=RT.cvm(1L);
 		SignedData<ACell> sd1=kp1.signData(data);
-		assertTrue(sd1.isValid());
+		assertTrue(sd1.checkSignature());
 		
 		byte[] privateKeyBytes=kp1.getPrivate().getEncoded();
 		
@@ -77,7 +77,7 @@ public class Ed25519Test {
 		assertArrayEquals(privateKeyBytes,kp2.getPrivate().getEncoded());
 		
 		SignedData<ACell> sd2=kp2.signData(data);
-		assertTrue(sd2.isValid());
+		assertTrue(sd2.checkSignature());
 		
 		Blob pkb=Ed25519KeyPair.extractPrivateKey(priv);
 		AKeyPair kp3=Ed25519KeyPair.create(address, pkb);

@@ -58,7 +58,7 @@ import convex.core.util.Utils;
 public class Etch {
 	// structural constants for data block
 	private static final int KEY_SIZE=32;
-	private static final int LABEL_SIZE=1+8; // status plus Memory Size long
+	private static final int LABEL_SIZE=1+8; // Flags (byte) plus Memory Size (long)
 	private static final int LENGTH_SIZE=2;
 	private static final int POINTER_SIZE=8;
 	
@@ -715,7 +715,7 @@ public class Etch {
 	private Ref<ACell> writeNewData(long indexPosition, int digit, AArrayBlob key, Ref<ACell> value, long type) throws IOException {
 		long newDataPointer=appendData(key,value)|type;
 		writeSlot(indexPosition, digit, newDataPointer);
-		return value.withMinimumStatus(Ref.STORED);
+		return value;
 	}
 	
     /**

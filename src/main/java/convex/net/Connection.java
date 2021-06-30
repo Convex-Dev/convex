@@ -15,10 +15,12 @@ import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import convex.core.Constants;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
@@ -132,6 +134,7 @@ public class Connection {
 	 * @param store         Store to use for this Connection
 	 * @return New Connection instance
 	 * @throws IOException If connection fails because of any IO problem
+	 * @throws TimeoutException If connection cannot be established within an acceptable time (~5s)
 	 */
 	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store) throws IOException {
 		return connect(hostAddress, receiveAction, store, null);
@@ -155,10 +158,14 @@ public class Connection {
 		AccountKey trustedPeerKey
 	) throws IOException {
 		if (store == null) throw new Error("Connection requires a store");
-		SocketChannel clientChannel = SocketChannel.open(hostAddress);
+		SocketChannel clientChannel = SocketChannel.open();
 		clientChannel.configureBlocking(false);
+		clientChannel.connect(hostAddress);
 
+		long start=Utils.getCurrentTimestamp();
 		while (!clientChannel.finishConnect()) {
+			long now=Utils.getCurrentTimestamp();
+			if (now>start+Constants.DEFAULT_CLIENT_TIMEOUT) throw new TimeoutException("Couldn't connect");
 			try {
 				Thread.sleep(100);
 			} catch (InterruptedException e) {
