@@ -66,7 +66,6 @@ public class Helpers {
 	 */
 	public static Convex connect(String hostname, int port, Address address, AKeyPair keyPair) {
 		InetSocketAddress host=new InetSocketAddress(hostname, port);
-		System.out.printf("Connecting to peer: %s\n", host);
 		Convex convex;
 		try {
 			convex=Convex.connect(host, address, keyPair);

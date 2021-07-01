@@ -299,7 +299,7 @@ public class Server implements Closeable {
 			}
 
 			lastOwnTransactionTimestamp=Utils.getCurrentTimestamp();
-			
+
 			// set running status now, so that loops don't terminate
 			isRunning = true;
 
@@ -308,7 +308,7 @@ public class Server implements Closeable {
 			connectionThread.setDaemon(true);
 			connectionThread.start();
 
-			
+
 			receiverThread = new Thread(receiverLoop, "Receive queue worker loop serving port: " + port);
 			receiverThread.setDaemon(true);
 			receiverThread.start();
@@ -434,7 +434,7 @@ public class Server implements Closeable {
 				processTransact(m);
 				break;
 			case GOODBYE:
-				m.getPeerConnection().close();
+				processClose(m);
 				break;
 			case STATUS:
 				processStatus(m);
@@ -515,6 +515,17 @@ public class Server implements Closeable {
 	}
 
 	/**
+	 * Called by a remote peer to close connections to the remote peer.
+	 *
+	 */
+	private void processClose(Message m) {
+		SignedData<AccountKey> signedPeerKey = m.getPayload();
+		AccountKey remotePeerKey = RT.ensureAccountKey(signedPeerKey.getValue());
+		manager.closeConnection(remotePeerKey);
+		raiseServerChange("conection change");
+	}
+
+	/**
 	 * Checks if received data fulfils the requirement for a partial message If so,
 	 * process the message again.
 	 *
@@ -571,7 +582,7 @@ public class Server implements Closeable {
 	 */
 	protected boolean maybeUpdateBelief() throws InterruptedException {
 		long oldConsensusPoint = peer.getConsensusPoint();
-		
+
 		// possibly have own transactions to publish
 		maybePostOwnTransactions(newTransactions);
 
@@ -665,7 +676,7 @@ public class Server implements Closeable {
 		synchronized (transactionList) {
 			State s=getPeer().getConsensusState();
 			long ts=Utils.getCurrentTimestamp();
-			
+
 			// If no connections yet, don't try this
 			if (manager.getConnectionCount()==0) return;
 
@@ -839,7 +850,19 @@ public class Server implements Closeable {
 	}
 
 	private void processResponse(Message m) {
-		manager.processResponse(m,peer);
+		AccountKey trustedPeerKey = manager.processResponse(m,peer);
+		if (trustedPeerKey != null) {
+			try {
+				InetSocketAddress hostAddress = manager.getConnection(trustedPeerKey).getRemoteAddress();
+				// manager.closeConnection(trustedPeerKey);
+				// reconnect as a trusted peer
+				connectToPeer(trustedPeerKey, hostAddress, trustedPeerKey);
+			} catch (IOException | TimeoutException e) {
+				log.warning("Cannot connect to remote peer " + e);
+			}
+			raiseServerChange("new trusted connection");
+		}
+
 	}
 
 	private void processQuery(Message m) {
@@ -1129,6 +1152,12 @@ public class Server implements Closeable {
 			persistPeerData();
 		}
 
+		SignedData<ACell> signedPeerKey = peer.sign(peer.getPeerKey());
+		Message msg = Message.createGoodBye(signedPeerKey);
+
+		// broadcast GOODBYE message to all peers trusted or not
+		manager.broadcast(msg, false);
+
 		isRunning = false;
 		if (updateThread != null) updateThread.interrupt();
 		if (receiverThread != null) receiverThread.interrupt();
@@ -1176,12 +1205,17 @@ public class Server implements Closeable {
 	 *
 	 * @param peerKey
 	 * @param hostAddress
+	 * @param trustedPeerKey Peer account key of the trusted peer.
 	 * @return The newly created connection
 	 * @throws IOException
-	 * @throws TimeoutException 
+	 * @throws TimeoutException
 	 */
-	public Connection connectToPeer(AccountKey peerKey, InetSocketAddress hostAddress) throws IOException, TimeoutException {
-		Connection pc = Connection.connect(hostAddress, peerReceiveAction, getStore());
+	public Connection connectToPeer(
+		AccountKey peerKey,
+		InetSocketAddress hostAddress,
+		AccountKey trustedPeerKey
+	) throws IOException, TimeoutException {
+		Connection pc = Connection.connect(hostAddress, peerReceiveAction, getStore(), trustedPeerKey);
 		manager.setConnection(peerKey, pc);
 		return pc;
 	}
@@ -1200,7 +1234,7 @@ public class Server implements Closeable {
 			try {
 				log.log(LEVEL_SERVER, getHostname() + ": connecting too " + peerHostname.toString());
 				InetSocketAddress peerAddress = Utils.toInetSocketAddress(peerHostname.toString());
-				connectToPeer(peerKey, peerAddress);
+				connectToPeer(peerKey, peerAddress, null);
 			} catch (IOException | TimeoutException e) {
 				log.warning("cannot connect to peer " + peerHostname.toString());
 			}

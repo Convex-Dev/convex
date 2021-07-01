@@ -52,6 +52,10 @@ public class Message {
 		return create(null,MessageType.RESPONSE, response);
 	}
 
+	public static Message createGoodBye(SignedData<ACell> peerKey) {
+		return create(null,MessageType.GOODBYE, peerKey);
+	}
+
     public Connection getPeerConnection() {
 		return peerConnection;
 	}
