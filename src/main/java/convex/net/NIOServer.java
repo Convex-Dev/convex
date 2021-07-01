@@ -54,6 +54,12 @@ public class NIOServer implements Closeable {
 		this.receiveQueue=receiveQueue;
 	}
 
+	/**
+	 * Creates a new unlaunched NIO server
+	 * @param server Peer Server instance for this NIOServer
+	 * @param receiveQueue Queue for received messages
+	 * @return New NIOServer instance
+	 */
 	public static NIOServer create(Server server, BlockingQueue<Message> receiveQueue) {
 		return new NIOServer(server,receiveQueue);
 	}

@@ -226,18 +226,17 @@ public class ConnectionManager {
 		}
 	}
 
-
 	/**
 	 *
 	 * @param msg Message to broadcast
 	 *
-	 * @param isTrusted Only broadcast to trusted peers
+	 * @param requireTrusted If true, only broadcast to trusted peers
 	 *
 	 */
-	public synchronized void broadcast(Message msg, boolean isTrusted) {
+	public synchronized void broadcast(Message msg, boolean requireTrusted) {
 		for (Connection pc : connections.values()) {
 			try {
-				if ( (isTrusted && pc.isTrusted()) || !isTrusted) {
+				if ( (requireTrusted && pc.isTrusted()) || !requireTrusted) {
 					pc.sendMessage(msg);
 				}
 			} catch (IOException e) {

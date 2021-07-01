@@ -222,7 +222,7 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Creates a Server with a given config. Reference to config is kept: don't
+	 * Creates a new unlaunched Server with a given config. Reference to config is kept: don't
 	 * mutate elsewhere.
 	 *
 	 * @param config
@@ -284,6 +284,9 @@ public class Server implements Closeable {
 		return (AHashMap<AccountKey, AString>) result;
 	}
 
+	/**
+	 * Launch the Peer Server, including all main server threads
+	 */
 	public synchronized void launch() {
 		Object p = config.get(Keywords.PORT);
 		Integer port = (p == null) ? null : Utils.toInt(p);
@@ -319,7 +322,7 @@ public class Server implements Closeable {
 			updateThread.start();
 
 
-			// Close server on shutdown, must be before Etch stores
+			// Close server on shutdown, should be before Etch stores in priority
 			Shutdown.addHook(Shutdown.SERVER, new Runnable() {
 				@Override
 				public void run() {
@@ -369,6 +372,7 @@ public class Server implements Closeable {
 			throw new Error("Failed to join network, we want Network ID "+peer.getNetworkID()+" but remote Peer repoerted "+remoteNetworkID);
 		}
 
+		// TODOL
 		AHashMap<ABlob, AString> buildPeerList = (AHashMap<ABlob, AString>) values.get(3);
 
 		AHashMap<AccountKey, AString> statusPeerList = Maps.empty();
@@ -608,7 +612,8 @@ public class Server implements Closeable {
 		// Broadcast latest Belief to connected Peers
 		SignedData<Belief> sb = peer.getSignedBelief();
 		Message msg = Message.createBelief(sb);
-        // at the moment broadcast to all peers trusted or not
+		
+        // at the moment broadcast to all peers trusted or not TODO: recheck this
 		manager.broadcast(msg, false);
 
 		// Report transaction results
@@ -764,9 +769,8 @@ public class Server implements Closeable {
 			Hash beliefHash=peer.getSignedBelief().getHash();
 			Hash stateHash=peer.getStates().getHash();
 			Hash initialStateHash=peer.getStates().get(0).getHash();
-			AHashMap<AccountKey, AString> peerList = getPeerStatusConnectList();
 
-			AVector<ACell> reply=Vectors.of(beliefHash,stateHash,initialStateHash,peerList);
+			AVector<ACell> reply=Vectors.of(beliefHash,stateHash,initialStateHash);
 
 			pc.sendResult(m.getID(), reply);
 		} catch (Throwable t) {
@@ -1198,7 +1202,7 @@ public class Server implements Closeable {
 				continue;
 			}
 			try {
-				log.log(LEVEL_SERVER, getHostname() + ": connecting too " + peerHostname.toString());
+				log.log(LEVEL_SERVER, getHostname() + ": connecting to " + peerHostname.toString());
 				InetSocketAddress peerAddress = Utils.toInetSocketAddress(peerHostname.toString());
 				connectToPeer(peerKey, peerAddress);
 			} catch (IOException | TimeoutException e) {
