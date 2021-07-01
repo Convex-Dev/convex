@@ -29,7 +29,7 @@ public class MessageReceiverTest {
 		// null Queue OK, we aren't queueing with our custom receive action
 		MessageReceiver mr = new MessageReceiver(a -> received.add(a), null);
 		MemoryByteChannel chan = MemoryByteChannel.create(10000);
-		Connection pc = Connection.create(chan, null,Stores.current());
+		Connection pc = Connection.create(chan, null, Stores.current(), null);
 
 		ACell msg1 = RT.cvm("Hello World!");
 		assertTrue(pc.sendData(msg1));

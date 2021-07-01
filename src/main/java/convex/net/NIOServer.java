@@ -209,7 +209,7 @@ public class NIOServer implements Closeable {
 				log.warning("Interrupted while attempting to add to receive queue");
 				Thread.currentThread().interrupt();
 			}
-		},store);
+		},store,null);
 	}
 
 	protected void selectRead(SelectionKey key) throws IOException {
