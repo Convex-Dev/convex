@@ -52,16 +52,6 @@ public class ConnectionManager {
 	}
 
 	/**
-	 * Remove the connection, but do not close it.
-	 *
-	 * @param peerKey to remove from the list of connections
-	 *
-	 */
-	public synchronized void removeConnection(AccountKey peerKey) {
-		connections.remove(peerKey);
-	}
-
-	/**
 	 * Close and remove the connection
 	 *
 	 * @param peerKey Peer key linked to the connection to close and remove.
