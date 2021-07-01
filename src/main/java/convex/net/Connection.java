@@ -154,6 +154,7 @@ public class Connection {
 	 * @param trustedPeerKey    Trusted peer account key if this is a trusted conneciton, if not then null
 	 * @return New Connection instance
 	 * @throws IOException If connection fails because of any IO problem
+	 * @throws TimeoutException If the connection cannot be established within the timeout period
 	 */
 	public static Connection connect(
 		InetSocketAddress hostAddress,

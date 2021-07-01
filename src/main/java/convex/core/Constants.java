@@ -47,7 +47,7 @@ public class Constants {
 	 */
 	public static final long MEMORY_OVERHEAD = 64;
 
-	public static final long DEFAULT_CLIENT_TIMEOUT = 10000;
+	public static final long DEFAULT_CLIENT_TIMEOUT = 3000;
 
 	/**
 	 * Allowance for initial user / peer accounts

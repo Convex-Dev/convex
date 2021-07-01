@@ -28,7 +28,7 @@ public class ConnectionManager {
 
 	static final Level LEVEL_CHALLENGE_RESPONSE = Level.FINEST;
 
-	private final Server server;
+	protected final Server server;
 	private final HashMap<AccountKey,Connection> connections = new HashMap<>();
 
 	/**

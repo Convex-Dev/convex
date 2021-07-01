@@ -121,10 +121,9 @@ public class PeerManager implements IServerEvent {
 			throw new Error("Failed to join network: Cannot connect to remote peer at "+remotePeerHostname);
 		}
 
-
 		AVector<ACell> values = result.getValue();
 		Hash beliefHash = RT.ensureHash(values.get(0));
-		Hash stateHash = RT.ensureHash(values.get(1));
+		// Hash stateHash = RT.ensureHash(values.get(1));
 
 		long timeout = TRANSACTION_TIMEOUT_MILLIS;
 		try {
