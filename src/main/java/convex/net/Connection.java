@@ -75,9 +75,8 @@ public class Connection {
 
 	/**
 	 * If trusted, the Account Key of the remote peer.
-	 * This is immutable so trust can only be set on a new connection.
 	 */
-	private final AccountKey trustedPeerKey;
+	private AccountKey trustedPeerKey;
 
 	private static final Logger log = Logger.getLogger(Connection.class.getName());
 

@@ -143,12 +143,6 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	}
 
 	@Override
-	public boolean isEmbedded() {
-		// Keywords are always embedded
-		return true;
-	}
-
-	@Override
 	public byte getTag() {
 		return Tag.KEYWORD;
 	}
