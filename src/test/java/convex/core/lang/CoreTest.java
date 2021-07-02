@@ -1461,8 +1461,16 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(reduced)"));
 		assertArityError(step("(reduced 1 2)"));
 
-		// reduced on its own is an exceptional result
+		// reduced on its own is an :EXCEPTION Error
 		assertError(ErrorCodes.EXCEPTION,step("(reduced 1)"));
+		
+		// reduced cannot escape actor call boundary
+		{
+			Context<?> ctx=context();
+			ctx=step(ctx,"(def act (deploy `(do (defn foo [] (reduced 1)) (export foo))))");
+			ctx=step(ctx,"(reduce (fn [_ _] (call act (foo))) nil [nil])");
+			assertError(ErrorCodes.EXCEPTION,ctx);
+		}
 	}
 
 	@Test
@@ -1521,7 +1529,7 @@ public class CoreTest extends ACVMTest {
 		// TODO: think about letrec?
 		assertDepthError(step("(do   (def f (fn [x] (recur (f x))))   (f 1))"));
 
-		// basic return mechanics
+		// Recur on its own is an :EXCEPTION Error
 		assertError(ErrorCodes.EXCEPTION,step("(recur 1)"));
 	}
 
@@ -1549,7 +1557,7 @@ public class CoreTest extends ACVMTest {
 		// check we aren't consuming stack, should fail with :JUICE not :DEPTH
 		assertJuiceError(step("(do (def f (fn [x] (tailcall (f x)))) (f 1))"));
 
-		// basic return mechanics
+		// tailcall on its own is an :EXCEPTION Error
 		assertError(ErrorCodes.EXCEPTION,step("(tailcall (count 1))"));
 	}
 

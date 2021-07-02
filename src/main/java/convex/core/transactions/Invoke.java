@@ -3,7 +3,6 @@ package convex.core.transactions;
 import java.nio.ByteBuffer;
 
 import convex.core.Constants;
-import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Format;
@@ -15,10 +14,6 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Reader;
-import convex.core.lang.impl.AExceptional;
-import convex.core.lang.impl.HaltValue;
-import convex.core.lang.impl.ReturnValue;
-import convex.core.lang.impl.RollbackValue;
 import convex.core.util.Utils;
 
 /**
@@ -95,28 +90,13 @@ public class Invoke extends ATransaction {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> Context<T> apply(final Context<?> context) {
-		State initialState=context.getState();
 		Context<T> ctx=(Context<T>) context;
 		
 		// Run command
 		if (command instanceof AOp) {
-			ctx = ctx.execute((AOp<T>) command);
+			ctx = ctx.run((AOp<T>) command);
 		} else {
-			ctx = ctx.eval(command);
-		}
-		
-		// Handle exceptional return cases
-		if (ctx.isExceptional()) {
-			AExceptional ex=ctx.getExceptional();
-			if (ex instanceof HaltValue) {
-				ctx=ctx.withResult(((HaltValue<T>)ex).getValue());
-			} else if (ex instanceof ReturnValue) {
-				ctx=ctx.withResult(((ReturnValue<T>)ex).getValue());
-			} else if (ex instanceof RollbackValue) {
-				ctx=ctx.withResult(((RollbackValue<T>)ex).getValue());
-				ctx=ctx.withState(initialState);
-			}
-			// Other exceptional cases fall through
+			ctx = ctx.run(command);
 		}
 		return (Context<T>) ctx;
 	}

@@ -37,6 +37,7 @@ import convex.core.lang.impl.ATrampoline;
 import convex.core.lang.impl.ErrorValue;
 import convex.core.lang.impl.HaltValue;
 import convex.core.lang.impl.RecurValue;
+import convex.core.lang.impl.Reduced;
 import convex.core.lang.impl.ReturnValue;
 import convex.core.lang.impl.RollbackValue;
 import convex.core.lang.impl.TailcallValue;
@@ -880,7 +881,7 @@ public class Context<T extends ACell> extends AObject {
 	 *
 	 * Returning an updated context containing the result or an exceptional error.
 	 *
-	 * @param <I> Return type of the Op
+	 * @param <R> Return type of the Op
 	 * @param op Op to execute
 	 * @return Updated Context
 	 */
@@ -891,6 +892,23 @@ public class Context<T extends ACell> extends AObject {
 		// must handle state results like halt, rollback etc.
 		return handleStateResults(ctx,false);
 	}
+	
+	/**
+	 * Executes a form at the top level in a new forked Context. Handles top level halt, recur and return.
+	 *
+	 * Returning an updated context containing the result or an exceptional error.
+	 *
+	 * @param <R> Return type of the Op
+	 * @param code Code to execute
+	 * @return Updated Context
+	 */
+	public <R extends ACell> Context<R> run(ACell code) {
+		Context<R> ctx=fork().eval(code);
+
+		// must handle state results like halt, rollback etc.
+		return handleStateResults(ctx,false);
+	}
+
 
 	/**
 	 * Invokes a function within this context, returning an updated context.
@@ -1208,7 +1226,6 @@ public class Context<T extends ACell> extends AObject {
 	 * @param <R> Return type of evaluation
 	 * @param form
 	 * @return Context containing the result of evaluating the specified form
-	 * @throws ExecutionException
 	 */
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> eval(ACell form) {
@@ -1225,7 +1242,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param <R>
 	 * @param address
 	 * @param form
-	 * @return
+	 * @return Updated Context
 	 */
 	public <R extends ACell> Context<R> evalAs(Address address, ACell form) {
 		Address caller=getAddress();
@@ -1642,6 +1659,13 @@ public class Context<T extends ACell> extends AObject {
 		return Context.create(state, juice, EMPTY_BINDINGS, (R)null, depth+1, getOrigin(),getAddress(), target,offer, log,null);
 	}
 
+	/**
+	 * Handle results at the end of an execution boundary (actor call, transaction etc.)
+	 * @param <R>
+	 * @param returnContext
+	 * @param rollback
+	 * @return
+	 */
 	@SuppressWarnings("unchecked")
 	private <R extends ACell> Context<R> handleStateResults(Context<R> returnContext, boolean rollback) {
 		/** Return value */
@@ -1666,7 +1690,15 @@ public class Context<T extends ACell> extends AObject {
 				rv=((ReturnValue<R>)ex).getValue();
 			} else {
 				rollback=true;
-				rv=ErrorValue.create(ErrorCodes.EXCEPTION, "Unhandled Exception with Code:"+ex.getCode());
+				String msg;
+				if (ex instanceof ATrampoline) {
+					msg="attempt to recur or tail call outside of a function body";
+				} if (ex instanceof Reduced) {
+					msg="reduced used outside of a reduce operation";
+				} else {
+					msg="Unhandled Exception with Code:"+ex.getCode();
+				}
+				rv=ErrorValue.create(ErrorCodes.EXCEPTION, msg);
 			}
 		} else {
 			rv=returnContext.getResult();
