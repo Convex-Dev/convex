@@ -132,6 +132,17 @@ public class Convex {
 		// TODO: numeric address
 		this.address = address;
 	}
+	
+	/**
+	 * Creates an anonymous connection to a Peer, suitable for queries
+	 * @param hostAddress Address of Peer
+	 * @return New Convex client instance
+	 * @throws IOException
+	 * @throws TimeoutException
+	 */
+	public static Convex connect(InetSocketAddress hostAddress) throws IOException, TimeoutException {
+		return connect(hostAddress,(Address)null, (AKeyPair)null);
+	}
 
 	/**
 	 * Create a Convex client by connecting to the specified Peer using the given
@@ -760,5 +771,7 @@ public class Convex {
 			throw new IOException("Unable to query balance", ex);
 		}
 	}
+
+
 
 }

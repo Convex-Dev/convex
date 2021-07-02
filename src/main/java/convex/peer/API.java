@@ -1,11 +1,9 @@
 package convex.peer;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeoutException;
 import java.util.logging.Logger;
 
 import convex.core.crypto.AKeyPair;
@@ -116,20 +114,17 @@ public class API {
 
 		Server genesisServer = serverList.get(0);
 
-		// go through 1..count-1 peers and join them all to peer #0
+		// go through 1..count-1 peers and join them all to the genesis Peer
 		// do this twice to allow for all of the peers to get all of the address in the group of peers
 
 		for (int i = 1; i < count; i++) {
 			Server server=serverList.get(i);
 
-			try {
-				// Join this Server to the Seer #0
-				serverList.get(i).connectToPeer(genesisServer.getPeerKey(), genesisServer.getHostAddress(), null);
-				// Join server #0 to this server
-				genesisServer.connectToPeer(server.getPeerKey(), server.getHostAddress(), null);
-			} catch (IOException | TimeoutException e) {
-				log.severe("Failed to connect peers" +e.getMessage());
-			}
+			// Join each additional Server to the Peer #0
+			serverList.get(i).connectToPeerAsync(genesisServer.getHostAddress());
+			
+			// Join server #0 to this server
+			genesisServer.connectToPeerAsync(server.getHostAddress());
 		}
 
 		// wait for the peers to sync upto 10 seconds

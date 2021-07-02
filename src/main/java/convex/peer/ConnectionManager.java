@@ -1,17 +1,30 @@
 package convex.peer;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import convex.api.Convex;
+import convex.core.Constants;
+import convex.core.Order;
 import convex.core.Peer;
+import convex.core.Result;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;
+import convex.core.store.Stores;
+import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.net.Message;
 
@@ -27,14 +40,98 @@ public class ConnectionManager {
 	private static final Logger log = Logger.getLogger(ConnectionManager.class.getName());
 
 	static final Level LEVEL_CHALLENGE_RESPONSE = Level.FINEST;
+	static final Level LEVEL_CONNECT = Level.INFO;
+	
+	/**
+	 * Pause for each iteration of Server connection loop.
+	 */
+	static final long SERVER_CONNECTION_PAUSE = 1000;
 
 	protected final Server server;
 	private final HashMap<AccountKey,Connection> connections = new HashMap<>();
 
 	/**
+	 * Planned future connections for this Peer
+	 */
+	private final HashSet<InetSocketAddress> plannedConnections=new HashSet<>();
+	
+	/**
 	 * The list of outgoing challenges that are being made to remote peers
 	 */
 	private HashMap<AccountKey, ChallengeRequest> challengeList = new HashMap<>();
+
+	private Thread connectionThread = null;
+
+	
+	/*
+	 * Runnable loop for managing server connections
+	 */
+	private Runnable connectionLoop = new Runnable() {
+		@Override
+		public void run() {
+			Stores.setCurrent(server.getStore()); // ensure the loop uses this Server's store
+			try {
+	
+				/*
+				// wait for server to join network
+				while(networkID == null && isRunning) {
+					Thread.sleep(2000);
+				}
+				*/
+				// loop while the server is running
+				long lastConsensusPoint = 0;
+	            Order lastOrder = null;
+	            
+				while (true) {
+					Thread.sleep(ConnectionManager.SERVER_CONNECTION_PAUSE);
+					
+					makePlannedConnections();
+	
+					Peer peer=server.getPeer();
+					Order order=peer.getPeerOrder();
+					// TODO: think about behaviour when the Peer leaves or joins. Should Server continue running?
+					if (order==null && lastOrder!=null) {
+						// raiseServerMessage("is out of sync with the network");
+					}
+					if (order!=null && lastOrder==null) {
+						// System.out.println(getHostname() + " has joined the network");
+						///raiseServerMessage("is in sync with the network");
+					}
+					lastOrder = order;
+					if ( lastConsensusPoint != peer.getConsensusPoint()) {
+						// only update the peer connection lists if the state has changed
+						lastConsensusPoint = peer.getConsensusPoint();
+						// raiseServerMessage("reconnect peers");
+						// manager.connectToPeers(this, getPeerStatusConnectList());
+						// send out a challenge to a peer that is not yet trusted
+						requestChallenges(peer);
+						server.raiseServerChange("consensus change");
+					}
+				}
+			} catch (InterruptedException e) {
+				/* OK? Close the thread normally */
+			} catch (Throwable e) {
+				log.severe("Unexpected exception, Terminating Server connection loop");
+				e.printStackTrace();
+			} finally {
+				connectionThread = null;
+			}
+		}
+	};
+	
+	private void makePlannedConnections() {
+		synchronized(plannedConnections) {
+			for (InetSocketAddress a: plannedConnections) {
+				Connection c=connectToPeer(a);
+				if (c==null) {
+					log.log(LEVEL_CONNECT, "Planned Connection failed to "+a);
+				} else {
+					log.log(LEVEL_CONNECT, "Planned Connection made to "+a);
+				}
+			}
+			plannedConnections.clear();
+		}
+	}
 
 
 	public ConnectionManager(Server server) {
@@ -251,5 +348,97 @@ public class ConnectionManager {
 			}
 		}
 	}
+
+	/**
+	 * Connects this Peer to a target Peer, adding the Connection to this Server's
+	 * Manager
+	 *
+	 * @param server TODO
+	 * @param peerKey
+	 * @param hostAddress
+	 * @param trustedPeerKey Peer account key of the trusted peer.
+	 * @return The newly created connection
+	 * @throws IOException
+	 * @throws TimeoutException
+	 */
+	public Connection connectToPeer(AccountKey peerKey, InetSocketAddress hostAddress, AccountKey trustedPeerKey
+	) throws IOException, TimeoutException {
+		Connection pc = Connection.connect(hostAddress, server.peerReceiveAction, server.getStore(), trustedPeerKey);
+		setConnection(peerKey, pc);
+		return pc;
+	}
+	
+	/**
+	 * Connects explicitly to a Peer at the given host address
+	 * @param hostAddress Address to connect to
+	 * @return new Connection, or null if attempt fails
+	 */
+	public Connection connectToPeer(InetSocketAddress hostAddress) {
+		try {
+			// Temp client connection
+			Convex convex=Convex.connect(hostAddress);
+			
+			Result status = convex.requestStatus().get(Constants.DEFAULT_CLIENT_TIMEOUT,TimeUnit.MILLISECONDS);
+			AVector<ACell> v=status.getValue();
+			AccountKey peerKey =RT.ensureAccountKey(v.get(3));
+			if (peerKey==null) return null;
+			
+			Connection existing=connections.get(peerKey);
+			if ((existing!=null)&&!existing.isClosed()) return existing;
+			
+			Connection newConn=convex.getConnection();
+			connections.put(peerKey, newConn);
+			return newConn;
+		} catch (InterruptedException | IOException |ExecutionException | TimeoutException e) {
+			return null;
+		} 
+	}
+	
+	/**
+	 * Schedules a request to connect to a Peer at the given host address
+	 * @param hostAddress Address to connect to
+	 */
+	public void connectToPeerAsync(InetSocketAddress hostAddress) {
+		synchronized (plannedConnections) {
+			plannedConnections.add(hostAddress);
+		}
+	}
+
+
+	protected void connectToPeers(Server server, AHashMap<AccountKey, AString> peerList) {
+		// connect to the other peers returned from the status call, or in the state list of peers
+	
+		for (AccountKey peerKey: peerList.keySet()) {
+			AString peerHostname = peerList.get(peerKey);
+			if (server.hostname.toString() == peerHostname.toString() ) {
+				continue;
+			}
+			if ( isConnected(peerKey)) {
+				continue;
+			}
+			try {
+				log.log(LEVEL_CONNECT, server.getHostname() + ": connecting to " + peerHostname.toString());
+				InetSocketAddress peerAddress = Utils.toInetSocketAddress(peerHostname.toString());
+				connectToPeer(peerKey, peerAddress, null);
+			} catch (IOException | TimeoutException e) {
+				Server.log.warning("cannot connect to peer " + peerHostname.toString());
+			}
+		}
+	}
+
+	public void start() {
+		// start connection thread
+		connectionThread = new Thread(connectionLoop, "Dynamicaly connect to other peers");
+		connectionThread.setDaemon(true);
+		connectionThread.start();
+
+	}
+
+	public void close() {
+		if (connectionThread!=null) {
+			connectionThread.interrupt();
+		}
+	}
+
 
 }

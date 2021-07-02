@@ -23,7 +23,6 @@ import convex.core.Belief;
 import convex.core.Block;
 import convex.core.BlockResult;
 import convex.core.ErrorCodes;
-import convex.core.Order;
 import convex.core.Peer;
 import convex.core.Result;
 import convex.core.State;
@@ -31,7 +30,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
-import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -93,12 +91,9 @@ public class Server implements Closeable {
 	// Maximum Pause for each iteration of Server update loop.
 	private static final long SERVER_UPDATE_PAUSE = 1L;
 
-	// Maximum Pause for each iteration of Server connection loop.
-	private static final long SERVER_CONNECTION_PAUSE = (1000 * 2);
-
-	private static final Logger log = Logger.getLogger(Server.class.getName());
+	static final Logger log = Logger.getLogger(Server.class.getName());
 	private static final Level LEVEL_BELIEF = Level.FINER;
-	private static final Level LEVEL_SERVER = Level.FINER;
+	static final Level LEVEL_SERVER = Level.FINER;
 	private static final Level LEVEL_DATA = Level.FINEST;
 	private static final Level LEVEL_PARTIAL = Level.FINER;
 
@@ -114,7 +109,7 @@ public class Server implements Closeable {
 	 * Message consumer that simply enqueues received messages. Used for outward
 	 * connections. i.e. ones this Server has made.
 	 */
-	private Consumer<Message> peerReceiveAction = new Consumer<Message>() {
+	Consumer<Message> peerReceiveAction = new Consumer<Message>() {
 		@Override
 		public void accept(Message msg) {
 			receiveQueue.add(msg);
@@ -144,7 +139,6 @@ public class Server implements Closeable {
 	private NIOServer nio;
 	private Thread receiverThread = null;
 	private Thread updateThread = null;
-	private Thread connectionThread = null;
 
 	/**
 	 * The Peer instance current state for this server. Will be updated based on peer events.
@@ -176,7 +170,7 @@ public class Server implements Closeable {
 	/**
 	 * Hostname of the peer server.
 	 */
-	private String hostname;
+	String hostname;
 
 	private IServerEvent event = null;
 
@@ -267,23 +261,6 @@ public class Server implements Closeable {
 		return hostname;
 	}
 
-	public AHashMap<AccountKey, AString> getPeerStatusConnectList() {
-		AMap<AccountKey, AString> result = Maps.empty();
-		if (getHostname() != null) {
-			result = result.assoc(peer.getPeerKey(), Strings.create(getHostname()));
-		}
-		State state = peer.getConsensusState();
-		for ( ABlob key: state.getPeers().keySet()) {
-			AccountKey peerKey = RT.ensureAccountKey(key);
-			PeerStatus peerStatus = state.getPeer(peerKey);
-			AString hostname = peerStatus.getHostname();
-			if (hostname != null) {
-				result = result.assoc(peerKey, hostname);
-			}
-		}
-		return (AHashMap<AccountKey, AString>) result;
-	}
-
 	/**
 	 * Launch the Peer Server, including all main server threads
 	 */
@@ -306,11 +283,8 @@ public class Server implements Closeable {
 			// set running status now, so that loops don't terminate
 			isRunning = true;
 
-			// start connection thread
-			connectionThread = new Thread(connectionLoop, "Dynamicaly connect to other peers");
-			connectionThread.setDaemon(true);
-			connectionThread.start();
-
+			// Start connection manager loop
+			manager.start();
 
 			receiverThread = new Thread(receiverLoop, "Receive queue worker loop serving port: " + port);
 			receiverThread.setDaemon(true);
@@ -379,7 +353,6 @@ public class Server implements Closeable {
 		} catch (BadSignatureException | InvalidDataException e) {
 			throw new Error("Cannot merge to latest belief " + e);
 		}
-
 		raiseServerChange("join network");
 
 		return true;
@@ -767,7 +740,7 @@ public class Server implements Closeable {
 			Hash stateHash=peer.getStates().getHash();
 			Hash initialStateHash=peer.getStates().get(0).getHash();
 
-			AVector<ACell> reply=Vectors.of(beliefHash,stateHash,initialStateHash);
+			AVector<ACell> reply=Vectors.of(beliefHash,stateHash,initialStateHash,getPeerKey());
 
 			pc.sendResult(m.getID(), reply);
 		} catch (Throwable t) {
@@ -840,19 +813,7 @@ public class Server implements Closeable {
 	}
 
 	private void processResponse(Message m) {
-		AccountKey trustedPeerKey = manager.processResponse(m,peer);
-		if (trustedPeerKey != null) {
-			try {
-				InetSocketAddress hostAddress = manager.getConnection(trustedPeerKey).getRemoteAddress();
-				// manager.closeConnection(trustedPeerKey);
-				// reconnect as a trusted peer
-				connectToPeer(trustedPeerKey, hostAddress, trustedPeerKey);
-			} catch (IOException | TimeoutException e) {
-				log.warning("Cannot connect to remote peer " + e);
-			}
-			raiseServerChange("new trusted connection");
-		}
-
+		manager.processResponse(m,peer);
 	}
 
 	private void processQuery(Message m) {
@@ -1027,58 +988,6 @@ public class Server implements Closeable {
 		}
 	};
 
-	/*
-	 * Runnable loop for managing server connections
-	 */
-	private Runnable connectionLoop = new Runnable() {
-		@Override
-		public void run() {
-			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
-			try {
-
-				/*
-				// wait for server to join network
-				while(networkID == null && isRunning) {
-					Thread.sleep(2000);
-				}
-				*/
-				// loop while the server is running
-				long lastConsensusPoint = 0;
-                Order lastOrder = null;
-				while (isRunning) {
-					Thread.sleep(SERVER_CONNECTION_PAUSE);
-
-					Order order=peer.getPeerOrder();
-					// TODO: think about behaviour when the Peer leaves or joins. Should Server continue running?
-					if (order==null && lastOrder!=null) {
-						// raiseServerMessage("is out of sync with the network");
-					}
-					if (order!=null && lastOrder==null) {
-						// System.out.println(getHostname() + " has joined the network");
-						///raiseServerMessage("is in sync with the network");
-					}
-					lastOrder = order;
-					if ( lastConsensusPoint != peer.getConsensusPoint()) {
-						// only update the peer connection lists if the state has changed
-						lastConsensusPoint = peer.getConsensusPoint();
-						// raiseServerMessage("reconnect peers");
-						connectToPeers(getPeerStatusConnectList());
-						// send out a challenge to a peer that is not yet trusted
-						manager.requestChallenges(peer);
-						raiseServerChange("consensus change");
-					}
-				}
-			} catch (InterruptedException e) {
-				/* OK? Close the thread normally */
-			} catch (Throwable e) {
-				log.severe("Unexpected exception, Terminating Server connection loop");
-				e.printStackTrace();
-			} finally {
-				connectionThread = null;
-			}
-		}
-	};
-
 	private void reportTransactions(Block block, BlockResult br) {
 		// TODO: consider culling old interests after some time period
 		int nTrans = block.length();
@@ -1142,16 +1051,17 @@ public class Server implements Closeable {
 			persistPeerData();
 		}
 
+		// TODO: not much point signing this?
 		SignedData<ACell> signedPeerKey = peer.sign(peer.getPeerKey());
 		Message msg = Message.createGoodBye(signedPeerKey);
 
-		// broadcast GOODBYE message to all peers trusted or not
+		// broadcast GOODBYE message to all outgoing remote peers
 		manager.broadcast(msg, false);
 
 		isRunning = false;
 		if (updateThread != null) updateThread.interrupt();
 		if (receiverThread != null) receiverThread.interrupt();
-		if (connectionThread != null) connectionThread.interrupt();
+		manager.close();
 		nio.close();
 		// Note we don't do store.close(); because we don't own the store.
 	}
@@ -1189,50 +1099,6 @@ public class Server implements Closeable {
 		return store;
 	}
 
-	/**
-	 * Connects this Peer to a target Peer, adding the Connection to this Server's
-	 * Manager
-	 *
-	 * @param peerKey
-	 * @param hostAddress
-	 * @param trustedPeerKey Peer account key of the trusted peer.
-	 * @return The newly created connection
-	 * @throws IOException
-	 * @throws TimeoutException
-	 */
-	public Connection connectToPeer(
-		AccountKey peerKey,
-		InetSocketAddress hostAddress,
-		AccountKey trustedPeerKey
-	) throws IOException, TimeoutException {
-		Connection pc = Connection.connect(hostAddress, peerReceiveAction, getStore(), trustedPeerKey);
-		manager.setConnection(peerKey, pc);
-		return pc;
-	}
-
-	protected void connectToPeers(AHashMap<AccountKey, AString> peerList) {
-		// connect to the other peers returned from the status call, or in the state list of peers
-
-		for (AccountKey peerKey: peerList.keySet()) {
-			AString peerHostname = peerList.get(peerKey);
-			if (hostname.toString() == peerHostname.toString() ) {
-				continue;
-			}
-			if ( manager.isConnected(peerKey)) {
-				continue;
-			}
-			try {
-				log.log(LEVEL_SERVER, getHostname() + ": connecting to " + peerHostname.toString());
-				InetSocketAddress peerAddress = Utils.toInetSocketAddress(peerHostname.toString());
-				connectToPeer(peerKey, peerAddress, null);
-			} catch (IOException | TimeoutException e) {
-				log.warning("cannot connect to peer " + peerHostname.toString());
-			}
-		}
-	}
-
-
-
 	public void raiseServerChange(String reason) {
 		if (event != null) {
 			ServerEvent serverEvent = ServerEvent.create(this.getServerInformation(), reason);
@@ -1242,5 +1108,14 @@ public class Server implements Closeable {
 
 	public ServerInformation getServerInformation() {
 		return ServerInformation.create(this, manager);
+	}
+
+	public void connectToPeer(InetSocketAddress hostAddress) throws IOException, TimeoutException {
+		manager.connectToPeer(hostAddress);
+
+	}
+
+	public void connectToPeerAsync(InetSocketAddress hostAddress) {
+		manager.connectToPeerAsync(hostAddress);
 	}
 }

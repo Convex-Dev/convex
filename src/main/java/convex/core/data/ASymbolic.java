@@ -40,6 +40,12 @@ public abstract class ASymbolic extends ACell {
 	}
 	
 	@Override
+	public boolean isEmbedded() {
+		// Symbolic values are always embedded
+		return true;
+	}
+	
+	@Override
 	public final int hashCode() {
 		return name.hashCode();
 	}
