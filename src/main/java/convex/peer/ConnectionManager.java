@@ -2,8 +2,10 @@ package convex.peer;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -12,15 +14,16 @@ import java.util.logging.Logger;
 
 import convex.api.Convex;
 import convex.core.Constants;
-import convex.core.Order;
 import convex.core.Peer;
 import convex.core.Result;
+import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
+import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;
 import convex.core.store.Stores;
@@ -61,6 +64,8 @@ public class ConnectionManager {
 	private HashMap<AccountKey, ChallengeRequest> challengeList = new HashMap<>();
 
 	private Thread connectionThread = null;
+	
+	private SecureRandom random=new SecureRandom();
 
 	
 	/*
@@ -71,42 +76,10 @@ public class ConnectionManager {
 		public void run() {
 			Stores.setCurrent(server.getStore()); // ensure the loop uses this Server's store
 			try {
-	
-				/*
-				// wait for server to join network
-				while(networkID == null && isRunning) {
-					Thread.sleep(2000);
-				}
-				*/
-				// loop while the server is running
-				long lastConsensusPoint = 0;
-	            Order lastOrder = null;
-	            
 				while (true) {
-					Thread.sleep(ConnectionManager.SERVER_CONNECTION_PAUSE);
-					
-					makePlannedConnections();
-	
-					Peer peer=server.getPeer();
-					Order order=peer.getPeerOrder();
-					// TODO: think about behaviour when the Peer leaves or joins. Should Server continue running?
-					if (order==null && lastOrder!=null) {
-						// raiseServerMessage("is out of sync with the network");
-					}
-					if (order!=null && lastOrder==null) {
-						// System.out.println(getHostname() + " has joined the network");
-						///raiseServerMessage("is in sync with the network");
-					}
-					lastOrder = order;
-					if ( lastConsensusPoint != peer.getConsensusPoint()) {
-						// only update the peer connection lists if the state has changed
-						lastConsensusPoint = peer.getConsensusPoint();
-						// raiseServerMessage("reconnect peers");
-						// manager.connectToPeers(this, getPeerStatusConnectList());
-						// send out a challenge to a peer that is not yet trusted
-						requestChallenges(peer);
-						server.raiseServerChange("consensus change");
-					}
+					Thread.sleep(ConnectionManager.SERVER_CONNECTION_PAUSE);				
+					makePlannedConnections();			
+					maintainConnections();		
 				}
 			} catch (InterruptedException e) {
 				/* OK? Close the thread normally */
@@ -130,6 +103,63 @@ public class ConnectionManager {
 				}
 			}
 			plannedConnections.clear();
+		}
+	}
+
+
+	protected void maintainConnections() {
+		State s=server.getPeer().getConsensusState();
+
+		AccountKey[] peers = connections.keySet().toArray(new AccountKey[connections.size()]);
+		for (AccountKey p: peers) {
+			Connection conn=connections.get(p);
+			
+			// Remove closed connections
+			if ((conn==null)||(conn.isClosed())) {
+				connections.remove(p);
+				continue;
+			}
+			
+			// Remove Peers not staked in consensus
+			PeerStatus ps=s.getPeer(p);
+			if ((ps==null)||(ps.getTotalStake()==0)) {
+				conn.close();
+				connections.remove(p);
+			}
+		}
+		
+		// refresh peers list
+		peers = connections.keySet().toArray(new AccountKey[connections.size()]);
+		
+		int targetPeerCount=5;
+		if (peers.length<targetPeerCount) {
+			// Connect to a random peer with host address by stake
+			
+			Set<AccountKey> potentialPeers=s.getPeers().keySet();
+			InetSocketAddress target=null;
+			double accStake=0.0;
+			for (ACell c:potentialPeers) {
+				AccountKey peerKey=RT.ensureAccountKey(c);
+				if (connections.containsKey(peerKey)) continue; // skip if already connected
+				PeerStatus ps=s.getPeers().get(peerKey);
+				if (ps==null) continue; // skip 
+				AString hostName=ps.getHostname();
+				if (hostName==null) continue;
+				InetSocketAddress maybeAddress=Utils.toInetSocketAddress(hostName.toString());
+				if (maybeAddress==null) continue;
+				long peerStake=ps.getTotalStake();
+				if (peerStake>0) {
+					double t=random.nextDouble()*(accStake+peerStake);
+					if (t>=accStake) {
+						target=maybeAddress;
+					}
+					accStake+=peerStake;
+				}
+			}
+			
+			if (target!=null) {
+				connectToPeer(target);
+			}
 		}
 	}
 

@@ -887,15 +887,20 @@ public class Utils {
 	 * Converts a String to an InetSocketAddress
 	 *
 	 * @param s A string in the format "http://myhost.com:17888"
-	 * @return A valid InetSocketAddress
+	 * @return A valid InetSocketAddress, or null if not in valid format
 	 */
 	public static InetSocketAddress toInetSocketAddress(String s) {
+		if (s==null) return null;
 		int colon = s.lastIndexOf(':');
-		if (colon < 0) throw new IllegalArgumentException("No port in String: " + s);
-		String hostName = s.substring(0, colon); // up to last colon
-		int port = Utils.toInt(s.substring(colon + 1)); // up to last colon
-		InetSocketAddress addr = new InetSocketAddress(hostName, port);
-		return addr;
+		if (colon < 0) return null;
+		try {
+			String hostName = s.substring(0, colon); // up to last colon
+			int port = Utils.toInt(s.substring(colon + 1)); // up to last colon
+			InetSocketAddress addr = new InetSocketAddress(hostName, port);
+			return addr;
+		} catch (Exception ex) {
+			return null;
+		}
 	}
 
 	/**

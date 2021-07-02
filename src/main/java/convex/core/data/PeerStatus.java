@@ -93,6 +93,14 @@ public class PeerStatus extends ARecord {
 		return RT.ensureString(metadata.get(Keywords.URL));
 	}
 	
+	/**
+	 * Gets the Metadata of this Peer
+	 *
+	 * @return Host String
+	 */
+	public AHashMap<Keyword, ACell> getMetadata() {
+		return metadata==null?Maps.empty():metadata;
+	}
 	
 
 	@Override
