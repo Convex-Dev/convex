@@ -52,6 +52,7 @@ public class PeerGUI extends JPanel {
 
 	public static InitConfig initConfig = InitConfig.create();
 	private static StateModel<State> latestState = StateModel.create(Init.createState(initConfig));
+	public static StateModel<Long> tickState = StateModel.create(0L);
 
 	public static long maxBlock = 0;
 
@@ -145,7 +146,9 @@ public class PeerGUI extends JPanel {
 		public void run() {
 			while (updateRunning) {
 				try {
-					Thread.sleep(30);
+					Thread.sleep(100);
+					tickState.setValue(tickState.getValue()+1);
+					
 					java.util.List<PeerView> peerViews = peerPanel.getPeerViews();
 					peerPanel.repaint();
 					State latest = latestState.getValue();
@@ -168,9 +171,10 @@ public class PeerGUI extends JPanel {
 							//String ls="PeerGUI Consensus State update detected at depth "+cp;
 							//System.err.println(ls);
 							latest = p.getConsensusState();
-							latestState.setValue(latest);
+							
 						}
 					}
+					latestState.setValue(latest); // trigger peer view repaints etc.
 
 				} catch (InterruptedException e) {
 					//

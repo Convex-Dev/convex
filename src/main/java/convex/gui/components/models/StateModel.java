@@ -48,7 +48,6 @@ public class StateModel<T> {
 	 */
 	public void setValue(T newValue) {
 		T oldValue = this.value;
-		if (oldValue == newValue) return;
 		this.value = newValue;
 		SwingUtilities.invokeLater(new Runnable() {
 			@Override

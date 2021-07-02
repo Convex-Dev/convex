@@ -196,6 +196,13 @@ public class ConnectionManager {
 			connections.remove(peerKey);
 		}
 	}
+	
+
+	public void closeAllConnections() {
+		for (Connection c:connections.values()) {
+			c.close();
+		}
+	}
 
 	/**
 	 * Gets the current set of outbound peer connections from this server
@@ -475,6 +482,8 @@ public class ConnectionManager {
 			connectionThread.interrupt();
 		}
 	}
+
+
 
 
 }

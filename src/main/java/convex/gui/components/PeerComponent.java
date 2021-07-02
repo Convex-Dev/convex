@@ -94,6 +94,14 @@ public class PeerComponent extends BaseListComponent {
 				});
 				popupMenu.add(storeButton);
 			}
+			
+			
+			JMenuItem killConn = new JMenuItem("Kill Connections");
+			killConn.addActionListener(e -> {
+				peer.peerServer.getManager().closeAllConnections();
+			});
+			popupMenu.add(killConn);
+			
 		} else {
 			JMenuItem closeButton = new JMenuItem("Close connection");
 			closeButton.addActionListener(e -> {
@@ -122,6 +130,10 @@ public class PeerComponent extends BaseListComponent {
 				});
 			}
 		}
+		
+		PeerGUI.tickState.addPropertyChangeListener(e->{
+			description.setText(peer.toString());
+		});
 
 	}
 }
