@@ -134,6 +134,8 @@ public class ConnectionManager {
 		int targetPeerCount=5;
 		if (peers.length<targetPeerCount) {
 			// Connect to a random peer with host address by stake
+			// SECURITY: stake weighted connection is important to avoid bad peers
+			// influencing the connection pool
 			
 			Set<AccountKey> potentialPeers=s.getPeers().keySet();
 			InetSocketAddress target=null;
@@ -158,6 +160,7 @@ public class ConnectionManager {
 			}
 			
 			if (target!=null) {
+				// Try to connect to Peer. If it fails, no worry, will retry another peer next time
 				connectToPeer(target);
 			}
 		}

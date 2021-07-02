@@ -621,7 +621,6 @@ public class Connection {
 							key.cancel();
 						} catch (IOException e) {
 							log.log(LEVEL_SEND, "Unexpected IOException, cancelling key: " + e.getMessage());
-							e.printStackTrace();
 							key.cancel();
 						}
 					}
