@@ -1472,7 +1472,7 @@ public class CoreTest extends ACVMTest {
 			assertError(ErrorCodes.EXCEPTION,ctx);
 		}
 		
-		// reduced can escape function call
+		// reduced can escape  nested function call
 		{
 			Context<?> ctx=context();
 			ctx=step(ctx,"(defn foo [x] (reduced x))");
