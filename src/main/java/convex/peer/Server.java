@@ -100,7 +100,7 @@ public class Server implements Closeable {
 	private static final Level LEVEL_BELIEF = Level.FINER;
 	private static final Level LEVEL_SERVER = Level.FINER;
 	private static final Level LEVEL_DATA = Level.FINEST;
-	private static final Level LEVEL_PARTIAL = Level.WARNING;
+	private static final Level LEVEL_PARTIAL = Level.FINER;
 
 	private static final Level LEVEL_INFO = Level.FINER;
 	// private static final Level LEVEL_MESSAGE = Level.FINER;
@@ -372,16 +372,6 @@ public class Server implements Closeable {
 			throw new Error("Failed to join network, we want Network ID "+peer.getNetworkID()+" but remote Peer repoerted "+remoteNetworkID);
 		}
 
-		// TODOL
-		AHashMap<ABlob, AString> buildPeerList = (AHashMap<ABlob, AString>) values.get(3);
-
-		AHashMap<AccountKey, AString> statusPeerList = Maps.empty();
-
-		for ( ABlob key: buildPeerList.keySet()) {
-			AccountKey accountKey = RT.ensureAccountKey(key);
-			statusPeerList = statusPeerList.assoc(accountKey, buildPeerList.get(key));
-		}
-
 		try {
 			if (signedBelief != null) {
 				this.peer = this.peer.mergeBeliefs(signedBelief.getValue());
@@ -389,10 +379,6 @@ public class Server implements Closeable {
 		} catch (BadSignatureException | InvalidDataException e) {
 			throw new Error("Cannot merge to latest belief " + e);
 		}
-
-		// now use the remote peer host name list returned from the status call
-		// to connect to the peers
-		connectToPeers(statusPeerList);
 
 		raiseServerChange("join network");
 
@@ -623,7 +609,7 @@ public class Server implements Closeable {
 		// Broadcast latest Belief to connected Peers
 		SignedData<Belief> sb = peer.getSignedBelief();
 		Message msg = Message.createBelief(sb);
-		
+
         // at the moment broadcast to all peers trusted or not TODO: recheck this
 		manager.broadcast(msg, false);
 
