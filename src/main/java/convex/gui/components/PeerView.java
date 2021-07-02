@@ -10,6 +10,7 @@ import convex.core.data.PeerStatus;
 import convex.core.util.Text;
 import convex.gui.components.models.StateModel;
 import convex.gui.manager.PeerGUI;
+import convex.peer.ConnectionManager;
 import convex.peer.Server;
 
 /**
@@ -39,6 +40,9 @@ public class PeerView {
 				sb.append("    ");
 				sb.append("Delegated Stake:  "+Text.toFriendlyBalance(ps.getDelegatedStake()));
 			}
+			ConnectionManager cm=peerServer.getManager();
+			sb.append("\n");
+			sb.append("Connections: "+cm.getConnectionCount());
 		} else if (peerConnection != null) {
 			sb.append("Remote peer at: " + peerConnection.getRemoteAddress()+"\n");
 		} else {

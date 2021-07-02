@@ -269,7 +269,6 @@ public class Server implements Closeable {
 			nio.launch(port);
 			port = nio.getPort(); // get the actual port (may be auto-allocated)
 
-
 			hostname = String.format("localhost:%d", port);
 			if (config.containsKey(Keywords.URL)) {
 				hostname = (String) config.get(Keywords.URL);
@@ -1113,5 +1112,9 @@ public class Server implements Closeable {
 
 	public void connectToPeerAsync(InetSocketAddress hostAddress) {
 		manager.connectToPeerAsync(hostAddress);
+	}
+
+	public ConnectionManager getManager() {
+		return manager;
 	}
 }

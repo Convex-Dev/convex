@@ -147,6 +147,7 @@ public class PeerGUI extends JPanel {
 				try {
 					Thread.sleep(30);
 					java.util.List<PeerView> peerViews = peerPanel.getPeerViews();
+					peerPanel.repaint();
 					State latest = latestState.getValue();
 					for (PeerView s : peerViews) {
 						s.checkPeer();

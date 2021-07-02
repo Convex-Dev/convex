@@ -143,6 +143,9 @@ public class ConnectionManager {
 			for (ACell c:potentialPeers) {
 				AccountKey peerKey=RT.ensureAccountKey(c);
 				if (connections.containsKey(peerKey)) continue; // skip if already connected
+				
+				if (server.getPeerKey().equals(peerKey)) continue; // don't connect to self!!
+				
 				PeerStatus ps=s.getPeers().get(peerKey);
 				if (ps==null) continue; // skip 
 				AString hostName=ps.getHostname();

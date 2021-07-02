@@ -269,6 +269,13 @@ public class UtilsTest {
 		String s = "http://www.something-unusual.com:18888";
 		InetSocketAddress sa = Utils.toInetSocketAddress(s);
 		assertNotNull(sa);
+		
+		assertNotNull(Utils.toInetSocketAddress("localhost:8080"));
+		assertNotNull(Utils.toInetSocketAddress("12.13.14.15:8080"));
+		assertNotNull(Utils.toInetSocketAddress("http:12.13.14.15:8080"));
+		
+		assertNull(Utils.toInetSocketAddress("@@@"));
+
 	}
 
 	@Test
