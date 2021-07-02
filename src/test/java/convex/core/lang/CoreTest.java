@@ -1471,6 +1471,15 @@ public class CoreTest extends ACVMTest {
 			ctx=step(ctx,"(reduce (fn [_ _] (call act (foo))) nil [nil])");
 			assertError(ErrorCodes.EXCEPTION,ctx);
 		}
+		
+		// reduced can escape function call
+		{
+			Context<?> ctx=context();
+			ctx=step(ctx,"(defn foo [x] (reduced x))");
+			ctx=step(ctx,"(reduce (fn [i x] (foo x)) nil [1 2])");
+			assertCVMEquals(1L,ctx.getResult());
+		}
+
 	}
 
 	@Test
