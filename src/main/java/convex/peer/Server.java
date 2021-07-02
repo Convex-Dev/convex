@@ -27,9 +27,7 @@ import convex.core.Peer;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
-import convex.core.data.ABlob;
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -39,7 +37,6 @@ import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
-import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
@@ -310,7 +307,6 @@ public class Server implements Closeable {
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	public boolean joinNetwork(AKeyPair keyPair, Address address, String remoteHostname, SignedData<Belief> signedBelief) {
 		if (remoteHostname == null) {
 			return false;

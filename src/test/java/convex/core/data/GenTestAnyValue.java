@@ -79,7 +79,7 @@ public class GenTestAnyValue {
 	@Property
 	public void validEmbedded(@From(ValueGen.class) ACell o) throws InvalidDataException, BadFormatException {
 		if (Format.isEmbedded(o)) {
-			// shouldn't need to persist embedded data
+			ACell.createPersisted(o); // may have child refs to persist
 			Blob data=Format.encodedBlob(o);
 			
 			ACell o2=Format.read(data);
@@ -95,7 +95,7 @@ public class GenTestAnyValue {
 			assertTrue(ref.isDirect()); 
 			assertEquals(data,ref.getEncoding()); // should encode ref same as value
 		} else {
-			// when we persist a ref to non-embedeed object, should be a ref type
+			// when we persist a ref to non-embedded object, should be a ref type
 			Ref<?> ref=Ref.get(o);
 			Blob b=ref.getEncoding();
 			assertEquals(Tag.REF,b.byteAt(0));
