@@ -4,7 +4,6 @@ import static convex.test.Assertions.assertNobodyError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
 
@@ -29,7 +28,7 @@ public class PeerTest {
 		// initial checks
 		long timestamp = p.getTimeStamp();
 		assertEquals(timestamp, Constants.INITIAL_TIMESTAMP);
-		assertSame(STATE, p.getConsensusState());
+		assertEquals(STATE, p.getConsensusState());
 
 		// Belief check
 		AccountKey peerKey = p.getPeerKey();
