@@ -959,7 +959,9 @@ public class Server implements Closeable {
 				while (isRunning) {
 
 					// Try belief update
-					maybeUpdateBelief();
+					if (maybeUpdateBelief() ) {
+						raiseServerChange("consensus");
+					}
 
 					// Maybe sleep a bit, wait for some belief updates to accumulate
 					if (hasNewMessages) {

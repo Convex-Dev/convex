@@ -43,8 +43,8 @@ public class ConnectionManager {
 	private static final Logger log = Logger.getLogger(ConnectionManager.class.getName());
 
 	static final Level LEVEL_CHALLENGE_RESPONSE = Level.FINEST;
-	static final Level LEVEL_CONNECT = Level.INFO;
-	
+	static final Level LEVEL_CONNECT = Level.FINER;
+
 	/**
 	 * Pause for each iteration of Server connection loop.
 	 */
@@ -57,17 +57,17 @@ public class ConnectionManager {
 	 * Planned future connections for this Peer
 	 */
 	private final HashSet<InetSocketAddress> plannedConnections=new HashSet<>();
-	
+
 	/**
 	 * The list of outgoing challenges that are being made to remote peers
 	 */
 	private HashMap<AccountKey, ChallengeRequest> challengeList = new HashMap<>();
 
 	private Thread connectionThread = null;
-	
+
 	private SecureRandom random=new SecureRandom();
 
-	
+
 	/*
 	 * Runnable loop for managing server connections
 	 */
@@ -77,9 +77,9 @@ public class ConnectionManager {
 			Stores.setCurrent(server.getStore()); // ensure the loop uses this Server's store
 			try {
 				while (true) {
-					Thread.sleep(ConnectionManager.SERVER_CONNECTION_PAUSE);				
-					makePlannedConnections();			
-					maintainConnections();		
+					Thread.sleep(ConnectionManager.SERVER_CONNECTION_PAUSE);
+					makePlannedConnections();
+					maintainConnections();
 				}
 			} catch (InterruptedException e) {
 				/* OK? Close the thread normally */
@@ -91,7 +91,7 @@ public class ConnectionManager {
 			}
 		}
 	};
-	
+
 	private void makePlannedConnections() {
 		synchronized(plannedConnections) {
 			for (InetSocketAddress a: plannedConnections) {
@@ -113,13 +113,13 @@ public class ConnectionManager {
 		AccountKey[] peers = connections.keySet().toArray(new AccountKey[connections.size()]);
 		for (AccountKey p: peers) {
 			Connection conn=connections.get(p);
-			
+
 			// Remove closed connections
 			if ((conn==null)||(conn.isClosed())) {
 				connections.remove(p);
 				continue;
 			}
-			
+
 			// Remove Peers not staked in consensus
 			PeerStatus ps=s.getPeer(p);
 			if ((ps==null)||(ps.getTotalStake()==0)) {
@@ -127,27 +127,27 @@ public class ConnectionManager {
 				connections.remove(p);
 			}
 		}
-		
+
 		// refresh peers list
 		peers = connections.keySet().toArray(new AccountKey[connections.size()]);
-		
+
 		int targetPeerCount=5;
 		if (peers.length<targetPeerCount) {
 			// Connect to a random peer with host address by stake
 			// SECURITY: stake weighted connection is important to avoid bad peers
 			// influencing the connection pool
-			
+
 			Set<AccountKey> potentialPeers=s.getPeers().keySet();
 			InetSocketAddress target=null;
 			double accStake=0.0;
 			for (ACell c:potentialPeers) {
 				AccountKey peerKey=RT.ensureAccountKey(c);
 				if (connections.containsKey(peerKey)) continue; // skip if already connected
-				
+
 				if (server.getPeerKey().equals(peerKey)) continue; // don't connect to self!!
-				
+
 				PeerStatus ps=s.getPeers().get(peerKey);
-				if (ps==null) continue; // skip 
+				if (ps==null) continue; // skip
 				AString hostName=ps.getHostname();
 				if (hostName==null) continue;
 				InetSocketAddress maybeAddress=Utils.toInetSocketAddress(hostName.toString());
@@ -161,7 +161,7 @@ public class ConnectionManager {
 					accStake+=peerStake;
 				}
 			}
-			
+
 			if (target!=null) {
 				// Try to connect to Peer. If it fails, no worry, will retry another peer next time
 				connectToPeer(target);
@@ -196,7 +196,7 @@ public class ConnectionManager {
 			connections.remove(peerKey);
 		}
 	}
-	
+
 
 	public void closeAllConnections() {
 		for (Connection c:connections.values()) {
@@ -381,13 +381,15 @@ public class ConnectionManager {
 	 *
 	 */
 	public synchronized void broadcast(Message msg, boolean requireTrusted) {
-		for (Connection pc : connections.values()) {
-			try {
-				if ( (requireTrusted && pc.isTrusted()) || !requireTrusted) {
-					pc.sendMessage(msg);
+		synchronized(connections) {
+			for (Connection pc : connections.values()) {
+				try {
+					if ( (requireTrusted && pc.isTrusted()) || !requireTrusted) {
+						pc.sendMessage(msg);
+					}
+				} catch (IOException e) {
+					log.warning("Error in broadcast: " + e.getMessage());
 				}
-			} catch (IOException e) {
-				log.warning("Error in broadcast: " + e.getMessage());
 			}
 		}
 	}
@@ -410,7 +412,7 @@ public class ConnectionManager {
 		setConnection(peerKey, pc);
 		return pc;
 	}
-	
+
 	/**
 	 * Connects explicitly to a Peer at the given host address
 	 * @param hostAddress Address to connect to
@@ -420,23 +422,24 @@ public class ConnectionManager {
 		try {
 			// Temp client connection
 			Convex convex=Convex.connect(hostAddress);
-			
+
 			Result status = convex.requestStatus().get(Constants.DEFAULT_CLIENT_TIMEOUT,TimeUnit.MILLISECONDS);
 			AVector<ACell> v=status.getValue();
 			AccountKey peerKey =RT.ensureAccountKey(v.get(3));
 			if (peerKey==null) return null;
-			
+
 			Connection existing=connections.get(peerKey);
 			if ((existing!=null)&&!existing.isClosed()) return existing;
-			
+
 			Connection newConn=convex.getConnection();
 			connections.put(peerKey, newConn);
+			server.raiseServerChange("connection change");
 			return newConn;
 		} catch (InterruptedException | IOException |ExecutionException | TimeoutException e) {
 			return null;
-		} 
+		}
 	}
-	
+
 	/**
 	 * Schedules a request to connect to a Peer at the given host address
 	 * @param hostAddress Address to connect to
@@ -450,7 +453,7 @@ public class ConnectionManager {
 
 	protected void connectToPeers(Server server, AHashMap<AccountKey, AString> peerList) {
 		// connect to the other peers returned from the status call, or in the state list of peers
-	
+
 		for (AccountKey peerKey: peerList.keySet()) {
 			AString peerHostname = peerList.get(peerKey);
 			if (server.hostname.toString() == peerHostname.toString() ) {
