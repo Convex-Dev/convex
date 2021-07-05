@@ -130,7 +130,7 @@ public class ConnectionManager {
 			// Remove closed connections
 			if ((conn==null)||(conn.isClosed())) {
 				closeConnection(p);
-				server.raiseServerChange("connection");
+				currentPeerCount--;
 				continue;
 			}
 
@@ -138,12 +138,14 @@ public class ConnectionManager {
 			PeerStatus ps=s.getPeer(p);
 			if ((ps==null)||(ps.getTotalStake()==0)) {
 				closeConnection(p);
-				server.raiseServerChange("connection");
 				currentPeerCount--;
 				continue;
 			}
 			
-			// Drop Peers randomly 
+			/* Drop Peers randomly if they have a small stake
+			 * This ensure that new peers will get picked up occasionally and
+			 * the distribution of peers tends towards the level of stake over time
+			 */
 			if ((millisSinceLastUpdate>0)&&(currentPeerCount>=targetPeerCount)) {
 				double prop=ps.getTotalStake()/totalStake; // proportion of stake represented by this Peer
 				// Very low chance of dropping a Peer with high stake (more than
@@ -248,6 +250,7 @@ public class ConnectionManager {
 				conn.close();
 			}
 			connections.remove(peerKey);
+			server.raiseServerChange("connection removed for "+peerKey);
 		}
 	}
 
