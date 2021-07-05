@@ -69,7 +69,9 @@ public class ConnectionManager {
 
 	private SecureRandom random=new SecureRandom();
 
-
+	/**
+	 * Timstamp for the last execution of the Connection Manager update loop.
+	 */
 	private long lastUpdate=Utils.getCurrentTimestamp();
 	
 	/*
