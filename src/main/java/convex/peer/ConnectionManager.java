@@ -129,16 +129,19 @@ public class ConnectionManager {
 		for (AccountKey p: peers) {
 			Connection conn=connections.get(p);
 
-			// Remove closed connections
+			// Remove closed connections. No point keeping these
 			if ((conn==null)||(conn.isClosed())) {
 				closeConnection(p);
 				currentPeerCount--;
 				continue;
 			}
 
-			// Remove Peers not staked in consensus
+			/**
+			 *  Always remove Peers not staked in consensus. This should eliminate Peers that have 
+			 *  withdrawn or are slashed from current consideration.
+			 */
 			PeerStatus ps=s.getPeer(p);
-			if ((ps==null)||(ps.getTotalStake()==0)) {
+			if ((ps==null)||(ps.getTotalStake()<=Constants.MINIMUM_EFFECTIVE_STAKE)) {
 				closeConnection(p);
 				currentPeerCount--;
 				continue;

@@ -97,4 +97,9 @@ public class Constants {
 	 * Number of milliseconds average time to drop low-staked Peers
 	 */
 	public static final double PEER_CONNECTION_DROP_TIME = 20000;
+
+	/**
+	 * Minimum stake for a PEer to be considered by other Peers in consensus
+	 */
+	public static final long MINIMUM_EFFECTIVE_STAKE = Coin.GOLD*1;
 }
