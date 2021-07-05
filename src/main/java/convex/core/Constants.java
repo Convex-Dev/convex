@@ -84,7 +84,17 @@ public class Constants {
 	public static final int KEY_LENGTH = 32;
 
 	/**
-	 * Length for HAsh values
+	 * Length for Hash values
 	 */
 	public static final int HASH_LENGTH = 32;
+
+	/**
+	 * Default number of outgoing connections for a Peer
+	 */
+	public static final Integer DEFAULT_OUTGOING_CONNECTION_COUNT = 20;
+
+	/**
+	 * Number of milliseconds average time to drop low-staked Peers
+	 */
+	public static final double PEER_CONNECTION_DROP_TIME = 20000;
 }

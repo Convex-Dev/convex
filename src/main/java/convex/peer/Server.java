@@ -199,7 +199,7 @@ public class Server implements Closeable {
 	private Peer establishPeer(AKeyPair keyPair, Map<Keyword, Object> config2) {
 		log.log(LEVEL_INFO, "Establishing Peer with store: "+Stores.current());
 
-		if (Utils.bool(config.get(Keywords.RESTORE))) {
+		if (Utils.bool(getConfig().get(Keywords.RESTORE))) {
 			try {
 				Hash hash = store.getRootHash();
 				Peer peer = Peer.restorePeer(store, hash, keyPair);
@@ -209,7 +209,7 @@ public class Server implements Closeable {
 			}
 		}
 		log.log(LEVEL_INFO, "Defaulting to standard Peer startup.");
-		return Peer.createStartupPeer(config);
+		return Peer.createStartupPeer(getConfig());
 	}
 
 	/**
@@ -262,7 +262,7 @@ public class Server implements Closeable {
 	 * Launch the Peer Server, including all main server threads
 	 */
 	public synchronized void launch() {
-		Object p = config.get(Keywords.PORT);
+		Object p = getConfig().get(Keywords.PORT);
 		Integer port = (p == null) ? null : Utils.toInt(p);
 
 		try {
@@ -270,8 +270,8 @@ public class Server implements Closeable {
 			port = nio.getPort(); // get the actual port (may be auto-allocated)
 
 			hostname = String.format("localhost:%d", port);
-			if (config.containsKey(Keywords.URL)) {
-				hostname = (String) config.get(Keywords.URL);
+			if (getConfig().containsKey(Keywords.URL)) {
+				hostname = (String) getConfig().get(Keywords.URL);
 			}
 
 			lastOwnTransactionTimestamp=Utils.getCurrentTimestamp();
@@ -983,7 +983,7 @@ public class Server implements Closeable {
 	@Override
 	public synchronized void close() {
 		// persist peer state if necessary
-		if ((peer != null) && Utils.bool(config.get(Keywords.PERSIST))) {
+		if ((peer != null) && Utils.bool(getConfig().get(Keywords.PERSIST))) {
 			persistPeerData();
 		}
 
@@ -1017,7 +1017,7 @@ public class Server implements Closeable {
 	 * SECURITY: Be careful with this!
 	 */
 	private AKeyPair getKeyPair() {
-		return (AKeyPair) config.get(Keywords.KEYPAIR);
+		return (AKeyPair) getConfig().get(Keywords.KEYPAIR);
 	}
 
 	/**
@@ -1057,5 +1057,9 @@ public class Server implements Closeable {
 
 	public ConnectionManager getManager() {
 		return manager;
+	}
+
+	public HashMap<Keyword, Object> getConfig() {
+		return config;
 	}
 }

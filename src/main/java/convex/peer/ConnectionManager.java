@@ -23,6 +23,7 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
+import convex.core.data.Keywords;
 import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
@@ -69,6 +70,8 @@ public class ConnectionManager {
 	private SecureRandom random=new SecureRandom();
 
 
+	private long lastUpdate=Utils.getCurrentTimestamp();
+	
 	/*
 	 * Runnable loop for managing server connections
 	 */
@@ -77,10 +80,12 @@ public class ConnectionManager {
 		public void run() {
 			Stores.setCurrent(server.getStore()); // ensure the loop uses this Server's store
 			try {
+				lastUpdate=Utils.getCurrentTimestamp();
 				while (true) {
 					Thread.sleep(ConnectionManager.SERVER_CONNECTION_PAUSE);
 					makePlannedConnections();
 					maintainConnections();
+					lastUpdate=Utils.getCurrentTimestamp();
 				}
 			} catch (InterruptedException e) {
 				/* OK? Close the thread normally */
@@ -89,6 +94,7 @@ public class ConnectionManager {
 				e.printStackTrace();
 			} finally {
 				connectionThread = null;
+				closeAllConnections(); // shut down everything gracefully if we can
 			}
 		}
 	};
@@ -110,14 +116,20 @@ public class ConnectionManager {
 
 	protected void maintainConnections() {
 		State s=server.getPeer().getConsensusState();
-
-		AccountKey[] peers = connections.keySet().toArray(new AccountKey[connections.size()]);
+		
+		long millisSinceLastUpdate=Math.max(0,Utils.getCurrentTimestamp()-lastUpdate);
+		
+		int targetPeerCount=getTargetPeerCount();
+		int currentPeerCount=connections.size();
+		double totalStake=s.computeStakes().get(null);
+		
+		AccountKey[] peers = connections.keySet().toArray(new AccountKey[currentPeerCount]);
 		for (AccountKey p: peers) {
 			Connection conn=connections.get(p);
 
 			// Remove closed connections
 			if ((conn==null)||(conn.isClosed())) {
-				connections.remove(p);
+				closeConnection(p);
 				server.raiseServerChange("connection");
 				continue;
 			}
@@ -125,20 +137,37 @@ public class ConnectionManager {
 			// Remove Peers not staked in consensus
 			PeerStatus ps=s.getPeer(p);
 			if ((ps==null)||(ps.getTotalStake()==0)) {
-				conn.close();
-				connections.remove(p);
+				closeConnection(p);
 				server.raiseServerChange("connection");
+				currentPeerCount--;
 				continue;
 			}
-			// send request for a trusted peer connection
+			
+			// Drop Peers randomly 
+			if ((millisSinceLastUpdate>0)&&(currentPeerCount>=targetPeerCount)) {
+				double prop=ps.getTotalStake()/totalStake; // proportion of stake represented by this Peer
+				// Very low chance of dropping a Peer with high stake (more than
+				double keepChance=Math.min(1.0, prop*targetPeerCount);
+				
+				if (keepChance<1.0) {
+					
+					double dropRate=millisSinceLastUpdate/(double)Constants.PEER_CONNECTION_DROP_TIME;
+					if (random.nextDouble()<(dropRate*(1.0-keepChance))) {
+						closeConnection(p);
+						currentPeerCount--;
+						continue;
+					}
+				}
+			}
+			
+			// send request for a trusted peer connection if necessary
 			// TODO: need to find out why the response message is not being received by the peers
 			requestChallenge(p, conn, server.getPeer());
 		}
 
 		// refresh peers list
-		peers = connections.keySet().toArray(new AccountKey[connections.size()]);
-
-		int targetPeerCount=5;
+		currentPeerCount=connections.size();
+		peers = connections.keySet().toArray(new AccountKey[currentPeerCount]);
 		if (peers.length<targetPeerCount) {
 			// Connect to a random peer with host address by stake
 			// SECURITY: stake weighted connection is important to avoid bad peers
@@ -176,6 +205,21 @@ public class ConnectionManager {
 		}
 	}
 
+	/**
+	 * Gets the desired number of outgoing connections
+	 * @return
+	 */
+	private int getTargetPeerCount() {
+		Integer target;
+		try {
+			target = Utils.toInt(server.getConfig().get(Keywords.OUTGOING_CONNECTIONS));
+		} catch (Exception ex) {
+			target=null;
+		}
+		if (target==null) target=Constants.DEFAULT_OUTGOING_CONNECTION_COUNT;
+		return target;
+	}
+
 
 	public ConnectionManager(Server server) {
 		this.server = server;
@@ -192,23 +236,29 @@ public class ConnectionManager {
 	}
 
 	/**
-	 * Close and remove the connection
+	 * Close and remove a connection
 	 *
 	 * @param peerKey Peer key linked to the connection to close and remove.
 	 *
 	 */
 	public synchronized void closeConnection(AccountKey peerKey) {
 		if (connections.containsKey(peerKey)) {
-			connections.get(peerKey).close();
+			Connection conn=connections.get(peerKey);
+			if (conn!=null) {
+				conn.close();
+			}
 			connections.remove(peerKey);
 		}
 	}
 
-
-	public void closeAllConnections() {
-		for (Connection c:connections.values()) {
-			c.close();
+	/**
+	 * Close all outgoing connections from this Peer
+	 */
+	public synchronized void closeAllConnections() {
+		for (Connection conn:connections.values()) {
+			if (conn!=null) conn.close();
 		}
+		connections.clear();
 	}
 
 	/**
