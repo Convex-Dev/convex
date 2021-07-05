@@ -89,7 +89,7 @@ public class Server implements Closeable {
 	private static final long SERVER_UPDATE_PAUSE = 1L;
 
 	static final Logger log = Logger.getLogger(Server.class.getName());
-	private static final Level LEVEL_BELIEF = Level.FINER;
+	private static final Level LEVEL_BELIEF = Level.FINEST;
 	static final Level LEVEL_SERVER = Level.FINER;
 	private static final Level LEVEL_DATA = Level.FINEST;
 	private static final Level LEVEL_PARTIAL = Level.FINER;
@@ -363,7 +363,6 @@ public class Server implements Closeable {
 	 */
 	private void processMessage(Message m) {
 		MessageType type = m.getType();
-
 		try {
 			switch (type) {
 			case BELIEF:
@@ -371,6 +370,9 @@ public class Server implements Closeable {
 				break;
 			case CHALLENGE:
 				processChallenge(m);
+				break;
+			case RESPONSE:
+				processResponse(m);
 				break;
 			case COMMAND:
 				break;
@@ -382,9 +384,6 @@ public class Server implements Closeable {
 				break;
 			case QUERY:
 				processQuery(m);
-				break;
-			case RESPONSE:
-				processResponse(m);
 				break;
 			case RESULT:
 				break;
@@ -480,7 +479,7 @@ public class Server implements Closeable {
 		SignedData<AccountKey> signedPeerKey = m.getPayload();
 		AccountKey remotePeerKey = RT.ensureAccountKey(signedPeerKey.getValue());
 		manager.closeConnection(remotePeerKey);
-		raiseServerChange("conection change");
+		raiseServerChange("connection");
 	}
 
 	/**
@@ -744,71 +743,11 @@ public class Server implements Closeable {
 	}
 
 	private void processChallenge(Message m) {
-		try {
-			SignedData<AVector<ACell>> signedData = m.getPayload();
-			if ( signedData == null) {
-				log.log(ConnectionManager.LEVEL_CHALLENGE_RESPONSE, "challenge bad message data sent");
-				return;
-			}
-			AVector<ACell> challengeValues = signedData.getValue();
-
-			if (challengeValues == null || challengeValues.size() != 3) {
-				log.log(ConnectionManager.LEVEL_CHALLENGE_RESPONSE, "challenge data incorrect number of items should be 3 not " + RT.count(challengeValues));
-				return;
-			}
-			Connection pc = m.getPeerConnection();
-			if ( pc == null) {
-				log.log(ConnectionManager.LEVEL_CHALLENGE_RESPONSE, "No remote peer connection from challenge");
-				return;
-			}
-			log.log(ConnectionManager.LEVEL_CHALLENGE_RESPONSE, "Processing challenge request from: " + pc.getRemoteAddress());
-
-
-			// get the token to respond with
-			Hash token = RT.ensureHash(challengeValues.get(0));
-			if (token == null) {
-				log.log(ConnectionManager.LEVEL_CHALLENGE_RESPONSE, "no challenge token provided");
-				return;
-			}
-
-			// check to see if we are both want to connect to the same network
-			Hash networkId = RT.ensureHash(challengeValues.get(1));
-			if (networkId == null) {
-				log.log(ConnectionManager.LEVEL_CHALLENGE_RESPONSE, "challenge data has no networkId");
-				return;
-			}
-			if ( !networkId.equals(peer.getNetworkID())) {
-				log.log(ConnectionManager.LEVEL_CHALLENGE_RESPONSE, "challenge data has incorrect networkId");
-				return;
-			}
-			// check to see if the challenge is for this peer
-			AccountKey toPeer = RT.ensureAccountKey(challengeValues.get(2));
-			if (toPeer == null) {
-				log.log(ConnectionManager.LEVEL_CHALLENGE_RESPONSE, "challenge data has no toPeer address");
-				return;
-			}
-			if ( !toPeer.equals(peer.getPeerKey())) {
-				log.log(ConnectionManager.LEVEL_CHALLENGE_RESPONSE, "challenge data has incorrect addressed peer");
-				return;
-			}
-
-			// get who sent this challenge
-			AccountKey fromPeer = signedData.getAccountKey();
-
-			// send the signed response back
-			AVector<ACell> responseValues = Vectors.of(token, peer.getNetworkID(), fromPeer, signedData.getHash());
-
-			SignedData<ACell> response = peer.sign(responseValues);
-			pc.sendResponse(response);
-
-		} catch (Throwable t) {
-			log.warning("Challenge Error: " + t);
-			// t.printStackTrace();
-		}
+		manager.processChallenge(m, peer);
 	}
 
 	private void processResponse(Message m) {
-		manager.processResponse(m,peer);
+		manager.processResponse(m, peer);
 	}
 
 	private void processQuery(Message m) {
@@ -959,7 +898,9 @@ public class Server implements Closeable {
 				while (isRunning) {
 
 					// Try belief update
-					maybeUpdateBelief();
+					if (maybeUpdateBelief() ) {
+						raiseServerChange("consensus");
+					}
 
 					// Maybe sleep a bit, wait for some belief updates to accumulate
 					if (hasNewMessages) {

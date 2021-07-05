@@ -75,27 +75,6 @@ public class PeerManager implements IServerEvent {
 
 	public void launchLocalPeers(int count, AInitConfig initConfig) {
 		peerServerList = API.launchLocalPeers(count, initConfig, this);
-
-		// we need to start doing the first invoke on a peer to start all the other
-		// peers to connect and sync with the consensus.
-
-		Server server = peerServerList.get(0);
-		InetSocketAddress hostAddress = server.getHostAddress();
-
-		// TODO Remove this hack once we figure out why Peers need a kick to get started
-		Address peerAddress = initConfig.getUserAddress(0);
-		try {
-			Convex convex = Convex.connect(hostAddress, peerAddress, initConfig.getUserKeyPair(0));
-
-			// send a 'do' to wake up the other peers
-			ACell message = Reader.read("(do)");
-			ATransaction transaction = Invoke.create(peerAddress,-1, message);
-
-			@SuppressWarnings("unused")
-			Future<Result> future = convex.transact(transaction);
-		} catch (IOException | TimeoutException e) {
-			log.severe("cannot connect to the first peer "+e);
-		}
 	}
 
 	public SignedData<Belief> aquireLatestBelief(AKeyPair keyPair, Address address, AStore store, String remotePeerHostname) {

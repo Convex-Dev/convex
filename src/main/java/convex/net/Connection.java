@@ -717,6 +717,10 @@ public class Connection {
 		return trustedPeerKey;
 	}
 
+	public void setTrustedPeerKey(AccountKey value) {
+		trustedPeerKey = value;
+	}
+
 	public boolean isTrusted() {
 		return trustedPeerKey != null;
 	}
