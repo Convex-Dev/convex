@@ -38,12 +38,12 @@ public class ServerInformation {
 		hostname = server.getHostname();
 		connectionCount = manager.getConnectionCount();
 		trustedConnectionCount = manager.getTrustedConnectionCount();
-		isSynced =  order != null;
+		isSynced =  order != null && peer.getConsensusPoint() > 0;
 		networkID = peer.getNetworkID();
 		consensusPoint = peer.getConsensusPoint();
         isJoined = connectionCount > 1;
 		stateHash = peer.getConsensusState().getHash();
-        beliefHash = peer.getSignedBelief().getHash();
+        beliefHash = peer.getBelief().getHash();
 		blockCount = 0;
 		if (order != null ) {
 			blockCount = order.getBlockCount();
