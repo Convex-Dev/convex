@@ -1043,7 +1043,7 @@ public class Server implements Closeable {
 	}
 
 	public ServerInformation getServerInformation() {
-		return ServerInformation.create(this, manager);
+		return ServerInformation.create(this);
 	}
 
 	public void connectToPeer(InetSocketAddress hostAddress) throws IOException, TimeoutException {

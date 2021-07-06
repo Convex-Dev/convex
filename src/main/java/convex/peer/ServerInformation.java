@@ -6,7 +6,9 @@ import convex.core.Peer;
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 
-
+/**
+ * Utility class to store extract server information samples
+ */
 public class ServerInformation {
 
 	private AccountKey peerKey;
@@ -26,8 +28,8 @@ public class ServerInformation {
 		load(server, manager);
 	}
 
-	public static ServerInformation create(Server server, ConnectionManager manager) {
-		return new ServerInformation(server, manager);
+	public static ServerInformation create(Server server) {
+		return new ServerInformation(server, server.getManager());
 	}
 
 	protected void load(Server server,  ConnectionManager manager) {
