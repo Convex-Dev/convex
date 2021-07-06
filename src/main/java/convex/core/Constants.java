@@ -4,6 +4,7 @@ import java.time.Instant;
 
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Format;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 
@@ -102,4 +103,6 @@ public class Constants {
 	 * Minimum stake for a PEer to be considered by other Peers in consensus
 	 */
 	public static final long MINIMUM_EFFECTIVE_STAKE = Coin.GOLD*1;
+
+	public static final int RECEIVE_BUFFER_SIZE = Format.LIMIT_ENCODING_LENGTH*2+20;
 }

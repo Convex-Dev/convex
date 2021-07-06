@@ -7,6 +7,7 @@ import java.nio.channels.ReadableByteChannel;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
+import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.Format;
 import convex.core.exceptions.BadFormatException;
@@ -30,7 +31,7 @@ import convex.core.exceptions.BadFormatException;
  */
 public class MessageReceiver {
 	// Receive buffer must be big enough for one max sized message plus message header
-	public static final int RECEIVE_BUFFER_SIZE = Format.LIMIT_ENCODING_LENGTH  + 20;
+	public static final int RECEIVE_BUFFER_SIZE = Constants.RECEIVE_BUFFER_SIZE;
 
 	// Maybe use a direct buffer since we are copying from the socket channel?
 	// But probably doesn't make any difference.
