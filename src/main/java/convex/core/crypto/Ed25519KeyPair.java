@@ -37,9 +37,9 @@ public class Ed25519KeyPair extends AKeyPair {
 	public static final int PRIVATE_KEY_LENGTH=32;
 	private static final String ED25519 = "Ed25519";
 
-	private Ed25519KeyPair(KeyPair kp, AccountKey address) {
+	private Ed25519KeyPair(KeyPair kp, AccountKey publicKey) {
 		this.keyPair = kp;
-		this.publicKey=address;
+		this.publicKey=publicKey;
 	}
 
 	/**
@@ -61,8 +61,8 @@ public class Ed25519KeyPair extends AKeyPair {
 		return create(keyPair);
 	}
 	
-	public static Ed25519KeyPair create(AccountKey address, Blob encodedPrivateKey) {
-		PublicKey publicKey= publicKeyFromBytes(address.getBytes());
+	public static Ed25519KeyPair create(AccountKey accountKey, Blob encodedPrivateKey) {
+		PublicKey publicKey= publicKeyFromBytes(accountKey.getBytes());
 		PrivateKey privateKey=privateKeyFromBlob(encodedPrivateKey);
 		return create(publicKey,privateKey);
 	}

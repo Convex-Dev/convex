@@ -60,12 +60,12 @@ public abstract class AKeyPair {
 	/**
 	 * Create a key pair with the given Address and encoded private key
 	 * 
-	 * @param address Public Key
+	 * @param publicKey Public Key
 	 * @param encodedPrivateKey Encoded private key
 	 * @return New key pair
 	 */
-	public static AKeyPair create(AccountKey address, Blob encodedPrivateKey) {
-		return Ed25519KeyPair.create(address,encodedPrivateKey);
+	public static AKeyPair create(AccountKey publicKey, Blob encodedPrivateKey) {
+		return Ed25519KeyPair.create(publicKey,encodedPrivateKey);
 	}
 	
 	static {
