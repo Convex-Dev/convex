@@ -1,6 +1,8 @@
 package convex.core.lang;
 
 import convex.core.data.*;
+import convex.core.lang.reader.ParboiledReader;
+
 import org.parboiled.Parboiled;
 import org.parboiled.Rule;
 import org.parboiled.annotations.BuildParseTree;
@@ -13,7 +15,7 @@ import org.parboiled.support.Var;
 import java.util.ArrayList;
 
 @BuildParseTree
-public class ScryptNext extends Reader {
+public class ScryptNext extends ParboiledReader {
 
     // Use a ThreadLocal reader because instances are not thread safe
     private static final ThreadLocal<ScryptNext> syntaxReader = ThreadLocal.withInitial(() -> Parboiled.createParser(ScryptNext.class));

@@ -1,11 +1,14 @@
 package convex.core.lang;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static convex.test.Assertions.*;
+import static convex.test.Assertions.assertCVMEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
-import org.parboiled.Parboiled;
 
+import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AVector;
 import convex.core.data.Address;
@@ -57,14 +60,6 @@ public class ReaderTest {
 		assertCVMEquals(1L, Reader.read(";this is a comment\n 1 \n"));
 		assertCVMEquals(2L, Reader.read("#_foo 2"));
 		assertCVMEquals(3L, Reader.read("3 #_foo"));
-	}
-
-	@Test
-	public void testReadAll() {
-		assertSame(Lists.empty(), Reader.readAllSyntax(""));
-		assertSame(Lists.empty(), Reader.readAllSyntax("  "));
-		assertEquals(Samples.FOO, Reader.readAllSyntax(" :foo ").get(0).getValue());
-		assertEquals(Symbol.create("+"), Reader.readAllSyntax("+ 1").get(0).getValue());
 	}
 
 	@Test
@@ -217,12 +212,6 @@ public class ReaderTest {
 	}
 
 	@Test
-	public void testRules() {
-		Reader reader = Parboiled.createParser(Reader.class, false);
-		assertCVMEquals(1L, Reader.doParse(reader.Long(), "1  "));
-	}
-
-	@Test
 	public void testWrongSizeMaps() {
 		assertThrows(ParseException.class, () -> Reader.read("{:foobar}"));
 	}
@@ -258,15 +247,16 @@ public class ReaderTest {
 		assertEquals(Syntax.create(Keywords.FOO),Reader.read("^{} :foo"));
 	}
 
-
+	@SuppressWarnings("unchecked")
 	@Test
 	public void testMetadata() {
 		assertCVMEquals(Boolean.TRUE, Reader.readSyntax("^:foo a").getMeta().get(Keywords.FOO));
 		
 		{
-			Syntax def=Reader.readAllSyntax("(def ^{:foo 2} a 1)").get(0);
-			AList<Syntax> form=def.getValue();
-			assertCVMEquals(2L, form.get(1).getMeta().get(Keywords.FOO));
+			AList<ACell> def=(AList<ACell>) Reader.readAll("(def ^{:foo 2} a 1)").get(0);
+			Syntax form=(Syntax) def.get(1);
+			
+			assertCVMEquals(2L, form.getMeta().get(Keywords.FOO));
 		}
 
 		// TODO: Decide how to handle values within meta - unwrap Syntax Objects?
