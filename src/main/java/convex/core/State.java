@@ -8,7 +8,7 @@ import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.parboiled.common.Utils;
+import convex.core.util.Utils;
 
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
@@ -404,7 +404,7 @@ public class State extends ARecord {
 		} else {
 			AccountKey key=as.getAccountKey();
 			if (key==null) return Context.createFake(this).withError(ErrorCodes.NOBODY,"Transaction for account that is an Actor: "+addr);
-			if (!Utils.equal(key, signedTransaction.getAccountKey())) {
+			if (!Utils.equals(key, signedTransaction.getAccountKey())) {
 				return Context.createFake(this).withError(ErrorCodes.SIGNATURE,"Signature not valid for Account: "+addr+" expected public key: "+key);
 			}
 		}

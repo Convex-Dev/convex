@@ -13,8 +13,6 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 
-import org.parboiled.common.Utils;
-
 import convex.api.Convex;
 import convex.core.Result;
 import convex.core.crypto.WalletEntry;
@@ -82,7 +80,7 @@ public class SmartOpComponent extends BaseListComponent {
 
 		for (int i = 0; i < paramCount; i++) {
 			ACell paramSym = params.get(i);
-			paramPanel.add(new ParamLabel(Utils.toString(paramSym)));
+			paramPanel.add(new ParamLabel(RT.str(paramSym)));
 			JTextField argBox = new ArgBox();
 			paramPanel.add(argBox);
 			paramFields.put(i, argBox);

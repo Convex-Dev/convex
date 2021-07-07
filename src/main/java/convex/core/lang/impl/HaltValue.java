@@ -1,7 +1,5 @@
 package convex.core.lang.impl;
 
-import org.parboiled.common.Utils;
-
 import convex.core.ErrorCodes;
 import convex.core.data.ACell;
 
@@ -30,7 +28,7 @@ public class HaltValue<T extends ACell> extends AReturn {
 
 	@Override
 	public String toString() {
-		return "HaltValue: " + Utils.toString(value);
+		return "HaltValue: " + value;
 	}
 
 	@Override

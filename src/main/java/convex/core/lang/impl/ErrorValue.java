@@ -3,8 +3,6 @@ package convex.core.lang.impl;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.parboiled.common.Utils;
-
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Strings;
@@ -101,7 +99,7 @@ public class ErrorValue extends AExceptional {
 	@Override 
 	public String toString() {
 		StringBuilder sb=new StringBuilder();
-		sb.append("ErrorValue["+code+"]"+((message==null)?"":" : "+Utils.toString(message)));
+		sb.append("ErrorValue["+code+"]"+((message==null)?"":" : "+message));
 		if (trace!=null) {
 			for (Object o:trace) {
 				sb.append("\n");

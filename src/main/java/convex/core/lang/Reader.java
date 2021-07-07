@@ -2,8 +2,6 @@ package convex.core.lang;
 
 import java.io.IOException;
 
-import org.parboiled.annotations.BuildParseTree;
-
 import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.Syntax;
@@ -19,7 +17,6 @@ import convex.core.util.Utils;
  *
  * "Talk is cheap. Show me the code." - Linus Torvalds
  */
-@BuildParseTree
 @SuppressWarnings("javadoc")
 public class Reader {
 	/**
