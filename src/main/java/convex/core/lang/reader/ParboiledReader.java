@@ -22,7 +22,6 @@ import org.parboiled.support.Var;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AList;
-import convex.core.data.AMap;
 import convex.core.data.ASequence;
 import convex.core.data.Address;
 import convex.core.data.Blob;
@@ -40,8 +39,8 @@ import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
-import convex.core.lang.Symbols;
 import convex.core.lang.RT;
+import convex.core.lang.Symbols;
 import convex.core.util.Utils;
 
 //@formatter:off
@@ -151,25 +150,11 @@ public class ParboiledReader extends BaseParser<ACell> {
 	}
 
 	public Syntax assocMeta(ACell exp, ACell meta) {
-		AHashMap<ACell, ACell> metaMap = interpretMetadata(meta);
+		AHashMap<ACell, ACell> metaMap = ReaderUtils.interpretMetadata(meta);
 		return Syntax.create(exp).mergeMeta(metaMap);
 	}
 
-	/**
-	 * Converts a metadata object according to the following rule: - Map ->
-	 * unchanged - Keyword -> {:keyword true} - Any other expression -> {:tag
-	 * expression}
-	 * 
-	 * @param metaNode Syntax node containing metadata
-	 * @return Metadata map
-	 */
-	@SuppressWarnings("unchecked")
-	public AHashMap<ACell, ACell> interpretMetadata(ACell metaNode) {
-		ACell val = Syntax.unwrapAll(metaNode);
-		if (val instanceof AMap) return (AHashMap<ACell, ACell>) val;
-		if (val instanceof Keyword) return Maps.of(val, Boolean.TRUE);
-		return Maps.of(Keywords.TAG, val);
-	}
+
 
 	public Rule Meta() {
 		return Sequence("^", Expression());

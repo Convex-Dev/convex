@@ -11,11 +11,14 @@ import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
+import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.Symbol;
+import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
@@ -33,9 +36,11 @@ import convex.core.lang.reader.antlr.ConvexParser.KeywordContext;
 import convex.core.lang.reader.antlr.ConvexParser.ListContext;
 import convex.core.lang.reader.antlr.ConvexParser.LiteralContext;
 import convex.core.lang.reader.antlr.ConvexParser.LongValueContext;
+import convex.core.lang.reader.antlr.ConvexParser.MapContext;
 import convex.core.lang.reader.antlr.ConvexParser.NilContext;
 import convex.core.lang.reader.antlr.ConvexParser.SetContext;
 import convex.core.lang.reader.antlr.ConvexParser.SymbolContext;
+import convex.core.lang.reader.antlr.ConvexParser.SyntaxContext;
 import convex.core.lang.reader.antlr.ConvexParser.VectorContext;
 
 public class AntlrReader {
@@ -51,6 +56,10 @@ public class AntlrReader {
 			int n=stack.size()-1;
 			ArrayList<ACell> top=stack.get(n);
 			top.add(a);
+		}
+		
+		private void pushList() {
+			stack.add(new ArrayList<>());
 		}
 		
 		public ArrayList<ACell> pop() {
@@ -93,7 +102,7 @@ public class AntlrReader {
 		@Override
 		public void enterForms(FormsContext ctx) {
 			// We add a new ArrayList to the stack to capture values
-			stack.add(new ArrayList<>());
+			pushList();
 		}
 
 		@Override
@@ -142,6 +151,17 @@ public class AntlrReader {
 		public void exitSet(SetContext ctx) {
 			ArrayList<ACell> elements=pop();
 			push(Sets.fromCollection(elements));
+		}
+		
+		@Override
+		public void enterMap(MapContext ctx) {
+			// Nothing to do
+		}
+
+		@Override
+		public void exitMap(MapContext ctx) {
+			ArrayList<ACell> elements=pop();
+			push(Maps.create(elements.toArray(new ACell[elements.size()])));
 		}
 
 		@Override
@@ -234,6 +254,24 @@ public class AntlrReader {
 			String s=ctx.getText();
 			push (Address.parse(s));
 		}
+
+		@Override
+		public void enterSyntax(SyntaxContext ctx) {
+			// add new list to collect [syntax, value]
+			pushList();
+		}
+
+
+		@Override
+		public void exitSyntax(SyntaxContext ctx) {
+			ArrayList<ACell> elements=pop();
+			if (elements.size()!=2) throw new ParseException("Metadata requires metadata and annotated form but got:"+ elements);
+			ACell value=elements.get(1);
+			AHashMap<ACell,ACell> meta=ReaderUtils.interpretMetadata(elements.get(0));
+			push(Syntax.create(value, meta));
+		}
+
+	
 		
 	}
 

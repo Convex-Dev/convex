@@ -10,7 +10,9 @@ import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
+import convex.core.data.Maps;
 import convex.core.data.Sets;
+import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
@@ -18,8 +20,9 @@ import convex.core.lang.Symbols;
 
 public class ANTLRTest {
 	
-	private ACell read(String s) {
-		return AntlrReader.read(s);
+	@SuppressWarnings("unchecked")
+	private <R extends ACell> R read(String s) {
+		return (R) AntlrReader.read(s);
 	}
 
 	@Test public void testParser() {
@@ -34,9 +37,11 @@ public class ANTLRTest {
 		assertEquals(Vectors.of(1,2),read("[1 2]"));
 		assertEquals(Lists.of(1,2),read("(1 2)"));
 		assertEquals(Sets.of(1,2),read("#{1 2}"));
+		assertEquals(Maps.of(1,2),read("{1 2}"));
 		assertSame(Sets.empty(),read("#{}"));
 		assertSame(Lists.empty(),read("()"));
 		assertSame(Vectors.empty(),read("[]"));
+		assertSame(Maps.empty(),read("{}"));
 		
 		// Keywords and Symbols
 		assertEquals(Keywords.FOO,read(":foo"));
@@ -46,6 +51,10 @@ public class ANTLRTest {
 		assertEquals(Address.create(17),read("#17"));
 		
 
+	}
+	
+	@Test public void testSytnax() {
+		assertEquals(Syntax.create(CVMLong.ONE,Maps.empty()), read("^{} 1"));
 	}
 
 

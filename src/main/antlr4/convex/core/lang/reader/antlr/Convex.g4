@@ -4,18 +4,21 @@ form
 	: literal
 	| symbol
 	| dataStructure
+	| syntax
 	;
 	
 forms: form* ;
 
 dataStructure:
-	list | vector | set;
+	list | vector | set | map;
 
 list : '(' forms ')';
 
 vector : '[' forms ']';
 
 set : HASH '{' forms '}';
+
+map : '{' forms '}';
 
 literal 
 	: nil
@@ -41,12 +44,16 @@ keyword: KEYWORD;
 
 symbol: SYMBOL;
 
+syntax: META form form;
+
 /*  =========================================
  *  Lexer stuff below here
  *  =========================================
  */ 
 
 HASH: '#';
+
+META: '^';
 
 NIL: 'nil';
 
