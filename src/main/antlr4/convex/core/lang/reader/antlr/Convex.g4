@@ -2,6 +2,7 @@ grammar Convex;
 
 form
 	: literal
+	| symbol
 	| dataStructure
 	;
 	
@@ -19,11 +20,15 @@ set : '#{' forms '}';
 literal 
 	: nil
 	| bool
+	| keyword
+	| address
 	| longValue
 	;
    
 longValue: 
    LONG;   
+   
+address: HASH DIGITS;
 
 nil: NIL;
 
@@ -39,6 +44,8 @@ symbol: SYMBOL;
  *  Lexer stuff below here
  *  =========================================
  */ 
+
+HASH: '#';
 
 NIL: 'nil';
 

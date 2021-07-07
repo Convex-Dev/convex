@@ -11,6 +11,7 @@ import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
 import convex.core.data.ACell;
+import convex.core.data.Address;
 import convex.core.data.Lists;
 import convex.core.data.Sets;
 import convex.core.data.Vectors;
@@ -20,6 +21,7 @@ import convex.core.exceptions.ParseException;
 import convex.core.lang.reader.antlr.ConvexLexer;
 import convex.core.lang.reader.antlr.ConvexListener;
 import convex.core.lang.reader.antlr.ConvexParser;
+import convex.core.lang.reader.antlr.ConvexParser.AddressContext;
 import convex.core.lang.reader.antlr.ConvexParser.BoolContext;
 import convex.core.lang.reader.antlr.ConvexParser.CharacterContext;
 import convex.core.lang.reader.antlr.ConvexParser.DataStructureContext;
@@ -228,6 +230,18 @@ public class AntlrReader {
 		public void exitSymbol(SymbolContext ctx) {
 			// TODO Auto-generated method stub
 			
+		}
+
+		@Override
+		public void enterAddress(AddressContext ctx) {
+			// Nothing
+			
+		}
+
+		@Override
+		public void exitAddress(AddressContext ctx) {
+			String s=ctx.getText();
+			push (Address.parse(s));
 		}
 		
 	}
