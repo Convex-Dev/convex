@@ -388,7 +388,7 @@ public class AntlrReader {
 			ArrayList<ACell> elements=popList();
 			if (elements.size()!=2) throw new ParseException("Expected path and symbol but got:"+ elements);
 			ACell exp=elements.get(0);
-			System.out.println(elements);
+			// System.out.println(elements);
 			Symbol sym=RT.ensureSymbol(elements.get(1));
 			if (sym==null) throw new ParseException("Not a valid Symbol");
 			AList<ACell> lookup=Lists.of(Symbols.LOOKUP,exp,sym);

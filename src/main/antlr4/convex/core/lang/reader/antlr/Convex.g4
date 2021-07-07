@@ -154,13 +154,13 @@ SPECIAL_CHARACTER
 fragment
 SYMBOL_FIRST
     : ALPHA
-    | [0-9]
     | '.' | '*' | '+' | '!' | '-' | '?' | '$' | '%' | '&' | '=' | '<' | '>'
     ;
 
 fragment
 SYMBOL_FOLLOWING
     : SYMBOL_FIRST
+    | [0-9]
     | ':' | '#'
     ;
     

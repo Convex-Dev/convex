@@ -112,6 +112,7 @@ public class ANTLRTest {
 
 	@Test public void testError() {
 		assertThrows(ParseException.class,()->read("1 2"));
+		assertThrows(ParseException.class,()->read("1.0e0.1234"));
 	}
 
 }
