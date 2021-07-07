@@ -81,7 +81,7 @@
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>3.8.1</version>
 				<configuration>
-					<release>11</release> <!--  needed for parboiled?? -->
+					<release>11</release> <!-- needed for parboiled?? -->
 					<annotationProcessorPaths>
 						<path>
 							<groupId>org.openjdk.jmh</groupId>
@@ -90,6 +90,22 @@
 						</path>
 					</annotationProcessorPaths>
 				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.antlr</groupId>
+				<artifactId>antlr4-maven-plugin</artifactId>
+				<version>4.9.2</version>
+				<configuration>
+					<libDirectory>${basedir}/src/main/antlr4/convex/core/lang/reader/antlr</libDirectory>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>antlr4</goal>
+						</goals>
+					</execution>
+				</executions>
+
 			</plugin>
 			<plugin>
 				<artifactId>maven-assembly-plugin</artifactId>
@@ -105,9 +121,9 @@
 						<descriptor>src/main/assembly/testing.xml</descriptor>
 					</descriptors>
 					<descriptorRefs>
-            			<descriptorRef>jar-with-dependencies</descriptorRef>
-          			</descriptorRefs>
-					<!-- We want differentiated outputs  <appendAssemblyId>false</appendAssemblyId> -->
+						<descriptorRef>jar-with-dependencies</descriptorRef>
+					</descriptorRefs>
+					<!-- We want differentiated outputs <appendAssemblyId>false</appendAssemblyId> -->
 				</configuration>
 				<executions>
 					<execution>
@@ -241,6 +257,11 @@
 			<artifactId>jmh-generator-annprocess</artifactId>
 			<version>${jmh.version}</version>
 			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.antlr</groupId>
+			<artifactId>antlr4-runtime</artifactId>
+			<version>4.9.2</version>
 		</dependency>
 
 		<dependency>
