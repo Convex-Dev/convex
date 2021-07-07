@@ -3,6 +3,7 @@ package convex.core.lang.reader;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 
@@ -20,6 +21,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.ParseException;
 import convex.core.lang.Symbols;
 
 public class ANTLRTest {
@@ -61,7 +63,7 @@ public class ANTLRTest {
 		assertEquals(Address.create(17),read("#17"));
 	}
 	
-	@Test public void testSytnax() {
+	@Test public void testSyntax() {
 		assertEquals(Syntax.create(CVMLong.ONE,Maps.empty()), read("^{} 1"));
 	}
 	
@@ -102,6 +104,14 @@ public class ANTLRTest {
 		assertSame(Lists.empty(),AntlrReader.readAll(""));
 		assertEquals(Lists.of(1,2),AntlrReader.readAll(" 1 2 "));
 	}
+	
+	@Test public void testPath() {
+		assertSame(Lists.empty(),AntlrReader.readAll(""));
+		assertEquals(Lists.of(Symbols.LOOKUP,Address.ZERO,Symbols.FOO),AntlrReader.read("#0/foo"));
+	}
 
+	@Test public void testError() {
+		assertThrows(ParseException.class,()->read("1 2"));
+	}
 
 }

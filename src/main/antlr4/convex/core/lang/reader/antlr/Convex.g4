@@ -3,10 +3,13 @@ grammar Convex;
 form
 	: literal
 	| symbol
+	| pathSymbol
 	| dataStructure
 	| syntax
 	| quoted
 	;
+
+singleForm: form EOF;
 	
 forms: form* ;
 
@@ -56,6 +59,8 @@ character: CHARACTER;
 keyword: KEYWORD;
 
 symbol: SYMBOL;
+
+pathSymbol: (address | symbol) '/' symbol;
 
 syntax: META form form;
 

@@ -30,6 +30,8 @@ import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
+import convex.core.lang.RT;
+import convex.core.lang.Symbols;
 import convex.core.lang.reader.antlr.ConvexLexer;
 import convex.core.lang.reader.antlr.ConvexListener;
 import convex.core.lang.reader.antlr.ConvexParser;
@@ -48,8 +50,10 @@ import convex.core.lang.reader.antlr.ConvexParser.LiteralContext;
 import convex.core.lang.reader.antlr.ConvexParser.LongValueContext;
 import convex.core.lang.reader.antlr.ConvexParser.MapContext;
 import convex.core.lang.reader.antlr.ConvexParser.NilContext;
+import convex.core.lang.reader.antlr.ConvexParser.PathSymbolContext;
 import convex.core.lang.reader.antlr.ConvexParser.QuotedContext;
 import convex.core.lang.reader.antlr.ConvexParser.SetContext;
+import convex.core.lang.reader.antlr.ConvexParser.SingleFormContext;
 import convex.core.lang.reader.antlr.ConvexParser.SpecialLiteralContext;
 import convex.core.lang.reader.antlr.ConvexParser.StringContext;
 import convex.core.lang.reader.antlr.ConvexParser.SymbolContext;
@@ -374,6 +378,33 @@ public class AntlrReader {
 			pop();	
 		}
 
+		@Override
+		public void enterPathSymbol(PathSymbolContext ctx) {
+			pushList();
+		}
+
+		@Override
+		public void exitPathSymbol(PathSymbolContext ctx) {
+			ArrayList<ACell> elements=popList();
+			if (elements.size()!=2) throw new ParseException("Expected path and symbol but got:"+ elements);
+			ACell exp=elements.get(0);
+			System.out.println(elements);
+			Symbol sym=RT.ensureSymbol(elements.get(1));
+			if (sym==null) throw new ParseException("Not a valid Symbol");
+			AList<ACell> lookup=Lists.of(Symbols.LOOKUP,exp,sym);
+			push(lookup);
+		}
+
+		@Override
+		public void enterSingleForm(SingleFormContext ctx) {
+			// Nothing	
+		}
+
+		@Override
+		public void exitSingleForm(SingleFormContext ctx) {
+			// Nothing
+		}
+
 
 	}
 
@@ -389,7 +420,7 @@ public class AntlrReader {
 		ConvexLexer lexer=new ConvexLexer(cs);
 		CommonTokenStream tokens = new CommonTokenStream(lexer);
 		ConvexParser parser = new ConvexParser(tokens);
-		ParseTree tree = parser.form();
+		ParseTree tree = parser.singleForm();
 		
 		CRListener visitor=new CRListener();
 		ParseTreeWalker.DEFAULT.walk(visitor, tree);
