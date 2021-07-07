@@ -2,6 +2,7 @@ package convex.core.lang.reader;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
@@ -30,7 +31,6 @@ import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
-import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.core.lang.reader.antlr.ConvexLexer;
 import convex.core.lang.reader.antlr.ConvexListener;
@@ -59,6 +59,7 @@ import convex.core.lang.reader.antlr.ConvexParser.StringContext;
 import convex.core.lang.reader.antlr.ConvexParser.SymbolContext;
 import convex.core.lang.reader.antlr.ConvexParser.SyntaxContext;
 import convex.core.lang.reader.antlr.ConvexParser.VectorContext;
+import convex.core.util.Utils;
 
 public class AntlrReader {
 	
@@ -103,7 +104,7 @@ public class AntlrReader {
 
 		@Override
 		public void visitErrorNode(ErrorNode node) {
-			throw new ParseException(node.toString());
+			throw new ParseException(node.getSourceInterval()+" "+node.getText());
 		}
 
 		@Override
@@ -188,6 +189,9 @@ public class AntlrReader {
 		@Override
 		public void exitMap(MapContext ctx) {
 			ArrayList<ACell> elements=popList();
+			if (Utils.isOdd(elements.size())) {
+				throw new ParseException("Map requires an even number form forms.");
+			}
 			push(Maps.create(elements.toArray(new ACell[elements.size()])));
 		}
 
@@ -254,7 +258,7 @@ public class AntlrReader {
 		public void exitCharacter(CharacterContext ctx) {
 			String s=ctx.getText();
 			CVMChar c=CVMChar.parse(s);
-			if (c==null) throw new ParseException("Bad chracter literal format: "+s);
+			if (c==null) throw new ParseException("Bad character literal format: "+s);
 			push(c);
 		}
 
@@ -369,27 +373,30 @@ public class AntlrReader {
 
 		@Override
 		public void enterCommented(CommentedContext ctx) {
-			// Nothing to do
+			// make a dummy list, doesn't matter what goes in here
+			pushList();
 		}
 
 		@Override
 		public void exitCommented(CommentedContext ctx) {
 			// remove commented form
-			pop();	
+			popList();	
 		}
 
 		@Override
 		public void enterPathSymbol(PathSymbolContext ctx) {
-			pushList();
+			// Nothing	
 		}
 
 		@Override
 		public void exitPathSymbol(PathSymbolContext ctx) {
-			ArrayList<ACell> elements=popList();
-			if (elements.size()!=2) throw new ParseException("Expected path and symbol but got:"+ elements);
-			ACell exp=elements.get(0);
+			String s=ctx.getText();
+			String[] ss=s.split("/",2);
+			if (ss.length!=2) throw new ParseException("Expected path and symbol but got: "+ Arrays.toString(ss));
+			ACell exp=(ss[0].startsWith("#"))?Address.parse(ss[0]):Symbol.create(ss[0]);
+			if (exp==null) throw new ParseException("Expected path to be a Symbol or Address but got: "+ ss[0]);
 			// System.out.println(elements);
-			Symbol sym=RT.ensureSymbol(elements.get(1));
+			Symbol sym=Symbol.create(ss[1]);
 			if (sym==null) throw new ParseException("Not a valid Symbol");
 			AList<ACell> lookup=Lists.of(Symbols.LOOKUP,exp,sym);
 			push(lookup);
@@ -418,8 +425,11 @@ public class AntlrReader {
 	
 	public static ACell read(CharStream cs) {
 		ConvexLexer lexer=new ConvexLexer(cs);
+		lexer.removeErrorListeners();
 		CommonTokenStream tokens = new CommonTokenStream(lexer);
 		ConvexParser parser = new ConvexParser(tokens);
+		parser.removeErrorListeners();
+		
 		ParseTree tree = parser.singleForm();
 		
 		CRListener visitor=new CRListener();
@@ -439,8 +449,10 @@ public class AntlrReader {
 
 	public static AList<ACell> readAll(CharStream cs) {
 		ConvexLexer lexer=new ConvexLexer(cs);
+		lexer.removeErrorListeners();
 		CommonTokenStream tokens = new CommonTokenStream(lexer);
 		ConvexParser parser = new ConvexParser(tokens);
+		parser.removeErrorListeners();
 		ParseTree tree = parser.forms();
 		
 		CRListener visitor=new CRListener();

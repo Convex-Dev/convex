@@ -74,7 +74,7 @@ public final class CVMChar extends APrimitive {
 	}
 	
 	/**
-	 * Parses a Chracter from a String
+	 * Parses a Character from a String
 	 * @param s
 	 * @return CVMChar instance, or null if not valid
 	 */
@@ -85,6 +85,13 @@ public final class CVMChar extends APrimitive {
 		
 		if (n==2) {
 			return CVMChar.create(s.charAt(1));
+		}
+		
+		if (s.charAt(1)=='u') {
+			if (n==6) {
+				char c = (char) Long.parseLong(s.substring(2),16);
+				return CVMChar.create(c);
+			}
 		}
 		
 		s=s.substring(1);

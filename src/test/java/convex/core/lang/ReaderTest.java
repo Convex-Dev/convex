@@ -57,8 +57,8 @@ public class ReaderTest {
 	@Test
 	public void testComment() {
 		assertCVMEquals(1L, Reader.read(";this is a comment\n 1 \n"));
-		assertCVMEquals(2L, Reader.read("#_foo 2"));
-		assertCVMEquals(3L, Reader.read("3 #_foo"));
+		assertCVMEquals(Vectors.of(2L), Reader.read("[#_foo 2]"));
+		assertCVMEquals(Vectors.of(3L), Reader.read("[3 #_foo]"));
 	}
 
 	@Test
@@ -123,9 +123,12 @@ public class ReaderTest {
 		assertCVMEquals(0.2, Reader.read("2.0e-1"));
 		assertCVMEquals(12.0, Reader.read("12e0"));
 		
-		assertThrows(Error.class, () -> Reader.read("2.0e0.1234"));
+		assertThrows(Error.class, () -> {
+			ACell c=Reader.read("2.0e0.1234");
+		});
 		// assertNull( Reader.read("[2.0e0.1234]"));
-		assertThrows(Error.class, () -> Reader.read("[2.0e0.1234]")); // Issue #70
+		// TODO: do we want this?
+		//assertThrows(Error.class, () -> Reader.read("[2.0e0.1234]")); // Issue #70
 
 		// metadata ignored
 		assertEquals(Syntax.create(RT.cvm(3.23),Maps.of(Keywords.FOO, CVMBool.TRUE)), Reader.read("^:foo 3.23"));

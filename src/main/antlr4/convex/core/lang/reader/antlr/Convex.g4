@@ -11,7 +11,7 @@ form
 
 singleForm: form EOF;
 	
-forms: form* ;
+forms: (form | commented) * ;
 
 dataStructure:
 	list | vector | set | map;
@@ -60,7 +60,7 @@ keyword: KEYWORD;
 
 symbol: SYMBOL;
 
-pathSymbol: (address | symbol) '/' symbol;
+pathSymbol: SYMBOL_PATH;
 
 syntax: META form form;
 
@@ -74,7 +74,10 @@ commented: COMMENTED form;
  *  Lexer stuff below here
  *  =========================================
  */ 
-
+ 
+SYMBOL_PATH:
+	(NAME | HASH DIGITS) '/' NAME;
+ 
 COMMENTED: '#_';
 
 HASH: '#';
@@ -93,8 +96,8 @@ DOUBLE:
 fragment  
 DOUBLE_TAIL:
   DECIMAL EPART | DECIMAL | EPART;
-  
-fragment
+
+fragment  
 DECIMAL:
   '.' DIGITS;
   
@@ -105,7 +108,6 @@ EPART:
 DIGITS:
   [0-9]+;
   
-fragment  
 SIGNED_DIGITS:
   '-' DIGITS;
   
@@ -125,21 +127,23 @@ QUOTING: '\'' | '`' | '~' | '~@';
 
 // Symbols and Keywords
 
+
 KEYWORD:
    ':' NAME;
 
 SYMBOL
-    : '/'
-    | NAME
+    : NAME
     ;
     
-    fragment
-    
-NAME: SYMBOL_FIRST SYMBOL_FOLLOWING*;
+fragment    
+NAME
+	: '/'
+	| SYMBOL_FIRST SYMBOL_FOLLOWING*;
 
 CHARACTER
-  : '\\' .
-  |SPECIAL_CHARACTER;
+  : '\\u' HEX_BYTE HEX_BYTE
+  | '\\' .
+  | SPECIAL_CHARACTER;
 
 fragment  
 SPECIAL_CHARACTER
@@ -151,10 +155,12 @@ SPECIAL_CHARACTER
            | 'backspace' ) ;
 
 
+// Test case "a*+!-_?<>=!" should be a symbol
+
 fragment
 SYMBOL_FIRST
     : ALPHA
-    | '.' | '*' | '+' | '!' | '-' | '?' | '$' | '%' | '&' | '=' | '<' | '>'
+    | '.' | '*' | '+' | '!' | '-' | '_' | '?' | '$' | '%' | '&' | '=' | '<' | '>'
     ;
 
 fragment

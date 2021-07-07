@@ -10,11 +10,13 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Blob;
+import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
+import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
@@ -31,28 +33,44 @@ public class ANTLRTest {
 		return (R) AntlrReader.read(s);
 	}
 
-	@Test public void testParser() {
+	@Test public void testNil() {
 		assertNull(read("nil"));
+	}
 		
+	@Test public void testPrimitives () {
 		assertSame(CVMBool.TRUE,read("true"));
 		assertSame(CVMBool.FALSE,read("false"));
 		assertEquals(CVMLong.create(17),read("17"));
+		assertEquals(CVMLong.create(-2),read("-2"));
 		assertEquals(CVMLong.ZERO,read("0"));
+	}
 		
+	@Test public void testDataStructures() {
 		// basic data structures
 		assertEquals(Vectors.of(1,2),read("[1 2]"));
 		assertEquals(Lists.of(1,2),read("(1 2)"));
 		assertEquals(Sets.of(1,2),read("#{1 2}"));
 		assertEquals(Maps.of(1,2),read("{1 2}"));
+		
+		// empty structures
 		assertSame(Sets.empty(),read("#{}"));
 		assertSame(Lists.empty(),read("()"));
 		assertSame(Vectors.empty(),read("[]"));
 		assertSame(Maps.empty(),read("{}"));
-		
-		// Keywords and Symbols
-		assertEquals(Keywords.FOO,read(":foo"));
+	}
+	
+	@Test public void testSymbols() {
 		assertEquals(Symbols.FOO,read("foo"));
+		assertEquals(Symbol.create("/"),read("/"));
+	}
+	
+	@Test public void testKeywords() {
+		assertEquals(Keywords.FOO,read(":foo"));
+		assertEquals(Keyword.create("/"),read(":/"));
+	}
+
 		
+	@Test public void testBlobs() {
 		// Blobs
 		assertEquals(Blob.EMPTY,read("0x"));
 		assertEquals(Blob.fromHex("cafebabe"),read("0xcaFEBAbe"));
@@ -106,8 +124,8 @@ public class ANTLRTest {
 	}
 	
 	@Test public void testPath() {
-		assertSame(Lists.empty(),AntlrReader.readAll(""));
 		assertEquals(Lists.of(Symbols.LOOKUP,Address.ZERO,Symbols.FOO),AntlrReader.read("#0/foo"));
+		assertEquals(Lists.of(Symbols.LOOKUP,Address.ZERO,Symbols.DIVIDE),AntlrReader.read("#0//"));
 	}
 
 	@Test public void testError() {

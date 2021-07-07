@@ -7,7 +7,7 @@ import org.parboiled.annotations.BuildParseTree;
 import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.Syntax;
-import convex.core.lang.reader.ParboiledReader;
+import convex.core.lang.reader.AntlrReader;
 import convex.core.util.Utils;
 
 /**
@@ -54,7 +54,7 @@ public class Reader {
 	 * @return List of Syntax Objects
 	 */
 	public static AList<ACell> readAll(String source) {
-		return ParboiledReader.readAll(source);
+		return AntlrReader.readAll(source);
 	}
 
 	/**
@@ -64,7 +64,7 @@ public class Reader {
 	 * @return Parsed form
 	 */
 	public static ACell read(java.io.Reader source) throws IOException {
-		return ParboiledReader.read(source);
+		return AntlrReader.read(source);
 	}
 	
 	/**
@@ -75,7 +75,7 @@ public class Reader {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <R extends ACell> R read(String source) {
-		return (R) ParboiledReader.read(source);
+		return (R) AntlrReader.read(source);
 	}
 
 }
