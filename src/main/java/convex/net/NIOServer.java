@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.net.StandardSocketOptions;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -252,8 +253,9 @@ public class NIOServer implements Closeable {
 		if (socketChannel==null) return; // false alarm? Nobody there?
 		log.finer("New connection accepted: " + socketChannel);
 		socketChannel.configureBlocking(false);
-		// TODO: Do we want Nagle?
-		// socketChannel.setOption(StandardSocketOptions.TCP_NODELAY, true);
+		
+		// TODO: Confirm we don't want  Nagle?
+		socketChannel.setOption(StandardSocketOptions.TCP_NODELAY, true);
 		socketChannel.register(selector, SelectionKey.OP_READ);
 	}
 

@@ -177,7 +177,7 @@ public class Connection {
 			}
 		}
 		// clientChannel.setOption(StandardSocketOptions.SO_KEEPALIVE,true);
-		// clientChannel.setOption(StandardSocketOptions.TCP_NODELAY,true);
+		clientChannel.setOption(StandardSocketOptions.TCP_NODELAY,true);
 
 		Connection pc = create(clientChannel, receiveAction, store, trustedPeerKey);
 		pc.startClientListening();
