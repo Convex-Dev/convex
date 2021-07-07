@@ -21,6 +21,7 @@ literal
 	: nil
 	| bool
 	| keyword
+	| symbol
 	| address
 	| longValue
 	;
@@ -36,7 +37,7 @@ bool: BOOL;
 
 character: CHARACTER; 
 
-keyword: ':' symbol;
+keyword: KEYWORD;
 
 symbol: SYMBOL;
 
@@ -59,7 +60,10 @@ DIGITS:
 SIGNED_DIGITS:
   '-' DIGITS | '+' DIGITS;
 
-// Symbols
+// Symbols and Keywords
+
+KEYWORD:
+   ':' NAME;
 
 SYMBOL
     : '/'

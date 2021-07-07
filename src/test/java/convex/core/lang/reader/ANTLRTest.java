@@ -14,6 +14,7 @@ import convex.core.data.Sets;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.Symbols;
 
 public class ANTLRTest {
 	
@@ -39,6 +40,7 @@ public class ANTLRTest {
 		
 		// Keywords and Symbols
 		assertEquals(Keywords.FOO,read(":foo"));
+		assertEquals(Symbols.FOO,read("foo"));
 		
 		// Address
 		assertEquals(Address.create(17),read("#17"));

@@ -15,6 +15,7 @@ import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
 import convex.core.data.Sets;
+import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
@@ -199,8 +200,7 @@ public class AntlrReader {
 
 		@Override
 		public void enterKeyword(KeywordContext ctx) {
-			// TODO Auto-generated method stub
-			
+			// Nothing to do
 		}
 
 		@Override
@@ -213,20 +213,20 @@ public class AntlrReader {
 
 		@Override
 		public void enterSymbol(SymbolContext ctx) {
-			// TODO Auto-generated method stub
-			
+			// Nothing to do
 		}
 
 		@Override
 		public void exitSymbol(SymbolContext ctx) {
-			// TODO Auto-generated method stub
-			
+			String s=ctx.getText();
+			Symbol sym=Symbol.create(s);
+			if (sym==null) throw new ParseException("Bad keyword format: "+s);
+			push( sym);
 		}
 
 		@Override
 		public void enterAddress(AddressContext ctx) {
-			// Nothing
-			
+			// Nothing to do
 		}
 
 		@Override
