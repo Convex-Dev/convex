@@ -18,6 +18,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
+import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
@@ -43,6 +44,7 @@ import convex.core.lang.reader.antlr.ConvexParser.MapContext;
 import convex.core.lang.reader.antlr.ConvexParser.NilContext;
 import convex.core.lang.reader.antlr.ConvexParser.QuotedContext;
 import convex.core.lang.reader.antlr.ConvexParser.SetContext;
+import convex.core.lang.reader.antlr.ConvexParser.StringContext;
 import convex.core.lang.reader.antlr.ConvexParser.SymbolContext;
 import convex.core.lang.reader.antlr.ConvexParser.SyntaxContext;
 import convex.core.lang.reader.antlr.ConvexParser.VectorContext;
@@ -304,7 +306,6 @@ public class AntlrReader {
 		@Override
 		public void enterQuoted(QuotedContext ctx) {
 			// Nothing to do
-			
 		}
 
 		@Override
@@ -314,6 +315,20 @@ public class AntlrReader {
 			Symbol qsym=ReaderUtils.getQuotingSymbol(qs);
 			if (qsym==null) throw new ParseException("Invalid quoting reader macro: "+qs);
 			push(Lists.of(qsym,form));	
+		}
+
+		@Override
+		public void enterString(StringContext ctx) {
+			// Nothing to do
+		}
+
+		@Override
+		public void exitString(StringContext ctx) {
+			String s=ctx.getText();
+			int n=s.length();
+			s=s.substring(1, n-1); // skip surrounding double quotes
+			s=ReaderUtils.unescapeString(s);
+			push(Strings.create(s));
 		}
 	}
 

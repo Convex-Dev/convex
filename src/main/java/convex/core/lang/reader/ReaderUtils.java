@@ -2,6 +2,8 @@ package convex.core.lang.reader;
 
 import java.util.HashMap;
 
+import org.apache.commons.text.StringEscapeUtils;
+
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
@@ -53,6 +55,14 @@ public class ReaderUtils {
 
 	public static Symbol getQuotingSymbol(String s) {
 		return quotingSymbols.get(s);
+	}
+
+	public static String unescapeString(String s) {
+		return StringEscapeUtils.unescapeJava(s);
+	}
+
+	public static String escapeString(String s) {
+		return StringEscapeUtils.escapeJava(s);
 	}
 	
 }

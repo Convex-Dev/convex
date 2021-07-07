@@ -364,7 +364,7 @@ public class ParboiledReader extends BaseParser<ACell> {
 		return Sequence(
 				'"', 
 				ZeroOrMore(Sequence(StringCharacter(), sb.append(matchOrDefault("0")))),
-				push(prepare(Strings.create(Utils.unescapeString(sb.get())))), '"');
+				push(prepare(Strings.create(ReaderUtils.unescapeString(sb.get())))), '"');
 	}
 
 	public Rule StringCharacter() {

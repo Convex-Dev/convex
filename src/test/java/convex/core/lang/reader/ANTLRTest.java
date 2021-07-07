@@ -13,6 +13,7 @@ import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
+import convex.core.data.Strings;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
@@ -73,6 +74,13 @@ public class ANTLRTest {
 	@Test public void testChars() {
 		assertEquals(CVMChar.create('a'), read("\\a"));
 		assertEquals(CVMChar.create('\t'), read("\\tab"));
+	}
+	
+	@Test public void testStrings() {
+		assertEquals(Strings.create(""), read("\"\""));
+		assertEquals(Strings.create("a"), read("\"a\""));
+		assertEquals(Strings.create("bar"), read("\"bar\""));
+		assertEquals(Strings.create("ba\nr"), read("\"ba\\\nr\""));
 	}
 
 

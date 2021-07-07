@@ -27,8 +27,6 @@ import java.util.stream.Collectors;
 import convex.core.State;
 import convex.core.data.*;
 import convex.core.data.prim.CVMLong;
-import org.apache.commons.text.StringEscapeUtils;
-
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 
@@ -1238,14 +1236,6 @@ public class Utils {
 	 */
 	public static boolean firstDigitMatch(byte a, byte b) {
 		return (a & 0xF0) == (b & 0xF0);
-	}
-
-	public static String unescapeString(String s) {
-		return StringEscapeUtils.unescapeJava(s);
-	}
-
-	public static String escapeString(String s) {
-		return StringEscapeUtils.escapeJava(s);
 	}
 
 	/**
