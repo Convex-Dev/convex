@@ -1,6 +1,7 @@
 package convex.core.lang.reader;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,7 @@ public class ANTLRTest {
 	}
 
 	@Test public void testParser() {
+		assertNull(read("nil"));
 		
 		assertSame(CVMBool.TRUE,read("true"));
 		assertSame(CVMBool.FALSE,read("false"));

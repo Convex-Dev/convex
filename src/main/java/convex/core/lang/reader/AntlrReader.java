@@ -181,8 +181,7 @@ public class AntlrReader {
 
 		@Override
 		public void exitNil(NilContext ctx) {
-			// TODO Auto-generated method stub
-			
+			push(null);
 		}
 
 		@Override
