@@ -63,10 +63,14 @@ quoted: QUOTING form;
 
 string: STRING;
 
+commented: COMMENTED form;
+
 /*  =========================================
  *  Lexer stuff below here
  *  =========================================
  */ 
+
+COMMENTED: '#_';
 
 HASH: '#';
 

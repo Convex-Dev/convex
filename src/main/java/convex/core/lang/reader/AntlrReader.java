@@ -37,6 +37,7 @@ import convex.core.lang.reader.antlr.ConvexParser.AddressContext;
 import convex.core.lang.reader.antlr.ConvexParser.BlobContext;
 import convex.core.lang.reader.antlr.ConvexParser.BoolContext;
 import convex.core.lang.reader.antlr.ConvexParser.CharacterContext;
+import convex.core.lang.reader.antlr.ConvexParser.CommentedContext;
 import convex.core.lang.reader.antlr.ConvexParser.DataStructureContext;
 import convex.core.lang.reader.antlr.ConvexParser.DoubleValueContext;
 import convex.core.lang.reader.antlr.ConvexParser.FormContext;
@@ -360,6 +361,17 @@ public class AntlrReader {
 			ACell special=ReaderUtils.specialLiteral(s);
 			if (special==null) throw new ParseException("Invalid special literal: "+s);
 			push(special);
+		}
+
+		@Override
+		public void enterCommented(CommentedContext ctx) {
+			// Nothing to do
+		}
+
+		@Override
+		public void exitCommented(CommentedContext ctx) {
+			// remove commented form
+			pop();	
 		}
 
 
