@@ -2,17 +2,13 @@ package convex.core.lang;
 
 import java.io.IOException;
 
-import org.parboiled.BaseParser;
 import org.parboiled.annotations.BuildParseTree;
 
 import convex.core.data.ACell;
 import convex.core.data.AList;
-import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.lang.reader.ParboiledReader;
 import convex.core.util.Utils;
-
-//@formatter:off
 
 /**
  * Parboiled Parser implementation which reads source code and produces a tree
@@ -25,9 +21,7 @@ import convex.core.util.Utils;
  */
 @BuildParseTree
 @SuppressWarnings("javadoc")
-public class Reader extends BaseParser<ACell> {
-
-
+public class Reader {
 	/**
 	 * Parses an expression and returns a Syntax object
 	 * 
@@ -35,7 +29,7 @@ public class Reader extends BaseParser<ACell> {
 	 * @return Parsed form
 	 */
 	public static Syntax readSyntax(String source) {
-		return ParboiledReader.readSyntax(source);
+		return Syntax.create(read(source));
 	}
 
 	public static ACell readResource(String path)  {
@@ -45,12 +39,12 @@ public class Reader extends BaseParser<ACell> {
 		} catch (IOException e) {
 			throw Utils.sneakyThrow(e);
 		}
-		return ParboiledReader.read(source);
+		return read(source);
 	}
 	
 	public static ACell readResourceAsData(String path) throws IOException {
 		String source = Utils.readResourceAsString(path);
-		return ParboiledReader.read(source);
+		return read(source);
 	}
 
 	/**
@@ -61,16 +55,6 @@ public class Reader extends BaseParser<ACell> {
 	 */
 	public static AList<ACell> readAll(String source) {
 		return ParboiledReader.readAll(source);
-	}
-
-	/**
-	 * Parses a symbol
-	 * 
-	 * @param source
-	 * @return Parsed Symbol
-	 */
-	public static Symbol readSymbol(String source) {
-		return ParboiledReader.readSymbol(source);
 	}
 
 	/**
@@ -94,5 +78,3 @@ public class Reader extends BaseParser<ACell> {
 	}
 
 }
-
-//@formatter:on

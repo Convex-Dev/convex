@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
 import convex.core.data.AList;
-import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
@@ -60,13 +59,6 @@ public class ReaderTest {
 		assertCVMEquals(1L, Reader.read(";this is a comment\n 1 \n"));
 		assertCVMEquals(2L, Reader.read("#_foo 2"));
 		assertCVMEquals(3L, Reader.read("3 #_foo"));
-	}
-
-	@Test
-	public void testReadSymbol() {
-		assertEquals(Symbols.FOO, Reader.readSymbol("foo"));
-		assertThrows(Error.class, () -> Reader.readSymbol(""));
-		assertThrows(Error.class, () -> Reader.readSymbol("1"));
 	}
 
 	@Test
@@ -228,19 +220,6 @@ public class ReaderTest {
 		assertEquals(Syntax.create(Symbols.FOO), Reader.readSyntax("foo").withoutMeta());
 		assertEquals(Syntax.create(Keywords.FOO), Reader.readSyntax(":foo").withoutMeta());
 	}
-
-	@Test
-	public void testSyntaxReaderExample() {
-		String src = "[1 2 nil '(a b) :foo 2 \\a \"bar\" #{} {1 2 3 4}]";
-		Syntax s = Reader.readSyntax(src);
-		AVector<Syntax> v = s.getValue();
-		Syntax v1 = v.get(1);
-		assertCVMEquals(2L, v1.getValue());
-		//assertEquals(3L, v1.getStart());
-		//assertEquals(4L, v1.getEnd());
-
-		//assertEquals(src, s.getSource());
-	}
 	
 	@Test
 	public void testReadMetadata() {
@@ -259,8 +238,5 @@ public class ReaderTest {
 			assertCVMEquals(2L, form.getMeta().get(Keywords.FOO));
 		}
 
-		// TODO: Decide how to handle values within meta - unwrap Syntax Objects?
-		assertCVMEquals(Boolean.FALSE, Reader.readSyntax("^{:foo false} a").getMeta().get(Keywords.FOO));
-		assertEquals(Vectors.of(1L, 2L), Reader.readSyntax("^{:foo [1 2]} a").getMeta().get(Keywords.FOO));
 	}
 }
