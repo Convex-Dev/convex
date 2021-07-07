@@ -1,7 +1,9 @@
 package convex.core.lang.reader;
 
+import java.io.IOException;
 import java.util.ArrayList;
 
+import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -347,9 +349,16 @@ public class AntlrReader {
 		}
 	}
 
-	
 	public static ACell read(String s) {
-		ConvexLexer lexer=new ConvexLexer(CharStreams.fromString(s));
+		return read(CharStreams.fromString(s));
+	}
+	
+	public static ACell read(java.io.Reader r) throws IOException {
+		return read(CharStreams.fromReader(r));
+	}
+	
+	public static ACell read(CharStream cs) {
+		ConvexLexer lexer=new ConvexLexer(cs);
 		
 		CommonTokenStream tokens = new CommonTokenStream(lexer);
 		ConvexParser parser = new ConvexParser(tokens);
@@ -360,7 +369,7 @@ public class AntlrReader {
 		
 		ArrayList<ACell> top=visitor.popList();
 		if (top.size()!=1) {
-			throw new ParseException("Bad parse output: "+top+" in code "+s);
+			throw new ParseException("Bad parse output: "+top);
 		}
 		
 		return top.get(0);
