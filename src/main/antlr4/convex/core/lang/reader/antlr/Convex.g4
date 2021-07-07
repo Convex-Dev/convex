@@ -2,6 +2,7 @@ grammar Convex;
 
 form
 	: literal
+	| dataStructure
 	;
 	
 forms: form* ;
@@ -18,13 +19,11 @@ set : '#{' forms '}';
 literal 
 	: nil
 	| bool
-	| number
+	| longValue
 	;
-	
-number
-   : longValue;
    
-longValue: LONG;   
+longValue: 
+   LONG;   
 
 nil: NIL;
 
@@ -44,6 +43,20 @@ symbol: SYMBOL;
 NIL: 'nil';
 
 BOOL : 'true' | 'false' ;
+
+// Number. Needs to go before Symbols!
+
+
+LONG: SIGN? DIGITS;
+
+fragment
+DIGITS:
+  [0-9]+;
+
+fragment 
+SIGN:
+  '-' | '+';
+
 
 // Symbols
 
@@ -71,7 +84,7 @@ SPECIAL_CHARACTER
 fragment
 SYMBOL_FIRST
     : ALPHA
-    | DIGIT
+    | [0-9]
     | '.' | '*' | '+' | '!' | '-' | '?' | '$' | '%' | '&' | '=' | '<' | '>'
     ;
 
@@ -83,17 +96,6 @@ SYMBOL_FOLLOWING
     
 fragment
 ALPHA: [a-z] | [A-Z];
-
-fragment
-LONG:
-  SIGN? DIGIT+;
-  
-SIGN:
-  '-' | '+';
-    
-fragment 
-DIGIT : [0-9];
-    
 
 /*
  * Whitespace and comments

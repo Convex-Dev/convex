@@ -105,6 +105,11 @@ public final class CVMLong extends APrimitive implements INumeric {
 		return (double)value;
 	}
 	
+	/**
+	 * Parse a String as a CVM Long. Throws an exception if the string is not valid
+	 * @param s
+	 * @return CVM Long value
+	 */
 	public static CVMLong parse(String s) {
 		return create(Long.parseLong(s));
 	}

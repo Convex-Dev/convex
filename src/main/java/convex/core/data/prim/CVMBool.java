@@ -1,5 +1,6 @@
 package convex.core.data.prim;
 
+import convex.core.data.ACell;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
@@ -90,6 +91,12 @@ public final class CVMBool extends APrimitive {
 	@Override
 	public byte getTag() {
 		return (value)?Tag.TRUE:Tag.FALSE;
+	}
+
+	public static ACell parse(String text) {
+		if ("true".equals(text)) return TRUE;
+		if ("false".equals(text)) return FALSE;
+		return null;
 	}
 
 

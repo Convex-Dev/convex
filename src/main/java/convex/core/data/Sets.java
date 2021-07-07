@@ -1,5 +1,7 @@
 package convex.core.data;
 
+import java.util.Collection;
+
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 
@@ -35,5 +37,16 @@ public class Sets {
 			return Set.create(seq);
 		}
 		throw new IllegalArgumentException("Unexpected type!" + Utils.getClass(source));
+	}
+	
+	/**
+	 * Creates a set of all the elements in the given data structure
+	 * 
+	 * @param <T>
+	 * @param source
+	 * @return A Set
+	 */
+	public static <T extends ACell> Set<T> fromCollection(Collection<T> source) {
+		return Sets.of(source.toArray());
 	}
 }
