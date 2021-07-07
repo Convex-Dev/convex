@@ -5,6 +5,7 @@ form
 	| symbol
 	| dataStructure
 	| syntax
+	| quoted
 	;
 	
 forms: form* ;
@@ -50,6 +51,8 @@ symbol: SYMBOL;
 
 syntax: META form form;
 
+quoted: QUOTING form;
+
 /*  =========================================
  *  Lexer stuff below here
  *  =========================================
@@ -79,6 +82,10 @@ HEX_BYTE: HEX_DIGIT HEX_DIGIT;
 
 fragment 
 HEX_DIGIT: [0-9a-fA-F];
+
+// Quoting
+
+QUOTING: '\'' | '`' | '~' | '~@';
 
 // Symbols and Keywords
 

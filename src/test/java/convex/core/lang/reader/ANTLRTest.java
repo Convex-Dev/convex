@@ -63,6 +63,12 @@ public class ANTLRTest {
 		assertEquals(Syntax.create(CVMLong.ONE,Maps.empty()), read("^{} 1"));
 	}
 	
+	@Test public void testQuoting() {
+		assertEquals(Lists.of(Symbols.QUOTE,CVMLong.ZERO), read("'0"));
+		assertEquals(Lists.of(Symbols.QUOTE,Symbols.FOO), read("'foo"));
+		assertEquals(Lists.of(Symbols.QUOTE,Vectors.empty()), read("'[]"));
+	}
+	
 
 	@Test public void testChars() {
 		assertEquals(CVMChar.create('a'), read("\\a"));

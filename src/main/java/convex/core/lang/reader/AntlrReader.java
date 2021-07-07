@@ -41,6 +41,7 @@ import convex.core.lang.reader.antlr.ConvexParser.LiteralContext;
 import convex.core.lang.reader.antlr.ConvexParser.LongValueContext;
 import convex.core.lang.reader.antlr.ConvexParser.MapContext;
 import convex.core.lang.reader.antlr.ConvexParser.NilContext;
+import convex.core.lang.reader.antlr.ConvexParser.QuotedContext;
 import convex.core.lang.reader.antlr.ConvexParser.SetContext;
 import convex.core.lang.reader.antlr.ConvexParser.SymbolContext;
 import convex.core.lang.reader.antlr.ConvexParser.SyntaxContext;
@@ -61,11 +62,21 @@ public class AntlrReader {
 			top.add(a);
 		}
 		
+		public ACell pop() {
+			int n=stack.size()-1;
+			ArrayList<ACell> top=stack.get(n);
+			int c=top.size()-1;
+			ACell cell=top.get(c);
+			top.remove(c);
+			return cell;
+		}
+
+		
 		private void pushList() {
 			stack.add(new ArrayList<>());
 		}
 		
-		public ArrayList<ACell> pop() {
+		public ArrayList<ACell> popList() {
 			int n=stack.size()-1;
 			ArrayList<ACell> top=stack.get(n);
 			stack.remove(n);
@@ -130,7 +141,7 @@ public class AntlrReader {
 
 		@Override
 		public void exitList(ListContext ctx) {
-			ArrayList<ACell> elements=pop();
+			ArrayList<ACell> elements=popList();
 			push(Lists.create(elements));
 		}
 
@@ -141,7 +152,7 @@ public class AntlrReader {
 
 		@Override
 		public void exitVector(VectorContext ctx) {
-			ArrayList<ACell> elements=pop();
+			ArrayList<ACell> elements=popList();
 			push(Vectors.create(elements));
 		}
 
@@ -152,7 +163,7 @@ public class AntlrReader {
 
 		@Override
 		public void exitSet(SetContext ctx) {
-			ArrayList<ACell> elements=pop();
+			ArrayList<ACell> elements=popList();
 			push(Sets.fromCollection(elements));
 		}
 		
@@ -163,7 +174,7 @@ public class AntlrReader {
 
 		@Override
 		public void exitMap(MapContext ctx) {
-			ArrayList<ACell> elements=pop();
+			ArrayList<ACell> elements=popList();
 			push(Maps.create(elements.toArray(new ACell[elements.size()])));
 		}
 
@@ -269,7 +280,7 @@ public class AntlrReader {
 
 		@Override
 		public void exitSyntax(SyntaxContext ctx) {
-			ArrayList<ACell> elements=pop();
+			ArrayList<ACell> elements=popList();
 			if (elements.size()!=2) throw new ParseException("Metadata requires metadata and annotated form but got:"+ elements);
 			ACell value=elements.get(1);
 			AHashMap<ACell,ACell> meta=ReaderUtils.interpretMetadata(elements.get(0));
@@ -290,8 +301,20 @@ public class AntlrReader {
 			push(b);
 		}
 
-	
-		
+		@Override
+		public void enterQuoted(QuotedContext ctx) {
+			// Nothing to do
+			
+		}
+
+		@Override
+		public void exitQuoted(QuotedContext ctx) {
+			ACell form=pop();
+			String qs=ctx.getStart().getText();
+			Symbol qsym=ReaderUtils.getQuotingSymbol(qs);
+			if (qsym==null) throw new ParseException("Invalid quoting reader macro: "+qs);
+			push(Lists.of(qsym,form));	
+		}
 	}
 
 	
@@ -305,7 +328,7 @@ public class AntlrReader {
 		CRListener visitor=new CRListener();
 		ParseTreeWalker.DEFAULT.walk(visitor, tree);
 		
-		ArrayList<ACell> top=visitor.pop();
+		ArrayList<ACell> top=visitor.popList();
 		if (top.size()!=1) {
 			throw new ParseException("Bad parse output: "+top+" in code "+s);
 		}

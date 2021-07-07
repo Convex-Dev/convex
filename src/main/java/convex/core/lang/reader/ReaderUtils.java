@@ -8,8 +8,10 @@ import convex.core.data.AMap;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
+import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.prim.CVMChar;
+import convex.core.lang.Symbols;
 
 public class ReaderUtils {
 
@@ -40,6 +42,17 @@ public class ReaderUtils {
 
 	public static CVMChar specialCharacter(String s) {
 		return specialCharacters.get(s);
+	}
+	
+	private static final HashMap<String,Symbol> quotingSymbols=Maps.hashMapOf(
+			"'",Symbols.QUOTE,
+			"`",Symbols.QUASIQUOTE,
+			"~",Symbols.UNQUOTE,
+			"~@",Symbols.UNQUOTE_SPLICING
+			);
+
+	public static Symbol getQuotingSymbol(String s) {
+		return quotingSymbols.get(s);
 	}
 	
 }
