@@ -14,6 +14,7 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AList;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Keyword;
@@ -359,7 +360,6 @@ public class AntlrReader {
 	
 	public static ACell read(CharStream cs) {
 		ConvexLexer lexer=new ConvexLexer(cs);
-		
 		CommonTokenStream tokens = new CommonTokenStream(lexer);
 		ConvexParser parser = new ConvexParser(tokens);
 		ParseTree tree = parser.form();
@@ -373,6 +373,23 @@ public class AntlrReader {
 		}
 		
 		return top.get(0);
+	}
+	
+	public static AList<ACell> readAll(String source) {
+		return readAll(CharStreams.fromString(source));
+	}
+
+	public static AList<ACell> readAll(CharStream cs) {
+		ConvexLexer lexer=new ConvexLexer(cs);
+		CommonTokenStream tokens = new CommonTokenStream(lexer);
+		ConvexParser parser = new ConvexParser(tokens);
+		ParseTree tree = parser.forms();
+		
+		CRListener visitor=new CRListener();
+		ParseTreeWalker.DEFAULT.walk(visitor, tree);
+		
+		ArrayList<ACell> top=visitor.popList();
+		return Lists.create(top);
 	}
 
 }

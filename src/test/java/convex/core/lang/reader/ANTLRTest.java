@@ -87,6 +87,11 @@ public class ANTLRTest {
 		assertEquals(Strings.create("bar"), read("\"bar\""));
 		assertEquals(Strings.create("ba\nr"), read("\"ba\\\nr\""));
 	}
+	
+	@Test public void testReadAll() {
+		assertSame(Lists.empty(),AntlrReader.readAll(""));
+		assertEquals(Lists.of(1,2),AntlrReader.readAll(" 1 2 "));
+	}
 
 
 }
