@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
 import convex.core.data.Address;
+import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.data.Sets;
 import convex.core.data.Vectors;
@@ -28,6 +29,7 @@ public class ANTLRTest {
 		assertEquals(CVMLong.create(17),read("+17"));
 		assertEquals(CVMLong.ZERO,read("0"));
 		
+		// basic data structures
 		assertEquals(Vectors.of(1,2),read("[1 2]"));
 		assertEquals(Lists.of(1,2),read("(1 2)"));
 		assertEquals(Sets.of(1,2),read("#{1 2}"));
@@ -35,6 +37,10 @@ public class ANTLRTest {
 		assertSame(Lists.empty(),read("()"));
 		assertSame(Vectors.empty(),read("[]"));
 		
+		// Keywords and Symbols
+		assertEquals(Keywords.FOO,read(":foo"));
+		
+		// Address
 		assertEquals(Address.create(17),read("#17"));
 		
 

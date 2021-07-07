@@ -12,6 +12,7 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 
 import convex.core.data.ACell;
 import convex.core.data.Address;
+import convex.core.data.Keyword;
 import convex.core.data.Lists;
 import convex.core.data.Sets;
 import convex.core.data.Vectors;
@@ -60,36 +61,32 @@ public class AntlrReader {
 
 		@Override
 		public void visitTerminal(TerminalNode node) {
-			// TODO Auto-generated method stub
-			
+			// Nothing to do
 		}
 
 		@Override
 		public void visitErrorNode(ErrorNode node) {
-			// TODO Auto-generated method stub
-			
+			throw new ParseException(node.toString());
 		}
 
 		@Override
 		public void enterEveryRule(ParserRuleContext ctx) {
-			// TODO Auto-generated method stub
-			
+			// Nothing to do
 		}
 
 		@Override
 		public void exitEveryRule(ParserRuleContext ctx) {
-			// TODO Auto-generated method stub
-			
+			// Nothing to do
 		}
 
 		@Override
 		public void enterForm(FormContext ctx) {
+			// Nothing to do
 		}
 
 		@Override
 		public void exitForm(FormContext ctx) {
-			// TODO Auto-generated method stub
-			
+			// Nothing to do
 		}
 
 		@Override
@@ -100,19 +97,17 @@ public class AntlrReader {
 
 		@Override
 		public void exitForms(FormsContext ctx) {
-			// TODO Auto-generated method stub
+			// Nothing to do
 		}
 
 		@Override
 		public void enterDataStructure(DataStructureContext ctx) {
-			// TODO Auto-generated method stub
-			
+			// Nothing to do
 		}
 
 		@Override
 		public void exitDataStructure(DataStructureContext ctx) {
-			// TODO Auto-generated method stub
-			
+			// Nothing to do
 		}
 
 		@Override
@@ -139,8 +134,7 @@ public class AntlrReader {
 
 		@Override
 		public void enterSet(SetContext ctx) {
-			// TODO Auto-generated method stub
-			
+			// Nothing to do
 		}
 
 		@Override
@@ -151,32 +145,29 @@ public class AntlrReader {
 
 		@Override
 		public void enterLiteral(LiteralContext ctx) {
-			// TODO Auto-generated method stub
-			
+			// Nothing to do
 		}
 
 		@Override
 		public void exitLiteral(LiteralContext ctx) {
-			// TODO Auto-generated method stub
-			
+			// Nothing to do
 		}
 
 		@Override
 		public void enterLongValue(LongValueContext ctx) {
-			// TODO Auto-generated method stub
+			// Nothing to do
 		}
 
 		@Override
 		public void exitLongValue(LongValueContext ctx) {
 			String s=ctx.getText();
-			System.out.println(s);
+			// System.out.println(s);
 			push( CVMLong.parse(s));
 		}
 
 		@Override
 		public void enterNil(NilContext ctx) {
-			// TODO Auto-generated method stub
-			
+			// Nothing to do
 		}
 
 		@Override
@@ -186,8 +177,7 @@ public class AntlrReader {
 
 		@Override
 		public void enterBool(BoolContext ctx) {
-			// TODO Auto-generated method stub
-			
+			// Nothing to do
 		}
 
 		@Override
@@ -215,8 +205,10 @@ public class AntlrReader {
 
 		@Override
 		public void exitKeyword(KeywordContext ctx) {
-			// TODO Auto-generated method stub
-			
+			String s=ctx.getText();
+			Keyword k=Keyword.create(s.substring(1));
+			if (k==null) throw new ParseException("Bad keyword format: "+s);
+			push( k);
 		}
 
 		@Override
