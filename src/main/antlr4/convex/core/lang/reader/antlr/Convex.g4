@@ -23,6 +23,7 @@ map : '{' forms '}';
 literal 
 	: nil
 	| bool
+	| blob
 	| keyword
 	| symbol
 	| address
@@ -35,6 +36,8 @@ longValue:
 address: HASH DIGITS;
 
 nil: NIL;
+
+blob: BLOB;
 
 bool: BOOL; 
 
@@ -66,6 +69,15 @@ DIGITS:
   
 SIGNED_DIGITS:
   '-' DIGITS | '+' DIGITS;
+  
+             
+BLOB: '0x' HEX_DIGIT*;
+
+fragment           
+HEX_BYTE: HEX_DIGIT HEX_DIGIT;
+
+fragment 
+HEX_DIGIT: [0-9a-fA-F];
 
 // Symbols and Keywords
 
@@ -84,7 +96,8 @@ NAME: SYMBOL_FIRST SYMBOL_FOLLOWING*;
 CHARACTER
   : '\\' .
   |SPECIAL_CHARACTER;
-  
+
+fragment  
 SPECIAL_CHARACTER
     : '\\' ( 'newline'
            | 'return'
@@ -92,6 +105,7 @@ SPECIAL_CHARACTER
            | 'tab'
            | 'formfeed'
            | 'backspace' ) ;
+
 
 fragment
 SYMBOL_FIRST

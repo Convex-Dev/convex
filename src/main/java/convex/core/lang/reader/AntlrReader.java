@@ -13,6 +13,7 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
@@ -27,6 +28,7 @@ import convex.core.lang.reader.antlr.ConvexLexer;
 import convex.core.lang.reader.antlr.ConvexListener;
 import convex.core.lang.reader.antlr.ConvexParser;
 import convex.core.lang.reader.antlr.ConvexParser.AddressContext;
+import convex.core.lang.reader.antlr.ConvexParser.BlobContext;
 import convex.core.lang.reader.antlr.ConvexParser.BoolContext;
 import convex.core.lang.reader.antlr.ConvexParser.CharacterContext;
 import convex.core.lang.reader.antlr.ConvexParser.DataStructureContext;
@@ -269,6 +271,20 @@ public class AntlrReader {
 			ACell value=elements.get(1);
 			AHashMap<ACell,ACell> meta=ReaderUtils.interpretMetadata(elements.get(0));
 			push(Syntax.create(value, meta));
+		}
+
+		@Override
+		public void enterBlob(BlobContext ctx) {
+			// Nothing to do
+			
+		}
+
+		@Override
+		public void exitBlob(BlobContext ctx) {
+			String s=ctx.getText();
+			Blob b=Blob.fromHex(s.substring(2));
+			if (b==null) throw new ParseException("Invalid Blob syntax: "+s);
+			push(b);
 		}
 
 	

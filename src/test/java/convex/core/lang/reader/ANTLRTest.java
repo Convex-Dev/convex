@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
@@ -46,6 +47,10 @@ public class ANTLRTest {
 		// Keywords and Symbols
 		assertEquals(Keywords.FOO,read(":foo"));
 		assertEquals(Symbols.FOO,read("foo"));
+		
+		// Blobs
+		assertEquals(Blob.EMPTY,read("0x"));
+		assertEquals(Blob.fromHex("cafebabe"),read("0xcaFEBAbe"));
 		
 		// Address
 		assertEquals(Address.create(17),read("#17"));
