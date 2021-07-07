@@ -73,8 +73,9 @@ public class Reader {
 	 * @param source
 	 * @return Parsed form
 	 */
+	@SuppressWarnings("unchecked")
 	public static <R extends ACell> R read(String source) {
-		return ParboiledReader.read(source);
+		return (R) ParboiledReader.read(source);
 	}
 
 }
