@@ -124,7 +124,7 @@ public class ReaderTest {
 		assertCVMEquals(12.0, Reader.read("12e0"));
 		
 		assertThrows(Error.class, () -> {
-			ACell c=Reader.read("2.0e0.1234");
+			Reader.read("2.0e0.1234");
 		});
 		// assertNull( Reader.read("[2.0e0.1234]"));
 		// TODO: do we want this?
