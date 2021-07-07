@@ -27,6 +27,7 @@ import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
+import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
 import convex.core.lang.reader.antlr.ConvexLexer;
@@ -37,6 +38,7 @@ import convex.core.lang.reader.antlr.ConvexParser.BlobContext;
 import convex.core.lang.reader.antlr.ConvexParser.BoolContext;
 import convex.core.lang.reader.antlr.ConvexParser.CharacterContext;
 import convex.core.lang.reader.antlr.ConvexParser.DataStructureContext;
+import convex.core.lang.reader.antlr.ConvexParser.DoubleValueContext;
 import convex.core.lang.reader.antlr.ConvexParser.FormContext;
 import convex.core.lang.reader.antlr.ConvexParser.FormsContext;
 import convex.core.lang.reader.antlr.ConvexParser.KeywordContext;
@@ -205,6 +207,17 @@ public class AntlrReader {
 			// System.out.println(s);
 			push( CVMLong.parse(s));
 		}
+		
+		@Override
+		public void enterDoubleValue(DoubleValueContext ctx) {
+			// Nothing to do
+		}
+
+		@Override
+		public void exitDoubleValue(DoubleValueContext ctx) {
+			String s=ctx.getText();
+			push( CVMDouble.parse(s));
+		}
 
 		@Override
 		public void enterNil(NilContext ctx) {
@@ -348,6 +361,8 @@ public class AntlrReader {
 			if (special==null) throw new ParseException("Invalid special literal: "+s);
 			push(special);
 		}
+
+
 	}
 
 	public static ACell read(String s) {

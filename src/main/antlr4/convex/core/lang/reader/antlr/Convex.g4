@@ -31,11 +31,15 @@ literal
 	| address
 	| string
 	| longValue
+	| doubleValue
 	| specialLiteral
 	;
    
 longValue: 
    DIGITS | SIGNED_DIGITS;   
+   
+doubleValue:
+   DOUBLE;
    
 specialLiteral: HASH HASH symbol;
    
@@ -74,13 +78,28 @@ BOOL : 'true' | 'false' ;
 
 // Number. Needs to go before Symbols!
 
+DOUBLE:
+  (DIGITS | SIGNED_DIGITS) DOUBLE_TAIL;
+  
+fragment  
+DOUBLE_TAIL:
+  DECIMAL EPART | DECIMAL | EPART;
+  
+fragment
+DECIMAL:
+  '.' DIGITS;
+  
+fragment 
+EPART:
+  [eE] (DIGITS | SIGNED_DIGITS);  
+
 DIGITS:
   [0-9]+;
   
+fragment  
 SIGNED_DIGITS:
-  '-' DIGITS | '+' DIGITS;
+  '-' DIGITS;
   
-             
 BLOB: '0x' HEX_DIGIT*;
 
 fragment           

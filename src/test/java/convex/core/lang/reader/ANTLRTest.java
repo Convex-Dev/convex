@@ -34,7 +34,7 @@ public class ANTLRTest {
 		
 		assertSame(CVMBool.TRUE,read("true"));
 		assertSame(CVMBool.FALSE,read("false"));
-		assertEquals(CVMLong.create(17),read("+17"));
+		assertEquals(CVMLong.create(17),read("17"));
 		assertEquals(CVMLong.ZERO,read("0"));
 		
 		// basic data structures
@@ -54,11 +54,11 @@ public class ANTLRTest {
 		// Blobs
 		assertEquals(Blob.EMPTY,read("0x"));
 		assertEquals(Blob.fromHex("cafebabe"),read("0xcaFEBAbe"));
-		
+	}
+	
+	@Test public void testAddress() {
 		// Address
 		assertEquals(Address.create(17),read("#17"));
-		
-
 	}
 	
 	@Test public void testSytnax() {
@@ -79,6 +79,16 @@ public class ANTLRTest {
 	
 	@Test public void testSpecial() {
 		assertEquals(CVMDouble.NaN, read("##NaN"));
+	}
+	
+	
+	@Test public void testDouble() {
+		assertEquals(CVMDouble.ONE, read("1.0"));
+		assertEquals(CVMDouble.ONE, read("1.0e0"));
+		assertEquals(CVMDouble.create(-17.0), read("-17.0"));
+		assertEquals(CVMDouble.create(-17.0e2), read("-17.0E2"));
+		assertEquals(CVMDouble.create(1000), read("1e3"));
+		assertEquals(CVMDouble.create(0.001), read("1e-3"));
 	}
 	
 	@Test public void testStrings() {
