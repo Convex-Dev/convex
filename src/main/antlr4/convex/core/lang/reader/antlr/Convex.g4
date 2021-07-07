@@ -15,7 +15,7 @@ list : '(' forms ')';
 
 vector : '[' forms ']';
 
-set : '#{' forms '}';
+set : HASH '{' forms '}';
 
 literal 
 	: nil
@@ -26,7 +26,7 @@ literal
 	;
    
 longValue: 
-   LONG;   
+   DIGITS | SIGNED_DIGITS;   
    
 address: HASH DIGITS;
 
@@ -53,17 +53,11 @@ BOOL : 'true' | 'false' ;
 
 // Number. Needs to go before Symbols!
 
-
-LONG: SIGN? DIGITS;
-
-fragment
 DIGITS:
   [0-9]+;
-
-fragment 
-SIGN:
-  '-' | '+';
-
+  
+SIGNED_DIGITS:
+  '-' DIGITS | '+' DIGITS;
 
 // Symbols
 
