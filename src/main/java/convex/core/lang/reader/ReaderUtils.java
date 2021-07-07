@@ -13,6 +13,7 @@ import convex.core.data.Maps;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.prim.CVMChar;
+import convex.core.data.prim.CVMDouble;
 import convex.core.lang.Symbols;
 
 public class ReaderUtils {
@@ -63,6 +64,16 @@ public class ReaderUtils {
 
 	public static String escapeString(String s) {
 		return StringEscapeUtils.escapeJava(s);
+	}
+	
+	private static final HashMap<String,ACell> specialLiterals=Maps.hashMapOf(
+			"##NaN",CVMDouble.NaN,
+			"##Inf",CVMDouble.POSITIVE_INFINITY,
+			"##-Inf",CVMDouble.NEGATIVE_INFINITY
+			);
+
+	public static ACell specialLiteral(String s) {
+		return specialLiterals.get(s);
 	}
 	
 }

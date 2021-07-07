@@ -44,6 +44,7 @@ import convex.core.lang.reader.antlr.ConvexParser.MapContext;
 import convex.core.lang.reader.antlr.ConvexParser.NilContext;
 import convex.core.lang.reader.antlr.ConvexParser.QuotedContext;
 import convex.core.lang.reader.antlr.ConvexParser.SetContext;
+import convex.core.lang.reader.antlr.ConvexParser.SpecialLiteralContext;
 import convex.core.lang.reader.antlr.ConvexParser.StringContext;
 import convex.core.lang.reader.antlr.ConvexParser.SymbolContext;
 import convex.core.lang.reader.antlr.ConvexParser.SyntaxContext;
@@ -329,6 +330,20 @@ public class AntlrReader {
 			s=s.substring(1, n-1); // skip surrounding double quotes
 			s=ReaderUtils.unescapeString(s);
 			push(Strings.create(s));
+		}
+
+		@Override
+		public void enterSpecialLiteral(SpecialLiteralContext ctx) {
+			// Nothing to do
+		}
+
+		@Override
+		public void exitSpecialLiteral(SpecialLiteralContext ctx) {
+			pop(); // pop the symbol
+			String s=ctx.getText();
+			ACell special=ReaderUtils.specialLiteral(s);
+			if (special==null) throw new ParseException("Invalid special literal: "+s);
+			push(special);
 		}
 	}
 

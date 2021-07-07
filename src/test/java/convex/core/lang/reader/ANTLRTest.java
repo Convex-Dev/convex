@@ -18,6 +18,7 @@ import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
+import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.Symbols;
 
@@ -74,6 +75,10 @@ public class ANTLRTest {
 	@Test public void testChars() {
 		assertEquals(CVMChar.create('a'), read("\\a"));
 		assertEquals(CVMChar.create('\t'), read("\\tab"));
+	}
+	
+	@Test public void testSpecial() {
+		assertEquals(CVMDouble.NaN, read("##NaN"));
 	}
 	
 	@Test public void testStrings() {

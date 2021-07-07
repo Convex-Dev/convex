@@ -31,10 +31,13 @@ literal
 	| address
 	| string
 	| longValue
+	| specialLiteral
 	;
    
 longValue: 
    DIGITS | SIGNED_DIGITS;   
+   
+specialLiteral: HASH HASH symbol;
    
 address: HASH DIGITS;
 
