@@ -16,6 +16,7 @@ import convex.core.data.Sets;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
+import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.Symbols;
 
@@ -60,6 +61,12 @@ public class ANTLRTest {
 	
 	@Test public void testSytnax() {
 		assertEquals(Syntax.create(CVMLong.ONE,Maps.empty()), read("^{} 1"));
+	}
+	
+
+	@Test public void testChars() {
+		assertEquals(CVMChar.create('a'), read("\\a"));
+		assertEquals(CVMChar.create('\t'), read("\\tab"));
 	}
 
 

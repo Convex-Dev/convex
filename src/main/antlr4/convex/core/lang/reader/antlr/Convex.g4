@@ -24,6 +24,7 @@ literal
 	: nil
 	| bool
 	| blob
+	| character
 	| keyword
 	| symbol
 	| address

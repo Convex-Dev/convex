@@ -4,6 +4,7 @@ import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.reader.ReaderUtils;
 import convex.core.util.Utils;
 
 /**
@@ -72,8 +73,22 @@ public final class CVMChar extends APrimitive {
 		return (double)value;
 	}
 	
+	/**
+	 * Parses a Chracter from a String
+	 * @param s
+	 * @return CVMChar instance, or null if not valid
+	 */
 	public static CVMChar parse(String s) {
-		return create(Long.parseLong(s));
+		int n=s.length();
+		
+		if (n<2) return null;
+		
+		if (n==2) {
+			return CVMChar.create(s.charAt(1));
+		}
+		
+		s=s.substring(1);
+		return ReaderUtils.specialCharacter(s);
 	}
 
 	public char charValue() {

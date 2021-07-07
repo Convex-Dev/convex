@@ -22,6 +22,7 @@ import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
+import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
 import convex.core.lang.reader.antlr.ConvexLexer;
@@ -216,8 +217,10 @@ public class AntlrReader {
 
 		@Override
 		public void exitCharacter(CharacterContext ctx) {
-			// TODO Auto-generated method stub
-			
+			String s=ctx.getText();
+			CVMChar c=CVMChar.parse(s);
+			if (c==null) throw new ParseException("Bad chracter literal format: "+s);
+			push(c);
 		}
 
 		@Override
