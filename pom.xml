@@ -5,6 +5,10 @@
 	<groupId>world.convex</groupId>
 	<artifactId>convex</artifactId>
 	<version>0.7.0-SNAPSHOT</version>
+	
+	<prerequisites>
+    	<maven>3.0.5</maven>
+  	</prerequisites>
 
 	<properties>
 		<maven.compiler.target>15</maven.compiler.target>
@@ -81,7 +85,7 @@
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>3.8.1</version>
 				<configuration>
-					<release>11</release> <!-- needed for parboiled?? -->
+					<release>15</release>
 					<annotationProcessorPaths>
 						<path>
 							<groupId>org.openjdk.jmh</groupId>

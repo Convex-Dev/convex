@@ -997,7 +997,7 @@ public class Context<T extends ACell> extends AObject {
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> updateBindings(ACell bindingForm, Object args) {
 		// Clear any exceptional status
-		Context<R> ctx=this.withValue(null);
+		Context<R> ctx=this.withValue(null);	
 
 		if (bindingForm instanceof Symbol) {
 			Symbol sym=(Symbol)bindingForm;

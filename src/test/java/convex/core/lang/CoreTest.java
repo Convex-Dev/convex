@@ -3595,7 +3595,12 @@ public class CoreTest extends ACVMTest {
 
 		// Result should get value of last completed expression
 		assertEquals(Keywords.FOO, eval("(do :foo *result*)"));
-		assertNull(eval("(do (do) *result*)"));
+		assertNull(eval("(do 1 (do) *result*)"));
+		
+		// TODO: how should this behave?
+		// assertEquals(Keywords.FOO, eval("(let [a :foo] *result*)"));
+		
+		assertEquals(Keywords.FOO, eval("(do ((fn [] :foo)) *result*)"));
 
 		// *result* should be cleared to nil in an Actor call.
 		assertNull(eval("(do (def c (deploy '(do (defn f [] *result*) (export f)))) (call c (f)))"));
