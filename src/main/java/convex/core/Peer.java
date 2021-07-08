@@ -217,7 +217,7 @@ public class Peer {
 		}
 
 		AOp<T> op = ectx.getResult();
-		Context<T> rctx = ctx.execute(op);
+		Context<T> rctx = ctx.run(op);
 		return rctx;
 	}
 
@@ -249,7 +249,7 @@ public class Peer {
 	}
 
 	/**
-	 * Executes a query in this
+	 * Executes a query in this Peer's current Consensus State, using a default address
 	 * @param <T>
 	 * @param form
 	 * @return Context after executing query
