@@ -7,8 +7,7 @@ import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.init.Init;
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import etch.EtchStore;
@@ -21,7 +20,7 @@ public class EtchInitTest {
 			Stores.setCurrent(EtchStore.createTemp());
 
 			// Use fresh State
-			State s=Init.createState(InitConfigTest.create());
+			State s=InitTest.createState();
 			Ref<State> sr=ACell.createPersisted(s);
 
 			Hash hash=sr.getHash();

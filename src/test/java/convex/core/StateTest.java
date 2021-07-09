@@ -16,7 +16,6 @@ import convex.core.data.RecordTest;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.init.InitConfigTest;
 import convex.core.init.InitTest;
 
 /**
@@ -64,7 +63,7 @@ public class StateTest {
 		State s2 = Format.read(b);
 		assertEquals(s, s2);
 
-		AccountStatus as=s2.getAccount(InitConfigTest.HERO_ADDRESS);
+		AccountStatus as=s2.getAccount(InitTest.HERO);
 		assertNotNull(as);
 	}
 }

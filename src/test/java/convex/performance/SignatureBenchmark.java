@@ -9,11 +9,11 @@ import convex.core.crypto.ASignature;
 import convex.core.data.ABlob;
 import convex.core.data.Blobs;
 import convex.core.data.SignedData;
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 
 public class SignatureBenchmark {
 
-	private static final AKeyPair KEYPAIR=InitConfigTest.HERO_KEYPAIR;
+	private static final AKeyPair KEYPAIR=InitTest.HERO_KEYPAIR;
 
 	@Benchmark
 	public void signData() {

@@ -26,8 +26,8 @@ import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
+import convex.core.init.InitTest;
 import convex.core.lang.TestState;
-import convex.core.init.InitConfigTest;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Bits;
@@ -351,7 +351,7 @@ public class UtilsTest {
 
 	@Test
 	public void testStatesAsOfRange() throws BadSignatureException {
-		Peer peer = Peer.create(InitConfigTest.FIRST_PEER_KEYPAIR, TestState.STATE);
+		Peer peer = Peer.create(InitTest.FIRST_PEER_KEYPAIR, TestState.STATE);
 
 		AVector<State> states = Vectors.of(STATE);
 
@@ -361,9 +361,9 @@ public class UtilsTest {
 			long timestamp = state0.getTimeStamp().longValue() + 100;
 
 			String command = "(def x " + timestamp + ")";
-			SignedData<ATransaction> data = peer.sign(Invoke.create(InitConfigTest.HERO_ADDRESS, timestamp, command));
+			SignedData<ATransaction> data = peer.sign(Invoke.create(InitTest.HERO, timestamp, command));
 
-			Block block = Block.of(timestamp, InitConfigTest.FIRST_PEER_KEY, data);
+			Block block = Block.of(timestamp, InitTest.FIRST_PEER_KEY, data);
 
 			State state1 = state0.applyBlock(block).getState();
 

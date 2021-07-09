@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.lang.Context;
 import convex.core.lang.Core;
 import convex.core.lang.Symbols;
@@ -64,7 +64,7 @@ public class ActorsTest {
 
 	@Test public void testUserAsActor() {
 		Context<?> ctx=step("(do (defn foo [] *caller*) (defn bar [] nil) (def z 1) (export foo z))");
-		assertEquals(InitConfigTest.HERO_ADDRESS,eval(ctx,"(call *address* (foo))"));
+		assertEquals(InitTest.HERO,eval(ctx,"(call *address* (foo))"));
 		assertStateError(step(ctx,"(call *address* (non-existent-function))"));
 		assertStateError(step(ctx,"(call *address* (bar))"));
 		assertStateError(step(ctx,"(call *address* (z))"));
@@ -88,8 +88,8 @@ public class ActorsTest {
 	}
 
 	@Test public void testTokenContract() throws IOException {
-		String VILLAIN=InitConfigTest.VILLAIN_ADDRESS.toHexString();
-		String HERO=InitConfigTest.HERO_ADDRESS.toHexString();
+		String VILLAIN=InitTest.VILLAIN.toHexString();
+		String HERO=InitTest.HERO.toHexString();
 
 		// setup address for this scene
 		Context<?> ctx=TestState.step("(do (def HERO (address \""+HERO+"\")) (def VILLAIN (address \""+VILLAIN+"\")))");

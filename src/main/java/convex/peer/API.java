@@ -11,7 +11,6 @@ import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.init.AInitConfig;
 import convex.core.init.Init;
-import convex.core.init.InitConfig;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
@@ -62,7 +61,7 @@ public class API {
 	public static Server launchPeer(Map<Keyword, Object> peerConfig, IServerEvent event) {
 		HashMap<Keyword,Object> config=new HashMap<>(peerConfig);
 
-		InitConfig initConfig = InitConfig.create();
+		AInitConfig initConfig = AInitConfig.create();
 
 		try {
 			if (!config.containsKey(Keywords.PORT)) config.put(Keywords.PORT, null);

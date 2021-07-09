@@ -5,10 +5,16 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.stream.Collectors;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
 import convex.core.State;
+import convex.core.crypto.AKeyPair;
+import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.exceptions.InvalidDataException;
@@ -20,12 +26,48 @@ import convex.core.lang.ACVMTest;
  * Also includes static State instances for Testing
  */
 public class InitTest extends ACVMTest {
-
-	public static final State STATE=Init.createState(InitConfigTest.create());
-	public static final State BASE = Init.createBaseState(InitConfigTest.create());
 	
-	public static Address HERO=InitConfigTest.HERO_ADDRESS;
-	public static Address VILLAIN=InitConfigTest.VILLAIN_ADDRESS;
+	public static final AKeyPair[] KEYPAIRS = new AKeyPair[] {
+			AKeyPair.createSeeded(2),
+			AKeyPair.createSeeded(3),
+			AKeyPair.createSeeded(5),
+			AKeyPair.createSeeded(7),
+			AKeyPair.createSeeded(11),
+			AKeyPair.createSeeded(13),
+			AKeyPair.createSeeded(17),
+			AKeyPair.createSeeded(19),
+	};
+	
+	public static ArrayList<AccountKey> PEER_KEYS=(ArrayList<AccountKey>) Arrays.asList(KEYPAIRS).stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
+
+	public static final AKeyPair FIRST_PEER_KEYPAIR = KEYPAIRS[0];
+	public static final AccountKey FIRST_PEER_KEY = FIRST_PEER_KEYPAIR.getAccountKey();
+	
+	public static final AKeyPair HERO_KEYPAIR = KEYPAIRS[0];
+	public static final AKeyPair VILLAIN_KEYPAIR = KEYPAIRS[1];
+	
+	public static final AccountKey HERO_KEY = HERO_KEYPAIR.getAccountKey();
+
+	
+	/**
+	 * Standard Genesis state used for testing
+	 */
+	public static final State STATE= createState();
+	public static final State BASE = Init.createBaseState(PEER_KEYS);
+
+
+	
+
+	public static State createState() {
+		// TODO Auto-generated method stub
+		return Init.createState(PEER_KEYS);
+	}
+	
+	public static Address HERO=Init.BASE_FIRST_ADDRESS;
+	public static Address VILLAIN=Address.create(HERO.longValue()+1);
+	
+	public static final Address FIRST_PEER_ADDRESS = HERO;
+
 
 	protected InitTest() {
 		super(STATE);
@@ -49,8 +91,9 @@ public class InitTest extends ACVMTest {
 
 	@Test
 	public void testHero() {
- 		AccountStatus as=STATE.getAccount(InitConfigTest.HERO_ADDRESS);
+ 		AccountStatus as=STATE.getAccount(HERO);
 		assertNotNull(as);
 		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE,as.getMemory());
 	}
+
 }

@@ -1,8 +1,7 @@
 package convex.core.lang;
 
+import static convex.test.Assertions.assertCVMEquals;
 import static org.junit.Assert.assertEquals;
-
-import static convex.test.Assertions.*;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -19,7 +18,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.exceptions.BadFormatException;
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.util.Utils;
 
 @RunWith(Parameterized.class)
@@ -77,7 +76,7 @@ public class ParamTestJuice {
 
 	static {
 		try {
-			INITIAL_CONTEXT = Context.createInitial(INITIAL, InitConfigTest.HERO_ADDRESS, INITIAL_JUICE);
+			INITIAL_CONTEXT = Context.createInitial(INITIAL, InitTest.HERO, INITIAL_JUICE);
 		} catch (Throwable e) {
 			throw new Error(e);
 		}

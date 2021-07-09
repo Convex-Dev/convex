@@ -19,7 +19,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.lang.Reader;
 import convex.core.lang.ops.Constant;
 import convex.core.transactions.ATransaction;
@@ -43,8 +43,8 @@ public class ConvexTest {
 			try {
 				CONVEX=Convex.connect(
 					ServerTest.SERVER.getHostAddress(),
-					InitConfigTest.HERO_ADDRESS,
-					InitConfigTest.HERO_KEYPAIR
+					InitTest.HERO,
+					InitTest.HERO_KEYPAIR
 				);
 				ADDRESS=CONVEX.createAccount(KEYPAIR.getAccountKey());
 				CONVEX.transfer(ADDRESS, 1000000000L);
@@ -60,8 +60,8 @@ public class ConvexTest {
 		// Don't need locking
 		Convex convex=Convex.connect(
 			ServerTest.SERVER.getHostAddress(),
-				InitConfigTest.HERO_ADDRESS,
-				InitConfigTest.HERO_KEYPAIR
+				InitTest.HERO,
+				InitTest.HERO_KEYPAIR
 		);
 		assertTrue(convex.isConnected());
 		convex.close();

@@ -44,7 +44,8 @@ public class PeersListPanel extends JPanel {
 	private static final Logger log = Logger.getLogger(PeersListPanel.class.getName());
 
 	public void launchAllPeers(PeerGUI manager) {
-		List<Server> serverList = API.launchLocalPeers(PeerGUI.initConfig.getPeerCount(), PeerGUI.initConfig, null);
+		int N=manager.KEYPAIRS.size();
+		List<Server> serverList = API.launchLocalPeers(KEYPAIRS);
 		for (Server server: serverList) {
 			PeerView peer = new PeerView();
 			peer.peerServer = server;

@@ -31,7 +31,7 @@ import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.lang.Symbols;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
@@ -112,13 +112,13 @@ public class EtchStoreTest {
 		AStore oldStore = Stores.current();
 		AtomicLong counter=new AtomicLong(0L);
 
-		AKeyPair kp=InitConfigTest.HERO_KEYPAIR;
+		AKeyPair kp=InitTest.HERO_KEYPAIR;
 		try {
 			Stores.setCurrent(store);
 
-			ATransaction t1=Invoke.create(InitConfigTest.HERO_ADDRESS,0, Lists.of(Symbols.PLUS, Symbols.STAR_BALANCE, 1000L));
-			ATransaction t2=Transfer.create(InitConfigTest.HERO_ADDRESS,1, InitConfigTest.VILLAIN_ADDRESS,1000000);
-			Block b=Block.of(Utils.getCurrentTimestamp(),InitConfigTest.FIRST_PEER_KEY,kp.signData(t1),kp.signData(t2));
+			ATransaction t1=Invoke.create(InitTest.HERO,0, Lists.of(Symbols.PLUS, Symbols.STAR_BALANCE, 1000L));
+			ATransaction t2=Transfer.create(InitTest.HERO,1, InitTest.VILLAIN,1000000);
+			Block b=Block.of(Utils.getCurrentTimestamp(),InitTest.FIRST_PEER_KEY,kp.signData(t1),kp.signData(t2));
 			assertNotNull(b.getPeer());
 
 			Order ord=Order.create().propose(b);

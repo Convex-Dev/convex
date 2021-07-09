@@ -13,7 +13,8 @@ import org.openjdk.jmh.runner.options.Options;
 
 import convex.api.Convex;
 import convex.core.Result;
-import convex.core.init.InitConfigTest;
+import convex.core.data.Address;
+import convex.core.init.InitTest;
 import convex.core.lang.ops.Constant;
 import convex.core.transactions.Invoke;
 import convex.peer.API;
@@ -23,6 +24,10 @@ import convex.peer.Server;
  * Benchmark for full round-trip latencies
  */
 public class LatencyBenchmark {
+	
+	static final Address HERO=InitTest.HERO;
+	static final Address VILLAIN=InitTest.VILLAIN;
+
 
 	static Server server;
 	static Convex client;
@@ -30,8 +35,8 @@ public class LatencyBenchmark {
 	static {
 		server=API.launchPeer();
 		try {
-			client=Convex.connect(server.getHostAddress(), InitConfigTest.HERO_ADDRESS,InitConfigTest.HERO_KEYPAIR);
-			client2=Convex.connect(server.getHostAddress(), InitConfigTest.VILLAIN_ADDRESS,InitConfigTest.VILLAIN_KEYPAIR);
+			client=Convex.connect(server.getHostAddress(), HERO,InitTest.HERO_KEYPAIR);
+			client2=Convex.connect(server.getHostAddress(), VILLAIN,InitTest.VILLAIN_KEYPAIR);
 		} catch (IOException | TimeoutException e) {
 			e.printStackTrace();
 		}
@@ -40,13 +45,13 @@ public class LatencyBenchmark {
 
 	@Benchmark
 	public void roundTripTransaction() throws TimeoutException, IOException {
-		client.transactSync(Invoke.create(InitConfigTest.HERO_ADDRESS,-1, Constant.of(1L)));
+		client.transactSync(Invoke.create(InitTest.HERO,-1, Constant.of(1L)));
 	}
 
 	@Benchmark
 	public void roundTripTwoTransactions() throws TimeoutException, IOException, InterruptedException, ExecutionException {
-		Future<Result> r1=client.transact(Invoke.create(InitConfigTest.HERO_ADDRESS,-1, Constant.of(1L)));
-		Future<Result> r2=client2.transact(Invoke.create(InitConfigTest.VILLAIN_ADDRESS,-1, Constant.of(1L)));
+		Future<Result> r1=client.transact(Invoke.create(HERO,-1, Constant.of(1L)));
+		Future<Result> r2=client2.transact(Invoke.create(VILLAIN,-1, Constant.of(1L)));
 		r1.get(1000,TimeUnit.MILLISECONDS);
 		r2.get(1000,TimeUnit.MILLISECONDS);
 	}
@@ -70,7 +75,7 @@ public class LatencyBenchmark {
 	private void doTransactions(int n) throws IOException, InterruptedException, ExecutionException, TimeoutException {
 		CompletableFuture<Result>[] rs=new CompletableFuture[n];
 		for (int i=0; i<n; i++) {
-			CompletableFuture<Result> f=client.transact(Invoke.create(InitConfigTest.HERO_ADDRESS,-1, Constant.of(i)));
+			CompletableFuture<Result> f=client.transact(Invoke.create(HERO,-1, Constant.of(i)));
 			rs[i]=f;
 		}
 		CompletableFuture.allOf(rs).get(1000,TimeUnit.MILLISECONDS);

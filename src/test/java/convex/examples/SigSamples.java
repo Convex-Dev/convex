@@ -6,7 +6,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 
 /**
  * Test class for Ed25519 functionality
@@ -15,7 +15,7 @@ public class SigSamples {
 
 	public static void main(String[] args) {
 
-		AKeyPair kp=InitConfigTest.HERO_KEYPAIR;
+		AKeyPair kp=InitTest.HERO_KEYPAIR;
 		AccountKey a=kp.getAccountKey();
 
 		AVector<CVMLong> v=Vectors.of(1L,2L);

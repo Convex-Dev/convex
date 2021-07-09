@@ -10,7 +10,7 @@ import convex.core.data.ASequence;
 import convex.core.data.ASet;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.util.Utils;
 
 /**
@@ -25,7 +25,7 @@ public class DataStructuresTest {
 
 	static {
 		try {
-			INITIAL_CONTEXT = Context.createInitial(INITIAL, InitConfigTest.HERO_ADDRESS, INITIAL_JUICE);
+			INITIAL_CONTEXT = Context.createInitial(INITIAL, InitTest.HERO, INITIAL_JUICE);
 		} catch (Throwable e) {
 			throw new Error(e);
 		}

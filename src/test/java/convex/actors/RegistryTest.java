@@ -16,7 +16,6 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Symbol;
 import convex.core.init.Init;
-import convex.core.init.InitConfigTest;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
@@ -66,7 +65,7 @@ public class RegistryTest extends ACVMTest {
 		assertEquals(realAddr,eval(ctx,"(call *registry* (cns-resolve :convex.test.foo))"));
 
 		{ // Check VILLAIN can't steal CNS mapping
-			Context<?> c=ctx.forkWithAddress(InitConfigTest.VILLAIN_ADDRESS);
+			Context<?> c=ctx.forkWithAddress(VILLAIN);
 
 			// VILLAIN shouldn't be able to use update on existing CNS mapping
 			assertTrustError(step(c,"(call *registry* (cns-update 'convex.test.foo *address*))"));
@@ -76,32 +75,32 @@ public class RegistryTest extends ACVMTest {
 		}
 
 		{ // Check Transfer of control to VILLAIN
-			Context<?> c=step(ctx,"(call *registry* (cns-control 'convex.test.foo "+InitConfigTest.VILLAIN_ADDRESS+"))");
+			Context<?> c=step(ctx,"(call *registry* (cns-control 'convex.test.foo "+VILLAIN+"))");
 
 			// HERO shouldn't be able to use update or control any more
 			assertTrustError(step(c,"(call *registry* (cns-update 'convex.test.foo *address*))"));
 			assertTrustError(step(c,"(call *registry* (cns-control 'convex.test.foo *address*))"));
 
 			// Switch to VILLAIN
-			c=c.forkWithAddress(InitConfigTest.VILLAIN_ADDRESS);
+			c=c.forkWithAddress(VILLAIN);
 
 			// Change mapping
 			c=step(c,"(call *registry* (cns-update 'convex.test.foo *address*))");
 			assertNotError(c);
-			assertEquals(InitConfigTest.VILLAIN_ADDRESS,eval(c,"(call *registry* (cns-resolve :convex.test.foo))"));
+			assertEquals(VILLAIN,eval(c,"(call *registry* (cns-resolve :convex.test.foo))"));
 		}
 
 		{ // Check VILLAIN can create new mapping
 			// TODO probably shouldn't be free-for-all?
 
-			Context<?> c=ctx.forkWithAddress(InitConfigTest.VILLAIN_ADDRESS);
+			Context<?> c=ctx.forkWithAddress(VILLAIN);
 
 			// VILLAIN shouldn't be able to use update on existing CNS mapping
 			c=step(c,"(call *registry* (cns-update :convex.villain *address*))");
 			assertNotError(c);
 
 			// original mapping should be held
-			assertEquals(InitConfigTest.VILLAIN_ADDRESS,eval(c,"(call *registry* (cns-resolve :convex.villain))"));
+			assertEquals(VILLAIN,eval(c,"(call *registry* (cns-resolve :convex.villain))"));
 		}
 	}
 }

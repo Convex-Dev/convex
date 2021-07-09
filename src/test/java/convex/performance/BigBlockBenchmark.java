@@ -17,7 +17,7 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadSignatureException;
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.lang.TestState;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Transfer;
@@ -51,7 +51,7 @@ public class BigBlockBenchmark {
 			Transfer t = Transfer.create(source,1, target, 1);
 			transactions.add(kp.signData(t));
 		}
-		block = Block.create(System.currentTimeMillis(),transactions,InitConfigTest.FIRST_PEER_KEY);
+		block = Block.create(System.currentTimeMillis(),transactions,InitTest.FIRST_PEER_KEY);
 	}
 
 	@Benchmark

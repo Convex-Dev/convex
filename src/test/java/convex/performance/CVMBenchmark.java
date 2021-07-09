@@ -12,11 +12,10 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.init.Init;
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.lang.Context;
 import convex.core.lang.Core;
 import convex.core.lang.Symbols;
-import convex.core.lang.TestState;
 import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Lookup;
 import convex.core.transactions.ATransaction;
@@ -31,20 +30,22 @@ import convex.core.transactions.Transfer;
  * Skips stuff around transactions, block overhead, signatures etc.
  */
 public class CVMBenchmark {
+	State STATE=InitTest.STATE;
+	Address HERO=InitTest.HERO;
 
 	@Benchmark
 	public void smallTransfer() {
-		State s=TestState.STATE;
-		Address addr=InitConfigTest.HERO_ADDRESS;
-		ATransaction trans=Transfer.create(addr,1, InitConfigTest.VILLAIN_ADDRESS, 1000);
+		State s=STATE;
+		Address addr=HERO;
+		ATransaction trans=Transfer.create(addr,1, InitTest.VILLAIN, 1000);
 		Context<ACell>  ctx=s.applyTransaction(trans);
 		ctx.getValue();
 	}
 
 	@Benchmark
 	public void simpleCalculationStatic() {
-		State s=TestState.STATE;
-		Address addr=InitConfigTest.HERO_ADDRESS;
+		State s=STATE;
+		Address addr=HERO;
 		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Invoke.create(Constant.create(Core.PLUS),Constant.of(1L),Constant.of(2L)));
 		Context<ACell>  ctx=s.applyTransaction(trans);
 		ctx.getValue();
@@ -52,8 +53,8 @@ public class CVMBenchmark {
 
 	@Benchmark
 	public void simpleCalculationDynamic() {
-		State s=TestState.STATE;
-		Address addr=InitConfigTest.HERO_ADDRESS;
+		State s=STATE;
+		Address addr=HERO;
 		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Invoke.create(Lookup.create("+"),Constant.of(1L),Constant.of(2L)));
 		Context<ACell> ctx=s.applyTransaction(trans);
 		ctx.getValue();
@@ -61,8 +62,8 @@ public class CVMBenchmark {
 
 	@Benchmark
 	public void defInEnvironment() {
-		State s=TestState.STATE;
-		Address addr=InitConfigTest.HERO_ADDRESS;
+		State s=STATE;
+		Address addr=HERO;
 		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Def.create("a", Constant.of(13L)));
 		Context<ACell>  ctx=s.applyTransaction(trans);
 		ctx.getValue();
@@ -70,8 +71,8 @@ public class CVMBenchmark {
 
 	@Benchmark
 	public void contractCall() {
-		State s=TestState.STATE;
-		Address addr=InitConfigTest.HERO_ADDRESS;
+		State s=STATE;
+		Address addr=HERO;
 		ATransaction trans=Call.create(addr,1L, Init.REGISTRY_ADDRESS, Symbols.REGISTER, Vectors.of(Maps.of(Keywords.NAME,Strings.create("Bob"))));
 		Context<ACell>  ctx=s.applyTransaction(trans);
 		ctx.getValue();

@@ -7,7 +7,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.util.Utils;
 
 /**
@@ -20,6 +20,9 @@ public abstract class ACVMTest {
     protected State INITIAL;
 	private Context<?> CONTEXT;
 	protected long INITIAL_JUICE;
+	
+	protected final Address HERO;
+	protected final Address VILLAIN;
 
 	/**
 	 * Balance of hero's account before spending any juice / funds
@@ -31,12 +34,25 @@ public abstract class ACVMTest {
 	 */
 	public final long VILLAIN_BALANCE;
 
-	protected ACVMTest(State s) {
-		this.INITIAL=s;
-		CONTEXT=Context.createFake(s,Init.BASE_FIRST_ADDRESS);
+	/**
+	 * Constructor using a specified Genesis State
+	 * @param genesis Genesis State to use for this CVM test
+	 */
+	protected ACVMTest(State genesis) {
+		this.INITIAL=genesis;
+		CONTEXT=Context.createFake(genesis,Init.BASE_FIRST_ADDRESS);
+		HERO=InitTest.HERO;
+		VILLAIN=InitTest.VILLAIN;
 		INITIAL_JUICE=CONTEXT.getJuice();
-		HERO_BALANCE = INITIAL.getAccount(InitConfigTest.HERO_ADDRESS).getBalance();
-		VILLAIN_BALANCE = INITIAL.getAccount(InitConfigTest.VILLAIN_ADDRESS).getBalance();
+		HERO_BALANCE = INITIAL.getAccount(InitTest.HERO).getBalance();
+		VILLAIN_BALANCE = INITIAL.getAccount(InitTest.VILLAIN).getBalance();
+	}
+	
+	/**
+	 * Default Constructor uses standard testing Genesis State
+	 */
+	protected ACVMTest() {
+		this(InitTest.STATE);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -52,7 +68,7 @@ public abstract class ACVMTest {
 	 * @return New forked context containing step result
 	 */
 	@SuppressWarnings("unchecked")
-	public <T extends ACell> Context<T> step(Context<?> ctx, String source) {
+	public static <T extends ACell> Context<T> step(Context<?> ctx, String source) {
 		// Compile form in forked context
 		Context<AOp<ACell>> cctx=ctx.fork();
 		ACell form = Reader.read(source);

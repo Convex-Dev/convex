@@ -12,7 +12,7 @@ import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.data.Address;
-import convex.core.init.InitConfig;
+import convex.core.init.AInitConfig;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -49,7 +49,7 @@ public class Main implements Runnable {
 	private static final Logger log = Logger.getLogger(Main.class.getName());
 
 	private static CommandLine commandLine;
-    public static InitConfig initConfig = InitConfig.create();
+    public static AInitConfig initConfig = AInitConfig.create();
 
 
 	@Option(names={ "-c", "--config"},

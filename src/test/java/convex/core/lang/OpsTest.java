@@ -22,7 +22,6 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
-import convex.core.init.InitConfigTest;
 import convex.core.init.InitTest;
 import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.Fn;
@@ -78,7 +77,7 @@ public class OpsTest extends ACVMTest {
 	@Test
 	public void testOutOfJuice() {
 		long JUICE = Juice.CONSTANT - 1; // insufficient juice to run operation
-		Context<?> c = Context.createInitial(INITIAL, InitConfigTest.HERO_ADDRESS, JUICE);
+		Context<?> c = Context.createInitial(INITIAL, InitTest.HERO, JUICE);
 
 		AOp<CVMLong> op = Constant.of(10L);
 		assertJuiceError(c.execute(op));

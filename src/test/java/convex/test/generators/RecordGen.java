@@ -8,8 +8,8 @@ import convex.core.Belief;
 import convex.core.Block;
 import convex.core.Constants;
 import convex.core.data.ARecord;
+import convex.core.init.InitTest;
 import convex.core.lang.TestState;
-import convex.core.init.InitConfigTest;
 
 /**
  * Generator for binary Blobs
@@ -26,11 +26,11 @@ public class RecordGen extends Generator<ARecord> {
 		int type = r.nextInt();
 		switch (type % 8) {
 		case 0:
-			return Belief.createSingleOrder(InitConfigTest.HERO_KEYPAIR);
+			return Belief.createSingleOrder(InitTest.HERO_KEYPAIR);
 		case 1:
 			return TestState.STATE;
 		default:
-			return Block.of(Constants.INITIAL_TIMESTAMP,InitConfigTest.FIRST_PEER_KEY);
+			return Block.of(Constants.INITIAL_TIMESTAMP,InitTest.FIRST_PEER_KEY);
 		}
 	}
 }

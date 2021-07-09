@@ -37,7 +37,6 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
-import convex.core.init.InitConfigTest;
 import convex.core.init.InitTest;
 import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Def;
@@ -383,7 +382,7 @@ public class CompilerTest extends ACVMTest {
 	@Test
 	public void testLookupAddress() {
 		Lookup<?> l=comp("foo");
-		assertEquals(Constant.of(InitConfigTest.HERO_ADDRESS),l.getAddress());
+		assertEquals(Constant.of(HERO),l.getAddress());
 	}
 
 	@Test
@@ -522,8 +521,8 @@ public class CompilerTest extends ACVMTest {
 	@Test
 	public void testQuoteCompile()  {
 		assertEquals(Constant.create((ACell)null),comp("nil"));
-		assertEquals(Lookup.create(InitConfigTest.HERO_ADDRESS,Symbols.FOO),comp("foo"));
-		assertEquals(Lookup.create(InitConfigTest.HERO_ADDRESS,Symbols.FOO),comp("`~foo"));
+		assertEquals(Lookup.create(HERO,Symbols.FOO),comp("foo"));
+		assertEquals(Lookup.create(HERO,Symbols.FOO),comp("`~foo"));
 	}
 
 	@Test

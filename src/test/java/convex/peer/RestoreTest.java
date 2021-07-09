@@ -19,7 +19,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.lang.Symbols;
 import convex.core.store.AStore;
 import convex.core.transactions.Invoke;
@@ -44,7 +44,7 @@ public class RestoreTest {
 //		   }
 //		}
 
-		AKeyPair kp=InitConfigTest.FIRST_PEER_KEYPAIR;
+		AKeyPair kp=InitTest.FIRST_PEER_KEYPAIR;
 		AStore store=EtchStore.createTemp();
 		Map<Keyword, Object> config = Maps.hashMapOf(
 				Keywords.KEYPAIR,kp,
@@ -54,11 +54,11 @@ public class RestoreTest {
 		Server s1=API.launchPeer(config);
 
 		// Connect with HERO Account
-		Convex cvx1=Convex.connect(s1.getHostAddress(), InitConfigTest.HERO_ADDRESS,InitConfigTest.HERO_KEYPAIR);
+		Convex cvx1=Convex.connect(s1.getHostAddress(), InitTest.HERO,InitTest.HERO_KEYPAIR);
 
-		Result tx1=cvx1.transactSync(Invoke.create(InitConfigTest.HERO_ADDRESS,1, Symbols.STAR_ADDRESS));
-		assertEquals(InitConfigTest.HERO_ADDRESS,tx1.getValue());
-		Long balance1=cvx1.getBalance(InitConfigTest.HERO_ADDRESS);
+		Result tx1=cvx1.transactSync(Invoke.create(InitTest.HERO,1, Symbols.STAR_ADDRESS));
+		assertEquals(InitTest.HERO,tx1.getValue());
+		Long balance1=cvx1.getBalance(InitTest.HERO);
 		assertTrue(balance1>0);
 		s1.close();
 
@@ -68,12 +68,12 @@ public class RestoreTest {
 
 		// Launch peer and connect
 		Server s2=API.launchPeer(config);
-		Convex cvx2=Convex.connect(s2.getHostAddress(), InitConfigTest.HERO_ADDRESS,InitConfigTest.HERO_KEYPAIR);
+		Convex cvx2=Convex.connect(s2.getHostAddress(), InitTest.HERO,InitTest.HERO_KEYPAIR);
 
-		Long balance2=cvx2.getBalance(InitConfigTest.HERO_ADDRESS);
+		Long balance2=cvx2.getBalance(InitTest.HERO);
 		assertEquals(balance1,balance2);
 
-		Result tx2=cvx2.transactSync(Invoke.create(InitConfigTest.HERO_ADDRESS,2, Symbols.BALANCE));
+		Result tx2=cvx2.transactSync(Invoke.create(InitTest.HERO,2, Symbols.BALANCE));
 		assertFalse(tx2.isError());
 
 		State state=s2.getPeer().getConsensusState();

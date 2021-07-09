@@ -7,10 +7,13 @@ import java.awt.Toolkit;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -24,10 +27,10 @@ import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.ACell;
+import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.init.Init;
-import convex.core.init.InitConfig;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
@@ -49,9 +52,12 @@ public class PeerGUI extends JPanel {
 	private static final Logger log = Logger.getLogger(PeerGUI.class.getName());
 
 	private static JFrame frame;
-
-	public static InitConfig initConfig = InitConfig.create();
-	private static StateModel<State> latestState = StateModel.create(Init.createState(initConfig));
+	
+	public static List<AKeyPair> KEYPAIRS=Arrays.asList(AKeyPair.generate(),AKeyPair.generate()); 
+	public static List<AccountKey> PEERKEYS=KEYPAIRS.stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
+	
+	public static State genesisState=Init.createState(PEERKEYS);
+	private static StateModel<State> latestState = StateModel.create(genesisState);
 	public static StateModel<Long> tickState = StateModel.create(0L);
 
 	public static long maxBlock = 0;

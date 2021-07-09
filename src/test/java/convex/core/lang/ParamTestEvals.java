@@ -1,7 +1,7 @@
 package convex.core.lang;
 
+import static convex.test.Assertions.assertCVMEquals;
 import static org.junit.Assert.assertEquals;
-import static convex.test.Assertions.*;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -16,7 +16,7 @@ import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.exceptions.BadFormatException;
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.util.Utils;
 
 @RunWith(Parameterized.class)
@@ -36,9 +36,9 @@ public class ParamTestEvals {
 				{ "(do 1 *result*)", 1L },
 				{ "(do (do :foo) (do))", null },
 				{ "*result*", null },
-				{ "*origin*", InitConfigTest.HERO_ADDRESS },
+				{ "*origin*", InitTest.HERO },
 				{ "*caller*", null },
-				{ "*address*", InitConfigTest.HERO_ADDRESS },
+				{ "*address*", InitTest.HERO },
 				{ "(do 1 *result*)", 1L },
 
 				{ "(call " + TEST_CONTRACT + " (my-address))", TEST_CONTRACT },

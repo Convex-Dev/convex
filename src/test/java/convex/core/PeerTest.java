@@ -11,7 +11,6 @@ import convex.core.data.AccountKey;
 import convex.core.data.PeerStatus;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
-import convex.core.init.InitConfigTest;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
@@ -23,7 +22,7 @@ public class PeerTest {
 
 	@Test
 	public void testInitial() throws BadSignatureException {
-		Peer p = Peer.create(InitConfigTest.FIRST_PEER_KEYPAIR, STATE);
+		Peer p = Peer.create(InitTest.FIRST_PEER_KEYPAIR, STATE);
 
 		// initial checks
 		long timestamp = p.getTimeStamp();
@@ -51,15 +50,15 @@ public class PeerTest {
 
 	@Test
 	public void testNullPeers() {
-		assertNull(STATE.getPeer(InitConfigTest.HERO_KEYPAIR.getAccountKey())); // hero not a peer in initial state
+		assertNull(STATE.getPeer(InitTest.HERO_KEYPAIR.getAccountKey())); // hero not a peer in initial state
 	}
 
 	@Test
 	public void testQuery() throws BadSignatureException {
-		Peer p = Peer.create(InitConfigTest.FIRST_PEER_KEYPAIR, STATE);
+		Peer p = Peer.create(InitTest.FIRST_PEER_KEYPAIR, STATE);
 
 		assertEquals(RT.cvm(3L),p.executeQuery(Reader.read("(+ 1 2)")).getResult());
-		assertEquals(InitConfigTest.HERO_ADDRESS,p.executeQuery(Reader.read("*address*"),InitConfigTest.HERO_ADDRESS).getResult());
+		assertEquals(InitTest.HERO,p.executeQuery(Reader.read("*address*"),InitTest.HERO).getResult());
 
 		assertNobodyError(p.executeQuery(Reader.read("(+ 2 3)"),Samples.BAD_ADDRESS));
 	}
@@ -67,23 +66,23 @@ public class PeerTest {
 	@Test
 	public void testStakeAccess() {
 		// use peer address from first peer for testing
-		AccountKey pa = InitConfigTest.FIRST_PEER_KEY;
+		AccountKey pa = InitTest.FIRST_PEER_KEY;
 		PeerStatus ps = STATE.getPeer(pa);
 		long initialStake = ps.getPeerStake();
 		assertEquals(initialStake, ps.getTotalStake());
 
-		assertEquals(0, ps.getDelegatedStake(InitConfigTest.HERO_ADDRESS));
+		assertEquals(0, ps.getDelegatedStake(InitTest.HERO));
 
 		// add a delegated stake
-		PeerStatus ps2 = ps.withDelegatedStake(InitConfigTest.HERO_ADDRESS, 1234);
-		assertEquals(1234L, ps2.getDelegatedStake(InitConfigTest.HERO_ADDRESS));
+		PeerStatus ps2 = ps.withDelegatedStake(InitTest.HERO, 1234);
+		assertEquals(1234L, ps2.getDelegatedStake(InitTest.HERO));
 		assertEquals(initialStake + 1234, ps2.getTotalStake());
 		assertEquals(initialStake, ps2.getPeerStake());
 	}
 
 	@Test
 	public void testAsOf() {
-		Peer p = Peer.create(InitConfigTest.FIRST_PEER_KEYPAIR, STATE);
+		Peer p = Peer.create(InitTest.FIRST_PEER_KEYPAIR, STATE);
 
 		CVMLong timestamp = p.getStates().get(0).getTimeStamp();
 
@@ -99,7 +98,7 @@ public class PeerTest {
 
 	@Test
 	public void testAsOfRange() {
-		Peer p = Peer.create(InitConfigTest.FIRST_PEER_KEYPAIR, STATE);
+		Peer p = Peer.create(InitTest.FIRST_PEER_KEYPAIR, STATE);
 
 		CVMLong initialTimestamp = p.getStates().get(0).getTimeStamp();
 

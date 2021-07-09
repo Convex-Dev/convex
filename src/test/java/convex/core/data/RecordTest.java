@@ -6,14 +6,14 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Belief;
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.lang.impl.RecordFormat;
 
 public class RecordTest {
 
 	@Test
 	public void testBelief() {
-		Belief b=Belief.createSingleOrder(InitConfigTest.FIRST_PEER_KEYPAIR);
+		Belief b=Belief.createSingleOrder(InitTest.FIRST_PEER_KEYPAIR);
 		assertEquals(b.getRefCount(),b.getOrders().getRefCount());
 
 		doRecordTests(b);

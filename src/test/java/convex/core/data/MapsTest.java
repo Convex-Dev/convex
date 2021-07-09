@@ -19,7 +19,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.lang.RT;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Transfer;
@@ -140,7 +140,7 @@ public class MapsTest {
 
 	@Test
 	public void regressionEmbeddedTransfer() throws BadFormatException {
-		ATransaction trans=Transfer.create(InitConfigTest.HERO_ADDRESS,0, InitConfigTest.HERO_ADDRESS, 58);
+		ATransaction trans=Transfer.create(InitTest.HERO,0, InitTest.HERO, 58);
 		CVMLong key=CVMLong.create(23771L);
 		AMap<CVMLong,ATransaction> m=Maps.create(key,trans);
 		MapEntry<CVMLong,ATransaction> me=m.entryAt(0);

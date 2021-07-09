@@ -1,11 +1,11 @@
 package convex.core.init;
 
 import java.io.IOException;
+import java.util.List;
 
 import convex.core.Coin;
 import convex.core.Constants;
 import convex.core.State;
-import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -38,9 +38,9 @@ public class Init {
 	// Governance accounts and funding pools
 	public static final Address RESERVED_ADDRESS = Address.create(2);
 	public static final Address MAINBANK_ADDRESS = Address.create(3);
-	public static final Address MAINPOOL_ADDRESS = Address.create(4);
-	public static final Address LIVEPOOL_ADDRESS = Address.create(5);
-	public static final Address ROOTFUND_ADDRESS = Address.create(6);
+	public static final Address ROOTFUND_ADDRESS = Address.create(4);
+	public static final Address MAINPOOL_ADDRESS = Address.create(5);
+	public static final Address LIVEPOOL_ADDRESS = Address.create(6);
 
 	// Built-in special accounts
 	public static final Address MEMORY_EXCHANGE_ADDRESS = Address.create(7);
@@ -52,38 +52,51 @@ public class Init {
 	public static final Address BASE_FIRST_ADDRESS = Address.create(11);
 
 
-	public static State createBaseState(AInitConfig config) {
+	public static State createBaseState(List<AccountKey> genesisKeys) {
 		// accumulators for initial state maps
 		BlobMap<AccountKey, PeerStatus> peers = BlobMaps.empty();
 		AVector<AccountStatus> accts = Vectors.empty();
 
-		// governance accounts
+		long supply = Constants.MAX_SUPPLY;
+		
+		// Initial accounts
 		accts = addGovernanceAccount(accts, NULL_ADDRESS, 0L); // Null account
 		accts = addGovernanceAccount(accts, INIT_ADDRESS, 0L); // Initialisation Account
 
-		accts = addGovernanceAccount(accts, RESERVED_ADDRESS, 750 * Coin.EMERALD); // 75% for investors
-
-		accts = addGovernanceAccount(accts, MAINBANK_ADDRESS, 240 * Coin.EMERALD); // 24% Foundation
+		// Reserved fund
+		long reserved=100*Coin.EMERALD;
+		accts = addGovernanceAccount(accts, RESERVED_ADDRESS, reserved); // 75% for investors
+		supply-=reserved;
+		
+		// Foundation governance fund
+		long governance=240*Coin.EMERALD;
+		accts = addGovernanceAccount(accts, MAINBANK_ADDRESS, governance); // 24% Foundation
+		supply-=governance;
 
 		// Pools for network rewards
-		accts = addGovernanceAccount(accts, MAINPOOL_ADDRESS, 1 * Coin.EMERALD); // 0.1% distribute 5% / year ~= 0.0003% //
-																			// /day
-		accts = addGovernanceAccount(accts, LIVEPOOL_ADDRESS, 5 * Coin.DIAMOND); // 0.0005% = approx 2 days of mainpool feed
-
-		accts = addGovernanceAccount(accts, ROOTFUND_ADDRESS, 8 * Coin.EMERALD); // 0.8% Long term net rewards
+		long rootFund=8 * Coin.EMERALD; // 0.8% Long term net rewards
+		accts = addGovernanceAccount(accts, ROOTFUND_ADDRESS, rootFund); 
+		supply -= rootFund;
+		
+		long mainPool=1 * Coin.EMERALD; // 0.1% distribute 5% / year ~= 0.0003% /day
+		accts = addGovernanceAccount(accts, MAINPOOL_ADDRESS, mainPool); 	
+		supply-=mainPool;
+		
+		long livePool = 5 * Coin.DIAMOND; // 0.0005% = approx 2 days of mainpool feed
+		accts = addGovernanceAccount(accts, LIVEPOOL_ADDRESS, 5 * Coin.DIAMOND); 
+		supply-=livePool;
 
 		// set up memory exchange. Initially 1GB available at 1000 per byte. (one
 		// diamond coin liquidity)
 		{
-			accts = addMemoryExchange(accts, MEMORY_EXCHANGE_ADDRESS, 1 * Coin.DIAMOND, 1000000000L);
+			long memoryCoins=1 * Coin.DIAMOND;
+			accts = addMemoryExchange(accts, MEMORY_EXCHANGE_ADDRESS, memoryCoins, 1000000000L);
+			supply-=memoryCoins;
 		}
 
-		long USER_ALLOCATION = 994 * Coin.DIAMOND; // remaining allocation to divide between initial user accounts
-
 		// always have at least one user and one peer setup
-		assert(config.getUserCount() > 0);
-		assert(config.getPeerCount() > 0);
-		int totalUserPeerCount = config.getUserCount() + config.getPeerCount();
+		int keyCount=genesisKeys.size();
+		assert(keyCount > 0);
 
 		// Core library at static address: CORE_ADDRESS
 		accts = addCoreLibrary(accts, CORE_ADDRESS);
@@ -103,33 +116,43 @@ public class Init {
 		accts = s.getAccounts();
 
 		// Set up initial user accounts
-		for (int i = 0; i < config.getUserCount(); i++) {
-			// TODO: construct addresses
-			AKeyPair kp = config.getUserKeyPair(i);
-			Address address = config.getUserAddress(i);
-			accts = addAccount(accts, address, kp.getAccountKey(), USER_ALLOCATION / totalUserPeerCount);
+		assert(accts.count()==BASE_FIRST_ADDRESS.longValue());
+		{
+			long userFunds=supply/2;
+			supply-=userFunds;
+			for (int i = 0; i < keyCount; i++) {
+				// TODO: construct addresses
+				Address address = Address.create(accts.count());
+				assert(address.longValue()==accts.count());
+				AccountKey key=genesisKeys.get(i);
+				long userBalance=userFunds/(keyCount-i);
+				accts = addAccount(accts, address, key, userBalance);
+				userFunds-= userBalance;
+			}
+			assert(userFunds==0L);
 		}
 
 		// Finally add peers
 		// Set up initial peers
 
 		// BASE_PEER_ADDRESS = accts.size();
-
-		for (int i = 0; i < config.getPeerCount(); i++) {
-			AKeyPair kp = config.getPeerKeyPair(i);
-			AccountKey peerKey = kp.getAccountKey();
-			long peerFunds = USER_ALLOCATION / totalUserPeerCount;
-
-			// set a staked fund such that the first peer starts with super-majority
-			long stakedFunds = (long) (((i == 0) ? 0.75 : 0.01) * peerFunds);
-
-            // create the peer account first
-			Address peerAddress = Address.create(config.getPeerAddress(i));
-			accts = addAccount(accts, peerAddress, peerKey, peerFunds - stakedFunds);
-
-            // split peer funds between stake and account
-			peers = addPeer(peers, peerKey, peerAddress, stakedFunds);
+		{
+			long peerFunds=supply;
+			supply-=peerFunds;
+			for (int i = 0; i < keyCount; i++) {
+				AccountKey peerKey = genesisKeys.get(i);
+				Address peerController= Address.create(BASE_FIRST_ADDRESS.longValue()+i);
+	
+				// set a staked fund such that the first peer starts with super-majority
+				long peerStake = peerFunds/(keyCount-i);
+	
+	            // split peer funds between stake and account
+				peers = addPeer(peers, peerKey, peerController, peerStake);
+				peerFunds-=peerStake;
+			}
+			assert(peerFunds==0L);
 		}
+		
 
 		// add the new accounts to the state
 		s = s.withAccounts(accts);
@@ -192,9 +215,9 @@ public class Init {
 		return s;
 	}
 
-	public static State createState(AInitConfig config) {
+	public static State createState(List<AccountKey> genesisKeys) {
 		try {
-			State s=createBaseState(config);
+			State s=createBaseState(genesisKeys);
 
 
 			// ============================================================

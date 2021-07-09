@@ -15,7 +15,7 @@ import java.security.cert.CertificateException;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.lang.RT;
 
 public class PFXTest {
@@ -32,11 +32,11 @@ public class PFXTest {
 		//assertThrows(IOException.class,()->PFXUtils.loadStore(f,null));
 
 		KeyStore ks=PFXTools.loadStore(f, "test");
-		AKeyPair kp=InitConfigTest.HERO_KEYPAIR;
+		AKeyPair kp=InitTest.HERO_KEYPAIR;
 		PFXTools.saveKey(ks, kp, "thehero");
 		PFXTools.saveStore(ks, f, "test");
 
-		String alias=InitConfigTest.HERO_KEYPAIR.getAccountKey().toHexString();
+		String alias=InitTest.HERO_KEYPAIR.getAccountKey().toHexString();
 		KeyStore ks2=PFXTools.loadStore(f, "test");
 		assertEquals(alias,ks2.aliases().asIterator().next());
 

@@ -19,7 +19,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.AMap;
 import convex.core.data.Address;
 import convex.core.data.Symbol;
-import convex.core.init.InitConfigTest;
+import convex.core.init.InitTest;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
@@ -30,6 +30,8 @@ public class FungibleTest {
 	private static final Symbol fSym=Symbol.create("fun-actor");
 
 	static final AKeyPair TEST_KEYPAIR=AKeyPair.generate();
+	
+	private static final Address VILLAIN=InitTest.VILLAIN;
 
 
 	private static Context<?> loadFungible() {
@@ -83,14 +85,14 @@ public class FungibleTest {
 		assertEquals(1000000L,evalL(ctx,"(asset/balance token *address*)"));
 		assertEquals(0L,evalL(ctx,"(asset/balance token *registry*)"));
 
-		ctx=step(ctx,"(asset/offer "+InitConfigTest.VILLAIN_ADDRESS+" [token 1000])");
+		ctx=step(ctx,"(asset/offer "+VILLAIN+" [token 1000])");
 		assertNotError(ctx);
 
-		ctx=step(ctx,"(asset/transfer "+InitConfigTest.VILLAIN_ADDRESS+" [token 2000])");
+		ctx=step(ctx,"(asset/transfer "+VILLAIN+" [token 2000])");
 		assertNotError(ctx);
 
 		assertEquals(998000L,evalL(ctx,"(asset/balance token *address*)"));
-		assertEquals(2000L,evalL(ctx,"(asset/balance token "+InitConfigTest.VILLAIN_ADDRESS+")"));
+		assertEquals(2000L,evalL(ctx,"(asset/balance token "+VILLAIN+")"));
 
 		assertEquals(0L,evalL(ctx,"(asset/quantity-zero token)"));
 		assertEquals(110L,evalL(ctx,"(asset/quantity-add token 100 10)"));
@@ -105,18 +107,18 @@ public class FungibleTest {
 
 
 
-		assertTrue(evalB(ctx,"(asset/owns? "+InitConfigTest.VILLAIN_ADDRESS+" [token 1000])"));
-		assertTrue(evalB(ctx,"(asset/owns? "+InitConfigTest.VILLAIN_ADDRESS+" [token 2000])"));
-		assertFalse(evalB(ctx,"(asset/owns? "+InitConfigTest.VILLAIN_ADDRESS+" [token 2001])"));
+		assertTrue(evalB(ctx,"(asset/owns? "+VILLAIN+" [token 1000])"));
+		assertTrue(evalB(ctx,"(asset/owns? "+VILLAIN+" [token 2000])"));
+		assertFalse(evalB(ctx,"(asset/owns? "+VILLAIN+" [token 2001])"));
 
 		// transfer using map argument
-		ctx=step(ctx,"(asset/transfer "+InitConfigTest.VILLAIN_ADDRESS+" {token 100})");
+		ctx=step(ctx,"(asset/transfer "+VILLAIN+" {token 100})");
 		assertTrue(ctx.getResult() instanceof AMap);
-		assertTrue(evalB(ctx,"(asset/owns? "+InitConfigTest.VILLAIN_ADDRESS+" [token 2100])"));
+		assertTrue(evalB(ctx,"(asset/owns? "+VILLAIN+" [token 2100])"));
 
 		// test offer
-		ctx=step(ctx,"(asset/offer "+InitConfigTest.VILLAIN_ADDRESS+" [token 1337])");
-		assertEquals(1337L,evalL(ctx,"(asset/get-offer token *address* "+InitConfigTest.VILLAIN_ADDRESS+")"));
+		ctx=step(ctx,"(asset/offer "+VILLAIN+" [token 1337])");
+		assertEquals(1337L,evalL(ctx,"(asset/get-offer token *address* "+VILLAIN+")"));
 	}
 
 	@Test public void testBuildToken() {
@@ -139,9 +141,9 @@ public class FungibleTest {
 
 		// transfer to the Villain scenario
 		{
-			Context<?> tctx=step(ctx,"(fungible/transfer token "+InitConfigTest.VILLAIN_ADDRESS+" 100)");
+			Context<?> tctx=step(ctx,"(fungible/transfer token "+VILLAIN+" 100)");
 			assertEquals(bal-100,evalL(tctx,"(fungible/balance token *address*)"));
-			assertEquals(100,evalL(tctx,"(fungible/balance token "+InitConfigTest.VILLAIN_ADDRESS+")"));
+			assertEquals(100,evalL(tctx,"(fungible/balance token "+VILLAIN+")"));
 		}
 
 		// acceptable transfers
@@ -203,7 +205,7 @@ public class FungibleTest {
 			Context<?> c=step(ctx,"(fungible/mint token 900)");
 			assertEquals(1000L,evalL(c,"(fungible/balance token *address*)"));
 
-			c=step(c,"(fungible/transfer token "+InitConfigTest.VILLAIN_ADDRESS+" 800)");
+			c=step(c,"(fungible/transfer token "+VILLAIN+" 800)");
 			assertEquals(200L,evalL(c,"(fungible/balance token *address*)"));
 
 			assertAssertError(step(c,"(fungible/burn token 201)")); // Fails, not held
@@ -218,7 +220,7 @@ public class FungibleTest {
 
 		// Villain shouldn't be able to mint or burn
 		{
-			Context<?> c=ctx.forkWithAddress(InitConfigTest.VILLAIN_ADDRESS);
+			Context<?> c=ctx.forkWithAddress(VILLAIN);
 			c=step(c,"(def token "+token+")");
 			c=step(c,"(import convex.fungible :as fungible)");
 
