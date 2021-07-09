@@ -123,10 +123,11 @@ public class API {
 			Server server=serverList.get(i);
 
 			// Join each additional Server to the Peer #0
-			serverList.get(i).connectToPeerAsync(genesisServer.getHostAddress());
+			ConnectionManager cm=server.getConnectionManager();
+			cm.connectToPeerAsync(genesisServer.getHostAddress());
 			
 			// Join server #0 to this server
-			genesisServer.connectToPeerAsync(server.getHostAddress());
+			genesisServer.getConnectionManager().connectToPeerAsync(server.getHostAddress());
 		}
 
 		// wait for the peers to sync upto 10 seconds

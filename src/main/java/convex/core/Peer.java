@@ -15,6 +15,7 @@ import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
+import convex.core.data.PeerStatus;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
@@ -61,7 +62,7 @@ public class Peer {
 	 * 
 	 */
 	private transient final AKeyPair keyPair;
-
+	
 	/** The latest merged belief */
 	private final SignedData<Belief> belief;
 
@@ -268,10 +269,20 @@ public class Peer {
 
 	/**
 	 * Gets the Peer Key of this Peer.
-	 * @return Address of Peer.
+	 * @return AccountKey of Peer.
 	 */
  	public AccountKey getPeerKey() {
 		return peerKey;
+	}
+ 	
+	/**
+	 * Gets the controller Address for this Peer
+	 * @return Address of Peer controller Account, or null if does not exist
+	 */
+ 	public Address getController() {
+		PeerStatus ps= getConsensusState().getPeer(peerKey);
+		if (ps==null) return null;
+		return ps.getController();
 	}
  	
 	/**

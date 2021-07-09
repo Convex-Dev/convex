@@ -1035,6 +1035,12 @@ public class Server implements Closeable {
 		return kp.getAccountKey();
 	}
 
+	/**
+	 * Gets the Store configured for this Server. A server must consistently use the 
+	 * same store instance for all Server threads.
+	 * 
+	 * @return Store instance
+	 */
 	public AStore getStore() {
 		return store;
 	}
@@ -1048,15 +1054,6 @@ public class Server implements Closeable {
 
 	public ServerInformation getServerInformation() {
 		return ServerInformation.create(this);
-	}
-
-	public void connectToPeer(InetSocketAddress hostAddress) throws IOException, TimeoutException {
-		manager.connectToPeer(hostAddress);
-
-	}
-
-	public void connectToPeerAsync(InetSocketAddress hostAddress) {
-		manager.connectToPeerAsync(hostAddress);
 	}
 
 	public ConnectionManager getConnectionManager() {
