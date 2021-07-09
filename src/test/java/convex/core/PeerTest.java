@@ -49,11 +49,6 @@ public class PeerTest {
 	}
 
 	@Test
-	public void testNullPeers() {
-		assertNull(STATE.getPeer(InitTest.HERO_KEYPAIR.getAccountKey())); // hero not a peer in initial state
-	}
-
-	@Test
 	public void testQuery() throws BadSignatureException {
 		Peer p = Peer.create(InitTest.FIRST_PEER_KEYPAIR, STATE);
 

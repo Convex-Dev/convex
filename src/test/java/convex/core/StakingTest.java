@@ -57,8 +57,9 @@ public class StakingTest extends ACVMTest {
 	public void testBadStake() {
 		Context<ACell> ctx0 = context();
 
+		// TODO: new test since HERO is now a peer manager
 		// not a peer, should be state error
-		assertStateError(ctx0.setDelegatedStake(InitTest.HERO_KEYPAIR.getAccountKey(), 1000));
+		//assertStateError(ctx0.setDelegatedStake(InitTest.HERO_KEYPAIR.getAccountKey(), 1000));
 
 		// bad arguments, out of range
 		assertArgumentError(ctx0.setDelegatedStake(InitTest.FIRST_PEER_KEY, -1));

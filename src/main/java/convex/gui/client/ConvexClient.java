@@ -10,13 +10,11 @@ import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
 import convex.api.Convex;
-import convex.core.init.Init;
 import convex.core.State;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.gui.client.panels.HomePanel;
 import convex.gui.components.models.StateModel;
-import convex.gui.manager.PeerGUI;
 import convex.gui.manager.mainpanels.AboutPanel;
 import convex.gui.utils.Toolkit;
 
@@ -34,7 +32,7 @@ public class ConvexClient extends JPanel {
 
 	private static JFrame frame;
 
-	private static StateModel<State> latestState = StateModel.create(Init.createState(PeerGUI.initConfig));
+	private static StateModel<State> latestState = StateModel.create(null);
 
 	public static long maxBlock = 0;
 

@@ -20,6 +20,7 @@ import convex.api.Shutdown;
 import convex.cli.Helpers;
 import convex.core.Belief;
 import convex.core.Result;
+import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
@@ -30,6 +31,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.SignedData;
 import convex.core.init.AInitConfig;
+import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.util.Utils;
@@ -71,7 +73,10 @@ public class PeerManager implements IServerEvent {
 	}
 
 	public void launchLocalPeers(int count, AInitConfig initConfig) {
-		peerServerList = API.launchLocalPeers(count, initConfig, this);
+		ArrayList<AKeyPair> keyPairs=new ArrayList<>(); 
+		List<AccountKey> keys=keyPairs.stream().map(kp->kp.getAccountKey()).collect(java.util.stream.Collectors.toList()); 
+		State genesisState=Init.createState(keys);
+		peerServerList = API.launchLocalPeers(keyPairs,genesisState, this);
 	}
 
 	public SignedData<Belief> aquireLatestBelief(AKeyPair keyPair, Address address, AStore store, String remotePeerHostname) {

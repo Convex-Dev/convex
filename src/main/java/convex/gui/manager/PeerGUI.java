@@ -53,7 +53,7 @@ public class PeerGUI extends JPanel {
 
 	private static JFrame frame;
 	
-	public static List<AKeyPair> KEYPAIRS=Arrays.asList(AKeyPair.generate(),AKeyPair.generate()); 
+	public static List<AKeyPair> KEYPAIRS=Arrays.asList(AKeyPair.generate(),AKeyPair.generate(),AKeyPair.generate()); 
 	public static List<AccountKey> PEERKEYS=KEYPAIRS.stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
 	
 	public static State genesisState=Init.createState(PEERKEYS);
@@ -288,5 +288,13 @@ public class PeerGUI extends JPanel {
 
 	public static PeerView getDefaultPeer() {
 		return PeersListPanel.getFirst();
+	}
+
+	public static Address getUserAddress(int i) {
+		return Address.create(Init.BASE_FIRST_ADDRESS.longValue()+i);
+	}
+	
+	public static AKeyPair getUserKeyPair(int i) {
+		return KEYPAIRS.get(i);
 	}
 }

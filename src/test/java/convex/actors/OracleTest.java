@@ -25,7 +25,7 @@ public class OracleTest extends ACVMTest {
 	public void testOracleActor() throws IOException {
 
 		// setup address for this scene
-		Context ctx =step("(do (def HERO" + HERO + ") (def VILLAIN " + VILLAIN + "))");
+		Context ctx =step("(do (def HERO " + HERO + ") (def VILLAIN " + VILLAIN + "))");
 
 		ACell contractCode = Reader.readResource("actors/oracle-trusted.con");
 		ctx = ctx.deployActor(contractCode);
