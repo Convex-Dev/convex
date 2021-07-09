@@ -55,8 +55,12 @@ public class Peer {
 	/** This Peer's key */
 	private final AccountKey peerKey;
 
-	/** This Peer's key pair */
-	private final AKeyPair keyPair;
+	/** This Peer's key pair 
+	 * 
+	 *  Make transient to mark that this should never be Persisted by accident
+	 * 
+	 */
+	private transient final AKeyPair keyPair;
 
 	/** The latest merged belief */
 	private final SignedData<Belief> belief;
@@ -268,6 +272,14 @@ public class Peer {
 	 */
  	public AccountKey getPeerKey() {
 		return peerKey;
+	}
+ 	
+	/**
+	 * Gets the Peer Key of this Peer.
+	 * @return Address of Peer.
+	 */
+ 	public AKeyPair getKeyPair() {
+		return keyPair;
 	}
 
 	public Belief getBelief() {

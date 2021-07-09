@@ -40,7 +40,7 @@ public class PeerView {
 				sb.append("    ");
 				sb.append("Delegated Stake:  "+Text.toFriendlyBalance(ps.getDelegatedStake()));
 			}
-			ConnectionManager cm=peerServer.getManager();
+			ConnectionManager cm=peerServer.getConnectionManager();
 			sb.append("\n");
 			sb.append("Connections: "+cm.getConnectionCount());
 		} else if (peerConnection != null) {

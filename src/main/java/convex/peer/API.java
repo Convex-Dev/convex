@@ -83,7 +83,9 @@ public class API {
 	}
 
 	/**
-	 * Launch a set of peers.
+	 * Launch a local set of peers. Intended mainly for testing / development.
+	 * 
+	 * The Peers will have a unique genesis State, i.e. an independent network
 	 *
 	 * @param count Number of peers to launch.
 	 * @param initConfig

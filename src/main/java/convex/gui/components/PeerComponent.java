@@ -98,7 +98,7 @@ public class PeerComponent extends BaseListComponent {
 			
 			JMenuItem killConn = new JMenuItem("Kill Connections");
 			killConn.addActionListener(e -> {
-				peer.peerServer.getManager().closeAllConnections();
+				peer.peerServer.getConnectionManager().closeAllConnections();
 			});
 			popupMenu.add(killConn);
 			

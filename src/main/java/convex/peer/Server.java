@@ -174,7 +174,7 @@ public class Server implements Closeable {
 	private Server(HashMap<Keyword, Object> config, IServerEvent event) {
 		this.event = event;
 		AStore configStore = (AStore) config.get(Keywords.STORE);
-		this.store = (configStore == null) ? Stores.getGlobalStore() : configStore;
+		this.store = (configStore == null) ? Stores.current() : configStore;
 
 		AKeyPair keyPair = (AKeyPair) config.get(Keywords.KEYPAIR);
 		if (keyPair==null) throw new IllegalArgumentException("No Peer Key Pair provided in config");
@@ -246,14 +246,18 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Gets the current Belief held by this PeerServer
+	 * Gets the current Peer data for this Server.
 	 *
-	 * @return Current Belief
+	 * @return Current Peer
 	 */
 	public Peer getPeer() {
 		return peer;
 	}
 
+	/**
+	 * Gets the host name for this Peer
+	 * @return Hostname String
+	 */
 	public String getHostname() {
 		return hostname;
 	}
@@ -1017,7 +1021,7 @@ public class Server implements Closeable {
 	 * SECURITY: Be careful with this!
 	 */
 	private AKeyPair getKeyPair() {
-		return (AKeyPair) getConfig().get(Keywords.KEYPAIR);
+		return getPeer().getKeyPair();
 	}
 
 	/**
@@ -1055,7 +1059,7 @@ public class Server implements Closeable {
 		manager.connectToPeerAsync(hostAddress);
 	}
 
-	public ConnectionManager getManager() {
+	public ConnectionManager getConnectionManager() {
 		return manager;
 	}
 

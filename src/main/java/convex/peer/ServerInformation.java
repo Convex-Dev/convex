@@ -29,7 +29,7 @@ public class ServerInformation {
 	}
 
 	public static ServerInformation create(Server server) {
-		return new ServerInformation(server, server.getManager());
+		return new ServerInformation(server, server.getConnectionManager());
 	}
 
 	protected void load(Server server,  ConnectionManager manager) {
