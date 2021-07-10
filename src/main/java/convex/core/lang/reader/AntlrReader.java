@@ -310,8 +310,8 @@ public class AntlrReader {
 		public void exitSyntax(SyntaxContext ctx) {
 			ArrayList<ACell> elements=popList();
 			if (elements.size()!=2) throw new ParseException("Metadata requires metadata and annotated form but got:"+ elements);
-			ACell value=elements.get(1);
 			AHashMap<ACell,ACell> meta=ReaderUtils.interpretMetadata(elements.get(0));
+			ACell value=elements.get(1);
 			push(Syntax.create(value, meta));
 		}
 
