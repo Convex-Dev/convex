@@ -2,7 +2,6 @@ package convex.core;
 
 import static convex.test.Assertions.assertArgumentError;
 import static convex.test.Assertions.assertFundsError;
-import static convex.test.Assertions.assertStateError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
