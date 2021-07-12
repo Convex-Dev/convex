@@ -73,7 +73,7 @@ public class ConnectionManager {
 	 * Timstamp for the last execution of the Connection Manager update loop.
 	 */
 	private long lastUpdate=Utils.getCurrentTimestamp();
-	
+
 	/*
 	 * Runnable loop for managing server connections
 	 */
@@ -118,13 +118,13 @@ public class ConnectionManager {
 
 	protected void maintainConnections() {
 		State s=server.getPeer().getConsensusState();
-		
+
 		long millisSinceLastUpdate=Math.max(0,Utils.getCurrentTimestamp()-lastUpdate);
-		
+
 		int targetPeerCount=getTargetPeerCount();
 		int currentPeerCount=connections.size();
 		double totalStake=s.computeStakes().get(null);
-		
+
 		AccountKey[] peers = connections.keySet().toArray(new AccountKey[currentPeerCount]);
 		for (AccountKey p: peers) {
 			Connection conn=connections.get(p);
@@ -137,7 +137,7 @@ public class ConnectionManager {
 			}
 
 			/**
-			 *  Always remove Peers not staked in consensus. This should eliminate Peers that have 
+			 *  Always remove Peers not staked in consensus. This should eliminate Peers that have
 			 *  withdrawn or are slashed from current consideration.
 			 */
 			PeerStatus ps=s.getPeer(p);
@@ -146,7 +146,7 @@ public class ConnectionManager {
 				currentPeerCount--;
 				continue;
 			}
-			
+
 			/* Drop Peers randomly if they have a small stake
 			 * This ensure that new peers will get picked up occasionally and
 			 * the distribution of peers tends towards the level of stake over time
@@ -155,9 +155,9 @@ public class ConnectionManager {
 				double prop=ps.getTotalStake()/totalStake; // proportion of stake represented by this Peer
 				// Very low chance of dropping a Peer with high stake (more than
 				double keepChance=Math.min(1.0, prop*targetPeerCount);
-				
+
 				if (keepChance<1.0) {
-					
+
 					double dropRate=millisSinceLastUpdate/(double)Constants.PEER_CONNECTION_DROP_TIME;
 					if (random.nextDouble()<(dropRate*(1.0-keepChance))) {
 						closeConnection(p);
@@ -166,7 +166,7 @@ public class ConnectionManager {
 					}
 				}
 			}
-			
+
 			// send request for a trusted peer connection if necessary
 			// TODO: need to find out why the response message is not being received by the peers
 			requestChallenge(p, conn, server.getPeer());
@@ -255,7 +255,7 @@ public class ConnectionManager {
 				conn.close();
 			}
 			connections.remove(peerKey);
-			server.raiseServerChange("connection removed for "+peerKey);
+			server.raiseServerChange("connection");
 		}
 	}
 
