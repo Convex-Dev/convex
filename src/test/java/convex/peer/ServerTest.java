@@ -163,16 +163,7 @@ public class ServerTest {
 	@Test
 	public void testAcquireBelief() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
 		synchronized(ServerTest.SERVER) {
-			// Stores.setCurrent(Stores.getGlobalStore()); // not needed?
-			InetSocketAddress hostAddress=SERVER.getHostAddress();
-
-			// Connect to Peer Server using the current store for the client
-			// SignedData<Belief> s=server.getPeer().getSignedBelief();
-			// Hash h=s.getHash();
-			//System.out.println("SignedBelief Hash="+h);
-			//System.out.println("testAcquireBelief store="+Stores.current());
-
-			Convex convex=Convex.connect(hostAddress, InitTest.HERO, InitTest.HERO_KEYPAIR);
+			Convex convex=ServerTest.SERVER.getLocalClient();
 
 			Future<Result> statusFuture=convex.requestStatus();
 			Result status=statusFuture.get(10000,TimeUnit.MILLISECONDS);

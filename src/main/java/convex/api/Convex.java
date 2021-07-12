@@ -273,7 +273,7 @@ public class Convex {
 	 * @throws TimeoutException
 	 * @throws IOException
 	 */
-	public synchronized Address createAccount(AccountKey publicKey) throws TimeoutException, IOException {
+	public Address createAccount(AccountKey publicKey) throws TimeoutException, IOException {
 		Invoke trans = Invoke.create(address, 0, "(create-account 0x" + publicKey.toHexString() + ")");
 		Result r = transactSync(trans);
 		if (r.isError()) throw new Error("Error creating account: " + r);
@@ -307,7 +307,7 @@ public class Convex {
 	 *          desired
 	 * @return The updated transaction
 	 */
-	public synchronized ATransaction applyNextSequence(ATransaction t) {
+	private synchronized ATransaction applyNextSequence(ATransaction t) {
 		if (sequence != null) {
 			// if already we know the next sequence number to be applied, set it
 			return t.withSequence(++sequence);
