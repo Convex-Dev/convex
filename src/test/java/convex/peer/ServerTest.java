@@ -52,6 +52,9 @@ public class ServerTest {
 	public static final Server SERVER;
 
 	private static final List<Server> SERVERS;
+	
+	public static final Convex CONVEX;
+
 
 	static {
 		// Use fresh State
@@ -69,9 +72,14 @@ public class ServerTest {
 		synchronized(SERVER) {
 			// wait for server to be launched
 			try {
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {
-				// continue
+				Thread.sleep(2000);
+				CONVEX=Convex.connect(
+						SERVER.getHostAddress(),
+						SERVER.getPeerController(),
+						InitTest.FIRST_PEER_KEYPAIR
+					);
+			} catch (InterruptedException | IOException | TimeoutException e) {
+				throw Utils.sneakyThrow(e);
 			}
 		}
 	}

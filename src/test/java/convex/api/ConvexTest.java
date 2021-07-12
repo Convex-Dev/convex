@@ -38,17 +38,10 @@ public class ConvexTest {
 
 
 	static {
-		Convex CONVEX;
 		synchronized(ServerTest.SERVER) {
 			try {
-				CONVEX=Convex.connect(
-					ServerTest.SERVER.getHostAddress(),
-					InitTest.HERO,
-					InitTest.HERO_KEYPAIR
-				);
-				ADDRESS=CONVEX.createAccount(KEYPAIR.getAccountKey());
-				CONVEX.transfer(ADDRESS, 1000000000L);
-				CONVEX.setAddress(ADDRESS,KEYPAIR);
+				ADDRESS=ServerTest.CONVEX.createAccount(KEYPAIR.getAccountKey());
+				ServerTest.CONVEX.transfer(ADDRESS, 1000000000L).get(1000,TimeUnit.MILLISECONDS);
 			} catch (Throwable e) {
 				e.printStackTrace();
 				throw Utils.sneakyThrow(e);

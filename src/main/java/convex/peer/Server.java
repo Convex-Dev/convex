@@ -632,7 +632,7 @@ public class Server implements Closeable {
 	}
 
 	private long lastOwnTransactionTimestamp;
-	private static final long OWN_TRANSACTIONS_DELAY=1000;
+	private static final long OWN_TRANSACTIONS_DELAY=300;
 	
 	/**
 	 * Gets the Peer controller Address
