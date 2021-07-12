@@ -112,10 +112,10 @@ public class Utils {
 	 * SECURITY; do not use this output for any comparison.
 	 *
 	 * @param hexString String to show in friendly format.
+     * @param size Number of hex chars to output.
 	 * @return Hex String
 	 */
-	public static String toFriendlyHexString(String hexString) {
-		int size = 4;
+	public static String toFriendlyHexString(String hexString, int size) {
 		String cleanHexString = hexString.replaceAll("^0[Xx]", "");
 		String result = cleanHexString.substring(0, size);
 		// + ".." + cleanHexString.substring(cleanHexString.length() - size);

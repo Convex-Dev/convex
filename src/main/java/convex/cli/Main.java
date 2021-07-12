@@ -244,4 +244,52 @@ public class Main implements Runnable {
 		}
 		return convex;
 	}
+
+	public AKeyPair[] generateKeyPairs(int count) throws Error {
+		AKeyPair[] keyPairs = new AKeyPair[count];
+
+		// get the password of the key store file
+		String password = getPassword();
+		if (password == null) {
+			throw new Error("You need to provide a keystore password");
+		}
+        // get the key store file
+		File keyFile = new File(getKeyStoreFilename());
+
+		KeyStore keyStore = null;
+		try {
+            // try to load the keystore file
+			if (keyFile.exists()) {
+				keyStore = PFXTools.loadStore(keyFile, password);
+			} else {
+				// create the path to the new key file
+				Helpers.createPath(keyFile);
+				keyStore = PFXTools.createStore(keyFile, password);
+			}
+		} catch (Throwable t) {
+			throw new Error("Cannot load key store "+t);
+		}
+
+		// we have now the count, keystore-password, keystore-file
+		// generate keys
+		for (int index = 0; index < count; index ++) {
+			keyPairs[index] = AKeyPair.generate();
+
+			// System.out.println("generated #"+(index+1)+" public key: " + keyPair.getAccountKey().toHexString());
+			try {
+                // save the key in the keystore
+				PFXTools.saveKey(keyStore, keyPairs[index], password);
+			} catch (Throwable t) {
+				throw new Error("Cannot store the key to the key store "+t);
+			}
+		}
+
+        // save the keystore file
+		try {
+			PFXTools.saveStore(keyStore, keyFile, password);
+		} catch (Throwable t) {
+			throw new Error("Cannot save the key store file "+t);
+		}
+		return keyPairs;
+    }
 }
