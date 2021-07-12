@@ -153,6 +153,8 @@ public class Peer {
 			Stores.setCurrent(store);
 			Ref<ACell> ref=store.refForHash(root);
 			if (ref==null) return null; // not found case
+			if (ref.getStatus()<=Ref.PERSISTED) return null; // not fully in store
+			
 			@SuppressWarnings("unchecked")
 			AMap<Keyword,ACell> peerData=(AMap<Keyword, ACell>) ref.getValue();
 
@@ -171,12 +173,12 @@ public class Peer {
 	 * @return A new Peer instance
 	 */
 	public static Peer createStartupPeer(Map<Keyword, Object> config) {
-		State initialState = (State) config.get(Keywords.STATE);
-		if (initialState == null) throw new IllegalArgumentException("Peer initialisation requires an initial state");
+		State genesisState = (State) config.get(Keywords.STATE);
+		if (genesisState == null) throw new IllegalArgumentException("Peer initialisation requires an initial state");
 		AKeyPair keyPair = (AKeyPair) config.get(Keywords.KEYPAIR);
 		if (keyPair == null) throw new IllegalArgumentException("Peer initialisation requires a keypair");
 
-		return create(keyPair, initialState);
+		return create(keyPair, genesisState);
 	}
 
 	public MergeContext getMergeContext() {

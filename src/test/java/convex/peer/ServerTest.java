@@ -221,7 +221,7 @@ public class ServerTest {
 			assertTrue(!pc.isClosed());
 
 			// wait for results to come back
-			assertFalse(Utils.timeout(20000, () -> results.containsKey(last)));
+			assertFalse(Utils.timeout(10000, () -> results.containsKey(last)));
 			Thread.sleep(100); // bit more time in case something out of order?
 
 			AVector<CVMLong> v = Vectors.of(1l, 2l, 3l);

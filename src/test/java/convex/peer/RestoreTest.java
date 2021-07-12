@@ -3,9 +3,12 @@ package convex.peer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
@@ -16,16 +19,24 @@ import convex.api.Convex;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.AccountKey;
+import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.data.Lists;
 import convex.core.data.Maps;
-import convex.core.init.InitTest;
+import convex.core.init.Init;
 import convex.core.lang.Symbols;
 import convex.core.store.AStore;
 import convex.core.transactions.Invoke;
 import etch.EtchStore;
 
 public class RestoreTest {
+	AKeyPair KP=AKeyPair.createSeeded(123456781);
+	List<AccountKey> keys=Lists.of(KP.getAccountKey());
+	
+	State GENESIS=Init.createBaseState(keys);
+	Address HERO=Init.BASE_FIRST_ADDRESS;
 
 	@Test
 	public void restoreTest() throws IOException, InterruptedException, ExecutionException, TimeoutException {
@@ -44,36 +55,39 @@ public class RestoreTest {
 //		   }
 //		}
 
-		AKeyPair kp=InitTest.FIRST_PEER_KEYPAIR;
 		AStore store=EtchStore.createTemp();
 		Map<Keyword, Object> config = Maps.hashMapOf(
-				Keywords.KEYPAIR,kp,
+				Keywords.KEYPAIR,KP,
+				Keywords.STATE,GENESIS,
 				Keywords.STORE,store,
+				Keywords.URL,null,
 				Keywords.PERSIST,true
 		);
 		Server s1=API.launchPeer(config);
 
 		// Connect with HERO Account
-		Convex cvx1=Convex.connect(s1.getHostAddress(), InitTest.HERO,InitTest.HERO_KEYPAIR);
+		Convex cvx1=Convex.connect(s1.getHostAddress(), HERO,KP);
 
-		Result tx1=cvx1.transactSync(Invoke.create(InitTest.HERO,1, Symbols.STAR_ADDRESS));
-		assertEquals(InitTest.HERO,tx1.getValue());
-		Long balance1=cvx1.getBalance(InitTest.HERO);
+		Result tx1=cvx1.transactSync(Invoke.create(HERO,1, Symbols.STAR_ADDRESS));
+		assertEquals(HERO,tx1.getValue());
+		Long balance1=cvx1.getBalance(HERO);
 		assertTrue(balance1>0);
 		s1.close();
 
 		// TODO: testing that server is definitely down
-		// assertThrows(IOException.class,()->Convex.connect(s1.getHostAddress(), Init.HERO_KP));
-		// assertThrows(IOException.class,()->cvx1.getBalance(Init.HERO));
+		assertThrows(Throwable.class,()->cvx1.getBalance(HERO));
 
 		// Launch peer and connect
 		Server s2=API.launchPeer(config);
-		Convex cvx2=Convex.connect(s2.getHostAddress(), InitTest.HERO,InitTest.HERO_KEYPAIR);
+		
+		assertNull(s2.getHostname());
+		
+		Convex cvx2=Convex.connect(s2.getHostAddress(), HERO,KP);
 
-		Long balance2=cvx2.getBalance(InitTest.HERO);
+		Long balance2=cvx2.getBalance(HERO);
 		assertEquals(balance1,balance2);
 
-		Result tx2=cvx2.transactSync(Invoke.create(InitTest.HERO,2, Symbols.BALANCE));
+		Result tx2=cvx2.transactSync(Invoke.create(HERO,2, Symbols.BALANCE));
 		assertFalse(tx2.isError());
 
 		State state=s2.getPeer().getConsensusState();

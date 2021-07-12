@@ -273,9 +273,11 @@ public class Server implements Closeable {
 			nio.launch(port);
 			port = nio.getPort(); // get the actual port (may be auto-allocated)
 
-			hostname = String.format("localhost:%d", port);
+			
 			if (getConfig().containsKey(Keywords.URL)) {
 				hostname = (String) getConfig().get(Keywords.URL);
+			} else {
+				hostname = String.format("localhost:%d", port);
 			}
 
 			lastOwnTransactionTimestamp=Utils.getCurrentTimestamp();
@@ -917,6 +919,8 @@ public class Server implements Closeable {
 						}
 					}
 				}
+			} catch (InterruptedException e) {
+				log.fine("Terminating Server update due to interrupt");
 			} catch (Throwable e) {
 				log.severe("Unexpected exception in server update loop: " + e.toString());
 				log.severe("Terminating Server update");

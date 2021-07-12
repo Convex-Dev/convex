@@ -60,7 +60,11 @@ public class API {
 	public static Server launchPeer(Map<Keyword, Object> peerConfig, IServerEvent event) {
 		HashMap<Keyword,Object> config=new HashMap<>(peerConfig);
 		
-		if (!config.containsKey(Keywords.STATE)) throw new IllegalArgumentException("Peer launch requires a genesis :state in config");
+		// State no8t strictly necessarry? Should be possible to restore a Peer from store
+		if (!(config.containsKey(Keywords.STATE)||config.containsKey(Keywords.STORE))) {
+			throw new IllegalArgumentException("Peer launch requires a genesis :state or exsiting :store in config");
+		}
+		
 		if (!config.containsKey(Keywords.KEYPAIR)) throw new IllegalArgumentException("Peer launch requires a "+Keywords.KEYPAIR+" in config");
 
 		try {
