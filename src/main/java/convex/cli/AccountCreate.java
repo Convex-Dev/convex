@@ -5,6 +5,8 @@ import java.util.logging.Logger;
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
+import convex.core.util.Utils;
+
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -61,11 +63,25 @@ public class AccountCreate implements Runnable {
 		Main mainParent = accountParent.mainParent;
 
 		AKeyPair keyPair = null;
-		try {
-			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
-		} catch (Error e) {
-			log.info(e.getMessage());
-			return;
+		if (keystorePublicKey.length() == 0 && keystoreIndex == -1) {
+			// create a local key store AKeyPair
+			try {
+				AKeyPair keyPairs[] = mainParent.generateKeyPairs(1);
+				keyPair = keyPairs[0];
+				System.out.println("generated public key: " + keyPair.getAccountKey().toHexString());
+			}
+			catch (Error e) {
+				log.severe("failed to create key pair" + e);
+				return;
+			}
+		}
+		else {
+			try {
+				keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
+			} catch (Error e) {
+				log.info(e.getMessage());
+				return;
+			}
 		}
 
 		Convex convex = null;
@@ -86,7 +102,13 @@ public class AccountCreate implements Runnable {
 				Long balance = convex.getBalance(address);
 				log.info("account balance: " + balance);
 			}
-
+			log.info(
+				String.format(
+					"to use this key can use the options --address=%d --public-key=%s",
+					address.toLong(),
+					Utils.toFriendlyHexString(keyPair.getAccountKey().toHexString(), 6)
+				)
+			);
 		} catch (Throwable t) {
 			log.severe(t.getMessage());
 			return;

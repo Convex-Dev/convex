@@ -54,6 +54,7 @@ public class PeerManager implements IServerEvent {
 	private static final Logger log = Logger.getLogger(PeerManager.class.getName());
 
 	private static final long TRANSACTION_TIMEOUT_MILLIS = 50000;
+	private static final int FRIENDLY_HEX_STRING_SIZE = 6;
 
 	protected List<Server> peerServerList = new ArrayList<Server>();
 
@@ -265,7 +266,7 @@ public class PeerManager implements IServerEvent {
 	}
 
 	protected String toServerInformationText(ServerInformation serverInformation) {
-		String shortName = Utils.toFriendlyHexString(serverInformation.getPeerKey().toHexString());
+		String shortName = Utils.toFriendlyHexString(serverInformation.getPeerKey().toHexString(), FRIENDLY_HEX_STRING_SIZE);
 		String hostname = serverInformation.getHostname();
 		String joined = "NJ";
 		String synced = "NS";
@@ -275,8 +276,8 @@ public class PeerManager implements IServerEvent {
 		if (serverInformation.isSynced()) {
 			synced = " S";
 		}
-		String stateHash =  Utils.toFriendlyHexString(serverInformation.getStateHash().toHexString());
-		String beliefHash =  Utils.toFriendlyHexString(serverInformation.getBeliefHash().toHexString());
+		String stateHash =  Utils.toFriendlyHexString(serverInformation.getStateHash().toHexString(), FRIENDLY_HEX_STRING_SIZE);
+		String beliefHash =  Utils.toFriendlyHexString(serverInformation.getBeliefHash().toHexString(), FRIENDLY_HEX_STRING_SIZE);
 		int connectionCount = serverInformation.getConnectionCount();
 		int trustedConnectionCount = serverInformation.getTrustedConnectionCount();
 		long consensusPoint = serverInformation.getConsensusPoint();

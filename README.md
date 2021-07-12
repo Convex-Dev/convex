@@ -46,7 +46,7 @@ The repository also contains core "on-chain" libraries providing key full-stack 
 Convex is available to run as a CLI application out of the box. After building (with e.g. `mvn install`) it can be run directly as an executable `jar` file:
 
 ```
-java -jar target/convex.jar <args>
+java -jar target/convex-jar-with-dependencies.jar <args>
 ```
 
 Or using the convenience batch script in windows:
@@ -58,17 +58,46 @@ convex <args>
 or in linux/mac you can use the shell script:
 
 ```
-./convex.sh <args>
+./convex <args>
 ```
 
+### Staring a private local network using the CLI
 
-A common usage of the CLI would be to start a Convex peer:
+If you want to start a local network for testing and try out Convex without accesing the public (test) network at https://convex.world. You can start a local network using the CLI command.
+
+The local Convex network uses 3 types of files:
+
+1. The *Etch Storage database*. This contains the stored state of the Convex network. Usually when starting up the initial cluster the first set of peers share the same Etch database. CLI Parameter: **--etch**
+
+2. *Keystore file*. This file contains the private/public key pairs used for the peers and any subsequent users. CLI Parameters: **--keystore**, **--password**
+
+3. *Session file*. This is created by the CLI to keep track of the running peers, so that if you want to access the local network or add another peer to the network, the CLI will look at the session file for a randomly available peer to connect too. CLI Parameter: **--session**
+
+
+So to start a new network using the mimimum number of parameters:
 
 ```
-convex peer start
+./convex local start
 ```
 
-Which initiates a local convex network with 8 peers using the current local configuration.
+This will startup 8 peers that are sharing the same Etch database.
+
+To create another peer to join the network, you can enter the following command:
+
+```
+./convex peer create --password=my-secret
+```
+You wil always need to provide the `--password` so that the CLI can access your Keystore file and save the new peer key.
+
+The `peer create` command will generate the peer start command so you can copy and paste it into the command line, such as..
+
+```
+./convex peer start --password=my-secret --address=48 --public-key=59a457
+```
+
+The `--address` parameter is the address of the peer account, `--public-key` is the first hex chars of the private/public key in your keystore file and `--password` is allowing access to your keystore file.
+
+
 
 ### Peer manager
 
@@ -83,12 +112,6 @@ or you can run this from the command line by using the `peer manager` command:
 ```
 ./convex local manager
 ```
-or
-
-```
-./convex local start
-```
-
 
 ### Benchmarking
 
