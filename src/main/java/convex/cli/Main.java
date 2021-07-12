@@ -78,6 +78,7 @@ public class Main implements Runnable {
 
 	@Option(names={"-s", "--session"},
 	defaultValue=Constants.SESSION_FILENAME,
+    scope = ScopeType.INHERIT,
 	description="Session filename. Defaults ${DEFAULT-VALUE}")
 	private String sessionFilename;
 

@@ -67,11 +67,11 @@ If you want to start a local network for testing and try out Convex without acce
 
 The local Convex network uses 3 types of files:
 
-1. The *Etch Storage database*. This contains the stored state of the Convex network. Usually when starting up the initial cluster the first set of peers share the same Etch database. CLI Parameter: **--etch=**
+1. The *Etch Storage database*. This contains the stored state of the Convex network. Usually when starting up the initial cluster the first set of peers share the same Etch database. CLI Parameter: **--etch**
 
-2. *Keystore file*. This file contains the private/public key pairs used for the peers and any subsequent users. CLI Parameters: **--keystore=**, **--password=**
+2. *Keystore file*. This file contains the private/public key pairs used for the peers and any subsequent users. CLI Parameters: **--keystore**, **--password**
 
-3. *Session file*. This is created by the CLI to keep track of the running peers, so that if you want to access the local network or add another peer to the network, the CLI will look at the session file for a randomly available peer to connect too. CLI Parameter: **--session=**
+3. *Session file*. This is created by the CLI to keep track of the running peers, so that if you want to access the local network or add another peer to the network, the CLI will look at the session file for a randomly available peer to connect too. CLI Parameter: **--session**
 
 
 So to start a new network using the mimimum number of parameters:
@@ -87,7 +87,7 @@ To create another peer to join the network, you can enter the following command:
 ```
 ./convex peer create --password=my-secret
 ```
-You wil always need to provide the password so that the CLI can access your Keystore file and save the new peer key.
+You wil always need to provide the `--password` so that the CLI can access your Keystore file and save the new peer key.
 
 The `peer create` command will generate the peer start command so you can copy and paste it into the command line, such as..
 
@@ -95,7 +95,7 @@ The `peer create` command will generate the peer start command so you can copy a
 ./convex peer start --password=my-secret --address=48 --public-key=59a457
 ```
 
-The `address` parameter is the address of the peer account, `public-key` is the first hex chars of the private/public key in your keystore file and `password` is allowing access to your keystore file.
+The `--address` parameter is the address of the peer account, `--public-key` is the first hex chars of the private/public key in your keystore file and `--password` is allowing access to your keystore file.
 
 
 
