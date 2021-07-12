@@ -62,7 +62,7 @@ public class API {
 		
 		// State no8t strictly necessarry? Should be possible to restore a Peer from store
 		if (!(config.containsKey(Keywords.STATE)||config.containsKey(Keywords.STORE))) {
-			throw new IllegalArgumentException("Peer launch requires a genesis :state or exsiting :store in config");
+			throw new IllegalArgumentException("Peer launch requires a genesis :state or existing :store in config");
 		}
 		
 		if (!config.containsKey(Keywords.KEYPAIR)) throw new IllegalArgumentException("Peer launch requires a "+Keywords.KEYPAIR+" in config");
