@@ -70,16 +70,19 @@ public class ServerTest {
 		Map<Keyword, Object> config = new HashMap<>();
 		config.put(Keywords.PORT, 0); // create new port
 		config.put(Keywords.STATE, s);
+		// config.put(Keywords.URL, null);
 		config.put(Keywords.STORE, EtchStore.createTemp("server-test-store"));
 		config.put(Keywords.KEYPAIR, InitTest.FIRST_PEER_KEYPAIR); // use first peer keypair
 
 		SERVERS=API.launchLocalPeers(InitTest.PEER_KEYPAIRS, s, null);
 		SERVER = SERVERS.get(0);
-		// wait for server to be launched
-		try {
-			Thread.sleep(1000);
-		} catch (InterruptedException e) {
-			// continue
+		synchronized(SERVER) {
+			// wait for server to be launched
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				// continue
+			}
 		}
 	}
 

@@ -437,7 +437,8 @@ public class Convex {
 		long now = Utils.getTimeMillis();
 		timeout = Math.max(0L, timeout - (now - start));
 		try {
-			return cf.get(timeout, TimeUnit.MILLISECONDS);
+			Result r = cf.get(timeout, TimeUnit.MILLISECONDS);
+			return r;
 		} catch (InterruptedException | ExecutionException e) {
 			throw new Error("Not possible? Since there is no Thread for the future....", e);
 		}
