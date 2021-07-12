@@ -1,11 +1,8 @@
 package convex.cli;
 
-import java.io.File;
 import java.util.logging.Logger;
-import java.security.KeyStore;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.PFXTools;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
