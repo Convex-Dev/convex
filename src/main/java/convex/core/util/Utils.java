@@ -18,6 +18,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -1315,6 +1316,11 @@ public class Utils {
 		if (a instanceof ACell) return (RT.bool((ACell)a));
 		if (a instanceof Boolean) return ((Boolean)a);
 		return true; // consider other values truthy
+	}
+
+	@SafeVarargs
+	public static <T> List<T> listOf(T... values) {
+		return Arrays.asList(values);
 	}
 
 }

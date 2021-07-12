@@ -173,10 +173,14 @@ public class Peer {
 	 * @return A new Peer instance
 	 */
 	public static Peer createStartupPeer(Map<Keyword, Object> config) {
-		State genesisState = (State) config.get(Keywords.STATE);
-		if (genesisState == null) throw new IllegalArgumentException("Peer initialisation requires an initial state");
 		AKeyPair keyPair = (AKeyPair) config.get(Keywords.KEYPAIR);
 		if (keyPair == null) throw new IllegalArgumentException("Peer initialisation requires a keypair");
+
+		State genesisState = (State) config.get(Keywords.STATE);
+		if (genesisState == null) {
+			genesisState=Init.createState(Utils.listOf(keyPair.getAccountKey()));
+			genesisState=genesisState.withTimestamp(Utils.getCurrentTimestamp());
+		}
 
 		return create(keyPair, genesisState);
 	}

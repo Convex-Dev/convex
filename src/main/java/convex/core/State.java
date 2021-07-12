@@ -718,4 +718,8 @@ public class State extends ARecord {
 		return globals;
 	}
 
+	public State withTimestamp(long timestamp) {
+		return withGlobals(globals.assoc(GLOBAL_TIMESTAMP, CVMLong.create(timestamp)));
+	}
+
 }
