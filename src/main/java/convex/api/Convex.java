@@ -266,7 +266,7 @@ public class Convex {
 	}
 
 	/**
-	 * Creates a new account with the gievn public key
+	 * Creates a new account with the given public key
 	 *
 	 * @param publicKey Public key to set for the new account
 	 * @return Address of account created

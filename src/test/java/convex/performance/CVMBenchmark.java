@@ -30,8 +30,8 @@ import convex.core.transactions.Transfer;
  * Skips stuff around transactions, block overhead, signatures etc.
  */
 public class CVMBenchmark {
-	State STATE=InitTest.STATE;
-	Address HERO=InitTest.HERO;
+	static State STATE=InitTest.STATE;
+	static Address HERO=InitTest.HERO;
 
 	@Benchmark
 	public void smallTransfer() {
