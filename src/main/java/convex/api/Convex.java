@@ -344,7 +344,7 @@ public class Convex {
 	 * @return A Future for the result of the transaction
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
-	public CompletableFuture<Result> transact(SignedData<ATransaction> signed) throws IOException {
+	public synchronized CompletableFuture<Result> transact(SignedData<ATransaction> signed) throws IOException {
 		CompletableFuture<Result> cf = new CompletableFuture<Result>();
 		synchronized (awaiting) {
 			long id = connection.sendTransaction(signed);

@@ -69,19 +69,7 @@ public class ServerTest {
 
 		SERVERS=API.launchLocalPeers(InitTest.PEER_KEYPAIRS, s, null);
 		SERVER = SERVERS.get(0);
-		synchronized(SERVER) {
-			// wait for server to be launched
-			try {
-				Thread.sleep(2000);
-				CONVEX=Convex.connect(
-						SERVER.getHostAddress(),
-						SERVER.getPeerController(),
-						InitTest.FIRST_PEER_KEYPAIR
-					);
-			} catch (InterruptedException | IOException | TimeoutException e) {
-				throw Utils.sneakyThrow(e);
-			}
-		}
+		CONVEX=SERVER.getLocalClient();
 	}
 
 	private static final Logger log = Logger.getLogger(ServerTest.class.getName());

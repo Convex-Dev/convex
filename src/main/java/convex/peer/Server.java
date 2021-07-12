@@ -632,6 +632,9 @@ public class Server implements Closeable {
 	}
 
 	private long lastOwnTransactionTimestamp;
+
+	private Convex localClient=null;
+	;
 	private static final long OWN_TRANSACTIONS_DELAY=300;
 	
 	/**
@@ -684,8 +687,29 @@ public class Server implements Closeable {
 				}
 				ACell message = Reader.read(code);
 				ATransaction transaction = Invoke.create(address, as.getSequence()+1, message);
-				SignedData<ATransaction> signedTransaction = getKeyPair().signData(transaction);
-				transactionList.add(signedTransaction);
+				postOwnTransaction(transaction);
+			}
+		}
+	}
+	
+	private synchronized void postOwnTransaction(ATransaction trans) {
+		try {
+			getLocalClient().transact(trans);
+		} catch (IOException e) {
+			localClient=null;
+			// Otherwise ignore
+		}
+	}
+
+	public Convex getLocalClient() {
+		if (localClient!=null) return localClient;
+		synchronized (this) {
+			if (localClient!=null) return localClient;
+			try {
+				localClient=Convex.connect(getHostAddress(),getPeerController(),peer.getKeyPair());
+				return localClient;
+			} catch (TimeoutException | IOException e) {
+				throw Utils.sneakyThrow(e);
 			}
 		}
 	}
@@ -1003,6 +1027,10 @@ public class Server implements Closeable {
 
 	@Override
 	public synchronized void close() {
+		if (localClient!=null) {
+			localClient.close();
+		}
+		
 		// persist peer state if necessary
 		if ((peer != null) && Utils.bool(getConfig().get(Keywords.PERSIST))) {
 			persistPeerData();

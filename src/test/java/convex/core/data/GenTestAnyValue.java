@@ -92,7 +92,6 @@ public class GenTestAnyValue {
 			
 			// when we persist a ref to an embedded object, should be the object itself
 			Ref<ACell> ref=Ref.get(o);
-			assertTrue(ref.isDirect()); 
 			assertEquals(data,ref.getEncoding()); // should encode ref same as value
 		} else {
 			// when we persist a ref to non-embedded object, should be a ref type
