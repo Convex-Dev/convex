@@ -320,6 +320,9 @@ public class Convex {
 	 * Submits a transaction to the Convex network, returning a future once the
 	 * transaction has been successfully queued. Signs the transaction with the
 	 * currently set key pair
+	 * 
+	 * Should be thread safe as long as multiple clients do not attempt to submit
+	 * transactions for the same account concurrently.
 	 *
 	 * @param transaction Transaction to execute
 	 * @return A Future for the result of the transaction

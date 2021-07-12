@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -25,8 +24,6 @@ import convex.core.Result;
 import convex.core.State;
 import convex.core.data.AVector;
 import convex.core.data.Hash;
-import convex.core.data.Keyword;
-import convex.core.data.Keywords;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
@@ -42,7 +39,6 @@ import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.net.Message;
 import convex.net.ResultConsumer;
-import etch.EtchStore;
 
 /**
  * Tests for a fresh standalone server instance
@@ -60,16 +56,17 @@ public class ServerTest {
 		// Use fresh State
 		State s=InitTest.createState();
 
-		Map<Keyword, Object> config = new HashMap<>();
-		config.put(Keywords.PORT, 0); // create new port
-		config.put(Keywords.STATE, s);
-		config.put(Keywords.URL, null);
-		config.put(Keywords.STORE, EtchStore.createTemp("server-test-store"));
-		config.put(Keywords.KEYPAIR, InitTest.FIRST_PEER_KEYPAIR); // use first peer keypair
-
 		SERVERS=API.launchLocalPeers(InitTest.PEER_KEYPAIRS, s, null);
 		SERVER = SERVERS.get(0);
-		CONVEX=SERVER.getLocalClient();
+		synchronized(SERVER) {
+			try {
+				Thread.sleep(1000);
+				CONVEX=Convex.connect(SERVER.getHostAddress(), SERVER.getPeerController(), InitTest.FIRST_PEER_KEYPAIR);
+			} catch (Throwable t) {
+				throw Utils.sneakyThrow(t);
+			}
+		}
+		
 	}
 
 	private static final Logger log = Logger.getLogger(ServerTest.class.getName());
@@ -163,7 +160,8 @@ public class ServerTest {
 	@Test
 	public void testAcquireBelief() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
 		synchronized(ServerTest.SERVER) {
-			Convex convex=ServerTest.SERVER.getLocalClient();
+
+			Convex convex=CONVEX;
 
 			Future<Result> statusFuture=convex.requestStatus();
 			Result status=statusFuture.get(10000,TimeUnit.MILLISECONDS);

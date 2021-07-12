@@ -38,15 +38,15 @@ public class API {
 	}
 
 	/**
-	 * <p>Launches a Peer Server with a default configuration.</p>
+	 * <p>Launches a Peer Server with a supplied configuration.</p>
 	 *
 	 * <p>Config keys are:</p>
 	 *
 	 * <ul>
-	 * <li>:port (optional) - Integer port number to use for incoming connections. Defaults to random.
+	 * <li>:keypair (required) - AKeyPair instance.
+	 * <li>:port (optional) - Integer port number to use for incoming connections. Defaults to random allocation.
 	 * <li>:store (optional) - AStore instance. Defaults to the configured global store
-	 * <li>:keypair (optional) - AKeyPair instance. Defaults to first auto-generated Peer keyPair;
-	 * <li>:state (optional) - Initialisation state. Only used if initialising a new Peer.
+	 * <li>:state (optional) - Genesis state. Defaults to a fresh genesis state for the Peer.
 	 * <li>:restore (optional) - Boolean Flag to restore from existing store. Default to true
 	 * <li>:persist (optional) - Boolean flag to determine if peer state should be persisted in store at server close. Default true.
 	 * </ul>
@@ -105,9 +105,8 @@ public class API {
 		config.put(Keywords.PORT, null);
 		config.put(Keywords.STATE, genesisState);
 
-		// TODO maybe have this as an option in the calling parameters
-		AStore store = Stores.getGlobalStore();
-		Stores.setCurrent(store);
+		// TODO maybe have this as an option in the calling parameters?
+		AStore store = Stores.current();
 		config.put(Keywords.STORE, store);
 
 		for (int i = 0; i < count; i++) {

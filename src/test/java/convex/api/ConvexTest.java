@@ -50,7 +50,7 @@ public class ConvexTest {
 	}
 
 	@Test public void testConnection() throws IOException, TimeoutException {
-		// Don't need locking
+		// Don't need locking for query?
 		Convex convex=Convex.connect(
 			ServerTest.SERVER.getHostAddress(),
 				InitTest.HERO,

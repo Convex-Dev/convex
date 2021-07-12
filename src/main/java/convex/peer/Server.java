@@ -66,8 +66,9 @@ import convex.net.NIOServer;
  * A self contained server that can be launched with a config.
  *
  * Server creates the following threads:
- * - A ReceiverThread that precesses message from the Server's receive Queue
- * - An UpdateThreat that handles Belief updates and transaction processing
+ * - A ReceiverThread that processes message from the Server's receive Queue
+ * - An UpdateThread that handles Belief updates and transaction processing
+ * - A ConnectionManager thread, via the ConnectionManager
  *
  * "Programming is a science dressed up as art, because most of us don't
  * understand the physics of software and it's rarely, if ever, taught. The
@@ -179,7 +180,7 @@ public class Server implements Closeable {
 		AKeyPair keyPair = (AKeyPair) config.get(Keywords.KEYPAIR);
 		if (keyPair==null) throw new IllegalArgumentException("No Peer Key Pair provided in config");
 
-		// Switch to use the configured store, saving the caller store
+		// Switch to use the configured store for setup, saving the caller store
 		final AStore savedStore=Stores.current();
 		try {
 			Stores.setCurrent(store);
@@ -246,7 +247,7 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Gets the current Peer data for this Server.
+	 * Gets the current Peer data structure for this Server.
 	 *
 	 * @return Current Peer
 	 */
@@ -273,7 +274,6 @@ public class Server implements Closeable {
 			nio.launch(port);
 			port = nio.getPort(); // get the actual port (may be auto-allocated)
 
-			
 			if (getConfig().containsKey(Keywords.URL)) {
 				hostname = (String) getConfig().get(Keywords.URL);
 			} else {
@@ -701,7 +701,7 @@ public class Server implements Closeable {
 		}
 	}
 
-	public Convex getLocalClient() {
+	private Convex getLocalClient() {
 		if (localClient!=null) return localClient;
 		synchronized (this) {
 			if (localClient!=null) return localClient;

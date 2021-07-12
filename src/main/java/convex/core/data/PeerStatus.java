@@ -27,6 +27,9 @@ public class PeerStatus extends ARecord {
 
 	private final ABlobMap<Address, CVMLong> stakes;
 
+	/**
+	 * Metadata for the Peer. Can be null internally, which is interpreted as an empty Map.
+	 */
 	private final AHashMap<Keyword,ACell> metadata;
 
 	private PeerStatus(Address controller, long stake, ABlobMap<Address, CVMLong> stakes, long delegatedStake, AHashMap<Keyword,ACell> metadata) {
@@ -84,9 +87,10 @@ public class PeerStatus extends ARecord {
 	}
 
 	/**
-	 * Gets the String representation of the host address, or null if not specified
+	 * Gets the String representation of the hostname set for the current Peer status, 
+	 * or null if not specified.
 	 *
-	 * @return Host String
+	 * @return Hostname String
 	 */
 	public AString getHostname() {
 		if (metadata == null) return null;

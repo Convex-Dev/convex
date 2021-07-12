@@ -572,6 +572,9 @@ public class ConnectionManager {
 	}
 
 	public void start() {
+		// Set timestamp for connection updates
+		lastUpdate=Utils.getCurrentTimestamp();
+		
 		// start connection thread
 		connectionThread = new Thread(connectionLoop, "Dynamicaly connect to other peers");
 		connectionThread.setDaemon(true);

@@ -622,6 +622,8 @@ public class Connection {
 						} catch (IOException e) {
 							log.log(LEVEL_SEND, "Unexpected IOException, cancelling key: " + e.getMessage());
 							key.cancel();
+						} catch (CancelledKeyException e) {
+							log.log(LEVEL_SEND, "Cancelled key");
 						}
 					}
 				} catch (Throwable t) {
