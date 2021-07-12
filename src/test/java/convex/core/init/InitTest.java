@@ -38,6 +38,7 @@ public class InitTest extends ACVMTest {
 			AKeyPair.createSeeded(19),
 	};
 	
+	public static ArrayList<AKeyPair> PEER_KEYPAIRS=(ArrayList<AKeyPair>) Arrays.asList(KEYPAIRS).stream().collect(Collectors.toList());
 	public static ArrayList<AccountKey> PEER_KEYS=(ArrayList<AccountKey>) Arrays.asList(KEYPAIRS).stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
 
 	public static final AKeyPair FIRST_PEER_KEYPAIR = KEYPAIRS[0];

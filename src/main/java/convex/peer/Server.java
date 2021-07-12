@@ -453,6 +453,8 @@ public class Server implements Closeable {
 		// query is a vector [id , signed-object]
 		AVector<ACell> v = m.getPayload();
 		SignedData<ATransaction> sd = (SignedData<ATransaction>) v.get(1);
+		
+		// System.out.println("transact: "+v);
 
 		// Persist the signed transaction. Might throw MissingDataException?
 		// If we already have the transaction persisted, will get signature status
@@ -631,6 +633,16 @@ public class Server implements Closeable {
 
 	private long lastOwnTransactionTimestamp;
 	private static final long OWN_TRANSACTIONS_DELAY=1000;
+	
+	/**
+	 * Gets the Peer controller Address
+	 * @return Peer controller Address
+	 */
+	public Address getPeerController() {
+		PeerStatus ps=getPeer().getConsensusState().getPeer(getPeerKey());
+		if (ps==null) return null;
+		return ps.getController();
+	}
 
 	/**
 	 * Check if the Peer want to send any of its own transactions
@@ -947,6 +959,7 @@ public class Server implements Closeable {
 					if ((pc == null) || pc.isClosed()) continue;
 					ACell id = m.getID();
 					Result res = br.getResults().get(j).withID(id);
+					
 					pc.sendResult(res);
 				} catch (Throwable e) {
 					log.severe("Error sending Result: " + e.getMessage());

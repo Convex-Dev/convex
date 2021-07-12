@@ -294,6 +294,11 @@ public class SignedData<T extends ACell> extends ACell {
 	public boolean isEmbedded() {
 		return false;
 	}
+	
+	@Override
+	public String toString() {
+		return "{:signed "+getValue()+"}";
+	}
 
 	@Override
 	public byte getTag() {

@@ -13,11 +13,11 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 
 /**
- * Class representing an ordering of transactions, along with the consensus position.
+ * Class representing an Ordering of transactions, along with the consensus position.
  * 
- * An ordering contains: 
+ * An Ordering contains: 
  * <ul>
- * <li>The vector of known verified blocks announced by the Peer</li>
+ * <li>The Vector of known verified Blocks announced by the Peer</li>
  * <li>The proposed consensus point (point at which the peer believes there is sufficient
  * alignment for consensus)</li>
  * <li>The current consensus point (point at which the
