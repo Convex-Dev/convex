@@ -18,7 +18,6 @@ import convex.core.Peer;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -569,26 +568,6 @@ public class ConnectionManager {
 	public void connectToPeerAsync(InetSocketAddress hostAddress) {
 		synchronized (plannedConnections) {
 			plannedConnections.add(hostAddress);
-		}
-	}
-
-
-	protected void connectToPeers(Server server, AHashMap<AccountKey, AString> peerList) {
-		// connect to the other peers returned from the status call, or in the state list of peers
-
-		for (AccountKey peerKey: peerList.keySet()) {
-			AString peerHostname = peerList.get(peerKey);
-			if (server.hostname.toString() == peerHostname.toString() ) {
-				continue;
-			}
-			if ( isConnected(peerKey)) {
-				continue;
-			}
-				log.log(LEVEL_CONNECT, server.getHostname() + ": connecting to " + peerHostname.toString());
-				InetSocketAddress peerAddress = Utils.toInetSocketAddress(peerHostname.toString());
-			if (connectToPeer(peerAddress) == null) {
-				Server.log.warning("cannot connect to peer " + peerHostname.toString());
-			}
 		}
 	}
 
