@@ -188,7 +188,7 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 	}
 
 	@Override
-	protected Ref<T> getElementRef(long i) {
+	public Ref<T> getElementRef(long i) {
 		if ((i < 0) || (i >= count)) throw new IndexOutOfBoundsException("Index: " + i);
 		long ix = i - prefixLength();
 		if (ix >= 0) {

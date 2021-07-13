@@ -89,7 +89,7 @@ public class List<T extends ACell> extends AList<T> {
 	}
 
 	@Override
-	protected Ref<T> getElementRef(long i) {
+	public Ref<T> getElementRef(long i) {
 		return data.getElementRef(count - 1 - i);
 	}
 

@@ -128,7 +128,7 @@ public class VectorTree<T extends ACell> extends ASizedVector<T> {
 	}
 
 	@Override
-	protected Ref<T> getElementRef(long i) {
+	public Ref<T> getElementRef(long i) {
 		if ((i < 0) || (i >= count)) throw new IndexOutOfBoundsException("Index: " + i);
 		long bSize = 1L << shift; // size of a fully packed block
 		int b = (int) (i >> shift);

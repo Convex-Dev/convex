@@ -4,6 +4,7 @@ import convex.core.Constants;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
+import convex.core.util.MergeFunction;
 
 /**
  * Abstract based class for sets.
@@ -17,10 +18,21 @@ import convex.core.data.type.Types;
  * @param <T> Type of set elements
  */
 public abstract class ASet<T extends ACell> extends ACollection<T> implements java.util.Set<T>, IAssociative<T,CVMBool> {
+	protected final long count;
+	
+	protected ASet(long count) {
+		this.count=count;
+	}
+	
 	
 	@Override
 	public final AType getType() {
 		return Types.SET;
+	}
+	
+	@Override
+	public final byte getTag() {
+		return Tag.SET;
 	}
 	
 	@Override
@@ -47,7 +59,7 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	 * @param elements
 	 * @return Updated set
 	 */
-	public abstract <R extends ACell> ASet<R> includeAll(Set<R> elements) ;
+	public abstract <R extends ACell> ASet<R> includeAll(ASet<R> elements) ;
 	
 	/**
 	 * Updates the set to exclude all the given elements.
@@ -55,7 +67,7 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	 * @param elements
 	 * @return Updated set
 	 */
-	public abstract ASet<T> excludeAll(Set<T> elements) ;
+	public abstract ASet<T> excludeAll(ASet<T> elements) ;
 
 	@Override
 	public abstract <R extends ACell> ASet<R> conjAll(ACollection<R> xs);
@@ -86,11 +98,16 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	}
 	
 	@Override
-	public final boolean containsKey(ACell o) {
-		return contains(o);
+	public abstract boolean containsKey(ACell o);
+	
+	@Override
+	public final boolean contains(Object o) {
+		if ((o==null)||(o instanceof ACell)) {
+			return containsKey((ACell)o);
+		}
+		return false;
 	}
 	
-
 	
 	@SuppressWarnings("unchecked")
 	@Override
@@ -134,5 +151,12 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	 * @param b Set to test against
 	 * @return True if this is a subset of the other set, false otherwise.
 	 */
-	public abstract boolean isSubset(Set<T> b);
+	public abstract boolean isSubset(ASet<T> b);
+
+	public abstract Ref<T> getValueRef(ACell k);
+
+	protected abstract Ref<T> getRefByHash(Hash hash);
+
+
+	public abstract ASet<T> mergeWith(ASet<T> b, MergeFunction<T> func);
 }

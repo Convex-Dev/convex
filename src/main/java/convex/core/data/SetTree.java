@@ -16,20 +16,19 @@ import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 
 /**
- * Persistent Map for large hash maps requiring tree structure.
+ * Persistent Set for large hash sets requiring tree structure.
  * 
  * Internally implemented as a radix tree, indexed by key hash. Uses an array of
  * child Maps, with a bitmap mask indicating which hex digits are present, i.e.
  * have non-empty children.
  *
- * @param <K>
- * @param <V>
+ * @param <T>
  */
-public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
+public class SetTree<T extends ACell> extends AHashSet<T> {
 	/**
 	 * Child maps, one for each present bit in the mask, max 16
 	 */
-	private final Ref<AHashMap<K, V>>[] children;
+	private final Ref<AHashSet<T>>[] children;
 
 	/**
 	 * Shift position of this treemap node in number of hex digits
@@ -43,7 +42,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 */
 	private final short mask;
 
-	private MapTree(Ref<AHashMap<K, V>>[] blocks, int shift, short mask, long count) {
+	private SetTree(Ref<AHashSet<T>>[] blocks, int shift, short mask, long count) {
 		super(count);
 		this.children = blocks;
 		this.shift = shift;
@@ -57,38 +56,38 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * @param children
 	 * @return The total count of all child maps
 	 */
-	private static <K extends ACell, V extends ACell> long computeCount(Ref<AHashMap<K, V>>[] children) {
+	private static <T extends ACell> long computeCount(Ref<AHashSet<T>>[] children) {
 		long n = 0;
-		for (Ref<AHashMap<K, V>> cref : children) {
+		for (Ref<AHashSet<T>> cref : children) {
 			if (cref == null) continue;
-			AMap<K, V> m = cref.getValue();
+			ASet<T> m = cref.getValue();
 			n += m.count();
 		}
 		return n;
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <K extends ACell, V extends ACell> MapTree<K, V> create(MapEntry<K, V>[] newEntries, int shift) {
+	public static <V extends ACell> SetTree<V> create(Ref<V>[] newEntries, int shift) {
 		int n = newEntries.length;
-		if (n <= MapLeaf.MAX_ENTRIES) {
+		if (n <= SetLeaf.MAX_ENTRIES) {
 			throw new IllegalArgumentException(
 					"Insufficient distinct entries for TreeMap construction: " + newEntries.length);
 		}
 
 		// construct full child array
-		Ref<AHashMap<K, V>>[] children = new Ref[16];
+		Ref<AHashSet<V>>[] children = new Ref[16];
 		for (int i = 0; i < n; i++) {
-			MapEntry<K, V> e = newEntries[i];
-			int ix = e.getKeyHash().getHexDigit(shift);
-			Ref<AHashMap<K, V>> ref = children[ix];
+			Ref<V> e = newEntries[i];
+			int ix = e.getHash().getHexDigit(shift);
+			Ref<AHashSet<V>> ref = children[ix];
 			if (ref == null) {
-				children[ix] = MapLeaf.create(e).getRef();
+				children[ix] = SetLeaf.create(e).getRef();
 			} else {
-				AHashMap<K, V> newChild=ref.getValue().assocEntry(e, shift + 1);
+				AHashSet<V> newChild=ref.getValue().conj(e, shift + 1);
 				children[ix] = newChild.getRef();
 			}
 		}
-		return (MapTree<K, V>) createFull(children, shift);
+		return (SetTree<V>) createFull(children, shift);
 	}
 
 	/**
@@ -138,119 +137,93 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * @return A new map as specified @
 	 */
 	@SuppressWarnings("unchecked")
-	private static <K extends ACell, V extends ACell> AHashMap<K, V> create(Ref<AHashMap<K, V>>[] children, int shift, short mask, long count) {
+	private static <V extends ACell> AHashSet<V> create(Ref<AHashSet<V>>[] children, int shift, short mask, long count) {
 		int cLen = children.length;
 		if (Integer.bitCount(mask & 0xFFFF) != cLen) {
 			throw new IllegalArgumentException(
 					"Invalid child array length " + cLen + " for bit mask " + Utils.toHexString(mask));
 		}
 
-		// compress small counts to ListMap
-		if (count <= MapLeaf.MAX_ENTRIES) {
-			MapEntry<K, V>[] entries = new MapEntry[Utils.checkedInt(count)];
+		// compress small counts to SetLeaf
+		if (count <= SetLeaf.MAX_ENTRIES) {
+			Ref<V>[] entries = new Ref[Utils.checkedInt(count)];
 			int ix = 0;
-			for (Ref<AHashMap<K, V>> childRef : children) {
-				AMap<K, V> child = childRef.getValue();
+			for (Ref<AHashSet<V>> childRef : children) {
+				AHashSet<V> child = childRef.getValue();
 				long cc = child.count();
 				for (long i = 0; i < cc; i++) {
-					entries[ix++] = child.entryAt(i);
+					entries[ix++] = child.getElementRef(i);
 				}
 			}
 			assert (ix == count);
-			return MapLeaf.create(entries);
+			return SetLeaf.create(entries);
 		}
 		int sel = (1 << cLen) - 1;
 		short newMask = mask;
 		for (int i = 0; i < cLen; i++) {
-			AMap<K, V> child = children[i].getValue();
+			AHashSet<V> child = children[i].getValue();
 			if (child.isEmpty()) {
 				newMask = (short) (newMask & ~(1 << digitForIndex(i, mask))); // remove from mask
 				sel = sel & ~(1 << i); // remove from selection
 			}
 		}
 		if (mask != newMask) {
-			return new MapTree<K, V>(Utils.filterSmallArray(children, sel), shift, newMask, count);
+			return new SetTree<V>(Utils.filterSmallArray(children, sel), shift, newMask, count);
 		}
-		return new MapTree<K, V>(children, shift, mask, count);
+		return new SetTree<V>(children, shift, mask, count);
 	}
 
 	@Override
-	public boolean containsKey(ACell key) {
-		return containsKeyRef(Ref.get(key));
-	}
-
-	@Override
-	public MapEntry<K, V> getEntry(ACell k) {
-		return getKeyRefEntry(Ref.get(k));
-	}
-
-	@Override
-	public MapEntry<K, V> getKeyRefEntry(Ref<ACell> ref) {
-		int digit = Utils.extractDigit(ref.getHash(), shift);
-		int i = Bits.indexForDigit(digit, mask);
-		if (i < 0) return null; // -1 case indicates not found
-		return children[i].getValue().getKeyRefEntry(ref);
-	}
-
-	@Override
-	public boolean containsValue(Object value) {
-		for (Ref<AHashMap<K, V>> b : children) {
-			if (b.getValue().containsValue(value)) return true;
-		}
-		return false;
-	}
-
-	@Override
-	public V get(ACell key) {
-		MapEntry<K, V> me = getKeyRefEntry(Ref.get(key));
+	public T get(ACell key) {
+		MapEntry<K, T> me = getKeyRefEntry(Ref.get(key));
 		if (me == null) return null;
 		return me.getValue();
 	}
 
 	@Override
-	public MapEntry<K, V> entryAt(long i) {
+	public Ref<T> getElementRef(long i) {
 		long pos = i;
-		for (Ref<AHashMap<K, V>> c : children) {
-			AHashMap<K, V> child = c.getValue();
+		for (Ref<AHashSet<T>> c : children) {
+			AHashSet<T> child = c.getValue();
 			long cc = child.count();
-			if (pos < cc) return child.entryAt(pos);
+			if (pos < cc) return child.getElementRef(pos);
 			pos -= cc;
 		}
 		throw new IndexOutOfBoundsException("Entry index: " + i);
 	}
 
 	@Override
-	protected MapEntry<K, V> getEntryByHash(Hash hash) {
+	protected Ref<T> getRefByHash(Hash hash) {
 		int digit = Utils.extractDigit(hash, shift);
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) return null; // not present
-		return children[i].getValue().getEntryByHash(hash);
+		return children[i].getValue().getRefByHash(hash);
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public AHashMap<K, V> dissoc(ACell key) {
-		return dissocRef((Ref<K>) Ref.get(key));
+	public AHashSet<T> exclude(ACell key) {
+		return excludeRef((Ref<T>) Ref.get(key));
 	}
 
 	@Override
 	@SuppressWarnings("unchecked")
-	public AHashMap<K, V> dissocRef(Ref<K> keyRef) {
+	public AHashSet<T> excludeRef(Ref<T> keyRef) {
 		int digit = Utils.extractDigit(keyRef.getHash(), shift);
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) return this; // not present
 
 		// dissoc entry from child
-		AHashMap<K, V> child = children[i].getValue();
-		AHashMap<K, V> newChild = child.dissocRef(keyRef);
+		AHashSet<T> child = children[i].getValue();
+		AHashSet<T> newChild = child.excludeRef(keyRef);
 		if (child == newChild) return this; // no removal, no change
 
-		if (count - 1 == MapLeaf.MAX_ENTRIES) {
-			// reduce to a ListMap
-			HashSet<Entry<K, V>> eset = entrySet();
-			boolean removed = eset.removeIf(e -> Utils.equals(((MapEntry<K, V>) e).getKeyRef(), keyRef));
+		if (count - 1 == SetLeaf.MAX_ENTRIES) {
+			// reduce to a SetLeaf
+			AHashSet<Entry<K, T>> eset = entrySet();
+			boolean removed = eset.removeIf(e -> Utils.equals(((MapEntry<K, T>) e).getKeyRef(), keyRef));
 			if (!removed) throw new Error("Expected to remove at least one entry!");
-			return MapLeaf.create(eset.toArray((MapEntry<K, V>[]) MapLeaf.EMPTY_ENTRIES));
+			return MapLeaf.create(eset.toArray((MapEntry<K, T>[]) MapLeaf.EMPTY_ENTRIES));
 		} else {
 			// replace child
 			if (newChild.isEmpty()) return dissocChild(i);
@@ -259,10 +232,10 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@SuppressWarnings("unchecked")
-	private AHashMap<K, V> dissocChild(int i) {
+	private AHashSet<T> dissocChild(int i) {
 		int bsize = children.length;
-		AHashMap<K, V> child = children[i].getValue();
-		Ref<AHashMap<K, V>>[] newBlocks = (Ref<AHashMap<K, V>>[]) new Ref<?>[bsize - 1];
+		AHashSet<T> child = children[i].getValue();
+		Ref<AHashSet<T>>[] newBlocks = (Ref<AHashSet<T>>[]) new Ref<?>[bsize - 1];
 		System.arraycopy(children, 0, newBlocks, 0, i);
 		System.arraycopy(children, i + 1, newBlocks, i, bsize - i - 1);
 		short newMask = (short) (mask & (~(1 << digitForIndex(i, mask))));
@@ -271,18 +244,18 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@SuppressWarnings("unchecked")
-	private MapTree<K, V> insertChild(int digit, Ref<AHashMap<K, V>> newChild) {
+	private SetTree<T> insertChild(int digit, Ref<AHashSet<T>> newChild) {
 		int bsize = children.length;
 		int i = Bits.positionForDigit(digit, mask);
 		short newMask = (short) (mask | (1 << digit));
 		if (mask == newMask) throw new Error("Digit already present!");
 
-		Ref<AHashMap<K, V>>[] newChildren = (Ref<AHashMap<K, V>>[]) new Ref<?>[bsize + 1];
+		Ref<AHashSet<T>>[] newChildren = (Ref<AHashSet<T>>[]) new Ref<?>[bsize + 1];
 		System.arraycopy(children, 0, newChildren, 0, i);
 		System.arraycopy(children, i, newChildren, i + 1, bsize - i);
 		newChildren[i] = newChild;
 		long newCount = count + newChild.getValue().count();
-		return (MapTree<K, V>) create(newChildren, shift, newMask, newCount);
+		return (SetTree<T>) create(newChildren, shift, newMask, newCount);
 	}
 
 	/**
@@ -293,13 +266,13 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * @param newChild
 	 * @return @
 	 */
-	private MapTree<K, V> replaceChild(int i, Ref<AHashMap<K, V>> newChild) {
+	private SetTree<T> replaceChild(int i, Ref<AHashSet<T>> newChild) {
 		if (children[i] == newChild) return this;
-		AHashMap<K, V> oldChild = children[i].getValue();
-		Ref<AHashMap<K, V>>[] newChildren = children.clone();
+		AHashSet<T> oldChild = children[i].getValue();
+		Ref<AHashSet<T>>[] newChildren = children.clone();
 		newChildren[i] = newChild;
 		long newCount = count + newChild.getValue().count() - oldChild.count();
-		return (MapTree<K, V>) create(newChildren, shift, mask, newCount);
+		return (SetTree<T>) create(newChildren, shift, mask, newCount);
 	}
 
 	public static int digitForIndex(int index, short mask) {
@@ -315,19 +288,19 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public MapTree<K, V> assoc(ACell key, ACell value) {
+	public SetTree<T> assoc(ACell key, ACell value) {
 		K k= (K)key;
 		Ref<K> keyRef = Ref.get(k);
-		return assocRef(keyRef, (V) value, shift);
+		return assocRef(keyRef, (T) value, shift);
 	}
 
 	@Override
-	public MapTree<K, V> assocRef(Ref<K> keyRef, V value) {
+	public SetTree<K, T> assocRef(Ref<K> keyRef, T value) {
 		return assocRef(keyRef, value, shift);
 	}
 
 	@Override
-	protected MapTree<K, V> assocRef(Ref<K> keyRef, V value, int shift) {
+	protected SetTree<K, T> assocRef(Ref<K> keyRef, T value, int shift) {
 		if (this.shift != shift) {
 			throw new Error("Invalid shift!");
 		}
@@ -335,36 +308,36 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) {
 			// location not present, need to insert new child
-			AHashMap<K, V> newChild = MapLeaf.create(MapEntry.createRef(keyRef, Ref.get(value)));
+			AHashMap<K, T> newChild = MapLeaf.create(MapEntry.createRef(keyRef, Ref.get(value)));
 			return insertChild(digit, newChild.getRef());
 		} else {
 			// child exists, so assoc in new ref at lower shift level
-			AHashMap<K, V> child = children[i].getValue();
-			AHashMap<K, V> newChild = child.assocRef(keyRef, value, shift + 1);
+			AHashMap<K, T> child = children[i].getValue();
+			AHashMap<K, T> newChild = child.assocRef(keyRef, value, shift + 1);
 			return replaceChild(i, newChild.getRef());
 		}
 	}
 
 	@Override
-	public AHashMap<K, V> assocEntry(MapEntry<K, V> e) {
+	public AHashMap<K, T> assocEntry(MapEntry<K, T> e) {
 		assert (this.shift == 0); // should never call this on a different shift
 		return assocEntry(e, 0);
 	}
 
 	@Override
-	public MapTree<K, V> assocEntry(MapEntry<K, V> e, int shift) {
+	public SetTree<K, T> assocEntry(MapEntry<K, T> e, int shift) {
 		assert (this.shift == shift); // should always be correct shift
 		Ref<K> keyRef = e.getKeyRef();
 		int digit = Utils.extractDigit(keyRef.getHash(), shift);
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) {
 			// location not present
-			AHashMap<K, V> newChild = MapLeaf.create(e);
+			AHashMap<K, T> newChild = MapLeaf.create(e);
 			return insertChild(digit, newChild.getRef());
 		} else {
 			// location needs update
-			AHashMap<K, V> child = children[i].getValue();
-			AHashMap<K, V> newChild = child.assocEntry(e, shift + 1);
+			AHashMap<K, T> child = children[i].getValue();
+			AHashMap<K, T> newChild = child.assocEntry(e, shift + 1);
 			if (child == newChild) return this;
 			return replaceChild(i, newChild.getRef());
 		}
@@ -380,29 +353,29 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@Override
 	protected void accumulateKeySet(HashSet<K> h) {
-		for (Ref<AHashMap<K, V>> mr : children) {
+		for (Ref<AHashMap<K, T>> mr : children) {
 			mr.getValue().accumulateKeySet(h);
 		}
 	}
 
 	@Override
-	protected void accumulateValues(ArrayList<V> al) {
-		for (Ref<AHashMap<K, V>> mr : children) {
+	protected void accumulateValues(ArrayList<T> al) {
+		for (Ref<AHashMap<K, T>> mr : children) {
 			mr.getValue().accumulateValues(al);
 		}
 	}
 
 	@Override
-	public HashSet<Entry<K, V>> entrySet() {
+	public HashSet<Entry<K, T>> entrySet() {
 		int len = size();
-		HashSet<Map.Entry<K, V>> h = new HashSet<Map.Entry<K, V>>(len);
+		HashSet<Map.Entry<K, T>> h = new HashSet<Map.Entry<K, T>>(len);
 		accumulateEntrySet(h);
 		return h;
 	}
 
 	@Override
-	protected void accumulateEntrySet(HashSet<Entry<K, V>> h) {
-		for (Ref<AHashMap<K, V>> mr : children) {
+	protected void accumulateEntrySet(HashSet<Entry<K, T>> h) {
+		for (Ref<AHashMap<K, T>> mr : children) {
 			mr.getValue().accumulateEntrySet(h);
 		}
 	}
@@ -452,33 +425,27 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * 
 	 * @param bb
 	 * @param count
+	 * @param includeValues If values should be included
 	 * @return TreeMap instance as read from ByteBuffer
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K extends ACell, V extends ACell> MapTree<K, V> read(ByteBuffer bb, long count) throws BadFormatException {
+	public static <V extends ACell> SetTree<V> read(ByteBuffer bb, long count) throws BadFormatException {
 		int shift = bb.get();
 		short mask = bb.getShort();
 
 		int ilength = Integer.bitCount(mask & 0xFFFF);
-		Ref<AHashMap<K, V>>[] blocks = (Ref<AHashMap<K, V>>[]) new Ref<?>[ilength];
+		Ref<AHashSet<V>>[] blocks = (Ref<AHashSet<V>>[]) new Ref<?>[ilength];
 
 		for (int i = 0; i < ilength; i++) {
 			// need to read as a Ref
-			Ref<AHashMap<K, V>> ref = Format.readRef(bb);
+			Ref<AHashSet<V>> ref = Format.readRef(bb);
 			blocks[i] = ref;
 		}
 		// create directly, we have all values
-		MapTree<K, V> result = new MapTree<K, V>(blocks, shift, mask, count);
+		SetTree<V> result = new SetTree<V>(blocks, shift, mask, count);
 		if (!result.isValidStructure()) throw new BadFormatException("Problem with TreeMap invariants");
 		return result;
-	}
-
-	@Override
-	public void forEach(BiConsumer<? super K, ? super V> action) {
-		for (Ref<AHashMap<K, V>> sub : children) {
-			sub.getValue().forEach(action);
-		}
 	}
 
 	@Override
@@ -504,13 +471,13 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public MapTree<K,V> updateRefs(IRefFunction func) {
+	public SetTree<T> updateRefs(IRefFunction func) {
 		int n = children.length;
 		if (n == 0) return this;
-		Ref<AHashMap<K, V>>[] newChildren = children;
+		Ref<AHashSet<T>>[] newChildren = children;
 		for (int i = 0; i < n; i++) {
-			Ref<AHashMap<K, V>> child = children[i];
-			Ref<AHashMap<K, V>> newChild = (Ref<AHashMap<K, V>>) func.apply(child);
+			Ref<AHashMap<K, T>> child = children[i];
+			Ref<AHashMap<K, T>> newChild = (Ref<AHashMap<K, T>>) func.apply(child);
 			if (child != newChild) {
 				if (children == newChildren) {
 					newChildren = children.clone();
@@ -520,41 +487,42 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		}
 		if (newChildren == children) return this;
 		// Note: we assume no key hashes have changed, so structure is the same
-		return new MapTree<>(newChildren, shift, mask, count);
+		return new SetTree<>(newChildren, shift, mask, count);
 	}
 
 	@Override
-	public AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func) {
+	@Override
+	public AHashSet<T> mergeWith(AHashSet<T> b, MergeFunction<T> func) {
 		return mergeWith(b, func, this.shift);
 	}
 
 	@Override
-	protected AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func, int shift) {
-		if ((b instanceof MapTree)) {
-			MapTree<K, V> bt = (MapTree<K, V>) b;
+	protected AHashMap<K, T> mergeWith(AHashMap<K, T> b, MergeFunction<T> func, int shift) {
+		if ((b instanceof SetTree)) {
+			SetTree<K, T> bt = (SetTree<K, T>) b;
 			if (this.shift != bt.shift) throw new Error("Misaligned shifts!");
 			return mergeWith(bt, func, shift);
 		}
-		if ((b instanceof MapLeaf)) return mergeWith((MapLeaf<K, V>) b, func, shift);
+		if ((b instanceof MapLeaf)) return mergeWith((MapLeaf<K, T>) b, func, shift);
 		throw new Error("Unrecognised map type: " + b.getClass());
 	}
 
 	@SuppressWarnings("unchecked")
-	private AHashMap<K, V> mergeWith(MapTree<K, V> b, MergeFunction<V> func, int shift) {
+	private AHashMap<K, T> mergeWith(SetTree<K, T> b, MergeFunction<T> func, int shift) {
 		// assume two TreeMaps with identical prefix and shift
 		assert (b.shift == shift);
 		int fullMask = mask | b.mask;
 		// We are going to build full child list only if needed
-		Ref<AHashMap<K, V>>[] newChildren = null;
+		Ref<AHashMap<K, T>>[] newChildren = null;
 		for (int digit = 0; digit < 16; digit++) {
 			int bitMask = 1 << digit;
 			if ((fullMask & bitMask) == 0) continue; // nothing to merge at this index
-			AHashMap<K, V> ac = childForDigit(digit).getValue();
-			AHashMap<K, V> bc = b.childForDigit(digit).getValue();
-			AHashMap<K, V> rc = ac.mergeWith(bc, func, shift + 1);
+			AHashMap<K, T> ac = childForDigit(digit).getValue();
+			AHashMap<K, T> bc = b.childForDigit(digit).getValue();
+			AHashMap<K, T> rc = ac.mergeWith(bc, func, shift + 1);
 			if (ac != rc) {
 				if (newChildren == null) {
-					newChildren = (Ref<AHashMap<K, V>>[]) new Ref<?>[16];
+					newChildren = (Ref<AHashMap<K, T>>[]) new Ref<?>[16];
 					for (int ii = 0; ii < digit; ii++) { // copy existing children up to this point
 						int chi = Bits.indexForDigit(ii, mask);
 						if (chi >= 0) newChildren[ii] = children[chi];
@@ -568,19 +536,19 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@SuppressWarnings("unchecked")
-	private AHashMap<K, V> mergeWith(MapLeaf<K, V> b, MergeFunction<V> func, int shift) {
-		Ref<AHashMap<K, V>>[] newChildren = null;
+	private AHashMap<K, T> mergeWith(MapLeaf<K, T> b, MergeFunction<T> func, int shift) {
+		Ref<AHashMap<K, T>>[] newChildren = null;
 		int ix = 0;
 		for (int i = 0; i < 16; i++) {
 			int imask = (1 << i); // mask for this digit
 			if ((mask & imask) == 0) continue;
-			Ref<AHashMap<K, V>> cref = children[ix++];
-			AHashMap<K, V> child = cref.getValue();
-			MapLeaf<K, V> bSubset = b.filterHexDigits(shift, imask); // filter only relevant elements in b
-			AHashMap<K, V> newChild = child.mergeWith(bSubset, func, shift + 1);
+			Ref<AHashMap<K, T>> cref = children[ix++];
+			AHashMap<K, T> child = cref.getValue();
+			MapLeaf<K, T> bSubset = b.filterHexDigits(shift, imask); // filter only relevant elements in b
+			AHashMap<K, T> newChild = child.mergeWith(bSubset, func, shift + 1);
 			if (child != newChild) {
 				if (newChildren == null) {
-					newChildren = (Ref<AHashMap<K, V>>[]) new Ref<?>[16];
+					newChildren = (Ref<AHashMap<K, T>>[]) new Ref<?>[16];
 					for (int ii = 0; ii < children.length; ii++) { // copy existing children
 						int chi = digitForIndex(ii, mask);
 						newChildren[chi] = children[ii];
@@ -593,13 +561,13 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		}
 		assert (ix == children.length);
 		// if any new children created, create a new Map, else use this
-		AHashMap<K, V> result = (newChildren == null) ? this : createFull(newChildren, shift);
+		AHashMap<K, T> result = (newChildren == null) ? this : createFull(newChildren, shift);
 
-		MapLeaf<K, V> extras = b.filterHexDigits(shift, ~mask);
+		MapLeaf<K, T> extras = b.filterHexDigits(shift, ~mask);
 		int en = extras.size();
 		for (int i = 0; i < en; i++) {
-			MapEntry<K, V> e = extras.entryAt(i);
-			V value = func.merge(null, e.getValue());
+			MapEntry<K, T> e = extras.entryAt(i);
+			T value = func.merge(null, e.getValue());
 			if (value != null) {
 				// include only new keys where function result is not null. Re-use existing
 				// entry if possible.
@@ -610,41 +578,41 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
-	public AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func) {
+	public AHashMap<K, T> mergeDifferences(AHashMap<K, T> b, MergeFunction<T> func) {
 		return mergeDifferences(b, func,0);
 	}
 	
 	@Override
-	protected AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func,int shift) {
-		if ((b instanceof MapTree)) {
-			MapTree<K, V> bt = (MapTree<K, V>) b;
+	protected AHashMap<K, T> mergeDifferences(AHashMap<K, T> b, MergeFunction<T> func,int shift) {
+		if ((b instanceof SetTree)) {
+			SetTree<K, T> bt = (SetTree<K, T>) b;
 			// this is OK, top levels should both have shift 0 and be aligned down the tree.
 			if (this.shift != bt.shift) throw new Error("Misaligned shifts!");
 			return mergeDifferences(bt, func,shift);
 		} else {
 			// must be ListMap
-			return mergeDifferences((MapLeaf<K, V>) b, func,shift);
+			return mergeDifferences((MapLeaf<K, T>) b, func,shift);
 		}
 	}
 
 	@SuppressWarnings("unchecked")
-	private AHashMap<K, V> mergeDifferences(MapTree<K, V> b, MergeFunction<V> func, int shift) {
+	private AHashMap<K, T> mergeDifferences(SetTree<K, T> b, MergeFunction<T> func, int shift) {
 		// assume two treemaps with identical prefix and shift
 		if (this.equals(b)) return this; // no differences to merge
 		int fullMask = mask | b.mask;
-		Ref<AHashMap<K, V>>[] newChildren = null; // going to build new full child list if needed
+		Ref<AHashMap<K, T>>[] newChildren = null; // going to build new full child list if needed
 		for (int i = 0; i < 16; i++) {
 			int bitMask = 1 << i;
 			if ((fullMask & bitMask) == 0) continue; // nothing to merge at this index
-			Ref<AHashMap<K, V>> aref = childForDigit(i);
-			Ref<AHashMap<K, V>> bref = b.childForDigit(i);
+			Ref<AHashMap<K, T>> aref = childForDigit(i);
+			Ref<AHashMap<K, T>> bref = b.childForDigit(i);
 			if (aref.equalsValue(bref)) continue; // identical children, no differences
-			AHashMap<K, V> ac = aref.getValue();
-			AHashMap<K, V> bc = bref.getValue();
-			AHashMap<K, V> newChild = ac.mergeDifferences(bc, func,shift+1);
+			AHashMap<K, T> ac = aref.getValue();
+			AHashMap<K, T> bc = bref.getValue();
+			AHashMap<K, T> newChild = ac.mergeDifferences(bc, func,shift+1);
 			if (newChild != ac) {
 				if (newChildren == null) {
-					newChildren = (Ref<AHashMap<K, V>>[]) new Ref<?>[16];
+					newChildren = (Ref<AHashMap<K, T>>[]) new Ref<?>[16];
 					for (int ii = 0; ii < 16; ii++) { // copy existing children
 						int chi = Bits.indexForDigit(ii, mask);
 						if (chi >= 0) newChildren[ii] = children[chi];
@@ -658,19 +626,19 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@SuppressWarnings("unchecked")
-	private AHashMap<K, V> mergeDifferences(MapLeaf<K, V> b, MergeFunction<V> func, int shift) {
-		Ref<AHashMap<K, V>>[] newChildren = null;
+	private AHashMap<K, T> mergeDifferences(MapLeaf<K, T> b, MergeFunction<T> func, int shift) {
+		Ref<AHashMap<K, T>>[] newChildren = null;
 		int ix = 0;
 		for (int i = 0; i < 16; i++) {
 			int imask = (1 << i); // mask for this digit
 			if ((mask & imask) == 0) continue;
-			Ref<AHashMap<K, V>> cref = children[ix++];
-			AHashMap<K, V> child = cref.getValue();
-			MapLeaf<K, V> bSubset = b.filterHexDigits(shift, imask); // filter only relevant elements in b
-			AHashMap<K, V> newChild = child.mergeDifferences(bSubset, func,shift+1);
+			Ref<AHashMap<K, T>> cref = children[ix++];
+			AHashMap<K, T> child = cref.getValue();
+			MapLeaf<K, T> bSubset = b.filterHexDigits(shift, imask); // filter only relevant elements in b
+			AHashMap<K, T> newChild = child.mergeDifferences(bSubset, func,shift+1);
 			if (child != newChild) {
 				if (newChildren == null) {
-					newChildren = (Ref<AHashMap<K, V>>[]) new Ref<?>[16];
+					newChildren = (Ref<AHashMap<K, T>>[]) new Ref<?>[16];
 					for (int ii = 0; ii < children.length; ii++) { // copy existing children
 						int chi = digitForIndex(ii, mask);
 						newChildren[chi] = children[ii];
@@ -680,13 +648,13 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			if (newChildren != null) newChildren[i] = newChild.getRef();
 		}
 		assert (ix == children.length);
-		AHashMap<K, V> result = (newChildren == null) ? this : createFull(newChildren, shift);
+		AHashMap<K, T> result = (newChildren == null) ? this : createFull(newChildren, shift);
 
-		MapLeaf<K, V> extras = b.filterHexDigits(shift, ~mask);
+		MapLeaf<K, T> extras = b.filterHexDigits(shift, ~mask);
 		int en = extras.size();
 		for (int i = 0; i < en; i++) {
-			MapEntry<K, V> e = extras.entryAt(i);
-			V value = func.merge(null, e.getValue());
+			MapEntry<K, T> e = extras.entryAt(i);
+			T value = func.merge(null, e.getValue());
 			if (value != null) {
 				// include only new keys where function result is not null. Re-use existing
 				// entry if possible.
@@ -703,14 +671,14 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * @return The child map for this digit, or an empty map if the child does not
 	 *         exist
 	 */
-	private Ref<AHashMap<K, V>> childForDigit(int digit) {
+	private Ref<AHashMap<K, T>> childForDigit(int digit) {
 		int ix = Bits.indexForDigit(digit, mask);
 		if (ix < 0) return Maps.emptyRef();
 		return children[ix];
 	}
 
 	@Override
-	public <R> R reduceValues(BiFunction<? super R, ? super V, ? extends R> func, R initial) {
+	public <R> R reduceValues(BiFunction<? super R, ? super T, ? extends R> func, R initial) {
 		int n = children.length;
 		R result = initial;
 		for (int i = 0; i < n; i++) {
@@ -720,7 +688,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
-	public <R> R reduceEntries(BiFunction<? super R, MapEntry<K, V>, ? extends R> func, R initial) {
+	public <R> R reduceEntries(BiFunction<? super R, MapEntry<K, T>, ? extends R> func, R initial) {
 		int n = children.length;
 		R result = initial;
 		for (int i = 0; i < n; i++) {
@@ -730,13 +698,13 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
-	public boolean equalsKeys(AMap<K, V> a) {
-		if (a instanceof MapTree) return equalsKeys((MapTree<K, V>) a);
+	public boolean equalsKeys(AMap<K, T> a) {
+		if (a instanceof SetTree) return equalsKeys((SetTree<K, T>) a);
 		// different map type cannot possibly be equal
 		return false;
 	}
 
-	boolean equalsKeys(MapTree<K, V> a) {
+	boolean equalsKeys(SetTree<T> a) {
 		if (this == a) return true;
 		if (this.count != a.count) return false;
 		if (this.mask != a.mask) return false;
@@ -748,12 +716,12 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
-	public boolean equals(AMap<K, V> a) {
-		if (!(a instanceof MapTree)) return false;
-		return equals((MapTree<K, V>) a);
+	public boolean equals(ASet<T> a) {
+		if (!(a instanceof SetTree)) return false;
+		return equals((SetTree<T>) a);
 	}
 
-	boolean equals(MapTree<K, V> b) {
+	boolean equals(SetTree<T> b) {
 		if (this == b) return true;
 		long n = count;
 		if (n != b.count) return false;
@@ -766,13 +734,13 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
-	public AHashMap<K, V> mapEntries(Function<MapEntry<K, V>, MapEntry<K, V>> func) {
+	public AHashMap<K, T> mapEntries(Function<MapEntry<K, T>, MapEntry<K, T>> func) {
 		int n = children.length;
 		if (n == 0) return this;
-		Ref<AHashMap<K, V>>[] newChildren = children;
+		Ref<AHashMap<K, T>>[] newChildren = children;
 		for (int i = 0; i < n; i++) {
-			AHashMap<K, V> child = children[i].getValue();
-			AHashMap<K, V> newChild = child.mapEntries(func);
+			AHashMap<K, T> child = children[i].getValue();
+			AHashMap<K, T> newChild = child.mapEntries(func);
 			if (child != newChild) {
 				if (children == newChildren) {
 					newChildren = children.clone();
@@ -814,7 +782,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 						"Expected map child at " + prefix + Utils.toHexChar(digitForIndex(i, mask)), this);
 			}
 			@SuppressWarnings("unchecked")
-			AHashMap<K, V> child = (AHashMap<K, V>) o;
+			AHashMap<K, T> child = (AHashMap<K, T>) o;
 			if (child.isEmpty())
 				throw new InvalidDataException("Empty child at " + prefix + Utils.toHexChar(digitForIndex(i, mask)),
 						this);
@@ -845,28 +813,28 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public boolean containsAllKeys(AHashMap<K, V> map) {
-		if (map instanceof MapTree) {
-			return containsAllKeys((MapTree<K,V>)map);
+	public boolean containsAllKeys(AHashMap<K, T> map) {
+		if (map instanceof SetTree) {
+			return containsAllKeys((SetTree<K,T>)map);
 		}
 		// must be a MapLeaf
 		long n=map.count;
 		for (long i=0; i<n; i++) {
-			MapEntry<K,V> me=map.entryAt(i);
+			MapEntry<K,T> me=map.entryAt(i);
 			if (!this.containsKeyRef((Ref<ACell>) me.getKeyRef())) return false;
 		}
 		return true;
 	}
 	
-	protected boolean containsAllKeys(MapTree<K, V> map) {
+	protected boolean containsAllKeys(SetTree<K, T> map) {
 		// fist check this mask contains all of target mask
 		if ((this.mask|map.mask)!=this.mask) return false;
 		
 		for (int i=0; i<16; i++) {
-			Ref<AHashMap<K,V>> child=this.childForDigit(i);
+			Ref<AHashMap<K,T>> child=this.childForDigit(i);
 			if (child==null) continue;
 			
-			Ref<AHashMap<K,V>> mchild=map.childForDigit(i);
+			Ref<AHashMap<K,T>> mchild=map.childForDigit(i);
 			if (mchild==null) continue;
 			
 			if (!(child.getValue().containsAllKeys(mchild.getValue()))) return false; 

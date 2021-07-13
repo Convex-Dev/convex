@@ -211,6 +211,11 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	public abstract MapEntry<K, V> entryAt(long i);
 	
 	@Override
+	public Ref<MapEntry<K, V>> getElementRef(long index) {
+		return entryAt(index).getRef();
+	}
+	
+	@Override
 	public final MapEntry<K, V> get(long i) {
 		return entryAt(i);
 	}
@@ -280,9 +285,10 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 */
 	public abstract <R> R reduceEntries(BiFunction<? super R, MapEntry<K, V>, ? extends R> func, R initial);
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public Set<K> keySet() {
-		Set<K> ks=reduceEntries((s,me)->s.conj(me.getKey()), Sets.empty());
+		ASet<K> ks=reduceEntries((s,me)->s.conj(me.getKey()), (ASet<K>)(Sets.empty()));
 		return ks;
 	}
 

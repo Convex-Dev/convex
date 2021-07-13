@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Test;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AVector;
 import convex.core.data.Address;
-import convex.core.data.Set;
 import convex.core.data.Sets;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMLong;
@@ -73,7 +72,7 @@ public class SimpleNFTTest {
 		CVMLong b1=v.get(0);
 		
 		// Test balance
-		assertEquals(Set.create(v.toCellArray()),eval(ctx,"(asset/balance nft)"));
+		assertEquals(Sets.of(v.toCellArray()),eval(ctx,"(asset/balance nft)"));
 		
 		// Create test Users
 		ctx=ctx.createAccount(KP1.getAccountKey());

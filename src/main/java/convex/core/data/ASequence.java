@@ -139,7 +139,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	 * @param index Index of element to get
 	 * @return Ref to element at specified index
 	 */
-	protected abstract Ref<T> getElementRef(long index);
+	public abstract Ref<T> getElementRef(long index);
 
 	@Override
 	public T set(int index, T element) {

@@ -27,7 +27,6 @@ import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
-import convex.core.data.Set;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
@@ -1222,10 +1221,10 @@ public class RT {
 	 * @return A set instance, or null if the argument cannot be converted to a set
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> Set<T> ensureSet(ACell a) {
+	public static <T extends ACell> ASet<T> ensureSet(ACell a) {
 		if (a==null) return Sets.empty();
-		if (!(a instanceof Set)) return null;
-		return (Set<T>) a;
+		if (!(a instanceof ASet)) return null;
+		return (ASet<T>) a;
 	}
 
 	/**

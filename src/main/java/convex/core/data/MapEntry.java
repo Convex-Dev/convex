@@ -243,7 +243,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 
 	@SuppressWarnings("unchecked")
 	@Override
-	protected Ref<ACell> getElementRef(long i) {
+	public Ref<ACell> getElementRef(long i) {
 		if (i == 0) return (Ref<ACell>) keyRef;
 		if (i == 1) return (Ref<ACell>) valueRef;
 		throw new IndexOutOfBoundsException(Errors.badIndex(i));

@@ -1,26 +1,40 @@
 package convex.core.data;
 
+import java.nio.ByteBuffer;
 import java.util.Collection;
 
+import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 
 public class Sets {
 
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> Set<T> empty() {
-		return (Set<T>) Set.EMPTY;
+	public static <T extends ACell> SetLeaf<T> empty() {
+		return (SetLeaf<T>) SetLeaf.EMPTY;
 	}
 
+	@SuppressWarnings("unchecked")
 	@SafeVarargs
-	public static <T extends ACell> Set<T> of(Object... elements) {
-		return Set.of(elements);
+	public static <T extends ACell> ASet<T> of(Object... elements) {
+		int n=elements.length;
+		ASet<T> result=empty();
+		for (int i=0; i<n; i++) {
+			result=(ASet<T>) result.conj(RT.cvm(elements[i]));
+		}
+		return result;
 	}
 	
+	@SuppressWarnings("unchecked")
 	@SafeVarargs
-	public static <T extends ACell> Set<T> of(ACell... elements) {
-		return Set.create(elements);
-	}
+	public static <T extends ACell> ASet<T> of(ACell... elements) {
+		int n=elements.length;
+		ASet<T> result=empty();
+		for (int i=0; i<n; i++) {
+			result=(ASet<T>) result.conj(elements[i]);
+		}
+		return result;
+ 	}
 
 	/**
 	 * Creates a set of all the elements in the given data structure
@@ -29,12 +43,12 @@ public class Sets {
 	 * @param source
 	 * @return A Set
 	 */
-	public static <T extends ACell> Set<T> create(ADataStructure<T> source) {
-		if (source instanceof ASet) return (Set<T>) source;
-		if (source instanceof ASequence) return Set.create((ASequence<T>) source);
+	public static <T extends ACell> ASet<T> create(ADataStructure<T> source) {
+		if (source instanceof ASet) return (ASet<T>) source;
+		if (source instanceof ASequence) return Sets.create((ASequence<T>) source);
 		if (source instanceof AMap) {
 			ASequence<T> seq = RT.sequence(source); // should always be non-null
-			return Set.create(seq);
+			return Sets.create(seq);
 		}
 		throw new IllegalArgumentException("Unexpected type!" + Utils.getClass(source));
 	}
@@ -46,7 +60,16 @@ public class Sets {
 	 * @param source
 	 * @return A Set
 	 */
-	public static <T extends ACell> Set<T> fromCollection(Collection<T> source) {
+	public static <T extends ACell> ASet<T> fromCollection(Collection<T> source) {
 		return Sets.of(source.toArray());
+	}
+
+	public static <T extends ACell> ASet<T> read(ByteBuffer bb) throws BadFormatException {
+		long count = Format.readVLCLong(bb);
+		if (count <= SetLeaf.MAX_ENTRIES) {
+			return SetLeaf.read(bb, count);
+		} else {
+			return SetTree.read(bb, count);
+		}
 	}
 }

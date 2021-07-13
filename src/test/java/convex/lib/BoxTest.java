@@ -3,7 +3,8 @@ package convex.lib;
 import static convex.core.lang.TestState.eval;
 import static convex.core.lang.TestState.evalL;
 import static convex.core.lang.TestState.step;
-import static convex.test.Assertions.*;
+import static convex.test.Assertions.assertError;
+import static convex.test.Assertions.assertNotError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -15,7 +16,6 @@ import org.junit.jupiter.api.Test;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AVector;
 import convex.core.data.Address;
-import convex.core.data.Set;
 import convex.core.data.Sets;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMLong;
@@ -80,8 +80,8 @@ public class BoxTest {
 		// Put b1 and b2 in b0
 		ctx=step(ctx,"(box/insert "+b0+" [box #{"+b1+" "+b2+"}])");
 		assertNotError(ctx);
-		assertEquals(Set.of(b0,b3),eval(ctx,"(asset/balance box *address*)"));
-		assertEquals(Set.of(b1,b2),eval(ctx,"(asset/balance box box)"));
+		assertEquals(Sets.of(b0,b3),eval(ctx,"(asset/balance box *address*)"));
+		assertEquals(Sets.of(b1,b2),eval(ctx,"(asset/balance box box)"));
 		
 		// Try to put b0 in b1 - should fail since b1 not directly owned
 		ctx=step(ctx,"(box/insert "+b1+" [box #{"+b0+"}])");
@@ -89,13 +89,13 @@ public class BoxTest {
 		
 		// Take b1 and b2 out of b0
 		ctx=step(ctx,"(box/remove "+b0+" [box #{"+b1+" "+b2+"}])");
-		assertEquals(Set.of(b0,b1,b2,b3),eval(ctx,"(asset/balance box *address*)"));
+		assertEquals(Sets.of(b0,b1,b2,b3),eval(ctx,"(asset/balance box *address*)"));
 		assertEquals(Sets.empty(),eval(ctx,"(asset/balance box box)"));
 		
 		// Try to put a box into itself - should fail because b0 acceptance makes it no longer owned
 		ctx=step(ctx,"(box/insert "+b0+" [box #{"+b0+"}])");
 		assertError(ctx);
-		assertEquals(Set.of(b0,b1,b2,b3),eval(ctx,"(asset/balance box *address*)"));
+		assertEquals(Sets.of(b0,b1,b2,b3),eval(ctx,"(asset/balance box *address*)"));
 		
 		// Use a fungible token
 		ctx=step(ctx,"(def FOOCOIN (deploy (fun/build-token {:supply 1000000})))");
@@ -126,7 +126,7 @@ public class BoxTest {
 		CVMLong b1=v.get(0);
 		
 		// Test balance
-		assertEquals(Set.create(v.toCellArray()),eval(ctx,"(asset/balance box)"));
+		assertEquals(Sets.of(v.toCellArray()),eval(ctx,"(asset/balance box)"));
 		
 		// Create test Users
 		ctx=ctx.createAccount(KP1.getAccountKey());

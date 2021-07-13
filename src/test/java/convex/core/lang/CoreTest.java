@@ -38,6 +38,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
@@ -53,7 +54,6 @@ import convex.core.data.List;
 import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
-import convex.core.data.Set;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
@@ -1012,17 +1012,17 @@ public class CoreTest extends ACVMTest {
 		// See issue #153
 		Context<?> c=context();
 		c=step(c, "(def s1 #{#5477106 \\*})");
-		Set<ACell> s1=(Set<ACell>) c.getResult();
+		ASet<ACell> s1=(ASet<ACell>) c.getResult();
 		s1.validate();
 		c=step(c, "(def s2 #{#2 #0 true #3 0x61a049 #242411 #3478095 #9275832328719 #1489754187855142})");
-		Set<ACell> s2=(Set<ACell>) c.getResult();
+		ASet<ACell> s2=(ASet<ACell>) c.getResult();
 		s2.validate();
 
-		Set<ACell> u1=s2.includeAll(s1);
+		ASet<ACell> u1=s2.includeAll(s1);
 		u1.validate();
 
 		c=step(c, "(def union1 (union s2 s1))");
-		Set<ACell> u2=(Set<ACell>) c.getResult();
+		ASet<ACell> u2=(ASet<ACell>) c.getResult();
 		u2.validate();
 
 	}
@@ -2757,7 +2757,7 @@ public class CoreTest extends ACVMTest {
 		}
 	}
 
-	private static Set<Keyword> CORE_TYPES=Sets.of(Keywords.MACRO, Keywords.SPECIAL, Keywords.FUNCTION, Keywords.EXPANDER,Keywords.VALUE);
+	private static ASet<Keyword> CORE_TYPES=Sets.of(Keywords.MACRO, Keywords.SPECIAL, Keywords.FUNCTION, Keywords.EXPANDER,Keywords.VALUE);
 
 	@SuppressWarnings("unchecked")
 	private void doDocTests(Symbol sym, AHashMap<ACell,ACell> meta) {

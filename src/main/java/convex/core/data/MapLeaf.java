@@ -365,20 +365,14 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K extends ACell, V extends ACell> MapLeaf<K, V> read(ByteBuffer bb, long count, boolean includeValues) throws BadFormatException {
+	public static <K extends ACell, V extends ACell> MapLeaf<K, V> read(ByteBuffer bb, long count) throws BadFormatException {
 		if (count == 0) return (MapLeaf<K, V>) EMPTY;
 		if (count < 0) throw new BadFormatException("Negative count of map elements!");
 		if (count > MAX_ENTRIES) throw new BadFormatException("MapLeaf too big: " + count);
 
 		MapEntry<K, V>[] items = (MapEntry<K, V>[]) new MapEntry[(int) count];
 		for (int i = 0; i < count; i++) {
-			if (includeValues) {
-				items[i] = MapEntry.read(bb);
-			} else {
-				Ref<V> ref=Format.readRef(bb);
-				MapEntry<K,V> me=(MapEntry<K, V>) MapEntry.createRef(ref, convex.core.data.Set.DUMMY_REF);
-				items[i]=me;
-			}
+			items[i] = MapEntry.read(bb);
 		}
 
 		if (!isValidOrder(items)) {

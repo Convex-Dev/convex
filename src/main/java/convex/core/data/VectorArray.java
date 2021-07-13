@@ -166,7 +166,7 @@ public class VectorArray<T extends ACell> extends ASizedVector<T> {
 	}
 
 	@Override
-	protected Ref<T> getElementRef(long index) {
+	public Ref<T> getElementRef(long index) {
 		return Ref.get(get(index));
 	}
 

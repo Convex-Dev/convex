@@ -33,7 +33,6 @@ import convex.core.data.Keywords;
 import convex.core.data.List;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
-import convex.core.data.Set;
 import convex.core.data.Sets;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
@@ -210,13 +209,13 @@ public class Core {
 		@Override
 		public Context<ASet<ACell>> invoke(Context context, ACell[] args) {
 			int n=args.length;
-			Set<ACell> result=Sets.empty();
+			ASet<ACell> result=Sets.empty();
 
 			long juice=Juice.BUILD_DATA;
 
 			for (int i=0; i<n; i++) {
 				ACell arg=args[i];
-				Set<ACell> set=RT.ensureSet(arg);
+				ASet<ACell> set=RT.ensureSet(arg);
 				if (set==null) return context.withCastError(i,args, Types.SET);
 
 				// check juice before expensive operation
@@ -239,14 +238,14 @@ public class Core {
 
 			int n=args.length;
 			ACell arg0=(ACell) args[0];
-			Set<ACell> result=(arg0==null)?Sets.empty():RT.ensureSet(arg0);
+			ASet<ACell> result=(arg0==null)?Sets.empty():RT.ensureSet(arg0);
 			if (result==null) return context.withCastError(0,args, Types.SET);
 
 			long juice=Juice.BUILD_DATA;
 
 			for (int i=1; i<n; i++) {
 				ACell arg=(ACell) args[i];
-				Set<ACell> set=(arg==null)?Sets.empty():RT.ensureSet(args[i]);
+				ASet<ACell> set=(arg==null)?Sets.empty():RT.ensureSet(args[i]);
 				if (set==null) return context.withCastError(i,args, Types.SET);
 				long size=set.count();
 
@@ -268,14 +267,14 @@ public class Core {
 
 			int n=args.length;
 			ACell arg0=args[0];
-			Set<ACell> result=(arg0==null)?Sets.empty():RT.ensureSet(arg0);
+			ASet<ACell> result=(arg0==null)?Sets.empty():RT.ensureSet(arg0);
 			if (result==null) return context.withCastError(0,args, Types.SET);
 
 			long juice=Juice.BUILD_DATA;
 
 			for (int i=1; i<n; i++) {
 				ACell arg=args[i];
-				Set<ACell> set=RT.ensureSet(arg);
+				ASet<ACell> set=RT.ensureSet(arg);
 				if (set==null) return context.withCastError(i,args, Types.SET);
 				long size=set.count();
 
@@ -954,7 +953,7 @@ public class Core {
 			long juice = Juice.BUILD_DATA + (args.length * Juice.BUILD_PER_ELEMENT);
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
-			return context.withResult(juice, Set.create(args));
+			return context.withResult(juice, Sets.of(args));
 		}
 	});
 
@@ -1251,13 +1250,13 @@ public class Core {
 			int n = args.length;
 			if (n != 2) return context.withArityError(exactArityMessage(2, n));
 
-			Set<ACell> s0=RT.ensureSet(args[0]);
+			ASet<ACell> s0=RT.ensureSet(args[0]);
 			if (s0==null) return context.withCastError(args[0], Types.SET);
 
 			long juice = Juice.SET_COMPARE_PER_ELEMENT*s0.count();
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
-			Set<ACell> s1=RT.ensureSet(args[1]);
+			ASet<ACell> s1=RT.ensureSet(args[1]);
 			if (s1==null) return context.withCastError(args[1], Types.SET);
 
 			CVMBool result=CVMBool.of(s0.isSubset(s1));
