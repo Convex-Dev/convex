@@ -48,7 +48,7 @@ public class ServerTest {
 	public static final Server SERVER;
 
 	private static final List<Server> SERVERS;
-	
+
 	public static final Convex CONVEX;
 
 
@@ -66,7 +66,7 @@ public class ServerTest {
 				throw Utils.sneakyThrow(t);
 			}
 		}
-		
+
 	}
 
 	private static final Logger log = Logger.getLogger(ServerTest.class.getName());
@@ -87,7 +87,7 @@ public class ServerTest {
 			String msg=id+ " ERR: "+Utils.toString(code)+ " : "+message;
 			//System.err.println(msg);
 			log.finer(msg);
-			
+
 			results.put(id, code);
 		}
 	};
