@@ -19,7 +19,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
-import convex.core.init.InitTest;
 import convex.core.lang.Reader;
 import convex.core.lang.ops.Constant;
 import convex.core.transactions.ATransaction;
@@ -52,11 +51,7 @@ public class ConvexTest {
 
 	@Test public void testConnection() throws IOException, TimeoutException {
 		// Don't need locking for query?
-		Convex convex=Convex.connect(
-			ServerTest.SERVER.getHostAddress(),
-				InitTest.HERO,
-				InitTest.HERO_KEYPAIR
-		);
+		Convex convex=Convex.connect(ServerTest.SERVER);
 		assertTrue(convex.isConnected());
 		convex.close();
 		assertFalse(convex.isConnected());

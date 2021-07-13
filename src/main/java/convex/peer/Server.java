@@ -1043,8 +1043,9 @@ public class Server implements Closeable {
 	 * Returns the Keypair for this peer server
 	 *
 	 * SECURITY: Be careful with this!
+	 * @return Key pair for Peer
 	 */
-	private AKeyPair getKeyPair() {
+	public AKeyPair getKeyPair() {
 		return getPeer().getKeyPair();
 	}
 

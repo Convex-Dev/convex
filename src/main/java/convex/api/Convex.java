@@ -776,6 +776,17 @@ public class Convex {
 		}
 	}
 
+	/**
+	 * Connect to a local Server, using the Peer's address and keypair
+	 * @param server
+	 * @return New Client Connection
+	 * @throws TimeoutException 
+	 * @throws IOException 
+	 */
+	public static Convex connect(Server server) throws IOException, TimeoutException {
+		return connect(server.getHostAddress(),server.getPeerController(),server.getKeyPair());
+	}
+
 
 
 }
