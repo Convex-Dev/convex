@@ -39,8 +39,8 @@ public class ConvexTest {
 	static {
 		synchronized(ServerTest.SERVER) {
 			try {
-				// need to wait for ServerTest to create CONVEX client object
-				Thread.sleep(1000);
+				// need to jump to +2 sequence number for this to work
+				ServerTest.CONVEX.setNextSequence(ServerTest.CONVEX.getSequence() + 2L);
 				ADDRESS=ServerTest.CONVEX.createAccount(KEYPAIR.getAccountKey());
 				ServerTest.CONVEX.transfer(ADDRESS, 1000000000L).get(1000,TimeUnit.MILLISECONDS);
 			} catch (Throwable e) {
