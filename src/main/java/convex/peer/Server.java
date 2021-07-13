@@ -269,7 +269,7 @@ public class Server implements Closeable {
 	/**
 	 * Launch the Peer Server, including all main server threads
 	 */
-	public synchronized void launch() {
+	public void launch() {
 		Object p = getConfig().get(Keywords.PORT);
 		Integer port = (p == null) ? null : Utils.toInt(p);
 
@@ -691,7 +691,7 @@ public class Server implements Closeable {
 		}
 	}
 	
-	private synchronized void postOwnTransaction(ATransaction trans) {
+	private void postOwnTransaction(ATransaction trans) {
 		synchronized (newTransactions) {
 			newTransactions.add(getKeyPair().signData(trans));
 		}
@@ -1009,7 +1009,7 @@ public class Server implements Closeable {
 	}
 
 	@Override
-	public synchronized void close() {
+	public void close() {
 		// persist peer state if necessary
 		if ((peer != null) && Utils.bool(getConfig().get(Keywords.PERSIST))) {
 			persistPeerData();
