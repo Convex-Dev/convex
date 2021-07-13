@@ -40,6 +40,8 @@ public class ConvexTest {
 	static {
 		synchronized(ServerTest.SERVER) {
 			try {
+				// need to wait for ServerTest to create CONVEX client object
+				Thread.sleep(1000);
 				ADDRESS=ServerTest.CONVEX.createAccount(KEYPAIR.getAccountKey());
 				ServerTest.CONVEX.transfer(ADDRESS, 1000000000L).get(1000,TimeUnit.MILLISECONDS);
 			} catch (Throwable e) {
