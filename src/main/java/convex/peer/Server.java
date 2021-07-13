@@ -204,7 +204,10 @@ public class Server implements Closeable {
 			try {
 				Hash hash = store.getRootHash();
 				Peer peer = Peer.restorePeer(store, hash, keyPair);
-				if (peer != null) return peer;
+				if (peer != null) {
+					log.log(LEVEL_INFO, "Restored Peer with root data hash: "+hash);
+					return peer;
+				}
 			} catch (Throwable e) {
 				log.warning("Can't restore Peer from store: " + e.getMessage());
 			}
@@ -279,8 +282,6 @@ public class Server implements Closeable {
 			} else {
 				hostname = String.format("localhost:%d", port);
 			}
-
-			lastOwnTransactionTimestamp=Utils.getCurrentTimestamp();
 
 			// set running status now, so that loops don't terminate
 			isRunning = true;
@@ -631,10 +632,8 @@ public class Server implements Closeable {
 		}
 	}
 
-	private long lastOwnTransactionTimestamp;
+	private long lastOwnTransactionTimestamp=0L;
 
-	private Convex localClient=null;
-	;
 	private static final long OWN_TRANSACTIONS_DELAY=300;
 	
 	/**
@@ -693,24 +692,8 @@ public class Server implements Closeable {
 	}
 	
 	private synchronized void postOwnTransaction(ATransaction trans) {
-		try {
-			getLocalClient().transact(trans);
-		} catch (IOException e) {
-			localClient=null;
-			// Otherwise ignore
-		}
-	}
-
-	private Convex getLocalClient() {
-		if (localClient!=null) return localClient;
-		synchronized (this) {
-			if (localClient!=null) return localClient;
-			try {
-				localClient=Convex.connect(getHostAddress(),getPeerController(),peer.getKeyPair());
-				return localClient;
-			} catch (TimeoutException | IOException e) {
-				throw Utils.sneakyThrow(e);
-			}
+		synchronized (newTransactions) {
+			newTransactions.add(getKeyPair().signData(trans));
 		}
 	}
 
@@ -1027,10 +1010,6 @@ public class Server implements Closeable {
 
 	@Override
 	public synchronized void close() {
-		if (localClient!=null) {
-			localClient.close();
-		}
-		
 		// persist peer state if necessary
 		if ((peer != null) && Utils.bool(getConfig().get(Keywords.PERSIST))) {
 			persistPeerData();
