@@ -33,62 +33,68 @@ import convex.test.Samples;
 public class ConvexTest {
 
 	static final Address ADDRESS;
-	static final AKeyPair KEYPAIR=AKeyPair.generate();
-
+	static final AKeyPair KEYPAIR = AKeyPair.generate();
 
 	static {
-		synchronized(ServerTest.SERVER) {
-			try {
+		try {
+			synchronized (ServerTest.SERVER) {
+				Thread.sleep(500);
+				Convex CONVEX = Convex.connect(ServerTest.SERVER);
+
 				// need to wait for ServerTest to create CONVEX client object
-				Thread.sleep(1000);
-				ADDRESS=ServerTest.CONVEX.createAccount(KEYPAIR.getAccountKey());
-				ServerTest.CONVEX.transfer(ADDRESS, 1000000000L).get(1000,TimeUnit.MILLISECONDS);
-			} catch (Throwable e) {
-				e.printStackTrace();
-				throw Utils.sneakyThrow(e);
+				ADDRESS = CONVEX.createAccount(KEYPAIR.getAccountKey());
+				CONVEX.transfer(ADDRESS, 1000000000L).get(1000, TimeUnit.MILLISECONDS);
 			}
+		} catch (Throwable e) {
+			e.printStackTrace();
+			throw Utils.sneakyThrow(e);
 		}
 	}
 
-	@Test public void testConnection() throws IOException, TimeoutException {
-		// Don't need locking for query?
-		Convex convex=Convex.connect(ServerTest.SERVER);
-		assertTrue(convex.isConnected());
-		convex.close();
-		assertFalse(convex.isConnected());
-	}
-
-	@Test public void testConvex() throws IOException, TimeoutException {
+	@Test
+	public void testConnection() throws IOException, TimeoutException {
 		synchronized (ServerTest.SERVER) {
-			Convex convex=Convex.connect(ServerTest.SERVER.getHostAddress(),ADDRESS,KEYPAIR);
-			Result r=convex.transactSync(Invoke.create(ADDRESS,0,Reader.read("*address*")),1000);
-			assertNull(r.getErrorCode(),"Error:" +r.toString());
-			assertEquals(ADDRESS,r.getValue());
+			Convex convex = Convex.connect(ServerTest.SERVER);
+			assertTrue(convex.isConnected());
+			convex.close();
+			assertFalse(convex.isConnected());
 		}
 	}
 
-	@Test public void testBadSignature() throws IOException, TimeoutException, InterruptedException, ExecutionException {
+	@Test
+	public void testConvex() throws IOException, TimeoutException {
 		synchronized (ServerTest.SERVER) {
-			Convex convex=Convex.connect(ServerTest.SERVER.getHostAddress(),ADDRESS,KEYPAIR);
-			Ref<ATransaction> tr=Invoke.create(ADDRESS,0,Reader.read("*address*")).getRef();
-			Result r=convex.transact(SignedData.create(KEYPAIR, Samples.FAKE_SIGNATURE,tr)).get();
-			assertEquals(ErrorCodes.SIGNATURE,r.getErrorCode());
+			Convex convex = Convex.connect(ServerTest.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
+			Result r = convex.transactSync(Invoke.create(ADDRESS, 0, Reader.read("*address*")), 1000);
+			assertNull(r.getErrorCode(), "Error:" + r.toString());
+			assertEquals(ADDRESS, r.getValue());
+		}
+	}
+
+	@Test
+	public void testBadSignature() throws IOException, TimeoutException, InterruptedException, ExecutionException {
+		synchronized (ServerTest.SERVER) {
+			Convex convex = Convex.connect(ServerTest.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
+			Ref<ATransaction> tr = Invoke.create(ADDRESS, 0, Reader.read("*address*")).getRef();
+			Result r = convex.transact(SignedData.create(KEYPAIR, Samples.FAKE_SIGNATURE, tr)).get();
+			assertEquals(ErrorCodes.SIGNATURE, r.getErrorCode());
 		}
 	}
 
 	@SuppressWarnings("unchecked")
-	@Test public void testManyTransactions() throws IOException, TimeoutException, InterruptedException, ExecutionException {
+	@Test
+	public void testManyTransactions() throws IOException, TimeoutException, InterruptedException, ExecutionException {
 		synchronized (ServerTest.SERVER) {
-			Convex convex=Convex.connect(ServerTest.SERVER.getHostAddress(),ADDRESS,KEYPAIR);
-			int n=100;
-			Future<Result>[] rs=new Future[n];
-			for (int i=0; i<n; i++) {
-				Future<Result> f=convex.transact(Invoke.create(ADDRESS, 0,Constant.of(i)));
-				rs[i]=f;
+			Convex convex = Convex.connect(ServerTest.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
+			int n = 100;
+			Future<Result>[] rs = new Future[n];
+			for (int i = 0; i < n; i++) {
+				Future<Result> f = convex.transact(Invoke.create(ADDRESS, 0, Constant.of(i)));
+				rs[i] = f;
 			}
-			for (int i=0; i<n; i++) {
-				Result r=rs[i].get(6000,TimeUnit.MILLISECONDS);
-				assertNull(r.getErrorCode(),"Error:" +r.toString());
+			for (int i = 0; i < n; i++) {
+				Result r = rs[i].get(6000, TimeUnit.MILLISECONDS);
+				assertNull(r.getErrorCode(), "Error:" + r.toString());
 			}
 		}
 	}
