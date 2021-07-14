@@ -43,8 +43,8 @@ public class PeerCreate implements Runnable {
 
 	@Spec CommandSpec spec;
 
-	@Option(names={"-i", "--index"},
-		defaultValue="-1",
+	@Option(names={"-i", "--index-key"},
+		defaultValue="0",
 		description="Keystore index of the public/private key to use for the peer.")
 	private int keystoreIndex;
 
