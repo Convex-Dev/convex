@@ -130,7 +130,7 @@ public class Convex {
 		this.keyPair = keyPair;
 		this.address = address;
 	}
-	
+
 	/**
 	 * Creates an anonymous connection to a Peer, suitable for queries
 	 * @param hostAddress Address of Peer
@@ -151,7 +151,7 @@ public class Convex {
 	 * @param keyPair     Key pair to use for client transactions
 	 * @return New Convex client instance
 	 * @throws IOException If connection fails
-	 * @throws TimeoutException 
+	 * @throws TimeoutException
 	 */
 	public static Convex connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair) throws IOException, TimeoutException {
 		return Convex.connect(peerAddress, address, keyPair, Stores.current());
@@ -167,7 +167,7 @@ public class Convex {
 	 * @param store   Store to use for this connection
 	 * @return New Convex client instance
 	 * @throws IOException If connection fails
-	 * @throws TimeoutException 
+	 * @throws TimeoutException
 	 */
 	public static Convex connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair, AStore store) throws IOException, TimeoutException {
 		Convex convex = new Convex(address, keyPair);
@@ -318,7 +318,7 @@ public class Convex {
 	 * Submits a transaction to the Convex network, returning a future once the
 	 * transaction has been successfully queued. Signs the transaction with the
 	 * currently set key pair
-	 * 
+	 *
 	 * Should be thread safe as long as multiple clients do not attempt to submit
 	 * transactions for the same account concurrently.
 	 *
@@ -778,8 +778,8 @@ public class Convex {
 	 * Connect to a local Server, using the Peer's address and keypair
 	 * @param server
 	 * @return New Client Connection
-	 * @throws TimeoutException 
-	 * @throws IOException 
+	 * @throws TimeoutException
+	 * @throws IOException
 	 */
 	public static Convex connect(Server server) throws IOException, TimeoutException {
 		return connect(server.getHostAddress(),server.getPeerController(),server.getKeyPair());

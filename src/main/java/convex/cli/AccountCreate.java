@@ -1,5 +1,6 @@
 package convex.cli;
 
+import java.util.List;
 import java.util.logging.Logger;
 
 import convex.api.Convex;
@@ -66,8 +67,8 @@ public class AccountCreate implements Runnable {
 		if (keystorePublicKey.length() == 0 && keystoreIndex == -1) {
 			// create a local key store AKeyPair
 			try {
-				AKeyPair keyPairs[] = mainParent.generateKeyPairs(1);
-				keyPair = keyPairs[0];
+				List<AKeyPair> keyPairList = mainParent.generateKeyPairs(1);
+				keyPair = keyPairList.get(0);
 				System.out.println("generated public key: " + keyPair.getAccountKey().toHexString());
 			}
 			catch (Error e) {
