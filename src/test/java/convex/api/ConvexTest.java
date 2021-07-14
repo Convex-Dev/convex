@@ -36,19 +36,18 @@ public class ConvexTest {
 	static final AKeyPair KEYPAIR = AKeyPair.generate();
 
 	static {
-		synchronized(ServerTest.CONVEX) {
-			try {
-				// need to jump to +2 sequence number for this to work, since the +1 sequence is being used for (set-peer xxx)
-				ServerTest.CONVEX.setNextSequence(ServerTest.CONVEX.getSequence() + 2L);
-				ADDRESS=ServerTest.CONVEX.createAccount(KEYPAIR.getAccountKey());
-				ServerTest.CONVEX.transfer(ADDRESS, 1000000000L).get(1000,TimeUnit.MILLISECONDS);
-			} catch (Throwable e) {
-				e.printStackTrace();
-				throw Utils.sneakyThrow(e);
+		synchronized(ServerTest.SERVER) {
+			synchronized(ServerTest.CONVEX) {
+				try {
+					// need to jump to +2 sequence number for this to work, since the +1 sequence is being used for (set-peer xxx)
+					ServerTest.CONVEX.setNextSequence(ServerTest.CONVEX.getSequence() + 2L);
+					ADDRESS=ServerTest.CONVEX.createAccount(KEYPAIR.getAccountKey());
+					ServerTest.CONVEX.transfer(ADDRESS, 1000000000L).get(1000,TimeUnit.MILLISECONDS);
+				} catch (Throwable e) {
+					e.printStackTrace();
+					throw Utils.sneakyThrow(e);
+				}
 			}
-		} catch (Throwable e) {
-			e.printStackTrace();
-			throw Utils.sneakyThrow(e);
 		}
 	}
 
