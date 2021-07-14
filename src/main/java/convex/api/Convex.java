@@ -128,8 +128,6 @@ public class Convex {
 
 	private Convex(Address address, AKeyPair keyPair) {
 		this.keyPair = keyPair;
-
-		// TODO: numeric address
 		this.address = address;
 	}
 	
