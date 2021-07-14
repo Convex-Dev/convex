@@ -57,8 +57,9 @@ public class ServerTest {
 		State s=InitTest.createState();
 
 		SERVERS=API.launchLocalPeers(InitTest.PEER_KEYPAIRS, s, null);
-		SERVER = SERVERS.get(0);
-		synchronized(SERVER) {
+		Server server = SERVERS.get(0);
+		synchronized(server) {
+			SERVER=server;
 			try {
 				Thread.sleep(1000);
 				CONVEX=Convex.connect(SERVER.getHostAddress(), SERVER.getPeerController(), InitTest.FIRST_PEER_KEYPAIR);
