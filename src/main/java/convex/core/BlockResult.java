@@ -135,8 +135,8 @@ public class BlockResult extends ARecord {
 	
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos=state.write(bs,pos);
-		pos=results.write(bs,pos);
+		pos=state.encode(bs,pos);
+		pos=results.encode(bs,pos);
 		return pos;
 	}
 	

@@ -110,7 +110,7 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = fns.write(bs,pos);
+		pos = fns.encode(bs,pos);
 		return pos;
 	}
 	

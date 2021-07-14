@@ -374,7 +374,7 @@ public class Format {
 			bs[pos++]=Tag.NULL;
 			return pos;
 		}
-		return cell.write(bs,pos);
+		return cell.encode(bs,pos);
 	}
 
 	public static ByteBuffer writeVLCBigDecimal(ByteBuffer bb, BigDecimal value) {

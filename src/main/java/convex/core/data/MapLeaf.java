@@ -322,22 +322,11 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.MAP;
-		return writeRaw(bs,pos,true);
-	}
-	
-	@Override
-	public int write(byte[] bs, int pos, boolean includeValues) {
-		bs[pos++]=Tag.MAP;
-		return writeRaw(bs,pos,includeValues);
+		return encodeRaw(bs,pos);
 	}
 	
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		return writeRaw(bs,pos,true);
-	}
-
-	@Override
-	public int writeRaw(byte[] bs, int pos, boolean includeValues) {
 		pos = Format.writeVLCLong(bs,pos, count);
 
 		for (int i = 0; i < count; i++) {

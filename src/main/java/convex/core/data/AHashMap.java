@@ -148,24 +148,6 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	 */
 	public abstract int encode(byte[] bs, int pos);
 	
-	/**
-	 * Writes this HashMap to a byte array.
-	 * @param bs Byte array
-	 * @param pos Position to write in byte array
-	 * @param includeValues True to include values, false to exclude
-	 * @return Updated position
-	 */
-	public abstract int write(byte[] bs, int pos, boolean includeValues);
-	
-	/**
-	 * Writes this HashMap's raw data to a byte array. Excludes tag and count.
-	 * @param bs Byte array
-	 * @param pos Position to write in byte array
-	 * @param includeValues True to include values, false to exclude
-	 * @return Updated position
-	 */
-	public abstract int writeRaw(byte[] bs, int pos, boolean includeValues);
-
 	public AVector<K> getKeys() {
 		int n=Utils.checkedInt(count);
 		ACell[] keys=new ACell[n];
@@ -174,9 +156,5 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 		}
 		return Vectors.create(keys);
 	}
-	
-	@Override
-	public abstract V get(ACell key);
 
-	
 }

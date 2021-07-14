@@ -165,10 +165,10 @@ public class State extends ARecord {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = accounts.write(bs,pos);
-		pos = peers.write(bs,pos);
-		pos = globals.write(bs,pos);
-		pos = schedule.write(bs,pos);
+		pos = accounts.encode(bs,pos);
+		pos = peers.encode(bs,pos);
+		pos = globals.encode(bs,pos);
+		pos = schedule.encode(bs,pos);
 		return pos;
 	}
 

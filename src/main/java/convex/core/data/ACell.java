@@ -150,16 +150,6 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Writes this Cell's encoding to a byte array, including tag. USes cached encoding if available.
-	 * @param bs Byte array to encode into
-	 * @param pos Start position to encode at
-	 * @return Updated position
-	 */
-	public int write(byte[] bs, int pos) {
-		return getEncoding().writeToBuffer(bs,pos);
-	}
-	
-	/**
 	 * Writes this Cell's encoding to a byte array, including a tag byte which will be written first
 	 *
 	 * @param bs A byte array to which to write the encoding

@@ -181,7 +181,7 @@ public class VectorArray<T extends ACell> extends ASizedVector<T> {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		return toVector().write(bs, pos);
+		return toVector().encode(bs, pos);
 	}
 
 	@SuppressWarnings("unchecked")

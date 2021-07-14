@@ -1,10 +1,12 @@
 package convex.core.data;
 
+import java.util.function.Function;
+
 import convex.core.Constants;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
-import convex.core.util.MergeFunction;
+import convex.core.util.Utils;
 
 /**
  * Abstract based class for sets.
@@ -24,7 +26,6 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 		this.count=count;
 	}
 	
-	
 	@Override
 	public final AType getType() {
 		return Types.SET;
@@ -35,9 +36,6 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 		return Tag.SET;
 	}
 	
-	@Override
-	public abstract void ednString(StringBuilder sb) ;
-
 	/**
 	 * Updates the set to include the given element
 	 * @param a
@@ -79,10 +77,27 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	 */
 	public abstract ASet<T> disjAll(ACollection<T> xs);
 
+	@Override
+	public <R extends ACell> AVector<R> toVector() {
+		int n=Utils.checkedInt(count);
+		ACell[] elements=new ACell[n];
+		copyToArray(elements,0);
+		return Vectors.create(elements);
+	}
+	
+	@Override
+	public <R extends ACell> ASet<R> map(Function<? super T, ? extends R> mapper) {
+		ASet<R> result=Sets.empty();
+		for (long i=0; i<count; i++) {
+			result=result.conj(mapper.apply(get(i)));
+		}
+		return result;
+	}
+
 	/**
 	 * Returns the intersection of two sets
 	 * @param xs
-	 * @return
+	 * @return Intersection of the two sets
 	 */
 	public abstract ASet<T> intersectAll(ASet<T> xs);
 
@@ -98,12 +113,21 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	}
 	
 	@Override
-	public abstract boolean containsKey(ACell o);
+	public T get(long index) {
+		return getElementRef(index).getValue();
+	}
+	
+	/**
+	 * Tests if this Set contains a given value
+	 * @param o Value to test for set membership
+	 * @return True if set contains value, false otherwise
+	 */
+	public abstract boolean contains(ACell o);
 	
 	@Override
 	public final boolean contains(Object o) {
 		if ((o==null)||(o instanceof ACell)) {
-			return containsKey((ACell)o);
+			return contains((ACell)o);
 		}
 		return false;
 	}
@@ -129,17 +153,28 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	 * @param ref
 	 * @return Updated set
 	 */
-	public abstract <R extends ACell> ASet<R> includeRef(Ref<R> ref) ;
+	public abstract ASet<T> includeRef(Ref<T> ref) ;
 
 	@Override
 	public abstract <R extends ACell> ASet<R> conj(R a);
 
-	/**
-	 * Gets the Object in the set for the given hash, or null if not found
-	 * @param hash
-	 * @return The set value for the given Hash if found, null otherwise.
-	 */
-	public abstract ACell getByHash(Hash hash) ;
+	@SuppressWarnings("unchecked")
+	@Override
+	public ASet<T> assoc(ACell key, ACell value) {
+		if (value==CVMBool.TRUE) return (ASet<T>) include(key);
+		if (value==CVMBool.FALSE) return exclude((T) key);
+		return null;
+	}
+
+	@Override
+	public boolean containsKey(ACell key) {
+		return contains(key);
+	}
+
+	@Override
+	public long count() {
+		return count;
+	}
 	
 	@Override
 	public ASet<T> empty() {
@@ -147,16 +182,52 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	}
 	
 	/**
+	 * Gets the Ref in the Set for a given value, or null if not found
+	 * @param k Value to check for set membership
+	 * @return Ref to value, or null
+	 */
+	public abstract Ref<T> getValueRef(ACell k);
+
+	/**
+	 * Gets the Ref in the Set for a given hash, or null if not found
+	 * @param hash Hash to check for set membership
+	 * @return Ref to value with given Hash, or null
+	 */
+	protected abstract Ref<T> getRefByHash(Hash hash);
+
+	/**
+	 * Tests if this set contains all the elements of another set
+	 * @param b Set to compare with
+	 * @return True if other set is completely contained within this set, false otherwise
+	 */
+	public abstract boolean containsAll(ASet<T> b);
+	
+	/**
 	 * Tests if this set is a (non-strict) subset of another Set
 	 * @param b Set to test against
 	 * @return True if this is a subset of the other set, false otherwise.
 	 */
-	public abstract boolean isSubset(ASet<T> b);
-
-	public abstract Ref<T> getValueRef(ACell k);
-
-	protected abstract Ref<T> getRefByHash(Hash hash);
-
-
-	public abstract ASet<T> mergeWith(ASet<T> b, MergeFunction<T> func);
+	public boolean isSubset(ASet<T> b) {
+		return b.containsAll(this);
+	}
+	
+	@Override
+	public void ednString(StringBuilder sb) {
+		sb.append("#{");
+		for (long i=0; i<count; i++) {
+			if (i>0) sb.append(',');
+			Utils.ednString(sb,get(i));
+		}
+		sb.append('}');
+	}
+	
+	@Override
+	public void print(StringBuilder sb) {
+		sb.append("#{");
+		for (long i=0; i<count; i++) {
+			if (i>0) sb.append(',');
+			Utils.print(sb,get(i));
+		}
+		sb.append('}');
+	}
 }

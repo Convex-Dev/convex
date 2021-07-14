@@ -3,17 +3,11 @@ package convex.core.data;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.TODOException;
-import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 
 /**
@@ -22,22 +16,18 @@ import convex.core.util.Utils;
  * 
  * Must be sorted by Key hash value to ensure uniqueness of representation
  *
- * @param <V> Type of values
+ * @param <T> Type of values
  */
-public class SetLeaf<V extends ACell> extends AHashSet<V> {
+public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	/**
 	 * Maximum number of entries in a SetLeaf
 	 */
-	public static final int MAX_ENTRIES = 8;
+	public static final int MAX_ENTRIES = 16;
 
-	static final Ref<?>[] EMPTY_ENTRIES = new Ref[0];
+	private final Ref<T>[] entries;
 
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	static final SetLeaf<?> EMPTY = new SetLeaf(EMPTY_ENTRIES);
-
-	private final Ref<V>[] entries;
-
-	private SetLeaf(Ref<V>[] items) {
+	SetLeaf(Ref<T>[] items) {
+		super(items.length);
 		entries = items;
 	}
 
@@ -50,7 +40,8 @@ public class SetLeaf<V extends ACell> extends AHashSet<V> {
 	 * @param entries
 	 * @return New ListMap
 	 */
-	public static <V extends ACell> SetLeaf<V> create(Ref<V>[] entries) {
+	@SafeVarargs
+	public static <V extends ACell> SetLeaf<V> create(Ref<V>... entries) {
 		return create(entries, 0, entries.length);
 	}
 
@@ -65,10 +56,10 @@ public class SetLeaf<V extends ACell> extends AHashSet<V> {
 	 * @return A new ListMap
 	 */
 	protected static <V extends ACell> SetLeaf<V> create(Ref<V>[] entries, int offset, int length) {
-		if (length == 0) return empty();
+		if (length == 0) return Sets.empty();
 		if (length > MAX_ENTRIES) throw new IllegalArgumentException("Too many elements: " + entries.length);
 		Ref<V>[] sorted = Utils.copyOfRangeExcludeNulls(entries, offset, offset + length);
-		if (sorted.length == 0) return empty();
+		if (sorted.length == 0) return Sets.empty();
 		Arrays.sort(sorted);
 		return new SetLeaf<V>(sorted);
 	}
@@ -82,91 +73,99 @@ public class SetLeaf<V extends ACell> extends AHashSet<V> {
 	public int size() {
 		return entries.length;
 	}
-
-	@SuppressWarnings("unchecked")
+	
 	@Override
-	public boolean containsKey(ACell key) {
-		return getValueRef(key) != null;
-	}
-
-	@Override
-	public Ref<V> getValueRef(ACell k) {
+	public Ref<T> getValueRef(ACell k) {
+		// Use cached hash if available
 		Hash h=(k==null)?Hash.NULL_HASH:k.cachedHash();
 		if (h!=null) return getRefByHash(h);
 
 		int len = size();
 		for (int i = 0; i < len; i++) {
-			Ref<V> e = entries[i];
+			Ref<T> e = entries[i];
 			if (Utils.equals(k, e.getValue())) return e;
 		}
 		return null;
 	}
+	
+	@Override
+	public boolean containsHash(Hash hash) {
+		return getRefByHash(hash) != null;
+	}
 
 	@Override
-	protected Ref<V> getRefByHash(Hash hash) {
+	protected Ref<T> getRefByHash(Hash hash) {
 		int len = size();
 		for (int i = 0; i < len; i++) {
-			Ref<V> e = entries[i];
+			Ref<T> e = entries[i];
 			if (hash.equals(e.getHash())) return e;
 		}
 		return null;
 	}
-
+	
 	/**
 	 * Gets the index of key k in the internal array, or -1 if not found
 	 * 
 	 * @param key
 	 * @return
 	 */
-	private int seek(V key) {
+	private int seek(T key) {
 		int len = size();
 		for (int i = 0; i < len; i++) {
 			if (Utils.equals(key, entries[i].getValue())) return i;
 		}
 		return -1;
 	}
+	
+	/**
+	 * Gets the index of key k in the internal array, or -1 if not found
+	 * 
+	 * @param key
+	 * @return
+	 */
+	private int seekKeyRef(Ref<T> key) {
+		Hash h=key.getHash();
+		int len = size();
+		for (int i = 0; i < len; i++) {
+			if (h.compareTo(entries[i].getHash())==0) return i;
+		}
+		return -1;
+	}
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public SetLeaf<V> dissoc(ACell key) {
-		int i = seek((V)key);
+	public SetLeaf<T> exclude(ACell key) {
+		int i = seek((T)key);
 		if (i < 0) return this; // not found
-		return dissocEntry(i);
+		return excludeAt(i);
 	}
 
 	@Override
-	public SetLeaf<V> dissocRef(Ref<V> key) {
+	public SetLeaf<T> excludeRef(Ref<T> key) {
 		int i = seekKeyRef(key);
 		if (i < 0) return this; // not found
-		return dissocEntry(i);
+		return excludeAt(i);
 	}
 
 	@SuppressWarnings("unchecked")
-	private SetLeaf<V> dissocEntry(int internalIndex) {
+	private SetLeaf<T> excludeAt(int index) {
 		int len = size();
-		if (len == 1) return empty();
-		Ref<V>[] newEntries = (Ref<V>[]) new Ref[len - 1];
-		System.arraycopy(entries, 0, newEntries, 0, internalIndex);
-		System.arraycopy(entries, internalIndex + 1, newEntries, internalIndex, len - internalIndex - 1);
-		return new SetLeaf<V>(newEntries);
+		if (len == 1) return Sets.empty();
+		Ref<T>[] newEntries = (Ref<T>[]) new Ref[len - 1];
+		System.arraycopy(entries, 0, newEntries, 0, index);
+		System.arraycopy(entries, index + 1, newEntries, index, len - index - 1);
+		return new SetLeaf<T>(newEntries);
 	}
 
-	@Override
-	protected void accumulateValues(ArrayList<V> al) {
+	protected void accumulateValues(ArrayList<T> al) {
 		for (int i = 0; i < entries.length; i++) {
-			Ref<V> me = entries[i];
+			Ref<T> me = entries[i];
 			al.add(me.getValue());
 		}
 	}
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.SET;
-		return encodeRaw(bs,pos);
-	}
-	
-	@Override
-	public int write(byte[] bs, int pos) {
 		bs[pos++]=Tag.SET;
 		return encodeRaw(bs,pos);
 	}
@@ -222,7 +221,7 @@ public class SetLeaf<V extends ACell> extends AHashSet<V> {
 
 	@SuppressWarnings("unchecked")
 	public static <V extends ACell> SetLeaf<V> emptySet() {
-		return (SetLeaf<V>) EMPTY;
+		return (SetLeaf<V>) Sets.EMPTY;
 	}
 
 	@Override
@@ -249,13 +248,19 @@ public class SetLeaf<V extends ACell> extends AHashSet<V> {
 
 	@Override
 	public int getRefCount() {
-		return 2 * entries.length;
+		return entries.length;
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public Ref<V> getRef(int i) {
-		Ref<V> e = entries[i]; // IndexOutOfBoundsException if out of range
+	public Ref<T> getRef(int i) {
+		Ref<T> e = entries[i]; // IndexOutOfBoundsException if out of range
+		return e;
+	}
+	
+	@Override
+	public Ref<T> getElementRef(long i) {
+		Ref<T> e = entries[Utils.checkedInt(i)]; // Exception if out of range
 		return e;
 	}
 
@@ -264,10 +269,10 @@ public class SetLeaf<V extends ACell> extends AHashSet<V> {
 	public SetLeaf updateRefs(IRefFunction func) {
 		int n = entries.length;
 		if (n == 0) return this;
-		Ref<V>[] newEntries = entries;
+		Ref<T>[] newEntries = entries;
 		for (int i = 0; i < n; i++) {
-			Ref<V> e = newEntries[i];
-			Ref<V> newEntry = (Ref<V>) func.apply(e);
+			Ref<T> e = newEntries[i];
+			Ref<T> newEntry = (Ref<T>) func.apply(e);
 			if (e!=newEntry) {
 				if (newEntries==entries) newEntries=entries.clone();
 				newEntries[i]=newEntry;
@@ -286,9 +291,9 @@ public class SetLeaf<V extends ACell> extends AHashSet<V> {
 	 * @param mask     Mask of digits to include
 	 * @return Filtered ListMap
 	 */
-	public SetLeaf<V> filterHexDigits(int digitPos, int mask) {
+	public SetLeaf<T> filterHexDigits(int digitPos, int mask) {
 		mask = mask & 0xFFFF;
-		if (mask == 0) return empty();
+		if (mask == 0) return Sets.empty();
 		if (mask == 0xFFFF) return this;
 		int sel = 0;
 		int n = size();
@@ -298,7 +303,7 @@ public class SetLeaf<V extends ACell> extends AHashSet<V> {
 				sel = sel | (1 << i); // include this index in selection
 			}
 		}
-		if (sel == 0) return empty(); // no entries selected
+		if (sel == 0) return Sets.empty(); // no entries selected
 		return filterEntries(sel);
 	}
 
@@ -309,11 +314,11 @@ public class SetLeaf<V extends ACell> extends AHashSet<V> {
 	 * @return
 	 */
 	@SuppressWarnings("unchecked")
-	private SetLeaf<V> filterEntries(int selection) {
-		if (selection == 0) return empty(); // no items selected
+	private SetLeaf<T> filterEntries(int selection) {
+		if (selection == 0) return Sets.empty(); // no items selected
 		int n = size();
 		if (selection == ((1 << n) - 1)) return this; // all items selected
-		Ref<V>[] newEntries = new Ref[Integer.bitCount(selection)];
+		Ref<T>[] newEntries = new Ref[Integer.bitCount(selection)];
 		int ix = 0;
 		for (int i = 0; i < n; i++) {
 			if ((selection & (1 << i)) != 0) {
@@ -321,112 +326,49 @@ public class SetLeaf<V extends ACell> extends AHashSet<V> {
 			}
 		}
 		assert (ix == Integer.bitCount(selection));
-		return new SetLeaf<V>(newEntries);
+		return new SetLeaf<T>(newEntries);
 	}
 
 	@Override
-	public ASet<V> mergeWith(ASet<V> b, MergeFunction<V> func) {
-		return mergeWith(b, func, 0);
-	}
-
-	@Override
-	protected ASet<V> mergeWith(ASet<V> b, MergeFunction<V> func, int shift) {
-		if (b instanceof SetLeaf) return mergeWith((SetLeaf<K, V>) b, func, shift);
-		if (b instanceof SetTree) return ((SetTree<V>) b).mergeWith(this, func.reverse());
-		throw new TODOException("Unhandled set type: " + b.getClass());
-	}
-
-	@SuppressWarnings("null")
-	private ASet<V> mergeWith(SetLeaf<V> b, MergeFunction<V> func, int shift) {
-		int al = this.size();
-		int bl = b.size();
-		int ai = 0;
-		int bi = 0;
-		// Complexity to manage:
-		// 1. Must step through two ListMaps in order, comparing for key hashes
-		// 2. nulls can be produced to remove entries
-		// 3. We use the creation of a results ArrayList to signal a change from
-		// original value
-		ArrayList<Ref<V>> results = null;
-		while ((ai < al) || (bi < bl)) {
-			Ref<V> ae = (ai < al) ? this.entries[ai] : null;
-			Ref<V> be = (bi < bl) ? b.entries[bi] : null;
-			
-			// comparison
-			int c = (ae == null) ? 1 : ((be == null) ? -1 : ae.getHash().compareTo(be.getHash()));
-			
-			// new entry
-			Ref<V> newE = null;
-			if (c < 0) {
-				V r = func.merge(ae.getValue(), null);
-				if (r != null) newE = ae.withValue(r);
-			} else if (c > 0) {
-				V r = func.merge(null, be.getValue());
-				if (r != null) newE = be.withValue(r);
-			} else {
-				// we have matched keys
-				V r = func.merge(ae.getValue(), be.getValue());
-				if (r != null) newE = ae.withValue(r);
-			}
-			if ((results == null) && (newE != ((c <= 0) ? ae : null))) {
-				// create new results array if difference detected
-				results = new ArrayList<>(16);
-				for (int i = 0; i < ai; i++) { // copy previous values in this map, up to ai
-					results.add(entries[i]);
-				}
-			}
-			if (c <= 0) ai++; // inc ai if we used ae
-			if (c >= 0) bi++; // inc bi if we used be
-			if ((results != null) && (newE != null)) results.add(newE);
-		}
-		if (results == null) return this; // no change detected
-		return Sets.createWithShift(shift, results);
-	}
-
-	@Override
-	public AHashSet<V> mergeDifferences(AHashSet<V> b, MergeFunction<V> func) {
-		return mergeDifferences(b,func,0);
+	public AHashSet<T> mergeWith(AHashSet<T> b, int setOp) {
+		return mergeWith(b,setOp,0);
 	}
 	
 	@Override
-	@Override
-	protected AHashSet<V>  mergeDifferences(AHashSet<V>  b, MergeFunction<V> func, int shift) {
-		if (b instanceof SetLeaf) return mergeDifferences((SetLeaf<V>) b, func,shift);
-		if (b instanceof SetTree) return b.mergeWith(this, func.reverse());
+	protected AHashSet<T>  mergeWith(AHashSet<T>  b, int setOp, int shift) {
+		if (b instanceof SetLeaf) return mergeWith((SetLeaf<T>) b, setOp,shift);
+		if (b instanceof SetTree) return b.mergeWith(this, reverseOp(setOp),shift);
 		throw new TODOException("Unhandled map type: " + b.getClass());
 	}
 
-	@SuppressWarnings("null")
-	public AHashSet<V>  mergeDifferences(SetLeaf<V> b, MergeFunction<V> func,int shift) {
-		if (this.equals(b)) return this; // no change in identical case
+	public AHashSet<T>  mergeWith(SetLeaf<T> b, int setOp,int shift) {
+		if (this.equals(b)) return applySelf(setOp); // no change in identical case
 		int al = this.size();
 		int bl = b.size();
 		int ai = 0;
 		int bi = 0;
-		ArrayList<Ref<V>> results = null;
+		ArrayList<Ref<T>> results = null;
 		while ((ai < al) || (bi < bl)) {
-			Ref<V> ae = (ai < al) ? this.entries[ai] : null;
-			Ref<V> be = (bi < bl) ? b.entries[bi] : null;
+			Ref<T> ae = (ai < al) ? this.entries[ai] : null;
+			Ref<T> be = (bi < bl) ? b.entries[bi] : null;
 			int c = (ae == null) ? 1 : ((be == null) ? -1 : ae.getHash().compareTo(be.getHash()));
-			Ref<V> newE = null;
-			if (c < 0) {
-				// lowest key in this map only
-				V r = func.merge(ae.getValue(), null);
-				if (r != null) newE = ae.withValue(r);
-			} else if (c > 0) {
-				// lowest key in other map b only
-				V r = func.merge(null, be.getValue());
-				if (r != null) newE = be.withValue(r);
+			
+			Ref<T> newE;
+			if (c==0) {
+				newE= applyOp(setOp,ae,be);
+			} else if (c<0) {
+				// apply to a
+				newE= applyOp(setOp,ae,null);
 			} else {
-				// keys are equal (i.e. value in both maps)
-				V av = ae.getValue();
-				V bv = be.getValue();
-				V r = (Utils.equals(av, bv)) ? av : func.merge(ae.getValue(), be.getValue());
-				if (r != null) newE = ae.withValue(r);
+				// apply to a
+				newE= applyOp(setOp,null,be);
 			}
+			
+			// Create results arraylist if any difference from this
 			if ((results == null) && (newE != ((c <= 0) ? ae : null))) {
 				// create new results array if difference detected
-				results = new ArrayList<>(16);
+				results = new ArrayList<>(2*MAX_ENTRIES); // space for all if needed
+				// include new entries
 				for (int i = 0; i < ai; i++) {
 					results.add(entries[i]);
 				}
@@ -439,7 +381,7 @@ public class SetLeaf<V extends ACell> extends AHashSet<V> {
 		return Sets.createWithShift(shift,results);
 	}
 
-	public <R> R reduceValues(BiFunction<? super R, ? super V, ? extends R> func, R initial) {
+	public <R> R reduceValues(BiFunction<? super R, ? super T, ? extends R> func, R initial) {
 		int n = size();
 		R result = initial;
 		for (int i = 0; i < n; i++) {
@@ -449,12 +391,12 @@ public class SetLeaf<V extends ACell> extends AHashSet<V> {
 	}
 
 	@Override
-	public boolean equals(ASet<V> a) {
+	public boolean equals(ASet<T> a) {
 		if (!(a instanceof SetLeaf)) return false;
-		return equals((SetLeaf<V>) a);
+		return equals((SetLeaf<T>) a);
 	}
 
-	public boolean equals(SetLeaf<V> a) {
+	public boolean equals(SetLeaf<T> a) {
 		if (this == a) return true;
 		int n = size();
 		if (n != a.size()) return false;
@@ -468,7 +410,7 @@ public class SetLeaf<V extends ACell> extends AHashSet<V> {
 	protected void validateWithPrefix(String prefix) throws InvalidDataException {
 		validate();
 		for (int i = 0; i < entries.length; i++) {
-			Ref<V> e = entries[i];
+			Ref<T> e = entries[i];
 			Hash h = e.getHash();
 			if (!h.toHexString().startsWith(prefix)) {
 				throw new InvalidDataException("Prefix " + prefix + " invalid for set entry: " + e + " with hash: " + h,
@@ -480,7 +422,7 @@ public class SetLeaf<V extends ACell> extends AHashSet<V> {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if ((count == 0) && (this != EMPTY)) {
+		if ((count == 0) && (this != Sets.EMPTY)) {
 			throw new InvalidDataException("Empty map not using canonical instance", this);
 		}
 
@@ -495,24 +437,29 @@ public class SetLeaf<V extends ACell> extends AHashSet<V> {
 	}
 
 	@Override
-	public boolean containsAll(ASet<V> b) {
+	public boolean containsAll(ASet<T> b) {
 		if (this==b) return true;
 		
 		// if set is too big, can't possibly contain all keys
 		if (b.count()>count) return false;
 		
 		// must be a setleaf if this size or smaller
-		return containsAll((SetLeaf<V>)b);
+		return containsAll((SetLeaf<T>)b);
 	}
 	
-	protected boolean containsAll(SetLeaf<V> b) {
+	@Override
+	public boolean isSubset(ASet<T> b) {
+		return b.containsAll(this);
+	}
+	
+	protected boolean containsAll(SetLeaf<T> b) {
 		int ix=0;
-		for (Ref<V> meb:b.entries) {
+		for (Ref<T> meb:b.entries) {
 			Hash bh=meb.getHash();
 			
 			if (ix>=count) return false; // no remaining entries in this
 			while (ix<count) {
-				Ref<V> mea=entries[ix];
+				Ref<T> mea=entries[ix];
 				Hash ah=mea.getHash();
 				int c=ah.compareTo(bh);
 				if (c<0) {
@@ -533,6 +480,60 @@ public class SetLeaf<V extends ACell> extends AHashSet<V> {
 		
 		return true;
 	}
+
+	@Override
+	public AHashSet<T> includeRef(Ref<T> ref) {
+		return includeRef(ref,0);
+	}
+
+	@Override
+	protected AHashSet<T> includeRef(Ref<T> e, int shift) {
+		int n=entries.length;
+		Hash h=e.getHash();
+		int pos=0;
+		for (; pos<n; pos++) {
+			Ref<T> iref=entries[pos];
+			int c=h.compareTo(iref.getHash());
+			if (c==0) return this;
+			if (c<0) break; // need to add at this position
+		}
+	
+		// New element must be added at pos
+		@SuppressWarnings("unchecked")
+		Ref<T>[] newEntries=new Ref[n+1];
+		System.arraycopy(entries, 0, newEntries, 0, pos);
+		System.arraycopy(entries, pos, newEntries, pos+1, n-pos);
+		newEntries[pos]=e;
+		
+		if (n<MAX_ENTRIES) {
+			// New leaf
+			return new SetLeaf<T>(newEntries);
+		} else {
+			// expand to tree
+			return SetTree.create(newEntries, shift);
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	protected <R> void copyToArray(R[] arr, int offset) {
+		for (int i=0; i<count; i++) {
+			arr[i+offset]=(R)get(i);
+		}
+	}
+
+	@Override
+	public T get(long index) {
+		return entries[Utils.checkedInt(index)].getValue();
+	}
+
+	@Override
+	public AHashSet<T> toCanonical() {
+		if (count<=MAX_ENTRIES) return this;
+		return SetTree.create(entries, 0);
+	}
+
+
 
 
 }

@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collection;
 
 import convex.core.exceptions.BadFormatException;
@@ -8,10 +9,22 @@ import convex.core.lang.RT;
 import convex.core.util.Utils;
 
 public class Sets {
+	
+	static final Ref<?>[] EMPTY_ENTRIES = new Ref[0];
+
+	static final SetLeaf<?> EMPTY = new SetLeaf<>(EMPTY_ENTRIES);
+	
+	@SuppressWarnings("rawtypes")
+	public static final Ref<SetLeaf> EMPTY_REF = EMPTY.getRef();
 
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> SetLeaf<T> empty() {
-		return (SetLeaf<T>) SetLeaf.EMPTY;
+		return (SetLeaf<T>) EMPTY;
+	}
+	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public static <T extends ACell> Ref<SetLeaf<T>> emptyRef() {
+		return (Ref)EMPTY_REF;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -43,13 +56,15 @@ public class Sets {
 	 * @param source
 	 * @return A Set
 	 */
+	@SuppressWarnings("unchecked")
 	public static <T extends ACell> ASet<T> create(ADataStructure<T> source) {
 		if (source instanceof ASet) return (ASet<T>) source;
-		if (source instanceof ASequence) return Sets.create((ASequence<T>) source);
+
 		if (source instanceof AMap) {
 			ASequence<T> seq = RT.sequence(source); // should always be non-null
 			return Sets.create(seq);
 		}
+		if (source instanceof ACollection) return Sets.fromCollection((Collection<T>) source);
 		throw new IllegalArgumentException("Unexpected type!" + Utils.getClass(source));
 	}
 	
@@ -72,4 +87,14 @@ public class Sets {
 			return SetTree.read(bb, count);
 		}
 	}
+
+	public static <T extends ACell> AHashSet<T> createWithShift(int shift, ArrayList<Ref<T>> values) {
+		AHashSet<T> result=Sets.empty();
+		for (Ref<T> v: values) {
+			result=result.includeRef(v, shift);
+		}
+		return result;
+	}
+
+
 }

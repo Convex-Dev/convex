@@ -410,22 +410,12 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.MAP;
-		return writeRaw(bs,pos,true);
+		return encodeRaw(bs,pos);
 	}
-	
-	@Override
-	public int write(byte[] bs, int pos, boolean includeValues) {
-		bs[pos++]=Tag.MAP;
-		return writeRaw(bs,pos, includeValues);
-	}
+
 	
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		return writeRaw(bs,pos,true);
-	}
-
-	@Override
-	public int writeRaw(byte[] bs, int pos, boolean includeValues) {
 		int ilength = children.length;
 		pos = Format.writeVLCLong(bs,pos, count);
 		
