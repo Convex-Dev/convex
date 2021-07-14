@@ -288,13 +288,8 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		return pos;
 	}
 
-	@Override
-	public boolean isCanonical() {
-		return true;
-	}
 	
 	@Override public final boolean isCVMValue() {
-		// TODO: reconsider?
 		return true;
 	}
 
@@ -343,5 +338,16 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	public static MapEntry convertOrNull(AVector v) {
 		if (v.count()!=2) return null;
 		return createRef(v.getElementRef(0),v.getElementRef(1));
+	}
+	
+	@Override
+	public boolean isCanonical() {
+		return false;
+	}
+
+	@Override
+	public ACell toCanonical() {
+		// Vector is the canonical form of a MapEntry
+		return toVector();
 	}
 }

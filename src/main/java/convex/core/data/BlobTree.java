@@ -149,8 +149,7 @@ public class BlobTree extends ABlob {
 
 	@Override
 	public boolean isCanonical() {
-		// BlobTree is always canonical
-		return true;
+		return count>Blob.CHUNK_LENGTH;
 	}
 	
 	@Override public final boolean isCVMValue() {
@@ -478,6 +477,12 @@ public class BlobTree extends ABlob {
 	@Override
 	public byte getTag() {
 		return Tag.BLOB;
+	}
+
+	@Override
+	public ACell toCanonical() {
+		if (isCanonical()) return this;
+		return Blobs.toCanonical(this);
 	}
 
 }

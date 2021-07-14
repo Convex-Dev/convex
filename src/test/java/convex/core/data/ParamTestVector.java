@@ -47,7 +47,7 @@ public class ParamTestVector {
 
 	@Test
 	public void testCanonical() {
-		assertTrue(v.isCanonical());
+		assertTrue(v.toCanonical().isCanonical());
 	}
 
 	@Test

@@ -304,4 +304,9 @@ public class SignedData<T extends ACell> extends ACell {
 	public byte getTag() {
 		return Tag.SIGNED_DATA;
 	}
+
+	@Override
+	public ACell toCanonical() {
+		return this;
+	}
 }

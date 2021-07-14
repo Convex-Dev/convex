@@ -344,6 +344,11 @@ public class Syntax extends ACell {
 		return Tag.SYNTAX;
 	}
 
+	@Override
+	public ACell toCanonical() {
+		return this;
+	}
+
 
 
 }

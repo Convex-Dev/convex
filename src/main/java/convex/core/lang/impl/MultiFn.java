@@ -38,6 +38,11 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 	public boolean isCanonical() {
 		return true;
 	}
+	
+	@Override
+	public MultiFn<T> toCanonical() {
+		return this;
+	}
 
 	@Override
 	public void ednString(StringBuilder sb) {
@@ -143,6 +148,8 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 		if (env==this.lexicalEnv) return (F) this;
 		return (F) new MultiFn(fns.map(fn->fn.withEnvironment(env)),env);
 	}
+
+
 
 
 

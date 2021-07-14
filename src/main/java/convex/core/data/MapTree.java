@@ -11,6 +11,7 @@ import java.util.function.Function;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.TODOException;
 import convex.core.util.Bits;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
@@ -867,6 +868,13 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public byte getTag() {
 		return Tag.MAP;
+	}
+
+	@Override
+	public AHashMap<K,V> toCanonical() {
+		if (count > MapLeaf.MAX_ENTRIES) return this;
+		// shouldn't be possible?
+		throw new TODOException();
 	}
 
 }

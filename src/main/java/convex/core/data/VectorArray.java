@@ -206,4 +206,10 @@ public class VectorArray<T extends ACell> extends ASizedVector<T> {
 		throw new UnsupportedOperationException();
 	}
 
+	@Override
+	public AVector<T> toCanonical() {
+		// Convert to vector
+		return toVector();
+	}
+
 }

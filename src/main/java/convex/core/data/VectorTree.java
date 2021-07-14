@@ -710,4 +710,10 @@ public class VectorTree<T extends ACell> extends ASizedVector<T> {
 
 	}
 
+	@Override
+	public ACell toCanonical() {
+		// TODO Should be always true?
+		return this;
+	}
+
 }

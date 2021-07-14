@@ -269,4 +269,9 @@ public class Order extends ACell {
 	public byte getTag() {
 		return Tag.ORDER;
 	}
+
+	@Override
+	public ACell toCanonical() {
+		return this;
+	}
 }

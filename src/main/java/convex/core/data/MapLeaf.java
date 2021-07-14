@@ -386,8 +386,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@Override
 	public boolean isCanonical() {
-		// validation for both key uniqueness and sort order
-		return isValidOrder(entries);
+		return true;
 	}
 	
 	@Override public final boolean isCVMValue() {
@@ -709,8 +708,8 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		}
 
 		// validates both key uniqueness and sort order
-		if (!isCanonical()) {
-			throw new InvalidDataException("Non-canonical key ordering", this);
+		if (!isValidOrder(entries)) {
+			throw new InvalidDataException("Invalid key ordering", this);
 		}
 	}
 
@@ -757,5 +756,10 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public byte getTag() {
 		return Tag.MAP;
+	}
+
+	@Override
+	public ACell toCanonical() {
+		return this;
 	}
 }

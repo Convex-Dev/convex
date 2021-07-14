@@ -251,7 +251,12 @@ public class AccountKey extends AArrayBlob {
 
 	@Override
 	public boolean isCanonical() {
-		return true;
+		return false;
+	}
+
+	@Override
+	public Blob toCanonical() {
+		return toBlob();
 	}
 
 

@@ -103,5 +103,15 @@ public abstract class ATransaction extends ACell {
 	 * @return Updated transaction, or this transaction if unchanged.
 	 */
 	public abstract ATransaction withAddress(Address newAddress);
+	
+	@Override
+	public boolean isCanonical() {
+		return true;
+	}
+	
+	@Override
+	public ACell toCanonical() {
+		return this;
+	}
 
 }

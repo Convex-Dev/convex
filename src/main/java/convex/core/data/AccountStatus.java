@@ -481,10 +481,5 @@ public class AccountStatus extends ARecord {
 		if (environment==null) return Maps.empty();
 		return environment;
 	}
-	
-
-
-
-
 
 }

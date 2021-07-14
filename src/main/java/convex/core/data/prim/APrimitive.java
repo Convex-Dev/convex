@@ -44,7 +44,11 @@ public abstract  class APrimitive extends ACell {
 	 */
 	public abstract double doubleValue();
 	
-
+	@Override
+	public ACell toCanonical() {
+		// Always canonical, probably?
+		return this;
+	}
 
 
 

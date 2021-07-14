@@ -279,8 +279,17 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	public abstract boolean isCanonical();
 	
 	/**
+	 * Converts this Cell to its canonical version. Returns this if already canonical
+	 * 
+	 * @return Canonical version of Cell
+	 */
+	public abstract ACell toCanonical();
+	
+	/**
 	 * Returns true if this object represents a first class CVM Value. Sub-structural cells that are not themselves first class values
 	 * should return false.
+	 * 
+	 * CVM values might not be in a canonical format, e.g. temporary data structures
 	 * 
 	 * @return true if the object is a CVM Value, false otherwise
 	 */

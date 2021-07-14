@@ -144,4 +144,9 @@ public class Symbol extends ASymbolic {
 	public byte getTag() {
 		return Tag.SYMBOL;
 	}
+
+	@Override
+	public ACell toCanonical() {
+		return this;
+	}
 }

@@ -414,4 +414,9 @@ public class List<T extends ACell> extends AList<T> {
 		}
 	}
 
+	@Override
+	public ACell toCanonical() {
+		return this;
+	}
+
 }

@@ -47,6 +47,11 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 	public boolean isCanonical() {
 		return true;
 	}
+	
+	@Override
+	public CoreFn<T> toCanonical() {
+		return this;
+	}
 
 	protected String minArityMessage(int minArity, int actual) {
 		return name() + " requires minimum arity " + minArity + " but called with: " + actual;

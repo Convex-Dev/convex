@@ -350,5 +350,11 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	public RecordFormat getFormat() {
 		return format;
 	}
+	
+	@Override
+	public ARecord toCanonical() {
+		// Should already be canonical
+		return this;
+	}
 
 }

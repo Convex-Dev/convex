@@ -2,6 +2,7 @@ package convex.core.crypto;
 
 import java.nio.ByteBuffer;
 
+import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.Tag;
@@ -33,6 +34,11 @@ public class Ed25519Signature extends ASignature {
 	@Override
 	public boolean isCanonical() {
 		return true;
+	}
+	
+	@Override
+	public ACell toCanonical() {
+		return this;
 	}
 	
 	@Override public final boolean isCVMValue() {
