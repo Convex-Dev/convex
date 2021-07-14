@@ -49,6 +49,7 @@ public class ObjectsTest {
 			ACell canon=a.toCanonical();
 			assertNotSame(canon,a);
 			assertTrue(canon.isCanonical());
+			assertEquals(a,canon);
 		}
 		
 		doCellRefTests(a);
