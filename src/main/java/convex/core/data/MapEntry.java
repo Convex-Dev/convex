@@ -221,11 +221,6 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	}
 
 	@Override
-	public int size() {
-		return 2;
-	}
-
-	@Override
 	public boolean isEmpty() {
 		return false;
 	}

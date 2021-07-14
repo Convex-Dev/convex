@@ -40,11 +40,6 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	}
 
 	@Override
-	public int size() {
-		return Utils.checkedInt(count());
-	}
-
-	@Override
 	public boolean isEmpty() {
 		return count == 0L;
 	}

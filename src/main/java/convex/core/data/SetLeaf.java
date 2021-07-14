@@ -68,11 +68,6 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	public static <V extends ACell> SetLeaf<V> create(V item) {
 		return new SetLeaf<V>(new Ref[] { Ref.get(item) });
 	}
-
-	@Override
-	public int size() {
-		return entries.length;
-	}
 	
 	@Override
 	public Ref<T> getValueRef(ACell k) {

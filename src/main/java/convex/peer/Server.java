@@ -87,7 +87,7 @@ public class Server implements Closeable {
 	private static final int RECEIVE_QUEUE_SIZE = 10000;
 
 	// Maximum Pause for each iteration of Server update loop.
-	private static final long SERVER_UPDATE_PAUSE = 1L;
+	private static final long SERVER_UPDATE_PAUSE = 10L;
 
 	static final Logger log = Logger.getLogger(Server.class.getName());
 	private static final Level LEVEL_BELIEF = Level.FINEST;
@@ -474,9 +474,18 @@ public class Server implements Closeable {
 		}
 
 		synchronized (newTransactions) {
-			hasNewMessages=true;
 			newTransactions.add(sd);
 			registerInterest(sd.getHash(), m);
+		}
+		notifyNewMessages();
+	}
+
+	private void notifyNewMessages() {
+		if (!hasNewMessages) {
+			synchronized (updateThread) {
+				hasNewMessages=true;
+				updateThread.notify();
+			}
 		}
 	}
 
@@ -859,9 +868,9 @@ public class Server implements Closeable {
 					newBeliefs.put(addr, signedBelief);
 
 					// Notify the update thread that there is something new to handle
-					hasNewMessages=true;
 					log.log(LEVEL_BELIEF, "Valid belief received by peer at " + getHostAddress() + ": "
 							+ signedBelief.getValue().getHash().toHexString());
+					notifyNewMessages();
 				}
 			}
 		} catch (ClassCastException e) {
@@ -910,7 +919,7 @@ public class Server implements Closeable {
 	/*
 	 * Runnable loop for managing Server state updates
 	 */
-	private Runnable updateLoop = new Runnable() {
+	private final Runnable updateLoop = new Runnable() {
 		@Override
 		public void run() {
 			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
@@ -928,14 +937,11 @@ public class Server implements Closeable {
 					}
 
 					// Maybe sleep a bit, wait for some belief updates to accumulate
-					if (hasNewMessages) {
-						hasNewMessages=false;
-					} else {
-						try {
-							Thread.sleep(SERVER_UPDATE_PAUSE);
-						} catch (InterruptedException e) {
-							// continue
+					synchronized (updateThread) {
+						if (!hasNewMessages) {
+							updateThread.wait(SERVER_UPDATE_PAUSE);
 						}
+						hasNewMessages=false;
 					}
 				}
 			} catch (InterruptedException e) {

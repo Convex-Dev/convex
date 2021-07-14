@@ -34,6 +34,11 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 		return count;
 	}
 	
+	@Override
+	public final int size() {
+		return (int) (Math.min(count, Integer.MAX_VALUE));
+	}
+	
 	/**
 	 * Returns an empty instance of the same general type as this data structure.
 	 * 
