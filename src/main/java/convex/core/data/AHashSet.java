@@ -10,6 +10,9 @@ public abstract class AHashSet<T extends ACell> extends ASet<T> {
 	protected static final int OP_DIFF_LEFT=3;
 	protected static final int OP_DIFF_RIGHT=4;
 	
+	protected static final int MAX_SHIFT = Hash.LENGTH*2-1;
+
+	
 	protected AHashSet(long count) {
 		super(count);
 	}
@@ -109,13 +112,11 @@ public abstract class AHashSet<T extends ACell> extends ASet<T> {
 	 * child maps are valid, in particular have the correct shift level and that all
 	 * hashes start with the correct prefix of hex characters.
 	 * 
-	 * TODO: consider faster way of passing prefix than hex string, probably a
-	 * byte[] stack.
-	 * 
-	 * @param string
+	 * @param prefix Hash for earlier prefix values
+	 * @param digit Hex digit expected at position [shift]
 	 * @throws InvalidDataException
 	 */
-	protected abstract void validateWithPrefix(String prefix) throws InvalidDataException;
+	protected abstract void validateWithPrefix(Hash prefix, int digit, int shift) throws InvalidDataException;
 	
 	@Override
 	public Object[] toArray() {

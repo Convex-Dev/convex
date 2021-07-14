@@ -407,14 +407,17 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	}
 
 	@Override
-	protected void validateWithPrefix(String prefix) throws InvalidDataException {
-		validate();
+	protected void validateWithPrefix(Hash prefix, int digit, int shift) throws InvalidDataException {
 		for (int i = 0; i < entries.length; i++) {
 			Ref<T> e = entries[i];
 			Hash h = e.getHash();
-			if (!h.toHexString().startsWith(prefix)) {
-				throw new InvalidDataException("Prefix " + prefix + " invalid for set entry: " + e + " with hash: " + h,
-						this);
+			long match=h.commonHexPrefixLength(prefix);
+			if (match<(shift-1)) {
+				throw new InvalidDataException("Parent prefix did not match",this);
+			}
+			int mydigit=h.getHexDigit(shift);
+			if (mydigit!=digit) {
+				throw new InvalidDataException("Bad hex digit at position: "+shift,this);
 			}
 			e.validate();
 		}

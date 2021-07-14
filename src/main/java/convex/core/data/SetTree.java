@@ -17,6 +17,7 @@ import convex.core.util.Utils;
  * @param <T>
  */
 public class SetTree<T extends ACell> extends AHashSet<T> {
+
 	/**
 	 * Child maps, one for each present bit in the mask, max 16
 	 */
@@ -526,35 +527,51 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	@Override
 	public void validate() throws InvalidDataException {
 		super.validate();
-		// Perform validation for this tree position
-		validateWithPrefix("");
-	}
 
-	@Override
-	protected void validateWithPrefix(String prefix) throws InvalidDataException {
 		if (mask == 0) throw new InvalidDataException("TreeMap must have children!", this);
-		if (shift != prefix.length()) {
-			throw new InvalidDataException("Invalid prefix [" + prefix + "] for TreeMap with shift=" + shift, this);
+		if ((shift <0)||(shift>MAX_SHIFT)) {
+			throw new InvalidDataException("Invalid shift for SetTree", this);
 		}
+		
+		if (count<=SetLeaf.MAX_ENTRIES) {
+			throw new InvalidDataException("Count too small [" + count + "] for SetTree", this);
+		}
+
+		Hash firstHash=getElementRef(0).getHash();
+		
 		int bsize = children.length;
 
 		long childCount=0;;
 		for (int i = 0; i < bsize; i++) {
-			if (children[i] == null)
-				throw new InvalidDataException("Null child ref at " + prefix + Utils.toHexChar(digitForIndex(i, mask)),
-						this);
+			if (children[i] == null) {
+				throw new InvalidDataException("Null child ref at index " + i,this);
+			}
+			
 			ACell o = children[i].getValue();
 			if (!(o instanceof AHashMap)) {
 				throw new InvalidDataException(
-						"Expected map child at " + prefix + Utils.toHexChar(digitForIndex(i, mask)), this);
+						"Expected AHashSet child at index " + i +" but got "+Utils.getClassName(o), this);
 			}
 			@SuppressWarnings("unchecked")
 			AHashSet<T> child = (AHashSet<T>) o;
 			if (child.isEmpty())
-				throw new InvalidDataException("Empty child at " + prefix + Utils.toHexChar(digitForIndex(i, mask)),
-						this);
+				throw new InvalidDataException("Empty child at index " + i,this);
+			
+			if (child instanceof SetTree) {
+				SetTree<T> childTree=(SetTree<T>) child;
+				int expectedShift=shift+1;
+				if (childTree.shift!=expectedShift) {
+					throw new InvalidDataException("Wrong child shift ["+childTree.shift+"], expected ["+expectedShift+"]",this);
+				}
+			}
+			
+			Hash childHash=child.getElementRef(0).getHash();
+			long pmatch=firstHash.commonHexPrefixLength(childHash);
+			if (pmatch<shift) throw new InvalidDataException("Mismatched child hash [" + childHash +"] with this ["+firstHash+"]",
+					this);
+			
 			int d = digitForIndex(i, mask);
-			child.validateWithPrefix(prefix + Utils.toHexChar(d));
+			child.validateWithPrefix(firstHash ,d,shift+1);
 			
 			childCount += child.count();
 		}
@@ -562,6 +579,10 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		if (count != childCount) {
 			throw new InvalidDataException("Bad child count, expected " + count + " but children had: " + childCount, this);
 		}
+	}
+	
+	protected void validateWithPrefix(Hash base, int digit, int shift) {
+		
 	}
 
 	private boolean isValidStructure() {

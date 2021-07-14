@@ -45,10 +45,11 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Validates the local structure of this cell. Called by validate() super implementation.
+	 * Validates the local structure and invariants of this cell. Called by validate() super implementation.
 	 * 
-	 * Should validate contained Refs, but should validate all other structure of this cell.
+	 * Should validate directly contained data, but should not validate all other structure of this cell. 
 	 * 
+	 * In particular, should not traverse potentially missing child Refs.
 	 * 
 	 * @throws InvalidDataException 
 	 */
