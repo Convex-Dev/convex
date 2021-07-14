@@ -2,8 +2,11 @@ package convex.cli;
 
 import java.io.File;
 import java.io.IOException;
-import java.security.KeyStore;
+import java.security.KeyStore
+;
+import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -245,8 +248,8 @@ public class Main implements Runnable {
 		return convex;
 	}
 
-	public AKeyPair[] generateKeyPairs(int count) throws Error {
-		AKeyPair[] keyPairs = new AKeyPair[count];
+	public List<AKeyPair> generateKeyPairs(int count) throws Error {
+		List<AKeyPair> keyPairList = new ArrayList(count);
 
 		// get the password of the key store file
 		String password = getPassword();
@@ -273,12 +276,13 @@ public class Main implements Runnable {
 		// we have now the count, keystore-password, keystore-file
 		// generate keys
 		for (int index = 0; index < count; index ++) {
-			keyPairs[index] = AKeyPair.generate();
+            AKeyPair keyPair = AKeyPair.generate();
+			keyPairList.add(keyPair);
 
 			// System.out.println("generated #"+(index+1)+" public key: " + keyPair.getAccountKey().toHexString());
 			try {
                 // save the key in the keystore
-				PFXTools.saveKey(keyStore, keyPairs[index], password);
+				PFXTools.saveKey(keyStore, keyPair, password);
 			} catch (Throwable t) {
 				throw new Error("Cannot store the key to the key store "+t);
 			}
@@ -290,6 +294,6 @@ public class Main implements Runnable {
 		} catch (Throwable t) {
 			throw new Error("Cannot save the key store file "+t);
 		}
-		return keyPairs;
+		return keyPairList;
     }
 }

@@ -20,4 +20,6 @@ public class Constants {
 
 	public static final int ACCOUNT_FUND_AMOUNT = 100000000;
 
+	public static final int LOCAL_START_PEER_COUNT = 4;
+
 }

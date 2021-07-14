@@ -14,6 +14,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import convex.api.Convex;
 import convex.api.Shutdown;
@@ -73,11 +74,11 @@ public class PeerManager implements IServerEvent {
         return new PeerManager(sessionFilename);
 	}
 
-	public void launchLocalPeers(int count, AInitConfig initConfig) {
-		ArrayList<AKeyPair> keyPairs=new ArrayList<>(); 
-		List<AccountKey> keys=keyPairs.stream().map(kp->kp.getAccountKey()).collect(java.util.stream.Collectors.toList()); 
-		State genesisState=Init.createState(keys);
-		peerServerList = API.launchLocalPeers(keyPairs,genesisState, this);
+	public void launchLocalPeers(List<AKeyPair> keyPairList) {
+		List<AccountKey> keyList=keyPairList.stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
+
+		State genesisState=Init.createState(keyList);
+		peerServerList = API.launchLocalPeers(keyPairList,genesisState, this);
 	}
 
 	public SignedData<Belief> aquireLatestBelief(AKeyPair keyPair, Address address, AStore store, String remotePeerHostname) {

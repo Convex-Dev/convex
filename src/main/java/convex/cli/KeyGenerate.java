@@ -1,5 +1,6 @@
 package convex.cli;
 
+import java.util.List;
 import java.util.logging.Logger;
 
 import convex.core.crypto.AKeyPair;
@@ -45,9 +46,9 @@ public class KeyGenerate implements Runnable {
 		log.info("will generate "+count+" keys");
 
 		try {
-			AKeyPair keyPairs[] = mainParent.generateKeyPairs(count);
-			for ( int index = 0; index < count; index ++) {
-				System.out.println("generated #"+(index+1)+" public key: " + keyPairs[index].getAccountKey().toHexString());
+			List<AKeyPair> keyPairList = mainParent.generateKeyPairs(count);
+			for ( int index = 0; index < keyPairList.size(); index ++) {
+				System.out.println("generated #"+(index+1)+" public key: " + keyPairList.get(index).getAccountKey().toHexString());
 			}
 		} catch (Error e) {
 			log.severe("Key generate error " + e);
