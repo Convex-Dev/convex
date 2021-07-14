@@ -287,8 +287,13 @@ public class UtilsTest {
 		assertEquals("{1 2}", Utils.ednString(Maps.of(1L, 2L)));
 		assertEquals("#inst \"1970-01-01T00:00:00Z\"", Utils.ednString(Instant.ofEpochMilli(0)));
 
-		assertThrows(Error.class, () -> Utils.ednString(ByteBuffer.allocate(3)));
-
+		// Chars
+		// 
+		assertEquals("\\newline", Utils.ednString('\n'));
+		assertEquals("\\return", Utils.ednString('\r'));
+		assertEquals("\\space", Utils.ednString(' '));
+		assertEquals("\\tab", Utils.ednString('\t'));
+		assertEquals("\\a", Utils.ednString('a'));
 	}
 
 	@Test
