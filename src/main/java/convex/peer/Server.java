@@ -660,6 +660,8 @@ public class Server implements Closeable {
 	 * @param transactionList List of transactions to add to.
 	 */
 	private void maybePostOwnTransactions(ArrayList<SignedData<ATransaction>> transactionList) {
+		if (!Utils.bool(config.get(Keywords.AUTO_MANAGE))) return;
+		
 		synchronized (transactionList) {
 			State s=getPeer().getConsensusState();
 			long ts=Utils.getCurrentTimestamp();

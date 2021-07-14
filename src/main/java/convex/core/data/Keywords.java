@@ -78,7 +78,10 @@ public class Keywords {
 	public static final Keyword VALUE = Keyword.create("value");
 	public static final Keyword FUNCTION = Keyword.create("function");
 	public static final Keyword METADATA = Keyword.create("metadata");
+	
+	
 	public static final Keyword OUTGOING_CONNECTIONS = Keyword.create("outgoing-connections");
+	public static final Keyword AUTO_MANAGE = Keyword.create("auto-manage");
 
 
 
