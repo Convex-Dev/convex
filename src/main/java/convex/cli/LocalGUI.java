@@ -12,11 +12,11 @@ import picocli.CommandLine.ParentCommand;
  *
  *
  */
-@Command(name="manager",
-	aliases={"ma"},
+@Command(name="gui",
+	aliases={},
 	mixinStandardHelpOptions=true,
-	description="Starts a local convex test network using the peer manager gui application.")
-public class LocalManager implements Runnable {
+	description="Starts a local convex test network using the peer manager GUI application.")
+public class LocalGUI implements Runnable {
 
 	// private static final Logger log = Logger.getLogger(LocalManager.class.getName());
 

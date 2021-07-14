@@ -57,7 +57,7 @@ public class CLITest {
 		assertCommandLineResult(0, "^Usage: convex peer start \\[-hrvV\\] .*", "peer", "start", "--help");
 		assertCommandLineResult(0, "^Usage: convex local \\[-hvV\\] .*", "local", "--help");
 		assertCommandLineResult(0, "^Usage: convex local start \\[-hvV\\] .*", "local", "start", "--help");
-		assertCommandLineResult(0, "^Usage: convex local manager \\[-hvV\\] .*", "local", "manager", "--help");
+		assertCommandLineResult(0, "^Usage: convex local gui \\[-hvV\\] .*", "local", "gui", "--help");
 		assertCommandLineResult(0, "^Usage: convex query \\[-hvV\\] .*", "query", "--help");
 		assertCommandLineResult(0, "^Usage: convex status \\[-hvV\\] .*", "status", "--help");
 		assertCommandLineResult(0, "^Usage: convex transaction \\[-hvV\\] .*", "transaction", "--help");
