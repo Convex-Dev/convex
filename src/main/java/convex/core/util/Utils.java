@@ -878,7 +878,7 @@ public class Utils {
 		case '\t':
 			return "\\tab";
 		default:
-			return Character.toString(c);
+			return "\\" + Character.toString(c);
 		}
 	}
 
