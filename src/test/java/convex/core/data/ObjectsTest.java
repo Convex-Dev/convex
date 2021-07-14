@@ -44,8 +44,10 @@ public class ObjectsTest {
 		}
 		
 		if (a.isCanonical()) {
+			// Canonical objects should map to themselves
 			assertSame(a,a.toCanonical());
 		} else {
+			// non-canonical objects should map to a canonical object
 			ACell canon=a.toCanonical();
 			assertNotSame(canon,a);
 			assertTrue(canon.isCanonical());

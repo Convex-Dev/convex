@@ -64,11 +64,6 @@ public class VectorArray<T extends ACell> extends ASizedVector<T> {
 		return false;
 	}
 
-	@Override
-	protected <R> void copyToArray(R[] arr, int offset) {
-		// TODO Auto-generated method stub
-
-	}
 
 	@Override
 	public boolean anyMatch(Predicate<? super T> pred) {
@@ -210,6 +205,12 @@ public class VectorArray<T extends ACell> extends ASizedVector<T> {
 	public AVector<T> toCanonical() {
 		// Convert to vector
 		return toVector();
+	}
+
+	@Override
+	protected <R> void copyToArray(R[] arr, int offset) {
+		// TODO Auto-generated method stub
+		
 	}
 
 }

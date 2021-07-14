@@ -43,7 +43,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	public abstract void forEach(Consumer<? super T> action);
 
 	/**
-	 * Visits all elements in this sequence, callin the specified consumer for each.
+	 * Visits all elements in this sequence, calling the specified consumer for each.
 	 * 
 	 * @param f
 	 */
