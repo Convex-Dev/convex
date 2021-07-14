@@ -31,7 +31,6 @@ import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.SignedData;
-import convex.core.init.AInitConfig;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.store.AStore;

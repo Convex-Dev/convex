@@ -249,7 +249,7 @@ public class Main implements Runnable {
 	}
 
 	public List<AKeyPair> generateKeyPairs(int count) throws Error {
-		List<AKeyPair> keyPairList = new ArrayList(count);
+		List<AKeyPair> keyPairList = new ArrayList<>(count);
 
 		// get the password of the key store file
 		String password = getPassword();
