@@ -92,8 +92,8 @@ public class AccountStatus extends ARecord {
 	}
 
 	/**
-	 * Create a completely empty account, with no balance or public key
-	 * @return
+	 * Create a completely empty Account record, with no balance or public key
+	 * @return Empty Account record
 	 */
 	public static AccountStatus create() {
 		return create(0, 0L,null);
@@ -192,7 +192,6 @@ public class AccountStatus extends ARecord {
 	 * @param sym
 	 * @return The function specified in Actor, or null if not
 	 *         found/exported.
-	 * @throws BadStateException
 	 */
 	public <R extends ACell> AFn<R> getExportedFunction(Symbol sym) {
 		ASet<Symbol> exports = getExports();
@@ -475,7 +474,7 @@ public class AccountStatus extends ARecord {
 	
 	/**
 	 * Gets the Environment for this account. Defaults to the an empty map if no Environment has been created.
-	 * @return
+	 * @return Environment map for this Account
 	 */
 	public AHashMap<Symbol, ACell> getEnvironment() {
 		if (environment==null) return Maps.empty();

@@ -111,7 +111,7 @@ public class Hash extends AArrayBlob {
 	
 	/**
 	 * Get the first 32 bits of this Hash. Used for Java hashCodes
-	 * @return
+	 * @return Int representing the first 32 bits
 	 */
 	public int firstInt() {
 		return Utils.readInt(this.store, this.offset);

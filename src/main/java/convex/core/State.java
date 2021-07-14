@@ -581,13 +581,10 @@ public class State extends ARecord {
 	}
 
 	/**
-	 * Deploys the specified Actor environment in the current state.
+	 * Deploys a new Actor in the current state.
 	 *
-	 * Returns the updated state. The actor will be the last account.
+	 * Returns the updated state. The actor will be the last Account.
 	 *
-	 * @param address
-	 * @param actorArgs
-	 * @param environment Environment to use for new Actor Account. Can be null.
 	 * @return The updated state with the Actor deployed.
 	 */
 	public State tryAddActor() {

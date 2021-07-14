@@ -72,7 +72,7 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	/**
 	 * Removes all elements from this set, returning a new set.
 	 * @param xs Collection of elements to remove
-	 * @return
+	 * @return Set with specified element(s) removed
 	 */
 	public abstract ASet<T> disjAll(ACollection<T> xs);
 

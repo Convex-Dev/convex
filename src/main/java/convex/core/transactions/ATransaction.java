@@ -32,12 +32,6 @@ public abstract class ATransaction extends ACell {
 	@Override
 	public abstract int encode(byte[] bs, int pos);
 
-	/**
-	 * Writes this transaction to a byte array, excluding the message tag
-	 * 
-	 * @param bb
-	 * @return Same ByteBuffer after writing
-	 */
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = Format.writeVLCLong(bs,pos, address.longValue());

@@ -292,8 +292,8 @@ public class BlobTree extends ABlob {
 	 * Reads a BlobTree from a bytebuffer. Assumes that tag byte and count are already read
 	 * @param bb ByteBuffer
 	 * @param count
-	 * @return
-	 * @throws BadFormatException
+	 * @return Decoded BlobTree
+	 * @throws BadFormatException if the encoding was invalid
 	 */
 	public static BlobTree read(ByteBuffer bb, long count) throws BadFormatException {
 		if (count < 0) {
