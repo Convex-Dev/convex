@@ -207,7 +207,8 @@ public class SignedData<T extends ACell> extends ACell {
 	}
 	
 	/**
-	 * Checks if the signature has already gone through verification
+	 * Checks if the signature has already gone through verification. MAy or may 
+	 * not be a valid signature.
 	 *
 	 * @return true if valid, false otherwise
 	 */

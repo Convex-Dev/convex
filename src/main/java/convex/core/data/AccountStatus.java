@@ -350,7 +350,7 @@ public class AccountStatus extends ARecord {
 	 * <ul>
 	 * <li>The account does not define the *exports* symbol</li>
 	 * </ul>
-	 * @return
+	 * @return Set of exported accounts
 	 */
 	@SuppressWarnings("unchecked")
 	public ASet<Symbol> getExports() {

@@ -12,7 +12,8 @@ public class Sets {
 	
 	static final Ref<?>[] EMPTY_ENTRIES = new Ref[0];
 
-	static final SetLeaf<?> EMPTY = new SetLeaf<>(EMPTY_ENTRIES);
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	static final SetLeaf EMPTY = new SetLeaf(EMPTY_ENTRIES);
 	
 	@SuppressWarnings("rawtypes")
 	public static final Ref<SetLeaf> EMPTY_REF = EMPTY.getRef();
