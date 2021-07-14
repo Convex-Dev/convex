@@ -188,18 +188,24 @@ public class Main implements Runnable {
 		return keyStore;
 	}
 
-	public AKeyPair loadKeyFromStore(String keystorePublicKey, int keystoreIndex) throws Error {
+	public AKeyPair loadKeyFromStore(String publicKey, int indexKey) throws Error {
 
 		AKeyPair keyPair = null;
-		String publicKeyClean = keystorePublicKey.toLowerCase().replaceAll("^0x", "");
 
+		String publicKeyClean = publicKey.toLowerCase().replaceAll("^0x", "");
+
+		if ( publicKeyClean.isEmpty() && indexKey <= 0) {
+			return null;
+		}
+
+		String searchText = publicKeyClean;
+		if (indexKey > 0) {
+			searchText += " " + indexKey;
+		}
 		if (password == null || password.isEmpty()) {
 			throw new Error("You need to provide a keystore password");
 		}
 
-		if ( publicKeyClean.isEmpty() && keystoreIndex <= 0) {
-			throw new Error("You need to provide a keystore public key identity via the --index or --public-key options");
-		}
 
 		File keyFile = new File(getKeyStoreFilename());
 		try {
@@ -213,7 +219,7 @@ public class Main implements Runnable {
 
 			while (aliases.hasMoreElements()) {
 				String alias = aliases.nextElement();
-				if (counter == keystoreIndex || alias.indexOf(publicKeyClean) == 0) {
+				if (counter == indexKey || alias.indexOf(publicKeyClean) == 0) {
 					keyPair = PFXTools.getKeyPair(keyStore, alias, password);
 					break;
 				}
@@ -224,7 +230,7 @@ public class Main implements Runnable {
 		}
 
 		if (keyPair==null) {
-			throw new Error("Cannot find key in keystore");
+			throw new Error("Cannot find key in keystore '" + searchText + "'");
 		}
 		return keyPair;
 	}

@@ -36,7 +36,7 @@ public class Transaction implements Runnable {
 
 
 	@Option(names={"-i", "--index"},
-		defaultValue="-1",
+		defaultValue="0",
 		description="Keystore index of the public/private key to use to run the transaction.")
 	private int keystoreIndex;
 
@@ -75,7 +75,12 @@ public class Transaction implements Runnable {
 		try {
 			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
 		} catch (Error e) {
-			log.info(e.getMessage());
+			log.severe(e.getMessage());
+			return;
+		}
+
+		if (keyPair == null) {
+			log.severe("cannot load a valid key pair to perform this transaction");
 			return;
 		}
 

@@ -33,8 +33,8 @@ public class AccountCreate implements Runnable {
 	@ParentCommand
 	private Account accountParent;
 
-	@Option(names={"-i", "--index"},
-		defaultValue="-1",
+	@Option(names={"-i", "--key-index"},
+		defaultValue="0",
 		description="Keystore index of the public/private key to use to create an account.")
 	private int keystoreIndex;
 
@@ -64,8 +64,20 @@ public class AccountCreate implements Runnable {
 		Main mainParent = accountParent.mainParent;
 
 		AKeyPair keyPair = null;
-		if (keystorePublicKey.length() == 0 && keystoreIndex == -1) {
-			// create a local key store AKeyPair
+
+		if (keystoreIndex > 0 || keystorePublicKey != null) {
+			try {
+				keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
+			} catch (Error e) {
+				log.severe(e.getMessage());
+				return;
+			}
+			if (keyPair == null) {
+				log.severe("cannot find the provided public key");
+				return;
+			}
+		}
+		if (keyPair == null) {
 			try {
 				List<AKeyPair> keyPairList = mainParent.generateKeyPairs(1);
 				keyPair = keyPairList.get(0);
@@ -73,14 +85,6 @@ public class AccountCreate implements Runnable {
 			}
 			catch (Error e) {
 				log.severe("failed to create key pair" + e);
-				return;
-			}
-		}
-		else {
-			try {
-				keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
-			} catch (Error e) {
-				log.info(e.getMessage());
 				return;
 			}
 		}
