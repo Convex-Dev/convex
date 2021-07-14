@@ -60,12 +60,25 @@ public final class CVMChar extends APrimitive {
 
 	@Override
 	public void ednString(StringBuilder sb) {
-		sb.append(value);
+		sb.append(Utils.ednString(value));
 	}
 
 	@Override
 	public void print(StringBuilder sb) {
-		sb.append(value);
+		ednString(sb);
+	}
+
+	/**
+	 * Returns the String representation of this CVMChar.
+	 * 
+	 * Different from {@link #print() print()} which returns a readable representation.
+	 *
+	 * For instance, on CVMChar \a, this methods returns "a" while {@link #print() print()} returns "\a".
+	 */
+	@Override
+	public String toString() {
+		// Usually, primitive types are stringified using `print`. This method 
+		return Character.toString(value);
 	}
 
 	@Override
