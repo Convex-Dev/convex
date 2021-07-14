@@ -14,7 +14,7 @@ import convex.core.exceptions.InvalidDataException;
  *
  * @param <T>
  */
-public class VectorArray<T extends ACell> extends ASizedVector<T> {
+public class VectorArray<T extends ACell> extends AVector<T> {
 
 	private final T[] array;
 	private final int offset;

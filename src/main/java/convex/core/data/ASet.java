@@ -20,10 +20,9 @@ import convex.core.util.Utils;
  * @param <T> Type of set elements
  */
 public abstract class ASet<T extends ACell> extends ACollection<T> implements java.util.Set<T>, IAssociative<T,CVMBool> {
-	protected final long count;
 	
 	protected ASet(long count) {
-		this.count=count;
+		super(count);
 	}
 	
 	@Override
@@ -169,11 +168,6 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	@Override
 	public boolean containsKey(ACell key) {
 		return contains(key);
-	}
-
-	@Override
-	public long count() {
-		return count;
 	}
 	
 	@Override

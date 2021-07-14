@@ -42,6 +42,10 @@ import convex.core.util.Utils;
 public abstract class AVector<T extends ACell> extends ASequence<T> {
 
 	
+	public AVector(long count) {
+		super(count);
+	}
+
 	@Override
 	public AType getType() {
 		return Types.VECTOR;

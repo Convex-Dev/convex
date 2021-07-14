@@ -38,7 +38,7 @@ import convex.core.util.Utils;
  * 
  * @param <T>
  */
-public class VectorTree<T extends ACell> extends ASizedVector<T> {
+public class VectorTree<T extends ACell> extends AVector<T> {
 
 	public static final int MINIMUM_SIZE = 2 * Vectors.CHUNK_SIZE;
 	private final int shift; // bits in each child block

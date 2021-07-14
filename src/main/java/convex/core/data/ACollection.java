@@ -27,6 +27,10 @@ import convex.core.util.Utils;
  */
 public abstract class ACollection<T extends ACell> extends ADataStructure<T> implements Collection<T> {
 
+	protected ACollection(long count) {
+		super(count);
+	}
+	
 	@Override
 	public abstract AType getType();
 	

@@ -34,7 +34,7 @@ import convex.core.util.Utils;
  *
  * @param <T> Type of vector elements
  */
-public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
+public class VectorLeaf<T extends ACell> extends AVector<T> {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static final VectorLeaf<?> EMPTY = new VectorLeaf(new Ref<?>[0]);
 

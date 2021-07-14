@@ -28,11 +28,10 @@ public class List<T extends ACell> extends AList<T> {
 	static final List<ACell> EMPTY = new List<>(Vectors.empty());
 
 	AVector<T> data;
-	private long count;
 
 	private List(AVector<T> data) {
+		super(data.count);
 		this.data = data.toVector(); // ensure canonical, not a mapentry etc.
-		this.count = data.count();
 	}
 
 	/**
@@ -275,11 +274,6 @@ public class List<T extends ACell> extends AList<T> {
 		} catch (ClassCastException e) {
 			throw new BadFormatException("Expected vector in List format", e);
 		}
-	}
-
-	@Override
-	public long count() {
-		return count;
 	}
 
 	@Override

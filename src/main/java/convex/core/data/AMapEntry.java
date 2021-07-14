@@ -13,6 +13,10 @@ import convex.core.util.Utils;
 
 public abstract class AMapEntry<K extends ACell, V extends ACell> extends AVector<ACell> implements Map.Entry<K, V> {
 
+	public AMapEntry(long count) {
+		super(2);
+	}
+
 	@Override
 	public abstract ACell get(long i);
 
@@ -122,11 +126,6 @@ public abstract class AMapEntry<K extends ACell, V extends ACell> extends AVecto
 
 	@Override
 	public abstract int encode(byte[] bs, int pos);
-
-	@Override
-	public long count() {
-		return 2;
-	}
 
 	@Override
 	public final ACell set(int index, ACell element) {

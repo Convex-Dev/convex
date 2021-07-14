@@ -18,6 +18,10 @@ import convex.core.util.Utils;
  */
 public abstract class ASequence<T extends ACell> extends ACollection<T> implements List<T>, IAssociative<CVMLong,T> {
 
+	public ASequence(long count) {
+		super(count);
+	}
+	
 	@Override
 	public boolean contains(Object o) {
 		return longIndexOf(o) >= 0;

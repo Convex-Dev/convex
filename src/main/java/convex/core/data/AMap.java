@@ -19,7 +19,8 @@ import convex.core.util.Utils;
  * Abstract base class for maps.
  * 
  * Maps are Smart Data Structures that represent an immutable mapping of keys to
- * values.
+ * values. The can also be seen as a data structure where the elements are map entries
+ * (equivalent to length 2 vectors)
  * 
  * Ordering of map entries (as seen through iterators etc.) depends on map type.
  * 
@@ -29,20 +30,13 @@ import convex.core.util.Utils;
 public abstract class AMap<K extends ACell, V extends ACell> extends ADataStructure<MapEntry<K, V>>
 		implements Map<K, V> {
 
-	protected long count;
-
 	protected AMap(long count) {
-		this.count = count;
+		super(count);
 	}
 	
 	@Override
 	public AType getType() {
 		return Types.MAP;
-	}
-
-	@Override
-	public final long count() {
-		return count;
 	}
 
 	@Override

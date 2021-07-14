@@ -29,6 +29,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	private final Ref<V> valueRef;
 
 	private MapEntry(Ref<K> key, Ref<V> value) {
+		super(2);
 		this.keyRef = key;
 		this.valueRef = value;
 	}
