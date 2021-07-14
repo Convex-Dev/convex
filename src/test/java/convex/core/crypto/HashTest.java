@@ -79,7 +79,7 @@ public class HashTest {
 
 	@Test
 	public void testDataLength() {
-		assertEquals(34, Hash.NULL_HASH.encodedLength());
+		assertEquals(34, Hash.NULL_HASH.getEncodingLength());
 	}
 
 	@Test

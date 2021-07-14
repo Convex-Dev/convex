@@ -54,17 +54,9 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @throws InvalidDataException 
 	 */
 	public abstract void validateCell() throws InvalidDataException;
-
-	/**
-	 * Length of binary representation of this object
-	 * @return The length of the encoded binary representation in bytes
-	 */
-	public final int encodedLength() {
-		return Utils.checkedInt(getEncoding().count());
-	}
 	
 	/**
-	 * Hash of data encoding of this cell. Calling this method
+	 * Hash of data Encoding of this cell, equivalent to the Value ID. Calling this method
 	 * may force hash computation if needed.
 	 * 
 	 * @return The Hash of this cell's encoding.
