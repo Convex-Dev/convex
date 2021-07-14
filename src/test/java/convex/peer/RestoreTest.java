@@ -35,7 +35,7 @@ public class RestoreTest {
 	AKeyPair KP=AKeyPair.createSeeded(123456781);
 	List<AccountKey> keys=Lists.of(KP.getAccountKey());
 	
-	State GENESIS=Init.createBaseState(keys);
+	State GENESIS=Init.createState(keys);
 	Address HERO=Init.BASE_FIRST_ADDRESS;
 
 	@Test
@@ -66,7 +66,7 @@ public class RestoreTest {
 		Server s1=API.launchPeer(config);
 
 		// Connect with HERO Account
-		Convex cvx1=Convex.connect(s1.getHostAddress(), HERO,KP);
+		Convex cvx1=Convex.connect(s1);
 
 		Result tx1=cvx1.transactSync(Invoke.create(HERO,1, Symbols.STAR_ADDRESS));
 		assertEquals(HERO,tx1.getValue());
