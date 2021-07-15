@@ -165,10 +165,10 @@ public class State extends ARecord {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = accounts.write(bs,pos);
-		pos = peers.write(bs,pos);
-		pos = globals.write(bs,pos);
-		pos = schedule.write(bs,pos);
+		pos = accounts.encode(bs,pos);
+		pos = peers.encode(bs,pos);
+		pos = globals.encode(bs,pos);
+		pos = schedule.encode(bs,pos);
 		return pos;
 	}
 
@@ -581,13 +581,10 @@ public class State extends ARecord {
 	}
 
 	/**
-	 * Deploys the specified Actor environment in the current state.
+	 * Deploys a new Actor in the current state.
 	 *
-	 * Returns the updated state. The actor will be the last account.
+	 * Returns the updated state. The actor will be the last Account.
 	 *
-	 * @param address
-	 * @param actorArgs
-	 * @param environment Environment to use for new Actor Account. Can be null.
 	 * @return The updated state with the Actor deployed.
 	 */
 	public State tryAddActor() {

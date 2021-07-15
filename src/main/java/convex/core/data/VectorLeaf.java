@@ -34,7 +34,7 @@ import convex.core.util.Utils;
  *
  * @param <T> Type of vector elements
  */
-public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
+public class VectorLeaf<T extends ACell> extends AVector<T> {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static final VectorLeaf<?> EMPTY = new VectorLeaf(new Ref<?>[0]);
 
@@ -188,7 +188,7 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 	}
 
 	@Override
-	protected Ref<T> getElementRef(long i) {
+	public Ref<T> getElementRef(long i) {
 		if ((i < 0) || (i >= count)) throw new IndexOutOfBoundsException("Index: " + i);
 		long ix = i - prefixLength();
 		if (ix >= 0) {
@@ -563,7 +563,6 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 
 	@Override
 	public boolean isCanonical() {
-		if ((count > MAX_SIZE) && (prefix == null)) throw new Error("Invalid Listvector!");
 		return true;
 	}
 	
@@ -733,6 +732,11 @@ public class VectorLeaf<T extends ACell> extends ASizedVector<T> {
 	public void validateCell() throws InvalidDataException {
 		if ((count > 0) && (items.length == 0)) throw new InvalidDataException("Should be items present!", this);
 		if (!isCanonical()) throw new InvalidDataException("Not a canonical ListVector!", this);
+	}
+
+	@Override
+	public ACell toCanonical() {
+		return this;
 	}
 
 }

@@ -174,7 +174,7 @@ public class Syntax extends ACell {
 		if (meta.isEmpty()) {
 			bs[pos++]=Tag.NULL;
 		} else {
-			pos=meta.write(bs,pos);
+			pos=meta.encode(bs,pos);
 		}
 		return pos;
 	}
@@ -342,6 +342,11 @@ public class Syntax extends ACell {
 	@Override
 	public byte getTag() {
 		return Tag.SYNTAX;
+	}
+
+	@Override
+	public ACell toCanonical() {
+		return this;
 	}
 
 

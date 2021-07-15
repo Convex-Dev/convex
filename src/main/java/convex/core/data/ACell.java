@@ -45,25 +45,18 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Validates the local structure of this cell. Called by validate() super implementation.
+	 * Validates the local structure and invariants of this cell. Called by validate() super implementation.
 	 * 
-	 * Should validate contained Refs, but should validate all other structure of this cell.
+	 * Should validate directly contained data, but should not validate all other structure of this cell. 
 	 * 
+	 * In particular, should not traverse potentially missing child Refs.
 	 * 
 	 * @throws InvalidDataException 
 	 */
 	public abstract void validateCell() throws InvalidDataException;
-
-	/**
-	 * Length of binary representation of this object
-	 * @return The length of the encoded binary representation in bytes
-	 */
-	public final int encodedLength() {
-		return Utils.checkedInt(getEncoding().count());
-	}
 	
 	/**
-	 * Hash of data encoding of this cell. Calling this method
+	 * Hash of data Encoding of this cell, equivalent to the Value ID. Calling this method
 	 * may force hash computation if needed.
 	 * 
 	 * @return The Hash of this cell's encoding.
@@ -147,16 +140,6 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	@Override
 	public final ByteBuffer write(ByteBuffer bb) {
 		return getEncoding().writeToBuffer(bb);
-	}
-	
-	/**
-	 * Writes this Cell's encoding to a byte array, including tag. USes cached encoding if available.
-	 * @param bs Byte array to encode into
-	 * @param pos Start position to encode at
-	 * @return Updated position
-	 */
-	public int write(byte[] bs, int pos) {
-		return getEncoding().writeToBuffer(bs,pos);
 	}
 	
 	/**
@@ -296,8 +279,17 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	public abstract boolean isCanonical();
 	
 	/**
+	 * Converts this Cell to its canonical version. Returns this if already canonical
+	 * 
+	 * @return Canonical version of Cell
+	 */
+	public abstract ACell toCanonical();
+	
+	/**
 	 * Returns true if this object represents a first class CVM Value. Sub-structural cells that are not themselves first class values
 	 * should return false.
+	 * 
+	 * CVM values might not be in a canonical format, e.g. temporary data structures
 	 * 
 	 * @return true if the object is a CVM Value, false otherwise
 	 */

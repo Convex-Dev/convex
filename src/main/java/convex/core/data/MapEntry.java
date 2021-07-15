@@ -29,6 +29,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	private final Ref<V> valueRef;
 
 	private MapEntry(Ref<K> key, Ref<V> value) {
+		super(2);
 		this.keyRef = key;
 		this.valueRef = value;
 	}
@@ -220,11 +221,6 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	}
 
 	@Override
-	public int size() {
-		return 2;
-	}
-
-	@Override
 	public boolean isEmpty() {
 		return false;
 	}
@@ -243,7 +239,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 
 	@SuppressWarnings("unchecked")
 	@Override
-	protected Ref<ACell> getElementRef(long i) {
+	public Ref<ACell> getElementRef(long i) {
 		if (i == 0) return (Ref<ACell>) keyRef;
 		if (i == 1) return (Ref<ACell>) valueRef;
 		throw new IndexOutOfBoundsException(Errors.badIndex(i));
@@ -288,13 +284,8 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		return pos;
 	}
 
-	@Override
-	public boolean isCanonical() {
-		return true;
-	}
 	
 	@Override public final boolean isCVMValue() {
-		// TODO: reconsider?
 		return true;
 	}
 
@@ -343,5 +334,16 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	public static MapEntry convertOrNull(AVector v) {
 		if (v.count()!=2) return null;
 		return createRef(v.getElementRef(0),v.getElementRef(1));
+	}
+	
+	@Override
+	public boolean isCanonical() {
+		return false;
+	}
+
+	@Override
+	public ACell toCanonical() {
+		// Vector is the canonical form of a MapEntry
+		return toVector();
 	}
 }

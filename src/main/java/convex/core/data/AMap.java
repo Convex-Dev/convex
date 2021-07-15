@@ -19,7 +19,8 @@ import convex.core.util.Utils;
  * Abstract base class for maps.
  * 
  * Maps are Smart Data Structures that represent an immutable mapping of keys to
- * values.
+ * values. The can also be seen as a data structure where the elements are map entries
+ * (equivalent to length 2 vectors)
  * 
  * Ordering of map entries (as seen through iterators etc.) depends on map type.
  * 
@@ -29,25 +30,13 @@ import convex.core.util.Utils;
 public abstract class AMap<K extends ACell, V extends ACell> extends ADataStructure<MapEntry<K, V>>
 		implements Map<K, V> {
 
-	protected long count;
-
 	protected AMap(long count) {
-		this.count = count;
+		super(count);
 	}
 	
 	@Override
 	public AType getType() {
 		return Types.MAP;
-	}
-
-	@Override
-	public final long count() {
-		return count;
-	}
-
-	@Override
-	public int size() {
-		return Utils.checkedInt(count());
 	}
 
 	@Override
@@ -211,6 +200,11 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	public abstract MapEntry<K, V> entryAt(long i);
 	
 	@Override
+	public Ref<MapEntry<K, V>> getElementRef(long index) {
+		return entryAt(index).getRef();
+	}
+	
+	@Override
 	public final MapEntry<K, V> get(long i) {
 		return entryAt(i);
 	}
@@ -280,9 +274,10 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 */
 	public abstract <R> R reduceEntries(BiFunction<? super R, MapEntry<K, V>, ? extends R> func, R initial);
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public Set<K> keySet() {
-		Set<K> ks=reduceEntries((s,me)->s.conj(me.getKey()), Sets.empty());
+		ASet<K> ks=reduceEntries((s,me)->s.conj(me.getKey()), (ASet<K>)(Sets.empty()));
 		return ks;
 	}
 

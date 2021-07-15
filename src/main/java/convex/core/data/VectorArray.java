@@ -14,7 +14,7 @@ import convex.core.exceptions.InvalidDataException;
  *
  * @param <T>
  */
-public class VectorArray<T extends ACell> extends ASizedVector<T> {
+public class VectorArray<T extends ACell> extends AVector<T> {
 
 	private final T[] array;
 	private final int offset;
@@ -64,11 +64,6 @@ public class VectorArray<T extends ACell> extends ASizedVector<T> {
 		return false;
 	}
 
-	@Override
-	protected <R> void copyToArray(R[] arr, int offset) {
-		// TODO Auto-generated method stub
-
-	}
 
 	@Override
 	public boolean anyMatch(Predicate<? super T> pred) {
@@ -166,7 +161,7 @@ public class VectorArray<T extends ACell> extends ASizedVector<T> {
 	}
 
 	@Override
-	protected Ref<T> getElementRef(long index) {
+	public Ref<T> getElementRef(long index) {
 		return Ref.get(get(index));
 	}
 
@@ -181,7 +176,7 @@ public class VectorArray<T extends ACell> extends ASizedVector<T> {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		return toVector().write(bs, pos);
+		return toVector().encode(bs, pos);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -204,6 +199,18 @@ public class VectorArray<T extends ACell> extends ASizedVector<T> {
 	@Override
 	public int getRefCount() {
 		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public AVector<T> toCanonical() {
+		// Convert to vector
+		return toVector();
+	}
+
+	@Override
+	protected <R> void copyToArray(R[] arr, int offset) {
+		// TODO Auto-generated method stub
+		
 	}
 
 }

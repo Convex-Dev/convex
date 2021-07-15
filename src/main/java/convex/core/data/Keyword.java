@@ -147,4 +147,9 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		return Tag.KEYWORD;
 	}
 
+	@Override
+	public ACell toCanonical() {
+		return this;
+	}
+
 }

@@ -111,7 +111,7 @@ public class Hash extends AArrayBlob {
 	
 	/**
 	 * Get the first 32 bits of this Hash. Used for Java hashCodes
-	 * @return
+	 * @return Int representing the first 32 bits
 	 */
 	public int firstInt() {
 		return Utils.readInt(this.store, this.offset);
@@ -175,7 +175,7 @@ public class Hash extends AArrayBlob {
 	@Override
 	public boolean isCanonical() {
 		// always canonical, since class invariants are maintained
-		return true;
+		return false;
 	}
 	
 	@Override public final boolean isCVMValue() {
@@ -213,5 +213,10 @@ public class Hash extends AArrayBlob {
 	@Override
 	public byte getTag() {
 		return Tag.BLOB;
+	}
+
+	@Override
+	public Blob toCanonical() {
+		return toBlob();
 	}
 }

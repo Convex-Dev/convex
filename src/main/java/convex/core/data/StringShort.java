@@ -81,7 +81,7 @@ public class StringShort extends AString {
 
 	@Override
 	public boolean isCanonical() {
-		return true;
+		return (length<=MAX_LENGTH);
 	}
 	
 	@Override public final boolean isCVMValue() {
@@ -103,7 +103,7 @@ public class StringShort extends AString {
 	 * 
 	 * @param length Length in number of chars to read
 	 * @param bb
-	 * @return
+	 * @return AString instance
 	 */
 	public static AString read(int length, ByteBuffer bb) {
 		CharBuffer cb=bb.asCharBuffer();
@@ -153,5 +153,11 @@ public class StringShort extends AString {
 		StringBuilder sb=new StringBuilder(data);
 		sb.append(charValue);
 		return Strings.create(sb.toString());
+	}
+
+	@Override
+	public ACell toCanonical() {
+		if (length<=MAX_LENGTH) return this;
+		return StringTree.create(data);
 	}
 }

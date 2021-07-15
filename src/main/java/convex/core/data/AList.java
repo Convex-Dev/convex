@@ -27,6 +27,10 @@ import convex.core.data.type.Types;
  */
 public abstract class AList<T extends ACell> extends ASequence<T> {
 
+	public AList(long count) {
+		super(count);
+	}
+
 	@Override
 	public final AType getType() {
 		return Types.LIST;

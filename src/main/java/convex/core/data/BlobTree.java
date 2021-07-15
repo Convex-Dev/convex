@@ -149,8 +149,7 @@ public class BlobTree extends ABlob {
 
 	@Override
 	public boolean isCanonical() {
-		// BlobTree is always canonical
-		return true;
+		return count>Blob.CHUNK_LENGTH;
 	}
 	
 	@Override public final boolean isCVMValue() {
@@ -293,8 +292,8 @@ public class BlobTree extends ABlob {
 	 * Reads a BlobTree from a bytebuffer. Assumes that tag byte and count are already read
 	 * @param bb ByteBuffer
 	 * @param count
-	 * @return
-	 * @throws BadFormatException
+	 * @return Decoded BlobTree
+	 * @throws BadFormatException if the encoding was invalid
 	 */
 	public static BlobTree read(ByteBuffer bb, long count) throws BadFormatException {
 		if (count < 0) {
@@ -478,6 +477,12 @@ public class BlobTree extends ABlob {
 	@Override
 	public byte getTag() {
 		return Tag.BLOB;
+	}
+
+	@Override
+	public ACell toCanonical() {
+		if (isCanonical()) return this;
+		return Blobs.toCanonical(this);
 	}
 
 }

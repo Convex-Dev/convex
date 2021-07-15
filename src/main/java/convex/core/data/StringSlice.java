@@ -90,5 +90,10 @@ public class StringSlice extends AString {
 		return Strings.create(sb.toString());
 	}
 
+	@Override
+	public AString toCanonical() {
+		return Strings.create(toString());
+	}
+
 
 }

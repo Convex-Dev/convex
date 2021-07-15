@@ -207,7 +207,8 @@ public class SignedData<T extends ACell> extends ACell {
 	}
 	
 	/**
-	 * Checks if the signature has already gone through verification
+	 * Checks if the signature has already gone through verification. MAy or may 
+	 * not be a valid signature.
 	 *
 	 * @return true if valid, false otherwise
 	 */
@@ -303,5 +304,10 @@ public class SignedData<T extends ACell> extends ACell {
 	@Override
 	public byte getTag() {
 		return Tag.SIGNED_DATA;
+	}
+
+	@Override
+	public ACell toCanonical() {
+		return this;
 	}
 }

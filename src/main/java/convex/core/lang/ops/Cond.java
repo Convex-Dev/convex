@@ -118,4 +118,6 @@ public class Cond<T extends ACell> extends AMultiOp<T> {
 		ASequence<AOp<ACell>> newOps= ops.updateRefs(func);
 		return recreate(newOps);
 	}
+
+
 }

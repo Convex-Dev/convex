@@ -145,7 +145,7 @@ public class Block extends ARecord {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = Utils.writeLong(bs,pos, timestamp);
-		pos = transactions.write(bs,pos);
+		pos = transactions.encode(bs,pos);
 		pos = peerKey.writeToBuffer(bs, pos);
 		return pos;
 	}

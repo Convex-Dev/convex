@@ -87,7 +87,7 @@ public class Server implements Closeable {
 	private static final int RECEIVE_QUEUE_SIZE = 10000;
 
 	// Maximum Pause for each iteration of Server update loop.
-	private static final long SERVER_UPDATE_PAUSE = 1L;
+	private static final long SERVER_UPDATE_PAUSE = 10L;
 
 	static final Logger log = Logger.getLogger(Server.class.getName());
 	private static final Level LEVEL_BELIEF = Level.FINEST;
@@ -474,9 +474,18 @@ public class Server implements Closeable {
 		}
 
 		synchronized (newTransactions) {
-			hasNewMessages=true;
 			newTransactions.add(sd);
 			registerInterest(sd.getHash(), m);
+		}
+		notifyNewMessages();
+	}
+
+	private void notifyNewMessages() {
+		if (!hasNewMessages) {
+			synchronized (updateThread) {
+				hasNewMessages=true;
+				updateThread.notify();
+			}
 		}
 	}
 
@@ -651,6 +660,8 @@ public class Server implements Closeable {
 	 * @param transactionList List of transactions to add to.
 	 */
 	private void maybePostOwnTransactions(ArrayList<SignedData<ATransaction>> transactionList) {
+		if (!Utils.bool(config.get(Keywords.AUTO_MANAGE))) return;
+		
 		synchronized (transactionList) {
 			State s=getPeer().getConsensusState();
 			long ts=Utils.getCurrentTimestamp();
@@ -859,9 +870,9 @@ public class Server implements Closeable {
 					newBeliefs.put(addr, signedBelief);
 
 					// Notify the update thread that there is something new to handle
-					hasNewMessages=true;
 					log.log(LEVEL_BELIEF, "Valid belief received by peer at " + getHostAddress() + ": "
 							+ signedBelief.getValue().getHash().toHexString());
+					notifyNewMessages();
 				}
 			}
 		} catch (ClassCastException e) {
@@ -910,7 +921,7 @@ public class Server implements Closeable {
 	/*
 	 * Runnable loop for managing Server state updates
 	 */
-	private Runnable updateLoop = new Runnable() {
+	private final Runnable updateLoop = new Runnable() {
 		@Override
 		public void run() {
 			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
@@ -928,14 +939,11 @@ public class Server implements Closeable {
 					}
 
 					// Maybe sleep a bit, wait for some belief updates to accumulate
-					if (hasNewMessages) {
-						hasNewMessages=false;
-					} else {
-						try {
-							Thread.sleep(SERVER_UPDATE_PAUSE);
-						} catch (InterruptedException e) {
-							// continue
+					synchronized (updateThread) {
+						if (!hasNewMessages) {
+							updateThread.wait(SERVER_UPDATE_PAUSE);
 						}
+						hasNewMessages=false;
 					}
 				}
 			} catch (InterruptedException e) {
@@ -978,6 +986,10 @@ public class Server implements Closeable {
 		}
 	}
 
+	/**
+	 * Gets the port that this Server is currently accepting connections on
+	 * @return Port number
+	 */
 	public int getPort() {
 		return nio.getPort();
 	}
@@ -990,7 +1002,7 @@ public class Server implements Closeable {
 	/**
 	 * Writes the Peer data to the configured store.
 	 *
-	 * This will overwrite the previously persisted peer state.
+	 * This will overwrite any previously persisted peer data.
 	 */
 	public void persistPeerData() {
 		AStore tempStore = Stores.current();

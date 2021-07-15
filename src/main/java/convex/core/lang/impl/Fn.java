@@ -102,7 +102,7 @@ public class Fn<T extends ACell> extends AClosure<T> {
 
 	@Override
 	public boolean isCanonical() {
-		return false;
+		return true;
 	}
 
 	@Override
@@ -113,9 +113,9 @@ public class Fn<T extends ACell> extends AClosure<T> {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = params.write(bs,pos);
-		pos = body.write(bs,pos);
-		pos = lexicalEnv.write(bs,pos);
+		pos = params.encode(bs,pos);
+		pos = body.encode(bs,pos);
+		pos = lexicalEnv.encode(bs,pos);
 		return pos;
 	}
 	
@@ -211,6 +211,11 @@ public class Fn<T extends ACell> extends AClosure<T> {
 		params.validateCell();
 		body.validateCell();
 		lexicalEnv.validateCell();
+	}
+
+	@Override
+	public ACell toCanonical() {
+		return this;
 	}
 
 

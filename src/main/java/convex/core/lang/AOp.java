@@ -50,6 +50,11 @@ public abstract class AOp<T extends ACell> extends ACell {
 		return true;
 	}
 	
+	@Override
+	public ACell toCanonical() {
+		return this;
+	}
+	
 	@Override public final boolean isCVMValue() {
 		return true;
 	}

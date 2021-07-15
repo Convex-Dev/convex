@@ -24,6 +24,15 @@ public abstract class ACountable<E extends ACell> extends ACell {
 	 */
 	public abstract E get(long index);
 	
+
+	/**
+	 * Gets a Ref to the element at the specified index in this collection
+	 * 
+	 * @param index Index of element to get
+	 * @return Element at the specified index
+	 */
+	public abstract Ref<E> getElementRef(long index);
+	
 	/**
 	 * Checks if this data structure is empty, i.e. has a count of zero elements.
 	 * 

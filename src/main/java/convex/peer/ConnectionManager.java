@@ -135,7 +135,7 @@ public class ConnectionManager {
 				continue;
 			}
 
-			/**
+			/*
 			 *  Always remove Peers not staked in consensus. This should eliminate Peers that have
 			 *  withdrawn or are slashed from current consideration.
 			 */

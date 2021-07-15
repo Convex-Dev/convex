@@ -703,4 +703,9 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		return Tag.BLOBMAP;
 	}
 
+	@Override
+	public ACell toCanonical() {
+		return this;
+	}
+
 }

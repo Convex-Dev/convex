@@ -2,7 +2,6 @@ package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -70,7 +69,7 @@ public class SetsTest {
 	
 	@Test
 	public void testSubsets() {
-		Set<CVMLong> EM=Sets.empty();
+		ASet<CVMLong> EM=Sets.empty();
 		assertTrue(EM.isSubset(EM));
 		assertTrue(EM.isSubset(Samples.INT_SET_300));
 		assertTrue(EM.isSubset(Samples.INT_SET_10));
@@ -78,11 +77,11 @@ public class SetsTest {
 		assertFalse(Samples.INT_SET_300.isSubset(EM));
 		
 		{
-			Set<CVMLong> s=Samples.createRandomSubset(Samples.INT_SET_300,0.5,1);
+			ASet<CVMLong> s=Samples.createRandomSubset(Samples.INT_SET_300,0.5,1);
 			assertTrue(s.isSubset(Samples.INT_SET_300));
 		}
 		{
-			Set<CVMLong> s=Samples.createRandomSubset(Samples.INT_SET_10,0.5,2);
+			ASet<CVMLong> s=Samples.createRandomSubset(Samples.INT_SET_10,0.5,2);
 			assertTrue(s.isSubset(Samples.INT_SET_10));
 		}
 
@@ -175,17 +174,5 @@ public class SetsTest {
 		ASet<CVMLong> s5a = Sets.of(1, 3, 7, -1000);
 		ASet<CVMLong> s5 = s5a.disjAll(s);
 		assertEquals(Sets.of(-1000), s5);
-	}
-
-	@Test
-	public void testBadStructure() {
-		AHashMap<CVMLong, ACell> m = Maps.of(1L, true, 3L, false);
-		Set<CVMLong> s = Set.wrap(m);
-
-		// should not be identical, different hashes
-		assertNotEquals(m, Sets.of(1L, 3L));
-
-		// should fail validation
-		assertThrows(InvalidDataException.class, () -> s.validate());
 	}
 }

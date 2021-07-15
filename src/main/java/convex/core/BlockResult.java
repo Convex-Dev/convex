@@ -62,7 +62,7 @@ public class BlockResult extends ARecord {
 	/**
 	 * Checks if a result at a specific position is an error
 	 * @param i Index of result in block
-	 * @return
+	 * @return True if result at index i is an error, false otherwise.
 	 */
 	public boolean isError(long i) {
 		return getResult(i).isError();
@@ -135,8 +135,8 @@ public class BlockResult extends ARecord {
 	
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos=state.write(bs,pos);
-		pos=results.write(bs,pos);
+		pos=state.encode(bs,pos);
+		pos=results.encode(bs,pos);
 		return pos;
 	}
 	

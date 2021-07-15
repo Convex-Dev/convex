@@ -80,11 +80,6 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return new MapLeaf<K, V>((MapEntry<K, V>[]) new MapEntry<?, ?>[] { item });
 	}
 
-	@Override
-	public int size() {
-		return entries.length;
-	}
-
 	@SuppressWarnings("unchecked")
 	@Override
 	public boolean containsKey(ACell key) {
@@ -322,22 +317,11 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.MAP;
-		return writeRaw(bs,pos,true);
-	}
-	
-	@Override
-	public int write(byte[] bs, int pos, boolean includeValues) {
-		bs[pos++]=Tag.MAP;
-		return writeRaw(bs,pos,includeValues);
+		return encodeRaw(bs,pos);
 	}
 	
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		return writeRaw(bs,pos,true);
-	}
-
-	@Override
-	public int writeRaw(byte[] bs, int pos, boolean includeValues) {
 		pos = Format.writeVLCLong(bs,pos, count);
 
 		for (int i = 0; i < count; i++) {
@@ -365,20 +349,14 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K extends ACell, V extends ACell> MapLeaf<K, V> read(ByteBuffer bb, long count, boolean includeValues) throws BadFormatException {
+	public static <K extends ACell, V extends ACell> MapLeaf<K, V> read(ByteBuffer bb, long count) throws BadFormatException {
 		if (count == 0) return (MapLeaf<K, V>) EMPTY;
 		if (count < 0) throw new BadFormatException("Negative count of map elements!");
 		if (count > MAX_ENTRIES) throw new BadFormatException("MapLeaf too big: " + count);
 
 		MapEntry<K, V>[] items = (MapEntry<K, V>[]) new MapEntry[(int) count];
 		for (int i = 0; i < count; i++) {
-			if (includeValues) {
-				items[i] = MapEntry.read(bb);
-			} else {
-				Ref<V> ref=Format.readRef(bb);
-				MapEntry<K,V> me=(MapEntry<K, V>) MapEntry.createRef(ref, convex.core.data.Set.DUMMY_REF);
-				items[i]=me;
-			}
+			items[i] = MapEntry.read(bb);
 		}
 
 		if (!isValidOrder(items)) {
@@ -403,8 +381,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@Override
 	public boolean isCanonical() {
-		// validation for both key uniqueness and sort order
-		return isValidOrder(entries);
+		return true;
 	}
 	
 	@Override public final boolean isCVMValue() {
@@ -726,8 +703,8 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		}
 
 		// validates both key uniqueness and sort order
-		if (!isCanonical()) {
-			throw new InvalidDataException("Non-canonical key ordering", this);
+		if (!isValidOrder(entries)) {
+			throw new InvalidDataException("Invalid key ordering", this);
 		}
 	}
 
@@ -774,5 +751,10 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public byte getTag() {
 		return Tag.MAP;
+	}
+
+	@Override
+	public ACell toCanonical() {
+		return this;
 	}
 }

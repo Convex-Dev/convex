@@ -3,6 +3,7 @@ package convex.core.data;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -40,6 +41,17 @@ public class ObjectsTest {
 		
 		if (a.getRefCount()>0) {
 			doRefContainerTests(a);
+		}
+		
+		if (a.isCanonical()) {
+			// Canonical objects should map to themselves
+			assertSame(a,a.toCanonical());
+		} else {
+			// non-canonical objects should map to a canonical object
+			ACell canon=a.toCanonical();
+			assertNotSame(canon,a);
+			assertTrue(canon.isCanonical());
+			assertEquals(a,canon);
 		}
 		
 		doCellRefTests(a);
@@ -99,7 +111,6 @@ public class ObjectsTest {
 		Hash h=Hash.compute(a);
 		
 		boolean embedded=Format.isEmbedded(a);
-		assertTrue(Format.isCanonical(a));
 
 		Ref<ACell> r = Ref.get(a).persist();
 		assertEquals(h,r.getHash());
@@ -112,6 +123,8 @@ public class ObjectsTest {
 			assertEquals(a.getTag(),b.byteAt(0)); // Correct Tag
 			assertSame(b,a.getEncoding()); // should be same cached encoding
 			assertEquals(b.length,a.getEncodingLength());
+			
+			assertTrue(a.isCVMValue());
 		}
 
 		// Any encoding should be less than or equal to the limit

@@ -19,6 +19,26 @@ package convex.core.data;
  * @param <E> Type of Data Structure elements
  */
 public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
+	
+	protected final long count;
+	
+	protected ADataStructure(long count) {
+		this.count=count;
+	}
+	
+	/**
+	 * Gets the count of elements in this data structure
+	 */
+	@Override
+	public final long count() {
+		return count;
+	}
+	
+	@Override
+	public final int size() {
+		return (int) (Math.min(count, Integer.MAX_VALUE));
+	}
+	
 	/**
 	 * Returns an empty instance of the same general type as this data structure.
 	 * 

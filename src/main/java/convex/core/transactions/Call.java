@@ -51,11 +51,6 @@ public class Call extends ATransaction {
 	}
 
 	@Override
-	public boolean isCanonical() {
-		return true;
-	}
-
-	@Override
 	public void ednString(StringBuilder sb) {
 		sb.append("#trans/call {");
 		sb.append(":target ");

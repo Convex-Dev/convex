@@ -15,12 +15,10 @@ public interface IFn<T extends ACell> {
 	/**
 	 * Invoke this function in the given context.
 	 * 
-	 * @param <I>
 	 * @param context Context in which the function is to be executed
 	 * @param args    Arguments to the function
 	 * @return Context containing result of function invocation, or an exceptional
 	 *         value
-	 * @throws ExecutionException
 	 */
 	public abstract Context<T> invoke(Context<ACell> context, ACell[] args);
 

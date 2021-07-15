@@ -31,10 +31,6 @@ public class LongBlob extends ABlob {
 		return new LongBlob(value);
 	}
 
-	@Override
-	public boolean isCanonical() {
-		return true;
-	}
 	
 	@Override public final boolean isCVMValue() {
 		return true;
@@ -218,6 +214,16 @@ public class LongBlob extends ABlob {
 	@Override
 	public boolean equalsBytes(byte[] bytes, int byteOffset) {
 		return value==Utils.readLong(bytes, byteOffset);
+	}
+	
+	@Override
+	public boolean isCanonical() {
+		return false;
+	}
+
+	@Override
+	public Blob toCanonical() {
+		return toBlob();
 	}
 
 }

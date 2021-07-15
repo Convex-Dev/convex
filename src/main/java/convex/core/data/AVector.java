@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.lang.reflect.Array;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
@@ -43,6 +42,10 @@ import convex.core.util.Utils;
 public abstract class AVector<T extends ACell> extends ASequence<T> {
 
 	
+	public AVector(long count) {
+		super(count);
+	}
+
 	@Override
 	public AType getType() {
 		return Types.VECTOR;
@@ -112,27 +115,7 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 		sb.append(']');
 	}
 
-	/**
-	 * Copies the elements of this vector to an array at the specified offset
-	 * 
-	 * @param <R>    Type of array elements required
-	 * @param arr
-	 * @param offset
-	 */
-	protected abstract <R> void copyToArray(R[] arr, int offset);
 
-	@SuppressWarnings("unchecked")
-	@Override
-	public <V> V[] toArray(V[] a) {
-		int s = size();
-		if (s > a.length) {
-			Class<V> c = (Class<V>) a.getClass().getComponentType();
-			a = (V[]) Array.newInstance(c, s);
-		}
-		copyToArray(a, 0);
-		if (s < a.length) a[s] = null;
-		return a;
-	}
 
 	@Override
 	public T get(int index) {

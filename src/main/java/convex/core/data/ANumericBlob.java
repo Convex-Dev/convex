@@ -3,25 +3,14 @@ package convex.core.data;
 import java.util.Arrays;
 
 import convex.core.exceptions.TODOException;
-import convex.core.util.Utils;
 
 /**
  * Base class for Blobs which represent an integral numeric value
  */
-public class ANumericBlob extends AArrayBlob {
+public abstract class ANumericBlob extends AArrayBlob {
 
 	protected ANumericBlob(byte[] bytes, int offset, int length) {
 		super(bytes, offset, length);
-	}
-	
-	public static ANumericBlob create(long value) {
-		byte[] bs=new byte[8];
-		Utils.writeLong(bs, 0, value);
-		int i=0;
-		for (;i<8;i++) {
-			if (bs[i]!=0) break;
-		}
-		return new ANumericBlob(bs,i,8-i);
 	}
 
 	@Override

@@ -153,7 +153,7 @@ public class Peer {
 			Stores.setCurrent(store);
 			Ref<ACell> ref=store.refForHash(root);
 			if (ref==null) return null; // not found case
-			if (ref.getStatus()<=Ref.PERSISTED) return null; // not fully in store
+			if (ref.getStatus()<Ref.PERSISTED) return null; // not fully in store
 			
 			@SuppressWarnings("unchecked")
 			AMap<Keyword,ACell> peerData=(AMap<Keyword, ACell>) ref.getValue();

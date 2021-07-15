@@ -59,7 +59,7 @@ public class Order extends ACell {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = blocks.write(bs,pos);
+		pos = blocks.encode(bs,pos);
 		pos = Format.writeVLCLong(bs,pos, proposalPoint);
 		pos = Format.writeVLCLong(bs,pos, consensusPoint);
 		return pos;
@@ -268,5 +268,10 @@ public class Order extends ACell {
 	@Override
 	public byte getTag() {
 		return Tag.ORDER;
+	}
+
+	@Override
+	public ACell toCanonical() {
+		return this;
 	}
 }

@@ -12,7 +12,7 @@ public class Constants {
 
 	public static final String HOSTNAME_PEER = "localhost";
 
-	public static final String KEYSTORE_FILENAME = "~/.convex/keystore.dat";
+	public static final String KEYSTORE_FILENAME = "~/.convex/keystore.pfx";
 
 	public static final int KEY_GENERATE_COUNT = 1;
 

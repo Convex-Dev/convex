@@ -38,7 +38,7 @@ import convex.core.util.Utils;
  * 
  * @param <T>
  */
-public class VectorTree<T extends ACell> extends ASizedVector<T> {
+public class VectorTree<T extends ACell> extends AVector<T> {
 
 	public static final int MINIMUM_SIZE = 2 * Vectors.CHUNK_SIZE;
 	private final int shift; // bits in each child block
@@ -128,7 +128,7 @@ public class VectorTree<T extends ACell> extends ASizedVector<T> {
 	}
 
 	@Override
-	protected Ref<T> getElementRef(long i) {
+	public Ref<T> getElementRef(long i) {
 		if ((i < 0) || (i >= count)) throw new IndexOutOfBoundsException("Index: " + i);
 		long bSize = 1L << shift; // size of a fully packed block
 		int b = (int) (i >> shift);
@@ -708,6 +708,12 @@ public class VectorTree<T extends ACell> extends ASizedVector<T> {
 
 		if (blen < 2) throw new InvalidDataException("Insufficient children: " + blen, this);
 
+	}
+
+	@Override
+	public ACell toCanonical() {
+		// TODO Should be always true?
+		return this;
 	}
 
 }

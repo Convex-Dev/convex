@@ -11,6 +11,7 @@ import java.util.function.Function;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.TODOException;
 import convex.core.util.Bits;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
@@ -410,22 +411,12 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.MAP;
-		return writeRaw(bs,pos,true);
+		return encodeRaw(bs,pos);
 	}
-	
-	@Override
-	public int write(byte[] bs, int pos, boolean includeValues) {
-		bs[pos++]=Tag.MAP;
-		return writeRaw(bs,pos, includeValues);
-	}
+
 	
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		return writeRaw(bs,pos,true);
-	}
-
-	@Override
-	public int writeRaw(byte[] bs, int pos, boolean includeValues) {
 		int ilength = children.length;
 		pos = Format.writeVLCLong(bs,pos, count);
 		
@@ -452,12 +443,11 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * 
 	 * @param bb
 	 * @param count
-	 * @param includeValues If values should be included
 	 * @return TreeMap instance as read from ByteBuffer
 	 * @throws BadFormatException
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K extends ACell, V extends ACell> MapTree<K, V> read(ByteBuffer bb, long count, boolean includeValues) throws BadFormatException {
+	public static <K extends ACell, V extends ACell> MapTree<K, V> read(ByteBuffer bb, long count) throws BadFormatException {
 		int shift = bb.get();
 		short mask = bb.getShort();
 
@@ -878,6 +868,13 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public byte getTag() {
 		return Tag.MAP;
+	}
+
+	@Override
+	public AHashMap<K,V> toCanonical() {
+		if (count > MapLeaf.MAX_ENTRIES) return this;
+		// shouldn't be possible?
+		throw new TODOException();
 	}
 
 }

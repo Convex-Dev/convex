@@ -51,6 +51,11 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 		return CVMByte.create(byteAt(ix));
 	}
 	
+	@Override
+	public Ref<CVMByte> getElementRef(long index) {
+		return get(index).getRef();
+	}
+	
 	public Blob empty() {
 		return Blob.EMPTY;
 	}

@@ -132,32 +132,15 @@ public class Maps {
 	 * @param <K>
 	 * @param <V>
 	 * @param bb
-	 * @return
+	 * @return Map instance
 	 * @throws BadFormatException
 	 */
 	public static <K extends ACell, V extends ACell> AHashMap<K, V> read(ByteBuffer bb) throws BadFormatException {
 		long count = Format.readVLCLong(bb);
 		if (count <= MapLeaf.MAX_ENTRIES) {
-			return MapLeaf.read(bb, count,true);
+			return MapLeaf.read(bb, count);
 		} else {
-			return MapTree.read(bb, count,true);
-		}
-	}
-	
-	/**
-	 * Read a Hashmap from a ByteBuffer. Assumes tag byte already read.
-	 * @param <K>
-	 * @param <V>
-	 * @param bb
-	 * @return
-	 * @throws BadFormatException
-	 */
-	public static <K extends ACell, V extends ACell> AHashMap<K, V> readSet(ByteBuffer bb) throws BadFormatException {
-		long count = Format.readVLCLong(bb);
-		if (count <= MapLeaf.MAX_ENTRIES) {
-			return MapLeaf.read(bb, count,false);
-		} else {
-			return MapTree.read(bb, count,false);
+			return MapTree.read(bb, count);
 		}
 	}
 	

@@ -181,5 +181,10 @@ public class StringTree extends AString {
 		return Strings.create(sb.toString());
 	}
 
+	@Override
+	public StringTree toCanonical() {
+		return this;
+	}
+
 
 }

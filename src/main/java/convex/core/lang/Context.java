@@ -1165,7 +1165,6 @@ public class Context<T extends ACell> extends AObject {
 	 * @param <R> Return type of compiled op
 	 * @param form
 	 * @return Updated Context with compiled Op as result
-	 * @throws ExecutionException
 	 */
 	public <R extends ACell> Context<AOp<R>> expandCompile(ACell form) {
 		// run compiler with adjusted depth
@@ -1188,7 +1187,6 @@ public class Context<T extends ACell> extends AObject {
 	 * @param <R> Return type of compiled op
 	 * @param expandedForm
 	 * @return Updated Context with compiled Op as result
-	 * @throws ExecutionException
 	 */
 	public <R extends ACell> Context<AOp<R>> compile(ACell expandedForm) {
 		// Save an adjust depth
@@ -1753,7 +1751,6 @@ public class Context<T extends ACell> extends AObject {
 		// deploy initial contract state to next address
 		Address address=initialState.nextAddress();
 		State stateSetup=initialState.tryAddActor();
-		if (stateSetup==null) return withError(ErrorCodes.STATE,"Contract deployment address conflict: "+address);
 
 		// Deployment execution context with forked context and incremented depth
 		final Context<Address> exContext=Context.create(stateSetup, juice, EMPTY_BINDINGS, null, depth+1, getOrigin(),getAddress(), address,DEFAULT_OFFER,log,null);

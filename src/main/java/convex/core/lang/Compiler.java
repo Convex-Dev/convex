@@ -15,7 +15,6 @@ import convex.core.data.Keyword;
 import convex.core.data.List;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
-import convex.core.data.Set;
 import convex.core.data.Sets;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
@@ -766,7 +765,7 @@ public class Compiler {
 			if (form instanceof ASet) {
 				@SuppressWarnings("rawtypes")
 				Context<ACell> ctx =  (Context)context;
-				Set<ACell> updated = Sets.empty();
+				ASet<ACell> updated = Sets.empty();
 				for (ACell elem : ((ASet<ACell>) form)) {
 					ctx = ctx.expand(cont, elem, cont);
 					if (ctx.isExceptional()) return ctx;

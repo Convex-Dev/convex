@@ -30,6 +30,11 @@ public class Blobs {
 		return (T) BlobTree.create(blobs);
 	}
 
+	/**
+	 * Converts any blob to a the correct canonical Blob format
+	 * @param a Any Blob
+	 * @return Canonical version s a Blob or BlobTree
+	 */
 	public static ABlob toCanonical(ABlob a) {
 		long length = a.count();
 		if (length <= Blob.CHUNK_LENGTH) return a.toBlob();

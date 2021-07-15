@@ -56,6 +56,11 @@ public abstract class AString extends ACountable<CVMChar> implements CharSequenc
 	}
 	
 	@Override
+	public Ref<CVMChar> getElementRef(long i) {
+		return get(i).getRef();
+	}
+	
+	@Override
 	public int compareTo(AString o) {
 		return CharSequence.compare(this,o);
 	}

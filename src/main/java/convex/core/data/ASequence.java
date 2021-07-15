@@ -18,6 +18,10 @@ import convex.core.util.Utils;
  */
 public abstract class ASequence<T extends ACell> extends ACollection<T> implements List<T>, IAssociative<CVMLong,T> {
 
+	public ASequence(long count) {
+		super(count);
+	}
+	
 	@Override
 	public boolean contains(Object o) {
 		return longIndexOf(o) >= 0;
@@ -43,7 +47,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	public abstract void forEach(Consumer<? super T> action);
 
 	/**
-	 * Visits all elements in this sequence, callin the specified consumer for each.
+	 * Visits all elements in this sequence, calling the specified consumer for each.
 	 * 
 	 * @param f
 	 */
@@ -139,7 +143,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	 * @param index Index of element to get
 	 * @return Ref to element at specified index
 	 */
-	protected abstract Ref<T> getElementRef(long index);
+	public abstract Ref<T> getElementRef(long index);
 
 	@Override
 	public T set(int index, T element) {
@@ -252,7 +256,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 
 	/**
 	 * Reverses a sequence, converting Lists to Vectors and vice versa
-	 * @return
+	 * @return Reversed sequence
 	 */
 	public abstract ASequence<T> reverse();
 }

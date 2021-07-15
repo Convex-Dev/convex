@@ -660,7 +660,7 @@ public class Belief extends ARecord {
 	/**
 	 * Returns the timestamp of this Belief. A Belief should have a new timestamp if
 	 * and only if the Peer incorporates new information.
-	 * @return
+	 * @return Timestamp of belief
 	 */
 	public long getTimestamp() {
 		return timestamp;

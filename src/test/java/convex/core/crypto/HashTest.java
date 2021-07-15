@@ -2,7 +2,6 @@ package convex.core.crypto;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.bouncycastle.util.Arrays;
 import org.junit.jupiter.api.Test;
@@ -79,13 +78,12 @@ public class HashTest {
 
 	@Test
 	public void testDataLength() {
-		assertEquals(34, Hash.NULL_HASH.encodedLength());
+		assertEquals(34, Hash.NULL_HASH.getEncodingLength());
 	}
 
 	@Test
 	public void testExtractHash() {
 		Hash h = Hash.compute(Strings.create("foo"));
-		assertTrue(h.isCanonical());
 		Blob b = Format.encodedBlob(h);
 		byte[] bs = b.getBytes();
 		Hash h2 = Hash.wrap(bs, 2); // all bytes except the initial tag byte and count

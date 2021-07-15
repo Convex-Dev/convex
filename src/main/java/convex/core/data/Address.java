@@ -306,6 +306,11 @@ public class Address extends ABlob {
 		return Tag.ADDRESS;
 	}
 
+	@Override
+	public ACell toCanonical() {
+		return this;
+	}
+
 
 
 

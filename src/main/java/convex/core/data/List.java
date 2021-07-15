@@ -28,11 +28,10 @@ public class List<T extends ACell> extends AList<T> {
 	static final List<ACell> EMPTY = new List<>(Vectors.empty());
 
 	AVector<T> data;
-	private long count;
 
 	private List(AVector<T> data) {
+		super(data.count);
 		this.data = data.toVector(); // ensure canonical, not a mapentry etc.
-		this.count = data.count();
 	}
 
 	/**
@@ -89,7 +88,7 @@ public class List<T extends ACell> extends AList<T> {
 	}
 
 	@Override
-	protected Ref<T> getElementRef(long i) {
+	public Ref<T> getElementRef(long i) {
 		return data.getElementRef(count - 1 - i);
 	}
 
@@ -278,11 +277,6 @@ public class List<T extends ACell> extends AList<T> {
 	}
 
 	@Override
-	public long count() {
-		return count;
-	}
-
-	@Override
 	public Iterator<T> iterator() {
 		return listIterator();
 	}
@@ -403,6 +397,20 @@ public class List<T extends ACell> extends AList<T> {
 	@Override
 	public AVector<T> reverse() {
 		return data;
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	protected <R> void copyToArray(R[] arr, int offset) {
+		int n=Utils.checkedInt(count);
+		for (int i=0; i<n; i++) {
+			arr[offset+i]=(R)get(offset+i);
+		}
+	}
+
+	@Override
+	public ACell toCanonical() {
+		return this;
 	}
 
 }
