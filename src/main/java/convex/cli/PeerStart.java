@@ -38,9 +38,11 @@ public class PeerStart implements Runnable {
 	@Spec
 	CommandSpec spec;
 
-	@Option(names = { "-i",
-			"--index" }, defaultValue = "-1", description = "Keystore index of the public/private key to use for the peer.")
-	private int keystoreIndex;
+	@Option(names={"-i", "--index-key"},
+		defaultValue="0",
+		description="Keystore index of the public/private key to use for the peer.")
+
+    private int keystoreIndex;
 
 	@Option(names = {
 			"--public-key" }, defaultValue = "", description = "Hex string of the public key in the Keystore to use for the peer.%n"
@@ -75,6 +77,11 @@ public class PeerStart implements Runnable {
 			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
 		} catch (Error e) {
 			log.error(e.getMessage());
+			return;
+		}
+
+		if (keyPair == null) {
+			log.warn("cannot load a valid key pair to perform peer start");
 			return;
 		}
 
