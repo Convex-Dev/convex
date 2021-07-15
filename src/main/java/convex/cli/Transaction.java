@@ -1,7 +1,5 @@
 package convex.cli;
 
-import java.util.logging.Logger;
-
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
@@ -11,6 +9,8 @@ import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.Result;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -32,8 +32,7 @@ public class Transaction implements Runnable {
 	@ParentCommand
 	protected Main mainParent;
 
-	private static final Logger log = Logger.getLogger(Transaction.class.getName());
-
+	private static final Logger log = LoggerFactory.getLogger(Transaction.class);
 
 	@Option(names={"-i", "--index"},
 		defaultValue="-1",
@@ -75,12 +74,12 @@ public class Transaction implements Runnable {
 		try {
 			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
 		} catch (Error e) {
-			log.info(e.getMessage());
+			log.error(e.getMessage());
 			return;
 		}
 
 		if (addressNumber == 0) {
-			log.severe("--address. You need to provide a valid address number");
+			log.warn("--address. You need to provide a valid address number");
 			return;
 		}
 
@@ -96,8 +95,8 @@ public class Transaction implements Runnable {
 			Result result = convex.transactSync(transaction, timeout);
 			System.out.println(result);
 		} catch (Throwable t) {
-			log.severe(t.getMessage());
-			t.printStackTrace();
+			log.error(t.getMessage());
+			// t.printStackTrace();
 			return;
 		}
 	}

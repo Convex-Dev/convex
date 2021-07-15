@@ -1,11 +1,12 @@
 package convex.cli;
 
 import java.util.List;
-import java.util.logging.Logger;
 
 import convex.cli.peer.PeerManager;
 import convex.core.crypto.AKeyPair;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -23,7 +24,7 @@ import picocli.CommandLine.ParentCommand;
 	description="Starts a local convex test network.")
 public class LocalStart implements Runnable {
 
-	private static final Logger log = Logger.getLogger(LocalStart.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(LocalStart.class);
 
 	@ParentCommand
 	private Local localParent;
@@ -40,7 +41,7 @@ public class LocalStart implements Runnable {
 
 		List<AKeyPair> keyPairList = mainParent.generateKeyPairs(count);
 
-		log.info("Starting local network with "+count+" peer(s)");
+		log.info("Starting local network with {} peer(s)", count);
 		peerManager.launchLocalPeers(keyPairList);
 		peerManager.showPeerEvents();
 	}

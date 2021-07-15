@@ -1,13 +1,14 @@
 package convex.cli;
 
 import java.util.List;
-import java.util.logging.Logger;
 
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.util.Utils;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -28,7 +29,7 @@ import picocli.CommandLine.ParentCommand;
 		+ "If the keystore is not at the default location also the keystore filename.")
 public class AccountCreate implements Runnable {
 
-	private static final Logger log = Logger.getLogger(AccountCreate.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(AccountCreate.class);
 
 	@ParentCommand
 	private Account accountParent;
@@ -72,7 +73,7 @@ public class AccountCreate implements Runnable {
 				System.out.println("generated public key: " + keyPair.getAccountKey().toHexString());
 			}
 			catch (Error e) {
-				log.severe("failed to create key pair" + e);
+				log.error("failed to create key pair {}", e);
 				return;
 			}
 		}
@@ -80,7 +81,7 @@ public class AccountCreate implements Runnable {
 			try {
 				keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
 			} catch (Error e) {
-				log.info(e.getMessage());
+				log.error(e.getMessage());
 				return;
 			}
 		}
@@ -111,7 +112,7 @@ public class AccountCreate implements Runnable {
 				)
 			);
 		} catch (Throwable t) {
-			log.severe(t.getMessage());
+			log.error(t.getMessage());
 			return;
 		}
 	}
