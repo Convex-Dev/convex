@@ -21,16 +21,13 @@ import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Spec;
 
 /**
- *  peer start command
+ * peer start command
  *
- *		convex.peer.start
+ * convex.peer.start
  *
  */
 
-@Command(name="start",
-	aliases={"st"},
-	mixinStandardHelpOptions=true,
-	description="Starts a local peer.")
+@Command(name = "start", aliases = { "st" }, mixinStandardHelpOptions = true, description = "Starts a local peer.")
 public class PeerStart implements Runnable {
 
 	private static final Logger log = LoggerFactory.getLogger(PeerStart.class);
@@ -38,35 +35,31 @@ public class PeerStart implements Runnable {
 	@ParentCommand
 	private Peer peerParent;
 
-	@Spec CommandSpec spec;
+	@Spec
+	CommandSpec spec;
 
-	@Option(names={"-i", "--index"},
-		defaultValue="-1",
-		description="Keystore index of the public/private key to use for the peer.")
+	@Option(names = { "-i",
+			"--index" }, defaultValue = "-1", description = "Keystore index of the public/private key to use for the peer.")
 	private int keystoreIndex;
 
-	@Option(names={"--public-key"},
-		defaultValue="",
-		description="Hex string of the public key in the Keystore to use for the peer.%n"
-			+ "You only need to enter in the first distinct hex values of the public key.%n"
-			+ "For example: 0xf0234 or f0234")
+	@Option(names = {
+			"--public-key" }, defaultValue = "", description = "Hex string of the public key in the Keystore to use for the peer.%n"
+					+ "You only need to enter in the first distinct hex values of the public key.%n"
+					+ "For example: 0xf0234 or f0234")
 	private String keystorePublicKey;
 
-	@Option(names={"-r", "--reset"},
-		description="Reset and delete the etch database if it exists. Default: ${DEFAULT-VALUE}")
+	@Option(names = { "-r",
+			"--reset" }, description = "Reset and delete the etch database if it exists. Default: ${DEFAULT-VALUE}")
 	private boolean isReset;
 
-	@Option(names={"--port"},
-		description="Port number of this local peer.")
+	@Option(names = { "--port" }, description = "Port number of this local peer.")
 	private int port = 0;
 
-	@Option(names={"--host"},
-		defaultValue=Constants.HOSTNAME_PEER,
-		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
+	@Option(names = {
+			"--host" }, defaultValue = Constants.HOSTNAME_PEER, description = "Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
 	private String hostname = "localhost";
 
-	@Option(names={"-a", "--address"},
-	description="Account address to use for the peer.")
+	@Option(names = { "-a", "--address" }, description = "Account address to use for the peer.")
 	private long addressNumber;
 
 	@Override
@@ -85,7 +78,7 @@ public class PeerStart implements Runnable {
 			return;
 		}
 
-		if (port!=0) {
+		if (port != 0) {
 			port = Math.abs(port);
 		}
 		if ( addressNumber == 0) {
@@ -105,16 +98,16 @@ public class PeerStart implements Runnable {
 			String etchStoreFilename = mainParent.getEtchStoreFilename();
 			if (etchStoreFilename != null && !etchStoreFilename.isEmpty()) {
 				File etchFile = new File(etchStoreFilename);
-				if ( isReset && etchFile.exists()) {
+				if (isReset && etchFile.exists()) {
 					log.info("reset: removing old etch storage file {}", etchStoreFilename);
 					etchFile.delete();
 				}
 				store = EtchStore.create(etchFile);
-			}
-			else {
+			} else {
 				store = Stores.getDefaultStore();
 			}
-			SignedData<Belief> signedBelief = peerManager.aquireLatestBelief(keyPair, peerAddress, store, remotePeerHostname);
+			SignedData<Belief> signedBelief = peerManager.aquireLatestBelief(keyPair, peerAddress, store,
+					remotePeerHostname);
 			peerManager.launchPeer(keyPair, peerAddress, hostname, port, store, remotePeerHostname, signedBelief);
 			peerManager.showPeerEvents();
 		} catch (Throwable t) {

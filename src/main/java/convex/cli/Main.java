@@ -51,6 +51,7 @@ public class Main implements Runnable {
 
 	private static final Logger log = LoggerFactory.getLogger(Main.class);
 
+
 	private static CommandLine commandLine;
     public static AInitConfig initConfig = AInitConfig.create();
 
@@ -132,12 +133,13 @@ public class Main implements Runnable {
 			}
 			log.log(targetLevel, "Set level ALL");
 		*/
+
 		}
 		int result = 0;
 		try {
 			result = commandLine.execute(args);
 		} catch (Throwable t) {
-			log.error(t.getMessage());
+			log.error("Error executing command line: {}",t.getMessage());
 			return 2;
 		}
 		return result;

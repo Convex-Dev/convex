@@ -4,7 +4,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
@@ -26,7 +28,7 @@ import convex.core.util.Utils;
  */
 public class API {
 
-	private static final Logger log = Logger.getLogger(API.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(API.class.getName());
 
 	public static Server launchPeer() {
 		Map<Keyword, Object> config = new HashMap<>();
@@ -77,7 +79,7 @@ public class API {
 			server.launch();
 			return server;
 		} catch (Throwable t) {
-			log.warning("Error launching peer: "+t.getMessage());
+			log.error("Error launching peer: ",t);
 			t.printStackTrace();
 			throw Utils.sneakyThrow(t);
 		}

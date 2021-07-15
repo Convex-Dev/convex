@@ -14,8 +14,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 import convex.api.Convex;
 import convex.api.Shutdown;
@@ -89,13 +90,8 @@ public class Server implements Closeable {
 	// Maximum Pause for each iteration of Server update loop.
 	private static final long SERVER_UPDATE_PAUSE = 10L;
 
-	static final Logger log = Logger.getLogger(Server.class.getName());
-	private static final Level LEVEL_BELIEF = Level.FINEST;
-	static final Level LEVEL_SERVER = Level.FINER;
-	private static final Level LEVEL_DATA = Level.FINEST;
-	private static final Level LEVEL_PARTIAL = Level.FINER;
+	static final Logger log = LoggerFactory.getLogger(Server.class.getName());
 
-	private static final Level LEVEL_INFO = Level.FINER;
 	// private static final Level LEVEL_MESSAGE = Level.FINER;
 
 	/**
@@ -198,21 +194,21 @@ public class Server implements Closeable {
 	}
 
 	private Peer establishPeer(AKeyPair keyPair, Map<Keyword, Object> config2) {
-		log.log(LEVEL_INFO, "Establishing Peer with store: "+Stores.current());
+		log.info("Establishing Peer with store: {}",Stores.current());
 
 		if (Utils.bool(getConfig().get(Keywords.RESTORE))) {
 			try {
 				Hash hash = store.getRootHash();
 				Peer peer = Peer.restorePeer(store, hash, keyPair);
 				if (peer != null) {
-					log.log(LEVEL_INFO, "Restored Peer with root data hash: "+hash);
+					log.info("Restored Peer with root data hash: {}",hash);
 					return peer;
 				}
 			} catch (Throwable e) {
-				log.warning("Can't restore Peer from store: " + e.getMessage());
+				log.error("Can't restore Peer from store: {}",e);
 			}
 		}
-		log.log(LEVEL_INFO, "Defaulting to standard Peer startup.");
+		log.info("Defaulting to standard Peer startup.");
 		return Peer.createStartupPeer(getConfig());
 	}
 
@@ -307,7 +303,7 @@ public class Server implements Closeable {
 				}
 			});
 
-			log.log(LEVEL_SERVER, "Peer Server started with Peer Address: " + getPeerKey().toChecksumHex());
+			log.info( "Peer Server started with Peer Address: {}",getPeerKey());
 		} catch (Throwable e) {
 			throw new Error("Failed to launch Server on port: " + port, e);
 		}
@@ -333,7 +329,7 @@ public class Server implements Closeable {
 			}
 		}
 		if ((convex==null)||(result == null)) {
-			log.log(LEVEL_SERVER, "Failed to join network: Cannot connect to remote peer at "+remoteHostname);
+			log.warn("Failed to join network: Cannot connect to remote peer at {}",remoteHostname);
 			return false;
 		}
 
@@ -407,17 +403,16 @@ public class Server implements Closeable {
 
 		} catch (MissingDataException e) {
 			Hash missingHash = e.getMissingHash();
-			log.log(LEVEL_PARTIAL, "Missing data: " + missingHash.toHexString() + " in message of type " + type);
+			log.trace("Missing data: {} in message of type {}" , missingHash,type);
 			try {
 				registerPartialMessage(missingHash, m);
 				m.getPeerConnection().sendMissingData(missingHash);
-				log.log(LEVEL_PARTIAL,
-						() -> "Requested missing data " + missingHash.toHexString() + " for partial message");
+				log.trace("Requested missing data {} for partial message",missingHash);
 			} catch (IOException ex) {
-				log.log(Level.WARNING, () -> "Exception while requesting missing data: " + ex.getMessage());
+				log.warn( "Exception while requesting missing data: {}" + ex);
 			}
 		} catch (BadFormatException | ClassCastException | NullPointerException e) {
-			log.warning("Error processing client message: " + e);
+			log.warn("Error processing client message: {}", e);
 		}
 	}
 
@@ -438,14 +433,12 @@ public class Server implements Closeable {
 			try {
 				ACell data = r.getValue();
 				m.getPeerConnection().sendData(data);
-				log.log(LEVEL_INFO, "Sent missing data for hash: " + h.toHexString() + " with type "
-						+ Utils.getClassName(data));
+				log.trace( "Sent missing data for hash: {} with type {}",Utils.getClassName(data));
 			} catch (IOException e) {
-				log.log(LEVEL_INFO, "Unable to deliver missing data for " + h.toHexString() + " due to: " + e.getMessage());
+				log.warn("Unable to deliver missing data for {} due to: {}", h, e);
 			}
 		} else {
-			log.warning(
-					() -> "Unable to provide missing data for " + h.toHexString() + " from store: " + Stores.current());
+			log.warn("Unable to provide missing data for {} from store: {}", h,Stores.current());
 		}
 	}
 
@@ -469,7 +462,7 @@ public class Server implements Closeable {
 			} catch (IOException e) {
 				// Ignore??
 			}
-			log.warning("Bad signature from Client! " + sd);
+			log.warn("Bad signature from Client! {}" , sd);
 			return;
 		}
 
@@ -514,13 +507,12 @@ public class Server implements Closeable {
 			m = partialMessages.get(hash);
 
 			if (m != null) {
-				log.log(LEVEL_PARTIAL,
-						() -> "Attempting to re-queue partial message due to received hash: " + hash.toHexString());
+				log.trace( "Attempting to re-queue partial message due to received hash: ",hash);
 				if (receiveQueue.offer(m)) {
 					partialMessages.remove(hash);
 					return true;
 				} else {
-					log.log(Level.WARNING, () -> "Queue full for message with received hash: " + hash.toHexString());
+					log.warn( "Queue full for message with received hash: {}", hash);
 				}
 			}
 		}
@@ -535,7 +527,7 @@ public class Server implements Closeable {
 	 */
 	private void registerPartialMessage(Hash missingHash, Message m) {
 		synchronized (partialMessages) {
-			log.log(LEVEL_PARTIAL, () -> "Registering partial message with missing hash: " + missingHash);
+			log.trace( "Registering partial message with missing hash: " ,missingHash);
 			partialMessages.put(missingHash, m);
 		}
 	}
@@ -601,7 +593,7 @@ public class Server implements Closeable {
 		// Report transaction results
 		long newConsensusPoint = peer.getConsensusPoint();
 		if (newConsensusPoint > oldConsensusPoint) {
-			log.log(LEVEL_BELIEF, "Consensus update from " + oldConsensusPoint + " to " + newConsensusPoint);
+			log.info("Consensus point update from {} to {}" ,oldConsensusPoint , newConsensusPoint);
 			for (long i = oldConsensusPoint; i < newConsensusPoint; i++) {
 				Block block = peer.getPeerOrder().getBlock(i);
 				BlockResult br = peer.getBlockResult(i);
@@ -630,7 +622,7 @@ public class Server implements Closeable {
 
 			try {
 				Peer newPeer = peer.proposeBlock(block);
-				log.log(LEVEL_BELIEF, "New block proposed: " + block.getHash().toHexString());
+				log.info("New block proposed: " + block.getHash());
 				newTransactions.clear();
 				peer = newPeer;
 				return true;
@@ -726,7 +718,7 @@ public class Server implements Closeable {
 					try {
 						beliefs[i++] = newBeliefs.get(addr).getValue();
 					} catch (Exception e) {
-						log.warning(e.getMessage());
+						log.warn("Exception storing Belief: ",e);
 						// Should ignore belief.
 					}
 				}
@@ -737,7 +729,7 @@ public class Server implements Closeable {
 			// Check for substantive change (i.e. Orders updated, can ignore timestamp)
 			if (newPeer.getBelief().getOrders().equals(peer.getBelief().getOrders())) return false;
 
-			log.log(LEVEL_BELIEF, "New merged Belief update: " + newPeer.getBelief().getHash().toHexString());
+			log.debug( "New merged Belief update: {}" ,newPeer.getBelief().getHash());
 			// we merged successfully, so clear pending beliefs and update Peer
 			peer = newPeer;
 			return true;
@@ -761,7 +753,7 @@ public class Server implements Closeable {
 			// We can ignore payload
 
 			Connection pc = m.getPeerConnection();
-			log.log(LEVEL_INFO, "Processing status request from: " + pc.getRemoteAddress());
+			log.debug( "Processing status request from: {}" ,pc.getRemoteAddress());
 			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
 			// address);
 
@@ -774,7 +766,7 @@ public class Server implements Closeable {
 
 			pc.sendResult(m.getID(), reply);
 		} catch (Throwable t) {
-			log.warning("Status Request Error: " + t);
+			log.warn("Status Request Error: {}", t);
 		}
 	}
 
@@ -797,7 +789,7 @@ public class Server implements Closeable {
 			Address address = (Address) v.get(2);
 
 			Connection pc = m.getPeerConnection();
-			log.log(LEVEL_INFO, "Processing query: " + form + " with address: " + address);
+			log.debug( "Processing query: {} with address: {}" , form, address);
 			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
 			// address);
 			Context<ACell> resultContext = peer.executeQuery(form, address);
@@ -814,11 +806,11 @@ public class Server implements Closeable {
 			}
 
 			if (!resultReturned) {
-				log.warning("Failed to send query result back to client with ID: " + id);
+				log.warn("Failed to send query result back to client with ID: {}", id);
 			}
 
 		} catch (Throwable t) {
-			log.warning("Query Error: " + t);
+			log.warn("Query Error: {}", t);
 		}
 	}
 
@@ -830,9 +822,10 @@ public class Server implements Closeable {
 		r = r.persistShallow();
 		Hash payloadHash = r.getHash();
 
-		log.log(LEVEL_DATA, () -> "Processing DATA of type: " + Utils.getClassName(payload) + " with hash: "
-				+ payloadHash.toHexString() + " and encoding: " + Format.encodedBlob(payload).toHexString());
-
+		if (log.isTraceEnabled()) {
+			log.trace( "Processing DATA of type: " + Utils.getClassName(payload) + " with hash: "
+					+ payloadHash.toHexString() + " and encoding: " + Format.encodedBlob(payload).toHexString());
+		}
 		// if our data satisfies a missing data object, need to process it
 		maybeProcessPartial(r.getHash());
 	}
@@ -870,18 +863,18 @@ public class Server implements Closeable {
 					newBeliefs.put(addr, signedBelief);
 
 					// Notify the update thread that there is something new to handle
-					log.log(LEVEL_BELIEF, "Valid belief received by peer at " + getHostAddress() + ": "
-							+ signedBelief.getValue().getHash().toHexString());
+					log.debug("Valid belief received by peer at {}: {}"
+							,getHostAddress(),signedBelief.getValue().getHash());
 					notifyNewMessages();
 				}
 			}
 		} catch (ClassCastException e) {
 			// bad message?
-			log.warning("Bad message from peer? " + e.getMessage());
+			log.warn("Exception due to bad message from peer? {}" ,e);
 		} catch (BadSignatureException e) {
 			// we got sent a bad signature.
 			// TODO: Probably need to slash peer? but ignore for now
-			log.warning("Bad signed belief from peer: " + Utils.ednString(o));
+			log.warn("Bad signed belief from peer: " + Utils.ednString(o));
 		}
 	}
 
@@ -895,7 +888,7 @@ public class Server implements Closeable {
 			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
 
 			try {
-				log.log(LEVEL_SERVER, "Reciever thread started for peer at " + getHostAddress());
+				log.debug("Reciever thread started for peer at {}", getHostAddress());
 
 				while (isRunning) { // loop until server terminated
 					Message m = receiveQueue.poll(100, TimeUnit.MILLISECONDS);
@@ -904,12 +897,12 @@ public class Server implements Closeable {
 					}
 				}
 
-				log.log(LEVEL_SERVER, "Reciever thread terminated normally for peer " + this);
+				log.debug("Reciever thread terminated normally for peer {}", this);
 			} catch (InterruptedException e) {
-				log.log(LEVEL_SERVER, "Receiver thread interrupted ");
+				log.debug("Receiver thread interrupted ");
 			} catch (Throwable e) {
-				log.severe("Receiver thread terminated abnormally! ");
-				log.severe("Server FAILED: " + e.getMessage());
+				log.warn("Receiver thread terminated abnormally! ");
+				log.error("Server FAILED: " + e.getMessage());
 				e.printStackTrace();
 			} finally {
 				// clear thread from Server as we terminate
@@ -947,10 +940,10 @@ public class Server implements Closeable {
 					}
 				}
 			} catch (InterruptedException e) {
-				log.fine("Terminating Server update due to interrupt");
+				log.debug("Terminating Server update due to interrupt");
 			} catch (Throwable e) {
-				log.severe("Unexpected exception in server update loop: " + e.toString());
-				log.severe("Terminating Server update");
+				log.error("Unexpected exception in server update loop: {}", e);
+				log.error("Terminating Server update");
 				e.printStackTrace();
 			} finally {
 				// clear thread from Server as we terminate
@@ -968,7 +961,7 @@ public class Server implements Closeable {
 			Message m = interests.get(h);
 			if (m != null) {
 				try {
-					log.log(LEVEL_INFO, "Returning transaction result to " + m.getPeerConnection().getRemoteAddress());
+					log.trace("Returning transaction result to " ,m.getPeerConnection().getRemoteAddress());
 
 					Connection pc = m.getPeerConnection();
 					if ((pc == null) || pc.isClosed()) continue;
@@ -977,7 +970,7 @@ public class Server implements Closeable {
 					
 					pc.sendResult(res);
 				} catch (Throwable e) {
-					log.severe("Error sending Result: " + e.getMessage());
+					log.warn("Exception while sending Result: ",e);
 					e.printStackTrace();
 					// ignore
 				}
@@ -1012,9 +1005,9 @@ public class Server implements Closeable {
 			Ref<?> peerRef = ACell.createPersisted(peerData);
 			Hash peerHash = peerRef.getHash();
 			store.setRootHash(peerHash);
-			log.log(LEVEL_INFO, "Stored peer data for Server: " + peerHash.toHexString());
+			log.info( "Stored peer data for Server with hash: {}", peerHash.toHexString());
 		} catch (Throwable e) {
-			log.severe("Failed to persist peer state when closing server: " + e.getMessage());
+			log.warn("Failed to persist peer state when closing server: {}" ,e);
 		} finally {
 			Stores.setCurrent(tempStore);
 		}

@@ -12,7 +12,9 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.stream.Collectors;
 
 import javax.swing.JFrame;
@@ -49,7 +51,7 @@ import convex.peer.Server;
 @SuppressWarnings("serial")
 public class PeerGUI extends JPanel {
 
-	private static final Logger log = Logger.getLogger(PeerGUI.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(PeerGUI.class.getName());
 
 	private static JFrame frame;
 	
@@ -184,7 +186,7 @@ public class PeerGUI extends JPanel {
 
 				} catch (InterruptedException e) {
 					//
-					log.warning("Update thread interrupted abnormally: "+e.getMessage());
+					log.warn("Update thread interrupted abnormally: "+e.getMessage());
 					e.printStackTrace();
 					Thread.currentThread().interrupt();
 				}
@@ -256,7 +258,7 @@ public class PeerGUI extends JPanel {
 			AKeyPair kp = we.getKeyPair();
 			Convex convex = makeConnection(we.getAddress(),kp);
 			CompletableFuture<Result> fr= convex.transact(trans);
-			log.finer("Sent transaction: "+trans.toString());
+			log.trace("Sent transaction: {}",trans);
 			return fr;
 		} catch (IOException | TimeoutException e) {
 			throw Utils.sneakyThrow(e);

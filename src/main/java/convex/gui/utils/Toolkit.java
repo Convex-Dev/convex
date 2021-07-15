@@ -7,7 +7,9 @@ import java.awt.Image;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.net.URL;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
@@ -24,7 +26,7 @@ import mdlaf.themes.MaterialOceanicTheme;
 
 public class Toolkit {
 
-	private static final Logger log = Logger.getLogger(Toolkit.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(Toolkit.class.getName());
 
 	static {
 		try {
@@ -54,7 +56,7 @@ public class Toolkit {
 			UIManager.getLookAndFeelDefaults().put("TextField.caretForeground", Color.white);
 		} catch (Exception e) {
 			e.printStackTrace();
-			log.warning("Unable to set look and feel: " + e);
+			log.warn("Unable to set look and feel: {}", e);
 		}
 	}
 

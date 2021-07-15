@@ -45,7 +45,7 @@ public class KeyGenerate implements Runnable {
 			log.warn("You to provide 1 or more count of keys to generate");
 			return;
 		}
-		log.info("will generate "+count+" keys");
+		log.info("Generating {} keys",count);
 
 		try {
 			List<AKeyPair> keyPairList = mainParent.generateKeyPairs(count);

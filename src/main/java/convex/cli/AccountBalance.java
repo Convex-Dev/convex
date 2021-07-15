@@ -1,6 +1,5 @@
 package convex.cli;
 
-
 import convex.api.Convex;
 import convex.core.Result;
 import convex.core.data.ACell;

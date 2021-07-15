@@ -14,7 +14,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 import org.junit.jupiter.api.Test;
 
@@ -70,7 +72,7 @@ public class ServerTest {
 
 	}
 
-	private static final Logger log = Logger.getLogger(ServerTest.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(ServerTest.class.getName());
 
 	private HashMap<Long, Object> results = new HashMap<>();
 
@@ -79,7 +81,7 @@ public class ServerTest {
 		protected synchronized void handleResult(long id, Object value) {
 			String msg=id+ " : "+Utils.toString(value);
 			//System.err.println(msg);
-			log.finer(msg);
+			log.debug(msg);
 			results.put(id, value);
 		}
 
@@ -87,7 +89,7 @@ public class ServerTest {
 		protected synchronized void handleError(long id, Object code, Object message) {
 			String msg=id+ " ERR: "+Utils.toString(code)+ " : "+message;
 			//System.err.println(msg);
-			log.finer(msg);
+			log.debug(msg);
 
 			results.put(id, code);
 		}

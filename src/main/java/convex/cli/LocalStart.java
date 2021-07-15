@@ -39,10 +39,12 @@ public class LocalStart implements Runnable {
 		Main mainParent = localParent.mainParent;
 		PeerManager peerManager = PeerManager.create(mainParent.getSessionFilename());
 
+		log.info("Generating {} key pairs for Peers",count);
 		List<AKeyPair> keyPairList = mainParent.generateKeyPairs(count);
 
 		log.info("Starting local network with {} peer(s)", count);
 		peerManager.launchLocalPeers(keyPairList);
+		log.info("Local Peers launched");
 		peerManager.showPeerEvents();
 	}
 }

@@ -3,8 +3,9 @@ package convex.peer;
 import java.io.IOException;
 import java.security.SecureRandom;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 import convex.core.Peer;
 import convex.core.data.ACell;
@@ -18,8 +19,7 @@ import convex.net.Connection;
 
 class ChallengeRequest {
 
-	private static final Logger log = Logger.getLogger(ChallengeRequest.class.getName());
-	private static final Level LEVEL_CHALLENGE_RESPONSE = Level.FINEST;
+	private static final Logger log = LoggerFactory.getLogger(ChallengeRequest.class.getName());
 
 	private static final int TIMEOUT_SECONDS = 10;
 
@@ -65,7 +65,7 @@ class ChallengeRequest {
 			sendHash = challenge.getHash();
 			return connection.sendChallenge(challenge);
 		} catch (IOException e) {
-			log.log(LEVEL_CHALLENGE_RESPONSE,"Cannot send challenge to remote peer at " + connection.getRemoteAddress());
+			log.warn("Cannot send challenge to remote peer at {}", connection.getRemoteAddress());
 			values = null;
 		}
 		return -1;

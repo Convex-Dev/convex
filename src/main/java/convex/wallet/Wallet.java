@@ -3,7 +3,9 @@ package convex.wallet;
 import java.awt.BorderLayout;
 import java.awt.EventQueue;
 import java.awt.Toolkit;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -14,7 +16,7 @@ import convex.gui.manager.mainpanels.HomePanel;
 @SuppressWarnings("serial")
 public class Wallet extends JPanel {
 
-	private static final Logger log = Logger.getLogger(Wallet.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(Wallet.class.getName());
 
 	private static JFrame frame;
 
@@ -42,7 +44,7 @@ public class Wallet extends JPanel {
 					frame.getContentPane().add(window, BorderLayout.CENTER);
 					frame.pack();
 					frame.setVisible(true);
-					log.finer("Wallet GUI launched");
+					log.debug("Wallet GUI launched");
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
