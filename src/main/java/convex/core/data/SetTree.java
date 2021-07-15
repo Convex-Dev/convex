@@ -537,7 +537,12 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 			throw new InvalidDataException("Count too small [" + count + "] for SetTree", this);
 		}
 
-		Hash firstHash=getElementRef(0).getHash();
+		Hash firstHash;
+		try {
+			firstHash=getElementRef(0).getHash();
+		} catch (ClassCastException e) {
+			throw new InvalidDataException("Bad child type:" +e.getMessage(), this);
+		}
 		
 		int bsize = children.length;
 

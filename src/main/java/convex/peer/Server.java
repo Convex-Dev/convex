@@ -986,6 +986,10 @@ public class Server implements Closeable {
 		}
 	}
 
+	/**
+	 * Gets the port that this Server is currently accepting connections on
+	 * @return Port number
+	 */
 	public int getPort() {
 		return nio.getPort();
 	}
@@ -998,7 +1002,7 @@ public class Server implements Closeable {
 	/**
 	 * Writes the Peer data to the configured store.
 	 *
-	 * This will overwrite the previously persisted peer state.
+	 * This will overwrite any previously persisted peer data.
 	 */
 	public void persistPeerData() {
 		AStore tempStore = Stores.current();
