@@ -5,7 +5,8 @@ import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -53,7 +54,7 @@ public class SmartOpComponent extends BaseListComponent {
 	 */
 	private HashMap<Integer, JTextField> paramFields = new HashMap<>();
 
-	private static final Logger log = Logger.getLogger(SmartOpComponent.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(SmartOpComponent.class.getName());
 
 	public SmartOpComponent(ActorInvokePanel parent, Address contract, Symbol sym) {
 		this.parent = parent;
@@ -155,7 +156,7 @@ public class SmartOpComponent extends BaseListComponent {
 			}
 
 		} catch (Throwable e) {
-			log.warning(e.getMessage());
+			log.warn(e.getMessage());
 			Toast.display(parent, "Unexpected Error: "+e.getMessage(), Toast.FAIL);
 
 		}

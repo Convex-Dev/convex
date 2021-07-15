@@ -14,8 +14,10 @@ import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.AStore;
@@ -35,10 +37,7 @@ import convex.peer.Server;
 public class NIOServer implements Closeable {
 	public static final int DEFAULT_PORT = 18888;
 
-	private static final Logger log=Logger.getLogger(NIOServer.class.getName());
-
-	static final Level LEVEL_BAD_CONNECTION=Level.WARNING;
-	static final Level LEVEL_SERVER=Level.FINER;
+	private static final Logger log=LoggerFactory.getLogger(NIOServer.class.getName());
 
 	private ServerSocketChannel ssc=null;
 
@@ -82,7 +81,7 @@ public class NIOServer implements Closeable {
 			Thread selectorThread=new Thread(selectorLoop,"NIO Server selector loop on port: "+port);
 			selectorThread.setDaemon(true);
 			selectorThread.start();
-			log.log(LEVEL_SERVER, "NIO server started on port "+port);
+			log.info("NIO server started on port {}",port);
 		} catch (Exception e) {
 			throw new Error("Can't bind NIOServer to port: "+port,e);
 		}
@@ -122,10 +121,10 @@ public class NIOServer implements Closeable {
 			                }
 						} catch (ClosedChannelException e) {
 							// channel was closed, just lose the key?
-							log.log(LEVEL_BAD_CONNECTION,"Client closed channel");
+							log.debug("Client closed channel");
 							key.cancel();
 						} catch (IOException e) {
-							log.log(LEVEL_BAD_CONNECTION,"Unexpected IOException, canceling key: "+e.getMessage());
+							log.warn("Unexpected IOException, canceling key: {}",e);
 							// e.printStackTrace();
 							key.cancel();
 						}
@@ -133,7 +132,7 @@ public class NIOServer implements Closeable {
 					// keys.clear();
 				}
 			} catch (IOException e) {
-				log.log(LEVEL_BAD_CONNECTION,"Unexpected IOException, terminating selector loop: "+e.getMessage());
+				log.error("Unexpected IOException, terminating selector loop: {}",e);
 				// print error and terminate
 				e.printStackTrace();
 			} finally {
@@ -145,7 +144,7 @@ public class NIOServer implements Closeable {
 					selector.close();
 					selector=null;
 				} catch (IOException e) {
-					log.severe("IOException while closing NIO server");
+					log.error("IOException while closing NIO server");
 					e.printStackTrace();
 				} finally {
 					selector=null;
@@ -156,14 +155,14 @@ public class NIOServer implements Closeable {
 					try {
 						ssc.close();
 					} catch (IOException e) {
-						log.severe("IOException while closing NIO socket channel");
+						log.error("IOException while closing NIO socket channel");
 						e.printStackTrace();
 					} finally {
 						ssc=null;
 					}
 				}
 
-				log.log(LEVEL_SERVER,"Selector loop ended on port: "+getPort());
+				log.info("Selector loop ended on port: "+getPort());
 			}
 		}
 	};
@@ -206,8 +205,7 @@ public class NIOServer implements Closeable {
 				// Add message to the received message queue
 				queue.put(m);
 			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				log.warning("Interrupted while attempting to add to receive queue");
+				log.debug("Interrupted while attempting to add to receive queue");
 				Thread.currentThread().interrupt();
 			}
 		},store,null);
@@ -221,15 +219,15 @@ public class NIOServer implements Closeable {
 		try {
 			int n=conn.handleChannelRecieve();
 			if (n==0) {
-				log.finer("No bytes received for key: "+key);
+				log.debug("No bytes received for key: {}",key);
 			}
 		}
 		catch (ClosedChannelException e) {
-			log.log(LEVEL_SERVER,"Channel closed from: "+conn.getRemoteAddress());
+			log.debug("Channel closed from: {}",conn.getRemoteAddress());
 			key.cancel();
 		}
 		catch (BadFormatException e) {
-			log.log(LEVEL_BAD_CONNECTION,"Cancelled connection: Bad data format from: "+conn.getRemoteAddress()+" message: " +e.getMessage());
+			log.warn("Cancelled connection: Bad data format from: {} message: {}",conn.getRemoteAddress(),e);
 			// TODO: blacklist peer?
 			key.cancel();
 		}
@@ -251,7 +249,7 @@ public class NIOServer implements Closeable {
 	private void accept(Selector selector) throws IOException, ClosedChannelException {
 		SocketChannel socketChannel=ssc.accept();
 		if (socketChannel==null) return; // false alarm? Nobody there?
-		log.finer("New connection accepted: " + socketChannel);
+		log.debug("New connection accepted: {}", socketChannel);
 		socketChannel.configureBlocking(false);
 		
 		// TODO: Confirm we don't want  Nagle?

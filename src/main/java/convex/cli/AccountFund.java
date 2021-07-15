@@ -1,6 +1,7 @@
 package convex.cli;
 
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
@@ -26,7 +27,7 @@ import picocli.CommandLine.ParentCommand;
 		+ "If the keystore is not at the default location also the keystore filename.")
 public class AccountFund implements Runnable {
 
-	private static final Logger log = Logger.getLogger(AccountFund.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(AccountFund.class.getName());
 
 	@ParentCommand
 	private Account accountParent;
@@ -76,7 +77,7 @@ public class AccountFund implements Runnable {
 		}
 
 		if (addressNumber == 0) {
-			log.severe("--address. You need to provide a valid address number");
+			log.error("--address. You need to provide a valid address number");
 			return;
 		}
 
@@ -87,9 +88,9 @@ public class AccountFund implements Runnable {
 			convex.transferSync(address, amount);
 			convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
 			Long balance = convex.getBalance(address);
-			log.info("account balance: " + balance);
+			log.info("Got Account balance: {}", balance);
 		} catch (Throwable t) {
-			log.severe(t.getMessage());
+			log.error(t.getMessage());
 			t.printStackTrace();
 			return;
 		}

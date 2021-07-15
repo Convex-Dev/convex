@@ -13,7 +13,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.stream.Collectors;
 
 import convex.api.Convex;
@@ -51,7 +53,7 @@ import etch.EtchStore;
 
 public class PeerManager implements IServerEvent {
 
-	private static final Logger log = Logger.getLogger(PeerManager.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(PeerManager.class.getName());
 
 	private static final long TRANSACTION_TIMEOUT_MILLIS = 50000;
 	private static final int FRIENDLY_HEX_STRING_SIZE = 6;
@@ -155,7 +157,7 @@ public class PeerManager implements IServerEvent {
 		try {
 			session.load(sessionFile);
 		} catch (IOException e) {
-			log.severe("Cannot load the session control file");
+			log.error("Cannot load the session control file");
 		}
 	}
 
@@ -212,7 +214,7 @@ public class PeerManager implements IServerEvent {
 				sessionFile.delete();
 			}
 		} catch (IOException e) {
-			log.severe("Cannot store the session control data");
+			log.error("Cannot store the session control data");
 		}
 	}
 

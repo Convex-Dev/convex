@@ -9,8 +9,9 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 import convex.api.Convex;
 import convex.core.Constants;
@@ -41,10 +42,7 @@ import convex.net.Message;
  */
 public class ConnectionManager {
 
-	private static final Logger log = Logger.getLogger(ConnectionManager.class.getName());
-
-	static final Level LEVEL_CHALLENGE_RESPONSE = Level.FINEST;
-	static final Level LEVEL_CONNECT = Level.FINER;
+	private static final Logger log = LoggerFactory.getLogger(ConnectionManager.class.getName());
 
 	/**
 	 * Pause for each iteration of Server connection loop.
@@ -91,7 +89,7 @@ public class ConnectionManager {
 			} catch (InterruptedException e) {
 				/* OK? Close the thread normally */
 			} catch (Throwable e) {
-				log.severe("Unexpected exception, Terminating Server connection loop");
+				log.error("Unexpected exception, Terminating Server connection loop");
 				e.printStackTrace();
 			} finally {
 				connectionThread = null;
@@ -105,9 +103,9 @@ public class ConnectionManager {
 			for (InetSocketAddress a: plannedConnections) {
 				Connection c=connectToPeer(a);
 				if (c==null) {
-					log.log(LEVEL_CONNECT, "Planned Connection failed to "+a);
+					log.warn( "Planned Connection failed to {}",a);
 				} else {
-					log.log(LEVEL_CONNECT, "Planned Connection made to "+a);
+					log.info("Planned Connection made to {}",a);
 				}
 			}
 			plannedConnections.clear();
@@ -326,18 +324,18 @@ public class ConnectionManager {
 		try {
 			SignedData<AVector<ACell>> signedData = m.getPayload();
 			if ( signedData == null) {
-				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge bad message data sent");
+				log.debug( "challenge bad message data sent");
 				return;
 			}
 			AVector<ACell> challengeValues = signedData.getValue();
 
 			if (challengeValues == null || challengeValues.size() != 3) {
-				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge data incorrect number of items should be 3 not " + RT.count(challengeValues));
+				log.debug("challenge data incorrect number of items should be 3 not ",RT.count(challengeValues));
 				return;
 			}
 			Connection pc = m.getPeerConnection();
 			if ( pc == null) {
-				log.log(LEVEL_CHALLENGE_RESPONSE, "No remote peer connection from challenge");
+				log.warn( "No remote peer connection from challenge");
 				return;
 			}
 			// log.log(LEVEL_CHALLENGE_RESPONSE, "Processing challenge request from: " + pc.getRemoteAddress());
@@ -345,28 +343,28 @@ public class ConnectionManager {
 			// get the token to respond with
 			Hash token = RT.ensureHash(challengeValues.get(0));
 			if (token == null) {
-				log.log(LEVEL_CHALLENGE_RESPONSE, "no challenge token provided");
+				log.warn( "no challenge token provided");
 				return;
 			}
 
 			// check to see if we are both want to connect to the same network
 			Hash networkId = RT.ensureHash(challengeValues.get(1));
 			if (networkId == null) {
-				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge data has no networkId");
+				log.warn( "challenge data has no networkId");
 				return;
 			}
 			if ( !networkId.equals(thisPeer.getNetworkID())) {
-				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge data has incorrect networkId");
+				log.warn( "challenge data has incorrect networkId");
 				return;
 			}
 			// check to see if the challenge is for this peer
 			AccountKey toPeer = RT.ensureAccountKey(challengeValues.get(2));
 			if (toPeer == null) {
-				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge data has no toPeer address");
+				log.warn( "challenge data has no toPeer address");
 				return;
 			}
 			if ( !toPeer.equals(thisPeer.getPeerKey())) {
-				log.log(LEVEL_CHALLENGE_RESPONSE, "challenge data has incorrect addressed peer");
+				log.warn( "challenge data has incorrect addressed peer");
 				return;
 			}
 
@@ -379,11 +377,11 @@ public class ConnectionManager {
 			SignedData<ACell> response = thisPeer.sign(responseValues);
 			// log.log(LEVEL_CHALLENGE_RESPONSE, "Sending response to "+ pc.getRemoteAddress());
 			if (pc.sendResponse(response) == -1 ){
-				log.warning("Failed sending response from challenge to "+ pc.getRemoteAddress());
+				log.warn("Failed sending response from challenge to ", pc.getRemoteAddress());
 			}
 
 		} catch (Throwable t) {
-			log.warning("Challenge Error: " + t);
+			log.error("Challenge Error: {}" ,t);
 			// t.printStackTrace();
 		}
 	}
@@ -392,13 +390,13 @@ public class ConnectionManager {
 		try {
 			SignedData<ACell> signedData = m.getPayload();
 
-			log.log(LEVEL_CHALLENGE_RESPONSE, "Processing response request from: " + m.getPeerConnection().getRemoteAddress());
+			log.debug( "Processing response request from: {}",m.getPeerConnection().getRemoteAddress());
 
 			@SuppressWarnings("unchecked")
 			AVector<ACell> responseValues = (AVector<ACell>) signedData.getValue();
 
 			if (responseValues.size() != 4) {
-				log.log(LEVEL_CHALLENGE_RESPONSE, "response data incorrect number of items should be 4 not " + responseValues.size());
+				log.warn( "response data incorrect number of items should be 4 not {}",responseValues.size());
 				return null;
 			}
 
@@ -406,20 +404,20 @@ public class ConnectionManager {
 			// get the signed token
 			Hash token = RT.ensureHash(responseValues.get(0));
 			if (token == null) {
-				log.log(LEVEL_CHALLENGE_RESPONSE, "no response token provided");
+				log.warn( "no response token provided");
 				return null;
 			}
 
 			// check to see if we are both want to connect to the same network
 			Hash networkId = RT.ensureHash(responseValues.get(1));
 			if ( networkId == null || !networkId.equals(thisPeer.getNetworkID())) {
-				log.log(LEVEL_CHALLENGE_RESPONSE, "response data has incorrect networkId");
+				log.warn( "response data has incorrect networkId");
 				return null;
 			}
 			// check to see if the challenge is for this peer
 			AccountKey toPeer = RT.ensureAccountKey(responseValues.get(2));
 			if ( toPeer == null || !toPeer.equals(thisPeer.getPeerKey())) {
-				log.log(LEVEL_CHALLENGE_RESPONSE, "response data has incorrect addressed peer");
+				log.warn( "response data has incorrect addressed peer");
 				return null;
 			}
 
@@ -431,7 +429,7 @@ public class ConnectionManager {
 
 
 			if ( !challengeList.containsKey(fromPeer)) {
-				log.log(LEVEL_CHALLENGE_RESPONSE, "response from an unkown challenge");
+				log.warn( "response from an unkown challenge");
 				return null;
 			}
 			synchronized(challengeList) {
@@ -441,20 +439,20 @@ public class ConnectionManager {
 
 				Hash challengeToken = challengeRequest.getToken();
 				if (!challengeToken.equals(token)) {
-					log.log(LEVEL_CHALLENGE_RESPONSE, "invalid response token sent");
+					log.warn( "invalid response token sent");
 					return null;
 				}
 
 				AccountKey challengeFromPeer = challengeRequest.getPeerKey();
 				if (!signedData.getAccountKey().equals(challengeFromPeer)) {
-					log.warning("response key does not match requested key, sent from a different peer");
+					log.warn("response key does not match requested key, sent from a different peer");
 					return null;
 				}
 
 				// hash sent by this peer for the challenge
 				Hash challengeSourceHash = challengeRequest.getSendHash();
 				if ( !challengeHash.equals(challengeSourceHash)) {
-					log.log(LEVEL_CHALLENGE_RESPONSE, "response hash of the challenge does not match");
+					log.warn("response hash of the challenge does not match");
 					return null;
 				}
 				// remove from list incase this fails, we can generate another challenge
@@ -471,7 +469,7 @@ public class ConnectionManager {
 			}
 
 		} catch (Throwable t) {
-			log.warning("Response Error: " + t);
+			log.error("Response Error: {}",t);
 		}
 		return null;
 	}
@@ -523,7 +521,7 @@ public class ConnectionManager {
 						pc.sendMessage(msg);
 					}
 				} catch (IOException e) {
-					log.warning("Error in broadcast: " + e.getMessage());
+					log.error("Error in broadcast: ", e);
 				}
 			}
 		}

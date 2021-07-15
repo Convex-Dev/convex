@@ -2,7 +2,8 @@ package convex.cli;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.data.ACell;
@@ -26,7 +27,7 @@ import picocli.CommandLine.ParentCommand;
 	description="Execute a query on the current peer.")
 public class Query implements Runnable {
 
-	private static final Logger log = Logger.getLogger(Query.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(Query.class.getName());
 
 	@ParentCommand
 	protected Main mainParent;
@@ -53,7 +54,7 @@ public class Query implements Runnable {
 		try {
 			convex = mainParent.connectToSessionPeer(hostname, port, Main.initConfig.getUserAddress(0), null);
 		} catch (Error e) {
-			log.severe(e.getMessage());
+			log.error(e.getMessage());
 			return;
 		}
 		try {
@@ -62,12 +63,12 @@ public class Query implements Runnable {
 			Result result = convex.querySync(message, 5000);
 			System.out.println(result);
 		} catch (IOException e) {
-			log.severe("Query Error: "+e.getMessage());
+			log.error("Query Error: "+e.getMessage());
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 			return;
 		}  catch (TimeoutException e) {
-			log.severe("Query timeout");
+			log.warn("Query timeout");
 		}
 	}
 

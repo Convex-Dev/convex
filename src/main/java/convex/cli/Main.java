@@ -7,9 +7,11 @@ import java.security.KeyStore
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
-import java.util.logging.Handler;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+//import java.util.logging.Handler;
+//import java.util.logging.Level;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
@@ -49,7 +51,7 @@ import picocli.CommandLine.ScopeType;
 
 public class Main implements Runnable {
 
-	private static final Logger log = Logger.getLogger(Main.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(Main.class.getName());
 
 	private static CommandLine commandLine;
     public static AInitConfig initConfig = AInitConfig.create();
@@ -118,19 +120,20 @@ public class Main implements Runnable {
 		}
 
 		if (verbose) {
-			Logger root = Logger.getLogger("");
-			Level targetLevel = Level.ALL;
-			root.setLevel(targetLevel);
-			for (Handler handler: root.getHandlers()) {
-				handler.setLevel(targetLevel);
-			}
-			log.log(targetLevel, "Set level ALL");
+			// TODO: figure out verbose strategy. Should this go to STDOUT?
+			//Logger root = Logger.getLogger("");
+			//Level targetLevel = Level.ALL;
+			//root.setLevel(targetLevel);
+			//for (Handler handler: root.getHandlers()) {
+			//	handler.setLevel(targetLevel);
+			//}
+			// log.log(targetLevel, "Set level ALL");
 		}
 		int result = 0;
 		try {
 			result = commandLine.execute(args);
 		} catch (Throwable t) {
-			log.severe(t.getMessage());
+			log.error("Error executing command line: {}",t.getMessage());
 			return 2;
 		}
 		return result;

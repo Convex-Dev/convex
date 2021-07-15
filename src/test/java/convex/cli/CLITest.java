@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -16,7 +18,7 @@ import picocli.CommandLine;
 public class CLITest {
 
 	protected static final String OS = System.getProperty("os.name").toLowerCase();
-	protected static final Logger log = Logger.getLogger(CLITest.class.getName());
+	protected static final Logger log = LoggerFactory.getLogger(CLITest.class.getName());
 
 	private void assertMatch(String patternText, StringWriter output, String[] args) {
 		Pattern regex = Pattern.compile(patternText, Pattern.MULTILINE + Pattern.DOTALL);

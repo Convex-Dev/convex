@@ -2,7 +2,8 @@ package convex.cli;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.Result;
@@ -34,7 +35,7 @@ import picocli.CommandLine.ParentCommand;
 	description="Reports on the current status of the network.")
 public class Status implements Runnable {
 
-	private static final Logger log = Logger.getLogger(Status.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(Status.class.getName());
 
 	@ParentCommand
 	protected Main mainParent;
@@ -56,11 +57,11 @@ public class Status implements Runnable {
 			try {
                 port = Helpers.getSessionPort(mainParent.getSessionFilename());
 			} catch (IOException e) {
-				log.warning("Cannot load the session control file");
+				log.warn("Cannot load the session control file");
 			}
 		}
 		if (port == 0) {
-			log.warning("Cannot find a local port or you have not set a valid port number");
+			log.warn("Cannot find a local port or you have not set a valid port number");
 			return;
 		}
 
@@ -68,7 +69,7 @@ public class Status implements Runnable {
 		try {
 			convex = mainParent.connectToSessionPeer(hostname, port, Main.initConfig.getUserAddress(0), Main.initConfig.getUserKeyPair(0));
 		} catch (Throwable t) {
-			log.severe(t.getMessage());
+			log.error(t.getMessage());
 			return;
 		}
 

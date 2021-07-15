@@ -3,7 +3,9 @@ package convex.gui.client;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.EventQueue;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -26,7 +28,7 @@ import convex.gui.utils.Toolkit;
 @SuppressWarnings("serial")
 public class ConvexClient extends JPanel {
 
-	private static final Logger log = Logger.getLogger(ConvexClient.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(ConvexClient.class.getName());
 
 	public static final AStore CLIENT_STORE = Stores.getGlobalStore();
 

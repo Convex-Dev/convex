@@ -3,7 +3,10 @@ package convex.net;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 import convex.core.data.Format;
 
@@ -18,7 +21,7 @@ public class MessageSender {
 	 */
 	private final ByteBuffer buffer = ByteBuffer.allocateDirect(SEND_BUFFER_SIZE).flip();
 
-	protected static final Logger log = Logger.getLogger(MessageSender.class.getName());
+	protected static final Logger log = LoggerFactory.getLogger(MessageSender.class.getName());
 
 	public MessageSender(ByteChannel channel) {
 		this.channel = channel;
@@ -58,7 +61,7 @@ public class MessageSender {
 			channel.write(buffer);
 
 			if (buffer.hasRemaining()) {
-				log.warning("Send buffer full!");
+				log.debug("Send buffer full!");
 				return true;
 			} else {
 				return false;

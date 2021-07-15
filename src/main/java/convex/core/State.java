@@ -5,10 +5,9 @@ import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import convex.core.util.Utils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
@@ -42,6 +41,7 @@ import convex.core.lang.Symbols;
 import convex.core.lang.impl.RecordFormat;
 import convex.core.transactions.ATransaction;
 import convex.core.util.Counters;
+import convex.core.util.Utils;
 
 /**
  * Class representing the immutable state of the CVM
@@ -70,8 +70,8 @@ public class State extends ARecord {
 	public static final State EMPTY = create(Vectors.empty(), BlobMaps.empty(), Constants.INITIAL_GLOBALS,
 			BlobMaps.empty());
 
-	private static final Logger log = Logger.getLogger(State.class.getName());
-	private static final Level LEVEL_SCHEDULE=Level.FINE;
+	private static final Logger log = LoggerFactory.getLogger(State.class.getName());
+
 
 	// Note: we are embedding these directly in the State cell.
 	// TODO: check we aren't at risk of hitting max encoding size limits
@@ -318,7 +318,7 @@ public class State extends ARecord {
 
 		// now apply the transactions!
 		int n = al.size();
-		log.log(LEVEL_SCHEDULE,"Applying " + n + " scheduled transactions");
+		log.debug("Applying {} scheduled transactions",n);
 		for (int i = 0; i < n; i++) {
 			AVector<ACell> st = (AVector<ACell>) al.get(i);
 			Address origin = (Address) st.get(0);
@@ -331,13 +331,13 @@ public class State extends ARecord {
 				if (ctx.isExceptional()) {
 					// TODO: what to do here? probably ignore
 					// we maybe need to think about reporting scheduled results?
-					log.log(LEVEL_SCHEDULE,"Scheduled transaction error: " + ctx.getExceptional());
+					log.trace("Scheduled transaction error: {}", ctx.getExceptional());
 				} else {
 					state = ctx.getState();
-					log.log(LEVEL_SCHEDULE,"Scheduled transaction succeeded");
+					log.trace("Scheduled transaction succeeded");
 				}
 			} catch (Exception e) {
-				log.log(LEVEL_SCHEDULE,"Scheduled transaction failed");
+				log.trace("Scheduled transaction failed: {}",e);
 				e.printStackTrace();
 			}
 
@@ -378,7 +378,7 @@ public class State extends ARecord {
 				String msg= "Unexpected fatal exception applying transaction: "+t.toString();
 				results[i] = Result.create(CVMLong.create(i), Strings.create(msg),ErrorCodes.UNEXPECTED);
 				t.printStackTrace();
-				log.severe(msg);
+				log.error(msg);
 			}
 		}
 

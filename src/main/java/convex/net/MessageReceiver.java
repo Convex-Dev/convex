@@ -5,7 +5,9 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ReadableByteChannel;
 import java.util.function.Consumer;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
 import convex.core.data.ACell;
@@ -42,7 +44,7 @@ public class MessageReceiver {
 
 	private long receivedMessageCount = 0;
 
-	private static final Logger log = Logger.getLogger(MessageReceiver.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(MessageReceiver.class.getName());
 
 	public MessageReceiver(Consumer<Message> receiveAction, Connection pc) {
 		this.action = receiveAction;
@@ -158,14 +160,14 @@ public class MessageReceiver {
 		receivedMessageCount++;
 		if (action != null) {
 			try {
-				log.finest("Message received: " + message.getType());
+				log.trace("Message received: {}", message.getType());
 				action.accept(message);
 			} catch (Exception e) {
-				log.warning("Exception not handled from: " + peerConnection.getRemoteAddress());
+				log.warn("Exception not handled from: " + peerConnection.getRemoteAddress());
 				e.printStackTrace();
 			}
 		} else {
-			log.warning("Ignored message because no receive action set: " + message);
+			log.warn("Ignored message because no receive action set: " + message);
 		}
 	}
 
