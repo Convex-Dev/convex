@@ -11,8 +11,10 @@ import java.nio.channels.FileChannel.MapMode;
 import java.nio.channels.FileLock;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 import convex.api.Shutdown;
 import convex.core.Constants;
@@ -106,10 +108,7 @@ public class Etch {
 	private static final long PTR_START=0x8000000000000000L; // start of chained entries
 	private static final long PTR_CHAIN=0xC000000000000000L; // chained entries after start
 
-	private static final Logger log=Logger.getLogger(Etch.class.getName());
-
-	private static final Level LEVEL_STORE=Level.FINE;
-	
+	private static final Logger log=LoggerFactory.getLogger(Etch.class.getName());
 	
 	/**
 	 * Temporary byte array for writer. Must not be used by readers.
@@ -148,7 +147,7 @@ public class Etch {
 		FileChannel fileChannel=this.data.getChannel();
 		FileLock lock=fileChannel.tryLock();
 		if (lock==null) {
-			log.log(Level.SEVERE,"Unable to obtain lock on file: "+dataFile);
+			log.error("Unable to obtain lock on file: {}",dataFile);
 			throw new IOException("File lock failed");
 		}
 		
@@ -224,7 +223,7 @@ public class Etch {
 	 */
 	public static Etch create(File file) throws IOException {
 		Etch etch= new Etch(file);
-		log.log(LEVEL_STORE,"Etch created on file: "+file+" with data length: "+etch.dataLength);
+		log.debug("Etch created on file: {} with data length: {}"+file,etch.dataLength);
 		return etch;
 	}
 	
@@ -564,9 +563,9 @@ public class Etch {
 			
 			data.close();
 	
-			log.log(LEVEL_STORE,"Etch closed on file: "+data+" with data length: "+dataLength);
+			log.debug("Etch closed on file: "+data+" with data length: "+dataLength);
 		} catch (IOException e) {
-			log.severe("Error closing Etch file: "+file);
+			log.error("Error closing Etch file: "+file);
 			e.printStackTrace();
 		}
 	}

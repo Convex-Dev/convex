@@ -11,8 +11,9 @@ import java.awt.Font;
 import java.awt.GridLayout;
 import java.io.File;
 import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.awt.Color;
 import javax.swing.border.EtchedBorder;
 import javax.swing.border.TitledBorder;
@@ -27,7 +28,7 @@ import javax.swing.JFileChooser;
 @SuppressWarnings("serial")
 public class DatabasePanel extends JPanel {
 	
-	public static final Logger log = Logger.getLogger(DatabasePanel.class.getName());
+	public static final Logger log = LoggerFactory.getLogger(DatabasePanel.class.getName());
 
 	
 	/**
@@ -71,14 +72,14 @@ public class DatabasePanel extends JPanel {
 		
 		        if (returnVal == JFileChooser.APPROVE_OPTION) {
 		            File file = fc.getSelectedFile();
-		            log.log(Level.INFO,"Opening Etch Database: " + file.getName());
+		            log.info("Opening Etch Database: {}", file.getName());
 		            
 		            if (file.exists()) {
 		            	try {
 		            		EtchStore newEtch=EtchStore.create(file);
 		            		explorer.setStore(newEtch);
 		            	} catch (IOException ex) {
-				            log.log(Level.WARNING,"Error opening Etch database: " + ex.getMessage());
+				            log.error("Error opening Etch database: " + ex.getMessage());
 				        			            		
 		            	}
 		            }

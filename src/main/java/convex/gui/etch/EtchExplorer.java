@@ -4,7 +4,8 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.EventQueue;
 import java.awt.Toolkit;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -21,7 +22,7 @@ import etch.EtchStore;
 @SuppressWarnings("serial")
 public class EtchExplorer extends JPanel {
 
-	public static final Logger log = Logger.getLogger(EtchExplorer.class.getName());
+	public static final Logger log = LoggerFactory.getLogger(EtchExplorer.class.getName());
 
 	private static JFrame frame;
 

@@ -2,7 +2,9 @@ package convex.gui.manager.mainpanels.actors;
 
 import java.awt.BorderLayout;
 import java.util.function.Consumer;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -32,7 +34,7 @@ import convex.gui.utils.Toolkit;
 @SuppressWarnings("serial")
 public class OraclePanel extends JPanel {
 
-	public static final Logger log = Logger.getLogger(OraclePanel.class.getName());
+	public static final Logger log = LoggerFactory.getLogger(OraclePanel.class.getName());
 
 	Address oracleAddress = PeerGUI.getLatestState().lookupCNS("convex.trusted-oracle");
 
@@ -154,7 +156,7 @@ public class OraclePanel extends JPanel {
 				showResult("Prediction market deployed: " + addr);
 			} else {
 				String resultString = "Expected Address but got: " + m;
-				log.warning(resultString);
+				log.warn(resultString);
 				Toast.display(scrollPane, resultString, Toast.FAIL);
 			}
 		}

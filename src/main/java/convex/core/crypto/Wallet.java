@@ -6,14 +6,17 @@ import java.io.FileOutputStream;
 import java.security.KeyStore;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 import convex.core.data.Address;
 
 public class Wallet {
 	public static final String KEYSTORE_TYPE="pkcs12";
 	
-	private static final Logger log = Logger.getLogger(Wallet.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(Wallet.class.getName());
 
 	private HashMap<Address, WalletEntry> data;
 

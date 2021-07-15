@@ -3,7 +3,10 @@ package convex.core.store;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.function.Consumer;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 import convex.core.data.ACell;
 import convex.core.data.Hash;
@@ -18,7 +21,7 @@ import convex.core.util.Utils;
 public class MemoryStore extends AStore {
 	public static final MemoryStore DEFAULT = new MemoryStore();
 	
-	private static final Logger log = Logger.getLogger(MemoryStore.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(MemoryStore.class.getName());
 
 	/**
 	 * Storage of persisted Refs for each hash value
@@ -77,8 +80,10 @@ public class MemoryStore extends AStore {
 		if (topLevel||!embedded) {
 			// Persist at top level
 			final Hash fHash = (hash!=null)?hash:ref.getHash();
-			log.log(Stores.PERSIST_LOG_LEVEL,()->"Persisting ref 0x"+fHash.toHexString()+" of class "+Utils.getClassName(oTemp)+" with store "+this);
-
+			if (log.isTraceEnabled()) {
+				log.trace("Persisting ref 0x"+fHash.toHexString()+" of class "+Utils.getClassName(oTemp)+" with store "+this);
+			}
+			
 			hashRefs.put(fHash, (Ref<ACell>) ref);
 			if (noveltyHandler != null) noveltyHandler.accept((Ref<ACell>) ref);
 		}

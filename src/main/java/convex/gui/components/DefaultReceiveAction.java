@@ -1,7 +1,8 @@
 package convex.gui.components;
 
 import java.util.function.Consumer;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.JComponent;
 
@@ -11,7 +12,7 @@ import convex.core.util.Utils;
 
 public class DefaultReceiveAction implements Consumer<Result> {
 
-	public static final Logger log = Logger.getLogger(DefaultReceiveAction.class.getName());
+	public static final Logger log = LoggerFactory.getLogger(DefaultReceiveAction.class.getName());
 
 	private JComponent parent;
 

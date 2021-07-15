@@ -10,8 +10,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
 import convex.core.Result;
@@ -56,9 +57,7 @@ import convex.peer.Server;
 @SuppressWarnings("unused")
 public class Convex {
 
-	private static final Logger log = Logger.getLogger(Convex.class.getName());
-
-	private static final Level LEVEL_AQUIRE = Level.FINER;
+	private static final Logger log = LoggerFactory.getLogger(Convex.class.getName());
 
 	/**
 	 * Key pair for this Client
@@ -103,8 +102,8 @@ public class Convex {
 					awaiting.remove(id);
 					cf.complete(v);
 				} else {
-					log.warning(
-							"Unexpected result received for message ID: " + id + " - was not expecting this message");
+					log.warn(
+							"Ignored Result received for unexpected message ID: {}", id);
 				}
 			}
 
@@ -118,7 +117,7 @@ public class Convex {
 				try {
 					delegatedHandler.accept(m);
 				} catch (Throwable t) {
-					log.warning("Exception thrown in user-supplied handler function:" + t);
+					log.warn("Exception thrown in user-supplied handler function: {}", t);
 				}
 			}
 		}
@@ -530,10 +529,10 @@ public class Convex {
 						}
 						for (Hash h : missingSet) {
 							// send missing data requests until we fill pipeline
-							log.log(LEVEL_AQUIRE, "Request missing: " + h);
+							log.debug( "Request missing data: {}" , h);
 							boolean sent = connection.sendMissingData(h);
 							if (!sent) {
-								log.log(LEVEL_AQUIRE, "Queue full!");
+								log.debug("Send Queue full!");
 								break;
 							}
 						}
@@ -552,7 +551,7 @@ public class Convex {
 								f.complete(ref.getValue());
 							} catch (MissingDataException e) {
 								Hash missing = e.getMissingHash();
-								log.log(LEVEL_AQUIRE, "Still missing: " + missing);
+								log.debug("Still missing: {}", missing);
 								connection.sendMissingData(missing);
 							}
 						}

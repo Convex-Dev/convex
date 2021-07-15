@@ -3,14 +3,15 @@ package etch;
 import java.io.File;
 import java.io.IOException;
 import java.util.function.Consumer;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.Utils;
 
 /**
@@ -26,7 +27,7 @@ import convex.core.util.Utils;
  * Garbage collection is left as an exercise for the reader.
  */
 public class EtchStore extends AStore {
-	private static final Logger log = Logger.getLogger(EtchStore.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(EtchStore.class.getName());
 
 	/**
 	 * Etch Storage of persisted Refs for each hash value
@@ -141,9 +142,11 @@ public class EtchStore extends AStore {
 		if (topLevel || !embedded) {
 			// Do actual write to store
 			final Hash fHash = (hash != null) ? hash : ref.getHash();
-			log.log(Stores.PERSIST_LOG_LEVEL, () -> "Etch persisting at status=" + requiredStatus + " hash = 0x"
-					+ fHash.toHexString() + " ref of class " + Utils.getClassName(cell) + " with store " + this);
-
+			if (log.isTraceEnabled()) {
+				log.trace( "Etch persisting at status=" + requiredStatus + " hash = 0x"
+						+ fHash.toHexString() + " ref of class " + Utils.getClassName(cell) + " with store " + this);
+			}
+			
 			Ref<ACell> result;
 			try {
 				// ensure status is set when we write to store

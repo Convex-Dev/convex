@@ -8,7 +8,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
@@ -41,7 +42,7 @@ public class PeersListPanel extends JPanel {
 	JPanel peerViewPanel;
 	JScrollPane scrollPane;
 
-	private static final Logger log = Logger.getLogger(PeersListPanel.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(PeersListPanel.class.getName());
 
 	public void launchAllPeers(PeerGUI manager) {
 		int N=PeerGUI.KEYPAIRS.size();

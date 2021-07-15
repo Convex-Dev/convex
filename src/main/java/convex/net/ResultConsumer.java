@@ -4,8 +4,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.function.Consumer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.core.Result;
 import convex.core.data.ACell;
@@ -22,11 +23,7 @@ import convex.core.util.Utils;
  */
 public abstract class ResultConsumer implements Consumer<Message> {
 
-	private static final Logger log = Logger.getLogger(ResultConsumer.class.getName());
-
-	private static final Level LEVEL_RESULT= Level.FINER;
-	private static final Level LEVEL_ERROR = Level.FINER;
-	private static final Level LEVEL_MISSING = Level.INFO;
+	private static final Logger log = LoggerFactory.getLogger(ResultConsumer.class.getName());
 
 	@Override
 	public void accept(Message m) {
@@ -40,7 +37,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 						Ref<?> r = Ref.get(o);
 						r.persistShallow();
 						Hash h=r.getHash();
-						log.log(LEVEL_RESULT,"Recieved DATA for hash "+h);
+						log.trace("Recieved DATA for hash {}",h);
 						unbuffer(h);
 					} catch (MissingDataException e) {
 						// ignore?
@@ -54,7 +51,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 					if (r != null) try {
 						m.getPeerConnection().sendData(r.getValue());
 					} catch (IOException e) {
-						log.warning(e.getMessage());
+						log.warn("Error replying to MISSING DATA request",e);
 					}
 					break;
 				}
@@ -63,11 +60,11 @@ public abstract class ResultConsumer implements Consumer<Message> {
 					break;
 				}
 				default: {
-					log.log(LEVEL_ERROR, "Message type ignored: " + type);
+					log.error("Message type ignored: ", type);
 				}
 			}
 		} catch (Throwable t) {
-			log.warning("Failed to accept message!");
+			log.warn("Failed to accept message! {}",t);
 			t.printStackTrace();
 		}
 	}
@@ -120,7 +117,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	 * @param value The result value
 	 */
 	protected void handleResult(Object value) {
-		log.log(LEVEL_RESULT,"RESULT RECEIVED: " + value);
+		log.debug("RESULT RECEIVED: {}", value);
 	}
 
 	/**
@@ -148,14 +145,14 @@ public abstract class ResultConsumer implements Consumer<Message> {
 			Hash hash = e.getMissingHash();
 			try {
 				if (m.getPeerConnection().sendMissingData(hash)) {
-					log.log(LEVEL_MISSING,"Missing data "+hash.toHexString()+" requested by client for RESULT of type: "+Utils.getClassName(result));
+					log.debug("Missing data {} requested by client for RESULT of type: {}",hash.toHexString(),Utils.getClassName(result));
 					buffer(hash, m);
 				} else {
-					log.log(LEVEL_MISSING,"Unable to request missing data");
+					log.debug("Unable to request missing data");
 				}
 			} catch (IOException e1) {
 				// Ignore. We probably lost this result?
-				log.log(LEVEL_MISSING,"IO Exception handling result - "+e1.getMessage());
+				log.warn("IO Exception handling result - {}",e1);
 			}
 			return;
 		}
@@ -189,6 +186,6 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	 * @param errorMessage The error message associated with the result (may be null)
 	 */
 	protected void handleError(Object code, Object errorMessage) {
-		log.log(LEVEL_ERROR,"Error received: " + code + " : " + errorMessage);
+		log.debug("Error received: {} :  {}", code, errorMessage);
 	}
 }

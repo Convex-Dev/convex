@@ -1,9 +1,11 @@
 package convex.cli;
 
 import java.util.List;
-import java.util.logging.Logger;
 
 import convex.core.crypto.AKeyPair;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
@@ -23,7 +25,7 @@ import picocli.CommandLine.ParentCommand;
 	description="Generate 1 or more private key pairs.")
 public class KeyGenerate implements Runnable {
 
-	private static final Logger log = Logger.getLogger(KeyGenerate.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(KeyGenerate.class);
 
 	@ParentCommand
 	protected Key keyParent;
@@ -40,10 +42,10 @@ public class KeyGenerate implements Runnable {
 		Main mainParent = keyParent.mainParent;
 		// check the number of keys to generate.
 		if (count <= 0) {
-			log.severe("You to provide 1 or more count of keys to generate");
+			log.warn("You to provide 1 or more count of keys to generate");
 			return;
 		}
-		log.info("will generate "+count+" keys");
+		log.info("Generating {} keys",count);
 
 		try {
 			List<AKeyPair> keyPairList = mainParent.generateKeyPairs(count);
@@ -51,7 +53,7 @@ public class KeyGenerate implements Runnable {
 				System.out.println("generated #"+(index+1)+" public key: " + keyPairList.get(index).getAccountKey().toHexString());
 			}
 		} catch (Error e) {
-			log.severe("Key generate error " + e);
+			log.error("Key generate error {}", e);
 			return;
 		}
 	}

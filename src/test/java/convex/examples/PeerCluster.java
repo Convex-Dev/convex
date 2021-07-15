@@ -3,7 +3,8 @@ package convex.examples;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
 import convex.core.State;
@@ -28,7 +29,7 @@ import convex.peer.Server;
 
 public class PeerCluster {
 
-	private static final Logger log = Logger.getLogger(PeerCluster.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(PeerCluster.class.getName());
 
 	public static final int NUM_PEERS = 5;
 	public static final ArrayList<Map<Keyword, Object>> PEER_CONFIGS = new ArrayList<>(NUM_PEERS);
@@ -93,7 +94,7 @@ public class PeerCluster {
 					Thread.sleep(1000);
 					// Log.info("Waiting...");
 				} catch (InterruptedException e) {
-					log.warning("Sleep interrupted?");
+					log.warn("Sleep interrupted?");
 					return;
 				}
 			}

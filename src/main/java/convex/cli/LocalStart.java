@@ -2,11 +2,12 @@ package convex.cli;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
 
 import convex.cli.peer.PeerManager;
 import convex.core.crypto.AKeyPair;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -24,7 +25,7 @@ import picocli.CommandLine.ParentCommand;
 	description="Starts a local convex test network.")
 public class LocalStart implements Runnable {
 
-	private static final Logger log = Logger.getLogger(LocalStart.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(LocalStart.class);
 
 	@ParentCommand
 	private Local localParent;
@@ -64,7 +65,7 @@ public class LocalStart implements Runnable {
 						keyPairList.add(keyPair);
 					}
 				} catch (Error e) {
-					log.severe(e.getMessage());
+					log.error(e.getMessage());
 					return;
 				}
 			}
@@ -82,7 +83,7 @@ public class LocalStart implements Runnable {
 							keyPairList.add(keyPair);
 						}
 					} catch (Error e) {
-						log.severe(e.getMessage());
+						log.error(e.getMessage());
 						return;
 					}
 				}
@@ -94,16 +95,16 @@ public class LocalStart implements Runnable {
 		}
 
 		if (count > keyPairList.size()) {
-			log.severe(
-				String.format("Not enougth public keys provided. " +
-				"You have requested %d peers to start, but only provided %d public keys",
+			log.error(
+				"Not enougth public keys provided. " +
+				"You have requested {} peers to start, but only provided {} public keys",
 				count,
 				keyPairList.size()
-				)
 			);
 		}
 		log.info("Starting local network with "+count+" peer(s)");
 		peerManager.launchLocalPeers(keyPairList);
+		log.info("Local Peers launched");
 		peerManager.showPeerEvents();
 	}
 }

@@ -11,7 +11,10 @@ import java.util.ArrayList;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 import javax.swing.JButton;
 import javax.swing.JOptionPane;
@@ -59,7 +62,7 @@ public class REPLPanel extends JPanel {
 
 	private final Convex convex;
 
-	private static final Logger log = Logger.getLogger(REPLPanel.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(REPLPanel.class.getName());
 
 	public void setInput(String s) {
 		inputArea.setText(s);
@@ -209,7 +212,7 @@ public class REPLPanel extends JPanel {
 				} else {
 					throw new Error("Unrecognosed REPL mode: " + mode);
 				}
-				log.finer("Sent message");
+				log.trace("Sent message");
 				
 				handleResult(future.get(5000, TimeUnit.MILLISECONDS));
 			} catch (TimeoutException t) {

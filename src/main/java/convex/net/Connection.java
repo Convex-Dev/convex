@@ -17,8 +17,9 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 import convex.core.Constants;
 import convex.core.Result;
@@ -78,13 +79,8 @@ public class Connection {
 	 */
 	private AccountKey trustedPeerKey;
 
-	private static final Logger log = Logger.getLogger(Connection.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(Connection.class.getName());
 
-	// Log level for send events
-	private static final Level LEVEL_SEND = Level.FINER;
-
-	// log lever for client events
-	private static final Level LEVEL_CLIENT = Level.FINER;
 
 	/**
 	 * Pre-allocated direct buffer for message sending TODO: is one per connection
@@ -181,7 +177,7 @@ public class Connection {
 
 		Connection pc = create(clientChannel, receiveAction, store, trustedPeerKey);
 		pc.startClientListening();
-		log.log(LEVEL_SEND, "Connect succeeded for host: " + hostAddress);
+		log.info("Connect succeeded for host: {}", hostAddress);
 		return pc;
 	}
 
@@ -230,7 +226,7 @@ public class Connection {
 	 * @throws IOException
 	 */
 	public boolean sendData(ACell value) throws IOException {
-		log.log(LEVEL_SEND, "Sending data: " + Utils.toString(value));
+		log.trace("Sending data: {}",value);
 		ByteBuffer buf = Format.encodedBuffer(value);
 		return sendBuffer(MessageType.DATA, buf);
 	}
@@ -243,7 +239,7 @@ public class Connection {
 	 * @throws IOException
 	 */
 	public boolean sendMissingData(Hash value) throws IOException {
-		log.finer("Requested missing data for hash: " + value.toHexString() + " with store " + Stores.current());
+		log.trace("Requested missing data for hash {} with store {}", value.toHexString() , Stores.current());
 		return sendObject(MessageType.MISSING_DATA, value);
 	}
 
@@ -462,8 +458,10 @@ public class Connection {
 		});
 
 		ByteBuffer buf = Format.encodedBuffer(sendVal);
-		log.log(LEVEL_SEND, () -> "Sending message: " + type + " :: " + payload + " to " + getRemoteAddress()
-				+ " format: " + Format.encodedBlob(payload).toHexString());
+		if (log.isTraceEnabled()) {
+			log.trace("Sending message: " + type + " :: " + payload + " to " + getRemoteAddress()
+			+ " format: " + Format.encodedBlob(payload).toHexString());
+		}
 		boolean sent = sendBuffer(type, buf);
 		return sent;
 	}
@@ -515,11 +513,15 @@ public class Connection {
 				selector.wakeup();
 			}
 
-			log.log(LEVEL_SEND, () -> "Sent message " + type + " of length: " + dataLength + " Connection ID: "
-					+ System.identityHashCode(this));
+			if (log.isTraceEnabled()) {
+				log.trace( "Sent message " + type + " of length: " + dataLength + " Connection ID: "
+						+ System.identityHashCode(this));
+			}
 		} else {
-			log.log(LEVEL_SEND, () -> "Failed to send message " + type + " of length: " + dataLength
-					+ " Connection ID: " + System.identityHashCode(this));
+			if (log.isTraceEnabled()) {
+				log.trace( "Failed to send message " + type + " of length: " + dataLength
+						+ " Connection ID: " + System.identityHashCode(this));
+			}
 		}
 		return sent;
 	}
@@ -594,7 +596,7 @@ public class Connection {
 		@Override
 		public void run() {
 
-			log.log(LEVEL_CLIENT, "Client selector loop started");
+			log.debug("Client selector loop started");
 			while (true) {
 				try {
 					selector.select(1000);
@@ -617,17 +619,17 @@ public class Connection {
 							}
 						} catch (ClosedChannelException e) {
 							// channel was closed, just lose the key?
-							log.log(LEVEL_SEND, "Unexpected ChannelClosedException, cancelling key: " + e.getMessage());
+							log.debug("Unexpected ChannelClosedException, cancelling key: {}", e);
 							key.cancel();
 						} catch (IOException e) {
-							log.log(LEVEL_SEND, "Unexpected IOException, cancelling key: " + e.getMessage());
+							log.debug("Unexpected IOException, cancelling key: {}", e);
 							key.cancel();
 						} catch (CancelledKeyException e) {
-							log.log(LEVEL_SEND, "Cancelled key");
+							log.debug("Cancelled key");
 						}
 					}
 				} catch (Throwable t) {
-					log.severe("Uncaught error in PeerConnection client selector loop: " + t);
+					log.error("Uncaught error in PeerConnection client selector loop: {}", t);
 					t.printStackTrace();
 				}
 			}
@@ -650,10 +652,10 @@ public class Connection {
 			int n = conn.handleChannelRecieve();
 			// log.finest("Received bytes: " + n);
 		} catch (ClosedChannelException e) {
-			log.log(LEVEL_CLIENT, "Channel closed from: " + conn.getRemoteAddress());
+			log.debug("Channel closed from: {}",conn.getRemoteAddress());
 			key.cancel();
 		} catch (BadFormatException e) {
-			log.log(NIOServer.LEVEL_BAD_CONNECTION, "Cancelled connection to Peer: Bad data format from: "
+			log.warn("Cancelled connection to Peer: Bad data format from: "
 					+ conn.getRemoteAddress() + " " + e.getMessage());
 			key.cancel();
 		}
@@ -701,7 +703,7 @@ public class Connection {
 			}
 		} catch (IOException e) {
 			// TODO: figure out cases here. Probably channel closed?
-			log.log(NIOServer.LEVEL_BAD_CONNECTION, e.getMessage());
+			log.warn("Unexpected IOException: {}", e);
 			key.cancel();
 		}
 	}

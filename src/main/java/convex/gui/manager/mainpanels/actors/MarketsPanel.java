@@ -1,7 +1,8 @@
 package convex.gui.manager.mainpanels.actors;
 
 import java.awt.BorderLayout;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
@@ -19,7 +20,7 @@ import convex.gui.manager.PeerGUI;
 @SuppressWarnings("serial")
 public class MarketsPanel extends JPanel {
 
-	private static final Logger log = Logger.getLogger(MarketsPanel.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(MarketsPanel.class.getName());
 	AccountChooserPanel acctChooser;
 
 	static DefaultListModel<Address> marketList = new DefaultListModel<Address>();
