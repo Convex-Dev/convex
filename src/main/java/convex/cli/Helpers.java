@@ -157,7 +157,7 @@ public class Helpers {
 
 
 	public static List<String> splitArrayParameter(String[] parameterValue) {
-		List<String> result = new ArrayList(parameterValue.length);
+		List<String> result = new ArrayList<>(parameterValue.length);
 		for (int index = 0; index < parameterValue.length; index ++) {
 			String value = parameterValue[index];
 			String[] items = new String[1];
