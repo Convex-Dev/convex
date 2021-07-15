@@ -3,9 +3,6 @@ package convex.cli;
 import java.io.File;
 import java.io.IOException;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import convex.cli.peer.PeerManager;
 import convex.core.Belief;
 import convex.core.crypto.AKeyPair;
@@ -14,6 +11,9 @@ import convex.core.data.SignedData;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import etch.EtchStore;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
@@ -30,7 +30,7 @@ import picocli.CommandLine.Spec;
 @Command(name = "start", aliases = { "st" }, mixinStandardHelpOptions = true, description = "Starts a local peer.")
 public class PeerStart implements Runnable {
 
-	private static final Logger log = LoggerFactory.getLogger(PeerStart.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(PeerStart.class);
 
 	@ParentCommand
 	private Peer peerParent;
@@ -74,15 +74,15 @@ public class PeerStart implements Runnable {
 		try {
 			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
 		} catch (Error e) {
-			log.info(e.getMessage());
+			log.error(e.getMessage());
 			return;
 		}
 
 		if (port != 0) {
 			port = Math.abs(port);
 		}
-		if (addressNumber == 0) {
-			System.out.println("please provide an account address to run the peer from.");
+		if ( addressNumber == 0) {
+			log.warn("please provide an account address to run the peer from.");
 			return;
 		}
 		Address peerAddress = Address.create(addressNumber);
@@ -111,8 +111,8 @@ public class PeerStart implements Runnable {
 			peerManager.launchPeer(keyPair, peerAddress, hostname, port, store, remotePeerHostname, signedBelief);
 			peerManager.showPeerEvents();
 		} catch (Throwable t) {
-			System.out.println("Unable to launch peer " + t);
-			t.printStackTrace();
+			log.error("Unable to launch peer {}", t);
+			// t.printStackTrace();
 		}
 	}
 }

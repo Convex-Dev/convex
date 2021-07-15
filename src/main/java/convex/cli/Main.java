@@ -7,17 +7,15 @@ import java.security.KeyStore
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
-//import java.util.logging.Handler;
-//import java.util.logging.Level;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.data.Address;
 import convex.core.init.AInitConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -51,7 +49,8 @@ import picocli.CommandLine.ScopeType;
 
 public class Main implements Runnable {
 
-	private static final Logger log = LoggerFactory.getLogger(Main.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(Main.class);
+
 
 	private static CommandLine commandLine;
     public static AInitConfig initConfig = AInitConfig.create();
@@ -120,14 +119,21 @@ public class Main implements Runnable {
 		}
 
 		if (verbose) {
-			// TODO: figure out verbose strategy. Should this go to STDOUT?
-			//Logger root = Logger.getLogger("");
-			//Level targetLevel = Level.ALL;
-			//root.setLevel(targetLevel);
-			//for (Handler handler: root.getHandlers()) {
-			//	handler.setLevel(targetLevel);
-			//}
-			// log.log(targetLevel, "Set level ALL");
+		/*
+			Logger root = LoggerFactory.getLogger("");
+			root.setLevel(Level.TRACE);
+			log.info("Set log level TRACE");
+		*/
+		/*
+			Logger root = Logger.getLogger("");
+			Level targetLevel = Level.ALL;
+			root.setLevel(targetLevel);
+			for (Handler handler: root.getHandlers()) {
+				handler.setLevel(targetLevel);
+			}
+			log.log(targetLevel, "Set level ALL");
+		*/
+
 		}
 		int result = 0;
 		try {

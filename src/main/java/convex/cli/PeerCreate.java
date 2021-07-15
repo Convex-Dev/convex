@@ -2,9 +2,6 @@ package convex.cli;
 
 import java.io.File;
 import java.security.KeyStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
@@ -16,6 +13,8 @@ import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.Result;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
@@ -38,7 +37,7 @@ import picocli.CommandLine.Spec;
 	description="Creates a keypair, new account and a funding stake: to run a local peer.")
 public class PeerCreate implements Runnable {
 
-	private static final Logger log = LoggerFactory.getLogger(PeerCreate.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(PeerCreate.class);
 
 	@ParentCommand
 	private Peer peerParent;
@@ -122,7 +121,7 @@ public class PeerCreate implements Runnable {
 			ATransaction transaction = Invoke.create(address, -1, message);
 			Result result = convex.transactSync(transaction, timeout);
 			if (result.isError()) {
-				System.err.println("cannot create peer on the network: " + result.getErrorCode() + result.getTrace());
+				log.error("cannot create peer on the network: {} {} ", result.getErrorCode(), result.getTrace());
 				return;
 			}
 			long currentBalance = convex.getBalance(address);
@@ -144,7 +143,7 @@ public class PeerCreate implements Runnable {
 				"\n"
 			);
 		} catch (Throwable t) {
-			System.out.println("Unable to launch peer "+t);
+			log.error("Unable to launch peer {}", t);
 		}
 	}
 }

@@ -1,13 +1,13 @@
 package convex.cli;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import convex.api.Convex;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.lang.Reader;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -27,7 +27,7 @@ import picocli.CommandLine.ParentCommand;
 	description="Get account balance.")
 public class AccountBalance implements Runnable {
 
-	private static final Logger log = LoggerFactory.getLogger(AccountBalance.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(AccountBalance.class);
 
 	@ParentCommand
 	private Account accountParent;
@@ -53,7 +53,7 @@ public class AccountBalance implements Runnable {
 		Main mainParent = accountParent.mainParent;
 
 		if (addressNumber == 0) {
-			log.error("You need to provide a valid address number");
+			log.warn("You need to provide a valid address number");
 			return;
 		}
 
@@ -67,7 +67,7 @@ public class AccountBalance implements Runnable {
 			System.out.println(result);
 		} catch (Throwable t) {
 			log.error(t.getMessage());
-			t.printStackTrace();
+			// t.printStackTrace();
 			return;
 		}
 
