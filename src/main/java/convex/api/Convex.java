@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
+import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
@@ -91,7 +92,7 @@ public class Convex {
 		protected synchronized void handleResultMessage(Message m) {
 			Result v = m.getPayload();
 
-			if ((v!=null)&&(Keywords.SEQUENCE.equals(v.getErrorCode()))) {
+			if ((v!=null)&&(ErrorCodes.SEQUENCE.equals(v.getErrorCode()))) {
 				// We probably got a wrong sequence number. Kill the stored value.
 				sequence=null;
 			}
