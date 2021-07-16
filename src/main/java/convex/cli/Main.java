@@ -268,12 +268,12 @@ public class Main implements Runnable {
 		if (password == null) {
 			throw new Error("You need to provide a keystore password");
 		}
-        // get the key store file
+		// get the key store file
 		File keyFile = new File(getKeyStoreFilename());
 
 		KeyStore keyStore = null;
 		try {
-            // try to load the keystore file
+			// try to load the keystore file
 			if (keyFile.exists()) {
 				keyStore = PFXTools.loadStore(keyFile, password);
 			} else {
@@ -288,24 +288,31 @@ public class Main implements Runnable {
 		// we have now the count, keystore-password, keystore-file
 		// generate keys
 		for (int index = 0; index < count; index ++) {
-            AKeyPair keyPair = AKeyPair.generate();
+			AKeyPair keyPair = AKeyPair.generate();
 			keyPairList.add(keyPair);
 
 			// System.out.println("generated #"+(index+1)+" public key: " + keyPair.getAccountKey().toHexString());
 			try {
-                // save the key in the keystore
+				// save the key in the keystore
 				PFXTools.saveKey(keyStore, keyPair, password);
 			} catch (Throwable t) {
 				throw new Error("Cannot store the key to the key store "+t);
 			}
 		}
 
-        // save the keystore file
+		// save the keystore file
 		try {
 			PFXTools.saveStore(keyStore, keyFile, password);
 		} catch (Throwable t) {
 			throw new Error("Cannot save the key store file "+t);
 		}
 		return keyPairList;
-    }
+	}
+
+    void showError(Throwable t) {
+		log.error(t.getMessage());
+		if (verbose.length > 0) {
+			t.printStackTrace();
+		}
+	}
 }

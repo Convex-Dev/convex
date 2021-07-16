@@ -121,7 +121,7 @@ public class PeerCreate implements Runnable {
 			ATransaction transaction = Invoke.create(address, -1, message);
 			Result result = convex.transactSync(transaction, timeout);
 			if (result.isError()) {
-				log.error("cannot create peer on the network: {} {} ", result.getErrorCode(), result.getTrace());
+				mainParent.output.setResult(result);
 				return;
 			}
 			long currentBalance = convex.getBalance(address);
@@ -145,7 +145,7 @@ public class PeerCreate implements Runnable {
 				)
 			);
 		} catch (Throwable t) {
-			log.error("Unable to launch peer {}", t);
+			mainParent.showError(t);
 		}
 	}
 }

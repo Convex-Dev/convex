@@ -66,7 +66,7 @@ public class Query implements Runnable {
 		try {
 			convex = mainParent.connectToSessionPeer(hostname, port, Address.create(address), null);
 		} catch (Error e) {
-			log.error(e.getMessage());
+			mainParent.showError(e);
 			return;
 		}
 		try {
@@ -74,13 +74,8 @@ public class Query implements Runnable {
 			ACell message = Reader.read(queryCommand);
 			Result result = convex.querySync(message, timeout);
 			mainParent.output.setResult(result);
-		} catch (IOException e) {
-			log.error("Query Error: {}", e.getMessage());
-			// TODO Auto-generated catch block
-			// e.printStackTrace();
-			return;
-		}  catch (TimeoutException e) {
-			log.error("Query timeout");
+		} catch (IOException | TimeoutException e) {
+			mainParent.showError(e);
 		}
 	}
 

@@ -72,7 +72,7 @@ public class AccountFund implements Runnable {
 		try {
 			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
 		} catch (Error e) {
-			log.error(e.getMessage());
+			mainParent.showError(e);
 			return;
 		}
 
@@ -90,10 +90,7 @@ public class AccountFund implements Runnable {
 			Long balance = convex.getBalance(address);
 			mainParent.output.setField("Balance", balance);
 		} catch (Throwable t) {
-			log.error(t.getMessage());
-			// t.printStackTrace();
-			return;
+			mainParent.showError(t);
 		}
-
 	}
 }

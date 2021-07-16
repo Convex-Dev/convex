@@ -76,7 +76,7 @@ public class PeerStart implements Runnable {
 		try {
 			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
 		} catch (Error e) {
-			log.error(e.getMessage());
+			mainParent.showError(e);
 			return;
 		}
 
@@ -118,8 +118,7 @@ public class PeerStart implements Runnable {
 			peerManager.launchPeer(keyPair, peerAddress, hostname, port, store, remotePeerHostname, signedBelief);
 			peerManager.showPeerEvents();
 		} catch (Throwable t) {
-			log.error("Unable to launch peer {}", t);
-			// t.printStackTrace();
+			mainParent.showError(t);
 		}
 	}
 }

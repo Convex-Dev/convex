@@ -53,8 +53,7 @@ public class KeyGenerate implements Runnable {
 				System.out.println("generated #"+(index+1)+" public key: " + keyPairList.get(index).getAccountKey().toHexString());
 			}
 		} catch (Error e) {
-			log.error("Key generate error {}", e);
-			return;
+			mainParent.showError(e);
 		}
 	}
 }

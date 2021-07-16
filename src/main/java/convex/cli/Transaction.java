@@ -74,7 +74,7 @@ public class Transaction implements Runnable {
 		try {
 			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
 		} catch (Error e) {
-			log.error(e.getMessage());
+			mainParent.showError(e);
 			return;
 		}
 
@@ -100,9 +100,7 @@ public class Transaction implements Runnable {
 			Result result = convex.transactSync(transaction, timeout);
 			mainParent.output.setResult(result);
 		} catch (Throwable t) {
-			log.error(t.getMessage());
-			// t.printStackTrace();
-			return;
+			mainParent.showError(t);
 		}
 	}
 

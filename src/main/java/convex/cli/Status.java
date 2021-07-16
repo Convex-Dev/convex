@@ -74,7 +74,7 @@ public class Status implements Runnable {
 		try {
 			convex = mainParent.connectToSessionPeer(hostname, port, Main.initConfig.getUserAddress(0), Main.initConfig.getUserKeyPair(0));
 		} catch (Throwable t) {
-			log.error(t.getMessage());
+			mainParent.showError(t);
 			return;
 		}
 
@@ -99,7 +99,7 @@ public class Status implements Runnable {
 			mainParent.output.setField("Number of accounts", accountList.size());
 			mainParent.output.setField("Number of peers", peerList.size());
 		} catch (Throwable t) {
-			log.error("Not possible to get status information: {}", t);
+			mainParent.showError(t);
 		}
 	}
 

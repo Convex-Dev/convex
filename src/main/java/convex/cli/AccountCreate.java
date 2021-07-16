@@ -70,7 +70,7 @@ public class AccountCreate implements Runnable {
 			try {
 				keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
 			} catch (Error e) {
-				log.error(e.getMessage());
+				mainParent.showError(e);
 				return;
 			}
 			if (keyPair == null) {
@@ -85,7 +85,7 @@ public class AccountCreate implements Runnable {
 				mainParent.output.setField("Public Key", keyPair.getAccountKey().toHexString());
 			}
 			catch (Error e) {
-				log.error(e.getMessage());
+				mainParent.showError(e);
 				return;
 			}
 		}
@@ -115,8 +115,7 @@ public class AccountCreate implements Runnable {
 				)
 			);
 		} catch (Throwable t) {
-			log.error(t.getMessage());
-			return;
+			mainParent.showError(t);
 		}
 	}
 }

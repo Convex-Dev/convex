@@ -54,7 +54,7 @@ public class KeyList implements Runnable {
 			}
 
 		} catch (Throwable t) {
-			log.error("Cannot load key store {}", t);
+			mainParent.showError(t);
 		}
 	}
 

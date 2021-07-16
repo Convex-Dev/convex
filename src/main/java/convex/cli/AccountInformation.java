@@ -70,9 +70,7 @@ public class AccountInformation implements Runnable {
 			Result result = convex.querySync(message, timeout);
 			mainParent.output.setResult(result);
 		} catch (Throwable t) {
-			log.error(t.getMessage());
-			// t.printStackTrace();
-			return;
+			mainParent.showError(t);
 		}
 
 	}

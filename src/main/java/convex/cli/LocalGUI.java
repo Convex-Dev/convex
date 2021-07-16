@@ -25,11 +25,13 @@ public class LocalGUI implements Runnable {
 
 	@Override
 	public void run() {
+		Main mainParent = localParent.mainParent;
+
 		// sub command to launch peer manager
 		try {
 			Applications.launchApp(convex.gui.manager.PeerGUI.class);
 		} catch (Throwable t) {
-			System.err.println("cannot start local PeerManager "+t);
+			mainParent.showError(t);
 		}
 	}
 }
