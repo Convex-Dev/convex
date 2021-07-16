@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 import convex.api.Convex;
+import convex.cli.peer.SessionItem;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.data.ABlob;
@@ -60,7 +61,8 @@ public class Status implements Runnable {
 
 		if (port == 0) {
 			try {
-                port = Helpers.getSessionPort(mainParent.getSessionFilename());
+                SessionItem item = Helpers.getSessionItem(mainParent.getSessionFilename());
+				port = item.getPort();
 			} catch (IOException e) {
 				log.warn("Cannot load the session control file");
 			}
@@ -72,7 +74,7 @@ public class Status implements Runnable {
 
 		Convex convex = null;
 		try {
-			convex = mainParent.connectToSessionPeer(hostname, port, Main.initConfig.getUserAddress(0), Main.initConfig.getUserKeyPair(0));
+			convex = mainParent.connectAsPeer(0);
 		} catch (Throwable t) {
 			mainParent.showError(t);
 			return;

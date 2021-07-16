@@ -93,11 +93,7 @@ public class AccountCreate implements Runnable {
 		Convex convex = null;
 		try {
 
-			convex = mainParent.connectToSessionPeer(
-				hostname,
-				port,
-				Main.initConfig.getUserAddress(0),
-				Main.initConfig.getUserKeyPair(0));
+			convex = mainParent.connectAsPeer(0);
 
 			Address address = convex.createAccount(keyPair.getAccountKey());
 			mainParent.output.setField("Address", address.longValue());
@@ -107,7 +103,7 @@ public class AccountCreate implements Runnable {
 				Long balance = convex.getBalance(address);
 				mainParent.output.setField("Balance", balance);
 			}
-			mainParent.output.setField("Account",
+			mainParent.output.setField("Account usage",
 				String.format(
 					"to use this key can use the options --address=%d --public-key=%s",
 					address.toLong(),

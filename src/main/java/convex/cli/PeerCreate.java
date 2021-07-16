@@ -101,12 +101,7 @@ public class PeerCreate implements Runnable {
 			PFXTools.saveStore(keyStore, keyFile, mainParent.getPassword());
 
 			// connect using the default first user
-			Convex convex = mainParent.connectToSessionPeer(
-				hostname,
-				port,
-				Main.initConfig.getUserAddress(0),
-				Main.initConfig.getUserKeyPair(0));
-
+			Convex convex = mainParent.connectAsPeer(0);
 			// create an account
 			Address address = convex.createAccount(keyPair.getAccountKey());
 			convex.transferSync(address, peerStake);
