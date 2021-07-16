@@ -88,7 +88,7 @@ public class AccountFund implements Runnable {
 			convex.transferSync(address, amount);
 			convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
 			Long balance = convex.getBalance(address);
-			log.info("account balance: {}", balance);
+			mainParent.output.setField("Balance", balance);
 		} catch (Throwable t) {
 			log.error(t.getMessage());
 			// t.printStackTrace();

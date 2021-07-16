@@ -54,7 +54,8 @@ public class Main implements Runnable {
 
 
 	private static CommandLine commandLine;
-    public static AInitConfig initConfig = AInitConfig.create();
+	public static AInitConfig initConfig = AInitConfig.create();
+	public Output output = new Output();
 
 
 	@Option(names={ "-c", "--config"},
@@ -132,6 +133,8 @@ public class Main implements Runnable {
 		int result = 0;
 		try {
 			result = commandLine.execute(args);
+			output.writeToStream(System.out);
+
 		} catch (Throwable t) {
 			log.error("Error executing command line: {}",t.getMessage());
 			return 2;

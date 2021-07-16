@@ -67,7 +67,7 @@ public class PeerCreate implements Runnable {
 
 	@Option(names={"-t", "--timeout"},
 		description="Timeout in miliseconds.")
-	private long timeout = 5000;
+	private long timeout = Constants.DEFAULT_TIMEOUT_MILLIS;
 
 
 	@Override
@@ -126,21 +126,23 @@ public class PeerCreate implements Runnable {
 			}
 			long currentBalance = convex.getBalance(address);
 
-			System.out.println("Created the following items:");
-			System.out.println("Public Peer Key: " + keyPair.getAccountKey());
-			System.out.println("Account address: "+ address);
-			System.out.println("Current balance: " + currentBalance);
-			System.out.println("Inital stake amount: " + stakeAmount);
+			mainParent.output.setField("Public Peer Key", keyPair.getAccountKey().toString());
+			mainParent.output.setField("Address", address.longValue());
+			mainParent.output.setField("Balance", currentBalance);
+			mainParent.output.setField("Inital stake amount", stakeAmount);
 			String shortAccountKey = accountKeyString.substring(0, 6);
-			System.out.println("You can now start this peer by executing the following line:\n");
+			// System.out.println("You can now start this peer by executing the following line:\n");
 
 			// WARNING not sure about showing the users password..
 			// to make the starting of peers easier, I have left it in for a simple copy/paste
 
-			System.out.println(String.format("\t./convex peer start --password=%s", mainParent.getPassword() )+
-				" --address=" + address.toLong() +
-				" --public-key=" + shortAccountKey +
-				"\n"
+			mainParent.output.setField("Peer start line",
+				String.format(
+					"./convex peer start --password=%s --address=%d --public-key=%s",
+					mainParent.getPassword(),
+					address.toLong(),
+					shortAccountKey
+				)
 			);
 		} catch (Throwable t) {
 			log.error("Unable to launch peer {}", t);

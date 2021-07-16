@@ -22,4 +22,6 @@ public class Constants {
 
 	public static final int LOCAL_START_PEER_COUNT = 4;
 
+	public static final long DEFAULT_TIMEOUT_MILLIS = 5000;
+
 }

@@ -46,6 +46,10 @@ public class AccountBalance implements Runnable {
 	description="Address of the account to get the balance .")
 	private long addressNumber;
 
+	@Option(names={"-t", "--timeout"},
+		description="Timeout in miliseconds.")
+	private long timeout = Constants.DEFAULT_TIMEOUT_MILLIS;
+
 
 	@Override
 	public void run() {
@@ -61,10 +65,10 @@ public class AccountBalance implements Runnable {
 		Address address = Address.create(addressNumber);
 		try {
 			convex = mainParent.connectToSessionPeer(hostname, port, address, null);
-            String queryCommand = String.format("(balance #%d)", address.longValue());
+			String queryCommand = String.format("(balance #%d)", address.longValue());
 			ACell message = Reader.read(queryCommand);
-			Result result = convex.querySync(message, 5000);
-			System.out.println(result);
+			Result result = convex.querySync(message, timeout);
+			mainParent.output.setResult(result);
 		} catch (Throwable t) {
 			log.error(t.getMessage());
 			// t.printStackTrace();

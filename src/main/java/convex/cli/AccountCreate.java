@@ -66,7 +66,7 @@ public class AccountCreate implements Runnable {
 
 		AKeyPair keyPair = null;
 
-		if (keystoreIndex > 0 || keystorePublicKey != null) {
+		if (keystoreIndex > 0 || !keystorePublicKey.isEmpty()) {
 			try {
 				keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
 			} catch (Error e) {
@@ -82,10 +82,10 @@ public class AccountCreate implements Runnable {
 			try {
 				List<AKeyPair> keyPairList = mainParent.generateKeyPairs(1);
 				keyPair = keyPairList.get(0);
-				System.out.println("generated public key: " + keyPair.getAccountKey().toHexString());
+				mainParent.output.setField("Public Key", keyPair.getAccountKey().toHexString());
 			}
 			catch (Error e) {
-				log.error("failed to create key pair {}", e);
+				log.error(e.getMessage());
 				return;
 			}
 		}
@@ -100,15 +100,14 @@ public class AccountCreate implements Runnable {
 				Main.initConfig.getUserKeyPair(0));
 
 			Address address = convex.createAccount(keyPair.getAccountKey());
-
-			log.info("account address: " + address);
+			mainParent.output.setField("Address", address.longValue());
 			if (isFund) {
 				convex.transferSync(address, Constants.ACCOUNT_FUND_AMOUNT);
 				convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
 				Long balance = convex.getBalance(address);
-				log.info("account balance: " + balance);
+				mainParent.output.setField("Balance", balance);
 			}
-			log.info(
+			mainParent.output.setField("Account",
 				String.format(
 					"to use this key can use the options --address=%d --public-key=%s",
 					address.toLong(),
