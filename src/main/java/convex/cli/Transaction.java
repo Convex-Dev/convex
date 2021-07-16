@@ -34,8 +34,8 @@ public class Transaction implements Runnable {
 
 	private static final Logger log = LoggerFactory.getLogger(Transaction.class);
 
-	@Option(names={"-i", "--index"},
-		defaultValue="-1",
+	@Option(names={"-i", "--index-key"},
+		defaultValue="0",
 		description="Keystore index of the public/private key to use to run the transaction.")
 	private int keystoreIndex;
 
@@ -75,6 +75,11 @@ public class Transaction implements Runnable {
 			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
 		} catch (Error e) {
 			log.error(e.getMessage());
+			return;
+		}
+
+		if (keyPair == null) {
+			log.warn("cannot load a valid key pair to perform this transaction");
 			return;
 		}
 

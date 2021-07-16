@@ -3,6 +3,8 @@ package convex.cli;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeoutException;
 
@@ -153,6 +155,25 @@ public class Helpers {
 	return 0;
 	}
 
+
+	public static List<String> splitArrayParameter(String[] parameterValue) {
+		List<String> result = new ArrayList<>(parameterValue.length);
+		for (int index = 0; index < parameterValue.length; index ++) {
+			String value = parameterValue[index];
+			String[] items = new String[1];
+			items[0] = value;
+			if (value.indexOf(",") > 0) {
+				items = value.split(",");
+			}
+			for (int itemIndex = 0; itemIndex < items.length; itemIndex ++ ) {
+				String newValue = items[itemIndex].trim();
+				if (newValue.length() > 0) {
+					result.add(newValue);
+				}
+			}
+		}
+		return result;
+	}
 }
 
 

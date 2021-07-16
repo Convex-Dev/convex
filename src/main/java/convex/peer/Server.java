@@ -904,10 +904,7 @@ public class Server implements Closeable {
 				log.warn("Receiver thread terminated abnormally! ");
 				log.error("Server FAILED: " + e.getMessage());
 				e.printStackTrace();
-			} finally {
-				// clear thread from Server as we terminate
-				receiverThread = null;
-			}
+			} 
 		}
 	};
 
@@ -945,10 +942,7 @@ public class Server implements Closeable {
 				log.error("Unexpected exception in server update loop: {}", e);
 				log.error("Terminating Server update");
 				e.printStackTrace();
-			} finally {
-				// clear thread from Server as we terminate
-				updateThread = null;
-			}
+			} 
 		}
 	};
 
@@ -1028,8 +1022,22 @@ public class Server implements Closeable {
 		manager.broadcast(msg, false);
 
 		isRunning = false;
-		if (updateThread != null) updateThread.interrupt();
-		if (receiverThread != null) receiverThread.interrupt();
+		if (updateThread != null) {
+			updateThread.interrupt();
+			try {
+				updateThread.join(100);
+			} catch (InterruptedException e) {
+				// Ignore
+			}
+		}
+		if (receiverThread != null) {
+			receiverThread.interrupt();
+			try {
+				receiverThread.join(100);
+			} catch (InterruptedException e) {
+				// Ignore
+			}
+		}
 		manager.close();
 		nio.close();
 		// Note we don't do store.close(); because we don't own the store.
