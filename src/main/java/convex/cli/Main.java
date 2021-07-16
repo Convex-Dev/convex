@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 
-
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
@@ -16,6 +15,8 @@ import convex.core.data.Address;
 import convex.core.init.AInitConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+// import org.slf4j.impl.SimpleLogger;
+// import org.slf4j.simple.SimpleLoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -49,7 +50,7 @@ import picocli.CommandLine.ScopeType;
 
 public class Main implements Runnable {
 
-	private static final Logger log = LoggerFactory.getLogger(Main.class);
+	private static Logger log;
 
 
 	private static CommandLine commandLine;
@@ -118,23 +119,19 @@ public class Main implements Runnable {
 			System.err.println("unable to parse arguments " + t);
 		}
 
+		System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "warn");
 		if (verbose) {
-		/*
-			Logger root = LoggerFactory.getLogger("");
-			root.setLevel(Level.TRACE);
-			log.info("Set log level TRACE");
-		*/
-		/*
-			Logger root = Logger.getLogger("");
-			Level targetLevel = Level.ALL;
-			root.setLevel(targetLevel);
-			for (Handler handler: root.getHandlers()) {
-				handler.setLevel(targetLevel);
-			}
-			log.log(targetLevel, "Set level ALL");
-		*/
-
+			System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "trace");
 		}
+
+		Main.log = LoggerFactory.getLogger(Main.class);
+		log.info("starting..");
+		log.trace("trace");
+		log.debug("debug");
+		log.info("info");
+		log.warn("warn");
+		log.error("error");
+
 		int result = 0;
 		try {
 			result = commandLine.execute(args);
