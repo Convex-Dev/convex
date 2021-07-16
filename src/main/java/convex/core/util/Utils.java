@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 
 import convex.core.State;
 import convex.core.data.*;
+import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
@@ -813,72 +814,9 @@ public class Utils {
 		} else if (v instanceof Instant) {
 			sb.append(((Instant)v).toEpochMilli());
 		} else if (v instanceof Character) {
-			sb.append(ednString((char)v));
+			CVMChar.create((long)v).print(sb);
 		} else {
-			throw new TODOException("Can't print: "+Utils.getClass(v));
-		}
-	}
-
-
-	/**
-	 * Converts an Object to an edn String.
-	 * @param v Value to render as edn String
-	 * @return
-	 */
-	public static String ednString(Object v) {
-		if (v == null) return "nil";
-		if (v instanceof AObject) {
-			StringBuilder sb = new StringBuilder();
-			((AObject) v).ednString(sb);
-			return sb.toString();
-		}
-
-		if (v instanceof Number) return ednString((Number) v);
-		if (v instanceof Boolean) return v.toString();
-		if (v instanceof String) return "\"" + v + "\"";
-		if (v instanceof Character) return ednString((char) v);
-		if (v instanceof Instant) return "#inst \"" + DateTimeFormatter.ISO_INSTANT.format((Instant) v) + "\"";
-		throw new Error("Can't get edn string for: " + v.getClass());
-	}
-
-	public static void ednString(StringBuilder sb, Object v) {
-		if (v instanceof AObject) {
-			((AObject) v).ednString(sb);
-		} else {
-			sb.append(ednString(v));
-		}
-	}
-
-	private static String ednString(Number v) {
-		if (v instanceof Long) return v.toString();
-		if (v instanceof Integer) return "#int " + v.toString();
-		if (v instanceof Short) return "#int " + v.toString();
-		if (v instanceof Byte) return "#byte " + v.toString();
-		if (v instanceof Double) return v.toString();
-		if (v instanceof Float) return "#float " + v.toString();
-		if (v instanceof BigInteger) return v.toString() + "N";
-		if (v instanceof BigDecimal) return v.toString() + "M";
-		throw new Error("Can't get edn string number type: " + v.getClass());
-	}
-
-	public static String ednString(char c) {
-		// Notes from edn-format definition:
-		// Characters are preceded by a backslash: \c, \newline, \return, \space and
-		// \tab yield
-		// the corresponding characters.
-		// Unicode characters are represented as in Java.
-		// Backslash cannot be followed by whitespace.
-		switch (c) {
-		case '\n':
-			return "\\newline";
-		case '\r':
-			return "\\return";
-		case ' ':
-			return "\\space";
-		case '\t':
-			return "\\tab";
-		default:
-			return "\\" + Character.toString(c);
+			throw new TODOException("Can't print: " + Utils.getClass(v));
 		}
 	}
 

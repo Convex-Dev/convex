@@ -114,14 +114,6 @@ public class Invoke extends ATransaction {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append("#trans/invoke {");
-		sb.append(":args ");
-		Utils.ednString(sb, command);
-		sb.append('}');
-	}
-	
-	@Override
 	public void print(StringBuilder sb) {
 		sb.append("{");
 		sb.append(":invoke ");

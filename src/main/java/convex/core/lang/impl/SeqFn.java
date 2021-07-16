@@ -49,11 +49,6 @@ public class SeqFn<T extends ACell> extends ADataFn<T> {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		seq.ednString(sb);
-	}
-
-	@Override
 	public void print(StringBuilder sb) {
 		seq.print(sb);
 	}

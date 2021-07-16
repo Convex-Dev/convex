@@ -141,12 +141,6 @@ public class Address extends ABlob {
 		bs[pos++]=Tag.ADDRESS;
 		return encodeRaw(bs,pos);
 	}
-
-	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append("#addr ");
-		sb.append(value);
-	}
 	
 	@Override
 	public void print(StringBuilder sb) {

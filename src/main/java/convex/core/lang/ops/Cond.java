@@ -80,17 +80,6 @@ public class Cond<T extends ACell> extends AMultiOp<T> {
 			return (Context<T>) ctx.execute(ops.get(n-1));
 		}
 	}
-
-	@Override
-	public void ednString(StringBuilder sb)  {
-		sb.append("(cond");
-		int len=ops.size();
-		for (int i=0; i<len; i++) {
-			sb.append(' ');
-			ops.get(i).ednString(sb);
-		}
-		sb.append(')');
-	}
 	
 	@Override
 	public void print(StringBuilder sb)  {

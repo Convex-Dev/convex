@@ -82,11 +82,6 @@ public final class CVMDouble extends APrimitive implements INumeric {
 		long doubleBits=Double.doubleToRawLongBits(value);
 		return Utils.writeLong(bs,pos,doubleBits);
 	}
-
-	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append(toString());
-	}
 	
 	@Override
 	public String toString() {
@@ -105,6 +100,7 @@ public final class CVMDouble extends APrimitive implements INumeric {
 
 	@Override
 	public void print(StringBuilder sb) {
+		// TODO. Fix #236
 		sb.append(value);
 	}
 

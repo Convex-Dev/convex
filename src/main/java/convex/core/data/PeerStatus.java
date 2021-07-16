@@ -214,11 +214,6 @@ public class PeerStatus extends ARecord {
 	}
 
 	@Override
-	protected String ednTag() {
-		return "#peer-status";
-	}
-
-	@Override
 	public ACell get(ACell key) {
 		if (Keywords.CONTROLLER.equals(key)) return controller;
 		if (Keywords.STAKE.equals(key)) return CVMLong.create(stake);

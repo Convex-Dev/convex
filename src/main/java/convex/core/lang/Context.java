@@ -1056,18 +1056,6 @@ public class Context<T extends ACell> extends AObject {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb)  {
-		sb.append("#context {");
-		sb.append(":juice "+juice);
-		sb.append(',');
-		sb.append(":result "+Utils.ednString(result));
-		sb.append(',');
-		sb.append(":state ");
-		getState().ednString(sb);
-		sb.append("}");
-	}
-
-	@Override
 	public void print(StringBuilder sb)  {
 		sb.append("{");
 		sb.append(":juice "+juice);

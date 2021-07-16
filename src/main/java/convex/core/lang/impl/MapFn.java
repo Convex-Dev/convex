@@ -34,11 +34,6 @@ public class MapFn<K extends ACell, T  extends ACell> extends ADataFn<T> {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		map.ednString();
-	}
-
-	@Override
 	public void print(StringBuilder sb) {
 		map.print(sb);
 	}

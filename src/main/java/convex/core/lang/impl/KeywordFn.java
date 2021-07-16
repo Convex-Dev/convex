@@ -44,11 +44,6 @@ public class KeywordFn<T extends ACell> extends ADataFn<T> {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		key.ednString(sb);
-	}
-
-	@Override
 	public void print(StringBuilder sb) {
 		key.print(sb);
 	}

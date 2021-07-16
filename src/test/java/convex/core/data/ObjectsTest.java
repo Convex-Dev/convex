@@ -29,9 +29,6 @@ public class ObjectsTest {
 	public static void doCellTests(ACell a) {
 		if (a==null) return;
 		
-		String edn = a.ednString();
-		assertNotNull(edn);
-
 		try {
 			a.validateCell();
 			// doCellStorageTest(a); // TODO: Maybe fix after we have ACell.toDirect()

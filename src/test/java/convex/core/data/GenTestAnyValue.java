@@ -23,13 +23,6 @@ import convex.test.generators.ValueGen;
 public class GenTestAnyValue {
 	
 	@Property
-	public void stringFormats(@From(ValueGen.class) Object o) {
-		String edn=Utils.ednString(o);
-		assertNotNull(Utils.ednString(o));
-		assertTrue(edn.length()>0);
-	}
-	
-	@Property
 	public void printFormats(@From(ValueGen.class) Object o) {
 		String s=Utils.print(o);
 		assertNotNull(s);

@@ -202,26 +202,23 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public int hashCode() {
 		return getHash().hashCode();
 	}
-
+	
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append("#ref {:hash ");
-		sb.append(Utils.ednString(hash));
+	public void print(StringBuilder sb) {
+		// TODO. Really needed? How is it related to the Reader?
+		sb.append("#ref {:hash #hash 0x");
+		sb.append(hash.toHexString());
 		sb.append(", :flags ");
 		sb.append(flags);
 		sb.append("}");
 	}
-	
-	@Override
-	public void print(StringBuilder sb) {
-		ednString(sb);
-	}
 
 	@Override
 	public String toString() {
+		// TODO. Why protected by a try-catch? Looks like it will never throw.
 		StringBuilder sb = new StringBuilder();
 		try {
-			ednString(sb);
+			print(sb);
 		} catch (MissingDataException e) {
 			throw Utils.sneakyThrow(e);
 		}

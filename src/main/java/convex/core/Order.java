@@ -106,17 +106,6 @@ public class Order extends ACell {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append("#order {");
-		sb.append(":prop " + getProposalPoint() + ",");
-		sb.append(":cons " + getConsensusPoint() + ",");
-		sb.append(":hash " + getHash() + ",");
-		sb.append(":blocks ");
-		blocks.ednString(sb);
-		sb.append("}\n");
-	}
-	
-	@Override
 	public void print(StringBuilder sb) {
 		sb.append("{");
 		sb.append(":prop " + getProposalPoint() + ",");

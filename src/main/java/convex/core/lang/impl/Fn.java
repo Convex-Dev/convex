@@ -138,15 +138,6 @@ public class Fn<T extends ACell> extends AClosure<T> {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append("(fn ");
-		params.ednString(sb);
-		sb.append(' ');
-		body.ednString(sb);
-		sb.append(')');
-	}
-	
-	@Override
 	public void print(StringBuilder sb) {
 		sb.append("(fn ");
 		printInternal(sb);

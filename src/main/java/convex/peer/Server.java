@@ -874,7 +874,7 @@ public class Server implements Closeable {
 		} catch (BadSignatureException e) {
 			// we got sent a bad signature.
 			// TODO: Probably need to slash peer? but ignore for now
-			log.warn("Bad signed belief from peer: " + Utils.ednString(o));
+			log.warn("Bad signed belief from peer: " + Utils.print(o));
 		}
 	}
 

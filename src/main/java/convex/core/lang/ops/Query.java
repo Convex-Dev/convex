@@ -72,17 +72,6 @@ public class Query<T extends ACell> extends AMultiOp<T> {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append("(query");
-		int len = ops.size();
-		for (int i = 0; i < len; i++) {
-			sb.append(' ');
-			ops.get(i).ednString(sb);
-		}
-		sb.append(')');
-	}
-	
-	@Override
 	public void print(StringBuilder sb) {
 		sb.append("(query");
 		int len = ops.size();

@@ -51,18 +51,10 @@ public class Call extends ATransaction {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append("#trans/call {");
-		sb.append(":target ");
-		Utils.ednString(sb, target);
-		sb.append('}');
-	}
-	
-	@Override
 	public void print(StringBuilder sb) {
 		sb.append("{");
 		sb.append(":target ");
-		Utils.ednString(sb, target);
+		Utils.print(sb, target);
 		if (offer>0) {
 			sb.append(" :offer ");
 			sb.append(offer);

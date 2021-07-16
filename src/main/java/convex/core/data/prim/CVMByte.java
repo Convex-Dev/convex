@@ -70,11 +70,6 @@ public final class CVMByte extends APrimitive implements INumeric {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append(longValue());
-	}
-
-	@Override
 	public void print(StringBuilder sb) {
 		sb.append(longValue());
 	}

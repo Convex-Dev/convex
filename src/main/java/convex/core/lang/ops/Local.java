@@ -90,18 +90,13 @@ public class Local<T extends ACell> extends AOp<T> {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append(toString());
-	}
-
-	@Override
 	public void print(StringBuilder sb) {
 		sb.append(toString());
 	}
 	
 	@Override
 	public String toString() {
-		return "%"+position;
+		return "%" + position;
 	}
 
 

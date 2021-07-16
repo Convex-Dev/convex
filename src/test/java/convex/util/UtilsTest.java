@@ -279,24 +279,6 @@ public class UtilsTest {
 	}
 
 	@Test
-	public void testEdnString() {
-		assertEquals("#int 1", Utils.ednString(1));
-		assertEquals("100", Utils.ednString(100L));
-		assertEquals("true", Utils.ednString(true));
-		assertEquals("\"foo\\bar\"", Utils.ednString("foo\\bar"));
-		assertEquals("{1 2}", Utils.ednString(Maps.of(1L, 2L)));
-		assertEquals("#inst \"1970-01-01T00:00:00Z\"", Utils.ednString(Instant.ofEpochMilli(0)));
-
-		// Chars
-		// 
-		assertEquals("\\newline", Utils.ednString('\n'));
-		assertEquals("\\return", Utils.ednString('\r'));
-		assertEquals("\\space", Utils.ednString(' '));
-		assertEquals("\\tab", Utils.ednString('\t'));
-		assertEquals("\\a", Utils.ednString('a'));
-	}
-
-	@Test
 	public void testBinarySearchLeftmost() {
 		AVector<CVMLong> L = Vectors.of(
 				CVMLong.create(1),

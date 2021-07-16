@@ -135,11 +135,6 @@ public class Special<T extends ACell> extends AOp<T> {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		symbols[opCode-BASE].ednString(sb);
-	}
-
-	@Override
 	public void print(StringBuilder sb) {
 		symbols[opCode-BASE].print(sb);
 	}

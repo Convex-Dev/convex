@@ -193,13 +193,6 @@ public class ContextTest extends ACVMTest {
 	}
 
 	@Test
-	public void testEdn() {
-		Context<?> ctx=context();
-		String s = ctx.ednString();
-		assertNotNull(s);
-	}
-
-	@Test
 	public void testReturn() {
 		Context<?> ctx=context();
 		ctx = ctx.withResult(RT.cvm(100));
