@@ -2,18 +2,12 @@ package convex.cli;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.TimeoutException;
 
-import convex.api.Convex;
 import convex.cli.peer.Session;
 import convex.cli.peer.SessionItem;
-import convex.core.crypto.AKeyPair;
-import convex.core.data.Address;
-import convex.core.util.Utils;
 
 /**
  *

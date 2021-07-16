@@ -1,7 +1,6 @@
 package convex.cli;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.security.KeyStore
 ;
@@ -10,7 +9,6 @@ import java.util.Enumeration;
 import java.util.List;
 
 import convex.api.Convex;
-import convex.cli.peer.Session;
 import convex.cli.peer.SessionItem;
 import convex.cli.output.Output;
 import convex.core.crypto.AKeyPair;

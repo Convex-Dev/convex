@@ -2,9 +2,7 @@ package convex.cli.output;
 
 import java.io.PrintStream;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 import convex.core.data.ACell;
