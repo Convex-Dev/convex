@@ -49,7 +49,9 @@ public class KeyList implements Runnable {
 			int index = 1;
 			while (aliases.hasMoreElements()) {
 				String alias = aliases.nextElement();
-				System.out.println("#"+index+" Public Key: "+alias);
+				mainParent.output.setField("Index", String.format("%5d", index));
+				mainParent.output.setField("Public Key", alias);
+				mainParent.output.addRow();
 				index ++;
 			}
 
