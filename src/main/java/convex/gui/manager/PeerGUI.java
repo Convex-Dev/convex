@@ -7,19 +7,19 @@ import java.awt.Toolkit;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.stream.Collectors;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.Order;
@@ -55,7 +55,14 @@ public class PeerGUI extends JPanel {
 
 	private static JFrame frame;
 	
-	public static List<AKeyPair> KEYPAIRS=Arrays.asList(AKeyPair.generate(),AKeyPair.generate(),AKeyPair.generate()); 
+	public static List<AKeyPair> KEYPAIRS=new ArrayList<>();
+			
+	static {
+		for (int i=0; i<8; i++) {
+			KEYPAIRS.add(AKeyPair.generate());
+		}
+	}
+	
 	public static List<AccountKey> PEERKEYS=KEYPAIRS.stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
 	
 	public static State genesisState=Init.createState(PEERKEYS);

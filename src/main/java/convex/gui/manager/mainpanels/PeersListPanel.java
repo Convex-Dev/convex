@@ -88,8 +88,8 @@ public class PeersListPanel extends JPanel {
 		JPanel toolBar = new ActionPanel();
 		add(toolBar, BorderLayout.SOUTH);
 
-		// JButton btnLaunch = new JButton("Launch!");
-		// toolBar.add(btnLaunch);
+		JButton btnLaunch = new JButton("Launch!");
+		toolBar.add(btnLaunch);
 		// btnLaunch.addActionListener(e -> launchPeer(manager));
 
 		JButton btnConnect = new JButton("Connect...");
