@@ -33,6 +33,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.List;
 import convex.core.data.Lists;
+import convex.core.data.LongBlob;
 import convex.core.data.MapLeaf;
 import convex.core.data.MapTree;
 import convex.core.data.Maps;
@@ -116,6 +117,7 @@ public class Samples {
 	public static final AMap<ACell, ACell> DIABOLICAL_MAP_2_10000;
 
 	public static final Random rand = new Random(123);
+	
 	public static final long BIG_BLOB_LENGTH = 10000;
 	public static final BlobTree BIG_BLOB_TREE = Blobs.createRandom(Samples.rand, BIG_BLOB_LENGTH);
 	public static final Blob FULL_BLOB = Blobs.createRandom(Samples.rand, Blob.CHUNK_LENGTH);
@@ -237,6 +239,7 @@ public class Samples {
 			Keywords.FOO,
 			FULL_BLOB,
 			MAX_EMBEDDED_BLOB,
+			LongBlob.create(-1),
 			INT_LIST_10,
 			Lists.empty(),
 			INT_VECTOR_300,
@@ -247,6 +250,7 @@ public class Samples {
 			Maps.empty(),
 			LONG_SET_10,
 			Sets.empty(),
+			Sets.of(1,2,3),
 			CVMDouble.ONE,
 			CVMDouble.NaN,
 			CVMLong.MAX_VALUE,
@@ -261,6 +265,7 @@ public class Samples {
 			MAX_EMBEDDED_STRING,
 			Do.EMPTY,
 			Address.ZERO,
+			Address.create(666666),
 			AccountKey.ZERO,
 			CVMChar.A
 	};

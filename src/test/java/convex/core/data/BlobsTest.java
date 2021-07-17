@@ -205,8 +205,14 @@ public class BlobsTest {
 		Blob b = Format.read(Blob.wrap(bf));
 		assertEquals(0, b.count());
 		assertNotEquals(b.getHash(), Hash.EMPTY_HASH);
+		
+		doBlobTests(b);
 	}
 
+	/**
+	 * Generic tests for an arbitrary ABlob instance
+	 * @param a Any blob to test
+	 */
 	public static void doBlobTests(ABlob a) {
 		long n = a.count();
 		assertTrue(n >= 0L);
@@ -225,8 +231,6 @@ public class BlobsTest {
 			
 			assertEquals(a.get(n-1),CVMByte.create(a.byteAt(n-1)));
 		}
-		
-		
 
 		ObjectsTest.doAnyValueTests(a);
 	}
