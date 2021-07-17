@@ -2,6 +2,7 @@ package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -170,5 +171,34 @@ public class SetsTest {
 		ASet<CVMLong> s5a = Sets.of(1, 3, 7, -1000);
 		ASet<CVMLong> s5 = s5a.disjAll(s);
 		assertEquals(Sets.of(-1000), s5);
+	}
+	
+	@Test
+	public void testIncrementalBuilding() {
+		ASet<CVMLong> set=Sets.empty();
+		for (int i=0; i<300; i++) {
+			assertEquals(i,set.size());
+			
+			// extend set with one new element
+			CVMLong v=CVMLong.create(i);
+			ASet<CVMLong> newSet=set.conj(v);
+			
+			// new Set contains previous set
+			assertTrue(newSet.containsAll(set));
+			
+			assertNotEquals(set,newSet);
+			assertTrue(newSet.contains(v));
+			assertFalse(set.contains(v));
+			
+			// removing element should get back to original set
+			assertEquals(set,newSet.exclude(v));
+			
+			// removing original set should leave one element
+			assertEquals(Sets.of(v),newSet.excludeAll(set));
+			
+			set=newSet;
+		}
+		
+		
 	}
 }
