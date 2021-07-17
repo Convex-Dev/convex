@@ -10,7 +10,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.time.Instant;
 import java.util.Comparator;
 import java.util.function.Function;
 
@@ -21,7 +20,6 @@ import convex.core.Peer;
 import convex.core.State;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
-import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;

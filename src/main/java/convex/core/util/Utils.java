@@ -6,13 +6,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Array;
-import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -26,7 +24,16 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import convex.core.State;
-import convex.core.data.*;
+import convex.core.data.AArrayBlob;
+import convex.core.data.ABlob;
+import convex.core.data.ACell;
+import convex.core.data.AObject;
+import convex.core.data.ASequence;
+import convex.core.data.AVector;
+import convex.core.data.Blob;
+import convex.core.data.IRefFunction;
+import convex.core.data.Ref;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.TODOException;
@@ -772,22 +779,22 @@ public class Utils {
 	}
 
 	/**
-	 * Reads data from the buffer, up to the limit.
-	 * @param buffer
-	 * @return
+	 * Reads data from the Byte Buffer buffer, up to the limit.
+	 * @param bb ByteBuffer to read from
+	 * @return Blob containing bytes read from buffer
 	 */
-	public static AArrayBlob readBufferData(ByteBuffer buffer) {
-		buffer.position(0);
-		int len = buffer.remaining();
+	public static AArrayBlob readBufferData(ByteBuffer bb) {
+		bb.position(0);
+		int len = bb.remaining();
 		byte[] bytes = new byte[len];
-		buffer.get(bytes);
+		bb.get(bytes);
 		return Blob.wrap(bytes);
 	}
 
 	/**
 	 * Prints an Object in readable String representation
-	 * @param v
-	 * @return
+	 * @param v Object to print
+	 * @return String representation of value
 	 */
 	public static String print(Object v) {
 		StringBuilder sb=new StringBuilder();
@@ -798,7 +805,7 @@ public class Utils {
 	/**
 	 * Prints an Object in readable String representation
 	 * @param sb StringBuilder to append to
-	 * @param v
+	 * @param v Object to print
 	 */
 	public static void print(StringBuilder sb,Object v) {
 		if (v == null) {
