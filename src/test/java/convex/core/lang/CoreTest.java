@@ -3101,6 +3101,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testUnquote() {
 		assertEquals(Vectors.of(1L, 2L), eval("`[1 (unquote (+ 1 1))]"));
+		assertEquals(Constant.create(CVMLong.create(3L)), comp("(unquote (+ 1 2))"));
 
 		assertCompileError(step("(unquote)"));
 		assertCompileError(step("(unquote 1 2)"));
