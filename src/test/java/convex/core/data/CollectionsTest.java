@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -9,6 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.util.Iterator;
 import java.util.ListIterator;
 import java.util.Map;
+
+import convex.core.lang.RT;
 
 /**
  * Tests for general collection types
@@ -49,6 +52,8 @@ public class CollectionsTest {
 		doCollectionTests(a);
 	}
 
+	static final Keyword UNLIKELY_KEYWORD=Keyword.create("this-is-not-likely-to-happen-at-random");
+	
 	/**
 	 * Generic tests for any data structure
 	 * @param a Any Data Structure
@@ -57,7 +62,16 @@ public class CollectionsTest {
 		long n = a.count();
 		if (n == 0) {
 			assertSame(a.empty(), a);
+		} else {
+			assertFalse(a.isEmpty());
+			T first =a.get(0);
+			assertEquals(first,a.getElementRef(0).getValue());
 		}
+		
+		assertFalse(RT.bool(a.get(UNLIKELY_KEYWORD))); 
+		assertSame(Keywords.FOO,a.get(UNLIKELY_KEYWORD,Keywords.FOO));
+		
+		assertEquals(n,a.size());
 
 		ObjectsTest.doAnyValueTests(a);
 	}

@@ -94,7 +94,7 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 * Get the value associated with a given key.
 	 * 
 	 * @param key
-	 * @return Value from collection, or null if not found
+	 * @return Value from collection, or a falsey value (null or false) if not found
 	 */
 	public abstract ACell get(ACell key);
 	
@@ -102,7 +102,7 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 * Get the value associated with a given key.
 	 * 
 	 * @param key Key to look up in data structure
-	 * @param notFound Value to retun if key is not found
+	 * @param notFound Value to return if key is not found
 	 * @return Value from collection, or notFound value if not found
 	 */
 	public abstract ACell get(ACell key, ACell notFound);

@@ -100,7 +100,7 @@ public class ObjectsTest {
 	}
 
 	/**
-	 * Generic tests for any Value
+	 * Generic tests for any CVM Value
 	 * 
 	 * @param a
 	 */

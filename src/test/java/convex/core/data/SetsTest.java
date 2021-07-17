@@ -176,7 +176,7 @@ public class SetsTest {
 	@Test
 	public void testIncrementalBuilding() {
 		ASet<CVMLong> set=Sets.empty();
-		for (int i=0; i<300; i++) {
+		for (int i=0; i<320; i++) {
 			assertEquals(i,set.size());
 			
 			// extend set with one new element
@@ -199,6 +199,11 @@ public class SetsTest {
 			set=newSet;
 		}
 		
+		doSetTests(set);
+	}
+	
+	public static <T extends ACell> void doSetTests(ASet<T> a) {
 		
+		CollectionsTest.doSetTests(a);
 	}
 }
