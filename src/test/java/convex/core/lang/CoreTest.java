@@ -3097,6 +3097,14 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(undef a b)"));
 		assertArityError(step("(undef)"));
 	}
+	
+	@Test
+	public void testUnquote() {
+		assertEquals(Vectors.of(1L, 2L), eval("`[1 (unquote (+ 1 1))]"));
+
+		assertCompileError(step("(unquote)"));
+		assertCompileError(step("(unquote 1 2)"));
+	}
 
 
 	@Test
