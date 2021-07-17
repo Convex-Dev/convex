@@ -247,7 +247,7 @@ public class TestState {
 	}
 
 	public static void main(String[] args) {
-		System.out.println(Utils.ednString(STATE));
+		System.out.println(Utils.print(STATE));
 	}
 
 }

@@ -100,7 +100,7 @@ public class MessageFormatPanel extends JPanel {
 		try {
 			Blob b = Blob.fromHex(Utils.stripWhiteSpace(msg));
 			Object o = Format.read(b);
-			data = Utils.ednString(o);
+			data = Utils.print(o);
 			hashLabel.setText(HASHLABEL + b.getContentHash().toHexString());
 		} catch (ParseException e) {
 			data = "Unable to interpret message: " + e.getMessage();

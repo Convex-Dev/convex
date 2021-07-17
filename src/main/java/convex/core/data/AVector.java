@@ -94,17 +94,6 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	public abstract boolean isPacked();
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append('[');
-		int size = size();
-		for (int i = 0; i < size; i++) {
-			if (i > 0) sb.append(',');
-			Utils.ednString(sb,get(i));
-		}
-		sb.append(']');
-	}
-	
-	@Override
 	public void print(StringBuilder sb) {
 		sb.append('[');
 		int size = size();

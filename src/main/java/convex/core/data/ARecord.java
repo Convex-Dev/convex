@@ -66,21 +66,6 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	}
 	
 	@Override
-	public final void ednString(StringBuilder sb)  {
-		sb.append(ednTag());
-		sb.append(" {");
-		List<Keyword> keys=getKeys();
-		for (Keyword k:keys) {
-			k.ednString(sb);
-			sb.append(' ');
-			Object v=get(k);
-			Utils.ednString(sb, v);
-			sb.append(' ');
-		}
-		sb.append("}\n");
-	}
-	
-	@Override
 	public void print(StringBuilder sb) {
 		sb.append("{");
 		long n=format.count();
@@ -95,12 +80,6 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 		}
 		sb.append("}\n");
 	}
-
-	/**
-	 * Gets the edn tag for this record type
-	 * @return
-	 */
-	protected abstract String ednTag();
 
 	/**
 	 * Gets a vector of keys for this record

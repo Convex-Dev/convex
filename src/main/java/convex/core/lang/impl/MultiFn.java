@@ -45,16 +45,6 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append("(fn");
-		for (AFn<T> fn:fns) {
-			sb.append(' ');
-			fn.ednString(sb);
-		}
-		sb.append(')');
-	}
-
-	@Override
 	public void print(StringBuilder sb) {
 		sb.append("(fn ");
 		printInternal(sb);

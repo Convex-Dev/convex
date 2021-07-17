@@ -86,11 +86,6 @@ public final class CVMLong extends APrimitive implements INumeric {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append(value);
-	}
-
-	@Override
 	public void print(StringBuilder sb) {
 		sb.append(value);
 	}

@@ -206,16 +206,6 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	}
 	
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append("#{");
-		for (long i=0; i<count; i++) {
-			if (i>0) sb.append(',');
-			Utils.ednString(sb,get(i));
-		}
-		sb.append('}');
-	}
-	
-	@Override
 	public void print(StringBuilder sb) {
 		sb.append("#{");
 		for (long i=0; i<count; i++) {

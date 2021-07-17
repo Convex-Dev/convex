@@ -153,22 +153,6 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	public abstract void forEach(BiConsumer<? super K, ? super V> action);
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append('{');
-		this.forEach((k, v) -> {
-			String ks = Utils.ednString(k);
-			sb.append(ks);
-			sb.append(' ');
-			String vs = Utils.ednString(v);
-			sb.append(vs);
-			sb.append(',');
-			if (ks.length() + vs.length() > 100) sb.append('\n');
-		});
-		if (count() > 0) sb.setLength(sb.length() - 1); // delete trailing comma
-		sb.append('}');
-	}
-	
-	@Override
 	public void print(StringBuilder sb) {
 		sb.append('{');
 		this.forEach((k, v) -> {

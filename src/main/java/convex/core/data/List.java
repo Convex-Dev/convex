@@ -224,17 +224,6 @@ public class List<T extends ACell> extends AList<T> {
 	@Override public final boolean isCVMValue() {
 		return data.isCVMValue();
 	}
-
-	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append('(');
-		long n = count;
-		for (long i = 0; i < n; i++) {
-			if (i > 0) sb.append(' ');
-			Utils.ednString(sb,data.get(n - 1 - i));
-		}
-		sb.append(')');
-	}
 	
 	@Override
 	public void print(StringBuilder sb) {

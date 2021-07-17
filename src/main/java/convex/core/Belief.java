@@ -647,11 +647,6 @@ public class Belief extends ARecord {
 	}
 
 	@Override
-	protected String ednTag() {
-		return "#belief";
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		if (orders == null) throw new InvalidDataException("Null orders", this);
 		orders.validateCell();

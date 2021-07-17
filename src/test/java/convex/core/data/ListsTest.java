@@ -12,10 +12,6 @@ import convex.core.data.prim.CVMLong;
 import convex.test.Samples;
 
 public class ListsTest {
-	@Test
-	public void testEdn() {
-		assertEquals("(1 2)", Lists.of(1L, 2L).toString());
-	}
 
 	@Test
 	public void testEmptyList() {

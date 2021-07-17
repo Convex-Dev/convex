@@ -80,7 +80,8 @@ public class Message {
 
 	@Override
 	public String toString() {
-		return "#message {:type " + getType() + " :payload " + Utils.ednString(payload) + "}";
+		// TODO. Are tags really needed in `.toString`?
+		return "#message {:type " + getType() + " :payload " + Utils.print(payload) + "}";
 	}
 
 	/**

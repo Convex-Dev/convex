@@ -575,11 +575,6 @@ public class State extends ARecord {
 		return Tag.STATE;
 	}
 
-	@Override
-	protected String ednTag() {
-		return "#state";
-	}
-
 	/**
 	 * Deploys a new Actor in the current state.
 	 *

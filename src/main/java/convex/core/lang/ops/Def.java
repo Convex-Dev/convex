@@ -101,15 +101,6 @@ public class Def<T extends ACell> extends AOp<T> {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append("(def ");
-		sb.append(symbol);
-		sb.append(' ');
-		Utils.ednString(sb, op.getValue());
-		sb.append(')');
-	}
-	
-	@Override
 	public void print(StringBuilder sb) {
 		sb.append("(def ");
 		sb.append(symbol);

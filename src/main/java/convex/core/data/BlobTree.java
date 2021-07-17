@@ -143,11 +143,6 @@ public class BlobTree extends ABlob {
 //	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append("#blobtree {:length " + count() + " :shift " + shift + "}");
-	}
-
-	@Override
 	public boolean isCanonical() {
 		return count>Blob.CHUNK_LENGTH;
 	}

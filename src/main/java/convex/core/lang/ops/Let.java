@@ -136,26 +136,6 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append(isLoop ? "(loop [" : "(let [");
-		int len = ops.size();
-		for (int i = 0; i < bindingCount; i++) {
-			if (i > 0) sb.append(' ');
-			Utils.ednString(sb, symbols.get(i));
-			sb.append(' ');
-			ops.get(i).ednString(sb);
-			sb.append(' ');
-		}
-		sb.append("] ");
-
-		for (int i = bindingCount; i < len; i++) {
-			sb.append(' ');
-			ops.get(i).ednString(sb);
-		}
-		sb.append(')');
-	}
-	
-	@Override
 	public void print(StringBuilder sb) {
 		sb.append(isLoop ? "(loop [" : "(let [");
 		int len = ops.size();

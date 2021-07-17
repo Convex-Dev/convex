@@ -2758,8 +2758,6 @@ public class CoreTest extends ACVMTest {
 			Blob b = Format.encodedBlob(def);
 			assertSame(def, Format.read(b));
 
-			assertEquals(def.ednString(), sym.toString());
-
 			AHashMap<ACell,ACell> meta= Core.METADATA.get(sym);
 			assertNotNull(meta,"Missing metadata for core symbol: "+sym);
 			doDocTests(sym,meta);

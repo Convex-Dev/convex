@@ -18,11 +18,6 @@ public abstract class ARecordGeneric extends ARecord {
 		if (values.count()!=format.count()) throw new IllegalArgumentException("Wrong number of field values for record: "+values.count());
 		this.values=values;
 	}
-
-	@Override
-	protected String ednTag() {
-		return "result";
-	}
 	
 	@Override
 	public MapEntry<Keyword, ACell> entryAt(long i) {
