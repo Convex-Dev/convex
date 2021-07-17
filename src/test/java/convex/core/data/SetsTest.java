@@ -16,10 +16,6 @@ import convex.core.lang.RT;
 import convex.test.Samples;
 
 public class SetsTest {
-	@Test
-	public void testEdn() {
-		assertEquals("#{1,2}", Sets.of(1L, 2L).toString());
-	}
 
 	@Test
 	public void testEmptySet() {

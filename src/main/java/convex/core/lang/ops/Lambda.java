@@ -68,11 +68,6 @@ public class Lambda<T extends ACell> extends AOp<AClosure<T>> {
 		if (function==newFunction) return this;
 		return new Lambda<T>(newFunction);
 	}
-
-	@Override
-	public void ednString(StringBuilder sb)  {
-		function.getValue().ednString(sb);
-	}
 	
 	@Override
 	public void print(StringBuilder sb)  {

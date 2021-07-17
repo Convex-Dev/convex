@@ -87,16 +87,6 @@ public class Transfer extends ATransaction {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append("#trans/transfer {");
-		sb.append(":target ");
-		target.ednString(sb);
-		sb.append(',');
-		sb.append(":amount "+amount);
-		sb.append('}');
-	}
-	
-	@Override
 	public void print(StringBuilder sb) {
 		sb.append("{");
 		sb.append(":transfer-to ");

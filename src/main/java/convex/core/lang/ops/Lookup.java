@@ -75,11 +75,6 @@ public class Lookup<T extends ACell> extends AOp<T> {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		symbol.ednString(sb);
-	}
-	
-	@Override
 	public void print(StringBuilder sb) {
 		symbol.print(sb);
 	}

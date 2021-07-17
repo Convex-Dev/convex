@@ -6,18 +6,12 @@ public abstract class AObject {
 	 */
 	protected Blob encoding;
 
-	public abstract void ednString(StringBuilder sb);
-
 	public abstract void print(StringBuilder sb);
-
-	public String ednString() {
-		StringBuilder sb=new StringBuilder();
-		ednString(sb);
-		return sb.toString();
-	}
 	
 	public String print() {
-		return ednString();
+		StringBuilder sb = new StringBuilder();
+		print(sb);
+		return sb.toString();
 	}
 	
 	/**

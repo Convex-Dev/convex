@@ -194,11 +194,6 @@ public class Block extends ARecord {
 	}
 
 	@Override
-	protected String ednTag() {
-		return "#block";
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		transactions.validateCell();
 	}

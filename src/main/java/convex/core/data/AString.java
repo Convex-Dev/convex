@@ -20,18 +20,12 @@ public abstract class AString extends ACountable<CVMChar> implements CharSequenc
 		return Types.STRING;
 	}
 
-	
-	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append('"');
-		// TODO: fix quoting
-		sb.append(this);
-		sb.append('"');
-	}
-
 	@Override
 	public void print(StringBuilder sb) {
-		ednString(sb);
+		sb.append('"');
+		// TODO. Fix escaping.
+		sb.append(this);
+		sb.append('"');
 	}
 
 	@Override

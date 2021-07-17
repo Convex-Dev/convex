@@ -75,11 +75,6 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 		if (n<arity) return false;
 		return variadic;
 	}
-
-	@Override
-	public void ednString(StringBuilder sb) {
-		symbol.ednString(sb);
-	}
 	
 	@Override
 	public void print(StringBuilder sb) {

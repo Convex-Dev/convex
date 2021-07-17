@@ -17,9 +17,4 @@ public interface ICoreDef {
 	 */
 	public Symbol getSymbol();
 
-	/**
-	 * Gets the edn String representing this core definition
-	 * @return
-	 */
-	public String ednString();
 }

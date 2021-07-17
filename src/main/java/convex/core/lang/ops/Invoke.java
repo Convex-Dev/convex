@@ -84,17 +84,6 @@ public class Invoke<T extends ACell> extends AMultiOp<T> {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append('(');
-		int len = ops.size();
-		for (int i = 0; i < len; i++) {
-			if (i > 0) sb.append(' ');
-			ops.get(i).ednString(sb);
-		}
-		sb.append(')');
-	}
-	
-	@Override
 	public void print(StringBuilder sb) {
 		sb.append('(');
 		int len = ops.size();

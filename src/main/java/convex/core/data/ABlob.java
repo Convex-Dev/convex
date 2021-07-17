@@ -294,12 +294,6 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 * @return A Blob containing the specified chunk data.
 	 */
 	public abstract Blob getChunk(long i);
-
-	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append("#blob 0x");
-		toHexString(sb);
-	}
 	
 	@Override
 	public void print(StringBuilder sb) {

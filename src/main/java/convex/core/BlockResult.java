@@ -83,11 +83,6 @@ public class BlockResult extends ARecord {
 	}
 
 	@Override
-	protected String ednTag() {
-		return "blockresult";
-	}
-
-	@Override
 	public ACell get(ACell key) {
 		if (Keywords.STATE.equals(key)) return state;
 		if (Keywords.RESULTS.equals(key)) return results;

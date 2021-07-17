@@ -70,11 +70,6 @@ public final class CVMBool extends APrimitive {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append(value?"true":"false");
-	}
-
-	@Override
 	public void print(StringBuilder sb) {
 		sb.append(value?"true":"false");
 	}

@@ -63,11 +63,6 @@ public class Constant<T extends ACell> extends AOp<T> {
 	public <I extends ACell> Context<T> execute(Context<I> context) {
 		return context.withResult(Juice.CONSTANT, valueRef.getValue());
 	}
-
-	@Override
-	public void ednString(StringBuilder sb) {
-		Utils.ednString(sb,valueRef.getValue());
-	}
 	
 	@Override
 	public void print(StringBuilder sb) {

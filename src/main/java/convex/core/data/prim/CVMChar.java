@@ -59,13 +59,23 @@ public final class CVMChar extends APrimitive {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append(Utils.ednString(value));
-	}
-
-	@Override
 	public void print(StringBuilder sb) {
-		ednString(sb);
+		// Prints like EDN.
+		// Characters are preceded by a backslash: \c, \newline, \return, \space and
+		// \tab yield
+		// the corresponding characters.
+		// Unicode characters are represented as in Java.
+		// Backslash cannot be followed by whitespace.
+		//
+		String s;
+		switch(value) {
+			case '\n': s = "\\newline"; break;
+			case '\r': s = "\\return"; break;
+			case ' ':  s = "\\space"; break;
+			case '\t': s = "\\tab"; break;
+			default:   s = "\\" + Character.toString(value);
+		}
+		sb.append(s);
 	}
 
 	/**

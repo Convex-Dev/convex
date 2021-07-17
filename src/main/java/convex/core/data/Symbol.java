@@ -114,11 +114,6 @@ public class Symbol extends ASymbolic {
 		// Always canonical
 		return true;
 	}
-
-	@Override
-	public void ednString(StringBuilder sb) {
-		print(sb);
-	}
 	
 	@Override
 	public void print(StringBuilder sb) {

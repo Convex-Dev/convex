@@ -105,11 +105,6 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		print(sb);
-	}
-	
-	@Override
 	public void print(StringBuilder sb) {
 		sb.append(':');
 		sb.append(name);

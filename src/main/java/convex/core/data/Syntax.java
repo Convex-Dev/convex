@@ -180,15 +180,6 @@ public class Syntax extends ACell {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append("#syntax {:datum ");
-		Utils.ednString(sb, datumRef.getValue());
-		sb.append(" :meta ");
-		Utils.ednString(sb,meta);
-		sb.append('}');
-	}
-	
-	@Override
 	public void print(StringBuilder sb) {
 		if (meta==null) {
 			sb.append("^{} ");

@@ -167,12 +167,6 @@ public class Hash extends AArrayBlob {
 	}
 
 	@Override
-	public void ednString(StringBuilder sb) {
-		sb.append("#hash 0x");
-		sb.append(toHexString());
-	}
-
-	@Override
 	public boolean isCanonical() {
 		// always canonical, since class invariants are maintained
 		return false;
