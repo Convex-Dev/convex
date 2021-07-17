@@ -656,10 +656,9 @@ public class Compiler {
 		if (n != 3) return context.withCompileError("def requires a symbol and an expression, but got: " + list);
 
 		ACell symArg=list.get(1);
-		Syntax symbolSyntax = Syntax.create(symArg);
 
 		{// check we are actually defining a symbol
-			ACell sym = symbolSyntax.getValue();
+			ACell sym = Syntax.unwrapAll(symArg);
 			if (!(sym instanceof Symbol)) return context.withCompileError("def requires a Symbol as first argument but got: " + RT.getType(sym));
 		}
 		
@@ -667,15 +666,14 @@ public class Compiler {
 		
 		// move metadata from expression. TODO: do we need to expand this first?
 		if (exp instanceof Syntax) {
-			symbolSyntax=symbolSyntax.mergeMeta(((Syntax)exp).getMeta());
+			symArg=Syntax.create(symArg).mergeMeta(((Syntax)exp).getMeta());
 			exp=Syntax.unwrap(exp);
 		}
 		
 		context = context.compile(exp);
 		if (context.isExceptional()) return (Context<T>) context;
 
-		
-		Def<R> op = Def.create(symbolSyntax, (AOp<R>) context.getResult());
+		Def<R> op = Def.create(symArg, (AOp<R>) context.getResult());
 		return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
 	}
 	

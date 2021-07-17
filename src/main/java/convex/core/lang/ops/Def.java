@@ -56,6 +56,10 @@ public class Def<T extends ACell> extends AOp<T> {
 	public static <T extends ACell> Def<T> create(Symbol key, AOp<T> op) {
 		return new Def<T>(key, op.getRef());
 	}
+	
+	public static <T extends ACell> Def<T> create(ACell key, AOp<T> op) {
+		return new Def<T>(key, op.getRef());
+	}
 
 	public static <T extends ACell> Def<T> create(String key, AOp<T> op) {
 		return create(Symbol.create(key), op);
@@ -145,4 +149,6 @@ public class Def<T extends ACell> extends AOp<T> {
 		if (!(key instanceof Syntax)) return false;
 		return ((Syntax)key).getValue() instanceof Symbol;
 	}
+
+
 }

@@ -3046,6 +3046,8 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testDefMeta() {
 		AHashMap<ACell, ACell> FOOMAP = Maps.of(Keywords.FOO, CVMBool.TRUE);
+		AHashMap<ACell, ACell> BARMAP = Maps.of(Keywords.BAR, CVMBool.TRUE);
+		AHashMap<ACell, ACell> FOOBARMAP=FOOMAP.merge(BARMAP);
 		
 		// def of simple symbol has empty meta
 		assertEquals(Maps.empty(), eval("(do (def v 1) (lookup-meta 'v))"));
@@ -3061,6 +3063,16 @@ public class CoreTest extends ACVMTest {
 
 		// def with syntax object constructed for symbol inline
 		// assertEquals(FOOMAP, eval("(do (def ~(syntax 'v {:foo true})) (lookup-meta 'v))"));
+		
+		// def without metadata on symbol shouldn't change metadata
+		assertEquals(FOOMAP, eval("(do (def ^:foo v 1) (def v 2) (lookup-meta 'v))"));
+
+		// def with new metadata should overwrite
+		assertEquals(BARMAP, eval("(do (def ^:foo v 1) (def ^:bar v 2) (lookup-meta 'v))"));
+		
+		// def with metadata on both symbol and value should merge
+		assertEquals(FOOBARMAP, eval("(do (def ^:foo v ^{:bar true} 1) (lookup-meta 'v))"));
+
 	}
 
 	@Test
