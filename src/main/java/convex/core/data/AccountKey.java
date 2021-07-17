@@ -73,7 +73,7 @@ public class AccountKey extends AArrayBlob {
 		if (b instanceof AccountKey) return (AccountKey) b;
 		if (b instanceof AArrayBlob) {
 			AArrayBlob ab=(AArrayBlob)b;
-			return new AccountKey(ab.getInternalArray(),ab.getOffset(),LENGTH);
+			return new AccountKey(ab.getInternalArray(),ab.getInternalOffset(),LENGTH);
 		}
 		return wrap(b.getBytes());
 	}

@@ -854,7 +854,7 @@ public class Etch {
 		MappedByteBuffer mbb=seekMap(position);
 		
 		// append key
-		mbb.put(key.getInternalArray(),key.getOffset(),KEY_SIZE);
+		mbb.put(key.getInternalArray(),key.getInternalOffset(),KEY_SIZE);
 		
 		// append flags (1 byte)
 		int flags=value.flagsWithStatus(Math.max(value.getStatus(),Ref.STORED));
@@ -872,7 +872,7 @@ public class Etch {
 		mbb.putShort(length);
 		
 		// append blob value
-		mbb.put(encoding.getInternalArray(),encoding.getOffset(),length);
+		mbb.put(encoding.getInternalArray(),encoding.getInternalOffset(),length);
 		
 		// update total data length and return
 		dataLength=mbb.position();

@@ -143,21 +143,25 @@ public abstract class AArrayBlob extends ABlob {
 		return (b >> shift) & 0x0F;
 	}
 
-	public Hash extractHash(int offset, int length) {
-		return Hash.wrap(store, this.offset + offset);
-	}
-
+	/**
+	 * Gets the internal array backing this Blob. Use with caution!
+	 * @return Byte array backing this blob
+	 */
 	public byte[] getInternalArray() {
 		return store;
+	}
+	
+	/**
+	 * Gets this offset into the internal array backing this Blob.
+	 * @return Offset into backing array
+	 */
+	public int getInternalOffset() {
+		return offset;
 	}
 
 	@Override
 	public ByteBuffer getByteBuffer() {
 		return ByteBuffer.wrap(store, offset, length).asReadOnlyBuffer();
-	}
-
-	public int getOffset() {
-		return offset;
 	}
 
 	@Override

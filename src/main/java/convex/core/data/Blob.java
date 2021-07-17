@@ -259,7 +259,7 @@ public class Blob extends AArrayBlob {
 	}
 
 	@Override
-	public ACell toCanonical() {
+	public ABlob toCanonical() {
 		if (isCanonical()) return this;
 		return Blobs.toCanonical(this);
 	}

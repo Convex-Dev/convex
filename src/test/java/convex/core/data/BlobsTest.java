@@ -12,6 +12,7 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.prim.CVMByte;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.test.Samples;
@@ -76,13 +77,20 @@ public class BlobsTest {
 		assertEquals(b, bt.getChunk(1));
 
 		doBlobTests(bt);
-
 	}
 
+	@Test
+	public void testToLong() {
+		assertEquals(255L,Blob.fromHex("ff").toLong());
+		assertEquals(-1L,Blob.fromHex("ffffffffffffffff").toLong());
+	}
+	
 	@Test
 	public void testLongBlob() {
 		LongBlob b = LongBlob.create("cafebabedeadbeef");
 		Blob bb = Blob.fromHex("cafebabedeadbeef");
+		
+		assertEquals(b.longValue(),bb.longValue());
 
 		assertEquals(10, b.getHexDigit(1)); // 'a'
 
@@ -120,6 +128,13 @@ public class BlobsTest {
 		assertSame(blob,blob.slice(0,0));
 		
 		doBlobTests(Blob.EMPTY);
+	}
+	
+	@Test
+	public void testBlobSlice() {
+		ABlob blob = Blob.fromHex("cafebabedeadbeef").slice(2,4);
+		assertEquals(8,blob.hexLength());
+		doBlobTests(blob);
 	}
 
 	@Test
@@ -195,6 +210,23 @@ public class BlobsTest {
 	public static void doBlobTests(ABlob a) {
 		long n = a.count();
 		assertTrue(n >= 0L);
+		
+		//  copy of the Blob data
+		ABlob b=Blob.wrap(a.getBytes()).toCanonical();
+		
+		if (a.isRegularBlob()) {
+			assertEquals(a,b);
+		}
+		
+		if (n>0) {
+			assertEquals(n*2,a.commonHexPrefixLength(b));
+			
+			assertEquals(a.slice(n/2,n/2),b.slice(n/2, n/2));
+			
+			assertEquals(a.get(n-1),CVMByte.create(a.byteAt(n-1)));
+		}
+		
+		
 
 		ObjectsTest.doAnyValueTests(a);
 	}

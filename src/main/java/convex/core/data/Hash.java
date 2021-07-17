@@ -71,7 +71,7 @@ public class Hash extends AArrayBlob {
      */
 	public static Hash wrap(AArrayBlob data) {
 		if (data instanceof Hash) return (Hash)data;
-		return wrap(data.getInternalArray(),data.getOffset());
+		return wrap(data.getInternalArray(),data.getInternalOffset());
 	}
 
 	/**
@@ -130,7 +130,7 @@ public class Hash extends AArrayBlob {
 	}
 
 	public static Hash wrap(AArrayBlob data, int offset, int length) {
-		return data.extractHash(offset, length);
+		return wrap(data.store, data.offset + offset);
 	}
 	
 	/**

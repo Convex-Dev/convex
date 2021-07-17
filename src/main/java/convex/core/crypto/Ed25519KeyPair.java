@@ -223,7 +223,7 @@ public class Ed25519KeyPair extends AKeyPair {
 		try {
 			Signature signer = Signature.getInstance(ED25519);
 			signer.initSign(getPrivate());
-			signer.update(hash.getInternalArray(), hash.getOffset(), Hash.LENGTH);
+			signer.update(hash.getInternalArray(), hash.getInternalOffset(), Hash.LENGTH);
 			byte[] signature = signer.sign();
 			return Ed25519Signature.wrap(signature);
 		} catch (SignatureException | NoSuchAlgorithmException | InvalidKeyException e) {

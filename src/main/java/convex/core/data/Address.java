@@ -301,7 +301,7 @@ public class Address extends ABlob {
 	}
 
 	@Override
-	public ACell toCanonical() {
+	public Address toCanonical() {
 		return this;
 	}
 
