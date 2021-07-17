@@ -1111,8 +1111,8 @@ public class Context<T extends ACell> extends AObject {
 	 * @return Updated context with symbol defined in environment
 	 */
 	public Context<T> define(Symbol key, ACell value) {
-		AHashMap<Symbol, ACell> m = getEnvironment();
-		AHashMap<Symbol, ACell> newEnvironment = m.assoc(key, value);
+		AHashMap<Symbol, ACell> env = getEnvironment();
+		AHashMap<Symbol, ACell> newEnvironment = env.assoc(key, value);
 
 		return withEnvironment(newEnvironment);
 	}
@@ -1126,8 +1126,8 @@ public class Context<T extends ACell> extends AObject {
 	 */
 	public Context<T> defineWithSyntax(Syntax syn, ACell value) {
 		Symbol key=syn.getValue();
-		AHashMap<Symbol, ACell> m = getEnvironment();
-		AHashMap<Symbol, ACell> newEnvironment = m.assoc(key, value);
+		AHashMap<Symbol, ACell> env = getEnvironment();
+		AHashMap<Symbol, ACell> newEnvironment = env.assoc(key, value);
 		AHashMap<Symbol, AHashMap<ACell,ACell>> newMeta = getMetadata().assoc(key, syn.getMeta());
 
 		return withEnvironment(newEnvironment,newMeta);

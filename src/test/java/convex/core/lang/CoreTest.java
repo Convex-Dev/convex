@@ -3042,6 +3042,26 @@ public class CoreTest extends ACVMTest {
 
 		assertUndeclaredError(step("(def a a)"));
 	}
+	
+	@Test
+	public void testDefMeta() {
+		AHashMap<ACell, ACell> FOOMAP = Maps.of(Keywords.FOO, CVMBool.TRUE);
+		
+		// def of simple symbol has empty meta
+		assertEquals(Maps.empty(), eval("(do (def v 1) (lookup-meta 'v))"));
+
+		// def with a keyword tag
+		assertEquals(FOOMAP, eval("(do (def ^:foo v 1) (lookup-meta 'v))"));
+		
+		// def with a keyword tag on value
+		assertEquals(FOOMAP, eval("(do (def v ^:foo 1) (lookup-meta 'v))"));
+
+		// def with constructed syntax object shouldn't set metadata
+		assertEquals(Maps.empty(), eval("(do (def v (syntax 1 {:foo true})) (lookup-meta 'v))"));
+
+		// def with syntax object constructed for symbol inline
+		// assertEquals(FOOMAP, eval("(do (def ~(syntax 'v {:foo true})) (lookup-meta 'v))"));
+	}
 
 	@Test
 	public void testDefinedQ() {
