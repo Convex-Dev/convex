@@ -344,7 +344,6 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * 
 	 * @param bb ByteBuffer to read from
 	 * @param count Count of map elements
-	 * @param includeValues True to include values, false otherwise (i.e. this is a Set)
 	 * @return A Map as deserialised from the provided ByteBuffer
 	 * @throws BadFormatException
 	 */

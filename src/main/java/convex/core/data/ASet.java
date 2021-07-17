@@ -131,7 +131,6 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 		return false;
 	}
 	
-	
 	@SuppressWarnings("unchecked")
 	@Override
 	public final boolean equals(ACell o) {

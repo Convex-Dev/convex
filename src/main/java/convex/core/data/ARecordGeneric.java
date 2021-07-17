@@ -30,7 +30,7 @@ public abstract class ARecordGeneric extends ARecord {
 		if (ix==null) return null;
 		return values.get((long)ix);
 	}
-
+	
 	@Override
 	public abstract byte getTag();
 	

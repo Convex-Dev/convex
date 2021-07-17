@@ -39,11 +39,6 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 		return Types.MAP;
 	}
 
-	@Override
-	public boolean isEmpty() {
-		return count == 0L;
-	}
-
 	/**
 	 * Gets the values from this map, in map-determined order
 	 */

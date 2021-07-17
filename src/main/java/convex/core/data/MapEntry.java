@@ -221,11 +221,6 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	}
 
 	@Override
-	public boolean isEmpty() {
-		return false;
-	}
-
-	@Override
 	public boolean contains(Object o) {
 		return (Utils.equals(o, getKey()) || Utils.equals(o, getValue()));
 	}

@@ -45,6 +45,11 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 * @return An empty data structure
 	 */
 	public abstract ADataStructure<E> empty();
+	
+	@Override
+	public final boolean isEmpty() {
+		return count==0L;
+	}
 
 	/**
 	 * Adds an element to this data structure, in the natural manner defined by the
