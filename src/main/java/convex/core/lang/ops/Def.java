@@ -107,7 +107,7 @@ public class Def<T extends ACell> extends AOp<T> {
 	@Override
 	public void print(StringBuilder sb) {
 		sb.append("(def ");
-		sb.append(symbol);
+		symbol.print(sb);
 		sb.append(' ');
 		Utils.print(sb, op.getValue());
 		sb.append(')');
@@ -133,7 +133,8 @@ public class Def<T extends ACell> extends AOp<T> {
 	public static <T extends ACell> Def<T> read(ByteBuffer b) throws BadFormatException {
 		ACell symbol = Format.read(b);
 		Ref<AOp<T>> ref = Format.readRef(b);
-		return create(symbol, ref);
+		if (!validKey(symbol)) throw new BadFormatException("Symbol not valid for Def op");
+		return new Def<>(symbol, ref);
 	}
 
 	@Override
