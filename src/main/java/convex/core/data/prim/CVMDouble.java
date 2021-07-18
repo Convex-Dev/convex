@@ -100,8 +100,7 @@ public final class CVMDouble extends APrimitive implements INumeric {
 
 	@Override
 	public void print(StringBuilder sb) {
-		// TODO. Fix #236
-		sb.append(value);
+		sb.append(toString());
 	}
 
 	@Override

@@ -812,7 +812,7 @@ public class Utils {
 			sb.append("nil");
 		} else if (v instanceof AObject) {
 			((AObject)v).print(sb);
-		} else if (v instanceof Boolean||v instanceof Number){
+		} else if (v instanceof Boolean || v instanceof Number){
 			sb.append(v.toString());
 		} else if (v instanceof String) {
 			sb.append('"');

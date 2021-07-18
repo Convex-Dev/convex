@@ -585,6 +585,10 @@ public class CoreTest extends ACVMTest {
 		assertEquals("", evalS("(str)"));
 		assertEquals("1", evalS("(str 1)"));
 		assertEquals("12", evalS("(str 1 2)"));
+		assertEquals("42.0", evalS("(str 42.0)"));
+		assertEquals("##Inf", evalS("(str ##Inf)"));
+		assertEquals("##-Inf", evalS("(str ##-Inf)"));
+		assertEquals("##NaN", evalS("(str ##NaN)"));
 		assertEquals("255", evalS("(str (byte 0xff))"));
 		assertEquals("baz", evalS("(str \"baz\")"));
 		assertEquals("bazbar", evalS("(str \"baz\" \"bar\")"));
