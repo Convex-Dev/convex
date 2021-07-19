@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: convex.actors.ActorsTest
--------------------------------------------------------------------------------
-Tests run: 48, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.183 s - in convex.actors.ActorsTest

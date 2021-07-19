@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: convex.core.lang.AliasTest
--------------------------------------------------------------------------------
-Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.163 s - in convex.core.lang.AliasTest

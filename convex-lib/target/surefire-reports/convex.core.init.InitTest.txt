@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: convex.core.init.InitTest
--------------------------------------------------------------------------------
-Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.336 s - in convex.core.init.InitTest

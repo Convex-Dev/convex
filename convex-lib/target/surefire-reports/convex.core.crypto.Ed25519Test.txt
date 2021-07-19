@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: convex.core.crypto.Ed25519Test
--------------------------------------------------------------------------------
-Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.055 s - in convex.core.crypto.Ed25519Test

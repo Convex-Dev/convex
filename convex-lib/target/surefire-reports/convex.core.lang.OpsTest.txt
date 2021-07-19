@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: convex.core.lang.OpsTest
--------------------------------------------------------------------------------
-Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.01 s - in convex.core.lang.OpsTest
