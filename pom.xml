@@ -8,7 +8,7 @@
 	<packaging>pom</packaging>
 
 	<modules>
-		<module>convex-lib</module>
+		<module>convex-core</module>
 		<module>convex-cli</module>
 		<module>convex-gui</module>
 		<module>convex-benchmarks</module>
