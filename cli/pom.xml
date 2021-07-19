@@ -7,9 +7,8 @@
 		<version>0.7.0-SNAPSHOT</version>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>world.convex</groupId>
+
 	<artifactId>cli</artifactId>
-	<version>0.7.0-SNAPSHOT</version>
 
 	<build>
 		<finalName>convex-cli</finalName>

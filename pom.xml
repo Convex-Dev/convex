@@ -6,11 +6,13 @@
 	<artifactId>convex</artifactId>
 	<version>0.7.0-SNAPSHOT</version>
 	<packaging>pom</packaging>
+
 	<modules>
 		<module>convex-lib</module>
 		<module>cli</module>
 		<module>gui</module>
 	</modules>
+
 	<properties>
 		<maven.compiler.target>11</maven.compiler.target>
 		<maven.compiler.source>11</maven.compiler.source>
@@ -24,25 +26,25 @@
 	</properties>
 
 	<licenses>
-			<license>
-					<name>Convex Public License</name>
-					<url>https://github.com/Convex-Dev/convex/blob/master/LICENSE.md</url>
-			</license>
+		<license>
+			<name>Convex Public License</name>
+			<url>https://github.com/Convex-Dev/convex/blob/master/LICENSE.md</url>
+		</license>
 	</licenses>
 
 	<developers>
-			<developer>
-					<name>Mike Anderson</name>
-					<email>mike@convex.world</email>
-					<organization>Convex Foundation</organization>
-					<organizationUrl>https://convex.world</organizationUrl>
-			</developer>
+		<developer>
+			<name>Mike Anderson</name>
+			<email>mike@convex.world</email>
+			<organization>Convex Foundation</organization>
+			<organizationUrl>https://convex.world</organizationUrl>
+		</developer>
 	</developers>
 
 	<scm>
-			<connection>scm:git:git://github.com/Convex-Dev/convex.git</connection>
-			<developerConnection>scm:git:ssh://github.com:Convex-Dev/convex.git</developerConnection>
-			<url>https://github.com/Convex-Dev/convex.git</url>
+		<connection>scm:git:git://github.com/Convex-Dev/convex.git</connection>
+		<developerConnection>scm:git:ssh://github.com:Convex-Dev/convex.git</developerConnection>
+		<url>https://github.com/Convex-Dev/convex.git</url>
 	</scm>
 	<build>
 		<plugins>
@@ -97,7 +99,7 @@
 		</plugins>
 		<pluginManagement>
 			<plugins>
-				<!--This plugin's configuration is used to store Eclipse m2e settings
+				<!--This plugin's configuration is used to store Eclipse m2e settings 
 					only. It has no influence on the Maven build itself. -->
 				<plugin>
 					<groupId>org.eclipse.m2e</groupId>
