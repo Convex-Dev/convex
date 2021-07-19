@@ -1,0 +1,179 @@
+(do
+  ;; Fungible library.
+  ;;
+  ;; Provides library functions to build and manage standard fungible assets.
+  ;;
+  ;; Fungible assets follow these rules:
+  ;; - The quantity can be expressed in a numerical Long value, representing an amount of the asset
+  ;; - They conform to the standard rules of the 'convex.asset' general Asset API
+  ;;
+  ;; deploy library with: (deploy-once fungible-code)
+  ;; import with (import <address of fungible> :as fungible)
+  ;;
+  ;; Key usage:
+  ;;   (fungible/balance token)                        ;; Gets own balance (i.e. for *address*)
+  ;;   (fungible/balance token other-address)          ;; Gets balance for another Address
+  ;;   (fungible/transfer token target-address amount) ;; transfer to a new holder
+  
+  (call *registry* (register {:name "Fungible Library"}))
+  
+  (defn balance 
+    ^{:doc {:description "Gets the balance from a fungible token. Checks the balance for the specified holder, or the current *address* if not specified."
+            :examples [{:code "(balance my-token-address)"}]
+            :type :function
+            :signature [{:params [token holder]}]}
+      }
+    [token holder]
+    (call token (balance holder))) 
+  
+  (defn transfer 
+    ^{:doc {:description "Transfers balance of a fungible token. Returns the amount transferred, or nil if the transfer fails."
+            :examples [{:code "(transfer my-token-address my-friend 100)"}]
+            :type :function
+            :signature [{:params [token target amount]}]}
+      }
+    [token target amount]
+    (call token (direct-transfer target amount))) 
+  
+  (defn mint 
+    ^{:doc {:description "Mints an amount of tokens for the given token. User must have minting privileges. Amount may be negative to burn fungible tokens."
+            :examples [{:code "(mint my-token-address 1000)"}]
+            :type :function
+            :signature [{:params [token amount]}]}
+      }
+    [token amount]
+    (call token (mint amount))) 
+  
+  (defn burn 
+    ^{:doc {:description "Burns an amount of tokens for the given token. User must have minting privileges. Amount must be non-negative and no greater than the caller's balance."
+            :examples [{:code "(mint my-token-address 1000)"}]
+            :type :function
+            :signature [{:params [token amount]}]}
+      }
+    [token amount]
+    (call token (burn amount))) 
+  
+  (defn build-token 
+    ^{:doc {:description "Creates deployable code for a new fungible token. An optional config map can be provided"
+            :examples [{:code "(deploy (build-token {:supply 1000000 :initial-holder *address*}))"}]
+            :type :function
+            :signature [{:params [config]}]}
+      }
+    [config]
+    (let [supply (long (or (:supply config) 1000000))
+          initial-holder (address (or (:initial-holder config) *address*))]
+      `(do
+         (def supply ~supply)
+         
+         (set-holding ~initial-holder ~supply)
+         
+         ;; map of holder-address -> {offeree-address -> positive long amount}
+         ;; must enforce valid positive offers
+         (def offers {})
+         
+         (defn balance [addr]
+           (or (get-holding addr) 0))
+         
+         (defn offer [receiver quantity]
+           (let [receiver (address receiver)
+                 quantity (if quantity (long quantity) 0)
+                 om (get offers *caller*)]
+             (cond 
+               (<= quantity 0) (if (get om receiver)
+                                 (def offers (assoc offers *caller* (dissoc om receiver))))
+               (def offers (assoc-in offers [*caller* receiver] quantity)))
+             quantity))
+         
+         (defn get-offer [sender receiver] 
+           (or (get (get offers sender) receiver) 0))
+           
+         (defn accept [sender quantity]
+           (let [sender (address sender)
+                 quantity (if quantity (long quantity) 0)
+                 om (or (get offers sender) 0)
+                 sendbal (or (get-holding sender) 0)
+                 offer (or (get om *caller*) 0)]
+               (cond 
+                 (< quantity 0) (fail "Can't accept a negative quantity of fungible tokens.")
+                 (< offer quantity) (fail "Offer is insufficient")
+                 (< sendbal quantity) (fail "Sender token balance is insufficient")
+                 (let [new-offer (- offer quantity)] 
+                   (def offers (assoc offers sender (if (> new-offer 0) (assoc om *caller* new-offer) (dissoc om *caller*))))
+                   (set-holding sender (- sendbal quantity))
+                   (set-holding *caller* (+ (or (get-holding *caller*) 0) quantity))))))
+         
+         (defn direct-transfer [addr amount]
+           (let [addr (address addr)
+                 amount (if amount (long amount) 0)
+                 bal (or (get-holding *caller*) 0)
+                 tbal (or (get-holding addr) 0)]
+             (assert (<= 0 amount bal)) ;; amount must be in valid range
+             (if (= *caller* addr) (return amount)) ;; need this check in case of self transfers
+             (set-holding *caller* (- bal amount))
+             (set-holding addr (+ tbal amount))
+             ))
+         
+         (defn quantity-subset? [a b]
+           (let [a (if a (long a ) 0)
+                 b (if b (long b ) 0)]
+             (<= a b)))
+         
+         ;; no restrictions on transfer by default
+         (defn check-transfer [sender receiver quantity]
+           nil)
+         
+         (defn quantity-add [a b]
+           (let [a (if a (long a) 0)
+                 b (if b (long b) 0)] (+ a b)))
+         
+         (defn quantity-sub [a b]
+           (let [a (if a (long a) 0)
+                 b (if b (long b) 0)] 
+             (if (> a b) (- a b) 0)))
+         
+         (export direct-transfer quantity-add quantity-sub balance quantity-subset? offer accept get-offer check-transfer))))
+  
+  (defn add-mint 
+    ^{:doc {:description "Creates deployable code that, when added to a fungible token actor, allows priviledged accounts to mint and burn tokens. The :minter may be a single address, or a Trust Monitor."
+            :examples [{:code "(deploy [(build-token {}) (add-mint {:minter *address* :max-supply 1000000000})])"}]
+            :type :function
+            :signature [{:params [config]}]}
+      }
+    [config]
+    (let [max-supply (long (or (:max-supply config) 1000000000000000000))
+          minter (address (or (:minter config) *address*))]
+      (assert (<= 0 max-supply 1000000000000000000))
+      `(do
+         (import convex.trust :as trust)
+         
+         ;; Who is allowed to mint tokens?
+         (def minter ~minter)
+         
+         ;; Maximum supply (limit after minting)
+         (def max-supply ~max-supply)
+         
+         (defn mint [amount]
+           (when-not (trust/trusted? minter *caller*) (fail :TRUST "No rights to mint"))
+           (let [amount (long amount)
+                 new-supply (+ supply amount)
+                 bal (balance *caller*)
+                 new-bal (+ bal amount)]
+             (assert (<= 0 new-bal max-supply)) ;; mint amount
+             (assert (<= 0 new-supply max-supply)) ;; new supply must be in valid range
+             (set-holding *caller* new-bal)
+             (def supply new-supply)
+             ))
+         
+         (defn burn [amount]
+           (when-not (trust/trusted? minter *caller*) (fail :TRUST "No rights to burn"))
+           (let [amount (long amount)
+                 bal (balance *caller*)]
+             (assert (<= 0 amount bal)) ;; burn amount must be less than or equal to caller's balance
+             (set-holding *caller* (- bal amount))
+             (def supply (- supply amount))
+             ))
+         
+         (export mint burn))))
+  
+  
+  )

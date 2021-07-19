@@ -5,7 +5,12 @@
 	<groupId>world.convex</groupId>
 	<artifactId>convex</artifactId>
 	<version>0.7.0-SNAPSHOT</version>
-
+	<packaging>pom</packaging>
+	<modules>
+		<module>convex-lib</module>
+		<module>cli</module>
+		<module>gui</module>
+	</modules>
 	<properties>
 		<maven.compiler.target>11</maven.compiler.target>
 		<maven.compiler.source>11</maven.compiler.source>
@@ -19,30 +24,27 @@
 	</properties>
 
 	<licenses>
-		<license>
-			<name>Convex Public License</name>
-			<url>https://github.com/Convex-Dev/convex/blob/master/LICENSE.md</url>
-		</license>
+			<license>
+					<name>Convex Public License</name>
+					<url>https://github.com/Convex-Dev/convex/blob/master/LICENSE.md</url>
+			</license>
 	</licenses>
 
 	<developers>
-		<developer>
-			<name>Mike Anderson</name>
-			<email>mike@convex.world</email>
-			<organization>Convex Foundation</organization>
-			<organizationUrl>https://convex.world</organizationUrl>
-		</developer>
+			<developer>
+					<name>Mike Anderson</name>
+					<email>mike@convex.world</email>
+					<organization>Convex Foundation</organization>
+					<organizationUrl>https://convex.world</organizationUrl>
+			</developer>
 	</developers>
 
 	<scm>
-		<connection>scm:git:git://github.com/Convex-Dev/convex.git</connection>
-		<developerConnection>scm:git:ssh://github.com:Convex-Dev/convex.git</developerConnection>
-		<url>https://github.com/Convex-Dev/convex.git</url>
+			<connection>scm:git:git://github.com/Convex-Dev/convex.git</connection>
+			<developerConnection>scm:git:ssh://github.com:Convex-Dev/convex.git</developerConnection>
+			<url>https://github.com/Convex-Dev/convex.git</url>
 	</scm>
-
 	<build>
-		<finalName>convex</finalName>
-
 		<plugins>
 			<plugin>
 				<artifactId>maven-surefire-plugin</artifactId>
@@ -91,50 +93,7 @@
 					</annotationProcessorPaths>
 				</configuration>
 			</plugin>
-			<plugin>
-				<groupId>org.antlr</groupId>
-				<artifactId>antlr4-maven-plugin</artifactId>
-				<version>4.9.2</version>
-				<configuration>
-					<libDirectory>${basedir}/src/main/antlr4/convex/core/lang/reader/antlr</libDirectory>
-				</configuration>
-				<executions>
-					<execution>
-						<goals>
-							<goal>antlr4</goal>
-						</goals>
-					</execution>
-				</executions>
 
-			</plugin>
-			<plugin>
-				<artifactId>maven-assembly-plugin</artifactId>
-				<version>3.3.0</version>
-				<configuration>
-					<outputDirectory>${project.directory}</outputDirectory>
-					<archive>
-						<manifest>
-							<mainClass>convex.cli.Main</mainClass>
-						</manifest>
-					</archive>
-					<descriptors>
-						<descriptor>src/main/assembly/testing.xml</descriptor>
-					</descriptors>
-					<descriptorRefs>
-						<descriptorRef>jar-with-dependencies</descriptorRef>
-					</descriptorRefs>
-					<!-- We want differentiated outputs <appendAssemblyId>false</appendAssemblyId> -->
-				</configuration>
-				<executions>
-					<execution>
-						<id>create-archive</id>
-						<phase>package</phase>
-						<goals>
-							<goal>single</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
 		</plugins>
 		<pluginManagement>
 			<plugins>
@@ -175,112 +134,4 @@
 			</plugins>
 		</pluginManagement>
 	</build>
-
-	<dependencies>
-		<dependency>
-			<groupId>org.bouncycastle</groupId>
-			<artifactId>bcprov-jdk15on</artifactId>
-			<version>1.69</version>
-		</dependency>
-		<dependency>
-			<groupId>org.bouncycastle</groupId>
-			<artifactId>bcpkix-jdk15on</artifactId>
-			<version>1.69</version>
-		</dependency>
-
-		<dependency>
-			<groupId>com.goterl</groupId>
-			<artifactId>lazysodium-java</artifactId>
-			<version>5.0.1</version>
-		</dependency>
-
-		<dependency>
-			<groupId>net.java.dev.jna</groupId>
-			<artifactId>jna</artifactId>
-			<version>5.8.0</version>
-		</dependency>
-
-		<dependency>
-			<groupId>org.apache.commons</groupId>
-			<artifactId>commons-text</artifactId>
-			<version>1.9</version>
-		</dependency>
-		<dependency>
-			<groupId>info.picocli</groupId>
-			<artifactId>picocli</artifactId>
-			<version>4.6.1</version>
-		</dependency>
-		<dependency>
-			<groupId>com.pholser</groupId>
-			<artifactId>junit-quickcheck-core</artifactId>
-			<version>1.0</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>com.pholser</groupId>
-			<artifactId>junit-quickcheck-generators</artifactId>
-			<version>1.0</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.junit.jupiter</groupId>
-			<artifactId>junit-jupiter-engine</artifactId>
-			<version>${junit.version}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.junit.vintage</groupId>
-			<artifactId>junit-vintage-engine</artifactId>
-			<version>${junit.version}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.junit.jupiter</groupId>
-			<artifactId>junit-jupiter-params</artifactId>
-			<version>${junit.version}</version>
-			<scope>test</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>org.openjdk.jmh</groupId>
-			<artifactId>jmh-core</artifactId>
-			<version>${jmh.version}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.openjdk.jmh</groupId>
-			<artifactId>jmh-generator-annprocess</artifactId>
-			<version>${jmh.version}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.antlr</groupId>
-			<artifactId>antlr4-runtime</artifactId>
-			<version>4.9.2</version>
-		</dependency>
-
-		<dependency>
-			<groupId>io.github.vincenzopalazzo</groupId>
-			<artifactId>material-ui-swing</artifactId>
-			<version>1.1.2</version>
-			<exclusions>
-				<exclusion>
-					<groupId>ch.qos.logback</groupId>
-					<artifactId>logback-classic</artifactId>
-				</exclusion>
-			</exclusions>
-		</dependency>
-		<dependency>
-		    <groupId>org.slf4j</groupId>
-    		<artifactId>slf4j-api</artifactId>
-    		<version>1.7.31</version>
-		</dependency>
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-jdk14</artifactId>
-			<version>${slf4j.version}</version>
-			<scope>test</scope>
-		</dependency>
-
-	</dependencies>
 </project>

@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: convex.actors.TorusTest
+-------------------------------------------------------------------------------
+Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.321 s - in convex.actors.TorusTest

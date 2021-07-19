@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: convex.util.BitsTest
+-------------------------------------------------------------------------------
+Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s - in convex.util.BitsTest

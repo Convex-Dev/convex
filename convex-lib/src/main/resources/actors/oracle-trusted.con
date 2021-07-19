@@ -1,0 +1,46 @@
+(do 
+  ;; a simple oracle contract that depends on a trusted set who may provide results
+  ;; Trusted users are a set with key :trust in the registration data
+  
+  ;; Map of keys to oracle descriptive data
+  (def full-list {})
+  
+  ;; May of keys to oracle results for each key
+  (def results {})
+  
+  ;; ORACLE REGISTER INTERFACE
+  
+  ;; method to register a new oracle key. Returns true if successful, false otherwise
+  (defn register [key data]
+    (cond
+      (contains-key? full-list key) false
+      (do 
+        (def full-list (assoc full-list key data))
+        true)))
+  
+  
+  ;; ORCALE PULL INTERFACE
+  
+  ;; Method to read the oracle value. Returns nil if not yet finalised. 
+  (defn read [key]
+    (results key))
+  
+  ;; Returns true iff the oracle is finalised for a given key
+  (defn finalised? [key]
+    (contains-key? results key))
+  
+  ;; ORACLE PROVIDER INTERFACE
+
+  ;; Finalise the oracle value with a value provided by a trusted caller
+  ;; Throws error if caller is not trusted
+  ;; Returns the finalised value
+  (defn provide [key value]
+    (cond
+      (not (get-in full-list [key :trust *caller*])) (fail :ASSERT "Untrusted caller") ;; Is this sensible?
+      (not (full-list key)) (fail 80 (str "Unknown oracle key: " key)) ;; Fail if not registered
+      (contains-key? results key) (results key)
+      (def results (assoc results key value))
+      value))
+  
+  (export finalised? read provide register)
+  )

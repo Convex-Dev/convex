@@ -1,0 +1,8 @@
+(defn min [& vals]
+  (let [fst (first vals)
+        n (count vals)]
+    (loop [min fst i 1]
+      (if (>= i n) 
+        min
+        (let [v (nth vals i)]
+          (recur (if (< v min) v min) (inc i)))))))

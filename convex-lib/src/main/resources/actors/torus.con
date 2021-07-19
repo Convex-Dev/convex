@@ -1,0 +1,306 @@
+(do
+ ;; Torus library 
+ ;;
+ ;; Torus establishes automated market makers for fungible assets, by creating singleton CVX/Token trading pairs
+ ;; for each fungible asset.
+ ;;
+ ;; 
+ ;;
+ ;; deploy with: (deploy torus-code)
+ ;; 
+ ;; import with (import <address of fungible> :as fungible)
+ ;;
+ ;; Key usage:
+ ;;   (torus/get-market token-address)                   ;; Gets a Torus CVX/Token market
+ ;;   (torus/create-market token-address)                ;; Gets or creates the canonical market for a CVX/Token pain
+ ;;
+ ;; For each market, to add liquidity
+ ;;   (call market cvx-amt (add-liquidity token-amt))    ;; Add liquidity [cvx-amt, token-amt]
+     
+  (call *registry* (register {:name "Torus Exchange Library"}))
+
+  
+  (import convex.trust :as trust)
+  (import convex.fungible :as fungible)
+  (import convex.asset :as asset)
+
+  
+  ;; BlobMap of token addresses to market Actor addresses
+  (def markets (blob-map))
+  
+  (defn get-market 
+    ^{:doc {:description "Gets the canonical market for a token. Returns nil if the market does not exist."
+         :examples [{:code "(deploy-once (build-market {:token token-address}))"}]
+         :type :function
+         :signature [{:params [config]}]}
+	  }
+    [token]
+    (get markets token))
+  
+    (defn create-market
+      ^{:doc {:description "Gets or creates the canonical market for a token."
+         :examples [{:code "(deploy-once (build-market {:token token-address}))"}]
+         :type :function
+         :signature [{:params [config]}]}
+	  }
+      ([token] 
+        ;; ensure we are calling this in the actor's environment, so that "def" works
+        (if (not (= *address* ~*address*)) (return (call ~*address* (create-market token))))
+        (let [existing-market (get markets token)]
+          (if existing-market (return existing-market))
+          (let [token (address token)
+                code (build-market token *address*)
+                market (deploy code)
+                ]
+            (def markets (assoc markets token market))
+            market))))
+  
+  (defn build-market
+    ^{:doc {:description "Creates deployable code for a new Torus token market"
+         :examples [{:code "(deploy-once (build-market {:token token-address}))"}]
+         :type :function
+         :signature [{:params [config]}]}
+	  }
+    [token torus]
+    (let []
+        [;; start with code for a basic fungible token, with zero supply.
+         (fungible/build-token {:supply 0})
+       
+         ;; Add code for market functionality
+        `(do
+           (import convex.asset :as asset)
+           (import convex.fungible :as fungible)
+         (import convex.core :as core)
+         
+         (def token ~token)
+           (def torus ~torus)
+         
+         (def token-balance 0)
+         
+         (defn calc-rate []
+             ;; TODO: have vairable rate set by torus and/or trade velocity
+             ;; Maybe BASE_FEE / 1 + (THROUGHPUT / LIQUIDITY) ?
+             0.001)
+         
+           ;; price is convex amount per token, or nil if there are no tokens in liquidity pool
+           (defn price []
+             (if (> token-balance 0) (/ (double *balance*) token-balance) nil))
+         
+           (defn add-liquidity [amt]
+             (let [amt (long amt)                                            ;; amount of tokens deposited
+                   price (price)                                             ;; (double) price of token in CVX, nil if no current liquidity
+                   initial-cvx-balance *balance*                             ;; initial CVX balance
+                   cvx (core/accept (if price (long (* price amt)) *offer*)) ;; accept amount of CVX required (all if initial deposit)
+                   _ (asset/accept *caller* [token amt])                     ;; ensure tokens are transferred from caller to market actor
+                 
+                   ;; compute new total balances for actor
+                   new-token-balance (+ token-balance amt)
+                 
+                   ;; compute number of new shares for depositor = increase in liquidity (%) * current total shares
+                   ;; if no current liquidity just initialise with the geometric mean of amounts deposited
+                   delta (if (> supply 0)
+                           (let [liquidity (sqrt (* (double initial-cvx-balance) token-balance)) ;; initial size of liquidity pool (geomentric mean)
+                                 new-liquidity (sqrt (* (double *balance*) new-token-balance))]
+                             (long (* (- new-liquidity liquidity) (/ supply liquidity))))
+                           (long (sqrt (* (double amt) cvx))))
+                   ]
+                ;; Perform updates to reflect new holdings of liquidity pool shares and total token balance (all longs)
+                (set-holding *caller* (+ delta (or (get-holding *caller*) 0)))
+                (def supply (+ supply delta))
+                (def token-balance new-token-balance)
+                delta))
+         
+           (defn withdraw-liquidity [shares]
+           (let [shares (long shares)                                  ;; amount of shares to withdraw
+                   own-holding (or (get-holding *caller*) 0)             ;; shares of holder
+                   _ (assert (<= 0 shares own-holding))
+                 proportion (if (> supply 0) (/ (double shares) supply) 0.0)
+                 coin-refund (long (* proportion *balance*))         
+                 token-refund (long (* proportion token-balance))
+                 ]
+              
+                ;; SECURITY: 
+                ;; 1. update balances then transfer coins first. Risk of re-entrancy attack if transfers are made while
+                ;;    this actor is in an inconsistent state so we MUST do accounting first
+                (def token-balance (- token-balance token-refund))
+                (set-holding *caller* (- own-holding shares))
+                (def supply (- supply shares))
+               
+                 ;; 2. Transfer back coins. Be aware caller might do *anything* in transfer callbacks!
+                 (transfer *caller* coin-refund)
+               
+                 ;; 3. Finally transfer asset. We've accounted this already, so safe 
+                 ;; TODO: decide which of these is best
+                 ;;(asset/transfer *caller* [token token-refund] :withdraw)
+                 (fungible/transfer token *caller* token-refund)
+                 shares))
+         
+           (defn buy-cvx-quote [amt]
+           (let [;; SECURITY: check pool can provide!
+                   _ (if (< 0 amt *balance*) :OK (return nil))   
+
+                 ;; Compute pool and fees
+                   cvx-balance *balance*
+                 pool (* (double token-balance) cvx-balance)
+                 rate (calc-rate)]
+             ;; Compute required payment in Tokens
+               (long (ceil (* (+ 1.0 rate) (- (/ pool (- cvx-balance amt)) token-balance))))))
+
+         (defn sell-cvx-quote [amt]
+           (let [;; SECURITY: check amount is positive
+                   _ (if (< 0 amt) :OK (return nil))   
+
+                 ;; Compute pool and fees
+                   cvx-balance *balance*
+                 pool (* (double token-balance) cvx-balance)
+                 rate (calc-rate)
+                 new-cvx-balance (+ cvx-balance amt)]
+             ;; Compute gained Tokens coins from sale
+               (long (/ (- token-balance (/ pool new-cvx-balance)) (+ 1.0 rate)))))
+         
+           (defn buy-tokens-quote [amt]
+             (let [;; SECURITY: check pool can provide!
+                   _ (if (< 0 amt token-balance) :OK (return nil))   
+
+                 ;; Compute pool and fees
+                   cvx-balance *balance*
+                 pool (* (double token-balance) cvx-balance)
+                 rate (calc-rate)]
+               ;; Compute required payment in CVX
+               (long (ceil (* (+ 1.0 rate) (- (/ pool (- token-balance amt)) cvx-balance))))))
+
+           (defn sell-tokens-quote [amt]
+           (let [;; SECURITY: check amount is positive
+                   _ (if (< 0 amt) :OK (return nil))   
+
+                 ;; Compute pool and fees
+                   cvx-balance *balance*
+                 pool (* (double token-balance) cvx-balance)
+                 rate (calc-rate)
+                   new-token-balance (+ token-balance amt)]
+             ;; Compute gained Convex coins from sale
+               (long (/ (- cvx-balance (/ pool new-token-balance)) (+ 1.0 rate)))))
+         
+           (defn buy-cvx [amt]
+           (let [amt (long amt)
+                 required-tokens (or (buy-cvx-quote amt) (fail "Pool cannot supply this amount of CVX"))
+                 ]
+             (asset/accept *caller* [token required-tokens]) 
+             
+             (def token-balance (+ token-balance required-tokens))
+             (core/transfer *caller* amt) ;; do this last!
+               required-tokens))
+         
+          (defn sell-cvx [amt]
+           (let [amt (long amt)
+                 gained-tokens (or (sell-cvx-quote amt) (fail "Cannot sell this amount into pool"))
+                 ]
+             (core/accept amt) 
+             (def token-balance (- token-balance gained-tokens))
+             (asset/transfer *caller* [token gained-tokens]) ;; do this last!
+               gained-tokens))
+
+         
+         (defn buy-tokens [amt]
+           (let [amt (long amt)
+                   required-cvx (or (buy-tokens-quote amt) (fail "Pool cannot supply this amount of tokens"))
+                   ]
+               (core/accept required-cvx) 
+               (def token-balance (- token-balance amt))
+               (fungible/transfer token *caller* amt) ;; do this last!
+               required-cvx))
+         
+            (defn sell-tokens [amt]
+           (let [amt (long amt)
+                 gained-cvx (or (sell-tokens-quote amt) (fail "Cannot sell this amount into pool"))
+                 ]
+               (asset/accept *caller* [token amt]) 
+             (def token-balance (+ token-balance amt))
+             (core/transfer *caller* gained-cvx) ;; do this last!
+               gained-cvx))
+       
+         (export add-liquidity buy-tokens sell-tokens buy-tokens-quote sell-tokens-quote buy-cvx sell-cvx buy-cvx-quote sell-cvx-quote withdraw-liquidity price))
+        ]))
+  
+     (defn buy-cvx [token amt] 
+     (let [market (or (get-market token) (fail :LIQUIDITY (str "Torus: market does not exist for token: " token)))]
+       ;; Note we can offer all tokens, market will accept what it needs to complete order
+         (asset/offer market [token (fungible/balance token *address*)]) 
+         (call market *balance* (buy-cvx amt))))
+    
+    (defn sell-cvx [token amt] 
+      (let [market (or (get-market token) (fail :LIQUIDITY (str "Torus: market does not exist for token: " token)))]
+        ;; offer the amount of CVX being sold
+          (call market amt (sell-cvx amt))))
+  
+    (defn buy-tokens [token amt ] 
+        (let [market (or (get-market token) (fail :LIQUIDITY (str "Torus: market does not exist for token: " token)))]
+          ;; Note we can offer all CVX
+          (call market *balance* (buy-tokens amt))))
+    
+      (defn sell-tokens [token amt ] 
+      (let [market (or (get-market token) (fail :LIQUIDITY (str "Torus: market does not exist for token: " token)))]
+        ;; offer the amount of tokens being sold
+          (asset/offer market [token amt]) 
+          (call market (sell-tokens amt))))
+    
+      (defn sell [of-token amt with-token]
+        (let [cvx-amt (sell-tokens of-token amt)]
+          (sell-cvx with-token cvx-amt)))
+    
+      (defn buy [of-token amt with-token]
+      (let [market (or (get-market of-token) (fail (str "Torus: market does not exist for token: " of-token)))
+              cvx-amt (or (call market (buy-tokens-quote amt)) (fail :LIQUIDITY "No liquidity available to buy token"))
+              sold (buy-cvx with-token cvx-amt)]
+        (buy-tokens of-token amt)
+          sold))
+    
+      (defn sell-quote 
+        ([of-token amt]
+          (let [market (or (get-market of-token) (return nil))]
+          (call market (sell-tokens-quote amt))))
+        ([of-token amt with-token]
+        (let [market (or (get-market with-token) (return nil))
+                cvx-amt (or (sell-quote of-token amt) (return nil))]
+          (call market (sell-cvx-quote cvx-amt)))))
+    
+    (defn buy-quote 
+        ([of-token amt]
+        (let [market (or (get-market of-token) (return nil))]
+          (call market (buy-tokens-quote amt))))
+        ([of-token amt with-token]
+        (let [market (or (get-market with-token) (return nil))
+              cvx-amt (or (buy-quote of-token amt) (return nil))]
+          (call market (buy-cvx-quote cvx-amt)))))
+    
+      (defn add-liquidity [token token-amount cvx-amount]
+        (let [market (create-market token)]
+          (asset/offer market [token token-amount])
+          (call market (long cvx-amount) (add-liquidity token-amount))))
+    
+      (defn withdraw-liquidity [token shares]
+      (let [market (or (get-market token) (fail "No market exists to withdraw liquidity"))]
+        (call market (withdraw-liquidity shares))))
+    
+      (defn price 
+	      ^{:doc {:description "Gets the current price for a token, in CVX or an optional given currency. Returns nil if a market with liquidity does not exist."
+	         :examples [{:code "(price USD)"}
+	                    {:code "(price GBP USD)"}]
+	         :type :function
+	         :signature [{:params [token]}
+	                     {:params [token currency]}]}
+		  }
+      ([token]
+          (let [market (or (get-market token) (return nil))]
+            (call market (price))))
+        ([token currency]
+          (let [market (or (get-market token) (return nil))
+                cvx-price (or (call market (price)) (return nil))
+                market2 (or (get-market currency) (return nil))
+                curr-price (or (call market2 (price)) (return nil))]
+          (/ cvx-price curr-price))))
+  
+      ;; We only export these two functions, which are needed to interact with torus market registry.
+      ;; Torus mainly operates as a library.
+      (export create-market)
+  )

@@ -1,0 +1,318 @@
+(import convex.asset :as asset)
+(import convex.nft-tokens :as nft)
+
+;; Executed as HERO
+;; Note p2 is configured as VILLAIN, with hero as controller
+
+;; T2 tests
+  (def t2 (call nft (create-token {:name "Token2"} nil)))
+  (asset/transfer p2 [nft t2] nil)
+  (assert (not (asset/owns? *address* [nft t2])))
+  (assert (asset/owns? p2  [nft t2]))
+  (assert (not (subset? #{t2} (asset/balance nft *address*))))
+  (assert (subset? #{t2} (asset/balance nft p2)))
+  (assert (= (call nft (get-token-creator t2)) *address*))
+  (assert (= (call nft (get-token-owner t2)) p2))
+  (assert (not (call nft (check-trusted? *address* :destroy t2))))
+  (assert (not (call nft (check-trusted? *address* :update t2))))
+  (assert (not (call nft (check-trusted? *address* :transfer t2))))
+  (assert (not (call nft (check-trusted? *address* [:update :name] t2))))
+  (assert (call nft (check-trusted? p2 :destroy t2)))
+  (assert (call nft (check-trusted? p2 :update t2)))
+  (assert (call nft (check-trusted? p2 :transfer t2)))
+  (assert (call nft (check-trusted? p2 [:update :name] t2)))
+
+;; Testing policies
+
+(do
+  (def t3 (call nft (create-token {:name "Token3", :status false}
+                                  {:destroy :creator,
+                                   :update :none,
+                                   [:update :status] t2,
+                                   :transfer :owner})))
+  (asset/transfer p2 [nft t3] nil)
+  (assert (call nft (check-trusted? *address* :destroy t3)))
+  (assert (not (call nft (check-trusted? *address* :update t3))))
+  (assert (not (call nft (check-trusted? *address* :transfer t3))))
+  (assert (not (call nft (check-trusted? *address* [:update :name] t3))))
+  (assert (not (call nft (check-trusted? *address* [:update :status] t3))))
+  (assert (not (call nft (check-trusted? p2 :destroy t3))))
+  (assert (not (call nft (check-trusted? p2 :update t3))))
+  (assert (call nft (check-trusted? p2 :transfer t3)))
+  (assert (not (call nft (check-trusted? p2 [:update :name] t3))))
+  (assert (call nft (check-trusted? p2 [:update :status] t3))))
+
+;; From acct 2
+(eval-as p2
+  `(do 
+     (call nft (merge-token-data ~t3 {:status true}))
+     (assert (= (call nft (get-token-data ~t3)) {:name "Token3", :status true}))))
+
+;; From acct 1
+(do
+  (call nft (destroy-token t3))
+  (assert (not (asset/owns? *address* [nft t3])))
+  (assert (not (asset/owns? p2  [nft t3])))
+  (assert (not (subset? #{t3} (asset/balance nft *address*))))
+  (assert (not (subset? #{t3} (asset/balance nft p2)))))
+
+;; Testing transfer to actors
+
+
+  (def a2 (deploy '(do
+                          (import convex.asset :as asset)
+                          (defn receive-asset [a data]
+                            (asset/accept *caller* a))
+                          (export receive-asset))))
+  (def t4 (call nft (create-token {:name "Token4"} nil)))
+  (asset/transfer a2 [nft t4] nil)
+  (assert (not (asset/owns? *address* [nft t4])))
+  (assert (asset/owns? a2  [nft t4]))
+  (assert (not (subset? #{t4} (asset/balance nft *address*))))
+  (assert (subset? #{t4} (asset/balance nft a2)))
+  (assert (= (call nft (get-token-creator t4)) *address*))
+  (assert (= (call nft (get-token-owner t4)) a2))
+  (assert (not (call nft (check-trusted? *address* :destroy t4))))
+  (assert (not (call nft (check-trusted? *address* :update t4))))
+  (assert (not (call nft (check-trusted? *address* :transfer t4))))
+  (assert (not (call nft (check-trusted? *address* [:update :name] t4))))
+  (assert (call nft (check-trusted? a2 :destroy t4)))
+  (assert (call nft (check-trusted? a2 :update t4)))
+  (assert (call nft (check-trusted? a2 :transfer t4)))
+  (assert (call nft (check-trusted? a2 [:update :name] t4)))
+
+;; Test transferring multiple tokens
+
+(do
+  (def t5 (call nft (create-token {:name "Token5"} nil)))
+  (def t6 (call nft (create-token {:name "Token6"} nil)))
+  (def t7 (call nft (create-token {:name "Token7"} nil)))  
+  (asset/transfer a2 [nft #{t5 t6 t7}])
+  (assert (not (asset/owns? *address* [nft t5])))
+  (assert (asset/owns? a2  [nft t5]))
+  (assert (not (subset? #{t5} (asset/balance nft *address*))))
+  (assert (subset? #{t5} (asset/balance nft a2)))
+  (assert (= (call nft (get-token-creator t5)) *address*))
+  (assert (= (call nft (get-token-owner t5)) a2))
+  (assert (not (call nft (check-trusted? *address* :destroy t5))))
+  (assert (not (call nft (check-trusted? *address* :update t5))))
+  (assert (not (call nft (check-trusted? *address* :transfer t5))))
+  (assert (not (call nft (check-trusted? *address* [:update :name] t5))))
+  (assert (call nft (check-trusted? a2 :destroy t5)))
+  (assert (call nft (check-trusted? a2 :update t5)))
+  (assert (call nft (check-trusted? a2 :transfer t5)))
+  (assert (call nft (check-trusted? a2 [:update :name] t5)))
+  (assert (not (asset/owns? *address* [nft t6])))
+  (assert (asset/owns? a2  [nft t6]))
+  (assert (not (subset? #{t6} (asset/balance nft *address*))))
+  (assert (subset? #{t6} (asset/balance nft a2)))
+  (assert (= (call nft (get-token-creator t6)) *address*))
+  (assert (= (call nft (get-token-owner t6)) a2))
+  (assert (not (call nft (check-trusted? *address* :destroy t6))))
+  (assert (not (call nft (check-trusted? *address* :update t6))))
+  (assert (not (call nft (check-trusted? *address* :transfer t6))))
+  (assert (not (call nft (check-trusted? *address* [:update :name] t6))))
+  (assert (call nft (check-trusted? a2 :destroy t6)))
+  (assert (call nft (check-trusted? a2 :update t6)))
+  (assert (call nft (check-trusted? a2 :transfer t6)))
+  (assert (call nft (check-trusted? a2 [:update :name] t6)))
+  (assert (not (asset/owns? *address* [nft t7])))
+  (assert (asset/owns? a2  [nft t7]))
+  (assert (not (subset? #{t7} (asset/balance nft *address*))))
+  (assert (subset? #{t7} (asset/balance nft a2)))
+  (assert (= (call nft (get-token-creator t7)) *address*))
+  (assert (= (call nft (get-token-owner t7)) a2))
+  (assert (not (call nft (check-trusted? *address* :destroy t7))))
+  (assert (not (call nft (check-trusted? *address* :update t7))))
+  (assert (not (call nft (check-trusted? *address* :transfer t7))))
+  (assert (not (call nft (check-trusted? *address* [:update :name] t7))))
+  (assert (call nft (check-trusted? a2 :destroy t7)))
+  (assert (call nft (check-trusted? a2 :update t7)))
+  (assert (call nft (check-trusted? a2 :transfer t7)))
+  (assert (call nft (check-trusted? a2 [:update :name] t7))))
+
+;; Test transferring multiple tokens and accepting a subset
+
+
+  (def a2 (deploy '(do
+                          (import convex.asset :as asset)
+                          (defn receive-asset [[addr id-set] data]
+                            (asset/accept *caller* [addr (hash-set (apply min (vec id-set)) (apply max (vec id-set)))]))
+                          (export receive-asset))))
+  (def t5 (call nft (create-token {:name "Token5"} nil)))
+  (def t6 (call nft (create-token {:name "Token6"} nil)))
+  (def t7 (call nft (create-token {:name "Token7"} nil)))  
+  (asset/transfer a2 [nft #{t5 t6 t7}] nil)
+  (assert (not (asset/owns? *address* [nft t5])))
+  (assert (asset/owns? a2  [nft t5]))
+  (assert (not (subset? #{t5} (asset/balance nft *address*))))
+  (assert (subset? #{t5} (asset/balance nft a2)))
+  (assert (= (call nft (get-token-creator t5)) *address*))
+  (assert (= (call nft (get-token-owner t5)) a2))
+  (assert (not (call nft (check-trusted? *address* :destroy t5))))
+  (assert (not (call nft (check-trusted? *address* :update t5))))
+  (assert (not (call nft (check-trusted? *address* :transfer t5))))
+  (assert (not (call nft (check-trusted? *address* [:update :name] t5))))
+  (assert (call nft (check-trusted? a2 :destroy t5)))
+  (assert (call nft (check-trusted? a2 :update t5)))
+  (assert (call nft (check-trusted? a2 :transfer t5)))
+  (assert (call nft (check-trusted? a2 [:update :name] t5)))
+  (assert (not (asset/owns? *address* [nft t7])))
+  (assert (asset/owns? a2  [nft t7]))
+  (assert (not (subset? #{t7} (asset/balance nft *address*))))
+  (assert (subset? #{t7} (asset/balance nft a2)))
+  (assert (= (call nft (get-token-creator t7)) *address*))
+  (assert (= (call nft (get-token-owner t7)) a2))
+  (assert (not (call nft (check-trusted? *address* :destroy t7))))
+  (assert (not (call nft (check-trusted? *address* :update t7))))
+  (assert (not (call nft (check-trusted? *address* :transfer t7))))
+  (assert (not (call nft (check-trusted? *address* [:update :name] t7))))
+  (assert (call nft (check-trusted? a2 :destroy t7)))
+  (assert (call nft (check-trusted? a2 :update t7)))
+  (assert (call nft (check-trusted? a2 :transfer t7)))
+  (assert (call nft (check-trusted? a2 [:update :name] t7)))
+  (assert (not (asset/owns? a2 [nft t6])))
+  (assert (asset/owns? *address* [nft t6]))
+  (assert (not (subset? #{t6} (asset/balance nft a2))))
+  (assert (subset? #{t6} (asset/balance nft *address*)))
+  (assert (= (call nft (get-token-creator t6)) *address*))
+  (assert (= (call nft (get-token-owner t6)) *address*))
+  (assert (not (call nft (check-trusted? a2 :destroy t6))))
+  (assert (not (call nft (check-trusted? a2 :update t6))))
+  (assert (not (call nft (check-trusted? a2 :transfer t6))))
+  (assert (not (call nft (check-trusted? a2 [:update :name] t6))))
+  (assert (call nft (check-trusted? *address* :destroy t6)))
+  (assert (call nft (check-trusted? *address* :update t6)))
+  (assert (call nft (check-trusted? *address* :transfer t6)))
+  (assert (call nft (check-trusted? *address* [:update :name] t6)))
+
+;; Testing class tokens
+
+(do
+  (def logger
+    (deploy
+     '(do
+        (import convex.nft-tokens :as nft)
+        (def token-history {})
+        (defn get-token-history [id]
+          (get token-history id))
+        (defn check-trusted? [addr policy-key id]
+          (if (= policy-key :destroy)
+            (= (call nft (get-token-creator id)) addr)
+            (= (call nft (get-token-owner id)) addr)))
+        (defn create-token [caller id initial-data]
+          (def token-history (assoc token-history id [{:event :create-token, :caller caller, :data initial-data}])))
+        (defn destroy-token [caller id]
+          (def token-history (dissoc token-history id)))
+        (defn set-token-data [caller id data]
+          (def token-history
+            (assoc token-history id
+                   (conj (get token-history id)
+                         {:event :set-token-data, :caller caller, :data data}))))
+        (defn merge-token-data [caller id data]
+          (def token-history
+            (assoc token-history id
+                   (conj (get token-history id)
+                         {:event :merge-token-data, :caller caller, :data data}))))     
+        (defn get-uri [id]
+          "http://www.logger.com")
+        (defn perform-transfer [caller sender receiver id-set]
+          (def token-history
+            (reduce (fn [history id]
+                      (assoc history id
+                             (conj (get history id)
+                                   {:event :transfer, :caller caller, :sender sender, :receiver receiver})))
+                    token-history id-set)))
+        (export get-token-history check-trusted? create-token destroy-token set-token-data merge-token-data get-uri perform-transfer))))
+
+  (def t1 (call nft (create-token {:name "Token1", :uri "http://www.mysite.com"} logger)))
+  (assert (asset/owns? *address* [nft t1]))
+  (assert (subset? #{t1} (asset/balance nft *address*)))
+  (assert (= (call nft (get-token-creator t1)) *address*))
+  (assert (= (call nft (get-token-owner t1)) *address*))
+  (assert (= (call nft (get-token-data t1)) {:name "Token1", :uri "http://www.mysite.com"}))
+  (assert (= (call nft (get-token-class t1)) logger))
+  (assert (= (call nft (get-uri t1)) "http://www.logger.com"))
+  (assert (call nft (check-trusted? *address* :destroy t1)))
+  (assert (call nft (check-trusted? *address* :update t1)))
+  (assert (call nft (check-trusted? *address* :transfer t1)))
+  (assert (call nft (check-trusted? *address* [:update :name] t1)))
+  (call nft (merge-token-data t1 {:name "token1"}))
+  (assert (= (call nft (get-token-data t1)) {:name "token1", :uri "http://www.mysite.com"}))
+  (call nft (set-token-data t1 {:name "token1"}))
+  (assert (= (call nft (get-token-data t1)) {:name "token1"}))
+  (assert (= (call nft (check-transfer *address* nil t1)) nil))
+  (assert (= (call nft (check-transfer *address* nil -1)) "No right to transfer token -1"))
+  (asset/transfer p2 [nft t1] nil)
+  (assert (= (call logger (get-token-history t1))
+             [{:caller *address*, :event :create-token, :data {:name "Token1", :uri "http://www.mysite.com"}}
+              {:caller *address*, :event :merge-token-data, :data {:name "token1"}}
+              {:caller *address*, :data {:name "token1"}, :event :set-token-data}
+              {:caller *address*, :sender *address*, :receiver p2, :event :transfer}]))  
+  (call nft (destroy-token t1))
+  (assert (not (asset/owns? *address* [nft t1])))
+  (assert (not (subset? #{t1} (asset/balance nft *address*))))
+  (assert (= (call logger (get-token-history t1)) nil)))
+
+
+;; Test restrict-transfer in class tokens
+
+(do
+  (def transfer-max-twice
+    (deploy
+     '(do
+        (import convex.nft-tokens :as nft)
+        (def transfer-count {})
+        (defn check-trusted? [addr policy-key id]
+          (if (contains-key? #{:destroy :transfer} policy-key)
+            (= (call nft (get-token-creator id)) addr)
+            (= (call nft (get-token-owner id)) addr)))
+        (defn create-token [caller id initial-data]
+          (def transfer-count (assoc transfer-count id 0)))
+        (defn destroy-token [caller id]
+          (def transfer-count (dissoc transfer-count id)))
+        (defn check-transfer [caller sender receiver id-set]
+          (reduce (fn [_ id] (when (>= (get transfer-count id) 2)
+                               (reduced (str "Token " id " has already been transferred twice"))))
+                  nil id-set))
+        (defn perform-transfer [caller sender receiver id-set]
+          (def transfer-count
+            (reduce (fn [tc id] (assoc tc id (inc (get tc id))))
+                    transfer-count id-set)))
+        (export check-trusted? create-token destroy-token check-transfer perform-transfer))))
+  
+  (def t1 (call nft (create-token {:name "Token1", :uri "http://www.mysite.com"} transfer-max-twice)))
+  (assert (asset/owns? *address* [nft t1]))
+  (assert (subset? #{t1} (asset/balance nft *address*)))
+  (assert (= (call nft (get-token-creator t1)) *address*))
+  (assert (= (call nft (get-token-owner t1)) *address*))
+  (assert (= (call nft (get-token-data t1)) {:name "Token1", :uri "http://www.mysite.com"}))
+  (assert (= (call nft (get-token-class t1)) transfer-max-twice))
+  (assert (= (call nft (get-uri t1)) "http://www.mysite.com"))
+  (asset/transfer p2 [nft t1] nil)
+  (asset/transfer *address* [nft t1] nil))
+
+  ;Now the following should fail
+  ;;(asset/transfer p2 [nft t1] nil)
+
+
+;; Testing separate offer and accept
+  (def t2 (call nft (create-token {:name "Token2"} nil)))
+  (asset/offer p2 [nft t2]) ;; Offers but does not perform transfer
+  (assert (not (asset/owns? p2 [nft t2])))
+  (eval-as p2 `(asset/accept ~*address* [nft ~t2])) ;; does accept as p2
+  (assert (asset/owns? p2 [nft t2]))
+
+
+  (def a2 (deploy '(do
+                          (import convex.asset :as asset)
+                          (defn receive-asset [a data]
+                            (asset/accept *caller* a))
+                          (export receive-asset))))
+  (def t4 (call nft (create-token {:name "Token4"} nil)))
+  (asset/offer a2 [nft t4])
+  (assert (asset/owns? *address* [nft t4]))
+  (call a2 (receive-asset [nft t4] nil))
+  (assert (asset/owns? a2 [nft t4]))
+  
+:OK  

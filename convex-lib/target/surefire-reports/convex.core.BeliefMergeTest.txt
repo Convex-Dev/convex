@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: convex.core.BeliefMergeTest
+-------------------------------------------------------------------------------
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.254 s - in convex.core.BeliefMergeTest

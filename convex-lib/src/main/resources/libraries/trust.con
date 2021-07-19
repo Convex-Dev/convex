@@ -1,0 +1,135 @@
+(do
+  ;; Trust library 
+  ;;
+  ;; This library is based on the Reference Monitor security model. The library works with 'Trust Monitors', which are 
+  ;; a design pattern of for reference monitors on the Convex platform.
+  ;; 
+  ;; See: https://en.wikipedia.org/wiki/Reference_monitor
+  ;;
+  ;; Library operation:
+  ;;
+  ;;   deploy with: (deploy-once trust-code)
+  ;; 
+  ;;   import with (import <address of trust> :as trust)
+  ;;
+  ;; Key usage:
+  ;;   (trust/trusted? trust-store address)                        
+  ;; Checks if subject is trusted
+  
+  ;; save current actor address, we will want it later to give to new actors
+  (def trust *address*)
+  
+  (defn trusted? 
+    ^{:doc {:description "Tests if a given subject is trusted by the specified trust monitor. Returns true or false. If trust-store is a user address rather than an actor, it is defined to trust only itself."
+         :examples [{:code "(trusted? my-trusted-store *caller*)"}]
+         :type :function
+         :signature [{:params [trust-monitor subject]}
+                     {:params [trust-monitor subject action]}
+                     {:params [trust-monitor subject action object]}]}
+	  }
+    ([trust-monitor subject action object]
+	    (let [trust-monitor (address trust-monitor)] 
+	      (if (actor? trust-monitor) 
+	        (query (call trust-monitor (check-trusted? subject action object)))
+	        (= trust-monitor subject))))
+    
+    ([trust-monitor subject]
+	    (trusted? trust-monitor subject nil nil))
+     
+    ([trust-monitor subject action]
+	    (trusted? trust-monitor subject action nil))) 
+  
+  (defn build-whitelist
+    ^{:doc {:description "Creates deployable code for a new whitelist. An optional config may be provided, where ':controller' is the user or trust monitor that has the ability to modify the whitelist, and ':whitelist' is a collection of addresses to put on the initial whitelist."
+         :examples [{:code "(deploy (build-whitelist {:controller *address* :whitelist [*address*]}))"}]
+         :type :function
+         :signature [{:params [config]}]}
+	  }
+    [config]
+    (let [whitelist (reduce (fn [w x] (conj w (address x))) #{} (or (:whitelist config) [*address*]))  
+          controller (or (:controller config)  *address*)]
+      `(do
+         (import ~trust :as trust)
+         
+         ;; a whitelist of subjects that will be accepted
+         (def whitelist (set ~whitelist))
+         
+         ;; controller determines who can modify the whitelist
+         (def controller ~(address controller))
+         
+         (defn check-trusted? [subject action object]
+           (contains-key? whitelist (address subject)))
+         
+         (defn set-trusted [subject allow?]
+           (if (trust/trusted? controller *caller*)
+             (def whitelist ((if allow? conj disj) whitelist (address subject)))
+             (fail :TRUST "No access to whitelist!")))
+       
+         (export check-trusted? set-trusted)))) 
+  
+  
+    (defn build-blacklist
+    ^{:doc {:description "Creates deployable code for a new blacklist. An optional config may be provided, where ':controller' is the user or trust monitor that has the ability to modify the blacklist, and ':blacklist' is a collection of addresses to put on the initial blacklist."
+         :examples [{:code "(deploy (build-blacklist {:controller *address* :blacklist [my-foe-1 my-foe-2]}))"}]
+         :type :function
+         :signature [{:params [config]}]}
+	  }
+    [config]
+    (let [blacklist (reduce (fn [w x] (conj w (address x))) #{} (or (:blacklist config) [*address*]))  
+          controller (address (or (:controller config)  *address*))]
+      `(do
+         (import ~trust :as trust)
+         
+         ;; a blacklist of subjects that will be denied
+           (def blacklist ~blacklist)
+         
+         ;; controller determines who can modify the blacklist
+           (def controller ~controller)
+       
+         (defn check-trusted? [subject action object]
+           (not (contains-key? blacklist (address subject))))
+         
+         (defn set-trusted [subject allow?]
+           (if (trust/trusted? controller *caller*)
+             (def blacklist ((if allow? disj conj) blacklist (address subject)))
+             (fail :TRUST "No access to blacklist!")))
+       
+         (export check-trusted? set-trusted)))) 
+    
+    (defn remove-upgradability! 
+      ^{:doc {:description "Removes upgradability from an Actor Account, assuming this capability was added in the same manner as 'add-trusted-upgrade'. SECURITY: This cannot be undone! Use with caution. You should verify that the removal of upgradability does not break any other actor functionality."
+         :examples [{:code "(remove-upgradability! upgradable-actor)"}]
+         :type :function
+         :signature [{:params [config]}]}
+	    }
+      [actor]
+      (let [actor (address actor)]
+        (call actor (upgrade 
+                      '(do 
+                         ;; undefine things used for upgradability
+                         (undef upgradable-root)
+                         (undef upgrade)
+                         (def *exports* (disj *exports* 'upgrade))
+                         )))))
+    
+    (defn add-trusted-upgrade
+      ^{:doc {:description "Creates deployable code for an Actor upgradable by a ':root' User or Trust Monitor. A root-authorised user can 'eval' code in the Actor's environment using '(call actor (upgrade code-to-eval))'. If not specified, the generator of the code (*address*) will be the initial root user. SECURITY: A user or actor with root access can do *anything* to this actor. Do not hand out such access unwisely."
+         :examples [{:code "(deploy (add-trusted-upgrade {:root *address*}))"}]
+         :type :function
+         :signature [{:params [config]}]}
+	    }
+      [config]
+      (let [root (address (or (:root config)  *address*))]
+        `(do
+           (import ~trust :as trust)
+           
+           (def upgradable-root ~root)
+           
+           (defn upgrade [code]
+             (if (trust/trusted? upgradable-root *caller*)
+               (eval code)
+               (fail :TRUST "No root access to upgrade capability!")))
+             
+           (export upgrade))))
+  
+  )
