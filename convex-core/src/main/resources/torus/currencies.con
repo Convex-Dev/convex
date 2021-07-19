@@ -1,0 +1,12 @@
+[
+["USD" "US Dollar" "US National Currency" "$" 1000000000 2 1.00]
+["JPY" "Japanese Yen" "Japanese National Currency" "¥" 1000000000 0 0.0092]
+["EUR" "Euro" "European Union Currency" "€" 1000000000 2 1.18819]
+["GBP" "Pound Sterling" "UK National Currency" "£" 1000000000 2 1.38700]
+["THB" "Thai Baht" "Thai National Currency" "฿" 1000000000 2 0.03244]
+["VND" "Vietnamese Dong" "Vietnamese National Currency" "₫" 1000000000 2 0.00004]
+["MYR" "Malaysian Ringgit" "Malaysian National Currency" "RM" 1000000000 2 0.24260]
+["CHF" "Swiss Franc" "Swiss National Currency" "Fr." 1000000000 2 1.07269]
+["HKD" "Hong Kong Dollar" "Hong Kong Currency" "HK$" 1000000000 2 0.12879]
+["SGD" "Singapore Dollar" "Singapore National Currency" "S$" 1000000000 2 0.751]
+]

@@ -1,0 +1,91 @@
+(defactor prediction-market [oracle oracle-key outcomes]
+  
+	  ;; store oracle address and key in environment
+	  (def oracle (address oracle))
+	  (def oracle-key oracle-key)
+	  
+	  ;; Stakes are a map of outcome value to map of ( address ->stake)
+	  (def stakes (into {} (map (fn [x] [x {}]) outcomes)))
+	  
+	  ;; Total stake for each outcome
+	  (def totals (into {} (map (fn [x] [x 0]) outcomes)))
+	  
+	  ;; NOTE: total current bonded value is the balance of this contract
+	  
+	  ;; Bonding curve function for a given map of stakes
+	  (defn bond [stks]
+	    (let [sxx (reduce (fn [acc [k v]] (let [x (double v)] (+ acc (* x x)))) 0.0 stks)]
+	      (sqrt sxx)))
+	  
+	  ;; Adjust stake on an outcome
+	  ;; must be called with a sufficient offer to fund any increase
+	  ;; returns positive cost of increased stake, or negative refund of reduced stake
+	  (defn stake [outcome new-stake]
+	    (assert (contains-key? stakes outcome) (>= new-stake 0))
+	    
+	    (let [old-stake (or (get (stakes outcome) *caller*) 0)
+	          _ (if (== old-stake new-stake) (return 0))
+	          nos (assoc (stakes outcome) *caller* new-stake)
+	          new-stakes (assoc stakes outcome nos)
+	          new-totals (assoc totals outcome (+ (totals outcome) (- new-stake old-stake)))
+	          new-bond (long (bond new-totals))
+	          dval (- new-bond *balance*)]
+	      
+	      ;; get or refund funds. Will error if not enough provided for stake increase?
+	      (cond 
+	        (== dval 0) nil ;; nothing to do.... can this happen?
+	        (> dval 0) (accept dval)
+	        (< dval 0) (transfer *caller* (- dval)))
+	      
+	      (def totals new-totals)
+	      (def stakes new-stakes)
+	      dval))
+	  
+	  ;; Get the effective price for an outcome. May be NaN if no balance at all.
+	  (defn price [outcome]
+	    (when-not (contains-key? totals outcome) (return il))
+	    (let [tstk (double (totals outcome))
+	          bal (double *balance*)]
+	      (/ (* tstk tstk) (* bal bal))))
+	  
+	  ;; Get the collection of possible outcomes
+	  (defn get-outcomes [data]
+	    outcomes)
+	  
+	  ;; final outcome
+	  (def final-outcome nil)
+	  (def final-flag false)
+	  
+	  ;; Check if contract is finalised
+	  (defn finalised? []
+	    (when final-flag (return true))
+	    (cond (call oracle (finalised? oracle-key)) :OK (return false))
+	    
+	    (let [result (call oracle (read oracle-key))]
+	      (def final-outcome result)
+	      (def final-flag true)
+	      true))
+	  
+	  ;; call to refund all stakes, not for external use
+	  ;; called in event of a unanticipated outsome
+	  (def refund []
+	    ;; TODO
+	    )
+	  
+	  
+	  ;; call to claim payout
+	  ;; returns amount paid out, or null if not yet finalised
+	  (defn payout []
+	    (if (finalised?) :OK (return nil))
+	    (when-not (contains-key? totals final-outcome) (return (refund)))
+	    (let [total (double (totals final-outcome)) ;; total stake on winning outcome
+	          fo-stakes (stakes final-outcome {})
+	          stk (double (or (fo-stakes *caller*) 0.0)) ;; caller's stake on final outcome
+	          quota (long (* *balance* (/ stk total)))]
+	      (def stakes (assoc stakes final-outcome (dissoc fo-stakes *caller*)))
+	      (transfer *caller* quota)
+	      quota))
+	    
+	  (export get-outcomes bond stake price finalised? payout stakes totals)
+	  
+	  )

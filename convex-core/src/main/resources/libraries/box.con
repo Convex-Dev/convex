@@ -1,0 +1,126 @@
+(do
+  ;; Box asset smart contract
+  ;;
+  ;; A box acts as an holder of arbitrary assets. The owner of the box has exclusive rights to 
+  ;; put assets in or take assets out.
+  ;; 
+  ;; The box itself is an asset with the designator [box-actor id]
+  ;;
+  ;; deploy with: (deploy-once box-code)
+  
+  (import convex.asset :as asset-lib)
+  
+  (def counter 0)
+  
+  ;; map of owner -> #{<box ids>}}
+  (def ownership {})
+  
+  ;; map of box-id -> asset-quantity (always a map)
+  (def boxes {})
+  
+  ;; map of {owner -> {recipient-address -> id-set}}
+  (def offers {})
+
+  ;; Library function to insert an asset into a box
+  (defn insert [box-id asset]
+    (asset-lib/transfer ~*address* asset box-id))
+  
+  ;; Library function to remove an asset from a box
+  (defn remove [box-id asset] 
+    (call ~*address* (remove-asset box-id asset)))
+  
+  ;; Remove asset implementation intended to be called
+  (defn remove-asset [box-id asset]
+     (let [box-id (long box-id)
+           current-asset (get boxes box-id)]
+        (if (not (asset-lib/quantity-contains? current-asset asset)) (fail "Box does not contain quantity of asset specified for removal"))
+        (or (contains-key? (ownership *caller*) box-id) (fail :TRUST (str "Box not owned: " box-id)))
+        (def boxes (assoc boxes box-id (asset-lib/quantity-sub current-asset asset)))
+        (asset-lib/transfer *caller* asset) ;; deliver the asset to the caller
+        ))
+  
+  ;; Receive-asset implementation inserts into box specified by data value, if it exists, otherwise errors
+  (defn receive-asset 
+    ([asset box-id]
+      (let [box-id (long box-id)]
+	      (asset-lib/accept *caller* asset) ;; accept first. Solve problem of putting box into itself
+	      (cond
+	        (not (contains-key? boxes box-id)) (fail "Target box does not exist")
+	        (not (contains-key? (ownership *caller*) box-id)) (fail (str "Box " box-id " not owned"))
+	        )
+	      (def boxes (assoc boxes box-id (asset-lib/quantity-add (get boxes box-id) asset))))))
+
+  
+  (defn offer [receiver quantity]
+    (let [caller-offers (get offers *caller* {})]
+      (def offers (assoc offers *caller* (assoc caller-offers receiver quantity)))))
+  
+  (defn accept [sender quantity]
+    
+    (let [sender (address sender)
+          sender-offers (get offers sender {})  
+          offer (or (get-in offers [sender *caller*]) #{})
+          _ (assert (subset? quantity offer))
+          receiver-balance (get ownership *caller* #{})
+          new-offer (difference offer quantity)]
+       (def offers (assoc offers sender (assoc sender-offers *caller* new-offer)))
+       (internal-direct-transfer sender *caller* quantity)))
+
+  (defn direct-transfer [receiver quantity]
+    (internal-direct-transfer *caller* receiver quantity))
+  
+  ;; Internal transfer implementation. Must not be accessible from outside!
+  (defn internal-direct-transfer [sender receiver quantity]
+    (let [receiver (address receiver)
+          sender-balance (get ownership sender #{})
+          _ (assert (subset? quantity sender-balance))
+          receiver-balance (get ownership receiver #{})
+          new-sender-balance (difference sender-balance quantity)
+          new-receiver-balance (union receiver-balance quantity)
+          ]
+      (def ownership (assoc ownership 
+                             sender new-sender-balance
+                             receiver new-receiver-balance))
+      quantity))
+  
+  ;; Library function to create a box
+  (defn create []
+    (call ~*address* (create-box)))
+  
+  ;; Contract to create a new box, with a fresh ID
+  (defn create-box []
+    (let [id counter
+          owner *caller*
+          owned-boxes (or (get ownership owner) #{})]
+      (def ownership (assoc ownership owner (conj owned-boxes id)))
+      (def boxes (assoc boxes id {})) ;; new box contains no assets
+      (def counter (inc counter))
+      id)) 
+  
+  ;; Destroys a set of boxes. Boxes must be owned and empty.  
+  (defn burn [box-set]
+    (let [owned-boxes (ownership *caller*)]
+      (if (subset? box-set owned-boxes) :OK (fail :TRUST "Trying to burn boxes not owned!"))
+      (for [id (vec box-set)]
+        (let [contents (boxes id)]
+          (if (empty? contents)
+            (def boxes (dissoc boxes id))
+            (fail :STATE (str "Trying to delete non-empty box: " id)))))
+      (def ownership (assoc ownership *caller* (difference owned-boxes box-set)))
+      :OK))
+  
+  (defn balance [owner]
+    (or (get ownership owner) #{}))
+  
+  (defn owns? [owner boxes]
+    (subset? boxes (get ownership owner)))
+  
+  (def quantity-add union)
+  
+  (def quantity-sub difference)
+  
+  (def quantity-subset? subset?)
+  
+  
+  (export balance create-box burn quantity-add quantity-sub quantity-subset? offer accept direct-transfer receive-asset remove-asset )
+  )
