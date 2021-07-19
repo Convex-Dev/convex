@@ -45,13 +45,17 @@ public class PeersListPanel extends JPanel {
 	private static final Logger log = LoggerFactory.getLogger(PeersListPanel.class.getName());
 
 	public void launchAllPeers(PeerGUI manager) {
-		int N=PeerGUI.KEYPAIRS.size();
-		List<Server> serverList = API.launchLocalPeers(PeerGUI.KEYPAIRS,PeerGUI.genesisState,null);
-		for (Server server: serverList) {
-			PeerView peer = new PeerView();
-			peer.peerServer = server;
-			// InetSocketAddress sa = server.getHostAddress();
-			addPeer(peer);
+		try {
+			int N=PeerGUI.KEYPAIRS.size();
+			List<Server> serverList = API.launchLocalPeers(PeerGUI.KEYPAIRS,PeerGUI.genesisState,null);
+			for (Server server: serverList) {
+				PeerView peer = new PeerView();
+				peer.peerServer = server;
+				// InetSocketAddress sa = server.getHostAddress();
+				addPeer(peer);
+			}
+		} catch (IllegalStateException e) {
+			// Ignore, application probably shutting down?
 		}
 	}
 
