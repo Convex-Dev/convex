@@ -248,7 +248,7 @@ public class Convex {
 	 *
 	 * @param <T>   Type of value to sign
 	 * @param value Value to sign
-	 * @return
+	 * @return SignedData instance
 	 */
 	public <T extends ACell> SignedData<T> signData(T value) {
 		return keyPair.signData(value);

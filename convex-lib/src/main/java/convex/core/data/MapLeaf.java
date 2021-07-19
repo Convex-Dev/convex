@@ -497,7 +497,6 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		throw new TODOException("Unhandled map type: " + b.getClass());
 	}
 
-	@SuppressWarnings("null")
 	private AHashMap<K, V> mergeWith(MapLeaf<K, V> b, MergeFunction<V> func, int shift) {
 		int al = this.size();
 		int bl = b.size();
@@ -556,7 +555,6 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		throw new TODOException("Unhandled map type: " + b.getClass());
 	}
 
-	@SuppressWarnings("null")
 	public AHashMap<K, V> mergeDifferences(MapLeaf<K, V> b, MergeFunction<V> func,int shift) {
 		if (this.equals(b)) return this; // no change in identical case
 		int al = this.size();
