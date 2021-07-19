@@ -18,12 +18,16 @@ public class Shutdown {
 	public static final int CLI = 120;
 
 	static {
-		Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
-			@Override
-			public void run() {
-				Shutdown.runHooks();
-			}
-		}));
+		try {
+			Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+				@Override
+				public void run() {
+					Shutdown.runHooks();
+				}
+			}));
+		} catch(IllegalStateException e) {
+			// Ignore, already shutting down
+		}
 	}
 
 	private static class Group {
