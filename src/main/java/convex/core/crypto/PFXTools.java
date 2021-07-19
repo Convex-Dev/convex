@@ -72,8 +72,9 @@ public class PFXTools {
 		KeyStore ks = KeyStore.getInstance(KEYSTORE_TYPE);
 
 		char[] pwdArray = (passPhrase==null)?null:passPhrase.toCharArray();
-		ks.load(new FileInputStream(keyFile), pwdArray);
-
+		try (FileInputStream fis = new FileInputStream(keyFile)) {
+			ks.load(fis, pwdArray);
+		}
 		return ks;
 	}
 
