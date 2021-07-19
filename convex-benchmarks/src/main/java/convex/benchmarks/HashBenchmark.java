@@ -13,13 +13,6 @@ import convex.core.data.prim.CVMLong;
 public class HashBenchmark {
 
 	@Benchmark
-	public void longHash_KECCAK_256() {
-		CVMLong l = CVMLong.create(17L);
-		AArrayBlob d = Format.encodedBlob(l);
-		d.getContentHash();
-	}
-
-	@Benchmark
 	public void longHash_SHA_256() {
 		CVMLong l = CVMLong.create(17L);
 		AArrayBlob d = Format.encodedBlob(l);
