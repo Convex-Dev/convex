@@ -1,4 +1,4 @@
-package convex.performance;
+package convex.benchmarks;
 
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.runner.Runner;
@@ -7,11 +7,10 @@ import org.openjdk.jmh.runner.options.Options;
 import convex.core.data.ACell;
 import convex.core.lang.Context;
 import convex.core.lang.Reader;
-import convex.core.lang.TestState;
 
 public class EvalBenchmark {
 	
-	static final Context<?> CTX=TestState.CONTEXT.fork();
+	static final Context<?> CTX=Benchmarks.context();
 	
 	private static final ACell eval(ACell form) {
 		return CTX.fork().eval(form).getResult();

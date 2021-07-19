@@ -1,4 +1,4 @@
-package convex.performance;
+package convex.benchmarks;
 
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.runner.Runner;
@@ -12,7 +12,6 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.init.Init;
-import convex.core.init.InitTest;
 import convex.core.lang.Context;
 import convex.core.lang.Core;
 import convex.core.lang.Symbols;
@@ -30,14 +29,14 @@ import convex.core.transactions.Transfer;
  * Skips stuff around transactions, block overhead, signatures etc.
  */
 public class CVMBenchmark {
-	static State STATE=InitTest.STATE;
-	static Address HERO=InitTest.HERO;
+	static State STATE=Benchmarks.STATE;
+	static Address HERO=Benchmarks.HERO;
 
 	@Benchmark
 	public void smallTransfer() {
 		State s=STATE;
 		Address addr=HERO;
-		ATransaction trans=Transfer.create(addr,1, InitTest.VILLAIN, 1000);
+		ATransaction trans=Transfer.create(addr,1, Benchmarks.VILLAIN, 1000);
 		Context<ACell>  ctx=s.applyTransaction(trans);
 		ctx.getValue();
 	}

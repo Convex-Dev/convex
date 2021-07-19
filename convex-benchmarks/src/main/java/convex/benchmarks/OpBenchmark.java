@@ -1,4 +1,4 @@
-package convex.performance;
+package  convex.benchmarks;
 
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.runner.Runner;
@@ -9,13 +9,12 @@ import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Core;
 import convex.core.lang.Reader;
-import convex.core.lang.TestState;
 import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Invoke;
 
 public class OpBenchmark {
 	
-	static final Context<?> CTX=TestState.CONTEXT.fork();
+	static final Context<?> CTX=Benchmarks.context();
 	
 	private static final ACell runOp(AOp<ACell> op) {
 		return CTX.fork().execute(op).getResult();

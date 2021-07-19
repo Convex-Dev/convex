@@ -9,10 +9,9 @@
 	
 	<modelVersion>4.0.0</modelVersion>
 	
-	<artifactId>lib</artifactId>
+	<artifactId>convex-lib</artifactId>
 
 	<build>
-		<finalName>convex-lib</finalName>
 		<plugins>
 			<plugin>
 				<groupId>org.antlr</groupId>
@@ -115,18 +114,6 @@
 			<scope>test</scope>
 		</dependency>
 
-		<dependency>
-			<groupId>org.openjdk.jmh</groupId>
-			<artifactId>jmh-core</artifactId>
-			<version>${jmh.version}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.openjdk.jmh</groupId>
-			<artifactId>jmh-generator-annprocess</artifactId>
-			<version>${jmh.version}</version>
-			<scope>test</scope>
-		</dependency>
 		<dependency>
 			<groupId>org.antlr</groupId>
 			<artifactId>antlr4-runtime</artifactId>

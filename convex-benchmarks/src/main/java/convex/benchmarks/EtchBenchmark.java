@@ -1,4 +1,4 @@
-package convex.performance;
+package convex.benchmarks;
 
 import java.util.Random;
 

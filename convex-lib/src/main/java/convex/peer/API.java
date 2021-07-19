@@ -104,7 +104,10 @@ public class API {
 
 		Map<Keyword, Object> config = new HashMap<>();
 
+		// Peer should get a new allocated port
 		config.put(Keywords.PORT, null);
+		
+		// Peers should all have the same genesis state
 		config.put(Keywords.STATE, genesisState);
 
 		// TODO maybe have this as an option in the calling parameters?

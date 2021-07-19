@@ -1,4 +1,4 @@
-package convex.performance;
+package convex.benchmarks;
 
 import java.util.ArrayList;
 import java.util.Random;
@@ -17,8 +17,6 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadSignatureException;
-import convex.core.init.InitTest;
-import convex.core.lang.TestState;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Transfer;
 
@@ -29,7 +27,7 @@ public class BigBlockBenchmark {
 	private static final long INITIAL_FUNDS = 1000000000;
 	static ArrayList<AKeyPair> keyPairs = new ArrayList<AKeyPair>();
 	static ArrayList<Address> addresses = new ArrayList<Address>();
-	public static State state = TestState.STATE;
+	public static State state = Benchmarks.STATE;
 	public static Block block;
 	static ArrayList<SignedData<ATransaction>> transactions = new ArrayList<SignedData<ATransaction>>();
 
@@ -51,7 +49,7 @@ public class BigBlockBenchmark {
 			Transfer t = Transfer.create(source,1, target, 1);
 			transactions.add(kp.signData(t));
 		}
-		block = Block.create(System.currentTimeMillis(),transactions,InitTest.FIRST_PEER_KEY);
+		block = Block.create(System.currentTimeMillis(),transactions,Benchmarks.FIRST_PEER_KEY);
 	}
 
 	@Benchmark

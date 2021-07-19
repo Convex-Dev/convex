@@ -1,4 +1,4 @@
-package convex.performance;
+package  convex.benchmarks;
 
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
@@ -14,7 +14,8 @@ import org.openjdk.jmh.runner.options.Options;
 import convex.api.Convex;
 import convex.core.Result;
 import convex.core.data.Address;
-import convex.core.init.InitTest;
+import convex.core.data.Keywords;
+import convex.core.data.Maps;
 import convex.core.lang.ops.Constant;
 import convex.core.transactions.Invoke;
 import convex.peer.API;
@@ -25,18 +26,20 @@ import convex.peer.Server;
  */
 public class LatencyBenchmark {
 	
-	static final Address HERO=InitTest.HERO;
-	static final Address VILLAIN=InitTest.VILLAIN;
+	static final Address HERO=Benchmarks.HERO;
+	static final Address VILLAIN=Benchmarks.VILLAIN;
 
 
 	static Server server;
 	static Convex client;
 	static Convex client2;
 	static {
-		server=API.launchPeer();
+		server=API.launchPeer(Maps.hashMapOf(
+				Keywords.STATE,Benchmarks.STATE,
+				Keywords.KEYPAIR,Benchmarks.HERO_KEYPAIR));
 		try {
-			client=Convex.connect(server.getHostAddress(), HERO,InitTest.HERO_KEYPAIR);
-			client2=Convex.connect(server.getHostAddress(), VILLAIN,InitTest.VILLAIN_KEYPAIR);
+			client=Convex.connect(server.getHostAddress(), HERO,Benchmarks.HERO_KEYPAIR);
+			client2=Convex.connect(server.getHostAddress(), VILLAIN,Benchmarks.VILLAIN_KEYPAIR);
 		} catch (IOException | TimeoutException e) {
 			e.printStackTrace();
 		}
@@ -45,7 +48,7 @@ public class LatencyBenchmark {
 
 	@Benchmark
 	public void roundTripTransaction() throws TimeoutException, IOException {
-		client.transactSync(Invoke.create(InitTest.HERO,-1, Constant.of(1L)));
+		client.transactSync(Invoke.create(Benchmarks.HERO,-1, Constant.of(1L)));
 	}
 
 	@Benchmark

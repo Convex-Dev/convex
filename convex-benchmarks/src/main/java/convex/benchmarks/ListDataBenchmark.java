@@ -1,4 +1,4 @@
-package convex.performance;
+package convex.benchmarks;
 
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.runner.Runner;

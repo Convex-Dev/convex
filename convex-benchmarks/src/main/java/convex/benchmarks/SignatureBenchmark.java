@@ -1,4 +1,4 @@
-package convex.performance;
+package convex.benchmarks;
 
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.runner.Runner;
@@ -9,11 +9,10 @@ import convex.core.crypto.ASignature;
 import convex.core.data.ABlob;
 import convex.core.data.Blobs;
 import convex.core.data.SignedData;
-import convex.core.init.InitTest;
 
 public class SignatureBenchmark {
 
-	private static final AKeyPair KEYPAIR=InitTest.HERO_KEYPAIR;
+	private static final AKeyPair KEYPAIR=AKeyPair.generate();
 
 	@Benchmark
 	public void signData() {

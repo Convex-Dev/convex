@@ -11,6 +11,7 @@
 		<module>convex-lib</module>
 		<module>convex-cli</module>
 		<module>convex-gui</module>
+		<module>convex-benchmarks</module>
 	</modules>
 
 	<properties>
@@ -80,21 +81,7 @@
 					</execution>
 				</executions>
 			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.8.1</version>
-				<configuration>
-					<release>11</release>
-					<annotationProcessorPaths>
-						<path>
-							<groupId>org.openjdk.jmh</groupId>
-							<artifactId>jmh-generator-annprocess</artifactId>
-							<version>${jmh.version}</version>
-						</path>
-					</annotationProcessorPaths>
-				</configuration>
-			</plugin>
+	
 
 		</plugins>
 		<pluginManagement>
