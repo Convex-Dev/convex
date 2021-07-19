@@ -9,7 +9,7 @@
 
 	<modules>
 		<module>convex-lib</module>
-		<module>cli</module>
+		<module>convex-cli</module>
 		<module>gui</module>
 	</modules>
 
