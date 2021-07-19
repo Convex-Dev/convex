@@ -22,9 +22,6 @@
 							<mainClass>convex.cli.Main</mainClass>
 						</manifest>
 					</archive>
-					<descriptors>
-						<descriptor>src/main/assembly/testing.xml</descriptor>
-					</descriptors>
 					<descriptorRefs>
 						<descriptorRef>jar-with-dependencies</descriptorRef>
 					</descriptorRefs>
