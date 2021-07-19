@@ -20,7 +20,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<jmh.version>1.32</jmh.version>
 		<junit.version>5.7.1</junit.version>
-		<slf4j.version>1.7.30</slf4j.version>
+		<slf4j.version>1.7.31</slf4j.version>
 
 		<!--Freeze this for reproducible builds. -->
 		<project.build.outputTimestamp>2020-02-02T00:00:00Z</project.build.outputTimestamp>

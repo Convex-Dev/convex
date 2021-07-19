@@ -19,9 +19,9 @@ import convex.core.lang.impl.ErrorValue;
 import convex.core.lang.impl.RecordFormat;
 
 /**
- * Class representing the result of a query or transaction.
+ * Class representing the result of a Query or Transaction.
  * 
- * A Result is used to communicate the outcome of a query of a transaction from a Peer to a Client.
+ * A Result is typically used to communicate the outcome of a Query or a Transaction from a Peer to a Client.
  * 
  * 
  */
