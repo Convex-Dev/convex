@@ -48,7 +48,12 @@
 		</dependency>
 		<dependency>
 			<groupId>world.convex</groupId>
-			<artifactId>gui</artifactId>
+			<artifactId>convex-core</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>world.convex</groupId>
+			<artifactId>convex-gui</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>

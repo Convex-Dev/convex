@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory;
 import java.util.stream.Collectors;
 
 import convex.api.Convex;
-import convex.api.Shutdown;
+import convex.core.util.Shutdown;
 import convex.cli.Helpers;
 import convex.core.Belief;
 import convex.core.Result;
@@ -239,7 +239,7 @@ public class PeerManager implements IServerEvent {
 		*/
 
 		// shutdown hook to remove/update the session file
-		convex.api.Shutdown.addHook(Shutdown.CLI,new Runnable() {
+		Shutdown.addHook(Shutdown.CLI,new Runnable() {
 		    public void run() {
 				// System.out.println("peers stopping");
 				// remove session file
