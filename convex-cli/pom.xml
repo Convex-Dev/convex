@@ -10,6 +10,10 @@
 
 	<artifactId>convex-cli</artifactId>
 
+	<properties>
+		<logback.version>1.2.3</logback.version>
+	</properties>
+
 	<build>
 		<plugins>
 			<plugin>
@@ -56,6 +60,7 @@
 			<artifactId>convex-gui</artifactId>
 			<version>${convex.version}</version>
 		</dependency>
+		<!--
 		<dependency>
 			<groupId>org.bouncycastle</groupId>
 			<artifactId>bcprov-jdk15on</artifactId>
@@ -84,6 +89,7 @@
 			<artifactId>commons-text</artifactId>
 			<version>1.9</version>
 		</dependency>
+		-->
 		<dependency>
 			<groupId>info.picocli</groupId>
 			<artifactId>picocli</artifactId>
@@ -119,7 +125,6 @@
 			<version>${junit.version}</version>
 			<scope>test</scope>
 		</dependency>
-
 		<dependency>
 			<groupId>org.openjdk.jmh</groupId>
 			<artifactId>jmh-core</artifactId>
@@ -135,7 +140,7 @@
 		<dependency>
 		    <groupId>org.slf4j</groupId>
     		<artifactId>slf4j-api</artifactId>
-    		<version>1.7.31</version>
+    		<version>${slf4j.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>
@@ -143,6 +148,15 @@
 			<version>${slf4j.version}</version>
 			<scope>test</scope>
 		</dependency>
-
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-core</artifactId>
+			<version>${logback.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+			<version>${logback.version}</version>
+		</dependency>
 	</dependencies>
 </project>

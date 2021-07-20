@@ -44,26 +44,26 @@ public class CLITest {
 
 	@Test
 	public void testHelp() {
-		assertCommandLineResult(0, "^Usage: convex \\[-hvV\\] .*", "--help");
-		assertCommandLineResult(0, "^Usage: convex \\[-hvV\\] .*", "-h");
-		assertCommandLineResult(0, "^Usage: convex \\[-hvV\\] .*", "help");
-		assertCommandLineResult(0, "^Usage: convex account \\[-hvV\\] .*", "account", "help");
-		assertCommandLineResult(0, "^Usage: convex account balance \\[-hvV\\] .*", "account",  "balance", "--help");
-		assertCommandLineResult(0, "^Usage: convex account create \\[-fhvV\\] .*", "account",  "create", "--help");
-		assertCommandLineResult(0, "^Usage: convex account information \\[-hvV\\] .*", "account",  "information", "--help");
-		assertCommandLineResult(0, "^Usage: convex account fund \\[-hvV\\] .*", "account",  "fund", "--help");
-		assertCommandLineResult(0, "^Usage: convex key \\[-hvV\\] .*", "key", "help");
-		assertCommandLineResult(0, "^Usage: convex key generate \\[-hvV\\] .*", "key", "generate", "--help");
-		assertCommandLineResult(0, "^Usage: convex key list \\[-hvV\\] .*", "key", "list", "--help");
-		assertCommandLineResult(0, "^Usage: convex peer \\[-hvV\\] .*", "peer", "help");
-		assertCommandLineResult(0, "^Usage: convex peer start \\[-hrvV\\] .*", "peer", "start", "--help");
-		assertCommandLineResult(0, "^Usage: convex local \\[-hvV\\] .*", "local", "--help");
-		assertCommandLineResult(0, "^Usage: convex local start \\[-hvV\\] .*", "local", "start", "--help");
-		assertCommandLineResult(0, "^Usage: convex local gui \\[-hvV\\] .*", "local", "gui", "--help");
-		assertCommandLineResult(0, "^Usage: convex query \\[-hvV\\] .*", "query", "--help");
-		assertCommandLineResult(0, "^Usage: convex status \\[-hvV\\] .*", "status", "--help");
-		assertCommandLineResult(0, "^Usage: convex transaction \\[-hvV\\] .*", "transaction", "--help");
-		assertCommandLineResult(0, "^Usage: convex transaction \\[-hvV\\] .*", "transact", "--help");
+		assertCommandLineResult(0, "^Usage: convex \\[-hVv\\] .*", "--help");
+		assertCommandLineResult(0, "^Usage: convex \\[-hVv\\] .*", "-h");
+		assertCommandLineResult(0, "^Usage: convex \\[-hVv\\] .*", "help");
+		assertCommandLineResult(0, "^Usage: convex account \\[-hVv\\] .*", "account", "help");
+		assertCommandLineResult(0, "^Usage: convex account balance \\[-hVv\\] .*", "account",  "balance", "--help");
+		assertCommandLineResult(0, "^Usage: convex account create \\[-fhVv\\] .*", "account",  "create", "--help");
+		assertCommandLineResult(0, "^Usage: convex account information \\[-hVv\\] .*", "account",  "information", "--help");
+		assertCommandLineResult(0, "^Usage: convex account fund \\[-hVv\\] .*", "account",  "fund", "--help");
+		assertCommandLineResult(0, "^Usage: convex key \\[-hVv\\] .*", "key", "help");
+		assertCommandLineResult(0, "^Usage: convex key generate \\[-hVv\\] .*", "key", "generate", "--help");
+		assertCommandLineResult(0, "^Usage: convex key list \\[-hVv\\] .*", "key", "list", "--help");
+		assertCommandLineResult(0, "^Usage: convex peer \\[-hVv\\] .*", "peer", "help");
+		assertCommandLineResult(0, "^Usage: convex peer start \\[-hrVv\\] .*", "peer", "start", "--help");
+		assertCommandLineResult(0, "^Usage: convex local \\[-hVv\\] .*", "local", "--help");
+		assertCommandLineResult(0, "^Usage: convex local start \\[-hVv\\] .*", "local", "start", "--help");
+		assertCommandLineResult(0, "^Usage: convex local gui \\[-hVv\\] .*", "local", "gui", "--help");
+		assertCommandLineResult(0, "^Usage: convex query \\[-hVv\\] .*", "query", "--help");
+		assertCommandLineResult(0, "^Usage: convex status \\[-hVv\\] .*", "status", "--help");
+		assertCommandLineResult(0, "^Usage: convex transaction \\[-hVv\\] .*", "transaction", "--help");
+		assertCommandLineResult(0, "^Usage: convex transaction \\[-hVv\\] .*", "transact", "--help");
 	}
 
 

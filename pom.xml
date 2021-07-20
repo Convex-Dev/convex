@@ -23,7 +23,6 @@
 		<junit.version>5.7.1</junit.version>
 		<slf4j.version>1.7.31</slf4j.version>
 		<convex.version>${project.version}</convex.version>
-
 		<!--Freeze this for reproducible builds. -->
 		<project.build.outputTimestamp>2020-02-02T00:00:00Z</project.build.outputTimestamp>
 	</properties>
@@ -63,7 +62,7 @@
 		</plugins>
 		<pluginManagement>
 			<plugins>
-				<!--This plugin's configuration is used to store Eclipse m2e settings 
+				<!--This plugin's configuration is used to store Eclipse m2e settings
 					only. It has no influence on the Maven build itself. -->
 				<plugin>
 					<groupId>org.eclipse.m2e</groupId>
@@ -98,7 +97,6 @@
 						</execution>
 					</executions>
 				</plugin>
-
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-gpg-plugin</artifactId>
@@ -113,7 +111,6 @@
 						</execution>
 					</executions>
 				</plugin>
-
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-source-plugin</artifactId>

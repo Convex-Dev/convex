@@ -8,12 +8,13 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 
-
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.data.Address;
 import convex.core.init.AInitConfig;
+
+import ch.qos.logback.classic.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -49,7 +50,7 @@ import picocli.CommandLine.ScopeType;
 
 public class Main implements Runnable {
 
-	private static final Logger log = LoggerFactory.getLogger(Main.class);
+	private static Logger log = LoggerFactory.getLogger(Main.class);
 
 
 	private static CommandLine commandLine;
@@ -88,8 +89,8 @@ public class Main implements Runnable {
 
     @Option(names={ "-v", "--verbose"},
 		scope = ScopeType.INHERIT,
-		description="Show more verbose log information.")
-	private boolean verbose;
+		description="Show more verbose log information. You can increase verbosity by using multiple -v or -vvv")
+	private boolean[] verbose = new boolean[0];
 
 
 	@Override
@@ -118,23 +119,16 @@ public class Main implements Runnable {
 			System.err.println("unable to parse arguments " + t);
 		}
 
-		if (verbose) {
-		/*
-			Logger root = LoggerFactory.getLogger("");
-			root.setLevel(Level.TRACE);
-			log.info("Set log level TRACE");
-		*/
-		/*
-			Logger root = Logger.getLogger("");
-			Level targetLevel = Level.ALL;
-			root.setLevel(targetLevel);
-			for (Handler handler: root.getHandlers()) {
-				handler.setLevel(targetLevel);
-			}
-			log.log(targetLevel, "Set level ALL");
-		*/
+		ch.qos.logback.classic.Logger parentLogger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
 
+		Level[] verboseLevels = {Level.INFO, Level.DEBUG, Level.TRACE, Level.ALL};
+
+		parentLogger.setLevel(Level.WARN);
+		if (verbose.length > 0 && verbose.length <= verboseLevels.length) {
+			parentLogger.setLevel(verboseLevels[verbose.length]);
+			log.info("set level to {}", parentLogger.getLevel());
 		}
+
 		int result = 0;
 		try {
 			result = commandLine.execute(args);
