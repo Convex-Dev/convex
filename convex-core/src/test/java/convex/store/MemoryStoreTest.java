@@ -22,6 +22,7 @@ import convex.core.data.Hash;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
+import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.AStore;
@@ -91,7 +92,7 @@ public class MemoryStoreTest {
 		ArrayList<Ref<ACell>> al = new ArrayList<>();
 		try {
 			Stores.setCurrent(ms);
-			AVector<CVMLong> data = Samples.INT_VECTOR_300;
+			ACell data = Sets.of(Samples.INT_SET_10,15685995L,Samples.INT_VECTOR_300,Samples.MAX_EMBEDDED_BLOB); // should be novel
 
 			Consumer<Ref<ACell>> handler = r -> al.add(r);
 
@@ -104,7 +105,7 @@ public class MemoryStoreTest {
 			assertTrue(num>0);
 			assertEquals(data, al.get(num-1).getValue());
 
-			Samples.INT_VECTOR_300.getRef().persist();
+			data.getRef().persist();
 			assertEquals(num, al.size()); // no new novelty transmitted
 		} finally {
 			Stores.setCurrent(oldStore);
