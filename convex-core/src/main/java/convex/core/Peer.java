@@ -1,7 +1,6 @@
 package convex.core;
 
 import java.io.IOException;
-import java.util.Map;
 import java.util.function.Consumer;
 
 import convex.core.crypto.AKeyPair;
@@ -179,15 +178,18 @@ public class Peer {
 	/**
 	 * Creates a new Peer instance at server startup using the provided
 	 * configuration. Current store must be set to store for server.
-	 *
-	 * @param config
+	 * <p>
+	 * Config map must contain:
+	 * <ul>
+	 * 
+	 * </ul>
+	 * @param keyPair Key pair for genesis peer
+	 * @param genesisState Genesis state, or null to generate fresh state
 	 * @return A new Peer instance
 	 */
-	public static Peer createStartupPeer(Map<Keyword, Object> config) {
-		AKeyPair keyPair = (AKeyPair) config.get(Keywords.KEYPAIR);
+	public static Peer createGenesisPeer(AKeyPair keyPair, State genesisState) {
 		if (keyPair == null) throw new IllegalArgumentException("Peer initialisation requires a keypair");
 
-		State genesisState = (State) config.get(Keywords.STATE);
 		if (genesisState == null) {
 			genesisState=Init.createState(Utils.listOf(keyPair.getAccountKey()));
 			genesisState=genesisState.withTimestamp(Utils.getCurrentTimestamp());
@@ -203,7 +205,7 @@ public class Peer {
 	/**
 	 * Updates the timestamp to the specified time, going forwards only
 	 *
-	 * @param newTimestamp
+	 * @param newTimestamp New Peer timestamp
 	 * @return This peer upated with the given timestamp
 	 */
 	public Peer updateTimestamp(long newTimestamp) {
@@ -259,9 +261,9 @@ public class Peer {
 	}
 
 	/**
-	 * Executes a transaction on the current consensus state of this Peer.
+	 * Executes a "dry run" transaction on the current consensus state of this Peer.
 	 *
-	 * @param <T>
+	 * @param <T> Type of Result
 	 * @param transaction Transaction to execute
 	 * @return The Context containing the transaction results.
 	 */
@@ -272,8 +274,8 @@ public class Peer {
 
 	/**
 	 * Executes a query in this Peer's current Consensus State, using a default address
-	 * @param <T>
-	 * @param form
+	 * @param <T> Type of query result
+	 * @param form Form to execute as a Query
 	 * @return Context after executing query
 	 */
 	public <T extends ACell> Context<T> executeQuery(ACell form) {
@@ -337,8 +339,8 @@ public class Peer {
 	 *
 	 * @param beliefs An array of Beliefs. May contain nulls, which will be ignored.
 	 * @return Updated Peer after Belief Merge
-	 * @throws InvalidDataException
-	 * @throws BadSignatureException
+	 * @throws InvalidDataException if 
+	 * @throws BadSignatureException IF a Signature validation fails
 	 *
 	 */
 	public Peer mergeBeliefs(Belief... beliefs) throws BadSignatureException, InvalidDataException {

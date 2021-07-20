@@ -215,7 +215,7 @@ public class Belief extends ARecord {
 	 * given merge context
 	 * 
 	 * @param accOrders Accumulated map for latest Orders received from all Peer Beliefs
-	 * @param mc
+	 * @param mc Merge context
 	 * @param filteredChains
 	 * @return
 	 * @throws BadSignatureException @

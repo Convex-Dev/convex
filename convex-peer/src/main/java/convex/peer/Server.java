@@ -208,8 +208,10 @@ public class Server implements Closeable {
 				log.error("Can't restore Peer from store: {}",e);
 			}
 		}
+		State genesisStae = (State) config.get(Keywords.STATE);
 		log.info("Defaulting to standard Peer startup.");
-		return Peer.createStartupPeer(getConfig());
+
+		return Peer.createGenesisPeer(keyPair,genesisStae);
 	}
 
 	/**
