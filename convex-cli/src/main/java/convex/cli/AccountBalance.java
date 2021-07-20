@@ -26,7 +26,6 @@ import picocli.CommandLine.ParentCommand;
 	mixinStandardHelpOptions=true,
 	description="Get account balance.")
 public class AccountBalance implements Runnable {
-
 	private static final Logger log = LoggerFactory.getLogger(AccountBalance.class);
 
 	@ParentCommand
