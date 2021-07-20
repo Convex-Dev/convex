@@ -33,12 +33,12 @@ public class PeerCluster {
 
 	public static final int NUM_PEERS = 5;
 	public static final ArrayList<Map<Keyword, Object>> PEER_CONFIGS = new ArrayList<>(NUM_PEERS);
-	public static final ArrayList<AKeyPair> PEER_KEYS = new ArrayList<>(NUM_PEERS);
+	public static final ArrayList<AKeyPair> PEER_KEYPAIRS = new ArrayList<>(NUM_PEERS);
 
 	static {
 		// create a key pair for each peer
 		for (int i = 0; i < NUM_PEERS; i++) {
-			PEER_KEYS.add(Ed25519KeyPair.createSeeded(1000+i));
+			PEER_KEYPAIRS.add(Ed25519KeyPair.createSeeded(1000+i));
 		}
 
 		// create configuration maps for each peer
@@ -46,7 +46,7 @@ public class PeerCluster {
 			int port = Server.DEFAULT_PORT + i;
 			Map<Keyword, Object> config = new HashMap<>();
 			config.put(Keywords.PORT, port);
-			config.put(Keywords.KEYPAIR, PEER_KEYS.get(i));
+			config.put(Keywords.KEYPAIR, PEER_KEYPAIRS.get(i));
 			PEER_CONFIGS.add(config);
 		}
 
@@ -63,7 +63,7 @@ public class PeerCluster {
 		AVector<AccountStatus> accts = Vectors.empty();
 		BlobMap<AccountKey, PeerStatus> peers = BlobMaps.empty();
 		for (int i = 0; i < NUM_PEERS; i++) {
-			AccountKey peerKey = PEER_KEYS.get(i).getAccountKey();
+			AccountKey peerKey = PEER_KEYPAIRS.get(i).getAccountKey();
 			Map<Keyword, Object> config = PEER_CONFIGS.get(i);
 			int port = Utils.toInt(config.get(Keywords.PORT));
 			AString urlString = Strings.create("http://localhost"+ port);

@@ -217,7 +217,7 @@ public class Server implements Closeable {
 	 * mutate elsewhere.
 	 *
 	 * @param config
-	 * @return
+	 * @return New Server instance
 	 */
 	public static Server create(HashMap<Keyword, Object> config) {
 		return create(config, null);
@@ -230,7 +230,7 @@ public class Server implements Closeable {
 	 * @param config
 	 *
 	 * @param event Event interface where the server will send information about the peer
-	 * @return
+	 * @return New Server instance
 	 */
 	public static Server create(HashMap<Keyword, Object> config, IServerEvent event) {
 		return new Server(config, event);
