@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>world.convex</groupId>
 	<artifactId>convex</artifactId>
-	<version>${revision}</version>
+	<version>0.7.0-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
 	<modules>
@@ -22,6 +22,7 @@
 		<jmh.version>1.32</jmh.version>
 		<junit.version>5.7.1</junit.version>
 		<slf4j.version>1.7.31</slf4j.version>
+		<convex.version>${project.version}</convex.version>
 
 		<!--Freeze this for reproducible builds. -->
 		<project.build.outputTimestamp>2020-02-02T00:00:00Z</project.build.outputTimestamp>

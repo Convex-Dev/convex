@@ -10,7 +10,6 @@
 	<modelVersion>4.0.0</modelVersion>
 	
 	<artifactId>convex-peer</artifactId>
-	<version>${revision}</version>
 
 	<build>
 		<plugins>
@@ -22,7 +21,7 @@
 		<dependency>
 			<groupId>world.convex</groupId>
 			<artifactId>convex-core</artifactId>
-			<version>${project.version}</version>
+			<version>${convex.version}</version>
 		</dependency>
 	
 		<dependency>

@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>${revision}</version>
+		<version>0.7.0-SNAPSHOT</version>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
 
@@ -44,17 +44,17 @@
 		<dependency>
 			<groupId>world.convex</groupId>
 			<artifactId>convex-peer</artifactId>
-			<version>${project.version}</version>
+			<version>${convex.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>world.convex</groupId>
 			<artifactId>convex-core</artifactId>
-			<version>${project.version}</version>
+			<version>${convex.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>world.convex</groupId>
 			<artifactId>convex-gui</artifactId>
-			<version>${project.version}</version>
+			<version>${convex.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.bouncycastle</groupId>
