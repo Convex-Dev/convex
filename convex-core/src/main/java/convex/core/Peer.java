@@ -129,9 +129,9 @@ public class Peer {
 	
 	/**
 	 * Create a Peer instance from a remotely acquired Belief
-	 * @param peerKP
+	 * @param peerKP Peer KeyPair
 	 * @param initialState Initial genesis State of the Network
-	 * @param remoteBelief
+	 * @param remoteBelief Remote belief to sync with
 	 * @return New Peer instance
 	 */
 	public static Peer create(AKeyPair peerKP, State initialState, Belief remoteBelief) {
@@ -141,25 +141,36 @@ public class Peer {
 	/**
 	 * Restores a Peer from the Etch database specified in Config
 	 * @param store Store to restore from
-	 * @param root Root Hash of Peer data
 	 * @param keyPair Key Pair to use for restored Peer
 	 * @return Peer instance, or null if root hash was not found
 	 * @throws IOException If store reading failed
 	 */
-	public static Peer restorePeer(AStore store,Hash root, AKeyPair keyPair) throws IOException {
-		// temporarily set current store
+	public static Peer restorePeer(AStore store,AKeyPair keyPair) throws IOException {
+			AMap<Keyword,ACell> peerData=getPeerData(store);
+			if (peerData==null) return null;
+			Peer peer=Peer.fromData(keyPair,peerData);
+			return peer;
+	}
+	
+	/**
+	 * Gets Peer Data from a Store.
+	 * 
+	 * @param store Store to retrieve Peer Datat from
+	 * @return Peer data map, or null if not available
+	 * @throws IOException If a store IO error occurs
+	 */
+	public static AMap<Keyword, ACell> getPeerData(AStore store) throws IOException {
 		AStore tempStore=Stores.current();
 		try {
 			Stores.setCurrent(store);
+			Hash root = store.getRootHash();
 			Ref<ACell> ref=store.refForHash(root);
 			if (ref==null) return null; // not found case
 			if (ref.getStatus()<Ref.PERSISTED) return null; // not fully in store
 			
 			@SuppressWarnings("unchecked")
 			AMap<Keyword,ACell> peerData=(AMap<Keyword, ACell>) ref.getValue();
-
-			Peer peer=Peer.fromData(keyPair,peerData);
-			return peer;
+			return peerData;
 		} finally {
 			Stores.setCurrent(tempStore);
 		}

@@ -122,13 +122,13 @@ public class Server implements Closeable {
 
 	private final HashMap<Keyword, Object> config;
 
-	private boolean isRunning = false;
+	private volatile boolean isRunning = false;
 
 	/**
 	 * Flag to indicate if there are any new things for the server to process (Beliefs, transactions)
 	 * can safely sleep a bit if nothing to do
 	 */
-	private boolean hasNewMessages = false;
+	private volatile boolean hasNewMessages = false;
 
 	private NIOServer nio;
 	private Thread receiverThread = null;
@@ -198,10 +198,10 @@ public class Server implements Closeable {
 
 		if (Utils.bool(getConfig().get(Keywords.RESTORE))) {
 			try {
-				Hash hash = store.getRootHash();
-				Peer peer = Peer.restorePeer(store, hash, keyPair);
+
+				Peer peer = Peer.restorePeer(store, keyPair);
 				if (peer != null) {
-					log.info("Restored Peer with root data hash: {}",hash);
+					log.info("Restored Peer with root data hash: {}",store.getRootHash());
 					return peer;
 				}
 			} catch (Throwable e) {
