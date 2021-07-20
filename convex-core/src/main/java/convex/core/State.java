@@ -250,11 +250,10 @@ public class State extends ARecord {
 	 *
 	 * Updates the state by applying a given block of transactions
 	 *
-	 * @param block
+	 * @param block Block to Apply
 	 * @return The BlockResult from applying the given Block to this State
-	 * @throws BadSignatureException If any transaction is not signed correctly
 	 */
-	public BlockResult applyBlock(Block block) throws BadSignatureException {
+	public BlockResult applyBlock(Block block) {
 		Counters.applyBlock++;
 		State state = prepareBlock(block);
 		return state.applyTransactions(block);
@@ -356,7 +355,7 @@ public class State extends ARecord {
 		return new State(accounts, peers, newGlobals, schedule);
 	}
 
-	private BlockResult applyTransactions(Block block) throws BadSignatureException {
+	private BlockResult applyTransactions(Block block) {
 		State state = this;
 		int blockLength = block.length();
 		Result[] results = new Result[blockLength];

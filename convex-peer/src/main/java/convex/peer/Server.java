@@ -464,7 +464,7 @@ public class Server implements Closeable {
 			} catch (IOException e) {
 				// Ignore??
 			}
-			log.warn("Bad signature from Client! {}" , sd);
+			log.info("Bad signature from Client! {}" , sd);
 			return;
 		}
 
@@ -622,16 +622,11 @@ public class Server implements Closeable {
 
 			ACell.createPersisted(block);
 
-			try {
-				Peer newPeer = peer.proposeBlock(block);
-				log.info("New block proposed: " + block.getHash());
-				newTransactions.clear();
-				peer = newPeer;
-				return true;
-			} catch (BadSignatureException e) {
-				// TODO what to do here?
-				return false;
-			}
+			Peer newPeer = peer.proposeBlock(block);
+			log.info("New block proposed: " + block.getHash());
+			newTransactions.clear();
+			peer = newPeer;
+			return true;
 		}
 	}
 

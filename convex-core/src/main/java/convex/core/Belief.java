@@ -634,9 +634,8 @@ public class Belief extends ARecord {
 	 * 
 	 * @param address Address of peer
 	 * @return The chain for the peer within this Belief, or null if noy found.
-	 * @throws BadSignatureException
 	 */
-	public Order getOrder(AccountKey address) throws BadSignatureException {
+	public Order getOrder(AccountKey address) {
 		SignedData<Order> sc = orders.get(address);
 		if (sc == null) return null;
 		return sc.getValue();

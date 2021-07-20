@@ -366,9 +366,9 @@ public class Peer {
 	 *
 	 * @param newBelief
 	 * @return
-	 * @throws BadSignatureException
+	 * @throws BadSignatureException 
 	 */
-	private Peer updateConsensus(Belief newBelief) throws BadSignatureException {
+	private Peer updateConsensus(Belief newBelief) {
 		if (belief.getValue() == newBelief) return this;
 		Order myOrder = newBelief.getOrder(peerKey); // this peer's chain from new belief
 		long consensusPoint = myOrder.getConsensusPoint();
@@ -440,9 +440,8 @@ public class Peer {
 	 *
 	 * @param block Block to publish
 	 * @return Peer after proposing new Block in Peer's own Order
-	 * @throws BadSignatureException
 	 */
-	public Peer proposeBlock(Block block) throws BadSignatureException {
+	public Peer proposeBlock(Block block) {
 		Belief b = getBelief();
 		BlobMap<AccountKey, SignedData<Order>> orders = b.getOrders();
 
@@ -452,7 +451,8 @@ public class Peer {
 		Order newChain = myOrder.propose(block);
 		SignedData<Order> newSignedChain = sign(newChain);
 		BlobMap<AccountKey, SignedData<Order>> newChains = orders.assoc(peerKey, newSignedChain);
-		return updateConsensus(b.withOrders(newChains));
+		Belief newBelief=b.withOrders(newChains);
+		return updateConsensus(newBelief);
 	}
 
 	public long getConsensusPoint() {
@@ -468,11 +468,7 @@ public class Peer {
 	 *
 	 */
 	public Order getPeerOrder() {
-		try {
-			return getBelief().getOrder(peerKey);
-		} catch (BadSignatureException e) {
-			throw new Error("Bad signature on own chain?", e);
-		}
+		return getBelief().getOrder(peerKey);
 	}
 
 	/**
@@ -480,9 +476,8 @@ public class Peer {
 	 *
 	 * @param peerKey Peer Key
 	 * @return The current Order for the specified peer
-	 * @throws BadSignatureException
 	 */
-	public Order getOrder(AccountKey peerKey) throws BadSignatureException {
+	public Order getOrder(AccountKey peerKey) {
 		return getBelief().getOrder(peerKey);
 	}
 
