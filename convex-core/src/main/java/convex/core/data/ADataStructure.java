@@ -55,6 +55,7 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 * Adds an element to this data structure, in the natural manner defined by the
 	 * general data structure type. e.g. append at the end of a vector.
 	 * 
+	 * @param <R> Type of Value added
 	 * @param x New element to add
 	 * @return The updated data structure, or null if a failure occurred due to invalid element type
 	 */
@@ -66,6 +67,7 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 * 
 	 * This may be more efficient than using 'conj' for individual items.
 	 * 
+	 * @param <R> Type of Value added
 	 * @param xs New elements to add
 	 * @return The updated data structure, or null if a failure occurred due to invalid elementtypes
 	 */
@@ -84,8 +86,8 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 * 
 	 * May return null if the Key or Value is incompatible with the data structure.
 	 * 
-	 * @param key
-	 * @param value
+	 * @param key Associative key
+	 * @param value Value to associate with key
 	 * @return Updates data structure, or null if data types are invalid
 	 */
 	public abstract ADataStructure<E> assoc(ACell key,ACell value);
@@ -93,7 +95,7 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	/**
 	 * Get the value associated with a given key.
 	 * 
-	 * @param key
+	 * @param key Associative key to look up
 	 * @return Value from collection, or a falsey value (null or false) if not found
 	 */
 	public abstract ACell get(ACell key);
@@ -111,7 +113,7 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	/**
 	 * Checks if the data structure contains the specified key
 	 * 
-	 * @param key
+	 * @param key Associative key to look up
 	 * @return true if the data structure contains the key, false otherwise
 	 */
 	public abstract boolean containsKey(ACell key);

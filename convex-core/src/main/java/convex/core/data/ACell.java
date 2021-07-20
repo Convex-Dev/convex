@@ -325,6 +325,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	/**
 	 * Gets a numbered child Ref from within this Cell.
 	 * 
+	 * @param <R> Type of referenced Cell
 	 * @param i Index of ref to get
 	 * @return The Ref at the specified index
 	 */
@@ -361,7 +362,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * 
 	 * Concrete implementations may override this to optimise performance.
 	 * 
-	 * @param <R>
+	 * @param <R> Type of referenced Cell
 	 * @return Array of Refs
 	 */
 	@SuppressWarnings("unchecked")
@@ -413,7 +414,8 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * Novelty handler is called for all new Refs that are persisted (recursively),
 	 * starting from lowest levels.
 	 * 
-	 * @param value
+	 * @param <T> Type of Value
+	 * @param value Value to announce
 	 * @param noveltyHandler Novelty handler to call for any Novelty (may be null)
 	 * @return Persisted Ref
 	 */
@@ -429,6 +431,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * Novelty handler is called for all new Refs that are persisted (recursively),
 	 * starting from lowest levels (depth first order)
 	 * 
+	 * @param <T> Type of Value
 	 * @param value Any CVM value to persist
 	 * @param noveltyHandler Novelty handler to call for any Novelty (may be null)
 	 * @return Persisted Ref
@@ -447,6 +450,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * Creates a persisted Ref with the given value in the current store. Returns
 	 * the current Ref if already persisted
 	 * 
+	 * @param <T> Type of Value
 	 * @param value Any CVM value to persist
 	 * @return Ref to the given value
 	 */
