@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -14,6 +16,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,14 +28,17 @@ import convex.api.Convex;
 import convex.core.Belief;
 import convex.core.Result;
 import convex.core.State;
+import convex.core.crypto.AKeyPair;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
+import convex.core.data.Address;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
-import convex.core.init.InitTest;
+import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.core.store.AStore;
@@ -52,19 +59,45 @@ public class ServerTest {
 	private static final List<Server> SERVERS;
 
 	public static final Convex CONVEX;
+	
+	public static final AKeyPair[] KEYPAIRS = new AKeyPair[] {
+			AKeyPair.createSeeded(2),
+			AKeyPair.createSeeded(3),
+			AKeyPair.createSeeded(5),
+			AKeyPair.createSeeded(7),
+			AKeyPair.createSeeded(11),
+			AKeyPair.createSeeded(13),
+			AKeyPair.createSeeded(17),
+			AKeyPair.createSeeded(19),
+	};
+	
+	public static ArrayList<AKeyPair> PEER_KEYPAIRS=(ArrayList<AKeyPair>) Arrays.asList(KEYPAIRS).stream().collect(Collectors.toList());
+	public static ArrayList<AccountKey> PEER_KEYS=(ArrayList<AccountKey>) Arrays.asList(KEYPAIRS).stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
 
+	public static final AKeyPair FIRST_PEER_KEYPAIR = KEYPAIRS[0];
+	public static final AccountKey FIRST_PEER_KEY = FIRST_PEER_KEYPAIR.getAccountKey();
+	
+	public static final AKeyPair HERO_KEYPAIR = KEYPAIRS[0];
+	public static final AKeyPair VILLAIN_KEYPAIR = KEYPAIRS[1];
+	
+	public static final AccountKey HERO_KEY = HERO_KEYPAIR.getAccountKey();
+
+	public static final Address HERO;
+	public static final Address VILLAIN;
 
 	static {
 		// Use fresh State
-		State s=InitTest.createState();
+		State s=Init.createState(PEER_KEYS);
+		HERO=Address.create(Init.BASE_FIRST_ADDRESS);
+		VILLAIN=HERO.offset(1);
 
-		SERVERS=API.launchLocalPeers(InitTest.PEER_KEYPAIRS, s, null);
+		SERVERS=API.launchLocalPeers(PEER_KEYPAIRS, s, null);
 		Server server = SERVERS.get(0);
 		synchronized(server) {
 			SERVER=server;
 			try {
 				Thread.sleep(1000);
-				CONVEX=Convex.connect(SERVER.getHostAddress(), SERVER.getPeerController(), InitTest.FIRST_PEER_KEYPAIR);
+				CONVEX=Convex.connect(SERVER.getHostAddress(), SERVER.getPeerController(), FIRST_PEER_KEYPAIR);
 			} catch (Throwable t) {
 				throw Utils.sneakyThrow(t);
 			}
@@ -102,7 +135,7 @@ public class ServerTest {
 		// Connect to Peer Server using the current store for the client
 		Connection pc = Connection.connect(hostAddress, handler, Stores.current());
 		AVector<CVMLong> v = Vectors.of(1l, 2l, 3l);
-		long id1 = pc.sendQuery(v,InitTest.HERO);
+		long id1 = pc.sendQuery(v,HERO);
 		Utils.timeout(5000, () -> results.get(id1) != null);
 		assertEquals(v, results.get(id1));
 	}
@@ -124,20 +157,20 @@ public class ServerTest {
 //	}
 
 	@Test public void testBalanceQuery() throws IOException, TimeoutException {
-		Convex convex=Convex.connect(SERVER.getHostAddress(),InitTest.VILLAIN,InitTest.VILLAIN_KEYPAIR);
+		Convex convex=Convex.connect(SERVER.getHostAddress(),VILLAIN,VILLAIN_KEYPAIR);
 
 		// test the connection is still working
-		assertNotNull(convex.getBalance(InitTest.VILLAIN));
+		assertNotNull(convex.getBalance(VILLAIN));
 	}
 
 	@Test
 	public void testConvexAPI() throws IOException, InterruptedException, ExecutionException, TimeoutException {
-		Convex convex=Convex.connect(SERVER.getHostAddress(),InitTest.VILLAIN,InitTest.VILLAIN_KEYPAIR);
+		Convex convex=Convex.connect(SERVER.getHostAddress(),VILLAIN,VILLAIN_KEYPAIR);
 
 		Future<convex.core.Result> f=convex.query(Symbols.STAR_BALANCE);
 		convex.core.Result f2=convex.querySync(Symbols.STAR_ADDRESS);
 
-		assertEquals(InitTest.VILLAIN,f2.getValue());
+		assertEquals(VILLAIN,f2.getValue());
 		assertTrue(f.get().getValue() instanceof CVMLong);
 	}
 

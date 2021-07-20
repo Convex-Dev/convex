@@ -15,8 +15,6 @@ import java.util.Arrays;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
-import convex.api.Shutdown;
 import convex.core.Constants;
 import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
@@ -26,6 +24,7 @@ import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.RefSoft;
 import convex.core.util.Counters;
+import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 
 /**
@@ -185,7 +184,7 @@ public class Etch {
 		}
 		
 		// shutdown hook to close file / release lock
-		convex.api.Shutdown.addHook(Shutdown.ETCH,new Runnable() {
+		convex.core.util.Shutdown.addHook(Shutdown.ETCH,new Runnable() {
 		    public void run() {
 		        close();
 		    }

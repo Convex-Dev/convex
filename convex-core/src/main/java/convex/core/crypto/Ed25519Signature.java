@@ -19,6 +19,8 @@ public class Ed25519Signature extends ASignature {
 	 * Length in bytes of an Ed25519 signature
 	 */
 	public static final int SIGNATURE_LENGTH = 64;
+
+	public static final ASignature ZERO = wrap(new byte[SIGNATURE_LENGTH]);
 	
 	private final byte[] signatureBytes;
 	

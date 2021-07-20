@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.Ed25519Signature;
 import convex.core.data.Address;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
@@ -25,7 +26,6 @@ import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
 import convex.peer.ServerTest;
-import convex.test.Samples;
 
 /**
  * Tests for a Convex Client connection
@@ -72,7 +72,7 @@ public class ConvexTest {
 		synchronized (ServerTest.SERVER) {
 			Convex convex = Convex.connect(ServerTest.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
 			Ref<ATransaction> tr = Invoke.create(ADDRESS, 0, Reader.read("*address*")).getRef();
-			Result r = convex.transact(SignedData.create(KEYPAIR, Samples.FAKE_SIGNATURE, tr)).get();
+			Result r = convex.transact(SignedData.create(KEYPAIR, Ed25519Signature.ZERO, tr)).get();
 			assertEquals(ErrorCodes.SIGNATURE, r.getErrorCode());
 		}
 	}

@@ -11,6 +11,7 @@
 		<module>convex-core</module>
 		<module>convex-cli</module>
 		<module>convex-gui</module>
+		<module>convex-peer</module>
 		<module>convex-benchmarks</module>
 	</modules>
 

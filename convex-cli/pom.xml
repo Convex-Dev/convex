@@ -43,7 +43,7 @@
 	<dependencies>
 		<dependency>
 			<groupId>world.convex</groupId>
-			<artifactId>lib</artifactId>
+			<artifactId>convex-peer</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>

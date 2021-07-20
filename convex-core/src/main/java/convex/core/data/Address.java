@@ -305,6 +305,15 @@ public class Address extends ABlob {
 		return this;
 	}
 
+	/**
+	 * Creates a new Address at an offset to this Address
+	 * @param offset Offset to add to this Address (may be negative)
+	 * @return New Address
+	 */
+	public Address offset(long offset) {
+		return create(value+offset);
+	}
+
 
 
 

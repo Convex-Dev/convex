@@ -19,7 +19,6 @@ import org.slf4j.LoggerFactory;
 
 
 import convex.api.Convex;
-import convex.api.Shutdown;
 import convex.core.Belief;
 import convex.core.Block;
 import convex.core.BlockResult;
@@ -56,6 +55,7 @@ import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
+import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.net.Message;
