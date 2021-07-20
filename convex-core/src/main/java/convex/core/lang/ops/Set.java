@@ -19,7 +19,7 @@ import convex.core.util.Errors;
 /**
  * Op to set a lexical value in the local execution context.
  *
- * @param <T>
+ * @param <T> Result type of Op
  */
 public class Set<T extends ACell> extends AOp<T> {
 

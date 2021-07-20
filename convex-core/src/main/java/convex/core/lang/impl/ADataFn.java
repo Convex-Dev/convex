@@ -9,8 +9,9 @@ import convex.core.lang.Context;
 /**
  * Abstract base class for data structure lookup functions.
  * 
- * Not a canonical object, can't exist as CVM value
- * @param <T>
+ * Not a canonical object, can't exist as CVM value.
+ * 
+ * @param <T> Type of function return value
  */
 public abstract class ADataFn<T extends ACell> extends AFn<T> {
 

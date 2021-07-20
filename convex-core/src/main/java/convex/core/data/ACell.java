@@ -26,6 +26,9 @@ import convex.core.util.Utils;
 public abstract class ACell extends AObject implements IWriteable, IValidated {
 
 	
+	/**
+	 * An empty Java array of cells
+	 */
 	public static final ACell[] EMPTY_ARRAY = new ACell[0];
 
 	/**
@@ -51,7 +54,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * 
 	 * In particular, should not traverse potentially missing child Refs.
 	 * 
-	 * @throws InvalidDataException 
+	 * @throws InvalidDataException  If the Cell is invalid
 	 */
 	public abstract void validateCell() throws InvalidDataException;
 	
@@ -74,7 +77,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	
 	/**
 	 * Gets the Hash if already computed, or null if not yet available
-	 * @return
+	 * @return Cached Hash value, or null if not available
 	 */
 	protected final Hash cachedHash() {
 		if (cachedRef!=null) {
@@ -307,6 +310,8 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 
 	/**
 	 * Gets the Ref for this Cell, creating a new direct reference if necessary
+	 * 
+	 * @param <R> Type of Cell
 	 * @return Ref for this Cell
 	 */
 	@SuppressWarnings("unchecked")

@@ -4,7 +4,7 @@ import convex.core.data.ACell;
 
 /**
  * Base type for standard types mapped directly to a branch of ACell hierarchy
- * @param <T>
+ * @param <T> Java Type (common superclass)
  */
 public abstract class AStandardType<T extends ACell> extends AType {
 

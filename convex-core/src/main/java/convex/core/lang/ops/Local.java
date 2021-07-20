@@ -17,7 +17,7 @@ import convex.core.lang.Ops;
 /**
  * Op to look up a local value from the lexical environment
  *
- * @param <T>
+ * @param <T> Result type of Op
  */
 public class Local<T extends ACell> extends AOp<T> {
 	

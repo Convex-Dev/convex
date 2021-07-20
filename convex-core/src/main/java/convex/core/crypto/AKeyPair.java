@@ -81,12 +81,26 @@ public abstract class AKeyPair {
 		return Ed25519KeyPair.generate();
 	}
 
+	/**
+	 * Creates a key pair using specific key material.
+	 * 
+	 * @param keyMaterial Bytes to use as key
+	 * @return New key pair
+	 */
 	public static AKeyPair create(byte[] keyMaterial) {
 		return Ed25519KeyPair.create(keyMaterial);
 	}
 
+	/**
+	 * Gets the JCA PrivateKey
+	 * @return Private Key
+	 */
 	public abstract PrivateKey getPrivate();
 
+	/**
+	 * Gets the JCA PublicKey
+	 * @return Public Key
+	 */
 	public abstract PublicKey getPublic();
 	
 	@Override

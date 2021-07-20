@@ -20,7 +20,7 @@ import convex.core.lang.Ops;
  * together" 
  * - Rich Hickey
  *
- * @param <T>
+ * @param <T> Result type of Do Op
  */
 public class Do<T extends ACell> extends AMultiOp<T> {
 

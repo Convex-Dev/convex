@@ -14,11 +14,14 @@ import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.util.Utils;
 
+/**
+ * Tests for hashing functionality
+ */
 public class HashTest {
 	public static final String GENESIS_HEADER = "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c";
 
 	@Test
-	public void testBasicSHA256() {
+	void testBasicSHA256() {
 		// empty bytes
 		Hash h1 = Hashing.sha256(Utils.EMPTY_BYTES);
 		assertEquals("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", h1.toHexString());
@@ -37,29 +40,8 @@ public class HashTest {
 				h3.toHexString().toUpperCase());
 	}
 
-	@Test
-	public void testBasicKeccak256() {
-		// empty bytes Keccak256
-		// note that SHA-3 is
-		// "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a"
-		Hash h1 = Hashing.keccak256(Utils.EMPTY_BYTES);
-		assertEquals("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470", h1.toHexString());
-
-		// from https://leventozturk.com/engineering/sha3/
-		Hash h2 = Hashing.keccak256("abc");
-		assertEquals("4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45", h2.toHexString());
-
-		// from web3j test suite
-		Hash h3 = Hashing.keccak256("EVWithdraw(address,uint256,bytes32)");
-		assertEquals("953d0c27f84a9649b0e121099ffa9aeb7ed83e65eaed41d3627f895790c72d41", h3.toHexString());
-
-		// Random name hash
-		Hash h4 = Hashing.keccak256("Poland");
-		assertEquals("62812097841d5ae3dd00c7fbe3157fad0b8118c15b2f5816f6831069f6056f82", h4.toHexString());
-	}
-	
 	@Test 
-	public void testBuiltinHashes() {
+	void testBuiltinHashes() {
 		Hash h1 = Hashing.sha3(Utils.EMPTY_BYTES);
 		assertEquals("a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a", h1.toHexString());
 		assertEquals(Hash.EMPTY_HASH, h1);
@@ -67,7 +49,7 @@ public class HashTest {
 	}
 
 	@Test
-	public void testNullHash() {
+	void testNullHash() {
 		// hash of single zero byte (CVM null encoding), tested against multiple online calculators
 		assertEquals("5d53469f20fef4f8eab52b88044ede69c77a6a68a60728609fc4a65ff531e7d0", Hash.NULL_HASH.toHexString());
 		
@@ -77,12 +59,12 @@ public class HashTest {
 	}
 
 	@Test
-	public void testDataLength() {
+	void testDataLength() {
 		assertEquals(34, Hash.NULL_HASH.getEncodingLength());
 	}
 
 	@Test
-	public void testExtractHash() {
+	void testExtractHash() {
 		Hash h = Hash.compute(Strings.create("foo"));
 		Blob b = Format.encodedBlob(h);
 		byte[] bs = b.getBytes();
@@ -91,7 +73,7 @@ public class HashTest {
 	}
 
 	@Test
-	public void testBitcoinGenesis() {
+	void testBitcoinGenesis() {
 		// Bitcoin genesis block header
 		// 0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c
 		// Should hash to:
@@ -110,7 +92,7 @@ public class HashTest {
 	}
 
 	@Test
-	public void testEquality() {
+	void testEquality() {
 		Hash h = Hash.NULL_HASH;
 		assertEquals(h, Hashing.sha3(new byte[] { Tag.NULL }));
 		assertEquals(h, h.toBlob());

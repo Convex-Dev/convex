@@ -23,7 +23,7 @@ import convex.core.util.Utils;
  * 
  * Loop version can act as a target for (recur ...) expressions.
  *
- * @param <T>
+ * @param <T> Result type of Op
  */
 public class Let<T extends ACell> extends AMultiOp<T> {
 

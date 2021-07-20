@@ -38,7 +38,7 @@ import convex.core.util.Utils;
  * any architectural guidance from this: Just do it. Choose immutability and see
  * where it takes you." - Rich Hickey
  *
- * @param <T>
+ * @param <T> Type of element in Vector
  */
 public abstract class AVector<T extends ACell> extends ASequence<T> {
 

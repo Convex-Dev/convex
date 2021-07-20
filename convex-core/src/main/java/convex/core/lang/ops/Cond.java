@@ -23,7 +23,7 @@ import convex.core.lang.RT;
  * 2. Are executed in sequence until the first condition succeeds
  * 3. Are only executed if required, i.e. cond operates as a "short-circuiting" conditional.
  *
- * @param <T>
+ * @param <T> Result type of Op
  */
 public class Cond<T extends ACell> extends AMultiOp<T> {
 

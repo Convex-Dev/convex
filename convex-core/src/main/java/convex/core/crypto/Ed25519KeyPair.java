@@ -29,12 +29,15 @@ import convex.core.data.SignedData;
 import convex.core.exceptions.TODOException;
 import convex.core.util.Utils;
 
+/**
+ * Class representing an Ed25519 Key Pair
+ */
 public class Ed25519KeyPair extends AKeyPair {
 
 	private final AccountKey publicKey;
 	private final KeyPair keyPair;
 	
-	public static final int PRIVATE_KEY_LENGTH=32;
+	protected static final int PRIVATE_KEY_LENGTH=32;
 	private static final String ED25519 = "Ed25519";
 
 	private Ed25519KeyPair(KeyPair kp, AccountKey publicKey) {
@@ -51,11 +54,17 @@ public class Ed25519KeyPair extends AKeyPair {
 		return generate(new SecureRandom());
 	}
 	
-	public static Ed25519KeyPair create(KeyPair keyPair) {
+	protected static Ed25519KeyPair create(KeyPair keyPair) {
 		AccountKey address=extractAccountKey(keyPair.getPublic());
 		return new Ed25519KeyPair(keyPair,address);
 	}
 	
+	/**
+	 * Creates an Ed25519 Key Pair with the specified keys
+	 * @param publicKey Public key
+	 * @param privateKey Private key
+	 * @return Key Pair instance
+	 */
 	public static Ed25519KeyPair create(PublicKey publicKey, PrivateKey privateKey) {
 		KeyPair keyPair=new KeyPair(publicKey,privateKey);
 		return create(keyPair);
@@ -67,6 +76,11 @@ public class Ed25519KeyPair extends AKeyPair {
 		return create(publicKey,privateKey);
 	}
 
+	/**
+	 * Generates a secure random key pair
+	 * @param random A secure random instance
+	 * @return New key pair
+	 */
 	public static Ed25519KeyPair generate(SecureRandom random) {
 		try {
 			KeyPairGenerator generator = KeyPairGenerator.getInstance(ED25519);
@@ -151,11 +165,15 @@ public class Ed25519KeyPair extends AKeyPair {
 		return Blob.wrap(bytes);
 	}
 
+	/**
+	 * Gets a byte array representation of the public key
+	 * @return Bytes of public key
+	 */
 	public byte[] getPublicKeyBytes() {
 		return getAccountKey().getBytes();
 	}
 	
-	public static PrivateKey privateKeyFromBlob(Blob encodedKey) {
+	static PrivateKey privateKeyFromBlob(Blob encodedKey) {
 		try {
 			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
 			PKCS8EncodedKeySpec pkcs8KeySpec = new PKCS8EncodedKeySpec(encodedKey.getBytes());
@@ -184,7 +202,7 @@ public class Ed25519KeyPair extends AKeyPair {
 		}
 	}
 
-	public static PublicKey publicKeyFromBytes(byte[] key) {
+	static PublicKey publicKeyFromBytes(byte[] key) {
 		try {
 			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
 			SubjectPublicKeyInfo pubKeyInfo = new SubjectPublicKeyInfo(
@@ -237,7 +255,7 @@ public class Ed25519KeyPair extends AKeyPair {
 		return equals((Ed25519KeyPair) o);
 	}
 
-	public boolean equals(Ed25519KeyPair other) {
+	boolean equals(Ed25519KeyPair other) {
 		if (!keyPair.getPrivate().equals(other.keyPair.getPrivate())) return false;
 		return keyPair.getPublic().equals(other.getPublic());
 	}

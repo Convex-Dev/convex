@@ -21,7 +21,7 @@ import convex.core.util.Utils;
  * that its programs are lists, which everyone, including me, has regarded as a
  * disadvantage." - John McCarthy, "Early History of Lisp"
  * 
- * @param <T>
+ * @param <T> Type of List elements
  */
 public class List<T extends ACell> extends AList<T> {
 

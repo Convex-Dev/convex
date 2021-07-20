@@ -20,6 +20,9 @@ public class Ed25519Signature extends ASignature {
 	 */
 	public static final int SIGNATURE_LENGTH = 64;
 
+	/**
+	 * A Signature containing zerod bytes (not valid)
+	 */
 	public static final ASignature ZERO = wrap(new byte[SIGNATURE_LENGTH]);
 	
 	private final byte[] signatureBytes;
@@ -28,6 +31,11 @@ public class Ed25519Signature extends ASignature {
 		this.signatureBytes=signature;
 	}
 	
+	/**
+	 * Creates a Signature instance with specific bytes
+	 * @param signature Bytes for signature
+	 * @return Signature instance
+	 */
 	public static Ed25519Signature wrap(byte[] signature) {
 		if (signature.length!=SIGNATURE_LENGTH) throw new IllegalArgumentException("Bsd signature length for ED25519");
 		return new Ed25519Signature(signature);

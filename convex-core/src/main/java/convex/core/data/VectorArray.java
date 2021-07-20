@@ -12,7 +12,7 @@ import convex.core.exceptions.InvalidDataException;
 /**
  * Experimental: implementation of AVector backed by a Java array for temporary usage purposes.
  *
- * @param <T>
+ * @param <T> Type of vector elements
  */
 public class VectorArray<T extends ACell> extends AVector<T> {
 

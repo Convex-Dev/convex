@@ -21,7 +21,7 @@ import convex.core.lang.RT;
  * The first child Op identifies the function to be called, the remaining ops
  * are arguments.
  *
- * @param <T>
+ * @param <T> Result type of Op
  */
 public class Invoke<T extends ACell> extends AMultiOp<T> {
 

@@ -21,7 +21,7 @@ import convex.core.lang.Ops;
  * together" 
  * - Rich Hickey
  *
- * @param <T>
+ * @param <T> Result type of Op
  */
 public class Query<T extends ACell> extends AMultiOp<T> {
 

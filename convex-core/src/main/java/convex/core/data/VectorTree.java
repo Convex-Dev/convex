@@ -36,7 +36,7 @@ import convex.core.util.Utils;
  * 
  * - Niklaus Wirth
  * 
- * @param <T>
+ * @param <T> Type of Vector elements
  */
 public class VectorTree<T extends ACell> extends AVector<T> {
 

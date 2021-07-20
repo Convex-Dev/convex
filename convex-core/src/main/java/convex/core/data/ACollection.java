@@ -198,6 +198,13 @@ public abstract class ACollection<T extends ACell> extends ADataStructure<T> imp
 	@Override
 	public abstract <R extends ACell> ACollection<R> conj(R x);
 	
+	/**
+	 * Maps a function over a collection, applying it to each element in turn.
+	 * 
+	 * @param <R> Type of element in resulting collection
+	 * @param mapper Function to map over collection
+	 * @return Collection after function applied to each element
+	 */
 	public abstract <R extends ACell> ACollection<R> map(Function<? super T, ? extends R> mapper);
 
 

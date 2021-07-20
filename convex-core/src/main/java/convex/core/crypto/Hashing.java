@@ -8,6 +8,9 @@ import org.bouncycastle.jcajce.provider.digest.Keccak;
 
 import convex.core.data.Hash;
 
+/**
+ * Class for static Hashing functionality
+ */
 public class Hashing {
 
 	/**
@@ -73,40 +76,6 @@ public class Hashing {
 	 */
 	public static MessageDigest getSHA256Digest() {
 		return sha256Store.get();
-	}
-
-	/**
-	 * Computes the keccak256 hash of all byte data in an array
-	 * 
-	 * @param data
-	 * @return Hash of byte data
-	 */
-	public static Hash keccak256(byte[] data) {
-		return keccak256(data, 0, data.length);
-	}
-
-	/**
-	 * Computes the keccak256 hash of a subset of byte data in an array
-	 * 
-	 * @param data
-	 * @param offset
-	 * @param length
-	 * @return Hash of byte data
-	 */
-	public static Hash keccak256(byte[] data, int offset, int length) {
-		MessageDigest kecc = getKeccak256Digest();
-		kecc.update(data, offset, length);
-		return Hash.wrap(kecc.digest());
-	}
-
-	/**
-	 * Compute the keccak256 hash of the UTF8 encoding of a string
-	 * 
-	 * @param string
-	 * @return Hash of UTF-8 encoded string
-	 */
-	public static Hash keccak256(String string) {
-		return keccak256(string.getBytes(StandardCharsets.UTF_8));
 	}
 
 	/**

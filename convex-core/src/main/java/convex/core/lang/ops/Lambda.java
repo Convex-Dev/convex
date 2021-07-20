@@ -25,7 +25,7 @@ import convex.core.util.Utils;
  * 
  * Equivalent to (fn [...] ...)
  *
- * @param <T>
+ * @param <T> Result type of Closure
  */
 public class Lambda<T extends ACell> extends AOp<AClosure<T>> {
 	

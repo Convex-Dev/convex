@@ -25,7 +25,7 @@ import convex.core.lang.RT;
  * 
  * Consumes juice for lookup when executed.
  *
- * @param <T>
+ * @param <T> Result type of Op
  */
 public class Lookup<T extends ACell> extends AOp<T> {
 	private final AOp<Address> address;

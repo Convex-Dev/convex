@@ -28,7 +28,7 @@ public abstract class AObject {
 	 * Creates a Blob object representing this object. Should be called only after
 	 * the cached encoding has been checked.
 	 * 
-	 * @return
+	 * @return Blob Encoding of Object
 	 */
 	protected abstract Blob createEncoding();
 	
@@ -38,7 +38,7 @@ public abstract class AObject {
 	 * Warning: Blob must be the correct canonical representation of this Cell,
 	 * otherwise bad things may happen (incorrect hashcode, etc.)
 	 * 
-	 * @param data
+	 * @param data Encoding of Value. Must be a correct canonical encoding.
 	 */
 	public final void attachEncoding(Blob data) {
 		this.encoding=data;

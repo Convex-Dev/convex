@@ -23,8 +23,8 @@ import convex.core.util.Utils;
  * child Maps, with a bitmap mask indicating which hex digits are present, i.e.
  * have non-empty children.
  *
- * @param <K>
- * @param <V>
+ * @param <K> Type of map keys
+ * @param <V> Type of map values
  */
 public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	/**

@@ -14,7 +14,7 @@ import convex.core.util.Utils;
  * child Maps, with a bitmap mask indicating which hex digits are present, i.e.
  * have non-empty children.
  *
- * @param <T>
+ * @param <T> Type of set elemets
  */
 public class SetTree<T extends ACell> extends AHashSet<T> {
 

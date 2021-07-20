@@ -15,7 +15,9 @@ import convex.core.util.Utils;
  * <p>
  * Using Ed25519:
  * </p>
+ * <ul>
  * <li>AccountKey is the Public Key (32 bytes)</li>
+ * </li>
  * 
  */
 public class AccountKey extends AArrayBlob {

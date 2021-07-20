@@ -17,7 +17,7 @@ public interface IValidated {
 	 * <li>Call validate() on any contained cells in this class</li>
 	 * </ol>
 	 * 
-	 * @throws InvalidDataException
+	 * @throws InvalidDataException If the data Valie is invalid in any way
 	 */
 	public void validate() throws InvalidDataException;
 

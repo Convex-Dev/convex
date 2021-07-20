@@ -9,6 +9,9 @@ import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.util.Utils;
 
+/**
+ * Class representing a cryptographic signature
+ */
 public abstract class ASignature extends ACell {
 
 	/**

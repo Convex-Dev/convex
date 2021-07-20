@@ -5,7 +5,7 @@ package convex.core.data;
  * 
  * Countable values support a count of sub-elements and the ability  to get by index.
  * 
- * @param <E>
+ * @param <E> Type of element that is counted
  */
 public abstract class ACountable<E extends ACell> extends ACell {
 

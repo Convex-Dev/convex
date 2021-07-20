@@ -22,7 +22,7 @@ import convex.core.util.Utils;
  * SoftRef must always have a non-null hash, to ensure lookup capability in
  * store.
  * 
- * @param <T>
+ * @param <T> Type of referenced Cell
  */
 public class RefSoft<T extends ACell> extends Ref<T> {
 	

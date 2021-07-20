@@ -45,6 +45,7 @@ import convex.core.util.Utils;
 
 /**
  * Representation of CVM execution context.
+ * <p>
  *
  * Execution context includes:
  * - The current on-Chain state, including the defined execution environment for each Address
@@ -52,19 +53,19 @@ import convex.core.util.Utils;
  * - The identity (as an Address) for the origin, caller and currently executing actor
  * - Juice and execution depth current status for
  * - Result of the last operation executed (which may be exceptional)
- *
- * Interestingly, this behaves like Scala's ZIO[<Context-Stuff>, AExceptional, T]
- *
+ * <p>
+ * Interestingly, this behaves like Scala's ZIO[Context-Stuff, AExceptional, T]
+ * <p>
  * Contexts maintain checks on execution depth and juice to control against arbitrary on-chain
  * execution. Coupled with limits on total juice and limits on memory allocation
  * per unit juice, this places an upper bound on execution time and space.
- *
+ * <p>
  * Contexts also support returning exceptional values. Exceptional results may come
  * from arbitrary nested depth (which requires a bit of complexity to reset depth when
  * catching exceptional values). We avoid using Java exceptions here, because exceptionals
  * are "normal" in the context of on-chain execution, and we'd like to avoid the overhead
  * of exception handling - may be especially important in DoS scenarios.
- *
+ * <p>
  * "If you have a procedure with 10 parameters, you probably missed some"
  * - Alan Perlis
  *
