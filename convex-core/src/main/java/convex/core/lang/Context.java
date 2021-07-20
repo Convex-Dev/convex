@@ -1,7 +1,5 @@
 package convex.core.lang;
 
-import java.util.concurrent.ExecutionException;
-
 import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.State;
@@ -858,7 +856,7 @@ public class Context<T extends ACell> extends AObject {
 	/**
 	 * Executes an Op within this context, returning an updated context.
 	 *
-	 * @param <I> Return type of the Op
+	 * @param <R> Return type of the Op
 	 * @param op Op to execute
 	 * @return Updated Context
 	 */
@@ -978,7 +976,6 @@ public class Context<T extends ACell> extends AObject {
 	 *
 	 * @param <I>
 	 * @return Context with local bindings updated
-	 * @throws ExecutionException
 	 */
 	@SuppressWarnings("unchecked")
 	public <I extends ACell> Context<I> executeLocalBinding(ACell bindingForm, AOp<I> op) {

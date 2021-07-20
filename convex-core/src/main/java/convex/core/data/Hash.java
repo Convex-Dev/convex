@@ -67,7 +67,7 @@ public class Hash extends AArrayBlob {
     /**
      * Wraps the specified blob data as a Hash, sharing the underlying byte array.
      * @param data Blob data of correct size for a Hash. Must have at least enough bytes for a Hash
-     * @return
+     * @return Wrapped data as a Hash
      */
 	public static Hash wrap(AArrayBlob data) {
 		if (data instanceof Hash) return (Hash)data;

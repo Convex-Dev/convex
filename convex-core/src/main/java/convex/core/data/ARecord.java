@@ -54,7 +54,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	
 	/**
 	 * Writes the raw fields of this record in declared order
-	 * @param b ByteBuffer to write to
+	 * @param bs Array to write to
 	 */
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {

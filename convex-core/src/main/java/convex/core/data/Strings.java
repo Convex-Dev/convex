@@ -13,8 +13,8 @@ public class Strings {
 	 * Reads a CVM String value from a bytebuffer. Assumes tag already read.
 	 * 
 	 * @param bb
-	 * @return
-	 * @throws BadFormatException 
+	 * @return String instance
+	 * @throws BadFormatException If format has problems
 	 */
 	public static AString read(ByteBuffer bb) throws BadFormatException {
 		long length=Format.readVLCLong(bb);

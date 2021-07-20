@@ -257,7 +257,7 @@ public class Convex {
 	/**
 	 * Gets the Internet address of the currently connected remote
 	 *
-	 * @return
+	 * @return Remote socket address
 	 */
 	public InetSocketAddress getRemoteAddress() {
 		return connection.getRemoteAddress();

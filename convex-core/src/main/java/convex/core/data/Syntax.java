@@ -254,8 +254,8 @@ public class Syntax extends ACell {
 	 * Merge metadata into a Cell, after wrapping as a Syntax Object
 	 * 
 	 * @param original Cell to enhance with merged metadata
-	 * @param additional Syntax Object containing additional metadata
-	 * @return
+	 * @param additional Syntax Object containing additional metadata. Any value will be ignored.
+	 * @return Syntax object with merged metadata
 	 */
 	public static Syntax mergeMeta(ACell original, Syntax additional) {
 		Syntax x=Syntax.create(original);

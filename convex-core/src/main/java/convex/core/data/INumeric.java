@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import convex.core.data.prim.APrimitive;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 
@@ -23,9 +24,9 @@ public interface INumeric {
 
 	/**
 	 * Gets the signum of this numerical value. Will be -1, 0 or 1 for Longs, -1.0, 0.0 , 1.0 or ##NaN for doubles.
-	 * @return
+	 * @return Signum of the numeric value
 	 */
-	public ACell signum();
+	public APrimitive signum();
 
 	public INumeric toStandardNumber();
 	

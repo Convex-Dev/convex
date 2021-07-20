@@ -529,7 +529,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 
 	/**
 	 * Converts this Ref to a RefDirect
-	 * @return
+	 * @return Direct Ref
 	 */
 	public Ref<T> toDirect() {
 		return RefDirect.create(getValue(), hash, flags);

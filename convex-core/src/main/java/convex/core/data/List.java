@@ -57,9 +57,9 @@ public class List<T extends ACell> extends AList<T> {
 	
 	/***
 	 * Creates a list wrapping the given array. May destructively alter the array
-	 * @param <T>
+	 * @param <T> Type of element
 	 * @param args
-	 * @return
+	 * @return New List
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> List<T> create(ACell... args) {

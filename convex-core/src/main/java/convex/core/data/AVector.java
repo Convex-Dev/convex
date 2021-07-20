@@ -10,6 +10,7 @@ import java.util.function.Predicate;
 
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
+import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 
 /**
@@ -256,8 +257,9 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	 * @return A new vector, equal in length to the largest of the two vectors
 	 *         passed @
 	 */
-	// public abstract AVector<T> mergeWith(AVector<T> b, MergeFunction<T> func)
-	// ;
+	public AVector<T> mergeWith(AVector<T> b, MergeFunction<T> func) {
+		throw new UnsupportedOperationException();
+	}
 	
 	@Override
 	public byte getTag() {

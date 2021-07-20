@@ -1,7 +1,5 @@
 package convex.core.lang;
 
-import java.util.concurrent.ExecutionException;
-
 import convex.core.data.ACell;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
@@ -31,7 +29,6 @@ public abstract class AOp<T extends ACell> extends ACell {
 	 * @param context
 	 * @return The updated Context after executing this operation
 	 * 
-	 * @throws ExecutionException
 	 */
 	public abstract <I extends ACell> Context<T> execute(Context<I> context);
 

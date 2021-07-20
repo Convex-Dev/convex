@@ -274,7 +274,7 @@ public class RT {
 	/**
 	 * Computes the result of a pow operation. Returns null if a cast fails.
 	 * @param args
-	 * @return
+	 * @return Result of exponentiation
 	 */
 	public static CVMDouble pow(ACell[] args) {
 		CVMDouble a = ensureDouble(args[0]);
@@ -335,7 +335,7 @@ public class RT {
 	 * Gets the absolute value of a numeric value. Supports double and long.
 	 * 
 	 * @param a Numeric CVM value
-	 * @return
+	 * @return Absolute value, or null if not a numeric value
 	 */
 	public static APrimitive abs(ACell a) {
 		INumeric x=RT.ensureNumber(a);

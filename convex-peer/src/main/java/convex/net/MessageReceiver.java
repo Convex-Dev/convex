@@ -57,7 +57,7 @@ public class MessageReceiver {
 
 	/**
 	 * Get the number of messages received in total by this Receiver
-	 * @return
+	 * @return Count of messages received
 	 */
 	public long getReceivedCount() {
 		return receivedMessageCount;

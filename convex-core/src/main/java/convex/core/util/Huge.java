@@ -23,7 +23,7 @@ public class Huge {
 	/**
 	 * Creates a new Huge by sign extending a long to 128 bits
 	 * @param a Any signed 64-bit long value
-	 * @return
+	 * @return New Huge instance
 	 */
 	public static Huge create(long a) {
 		return new Huge((a>=0)?0:-1,a);
@@ -33,7 +33,7 @@ public class Huge {
 	 * Creates a new Huge by multiplying two signed longs
 	 * @param a Any signed 64-bit long value
 	 * @param b Any signed 64-bit long value
-	 * @return
+	 * @return Huge product of arguments
 	 */
 	public static Huge multiply(long a, long b) {
 		long hi=Math.multiplyHigh(a, b);
@@ -44,7 +44,7 @@ public class Huge {
 	 * Creates a new Huge by multiplying a Huge with a signed long
 	 * @param a Any signed 128-bit Huge value
 	 * @param b Any signed 64-bit long value
-	 * @return
+	 * @return Huge product of arguments
 	 */
 	public static Huge multiply(Huge a, long b) {
 		long carry=Math.multiplyHigh(a.lo, b);
@@ -55,7 +55,7 @@ public class Huge {
 	 * Creates a Huge by adding two signed longs
 	 * @param a Any signed 64-bit long value
 	 * @param b Any signed 64-bit long value
-	 * @return
+	 * @return Huge sum of arguments
 	 */
 	public static Huge add(long a, long b) {
 		long carry = UMath.unsignedAddCarry(a,b);
@@ -66,7 +66,7 @@ public class Huge {
 	/**
 	 * Creates a Huge by adding a long value to this Huge
 	 * @param b Any signed 64-bit long value
-	 * @return
+	 * @return Huge sum of arguments
 	 */
 	public Huge add(long b) {
 		long carry = UMath.unsignedAddCarry(lo,b);
@@ -90,7 +90,7 @@ public class Huge {
 	/**
 	 * Creates a Huge by adding another Huge
 	 * @param b Any Huge value
-	 * @return
+	 * @return Huge sum of arguments
 	 */
 	public Huge add(Huge b) {
 		long carry = UMath.unsignedAddCarry(lo,b.lo);
@@ -123,7 +123,7 @@ public class Huge {
 
 	/**
 	 * Negates this Huge value
-	 * @return
+	 * @return Huge negation of this value
 	 */
 	public Huge negate() {
 		return new Huge(-hi-((lo!=0L)?1L:0L),-lo);

@@ -12,8 +12,8 @@ import convex.core.util.Utils;
  * 
  * Ref makes use of a soft reference to values, allowing memory to be reclaimed
  * by the garbage collector when not required. A MissingDataException will occur
- * with any attempt to deference the {@link this} when this value is not present
- * and not persisted in the current store.
+ * with any attempt to deference this Ref when the value is not present
+ * and not stored in the current store.
  * 
  * Instances of this class should usually be be STORED, otherwise data loss
  * may occur due to garbage collection. However UNKNOWN RefSoft may exist temporarily 

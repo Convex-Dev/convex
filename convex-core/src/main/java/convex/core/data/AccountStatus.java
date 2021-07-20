@@ -75,8 +75,7 @@ public class AccountStatus extends ARecord {
 	/**
 	 * Create a governance account.
 	 * 
-	 * @param sequence
-	 * @param balance
+	 * @param balance Balance for governance account
 	 * @return New governance AccountStatus
 	 */
 	public static AccountStatus createGovernance(long balance) {
