@@ -1,7 +1,9 @@
 package convex.cli.peer;
 
+import java.net.InetSocketAddress;
 
 import convex.core.data.AccountKey;
+import convex.core.util.Utils;
 
 public class SessionItem {
 
@@ -71,6 +73,15 @@ public class SessionItem {
 	 */
 	public String getHostname() {
 		return hostname;
+	}
+
+	public int getPort() {
+		InetSocketAddress address = Utils.toInetSocketAddress(hostname);
+		return address.getPort();
+	}
+
+	public InetSocketAddress getHostAddress() {
+		return Utils.toInetSocketAddress(hostname);
 	}
 
 	/**
