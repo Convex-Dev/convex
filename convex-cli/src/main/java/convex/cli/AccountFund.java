@@ -72,7 +72,7 @@ public class AccountFund implements Runnable {
 		try {
 			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
 		} catch (Error e) {
-			log.error(e.getMessage());
+			mainParent.showError(e);
 			return;
 		}
 
@@ -84,16 +84,13 @@ public class AccountFund implements Runnable {
 		Convex convex = null;
 		Address address = Address.create(addressNumber);
 		try {
-			convex = mainParent.connectToSessionPeer(hostname, port, Main.initConfig.getUserAddress(0), Main.initConfig.getUserKeyPair(0));
+			convex = mainParent.connectAsPeer(0);
 			convex.transferSync(address, amount);
 			convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
 			Long balance = convex.getBalance(address);
-			log.info("account balance: {}", balance);
+			mainParent.output.setField("Balance", balance);
 		} catch (Throwable t) {
-			log.error(t.getMessage());
-			// t.printStackTrace();
-			return;
+			mainParent.showError(t);
 		}
-
 	}
 }

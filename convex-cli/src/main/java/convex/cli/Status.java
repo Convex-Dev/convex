@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 import convex.api.Convex;
+import convex.cli.peer.SessionItem;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.data.ABlob;
@@ -50,13 +51,18 @@ public class Status implements Runnable {
 		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
 	private String hostname;
 
+	@Option(names={"-t", "--timeout"},
+		description="Timeout in miliseconds.")
+	private long timeout = Constants.DEFAULT_TIMEOUT_MILLIS;
+
 	@SuppressWarnings("unchecked")
 	@Override
 	public void run() {
 
 		if (port == 0) {
 			try {
-                port = Helpers.getSessionPort(mainParent.getSessionFilename());
+                SessionItem item = Helpers.getSessionItem(mainParent.getSessionFilename());
+				port = item.getPort();
 			} catch (IOException e) {
 				log.warn("Cannot load the session control file");
 			}
@@ -68,17 +74,16 @@ public class Status implements Runnable {
 
 		Convex convex = null;
 		try {
-			convex = mainParent.connectToSessionPeer(hostname, port, Main.initConfig.getUserAddress(0), Main.initConfig.getUserKeyPair(0));
+			convex = mainParent.connectAsPeer(0);
 		} catch (Throwable t) {
-			log.error(t.getMessage());
+			mainParent.showError(t);
 			return;
 		}
 
 		try {
-			Result result = convex.requestStatus().get(3000, TimeUnit.MILLISECONDS);
+			Result result = convex.requestStatus().get(timeout, TimeUnit.MILLISECONDS);
 			AVector<ACell> resultVector = (AVector<ACell>) result.getValue();
 			ABlob stateHash = (ABlob) resultVector.get(1);
-			System.out.println("State hash: " + stateHash.toString());
 			Hash hash = Hash.wrap(stateHash.getBytes());
 			AVector<ACell> stateWrapper = (AVector<ACell>) convex.acquire(hash, Stores.current()).get(3000,TimeUnit.MILLISECONDS);
 			State state = (State) stateWrapper.get(0);
@@ -87,16 +92,16 @@ public class Status implements Runnable {
 			AVector<AccountStatus> accountList = state.getAccounts();
 			BlobMap<AccountKey, PeerStatus> peerList = state.getPeers();
 
-			System.out.println("State hash: " + stateHash.toString());
-			System.out.println("Timestamp: " + state.getTimeStamp());
-			System.out.println("Timestamp: " + Text.dateFormat(state.getTimeStamp().longValue()));
-			System.out.println("Global Fees: " + Text.toFriendlyBalance(state.getGlobalFees().longValue()));
-			System.out.println("Juice Price: " + Text.toFriendlyBalance(state.getJuicePrice().longValue()));
-			System.out.println("Total Funds: " + Text.toFriendlyBalance(state.computeTotalFunds()));
-			System.out.println("Number of accounts: " + accountList.size());
-			System.out.println("Number of peers: " + peerList.size());
+			mainParent.output.setField("State hash", stateHash.toString());
+			mainParent.output.setField("Timestamp",state.getTimeStamp().toString());
+			mainParent.output.setField("Timestamp value", Text.dateFormat(state.getTimeStamp().longValue()));
+			mainParent.output.setField("Global Fees", Text.toFriendlyBalance(state.getGlobalFees().longValue()));
+			mainParent.output.setField("Juice Price", Text.toFriendlyBalance(state.getJuicePrice().longValue()));
+			mainParent.output.setField("Total Funds", Text.toFriendlyBalance(state.computeTotalFunds()));
+			mainParent.output.setField("Number of accounts", accountList.size());
+			mainParent.output.setField("Number of peers", peerList.size());
 		} catch (Throwable t) {
-			log.error("Not possible to get status information: {}", t);
+			mainParent.showError(t);
 		}
 	}
 

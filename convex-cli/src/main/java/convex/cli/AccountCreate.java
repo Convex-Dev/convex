@@ -66,11 +66,11 @@ public class AccountCreate implements Runnable {
 
 		AKeyPair keyPair = null;
 
-		if (keystoreIndex > 0 || keystorePublicKey != null) {
+		if (keystoreIndex > 0 || !keystorePublicKey.isEmpty()) {
 			try {
 				keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
 			} catch (Error e) {
-				log.error(e.getMessage());
+				mainParent.showError(e);
 				return;
 			}
 			if (keyPair == null) {
@@ -82,10 +82,10 @@ public class AccountCreate implements Runnable {
 			try {
 				List<AKeyPair> keyPairList = mainParent.generateKeyPairs(1);
 				keyPair = keyPairList.get(0);
-				System.out.println("generated public key: " + keyPair.getAccountKey().toHexString());
+				mainParent.output.setField("Public Key", keyPair.getAccountKey().toHexString());
 			}
 			catch (Error e) {
-				log.error("failed to create key pair {}", e);
+				mainParent.showError(e);
 				return;
 			}
 		}
@@ -93,22 +93,17 @@ public class AccountCreate implements Runnable {
 		Convex convex = null;
 		try {
 
-			convex = mainParent.connectToSessionPeer(
-				hostname,
-				port,
-				Main.initConfig.getUserAddress(0),
-				Main.initConfig.getUserKeyPair(0));
+			convex = mainParent.connectAsPeer(0);
 
 			Address address = convex.createAccount(keyPair.getAccountKey());
-
-			log.info("account address: " + address);
+			mainParent.output.setField("Address", address.longValue());
 			if (isFund) {
 				convex.transferSync(address, Constants.ACCOUNT_FUND_AMOUNT);
 				convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
 				Long balance = convex.getBalance(address);
-				log.info("account balance: " + balance);
+				mainParent.output.setField("Balance", balance);
 			}
-			log.info(
+			mainParent.output.setField("Account usage",
 				String.format(
 					"to use this key can use the options --address=%d --public-key=%s",
 					address.toLong(),
@@ -116,8 +111,7 @@ public class AccountCreate implements Runnable {
 				)
 			);
 		} catch (Throwable t) {
-			log.error(t.getMessage());
-			return;
+			mainParent.showError(t);
 		}
 	}
 }
