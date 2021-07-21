@@ -20,7 +20,6 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 import convex.core.Constants;
 import convex.core.Result;
 import convex.core.data.ACell;
@@ -81,7 +80,6 @@ public class Connection {
 
 	private static final Logger log = LoggerFactory.getLogger(Connection.class.getName());
 
-
 	/**
 	 * Pre-allocated direct buffer for message sending TODO: is one per connection
 	 * OK? Users should synchronise on this briefly while building message.
@@ -105,18 +103,15 @@ public class Connection {
 	 * connection initialisation: channel should already be connected.
 	 *
 	 * @param channel
-	 * @param receiveAction     Consumer to be called when a Message is received
-	 * @param store             Store to use when receiving messages.
-	 * @param trustedPeerKey    Trusted peer account key if this is a trusted conneciton, if not then null*
+	 * @param receiveAction  Consumer to be called when a Message is received
+	 * @param store          Store to use when receiving messages.
+	 * @param trustedPeerKey Trusted peer account key if this is a trusted
+	 *                       conneciton, if not then null*
 	 * @return New Connection instance
 	 * @throws IOException
 	 */
-	public static Connection create(
-		ByteChannel channel,
-		Consumer<Message> receiveAction,
-		AStore store,
-		AccountKey trustedPeerKey
-	) throws IOException {
+	public static Connection create(ByteChannel channel, Consumer<Message> receiveAction, AStore store,
+			AccountKey trustedPeerKey) throws IOException {
 		return new Connection(channel, receiveAction, store, trustedPeerKey);
 	}
 
@@ -128,44 +123,42 @@ public class Connection {
 	 *                      messages on this connection
 	 * @param store         Store to use for this Connection
 	 * @return New Connection instance
-	 * @throws IOException If connection fails because of any IO problem
-	 * @throws TimeoutException If connection cannot be established within an acceptable time (~5s)
+	 * @throws IOException      If connection fails because of any IO problem
+	 * @throws TimeoutException If connection cannot be established within an
+	 *                          acceptable time (~5s)
 	 */
-	public static Connection connect(
-		InetSocketAddress hostAddress,
-		Consumer<Message> receiveAction,
-		AStore store
-	) throws IOException, TimeoutException {
+	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store)
+			throws IOException, TimeoutException {
 		return connect(hostAddress, receiveAction, store, null);
 	}
 
 	/**
 	 * Create a PeerConnection by connecting to a remote address
 	 *
-	 * @param hostAddress       Internet Address to connect to
-	 * @param receiveAction     A callback Consumer to be called for any received
-	 *                          messages on this connection
-	 * @param store             Store to use for this Connection
-	 * @param trustedPeerKey    Trusted peer account key if this is a trusted conneciton, if not then null
+	 * @param hostAddress    Internet Address to connect to
+	 * @param receiveAction  A callback Consumer to be called for any received
+	 *                       messages on this connection
+	 * @param store          Store to use for this Connection
+	 * @param trustedPeerKey Trusted peer account key if this is a trusted
+	 *                       connection, if not then null
 	 * @return New Connection instance
-	 * @throws IOException If connection fails because of any IO problem
-	 * @throws TimeoutException If the connection cannot be established within the timeout period
+	 * @throws IOException      If connection fails because of any IO problem
+	 * @throws TimeoutException If the connection cannot be established within the
+	 *                          timeout period
 	 */
-	public static Connection connect(
-		InetSocketAddress hostAddress,
-		Consumer<Message> receiveAction,
-		AStore store,
-		AccountKey trustedPeerKey
-	) throws IOException, TimeoutException {
-		if (store == null) throw new Error("Connection requires a store");
+	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store,
+			AccountKey trustedPeerKey) throws IOException, TimeoutException {
+		if (store == null)
+			throw new Error("Connection requires a store");
 		SocketChannel clientChannel = SocketChannel.open();
 		clientChannel.configureBlocking(false);
 		clientChannel.connect(hostAddress);
 
-		long start=Utils.getCurrentTimestamp();
+		long start = Utils.getCurrentTimestamp();
 		while (!clientChannel.finishConnect()) {
-			long now=Utils.getCurrentTimestamp();
-			if (now>start+Constants.DEFAULT_CLIENT_TIMEOUT) throw new TimeoutException("Couldn't connect");
+			long now = Utils.getCurrentTimestamp();
+			if (now > start + Constants.DEFAULT_CLIENT_TIMEOUT)
+				throw new TimeoutException("Couldn't connect");
 			try {
 				Thread.sleep(100);
 			} catch (InterruptedException e) {
@@ -173,7 +166,7 @@ public class Connection {
 			}
 		}
 		// clientChannel.setOption(StandardSocketOptions.SO_KEEPALIVE,true);
-		clientChannel.setOption(StandardSocketOptions.TCP_NODELAY,true);
+		clientChannel.setOption(StandardSocketOptions.TCP_NODELAY, true);
 
 		Connection pc = create(clientChannel, receiveAction, store, trustedPeerKey);
 		pc.startClientListening();
@@ -192,7 +185,8 @@ public class Connection {
 	 * @return An InetSocketAddress if associated, otherwise null
 	 */
 	public InetSocketAddress getRemoteAddress() {
-		if (!(channel instanceof SocketChannel)) return null;
+		if (!(channel instanceof SocketChannel))
+			return null;
 		try {
 			return (InetSocketAddress) ((SocketChannel) channel).getRemoteAddress();
 		} catch (Exception e) {
@@ -208,7 +202,8 @@ public class Connection {
 	 * @return A SocketAddress if associated, otherwise null
 	 */
 	public InetSocketAddress getLocalAddress() {
-		if (!(channel instanceof SocketChannel)) return null;
+		if (!(channel instanceof SocketChannel))
+			return null;
 		try {
 			return (InetSocketAddress) ((SocketChannel) channel).getLocalAddress();
 		} catch (Exception e) {
@@ -226,7 +221,7 @@ public class Connection {
 	 * @throws IOException
 	 */
 	public boolean sendData(ACell value) throws IOException {
-		log.trace("Sending data: {}",value);
+		log.trace("Sending data: {}", value);
 		ByteBuffer buf = Format.encodedBuffer(value);
 		return sendBuffer(MessageType.DATA, buf);
 	}
@@ -239,7 +234,7 @@ public class Connection {
 	 * @throws IOException
 	 */
 	public boolean sendMissingData(Hash value) throws IOException {
-		log.trace("Requested missing data for hash {} with store {}", value.toHexString() , Stores.current());
+		log.trace("Requested missing data for hash {} with store {}", value.toHexString(), Stores.current());
 		return sendObject(MessageType.MISSING_DATA, value);
 	}
 
@@ -268,7 +263,7 @@ public class Connection {
 			long id = ++idCounter;
 			AVector<ACell> v = Vectors.of(id, form, address);
 			boolean sent = sendObject(MessageType.QUERY, v);
-			return sent?id:-1;
+			return sent ? id : -1;
 		} finally {
 			Stores.setCurrent(temp);
 		}
@@ -379,7 +374,7 @@ public class Connection {
 	 * @param value     Any data object
 	 * @param errorCode Error code for this result. May be null to indicate success
 	 * @return True if buffered for sending successfully, false otherwise
-	 * @throws IOException
+	 * @throws IOException In case of IO Error
 	 */
 	public boolean sendResult(CVMLong id, ACell value, ACell errorCode) throws IOException {
 		Result result = Result.create(id, value, errorCode);
@@ -404,7 +399,8 @@ public class Connection {
 	private final IRefFunction sendAll = (r -> {
 		// TODO: halt conditions to prevent sending the whole universe
 		ACell o = r.getValue();
-		if (o == null) return r;
+		if (o == null)
+			return r;
 
 		// send children first
 		o.updateRefs(sender());
@@ -459,8 +455,8 @@ public class Connection {
 
 		ByteBuffer buf = Format.encodedBuffer(sendVal);
 		if (log.isTraceEnabled()) {
-			log.trace("Sending message: " + type + " :: " + payload + " to " + getRemoteAddress()
-			+ " format: " + Format.encodedBlob(payload).toHexString());
+			log.trace("Sending message: " + type + " :: " + payload + " to " + getRemoteAddress() + " format: "
+					+ Format.encodedBlob(payload).toHexString());
 		}
 		boolean sent = sendBuffer(type, buf);
 		return sent;
@@ -514,13 +510,13 @@ public class Connection {
 			}
 
 			if (log.isTraceEnabled()) {
-				log.trace( "Sent message " + type + " of length: " + dataLength + " Connection ID: "
+				log.trace("Sent message " + type + " of length: " + dataLength + " Connection ID: "
 						+ System.identityHashCode(this));
 			}
 		} else {
 			if (log.isTraceEnabled()) {
-				log.trace( "Failed to send message " + type + " of length: " + dataLength
-						+ " Connection ID: " + System.identityHashCode(this));
+				log.trace("Failed to send message " + type + " of length: " + dataLength + " Connection ID: "
+						+ System.identityHashCode(this));
 			}
 		}
 		return sent;
@@ -646,17 +642,18 @@ public class Connection {
 	 */
 	protected static void selectRead(SelectionKey key) throws IOException {
 		Connection conn = (Connection) key.attachment();
-		if (conn == null) throw new Error("No PeerConnection specified");
+		if (conn == null)
+			throw new Error("No PeerConnection specified");
 
 		try {
 			int n = conn.handleChannelRecieve();
 			// log.finest("Received bytes: " + n);
 		} catch (ClosedChannelException e) {
-			log.debug("Channel closed from: {}",conn.getRemoteAddress());
+			log.debug("Channel closed from: {}", conn.getRemoteAddress());
 			key.cancel();
 		} catch (BadFormatException e) {
-			log.warn("Cancelled connection to Peer: Bad data format from: "
-					+ conn.getRemoteAddress() + " " + e.getMessage());
+			log.warn("Cancelled connection to Peer: Bad data format from: " + conn.getRemoteAddress() + " "
+					+ e.getMessage());
 			key.cancel();
 		}
 	}

@@ -195,8 +195,8 @@ public class State extends ARecord {
 	/**
 	 * Reads a State from a ByteBuffer encoding. Assumes tag byte already read.
 	 *
-	 * @param bb
-	 * @return The State read
+	 * @param bb ByteBuffer to decode from
+	 * @return The State decoded
 	 * @throws BadFormatException If a State could not be read
 	 */
 	public static State read(ByteBuffer bb) throws BadFormatException {

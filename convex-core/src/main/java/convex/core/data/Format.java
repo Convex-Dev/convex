@@ -604,12 +604,12 @@ public class Format {
 	}
 
 	/**
-	 * Reads a single object from a Blob. Assumes the presence of an object tag.
+	 * Decodes a single Value from a Blob. Assumes the presence of a tag.
 	 * throws an exception if the Blob contents are not fully consumed
 	 * 
-	 * @param blob
+	 * @param blob Blob representing the Encoding of the Value
 	 * @return Value read from the blob of encoded data
-	 * @throws BadFormatException
+	 * @throws BadFormatException In case of encoding error
 	 */
 	public static <T extends ACell> T read(Blob blob) throws BadFormatException {
 		byte tag = blob.byteAt(0);
@@ -674,12 +674,12 @@ public class Format {
 	}
 
 	/**
-	 * Reads a basic type (primitives and numerics) with the given tag
+	 * Reads a Record with the given tag
 	 * 
 	 * @param bb ByteBuffer to read from
 	 * @param tag Tag byte indicating type to read
 	 * @return Record value read
-	 * @throws BadFormatException
+	 * @throws BadFormatException In case of a bad record encoding
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T readRecord(ByteBuffer bb, byte tag) throws BadFormatException {
