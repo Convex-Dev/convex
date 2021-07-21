@@ -1,16 +1,7 @@
 package convex.cli;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import java.io.PrintWriter;
-import java.io.StringWriter;
-
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import org.junit.jupiter.api.Test;
-
-import picocli.CommandLine;
 
 public class Helper {
 
@@ -25,7 +16,5 @@ public class Helper {
 		assertEquals(returnCode, tester.getResult());
 		tester.assertOutputMatch(patternText);
 	}
-
-
 }
 

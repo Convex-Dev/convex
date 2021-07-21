@@ -50,7 +50,10 @@ public class KeyGenerate implements Runnable {
 		try {
 			List<AKeyPair> keyPairList = mainParent.generateKeyPairs(count);
 			for ( int index = 0; index < keyPairList.size(); index ++) {
-				System.out.println("generated #"+(index+1)+" public key: " + keyPairList.get(index).getAccountKey().toHexString());
+                String publicKeyHexString =  keyPairList.get(index).getAccountKey().toHexString();
+				mainParent.output.setField("Index", String.format("%5d", index));
+				mainParent.output.setField("Public Key", publicKeyHexString);
+				mainParent.output.addRow();
 			}
 		} catch (Error e) {
 			mainParent.showError(e);

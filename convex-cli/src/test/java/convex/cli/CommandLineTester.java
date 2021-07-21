@@ -28,12 +28,13 @@ public class CommandLineTester {
 		CommandLine commandLine = new CommandLine(mainApp);
 
 		commandLine.setOut(printWriter);
+
 		this.result = commandLine.execute(args);
+		mainApp.output.writeToStream(printWriter);
 		this.output = new String(outputWriter.toString());
 	}
 
 	public void assertOutputMatch(String patternText) {
-		System.out.println("output " + output);
 		Pattern regex = Pattern.compile(patternText, Pattern.MULTILINE + Pattern.DOTALL);
 		Matcher matcher = regex.matcher(output);
 
@@ -41,7 +42,7 @@ public class CommandLineTester {
 			"\nMatch: '" + patternText + "'" +
 			"\nOutput: '" + output.substring(0, Math.min(132, output.length())) + "'" +
 			"\n";
-		assertEquals(true, matcher.matches(),  assertText);
+		assertEquals(true, matcher.find(),  assertText);
 	}
 
 
