@@ -1,0 +1,253 @@
+(do
+  ;; Asset Abstraction library
+  ;;
+  ;; deploy with: (deploy-once asset-code)
+  ;;
+  ;; import with (import convex.asset :as asset)
+  ;;
+  ;; An asset is described by either:
+  ;; - a Long (indicating a quantity of convex coins), or
+  ;; - [asset-address quantity] vector, indicating an asset managed by an Actor 
+  ;; - A {asset-address quantity} map, indicating assets owned managed by zero or more Actors
+  ;;
+  ;; In each case quantities of an asset are are interpreted
+  ;; in an asset-specific manner. For example, for fungible currencies, quantity is the amount,
+  ;; whereas for non-fungible-tokens, quantity may be represented as a set of token ids.
+  ;;
+  ;; Key usage:
+  ;;   (asset/transfer receiver asset data)
+  ;;   (asset/owns? owner asset)
+  ;;   (asset/balance asset-address owner)
+  ;;
+  ;; transfer for assets other than convex is implemented in terms of an offer/accept model.
+  ;; In some instances, it may be useful to call these functions separately:
+  ;;
+  ;;   (asset/offer receiver asset)  ;; called by the sender
+  ;;   (asset/accept receiver asset) ;; called by the receiver
+  ;;
+  ;;   (asset/get-offer asset-address sender receiver)
+  ;;        Gets current offer between sender and receiver
+  ;;   
+  ;;   (asset/check-transfer sender receiver asset)
+  ;;        Checks whether sender has permission to transfer asset to receiver.
+  ;;        Returns failure message if there is a restriction, nil if there is no restriction.
+  ;;
+  ;; In order to implement a new asset type that can be used by this library, you must write the
+  ;; following functions in your asset contract:
+  ;;   (check-transfer sender receiver quantity)
+  ;;   (direct-transfer receiver quantity)
+  ;;   (offer receiver quantity)
+  ;;   (accept sender quantity)
+  ;;   (get-offer sender receiver)
+  ;;   (owns? owner quantity)
+  ;;   (balance owner)
+  
+  (import convex.core :as core)
+  (call *registry* (register {:name "Asset Abstraction Library"}))
+  
+  (defn transfer
+    ^{:doc {:description "Transfers asset to receiver. Data is an arbitrary value, which will be passed to the receiver's receive-asset method.",
+            :examples [{:code "(transfer receiver [fungible-token-address 1000])"}
+                       {:code "(transfer receiver [non-fungible-token-address #{1 4 6}] optional-data)"}]
+            :type :function
+            :signature [{:params [receiver asset]}
+                        {:params [receiver asset data]}]}}
+    ([receiver asset data]
+     (let [receiver (address receiver)]
+       (cond
+         (vector? asset)
+           (let [[asset-address quantity] asset
+                 asset-address (address asset-address)]
+             (cond
+               (exports? receiver 'receive-asset)
+               (do 
+                 (call asset-address (offer receiver quantity))
+                 (call receiver (receive-asset asset data))),
+             
+               (actor? receiver) (fail "Receiver does not have receive-asset function")          
+               (account? receiver) (call asset-address (direct-transfer receiver quantity))
+               :else (fail "Address cannot receive asset")))
+         (map? asset)
+           (reduce
+             (fn [rs entry]
+               (assoc rs (first entry) (transfer receiver entry data)))
+             {}
+             asset)
+         :else (fail "Invalid asset"))))
+    ([receiver asset]
+     (transfer receiver asset nil)))
+  
+  ;; For smart contract assets, you can offer and accept separately if you choose
+  (defn offer
+    ^{:doc {:description "Opens an offer of an asset to a receiver, which makes it possible for the receiver to 'accept' up to this quantity. May result in an error if the asset does not support open offers.",
+            :examples [{:code "(offer receiver [fungible-token-address 1000])"}
+                       {:code "(offer receiver [non-fungible-token-address #{1 4 6}])"}]
+            :type :function
+            :signature [{:params [receiver [asset-address quantity]]}]}}
+    [receiver asset]
+    (cond 
+      (vector? asset)
+      (let [asset-address (first asset)
+            quantity (second asset)]
+         (call asset-address (offer receiver quantity)))
+      
+      (map? asset)
+         (reduce 
+           (fn [m [asset-address quantity]]
+             (assoc m asset-address (call asset-address (offer receiver quantity))))
+           {}
+           asset))
+    )
+
+  (defn get-offer
+    ^{:doc {:description "Gets the current offer from sender to receiver for a given asset. Returns the quantity representing the current offer. Will be the 'zero' quantity if no open offer exists.",
+            :examples [{:code "(get-offer asset-address sender receiver)"}]
+            :type :function
+            :signature [{:params [asset-address sender receiver]}]}}
+    [asset-address sender receiver]
+    (query (call asset-address (get-offer (address sender) (address receiver)))))
+  
+  (defn accept
+    ^{:doc {:description "Accepts asset from sender. If asset argument contains multiple assets, accepts each in turn. MUST fail if the asset cannot be accepted.",
+            :examples [{:code "(accept sender [fungible-token-address 1000])"}]
+            :type :function
+            :signature [{:params [sender [asset-address quantity]]}]}}
+    [sender asset]
+    (cond 
+      (vector? asset)
+        (let [asset-address (first asset)
+              quantity (second asset)]
+           (call asset-address (accept sender quantity)))
+    
+      (map? asset)
+        (reduce 
+           (fn [m [asset-address quantity]]
+             (assoc m asset-address (call asset-address (accept sender quantity))))
+           {}
+           asset)
+      )
+    )
+  
+  ;; Also, independently of general transfer, you can test whether there are restrictions on transferring
+  (defn check-transfer
+    ^{:doc {:description "Checks whether sender can transfer this asset to receiver. Returns a descriptive failure message if there is a restriction prohibiting transfer, or nil if there is no restriction.",
+            :examples [{:code "(check-transfer sender receiver [fungible-token-address 1000])"}
+                       {:code "(check-transfer sender receiver [non-fungible-token-address #{1 4 6}])"}]
+            :type :function
+            :signature [{:params [sender receiver [asset-address quantity]]}]}}
+    [sender receiver [asset-address quantity]]
+      (query (call (address asset-address) (check-transfer (address sender) (address receiver) quantity))))
+
+  (defn balance
+    ^{:doc {:description "Returns asset balance for a specified owner, or the current address if not supplied. Return value will be in the quantity format as specified by the asset type.",
+            :examples [{:code "(balance asset-address owner)"}]
+            :type :function
+            :signature [{:params [asset-address owner]}]}}
+    ([asset-address]
+      (query (call asset-address (balance *address*))))
+    ([asset-address owner]
+      (query (call asset-address (balance (address owner))))))
+  
+  (defn make-map
+    [a]
+    (cond 
+      (map? a) a
+      (vector? a) {(first a) (second a)}
+      (nil? a) {}))
+  
+  (defn quantity-add
+    ^{:doc {:description "Adds two asset quantities. Quantities must be specified in the format required by the asset type. nil may be used to indicate the 'zero' quantity.",
+            :examples [{:code "(quantity-add fungible-token 100 1000)"}
+                       {:code "(quantity-add non-fungible-token #{1 2} #{3 4})"}
+                       {:code "(quantity-add [token-a 100] [token-b 1000])"}]
+            :type :function
+            :signature [{:params [asset-address a b]}]}}
+    ([asset-a asset-b]
+      (let [asset-a (make-map asset-a)
+            asset-b (make-map asset-b)]
+        (reduce 
+          (fn [m [asset-address qb]]
+            (let [qa (get m asset-address)]
+              (assoc m asset-address (quantity-add asset-address qa qb))))
+          asset-a
+          asset-b)))
+    ([asset-address a b]
+      (query (call asset-address (quantity-add a b)))))
+  
+  (defn quantity-sub 
+    ^{:doc {:description "Subracts a quantity from another quantity for a given asset. Quantities must be specified in the format required by the asset type. Subtracting a larger amount from a smaller amount should return 'zero' or equivalent, although the exact meaning of this operation may be asset-specific. nil may be used to indicate the 'zero' quantity in inputs.",
+            :examples [{:code "(quantity-sub fungible-token 500 300)"}
+                       {:code "(quantity-sub non-fungible-token #{1 2 3 4} #{2 3})"}]
+            :type :function
+            :signature [{:params [asset-address a b]}]}}
+    ([asset-a asset-b]
+      (let [asset-a (make-map asset-a)
+            asset-b (make-map asset-b)]
+        (reduce 
+          (fn [m [asset-address qb]]
+            (let [qa (get m asset-address)]
+              (if (= qa qb) 
+                (dissoc m asset-address) ;; allow removal without calcultion
+                (assoc m asset-address (quantity-sub asset-address qa qb)))
+                ))
+          asset-a
+          asset-b)))
+    ([asset-address a b]
+      (query (call asset-address (quantity-sub a b)))))
+  
+  (defn quantity-zero 
+    ^{:doc {:description "Returns the unique 'zero' quantity for the given asset.",
+            :examples [{:code "(quantity-zero fungible-token)" :result 0}
+                       {:code "(quantity-zero non-fungible-token)" :result #{}}]
+            :type :function
+            :signature [{:params [asset-address a b]}]}}
+    [asset-address]
+    (query (call asset-address (quantity-add nil nil))))
+  
+  (defn quantity-contains?
+    ^{:doc {:description "Returns true if the first quantity 'contains' the second quantity in its entirety. Any valid quantity must contain the 'zero' quantity.",
+            :examples [{:code "(quantity-contains? fungible-token 100 60)" :result true}
+                       {:code "(quantity-contains? non-fungible-token #{1 2} #{2 3})" :result false}]
+            :type :function
+            :signature [{:params [asset a b]}]}}
+    ([asset-a asset-b]
+      (query 
+	      (let [asset-a (make-map asset-a)
+	            asset-b (make-map asset-b)]
+	        (reduce 
+	          (fn [m [asset-address qb]]
+	            (let [qa (get asset-a asset-address)]
+	              (cond 
+                  (= qa qb) true ;; always OK
+	                (call asset-address (quantity-subset? qb qa)) true 
+                  (reduced false))))
+	          true
+	          asset-b))))
+    ([asset-address a b]
+      (query (call asset-address (quantity-subset? b a)))))
+  
+  (defn owns?
+    ^{:doc {:description "Tests whether owner owns at least a given quantity of an asset",
+            :examples [{:code "(owns? owner [fungible-token-address 1000])"}
+                       {:code "(owns? owner [non-fungible-token-address #{1 4 6}])"}]
+            :type :function
+            :signature [{:params [owner asset]}]}}
+    [owner asset]
+    (query 
+      (cond
+        (vector? asset)
+          (let [[asset-address quantity] asset
+                   bal (call asset-address (balance owner))]
+            (call asset-address (quantity-subset? quantity bal)))
+          
+          (map? asset) 
+            (reduce 
+              (fn [result [asset-address quantity]]
+                (if (call asset-address (quantity-subset? quantity (call asset-address (balance owner)))) true (reduced false)))
+              true
+             asset)
+        
+        ;; interpret nil as the 'zero' asset, which everybody owns
+        (nil? asset) true)))
+  
+  )
