@@ -38,6 +38,12 @@ public class BlockResult extends ARecord {
 		this.results = results;
 	}
 
+	/**
+	 * Create a BlockResult
+	 * @param state Resulting State
+	 * @param results Results of transactions in Block
+	 * @return BlockResult instance
+	 */
 	public static BlockResult create(State state, Result[] results) {
 		int n=results.length;
 		Object[] rs=new Object[n];
@@ -47,14 +53,28 @@ public class BlockResult extends ARecord {
 		return new BlockResult(state, Vectors.of(rs));
 	}
 	
+	/**
+	 * Create a BlockResult
+	 * @param state Resulting State
+	 * @param results Results of transactions in Block
+	 * @return BlockResult instance
+	 */
 	public static BlockResult create(State state, AVector<Result> results) {
 		return new BlockResult(state, results);
 	}
 
+	/**
+	 * Get the State resulting from this Block.
+	 * @return State after Block is executed
+	 */
 	public State getState() {
 		return state;
 	}
 
+	/**
+	 * Gets the Results of all transactions in the Block
+	 * @return Vector of Results
+	 */
 	public AVector<Result> getResults() {
 		return results;
 	}
@@ -68,13 +88,18 @@ public class BlockResult extends ARecord {
 		return getResult(i).isError();
 	}
 
+	/**
+	 * Gets a specific Result
+	 * @param i Index of Result
+	 * @return Result at specified index for the current Block
+	 */
 	public Result getResult(long i) {
 		return results.get(i);
 	}
 
 	/**
 	 * Gets the error code for a given transaction
-	 * @param i
+	 * @param i Index of Result
 	 * @return Error code, or null if the transaction succeeded.
 	 */
 	public Object getErrorCode(long i) {

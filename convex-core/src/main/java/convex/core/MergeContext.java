@@ -29,6 +29,13 @@ public class MergeContext {
 		this.timestamp = mergeTimestamp;
 	}
 
+	/**
+	 * Create a MergeContext
+	 * @param kp Keypair
+	 * @param timestamp Timestamp
+	 * @param s Consensus State
+	 * @return New MergeContext instance
+	 */
 	public static MergeContext create(AKeyPair kp, long timestamp, State s) {
 		return new MergeContext(kp, timestamp, s);
 	}
@@ -42,18 +49,37 @@ public class MergeContext {
 		return publicKey;
 	}
 
+	/**
+	 * Sign a value using the keypair for this MergeContext
+	 * @param <T> Type of value
+	 * @param value Value to sign
+	 * @return Signed value
+	 */
 	public <T extends ACell> SignedData<T> sign(T value) {
 		return SignedData.create(keyPair, value);
 	}
 
+	/**
+	 * Gets the timestamp of this merge
+	 * @return Timestamp
+	 */
 	public long getTimeStamp() {
 		return timestamp;
 	}
 
+	/**
+	 * Updates the timestamp of this MergeContext
+	 * @param newTimestamp New timestamp
+	 * @return Updated MergeContext
+	 */
 	public MergeContext withTimestamp(long newTimestamp) {
 		return new MergeContext(keyPair, newTimestamp, state);
 	}
 
+	/**
+	 * Gets the Consensus State for this merge
+	 * @return Consensus State
+	 */
 	public State getConsensusState() {
 		return state;
 	}

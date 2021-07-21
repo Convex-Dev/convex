@@ -101,15 +101,15 @@ public class Block extends ARecord {
 	 * 
 	 * @param timestamp Timestamp for the newly created Block.
 	 * @param transactions A java.util.List instance containing the required transactions
-	 * @param peerAddress 
+	 * @param peerKey Peer Key of Peer producing Block
 	 * @return A new Block containing the specified signed transactions
 	 */
-	public static Block create(long timestamp, List<SignedData<ATransaction>> transactions, AccountKey peerAddress) {
-		return new Block(timestamp, Vectors.create(transactions),peerAddress);
+	public static Block create(long timestamp, List<SignedData<ATransaction>> transactions, AccountKey peerKey) {
+		return new Block(timestamp, Vectors.create(transactions),peerKey);
 	}
 
 	/**
-	 * Creates a block with the given transactions
+	 * Creates a block with the given transactions.
 	 * 
 	 * @param timestamp Timestamp of block creation, according to Peer
 	 * @param peerKey Public key of Peer producing Block
@@ -121,6 +121,14 @@ public class Block extends ARecord {
 		return new Block(timestamp, transactions,peerKey);
 	}
 
+	/**
+	 * Creates a block with the given transactions.
+	 * 
+	 * @param timestamp Timestamp of block creation, according to Peer
+	 * @param peerKey Public key of Peer producing Block
+	 * @param transactions Array of transactions to include in Block
+	 * @return New Block
+	 */
 	@SafeVarargs
 	public static Block of(long timestamp, AccountKey peerKey, SignedData<ATransaction>... transactions) {
 		return new Block(timestamp, Vectors.of((Object[])transactions),peerKey);

@@ -188,7 +188,8 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	 * 
 	 * Returns this if all values are identical.
 	 * 
-	 * @param newVals
+	 * @param newVals New values to replace current
+	 * @return Updated Record
 	 */
 	protected abstract ARecord updateAll(ACell[] newVals);
 	

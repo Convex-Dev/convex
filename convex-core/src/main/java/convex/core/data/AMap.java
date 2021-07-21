@@ -60,8 +60,8 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	/**
 	 * Associates the given key with the specified value.
 	 * 
-	 * @param key
-	 * @param value
+	 * @param key Map key to associate
+	 * @param value Map value
 	 * @return An updated map with the new association, or null if the association fails
 	 */
 	public abstract AMap<K,V> assoc(ACell key, ACell value);
@@ -98,7 +98,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 * directly looking up using the key for some map types, and should be preferred
 	 * if the caller already has a Ref available.
 	 * 
-	 * @param ref
+	 * @param ref Ref to Map key
 	 * @return MapEntry for the given key ref
 	 */
 	public abstract MapEntry<K, V> getKeyRefEntry(Ref<ACell> ref);
@@ -106,21 +106,21 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	/**
 	 * Accumulate all entries from this map in the given HashSet.
 	 * 
-	 * @param h
+	 * @param h HashSet in which to accumulate entries
 	 */
 	protected abstract void accumulateEntrySet(HashSet<Entry<K, V>> h);
 
 	/**
 	 * Accumulate all keys from this map in the given HashSet.
 	 * 
-	 * @param h
+	 * @param h HashSet in which to accumulate keys
 	 */
 	protected abstract void accumulateKeySet(HashSet<K> h);
 
 	/**
 	 * Accumulate all values from this map in the given ArrayList.
 	 * 
-	 * @param h
+	 * @param al ArrayList in which to accumulate values
 	 */
 	protected abstract void accumulateValues(ArrayList<V> al);
 
@@ -172,7 +172,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 * Gets the entry in this map at a specified index, according to the
 	 * map-specific order.
 	 * 
-	 * @param i
+	 * @param i Index of entry
 	 * @return MapEntry at the specified index.
 	 * @throws IndexOutOfBoundsException If this index is not valid
 	 */
@@ -191,7 +191,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	/**
 	 * Gets the MapEntry for the given key
 	 * 
-	 * @param k
+	 * @param k Key to lookup in Map
 	 * @return The map entry, or null if the key is not found
 	 */
 	public abstract MapEntry<K, V> getEntry(ACell k);
@@ -207,7 +207,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	/**
 	 * Gets the value at a specified key, or returns the fallback value if not found
 	 * 
-	 * @param key
+	 * @param key Key to lookup in Map
 	 * @param notFound Fallback value to return if key is not present
 	 * @return Value for the specified key, or the notFound value.
 	 */
@@ -264,7 +264,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	/**
 	 * Returns true if this map has exactly the same keys as the other map
 	 * 
-	 * @param map
+	 * @param map Map to compare with
 	 * @return true if maps have the same keys, false otherwise
 	 */
 	public abstract boolean equalsKeys(AMap<K, V> map);
@@ -284,7 +284,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 * Subclasses may override this this they have a more efficient equals
 	 * implementation or a more specific definition of equality.
 	 * 
-	 * @param a
+	 * @param a Map to compare with
 	 * @return true if maps are equal, false otherwise.
 	 */
 	public boolean equals(AMap<K, V> a) {
@@ -298,7 +298,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	/**
 	 * Gets the map entry with the specified hash
 	 * 
-	 * @param hash
+	 * @param hash Hash of key to lookup
 	 * @return The specified MapEntry, or null if not found.
 	 */
 	protected abstract MapEntry<K, V> getEntryByHash(Hash hash);
