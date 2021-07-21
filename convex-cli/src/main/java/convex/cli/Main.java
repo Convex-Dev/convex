@@ -1,7 +1,7 @@
 package convex.cli;
 
 import java.io.File;
-import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.security.KeyStore
 ;
 import java.util.ArrayList;
@@ -9,10 +9,14 @@ import java.util.Enumeration;
 import java.util.List;
 
 import convex.api.Convex;
+import convex.cli.peer.SessionItem;
+import convex.cli.output.Output;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
+import convex.core.data.AccountKey;
 import convex.core.data.Address;
-import convex.core.init.AInitConfig;
+import convex.core.init.Init;
+
 
 import ch.qos.logback.classic.Level;
 import org.slf4j.Logger;
@@ -54,7 +58,7 @@ public class Main implements Runnable {
 
 
 	private static CommandLine commandLine;
-    public static AInitConfig initConfig = AInitConfig.create();
+	public Output output = new Output();
 
 
 	@Option(names={ "-c", "--config"},
@@ -132,6 +136,8 @@ public class Main implements Runnable {
 		int result = 0;
 		try {
 			result = commandLine.execute(args);
+			output.writeToStream(System.out);
+
 		} catch (Throwable t) {
 			log.error("Error executing command line: {}",t.getMessage());
 			return 2;
@@ -239,20 +245,41 @@ public class Main implements Runnable {
 	}
 
 	public Convex connectToSessionPeer(String hostname, int port, Address address, AKeyPair keyPair) throws Error {
-		if (port == 0) {
-			try {
-				port = Helpers.getSessionPort(getSessionFilename());
-			} catch (IOException e) {
-				throw new Error("Cannot load the session control file");
+		SessionItem item;
+		Convex convex = null;
+		try {
+			if (port == 0) {
+				item = Helpers.getSessionItem(getSessionFilename());
+				if (item != null) {
+					port = item.getPort();
+				}
 			}
+			if (port == 0) {
+				throw new Error("Cannot find a local port or you have not set a valid port number");
+			}
+			InetSocketAddress host=new InetSocketAddress(hostname, port);
+			convex = Convex.connect(host, address, keyPair);
+		} catch (Throwable t) {
+			throw new Error("Cannot connect to a local peer " + t);
 		}
-		if (port == 0) {
-			throw new Error("Cannot find a local port or you have not set a valid port number");
-		}
+		return convex;
+	}
 
-		Convex convex = Helpers.connect(hostname, port, address, keyPair);
-		if (convex==null) {
-			throw new Error("Cannot connect to a peer");
+	public Convex connectAsPeer(int peerIndex) throws Error {
+		Convex convex = null;
+		try {
+			SessionItem item = Helpers.getSessionItem(getSessionFilename(), peerIndex);
+			AccountKey peerKey = item.getAccountKey();
+			log.debug("peer public-key {}", peerKey.toHexString());
+			AKeyPair keyPair = loadKeyFromStore(peerKey.toHexString(), 0);
+			log.debug("peer key pair {}", keyPair.getAccountKey().toHexString());
+			Address address = Address.create(Init.BASE_FIRST_ADDRESS.longValue() + peerIndex);
+			log.debug("peer address {}", address.longValue());
+			InetSocketAddress host = item.getHostAddress();
+			log.debug("connect to peer {}", host);
+			convex = Convex.connect(host, address, keyPair);
+		} catch (Throwable t) {
+			throw new Error("Cannot connect as a peer " + t);
 		}
 		return convex;
 	}
@@ -265,12 +292,12 @@ public class Main implements Runnable {
 		if (password == null) {
 			throw new Error("You need to provide a keystore password");
 		}
-        // get the key store file
+		// get the key store file
 		File keyFile = new File(getKeyStoreFilename());
 
 		KeyStore keyStore = null;
 		try {
-            // try to load the keystore file
+			// try to load the keystore file
 			if (keyFile.exists()) {
 				keyStore = PFXTools.loadStore(keyFile, password);
 			} else {
@@ -285,24 +312,31 @@ public class Main implements Runnable {
 		// we have now the count, keystore-password, keystore-file
 		// generate keys
 		for (int index = 0; index < count; index ++) {
-            AKeyPair keyPair = AKeyPair.generate();
+			AKeyPair keyPair = AKeyPair.generate();
 			keyPairList.add(keyPair);
 
 			// System.out.println("generated #"+(index+1)+" public key: " + keyPair.getAccountKey().toHexString());
 			try {
-                // save the key in the keystore
+				// save the key in the keystore
 				PFXTools.saveKey(keyStore, keyPair, password);
 			} catch (Throwable t) {
 				throw new Error("Cannot store the key to the key store "+t);
 			}
 		}
 
-        // save the keystore file
+		// save the keystore file
 		try {
 			PFXTools.saveStore(keyStore, keyFile, password);
 		} catch (Throwable t) {
 			throw new Error("Cannot save the key store file "+t);
 		}
 		return keyPairList;
-    }
+	}
+
+    void showError(Throwable t) {
+		log.error(t.getMessage());
+		if (verbose.length > 0) {
+			t.printStackTrace();
+		}
+	}
 }

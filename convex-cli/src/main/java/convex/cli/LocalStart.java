@@ -65,7 +65,7 @@ public class LocalStart implements Runnable {
 						keyPairList.add(keyPair);
 					}
 				} catch (Error e) {
-					log.error(e.getMessage());
+					mainParent.showError(e);
 					return;
 				}
 			}
@@ -83,7 +83,7 @@ public class LocalStart implements Runnable {
 							keyPairList.add(keyPair);
 						}
 					} catch (Error e) {
-						log.error(e.getMessage());
+						mainParent.showError(e);
 						return;
 					}
 				}

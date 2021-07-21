@@ -43,7 +43,7 @@ public class ServerInformation {
 		isSynced =  order != null && peer.getConsensusPoint() > 0;
 		networkID = peer.getNetworkID();
 		consensusPoint = peer.getConsensusPoint();
-        isJoined = connectionCount > 1;
+        isJoined = connectionCount > 0;
 		stateHash = peer.getConsensusState().getHash();
         beliefHash = peer.getBelief().getHash();
 		blockCount = 0;

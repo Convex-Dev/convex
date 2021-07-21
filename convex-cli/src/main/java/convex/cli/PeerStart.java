@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 
 import convex.cli.peer.PeerManager;
+import convex.cli.peer.SessionItem;
 import convex.core.Belief;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
@@ -76,7 +77,7 @@ public class PeerStart implements Runnable {
 		try {
 			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
 		} catch (Error e) {
-			log.error(e.getMessage());
+			mainParent.showError(e);
 			return;
 		}
 
@@ -95,8 +96,8 @@ public class PeerStart implements Runnable {
 		Address peerAddress = Address.create(addressNumber);
 
 		try {
-			// TODO remove the 0 index in this param after the peer belief bug is fixed
-			remotePeerHostname = Helpers.getSessionHostname(mainParent.getSessionFilename());
+			SessionItem item = Helpers.getSessionItem(mainParent.getSessionFilename());
+			remotePeerHostname = item.getHostname();
 		} catch (IOException e) {
 			log.warn("Cannot load the session control file");
 		}
@@ -118,8 +119,7 @@ public class PeerStart implements Runnable {
 			peerManager.launchPeer(keyPair, peerAddress, hostname, port, store, remotePeerHostname, signedBelief);
 			peerManager.showPeerEvents();
 		} catch (Throwable t) {
-			log.error("Unable to launch peer {}", t);
-			// t.printStackTrace();
+			mainParent.showError(t);
 		}
 	}
 }

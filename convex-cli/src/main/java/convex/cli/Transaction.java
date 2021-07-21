@@ -61,7 +61,7 @@ public class Transaction implements Runnable {
 
 	@Option(names={"-t", "--timeout"},
 		description="Timeout in miliseconds.")
-	private long timeout = 5000;
+	private long timeout = Constants.DEFAULT_TIMEOUT_MILLIS;
 
 	@Parameters(paramLabel="transactionCommand",
 		description="Transaction Command")
@@ -74,7 +74,7 @@ public class Transaction implements Runnable {
 		try {
 			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
 		} catch (Error e) {
-			log.error(e.getMessage());
+			mainParent.showError(e);
 			return;
 		}
 
@@ -93,16 +93,14 @@ public class Transaction implements Runnable {
 		Convex convex = null;
 		try {
 			convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
-			System.out.printf("Executing transaction: %s\n", transactionCommand);
+			log.info("Executing transaction: %s\n", transactionCommand);
 			ACell message = Reader.read(transactionCommand);
 			ATransaction transaction = Invoke.create(address, -1, message);
 
 			Result result = convex.transactSync(transaction, timeout);
-			System.out.println(result);
+			mainParent.output.setResult(result);
 		} catch (Throwable t) {
-			log.error(t.getMessage());
-			// t.printStackTrace();
-			return;
+			mainParent.showError(t);
 		}
 	}
 

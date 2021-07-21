@@ -46,7 +46,7 @@ public class Query implements Runnable {
 
 	@Option(names={"-t", "--timeout"},
 		description="Timeout in miliseconds.")
-	private long timeout = 5000;
+	private long timeout = Constants.DEFAULT_TIMEOUT_MILLIS;
 
 	@Option(names={"-a", "--address"},
 		description = "Address to make the query from. Default: First peer address.")
@@ -66,26 +66,16 @@ public class Query implements Runnable {
 		try {
 			convex = mainParent.connectToSessionPeer(hostname, port, Address.create(address), null);
 		} catch (Error e) {
-			log.error(e.getMessage());
+			mainParent.showError(e);
 			return;
 		}
 		try {
-			System.out.printf("Executing query: %s\n", queryCommand);
+			log.info("Executing query: %s\n", queryCommand);
 			ACell message = Reader.read(queryCommand);
 			Result result = convex.querySync(message, timeout);
-            if (result.isError()) {
-				log.error("Error code: {}", result.getErrorCode());
-				return;
-			}
-			ACell value = result.getValue();
-			System.out.println("Result: " + value.toString() + " type:" + value.getType().toString());
-		} catch (IOException e) {
-			log.error("Query Error: {}", e.getMessage());
-			// TODO Auto-generated catch block
-			// e.printStackTrace();
-			return;
-		}  catch (TimeoutException e) {
-			log.error("Query timeout");
+			mainParent.output.setResult(result);
+		} catch (IOException | TimeoutException e) {
+			mainParent.showError(e);
 		}
 	}
 
