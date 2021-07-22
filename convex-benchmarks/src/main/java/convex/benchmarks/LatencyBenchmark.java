@@ -1,6 +1,7 @@
 package  convex.benchmarks;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -12,10 +13,10 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 
 import convex.api.Convex;
+import convex.core.Coin;
 import convex.core.Result;
+import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
-import convex.core.data.Keywords;
-import convex.core.data.Maps;
 import convex.core.lang.ops.Constant;
 import convex.core.transactions.Invoke;
 import convex.peer.API;
@@ -26,21 +27,31 @@ import convex.peer.Server;
  */
 public class LatencyBenchmark {
 	
-	static final Address HERO=Benchmarks.HERO;
-	static final Address VILLAIN=Benchmarks.VILLAIN;
-
+	static Address HERO=null;
+	static Address VILLAIN=null;
+	static final AKeyPair[] KPS=new AKeyPair[] {AKeyPair.generate(),AKeyPair.generate()};
 
 	static Server server;
 	static Convex client;
 	static Convex client2;
+	static Convex peer;
 	static {
-		server=API.launchPeer(Maps.hashMapOf(
-				Keywords.STATE,Benchmarks.STATE,
-				Keywords.KEYPAIR,Benchmarks.HERO_KEYPAIR));
+		List<Server> servers=API.launchLocalPeers(Benchmarks.PEER_KEYPAIRS, Benchmarks.STATE, null);
+		server=servers.get(0);
 		try {
-			client=Convex.connect(server.getHostAddress(), HERO,Benchmarks.HERO_KEYPAIR);
-			client2=Convex.connect(server.getHostAddress(), VILLAIN,Benchmarks.VILLAIN_KEYPAIR);
+			Thread.sleep(1000);
+			peer=Convex.connect(server);
+			HERO=peer.createAccount(KPS[0].getAccountKey());
+			VILLAIN=peer.createAccount(KPS[1].getAccountKey());
+			peer.transfer(HERO, Coin.EMERALD);
+			peer.transfer(VILLAIN, Coin.EMERALD);
+			
+			client=Convex.connect(server.getHostAddress(), HERO,KPS[0]);
+			client2=Convex.connect(server.getHostAddress(), VILLAIN,KPS[1]);
 		} catch (IOException | TimeoutException e) {
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 
@@ -82,6 +93,10 @@ public class LatencyBenchmark {
 			rs[i]=f;
 		}
 		CompletableFuture.allOf(rs).get(1000,TimeUnit.MILLISECONDS);
+		Result r0=rs[0].get();
+		if (r0.isError()) {
+			throw new Error("Transaction failed: "+r0);
+		}
 	}
 
 	@Benchmark

@@ -74,6 +74,11 @@ public class NIOServer implements Closeable {
 			address=(InetSocketAddress) ssc.getLocalAddress();
 			ssc.configureBlocking(false);
 			port=ssc.socket().getLocalPort();
+			
+			// Register for accept. Do this before selection loop starts and
+			// before we return from launch!
+			selector = Selector.open();
+			ssc.register(selector, SelectionKey.OP_ACCEPT);
 
 			// set running status now, so that loops don't terminate
 			running=true;
@@ -98,9 +103,6 @@ public class NIOServer implements Closeable {
 			// Use the store configured for the owning server.
 			Stores.setCurrent(server.getStore());
 			try {
-				selector = Selector.open();
-
-				ssc.register(selector, SelectionKey.OP_ACCEPT);
 
 				while (running) {
 					selector.select(1000);
