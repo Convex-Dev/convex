@@ -1,7 +1,7 @@
 package convex.core.crypto;
 
 import java.io.IOException;
-import java.security.InvalidKeyException;
+import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -36,6 +36,7 @@ public class Ed25519KeyPair extends AKeyPair {
 
 	private final AccountKey publicKey;
 	private final KeyPair keyPair;
+	private byte[] privateKeyBytes;
 	
 	private static final String ED25519 = "Ed25519";
 
@@ -255,15 +256,41 @@ public class Ed25519KeyPair extends AKeyPair {
 
 	@Override
 	public ASignature sign(Hash hash) {
+//		byte[] signature=new byte[Ed25519Signature.SIGNATURE_LENGTH];
+//		if (Providers.SODIUM_SIGN.cryptoSignDetached(
+//				signature, 
+//				hash.getBytes(),
+//				Hash.LENGTH,
+//				getPrivateKeyBytes())) {;
+//				return Ed25519Signature.wrap(signature);
+//		} else {
+//			throw new Error("Signing failed!");
+//		}
+		
 		try {
 			Signature signer = Signature.getInstance(ED25519);
 			signer.initSign(getPrivate());
 			signer.update(hash.getInternalArray(), hash.getInternalOffset(), Hash.LENGTH);
 			byte[] signature = signer.sign();
 			return Ed25519Signature.wrap(signature);
-		} catch (SignatureException | NoSuchAlgorithmException | InvalidKeyException e) {
+		} catch (GeneralSecurityException e) {
 			throw new Error(e);
 		}
+	}
+
+	/**
+	 * Secret key bytes for LazySodium
+	 * @return
+	 */
+	private byte[] getPrivateKeyBytes() {
+		if (privateKeyBytes==null) {
+			privateKeyBytes=new byte[64]; // private key|public key
+			Blob enc=getEncodedPrivateKey();
+			long n=enc.count();
+			enc.slice(n-32,32).getBytes(privateKeyBytes,0);
+			getAccountKey().getBytes(privateKeyBytes,32);
+		}
+		return privateKeyBytes;
 	}
 
 	@Override
