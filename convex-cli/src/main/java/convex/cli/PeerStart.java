@@ -2,12 +2,15 @@ package convex.cli;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 import convex.cli.peer.PeerManager;
 import convex.cli.peer.SessionItem;
 import convex.core.Belief;
+import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
+import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
@@ -69,7 +72,7 @@ public class PeerStart implements Runnable {
 	public void run() {
 
 		Main mainParent = peerParent.mainParent;
-		PeerManager peerManager = PeerManager.create(mainParent.getSessionFilename());
+		PeerManager peerManager = null;
 
 		int port = 0;
 		AKeyPair keyPair = null;
@@ -114,9 +117,13 @@ public class PeerStart implements Runnable {
 			} else {
 				store = Stores.getDefaultStore();
 			}
-			SignedData<Belief> signedBelief = peerManager.aquireLatestBelief(keyPair, peerAddress, store,
-					remotePeerHostname);
-			peerManager.launchPeer(keyPair, peerAddress, hostname, port, store, remotePeerHostname, signedBelief);
+			peerManager = PeerManager.create(mainParent.getSessionFilename(), keyPair, peerAddress, store);
+			List<Hash> networkHashList = peerManager.getNetworkHashList(remotePeerHostname);
+			log.info("will join remote networkId " + networkHashList.get(2).toHexString());
+
+			State baseState = peerManager.aquireState(remotePeerHostname, networkHashList.get(2));
+			SignedData<Belief> signedBelief = peerManager.aquireBelief(remotePeerHostname, networkHashList.get(0));
+			peerManager.launchPeer(hostname, port, remotePeerHostname, baseState, signedBelief);
 			peerManager.showPeerEvents();
 		} catch (Throwable t) {
 			mainParent.showError(t);

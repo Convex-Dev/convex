@@ -129,7 +129,7 @@ public class Main implements Runnable {
 
 		ch.qos.logback.classic.Logger parentLogger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
 
-		Level[] verboseLevels = {Level.INFO, Level.DEBUG, Level.TRACE, Level.ALL};
+		Level[] verboseLevels = {Level.WARN, Level.INFO, Level.DEBUG, Level.TRACE, Level.ALL};
 
 		parentLogger.setLevel(Level.WARN);
 		if (verbose.length > 0 && verbose.length <= verboseLevels.length) {
