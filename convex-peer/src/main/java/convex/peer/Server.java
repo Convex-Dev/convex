@@ -208,10 +208,10 @@ public class Server implements Closeable {
 				log.error("Can't restore Peer from store: {}",e);
 			}
 		}
-		State genesisStae = (State) config.get(Keywords.STATE);
+		State genesisState = (State) config.get(Keywords.STATE);
 		log.info("Defaulting to standard Peer startup.");
 
-		return Peer.createGenesisPeer(keyPair,genesisStae);
+		return Peer.createGenesisPeer(keyPair,genesisState);
 	}
 
 	/**
@@ -343,7 +343,7 @@ public class Server implements Closeable {
 		// check the initStateHash to see if this is the network we want to join?
 		Hash remoteNetworkID = RT.ensureHash(values.get(2));
 		if (!Utils.equals(peer.getNetworkID(),remoteNetworkID)) {
-			throw new Error("Failed to join network, we want Network ID "+peer.getNetworkID()+" but remote Peer repoerted "+remoteNetworkID);
+			throw new Error("Failed to join network, we want Network ID "+peer.getNetworkID()+" but remote Peer reported "+remoteNetworkID);
 		}
 
 		try {
@@ -449,7 +449,7 @@ public class Server implements Closeable {
 		// query is a vector [id , signed-object]
 		AVector<ACell> v = m.getPayload();
 		SignedData<ATransaction> sd = (SignedData<ATransaction>) v.get(1);
-		
+
 		// System.out.println("transact: "+v);
 
 		// Persist the signed transaction. Might throw MissingDataException?
@@ -633,7 +633,7 @@ public class Server implements Closeable {
 	private long lastOwnTransactionTimestamp=0L;
 
 	private static final long OWN_TRANSACTIONS_DELAY=300;
-	
+
 	/**
 	 * Gets the Peer controller Address
 	 * @return Peer controller Address
@@ -650,7 +650,7 @@ public class Server implements Closeable {
 	 */
 	private void maybePostOwnTransactions(ArrayList<SignedData<ATransaction>> transactionList) {
 		if (!Utils.bool(config.get(Keywords.AUTO_MANAGE))) return;
-		
+
 		synchronized (transactionList) {
 			State s=getPeer().getConsensusState();
 			long ts=Utils.getCurrentTimestamp();
@@ -690,7 +690,7 @@ public class Server implements Closeable {
 			}
 		}
 	}
-	
+
 	private void postOwnTransaction(ATransaction trans) {
 		synchronized (newTransactions) {
 			newTransactions.add(getKeyPair().signData(trans));
@@ -901,7 +901,7 @@ public class Server implements Closeable {
 				log.warn("Receiver thread terminated abnormally! ");
 				log.error("Server FAILED: " + e.getMessage());
 				e.printStackTrace();
-			} 
+			}
 		}
 	};
 
@@ -939,7 +939,7 @@ public class Server implements Closeable {
 				log.error("Unexpected exception in server update loop: {}", e);
 				log.error("Terminating Server update");
 				e.printStackTrace();
-			} 
+			}
 		}
 	};
 
@@ -958,7 +958,7 @@ public class Server implements Closeable {
 					if ((pc == null) || pc.isClosed()) continue;
 					ACell id = m.getID();
 					Result res = br.getResults().get(j).withID(id);
-					
+
 					pc.sendResult(res);
 				} catch (Throwable e) {
 					log.warn("Exception while sending Result: ",e);
@@ -1071,9 +1071,9 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Gets the Store configured for this Server. A server must consistently use the 
+	 * Gets the Store configured for this Server. A server must consistently use the
 	 * same store instance for all Server threads.
-	 * 
+	 *
 	 * @return Store instance
 	 */
 	public AStore getStore() {
