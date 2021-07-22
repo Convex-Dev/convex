@@ -742,6 +742,11 @@ public class Convex {
 		connection = null;
 		awaiting.clear();
 	}
+	
+	@Override
+	public void finalize() {
+		close();
+	}
 
 	/**
 	 * Determines if this Client is configured to automatically generate sequence

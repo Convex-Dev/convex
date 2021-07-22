@@ -23,8 +23,10 @@ import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 
 import convex.api.Convex;
+import convex.core.Coin;
 import convex.core.Result;
 import convex.core.State;
+import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.lang.Reader;
 import convex.core.transactions.ATransaction;
@@ -93,7 +95,7 @@ public class StressPanel extends JPanel {
 		JLabel lblNewLabel3 = new JLabel("Clients");
 		optionPanel.add(lblNewLabel3);
 		clientCountSpinner = new JSpinner();
-		clientCountSpinner.setModel(new SpinnerNumberModel(1, 1, 1, 1));
+		clientCountSpinner.setModel(new SpinnerNumberModel(1, 1, 100, 1));
 		optionPanel.add(clientCountSpinner);
 
 		// =========================================
@@ -128,7 +130,7 @@ public class StressPanel extends JPanel {
 		int transCount = (Integer) transactionCountSpinner.getValue();
 		int opCount = (Integer) opCountSpinner.getValue();
 		// TODO: enable multiple clients
-		// int clientCount = (Integer) opCountSpinner.getValue();
+		int clientCount = (Integer) clientCountSpinner.getValue();
 
 		new SwingWorker<String,Object>() {
 			@Override
@@ -142,7 +144,16 @@ public class StressPanel extends JPanel {
 					// Stores.setCurrent(Stores.CLIENT_STORE);
 					ArrayList<CompletableFuture<Result>> frs=new ArrayList<>();
 					Convex pc = Convex.connect(sa, address,PeerGUI.getUserKeyPair(0));
-
+					
+					ArrayList<Convex> ccs=new ArrayList<>(clientCount);
+					for (int i=0; i<clientCount; i++) {
+						AKeyPair kp=AKeyPair.generate();
+						Address clientAddr = pc.createAccount(kp.getAccountKey());
+						pc.transferSync(clientAddr, Coin.DIAMOND);
+						Convex cc=Convex.connect(sa,clientAddr,kp);
+						ccs.add(cc);
+					}
+					
 					for (int i = 0; i < transCount; i++) {
 						StringBuilder tsb = new StringBuilder();
 						tsb.append("(def a (do ");
@@ -151,9 +162,13 @@ public class StressPanel extends JPanel {
 						}
 						tsb.append("))");
 						String source = tsb.toString();
-						ATransaction t = Invoke.create(PeerGUI.getUserAddress(0),-1, Reader.read(source));
-						CompletableFuture<Result> fr = pc.transact(t);
-						frs.add(fr);
+						
+						for (int c=0; c<clientCount; c++) {
+							Convex cc=ccs.get(c);
+							ATransaction t = Invoke.create(cc.getAddress(),-1, Reader.read(source));
+							CompletableFuture<Result> fr = cc.transact(t);
+							frs.add(fr);
+						}
 					}
 
 					long sendTime = Utils.getCurrentTimestamp();
@@ -167,6 +182,10 @@ public class StressPanel extends JPanel {
 						} else {
 							values++;
 						}
+					}
+					
+					for (int i=0; i<clientCount; i++) {
+						ccs.get(i).close();
 					}
 
 					Thread.sleep(100); // wait for state update to be reflected
