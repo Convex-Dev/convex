@@ -152,7 +152,10 @@ public class Connection {
 			throw new Error("Connection requires a store");
 		SocketChannel clientChannel = SocketChannel.open();
 		clientChannel.configureBlocking(false);
-		clientChannel.connect(hostAddress);
+		clientChannel.socket().setReceiveBufferSize(Constants.SOCKET_RECEIVE_BUFFER_SIZE);
+		clientChannel.socket().setSendBufferSize(Constants.SOCKET_SEND_BUFFER_SIZE);
+
+		clientChannel.connect(hostAddress);	
 
 		long start = Utils.getCurrentTimestamp();
 		while (!clientChannel.finishConnect()) {

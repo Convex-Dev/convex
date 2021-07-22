@@ -18,7 +18,7 @@ import java.util.concurrent.BlockingQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
@@ -69,6 +69,10 @@ public class NIOServer implements Closeable {
 
 		try {
 			ssc=ServerSocketChannel.open();
+			
+			// Set receive buffer size
+			ssc.socket().setReceiveBufferSize(Constants.SOCKET_RECEIVE_BUFFER_SIZE);
+	
 			InetSocketAddress address=new InetSocketAddress(port);
 			ssc.bind(address);
 			address=(InetSocketAddress) ssc.getLocalAddress();

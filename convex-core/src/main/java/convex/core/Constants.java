@@ -141,4 +141,14 @@ public class Constants {
 	 * Default size for client receive buffers.
 	 */
 	public static final int RECEIVE_BUFFER_SIZE = Format.LIMIT_ENCODING_LENGTH*10+20;
+
+	/**
+	 * Size of default socket receive buffer
+	 */
+	public static final int SOCKET_RECEIVE_BUFFER_SIZE = 65536;
+
+	/**
+	 * Size of default socket send buffer
+	 */
+	public static final int SOCKET_SEND_BUFFER_SIZE = 65536;
 }
