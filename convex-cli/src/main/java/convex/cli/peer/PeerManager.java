@@ -82,17 +82,14 @@ public class PeerManager implements IServerEvent {
 		peerServerList = API.launchLocalPeers(keyPairList,genesisState, this);
 	}
 
-	public SignedData<Belief> aquireLatestBelief(AKeyPair keyPair, Address address, AStore store, String remotePeerHostname) {
-		// sync the etch db with the network state
-
+	public List<Hash> getNetworkHashList(AKeyPair keyPair, Address address, String remotePeerHostname) {
 		InetSocketAddress remotePeerAddress = Utils.toInetSocketAddress(remotePeerHostname);
 		int retryCount = 5;
 		Convex convex = null;
 		Result result = null;
-		SignedData<Belief> signedBelief = null;
 		while (retryCount > 0) {
 			try {
-				convex = Convex.connect(remotePeerAddress, address, keyPair, store);
+				convex = Convex.connect(remotePeerAddress, address, keyPair);
 				Future<Result> cf =  convex.requestStatus();
 				result = cf.get(TRANSACTION_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
 				retryCount = 0;
@@ -104,24 +101,44 @@ public class PeerManager implements IServerEvent {
 		if ((convex==null)||(result == null)) {
 			throw new Error("Failed to join network: Cannot connect to remote peer at "+remotePeerHostname);
 		}
-
+		convex.close();
+		List<Hash> hashList = new ArrayList<Hash>(3);
 		AVector<ACell> values = result.getValue();
-		Hash beliefHash = RT.ensureHash(values.get(0));
-		// Hash stateHash = RT.ensureHash(values.get(1));
+		hashList.add(RT.ensureHash(values.get(0))); 		// beliefHash
+		hashList.add(RT.ensureHash(values.get(1)));		// stateHash
+		hashList.add(RT.ensureHash(values.get(2)));		// netwokIdHash
+		return hashList;
+	}
 
-		long timeout = TRANSACTION_TIMEOUT_MILLIS;
+	public State aquireState(AKeyPair keyPair, Address address, AStore store, String remotePeerHostname, Hash stateHash) {
+		InetSocketAddress remotePeerAddress = Utils.toInetSocketAddress(remotePeerHostname);
+		Convex convex = null;
+		State state = null;
 		try {
-			// convex = Convex.connect(localPeerAddress, address, keyPair);
-			long start = Utils.getTimeMillis();
-
-			Future<SignedData<Belief>> cf = convex.acquire(beliefHash, store);
-			// adjust timeout if time elapsed to submit transaction
-			long now = Utils.getTimeMillis();
-			timeout = Math.max(0L, timeout - (now - start));
-			signedBelief = cf.get(timeout, TimeUnit.MILLISECONDS);
-		} catch (InterruptedException | ExecutionException | TimeoutException e) {
-			throw new Error("cannot request for network sync: " + e);
+			convex = Convex.connect(remotePeerAddress, address, keyPair);
+			Future<State> bf = convex.acquire(stateHash, store);
+			state = bf.get(TRANSACTION_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+			convex.close();
+		} catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
+			throw new Error("cannot aquire network state: " + e);
 		}
+		return state;
+
+	}
+	public SignedData<Belief> aquireBelief(AKeyPair keyPair, Address address, AStore store, String remotePeerHostname, Hash beliefHash) {
+		// sync the etch db with the network state
+		Convex convex = null;
+		SignedData<Belief> signedBelief = null;
+		InetSocketAddress remotePeerAddress = Utils.toInetSocketAddress(remotePeerHostname);
+		try {
+			convex = Convex.connect(remotePeerAddress, address, keyPair);
+			Future<SignedData<Belief>> cf = convex.acquire(beliefHash, store);
+			signedBelief = cf.get(TRANSACTION_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+			convex.close();
+		} catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
+			throw new Error("cannot acquire belief: " + e);
+		}
+
 		return signedBelief;
 	}
 
@@ -132,6 +149,7 @@ public class PeerManager implements IServerEvent {
 		int port,
 		AStore store,
 		String remotePeerHostname,
+		State baseState,
 		SignedData<Belief> signedBelief
 	) {
 		Map<Keyword, Object> config = new HashMap<>();
@@ -139,6 +157,7 @@ public class PeerManager implements IServerEvent {
 			config.put(Keywords.PORT, port);
 		}
 		config.put(Keywords.STORE, store);
+		config.put(Keywords.STATE, baseState);
 		config.put(Keywords.KEYPAIR, keyPair);
 		Server server = API.launchPeer(config, this);
 
