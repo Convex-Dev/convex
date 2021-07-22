@@ -10,7 +10,6 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Signature;
-import java.security.SignatureException;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
@@ -280,9 +279,9 @@ public class Ed25519KeyPair extends AKeyPair {
 
 	/**
 	 * Secret key bytes for LazySodium
-	 * @return
+	 * @return Private key byte array
 	 */
-	private byte[] getPrivateKeyBytes() {
+	byte[] getPrivateKeyBytes() {
 		if (privateKeyBytes==null) {
 			privateKeyBytes=new byte[64]; // private key|public key
 			Blob enc=getEncodedPrivateKey();
