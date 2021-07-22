@@ -140,5 +140,5 @@ public class Constants {
 	/**
 	 * Default size for client receive buffers.
 	 */
-	public static final int RECEIVE_BUFFER_SIZE = Format.LIMIT_ENCODING_LENGTH*2+20;
+	public static final int RECEIVE_BUFFER_SIZE = Format.LIMIT_ENCODING_LENGTH*10+20;
 }
