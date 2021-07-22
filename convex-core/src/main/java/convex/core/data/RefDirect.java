@@ -27,7 +27,7 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 	 
     /**
      * Construction function for a Direct Ref
-     * @param <T>
+     * @param <T> Type of value
      * @param value Value for the Ref
      * @param hash Hash (may be null)
      * @param status Status for the Ref
@@ -40,7 +40,7 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 
 	/**
 	 * Creates a direct Ref to the given value
-	 * @param <T>
+	 * @param <T> Type of value
 	 * @param value Any value (may be embedded or otherwise, but should not be null)
 	 * @param hash Hash of value's encoding, or null if not known
 	 * @return Direct Ref to Value
@@ -52,7 +52,7 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 	/**
 	 * Creates a new Direct ref to the given value. Does not compute hash.
 	 * @param <T> Type of Value
-	 * @param value
+	 * @param value Value
 	 * @return Direct Ref to Value
 	 */
 	@SuppressWarnings("unchecked")

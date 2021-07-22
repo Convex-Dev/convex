@@ -45,8 +45,8 @@ public class Symmetric {
 	/**
 	 * Encrypt bytes with a given AES SecretKey Prepends the IV to the ciphertext.
 	 * 
-	 * @param key
-	 * @param data
+	 * @param key Secret encryption key
+	 * @param data Data to encrypt
 	 * @return Encrypted representation of the given byte array data
 	 */
 	public static byte[] encrypt(SecretKey key, byte[] data) {
@@ -93,8 +93,8 @@ public class Symmetric {
 	 * Decrypts AES ciphertext with a given secret key. IV is assumed to be
 	 * prepended to the cipherText
 	 * 
-	 * @param key
-	 * @param encryptedData
+	 * @param key Secret encryption key
+	 * @param encryptedData Encrypted data to decrypt
 	 * @return A new byte array containing the decrypted data
 	 */
 	public static byte[] decrypt(SecretKey key, byte[] encryptedData) {
@@ -110,10 +110,10 @@ public class Symmetric {
 	 * Decrypts AES ciphertext with a given secret key. IV is assumed to be
 	 * prepended to the cipherText
 	 * 
-	 * @param key
+	 * @param key Secret encryption key
 	 * @param bis InputStream of data to decrypt
 	 * @return A new byte array containing the decrypted data
-	 * @throws IOException
+	 * @throws IOException If an IO error occurs
 	 */
 	public static byte[] decrypt(SecretKey key, InputStream bis) throws IOException {
 		byte[] iv = new byte[IV_LENGTH];

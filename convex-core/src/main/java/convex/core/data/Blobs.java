@@ -43,7 +43,7 @@ public class Blobs {
 
 	/**
 	 * Creates a blob from a hex string
-	 * @param a
+	 * @param a Hex String
 	 * @return Blob created, or null if String not valid hex
 	 */
 	public static ABlob fromHex(String a) {
@@ -61,7 +61,7 @@ public class Blobs {
 	 * 
 	 * @param bb ByteBuffer starting with a blob encoding
 	 * @return Blob read from ByteBuffer
-	 * @throws BadFormatException
+	 * @throws BadFormatException If format is invalid
 	 */
 	public static ABlob read(ByteBuffer bb) throws BadFormatException {
 		long len = Format.readVLCLong(bb);

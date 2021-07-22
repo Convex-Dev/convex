@@ -25,8 +25,8 @@ public abstract class AOp<T extends ACell> extends ACell {
 	 * Executes this op with the given context. Must preserve depth unless an
 	 * exceptional is returned.
 	 * 
-	 * @param <I>
-	 * @param context
+	 * @param <I> Type of Context
+	 * @param context Initial Context
 	 * @return The updated Context after executing this operation
 	 * 
 	 */

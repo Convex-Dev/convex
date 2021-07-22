@@ -61,10 +61,10 @@ public class BlobTree extends ABlob {
 	 * Create a BlobTree from an array of children. Each child must be a valid
 	 * chunk. All except the last child must be of the correct chunk size.
 	 * 
-	 * @param blobs
+	 * @param blobs Blobs to include
 	 * @return New BlobTree
 	 */
-	public static BlobTree create(Blob... blobs) {
+	static BlobTree create(Blob... blobs) {
 		return create(blobs, 0, blobs.length);
 	}
 
@@ -74,7 +74,7 @@ public class BlobTree extends ABlob {
 	 * @param chunkCount
 	 * @return Shift value for a BlobTree with the specified number of chunks
 	 */
-	public static int calcShift(long chunkCount) {
+	static int calcShift(long chunkCount) {
 		int shift = 0;
 		while (chunkCount > FANOUT) {
 			shift += BIT_SHIFT_PER_LEVEL;
@@ -147,7 +147,8 @@ public class BlobTree extends ABlob {
 		return count>Blob.CHUNK_LENGTH;
 	}
 	
-	@Override public final boolean isCVMValue() {
+	@Override 
+	public final boolean isCVMValue() {
 		return true;
 	}
 
@@ -286,7 +287,7 @@ public class BlobTree extends ABlob {
 	/**
 	 * Reads a BlobTree from a bytebuffer. Assumes that tag byte and count are already read
 	 * @param bb ByteBuffer
-	 * @param count
+	 * @param count Count of bytes in BlobTree being read
 	 * @return Decoded BlobTree
 	 * @throws BadFormatException if the encoding was invalid
 	 */

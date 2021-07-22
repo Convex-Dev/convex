@@ -44,7 +44,7 @@ public class EtchStore extends AStore {
 	 * @param file File to use for storage. Will be created it it does not already
 	 *             exist.
 	 * @return EtchStore instance
-	 * @throws IOException 
+	 * @throws IOException If an IO error occurs
 	 */
 	public static EtchStore create(File file) throws IOException {
 		Etch etch = Etch.create(file);

@@ -31,24 +31,24 @@ import convex.core.util.Utils;
 public class Invoke extends ATransaction {
 	protected final ACell command;
 
-	protected Invoke(Address address,long nonce, ACell args) {
-		super(address,nonce);
+	protected Invoke(Address address,long sequence, ACell args) {
+		super(address,sequence);
 		this.command = args;
 	}
 
-	public static Invoke create(Address address,long nonce, ACell command) {
-		return new Invoke(address,nonce, command);
+	public static Invoke create(Address address,long elements, ACell command) {
+		return new Invoke(address,elements, command);
 	}
 	
 	/**
 	 * Creates an Invoke transaction
-	 * @param address
-	 * @param nonce
+	 * @param address Address of origin Account
+	 * @param sequence Sequence number
 	 * @param command Command as a string, which will be read as Convex Lisp code
 	 * @return New Invoke transaction instance
 	 */
-	public static Invoke create(Address address,long nonce, String command) {
-		return create(address,nonce, Reader.read(command));
+	public static Invoke create(Address address,long sequence, String command) {
+		return create(address,sequence, Reader.read(command));
 	}
 
 	@Override

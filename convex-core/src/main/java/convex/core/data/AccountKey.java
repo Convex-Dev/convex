@@ -45,7 +45,7 @@ public class AccountKey extends AArrayBlob {
 	 * used directly. Use only if no external references to the byte array will be
 	 * retained.
 	 * 
-	 * @param data
+	 * @param data Byte array to wrap as Account Key
 	 * @return An Address wrapping the given bytes
 	 */
 	public static AccountKey wrap(byte[] data) {
@@ -67,7 +67,7 @@ public class AccountKey extends AArrayBlob {
 	
 	/**
 	 * Creates an AccountKey from a blob. Must have correct length.
-	 * @param b
+	 * @param b Blob to wrap as Account Key
 	 * @return AccountKey insatnce, or null if not valid
 	 */
 	public static AccountKey create(ABlob b) {
@@ -119,7 +119,7 @@ public class AccountKey extends AArrayBlob {
 	/**
 	 * Constructs an AccountKey object from a hex string
 	 * 
-	 * @param hexString
+	 * @param hexString Hex String
 	 * @return An AccountKey constructed from the hex string, or null if not a valid
 	 *         hex string
 	 */
@@ -132,7 +132,7 @@ public class AccountKey extends AArrayBlob {
 	/**
 	 * Constructs an AccountKey object from a hex string
 	 * 
-	 * @param hexString
+	 * @param hexString Hex String
 	 * @return An Address constructed from the hex string, or null if not a valid
 	 *         hex string
 	 */
@@ -154,7 +154,7 @@ public class AccountKey extends AArrayBlob {
 	 * 
 	 * Throws an exception if checksum is not valid
 	 * 
-	 * @param hexString
+	 * @param hexString Hex String
 	 * @return An Address constructed from the hex string
 	 */
 	public static AccountKey fromChecksumHex(String hexString) {

@@ -32,10 +32,10 @@ public class Maps {
 	/**
 	 * Constructs a map with the given keys and values. If keys are repreated, later keys will
 	 * overwrite earlier ones. Performs conversion to CVM types.
-	 * @param <R>
-	 * @param <K>
-	 * @param <V>
-	 * @param keysAndValues
+	 * @param <R> Map type
+	 * @param <K> Key type
+	 * @param <V> Value type
+	 * @param keysAndValues Keys and values to include
 	 * @return Map with given keys and values
 	 */
 	@SuppressWarnings("unchecked")
@@ -56,10 +56,10 @@ public class Maps {
 	/**
 	 * Constructs a map with the given keys and values. If keys are repreated, later keys will
 	 * overwrite earlier ones. Performs conversion to CVM types.
-	 * @param <R>
-	 * @param <K>
-	 * @param <V>
-	 * @param keysAndValues
+	 * @param <R> Map type
+	 * @param <K> Key type
+	 * @param <V> Value type
+	 * @param keysAndValues Keys and values to include
 	 * @return Map with given keys and values
 	 */
 	@SuppressWarnings("unchecked")
@@ -94,9 +94,9 @@ public class Maps {
 	/**
 	 * Create a map with a collection of entries.
 	 * 
-	 * @param <K>
-	 * @param <V>
-	 * @param entries
+	 * @param <K> Key type
+	 * @param <V> Value type
+	 * @param entries Entries to include
 	 * @return AHashMap instance
 	 */
 	public static <K extends ACell, V extends ACell> AHashMap<K, V> create(java.util.List<MapEntry<K, V>> entries) {
@@ -108,8 +108,8 @@ public class Maps {
 	 * 
 	 * @param <K>     Key type
 	 * @param <V>     Value type
-	 * @param shift
-	 * @param entries
+	 * @param shift Shift level of map
+	 * @param entries Entries to include
 	 * @return AHashMap instance
 	 */
 	public static <K extends ACell, V extends ACell> AHashMap<K, V> createWithShift(int shift, java.util.List<MapEntry<K, V>> entries) {
@@ -129,11 +129,11 @@ public class Maps {
 
 	/**
 	 * Read a Hashmap from a ByteBuffer. Assumes tag byte already read.
-	 * @param <K>
-	 * @param <V>
-	 * @param bb
+	 * @param <K> Key type
+	 * @param <V> Value type
+	 * @param bb ByteBuffer to read from
 	 * @return Map instance
-	 * @throws BadFormatException
+	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static <K extends ACell, V extends ACell> AHashMap<K, V> read(ByteBuffer bb) throws BadFormatException {
 		long count = Format.readVLCLong(bb);

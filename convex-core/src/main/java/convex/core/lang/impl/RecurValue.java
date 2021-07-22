@@ -20,7 +20,7 @@ public class RecurValue extends ATrampoline {
 	/**
 	 * Wraps an object array as a RecurValue
 	 * 
-	 * @param values
+	 * @param values Values to recur with
 	 * @return new RecurValue
 	 */
 	public static RecurValue wrap(ACell... values) {

@@ -73,7 +73,7 @@ public class Special<T extends ACell> extends AOp<T> {
 
 	/**
 	 * Creates special Op for the given opCode
-	 * @param opCode
+	 * @param opCode Special opcode
 	 * @return Special instance, or null if not found
 	 */
 	public static final Special<?> create(int opCode) {
@@ -141,7 +141,7 @@ public class Special<T extends ACell> extends AOp<T> {
 
 	/**
 	 * Gets the special Op for a given Symbol, or null if not found
-	 * @param <R>
+	 * @param <R> Result type
 	 * @param sym Symbol to look up
 	 * @return Special Op or null
 	 */

@@ -8,9 +8,9 @@ public class BlobMaps {
 	/**
 	 * Returns the empty BlobMap. Guaranteed singleton.
 	 * 
-	 * @param <R>
-	 * @param <K>
-	 * @param <V>
+	 * @param <R> Type of Blob Map
+	 * @param <K> Key type
+	 * @param <V> Value type
 	 * @return The empty BlobMap
 	 */
 	@SuppressWarnings("unchecked")

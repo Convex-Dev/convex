@@ -1923,7 +1923,7 @@ public class Core {
 
 			AExceptional result = RollbackValue.wrap((ACell)args[0]);
 
-			return context.withException(Juice.ROLLBACK, result);
+			return context.withException(Juice.RETURN, result);
 		}
 	});
 
@@ -1936,7 +1936,7 @@ public class Core {
 
 			AExceptional result = HaltValue.wrap((n > 0) ? (ACell)args[0] : null);
 
-			return context.withException(Juice.HALT, result);
+			return context.withException(Juice.RETURN, result);
 		}
 	});
 
@@ -2190,7 +2190,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			AExceptional result = Reduced.wrap((ACell) args[0]);
-			return context.withException(Juice.REDUCED, result);
+			return context.withException(Juice.RETURN, result);
 		}
 	});
 

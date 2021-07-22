@@ -99,10 +99,10 @@ public class StringShort extends AString {
 	}
 
 	/**
-	 * Read a StringShort from a bytebuffer. Assumes tag and length already read and correct.
+	 * Read a StringShort from a ByteBuffer. Assumes tag and length already read and correct.
 	 * 
 	 * @param length Length in number of chars to read
-	 * @param bb
+	 * @param bb ByteBuffer to read from
 	 * @return AString instance
 	 */
 	public static AString read(int length, ByteBuffer bb) {

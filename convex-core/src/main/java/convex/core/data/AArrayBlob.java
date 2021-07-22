@@ -176,9 +176,9 @@ public abstract class AArrayBlob extends ABlob {
 	
 	/**
 	 * Tests if a specific range of bytes are exactly equal.
-	 * @param b
-	 * @param start
-	 * @param end
+	 * @param b Blob to compare with
+	 * @param start Start index of range (inclusive)
+	 * @param end End index of range (exclusive)
 	 * @return true if digits are equal, false otherwise
 	 */
 	public boolean rangeMatches(ABlob b, int start, int end) {
@@ -213,9 +213,9 @@ public abstract class AArrayBlob extends ABlob {
 	
 	/**
 	 * Tests if a specific range of hex digits are exactly equal.
-	 * @param key
-	 * @param start
-	 * @param end
+	 * @param key Blob to compare with
+	 * @param start Start hex digit index (inclusive)
+	 * @param end End hex digit index (Exclusive)
 	 * @return true if digits are equal, false otherwise
 	 */
 	public boolean hexMatches(ABlob key, int start, int end) {

@@ -55,21 +55,21 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	}
 
 	/**
-	 * Creates a ListVector with the given items
+	 * Creates a VectorLeaf with the given items
 	 * 
-	 * @param things
-	 * @param offset
-	 * @param length
+	 * @param elements Elements to add
+	 * @param offset Offset into element array
+	 * @param length Number of elements to include from array
 	 * @return New ListVector
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> VectorLeaf<T> create(ACell[] things, int offset, int length) {
+	public static <T extends ACell> VectorLeaf<T> create(ACell[] elements, int offset, int length) {
 		if (length == 0) return (VectorLeaf<T>) VectorLeaf.EMPTY;
 		if (length > Vectors.CHUNK_SIZE)
 			throw new IllegalArgumentException("Too many elements for ListVector: " + length);
 		Ref<T>[] items = new Ref[length];
 		for (int i = 0; i < length; i++) {
-			T value=(T) things[i + offset];
+			T value=(T) elements[i + offset];
 			items[i] = Ref.get(value);
 		}
 		return new VectorLeaf<T>(items);
@@ -78,24 +78,24 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	/**
 	 * Creates a ListVector with the given items appended to the specified tail
 	 * 
-	 * @param things
-	 * @param offset
-	 * @param length
-	 * @param tail 
+	 * @param elements Elements to add
+	 * @param offset Offset into element array
+	 * @param length Number of elements to include from array
+	 * @param prefix Prefix vector to append to
 	 * @return The updated ListVector
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> VectorLeaf<T> create(ACell[] things, int offset, int length, AVector<T> tail) {
+	public static <T extends ACell> VectorLeaf<T> create(ACell[] elements, int offset, int length, AVector<T> prefix) {
 		if (length == 0)
 			throw new IllegalArgumentException("ListVector with tail cannot be created with zero head elements");
 		if (length > Vectors.CHUNK_SIZE)
 			throw new IllegalArgumentException("Too many elements for ListVector: " + length);
 		Ref<T>[] items = new Ref[length];
 		for (int i = 0; i < length; i++) {
-			T value=(T) things[i + offset];
+			T value=(T) elements[i + offset];
 			items[i] = Ref.get(value);
 		}
-		return new VectorLeaf<T>(items, tail.getRef(), tail.count() + length);
+		return new VectorLeaf<T>(items, prefix.getRef(), prefix.count() + length);
 	}
 
 	public static <T extends ACell> VectorLeaf<T> create(T[] things) {
@@ -223,10 +223,10 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	 * 
 	 * Assumes the header byte and count is already read.
 	 * 
-	 * @param bb
-	 * @param count
-	 * @return ListVector read from ByteBuffer
-	 * @throws BadFormatException
+	 * @param bb ByteBuffer to read from
+	 * @param count Number of elements
+	 * @return VectorLeaf read from ByteBuffer
+	 * @throws BadFormatException If encoding is invalid
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> VectorLeaf<T> read(ByteBuffer bb, long count) throws BadFormatException {

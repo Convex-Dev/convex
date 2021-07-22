@@ -194,7 +194,7 @@ public class Etch {
 	/**
 	 * Create an Etch instance using a temporary file.
 	 * @return The new Etch instance
-	 * @throws IOException
+	 * @throws IOException If an IO error occurs
 	 */	
 	public static Etch createTempEtch() throws IOException {
 		Etch newEtch =  createTempEtch("etch-"+tempIndex);
@@ -206,7 +206,7 @@ public class Etch {
 	 * Create an Etch instance using a temporary file with a specific file prefix.
 	 * @param prefix temporary file prefix to use
 	 * @return The new Etch instance
-	 * @throws IOException
+	 * @throws IOException If an IO error occurs
 	 */	
 	public static Etch createTempEtch(String prefix) throws IOException {
 		File data = File.createTempFile(prefix+"-", null);
@@ -216,9 +216,9 @@ public class Etch {
 	
 	/**
 	 * Create an Etch instance using the specified file
-	 * @param file
+	 * @param file File with which to create Etch instance
 	 * @return The new Etch instance
-	 * @throws IOException
+	 * @throws IOException If an IO error occurs
 	 */
 	public static Etch create(File file) throws IOException {
 		Etch etch= new Etch(file);
@@ -292,7 +292,7 @@ public class Etch {
 	 * @param key A key value (typically the Hash)
 	 * @param value Value data to associate with the key
 	 * @return Ref after writing to store
-	 * @throws IOException
+	 * @throws IOException If an IO error occurs
 	 */
 	public synchronized Ref<ACell> write(AArrayBlob key, Ref<ACell> value) throws IOException {
 		Counters.etchWrite++;
@@ -618,9 +618,9 @@ public class Etch {
 
 	/**
 	 * Reads a Blob from the database, returning null if not found
-	 * @param key
+	 * @param key Key to read from Store
 	 * @return Blob containing the data, or null if not found
-	 * @throws IOException
+	 * @throws IOException If an IO error occurs
 	 */
 	public Ref<ACell> read(AArrayBlob key) throws IOException {
 		Counters.etchRead++;
@@ -667,7 +667,7 @@ public class Etch {
 
 	/**
 	 * Flushes any changes to persistent storage.
-	 * @throws IOException
+	 * @throws IOException If an IO error occurs
 	 */
 	public synchronized void flush() throws IOException {
 		for (MappedByteBuffer mbb: regionMap) {

@@ -9,8 +9,8 @@ public class Bits {
 	 * Returns the index from the present mask for the given hex digit (0-15), or -1
 	 * if not found
 	 * 
-	 * @param digit
-	 * @param mask
+	 * @param digit Hex digit (0-15)
+	 * @param mask Bitmask of hex digits
 	 * @return The index of the appropriate child for this digit, or -1 if not found
 	 */
 	public static int indexForDigit(int digit, short mask) {
@@ -25,8 +25,8 @@ public class Bits {
 	 * Returns the array position for a given digit given a current mask. If not
 	 * present, this is where the new array entry must be inserted.
 	 * 
-	 * @param digit
-	 * @param mask
+	 * @param digit Hex digit (0-15)
+	 * @param mask Bitmask of hex digits
 	 * @return Array position for the given digit in the specified mask
 	 */
 	public static int positionForDigit(int digit, short mask) {
@@ -85,7 +85,7 @@ public class Bits {
 	/**
 	 * Gets a bit mask for the specified number of low bits in an int
 	 * 
-	 * @param numBits
+	 * @param numBits Number of bits to set to 1
 	 * @return int containing the specified number of set low bits
 	 */
 	public static int lowBitMask(int numBits) {
@@ -95,8 +95,8 @@ public class Bits {
 	/**
 	 * Gets the specified number of low Bits in an integer. Other bits are zeroed.
 	 * 
-	 * @param numBits
-	 * @param val
+	 * @param numBits Number of bits to get
+	 * @param val Value to extract bits from
 	 * @return Masked in with the specified number of low bits
 	 */
 	public static int lowBits(int numBits, int val) {

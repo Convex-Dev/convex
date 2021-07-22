@@ -98,7 +98,7 @@ public final class CVMChar extends APrimitive {
 	
 	/**
 	 * Parses a Character from a String
-	 * @param s
+	 * @param s String to parse
 	 * @return CVMChar instance, or null if not valid
 	 */
 	public static CVMChar parse(String s) {

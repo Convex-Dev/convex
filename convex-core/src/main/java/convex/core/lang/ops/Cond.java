@@ -35,7 +35,7 @@ public class Cond<T extends ACell> extends AMultiOp<T> {
 	 * Create a Cond operation with the given nested operations
 	 * 
 	 * @param <T> Return type of Cond
-	 * @param ops
+	 * @param ops Ops to execute conditionally
 	 * @return Cond instance
 	 */
 	public static <T extends ACell> Cond<T> create(AOp<?>... ops) {

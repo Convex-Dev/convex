@@ -70,14 +70,14 @@ public abstract class AStore {
 	 * in situations where the Peer needs to be restored from persistent storage.
 	 * 
 	 * @return Root hash value from this store.
-	 * @throws IOException
+	 * @throws IOException In case of store IO error
 	 */
 	public abstract Hash getRootHash() throws IOException;
 
 	/**
 	 * Sets the root hash for this Store
-	 * @param h
-	 * @throws IOException 
+	 * @param h Root Hash to set
+	 * @throws IOException In case of store IO error
 	 */
 	public abstract void setRootHash(Hash h) throws IOException;
 

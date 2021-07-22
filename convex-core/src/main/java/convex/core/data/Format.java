@@ -64,6 +64,9 @@ public class Format {
 	 */
 	public static final int MAX_EMBEDDED_LENGTH=140; // TODO: reconsider
 	
+	/**
+	 * Encoded length of a null value
+	 */
 	public static final int NULL_ENCODING_LENGTH = 1;
 
 	
@@ -154,7 +157,7 @@ public class Format {
 	 * 
 	 * @param bb ByteBuffer from which to read
 	 * @return Long value from ByteBuffer
-	 * @throws BadFormatException
+	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static long readVLCLong(ByteBuffer bb) throws BadFormatException {
 		byte octet = bb.get();
@@ -186,7 +189,7 @@ public class Format {
 	/**
 	 * Sign extend 7th bit (sign) of a byte to all bits in a long
 	 * 
-	 * @param b
+	 * @param b Byte to extend
 	 * @return The sign-extended byte as a long
 	 */
 	public static long vlcSignExtend(byte b) {
@@ -263,8 +266,8 @@ public class Format {
 	/**
 	 * Writes a message length as a VLC encoded long
 	 * 
-	 * @param bb  Bytebuffer with capacity available for writing
-	 * @param len
+	 * @param bb  ByteBuffer with capacity available for writing
+	 * @param len Length of message to write
 	 * @return The ByteBuffer after writing the message length
 	 */
 	public static ByteBuffer writeMessageLength(ByteBuffer bb, int len) {
@@ -311,9 +314,9 @@ public class Format {
 	/**
 	 * Reads a BigInteger from the ByteBuffer. Assumes tag already read.
 	 * 
-	 * @param bb
+	 * @param bb ByteBuffer to read from
 	 * @return A BigInteger
-	 * @throws BadFormatException
+	 * @throws BadFormatException If format is invalid
 	 */
 	public static BigInteger readVLCBigInteger(ByteBuffer bb) throws BadFormatException {
 		int vlclen = findVLCTerminal(bb) + 1;
@@ -392,8 +395,8 @@ public class Format {
 	/**
 	 * Writes a UTF-8 String to the byteBuffer. Includes string tag and length
 	 * 
-	 * @param bb
-	 * @param s
+	 * @param bb ByteBuffer to write to
+	 * @param s String to write
 	 * @return ByteBuffer after writing
 	 */
 	public static ByteBuffer writeUTF8String(ByteBuffer bb, String s) {
@@ -405,8 +408,8 @@ public class Format {
 	 * Writes a raw string without tag to the byteBuffer. Includes length in bytes
 	 * of UTF-8 representation
 	 * 
-	 * @param bb
-	 * @param s
+	 * @param bb ByteBuffer to write to
+	 * @param s String to write
 	 * @return ByteBuffer after writing
 	 */
 	public static ByteBuffer writeRawUTF8String(ByteBuffer bb, String s) {
@@ -442,8 +445,8 @@ public class Format {
 		return pos+n;
 	}
 
-	public static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
-	public static final ThreadLocal<CharsetDecoder> UTF8_DECODERS = new ThreadLocal<CharsetDecoder>() {
+	private static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
+	private static final ThreadLocal<CharsetDecoder> UTF8_DECODERS = new ThreadLocal<CharsetDecoder>() {
 		@Override
 		protected CharsetDecoder initialValue() {
 			CharsetDecoder dec = UTF8_CHARSET.newDecoder();
@@ -453,7 +456,7 @@ public class Format {
 		}
 	};
 	
-	public static final ThreadLocal<CharsetEncoder> UTF8_ENCODERS = new ThreadLocal<CharsetEncoder>() {
+	private static final ThreadLocal<CharsetEncoder> UTF8_ENCODERS = new ThreadLocal<CharsetEncoder>() {
 		@Override
 		protected CharsetEncoder initialValue() {
 			CharsetEncoder dec = UTF8_CHARSET.newEncoder();
@@ -468,9 +471,9 @@ public class Format {
 	 * Reads a UTF-8 String from a ByteBuffer. Assumes the object tag has already been
 	 * read
 	 * 
-	 * @param bb
+	 * @param bb ByteBuffer to read from
 	 * @return String from ByteBuffer
-	 * @throws BadFormatException
+	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static String readUTF8String(ByteBuffer bb) throws BadFormatException {
 		try {
@@ -496,7 +499,7 @@ public class Format {
 	 * 
 	 * @param bb ByteBuffer from which to read a Symbol
 	 * @return Symbol read from ByteBuffer
-	 * @throws BadFormatException
+	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static Symbol readSymbol(ByteBuffer bb) throws BadFormatException {
 		return Symbol.read(bb);
@@ -510,9 +513,9 @@ public class Format {
 	/**
 	 * Read an int length field (used for Strings etc.)
 	 * 
-	 * @param bb
+	 * @param bb ByteBuffer from which to read
 	 * @return Length field
-	 * @throws BadFormatException
+	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static int readLength(ByteBuffer bb) throws BadFormatException {
 		// our strategy to to read along, then test if it is a valid non-negative int
@@ -527,7 +530,7 @@ public class Format {
 	 * Writes a 64-bit long as 8 bytes to the ByteBuffer provided
 	 * 
 	 * @param bb Destination ByteBuffer
-	 * @param value
+	 * @param value Value to write
 	 * @return ByteBuffer after writing
 	 */
 	public static ByteBuffer writeLong(ByteBuffer bb, long value) {
@@ -545,7 +548,7 @@ public class Format {
 	}
 
 	/**
-	 * Reads a Ref<T> from the ByteBuffer.
+	 * Reads a Ref from the ByteBuffer.
 	 * 
 	 * Converts Embedded objects to Refs automatically.
 	 * 
@@ -617,6 +620,14 @@ public class Format {
 		return read(tag,blob);
 	}
 	
+	/**
+	 * Read from a Blob with the specified tag
+	 * @param <T> Type of value to read
+	 * @param tag Tag to use for reading
+	 * @param blob Blob to read from
+	 * @return Value decoded
+	 * @throws BadFormatException If encoding is invalid for the given tag
+	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T read(byte tag, Blob blob) throws BadFormatException {
 		if (tag == Tag.NULL) {
@@ -644,7 +655,13 @@ public class Format {
 		}
 	}
 
-
+	/**
+	 * Read a value encoded as a hex string
+	 * @param <T> Type of value to read
+	 * @param hexString A valid hex String
+	 * @return Value read
+	 * @throws BadFormatException If encoding is invalid
+	 */
 	public static <T extends ACell> T read(String hexString) throws BadFormatException {
 		return read(Blob.fromHex(hexString));
 	}
@@ -656,11 +673,11 @@ public class Format {
 	 * @param tag Tag byte indicating type to read
 	 * @return Cell value read
 
-	 * @throws BadFormatException
+	 * @throws BadFormatException If encoding is invalid
 	 * @throws BufferUnderflowException if the ByteBuffer contains insufficent bytes for Encoding
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> T readBasicType(ByteBuffer bb, byte tag) throws BadFormatException, BufferUnderflowException {
+	private static <T extends ACell> T readBasicType(ByteBuffer bb, byte tag) throws BadFormatException, BufferUnderflowException {
 		try {
 			if (tag == Tag.NULL) return null;
 			if (tag == Tag.BYTE) return (T) CVMByte.create(bb.get());
@@ -683,7 +700,7 @@ public class Format {
 	 * @throws BadFormatException In case of a bad record encoding
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> T readRecord(ByteBuffer bb, byte tag) throws BadFormatException {
+	private static <T extends ACell> T readRecord(ByteBuffer bb, byte tag) throws BadFormatException {
 		if (tag == Tag.BLOCK) {
 			return (T) Block.read(bb);
 		}
@@ -724,7 +741,7 @@ public class Format {
 	 * 
 	 * @param bb ByteBuffer from which to read
 	 * @return Value read from the ByteBuffer
-	 * @throws BadFormatException
+	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static <T extends ACell> T read(ByteBuffer bb) throws BadFormatException {
 		byte tag = bb.get();
@@ -732,7 +749,7 @@ public class Format {
 	}
 	
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> T read(byte tag,ByteBuffer bb) throws BadFormatException {
+	static <T extends ACell> T read(byte tag,ByteBuffer bb) throws BadFormatException {
 		try {
 			if ((tag & 0xF0) == 0x00) return readBasicType(bb, tag);
 
@@ -773,7 +790,7 @@ public class Format {
 				+ " Content: " + data.toHexString());
 	}
 
-	private static ATransaction readTransaction(ByteBuffer bb, byte tag) throws BadFormatException {
+	static ATransaction readTransaction(ByteBuffer bb, byte tag) throws BadFormatException {
 		if (tag == Tag.INVOKE) {
 			return Invoke.read(bb);
 		} else if (tag == Tag.TRANSFER) {
@@ -788,7 +805,7 @@ public class Format {
 	 * Returns true if the object is a canonical data object. Canonical data objects
 	 * can be used as first class decentralised data objects.
 	 * 
-	 * @param o
+	 * @param o Value to test
 	 * @return true if object is canonical, false otherwise.
 	 */
 	public static boolean isCanonical(ACell o) {
@@ -800,7 +817,7 @@ public class Format {
 	 * Determines if an object should be embedded directly in the encoding rather
 	 * than referenced with a Ref / hash. Defined to be true for most small objects.
 	 * 
-	 * @param cell
+	 * @param cell Value to test
 	 * @return true if object is embedded, false otherwise
 	 */
 	public static boolean isEmbedded(ACell cell) {
@@ -857,13 +874,13 @@ public class Format {
 	/**
 	 * Writes hex digits from digit position start, total length
 	 * 
-	 * @param bb
+	 * @param bb ByteBuffer to read from
 	 * @param src Blob containing hex digits
 	 * @param start Start position (in hex digits)
 	 * @param length Length (in hex digits)
 	 * @return ByteBuffer after writing
 	 */
-	public static ByteBuffer writeHexDigits(ByteBuffer bb, ABlob src, long start, long length) {
+	static ByteBuffer writeHexDigits(ByteBuffer bb, ABlob src, long start, long length) {
 		bb = Format.writeVLCLong(bb, start);
 		bb = Format.writeVLCLong(bb, length);
 		int nBytes = Utils.checkedInt((length + 1) >> 1);
@@ -908,7 +925,7 @@ public class Format {
 	 * 
 	 * @param start Start position (in hex digits)
 	 * @param length Length (in hex digits)
-	 * @param bb
+	 * @param bb ByteBuffer to read from
 	 * @return byte array containing hex digits
 	 * @throws BadFormatException In case of bad Encoding format
 	 */

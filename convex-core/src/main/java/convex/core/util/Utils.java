@@ -60,7 +60,7 @@ public class Utils {
 	 * Assumes two's-complement big-endian binary representation format as per new
 	 * BigInteger(byte[]);
 	 *
-	 * @param data
+	 * @param data Byte array to convert to BigInteger
 	 * @return A signed BigInteger
 	 */
 	public static BigInteger toSignedBigInteger(byte[] data) {
@@ -70,7 +70,7 @@ public class Utils {
 	/**
 	 * Converts an int to a hex string e.g. "80cafe80"
 	 *
-	 * @param val
+	 * @param val Value to convert
 	 * @return Lowercase hex string
 	 */
 	public static String toHexString(int val) {
@@ -92,7 +92,7 @@ public class Utils {
 	/**
 	 * Converts a byte to a two-character hex string
 	 *
-	 * @param value
+	 * @param value Value to convert
 	 * @return Lowercase hex string
 	 */
 	public static String toHexString(byte value) {
@@ -105,7 +105,7 @@ public class Utils {
 	/**
 	 * Converts a long value to a 16 character hex string
 	 *
-	 * @param x
+	 * @param x Value to convert
 	 * @return Hex string for the given long
 	 */
 	public static String toHexString(long x) {
@@ -231,7 +231,7 @@ public class Utils {
 	/**
 	 * Reads ByteBuffer contents into a new byte array
 	 *
-	 * @param bb
+	 * @param bb ByteBuffer
 	 * @return New byte array
 	 */
 	public static byte[] toByteArray(ByteBuffer bb) {
@@ -254,7 +254,7 @@ public class Utils {
 	/**
 	 * Converts an int value in the range 0..15 to a hexadecimal character
 	 *
-	 * @param i
+	 * @param i Value to convert
 	 * @return Hex digit value (lowercase)
 	 */
 	public static char toHexChar(int i) {
@@ -311,7 +311,7 @@ public class Utils {
 	/**
 	 * Converts a hex string to an unsigned big Integer
 	 *
-	 * @param hex
+	 * @param hex Value to convert
 	 * @return BigInteger
 	 */
 	public static BigInteger hexToBigInt(String hex) {
@@ -378,11 +378,11 @@ public class Utils {
 	/**
 	 * Tests if two byte array regions are identical
 	 *
-	 * @param a
-	 * @param aOffset
-	 * @param b
-	 * @param bOffset
-	 * @param length
+	 * @param a First array
+	 * @param aOffset Offset into first array
+	 * @param b Second array
+	 * @param bOffset Offset into second array
+	 * @param length Number of bytes to compare
 	 * @return true if array regions are equal, false otherwise
 	 */
 	public static boolean arrayEquals(byte[] a, int aOffset, byte[] b, int bOffset, int length) {
@@ -393,10 +393,10 @@ public class Utils {
 	 * Compares two byte arrays on an unsigned basis. Shorter arrays will be
 	 * considered "smaller" if they match in all other positions.
 	 *
-	 * @param a
-	 * @param aOffset
-	 * @param b
-	 * @param bOffset
+	 * @param a First array
+	 * @param aOffset Offset into first array
+	 * @param b Second array
+	 * @param bOffset Offset into second array
 	 * @param maxLength The maximum size for comparison. If arrays are equal up to
 	 *                  this length, will return 0
 	 * @return Negative if a is 'smaller', 0 if a 'equals' b, positive if a is
@@ -420,8 +420,8 @@ public class Utils {
 	 * Converts an unsigned BigInteger to a hex string with the given number of
 	 * digits Truncates any high bytes beyond the given digits.
 	 *
-	 * @param a
-	 * @param digits
+	 * @param a Value to convert
+	 * @param digits Number of hex digits to produce
 	 * @return String containing the hex representation
 	 */
 	public static String toHexString(BigInteger a, int digits) {
@@ -441,13 +441,13 @@ public class Utils {
 	}
 
 	/**
-	 * Writes an unsigned big integer to a specific segment of a byte[] array Pads
-	 * with zeros if necessary to fill the specified length
+	 * Writes an unsigned big integer to a specific segment of a byte[] array. Pads
+	 * with zeros if necessary to fill the specified length.
 	 *
-	 * @param a
-	 * @param dest
-	 * @param offset
-	 * @param length
+	 * @param a Value to write
+	 * @param dest Destination array
+	 * @param offset Offset into destination array
+	 * @param length Length to write
 	 */
 	public static void writeUInt(BigInteger a, byte[] dest, int offset, int length) {
 		if (a.signum() < 0) throw new IllegalArgumentException("Non-negative big integer expected!");
@@ -487,7 +487,7 @@ public class Utils {
 	/**
 	 * Converts any array to an Object[] array
 	 *
-	 * @param anyArray
+	 * @param anyArray Array to convert
 	 * @return Object[] array
 	 */
 	public static Object[] toObjectArray(Object anyArray) {
@@ -503,7 +503,7 @@ public class Utils {
 	/**
 	 * Converts any array to an ACell[] array. Elements must be Cells.
 	 *
-	 * @param anyArray
+	 * @param anyArray Array to convert
 	 * @return ACell[] array
 	 */
 	public static ACell[] toCellArray(Object anyArray) {
@@ -518,8 +518,8 @@ public class Utils {
 	/**
 	 * Equality method allowing for nulls
 	 *
-	 * @param a
-	 * @param b
+	 * @param a First value
+	 * @param b Second value
 	 * @return true if arguments are equal, false otherwise
 	 */
 	public static boolean equals(Object a, Object b) {
@@ -531,8 +531,8 @@ public class Utils {
 	/**
 	 * Equality method allowing for nulls
 	 *
-	 * @param a
-	 * @param b
+	 * @param a First value
+	 * @param b Second value
 	 * @return true if arguments are equal, false otherwise
 	 */
 	public static boolean equals(ACell a, ACell b) {
@@ -555,8 +555,8 @@ public class Utils {
 	/**
 	 * Gets the class of an Object, or null if the value is null
 	 *
-	 * @param o
-	 * @return Class of the object
+	 * @param o Object to examine
+	 * @return Class of the Object
 	 */
 	public static Class<?> getClass(Object o) {
 		if (o == null) return null;
@@ -566,8 +566,8 @@ public class Utils {
 	/**
 	 * Gets the class name of an Object, or "null" if the value is null
 	 *
-	 * @param o
-	 * @return Class name of the object
+	 * @param o Object to examine
+	 * @return Class name of the Object
 	 */
 	public static String getClassName(Object o) {
 		Class<?> klass = getClass(o);
@@ -577,7 +577,7 @@ public class Utils {
 	/**
 	 * Converts a long to an int, throws error if out of allowable range.
 	 *
-	 * @param a
+	 * @param a Value to convert
 	 * @return int value of the long if in valid Integer range
 	 */
 	public static int checkedInt(long a) {
@@ -589,7 +589,7 @@ public class Utils {
 	/**
 	 * Converts a long to a short, throws error if out of allowable range.
 	 *
-	 * @param a
+	 * @param a Value to convert
 	 * @return short value of the long if in valid Short range
 	 */
 	public static short checkedShort(long a) {
@@ -601,7 +601,7 @@ public class Utils {
 	/**
 	 * Converts a long to a byte, throws error if out of allowable range.
 	 *
-	 * @param a
+	 * @param a Value to convert
 	 * @return byte value of the long if in valid Byte range
 	 */
 	public static byte checkedByte(long a) {
@@ -650,7 +650,7 @@ public class Utils {
 	 * Returns the minimal number of bits to represent the signed twos complement
 	 * long value. Return value will be at least 1, max 64
 	 *
-	 * @param x
+	 * @param x Long value
 	 * @return Number of bits required for representation, in the range 1..64
 	 *         inclusive
 	 */
@@ -687,7 +687,7 @@ public class Utils {
 	 *
 	 * @param path Path to resource, e.g "actors/token.con"
 	 * @return String content of resource file
-	 * @throws IOException
+	 * @throws IOException If an IO error occurs
 	 */
 	public static String readResourceAsString(String path) throws IOException {
 		ClassLoader classLoader = ClassLoader.getSystemClassLoader();
@@ -852,8 +852,8 @@ public class Utils {
 	 * predicate returns true. May return the same array if all elements are
 	 * included.
 	 *
-	 * @param arr
-	 * @param predicate
+	 * @param arr Array to filter
+	 * @param predicate Predicate to test array elements
 	 * @return Filtered array.
 	 */
 	public static <T> T[] filterArray(T[] arr, Predicate<T> predicate) {
@@ -936,8 +936,8 @@ public class Utils {
 	 *
 	 * Subset must be an ordered subset of of the full array
 	 *
-	 * @param set
-	 * @param subset
+	 * @param set Array of elements
+	 * @param subset Array of element subset (must be identical)
 	 * @return Bit mask as a short
 	 */
 	public static <T> short computeMask(T[] set, T[] subset) {
@@ -1018,7 +1018,7 @@ public class Utils {
 	 *
 	 * @param is An arbitrary InputStream
 	 * @return A byte array containing the full contents of the given InputStream
-	 * @throws IOException
+	 * @throws IOException If IO error occurs
 	 */
 	public static byte[] readBytes(InputStream is) throws IOException {
 		ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -1035,11 +1035,11 @@ public class Utils {
 	}
 
 	/**
-	 * Displays a String representing the given Object.
+	 * Displays a String representing the given Object, printing null as "nil"
 	 *
 	 * SECURITY: should *not* be used in Actor code, use RT.str(...) instead.
 	 *
-	 * @param o
+	 * @param o Object to convert
 	 * @return String representation of object
 	 */
 	public static String toString(Object o) {
@@ -1047,6 +1047,11 @@ public class Utils {
 		return o.toString();
 	}
 
+	/**
+	 * Removes all spaces from a String
+	 * @param s String to strip
+	 * @return String without spaces
+	 */
 	public static String stripWhiteSpace(String s) {
 		return s.replaceAll("\\s+", "");
 	}
@@ -1104,8 +1109,8 @@ public class Utils {
 	/**
 	 * Runs test repeatedly, until it returns true or the timeout has elapsed
 	 *
-	 * @param timeoutMillis
-	 * @param test
+	 * @param timeoutMillis Timeout interval
+	 * @param test Test to run until true
 	 * @return True if the operation timed out, false otherwise
 	 */
 	public static boolean timeout(int timeoutMillis, Supplier<Boolean> test) {

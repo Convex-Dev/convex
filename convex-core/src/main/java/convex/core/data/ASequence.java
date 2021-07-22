@@ -49,7 +49,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	/**
 	 * Visits all elements in this sequence, calling the specified consumer for each.
 	 * 
-	 * @param f
+	 * @param f Function to call for each element
 	 */
 	public abstract void visitElementRefs(Consumer<Ref<T>> f);
 
@@ -206,7 +206,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	/**
 	 * Adds an element to the sequence in the natural position
 	 * 
-	 * @param value
+	 * @param value Value to add
 	 * @return Updated sequence
 	 */
 	@Override
@@ -233,8 +233,8 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	/**
 	 * Gets a vector containing the specified subset of this sequence.
 	 * 
-	 * @param start
-	 * @param length
+	 * @param start Start index of sub vector
+	 * @param length Length of sub vector to produce
 	 * @return Sub-vector of this sequence
 	 */
 	public abstract <R extends ACell> AVector<R> subVector(long start, long length);

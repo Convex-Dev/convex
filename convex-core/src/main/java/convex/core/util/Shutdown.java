@@ -54,15 +54,15 @@ public class Shutdown {
 	 * be executed first.
 	 *
 	 * @param priority Priority number for shutdown hook
-	 * @param r
+	 * @param shutdownTask Runnable instance to execute on shutdown
 	 */
-	public static synchronized void addHook(int priority,Runnable r) {
+	public static synchronized void addHook(int priority,Runnable shutdownTask) {
 		Group g=order.get(priority);
 		if (g==null) {
 			g=new Group();
 			order.put(priority, g);
 		}
-		g.addHook(r);
+		g.addHook(shutdownTask);
 	}
 
 	/**

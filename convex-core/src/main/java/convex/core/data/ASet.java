@@ -37,14 +37,14 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	
 	/**
 	 * Updates the set to include the given element
-	 * @param a
+	 * @param a Value to include
 	 * @return Updated set
 	 */
 	public abstract <R extends ACell> ASet<R> include(R a);
 	
 	/**
 	 * Updates the set to exclude the given element
-	 * @param a
+	 * @param a Value to exclude
 	 * @return Updated set
 	 */
 	public abstract ASet<T> exclude(T a) ;
@@ -53,7 +53,7 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	 * Updates the set to include all the given elements.
 	 * Can be used to implement union of sets
 	 * 
-	 * @param elements
+	 * @param elements Elements to include
 	 * @return Updated set
 	 */
 	public abstract <R extends ACell> ASet<R> includeAll(ASet<R> elements) ;
@@ -61,7 +61,7 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	/**
 	 * Updates the set to exclude all the given elements.
 	 * 
-	 * @param elements
+	 * @param elements Elements to exclude
 	 * @return Updated set
 	 */
 	public abstract ASet<T> excludeAll(ASet<T> elements) ;
@@ -95,7 +95,7 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 
 	/**
 	 * Returns the intersection of two sets
-	 * @param xs
+	 * @param xs Set to intersect with
 	 * @return Intersection of the two sets
 	 */
 	public abstract ASet<T> intersectAll(ASet<T> xs);
@@ -148,7 +148,7 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 
 	/**
 	 * Adds a value to this set using a Ref to the value
-	 * @param ref
+	 * @param ref Ref to value to include
 	 * @return Updated set
 	 */
 	public abstract ASet<T> includeRef(Ref<T> ref) ;

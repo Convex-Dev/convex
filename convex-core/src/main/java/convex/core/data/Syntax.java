@@ -94,7 +94,7 @@ public class Syntax extends ACell {
 	/**
 	 * Create a Syntax Object with the given value. Converts to appropriate CVM type as a convenience
 	 * 
-	 * @param value
+	 * @param value Value to wrap
 	 * @return Syntax instance
 	 */
 	public static Syntax of(Object value) {
@@ -241,7 +241,7 @@ public class Syntax extends ACell {
 	/**
 	 * Merges metadata into this syntax object, overriding existing metadata
 	 * 
-	 * @param additionalMetadata
+	 * @param additionalMetadata Extra metadata to merge
 	 * @return Syntax Object with updated metadata
 	 */
 	public Syntax mergeMeta(AHashMap<ACell, ACell> additionalMetadata) {
@@ -268,21 +268,12 @@ public class Syntax extends ACell {
 	/**
 	 * Replaces metadata on this Syntax Object. Old metadata is discarded.
 	 * 
-	 * @param newMetadata
+	 * @param newMetadata New metadata map
 	 * @return Syntax Object with updated metadata
 	 */
 	public Syntax withMeta(AHashMap<ACell, ACell> newMetadata) {
 		if (meta == newMetadata) return this;
 		return new Syntax(datumRef, newMetadata);
-	}
-	
-	/**
-	 * Updates Syntax with a new value. Always creates a new Syntax Object.
-	 * @param newValue
-	 * @return new Syntax Object
-	 */
-	public Syntax withValue(ACell newValue) {
-		return create(newValue,meta);
 	}
 
 	/**

@@ -137,9 +137,9 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 
 	/**
 	 * Reads a MapEntry from a ByteBuffer. Assumes Tag already handled.
-	 * @param bb
+	 * @param bb ByteBuffer to read from
 	 * @return MapEntry instance
-	 * @throws BadFormatException
+	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static <K extends ACell, V extends ACell> MapEntry<K, V> read(ByteBuffer bb) throws BadFormatException {
 		Ref<K> kr = Format.readRef(bb);
@@ -149,9 +149,9 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	
 	/**
 	 * Reads a MapEntry or null from a ByteBuffer. Assumes no Tag.
-	 * @param bb
+	 * @param bb ByteBuffer to read from
 	 * @return MapEntry instance, or null
-	 * @throws BadFormatException
+	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static <K extends ACell, V extends ACell> MapEntry<K, V> readCompressed(ByteBuffer bb) throws BadFormatException {
 		byte b=bb.get();

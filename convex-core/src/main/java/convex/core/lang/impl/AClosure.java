@@ -27,10 +27,9 @@ public abstract class AClosure<T extends ACell> extends AFn<T> {
 	 */
 	public abstract <F extends AClosure<T>> F withEnvironment(AVector<ACell> env);
 	
-
 	/**
 	 * Print the "internal" representation of a closure e.g. "[x] 1", excluding the 'fn' symbol.
-	 * @param sb
+	 * @param sb StringBuilder to print to
 	 */
 	public abstract void printInternal(StringBuilder sb);
 }

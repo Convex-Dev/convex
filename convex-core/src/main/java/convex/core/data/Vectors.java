@@ -18,9 +18,9 @@ public class Vectors {
 	/**
 	 * Creates a canonical AVector with the given elements
 	 * 
-	 * @param elements
-	 * @param offset
-	 * @param length
+	 * @param elements Elements to include
+	 * @param offset Offset into element array
+	 * @param length Number of elements to take
 	 * @return New vector with the specified elements
 	 */
 	public static <T extends ACell> AVector<T> create(ACell[] elements, int offset, int length) {
@@ -50,8 +50,8 @@ public class Vectors {
 	/**
 	 * Create a vector from an array of elements.
 	 * 
-	 * @param <T>
-	 * @param elements
+	 * @param <T> Type of elements
+	 * @param elements Elements to include
 	 * @return New vector with the specified elements
 	 */
 	public static <T extends ACell> AVector<T> create(ACell[] elements) {
@@ -59,19 +59,19 @@ public class Vectors {
 	}
 
 	/**
-	 * Concerts a collection to a vector. Not necessarily the most efficient.
+	 * Coerces a collection to a vector. Not necessarily the most efficient.
 	 * Performs an unchecked cast.
 	 * 
 	 * @param <R>  Type of Vector elements to produce
 	 * @param <T>  Type of source collection elements
-	 * @param list
+	 * @param elements Elements to include
 	 * @return New vector with the specified collection of elements
 	 */
 	@SuppressWarnings("unchecked")
-	public static <R extends ACell, T extends ACell> AVector<R> create(Collection<?> list) {
-		if (list instanceof ASequence) return create((ASequence<R>) list);
-		if (list.size() == 0) return empty();
-		ACell[] cells=Utils.toCellArray(list.toArray());
+	public static <R extends ACell, T extends ACell> AVector<R> create(Collection<?> elements) {
+		if (elements instanceof ASequence) return create((ASequence<R>) elements);
+		if (elements.size() == 0) return empty();
+		ACell[] cells=Utils.toCellArray(elements.toArray());
 		return (AVector<R>) create(cells);
 	}
 	
@@ -89,8 +89,8 @@ public class Vectors {
 
 	/**
 	 * Creates a vector with the given values. Performs conversion to CVM types.
-	 * @param <T>
-	 * @param elements
+	 * @param <T> Type of elements (after CVM conversion)
+	 * @param elements Elements to include
 	 * @return New Vector
 	 */
 	@SuppressWarnings("unchecked")
@@ -117,10 +117,10 @@ public class Vectors {
 	 * 
 	 * Distinguishes between child types according to count.
 	 * 
-	 * @param <T>
-	 * @param bb
+	 * @param <T> Type of elements
+	 * @param bb ByteBuffer to read from
 	 * @return Vector read from ByteBuffer
-	 * @throws BadFormatException
+	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static <T extends ACell> AVector<T> read(ByteBuffer bb) throws BadFormatException {
 		long count = Format.readVLCLong(bb);

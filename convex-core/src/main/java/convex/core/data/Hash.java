@@ -57,7 +57,7 @@ public class Hash extends AArrayBlob {
 	 * directly. Use only if no external references to the byte array will be
 	 * retained.
 	 * 
-	 * @param hashBytes
+	 * @param hashBytes Bytes to wrap
 	 * @return Hash wrapping the given byte array
 	 */
 	public static Hash wrap(byte[] hashBytes) {
@@ -101,7 +101,7 @@ public class Hash extends AArrayBlob {
 	/**
 	 * Tests if the Hash value is precisely equal to another non-null Hash value.
 	 * 
-	 * @param other
+	 * @param other Hash to comapre with
 	 * @return true if Hashes are equal, false otherwise.
 	 */
 	public boolean equals(Hash other) {
@@ -120,11 +120,12 @@ public class Hash extends AArrayBlob {
 	/**
 	 * Constructs a Hash object from a hex string
 	 * 
-	 * @param hexString
-	 * @return Hash with the given hex string value
+	 * @param hexString Hex String
+	 * @return Hash with the given hex string value, or null is String is not valid
 	 */
 	public static Hash fromHex(String hexString) {
 		byte [] bs=Utils.hexToBytes(hexString);
+		if (bs==null) return null;
 		if (bs.length!=LENGTH) return null;
 		return wrap(bs);
 	}
@@ -136,9 +137,9 @@ public class Hash extends AArrayBlob {
 	/**
 	 * Computes the Hash for any ACell value.
 	 * 
-	 * May return a cached Hash if available in memory
+	 * May return a cached Hash if available in memory.
 	 * 
-	 * @param value
+	 * @param value Any Cell
 	 * @return Hash of the encoded data for the given value
 	 */
 	public static Hash compute(ACell value) {
@@ -150,7 +151,7 @@ public class Hash extends AArrayBlob {
 	 * Reads a Hash from a ByteBuffer Assumes no Tag, i.e. just Hash.LENGTH for the
 	 * hash is read.
 	 * 
-	 * @param bb
+	 * @param bb ByteBuffer to read from
 	 * @return Hash object read from ByteBuffer
 	 */
 	public static Hash readRaw(ByteBuffer bb) {

@@ -32,24 +32,23 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	}
 
 	/**
-	 * Creates a SetLeaf with the specified entries. Entries must have distinct keys
-	 * but may otherwise be specified in any order.
+	 * Creates a SetLeaf with the specified elements. 
 	 * 
 	 * Null entries are ignored/removed.
 	 * 
-	 * @param entries
+	 * @param elements Refs of Elements to include
 	 * @return New ListMap
 	 */
 	@SafeVarargs
-	public static <V extends ACell> SetLeaf<V> create(Ref<V>... entries) {
-		return create(entries, 0, entries.length);
+	public static <V extends ACell> SetLeaf<V> create(Ref<V>... elements) {
+		return create(elements, 0, elements.length);
 	}
 
 	/**
-	 * Creates a ListMap with the specified entries. Null entries are
+	 * Creates a SetLeaf with the specified elements. Null references are
 	 * ignored/removed.
 	 * 
-	 * @param entries
+	 * @param entries Refs to elements to include (some may be null)
 	 * @param offset  Offset into entries array
 	 * @param length  Number of entries to take from entries array, starting at
 	 *                offset
@@ -191,7 +190,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	 * @param bb ByteBuffer to read from
 	 * @param count Count of map elements
 	 * @return A Map as deserialised from the provided ByteBuffer
-	 * @throws BadFormatException
+	 * @throws BadFormatException If encoding is invalid
 	 */
 	@SuppressWarnings("unchecked")
 	public static <V extends ACell> SetLeaf<V> read(ByteBuffer bb, long count) throws BadFormatException {

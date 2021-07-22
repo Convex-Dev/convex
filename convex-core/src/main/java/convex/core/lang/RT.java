@@ -152,7 +152,7 @@ public class RT {
 	 * Get the target common numeric type for a given set of arguments. - Integers
 	 * upcast to Long - Anything else upcasts to Double
 	 * 
-	 * @param args
+	 * @param args Argument array
 	 * 
 	 * @return The target numeric type, or null if there is a non-numeric argument
 	 */
@@ -170,7 +170,7 @@ public class RT {
 	/**
 	 * Finds the first non-numeric value in an array. Used for error reporting.
 	 * 
-	 * @param args
+	 * @param args Argument array
 	 * @return First non-numeric value, or null if not found.
 	 */
 	public static int findNonNumeric(ACell[] args) {
@@ -185,7 +185,7 @@ public class RT {
 	/**
 	 * Gets the numeric class of an object
 	 * 
-	 * @param a
+	 * @param a Numerical value
 	 * @return Long.class or Double.class if cast possible, or null if not numeric.
 	 */
 	public static Class<?> numericType(ACell a) {
@@ -273,7 +273,7 @@ public class RT {
 
 	/**
 	 * Computes the result of a pow operation. Returns null if a cast fails.
-	 * @param args
+	 * @param args Argument array, should be length 2
 	 * @return Result of exponentiation
 	 */
 	public static CVMDouble pow(ACell[] args) {
@@ -297,7 +297,7 @@ public class RT {
 	/**
 	 * Gets the floor a number after casting to a double. Equivalent to java.lang.StrictMath.floor(...)
 	 * 
-	 * @param a
+	 * @param a Numerical Value
 	 * @return The floor of the number, or null if cast fails
 	 */
 	public static CVMDouble floor(ACell a) {
@@ -309,7 +309,7 @@ public class RT {
 	/**
 	 * Gets the ceiling a number after casting to a double. Equivalent to java.lang.StrictMath.ceil(...)
 	 * 
-	 * @param a
+	 * @param a Numerical Value
 	 * @return The ceiling of the number, or null if cast fails
 	 */
 	public static CVMDouble ceil(ACell a) {
@@ -322,7 +322,7 @@ public class RT {
 	 * Gets the exact positive square root of a number after casting to a double.
 	 * Returns NaN for negative numbers.
 	 * 
-	 * @param a
+	 * @param a Numerical Value
 	 * @return The square root of the number, or null if cast fails
 	 */
 	public static CVMDouble sqrt(ACell a) {
@@ -776,7 +776,7 @@ public class RT {
 	/**
 	 * Gets the name from a CVM value. Supports Strings, Keywords and Symbols.
 	 *
-	 * @param a
+	 * @param a Value to cast to a name
 	 * @return Name of the argument, or null if not Named
 	 */
 	public static AString name(ACell a) {
@@ -913,7 +913,7 @@ public class RT {
 	public static Address castAddress(ACell a) {
 		if (a instanceof Address) return (Address) a;
 		if (a instanceof ABlob) return Address.create((ABlob)a);
-		if (a instanceof AString) return Address.fromHexOrNull(a.toString());
+		if (a instanceof AString) return Address.fromHex(a.toString());
 		CVMLong value=RT.ensureLong(a);
 		if (value==null) return null;
 		return Address.create(value.longValue());

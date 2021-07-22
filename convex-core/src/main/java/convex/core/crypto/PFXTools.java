@@ -55,8 +55,10 @@ public class PFXTools {
 	 * @param keyFile File for existing KeyStore
 	 * @param passPhrase Passphrase for KeyStore. May be blank or null.
 	 * @return KeyStore instance
+	 * @throws IOException If an IO error occurs
+	 * @throws GeneralSecurityException If a security error occurs
 	 */
-	public static KeyStore loadStore(File keyFile, String passPhrase) throws KeyStoreException, IOException, NoSuchAlgorithmException, CertificateException {
+	public static KeyStore loadStore(File keyFile, String passPhrase) throws IOException,GeneralSecurityException {
 
 		// need to load in bouncy castle crypto providers to set/get keys from the keystore
 		Providers.init();

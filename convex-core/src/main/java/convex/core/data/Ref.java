@@ -182,7 +182,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 
 	/**
 	 * Create a new Ref of the same type with updated flags
-	 * @param newFlags
+	 * @param newFlags New flags to set
 	 * @return Updated Ref
 	 */
 	public abstract Ref<T> withFlags(int newFlags);
@@ -424,7 +424,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * 
 	 * Might stack overflow if nesting is too deep - not for use in on-chain code.
 	 * 
-	 * @param a
+	 * @param a Ref or Cell
 	 * @return Set containing all unique refs (accoumulated recursively) within the
 	 *         given object
 	 */
@@ -495,7 +495,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * Logically, provides the guarantee that the set will contain all cells needed
 	 * to recreate the complete value of this Ref.
 	 * 
-	 * @param store
+	 * @param store Store to add to
 	 * @return Set containing this Ref and all direct or indirect child refs
 	 */
 	@SuppressWarnings("unchecked")
@@ -565,7 +565,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * Updates the value stored within this Ref. New value must be equal in value to the old value 
 	 * (identical hash), but may have updated internal refs etc.
 	 * 
-	 * @param newValue
+	 * @param newValue New value
 	 * @return Updated Ref
 	 */
 	public abstract Ref<T> withValue(T newValue);
@@ -642,7 +642,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 
 	/**
 	 * Finds all instances of missing data in this Ref, and adds them to the missing set
-	 * @param missingSet
+	 * @param missingSet Set to add missing instances to
 	 */
 	public void findMissing(HashSet<Hash> missingSet) {
 		if (getStatus()>=Ref.PERSISTED) return;

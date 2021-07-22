@@ -441,10 +441,10 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * Reads a ListMap from the provided ByteBuffer Assumes the header byte and count is
 	 * already read.
 	 * 
-	 * @param bb
-	 * @param count
+	 * @param bb ByteBuffer to read from
+	 * @param count Count of map entries
 	 * @return TreeMap instance as read from ByteBuffer
-	 * @throws BadFormatException
+	 * @throws BadFormatException If encoding is invalid
 	 */
 	@SuppressWarnings("unchecked")
 	public static <K extends ACell, V extends ACell> MapTree<K, V> read(ByteBuffer bb, long count) throws BadFormatException {

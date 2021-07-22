@@ -53,8 +53,8 @@ public class Sets {
 	/**
 	 * Creates a set of all the elements in the given data structure
 	 * 
-	 * @param <T>
-	 * @param source
+	 * @param <T> Type of elements
+	 * @param source Source for elements
 	 * @return A Set
 	 */
 	@SuppressWarnings("unchecked")
@@ -72,8 +72,8 @@ public class Sets {
 	/**
 	 * Creates a set of all the elements in the given data structure
 	 * 
-	 * @param <T>
-	 * @param source
+	 * @param <T> Type of elements
+	 * @param source Source for elements
 	 * @return A Set
 	 */
 	public static <T extends ACell> ASet<T> fromCollection(Collection<T> source) {

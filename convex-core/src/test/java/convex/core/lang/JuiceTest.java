@@ -155,12 +155,12 @@ public class JuiceTest extends ACVMTest {
 
 	@Test
 	public void testHalt() {
-		assertEquals(Juice.HALT + Juice.CONSTANT + Juice.LOOKUP_SYM, juice("(halt 123)"));
+		assertEquals(Juice.RETURN + Juice.CONSTANT + Juice.LOOKUP_SYM, juice("(halt 123)"));
 	}
 
 	@Test
 	public void testRollback() {
-		assertEquals(Juice.ROLLBACK + Juice.CONSTANT + Juice.LOOKUP_SYM, juice("(rollback 123)"));
+		assertEquals(Juice.RETURN + Juice.CONSTANT + Juice.LOOKUP_SYM, juice("(rollback 123)"));
 	}
 
 	@Test

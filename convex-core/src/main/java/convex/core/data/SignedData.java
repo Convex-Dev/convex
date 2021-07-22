@@ -174,7 +174,7 @@ public class SignedData<T extends ACell> extends ACell {
 	 *
 	 * @param data A ByteBuffer containing
 	 * @return A SignedData object
-	 * @throws BadFormatException
+	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static <T extends ACell> SignedData<T> read(ByteBuffer data) throws BadFormatException {
 		// header already assumed to be consumed

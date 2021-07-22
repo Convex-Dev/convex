@@ -81,7 +81,7 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	/**
 	 * Appends a single element to this vector
 	 * 
-	 * @param value
+	 * @param value Value to append
 	 * @return Updated vector
 	 */
 	public abstract AVector<T> append(T value);

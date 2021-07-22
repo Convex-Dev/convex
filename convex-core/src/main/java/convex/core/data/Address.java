@@ -40,7 +40,7 @@ public class Address extends ABlob {
 
 	/**
 	 * Creates an Address from a blob. Must be a valid long value
-	 * @param b
+	 * @param b Blob to convert to an Address
 	 * @return Address instance, or null if not valid
 	 */
 	public static Address create(ABlob b) {
@@ -73,7 +73,7 @@ public class Address extends ABlob {
 	/**
 	 * Constructs an Address object from a hex string
 	 * 
-	 * @param hexString
+	 * @param hexString String to read Address from
 	 * @return An Address constructed from the hex string, or null if not a valid
 	 *         hex string
 	 */
@@ -84,18 +84,6 @@ public class Address extends ABlob {
 		// catch odd length
 		if ((hexString.length()&1)!=0) return null;
 		
-		Address result = fromHexOrNull(hexString);
-		return result;
-	}
-
-	/**
-	 * Constructs an Address object from a hex string
-	 * 
-	 * @param hexString
-	 * @return An Address constructed from the hex string, or null if not a valid
-	 *         hex string
-	 */
-	public static Address fromHexOrNull(String hexString) {
 		if (hexString.length()>16) return null;
 		Blob b=Blob.fromHex(hexString);
 		if (b==null) return null;
@@ -116,7 +104,7 @@ public class Address extends ABlob {
 		
 		if (s.startsWith("0x")) {
 			s=s.substring(2);
-			return fromHexOrNull(s);
+			return fromHex(s);
 		}
 		
 		try {

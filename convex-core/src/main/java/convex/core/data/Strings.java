@@ -12,7 +12,7 @@ public class Strings {
 	/**
 	 * Reads a CVM String value from a bytebuffer. Assumes tag already read.
 	 * 
-	 * @param bb
+	 * @param bb ByteBuffer to read from
 	 * @return String instance
 	 * @throws BadFormatException If format has problems
 	 */

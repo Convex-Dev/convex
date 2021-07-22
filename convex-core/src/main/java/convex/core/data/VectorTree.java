@@ -55,7 +55,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	 * Computes the shift value for a BlockVector of the given count Note: if
 	 * returns zero, count cannot be supported by a valid BlockVector
 	 * 
-	 * @param count
+	 * @param count Number of elements
 	 * @return Shift value
 	 */
 	public static int computeShift(long count) {
@@ -95,9 +95,9 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	 * 32 elements (the minimum TreeVector size) - must be a whole multiple of 16
 	 * elements (complete chunks only)
 	 * 
-	 * @param things
-	 * @param offset
-	 * @param length
+	 * @param things Elements to include
+	 * @param offset Offset into element array
+	 * @param length Number of elements to include
 	 * @return New TreeVector instance
 	 */
 	public static <T extends ACell> VectorTree<T> create(ACell[] things, int offset, int length) {
@@ -196,10 +196,10 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	 * 
 	 * Assumes the header byte and count is already read.
 	 * 
-	 * @param bb
-	 * @param count
+	 * @param bb ByteBuffer to read from
+	 * @param count Number of elements
 	 * @return TreeVector instance as read from ByteBuffer
-	 * @throws BadFormatException
+	 * @throws BadFormatException If encoding is invalid
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> VectorTree<T> read(ByteBuffer bb, long count)
@@ -662,11 +662,11 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		if ((start & Vectors.BITMASK) == 0) {
 			// TODO: this can be fast!
 		}
-		Object[] arr = new Object[Utils.checkedInt(length)];
+		ACell[] arr = new ACell[Utils.checkedInt(length)];
 		for (int i = 0; i < length; i++) {
 			arr[i] = get(start + i);
 		}
-		return (AVector<T>) Vectors.of(arr);
+		return (AVector<T>) Vectors.create(arr);
 	}
 
 	@Override

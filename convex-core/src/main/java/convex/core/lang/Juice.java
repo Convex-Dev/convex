@@ -48,12 +48,6 @@ public class Juice {
 	 */
 	public static final long DO = 10;
 
-	/**
-	 * Juice required to execute a Return op
-	 * 
-	 * Pretty cheap, one alloc and a bit of exceptional value handling.
-	 */
-	public static final long RETURN = 20;
 
 	/**
 	 * Juice required to execute a Let block
@@ -206,19 +200,35 @@ public class Juice {
 	// Juice amounts for compiler. TODO: figure out if compile / eval should be
 	// allowed on-chain
 
+	/**
+	 * Juice cost to compile a Constant value
+	 */
 	public static final long COMPILE_CONSTANT = 30;
 
+	/**
+	 * Juice cost to compile a Constant value
+	 */
 	public static final long COMPILE_LOOKUP = 50;
 
+	/**
+	 * Juice cost to compile a general AST node
+	 */
 	public static final long COMPILE_NODE = 200;
 
+	/**
+	 * Juice cost to expand a constant
+	 */
 	public static final long EXPAND_CONSTANT = 40;
 
+	/**
+	 * Juice cost to expand a sequence
+	 */
 	public static final long EXPAND_SEQUENCE = 100;
 
+	/**
+	 * Juice cost to schedule
+	 */
 	public static final long SCHEDULE = 800;
-
-	public static final long SCHEDULE_EXPAND = 200;
 
 	/**
 	 * Default future schedule juice (10 per hour)
@@ -230,18 +240,20 @@ public class Juice {
 	 */
 	public static final long SCHEDULE_MILLIS_PER_JUICE_UNIT = 360000;
 
-	public static final long ROLLBACK = 50;
-
-	public static final long HALT = 50;
 	
-	protected static final long REDUCED =50;
+	/**
+	 * Juice required to execute an exceptional return (return, halt, rollback etc.)
+	 * 
+	 * Pretty cheap, one alloc and a bit of exceptional value handling.
+	 */
+	public static final long RETURN = 50;
 
 	/**
-	 * Juice cost for accepting an offer of crypto funds.
+	 * Juice cost for accepting an offer of Convex coins.
 	 * 
 	 * We make this a little expensive because it involves updating two separate accounts.
 	 */
-	public static final long ACCEPT = 100;
+	public static final long ACCEPT = 200;
 
 	/**
 	 * Juice cost for constructing a Syntax Object. Fairly lightweight.
@@ -253,8 +265,14 @@ public class Juice {
 	 */
 	public static final long META = Juice.CHEAP_OP;
 
+	/**
+	 * Juice cost for an 'assoc'
+	 */
 	public static final long ASSOC = Juice.BUILD_DATA+Juice.BUILD_PER_ELEMENT*2;
 
+	/**
+	 * Variable Juice cost for set comparison
+	 */
 	public static final long SET_COMPARE_PER_ELEMENT = 10;
 
 	public static final long CREATE_ACCOUNT = 100;
@@ -273,13 +291,13 @@ public class Juice {
 	public static final long PEER_UPDATE = 1000;
 
 	/**
-	 * Saturating multiply and add result = a + b * c
+	 * Saturating multiply and add: result = a + (b * c)
 	 * 
 	 * Returns Long.MAX_VALUE on overflow.
 	 * 
-	 * @param a
-	 * @param b
-	 * @param c
+	 * @param a First number (to be added)
+	 * @param b Second number (to be multiplied)
+	 * @param c Thirst number (to be multiplied)
 	 * @return long result, capped at Long.MAX_VALUE
 	 */
 	public static final long addMul(long a, long b, long c) {
@@ -288,8 +306,8 @@ public class Juice {
 	
 	/**
 	 * Saturating multiply. Returns Long.MAX_VALUE on overflow.
-	 * @param a
-	 * @param b
+	 * @param a First number
+	 * @param b Second number
 	 * @return long result, capped at Long.MAX_VALUE
 	 */
 	public static final long mul(long a, long b) {
@@ -300,8 +318,8 @@ public class Juice {
 	
 	/**
 	 * Saturating addition. Returns Long.MAX_VALUE on overflow.
-	 * @param a
-	 * @param b
+	 * @param a First number
+	 * @param b Second number
 	 * @return long result, capped at Long.MAX_VALUE
 	 */
 	public static final long add(long a, long b) {

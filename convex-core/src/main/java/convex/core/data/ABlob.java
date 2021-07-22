@@ -33,8 +33,8 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	/**
 	 * Copies the bytes from this blob to a given destination
 	 * 
-	 * @param dest
-	 * @param destOffset
+	 * @param dest Destination array
+	 * @param destOffset Offset into destination array
 	 */
 	public abstract void getBytes(byte[] dest, int destOffset);
 
@@ -205,7 +205,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	/**
 	 * Append an additional data object to this, creating a new data object.
 	 * 
-	 * @param d
+	 * @param d Blob to append
 	 * @return A new blob, containing the additional data appended to this blob.
 	 */
 	public abstract ABlob append(ABlob d);
@@ -244,8 +244,8 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 
 	/**
 	 * Tests if this Blob is equal to a subset of a byte array
-	 * @param bytes
-	 * @param byteOffset
+	 * @param bytes Byte array to compare with
+	 * @param byteOffset Offset into byte array
 	 * @return true if exactly equal, false otherwise
 	 */
 	public abstract boolean equalsBytes(byte[] bytes, int byteOffset);

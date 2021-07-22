@@ -32,7 +32,7 @@ public class Blob extends AArrayBlob {
 	/**
 	 * Creates a new data object using a copy of the specified byte range
 	 * 
-	 * @param data
+	 * @param data Byte array
 	 * @param offset Start offset in the byte array
 	 * @param length Number of bytes to take from data array
 	 * @return The new Data object
@@ -49,7 +49,7 @@ public class Blob extends AArrayBlob {
 	/**
 	 * Creates a new data object using a copy of the specified byte array.
 	 * 
-	 * @param data
+	 * @param data Byte array
 	 * @return Blob with the same byte contents as the given array
 	 */
 	public static Blob create(byte[] data) {
@@ -61,7 +61,7 @@ public class Blob extends AArrayBlob {
 	 * directly. Use only if no other references to the byte array are kept which
 	 * might be mutated.
 	 * 
-	 * @param data
+	 * @param data Byte array
 	 * @return Blob wrapping the given data
 	 */
 	public static Blob wrap(byte[] data) {
@@ -121,7 +121,7 @@ public class Blob extends AArrayBlob {
 	 * 
 	 * Implemented by testing equality of byte data
 	 * 
-	 * @param other
+	 * @param other Blob to comapre with
 	 * @return true if blobs are equal, false otherwise.
 	 */
 	public boolean equals(AArrayBlob other) {
@@ -129,7 +129,7 @@ public class Blob extends AArrayBlob {
 		if (this.length != other.length) return false;
 
 		// avoid false positives with other Blob types, especially Hash and Address
-		if (this.getClass() != other.getClass()) return false;
+		if (this.getType() != other.getType()) return false;
 
 		if ((contentHash != null) && (other.contentHash != null) && contentHash.equals(other.contentHash)) return true;
 		return Utils.arrayEquals(other.store, other.offset, this.store, this.offset, this.length);
@@ -138,7 +138,7 @@ public class Blob extends AArrayBlob {
 	/**
 	 * Constructs a Blob object from a hex string
 	 * 
-	 * @param hexString
+	 * @param hexString Hex String to read
 	 * @return Blob with the provided hex value, or null if not a valid blob
 	 */
 	public static Blob fromHex(String hexString) {
@@ -178,7 +178,7 @@ public class Blob extends AArrayBlob {
 	 * @param source Source Blob object.
 	 * @param len Length in bytes to take from the source Blob
 	 * @return Blob read from the source
-	 * @throws BadFormatException
+	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static AArrayBlob read(Blob source, long len) throws BadFormatException {
 		// compute data length, excluding tag and encoded length

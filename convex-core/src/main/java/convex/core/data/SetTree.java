@@ -335,13 +335,13 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	public static int MAX_ENCODING_LENGTH = 4 + Format.MAX_EMBEDDED_LENGTH * 16;
 
 	/**
-	 * Reads a ListMap from the provided ByteBuffer Assumes the header byte and count is
+	 * Reads a SetTree from the provided ByteBuffer Assumes the header byte and count is
 	 * already read.
 	 * 
-	 * @param bb
-	 * @param count
+	 * @param bb ByteBuffer to read from
+	 * @param count Number of elements
 	 * @return TreeMap instance as read from ByteBuffer
-	 * @throws BadFormatException
+	 * @throws BadFormatException If encoding is invalid
 	 */
 	@SuppressWarnings("unchecked")
 	public static <V extends ACell> SetTree<V> read(ByteBuffer bb, long count) throws BadFormatException {

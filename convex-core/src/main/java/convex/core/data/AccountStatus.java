@@ -187,8 +187,8 @@ public class AccountStatus extends ARecord {
 	 * <li>The exported symbol does not refer to a function</li>
 	 * </ul>
 	 * 
-	 * @param <R>
-	 * @param sym
+	 * @param <R> Result type
+	 * @param sym Symbol to look up
 	 * @return The function specified in Actor, or null if not
 	 *         found/exported.
 	 */
@@ -262,7 +262,7 @@ public class AccountStatus extends ARecord {
 	/**
 	 * Updates this account with a new sequence number.
 	 * 
-	 * @param newSequence
+	 * @param newSequence New sequence number
 	 * @return Updated account, or null if the sequence number was wrong
 	 */
 	public AccountStatus updateSequence(long newSequence) {
@@ -292,7 +292,7 @@ public class AccountStatus extends ARecord {
 	/**
 	 * Gets the value in the Account's environment for the given symbol.
 	 * 
-	 * @param <R>
+	 * @param <R> Result type
 	 * @param symbol Symbol to get in Environment
 	 * @return The value from the environment, or null if not found
 	 */
@@ -445,7 +445,7 @@ public class AccountStatus extends ARecord {
 	/**
 	 * Adds a change in balance to this account. Must not cause an illegal balance. Returns this instance unchanged
 	 * if the delta is zero
-	 * @param delta
+	 * @param delta Amount of Convex copper to add
 	 * @return Updates account record
 	 */
 	public AccountStatus addBalance(long delta) {

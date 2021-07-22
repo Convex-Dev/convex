@@ -135,7 +135,7 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 
 	/**
 	 * Returns true if this map contains all the same keys as another map
-	 * @param map
+	 * @param map Map to compare with
 	 * @return True if this map contains all the keys of the other
 	 */
 	public abstract boolean containsAllKeys(AHashMap<K, V> map);

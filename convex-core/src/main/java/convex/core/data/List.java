@@ -39,7 +39,7 @@ public class List<T extends ACell> extends AList<T> {
 	 * order
 	 * 
 	 * @param <T>    Type of list elements
-	 * @param vector
+	 * @param vector Vector to reverse into a List
 	 * @return Vector representing this list in reverse order
 	 */
 	@SuppressWarnings("unchecked")
@@ -58,7 +58,7 @@ public class List<T extends ACell> extends AList<T> {
 	/***
 	 * Creates a list wrapping the given array. May destructively alter the array
 	 * @param <T> Type of element
-	 * @param args
+	 * @param args Elements to include
 	 * @return New List
 	 */
 	@SuppressWarnings("unchecked")
@@ -278,7 +278,7 @@ public class List<T extends ACell> extends AList<T> {
 	/**
 	 * Prepends an element to the list in first position.
 	 * 
-	 * @param value
+	 * @param value Value to prepend
 	 * @return Updated list
 	 */
 	@Override

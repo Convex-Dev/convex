@@ -255,7 +255,7 @@ public class Context<T extends ACell> extends AObject {
 	 *
 	 * Useful for Testing
 	 *
-	 * @param state
+	 * @param state State to use for this Context
 	 * @return Fake context
 	 */
 	public static <R extends ACell> Context<R> createFake(State state) {
@@ -268,13 +268,13 @@ public class Context<T extends ACell> extends AObject {
 	 * Not valid for use in real transactions, but can be used to
 	 * compute stuff off-chain "as-if" the actor made the call.
 	 *
-	 * @param state
-	 * @param actor
+	 * @param state State to use for this Context
+	 * @param origin Origin address to use
 	 * @return Fake context
 	 */
-	public static <R extends ACell> Context<R> createFake(State state, Address actor) {
-		if (actor==null) throw new Error("Null actor address!");
-		return create(state,Constants.MAX_TRANSACTION_JUICE,EMPTY_BINDINGS,null,0,actor,null,actor, 0, DEFAULT_LOG,null);
+	public static <R extends ACell> Context<R> createFake(State state, Address origin) {
+		if (origin==null) throw new IllegalArgumentException("Null address!");
+		return create(state,Constants.MAX_TRANSACTION_JUICE,EMPTY_BINDINGS,null,0,origin,null,origin, 0, DEFAULT_LOG,null);
 	}
 
 	/**
@@ -285,7 +285,7 @@ public class Context<T extends ACell> extends AObject {
 	 *
 	 * @param state Initial State for Context
 	 * @param origin Origin Address for Context
-	 * @param juice
+	 * @param juice Initial juice for Context
 	 * @return Initial execution context with reserved juice.
 	 */
 	public static <T extends ACell> Context<T> createInitial(State state, Address origin,long juice) {
@@ -423,30 +423,50 @@ public class Context<T extends ACell> extends AObject {
 		return chainState.state;
 	}
 
+	/**
+	 * Get the juice available in this Context
+	 * @return Juice available
+	 */
 	public long getJuice() {
 		return juice;
 	}
 
+	/**
+	 * Get the current offer from this Context
+	 * @return Offered amount in Convex copper
+	 */
 	public long getOffer() {
 		return chainState.getOffer();
 	}
 
+	/**
+	 * Gets the current Environment
+	 * @return Environment map
+	 */
 	public AHashMap<Symbol,ACell> getEnvironment() {
 		return chainState.getEnvironment();
 	}
 
+	/**
+	 * Gets the compiler state
+	 * @return CompilerState instance
+	 */
 	public CompilerState getCompilerState() {
 		return compilerState;
 	}
 
+	/**
+	 * Gets the metadata for the current Account
+	 * @return Metadata map
+	 */
 	public AHashMap<Symbol,AHashMap<ACell,ACell>> getMetadata() {
 		return chainState.getMetadata();
 	}
 
 	/**
 	 * Consumes juice, returning an updated context if sufficient juice remains or an exceptional JUICE error.
-	 * @param <R>
-	 * @param gulp
+	 * @param <R> Result type
+	 * @param gulp Amount of jjuice to consume
 	 * @return Updated context with juice consumed
 	 */
 	@SuppressWarnings("unchecked")
@@ -485,8 +505,8 @@ public class Context<T extends ACell> extends AObject {
 	 *
 	 * Returns an UNDECLARED exception if the symbol cannot be resolved.
 	 *
-	 * @param <R>
-	 * @param symbol
+	 * @param <R> Result type
+	 * @param symbol Symbol to look up
 	 * @return Updated Context
 	 */
 	public <R extends ACell> Context<R> lookupDynamic(Symbol symbol) {
@@ -501,7 +521,7 @@ public class Context<T extends ACell> extends AObject {
 	 *
 	 * @param <R> Type of value result
 	 * @param address Address of account in which to look up value
-	 * @param symbol
+	 * @param symbol Symbol to look up
 	 * @return Updated Context
 	 */
 	@SuppressWarnings("unchecked")
@@ -760,8 +780,8 @@ public class Context<T extends ACell> extends AObject {
 	 *
 	 * Context may become exceptional depending on the result type.
 	 *
-	 * @param <R>
-	 * @param value
+	 * @param <R> Result type
+	 * @param value Value
 	 * @return Context updated with the specified result.
 	 */
 	@SuppressWarnings("unchecked")
@@ -773,8 +793,8 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Updates this context with a given value, which may either be a normal result or exceptional value
-	 * @param <R>
-	 * @param value
+	 * @param <R> Result type
+	 * @param value Value
 	 * @return Context updated with the specified result value.
 	 */
 	@SuppressWarnings("unchecked")
@@ -798,7 +818,7 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Returns this context with a JUICE error, consuming all juice.
-	 * @param <R>
+	 * @param <R> Result type
 	 * @return Exceptional Context signalling JUICE error.
 	 */
 	public <R extends ACell> Context<R> withJuiceError() {
@@ -972,10 +992,10 @@ public class Context<T extends ACell> extends AObject {
 	 * Execute an op, and bind the result to the given binding form in the lexical environment
 	 *
 	 * Binding form may be a destructuring form
-	 * @param bindingForm
-	 * @param op
+	 * @param bindingForm Binding form
+	 * @param op Op to execute to get binding values
 	 *
-	 * @param <I>
+	 * @param <I> Result type of Context
 	 * @return Context with local bindings updated
 	 */
 	@SuppressWarnings("unchecked")
@@ -988,8 +1008,9 @@ public class Context<T extends ACell> extends AObject {
 	/**
 	 * Updates local bindings with a given binding form
 	 *
-	 * @param bindingForm
-	 * @param args
+	 * @param <R> Result type of Context
+	 * @param bindingForm Binding form
+	 * @param args Arguments to bind
 	 * @return Non-exceptional Context with local bindings updated, or an exceptional result if bindings fail
 	 */
 	@SuppressWarnings("unchecked")
@@ -1105,7 +1126,7 @@ public class Context<T extends ACell> extends AObject {
 	/**
 	 * Defines a value in the environment of the current address
 	 * @param key Symbol of the mapping to create
-	 * @param value
+	 * @param value Value to define
 	 * @return Updated context with symbol defined in environment
 	 */
 	public Context<T> define(Symbol key, ACell value) {
@@ -1149,7 +1170,7 @@ public class Context<T extends ACell> extends AObject {
 	 * Expand and compile a form in this Context.
 	 *
 	 * @param <R> Return type of compiled op
-	 * @param form
+	 * @param form Form to expand and compile
 	 * @return Updated Context with compiled Op as result
 	 */
 	public <R extends ACell> Context<AOp<R>> expandCompile(ACell form) {
@@ -1171,7 +1192,7 @@ public class Context<T extends ACell> extends AObject {
 	 * Compile a form in this Context. Form must already be fully expanded to a Syntax Object
 	 *
 	 * @param <R> Return type of compiled op
-	 * @param expandedForm
+	 * @param expandedForm Form to compile
 	 * @return Updated Context with compiled Op as result
 	 */
 	public <R extends ACell> Context<AOp<R>> compile(ACell expandedForm) {
@@ -1208,7 +1229,7 @@ public class Context<T extends ACell> extends AObject {
 	 * Expands, compile and executes a form in the current context.
 	 *
 	 * @param <R> Return type of evaluation
-	 * @param form
+	 * @param form Form to evaluate
 	 * @return Context containing the result of evaluating the specified form
 	 */
 	@SuppressWarnings("unchecked")
@@ -1223,9 +1244,9 @@ public class Context<T extends ACell> extends AObject {
 	 * Evaluates a form as another Address.
 	 *
 	 * Causes TRUST error if the Address is not controlled by the current address.
-	 * @param <R>
-	 * @param address
-	 * @param form
+	 * @param <R> Result type
+	 * @param address Address of Account in which to evaluate
+	 * @param form Form to evaluate
 	 * @return Updated Context
 	 */
 	public <R extends ACell> Context<R> evalAs(Address address, ACell form) {
@@ -1333,12 +1354,12 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Changes the depth of this context. Returns exceptional result if depth limit exceeded.
-	 * @param <R>
-	 * @param newDepth
+	 * @param <R> Result type
+	 * @param newDepth New depth value
 	 * @return Updated context with new depth set
 	 */
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> withDepth(int newDepth) {
+	<R extends ACell> Context<R> withDepth(int newDepth) {
 		if (newDepth==depth) return (Context<R>) this;
 		if ((newDepth<0)||(newDepth>Constants.MAX_DEPTH)) return withError(ErrorCodes.DEPTH,"Invalid depth: "+newDepth);
 		depth=newDepth;
@@ -1495,7 +1516,7 @@ public class Context<T extends ACell> extends AObject {
 	/**
 	 * Sets the memory allowance for the current account, buying / selling from the pool as necessary to
 	 * ensure the correct final allowance
-	 * @param allowance
+	 * @param allowance New memory allowance
 	 * @return Context indicating the price paid for the allowance change (may be zero or negative for refund)
 	 */
 	public Context<CVMLong> setMemory(long allowance) {
@@ -1539,8 +1560,8 @@ public class Context<T extends ACell> extends AObject {
 	 *
 	 * STATE error if offered amount is insufficient. ARGUMENT error if acceptance is negative.
 	 *
-	 * @param <R>
-	 * @param amount
+	 * @param <R> Type of result
+	 * @param amount Amount to accept
 	 * @return Updated context, with long amount accepted as result
 	 */
 	@SuppressWarnings("unchecked")
@@ -1750,7 +1771,7 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Create a new Account with a given AccountKey (may be null for actors etc.)
-	 * @param key
+	 * @param key New Account Key
 	 * @return Updated context with new Account added
 	 */
 	public Context<Address> createAccount(AccountKey key) {
@@ -2042,8 +2063,8 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Sets the controller for the current Account
-	 * @param <R>
-	 * @param address
+	 * @param <R> Result type
+	 * @param address New controller Address
 	 * @return Context with current Account controller set
 	 */
 	public <R extends ACell> Context<R> setController(Address address) {
@@ -2055,7 +2076,7 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Sets the public key for the current account
-	 * @param <R>
+	 * @param <R> Result type
 	 * @param publicKey New Account Public Key
 	 * @return Context with current Account Key set
 	 */
@@ -2071,7 +2092,7 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Switches the context to a new address, creating a new execution context. Suitable for testing.
-	 * @param <R>
+	 * @param <R> Result type
 	 * @param newAddress New Address to use.
 	 * @return Result type of new Context
 	 */
@@ -2095,7 +2116,7 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Appends a log entry for the current address.
-	 * @param values
+	 * @param values Values to log
 	 * @return Updated Context
 	 */
 	public Context<T> appendLog(AVector<ACell> values) {
@@ -2130,7 +2151,7 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Expands a form with the default *initial-expander*
-	 * @param form
+	 * @param form Form to expand
 	 * @return Syntax Object resulting from expansion.
 	 */
 	public Context<ACell> expand(ACell form) {
@@ -2202,7 +2223,7 @@ public class Context<T extends ACell> extends AObject {
 
 		if (me==null) return null;
 
-			// TODO: examine syntax object for expander details?
+		// TODO: examine syntax object for expander details?
 		ACell expBool =me.get(Keywords.EXPANDER);
 		if (RT.bool(expBool)) {
 			// expand form using specified expander and continuation expander

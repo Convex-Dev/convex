@@ -49,7 +49,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * 
 	 * Null entries are ignored/removed.
 	 * 
-	 * @param entries
+	 * @param entries Entries for map
 	 * @return New ListMap
 	 */
 	public static <K extends ACell, V extends ACell> MapLeaf<K, V> create(MapEntry<K, V>[] entries) {
@@ -345,7 +345,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * @param bb ByteBuffer to read from
 	 * @param count Count of map elements
 	 * @return A Map as deserialised from the provided ByteBuffer
-	 * @throws BadFormatException
+	 * @throws BadFormatException If encoding is invalid
 	 */
 	@SuppressWarnings("unchecked")
 	public static <K extends ACell, V extends ACell> MapLeaf<K, V> read(ByteBuffer bb, long count) throws BadFormatException {

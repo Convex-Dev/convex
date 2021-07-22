@@ -60,7 +60,7 @@ public class Symbol extends ASymbolic {
 	/**
 	 * Creates a Symbol with the given name. Must be an unqualified name.
 	 * 
-	 * @param name
+	 * @param name Name for Symbol
 	 * @return Symbol instance, or null if the name is invalid for a Symbol.
 	 */
 	public static Symbol create(AString name) {
@@ -76,7 +76,7 @@ public class Symbol extends ASymbolic {
 
 	/**
 	 * Tests if this Symbol is equal to another Symbol. Equality is defined by both namespace and name being equal.
-	 * @param sym
+	 * @param sym Symbol to compare with
 	 * @return true if Symbols are equal, false otherwise
 	 */
 	public boolean equals(Symbol sym) {

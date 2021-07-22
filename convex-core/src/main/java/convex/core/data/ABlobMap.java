@@ -35,7 +35,7 @@ public abstract class ABlobMap<K extends ABlob, V extends ACell> extends AMap<K,
 	/**
 	 * Gets the map entry for a given blob
 	 * 
-	 * @param key
+	 * @param key Key to lookup up
 	 * @return The value specified by the given blob key or null if not present.
 	 */
 	public abstract V get(ABlob key);

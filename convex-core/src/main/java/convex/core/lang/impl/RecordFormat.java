@@ -50,7 +50,7 @@ public class RecordFormat {
 
 	/**
 	 * Gets the key at the specified index
-	 * @param i
+	 * @param i Index of record key
 	 * @return Keyword at the specified index
 	 */
 	public Keyword getKey(int i) {

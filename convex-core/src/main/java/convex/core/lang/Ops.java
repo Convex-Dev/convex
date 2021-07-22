@@ -49,7 +49,7 @@ public class Ops {
 	 * @param <T> The return type of the Op
 	 * @param bb  ByteBuffer
 	 * @return Op read from ByteBuffer
-	 * @throws BadFormatException
+	 * @throws BadFormatException If encoding is invalid
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> AOp<T> read(ByteBuffer bb) throws BadFormatException {
