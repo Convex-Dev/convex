@@ -30,7 +30,7 @@ public class MessageSender {
 	/**
 	 * Buffers a message for sending.
 	 * 
-	 * @param src
+	 * @param src Source ByteBuffer
 	 * @return True if successfully buffered, false otherwise (insufficient send buffer
 	 *         size)
 	 */
@@ -51,7 +51,7 @@ public class MessageSender {
 	 * Try to send bytes on the outbound channel.
 	 * 
 	 * @return True if there are more bytes to send, false otherwise.
-	 * @throws IOException
+	 * @throws IOException If IO error occurs
 	 */
 	public boolean maybeSendBytes() throws IOException {
 		synchronized (buffer) {

@@ -1,5 +1,7 @@
 package convex.api;
 
+import java.io.IOException;
+
 public class Applications {
 
 	/**
@@ -8,9 +10,9 @@ public class Applications {
 	 * @param c Main class to launch
 	 * @param args Command line args for launched process
 	 * @return Process instance that can be used to observe exit value etc.
-	 * @throws Exception 
+	 * @throws IOException if IO error occurs
 	 */
-	public static Process launchApp(Class<?> c, String... args) throws Exception {
+	public static Process launchApp(Class<?> c, String... args) throws IOException {
 		// construct path to java executable
 		String separator = System.getProperty("file.separator");
 		String classpath = System.getProperty("java.class.path");

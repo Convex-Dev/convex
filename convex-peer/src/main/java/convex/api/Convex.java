@@ -135,8 +135,8 @@ public class Convex {
 	 * Creates an anonymous connection to a Peer, suitable for queries
 	 * @param hostAddress Address of Peer
 	 * @return New Convex client instance
-	 * @throws IOException
-	 * @throws TimeoutException
+	 * @throws IOException If IO Error occurs
+	 * @throws TimeoutException If connection attempt times out
 	 */
 	public static Convex connect(InetSocketAddress hostAddress) throws IOException, TimeoutException {
 		return connect(hostAddress,(Address)null, (AKeyPair)null);
@@ -151,7 +151,7 @@ public class Convex {
 	 * @param keyPair     Key pair to use for client transactions
 	 * @return New Convex client instance
 	 * @throws IOException If connection fails
-	 * @throws TimeoutException
+	 * @throws TimeoutException If connection attempt times out
 	 */
 	public static Convex connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair) throws IOException, TimeoutException {
 		return Convex.connect(peerAddress, address, keyPair, Stores.current());
@@ -167,7 +167,7 @@ public class Convex {
 	 * @param store   Store to use for this connection
 	 * @return New Convex client instance
 	 * @throws IOException If connection fails
-	 * @throws TimeoutException
+	 * @throws TimeoutException If connection attempt times out
 	 */
 	public static Convex connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair, AStore store) throws IOException, TimeoutException {
 		Convex convex = new Convex(address, keyPair);
@@ -268,8 +268,8 @@ public class Convex {
 	 *
 	 * @param publicKey Public key to set for the new account
 	 * @return Address of account created
-	 * @throws TimeoutException
-	 * @throws IOException
+	 * @throws TimeoutException If attempt times out
+	 * @throws IOException If IO error occurs
 	 */
 	public Address createAccount(AccountKey publicKey) throws TimeoutException, IOException {
 		Invoke trans = Invoke.create(address, 0, "(create-account 0x" + publicKey.toHexString() + ")");
@@ -776,10 +776,10 @@ public class Convex {
 
 	/**
 	 * Connect to a local Server, using the Peer's address and keypair
-	 * @param server
+	 * @param server Server to connect to
 	 * @return New Client Connection
-	 * @throws TimeoutException
-	 * @throws IOException
+	 * @throws TimeoutException If connection attempt times out
+	 * @throws IOException If IO error occurs
 	 */
 	public static Convex connect(Server server) throws IOException, TimeoutException {
 		return connect(server.getHostAddress(),server.getPeerController(),server.getKeyPair());

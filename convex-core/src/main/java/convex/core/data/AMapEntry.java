@@ -105,7 +105,7 @@ public abstract class AMapEntry<K extends ACell, V extends ACell> extends AVecto
 	 * Create a new MapEntry with an updated key. Shares old value. Returns the same
 	 * MapEntry if unchanged
 	 * 
-	 * @param value
+	 * @param key Key to update
 	 * @return
 	 */
 	protected abstract AMapEntry<K, V> withKey(K key);
@@ -114,7 +114,7 @@ public abstract class AMapEntry<K extends ACell, V extends ACell> extends AVecto
 	 * Create a new MapEntry with an updated value. Shares old key. Returns the same
 	 * MapEntry if unchanged
 	 * 
-	 * @param value
+	 * @param value Value to update
 	 * @return
 	 */
 	protected abstract AMapEntry<K, V> withValue(V value);

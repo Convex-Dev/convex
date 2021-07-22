@@ -46,8 +46,8 @@ class ChallengeRequest {
 
 	/**
 	 * Sends out a single challenge to the remote peer.
-	 * @param connection 
-	 * @param peer 
+	 * @param connection Connection
+	 * @param peer This Peer
 	 * @return ID of message sent, or negative value if sending fails
 	 */
 	public long send(Connection connection, Peer peer) {

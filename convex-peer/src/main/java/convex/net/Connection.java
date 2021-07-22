@@ -102,13 +102,13 @@ public class Connection {
 	 * Create a PeerConnection using an existing channel. Does not perform any
 	 * connection initialisation: channel should already be connected.
 	 *
-	 * @param channel
+	 * @param channel Byte channel to wrap
 	 * @param receiveAction  Consumer to be called when a Message is received
 	 * @param store          Store to use when receiving messages.
 	 * @param trustedPeerKey Trusted peer account key if this is a trusted
-	 *                       conneciton, if not then null*
+	 *                       connection, if not then null*
 	 * @return New Connection instance
-	 * @throws IOException
+	 * @throws IOException If IO error occurs
 	 */
 	public static Connection create(ByteChannel channel, Consumer<Message> receiveAction, AStore store,
 			AccountKey trustedPeerKey) throws IOException {
@@ -218,7 +218,7 @@ public class Connection {
 	 *
 	 * @param value Any data object, which will be encoded and sent as a single cell
 	 * @return true if buffered successfully, false otherwise (not sent)
-	 * @throws IOException
+	 * @throws IOException If IO error occurs
 	 */
 	public boolean sendData(ACell value) throws IOException {
 		log.trace("Sending data: {}", value);
@@ -231,7 +231,7 @@ public class Connection {
 	 *
 	 * @param value Any data object
 	 * @return true if buffered successfully, false otherwise (not sent)
-	 * @throws IOException
+	 * @throws IOException If IO error occurs
 	 */
 	public boolean sendMissingData(Hash value) throws IOException {
 		log.trace("Requested missing data for hash {} with store {}", value.toHexString(), Stores.current());
@@ -243,7 +243,7 @@ public class Connection {
 	 *
 	 * @param form A data object representing the query form
 	 * @return The ID of the message sent, or -1 if send buffer is full.
-	 * @throws IOException
+	 * @throws IOException If IO error occurs
 	 */
 	public long sendQuery(ACell form) throws IOException {
 		return sendQuery(form, null);
@@ -255,7 +255,7 @@ public class Connection {
 	 * @param form    A data object representing the query form
 	 * @param address The address with which to run the query, which may be null
 	 * @return The ID of the message sent, or -1 if send buffer is full.
-	 * @throws IOException
+	 * @throws IOException If IO error occurs
 	 */
 	public long sendQuery(ACell form, Address address) throws IOException {
 		AStore temp = Stores.current();
@@ -274,7 +274,7 @@ public class Connection {
 	 * Sends a STATUS Request Message on this connection.
 	 *
 	 * @return The ID of the message sent, or -1 if send buffer is full.
-	 * @throws IOException
+	 * @throws IOException If IO error occurs
 	 */
 	public long sendStatusRequest() throws IOException {
 		AStore temp = Stores.current();
@@ -295,7 +295,7 @@ public class Connection {
 	 *
 	 * @return The ID of the message sent, or -1 if the message cannot be sent.
 	 *
-	 * @throws IOException
+	 * @throws IOException If IO error occurs
 	 *
 	 */
 	public long sendChallenge(SignedData<ACell> challenge) throws IOException {
@@ -315,7 +315,7 @@ public class Connection {
 	 * @param response Signed response for the remote peer
 	 * @return The ID of the message sent, or -1 if the message cannot be sent.
 	 *
-	 * @throws IOException
+	 * @throws IOException If IO error occurs
 	 *
 	 */
 	public long sendResponse(SignedData<ACell> response) throws IOException {
@@ -338,7 +338,7 @@ public class Connection {
 	 *
 	 * Returns -1 if the message could not be sent because of a full buffer.
 	 *
-	 * @param signed
+	 * @param signed Signed transaction
 	 * @return Message ID of the transaction request, or -1 if send buffer is full.
 	 * @throws IOException In the event of an IO error, e.g. closed connection
 	 */
@@ -361,7 +361,7 @@ public class Connection {
 	 * @param id    ID for result message
 	 * @param value Any data object
 	 * @return True if buffered for sending successfully, false otherwise
-	 * @throws IOException
+	 * @throws IOException If IO error occurs
 	 */
 	public boolean sendResult(CVMLong id, ACell value) throws IOException {
 		return sendResult(id, value, null);
@@ -386,7 +386,7 @@ public class Connection {
 	 *
 	 * @param result Result data structure
 	 * @return true if message queued successfully, false otherwise
-	 * @throws IOException
+	 * @throws IOException If IO error occurs
 	 */
 	public boolean sendResult(Result result) throws IOException {
 		return sendObject(MessageType.RESULT, result);
@@ -422,7 +422,7 @@ public class Connection {
 	 *
 	 * @param msg Message to send
 	 * @return true if message buffered successfully, false if failed
-	 * @throws IOException
+	 * @throws IOException If IO error occurs
 	 */
 	public boolean sendMessage(Message msg) throws IOException {
 		return sendObject(msg.getType(), msg.getPayload());
@@ -435,7 +435,7 @@ public class Connection {
 	 * @param type    Type of message
 	 * @param payload Payload value for message
 	 * @return true if message queued successfully, false otherwise
-	 * @throws IOException
+	 * @throws IOException If IO error occurs
 	 */
 	public boolean sendObject(MessageType type, ACell payload) throws IOException {
 		Counters.sendCount++;
@@ -545,7 +545,7 @@ public class Connection {
 	 * Starts listening for received events with this given peer connection.
 	 * PeerConnection must have a selectable SocketChannel associated
 	 *
-	 * @throws IOException
+	 * @throws IOException If IO error occurs
 	 */
 	public void startClientListening() throws IOException {
 		SocketChannel chan = (SocketChannel) channel;
@@ -666,8 +666,8 @@ public class Connection {
 	 * SECURITY: Called on NIO Thread (Server or client Connection)
 	 *
 	 * @return The number of bytes read from channel
-	 * @throws IOException
-	 * @throws BadFormatException
+	 * @throws IOException If IO error occurs
+	 * @throws BadFormatException If there is an encoding error
 	 */
 	public int handleChannelRecieve() throws IOException, BadFormatException {
 		AStore tempStore = Stores.current();
@@ -685,7 +685,7 @@ public class Connection {
 	 *
 	 * SECURITY: Called on Connection Selector Thread
 	 *
-	 * @param key
+	 * @param key Selection Key
 	 */
 	public static void selectWrite(SelectionKey key) {
 		try {

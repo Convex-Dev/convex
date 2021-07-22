@@ -218,7 +218,7 @@ public class Server implements Closeable {
 	 * Creates a new unlaunched Server with a given config. Reference to config is kept: don't
 	 * mutate elsewhere.
 	 *
-	 * @param config
+	 * @param config Server configuration map
 	 * @return New Server instance
 	 */
 	public static Server create(HashMap<Keyword, Object> config) {
@@ -229,7 +229,7 @@ public class Server implements Closeable {
 	 * Creates a Server with a given config. Reference to config is kept: don't
 	 * mutate elsewhere.
 	 *
-	 * @param config
+	 * @param config Server configuration map
 	 *
 	 * @param event Event interface where the server will send information about the peer
 	 * @return New Server instance

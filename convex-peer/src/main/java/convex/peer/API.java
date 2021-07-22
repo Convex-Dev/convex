@@ -92,7 +92,7 @@ public class API {
 	 *
 	 * @param keyPairs List of keypairs for peers
 	 * @param genesisState GEnesis state for local network
-	 * @param event
+	 * @param event Server event handler
 	 *
 	 * @return List of Servers launched
 	 *
