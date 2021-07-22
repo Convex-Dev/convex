@@ -8,12 +8,16 @@ import java.util.Arrays;
 /**
  * A SecureRandom instance that returns deterministic values given an initial seed.
  * 
- * SECURITY: Neither secure nor random, but useful for testing. Please don't use for protecting real assets....
+ * SECURITY: Neither secure nor truly random, but useful for testing. Please don't use for protecting real assets....
  * 
  */
 @SuppressWarnings("serial")
 public class InsecureRandom extends SecureRandom {
 
+	/**
+	 * Create an InsecureRandom instance with a specified seed
+	 * @param seed Seed value to use
+	 */
 	public InsecureRandom(long seed) {
 		super(new InsecureRandomSpi(seed), SECURITY_PROVIDER);
 	}

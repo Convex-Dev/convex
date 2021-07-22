@@ -16,20 +16,20 @@ public abstract class ASignature extends ACell {
 
 	/**
 	 * Checks if the signature is valid for a given message hash
-	 * @param hash
-	 * @param publickKey
+	 * @param hash Hash of value to verify
+	 * @param publicKey Public key of signer
 	 * @return True if signature is valid, false otherwise
 	 */
-	public abstract boolean verify(Hash hash, AccountKey publickKey);
+	public abstract boolean verify(Hash hash, AccountKey publicKey);
 	
 	/**
 	 * Reads a Signature from the given ByteBuffer. Assumes tag byte already read.
 	 * 
-	 * Uses Ed25519 or ECDSA as configured.
+	 * Uses Ed25519
 	 * 
 	 * @param bb ByteBuffer to read from
 	 * @return Signature instance
-	 * @throws BadFormatException
+	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static ASignature read(ByteBuffer bb) throws BadFormatException {
 		return Ed25519Signature.read(bb);
@@ -37,20 +37,19 @@ public abstract class ASignature extends ACell {
 	
 	/**
 	 * Gets the content of this Signature as a hex string
-	 * @return Hex String represenation of Signature
+	 * @return Hex String representation of Signature
 	 */
 	public abstract String toHexString();
 	
 	/**
-	 * Reads a Signature from the given ByteBuffer. Assumes tag byte already read.
+	 * Construct a Signature from a hex string
 	 * 
-	 * Uses Ed25519 or ECDSA as configured.
+	 * Uses Ed25519 
 	 * 
 	 * @param hex Hex String to read from
 	 * @return Signature instance
-	 * @throws BadFormatException
 	 */
-	public static ASignature fromHex(String hex) throws BadFormatException {
+	public static ASignature fromHex(String hex) {
 		byte[] bs=Utils.hexToBytes(hex);
 		return Ed25519Signature.wrap(bs);
 	}

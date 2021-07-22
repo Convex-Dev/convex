@@ -165,6 +165,12 @@ public class BlockResult extends ARecord {
 		return 1+state.estimatedEncodingSize()+results.estimatedEncodingSize();
 	}
 
+	/**
+	 * Decodes a BlockResult from a ByteBuffer
+	 * @param bb ByteBuffer to read from
+	 * @return BlockResult instance
+	 * @throws BadFormatException If encoding format has errors
+	 */
 	public static BlockResult read(ByteBuffer bb) throws BadFormatException {
 		State newState=Format.read(bb);
 		if (newState==null) throw new BadFormatException("Null state");

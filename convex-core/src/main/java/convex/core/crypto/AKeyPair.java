@@ -30,7 +30,7 @@ public abstract class AKeyPair {
 
 	/**
 	 * Signs a value with this key pair 
-	 * @param <R>
+	 * @param <R> Type of Value
 	 * @param value Value to sign. Can be any valid CVM value.
 	 * @return Signed Data Object
 	 */
@@ -41,7 +41,7 @@ public abstract class AKeyPair {
 
 	/**
 	 * Signs a hash value with this key pair, producing a signature of the appropriate type.
-	 * @param hash
+	 * @param hash Hash of value to sign
 	 * @return A Signature compatible with the key pair.
 	 */
 	public abstract ASignature sign(Hash hash);

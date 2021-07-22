@@ -91,6 +91,12 @@ public class Peer {
 		this.timestamp = timeStamp;
 	}
 
+	/**
+	 * Constructs a Peer instance from persisted PEer Data
+	 * @param keyPair Key Pair for Peer
+	 * @param peerData Peer data map
+	 * @return NEw Peer instance
+	 */
 	@SuppressWarnings("unchecked")
 	public static Peer fromData(AKeyPair keyPair,AMap<Keyword, ACell> peerData)  {
 		SignedData<Belief> belief=(SignedData<Belief>) peerData.get(Keywords.BELIEF);
@@ -292,6 +298,10 @@ public class Peer {
 		return executeQuery(form,Init.BASE_FIRST_ADDRESS);
 	}
 
+	/**
+	 * Gets the timestamp of this Peer
+	 * @return Timestamp
+	 */
 	public long getTimeStamp() {
 		return timestamp;
 	}
@@ -322,14 +332,28 @@ public class Peer {
 		return keyPair;
 	}
 
+ 	/**
+ 	 * Get the current Belief of this Peer
+ 	 * @return Belief
+ 	 */
 	public Belief getBelief() {
 		return belief.getValue();
 	}
 
+	/**
+	 * Get the signed Belief of this Peer
+	 * @return Signed Belief
+	 */
 	public SignedData<Belief> getSignedBelief() {
 		return belief;
 	}
 
+	/**
+	 * Signs a value with the keypair of this Peer
+	 * @param <T> Type of value to sign
+	 * @param value Value to sign
+	 * @return Signed data value
+	 */
 	public <T extends ACell> SignedData<T> sign(T value) {
 		return SignedData.create(keyPair, value);
 	}
@@ -421,6 +445,12 @@ public class Peer {
 		return new Peer(this.keyPair, sb, newStates, newResults, this.timestamp);
 	}
 
+	/**
+	 * Gets the vector of States maintained by this Peer, starting from the
+	 * Genesis state (index 0).
+	 * 
+	 * @return Vector of states
+	 */
 	public AVector<State> getStates() {
 		return states;
 	}

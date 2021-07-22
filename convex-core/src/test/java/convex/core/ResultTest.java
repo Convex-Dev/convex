@@ -1,6 +1,5 @@
 package convex.core;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
@@ -25,8 +24,6 @@ public class ResultTest {
 	@Test
 	public void testResultCreation() {
 		Result r1=Result.create(CVMLong.create(0L),RT.cvm(1L),null);
-	
-		assertEquals(r1,Result.create(Vectors.of(0L,1L,null,null)));
 		
 		RecordTest.doRecordTests(r1);
 	}

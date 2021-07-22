@@ -61,11 +61,15 @@ public class State extends ARecord {
 
 	private static final RecordFormat FORMAT = RecordFormat.of(STATE_KEYS);
 
-	public static final AVector<Symbol> GLOBAL_SYMBOLS=Vectors.of(Symbols.TIMESTAMP, Symbols.FEES, Symbols.JUICE_PRICE);
+	/**
+	 * Symbols for Globals
+	 */
+	static final AVector<Symbol> GLOBAL_SYMBOLS=Vectors.of(Symbols.TIMESTAMP, Symbols.FEES, Symbols.JUICE_PRICE);
 
-	public static final int GLOBAL_TIMESTAMP=0;
-	public static final int GLOBAL_FEES=1;
-	public static final int GLOBAL_JUICE_PRICE=2;
+	// Indexes for globals in Globals Vector
+	static final int GLOBAL_TIMESTAMP=0;
+	static final int GLOBAL_FEES=1;
+	static final int GLOBAL_JUICE_PRICE=2;
 
 	public static final State EMPTY = create(Vectors.empty(), BlobMaps.empty(), Constants.INITIAL_GLOBALS,
 			BlobMaps.empty());
@@ -226,7 +230,7 @@ public class State extends ARecord {
 
 	/**
 	 * Gets the balance of a specific address, or null if the Address does not exist
-	 * @param address
+	 * @param address Address to check
 	 * @return Long balance, or null if Account does not exist
 	 */
 	public Long getBalance(Address address) {
@@ -424,6 +428,7 @@ public class State extends ARecord {
 	 *
 	 * SECURITY: Assumes digital signature already checked.
 	 *
+	 * @param <T> Type of transaction result
 	 * @param t Transaction to apply
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
@@ -465,7 +470,7 @@ public class State extends ARecord {
 	}
 
 	@SuppressWarnings("unchecked")
-	public <T extends ACell> Context<T> prepareTransaction(Address origin,ATransaction t) {
+	private <T extends ACell> Context<T> prepareTransaction(Address origin,ATransaction t) {
 		// Pre-transaction state updates (persisted even if transaction fails)
 		AccountStatus account = getAccount(origin);
 		if (account == null) {
@@ -496,7 +501,7 @@ public class State extends ARecord {
 	 * Computes the weighted stake for each peer. Adds a single entry for the null
 	 * key, containing the total stake
 	 *
-	 * @return @
+	 * @return Map of Stakes
 	 */
 	public HashMap<AccountKey, Double> computeStakes() {
 		HashMap<AccountKey, Double> hm = new HashMap<>(peers.size());
@@ -517,8 +522,8 @@ public class State extends ARecord {
 	/**
 	 * Returns this state after updating the given account
 	 *
-	 * @param address
-	 * @param accountStatus
+	 * @param address Address of Account to update
+	 * @param accountStatus New Account Status
 	 * @return Updates State, or this state if Account was unchanged
 	 */
 	public State putAccount(Address address, AccountStatus accountStatus) {
@@ -623,6 +628,11 @@ public class State extends ARecord {
 		return (CVMLong) globals.get(GLOBAL_TIMESTAMP);
 	}
 
+	/**
+	 * Gets the current Juice price
+	 * 
+	 * @return Juice Price
+	 */
 	public CVMLong getJuicePrice() {
 		return (CVMLong) globals.get(GLOBAL_JUICE_PRICE);
 	}
@@ -660,10 +670,19 @@ public class State extends ARecord {
 		return schedule;
 	}
 
+	/**
+	 * Gets the Global Fees accumulated in the State
+	 * @return Global Fees
+	 */
 	public CVMLong getGlobalFees() {
 		return (CVMLong) globals.get(GLOBAL_FEES);
 	}
 
+	/**
+	 * Update Global Fees
+	 * @param newFees New Fees
+	 * @return Updated State
+	 */
 	public State withGlobalFees(CVMLong newFees) {
 		return withGlobals(globals.assoc(GLOBAL_FEES,newFees));
 	}
@@ -683,14 +702,20 @@ public class State extends ARecord {
 	/**
 	 * Updates the specified peer status
 	 *
-	 * @param peerKey
-	 * @param updatedPeer
+	 * @param peerKey Peer Key
+	 * @param updatedPeer New Peer Status
 	 * @return Updated state
 	 */
 	public State withPeer(AccountKey peerKey, PeerStatus updatedPeer) {
 		return withPeers(peers.assoc(peerKey, updatedPeer));
 	}
 
+	/**
+	 * Gets the next available address for allocation, i.e. the lowest Address
+	 * that does not yet exist in this State.
+	 * 
+	 * @return Next address available
+	 */
 	public Address nextAddress() {
 		return Address.create(accounts.count());
 	}

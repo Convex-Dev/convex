@@ -76,8 +76,8 @@ public abstract class ARecordGeneric extends ARecord {
 	 * 
 	 * Returns this if and only if values vector is identical.
 	 * 
-	 * @param newVector
-	 * @return
+	 * @param newValues New values to use
+	 * @return Updated Record
 	 */
 	protected abstract ARecord withValues(AVector<ACell> newValues);
 

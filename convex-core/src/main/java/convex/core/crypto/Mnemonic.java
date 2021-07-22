@@ -8,6 +8,9 @@ import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.util.Utils;
 
+/**
+ * Static utility functions for Mnemonic encoding
+ */
 public class Mnemonic {
 
 	// word list from https://tools.ietf.org/html/rfc1751
@@ -169,7 +172,7 @@ public class Mnemonic {
 	/**
 	 * Encode bytes as a mnemonic string
 	 * 
-	 * @param data
+	 * @param data Byte array to encode
 	 * @return Mnemonic String
 	 */
 	public static String encode(byte[] data) {
@@ -208,6 +211,12 @@ public class Mnemonic {
 		return hm;
 	}
 
+	/**
+	 * Decode from a Mnemonic string
+	 * @param phrase Mnemonic string
+	 * @param bitLength Bits to extract
+	 * @return Decoded byte array
+	 */
 	public static byte[] decode(String phrase, int bitLength) {
 		int nByte = (bitLength + 7) / 8;
 		byte[] result = new byte[nByte];

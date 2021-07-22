@@ -26,7 +26,7 @@ public class Hashing {
 	/**
 	 * Computes the SHA3-256 hash of byte data
 	 * 
-	 * @param data
+	 * @param data Byte array to hash
 	 * @return SHA3-256 Hash value
 	 */
 	public static Hash sha3(byte[] data) {
@@ -81,7 +81,7 @@ public class Hashing {
 	/**
 	 * Computes the SHA3-256 hash of byte data
 	 * 
-	 * @param data
+	 * @param data Byte array to hash
 	 * @return SHA3-256 Hash value
 	 */
 	public static Hash sha256(byte[] data) {

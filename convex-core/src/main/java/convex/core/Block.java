@@ -41,7 +41,10 @@ public class Block extends ARecord {
 	private static final Keyword[] BLOCK_KEYS = new Keyword[] { Keywords.TIMESTAMP, Keywords.TRANSACTIONS, Keywords.PEER };
 	private static final RecordFormat FORMAT = RecordFormat.of(BLOCK_KEYS);
 
-	public static final Comparator<Block> TIMESTAMP_COMPARATOR = new Comparator<>() {
+	/**
+	 * Comparator to sort blocks by timestamp
+	 */
+	static final Comparator<Block> TIMESTAMP_COMPARATOR = new Comparator<>() {
 		@Override
 		public int compare(Block a, Block b) {
 			int sig = Long.compare(a.getTimeStamp(), b.getTimeStamp());
@@ -184,8 +187,10 @@ public class Block extends ARecord {
 		}
 	}
 
-
-
+	/**
+	 * Get the vector of transactions in this Block
+	 * @return Vector of transactions
+	 */
 	public AVector<SignedData<ATransaction>> getTransactions() {
 		return transactions;
 	}

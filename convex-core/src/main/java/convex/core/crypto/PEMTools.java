@@ -10,6 +10,11 @@ import java.util.Base64;
 public class PEMTools {
 	// private static String encryptionAlgorithm="AES-128-CBC";
 	
+	/**
+	 * Writes a key pair to a String
+	 * @param kp Key pair to write
+	 * @return PEM String representation of key pair
+	 */
 	public static String writePEM(AKeyPair kp) {
 
 		PrivateKey priv=kp.getPrivate();
@@ -30,6 +35,12 @@ public class PEMTools {
 		return pem;
 	}
 	
+	/**
+	 * Read a key pair from a PEM String
+	 * @param pem PEM String
+	 * @return Key pair instance
+	 * @throws GeneralSecurityException If a security error occurs
+	 */
 	public static AKeyPair readPEM(String pem) throws GeneralSecurityException {
 		String publicKeyPEM = pem.trim()
 			      .replace("-----BEGIN PRIVATE KEY-----", "")

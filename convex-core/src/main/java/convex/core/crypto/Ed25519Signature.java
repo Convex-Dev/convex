@@ -55,7 +55,12 @@ public class Ed25519Signature extends ASignature {
 		return false;
 	}
 	
-	
+	/**
+	 * Read a signature from a ByteBuffer. Assumes tag already read.
+	 * @param bb ByteBuffer to read from
+	 * @return Signature instance
+	 * @throws BadFormatException If encoding is invalid
+	 */
 	public static Ed25519Signature read(ByteBuffer bb) throws BadFormatException {
 		byte[] sigData=new byte[SIGNATURE_LENGTH];
 		bb.get(sigData);

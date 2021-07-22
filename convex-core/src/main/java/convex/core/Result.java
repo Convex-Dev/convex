@@ -27,24 +27,45 @@ import convex.core.lang.impl.RecordFormat;
  */
 public class Result extends ARecordGeneric {
 
-	public static final RecordFormat RESULT_FORMAT=RecordFormat.of(Keywords.ID,Keywords.RESULT,Keywords.ERROR_CODE,Keywords.TRACE);
+	private static final RecordFormat RESULT_FORMAT=RecordFormat.of(Keywords.ID,Keywords.RESULT,Keywords.ERROR_CODE,Keywords.TRACE);
 	
 	protected Result(AVector<ACell> values) {
 		super(RESULT_FORMAT, values);
 	}
 	
-	public static Result create(AVector<ACell> values) {
+	static Result create(AVector<ACell> values) {
 		return new Result(values);
 	}
 	
+	/**
+	 * Create a Result
+	 * @param id ID of Result message
+	 * @param value Result Value
+	 * @param errorCode Error Code (may be null for success)
+	 * @param trace Error Trace
+	 * @return Result instance
+	 */
 	public static Result create(CVMLong id, ACell value, ACell errorCode, ACell trace) {
 		return create(Vectors.of(id,value,errorCode,trace));
 	}
 	
+	/**
+	 * Create a Result
+	 * @param id ID of Result message
+	 * @param value Result Value
+	 * @param errorCode Error Code (may be null for success)
+	 * @return Result instance
+	 */
 	public static Result create(CVMLong id, ACell value, ACell errorCode) {
 		return create(id,value,errorCode,null);
 	}
 
+	/**
+	 * Create a Result
+	 * @param id ID of Result message
+	 * @param value Result Value
+	 * @return Result instance
+	 */
 	public static Result create(CVMLong id, ACell value) {
 		return create(id,value,null,null);
 	}
@@ -61,6 +82,7 @@ public class Result extends ARecordGeneric {
 	/**
 	 * Returns the value for this result. The value is the result of transaction execution (may be an error message if the transaction failed)
 	 * 
+	 * @param <T> Type of Value
 	 * @return ID from this result
 	 */
 	@SuppressWarnings("unchecked")
@@ -119,7 +141,7 @@ public class Result extends ARecordGeneric {
 	/**
 	 * Reads a Result from a ByteBuffer encoding. Assumes tag byte already read.
 	 * 
-	 * @param bb
+	 * @param bb ByteBuffer to read from
 	 * @return The Result read
 	 * @throws BadFormatException If a Result could not be read
 	 */
@@ -130,10 +152,20 @@ public class Result extends ARecordGeneric {
 		return create(v);
 	}
 
+	/**
+	 * Tests is the Result represents an Error
+	 * @return True if error, false otherwise
+	 */
 	public boolean isError() {
 		return getErrorCode()!=null;
 	}
 
+	/**
+	 * Constructs a Result from a Context
+	 * @param id Id for Result
+	 * @param ctx Context
+	 * @return New Result instance
+	 */
 	public static Result fromContext(CVMLong id,Context<?> ctx) {
 		Object result=ctx.getValue();
 		ACell errorCode=null;

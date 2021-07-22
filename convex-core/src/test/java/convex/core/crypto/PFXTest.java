@@ -5,13 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
 import java.io.IOException;
-import java.security.InvalidKeyException;
+import java.security.GeneralSecurityException;
 import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.SignatureException;
-import java.security.UnrecoverableKeyException;
-import java.security.cert.CertificateException;
 
 import org.junit.jupiter.api.Test;
 
@@ -20,7 +15,7 @@ import convex.core.lang.RT;
 
 public class PFXTest {
 
-	@Test public void testNewStore() throws IOException, KeyStoreException, NoSuchAlgorithmException, CertificateException, InvalidKeyException, SecurityException, SignatureException, UnrecoverableKeyException {
+	@Test public void testNewStore() throws IOException, GeneralSecurityException {
 		File f=File.createTempFile("temp-keystore", "pfx");
 
 		PFXTools.createStore(f, "test");

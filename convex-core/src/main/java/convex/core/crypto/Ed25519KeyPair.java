@@ -37,7 +37,6 @@ public class Ed25519KeyPair extends AKeyPair {
 	private final AccountKey publicKey;
 	private final KeyPair keyPair;
 	
-	protected static final int PRIVATE_KEY_LENGTH=32;
 	private static final String ED25519 = "Ed25519";
 
 	private Ed25519KeyPair(KeyPair kp, AccountKey publicKey) {
@@ -54,6 +53,11 @@ public class Ed25519KeyPair extends AKeyPair {
 		return generate(new SecureRandom());
 	}
 	
+	/**
+	 * Create a KeyPair from a JCA KeyPair
+	 * @param keyPair JCA KeyPair
+	 * @return AKeyPair instance
+	 */
 	protected static Ed25519KeyPair create(KeyPair keyPair) {
 		AccountKey address=extractAccountKey(keyPair.getPublic());
 		return new Ed25519KeyPair(keyPair,address);
@@ -70,6 +74,12 @@ public class Ed25519KeyPair extends AKeyPair {
 		return create(keyPair);
 	}
 	
+	/**
+	 * Create a key pair given a public AccountKey and a encoded Blob
+	 * @param accountKey Public Key
+	 * @param encodedPrivateKey Encoded PKCS8 Private key
+	 * @return AKeyPair instance
+	 */
 	public static Ed25519KeyPair create(AccountKey accountKey, Blob encodedPrivateKey) {
 		PublicKey publicKey= publicKeyFromBytes(accountKey.getBytes());
 		PrivateKey privateKey=privateKeyFromBlob(encodedPrivateKey);
@@ -92,6 +102,13 @@ public class Ed25519KeyPair extends AKeyPair {
 		}
 	}
 
+	/**
+	 * Create a deterministic key pair with a specified seed.
+	 * 
+	 * SECURITY: Use for testing purpose only
+	 * @param seed See to use for generation
+	 * @return Key Pair instance
+	 */
 	public static Ed25519KeyPair createSeeded(long seed) {
 		SecureRandom r = new InsecureRandom(seed);
 		try {

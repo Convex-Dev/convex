@@ -6,6 +6,11 @@ public abstract class AObject {
 	 */
 	protected Blob encoding;
 
+	/**
+	 * Prints this Object to a readable String Representation
+	 * 
+	 * @param sb StringBuilder to append to
+	 */
 	public abstract void print(StringBuilder sb);
 	
 	/**

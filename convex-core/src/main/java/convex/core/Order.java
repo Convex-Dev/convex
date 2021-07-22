@@ -82,6 +82,12 @@ public class Order extends ACell {
 		return blocks.estimatedEncodingSize()+30; // blocks plus enough size for points
 	}
 
+	/**
+	 * Decode an Order from a ByteBuffer
+	 * @param bb ByteBuffer to read from
+	 * @return Order instance
+	 * @throws BadFormatException If encoding format is invalid
+	 */
 	public static Order read(ByteBuffer bb) throws BadFormatException {
 		AVector<Block> blocks = Format.read(bb);
 		if (blocks==null) {
@@ -146,18 +152,35 @@ public class Order extends ACell {
 		return commonPrefix >= consensusPoint;
 	}
 
+	/**
+	 * Gets the Consensus Point of this Order
+	 * @return Consensus Point
+	 */
 	public long getConsensusPoint() {
 		return consensusPoint;
 	}
 
+	/**
+	 * Gets the Proposal Point of this Order
+	 * @return Proposal Point
+	 */
 	public long getProposalPoint() {
 		return proposalPoint;
 	}
 
+	/**
+	 * Gets the Blocks in this Order
+	 * @return Vector of Blocks
+	 */
 	public AVector<Block> getBlocks() {
 		return blocks;
 	}
 
+	/**
+	 * Get a specific Block in this Order
+	 * @param i Index of Block
+	 * @return Block at specified index.
+	 */
 	public Block getBlock(long i) {
 		return blocks.get(i);
 	}
