@@ -58,7 +58,7 @@ public class Main implements Runnable {
 
 
 	private static CommandLine commandLine;
-	public Output output = new Output();
+	public Output output;
 
 
 	@Option(names={ "-c", "--config"},
@@ -96,6 +96,10 @@ public class Main implements Runnable {
 		description="Show more verbose log information. You can increase verbosity by using multiple -v or -vvv")
 	private boolean[] verbose = new boolean[0];
 
+
+	public Main() {
+		output = new Output();
+	}
 
 	@Override
 	public void run() {
@@ -136,7 +140,7 @@ public class Main implements Runnable {
 		int result = 0;
 		try {
 			result = commandLine.execute(args);
-			output.writeToStream(System.out);
+			output.writeToStream(commandLine.getOut());
 
 		} catch (Throwable t) {
 			log.error("Error executing command line: {}",t.getMessage());
