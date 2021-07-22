@@ -8,7 +8,11 @@ public abstract class AObject {
 
 	public abstract void print(StringBuilder sb);
 	
-	public String print() {
+	/**
+	 * Renders this object as a String value
+	 * @return String representation
+	 */
+	public final String print() {
 		StringBuilder sb = new StringBuilder();
 		print(sb);
 		return sb.toString();

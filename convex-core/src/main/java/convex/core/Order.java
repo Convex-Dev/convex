@@ -39,10 +39,22 @@ public class Order extends ACell {
 		this.proposalPoint = proposalPoint;
 	}
 
+	/**
+	 * Create an Order
+	 * @param blocks Blocks in ORder
+	 * @param proposalPoint Proposal Point
+	 * @param consensusPoint Conesnsus Point
+	 * @return New Order instance
+	 */
 	private static Order create(AVector<Block> blocks, long proposalPoint, long consensusPoint) {
 		return new Order(blocks, proposalPoint, consensusPoint);
 	}
 
+	/**
+	 * Create an empty Order
+
+	 * @return New Order instance
+	 */
 	public static Order create() {
 		return create(Vectors.empty(), 0, 0);
 	}
@@ -126,7 +138,7 @@ public class Order extends ACell {
 	 * </li>
 	 * </ul>
 	 * 
-	 * @param bc
+	 * @param bc Order to compare with
 	 * @return True if chains are consistent, false otherwise.
 	 */
 	public boolean checkConsistent(Order bc) {
@@ -153,7 +165,7 @@ public class Order extends ACell {
 	/**
 	 * Propose a new block of transactions in this Order
 	 * 
-	 * @param block
+	 * @param block Block to append
 	 * @return The updated chain
 	 */
 	public Order propose(Block block) {
@@ -162,8 +174,8 @@ public class Order extends ACell {
 	}
 
 	/**
-	 * Updates blocks in this Order. Returns the same order if the blocks are identical.
-	 * @param newBlocks
+	 * Updates blocks in this Order. Returns the same Order if the blocks are identical.
+	 * @param newBlocks New blocks to use
 	 * @return Updated Order, or the same order if unchanged
 	 */
 	public Order withBlocks(AVector<Block> newBlocks) {
@@ -194,7 +206,7 @@ public class Order extends ACell {
 	 * Proposal point will be set to the max of the consensus point and the current
 	 * proposal point
 	 * 
-	 * @param newConsensusPoint
+	 * @param newConsensusPoint New consensus point
 	 * @return Updated chain, or this Chain instance if no change.
 	 */
 	public Order withConsenusPoint(long newConsensusPoint) {
@@ -205,10 +217,18 @@ public class Order extends ACell {
 		return create(blocks, newProposalPoint, newConsensusPoint);
 	}
 
+	/**
+	 * Get the number of Blocks in this Order
+	 * @return Number of Blocks
+	 */
 	public long getBlockCount() {
 		return blocks.count();
 	}
 
+	/**
+	 * Clears the consensus and proposal point
+	 * @return Updated order with zeroed consensus positions
+	 */
 	public Order withoutConsenus() {
 		return create(blocks, 0, 0);
 	}

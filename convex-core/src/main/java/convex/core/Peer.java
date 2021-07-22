@@ -100,6 +100,10 @@ public class Peer {
 		return new Peer(keyPair,belief,states,results,timestamp);
 	}
 
+	/**
+	 * Gets the Peer Datat map for this Peer
+	 * @return Peer data
+	 */
 	public AMap<Keyword, ACell> toData() {
 		return Maps.of(
 			Keywords.BELIEF,belief,
@@ -108,6 +112,12 @@ public class Peer {
 		);
 	}
 
+	/**
+	 * Creates a Peer
+	 * @param peerKP Key Pair
+	 * @param initialState Genesis State
+	 * @return New Peer instance
+	 */
 	public static Peer create(AKeyPair peerKP, State initialState) {
 		Belief belief = Belief.createSingleOrder(peerKP);
 		SignedData<Belief> sb = peerKP.signData(belief);
@@ -178,11 +188,7 @@ public class Peer {
 	/**
 	 * Creates a new Peer instance at server startup using the provided
 	 * configuration. Current store must be set to store for server.
-	 * <p>
-	 * Config map must contain:
-	 * <ul>
 	 * 
-	 * </ul>
 	 * @param keyPair Key pair for genesis peer
 	 * @param genesisState Genesis state, or null to generate fresh state
 	 * @return A new Peer instance
@@ -198,6 +204,10 @@ public class Peer {
 		return create(keyPair, genesisState);
 	}
 
+	/**
+	 * Gets a MergeContext for this Peer
+	 * @return MergeContext
+	 */
 	public MergeContext getMergeContext() {
 		return MergeContext.create(keyPair, timestamp, getConsensusState());
 	}
@@ -392,7 +402,7 @@ public class Peer {
 
 	/**
 	 * Persist the state of the Peer to the current store
-	 * @param noveltyHandler
+	 * @param noveltyHandler Novelty handler
 	 * @return Updates Peer
 	 */
 	public Peer persistState(Consumer<Ref<ACell>> noveltyHandler) {
