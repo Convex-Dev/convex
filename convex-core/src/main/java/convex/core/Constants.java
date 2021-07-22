@@ -14,14 +14,29 @@ import convex.core.data.prim.CVMBool;
  */
 public class Constants {
 
+	/**
+	 * Limit of scheduled transactions run in a single Block
+	 */
 	public static final long MAX_SCHEDULED_TRANSACTIONS_PER_BLOCK = 100;
 
+	/**
+	 * Threshold of stake required to propose consensus
+	 */
 	public static final double PROPOSAL_THRESHOLD = 0.50;
 
+	/**
+	 * Threshold of stake required to confirm consensus
+	 */
 	public static final double CONSENSUS_THRESHOLD = 0.67;
 
+	/**
+	 * Initial timestamp for new States
+	 */
 	public static final long INITIAL_TIMESTAMP = Instant.parse("2020-02-02T00:20:20.0202Z").toEpochMilli();
 
+	/**
+	 * Juice price in the initial Genesis State
+	 */
 	public static final long INITIAL_JUICE_PRICE = 2L;
 	
 	/**
@@ -34,8 +49,14 @@ public class Constants {
 	 */
 	public static final long INITIAL_MEMORY_PRICE = 10L;
 
+	/**
+	 * Max juice allowable for execution of a single transaction.
+	 */
 	public static final long MAX_TRANSACTION_JUICE = 1000000;
 
+	/**
+	 * Constant to set deletion of Etch temporary files on exit. Probably should be true, unless you want to dubug temp files.
+	 */
 	public static final boolean ETCH_DELETE_TEMP_ON_EXIT = true;
 	
 	/**
@@ -48,6 +69,9 @@ public class Constants {
 	 */
 	public static final long MEMORY_OVERHEAD = 64;
 
+	/**
+	 * Default timeout in milliseconds for client transactions
+	 */
 	public static final long DEFAULT_CLIENT_TIMEOUT = 6000;
 
 	/**
@@ -55,10 +79,19 @@ public class Constants {
 	 */
 	public static final long INITIAL_ACCOUNT_ALLOWANCE = 10000000;
 
+	/**
+	 * Maximum supply of Convex Coins set at protocol level
+	 */
 	public static final long MAX_SUPPLY = Coin.SUPPLY;
 
+	/**
+	 * Maximum CVM execution depth
+	 */
 	public static final int MAX_DEPTH = 256;
 
+	/**
+	 * Initial global values for a new State
+	 */
 	public static final AVector<ACell> INITIAL_GLOBALS = Vectors.of(
 			Constants.INITIAL_TIMESTAMP, 0L, Constants.INITIAL_JUICE_PRICE);
 
@@ -104,5 +137,8 @@ public class Constants {
 	 */
 	public static final long MINIMUM_EFFECTIVE_STAKE = Coin.GOLD*1;
 
+	/**
+	 * Default size for client receive buffers.
+	 */
 	public static final int RECEIVE_BUFFER_SIZE = Format.LIMIT_ENCODING_LENGTH*2+20;
 }

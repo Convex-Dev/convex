@@ -205,6 +205,14 @@ public class ReaderTest {
 		assertEquals(Lists.of(Symbols.QUOTE,Lists.of(Symbols.UNQUOTE,Symbols.FOO)),Reader.read("'~foo"));
 
 	}
+	
+
+	@Test
+	public void testTooManyClosingParens() {
+		// See #244
+		assertThrows(ParseException.class, () -> Reader.read("(42))))"));
+	}
+
 
 	@Test
 	public void testWrongSizeMaps() {

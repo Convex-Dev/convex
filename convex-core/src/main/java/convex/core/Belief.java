@@ -84,6 +84,10 @@ public class Belief extends ARecord {
 		return new Belief(newOrders, newTimestamp);
 	}
 
+	/**
+	 * Gets an empty Belief
+	 * @return Empty Belief
+	 */
 	public static Belief initial() {
 		return create(BlobMaps.empty());
 	}
@@ -108,6 +112,12 @@ public class Belief extends ARecord {
 		return create(orders, Constants.INITIAL_TIMESTAMP);
 	}
 
+	/**
+	 * Create a Belief with a single empty order. USeful for Peer startup.
+	 * 
+	 * @param kp Keypair for Peer
+	 * @return New Belief
+	 */
 	public static Belief createSingleOrder(AKeyPair kp) {
 		AccountKey address = kp.getAccountKey();
 		SignedData<Order> order = kp.signData(Order.create());
@@ -120,8 +130,8 @@ public class Belief extends ARecord {
 	 * @param mc MergeContext for Belief Merge
 	 * @param beliefs An array of Beliefs. May contain nulls, which will be ignored.
 	 * @return The updated merged belief, or the same Belief if there is no change.
-	 * @throws BadSignatureException
-	 * @throws InvalidDataException
+	 * @throws BadSignatureException In case of a bad signature
+	 * @throws InvalidDataException In case of invalid data
 	 */
 	public Belief merge(MergeContext mc, Belief... beliefs) throws BadSignatureException, InvalidDataException {
 		Belief newBelief = mergeOnce(mc, beliefs);
@@ -405,9 +415,9 @@ public class Belief extends ARecord {
 	 * Compute the new winning Order for this Peer, including any new blocks
 	 * encountered
 	 * 
-	 * @param stakedOrders
-	 * @param consensusPoint
-	 * @param initialTotalStake
+	 * @param stakedOrders Amount of stake on each distinct Order
+	 * @param consensusPoint Current consensus point
+	 * @param initialTotalStake Total stake under consideration
 	 * @return Vector of Blocks in wiing Order
 	 */
 	public static AVector<Block> computeWinningOrder(HashMap<Order, Double> stakedOrders, long consensusPoint,
@@ -597,7 +607,7 @@ public class Belief extends ARecord {
 	/**
 	 * Updates this Belief with a new set of Chains for each peer address
 	 * 
-	 * @param newOrders
+	 * @param newOrders New map of peer keys to Orders
 	 * @return The updated belief, or the same Belief if no change.
 	 */
 	public Belief withOrders(BlobMap<AccountKey, SignedData<Order>> newOrders) {
@@ -641,6 +651,10 @@ public class Belief extends ARecord {
 		return sc.getValue();
 	}
 
+	/**
+	 * Get the map of orders for this Belief
+	 * @return Orders map
+	 */
 	public BlobMap<AccountKey, SignedData<Order>> getOrders() {
 		return orders;
 	}

@@ -115,6 +115,9 @@ public class ErrorCodes {
 	 */
 	public static final Keyword TRUST = Keyword.create("TRUST");
 
+	/**
+	 * ErrorCode for an unexpected Error. Likely fatal.
+	 */
 	public static final Keyword UNEXPECTED = Keyword.create("UNEXPECTED");
 	
 	/**
@@ -178,6 +181,9 @@ public class ErrorCodes {
 	 */
 	public static final Keyword TODO = Keyword.create("TODO");
 
+	/**
+	 * ErrorCode for a FATAL Error. Should trigger Peer shutdown.
+	 */
 	public static final Keyword FATAL = Keyword.create("FATAL");
 
 
