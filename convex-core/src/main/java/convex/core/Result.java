@@ -25,15 +25,15 @@ import convex.core.lang.impl.RecordFormat;
  * 
  * 
  */
-public class Result extends ARecordGeneric {
+public final class Result extends ARecordGeneric {
 
 	private static final RecordFormat RESULT_FORMAT=RecordFormat.of(Keywords.ID,Keywords.RESULT,Keywords.ERROR_CODE,Keywords.TRACE);
 	
-	protected Result(AVector<ACell> values) {
+	private Result(AVector<ACell> values) {
 		super(RESULT_FORMAT, values);
 	}
 	
-	static Result create(AVector<ACell> values) {
+	private static Result create(AVector<ACell> values) {
 		return new Result(values);
 	}
 	

@@ -495,6 +495,10 @@ public class Peer {
 		return updateConsensus(newBelief);
 	}
 
+	/**
+	 * Gets the Consensus Point for this Peer
+	 * @return Consensus Point value
+	 */
 	public long getConsensusPoint() {
 		Order order=getPeerOrder();
 		if (order==null) return 0;
@@ -545,6 +549,10 @@ public class Peer {
 		return Utils.statesAsOfRange(states, timestamp, interval, count);
 	}
 
+	/**
+	 * Get the Network ID for this PEer
+	 * @return Network ID
+	 */
 	public Hash getNetworkID() {
 		return getStates().get(0).getHash();
 	}

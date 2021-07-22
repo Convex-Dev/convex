@@ -71,6 +71,9 @@ public class State extends ARecord {
 	static final int GLOBAL_FEES=1;
 	static final int GLOBAL_JUICE_PRICE=2;
 
+	/**
+	 * An empty State
+	 */
 	public static final State EMPTY = create(Vectors.empty(), BlobMaps.empty(), Constants.INITIAL_GLOBALS,
 			BlobMaps.empty());
 
@@ -156,6 +159,14 @@ public class State extends ARecord {
 		return new State(accounts, peers, globals, schedule);
 	}
 
+	/**
+	 * Create a State
+	 * @param accounts Accounts
+	 * @param peers Peers
+	 * @param globals Globals
+	 * @param schedule Schedule (may be null)
+	 * @return New State instance
+	 */
 	public static State create(AVector<AccountStatus> accounts, BlobMap<AccountKey, PeerStatus> peers,
 			AVector<ACell> globals, BlobMap<ABlob, AVector<ACell>> schedule) {
 		return new State(accounts, peers, globals, schedule);
@@ -215,6 +226,10 @@ public class State extends ARecord {
 		}
 	}
 
+	/**
+	 * Get all Accounts in this State
+	 * @return Vector of Accounts
+	 */
 	public AVector<AccountStatus> getAccounts() {
 		return accounts;
 	}
@@ -328,7 +343,7 @@ public class State extends ARecord {
 			AOp<?> op = (AOp<?>) st.get(1);
 			Context<?> ctx;
 			try {
-				// TODO juice refund
+				// TODO juice refund?
 				ctx = Context.createInitial(state, origin, Constants.MAX_TRANSACTION_JUICE);
 				ctx = ctx.run(op);
 				if (ctx.isExceptional()) {
@@ -514,6 +529,11 @@ public class State extends ARecord {
 		return hm;
 	}
 
+	/**
+	 * Updates the Accounts in this State
+	 * @param newAccounts New Accounts vector
+	 * @return Updated State
+	 */
 	public State withAccounts(AVector<AccountStatus> newAccounts) {
 		if (newAccounts == accounts) return this;
 		return create(newAccounts, peers,globals, schedule);
@@ -568,7 +588,11 @@ public class State extends ARecord {
 		return as.getEnvironment();
 	}
 
-
+	/**
+	 * Updates the Peers in this State
+	 * @param newPeers New Peer Map
+	 * @return Updated State
+	 */
 	public State withPeers(BlobMap<AccountKey, PeerStatus> newPeers) {
 		if (peers == newPeers) return this;
 		return create(accounts, newPeers, globals, schedule);
@@ -720,6 +744,11 @@ public class State extends ARecord {
 		return Address.create(accounts.count());
 	}
 
+	/**
+	 * Look up an Address from CNS
+	 * @param name CNS name String
+	 * @return Address from CNS, or null if not found
+	 */
 	public Address lookupCNS(String name) {
 		Context<?> ctx=Context.createFake(this);
 		return (Address) ctx.lookupCNS(name).getResult();
@@ -734,6 +763,11 @@ public class State extends ARecord {
 		return globals;
 	}
 
+	/**
+	 * Updates the State with a new timestamp
+	 * @param timestamp New timestamp
+	 * @return Updated State
+	 */
 	public State withTimestamp(long timestamp) {
 		return withGlobals(globals.assoc(GLOBAL_TIMESTAMP, CVMLong.create(timestamp)));
 	}

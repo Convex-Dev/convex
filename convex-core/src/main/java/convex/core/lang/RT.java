@@ -59,9 +59,9 @@ public class RT {
 	 * Returns true if all elements in an array are equal. Nulls are equal to null
 	 * only.
 	 * 
-	 * @param <T>
-	 * @param values
-	 * @return True i
+	 * @param <T> Type of values
+	 * @param values Array of values
+	 * @return True if all values are equal
 	 */
 	public static <T extends ACell> Boolean allEqual(T[] values) {
 		for (int i = 0; i < values.length - 1; i++) {
@@ -386,9 +386,9 @@ public class RT {
 	 * Compares two long values numerically, according to Java primitive
 	 * comparisons.
 	 * 
-	 * @param a
-	 * @param b
-	 * @return -1 if a<b, 1 if a>b, 0 is they are equal
+	 * @param a First number
+	 * @param b Second number
+	 * @return -1 if a is less than b, 1 if greater, 0 is they are equal
 	 */
 	public static long compare(long a, long b) {
 		if (a < b) return -1;
@@ -417,16 +417,31 @@ public class RT {
 		return null;
 	}
 	
+	/**
+	 * Tests if a Value is a valid numerical value
+	 * @param val Value to test
+	 * @return True if a number, false otherwise
+	 */
 	public static boolean isNumber(ACell val) {
 		return (val instanceof INumeric);
 	}
 
+	/**
+	 * Increments a Long value
+	 * @param x Value to increment
+	 * @return Long Value, or null if conversion fails
+	 */
 	public static CVMLong inc(ACell x) {
 		CVMLong n = ensureLong(x);
 		if (n == null) return null;
 		return CVMLong.create(n.longValue() + 1L);
 	}
 
+	/**
+	 * Decrements a Long value
+	 * @param x Value to decrement
+	 * @return Long Value, or null if conversion fails
+	 */
 	public static CVMLong dec(ACell x) {
 		CVMLong n = ensureLong(x);
 		if (n == null) return null;
@@ -435,7 +450,7 @@ public class RT {
 
 	/**
 	 * Converts a numerical value to a CVM Double. 
-	 * @param a
+	 * @param a Value to cast
 	 * @return Double value, or null if not convertible
 	 */
 	public static CVMDouble castDouble(ACell a) {
@@ -448,7 +463,7 @@ public class RT {
 	
 	/**
 	 * Ensures the argument is a CVM Long value. 
-	 * @param a
+	 * @param a Value to cast
 	 * @return CVMDouble value, or null if not convertible
 	 */
 	public static CVMDouble ensureDouble(ACell a) {
@@ -461,7 +476,7 @@ public class RT {
 	
 	/**
 	 * Converts a numerical value to a CVM Long. Doubles and floats will be converted if possible.
-	 * @param a
+	 * @param a Value to cast
 	 * @return Long value, or null if not convertible
 	 */
 	public static CVMLong castLong(ACell a) {
@@ -485,7 +500,7 @@ public class RT {
 	
 	/**
 	 * Ensures the argument is a CVM Long value. 
-	 * @param a
+	 * @param a Value to cast
 	 * @return CVMLong value, or null if not convertible
 	 */
 	public static CVMLong ensureLong(ACell a) {
@@ -502,7 +517,7 @@ public class RT {
 	 * 
 	 * Doubles and floats will be converted if possible.
 	 * 
-	 * @param a
+	 * @param a Value to cast
 	 * @return Long value, or null if not convertible
 	 */
 	public static CVMByte castByte(ACell a) {
@@ -512,6 +527,11 @@ public class RT {
 		return CVMByte.create((byte)l.longValue());
 	}
 
+	/**
+	 * Casts a value to a Character
+	 * @param a Value to cast
+	 * @return CVMChar value, or null if cast fails
+	 */
 	public static CVMChar toCharacter(ACell a) {
 		if (a instanceof CVMChar) return (CVMChar) a;
 		CVMLong l=castLong(a);
@@ -632,8 +652,8 @@ public class RT {
 	 * 
 	 * Returns null if conversion is not possible.
 	 * 
-	 * @param <T>
-	 * @param o
+	 * @param <T> Type of sequence elements
+	 * @param o Value to cast to sequence
 	 * @return An ASequence instance, or null if the argument cannot be converted to
 	 *         a sequence
 	 */
@@ -726,7 +746,7 @@ public class RT {
 	 * <li>Other Objects (printed in canonical format)
 	 * </ul>
 	 * 
-	 * @param args
+	 * @param args Values to convert to String
 	 * @return AString value
 	 */
 	public static AString str(ACell[] args) {
@@ -880,12 +900,14 @@ public class RT {
 	 * Casts the argument to a valid Address.
 	 * 
 	 * Handles:
+	 * <ul>
 	 * <li>Strings, which are interpreted as 16-character hex strings</li>
 	 * <li>Addresses, which are returned unchanged </li>
 	 * <li>Blobs, which are converted to addresses if and only if they are of the correct length (8 bytes)</li>
 	 * <li>Numeric Longs, which are converted to the equivalent Address</li>
+	 * </ul>
 	 * 
-	 * @param a Vaue to cast to an Address
+	 * @param a Value to cast to an Address
 	 * @return Address value or null if not castable to a valid address
 	 */
 	public static Address castAddress(ACell a) {
@@ -900,7 +922,7 @@ public class RT {
 	/**
 	 * Ensures the argument is a valid Address.
 	 * 
-	 * @param a
+	 * @param a Value to cast
 	 * @return Address value or null if not a valid address
 	 */
 	public static Address ensureAddress(ACell a) {
@@ -910,7 +932,7 @@ public class RT {
 	
 	/**
 	 * Implicit cast to an AccountKey. Accepts blobs of correct length
-	 * @param a
+	 * @param a Value to cast
 	 * @return AccountKey instance, or null if coercion fails
 	 */
 	public static AccountKey ensureAccountKey(ACell a) {
@@ -926,7 +948,7 @@ public class RT {
 	
 	/**
 	 * Coerce to an AccountKey. Accepts strings and blobs of correct length
-	 * @param a
+	 * @param a Value to cast
 	 * @return AccountKey instance, or null if coercion fails
 	 */
 	public static AccountKey castAccountKey(ACell a) {
@@ -953,9 +975,9 @@ public class RT {
 	 * Converts the argument to a non-null Map. Nulls are implicitly converted to the empty
 	 * map.
 	 * 
-	 * @param <K>
-	 * @param <V>
-	 * @param a
+	 * @param <K> Type of map keys
+	 * @param <V> Type of map values
+	 * @param a Value to cast
 	 * @return Map instance, or null if argument cannot be converted to a map
 	 * 
 	 */
@@ -969,9 +991,9 @@ public class RT {
 	/**
 	 * Gets an element from a data structure using the given key.
 	 * 
-	 * @param coll
-	 * @param key
-	 * @return Object from collection with the specified key, or null if not found.
+	 * @param coll Collection to query
+	 * @param key Key to look up in collection
+	 * @return Value from collection with the specified key, or null if not found.
 	 */
 	public static ACell get(ADataStructure<?> coll, ACell key) {
 		if (coll == null) return null;
@@ -982,8 +1004,8 @@ public class RT {
 	 * Gets an element from a data structure using the given key. Returns the
 	 * notFound parameter if the data structure does not have the specified key
 	 * 
-	 * @param coll
-	 * @param key
+	 * @param coll Collection to query
+	 * @param key Key to look up in collection
 	 * @param notFound Value to return if the lookup failed
 	 * @return Value from collection with the specified key, or notFound argument
 	 *         if not found.
@@ -1007,9 +1029,9 @@ public class RT {
 	/**
 	 * Converts an object to a map entry. Handles MapEntries and length 2 vectors.
 	 * 
-	 * @param <K>
-	 * @param <V>
-	 * @param x
+	 * @param <K> Type of map key
+	 * @param <V> Type of map value
+	 * @param x Value to cast
 	 * @return MapEntry instance, or null if conversion fails
 	 */
 	@SuppressWarnings("unchecked")
@@ -1030,7 +1052,7 @@ public class RT {
 	/**
 	 * Coerces to Hash type. Converts blobs of correct length.
 	 * 
-	 * @param o
+	 * @param o Value to cast
 	 * @return Hash instance, or null if conversion not possible
 	 */
 	public static Hash ensureHash(ACell o) {
@@ -1047,7 +1069,7 @@ public class RT {
 	/**
 	 * Coerces an named argument to a keyword.
 	 * 
-	 * @param a
+	 * @param a Value to cast
 	 * @return Keyword if correctly constructed, or null if a failure occurs
 	 */
 	public static Keyword castKeyword(ACell a) {
@@ -1061,7 +1083,7 @@ public class RT {
 	/**
 	 * Coerces an named argument to a Symbol.
 	 * 
-	 * @param a
+	 * @param a Value to cast
 	 * @return Symbol if correctly constructed, or null if a failure occurs
 	 */
 	public static Symbol ensureSymbol(ACell a) {
@@ -1074,8 +1096,8 @@ public class RT {
 	/**
 	 * Casts to an ADataStructure instance
 	 * 
-	 * @param <E>
-	 * @param a
+	 * @param <E> Type of data structure element
+	 * @param a Value to cast
 	 * @return ADataStructure instance, or null if not a data structure
 	 */
 	@SuppressWarnings("unchecked")
@@ -1087,8 +1109,8 @@ public class RT {
 	/**
 	 * Casts to an ACountable instance
 	 * 
-	 * @param <E>
-	 * @param a
+	 * @param <E> Type of countable element
+	 * @param a Value to cast
 	 * @return ADataStructure instance, or null if not a data structure
 	 */
 	@SuppressWarnings("unchecked")
@@ -1125,9 +1147,8 @@ public class RT {
 	/**
 	 * Validates an object. Might be a Cell or Ref
 	 * 
-	 * @param o
-	 * @throws InvalidDataException For any miscellaneous validation failure @ If
-	 *                              the data has missing data
+	 * @param o Object to validate
+	 * @throws InvalidDataException For any validation failure
 	 */
 	public static void validate(Object o) throws InvalidDataException {
 		if (o==null) return;
@@ -1142,6 +1163,12 @@ public class RT {
 		
 	}
 
+	/**
+	 * Validate a Cell.
+	 * 
+	 * @param o Object to validate
+	 * @throws InvalidDataException For any validation failure
+	 */
 	public static void validateCell(ACell o) throws InvalidDataException {
 		if (o==null) return;
 		if (o instanceof ACell) {
@@ -1202,7 +1229,7 @@ public class RT {
 	/**
 	 * Ensures the argument is an IAssociative instance. A null argument is considered an empty map.
 	 * 
-	 * @param o
+	 * @param o Value to cast
 	 * @return IAssociative instance, or null if conversion is not possible
 	 */
 	public static ADataStructure<?> ensureAssociative(ACell o) {
@@ -1216,8 +1243,8 @@ public class RT {
 	 * 
 	 * Returns null if the argument is not a set.
 	 * 
-	 * @param <T>
-	 * @param a
+	 * @param <T> Type of set element
+	 * @param a Value to cast
 	 * @return A set instance, or null if the argument cannot be converted to a set
 	 */
 	@SuppressWarnings("unchecked")
@@ -1270,8 +1297,6 @@ public class RT {
 	/**
 	 * Converts a Java value to a CVM type
 	 * 
-	 * TODO: should be an ACell return
-	 * 
 	 * @param o Any Java Object
 	 * @return Valid CVM type
 	 */
@@ -1289,7 +1314,7 @@ public class RT {
 
 	/**
 	 * Converts a CVM value to equivalent JVM value
-	 * @param o
+	 * @param o Value to convert to JVM type
 	 * @return Java value, or unchanged input
 	 */
 	@SuppressWarnings("unchecked")

@@ -635,6 +635,12 @@ public class Belief extends ARecord {
 		return 1+orders.estimatedEncodingSize()+12;
 	}
 
+	/**
+	 * Read a Belief from a ByteBuffer. Assumes tag already read.
+	 * @param bb ByteBuffer to read from
+	 * @return Belief instance
+	 * @throws BadFormatException If encoding is invalid
+	 */
 	public static Belief read(ByteBuffer bb) throws BadFormatException {
 		BlobMap<AccountKey, SignedData<Order>> chains = Format.read(bb);
 		if (chains == null) throw new BadFormatException("Null orders in Belief");
