@@ -72,7 +72,7 @@ public class PeerStart implements Runnable {
 	public void run() {
 
 		Main mainParent = peerParent.mainParent;
-		PeerManager peerManager = PeerManager.create(mainParent.getSessionFilename());
+		PeerManager peerManager = null;
 
 		int port = 0;
 		AKeyPair keyPair = null;
@@ -117,12 +117,13 @@ public class PeerStart implements Runnable {
 			} else {
 				store = Stores.getDefaultStore();
 			}
-			List<Hash> networkHashList = peerManager.getNetworkHashList(keyPair, peerAddress, remotePeerHostname);
+			peerManager = PeerManager.create(mainParent.getSessionFilename(), keyPair, peerAddress, store);
+			List<Hash> networkHashList = peerManager.getNetworkHashList(remotePeerHostname);
 			log.info("will join remote networkId " + networkHashList.get(2).toHexString());
 
-			State baseState = peerManager.aquireState(keyPair, peerAddress, store, remotePeerHostname, networkHashList.get(2));
-			SignedData<Belief> signedBelief = peerManager.aquireBelief(keyPair, peerAddress, store, remotePeerHostname, networkHashList.get(0));
-			peerManager.launchPeer(keyPair, peerAddress, hostname, port, store, remotePeerHostname, baseState, signedBelief);
+			State baseState = peerManager.aquireState(remotePeerHostname, networkHashList.get(2));
+			SignedData<Belief> signedBelief = peerManager.aquireBelief(remotePeerHostname, networkHashList.get(0));
+			peerManager.launchPeer(hostname, port, remotePeerHostname, baseState, signedBelief);
 			peerManager.showPeerEvents();
 		} catch (Throwable t) {
 			mainParent.showError(t);

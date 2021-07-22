@@ -64,15 +64,28 @@ public class PeerManager implements IServerEvent {
 
 	protected String sessionFilename;
 
+	protected AKeyPair keyPair;
+
+	protected Address address;
+
+	protected AStore store;
+
 	protected BlockingQueue<ServerEvent> serverEventQueue = new ArrayBlockingQueue<ServerEvent>(1024);
 
 
-	private PeerManager(String sessionFilename) {
+	private PeerManager(String sessionFilename, AKeyPair keyPair, Address address, AStore store) {
         this.sessionFilename = sessionFilename;
+		this.keyPair = keyPair;
+		this.address = address;
+		this.store = store;
 	}
 
 	public static PeerManager create(String sessionFilename) {
-        return new PeerManager(sessionFilename);
+        return new PeerManager(sessionFilename, null, null, null);
+	}
+
+	public static PeerManager create(String sessionFilename, AKeyPair keyPair, Address address, AStore store) {
+        return new PeerManager(sessionFilename, keyPair, address, store);
 	}
 
 	public void launchLocalPeers(List<AKeyPair> keyPairList) {
@@ -82,7 +95,7 @@ public class PeerManager implements IServerEvent {
 		peerServerList = API.launchLocalPeers(keyPairList,genesisState, this);
 	}
 
-	public List<Hash> getNetworkHashList(AKeyPair keyPair, Address address, String remotePeerHostname) {
+	public List<Hash> getNetworkHashList(String remotePeerHostname) {
 		InetSocketAddress remotePeerAddress = Utils.toInetSocketAddress(remotePeerHostname);
 		int retryCount = 5;
 		Convex convex = null;
@@ -110,7 +123,7 @@ public class PeerManager implements IServerEvent {
 		return hashList;
 	}
 
-	public State aquireState(AKeyPair keyPair, Address address, AStore store, String remotePeerHostname, Hash stateHash) {
+	public State aquireState(String remotePeerHostname, Hash stateHash) {
 		InetSocketAddress remotePeerAddress = Utils.toInetSocketAddress(remotePeerHostname);
 		Convex convex = null;
 		State state = null;
@@ -125,7 +138,7 @@ public class PeerManager implements IServerEvent {
 		return state;
 
 	}
-	public SignedData<Belief> aquireBelief(AKeyPair keyPair, Address address, AStore store, String remotePeerHostname, Hash beliefHash) {
+	public SignedData<Belief> aquireBelief(String remotePeerHostname, Hash beliefHash) {
 		// sync the etch db with the network state
 		Convex convex = null;
 		SignedData<Belief> signedBelief = null;
@@ -143,11 +156,8 @@ public class PeerManager implements IServerEvent {
 	}
 
     public void launchPeer(
-		AKeyPair keyPair,
-		Address peerAddress,
 		String hostname,
 		int port,
-		AStore store,
 		String remotePeerHostname,
 		State baseState,
 		SignedData<Belief> signedBelief
@@ -161,7 +171,7 @@ public class PeerManager implements IServerEvent {
 		config.put(Keywords.KEYPAIR, keyPair);
 		Server server = API.launchPeer(config, this);
 
-		server.joinNetwork(keyPair, peerAddress, remotePeerHostname, signedBelief);
+		server.joinNetwork(keyPair, address, remotePeerHostname, signedBelief);
 		peerServerList.add(server);
 	}
 
