@@ -18,6 +18,9 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -1271,6 +1274,24 @@ public class Utils {
 	@SafeVarargs
 	public static <T> List<T> listOf(T... values) {
 		return Arrays.asList(values);
+	}
+
+	private static final ExecutorService executor=Executors.newCachedThreadPool();
+	
+	/**
+	 * Executes functions on a thread pool for each element of a collection
+	 * @param <R> Result type of function
+	 * @param <T> Argument type
+	 * @param func Function to run
+	 * @param items Collection of items to run futures on
+	 * @return List of futures for each item
+	 */
+	public static <R,T> ArrayList<Future<R>> futureMap(Function<T,R> func, Collection<T> items) {
+		ArrayList<Future<R>> futures=new ArrayList<>(items.size());
+		for (T item: items) {
+			futures.add(executor.submit(()->func.apply(item)));
+		}
+		return futures;
 	}
 
 }

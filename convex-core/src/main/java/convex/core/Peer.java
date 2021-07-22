@@ -425,8 +425,8 @@ public class Peer {
 	}
 
 	/**
-	 * Persist the state of the Peer to the current store
-	 * @param noveltyHandler Novelty handler
+	 * Persist the state of the Peer to the current store. We ensure states and results are also persisted
+	 * @param noveltyHandler Novelty handler for Belief
 	 * @return Updates Peer
 	 */
 	public Peer persistState(Consumer<Ref<ACell>> noveltyHandler) {

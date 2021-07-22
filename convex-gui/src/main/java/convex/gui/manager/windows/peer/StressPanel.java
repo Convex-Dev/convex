@@ -10,6 +10,7 @@ import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import javax.swing.JButton;
@@ -154,21 +155,30 @@ public class StressPanel extends JPanel {
 						ccs.add(cc);
 					}
 					
-					for (int i = 0; i < transCount; i++) {
-						StringBuilder tsb = new StringBuilder();
-						tsb.append("(def a (do ");
-						for (int j = 0; j < opCount; j++) {
-							tsb.append(" (* 10 " + i + ")");
+					ArrayList<Future<Object>> cfutures=Utils.futureMap (cc->{
+						try {
+							for (int i = 0; i < transCount; i++) {
+								StringBuilder tsb = new StringBuilder();
+								tsb.append("(def a (do ");
+								for (int j = 0; j < opCount; j++) {
+									tsb.append(" (* 10 " + i + ")");
+								}
+								tsb.append("))");
+								String source = tsb.toString();
+								
+								ATransaction t = Invoke.create(cc.getAddress(),-1, Reader.read(source));
+								CompletableFuture<Result> fr;
+									fr = cc.transact(t);
+								frs.add(fr);
+							}
+						} catch (IOException e) {
+							throw Utils.sneakyThrow(e);
 						}
-						tsb.append("))");
-						String source = tsb.toString();
-						
-						for (int c=0; c<clientCount; c++) {
-							Convex cc=ccs.get(c);
-							ATransaction t = Invoke.create(cc.getAddress(),-1, Reader.read(source));
-							CompletableFuture<Result> fr = cc.transact(t);
-							frs.add(fr);
-						}
+						return null;
+					},ccs);
+					// wait for everything to be sent
+					for (int i=0; i<clientCount; i++) {
+						cfutures.get(i).get(10000, TimeUnit.MILLISECONDS);
 					}
 
 					long sendTime = Utils.getCurrentTimestamp();

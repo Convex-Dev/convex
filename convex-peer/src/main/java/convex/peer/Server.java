@@ -22,6 +22,7 @@ import convex.api.Convex;
 import convex.core.Belief;
 import convex.core.Block;
 import convex.core.BlockResult;
+import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Peer;
 import convex.core.Result;
@@ -572,25 +573,7 @@ public class Server implements Closeable {
 		// At this point we know our Order should have changed
 		final Belief belief = peer.getBelief();
 
-		// At this point we know something updated our belief, so we want to rebroadcast
-		// belief to network
-		Consumer<Ref<ACell>> noveltyHandler = r -> {
-			ACell o = r.getValue();
-			if (o == belief) return; // skip sending data for belief cell itself, will be BELIEF payload
-			Message msg = Message.createData(o);
-            // broadcast to all peers trusted or not
-			manager.broadcast(msg, false);
-		};
-
-		// persist the state of the Peer, announcing the new Belief
-		peer=peer.persistState(noveltyHandler);
-
-		// Broadcast latest Belief to connected Peers
-		SignedData<Belief> sb = peer.getSignedBelief();
-		Message msg = Message.createBelief(sb);
-
-        // at the moment broadcast to all peers trusted or not TODO: recheck this
-		manager.broadcast(msg, false);
+		broadcastBelief(belief);
 
 		// Report transaction results
 		long newConsensusPoint = peer.getConsensusPoint();
@@ -604,6 +587,34 @@ public class Server implements Closeable {
 		}
 
 		return true;
+	}
+	
+	/**
+	 * Time of last belief broadcast
+	 */
+	private long lastBroadcastBelief=0;
+
+	private void broadcastBelief(Belief belief) {
+		// At this point we know something updated our belief, so we want to rebroadcast
+		// belief to network
+		Consumer<Ref<ACell>> noveltyHandler = r -> {
+			ACell o = r.getValue();
+			if (o == belief) return; // skip sending data for belief cell itself, will be BELIEF payload
+			Message msg = Message.createData(o);
+            // broadcast to all peers trusted or not
+			manager.broadcast(msg, false);
+		};
+		
+		// persist the state of the Peer, announcing the new Belief
+		peer=peer.persistState(noveltyHandler);
+
+		// Broadcast latest Belief to connected Peers
+		SignedData<Belief> sb = peer.getSignedBelief();
+		Message msg = Message.createBelief(sb);
+
+        // at the moment broadcast to all peers trusted or not TODO: recheck this
+		manager.broadcast(msg, false);
+		lastBroadcastBelief=Utils.getCurrentTimestamp();
 	}
 
 	/**
@@ -919,10 +930,19 @@ public class Server implements Closeable {
 
 				// loop while the server is running
 				while (isRunning) {
+					long timestamp=Utils.getCurrentTimestamp();
 
 					// Try belief update
 					if (maybeUpdateBelief() ) {
 						raiseServerChange("consensus");
+					}
+					
+					// Maybe rebroadcast Belief if not done recently
+					if ((lastBroadcastBelief+Constants.REBROADCAST_DELAY)<timestamp) {
+						// rebroadcast if there is still stuff outstanding for consensus
+						if (peer.getConsensusPoint()<peer.getPeerOrder().getBlockCount()) {
+							broadcastBelief(peer.getBelief());
+						}
 					}
 
 					// Maybe sleep a bit, wait for some belief updates to accumulate

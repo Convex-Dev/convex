@@ -151,4 +151,9 @@ public class Constants {
 	 * Size of default socket send buffer
 	 */
 	public static final int SOCKET_SEND_BUFFER_SIZE = 65536;
+
+	/**
+	 * Delay before rebroadcasting Belief if not in consensus
+	 */
+	public static final long REBROADCAST_DELAY = 200;
 }
