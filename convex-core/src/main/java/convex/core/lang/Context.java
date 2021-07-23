@@ -1246,7 +1246,12 @@ public class Context<T extends ACell> extends AObject {
 		} else {
 			AFn<R> lang=RT.ensureFunction(lookupValue(Symbols.STAR_LANG));
 			if (lang!=null) {
-				return invoke(lang,form);
+				// Execute *lang* function, but increment depth just in case
+				int saveDepth=ctx.getDepth();
+				ctx=ctx.withDepth(saveDepth+1);
+				if (ctx.isExceptional()) return (Context<R>) ctx;
+				Context<R> rctx = ctx.invoke(lang,form);
+				return rctx.withDepth(saveDepth);
 			} else {
 				ctx=expandCompile(form);
 				if (ctx.isExceptional()) return (Context<R>) ctx;
