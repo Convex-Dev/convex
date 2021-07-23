@@ -1,18 +1,16 @@
 package convex.cli.output;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
 
-import convex.core.data.prim.CVMLong;
+import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.Address;
-import convex.core.Result;
+import convex.core.data.prim.CVMLong;
 
 public class OutputTest {
 
