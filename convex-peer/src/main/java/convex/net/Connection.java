@@ -517,10 +517,8 @@ public class Connection {
 						+ System.identityHashCode(this));
 			}
 		} else {
-			if (log.isTraceEnabled()) {
-				log.trace("Failed to send message " + type + " of length: " + dataLength + " Connection ID: "
-						+ System.identityHashCode(this));
-			}
+			log.info("Failed to send message {} of length: {} Connection ID: {}"
+						, type, dataLength, System.identityHashCode(this));
 		}
 		return sent;
 	}
