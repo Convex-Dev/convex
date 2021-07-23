@@ -62,45 +62,28 @@ public abstract class ACVMTest {
 
 	/**
 	 * Steps execution in a new forked Context
-	 * @param <T>
+	 * @param <T> Type of result
 	 * @param ctx Initial context to fork
-	 * @param source
+	 * @param source Source form to read
 	 * @return New forked context containing step result
 	 */
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> Context<T> step(Context<?> ctx, String source) {
-		// Compile form in forked context
-		Context<AOp<ACell>> cctx=ctx.fork();
+	public <T extends ACell> Context<T> step(Context<?> ctx, String source) {
 		ACell form = Reader.read(source);
-		cctx = cctx.expandCompile(form);
-		if (cctx.isExceptional()) return (Context<T>) cctx;
-		AOp<ACell> op = cctx.getResult();
-
-		// Run form in separate forked context to get result context
-		Context<T> rctx = ctx.fork();
-		rctx=(Context<T>) rctx.run(op);
-		assert(rctx.getDepth()==0):"Invalid depth after step: "+rctx.getDepth();
-		return rctx;
+		return step(ctx,form);
 	}
 
 	/**
 	 * Steps execution in a new forked Context
-	 * @param <T>
+	 * @param <T> Type of result
 	 * @param ctx Initial context to fork
 	 * @param form Form to compile and execute execute
 	 * @return New forked context containing step result
 	 */
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> Context<T> step(Context<?> ctx, ACell form) {
-		// Compile form in forked context
-		Context<AOp<ACell>> cctx=ctx.fork();
-		cctx = cctx.compile(form);
-		if (cctx.isExceptional()) return (Context<T>) cctx;
-		AOp<ACell> op = cctx.getResult();
-
 		// Run form in separate forked context to get result context
 		Context<T> rctx = ctx.fork();
-		rctx=(Context<T>) rctx.run(op);
+		rctx=(Context<T>) rctx.run(form);
 		assert(rctx.getDepth()==0):"Invalid depth after step: "+rctx.getDepth();
 		return rctx;
 	}
@@ -118,16 +101,7 @@ public abstract class ACVMTest {
 		}
 	}
 
-	public <T extends ACell> T eval(Context<?> c, String source) {
-		c=c.fork();
-		try {
-			AOp<T> op = compile(c, source);
-			Context<T> rc = c.run(op);
-			return rc.getResult();
-		} catch (Exception e) {
-			throw Utils.sneakyThrow(e);
-		}
-	}
+
 
 	public <T extends ACell> T read(String source) {
 		return Reader.read(source);
@@ -190,6 +164,11 @@ public abstract class ACVMTest {
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> T eval(ACell form) {
 		return (T) step(CONTEXT,form).getResult();
+	}
+	
+	public <T extends ACell> T eval(Context<?> c, String source) {
+		Context<T> rc = step(c,source);
+		return rc.getResult();
 	}
 
 	public <T extends ACell> Context<T> step(String source) {

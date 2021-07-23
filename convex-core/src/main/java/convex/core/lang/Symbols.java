@@ -169,6 +169,7 @@ public class Symbols {
 	public static final Symbol STAR_SEQUENCE = Symbol.create("*sequence*");
 	public static final Symbol STAR_KEY = Symbol.create("*key*");
 
+	public static final Symbol STAR_LANG = Symbol.create("*lang*");
 
 	public static final Symbol STAR_ALIASES = Symbol.create("*aliases*");
 
