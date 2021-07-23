@@ -291,6 +291,17 @@ public class Main implements Runnable {
 	public List<AKeyPair> generateKeyPairs(int count) throws Error {
 		List<AKeyPair> keyPairList = new ArrayList<>(count);
 
+		// generate `count` keys
+		for (int index = 0; index < count; index ++) {
+			AKeyPair keyPair = AKeyPair.generate();
+			keyPairList.add(keyPair);
+			addKeyPairToStore(keyPair);
+		}
+
+		return keyPairList;
+	}
+
+	public void addKeyPairToStore(AKeyPair keyPair) {
 		// get the password of the key store file
 		String password = getPassword();
 		if (password == null) {
@@ -312,29 +323,18 @@ public class Main implements Runnable {
 		} catch (Throwable t) {
 			throw new Error("Cannot load key store "+t);
 		}
-
-		// we have now the count, keystore-password, keystore-file
-		// generate keys
-		for (int index = 0; index < count; index ++) {
-			AKeyPair keyPair = AKeyPair.generate();
-			keyPairList.add(keyPair);
-
-			// System.out.println("generated #"+(index+1)+" public key: " + keyPair.getAccountKey().toHexString());
-			try {
-				// save the key in the keystore
-				PFXTools.saveKey(keyStore, keyPair, password);
-			} catch (Throwable t) {
-				throw new Error("Cannot store the key to the key store "+t);
-			}
+		try {
+			// save the key in the keystore
+			PFXTools.saveKey(keyStore, keyPair, password);
+		} catch (Throwable t) {
+			throw new Error("Cannot store the key to the key store "+t);
 		}
-
 		// save the keystore file
 		try {
 			PFXTools.saveStore(keyStore, keyFile, password);
 		} catch (Throwable t) {
 			throw new Error("Cannot save the key store file "+t);
 		}
-		return keyPairList;
 	}
 
     void showError(Throwable t) {
