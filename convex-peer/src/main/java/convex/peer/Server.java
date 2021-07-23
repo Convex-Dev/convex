@@ -101,13 +101,16 @@ public class Server implements Closeable {
 	private BlockingQueue<Message> receiveQueue = new ArrayBlockingQueue<Message>(RECEIVE_QUEUE_SIZE);
 
 	/**
-	 * Message consumer that simply enqueues received messages. Used for outward
-	 * connections. i.e. ones this Server has made.
+	 * Message consumer that simply enqueues received messages received by this Server
 	 */
 	Consumer<Message> peerReceiveAction = new Consumer<Message>() {
 		@Override
 		public void accept(Message msg) {
-			receiveQueue.add(msg);
+			try {
+				receiveQueue.put(msg);
+			} catch (InterruptedException e) {
+				log.warn("Interrupt on peer receive queue!");
+			}
 		}
 	};
 
@@ -210,7 +213,7 @@ public class Server implements Closeable {
 			}
 		}
 		State genesisState = (State) config.get(Keywords.STATE);
-		log.info("Defaulting to standard Peer startup.");
+		log.info("Defaulting to standard Peer startup with genesis state: "+genesisState.getHash());
 
 		return Peer.createGenesisPeer(keyPair,genesisState);
 	}
@@ -258,7 +261,7 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Gets the host name for this Peer
+	 * Gets the desired host name for this Peer
 	 * @return Hostname String
 	 */
 	public String getHostname() {
@@ -288,12 +291,12 @@ public class Server implements Closeable {
 			// Start connection manager loop
 			manager.start();
 
-			receiverThread = new Thread(receiverLoop, "Receive queue worker loop serving port: " + port);
+			receiverThread = new Thread(receiverLoop, "Receive Loop on port: " + port);
 			receiverThread.setDaemon(true);
 			receiverThread.start();
 
 			// Start Peer update thread
-			updateThread = new Thread(updateLoop, "Server Belief update loop for port: " + port);
+			updateThread = new Thread(updateLoop, "Update Loop on port: " + port);
 			updateThread.setDaemon(true);
 			updateThread.start();
 
@@ -363,12 +366,15 @@ public class Server implements Closeable {
 	 * Process a message received from a peer or client. We know at this point that the
 	 * message parsed successfully, not much else.....
 	 *
-	 * If the message is partial, will be queued pending delivery of missing data
+	 * If the message is partial, will be queued pending delivery of missing data.
+	 * 
+	 * Runs on receiver thread
 	 *
 	 * @param m
 	 */
 	private void processMessage(Message m) {
 		MessageType type = m.getType();
+		log.trace("Processing message {}",type);
 		try {
 			switch (type) {
 			case BELIEF:
@@ -463,7 +469,7 @@ public class Server implements Closeable {
 				// TODO: throttle?
 				m.getPeerConnection().sendResult(m.getID(), Strings.create("Bad Signature!"), ErrorCodes.SIGNATURE);
 			} catch (IOException e) {
-				// Ignore??
+				// Ignore?? Connection probably gone anyway
 			}
 			log.info("Bad signature from Client! {}" , sd);
 			return;
@@ -476,13 +482,9 @@ public class Server implements Closeable {
 		notifyNewMessages();
 	}
 
+	// Mark presence of new messages to handle
 	private void notifyNewMessages() {
-		if (!hasNewMessages) {
-			synchronized (updateThread) {
-				hasNewMessages=true;
-				updateThread.notify();
-			}
-		}
+		hasNewMessages=true;
 	}
 
 	/**
@@ -578,7 +580,7 @@ public class Server implements Closeable {
 		// Report transaction results
 		long newConsensusPoint = peer.getConsensusPoint();
 		if (newConsensusPoint > oldConsensusPoint) {
-			log.info("Consensus point update from {} to {}" ,oldConsensusPoint , newConsensusPoint);
+			log.debug("Consensus point update from {} to {}" ,oldConsensusPoint , newConsensusPoint);
 			for (long i = oldConsensusPoint; i < newConsensusPoint; i++) {
 				Block block = peer.getPeerOrder().getBlock(i);
 				BlockResult br = peer.getBlockResult(i);
@@ -617,28 +619,35 @@ public class Server implements Closeable {
 		lastBroadcastBelief=Utils.getCurrentTimestamp();
 	}
 
+	private long lastBlockPublished=0L;
+
 	/**
 	 * Checks for pending transactions, and if found propose them as a new Block.
 	 *
 	 * @return True if a new block is published, false otherwise.
 	 */
 	protected boolean maybePublishBlock() {
+		long timestamp=Utils.getCurrentTimestamp();
+		// skip if recently published a block
+		if ((lastBlockPublished+Constants.MIN_BLOCK_TIME)>timestamp) return false;
+		
+		Block block=null;
 		synchronized (newTransactions) {
-
 			int n = newTransactions.size();
 			if (n == 0) return false;
 			// TODO: smaller block if too many transactions?
-			long timestamp = Utils.getCurrentTimestamp();
-			Block block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions, peer.getPeerKey());
-
-			ACell.createPersisted(block);
-
-			Peer newPeer = peer.proposeBlock(block);
-			log.info("New block proposed: " + block.getHash());
+			block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions, peer.getPeerKey());
 			newTransactions.clear();
-			peer = newPeer;
-			return true;
 		}
+		
+		ACell.createPersisted(block);
+
+		Peer newPeer = peer.proposeBlock(block);
+		log.info("New block proposed: {} transaction(s), hash={}", block.getTransactions().count(), block.getHash());
+		
+		peer = newPeer;
+		lastBlockPublished=timestamp;
+		return true;
 	}
 
 	private long lastOwnTransactionTimestamp=0L;
@@ -683,6 +692,7 @@ public class Server implements Closeable {
 			// Try to set hostname if not correctly set
 			trySetHostname:
 			if (!Utils.equals(desiredHostname, currentHostname)) {
+				log.info("Trying to update own hostname from: {} to {}",currentHostname,desiredHostname);
 				Address address=ps.getController();
 				if (address==null) break trySetHostname;
 				AccountStatus as=s.getAccount(address);
@@ -900,8 +910,15 @@ public class Server implements Closeable {
 
 				while (isRunning) { // loop until server terminated
 					Message m = receiveQueue.poll(100, TimeUnit.MILLISECONDS);
-					if (m != null) {
+					while (m != null) {
 						processMessage(m);
+						m=receiveQueue.poll(100, TimeUnit.MILLISECONDS);
+					}
+					// Notify updateThread after available messages are processed
+					if (hasNewMessages) {
+						synchronized (updateThread) {
+							updateThread.notify();
+						}
 					}
 				}
 
@@ -945,7 +962,7 @@ public class Server implements Closeable {
 						}
 					}
 
-					// Maybe sleep a bit, wait for some belief updates to accumulate
+					// Maybe sleep a bit, wait for some messages to accumulate
 					synchronized (updateThread) {
 						if (!hasNewMessages) {
 							updateThread.wait(SERVER_UPDATE_PAUSE);
@@ -1117,5 +1134,17 @@ public class Server implements Closeable {
 
 	public HashMap<Keyword, Object> getConfig() {
 		return config;
+	}
+
+	public Consumer<Message> getReceiveAction() {
+		return peerReceiveAction;
+	}
+
+	/**
+	 * Sets the desired host name for this Server
+	 * @param string Desired host name String, e.g. "my-domain.com:12345"
+	 */
+	public void setHostname(String string) {
+		hostname=string;
 	}
 }

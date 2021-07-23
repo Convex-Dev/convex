@@ -2,6 +2,7 @@ package convex.peer;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.channels.UnresolvedAddressException;
 import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -555,6 +556,8 @@ public class ConnectionManager {
 			server.raiseServerChange("connection");
 		} catch (InterruptedException | IOException |ExecutionException | TimeoutException e) {
 			// ignore any errors from the peer connections
+		} catch (UnresolvedAddressException e) {
+			log.info("Unable to resolve host address: "+hostAddress);
 		}
 		return newConn;
 	}

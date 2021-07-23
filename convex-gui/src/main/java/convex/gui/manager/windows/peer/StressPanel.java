@@ -29,6 +29,7 @@ import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
+import convex.core.data.Strings;
 import convex.core.lang.Reader;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
@@ -139,7 +140,6 @@ public class StressPanel extends JPanel {
 				StringBuilder sb = new StringBuilder();
 				try {
 					InetSocketAddress sa = peerView.peerServer.getHostAddress();
-					long startTime = Utils.getCurrentTimestamp();
 
 					// Use client store
 					// Stores.setCurrent(Stores.CLIENT_STORE);
@@ -150,10 +150,13 @@ public class StressPanel extends JPanel {
 					for (int i=0; i<clientCount; i++) {
 						AKeyPair kp=AKeyPair.generate();
 						Address clientAddr = pc.createAccount(kp.getAccountKey());
-						pc.transferSync(clientAddr, Coin.DIAMOND);
+						pc.transfer(clientAddr, Coin.DIAMOND);
 						Convex cc=Convex.connect(sa,clientAddr,kp);
 						ccs.add(cc);
 					}
+					// Make sure we are in consensus
+					pc.transactSync(Invoke.create(address, -1, Strings.create("sync")));
+					long startTime = Utils.getCurrentTimestamp();
 					
 					ArrayList<Future<Object>> cfutures=Utils.futureMap (cc->{
 						try {
@@ -178,12 +181,12 @@ public class StressPanel extends JPanel {
 					},ccs);
 					// wait for everything to be sent
 					for (int i=0; i<clientCount; i++) {
-						cfutures.get(i).get(10000, TimeUnit.MILLISECONDS);
+						cfutures.get(i).get(60, TimeUnit.SECONDS);
 					}
 
 					long sendTime = Utils.getCurrentTimestamp();
 
-					List<Result> results = Utils.completeAll(frs).get(10000, TimeUnit.MILLISECONDS);
+					List<Result> results = Utils.completeAll(frs).get(60, TimeUnit.SECONDS);
 					long endTime = Utils.getCurrentTimestamp();
 
 					for (Result r : results) {

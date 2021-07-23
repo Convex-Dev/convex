@@ -20,7 +20,6 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
-import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.peer.Server;
 
@@ -185,12 +184,8 @@ public class NIOServer implements Closeable {
 	}
 
 	protected void selectWrite(SelectionKey key) throws IOException {
-		SocketChannel sc=(SocketChannel) key.channel();
-
 		// attach a PeerConnection if needed for this client
-		if (key.attachment()==null) {
-        	key.attach(createPC(sc,receiveQueue,server.getStore()));
-    	}
+		ensurePeerConnection(key);
 
 		Connection.selectWrite(key);
 	}
@@ -200,21 +195,13 @@ public class NIOServer implements Closeable {
 		if (pc!=null) return pc;
 		SocketChannel sc=(SocketChannel) key.channel();
 		assert(!sc.isBlocking());
-		pc=createPC(sc,receiveQueue,server.getStore());
+		pc=createPC(sc,receiveQueue);
     	key.attach(pc);
     	return pc;
 	}
 
-	private static Connection createPC(SocketChannel sc, BlockingQueue<Message> queue, AStore store) throws IOException {
-		return Connection.create(sc,m->{
-			try {
-				// Add message to the received message queue
-				queue.put(m);
-			} catch (InterruptedException e) {
-				log.debug("Interrupted while attempting to add to receive queue");
-				Thread.currentThread().interrupt();
-			}
-		},store,null);
+	private Connection createPC(SocketChannel sc, BlockingQueue<Message> queue) throws IOException {
+		return Connection.create(sc,server.getReceiveAction(),server.getStore(),null);
 	}
 
 	protected void selectRead(SelectionKey key) throws IOException {

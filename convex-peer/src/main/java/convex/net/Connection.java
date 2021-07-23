@@ -133,7 +133,7 @@ public class Connection {
 	}
 
 	/**
-	 * Create a PeerConnection by connecting to a remote address
+	 * Create a Connection by connecting to a remote address
 	 *
 	 * @param hostAddress    Internet Address to connect to
 	 * @param receiveAction  A callback Consumer to be called for any received

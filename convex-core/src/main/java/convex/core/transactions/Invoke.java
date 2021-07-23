@@ -36,8 +36,8 @@ public class Invoke extends ATransaction {
 		this.command = args;
 	}
 
-	public static Invoke create(Address address,long elements, ACell command) {
-		return new Invoke(address,elements, command);
+	public static Invoke create(Address address,long sequence, ACell command) {
+		return new Invoke(address,sequence, command);
 	}
 	
 	/**

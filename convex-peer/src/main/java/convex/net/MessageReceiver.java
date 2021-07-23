@@ -32,7 +32,7 @@ import convex.core.exceptions.BadFormatException;
  *
  */
 public class MessageReceiver {
-	// Receive buffer must be big enough for one max sized message plus message header
+	// Receive buffer must be big enough at least for one max sized message plus message header
 	public static final int RECEIVE_BUFFER_SIZE = Constants.RECEIVE_BUFFER_SIZE;
 
 	// Maybe use a direct buffer since we are copying from the socket channel?

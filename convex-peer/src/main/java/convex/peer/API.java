@@ -113,6 +113,10 @@ public class API {
 		// TODO maybe have this as an option in the calling parameters?
 		AStore store = Stores.current();
 		config.put(Keywords.STORE, store);
+		
+		// Automatically manage Peer connections
+		config.put(Keywords.AUTO_MANAGE, true);
+
 
 		for (int i = 0; i < count; i++) {
 			AKeyPair keyPair = keyPairs.get(i);
@@ -135,6 +139,7 @@ public class API {
 			
 			// Join server #0 to this server
 			genesisServer.getConnectionManager().connectToPeer(server.getHostAddress());
+			server.setHostname("localhost:"+server.getPort());
 		}
 
 		// wait for the peers to sync upto 10 seconds
