@@ -7,11 +7,10 @@ import java.nio.channels.ByteChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
-import convex.core.data.Format;
+import convex.core.Constants;
 
 public class MessageSender {
-	public static final int SEND_BUFFER_SIZE = Format.LIMIT_ENCODING_LENGTH * 10;
+	public static final int SEND_BUFFER_SIZE = Constants.SEND_BUFFER_SIZE;
 
 	private final ByteChannel channel;
 
