@@ -1,0 +1,20 @@
+(do
+  
+  (defn runner [form]
+    (let [cmds (cond (list? form) 
+                     (let [n (count form)]
+                       (cond (== n 0) []
+                             (= 'do ) (vec (next form))
+                             (vec form)))
+                     [form])]
+      (cond 
+        (empty? cmds) "You do nothing."
+        (= ['quit] cmds) (do (undef *lang*) (return "Exiting game... goodbye!")))
+      (reduce (fn [s c] (str s " " c)) "You don't know how to:" cmds)))
+  
+  (defn start 
+    ^{:doc {:description "Start the adventure!"}}
+    []
+    (def *lang* runner) "Welcome to the Adventure!")
+  
+  )
