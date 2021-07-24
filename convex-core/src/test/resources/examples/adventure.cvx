@@ -15,6 +15,7 @@
   (defn start 
     ^{:doc {:description "Start the adventure!"}}
     []
-    (def *lang* runner) "Welcome to the Adventure!")
+    (do 
+      (def *lang* runner) "Welcome to the Adventure!"))
   
   )
