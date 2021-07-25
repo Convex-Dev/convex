@@ -290,8 +290,8 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	public boolean equals(AMap<K, V> a) {
 		if (this == a) return true; // important optimisation for e.g. hashmap equality
 		if (a == null) return false;
-		if (!(a.getClass() == this.getClass())) return false;
-		if (this.count() != a.count()) return false;
+		long n=this.count();
+		if (n != a.count()) return false;
 		return getHash().equals(a.getHash());
 	}
 
