@@ -14,6 +14,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.init.Init;
 
 
 import ch.qos.logback.classic.Level;
