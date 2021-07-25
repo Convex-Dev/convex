@@ -4,6 +4,8 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
 import convex.core.exceptions.TODOException;
 
 /**
@@ -66,6 +68,11 @@ public abstract class ABlobMap<K extends ABlob, V extends ACell> extends AMap<K,
 	@Override
 	public boolean isCanonical() {
 		return true;
+	}
+	
+	@Override
+	public AType getType() {
+		return Types.BLOBMAP;
 	}
 
 	/**

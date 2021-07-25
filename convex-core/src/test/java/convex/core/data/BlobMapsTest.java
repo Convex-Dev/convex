@@ -32,6 +32,10 @@ public class BlobMapsTest {
 		assertSame(m, m.dissoc(Blob.fromHex("cafe")));
 		assertSame(m, m.dissoc(Blob.fromHex("")));
 
+		// checks vs regular map
+		assertFalse(m.equals(Maps.empty()));
+		assertFalse(Maps.empty().equals(m));
+		
 		doBlobMapTests(m);
 	}
 
