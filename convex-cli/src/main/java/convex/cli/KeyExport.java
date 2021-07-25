@@ -1,8 +1,6 @@
 package convex.cli;
 
 
-import java.util.List;
-
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,7 +42,7 @@ public class KeyExport implements Runnable {
 			+ "For example: 0xf0234 or f0234")
 	private String[] keystorePublicKey ;
 
-	@Option(names={"--key-password"},
+	@Option(names={"--export-password"},
 		description="Password of the exported key.")
     private String exportPassword;
 
@@ -56,10 +54,12 @@ public class KeyExport implements Runnable {
 
 		if (keystoreIndex == null && keystorePublicKey == null) {
 			log.warn("You need to provide at least on --index-key or --public-key parameter");
+			return;
 		}
 
 		if (exportPassword == null || exportPassword.length() == 0) {
-			log.warn("You need to provide an export password '--key-password' of the exported key");
+			log.warn("You need to provide an export password '--export-password' of the exported key");
+			return;
 		}
 
 		try {
@@ -81,10 +81,14 @@ public class KeyExport implements Runnable {
 					publicKey = keystorePublicKey[index];
 				}
 				AKeyPair keyPair = mainParent.loadKeyFromStore(publicKey, indexKey);
-				String exportText = PEMTools.writePEM(keyPair);
-				mainParent.output.setField("index", index + 1);
-				mainParent.output.setField("export", exportText);
+				String pemText = PEMTools.encryptPrivateKeyToPEM(keyPair.getPrivate(), exportPassword.toCharArray());
+
+				mainParent.output.setField("index", String.format("%5d", index + 1));
+				mainParent.output.setField("publicKey", keyPair.getAccountKey().toHexString());
+				mainParent.output.setField("export", pemText);
 				mainParent.output.addRow();
+
+				index ++;
 			}
 
 		} catch (Error e) {

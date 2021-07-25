@@ -1,12 +1,10 @@
 package convex.cli;
 
 import java.io.IOException;
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.charset.StandardCharsets;
-import java.security.GeneralSecurityException;
-import java.util.List;
+import java.security.PrivateKey;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +13,7 @@ import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Option;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.Ed25519KeyPair;
 import convex.core.crypto.PEMTools;
 
 
@@ -37,7 +36,7 @@ public class KeyImport implements Runnable {
 	@ParentCommand
 	protected Key keyParent;
 
-	@Option(names={"-i", "--import"},
+	@Option(names={"-i", "--import-text"},
 		description="Import format PEM text of the keypair.")
 	private String importText;
 
@@ -46,7 +45,7 @@ public class KeyImport implements Runnable {
 		description="Import file name of the keypair PEM file.")
 	private String importFilename;
 
-	@Option(names={"--key-password"},
+	@Option(names={"--import-password"},
 		description="Password of the imported key.")
     private String importPassword;
 
@@ -63,18 +62,21 @@ public class KeyImport implements Runnable {
 			}
 		}
 		if (importText == null || importText.length() == 0) {
-			log.warn("You need to provide an import text '--import' or import filename '--import-file' to import a key");
+			log.warn("You need to provide an import text '--import' or import filename '--import-file' to import a private key");
 			return;
 		}
 
 		if (importPassword == null || importPassword.length() == 0) {
-			log.warn("You need to provide an import password '--key-password' of the imported key");
+			log.warn("You need to provide an import password '--import-password' of the imported encrypted PEM data");
 		}
 
 		try {
-			AKeyPair keyPair = PEMTools.readPEM(importText);
+			PrivateKey privateKey = PEMTools.decryptPrivateKeyFromPEM(importText, importPassword.toCharArray());
+			AKeyPair keyPair = Ed25519KeyPair.create(privateKey);
 			mainParent.addKeyPairToStore(keyPair);
-		} catch (Error | GeneralSecurityException e) {
+			mainParent.output.setField("public key", keyPair.getAccountKey().toHexString());
+
+		} catch (Error e) {
 			mainParent.showError(e);
 		}
 	}

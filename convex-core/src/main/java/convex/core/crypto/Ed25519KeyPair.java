@@ -2,6 +2,8 @@ package convex.core.crypto;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.security.InvalidKeyException;
+import java.security.Key;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -19,6 +21,8 @@ import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
 
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
@@ -36,7 +40,7 @@ public class Ed25519KeyPair extends AKeyPair {
 	private final AccountKey publicKey;
 	private final KeyPair keyPair;
 	private byte[] privateKeyBytes;
-	
+
 	private static final String ED25519 = "Ed25519";
 
 	private Ed25519KeyPair(KeyPair kp, AccountKey publicKey) {
@@ -46,13 +50,13 @@ public class Ed25519KeyPair extends AKeyPair {
 
 	/**
 	 * Generates a new, secure random key pair. Uses a Java SecureRandom instance.
-	 * 
+	 *
 	 * @return New Key Pair instance.
 	 */
 	public static Ed25519KeyPair generate() {
 		return generate(new SecureRandom());
 	}
-	
+
 	/**
 	 * Create a KeyPair from a JCA KeyPair
 	 * @param keyPair JCA KeyPair
@@ -62,7 +66,7 @@ public class Ed25519KeyPair extends AKeyPair {
 		AccountKey address=extractAccountKey(keyPair.getPublic());
 		return new Ed25519KeyPair(keyPair,address);
 	}
-	
+
 	/**
 	 * Creates an Ed25519 Key Pair with the specified keys
 	 * @param publicKey Public key
@@ -73,7 +77,7 @@ public class Ed25519KeyPair extends AKeyPair {
 		KeyPair keyPair=new KeyPair(publicKey,privateKey);
 		return create(keyPair);
 	}
-	
+
 	/**
 	 * Create a key pair given a public AccountKey and a encoded Blob
 	 * @param accountKey Public Key
@@ -104,7 +108,7 @@ public class Ed25519KeyPair extends AKeyPair {
 
 	/**
 	 * Create a deterministic key pair with a specified seed.
-	 * 
+	 *
 	 * SECURITY: Use for testing purpose only
 	 * @param seed See to use for generation
 	 * @return Key Pair instance
@@ -120,11 +124,11 @@ public class Ed25519KeyPair extends AKeyPair {
 			throw new Error(e);
 		}
 	}
-	
+
 	/**
 	 * Create a SignKeyPair from given private key material. Public key is generated
 	 * automatically from the private key
-	 * 
+	 *
 	 * @param keyMaterial An array of 32 bytes of random material to use for private key
 	 * @return A new key pair using the given private key
 	 */
@@ -132,7 +136,22 @@ public class Ed25519KeyPair extends AKeyPair {
 		if (keyMaterial.length != 32) throw new IllegalArgumentException("256 bit private key material expected!");
 		throw new TODOException();
 	}
-	
+
+	/**
+	 * Create a SignKeyPair from given private key. Public key is generated
+	 * automatically from the private key
+	 *
+	 * @param privateKey An PrivateKey item for private key
+	 * @return A new key pair using the given private key
+	 */
+	public static Ed25519KeyPair create(PrivateKey privateKey) {
+		Ed25519PrivateKeyParameters privateKeyParam = new Ed25519PrivateKeyParameters(privateKey.getEncoded(), 16);
+		Ed25519PublicKeyParameters publicKeyParam = privateKeyParam.generatePublicKey();
+		PublicKey generatedPublicKey = publicKeyFromBytes(publicKeyParam.getEncoded());
+		PrivateKey generatedPrivateKey = privateFromBytes(privateKeyParam.getEncoded());
+		return create(generatedPublicKey, generatedPrivateKey);
+	}
+
 	/**
 	 * Extracts an Address from an Ed25519 public key
 	 * @param publicKey Public key
@@ -144,7 +163,7 @@ public class Ed25519KeyPair extends AKeyPair {
 		// take the bytes at the end of the encoding
 		return AccountKey.wrap(bytes,n-AccountKey.LENGTH);
 	}
-	
+
 	/**
 	 * Gets a Ed25519 Private Key from a 32-byte array.
 	 * @param privKey
@@ -154,7 +173,7 @@ public class Ed25519KeyPair extends AKeyPair {
 		try {
 			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
 			PrivateKeyInfo privKeyInfo = new PrivateKeyInfo(new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519), new DEROctetString(privKey));
-		
+
 			var pkcs8KeySpec = new PKCS8EncodedKeySpec(privKeyInfo.getEncoded());
 
 	        PrivateKey result = keyFactory.generatePrivate(pkcs8KeySpec);
@@ -163,17 +182,17 @@ public class Ed25519KeyPair extends AKeyPair {
 			throw Utils.sneakyThrow(e);
 		}
 	}
-	
+
 	@Override
 	public Blob getEncodedPrivateKey() {
 		return extractPrivateKey(getPrivate());
 	}
-	
+
 	/**
 	 * Extracts an Blob containing the private key data from an Ed25519 private key
-	 * 
+	 *
 	 * SECURITY: Be careful with this Blob!
-	 * 
+	 *
 	 * @param publicKey Public key
 	 * @return
 	 */
@@ -189,7 +208,7 @@ public class Ed25519KeyPair extends AKeyPair {
 	public byte[] getPublicKeyBytes() {
 		return getAccountKey().getBytes();
 	}
-	
+
 	static PrivateKey privateKeyFromBlob(Blob encodedKey) {
 		try {
 			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
@@ -257,7 +276,7 @@ public class Ed25519KeyPair extends AKeyPair {
 	public ASignature sign(Hash hash) {
 //		byte[] signature=new byte[Ed25519Signature.SIGNATURE_LENGTH];
 //		if (Providers.SODIUM_SIGN.cryptoSignDetached(
-//				signature, 
+//				signature,
 //				hash.getBytes(),
 //				Hash.LENGTH,
 //				getPrivateKeyBytes())) {;
@@ -265,7 +284,7 @@ public class Ed25519KeyPair extends AKeyPair {
 //		} else {
 //			throw new Error("Signing failed!");
 //		}
-		
+
 		try {
 			Signature signer = Signature.getInstance(ED25519);
 			signer.initSign(getPrivate());
@@ -299,8 +318,22 @@ public class Ed25519KeyPair extends AKeyPair {
 	}
 
 	boolean equals(Ed25519KeyPair other) {
-		if (!keyPair.getPrivate().equals(other.keyPair.getPrivate())) return false;
-		return keyPair.getPublic().equals(other.getPublic());
+		if (this.keyPair == null || other.keyPair == null) return false;
+		if (!this.keyPair.getPublic().equals(other.keyPair.getPublic())) return false;
+		// private keys are stored differently depending on the source of this keypair
+		// if from a generate or keystore then they are the same
+		// if from a encrypted pem then they have a different byte format
+		// so we need to convert the to a standard 32 byte private key and then compare
+		try {
+			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
+			Key keyThis = keyFactory.translateKey(this.getPrivate());
+			Key keyOther = keyFactory.translateKey(other.getPrivate());
+			return keyThis.equals(keyOther);
+		} catch ( NoSuchAlgorithmException | InvalidKeyException e ) {
+			// throw new Error(e);
+			// do nothing just return false
+		}
+		return false;
 	}
 
 

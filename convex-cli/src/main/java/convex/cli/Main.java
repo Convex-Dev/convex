@@ -2,8 +2,7 @@ package convex.cli;
 
 import java.io.File;
 import java.net.InetSocketAddress;
-import java.security.KeyStore
-;
+import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
@@ -15,7 +14,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
-import convex.core.init.Init;
 
 
 import ch.qos.logback.classic.Level;
@@ -205,7 +203,10 @@ public class Main implements Runnable {
 
 		AKeyPair keyPair = null;
 
-		String publicKeyClean = publicKey.toLowerCase().replaceAll("^0x", "");
+		String publicKeyClean = "";
+		if (publicKey != null) {
+			publicKeyClean = publicKey.toLowerCase().replaceAll("^0x", "");
+		}
 
 		if ( publicKeyClean.isEmpty() && indexKey <= 0) {
 			return null;
@@ -232,7 +233,7 @@ public class Main implements Runnable {
 
 			while (aliases.hasMoreElements()) {
 				String alias = aliases.nextElement();
-				if (counter == indexKey || alias.indexOf(publicKeyClean) == 0) {
+				if (counter == (indexKey + 1) || alias.indexOf(publicKeyClean) == 0) {
 					keyPair = PFXTools.getKeyPair(keyStore, alias, password);
 					break;
 				}
