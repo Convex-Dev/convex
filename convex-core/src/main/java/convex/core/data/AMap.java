@@ -287,13 +287,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 * @param a Map to compare with
 	 * @return true if maps are equal, false otherwise.
 	 */
-	public boolean equals(AMap<K, V> a) {
-		if (this == a) return true; // important optimisation for e.g. hashmap equality
-		if (a == null) return false;
-		long n=this.count();
-		if (n != a.count()) return false;
-		return getHash().equals(a.getHash());
-	}
+	public abstract boolean equals(AMap<K, V> a);
 
 	/**
 	 * Gets the map entry with the specified hash

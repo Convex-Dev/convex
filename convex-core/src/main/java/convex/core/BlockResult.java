@@ -3,9 +3,11 @@ package convex.core;
 import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
+import convex.core.data.AMap;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
 import convex.core.data.Format;
+import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Tag;
@@ -177,6 +179,33 @@ public class BlockResult extends ARecord {
 		AVector<Result> newResults=Format.read(bb);
 		if (newResults==null) throw new BadFormatException("Null results");
 		return create(newState,newResults);
+	}
+	
+	@Override 
+	public boolean equals(AMap<Keyword,ACell> a) {
+		if (this == a) return true; // important optimisation for e.g. hashmap equality
+		if (a == null) return false;
+		if (a.getTag()!=getTag()) return false;
+		BlockResult as=(BlockResult)a;
+		return equals(as);
+	}
+	
+	/**
+	 * Tests if this BlockResult is equal to another
+	 * @param a BlockResult to compare with
+	 * @return true if equal, false otherwise
+	 */
+	public boolean equals(BlockResult a) {
+		if (a == null) return false;
+		Hash h=this.cachedHash();
+		if (h!=null) {
+			Hash ha=a.cachedHash();
+			if (ha!=null) return Utils.equals(h, ha);
+		}
+		
+		if (!(Utils.equals(results, a.results))) return false;
+		if (!(Utils.equals(state, a.state))) return false;
+		return true;
 	}
 	
 }

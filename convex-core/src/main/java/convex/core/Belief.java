@@ -19,6 +19,8 @@ import convex.core.data.AccountKey;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Format;
+import convex.core.data.Hash;
+import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.MapEntry;
 import convex.core.data.PeerStatus;
@@ -690,6 +692,33 @@ public class Belief extends ARecord {
 	 */
 	public long getTimestamp() {
 		return timestamp;
+	}
+	
+	@Override 
+	public boolean equals(AMap<Keyword,ACell> a) {
+		if (this == a) return true; // important optimisation for e.g. hashmap equality
+		if (a == null) return false;
+		if (a.getTag()!=getTag()) return false;
+		Belief as=(Belief)a;
+		return equals(as);
+	}
+	
+	/**
+	 * Tests if this Belief is equal to another
+	 * @param a Belief to compare with
+	 * @return true if equal, false otherwise
+	 */
+	public boolean equals(Belief a) {
+		if (a == null) return false;
+		Hash h=this.cachedHash();
+		if (h!=null) {
+			Hash ha=a.cachedHash();
+			if (ha!=null) return Utils.equals(h, ha);
+		}
+
+		if (timestamp!=a.timestamp) return false;
+		if (!(Utils.equals(orders, a.orders))) return false;
+		return true;
 	}
 	
 }

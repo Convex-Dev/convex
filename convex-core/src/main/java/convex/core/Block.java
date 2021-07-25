@@ -5,10 +5,12 @@ import java.util.Comparator;
 import java.util.List;
 
 import convex.core.data.ACell;
+import convex.core.data.AMap;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Format;
+import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.SignedData;
@@ -209,6 +211,34 @@ public class Block extends ARecord {
 	@Override
 	public void validateCell() throws InvalidDataException {
 		transactions.validateCell();
+	}
+	
+	@Override 
+	public boolean equals(AMap<Keyword,ACell> a) {
+		if (this == a) return true; // important optimisation for e.g. hashmap equality
+		if (a == null) return false;
+		if (a.getTag()!=getTag()) return false;
+		Block as=(Block)a;
+		return equals(as);
+	}
+	
+	/**
+	 * Tests if this Block is equal to another
+	 * @param a PeerStatus to compare with
+	 * @return true if equal, false otherwise
+	 */
+	public boolean equals(Block a) {
+		if (a == null) return false;
+		Hash h=this.cachedHash();
+		if (h!=null) {
+			Hash ha=a.cachedHash();
+			if (ha!=null) return Utils.equals(h, ha);
+		}
+		
+		if (timestamp!=a.timestamp) return false;
+		if (!(Utils.equals(peerKey, a.peerKey))) return false;
+		if (!(Utils.equals(transactions, a.transactions))) return false;
+		return true;
 	}
 	
 }
