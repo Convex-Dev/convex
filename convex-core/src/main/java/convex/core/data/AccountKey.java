@@ -68,7 +68,7 @@ public class AccountKey extends AArrayBlob {
 	/**
 	 * Creates an AccountKey from a blob. Must have correct length.
 	 * @param b Blob to wrap as Account Key
-	 * @return AccountKey insatnce, or null if not valid
+	 * @return AccountKey instance, or null if not valid
 	 */
 	public static AccountKey create(ABlob b) {
 		if (b.count()!=LENGTH) return null;

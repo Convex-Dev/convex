@@ -31,7 +31,7 @@ public class OutputTest {
 		output.writeToStream(printWriter);
 		String outputResult = outputWriter.toString();
 		String fullText = String.format("Test-Long: %d\nTest-Cell: #%d\nTest-String: %s\n", TEST_LONG_VALUE, TEST_LONG_VALUE, TEST_STRING_VALUE);
-		assertEquals(fullText, outputResult);
+		assertEquals(fullText, outputResult.replaceAll("\r\n", "\n"));
 	}
 
 	@Test
@@ -46,7 +46,7 @@ public class OutputTest {
 		output.writeToStream(printWriter);
 		String outputResult = outputWriter.toString();
 		String fullText = String.format("Result: #%d\nData type: Address\n", TEST_LONG_VALUE);
-		assertEquals(fullText, outputResult);
+		assertEquals(fullText, outputResult.replaceAll("\r\n", "\n"));
 	}
 
 	@Test
@@ -62,7 +62,7 @@ public class OutputTest {
 		String outputResult = outputWriter.toString();
 		System.out.println(outputResult);
 		String fullText = String.format("Result: #%d\nError code: %d\n", TEST_LONG_VALUE, TEST_ERROR_CODE);
-		assertEquals(fullText, outputResult);
+		assertEquals(fullText, outputResult.replaceAll("\r\n", "\n"));
 	}
 
 

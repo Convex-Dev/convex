@@ -37,6 +37,7 @@ import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
+import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.core.lang.impl.RecordFormat;
 import convex.core.transactions.ATransaction;
@@ -522,7 +523,9 @@ public class State extends ARecord {
 		HashMap<AccountKey, Double> hm = new HashMap<>(peers.size());
 		Double totalStake = peers.reduceEntries((acc, e) -> {
 			double stake = (double) (e.getValue().getTotalStake());
-			hm.put(AccountKey.create(e.getKey()), stake);
+			
+			// TODO: potential performance bottleneck from hashing?
+			hm.put(RT.ensureAccountKey(e.getKey()), stake);
 			return stake + acc;
 		}, 0.0);
 		hm.put(null, totalStake);
