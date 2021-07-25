@@ -47,7 +47,7 @@ public class Benchmarks {
 
 	static Options createOptions(Class<?> c) {
 		return new OptionsBuilder().include(c.getSimpleName()).warmupIterations(1).measurementIterations(5)
-				.warmupTime(TimeValue.seconds(1)).measurementTime(TimeValue.seconds(1)).forks(1).build();
+				.warmupTime(TimeValue.seconds(1)).measurementTime(TimeValue.seconds(1)).forks(0).build();
 	}
 
 	public static Context<?> context() {

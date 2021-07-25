@@ -256,13 +256,12 @@ public class Belief extends ARecord {
 		// TODO: figure out what to do with new blocks filtered out?
 		final BlobMap<AccountKey, SignedData<Order>> filteredOrders = accOrders.filterValues(signedOrder -> {
 			try {
-				Order otherChain = signedOrder.getValue();
-				return myOrder.checkConsistent(otherChain);
+				Order otherOrder = signedOrder.getValue();
+				return myOrder.checkConsistent(otherOrder);
 			} catch (Exception e) {
 				throw Utils.sneakyThrow(e);
 			}
 		});
-		assert (filteredOrders.get(myAddress).getValue() == myOrder);
 
 		// Current Consensus Point
 		long consensusPoint = myOrder.getConsensusPoint();
@@ -294,8 +293,12 @@ public class Belief extends ARecord {
 		final double C_THRESHOLD = totalStake * Constants.CONSENSUS_THRESHOLD;
 		final Order consensusOrder = updateConsensus(proposedOrder, stakedOrders, C_THRESHOLD);
 
-		final SignedData<Order> signedOrder = mc.sign(consensusOrder);
-		final BlobMap<AccountKey, SignedData<Order>> resultOrders = filteredOrders.assoc(myAddress, signedOrder);
+		BlobMap<AccountKey, SignedData<Order>> resultOrders = filteredOrders;
+		if (!consensusOrder.equals(myOrder)) {
+			// Only sign and update Order if it has changed
+			final SignedData<Order> signedOrder = mc.sign(consensusOrder);
+			resultOrders = resultOrders.assoc(myAddress, signedOrder);
+		}
 		return resultOrders;
 	}
 

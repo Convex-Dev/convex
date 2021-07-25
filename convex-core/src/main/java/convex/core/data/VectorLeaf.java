@@ -631,7 +631,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	@Override
 	public long commonPrefixLength(AVector<T> b) {
 		long n = count();
-		if (this.equals(b)) return n;
+		if (this==b) return n;
 		int il = items.length;
 		long prefixLength = n - il;
 		if (prefixLength > 0) {
