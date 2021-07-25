@@ -110,8 +110,8 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	@Override
 	public boolean equalsValue(Ref<T> a) {
 		if (a == this) return true;
-		if ((this.hash == a.hash) && (this.hash != null)) return true;
-		return getHash().equals(a.getHash());
+		// compare by hash value
+		return hash.equals(a.getHash());
 	}
 
 	@Override

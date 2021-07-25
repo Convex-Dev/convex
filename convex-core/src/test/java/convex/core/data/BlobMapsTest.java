@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.prim.CVMLong;
+import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
@@ -288,6 +289,8 @@ public class BlobMapsTest {
 			MapEntry<K, V> e2 = m.entryAt(n - 1);
 			assertTrue(e1.getKey().compareTo(e2.getKey()) < 0);
 		}
+		
+		assertEquals(Types.BLOBMAP,m.getType());
 
 		CollectionsTest.doMapTests(m);
 	}
