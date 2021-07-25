@@ -19,6 +19,8 @@ import convex.core.data.AccountKey;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Format;
+import convex.core.data.Hash;
+import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.MapEntry;
 import convex.core.data.PeerStatus;
@@ -256,13 +258,12 @@ public class Belief extends ARecord {
 		// TODO: figure out what to do with new blocks filtered out?
 		final BlobMap<AccountKey, SignedData<Order>> filteredOrders = accOrders.filterValues(signedOrder -> {
 			try {
-				Order otherChain = signedOrder.getValue();
-				return myOrder.checkConsistent(otherChain);
+				Order otherOrder = signedOrder.getValue();
+				return myOrder.checkConsistent(otherOrder);
 			} catch (Exception e) {
 				throw Utils.sneakyThrow(e);
 			}
 		});
-		assert (filteredOrders.get(myAddress).getValue() == myOrder);
 
 		// Current Consensus Point
 		long consensusPoint = myOrder.getConsensusPoint();
@@ -294,8 +295,12 @@ public class Belief extends ARecord {
 		final double C_THRESHOLD = totalStake * Constants.CONSENSUS_THRESHOLD;
 		final Order consensusOrder = updateConsensus(proposedOrder, stakedOrders, C_THRESHOLD);
 
-		final SignedData<Order> signedOrder = mc.sign(consensusOrder);
-		final BlobMap<AccountKey, SignedData<Order>> resultOrders = filteredOrders.assoc(myAddress, signedOrder);
+		BlobMap<AccountKey, SignedData<Order>> resultOrders = filteredOrders;
+		if (!consensusOrder.equals(myOrder)) {
+			// Only sign and update Order if it has changed
+			final SignedData<Order> signedOrder = mc.sign(consensusOrder);
+			resultOrders = resultOrders.assoc(myAddress, signedOrder);
+		}
 		return resultOrders;
 	}
 
@@ -687,6 +692,33 @@ public class Belief extends ARecord {
 	 */
 	public long getTimestamp() {
 		return timestamp;
+	}
+	
+	@Override 
+	public boolean equals(AMap<Keyword,ACell> a) {
+		if (this == a) return true; // important optimisation for e.g. hashmap equality
+		if (a == null) return false;
+		if (a.getTag()!=getTag()) return false;
+		Belief as=(Belief)a;
+		return equals(as);
+	}
+	
+	/**
+	 * Tests if this Belief is equal to another
+	 * @param a Belief to compare with
+	 * @return true if equal, false otherwise
+	 */
+	public boolean equals(Belief a) {
+		if (a == null) return false;
+		Hash h=this.cachedHash();
+		if (h!=null) {
+			Hash ha=a.cachedHash();
+			if (ha!=null) return Utils.equals(h, ha);
+		}
+
+		if (timestamp!=a.timestamp) return false;
+		if (!(Utils.equals(orders, a.orders))) return false;
+		return true;
 	}
 	
 }

@@ -149,7 +149,7 @@ public class StressPanel extends JPanel {
 					ArrayList<Convex> ccs=new ArrayList<>(clientCount);
 					for (int i=0; i<clientCount; i++) {
 						AKeyPair kp=AKeyPair.generate();
-						Address clientAddr = pc.createAccount(kp.getAccountKey());
+						Address clientAddr = pc.createAccountSync(kp.getAccountKey());
 						pc.transfer(clientAddr, Coin.DIAMOND);
 						Convex cc=Convex.connect(sa,clientAddr,kp);
 						ccs.add(cc);

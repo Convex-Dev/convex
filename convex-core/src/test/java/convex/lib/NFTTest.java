@@ -8,11 +8,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
+import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Symbol;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
+import convex.core.lang.Reader;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
 import convex.test.Assertions;
@@ -30,7 +32,8 @@ public class NFTTest extends ACVMTest {
 		Context<?> ctx=Context.createFake(InitTest.STATE,InitTest.HERO);
 		try {
 			String importS="(import convex.nft-tokens :as "+nSym.getName()+")";
-			ctx=step(ctx,importS);
+			ACell code=Reader.read(importS);
+			ctx=ctx.run(code);
 			Address nft=(Address) ctx.getResult();
 			assertFalse(ctx.isExceptional());
 
@@ -38,7 +41,8 @@ public class NFTTest extends ACVMTest {
 		} catch (Throwable e) {
 			throw Utils.sneakyThrow(e);
 		}
-		ctx=step(ctx,"(import convex.asset :as asset)");
+		ACell code=Reader.read("(import convex.asset :as asset)");
+		ctx=ctx.run(code);
 		return ctx;
 	}
 

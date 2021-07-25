@@ -31,10 +31,12 @@ import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.ACell;
+import convex.core.data.AList;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.lang.Reader;
+import convex.core.lang.Symbols;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
@@ -189,7 +191,8 @@ public class REPLPanel extends JPanel {
 			outputArea.append(s);
 			outputArea.append("\n");
 			try {
-				ACell message = Reader.read(s);
+				AList<ACell> forms = Reader.readAll(s);
+				ACell message = (forms.count()==1)?forms.get(0):forms.cons(Symbols.DO);
 				Future<Result> future;
 				String mode = execPanel.getMode();
 				if (mode.equals("Query")) {

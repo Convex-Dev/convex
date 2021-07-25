@@ -611,6 +611,8 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	public boolean equals(ACell a) {
 		if (a instanceof VectorLeaf) return equals((VectorLeaf<T>)a);
 		if (!(a instanceof AVector)) return false;
+		
+		// Its a vector, but not canonical?
 		AVector<T> v=(AVector<T>) a;
 		if (v.count()!=count) return false;
 		return a.getEncoding().equals(this.getEncoding());
@@ -629,7 +631,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	@Override
 	public long commonPrefixLength(AVector<T> b) {
 		long n = count();
-		if (this.equals(b)) return n;
+		if (this==b) return n;
 		int il = items.length;
 		long prefixLength = n - il;
 		if (prefixLength > 0) {

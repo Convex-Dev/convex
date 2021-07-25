@@ -1226,7 +1226,11 @@ public class Context<T extends ACell> extends AObject {
 	}
 
 	/**
-	 * Expands, compile and executes a form in the current context.
+	 * Executes a form in the current context.
+	 * 
+	 * Ops are executed directly.
+	 * Other forms will be expanded and compiled before execution, unless *lang* is set, in which case they will
+	 * be executed via the *lang* function.
 	 *
 	 * @param <R> Return type of evaluation
 	 * @param form Form to evaluate
@@ -1234,10 +1238,28 @@ public class Context<T extends ACell> extends AObject {
 	 */
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> eval(ACell form) {
-		Context<AOp<R>> compiledContext=expandCompile(form);
-		if (compiledContext.isExceptional()) return (Context<R>) compiledContext;
-		AOp<R> op=compiledContext.getResult();
-		return compiledContext.execute(op);
+		Context<AOp<R>> ctx=(Context<AOp<R>>) this;
+		AOp<R> op;
+	
+		if (form instanceof AOp) {
+			op=(AOp<R>)form;
+		} else {
+			AFn<R> lang=RT.ensureFunction(lookupValue(Symbols.STAR_LANG));
+			if (lang!=null) {
+				// Execute *lang* function, but increment depth just in case
+				int saveDepth=ctx.getDepth();
+				ctx=ctx.withDepth(saveDepth+1);
+				if (ctx.isExceptional()) return (Context<R>) ctx;
+				Context<R> rctx = ctx.invoke(lang,form);
+				return rctx.withDepth(saveDepth);
+			} else {
+				ctx=expandCompile(form);
+				if (ctx.isExceptional()) return (Context<R>) ctx;
+				op=ctx.getResult();
+				ctx=ctx.withResult(null); // clear result for execution
+			}
+		}
+		return ctx.execute(op);
 	}
 
 	/**

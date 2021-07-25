@@ -160,7 +160,7 @@ public class ContextTest extends ACVMTest {
 		assertEquals(Special.forSymbol(Symbols.STAR_BALANCE),comp("*balance*"));
 
 		assertNull(eval(Symbols.STAR_RESULT));
-		assertCVMEquals(ctx.getJuice(), eval(Symbols.STAR_JUICE));
+		assertCVMEquals(ctx.getJuice(), eval(Special.forSymbol(Symbols.STAR_JUICE)));
 		assertCVMEquals(0L,eval(Symbols.STAR_DEPTH));
 		assertCVMEquals(ctx.getBalance(ADDR),eval(Symbols.STAR_BALANCE));
 		assertCVMEquals(0L,eval(Symbols.STAR_OFFER));

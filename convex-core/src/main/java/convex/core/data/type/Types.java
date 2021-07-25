@@ -38,6 +38,7 @@ public class Types {
 	public static final Map MAP = Map.INSTANCE;
 	public static final Sequence SEQUENCE = Sequence.INSTANCE;
 
+	public static final BlobMapType BLOBMAP = BlobMapType.INSTANCE;
 
 	public static final Blob BLOB = Blob.INSTANCE;
 	public static final AddressType ADDRESS = AddressType.INSTANCE;
@@ -60,6 +61,7 @@ public class Types {
 		MAP,
 		LIST,
 		SET,
+		BLOBMAP,
 		
 		NUMBER,
 		LONG,

@@ -10,6 +10,7 @@ import convex.core.lang.AFn;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.core.lang.impl.RecordFormat;
+import convex.core.util.Utils;
 
 /**
  * Class representing the current on-chain status of an account.
@@ -257,6 +258,39 @@ public class AccountStatus extends ARecord {
 		if ((newMeta!=null)&&newMeta.isEmpty()) newMeta=null;
 		if (metadata==newMeta) return this;
 		return new AccountStatus(sequence, balance, memory,environment,newMeta,holdings,controller,publicKey);
+	}
+	
+	@Override 
+	public boolean equals(AMap<Keyword,ACell> a) {
+		if (this == a) return true; // important optimisation for e.g. hashmap equality
+		if (a == null) return false;
+		if (a.getTag()!=getTag()) return false;
+		AccountStatus as=(AccountStatus)a;
+		return equals(as);
+	}
+	
+	/**
+	 * Tests if this account is equal to another Account
+	 * @param a AccountStatus to compare with
+	 * @return true if equal, false otherwise
+	 */
+	public boolean equals(AccountStatus a) {
+		if (a == null) return false;
+		Hash h=this.cachedHash();
+		if (h!=null) {
+			Hash ha=a.cachedHash();
+			if (ha!=null) return Utils.equals(h, ha);
+		}
+		
+		if (balance!=a.balance) return false;
+		if (sequence!=a.sequence) return false;
+		if (memory!=a.memory) return false;
+		if (!(Utils.equals(controller, a.controller))) return false;
+		if (!(Utils.equals(publicKey, a.publicKey))) return false;
+		if (!(Utils.equals(holdings, a.holdings))) return false;
+		if (!(Utils.equals(metadata, a.metadata))) return false;
+		if (!(Utils.equals(environment, a.environment))) return false;
+		return true;
 	}
 
 	/**

@@ -220,7 +220,7 @@ public class NIOServer implements Closeable {
 			key.cancel();
 		}
 		catch (BadFormatException e) {
-			log.warn("Cancelled connection: Bad data format from: {} message: {}",conn.getRemoteAddress(),e);
+			log.warn("Cancelled connection: Bad data format from: {} message: {}",conn.getRemoteAddress(),e.getMessage());
 			// TODO: blacklist peer?
 			key.cancel();
 		}

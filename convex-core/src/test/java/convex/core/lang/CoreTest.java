@@ -74,6 +74,7 @@ import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Do;
 import convex.core.lang.ops.Invoke;
 import convex.core.lang.ops.Lookup;
+import convex.core.lang.ops.Special;
 
 /**
  * Test class for core functions in the initial environment.
@@ -1415,6 +1416,15 @@ public class CoreTest extends ACVMTest {
 
 		assertArityError(step("(filter +)"));
 		assertArityError(step("(filter 1 2 3)"));
+	}
+	
+	@Test
+	public void testLang() {
+		{
+			Context<?> ctx=context();
+			ctx=step(ctx,"(def *lang* (fn [x] x))");
+			assertEquals(Symbols.COUNT,eval(ctx,"count"));
+		}
 	}
 
 	@Test
@@ -3678,10 +3688,10 @@ public class CoreTest extends ACVMTest {
 	public void testSpecialJuice() {
 		// TODO: semantics of returning juice before lookup complete is OK?
 		// seems sensible, represents "juice left at this position".
-		assertEquals(INITIAL_JUICE, evalL("*juice*"));
+		assertCVMEquals(INITIAL_JUICE, eval(Special.forSymbol(Symbols.STAR_JUICE)));
 
 		// juice gets consumed before returning a value
-		assertEquals(INITIAL_JUICE-Juice.DO - Juice.CONSTANT, evalL("(do 1 *juice*)"));
+		assertCVMEquals(INITIAL_JUICE-Juice.DO - Juice.CONSTANT, eval(comp("(do 1 *juice*)")));
 	}
 
 

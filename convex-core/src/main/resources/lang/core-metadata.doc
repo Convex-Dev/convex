@@ -414,7 +414,7 @@
 
   eval
  	{
-	 :doc {:description "Compiles and evaluates a form in the current context."
+	 :doc {:description "Evaluates code in the current context, compiling a form if necessary."
          :examples [{:code "(eval '(+ 1 2))"}]
          :type :function
          :signature [{:params [form]}]
@@ -424,7 +424,7 @@
 
   eval-as
  	{
-	 :doc {:description "Compiles and evaluates a form in the environment of the specifed Account. The current Account must have controller privileges to execute this operation."
+	 :doc {:description "Evaluates code in the environment of the specifed Account. The current Account must have controller privileges to execute this operation."
          :examples [{:code "(eval-as #666 '(+ 1 2))"}]
          :type :function
          :signature [{:params [address form]}]}

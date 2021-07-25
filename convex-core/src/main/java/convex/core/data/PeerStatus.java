@@ -7,6 +7,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.lang.impl.RecordFormat;
+import convex.core.util.Utils;
 
 /**
  * Class describing the on-chain state of a Peer declared on the network.
@@ -248,5 +249,35 @@ public class PeerStatus extends ARecord {
 	protected static long computeDelegatedStake(ABlobMap<Address, CVMLong> stakes) {
 		long ds = stakes.reduceValues((acc, e)->acc+e.longValue(), 0L);
 		return ds;
+	}
+
+	@Override 
+	public boolean equals(AMap<Keyword,ACell> a) {
+		if (this == a) return true; // important optimisation for e.g. hashmap equality
+		if (a == null) return false;
+		if (a.getTag()!=getTag()) return false;
+		PeerStatus as=(PeerStatus)a;
+		return equals(as);
+	}
+	
+	/**
+	 * Tests if this PeerStatus is equal to another
+	 * @param a PeerStatus to compare with
+	 * @return true if equal, false otherwise
+	 */
+	public boolean equals(PeerStatus a) {
+		if (a == null) return false;
+		Hash h=this.cachedHash();
+		if (h!=null) {
+			Hash ha=a.cachedHash();
+			if (ha!=null) return Utils.equals(h, ha);
+		}
+		
+		if (stake!=a.stake) return false;
+		if (delegatedStake!=a.delegatedStake) return false;
+		if (!(Utils.equals(metadata, a.metadata))) return false;
+		if (!(Utils.equals(stakes, a.stakes))) return false;
+		if (!(Utils.equals(controller, a.controller))) return false;
+		return true;
 	}
 }

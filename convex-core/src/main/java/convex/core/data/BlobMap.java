@@ -697,6 +697,42 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		}
 		return bm;
 	}
+	
+	/**
+	 * Checks this BlobMap for equality with another map. 
+	 * 
+	 * @param a Map to compare with
+	 * @return true if maps are equal, false otherwise.
+	 */
+	public boolean equals(AMap<K, V> a) {
+		if (this == a) return true; // important optimisation for e.g. hashmap equality
+		if (a == null) return false;
+		if (this.getType()!=a.getType()) return false;
+		// Must be a BlobMap
+		return equals((BlobMap<K,V>)a);
+	}
+	
+	/**
+	 * Checks this BlobMap for equality with another BlobMap 
+	 * 
+	 * @param a BlobMap to compare with
+	 * @return true if maps are equal, false otherwise.
+	 */
+	public boolean equals(BlobMap<K, V> a) {
+		if (a==null) return false;
+		long n=this.count();
+		if (n != a.count()) return false;
+		if (this.mask!=a.mask) return false;
+		
+		if (!Utils.equals(this.entry, a.entry)) return false;
+		
+		Hash h=this.cachedHash();
+		if (h!=null) {
+			Hash ha=a.cachedHash();
+			if (ha!=null) return h.equals(ha);
+		}
+		return getHash().equals(a.getHash());
+	}
 
 	@Override
 	public byte getTag() {

@@ -39,6 +39,19 @@ public abstract class ARecordGeneric extends ARecord {
 		return values.getRefCount();
 	}
 	
+	@Override 
+	public boolean equals(AMap<Keyword,ACell> a) {
+		if (this == a) return true; // important optimisation for e.g. hashmap equality
+		if (a == null) return false;
+		if (a.getTag()!=getTag()) return false;
+		Hash h=this.cachedHash();
+		if (h!=null) {
+			Hash ha=a.cachedHash();
+			if (ha!=null) return Utils.equals(h, ha);
+		}
+		return values.equals(((ARecordGeneric)a).values);
+	}
+	
 	@Override
 	public <R extends ACell> Ref<R> getRef(int index) {
 		return values.getRef(index);

@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.prim.CVMLong;
+import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
@@ -32,6 +33,10 @@ public class BlobMapsTest {
 		assertSame(m, m.dissoc(Blob.fromHex("cafe")));
 		assertSame(m, m.dissoc(Blob.fromHex("")));
 
+		// checks vs regular map
+		assertFalse(m.equals(Maps.empty()));
+		assertFalse(Maps.empty().equals(m));
+		
 		doBlobMapTests(m);
 	}
 
@@ -82,16 +87,14 @@ public class BlobMapsTest {
 		assertEquals(Vectors.of(17L,23L,34L),m.values());
 	}
 
-	@SuppressWarnings("unlikely-arg-type")
 	@Test
 	public void testGet() throws InvalidDataException {
 		Blob k1 = Blob.fromHex("cafe");
 		BlobMap<ABlob, CVMLong> m = BlobMaps.of(k1, 17L);
-		assertNull(m.get("cafe")); // needs a blob. String counts as non-existent key
+		assertNull(m.get(Samples.MAX_EMBEDDED_STRING)); // needs a blob. String counts as non-existent key
 		assertCVMEquals(17L,m.get(k1));
 
 		assertNull(m.get((Object)null)); // Null counts as non-existent key when used as an Object arg
-
 	}
 
 
@@ -286,6 +289,8 @@ public class BlobMapsTest {
 			MapEntry<K, V> e2 = m.entryAt(n - 1);
 			assertTrue(e1.getKey().compareTo(e2.getKey()) < 0);
 		}
+		
+		assertEquals(Types.BLOBMAP,m.getType());
 
 		CollectionsTest.doMapTests(m);
 	}

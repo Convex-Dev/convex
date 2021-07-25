@@ -20,6 +20,7 @@ import convex.core.data.Address;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Format;
+import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.LongBlob;
@@ -37,6 +38,7 @@ import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
+import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.core.lang.impl.RecordFormat;
 import convex.core.transactions.ATransaction;
@@ -522,7 +524,9 @@ public class State extends ARecord {
 		HashMap<AccountKey, Double> hm = new HashMap<>(peers.size());
 		Double totalStake = peers.reduceEntries((acc, e) -> {
 			double stake = (double) (e.getValue().getTotalStake());
-			hm.put(AccountKey.create(e.getKey()), stake);
+			
+			// TODO: potential performance bottleneck from hashing?
+			hm.put(RT.ensureAccountKey(e.getKey()), stake);
 			return stake + acc;
 		}, 0.0);
 		hm.put(null, totalStake);
@@ -770,6 +774,35 @@ public class State extends ARecord {
 	 */
 	public State withTimestamp(long timestamp) {
 		return withGlobals(globals.assoc(GLOBAL_TIMESTAMP, CVMLong.create(timestamp)));
+	}
+	
+	@Override 
+	public boolean equals(AMap<Keyword,ACell> a) {
+		if (this == a) return true; // important optimisation for e.g. hashmap equality
+		if (a == null) return false;
+		if (a.getTag()!=getTag()) return false;
+		State as=(State)a;
+		return equals(as);
+	}
+	
+	/**
+	 * Tests if this State is equal to another
+	 * @param a State to compare with
+	 * @return true if equal, false otherwise
+	 */
+	public boolean equals(State a) {
+		if (a == null) return false;
+		Hash h=this.cachedHash();
+		if (h!=null) {
+			Hash ha=a.cachedHash();
+			if (ha!=null) return Utils.equals(h, ha);
+		}
+		
+		if (!(Utils.equals(accounts, a.accounts))) return false;
+		if (!(Utils.equals(globals, a.globals))) return false;
+		if (!(Utils.equals(peers, a.peers))) return false;
+		if (!(Utils.equals(schedule, a.schedule))) return false;
+		return true;
 	}
 
 }

@@ -182,6 +182,14 @@ public class EtchStore extends AStore {
 	public void close() {
 		etch.close();
 	}
+	
+	/**
+	 * Ensure the store is fully persisted to disk
+	 * @throws IOException If an IO error occurs
+	 */
+	public void flush() throws IOException  {
+		etch.flush();
+	}
 
 	public File getFile() {
 		return etch.getFile();
