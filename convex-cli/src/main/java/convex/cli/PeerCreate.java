@@ -103,7 +103,7 @@ public class PeerCreate implements Runnable {
 			// connect using the default first user
 			Convex convex = mainParent.connectAsPeer(0);
 			// create an account
-			Address address = convex.createAccount(keyPair.getAccountKey());
+			Address address = convex.createAccountSync(keyPair.getAccountKey());
 			convex.transferSync(address, peerStake);
 
 			convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);

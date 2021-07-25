@@ -271,11 +271,25 @@ public class Convex {
 	 * @throws TimeoutException If attempt times out
 	 * @throws IOException If IO error occurs
 	 */
-	public Address createAccount(AccountKey publicKey) throws TimeoutException, IOException {
+	public Address createAccountSync(AccountKey publicKey) throws TimeoutException, IOException {
 		Invoke trans = Invoke.create(address, 0, "(create-account 0x" + publicKey.toHexString() + ")");
 		Result r = transactSync(trans);
 		if (r.isError()) throw new Error("Error creating account: " + r);
 		return (Address) r.getValue();
+	}
+	
+	/**
+	 * Creates a new account with the given public key
+	 *
+	 * @param publicKey Public key to set for the new account
+	 * @return Address of account created
+	 * @throws TimeoutException If attempt times out
+	 * @throws IOException If IO error occurs
+	 */
+	public CompletableFuture<Address> createAccount(AccountKey publicKey) throws TimeoutException, IOException {
+		Invoke trans = Invoke.create(address, 0, "(create-account 0x" + publicKey.toHexString() + ")");
+		CompletableFuture<Result> fr = transact(trans);
+		return fr.thenApply(r->r.getValue());
 	}
 
 	/**

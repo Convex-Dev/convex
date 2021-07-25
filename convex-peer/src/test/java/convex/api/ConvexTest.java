@@ -38,7 +38,7 @@ public class ConvexTest {
 	static {
 		synchronized(ServerTest.SERVER) {
 			try {
-				ADDRESS=ServerTest.CONVEX.createAccount(KEYPAIR.getAccountKey());
+				ADDRESS=ServerTest.CONVEX.createAccountSync(KEYPAIR.getAccountKey());
 				ServerTest.CONVEX.transfer(ADDRESS, 1000000000L).get(1000,TimeUnit.MILLISECONDS);
 			} catch (Throwable e) {
 				e.printStackTrace();

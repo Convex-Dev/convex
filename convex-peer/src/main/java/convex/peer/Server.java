@@ -484,7 +484,15 @@ public class Server implements Closeable {
 
 	// Mark presence of new messages to handle
 	private void notifyNewMessages() {
-		hasNewMessages=true;
+		// Notify updateThread after available messages are processed
+		if (!hasNewMessages) {
+			synchronized (updateThread) {
+				hasNewMessages=true;
+				if (!hasNewMessages) {
+					updateThread.notify();
+				}
+			}
+		}	
 	}
 
 	/**
@@ -910,15 +918,8 @@ public class Server implements Closeable {
 
 				while (isRunning) { // loop until server terminated
 					Message m = receiveQueue.poll(100, TimeUnit.MILLISECONDS);
-					while (m != null) {
+					if (m != null) {
 						processMessage(m);
-						m=receiveQueue.poll(100, TimeUnit.MILLISECONDS);
-					}
-					// Notify updateThread after available messages are processed
-					if (hasNewMessages) {
-						synchronized (updateThread) {
-							updateThread.notify();
-						}
 					}
 				}
 
