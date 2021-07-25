@@ -2,16 +2,6 @@
 ;;
 ;; Ordering matters! Later definitions may require earlier ones.
 
-; TODO: Experimental 'macro' definition in Convex Lisp
-;(def macro2
-;  (expander (fn [x e] ;; x is (macro & spec)
-;              (let [spec (next (unsyntax x))]
-;                (expand
-;                  '(let [f ~(cons 'fn spec)]
-;                     (expander (fn [x e] (expand (f x) e)))) e)))))
-
-
-
 (def defexpander
   ^{:doc {:description "Defines an expander in the current environment."
            :examples [{:code "(defexpander expand-once [x e] (e x (fn [x e] x)))"}]
