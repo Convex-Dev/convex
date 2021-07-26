@@ -2,8 +2,7 @@ package convex.cli;
 
 import java.io.File;
 import java.net.InetSocketAddress;
-import java.security.KeyStore
-;
+import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
@@ -205,7 +204,10 @@ public class Main implements Runnable {
 
 		AKeyPair keyPair = null;
 
-		String publicKeyClean = publicKey.toLowerCase().replaceAll("^0x", "");
+		String publicKeyClean = "";
+		if (publicKey != null) {
+			publicKeyClean = publicKey.toLowerCase().replaceAll("^0x", "");
+		}
 
 		if ( publicKeyClean.isEmpty() && indexKey <= 0) {
 			return null;
@@ -232,7 +234,7 @@ public class Main implements Runnable {
 
 			while (aliases.hasMoreElements()) {
 				String alias = aliases.nextElement();
-				if (counter == indexKey || alias.indexOf(publicKeyClean) == 0) {
+				if (counter == (indexKey + 1) || alias.indexOf(publicKeyClean) == 0) {
 					keyPair = PFXTools.getKeyPair(keyStore, alias, password);
 					break;
 				}
@@ -291,6 +293,17 @@ public class Main implements Runnable {
 	public List<AKeyPair> generateKeyPairs(int count) throws Error {
 		List<AKeyPair> keyPairList = new ArrayList<>(count);
 
+		// generate `count` keys
+		for (int index = 0; index < count; index ++) {
+			AKeyPair keyPair = AKeyPair.generate();
+			keyPairList.add(keyPair);
+			addKeyPairToStore(keyPair);
+		}
+
+		return keyPairList;
+	}
+
+	public void addKeyPairToStore(AKeyPair keyPair) {
 		// get the password of the key store file
 		String password = getPassword();
 		if (password == null) {
@@ -312,29 +325,18 @@ public class Main implements Runnable {
 		} catch (Throwable t) {
 			throw new Error("Cannot load key store "+t);
 		}
-
-		// we have now the count, keystore-password, keystore-file
-		// generate keys
-		for (int index = 0; index < count; index ++) {
-			AKeyPair keyPair = AKeyPair.generate();
-			keyPairList.add(keyPair);
-
-			// System.out.println("generated #"+(index+1)+" public key: " + keyPair.getAccountKey().toHexString());
-			try {
-				// save the key in the keystore
-				PFXTools.saveKey(keyStore, keyPair, password);
-			} catch (Throwable t) {
-				throw new Error("Cannot store the key to the key store "+t);
-			}
+		try {
+			// save the key in the keystore
+			PFXTools.saveKey(keyStore, keyPair, password);
+		} catch (Throwable t) {
+			throw new Error("Cannot store the key to the key store "+t);
 		}
-
 		// save the keystore file
 		try {
 			PFXTools.saveStore(keyStore, keyFile, password);
 		} catch (Throwable t) {
 			throw new Error("Cannot save the key store file "+t);
 		}
-		return keyPairList;
 	}
 
     void showError(Throwable t) {

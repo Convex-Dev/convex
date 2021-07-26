@@ -59,6 +59,12 @@
 			<groupId>world.convex</groupId>
 			<artifactId>convex-gui</artifactId>
 			<version>${convex.version}</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.slf4j</groupId>
+					<artifactId>slf4j-simple</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>info.picocli</groupId>
