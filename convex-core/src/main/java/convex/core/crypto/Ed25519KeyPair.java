@@ -320,14 +320,12 @@ public class Ed25519KeyPair extends AKeyPair {
 	boolean equals(Ed25519KeyPair other) {
 		if (this.keyPair == null || other.keyPair == null) return false;
 		if (!this.keyPair.getPublic().equals(other.keyPair.getPublic())) return false;
-		// private keys are stored differently depending on the source of this keypair
-		// if from a generate or keystore then they are the same
-		// if from a encrypted pem then they have a different byte format
+		// private keys are stored in byte format differently depending on the source of this keypair
 		// so we need to convert the to a standard 32 byte private key and then compare
 		try {
 			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
-			Key keyThis = keyFactory.translateKey(this.getPrivate());
-			Key keyOther = keyFactory.translateKey(other.getPrivate());
+			Key keyThis = keyFactory.translateKey(this.keyPair.getPrivate());
+			Key keyOther = keyFactory.translateKey(other.keyPair.getPrivate());
 			return keyThis.equals(keyOther);
 		} catch ( NoSuchAlgorithmException | InvalidKeyException e ) {
 			// throw new Error(e);
