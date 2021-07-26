@@ -7,10 +7,12 @@ import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.Security;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
 
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openssl.PKCS8Generator;
 import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPKCS8Generator;
@@ -116,6 +118,7 @@ public class PEMTools {
 		StringReader stringReader = new StringReader(pemText);
 		PEMParser pemParser = new PEMParser(stringReader);
 		PemObject pemObject = null;
+		Security.addProvider(new BouncyCastleProvider());
 		JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
 		try {
 			pemObject = pemParser.readPemObject();
@@ -137,6 +140,7 @@ public class PEMTools {
 			PKCS8EncryptedPrivateKeyInfo encryptedInfo = new PKCS8EncryptedPrivateKeyInfo(pemObject.getContent());
 
 			JceOpenSSLPKCS8DecryptorProviderBuilder inputBuilder = new JceOpenSSLPKCS8DecryptorProviderBuilder();
+			inputBuilder.setProvider("BC");
 			InputDecryptorProvider decryptor = inputBuilder.build(password);
 
 			PrivateKeyInfo privateKeyInfo = encryptedInfo.decryptPrivateKeyInfo(decryptor);
