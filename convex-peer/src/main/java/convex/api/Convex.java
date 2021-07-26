@@ -274,7 +274,7 @@ public class Convex {
 	public Address createAccountSync(AccountKey publicKey) throws TimeoutException, IOException {
 		Invoke trans = Invoke.create(address, 0, "(create-account 0x" + publicKey.toHexString() + ")");
 		Result r = transactSync(trans);
-		if (r.isError()) throw new Error("Error creating account: " + r);
+		if (r.isError()) throw new Error("Error creating account: " + r.getErrorCode()+ " "+r.getValue());
 		return (Address) r.getValue();
 	}
 	
