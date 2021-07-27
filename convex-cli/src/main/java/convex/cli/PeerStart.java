@@ -62,8 +62,12 @@ public class PeerStart implements Runnable {
 	private int port = 0;
 
 	@Option(names = {
-			"--host" }, defaultValue = Constants.HOSTNAME_PEER, description = "Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
-	private String hostname = "localhost";
+			"--host" }, defaultValue=Constants.HOSTNAME_PEER, description = "Hostname of this peer. Default: ${DEFAULT-VALUE}")
+	private String hostname = Constants.HOSTNAME_PEER;
+
+	@Option(names = {
+			"--peer" }, description = "Hostname and port number of remote peer. If not provided then try to connect to a local peer")
+	private String remotePeerHostname;
 
 	@Option(names = { "-a", "--address" }, description = "Account address to use for the peer.")
 	private long addressNumber;
@@ -74,9 +78,7 @@ public class PeerStart implements Runnable {
 		Main mainParent = peerParent.mainParent;
 		PeerManager peerManager = null;
 
-		int port = 0;
 		AKeyPair keyPair = null;
-		String remotePeerHostname = null;
 		try {
 			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
 		} catch (Error e) {
@@ -98,12 +100,22 @@ public class PeerStart implements Runnable {
 		}
 		Address peerAddress = Address.create(addressNumber);
 
-		try {
-			SessionItem item = Helpers.getSessionItem(mainParent.getSessionFilename());
-			remotePeerHostname = item.getHostname();
-		} catch (IOException e) {
-			log.warn("Cannot load the session control file");
+		if (remotePeerHostname == null) {
+			try {
+				SessionItem item = Helpers.getSessionItem(mainParent.getSessionFilename());
+				if (item != null) {
+					remotePeerHostname = item.getHostname();
+				}
+				else {
+					log.warn("Cannot find a local peer to connect too");
+					return;
+				}
+			} catch (IOException e) {
+				log.warn("Cannot load the session control file");
+				return;
+			}
 		}
+
 		try {
 			AStore store = null;
 			String etchStoreFilename = mainParent.getEtchStoreFilename();
