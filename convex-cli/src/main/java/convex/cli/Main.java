@@ -59,7 +59,6 @@ public class Main implements Runnable {
 	private static CommandLine commandLine;
 	public Output output;
 
-
 	@Option(names={ "-c", "--config"},
 		scope = ScopeType.INHERIT,
 		description="Use the specified config file.%n All parameters to this app can be set by removing the leading '--', and adding"
@@ -234,7 +233,8 @@ public class Main implements Runnable {
 
 			while (aliases.hasMoreElements()) {
 				String alias = aliases.nextElement();
-				if (counter == (indexKey + 1) || alias.indexOf(publicKeyClean) == 0) {
+				if (counter == indexKey || alias.indexOf(publicKeyClean) == 0) {
+					log.trace("found keypair " + indexKey + " " + counter + " " + alias + " " + publicKeyClean + " " + alias.indexOf(publicKeyClean));
 					keyPair = PFXTools.getKeyPair(keyStore, alias, password);
 					break;
 				}
@@ -276,7 +276,7 @@ public class Main implements Runnable {
 		try {
 			SessionItem item = Helpers.getSessionItem(getSessionFilename(), peerIndex);
 			AccountKey peerKey = item.getAccountKey();
-			log.debug("peer public-key {}", peerKey.toHexString());
+			log.debug("peer public key {}", peerKey.toHexString());
 			AKeyPair keyPair = loadKeyFromStore(peerKey.toHexString(), 0);
 			log.debug("peer key pair {}", keyPair.getAccountKey().toHexString());
 			Address address = Address.create(Init.BASE_FIRST_ADDRESS.longValue() + peerIndex);
