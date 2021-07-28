@@ -68,8 +68,14 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * Belief. This means that the Peer has a commitment to maintain this data
 	 */
 	public static final int ANNOUNCED = 4;
+	
+	/**
+	 * Ref status indicating the Ref has been shared by this peer in an announced
+	 * Belief. This means that the Peer has a commitment to maintain this data
+	 */
+	public static final int INTERNAL = 5;
 
-	public static final int MAX_STATUS = ANNOUNCED;
+	public static final int MAX_STATUS = INTERNAL;
 	
 	public static final int STATUS_MASK = 0x0F;
 	

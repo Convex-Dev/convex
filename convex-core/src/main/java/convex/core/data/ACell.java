@@ -315,8 +315,18 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return Ref for this Cell
 	 */
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> Ref<R> getRef() {
+	public final <R extends ACell> Ref<R> getRef() {
 		if (cachedRef!=null) return (Ref<R>) cachedRef;
+		return createRef();
+	}
+	
+	/**
+	 * Creates a new Ref for this Cell
+	 * @param <R> Type of Cell
+	 * @return New Ref instance
+	 */
+	@SuppressWarnings("unchecked")
+	protected <R extends ACell> Ref<R> createRef() {
 		Ref<ACell> newRef= RefDirect.create(this,cachedHash());
 		cachedRef=newRef;
 		return (Ref<R>) newRef;
