@@ -70,32 +70,55 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public static final int ANNOUNCED = 4;
 	
 	/**
-	 * Ref status indicating the Ref has been shared by this peer in an announced
-	 * Belief. This means that the Peer has a commitment to maintain this data
+	 * Ref status indicating the Ref is an internal embedded value that can be
+	 * encoded and used independency of any given store state
 	 */
 	public static final int INTERNAL = 5;
 
+	/**
+	 * Maximum Ref status
+	 */
 	public static final int MAX_STATUS = INTERNAL;
 	
+	/**
+	 * MAsk for Ref flag bits representing the Status
+	 */
 	public static final int STATUS_MASK = 0x0F;
 	
-	// mask bit for a proven embedded value
-	protected static final int KNOWN_EMBEDDED_MASK = 0x10;
+	/**
+	 * Mask bit for a proven embedded value
+	 */
+	public static final int KNOWN_EMBEDDED_MASK = 0x10;
 	
-	// mask bit for a proven non-embedded value
-	protected static final int NON_EMBEDDED_MASK = 0x20;
+	/**
+	 * Mask bit for a proven non-embedded value
+	 */
+	public static final int NON_EMBEDDED_MASK = 0x20;
 
-	protected static final int EMBEDDING_MASK = KNOWN_EMBEDDED_MASK | NON_EMBEDDED_MASK;
+	/**
+	 * Mask for embedding status
+	 */
+	public static final int EMBEDDING_MASK = KNOWN_EMBEDDED_MASK | NON_EMBEDDED_MASK;
 	
-	// mask bit for verified data, especially signatures
-	protected static final int VERIFIED_MASK = 0x40;
+	/**
+	 * Mask bit for verified data, especially signatures
+	 */
+	public static final int VERIFIED_MASK = 0x40;
 
-	// mask bit for bad data, especially signatures
-	protected static final int BAD_MASK = 0x80;
+	/**
+	 * Mask bit for bad data, especially signatures proved invalid
+	 */
+	public static final int BAD_MASK = 0x80;
 	
-	protected static final int VERIFICATION_MASK = VERIFIED_MASK | BAD_MASK;
+	/**
+	 * Mask bit for bad data, especially signatures proved invalid
+	 */
+	public static final int VERIFICATION_MASK = VERIFIED_MASK | BAD_MASK;
 
-
+	/**
+	 * Flags for internal constant values
+	 */
+	public static final int INTERNAL_FLAGS=INTERNAL|KNOWN_EMBEDDED_MASK|VERIFIED_MASK;
 	
 	/**
 	 * Ref status indicating that the Ref refers to data that has been proven to be invalid
@@ -106,10 +129,10 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * Ref for null value. Important because we can't persist this, since null
 	 * collides with the result of an empty soft reference.
 	 */
-	public static final RefDirect<?> NULL_VALUE = RefDirect.create(null, Hash.NULL_HASH, KNOWN_EMBEDDED_MASK|MAX_STATUS);
+	public static final RefDirect<?> NULL_VALUE = RefDirect.create(null, Hash.NULL_HASH, INTERNAL_FLAGS);
 
-	public static final RefDirect<CVMBool> TRUE_VALUE = RefDirect.create(CVMBool.TRUE, Hash.TRUE_HASH, KNOWN_EMBEDDED_MASK|MAX_STATUS);
-	public static final RefDirect<CVMBool> FALSE_VALUE = RefDirect.create(CVMBool.FALSE, Hash.FALSE_HASH, KNOWN_EMBEDDED_MASK|MAX_STATUS);
+	public static final RefDirect<CVMBool> TRUE_VALUE = RefDirect.create(CVMBool.TRUE, Hash.TRUE_HASH, INTERNAL_FLAGS);
+	public static final RefDirect<CVMBool> FALSE_VALUE = RefDirect.create(CVMBool.FALSE, Hash.FALSE_HASH, INTERNAL_FLAGS);
 
 	public static final RefDirect<AList<?>> EMPTY_LIST = RefDirect.create(Lists.empty());
 	public static final RefDirect<AVector<?>> EMPTY_VECTOR = RefDirect.create(Vectors.empty());

@@ -19,6 +19,15 @@ public abstract class ALongBlob extends ABlob {
 	public final long count() {
 		return 8;
 	}
+	
+	@Override
+	@SuppressWarnings("unchecked")
+	protected <R extends ACell> Ref<R> createRef() {
+		// Create Ref at maximum status to reflect internal embedded nature
+		Ref<ACell> newRef= RefDirect.create(this,cachedHash(),Ref.INTERNAL|Ref.KNOWN_EMBEDDED_MASK);
+		cachedRef=newRef;
+		return (Ref<R>) newRef;
+	}
 
 	@Override
 	public final String toHexString() {

@@ -39,6 +39,15 @@ public class AccountKey extends AArrayBlob {
 	public AType getType() {
 		return TYPE;
 	}
+	
+	@Override
+	@SuppressWarnings("unchecked")
+	protected <R extends ACell> Ref<R> createRef() {
+		// Create Ref at maximum status to reflect internal embedded status
+		Ref<ACell> newRef= RefDirect.create(this,cachedHash(),Ref.INTERNAL_FLAGS);
+		cachedRef=newRef;
+		return (Ref<R>) newRef;
+	}
 
 	/**
 	 * Wraps the specified bytes as an AccountKey object. Warning: underlying bytes are
