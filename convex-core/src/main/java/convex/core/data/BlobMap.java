@@ -27,19 +27,19 @@ import convex.core.util.Utils;
  */
 public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	private static final Ref<ABlobMap>[] EMPTY_CHILDREN = new Ref[0];
+	private static final Ref<BlobMap>[] EMPTY_CHILDREN = new Ref[0];
 
 	/**
 	 * Empty BlobMap singleton
 	 */
-	public static final BlobMap<ABlob, ACell> EMPTY = new BlobMap<ABlob, ACell>(Blob.EMPTY, 0, 0, null, EMPTY_CHILDREN,
+	public static final BlobMap<ABlob, ACell> EMPTY = new BlobMap<ABlob, ACell>(0, 0, null, EMPTY_CHILDREN,
 			(short) 0, 0L);
 
 	/**
 	 * Child entries, i.e. nodes with keys where this node is a common prefix. Only contains children where mask is set.
 	 * Child entries must have at least one entry.
 	 */
-	private final Ref<ABlobMap<K, V>>[] children;
+	private final Ref<BlobMap<K, V>>[] children;
 
 	/**
 	 * Entry for this node of the radix tree. Invariant assumption that the prefix
@@ -63,22 +63,10 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	 */
 	private final long prefixLength;
 
-	/**
-	 * Prefix blob, must contain hex digits in the range [depth,depth+prefixLength).
-	 * 
-	 * May contain more hex digits in memory, this is irrelevant from the
-	 * perspective of serialisation.
-	 * 
-	 * Typically we populate with the key of the first entry added to avoid
-	 * unnecessary blob instances being created.
-	 */
-	private final Blob prefix;
-
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	protected BlobMap(Blob prefix, long depth, long prefixLength, MapEntry<K, V> entry, Ref<ABlobMap>[] entries,
+	protected BlobMap(long depth, long prefixLength, MapEntry<K, V> entry, Ref<BlobMap>[] entries,
 			short mask, long count) {
 		super(count);
-		this.prefix = prefix;
 		this.depth = depth;
 		this.prefixLength = prefixLength;
 		this.entry = entry;
@@ -92,9 +80,8 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	public static <K extends ABlob, V extends ACell> BlobMap<K, V> create(MapEntry<K, V> me) {
 		ACell k=me.getKey();
 		if (!(k instanceof ABlob)) return null;
-		Blob prefix = ((ABlob)k).toBlob();
-		long hexLength = prefix.hexLength();
-		return new BlobMap<K, V>(prefix, 0, hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
+		long hexLength = ((ABlob)k).hexLength();
+		return new BlobMap<K, V>(0, hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
 	}
 
 	private static <K extends ABlob, V extends ACell> BlobMap<K, V> createAtDepth(MapEntry<K, V> me, long depth) {
@@ -102,14 +89,13 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		long hexLength = prefix.hexLength();
 		if (depth > hexLength)
 			throw new IllegalArgumentException("Depth " + depth + " too deep for key with hexLength: " + hexLength);
-		return new BlobMap<K, V>(prefix, depth, hexLength - depth, me, EMPTY_CHILDREN, (short) 0, 1L);
+		return new BlobMap<K, V>(depth, hexLength - depth, me, EMPTY_CHILDREN, (short) 0, 1L);
 	}
 
 	public static <K extends ABlob, V extends ACell> BlobMap<K, V> create(K k, V v) {
-		Blob prefix=k.toBlob();
 		MapEntry<K, V> me = MapEntry.create(k, v);
 		long hexLength = k.hexLength();
-		return new BlobMap<K, V>(prefix, 0, hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
+		return new BlobMap<K, V>(0, hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
 	}
 	
 	public static <K extends ABlob, V extends ACell> BlobMap<K, V> of(Object k, Object v) {
@@ -129,9 +115,9 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	@Override
 	public BlobMap<K,V> updateRefs(IRefFunction func) {
 		MapEntry<K, V> newEntry = (entry == null) ? null : entry.updateRefs(func);
-		Ref<ABlobMap<K, V>>[] newChildren = Ref.updateRefs(children, func);
+		Ref<BlobMap<K, V>>[] newChildren = Ref.updateRefs(children, func);
 		if ((entry == newEntry) && (children == newChildren)) return this;
-		return new BlobMap<K, V>(prefix, depth, prefixLength, newEntry, (Ref[])newChildren, mask, count);
+		return new BlobMap<K, V>(depth, prefixLength, newEntry, (Ref[])newChildren, mask, count);
 	}
 
 	@Override
@@ -155,11 +141,11 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		long kl = key.hexLength();
 		long pl = depth + prefixLength;
 		if (kl < pl) return null; // key is too short to start with current prefix
-		
-		// check hex range
-		if (!prefix.hexMatches(key,Utils.checkedInt(depth),Utils.checkedInt(pl))) return null;
 
-		if (kl == pl) return entry; // we matched this key exactly!
+		if (kl == pl) {
+			if ((entry!=null)&&(key.equalsBytes(entry.getKey()))) return entry; // we matched this key exactly!
+			return null; // entry does not exist
+		}
 
 		int digit = key.getHexDigit(pl);
 		BlobMap<K, V> cc = getChild(digit);
@@ -223,17 +209,17 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		if (kl == pDepth) {
 			// need to check for match with current entry
 			if (entry == null) return this;
-			if (!prefix.hexEquals(k, depth, prefixLength)) return this;
+			if (!k.equalsBytes(entry.getKey())) return this;
 			// at this point have matched entry exactly. So need to remove it safely while
 			// preserving invariants
 			if (children.length == 1) {
 				// need to promote child to the current depth
 				BlobMap<K, V> c = (BlobMap<K, V>) children[0].getValue();
-				return new BlobMap(c.getPrefix(), depth, (c.depth + c.prefixLength) - depth, c.entry, c.children, c.mask,
+				return new BlobMap(depth, (c.depth + c.prefixLength) - depth, c.entry, c.children, c.mask,
 						count - 1);
 			} else {
 				// Clearing current entry, keeping existing children (must be 2+)
-				return new BlobMap(prefix, depth, prefixLength, null, children, mask, count - 1);
+				return new BlobMap(depth, prefixLength, null, children, mask, count - 1);
 			}
 		}
 		// dissoc beyond current prefix length, so need to check children
@@ -250,11 +236,21 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		return r;
 	}
 
-	private Blob getPrefix() {
-		return prefix;
+	/**
+	 * Prefix blob, must contain hex digits in the range [depth,depth+prefixLength).
+	 * 
+	 * May contain more hex digits in memory, this is irrelevant from the
+	 * perspective of serialisation.
+	 * 
+	 * Typically we populate with the key of the first entry added to avoid
+	 * unnecessary blob instances being created.
+	 */
+	private ABlob getPrefix() {
+		if (entry!=null) return entry.getKey();
+		int n=children.length;
+		if (n==0) return Blob.EMPTY;
+		return children[0].getValue().getPrefix();
 	}
-
-
 
 	@Override
 	protected void accumulateEntrySet(HashSet<Entry<K, V>> h) {
@@ -305,6 +301,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		long pDepth = this.prefixDepth(); // hex depth of this node including prefix
 		long newKeyLength = k.hexLength(); // hex length of new key
 		long mkl; // matched key length
+		ABlob prefix=getPrefix();
 		if (newKeyLength >= pDepth) {
 			// constrain relevant key length by match with current prefix
 			mkl = depth + k.hexMatchLength(prefix, depth, prefixLength);
@@ -318,20 +315,20 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 				// doesn't need to adjust child depths, since they are splitting at the same
 				// point
 				long newDepth=mkl+1; // depth for new child
-				BlobMap<K, V> split = new BlobMap<K, V>(prefix, newDepth, pDepth - newDepth, entry, (Ref[]) children, mask,
+				BlobMap<K, V> split = new BlobMap<K, V>(newDepth, pDepth - newDepth, entry, (Ref[]) children, mask,
 						count);
 				int splitDigit = prefix.getHexDigit(mkl);
 				short splitMask = (short) (1 << splitDigit);
-				BlobMap<K, V> result = new BlobMap<K, V>(k.toBlob(), depth, mkl - depth, e, new Ref[] { split.getRef() },
+				BlobMap<K, V> result = new BlobMap<K, V>(depth, mkl - depth, e, new Ref[] { split.getRef() },
 						splitMask, count + 1);
 				return result;
 			} else {
 				// we need to fork the current prefix in two at position mkl
 				long newDepth=mkl+1; // depth for new children
 				
-				BlobMap<K, V> branch1 = new BlobMap<K, V>(prefix, newDepth, pDepth - newDepth, entry, (Ref[]) children, mask,
+				BlobMap<K, V> branch1 = new BlobMap<K, V>(newDepth, pDepth - newDepth, entry, (Ref[]) children, mask,
 						count);
-				BlobMap<K, V> branch2 = new BlobMap<K, V>(k.toBlob(), newDepth, newKeyLength - newDepth, e, (Ref[]) EMPTY_CHILDREN,
+				BlobMap<K, V> branch2 = new BlobMap<K, V>(newDepth, newKeyLength - newDepth, e, (Ref[]) EMPTY_CHILDREN,
 						(short) 0, 1L);
 				int d1 = prefix.getHexDigit(mkl);
 				int d2 = k.getHexDigit(mkl);
@@ -343,7 +340,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 				}
 				Ref[] newChildren = new Ref[] { branch1.getRef(), branch2.getRef() };
 				short newMask = (short) ((1 << d1) | (1 << d2));
-				BlobMap<K, V> fork = new BlobMap<K, V>(k.toBlob(), depth, mkl - depth, null, newChildren, newMask, count + 1L);
+				BlobMap<K, V> fork = new BlobMap<K, V>(depth, mkl - depth, null, newChildren, newMask, count + 1L);
 				return fork;
 			}
 		}
@@ -352,12 +349,12 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 			// we must have matched the current entry exactly
 			if (entry == null) {
 				// just add entry at this position
-				return new BlobMap<K, V>(k.toBlob(), depth, prefixLength, e, (Ref[]) children, mask, count + 1);
+				return new BlobMap<K, V>(depth, prefixLength, e, (Ref[]) children, mask, count + 1);
 			}
 			if (entry == e) return this;
 
 			// swap entry, no need to change count
-			return new BlobMap<K, V>(k.toBlob(), depth, prefixLength, e, (Ref[]) children, mask, count);
+			return new BlobMap<K, V>(depth, prefixLength, e, (Ref[]) children, mask, count);
 		}
 		// at this point we have matched full prefix, but new key length is longer.
 		// so we need to update (or add) exactly one child
@@ -400,7 +397,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 			System.arraycopy(children, 0, newChildren, 0, newPos); // earlier entries
 			newChildren[newPos] = newChild.getRef();
 			System.arraycopy(children, newPos, newChildren, newPos + 1, n - newPos); // later entries
-			return new BlobMap<K, V>(prefix, depth, prefixLength, entry, newChildren, newMask,
+			return new BlobMap<K, V>(depth, prefixLength, entry, newChildren, newMask,
 					count + newChild.count());
 		} else {
 			// dealing with an existing child
@@ -413,7 +410,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 					if (n == 2) {
 						BlobMap<K, V> rm = (BlobMap<K, V>) children[1 - delPos].getValue();
 						long newPLength = prefixLength + rm.prefixLength+1;
-						return new BlobMap<K, V>(rm.getPrefix(), depth, newPLength, rm.entry, (Ref[]) rm.children, rm.mask,
+						return new BlobMap<K, V>(depth, newPLength, rm.entry, (Ref[]) rm.children, rm.mask,
 								rm.count());
 					} else if (n == 1) {
 						// deleting entire BlobMap!
@@ -427,7 +424,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 				short newMask = (short) (mask & ~(1 << childDigit));
 				System.arraycopy(children, 0, newChildren, 0, delPos); // earlier entries
 				System.arraycopy(children, delPos + 1, newChildren, delPos, n - delPos - 1); // later entries
-				return new BlobMap<K, V>(prefix, depth, prefixLength, entry, newChildren, newMask,
+				return new BlobMap<K, V>(depth, prefixLength, entry, newChildren, newMask,
 						count - oldChild.count());
 			} else {
 				// need to replace a child
@@ -435,7 +432,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 				newChildren = children.clone();
 				newChildren[childPos] = newChild.getRef();
 				long newCount = count + newChild.count() - oldChild.count();
-				return new BlobMap<K, V>(prefix, depth, prefixLength, entry, newChildren, mask, newCount);
+				return new BlobMap<K, V>(depth, prefixLength, entry, newChildren, mask, newCount);
 			}
 		}
 	}
@@ -495,7 +492,9 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		pos = Format.writeVLCLong(bs,pos, count);
 		if (count == 0) return pos; // nothing more to know... this must be the empty singleton
 
-		pos = Format.writeHexDigits(bs,pos, prefix, depth, prefixLength);
+		pos = Format.writeVLCLong(bs,pos, depth);
+		pos = Format.writeVLCLong(bs,pos, prefixLength);
+			
 		pos = MapEntry.encodeCompressed(entry,bs,pos); // entry may be null
 		if (count == 1) return pos; // must be a single entry
 
@@ -509,7 +508,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	}
 	
 	private int encodeChild(byte[] bs, int pos, int i) {
-		Ref<ABlobMap<K, V>> cref = children[i];
+		Ref<BlobMap<K, V>> cref = children[i];
 		return cref.encode(bs, pos);
 		
 		// TODO: maybe compress single entries?
@@ -538,29 +537,26 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		if (depth < 0) throw new BadFormatException("Negative depth!");
 		long prefixLength = Format.readVLCLong(bb);
 		if (prefixLength < 0) throw new BadFormatException("Negative prefix length!");
-
-		byte[] pbs = Format.readHexDigits(bb, depth, prefixLength);
-		Blob prefix = Blob.wrap(pbs);
 		
 		// Get entry at this node, might be null
 		MapEntry<K, V> me = MapEntry.readCompressed(bb); 
 
 		// single entry map
-		if (count == 1) return new BlobMap<K, V>(prefix, depth, prefixLength, me, EMPTY_CHILDREN, (short) 0, 1L);
+		if (count == 1) return new BlobMap<K, V>(depth, prefixLength, me, EMPTY_CHILDREN, (short) 0, 1L);
 
 		short mask = bb.getShort();
 		int n = Utils.bitCount(mask);
-		Ref<ABlobMap>[] children = new Ref[n];
+		Ref<BlobMap>[] children = new Ref[n];
 		long childDepth=depth+prefixLength+1; // depth for children = this prefixDepth plus one extra hex digit
 		for (int i = 0; i < n; i++) {
 			children[i] = readChild(bb,childDepth);
 		}
-		return new BlobMap<K, V>(prefix, depth, prefixLength, me, children, mask, count);
+		return new BlobMap<K, V>(depth, prefixLength, me, children, mask, count);
 	}
 	
 	@SuppressWarnings({ "rawtypes" })
-	private static Ref<ABlobMap> readChild(ByteBuffer bb, long childDepth) throws BadFormatException {
-		Ref<ABlobMap> ref = Format.readRef(bb);
+	private static Ref<BlobMap> readChild(ByteBuffer bb, long childDepth) throws BadFormatException {
+		Ref<BlobMap> ref = Format.readRef(bb);
 		return ref;
 		// TODO: compression of single entries?
 //		ACell c=ref.getValue();
@@ -613,10 +609,6 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 			c.validate();
 
 			ecount += ccount;
-		}
-
-		if (pDepth > prefix.count() * 2) {
-			throw new InvalidDataException("Insufficient prefix size for prefix depth " + pDepth, this);
 		}
 
 		if (count != ecount) throw new InvalidDataException("Bad entry count: " + ecount + " expected: " + count, this);
