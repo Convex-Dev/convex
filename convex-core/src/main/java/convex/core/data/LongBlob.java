@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 
 import convex.core.util.Errors;
@@ -12,13 +11,10 @@ import convex.core.util.Utils;
  * We use this for efficient management of indexes using longs in BlobMaps.
  * 
  */
-public class LongBlob extends ABlob {
-	private final long value;
-
-	static final long LENGTH = 8;
+public final class LongBlob extends ALongBlob {
 
 	private LongBlob(long value) {
-		this.value = value;
+		super(value);
 	}
 
 	public static LongBlob create(String string) {
@@ -42,16 +38,6 @@ public class LongBlob extends ABlob {
 	}
 
 	@Override
-	public long count() {
-		return LENGTH;
-	}
-
-	@Override
-	public String toHexString() {
-		return Utils.toHexString(value);
-	}
-
-	@Override
 	public ABlob slice(long start, long length) {
 		if ((start == 0) && (length == LENGTH)) return this;
 
@@ -68,21 +54,6 @@ public class LongBlob extends ABlob {
 	protected void updateDigest(MessageDigest digest) {
 		byte[] bs = getEncoding().getInternalArray();
 		digest.update(bs, 2, (int) LENGTH);
-	}
-
-	private void checkIndex(long i) {
-		if ((i < 0) || (i >= LENGTH)) throw new IndexOutOfBoundsException(Errors.badIndex(i));
-	}
-
-	@Override
-	public byte byteAt(long i) {
-		checkIndex(i);
-		return (byte) (value >> ((LENGTH - i - 1) * 8));
-	}
-	
-	@Override
-	public byte getUnchecked(long i) {
-		return (byte) (value >> ((LENGTH - i - 1) * 8));
 	}
 
 	@Override
@@ -105,11 +76,6 @@ public class LongBlob extends ABlob {
 	}
 
 	@Override
-	public ABlob append(ABlob d) {
-		return toBlob().append(d);
-	}
-
-	@Override
 	public boolean equals(ABlob a) {
 		if (a instanceof LongBlob) return (((LongBlob) a).value == value);
 		if (a instanceof Blob) {
@@ -117,22 +83,6 @@ public class LongBlob extends ABlob {
 			return ((b.count()==LENGTH)&& (b.longValue()== value));
 		}
 		return false;
-	}
-
-	@Override
-	public Blob getChunk(long i) {
-		if (i == 0L) return toBlob();
-		throw new IndexOutOfBoundsException(Errors.badIndex(i));
-	}
-
-	@Override
-	public ByteBuffer getByteBuffer() {
-		return toBlob().getByteBuffer();
-	}
-
-	@Override
-	public void toHexString(StringBuilder sb) {
-		sb.append(Utils.toHexString(value));
 	}
 
 	@Override
@@ -167,43 +117,10 @@ public class LongBlob extends ABlob {
 		}
 		return length;
 	}
-
-	@Override
-	public long toLong() {
-		return value;
-	}
-	
-	@Override
-	public int getRefCount() {
-		return 0;
-	}
-
-	@Override
-	public boolean isEmbedded() {
-		// Always embedded
-		return true;
-	}
-	
-	@Override
-	protected long calcMemorySize() {	
-		// always embedded and no child Refs, so memory size == 0
-		return 0;
-	}
 	
 	@Override
 	public boolean isRegularBlob() {
 		return true;
-	}
-
-	@Override
-	public ByteBuffer writeToBuffer(ByteBuffer bb) {
-		return bb.putLong(value);
-	}
-	
-	@Override
-	public int writeToBuffer(byte[] bs, int pos) {
-		Utils.writeLong(bs, pos, value);
-		return pos+8;
 	}
 	
 	@Override

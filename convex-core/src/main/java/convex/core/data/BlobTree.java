@@ -245,6 +245,23 @@ public class BlobTree extends ABlob {
 	}
 	
 	@Override
+	public boolean equalsBytes(ABlob b) {
+		if (b.count()!=count) return false;
+		if (b instanceof BlobTree) {
+			BlobTree bb=(BlobTree) b;
+			for (int i=0; i<children.length; i++) {
+				if (!(getChild(i).equalsBytes(bb.getChild(i)))) return false;
+			}		
+			return true;
+		}
+		if (b instanceof AArrayBlob) {
+			AArrayBlob ab=(AArrayBlob) b;
+			return equalsBytes(ab.getInternalArray(),ab.getInternalOffset());
+		}
+		throw new UnsupportedOperationException("Shouldn't be possible?");
+	}
+	
+	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.BLOB;
 		return encodeRaw(bs,pos);
@@ -480,5 +497,7 @@ public class BlobTree extends ABlob {
 		if (isCanonical()) return this;
 		return Blobs.toCanonical(this);
 	}
+
+
 
 }
