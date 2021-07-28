@@ -31,6 +31,7 @@ public class ParamTestBlobs {
 				{ "Long random BlobTree", BlobTree.create(Blob.createRandom(rand, 10000)) },
 				{ "Length 2 strict sublist of byte data", Blob.create(new byte[] { 1, 2, 3, 4 }, 1, 2) },
 				{ "Bitcoin genesis header block", Blob.fromHex(HashTest.GENESIS_HEADER) },
+				{ "Max size embedded blob", Samples.MAX_EMBEDDED_BLOB },
 				{ "Full Blob of random data", Samples.FULL_BLOB }, { "Big blob", Samples.BIG_BLOB_TREE } });
 	}
 
@@ -44,8 +45,13 @@ public class ParamTestBlobs {
 
 	@Test
 	public void testSlice() {
-		ABlob d = data.slice(0, data.count());
-		assertEquals(data, d);
+		long n=data.count();
+		ABlob full = data.slice(0, n);
+		assertEquals(data, full);
+		BlobsTest.doBlobTests(full);
+		
+		ABlob half = data.slice(n/2,n/2);
+		BlobsTest.doBlobTests(half);
 	}
 
 	@Test

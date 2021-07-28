@@ -24,7 +24,7 @@ public class ObjectsTest {
 	/**
 	 * Generic tests for a Cell
 	 * 
-	 * @param a
+	 * @param a Cell to test
 	 */
 	public static void doCellTests(ACell a) {
 		if (a==null) return;
@@ -102,33 +102,33 @@ public class ObjectsTest {
 	/**
 	 * Generic tests for any CVM Value
 	 * 
-	 * @param a
+	 * @param a Value to test
 	 */
 	public static void doAnyValueTests(ACell a) {
 		Hash h=Hash.compute(a);
-		
+				
 		boolean embedded=Format.isEmbedded(a);
 
 		Ref<ACell> r = Ref.get(a).persist();
 		assertEquals(h,r.getHash());
 		assertEquals(a, r.getValue());
 
-		Blob b = Format.encodedBlob(a);
+		Blob encoding = Format.encodedBlob(a);
 		if (a==null) {
-			assertEquals(Blob.NULL_ENCODING,b);
+			assertEquals(Blob.NULL_ENCODING,encoding);
 		} else {
-			assertEquals(a.getTag(),b.byteAt(0)); // Correct Tag
-			assertSame(b,a.getEncoding()); // should be same cached encoding
-			assertEquals(b.length,a.getEncodingLength());
+			assertEquals(a.getTag(),encoding.byteAt(0)); // Correct Tag
+			assertSame(encoding,a.getEncoding()); // should be same cached encoding
+			assertEquals(encoding.length,a.getEncodingLength());
 			
 			assertTrue(a.isCVMValue());
 		}
 
 		// Any encoding should be less than or equal to the limit
-		assertTrue(b.length <= Format.LIMIT_ENCODING_LENGTH);
+		assertTrue(encoding.length <= Format.LIMIT_ENCODING_LENGTH);
 		
 		// If length exceeds MAX_EMBEDDED_LENGTH, cannot be an embedded value
-		if (b.length > Format.MAX_EMBEDDED_LENGTH) {
+		if (encoding.length > Format.MAX_EMBEDDED_LENGTH) {
 			assertFalse(Format.isEmbedded(a),()->"Testing: "+Utils.getClassName(a)+ " = "+Utils.toString(a));
 		}
 		
@@ -153,10 +153,10 @@ public class ObjectsTest {
 
 		try {
 			ACell a2;
-			a2 = Format.read(b);
+			a2 = Format.read(encoding);
 			assertEquals(a, a2);
 		} catch (BadFormatException e) {
-			throw new Error("Can't read encoding: " + b.toHexString(), e);
+			throw new Error("Can't read encoding: " + encoding.toHexString(), e);
 		}
 		
 		doCellTests(a);

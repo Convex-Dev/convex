@@ -211,17 +211,19 @@ public class BlobsTest {
 
 	/**
 	 * Generic tests for an arbitrary ABlob instance
-	 * @param a Any blob to test
+	 * @param a Any blob to test, might not be canonical
 	 */
 	public static void doBlobTests(ABlob a) {
 		long n = a.count();
 		assertTrue(n >= 0L);
+		ABlob canonical=a.toCanonical();
 		
 		//  copy of the Blob data
 		ABlob b=Blob.wrap(a.getBytes()).toCanonical();
 		
 		if (a.isRegularBlob()) {
-			assertEquals(a,b);
+			assertEquals(a.count(),b.count());
+			assertEquals(canonical,b);
 		}
 		
 		if (n>0) {
@@ -232,6 +234,6 @@ public class BlobsTest {
 			assertEquals(a.get(n-1),CVMByte.create(a.byteAt(n-1)));
 		}
 
-		ObjectsTest.doAnyValueTests(a);
+		ObjectsTest.doAnyValueTests(canonical);
 	}
 }
