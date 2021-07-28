@@ -50,7 +50,7 @@ public class SessionTest {
 	public void sessionGetHostNameList() {
 		Session session = new Session();
 		int itemCount = 10;
-		List<AKeyPair> keyPairList = generateSessionList(session, itemCount);
+		generateSessionList(session, itemCount);
 		String[] hostnameList = session.getPeerHostnameList();
 		for (int index = 0; index < hostnameList.length; index ++ ) {
 			String expectedHostname = String.format("testhostname_%d.com", index);
@@ -66,7 +66,7 @@ public class SessionTest {
 		}
 		Session session = new Session();
 		int itemCount = 10;
-		List<AKeyPair> keyPairList = generateSessionList(session, itemCount);
+		generateSessionList(session, itemCount);
 
 		try {
 			session.store(fp);

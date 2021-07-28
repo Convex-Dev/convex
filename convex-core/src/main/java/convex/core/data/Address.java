@@ -169,8 +169,7 @@ public final class Address extends ALongBlob {
 	}
 
 	@Override
-	public ABlob slice(long start, long length) {
-		if ((start==0)&&(length==8)) return this;
+	public Blob slice(long start, long length) {
 		return toBlob().slice(start,length);
 	}
 
