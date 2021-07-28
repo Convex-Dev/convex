@@ -134,9 +134,6 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public static final RefDirect<CVMBool> TRUE_VALUE = RefDirect.create(CVMBool.TRUE, Hash.TRUE_HASH, INTERNAL_FLAGS);
 	public static final RefDirect<CVMBool> FALSE_VALUE = RefDirect.create(CVMBool.FALSE, Hash.FALSE_HASH, INTERNAL_FLAGS);
 
-	public static final RefDirect<AList<?>> EMPTY_LIST = RefDirect.create(Lists.empty());
-	public static final RefDirect<AVector<?>> EMPTY_VECTOR = RefDirect.create(Vectors.empty());
-
 	/**
 	 * Length of an external Reference encoding. Will be a tag byte plus the Hash length
 	 */

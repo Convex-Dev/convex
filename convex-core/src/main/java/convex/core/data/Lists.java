@@ -1,6 +1,11 @@
 package convex.core.data;
 
 public class Lists {
+	
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> AList<T> empty() {
+		return (List<T>) List.EMPTY;
+	}
 
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell, L extends AList<T>> L create(java.util.List<T> list) {
@@ -10,10 +15,5 @@ public class Lists {
 	@SafeVarargs
 	public static <T extends ACell> AList<T> of(Object... vals) {
 		return List.of(vals);
-	}
-
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> AList<T> empty() {
-		return (List<T>) List.EMPTY;
 	}
 }

@@ -28,19 +28,25 @@ import convex.core.util.Utils;
  * 
  * Representation in bytes:
  * 
- * 0x80 ListVector tag byte VLC Long Length of list. >16 implies prefix must be
- * present. Low 4 bits specify N (0 means 16 in presence of prefix) [Ref]*N N
- * Elements with length Tail Ref using prefix hash (omitted if no prefix)
- *
+ * <ul>
+ * <li>0x80 - ListVector tag byte </li>
+ * <li>VLC Long - Length of list. Greater than 16 implies prefix must be
+ * present. Low 4 bits specify N (0 means 16 in presence of prefix) </li>
+ * <li>[Ref]*N - N Elements with length </li>
+ * <li>Ref? - Tail Ref (excluded if not present)</li>
+ * </ul>
+ * 
  * @param <T> Type of vector elements
  */
 public class VectorLeaf<T extends ACell> extends AVector<T> {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static final VectorLeaf<?> EMPTY = new VectorLeaf(new Ref<?>[0]);
 	
+	public static final Ref<VectorLeaf<?>> EMPTY_REF = EMPTY.getRef();
+	
 	static {
 		// Set empty Ref flags as internal embedded constant
-		EMPTY.getRef().setFlags(Ref.INTERNAL_FLAGS);
+		EMPTY_REF.setFlags(Ref.INTERNAL_FLAGS);
 	}
 
 	/** Maximum size of a single ListVector before a tail is required */
