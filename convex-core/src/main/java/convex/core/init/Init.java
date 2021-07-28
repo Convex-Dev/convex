@@ -251,6 +251,10 @@ public class Init {
 				s = doActorDeploy(s, "asset.box", "libraries/box.con");
 			}
 
+			{ // Deploy Play Actor
+				s = doActorDeploy(s, "convex.play", "libraries/play.cvx");
+			}
+
 			{ // Deploy Currencies
 				@SuppressWarnings("unchecked")
 				AVector<AVector<ACell>> table = (AVector<AVector<ACell>>) Reader
