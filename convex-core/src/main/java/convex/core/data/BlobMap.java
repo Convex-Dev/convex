@@ -34,6 +34,11 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	 */
 	public static final BlobMap<ABlob, ACell> EMPTY = new BlobMap<ABlob, ACell>(0, 0, null, EMPTY_CHILDREN,
 			(short) 0, 0L);
+	
+	static {
+		// Set empty Ref flags as internal embedded constant
+		EMPTY.getRef().setFlags(Ref.INTERNAL_FLAGS);
+	}
 
 	/**
 	 * Child entries, i.e. nodes with keys where this node is a common prefix. Only contains children where mask is set.

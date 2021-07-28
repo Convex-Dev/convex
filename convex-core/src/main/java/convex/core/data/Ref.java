@@ -335,6 +335,16 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		flags=newFlags;
 		return this;
 	}
+	
+	/**
+	 * Sets the Flags for this Ref. WARNING: caller must have performed any necessary validation
+	 * @param newFlags Flags to set
+	 * @return Updated Ref
+	 */
+	public Ref<T> setFlags(int newFlags) {
+		flags=newFlags;
+		return this;
+	}
 
 	/**
 	 * Reads a ref from the given ByteBuffer. Assumes no tag.

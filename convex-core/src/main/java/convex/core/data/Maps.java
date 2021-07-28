@@ -13,6 +13,12 @@ import convex.core.lang.RT;
 public class Maps {
 
 	private static final AMap<?, ?> EMPTY_MAP = MapLeaf.emptyMap();
+	
+	static {
+		// Set empty Ref flags as internal embedded constant
+		EMPTY_MAP.getRef().setFlags(Ref.INTERNAL_FLAGS);
+	}
+	
 	private static final Ref<?> EMPTY_REF = EMPTY_MAP.getRef();
 
 	@SuppressWarnings("unchecked")

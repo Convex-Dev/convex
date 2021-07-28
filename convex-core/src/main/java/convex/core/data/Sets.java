@@ -15,6 +15,11 @@ public class Sets {
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	static final SetLeaf EMPTY = new SetLeaf(EMPTY_ENTRIES);
 	
+	static {
+		// Set empty Ref flags as internal embedded constant
+		EMPTY.getRef().setFlags(Ref.INTERNAL_FLAGS);
+	}
+	
 	@SuppressWarnings("rawtypes")
 	public static final Ref<SetLeaf> EMPTY_REF = EMPTY.getRef();
 

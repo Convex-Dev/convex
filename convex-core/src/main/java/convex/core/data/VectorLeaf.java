@@ -37,6 +37,11 @@ import convex.core.util.Utils;
 public class VectorLeaf<T extends ACell> extends AVector<T> {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static final VectorLeaf<?> EMPTY = new VectorLeaf(new Ref<?>[0]);
+	
+	static {
+		// Set empty Ref flags as internal embedded constant
+		EMPTY.getRef().setFlags(Ref.INTERNAL_FLAGS);
+	}
 
 	/** Maximum size of a single ListVector before a tail is required */
 	public static final int MAX_SIZE = Vectors.CHUNK_SIZE;

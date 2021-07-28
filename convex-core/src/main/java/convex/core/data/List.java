@@ -26,6 +26,11 @@ import convex.core.util.Utils;
 public class List<T extends ACell> extends AList<T> {
 
 	static final List<ACell> EMPTY = new List<>(Vectors.empty());
+	
+	static {
+		// Set empty Ref flags as internal embedded constant
+		EMPTY.getRef().setFlags(Ref.INTERNAL_FLAGS);
+	}
 
 	AVector<T> data;
 
