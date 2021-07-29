@@ -322,10 +322,6 @@ public class Ed25519KeyPair extends AKeyPair {
 
 	boolean equals(Ed25519KeyPair other) {
 		if (this.keyPair == null || other.keyPair == null) return false;
-		System.out.println("public key compare: " + this.keyPair.getPublic() +
-			" " +
-			other.keyPair.getPublic()
-		);
 		if (!this.keyPair.getPublic().equals(other.keyPair.getPublic())) return false;
 		// private keys are stored in byte format differently depending on the source of this keypair
 		// so we need to convert the to a standard 32 byte private key and then compare
@@ -333,6 +329,11 @@ public class Ed25519KeyPair extends AKeyPair {
 			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
 			Key keyThis = keyFactory.translateKey(this.keyPair.getPrivate());
 			Key keyOther = keyFactory.translateKey(other.keyPair.getPrivate());
+			System.out.println("key compare: " + Utils.toHexString(keyThis.getEncoded()) +
+				" " +
+				Utils.toHexString(keyOther.getEncoded())
+			);
+
 			return keyThis.equals(keyOther);
 		} catch ( NoSuchAlgorithmException | InvalidKeyException e ) {
 			// throw new Error(e);
