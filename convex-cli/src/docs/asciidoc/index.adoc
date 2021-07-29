@@ -1,7 +1,7 @@
 = Convex Command Line Interface
+:icons:
 
 image::convex_logo.svg[Convex Command Line Interface,200,opts=inline]
-
 
 == Introduction
 Convex Command Line Interface or CLI, allows you to control and setup a local Convex network and peers.
@@ -118,69 +118,90 @@ convex help
 === Commands
 The CLI is split into commands and some sub commands they are:
 
-* *account*, *ac*
-Manages convex accounts.
+Account Commands::
 
-**  *balance*, *bal*, *ba*
-Get account balance.
+[cols="1,1,2"]
+|===
+|Command|Sub command|Description
 
-**  *create*, *cr*
-Creates an account using a public/private key from the keystore.
+|account, ac| |Manages convex accounts.
+||balance, bal, ba |Get account balance.
+
+||create, cr| Creates an account using a public/private key from the keystore.
 You must provide a valid keystore password to the keystore.
 If the keystore is not at the default location also the keystore filename.
-
-** *fund*, *fu*
+||fund, fu|
 Transfers funds to account using a public/private key from the keystore.
 You must provide a valid keystore password to the keystore and a valid address.
 If the keystore is not at the default location also the keystore filename.
+||information, info, in|Get account information.
+|===
 
-** *information*, *info*, *in*
-Get account information.
+Key Commands::
+[cols="1,1,2"]
+|===
+|Command|Sub command|Description
 
-* *key*, *ke*
-Manage local Convex key store.
+|key, ke| |Manage local Convex key store.
 
-** *import*, *im*
-Import key pairs to the keystore.
+||import, im|Import key pairs to the keystore.
+||generate, ge|Generate 1 or more private key pairs.
+||list, li|List available key pairs.
+||export, ex|Export 1 or more key pairs from the keystore.
+|===
 
-** *generate*, *ge*
-Generate 1 or more private key pairs.
+Local Commands::
+[cols="1,1,2"]
+|===
+|Command|Sub command|Description
 
-** *list*, *li*
-List available key pairs.
+|local, lo||Operates a local convex network.
+||gui|Starts a local convex test network using the peer manager GUI application.
+||start, st|Starts a local convex test network.
+|===
 
-** *export*, *ex*
-Export 1 or more key pairs from the keystore.
+Peer Commands::
+[cols="1,1,2"]
+|===
+|Command|Sub command|Description
 
-* *local*, *lo*
-Operates a local convex network.
+|peer, pe||Operates a local peer.
+||create, cr|Creates a keypair, new account and a funding stake: to run a local peer.
+||start, st|Starts a local peer.
+|===
 
-** *gui*
-Starts a local convex test network using the peer manager GUI application.
+Query Command::
+[cols="1,1"]
+|===
+|Command|Description
 
-** *start*, *st*
-Starts a local convex test network.
+|query, qu|Execute a query on the current peer.
+|===
 
-* *peer*, *pe*
-Operates a local peer.
+Status Command::
+[cols="1,1"]
+|===
+|Command|Description
 
-** *create*, *cr*
-Creates a keypair, new account and a funding stake: to run a local peer.
+|status, st|Reports on the current status of the network.
+|===
 
-** *start*, *st*
-Starts a local peer.
+Transaction Command::
+[cols="1,1"]
+|===
+|Command|Description
 
-* *query*, *qu*
-Execute a query on the current peer.
 
-* *status*, *st*
-Reports on the current status of the network.
+|transaction, transact, tr|Execute a transaction on the network via a peer.
+|===
 
-* *transaction*, *transact*, *tr*
-Execute a transaction on the network via a peer.
+Help Command::
+[cols="1,1"]
+|===
+|Command|Description
 
-* *help*
-Displays help information about the specified command
+|help|Displays help information about the specified command
+|===
 
 === Requesting Help
 The CLI supports help using the *-h* or *--help* options or the command *help*. For each sub command there are more help options.
@@ -205,6 +226,10 @@ The simplest way to start up the local Convex network is to run the following co
     ./convex local start --password=my-password
 
 You wil always need to pass the password to the *keystore* file since the CLI will need access to create and start up the local peers.
+
+The CLI will automatically create 4 keypairs and place them in the keystore. The CLI will then start up 4 peers all sharing a single
+temporary local _Etch Database_ in the /tmp folder.
+
 
 === Local start with preset peer keys
 Whilst the simple local start will auto generate public keys for the local peers. You can always select the peer keys you wish
@@ -244,7 +269,7 @@ To start the same peers using the same public keys you can also use the index nu
 
     ./convex local start --index-key=1,2,3,4 --password=my-password
 
-Will start the same peers.
+Will start the same set of peers as above using the first 4 key pairs from the keystore.
 ====
 
 
