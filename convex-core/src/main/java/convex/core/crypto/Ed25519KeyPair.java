@@ -8,7 +8,6 @@ import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
@@ -25,7 +24,6 @@ import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
@@ -326,18 +324,14 @@ public class Ed25519KeyPair extends AKeyPair {
 		// private keys are stored in byte format differently depending on the source of this keypair
 		// so we need to convert the to a standard 32 byte private key and then compare
 		try {
-			KeyFactory keyFactory = KeyFactory.getInstance(ED25519, "SunEC");
+			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
 			Key keyThis = keyFactory.translateKey(this.keyPair.getPrivate());
 			Key keyOther = keyFactory.translateKey(other.keyPair.getPrivate());
-			System.out.println("key compare: " + Utils.toHexString(keyThis.getEncoded()) +
-				" " +
-				Utils.toHexString(keyOther.getEncoded())
-			);
-
 			return keyThis.equals(keyOther);
-		} catch ( NoSuchAlgorithmException | InvalidKeyException | NoSuchProviderException e ) {
+		} catch ( NoSuchAlgorithmException | InvalidKeyException  e ) {
 			// throw new Error(e);
 			// do nothing just return false
+			System.out.println(e);
 		}
 		return false;
 	}

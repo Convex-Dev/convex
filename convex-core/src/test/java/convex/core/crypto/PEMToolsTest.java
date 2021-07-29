@@ -6,7 +6,6 @@ import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.SecureRandom;
 import java.security.Security;
@@ -55,14 +54,14 @@ public class PEMToolsTest {
 
 
 		try {
-			KeyFactory keyFactory = KeyFactory.getInstance("Ed25519", "SunEC");
+			KeyFactory keyFactory = KeyFactory.getInstance("Ed25519");
 			Key key1 = keyFactory.translateKey(keyPair.getPrivate());
 			// System.out.println("Key 1 " + Utils.toHexString(key1.getEncoded()));
 			Key key2 = keyFactory.translateKey(importKeyPair.getPrivate());
 			// System.out.println("Key 2 " + Utils.toHexString(key1.getEncoded()));
 			assertTrue(key1.equals(key2));
 
-		} catch ( NoSuchAlgorithmException | InvalidKeyException  | NoSuchProviderException e ) {
+		} catch ( NoSuchAlgorithmException | InvalidKeyException  e ) {
 			throw new Error(e);
 		}
 		/*
