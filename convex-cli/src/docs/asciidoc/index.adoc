@@ -303,17 +303,29 @@ Will start the same set of peers as above using the first 4 key pairs from the k
 == Starting a local Peer
 How to start a local peer, and join a local Convex network.
 
+== Starting a local Peer to a remote Convex network
+How to start a local peer, that connects to a remote Convex network.
+
 == Starting the GUI local network
 How to start the gui local network.
-
-== Startning a local Peer to a remote Convex network
-How to start a local peer, that connects to a remote Convex network.
 
 == Managing your Keys - The Keystore
 To run any peer you need to manage the local public/private key pairs.
 
 == Managing Accounts
 Information on how to create, fund and get information about the local accounts.
+
+=== Create an account
+How to create a local account
+
+=== Get an accounts balance
+How to get an account's balance
+
+=== Request funds for an account
+How to request funds for an account
+
+=== Get information about an account
+How to get information about an account
 
 == Queries
 How to execute queries on a local Convex network.
