@@ -7,7 +7,6 @@ import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.util.Errors;
 import convex.core.util.Utils;
 
 /**
@@ -17,14 +16,13 @@ import convex.core.util.Utils;
  * serves as an index into the vector of accounts for the current state.
  * 
  */
-public class Address extends ABlob {
+public final class Address extends ALongBlob {
 
-	private final long value;
 
 	public static final Address ZERO = Address.create(0);
 
 	private Address(long value) {
-		this.value=value;
+		super(value);
 	}
 	
 	/**
@@ -149,32 +147,16 @@ public class Address extends ABlob {
 	}
 
 	@Override
-	public Blob getChunk(long i) {
-		if (i != 0) throw new IndexOutOfBoundsException(Errors.badIndex(i));
-		return toBlob();
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		if (value<0)
 			throw new InvalidDataException("Address must be positive",this);
 
-	}
-
-	@Override
-	public boolean isEmbedded() {
-		return true;
 	}
 	
 	@Override public final boolean isCVMValue() {
 		return true;
 	}
 	
-	@Override
-	protected long calcMemorySize() {	
-		// always embedded and no child Refs, so memory size == 0
-		return 0;
-	}
 
 	@Override
 	public boolean isRegularBlob() {
@@ -187,19 +169,7 @@ public class Address extends ABlob {
 	}
 
 	@Override
-	public long count() {
-		return 8;
-	}
-
-
-	@Override
-	public String toHexString() {
-		return Utils.toHexString(value);
-	}
-
-	@Override
-	public ABlob slice(long start, long length) {
-		if ((start==0)&&(length==8)) return this;
+	public Blob slice(long start, long length) {
 		return toBlob().slice(start,length);
 	}
 
@@ -211,59 +181,13 @@ public class Address extends ABlob {
 	}
 
 	@Override
-	public long commonHexPrefixLength(ABlob b) {
-		return toBlob().commonHexPrefixLength(b);
-	}
-
-	@Override
 	protected void updateDigest(MessageDigest digest) {
 		toBlob().updateDigest(digest);
-	}
-
-	@Override
-	public byte getUnchecked(long i) {
-		return (byte)(value>>((7-i)*8));
-	}
-
-	@Override
-	public ABlob append(ABlob b) {
-		return toBlob().append(b);
-	}
-
-	@Override
-	public ByteBuffer writeToBuffer(ByteBuffer bb) {
-		return toBlob().writeToBuffer(bb);
-	}
-
-	@Override
-	public int writeToBuffer(byte[] bs, int pos) {
-		return toBlob().writeToBuffer(bs,pos);
-	}
-
-	@Override
-	public ByteBuffer getByteBuffer() {
-		return toBlob().getByteBuffer();
-	}
-
-	@Override
-	public void toHexString(StringBuilder sb) {
-		String s= Utils.toHexString(value);
-		sb.append(s);
-	}
-
-	@Override
-	public long hexMatchLength(ABlob b, long start, long length) {
-		return toBlob().hexMatchLength(b,start,length);
 	}
 	
 	@Override
 	public boolean equalsBytes(byte[] bytes, int byteOffset) {
 		return value==Utils.readLong(bytes, byteOffset);
-	}
-
-	@Override
-	public long toLong() {
-		return value;
 	}
 
 	@Override
@@ -277,11 +201,6 @@ public class Address extends ABlob {
 	}
 	
 	public static final int MAX_ENCODING_LENGTH = 1+Format.MAX_VLC_LONG_LENGTH;
-
-	@Override
-	public int getRefCount() {
-		return 0;
-	}
 
 	@Override
 	public byte getTag() {

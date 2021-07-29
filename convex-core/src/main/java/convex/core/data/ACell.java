@@ -264,13 +264,22 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * Determines if this Cell Represents an embedded object. Embedded objects are encoded directly into
 	 * the encoding of the containing Cell (avoiding the need for a hashed reference). 
 	 * 
-	 * Subclasses may override this if they have a cheap (preferably O(1) 
+	 * Subclasses should override this if they have a cheap O(1) 
 	 * way to determine if they are embedded or otherwise. 
 	 * 
 	 * @return true if Cell is embedded, false otherwise
 	 */
 	public boolean isEmbedded() {
-		return getEncodingLength()<=Format.MAX_EMBEDDED_LENGTH;
+		if (cachedRef!=null) {
+			int flags=cachedRef.flags;
+			if ((flags&Ref.KNOWN_EMBEDDED_MASK)!=0) return true;
+			if ((flags&Ref.NON_EMBEDDED_MASK)!=0) return false;
+		}
+		boolean embedded= getEncodingLength()<=Format.MAX_EMBEDDED_LENGTH;
+		if (cachedRef!=null) {
+			cachedRef.flags|=(embedded)?Ref.KNOWN_EMBEDDED_MASK:Ref.NON_EMBEDDED_MASK;
+		}
+		return embedded;
 	}
 	
 	/**
@@ -315,8 +324,18 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return Ref for this Cell
 	 */
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> Ref<R> getRef() {
+	public final <R extends ACell> Ref<R> getRef() {
 		if (cachedRef!=null) return (Ref<R>) cachedRef;
+		return createRef();
+	}
+	
+	/**
+	 * Creates a new Ref for this Cell
+	 * @param <R> Type of Cell
+	 * @return New Ref instance
+	 */
+	@SuppressWarnings("unchecked")
+	protected <R extends ACell> Ref<R> createRef() {
 		Ref<ACell> newRef= RefDirect.create(this,cachedHash());
 		cachedRef=newRef;
 		return (Ref<R>) newRef;

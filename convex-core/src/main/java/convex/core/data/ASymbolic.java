@@ -14,6 +14,15 @@ public abstract class ASymbolic extends ACell {
 		this.name = name;
 	}
 	
+	@Override
+	@SuppressWarnings("unchecked")
+	protected <R extends ACell> Ref<R> createRef() {
+		// Create Ref at maximum status to reflect internal embedded status
+		Ref<ACell> newRef= RefDirect.create(this,cachedHash(),Ref.INTERNAL_FLAGS);
+		cachedRef=newRef;
+		return (Ref<R>) newRef;
+	}
+	
 	@Override public final boolean isCVMValue() {
 		return true;
 	}

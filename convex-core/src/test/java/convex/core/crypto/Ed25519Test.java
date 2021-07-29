@@ -89,7 +89,7 @@ public class Ed25519Test {
 	public void testCreateFromPrivateKey() {
 		Ed25519KeyPair kp1=Ed25519KeyPair.generate();
 		PrivateKey priv=kp1.getPrivate();
-		PublicKey pub=kp1.getPublic();
+		// PublicKey pub=kp1.getPublic();
 
 		Ed25519KeyPair kp2 = Ed25519KeyPair.create(priv);
 		assertTrue(kp1.equals(kp2));

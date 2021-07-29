@@ -24,14 +24,34 @@ import convex.core.util.Utils;
  * @param <T> Type of List elements
  */
 public class List<T extends ACell> extends AList<T> {
+	
+	public static final List<?> EMPTY = wrap(VectorLeaf.EMPTY);
 
-	static final List<ACell> EMPTY = new List<>(Vectors.empty());
+	public static final Ref<List<?>> EMPTY_REF = EMPTY.getRef();
 
-	AVector<T> data;
+	static {
+		// Set empty Ref flags as internal embedded constant
+		EMPTY_REF.setFlags(Ref.INTERNAL_FLAGS);
+	}
+
+	/**
+	 * Wrapped vector containing reversed elements
+	 */
+	private AVector<T> data;
 
 	private List(AVector<T> data) {
 		super(data.count);
 		this.data = data.toVector(); // ensure canonical, not a mapentry etc.
+	}
+	
+	/**
+	 * Wraps a Vector as a list (will reverse element order)
+	 * @param <R> Type of elements
+	 * @param vector Vector to wrap
+	 * @return New List instance
+	 */
+	public static <R extends ACell> List<R> wrap(AVector<R> vector) {
+		return new List<R>(vector);
 	}
 
 	/**
@@ -50,7 +70,7 @@ public class List<T extends ACell> extends AList<T> {
 
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> List<T> of(Object... elements) {
-		if (elements.length == 0) return (List<T>) EMPTY;
+		if (elements.length == 0) return (List<T>) Lists.empty();
 		Utils.reverse(elements);
 		return new List<T>(Vectors.of(elements));
 	}
@@ -63,7 +83,7 @@ public class List<T extends ACell> extends AList<T> {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> List<T> create(ACell... args) {
-		if (args.length==0) return (List<T>) EMPTY;
+		if (args.length==0) return (List<T>) Lists.empty();
 		Utils.reverse(args);
 		return new List<T>(Vectors.create(args));
 	}

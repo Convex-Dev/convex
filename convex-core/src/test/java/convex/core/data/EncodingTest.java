@@ -108,7 +108,7 @@ public class EncodingTest {
 	@Test public void testListRegression() throws BadFormatException {
 		MapEntry<ACell,ACell> me=MapEntry.create(Blobs.fromHex("41da2aa427dc50975dd0b077"), RT.cvm(-1449690165L));
 		List<ACell> l=List.reverse(me);
-		assertEquals(me,l.data); // ensure MapEntry gets converted to canonical vector
+		assertEquals(me,l.reverse()); // ensure MapEntry gets converted to canonical vector
 		
 		Blob b=Format.encodedBlob(l);
 		List<ACell> l2=Format.read(b);

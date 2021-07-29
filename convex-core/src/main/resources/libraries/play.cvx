@@ -1,0 +1,33 @@
+;; convex.play library
+;;
+;; The intention of this library is to provide tools to safely delegate command execution to an actor
+;; Which can intrepret user input as a custom language.
+;;
+;; Safety measures:
+;; - All commands executed in the actor's environment: cannot access user account other than this
+;; - User can always type `quit` to exit
+
+(do
+  
+  
+  (defn runner 
+    ^{:doc {:description "Generator function for a custom language runner. Set *lang* to (runner actor-address) to instantiate and use.",
+            :examples [{:code "(plat/runner #1234)"}]
+            :type :function
+            :signature [{:params [code]}]}}    
+    [addr]
+    (fn [code]
+      (cond 
+        (= 'quit code) (undef *lang*)
+        (call addr (evaluate code)))))
+  
+  (defn start 
+    ^{:doc {:description "Starts a custom interpreter using the convex.play framework. Entering `quit` will exit.",
+            :examples [{:code "(play/start #1234)"}]
+            :type :function
+            :signature [{:params [addr]}]}}
+    [addr]
+    (do
+      (def *lang* (runner addr))
+      (call addr (join))
+    )))

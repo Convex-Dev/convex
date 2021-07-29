@@ -76,7 +76,7 @@ public class RefTest {
 	public void testEmbedded() {
 		assertTrue(Ref.get(RT.cvm(1L)).isEmbedded()); // a primitive
 		assertTrue(Ref.NULL_VALUE.isEmbedded()); // singleton null ref
-		assertTrue(Ref.EMPTY_VECTOR.isEmbedded()); // singleton null ref
+		assertTrue(List.EMPTY_REF.isEmbedded()); // singleton null ref
 		assertFalse(Blob.create(new byte[Format.MAX_EMBEDDED_LENGTH]).getRef().isEmbedded()); // too big to embed
 		assertTrue(Samples.LONG_MAP_10.getRef().isEmbedded()); // a ref container
 	}
