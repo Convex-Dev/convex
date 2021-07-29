@@ -100,8 +100,8 @@ public class Ed25519Test {
 		AKeyPair kp1=Ed25519KeyPair.createSeeded(1337);
 		AKeyPair kp2=Ed25519KeyPair.createSeeded(1337);
 		AKeyPair kp3=Ed25519KeyPair.createSeeded(13378);
-		assertEquals(kp1,kp2);
-		assertNotEquals(kp2,kp3);
+		assertTrue(kp1.equals(kp2));
+		assertFalse(kp2.equals(kp3));
 	}
 
 	@Test
