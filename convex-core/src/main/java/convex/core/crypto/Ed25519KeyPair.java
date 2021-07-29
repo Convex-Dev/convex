@@ -12,6 +12,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Signature;
+import java.security.Security;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
@@ -23,6 +24,7 @@ import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
@@ -46,6 +48,7 @@ public class Ed25519KeyPair extends AKeyPair {
 	private Ed25519KeyPair(KeyPair kp, AccountKey publicKey) {
 		this.keyPair = kp;
 		this.publicKey=publicKey;
+		Security.addProvider(new BouncyCastleProvider());
 	}
 
 	/**
