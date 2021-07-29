@@ -6,9 +6,12 @@ import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.SecureRandom;
+import java.security.Security;
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.AString;
@@ -50,15 +53,16 @@ public class PEMToolsTest {
 		ASignature rightSignature = importKeyPair.sign(data.getHash());
 		assertTrue(leftSignature.equals(rightSignature));
 
+
 		try {
-			KeyFactory keyFactory = KeyFactory.getInstance("Ed25519");
+			KeyFactory keyFactory = KeyFactory.getInstance("Ed25519", "SunEC");
 			Key key1 = keyFactory.translateKey(keyPair.getPrivate());
 			// System.out.println("Key 1 " + Utils.toHexString(key1.getEncoded()));
 			Key key2 = keyFactory.translateKey(importKeyPair.getPrivate());
 			// System.out.println("Key 2 " + Utils.toHexString(key1.getEncoded()));
 			assertTrue(key1.equals(key2));
 
-		} catch ( NoSuchAlgorithmException | InvalidKeyException e ) {
+		} catch ( NoSuchAlgorithmException | InvalidKeyException  | NoSuchProviderException e ) {
 			throw new Error(e);
 		}
 		/*

@@ -8,6 +8,7 @@ import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
@@ -48,7 +49,6 @@ public class Ed25519KeyPair extends AKeyPair {
 	private Ed25519KeyPair(KeyPair kp, AccountKey publicKey) {
 		this.keyPair = kp;
 		this.publicKey=publicKey;
-		Security.addProvider(new BouncyCastleProvider());
 	}
 
 	/**
@@ -326,7 +326,7 @@ public class Ed25519KeyPair extends AKeyPair {
 		// private keys are stored in byte format differently depending on the source of this keypair
 		// so we need to convert the to a standard 32 byte private key and then compare
 		try {
-			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
+			KeyFactory keyFactory = KeyFactory.getInstance(ED25519, "SunEC");
 			Key keyThis = keyFactory.translateKey(this.keyPair.getPrivate());
 			Key keyOther = keyFactory.translateKey(other.keyPair.getPrivate());
 			System.out.println("key compare: " + Utils.toHexString(keyThis.getEncoded()) +
@@ -335,7 +335,7 @@ public class Ed25519KeyPair extends AKeyPair {
 			);
 
 			return keyThis.equals(keyOther);
-		} catch ( NoSuchAlgorithmException | InvalidKeyException e ) {
+		} catch ( NoSuchAlgorithmException | InvalidKeyException | NoSuchProviderException e ) {
 			// throw new Error(e);
 			// do nothing just return false
 		}
