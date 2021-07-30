@@ -249,6 +249,13 @@ You wil always need to pass the password to the *keystore* file since the CLI wi
 The CLI will automatically create 4 keypairs and place them in the keystore. The CLI will then start up 4 peers all sharing a single
 temporary local _Etch Database_ in the /tmp folder.
 
+The Simple local start consists of the following steps:
+
+. Create the _count_ number of peer keypairs.
+. Store the new keypairs in the keystore.
+. Start up the local network using the new created keys.
+
+
 
 === Local start with peer keys
 While the simple local start will auto generate public keys for the local peers, create the peer accounts. You have the option to start any number of peers using the private keys from your keystore. To do this you need to provide a list of public keys that you want the CLI to use to start up the local network.
@@ -309,7 +316,7 @@ local network using a config file, instead of providing a list of keys.
 .file: example_convex_local_start.conf
 ----
     # etch storage database
-    convex.etch = <1>
+    convex.etch = <.>
 
     # default keystore filename
     convex.keystore =$HOME/.convex/keystore.pfx
@@ -320,7 +327,7 @@ local network using a config file, instead of providing a list of keys.
     # number of peers to start
     convex.local.start = 4
 
-    # comma list of index of keys or items <2>
+    # comma list of index of keys or items <.>
     convex.local.start.index-key=
 
     # comma list of public-key hex values, or multiple items
@@ -330,11 +337,11 @@ local network using a config file, instead of providing a list of keys.
     convex.local.start.public-key=ce55bb8
 
     # keystore password
-    convex.local.password = <3>
+    convex.local.password = <.>
 ----
 
-<1> If no filename is provided, then the CLI will create a temporary etch storage database in the temp folder.
-<2> You can provide a list of public keys or indexes or duplicate settings with different values.
+<.> If no filename is provided, then the CLI will create a temporary etch storage database in the temp folder.
+<.> You can provide a list of public keys or indexes or duplicate settings with different values.
 
     convex.local.index-key = 1,2,3
     # is the same as
@@ -342,8 +349,7 @@ local network using a config file, instead of providing a list of keys.
     convex.local.index-key = 2
     convex.local.index-key = 3
 
-
-<3> If you do not provide a password, then the CLI will request a password on starting the local network.
+<.> If you do not provide a password, then the CLI will request a password on starting the local network.
 
 [#command-peer-start-local]
 == Starting a local Peer
@@ -382,6 +388,33 @@ then later
 #3: Peer:556deb URL: localhost:37985 Status: J  S Connections: 3/ 3 Consensus:  20 State:cfa8fe Belief:2c6f2a Msg: trusted connection
 #4: Peer:0fce50 URL: localhost:46559 Status: J  S Connections: 3/ 3 Consensus:  20 State:cfa8fe Belief:2c6f2a Msg: trusted connection
 ----
+
+On every event that occurs for a peer in the cluster, on it's own an event is shown as a line.
+
+The event data can be split up into the following fields:
+
+[cols="1,2a,1m"]
+|===
+|Name |Description|Example
+
+|Index |Peer index starting at 1 within the cluster of peers |#4
+|Peer |First 6 characters of the public key of the peer |Peer:0fce50
+|URL |URL of the peer|URL: localhost:46559
+|Status
+|
+[horizontal]
+NJ:: Not Joined
+J:: Joined
+NS:: Not Synced
+S:: Synced
+|Status: J  S
+
+|Connections |_Peer connection count_ / _Peer trusted connection count_|Connections: 3/ 2
+|Consensus |Consensus level |Consensus:  20
+|State | First 6 characters of the State hash |State:cfa8fe
+|Belief |First 6 characters of the Belief hash |Belief:2c6f2a
+|Msg |Short message of the event that occured on this peer |Msg: trusted connection
+|===
 
 [#command-keys]
 == Managing your Keys - The Keystore
