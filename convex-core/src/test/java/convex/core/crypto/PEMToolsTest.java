@@ -50,6 +50,7 @@ public class PEMToolsTest {
 		ASignature rightSignature = importKeyPair.sign(data.getHash());
 		assertTrue(leftSignature.equals(rightSignature));
 
+
 		try {
 			KeyFactory keyFactory = KeyFactory.getInstance("Ed25519");
 			Key key1 = keyFactory.translateKey(keyPair.getPrivate());
@@ -58,7 +59,7 @@ public class PEMToolsTest {
 			// System.out.println("Key 2 " + Utils.toHexString(key1.getEncoded()));
 			assertTrue(key1.equals(key2));
 
-		} catch ( NoSuchAlgorithmException | InvalidKeyException e ) {
+		} catch ( NoSuchAlgorithmException | InvalidKeyException  e ) {
 			throw new Error(e);
 		}
 		/*
