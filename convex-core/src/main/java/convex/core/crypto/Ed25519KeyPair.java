@@ -12,6 +12,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Signature;
+import java.security.Security;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
@@ -322,14 +323,16 @@ public class Ed25519KeyPair extends AKeyPair {
 		if (!this.keyPair.getPublic().equals(other.keyPair.getPublic())) return false;
 		// private keys are stored in byte format differently depending on the source of this keypair
 		// so we need to convert the to a standard 32 byte private key and then compare
+		// WARNING: This only works if using java > 15 (not for v11)
 		try {
 			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
 			Key keyThis = keyFactory.translateKey(this.keyPair.getPrivate());
 			Key keyOther = keyFactory.translateKey(other.keyPair.getPrivate());
 			return keyThis.equals(keyOther);
-		} catch ( NoSuchAlgorithmException | InvalidKeyException e ) {
+		} catch ( NoSuchAlgorithmException | InvalidKeyException  e ) {
 			// throw new Error(e);
 			// do nothing just return false
+			// System.out.println(e);
 		}
 		return false;
 	}
