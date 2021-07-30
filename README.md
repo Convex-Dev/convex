@@ -46,7 +46,7 @@ The repository also contains core "on-chain" libraries providing key full-stack 
 Convex is available to run as a CLI application out of the box. After building (with e.g. `mvn install`) it can be run directly as an executable `jar` file:
 
 ```
-java -jar target/convex-jar-with-dependencies.jar <args>
+java -jar convex-cli/target/convex-cli-0.7.0-SNAPSHOT-jar-with-dependencies.jar <args>
 ```
 
 Or using the convenience batch script in windows:
@@ -77,10 +77,10 @@ The local Convex network uses 3 types of files:
 So to start a new network using the mimimum number of parameters:
 
 ```
-./convex local start
+./convex local start --password=my-secret
 ```
 
-This will startup 8 peers that are sharing the same Etch database.
+This will startup 4 peers that are sharing the same Etch database.
 
 To create another peer to join the network, you can enter the following command:
 
@@ -99,20 +99,19 @@ The `--address` parameter is the address of the peer account, `--public-key` is 
 
 
 
-### Peer manager
+### Local GUI Peers
 
 The convex Peer Manager (GUI application) can be used to run a local test network.
 
-This can be invoked by running `convex.gui.manager.PeerManager` as the main class, e.g. with the following command:
+This can be invoked by running the jar archive directly e.g. with the following command:
 
-`java -cp convex.jar convex.gui.manager.PeerManager`
+`java -jar convex-gui/target/convex-gui-0.7.0-SNAPSHOT-jar-with-dependencies.jar`
 
-or you can run this from the command line by using the `peer manager` command:
+or you can run this from the command line by using the `local gui` command:
 
 ```
-./convex local manager
+./convex local gui
 ```
-
 
 
 ## Contributing
