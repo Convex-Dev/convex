@@ -1665,7 +1665,7 @@ public class Context<T extends ACell> extends AObject {
 			return this.withError(ErrorCodes.STATE, "Value defined in account " + target + " is not a function: " + sym);
 		}
 
-		if (as.getMetadata().get(sym).get(Keywords.CALLABLE) != CVMBool.TRUE) {
+		if (as.getMetadata().get(sym).get(Keywords.CALLABLE_Q) != CVMBool.TRUE) {
 			return this.withError(ErrorCodes.STATE, "Function for account " + target + " is not callable: " + sym);
 		}
 
