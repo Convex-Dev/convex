@@ -264,6 +264,12 @@
           :type :value}}
   (address 10))
 
+(def *lang*
+  ^{:doc {:description "The current language font-end function. If set to a function in the environment, this function will be called with the input form during evaluation insteand of the normal `eval` behaviour. Pre-compiled ops bypass this language setting."
+          :examples [{:code "(def *lang* (fn [code] (str code)))"}]
+          :type :function}}
+  nil)
+
 (defmacro undef
     ^{:doc {:description "Undefines a symbol, removing the mapping from the current environment if it exists."
           :examples [{:code "(do (def foo 1) (undef foo))"}]
