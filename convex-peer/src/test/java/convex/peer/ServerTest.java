@@ -88,7 +88,7 @@ public class ServerTest {
 	static {
 		// Use fresh State
 		State s=Init.createState(PEER_KEYS);
-		HERO=Address.create(Init.BASE_FIRST_ADDRESS);
+		HERO=Address.create(Init.GENESIS_ADDRESS);
 		VILLAIN=HERO.offset(1);
 
 		SERVERS=API.launchLocalPeers(PEER_KEYPAIRS, s, null);

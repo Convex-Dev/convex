@@ -37,7 +37,7 @@ public class Benchmarks {
 	public static final AKeyPair HERO_KEYPAIR = KEYPAIRS[0];
 	public static final AKeyPair VILLAIN_KEYPAIR = KEYPAIRS[1];
 	
-	public static Address HERO=Init.BASE_FIRST_ADDRESS;
+	public static Address HERO=Init.GENESIS_ADDRESS;
 	public static Address VILLAIN=Address.create(HERO.longValue()+1);
 	
 	public static final AccountKey HERO_KEY = HERO_KEYPAIR.getAccountKey();

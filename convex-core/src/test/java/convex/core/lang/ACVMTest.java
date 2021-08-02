@@ -40,7 +40,7 @@ public abstract class ACVMTest {
 	 */
 	protected ACVMTest(State genesis) {
 		this.INITIAL=genesis;
-		CONTEXT=Context.createFake(genesis,Init.BASE_FIRST_ADDRESS);
+		CONTEXT=Context.createFake(genesis,Init.GENESIS_ADDRESS);
 		HERO=InitTest.HERO;
 		VILLAIN=InitTest.VILLAIN;
 		INITIAL_JUICE=CONTEXT.getJuice();

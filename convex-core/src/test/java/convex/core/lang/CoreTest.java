@@ -2478,12 +2478,14 @@ public class CoreTest extends ACVMTest {
 			assertEquals(newHostname,ctx.getState().getPeer(InitTest.FIRST_PEER_KEY).getHostname().toString());
         }
 
-		ctx=ctx.forkWithAddress(VILLAIN);
+		// Try to hijack with an account that isn't the first Peer
+		ctx=ctx.forkWithAddress(HERO.offset(2));
 		{
 			newHostname = "set-key-hijack";
 			ctx=step(ctx,"(do (set-key "+peerKey+") (set-peer-data "+peerKey+" {:url \"" + newHostname + "\"}))");
 			assertStateError(ctx);
 		}
+		
 		ctx=ctx.forkWithAddress(InitTest.FIRST_PEER_ADDRESS);
 		assertCastError(step(ctx,"(set-peer-data peer-key 0x1234567812345678123456781234567812345678123456781234567812345678)"));
 		assertCastError(step(ctx,"(set-peer-data peer-key :bad-key)"));
