@@ -159,7 +159,10 @@ public class Main implements Runnable {
 	}
 
 	public String getSessionFilename() {
-		return Helpers.expandTilde(sessionFilename);
+        if (sessionFilename != null) {
+			return Helpers.expandTilde(sessionFilename.strip());
+		}
+		return null;
 	}
 
 	public String getPassword() {
@@ -167,11 +170,17 @@ public class Main implements Runnable {
 	}
 
 	public String getKeyStoreFilename() {
-		return Helpers.expandTilde(keyStoreFilename);
+		if ( keyStoreFilename != null) {
+			return Helpers.expandTilde(keyStoreFilename).strip();
+		}
+		return null;
 	}
 
 	public String getEtchStoreFilename() {
-		return Helpers.expandTilde(etchStoreFilename);
+		if ( etchStoreFilename != null) {
+			return Helpers.expandTilde(etchStoreFilename).strip();
+		}
+		return null;
 	}
 
 	public KeyStore loadKeyStore(boolean isCreate) throws Error {
@@ -205,7 +214,7 @@ public class Main implements Runnable {
 
 		String publicKeyClean = "";
 		if (publicKey != null) {
-			publicKeyClean = publicKey.toLowerCase().replaceAll("^0x", "");
+			publicKeyClean = publicKey.toLowerCase().replaceAll("^0x", "").strip();
 		}
 
 		if ( publicKeyClean.isEmpty() && indexKey <= 0) {
@@ -263,7 +272,7 @@ public class Main implements Runnable {
 			if (port == 0) {
 				throw new Error("Cannot find a local port or you have not set a valid port number");
 			}
-			InetSocketAddress host=new InetSocketAddress(hostname, port);
+			InetSocketAddress host=new InetSocketAddress(hostname.strip(), port);
 			convex = Convex.connect(host, address, keyPair);
 		} catch (Throwable t) {
 			throw new Error("Cannot connect to a local peer " + t);
