@@ -1,4 +1,6 @@
 = Convex Command Line Interface
+:toc:
+:toc-title: Convex CLI
 
 image::convex_logo.svg[Convex Command Line Interface,100,float=right,opts=inline]
 
