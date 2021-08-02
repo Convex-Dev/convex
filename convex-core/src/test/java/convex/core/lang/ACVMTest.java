@@ -21,7 +21,14 @@ public abstract class ACVMTest {
 	private Context<?> CONTEXT;
 	protected long INITIAL_JUICE;
 	
+	/**
+	 * Address of the HERO, equal to the genesis address
+	 */
 	protected final Address HERO;
+	
+	/**
+	 * Address of the villain: has compromised peer at index 1 (i.e. the second peer)
+	 */
 	protected final Address VILLAIN;
 
 	/**
@@ -30,7 +37,7 @@ public abstract class ACVMTest {
 	public final long HERO_BALANCE;
 
 	/**
-	 * Balance of hero's account before spending any juice / funds
+	 * Balance of villain's account before spending any juice / funds
 	 */
 	public final long VILLAIN_BALANCE;
 
