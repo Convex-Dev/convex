@@ -75,6 +75,8 @@ public class Keywords {
 	public static final Keyword EXPANDER = Keyword.create("expander");
 	public static final Keyword MACRO = Keyword.create("macro");
 
+	public static final Keyword CALLABLE = Keyword.create("callable?");
+
 	public static final Keyword VALUE = Keyword.create("value");
 	public static final Keyword FUNCTION = Keyword.create("function");
 	public static final Keyword METADATA = Keyword.create("metadata");
