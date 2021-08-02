@@ -115,6 +115,14 @@ public class PeerStart implements Runnable {
 				return;
 			}
 		}
+		else {
+			remotePeerHostname = remotePeerHostname.strip();
+		}
+		if (hostname == null) {
+			log.warn("you need to provide a host name for this peer");
+			return;
+		}
+		hostname = hostname.strip();
 
 		try {
 			AStore store = null;
