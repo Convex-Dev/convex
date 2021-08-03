@@ -8,7 +8,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AFn;
 import convex.core.lang.RT;
-import convex.core.lang.Symbols;
 import convex.core.lang.impl.RecordFormat;
 import convex.core.util.Utils;
 
@@ -178,32 +177,6 @@ public class AccountStatus extends ARecord {
 		return publicKey==null;
 	}
 
-	/**
-	 * Gets the exported function for a given symbol in an Account
-	 * 
-	 * Returns null if not found. This might occur because:
-	 * 
-	 * <ul>
-	 * <li>The Account does not have the specified exported symbol.<li>
-	 * <li>The exported symbol does not refer to a function</li>
-	 * </ul>
-	 * 
-	 * @param <R> Result type
-	 * @param sym Symbol to look up
-	 * @return The function specified in Actor, or null if not
-	 *         found/exported.
-	 */
-	public <R extends ACell> AFn<R> getExportedFunction(Symbol sym) {
-		ASet<Symbol> exports = getExports();
-		if (exports==null) return null;
-		if (!exports.contains(sym)) return null;
-
-		// get function from environment. Anything not a function results in null
-		ACell maybeFn = environment.get(sym);
-		
-		AFn<R> fn = RT.castFunction(maybeFn);
-		return fn;
-	}
 
 
 	/**
@@ -375,27 +348,6 @@ public class AccountStatus extends ARecord {
 		return new AccountStatus(sequence, balance, memory, environment,metadata,holdings,newController,publicKey);
 	}
 
-	/**
-	 * Gets *exports* from account
-	 * 
-	 * Returns null if the account has no *exports*. This might be for any of the following reasons:
-	 * <ul>
-	 * <li>The account does not define the *exports* symbol</li>
-	 * </ul>
-	 * @return Set of exported accounts
-	 */
-	@SuppressWarnings("unchecked")
-	public ASet<Symbol> getExports() {
-		// get *exports* from environment, bail out if doesn't exist
-		ACell exports = getEnvironment().get(Symbols.STAR_EXPORTS);
-		if (exports == null) return null;
-
-		if (!(exports instanceof ASet)) return null;
-
-		ASet<Symbol> result = (ASet<Symbol>) exports;
-		return result;
-	}
-
 	@Override
 	public int getRefCount() {
 		int rc=(environment==null)?0:environment.getRefCount();
@@ -507,6 +459,42 @@ public class AccountStatus extends ARecord {
 	public AHashMap<Symbol, ACell> getEnvironment() {
 		if (environment==null) return Maps.empty();
 		return environment;
+	}
+
+	/**
+	 * Gets the callable functions from this Account.
+	 * @return Set of callable Symbols
+	 */
+	public ASet<Symbol> getCallableFunctions() {
+		ASet<Symbol> results=Sets.empty();
+		if (metadata==null) return results;
+		for (Entry<Symbol, AHashMap<ACell, ACell>> me:metadata.entrySet()) {
+			ACell callVal=me.getValue().get(Keywords.CALLABLE_Q);
+			if (RT.bool(callVal)) {
+				Symbol sym=me.getKey();
+				if (RT.ensureFunction(getEnvironmentValue(sym))==null) continue;
+				results=results.conj(sym);
+			}
+		}
+		return results;
+	}
+
+	/**
+	 * Gets a callable function from the environment, or null if not callable
+	 * @param sym Symbol to look up
+	 * @return Callable function if found, null otherwise
+	 */
+	public <R extends ACell> AFn<R> getCallableFunction(Symbol sym) {
+		ACell exported=getEnvironmentValue(sym);
+		if (exported==null) return null;
+		AFn<R> fn=RT.ensureFunction(exported);
+		if (fn==null) return null;
+		AHashMap<ACell,ACell> md=getMetadata().get(sym);
+		if (RT.bool(md.get(Keywords.CALLABLE_Q))) {
+			// We have both a function and required metadata tag
+			return fn;
+		}
+		return null;
 	}
 
 }

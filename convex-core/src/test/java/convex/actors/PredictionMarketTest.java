@@ -162,7 +162,7 @@ public class PredictionMarketTest extends ACVMTest {
 
 			c = stepAs(VILLAIN, c, "(call pmaddr (payout))");
 			assertCVMEquals(5000L, c.getResult());
-			assertEquals(HERO_BALANCE + 4000, c.getBalance(VILLAIN));
+			assertEquals(VILLAIN_BALANCE + 4000, c.getBalance(VILLAIN));
 
 			assertEquals(0L, c.getBalance(pmaddr));
 			assertEquals(TestState.TOTAL_FUNDS, c.getState().computeTotalFunds());

@@ -14,7 +14,7 @@ target/
 /.apt_generated/
 /myrecording.jfr
 /.apt_generated_tests/
-/.factorypath
+**/.factorypath
 /etch-db
 /bin/
 .idea/

@@ -1,6 +1,7 @@
 package convex.core.init;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -64,10 +65,10 @@ public class InitTest extends ACVMTest {
 		return Init.createState(PEER_KEYS);
 	}
 	
-	public static Address HERO=Init.BASE_FIRST_ADDRESS;
-	public static Address VILLAIN=Address.create(HERO.longValue()+1);
+	public static Address HERO=Init.getGenesisAddress();
+	public static Address VILLAIN=Init.getGenesisPeerAddress(1);
 	
-	public static final Address FIRST_PEER_ADDRESS = HERO;
+	public static final Address FIRST_PEER_ADDRESS = Init.getGenesisPeerAddress(0);
 
 
 	protected InitTest() {
@@ -95,6 +96,14 @@ public class InitTest extends ACVMTest {
  		AccountStatus as=STATE.getAccount(HERO);
 		assertNotNull(as);
 		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE,as.getMemory());
+	}
+	
+	@Test
+	public void testVILLAIN() {
+ 		AccountStatus as=STATE.getAccount(VILLAIN);
+		assertNotNull(as);
+		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE,as.getMemory());
+		assertNotEquals(HERO,VILLAIN);
 	}
 
 }

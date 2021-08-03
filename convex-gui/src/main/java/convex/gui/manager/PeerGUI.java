@@ -302,10 +302,14 @@ public class PeerGUI extends JPanel {
 	}
 
 	public static Address getUserAddress(int i) {
-		return Address.create(Init.BASE_FIRST_ADDRESS.longValue()+i);
+		return Init.getGenesisPeerAddress(i);
 	}
 	
 	public static AKeyPair getUserKeyPair(int i) {
 		return KEYPAIRS.get(i);
+	}
+
+	public static Address getGenesisAddress() {
+		return Init.getGenesisAddress();
 	}
 }

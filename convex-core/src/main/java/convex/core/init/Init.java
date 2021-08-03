@@ -49,7 +49,7 @@ public class Init {
 	public static final Address REGISTRY_ADDRESS = Address.create(10);
 
 	// Base for user-specified addresses
-	public static final Address BASE_FIRST_ADDRESS = Address.create(11);
+	public static final Address GENESIS_ADDRESS = Address.create(11);
 
 
 	public static State createBaseState(List<AccountKey> genesisKeys) {
@@ -116,12 +116,18 @@ public class Init {
 		accts = s.getAccounts();
 
 		// Set up initial user accounts
-		assert(accts.count()==BASE_FIRST_ADDRESS.longValue());
+		assert(accts.count()==GENESIS_ADDRESS.longValue());
 		{
-			long userFunds=supply/2;
+			long userFunds=(long)(supply*0.8); // 80% to user accounts
 			supply-=userFunds;
+			
+			// Genesis user gets half of all user funds
+			long genFunds=userFunds/2;
+			accts = addAccount(accts, GENESIS_ADDRESS, genesisKeys.get(0), genFunds);
+			userFunds-=genFunds;
+			
 			for (int i = 0; i < keyCount; i++) {
-				// TODO: construct addresses
+				// TODO: construct peer controller addresses
 				Address address = Address.create(accts.count());
 				assert(address.longValue()==accts.count());
 				AccountKey key=genesisKeys.get(i);
@@ -141,7 +147,7 @@ public class Init {
 			supply-=peerFunds;
 			for (int i = 0; i < keyCount; i++) {
 				AccountKey peerKey = genesisKeys.get(i);
-				Address peerController= Address.create(BASE_FIRST_ADDRESS.longValue()+i);
+				Address peerController= getGenesisPeerAddress(i);
 	
 				// set a staked fund such that the first peer starts with super-majority
 				long peerStake = peerFunds/(keyCount-i);
@@ -278,11 +284,11 @@ public class Init {
 	}
 
 	public static Address calcPeerAddress(int userCount, int index) {
-		return Address.create(BASE_FIRST_ADDRESS.longValue() + userCount + index);
+		return Address.create(GENESIS_ADDRESS.longValue() + userCount + index);
 	}
 
 	public static Address calcUserAddress(int index) {
-		return Address.create(BASE_FIRST_ADDRESS.longValue() + index);
+		return Address.create(GENESIS_ADDRESS.longValue() + index);
 	}
 
 	private static State doActorDeploy(State s, String name, String resource) {
@@ -331,6 +337,14 @@ public class Init {
 		ctx = ctx.actorCall(REGISTRY_ADDRESS, 0L, Strings.create("register"),
 				Maps.of(Keywords.NAME, Strings.create(name)));
 		return ctx.getState();
+	}
+	
+	public static Address getGenesisAddress() {
+		return GENESIS_ADDRESS;
+	}
+	
+	public static Address getGenesisPeerAddress(int index) {
+		return GENESIS_ADDRESS.offset(index+1);
 	}
 
 	private static BlobMap<AccountKey, PeerStatus> addPeer(BlobMap<AccountKey, PeerStatus> peers, AccountKey peerKey,
