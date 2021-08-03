@@ -54,6 +54,8 @@ public class RecordTest {
 			assertEquals(k,me.getKey());
 			assertEquals(v,me.getValue());
 		}
+		assertThrows(IndexOutOfBoundsException.class,()->r.entryAt(n));
+		assertThrows(IndexOutOfBoundsException.class,()->r.entryAt(-1));
 
 		int rc=r.getRefCount();
 		for (int i=0; i<rc; i++) {
@@ -62,6 +64,7 @@ public class RecordTest {
 		assertThrows(Exception.class,()->r.getRef(rc));
 
 		assertSame(r,r.updateAll(r.getValuesArray()));
+		assertSame(r,r.updateAll(r.values().toCellArray()));
 
 		CollectionsTest.doDataStructureTests(r);
 	}

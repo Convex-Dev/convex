@@ -18,6 +18,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.core.data.RecordTest;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.ACVMTest;
 
@@ -89,6 +90,9 @@ public class InitTest extends ACVMTest {
 		AccountStatus as=STATE.getAccount(Init.MEMORY_EXCHANGE_ADDRESS);
 		assertNotNull(as);
 		assertTrue(as.getMemory()>0L);
+		
+		// Test Actor record
+		RecordTest.doRecordTests(as);
 	}
 
 	@Test
