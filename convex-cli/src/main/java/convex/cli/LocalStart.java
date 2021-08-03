@@ -47,6 +47,11 @@ public class LocalStart implements Runnable {
 			+ "For example: 0xf0234 or f0234")
 	private String[] keystorePublicKey;
 
+    @Option(names={"--ports"},
+		description="Range or list of ports to assign each peer in the cluster. This can be a multiple of --ports %n"
+			+ "or a single --ports=8081,8082,8083 or --ports=8080-8090")
+	private String[] ports;
+
 	@Override
 	public void run() {
 		Main mainParent = localParent.mainParent;
@@ -102,6 +107,7 @@ public class LocalStart implements Runnable {
 				keyPairList.size()
 			);
 		}
+		int peerPorts[] = mainParent.getPortList(ports, count);
 		log.info("Starting local network with "+count+" peer(s)");
 		peerManager.launchLocalPeers(keyPairList);
 		log.info("Local Peers launched");
