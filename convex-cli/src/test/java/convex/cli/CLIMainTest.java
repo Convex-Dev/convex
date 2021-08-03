@@ -1,7 +1,9 @@
 package convex.cli;
 
+import java.lang.NumberFormatException;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.Test;
 
 public class CLIMainTest {
@@ -41,7 +43,10 @@ public class CLIMainTest {
 		result = mainApp.getPortList(combinedCommaOpenRange, 6);
 		assertArrayEquals(new int[]{80, 100, 101, 102, 103, 104}, result);
 
-
+		assertThrows(NumberFormatException.class, () -> {
+			String badNumberValue[] = {"80,100+,200,300"};
+			mainApp.getPortList(badNumberValue, 6);
+		});
 	}
 
 }

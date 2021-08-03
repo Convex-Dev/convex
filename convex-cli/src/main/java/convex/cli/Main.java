@@ -1,6 +1,7 @@
 package convex.cli;
 
 import java.io.File;
+import java.lang.NumberFormatException;
 import java.net.InetSocketAddress;
 import java.security.KeyStore;
 import java.util.ArrayList;
@@ -351,7 +352,7 @@ public class Main implements Runnable {
 		}
 	}
 
-	int[] getPortList(String ports[], int count) {
+	int[] getPortList(String ports[], int count) throws NumberFormatException {
 		Pattern rangePattern = Pattern.compile(("([0-9]+)\\s*-\\s*([0-9]*)"));
 		List<String> portTextList = Helpers.splitArrayParameter(ports);
 		List<Integer> portList = new ArrayList<Integer>();

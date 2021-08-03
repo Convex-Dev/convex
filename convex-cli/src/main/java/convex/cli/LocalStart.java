@@ -1,5 +1,6 @@
 package convex.cli;
 
+import java.lang.NumberFormatException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -107,9 +108,21 @@ public class LocalStart implements Runnable {
 				keyPairList.size()
 			);
 		}
-		int peerPorts[] = mainParent.getPortList(ports, count);
+		int peerPorts[] = null;
+		if (ports != null) {
+			try {
+				peerPorts = mainParent.getPortList(ports, count);
+			} catch (NumberFormatException e) {
+				log.warn("cannot convert port number " + e);
+				return;
+			}
+			if (peerPorts.length < count) {
+				log.warn("you need only provided {} ports you need to provide at least {} ports", peerPorts.length, count);
+				return;
+			}
+		}
 		log.info("Starting local network with "+count+" peer(s)");
-		peerManager.launchLocalPeers(keyPairList);
+		peerManager.launchLocalPeers(keyPairList, peerPorts);
 		log.info("Local Peers launched");
 		peerManager.showPeerEvents();
 	}
