@@ -2281,6 +2281,11 @@ public class CoreTest extends ACVMTest {
 		ctx=step(ctx,"(set-key "+InitTest.HERO_KEY+")");
 		assertEquals(InitTest.HERO_KEY,ctx.getResult());
 		assertEquals(InitTest.HERO_KEY,eval(ctx,"*key*"));
+		
+		assertEquals(true, evalB("(do "
+				+ "    (def k 0x0000000000000000000000000000000000000000000000000000000000000000)"
+				+ "    (def a (deploy `(set-key ~k)))"
+				+ "    (= k (:key (account a))))"));
 	}
 
 	@Test
