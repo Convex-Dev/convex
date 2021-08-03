@@ -92,6 +92,21 @@ public class API {
 	 *
 	 * @param keyPairs List of keypairs for peers
 	 * @param genesisState GEnesis state for local network
+	 *
+	 * @return List of Servers launched
+	 *
+	 */
+	public static List<Server> launchLocalPeers(List<AKeyPair> keyPairs, State genesisState) {
+		return launchLocalPeers(keyPairs, genesisState, null, null);
+	}
+	/**
+	 * Launch a local set of peers. Intended mainly for testing / development.
+	 *
+	 * The Peers will have a unique genesis State, i.e. an independent network
+	 *
+	 * @param keyPairs List of keypairs for peers
+	 * @param genesisState GEnesis state for local network
+	 * @param peerPorts Array of ports to use for each peer, if == null then randomly assign port numbers
 	 * @param event Server event handler
 	 *
 	 * @return List of Servers launched

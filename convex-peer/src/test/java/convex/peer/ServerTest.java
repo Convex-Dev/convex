@@ -91,7 +91,7 @@ public class ServerTest {
 		HERO=Address.create(Init.BASE_FIRST_ADDRESS);
 		VILLAIN=HERO.offset(1);
 
-		SERVERS=API.launchLocalPeers(PEER_KEYPAIRS, s, null,null);
+		SERVERS=API.launchLocalPeers(PEER_KEYPAIRS, s);
 		Server server = SERVERS.get(0);
 		synchronized(server) {
 			SERVER=server;
