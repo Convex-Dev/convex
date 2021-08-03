@@ -3134,7 +3134,11 @@ public class CoreTest extends ACVMTest {
 		assertCompileError(step("(unquote)"));
 		assertCompileError(step("(unquote 1 2)"));
 	}
-
+	
+	@Test
+	public void testUnquoteError() {
+		assertUndeclaredError(step("~~foo"));
+	}
 
 	@Test
 	public void testDefn() {

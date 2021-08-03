@@ -422,6 +422,7 @@ public class Compiler {
 				// execute the unquoted code directly to get a form to compile
 				if (list.size() != 2) return context.withCompileError(Symbols.UNQUOTE + " expects one argument.");
 				context = context.expandCompile(list.get(1));
+				if (context.isExceptional()) return (Context<T>) context;
 				AOp<T> quotedOp = (AOp<T>) context.getResult();
 
 				Context<T> rctx = context.execute(quotedOp);
