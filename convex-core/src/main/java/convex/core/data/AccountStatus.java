@@ -477,9 +477,9 @@ public class AccountStatus extends ARecord {
 	}
 
 	/**
-	 * GEts a callable function from the environment, or null if not callable
-	 * @param sym
-	 * @return
+	 * Gets a callable function from the environment, or null if not callable
+	 * @param sym Symbol to look up
+	 * @return Callable function if found, null otherwise
 	 */
 	public <R extends ACell> AFn<R> getExportedFunction(Symbol sym) {
 		ACell exported=environment.get(sym);
