@@ -52,9 +52,11 @@ import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
+import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.core.lang.ops.Do;
+import convex.core.transactions.Invoke;
 
 /**
  * Miscellaneous value objects for testing purposes
@@ -247,6 +249,7 @@ public class Samples {
 			LONG_MAP_100,
 			Syntax.of(1),
 			Syntax.create(Vectors.empty(),Maps.of(1,2)),
+			Invoke.create(Init.GENESIS_ADDRESS, 0, (ACell)null),
 			Maps.empty(),
 			LONG_SET_10,
 			Sets.empty(),
