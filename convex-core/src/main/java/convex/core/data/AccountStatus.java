@@ -482,7 +482,7 @@ public class AccountStatus extends ARecord {
 	 * @return Callable function if found, null otherwise
 	 */
 	public <R extends ACell> AFn<R> getExportedFunction(Symbol sym) {
-		ACell exported=environment.get(sym);
+		ACell exported=getEnvironmentValue(sym);
 		if (exported==null) return null;
 		AFn<R> fn=RT.ensureFunction(exported);
 		if (fn==null) return null;
