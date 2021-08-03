@@ -242,14 +242,21 @@
           :type :macro
           :signature [{:params [& symbols]}]}
 	}
+
   [& syms]
-  (let [f (fn [s]
-            (let [esym (unsyntax s)]
-              (or (symbol? esym) (fail :CAST (str "Not a symbol: " esym)))
-              (list 'quote esym)))
-        qsyms (mapv f syms)
-        vals (cons 'vector qsyms)]
-    `(def *exports* (into *exports* ~vals))))
+
+  (cons 'do
+        (map (fn [sym]
+			   (or (symbol? sym)
+				   (fail :CAST
+					     (str "Not a symbol: " sym)))
+			   `(eval (list 'def
+					        (quote ~sym)
+							(syntax ~sym
+								    (assoc (lookup-meta (quote ~sym))
+									       :callable?
+									       true)))))
+		     syms)))
 
 (def *registry*
   ^{:doc {:description "The address of the Convex registry Actor."

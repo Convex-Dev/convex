@@ -2131,7 +2131,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testCallStar() {
-		Context<Address> ctx = step("(def ctr (deploy '(do :foo (defn f [x] (inc x)) (export f g) )))");
+		Context<Address> ctx = step("(def ctr (deploy '(do :foo (defn f [x] (inc x)) (export f) )))");
 
 		assertEquals(9L,evalL(ctx, "(call* ctr 0 'f 8)"));
 		assertCastError(step(ctx, "(call* ctr 0 :f 8)")); // cast fail on keyword function name
@@ -3492,7 +3492,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testExports() {
 		assertEquals(Sets.empty(), eval("*exports*"));
-		assertEquals(Sets.of(Symbols.FOO, Symbols.BAR), eval("(do (export foo bar) *exports*)"));
+		assertTrue(evalB("(do (defn foo []) (export foo) (get (lookup-meta 'foo) :callable?))"));
 	}
 
 	@Test

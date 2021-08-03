@@ -46,7 +46,7 @@ public class PeersListPanel extends JPanel {
 
 	public void launchAllPeers(PeerGUI manager) {
 		int N=PeerGUI.KEYPAIRS.size();
-		List<Server> serverList = API.launchLocalPeers(PeerGUI.KEYPAIRS,PeerGUI.genesisState,null);
+		List<Server> serverList = API.launchLocalPeers(PeerGUI.KEYPAIRS,PeerGUI.genesisState);
 		for (Server server: serverList) {
 			PeerView peer = new PeerView();
 			peer.peerServer = server;
@@ -97,7 +97,7 @@ public class PeersListPanel extends JPanel {
 		btnConnect.addActionListener(e -> {
 			String input = JOptionPane.showInputDialog("Enter host address: ", "");
 			if (input==null) return; // no result?
-			
+
 			String[] ss = input.split(":");
 			String host = ss[0].trim();
 			int port = (ss.length > 1) ? Integer.parseInt(ss[1].trim()) : 0;

@@ -573,7 +573,15 @@ public class Core {
 			AccountStatus as = context.getState().getAccount(addr);
 			if (as == null) return context.withResult(Juice.LOOKUP, CVMBool.FALSE);
 
-			CVMBool result = CVMBool.of(as.getExportedFunction(sym) != null);
+			AHashMap<ACell, ACell> symMeta = as.getMetadata().get(sym);
+
+			CVMBool result;
+
+			if (symMeta == null) {
+				result = CVMBool.FALSE;
+			} else {
+				result = CVMBool.of(symMeta.get(Keywords.CALLABLE_Q) == CVMBool.TRUE);
+			}
 
 			return context.withResult(Juice.LOOKUP, result);
 		}
