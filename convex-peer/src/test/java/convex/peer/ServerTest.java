@@ -59,7 +59,7 @@ public class ServerTest {
 	private static final List<Server> SERVERS;
 
 	public static final Convex CONVEX;
-	
+
 	public static final AKeyPair[] KEYPAIRS = new AKeyPair[] {
 			AKeyPair.createSeeded(2),
 			AKeyPair.createSeeded(3),
@@ -70,16 +70,16 @@ public class ServerTest {
 			AKeyPair.createSeeded(17),
 			AKeyPair.createSeeded(19),
 	};
-	
+
 	public static ArrayList<AKeyPair> PEER_KEYPAIRS=(ArrayList<AKeyPair>) Arrays.asList(KEYPAIRS).stream().collect(Collectors.toList());
 	public static ArrayList<AccountKey> PEER_KEYS=(ArrayList<AccountKey>) Arrays.asList(KEYPAIRS).stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
 
 	public static final AKeyPair FIRST_PEER_KEYPAIR = KEYPAIRS[0];
 	public static final AccountKey FIRST_PEER_KEY = FIRST_PEER_KEYPAIR.getAccountKey();
-	
+
 	public static final AKeyPair HERO_KEYPAIR = KEYPAIRS[0];
 	public static final AKeyPair VILLAIN_KEYPAIR = KEYPAIRS[1];
-	
+
 	public static final AccountKey HERO_KEY = HERO_KEYPAIR.getAccountKey();
 
 	public static final Address HERO;
@@ -91,7 +91,7 @@ public class ServerTest {
 		HERO=Address.create(Init.BASE_FIRST_ADDRESS);
 		VILLAIN=HERO.offset(1);
 
-		SERVERS=API.launchLocalPeers(PEER_KEYPAIRS, s, null);
+		SERVERS=API.launchLocalPeers(PEER_KEYPAIRS, s, null,null);
 		Server server = SERVERS.get(0);
 		synchronized(server) {
 			SERVER=server;
