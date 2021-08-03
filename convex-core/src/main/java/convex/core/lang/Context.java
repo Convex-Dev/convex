@@ -1652,7 +1652,7 @@ public class Context<T extends ACell> extends AObject {
 			return this.withError(ErrorCodes.ARGUMENT, "Cannot make negative offer in Actor call: "+offer);
 		}
 
-		AFn<R> fn = as.getExportedFunction(sym);
+		AFn<R> fn = as.getCallableFunction(sym);
 
 		if (fn == null) {
 			return this.withError(ErrorCodes.STATE, "Value defined in account " + target + " is not a callable function: " + sym);

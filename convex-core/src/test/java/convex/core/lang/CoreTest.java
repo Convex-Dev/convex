@@ -2122,10 +2122,17 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testCallSelf() {
 		Context<Address> ctx = step("(def ctr (deploy '(do (defn foo [] (call *address* (bar))) (defn bar [] (= *address* *caller*)) (export foo bar))))");
-
+		Address actor=ctx.getResult();
+		
 		assertTrue(evalB(ctx, "(call ctr (foo))")); // nested call to same actor
 		assertFalse(evalB(ctx, "(call ctr (bar))")); // call from hero only
 
+		assertEquals(Sets.of(Symbols.FOO,Symbols.BAR),ctx.getAccountStatus(actor).getCallableFunctions());
+	}
+	
+	@Test 
+	public void testCallables() {
+		assertSame(Sets.empty(),context().getAccountStatus().getCallableFunctions());
 	}
 
 

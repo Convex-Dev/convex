@@ -462,15 +462,18 @@ public class AccountStatus extends ARecord {
 	}
 
 	/**
-	 * Gets the exported Symbols from this Account.
+	 * Gets the callable functions from this Account.
 	 * @return Set of callable Symbols
 	 */
-	public ASet<Symbol> getExports() {
+	public ASet<Symbol> getCallableFunctions() {
 		ASet<Symbol> results=Sets.empty();
+		if (metadata==null) return results;
 		for (Entry<Symbol, AHashMap<ACell, ACell>> me:metadata.entrySet()) {
 			ACell callVal=me.getValue().get(Keywords.CALLABLE_Q);
 			if (RT.bool(callVal)) {
-				results=results.conj(me.getKey());
+				Symbol sym=me.getKey();
+				if (RT.ensureFunction(getEnvironmentValue(sym))==null) continue;
+				results=results.conj(sym);
 			}
 		}
 		return results;
@@ -481,7 +484,7 @@ public class AccountStatus extends ARecord {
 	 * @param sym Symbol to look up
 	 * @return Callable function if found, null otherwise
 	 */
-	public <R extends ACell> AFn<R> getExportedFunction(Symbol sym) {
+	public <R extends ACell> AFn<R> getCallableFunction(Symbol sym) {
 		ACell exported=getEnvironmentValue(sym);
 		if (exported==null) return null;
 		AFn<R> fn=RT.ensureFunction(exported);

@@ -72,7 +72,7 @@ public class SmartOpComponent extends BaseListComponent {
 
 		AccountStatus as = PeerGUI.getLatestState().getAccount(contract);
 
-		AFn<?> fn = as.getExportedFunction(sym);
+		AFn<?> fn = as.getCallableFunction(sym);
 
 		// Function might be a map or set
 		AVector<ACell> params = (fn instanceof Fn) ? ((Fn<?>) fn).getParams()
