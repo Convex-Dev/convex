@@ -161,7 +161,6 @@ public class Symbols {
 	public static final Symbol STAR_BALANCE = Symbol.create("*balance*");
 	public static final Symbol STAR_DEPTH = Symbol.create("*depth*");
 	public static final Symbol STAR_RESULT = Symbol.create("*result*");
-	public static final Symbol STAR_EXPORTS = Symbol.create("*exports*");
 	public static final Symbol STAR_TIMESTAMP = Symbol.create("*timestamp*");
 	public static final Symbol STAR_OFFER = Symbol.create("*offer*");
 	public static final Symbol STAR_STATE = Symbol.create("*state*");

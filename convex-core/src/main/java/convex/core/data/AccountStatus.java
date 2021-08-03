@@ -178,32 +178,6 @@ public class AccountStatus extends ARecord {
 		return publicKey==null;
 	}
 
-	/**
-	 * Gets the exported function for a given symbol in an Account
-	 * 
-	 * Returns null if not found. This might occur because:
-	 * 
-	 * <ul>
-	 * <li>The Account does not have the specified exported symbol.<li>
-	 * <li>The exported symbol does not refer to a function</li>
-	 * </ul>
-	 * 
-	 * @param <R> Result type
-	 * @param sym Symbol to look up
-	 * @return The function specified in Actor, or null if not
-	 *         found/exported.
-	 */
-	public <R extends ACell> AFn<R> getExportedFunction(Symbol sym) {
-		ASet<Symbol> exports = getExports();
-		if (exports==null) return null;
-		if (!exports.contains(sym)) return null;
-
-		// get function from environment. Anything not a function results in null
-		ACell maybeFn = environment.get(sym);
-		
-		AFn<R> fn = RT.castFunction(maybeFn);
-		return fn;
-	}
 
 
 	/**
@@ -373,27 +347,6 @@ public class AccountStatus extends ARecord {
 	public AccountStatus withController(Address newController) {
 		if (controller==newController) return this;
 		return new AccountStatus(sequence, balance, memory, environment,metadata,holdings,newController,publicKey);
-	}
-
-	/**
-	 * Gets *exports* from account
-	 * 
-	 * Returns null if the account has no *exports*. This might be for any of the following reasons:
-	 * <ul>
-	 * <li>The account does not define the *exports* symbol</li>
-	 * </ul>
-	 * @return Set of exported accounts
-	 */
-	@SuppressWarnings("unchecked")
-	public ASet<Symbol> getExports() {
-		// get *exports* from environment, bail out if doesn't exist
-		ACell exports = getEnvironment().get(Symbols.STAR_EXPORTS);
-		if (exports == null) return null;
-
-		if (!(exports instanceof ASet)) return null;
-
-		ASet<Symbol> result = (ASet<Symbol>) exports;
-		return result;
 	}
 
 	@Override

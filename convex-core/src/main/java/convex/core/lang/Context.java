@@ -26,6 +26,7 @@ import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.exceptions.TODOException;
@@ -1652,8 +1653,21 @@ public class Context<T extends ACell> extends AObject {
 			return this.withError(ErrorCodes.ARGUMENT, "Cannot make negative offer in Actor call: "+offer);
 		}
 
-		AFn<R> fn=as.getExportedFunction(sym);
-		if (fn==null) return this.withError(ErrorCodes.STATE,"Account "+target+" does not have exported function: "+sym+" , *exports*="+as.getEnvironmentValue(Symbols.STAR_EXPORTS));
+		ACell value = as.getEnvironmentValue(sym);
+
+		if (value == null) {
+			return this.withError(ErrorCodes.STATE, "No value defined in account " + target + " for symbol: " + sym);
+		}
+
+		AFn<R> fn = RT.castFunction(value);
+
+		if (fn == null) {
+			return this.withError(ErrorCodes.STATE, "Value defined in account " + target + " is not a function: " + sym);
+		}
+
+		if (as.getMetadata().get(sym).get(Keywords.CALLABLE_Q) != CVMBool.TRUE) {
+			return this.withError(ErrorCodes.STATE, "Function for account " + target + " is not callable: " + sym);
+		}
 
 		// Ensure we create a forked Context for the Actor call
 		final Context<R> exContext=forkActorCall(state, target, offer);
