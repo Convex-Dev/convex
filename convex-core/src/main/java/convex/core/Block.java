@@ -35,7 +35,7 @@ import convex.core.util.Utils;
  * than any established style or system." - Bruce Lee
  *
  */
-public class Block extends ARecord {
+public final class Block extends ARecord {
 	private final long timestamp;
 	private final AVector<SignedData<ATransaction>> transactions;
 	private final AccountKey peerKey;
@@ -140,7 +140,7 @@ public class Block extends ARecord {
 	}
 
 	/**
-	 * Gets the length of this block.
+	 * Gets the length of this block in number of transactions
 	 * 
 	 * @return Number of transactions on this block
 	 */
@@ -215,11 +215,8 @@ public class Block extends ARecord {
 	
 	@Override 
 	public boolean equals(AMap<Keyword,ACell> a) {
-		if (this == a) return true; // important optimisation for e.g. hashmap equality
-		if (a == null) return false;
-		if (a.getTag()!=getTag()) return false;
-		Block as=(Block)a;
-		return equals(as);
+		if (!(a instanceof Block)) return false;
+		return equals((Block)a);
 	}
 	
 	/**
