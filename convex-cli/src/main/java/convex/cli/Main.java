@@ -288,8 +288,8 @@ public class Main implements Runnable {
 			log.debug("peer public key {}", peerKey.toHexString());
 			AKeyPair keyPair = loadKeyFromStore(peerKey.toHexString(), 0);
 			log.debug("peer key pair {}", keyPair.getAccountKey().toHexString());
-			Address address = Address.create(Init.GENESIS_ADDRESS.longValue() + peerIndex);
-			log.debug("peer address {}", address.longValue());
+			Address address = Init.getGenesisPeerAddress(peerIndex);
+			log.debug("peer address {}", address);
 			InetSocketAddress host = item.getHostAddress();
 			log.debug("connect to peer {}", host);
 			convex = Convex.connect(host, address, keyPair);

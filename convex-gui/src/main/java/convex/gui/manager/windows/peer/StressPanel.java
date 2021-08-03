@@ -127,7 +127,7 @@ public class StressPanel extends JPanel {
 	private synchronized void runStressTest() {
 		errors = 0;
 		values = 0;
-		Address address=PeerGUI.getUserAddress(0);
+		Address address=PeerGUI.getGenesisAddress();
 
 		int transCount = (Integer) transactionCountSpinner.getValue();
 		int opCount = (Integer) opCountSpinner.getValue();

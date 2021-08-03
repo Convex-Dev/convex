@@ -295,7 +295,7 @@ public class Peer {
 	 * @return Context after executing query
 	 */
 	public <T extends ACell> Context<T> executeQuery(ACell form) {
-		return executeQuery(form,Init.GENESIS_ADDRESS);
+		return executeQuery(form,Init.getGenesisAddress());
 	}
 
 	/**
