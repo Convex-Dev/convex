@@ -88,11 +88,11 @@ public class PeerManager implements IServerEvent {
         return new PeerManager(sessionFilename, keyPair, address, store);
 	}
 
-	public void launchLocalPeers(List<AKeyPair> keyPairList) {
+	public void launchLocalPeers(List<AKeyPair> keyPairList, int peerPorts[]) {
 		List<AccountKey> keyList=keyPairList.stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
 
 		State genesisState=Init.createState(keyList);
-		peerServerList = API.launchLocalPeers(keyPairList,genesisState, this);
+		peerServerList = API.launchLocalPeers(keyPairList,genesisState, peerPorts, this);
 	}
 
 	public List<Hash> getNetworkHashList(String remotePeerHostname) {
