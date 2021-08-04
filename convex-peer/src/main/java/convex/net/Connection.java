@@ -706,6 +706,11 @@ public class Connection {
 		}
 	}
 
+	/**
+	 * Sends bytes buffered in this channel.
+	 * @return True if there are remaining bytes to send, false otherwise
+	 * @throws IOException If an IO Exception occurs
+	 */
 	public boolean sendBytes() throws IOException {
 		return sender.maybeSendBytes();
 	}

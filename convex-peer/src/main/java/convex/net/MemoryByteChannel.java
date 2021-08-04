@@ -1,4 +1,4 @@
-package convex.core.util;
+package convex.net;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -11,6 +11,10 @@ import java.nio.channels.ClosedChannelException;
  *
  */
 public class MemoryByteChannel implements ByteChannel {
+	/**
+	 * ByteBuffer for channel contents. 
+	 * Maintained ready for writing
+	 */
 	private final ByteBuffer memory;
 	boolean open=true;
 	
@@ -19,18 +23,19 @@ public class MemoryByteChannel implements ByteChannel {
 	}
 	
 	public static MemoryByteChannel create(int length) {
-		return new MemoryByteChannel(ByteBuffer.allocate(length));
+		ByteBuffer bb=ByteBuffer.allocate(length);
+		return new MemoryByteChannel(bb);
 	}
 	
 	@Override
-	public int read(ByteBuffer dst) throws IOException {
+	public int read(ByteBuffer dst) throws ClosedChannelException  {
 		if (!open) throw new ClosedChannelException();
-		memory.flip();
-		int savledLimit=memory.limit();
-		memory.limit(dst.remaining());
+		memory.flip(); // position will be 0, limit is available bytes
+		int available=memory.remaining();
+		int numRead=Math.min(available, dst.remaining());
+		memory.limit(numRead);
 		dst.put(memory);
-		int numRead=memory.position(); // number of bytes read into dst
-		memory.limit(savledLimit);
+		memory.limit(available);
 		memory.compact();
 		return numRead;
 	}

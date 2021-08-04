@@ -13,11 +13,11 @@ import convex.core.data.ACell;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.store.Stores;
-import convex.core.util.MemoryByteChannel;
 import convex.net.Message;
 import convex.net.MessageReceiver;
 import convex.net.MessageType;
 import convex.net.Connection;
+import convex.net.MemoryByteChannel;
 
 public class MessageReceiverTest {
 
