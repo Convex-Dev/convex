@@ -170,8 +170,6 @@ public class Symbols {
 
 	public static final Symbol STAR_LANG = Symbol.create("*lang*");
 
-	public static final Symbol STAR_ALIASES = Symbol.create("*aliases*");
-
 	public static final Symbol STAR_INITIAL_EXPANDER = Symbol.create("*initial-expander*");
 
 	public static final Symbol HERO = Symbol.create("hero");
@@ -292,12 +290,6 @@ public class Symbols {
 	public static final Symbol CNS_RESOLVE = Symbol.create("cns-resolve");
 
 	public static final Symbol NAN_Q = Symbol.create("nan?");
-
-
-
-
-
-
 
 
 

@@ -1356,14 +1356,6 @@
      :special-symbol true
   }
 
-  *aliases*
-  {
-     :doc {:description "Returns the map of aliases in the current enviornment. Aliases enable symbols with namespaces e.g. 'library/foo' enables lookup of the symbol 'foo' via the 'library' alias."
-           :examples [{:code "*aliases*"}]
-           :type :special}
-     :special-symbol true
-  }
-
   *memory*
   {
      :doc {:description "Gets the current Memory Allowance for this Account. May be zero - in which case any new memory allocations will be charged at the current memory exchange pool price."
