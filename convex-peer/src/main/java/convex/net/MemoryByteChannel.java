@@ -30,14 +30,16 @@ public class MemoryByteChannel implements ByteChannel {
 	@Override
 	public int read(ByteBuffer dst) throws ClosedChannelException  {
 		if (!open) throw new ClosedChannelException();
-		memory.flip(); // position will be 0, limit is available bytes
-		int available=memory.remaining();
-		int numRead=Math.min(available, dst.remaining());
-		memory.limit(numRead);
-		dst.put(memory);
-		memory.limit(available);
-		memory.compact();
-		return numRead;
+		synchronized (memory) {
+			memory.flip(); // position will be 0, limit is available bytes
+			int available=memory.remaining();
+			int numRead=Math.min(available, dst.remaining());
+			memory.limit(numRead);
+			dst.put(memory);
+			memory.limit(available);
+			memory.compact();
+			return numRead;
+		}
 	}
 
 	@Override
@@ -53,10 +55,16 @@ public class MemoryByteChannel implements ByteChannel {
 	@Override
 	public int write(ByteBuffer src) throws IOException {
 		if (!open) throw new ClosedChannelException();
-		int pos=memory.position();
-		memory.put(src);
-		int numPut=memory.position()-pos;
-		return numPut;
+		synchronized(memory) {
+			synchronized(src) {
+				int numPut=Math.min(memory.remaining(), src.remaining());
+				int savedLimit=src.limit();
+				src.limit(src.position()+numPut);
+				memory.put(src);
+				src.limit(savedLimit);
+				return numPut;
+			}
+		}
 	}
 
 }

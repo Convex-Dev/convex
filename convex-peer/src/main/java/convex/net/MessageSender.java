@@ -18,7 +18,7 @@ public class MessageSender {
 	 * Buffer for send bytes. Retained in a state ready for reading, so we flip on
 	 * initialisation. Must be accessed holding lock on buffer.
 	 */
-	private final ByteBuffer buffer = ByteBuffer.allocateDirect(SEND_BUFFER_SIZE).flip();
+	private final ByteBuffer buffer = ByteBuffer.allocate(SEND_BUFFER_SIZE).flip();
 
 	protected static final Logger log = LoggerFactory.getLogger(MessageSender.class.getName());
 
