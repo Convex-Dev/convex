@@ -51,7 +51,7 @@ public class ConnectionTest {
 			}
 		}
 			
-		Thread.sleep(1000);
+		Thread.sleep(2000);
 		assertEquals(10000,received.size());
 		
 		receiveThread.interrupt();

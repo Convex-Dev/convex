@@ -611,7 +611,8 @@ public class Connection {
 						try {
 							if (key.isReadable()) {
 								selectRead(key);
-							} else if (key.isWritable()) {
+							} 
+							if (key.isWritable()) {
 								selectWrite(key);
 							}
 						} catch (ClosedChannelException e) {
@@ -707,7 +708,7 @@ public class Connection {
 	}
 
 	/**
-	 * Sends bytes buffered in this channel.
+	 * Sends bytes buffered in the underlying channel.
 	 * @return True if there are remaining bytes to send, false otherwise
 	 * @throws IOException If an IO Exception occurs
 	 */
