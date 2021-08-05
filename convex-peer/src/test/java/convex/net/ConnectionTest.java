@@ -51,6 +51,7 @@ public class ConnectionTest {
 			}
 		}
 			
+		// read everything still left in the channel before continuing
 		int rec=-1;
 		while (rec!=0) {
 			rec=mr.receiveFromChannel(chan);
