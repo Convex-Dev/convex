@@ -97,7 +97,7 @@ public class ServerTest {
 			SERVER=server;
 			try {
 				Thread.sleep(1000);
-				CONVEX=Convex.connect(SERVER.getHostAddress(), SERVER.getPeerController(), FIRST_PEER_KEYPAIR);
+				CONVEX=Convex.connect(SERVER.getHostAddress(), HERO, HERO_KEYPAIR);
 			} catch (Throwable t) {
 				throw Utils.sneakyThrow(t);
 			}

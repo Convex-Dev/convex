@@ -54,6 +54,21 @@ public class PeersListPanel extends JPanel {
 			addPeer(peer);
 		}
 	}
+	
+	// TODO
+	public void launchPeer(PeerGUI manager) {
+		
+		AKeyPair kp=AKeyPair.generate();
+		HashMap<Keyword, Object> config=new HashMap<>();
+		config.put(Keywords.KEYPAIR, kp);
+		config.put(Keywords.STATE, PeerGUI.genesisState);
+		Server server=API.launchPeer(config);
+		// server.
+		
+		PeerView peer = new PeerView();
+		peer.peerServer = server;
+		addPeer(peer);
+	}
 
 	public static PeerView getFirst() {
 		return peerList.elementAt(0);
@@ -90,7 +105,7 @@ public class PeersListPanel extends JPanel {
 
 		JButton btnLaunch = new JButton("Launch!");
 		toolBar.add(btnLaunch);
-		// btnLaunch.addActionListener(e -> launchPeer(manager));
+		btnLaunch.addActionListener(e -> launchPeer(manager));
 
 		JButton btnConnect = new JButton("Connect...");
 		toolBar.add(btnConnect);
