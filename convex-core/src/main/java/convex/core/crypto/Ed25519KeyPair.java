@@ -149,7 +149,7 @@ public class Ed25519KeyPair extends AKeyPair {
 		Ed25519PublicKeyParameters publicKeyParam = privateKeyParam.generatePublicKey();
 		PublicKey generatedPublicKey = publicKeyFromBytes(publicKeyParam.getEncoded());
 		PrivateKey generatedPrivateKey = privateFromBytes(privateKeyParam.getEncoded());
-		return create(generatedPublicKey, generatedPrivateKey);
+		return create(generatedPublicKey, privateKey);
 	}
 
 	/**
@@ -320,21 +320,9 @@ public class Ed25519KeyPair extends AKeyPair {
 	boolean equals(Ed25519KeyPair other) {
 		if (this.keyPair == null || other.keyPair == null) return false;
 		if (!this.keyPair.getPublic().equals(other.keyPair.getPublic())) return false;
-		// private keys are stored in byte format differently depending on the source of this keypair
-		// so we need to convert the to a standard 32 byte private key and then compare
-		// WARNING: This only works if using java > 15 (not for v11)
-		try {
-			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
-			Key keyThis = keyFactory.translateKey(this.keyPair.getPrivate());
-			Key keyOther = keyFactory.translateKey(other.keyPair.getPrivate());
-			return keyThis.equals(keyOther);
-		} catch ( NoSuchAlgorithmException | InvalidKeyException  e ) {
-			// throw new Error(e);
-			// do nothing just return false
-			// System.out.println(e);
-		}
-		return false;
+		Blob thisKey = this.getEncodedPrivateKey();
+		Blob otherKey = other.getEncodedPrivateKey();
+		return thisKey.equals(otherKey);
 	}
-
 
 }
