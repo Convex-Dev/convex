@@ -51,7 +51,11 @@ public class ConnectionTest {
 			}
 		}
 			
-		Thread.sleep(2000);
+		int rec=-1;
+		while (rec!=0) {
+			rec=mr.receiveFromChannel(chan);
+		}
+		
 		assertEquals(10000,received.size());
 		
 		receiveThread.interrupt();
