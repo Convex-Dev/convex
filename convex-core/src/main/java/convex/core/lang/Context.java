@@ -637,8 +637,6 @@ public class Context<T extends ACell> extends AObject {
 	/**
 	 * Looks up an environment entry for a specific address without consuming juice.
 	 *
-	 * If the symbol is qualified, try lookup via *aliases*
-	 *
 	 * @param address Address of Account in which to look up entry
 	 * @param sym Symbol to look up
 	 * @return Environment entry
