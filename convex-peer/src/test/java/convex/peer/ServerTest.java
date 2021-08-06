@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
 import convex.core.Belief;
+import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
@@ -37,8 +38,11 @@ import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.data.Maps;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.Init;
+import convex.core.transactions.*;
+import convex.core.lang.Reader;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.core.store.AStore;
@@ -218,45 +222,45 @@ public class ServerTest {
 		return x;
 	}
 
-//	@Test
-//	public void testServerTransactions() throws IOException, InterruptedException, TimeoutException {
-//		synchronized(ServerTest.SERVER) {
-//			InetSocketAddress hostAddress=SERVER.getHostAddress();
-//
-//			// Connect to Peer Server using the current store for the client
-//			Connection pc = Connection.connect(hostAddress, handler, Stores.current());
-//			long s=SERVER.getPeer().getConsensusState().getAccount(InitTest.HERO).getSequence();
-//			Address addr=InitTest.HERO;
-//			AKeyPair kp=InitTest.HERO_KEYPAIR;
-//			long id1 = checkSent(pc,kp.signData(Invoke.create(addr, s+1, Reader.read("[1 2 3]"))));
-//			long id2 = checkSent(pc,kp.signData(Invoke.create(addr, s+2, Reader.read("(return 2)"))));
-//			long id2a = checkSent(pc,kp.signData(Invoke.create(addr, s+2, Reader.read("22"))));
-//			long id3 = checkSent(pc,kp.signData(Invoke.create(addr, s+3, Reader.read("(do (def foo :bar) (rollback 3))"))));
-//			long id4 = checkSent(pc,kp.signData(Transfer.create(addr, s+4, InitTest.HERO, 1000)));
-//			long id5 = checkSent(pc,kp.signData(Call.create(addr, s+5, Init.REGISTRY_ADDRESS, Symbols.FOO, Vectors.of(Maps.empty()))));
-//			long id6bad = checkSent(pc,kp.signData(Invoke.create(InitTest.VILLAIN, s+6, Reader.read("(def a 1)"))));
-//			long id6 = checkSent(pc,kp.signData(Invoke.create(addr, s+6, Reader.read("foo"))));
-//
-//			long last=id6;
-//
-//			assertTrue(last>=0);
-//			assertTrue(!pc.isClosed());
-//
-//			// wait for results to come back
-//			assertFalse(Utils.timeout(10000, () -> results.containsKey(last)));
-//			Thread.sleep(100); // bit more time in case something out of order?
-//
-//			AVector<CVMLong> v = Vectors.of(1l, 2l, 3l);
-//			assertCVMEquals(v, results.get(id1));
-//			assertCVMEquals(2L, results.get(id2));
-//			assertEquals(ErrorCodes.SEQUENCE, results.get(id2a));
-//			assertCVMEquals(3L, results.get(id3));
-//			assertCVMEquals(1000L, results.get(id4));
-//			assertTrue( results.containsKey(id5));
-//			assertEquals(ErrorCodes.SIGNATURE, results.get(id6bad));
-//			assertEquals(ErrorCodes.UNDECLARED, results.get(id6));
-//		}
-//	}
+	@Test
+	public void testServerTransactions() throws IOException, InterruptedException, TimeoutException {
+		synchronized(ServerTest.SERVER) {
+			InetSocketAddress hostAddress=SERVER.getHostAddress();
+
+			// Connect to Peer Server using the current store for the client
+			Connection pc = Connection.connect(hostAddress, handler, Stores.current());
+			Address addr=SERVER.getPeerController();
+			long s=SERVER.getPeer().getConsensusState().getAccount(addr).getSequence();
+			AKeyPair kp=SERVER.getKeyPair();
+			long id1 = checkSent(pc,kp.signData(Invoke.create(addr, s+1, Reader.read("[1 2 3]"))));
+			long id2 = checkSent(pc,kp.signData(Invoke.create(addr, s+2, Reader.read("(return 2)"))));
+			long id2a = checkSent(pc,kp.signData(Invoke.create(addr, s+2, Reader.read("22"))));
+			long id3 = checkSent(pc,kp.signData(Invoke.create(addr, s+3, Reader.read("(do (def foo :bar) (rollback 3))"))));
+			long id4 = checkSent(pc,kp.signData(Transfer.create(addr, s+4, addr, 1000)));
+			long id5 = checkSent(pc,kp.signData(Call.create(addr, s+5, Init.REGISTRY_ADDRESS, Symbols.FOO, Vectors.of(Maps.empty()))));
+			long id6bad = checkSent(pc,kp.signData(Invoke.create(addr.offset(2), s+6, Reader.read("(def a 1)"))));
+			long id6 = checkSent(pc,kp.signData(Invoke.create(addr, s+6, Reader.read("foo"))));
+
+			long last=id6;
+
+			assertTrue(last>=0);
+			assertTrue(!pc.isClosed());
+
+			// wait for results to come back
+			assertFalse(Utils.timeout(10000, () -> results.containsKey(last)));
+			Thread.sleep(100); // bit more time in case something out of order?
+
+			AVector<CVMLong> v = Vectors.of(1l, 2l, 3l);
+			assertEquals(v, results.get(id1));
+			assertEquals(RT.cvm(2L), results.get(id2));
+			assertEquals(ErrorCodes.SEQUENCE, results.get(id2a));
+			assertEquals(RT.cvm(3L), results.get(id3));
+			assertEquals(RT.cvm(1000L), results.get(id4));
+			assertTrue( results.containsKey(id5));
+			assertEquals(ErrorCodes.SIGNATURE, results.get(id6bad));
+			assertEquals(ErrorCodes.UNDECLARED, results.get(id6));
+		}
+	}
 
 
 
