@@ -44,14 +44,28 @@ public class ConnectionTest {
 		});
 		receiveThread.start();
 		
-		for (int i=0; i<10000; i++) {
+		int NUM=10000;
+		int sentCount = 0;
+		int resendCount = 0;
+		
+		for (int i=0; i<NUM; i++) {
 			boolean sent=false;
 			CVMLong value=CVMLong.create(i);
 			while(!sent) {
 				sent=conn.sendData(value);
-				conn.sendBytes();
+				if (sent) {
+					sentCount++;
+				} else {
+					resendCount++;
+				}
+				
+				boolean flushed=false;
+				while (!flushed) {
+					flushed=!conn.sendBytes();
+				}
 			}
 		}
+		assertEquals(NUM,sentCount);
 			
 		// read everything still left in the channel before continuing
 		int rec=-1;
@@ -59,7 +73,11 @@ public class ConnectionTest {
 			rec=mr.receiveFromChannel(chan);
 		}
 		
-		assertEquals(10000,received.size());
+		if (received.size()<NUM) {
+			System.out.println("Missing messages? Had to resend: "+resendCount);
+		}
+		
+		assertEquals(NUM,received.size());
 		
 		receiveThread.interrupt();
 		receiveThread.join();
