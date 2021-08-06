@@ -21,7 +21,9 @@ public class ConnectionTest {
 		// create a custom PeerConnection and MessageReceiver for testing
 		// null Queue OK, we aren't queueing with our custom receive action
 		MessageReceiver mr = new MessageReceiver(a -> {
-			received.add(a);
+			synchronized (received) {
+				received.add(a);
+			}
 		}, null);
 		
 		MemoryByteChannel chan = MemoryByteChannel.create(100);
