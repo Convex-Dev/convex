@@ -38,7 +38,7 @@ public class MessageReceiverTest {
 
 		// need to call sendBytes to flush send buffer to channel
 		// since we aren't using a Selector / SocketChannel here
-		assertFalse(pc.sendBytes());
+		assertTrue(pc.sendBytes());
 
 		// receive first message
 		mr.receiveFromChannel(chan);

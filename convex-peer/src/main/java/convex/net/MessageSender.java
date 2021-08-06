@@ -9,6 +9,11 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
 
+/**
+ * Message sender responsible for moving bytes from a ByteBuffer to a ByteChannel
+ * 
+ * Must call maybeSendBytes to attempt to flush buffer to channel.
+ */
 public class MessageSender {
 	public static final int SEND_BUFFER_SIZE = Constants.SEND_BUFFER_SIZE;
 
@@ -35,12 +40,15 @@ public class MessageSender {
 	 */
 	public boolean bufferMessage(ByteBuffer src) {
 		synchronized (buffer) {
+			// compact buffer, ready for writing			
 			buffer.compact();
+			
 			// return false if insufficient space to send
 			if (buffer.remaining() < src.remaining()) {
 				return false;
 			}
 			buffer.put(src);
+			// flip so ready for reading once again
 			buffer.flip();
 		}
 		return true;
@@ -49,21 +57,21 @@ public class MessageSender {
 	/**
 	 * Try to send bytes on the outbound channel.
 	 * 
-	 * @return True if there are more bytes to send, false otherwise.
+	 * @return True if all bytes have been sent, false otherwise.
 	 * @throws IOException If IO error occurs
 	 */
 	public boolean maybeSendBytes() throws IOException {
 		synchronized (buffer) {
-			if (!buffer.hasRemaining()) return false;
+			if (!buffer.hasRemaining()) return true;
 
 			// write to channel if possible. May write zero or more bytes
 			channel.write(buffer);
 
 			if (buffer.hasRemaining()) {
 				log.debug("Send buffer full!");
-				return true;
-			} else {
 				return false;
+			} else {
+				return true;
 			}
 		}
 	}

@@ -517,7 +517,7 @@ public class Connection {
 						+ System.identityHashCode(this));
 			}
 		} else {
-			log.info("Failed to send message {} of length: {} Connection ID: {}"
+			log.info("sendBuffer failed with message {} of length: {} Connection ID: {}"
 						, type, dataLength, System.identityHashCode(this));
 		}
 		return sent;
@@ -692,13 +692,13 @@ public class Connection {
 	public static void selectWrite(SelectionKey key) {
 		try {
 			Connection pc = (Connection) key.attachment();
-			boolean moreBytes = pc.sender.maybeSendBytes();
+			boolean allSent = pc.sender.maybeSendBytes();
 
-			if (moreBytes) {
-				// we want to continue writing
-			} else {
+			if (allSent) {
 				// deregister interest in writing
 				key.interestOps(key.interestOps() & ~SelectionKey.OP_WRITE);
+			} else {
+				// we want to continue writing
 			}
 		} catch (IOException e) {
 			// TODO: figure out cases here. Probably channel closed?
@@ -709,7 +709,7 @@ public class Connection {
 
 	/**
 	 * Sends bytes buffered in the underlying channel.
-	 * @return True if there are remaining bytes to send, false otherwise
+	 * @return True if all bytes are sent, false otherwise
 	 * @throws IOException If an IO Exception occurs
 	 */
 	public boolean sendBytes() throws IOException {
