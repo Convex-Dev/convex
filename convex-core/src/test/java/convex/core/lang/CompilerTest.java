@@ -329,6 +329,13 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(2L,evalL("(eval '(if true ~(if true 2 3)))"));
 	}
 
+	@Test
+	public void testQuotedMetadata() {
+		// From issue #267
+		assertEquals(eval("'(defn foo ^{:a :b} [])"),eval("`(defn foo ^{:a :b} [])"));
+		assertEquals(eval("'(defn foo ^{:a :b} [a])"),eval("`(defn foo ^{:a :b} [a])"));
+	}
+
 
 	@Test
 	public void testLet() {
