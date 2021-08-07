@@ -28,6 +28,7 @@ import convex.core.Coin;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Strings;
 import convex.core.lang.Reader;
@@ -146,11 +147,24 @@ public class StressPanel extends JPanel {
 					ArrayList<CompletableFuture<Result>> frs=new ArrayList<>();
 					Convex pc = Convex.connect(sa, address,PeerGUI.getUserKeyPair(0));
 					
+					ArrayList<AKeyPair> kps=new ArrayList<>(clientCount);
+					for (int i=0; i<clientCount; i++) {
+						kps.add(AKeyPair.generate());
+					}
+					
+					StringBuilder cmdsb=new StringBuilder();
+					cmdsb.append("[");
+					for (int i=0; i<clientCount; i++) {
+						cmdsb.append("(let [a (create-account "+kps.get(i).getAccountKey()+")] (transfer a 1000000000) a)");
+					}
+					cmdsb.append("]");
+					
+					AVector<Address> v=pc.transactSync(Invoke.create(address, -1, cmdsb.toString())).getValue();
+
 					ArrayList<Convex> ccs=new ArrayList<>(clientCount);
 					for (int i=0; i<clientCount; i++) {
-						AKeyPair kp=AKeyPair.generate();
-						Address clientAddr = pc.createAccountSync(kp.getAccountKey());
-						pc.transfer(clientAddr, Coin.DIAMOND);
+						AKeyPair kp=kps.get(i);
+						Address clientAddr = v.get(i);
 						Convex cc=Convex.connect(sa,clientAddr,kp);
 						ccs.add(cc);
 					}
@@ -171,7 +185,7 @@ public class StressPanel extends JPanel {
 								
 								ATransaction t = Invoke.create(cc.getAddress(),-1, Reader.read(source));
 								CompletableFuture<Result> fr;
-									fr = cc.transact(t);
+								fr = cc.transact(t);
 								frs.add(fr);
 							}
 						} catch (IOException e) {
@@ -213,7 +227,7 @@ public class StressPanel extends JPanel {
 					sb.append("Consensus time: "
 							+ formatter.format((endState.getTimeStamp().longValue() - startTime) * 0.001) + "s\n");
 
-				} catch (IOException e) {
+				} catch (Exception e) {
 					e.printStackTrace();
 				} finally {
 					btnRun.setEnabled(true);
