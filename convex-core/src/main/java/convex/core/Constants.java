@@ -149,6 +149,12 @@ public class Constants {
 
 
 	/**
+	 * Size of default server socket receive buffer
+	 */
+	public static final int SOCKET_SERVER_BUFFER_SIZE = 16*65536;
+
+
+	/**
 	 * Size of default socket receive buffer
 	 */
 	public static final int SOCKET_RECEIVE_BUFFER_SIZE = 65536;
