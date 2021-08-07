@@ -93,7 +93,7 @@ public class Ed25519Signature extends ASignature {
 	
 	@Override
 	public boolean verify(ABlob message, AccountKey address) {
-	    boolean verified = Providers.SODIUM_SIGN.cryptoSignVerifyDetached(signatureBytes, message.getBytes(), 32, address.getBytes());
+	    boolean verified = Providers.SODIUM_SIGN.cryptoSignVerifyDetached(signatureBytes, message.getBytes(), (int)message.count(), address.getBytes());
 	    return verified;
 	}
 	
