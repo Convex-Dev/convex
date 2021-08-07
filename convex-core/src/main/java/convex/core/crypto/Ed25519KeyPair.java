@@ -147,7 +147,7 @@ public class Ed25519KeyPair extends AKeyPair {
 		Ed25519PrivateKeyParameters privateKeyParam = new Ed25519PrivateKeyParameters(privateKey.getEncoded(), 16);
 		Ed25519PublicKeyParameters publicKeyParam = privateKeyParam.generatePublicKey();
 		PublicKey generatedPublicKey = publicKeyFromBytes(publicKeyParam.getEncoded());
-		PrivateKey generatedPrivateKey = privateFromBytes(privateKeyParam.getEncoded());
+		// PrivateKey generatedPrivateKey = privateFromBytes(privateKeyParam.getEncoded());
 		return create(generatedPublicKey, privateKey);
 	}
 
@@ -208,7 +208,7 @@ public class Ed25519KeyPair extends AKeyPair {
 		return getAccountKey().getBytes();
 	}
 
-	static PrivateKey privateKeyFromBlob(Blob encodedKey) {
+	private static PrivateKey privateKeyFromBlob(Blob encodedKey) {
 		try {
 			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
 			PKCS8EncodedKeySpec pkcs8KeySpec = new PKCS8EncodedKeySpec(encodedKey.getBytes());

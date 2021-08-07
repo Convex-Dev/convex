@@ -2,17 +2,12 @@ package convex.core.crypto;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.security.InvalidKeyException;
-import java.security.Key;
-import java.security.KeyFactory;
-import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.SecureRandom;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.AString;
-import convex.core.data.Blob;
 import convex.core.data.Strings;
 import convex.core.util.Utils;
 
@@ -51,11 +46,11 @@ public class PEMToolsTest {
 		ASignature rightSignature = importKeyPair.sign(data.getHash());
 		assertTrue(leftSignature.equals(rightSignature));
 
-        Blob key1 = keyPair.getEncodedPrivateKey();
-		Blob key2 = importKeyPair.getEncodedPrivateKey();
-		
+ 		
 		// TODO: fix equality testing
-		//assertTrue(key1.equals(key2));
-		//assertTrue(keyPair.equals(importKeyPair));
+	    // Blob key1 = keyPair.getEncodedPrivateKey();
+		// Blob key2 = importKeyPair.getEncodedPrivateKey();
+		//assertEquals(key1,key2);
+		//(keyPair,importKeyPair);
 	}
 }
