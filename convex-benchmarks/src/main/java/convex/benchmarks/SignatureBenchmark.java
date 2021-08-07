@@ -13,6 +13,8 @@ import convex.core.data.SignedData;
 public class SignatureBenchmark {
 
 	private static final AKeyPair KEYPAIR=AKeyPair.generate();
+	private static final SignedData<ABlob> SIGNED=KEYPAIR.signData(Blobs.fromHex("cafebabe"));
+	private static final ASignature SIGNATURE=SIGNED.getSignature();
 
 	@Benchmark
 	public void signData() {
@@ -28,6 +30,13 @@ public class SignatureBenchmark {
 
 		sig.verify(b.getHash(), KEYPAIR.getAccountKey());
 	}
+	
+	@Benchmark
+	public void verify() {
+		ASignature sig=SIGNATURE;
+		sig.verify(SIGNED.getValue().getHash(), KEYPAIR.getAccountKey());
+	}
+
 
 	public static void main(String[] args) throws Exception {
 		Options opt = Benchmarks.createOptions(SignatureBenchmark.class);
