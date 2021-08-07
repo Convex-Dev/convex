@@ -308,7 +308,7 @@
 
   dec
 	{
-	 :doc {:description "Decrements the given number by 1. Result is a Long."
+	 :doc {:description "Decrements the given long by 1. Result is a Long."
          :examples [{:code "(dec 10)"}]
          :type :function
          :signature [{:params [num]
@@ -581,7 +581,7 @@
 
   inc
 	{
-	 :doc {:description "Increments the given number by 1. Converts to Long if necessary."
+	 :doc {:description "Increments the given long by 1. Converts to Long if necessary."
          :examples [{:code "(inc 10)"}]
          :type :function
          :signature [{:params [num]
@@ -1391,7 +1391,7 @@
 
   *holdings*
    {
-     :doc {:description "Returns the holdings map for this Account. Holdings are data values controlled by other Accounts (usually Actors, e.g. Token contracts). They can be used to indicate that an Account may have special rights or holdings with respect to a specific Actor, although this interpretation is Actor-specific."
+     :doc {:description "Returns the holdings blob map for this Account. Holdings are data values controlled by other Accounts (usually Actors, e.g. Token contracts). They can be used to indicate that an Account may have special rights or holdings with respect to a specific Actor, although this interpretation is Actor-specific."
            :examples [{:code "*holdings*"}]
            :type :special}
      :special-symbol true
