@@ -131,7 +131,7 @@ public class Connection {
 			throws IOException, TimeoutException {
 		return connect(hostAddress, receiveAction, store, null);
 	}
-
+	
 	/**
 	 * Create a Connection by connecting to a remote address
 	 *
@@ -147,13 +147,34 @@ public class Connection {
 	 *                          timeout period
 	 */
 	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store,
-			AccountKey trustedPeerKey) throws IOException, TimeoutException {
+			AccountKey trustedPeerKey) throws IOException, TimeoutException {	
+		return connect(hostAddress,receiveAction,store,trustedPeerKey,Constants.SOCKET_SEND_BUFFER_SIZE,Constants.SOCKET_RECEIVE_BUFFER_SIZE);
+	}
+
+	/**
+	 * Create a Connection by connecting to a remote address
+	 *
+	 * @param hostAddress    Internet Address to connect to
+	 * @param receiveAction  A callback Consumer to be called for any received
+	 *                       messages on this connection
+	 * @param store          Store to use for this Connection
+	 * @param trustedPeerKey Trusted peer account key if this is a trusted
+	 *                       connection, if not then null
+	 * @param sendBufferSize Size of connection send buffer in bytes
+	 * @param receiveBufferSize Size of connection receive buffer in bytes
+	 * @return New Connection instance
+	 * @throws IOException      If connection fails because of any IO problem
+	 * @throws TimeoutException If the connection cannot be established within the
+	 *                          timeout period
+	 */
+	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store,
+			AccountKey trustedPeerKey, int sendBufferSize, int receiveBufferSize) throws IOException, TimeoutException {
 		if (store == null)
 			throw new Error("Connection requires a store");
 		SocketChannel clientChannel = SocketChannel.open();
 		clientChannel.configureBlocking(false);
-		clientChannel.socket().setReceiveBufferSize(Constants.SOCKET_RECEIVE_BUFFER_SIZE);
-		clientChannel.socket().setSendBufferSize(Constants.SOCKET_SEND_BUFFER_SIZE);
+		clientChannel.socket().setReceiveBufferSize(receiveBufferSize);
+		clientChannel.socket().setSendBufferSize(sendBufferSize);
 
 		clientChannel.connect(hostAddress);	
 
