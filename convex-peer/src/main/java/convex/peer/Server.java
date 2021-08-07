@@ -488,9 +488,7 @@ public class Server implements Closeable {
 		if (!hasNewMessages) {
 			synchronized (updateThread) {
 				hasNewMessages=true;
-				if (!hasNewMessages) {
-					updateThread.notify();
-				}
+				updateThread.notify();
 			}
 		}	
 	}

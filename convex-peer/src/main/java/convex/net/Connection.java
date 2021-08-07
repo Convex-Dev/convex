@@ -175,16 +175,20 @@ public class Connection {
 		clientChannel.configureBlocking(false);
 		clientChannel.socket().setReceiveBufferSize(receiveBufferSize);
 		clientChannel.socket().setSendBufferSize(sendBufferSize);
+		
+		// TODO: reconsider this
+		clientChannel.socket().setTcpNoDelay(true);
 
 		clientChannel.connect(hostAddress);	
 
 		long start = Utils.getCurrentTimestamp();
 		while (!clientChannel.finishConnect()) {
 			long now = Utils.getCurrentTimestamp();
-			if (now > start + Constants.DEFAULT_CLIENT_TIMEOUT)
+			long elapsed=now-start;
+			if (elapsed > Constants.DEFAULT_CLIENT_TIMEOUT)
 				throw new TimeoutException("Couldn't connect");
 			try {
-				Thread.sleep(100);
+				Thread.sleep(10+elapsed/5);
 			} catch (InterruptedException e) {
 				throw new IOException("Connect interrupted", e);
 			}
@@ -632,8 +636,7 @@ public class Connection {
 						try {
 							if (key.isReadable()) {
 								selectRead(key);
-							} 
-							if (key.isWritable()) {
+							} else if (key.isWritable()) {
 								selectWrite(key);
 							}
 						} catch (ClosedChannelException e) {

@@ -117,6 +117,7 @@ public class NIOServer implements Closeable {
 						it.remove();
 
 						try {
+							// Just do one op on each key
 			                if (key.isAcceptable()) {
 			                	accept(selector);
 			                } else if (key.isReadable()) {
