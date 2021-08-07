@@ -47,8 +47,9 @@ public class Ed25519Test {
 
 	@Test
 	public void testKeyRebuilding() {
-		AKeyPair kp1=Ed25519KeyPair.generate();
-		AKeyPair kp2=AKeyPair.create(kp1.getAccountKey(), kp1.getEncodedPrivateKey());
+		Ed25519KeyPair kp1=Ed25519KeyPair.generate();
+		Ed25519KeyPair kp2=Ed25519KeyPair.create(kp1.getSeed());
+		assertEquals(kp1,kp2);
 		assertEquals(kp1.getAccountKey(),kp2.getAccountKey());
 
 		ACell data=RT.cvm(1L);
