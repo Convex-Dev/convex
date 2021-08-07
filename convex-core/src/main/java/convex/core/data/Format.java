@@ -271,8 +271,9 @@ public class Format {
 	 * @return The ByteBuffer after writing the message length
 	 */
 	public static ByteBuffer writeMessageLength(ByteBuffer bb, int len) {
-		if ((len < 0) || (len > LIMIT_ENCODING_LENGTH))
+		if ((len <= 0) || (len > LIMIT_ENCODING_LENGTH)) {
 			throw new IllegalArgumentException("Invalid message length: " + len);
+		}
 		return writeVLCLong(bb, len);
 	}
 

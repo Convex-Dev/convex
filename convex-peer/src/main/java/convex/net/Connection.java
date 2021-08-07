@@ -517,7 +517,7 @@ public class Connection {
 						+ System.identityHashCode(this));
 			}
 		} else {
-			log.info("sendBuffer failed with message {} of length: {} Connection ID: {}"
+			log.debug("sendBuffer failed with message {} of length: {} Connection ID: {}"
 						, type, dataLength, System.identityHashCode(this));
 		}
 		return sent;

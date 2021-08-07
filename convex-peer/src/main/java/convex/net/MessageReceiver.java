@@ -36,7 +36,7 @@ public class MessageReceiver {
 	public static final int RECEIVE_BUFFER_SIZE = Constants.RECEIVE_BUFFER_SIZE;
 
 	/**
-	 * Buffer for receiving messages. Maintained ready for writing.
+	 * Buffer for receiving partial messages. Maintained ready for writing.
 	 * 
 	 * Maybe use a direct buffer since we are copying from the socket channel? But probably doesn't make any difference.
 	 */
@@ -94,7 +94,7 @@ public class MessageReceiver {
 
 			if (numRead < 0) throw new ClosedChannelException();
 
-			// exit if we don't have at least 2 bytes for message length
+			// exit if we don't have at least 2 bytes for message length (may also be a message code)
 			if (buffer.position()<2) return numRead;
 		}
 
@@ -102,9 +102,9 @@ public class MessageReceiver {
 		int len = Format.peekMessageLength(buffer);
 		int lengthLength = (len < 64) ? 1 : 2;
 
-		// limit buffer to total message size including length
-		int size=lengthLength + len;
-		buffer.limit(size);
+		// limit buffer to total message frame size including length
+		int totalFrameSize=lengthLength + len;
+		buffer.limit(totalFrameSize);
 
 		// try to read more bytes up to limit of total message size
 		{
@@ -124,7 +124,7 @@ public class MessageReceiver {
 		buffer.position(lengthLength);
 
 		// receive message, expecting the specified final position
-		int expectedPosition = lengthLength + len;
+		int expectedPosition = totalFrameSize;
 		receiveMessage(buffer, expectedPosition);
 
 		// clear buffer

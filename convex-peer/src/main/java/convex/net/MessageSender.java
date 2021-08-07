@@ -34,20 +34,22 @@ public class MessageSender {
 	/**
 	 * Buffers a message for sending.
 	 * 
-	 * @param src Source ByteBuffer
+	 * @param messageFrame Source ByteBuffer containing complete message bytes (including length)
 	 * @return True if successfully buffered, false otherwise (insufficient send buffer
 	 *         size)
 	 */
-	public boolean bufferMessage(ByteBuffer src) {
+	public boolean bufferMessage(ByteBuffer messageFrame) {
 		synchronized (buffer) {
 			// compact buffer, ready for writing			
 			buffer.compact();
 			
 			// return false if insufficient space to send
-			if (buffer.remaining() < src.remaining()) {
+			if (buffer.remaining() < messageFrame.remaining()) {
+				// flip to maintain readiness for writing
+				buffer.flip();
 				return false;
 			}
-			buffer.put(src);
+			buffer.put(messageFrame);
 			// flip so ready for reading once again
 			buffer.flip();
 		}
