@@ -7,6 +7,7 @@ import java.awt.Toolkit;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -149,7 +150,9 @@ public class PeerGUI extends JPanel {
 		tabs.add("About", aboutPanel);
 
 		// launch local peers for testing
-		EventQueue.invokeLater(() -> peerPanel.launchAllPeers(this));
+		EventQueue.invokeLater(() -> {
+			peerPanel.launchAllPeers(this);
+		});
 
 		updateThread.start();
 	}

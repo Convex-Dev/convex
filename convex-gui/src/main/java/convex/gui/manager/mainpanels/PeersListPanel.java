@@ -4,6 +4,7 @@ import java.awt.BorderLayout;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -45,14 +46,24 @@ public class PeersListPanel extends JPanel {
 	private static final Logger log = LoggerFactory.getLogger(PeersListPanel.class.getName());
 
 	public void launchAllPeers(PeerGUI manager) {
-		int N=PeerGUI.KEYPAIRS.size();
-		List<Server> serverList = API.launchLocalPeers(PeerGUI.KEYPAIRS,PeerGUI.genesisState);
-		for (Server server: serverList) {
-			PeerView peer = new PeerView();
-			peer.peerServer = server;
-			// InetSocketAddress sa = server.getHostAddress();
-			addPeer(peer);
+		try {
+			int N=PeerGUI.KEYPAIRS.size();
+			List<Server> serverList = API.launchLocalPeers(PeerGUI.KEYPAIRS,PeerGUI.genesisState);
+			for (Server server: serverList) {
+				PeerView peer = new PeerView();
+				peer.peerServer = server;
+				// InetSocketAddress sa = server.getHostAddress();
+				addPeer(peer);
+			}
+		} catch (Exception e) {
+			if (e instanceof ClosedChannelException) {
+				// Ignore
+			} else {
+				throw(e);
+			}
+			
 		}
+
 	}
 	
 	// TODO
