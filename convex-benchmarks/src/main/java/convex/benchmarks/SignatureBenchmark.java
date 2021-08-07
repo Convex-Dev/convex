@@ -26,7 +26,7 @@ public class SignatureBenchmark {
 		SignedData<ABlob> sd=KEYPAIR.signData(b);
 		ASignature sig=sd.getSignature();
 
-		sig.verify(sd.getHash(), KEYPAIR.getAccountKey());
+		sig.verify(b.getHash(), KEYPAIR.getAccountKey());
 	}
 
 	public static void main(String[] args) throws Exception {

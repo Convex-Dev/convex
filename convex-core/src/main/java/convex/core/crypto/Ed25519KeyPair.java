@@ -138,7 +138,7 @@ public class Ed25519KeyPair extends AKeyPair {
 	}
 
 	/**
-	 * Create a SignKeyPair from given private key. Public key is generated
+	 * Create a KeyPair from given private key. Public key is generated
 	 * automatically from the private key
 	 *
 	 * @param privateKey An PrivateKey item for private key
