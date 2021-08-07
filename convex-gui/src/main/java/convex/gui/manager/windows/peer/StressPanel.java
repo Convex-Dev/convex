@@ -24,7 +24,6 @@ import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 
 import convex.api.Convex;
-import convex.core.Coin;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;

@@ -485,8 +485,8 @@ public class Server implements Closeable {
 	// Mark presence of new messages to handle
 	private void notifyNewMessages() {
 		// Notify updateThread after available messages are processed
-		if (!hasNewMessages) {
-			synchronized (updateThread) {
+		synchronized (updateThread) {
+			if (!hasNewMessages) {
 				hasNewMessages=true;
 				updateThread.notify();
 			}
@@ -871,24 +871,24 @@ public class Server implements Closeable {
 			ref = ref.persist();
 
 			@SuppressWarnings("unchecked")
-			SignedData<Belief> signedBelief = (SignedData<Belief>) o;
-			signedBelief.validateSignature();
+			SignedData<Belief> receivedBelief = (SignedData<Belief>) o;
+			receivedBelief.validateSignature();
 
 			// TODO: validate trusted connection?
 			// TODO: can drop Beliefs if under pressure?
 
 			synchronized (newBeliefs) {
-				AccountKey addr = signedBelief.getAccountKey();
+				AccountKey addr = receivedBelief.getAccountKey();
 				SignedData<Belief> current = newBeliefs.get(addr);
 				// Make sure the Belief is the latest from a Peer
-				if ((current == null) || (current.getValue().getTimestamp() >= signedBelief.getValue()
+				if ((current == null) || (current.getValue().getTimestamp() <= receivedBelief.getValue()
 						.getTimestamp())) {
 					// Add to map of new Beliefs received for each Peer
-					newBeliefs.put(addr, signedBelief);
+					newBeliefs.put(addr, receivedBelief);
 
 					// Notify the update thread that there is something new to handle
 					log.debug("Valid belief received by peer at {}: {}"
-							,getHostAddress(),signedBelief.getValue().getHash());
+							,getHostAddress(),receivedBelief.getValue().getHash());
 					notifyNewMessages();
 				}
 			}
@@ -940,10 +940,6 @@ public class Server implements Closeable {
 		public void run() {
 			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
 			try {
-				// short initial sleep before we start managing updates. Give stuff time to
-				// ramp up.
-				Thread.sleep(20);
-
 				// loop while the server is running
 				while (isRunning) {
 					long timestamp=Utils.getCurrentTimestamp();

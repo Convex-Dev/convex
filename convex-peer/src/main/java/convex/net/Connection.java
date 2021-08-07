@@ -732,11 +732,11 @@ public class Connection {
 	}
 
 	/**
-	 * Sends bytes buffered in the underlying channel.
+	 * Sends bytes buffered into the underlying channel.
 	 * @return True if all bytes are sent, false otherwise
 	 * @throws IOException If an IO Exception occurs
 	 */
-	public boolean sendBytes() throws IOException {
+	public boolean flushBytes() throws IOException {
 		return sender.maybeSendBytes();
 	}
 

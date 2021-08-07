@@ -61,7 +61,7 @@ public class ConnectionTest {
 				
 				boolean flushed=false;
 				while (!flushed) {
-					flushed=conn.sendBytes();
+					flushed=conn.flushBytes();
 				}
 			}
 		}
