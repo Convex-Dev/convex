@@ -37,7 +37,8 @@ public class Ed25519KeyPair extends AKeyPair {
 
 	private final AccountKey publicKey;
 	private final KeyPair keyPair;
-	private byte[] privateKeyBytes;
+	
+	private byte[] secretKeyBytes;
 
 	private static final String ED25519 = "Ed25519";
 
@@ -299,14 +300,14 @@ public class Ed25519KeyPair extends AKeyPair {
 	 * @return Private key byte array
 	 */
 	byte[] getPrivateKeyBytes() {
-		if (privateKeyBytes==null) {
-			privateKeyBytes=new byte[64]; // private key|public key
+		if (secretKeyBytes==null) {
+			secretKeyBytes=new byte[64]; // private key|public key
 			Blob enc=getEncodedPrivateKey();
 			long n=enc.count();
-			enc.slice(n-32,32).getBytes(privateKeyBytes,0);
-			getAccountKey().getBytes(privateKeyBytes,32);
+			enc.slice(n-32,32).getBytes(secretKeyBytes,0);
+			getAccountKey().getBytes(secretKeyBytes,32);
 		}
-		return privateKeyBytes;
+		return secretKeyBytes;
 	}
 
 	@Override
