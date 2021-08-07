@@ -993,6 +993,8 @@ public class CoreTest extends ACVMTest {
 		assertSame(Sets.empty(), eval("(reduce disj #{1 2} [1 2])"));
 		assertEquals(Sets.empty(), eval("(disj #{} 1)"));
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(disj (set [3 2 1 2 4]) 4)"));
+		assertEquals(Sets.of(1L), eval("(disj (set [3 2 1 2 4]) 2 3 4)"));
+		assertEquals(Sets.empty(), eval("(disj #{})"));
 
 		// nil is treated as empty set
 		assertSame(Sets.empty(), eval("(disj nil 1)"));
@@ -1000,7 +1002,6 @@ public class CoreTest extends ACVMTest {
 
 		assertCastError(step("(disj [] 1)"));
 		assertArityError(step("(disj)"));
-		assertArityError(step("(disj nil 1 2)"));
 	}
 
 	@Test
