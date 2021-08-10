@@ -21,7 +21,6 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.exceptions.TODOException;
 import convex.core.init.Init;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
@@ -150,7 +149,13 @@ public class Peer {
 	 * @return New Peer instance
 	 */
 	public static Peer create(AKeyPair peerKP, State initialState, Belief remoteBelief) {
-		throw new TODOException();
+		Peer peer=create(peerKP,initialState);
+		try {
+			peer=peer.mergeBeliefs(remoteBelief);
+			return peer;
+		} catch (Throwable  e) {
+			throw Utils.sneakyThrow(e);
+		}
 	}
 
 	/**

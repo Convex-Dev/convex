@@ -6,7 +6,6 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
@@ -14,9 +13,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 import convex.api.Convex;
 import convex.core.Belief;
@@ -172,13 +171,11 @@ public class Server implements Closeable {
 
 	private IServerEvent event = null;
 
-	private Server(HashMap<Keyword, Object> config, IServerEvent event) {
+	private Server(HashMap<Keyword, Object> config, IServerEvent event) throws TimeoutException, IOException {
 		this.event = event;
 		AStore configStore = (AStore) config.get(Keywords.STORE);
 		this.store = (configStore == null) ? Stores.current() : configStore;
 
-		AKeyPair keyPair = (AKeyPair) config.get(Keywords.KEYPAIR);
-		if (keyPair==null) throw new IllegalArgumentException("No Peer Key Pair provided in config");
 
 		// Switch to use the configured store for setup, saving the caller store
 		final AStore savedStore=Stores.current();
@@ -188,7 +185,7 @@ public class Server implements Closeable {
 			// now setup the connection manager
 			this.manager = new ConnectionManager(this);
 
-			this.peer = establishPeer(keyPair, config);
+			this.peer = establishPeer();
 
 			nio = NIOServer.create(this, receiveQueue);
 
@@ -197,25 +194,62 @@ public class Server implements Closeable {
 		}
 	}
 
-	private Peer establishPeer(AKeyPair keyPair, Map<Keyword, Object> config2) {
+	@SuppressWarnings("unchecked")
+	private Peer establishPeer() throws TimeoutException, IOException {
 		log.info("Establishing Peer with store: {}",Stores.current());
-
-		if (Utils.bool(getConfig().get(Keywords.RESTORE))) {
-			try {
-
-				Peer peer = Peer.restorePeer(store, keyPair);
-				if (peer != null) {
-					log.info("Restored Peer with root data hash: {}",store.getRootHash());
-					return peer;
+		try {
+			AKeyPair keyPair = (AKeyPair) getConfig().get(Keywords.KEYPAIR);
+			if (keyPair==null) throw new IllegalArgumentException("No Peer Key Pair provided in config");
+	
+			Object source=getConfig().get(Keywords.SOURCE);
+			if (Utils.bool(source)) {
+				// Peer sync case
+				InetSocketAddress sourceAddr=Utils.toInetSocketAddress(source);
+				Convex convex=Convex.connect(sourceAddr);
+				log.info("Attempting Peer Sync with: "+sourceAddr);
+				Future<Result> statusF=convex.requestStatus();
+				long timeout=establishTimeout();
+				AVector<ACell> status=statusF.get(timeout,TimeUnit.MILLISECONDS).getValue();
+				if (status.count()!=Constants.STATUS_COUNT) {
+					throw new Error("Bad status message from remote Peer");
 				}
-			} catch (Throwable e) {
-				log.error("Can't restore Peer from store: {}",e);
+				Hash beliefHash=RT.ensureHash(status.get(0));
+				Hash networkID=RT.ensureHash(status.get(2));
+				State genF=(State) convex.acquire(networkID).get(timeout,TimeUnit.MILLISECONDS);
+				log.info("Retreived Genesis State: "+networkID);
+				SignedData<Belief> belF=(SignedData<Belief>) convex.acquire(beliefHash).get(timeout,TimeUnit.MILLISECONDS);
+				log.info("Retreived Peer Signed Belief: "+networkID);
+				
+				Peer peer=Peer.create(keyPair, genF, belF.getValue());
+				return peer;
+						
+			} else if (Utils.bool(getConfig().get(Keywords.RESTORE))) {
+				// Restore from storage case
+				try {
+	
+					Peer peer = Peer.restorePeer(store, keyPair);
+					if (peer != null) {
+						log.info("Restored Peer with root data hash: {}",store.getRootHash());
+						return peer;
+					}
+				} catch (Throwable e) {
+					log.error("Can't restore Peer from store: {}",e);
+				}
 			}
+			State genesisState = (State) config.get(Keywords.STATE);
+			log.info("Defaulting to standard Peer startup with genesis state: "+genesisState.getHash());
+	
+			return Peer.createGenesisPeer(keyPair,genesisState);
+		} catch (ExecutionException|InterruptedException e) {
+			throw Utils.sneakyThrow(e);
 		}
-		State genesisState = (State) config.get(Keywords.STATE);
-		log.info("Defaulting to standard Peer startup with genesis state: "+genesisState.getHash());
+	}
 
-		return Peer.createGenesisPeer(keyPair,genesisState);
+	private long establishTimeout() {
+		Object maybeTimeout=getConfig().get(Keywords.TIMEOUT);
+		if (maybeTimeout==null) return Constants.PEER_SYNC_TIMEOUT;
+		Utils.toInt(maybeTimeout);
+		return 0;
 	}
 
 	/**
@@ -224,8 +258,10 @@ public class Server implements Closeable {
 	 *
 	 * @param config Server configuration map
 	 * @return New Server instance
+	 * @throws IOException If an IO Error occurred establishing the Peer
+	 * @throws TimeoutException If Peer creation timed out
 	 */
-	public static Server create(HashMap<Keyword, Object> config) {
+	public static Server create(HashMap<Keyword, Object> config) throws TimeoutException, IOException {
 		return create(config, null);
 	}
 
@@ -237,8 +273,10 @@ public class Server implements Closeable {
 	 *
 	 * @param event Event interface where the server will send information about the peer
 	 * @return New Server instance
+	 * @throws IOException If an IO Error occurred establishing the Peer
+	 * @throws TimeoutException If Peer creation timed out
 	 */
-	public static Server create(HashMap<Keyword, Object> config, IServerEvent event) {
+	public static Server create(HashMap<Keyword, Object> config, IServerEvent event) throws TimeoutException, IOException {
 		return new Server(config, event);
 	}
 

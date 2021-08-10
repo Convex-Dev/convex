@@ -829,6 +829,22 @@ public class Utils {
 			throw new TODOException("Can't print: " + Utils.getClass(v));
 		}
 	}
+	
+	/**
+	 * Converts a Object to an InetSocketAddress
+	 *
+	 * @param o An Object to convert to a socket address. May be a String or existing InetSocketAddress 
+	 * @return A valid InetSocketAddress, or null if not in valid format
+	 */
+	public static InetSocketAddress toInetSocketAddress(Object o) {
+		if (o instanceof InetSocketAddress) {
+			return (InetSocketAddress) o;
+		} else if (o instanceof String) {
+			return toInetSocketAddress((String)o);
+		} else {
+			return null;
+		}
+	}
 
 	/**
 	 * Converts a String to an InetSocketAddress

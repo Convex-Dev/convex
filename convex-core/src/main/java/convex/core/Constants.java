@@ -177,4 +177,14 @@ public class Constants {
 	 * Delay before a Peer produces another Block
 	 */
 	public static final long MIN_BLOCK_TIME = 100;
+
+	/**
+	 * Timeout for syncing with an existing Peer
+	 */
+	public static final long PEER_SYNC_TIMEOUT = 60000;
+
+	/**
+	 * Number of fields in a Peer STATUS message
+	 */
+	public static final long STATUS_COUNT = 4;
 }

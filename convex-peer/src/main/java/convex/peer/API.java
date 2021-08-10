@@ -48,7 +48,8 @@ public class API {
 	 * <li>:keypair (required) - AKeyPair instance.
 	 * <li>:port (optional) - Integer port number to use for incoming connections. Defaults to random allocation.
 	 * <li>:store (optional) - AStore instance. Defaults to the configured global store
-	 * <li>:state (optional) - Genesis state. Defaults to a fresh genesis state for the Peer.
+	 * <li>:source (optional) - URL for Peer to replicate initial State/Belief from.
+	 * <li>:state (optional) - Genesis state. Defaults to a fresh genesis state for the Peer if neither :source nor :state is specified
 	 * <li>:restore (optional) - Boolean Flag to restore from existing store. Default to true
 	 * <li>:persist (optional) - Boolean flag to determine if peer state should be persisted in store at server close. Default true.
 	 * </ul>
@@ -63,8 +64,10 @@ public class API {
 		HashMap<Keyword,Object> config=new HashMap<>(peerConfig);
 
 		// State no8t strictly necessarry? Should be possible to restore a Peer from store
-		if (!(config.containsKey(Keywords.STATE)||config.containsKey(Keywords.STORE))) {
-			throw new IllegalArgumentException("Peer launch requires a genesis :state or existing :store in config");
+		if (!(config.containsKey(Keywords.STATE)
+				||config.containsKey(Keywords.STORE))
+				||config.containsKey(Keywords.SOURCE)) {
+			throw new IllegalArgumentException("Peer launch requires a genesis :state, remote :source or existing :store in config");
 		}
 
 		if (!config.containsKey(Keywords.KEYPAIR)) throw new IllegalArgumentException("Peer launch requires a "+Keywords.KEYPAIR+" in config");
