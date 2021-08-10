@@ -141,6 +141,11 @@ public class Server implements Closeable {
 	 * The Peer instance current state for this server. Will be updated based on peer events.
 	 */
 	private Peer peer;
+	
+	/**
+	 * The Peer Controller Address
+	 */
+	private Address controller;
 
 	/**
 	 * The list of transactions for the block being created Should only modify with
@@ -186,12 +191,35 @@ public class Server implements Closeable {
 			this.manager = new ConnectionManager(this);
 
 			this.peer = establishPeer();
-
+			
+			establishController();
+			
 			nio = NIOServer.create(this, receiveQueue);
 
 		} finally {
 			Stores.setCurrent(savedStore);
 		}
+	}
+
+	/**
+	 * Establish the controller Account for this Peer.
+	 */
+	private void establishController() {
+		Address controlAddress=RT.castAddress(getConfig().get(Keywords.CONTROLLER));
+		if (controlAddress==null) {
+			controlAddress=peer.getController();
+			if (controlAddress==null) {
+				throw new IllegalStateException("Peer Controller account does not exist for Peer Key: "+peer.getPeerKey());
+			}
+		}
+		AccountStatus as=peer.getConsensusState().getAccount(controlAddress);
+		if (as==null) {
+			throw new IllegalStateException("Peer Controller Account does not exist: "+controlAddress);
+		}
+		if (!as.getAccountKey().equals(getKeyPair().getAccountKey())) {
+			throw new IllegalStateException("Server keypair does not match keypair for control account: "+controlAddress);
+		}
+		this.setPeerController(controlAddress);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -663,7 +691,7 @@ public class Server implements Closeable {
 		lastBroadcastBelief=Utils.getCurrentTimestamp();
 	}
 
-	private long lastBlockPublished=0L;
+	private long lastBlockPublishedTime=0L;
 
 	/**
 	 * Checks for pending transactions, and if found propose them as a new Block.
@@ -673,7 +701,7 @@ public class Server implements Closeable {
 	protected boolean maybePublishBlock() {
 		long timestamp=Utils.getCurrentTimestamp();
 		// skip if recently published a block
-		if ((lastBlockPublished+Constants.MIN_BLOCK_TIME)>timestamp) return false;
+		if ((lastBlockPublishedTime+Constants.MIN_BLOCK_TIME)>timestamp) return false;
 		
 		Block block=null;
 		synchronized (newTransactions) {
@@ -690,7 +718,7 @@ public class Server implements Closeable {
 		log.info("New block proposed: {} transaction(s), hash={}", block.getTransactions().count(), block.getHash());
 		
 		peer = newPeer;
-		lastBlockPublished=timestamp;
+		lastBlockPublishedTime=timestamp;
 		return true;
 	}
 
@@ -703,9 +731,15 @@ public class Server implements Closeable {
 	 * @return Peer controller Address
 	 */
 	public Address getPeerController() {
-		PeerStatus ps=getPeer().getConsensusState().getPeer(getPeerKey());
-		if (ps==null) return null;
-		return ps.getController();
+		return controller;
+	}
+	
+	/**
+	 * Sets the Peer controller Address
+	 * @param a Peer Controller Address to set
+	 */
+	public void setPeerController(Address a) {
+		controller=a;
 	}
 
 	/**

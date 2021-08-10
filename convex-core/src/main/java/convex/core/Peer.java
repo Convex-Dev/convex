@@ -313,7 +313,7 @@ public class Peer {
 
 	/**
 	 * Gets the Peer Key of this Peer.
-	 * @return AccountKey of Peer.
+	 * @return Peer Key of Peer.
 	 */
  	public AccountKey getPeerKey() {
 		return peerKey;
