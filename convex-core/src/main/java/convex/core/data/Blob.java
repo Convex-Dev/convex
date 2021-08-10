@@ -102,13 +102,11 @@ public class Blob extends AArrayBlob {
 
 	@Override
 	public boolean equals(ABlob a) {
+		if (a==null) return false;
 		if (a instanceof Blob) return equals((Blob) a);
-		if (a instanceof LongBlob) {
-			if (length!=LongBlob.LENGTH) return false;
-			LongBlob b= (LongBlob)a;
-			return longValue()==b.longValue();
-		}
-		return false;
+		if (a.getType()!=getType()) return false;
+		if (a.count()!=count()) return false;
+		return a.equalsBytes(this.store, this.offset);
 	}
 
 	public boolean equals(Blob b) {

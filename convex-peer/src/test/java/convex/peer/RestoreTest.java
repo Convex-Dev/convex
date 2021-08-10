@@ -35,7 +35,7 @@ public class RestoreTest {
 	List<AccountKey> keys=Lists.of(KP.getAccountKey());
 	
 	State GENESIS=Init.createState(keys);
-	Address HERO=Init.BASE_FIRST_ADDRESS;
+	Address HERO=Init.GENESIS_ADDRESS;
 
 	@Test
 	public void restoreTest() throws IOException, InterruptedException, ExecutionException, TimeoutException {

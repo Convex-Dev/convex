@@ -1,7 +1,6 @@
 package convex.peer;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -13,11 +12,11 @@ import convex.core.data.ACell;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.store.Stores;
-import convex.core.util.MemoryByteChannel;
+import convex.net.Connection;
+import convex.net.MemoryByteChannel;
 import convex.net.Message;
 import convex.net.MessageReceiver;
 import convex.net.MessageType;
-import convex.net.Connection;
 
 public class MessageReceiverTest {
 
@@ -38,7 +37,7 @@ public class MessageReceiverTest {
 
 		// need to call sendBytes to flush send buffer to channel
 		// since we aren't using a Selector / SocketChannel here
-		assertFalse(pc.sendBytes());
+		assertTrue(pc.flushBytes());
 
 		// receive first message
 		mr.receiveFromChannel(chan);

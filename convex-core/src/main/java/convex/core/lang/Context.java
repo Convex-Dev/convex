@@ -637,8 +637,6 @@ public class Context<T extends ACell> extends AObject {
 	/**
 	 * Looks up an environment entry for a specific address without consuming juice.
 	 *
-	 * If the symbol is qualified, try lookup via *aliases*
-	 *
 	 * @param address Address of Account in which to look up entry
 	 * @param sym Symbol to look up
 	 * @return Environment entry
@@ -1652,8 +1650,11 @@ public class Context<T extends ACell> extends AObject {
 			return this.withError(ErrorCodes.ARGUMENT, "Cannot make negative offer in Actor call: "+offer);
 		}
 
-		AFn<R> fn=as.getExportedFunction(sym);
-		if (fn==null) return this.withError(ErrorCodes.STATE,"Account "+target+" does not have exported function: "+sym+" , *exports*="+as.getEnvironmentValue(Symbols.STAR_EXPORTS));
+		AFn<R> fn = as.getCallableFunction(sym);
+
+		if (fn == null) {
+			return this.withError(ErrorCodes.STATE, "Value defined in account " + target + " is not a callable function: " + sym);
+		}
 
 		// Ensure we create a forked Context for the Actor call
 		final Context<R> exContext=forkActorCall(state, target, offer);

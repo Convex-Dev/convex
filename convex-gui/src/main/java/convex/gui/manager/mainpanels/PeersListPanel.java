@@ -4,6 +4,7 @@ import java.awt.BorderLayout;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -45,14 +46,39 @@ public class PeersListPanel extends JPanel {
 	private static final Logger log = LoggerFactory.getLogger(PeersListPanel.class.getName());
 
 	public void launchAllPeers(PeerGUI manager) {
-		int N=PeerGUI.KEYPAIRS.size();
-		List<Server> serverList = API.launchLocalPeers(PeerGUI.KEYPAIRS,PeerGUI.genesisState,null);
-		for (Server server: serverList) {
-			PeerView peer = new PeerView();
-			peer.peerServer = server;
-			// InetSocketAddress sa = server.getHostAddress();
-			addPeer(peer);
+		try {
+			int N=PeerGUI.KEYPAIRS.size();
+			List<Server> serverList = API.launchLocalPeers(PeerGUI.KEYPAIRS,PeerGUI.genesisState);
+			for (Server server: serverList) {
+				PeerView peer = new PeerView();
+				peer.peerServer = server;
+				// InetSocketAddress sa = server.getHostAddress();
+				addPeer(peer);
+			}
+		} catch (Exception e) {
+			if (e instanceof ClosedChannelException) {
+				// Ignore
+			} else {
+				throw(e);
+			}
+			
 		}
+
+	}
+	
+	// TODO
+	public void launchPeer(PeerGUI manager) {
+		
+		AKeyPair kp=AKeyPair.generate();
+		HashMap<Keyword, Object> config=new HashMap<>();
+		config.put(Keywords.KEYPAIR, kp);
+		config.put(Keywords.STATE, PeerGUI.genesisState);
+		Server server=API.launchPeer(config);
+		// server.
+		
+		PeerView peer = new PeerView();
+		peer.peerServer = server;
+		addPeer(peer);
 	}
 
 	public static PeerView getFirst() {
@@ -90,14 +116,14 @@ public class PeersListPanel extends JPanel {
 
 		JButton btnLaunch = new JButton("Launch!");
 		toolBar.add(btnLaunch);
-		// btnLaunch.addActionListener(e -> launchPeer(manager));
+		btnLaunch.addActionListener(e -> launchPeer(manager));
 
 		JButton btnConnect = new JButton("Connect...");
 		toolBar.add(btnConnect);
 		btnConnect.addActionListener(e -> {
 			String input = JOptionPane.showInputDialog("Enter host address: ", "");
 			if (input==null) return; // no result?
-			
+
 			String[] ss = input.split(":");
 			String host = ss[0].trim();
 			int port = (ss.length > 1) ? Integer.parseInt(ss[1].trim()) : 0;

@@ -1,11 +1,15 @@
 package convex.cli;
 
 import java.io.File;
+import java.lang.NumberFormatException;
 import java.net.InetSocketAddress;
 import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 
 import convex.api.Convex;
 import convex.cli.peer.SessionItem;
@@ -288,8 +292,8 @@ public class Main implements Runnable {
 			log.debug("peer public key {}", peerKey.toHexString());
 			AKeyPair keyPair = loadKeyFromStore(peerKey.toHexString(), 0);
 			log.debug("peer key pair {}", keyPair.getAccountKey().toHexString());
-			Address address = Address.create(Init.BASE_FIRST_ADDRESS.longValue() + peerIndex);
-			log.debug("peer address {}", address.longValue());
+			Address address = Init.getGenesisPeerAddress(peerIndex);
+			log.debug("peer address {}", address);
 			InetSocketAddress host = item.getHostAddress();
 			log.debug("connect to peer {}", host);
 			convex = Convex.connect(host, address, keyPair);
@@ -346,6 +350,34 @@ public class Main implements Runnable {
 		} catch (Throwable t) {
 			throw new Error("Cannot save the key store file "+t);
 		}
+	}
+
+	int[] getPortList(String ports[], int count) throws NumberFormatException {
+		Pattern rangePattern = Pattern.compile(("([0-9]+)\\s*-\\s*([0-9]*)"));
+		List<String> portTextList = Helpers.splitArrayParameter(ports);
+		List<Integer> portList = new ArrayList<Integer>();
+		int countLeft = count;
+		for (int index = 0; index < portTextList.size() && countLeft > 0; index ++) {
+			String item = portTextList.get(index);
+			Matcher matcher = rangePattern.matcher(item);
+			if (matcher.matches()) {
+				int portFrom = Integer.parseInt(matcher.group(1));
+				int portTo = portFrom  + count + 1;
+				if (!matcher.group(2).isEmpty()) {
+					portTo = Integer.parseInt(matcher.group(2));
+				}
+				for ( int portIndex = portFrom; portIndex <= portTo && countLeft > 0; portIndex ++, --countLeft ) {
+					portList.add(portIndex);
+				}
+			}
+			else if (item.strip().length() == 0) {
+			}
+			else {
+				portList.add(Integer.parseInt(item));
+				countLeft --;
+			}
+		}
+		return portList.stream().mapToInt(Integer::intValue).toArray();
 	}
 
     void showError(Throwable t) {

@@ -131,7 +131,7 @@ public class Connection {
 			throws IOException, TimeoutException {
 		return connect(hostAddress, receiveAction, store, null);
 	}
-
+	
 	/**
 	 * Create a Connection by connecting to a remote address
 	 *
@@ -147,23 +147,48 @@ public class Connection {
 	 *                          timeout period
 	 */
 	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store,
-			AccountKey trustedPeerKey) throws IOException, TimeoutException {
+			AccountKey trustedPeerKey) throws IOException, TimeoutException {	
+		return connect(hostAddress,receiveAction,store,trustedPeerKey,Constants.SOCKET_SEND_BUFFER_SIZE,Constants.SOCKET_RECEIVE_BUFFER_SIZE);
+	}
+
+	/**
+	 * Create a Connection by connecting to a remote address
+	 *
+	 * @param hostAddress    Internet Address to connect to
+	 * @param receiveAction  A callback Consumer to be called for any received
+	 *                       messages on this connection
+	 * @param store          Store to use for this Connection
+	 * @param trustedPeerKey Trusted peer account key if this is a trusted
+	 *                       connection, if not then null
+	 * @param sendBufferSize Size of connection send buffer in bytes
+	 * @param receiveBufferSize Size of connection receive buffer in bytes
+	 * @return New Connection instance
+	 * @throws IOException      If connection fails because of any IO problem
+	 * @throws TimeoutException If the connection cannot be established within the
+	 *                          timeout period
+	 */
+	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store,
+			AccountKey trustedPeerKey, int sendBufferSize, int receiveBufferSize) throws IOException, TimeoutException {
 		if (store == null)
 			throw new Error("Connection requires a store");
 		SocketChannel clientChannel = SocketChannel.open();
 		clientChannel.configureBlocking(false);
-		clientChannel.socket().setReceiveBufferSize(Constants.SOCKET_RECEIVE_BUFFER_SIZE);
-		clientChannel.socket().setSendBufferSize(Constants.SOCKET_SEND_BUFFER_SIZE);
+		clientChannel.socket().setReceiveBufferSize(receiveBufferSize);
+		clientChannel.socket().setSendBufferSize(sendBufferSize);
+		
+		// TODO: reconsider this
+		clientChannel.socket().setTcpNoDelay(true);
 
 		clientChannel.connect(hostAddress);	
 
 		long start = Utils.getCurrentTimestamp();
 		while (!clientChannel.finishConnect()) {
 			long now = Utils.getCurrentTimestamp();
-			if (now > start + Constants.DEFAULT_CLIENT_TIMEOUT)
+			long elapsed=now-start;
+			if (elapsed > Constants.DEFAULT_CLIENT_TIMEOUT)
 				throw new TimeoutException("Couldn't connect");
 			try {
-				Thread.sleep(100);
+				Thread.sleep(10+elapsed/5);
 			} catch (InterruptedException e) {
 				throw new IOException("Connect interrupted", e);
 			}
@@ -517,7 +542,7 @@ public class Connection {
 						+ System.identityHashCode(this));
 			}
 		} else {
-			log.info("Failed to send message {} of length: {} Connection ID: {}"
+			log.debug("sendBuffer failed with message {} of length: {} Connection ID: {}"
 						, type, dataLength, System.identityHashCode(this));
 		}
 		return sent;
@@ -691,13 +716,13 @@ public class Connection {
 	public static void selectWrite(SelectionKey key) {
 		try {
 			Connection pc = (Connection) key.attachment();
-			boolean moreBytes = pc.sender.maybeSendBytes();
+			boolean allSent = pc.sender.maybeSendBytes();
 
-			if (moreBytes) {
-				// we want to continue writing
-			} else {
+			if (allSent) {
 				// deregister interest in writing
 				key.interestOps(key.interestOps() & ~SelectionKey.OP_WRITE);
+			} else {
+				// we want to continue writing
 			}
 		} catch (IOException e) {
 			// TODO: figure out cases here. Probably channel closed?
@@ -706,7 +731,12 @@ public class Connection {
 		}
 	}
 
-	public boolean sendBytes() throws IOException {
+	/**
+	 * Sends bytes buffered into the underlying channel.
+	 * @return True if all bytes are sent, false otherwise
+	 * @throws IOException If an IO Exception occurs
+	 */
+	public boolean flushBytes() throws IOException {
 		return sender.maybeSendBytes();
 	}
 

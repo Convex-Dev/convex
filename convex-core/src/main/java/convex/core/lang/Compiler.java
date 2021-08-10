@@ -270,12 +270,25 @@ public class Compiler {
 	 * @return Context with complied op as result
 	 */
 	@SuppressWarnings("unchecked")
-	private static <T extends ACell> Context<AOp<T>> compileQuoted(Context<?> context, ACell aForm, int depth) {
-		ACell form = Syntax.unwrap(aForm);
+	private static <T extends ACell> Context<AOp<T>> compileQuasiQuoted(Context<?> context, ACell aForm, int depth) {
+		ACell form;
+		
+		// Check if form is a Syntax Object and unwrap if necessary
+		boolean isSyntax;
+		if (aForm instanceof Syntax) {
+			form= Syntax.unwrap(aForm);
+			isSyntax=true;
+		} else {
+			form=aForm;
+			isSyntax=false;
+		}
+		
 		if (form instanceof ASequence) {
 			ASequence<ACell> seq = (ASequence<ACell>) form;
 			int n = seq.size();
-			if (n == 0) return compileConstant(context, seq);
+			if (n == 0) {
+				return compileConstant(context, aForm);
+			} 
 
 			if (isListStarting(Symbols.UNQUOTE, form)) {
 				if (depth==1) {
@@ -292,11 +305,14 @@ public class Compiler {
 			}
 
 			// compile quoted elements
-			context = compileAllQuoted(context, seq, depth);
+			context = compileAllQuasiQuoted(context, seq, depth);
 			ASequence<AOp<ACell>> rSeq = (ASequence<AOp<ACell>>) context.getResult();
 
 			ACell fn = (seq instanceof AList) ? Core.LIST : Core.VECTOR;
-			Invoke<T> inv = Invoke.create( Constant.create(fn), rSeq);
+			AOp<T> inv = Invoke.create( Constant.create(fn), rSeq);
+			if (isSyntax) {
+				inv=wrapSyntaxBuilder(inv,(Syntax)aForm);
+			}
 			return context.withResult(Juice.COMPILE_NODE, inv);
 		} else if (form instanceof AMap) {
 			AMap<ACell, ACell> map = (AMap<ACell, ACell>) form;
@@ -307,26 +323,38 @@ public class Compiler {
 			}
 
 			// compile quoted elements
-			context = compileAllQuoted(context, rSeq,depth);
+			context = compileAllQuasiQuoted(context, rSeq,depth);
 			ASequence<AOp<ACell>> cSeq = (ASequence<AOp<ACell>>) context.getResult();
 
 			ACell fn = Core.HASHMAP;
-			Invoke<T> inv = Invoke.create(Constant.create(fn), cSeq);
+			AOp<T> inv = Invoke.create(Constant.create(fn), cSeq);
+			if (isSyntax) {
+				inv=wrapSyntaxBuilder(inv,(Syntax)aForm);
+			}
+
 			return context.withResult(Juice.COMPILE_NODE, inv);
 		} else if (form instanceof ASet) {
 			ASet<ACell> set = (ASet<ACell>) form;
 			AVector<ACell> rSeq = set.toVector();
 
 			// compile quoted elements
-			context = compileAllQuoted(context, rSeq,depth);
+			context = compileAllQuasiQuoted(context, rSeq,depth);
 			ASequence<AOp<ACell>> cSeq = (ASequence<AOp<ACell>>) context.getResult();
 
 			ACell fn = Core.HASHSET;
-			Invoke<T> inv = Invoke.create(Constant.create(fn), cSeq);
+			AOp<T> inv = Invoke.create(Constant.create(fn), cSeq);
+			if (isSyntax) {
+				inv=wrapSyntaxBuilder(inv,(Syntax)aForm);
+			}
+
 			return context.withResult(Juice.COMPILE_NODE, inv);
 		}else {
-			return compileConstant(context, form);
+			return compileConstant(context, aForm);
 		}
+	}
+	
+	private static <T extends ACell> AOp<T> wrapSyntaxBuilder(AOp<T> op, Syntax source) {
+		return Invoke.create(Constant.create(Core.SYNTAX), op, Constant.create(source.getMeta()));
 	}
 
 	/**
@@ -338,7 +366,7 @@ public class Compiler {
 	 * @return Context with complied sequence of ops as result
 	 */
 	@SuppressWarnings("unchecked")
-	private static <T extends ACell> Context<ASequence<AOp<T>>> compileAllQuoted(Context<?> context, ASequence<ACell> forms, int depth) {
+	private static <T extends ACell> Context<ASequence<AOp<T>>> compileAllQuasiQuoted(Context<?> context, ASequence<ACell> forms, int depth) {
 		int n = forms.size();
 		// create a list of ops producing each sub-element
 		ASequence<AOp<T>> rSeq = Vectors.empty();
@@ -352,7 +380,7 @@ public class Compiler {
 				// unquote-splicing looks like it needs flatmap
 				return context.withError(ErrorCodes.TODO,"unquote-splicing not yet supported");
 			} else {
-				Context<AOp<T>> rctx= compileQuoted(context, subSyntax,depth);
+				Context<AOp<T>> rctx= compileQuasiQuoted(context, subSyntax,depth);
 				rSeq = (ASequence<AOp<T>>) (rSeq.conj(rctx.getResult()));
 			}
 		}
@@ -415,13 +443,14 @@ public class Compiler {
 				
 			if (sym.equals(Symbols.QUASIQUOTE)) {
 				if (list.size() != 2) return context.withCompileError(sym + " expects one argument.");
-				return (Context<T>) compileQuoted(context, list.get(1),1);
+				return (Context<T>) compileQuasiQuoted(context, list.get(1),1);
 			}
 
 			if (sym.equals(Symbols.UNQUOTE)) {
 				// execute the unquoted code directly to get a form to compile
 				if (list.size() != 2) return context.withCompileError(Symbols.UNQUOTE + " expects one argument.");
 				context = context.expandCompile(list.get(1));
+				if (context.isExceptional()) return (Context<T>) context;
 				AOp<T> quotedOp = (AOp<T>) context.getResult();
 
 				Context<T> rctx = context.execute(quotedOp);

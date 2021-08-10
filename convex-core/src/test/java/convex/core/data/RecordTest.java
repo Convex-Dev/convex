@@ -2,6 +2,7 @@ package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 
@@ -53,13 +54,17 @@ public class RecordTest {
 			assertEquals(k,me.getKey());
 			assertEquals(v,me.getValue());
 		}
+		assertThrows(IndexOutOfBoundsException.class,()->r.entryAt(n));
+		assertThrows(IndexOutOfBoundsException.class,()->r.entryAt(-1));
 
 		int rc=r.getRefCount();
 		for (int i=0; i<rc; i++) {
 			r.getRef(i);
 		}
+		assertThrows(Exception.class,()->r.getRef(rc));
 
 		assertSame(r,r.updateAll(r.getValuesArray()));
+		assertSame(r,r.updateAll(r.values().toCellArray()));
 
 		CollectionsTest.doDataStructureTests(r);
 	}

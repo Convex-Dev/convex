@@ -25,10 +25,12 @@ public class BlocksTest {
 		assertEquals(b1.getHash(), b2.getHash());
 		assertEquals(b1.getEncoding(), b2.getEncoding());
 		assertEquals(b1, Format.read(b2.getEncoding()));
+		
+		assertEquals(0,b1.getTransactions().count());
 
 		RecordTest.doRecordTests(b1);
 	}
-
+	
 	@Test
 	public void testTransactions() throws BadSignatureException {
 		AKeyPair kp = InitTest.HERO_KEYPAIR;

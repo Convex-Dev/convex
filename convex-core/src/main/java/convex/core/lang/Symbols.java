@@ -161,7 +161,6 @@ public class Symbols {
 	public static final Symbol STAR_BALANCE = Symbol.create("*balance*");
 	public static final Symbol STAR_DEPTH = Symbol.create("*depth*");
 	public static final Symbol STAR_RESULT = Symbol.create("*result*");
-	public static final Symbol STAR_EXPORTS = Symbol.create("*exports*");
 	public static final Symbol STAR_TIMESTAMP = Symbol.create("*timestamp*");
 	public static final Symbol STAR_OFFER = Symbol.create("*offer*");
 	public static final Symbol STAR_STATE = Symbol.create("*state*");
@@ -170,8 +169,6 @@ public class Symbols {
 	public static final Symbol STAR_KEY = Symbol.create("*key*");
 
 	public static final Symbol STAR_LANG = Symbol.create("*lang*");
-
-	public static final Symbol STAR_ALIASES = Symbol.create("*aliases*");
 
 	public static final Symbol STAR_INITIAL_EXPANDER = Symbol.create("*initial-expander*");
 
@@ -293,12 +290,6 @@ public class Symbols {
 	public static final Symbol CNS_RESOLVE = Symbol.create("cns-resolve");
 
 	public static final Symbol NAN_Q = Symbol.create("nan?");
-
-
-
-
-
-
 
 
 

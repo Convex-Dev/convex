@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.AccountKey;
 import convex.core.data.PeerStatus;
+import convex.core.data.RecordTest;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitTest;
@@ -46,6 +47,7 @@ public class PeerTest {
 
 		// Run a query
 		assertEquals(RT.cvm(3L), (p.executeQuery(Reader.read("(+ 1 2)")).getResult()));
+		
 	}
 
 	@Test
@@ -63,6 +65,7 @@ public class PeerTest {
 		// use peer address from first peer for testing
 		AccountKey pa = InitTest.FIRST_PEER_KEY;
 		PeerStatus ps = STATE.getPeer(pa);
+		
 		long initialStake = ps.getPeerStake();
 		assertEquals(initialStake, ps.getTotalStake());
 
@@ -73,6 +76,9 @@ public class PeerTest {
 		assertEquals(1234L, ps2.getDelegatedStake(InitTest.HERO));
 		assertEquals(initialStake + 1234, ps2.getTotalStake());
 		assertEquals(initialStake, ps2.getPeerStake());
+		
+		RecordTest.doRecordTests(ps);
+		RecordTest.doRecordTests(ps2);
 	}
 
 	@Test

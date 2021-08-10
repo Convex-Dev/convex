@@ -36,7 +36,7 @@ public class LatencyBenchmark {
 	static Convex client2;
 	static Convex peer;
 	static {
-		List<Server> servers=API.launchLocalPeers(Benchmarks.PEER_KEYPAIRS, Benchmarks.STATE, null);
+		List<Server> servers=API.launchLocalPeers(Benchmarks.PEER_KEYPAIRS, Benchmarks.STATE, null, null);
 		server=servers.get(0);
 		try {
 			Thread.sleep(1000);

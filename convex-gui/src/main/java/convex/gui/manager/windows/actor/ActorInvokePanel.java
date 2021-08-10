@@ -29,7 +29,7 @@ public class ActorInvokePanel extends JPanel {
 		setLayout(new BorderLayout());
 
 		AccountStatus as = PeerGUI.getLatestState().getAccount(contract);
-		ASet<Symbol> exports = as.getExports();
+		ASet<Symbol> exports = as.getCallableFunctions();
 		for (Symbol s : exports) {
 			exportList.addElement(s);
 		}

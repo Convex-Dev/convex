@@ -550,7 +550,7 @@ public class ConnectionManager {
 			convex.close();
 			synchronized(connections) {
 				// reopen with connection to the peer and handle server messages
-				newConn = Connection.connect(hostAddress, server.peerReceiveAction, server.getStore(), null);
+				newConn = Connection.connect(hostAddress, server.peerReceiveAction, server.getStore(), null,Constants.SOCKET_PEER_BUFFER_SIZE,Constants.SOCKET_PEER_BUFFER_SIZE);
 				connections.put(peerKey, newConn);
 			}
 			server.raiseServerChange("connection");

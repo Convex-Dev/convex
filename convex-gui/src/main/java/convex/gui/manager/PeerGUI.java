@@ -57,7 +57,7 @@ public class PeerGUI extends JPanel {
 	
 	public static List<AKeyPair> KEYPAIRS=new ArrayList<>();
 			
-	private static final int NUM_PEERS=3;
+	private static final int NUM_PEERS=8;
 	
 	static {
 		for (int i=0; i<NUM_PEERS; i++) {
@@ -149,7 +149,9 @@ public class PeerGUI extends JPanel {
 		tabs.add("About", aboutPanel);
 
 		// launch local peers for testing
-		EventQueue.invokeLater(() -> peerPanel.launchAllPeers(this));
+		EventQueue.invokeLater(() -> {
+			peerPanel.launchAllPeers(this);
+		});
 
 		updateThread.start();
 	}
@@ -302,10 +304,14 @@ public class PeerGUI extends JPanel {
 	}
 
 	public static Address getUserAddress(int i) {
-		return Address.create(Init.BASE_FIRST_ADDRESS.longValue()+i);
+		return Init.getGenesisPeerAddress(i);
 	}
 	
 	public static AKeyPair getUserKeyPair(int i) {
 		return KEYPAIRS.get(i);
+	}
+
+	public static Address getGenesisAddress() {
+		return Init.getGenesisAddress();
 	}
 }

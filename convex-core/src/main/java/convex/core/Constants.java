@@ -149,12 +149,22 @@ public class Constants {
 
 
 	/**
-	 * Size of default socket receive buffer
+	 * Size of default server socket receive buffer
+	 */
+	public static final int SOCKET_SERVER_BUFFER_SIZE = 16*65536;
+	
+	/**
+	 * Size of default server socket buffers for a peer connection
+	 */
+	public static final int SOCKET_PEER_BUFFER_SIZE = 16*65536;
+
+	/**
+	 * Size of default client socket receive buffer
 	 */
 	public static final int SOCKET_RECEIVE_BUFFER_SIZE = 65536;
 
 	/**
-	 * Size of default socket send buffer
+	 * Size of default client socket send buffer
 	 */
 	public static final int SOCKET_SEND_BUFFER_SIZE = 65536;
 

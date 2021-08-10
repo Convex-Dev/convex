@@ -3,6 +3,8 @@ package convex.core.transactions;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Format;
+import convex.core.data.type.AType;
+import convex.core.data.type.Transaction;
 import convex.core.lang.Context;
 
 /**
@@ -82,6 +84,11 @@ public abstract class ATransaction extends ACell {
 	@Override public final boolean isCVMValue() {
 		// Transactions exist outside CVM only
 		return false;
+	}
+	
+	@Override
+	public AType getType() {
+		return Transaction.INSTANCE;
 	}
 	
 	/**

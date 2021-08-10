@@ -65,5 +65,8 @@ public class StateTest {
 
 		AccountStatus as=s2.getAccount(InitTest.HERO);
 		assertNotNull(as);
+		
+		RecordTest.doRecordTests(s2);
+		RecordTest.doRecordTests(as);
 	}
 }

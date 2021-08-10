@@ -993,6 +993,8 @@ public class CoreTest extends ACVMTest {
 		assertSame(Sets.empty(), eval("(reduce disj #{1 2} [1 2])"));
 		assertEquals(Sets.empty(), eval("(disj #{} 1)"));
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(disj (set [3 2 1 2 4]) 4)"));
+		assertEquals(Sets.of(1L), eval("(disj (set [3 2 1 2 4]) 2 3 4)"));
+		assertEquals(Sets.empty(), eval("(disj #{})"));
 
 		// nil is treated as empty set
 		assertSame(Sets.empty(), eval("(disj nil 1)"));
@@ -1000,7 +1002,6 @@ public class CoreTest extends ACVMTest {
 
 		assertCastError(step("(disj [] 1)"));
 		assertArityError(step("(disj)"));
-		assertArityError(step("(disj nil 1 2)"));
 	}
 
 	@Test
@@ -2122,16 +2123,23 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testCallSelf() {
 		Context<Address> ctx = step("(def ctr (deploy '(do (defn foo [] (call *address* (bar))) (defn bar [] (= *address* *caller*)) (export foo bar))))");
-
+		Address actor=ctx.getResult();
+		
 		assertTrue(evalB(ctx, "(call ctr (foo))")); // nested call to same actor
 		assertFalse(evalB(ctx, "(call ctr (bar))")); // call from hero only
 
+		assertEquals(Sets.of(Symbols.FOO,Symbols.BAR),ctx.getAccountStatus(actor).getCallableFunctions());
+	}
+	
+	@Test 
+	public void testCallables() {
+		assertSame(Sets.empty(),context().getAccountStatus().getCallableFunctions());
 	}
 
 
 	@Test
 	public void testCallStar() {
-		Context<Address> ctx = step("(def ctr (deploy '(do :foo (defn f [x] (inc x)) (export f g) )))");
+		Context<Address> ctx = step("(def ctr (deploy '(do :foo (defn f [x] (inc x)) (export f) )))");
 
 		assertEquals(9L,evalL(ctx, "(call* ctr 0 'f 8)"));
 		assertCastError(step(ctx, "(call* ctr 0 :f 8)")); // cast fail on keyword function name
@@ -2274,6 +2282,11 @@ public class CoreTest extends ACVMTest {
 		ctx=step(ctx,"(set-key "+InitTest.HERO_KEY+")");
 		assertEquals(InitTest.HERO_KEY,ctx.getResult());
 		assertEquals(InitTest.HERO_KEY,eval(ctx,"*key*"));
+		
+		assertEquals(true, evalB("(do "
+				+ "    (def k 0x0000000000000000000000000000000000000000000000000000000000000000)"
+				+ "    (def a (deploy `(set-key ~k)))"
+				+ "    (= k (:key (account a))))"));
 	}
 
 	@Test
@@ -2478,12 +2491,14 @@ public class CoreTest extends ACVMTest {
 			assertEquals(newHostname,ctx.getState().getPeer(InitTest.FIRST_PEER_KEY).getHostname().toString());
         }
 
-		ctx=ctx.forkWithAddress(VILLAIN);
+		// Try to hijack with an account that isn't the first Peer
+		ctx=ctx.forkWithAddress(HERO.offset(2));
 		{
 			newHostname = "set-key-hijack";
 			ctx=step(ctx,"(do (set-key "+peerKey+") (set-peer-data "+peerKey+" {:url \"" + newHostname + "\"}))");
 			assertStateError(ctx);
 		}
+		
 		ctx=ctx.forkWithAddress(InitTest.FIRST_PEER_ADDRESS);
 		assertCastError(step(ctx,"(set-peer-data peer-key 0x1234567812345678123456781234567812345678123456781234567812345678)"));
 		assertCastError(step(ctx,"(set-peer-data peer-key :bad-key)"));
@@ -3132,7 +3147,11 @@ public class CoreTest extends ACVMTest {
 		assertCompileError(step("(unquote)"));
 		assertCompileError(step("(unquote 1 2)"));
 	}
-
+	
+	@Test
+	public void testUnquoteError() {
+		assertUndeclaredError(step("~~foo"));
+	}
 
 	@Test
 	public void testDefn() {
@@ -3490,7 +3509,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testExports() {
 		assertEquals(Sets.empty(), eval("*exports*"));
-		assertEquals(Sets.of(Symbols.FOO, Symbols.BAR), eval("(do (export foo bar) *exports*)"));
+		assertTrue(evalB("(do (defn foo []) (export foo) (get (lookup-meta 'foo) :callable?))"));
 	}
 
 	@Test

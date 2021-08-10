@@ -61,12 +61,12 @@ public class API {
 	 */
 	public static Server launchPeer(Map<Keyword, Object> peerConfig, IServerEvent event) {
 		HashMap<Keyword,Object> config=new HashMap<>(peerConfig);
-		
+
 		// State no8t strictly necessarry? Should be possible to restore a Peer from store
 		if (!(config.containsKey(Keywords.STATE)||config.containsKey(Keywords.STORE))) {
 			throw new IllegalArgumentException("Peer launch requires a genesis :state or existing :store in config");
 		}
-		
+
 		if (!config.containsKey(Keywords.KEYPAIR)) throw new IllegalArgumentException("Peer launch requires a "+Keywords.KEYPAIR+" in config");
 
 		try {
@@ -87,33 +87,48 @@ public class API {
 
 	/**
 	 * Launch a local set of peers. Intended mainly for testing / development.
-	 * 
+	 *
 	 * The Peers will have a unique genesis State, i.e. an independent network
 	 *
 	 * @param keyPairs List of keypairs for peers
 	 * @param genesisState GEnesis state for local network
+	 *
+	 * @return List of Servers launched
+	 *
+	 */
+	public static List<Server> launchLocalPeers(List<AKeyPair> keyPairs, State genesisState) {
+		return launchLocalPeers(keyPairs, genesisState, null, null);
+	}
+	/**
+	 * Launch a local set of peers. Intended mainly for testing / development.
+	 *
+	 * The Peers will have a unique genesis State, i.e. an independent network
+	 *
+	 * @param keyPairs List of keypairs for peers
+	 * @param genesisState GEnesis state for local network
+	 * @param peerPorts Array of ports to use for each peer, if == null then randomly assign port numbers
 	 * @param event Server event handler
 	 *
 	 * @return List of Servers launched
 	 *
 	 */
-	public static List<Server> launchLocalPeers(List<AKeyPair> keyPairs, State genesisState, IServerEvent event) {
+	public static List<Server> launchLocalPeers(List<AKeyPair> keyPairs, State genesisState, int peerPorts[], IServerEvent event) {
 		int count=keyPairs.size();
-		
+
 		List<Server> serverList = new ArrayList<Server>();
 
 		Map<Keyword, Object> config = new HashMap<>();
 
 		// Peer should get a new allocated port
 		config.put(Keywords.PORT, null);
-		
+
 		// Peers should all have the same genesis state
 		config.put(Keywords.STATE, genesisState);
 
 		// TODO maybe have this as an option in the calling parameters?
 		AStore store = Stores.current();
 		config.put(Keywords.STORE, store);
-		
+
 		// Automatically manage Peer connections
 		config.put(Keywords.AUTO_MANAGE, true);
 
@@ -121,6 +136,9 @@ public class API {
 		for (int i = 0; i < count; i++) {
 			AKeyPair keyPair = keyPairs.get(i);
 			config.put(Keywords.KEYPAIR, keyPair);
+			if (peerPorts != null) {
+				config.put(Keywords.PORT, peerPorts[i]);
+			}
 			Server server = API.launchPeer(config, event);
 			serverList.add(server);
 		}
@@ -136,7 +154,7 @@ public class API {
 			// Join each additional Server to the Peer #0
 			ConnectionManager cm=server.getConnectionManager();
 			cm.connectToPeer(genesisServer.getHostAddress());
-			
+
 			// Join server #0 to this server
 			genesisServer.getConnectionManager().connectToPeer(server.getHostAddress());
 			server.setHostname("localhost:"+server.getPort());

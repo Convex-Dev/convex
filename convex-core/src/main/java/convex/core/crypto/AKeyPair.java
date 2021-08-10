@@ -1,5 +1,6 @@
 package convex.core.crypto;
 
+import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 
@@ -107,4 +108,10 @@ public abstract class AKeyPair {
 	public String toString() {
 		return getAccountKey()+":"+getEncodedPrivateKey();
 	}
+
+	/**
+	 * Gets the JCA representation of this Key Pair
+	 * @return JCA KepPair
+	 */
+	public abstract KeyPair getJCAKeyPair();
 }

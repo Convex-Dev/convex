@@ -22,6 +22,7 @@ import convex.core.data.Address;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.PeerStatus;
+import convex.core.data.RecordTest;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
@@ -429,6 +430,9 @@ public class BeliefMergeTest {
 
 		// 100% of value still exists
 		assertEquals(TOTAL_VALUE, finalState.computeTotalFunds());
+		
+		RecordTest.doRecordTests(bs4[0].getBelief());
+		RecordTest.doRecordTests(finalState);
 	}
 
 	private void printAccounts(AVector<AccountStatus> accounts) {

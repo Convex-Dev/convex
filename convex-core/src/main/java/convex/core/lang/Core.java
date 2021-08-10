@@ -573,7 +573,15 @@ public class Core {
 			AccountStatus as = context.getState().getAccount(addr);
 			if (as == null) return context.withResult(Juice.LOOKUP, CVMBool.FALSE);
 
-			CVMBool result = CVMBool.of(as.getExportedFunction(sym) != null);
+			AHashMap<ACell, ACell> symMeta = as.getMetadata().get(sym);
+
+			CVMBool result;
+
+			if (symMeta == null) {
+				result = CVMBool.FALSE;
+			} else {
+				result = CVMBool.of(symMeta.get(Keywords.CALLABLE_Q) == CVMBool.TRUE);
+			}
 
 			return context.withResult(Juice.LOOKUP, result);
 		}
@@ -1310,13 +1318,23 @@ public class Core {
 		@SuppressWarnings("unchecked")
 		@Override
 		public  Context<ASet<ACell>> invoke(Context context, ACell[] args) {
-			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
+
+			// compute juice up front
+			int numAdditions = args.length - 1;
+			long juice = Juice.BUILD_DATA + Juice.BUILD_PER_ELEMENT * numAdditions;
+			if (!context.checkJuice(juice)) return context.withJuiceError();
 
 			ASet<ACell> result = RT.ensureSet(args[0]);
 			if (result == null) return context.withCastError(0,args, Types.SET);
 
-			result = result.exclude((ACell) args[1]);
-			long juice = Juice.BUILD_DATA + Juice.BUILD_PER_ELEMENT;
+
+			for (int i = 0; i < numAdditions; i++) {
+				int argIndex=i+1;
+				ACell val = args[argIndex];
+				result = result.exclude(val);
+			}
+
 			return context.withResult(juice, result);
 		}
 	});

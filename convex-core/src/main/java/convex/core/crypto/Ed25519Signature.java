@@ -2,9 +2,10 @@ package convex.core.crypto;
 
 import java.nio.ByteBuffer;
 
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
-import convex.core.data.Hash;
+import convex.core.data.Blob;
 import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -91,8 +92,8 @@ public class Ed25519Signature extends ASignature {
 	//}
 	
 	@Override
-	public boolean verify(Hash hash, AccountKey address) {
-	    boolean verified = Providers.SODIUM_SIGN.cryptoSignVerifyDetached(signatureBytes, hash.getBytes(), 32, address.getBytes());
+	public boolean verify(ABlob message, AccountKey address) {
+	    boolean verified = Providers.SODIUM_SIGN.cryptoSignVerifyDetached(signatureBytes, message.getBytes(), (int)message.count(), address.getBytes());
 	    return verified;
 	}
 	
@@ -128,6 +129,11 @@ public class Ed25519Signature extends ASignature {
 	@Override
 	public String toHexString() {
 		return Utils.toHexString(signatureBytes);
+	}
+
+	@Override
+	public Blob getSignatureBlob() {
+		return Blob.wrap(signatureBytes);
 	}
 
 

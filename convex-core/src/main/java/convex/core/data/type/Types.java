@@ -47,6 +47,9 @@ public class Types {
 	public static final Function FUNCTION = Function.INSTANCE;
 	public static final OpCode OP = OpCode.INSTANCE;
 	public static final SyntaxType SYNTAX=SyntaxType.INSTANCE;
+	
+	public static final Transaction TRANSACTION=Transaction.INSTANCE;
+
 
 
 	public static AType[] ALL_TYPES=new AType[] {
@@ -79,7 +82,6 @@ public class Types {
 		
 		FUNCTION,
 		OP,
-		SYNTAX
-
+		SYNTAX,
 	};
 }
