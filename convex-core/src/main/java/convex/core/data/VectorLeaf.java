@@ -506,9 +506,6 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		Ref<R>[] newItems = (Ref<R>[]) new Ref[ilength];
 		for (int i = 0; i < ilength; i++) {
 			Ref<T> iref=items[i];
-			if (iref==null) {
-				System.out.println("Null ref in vector!!!!");
-			}
 			R r = mapper.apply(iref.getValue());
 			newItems[i] = Ref.get(r);
 		}

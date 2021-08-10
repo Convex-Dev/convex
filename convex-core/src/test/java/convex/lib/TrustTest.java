@@ -13,9 +13,11 @@ import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Keywords;
 import convex.core.data.Symbol;
+import convex.core.exceptions.InvalidDataException;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
@@ -251,5 +253,11 @@ public class TrustTest extends ACVMTest {
 
 		// eval-as should now fail
 		assertTrustError(step(ctx, "(eval-as alice `(eval-as ~bob :foo))"));
+	}
+	
+	@Test
+	public void validateCode() throws InvalidDataException {
+		ACell code=Reader.readResource("libraries/trust.con");
+		code.validate();
 	}
 }
