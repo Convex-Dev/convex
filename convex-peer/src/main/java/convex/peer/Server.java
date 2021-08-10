@@ -87,6 +87,8 @@ public class Server implements Closeable {
 
 	private static final int RECEIVE_QUEUE_SIZE = 10000;
 
+	private static final int EVENT_QUEUE_SIZE = 1000;
+
 	// Maximum Pause for each iteration of Server update loop.
 	private static final long SERVER_UPDATE_PAUSE = 1L;
 
@@ -99,6 +101,12 @@ public class Server implements Closeable {
 	 */
 	private BlockingQueue<Message> receiveQueue = new ArrayBlockingQueue<Message>(RECEIVE_QUEUE_SIZE);
 
+	/**
+	 * Queue for received events (Beliefs, Transactions) to be processed
+	 */
+	private BlockingQueue<SignedData<?>> eventQueue = new ArrayBlockingQueue<>(EVENT_QUEUE_SIZE);
+
+	
 	/**
 	 * Message consumer that simply enqueues received messages received by this Server
 	 */
@@ -148,8 +156,7 @@ public class Server implements Closeable {
 	private Address controller;
 
 	/**
-	 * The list of transactions for the block being created Should only modify with
-	 * the lock for this Server held.
+	 * The list of new transactions to be added to the next Block
 	 *
 	 * Must all have been fully persisted.
 	 */
@@ -164,7 +171,7 @@ public class Server implements Closeable {
 
 	/**
 	 * The list of new beliefs received from remote peers the block being created
-	 * Should only modify with the lock for this Server help.
+	 * Should only modify with the lock for this Server held.
 	 */
 	private HashMap<AccountKey, SignedData<Belief>> newBeliefs = new HashMap<>();
 
@@ -545,7 +552,11 @@ public class Server implements Closeable {
 			newTransactions.add(sd);
 			registerInterest(sd.getHash(), m);
 		}
-		notifyNewMessages();
+		try {
+			eventQueue.put(sd);
+		} catch (InterruptedException e) {
+			log.warn("Unexpected interruption adding transaction to event queue!");
+		}
 	}
 
 	// Mark presence of new messages to handle
@@ -610,12 +621,12 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Register of client interests in receiving message responses
+	 * Register of client interests in receiving transaction responses
 	 */
 	private HashMap<Hash, Message> interests = new HashMap<>();
 
-	private void registerInterest(Hash hash, Message m) {
-		interests.put(hash, m);
+	private void registerInterest(Hash signedTransactionHash, Message m) {
+		interests.put(signedTransactionHash, m);
 	}
 
 	/**
@@ -949,21 +960,7 @@ public class Server implements Closeable {
 			// TODO: validate trusted connection?
 			// TODO: can drop Beliefs if under pressure?
 
-			synchronized (newBeliefs) {
-				AccountKey addr = receivedBelief.getAccountKey();
-				SignedData<Belief> current = newBeliefs.get(addr);
-				// Make sure the Belief is the latest from a Peer
-				if ((current == null) || (current.getValue().getTimestamp() <= receivedBelief.getValue()
-						.getTimestamp())) {
-					// Add to map of new Beliefs received for each Peer
-					newBeliefs.put(addr, receivedBelief);
-
-					// Notify the update thread that there is something new to handle
-					log.debug("Valid belief received by peer at {}: {}"
-							,getHostAddress(),receivedBelief.getValue().getHash());
-					notifyNewMessages();
-				}
-			}
+			eventQueue.put(receivedBelief);
 		} catch (ClassCastException e) {
 			// bad message?
 			log.warn("Exception due to bad message from peer? {}" ,e);
@@ -971,6 +968,9 @@ public class Server implements Closeable {
 			// we got sent a bad signature.
 			// TODO: Probably need to slash peer? but ignore for now
 			log.warn("Bad signed belief from peer: " + Utils.print(o));
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 	}
 
@@ -1030,12 +1030,7 @@ public class Server implements Closeable {
 					}
 
 					// Maybe sleep a bit, wait for some messages to accumulate
-					synchronized (updateThread) {
-						if (!hasNewMessages) {
-							updateThread.wait(SERVER_UPDATE_PAUSE);
-						}
-						hasNewMessages=false;
-					}
+					awaitEvents();
 				}
 			} catch (InterruptedException e) {
 				log.debug("Terminating Server update due to interrupt");
@@ -1046,6 +1041,38 @@ public class Server implements Closeable {
 			}
 		}
 	};
+	
+	@SuppressWarnings("unchecked")
+	private void awaitEvents() throws InterruptedException {
+		SignedData<?> firstEvent=eventQueue.poll(SERVER_UPDATE_PAUSE, TimeUnit.MILLISECONDS);
+		if (firstEvent==null) return;
+		ArrayList<SignedData<?>> allEvents=new ArrayList<>();
+		allEvents.add(firstEvent);
+		eventQueue.drainTo(allEvents);
+		for (SignedData<?> signedEvent: allEvents) {
+			ACell event=signedEvent.getValue();
+			if (event instanceof ATransaction) {
+				SignedData<ATransaction> receivedTrans=(SignedData<ATransaction>)signedEvent;
+				newTransactions.add(receivedTrans);
+			} else if (event instanceof Belief) {
+				SignedData<Belief> receivedBelief=(SignedData<Belief>)signedEvent;
+				AccountKey addr = receivedBelief.getAccountKey();
+				SignedData<Belief> current = newBeliefs.get(addr);
+				// Make sure the Belief is the latest from a Peer
+				if ((current == null) || (current.getValue().getTimestamp() <= receivedBelief.getValue()
+						.getTimestamp())) {
+					// Add to map of new Beliefs received for each Peer
+					newBeliefs.put(addr, receivedBelief);
+
+					// Notify the update thread that there is something new to handle
+					log.debug("Valid belief received by peer at {}: {}"
+							,getHostAddress(),receivedBelief.getValue().getHash());
+				}
+			} else {
+				throw new Error("Unexpected type in event queue!"+Utils.getClassName(event));
+			}
+		}
+	}
 
 	private void reportTransactions(Block block, BlockResult br) {
 		// TODO: consider culling old interests after some time period
