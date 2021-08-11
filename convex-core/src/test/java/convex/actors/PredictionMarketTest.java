@@ -120,12 +120,7 @@ public class PredictionMarketTest extends ACVMTest {
 		// setup address for this little play
 		Context<?> ctx = step("(do (def HERO " + HERO + ") (def VILLAIN " +VILLAIN + ") )");
 
-		// deploy an oracle contract.
-		String oracleString = Utils.readResourceAsString("actors/oracle-trusted.con");
-		ctx=step("(def oaddr (deploy '"+oracleString+"))");
-		Address oaddr=(Address) ctx.getResult();
-
-		ctx = step(ctx, "(def oaddr" + oaddr + ")");
+		ctx = step("(import convex.trusted-oracle :as oaddr)");
 
 		// call to create oracle with key :bar and current address (HERO) trusted
 		ctx = step(ctx, "(call oaddr (register :bar {:trust #{*address*}}))");

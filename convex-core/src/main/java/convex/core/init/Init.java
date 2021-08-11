@@ -7,6 +7,7 @@ import convex.core.Coin;
 import convex.core.Constants;
 import convex.core.State;
 import convex.core.data.ACell;
+import convex.core.data.AList;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
@@ -22,6 +23,7 @@ import convex.core.lang.Context;
 import convex.core.lang.Core;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.lang.Symbols;
 import convex.core.util.Utils;
 
 /**
@@ -45,8 +47,8 @@ public class Init {
 	// Built-in special accounts
 	public static final Address MEMORY_EXCHANGE_ADDRESS = Address.create(7);
 	public static final Address CORE_ADDRESS = Address.create(8);
-    public static final Address TRUST_ADDRESS = Address.create(9);
-	public static final Address REGISTRY_ADDRESS = Address.create(10);
+	public static final Address REGISTRY_ADDRESS = Address.create(9);
+    public static final Address TRUST_ADDRESS = Address.create(10);
 
 	// Base for user-specified addresses
 	public static final Address GENESIS_ADDRESS = Address.create(11);
@@ -173,38 +175,27 @@ public class Init {
 		return s;
 	}
 
-	static final ACell TRUST_CODE=Reader.readResource("libraries/trust.con");
-	static final ACell REGISTRY_CODE=Reader.readResource("actors/registry.con");
-
 	public static State createStaticLibraries(State s, Address trustAddress, Address registryAddress) {
 
 		// At this point we have a raw initial state with no user or peer accounts
 
-
-		{ // Deploy Trust library
-			Context<?> ctx = Context.createFake(s, INIT_ADDRESS);
-			ctx = ctx.deployActor(TRUST_CODE);
-			if (!trustAddress .equals(ctx.getResult())) throw new Error("Wrong trust address!");
-			s = ctx.getState();
+		{ // Deploy Registry Actor to fixed Address
+			s = doActorDeploy(s, "convex.registry", "actors/registry.cvx");
+			//if (!registryAddress .equals(ctx.getResult())) throw new Error("Wrong registry address!");
+			// Note the Registry registers itself upon creation
 		}
 
+		{ // Deploy Trust library
+			s = doActorDeploy(s, "convex.trust", "libraries/trust.cvx");
 
-		{ // Deploy Registry Actor to fixed Address
-			Context<Address> ctx = Context.createFake(s, INIT_ADDRESS);
-			ctx = ctx.deployActor(REGISTRY_CODE);
-			if (!registryAddress .equals(ctx.getResult())) throw new Error("Wrong registry address!");
-			// Note the Registry registers itself upon creation
-			s = ctx.getState();
+			//if (!trustAddress .equals(ctx.getResult())) throw new Error("Wrong trust address!");
 		}
 
 		{ // Register core libraries now that registry exists
 			Context<?> ctx = Context.createFake(s, INIT_ADDRESS);
 			ctx = ctx.eval(Reader.read("(call *registry* (cns-update 'convex.core " + CORE_ADDRESS + "))"));
-			ctx = ctx.eval(Reader.read("(call *registry* (cns-update 'convex.trust " + trustAddress + "))"));
-			ctx = ctx.eval(Reader.read("(call *registry* (cns-update 'convex.registry " + registryAddress + "))"));
 			s = ctx.getState();
 			s = register(s, CORE_ADDRESS, "Convex Core Library");
-			s = register(s, trustAddress, "Trust Monitor Library");
 			s = register(s, MEMORY_EXCHANGE_ADDRESS, "Memory Exchange Pool");
 		}
 
@@ -230,31 +221,31 @@ public class Init {
 			// Standard library deployment
 
 			{ // Deploy Fungible library and register with CNS
-				s = doActorDeploy(s, "convex.fungible", "libraries/fungible.con");
+				s = doActorDeploy(s, "convex.fungible", "libraries/fungible.cvx");
 			}
 
 			{ // Deploy Oracle Actor
-				s = doActorDeploy(s, "convex.trusted-oracle", "actors/oracle-trusted.con");
+				s = doActorDeploy(s, "convex.trusted-oracle", "actors/oracle-trusted.cvx");
 			}
 
 			{ // Deploy Asset Actor
-				s = doActorDeploy(s, "convex.asset", "libraries/asset.con");
+				s = doActorDeploy(s, "convex.asset", "libraries/asset.cvx");
 			}
 
 			{ // Deploy Torus Actor
-				s = doActorDeploy(s, "torus.exchange", "actors/torus.con");
+				s = doActorDeploy(s, "torus.exchange", "actors/torus.cvx");
 			}
 
 			{ // Deploy NFT Actor
-				s = doActorDeploy(s, "asset.nft-tokens", "libraries/nft-tokens.con");
+				s = doActorDeploy(s, "asset.nft-tokens", "libraries/nft-tokens.cvx");
 			}
 
 			{ // Deploy Simple NFT Actor
-				s = doActorDeploy(s, "asset.simple-nft", "libraries/simple-nft.con");
+				s = doActorDeploy(s, "asset.simple-nft", "libraries/simple-nft.cvx");
 			}
 
 			{ // Deploy Box Actor
-				s = doActorDeploy(s, "asset.box", "libraries/box.con");
+				s = doActorDeploy(s, "asset.box", "libraries/box.cvx");
 			}
 
 			{ // Deploy Play Actor
@@ -293,12 +284,10 @@ public class Init {
 
 	private static State doActorDeploy(State s, String name, String resource) {
 		Context<Address> ctx = Context.createFake(s, INIT_ADDRESS);
-		ACell form;
+		AList<ACell> form;
 		try {
-			form = Reader.read(Utils.readResourceAsString(resource));
-			ctx = ctx.deployActor(form);
-			Address addr = ctx.getResult();
-			ctx = ctx.eval(Reader.read("(call *registry* (cns-update '" + name + " " + addr + "))"));
+			form = Reader.readAll(Utils.readResourceAsString(resource));
+			ctx = ctx.deployActor(form.cons(Symbols.DO));
 
 			if (ctx.isExceptional()) throw new Error("Error deploying actor: " + ctx.getValue());
 			return ctx.getState();
