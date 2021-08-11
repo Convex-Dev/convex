@@ -508,13 +508,16 @@ public class Server implements Closeable {
 		if (r != null) {
 			try {
 				ACell data = r.getValue();
-				m.getPeerConnection().sendData(data);
-				log.trace( "Sent missing data for hash: {} with type {}",Utils.getClassName(data));
+				boolean sent = m.getPeerConnection().sendData(data);
+				// log.trace( "Sent missing data for hash: {} with type {}",Utils.getClassName(data));
+				if (!sent) {
+					log.debug("Can't send missing data for hash {} due to full buffer",h);
+				}
 			} catch (IOException e) {
-				log.warn("Unable to deliver missing data for {} due to: {}", h, e);
+				log.warn("Unable to deliver missing data for {} due to exception: {}", h, e);
 			}
 		} else {
-			log.warn("Unable to provide missing data for {} from store: {}", h,Stores.current());
+			log.debug("Unable to provide missing data for {} from store: {}", h,Stores.current());
 		}
 	}
 
@@ -1066,14 +1069,14 @@ public class Server implements Closeable {
 				Hash h = t.getHash();
 				Message m = interests.get(h);
 				if (m != null) {
-						log.trace("Returning transaction result to " ,m.getPeerConnection().getRemoteAddress());
-	
-						Connection pc = m.getPeerConnection();
-						if ((pc == null) || pc.isClosed()) continue;
-						ACell id = m.getID();
-						Result res = br.getResults().get(j).withID(id);
-	
-						pc.sendResult(res);
+					log.trace("Returning transaction result to ", m.getPeerConnection().getRemoteAddress());
+
+					Connection pc = m.getPeerConnection();
+					if ((pc == null) || pc.isClosed()) continue;
+					ACell id = m.getID();
+					Result res = br.getResults().get(j).withID(id);
+
+					pc.sendResult(res);
 					interests.remove(h);
 				}
 			} catch (Throwable e) {
