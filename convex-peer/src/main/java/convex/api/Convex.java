@@ -820,6 +820,7 @@ public class Convex {
 			Future<Result> sF=requestStatus();
 			AVector<ACell> status=sF.get(Constants.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS).getValue();
 			Hash stateHash=RT.ensureHash(status.get(4));
+
 			if (stateHash==null) throw new Error("Bad status response from Peer");
 			return acquire(stateHash);
 		} catch (InterruptedException|ExecutionException|IOException e) {

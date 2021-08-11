@@ -167,27 +167,4 @@ public class API {
 		//API.waitForNetworkReady(serverList, 10);
 		return serverList;
 	}
-
-	public static void waitForNetworkReady(List<Server> serverList, long timeoutSeconds) {
-		try {
-			boolean isNetworkReady = false;
-			long lastTimeStamp = 0;
-			long timeoutMillis = System.currentTimeMillis() + (timeoutSeconds * 1000);
-			while (!isNetworkReady || (timeoutMillis > System.currentTimeMillis())) {
-				isNetworkReady = true;
-				for (int index = 1; index < serverList.size(); index ++) {
-					Server peerServer = serverList.get(index);
-					convex.core.Peer peer = peerServer.getPeer();
-					if ( peer.getTimeStamp() != lastTimeStamp) {
-						lastTimeStamp = peer.getTimeStamp();
-						isNetworkReady = false;
-						break;
-					}
-				}
-				Thread.sleep(1000);
-			}
-		} catch ( InterruptedException e) {
-			return;
-		}
-	}
 }
