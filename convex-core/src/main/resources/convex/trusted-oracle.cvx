@@ -4,9 +4,8 @@
 ;;
 ;;
 
-(call *registry*
-      (cns-update 'convex.trusted-oracle
-                  *address*))
+
+'convex.trusted-oracle
 
 (call *registry*
       (register {:name "Trusted Oracle"}))

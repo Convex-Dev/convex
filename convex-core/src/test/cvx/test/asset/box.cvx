@@ -14,7 +14,7 @@
 
 (eval `(def box
             (deploy (quote ~(cons 'do
-                                  (next (next $/*result*)))))))
+                                  (next $/*result*))))))
 
 
 ;; Requiring test suites for `convex.asset` since this library implement that interface.

@@ -13,9 +13,7 @@
 ;; REGISTERING THE LIBRARY
 
 
-(call *registry*
-      (cns-update 'asset.box
-                  *address*))
+'asset.box
 
 (call *registry*
       (register {:name "Box Library"}))

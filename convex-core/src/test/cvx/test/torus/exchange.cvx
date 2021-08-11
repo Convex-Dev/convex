@@ -13,7 +13,7 @@
 
 (def torus
      (deploy (cons 'do
-                   (next (next $/*result*)))))
+                   (next $/*result*))))
 
 
 (def T
@@ -22,7 +22,6 @@
 
 (import convex.asset    :as asset)
 (import convex.fungible :as fungible)
-;(import torus.exchange  :as torus)
 
 
 ($.stream/out! (str $.term/clear.screen

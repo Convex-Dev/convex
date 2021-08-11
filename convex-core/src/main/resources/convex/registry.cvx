@@ -1,3 +1,5 @@
+'convex.registry
+
 ;; This code implements the standard Convex Registry
 ;;
 ;; It is deployed by default during network initialisation
@@ -19,7 +21,7 @@
   ^{:private? true}
   (address (inc (long *address*))))
 
-(def cns-database {'convex.registry [*address* *caller*]})
+(def cns-database {})
 
 
 ;; =============================================================

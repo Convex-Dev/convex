@@ -46,10 +46,7 @@
 ;; REGISTERING THE LIBRARY
 
 
-(call *registry*
-      (cns-update 'convex.asset
-                  *address*))
-
+'convex.asset
 
 (call *registry*
       (register {:name "Asset Abstraction Library"}))
