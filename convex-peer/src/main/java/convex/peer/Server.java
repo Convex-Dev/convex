@@ -854,8 +854,10 @@ public class Server implements Closeable {
 			Hash beliefHash=peer.getSignedBelief().getHash();
 			Hash stateHash=peer.getStates().getHash();
 			Hash initialStateHash=peer.getStates().get(0).getHash();
+			AccountKey peerKey=getPeerKey();
+			Hash consensusHash=peer.getConsensusState().getHash();
 
-			AVector<ACell> reply=Vectors.of(beliefHash,stateHash,initialStateHash,getPeerKey());
+			AVector<ACell> reply=Vectors.of(beliefHash,stateHash,initialStateHash,peerKey,consensusHash);
 
 			pc.sendResult(m.getID(), reply);
 		} catch (Throwable t) {

@@ -215,6 +215,17 @@ public class ServerTest {
 			assertEquals(h,ab.getHash());
 		}
 	}
+	
+	@Test
+	public void testAcquireState() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
+		synchronized(ServerTest.SERVER) {
+
+			Convex convex=CONVEX;
+
+			State s=convex.acquireState().get(60000,TimeUnit.MILLISECONDS);
+			assertTrue(s instanceof State);
+		}
+	}
 
 	public long checkSent(Connection pc,SignedData<ATransaction> st) throws IOException {
 		long x=pc.sendTransaction(st);

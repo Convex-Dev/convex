@@ -19,6 +19,7 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Hash;
@@ -38,6 +39,7 @@ import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.transactions.Transfer;
 import convex.core.util.Utils;
+import convex.core.State;
 import convex.net.Connection;
 import convex.net.Message;
 import convex.net.ResultConsumer;
@@ -811,6 +813,18 @@ public class Convex {
 	 */
 	public static Convex connect(Server server) throws IOException, TimeoutException {
 		return connect(server.getHostAddress(),server.getPeerController(),server.getKeyPair());
+	}
+
+	public Future<State> acquireState() throws TimeoutException {
+		try {
+			Future<Result> sF=requestStatus();
+			AVector<ACell> status=sF.get(Constants.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS).getValue();
+			Hash stateHash=RT.ensureHash(status.get(4));
+			if (stateHash==null) throw new Error("Bad status response from Peer");
+			return acquire(stateHash);
+		} catch (InterruptedException|ExecutionException|IOException e) {
+			throw Utils.sneakyThrow(e);
+		} 
 	}
 
 
