@@ -175,10 +175,10 @@ public class Server implements Closeable {
 	 */
 	String hostname;
 
-	private IServerEvent event = null;
+	private IServerEvent eventHook = null;
 
 	private Server(HashMap<Keyword, Object> config, IServerEvent event) throws TimeoutException, IOException {
-		this.event = event;
+		this.eventHook = event;
 		AStore configStore = (AStore) config.get(Keywords.STORE);
 		this.store = (configStore == null) ? Stores.current() : configStore;
 
@@ -1198,15 +1198,15 @@ public class Server implements Closeable {
 		return store;
 	}
 
+	/**
+	 * Reports a server change event to the registered hook, if any
+	 * @param reason Message for server change
+	 */
 	public void raiseServerChange(String reason) {
-		if (event != null) {
-			ServerEvent serverEvent = ServerEvent.create(this.getServerInformation(), reason);
-			event.onServerChange(serverEvent);
+		if (eventHook != null) {
+			ServerEvent serverEvent = ServerEvent.create(this, reason);
+			eventHook.onServerChange(serverEvent);
 		}
-	}
-
-	public ServerInformation getServerInformation() {
-		return ServerInformation.create(this);
 	}
 
 	public ConnectionManager getConnectionManager() {

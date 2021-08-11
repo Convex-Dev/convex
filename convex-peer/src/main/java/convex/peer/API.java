@@ -94,7 +94,7 @@ public class API {
 	 * The Peers will have a unique genesis State, i.e. an independent network
 	 *
 	 * @param keyPairs List of keypairs for peers
-	 * @param genesisState GEnesis state for local network
+	 * @param genesisState genesis state for local network
 	 *
 	 * @return List of Servers launched
 	 *

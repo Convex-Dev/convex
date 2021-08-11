@@ -54,7 +54,7 @@ import convex.net.Message;
 import convex.net.ResultConsumer;
 
 /**
- * Tests for a fresh standalone server instance
+ * Tests for a fresh standalone server cluster instance
  */
 public class ServerTest {
 

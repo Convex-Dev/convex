@@ -10,8 +10,8 @@ public class ServerEvent {
         this.reason = reason;
     }
 
-    public static ServerEvent create(ServerInformation information, String reason) {
-        return new ServerEvent(information, reason);
+    public static ServerEvent create(Server server, String reason) {
+        return new ServerEvent(ServerInformation.create(server), reason);
     }
 
     public ServerInformation getInformation() {
