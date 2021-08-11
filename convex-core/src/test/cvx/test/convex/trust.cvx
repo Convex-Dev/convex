@@ -1,0 +1,390 @@
+;;
+;;
+;; Testing `convex.trust`.
+;;
+;;
+
+
+($.stream/out! (str $.term/clear.screen
+                    "Testing `convex.trust`"))
+
+
+;;;;;;;;;; Setup
+
+
+(def T
+     $.test)
+
+
+($.file/read "src/main/resources/convex/trust.cvx")
+
+
+(eval `(def trust
+            (deploy (quote ~(cons 'do
+                                  (next (next $/*result*)))))))
+
+
+;; Default account is an actor, key is set to transform it into a user account.
+;;
+(set-key $.account/fake-key)
+
+
+;;;;;;;;;; Test suites
+
+
+(defn suite.blacklist
+
+  ^{:doc {:description "Creates a blacklist and ensures access is managed accordingly."}}
+
+  []
+
+  (T/group '((T/path.conj 'black-list)
+
+             (T/trx '(address? (def bl
+                                    (deploy (trust/build-blacklist nil))))
+                    {:description "Blacklist deployed."})
+
+             (T/trx '(not (trust/trusted? bl
+                                          *address*))
+                    {:description "Controller is not trusted by default when no list is provided."})
+
+             (T/fail.code #{:CAST}
+                          '(trust/trusted? bl
+                                           nil)
+                          {:description "Cannot check nil."})
+
+             (T/fail.code #{:CAST}
+                          '(trust/trusted? bl
+                                           [])
+                          {:description "Cannot trust something that is not an address."})
+
+             (T/fail.code #{:CAST}
+                          '(trust/trusted? nil
+                                           *address*)
+                          {:description "List cannot be nil."})
+
+             (T/fail.code #{:CAST}
+                          '(trust/trusted? []
+                                           *address*)
+                          {:description "List must be an address, obviously."})
+
+             (T/trx '(address? (def user-1
+                                    ($.account/zombie)))
+                    {:description "User 1 deployed."})
+
+             (T/trx '(trust/trusted? bl
+                                     user-1)
+                    {:description "Cannot trust new account."})
+
+             (T/trx '(= #{*address*
+                          user-1}
+                        (call bl
+                              (set-trusted user-1
+                                           false)))
+                    {:description "Removing trust for new account."})
+
+             (T/trx '(not (trust/trusted? bl
+                                          user-1))
+                    {:description "Excluded account is not trusted."})
+
+             (T/trx '(= #{*address*}
+                        (call bl
+                              (set-trusted user-1
+                                           true)))
+                    {:description "Restoring trust in new account."})
+
+             (T/trx '(trust/trusted? bl
+                                     user-1)
+                    {:description "New account is trusted again."})
+
+             (T/trx '(address? (def user-2
+                                    ($.account/zombie)))
+                    {:description "User 2 deployed."})
+
+             (T/trx '(= #{*address*
+                          user-2}
+                        (call bl
+                              (set-trusted user-2
+                                           false)))
+                    {:description "Removing trust in user 2."})
+
+             (T/trx '(eval-as user-1
+                              `(~trust/trusted? ~bl
+                                                ~user-1))
+                    {:description "Non-controller can check monitor for trusted address."})
+
+             (T/trx '(not (eval-as user-1
+                                   `(~trust/trusted? ~bl
+                                                     ~user-2)))
+                    {:description "Non-controller can check monitor for untrusted address."})
+
+             (T/fail.code #{:TRUST}
+                          '(eval-as user-1
+                                    `(call ~bl
+                                           (set-trusted ~user-1
+                                                        false)))
+                          {:description "Non-controller trying to remove trust for itself fails."})
+
+             (T/fail.code #{:TRUST}
+                          '(eval-as user-1
+                                    `(call ~bl
+                                           (set-trusted ~user-1
+                                                        true)))
+                          {:description "Non-controller cannot grant trust in itself."})
+
+             (T/fail.code #{:TRUST}
+                          '(eval-as user-1
+                                    `(call ~bl
+                                           (set-trusted ~user-2
+                                                        true)))
+                          {:description "Non-controller cannot grant trust to another account."})
+
+             (T/fail.code #{:TRUST}
+                          '(eval-as user-1
+                                    `(call ~bl
+                                           (set-trusted ~user-2
+                                                        false)))
+                          {:description "Non-controller trying to remove trust for another account fails."})
+
+             (T/fail.code #{:TRUST}
+                          '(eval-as user-1
+                                    `(call ~bl
+                                           (set-trusted ~*address*
+                                                        true)))
+                          {:description "Non-controller cannot grant trust to trusted account."})
+
+             (T/fail.code #{:TRUST}
+                          '(eval-as user-1
+                                    `(call ~bl
+                                           (set-trusted ~*address*
+                                                        false)))
+                          {:description "Non-controller trying to remove trust for trusted account fails."}))))
+
+
+
+(defn suite.self-trust
+
+  ^{:doc {:description "Basic truths about trust."}}
+
+  []
+
+  (T/group '((T/path.conj 'self-trust)
+
+             (T/trx '(trust/trusted? *address*
+                                     *address*)
+                    {:description "Self trust."})
+
+             (T/trx '(not (trust/trusted? *address*
+                                          nil))
+                    {:description "Never trust \"nothing\"."})
+
+             (T/trx '(not (trust/trusted? *address*
+                                          :foo))
+                    {:description "Cannot trust something that is not an address."})
+
+             (T/trx '(and (nil? (account #666666))
+                          (not (trust/trusted? *address*
+                                               #666666)))
+                    {:description "Cannot trust an inexistent address."}))))
+
+
+
+(defn suite.upgrade
+
+  ^{:doc {:description "Adding and removing upgradability from an account (ie. ability to eval arbitrary code)."}}
+
+  []
+
+  (T/group '((T/path.conj 'upgrade)
+
+             (T/trx '(address? (def target
+                                    (deploy `(do
+                                               (def bar
+                                                    1)
+                                               ~(trust/add-trusted-upgrade nil)))))
+                    {:description "Upgradable whiteliste deployed."})
+
+             (T/trx '(do
+                       (call target
+                             (upgrade '(def foo
+                                            42)))
+                       (= 42
+                          target/foo))
+                    {:description "Eval arbitrary code in list actor."})
+
+             (T/trx '(address? (def not-root
+                                    ($.account/zombie)))
+                    {:description "Accoutn deployed."})
+
+             (T/fail.code #{:TRUST}
+                          '(eval-as not-root
+                                    `(call ~target
+                                           (upgrade '(def foo
+                                                          100))))
+                          {:description "Non-root account cannot upgrade."})
+
+             (T/trx '(nil? (trust/remove-upgradability! target))
+                    {:description "Upgrade utilities removed (returns nil)."})
+
+             (T/fail.code #{:STATE}
+                          '(call target
+                                 (updade '(def foo
+                                               1001)))
+                          {:description "Impossible to upgrade."})
+
+             (T/trx '(= 1
+                        target/bar)
+                    {:description "Rest of environment is preserved after loosing upgradability."}))))
+
+
+
+(defn suite.whitelist
+
+  ^{:doc {:description "Builds whitelist and ensures access is managed accordingly."}}
+
+  []
+
+  (T/group '((T/path.conj 'white-list)
+
+             (T/trx '(address? (def wl
+                                    (deploy (trust/build-whitelist nil))))
+                    {:description "Whitelist deployed."})
+
+             (T/trx '(trust/trusted? wl
+                                     *address*)
+                    {:description "Controller is trusted by default when no list is provided."})
+
+             (T/fail.code #{:CAST}
+                          '(trust/trusted? wl
+                                           nil)
+                          {:description "Cannot check nil."})
+
+             (T/fail.code #{:CAST}
+                          '(trust/trusted? wl
+                                           [])
+                          {:description "Cannot trust something that is not an address."})
+
+             (T/fail.code #{:CAST}
+                          '(trust/trusted? nil
+                                           *address*)
+                          {:description "List cannot be nil."})
+
+             (T/fail.code #{:CAST}
+                          '(trust/trusted? []
+                                           *address*)
+                          {:description "List must be an address, obviously."})
+
+             (T/trx '(address? (def user-1
+                                    ($.account/zombie)))
+                    {:description "User 1 deployed."})
+
+             (T/trx '(not (trust/trusted? wl
+                                          user-1))
+                    {:description "Cannot trust new account."})
+
+             (T/trx '(= #{*address*
+                          user-1}
+                        (call wl
+                              (set-trusted user-1
+                                           true)))
+                    {:description "Trusting new account."})
+
+             (T/trx '(trust/trusted? wl
+                                     user-1)
+                    {:description "New account is trusted."})
+
+             (T/trx '(= #{*address*}
+                        (call wl
+                              (set-trusted user-1
+                                           false)))
+                    {:description "Removing trust in new account."})
+
+             (T/trx '(not (trust/trusted? wl
+                                          user-1))
+                    {:description "New account is not trusted anymore."})
+
+             (T/trx '(address? (def user-2
+                                    ($.account/zombie)))
+                    {:description "User 2 deployed."})
+
+             (T/trx '(= #{*address*
+                          user-2}
+                        (call wl
+                              (set-trusted user-2
+                                           true)))
+                    {:description "Trusting user 2."})
+
+             (T/trx '(not (eval-as user-1
+                                   `(~trust/trusted? ~wl
+                                                     ~user-1)))
+                    {:description "Non-controller can check monitor for untrusted address."})
+
+             (T/trx '(eval-as user-1
+                              `(~trust/trusted? ~wl
+                                                ~user-2))
+                    {:description "Non-controller can check monitor for trusted address."})
+
+             (T/fail.code #{:TRUST}
+                          '(eval-as user-1
+                                    `(call ~wl
+                                           (set-trusted ~user-1
+                                                        true)))
+                          {:description "Non-controller cannot grant trust to itself."})
+
+             (T/fail.code #{:TRUST}
+                          '(eval-as user-1
+                                    `(call ~wl
+                                           (set-trusted ~user-1
+                                                        false)))
+                          {:description "Non-controller trying to remove trust for itself fails."})
+
+             (T/fail.code #{:TRUST}
+                          '(eval-as user-1
+                                    `(call ~wl
+                                           (set-trusted ~user-2
+                                                        true)))
+                          {:description "Non-controller cannot grant trust to another account."})
+
+             (T/fail.code #{:TRUST}
+                          '(eval-as user-1
+                                    `(call ~wl
+                                           (set-trusted ~user-2
+                                                        false)))
+                          {:description "Non-controller trying to remove trust for another account fails."})
+
+             (T/fail.code #{:TRUST}
+                          '(eval-as user-1
+                                    `(call ~wl
+                                           (set-trusted ~*address*
+                                                        true)))
+                          {:description "Non-controller cannot grant trust to trusted account."})
+
+             (T/fail.code #{:TRUST}
+                          '(eval-as user-1
+                                    `(call ~wl
+                                           (set-trusted ~*address*
+                                                        false)))
+                          {:description "Non-controller trying to remove trust for trusted account fails."}))))
+
+
+;;;
+
+
+(defn suite.main
+
+  ^{:doc {:description "Main suite gathering all other suites."}}
+
+  []
+
+  (T/group '((T/path.conj 'convex.trust)
+             (suite.blacklist)
+             (suite.self-trust)
+             (suite.upgrade)
+             (suite.whitelist))))
+
+
+;;;
+
+
+(suite.main)
+(T/print "convex.trust")

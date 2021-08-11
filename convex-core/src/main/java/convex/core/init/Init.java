@@ -213,7 +213,7 @@ public class Init {
 			s = doActorDeploy(s, "convex/fungible.cvx");
 			s = doActorDeploy(s, "convex/trusted-oracle.cvx");
 			s = doActorDeploy(s, "convex/asset.cvx");
-			s = doActorDeploy(s, "asset/torus/exchange.cvx");
+			s = doActorDeploy(s, "torus/exchange.cvx");
 			s = doActorDeploy(s, "asset/nft-tokens.cvx");
 			s = doActorDeploy(s, "asset/simple-nft.cvx");
 			s = doActorDeploy(s, "asset/box.cvx");
@@ -222,7 +222,7 @@ public class Init {
 			{ // Deploy Currencies
 				@SuppressWarnings("unchecked")
 				AVector<AVector<ACell>> table = (AVector<AVector<ACell>>) Reader
-						.readResourceAsData("asset/torus/currencies.cvx");
+						.readResourceAsData("torus/currencies.cvx");
 				for (AVector<ACell> row : table) {
 					s = doCurrencyDeploy(s, row);
 				}

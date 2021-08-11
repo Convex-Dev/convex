@@ -1,0 +1,103 @@
+;;
+;;
+;; Testing `convex.trusted-oracle`.
+;;
+;;
+
+
+;;;;;;;;;; Setup
+
+
+($.file/read "src/main/resources/convex/trusted-oracle.cvx")
+
+
+(def oracle
+     (deploy (cons 'do
+                   (next (next $/*result*)))))
+
+
+(def T
+     $.test)
+
+
+;;;;;;;;;; Test suites
+
+
+(defn suite.main
+
+  ^{:doc {:description "Only test suite."}}
+
+  []
+
+  (T/group '((T/path.conj 'convex.trusted-oracle)
+
+             (T/trx '(call oracle
+                           (register :foo
+                                     {:trust #{*address*}}))
+                    {:description "Registering oracle."})
+
+             (T/trx '(= false
+                        (call oracle
+                              (register :foo
+                                        {:bar :baz})))
+                    {:description "Cannot register same key twice."})
+
+             (T/trx '(= {:foo {:trust #{*address*}}}
+                        oracle/full-list)
+                    {:description "Overwrite did not work."})
+
+             (T/trx '(= false
+                        (call oracle
+                              (finalised? :foo)))
+                    {:description "Not yet finalized."})
+
+             (T/trx '(nil? (call oracle
+                                 (read :foo)))
+                    {:description "Nothing to read, not yet finalized."})
+
+             (def villain
+                  ($.account/zombie))
+
+             (T/fail.code #{:ASSERT}
+                          '(eval-as villain
+                                    `(call ~oracle
+                                           (provide :foo
+                                                    :bar)))
+                          {:description "Villain is not trusted for providing a value."})
+
+             (T/trx '(nil? (call oracle
+                                 (read :foo)))
+                    {:description "Vilain did not manage to provide a value."})
+
+             (T/trx '(= :baz
+                        (call oracle
+                              (provide :foo
+                                       :baz)))
+                    {:description "Trusted account provides value."})
+
+             (T/trx '(call oracle
+                           (finalised? :foo))
+                    {:description "Key is finalized."})
+
+             (T/trx '(= :baz
+                        (call oracle
+                              (read :foo)))
+                    {:description "Finalized key is read."})
+
+             (T/trx '(= :baz
+                        (call oracle
+                              (provide :foo
+                                       42)))
+                    {:description "Cannot overwrite value."})
+
+             (T/trx '(= :baz
+                         (call oracle
+                               (read :foo)))
+                    {:description "Value was not overwritten."}))))
+
+
+;;;
+
+
+(suite.main)
+(T/print "convex.trusted-oracle")
