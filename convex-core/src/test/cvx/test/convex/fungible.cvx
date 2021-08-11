@@ -19,7 +19,7 @@
 
 (eval `(def fungible
             (deploy (quote ~(cons 'do
-                                  (next (next $/*result*)))))))
+                                  (next $/*result*))))))
 
 ($.file/exec "src/test/cvx/test/convex/fungible/generic.cvx")
 

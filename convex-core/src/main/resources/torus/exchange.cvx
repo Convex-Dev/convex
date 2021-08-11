@@ -17,9 +17,7 @@
 ;;   (call market cvx-amt (add-liquidity token-amt))    ;; Add liquidity [cvx-amt, token-amt]
      
 
-(call *registry*
-      (cns-update 'torus.exchange
-                  *address*))
+'torus.exchange
 
 (call *registry* (register {:name "Torus Exchange Library"}))
 

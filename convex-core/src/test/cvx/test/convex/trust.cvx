@@ -21,7 +21,7 @@
 
 (eval `(def trust
             (deploy (quote ~(cons 'do
-                                  (next (next $/*result*)))))))
+                                  (next $/*result*))))))
 
 
 ;; Default account is an actor, key is set to transform it into a user account.

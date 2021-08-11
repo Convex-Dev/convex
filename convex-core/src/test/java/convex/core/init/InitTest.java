@@ -85,7 +85,7 @@ public class InitTest extends ACVMTest {
 		assertTrue(evalA("(call *registry* (cns-resolve 'torus.exchange))"));
 
 		assertEquals(Init.CORE_ADDRESS, eval("(call *registry* (cns-resolve 'convex.core))"));
-		assertEquals(Init.REGISTRY_ADDRESS, eval("*registry*"));
+		assertEquals(Init.REGISTRY_ADDRESS, eval("(call *registry* (cns-resolve 'convex.registry))"));
 		assertEquals(Init.TRUST_ADDRESS, eval("(call *registry* (cns-resolve 'convex.trust))"));
 	}
 

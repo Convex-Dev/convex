@@ -10,9 +10,8 @@
 ;;
 
 
-(call *registry*
-      (cns-update 'convex.trust
-                  *address*))
+'convex.trust
+
 
 (call *registry*
       (register {:name "Trust Monitor Library"}))

@@ -5,7 +5,7 @@
 ;;
 
 
-;;;;;;;;;; Setup
+;;;;;;;;;; Setup:w
 
 
 ($.file/read "src/main/resources/convex/trusted-oracle.cvx")
@@ -13,7 +13,7 @@
 
 (def oracle
      (deploy (cons 'do
-                   (next (next $/*result*)))))
+                   (next $/*result*))))
 
 
 (def T

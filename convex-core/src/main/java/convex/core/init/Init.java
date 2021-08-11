@@ -14,10 +14,7 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
-import convex.core.data.Keywords;
-import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
-import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.lang.Context;
 import convex.core.lang.Core;
@@ -249,14 +246,21 @@ public class Init {
 		return Address.create(GENESIS_ADDRESS.longValue() + index);
 	}
 
+	// A CVX file contains forms which must be wrapped in a `(do ...)` and deployed as an actor.
+	// First form is the name that must be used when registering the actor.
+	//
 	private static State doActorDeploy(State s, String resource) {
 		Context<Address> ctx = Context.createFake(s, INIT_ADDRESS);
-		AList<ACell> form;
-		try {
-			form = Reader.readAll(Utils.readResourceAsString(resource));
-			ctx = ctx.deployActor(form.cons(Symbols.DO));
 
-			if (ctx.isExceptional()) throw new Error("Error deploying actor: " + ctx.getValue());
+		try {
+			AList<ACell> forms = Reader.readAll(Utils.readResourceAsString(resource));
+
+			ctx = ctx.deployActor(forms.next().cons(Symbols.DO));
+			if (ctx.isExceptional()) throw new Error("Error deploying actor:" + ctx.getValue());
+
+			ctx = ctx.eval(Reader.read("(call *registry* (cns-update " + forms.get(0) + " " + ctx.getResult() + "))"));
+			if (ctx.isExceptional()) throw new Error("Error while registering actor:" + ctx.getValue());
+
 			return ctx.getState();
 		} catch (IOException e) {
 			throw Utils.sneakyThrow(e);
@@ -268,10 +272,10 @@ public class Init {
 		double usdValue = RT.jvm(row.get(6));
 		long decimals = RT.jvm(row.get(5));
 
-		// currency liquidity in lowest currency division
+		// Currency liquidity in lowest currency division
 		double liquidity = (Long) RT.jvm(row.get(4)) * Math.pow(10, decimals);
 
-		// cvx price for unit
+		// CVX price for unit
 		double price = usdValue * 1000;
 		double cvx = price * liquidity / Math.pow(10, decimals);
 

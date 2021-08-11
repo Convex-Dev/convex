@@ -15,9 +15,7 @@
 ;; - If actors return a falsey value, the session quites automatically
 
 
-(call *registry*
-	  (cns-update 'convex.play
-				  *address*))
+'convex.play
 
 
 (defn exit 

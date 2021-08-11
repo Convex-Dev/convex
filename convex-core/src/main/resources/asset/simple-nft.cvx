@@ -12,10 +12,7 @@
 ;; REGISTERING THE LIBRARY
 
 
-(call *registry*
-      (cns-update 'asset.simple-nft
-                  *address*))
-
+'asset.simple-nft
 
 (call *registry*
       (register {:name "Simple NFT Library"}))
