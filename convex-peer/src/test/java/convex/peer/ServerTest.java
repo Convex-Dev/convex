@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
 import convex.core.Belief;
+import convex.core.Coin;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.State;
@@ -34,6 +35,8 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Hash;
+import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
@@ -195,6 +198,47 @@ public class ServerTest {
 		Thread.sleep(200);
 		Ref<State> ref=Ref.forHash(h);
 		assertNotNull(ref);
+	}
+	
+	@Test
+	public void testJoinNetwork() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
+		AKeyPair kp=AKeyPair.generate();
+		AccountKey peerKey=kp.getAccountKey();
+
+		
+		long STAKE=1000000000;
+		synchronized(ServerTest.SERVER) {
+			Convex heroConvex=CONVEX;
+			
+			// Create new peer controller account
+			Address controller=heroConvex.createAccountSync(kp.getAccountKey());
+			Result trans=heroConvex.transferSync(controller,Coin.DIAMOND);
+			assertFalse(trans.isError());
+			
+			// create test user account
+			Address user=heroConvex.createAccountSync(kp.getAccountKey());
+			trans=heroConvex.transferSync(user,STAKE);
+			assertFalse(trans.isError());
+			
+			Convex convex=Convex.connect(SERVER.getHostAddress(), controller, kp);
+			trans=convex.transactSync(Invoke.create(controller, 0, "(create-peer "+peerKey+" "+STAKE+")"));
+			assertEquals(RT.cvm(STAKE),trans.getValue());
+
+			HashMap<Keyword,Object> config=new HashMap<>();
+			config.put(Keywords.KEYPAIR,kp);
+			config.put(Keywords.SOURCE,ServerTest.SERVER.getHostAddress());
+			Server newServer=API.launchPeer(config);
+			
+			// make peer connections directly
+			newServer.getConnectionManager().connectToPeer(SERVER.getHostAddress());
+			SERVER.getConnectionManager().connectToPeer(newServer.getHostAddress());
+			
+			// should be in consensus at this point since just synced
+			assertEquals(newServer.getPeer().getConsensusState(),SERVER.getPeer().getConsensusState());
+			
+			Convex client=Convex.connect(newServer.getHostAddress(), user, kp);
+			assertEquals(user,client.transactSync(Invoke.create(user, 0, "*address*")).getValue());
+		}
 	}
 
 	@Test

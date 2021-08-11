@@ -814,6 +814,17 @@ public class Convex {
 	public static Convex connect(Server server) throws IOException, TimeoutException {
 		return connect(server.getHostAddress(),server.getPeerController(),server.getKeyPair());
 	}
+	
+	/**
+	 * Wraps a connection as a Convex client instance
+	 * @param c Connection to wrap
+	 * @return New Convex client instance using underlying connection
+	 */
+	public static Convex wrap(Connection c) {
+		Convex convex=new Convex(null,null);
+		convex.setConnection(c);
+		return convex;
+	}
 
 	public Future<State> acquireState() throws TimeoutException {
 		try {
@@ -827,6 +838,15 @@ public class Convex {
 			throw Utils.sneakyThrow(e);
 		} 
 	}
+
+	/**
+	 * Close without affecting the connection
+	 */
+	public void closeButMaintainConnection() {
+		this.connection=null;
+		close();
+	}
+
 
 
 

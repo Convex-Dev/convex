@@ -717,22 +717,17 @@ public class Connection {
 	 * SECURITY: Called on Selector Thread
 	 *
 	 * @param key Selection Key
+	 * @throws IOException 
 	 */
-	public static void selectWrite(SelectionKey key) {
-		try {
-			Connection pc = (Connection) key.attachment();
-			boolean allSent = pc.sender.maybeSendBytes();
+	static void selectWrite(SelectionKey key) throws IOException {
+		Connection pc = (Connection) key.attachment();
+		boolean allSent = pc.sender.maybeSendBytes();
 
-			if (allSent) {
-				// deregister interest in writing
-				key.interestOps(key.interestOps() & ~SelectionKey.OP_WRITE);
-			} else {
-				// we want to continue writing
-			}
-		} catch (IOException e) {
-			// TODO: figure out cases here. Probably channel closed?
-			log.warn("Unexpected IOException: {}", e);
-			key.cancel();
+		if (allSent) {
+			// deregister interest in writing
+			key.interestOps(key.interestOps() & ~SelectionKey.OP_WRITE);
+		} else {
+			// we want to continue writing
 		}
 	}
 

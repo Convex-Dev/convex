@@ -740,6 +740,14 @@ public class Server implements Closeable {
 	public void setPeerController(Address a) {
 		controller=a;
 	}
+	
+	/**
+	 * Adds an event to the inboud server event queue. May block.
+	 * @throws InterruptedException 
+	 */
+	public void queueEvent(SignedData<?> event) throws InterruptedException {
+		eventQueue.put(event);
+	}
 
 	/**
 	 * Check if the Peer want to send any of its own transactions
