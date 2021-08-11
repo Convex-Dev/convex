@@ -153,7 +153,7 @@ public class Server implements Closeable {
 	private Address controller;
 
 	/**
-	 * The list of new transactions to be added to the next Block
+	 * The list of new transactions to be added to the next Block. Accessed only in update loop
 	 *
 	 * Must all have been fully persisted.
 	 */
@@ -617,7 +617,7 @@ public class Server implements Closeable {
 		long oldConsensusPoint = peer.getConsensusPoint();
 
 		// possibly have own transactions to publish
-		maybePostOwnTransactions(newTransactions);
+		maybePostOwnTransactions();
 
 		// publish new blocks if needed. Guaranteed to change belief if this happens
 		boolean published = maybePublishBlock();
@@ -693,13 +693,11 @@ public class Server implements Closeable {
 		if ((lastBlockPublishedTime+Constants.MIN_BLOCK_TIME)>timestamp) return false;
 		
 		Block block=null;
-		synchronized (newTransactions) {
-			int n = newTransactions.size();
-			if (n == 0) return false;
-			// TODO: smaller block if too many transactions?
-			block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions, peer.getPeerKey());
-			newTransactions.clear();
-		}
+		int n = newTransactions.size();
+		if (n == 0) return false;
+		// TODO: smaller block if too many transactions?
+		block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions, peer.getPeerKey());
+		newTransactions.clear();
 		
 		ACell.createPersisted(block);
 
@@ -735,55 +733,48 @@ public class Server implements Closeable {
 	 * Check if the Peer want to send any of its own transactions
 	 * @param transactionList List of transactions to add to.
 	 */
-	private void maybePostOwnTransactions(ArrayList<SignedData<ATransaction>> transactionList) {
+	private void maybePostOwnTransactions() {
 		if (!Utils.bool(config.get(Keywords.AUTO_MANAGE))) return;
 
-		synchronized (transactionList) {
-			State s=getPeer().getConsensusState();
-			long ts=Utils.getCurrentTimestamp();
+		State s=getPeer().getConsensusState();
+		long ts=Utils.getCurrentTimestamp();
 
-			// If no connections yet, don't try this
-			if (manager.getConnectionCount()==0) return;
+		// If no connections yet, don't try this
+		if (manager.getConnectionCount()==0) return;
 
-			// If we already did this recently, don't try again
-			if (ts<(lastOwnTransactionTimestamp+OWN_TRANSACTIONS_DELAY)) return;
+		// If we already did this recently, don't try again
+		if (ts<(lastOwnTransactionTimestamp+OWN_TRANSACTIONS_DELAY)) return;
 
-			lastOwnTransactionTimestamp=ts; // mark this timestamp
+		lastOwnTransactionTimestamp=ts; // mark this timestamp
 
-			String desiredHostname=getHostname(); // Intended hostname
-			AccountKey peerKey=getPeerKey();
-			PeerStatus ps=s.getPeer(peerKey);
-			AString chn=ps.getHostname();
-			String currentHostname=(chn==null)?null:chn.toString();
+		String desiredHostname=getHostname(); // Intended hostname
+		AccountKey peerKey=getPeerKey();
+		PeerStatus ps=s.getPeer(peerKey);
+		AString chn=ps.getHostname();
+		String currentHostname=(chn==null)?null:chn.toString();
 
-			// Try to set hostname if not correctly set
-			trySetHostname:
-			if (!Utils.equals(desiredHostname, currentHostname)) {
-				log.info("Trying to update own hostname from: {} to {}",currentHostname,desiredHostname);
-				Address address=ps.getController();
-				if (address==null) break trySetHostname;
-				AccountStatus as=s.getAccount(address);
-				if (as==null) break trySetHostname;
-				if (!Utils.equals(getPeerKey(), as.getAccountKey())) break trySetHostname;
+		// Try to set hostname if not correctly set
+		trySetHostname:
+		if (!Utils.equals(desiredHostname, currentHostname)) {
+			log.info("Trying to update own hostname from: {} to {}",currentHostname,desiredHostname);
+			Address address=ps.getController();
+			if (address==null) break trySetHostname;
+			AccountStatus as=s.getAccount(address);
+			if (as==null) break trySetHostname;
+			if (!Utils.equals(getPeerKey(), as.getAccountKey())) break trySetHostname;
 
-				String code;
-				if (desiredHostname==null) {
-					code = String.format("(set-peer-data %s {:url nil})", peerKey);
-				} else {
-					code = String.format("(set-peer-data %s {:url \"%s\"})", peerKey, desiredHostname);
-				}
-				ACell message = Reader.read(code);
-				ATransaction transaction = Invoke.create(address, as.getSequence()+1, message);
-				postOwnTransaction(transaction);
+			String code;
+			if (desiredHostname==null) {
+				code = String.format("(set-peer-data %s {:url nil})", peerKey);
+			} else {
+				code = String.format("(set-peer-data %s {:url \"%s\"})", peerKey, desiredHostname);
 			}
+			ACell message = Reader.read(code);
+			ATransaction transaction = Invoke.create(address, as.getSequence()+1, message);
+			newTransactions.add(getKeyPair().signData(transaction));
 		}
 	}
 
-	private void postOwnTransaction(ATransaction trans) {
-		synchronized (newTransactions) {
-			newTransactions.add(getKeyPair().signData(trans));
-		}
-	}
 
 	/**
 	 * Checks for mergeable remote beliefs, and if found merge and update own
