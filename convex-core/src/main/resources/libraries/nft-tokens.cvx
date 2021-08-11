@@ -61,8 +61,8 @@
 ;;
 ;;
   
+(call *registry* (cns-update 'asset.nft-tokens *address*))
 (call *registry* (register {:name "NFT Tokens"}))
-(call *registry* (cns-update 'convex.nft-tokens *address*))
 
 (import convex.asset :as asset)
 
