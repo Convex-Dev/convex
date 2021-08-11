@@ -714,7 +714,7 @@ public class Connection {
 	/**
 	 * Handles writes to the channel.
 	 *
-	 * SECURITY: Called on Connection Selector Thread
+	 * SECURITY: Called on Selector Thread
 	 *
 	 * @param key Selection Key
 	 */

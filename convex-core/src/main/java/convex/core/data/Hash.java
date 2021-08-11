@@ -182,6 +182,12 @@ public class Hash extends AArrayBlob {
 		// tag plus raw data
 		return 1 + LENGTH;
 	}
+	
+	@Override
+	public long getEncodingLength() {
+		// Always a fixed encoding length, tag plus count plus length
+		return 2 + LENGTH;
+	}
 
 	@Override
 	public Blob getChunk(long i) {
