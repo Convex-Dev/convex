@@ -169,7 +169,8 @@ public class PeerManager implements IServerEvent {
 		config.put(Keywords.STORE, store);
 		config.put(Keywords.STATE, baseState);
 		config.put(Keywords.KEYPAIR, keyPair);
-		Server server = API.launchPeer(config, this);
+		config.put(Keywords.EVENT_HOOK, this); // Add this as IServerEvent hook
+		Server server = API.launchPeer(config);
 
 		server.joinNetwork(keyPair, address, remotePeerHostname, signedBelief);
 		peerServerList.add(server);

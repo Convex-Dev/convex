@@ -30,15 +30,6 @@ public class API {
 
 	private static final Logger log = LoggerFactory.getLogger(API.class.getName());
 
-	public static Server launchPeer() {
-		Map<Keyword, Object> config = new HashMap<>();
-		return launchPeer(config, null);
-	}
-
-	public static Server launchPeer(Map<Keyword, Object> config) {
-		return launchPeer(config, null);
-	}
-
 	/**
 	 * <p>Launches a Peer Server with a supplied configuration.</p>
 	 *
@@ -60,7 +51,7 @@ public class API {
      *
 	 * @return New Server instance
 	 */
-	public static Server launchPeer(Map<Keyword, Object> peerConfig, IServerEvent event) {
+	public static Server launchPeer(Map<Keyword, Object> peerConfig) {
 		HashMap<Keyword,Object> config=new HashMap<>(peerConfig);
 
 		// State no8t strictly necessarry? Should be possible to restore a Peer from store
@@ -78,7 +69,7 @@ public class API {
 			if (!config.containsKey(Keywords.RESTORE)) config.put(Keywords.RESTORE, true);
 			if (!config.containsKey(Keywords.PERSIST)) config.put(Keywords.PERSIST, true);
 
-			Server server = Server.create(config, event);
+			Server server = Server.create(config);
 			server.launch();
 			return server;
 		} catch (Throwable t) {
@@ -135,6 +126,9 @@ public class API {
 		// Automatically manage Peer connections
 		config.put(Keywords.AUTO_MANAGE, true);
 
+		if (event!=null) {
+			config.put(Keywords.EVENT_HOOK, event);
+		}
 
 		for (int i = 0; i < count; i++) {
 			AKeyPair keyPair = keyPairs.get(i);
@@ -142,7 +136,7 @@ public class API {
 			if (peerPorts != null) {
 				config.put(Keywords.PORT, peerPorts[i]);
 			}
-			Server server = API.launchPeer(config, event);
+			Server server = API.launchPeer(config);
 			serverList.add(server);
 		}
 

@@ -177,11 +177,16 @@ public class Server implements Closeable {
 
 	private IServerEvent eventHook = null;
 
-	private Server(HashMap<Keyword, Object> config, IServerEvent event) throws TimeoutException, IOException {
-		this.eventHook = event;
+	private Server(HashMap<Keyword, Object> config) throws TimeoutException, IOException {
 		AStore configStore = (AStore) config.get(Keywords.STORE);
 		this.store = (configStore == null) ? Stores.current() : configStore;
 
+		Object maybeHook=config.get(Keywords.EVENT_HOOK);
+		if (maybeHook instanceof IServerEvent) {
+			this.eventHook = (IServerEvent)maybeHook;
+		} else {
+			eventHook=null;
+		}
 
 		// Switch to use the configured store for setup, saving the caller store
 		final AStore savedStore=Stores.current();
@@ -286,27 +291,14 @@ public class Server implements Closeable {
 	 * mutate elsewhere.
 	 *
 	 * @param config Server configuration map
-	 * @return New Server instance
-	 * @throws IOException If an IO Error occurred establishing the Peer
-	 * @throws TimeoutException If Peer creation timed out
-	 */
-	public static Server create(HashMap<Keyword, Object> config) throws TimeoutException, IOException {
-		return create(config, null);
-	}
-
-	/**
-	 * Creates a Server with a given config. Reference to config is kept: don't
-	 * mutate elsewhere.
-	 *
-	 * @param config Server configuration map
 	 *
 	 * @param event Event interface where the server will send information about the peer
 	 * @return New Server instance
 	 * @throws IOException If an IO Error occurred establishing the Peer
 	 * @throws TimeoutException If Peer creation timed out
 	 */
-	public static Server create(HashMap<Keyword, Object> config, IServerEvent event) throws TimeoutException, IOException {
-		return new Server(config, event);
+	public static Server create(HashMap<Keyword, Object> config) throws TimeoutException, IOException {
+		return new Server(config);
 	}
 
 	/**
