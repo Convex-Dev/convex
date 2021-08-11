@@ -60,6 +60,7 @@ public class LatencyBenchmark {
 	@Benchmark
 	public void roundTripTransaction() throws TimeoutException, IOException {
 		client.transactSync(Invoke.create(Benchmarks.HERO,-1, Constant.of(1L)));
+		// System.out.println(server.getBroadcastCount());
 	}
 
 	@Benchmark

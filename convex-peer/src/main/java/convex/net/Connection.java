@@ -114,6 +114,14 @@ public class Connection {
 			AccountKey trustedPeerKey) throws IOException {
 		return new Connection(channel, receiveAction, store, trustedPeerKey);
 	}
+	
+	/**
+	 * Gets the global message ID counter
+	 * @return Message ID counter for last message sent
+	 */
+	public static long getCounter() {
+		return idCounter;
+	}
 
 	/**
 	 * Create a PeerConnection by connecting to a remote address

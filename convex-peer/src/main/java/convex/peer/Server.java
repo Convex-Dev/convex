@@ -656,6 +656,7 @@ public class Server implements Closeable {
 	 * Time of last belief broadcast
 	 */
 	private long lastBroadcastBelief=0;
+	private long broadcastCount=0L;
 
 	private void broadcastBelief(Belief belief) {
 		// At this point we know something updated our belief, so we want to rebroadcast
@@ -669,15 +670,26 @@ public class Server implements Closeable {
 		};
 		
 		// persist the state of the Peer, announcing the new Belief
+		// (ensure we can handle missing data requests etc.)
 		peer=peer.persistState(noveltyHandler);
 
 		// Broadcast latest Belief to connected Peers
 		SignedData<Belief> sb = peer.getSignedBelief();
+		
 		Message msg = Message.createBelief(sb);
 
         // at the moment broadcast to all peers trusted or not TODO: recheck this
 		manager.broadcast(msg, false);
 		lastBroadcastBelief=Utils.getCurrentTimestamp();
+		broadcastCount++;
+	}
+	
+	/**
+	 * Gets the number of belief broadcasts made by this Peer
+	 * @return Count of broadcasts from this Server instance
+	 */
+	public long getBroadcastCount() {
+		return broadcastCount;
 	}
 
 	private long lastBlockPublishedTime=0L;
