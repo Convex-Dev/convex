@@ -135,12 +135,6 @@ public class Server implements Closeable {
 
 	private volatile boolean isRunning = false;
 
-	/**
-	 * Flag to indicate if there are any new things for the server to process (Beliefs, transactions)
-	 * can safely sleep a bit if nothing to do
-	 */
-	private volatile boolean hasNewMessages = false;
-
 	private NIOServer nio;
 	private Thread receiverThread = null;
 	private Thread updateThread = null;
@@ -557,17 +551,6 @@ public class Server implements Closeable {
 		} catch (InterruptedException e) {
 			log.warn("Unexpected interruption adding transaction to event queue!");
 		}
-	}
-
-	// Mark presence of new messages to handle
-	private void notifyNewMessages() {
-		// Notify updateThread after available messages are processed
-		synchronized (updateThread) {
-			if (!hasNewMessages) {
-				hasNewMessages=true;
-				updateThread.notify();
-			}
-		}	
 	}
 
 	/**
@@ -1078,25 +1061,24 @@ public class Server implements Closeable {
 		// TODO: consider culling old interests after some time period
 		int nTrans = block.length();
 		for (long j = 0; j < nTrans; j++) {
-			SignedData<ATransaction> t = block.getTransactions().get(j);
-			Hash h = t.getHash();
-			Message m = interests.get(h);
-			if (m != null) {
-				try {
-					log.trace("Returning transaction result to " ,m.getPeerConnection().getRemoteAddress());
-
-					Connection pc = m.getPeerConnection();
-					if ((pc == null) || pc.isClosed()) continue;
-					ACell id = m.getID();
-					Result res = br.getResults().get(j).withID(id);
-
-					pc.sendResult(res);
-				} catch (Throwable e) {
-					log.warn("Exception while sending Result: ",e);
-					e.printStackTrace();
-					// ignore
+			try {
+				SignedData<ATransaction> t = block.getTransactions().get(j);
+				Hash h = t.getHash();
+				Message m = interests.get(h);
+				if (m != null) {
+						log.trace("Returning transaction result to " ,m.getPeerConnection().getRemoteAddress());
+	
+						Connection pc = m.getPeerConnection();
+						if ((pc == null) || pc.isClosed()) continue;
+						ACell id = m.getID();
+						Result res = br.getResults().get(j).withID(id);
+	
+						pc.sendResult(res);
+					interests.remove(h);
 				}
-				interests.remove(h);
+			} catch (Throwable e) {
+				log.warn("Exception while sending Result: ",e);
+				// ignore
 			}
 		}
 	}
