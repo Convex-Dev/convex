@@ -7,7 +7,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 
 /**
- * Utility class to store extract server information samples
+ * Utility class to extract and store server information samples
  */
 public class ServerInformation {
 
