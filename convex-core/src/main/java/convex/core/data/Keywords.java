@@ -1,0 +1,92 @@
+package convex.core.data;
+
+/**
+ * Static Keyword values for configuration maps, records etc.
+ */
+public class Keywords {
+
+	public static final Keyword STATE = Keyword.create("state");
+	public static final Keyword KEYPAIR = Keyword.create("keypair");
+	public static final Keyword PORT = Keyword.create("port");
+	public static final Keyword ORDERS = Keyword.create("orders");
+	public static final Keyword TRANSACTIONS = Keyword.create("transactions");
+	public static final Keyword TIMESTAMP = Keyword.create("timestamp");
+	public static final Keyword ACCOUNTS = Keyword.create("accounts");
+	public static final Keyword PEERS = Keyword.create("peers");
+	public static final Keyword BELIEF = Keyword.create("belief");
+	public static final Keyword STATES = Keyword.create("states");
+	public static final Keyword RESULTS = Keyword.create("results");
+	public static final Keyword PERSIST = Keyword.create("persist");
+
+
+	public static final Keyword STORE = Keyword.create("store");
+	public static final Keyword RESTORE = Keyword.create("restore");
+
+	// for testing and suchlike
+	public static final Keyword FOO = Keyword.create("foo");
+	public static final Keyword BAR = Keyword.create("bar");
+	public static final Keyword BAZ = Keyword.create("baz");
+
+
+	public static final Keyword SALT = Keyword.create("salt");
+	public static final Keyword IV = Keyword.create("iv");
+	public static final Keyword ROUNDS = Keyword.create("rounds");
+	public static final Keyword CIPHERTEXT = Keyword.create("ciphertext");
+	public static final Keyword GLOBALS = Keyword.create("globals");
+	public static final Keyword SCHEDULE = Keyword.create("schedule");
+
+	public static final Keyword NAME = Keyword.create("name");
+
+	// source info
+	public static final Keyword START = Keyword.create("start");
+	public static final Keyword END = Keyword.create("end");
+	public static final Keyword SOURCE = Keyword.create("source");
+	public static final Keyword TAG = Keyword.create("tag");
+	public static final Keyword DOC = Keyword.create("doc");
+	public static final Keyword DESCRIPTION = Keyword.create("description");
+	public static final Keyword EXAMPLES = Keyword.create("examples");
+	public static final Keyword CODE = Keyword.create("code");
+
+	public static final Keyword TYPE = Keyword.create("type");
+	public static final Keyword SPECIAL = Keyword.create("special");
+	public static final Keyword SPECIAL_SYMBOL = Keyword.create("special-symbol");
+
+	public static final Keyword PEER = Keyword.create("peer");
+	public static final Keyword STAKE = Keyword.create("stake");
+	public static final Keyword STAKES = Keyword.create("stakes");
+	public static final Keyword DELEGATED_STAKE = Keyword.create("delegated-stake");
+	public static final Keyword OWNER = Keyword.create("owner");
+
+	public static final Keyword URL = Keyword.create("url");
+
+	public static final Keyword SEQUENCE = Keyword.create("sequence");
+	public static final Keyword BALANCE = Keyword.create("balance");
+	public static final Keyword ENVIRONMENT = Keyword.create("environment");
+	public static final Keyword HOLDINGS = Keyword.create("holdings");
+	public static final Keyword ALLOWANCE = Keyword.create("allowance");
+	public static final Keyword CONTROLLER = Keyword.create("controller");
+	public static final Keyword KEY = Keyword.create("key");
+
+	public static final Keyword ID = Keyword.create("id");
+	public static final Keyword RESULT = Keyword.create("result");
+	public static final Keyword ERROR_CODE = Keyword.create("error-code");
+	public static final Keyword TRACE = Keyword.create("trace");
+
+	public static final Keyword EXPANDER = Keyword.create("expander");
+	public static final Keyword MACRO = Keyword.create("macro");
+
+	public static final Keyword CALLABLE_Q = Keyword.create("callable?");
+
+	public static final Keyword VALUE = Keyword.create("value");
+	public static final Keyword FUNCTION = Keyword.create("function");
+	public static final Keyword METADATA = Keyword.create("metadata");
+	
+	
+	public static final Keyword OUTGOING_CONNECTIONS = Keyword.create("outgoing-connections");
+	public static final Keyword AUTO_MANAGE = Keyword.create("auto-manage");
+	public static final Keyword TIMEOUT = Keyword.create("timeout");
+
+
+
+
+}

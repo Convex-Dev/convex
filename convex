@@ -1,3 +1,5 @@
 #!/bin/bash
 
-java -jar target/convex-jar-with-dependencies.jar $@
+BASE_PATH=$(dirname $0)
+
+java -jar $BASE_PATH/convex-cli/target/convex-cli-0.7.0-SNAPSHOT-jar-with-dependencies.jar $@

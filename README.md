@@ -46,7 +46,7 @@ The repository also contains core "on-chain" libraries providing key full-stack 
 Convex is available to run as a CLI application out of the box. After building (with e.g. `mvn install`) it can be run directly as an executable `jar` file:
 
 ```
-java -jar target/convex-jar-with-dependencies.jar <args>
+java -jar convex-cli/target/convex-cli-0.7.0-SNAPSHOT-jar-with-dependencies.jar <args>
 ```
 
 Or using the convenience batch script in windows:
@@ -77,10 +77,10 @@ The local Convex network uses 3 types of files:
 So to start a new network using the mimimum number of parameters:
 
 ```
-./convex local start
+./convex local start --password=my-secret
 ```
 
-This will startup 8 peers that are sharing the same Etch database.
+This will startup 4 peers that are sharing the same Etch database.
 
 To create another peer to join the network, you can enter the following command:
 
@@ -99,55 +99,19 @@ The `--address` parameter is the address of the peer account, `--public-key` is 
 
 
 
-### Peer manager
+### Local GUI Peers
 
 The convex Peer Manager (GUI application) can be used to run a local test network.
 
-This can be invoked by running `convex.gui.manager.PeerManager` as the main class, e.g. with the following command:
+This can be invoked by running the jar archive directly e.g. with the following command:
 
-`java -cp convex.jar convex.gui.manager.PeerManager`
+`java -jar convex-gui/target/convex-gui-0.7.0-SNAPSHOT-jar-with-dependencies.jar`
 
-or you can run this from the command line by using the `peer manager` command:
-
-```
-./convex local manager
-```
-
-### Benchmarking
-
-Convex includes a wide set of benchmarks, which are used to evaluate performance enhancements. These are mostly implemented with the JMH framework, and reside in the `convex.performance` package.
-
-#### Preparing to run benchmarks
-
-To run benchmarks, it is easiest to build the full `convex.jar` which includes all benchmarks, tests and dependencies. This can be done with the following commend:
-
-`mvn package`
-
-#### Directly running benchmarks
-
-After building the testing `.jar`, you can launch benchmarks as main classes in the `convex.performance` package, e.g.
-
-`java -cp target/convex.jar convex.performance.EtchBenchmark`
-
-#### Running with Java Flight Recorder
-
-If you want to analyse profiling results for the benchmarks, you can run using JFR to produce a profiling output file `flight.jfr`
-
-`java -cp target/convex-testing.jar -XX:+FlightRecorder -XX:StartFlightRecording=duration=200s,filename=flight.jfr -Djava.util.logging.config.file=logging.properties convex.performance.CVMBenchmark`
-
-The resulting `flight.jfr` can the be opened in tools such as JDK Mission Control which enables detailed analysis and visualisation of profiling results. This is a useful approach that the Convex team use to identify performance bottlenecks.
-
-#### Benchmark results
-
-After running benchmarks, you should see results similar to this:
+or you can run this from the command line by using the `local gui` command:
 
 ```
-Benchmark                      Mode  Cnt        Score        Error  Units
-EtchBenchmark.readDataRandom  thrpt    5  4848620.857 ± 110622.054  ops/s
-EtchBenchmark.writeData       thrpt    5   728486.145 ± 168739.491  ops/s
+./convex local gui
 ```
-
-For example, this can be interpreted as an indication that the Etch database layer is handling approximately 4.8 million reads and 729k million atomic writes per second in the testing environment. Usual benchmarking caveats apply and results may vary considerably based on your system setup (available RAM, disk performance etc.) - it is advisable to examine the benchmark source to determine precisely which operations are being performed.
 
 
 ## Contributing
