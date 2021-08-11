@@ -178,15 +178,16 @@ public class Init {
 
 		// At this point we have a raw initial state with no user or peer accounts
 
-		s = doActorDeploy(s, "actors/registry.cvx");
-		s = doActorDeploy(s, "libraries/trust.cvx");
+		s = doActorDeploy(s, "convex/registry.cvx");
+		s = doActorDeploy(s, "convex/trust.cvx");
 
 		{ // Register core libraries now that registry exists
 			Context<?> ctx = Context.createFake(s, INIT_ADDRESS);
 			ctx = ctx.eval(Reader.read("(call *registry* (cns-update 'convex.core " + CORE_ADDRESS + "))"));
+						             
 			s = ctx.getState();
-			s = register(s, CORE_ADDRESS, "Convex Core Library");
-			s = register(s, MEMORY_EXCHANGE_ADDRESS, "Memory Exchange Pool");
+			s = register(s, CORE_ADDRESS, "Convex Core Library", "Core utilities accessible by default in any account.");
+			s = register(s, MEMORY_EXCHANGE_ADDRESS, "Memory Exchange Pool", "Automated exchange following the Convex memory allowance model.");
 		}
 
 		/*
@@ -209,19 +210,19 @@ public class Init {
 
 			// ============================================================
 			// Standard library deployment
-			s = doActorDeploy(s, "libraries/fungible.cvx");
-			s = doActorDeploy(s, "actors/oracle-trusted.cvx");
-			s = doActorDeploy(s, "libraries/asset.cvx");
-			s = doActorDeploy(s, "actors/torus.cvx");
-			s = doActorDeploy(s, "libraries/nft-tokens.cvx");
-			s = doActorDeploy(s, "libraries/simple-nft.cvx");
-			s = doActorDeploy(s, "libraries/box.cvx");
-			s = doActorDeploy(s, "libraries/play.cvx");
+			s = doActorDeploy(s, "convex/fungible.cvx");
+			s = doActorDeploy(s, "convex/trusted-oracle.cvx");
+			s = doActorDeploy(s, "convex/asset.cvx");
+			s = doActorDeploy(s, "asset/torus/exchange.cvx");
+			s = doActorDeploy(s, "asset/nft-tokens.cvx");
+			s = doActorDeploy(s, "asset/simple-nft.cvx");
+			s = doActorDeploy(s, "asset/box.cvx");
+			s = doActorDeploy(s, "convex/play.cvx");
 
 			{ // Deploy Currencies
 				@SuppressWarnings("unchecked")
 				AVector<AVector<ACell>> table = (AVector<AVector<ACell>>) Reader
-						.readResourceAsData("torus/currencies.con");
+						.readResourceAsData("asset/torus/currencies.cvx");
 				for (AVector<ACell> row : table) {
 					s = doCurrencyDeploy(s, row);
 				}
@@ -287,10 +288,9 @@ public class Init {
 		return ctx.getState();
 	}
 
-	private static State register(State state, Address origin, String name) {
+	private static State register(State state, Address origin, String name, String description) {
 		Context<?> ctx = Context.createFake(state, origin);
-		ctx = ctx.actorCall(REGISTRY_ADDRESS, 0L, Strings.create("register"),
-				Maps.of(Keywords.NAME, Strings.create(name)));
+		ctx = ctx.eval(Reader.read("(call *registry* (register {:description \"" + description + "\" :name \"" + name + "\"}))"));
 		return ctx.getState();
 	}
 	
@@ -315,8 +315,7 @@ public class Init {
 		return accts;
 	}
 
-	private static AVector<AccountStatus> addMemoryExchange(AVector<AccountStatus> accts, Address a, long balance,
-			long allowance) {
+	private static AVector<AccountStatus> addMemoryExchange(AVector<AccountStatus> accts, Address a, long balance, long allowance) {
 		if (accts.count() != a.longValue()) throw new Error("Incorrect memory exchange address: " + a);
 		AccountStatus as = AccountStatus.createGovernance(balance).withMemory(allowance);
 		accts = accts.conj(as);

@@ -100,12 +100,9 @@ public class InitTest extends ACVMTest {
 
 	@Test
 	public void testMemoryExchange() {
-		AccountStatus as=STATE.getAccount(Init.MEMORY_EXCHANGE_ADDRESS);
+		AccountStatus as = STATE.getAccount(Init.MEMORY_EXCHANGE_ADDRESS);
 		assertNotNull(as);
-		assertTrue(as.getMemory()>0L);
-		
-		// Test Actor record
-		RecordTest.doRecordTests(as);
+		assertTrue(as.getMemory() > 0L);
 	}
 
 	@Test
