@@ -18,17 +18,16 @@ public class ConnectionTest {
 	public void testMessageFlood() throws IOException, BadFormatException, InterruptedException {
 		final ArrayList<Message> received = new ArrayList<>();
 
+		MemoryByteChannel chan = MemoryByteChannel.create(100);
+		Connection conn=Connection.create(chan, null, Stores.current(), null);
+
 		// create a custom PeerConnection and MessageReceiver for testing
 		// null Queue OK, we aren't queueing with our custom receive action
 		MessageReceiver mr = new MessageReceiver(a -> {
 			synchronized (received) {
 				received.add(a);
 			}
-		}, null);
-		
-		MemoryByteChannel chan = MemoryByteChannel.create(100);
-
-		Connection conn=Connection.create(chan, null, Stores.current(), null);
+		}, conn);
 		
 		Thread receiveThread=new Thread(()-> {
 			while (true) {

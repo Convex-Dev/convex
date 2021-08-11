@@ -198,11 +198,11 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 
 	/**
-	 * Gets the cached blob representing this Cell in binary format, if it exists.
+	 * Gets the cached blob representing this Cell's Encoding in binary format, if it exists.
 	 * 
 	 * @return The cached blob for this cell, or null if not available. 
 	 */
-	public ABlob cachedBlob() {
+	public ABlob cachedEncoding() {
 		return encoding;
 	}
 
@@ -412,6 +412,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	public void attachMemorySize(long memorySize) {
 		if (this.memorySize<0) {
 			this.memorySize=memorySize;
+			assert (this.memorySize>0) : "Attempting to attach memory size "+memorySize+" to object of class "+Utils.getClassName(this);
 		} else {
 			assert (this.memorySize==memorySize) : "Attempting to attach memory size "+memorySize+" to object of class "+Utils.getClassName(this)+" which already has memorySize "+this.memorySize;
 		}

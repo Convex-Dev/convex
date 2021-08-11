@@ -8,7 +8,7 @@ import convex.core.data.ACell;
 /**
  * In-memory cache for Blob decoding. Should be used in the context of a specific Store
  */
-public class BlobCache {
+public final class BlobCache {
 
 	private SoftReference<ACell>[] cache;
 	private int size;
@@ -18,6 +18,10 @@ public class BlobCache {
 		this.size=size;
 		this.cache=new SoftReference[size];
 	};
+	
+	public static BlobCache create(int size) {
+		return new BlobCache(size);
+	}
 	
 	int getSize() {
 		return size;
@@ -33,7 +37,12 @@ public class BlobCache {
 		SoftReference<ACell> ref=cache[ix];
 		if (ref==null) return null;
 		ACell cell=ref.get();
-		if (cell!=null) return cell;
+		if (cell!=null) {
+			if (encoding.equals(cell.getEncoding())) {
+				return cell;
+			}
+			return null; // cached value not the same as this encoding
+		}
 		cache[ix]=null;
 		return null;
 	}
@@ -52,4 +61,6 @@ public class BlobCache {
 		int ix=Math.floorMod(hash, size);
 		return ix;
 	}
+
+
 }

@@ -227,6 +227,14 @@ public class Connection {
 			return null;
 		}
 	}
+	
+	/**
+	 * Gets the store associated with this Connection
+	 * @return Store instance
+	 */
+	public AStore getStore() {
+		return store;
+	}
 
 	/**
 	 * Returns the local SocketAddress associated with this connection, or null if

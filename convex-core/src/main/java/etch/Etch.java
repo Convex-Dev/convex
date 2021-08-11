@@ -19,7 +19,6 @@ import convex.core.Constants;
 import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
-import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.RefSoft;
@@ -135,6 +134,7 @@ public class Etch {
 	private long dataLength=0;
 	
 	private boolean BUILD_CHAINS=true;
+	private EtchStore store;
 	
 	private Etch(File dataFile) throws IOException {
 		// Ensure we have a RandomAccessFile that exists
@@ -644,14 +644,13 @@ public class Etch {
 		short length=mbb.getShort(); 
 		byte[] bs=new byte[length];
 		mbb.get(bs);
-		Blob data= Blob.wrap(bs);
+		Blob encoding= Blob.wrap(bs);
 		try {
 			Hash hash=Hash.wrap(key);
-			ACell cell=Format.read(data);
-			data.attachContentHash(hash);
-			cell.attachEncoding(data);
+			ACell cell=store.decode(encoding);
+			encoding.getEncoding().attachContentHash(hash);
 			
-			if (memorySize>=0) {
+			if (memorySize>0) {
 				// need to attach memory size for cell
 				cell.attachMemorySize(memorySize);
 			}
@@ -661,7 +660,7 @@ public class Etch {
 			
 			return ref;
 		} catch (Exception e) {
-			throw new Error("Failed to read data in etch store: "+data.toHexString()+" flags = "+Utils.toHexString(flagByte)+" length ="+length+" pointer = "+Utils.toHexString(pointer)+ " memorySize="+memorySize,e);
+			throw new Error("Failed to read data in etch store: "+encoding.toHexString()+" flags = "+Utils.toHexString(flagByte)+" length ="+length+" pointer = "+Utils.toHexString(pointer)+ " memorySize="+memorySize,e);
 		}
 	}
 
@@ -900,5 +899,9 @@ public class Etch {
 		byte[] bs=h.getBytes();
 		assert(bs.length==Hash.LENGTH);
 		mbb.put(bs);
+	}
+
+	public void setStore(EtchStore etchStore) {
+		this.store=etchStore;
 	}
 }

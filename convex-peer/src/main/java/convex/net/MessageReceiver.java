@@ -10,12 +10,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.exceptions.BadFormatException;
 
 /**
- * Class responsible for buffered accumulation of messages received by a Peer.
+ * Class responsible for buffered accumulation of messages received over a connection.
  *
  * ByteBuffers received must be passed in via @receiveFromChannel
  *
@@ -43,7 +45,7 @@ public class MessageReceiver {
 	private ByteBuffer buffer = ByteBuffer.allocate(RECEIVE_BUFFER_SIZE);
 
 	private final Consumer<Message> action;
-	private final Connection peerConnection;
+	private final Connection connection;
 
 	private long receivedMessageCount = 0;
 
@@ -51,7 +53,7 @@ public class MessageReceiver {
 
 	public MessageReceiver(Consumer<Message> receiveAction, Connection pc) {
 		this.action = receiveAction;
-		this.peerConnection = pc;
+		this.connection = pc;
 	}
 
 	public Consumer<Message> getAction() {
@@ -122,10 +124,15 @@ public class MessageReceiver {
 		// position buffer ready to receive message content (i.e. skip length
 		// field). We still want to include the message code.
 		buffer.position(lengthLength);
+		byte mType=buffer.get();
+		MessageType type=MessageType.decode(mType);
+		
+		byte[] bs=new byte[len-1]; // message length after type byte
+		buffer.get(bs);
+		assert(!buffer.hasRemaining()); // should consume entire buffer!
+		Blob encoding=Blob.wrap(bs);
 
-		// receive message, expecting the specified final position
-		int expectedPosition = totalFrameSize;
-		receiveMessage(buffer, expectedPosition);
+		receiveMessage(type, encoding);
 
 		// clear buffer
 		buffer.clear();
@@ -145,30 +152,18 @@ public class MessageReceiver {
 	 *
 	 * @throws BadFormatException if the message is incorrectly formatted`
 	 */
-	private void receiveMessage(ByteBuffer bb, int expectedPosition) throws BadFormatException {
-		int firstPos = bb.position();
-		byte messageCode = bb.get();
-		MessageType type = MessageType.decode(messageCode);
+	private void receiveMessage(MessageType type, ABlob encoding) throws BadFormatException {
+		
+		ACell payload = connection.getStore().decode(encoding);
 
-		// Read an object from message
-		// TODO: Store.decode as per #273 ?
-		ACell payload = Format.read(bb);
-
-		int pos = bb.position();
-		if (pos != expectedPosition) {
-			String m = "Unexpected message length, expected: " + (expectedPosition - firstPos) + " but got:"
-					+ (pos - firstPos);
-			log.info(m);
-			throw new BadFormatException(m);
-		}
-		Message message = Message.create(peerConnection, type, payload);
+		Message message = Message.create(connection, type, payload);
 		receivedMessageCount++;
 		if (action != null) {
 			try {
 				log.trace("Message received: {}", message.getType());
 				action.accept(message);
 			} catch (Exception e) {
-				log.warn("Exception not handled from: " + peerConnection.getRemoteAddress());
+				log.warn("Exception not handled from: " + connection.getRemoteAddress());
 				e.printStackTrace();
 			}
 		} else {

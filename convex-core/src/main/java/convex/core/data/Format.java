@@ -850,7 +850,7 @@ public class Format {
 			return ByteBuffer.wrap(new byte[] {0}).flip();
 		}
 		
-		ABlob b = cell.cachedBlob();
+		ABlob b = cell.cachedEncoding();
 		if (b != null) return b.getByteBuffer();
 
 		initialLength = cell.estimatedEncodingSize();

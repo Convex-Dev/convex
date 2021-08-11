@@ -36,6 +36,7 @@ public class EtchStore extends AStore {
 
 	public EtchStore(Etch etch) {
 		this.etch = etch;
+		etch.setStore(this);
 	}
 
 	/**
@@ -203,5 +204,13 @@ public class EtchStore extends AStore {
 	@Override
 	public void setRootHash(Hash h) throws IOException {
 		etch.setRootHash(h);
+	}
+
+	/**
+	 * Gets the underlying Etch instance
+	 * @return Etch instance
+	 */
+	public Etch getEtch() {
+		return etch;
 	}
 }
