@@ -942,8 +942,7 @@ public class Server implements Closeable {
 	}
 
 	/*
-	 * Runnable class acting as a peer worker. Handles messages from the receive
-	 * queue from known peers
+	 * Loop to process messages from the receive queue 
 	 */
 	private Runnable receiverLoop = new Runnable() {
 		@Override

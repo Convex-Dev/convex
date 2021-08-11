@@ -178,7 +178,6 @@ public class Connection {
 		
 		// TODO: reconsider this
 		clientChannel.socket().setTcpNoDelay(true);
-
 		clientChannel.connect(hostAddress);	
 
 		long start = Utils.getCurrentTimestamp();
@@ -193,12 +192,10 @@ public class Connection {
 				throw new IOException("Connect interrupted", e);
 			}
 		}
-		// clientChannel.setOption(StandardSocketOptions.SO_KEEPALIVE,true);
-		clientChannel.setOption(StandardSocketOptions.TCP_NODELAY, true);
 
 		Connection pc = create(clientChannel, receiveAction, store, trustedPeerKey);
 		pc.startClientListening();
-		log.info("Connect succeeded for host: {}", hostAddress);
+		log.debug("Connect succeeded for host: {}", hostAddress);
 		return pc;
 	}
 
