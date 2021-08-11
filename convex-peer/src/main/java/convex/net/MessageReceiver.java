@@ -151,6 +151,7 @@ public class MessageReceiver {
 		MessageType type = MessageType.decode(messageCode);
 
 		// Read an object from message
+		// TODO: Store.decode as per #273 ?
 		ACell payload = Format.read(bb);
 
 		int pos = bb.position();
