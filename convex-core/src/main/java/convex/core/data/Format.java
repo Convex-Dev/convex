@@ -640,11 +640,11 @@ public class Format {
 			return (T) Blobs.readFromBlob(blob);
 		} else {
 			// TODO: maybe refactor to avoid read from byte buffers?
-			ByteBuffer bb = blob.getByteBuffer();
+			ByteBuffer bb = blob.getByteBuffer().position(1);
 			T result;
 
 			try {
-				result = (T) read(bb);
+				result = (T) read(tag,bb);
 				if (bb.hasRemaining()) throw new BadFormatException(
 						"Blob with type " + Utils.getClass(result) + " has excess bytes: " + bb.remaining());
 			} catch (BufferUnderflowException e) {
@@ -765,8 +765,6 @@ public class Format {
 			if (tag == Tag.ADDRESS) return (T) Address.readRaw(bb);
 			if (tag == Tag.SIGNED_DATA) return (T) SignedData.read(bb);
 
-			// need to product compound objects since they may get ClassCastExceptions
-			// if the data format is corrupted while reading child objects
 			if ((tag & 0xF0) == 0x80) return readDataStructure(bb, tag);
 
 			if ((tag & 0xF0) == 0xA0) return (T) readRecord(bb, tag);
