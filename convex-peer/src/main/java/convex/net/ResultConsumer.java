@@ -49,7 +49,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 					Hash h = m.getPayload();
 					Ref<?> r = Stores.current().refForHash(h);
 					if (r != null) try {
-						m.getPeerConnection().sendData(r.getValue());
+						m.getConnection().sendData(r.getValue());
 					} catch (IOException e) {
 						log.warn("Error replying to MISSING DATA request",e);
 					}
@@ -144,7 +144,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 			// And wait for it to arrive later
 			Hash hash = e.getMissingHash();
 			try {
-				if (m.getPeerConnection().sendMissingData(hash)) {
+				if (m.getConnection().sendMissingData(hash)) {
 					log.debug("Missing data {} requested by client for RESULT of type: {}",hash.toHexString(),Utils.getClassName(result));
 					buffer(hash, m);
 				} else {

@@ -90,7 +90,7 @@ public class Server implements Closeable {
 	private static final int EVENT_QUEUE_SIZE = 1000;
 
 	// Maximum Pause for each iteration of Server update loop.
-	private static final long SERVER_UPDATE_PAUSE = 1L;
+	private static final long SERVER_UPDATE_PAUSE = 10L;
 
 	static final Logger log = LoggerFactory.getLogger(Server.class.getName());
 
@@ -133,6 +133,9 @@ public class Server implements Closeable {
 
 	private final HashMap<Keyword, Object> config;
 
+	/**
+	 * Flag for a running server. Setting to false will terminate server threads.
+	 */
 	private volatile boolean isRunning = false;
 
 	private NIOServer nio;
@@ -474,7 +477,7 @@ public class Server implements Closeable {
 			log.trace("Missing data: {} in message of type {}" , missingHash,type);
 			try {
 				registerPartialMessage(missingHash, m);
-				m.getPeerConnection().sendMissingData(missingHash);
+				m.getConnection().sendMissingData(missingHash);
 				log.trace("Requested missing data {} for partial message",missingHash);
 			} catch (IOException ex) {
 				log.warn( "Exception while requesting missing data: {}" + ex);
@@ -500,7 +503,7 @@ public class Server implements Closeable {
 		if (r != null) {
 			try {
 				ACell data = r.getValue();
-				boolean sent = m.getPeerConnection().sendData(data);
+				boolean sent = m.getConnection().sendData(data);
 				// log.trace( "Sent missing data for hash: {} with type {}",Utils.getClassName(data));
 				if (!sent) {
 					log.debug("Can't send missing data for hash {} due to full buffer",h);
@@ -529,7 +532,7 @@ public class Server implements Closeable {
 			// terminate the connection, dishonest client?
 			try {
 				// TODO: throttle?
-				m.getPeerConnection().sendResult(m.getID(), Strings.create("Bad Signature!"), ErrorCodes.SIGNATURE);
+				m.getConnection().sendResult(m.getID(), Strings.create("Bad Signature!"), ErrorCodes.SIGNATURE);
 			} catch (IOException e) {
 				// Ignore?? Connection probably gone anyway
 			}
@@ -537,10 +540,7 @@ public class Server implements Closeable {
 			return;
 		}
 
-		synchronized (newTransactions) {
-			newTransactions.add(sd);
-			registerInterest(sd.getHash(), m);
-		}
+		registerInterest(sd.getHash(), m);
 		try {
 			eventQueue.put(sd);
 		} catch (InterruptedException e) {
@@ -800,12 +800,7 @@ public class Server implements Closeable {
 				beliefs = new Belief[n];
 				int i = 0;
 				for (AccountKey addr : newBeliefs.keySet()) {
-					try {
-						beliefs[i++] = newBeliefs.get(addr).getValue();
-					} catch (Exception e) {
-						log.warn("Exception storing Belief: ",e);
-						// Should ignore belief.
-					}
+					beliefs[i++] = newBeliefs.get(addr).getValue();
 				}
 				newBeliefs.clear();
 			}
@@ -837,7 +832,7 @@ public class Server implements Closeable {
 		try {
 			// We can ignore payload
 
-			Connection pc = m.getPeerConnection();
+			Connection pc = m.getConnection();
 			log.debug( "Processing status request from: {}" ,pc.getRemoteAddress());
 			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
 			// address);
@@ -875,7 +870,7 @@ public class Server implements Closeable {
 			// extract the Address, or use HERO if not available.
 			Address address = (Address) v.get(2);
 
-			Connection pc = m.getPeerConnection();
+			Connection pc = m.getConnection();
 			log.debug( "Processing query: {} with address: {}" , form, address);
 			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
 			// address);
@@ -923,7 +918,7 @@ public class Server implements Closeable {
 	 * @param m
 	 */
 	private void processBelief(Message m) {
-		Connection pc = m.getPeerConnection();
+		Connection pc = m.getConnection();
 		if (pc.isClosed()) return; // skip messages from closed peer
 
 		ACell o = m.getPayload();
@@ -931,6 +926,7 @@ public class Server implements Closeable {
 		Ref<ACell> ref = Ref.get(o);
 		try {
 			// check we can persist the new belief
+			// May also pick up cached signature verification if already held
 			ref = ref.persist();
 
 			@SuppressWarnings("unchecked")
@@ -1063,9 +1059,9 @@ public class Server implements Closeable {
 				Hash h = t.getHash();
 				Message m = interests.get(h);
 				if (m != null) {
-					log.trace("Returning transaction result to ", m.getPeerConnection().getRemoteAddress());
+					log.trace("Returning transaction result to ", m.getConnection().getRemoteAddress());
 
-					Connection pc = m.getPeerConnection();
+					Connection pc = m.getConnection();
 					if ((pc == null) || pc.isClosed()) continue;
 					ACell id = m.getID();
 					Result res = br.getResults().get(j).withID(id);

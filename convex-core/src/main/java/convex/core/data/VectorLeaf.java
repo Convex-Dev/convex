@@ -592,7 +592,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	public <R extends ACell> Ref<R> getRef(int i) {
 		if (prefix != null) {
 			if (i==0) return (Ref<R>) prefix;
-			i--; // DEcrement so that i indexes into child array after skipping prefix ref
+			i--; // Decrement so that i indexes into child array after skipping prefix ref
 		}
 		int itemsCount = items.length;
 		if (i < 0) throw new IndexOutOfBoundsException("Negative Ref index: " + i);

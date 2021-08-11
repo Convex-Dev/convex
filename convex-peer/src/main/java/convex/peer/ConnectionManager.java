@@ -334,7 +334,7 @@ public class ConnectionManager {
 				log.debug("challenge data incorrect number of items should be 3 not ",RT.count(challengeValues));
 				return;
 			}
-			Connection pc = m.getPeerConnection();
+			Connection pc = m.getConnection();
 			if ( pc == null) {
 				log.warn( "No remote peer connection from challenge");
 				return;
@@ -391,7 +391,7 @@ public class ConnectionManager {
 		try {
 			SignedData<ACell> signedData = m.getPayload();
 
-			log.debug( "Processing response request from: {}",m.getPeerConnection().getRemoteAddress());
+			log.debug( "Processing response request from: {}",m.getConnection().getRemoteAddress());
 
 			@SuppressWarnings("unchecked")
 			AVector<ACell> responseValues = (AVector<ACell>) signedData.getValue();
