@@ -90,12 +90,7 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 			// use hash if available
 			if (a.hash != null) return this.hash.equals(a.hash);
 		}
-		if (a instanceof RefDirect) {
-			// faster, potentially non-hashing check for direct objects
-			return Utils.equals(this.value, a.getValue());
-		}
-		// fallback to computing hashes
-		return getHash().equals(a.getHash());
+		return Utils.equals(this.value, a.getValue());
 	}
 
 	@Override

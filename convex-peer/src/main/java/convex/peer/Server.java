@@ -948,8 +948,7 @@ public class Server implements Closeable {
 			// TODO: Probably need to slash peer? but ignore for now
 			log.warn("Bad signed belief from peer: " + Utils.print(o));
 		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			throw Utils.sneakyThrow(e);
 		}
 	}
 

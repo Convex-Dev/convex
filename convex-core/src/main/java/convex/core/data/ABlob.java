@@ -360,6 +360,12 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 * @return long value of this blob
 	 */
 	public abstract long toLong();
+	
+	@Override
+	public int hashCode() {
+		// note: We use the Java hashcode of the last bytes for blobs
+		return Long.hashCode(toLong());
+	}
 
 	/**
 	 * Gets the long value of this Blob if the length is exactly 8 bytes, otherwise

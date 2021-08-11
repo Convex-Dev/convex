@@ -652,8 +652,10 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		}
 		// must have matched prefixLength at least
 		long nn = Math.min(n, b.count()) - prefixLength; // number of extra elements to check
+		if (nn==0) return prefixLength;
+		VectorLeaf<T> bChunk=b.getChunk(prefixLength);
 		for (int i = 0; i < nn; i++) {
-			if (!items[i].equalsValue(b.getElementRef(prefixLength + i))) {
+			if (!items[i].equalsValue(bChunk.items[i])) {
 				return prefixLength + i;
 			}
 		}
@@ -663,12 +665,17 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	@Override
 	public VectorLeaf<T> getChunk(long offset) {
 		if (prefix == null) {
-			if (items.length != MAX_SIZE) throw new IllegalStateException("Can only get full chunk");
-			if (offset != 0) throw new IndexOutOfBoundsException("Chunk offset must be zero");
-			return this;
+			if (offset == 0) return this;
 		} else {
-			return prefix.getValue().getChunk(offset);
+			AVector<T> pre=prefix.getValue();
+			long prefixLength=pre.count();
+			if (offset<prefixLength) {
+				return prefix.getValue().getChunk(offset);
+			} else if (offset==prefixLength) {
+				return this;
+			}
 		}
+		throw new IndexOutOfBoundsException("Invalid chunk offset: "+offset+" in vector of length "+count);
 	}
 
 	@SuppressWarnings("unchecked")
