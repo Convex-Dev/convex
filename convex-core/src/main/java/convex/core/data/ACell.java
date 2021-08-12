@@ -284,7 +284,8 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	
 	/**
 	 * Returns true if this Cell is in a canonical format for message writing.
-	 * Reading or writing a non-canonical value should be considered illegal
+	 * Reading or writing a non-canonical value should be considered illegal, but 
+	 * non-canonical objects may be used on a temporary internal basis.
 	 * 
 	 * @return true if the object is in canonical format, false otherwise
 	 */

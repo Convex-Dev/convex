@@ -53,7 +53,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	public static final int MAX_SIZE = Vectors.CHUNK_SIZE;
 
 	private final Ref<T>[] items;
-	private final Ref<AVector<T>> prefix;
+	private Ref<AVector<T>> prefix;
 
 	VectorLeaf(Ref<T>[] items, Ref<AVector<T>> prefix, long count) {
 		super(count);

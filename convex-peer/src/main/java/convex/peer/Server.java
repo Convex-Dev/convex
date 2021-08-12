@@ -90,7 +90,7 @@ public class Server implements Closeable {
 	private static final int EVENT_QUEUE_SIZE = 1000;
 
 	// Maximum Pause for each iteration of Server update loop.
-	private static final long SERVER_UPDATE_PAUSE = 10L;
+	private static final long SERVER_UPDATE_PAUSE = 5L;
 
 	static final Logger log = LoggerFactory.getLogger(Server.class.getName());
 
