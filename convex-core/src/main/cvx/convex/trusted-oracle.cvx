@@ -25,6 +25,7 @@
 (defn data
 
   ^{:doc {:description "Returns data registered for `key`."
+          :examples    [{:code "(data :foo)"}]
           :signature   [{:params [key]}
                         {:params [actor key]}]}}
 
@@ -46,6 +47,7 @@
 
   ^{:callable? true
     :doc       {:description "Returns a boolean indicating if a results has been provided for `key`."
+                :examples    [{:code "(finalized? :foo)"}]
                 :signature   [{:params [key]}
                               {:params [actor key]}]}}
 
@@ -67,6 +69,7 @@
 
   ^{:callable? true
     :doc       {:description "Returns the result for `key`."
+                :examples    [{:code "(read :foo)"}]
                 :signature   [{:params [key]}
                               {:params [actor key]}]}}
 
@@ -91,6 +94,7 @@
                               "Returns true if successful, false if key already exists."
                               "Data should be a map containg at least `:trust`, a set of addresses trusted for using `provide` on that key."
                               "Without `:trust`, a result cannot be delivered."]
+                :examples    [{:code "(register :foo {:trust #{*address*}})"}]
                 :signature   [{:params [key data]}
                               {:params [actor key data]}]}}
 
@@ -118,6 +122,7 @@
                               "Returns the result associated with that key."]
                 :errors      {:STATE "When key does not exist"
                               :TRUST "When caller is untrusted"}
+                :examples    [{:code "(provide :foo 42)"}]
                 :signature   [{:params [key result]}
                               {:params [actor key result]}]}}
 
