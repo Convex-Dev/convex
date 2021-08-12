@@ -1,41 +1,23 @@
-;;
-;;
-;; Fungible library.
-;;
-;; Provides library functions to build and manage standard fungible assets.
-;;
-;; Fungible assets follow these rules:
-;;
-;;   - The quantity can be expressed in a numerical Long value, representing an amount of the asset
-;;   - They conform to the standard rules of the 'convex.asset' general Asset API
-;;
-;;
-;; Key usage:
-;;   (balance token)                        ;; Gets own balance (i.e. for *address*)
-;;   (balance token other-address)          ;; Gets balance for another Address
-;;   (transfer token target-address amount) ;; transfer to a new holder
-;;
-;;
-
-
-;; REGISTERING THE LIBRARY
-
-
 'convex.fungible
 
 
 (call *registry*
-      (register {:name "Fungible Library"}))
+      (register {:description ["Provides library functions for building and managing standard fungible assets."
+	                           "Quantity is expressed as a long representing the amount of an asset."
+							   "The `build-token` function creates deployable code that follows the interface described in `convex.asset`."]
+	             :name        "Fungible token creation and management"}))
 
 
-;; BUILDING TOKENS
+;;;;;;;;;; Building actors
 
 
 (defn add-mint
 
-  ^{:doc {:description "Creates deployable code that, when added to a fungible token actor, allows priviledged accounts to mint and burn tokens. The :minter may be a single address, or a Trust Monitor."
+  ^{:doc {:description ["Creates deployable code that, when added to actor code from `build-token`, allows priviledged accounts to mint and burn tokens."
+						"Configuration map contains:"
+						"- `:max-supply`, a long designating the maximum mintable supply (optional, defaults to 1000000000000000000, the allowed maximum)"
+						"- `:minter`, a single address or a Trust Monitor from `convex.trust` (mandatory)"]
           :examples    [{:code "(deploy [(build-token {}) (add-mint {:minter *address* :max-supply 1000000000})])"}]
-          :type        :function
           :signature   [{:params [config]}]}}
 
   [config]
@@ -120,18 +102,21 @@
 
 (defn build-token 
 
-  ^{:doc {:description "Creates deployable code for a new fungible token. An optional config map can be provided"
+  ^{:doc {:description ["Creates deployable code for a new fungible token which follows the interface described in `convex.asset`."
+                        "An optional config map can be provided:"
+						"- `:initial-holder`, address which will hold the initial supply (defaults to `*address*`)"
+						"- `:supply`, supply created and attributed to `:initial-holder` (long, defaults to 1000000)"]
           :examples    [{:code "(deploy (build-token {:supply 1000000 :initial-holder *address*}))"}]
-          :type        :function
           :signature   [{:params [config]}]}}
 
   [config]
 
-  (let [supply         (long (or (:supply config)
-                                 1000000))
-        initial-holder (address (or (:initial-holder config)
-                                    *address*))]
+  (let [supply         (or (:supply config)
+                           1000000)
+        initial-holder (or (:initial-holder config)
+                           *address*)]
     `(do
+
        (def supply
             ~supply)
 
@@ -340,14 +325,13 @@
                0))))))
 
 
-;; CALLING ACTOR FUNCTIONS FROM A TOKEN
+;;;;;;;;;; API for handling actors
 
 
 (defn balance
 
   ^{:doc {:description "Gets the balance from a fungible token. Checks the balance for the specified holder, or the current *address* if not specified."
           :examples    [{:code "(balance my-token-address)"}]
-          :type        :function
           :signature   [{:params [token holder]}]}}
 
   [token holder]
@@ -361,7 +345,6 @@
 
   ^{:doc {:description "Burns an amount of tokens for the given token. User must have minting privileges. Amount must be non-negative and no greater than the caller's balance."
           :examples    [{:code "(mint my-token-address 1000)"}]
-          :type        :function
           :signature   [{:params [token amount]}]}}
 
   [token amount]
@@ -375,7 +358,6 @@
 
   ^{:doc {:description "Mints an amount of tokens for the given token. User must have minting privileges. Amount may be negative to burn fungible tokens."
           :examples    [{:code "(mint my-token-address 1000)"}]
-          :type        :function
           :signature   [{:params [token amount]}]}}
 
   [token amount]
@@ -387,11 +369,8 @@
 
 (defn transfer 
 
-  ;; TODO. Ensure docstring is accurate.
-
-  ^{:doc {:description "Transfers balance of a fungible token. Returns the balance of receiver, or nil if the transfer fails."
+  ^{:doc {:description "Transfers balance of a fungible token."
           :examples    [{:code "(transfer my-token-address my-friend 100)"}]
-          :type        :function
           :signature   [{:params [token target amount]}]}}
 
   [token target amount]
