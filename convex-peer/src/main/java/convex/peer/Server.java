@@ -278,8 +278,9 @@ public class Server implements Closeable {
 			if (genesisState!=null) {
 				log.info("Defaulting to standard Peer startup with genesis state: "+genesisState.getHash());
 			} else {
-				genesisState=Init.createState(List.of(keyPair.getAccountKey()));
-				log.info("Created new genesis state: "+genesisState.getHash());
+				AccountKey peerKey=keyPair.getAccountKey();
+				genesisState=Init.createState(List.of(peerKey));
+				log.info("Created new genesis state: "+genesisState.getHash()+ " with initial peer: "+peerKey);
 			}
 			return Peer.createGenesisPeer(keyPair,genesisState);
 		} catch (ExecutionException|InterruptedException e) {
