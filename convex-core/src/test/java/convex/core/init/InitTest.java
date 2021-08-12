@@ -59,10 +59,7 @@ public class InitTest extends ACVMTest {
 	public static final State BASE = Init.createBaseState(PEER_KEYS);
 
 
-	
-
 	public static State createState() {
-		// TODO Auto-generated method stub
 		return Init.createState(PEER_KEYS);
 	}
 	
@@ -77,6 +74,22 @@ public class InitTest extends ACVMTest {
 	}
 
 	@Test
+	public void testDeploy() {
+		assertTrue(evalA("(call *registry* (cns-resolve 'asset.box))"));
+		assertTrue(evalA("(call *registry* (cns-resolve 'asset.nft-tokens))"));
+		assertTrue(evalA("(call *registry* (cns-resolve 'asset.simple-nft))"));
+		assertTrue(evalA("(call *registry* (cns-resolve 'convex.asset))"));
+		assertTrue(evalA("(call *registry* (cns-resolve 'convex.fungible))"));
+		assertTrue(evalA("(call *registry* (cns-resolve 'convex.play))"));
+		assertTrue(evalA("(call *registry* (cns-resolve 'convex.trusted-oracle))"));
+		assertTrue(evalA("(call *registry* (cns-resolve 'torus.exchange))"));
+
+		assertEquals(Init.CORE_ADDRESS, eval("(call *registry* (cns-resolve 'convex.core))"));
+		assertEquals(Init.REGISTRY_ADDRESS, eval("(call *registry* (cns-resolve 'convex.registry))"));
+		assertEquals(Init.TRUST_ADDRESS, eval("(call *registry* (cns-resolve 'convex.trust))"));
+	}
+
+	@Test
 	public void testInitState() throws InvalidDataException {
 		STATE.validate();
 		assertEquals(0,context().getDepth());
@@ -87,12 +100,9 @@ public class InitTest extends ACVMTest {
 
 	@Test
 	public void testMemoryExchange() {
-		AccountStatus as=STATE.getAccount(Init.MEMORY_EXCHANGE_ADDRESS);
+		AccountStatus as = STATE.getAccount(Init.MEMORY_EXCHANGE_ADDRESS);
 		assertNotNull(as);
-		assertTrue(as.getMemory()>0L);
-		
-		// Test Actor record
-		RecordTest.doRecordTests(as);
+		assertTrue(as.getMemory() > 0L);
 	}
 
 	@Test

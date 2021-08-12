@@ -7,8 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
-
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
@@ -18,13 +16,10 @@ import convex.core.data.Sets;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.Context;
-import convex.core.lang.Reader;
 import convex.core.lang.TestState;
-import convex.core.util.Utils;
 import convex.test.Testing;
 
 public class SimpleNFTTest {
-	private static final Symbol nSym=Symbol.create("nft");
 	
 	static final AKeyPair KP1=AKeyPair.generate();
 	static final AKeyPair KP2=AKeyPair.generate();
@@ -35,26 +30,12 @@ public class SimpleNFTTest {
 	
 	static {
 		Context<?> ctx=TestState.CONTEXT.fork();
-		try {
-			ctx=ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/simple-nft.con")));
-			Address nft=(Address) ctx.getResult();
-			assert (ctx.getDepth()==0):"Invalid depth: "+ctx.getDepth();
-			String importS="(def nft (import "+nft+" :as "+nSym.getName()+"))";
-			ctx=step(ctx,importS);
-			NFT=(Address)ctx.getResult();
-			assertNotNull(NFT);
-			
-			ctx=ctx.define(nSym, nft);
-		} catch (IOException e) {
-			e.printStackTrace();
-			throw new Error(e);
-		}
+		String importS = "(import asset.simple-nft :as nft)";
+		ctx=step(ctx,importS);
+		NFT=(Address)ctx.getResult();
+		assertNotNull(NFT);
 		ctx=step(ctx,"(import convex.asset :as asset)");
 		CTX=ctx;
-	}
-	
-	@Test public void testSetup() {
-		assertTrue(CTX.lookupValue(nSym) instanceof Address);
 	}
 	
 	@Test public void testScript1() {

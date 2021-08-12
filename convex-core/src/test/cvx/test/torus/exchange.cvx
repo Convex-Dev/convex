@@ -1,0 +1,499 @@
+;;
+;;
+;; Testing `torus.exchange`.
+;;
+;;
+
+
+;;;;;;;;;; Setup
+
+
+($.file/read "src/main/resources/torus/exchange.cvx")
+
+
+(def torus
+     (deploy (cons 'do
+                   (next $/*result*))))
+
+
+(def T
+     $.test)
+
+
+(import convex.asset    :as asset)
+(import convex.fungible :as fungible)
+
+
+($.stream/out! (str $.term/clear.screen
+                    "Testing `torus.exchange`"))
+
+
+;; Generic fungiblity suites.
+;;
+($.file/exec "src/test/cvx/test/convex/fungible/generic.cvx")
+
+
+;; Requiring test suites for `convex.asset` as required for generic fungibility tests.
+;;
+($.file/read "src/test/cvx/test/convex/asset.cvx")
+
+
+(def asset.test
+     (deploy (cons 'do
+                    $/*result*)))
+
+
+(asset.test/setup)
+
+
+;; Easier to buy/sell as a user account, no need to implement `receive-coin`.
+;;
+(set-key $.account/fake-key)
+
+
+;;;;;;;;;; Deploying currencies - 1e6 each with 2 decimal places
+
+
+(def GBP.token
+     (deploy (fungible/build-token {:supply 1000000000})))
+
+
+(def USD.token
+     (deploy (fungible/build-token {:supply 1000000000})))
+
+
+(def USD.market
+     (call torus
+           (create-market USD.token)))
+
+
+;; Only market for USD at the moment.
+
+
+;;;;;;;;;; Test suites
+
+
+(defn suite.api
+
+  ^{:doc {:description "Testing core API functions."}}
+
+  []
+
+  (T/group '((T/path.conj 'api)
+
+             (T/trx '(address? (def GBP.market
+                                    (call torus
+                                          (create-market GBP.token))))
+                    {:description "Create market for GBP."})
+
+             (T/trx '(= GBP.market
+                        (torus/get-market GBP.token))
+                    {:description "Retrieve market for GBP."})
+
+             (T/trx '(= USD.market
+                        (torus/get-market USD.token))
+                    {:description "Retrieve market for USD."})
+
+             (T/trx '(nil? (torus/price GBP.token))
+                    {:description "No price for GBP yet, market exists but no liquidity."})
+
+             (T/trx '(nil? (torus/price USD.token))
+                    {:description "No price for USD yet, market exists but no liquidity."})
+
+              ;; Liquidity
+
+             (T/trx '(<= (- 1.0
+                            0.00001)
+                         (/ (sqrt (* 5000000.0
+                                     1000000000000.0))
+                            (torus/add-liquidity GBP.token
+                                                 5000000
+                                                 1000000000000))
+                         (+ 1.0
+                            0.00001))
+                    {:description "Initial deposit of 50K GBP token liquidity and checking result."})
+
+             (T/trx '(<= (- 1.0
+                            0.00001)
+                         (/ (sqrt (* 10000000.0
+                                     1000000000000.0))
+                            (torus/add-liquidity USD.token
+                                                 10000000
+                                                 1000000000000))
+                         (+ 1.0
+                            0.00001))
+                    {:description "Initial deposit of 100K USD token liquidity and checking result."})
+
+             ;; Prices
+
+             (T/trx '(= 200000.0
+                        (torus/price GBP.token))
+                    {:description "50 GBP token for 1e12 CVX Gold = 2e5 CVX / Penny sterling."})
+
+             (T/trx '(= 100000.0
+                        (torus/price USD.token))
+                    {:description "100K USD token for 1e12 CVX Gold = 1e5 CVX / US Cent."})
+
+             (T/trx '(= 1.0
+                        (torus/price GBP.token
+                                     GBP.token))
+                    {:description "Rate GBP / GBP."})
+
+             (T/trx '(= 2.0
+                        (torus/price GBP.token
+                                     USD.token))
+                    {:description "Rate GBP / USD."})
+
+             (T/trx '(= 0.5
+                        (torus/price USD.token
+                                     GBP.token))
+                    {:description "Rate USD / GBP."})
+
+             ;; Marginal buy trades for 1 GBP / 1 USD
+
+             (T/trx '(= 101
+                        (torus/buy GBP.token
+                                   100
+                                   GBP.token)))
+
+             (T/trx '(= 101
+                        (torus/buy-quote GBP.token
+                                         100
+                                         GBP.token)))
+
+             (T/trx '(= 51
+                        (torus/buy USD.token
+                                   100
+                                   GBP.token)))
+
+             (T/trx '(= 51
+                        (torus/buy-quote USD.token
+                                         100
+                                         GBP.token)))
+
+             (T/trx '(= 201
+                        (torus/buy GBP.token
+                                   100
+                                   USD.token)))
+
+             (T/trx '(= 201
+                        (torus/buy-quote GBP.token
+                                         100
+                                         USD.token)))
+
+             ;; Marginal sell trades for 1 GBD / 1 USD
+
+             (T/trx '(= 99
+                        (torus/sell GBP.token
+                                    100
+                                    GBP.token)))
+
+             (T/trx '(= 99
+                        (torus/sell-quote GBP.token
+                                          100
+                                          GBP.token)))
+
+             (T/trx '(= 49
+                        (torus/sell USD.token
+                                    100
+                                    GBP.token)))
+
+             (T/trx '(= 49
+                        (torus/sell-quote USD.token
+                                          100
+                                          GBP.token)))
+
+             (T/trx '(= 199
+                        (torus/sell GBP.token
+                                    100
+                                    USD.token)))
+
+             (T/trx '(= 199
+                        (torus/sell-quote GBP.token
+                                          100
+                                          USD.token)))
+
+             ;; Failures
+             ;; TODO. Review, errors in original Java tests were actually failing only because of arity exceptions.
+
+             (T/fail.code #{:LIQUIDITY}
+                          '(torus/buy USD.token
+                                      1000000000000000
+                                      USD.token)
+                          {:description "Trade too big, not enough liquidity."}))))
+
+
+
+(defn suite.deployed-currencies
+
+  ^{:doc {:description "Testing already deployed currencies."}}
+
+  []
+
+  (T/group '((T/path.conj 'deployed-currencies)
+
+             (import currency.GBP   :as GBP.default)
+             (import currency.USD   :as USD.default)
+             (import torus.exchange :as torus-old)
+
+             ;; TODO. Missing `double?` in core. See https://github.com/Convex-Dev/convex/issues/92
+             ;;
+             (T/trx '(number? (torus-old/price GBP.default
+                                               USD.default))
+                    {:description "Price of USD per GBP token."}))))
+
+
+
+(defn suite.initial-token-market
+
+  ^{:doc {:description "Testing common operations (adding liquidity, buy, sell, ...) on a new token market."}}
+
+  []
+
+  (T/group '((T/path.conj 'initial-token-market)
+
+             (T/trx '(nil? (call USD.market
+                                 (price)))
+                    {:description "No price since zero liquidity."})
+
+             (T/trx '(= 20000000
+                        (asset/offer USD.market
+                                     [USD.token
+                                      20000000]))
+                    {:description "Initial token offering for market (200K USD)."})
+
+             (T/trx '(= 20000000
+                        (asset/get-offer USD.token
+                                         *address*
+                                         USD.market))
+                    {:description "Accept initial offer."})
+
+             ;; Adding liquidity.
+
+             (T/trx '(do
+                       (def shares.initial
+                            (call USD.market
+                                  1000000000000
+                                  (add-liquidity 10000000)))
+                       true)
+                    {:description "Initial deposit of 100K USD for 1000 CVX Gold."})
+
+             (T/trx '(= 10000000
+                        (asset/balance USD.token
+                                       USD.market))
+                    {:description "Market has balance of 100K USD."})
+
+             (T/trx '(= 1000000000000
+                        (balance USD.market))
+                    {:description "Market has CVX balance of 1000 Gold."})
+
+             (T/trx '(= shares.initial
+                        (asset/balance USD.market
+                                       *address*))
+                    {:description "Initial pool shares, accessible as a fungible asset balance."})
+
+             (T/trx '(= 10000000
+                        (asset/get-offer USD.token
+                                         *address*
+                                         USD.market))
+                    {:description "Consumed half the full offer of tokens."})
+
+             (T/trx '(= 100000.0
+                        (call USD.market
+                              (price)))
+                    {:description "Price should be 100000 CVX / US Cent."})
+
+             ;; More liquidity.
+
+             (T/trx '(do
+                       (def shares.new
+                            (call USD.market
+                                  1000000000000
+                                  (add-liquidity 10000000)))
+                       true)
+                    {:description "Initial deposit of 100K USD for 1000 CVX Gold."})
+
+             (T/trx '(= 20000000
+                        (asset/balance USD.token
+                                       USD.market))
+                    {:description "Market has balance of 100K USD."})
+
+             (T/trx '(= (+ shares.initial
+                           shares.new)
+                        (asset/balance USD.market
+                                       *address*))
+                    {:description "New pool shares, accessible as a fungible asset balance."})
+
+             (T/trx '(= 100000.0
+                        (call USD.market
+                              (price)))
+                    {:description "Price remains unchanged with new pool."})
+
+             (T/trx '(zero? (asset/get-offer USD.token
+                                             *address*
+                                             USD.market))
+                    {:description "Whole offer consumed."})
+
+             ;; Withdraw half of liquidity
+
+             (def balance-before-withdrawal
+                  *balance*)
+
+             (T/trx '(= shares.new
+                        (call USD.market
+                              (withdraw-liquidity shares.new)))
+                    {:description "Withdrawing half of liquidify."})
+
+             (T/trx '(= shares.initial
+                        (asset/balance USD.market
+                                       *address*))
+                    {:description "Remaining liquidity."})
+
+             (T/trx '(= 10000000
+                        (asset/balance USD.token
+                                       USD.market)))
+
+             (T/trx '(= 990000000
+                        (asset/balance USD.token
+                                       *address*)))
+
+             (T/trx '(> *balance*
+                        balance-before-withdrawal))
+
+             (T/trx '(= 1000000000000
+                        (balance USD.market))
+                    {:description "CVX balance of market back to start."})
+
+             ;; Generic fungible tests on shares
+
+             (suite.fungible USD.market
+                             shares.initial
+                             *address*)
+
+             ;; Buy half of all tokens (50K USD)
+
+             (T/trx '(long? (def cvx.paid
+                                 (call USD.market
+                                       *balance*
+                                       (buy-tokens 5000000))))
+                    {:description "Buy half of all tokens."})
+
+             (T/trx '(> cvx.paid
+                        1000000000000)
+                    {:description "Should cost more than pool CVX balance after fee."})
+
+             (T/trx '(< cvx.paid
+                        1100000000000)
+                    {:description "Should cost less than 10% fee."})
+
+             (T/trx '(= 5000000
+                        (asset/balance USD.token
+                                       USD.market))
+                    {:description "Half tokens remaining in the market."})
+
+             (T/trx '(= 995000000
+                        (asset/balance USD.token
+                                       *address*)))
+
+             (T/trx '(= shares.initial
+                        (asset/balance USD.market
+                                       *address*)))
+
+             ;; Sell back tokens (50K USD)
+
+             (T/trx '(= 5000000
+                        (asset/offer USD.market
+                                     [USD.token
+                                      5000000]))
+                    {:description "Sell back tokens."})
+
+             (T/trx '(long? (def cvx.gained
+                                 (call USD.market
+                                       (sell-tokens 5000000)))))
+
+             (T/trx '(> cvx.gained
+                        900000000000)
+                    {:description "Should gain most of money bach."})
+
+             (T/trx '(< cvx.gained
+                        cvx.paid)
+                    {:description "Gain less than cost because of fees."})
+
+             (T/trx '(= 10000000
+                        (asset/balance USD.token
+                                       USD.market)))
+
+             (T/trx '(= 990000000
+                        (asset/balance USD.token
+                                       *address*)))
+
+             (T/trx '(= shares.initial
+                        (asset/balance USD.market
+                                       *address*)))
+
+             ;; Withdraw all liquidity
+
+             (T/trx '(long? (def shares.remaining
+                                 (asset/balance USD.market
+                                                *address*))))
+
+             (T/trx '(> shares.remaining
+                        0))
+
+             (T/trx '(= shares.remaining
+                        (torus/withdraw-liquidity USD.token
+                                                  shares.remaining))
+                    {:description "Withdraw all remaining shares."})
+
+             (T/trx '(zero? (asset/balance USD.market
+                                           *address*))
+                    {:description "No shares left."})
+
+             (T/trx '(zero? (asset/balance USD.token
+                                           USD.market))
+                    {:description "No USD tokens left in liquidity pool."})
+
+             (T/trx '(zero? (balance USD.market))
+                    {:description "No CVX left in liquidity pool."}))))
+
+
+
+(defn suite.missing-market
+
+  ^{:doc {:description "Testing facts about markets which do not exist or have no liquidity."}}
+
+  []
+
+  (T/group '((T/path.conj 'missing-market)
+
+             (T/trx '(nil? (torus/get-market GBP.token))
+                    {:description "There is no market for GBP yet."})
+
+             (T/trx '(nil? (torus/price #4242424242))
+                    {:description "No price for a market that does not exist."})
+
+             (T/trx '(nil? (torus/price GBP.token))
+                    {:description "No price for a market that does not exist, even if token exists."}))))
+
+
+;;;
+
+
+(defn suite.main
+
+  ^{:doc {:description "Main suite gathering all other suites."}}
+
+  []
+
+  (T/group '((T/path.conj 'torus.exchange)
+             (suite.api)
+             (suite.deployed-currencies)
+             (suite.initial-token-market)
+             (suite.missing-market))))
+
+
+;;;;;;;;;;
+
+
+(suite.main)
+(T/print "torus.exchange")

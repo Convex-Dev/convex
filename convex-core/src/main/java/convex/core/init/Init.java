@@ -7,21 +7,20 @@ import convex.core.Coin;
 import convex.core.Constants;
 import convex.core.State;
 import convex.core.data.ACell;
+import convex.core.data.AList;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
-import convex.core.data.Keywords;
-import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
-import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.lang.Context;
 import convex.core.lang.Core;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.lang.Symbols;
 import convex.core.util.Utils;
 
 /**
@@ -45,8 +44,8 @@ public class Init {
 	// Built-in special accounts
 	public static final Address MEMORY_EXCHANGE_ADDRESS = Address.create(7);
 	public static final Address CORE_ADDRESS = Address.create(8);
-    public static final Address TRUST_ADDRESS = Address.create(9);
-	public static final Address REGISTRY_ADDRESS = Address.create(10);
+	public static final Address REGISTRY_ADDRESS = Address.create(9);
+    public static final Address TRUST_ADDRESS = Address.create(10);
 
 	// Base for user-specified addresses
 	public static final Address GENESIS_ADDRESS = Address.create(11);
@@ -64,38 +63,37 @@ public class Init {
 		accts = addGovernanceAccount(accts, INIT_ADDRESS, 0L); // Initialisation Account
 
 		// Reserved fund
-		long reserved=100*Coin.EMERALD;
+		long reserved = 100*Coin.EMERALD;
 		accts = addGovernanceAccount(accts, RESERVED_ADDRESS, reserved); // 75% for investors
 		supply-=reserved;
 		
 		// Foundation governance fund
-		long governance=240*Coin.EMERALD;
+		long governance = 240*Coin.EMERALD;
 		accts = addGovernanceAccount(accts, MAINBANK_ADDRESS, governance); // 24% Foundation
-		supply-=governance;
+		supply -= governance;
 
 		// Pools for network rewards
-		long rootFund=8 * Coin.EMERALD; // 0.8% Long term net rewards
+		long rootFund = 8 * Coin.EMERALD; // 0.8% Long term net rewards
 		accts = addGovernanceAccount(accts, ROOTFUND_ADDRESS, rootFund); 
 		supply -= rootFund;
 		
-		long mainPool=1 * Coin.EMERALD; // 0.1% distribute 5% / year ~= 0.0003% /day
+		long mainPool = 1 * Coin.EMERALD; // 0.1% distribute 5% / year ~= 0.0003% /day
 		accts = addGovernanceAccount(accts, MAINPOOL_ADDRESS, mainPool); 	
-		supply-=mainPool;
+		supply -= mainPool;
 		
 		long livePool = 5 * Coin.DIAMOND; // 0.0005% = approx 2 days of mainpool feed
 		accts = addGovernanceAccount(accts, LIVEPOOL_ADDRESS, 5 * Coin.DIAMOND); 
-		supply-=livePool;
+		supply -= livePool;
 
-		// set up memory exchange. Initially 1GB available at 1000 per byte. (one
-		// diamond coin liquidity)
+		// Set up memory exchange. Initially 1GB available at 1000 per byte. (one diamond coin liquidity)
 		{
-			long memoryCoins=1 * Coin.DIAMOND;
+			long memoryCoins = 1 * Coin.DIAMOND;
 			accts = addMemoryExchange(accts, MEMORY_EXCHANGE_ADDRESS, memoryCoins, 1000000000L);
-			supply-=memoryCoins;
+			supply -= memoryCoins;
 		}
 
-		// always have at least one user and one peer setup
-		int keyCount=genesisKeys.size();
+		// Always have at least one user and one peer setup
+		int keyCount = genesisKeys.size();
 		assert(keyCount > 0);
 
 		// Core library at static address: CORE_ADDRESS
@@ -106,36 +104,36 @@ public class Init {
 		// Build globals
 		AVector<ACell> globals = Constants.INITIAL_GLOBALS;
 
-		// create the inital state
+		// Create the inital state
 		State s = State.create(accts, peers, globals, BlobMaps.empty());
 
-		// add the static defined libraries at addresses: TRUST_ADDRESS, REGISTRY_ADDRESS
+		// Add the static defined libraries at addresses: TRUST_ADDRESS, REGISTRY_ADDRESS
 		s = createStaticLibraries(s, TRUST_ADDRESS, REGISTRY_ADDRESS);
 
-		// reload accounts with the libraries
+		// Reload accounts with the libraries
 		accts = s.getAccounts();
 
 		// Set up initial user accounts
-		assert(accts.count()==GENESIS_ADDRESS.longValue());
+		assert(accts.count() == GENESIS_ADDRESS.longValue());
 		{
-			long userFunds=(long)(supply*0.8); // 80% to user accounts
-			supply-=userFunds;
+			long userFunds = (long)(supply*0.8); // 80% to user accounts
+			supply -= userFunds;
 			
 			// Genesis user gets half of all user funds
-			long genFunds=userFunds/2;
+			long genFunds = userFunds/2;
 			accts = addAccount(accts, GENESIS_ADDRESS, genesisKeys.get(0), genFunds);
-			userFunds-=genFunds;
+			userFunds -= genFunds;
 			
 			for (int i = 0; i < keyCount; i++) {
 				// TODO: construct peer controller addresses
 				Address address = Address.create(accts.count());
-				assert(address.longValue()==accts.count());
-				AccountKey key=genesisKeys.get(i);
-				long userBalance=userFunds/(keyCount-i);
+				assert(address.longValue() == accts.count());
+				AccountKey key = genesisKeys.get(i);
+				long userBalance = userFunds / (keyCount-i);
 				accts = addAccount(accts, address, key, userBalance);
-				userFunds-= userBalance;
+				userFunds -= userBalance;
 			}
-			assert(userFunds==0L);
+			assert(userFunds == 0L);
 		}
 
 		// Finally add peers
@@ -143,26 +141,26 @@ public class Init {
 
 		// BASE_PEER_ADDRESS = accts.size();
 		{
-			long peerFunds=supply;
-			supply-=peerFunds;
+			long peerFunds = supply;
+			supply -= peerFunds;
 			for (int i = 0; i < keyCount; i++) {
 				AccountKey peerKey = genesisKeys.get(i);
-				Address peerController= getGenesisPeerAddress(i);
+				Address peerController = getGenesisPeerAddress(i);
 	
 				// set a staked fund such that the first peer starts with super-majority
-				long peerStake = peerFunds/(keyCount-i);
+				long peerStake = peerFunds / (keyCount-i);
 	
 	            // split peer funds between stake and account
 				peers = addPeer(peers, peerKey, peerController, peerStake);
-				peerFunds-=peerStake;
+				peerFunds -= peerStake;
 			}
-			assert(peerFunds==0L);
+			assert(peerFunds == 0L);
 		}
 		
 
-		// add the new accounts to the state
+		// Add the new accounts to the state
 		s = s.withAccounts(accts);
-		// add peers to the state
+		// Add peers to the state
 		s = s.withPeers(peers);
 
 		{ // Test total funds after creating user / peer accounts
@@ -173,39 +171,20 @@ public class Init {
 		return s;
 	}
 
-	static final ACell TRUST_CODE=Reader.readResource("libraries/trust.con");
-	static final ACell REGISTRY_CODE=Reader.readResource("actors/registry.con");
-
 	public static State createStaticLibraries(State s, Address trustAddress, Address registryAddress) {
 
 		// At this point we have a raw initial state with no user or peer accounts
 
-
-		{ // Deploy Trust library
-			Context<?> ctx = Context.createFake(s, INIT_ADDRESS);
-			ctx = ctx.deployActor(TRUST_CODE);
-			if (!trustAddress .equals(ctx.getResult())) throw new Error("Wrong trust address!");
-			s = ctx.getState();
-		}
-
-
-		{ // Deploy Registry Actor to fixed Address
-			Context<Address> ctx = Context.createFake(s, INIT_ADDRESS);
-			ctx = ctx.deployActor(REGISTRY_CODE);
-			if (!registryAddress .equals(ctx.getResult())) throw new Error("Wrong registry address!");
-			// Note the Registry registers itself upon creation
-			s = ctx.getState();
-		}
+		s = doActorDeploy(s, "convex/registry.cvx");
+		s = doActorDeploy(s, "convex/trust.cvx");
 
 		{ // Register core libraries now that registry exists
 			Context<?> ctx = Context.createFake(s, INIT_ADDRESS);
 			ctx = ctx.eval(Reader.read("(call *registry* (cns-update 'convex.core " + CORE_ADDRESS + "))"));
-			ctx = ctx.eval(Reader.read("(call *registry* (cns-update 'convex.trust " + trustAddress + "))"));
-			ctx = ctx.eval(Reader.read("(call *registry* (cns-update 'convex.registry " + registryAddress + "))"));
+						             
 			s = ctx.getState();
-			s = register(s, CORE_ADDRESS, "Convex Core Library");
-			s = register(s, trustAddress, "Trust Monitor Library");
-			s = register(s, MEMORY_EXCHANGE_ADDRESS, "Memory Exchange Pool");
+			s = register(s, CORE_ADDRESS, "Convex Core Library", "Core utilities accessible by default in any account.");
+			s = register(s, MEMORY_EXCHANGE_ADDRESS, "Memory Exchange Pool", "Automated exchange following the Convex memory allowance model.");
 		}
 
 		/*
@@ -228,43 +207,19 @@ public class Init {
 
 			// ============================================================
 			// Standard library deployment
-
-			{ // Deploy Fungible library and register with CNS
-				s = doActorDeploy(s, "convex.fungible", "libraries/fungible.con");
-			}
-
-			{ // Deploy Oracle Actor
-				s = doActorDeploy(s, "convex.trusted-oracle", "actors/oracle-trusted.con");
-			}
-
-			{ // Deploy Asset Actor
-				s = doActorDeploy(s, "convex.asset", "libraries/asset.con");
-			}
-
-			{ // Deploy Torus Actor
-				s = doActorDeploy(s, "torus.exchange", "actors/torus.con");
-			}
-
-			{ // Deploy NFT Actor
-				s = doActorDeploy(s, "asset.nft-tokens", "libraries/nft-tokens.con");
-			}
-
-			{ // Deploy Simple NFT Actor
-				s = doActorDeploy(s, "asset.simple-nft", "libraries/simple-nft.con");
-			}
-
-			{ // Deploy Box Actor
-				s = doActorDeploy(s, "asset.box", "libraries/box.con");
-			}
-
-			{ // Deploy Play Actor
-				s = doActorDeploy(s, "convex.play", "libraries/play.cvx");
-			}
+			s = doActorDeploy(s, "convex/fungible.cvx");
+			s = doActorDeploy(s, "convex/trusted-oracle.cvx");
+			s = doActorDeploy(s, "convex/asset.cvx");
+			s = doActorDeploy(s, "torus/exchange.cvx");
+			s = doActorDeploy(s, "asset/nft-tokens.cvx");
+			s = doActorDeploy(s, "asset/simple-nft.cvx");
+			s = doActorDeploy(s, "asset/box.cvx");
+			s = doActorDeploy(s, "convex/play.cvx");
 
 			{ // Deploy Currencies
 				@SuppressWarnings("unchecked")
 				AVector<AVector<ACell>> table = (AVector<AVector<ACell>>) Reader
-						.readResourceAsData("torus/currencies.con");
+						.readResourceAsData("torus/currencies.cvx");
 				for (AVector<ACell> row : table) {
 					s = doCurrencyDeploy(s, row);
 				}
@@ -291,16 +246,21 @@ public class Init {
 		return Address.create(GENESIS_ADDRESS.longValue() + index);
 	}
 
-	private static State doActorDeploy(State s, String name, String resource) {
+	// A CVX file contains forms which must be wrapped in a `(do ...)` and deployed as an actor.
+	// First form is the name that must be used when registering the actor.
+	//
+	private static State doActorDeploy(State s, String resource) {
 		Context<Address> ctx = Context.createFake(s, INIT_ADDRESS);
-		ACell form;
-		try {
-			form = Reader.read(Utils.readResourceAsString(resource));
-			ctx = ctx.deployActor(form);
-			Address addr = ctx.getResult();
-			ctx = ctx.eval(Reader.read("(call *registry* (cns-update '" + name + " " + addr + "))"));
 
-			if (ctx.isExceptional()) throw new Error("Error deploying actor: " + ctx.getValue());
+		try {
+			AList<ACell> forms = Reader.readAll(Utils.readResourceAsString(resource));
+
+			ctx = ctx.deployActor(forms.next().cons(Symbols.DO));
+			if (ctx.isExceptional()) throw new Error("Error deploying actor:" + ctx.getValue());
+
+			ctx = ctx.eval(Reader.read("(call *registry* (cns-update " + forms.get(0) + " " + ctx.getResult() + "))"));
+			if (ctx.isExceptional()) throw new Error("Error while registering actor:" + ctx.getValue());
+
 			return ctx.getState();
 		} catch (IOException e) {
 			throw Utils.sneakyThrow(e);
@@ -312,10 +272,10 @@ public class Init {
 		double usdValue = RT.jvm(row.get(6));
 		long decimals = RT.jvm(row.get(5));
 
-		// currency liquidity in lowest currency division
+		// Currency liquidity in lowest currency division
 		double liquidity = (Long) RT.jvm(row.get(4)) * Math.pow(10, decimals);
 
-		// cvx price for unit
+		// CVX price for unit
 		double price = usdValue * 1000;
 		double cvx = price * liquidity / Math.pow(10, decimals);
 
@@ -332,10 +292,9 @@ public class Init {
 		return ctx.getState();
 	}
 
-	private static State register(State state, Address origin, String name) {
+	private static State register(State state, Address origin, String name, String description) {
 		Context<?> ctx = Context.createFake(state, origin);
-		ctx = ctx.actorCall(REGISTRY_ADDRESS, 0L, Strings.create("register"),
-				Maps.of(Keywords.NAME, Strings.create(name)));
+		ctx = ctx.eval(Reader.read("(call *registry* (register {:description \"" + description + "\" :name \"" + name + "\"}))"));
 		return ctx.getState();
 	}
 	
@@ -360,8 +319,7 @@ public class Init {
 		return accts;
 	}
 
-	private static AVector<AccountStatus> addMemoryExchange(AVector<AccountStatus> accts, Address a, long balance,
-			long allowance) {
+	private static AVector<AccountStatus> addMemoryExchange(AVector<AccountStatus> accts, Address a, long balance, long allowance) {
 		if (accts.count() != a.longValue()) throw new Error("Incorrect memory exchange address: " + a);
 		AccountStatus as = AccountStatus.createGovernance(balance).withMemory(allowance);
 		accts = accts.conj(as);

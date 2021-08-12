@@ -48,7 +48,7 @@ public class PredictionMarketTest extends ACVMTest {
 	@SuppressWarnings("rawtypes")
 	@Test
 	public void testPredictionContract() throws IOException {
-		String contractString = Utils.readResourceAsString("actors/prediction-market.con");
+		String contractString = Utils.readResourceAsString("lab/prediction-market.cvx");
 
 		// Run code to initialise actor with [oracle oracle-key outcomes]
 		Context ctx = TestState.CONTEXT.fork();
@@ -120,18 +120,13 @@ public class PredictionMarketTest extends ACVMTest {
 		// setup address for this little play
 		Context<?> ctx = step("(do (def HERO " + HERO + ") (def VILLAIN " +VILLAIN + ") )");
 
-		// deploy an oracle contract.
-		String oracleString = Utils.readResourceAsString("actors/oracle-trusted.con");
-		ctx=step("(def oaddr (deploy '"+oracleString+"))");
-		Address oaddr=(Address) ctx.getResult();
-
-		ctx = step(ctx, "(def oaddr" + oaddr + ")");
+		ctx = step("(import convex.trusted-oracle :as oaddr)");
 
 		// call to create oracle with key :bar and current address (HERO) trusted
 		ctx = step(ctx, "(call oaddr (register :bar {:trust #{*address*}}))");
 
 		// deploy a prediction market using the oracle
-		String contractString = Utils.readResourceAsString("actors/prediction-market.con");
+		String contractString = Utils.readResourceAsString("lab/prediction-market.cvx");
 		ctx=step(ctx,"(deploy ("+contractString+" oaddr :bar #{true,false}))");
 		Address pmaddr = (Address) ctx.getResult();
 		ctx = step(ctx, "(def pmaddr " + pmaddr + ")");

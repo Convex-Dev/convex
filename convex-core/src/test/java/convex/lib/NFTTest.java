@@ -31,7 +31,7 @@ public class NFTTest extends ACVMTest {
 	private static Context<?> loadNFT() {
 		Context<?> ctx=Context.createFake(InitTest.STATE,InitTest.HERO);
 		try {
-			String importS="(import convex.nft-tokens :as "+nSym.getName()+")";
+			String importS="(import asset.nft-tokens :as "+nSym.getName()+")";
 			ACell code=Reader.read(importS);
 			ctx=ctx.run(code);
 			Address nft=(Address) ctx.getResult();
@@ -64,7 +64,7 @@ public class NFTTest extends ACVMTest {
 		c=step(c,"(def p2 (address "+VILLAIN+"))");
 		c=TestState.stepAs(VILLAIN,c,"(do "
 				+ "(import convex.asset :as asset)\r\n"
-				+ "(import convex.nft-tokens :as nft)\r\n"
+				+ "(import asset.nft-tokens :as nft)\r\n"
 				+ "(set-controller "+HERO+"))");
 
 		c=c.withJuice(Constants.MAX_TRANSACTION_JUICE); //ensure enough juice

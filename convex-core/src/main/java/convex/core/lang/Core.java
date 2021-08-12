@@ -2389,7 +2389,7 @@ public class Core {
 		ACell form = null;
 
 		// Compile and execute forms in turn. Later definitions can use earlier macros!
-		AList<ACell> forms = Reader.readAll(Utils.readResourceAsString("lang/core.cvx"));
+		AList<ACell> forms = Reader.readAll(Utils.readResourceAsString("convex/core.cvx"));
 		for (ACell f : forms) {
 			form = f;
 			ctx=ctx.expandCompile(form);
@@ -2408,7 +2408,7 @@ public class Core {
 
 	@SuppressWarnings("unchecked")
 	private static Context<?> applyDocumentation(Context<?> ctx) throws IOException {
-		AMap<Symbol, AHashMap<ACell, ACell>> m = Reader.read(Utils.readResourceAsString("lang/core-metadata.doc"));
+		AMap<Symbol, AHashMap<ACell, ACell>> m = Reader.read(Utils.readResourceAsString("convex/core/metadata.cvx"));
 		for (Map.Entry<Symbol, AHashMap<ACell, ACell>> de : m.entrySet()) {
 			try {
 				Symbol sym = de.getKey();
