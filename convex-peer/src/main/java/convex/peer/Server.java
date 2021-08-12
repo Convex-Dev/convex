@@ -47,6 +47,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.init.Init;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
@@ -274,8 +275,12 @@ public class Server implements Closeable {
 				}
 			}
 			State genesisState = (State) config.get(Keywords.STATE);
-			log.info("Defaulting to standard Peer startup with genesis state: "+genesisState.getHash());
-	
+			if (genesisState!=null) {
+				log.info("Defaulting to standard Peer startup with genesis state: "+genesisState.getHash());
+			} else {
+				genesisState=Init.createState(List.of(keyPair.getAccountKey()));
+				log.info("Created new genesis state: "+genesisState.getHash());
+			}
 			return Peer.createGenesisPeer(keyPair,genesisState);
 		} catch (ExecutionException|InterruptedException e) {
 			throw Utils.sneakyThrow(e);
