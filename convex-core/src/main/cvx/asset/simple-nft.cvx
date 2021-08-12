@@ -1,29 +1,18 @@
-;;
-;;
-;; Simple NFT library
-;;
-;; Enables the creation of minimal NFT tokens.
-;; 
-;; The NFT is just a long. User can build a layer on top so that this number points to any arbitrary data.
-;;
-;;
-
-
-;; REGISTERING THE LIBRARY
-
-
 'asset.simple-nft
 
 (call *registry*
-      (register {:name "Simple NFT Library"}))
+      (register {:description ["Enables the creation of minimal NFT tokens."
+                               "An NFT is merely a long. Users can build an additional layer so that this id points to anything."
+                               "Follows the interface described in `convex.asset`."]
+                 :name         "Simple NFT creation and management"}))
 
 
-;; VALUES
+;;;;;;;;;; Values
 
 
 (def counter
  
-  ^{:doc {:description ""}}
+  ^{:doc {:description "Used for creating NFT ids."}}
 
   0)
 
@@ -31,23 +20,80 @@
 
 (def offers
 
-  ^{:doc {:description "Map of `owner` -> map of `recipient-address` -> `id-set`"}}
+  ^{:doc {:description "Map of `owner` -> map of `recipient address` -> `set of NFT ids`"}}
 
   {})
 
 
-
-(def self
-
-  *address*)
+;;;;;;;;;; Implementation of `convex.asset` interface
 
 
-;; IMPLEMENTING `convex.asset` INTERFACE
+(defn -direct-transfer
+
+  ^{:private? true}
+
+  ;; Used internally by [[accept]] and [[direct-transfer]].
+
+  [sender receiver quantity]
+
+  (let [receiver             (address receiver)
+        sender-balance       (or (get-holding sender)
+                                 #{})
+        _                    (assert (subset? quantity
+                                              sender-balance))
+        receiver-balance     (or (get-holding receiver)
+                                 #{})
+        new-sender-balance   (difference sender-balance
+                                         quantity)
+        new-receiver-balance (union receiver-balance
+                                    quantity)]
+    (set-holding sender
+                 new-sender-balance)
+    (set-holding receiver
+                 new-receiver-balance))
+    quantity)
+
+
+
+(defn accept
+
+  ^{:callable? true
+    :private?  true}
+
+  [sender quantity]
+
+  (let [sender           (address sender)
+        sender-offers    (or (get offers
+                                  sender)
+                             {})
+        offer            (or (get-in offers
+                                     [sender
+                                      *caller*])
+                             #{})
+        _                (assert (subset? quantity
+                                          offer))
+        receiver-balance (or (get-holding *caller*)
+                             #{})
+        new-offer        (difference offer
+                                     quantity)]
+
+    (def offers
+       (assoc offers
+              sender
+              (assoc sender-offers
+                     *caller*
+                     new-offer)))
+
+    (-direct-transfer sender
+                      *caller*
+                      quantity)))
+
 
 
 (defn balance
 
-  ^{:callable? true}
+  ^{:callable? true
+    :private?  true}
 
   [owner]
 
@@ -56,9 +102,23 @@
 
 
 
+(defn direct-transfer
+
+  ^{:callable? true
+    :private?  true}
+
+  [receiver quantity]
+
+  (-direct-transfer *caller*
+                    receiver
+                    quantity))
+
+
+
 (defn offer
 
-  ^{:callable? true}
+  ^{:callable? true
+    :private?  true}
 
   [receiver quantity]
 
@@ -74,18 +134,10 @@
 
 
 
-(defn owns?
-
-  [owner nfts]
-
-  (subset? nfts
-           (get-holding owner)))
-
-
-
 (def quantity-add
 
-  ^{:callable? true}
+  ^{:callable? true
+    :private?  true}
 
   union)
 
@@ -93,7 +145,8 @@
 
 (def quantity-sub
 
-  ^{:callable? true}
+  ^{:callable? true
+    :private?  true}
 
   difference)
 
@@ -101,83 +154,20 @@
 
 (def quantity-subset?
 
-  ^{:callable? true}
+  ^{:callable? true
+    :private?  true}
 
   subset?)
 
 
-
-(let [internal-direct-transfer (fn [sender receiver quantity]
-                                 (let [receiver             (address receiver)
-                                       sender-balance       (or (get-holding sender)
-                                                                #{})
-                                       _                    (assert (subset? quantity
-                                                                             sender-balance))
-                                       receiver-balance     (or (get-holding receiver)
-                                                                #{})
-                                       new-sender-balance   (difference sender-balance
-                                                                        quantity)
-                                       new-receiver-balance (union receiver-balance
-                                                                   quantity)]
-                                   (set-holding sender
-                                                new-sender-balance)
-                                   (set-holding receiver
-                                                new-receiver-balance))
-                                   quantity)]
-
-  (defn accept
-
-    ^{:callable? true}
-
-    [sender quantity]
-
-    (let [sender           (address sender)
-          sender-offers    (or (get offers
-                                    sender)
-                               {})
-          offer            (or (get-in offers
-                                       [sender
-                                        *caller*])
-                               #{})
-          _                (assert (subset? quantity
-                                            offer))
-          receiver-balance (or (get-holding *caller*)
-                               #{})
-          new-offer        (difference offer
-                                       quantity)]
-
-      (def offers
-         (assoc offers
-                sender
-                (assoc sender-offers
-                       *caller*
-                       new-offer)))
-
-      (internal-direct-transfer sender
-                              *caller*
-                              quantity)))
-
-
-  (defn direct-transfer
-
-    ^{:callable? true}
-
-    [receiver quantity]
-
-    (internal-direct-transfer *caller*
-                              receiver
-                              quantity)))
-
-
-
-
-;; ACTOR SPECIFIC CALLABLE FUNCTIONS
+;;;;;;;;;; Callable functions
 
 
 (defn burn
 
   ^{:callable? true
-    :doc       {:description "Destroys a set of NFTs. NFTs must be owned by the caller."}}
+    :doc       {:description "Destroys a set of NFTs. NFTs must be owned by the caller."
+                :signature   [{:params [nft-set]}]}}
 
   [nft-set]
 
@@ -189,7 +179,7 @@
     (when-not (subset? nft-set
                        owned-nfts)
       (fail :TRUST
-            "Trying to burn nfts which are not owned!"))
+            "Can only burn owned NFTs"))
     (set-holding *caller*
                  (difference owned-nfts
                              nft-set))
@@ -197,21 +187,11 @@
 
 
 
-(defn create 
-
-  ^{:doc {:description "Library function to create a NFT. Metadata for the NFT is option, will be nil if not specifies."}}
-
-  []
-
-  (call self
-        (create-nft)))
-
-
-
-(defn create-nft
+(defn create
 
   ^{:callable? true
-    :doc       {:description "Contract to create a new NFT, with a fresh ID and arbitrary metadata."}}
+    :doc       {:description "Creates a new NFT with a fresh ID and arbitrary metadata."
+                :signature   [{:params []}]}}
 
   []
 

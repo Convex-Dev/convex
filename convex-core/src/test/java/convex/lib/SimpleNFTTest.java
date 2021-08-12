@@ -13,7 +13,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Sets;
-import convex.core.data.Symbol;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.Context;
 import convex.core.lang.TestState;
@@ -47,7 +46,7 @@ public class SimpleNFTTest {
 	@SuppressWarnings("unchecked")
 	@Test public void testAssetAPI() {
 		Context<?> ctx=CTX.fork();
-		ctx=step(ctx,"(def total (map (fn [v] (call nft (create-nft))) [1 2 3 4]))");
+		ctx=step(ctx,"(def total (map (fn [v] (call nft (create))) [1 2 3 4]))");
 		AVector<CVMLong> v=(AVector<CVMLong>) ctx.getResult();
 		assertEquals(4,v.count());
 		CVMLong b1=v.get(0);

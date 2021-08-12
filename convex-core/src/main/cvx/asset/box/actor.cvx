@@ -157,18 +157,6 @@
 
 
 
-(defn owns?
-
-  ^{:private? true}
-
-  [owner boxes]
-
-  (subset? boxes
-           (get ownership
-                owner)))
-
-
-
 (defn receive-asset
 
   ^{:callable? true
