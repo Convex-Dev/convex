@@ -256,10 +256,10 @@ The simplest way to start up the local Convex network is to run the following co
 
 [WARNING]
 ====
-In this help document the password is always shown as `--password=my-password`. This is an example of a not very good password to use for storing your keys. We suggest that you use a more secure password.
+In this document the password option will always be shown as `--password=my-password`. This is an example of a not very good password to use for storing your keys. We suggest that you use a more secure password instead of `my-password`.
 ====
 
-You wil always need to pass the password to the *keystore* file since the CLI will need access to create and start up the local peers.
+You wil always need to pass the password to the *keystore* file since the CLI will need access the keys to create and start up the local peers.
 
 The CLI will automatically create 4 keypairs and place them in the keystore. The CLI will then start up 4 peers all sharing a single
 temporary local _Etch Database_ in the /tmp folder.
@@ -413,7 +413,7 @@ To start a local peer you first need to do the following:
 
 [NOTE]
 ====
-This type of block chain technology uses Convergent Proof of Stake (CPoS) algorithm, where each peer has a Stake amount. The stake amount is decides the peers role in the CPoS algorithm. See https://convex.world/technology[Convex Technology]
+This type of block chain technology uses Convergent Proof of Stake (CPoS) algorithm, where each peer has a public key and a stake amount. The stake amount decides the peers voting control in the CPoS algorithm. See https://convex.world/technology[Convex Technology]
 ====
 
 The following command does all of the above except step #1:
@@ -436,9 +436,27 @@ you can then copy the *Peer start line:* and run a peer with the local network.
 == Starting a local Peer to a remote Convex network
 How to start a local peer, that connects to a remote Convex network.
 
+If you whish to connect to your own remote peer, you can by adding the `--peer` option. This tells the new peer you are starting where a remote peer is located. Once found the started peer will try and sync with the remote peer.
+
+To connect to someone elses remote network or to connect to the test network at https://convex.world[convex] you will need to obtain a peer keypair, account with sufficient funds and the peer registered with a stake amount.
+
+
 [#command-local-gui]
 == Starting the GUI local network
 How to start the gui local network.
+
+To start the local GUI network, you can call the command:
+
+    ./convex local gui
+
+This starts the a local network in GUI mode. At the moment the GUI local network does not publish the keypairs used for the network, so the CLI cannot do the following when the GUI network is running:
+
+. Account Fund Request
+
+. Account Create
+
+. Peer Create
+
 
 == Peer Output
 Describes the output fields
@@ -495,35 +513,124 @@ S:: Synced
 
 [#command-keys]
 == Managing your Keys - The Keystore
-To run any peer you need to manage the local public/private key pairs.
+How to manage the local public/private key pairs.
+
+When using any of the `key` sub commands, you do not need to be connected to any network.
+
+The option `--keystore` can be used with any sub command to specify which keystore to use.
+
 
 [#command-key-generate]
 === Generating keypairs
 How to generate a new set of public/private keys.
 
+You need to generate keypairs when:
+
+. Creating an account
+
+. Creating a new peer
+
+This command allows you to create 1+ keypairs in the keystore.
+
+So for example this will create 10 keypairs:
+
+    ./convex key generate 10 --password=my-password
+
 [#command-key-list]
 === List keys
 How to list the keys store in the keystore.
 
+To list out your keystore and view the public keys of each keypair.
+
+    ./convex key list --password=my-password
+
+
 [#command-key-export]
-=== Export keys
+=== Exporting keys
 How to export the keys from your keystore to encrypted text.
 
+You can export a keypair from the keystore to an encrypted PEM formated text. This is usefull if you need
+to give another user, or application access to your network.
+
+You need to provide an `--export-password` option with the password of the encrypted PEM formated text.
+
+You also need to provide the location of the keypair you wish to export, this can be done using the `--index-key` or `--public-key` option.
+
+In this example first list out the keys from the keystore.
+
+    ./convex key list --password=my-password
+
+    1 e7fdcb0bfdfb786b51eedf33b575....
+    2 373d2a583695ff367dd986e12785....
+    ..
+
+
+If we now want to export the key #2, then we can use the following command:
+
+    ./convex key export --index-key=2 --export-password=my-password --password=my-password
+
+or a more safer way is to use the first hex of the  public key
+
+    ./convex key export --publi-key=373d2a583695ff --export-password=my-password --password=my-password
+
+
+[WARNING]
+====
+In this example we have used a insecure password of `my-password` to encrypt the exported key. We suggest that you use a better password when exporting your keys, and keep the exported PEM formated text secure.
+====
+
 [#command-key-import]
-=== Import keys
+=== Importing keys
 How to import keys into the keystore.
+
+You would need to import keys, when you want to run a peer or send a transaction for an account on another network.
+
+To import a keypair you need to set the options `--import-file` or `--import-file` and `--import-password`.
+
+So for example:
+
+    ./convex key import --import-file=my_key.pem --import-password=my-password --password=my-password
+
+If the import password is successfull, this will import the keypair into the keystore, and show the public key of the imported keypair.
+
 
 [#command-accounts]
 == Managing Accounts
 Information on how to create, fund and get information about the local accounts.
 
+This set of sub commands manage accounts on the local network. You need to have a local network running on the same computer for these commands to work.
+
+The reason is that the keystore needs to contain the keys for the first genesis accounts in the network. With the access to the genesis keypair, the account commands can create an account, and transfer sufficient funds to the new account.
+
+
 [#command-account-create]
 === Create an account
 How to create a local account.
 
+To create a new account and new keypair, you can just run:
+
+    ./convex account create --password=my-password
+
+If you wish to use an already defined keypair in your keystore, you can set the `--index-key` or `--public-key` options.
+
+    ./convex account create --public-key=eb1234 --password=my-password
+
+
+The command returns the account address and public key used to create the account.
+
+
 [#command-account-balance]
 === Get an accounts balance
 How to get an account's balance.
+
+To obtain the balance of an account, you just need to provide an address of the account.
+
+So to run:
+
+    ./convex account balance 45
+
+Returns the balance for account #45
+
 
 [#command-account-fund]
 === Request funds for an account
