@@ -262,7 +262,7 @@
   ^{:doc {:description "The address of the Convex registry Actor."
           :examples [{:code "(call *registry* (register {:name \"My name\"}))"}]
           :type :value}}
-  (address 10))
+  (address 9))
 
 (def *lang*
   ^{:doc {:description "The current language font-end function. If set to a function in the environment, this function will be called with the input form during evaluation insteand of the normal `eval` behaviour. Pre-compiled ops bypass this language setting."

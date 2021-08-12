@@ -1,5 +1,5 @@
 (import convex.asset :as asset)
-(import convex.nft-tokens :as nft)
+(import asset.nft-tokens :as nft)
 
 ;; Executed as HERO
 ;; Note p2 is configured as VILLAIN, with hero as controller
@@ -192,7 +192,7 @@
   (def logger
     (deploy
      '(do
-        (import convex.nft-tokens :as nft)
+        (import asset.nft-tokens :as nft)
         (def token-history {})
         (defn get-token-history [id]
           (get token-history id))
@@ -261,7 +261,7 @@
   (def transfer-max-twice
     (deploy
      '(do
-        (import convex.nft-tokens :as nft)
+        (import asset.nft-tokens :as nft)
         (def transfer-count {})
         (defn check-trusted? [addr policy-key id]
           (if (contains-key? #{:destroy :transfer} policy-key)

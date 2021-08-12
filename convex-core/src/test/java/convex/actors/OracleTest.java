@@ -10,13 +10,11 @@ import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Keywords;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
-import convex.core.lang.Reader;
 
 public class OracleTest extends ACVMTest {
 
@@ -25,10 +23,7 @@ public class OracleTest extends ACVMTest {
 	public void testOracleActor() throws IOException {
 
 		// setup address for this scene
-		Context ctx =step("(do (def HERO " + HERO + ") (def VILLAIN " + VILLAIN + "))");
-
-		ACell contractCode = Reader.readResource("actors/oracle-trusted.con");
-		ctx = ctx.deployActor(contractCode);
+		Context ctx =step("(do (def HERO " + HERO + ") (def VILLAIN " + VILLAIN + ") (import convex.trusted-oracle :as oracle))");
 
 		Address oracle3 = (Address) ctx.getResult();
 		String o3_str = oracle3.toHexString();
