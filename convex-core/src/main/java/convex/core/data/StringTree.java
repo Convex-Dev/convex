@@ -143,18 +143,12 @@ public class StringTree extends AString {
 	@Override
 	public StringTree updateRefs(IRefFunction func) {
 		int ic = children.length;
-		Ref<AString>[] newChildren = children;
 		for (int i = 0; i < ic; i++) {
 			Ref<AString> current = children[i];
 			Ref<AString> newChild = (Ref<AString>) func.apply(current);
-			
-			if (newChild!=current) {
-				if (children==newChildren) newChildren=children.clone();
-				newChildren[i] = newChild;
-			}
+			children[i] = newChild;
 		}
-		if (newChildren==children) return this; // no change, safe to return this
-		return new StringTree(length,newChildren);
+		return this;
 	}
 
 	@Override

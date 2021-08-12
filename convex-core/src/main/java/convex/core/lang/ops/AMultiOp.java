@@ -17,7 +17,7 @@ import convex.core.lang.AOp;
  * @param <T> Type of function return
  */
 public abstract class AMultiOp<T extends ACell> extends AOp<T> {
-	protected final AVector<AOp<ACell>> ops;
+	protected AVector<AOp<ACell>> ops;
 
 	protected AMultiOp(AVector<AOp<ACell>> ops) {
 		// TODO: need to think about bounds on number of child ops?
@@ -45,8 +45,8 @@ public abstract class AMultiOp<T extends ACell> extends AOp<T> {
 
 	@Override
 	public AMultiOp<T> updateRefs(IRefFunction func) {
-		ASequence<AOp<ACell>> newOps = ops.updateRefs(func);
-		return recreate(newOps);
+		ops=ops.updateRefs(func);
+		return this;
 	}
 
 	@Override

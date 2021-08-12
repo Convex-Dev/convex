@@ -59,8 +59,8 @@ public abstract class ARecordGeneric extends ARecord {
 
 	@Override
 	public ARecord updateRefs(IRefFunction func) {
-		AVector<ACell> newValues=values.updateRefs(func);
-		return withValues(newValues);
+		values=values.updateRefs(func);
+		return this;
 	}
 
 	@Override

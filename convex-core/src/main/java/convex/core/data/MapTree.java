@@ -497,21 +497,12 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public MapTree<K,V> updateRefs(IRefFunction func) {
 		int n = children.length;
-		if (n == 0) return this;
-		Ref<AHashMap<K, V>>[] newChildren = children;
 		for (int i = 0; i < n; i++) {
 			Ref<AHashMap<K, V>> child = children[i];
 			Ref<AHashMap<K, V>> newChild = (Ref<AHashMap<K, V>>) func.apply(child);
-			if (child != newChild) {
-				if (children == newChildren) {
-					newChildren = children.clone();
-				}
-				newChildren[i] = newChild;
-			}
+			children[i] = newChild;
 		}
-		if (newChildren == children) return this;
-		// Note: we assume no key hashes have changed, so structure is the same
-		return new MapTree<>(newChildren, shift, mask, count);
+		return this;	
 	}
 
 	@Override
