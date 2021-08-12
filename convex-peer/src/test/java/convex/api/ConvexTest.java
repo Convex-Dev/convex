@@ -32,14 +32,14 @@ import convex.peer.ServerTest;
  */
 public class ConvexTest {
 
-	static final Address ADDRESS;
+	static final Address USER;
 	static final AKeyPair KEYPAIR = AKeyPair.generate();
 
 	static {
 		synchronized(ServerTest.SERVER) {
 			try {
-				ADDRESS=ServerTest.CONVEX.createAccountSync(KEYPAIR.getAccountKey());
-				ServerTest.CONVEX.transfer(ADDRESS, 1000000000L).get(1000,TimeUnit.MILLISECONDS);
+				USER=ServerTest.CONVEX.createAccountSync(KEYPAIR.getAccountKey());
+				ServerTest.CONVEX.transfer(USER, 1000000000L).get(1000,TimeUnit.MILLISECONDS);
 			} catch (Throwable e) {
 				e.printStackTrace();
 				throw Utils.sneakyThrow(e);
@@ -60,18 +60,18 @@ public class ConvexTest {
 	@Test
 	public void testConvex() throws IOException, TimeoutException {
 		synchronized (ServerTest.SERVER) {
-			Convex convex = Convex.connect(ServerTest.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
-			Result r = convex.transactSync(Invoke.create(ADDRESS, 0, Reader.read("*address*")), 1000);
+			Convex convex = Convex.connect(ServerTest.SERVER.getHostAddress(), USER, KEYPAIR);
+			Result r = convex.transactSync(Invoke.create(USER, 0, Reader.read("*address*")), 1000);
 			assertNull(r.getErrorCode(), "Error:" + r.toString());
-			assertEquals(ADDRESS, r.getValue());
+			assertEquals(USER, r.getValue());
 		}
 	}
 
 	@Test
 	public void testBadSignature() throws IOException, TimeoutException, InterruptedException, ExecutionException {
 		synchronized (ServerTest.SERVER) {
-			Convex convex = Convex.connect(ServerTest.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
-			Ref<ATransaction> tr = Invoke.create(ADDRESS, 0, Reader.read("*address*")).getRef();
+			Convex convex = Convex.connect(ServerTest.SERVER.getHostAddress(), USER, KEYPAIR);
+			Ref<ATransaction> tr = Invoke.create(USER, 0, Reader.read("*address*")).getRef();
 			Result r = convex.transact(SignedData.create(KEYPAIR, Ed25519Signature.ZERO, tr)).get();
 			assertEquals(ErrorCodes.SIGNATURE, r.getErrorCode());
 		}
@@ -81,11 +81,11 @@ public class ConvexTest {
 	@Test
 	public void testManyTransactions() throws IOException, TimeoutException, InterruptedException, ExecutionException {
 		synchronized (ServerTest.SERVER) {
-			Convex convex = Convex.connect(ServerTest.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
+			Convex convex = Convex.connect(ServerTest.SERVER.getHostAddress(), USER, KEYPAIR);
 			int n = 100;
 			Future<Result>[] rs = new Future[n];
 			for (int i = 0; i < n; i++) {
-				Future<Result> f = convex.transact(Invoke.create(ADDRESS, 0, Constant.of(i)));
+				Future<Result> f = convex.transact(Invoke.create(USER, 0, Constant.of(i)));
 				rs[i] = f;
 			}
 			for (int i = 0; i < n; i++) {

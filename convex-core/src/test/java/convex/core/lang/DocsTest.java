@@ -17,7 +17,8 @@ public class DocsTest {
 	public static final boolean PRINT_MISSING=true;
 	
 	@Test public void testDocs() {
-		for (Entry<Symbol, AHashMap<ACell, ACell>> me: Core.METADATA.entrySet()) {
+		AHashMap<Symbol, AHashMap<ACell, ACell>> coreMeta=Core.buildCoreAccount().getMetadata();
+		for (Entry<Symbol, AHashMap<ACell, ACell>> me: coreMeta.entrySet()) {
 			Symbol sym=me.getKey();
 			AHashMap<ACell,ACell> meta = me.getValue();
 			if (meta.isEmpty()) {

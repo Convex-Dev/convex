@@ -31,7 +31,7 @@ public class Def<T extends ACell> extends AOp<T> {
 	private final ACell symbol;
 	
 	// expression to execute to determine the defined value
-	private final Ref<AOp<T>> op;
+	private Ref<AOp<T>> op;
 
 	private Def(ACell key, Ref<AOp<T>> op) {
 		this.op = op;
@@ -98,10 +98,9 @@ public class Def<T extends ACell> extends AOp<T> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public Def<T> updateRefs(IRefFunction func) {
-		ACell newSymbol=symbol.updateRefs(func);
-		Ref<AOp<T>> newRef = (Ref<AOp<T>>) func.apply(op);
-		if (op == newRef) return this;
-		return new Def<T>(newSymbol, newRef);
+		symbol.updateRefs(func);
+		op = (Ref<AOp<T>>) func.apply(op);
+		return this;
 	}
 
 	@Override

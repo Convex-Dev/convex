@@ -1,6 +1,7 @@
 package convex.test.generators;
 
 import java.util.List;
+import java.util.Map;
 
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
@@ -22,6 +23,13 @@ import convex.core.lang.RT;
 public class FormGen extends Generator<ACell> {
 	public FormGen() {
 		super(ACell.class);
+	}
+	
+	private static ACell[] coreVals=Core.getMap().values().toArray(new ACell[0]);
+	
+	private static Symbol randomCoreSymbol(SourceOfRandomness r) {
+		int n = coreVals.length;
+		return Core.symbolFor(coreVals[r.nextInt(n)]);
 	}
 
 	@Override
@@ -45,17 +53,14 @@ public class FormGen extends Generator<ACell> {
 		case 5: {
 			// random form containing core symbol at head
 			List<ACell> subForms = this.times(r.nextInt(4)).generate(r, status);
-			AHashMap<Symbol, ACell> env = Core.ENVIRONMENT;
-			int n = (int) env.count();
-			Symbol sym = env.entryAt(r.nextInt(n)).getKey();
+		
+			Symbol sym = randomCoreSymbol(r);
 			return RT.cons(sym, Lists.create(subForms));
 		}
 
 		case 6: {
 			// random core symbol
-			AHashMap<Symbol, ACell> env = Core.ENVIRONMENT;
-			int n = (int) env.count();
-			Symbol sym = env.entryAt(r.nextInt(n)).getKey();
+			Symbol sym = randomCoreSymbol(r);
 			return sym;
 		}
 

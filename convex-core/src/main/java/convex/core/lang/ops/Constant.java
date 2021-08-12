@@ -43,7 +43,7 @@ public class Constant<T extends ACell> extends AOp<T> {
 	public static final Constant<AList<?>> EMPTY_LIST = new Constant(List.EMPTY_REF);
 
 	
-	private final Ref<T> valueRef;
+	private Ref<T> valueRef;
 
 	private Constant(Ref<T> valueRef) {
 		this.valueRef = valueRef;
@@ -109,12 +109,11 @@ public class Constant<T extends ACell> extends AOp<T> {
 		return (Ref<R>) valueRef;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public Constant<T> updateRefs(IRefFunction func) {
-		@SuppressWarnings("unchecked")
-		Ref<T> newRef = (Ref<T>) func.apply(valueRef);
-		if (valueRef == newRef) return this;
-		return createFromRef(newRef);
+		this.valueRef = (Ref<T>) func.apply(valueRef);
+		return this;
 	}
 
 	@SuppressWarnings("unchecked")

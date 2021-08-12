@@ -3,7 +3,7 @@ package convex.core.lang;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -49,6 +49,7 @@ import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.CorePred;
 import convex.core.lang.impl.ErrorValue;
 import convex.core.lang.impl.HaltValue;
+import convex.core.lang.impl.ICoreDef;
 import convex.core.lang.impl.RecurValue;
 import convex.core.lang.impl.Reduced;
 import convex.core.lang.impl.ReturnValue;
@@ -83,26 +84,23 @@ import convex.core.util.Utils;
 public class Core {
 
 	/**
-	 * Default initial environment importing core namespace
-	 */
-	public static final AHashMap<Symbol, ACell> ENVIRONMENT;
-
-	/**
-	 * Default initial core metadata
-	 */
-	public static final AHashMap<Symbol, AHashMap<ACell,ACell>> METADATA;
-
-
-	/**
 	 * Symbol for core namespace
 	 */
 	public static final Symbol CORE_SYMBOL = Symbol.create("convex.core");
 
-	private static final HashSet<ACell> tempReg = new HashSet<ACell>();
+	private static final HashMap<Symbol,ACell> tempReg = new HashMap<>();
 
 	private static <T extends ACell> T reg(T o) {
-		tempReg.add(o);
+		tempReg.put(symbolFor(o),o);
 		return o;
+	}
+	
+	public static HashMap<Symbol,ACell> getMap() {
+		return tempReg;
+	}
+	
+	public static ACell getCoreValue(Symbol sym) {
+		return tempReg.get(sym);
 	}
 
 	public static final CoreFn<AVector<ACell>> VECTOR = reg(new CoreFn<>(Symbols.VECTOR) {
@@ -2357,8 +2355,8 @@ public class Core {
 	// =====================================================================================================
 	// Core environment generation
 
-	static Symbol symbolFor(ACell o) {
-		if (o instanceof CoreFn) return ((CoreFn<?>) o).getSymbol();
+	public static Symbol symbolFor(ACell o) {
+		if (o instanceof ICoreDef) return ((ICoreDef) o).getSymbol();
 		throw new Error("Cant get symbol for object of type " + o.getClass());
 	}
 
@@ -2367,6 +2365,8 @@ public class Core {
 		assert (!env.containsKey(sym)) : "Duplicate core declaration: " + sym;
 		return env.assoc(sym, o);
 	}
+	
+	private static final Address DUMMY=Address.ZERO;
 
 	/**
 	 * Bootstrap procedure to load the core.cvx library
@@ -2377,7 +2377,7 @@ public class Core {
 	 */
 	private static Context<?> registerCoreCode(AHashMap<Symbol, ACell> env) throws IOException {
 		// we use a fake State to build the initial environment with core address
-		Address ADDR=Address.ZERO;
+		Address ADDR=DUMMY;
 		State state = State.EMPTY.putAccount(ADDR,AccountStatus.createActor());
 		Context<?> ctx = Context.createFake(state, ADDR);
 
@@ -2447,32 +2447,25 @@ public class Core {
 
 		return ctx;
 	}
-
-	static {
-		// Set up convex.core environment
+	
+	public static AccountStatus buildCoreAccount() {
 		AHashMap<Symbol, ACell> coreEnv = Maps.empty();
-		AHashMap<Symbol, AHashMap<ACell,ACell>> coreMeta = Maps.empty();
-
+		
 		try {
-
-			// Register all objects from registered runtime
-			for (ACell o : tempReg) {
+		// Register all objects from registered runtime
+			for (ACell o : tempReg.values()) {
 				coreEnv = register(coreEnv, o);
 			}
 
 			Context<?> ctx = registerCoreCode(coreEnv);
 			ctx=applyDocumentation(ctx);
 
-			coreEnv = ctx.getEnvironment();
-			coreMeta = ctx.getMetadata();
-
-			METADATA = coreMeta;
-			ENVIRONMENT = coreEnv;
-		} catch (Throwable e) {
-			e.printStackTrace();
-			throw new Error("Error initialising core!",e);
+			return ctx.getAccountStatus(DUMMY);
+		} catch (Throwable t) {
+			throw Utils.sneakyThrow(t);
 		}
-
-
 	}
+
+
+
 }

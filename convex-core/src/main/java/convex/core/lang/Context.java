@@ -164,16 +164,12 @@ public class Context<T extends ACell> extends AObject {
 		}
 
 		public static ChainState create(State state, Address origin, Address caller, Address address, long offer) {
-			AHashMap<Symbol, ACell> environment=Core.ENVIRONMENT;
-			AHashMap<Symbol, AHashMap<ACell,ACell>> metadata=Core.METADATA;
-			if (address!=null) {
-				AccountStatus as=state.getAccount(address);
-				if (as!=null) {
-					environment=as.getEnvironment();
-					metadata=as.getMetadata();
-				}
+			AccountStatus as=state.getAccount(address);
+			if (as==null) {
+				return new ChainState(state,origin,caller,address,null,null,offer);
+			} else {
+				return new ChainState(state,origin,caller,address,as.getEnvironment(),as.getMetadata(),offer);
 			}
-			return new ChainState(state,origin,caller,address,environment,metadata,offer);
 		}
 
 		public ChainState withStateOffer(State newState,long newOffer) {
@@ -651,8 +647,7 @@ public class Context<T extends ACell> extends AObject {
 
 	private MapEntry<Symbol,ACell> lookupDynamicEntry(AccountStatus as,Symbol sym) {
 		// Get environment for Address, or default to initial environment
-		AHashMap<Symbol, ACell> env = (as==null)?Core.ENVIRONMENT:as.getEnvironment();
-
+		AHashMap<Symbol, ACell> env=as.getEnvironment();
 
 		MapEntry<Symbol,ACell> result=env.getEntry(sym);
 

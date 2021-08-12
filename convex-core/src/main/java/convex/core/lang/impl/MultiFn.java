@@ -16,7 +16,7 @@ import convex.core.lang.Context;
 
 public class MultiFn<T extends ACell> extends AClosure<T> {
 
-	private final AVector<AClosure<T>> fns;
+	private AVector<AClosure<T>> fns;
 	private final int num;
 	
 	private MultiFn(AVector<AClosure<T>> fns, AVector<ACell> env) {
@@ -86,9 +86,8 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 
 	@Override
 	public AFn<T> updateRefs(IRefFunction func) {
-		AVector<AClosure<T>> newFns=fns.updateRefs(func);
-		if (fns==newFns) return this;
-		return new MultiFn<T>(newFns);
+		fns=fns.updateRefs(func);
+		return this;
 	}
 
 	@Override

@@ -589,8 +589,7 @@ public class Format {
 		if (tag == Tag.OP) return Ops.read(bb);
 		if (tag == Tag.CORE_DEF) {
 			Symbol sym = Symbol.read(bb);
-			// TODO: consider if dependency of format on core bad?
-			ACell o = Core.ENVIRONMENT.get(sym);
+			ACell o = Core.getCoreValue(sym);
 			if (o == null) throw new BadFormatException("Core definition not found [" + sym + "]");
 			return o;
 		}

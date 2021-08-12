@@ -27,6 +27,7 @@ import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
+import convex.core.data.RefDirect;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
@@ -1372,6 +1373,16 @@ public class RT {
 
 	public static boolean isNaN(ACell val) {
 		return CVMDouble.NaN.equals(val);
+	}
+
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> T ensureInternal(ACell cell) {
+		if (cell==null) return null;
+		Ref<ACell> ref=RefDirect.create(cell, null, Ref.INTERNAL|Ref.VERIFIED_MASK);
+		ref.isEmbedded();
+		cell.attachRef(ref);
+		cell=cell.updateRefs(r -> Ref.get(ensureInternal(r.getValue())));
+		return (T)cell;
 	}
 
 

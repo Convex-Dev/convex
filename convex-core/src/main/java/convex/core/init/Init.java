@@ -329,9 +329,7 @@ public class Init {
 	private static AVector<AccountStatus> addCoreLibrary(AVector<AccountStatus> accts, Address a) {
 		if (accts.count() != a.longValue()) throw new Error("Incorrect core library address: " + a);
 
-		AccountStatus as = AccountStatus.createActor();
-		as=as.withEnvironment(Core.ENVIRONMENT);
-		as=as.withMetadata(Core.METADATA);
+		AccountStatus as = Core.buildCoreAccount();
 		accts = accts.conj(as);
 		return accts;
 	}

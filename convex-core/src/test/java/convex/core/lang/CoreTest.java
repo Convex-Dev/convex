@@ -1875,7 +1875,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testLookupSyntax() {
-		AHashMap<ACell,ACell> countMeta=Core.METADATA.get(Symbols.COUNT);
+		AHashMap<ACell,ACell> countMeta=context().getAccountStatus(Init.CORE_ADDRESS).getMetadata().get(Symbols.COUNT);
 		assertSame(countMeta, (eval("(lookup-meta 'count)")));
 		assertSame(countMeta, (eval("(lookup-meta "+Init.CORE_ADDRESS+ " 'count)")));
 
@@ -2755,9 +2755,9 @@ public class CoreTest extends ACVMTest {
 	}
 
 	private AVector<ACell> ALL_PREDICATES = Vectors
-			.create(Core.ENVIRONMENT.filterValues(e -> e instanceof CorePred).values());
+			.create(Core.buildCoreAccount().getEnvironment().filterValues(e -> e instanceof CorePred).values());
 	private AVector<ACell> ALL_CORE_DEFS = Vectors
-			.create(Core.ENVIRONMENT.filterValues(e -> e instanceof ICoreDef).values());
+			.create(Core.buildCoreAccount().getEnvironment().filterValues(e -> e instanceof ICoreDef).values());
 
 	@Test
 	public void testPredArity() {
@@ -2781,13 +2781,13 @@ public class CoreTest extends ACVMTest {
 		assertFalse(vals.isEmpty());
 		for (ACell def : vals) {
 			Symbol sym = ((ICoreDef)def).getSymbol();
-			ACell v=Core.ENVIRONMENT.get(sym);
-			assertSame(def, v);
+			ACell v=context().lookupValue(sym);
+			assertEquals(def, v);
 
 			Blob b = Format.encodedBlob(def);
 			assertSame(def, Format.read(b));
 
-			AHashMap<ACell,ACell> meta= Core.METADATA.get(sym);
+			AHashMap<ACell,ACell> meta= context().lookupMeta(sym);
 			assertNotNull(meta,"Missing metadata for core symbol: "+sym);
 			doDocTests(sym,meta);
 		}

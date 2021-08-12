@@ -13,7 +13,7 @@ public abstract class AClosure<T extends ACell> extends AFn<T> {
 	/**
 	 * Lexical environment saved for this closure
 	 */
-	protected final AVector<ACell> lexicalEnv;
+	protected AVector<ACell> lexicalEnv;
 
 	protected AClosure(AVector<ACell> lexicalEnv) {
 		this.lexicalEnv=lexicalEnv;

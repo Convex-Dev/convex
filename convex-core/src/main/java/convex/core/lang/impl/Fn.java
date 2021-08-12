@@ -32,8 +32,8 @@ public class Fn<T extends ACell> extends AClosure<T> {
 	// note: embedding these fields directly for efficiency rather than going by
 	// Refs.
 
-	private final AVector<ACell> params;
-	private final AOp<T> body;
+	private AVector<ACell> params;
+	private AOp<T> body;
 	
 	private Long variadic=null;
 
@@ -190,11 +190,10 @@ public class Fn<T extends ACell> extends AClosure<T> {
 
 	@Override
 	public Fn<T> updateRefs(IRefFunction func) {
-		AVector<ACell> newParams = params.updateRefs(func);
-		AOp<T> newBody = body.updateRefs(func);
-		AVector<ACell> newLexicalEnv = lexicalEnv.updateRefs(func);
-		if ((params == newParams) && (body == newBody) && (lexicalEnv == newLexicalEnv)) return this;
-		return new Fn<>(newParams, newBody, lexicalEnv);
+		params = params.updateRefs(func);
+		body = body.updateRefs(func);
+		lexicalEnv = lexicalEnv.updateRefs(func);
+		return this;
 	}
 
 	@Override
