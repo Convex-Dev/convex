@@ -1,0 +1,313 @@
+'asset.box.actor
+
+(call *registry*
+      (register {:description ["Default actor for `asset.box`."
+	                           "Implements callable functions for `asset.box` and `convex.asset`."]
+	             :name	      "Asset box actor."}))
+
+
+;;;;;;;;;; Setup
+
+
+(import convex.asset :as asset-lib)
+
+
+;;;;;;;;;; Values
+
+
+(def boxes
+
+  ^{:doc {:description "Map of `box id` -> `asset quantity`."}}
+
+  {})
+
+
+
+(def counter
+
+  ^{:doc {:description "Used for creating box ids."}}
+
+  0)
+
+
+
+(def offers 
+
+  ^{:doc {:description "Map of `owner` -> (Map of `recipient address` -> `set of box ids`."}}
+
+  {})
+
+
+
+(def ownership
+
+  ^{:doc {:descrption "Map of `owner` -> `set of box ids`."}}
+
+  {})
+
+
+;;;;;;;;;; Private helpers
+
+
+(defn -direct-transfer
+
+  ^{:private? true}
+
+  ;; Internal implementation for executing a direct transfer.
+
+  [sender receiver quantity]
+
+  (let [receiver             (address receiver)
+        sender-balance       (get ownership
+                                  sender
+                                  #{})
+        _                    (assert (subset? quantity
+                                              sender-balance))  ;; TODO. Replace with `fail` for better error messages?
+        receiver-balance     (get ownership
+                                  receiver
+                                  #{})
+        new-sender-balance   (difference sender-balance
+                                         quantity)
+        new-receiver-balance (union receiver-balance
+                                    quantity)]
+    (def ownership
+         (assoc ownership 
+                sender   new-sender-balance
+                receiver new-receiver-balance))
+    quantity))
+
+
+;;;;;;;;;; Implementation of `convex.asset` interface
+
+
+(defn accept
+
+  ^{:callable? true
+    :private?  true}
+
+  [sender quantity]
+
+  (let [sender           (address sender)
+        sender-offers    (get offers
+                              sender
+                              {})  
+        offer            (or (get-in offers
+                                     [sender *caller*])
+                             #{})
+        _                (assert (subset? quantity
+                                          offer))
+        receiver-balance (get ownership
+                              *caller*
+                              #{})
+        new-offer        (difference offer
+                                     quantity)]
+    (def offers
+         (assoc offers sender
+                (assoc sender-offers
+                       *caller*
+                       new-offer)))
+    (-direct-transfer sender
+                      *caller*
+                      quantity)))
+
+
+
+(defn balance
+
+  ^{:callable? true
+    :private?  true}
+
+  [owner]
+
+  (or (get ownership
+           owner)
+      #{}))
+
+
+
+(defn direct-transfer
+
+  ^{:callable? true
+    :private?  true}
+
+  [receiver quantity]
+
+  (-direct-transfer *caller*
+                    receiver
+                    quantity))
+
+
+
+(defn offer
+
+  ^{:callable? true
+    :private?  true}
+
+  [receiver quantity]
+
+  (let [caller-offers (get offers
+                           *caller*
+                           {})]
+    (def offers
+         (assoc offers
+                *caller*
+                (assoc caller-offers
+                       receiver
+                       quantity)))))
+
+
+
+(defn owns?
+
+  ^{:private? true}
+
+  [owner boxes]
+
+  (subset? boxes
+           (get ownership
+                owner)))
+
+
+
+(defn receive-asset
+
+  ^{:callable? true
+    :private?  true}
+
+  [asset box-id]
+
+  (let [box-id (long box-id)]
+    ;; Accepting first solves the problem of putting a box into itself.
+	;;
+    (asset-lib/accept *caller*
+                      asset)
+    (cond
+      (not (contains-key? boxes
+                          box-id))
+      (fail :STATE
+	        "Target box does not exist")
+
+      (not (contains-key? (get ownership
+                               *caller*)
+                          box-id))
+      (fail :TRUST
+	        (str "Box " box-id " not owned")))
+    (def boxes
+        (assoc boxes
+               box-id
+               (asset-lib/quantity-add (get boxes
+                                            box-id)
+                                       asset)))))
+
+
+
+(def quantity-add
+
+  ^{:callable? true
+    :private?  true}
+
+  union)
+
+
+
+(def quantity-sub
+
+  ^{:callable? true
+    :private?  true}
+
+  difference)
+
+
+
+(def quantity-subset?
+
+  ^{:callable? true
+    :private?  true}
+
+  subset?)
+
+
+;;;;;;;;;; Implementation of `asset.box` interface
+
+
+(defn burn
+
+  ^{:callable? true
+    :private?  true}
+
+  [set-box-ids]
+
+  (let [owned-boxes (ownership *caller*)]
+    (when-not (subset? set-box-ids
+                       owned-boxes)
+      (fail :TRUST
+	        "Burning boxes requires ownership"))
+    (for [id set-box-ids]
+      (let [contents (boxes id)]
+        (if (empty? contents)
+          (def boxes
+               (dissoc boxes
+                       id))
+          (fail :STATE
+                (str "Trying to delete non-empty box: " id)))))
+    (def ownership
+      (assoc ownership
+             *caller*
+             (difference owned-boxes
+                         set-box-ids)))
+	nil))
+
+
+
+(defn create
+
+  ^{:callable? true
+    :private?  true}
+
+  []
+
+  (let [id          counter
+        owner       *caller*
+        owned-boxes (or (get ownership
+                             owner)
+                        #{})]
+    (def ownership
+         (assoc ownership
+                owner
+                (conj owned-boxes
+                      id)))
+    (def boxes
+         (assoc boxes
+                id
+                {})) ;; New box contains no assets
+    (def counter
+         (inc counter))
+    id))
+
+
+
+(defn remove
+
+  ^{:callable? true
+    :private?  true}
+
+  [box-id asset]
+
+  (let [current-asset (get boxes
+                           box-id)]
+     (when-not (asset-lib/quantity-contains? current-asset
+                                             asset)
+       (fail "Box does not contain quantity of asset specified for removal"))
+     (when-not (contains-key? (ownership *caller*)
+                              box-id)
+         (fail :TRUST
+               (str "Box not owned: " box-id)))
+     (def boxes
+          (assoc boxes
+                 box-id
+                 (asset-lib/quantity-sub current-asset
+                                         asset)))
+     ;; Delivers the asset to the caller.
+     ;;
+     (asset-lib/transfer *caller*
+                         asset)))

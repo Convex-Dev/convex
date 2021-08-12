@@ -9,12 +9,22 @@
 
 ;; Deploying test version of `asset.box` instead of importing stable version.
 ;;
+($.file/read "src/main/cvx/asset/box/actor.cvx")
+
+
+(def box.actor
+     (deploy (cons 'do
+			       (next $/*result*))))
+
+
 ($.file/read "src/main/cvx/asset/box.cvx")
 
 
-(eval `(def box
-            (deploy (quote ~(cons 'do
-                                  (next $/*result*))))))
+(def box
+     (deploy (concat (cons 'do
+						   (next $/*result*))
+					 `((def box.actor
+					        ~box.actor)))))
 
 
 ;; Requiring test suites for `convex.asset` since this library implement that interface.
@@ -54,7 +64,7 @@
 (defmacro create-box+
 
   ^{:doc {:description "Creates `n-box` boxes defined under `total`, each being also defined under `b-X` where X is a number starting at 0."
-          :type        :macro}}
+          :signature   [{:params [n-box]}]}}
 
   [n-box]
 
@@ -63,7 +73,7 @@
     (if (< n
            n-box)
       (recur (conj acc
-                   (box/create))
+	               (box/create))
              (inc n))
       `(do
          (def total
@@ -95,7 +105,7 @@
              (create-box+ 4)
 
              (T/trx '(= (set total)
-                        (asset/balance box))
+                        (asset/balance box.actor))
                     {:description "Box actor owns all its boxes."})
 
              (T/trx '(address? (def user-1
@@ -111,7 +121,7 @@
                           b-1
                           b-2}
                         (asset/transfer user-1
-                                        [box
+                                        [box.actor
                                          #{b-0
                                            b-1
                                            b-2}]))
@@ -119,11 +129,11 @@
 
              (T/trx '(= #{b-3}
                         (asset/transfer user-2
-                                        [box
+                                        [box.actor
                                          #{b-3}]))
                     {:description "Transfer of last box to user 2."})
 
-             (asset.test/suite.main box
+             (asset.test/suite.main box.actor
                                     user-1
                                     user-2))))
 
@@ -140,17 +150,17 @@
              (create-box+ 4)  ;; defines `total` containing all boxes and `b-X` for each numbered box
 
              (T/trx '(asset/owns? *address*
-                                  [box
+                                  [box.actor
                                    (set total)])
                     {:description "Initially, creator owns all boxes."})
 
-             (T/trx '(= {0 {box #{b-1
-                                  b-2}}
+             (T/trx '(= {0 {box.actor #{b-1
+										b-2}}
                          1 {}
                          2 {}
                          3 {}}
                         (box/insert b-0
-                                    [box
+                                    [box.actor
                                      #{b-1
                                        b-2}]))
                     {:description "Put b-1 and b-2 in b-0 since boxes are assets themselves."})
@@ -161,49 +171,49 @@
                                          b-2}))
                     {:description "Loose ownership of inserted assets."})
 
-             (T/trx '(asset/owns? box
-                                  [box
+             (T/trx '(asset/owns? box.actor
+                                  [box.actor
                                    #{b-1
                                      b-2}])
                     {:description "Box actor takes ownership of inserted assets."})
 
              (T/trx '(asset/owns? *address*
-                                  [box
+                                  [box.actor
                                    #{b-0
                                      b-3}])
                     {:description "Creator still owns non-inserted assets."})
 
              (T/trx '(= #{b-0
                           b-3}
-                        (asset/balance box
+                        (asset/balance box.actor
                                        *address*))
                     {:description "Don't own inserted boxes anymore."})
 
              (T/trx '(= #{b-1
                           b-2}
-                        (asset/balance box
-                                       box))
+                        (asset/balance box.actor
+                                       box.actor))
                     {:description "Box actor owns inserted boxes."})
 
              (T/trx '(= #{b-1
                           b-2}
-                        (box/remove b-0
-                                    [box
-                                     #{b-1
-                                       b-2}]))
+						(box/remove  b-0
+                                     [box.actor
+                                      #{b-1
+                                        b-2}]))
                     {:description "Remove boxes from b-0."})
 
              (T/trx '(= #{b-0
                           b-1
                           b-2
                           b-3}
-                        (asset/balance box
+                        (asset/balance box.actor
                                        *address*))
                     {:description "Removed boxes owned again."})
 
-             (T/fail.code #{:ASSERT}
+             (T/fail.code #{:TRUST}
                           '(box/insert b-0
-                                       [box
+                                       [box.actor
                                         #{b-0}])
                           {:description "Cannot insert a box into itself."})
 
@@ -233,17 +243,17 @@
 
              (T/trx '(= 3000
                         (asset/balance foocoin
-                                       box))
-                    {:description "Box actor holds 3000 foocoin after insertions."})
+                                       box.actor))
+                    {:description "Box actor holds 3000 tokens after insertions."})
 
              (T/fail.code #{:ASSERT}
-                          '(box/remove b-1
-                                       [foocoin
+			              '(box/remove b-1
+								  	   [foocoin
                                         1001])
                           {:description "Cannot remove too much from a box."})
 
              (T/fail.code #{:ASSERT}
-                          '(box/remove b-1
+			              '(box/remove b-1
                                        [foocoin
                                         -1])
                           {:description "Cannot remove negative amount from a box."})
@@ -254,7 +264,7 @@
                      500))
 
              (T/trx '(= expected-balance
-                        (box/remove b-1
+					    (box/remove b-1
                                     [foocoin
                                      500]))
                     {:description "Remove 500 foocoin from b-1."})
@@ -266,7 +276,7 @@
 
              (T/trx '(= 2500
                         (asset/balance foocoin
-                                       box))
+                                       box.actor))
                     {:description "Box balance in foocoin adjusted after removing some."}))))
 
 
@@ -279,13 +289,13 @@
 
   []
 
-  (T/group '((T/path.conj "asset.box")
+  (T/group '((T/path.conj 'asset.box)
              (suite.asset)
              (suite.content))))
 
 
 ;;;
 
-
+;($.repl/start)
 (suite.main)
 (T/print "asset.box")
