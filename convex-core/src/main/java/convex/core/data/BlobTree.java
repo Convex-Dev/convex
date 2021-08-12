@@ -471,15 +471,14 @@ public class BlobTree extends ABlob {
 		return (Ref<R>) children[i];
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public BlobTree updateRefs(IRefFunction func) {
-		Ref<ABlob>[] newChildren = Ref.updateRefs(children, func);
-		return withChildren(newChildren);
-	}
-
-	private BlobTree withChildren(Ref<ABlob>[] newChildren) {
-		if (children == newChildren) return this;
-		return new BlobTree(newChildren, shift, count);
+		int n=children.length;
+		for (int i=0; i<n; i++) {
+			children[i]=(Ref<ABlob>) func.apply(children[i]);
+		}
+		return this;
 	}
 	
 	@Override

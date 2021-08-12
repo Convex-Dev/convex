@@ -603,19 +603,16 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public VectorLeaf<T> updateRefs(IRefFunction func) {
-		Ref<?> newPrefix = (prefix == null) ? null : func.apply(prefix); // do this first for in-order traversal
-		int ic = items.length;
-		Ref<?>[] newItems = items;
-		for (int i = 0; i < ic; i++) {
-			Ref<?> current = items[i];
-			Ref<?> newItem = func.apply(current);
-			if (newItem!=current) {
-				if (items==newItems) newItems=items.clone();
-				newItems[i] = newItem;
-			}
+		if (prefix != null) {
+			prefix=(Ref<AVector<T>>) func.apply(prefix); // do this first for in-order traversal
 		}
-		if ((items==newItems) && (prefix == newPrefix)) return this; // if no change, safe to return this
-		return new VectorLeaf<T>((Ref<T>[]) newItems, (Ref<AVector<T>>) newPrefix, count);
+		int ic = items.length;
+		for (int i = 0; i < ic; i++) {
+			Ref<T> current = items[i];
+			Ref<T> newItem = (Ref<T>) func.apply(current);
+			items[i] = newItem;
+		}
+		return this;
 	}
 
 	@SuppressWarnings("unchecked")

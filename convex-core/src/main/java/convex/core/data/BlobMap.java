@@ -50,7 +50,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	 * Entry for this node of the radix tree. Invariant assumption that the prefix
 	 * is correct. May be null if there is no entry at this node.
 	 */
-	private final MapEntry<K, V> entry;
+	private MapEntry<K, V> entry;
 
 	/**
 	 * Mask of child entries, 16 bits for each hex digit that may be present.
@@ -119,10 +119,12 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public BlobMap<K,V> updateRefs(IRefFunction func) {
-		MapEntry<K, V> newEntry = (entry == null) ? null : entry.updateRefs(func);
-		Ref<BlobMap<K, V>>[] newChildren = Ref.updateRefs(children, func);
-		if ((entry == newEntry) && (children == newChildren)) return this;
-		return new BlobMap<K, V>(depth, prefixLength, newEntry, (Ref[])newChildren, mask, count);
+		if (entry != null) entry=entry.updateRefs(func);
+		int n=children.length;
+		for (int i=0; i<n; i++) {
+			children[i]=(Ref<BlobMap<K, V>>) func.apply(children[i]);
+		}
+		return this;
 	}
 
 	@Override
