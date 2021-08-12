@@ -25,8 +25,8 @@ import convex.core.util.Utils;
  */
 public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> implements Comparable<MapEntry<K, V>> {
 
-	private final Ref<K> keyRef;
-	private final Ref<V> valueRef;
+	private Ref<K> keyRef;
+	private Ref<V> valueRef;
 
 	private MapEntry(Ref<K> key, Ref<V> value) {
 		super(2);
@@ -183,10 +183,9 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	@SuppressWarnings("unchecked")
 	@Override
 	public MapEntry<K, V> updateRefs(IRefFunction func) {
-		Ref<K> newKeyRef = (Ref<K>) func.apply(keyRef);
-		Ref<V> newValueRef = (Ref<V>) func.apply(valueRef);
-		if ((keyRef == newKeyRef) && (valueRef == newValueRef)) return this;
-		return new MapEntry<K, V>(newKeyRef, newValueRef);
+		keyRef = (Ref<K>) func.apply(keyRef);
+		valueRef = (Ref<V>) func.apply(valueRef);
+		return this;
 	}
 
 	@Override
