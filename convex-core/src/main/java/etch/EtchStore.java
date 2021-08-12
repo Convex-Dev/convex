@@ -86,7 +86,6 @@ public class EtchStore extends AStore {
 	public <T extends ACell> Ref<T> refForHash(Hash hash) {
 		try {
 			Ref<ACell> existing = etch.read(hash);
-			if (existing == null) return null;
 			return (Ref<T>) existing;
 		} catch (IOException e) {
 			throw new Error("IO exception from Etch", e);
