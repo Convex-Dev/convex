@@ -3,9 +3,9 @@
 
 (call *registry*
       (register {:description ["Provides library functions for building and managing standard fungible assets."
-	                           "Quantity is expressed as a long representing the amount of an asset."
-							   "The `build-token` function creates deployable code that follows the interface described in `convex.asset`."]
-	             :name        "Fungible token creation and management"}))
+                               "Quantity is expressed as a long representing the amount of an asset."
+                               "The `build-token` function creates deployable code that follows the interface described in `convex.asset`."]
+                 :name        "Fungible token creation and management"}))
 
 
 ;;;;;;;;;; Building actors
@@ -14,9 +14,9 @@
 (defn add-mint
 
   ^{:doc {:description ["Creates deployable code that, when added to actor code from `build-token`, allows priviledged accounts to mint and burn tokens."
-						"Configuration map contains:"
-						"- `:max-supply`, a long designating the maximum mintable supply (optional, defaults to 1000000000000000000, the allowed maximum)"
-						"- `:minter`, a single address or a Trust Monitor from `convex.trust` (mandatory)"]
+                        "Configuration map contains:"
+                        "- `:max-supply`, a long designating the maximum mintable supply (optional, defaults to 1000000000000000000, the allowed maximum)"
+                        "- `:minter`, a single address or a Trust Monitor from `convex.trust` (mandatory)"]
           :examples    [{:code "(deploy [(build-token {}) (add-mint {:minter *address* :max-supply 1000000000})])"}]
           :signature   [{:params [config]}]}}
 
@@ -104,8 +104,8 @@
 
   ^{:doc {:description ["Creates deployable code for a new fungible token which follows the interface described in `convex.asset`."
                         "An optional config map can be provided:"
-						"- `:initial-holder`, address which will hold the initial supply (defaults to `*address*`)"
-						"- `:supply`, supply created and attributed to `:initial-holder` (long, defaults to 1000000)"]
+                        "- `:initial-holder`, address which will hold the initial supply (defaults to `*address*`)"
+                        "- `:supply`, supply created and attributed to `:initial-holder` (long, defaults to 1000000)"]
           :examples    [{:code "(deploy (build-token {:supply 1000000 :initial-holder *address*}))"}]
           :signature   [{:params [config]}]}}
 
