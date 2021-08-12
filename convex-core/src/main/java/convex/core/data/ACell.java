@@ -439,11 +439,24 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @param noveltyHandler Novelty handler to call for any Novelty (may be null)
 	 * @return Persisted Ref
 	 */
-	public static <T extends ACell> Ref<T> createAnnounced(T value, Consumer<Ref<ACell>> noveltyHandler) {
-		Ref<T> ref = Ref.get(value);
-		AStore store=Stores.current();
-		return (Ref<T>) store.storeTopRef(ref, Ref.ANNOUNCED,noveltyHandler);
+	public static <T extends ACell> T createAnnounced(T value, Consumer<Ref<ACell>> noveltyHandler) {
+		if (value==null) return null;
+		return value.announce(noveltyHandler);
 	}
+	
+	public <T extends ACell> T announce() {
+		return announce(null);
+	}
+	
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> T announce(Consumer<Ref<ACell>> noveltyHandler) {
+		Ref<ACell> ref = getRef();
+		AStore store=Stores.current();
+		ref= store.storeTopRef(ref, Ref.ANNOUNCED,noveltyHandler);
+		cachedRef=ref;
+		return (T) this;
+	}
+
 
 	/**
 	 * Creates a persisted Ref with the given value in the current store.

@@ -22,7 +22,7 @@ import convex.core.init.InitTest;
  * Tests for the State data structure
  */
 public class StateTest {
-	State INIT_STATE=InitTest.STATE;
+	State INIT_STATE=InitTest.createState();
 
 	@Test
 	public void testEmptyState() {

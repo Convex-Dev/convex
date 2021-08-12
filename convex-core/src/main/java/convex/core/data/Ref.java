@@ -421,39 +421,6 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public <R extends ACell> Ref<R> persist() {
 		return persist(null);
 	}
-	
-	/**
-	 * Persists this Ref in the current store, ensuring that it is ANNOUNCED status
-	 * at minimum. Always stores the top level hash in the store.
-	 * 
-	 * If the persisted Ref represents novelty, will trigger the specified novelty
-	 * handler 
-	 * 
-	 * @param noveltyHandler Novelty handler to call (may be null)
-	 * @return the persisted Ref 
-	 * @throws MissingDataException If the Ref's value does not exist or has been
-	 *         garbage collected before being persisted 
-	 */
-	@SuppressWarnings("unchecked")
-	public Ref<T> announce(Consumer<Ref<ACell>> noveltyHandler) {
-		int status = getStatus();
-		if (status >= ANNOUNCED) return this; // already announced
-		AStore store=Stores.current();
-		return (Ref<T>) store.storeTopRef((Ref<ACell>)this, Ref.ANNOUNCED, noveltyHandler);
-	}
-	
-	/**
-	 * Persists this Ref in the current store if not embedded and not already
-	 * persisted. Resulting status will be PERSISTED or higher.
-	 * 
-	 * This may convert the Ref from a direct reference to a soft reference.
-	 * 
-	 * @throws MissingDataException if the Ref cannot be fully persisted.
-	 * @return the persisted Ref
-	 */
-	public Ref<T> announce() {
-		return announce(null);
-	}
 
 	/**
 	 * Accumulates the set of all unique Refs in the given object.

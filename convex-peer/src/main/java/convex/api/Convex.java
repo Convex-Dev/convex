@@ -62,6 +62,8 @@ public class Convex {
 
 	private static final Logger log = LoggerFactory.getLogger(Convex.class.getName());
 
+	private long timeout=Constants.DEFAULT_CLIENT_TIMEOUT;
+	
 	/**
 	 * Key pair for this Client
 	 */
@@ -426,7 +428,7 @@ public class Convex {
 	 *                          confirmed within a reasonable time
 	 */
 	public Result transactSync(SignedData<ATransaction> transaction) throws TimeoutException, IOException {
-		return transactSync(transaction, Constants.DEFAULT_CLIENT_TIMEOUT);
+		return transactSync(transaction, timeout);
 	}
 
 	/**
@@ -439,7 +441,7 @@ public class Convex {
 	 *                          confirmed within a reasonable time
 	 */
 	public Result transactSync(ATransaction transaction) throws TimeoutException, IOException {
-		return transactSync(transaction, Constants.DEFAULT_CLIENT_TIMEOUT);
+		return transactSync(transaction, timeout);
 	}
 
 	/**
@@ -703,7 +705,7 @@ public class Convex {
 	 * @throws IOException In case of network error
 	 */
 	public Result querySync(ACell query, Address address) throws IOException, TimeoutException {
-		return querySync(query, address, Constants.DEFAULT_CLIENT_TIMEOUT);
+		return querySync(query, address, timeout);
 	}
 
 	/**
@@ -795,7 +797,7 @@ public class Convex {
 	public Long getBalance(Address address) throws IOException {
 		try {
 			Future<Result> future = query(Reader.read("(balance " + address.toString() + ")"));
-			Result result = future.get(Constants.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+			Result result = future.get(timeout, TimeUnit.MILLISECONDS);
 			if (result.isError()) throw new Error(result.toString());
 			CVMLong bal = (CVMLong) result.getValue();
 			return bal.longValue();
@@ -829,7 +831,7 @@ public class Convex {
 	public Future<State> acquireState() throws TimeoutException {
 		try {
 			Future<Result> sF=requestStatus();
-			AVector<ACell> status=sF.get(Constants.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS).getValue();
+			AVector<ACell> status=sF.get(timeout, TimeUnit.MILLISECONDS).getValue();
 			Hash stateHash=RT.ensureHash(status.get(4));
 
 			if (stateHash==null) throw new Error("Bad status response from Peer");

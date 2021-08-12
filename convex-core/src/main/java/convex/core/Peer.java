@@ -437,7 +437,7 @@ public class Peer {
 	public Peer persistState(Consumer<Ref<ACell>> noveltyHandler) {
 		// Peer Belief must be announced using novelty handler
 		SignedData<Belief> sb=this.belief;
-		sb=ACell.createAnnounced(sb, noveltyHandler).getValue();
+		sb.announce(noveltyHandler);
 
 		// Persist states
 		AVector<State> newStates = this.states;

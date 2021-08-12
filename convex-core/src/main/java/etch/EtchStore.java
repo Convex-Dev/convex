@@ -122,7 +122,10 @@ public class EtchStore extends AStore {
 			Ref<T> existing = refForHash(hash);
 			if (existing != null) {
 				// Return existing ref if status is sufficient
-				if (existing.getStatus() >= requiredStatus) return existing;
+				if (existing.getStatus() >= requiredStatus) {
+					cell.attachRef(existing);
+					return existing;
+				}
 			}
 		}
 
