@@ -133,7 +133,7 @@ public class PredictionMarketTest extends ACVMTest {
 		ctx = stepAs(VILLAIN, ctx, "(def pmaddr "+pmaddr+")");
 
 		// initial state checks
-		assertEquals(false,evalB(ctx, "(call pmaddr (finalised?))"));
+		assertEquals(false,evalB(ctx, "(call pmaddr (finalized?))"));
 		assertEquals(0L, evalL(ctx, "(balance pmaddr)"));
 
 		{ // Act 1. Two players stake. our Villain wins this time....
@@ -142,7 +142,7 @@ public class PredictionMarketTest extends ACVMTest {
 			c = stepAs(VILLAIN, c, "(call pmaddr 5000 (stake false 3000))");
 			assertEquals(5000L, c.getBalance(pmaddr));
 
-			assertFalse(evalB(c, "(call pmaddr (finalised?))"));
+			assertFalse(evalB(c, "(call pmaddr (finalized?))"));
 			assertEquals(0.64, evalD(c, "(call pmaddr (price true))"), 0.0001); // 64% chance on true. Looks a good bet
 			assertNull(eval(c, "(call pmaddr (payout))"));
 

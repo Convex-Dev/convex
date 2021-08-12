@@ -33,7 +33,8 @@
 
              (T/trx '(call oracle
                            (register :foo
-                                     {:trust #{*address*}}))
+                                     {:a     :b
+                                      :trust #{*address*}}))
                     {:description "Registering oracle."})
 
              (T/trx '(= false
@@ -42,13 +43,15 @@
                                         {:bar :baz})))
                     {:description "Cannot register same key twice."})
 
-             (T/trx '(= {:foo {:trust #{*address*}}}
-                        oracle/full-list)
+             (T/trx '(= {:a     :b
+                         :trust #{*address*}}
+                        (call oracle
+                              (data :foo)))
                     {:description "Overwrite did not work."})
 
              (T/trx '(= false
                         (call oracle
-                              (finalised? :foo)))
+                              (finalized? :foo)))
                     {:description "Not yet finalized."})
 
              (T/trx '(nil? (call oracle
@@ -58,7 +61,7 @@
              (def villain
                   ($.account/zombie))
 
-             (T/fail.code #{:ASSERT}
+             (T/fail.code #{:TRUST}
                           '(eval-as villain
                                     `(call ~oracle
                                            (provide :foo
@@ -76,7 +79,7 @@
                     {:description "Trusted account provides value."})
 
              (T/trx '(call oracle
-                           (finalised? :foo))
+                           (finalized? :foo))
                     {:description "Key is finalized."})
 
              (T/trx '(= :baz
@@ -93,7 +96,13 @@
              (T/trx '(= :baz
                          (call oracle
                                (read :foo)))
-                    {:description "Value was not overwritten."}))))
+                    {:description "Value was not overwritten."})
+
+             (T/fail.code #{:STATE}
+                          '(call oracle
+                                 (provide :bar
+                                          42))
+                          {:description "Cannot provide a result for an inexistent key."}))))
 
 
 ;;;
