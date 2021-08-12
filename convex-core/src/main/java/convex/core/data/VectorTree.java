@@ -583,18 +583,12 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	@Override
 	public VectorTree<T> updateRefs(IRefFunction func) {
 		int ic = children.length;
-		Ref<AVector<T>>[] newChildren = children;
 		for (int i = 0; i < ic; i++) {
 			Ref<AVector<T>> current = children[i];
 			Ref<AVector<T>> newChild = (Ref<AVector<T>>) func.apply(current);
-			
-			if (newChild!=current) {
-				if (children==newChildren) newChildren=children.clone();
-				newChildren[i] = newChild;
-			}
+			children[i]=newChild;
 		}
-		if (newChildren==children) return this; // no change, safe to return this
-		return new VectorTree<>(newChildren, count);
+		return this;
 	}
 
 	@Override

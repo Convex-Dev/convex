@@ -419,19 +419,12 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public MapLeaf updateRefs(IRefFunction func) {
 		int n = entries.length;
-		if (n == 0) return this;
-		MapEntry<K, V>[] newEntries = entries;
 		for (int i = 0; i < n; i++) {
-			MapEntry<K, V> e = newEntries[i];
+			MapEntry<K, V> e = entries[i];
 			MapEntry<K, V> newEntry = e.updateRefs(func);
-			if (e!=newEntry) {
-				if (newEntries==entries) newEntries=entries.clone();
-				newEntries[i]=newEntry;
-			}
+			entries[i]=newEntry;
 		}
-		if (newEntries==entries) return this;
-		// Note: we assume no key hashes have changed
-		return new MapLeaf(newEntries);
+		return this;
 	}
 
 	/**

@@ -387,21 +387,12 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	@Override
 	public SetTree<T> updateRefs(IRefFunction func) {
 		int n = children.length;
-		if (n == 0) return this;
-		Ref<AHashSet<T>>[] newChildren = children;
 		for (int i = 0; i < n; i++) {
 			Ref<AHashSet<T>> child = children[i];
 			Ref<AHashSet<T>> newChild = (Ref<AHashSet<T>>) func.apply(child);
-			if (child != newChild) {
-				if (children == newChildren) {
-					newChildren = children.clone();
-				}
-				newChildren[i] = newChild;
-			}
+			children[i] = newChild;
 		}
-		if (newChildren == children) return this;
-		// Note: we assume no key hashes have changed, so structure is the same
-		return new SetTree<>(newChildren, shift, mask, count);
+		return this;
 	}
 
 	@Override

@@ -261,19 +261,12 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	@Override
 	public SetLeaf updateRefs(IRefFunction func) {
 		int n = entries.length;
-		if (n == 0) return this;
-		Ref<T>[] newEntries = entries;
 		for (int i = 0; i < n; i++) {
-			Ref<T> e = newEntries[i];
+			Ref<T> e = entries[i];
 			Ref<T> newEntry = (Ref<T>) func.apply(e);
-			if (e!=newEntry) {
-				if (newEntries==entries) newEntries=entries.clone();
-				newEntries[i]=newEntry;
-			}
+			entries[i]=newEntry;
 		}
-		if (newEntries==entries) return this;
-		// Note: we assume no key hashes have changed
-		return new SetLeaf(newEntries);
+		return this;
 	}
 
 	/**
