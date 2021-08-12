@@ -123,7 +123,7 @@ public class PredictionMarketTest extends ACVMTest {
 		ctx = step("(import convex.trusted-oracle :as oaddr)");
 
 		// call to create oracle with key :bar and current address (HERO) trusted
-		ctx = step(ctx, "(call oaddr (register :bar {:trust #{*address*}}))");
+		ctx = step(ctx, "(oaddr/register :bar {:trust #{*address*}})");
 
 		// deploy a prediction market using the oracle
 		String contractString = Utils.readResourceAsString("lab/prediction-market.cvx");
@@ -147,7 +147,7 @@ public class PredictionMarketTest extends ACVMTest {
 			assertNull(eval(c, "(call pmaddr (payout))"));
 
 			// But alas, our hero is thwarted...
-			c = step(c, "(call oaddr (provide :bar false))");
+			c = step(c, "(oaddr/provide :bar false)");
 			assertCVMEquals(Boolean.FALSE, c.getResult());
 
 			// collect payouts

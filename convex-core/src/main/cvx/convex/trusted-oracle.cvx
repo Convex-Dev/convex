@@ -2,42 +2,43 @@
 
 
 (call *registry*
-      (register {:description ["A simple oracle actor that depends on a trusted set of addresses who may provide results."
-                               "A key is first registered using `register`. When ready, a result for that key is provided using `provide`."
-                               "Consumer can see details about keys in `*list*` and, when finalized, see results in `*results*`."]
-                 :name        "Trusted oracle actor"}))
+      (register {:description ["API for simple oracle actors that depend on a trusted set of addresses who may provide results."
+                               "Default actor used is `convex.trusted-oracle.actor`."
+                               "At first, a key (any arbitrary value) is registered via `register`."
+                               "When ready, a result for that key is provided via `provide` by a trusted account."
+                               "Consumers can fetch data about keys using `data`, check if a result is provided using `finalized?`, and read results using `read`."
+                               "Implementating a simple oracle actor requires defining callable function versions of:"
+                               "- `(data key)`"
+                               "- `(finalized? key)`"
+                               "- `(read key)`"
+                               "- `(register key result)`"
+                               "- `(provide key result)`"]
+                 :name        "Trusted oracle API"}))
 
 
-;;;;;;;;;; Values
+(import convex.trusted-oracle.actor :as default-actor)
 
-(def *list*
 
-  ;; Map of `key` -> `arbitrary map describing an oracle`.
-
-  ^{:private? true}
-
-  {})
-
-(def *results*
-
-  ;; Map of `key` -> `result`.
-
-  ^{:private? true}
-
-  {})
-
-;;;;;;;;;; Callable functions
+;;;;;;;;;; API
 
 
 (defn data
 
-  ^{:callable? true
-    :doc       {:description "Returns data registered for `key`."
-                :signature   [{:params [key]}]}}
+  ^{:doc {:description "Returns data registered for `key`."
+          :signature   [{:params [key]}
+                        {:params [actor key]}]}}
 
-  [key]
 
-  (*list* key))
+  ([key]
+
+   (data default-actor
+        key))
+
+
+  ([actor key]
+
+   (call actor
+         (data key))))
 
 
 
@@ -45,12 +46,20 @@
 
   ^{:callable? true
     :doc       {:description "Returns a boolean indicating if a results has been provided for `key`."
-                :signature   [{:params [key]}]}}
+                :signature   [{:params [key]}
+                              {:params [actor key]}]}}
 
-  [key]
 
-  (contains-key? *results*
-                 key))
+  ([key]
+
+   (finalized? default-actor
+               key))
+
+
+  ([actor key]
+
+   (call actor
+         (finalized? key))))
 
 
 
@@ -58,11 +67,20 @@
 
   ^{:callable? true
     :doc       {:description "Returns the result for `key`."
-                :signature   [{:params [key]}]}}
+                :signature   [{:params [key]}
+                              {:params [actor key]}]}}
 
-  [key]
 
-  (*results* key))
+  ([key]
+
+   (read default-actor
+         key))
+
+
+  ([actor key]
+
+   (call actor
+         (read key))))
 
 
 
@@ -73,19 +91,22 @@
                               "Returns true if successful, false if key already exists."
                               "Data should be a map containg at least `:trust`, a set of addresses trusted for using `provide` on that key."
                               "Without `:trust`, a result cannot be delivered."]
-                :signature   [{:params [key data]}]}}
+                :signature   [{:params [key data]}
+                              {:params [actor key data]}]}}
 
-  [key data]
 
-  (if (contains-key? *list*
-                     key)
-    false
-    (do 
-      (def *list*
-           (assoc *list*
-                  key
-                  data))
-      true)))
+  ([key data]
+
+   (register default-actor
+             key
+             data))
+
+
+  ([actor key data]
+
+   (call actor
+         (register key
+                   data))))
 
 
 
@@ -97,31 +118,19 @@
                               "Returns the result associated with that key."]
                 :errors      {:STATE "When key does not exist"
                               :TRUST "When caller is untrusted"}
-                :signature   [{:params [key value]}]}}
+                :signature   [{:params [key result]}
+                              {:params [actor key result]}]}}
 
-  [key value]
 
-  (cond
-    (not (*list* key))
-    (fail :STATE
-          (str "Unknown oracle key: "
-               key))
+  ([key result]
 
-    (not (get-in *list*
-                 [key
-                  :trust
-                  *caller*]))
-    (fail :TRUST
-          "Untrusted caller")
+   (provide default-actor
+            key
+            result))
 
-    (contains-key? *results*
-                   key)
-    (*results* key)
 
-    :else
-    (do
-      (def *results*
-           (assoc *results*
-                  key
-                  value))
-      value)))
+  ([actor key result]
+
+   (call actor
+         (provide key
+                  result))))

@@ -208,6 +208,7 @@ public class Init {
 			// ============================================================
 			// Standard library deployment
 			s = doActorDeploy(s, "convex/fungible.cvx");
+			s = doActorDeploy(s, "convex/trusted-oracle/actor.cvx");
 			s = doActorDeploy(s, "convex/trusted-oracle.cvx");
 			s = doActorDeploy(s, "convex/asset.cvx");
 			s = doActorDeploy(s, "torus/exchange.cvx");
