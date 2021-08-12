@@ -872,8 +872,10 @@ public class Etch {
 		// append blob value
 		mbb.put(encoding.getInternalArray(),encoding.getInternalOffset(),length);
 		
-		// update total data length and return
+		// update total data length
 		dataLength=mbb.position();
+		
+		
 		
 		if (dataLength!=position+KEY_SIZE+LABEL_SIZE+LENGTH_SIZE+length) {
 			System.out.println("PANIC!");
