@@ -5,6 +5,8 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.io.File;
 import java.io.IOException;
@@ -22,6 +24,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
+import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
@@ -177,11 +180,9 @@ public class EtchStoreTest {
 			assertEquals(0L,counter.get()); // Nothing new persisted
 			assertTrue(Ref.STORED<=arb3.getStatus());
 
-			if (!belief.isEmbedded()) {
-				// Recover Belief from store
-				Belief recb=(Belief) store.refForHash(belief.getHash()).getValue();
-				assertEquals(belief,recb);
-			}
+			// Recover Belief from store. Should be top level stored
+			Belief recb=(Belief) store.refForHash(belief.getHash()).getValue();
+			assertEquals(belief,recb);
 		} finally {
 			Stores.setCurrent(oldStore);
 		}
@@ -213,6 +214,17 @@ public class EtchStoreTest {
 		} finally {
 			Stores.setCurrent(oldStore);
 		}
+	}
+	
+	@Test public void testDecodeCache() throws BadFormatException {
+		Address a1=Address.create(12345678);
+		ACell cell=store.decode(a1.getEncoding());
+		assertNotSame(cell,a1);
+		assertEquals(cell,a1);
+		
+		// decoding again should get same value with very high probability
+		ACell cell2=store.decode(a1.getEncoding());
+		assertSame(cell,cell2);
 	}
 
 	@Test
