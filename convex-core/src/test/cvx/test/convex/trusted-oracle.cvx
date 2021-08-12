@@ -8,7 +8,7 @@
 ;;;;;;;;;; Setup:w
 
 
-($.file/read "src/main/resources/convex/trusted-oracle.cvx")
+($.file/read "src/main/cvx/convex/trusted-oracle.cvx")
 
 
 (def oracle

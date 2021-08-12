@@ -16,7 +16,7 @@
      $.test)
 
 
-($.file/read "src/main/resources/convex/trust.cvx")
+($.file/read "src/main/cvx/convex/trust.cvx")
 
 
 (eval `(def trust

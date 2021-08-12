@@ -14,7 +14,7 @@
 
 ;; Deploying test version of `asset.simple-nft` instead of importing stable version.
 ;;
-($.file/read "src/main/resources/asset/nft-tokens.cvx")
+($.file/read "src/main/cvx/asset/nft-tokens.cvx")
 
 
 (eval `(def nft

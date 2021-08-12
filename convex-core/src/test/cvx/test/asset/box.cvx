@@ -9,7 +9,7 @@
 
 ;; Deploying test version of `asset.box` instead of importing stable version.
 ;;
-($.file/read "src/main/resources/asset/box.cvx")
+($.file/read "src/main/cvx/asset/box.cvx")
 
 
 (eval `(def box

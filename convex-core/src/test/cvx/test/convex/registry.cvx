@@ -8,7 +8,7 @@
 ;;;;;;;;;; Setup
 
 
-($.file/read "src/main/resources/convex/registry.cvx")
+($.file/read "src/main/cvx/convex/registry.cvx")
 
 
 (def registry

@@ -8,7 +8,7 @@
 ;;;;;;;;;; Setup
 
 
-($.file/read "src/main/resources/torus/exchange.cvx")
+($.file/read "src/main/cvx/torus/exchange.cvx")
 
 
 (def torus
