@@ -2,8 +2,8 @@
 
 (call *registry*
       (register {:description ["Default actor for `asset.box`."
-	                           "Implements callable functions for `asset.box` and `convex.asset`."]
-	             :name	      "Asset box actor."}))
+                               "Implements callable functions for `asset.box` and `convex.asset`."]
+                 :name        "Asset box actor."}))
 
 
 ;;;;;;;;;; Setup
@@ -178,20 +178,20 @@
 
   (let [box-id (long box-id)]
     ;; Accepting first solves the problem of putting a box into itself.
-	;;
+    ;;
     (asset-lib/accept *caller*
                       asset)
     (cond
       (not (contains-key? boxes
                           box-id))
       (fail :STATE
-	        "Target box does not exist")
+            "Target box does not exist")
 
       (not (contains-key? (get ownership
                                *caller*)
                           box-id))
       (fail :TRUST
-	        (str "Box " box-id " not owned")))
+            (str "Box " box-id " not owned")))
     (def boxes
         (assoc boxes
                box-id
@@ -241,7 +241,7 @@
     (when-not (subset? set-box-ids
                        owned-boxes)
       (fail :TRUST
-	        "Burning boxes requires ownership"))
+            "Burning boxes requires ownership"))
     (for [id set-box-ids]
       (let [contents (boxes id)]
         (if (empty? contents)
@@ -255,7 +255,7 @@
              *caller*
              (difference owned-boxes
                          set-box-ids)))
-	nil))
+    nil))
 
 
 
