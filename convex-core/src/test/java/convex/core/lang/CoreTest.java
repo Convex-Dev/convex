@@ -2754,9 +2754,9 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(if 1)"));
 	}
 
-	private AVector<ACell> ALL_PREDICATES = Vectors
+	private static AVector<ACell> ALL_PREDICATES = Vectors
 			.create(Core.buildCoreAccount().getEnvironment().filterValues(e -> e instanceof CorePred).values());
-	private AVector<ACell> ALL_CORE_DEFS = Vectors
+	private static AVector<ACell> ALL_CORE_DEFS = Vectors
 			.create(Core.buildCoreAccount().getEnvironment().filterValues(e -> e instanceof ICoreDef).values());
 
 	@Test
