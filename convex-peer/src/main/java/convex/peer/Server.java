@@ -185,13 +185,13 @@ public class Server implements Closeable {
 		AStore configStore = (AStore) config.get(Keywords.STORE);
 		this.store = (configStore == null) ? Stores.current() : configStore;
 
-		Object maybeHook=config.getOrDefault(Keywords.EVENT_HOOK, null);
-		if (maybeHook instanceof IServerEvent) {
-			this.eventHook = (IServerEvent)maybeHook;
-		} else {
-			eventHook=null;
+		// assign the event hook if set
+		if (config.containsKey(Keywords.EVENT_HOOK)) {
+			Object maybeHook=config.get(Keywords.EVENT_HOOK);
+			if (maybeHook instanceof IServerEvent) {
+				this.eventHook = (IServerEvent)maybeHook;
+			}
 		}
-
 		// Switch to use the configured store for setup, saving the caller store
 		final AStore savedStore=Stores.current();
 		try {
