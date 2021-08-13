@@ -119,7 +119,8 @@ public class ConnectionManager {
 			
 			ArrayList<Connection> conns=new ArrayList<>(connections.values());
 			if (conns.size()==0) {
-				log.debug("No connections available to poll!");
+				// Nothing to do
+				// log.debug("No connections available to poll!");
 				return;
 			}
 			Connection c=conns.get(random.nextInt(conns.size()));
