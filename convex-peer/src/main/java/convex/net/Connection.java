@@ -586,7 +586,7 @@ public class Connection {
 	 *
 	 * @throws IOException If IO error occurs
 	 */
-	public void startClientListening() throws IOException {
+	private void startClientListening() throws IOException {
 		SocketChannel chan = (SocketChannel) channel;
 		chan.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE, this);
 

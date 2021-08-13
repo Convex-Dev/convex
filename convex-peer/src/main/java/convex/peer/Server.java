@@ -47,6 +47,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.init.Init;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
@@ -90,7 +91,7 @@ public class Server implements Closeable {
 	private static final int EVENT_QUEUE_SIZE = 1000;
 
 	// Maximum Pause for each iteration of Server update loop.
-	private static final long SERVER_UPDATE_PAUSE = 10L;
+	private static final long SERVER_UPDATE_PAUSE = 5L;
 
 	static final Logger log = LoggerFactory.getLogger(Server.class.getName());
 
@@ -274,8 +275,13 @@ public class Server implements Closeable {
 				}
 			}
 			State genesisState = (State) config.get(Keywords.STATE);
-			log.info("Defaulting to standard Peer startup with genesis state: "+genesisState.getHash());
-
+			if (genesisState!=null) {
+				log.info("Defaulting to standard Peer startup with genesis state: "+genesisState.getHash());
+			} else {
+				AccountKey peerKey=keyPair.getAccountKey();
+				genesisState=Init.createState(List.of(peerKey));
+				log.info("Created new genesis state: "+genesisState.getHash()+ " with initial peer: "+peerKey);
+			}
 			return Peer.createGenesisPeer(keyPair,genesisState);
 		} catch (ExecutionException|InterruptedException e) {
 			throw Utils.sneakyThrow(e);
