@@ -55,6 +55,7 @@ import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.net.Message;
 import convex.net.ResultConsumer;
+import etch.EtchStore;
 
 /**
  * Tests for a fresh standalone server cluster instance
@@ -226,6 +227,7 @@ public class ServerTest {
 
 			HashMap<Keyword,Object> config=new HashMap<>();
 			config.put(Keywords.KEYPAIR,kp);
+			config.put(Keywords.STORE,EtchStore.createTemp());
 			config.put(Keywords.SOURCE,ServerTest.SERVER.getHostAddress());
 			Server newServer=API.launchPeer(config);
 			
@@ -234,6 +236,7 @@ public class ServerTest {
 			SERVER.getConnectionManager().connectToPeer(newServer.getHostAddress());
 			
 			// should be in consensus at this point since just synced
+			// note: shouldn't matter which is the current store
 			assertEquals(newServer.getPeer().getConsensusState(),SERVER.getPeer().getConsensusState());
 			
 			Convex client=Convex.connect(newServer.getHostAddress(), user, kp);
