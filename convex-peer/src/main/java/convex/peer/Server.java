@@ -107,7 +107,7 @@ public class Server implements Closeable {
 	 */
 	private BlockingQueue<SignedData<?>> eventQueue = new ArrayBlockingQueue<>(EVENT_QUEUE_SIZE);
 
-	
+
 	/**
 	 * Message consumer that simply enqueues received messages received by this Server
 	 */
@@ -147,7 +147,7 @@ public class Server implements Closeable {
 	 * The Peer instance current state for this server. Will be updated based on peer events.
 	 */
 	private Peer peer;
-	
+
 	/**
 	 * The Peer Controller Address
 	 */
@@ -185,13 +185,13 @@ public class Server implements Closeable {
 		AStore configStore = (AStore) config.get(Keywords.STORE);
 		this.store = (configStore == null) ? Stores.current() : configStore;
 
-		Object maybeHook=config.get(Keywords.EVENT_HOOK);
-		if (maybeHook instanceof IServerEvent) {
-			this.eventHook = (IServerEvent)maybeHook;
-		} else {
-			eventHook=null;
+		// assign the event hook if set
+		if (config.containsKey(Keywords.EVENT_HOOK)) {
+			Object maybeHook=config.get(Keywords.EVENT_HOOK);
+			if (maybeHook instanceof IServerEvent) {
+				this.eventHook = (IServerEvent)maybeHook;
+			}
 		}
-
 		// Switch to use the configured store for setup, saving the caller store
 		final AStore savedStore=Stores.current();
 		try {
@@ -201,9 +201,9 @@ public class Server implements Closeable {
 			this.manager = new ConnectionManager(this);
 
 			this.peer = establishPeer();
-			
+
 			establishController();
-			
+
 			nio = NIOServer.create(this, receiveQueue);
 
 		} finally {
@@ -238,7 +238,7 @@ public class Server implements Closeable {
 		try {
 			AKeyPair keyPair = (AKeyPair) getConfig().get(Keywords.KEYPAIR);
 			if (keyPair==null) throw new IllegalArgumentException("No Peer Key Pair provided in config");
-	
+
 			Object source=getConfig().get(Keywords.SOURCE);
 			if (Utils.bool(source)) {
 				// Peer sync case
@@ -257,14 +257,14 @@ public class Server implements Closeable {
 				log.info("Retreived Genesis State: "+networkID);
 				SignedData<Belief> belF=(SignedData<Belief>) convex.acquire(beliefHash).get(timeout,TimeUnit.MILLISECONDS);
 				log.info("Retreived Peer Signed Belief: "+networkID);
-				
+
 				Peer peer=Peer.create(keyPair, genF, belF.getValue());
 				return peer;
-						
+
 			} else if (Utils.bool(getConfig().get(Keywords.RESTORE))) {
 				// Restore from storage case
 				try {
-	
+
 					Peer peer = Peer.restorePeer(store, keyPair);
 					if (peer != null) {
 						log.info("Restored Peer with root data hash: {}",store.getRootHash());
@@ -435,7 +435,7 @@ public class Server implements Closeable {
 	 * message parsed successfully, not much else.....
 	 *
 	 * If the message is partial, will be queued pending delivery of missing data.
-	 * 
+	 *
 	 * Runs on receiver thread
 	 *
 	 * @param m
@@ -657,7 +657,7 @@ public class Server implements Closeable {
 
 		return true;
 	}
-	
+
 	/**
 	 * Time of last belief broadcast
 	 */
@@ -674,14 +674,14 @@ public class Server implements Closeable {
             // broadcast to all peers trusted or not
 			manager.broadcast(msg, false);
 		};
-		
+
 		// persist the state of the Peer, announcing the new Belief
 		// (ensure we can handle missing data requests etc.)
 		peer=peer.persistState(noveltyHandler);
 
 		// Broadcast latest Belief to connected Peers
 		SignedData<Belief> sb = peer.getSignedBelief();
-		
+
 		Message msg = Message.createBelief(sb);
 
         // at the moment broadcast to all peers trusted or not TODO: recheck this
@@ -689,7 +689,7 @@ public class Server implements Closeable {
 		lastBroadcastBelief=Utils.getCurrentTimestamp();
 		broadcastCount++;
 	}
-	
+
 	/**
 	 * Gets the number of belief broadcasts made by this Peer
 	 * @return Count of broadcasts from this Server instance
@@ -709,19 +709,19 @@ public class Server implements Closeable {
 		long timestamp=Utils.getCurrentTimestamp();
 		// skip if recently published a block
 		if ((lastBlockPublishedTime+Constants.MIN_BLOCK_TIME)>timestamp) return false;
-		
+
 		Block block=null;
 		int n = newTransactions.size();
 		if (n == 0) return false;
 		// TODO: smaller block if too many transactions?
 		block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions, peer.getPeerKey());
 		newTransactions.clear();
-		
+
 		ACell.createPersisted(block);
 
 		Peer newPeer = peer.proposeBlock(block);
 		log.info("New block proposed: {} transaction(s), hash={}", block.getTransactions().count(), block.getHash());
-		
+
 		peer = newPeer;
 		lastBlockPublishedTime=timestamp;
 		return true;
@@ -738,7 +738,7 @@ public class Server implements Closeable {
 	public Address getPeerController() {
 		return controller;
 	}
-	
+
 	/**
 	 * Sets the Peer controller Address
 	 * @param a Peer Controller Address to set
@@ -746,10 +746,10 @@ public class Server implements Closeable {
 	public void setPeerController(Address a) {
 		controller=a;
 	}
-	
+
 	/**
 	 * Adds an event to the inboud server event queue. May block.
-	 * @throws InterruptedException 
+	 * @throws InterruptedException
 	 */
 	public void queueEvent(SignedData<?> event) throws InterruptedException {
 		eventQueue.put(event);
@@ -967,7 +967,7 @@ public class Server implements Closeable {
 	}
 
 	/*
-	 * Loop to process messages from the receive queue 
+	 * Loop to process messages from the receive queue
 	 */
 	private Runnable receiverLoop = new Runnable() {
 		@Override
@@ -1011,7 +1011,7 @@ public class Server implements Closeable {
 					if (maybeUpdateBelief() ) {
 						raiseServerChange("consensus");
 					}
-					
+
 					// Maybe rebroadcast Belief if not done recently
 					if ((lastBroadcastBelief+Constants.REBROADCAST_DELAY)<timestamp) {
 						// rebroadcast if there is still stuff outstanding for consensus
@@ -1032,7 +1032,7 @@ public class Server implements Closeable {
 			}
 		}
 	};
-	
+
 	@SuppressWarnings("unchecked")
 	private void awaitEvents() throws InterruptedException {
 		SignedData<?> firstEvent=eventQueue.poll(SERVER_UPDATE_PAUSE, TimeUnit.MILLISECONDS);
