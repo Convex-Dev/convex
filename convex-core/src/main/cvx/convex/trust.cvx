@@ -1,22 +1,16 @@
-;;
-;;
-;; Trust library 
-;;
-;; This library is based on the Reference Monitor security model. The library works with 'Trust Monitors', which are 
-;; a design pattern of for reference monitors on the Convex platform.
-;;
-;; See: https://en.wikipedia.org/wiki/Reference_monitor
-;;
-;;
-
-
 'convex.trust
 
 
 (call *registry*
       (register {:description ["Based on the reference monitor security model."
+                               "See comments about trusted monitors in `trusted?`."
                                "Provides the creation of blacklists, whitelists, and upgradable actors."]
                  :name        "Trust monitor library"}))
+
+
+;;
+;; See: https://en.wikipedia.org/wiki/Reference_monitor
+;;
 
 
 ;;;;;;;;;; Private
@@ -35,8 +29,13 @@
 (defn trusted? 
 
   ^{:doc {:description ["Returns true if `subject` is trusted by `trust-monitor`, false otherwise."
-                        "If `trust-monitor` as a user address rather than an actor, it can trust only itself."]
-          :examples    [{:code "(trusted? my-trust-monitor *caller*)"}]
+                        "A trust monitor is an address, pointing to either:"
+                        "- A user account that can only trust itself"
+                        "- An actor implementing `(check-trusted? subject action object)` which returns true or false."
+                        "`action` and `object` are arbitrary values specific to the trust monitor."
+                        "In practice, `subject` is often an address, although this is specific to the trust monitor as well."
+                        "See `build-blacklist` and `build-whitelist`."]
+          :examples    [{:code "(trusted? my-blacklist *caller*)"}]
           :signature   [{:params [trust-monitor subject]}
                         {:params [trust-monitor subject action]}
                         {:params [trust-monitor subject action object]}]}}
@@ -74,7 +73,7 @@
 
 (defn build-blacklist
 
-  ^{:doc {:description ["Creates deployable code for a new blacklist."
+  ^{:doc {:description ["Creates deployable code for a new blacklist, an actor acting as a trust monitor."
                         "An optional configuration map may be provided:"
                         "- `:blacklist`, collection of addresses forming the initial blacklist"
                         "- `:controller`, address that has the ability to modify the blacklist"]
@@ -140,7 +139,7 @@
 
 (defn build-whitelist
 
-  ^{:doc {:description ["Creates deployable code for a new whitelist."
+  ^{:doc {:description ["Creates deployable code for a new whitelist, an actor acting as a trust monitor."
                         "An optional configuration map may be provided:"
                         "- `:controller`, address that has the ability to modify the whitelist"
                         "- `:whitelist`, collection of addresses forming the initial whitelist"]
