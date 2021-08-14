@@ -1,5 +1,6 @@
 'asset.simple-nft
 
+
 (call *registry*
       (register {:description ["Enables the creation of minimal NFT tokens."
                                "An NFT is merely a long. Users can build an additional layer so that this id points to anything."

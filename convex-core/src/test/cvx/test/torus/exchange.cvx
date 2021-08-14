@@ -16,6 +16,7 @@
                    (next $/*result*))))
 
 
+							($.repl/start)
 (def T
      $.test)
 
