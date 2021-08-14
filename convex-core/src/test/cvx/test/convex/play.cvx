@@ -1,0 +1,97 @@
+;;
+;;
+;; Testing `convex.play`.
+;;
+;;
+
+
+;;;;;;;;;; Setup
+
+
+($.stream/out! (str $.term/clear.screen
+                    "Testing `convex.play`"))
+
+
+($.file/read "src/main/cvx/convex/play.cvx")
+
+
+(def play
+     (deploy (cons 'do
+                   $/*result*)))
+
+
+(def T
+     $.test)
+
+
+;;;;;;;;;; Test suites
+
+
+(defn suite.main
+
+  ^{:doc {:description "Only test suite."}}
+
+  []
+
+  (T/group '((T/path.conj 'convex.play)
+
+              (def env
+                   (deploy
+                     `(do
+
+                        (def *log*
+                             [])
+
+                        (defn command
+                          ^{:callable? true}
+                          [trx]
+                          (when-not (= trx
+                                       42)
+                            (def *log*
+                                 (conj *log*
+                                       trx))))
+
+                        (defn start
+                          ^{:callable? true}
+                          []
+                          (def *log*
+                               [:join])))))
+
+
+             (T/group '((T/path.conj "Actor returns nil")
+
+                        (play/start env)
+                        1
+                        2
+                        3
+                        42 ;; Supposed to stop at 42
+
+                        (T/trx '(= "Stop."
+                                   $/*result*)
+                               {:description "Stops."})
+
+                        (T/trx '(= [:join 1 2 3]
+                                   env/*log*)
+                               {:description "Commands executed properly."})))
+
+             (T/group '((T/path.conj "Stops on user request")
+
+                        (play/start env)
+                        :a
+                        :b
+                        stop
+
+                        (T/trx '(= "Stop."
+                                   $/*result*)
+                               {:description "Stops."})
+
+                        (T/trx '(= [:join :a :b]
+                                   env/*log*)
+                               {:description "Commands executed properly."}))))))
+
+
+;;;
+
+
+(suite.main)
+(T/print "convex.play")
