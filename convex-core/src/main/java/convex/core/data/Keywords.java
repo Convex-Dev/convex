@@ -48,7 +48,7 @@ public class Keywords {
 	public static final Keyword CODE = Keyword.create("code");
 
 	public static final Keyword TYPE = Keyword.create("type");
-	public static final Keyword SPECIAL = Keyword.create("special");
+	public static final Keyword SPECIAL_Q = Keyword.create("special?");
 	public static final Keyword SPECIAL_SYMBOL = Keyword.create("special-symbol");
 
 	public static final Keyword PEER = Keyword.create("peer");

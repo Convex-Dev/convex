@@ -2413,19 +2413,19 @@ public class Core {
 			try {
 				Symbol sym = de.getKey();
 				AHashMap<ACell, ACell> docMeta = de.getValue();
-				MapEntry<Symbol, AHashMap<ACell,ACell>> metaEntry=ctx.getMetadata().getEntry(sym);
-				MapEntry<Symbol, ACell> valueEntry=ctx.getEnvironment().getEntry(sym);
+				MapEntry<Symbol, AHashMap<ACell,ACell>> metaEntry = ctx.getMetadata().getEntry(sym);
+				MapEntry<Symbol, ACell> valueEntry = ctx.getEnvironment().getEntry(sym);
 
 				if (valueEntry == null) {
-					// No existing value. Might be a special
-					AHashMap<Keyword, ACell> doc=(AHashMap<Keyword, ACell>) docMeta.get(Keywords.DOC);
-					if (doc==null) {
-						// no docs
+					// No existing value, might be a special.
+					AHashMap<Keyword, ACell> doc = (AHashMap<Keyword, ACell>) docMeta.get(Keywords.DOC);
+					if (doc == null) {
+						// No docs.
 						System.err.println("CORE WARNING: Missing :doc tag in metadata for: " + sym);
 						continue;
 					} else {
-						if (Keywords.SPECIAL.equals(doc.get(Keywords.TYPE))) {
-							// create a fake entry for special symbols
+						if (docMeta.get(Keywords.SPECIAL_Q) == CVMBool.TRUE) {
+							// Create a fake entry for special symbols.
 							ctx=ctx.define(sym, sym);
 							valueEntry=MapEntry.create(sym, sym);
 						} else {

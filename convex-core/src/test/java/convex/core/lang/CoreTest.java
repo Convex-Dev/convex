@@ -2788,19 +2788,9 @@ public class CoreTest extends ACVMTest {
 
 			AHashMap<ACell,ACell> meta= Core.METADATA.get(sym);
 			assertNotNull(meta,"Missing metadata for core symbol: "+sym);
-			doDocTests(sym,meta);
+		    ACell dobj=meta.get(Keywords.DOC);
+		    assertNotNull(dobj,"No documentation found for core definition: "+sym);
 		}
-	}
-
-	private static ASet<Keyword> CORE_TYPES=Sets.of(Keywords.MACRO, Keywords.SPECIAL, Keywords.FUNCTION, Keywords.EXPANDER,Keywords.VALUE);
-
-	@SuppressWarnings("unchecked")
-	private void doDocTests(Symbol sym, AHashMap<ACell,ACell> meta) {
-		ACell dobj=meta.get(Keywords.DOC);
-		assertNotNull(dobj,"No documentation found for core definition: "+sym);
-		AHashMap<ACell,ACell> doc=(AHashMap<ACell, ACell>) dobj;
-		Keyword type=(Keyword) doc.get(Keywords.TYPE);
-		assertTrue(CORE_TYPES.containsKey(type), sym +" has unexpected type in documentation: "+type);
 	}
 
 	@Test
