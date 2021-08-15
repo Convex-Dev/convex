@@ -2406,47 +2406,90 @@ public class Core {
 		return ctx;
 	}
 
-	@SuppressWarnings("unchecked")
-	private static Context<?> applyDocumentation(Context<?> ctx) throws IOException {
-		AMap<Symbol, AHashMap<ACell, ACell>> m = Reader.read(Utils.readResourceAsString("convex/core/metadata.cvx"));
-		for (Map.Entry<Symbol, AHashMap<ACell, ACell>> de : m.entrySet()) {
-			try {
-				Symbol sym = de.getKey();
-				AHashMap<ACell, ACell> docMeta = de.getValue();
-				MapEntry<Symbol, AHashMap<ACell,ACell>> metaEntry = ctx.getMetadata().getEntry(sym);
-				MapEntry<Symbol, ACell> valueEntry = ctx.getEnvironment().getEntry(sym);
+//	@SuppressWarnings("unchecked")
+//	private static Context<?> applyDocumentation(Context<?> ctx) throws IOException {
+//		AMap<Symbol, AHashMap<ACell, ACell>> metas = Reader.read(Utils.readResourceAsString("convex/core/metadata.cvx"));
+//
+//		for (Map.Entry<Symbol, AHashMap<ACell, ACell>> entry : metas.entrySet()) {
+//			try {
+//				Symbol sym = entry.getKey();
+//				AHashMap<ACell, ACell> meta = entry.getValue();
+//				AHashMap<Keyword, ACell> doc = (AHashMap<Keyword, ACell>)meta.get(Keywords.DOC);
+//
+//				if (doc == null) {
+//					// No docs.
+//					System.err.println("CORE WARNING: Missing :doc tag in metadata for: " + sym);
+//					continue;
+//				}
+//
+//				ACell value;
+//
+//				if (meta.get(Keywords.SPECIAL_Q) == CVMBool.TRUE) {
+//					// Create a fake entry for special symbols.
+//					ctx = ctx.define(sym, sym);
+//					value = sym;
+//				} else {
+//					value = ctx.getEnvironment().get(sym);
+//				System.out.println("sym " + sym + " " + value );
+//					if (value == null) {
+//						System.err.println("CORE WARNING: Documentation for non-existent core symbol: " + sym);
+//						continue;
+//					}
+//				}
+//
+//				ctx = ctx.defineWithSyntax(Syntax.create(sym, meta), value);
+//			} catch (Throwable ex) {
+//				throw new Error("Error applying documentation: " + entry, ex);
+//			}
+//		}
+//
+//		return ctx;
+//	}
 
-				if (valueEntry == null) {
-					// No existing value, might be a special.
-					AHashMap<Keyword, ACell> doc = (AHashMap<Keyword, ACell>) docMeta.get(Keywords.DOC);
-					if (doc == null) {
-						// No docs.
-						System.err.println("CORE WARNING: Missing :doc tag in metadata for: " + sym);
-						continue;
-					} else {
-						if (docMeta.get(Keywords.SPECIAL_Q) == CVMBool.TRUE) {
-							// Create a fake entry for special symbols.
-							ctx=ctx.define(sym, sym);
-							valueEntry=MapEntry.create(sym, sym);
-						} else {
-							System.err.println("CORE WARNING: Documentation for non-existent core symbol: " + sym);
-							continue;
-						}
-					}
-				}
 
-				AHashMap<ACell, ACell> oldMeta = (metaEntry==null)?null:metaEntry.getValue();
-				AHashMap<ACell, ACell> newMeta = (oldMeta==null)?docMeta:oldMeta.merge(docMeta);
-				ACell v=valueEntry.getValue();
-				Syntax newSyn=Syntax.create(sym,newMeta);
-				ctx = ctx.defineWithSyntax(newSyn, v);
-			} catch (Throwable t) {
-				throw new Error("Error applying documentation: "+de,t);
-			}
-		}
 
-		return ctx;
-	}
+ 	@SuppressWarnings("unchecked")
+ 	private static Context<?> applyDocumentation(Context<?> ctx) throws IOException {
+
+ 		AMap<Symbol, AHashMap<ACell, ACell>> metas = Reader.read(Utils.readResourceAsString("convex/core/metadata.cvx"));
+
+ 		for (Map.Entry<Symbol, AHashMap<ACell, ACell>> entry : metas.entrySet()) {
+ 			try {
+ 				Symbol sym = entry.getKey();
+ 				AHashMap<ACell, ACell> meta = entry.getValue();
+ 				MapEntry<Symbol, AHashMap<ACell,ACell>> metaEntry = ctx.getMetadata().getEntry(sym);
+ 				MapEntry<Symbol, ACell> definedEntry = ctx.getEnvironment().getEntry(sym);
+ 
+ 				if (definedEntry == null) {
+ 					// No existing value, might be a special.
+ 					AHashMap<Keyword, ACell> doc = (AHashMap<Keyword, ACell>) meta.get(Keywords.DOC);
+ 					if (doc == null) {
+ 						// No docs.
+ 						System.err.println("CORE WARNING: Missing :doc tag in metadata for: " + sym);
+ 						continue;
+ 					} else {
+ 						if (meta.get(Keywords.SPECIAL_Q) == CVMBool.TRUE) {
+ 							// Create a fake entry for special symbols.
+ 							ctx=ctx.define(sym, sym);
+ 							definedEntry = MapEntry.create(sym, sym);
+ 						} else {
+ 							System.err.println("CORE WARNING: Documentation for non-existent core symbol: " + sym);
+ 							continue;
+ 						}
+ 					}
+ 				}
+ 
+ 				ctx = ctx.defineWithSyntax(Syntax.create(sym, meta), definedEntry.getValue());
+ 			} catch (Throwable ex) {
+ 				throw new Error("Error applying documentation:  " + entry, ex);
+ 			}
+ 		}
+ 
+ 		return ctx;
+ 	}
+
+
+
 
 	static {
 		// Set up convex.core environment

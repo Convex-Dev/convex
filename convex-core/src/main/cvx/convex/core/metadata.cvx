@@ -143,19 +143,6 @@
                        :return Any}]}}
 
 
- call
- {:doc {:description "Calls an function in another Account. The specified address must be valid, and refer to an existing account. offer is optional, if provided must cast to Long. call-form must be a valid expression calling an exported function in the target Account."
-        :errors      {:ARITY    "If the supplied arguments are the wrong arity for the called function."
-                      :CAST     "If the address argument is an Address, the offer is not a Long, or the function name is not a Symbol."
-                      :STATE    "If the address does not refer to an Account with the callable function specified by fn-name."
-                      :ARGUMENT "If the offer is negative."}
-        :examples    [{:code "(call some-contract 1000 (contract-fn arg1 arg2))"}]
-        :signature   [{:params [address call-form]
-                       :return Any}
-                      {:params [address offer call-form]
-                       :return Any}]}}
-
-
  ceil
  {:doc {:description "Computes the mathematical ceiling (rounding up towards positive infinity) for a numerical argument. Uses double precision mathematics."
         :errors      {:CAST "If the argument is not a Number."}}
@@ -658,13 +645,6 @@
     :special? true
    }
 
- macro
- {
-   :doc {:description "Creates a macro expansion procedure. When used in a function call position, the macro procedure will expand to the given expression, which should be a compilable form."
-         :examples [{:code "(macro [x] '(or x y))"}]
-         :type :macro
-         :signature [{:params [params & body]}]}
- }
 
  map
  {
@@ -881,13 +861,6 @@
    :special? true
  }
 
- schedule
- {
-   :doc {:description "Schedules a form for future execution under this account. Expands and compiles form now, but does not execute until the specified timestamp."
-         :examples [{:code "(schedule (+ *timestamp* 1000) (transfer my-friend 1000000))"}]
-         :type :macro
-         :signature [{:params [timestamp code]}]}
- }
 
  schedule*
  {

@@ -32,10 +32,11 @@
        (e form e))))
 
 (defmacro macro
+
   ^{:doc {:description "Creates an anonymous macro function, suitable for use as an expander."
           :examples [{:code "(macro [x] (if x :foo :bar))"}]
           :type :macro
-          :signature [{:params [a]}]}
+          :signature [{:params [params & body]}]}
     :expander true
    }
   [& decl]
@@ -198,13 +199,19 @@
   [f & colls]
   (vec (apply map f colls)))
 
+
+
 (defmacro call
-   ^{:doc {:description "Calls a smart contract function. If offer is specified, offers this amount of coins."
-          :examples [{:code "(call smart-contract (some-function 1 2 3))"}]
-          :type :macro
-          :signature [{:params [addr funcall] }
-                      {:params [addr offer funcall]}]}
-    }
+  ^{:doc {:description "Calls an function in another Account. The specified address must be valid, and refer to an existing account. offer is optional, if provided must cast to Long. call-form must be a valid expression calling an exported function in the target Account."
+          :errors      {:ARITY    "If the supplied arguments are the wrong arity for the called function."
+                        :CAST     "If the address argument is an Address, the offer is not a Long, or the function name is not a Symbol."
+                        :STATE    "If the address does not refer to an Account with the callable function specified by fn-name."
+                        :ARGUMENT "If the offer is negative."}
+          :examples    [{:code "(call some-contract 1000 (contract-fn arg1 arg2))"}]
+          :signature   [{:params [address call-form]
+                         :return Any}
+                        {:params [address offer call-form]
+                         :return Any}]}}
   [addr & more]
   (let [addr (unsyntax addr)]
 	  (if (empty? more) (fail :ARITY "Insufficient arguments to call")) ;; TODO remove magic number
@@ -335,6 +342,8 @@
           :signature [{:params [timestamp code]}] }}
     [timestamp code]
   `(schedule* ~timestamp (compile ~(list 'quote code))))
+
+
 
 (defmacro dotimes
   ^{
