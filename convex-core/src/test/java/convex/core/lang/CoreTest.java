@@ -606,7 +606,6 @@ public class CoreTest extends ACVMTest {
 		assertEquals("conve x", evalS("(str \\c \\o \\n \"ve\" \\space \\x)"));
 		assertEquals("[\\a \\b (fn [] \\newline) (\\return {\\space \\tab})]",
 					 evalS("(str [\\a \\b (fn [] \\newline) (list \\return {\\space \\tab})])"));
-
 	}
 
 	@Test
