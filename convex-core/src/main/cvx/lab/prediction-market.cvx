@@ -57,9 +57,9 @@
 	  (def final-flag false)
 	  
 	  ;; Check if contract is finalised
-	  (defn finalised? []
+	  (defn finalized? []
 	    (when final-flag (return true))
-	    (cond (call oracle (finalised? oracle-key)) :OK (return false))
+	    (cond (call oracle (finalized? oracle-key)) :OK (return false))
 	    
 	    (let [result (call oracle (read oracle-key))]
 	      (def final-outcome result)
@@ -76,7 +76,7 @@
 	  ;; call to claim payout
 	  ;; returns amount paid out, or null if not yet finalised
 	  (defn payout []
-	    (if (finalised?) :OK (return nil))
+	    (if (finalized?) :OK (return nil))
 	    (when-not (contains-key? totals final-outcome) (return (refund)))
 	    (let [total (double (totals final-outcome)) ;; total stake on winning outcome
 	          fo-stakes (stakes final-outcome {})
@@ -86,6 +86,6 @@
 	      (transfer *caller* quota)
 	      quota))
 	    
-	  (export get-outcomes bond stake price finalised? payout stakes totals)
+	  (export get-outcomes bond stake price finalized? payout stakes totals)
 	  
 	  )

@@ -9,12 +9,12 @@
 
 
 ($.stream/out! (str $.term/clear.screen
-                    "Testing `convex.fungible` library"))
+                    "Testing `convex.fungible`"))
 
 
 ;; Deploying test version of `convex.fungible` instead of importing stable version.
 ;;
-($.file/read "src/main/resources/convex/fungible.cvx")
+($.file/read "src/main/cvx/convex/fungible.cvx")
 
 
 (eval `(def fungible

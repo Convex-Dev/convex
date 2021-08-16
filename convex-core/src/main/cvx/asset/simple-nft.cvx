@@ -1,0 +1,208 @@
+'asset.simple-nft
+
+
+(call *registry*
+      (register {:description ["Enables the creation of minimal NFT tokens."
+                               "An NFT is merely a long. Users can build an additional layer so that this id points to anything."
+                               "Follows the interface described in `convex.asset`."]
+                 :name         "Simple NFT creation and management"}))
+
+
+;;;;;;;;;; Values
+
+
+(def counter
+ 
+  ^{:doc {:description "Used for creating NFT ids."}}
+
+  0)
+
+
+
+(def offers
+
+  ^{:doc {:description "Map of `owner` -> map of `recipient address` -> `set of NFT ids`"}}
+
+  {})
+
+
+;;;;;;;;;; Implementation of `convex.asset` interface
+
+
+(defn -direct-transfer
+
+  ^{:private? true}
+
+  ;; Used internally by [[accept]] and [[direct-transfer]].
+
+  [sender receiver quantity]
+
+  (let [receiver             (address receiver)
+        sender-balance       (or (get-holding sender)
+                                 #{})
+        _                    (assert (subset? quantity
+                                              sender-balance))
+        receiver-balance     (or (get-holding receiver)
+                                 #{})
+        new-sender-balance   (difference sender-balance
+                                         quantity)
+        new-receiver-balance (union receiver-balance
+                                    quantity)]
+    (set-holding sender
+                 new-sender-balance)
+    (set-holding receiver
+                 new-receiver-balance))
+    quantity)
+
+
+
+(defn accept
+
+  ^{:callable? true
+    :private?  true}
+
+  [sender quantity]
+
+  (let [sender           (address sender)
+        sender-offers    (or (get offers
+                                  sender)
+                             {})
+        offer            (or (get-in offers
+                                     [sender
+                                      *caller*])
+                             #{})
+        _                (assert (subset? quantity
+                                          offer))
+        receiver-balance (or (get-holding *caller*)
+                             #{})
+        new-offer        (difference offer
+                                     quantity)]
+
+    (def offers
+       (assoc offers
+              sender
+              (assoc sender-offers
+                     *caller*
+                     new-offer)))
+
+    (-direct-transfer sender
+                      *caller*
+                      quantity)))
+
+
+
+(defn balance
+
+  ^{:callable? true
+    :private?  true}
+
+  [owner]
+
+  (or (get-holding owner)
+      #{}))
+
+
+
+(defn direct-transfer
+
+  ^{:callable? true
+    :private?  true}
+
+  [receiver quantity]
+
+  (-direct-transfer *caller*
+                    receiver
+                    quantity))
+
+
+
+(defn offer
+
+  ^{:callable? true
+    :private?  true}
+
+  [receiver quantity]
+
+  (let [caller-offers (get offers
+                           *caller*
+                           {})]
+    (def offers
+         (assoc offers
+                *caller*
+                (assoc caller-offers
+                       receiver
+                       quantity)))))
+
+
+
+(def quantity-add
+
+  ^{:callable? true
+    :private?  true}
+
+  union)
+
+
+
+(def quantity-sub
+
+  ^{:callable? true
+    :private?  true}
+
+  difference)
+
+
+
+(def quantity-subset?
+
+  ^{:callable? true
+    :private?  true}
+
+  subset?)
+
+
+;;;;;;;;;; Callable functions
+
+
+(defn burn
+
+  ^{:callable? true
+    :doc       {:description "Destroys a set of NFTs. NFTs must be owned by the caller."
+                :signature   [{:params [nft-set]}]}}
+
+  [nft-set]
+
+  (let [owned-nfts (get-holding *caller*)
+        nft-set    (cond
+                     (long? nft-set) #{nft-set}
+                     (set? nft-set)  nft-set
+                     :else           (set nft-set))]
+    (when-not (subset? nft-set
+                       owned-nfts)
+      (fail :TRUST
+            "Can only burn owned NFTs"))
+    (set-holding *caller*
+                 (difference owned-nfts
+                             nft-set))
+    nft-set))
+
+
+
+(defn create
+
+  ^{:callable? true
+    :doc       {:description "Creates a new NFT with a fresh ID and arbitrary metadata."
+                :signature   [{:params []}]}}
+
+  []
+
+  (let [id         counter
+        owner      *caller*
+        owned-nfts (or (get-holding owner)
+                       #{})]
+    (set-holding owner
+                 (conj owned-nfts
+                       id))
+    (def counter
+         (inc counter))
+    id))

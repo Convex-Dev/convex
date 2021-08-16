@@ -1,0 +1,109 @@
+;;
+;;
+;; Testing `convex.trusted-oracle`.
+;;
+;;
+
+
+;;;;;;;;;; Setup:w
+
+
+($.file/read "src/main/cvx/convex/trusted-oracle/actor.cvx")
+
+
+(def default-actor
+     (deploy (cons 'do
+                   (next $/*result*))))
+
+
+($.file/read "src/main/cvx/convex/trusted-oracle.cvx")
+
+
+(def oracle
+     (deploy (concat (cons 'do
+                           (next $/*result*))
+                           `((def default-actor
+                                  ~default-actor)))))
+
+
+(def T
+     $.test)
+
+
+;;;;;;;;;; Test suites
+
+
+(defn suite.main
+
+  ^{:doc {:description "Only test suite."}}
+
+  []
+
+  (T/group '((T/path.conj 'convex.trusted-oracle)
+
+             (T/trx '(oracle/register :foo
+                                      {:a     :b
+                                       :trust #{*address*}})
+                    {:description "Registering oracle."})
+
+             (T/trx '(= false
+                        (oracle/register :foo
+                                         {:bar :baz}))
+                    {:description "Cannot register same key twice."})
+
+             (T/trx '(= {:a     :b
+                         :trust #{*address*}}
+                        (oracle/data :foo))
+                    {:description "Overwrite did not work."})
+
+             (T/trx '(= false
+                        (oracle/finalized? :foo))
+                    {:description "Not yet finalized."})
+
+             (T/trx '(nil? (oracle/read :foo))
+                    {:description "Nothing to read, not yet finalized."})
+
+             (def villain
+                  ($.account/zombie))
+
+             (T/fail.code #{:TRUST}
+                          '(eval-as villain
+                                    `(~oracle/provide :foo
+                                                      :bar))
+                          {:description "Villain is not trusted for providing a value."})
+
+             (T/trx '(nil? (oracle/read :foo))
+                    {:description "Vilain did not manage to provide a value."})
+
+             (T/trx '(= :baz
+                        (oracle/provide :foo
+                                        :baz))
+                    {:description "Trusted account provides value."})
+
+             (T/trx '(oracle/finalized? :foo)
+                    {:description "Key is finalized."})
+
+             (T/trx '(= :baz
+                        (oracle/read :foo))
+                    {:description "Finalized key is read."})
+
+             (T/trx '(= :baz
+                        (oracle/provide :foo
+                                        42))
+                    {:description "Cannot overwrite value."})
+
+             (T/trx '(= :baz
+                        (oracle/read :foo))
+                    {:description "Value was not overwritten."})
+
+             (T/fail.code #{:STATE}
+                          '(oracle/provide :bar
+                                           42)
+                          {:description "Cannot provide a result for an inexistent key."}))))
+
+
+;;;
+
+
+(suite.main)
+(T/print "convex.trusted-oracle")

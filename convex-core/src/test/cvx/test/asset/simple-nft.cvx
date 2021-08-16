@@ -13,7 +13,7 @@
 
 ;; Deploying test version of `asset.simple-nft` instead of importing stable version.
 ;;
-($.file/read "src/main/resources/asset/simple-nft.cvx")
+($.file/read "src/main/cvx/asset/simple-nft.cvx")
 
 
 (eval `(def nft
@@ -113,7 +113,7 @@
                                       acc
                                       (recur (conj acc
                                                    (call nft
-                                                         (create-nft))))))))
+                                                         (create))))))))
                     {:description "4 NFTs created."})
 
              (T/trx '(= (set total)
@@ -231,7 +231,8 @@
                           {:description "Cannot burn inexistant NFT."})
 
              (T/trx '(long? (def piece
-                                 (nft/create)))
+                                 (call nft
+								       (create))))
                     {:description "NFT created."})
 
              (T/trx '(= #{piece}

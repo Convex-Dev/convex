@@ -208,11 +208,13 @@ public class Init {
 			// ============================================================
 			// Standard library deployment
 			s = doActorDeploy(s, "convex/fungible.cvx");
+			s = doActorDeploy(s, "convex/trusted-oracle/actor.cvx");
 			s = doActorDeploy(s, "convex/trusted-oracle.cvx");
 			s = doActorDeploy(s, "convex/asset.cvx");
 			s = doActorDeploy(s, "torus/exchange.cvx");
 			s = doActorDeploy(s, "asset/nft-tokens.cvx");
 			s = doActorDeploy(s, "asset/simple-nft.cvx");
+			s = doActorDeploy(s, "asset/box/actor.cvx");
 			s = doActorDeploy(s, "asset/box.cvx");
 			s = doActorDeploy(s, "convex/play.cvx");
 
