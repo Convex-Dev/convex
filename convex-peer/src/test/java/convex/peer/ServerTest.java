@@ -200,27 +200,27 @@ public class ServerTest {
 		Ref<State> ref=Ref.forHash(h);
 		assertNotNull(ref);
 	}
-	
+
 	@Test
 	public void testJoinNetwork() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
 		AKeyPair kp=AKeyPair.generate();
 		AccountKey peerKey=kp.getAccountKey();
 
-		
+
 		long STAKE=1000000000;
 		synchronized(ServerTest.SERVER) {
 			Convex heroConvex=CONVEX;
-			
+
 			// Create new peer controller account
 			Address controller=heroConvex.createAccountSync(kp.getAccountKey());
 			Result trans=heroConvex.transferSync(controller,Coin.DIAMOND);
 			assertFalse(trans.isError());
-			
+
 			// create test user account
 			Address user=heroConvex.createAccountSync(kp.getAccountKey());
 			trans=heroConvex.transferSync(user,STAKE);
 			assertFalse(trans.isError());
-			
+
 			Convex convex=Convex.connect(SERVER.getHostAddress(), controller, kp);
 			trans=convex.transactSync(Invoke.create(controller, 0, "(create-peer "+peerKey+" "+STAKE+")"));
 			assertEquals(RT.cvm(STAKE),trans.getValue());
@@ -229,16 +229,18 @@ public class ServerTest {
 			config.put(Keywords.KEYPAIR,kp);
 			config.put(Keywords.STORE,EtchStore.createTemp());
 			config.put(Keywords.SOURCE,ServerTest.SERVER.getHostAddress());
+			Thread.sleep(1000); // sleep a bit to allow ServerTest to confirm and write new consensus
+
 			Server newServer=API.launchPeer(config);
-			
+
 			// make peer connections directly
 			newServer.getConnectionManager().connectToPeer(SERVER.getHostAddress());
 			SERVER.getConnectionManager().connectToPeer(newServer.getHostAddress());
-			
+
 			// should be in consensus at this point since just synced
 			// note: shouldn't matter which is the current store
 			assertEquals(newServer.getPeer().getConsensusState(),SERVER.getPeer().getConsensusState());
-			
+
 			Convex client=Convex.connect(newServer.getHostAddress(), user, kp);
 			assertEquals(user,client.transactSync(Invoke.create(user, 0, "*address*")).getValue());
 		}
@@ -262,7 +264,7 @@ public class ServerTest {
 			assertEquals(h,ab.getHash());
 		}
 	}
-	
+
 	@Test
 	public void testAcquireState() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
 		synchronized(ServerTest.SERVER) {
