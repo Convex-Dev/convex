@@ -38,7 +38,7 @@ public class Constants {
 	 * Juice price in the initial Genesis State
 	 */
 	public static final long INITIAL_JUICE_PRICE = 2L;
-	
+
 	/**
 	 * Initial memory Pool of 1gb
 	 */
@@ -58,7 +58,7 @@ public class Constants {
 	 * Constant to set deletion of Etch temporary files on exit. Probably should be true, unless you want to dubug temp files.
 	 */
 	public static final boolean ETCH_DELETE_TEMP_ON_EXIT = true;
-	
+
 	/**
 	 * Sequence number used for any new account
 	 */
@@ -97,7 +97,7 @@ public class Constants {
 
 	/**
 	 * Maximum length of a symbolic name in characters (keywords and symbols)
-	 * 
+	 *
 	 * Note: Chosen so that small qualified symbolic values are always embedded
 	 */
 	public static final int MAX_NAME_LENGTH = 64;
@@ -106,7 +106,7 @@ public class Constants {
 	 * Value used to indicate inclusion of a key in a Set. Must be a singleton instance
 	 */
 	public static final CVMBool SET_INCLUDED = CVMBool.TRUE;
-	
+
 	/**
 	 * Value used to indicate exclusion of a key from a Set. Must be a singleton instance
 	 */
@@ -141,7 +141,7 @@ public class Constants {
 	 * Default size for client receive buffers.
 	 */
 	public static final int RECEIVE_BUFFER_SIZE = Format.LIMIT_ENCODING_LENGTH*10+20;
-	
+
 	/**
 	 * Default size for client receive buffers.
 	 */
@@ -152,7 +152,7 @@ public class Constants {
 	 * Size of default server socket receive buffer
 	 */
 	public static final int SOCKET_SERVER_BUFFER_SIZE = 16*65536;
-	
+
 	/**
 	 * Size of default server socket buffers for a peer connection
 	 */
