@@ -76,7 +76,7 @@ commented: COMMENTED form;
  */ 
  
 SYMBOL_PATH:
-	(NAME | HASH DIGITS) '/' NAME;
+	(NAME | HASH DIGITS) ('/' NAME)+;
  
 COMMENTED: '#_';
 

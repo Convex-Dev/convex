@@ -37,8 +37,9 @@ public class OraclePanel extends JPanel {
 	public static final Logger log = LoggerFactory.getLogger(OraclePanel.class.getName());
 
 	Address oracleAddress = PeerGUI.getLatestState().lookupCNS("convex.trusted-oracle");
+	Address oracleActorAddress = PeerGUI.getLatestState().lookupCNS("convex.trusted-oracle.actor");
 
-	OracleTableModel tableModel = new OracleTableModel(PeerGUI.getLatestState(), oracleAddress);
+	OracleTableModel tableModel = new OracleTableModel(PeerGUI.getLatestState(), oracleActorAddress);
 	JTable table = new JTable(tableModel);
 
 	JScrollPane scrollPane = new JScrollPane(table);;

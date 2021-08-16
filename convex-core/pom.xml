@@ -29,11 +29,15 @@
 				</executions>
 			</plugin>
 		</plugins>
-        <resources>
-            <resource>
-                <directory>src/main/cvx</directory>
-            </resource>
-        </resources>
+		<resources>
+			<resource>
+				<directory>src/main/cvx</directory>
+			</resource>
+			<resource>
+				<directory>src/main/antlr4</directory>
+			</resource>
+
+		</resources>
 	</build>
 
 	<dependencies>
@@ -102,9 +106,9 @@
 			<version>4.9.2</version>
 		</dependency>
 		<dependency>
-		    <groupId>org.slf4j</groupId>
-    		<artifactId>slf4j-api</artifactId>
-    		<version>${slf4j.version}</version>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>${slf4j.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>

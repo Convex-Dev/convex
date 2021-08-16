@@ -229,6 +229,8 @@ public class Symbols {
 
 	public static final Symbol FOO = Symbol.create("foo");
 	public static final Symbol BAR = Symbol.create("bar");
+	public static final Symbol BAZ = Symbol.create("baz");;
+
 
 	public static final Symbol LOOKUP = Symbol.create("lookup");
 
