@@ -263,6 +263,7 @@ public class ReaderTest {
 		doIdempotencyTest(Samples.BAD_HASH);
 		doIdempotencyTest(Samples.MAX_EMBEDDED_STRING);
 		doIdempotencyTest(Reader.readAll("(def ^{:foo 2} a 1)"));
+		doIdempotencyTest(Reader.readAll("(fn ^{:foo 2} [] bar/baz)"));
 	}
 	
 	public void doIdempotencyTest(ACell cell) {
