@@ -256,4 +256,17 @@ public class ReaderTest {
 		}
 
 	}
+	
+	@Test public void testIdempotentPrint() {
+		doIdempotencyTest(Address.create(12345));
+		doIdempotencyTest(Samples.LONG_MAP_10);
+		doIdempotencyTest(Samples.BAD_HASH);
+		doIdempotencyTest(Samples.MAX_EMBEDDED_STRING);
+		doIdempotencyTest(Reader.readAll("(def ^{:foo 2} a 1)"));
+	}
+	
+	public void doIdempotencyTest(ACell cell) {
+		String s=cell.print();
+		assertEquals(s,Reader.read(s).print());
+	}
 }
