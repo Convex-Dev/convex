@@ -76,7 +76,11 @@ public class Lookup<T extends ACell> extends AOp<T> {
 
 	@Override
 	public void print(StringBuilder sb) {
+		sb.append("(lookup ");
+		address.print(sb);
+		sb.append(" ");
 		symbol.print(sb);
+		sb.append(')');
 	}
 
 	@Override
