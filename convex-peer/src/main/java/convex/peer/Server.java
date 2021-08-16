@@ -383,53 +383,6 @@ public class Server implements Closeable {
 		}
 	}
 
-	public boolean joinNetwork(AKeyPair keyPair, Address address, String remoteHostname, SignedData<Belief> signedBelief) {
-		if (remoteHostname == null) {
-			return false;
-		}
-		InetSocketAddress remotePeerAddress = Utils.toInetSocketAddress(remoteHostname);
-		int retryCount = 5;
-		Convex convex = null;
-		Result result = null;
-		while (retryCount > 0) {
-			try {
-				convex = Convex.connect(remotePeerAddress, address, keyPair);
-				Future<Result> cf =  convex.requestStatus();
-				result = cf.get(2000, TimeUnit.MILLISECONDS);
-				retryCount = 0;
-			} catch (IOException | InterruptedException | ExecutionException | TimeoutException e ) {
-				// raiseServerMessage("unable to connect to remote peer at " + remoteHostname + ". Retrying " + e);
-				retryCount --;
-			}
-		}
-		if ((convex==null)||(result == null)) {
-			log.warn("Failed to join network: Cannot connect to remote peer at {}",remoteHostname);
-			return false;
-		}
-
-
-		AVector<ACell> values = result.getValue();
-		// Hash beliefHash = RT.ensureHash(values.get(0));
-		// Hash stateHash = RT.ensureHash(values.get(1));
-
-		// check the initStateHash to see if this is the network we want to join?
-		Hash remoteNetworkID = RT.ensureHash(values.get(2));
-		if (!Utils.equals(peer.getNetworkID(),remoteNetworkID)) {
-			throw new Error("Failed to join network, we want Network ID "+peer.getNetworkID()+" but remote Peer reported "+remoteNetworkID);
-		}
-
-		try {
-			if (signedBelief != null) {
-				this.peer = this.peer.mergeBeliefs(signedBelief.getValue());
-			}
-		} catch (BadSignatureException | InvalidDataException e) {
-			throw new Error("Cannot merge to latest belief " + e);
-		}
-		raiseServerChange("join network");
-
-		return true;
-	}
-
 	/**
 	 * Process a message received from a peer or client. We know at this point that the
 	 * message parsed successfully, not much else.....

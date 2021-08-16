@@ -138,12 +138,7 @@ public class PeerStart implements Runnable {
 				store = Stores.getDefaultStore();
 			}
 			peerManager = PeerManager.create(mainParent.getSessionFilename(), keyPair, peerAddress, store);
-			List<Hash> networkHashList = peerManager.getNetworkHashList(remotePeerHostname);
-			log.info("will join remote networkId " + networkHashList.get(2).toHexString());
-
-			State baseState = peerManager.aquireState(remotePeerHostname, networkHashList.get(2));
-			SignedData<Belief> signedBelief = peerManager.aquireBelief(remotePeerHostname, networkHashList.get(0));
-			peerManager.launchPeer(hostname, port, remotePeerHostname, baseState, signedBelief);
+			peerManager.launchPeer(hostname, port, remotePeerHostname);
 			peerManager.showPeerEvents();
 		} catch (Throwable t) {
 			mainParent.showError(t);
