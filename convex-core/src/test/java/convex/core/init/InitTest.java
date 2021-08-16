@@ -18,7 +18,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.RecordTest;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.ACVMTest;
 
