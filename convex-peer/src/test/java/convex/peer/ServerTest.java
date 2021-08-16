@@ -224,12 +224,12 @@ public class ServerTest {
 			Convex convex=Convex.connect(SERVER.getHostAddress(), controller, kp);
 			trans=convex.transactSync(Invoke.create(controller, 0, "(create-peer "+peerKey+" "+STAKE+")"));
 			assertEquals(RT.cvm(STAKE),trans.getValue());
+			Thread.sleep(1000); // sleep a bit to allow ServerTest to confirm and write new consensus
 
 			HashMap<Keyword,Object> config=new HashMap<>();
 			config.put(Keywords.KEYPAIR,kp);
 			config.put(Keywords.STORE,EtchStore.createTemp());
 			config.put(Keywords.SOURCE,ServerTest.SERVER.getHostAddress());
-			Thread.sleep(1000); // sleep a bit to allow ServerTest to confirm and write new consensus
 
 			Server newServer=API.launchPeer(config);
 
