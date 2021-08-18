@@ -113,10 +113,9 @@
 
 (defmacro macro
 
-  ^{:doc      {:description "Creates an anonymous macro function, suitable for use as an expander."
-               :examples    [{:code "(macro [x] (if x :foo :bar))"}]
-               :signature   [{:params [params & body]}]}
-    :expander true}
+  ^{:doc {:description "Creates an anonymous macro function, suitable for use as an expander."
+          :examples    [{:code "(macro [x] (if x :foo :bar))"}]
+          :signature   [{:params [params & body]}]}}
 
   [& decl]
 
@@ -182,12 +181,11 @@
 
 (defmacro if
 
-  ^{:doc      {:description ["If `test` expression evaluates to a truthy value (anything but false or nil), executes `expr-true`. Otherwise, executes `expr-false`."
-                             "For a more general conditional expression that can handle multiple branches, see `cond.` Also see `when`."]
-               :examples     [{:code "(if (< 1 2) :yes :no)"}]
-               :signature    [{:params [test expr-true]}
-                              {:params [test expr-true expr-false]}]}
-    :expander true}
+  ^{:doc {:description ["If `test` expression evaluates to a truthy value (anything but false or nil), executes `expr-true`. Otherwise, executes `expr-false`."
+                        "For a more general conditional expression that can handle multiple branches, see `cond.` Also see `when`."]
+          :examples     [{:code "(if (< 1 2) :yes :no)"}]
+          :signature    [{:params [test expr-true]}
+                         {:params [test expr-true expr-false]}]}}
 
   [test & cases]
 
