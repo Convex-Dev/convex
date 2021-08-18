@@ -2376,12 +2376,13 @@ public class Core {
 	 * @throws IOException
 	 */
 	private static Context<?> registerCoreCode(AHashMap<Symbol, ACell> env) throws IOException {
-		// we use a fake State to build the initial environment with core address
-		Address ADDR=Address.ZERO;
-		State state = State.EMPTY.putAccount(ADDR,AccountStatus.createActor());
+
+		//Awe use a fake state to build the initial environment with core address.
+		Address ADDR = Address.ZERO;
+		State state = State.EMPTY.putAccount(ADDR, AccountStatus.createActor());
 		Context<?> ctx = Context.createFake(state, ADDR);
 
-		// Map in forms from env
+		// Map in forms from env.
 		for (Map.Entry<Symbol,ACell> me : env.entrySet()) {
 			ctx=ctx.define(me.getKey(), me.getValue());
 		}
@@ -2392,15 +2393,14 @@ public class Core {
 		AList<ACell> forms = Reader.readAll(Utils.readResourceAsString("convex/core.cvx"));
 		for (ACell f : forms) {
 			form = f;
-			ctx=ctx.expandCompile(form);
+			ctx = ctx.expandCompile(form);
 			if (ctx.isExceptional()) {
-				throw new Error("Error compiling form: "+ form+ "\nException : "+ ctx.getExceptional());
+				throw new Error("Error compiling form: " + form + "\nException : " + ctx.getExceptional());
 			}
-			AOp<?> op=(AOp<?>) ctx.getResult();
+			AOp<?> op = (AOp<?>)ctx.getResult();
 			ctx = ctx.execute(op);
 			// System.out.println("Core compilation juice: "+ctx.getJuice());
 			assert (!ctx.isExceptional()) : "Error executing op: "+ op+ "\nException : "+ ctx.getExceptional().toString();
-
 		}
 
 		return ctx;
@@ -2415,7 +2415,6 @@ public class Core {
  			try {
  				Symbol sym = entry.getKey();
  				AHashMap<ACell, ACell> meta = entry.getValue();
- 				MapEntry<Symbol, AHashMap<ACell,ACell>> metaEntry = ctx.getMetadata().getEntry(sym);
  				MapEntry<Symbol, ACell> definedEntry = ctx.getEnvironment().getEntry(sym);
  
  				if (definedEntry == null) {

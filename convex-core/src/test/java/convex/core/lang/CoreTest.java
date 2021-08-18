@@ -3497,7 +3497,6 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testExports() {
-		assertEquals(Sets.empty(), eval("*exports*"));
 		assertTrue(evalB("(do (defn foo []) (export foo) (get (lookup-meta 'foo) :callable?))"));
 	}
 
