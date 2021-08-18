@@ -860,14 +860,14 @@
 
 
  quasiquote
- {:doc      {:description "Returns the quoted value of a form, without evaluating it. Like 'quote', but elements within the form may be unquoted via `unquote`."
-             :examples    [{:code   "(quasiquote foo)"
-                            :return "foo"}
-                           {:code   "(quasiquote (:a :b (unquote (+ 2 3))))"
-                            :return "(:a :b 5)"}]
-             :signature   [{:params [form]}]}
-  :expander true
-  :special? true}
+ {:doc       {:description "Returns the quoted value of a form, without evaluating it. Like 'quote', but elements within the form may be unquoted via `unquote`."
+              :examples    [{:code   "(quasiquote foo)"
+                             :return "foo"}
+                            {:code   "(quasiquote (:a :b (unquote (+ 2 3))))"
+                             :return "(:a :b 5)"}]
+              :signature   [{:params [form]}]}
+  :expander? true
+  :special?  true}
 
 
  query
@@ -886,12 +886,12 @@
 
 
  quote
- {:doc      {:description "Returns the quoted value of a form, without evaluating it. For example, you can quote a symbol to get the symbol itself rather than the value in the environment that it refers to."
-             :examples    [{:code "(quote foo)"}
-                           {:code "(eval (quote (+ 1 2 3)))"}]
-             :signature   [{:params [form]}]}
-  :expander true
-  :special? true}
+ {:doc       {:description "Returns the quoted value of a form, without evaluating it. For example, you can quote a symbol to get the symbol itself rather than the value in the environment that it refers to."
+              :examples    [{:code "(quote foo)"}
+                            {:code "(eval (quote (+ 1 2 3)))"}]
+              :signature   [{:params [form]}]}
+  :expander? true
+  :special?  true}
 
 
  recur

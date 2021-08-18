@@ -500,7 +500,7 @@ public class CompilerTest extends ACVMTest {
 		c=c.execute(compiled);
 		assertNotError(c);
 		assertTrue(c.getEnvironment().get(Symbol.create("bex")) instanceof AFn);
-		assertTrue(c.getMetadata().get(Symbol.create("bex")).containsKey(Keywords.EXPANDER));
+		assertTrue(c.getMetadata().get(Symbol.create("bex")).containsKey(Keywords.EXPANDER_Q));
 
 		compiled=comp("(bex 2)",c);
 		c=c.execute(compiled);

@@ -38,10 +38,10 @@
 
 (def defexpander
 
-  ^{:doc      {:description "Advanced feature. Defines an expander in the current environment."
-               :examples    [{:code "(defexpander expand-once [x e] (e x (fn [x e] x)))"}]
-               :signature   [{:params [a]}]}
-    :expander true}
+  ^{:doc       {:description "Advanced feature. Defines an expander in the current environment."
+                :examples    [{:code "(defexpander expand-once [x e] (e x (fn [x e] x)))"}]
+                :signature   [{:params [a]}]}
+    :expander? true}
 
   (fn [x e]
     (let [[_
@@ -50,7 +50,7 @@
           exp      (cons 'fn
                          decl)
           form     `(def ~(syntax name
-                                  {:expander true})
+                                  {:expander? true})
                          ~exp)]
       (e form
          e))))
@@ -59,10 +59,10 @@
 
 (def defmacro
 
-  ^{:doc      {:description ["Like `defn` but defines a macro instead of a regular function."
-                             "A macro is a special function that is executed at expansion, before compilation, and produces valid Convex Lisp code for subsequent execution."]
-               :signature   [{:params [name params & body]}]}
-    :expander true}
+  ^{:doc       {:description ["Like `defn` but defines a macro instead of a regular function."
+                              "A macro is a special function that is executed at expansion, before compilation, and produces valid Convex Lisp code for subsequent execution."]
+                :signature   [{:params [name params & body]}]}
+    :expander? true}
 
   (fn [x e]
     (let [[_
@@ -73,7 +73,7 @@
           mmeta    (meta (first decl))
           form     `(def ~(syntax name
                                   (merge mmeta
-                                         {:expander true}))
+                                         {:expander? true}))
                       (let [m# ~mac]
                         (fn [x e]
                           (e (apply m#

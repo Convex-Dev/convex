@@ -72,7 +72,7 @@ public class Keywords {
 	public static final Keyword ERROR_CODE = Keyword.create("error-code");
 	public static final Keyword TRACE = Keyword.create("trace");
 
-	public static final Keyword EXPANDER = Keyword.create("expander");
+	public static final Keyword EXPANDER_Q = Keyword.create("expander?");
 	public static final Keyword MACRO = Keyword.create("macro");
 
 	public static final Keyword CALLABLE_Q = Keyword.create("callable?");
