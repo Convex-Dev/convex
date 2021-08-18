@@ -9,49 +9,43 @@
 
 
 {*address*
- {:doc            {:description "Returns the address of the current account (user address in regular transaction, actor address in actor calls)."
-                   :examples    [{:code "(address? *address*)"}]}
-  :special-symbol true
-  :special?       true}
+ {:doc      {:description "Returns the address of the current account (user address in regular transaction, actor address in actor calls)."
+             :examples    [{:code "(address? *address*)"}]}
+  :special? true}
 
 
  *memory*
- {:doc            {:description "Returns the current memory Allowance for this account. May be zero - in which case any new memory allocations will be charged at the current memory exchange pool price."
-                   :examples    [{:code "*memory*"}]}
-  :special?       true
-  :special-symbol true}
+ {:doc      {:description "Returns the current memory Allowance for this account. May be zero - in which case any new memory allocations will be charged at the current memory exchange pool price."
+             :examples    [{:code "*memory*"}]}
+  :special? true}
 
 
  *balance*
-  {:doc            {:description ["Returns the available balance of the current account (in Convex coins)."
-                                  "The available balance excludes reserved balance for transaction execution, so this number may be somewhat less than the total account balance during transaction execution."]
-                    :examples    [{:code "*balance*"}]}
-   :special?       true
-   :special-symbol true}
+  {:doc      {:description ["Returns the available balance of the current account (in Convex coins)."
+                            "The available balance excludes reserved balance for transaction execution, so this number may be somewhat less than the total account balance during transaction execution."]
+              :examples    [{:code "*balance*"}]}
+   :special? true}
 
 
  *caller*
- {:doc            {:description "During an actor call, returns the address of the account doing the call. Nil otherwise."
-                   :examples    [{:code "*caller*"}]}
-  :special?       true
-  :special-symbol true}
+ {:doc      {:description "During an actor call, returns the address of the account doing the call. Nil otherwise."
+             :examples    [{:code "*caller*"}]}
+  :special? true}
 
 
  *depth*
- {:doc            {:description ["Returns the CVM execution stack depth, at the point the `*depth*` operation is executed. If the depth becomes too deep, the transaction will fail with a `:DEPTH` exception."
-                                 "InformativeIn most cases, the allowable depth should be sufficient."]
-                   :examples    [{:code "*depth*"}]}
-  :special?       true
-  :special-symbol true}
+ {:doc      {:description ["Returns the CVM execution stack depth, at the point the `*depth*` operation is executed. If the depth becomes too deep, the transaction will fail with a `:DEPTH` exception."
+                           "InformativeIn most cases, the allowable depth should be sufficient."]
+             :examples    [{:code "*depth*"}]}
+  :special? true}
 
 
  *holdings*
-  {:doc            {:description ["Returns the holdings blob map for this account."
-                                  "Holdings are data values controlled by other accounts (usually actors). They can be used to indicate that an account may have special rights or holdings with respect to a specific actor, for instance."
-                                  "See `get-holding`, `set-holding`."]
-                    :examples    [{:code "*holdings*"}]}
-   :special?       true
-   :special-symbol true}
+  {:doc      {:description ["Returns the holdings blob map for this account."
+                            "Holdings are data values controlled by other accounts (usually actors). They can be used to indicate that an account may have special rights or holdings with respect to a specific actor, for instance."
+                            "See `get-holding`, `set-holding`."]
+              :examples    [{:code "*holdings*"}]}
+   :special? true}
 
 
  *initial-expander*
@@ -61,66 +55,58 @@
 
 
   *juice*
-  {:doc            {:description ["Returns the amount of execution juice remaining at this point of the current transaction."
-                                  "Juice is required for every CVM operation executed, and the transaction will fail immediately with a `:JUICE` error if an attempt is made to consume juice beyond this value."]
-                    :examples    [{:code "*juice*"}]}
-   :special?       true
-   :special-symbol true}
+  {:doc      {:description ["Returns the amount of execution juice remaining at this point of the current transaction."
+                            "Juice is required for every CVM operation executed, and the transaction will fail immediately with a `:JUICE` error if an attempt is made to consume juice beyond this value."]
+              :examples    [{:code "*juice*"}]}
+   :special? true}
 
 
   *key*
-  {:doc            {:description "Returns the public key for this account. Returns nil in the case of an actor since actors are accounts without keys."
-                    :examples    [{:code "*key*"}]}
-   :special?       true
-   :special-symbol true}
+  {:doc      {:description "Returns the public key for this account. Returns nil in the case of an actor since actors are accounts without keys."
+              :examples    [{:code "*key*"}]}
+   :special? true}
 
 
  *offer*
- {:doc            {:description "Returns the amount of native coin offered by `*caller*` during a call. See `call`. Will usually be zero, unless the caller has included an offer with a 'call' expression."
-                   :examples    [{:code "*offer*"}]}
-  :special?       true
-  :special-symbol true}
+ {:doc      {:description "Returns the amount of native coin offered by `*caller*` during a call. See `call`. Will usually be zero, unless the caller has included an offer with a 'call' expression."
+             :examples    [{:code "*offer*"}]}
+  :special? true}
 
 
  *origin*
- {:doc            {:description ["Similar to `*caller*` but returns the address of the account that initially signed this transaction."
-                                 "In a chain of calls, this address is the very first link."
-                                 "Usually, should NOT be used for access control, since a rogue actor can potentially trick a user into creating a transaction that allows code to be indirectly executed. Consider using `*caller*` for access control instead."]
-                   :examples    [{:code "*origin*"}]}
-  :special?       true
-  :special-symbol true}
+ {:doc      {:description ["Similar to `*caller*` but returns the address of the account that initially signed this transaction."
+                           "In a chain of calls, this address is the very first link."
+                           "Usually, should NOT be used for access control, since a rogue actor can potentially trick a user into creating a transaction that allows code to be indirectly executed. Consider using `*caller*` for access control instead."]
+             :examples    [{:code "*origin*"}]}
+  :special? true}
 
 
  *result*
- {:doc            {:description "Returns the result of the last CVM operation executed. Can be used, in some cases, to access the value of the previous expression. Will be nil for new transactions, or at the start of an actor call."
-                   :examples    [{:code "(do 1 *result*)"}]}
-  :special?       true
-  :special-symbol true}
+ {:doc      {:description "Returns the result of the last CVM operation executed. Can be used, in some cases, to access the value of the previous expression. Will be nil for new transactions, or at the start of an actor call."
+             :examples    [{:code "(do 1 *result*)"}]}
+  :special? true}
 
 
  *sequence*
- {:doc            {:description "Returns the current sequence number for this account. The sequence number is equal to the number of signed transactions executed. The next valid sequence number is `(+ *sequence* 1)."
-                   :examples    [{:code "*sequence*"}]}
-  :special?       true
-  :special-symbol true}
+ {:doc      {:description "Returns the current sequence number for this account. The sequence number is equal to the number of signed transactions executed. The next valid sequence number is `(+ *sequence* 1)."
+             :examples    [{:code "*sequence*"}]}
+  :special? true}
 
 
  *state*
- {:doc            {:description "Returns the current CVM state record. This is a very large object, and should normally only be used temporarily to look up relevant values."
-                   :examples    [{:code "(keys *state*)"}
-                                 {:code "(get-in *state* [:accounts *address* :balance])"}]}
-  :special?       true
-  :special-symbol true}
+ {:doc      {:description "Returns the current CVM state record. This is a very large object, and should normally only be used temporarily to look up relevant values."
+             :examples    [{:code "(keys *state*)"}
+                           {:code "(get-in *state* [:accounts *address* :balance])"}]}
+  :special? true}
 
 
  *timestamp*
- {:doc            {:description ["Returns the current timestamp."
-                                 "The timestamp is a `long` value that is equal to the greatest timestamp of any block executed (including the current block)."
-                                 "A timestamp can be interpreted as the number of milliseconds since January 1, 1970, 00:00:00 GMT. The block timestamp should always be less than or equal to the Unix timestamp of peers that are in consensus."
-                                 "Commonly used with `schedule`."]
-                   :examples    [{:code "*timestamp*"}]}
-  :special?       true
-  :special-symbol true}
+ {:doc      {:description ["Returns the current timestamp."
+                           "The timestamp is a `long` value that is equal to the greatest timestamp of any block executed (including the current block)."
+                           "A timestamp can be interpreted as the number of milliseconds since January 1, 1970, 00:00:00 GMT. The block timestamp should always be less than or equal to the Unix timestamp of peers that are in consensus."
+                           "Commonly used with `schedule`."]
+             :examples    [{:code "*timestamp*"}]}
+  :special? true}
 
 
  <
