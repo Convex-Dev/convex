@@ -2449,7 +2449,7 @@ public class Core {
 
 
 	static {
-		// Set up convex.core environment
+		// Set up `convex.core` environment
 		AHashMap<Symbol, ACell> coreEnv = Maps.empty();
 		AHashMap<Symbol, AHashMap<ACell,ACell>> coreMeta = Maps.empty();
 
@@ -2472,7 +2472,5 @@ public class Core {
 			e.printStackTrace();
 			throw new Error("Error initialising core!",e);
 		}
-
-
 	}
 }

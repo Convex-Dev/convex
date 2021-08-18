@@ -324,13 +324,13 @@
 
 
  call*
- {:doc {:description ["Calls a actor, optionally offering coins which the actor receive by using `accept`."
-                      "Must refer to a callable function defined in the actor, called with appropriate arguments."]
+ {:doc {:description ["Like `call` but lower-level. Instead of a form, takes a symbol referring to the function, and then arguments separately."
+                      "Same kind of errors may happen."]
         :errors      {:ARITY    "If the supplied arguments are the wrong arity for the called function."
                       :CAST     "If the address argument is an Address, the offer is not a Long, or the function name is not a Symbol."
                       :STATE    "If the address does not refer to an Account with the callable function specified by fn-name."
                       :ARGUMENT "If the offer is negative."}
-        :examples    [{:code "(call* some-actor 1000 'actor-fn arg1 arg2)"}]
+        :examples    [{:code "(call* some-actor 1000 'contract-fn arg1 arg2)"}]
         :signature   [{:params [address offer fn-name & args]
                        :return Any}]}}
 
@@ -1106,8 +1106,7 @@
 
 
  tailcall*
- {:doc {:description ["Calls a function as a tail call. Returns from the current function with the result of the tail call, without consuming additional stack depth."
-                      "Advanced feature."]
+ {:doc {:description "Like `tailcall` but lower-level. Instead of a form, takes a function and then arguments separately."
          :examples   [{:code "(tailcall* + 1 2 3)"}]
          :signature  [{:params [f & args] }]}}
 
