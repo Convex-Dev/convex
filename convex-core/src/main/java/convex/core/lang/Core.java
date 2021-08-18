@@ -2406,48 +2406,6 @@ public class Core {
 		return ctx;
 	}
 
-//	@SuppressWarnings("unchecked")
-//	private static Context<?> applyDocumentation(Context<?> ctx) throws IOException {
-//		AMap<Symbol, AHashMap<ACell, ACell>> metas = Reader.read(Utils.readResourceAsString("convex/core/metadata.cvx"));
-//
-//		for (Map.Entry<Symbol, AHashMap<ACell, ACell>> entry : metas.entrySet()) {
-//			try {
-//				Symbol sym = entry.getKey();
-//				AHashMap<ACell, ACell> meta = entry.getValue();
-//				AHashMap<Keyword, ACell> doc = (AHashMap<Keyword, ACell>)meta.get(Keywords.DOC);
-//
-//				if (doc == null) {
-//					// No docs.
-//					System.err.println("CORE WARNING: Missing :doc tag in metadata for: " + sym);
-//					continue;
-//				}
-//
-//				ACell value;
-//
-//				if (meta.get(Keywords.SPECIAL_Q) == CVMBool.TRUE) {
-//					// Create a fake entry for special symbols.
-//					ctx = ctx.define(sym, sym);
-//					value = sym;
-//				} else {
-//					value = ctx.getEnvironment().get(sym);
-//				System.out.println("sym " + sym + " " + value );
-//					if (value == null) {
-//						System.err.println("CORE WARNING: Documentation for non-existent core symbol: " + sym);
-//						continue;
-//					}
-//				}
-//
-//				ctx = ctx.defineWithSyntax(Syntax.create(sym, meta), value);
-//			} catch (Throwable ex) {
-//				throw new Error("Error applying documentation: " + entry, ex);
-//			}
-//		}
-//
-//		return ctx;
-//	}
-
-
-
  	@SuppressWarnings("unchecked")
  	private static Context<?> applyDocumentation(Context<?> ctx) throws IOException {
 

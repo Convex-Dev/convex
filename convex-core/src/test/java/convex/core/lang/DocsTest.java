@@ -35,9 +35,9 @@ public class DocsTest {
 	}
 	
 	public void doDocTest(Symbol sym,AHashMap<ACell,ACell> doc) {
-		String desc=RT.jvm(doc.get(Keywords.DESCRIPTION));
-		if (desc==null) {
-			if (PRINT_MISSING) System.err.println("No description on Core def: "+sym);
+		ACell desc = doc.get(Keywords.DESCRIPTION);
+		if (desc == null) {
+			if (PRINT_MISSING) System.err.println("No description on Core def: " + sym);
 		}
 		
 		@SuppressWarnings("unchecked")
