@@ -522,30 +522,6 @@
 
 
 
-(defmacro export
-
-  ^{:doc {:description ["Exports symbols from the current actor."
-                        "Exported symbols may be called by external parties. It is advised to carefully audit the security of usages of this function: normally, an actor's deployment code should have a single export statement that exports functions that have been validated as safe and intended to provide a public API to the actor."]
-          :examples    [{:code "(export some-safe-function)"}]
-          :signature   [{:params [& symbols]}]}}
-
-  [& syms]
-
-  (cons 'do
-        (map (fn [sym]
-               (or (symbol? sym)
-                   (fail :CAST
-                         (str "Not a symbol: " sym)))
-               `(eval (list 'def
-                            (quote ~sym)
-                            (syntax ~sym
-                                    (assoc (lookup-meta (quote ~sym))
-                                           :callable?
-                                           true)))))
-             syms)))
-
-
-
 (defn filter
 
    ^{:doc {:description ["Filters a collection by applying the given predicate to each element."
