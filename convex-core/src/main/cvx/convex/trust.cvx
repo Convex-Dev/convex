@@ -1,11 +1,10 @@
 'convex.trust
 
 
-(call *registry*
-      (register {:description ["Based on the reference monitor security model."
-                               "See comments about trusted monitors in `trusted?`."
-                               "Provides the creation of blacklists, whitelists, and upgradable actors."]
-                 :name        "Trust monitor library"}))
+(*registry*/meta.set {:description ["Based on the reference monitor security model."
+                                    "See comments about trusted monitors in `trusted?`."
+                                    "Provides the creation of blacklists, whitelists, and upgradable actors."]
+                      :name        "Trust monitor library"})
 
 
 ;;

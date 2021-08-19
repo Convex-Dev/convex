@@ -25,7 +25,7 @@
 (def *registry*
 
   ^{:doc {:description "Address of the Convex registry actor."
-          :examples    [{:code "(call *registry* (register {:name \"My name\"}))"}]}}
+          :examples    [{:code "(*registry*/meta.set {:name \"My name\"})"}]}}
 
   (address 9))
 
@@ -586,10 +586,7 @@
   [addr as sym]
 
   (let [code (cond (symbol? addr)
-               `(or (call* *registry*
-                           0
-                           'cns-resolve
-                           (quote ~addr))
+               `(or (*registry*/cns.resolve (quote ~addr))
                     (fail :NOBODY
                           (str "Could not resolve library name for import: "
                                (quote ~addr))))

@@ -74,20 +74,20 @@ public class InitTest extends ACVMTest {
 
 	@Test
 	public void testDeploy() {
-		assertTrue(evalA("(call *registry* (cns-resolve 'asset.box))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'asset.box.actor))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'asset.nft.simple))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'asset.nft.tokens))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'convex.asset))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'convex.fungible))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'convex.play))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'convex.trusted-oracle.actor))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'convex.trusted-oracle))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'torus.exchange))"));
+		assertTrue(evalA("(*registry*/cns.resolve 'asset.box)"));
+		assertTrue(evalA("(*registry*/cns.resolve 'asset.box.actor)"));
+		assertTrue(evalA("(*registry*/cns.resolve 'asset.nft.simple)"));
+		assertTrue(evalA("(*registry*/cns.resolve 'asset.nft.tokens)"));
+		assertTrue(evalA("(*registry*/cns.resolve 'convex.asset)"));
+		assertTrue(evalA("(*registry*/cns.resolve 'convex.fungible)"));
+		assertTrue(evalA("(*registry*/cns.resolve 'convex.play)"));
+		assertTrue(evalA("(*registry*/cns.resolve 'convex.trusted-oracle.actor)"));
+		assertTrue(evalA("(*registry*/cns.resolve 'convex.trusted-oracle)"));
+		assertTrue(evalA("(*registry*/cns.resolve 'torus.exchange)"));
 
-		assertEquals(Init.CORE_ADDRESS, eval("(call *registry* (cns-resolve 'convex.core))"));
-		assertEquals(Init.REGISTRY_ADDRESS, eval("(call *registry* (cns-resolve 'convex.registry))"));
-		assertEquals(Init.TRUST_ADDRESS, eval("(call *registry* (cns-resolve 'convex.trust))"));
+		assertEquals(Init.CORE_ADDRESS, eval("(*registry*/cns.resolve 'convex.core)"));
+		assertEquals(Init.REGISTRY_ADDRESS, eval("(*registry*/cns.resolve 'convex.registry)"));
+		assertEquals(Init.TRUST_ADDRESS, eval("(*registry*/cns.resolve 'convex.trust)"));
 	}
 
 	@Test

@@ -1,15 +1,14 @@
 'asset.nft.tokens
 
 
-(call *registry*
-      (register {:description ["Actor for storing and handling Non-Fungible Tokens, where a token is an map containing:"
-                               "- `:creator`, address of the creator"
-                               "- `:data`, arbitrary value describing the NFT (eg. a URL)"
-                               "- `:owner`, current owner"
-                               "At creation, rights can be specified as to who can transfer, destroy, or update the NFT data in anyway (see `create-token`)."
-                               "Each NFT implements the asset interface described in `convex.asset`."
-                               "Hence, while this account offers specific functions such as `destroy-token`, all other matters are resolved using `convex.asset`."]
-                 :name        "Advanced NFT tokens creation and management"}))
+(*registry*/meta.set {:description ["Actor for storing and handling Non-Fungible Tokens, where a token is an map containing:"
+                                    "- `:creator`, address of the creator"
+                                    "- `:data`, arbitrary value describing the NFT (eg. a URL)"
+                                    "- `:owner`, current owner"
+                                    "At creation, rights can be specified as to who can transfer, destroy, or update the NFT data in anyway (see `create-token`)."
+                                    "Each NFT implements the asset interface described in `convex.asset`."
+                                    "Hence, while this account offers specific functions such as `destroy-token`, all other matters are resolved using `convex.asset`."]
+                      :name        "Advanced NFT tokens creation and management"})
 
 
 ;;

@@ -1,11 +1,10 @@
 'convex.fungible
 
 
-(call *registry*
-      (register {:description ["Provides library functions for building and managing standard fungible assets."
-                               "Quantity is expressed as a long representing the amount of an asset."
-                               "The `build-token` function creates deployable code that follows the interface described in `convex.asset`."]
-                 :name        "Fungible token creation and management"}))
+(*registry*/meta.set {:description ["Provides library functions for building and managing standard fungible assets."
+                                    "Quantity is expressed as a long representing the amount of an asset."
+                                    "The `build-token` function creates deployable code that follows the interface described in `convex.asset`."]
+                      :name        "Fungible token creation and management"})
 
 
 ;;;;;;;;;; Building actors
