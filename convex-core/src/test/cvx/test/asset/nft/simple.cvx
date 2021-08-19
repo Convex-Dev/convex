@@ -8,12 +8,12 @@
 ;;;;;;;;;; Setup
 
 ($.stream/out! (str $.term/clear.screen
-                    "Testing `asset.simple-nft`"))
+                    "Testing `asset.nft.simple`"))
 
 
 ;; Deploying test version of `asset.simple-nft` instead of importing stable version.
 ;;
-($.file/read "src/main/cvx/asset/simple-nft.cvx")
+($.file/read "src/main/cvx/asset/nft/simple.cvx")
 
 
 (eval `(def nft

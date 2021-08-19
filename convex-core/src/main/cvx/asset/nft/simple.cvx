@@ -1,4 +1,4 @@
-'asset.simple-nft
+'asset.nft.simple
 
 
 (call *registry*

@@ -1,4 +1,4 @@
-'asset.nft-tokens
+'asset.nft.tokens
 
 
 (call *registry*

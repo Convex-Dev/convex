@@ -76,8 +76,8 @@ public class InitTest extends ACVMTest {
 	public void testDeploy() {
 		assertTrue(evalA("(call *registry* (cns-resolve 'asset.box))"));
 		assertTrue(evalA("(call *registry* (cns-resolve 'asset.box.actor))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'asset.nft-tokens))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'asset.simple-nft))"));
+		assertTrue(evalA("(call *registry* (cns-resolve 'asset.nft.simple))"));
+		assertTrue(evalA("(call *registry* (cns-resolve 'asset.nft.tokens))"));
 		assertTrue(evalA("(call *registry* (cns-resolve 'convex.asset))"));
 		assertTrue(evalA("(call *registry* (cns-resolve 'convex.fungible))"));
 		assertTrue(evalA("(call *registry* (cns-resolve 'convex.play))"));

@@ -28,7 +28,7 @@ public class SimpleNFTTest {
 	
 	static {
 		Context<?> ctx=TestState.CONTEXT.fork();
-		String importS = "(import asset.simple-nft :as nft)";
+		String importS = "(import asset.nft.simple :as nft)";
 		ctx=step(ctx,importS);
 		NFT=(Address)ctx.getResult();
 		assertNotNull(NFT);
