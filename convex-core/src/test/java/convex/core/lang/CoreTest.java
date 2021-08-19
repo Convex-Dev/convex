@@ -156,6 +156,12 @@ public class CoreTest extends ACVMTest {
 	}
 
 	@Test
+	public void testDoc() {
+		assertEquals(42L, evalL("(do (def foo ^{:doc 42} nil) (doc foo))"));
+		assertEquals(42L, evalL("(do (def a (deploy '(def foo ^{:doc 42} nil))) (doc a/foo))"));
+	}
+
+	@Test
 	public void testLet() {
 
 		assertCastError(step("(let [[a b] :foo] b)"));

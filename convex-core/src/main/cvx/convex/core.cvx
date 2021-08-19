@@ -484,9 +484,16 @@
           :examples    [{:code "(doc count)"}]
           :signature   [{:params [sym]}]}}
 
+  ;; Accepts actual symbols or lookups.
+
   [sym]
 
-  `(:doc (lookup-meta (quote ~sym))))
+  `(:doc ~(if (symbol? sym)
+            `(lookup-meta (quote ~sym))
+            `(lookup-meta ~(nth sym
+                                1)
+                          (quote ~(nth sym
+                                       2))))))
 
 
 
