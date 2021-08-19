@@ -2711,7 +2711,8 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Maps.empty().getHash(), eval("(hash (encoding {}))"));
 
 		assertTrue(evalB("(= (hash 0x12) (hash 0x12))"));
-
+		assertTrue(evalB("(blob? (hash (encoding 42)))")); // Should be a Blob
+		
 		assertArityError(step("(hash)"));
 		assertArityError(step("(hash nil nil)"));
 	}
