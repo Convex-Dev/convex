@@ -610,13 +610,6 @@
                        :return Blob}]}}
 
 
- hash?
- {:doc {:description "Returns true if the given value is a `hash`."
-        :examples    [{:code "(hash? (hash 0x1234))"}]
-        :signature   [{:params [x]
-                       :return Boolean}]}}
-
-
  hash-map
  {:doc {:description "Constructs a map with the given keys and values. If a key is repeated, the last value will overwrite previous ones."
         :errors      {:ARITY "If the number of arguments is not even (key-value pairs)."}

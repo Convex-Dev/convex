@@ -2297,13 +2297,6 @@ public class Core {
 		}
 	});
 
-	public static final CorePred HASH_Q = reg(new CorePred(Symbols.HASH_Q) {
-		@Override
-		public boolean test(ACell val) {
-			return val instanceof Hash;
-		}
-	});
-
 	public static final CorePred LONG_Q = reg(new CorePred(Symbols.LONG_Q) {
 		@Override
 		public boolean test(ACell val) {

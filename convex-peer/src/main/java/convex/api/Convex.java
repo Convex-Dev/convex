@@ -89,6 +89,9 @@ public class Convex {
 	 */
 	protected Long sequence = null;
 
+	/**
+	 * Map of results awaiting completion. May be pending missing data.
+	 */
 	private HashMap<Long, CompletableFuture<Result>> awaiting = new HashMap<>();
 
 	private final Consumer<Message> internalHandler = new ResultConsumer() {

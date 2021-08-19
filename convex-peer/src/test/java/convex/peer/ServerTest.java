@@ -224,7 +224,7 @@ public class ServerTest {
 			Convex convex=Convex.connect(SERVER.getHostAddress(), controller, kp);
 			trans=convex.transactSync(Invoke.create(controller, 0, "(create-peer "+peerKey+" "+STAKE+")"));
 			assertEquals(RT.cvm(STAKE),trans.getValue());
-			Thread.sleep(1000); // sleep a bit to allow ServerTest to confirm and write new consensus
+			//Thread.sleep(1000); // sleep a bit to allow background stuff
 
 			HashMap<Keyword,Object> config=new HashMap<>();
 			config.put(Keywords.KEYPAIR,kp);
@@ -243,6 +243,9 @@ public class ServerTest {
 
 			Convex client=Convex.connect(newServer.getHostAddress(), user, kp);
 			assertEquals(user,client.transactSync(Invoke.create(user, 0, "*address*")).getValue());
+
+			Result r=client.requestStatus().get(1000,TimeUnit.MILLISECONDS);
+			assertFalse(r.isError());
 		}
 	}
 
