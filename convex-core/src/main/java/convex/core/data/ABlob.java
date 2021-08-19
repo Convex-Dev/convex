@@ -379,7 +379,9 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 * Returns true if this object is a regular blob (i.e. not a special blob type like Hash or Address)
 	 * @return True if a regular blob
 	 */
-	public abstract boolean isRegularBlob();
+	public boolean isRegularBlob() {
+		return getTag()==Tag.BLOB;
+	}
 
 	/**
 	 * Tests if this Blob has exactly the same bytes as another Blob

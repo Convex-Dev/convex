@@ -2912,11 +2912,12 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(blob? (blob *origin*))"));
 		assertTrue(evalB("(blob? 0xFF)"));
 		assertTrue(evalB("(blob? (blob 0x17))"));
+		assertTrue(evalB("(blob? (hash (encoding *state*)))")); // HAsh
+		assertTrue(evalB("(blob? *key*)")); // AccountKey
 
 		assertFalse(evalB("(blob? 17)"));
 		assertFalse(evalB("(blob? nil)"));
 		assertFalse(evalB("(blob? *address*)"));
-		assertFalse(evalB("(blob? (hash (encoding *state*)))"));
 	}
 
 	@Test
