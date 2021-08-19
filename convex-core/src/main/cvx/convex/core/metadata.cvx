@@ -552,15 +552,6 @@
                       :return Blob}]}
 	}
 
-  hash?
-  {
-	 :doc {:description "Tests if the given value is a Hash. A Hash is a specialised type of Blob"
-         :examples [{:code "(hash? (hash 0x1234))"}]
-         :type :function
-         :signature [{:params [a]
-                      :return Boolean}]}
-	}
-
   hash-map
   {
 	 :doc {:description "Constructs a hash map with the given keys and values. If a key is repeated, the last value will overwrite previous ones."
