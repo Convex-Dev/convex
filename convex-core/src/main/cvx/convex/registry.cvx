@@ -41,7 +41,7 @@
   (address (inc (long *address*))))
 
 
-;;;;;;;;;; Metadata
+;;;;;;;;;; Address metadata
 
 
 (defn -meta.get
@@ -93,7 +93,7 @@
         (-meta.set metadata)))
 
 
-;;;;;;;;;; Callable API - Convex Name Service
+;;;;;;;;;; Convex Name Service
 
 
 (defn -cns.control
@@ -176,6 +176,9 @@
                                     *caller*)))
       (fail :TRUST
             "Caller is not trusted with updating the requested CNS record"))
+	(when-not (account addr)
+	  (fail :NOBODY
+	        "Can only use an existing account"))
     (def cns.database
          (assoc cns.database
                 name

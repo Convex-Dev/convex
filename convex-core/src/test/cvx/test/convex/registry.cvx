@@ -45,8 +45,13 @@
              (T/trx '(nil? (registry/cns.resolve 'some.name))
                     {:description "Not found."})
 
-             (def addr
-                  (deploy nil))
+			 (T/trx '(address? (def addr
+									(deploy `(~registry/meta.set 42))))
+			        {:description "Actor deployed with metadata."})
+
+			 (T/trx '(= 42
+					    (registry/meta.get addr))
+			        {:description "Actor metadata retrieved."})
 
              (T/trx `(= [addr
                          *address*]
@@ -81,7 +86,7 @@
 
              (T/trx '(= addr-2
                         (registry/cns.resolve 'some.name))
-                    {:description "Ori   ginal mapping left intact."})
+                    {:description "Original mapping left intact."})
 
              (T/trx '(= [addr-2
                          villain]
@@ -122,7 +127,12 @@
 
              (T/trx '(= addr-2
                         (registry/cns.resolve 'another.name))
-                    {:description "Villain created new mapping."}))))
+                    {:description "Villain created new mapping."})
+
+			 (T/fail.code #{:NOBODY}
+			              '(registry/cns.update 'foo.bar
+							                    #4242424242)
+						  {:description "Cannot register a nonexistent account."}))))
 
 
 ;;;
