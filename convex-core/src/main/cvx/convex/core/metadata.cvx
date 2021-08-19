@@ -530,10 +530,10 @@
                       {:params [form expander cont]}]}}
 
 
- exports?
- {:doc {:description "Returns true the given function name (a symbol) is is a callable function in actor. See `call`."
+ callable?
+ {:doc {:description "Returns true the given function name (a symbol) is a callable function in actor. See `call`."
         :errors      {:CAST "If the actor argument is not an address."}
-        :examples    [{:code "(exports? actor-address 'function-name)"}]
+        :examples    [{:code "(callable? actor-address 'function-name)"}]
         :signature   [{:params [actor symbol]}]}}
 
 

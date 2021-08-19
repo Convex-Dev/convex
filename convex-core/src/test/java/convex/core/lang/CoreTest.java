@@ -3508,21 +3508,21 @@ public class CoreTest extends ACVMTest {
 		Address caddr = (Address) ctx.getResult();
 		assertNotNull(caddr);
 
-		assertTrue(evalB(ctx, "(exports? caddr 'public)")); // OK
-		assertFalse(evalB(ctx, "(exports? caddr 'private)")); // Defined, but not exported
-		assertFalse(evalB(ctx, "(exports? caddr 'random-symbol)")); // Doesn't exist
+		assertTrue(evalB(ctx, "(callable? caddr 'public)")); // OK
+		assertFalse(evalB(ctx, "(callable? caddr 'private)")); // Defined, but not exported
+		assertFalse(evalB(ctx, "(callable? caddr 'random-symbol)")); // Doesn't exist
 
-		assertCastError(step(ctx, "(exports? caddr :public)")); // not a Symbol
-		assertCastError(step(ctx, "(exports? caddr :random-name)"));
-		assertCastError(step(ctx, "(exports? caddr :private)"));
+		assertCastError(step(ctx, "(callable? caddr :public)")); // not a Symbol
+		assertCastError(step(ctx, "(callable? caddr :random-name)"));
+		assertCastError(step(ctx, "(callable? caddr :private)"));
 
-		assertArityError(step(ctx, "(exports? 1)"));
-		assertArityError(step(ctx, "(exports? 1 2 3)"));
+		assertArityError(step(ctx, "(callable? 1)"));
+		assertArityError(step(ctx, "(callable? 1 2 3)"));
 
-		assertCastError(step(ctx, "(exports? :foo :foo)"));
-		assertCastError(step(ctx, "(exports? nil :foo)"));
-		assertCastError(step(ctx, "(exports? caddr nil)"));
-		assertCastError(step(ctx, "(exports? caddr 1)"));
+		assertCastError(step(ctx, "(callable? :foo :foo)"));
+		assertCastError(step(ctx, "(callable? nil :foo)"));
+		assertCastError(step(ctx, "(callable? caddr nil)"));
+		assertCastError(step(ctx, "(callable? caddr 1)"));
 	}
 
 	@Test

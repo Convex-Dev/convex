@@ -558,7 +558,7 @@ public class Core {
 
 	public static final AFn<ACell> QUASIQUOTE_EXPANDER = reg(Compiler.QUASIQUOTE_EXPANDER);
 
-	public static final CoreFn<CVMBool> EXPORTS_Q = reg(new CoreFn<>(Symbols.EXPORTS_Q) {
+	public static final CoreFn<CVMBool> CALLABLE_Q = reg(new CoreFn<>(Symbols.CALLABLE_Q) {
 		@SuppressWarnings("unchecked")
 		@Override
 		public Context<CVMBool> invoke(Context context, ACell[] args) {

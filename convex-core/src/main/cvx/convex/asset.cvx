@@ -160,8 +160,8 @@
      (let [[asset-address
             quantity]     asset]
        (cond
-         (exports? receiver
-                   'receive-asset)
+         (callable? receiver
+                    'receive-asset)
          (do 
            (call asset-address
                  (offer receiver
