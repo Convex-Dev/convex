@@ -63,7 +63,7 @@ public class Convex {
 	private static final Logger log = LoggerFactory.getLogger(Convex.class.getName());
 
 	private long timeout=Constants.DEFAULT_CLIENT_TIMEOUT;
-	
+
 	/**
 	 * Key pair for this Client
 	 */
@@ -284,7 +284,7 @@ public class Convex {
 		if (r.isError()) throw new Error("Error creating account: " + r.getErrorCode()+ " "+r.getValue());
 		return (Address) r.getValue();
 	}
-	
+
 	/**
 	 * Creates a new account with the given public key
 	 *
@@ -368,9 +368,9 @@ public class Convex {
 	 */
 	public synchronized CompletableFuture<Result> transact(SignedData<ATransaction> signed) throws IOException {
 		CompletableFuture<Result> cf = new CompletableFuture<Result>();
-		
+
 		long id = -1;
-				
+
 		// loop until request is queued
 		while (id < 0) {
 			id = connection.sendTransaction(signed);
@@ -597,6 +597,33 @@ public class Convex {
 	}
 
 	/**
+	 * Request status using a sync operation. This request will automatically get any missing data with the status request
+	 *
+	 * @param timeoutMillis Milliseconds to wait for request timeout
+	 *
+	 * @throws IOException, InterruptedException, ExecutionException, TimeoutException
+	 *
+	 */
+	public AVector<ACell> requestStatusSync(long timeoutMillis) throws IOException, InterruptedException, ExecutionException, TimeoutException {
+		Future<Result> statusFuture=requestStatus();
+		AVector<ACell> status = null;
+		int retryCount = 10;
+		while (retryCount > 0 ) {
+			try {
+				status=statusFuture.get(timeoutMillis,TimeUnit.MILLISECONDS).getValue();
+				if (status != null) {
+					break;
+				}
+			} catch (MissingDataException e) {
+				acquire(e.getMissingHash()).get(timeoutMillis,TimeUnit.MILLISECONDS);
+				statusFuture=requestStatus();
+			}
+			retryCount -= 1;
+		}
+		return status;
+	}
+
+	/**
 	 * Submits a status request to the Convex network peer, returning a Future once the
 	 * request has been successfully queued.
 	 *
@@ -772,7 +799,7 @@ public class Convex {
 		connection = null;
 		awaiting.clear();
 	}
-	
+
 	@Override
 	public void finalize() {
 		close();
@@ -819,7 +846,7 @@ public class Convex {
 	public static Convex connect(Server server) throws IOException, TimeoutException {
 		return connect(server.getHostAddress(),server.getPeerController(),server.getKeyPair());
 	}
-	
+
 	/**
 	 * Wraps a connection as a Convex client instance
 	 * @param c Connection to wrap
@@ -841,7 +868,7 @@ public class Convex {
 			return acquire(stateHash);
 		} catch (InterruptedException|ExecutionException|IOException e) {
 			throw Utils.sneakyThrow(e);
-		} 
+		}
 	}
 
 	/**
