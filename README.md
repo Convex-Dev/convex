@@ -1,5 +1,7 @@
 # Convex
 
+[![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex.svg?label=Maven%20Central)](https://search.maven.org/artifact/world.convex/convex.svg)
+
 Convex is a decentralised network and execution engine for the Internet of Value.
 
 It is designed as a full stack solution for decentralised application and economic systems that manage digital assets, where asset ownership is cryptographically secured and can be managed (optionally) with Smart Contracts. It can be considered functionally similar to a decentralised public blockchain, but offers some significant advantages:
