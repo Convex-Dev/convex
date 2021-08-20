@@ -12,7 +12,9 @@
 	  (def balances {~owner ~supply})
 					
 	  ;;transfer function
-	  (defn transfer [target amount] 
+	  (defn transfer
+        ^{:callable? true}
+        [target amount] 
 	    (assert (address? target) (long? amount) (<= 0 amount (balances *caller*)))
 	    (if (not (= target *caller*))
 	      (let [srcbal (balances *caller*)
@@ -27,9 +29,14 @@
 	  (defn bad-function [] (def balances {}))
 					
 	  ;;return total supply
-	  (defn total-supply [] ~supply)
+	  (defn total-supply
+        ^{:callable? true}
+        []
+        ~supply)
 					
 	  ;; get balance, or 0 if no balance for specified address
-	  (defn balance [acct] (let [b (balances acct)] (if b b 0)))
-					
-	  (export transfer balance total-supply)))
+	  (defn balance
+        ^{:callable? true}
+        [acct]
+        (let [b (balances acct)] (if b b 0)))
+	  ))

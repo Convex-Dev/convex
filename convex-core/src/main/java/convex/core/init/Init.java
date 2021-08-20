@@ -180,7 +180,7 @@ public class Init {
 
 		{ // Register core libraries now that registry exists
 			Context<?> ctx = Context.createFake(s, INIT_ADDRESS);
-			ctx = ctx.eval(Reader.read("(call *registry* (cns-update 'convex.core " + CORE_ADDRESS + "))"));
+			ctx = ctx.eval(Reader.read("(*registry*/cns.update 'convex.core " + CORE_ADDRESS + ")"));
 						             
 			s = ctx.getState();
 			s = register(s, CORE_ADDRESS, "Convex Core Library", "Core utilities accessible by default in any account.");
@@ -204,7 +204,6 @@ public class Init {
 		try {
 			State s=createBaseState(genesisKeys);
 
-
 			// ============================================================
 			// Standard library deployment
 			s = doActorDeploy(s, "convex/fungible.cvx");
@@ -212,8 +211,8 @@ public class Init {
 			s = doActorDeploy(s, "convex/trusted-oracle.cvx");
 			s = doActorDeploy(s, "convex/asset.cvx");
 			s = doActorDeploy(s, "torus/exchange.cvx");
-			s = doActorDeploy(s, "asset/nft-tokens.cvx");
-			s = doActorDeploy(s, "asset/simple-nft.cvx");
+			s = doActorDeploy(s, "asset/nft/simple.cvx");
+			s = doActorDeploy(s, "asset/nft/tokens.cvx");
 			s = doActorDeploy(s, "asset/box/actor.cvx");
 			s = doActorDeploy(s, "asset/box.cvx");
 			s = doActorDeploy(s, "convex/play.cvx");
@@ -260,7 +259,7 @@ public class Init {
 			ctx = ctx.deployActor(forms.next().cons(Symbols.DO));
 			if (ctx.isExceptional()) throw new Error("Error deploying actor:" + ctx.getValue());
 
-			ctx = ctx.eval(Reader.read("(call *registry* (cns-update " + forms.get(0) + " " + ctx.getResult() + "))"));
+			ctx = ctx.eval(Reader.read("(*registry*/cns.update " + forms.get(0) + " " + ctx.getResult() + ")"));
 			if (ctx.isExceptional()) throw new Error("Error while registering actor:" + ctx.getValue());
 
 			return ctx.getState();
@@ -289,14 +288,14 @@ public class Init {
 		ctx = ctx.eval(Reader.read("(do (import torus.exchange :as torus) (torus/add-liquidity " + addr + " "
 				+ liquidity + " " + cvx + "))"));
 		if (ctx.isExceptional()) throw new Error("Error adding market liquidity: " + ctx.getValue());
-		ctx = ctx.eval(Reader.read("(call *registry* (cns-update 'currency." + symbol + " " + addr + "))"));
+		ctx = ctx.eval(Reader.read("(*registry*/cns.update 'currency." + symbol + " " + addr + ")"));
 		if (ctx.isExceptional()) throw new Error("Error registering currency in CNS: " + ctx.getValue());
 		return ctx.getState();
 	}
 
 	private static State register(State state, Address origin, String name, String description) {
 		Context<?> ctx = Context.createFake(state, origin);
-		ctx = ctx.eval(Reader.read("(call *registry* (register {:description \"" + description + "\" :name \"" + name + "\"}))"));
+		ctx = ctx.eval(Reader.read("(*registry*/meta.set {:description \"" + description + "\" :name \"" + name + "\"})"));
 		return ctx.getState();
 	}
 	

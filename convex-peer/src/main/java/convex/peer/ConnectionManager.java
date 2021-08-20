@@ -52,7 +52,7 @@ public class ConnectionManager {
 	 * Pause for each iteration of Server connection loop.
 	 */
 	static final long SERVER_CONNECTION_PAUSE = 1000;
-	
+
 	/**
 	 * Pause for each iteration of Server connection loop.
 	 */
@@ -108,7 +108,7 @@ public class ConnectionManager {
 			}
 		}
 	};
-	
+
 	/**
 	 * Celled by the connection manager to ensure we are tracking latest Beliefs on the network
 	 */
@@ -116,7 +116,7 @@ public class ConnectionManager {
 		try {
 			long lastConsensus=server.getPeer().getConsensusState().getTimeStamp().longValue();
 			if (lastConsensus+SERVER_POLL_DELAY>=lastUpdate) return;
-			
+
 			ArrayList<Connection> conns=new ArrayList<>(connections.values());
 			if (conns.size()==0) {
 				// Nothing to do
@@ -581,9 +581,12 @@ public class ConnectionManager {
 			// Temp client connection
 			Convex convex=Convex.connect(hostAddress);
 
-			Result status = convex.requestStatus().get(Constants.DEFAULT_CLIENT_TIMEOUT,TimeUnit.MILLISECONDS);
-			AVector<ACell> v=status.getValue();
-			AccountKey peerKey =RT.ensureAccountKey(v.get(3));
+			AVector<ACell> status = convex.requestStatusSync(Constants.DEFAULT_CLIENT_TIMEOUT);
+			if (status == null || status.count()!=Constants.STATUS_COUNT) {
+				throw new Error("Bad status message from remote Peer");
+			}
+
+			AccountKey peerKey =RT.ensureAccountKey(status.get(3));
 			if (peerKey==null) return null;
 
 			Connection existing=connections.get(peerKey);
@@ -596,7 +599,7 @@ public class ConnectionManager {
 				connections.put(peerKey, newConn);
 			}
 			server.raiseServerChange("connection");
-		} catch (InterruptedException | IOException |ExecutionException | TimeoutException e) {
+		} catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
 			// ignore any errors from the peer connections
 		} catch (UnresolvedAddressException e) {
 			log.info("Unable to resolve host address: "+hostAddress);
@@ -617,7 +620,7 @@ public class ConnectionManager {
 	public void start() {
 		// Set timestamp for connection updates
 		lastUpdate=Utils.getCurrentTimestamp();
-		
+
 		// start connection thread
 		connectionThread = new Thread(connectionLoop, "Connection Manager thread at "+server.getPort());
 		connectionThread.setDaemon(true);

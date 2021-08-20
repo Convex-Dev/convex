@@ -1,19 +1,18 @@
 'convex.trusted-oracle
 
 
-(call *registry*
-      (register {:description ["API for simple oracle actors that depend on a trusted set of addresses who may provide results."
-                               "Default actor used is `convex.trusted-oracle.actor`."
-                               "At first, a key (any arbitrary value) is registered via `register`."
-                               "When ready, a result for that key is provided via `provide` by a trusted account."
-                               "Consumers can fetch data about keys using `data`, check if a result is provided using `finalized?`, and read results using `read`."
-                               "Implementating a simple oracle actor requires defining callable function versions of:"
-                               "- `(data key)`"
-                               "- `(finalized? key)`"
-                               "- `(read key)`"
-                               "- `(register key result)`"
-                               "- `(provide key result)`"]
-                 :name        "Trusted oracle API"}))
+(*registry*/meta.set {:description ["API for simple oracle actors that depend on a trusted set of addresses who may provide results."
+                                    "Default actor used is `convex.trusted-oracle.actor`."
+                                    "At first, a key (any arbitrary value) is registered via `register`."
+                                    "When ready, a result for that key is provided via `provide` by a trusted account."
+                                    "Consumers can fetch data about keys using `data`, check if a result is provided using `finalized?`, and read results using `read`."
+                                    "Implementating a simple oracle actor requires defining callable function versions of:"
+                                    "- `(data key)`"
+                                    "- `(finalized? key)`"
+                                    "- `(read key)`"
+                                    "- `(register key result)`"
+                                    "- `(provide key result)`"]
+                      :name        "Trusted oracle API"})
 
 
 (import convex.trusted-oracle.actor :as default-actor)

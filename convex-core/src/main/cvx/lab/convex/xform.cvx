@@ -7,10 +7,7 @@
 ;;
 
 
-
-(call *registry*
-      (cns-update 'convex.xform
-                  *address*))
+'convex.xform
 
 
 

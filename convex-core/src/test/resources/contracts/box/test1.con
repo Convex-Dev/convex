@@ -20,8 +20,7 @@
                        (import convex.asset :as asset)
                        (def box ~box)
                        (set-controller *caller*) 
-                       (defn receive-asset [a data] (asset/accept *caller* a))
-                       (export receive-asset))))
+                       (defn receive-asset ^{:callable? true} [a data] (asset/accept *caller* a)))))
 
 (def b2 (call box (create-box)))
 

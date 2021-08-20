@@ -1,9 +1,9 @@
 'torus.exchange
 
-(call *registry*
-      (register {:description ["Torus establishes automated market makers for fungible assets (see `convex.fungible`)."
-                               "It creates singleton CVX/Token trading pairs for each fungible asset."]
-                 :name        "Torus exchange"}))
+
+(*registry*/meta.set {:description ["Torus establishes automated market makers for fungible assets (see `convex.fungible`)."
+                                    "It creates singleton CVX/Token trading pairs for each fungible asset."]
+                      :name        "Torus exchange"})
 
 
 ;; TODO. Add docstrings to library functions.

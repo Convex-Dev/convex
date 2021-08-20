@@ -1,14 +1,9 @@
-(do
+ (defn accept 
 
-  (defn accept 
-    ^{:doc {:description "Accepts a message and offered assets."
-            :examples [{:code "(call messenger (accept message-id))"}]
-            :type :function
-            :signature [{:params [token holder]}]}
-      }
-      [message-id]
-    )
+  ^{:callable? true
+    :doc       {:description "Accepts a message and offered assets."
+                :examples    [{:code "(call messenger (accept message-id))"}]
+                :signature   [{:params [token holder]}]}}
+  [message-id]
 
-
-  (export accept)
-)
+  )

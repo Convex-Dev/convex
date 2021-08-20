@@ -1,10 +1,9 @@
 'convex.trusted-oracle.actor
 
 
-(call *registry*
-      (register {:description ["Default actor used by `convex.trusted-oracle`."
-                               "Go there for more information about this implementation."]
-                 :name        "Trusted oracle actor implementation"}))
+(*registry*/meta.set {:description ["Default actor used by `convex.trusted-oracle`."
+                                    "Go there for more information about this implementation."]
+                      :name        "Trusted oracle actor implementation"})
 
 
 ;;;;;;;;;; Values

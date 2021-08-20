@@ -558,7 +558,7 @@ public class Core {
 
 	public static final AFn<ACell> QUASIQUOTE_EXPANDER = reg(Compiler.QUASIQUOTE_EXPANDER);
 
-	public static final CoreFn<CVMBool> EXPORTS_Q = reg(new CoreFn<>(Symbols.EXPORTS_Q) {
+	public static final CoreFn<CVMBool> CALLABLE_Q = reg(new CoreFn<>(Symbols.CALLABLE_Q) {
 		@SuppressWarnings("unchecked")
 		@Override
 		public Context<CVMBool> invoke(Context context, ACell[] args) {
@@ -2369,12 +2369,13 @@ public class Core {
 	 * @throws IOException
 	 */
 	private static Context<?> registerCoreCode(AHashMap<Symbol, ACell> env) throws IOException {
-		// we use a fake State to build the initial environment with core address
-		Address ADDR=Address.ZERO;
-		State state = State.EMPTY.putAccount(ADDR,AccountStatus.createActor());
+
+		//Awe use a fake state to build the initial environment with core address.
+		Address ADDR = Address.ZERO;
+		State state = State.EMPTY.putAccount(ADDR, AccountStatus.createActor());
 		Context<?> ctx = Context.createFake(state, ADDR);
 
-		// Map in forms from env
+		// Map in forms from env.
 		for (Map.Entry<Symbol,ACell> me : env.entrySet()) {
 			ctx=ctx.define(me.getKey(), me.getValue());
 		}
@@ -2385,64 +2386,63 @@ public class Core {
 		AList<ACell> forms = Reader.readAll(Utils.readResourceAsString("convex/core.cvx"));
 		for (ACell f : forms) {
 			form = f;
-			ctx=ctx.expandCompile(form);
+			ctx = ctx.expandCompile(form);
 			if (ctx.isExceptional()) {
-				throw new Error("Error compiling form: "+ form+ "\nException : "+ ctx.getExceptional());
+				throw new Error("Error compiling form: " + form + "\nException : " + ctx.getExceptional());
 			}
-			AOp<?> op=(AOp<?>) ctx.getResult();
+			AOp<?> op = (AOp<?>)ctx.getResult();
 			ctx = ctx.execute(op);
 			// System.out.println("Core compilation juice: "+ctx.getJuice());
 			assert (!ctx.isExceptional()) : "Error executing op: "+ op+ "\nException : "+ ctx.getExceptional().toString();
-
 		}
 
 		return ctx;
 	}
 
-	@SuppressWarnings("unchecked")
-	private static Context<?> applyDocumentation(Context<?> ctx) throws IOException {
-		AMap<Symbol, AHashMap<ACell, ACell>> m = Reader.read(Utils.readResourceAsString("convex/core/metadata.cvx"));
-		for (Map.Entry<Symbol, AHashMap<ACell, ACell>> de : m.entrySet()) {
-			try {
-				Symbol sym = de.getKey();
-				AHashMap<ACell, ACell> docMeta = de.getValue();
-				MapEntry<Symbol, AHashMap<ACell,ACell>> metaEntry=ctx.getMetadata().getEntry(sym);
-				MapEntry<Symbol, ACell> valueEntry=ctx.getEnvironment().getEntry(sym);
+ 	@SuppressWarnings("unchecked")
+ 	private static Context<?> applyDocumentation(Context<?> ctx) throws IOException {
 
-				if (valueEntry == null) {
-					// No existing value. Might be a special
-					AHashMap<Keyword, ACell> doc=(AHashMap<Keyword, ACell>) docMeta.get(Keywords.DOC);
-					if (doc==null) {
-						// no docs
-						System.err.println("CORE WARNING: Missing :doc tag in metadata for: " + sym);
-						continue;
-					} else {
-						if (Keywords.SPECIAL.equals(doc.get(Keywords.TYPE))) {
-							// create a fake entry for special symbols
-							ctx=ctx.define(sym, sym);
-							valueEntry=MapEntry.create(sym, sym);
-						} else {
-							System.err.println("CORE WARNING: Documentation for non-existent core symbol: " + sym);
-							continue;
-						}
-					}
-				}
+ 		AMap<Symbol, AHashMap<ACell, ACell>> metas = Reader.read(Utils.readResourceAsString("convex/core/metadata.cvx"));
 
-				AHashMap<ACell, ACell> oldMeta = (metaEntry==null)?null:metaEntry.getValue();
-				AHashMap<ACell, ACell> newMeta = (oldMeta==null)?docMeta:oldMeta.merge(docMeta);
-				ACell v=valueEntry.getValue();
-				Syntax newSyn=Syntax.create(sym,newMeta);
-				ctx = ctx.defineWithSyntax(newSyn, v);
-			} catch (Throwable t) {
-				throw new Error("Error applying documentation: "+de,t);
-			}
-		}
+ 		for (Map.Entry<Symbol, AHashMap<ACell, ACell>> entry : metas.entrySet()) {
+ 			try {
+ 				Symbol sym = entry.getKey();
+ 				AHashMap<ACell, ACell> meta = entry.getValue();
+ 				MapEntry<Symbol, ACell> definedEntry = ctx.getEnvironment().getEntry(sym);
+ 
+ 				if (definedEntry == null) {
+ 					// No existing value, might be a special.
+ 					AHashMap<Keyword, ACell> doc = (AHashMap<Keyword, ACell>) meta.get(Keywords.DOC);
+ 					if (doc == null) {
+ 						// No docs.
+ 						System.err.println("CORE WARNING: Missing :doc tag in metadata for: " + sym);
+ 						continue;
+ 					} else {
+ 						if (meta.get(Keywords.SPECIAL_Q) == CVMBool.TRUE) {
+ 							// Create a fake entry for special symbols.
+ 							ctx=ctx.define(sym, sym);
+ 							definedEntry = MapEntry.create(sym, sym);
+ 						} else {
+ 							System.err.println("CORE WARNING: Documentation for non-existent core symbol: " + sym);
+ 							continue;
+ 						}
+ 					}
+ 				}
+ 
+ 				ctx = ctx.defineWithSyntax(Syntax.create(sym, meta), definedEntry.getValue());
+ 			} catch (Throwable ex) {
+ 				throw new Error("Error applying documentation:  " + entry, ex);
+ 			}
+ 		}
+ 
+ 		return ctx;
+ 	}
 
-		return ctx;
-	}
+
+
 
 	static {
-		// Set up convex.core environment
+		// Set up `convex.core` environment
 		AHashMap<Symbol, ACell> coreEnv = Maps.empty();
 		AHashMap<Symbol, AHashMap<ACell,ACell>> coreMeta = Maps.empty();
 
@@ -2465,7 +2465,5 @@ public class Core {
 			e.printStackTrace();
 			throw new Error("Error initialising core!",e);
 		}
-
-
 	}
 }

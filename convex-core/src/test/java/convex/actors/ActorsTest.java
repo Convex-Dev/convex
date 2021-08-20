@@ -33,15 +33,15 @@ import convex.core.util.Utils;
 public class ActorsTest {
 
 	@Test public void testDeployAndCall() {
-		Context<?> ctx=TestState.step("(def caddr (deploy '(let [n 10] (defn getter [] n) (defn hidden [] nil) (defn plus [x] (+ n x)) (export getter plus))))");
+		Context<?> ctx=TestState.step("(def caddr (deploy '(let [n 10] (defn getter ^{:callable? true} [] n) (defn hidden [] nil) (defn plus ^{:callable? true} [x] (+ n x)))))");
 
 		assertEquals(Address.class,ctx.getResult().getClass());
 
 		assertEquals(10L,evalL(ctx,"(call caddr (getter))"));
 		assertEquals(14L,evalL(ctx,"(call caddr (plus 4))"));
 
-		assertFalse(evalB(ctx,"(exports? caddr 'foo)"));
-		assertTrue(evalB(ctx,"(exports? caddr 'getter)"));
+		assertFalse(evalB(ctx,"(callable? caddr 'foo)"));
+		assertTrue(evalB(ctx,"(callable? caddr 'getter)"));
 
 		assertStateError(step(ctx,"(call caddr (bad-symbol 2))"));
 		assertStateError(step(ctx,"(call caddr (hidden 2))"));
@@ -63,7 +63,7 @@ public class ActorsTest {
 	}
 
 	@Test public void testUserAsActor() {
-		Context<?> ctx=step("(do (defn foo [] *caller*) (defn bar [] nil) (def z 1) (export foo z))");
+		Context<?> ctx=step("(do (defn foo ^{:callable? true} [] *caller*) (defn bar [] nil) (def z 1))");
 		assertEquals(InitTest.HERO,eval(ctx,"(call *address* (foo))"));
 		assertStateError(step(ctx,"(call *address* (non-existent-function))"));
 		assertStateError(step(ctx,"(call *address* (bar))"));
@@ -72,7 +72,7 @@ public class ActorsTest {
 
 	@Test public void testNotActor() {
 		assertFalse(evalB("(actor? *address*)"));
-		assertFalse(evalB("(exports? *address* 'foo)"));
+		assertFalse(evalB("(callable? *address* 'foo)"));
 		assertStateError(TestState.step("(call *address* (not-a-function))"));
 	}
 
@@ -81,7 +81,7 @@ public class ActorsTest {
 		Address a=(Address) ctx.getResult();
 		assertNotNull(a);
 
-		assertFalse(evalB(ctx,"(exports? caddr 'foo)"));
+		assertFalse(evalB(ctx,"(callable? caddr 'foo)"));
 
 		assertEquals(Core.COUNT,ctx.lookup(Symbols.COUNT).getValue());
 		assertNull(ctx.getAccountStatus(a).getEnvironmentValue(Symbols.FOO));

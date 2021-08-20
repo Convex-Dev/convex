@@ -1,13 +1,19 @@
-;; a mostly stateless smart contract that allows deposits from any account
+;; A mostly stateless smart contract that allows deposits from any account
 ;; and a full withdrawal by anyone. A public charity box.
+;;
 (fn [] 
     
-  ;; deposit function accepts any offer
-  (defn deposit [] 
+  ;; Deposit function accepts any offer.
+  ;;
+  (defn deposit
+   ^{:callable? true}
+   [] 
    (accept *offer*))
   
-  ;; withdraw function sends the caller the complete balance
-  (defn withdraw []
-    (transfer *caller* *balance*))
-  
-  (export deposit withdraw))
+
+  ;; Withdraw function sends the caller the complete balance.
+  ;;
+  (defn withdraw
+    ^{:callable? true}
+    []
+    (transfer *caller* *balance*)))

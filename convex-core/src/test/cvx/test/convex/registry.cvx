@@ -15,11 +15,10 @@
      (deploy (concat ['do]
                      $/*result*
                      `[(do
-                         (def cns-database
+                         (def cns.database
                               {})
                          (def trust
-                              ~(call *registry*
-                                     (cns-resolve 'convex.trust))))])))
+                              ~(*registry*/cns.resolve 'convex.trust)))])))
 
 
 
@@ -43,24 +42,26 @@
 
   (T/group '((T/path.conj 'convex.registry)
 
-             (T/trx '(nil? (call registry
-                                 (cns-resolve 'some.name)))
+             (T/trx '(nil? (registry/cns.resolve 'some.name))
                     {:description "Not found."})
 
-             (def addr
-                  (deploy nil))
+			 (T/trx '(address? (def addr
+									(deploy `(~registry/meta.set 42))))
+			        {:description "Actor deployed with metadata."})
+
+			 (T/trx '(= 42
+					    (registry/meta.get addr))
+			        {:description "Actor metadata retrieved."})
 
              (T/trx `(= [addr
                          *address*]
-                        (get (call registry
-                                   (cns-update 'some.name
-                                               addr))
+                        (get (registry/cns.update 'some.name
+							                      addr)
                              'some.name))
                     {:description "Registering address."})
 
              (T/trx '(= addr
-                        (call registry
-                              (cns-resolve 'some.name)))
+                        (registry/cns.resolve 'some.name))
                     {:description "Address registered."})
 
              (def addr-2
@@ -69,9 +70,8 @@
 
              (T/trx '(= [addr-2
                          *address*]
-                        (get (call registry
-                                   (cns-update 'some.name
-                                               addr-2))
+                        (get (registry/cns.update 'some.name
+                                                  addr-2)
                              'some.name))
                     {:description "Controller can update name."})
 
@@ -80,63 +80,59 @@
 
              (T/fail.code #{:TRUST}
                           `(eval-as villain
-                                    '(call ~registry
-                                           (cns-update 'some.name
-                                                       *address*)))
+                                    '(~registry/cns.update 'some.name
+                                                           *address*))
                           {:description "Cannot update existing name unless controller."})
 
              (T/trx '(= addr-2
-                        (call registry
-                              (cns-resolve 'some.name)))
+                        (registry/cns.resolve 'some.name))
                     {:description "Original mapping left intact."})
 
              (T/trx '(= [addr-2
                          villain]
-                        (get (call registry
-                                   (cns-control 'some.name
-                                                villain))
+                        (get (registry/cns.control 'some.name
+                                                   villain)
                              'some.name))
                     {:description "Control transfered."})
 
              (T/fail.code #{:TRUST}
-                          '(call registry
-                                 (cns-update 'some.name
-                                             addr))
+                          '(registry/cns.update 'some.name
+                                                addr)
                           {:description "Cannot update after transferring control."})
 
              (T/fail.code #{:TRUST}
-                          '(call registry
-                                 (cns-control 'some.name
-                                              *address*))
+                          '(registry/cns.control 'some.name
+                                                 *address*)
                           {:description "Cannot transfer control when control is lost."})
 
              (T/trx '(= [addr
                          villain]
                         (get (eval-as villain
-                                      `(call ~registry
-                                             (cns-update 'some.name
-                                                         ~addr)))
+                                      `(~registry/cns.update 'some.name
+                                                             ~addr))
                              'some.name))
                     {:description "Villain can update after gaining control."})
 
              (T/trx '(= addr
-                        (call registry
-                              (cns-resolve 'some.name)))
+                        (registry/cns.resolve 'some.name))
                     {:description "Villain updated."})
 
              (T/trx '(= [addr-2
                          villain]
                         (get (eval-as villain
-                                      `(call ~registry
-                                             (cns-update 'another.name
-                                                         ~addr-2)))
+                                      `(~registry/cns.update 'another.name
+                                                             ~addr-2))
                              'another.name))
                     {:description "Villain can create new mapping."})
 
              (T/trx '(= addr-2
-                        (call registry
-                              (cns-resolve 'another.name)))
-                    {:description "Villain created new mapping."}))))
+                        (registry/cns.resolve 'another.name))
+                    {:description "Villain created new mapping."})
+
+			 (T/fail.code #{:NOBODY}
+			              '(registry/cns.update 'foo.bar
+							                    #4242424242)
+						  {:description "Cannot register a nonexistent account."}))))
 
 
 ;;;

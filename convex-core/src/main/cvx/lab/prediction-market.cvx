@@ -13,14 +13,18 @@
 	  ;; NOTE: total current bonded value is the balance of this contract
 	  
 	  ;; Bonding curve function for a given map of stakes
-	  (defn bond [stks]
+	  (defn bond
+        ^{:callable? true}
+        [stks]
 	    (let [sxx (reduce (fn [acc [k v]] (let [x (double v)] (+ acc (* x x)))) 0.0 stks)]
 	      (sqrt sxx)))
 	  
 	  ;; Adjust stake on an outcome
 	  ;; must be called with a sufficient offer to fund any increase
 	  ;; returns positive cost of increased stake, or negative refund of reduced stake
-	  (defn stake [outcome new-stake]
+	  (defn stake
+        ^{:callable? true}
+        [outcome new-stake]
 	    (assert (contains-key? stakes outcome) (>= new-stake 0))
 	    
 	    (let [old-stake (or (get (stakes outcome) *caller*) 0)
@@ -42,14 +46,18 @@
 	      dval))
 	  
 	  ;; Get the effective price for an outcome. May be NaN if no balance at all.
-	  (defn price [outcome]
+	  (defn price
+        ^{:callable? true}
+        [outcome]
 	    (when-not (contains-key? totals outcome) (return il))
 	    (let [tstk (double (totals outcome))
 	          bal (double *balance*)]
 	      (/ (* tstk tstk) (* bal bal))))
 	  
 	  ;; Get the collection of possible outcomes
-	  (defn get-outcomes [data]
+	  (defn get-outcomes
+        ^{:callable? true}
+        [data]
 	    outcomes)
 	  
 	  ;; final outcome
@@ -57,7 +65,9 @@
 	  (def final-flag false)
 	  
 	  ;; Check if contract is finalised
-	  (defn finalized? []
+	  (defn finalized?
+        ^{:callable? true}
+        []
 	    (when final-flag (return true))
 	    (cond (call oracle (finalized? oracle-key)) :OK (return false))
 	    
@@ -75,7 +85,9 @@
 	  
 	  ;; call to claim payout
 	  ;; returns amount paid out, or null if not yet finalised
-	  (defn payout []
+	  (defn payout
+        ^{:callable? true}
+        []
 	    (if (finalized?) :OK (return nil))
 	    (when-not (contains-key? totals final-outcome) (return (refund)))
 	    (let [total (double (totals final-outcome)) ;; total stake on winning outcome
@@ -85,7 +97,4 @@
 	      (def stakes (assoc stakes final-outcome (dissoc fo-stakes *caller*)))
 	      (transfer *caller* quota)
 	      quota))
-	    
-	  (export get-outcomes bond stake price finalized? payout stakes totals)
-	  
 	  )
