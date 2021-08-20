@@ -32,6 +32,11 @@ public class ANTLRTest {
 	private <R extends ACell> R read(String s) {
 		return (R) AntlrReader.read(s);
 	}
+	
+	@SuppressWarnings("unchecked")
+	private <R extends ACell> R readAll(String s) {
+		return (R) AntlrReader.readAll(s);
+	}
 
 	@Test public void testNil() {
 		assertNull(read("nil"));
@@ -119,8 +124,11 @@ public class ANTLRTest {
 	}
 	
 	@Test public void testReadAll() {
-		assertSame(Lists.empty(),AntlrReader.readAll(""));
-		assertEquals(Lists.of(1,2),AntlrReader.readAll(" 1 2 "));
+		assertSame(Lists.empty(),readAll(""));
+		assertEquals(Lists.of(1,2),readAll(" 1 2 "));
+		
+		assertThrows(ParseException.class,()->readAll("1 2 ("));
+
 	}
 	
 	@Test public void testPath() {
