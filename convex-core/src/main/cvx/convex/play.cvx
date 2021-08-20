@@ -1,13 +1,14 @@
 'convex.play
 
 
-(*registry*/meta.set {:description ["Provides a playable environment, akin to a text game, where transactions are actually interpreted by an actor."
-                                    "Based on `*lang*`."
-                                    "User can always send a transaction `stop` to stop the playable environment and resume normal transaction processing."
-                                    "Actor must define callable functions:"
-                                    "- `(command trx)`, takes a transaction and do any arbitrary operation, returns a displayable message or nil to stop"
-                                    "- `(start)`, for initializing the environment"]
-                      :name        "Playable environment library"})
+(call *registry*
+      (register {:description ["Provides a playable environment, akin to a text game, where transactions are actually interpreted by an actor."
+                               "Based on `*lang*`."
+                               "User can always send a transaction `stop` to stop the playable environment and resume normal transaction processing."
+                               "Actor must define callable functions:"
+                               "- `(command trx)`, takes a transaction and do any arbitrary operation, returns a displayable message or nil to stop"
+                               "- `(start)`, for initializing the environment"]
+                 :name        "Playable environment library"}))
 
 
 ;;

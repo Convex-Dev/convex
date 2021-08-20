@@ -1,9 +1,9 @@
 'asset.box.actor
 
-
-(*registry*/meta.set {:description ["Default actor for `asset.box`."
-                                    "Implements callable functions for `asset.box` and `convex.asset`."]
-                      :name        "Asset box actor."})
+(call *registry*
+      (register {:description ["Default actor for `asset.box`."
+                               "Implements callable functions for `asset.box` and `convex.asset`."]
+                 :name        "Asset box actor."}))
 
 
 ;;;;;;;;;; Setup

@@ -1,12 +1,12 @@
 'asset.box
 
-
-(*registry*/meta.set {:description ["A box acts as a holder of arbitrary assets, bundling them together."
-                                    "Assets are described in `convex.asset` and created using accounts such as `convex.fungible`."
-                                    "The owner of the box has exclusive rights to put assets in or take assets out."
-                                    "The box itself is an asset with the designator `[box-actor id]`."
-                                    "This library uses `asset.box.actor` as default actor. An alternative implementation can be provided if required."]
-                      :name        "Asset box API."})
+(call *registry*
+      (register {:description ["A box acts as a holder of arbitrary assets, bundling them together."
+                               "Assets are described in `convex.asset` and created using accounts such as `convex.fungible`."
+                               "The owner of the box has exclusive rights to put assets in or take assets out."
+                               "The box itself is an asset with the designator `[box-actor id]`."
+                               "This library uses `asset.box.actor` as default actor. An alternative implementation can be provided if required."]
+                 :name        "Asset box API."}))
 
 
 ;;;;;;;;;; Setup
