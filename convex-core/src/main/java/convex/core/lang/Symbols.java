@@ -104,8 +104,7 @@ public class Symbols {
 	public static final Symbol HALT = Symbol.create("halt");
 	public static final Symbol ROLLBACK = Symbol.create("rollback");
 
-	public static final Symbol EXPORT = Symbol.create("export");
-	public static final Symbol EXPORTS_Q = Symbol.create("exports?");
+	public static final Symbol CALLABLE_Q = Symbol.create("callable?");
 	public static final Symbol DEPLOY = Symbol.create("deploy");
 	public static final Symbol DEPLOY_ONCE = Symbol.create("deploy-once");
 

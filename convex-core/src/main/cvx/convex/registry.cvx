@@ -21,7 +21,8 @@
 
 ;;;;;;;;;; Values
 
-(def cns-database
+
+(def cns.database
 
   ^{:private? true}
 
@@ -40,28 +41,37 @@
   (address (inc (long *address*))))
 
 
-;;;;;;;;;; Callable API - Metadata
+;;;;;;;;;; Address metadata
 
 
-(defn lookup
+(defn -meta.get
 
   ^{:callable? true
-    :doc       {:description "Looks up registry metadata for a given address."
-                :examples    [{:code "(call *registry* (lookup somebody)"}]
-                :signature   [{:params [addr]}]}}
+    :private?  true}
 
   [addr]
 
-  (get-holding (address addr)))
+  (get-holding addr))
 
 
 
-(defn register
+(defn meta.get
+
+  ^{:doc {:description "Returns metadata for the given address."
+          :examples    [{:code "(*registry*/meta.get #8"}]
+          :signature   [{:params [address]}]}}
+
+  [addr]
+
+  (call ~*address*
+        (-meta.get addr)))
+
+
+
+(defn -meta.set
 
   ^{:callable? true
-    :doc       {:description "Registers metadata for the *caller* account. Metadata can be an arbitrary value, but by convention is a map with defined fields."
-                :examples    [{:code "(call *registry* (register  {:name \"My Name\"})"}]
-                :signature   [{:params [metadata]}]}}
+    :private?  true}
 
   [data]
 
@@ -69,19 +79,31 @@
                data))
 
 
-;;;;;;;;;; Callable API - Convex Name Service
+
+(defn meta.set
+
+  ^{:doc {:description ["Registers metadata for the calling account. Metadata can be an arbitrary value, but by convention is a map with defined fields."
+                        "Stored in `*holdings*` of the calling account."]
+          :examples    [{:code "(*registry*/meta.set {:description \"Does stuff.\", :name \"My name\"})"}]
+          :signature   [{:params [metadata]}]}}
+
+  [metadata]
+
+  (call ~*address*
+        (-meta.set metadata)))
 
 
-(defn cns-control
+;;;;;;;;;; Convex Name Service
+
+
+(defn -cns.control
 
   ^{:callable? true
-    :doc       {:description "Updates a CNS name mapping to set a new controller. May only be peformed by a current controller."
-                :examples    [{:code "(call *registry* (cns-control 'my.actor trust-monitor-address)"}]
-                :signature   [{:params [name addr]}]}}
+    :private?  true}
 
   [name addr]
 
-  (let [record (get cns-database
+  (let [record (get cns.database
                     name)]
    (when (nil? record)
      (fail :STATE
@@ -90,8 +112,8 @@
                               *caller*))
      (fail :TRUST
            "Caller is not trusted with transferring control for that CNS record"))
-    (def cns-database
-         (assoc cns-database
+    (def cns.database
+         (assoc cns.database
                 name
                 (assoc record
                        1
@@ -99,40 +121,80 @@
 
 
 
-(defn cns-resolve
+(defn cns.control
+
+  ^{:doc {:description "Updates a CNS name mapping to set a new controller. May only be peformed by a current controller."
+          :examples    [{:code "(*registry*/cns.control 'my.actor.name trust-monitor-address)"}]
+          :signature   [{:params [name address]}]}}
+
+  [name addr]
+
+  (call ~*address*
+        (-cns.control name
+		              addr)))
+
+
+
+(defn -cns.resolve
 
   ^{:callable? true
-    :doc {:description "Resolves a name in the Convex Name Service."
-          :examples    [{:code "(call *registry* (cns-resolve 'convex.registry)"}]
-          :signature   [{:params [addr]}]}}
+    :private?  true}
 
   [name]
 
   (assert (symbol? name))
-  (when-let [record (get cns-database
+  (when-let [record (get cns.database
                          name)]
     (first record)))
 
 
 
-(defn cns-update
+(defn cns.resolve
+
+  ^{:doc {:description "Resolves a name in the Convex Name Service."
+          :examples    [{:code "(*registry*/cns.resolve 'convex.registry)"}]
+          :signature   [{:params [name]}]}}
+
+  [name]
+
+  (call ~*address*
+        (-cns.resolve name)))
+
+
+
+(defn -cns.update
 
   ^{:callable? true
-    :doc       {:description "Updates or adds a name mapping in the Convex Name Service. Only the owner of a CNS record may update the mapping for an existing name"
-                :examples    [{:code "(call *registry* (cns-update 'my.actor addr)"}]
-                :signature   [{:params [name addr]}]}}
+    :private?  true}
 
   [name addr]
 
-  (let [record (get cns-database
+  (let [record (get cns.database
                     name)]
     (when (and record
                (not (trust/trusted? (second record)
                                     *caller*)))
       (fail :TRUST
             "Caller is not trusted with updating the requested CNS record"))
-    (def cns-database
-         (assoc cns-database
+	(when-not (account addr)
+	  (fail :NOBODY
+	        "Can only use an existing account"))
+    (def cns.database
+         (assoc cns.database
                 name
                 [addr
                  *caller*]))))
+
+
+
+(defn cns.update
+
+  ^{:doc {:description "Updates or adds a name mapping in the Convex Name Service. Only the trusted controller of a CNS record may update the mapping for an existing name."
+          :examples    [{:code "(*registry*/cns.update 'my.actor.name new-addr)"}]
+          :signature   [{:params [name address]}]}}
+
+  [name addr]
+
+  (call ~*address*
+        (-cns.update name
+		             addr)))

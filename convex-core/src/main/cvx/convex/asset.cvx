@@ -1,25 +1,25 @@
 'convex.asset
 
-(call *registry*
-      (register {:description ["An asset is either:"
-                               "- A vector `[asset-address quantity]` indicating an asset managed by an actor"
-                               "- A map `asset-adress` -> `quantity` indicating assets managed by one or more actors"
-                               "Quantities are arbitrary and asset-specific."
-                               "For a fungible currency, quantity is the amount ; for a non-fungible token, quantity may be a set of token ids."
-                               "Key functions from this library are `balance`, `owns?`, and `transfer`."
-                               "Other functions such as `accept` and `offer` provide more fine-grained control when required."
-                               "Implementing a new asset means deploying an actor which defines the following callable functions:"
-                               "- `(accept sender quantity)`"
-                               "- `(balance owner)`"
-                               "- `(check-transfer sender receiver quantity)`"
-                               "- `(direct-transfer receiver quantity)`"
-                               "- `(get-offet sender receiver)`"
-                               "- `(offer receiver quantity`"
-                               "- `(quantity-add asset-address a b)`"
-                               "- `(quantity-sub asset-address a b)`"
-                               "- `(quantity-subset a b)` ; returns true if `a` is considered a subset of `b`"
-                               "For more information, see those functions defined in this library whose purpose is to delegate to asset implementations in a generic way."]
-                 :name        "Asset abstraction library"}))
+
+(*registry*/meta.set {:description ["An asset is either:"
+                                    "- A vector `[asset-address quantity]` indicating an asset managed by an actor"
+                                    "- A map `asset-adress` -> `quantity` indicating assets managed by one or more actors"
+                                    "Quantities are arbitrary and asset-specific."
+                                    "For a fungible currency, quantity is the amount ; for a non-fungible token, quantity may be a set of token ids."
+                                    "Key functions from this library are `balance`, `owns?`, and `transfer`."
+                                    "Other functions such as `accept` and `offer` provide more fine-grained control when required."
+                                    "Implementing a new asset means deploying an actor which defines the following callable functions:"
+                                    "- `(accept sender quantity)`"
+                                    "- `(balance owner)`"
+                                    "- `(check-transfer sender receiver quantity)`"
+                                    "- `(direct-transfer receiver quantity)`"
+                                    "- `(get-offet sender receiver)`"
+                                    "- `(offer receiver quantity`"
+                                    "- `(quantity-add asset-address a b)`"
+                                    "- `(quantity-sub asset-address a b)`"
+                                    "- `(quantity-subset a b)` ; returns true if `a` is considered a subset of `b`"
+                                    "For more information, see those functions defined in this library whose purpose is to delegate to asset implementations in a generic way."]
+                      :name        "Asset abstraction library"})
 
 
 ;;;;;;;;;; Private
@@ -160,8 +160,8 @@
      (let [[asset-address
             quantity]     asset]
        (cond
-         (exports? receiver
-                   'receive-asset)
+         (callable? receiver
+                    'receive-asset)
          (do 
            (call asset-address
                  (offer receiver

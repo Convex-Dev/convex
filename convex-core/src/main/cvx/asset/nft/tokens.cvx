@@ -1,15 +1,14 @@
-'asset.nft-tokens
+'asset.nft.tokens
 
 
-(call *registry*
-      (register {:description ["Actor for storing and handling Non-Fungible Tokens, where a token is an map containing:"
-                               "- `:creator`, address of the creator"
-                               "- `:data`, arbitrary value describing the NFT (eg. a URL)"
-                               "- `:owner`, current owner"
-                               "At creation, rights can be specified as to who can transfer, destroy, or update the NFT data in anyway (see `create-token`)."
-                               "Each NFT implements the asset interface described in `convex.asset`."
-                               "Hence, while this account offers specific functions such as `destroy-token`, all other matters are resolved using `convex.asset`."]
-                 :name        "Advanced NFT tokens creation and management"}))
+(*registry*/meta.set {:description ["Actor for storing and handling Non-Fungible Tokens, where a token is an map containing:"
+                                    "- `:creator`, address of the creator"
+                                    "- `:data`, arbitrary value describing the NFT (eg. a URL)"
+                                    "- `:owner`, current owner"
+                                    "At creation, rights can be specified as to who can transfer, destroy, or update the NFT data in anyway (see `create-token`)."
+                                    "Each NFT implements the asset interface described in `convex.asset`."
+                                    "Hence, while this account offers specific functions such as `destroy-token`, all other matters are resolved using `convex.asset`."]
+                      :name        "Advanced NFT tokens creation and management"})
 
 
 ;;
@@ -137,8 +136,8 @@
   (reduce (fn [m id]
             (let [class (get-token-class id)]
               (if (and class
-                       (exports? class
-                                 required-export))
+                       (callable? class
+                                  required-export))
                 (assoc m
                        class
                        (conj (get m
@@ -250,8 +249,8 @@
           (or (nil? policy-map-or-class)
               (map? policy-map-or-class)
               (and (actor? policy-map-or-class)
-                   (exports? policy-map-or-class
-                             'check-trusted?))))
+                   (callable? policy-map-or-class
+                              'check-trusted?))))
   (let [holdings     (or (get-holding *caller*)
                          #{})
         id           next-token-id
@@ -275,8 +274,8 @@
                  (conj holdings
                        id))
     (when (and class
-               (exports? class
-                         'create-token))
+               (callable? class
+                          'create-token))
       (call class
             (create-token *caller*
                           id
@@ -314,8 +313,8 @@
          (dissoc token-records
                  id))
     (when (and class
-               (exports? class
-                         'destroy-token))
+               (callable? class
+                          'destroy-token))
       (call class
             (destroy-token *caller*
                            id)))
@@ -425,8 +424,8 @@
                     id)
         class  (:class record)]
     (if (and class
-             (exports? class
-                       'get-uri))
+             (callable? class
+                        'get-uri))
       (call class
             (get-uri id))
       (:uri (:data record)))))
@@ -464,8 +463,8 @@
                     :data]
                    new-data))
     (when (and class
-               (exports? class
-                         'merge-token-data))
+               (callable? class
+                          'merge-token-data))
       (call class
             (merge-token-data *caller*
                               id
@@ -494,8 +493,8 @@
                     :data]
                    data))
     (when (and class
-               (exports? class
-                         'set-token-data))
+               (callable? class
+                          'set-token-data))
       (call class
             (set-token-data *caller*
                             id
