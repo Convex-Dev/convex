@@ -245,10 +245,9 @@ public class Server implements Closeable {
 				InetSocketAddress sourceAddr=Utils.toInetSocketAddress(source);
 				Convex convex=Convex.connect(sourceAddr);
 				log.info("Attempting Peer Sync with: "+sourceAddr);
-				Future<Result> statusF=convex.requestStatus();
-				long timeout=establishTimeout();
-				AVector<ACell> status=statusF.get(timeout,TimeUnit.MILLISECONDS).getValue();
-				if (status.count()!=Constants.STATUS_COUNT) {
+				long timeout = establishTimeout();
+				AVector<ACell> status = convex.requestStatusSync(timeout);
+				if (status == null || status.count()!=Constants.STATUS_COUNT) {
 					throw new Error("Bad status message from remote Peer");
 				}
 				Hash beliefHash=RT.ensureHash(status.get(0));
