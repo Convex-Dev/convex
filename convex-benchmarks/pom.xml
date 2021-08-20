@@ -10,6 +10,10 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<artifactId>convex-benchmarks</artifactId>
+	
+	<name>Convex Benchmarks</name>
+	<description>Convex Benchmark Suite</description>
+	<url>https://convex.world</url>
 
 	<build>
 		<finalName>convex-benchmarks</finalName>

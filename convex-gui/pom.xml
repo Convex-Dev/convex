@@ -9,6 +9,10 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<artifactId>convex-gui</artifactId>
+	
+	<name>Convex GUI</name>
+	<description>Convex desktop GUI and test applications</description>
+	<url>https://convex.world</url>
 
 	<build>
 		<plugins>

@@ -6,6 +6,10 @@
 	<artifactId>convex</artifactId>
 	<version>0.7.0-rc1</version>
 	<packaging>pom</packaging>
+	
+	<name>Convex Parent</name>
+	<description>Parent POM used to build core Convex modules.</description>
+	<url>https://convex.world</url>
 
 	<modules>
 		<module>convex-core</module>
@@ -25,6 +29,10 @@
 		<convex.version>${project.version}</convex.version>
 		<!--Freeze this for reproducible builds. -->
 		<project.build.outputTimestamp>2020-02-02T00:00:00Z</project.build.outputTimestamp>
+		<argLine>
+			--illegal-access=permit
+			--add-opens=java.base/java.util=ALL-UNNAMED
+		</argLine>
 	</properties>
 
 	<licenses>
