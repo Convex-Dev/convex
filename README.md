@@ -1,6 +1,6 @@
 # Convex
 
-[![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex.svg?label=Maven%20Central)](https://search.maven.org/artifact/world.convex/convex.svg)
+[![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex.svg?label=Maven%20Central)](https://search.maven.org/artifact/world.convex/convex)
 
 Convex is a decentralised network and execution engine for the Internet of Value.
 
