@@ -605,18 +605,14 @@ public class Convex {
 	 *
 	 */
 	public AVector<ACell> requestStatusSync(long timeoutMillis) throws IOException, InterruptedException, ExecutionException, TimeoutException {
-		Future<Result> statusFuture=requestStatus();
 		AVector<ACell> status = null;
 		int retryCount = 10;
-		while (retryCount > 0 ) {
+		Future<Result> statusFuture=requestStatus();
+		while (status == null && retryCount > 0 ) {
 			try {
 				status=statusFuture.get(timeoutMillis,TimeUnit.MILLISECONDS).getValue();
-				if (status != null) {
-					break;
-				}
 			} catch (MissingDataException e) {
-				acquire(e.getMissingHash()).get(timeoutMillis,TimeUnit.MILLISECONDS);
-				statusFuture=requestStatus();
+				status = (AVector<ACell>) acquire(e.getMissingHash()).get(timeoutMillis,TimeUnit.MILLISECONDS);
 			}
 			retryCount -= 1;
 		}
