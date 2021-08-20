@@ -600,10 +600,15 @@ public class Convex {
 	 * Request status using a sync operation. This request will automatically get any missing data with the status request
 	 *
 	 * @param timeoutMillis Milliseconds to wait for request timeout
-	 *
-	 * @throws IOException, InterruptedException, ExecutionException, TimeoutException
+	 * @return Status Vector from target Peer
+	 * 
+	 * @throws IOException If an IO Error occurs
+	 * @throws InterruptedException If execution is interrupted
+	 * @throws ExecutionException If a concurrent execution failure occurs
+	 * @throws TimeoutException If operation times out
 	 *
 	 */
+	@SuppressWarnings("unchecked")
 	public AVector<ACell> requestStatusSync(long timeoutMillis) throws IOException, InterruptedException, ExecutionException, TimeoutException {
 		AVector<ACell> status = null;
 		int retryCount = 10;
