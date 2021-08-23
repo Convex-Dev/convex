@@ -43,6 +43,18 @@ public class CommandLineTester {
 	}
 
 
+	public String getField(String name) {
+		String lines[] = output.split("\\r?\\n");
+		for (int index = 0; index < lines.length; index ++) {
+			String line = lines[index];
+			int position = line.indexOf(name);
+			if (position > 0) {
+				return line.substring(position + name.length());
+			}
+		}
+		return "";
+	}
+
 	public String getOutput() {
 		return output;
 	}
