@@ -1,0 +1,46 @@
+(defn suite.fungible
+
+  ^{:doc {:description ["Reusable fungability tests with the `convex.asset` interface."
+                        "Requires asset test suites account interned as `asset.test`."]}}
+
+  [token supply user]
+
+  (T/group `((T/path.conj 'suite.fungible)
+
+             (T/trx '(= ~supply
+                        (asset/balance ~token
+                                       ~user))
+                    {:description "Owns total supply."})
+
+             (T/trx '(= 0
+                        (asset/balance ~token
+                                       (deploy nil)))
+                    {:description "Newly created account has no token."})
+
+             (T/trx '(do
+                      (asset/transfer ~user
+                                      [~token
+                                       (asset/balance ~token
+                                                      ~user)])
+                      (= ~supply
+                         (asset/balance ~token
+                                        ~user)))
+                    {:description "Self-transfer does not affect balance."})
+
+             (T/trx '(do
+                       (asset/transfer ~user
+                                       [~token
+                                        nil])
+                       (= ~supply
+                          (asset/balance ~token
+                                         ~user)))
+                    {:description "Self-transfer of nothing does not affect balance."})
+
+             (asset.test/suite.main ~token
+                                    ~user
+                                    (let [user-2 ($.account/zombie)]
+                                      (asset/transfer user-2
+                                                      [~token
+                                                       (long (/ ~supply
+                                                                3))])
+                                      user-2)))))

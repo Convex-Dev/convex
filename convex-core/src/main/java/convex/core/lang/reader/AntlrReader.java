@@ -2,7 +2,6 @@ package convex.core.lang.reader;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
@@ -31,6 +30,7 @@ import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
+import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.core.lang.reader.antlr.ConvexLexer;
 import convex.core.lang.reader.antlr.ConvexListener;
@@ -390,15 +390,27 @@ public class AntlrReader {
 
 		@Override
 		public void exitPathSymbol(PathSymbolContext ctx) {
-			String s=ctx.getText();
-			String[] ss=s.split("/",2);
-			if (ss.length!=2) throw new ParseException("Expected path and symbol but got: "+ Arrays.toString(ss));
-			ACell exp=(ss[0].startsWith("#"))?Address.parse(ss[0]):Symbol.create(ss[0]);
-			if (exp==null) throw new ParseException("Expected path to be a Symbol or Address but got: "+ ss[0]);
-			// System.out.println(elements);
-			Symbol sym=Symbol.create(ss[1]);
-			if (sym==null) throw new ParseException("Not a valid Symbol");
-			AList<ACell> lookup=Lists.of(Symbols.LOOKUP,exp,sym);
+			String matchString=ctx.getText();
+			String[] ss=matchString.split("/",-1); // negative limit keeps empty values in cases like `#0//`
+			int n=ss.length;
+			if (n<2) {
+				throw new ParseException("Expected followed by symbol but got: ["+ matchString+"]");
+			}
+			
+			ACell lookup=(ss[0].startsWith("#"))?Address.parse(ss[0]):Symbol.create(ss[0]);;
+			if (lookup==null) throw new ParseException("Path must start with Addres or Symbol");
+			
+			for (int i=1; i<n; i++) {
+				String s=ss[i];
+				if ((s.length()==0)&&(i<(n-1))) {
+					// Must be a `/` starting symbol
+					s="/"+ss[++i]; // append and advance
+				}
+				Symbol sym=Symbol.create(s);
+				if (sym==null) throw new ParseException("Expected path element to be a symbol but got: "+ RT.getType(sym));
+				// System.out.println(elements);
+				lookup=Lists.of(Symbols.LOOKUP,lookup,sym);
+			}
 			push(lookup);
 		}
 

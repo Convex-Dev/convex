@@ -1,0 +1,80 @@
+'convex.play
+
+
+(call *registry*
+      (register {:description ["Provides a playable environment, akin to a text game, where transactions are actually interpreted by an actor."
+                               "Based on `*lang*`."
+                               "User can always send a transaction `stop` to stop the playable environment and resume normal transaction processing."
+                               "Actor must define callable functions:"
+                               "- `(command trx)`, takes a transaction and do any arbitrary operation, returns a displayable message or nil to stop"
+                               "- `(start)`, for initializing the environment"]
+                 :name        "Playable environment library"}))
+
+
+;;
+;;
+;; The intention of this library is to provide tools to safely delegate command execution to an actor
+;; which can intrepret user input as a custom language.
+;;
+;; Safety measures:
+;; - All actor commands executed in the actor's environment: cannot control or modify user account
+;; - User can always type `stop` to stop, avoids getting locked
+;;
+;;
+
+
+;;;;;;;;;; Private API
+
+
+
+(defn -stop
+
+  ^{:private? true}
+
+  ;; Private because unreachable:
+  ;;
+  ;;   - User most likely cannot reach because transactions are interpreted by actor
+  ;;   - Actor cannot reach because it would define `*lang*` in its environment, not user's
+
+  []
+
+  (undef *lang*)
+  "Stop.")
+
+
+;;;;;;;;;; Public API
+
+
+(defn runner
+
+  ^{:doc {:description ["Returns a function that can be set to `*lang*` and which calls the `command` function on `actor` with each transaction."
+                        "User can always transact `stop` to remove it from `*lang*` and resume normal transaction processing."]
+          :examples    [{:code "(runner #1234)"}]
+          :signature   [{:params [actor]}]}}
+
+  [actor]
+
+  (fn [trx]
+    (if (= trx
+           'stop)
+      (-stop)
+      (let [result (call actor
+                         (command trx))]
+        (if (nil? result)
+          (-stop)
+          result)))))
+
+
+
+(defn start
+
+  ^{:doc {:description "Prepares `*lang*` using `runner` and then calls `start` on `actor` to launch the playable environment."
+          :examples    [{:code "(start #1234)"}]
+          :signature   [{:params [actor]}]}}
+
+  [actor]
+
+  (def *lang*
+       (runner actor))
+  (call actor
+        (start)))

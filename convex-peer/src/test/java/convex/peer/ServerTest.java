@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
 import convex.core.Belief;
+import convex.core.Coin;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.State;
@@ -34,6 +35,8 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Hash;
+import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
@@ -52,9 +55,10 @@ import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.net.Message;
 import convex.net.ResultConsumer;
+import etch.EtchStore;
 
 /**
- * Tests for a fresh standalone server instance
+ * Tests for a fresh standalone server cluster instance
  */
 public class ServerTest {
 
@@ -198,6 +202,54 @@ public class ServerTest {
 	}
 
 	@Test
+	public void testJoinNetwork() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
+		AKeyPair kp=AKeyPair.generate();
+		AccountKey peerKey=kp.getAccountKey();
+
+
+		long STAKE=1000000000;
+		synchronized(ServerTest.SERVER) {
+			Convex heroConvex=CONVEX;
+
+			// Create new peer controller account
+			Address controller=heroConvex.createAccountSync(kp.getAccountKey());
+			Result trans=heroConvex.transferSync(controller,Coin.DIAMOND);
+			assertFalse(trans.isError());
+
+			// create test user account
+			Address user=heroConvex.createAccountSync(kp.getAccountKey());
+			trans=heroConvex.transferSync(user,STAKE);
+			assertFalse(trans.isError());
+
+			Convex convex=Convex.connect(SERVER.getHostAddress(), controller, kp);
+			trans=convex.transactSync(Invoke.create(controller, 0, "(create-peer "+peerKey+" "+STAKE+")"));
+			assertEquals(RT.cvm(STAKE),trans.getValue());
+			//Thread.sleep(1000); // sleep a bit to allow background stuff
+
+			HashMap<Keyword,Object> config=new HashMap<>();
+			config.put(Keywords.KEYPAIR,kp);
+			config.put(Keywords.STORE,EtchStore.createTemp());
+			config.put(Keywords.SOURCE,ServerTest.SERVER.getHostAddress());
+
+			Server newServer=API.launchPeer(config);
+
+			// make peer connections directly
+			newServer.getConnectionManager().connectToPeer(SERVER.getHostAddress());
+			SERVER.getConnectionManager().connectToPeer(newServer.getHostAddress());
+
+			// should be in consensus at this point since just synced
+			// note: shouldn't matter which is the current store
+			assertEquals(newServer.getPeer().getConsensusState(),SERVER.getPeer().getConsensusState());
+
+			Convex client=Convex.connect(newServer.getHostAddress(), user, kp);
+			assertEquals(user,client.transactSync(Invoke.create(user, 0, "*address*")).getValue());
+
+			Result r=client.requestStatus().get(1000,TimeUnit.MILLISECONDS);
+			assertFalse(r.isError());
+		}
+	}
+
+	@Test
 	public void testAcquireBelief() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
 		synchronized(ServerTest.SERVER) {
 
@@ -213,6 +265,17 @@ public class ServerTest {
 			SignedData<Belief> ab=acquiror.get(10000,TimeUnit.MILLISECONDS);
 			assertTrue(ab.getValue() instanceof Belief);
 			assertEquals(h,ab.getHash());
+		}
+	}
+
+	@Test
+	public void testAcquireState() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
+		synchronized(ServerTest.SERVER) {
+
+			Convex convex=CONVEX;
+
+			State s=convex.acquireState().get(60000,TimeUnit.MILLISECONDS);
+			assertTrue(s instanceof State);
 		}
 	}
 

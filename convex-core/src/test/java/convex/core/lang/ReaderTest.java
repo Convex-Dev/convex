@@ -77,9 +77,9 @@ public class ReaderTest {
 		// Interpret leading dot as symbols always. Addresses Issue #65
 		assertEquals(Symbol.create(".56"), Reader.read(".56"));
 
-		
+		// TODO: maybe this should be possible?
 		// namespaces cannot themselves be qualified
-		assertThrows(ParseException.class,()->Reader.read("a/b/c"));
+		//assertThrows(ParseException.class,()->Reader.read("a/b/c"));
 		
 		// Bad address parsing
 		assertThrows(ParseException.class,()->Reader.read("#-1/foo"));
@@ -89,6 +89,12 @@ public class ReaderTest {
 		assertThrows(ParseException.class,()->Reader.read("abcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnop/a"));
 		assertThrows(ParseException.class,()->Reader.read("a/abcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnop"));
 
+	}
+	
+	@Test 
+	public void testSymbolPath() {
+		ACell form=Reader.read("foo/bar/baz");
+		assertEquals(Lists.of(Symbols.LOOKUP,Lists.of(Symbols.LOOKUP,Symbols.FOO,Symbols.BAR),Symbols.BAZ),form) ;
 	}
 
 	@Test
@@ -249,5 +255,19 @@ public class ReaderTest {
 			assertCVMEquals(2L, form.getMeta().get(Keywords.FOO));
 		}
 
+	}
+	
+	@Test public void testIdempotentPrint() {
+		doIdempotencyTest(Address.create(12345));
+		doIdempotencyTest(Samples.LONG_MAP_10);
+		doIdempotencyTest(Samples.BAD_HASH);
+		doIdempotencyTest(Samples.MAX_EMBEDDED_STRING);
+		doIdempotencyTest(Reader.readAll("(def ^{:foo 2} a 1)"));
+		doIdempotencyTest(Reader.readAll("(fn ^{:foo 2} [] bar/baz)"));
+	}
+	
+	public void doIdempotencyTest(ACell cell) {
+		String s=cell.print();
+		assertEquals(s,Reader.read(s).print());
 	}
 }

@@ -4,10 +4,12 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.UnresolvedAddressException;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
@@ -15,6 +17,7 @@ import org.slf4j.LoggerFactory;
 
 
 import convex.api.Convex;
+import convex.core.Belief;
 import convex.core.Constants;
 import convex.core.Peer;
 import convex.core.Result;
@@ -49,6 +52,12 @@ public class ConnectionManager {
 	 * Pause for each iteration of Server connection loop.
 	 */
 	static final long SERVER_CONNECTION_PAUSE = 1000;
+
+	/**
+	 * Pause for each iteration of Server connection loop.
+	 */
+	static final long SERVER_POLL_DELAY = 2000;
+
 
 	protected final Server server;
 	private final HashMap<AccountKey,Connection> connections = new HashMap<>();
@@ -85,6 +94,7 @@ public class ConnectionManager {
 					Thread.sleep(ConnectionManager.SERVER_CONNECTION_PAUSE);
 					makePlannedConnections();
 					maintainConnections();
+					pollBelief();
 					lastUpdate=Utils.getCurrentTimestamp();
 				}
 			} catch (InterruptedException e) {
@@ -98,6 +108,38 @@ public class ConnectionManager {
 			}
 		}
 	};
+
+	/**
+	 * Celled by the connection manager to ensure we are tracking latest Beliefs on the network
+	 */
+	private void pollBelief() {
+		try {
+			long lastConsensus=server.getPeer().getConsensusState().getTimeStamp().longValue();
+			if (lastConsensus+SERVER_POLL_DELAY>=lastUpdate) return;
+
+			ArrayList<Connection> conns=new ArrayList<>(connections.values());
+			if (conns.size()==0) {
+				// Nothing to do
+				// log.debug("No connections available to poll!");
+				return;
+			}
+			Connection c=conns.get(random.nextInt(conns.size()));
+			if (c.isClosed()) return;
+			Convex convex=Convex.connect(c.getRemoteAddress());
+			try {
+				Future<Result> r=convex.requestStatus();
+				AVector<ACell> status=r.get(1000,TimeUnit.MILLISECONDS).getValue();
+				Hash h=RT.ensureHash(status.get(0));
+				@SuppressWarnings("unchecked")
+				SignedData<Belief> sb=(SignedData<Belief>) convex.acquire(h).get(10000,TimeUnit.MILLISECONDS);
+				server.queueEvent(sb);
+			} finally {
+				convex.close();
+			}
+		} catch (Throwable t) {
+			log.warn("Polling failed: {}",t);
+		}
+	}
 
 	private void makePlannedConnections() {
 		synchronized(plannedConnections) {
@@ -334,7 +376,7 @@ public class ConnectionManager {
 				log.debug("challenge data incorrect number of items should be 3 not ",RT.count(challengeValues));
 				return;
 			}
-			Connection pc = m.getPeerConnection();
+			Connection pc = m.getConnection();
 			if ( pc == null) {
 				log.warn( "No remote peer connection from challenge");
 				return;
@@ -391,7 +433,7 @@ public class ConnectionManager {
 		try {
 			SignedData<ACell> signedData = m.getPayload();
 
-			log.debug( "Processing response request from: {}",m.getPeerConnection().getRemoteAddress());
+			log.debug( "Processing response request from: {}",m.getConnection().getRemoteAddress());
 
 			@SuppressWarnings("unchecked")
 			AVector<ACell> responseValues = (AVector<ACell>) signedData.getValue();
@@ -539,9 +581,12 @@ public class ConnectionManager {
 			// Temp client connection
 			Convex convex=Convex.connect(hostAddress);
 
-			Result status = convex.requestStatus().get(Constants.DEFAULT_CLIENT_TIMEOUT,TimeUnit.MILLISECONDS);
-			AVector<ACell> v=status.getValue();
-			AccountKey peerKey =RT.ensureAccountKey(v.get(3));
+			AVector<ACell> status = convex.requestStatusSync(Constants.DEFAULT_CLIENT_TIMEOUT);
+			if (status == null || status.count()!=Constants.STATUS_COUNT) {
+				throw new Error("Bad status message from remote Peer");
+			}
+
+			AccountKey peerKey =RT.ensureAccountKey(status.get(3));
 			if (peerKey==null) return null;
 
 			Connection existing=connections.get(peerKey);
@@ -554,7 +599,7 @@ public class ConnectionManager {
 				connections.put(peerKey, newConn);
 			}
 			server.raiseServerChange("connection");
-		} catch (InterruptedException | IOException |ExecutionException | TimeoutException e) {
+		} catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
 			// ignore any errors from the peer connections
 		} catch (UnresolvedAddressException e) {
 			log.info("Unable to resolve host address: "+hostAddress);
@@ -575,9 +620,9 @@ public class ConnectionManager {
 	public void start() {
 		// Set timestamp for connection updates
 		lastUpdate=Utils.getCurrentTimestamp();
-		
+
 		// start connection thread
-		connectionThread = new Thread(connectionLoop, "Dynamicaly connect to other peers");
+		connectionThread = new Thread(connectionLoop, "Connection Manager thread at "+server.getPort());
 		connectionThread.setDaemon(true);
 		connectionThread.start();
 

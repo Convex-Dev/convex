@@ -71,7 +71,7 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	public abstract AVector<T> appendChunk(VectorLeaf<T> listVector);
 
 	/**
-	 * Gets the ListVector chunk at a given offset
+	 * Gets the VectorLeaf chunk at a given offset
 	 * 
 	 * @param offset Offset into this vector. Must be a valid chunk start position
 	 * @return The chunk referenced

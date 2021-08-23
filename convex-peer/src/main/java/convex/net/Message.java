@@ -18,12 +18,12 @@ import convex.core.util.Utils;
  */
 public class Message {
 
-	private final Connection peerConnection;
+	private final Connection connection;
 	private final ACell payload;
 	private final MessageType type;
 
 	private Message(Connection peerConnection, MessageType type, ACell payload) {
-		this.peerConnection = peerConnection;
+		this.connection = peerConnection;
 		this.type = type;
 		this.payload = payload;
 	}
@@ -56,8 +56,8 @@ public class Message {
 		return create(null,MessageType.GOODBYE, peerKey);
 	}
 
-    public Connection getPeerConnection() {
-		return peerConnection;
+    public Connection getConnection() {
+		return connection;
 	}
 
 	public Message withConnection(Connection peerConnection) {

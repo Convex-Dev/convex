@@ -15,16 +15,12 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.Address;
 import convex.core.data.Keywords;
-import convex.core.data.Symbol;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
-import convex.core.lang.Reader;
-import convex.core.util.Utils;
 import convex.test.Samples;
 
 public class TrustTest extends ACVMTest {
-	private final Symbol tSym = Symbol.create("trust-actor");
 	private Address trusted=null;
 
 	private Context<?> CONTEXT;
@@ -32,28 +28,14 @@ public class TrustTest extends ACVMTest {
 		super(InitTest.BASE);
 		Context<?> ctx = context();
 
-		assert(ctx.getDepth()==0):"Invalid depth: "+ctx.getDepth();
-
-		try {
-			ctx = ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/trust.con")));
-			assert(ctx.getDepth()==0):"Invalid depth: "+ctx.getDepth();
-			Address trust = (Address) ctx.getResult();
-			String importS = "(import " + trust + " :as trust)";
-			ctx = step(ctx, importS);
-			assertNotError(ctx);
-
-			ctx = ctx.define(tSym, trust);
-		} catch (Throwable e) {
-			e.printStackTrace();
-			throw new Error(e);
-		}
+		String importS = "(import convex.trust :as trust)";
+		ctx = step(ctx, importS);
+		assertNotError(ctx);
+		trusted = (Address)ctx.getResult();
 
 		CONTEXT=ctx.fork();
 		INITIAL=ctx.getState();
-		trusted = (Address) ctx.lookupValue(tSym);
 	}
-
-
 
 	/**
 	 * Test that re-deployment of Fungible matches what is expected

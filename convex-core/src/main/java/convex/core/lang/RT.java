@@ -920,6 +920,17 @@ public class RT {
 	}
 	
 	/**
+	 * Casts an arbitrary value to an Address
+	 * @param a Value to cast. Strings or CVM values accepted
+	 * @return Address instance, or null if not convertible
+	 */
+	public static Address castAddress(Object a) {
+		if (a instanceof ACell) return castAddress((ACell)a);
+		if (a instanceof String) return Address.parse((String)a);
+		return null;
+	}
+	
+	/**
 	 * Ensures the argument is a valid Address.
 	 * 
 	 * @param a Value to cast
@@ -1362,6 +1373,8 @@ public class RT {
 	public static boolean isNaN(ACell val) {
 		return CVMDouble.NaN.equals(val);
 	}
+
+
 
 
 

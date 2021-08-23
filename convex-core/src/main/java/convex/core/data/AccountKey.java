@@ -223,7 +223,13 @@ public class AccountKey extends AArrayBlob {
 	@Override
 	public int estimatedEncodingSize() {
 		// tag plus LENGTH bytes
-		return 1 + LENGTH;
+		return 3 + LENGTH;
+	}
+	
+	@Override
+	public long getEncodingLength() {
+		// Always a fixed encoding length, tag plus count plus length
+		return 2 + LENGTH;
 	}
 
 	@Override

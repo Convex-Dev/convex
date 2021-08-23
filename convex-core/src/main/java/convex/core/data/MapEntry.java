@@ -262,7 +262,8 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	}
 	
 	/**
-	 * Writes a MapEntry or null content in compressed format (no count)
+	 * Writes a MapEntry or null content in compressed format (no count). Useful for
+	 * embedding an optional MapEntry inside a larger Encoding
 	 * 
 	 * @param me MapEntry to encode
 	 * @param bs Byte array to write to

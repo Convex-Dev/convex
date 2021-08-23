@@ -383,11 +383,11 @@ public class State extends ARecord {
 
 		AVector<SignedData<ATransaction>> transactions = block.getTransactions();
 		for (int i = 0; i < blockLength; i++) {
-			// extract the signed transaction from the block
-			SignedData<? extends ATransaction> signed = transactions.get(i);
-
 			// SECURITY: catch-all exception handler.
 			try {
+				// extract the signed transaction from the block
+				SignedData<? extends ATransaction> signed = transactions.get(i);
+				
 				// execute the transaction using the *latest* state (not necessarily "this")
 				Context<?> ctx = state.applyTransaction(signed);
 

@@ -29,6 +29,8 @@ public class ObjectsTest {
 	public static void doCellTests(ACell a) {
 		if (a==null) return;
 		
+		assertEquals(a.getEncodingLength(),a.getEncoding().count());
+		
 		try {
 			a.validateCell();
 			// doCellStorageTest(a); // TODO: Maybe fix after we have ACell.toDirect()

@@ -16,13 +16,15 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import etch.Etch;
+import etch.EtchStore;
 
 public class TestEtch {
 	private static final int ITERATIONS = 3;
 
 	@Test
 	public void testTempStore() throws IOException {
-		Etch etch = Etch.createTempEtch();
+		EtchStore store=EtchStore.createTemp();
+		Etch etch = store.getEtch();
 
 		AVector<CVMLong> v=Vectors.of(1,2,3);
 		Hash h = v.getHash();
@@ -40,7 +42,9 @@ public class TestEtch {
 
 	@Test
 	public void testRandomWritesStore() throws IOException, BadFormatException {
-		Etch etch = Etch.createTempEtch();
+		EtchStore store=EtchStore.createTemp();
+		Etch etch = store.getEtch();
+		
 		int COUNT = 1000;
 		for (int i = 0; i < COUNT; i++) {
 			Long a = (long) i;

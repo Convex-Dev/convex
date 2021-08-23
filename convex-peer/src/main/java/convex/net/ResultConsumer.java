@@ -19,7 +19,8 @@ import convex.core.util.Utils;
 /**
  * Consumer<Message> abstract base class for awaiting results.
  *
- * Provides basic buffering of results until all data is available.
+ * Provides basic buffering of:
+ * - Missing data until all data is available.
  */
 public abstract class ResultConsumer implements Consumer<Message> {
 
@@ -31,28 +32,11 @@ public abstract class ResultConsumer implements Consumer<Message> {
 			MessageType type = m.getType();
 			switch (type) {
 				case DATA: {
-					// Just store the data, can't guarantee full persistence yet
-					try {
-						ACell o = m.getPayload();
-						Ref<?> r = Ref.get(o);
-						r.persistShallow();
-						Hash h=r.getHash();
-						log.trace("Recieved DATA for hash {}",h);
-						unbuffer(h);
-					} catch (MissingDataException e) {
-						// ignore?
-					}
+					handleDataProvided(m);
 					break;
 				}
 				case MISSING_DATA: {
-					// try to be helpful by returning sent data
-					Hash h = m.getPayload();
-					Ref<?> r = Stores.current().refForHash(h);
-					if (r != null) try {
-						m.getPeerConnection().sendData(r.getValue());
-					} catch (IOException e) {
-						log.warn("Error replying to MISSING DATA request",e);
-					}
+					handleMissingDataRequest(m);
 					break;
 				}
 				case RESULT: {
@@ -66,6 +50,31 @@ public abstract class ResultConsumer implements Consumer<Message> {
 		} catch (Throwable t) {
 			log.warn("Failed to accept message! {}",t);
 			t.printStackTrace();
+		}
+	}
+
+	private void handleDataProvided(Message m) {
+		// Just store the data, can't guarantee full persistence yet
+		try {
+			ACell o = m.getPayload();
+			Ref<?> r = Ref.get(o);
+			r.persistShallow();
+			Hash h=r.getHash();
+			log.trace("Recieved DATA for hash {}",h);
+			unbuffer(h);
+		} catch (MissingDataException e) {
+			// ignore?
+		}
+	}
+
+	private void handleMissingDataRequest(Message m) {
+		// try to be helpful by returning sent data
+		Hash h = m.getPayload();
+		Ref<?> r = Stores.current().refForHash(h);
+		if (r != null) try {
+			m.getConnection().sendData(r.getValue());
+		} catch (IOException e) {
+			log.debug("Error replying to MISSING DATA request",e);
 		}
 	}
 
@@ -144,7 +153,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 			// And wait for it to arrive later
 			Hash hash = e.getMissingHash();
 			try {
-				if (m.getPeerConnection().sendMissingData(hash)) {
+				if (m.getConnection().sendMissingData(hash)) {
 					log.debug("Missing data {} requested by client for RESULT of type: {}",hash.toHexString(),Utils.getClassName(result));
 					buffer(hash, m);
 				} else {

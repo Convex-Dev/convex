@@ -27,7 +27,7 @@ public abstract class AMapEntry<K extends ACell, V extends ACell> extends AVecto
 
 	@Override
 	public final VectorLeaf<ACell> getChunk(long offset) {
-		throw new IllegalStateException("Can only get full chunk");
+		return toVector().getChunk(offset);
 	}
 
 	@Override

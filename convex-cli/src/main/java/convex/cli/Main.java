@@ -336,7 +336,7 @@ public class Main implements Runnable {
 				keyStore = PFXTools.createStore(keyFile, password);
 			}
 		} catch (Throwable t) {
-			throw new Error("Cannot load key store "+t);
+			throw new Error("Cannot load key store: "+t);
 		}
 		try {
 			// save the key in the keystore

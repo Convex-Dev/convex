@@ -2207,36 +2207,36 @@ public class Context<T extends ACell> extends AObject {
 		/**
 		 * MapEntry for Expander metadata lookup
 		 */
-		AHashMap<ACell,ACell> me=null;
+		AHashMap<ACell,ACell> me = null;
 		Address addr;
 		Symbol sym;
 
 		if (form instanceof Symbol) {
-			sym=(Symbol)form;
-			me=this.lookupMeta(sym);
-			addr=null;
+			sym = (Symbol)form;
+			me = this.lookupMeta(sym);
+			addr = null;
 		} else if (form instanceof AList) {
 			// Need to check for (lookup ....) as this could reference an expander
 			@SuppressWarnings("unchecked")
-			AList<ACell> listForm=(AList<ACell>)form;
-			int n=listForm.size();
-			if (n<=1) return null;
+			AList<ACell> listForm = (AList<ACell>)form;
+			int n = listForm.size();
+			if (n <= 1) return null;
 			if (!Symbols.LOOKUP.equals(listForm.get(0))) return null;
-			ACell maybeSym=listForm.get(n-1);
+			ACell maybeSym = listForm.get(n-1);
 			if (!(maybeSym instanceof Symbol)) return null;
-			sym=(Symbol)maybeSym;
-			if (n==2) {
-				addr=null;
-				me=lookupMeta(sym);
-			} else if (n==3) {
-				ACell maybeAddress=listForm.get(1);
+			sym = (Symbol)maybeSym;
+			if (n == 2) {
+				addr = null;
+				me = lookupMeta(sym);
+			} else if (n == 3) {
+				ACell maybeAddress = listForm.get(1);
 				if (maybeAddress instanceof Symbol) {
 					// one lookup via Environment for alias
-					maybeAddress=lookupValue((Symbol)maybeAddress);
+					maybeAddress = lookupValue((Symbol)maybeAddress);
 				}
 				if (!(maybeAddress instanceof Address)) return null;
-				addr=(Address) maybeAddress;
-				me=lookupMeta((Address)maybeAddress,sym);
+				addr = (Address)maybeAddress;
+				me = lookupMeta((Address)maybeAddress,sym);
 			} else {
 				return null;
 			}
@@ -2244,15 +2244,15 @@ public class Context<T extends ACell> extends AObject {
 			return null;
 		}
 
-		if (me==null) return null;
+		if (me == null) return null;
 
 		// TODO: examine syntax object for expander details?
-		ACell expBool =me.get(Keywords.EXPANDER);
+		ACell expBool = me.get(Keywords.EXPANDER_Q);
 		if (RT.bool(expBool)) {
 			// expand form using specified expander and continuation expander
-			ACell v=lookupValue(addr,sym);
+			ACell v = lookupValue(addr,sym);
 			AFn<ACell> expander = RT.castFunction(v);
-			if (expander!=null) return expander;
+			if (expander != null) return expander;
 		}
 		return null;
 	}

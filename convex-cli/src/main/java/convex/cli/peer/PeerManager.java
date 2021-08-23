@@ -115,11 +115,13 @@ public class PeerManager implements IServerEvent {
 			throw new Error("Failed to join network: Cannot connect to remote peer at "+remotePeerHostname);
 		}
 		convex.close();
-		List<Hash> hashList = new ArrayList<Hash>(3);
+		List<Hash> hashList = new ArrayList<Hash>(5);
 		AVector<ACell> values = result.getValue();
-		hashList.add(RT.ensureHash(values.get(0))); 		// beliefHash
+		hashList.add(RT.ensureHash(values.get(0)));		// beliefHash
 		hashList.add(RT.ensureHash(values.get(1)));		// stateHash
 		hashList.add(RT.ensureHash(values.get(2)));		// netwokIdHash
+		hashList.add(RT.ensureHash(values.get(4)));		// consensusHash
+
 		return hashList;
 	}
 
@@ -158,20 +160,18 @@ public class PeerManager implements IServerEvent {
     public void launchPeer(
 		String hostname,
 		int port,
-		String remotePeerHostname,
-		State baseState,
-		SignedData<Belief> signedBelief
+		String remotePeerHostname
 	) {
 		Map<Keyword, Object> config = new HashMap<>();
 		if (port > 0 ) {
 			config.put(Keywords.PORT, port);
 		}
 		config.put(Keywords.STORE, store);
-		config.put(Keywords.STATE, baseState);
+		config.put(Keywords.SOURCE, remotePeerHostname);
 		config.put(Keywords.KEYPAIR, keyPair);
-		Server server = API.launchPeer(config, this);
+		config.put(Keywords.EVENT_HOOK, this); // Add this as IServerEvent hook
+		Server server = API.launchPeer(config);
 
-		server.joinNetwork(keyPair, address, remotePeerHostname, signedBelief);
 		peerServerList.add(server);
 	}
 

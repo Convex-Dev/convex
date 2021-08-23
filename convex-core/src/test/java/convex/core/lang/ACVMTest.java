@@ -129,6 +129,15 @@ public abstract class ACVMTest {
 		return (Context<T>) Context.createFake(rc.getState(), c.getAddress()).withValue(rc.getValue());
 	}
 
+	public boolean evalA(String source) {
+		return evalA(CONTEXT, source);
+	}
+
+	public boolean evalA(Context<?> ctx, String source) {
+		return eval(ctx, source) instanceof Address;
+
+	}
+
 	public boolean evalB(String source) {
 		return ((CVMBool)eval(source)).booleanValue();
 	}

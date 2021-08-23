@@ -47,10 +47,9 @@ public class TestState {
 			for (int i = 0; i < NUM_CONTRACTS; i++) {
 				// Construct code for each contract
 				ACell contractCode = Reader.read(
-						"(do " + "(def my-data nil)" + "(defn write [x] (def my-data x)) "
-								+ "(defn read [] my-data)" + "(defn who-called-me [] *caller*)"
-								+ "(defn my-address [] *address*)" + "(defn my-number [] "+i+")" + "(defn foo [] :bar)"
-								+ "(export write read who-called-me my-address my-number foo)" + ")");
+						"(do " + "(def my-data nil)" + "(defn write ^{:callable? true} [x] (def my-data x)) "
+								+ "(defn read ^{:callable? true} [] my-data)" + "(defn who-called-me ^{:callable? true} [] *caller*)"
+								+ "(defn my-address ^{:callable? true} [] *address*)" + "(defn my-number ^{:callable? true} [] "+i+")" + "(defn foo ^{:callable? true} [] :bar))");
 
 				ctx = ctx.deployActor(contractCode);
 				CONTRACTS[i] = (Address) ctx.getResult();

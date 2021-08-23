@@ -11,7 +11,7 @@ import convex.core.data.prim.CVMLong;
 public class ListDataBenchmark {
 
 	@Benchmark
-	public void benchmark() {
+	public void append1000() {
 		AVector<CVMLong> list = Vectors.empty();
 		for (long i = 0; i < 1000; i++) {
 			list = list.append(CVMLong.create(i));

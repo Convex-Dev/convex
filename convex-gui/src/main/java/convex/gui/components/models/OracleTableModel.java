@@ -22,8 +22,8 @@ public class OracleTableModel extends AbstractTableModel implements TableModel {
 	private State state;
 	private Address oracle;
 	
-	Symbol LIST_S=Symbol.create("full-list");
-	Symbol RESULTS_S=Symbol.create("results");
+	Symbol LIST_S=Symbol.create("*list*");
+	Symbol RESULTS_S=Symbol.create("*results*");
 	
 	Keyword DESC_K=Keyword.create("desc");
 
@@ -49,6 +49,10 @@ public class OracleTableModel extends AbstractTableModel implements TableModel {
 			return 0;
 		}
 		AMap<ACell,ACell> list=as.getEnvironmentValue(LIST_S); 
+		if (list==null) {
+			System.err.println("OracleTableModel missing oracle list? in "+oracle);
+			return 0;
+		}
 		return Utils.checkedInt(list.count());
 	}
 

@@ -30,15 +30,6 @@ public class API {
 
 	private static final Logger log = LoggerFactory.getLogger(API.class.getName());
 
-	public static Server launchPeer() {
-		Map<Keyword, Object> config = new HashMap<>();
-		return launchPeer(config, null);
-	}
-
-	public static Server launchPeer(Map<Keyword, Object> config) {
-		return launchPeer(config, null);
-	}
-
 	/**
 	 * <p>Launches a Peer Server with a supplied configuration.</p>
 	 *
@@ -48,7 +39,8 @@ public class API {
 	 * <li>:keypair (required) - AKeyPair instance.
 	 * <li>:port (optional) - Integer port number to use for incoming connections. Defaults to random allocation.
 	 * <li>:store (optional) - AStore instance. Defaults to the configured global store
-	 * <li>:state (optional) - Genesis state. Defaults to a fresh genesis state for the Peer.
+	 * <li>:source (optional) - URL for Peer to replicate initial State/Belief from.
+	 * <li>:state (optional) - Genesis state. Defaults to a fresh genesis state for the Peer if neither :source nor :state is specified
 	 * <li>:restore (optional) - Boolean Flag to restore from existing store. Default to true
 	 * <li>:persist (optional) - Boolean flag to determine if peer state should be persisted in store at server close. Default true.
 	 * </ul>
@@ -59,12 +51,15 @@ public class API {
      *
 	 * @return New Server instance
 	 */
-	public static Server launchPeer(Map<Keyword, Object> peerConfig, IServerEvent event) {
+	public static Server launchPeer(Map<Keyword, Object> peerConfig) {
 		HashMap<Keyword,Object> config=new HashMap<>(peerConfig);
 
 		// State no8t strictly necessarry? Should be possible to restore a Peer from store
-		if (!(config.containsKey(Keywords.STATE)||config.containsKey(Keywords.STORE))) {
-			throw new IllegalArgumentException("Peer launch requires a genesis :state or existing :store in config");
+		if (!(config.containsKey(Keywords.STATE)
+				||config.containsKey(Keywords.STORE)
+				||config.containsKey(Keywords.SOURCE)
+				)) {
+			throw new IllegalArgumentException("Peer launch requires a genesis :state, remote :source or existing :store in config");
 		}
 
 		if (!config.containsKey(Keywords.KEYPAIR)) throw new IllegalArgumentException("Peer launch requires a "+Keywords.KEYPAIR+" in config");
@@ -75,7 +70,7 @@ public class API {
 			if (!config.containsKey(Keywords.RESTORE)) config.put(Keywords.RESTORE, true);
 			if (!config.containsKey(Keywords.PERSIST)) config.put(Keywords.PERSIST, true);
 
-			Server server = Server.create(config, event);
+			Server server = Server.create(config);
 			server.launch();
 			return server;
 		} catch (Throwable t) {
@@ -91,7 +86,7 @@ public class API {
 	 * The Peers will have a unique genesis State, i.e. an independent network
 	 *
 	 * @param keyPairs List of keypairs for peers
-	 * @param genesisState GEnesis state for local network
+	 * @param genesisState genesis state for local network
 	 *
 	 * @return List of Servers launched
 	 *
@@ -132,6 +127,9 @@ public class API {
 		// Automatically manage Peer connections
 		config.put(Keywords.AUTO_MANAGE, true);
 
+		if (event!=null) {
+			config.put(Keywords.EVENT_HOOK, event);
+		}
 
 		for (int i = 0; i < count; i++) {
 			AKeyPair keyPair = keyPairs.get(i);
@@ -139,7 +137,7 @@ public class API {
 			if (peerPorts != null) {
 				config.put(Keywords.PORT, peerPorts[i]);
 			}
-			Server server = API.launchPeer(config, event);
+			Server server = API.launchPeer(config);
 			serverList.add(server);
 		}
 
@@ -163,28 +161,5 @@ public class API {
 		// wait for the peers to sync upto 10 seconds
 		//API.waitForNetworkReady(serverList, 10);
 		return serverList;
-	}
-
-	public static void waitForNetworkReady(List<Server> serverList, long timeoutSeconds) {
-		try {
-			boolean isNetworkReady = false;
-			long lastTimeStamp = 0;
-			long timeoutMillis = System.currentTimeMillis() + (timeoutSeconds * 1000);
-			while (!isNetworkReady || (timeoutMillis > System.currentTimeMillis())) {
-				isNetworkReady = true;
-				for (int index = 1; index < serverList.size(); index ++) {
-					Server peerServer = serverList.get(index);
-					convex.core.Peer peer = peerServer.getPeer();
-					if ( peer.getTimeStamp() != lastTimeStamp) {
-						lastTimeStamp = peer.getTimeStamp();
-						isNetworkReady = false;
-						break;
-					}
-				}
-				Thread.sleep(1000);
-			}
-		} catch ( InterruptedException e) {
-			return;
-		}
 	}
 }

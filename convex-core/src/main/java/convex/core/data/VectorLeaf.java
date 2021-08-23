@@ -53,7 +53,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	public static final int MAX_SIZE = Vectors.CHUNK_SIZE;
 
 	private final Ref<T>[] items;
-	private final Ref<AVector<T>> prefix;
+	private Ref<AVector<T>> prefix;
 
 	VectorLeaf(Ref<T>[] items, Ref<AVector<T>> prefix, long count) {
 		super(count);
@@ -505,7 +505,8 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		int ilength = items.length;
 		Ref<R>[] newItems = (Ref<R>[]) new Ref[ilength];
 		for (int i = 0; i < ilength; i++) {
-			R r = mapper.apply(items[i].getValue());
+			Ref<T> iref=items[i];
+			R r = mapper.apply(iref.getValue());
 			newItems[i] = Ref.get(r);
 		}
 
@@ -591,7 +592,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	public <R extends ACell> Ref<R> getRef(int i) {
 		if (prefix != null) {
 			if (i==0) return (Ref<R>) prefix;
-			i--; // DEcrement so that i indexes into child array after skipping prefix ref
+			i--; // Decrement so that i indexes into child array after skipping prefix ref
 		}
 		int itemsCount = items.length;
 		if (i < 0) throw new IndexOutOfBoundsException("Negative Ref index: " + i);
@@ -651,8 +652,10 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		}
 		// must have matched prefixLength at least
 		long nn = Math.min(n, b.count()) - prefixLength; // number of extra elements to check
+		if (nn==0) return prefixLength;
+		VectorLeaf<T> bChunk=b.getChunk(prefixLength);
 		for (int i = 0; i < nn; i++) {
-			if (!items[i].equalsValue(b.getElementRef(prefixLength + i))) {
+			if (!items[i].equalsValue(bChunk.items[i])) {
 				return prefixLength + i;
 			}
 		}
@@ -662,12 +665,17 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	@Override
 	public VectorLeaf<T> getChunk(long offset) {
 		if (prefix == null) {
-			if (items.length != MAX_SIZE) throw new IllegalStateException("Can only get full chunk");
-			if (offset != 0) throw new IndexOutOfBoundsException("Chunk offset must be zero");
-			return this;
+			if (offset == 0) return this;
 		} else {
-			return prefix.getValue().getChunk(offset);
+			AVector<T> pre=prefix.getValue();
+			long prefixLength=pre.count();
+			if (offset<prefixLength) {
+				return prefix.getValue().getChunk(offset);
+			} else if (offset==prefixLength) {
+				return this;
+			}
 		}
+		throw new IndexOutOfBoundsException("Invalid chunk offset: "+offset+" in vector of length "+count);
 	}
 
 	@SuppressWarnings("unchecked")

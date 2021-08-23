@@ -36,6 +36,7 @@ public class EtchStore extends AStore {
 
 	public EtchStore(Etch etch) {
 		this.etch = etch;
+		etch.setStore(this);
 	}
 
 	/**
@@ -85,7 +86,6 @@ public class EtchStore extends AStore {
 	public <T extends ACell> Ref<T> refForHash(Hash hash) {
 		try {
 			Ref<ACell> existing = etch.read(hash);
-			if (existing == null) return null;
 			return (Ref<T>) existing;
 		} catch (IOException e) {
 			throw new Error("IO exception from Etch", e);
@@ -121,7 +121,10 @@ public class EtchStore extends AStore {
 			Ref<T> existing = refForHash(hash);
 			if (existing != null) {
 				// Return existing ref if status is sufficient
-				if (existing.getStatus() >= requiredStatus) return existing;
+				if (existing.getStatus() >= requiredStatus) {
+					cell.attachRef(existing);
+					return existing;
+				}
 			}
 		}
 
@@ -203,5 +206,13 @@ public class EtchStore extends AStore {
 	@Override
 	public void setRootHash(Hash h) throws IOException {
 		etch.setRootHash(h);
+	}
+
+	/**
+	 * Gets the underlying Etch instance
+	 * @return Etch instance
+	 */
+	public Etch getEtch() {
+		return etch;
 	}
 }
