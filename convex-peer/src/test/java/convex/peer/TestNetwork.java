@@ -62,7 +62,7 @@ import etch.EtchStore;
  */
 public class TestNetwork {
 
-	public Server SERVER;
+	public Server SERVER = null;
 
 	private List<Server> SERVERS;
 
@@ -102,9 +102,11 @@ public class TestNetwork {
 		VILLAIN=HERO.offset(1);
 
 		SERVERS=API.launchLocalPeers(PEER_KEYPAIRS, s);
-		Server server = SERVERS.get(0);
-		synchronized(server) {
-			SERVER=server;
+	}
+
+	private void waitForLaunch() {
+		if (SERVER == null) {
+			SERVER = SERVERS.get(0);
 			try {
 				// Thread.sleep(1000);
 				API.isNetworkReady(SERVERS, 10000);
@@ -113,11 +115,14 @@ public class TestNetwork {
 				throw Utils.sneakyThrow(t);
 			}
 		}
+		API.isNetworkReady(SERVERS, 10000);
 	}
+
 	public static TestNetwork getInstance() {
 		if (instance == null) {
 			instance = new TestNetwork();
 		}
+		instance.waitForLaunch();
 		return instance;
 	}
 }
