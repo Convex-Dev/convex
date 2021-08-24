@@ -3176,16 +3176,6 @@ public class CoreTest extends ACVMTest {
 	}
 
 	@Test
-	public void testDefactor() {
-		Context<?> ctx=step("(let [agf (defactor multiply-actor [x] (defn calc ^{:callable? true} [y] (* x y)))] (def ma (deploy (agf 13))))");
-
-		Address ma=(Address) ctx.getResult();
-		assertNotNull(ma);
-
-		assertEquals(130L,evalL(ctx,"(call ma (calc 10))"));
-	}
-
-	@Test
 	public void testDefExpander() {
 		Context<?> ctx=step("(defexpander expand-once [x e] (expand x (fn [x e] (syntax x))))");
 

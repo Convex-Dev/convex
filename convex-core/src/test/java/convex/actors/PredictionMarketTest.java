@@ -1,8 +1,6 @@
 package convex.actors;
 
-import static convex.test.Assertions.assertAssertError;
-import static convex.test.Assertions.assertCVMEquals;
-import static convex.test.Assertions.assertStateError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -51,8 +49,11 @@ public class PredictionMarketTest extends ACVMTest {
 		String contractString = Utils.readResourceAsString("lab/prediction-market.cvx");
 
 		// Run code to initialise actor with [oracle oracle-key outcomes]
-		Context ctx = TestState.CONTEXT.fork();
-		ctx=step("(deploy ("+contractString+" *address* :bar #{true,false}))");
+		Context ctx = context();
+		ctx=step(contractString);
+		assertNotError(ctx);
+		ctx=step(ctx,"(deploy (build-prediction-market *address* :bar #{true,false}))");
+		assertNotError(ctx);
 
 		Address addr = (Address) ctx.getResult();
 		assertNotNull(addr);

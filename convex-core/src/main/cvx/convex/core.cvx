@@ -284,33 +284,6 @@
 
 
 
-(defmacro actor
-
-  ;; TODO. Delete and favor direct usage of quasiquote?
-
-  ^{:doc {:description ["Creates an actor generation function."
-                        "This function generates deployable code when called, and may take optional arguments to configure the deployed actor."
-                        "The resulting code can be used with `deploy`."]
-          :examples    [{:code "(let [agf (actor [x] (defn calc [y] (* x y)))] (deploy (agf 42)))"}]
-          :signature   [{:params [name params & body]}]}}
-
-  [params & body]
-
-  (let [bindlist (reduce (fn [v p]
-                           (conj v
-                                 p
-                                 (list 'unquote
-                                        p)))
-                         []
-                         params)
-        code     (list 'quasiquote
-                       (cons 'let
-                             bindlist
-                             body))]
-    `(fn ~params
-         ~code)))
-
-
 (defn actor?
 
   ^{:doc {:description "Returns true if the given address refers to an actor."
@@ -444,23 +417,6 @@
       (fail :CAST
             "create-account requires a blob key"))
   (deploy `(set-key ~key)))
-
-
-
-(defmacro defactor
-
-  ^{:doc {:description "Defines an actor generation function in the environment. See `actor` for more details on actor generation functions."
-          :examples    [{:code "(defactor multiplier [x] (defn calc [y] (* x y)))"}]
-          :signature   [{:params [name params & body]}]}}
-
-  [name params & body]
-
-  (let [actr (cons 'actor
-                   params
-                   body)]
-    `(def ~name
-          ~actr)))
-
 
 
 (defmacro defined?
