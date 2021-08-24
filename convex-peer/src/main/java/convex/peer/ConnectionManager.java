@@ -127,8 +127,8 @@ public class ConnectionManager {
 			if (c.isClosed()) return;
 			Convex convex=Convex.connect(c.getRemoteAddress());
 			try {
-				Future<Result> r=convex.requestStatus();
-				AVector<ACell> status=r.get(1000,TimeUnit.MILLISECONDS).getValue();
+				// use requestStatusSync to auto acquire hash of the status instead of the value
+				AVector<ACell> status=convex.requestStatusSync(1000);
 				Hash h=RT.ensureHash(status.get(0));
 				@SuppressWarnings("unchecked")
 				SignedData<Belief> sb=(SignedData<Belief>) convex.acquire(h).get(10000,TimeUnit.MILLISECONDS);
