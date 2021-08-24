@@ -11,6 +11,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import convex.core.ErrorCodes;
@@ -25,21 +26,25 @@ import convex.core.lang.ops.Constant;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
-import convex.peer.ServerTest;
+import convex.peer.TestNetwork;
 
 /**
  * Tests for a Convex Client connection
  */
 public class ConvexTest {
 
-	static final Address ADDRESS;
+	static Address ADDRESS;
 	static final AKeyPair KEYPAIR = AKeyPair.generate();
 
-	static {
-		synchronized(ServerTest.SERVER) {
+	private static TestNetwork network;
+
+	@BeforeAll
+	public static void init() {
+		network =  TestNetwork.getInstance();
+		synchronized(network.SERVER) {
 			try {
-				ADDRESS=ServerTest.CONVEX.createAccountSync(KEYPAIR.getAccountKey());
-				ServerTest.CONVEX.transfer(ADDRESS, 1000000000L).get(1000,TimeUnit.MILLISECONDS);
+				ADDRESS=network.CONVEX.createAccountSync(KEYPAIR.getAccountKey());
+				network.CONVEX.transfer(ADDRESS, 1000000000L).get(1000,TimeUnit.MILLISECONDS);
 			} catch (Throwable e) {
 				e.printStackTrace();
 				throw Utils.sneakyThrow(e);
@@ -49,8 +54,8 @@ public class ConvexTest {
 
 	@Test
 	public void testConnection() throws IOException, TimeoutException {
-		synchronized (ServerTest.SERVER) {
-			Convex convex = Convex.connect(ServerTest.SERVER);
+		synchronized (network.SERVER) {
+			Convex convex = Convex.connect(network.SERVER);
 			assertTrue(convex.isConnected());
 			convex.close();
 			assertFalse(convex.isConnected());
@@ -59,8 +64,8 @@ public class ConvexTest {
 
 	@Test
 	public void testConvex() throws IOException, TimeoutException {
-		synchronized (ServerTest.SERVER) {
-			Convex convex = Convex.connect(ServerTest.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
+		synchronized (network.SERVER) {
+			Convex convex = Convex.connect(network.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
 			Result r = convex.transactSync(Invoke.create(ADDRESS, 0, Reader.read("*address*")), 1000);
 			assertNull(r.getErrorCode(), "Error:" + r.toString());
 			assertEquals(ADDRESS, r.getValue());
@@ -69,8 +74,8 @@ public class ConvexTest {
 
 	@Test
 	public void testBadSignature() throws IOException, TimeoutException, InterruptedException, ExecutionException {
-		synchronized (ServerTest.SERVER) {
-			Convex convex = Convex.connect(ServerTest.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
+		synchronized (network.SERVER) {
+			Convex convex = Convex.connect(network.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
 			Ref<ATransaction> tr = Invoke.create(ADDRESS, 0, Reader.read("*address*")).getRef();
 			Result r = convex.transact(SignedData.create(KEYPAIR, Ed25519Signature.ZERO, tr)).get();
 			assertEquals(ErrorCodes.SIGNATURE, r.getErrorCode());
@@ -80,8 +85,8 @@ public class ConvexTest {
 	@SuppressWarnings("unchecked")
 	@Test
 	public void testManyTransactions() throws IOException, TimeoutException, InterruptedException, ExecutionException {
-		synchronized (ServerTest.SERVER) {
-			Convex convex = Convex.connect(ServerTest.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
+		synchronized (network.SERVER) {
+			Convex convex = Convex.connect(network.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
 			int n = 100;
 			Future<Result>[] rs = new Future[n];
 			for (int i = 0; i < n; i++) {
