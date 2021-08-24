@@ -1,5 +1,6 @@
 package convex.peer;
 
+import java.lang.InterruptedException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -10,11 +11,14 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.AccountKey;
+import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
+import convex.net.Connection;
 
 
 /**
@@ -162,4 +166,40 @@ public class API {
 		//API.waitForNetworkReady(serverList, 10);
 		return serverList;
 	}
+
+	/**
+	 * Returns a true value if the local network is ready and synced with the same consensus state hash.
+	 *
+	 * @param serverList List of local peer servers running on the local network.
+	 *
+	 * @param timoutMillis Number of millis to wait before exiting with a failure.
+	 *
+	 * @return Return true if all server peers have the same consensus hash, else false is a timeout.
+	 *
+	 */
+	public static boolean isNetworkReady(List<Server> serverList, long timeoutMillis) {
+		boolean isReady = false;
+		long timeoutTime = Utils.getTimeMillis() + timeoutMillis;
+		while (timeoutTime > Utils.getTimeMillis()) {
+			isReady = true;
+			Hash consensusHash = null;
+			for (Server server: serverList) {
+				if (consensusHash == null) {
+					consensusHash = server.getPeer().getConsensusState().getHash();
+				}
+				if (!consensusHash.equals(server.getPeer().getConsensusState().getHash())) {
+					isReady=false;
+				}
+				try {
+					Thread.sleep(100);
+				} catch ( InterruptedException e) {
+					return false;
+				}
+			}
+			if (isReady) {
+				break;
+			}
+		}
+		return isReady;
+    }
 }
