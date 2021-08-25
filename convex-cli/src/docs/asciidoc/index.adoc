@@ -696,8 +696,6 @@ For example:
 == Queries
 How to execute queries on a local Convex network.
 
-The CLI sends queries to the local network via the Peer API. To use other networks we suggest you use the public link:https://convex.world/documentation/client-api[Convex Client API interface] instead.
-
 When you run a query, you usually need to provide an account address `--address`, but this command uses a default account address.
 
 So to find out the current balance using the `*balance*` command you can run the following:
@@ -708,18 +706,19 @@ So to find out the current balance using the `*balance*` command you can run the
 
 
 [#command-transaction]
-== Trancsactions
+== Transactions
 How to execute transactions on a local Convex network.
 
-The CLI uses the internal Peer API to submit a transaction. To use other networks we suggest you use the public link:https://convex.world/documentation/client-api[Convex Client API interface] instead.
 
 Submiting a ransaction on the Convex network can change the network state, and so this will incure a small fee that is passed back to the peers.
 
 So when sending a transaction you will need to provide a `--public-key` or `--index-key` field for the keypair stored in the keystore, and also the correct `--address`.
 
+For example:
+
+    ./convex transaction --address=46 --public-key=1cf32e --password=secret "(map inc [1 2 3 4 5])"
 
 
-
-
-
+[TIP]
+The CLI uses the internal Peer API for queries and transactions. To use other Convex networks or remote Convex networks we suggest you use the public link:https://convex.world/documentation/client-api[Convex Client API interface] instead.
 
