@@ -461,6 +461,7 @@ public class Convex {
 	public Result transactSync(ATransaction transaction, long timeout) throws TimeoutException, IOException {
 		// sample time at start of transaction attempt
 		long start = Utils.getTimeMillis();
+		Result result;
 
 		Future<Result> cf = transact(transaction);
 
@@ -468,11 +469,11 @@ public class Convex {
 		long now = Utils.getTimeMillis();
 		timeout = Math.max(0L, timeout - (now - start));
 		try {
-			Result r = cf.get(timeout, TimeUnit.MILLISECONDS);
-			return r;
+			result = cf.get(timeout, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException | ExecutionException e) {
 			throw new Error("Not possible? Since there is no Thread for the future....", e);
 		}
+		return result;
 	}
 
 	/**
@@ -490,6 +491,7 @@ public class Convex {
 			throws TimeoutException, IOException {
 		// sample time at start of transaction attempt
 		long start = Utils.getTimeMillis();
+		Result result;
 
 		Future<Result> cf = transact(transaction);
 
@@ -497,10 +499,11 @@ public class Convex {
 		long now = Utils.getTimeMillis();
 		timeout = Math.max(0L, timeout - (now - start));
 		try {
-			return cf.get(timeout, TimeUnit.MILLISECONDS);
+			result=cf.get(timeout,TimeUnit.MILLISECONDS);
 		} catch (InterruptedException | ExecutionException e) {
 			throw new Error("Not possible? Since there is no Thread for the future....", e);
 		}
+		return result;
 	}
 
 	/**
@@ -601,7 +604,7 @@ public class Convex {
 	 *
 	 * @param timeoutMillis Milliseconds to wait for request timeout
 	 * @return Status Vector from target Peer
-	 * 
+	 *
 	 * @throws IOException If an IO Error occurs
 	 * @throws InterruptedException If execution is interrupted
 	 * @throws ExecutionException If a concurrent execution failure occurs

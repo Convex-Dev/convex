@@ -116,7 +116,7 @@ public class PeerCreate implements Runnable {
 			ATransaction transaction = Invoke.create(address, -1, message);
 			Result result = convex.transactSync(transaction, timeout);
 			if (result.isError()) {
-				mainParent.output.setResult(result);
+                mainParent.output.setResult(result.getValue(), result.getErrorCode(), result.getTrace());
 				return;
 			}
 			long currentBalance = convex.getBalance(address);

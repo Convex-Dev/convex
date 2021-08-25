@@ -73,7 +73,7 @@ public class Query implements Runnable {
 			log.info("Executing query: %s\n", queryCommand);
 			ACell message = Reader.read(queryCommand);
 			Result result = convex.querySync(message, timeout);
-			mainParent.output.setResult(result);
+			mainParent.output.setResult(result.getValue(), result.getErrorCode(), result.getTrace());
 		} catch (IOException | TimeoutException e) {
 			mainParent.showError(e);
 		}

@@ -67,7 +67,7 @@ public class AccountBalance implements Runnable {
 			String queryCommand = String.format("(balance #%d)", address.longValue());
 			ACell message = Reader.read(queryCommand);
 			Result result = convex.querySync(message, timeout);
-			mainParent.output.setResult(result);
+			mainParent.output.setResult(result.getValue(), result.getErrorCode(), result.getTrace());
 		} catch (Throwable t) {
 			mainParent.showError(t);
 		}
