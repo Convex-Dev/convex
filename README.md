@@ -61,7 +61,7 @@ or in linux/mac you can use the shell script:
 ./convex <args>
 ```
 
-### Staring a private local network using the CLI
+### Starting a private local network using the CLI
 
 If you want to start a local network for testing and try out Convex without accesing the public (test) network at https://convex.world. You can start a local network using the CLI command.
 
