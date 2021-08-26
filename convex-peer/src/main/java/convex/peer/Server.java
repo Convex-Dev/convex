@@ -248,8 +248,7 @@ public class Server implements Closeable {
 				log.info("Attempting Peer Sync with: "+sourceAddr);
 				long timeout = establishTimeout();
 				Result result = convex.requestStatusSync(timeout);
-				// always use a temporary store for this result, so we do not pollute the genesis store
-				result = convex.loadResult(result, EtchStore.createTemp(), timeout);
+				result = convex.loadResult(result, timeout);
 				AVector<ACell> status = result.getValue();
 				if (status == null || status.count()!=Constants.STATUS_COUNT) {
 					throw new Error("Bad status message from remote Peer");

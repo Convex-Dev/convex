@@ -54,10 +54,19 @@ public class ConnectionManager {
 	static final long SERVER_CONNECTION_PAUSE = 1000;
 
 	/**
-	 * Pause for each iteration of Server connection loop.
+	 * Delay until the next poll belief.
 	 */
 	static final long SERVER_POLL_DELAY = 2000;
 
+	/**
+	 * How long to wait for a belief poll request of status.
+	 */
+	static final long POLL_TIMEOUT_MILLIS = 500;
+
+	/**
+	 * How long to wait for a complete acquire of a belief.
+	 */
+	static final long POLL_ACQUIRE_TIMEOUT_MILLIS = 10000;
 
 	protected final Server server;
 	private final HashMap<AccountKey,Connection> connections = new HashMap<>();
@@ -128,12 +137,12 @@ public class ConnectionManager {
 			Convex convex=Convex.connect(c.getRemoteAddress());
 			try {
 				// use requestStatusSync to auto acquire hash of the status instead of the value
-				Result result=convex.requestStatusSync(1000);
-				result = convex.loadResult(result, 1000);
+				Result result=convex.requestStatusSync(POLL_TIMEOUT_MILLIS);
+				result = convex.loadResult(result, POLL_TIMEOUT_MILLIS);
 				AVector<ACell> status = result.getValue();
 				Hash h=RT.ensureHash(status.get(0));
 				@SuppressWarnings("unchecked")
-				SignedData<Belief> sb=(SignedData<Belief>) convex.acquire(h).get(10000,TimeUnit.MILLISECONDS);
+				SignedData<Belief> sb=(SignedData<Belief>) convex.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS,TimeUnit.MILLISECONDS);
 				server.queueEvent(sb);
 			} finally {
 				convex.close();
