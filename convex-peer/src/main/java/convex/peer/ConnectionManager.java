@@ -128,7 +128,9 @@ public class ConnectionManager {
 			Convex convex=Convex.connect(c.getRemoteAddress());
 			try {
 				// use requestStatusSync to auto acquire hash of the status instead of the value
-				AVector<ACell> status=convex.requestStatusSync(1000);
+				Result result=convex.requestStatusSync(1000);
+				result = convex.loadResult(result, 1000);
+				AVector<ACell> status = result.getValue();
 				Hash h=RT.ensureHash(status.get(0));
 				@SuppressWarnings("unchecked")
 				SignedData<Belief> sb=(SignedData<Belief>) convex.acquire(h).get(10000,TimeUnit.MILLISECONDS);
@@ -580,8 +582,9 @@ public class ConnectionManager {
 		try {
 			// Temp client connection
 			Convex convex=Convex.connect(hostAddress);
-
-			AVector<ACell> status = convex.requestStatusSync(Constants.DEFAULT_CLIENT_TIMEOUT);
+			Result result = convex.requestStatusSync(Constants.DEFAULT_CLIENT_TIMEOUT);
+			result = convex.loadResult(result, Constants.DEFAULT_CLIENT_TIMEOUT);
+			AVector<ACell> status = result.getValue();
 			if (status == null || status.count()!=Constants.STATUS_COUNT) {
 				throw new Error("Bad status message from remote Peer");
 			}
@@ -599,7 +602,7 @@ public class ConnectionManager {
 				connections.put(peerKey, newConn);
 			}
 			server.raiseServerChange("connection");
-		} catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
+		} catch (IOException | TimeoutException e) {
 			// ignore any errors from the peer connections
 		} catch (UnresolvedAddressException e) {
 			log.info("Unable to resolve host address: "+hostAddress);

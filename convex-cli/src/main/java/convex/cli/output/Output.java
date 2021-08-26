@@ -37,15 +37,16 @@ public class Output {
 		return field;
 	}
 
-	public void setResult(ACell value, ACell errorCode, AVector<AString> trace) {
+	public void setResult(Result result) {
+        ACell value = result.getValue();
 		if (value != null) {
 			setField("Result", value);
 			setField("Data type", value.getType().toString());
 		}
-		if (errorCode != null) {
-			setField("Error code", errorCode);
-			if (trace != null) {
-				setField("Trace", trace);
+		if (result.isError()) {
+			setField("Error code", result.getErrorCode());
+			if (result.getTrace() != null) {
+				setField("Trace", result.getTrace());
 			}
 			return;
 		}

@@ -106,17 +106,8 @@ public class Transaction implements Runnable {
 			ACell value = null;
 			AVector<AString> trace = null;
 			Result result = convex.transactSync(transaction, timeout);
-			try {
-				value = result.getValue();
-			} catch (MissingDataException e) {
-				value = (Result) convex.acquire(e.getMissingHash()).get(timeout,TimeUnit.MILLISECONDS);
-			}
-			try {
-				trace = result.getTrace();
-			} catch (MissingDataException e) {
-				trace = (AVector<AString>) convex.acquire(e.getMissingHash()).get(timeout,TimeUnit.MILLISECONDS);
-			}
-			mainParent.output.setResult(value, result.getErrorCode(), trace);
+			result = convex.loadResult(result, timeout);
+			mainParent.output.setResult(result);
 		} catch (Throwable t) {
 			mainParent.showError(t);
 		}

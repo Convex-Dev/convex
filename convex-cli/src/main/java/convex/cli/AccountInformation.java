@@ -68,7 +68,7 @@ public class AccountInformation implements Runnable {
             String queryCommand = String.format("(account #%d)", address.longValue());
 			ACell message = Reader.read(queryCommand);
 			Result result = convex.querySync(message, timeout);
-			mainParent.output.setResult(result.getValue(), result.getErrorCode(), result.getTrace());
+			mainParent.output.setResult(result);
 		} catch (Throwable t) {
 			mainParent.showError(t);
 		}
