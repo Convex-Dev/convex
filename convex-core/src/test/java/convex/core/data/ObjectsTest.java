@@ -123,8 +123,12 @@ public class ObjectsTest {
 			assertSame(encoding,a.getEncoding()); // should be same cached encoding
 			assertEquals(encoding.length,a.getEncodingLength());
 			
-			assertTrue(a.isCVMValue());
+			if (a.isCVMValue()) {
+				assertNotNull(a.getType());
+			}
+			
 		}
+		
 
 		// Any encoding should be less than or equal to the limit
 		assertTrue(encoding.length <= Format.LIMIT_ENCODING_LENGTH);
