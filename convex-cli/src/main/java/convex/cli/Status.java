@@ -81,8 +81,9 @@ public class Status implements Runnable {
 		}
 
 		try {
-            Result result = convex.requestStatusSync(timeout);
-			AVector<ACell> status = convex.loadResult(result, timeout);
+			Result result = convex.requestStatusSync(timeout);
+			result = convex.loadResult(result, timeout);
+			AVector<ACell> status = result.getValue();
 			ABlob stateHash = (ABlob) status.get(1);
 			Hash hash = Hash.wrap(stateHash.getBytes());
 			AVector<ACell> stateWrapper = (AVector<ACell>) convex.acquire(hash, Stores.current()).get(3000,TimeUnit.MILLISECONDS);
