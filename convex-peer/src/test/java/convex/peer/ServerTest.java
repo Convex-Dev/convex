@@ -90,7 +90,7 @@ public class ServerTest {
 
 	@BeforeAll
 	public static void init() {
-		network =  TestNetwork.getInstance();
+		network = TestNetwork.getInstance();
 	}
 
 	@Test
