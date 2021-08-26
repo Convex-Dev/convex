@@ -1,6 +1,5 @@
 package convex.peer;
 
-import java.lang.InterruptedException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -11,14 +10,12 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
-import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
-import convex.net.Connection;
 
 
 /**
