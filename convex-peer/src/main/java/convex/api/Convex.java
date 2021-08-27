@@ -471,6 +471,7 @@ public class Convex {
 		timeout = Math.max(0L, timeout - (now - start));
 		try {
 			result = cf.get(timeout, TimeUnit.MILLISECONDS);
+			result = loadResult(result, timeout);
 		} catch (InterruptedException | ExecutionException e) {
 			throw new Error("Not possible? Since there is no Thread for the future....", e);
 		}
@@ -501,6 +502,7 @@ public class Convex {
 		timeout = Math.max(0L, timeout - (now - start));
 		try {
 			result=cf.get(timeout,TimeUnit.MILLISECONDS);
+			result = loadResult(result, timeout);
 		} catch (InterruptedException | ExecutionException e) {
 			throw new Error("Not possible? Since there is no Thread for the future....", e);
 		}
@@ -620,6 +622,7 @@ public class Convex {
 		timeout = Math.max(0L, timeout - (now - start));
 		try {
 			result=statusFuture.get(timeout,TimeUnit.MILLISECONDS);
+			result = loadResult(result, timeout);
 		} catch (InterruptedException | ExecutionException e) {
 			throw new Error("Unable to get status message", e);
 		}
@@ -754,12 +757,14 @@ public class Convex {
 	 */
 	public Result querySync(ACell query, Address address, long timeoutMillis) throws TimeoutException, IOException {
 		Future<Result> cf = query(query, address);
-
+		Result result;
 		try {
-			return cf.get(timeoutMillis, TimeUnit.MILLISECONDS);
+			result = cf.get(timeoutMillis, TimeUnit.MILLISECONDS);
+			result = loadResult(result, timeoutMillis);
 		} catch (InterruptedException | ExecutionException e) {
 			throw new Error("Not possible? Since there is no Thread for the future....", e);
 		}
+		return result;
 	}
 
 	/**

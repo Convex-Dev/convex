@@ -138,7 +138,6 @@ public class ConnectionManager {
 			try {
 				// use requestStatusSync to auto acquire hash of the status instead of the value
 				Result result=convex.requestStatusSync(POLL_TIMEOUT_MILLIS);
-				result = convex.loadResult(result, POLL_TIMEOUT_MILLIS);
 				AVector<ACell> status = result.getValue();
 				Hash h=RT.ensureHash(status.get(0));
 				@SuppressWarnings("unchecked")
@@ -592,7 +591,6 @@ public class ConnectionManager {
 			// Temp client connection
 			Convex convex=Convex.connect(hostAddress);
 			Result result = convex.requestStatusSync(Constants.DEFAULT_CLIENT_TIMEOUT);
-			result = convex.loadResult(result, Constants.DEFAULT_CLIENT_TIMEOUT);
 			AVector<ACell> status = result.getValue();
 			if (status == null || status.count()!=Constants.STATUS_COUNT) {
 				throw new Error("Bad status message from remote Peer");

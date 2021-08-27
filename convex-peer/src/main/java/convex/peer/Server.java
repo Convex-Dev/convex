@@ -248,7 +248,6 @@ public class Server implements Closeable {
 				log.info("Attempting Peer Sync with: "+sourceAddr);
 				long timeout = establishTimeout();
 				Result result = convex.requestStatusSync(timeout);
-				result = convex.loadResult(result, timeout);
 				AVector<ACell> status = result.getValue();
 				if (status == null || status.count()!=Constants.STATUS_COUNT) {
 					throw new Error("Bad status message from remote Peer");

@@ -106,7 +106,6 @@ public class Transaction implements Runnable {
 			ACell value = null;
 			AVector<AString> trace = null;
 			Result result = convex.transactSync(transaction, timeout);
-			result = convex.loadResult(result, timeout);
 			mainParent.output.setResult(result);
 		} catch (Throwable t) {
 			mainParent.showError(t);
