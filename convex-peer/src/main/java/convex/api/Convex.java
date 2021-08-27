@@ -790,7 +790,7 @@ public class Convex {
 	}
 
 	/**
-	 * Disconnects the client from the network.
+	 * Disconnects the client from the network, closing the underlying connection.
 	 */
 	public synchronized void close() {
 		Connection c = this.connection;
@@ -859,6 +859,11 @@ public class Convex {
 		return convex;
 	}
 
+	/**
+	 * Gets the consensus state from the remote Peer
+	 * @return Future for consensus state
+	 * @throws TimeoutException
+	 */
 	public Future<State> acquireState() throws TimeoutException {
 		try {
 			Future<Result> sF=requestStatus();

@@ -14,7 +14,7 @@ import convex.core.init.Init;
 import convex.core.util.Utils;
 
 /**
- * Tests for a fresh standalone server cluster instance
+ * Singleton server cluster instance
  */
 public class TestNetwork {
 
@@ -24,6 +24,7 @@ public class TestNetwork {
 
 	public Convex CONVEX;
 
+	// Deterministic keypairs
 	public AKeyPair[] KEYPAIRS = new AKeyPair[] {
 			AKeyPair.createSeeded(2),
 			AKeyPair.createSeeded(3),
