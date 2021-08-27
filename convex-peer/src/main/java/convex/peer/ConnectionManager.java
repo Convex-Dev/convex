@@ -19,6 +19,7 @@ import convex.api.Convex;
 import convex.core.Belief;
 import convex.core.Constants;
 import convex.core.Peer;
+import convex.core.Result;
 import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.AString;
