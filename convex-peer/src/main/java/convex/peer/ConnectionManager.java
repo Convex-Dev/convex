@@ -9,18 +9,16 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 import convex.api.Convex;
 import convex.core.Belief;
 import convex.core.Constants;
 import convex.core.Peer;
-import convex.core.Result;
 import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.AString;

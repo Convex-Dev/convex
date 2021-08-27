@@ -7,23 +7,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.Belief;
@@ -38,20 +32,22 @@ import convex.core.data.Address;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.data.Maps;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.Init;
-import convex.core.transactions.*;
-import convex.core.lang.Reader;
 import convex.core.lang.RT;
+import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
+import convex.core.transactions.Call;
+import convex.core.transactions.Invoke;
+import convex.core.transactions.Transfer;
 import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.net.Message;

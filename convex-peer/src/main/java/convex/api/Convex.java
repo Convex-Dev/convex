@@ -112,7 +112,7 @@ public class Convex {
 					cf.complete(v);
 				} else {
 					log.warn(
-							"Ignored Result received for unexpected message ID: {}", id);
+							"Ignored Result received for unexpected message ID: {} - {}", id, v);
 				}
 			}
 
