@@ -484,8 +484,8 @@ public class Connection {
 		Counters.sendCount++;
 
 		// Need to ensure message is persisted at least, so we can respond to missing
-		// data messages
-		// using the current thread store
+		// data messages using the current thread store
+		// We pre-send any novelty to the destination
 		ACell sendVal = payload;
 		ACell.createPersisted(sendVal, r -> {
 			try {

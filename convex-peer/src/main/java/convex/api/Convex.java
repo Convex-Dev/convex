@@ -109,6 +109,8 @@ public class Convex {
 				if (cf != null) {
 					awaiting.remove(id);
 					cf.complete(v);
+					log.debug(
+							"Completed Result received for message ID: {} - {}", id, v);
 				} else {
 					log.warn(
 							"Ignored Result received for unexpected message ID: {} - {}", id, v);
@@ -386,7 +388,7 @@ public class Convex {
 		// Store future for completion by result message
 		synchronized (awaiting) {
 			awaiting.put(id, cf);
-			log.trace("Sent transaction with message ID: {}",id);
+			log.debug("Sent transaction with message ID: {}",id);
 		}
 
 		return cf;
