@@ -490,6 +490,7 @@ public class Connection {
 		ACell.createPersisted(sendVal, r -> {
 			try {
 				ACell data = r.getValue();
+				if (data==sendVal) return; // skip sending top payload
 				if (!Format.isEmbedded(data)) sendData(data);
 			} catch (IOException e) {
 				throw Utils.sneakyThrow(e);
