@@ -862,7 +862,7 @@ public class Convex {
 	/**
 	 * Gets the consensus state from the remote Peer
 	 * @return Future for consensus state
-	 * @throws TimeoutException
+	 * @throws TimeoutException If initial status request times out
 	 */
 	public Future<State> acquireState() throws TimeoutException {
 		try {

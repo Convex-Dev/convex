@@ -256,6 +256,8 @@ public class Connection {
 
 	/**
 	 * Sends a DATA Message on this connection.
+	 * 
+	 * Does not send embedded values.
 	 *
 	 * @param value Any data object, which will be encoded and sent as a single cell
 	 * @return true if buffered successfully, false otherwise (not sent)
@@ -488,7 +490,7 @@ public class Connection {
 		ACell.createPersisted(sendVal, r -> {
 			try {
 				ACell data = r.getValue();
-				boolean sent = sendData(data);
+				if (!Format.isEmbedded(data)) sendData(data);
 			} catch (IOException e) {
 				throw Utils.sneakyThrow(e);
 			}
