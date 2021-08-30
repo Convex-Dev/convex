@@ -388,7 +388,7 @@ public class Convex {
 		// Store future for completion by result message
 		synchronized (awaiting) {
 			awaiting.put(id, cf);
-			log.debug("Sent transaction with message ID: {}",id);
+			log.debug("Sent transaction with message ID: {} awaiting count = {}",id,awaiting.size());
 		}
 
 		return cf;
