@@ -376,7 +376,7 @@ public class Convex {
 			id = connection.sendTransaction(signed);
 			if (id<0) {
 				try {
-					Thread.sleep(1);
+					Thread.sleep(10);
 				} catch (InterruptedException e) {
 					// Ignore
 				}
@@ -386,6 +386,7 @@ public class Convex {
 		// Store future for completion by result message
 		synchronized (awaiting) {
 			awaiting.put(id, cf);
+			log.trace("Sent transaction with message ID: {}",id);
 		}
 
 		return cf;
