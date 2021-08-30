@@ -378,20 +378,20 @@ public class Convex {
 
 		long id = -1;
 
-		// loop until request is queued
-		while (id < 0) {
-			id = connection.sendTransaction(signed);
-			if (id<0) {
-				try {
-					Thread.sleep(10);
-				} catch (InterruptedException e) {
-					// Ignore
+		synchronized (awaiting) {
+			// loop until request is queued
+			while (id < 0) {
+				id = connection.sendTransaction(signed);
+				if (id<0) {
+					try {
+						Thread.sleep(10);
+					} catch (InterruptedException e) {
+						// Ignore
+					}
 				}
 			}
-		}
-
-		// Store future for completion by result message
-		synchronized (awaiting) {
+	
+			// Store future for completion by result message
 			awaiting.put(id, cf);
 			log.debug("Sent transaction with message ID: {} awaiting count = {}",id,awaiting.size());
 		}
