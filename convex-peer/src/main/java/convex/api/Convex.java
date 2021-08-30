@@ -645,7 +645,7 @@ public class Convex {
 		synchronized (awaiting) {
 			long id = connection.sendStatusRequest();
 			if (id < 0) {
-				throw new IOException("Failed to send query due to full buffer");
+				throw new IOException("Failed to send status request due to full buffer");
 			}
 
 			// Store future for completion by result message

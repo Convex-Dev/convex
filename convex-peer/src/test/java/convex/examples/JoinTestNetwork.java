@@ -1,5 +1,6 @@
 package convex.examples;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
@@ -30,7 +31,7 @@ public class JoinTestNetwork {
 
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.KEYPAIR,kp);
-		config.put(Keywords.STORE,EtchStore.createTemp());
+		config.put(Keywords.STORE,EtchStore.create(new File("temp-join-db.etch")));
 		config.put(Keywords.CONTROLLER,acct);
 		config.put(Keywords.SOURCE,"convex.world:43579");
 
