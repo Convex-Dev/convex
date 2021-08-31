@@ -29,9 +29,9 @@ public class PFXTools {
 	public static final String CERTIFICATE_ALGORITHM = "RSA";
 
 	/**
-	 * Creates a new PKCS12 Key store.
-	 * @param keyFile File to use for key store
-	 * @param passPhrase Passphrase for key store
+	 * Creates a new PKCS12 key store.
+	 * @param keyFile File to use for creating the key store
+	 * @param passPhrase Passphrase used to protect the key store, may be null
 	 * @return New KeyStore instance
 	 */
 	@SuppressWarnings("javadoc")
@@ -51,16 +51,16 @@ public class PFXTools {
 	}
 
 	/**
-	 * Loads an existing PKCS12 Key store. Passphrase optional, may be blank or null.
-	 * @param keyFile File for existing KeyStore
-	 * @param passPhrase Passphrase for KeyStore. May be blank or null.
-	 * @return KeyStore instance
+	 * Loads an existing PKCS12 Key store.
+	 * @param keyFile File for the existing key store
+	 * @param passPhrase Passphrase for decrypting the key store. May be blank or null if not encrypted.
+	 * @return Found key store
 	 * @throws IOException If an IO error occurs
 	 * @throws GeneralSecurityException If a security error occurs
 	 */
 	public static KeyStore loadStore(File keyFile, String passPhrase) throws IOException,GeneralSecurityException {
 
-		// need to load in bouncy castle crypto providers to set/get keys from the keystore
+		// Need to load in bouncy castle crypto providers to set/get keys from the keystore.
 		Providers.init();
 
 		KeyStore ks = KeyStore.getInstance(KEYSTORE_TYPE);
@@ -73,12 +73,12 @@ public class PFXTools {
 	}
 
 	/**
-	 * Saves a PKCS12 Key store to disk. Passphrase optional, may be blank or null.
-	 * @param ks KeyStore to save
-	 * @param keyFile Target KeyStore file
-	 * @param passPhrase Passphrase for KeyStore. May be blank or null.
-	 * @return KeyStore instance
-	 * @throws IOException If an IO error occurs accessing the Keystore
+	 * Saves a PKCS12 Key store to disk.
+	 * @param ks Key store to save
+	 * @param keyFile Target file
+	 * @param passPhrase Passphrase for encrypting the key store. May be blank or null if not need for encryption.
+	 * @return Same key store instance.
+	 * @throws IOException If an IO error occurs accessing the key store
 	 * @throws GeneralSecurityException if a security exception occurs
 	 */
 	public static KeyStore saveStore(KeyStore ks, File keyFile, String passPhrase) throws GeneralSecurityException, IOException {
@@ -92,9 +92,10 @@ public class PFXTools {
 	}
 
 	/**
-	 * @param kpToSign Key Pair
-	 * @return New Certificate
-	 * @throws GeneralSecurityException if a security exception occurs
+	 * Generates a self-signed certificate.
+	 * @param kpToSign Key pair
+	 * @return New certificate
+	 * @throws GeneralSecurityException If a security exception occurs
 	 */
 	public static Certificate createSelfSignedCertificate(AKeyPair kpToSign) throws GeneralSecurityException {
 		KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(CERTIFICATE_ALGORITHM);
@@ -117,12 +118,12 @@ public class PFXTools {
 	}
 
 	/**
-	 * Adds a key to a key store
-	 * @param ks Keystore
+	 * Adds a key pair to a key store.
+	 * @param ks Key store
 	 * @param kp Key pair
-	 * @param passPhrase Passphrase for key
-	 * @return Updated KeyStore
-	 * @throws IOException If an IO error occurs accessing the Keystore
+	 * @param passPhrase Passphrase for encrypting the key pair. Mandatory.
+	 * @return Updated key store.
+	 * @throws IOException If an IO error occurs accessing the key store
 	 * @throws GeneralSecurityException if a security exception occurs
 	 */
 	public static KeyStore saveKey(KeyStore ks, AKeyPair kp, String passPhrase) throws IOException, GeneralSecurityException {
@@ -136,6 +137,13 @@ public class PFXTools {
 		return ks;
 	}
 
+	/**
+	 * Retrieves a key pair from a key store.
+	 * @param ks Key store
+	 * @param alias Alias used for finding the key pair in the store
+	 * @param passphrase Passphrase used for decrypting the key pair. Mandatory.
+	 * @return Found key pair
+	 */
 	public static AKeyPair getKeyPair(KeyStore ks, String alias, String passPhrase) throws UnrecoverableKeyException, KeyStoreException, NoSuchAlgorithmException {
 		char[] pwdArray = passPhrase.toCharArray();
 
