@@ -37,14 +37,15 @@ public class API {
 	 * <p>Config keys are:</p>
 	 *
 	 * <ul>
-	 * <li>:keypair (required) - AKeyPair instance.
-	 * <li>:port (optional) - Integer port number to use for incoming connections. Defaults to random allocation.
-	 * <li>:store (optional) - AStore instance. Defaults to the configured global store
-	 * <li>:source (optional) - URL for Peer to replicate initial State/Belief from.
-	 * <li>:state (optional) - Genesis state. Defaults to a fresh genesis state for the Peer if neither :source nor :state is specified
-	 * <li>:restore (optional) - Boolean Flag to restore from existing store. Default to true
-	 * <li>:persist (optional) - Boolean flag to determine if peer state should be persisted in store at server close. Default true.
-	 * <li>:url (optional) - public URL for server. If provided, peer will set its public on-chain address based on this
+	 * <li>:keypair (required, AKeyPair) - AKeyPair instance.
+	 * <li>:port (optional, Integer) - Integer port number to use for incoming connections. Defaults to random allocation.
+	 * <li>:store (optional, AStore) - AStore instance. Defaults to the configured global store
+	 * <li>:source (optional, String) - URL for Peer to replicate initial State/Belief from.
+	 * <li>:state (optional, State) - Genesis state. Defaults to a fresh genesis state for the Peer if neither :source nor :state is specified
+	 * <li>:restore (optional, Boolean) - Boolean Flag to restore from existing store. Default to true
+	 * <li>:persist (optional, Boolean) - Boolean flag to determine if peer state should be persisted in store at server close. Default true.
+	 * <li>:url (optional, String) - public URL for server. If provided, peer will set its public on-chain address based on this.
+	 * <li>:auto-manage (optional Boolean) - set to true for peer to auto-manage own account. Defaults to true.
 	 * </ul>
 	 *
 	 * @param peerConfig Config map for the new Peer
@@ -71,6 +72,7 @@ public class API {
 			if (!config.containsKey(Keywords.STORE)) config.put(Keywords.STORE, Stores.getGlobalStore());
 			if (!config.containsKey(Keywords.RESTORE)) config.put(Keywords.RESTORE, true);
 			if (!config.containsKey(Keywords.PERSIST)) config.put(Keywords.PERSIST, true);
+			if (!config.containsKey(Keywords.AUTO_MANAGE)) config.put(Keywords.AUTO_MANAGE, true);
 
 			Server server = Server.create(config);
 			server.launch();

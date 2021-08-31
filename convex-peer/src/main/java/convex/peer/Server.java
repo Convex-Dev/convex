@@ -717,9 +717,6 @@ public class Server implements Closeable {
 		State s=getPeer().getConsensusState();
 		long ts=Utils.getCurrentTimestamp();
 
-		// If no connections yet, don't try this
-		if (manager.getConnectionCount()==0) return;
-
 		// If we already did this recently, don't try again
 		if (ts<(lastOwnTransactionTimestamp+OWN_TRANSACTIONS_DELAY)) return;
 

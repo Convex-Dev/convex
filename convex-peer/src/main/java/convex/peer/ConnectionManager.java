@@ -112,6 +112,7 @@ public class ConnectionManager {
 	 */
 	private void pollBelief() {
 		try {
+			// Poll if no recent consensus updates
 			long lastConsensus=server.getPeer().getConsensusState().getTimeStamp().longValue();
 			if (lastConsensus+SERVER_POLL_DELAY>=lastUpdate) return;
 
