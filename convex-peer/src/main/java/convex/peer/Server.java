@@ -50,7 +50,6 @@ import convex.core.init.Init;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
-import convex.core.lang.impl.AExceptional;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;

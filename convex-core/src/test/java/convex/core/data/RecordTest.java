@@ -10,7 +10,6 @@ import convex.core.Belief;
 import convex.core.Result;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.InitTest;
-import convex.core.lang.Reader;
 import convex.core.lang.TestState;
 import convex.core.lang.impl.RecordFormat;
 
