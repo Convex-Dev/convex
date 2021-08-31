@@ -348,6 +348,7 @@ public class Server implements Closeable {
 
 			if (getConfig().containsKey(Keywords.URL)) {
 				hostname = (String) getConfig().get(Keywords.URL);
+				log.debug("Setting desired peer URL to: "+hostname);
 			} else {
 				hostname = null;
 			}
@@ -383,10 +384,15 @@ public class Server implements Closeable {
 				Object s=getConfig().get(Keywords.SOURCE);
 				InetSocketAddress sa=Utils.toInetSocketAddress(s);
 				if (sa!=null) {
-					manager.connectToPeer(sa);
+					if (manager.connectToPeer(sa)!=null) {
+						log.debug("Automatically connected to :source peer at: {}",sa);
+					} else {
+						log.warn("Failed to connect to :source peer at: {}",sa);	
+					}
+				} else {
+					log.warn("Failed to parse :source peer address {}",s);
 				}
 			}
-
 
 			log.info( "Peer Server started with Peer Address: {}",getPeerKey());
 		} catch (Throwable e) {
