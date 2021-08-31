@@ -2019,7 +2019,7 @@ public class Context<T extends ACell> extends AObject {
 		// if (!as.getAccountKey().equals(accountKey)) return this.withArgumentError("Cannot create a peer with a different account-key");
 
 		long balance=getBalance(myAddress);
-		if (initialStake>=balance) return this.withFundsError("Insufficient balance ("+balance+") to assign an initial stake of "+initialStake);
+		if (initialStake>balance) return this.withFundsError("Insufficient balance ("+balance+") to assign an initial stake of "+initialStake);
 
 		PeerStatus newPeerStatus = PeerStatus.create(myAddress, initialStake);
 

@@ -2548,6 +2548,14 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step(ctx,"(create-peer hero-peer)"));
 		assertArityError(step(ctx,"(create-peer hero-peer 1000 :foo)"));
 	}
+	
+	@Test 
+	public void testCreatePeerRegression() {
+		assertNotError(step("(create-peer 0x42ae93b185bd2ba64fd9b0304fec81a4d4809221a5b68de4da041b48c85bcc2e (dec *balance*))"));
+		assertNotError(step("(create-peer 0x42ae93b185bd2ba64fd9b0304fec81a4d4809221a5b68de4da041b48c85bcc2e *balance*)"));
+		assertFundsError(step("(create-peer 0x42ae93b185bd2ba64fd9b0304fec81a4d4809221a5b68de4da041b48c85bcc2e (inc *balance*))"));
+		
+	}
 
 	@Test
 	public void testNumericComparisons() {
