@@ -864,11 +864,7 @@ public class Server implements Closeable {
 			boolean resultReturned;
 
 			if (resultContext.isExceptional()) {
-				AExceptional err = resultContext.getExceptional();
-				ACell code = err.getCode();
-				ACell message = err.getMessage();
-
-				resultReturned = pc.sendResult(id, message, code);
+				resultReturned = pc.sendResult(Result.fromContext(id, resultContext));
 			} else {
 				resultReturned = pc.sendResult(id, resultContext.getResult());
 			}

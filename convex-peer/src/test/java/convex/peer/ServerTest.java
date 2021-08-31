@@ -134,6 +134,13 @@ public class ServerTest {
 
 		assertEquals(network.VILLAIN,f2.getValue());
 		assertTrue(f.get().getValue() instanceof CVMLong);
+		
+		
+		convex.core.Result r3=convex.querySync(Reader.read("(fail :foo)"));
+		assertTrue(r3.isError());
+		assertEquals(ErrorCodes.ASSERT,r3.getErrorCode());
+		assertEquals(Keywords.FOO,r3.getValue());
+		assertNotNull(r3.getTrace());
 	}
 
 	@Test
