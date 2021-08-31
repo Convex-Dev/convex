@@ -231,9 +231,8 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	
 	@Override
 	public void print(StringBuilder sb) {
-		// TODO. Really needed? How is it related to the Reader?
-		sb.append("#ref {:hash #hash 0x");
-		sb.append(hash.toHexString());
+		sb.append("#ref {:hash #hash ");
+		sb.append((hash==null)?"nil":hash.toString());
 		sb.append(", :flags ");
 		sb.append(flags);
 		sb.append("}");
