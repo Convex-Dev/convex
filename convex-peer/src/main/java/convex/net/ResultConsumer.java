@@ -13,6 +13,7 @@ import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.MissingDataException;
+import convex.core.lang.RT;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
 
@@ -69,7 +70,9 @@ public abstract class ResultConsumer implements Consumer<Message> {
 
 	private void handleMissingDataRequest(Message m) {
 		// try to be helpful by returning sent data
-		Hash h = m.getPayload();
+		Hash h = RT.ensureHash(m.getPayload());
+		if (h==null) return; // not a valid payload so ignore
+		
 		Ref<?> r = Stores.current().refForHash(h);
 		if (r != null) try {
 			m.getConnection().sendData(r.getValue());
