@@ -348,7 +348,7 @@ public class Server implements Closeable {
 			if (getConfig().containsKey(Keywords.URL)) {
 				hostname = (String) getConfig().get(Keywords.URL);
 			} else {
-				hostname = String.format("localhost:%d", port);
+				hostname = null;
 			}
 
 			// set running status now, so that loops don't terminate

@@ -896,7 +896,7 @@ public class Core {
 		@SuppressWarnings("unchecked")
 		@Override
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
-			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 			
 			AccountKey peerKey=RT.ensureAccountKey(args[0]);
 			if (peerKey == null) return context.withCastError(0,args, Types.BLOB);

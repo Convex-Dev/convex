@@ -44,6 +44,7 @@ public class API {
 	 * <li>:state (optional) - Genesis state. Defaults to a fresh genesis state for the Peer if neither :source nor :state is specified
 	 * <li>:restore (optional) - Boolean Flag to restore from existing store. Default to true
 	 * <li>:persist (optional) - Boolean flag to determine if peer state should be persisted in store at server close. Default true.
+	 * <li>:url (optional) - public URL for server. If provided, peer will set its public on-chain address based on this
 	 * </ul>
 	 *
 	 * @param peerConfig Config map for the new Peer
@@ -169,7 +170,7 @@ public class API {
 	 *
 	 * @param serverList List of local peer servers running on the local network.
 	 *
-	 * @param timoutMillis Number of millis to wait before exiting with a failure.
+	 * @param timeoutMillis Number of milliseconds to wait before exiting with a failure.
 	 *
 	 * @return Return true if all server peers have the same consensus hash, else false is a timeout.
 	 *
