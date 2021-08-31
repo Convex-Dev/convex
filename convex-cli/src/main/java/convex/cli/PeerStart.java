@@ -130,7 +130,7 @@ public class PeerStart implements Runnable {
 				}
 				store = EtchStore.create(etchFile);
 			} else {
-				store = Stores.getDefaultStore();
+				store = Stores.getGlobalStore();
 			}
 			peerManager = PeerManager.create(mainParent.getSessionFilename(), keyPair, peerAddress, store);
 			peerManager.launchPeer(hostname, port, remotePeerHostname);
