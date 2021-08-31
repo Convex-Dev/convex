@@ -91,7 +91,7 @@ public class Message {
 	 */
 	public CVMLong getID() {
 		switch (type) {
-			// Query and transact use a vector
+			// Query and transact use a vector [ID ...]
 			case QUERY:
 			case TRANSACT: return (CVMLong) ((AVector<?>)payload).get(0);
 

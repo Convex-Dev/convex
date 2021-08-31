@@ -701,7 +701,8 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Adds an event to the inboud server event queue. May block.
+	 * Adds an event to the inbound server event queue. May block.
+	 * @param event Signed event to add to inbound event queue
 	 * @throws InterruptedException
 	 */
 	public void queueEvent(SignedData<?> event) throws InterruptedException {
@@ -973,7 +974,7 @@ public class Server implements Closeable {
 						}
 					}
 
-					// Maybe sleep a bit, wait for some messages to accumulate
+					// Maybe sleep a bit, wait for some events to accumulate
 					awaitEvents();
 				}
 			} catch (InterruptedException e) {

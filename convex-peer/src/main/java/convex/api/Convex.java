@@ -110,6 +110,8 @@ public class Convex {
 				if (cf != null) {
 					awaiting.remove(id);
 					cf.complete(v);
+					log.debug(
+							"Completed Result received for message ID: {} - {}", id, v);
 				} else {
 					log.warn(
 							"Ignored Result received for unexpected message ID: {} - {}", id, v);
@@ -349,11 +351,16 @@ public class Convex {
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
 	public synchronized CompletableFuture<Result> transact(ATransaction transaction) throws IOException {
-		if (autoSequence || (transaction.getSequence() <= 0)) {
-			transaction = applyNextSequence(transaction);
-		}
 		if (transaction.getAddress() == null) {
 			transaction = transaction.withAddress(address);
+		}
+		if (autoSequence || (transaction.getSequence() <= 0)) {
+			// apply sequence if using expected address
+			if (Utils.equals(transaction.getAddress(), address)) {
+				transaction = applyNextSequence(transaction);
+			} else {
+				// ignore??
+			}
 		}
 		SignedData<ATransaction> signed = keyPair.signData(transaction);
 		return transact(signed);
@@ -372,21 +379,22 @@ public class Convex {
 
 		long id = -1;
 
-		// loop until request is queued
-		while (id < 0) {
-			id = connection.sendTransaction(signed);
-			if (id<0) {
-				try {
-					Thread.sleep(1);
-				} catch (InterruptedException e) {
-					// Ignore
+		synchronized (awaiting) {
+			// loop until request is queued
+			while (id < 0) {
+				id = connection.sendTransaction(signed);
+				if (id<0) {
+					try {
+						Thread.sleep(10);
+					} catch (InterruptedException e) {
+						// Ignore
+					}
 				}
 			}
-		}
-
-		// Store future for completion by result message
-		synchronized (awaiting) {
+	
+			// Store future for completion by result message
 			awaiting.put(id, cf);
+			log.debug("Sent transaction with message ID: {} awaiting count = {}",id,awaiting.size());
 		}
 
 		return cf;
@@ -797,7 +805,7 @@ public class Convex {
 	}
 
 	/**
-	 * Disconnects the client from the network.
+	 * Disconnects the client from the network, closing the underlying connection.
 	 */
 	public synchronized void close() {
 		Connection c = this.connection;
@@ -866,6 +874,11 @@ public class Convex {
 		return convex;
 	}
 
+	/**
+	 * Gets the consensus state from the remote Peer
+	 * @return Future for consensus state
+	 * @throws TimeoutException If initial status request times out
+	 */
 	public Future<State> acquireState() throws TimeoutException {
 		try {
 			Future<Result> sF=requestStatus();

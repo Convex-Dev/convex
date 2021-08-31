@@ -126,15 +126,15 @@ public class AccountKey extends AArrayBlob {
 	}
 
 	/**
-	 * Constructs an AccountKey object from a hex string
+	 * Constructs an AccountKey object from a hex string.
+	 * Throws an exception if string is not valid
 	 * 
 	 * @param hexString Hex String
-	 * @return An AccountKey constructed from the hex string, or null if not a valid
-	 *         hex string
+	 * @return An AccountKey constructed from the hex string
 	 */
 	public static AccountKey fromHex(String hexString) {
 		AccountKey result = fromHexOrNull(hexString);
-		if (result == null) throw new Error("Invalid Address hex String [" + hexString + "]");
+		if (result == null) throw new IllegalArgumentException("Invalid Address hex String [" + hexString + "]");
 		return result;
 	}
 

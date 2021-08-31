@@ -12,6 +12,9 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
 
+/**
+ * Tests for the low level Connection class
+ */
 public class ConnectionTest {
 	
 	@Test
