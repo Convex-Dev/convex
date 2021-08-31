@@ -93,7 +93,7 @@ public class PeerCreate implements Runnable {
 			keyPair = AKeyPair.generate();
 
 			// save the new keypair in the keystore
-			PFXTools.saveKey(keyStore, keyPair, mainParent.getPassword());
+			PFXTools.setKeyPair(keyStore, keyPair, mainParent.getPassword());
 
 			File keyFile = new File(mainParent.getKeyStoreFilename());
 

@@ -118,40 +118,6 @@ public class PFXTools {
 	}
 
 	/**
-	 * Adds a key pair to a key store.
-	 * @param ks Key store
-	 * @param kp Key pair
-	 * @param passPhrase Passphrase for encrypting the key pair. Mandatory.
-	 * @return Updated key store.
-	 * @throws IOException If an IO error occurs accessing the key store
-	 * @throws GeneralSecurityException if a security exception occurs
-	 */
-	public static KeyStore saveKey(KeyStore ks, AKeyPair kp, String passPhrase) throws IOException, GeneralSecurityException {
-
-		return saveKey(ks, kp.getAccountKey().toHexString(), kp, passPhrase);
-	}
-
-	/**
-	 * Adds a key pair to a key store.
-	 * @param ks Key store
-	 * @param kp Key pair
-	 * @param passPhrase Passphrase for encrypting the key pair. Mandatory.
-	 * @return Updated key store.
-	 * @throws IOException If an IO error occurs accessing the key store
-	 * @throws GeneralSecurityException if a security exception occurs
-	 */
-	public static KeyStore saveKey(KeyStore ks, String alias, AKeyPair kp, String passPhrase) throws IOException, GeneralSecurityException {
-
-		if (passPhrase == null) throw new IllegalArgumentException("Password is mandatory for private key");
-		char[] pwdArray = passPhrase.toCharArray();
-
-		Certificate cert = createSelfSignedCertificate(kp);
-		ks.setKeyEntry(alias, kp.getPrivate(), pwdArray, new Certificate[] {cert});
-
-		return ks;
-	}
-
-	/**
 	 * Retrieves a key pair from a key store.
 	 * @param ks Key store
 	 * @param alias Alias used for finding the key pair in the store
@@ -166,4 +132,39 @@ public class PFXTools {
 		Key sk=ks.getKey(alias,pwdArray);
 		return Ed25519KeyPair.create(cert.getPublicKey(),(PrivateKey) sk);
 	}
+
+	/**
+	 * Adds a key pair to a key store.
+	 * @param ks Key store
+	 * @param kp Key pair
+	 * @param passPhrase Passphrase for encrypting the key pair. Mandatory.
+	 * @return Updated key store.
+	 * @throws IOException If an IO error occurs accessing the key store
+	 * @throws GeneralSecurityException if a security exception occurs
+	 */
+	public static KeyStore setKeyPair(KeyStore ks, AKeyPair kp, String passPhrase) throws IOException, GeneralSecurityException {
+
+		return setKeyPair(ks, kp.getAccountKey().toHexString(), kp, passPhrase);
+	}
+
+	/**
+	 * Adds a key pair to a key store.
+	 * @param ks Key store
+	 * @param kp Key pair
+	 * @param passPhrase Passphrase for encrypting the key pair. Mandatory.
+	 * @return Updated key store.
+	 * @throws IOException If an IO error occurs accessing the key store
+	 * @throws GeneralSecurityException if a security exception occurs
+	 */
+	public static KeyStore setKeyPair(KeyStore ks, String alias, AKeyPair kp, String passPhrase) throws IOException, GeneralSecurityException {
+
+		if (passPhrase == null) throw new IllegalArgumentException("Password is mandatory for private key");
+		char[] pwdArray = passPhrase.toCharArray();
+
+		Certificate cert = createSelfSignedCertificate(kp);
+		ks.setKeyEntry(alias, kp.getPrivate(), pwdArray, new Certificate[] {cert});
+
+		return ks;
+	}
+
 }
