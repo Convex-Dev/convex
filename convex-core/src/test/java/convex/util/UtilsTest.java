@@ -269,7 +269,9 @@ public class UtilsTest {
 		assertNotNull(sa);
 		
 		assertNotNull(Utils.toInetSocketAddress("localhost:8080"));
-		assertNotNull(Utils.toInetSocketAddress("12.13.14.15:8080"));
+		
+		InetSocketAddress sa1=Utils.toInetSocketAddress("12.13.14.15:8080");
+		assertNotNull(sa1);
 		assertNotNull(Utils.toInetSocketAddress("http:12.13.14.15:8080"));
 		
 		assertNull(Utils.toInetSocketAddress("@@@"));

@@ -852,17 +852,17 @@ public class Utils {
 	/**
 	 * Converts a String to an InetSocketAddress
 	 *
-	 * @param s A string in the format "http://myhost.com:17888"
+	 * @param s A string in the format of a valid URL or "myhost.com:17888"
 	 * @return A valid InetSocketAddress, or null if not in valid format
 	 */
 	public static InetSocketAddress toInetSocketAddress(String s) {
+		if (s==null) return null;
 		try {
 			// Try URL parsing first
 			URL url=new URL(s);
 			return toInetSocketAddress(url);
 		} catch (MalformedURLException ex) {
 			// Try to parse as host:port
-			if (s==null) return null;
 			int colon = s.lastIndexOf(':');
 			if (colon < 0) return null;
 			try {
@@ -877,7 +877,7 @@ public class Utils {
 	}
 	
 	/**
-	 * Converts a URL to an InetSocketAddress. Will assume defualt port if not specified.
+	 * Converts a URL to an InetSocketAddress. Will assume default port if not specified.
 	 *
 	 * @param url A valid URL
 	 * @return A valid InetSocketAddress for the URL
