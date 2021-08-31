@@ -20,7 +20,7 @@ import convex.peer.Server;
 import etch.EtchStore;
 
 public class JoinTestNetwork {
-	InetSocketAddress hostAddress=Utils.toInetSocketAddress("convex.world:43579");
+	InetSocketAddress hostAddress=Utils.toInetSocketAddress("convex.world:18888");
 	AKeyPair kp=AKeyPair.createSeeded(578578); // for user
 	Address acct=Address.create(47);
 	AccountKey peerKey=kp.getAccountKey();
@@ -33,7 +33,7 @@ public class JoinTestNetwork {
 		config.put(Keywords.KEYPAIR,kp);
 		config.put(Keywords.STORE,EtchStore.create(new File("temp-join-db.etch")));
 		config.put(Keywords.CONTROLLER,acct);
-		config.put(Keywords.SOURCE,"convex.world:43579");
+		config.put(Keywords.SOURCE,"convex.world:18888");
 
 		Server newServer=API.launchPeer(config);
 
