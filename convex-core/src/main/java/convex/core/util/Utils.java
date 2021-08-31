@@ -844,6 +844,8 @@ public class Utils {
 			return (InetSocketAddress) o;
 		} else if (o instanceof String) {
 			return toInetSocketAddress((String)o);
+		} else if (o instanceof URL) {
+			return toInetSocketAddress((URL)o);
 		} else {
 			return null;
 		}

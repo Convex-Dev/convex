@@ -338,6 +338,7 @@ public class Server implements Closeable {
 	 * Launch the Peer Server, including all main server threads
 	 */
 	public void launch() {
+		
 		Object p = getConfig().get(Keywords.PORT);
 		Integer port = (p == null) ? null : Utils.toInt(p);
 
@@ -350,6 +351,8 @@ public class Server implements Closeable {
 			} else {
 				hostname = null;
 			}
+			
+
 
 			// set running status now, so that loops don't terminate
 			isRunning = true;
@@ -374,9 +377,20 @@ public class Server implements Closeable {
 					close();
 				}
 			});
+			
+			// Connect to source peer if specified
+			if (getConfig().containsKey(Keywords.SOURCE)) {
+				Object s=getConfig().get(Keywords.SOURCE);
+				InetSocketAddress sa=Utils.toInetSocketAddress(s);
+				if (sa!=null) {
+					manager.connectToPeer(sa);
+				}
+			}
+
 
 			log.info( "Peer Server started with Peer Address: {}",getPeerKey());
 		} catch (Throwable e) {
+			close();
 			throw new Error("Failed to launch Server on port: " + port, e);
 		}
 	}
