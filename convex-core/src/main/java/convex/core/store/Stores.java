@@ -64,7 +64,7 @@ public class Stores {
 	 * @param store Store instance to use as global store
 	 */
 	public static void setGlobalStore(EtchStore store) {
-		if (globalStore==null) throw new IllegalArgumentException("Cannot set global store to null)");
+		if (store==null) throw new IllegalArgumentException("Cannot set global store to null)");
 		globalStore=store;
 	}
 }
