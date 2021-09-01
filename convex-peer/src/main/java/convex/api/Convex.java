@@ -112,10 +112,10 @@ public class Convex {
 					awaiting.remove(id);
 					cf.complete(v);
 					log.debug(
-							"Completed Result received for message ID: {} - {}", id, v);
+							"Completed Result received for message ID: {}", id);
 				} else {
 					log.warn(
-							"Ignored Result received for unexpected message ID: {} - {}", id, v);
+							"Ignored Result received for unexpected message ID: {}", id);
 				}
 			}
 
