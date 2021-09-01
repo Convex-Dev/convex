@@ -340,7 +340,7 @@ public class Main implements Runnable {
 		}
 		try {
 			// save the key in the keystore
-			PFXTools.saveKey(keyStore, keyPair, password);
+			PFXTools.setKeyPair(keyStore, keyPair, password);
 		} catch (Throwable t) {
 			throw new Error("Cannot store the key to the key store "+t);
 		}
