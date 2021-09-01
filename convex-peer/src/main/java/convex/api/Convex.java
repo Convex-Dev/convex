@@ -104,6 +104,8 @@ public class Convex {
 				sequence=null;
 			}
 			long id = m.getID().longValue();
+			
+			// TODO: maybe extract method?
 			synchronized (awaiting) {
 				CompletableFuture<Result> cf = awaiting.get(id);
 				if (cf != null) {
