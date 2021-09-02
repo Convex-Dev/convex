@@ -96,14 +96,12 @@ public class Convex {
 
 	private final Consumer<Message> internalHandler = new ResultConsumer() {
 		@Override
-		protected synchronized void handleResultMessage(Message m) {
-			Result v = m.getPayload();
+		protected synchronized void handleResult(long id, Result v) {
 
 			if ((v!=null)&&(ErrorCodes.SEQUENCE.equals(v.getErrorCode()))) {
 				// We probably got a wrong sequence number. Kill the stored value.
 				sequence=null;
 			}
-			long id = m.getID().longValue();
 			
 			// TODO: maybe extract method?
 			synchronized (awaiting) {
@@ -118,7 +116,6 @@ public class Convex {
 							"Ignored Result received for unexpected message ID: {}", id);
 				}
 			}
-
 		}
 
 		@Override

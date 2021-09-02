@@ -81,6 +81,9 @@ public abstract class ResultConsumer implements Consumer<Message> {
 		}
 	}
 
+	/**
+	 * Map for messages delayed due to missing data
+	 */
 	private HashMap<Hash, ArrayList<Message>> bufferedMessages = new HashMap<>();
 
 	private synchronized void buffer(Hash hash, Message m) {
@@ -116,20 +119,8 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	 * @param id The ID of the original message to which this result corresponds
 	 * @param value The result value
 	 */
-	protected void handleResult(long id, Object value) {
-		handleResult(value);
-	}
-
-	/**
-	 * Method called when a normal (non-error) result is received.
-	 *
-	 * If this method throws a MissingDataException, missing data is requested and
-	 * the result handling may be retried later.
-	 *
-	 * @param value The result value
-	 */
-	protected void handleResult(Object value) {
-		log.debug("RESULT RECEIVED: {}", value);
+	protected void handleNormalResult(long id, ACell value) {
+		log.warn("UNHANDLED RESULT RECEIVED: id={}, value={}", id,value);
 	}
 
 	/**
@@ -137,20 +128,14 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	 *
 	 * By default, delegates to handleResult and handleError
 	 */
-	protected void handleResultMessage(Message m) {
+	protected final void handleResultMessage(Message m) {
 		Result result = m.getPayload();
 		try {
 			ACell.createPersisted(result);
 
 			// we now have the full result, so notify those interested
-			Object rv = result.getValue();
-			long id = m.getID().longValue();
-			Object err = result.getErrorCode();
-			if (err!=null) {
-				handleError(id, err, rv);
-			} else {
-				handleResult(id, rv);
-			}
+			long id=m.getID().longValue();
+			handleResult(id,result);
 		} catch (MissingDataException e) {
 			// If there is missing data, re-buffer the message
 			// And wait for it to arrive later
@@ -167,6 +152,21 @@ public abstract class ResultConsumer implements Consumer<Message> {
 				log.warn("IO Exception handling result - {}",e1);
 			}
 			return;
+		}
+	}
+	
+	/**
+	 * Handler for a fullt received Result. Maybe overridden
+	 * @param id ID of message received
+	 * @param result Result value
+	 */
+	protected void handleResult(long id, Result result) {
+		ACell rv = result.getValue();
+		ACell err = result.getErrorCode();
+		if (err!=null) {
+			handleError(id, err, rv);
+		} else {
+			handleNormalResult(id, rv);
 		}
 	}
 
@@ -198,6 +198,6 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	 * @param errorMessage The error message associated with the result (may be null)
 	 */
 	protected void handleError(Object code, Object errorMessage) {
-		log.debug("Error received: {} :  {}", code, errorMessage);
+		log.warn("UNHANDLED ERROR RECEIVED: {} :  {}", code, errorMessage);
 	}
 }

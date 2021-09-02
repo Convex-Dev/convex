@@ -26,6 +26,7 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
@@ -67,7 +68,7 @@ public class ServerTest {
 
 	private Consumer<Message> handler = new ResultConsumer() {
 		@Override
-		protected synchronized void handleResult(long id, Object value) {
+		protected synchronized void handleNormalResult(long id, ACell value) {
 			String msg=id+ " : "+Utils.toString(value);
 			//System.err.println(msg);
 			log.debug(msg);
