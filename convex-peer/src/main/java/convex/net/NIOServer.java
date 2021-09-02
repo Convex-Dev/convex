@@ -256,10 +256,10 @@ public class NIOServer implements Closeable {
 	 * @return Host address
 	 */
 	public InetSocketAddress getHostAddress() {
-		int port=getPort();
-		if (port<=0) return null;
-		InetSocketAddress sa= new InetSocketAddress(InetAddress.getLoopbackAddress(), port);
-		return sa;
+		if (ssc == null) return null;
+		ServerSocket socket = ssc.socket();
+		if (socket == null) return null;
+		return new InetSocketAddress(socket.getInetAddress(), socket.getLocalPort());
 	}
 
 }
