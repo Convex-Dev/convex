@@ -376,8 +376,7 @@ public class Convex {
 	 * @throws IOException If the connection is broken
 	 */
 	public synchronized CompletableFuture<Result> transact(SignedData<ATransaction> signed) throws IOException {
-		CompletableFuture<Result> cf = new CompletableFuture<Result>();
-
+		CompletableFuture<Result> cf;
 		long id = -1;
 
 		synchronized (awaiting) {
@@ -394,10 +393,10 @@ public class Convex {
 			}
 	
 			// Store future for completion by result message
-			awaiting.put(id, cf);
-			log.debug("Sent transaction with message ID: {} awaiting count = {}",id,awaiting.size());
+			cf =  awaitResult(id);
 		}
-
+		
+		log.debug("Sent transaction with message ID: {} awaiting count = {}",id,awaiting.size());
 		return cf;
 	}
 
@@ -642,18 +641,29 @@ public class Convex {
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
 	public Future<Result> requestStatus() throws IOException {
-		CompletableFuture<Result> cf = new CompletableFuture<Result>();
-
 		synchronized (awaiting) {
 			long id = connection.sendStatusRequest();
 			if (id < 0) {
 				throw new IOException("Failed to send status request due to full buffer");
 			}
 
+			// TODO: ensure status is fully loaded
 			// Store future for completion by result message
-			awaiting.put(id, cf);
-		}
+			CompletableFuture<Result> cf = awaitResult(id);
 
+			return cf;
+		}
+	}
+	
+	/**
+	 * Method to await a complete result. Should be called with lock on `awaiting` map
+	 * @param <T>
+	 * @param id
+	 * @return
+	 */
+	protected CompletableFuture<Result> awaitResult(long id) {
+		CompletableFuture<Result> cf = new CompletableFuture<Result>();
+		awaiting.put(id,cf);
 		return cf;
 	}
 
@@ -669,22 +679,17 @@ public class Convex {
 	 *
 	 */
 	public Future<Result> requestChallenge(SignedData<ACell> data) throws IOException {
-
-		CompletableFuture<Result> cf = new CompletableFuture<Result>();
-
 		synchronized (awaiting) {
 			long id = connection.sendChallenge(data);
 			if (id < 0) {
+				// TODO: too fragile?
 				throw new IOException("Failed to send challenge due to full buffer");
 			}
 
 			// Store future for completion by result message
-			awaiting.put(id, cf);
+			return awaitResult(id);
 		}
-
-		return cf;
 	}
-
 
 	/**
 	 * Submits a query to the Convex network, returning a Future once the query has
@@ -696,19 +701,14 @@ public class Convex {
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
 	public Future<Result> query(ACell query, Address address) throws IOException {
-		CompletableFuture<Result> cf = new CompletableFuture<Result>();
-
 		synchronized (awaiting) {
 			long id = connection.sendQuery(query, address);
 			if (id < 0) {
 				throw new IOException("Failed to send query due to full buffer");
 			}
 
-			// Store future for completion by result message
-			awaiting.put(id, cf);
+			return awaitResult(id);
 		}
-
-		return cf;
 	}
 
 	/**
