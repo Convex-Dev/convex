@@ -76,7 +76,7 @@ public class ServerTest {
 		}
 
 		@Override
-		protected synchronized void handleError(long id, Object code, Object message) {
+		protected synchronized void handleError(long id, ACell code, ACell message) {
 			String msg=id+ " ERR: "+Utils.toString(code)+ " : "+message;
 			//System.err.println(msg);
 			log.debug(msg);

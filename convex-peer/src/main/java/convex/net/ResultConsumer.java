@@ -111,24 +111,11 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	}
 
 	/**
-	 * Method called when a normal (non-error) result is received.
-	 *
-	 * If this method throws a MissingDataException, missing data is requested and
-	 * the result handling may be retried later.
-	 *
-	 * @param id The ID of the original message to which this result corresponds
-	 * @param value The result value
-	 */
-	protected void handleNormalResult(long id, ACell value) {
-		log.warn("UNHANDLED RESULT RECEIVED: id={}, value={}", id,value);
-	}
-
-	/**
 	 * Method called when a result is received.
 	 *
 	 * By default, delegates to handleResult and handleError
 	 */
-	protected final void handleResultMessage(Message m) {
+	private final void handleResultMessage(Message m) {
 		Result result = m.getPayload();
 		try {
 			ACell.createPersisted(result);
@@ -156,7 +143,8 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	}
 	
 	/**
-	 * Handler for a fullt received Result. Maybe overridden
+	 * Handler for a fully received Result. May be overridden.
+	 * 
 	 * @param id ID of message received
 	 * @param result Result value
 	 */
@@ -171,7 +159,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	}
 
 	/**
-	 * Method called when an error result is received.
+	 * Method called when an error result is received. May be overriden.
 	 *
 	 * Default behaviour is simply to log the error.
 	 *
@@ -182,22 +170,22 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	 * @param code The error code received. May not be null, and is usually a Keyword
 	 * @param errorMessage The error message associated with the result (may be null)
 	 */
-	protected void handleError(long id, Object code, Object errorMessage) {
-		handleError(code,errorMessage);
+	protected void handleError(long id, ACell code, ACell errorMessage) {
+		log.warn("UNHANDLED ERROR RECEIVED: {} :  {}", code, errorMessage);
 	}
-
+	
 	/**
-	 * Method called when an error result is received.
-	 *
-	 * Default behaviour is simply to log the error.
+	 * Method called when a normal (non-error) result is received.
 	 *
 	 * If this method throws a MissingDataException, missing data is requested and
 	 * the result handling may be retried later.
 	 *
-	 * @param code The error code received. May not be null, and is usually a Keyword
-	 * @param errorMessage The error message associated with the result (may be null)
+	 * @param id The ID of the original message to which this result corresponds
+	 * @param value The result value
 	 */
-	protected void handleError(Object code, Object errorMessage) {
-		log.warn("UNHANDLED ERROR RECEIVED: {} :  {}", code, errorMessage);
+	protected void handleNormalResult(long id, ACell value) {
+		log.warn("UNHANDLED RESULT RECEIVED: id={}, value={}", id,value);
 	}
+
+
 }

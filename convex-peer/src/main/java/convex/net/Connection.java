@@ -41,7 +41,7 @@ import convex.core.util.Utils;
 
 /**
  * <p>
- * Class representing a Connection between network participants.
+ * Class representing a low-level Connection between network participants.
  * </p>
  *
  * <p>
