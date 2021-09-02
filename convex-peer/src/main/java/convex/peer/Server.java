@@ -340,15 +340,17 @@ public class Server implements Closeable {
 		try {
 			Stores.setCurrent(store);
 			
-			Object p = getConfig().get(Keywords.PORT);
+			HashMap<Keyword, Object> config = getConfig();
+
+			Object p = config.get(Keywords.PORT);
 			Integer port = (p == null) ? null : Utils.toInt(p);
 
-			nio.launch(port);
-			port = nio.getPort(); // get the actual port (may be auto-allocated)
+			nio.launch((String)config.get(Keywords.HOST), port);
+			port = nio.getPort(); // Get the actual port (may be auto-allocated)
 
 			if (getConfig().containsKey(Keywords.URL)) {
-				hostname = (String) getConfig().get(Keywords.URL);
-				log.debug("Setting desired peer URL to: "+hostname);
+				hostname = (String) config.get(Keywords.URL);
+				log.debug("Setting desired peer URL to: " + hostname);
 			} else {
 				hostname = null;
 			}

@@ -64,6 +64,10 @@ public class NIOServer implements Closeable {
 	}
 
 	public void launch(Integer port) {
+		launch(null, port);
+	}
+
+	public void launch(String host, Integer port) {
 		if (port==null) port=0;
 
 		try {
@@ -72,7 +76,8 @@ public class NIOServer implements Closeable {
 			// Set receive buffer size
 			ssc.socket().setReceiveBufferSize(Constants.SOCKET_SERVER_BUFFER_SIZE);
 	
-			InetSocketAddress address=new InetSocketAddress(port);
+			host = (host == null)? "0.0.0.0" : host;
+			InetSocketAddress address=new InetSocketAddress(host, port);
 			ssc.bind(address);
 			address=(InetSocketAddress) ssc.getLocalAddress();
 			ssc.configureBlocking(false);
