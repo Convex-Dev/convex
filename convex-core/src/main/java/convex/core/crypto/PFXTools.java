@@ -24,9 +24,15 @@ import org.bouncycastle.x509.X509V3CertificateGenerator;
 
 @SuppressWarnings("deprecation")
 public class PFXTools {
+
 	public static final String KEYSTORE_TYPE="PKCS12";
 
 	public static final String CERTIFICATE_ALGORITHM = "RSA";
+
+
+	private static char[] password(String passPhrase) {
+		return (passPhrase == null) ? (new char[0]) : passPhrase.toCharArray();
+	}
 
 	/**
 	 * Creates a new PKCS12 key store.
@@ -41,7 +47,7 @@ public class PFXTools {
 		// need to load in bouncy castle crypto providers to set/get keys from the keystore
 		Providers.init();
 
-		char[] pwdArray = (passPhrase==null)?null:passPhrase.toCharArray();
+		char[] pwdArray = password(passPhrase);
 		ks.load(null, pwdArray);
 
 		try (FileOutputStream fos = new FileOutputStream(keyFile)) {
@@ -59,13 +65,12 @@ public class PFXTools {
 	 * @throws GeneralSecurityException If a security error occurs
 	 */
 	public static KeyStore loadStore(File keyFile, String passPhrase) throws IOException,GeneralSecurityException {
-
 		// Need to load in bouncy castle crypto providers to set/get keys from the keystore.
 		Providers.init();
 
 		KeyStore ks = KeyStore.getInstance(KEYSTORE_TYPE);
 
-		char[] pwdArray = (passPhrase==null)?null:passPhrase.toCharArray();
+		char[] pwdArray = password(passPhrase);
 		try (FileInputStream fis = new FileInputStream(keyFile)) {
 			ks.load(fis, pwdArray);
 		}
@@ -83,7 +88,11 @@ public class PFXTools {
 	 */
 	public static KeyStore saveStore(KeyStore ks, File keyFile, String passPhrase) throws GeneralSecurityException, IOException {
 
-		char[] pwdArray = (passPhrase==null)?null:passPhrase.toCharArray();
+		char[] pwdArray = password(passPhrase);
+
+		File parent = keyFile.getParentFile();
+		if (parent != null) parent.mkdirs();
+
 		try (FileOutputStream fos = new FileOutputStream(keyFile)) {
 		    ks.store(fos, pwdArray);
 		}
