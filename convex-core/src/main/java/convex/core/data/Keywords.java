@@ -56,6 +56,7 @@ public class Keywords {
 	public static final Keyword DELEGATED_STAKE = Keyword.create("delegated-stake");
 	public static final Keyword OWNER = Keyword.create("owner");
 
+	public static final Keyword HOST = Keyword.create("host");
 	public static final Keyword URL = Keyword.create("url");
 
 	public static final Keyword SEQUENCE = Keyword.create("sequence");
