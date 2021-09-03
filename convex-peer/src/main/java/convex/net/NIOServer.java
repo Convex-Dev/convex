@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.Stores;
+import convex.core.util.Utils;
 import convex.peer.Server;
 
 /**
@@ -258,7 +259,12 @@ public class NIOServer implements Closeable {
 	public InetSocketAddress getHostAddress() {
 		int port=getPort();
 		if (port<=0) return null;
-		InetSocketAddress sa= new InetSocketAddress(InetAddress.getLoopbackAddress(), port);
+		InetSocketAddress sa;
+		try {
+			sa = (InetSocketAddress)ssc.getLocalAddress();
+		} catch (IOException e) {
+			throw Utils.sneakyThrow(e);
+		}
 		return sa;
 	}
 
