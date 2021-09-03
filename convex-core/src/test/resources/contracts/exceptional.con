@@ -1,0 +1,30 @@
+(do  ;; Test contract for state changes and rollback.
+ 
+  (def fragile :ok)
+  
+  (defn halt-fn 
+    ^{:callable? true}
+    [x]
+    (halt x)
+    (return :foo)
+    :bar)
+  
+  (defn rollback-fn 
+    ^{:callable? true}
+    [x]
+    (def fragile :broken)
+    (rollback x)
+    :bar)
+  
+  (defn break-fn 
+    ^{:callable? true}
+    [x]
+    (def fragile :broken)
+    x)
+  
+  (defn get-fragile
+    ^{:callable? true}
+    []
+    (return fragile))
+  
+  )

@@ -1,0 +1,260 @@
+'convex.trust
+
+
+(call *registry*
+      (register {:description ["Based on the reference monitor security model."
+                               "See comments about trusted monitors in `trusted?`."
+                               "Provides the creation of blacklists, whitelists, and upgradable actors."]
+                 :name        "Trust monitor library"}))
+
+
+;;
+;; See: https://en.wikipedia.org/wiki/Reference_monitor
+;;
+
+
+;;;;;;;;;; Private
+
+
+(def -self
+
+  ^{:private? true}
+
+  *address*)
+
+
+;;;;;;;;;; Checking trust
+
+
+(defn trusted? 
+
+  ^{:doc {:description ["Returns true if `subject` is trusted by `trust-monitor`, false otherwise."
+                        "A trust monitor is an address, pointing to either:"
+                        "- A user account that can only trust itself"
+                        "- An actor implementing `(check-trusted? subject action object)` which returns true or false."
+                        "`action` and `object` are arbitrary values specific to the trust monitor."
+                        "In practice, `subject` is often an address, although this is specific to the trust monitor as well."
+                        "See `build-blacklist` and `build-whitelist`."]
+          :examples    [{:code "(trusted? my-blacklist *caller*)"}]
+          :signature   [{:params [trust-monitor subject]}
+                        {:params [trust-monitor subject action]}
+                        {:params [trust-monitor subject action object]}]}}
+
+
+  ([trust-monitor subject action]
+
+   (trusted? trust-monitor
+             subject
+             action
+             nil))
+
+
+  ([trust-monitor subject]
+
+   (trusted? trust-monitor
+             subject
+             nil
+             nil))
+
+
+  ([trust-monitor subject action object]
+
+   (if (actor? trust-monitor) 
+     (query (call trust-monitor
+                  (check-trusted? subject
+                                  action
+                                  object)))
+     (= (address trust-monitor)
+        subject))))
+
+
+;;;;;;;;;; Building black/white lists
+
+
+(defn build-blacklist
+
+  ^{:doc {:description ["Creates deployable code for a new blacklist, an actor acting as a trust monitor."
+                        "An optional configuration map may be provided:"
+                        "- `:blacklist`, collection of addresses forming the initial blacklist"
+                        "- `:controller`, address that has the ability to modify the blacklist"]
+          :examples    [{:code "(deploy (build-blacklist {:controller *address* :blacklist [my-foe-1 my-foe-2]}))"}]
+          :signature   [{:params [config]}]}}
+
+  [config]
+
+  (let [blacklist  (reduce (fn [w x]
+                             (conj w
+                                   (address x)))
+                           #{}
+                           (or (:blacklist config)
+                               [*address*]))  
+        controller (address (or (:controller config)
+                                *address*))]
+    `(do
+       (def trust
+            ~-self)
+
+       (def blacklist
+
+         ;;  blacklist of addresses that are denied.
+
+         ~blacklist)
+
+
+       (def controller
+
+         ;; Controller address determines who can modify the blacklist.
+
+         ~controller)
+
+
+       (defn check-trusted?
+
+         ^{:callable? true}
+
+         [subject action object]
+
+         (not (contains-key? blacklist
+                             (address subject))))
+
+
+       (defn set-trusted
+
+         ^{:callable? true}
+
+         [subject allow?]
+
+         (if (trust/trusted? controller
+                             *caller*)
+           (def blacklist
+                ((if allow?
+                   disj
+                   conj)
+                 blacklist
+                 (address subject)))
+           (fail :TRUST
+                 "No access to blacklist!"))))))
+
+
+
+(defn build-whitelist
+
+  ^{:doc {:description ["Creates deployable code for a new whitelist, an actor acting as a trust monitor."
+                        "An optional configuration map may be provided:"
+                        "- `:controller`, address that has the ability to modify the whitelist"
+                        "- `:whitelist`, collection of addresses forming the initial whitelist"]
+          :examples    [{:code "(deploy (build-whitelist {:controller *address* :whitelist [*address*]}))"}]
+          :signature   [{:params [config]}]}}
+
+  [config]
+
+  (let [whitelist  (reduce (fn [w x]
+                             (conj w
+                                   (address x)))
+                           #{}
+                           (or (:whitelist config)
+                               [*address*]))
+        controller (or (:controller config)
+                       *address*)]
+    `(do
+        (def trust
+             ~-self)
+
+
+       (def whitelist
+
+         ;; A whitelist of addresses that are accepted.
+
+         ~whitelist)
+
+
+       (def controller
+
+         ;; Controller address determines who can modify the whitelist.
+
+         ~(address controller))
+
+
+       (defn check-trusted?
+
+         ^{:callable? true}
+
+         [subject action object]
+
+         (contains-key? whitelist
+                        (address subject)))
+
+
+       (defn set-trusted
+
+         ^{:callable? true}
+
+         [subject allow?]
+
+         (if (trust/trusted? controller
+                             *caller*)
+           (def whitelist
+             ((if allow? conj disj)
+              whitelist
+              (address subject)))
+           (fail :TRUST
+                 "No access to whitelist!"))))))
+
+
+;;;;;;;;;; Upgradable actors
+
+
+(defn add-trusted-upgrade
+
+  ;; TODO. Improve docstring, `:root` is a blacklist or a whitelist.
+
+  ^{:doc {:description ["Creates deployable code for an upgradable actor where any arbitrary code can be executed."
+                        "An optional configuration map may be provided:"
+                        "- `:root`, address that can execute arbitrary code in the actor (defaults to `*address*`)"
+                        "Meant to be used wisely."]
+          :examples    [{:code "(deploy (add-trusted-upgrade {:root *address*}))"}]
+          :signature   [{:params [config]}]}}
+
+   [config]
+
+   (let [root (or (:root config)
+                  *address*)]
+     `(do
+        (def trust
+             ~-self)
+
+
+        (def upgradable-root
+             ~root)
+
+
+        (defn upgrade
+
+          ^{:callable? true}
+
+          [code]
+
+          (if (trust/trusted? upgradable-root
+                              *caller*)
+            (eval code)
+            (fail :TRUST
+                  "No root access to upgrade capability!"))))))
+
+
+
+(defn remove-upgradability! 
+
+  ^{:doc {:description ["Removes upgradability from an actor, previously added using `add-trusted-upgrade`."
+                        "Cannot be undone, meant to be used wisely after considering all implications."]
+          :examples    [{:code "(remove-upgradability! upgradable-actor)"}]
+          :signature   [{:params [config]}]}}
+
+  [actor]
+
+  (call actor
+        (upgrade
+          '(do
+             ;; Undefine things used for upgradability
+             (undef upgrade)
+             (undef upgradable-root))))
+  nil)

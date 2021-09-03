@@ -1,0 +1,16 @@
+;; The Hello World of smart contracts
+(do
+  
+  (def people #{})
+  
+  (defn greet
+    ^{:callable? true}
+    [name] 
+    (if (people name) 
+      (str "Welcome back " name)
+      (do
+        (def people (conj people name))
+        (str "Hello " name)
+        )))
+
+  )

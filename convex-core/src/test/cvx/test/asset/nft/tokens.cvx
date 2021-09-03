@@ -1,0 +1,1042 @@
+;;
+;;
+;; Testing the `asset.nft-tokens`.
+;;
+;;
+
+
+;;;;;;;;;; Setup
+
+
+($.stream/out! (str $.term/clear.screen
+                    "Testing `asset.nft.tokens`"))
+
+
+;; Deploying test version of `asset.simple-nft` instead of importing stable version.
+;;
+($.file/read "src/main/cvx/asset/nft/tokens.cvx")
+
+
+(eval `(def nft
+            (deploy (quote ~(cons 'do
+                                  (next $/*result*))))))
+
+
+($.file/exec "src/test/cvx/test/convex/asset/quantity/set-long.cvx")
+
+
+
+;; Importing stable versions
+;;
+(import convex.asset :as asset)
+
+(def T
+     $.test)
+
+
+;; Default account is an actor, key is set to transform it into a user account.
+;;
+(set-key $.account/fake-key)
+
+
+;;;;;;;;;; Reusable
+
+
+(defn create.check
+
+  ^{:doc {:description "Checks generic facts about `token`, a newly created token."}}
+
+  [prepare-trx-pop]
+
+  (T/group '((T/path.conj 'create.check)
+
+             (T/trx '(asset/owns? *address*
+                                  [nft
+                                   #{token}])
+                    {:description "Creater owns token."})
+
+             (T/trx '(= #{token}
+                        (asset/balance nft
+                                       *address*))
+                    {:description "Token is in creator balance."})
+
+             (T/trx '(= *address*
+                        (call nft
+                              (get-token-creator token)))
+                    {:description "Creator is retrieved."})
+
+             (T/trx '(= *address*
+                        (call nft
+                              (get-token-owner token)))
+                    {:description "Initially, creator is owner."})
+
+             (T/trx '(= data
+                        (call nft
+                              (get-token-data token)))
+                    {:description "Token data is retrieved."})
+
+             (T/trx '(call nft
+                           (check-trusted? *address*
+                                           :destroy
+                                           token))
+                    {:description "Can destroy token."})
+
+             (T/trx '(call nft
+                           (check-trusted? *address*
+                                           :transfer
+                                           token))
+                    {:description "Can transfer token."})
+
+             (T/trx '(call nft
+                           (check-trusted? *address*
+                                           :update
+                                           token))
+                    {:description "Can update token."})
+
+             (T/trx '(call nft
+                           (check-trusted? *address*
+                                           [:update :name]
+                                           token))
+                    {:description "Can update token name."})
+
+             (def data-new
+                  (assoc data
+                         :foo
+                         :bar))
+
+             (T/trx '(= data-new
+                        (call nft
+                              (merge-token-data token
+                                                {:foo :bar})))
+                    {:description "Can merge data to token."})
+
+             (T/trx '(= data-new
+                        (call nft
+                              (get-token-data token)))
+                    {:description "Data merged permanently."})
+
+             (T/trx '(= 42
+                        (call nft
+                              (set-token-data token
+                                              42)))
+                    {:description "Can replace token data."})
+
+             (T/trx '(= 42
+                        (call nft
+                              (get-token-data token)))
+                    {:description "Data replaced permanently."})
+
+             (T/trx '(nil? (call nft
+                                 (check-transfer *address*
+                                                 nil
+                                                 token)))
+                    {:description "No transfer issued."}))
+             prepare-trx-pop))
+
+
+
+(defn destroy.check
+
+  ^{:doc {:description "Destroys token interned as `token` and checks generic facts."}}
+
+  [prepare-trx-pop]
+
+  (T/group '((T/path.conj 'destroy.check)
+
+             (T/trx '(= "No right to transfer token -1"
+                        (call nft
+                              (check-transfer *address*
+                                              nil
+                                              -1)))
+                    {:description "Cannot check transfer on inexistent token."})
+
+             (T/trx '(call nft
+                           (destroy-token token))
+                    {:description "Token destroyed."})
+
+             (T/fail.code #{:ASSERT}
+                          '(call nft
+                                 (destroy-token -1))
+                          {:description "Cannot destroy inexistent token."})
+
+             (T/trx '(not (asset/owns? *address*
+                                       [nft
+                                        token]))
+                    {:description "Cannot own destroyed token."})
+
+             (T/trx '(= #{}
+                         (asset/balance nft
+                                        *address*))
+                    {:description "Balance is empty after destroying token."})
+
+             (T/trx '(nil? (get nft/token-records
+                                token))
+                    {:description "Token record destroyed."}))
+           prepare-trx-pop))
+
+
+
+(defn separate-offer-accept
+
+  ^{:doc {:description "Tests transfer scenario where the offer is accepted separatelu from emission."}}
+
+  [receiver]
+
+  (T/group `((T/path.conj 'separate-offer-accept)
+
+             (def receiver
+                  ~receiver)
+
+             (T/trx '(zero? (def token
+                                 (call nft
+                                       (create-token {:name "Token"}
+                                                     nil))))
+                    {:description "Token created."})
+
+             (T/trx '(= {*address* {receiver #{token}}}
+                        (asset/offer receiver
+                                     [nft
+                                      token]))
+                    {:description "Send offer."})
+
+             (T/trx '(asset/owns? *address*
+                                  [nft
+                                   token])
+                    {:description "Still owner, offer not yet accepted."})
+              
+             (T/trx '(not (asset/owns? receiver
+                                       [nft
+                                        token]))
+                    {:description "Receiver not yet owner, has not accepted yet."})
+
+             (T/trx '(= [nft
+                         #{token}]
+                        (eval-as receiver
+                                 `(~asset/accept ~*address*
+                                                 [~nft
+                                                  ~token])))
+                    {:description "Receiver accepts offer."})
+
+             (T/trx '(not (asset/owns? *address*
+                                       [nft
+                                        token]))
+                    {:description "Lost ownership after offer got accepted."})
+              
+             (T/trx '(asset/owns? receiver
+                                  [nft
+                                   token])
+                    {:description "Receiver gained ownership after accepting."}))))
+
+
+
+(defn transfer.check
+
+  ^{:doc {:description "Ensures basic facts are respected after a preliminary transfer between `sender` and `receiver`."}}
+
+
+  ([token]
+
+   (transfer.check token
+                   *address*
+                   *address*
+                   receiver))
+
+
+  ([token creator sender receiver]
+
+   (T/group `((T/path.conj 'transfer.check)
+
+              (do
+                (def creator
+                     ~creator)
+                (def receiver
+                     ~receiver)
+                (def sender
+                     ~sender)
+                (def token
+                    ~token))
+
+               (T/trx `(not (asset/owns? ~sender
+                                         ~[nft
+                                          token]))
+                      {:description "Lost ownership after transfer."})
+
+               (T/trx '(asset/owns? receiver
+                                    [nft
+                                     token])
+                      {:description "Receiver is now the owner."})
+
+               (T/trx '(not (subset? #{token}
+                                     (asset/balance nft
+                                                    sender)))
+                      {:description "Balance reflects lost ownership."})
+
+               (T/trx '(subset? #{token}
+                                (asset/balance nft
+                                               receiver))
+                      {:description "Balance of receiver reflects ownership."})
+
+               (T/trx '(= creator
+                          (call nft
+                                (get-token-creator token)))
+                      {:description "Creator did not change during transfer."})
+
+               (T/trx '(= receiver
+                          (call nft
+                                (get-token-owner token)))
+                      {:description "Token owner adjusted."})
+
+               (T/trx '(not (call nft
+                                  (check-trusted? sender
+                                                  :destroy
+                                                  token)))
+                      {:description "Lost ability to destroy."})
+
+               (T/trx '(not (call nft
+                                  (check-trusted? sender
+                                                  :transfer
+                                                  token)))
+                      {:description "Lost ability to transfer."})
+
+               (T/trx '(not (call nft
+                                  (check-trusted? sender
+                                                  :update
+                                                  token)))
+                      {:description "Lost ability to update."})
+
+               (T/trx '(not (call nft
+                                  (check-trusted? sender
+                                                  [:update :name]
+                                                  token)))
+                      {:description "Lost ability to update name."})
+
+               (T/trx '(call nft
+                             (check-trusted? receiver
+                                             :destroy
+                                             token))
+                      {:description "Receiver gained ability to destroy."})
+
+               (T/trx '(call nft
+                             (check-trusted? receiver
+                                             :transfer
+                                             token))
+                      {:description "Receiver gained ability to transfer."})
+
+               (T/trx '(call nft
+                             (check-trusted? receiver
+                                             :update
+                                             token))
+                      {:description "Receiver gained ability to update."})
+
+               (T/trx '(call nft
+                             (check-trusted? receiver
+                                             [:update :name]
+                                             token))
+                      {:description "Receiver gained ability to update name."})))))
+
+
+
+(defn transfer.do
+
+  ^{:doc {:description "Performs a transfer to internet `receiver`."}}
+
+  [load]
+
+  (T/trx `(= [nft
+              ~(if (set? load)
+                 load
+                  #{load})]
+             (asset/transfer receiver
+                             [nft
+                              ~load]))
+         {:description "Token(s) transferred."}))
+            
+
+
+(defn transfer.mono
+
+  ^{:doc {:description "Tests scenarios of a single token transfer."}}
+
+  [path-item make-account]
+
+  (T/group `((T/path.conj (quote ~path-item))
+             
+             (def receiver
+                  ~make-account)
+
+             (T/trx '(zero? (def token
+                                 (call nft
+                                       (create-token {:name "Token"}
+                                                     nil))))
+                    {:description "First token created."})
+
+             (transfer.do token)
+
+             (transfer.check token))))
+
+
+;;;;;;;;;; Test suites
+
+
+(defn suite.class
+
+  ^{:doc {:description "Tests creating a token with a class that logs all events."}}
+
+  []
+
+  (T/group '((T/path.conj 'class)
+
+             (def receiver
+                  ($.account/zombie))
+
+             (def uri-logger
+                  "http://www.logger.com")
+
+             (def logger
+                  (deploy
+                    `(do
+
+                        (def nft
+                             ~nft)
+
+                        (def token-history
+                             {})
+
+                        (defn check-trusted?
+                          ^{:callable? true}
+                          [addr policy-key id]
+                          (if (= policy-key
+                                 :destroy)
+                            (= (call nft
+                                     (get-token-creator id))
+                               addr)
+                            (= (call nft
+                                     (get-token-owner id))
+                               addr)))
+
+                        (defn create-token
+                          ^{:callable? true}
+                          [caller id initial-data]
+                          (def token-history
+                               (assoc token-history
+                                      id
+                                      [{:caller caller
+                                        :data   initial-data
+                                        :event  :create-token}])))
+
+                        (defn destroy-token
+                          ^{:callable? true}
+                          [caller id]
+                          (def token-history
+                               (dissoc token-history
+                                       id)))
+
+                        (defn get-token-history
+                          ^{:callable? true}
+                          [id]
+                          (get token-history
+                               id))
+
+                        (defn get-uri
+                          ^{:callable? true}
+                          [id]
+                          ~uri-logger)
+
+                        (defn merge-token-data
+                          ^{:callable? true}
+                          [caller id data]
+                          (def token-history
+                               (assoc token-history
+                                      id
+                                      (conj (get token-history
+                                                 id)
+                                            {:caller caller
+                                             :data   data
+                                             :event :merge-token-data}))))
+
+                        (defn set-token-data
+                          ^{:callable? true}
+                          [caller id data]
+                          (def token-history
+                            (assoc token-history
+                                   id
+                                   (conj (get token-history
+                                              id)
+                                         {:caller caller
+                                          :data   data
+                                          :event  :set-token-data}))))
+
+
+                        (defn perform-transfer
+                          ^{:callable? true}
+                          [caller sender receiver id-set]
+                          (def token-history
+                               (reduce (fn [history id]
+                                         (assoc history id
+                                                (conj (get history
+                                                           id)
+                                                      {:caller   caller
+                                                       :event    :transfer
+                                                       :sender   sender
+                                                       :receiver receiver})))
+                                       token-history
+                                       id-set))))))
+
+             (def data
+                   {:name "Token"
+                    :uri  "https://www.mysite.com"})
+
+             (T/trx '(zero? (def token
+                                 (call nft
+                                       (create-token data
+                                                     logger))))
+                     {:description "Token created."})
+
+             (T/trx '(= {:class   logger
+                         :creator *address*
+                         :data    data
+                         :owner   *address*}
+                        (get nft/token-records
+                             token))
+                    {:description "Accurate token record."})
+
+             (T/trx '(= logger
+                        (call nft
+                              (get-token-class token)))
+                    {:description "Class reported."})
+
+             (create.check (fn []
+                             `(def history
+                                   ~(call logger
+                                          (get-token-history token)))))
+            
+             (T/trx `(= ~[{:caller *address*
+                          :data   data
+                          :event  :create-token}
+                         {:caller *address*
+                          :data   {:foo :bar}  ;; Done by `create.check`
+                          :event  :merge-token-data}
+                         {:caller *address*
+                          :data   42  ;; Done by `create.check`
+                          :event  :set-token-data}]
+                        ~history)
+                    {:description "History tracked by logger."})
+
+             (T/trx '(= [nft
+                         #{token}]
+                        (asset/transfer receiver
+                                        [nft
+                                         token]))
+                    {:description "Token transferred."})
+
+             (destroy.check (fn []
+                              `(def history-2
+                                    ~(call logger
+                                           (get-token-history token)))))
+
+             (T/trx '(nil? history-2)
+                    {:description "History removed at destruction."}))))
+
+
+
+(defn suite.class.restrict
+
+  ^{:doc {:description "Tests creating a token with a class that limits the number of token transfer to 2."}}
+
+  []
+
+  (T/group '((T/path.conj 'class.restrict)
+
+             (def receiver
+                  ($.account/zombie))
+
+             (def transfer-max-twice
+                  (deploy
+                   `(do
+
+                      (def nft
+                           ~nft)
+
+                      (def transfer-count 
+                           {})
+
+                      (defn check-transfer
+                        ^{:callable? true}
+                        [caller sender receiver id-set]
+                        (reduce (fn [_ id]
+                                 (when (>= (get transfer-count
+                                                id)
+                                           2)
+                                   (reduced (str "Token " id " has already been transferred twice"))))
+                                nil
+                                id-set))
+
+                      (defn check-trusted?
+                        ^{:callable? true}
+                        [addr policy-key id]
+                        (if (contains-key? #{:destroy
+                                             :transfer}
+                                           policy-key)
+                          (= (call nft
+                                   (get-token-creator id))
+                              addr)
+                          (= (call nft
+                                   (get-token-owner id))
+                             addr)))
+
+                      (defn create-token
+                        ^{:callable? true}
+                        [caller id initial-data]
+                        (def transfer-count
+                             (assoc transfer-count
+                                    id
+                                    0)))
+
+                      (defn destroy-token
+                        ^{:callable? true}
+                        [caller id]
+                        (def transfer-count
+                             (dissoc transfer-count
+                                     id)))
+
+                      (defn perform-transfer
+                        ^{:callable? true}
+                        [caller sender receiver id-set]
+                        (def transfer-count
+                             (reduce (fn [tc id]
+                                       (assoc tc
+                                              id
+                                              (inc (get tc
+                                                    id))))
+                                  transfer-count
+                                  id-set))))))
+                                  
+             (def data
+                   {:name "Token"
+                    :uri  "https://www.mysite.com"})
+
+             (T/trx '(zero? (def token
+                                 (call nft
+                                       (create-token data
+                                                     transfer-max-twice))))
+                     {:description "Token created."})
+
+             (T/trx '(= {:class   transfer-max-twice
+                         :creator *address*
+                         :data    data
+                         :owner   *address*}
+                        (get nft/token-records
+                             token))
+                    {:description "Accurate token record."})
+
+             (T/trx '(= transfer-max-twice
+                        (call nft
+                              (get-token-class token)))
+                    {:description "Class reported."})
+
+             (create.check nil)
+
+             (T/trx '(= [nft
+                         #{token}]
+                        (asset/transfer receiver
+                                        [nft
+                                         token]))
+                    {:description "First transfer."})
+
+             (T/trx '(= [nft
+                         #{token}]
+                        (asset/transfer *address*
+                                        [nft
+                                         token]))
+                    {:description "First transfer."})
+
+
+             (T/fail.code #{:ASSERT}
+                          '(= [nft
+                               #{token}]
+                              (asset/transfer receiver
+                                              [nft
+                                               token]))
+                          {:description "Fail, already transferred twice."}))))
+
+
+
+(defn suite.policy
+
+  ^{:doc {:description "Ensures token policies are respected."}}
+
+  []
+
+  (T/group '((T/path.conj 'policy)
+
+             (def receiver
+                  ($.account/zombie))
+
+             (def someone
+                  ($.account/zombie))
+
+             (T/trx '(zero? (def token
+                                 (call nft
+                                       (create-token {:name   "Token"
+                                                      :status false}
+                                                     {:destroy          :creator
+                                                      :transfer         :owner
+                                                      :update           :none
+                                                      [:update :status] someone}))))
+                    {:description "Created token with specific policies."})
+
+             (T/trx '(= [nft
+                         #{token}]
+                        (asset/transfer receiver
+                                        [nft
+                                         token]))
+                    {:description "Token transferred."})
+
+             (T/trx '(call nft
+                           (check-trusted? *address*
+                                           :destroy
+                                           token))
+                    {:description "Can still destroy in spite of losing ownership."})
+
+             (T/trx '(not (call nft
+                                (check-trusted? receiver
+                                                :destroy
+                                                token)))
+                    {:description "Receiver cannot destroy in spite of ownership."})
+
+             (T/trx '(not (call nft
+                                (check-trusted? *address*
+                                                :transfer
+                                                token)))
+                    {:description "Cannot transfer since not the owner."})
+
+             (T/trx '(call nft
+                           (check-trusted? receiver
+                                           :transfer
+                                           token))
+                    {:description "New owner can transfer."})
+
+             (T/trx '(not (call nft
+                                (check-trusted? *address*
+                                                :update
+                                                token)))
+                    {:description "Cannot update."})
+
+             (T/trx '(not (call nft
+                                (check-trusted? receiver
+                                                :update
+                                                token)))
+                    {:description "Receiver cannot update either."})
+
+             (T/trx '(not (call nft
+                                (check-trusted? *address*
+                                                [:update :name]
+                                                token)))
+                    {:description "Cannot update name."})
+
+             (T/trx '(not (call nft
+                                (check-trusted? receiver
+                                                [:update :name]
+                                                token)))
+                    {:description "Receiver cannot update name either."})
+
+             (T/trx '(not (call nft
+                                (check-trusted? *address*
+                                                [:update :status]
+                                                token)))
+                    {:description "Cannot update status."})
+
+             (T/trx '(not (call nft
+                                (check-trusted? receiver
+                                                [:update :status]
+                                                token)))
+                    {:description "Receiver cannot update status either."})
+
+             (T/trx '(call nft
+                           (check-trusted? someone
+                                           [:update :status]
+                                           token))
+                    {:description "Someone else can update status as decided."})
+
+             (T/trx '(= {:name   "Token"
+                         :status true}
+                        (eval-as someone
+                                 `(call ~nft
+                                        (merge-token-data ~token
+                                                          {:status true}))))
+                    {:description "Status changed."})
+
+             (T/trx '(= {:name   "Token"
+                         :status true}
+                         (call nft
+                               (get-token-data token)))
+                    {:description "Status permanently updated."})
+
+
+             (T/trx '(call nft
+                           (destroy-token token))
+                    {:description "Token destroyed."})
+
+             (T/trx '(not (asset/owns? receiver
+                                       [nft
+                                        token]))
+                    {:description "Receiver cannot own destroyed token."})
+
+             (T/trx '(not (asset/owns? *address*
+                                       [nft
+                                        token]))
+                    {:description "Original owner cannot own destroyed token eiter."})
+
+             (T/trx '(empty? (asset/balance nft
+                                            *address*))
+                    {:description "Empty balance."})
+
+             (T/trx '(empty? (asset/balance nft
+                                            receiver))
+                    {:description "Receiver has empty balance after destruction."}))))
+
+
+
+(defn suite.self
+
+  ^{:doc {:description "Ensures basic facts about a token, without any transfer or more sophisticated operations."}}
+
+  []
+
+  (T/group '((T/path.conj 'self)
+
+             (def uri
+                  "https://www.mysite.com")
+
+             (def data
+                  {:name "Token-1"
+                   :uri  uri})
+
+             (T/trx '(zero? (def token
+                                 (call nft
+                                       (create-token data
+                                                     nil))))
+                    {:description "Token created."})
+
+             (T/trx '(= {:creator *address*
+                         :data    data
+                         :owner   *address*}
+                        (get nft/token-records
+                             token))
+                    {:description "Accurate token record."})
+
+             (create.check nil)
+
+             (T/trx '(nil? (call nft
+                                 (get-token-class token)))
+                    {:description "No class associated with token."})
+
+             (T/trx '(= uri
+                        (call nft
+                              (get-uri token)))
+                    {:description "URI of token is retrieved."})
+
+             (destroy.check nil))))
+
+
+
+(defn suite.separate-offer-accept
+
+  ^{:doc {:description "Tests transferring a token while separating offer and accepting the offer."}}
+
+  []
+
+  (separate-offer-accept ($.account/zombie)))
+
+
+
+(defn suite.separate-offer-accept.actor
+
+  ^{:doc {:description "Like `suite.separate-offer-accept` but with an actor."}}
+
+  []
+
+  (separate-offer-accept (deploy `(set-controller ~*address*))))
+
+
+
+(defn suite.transfer
+
+  ^{:doc {:description "Applies `transfer.mono` to a user account."}}
+
+  []
+
+  (transfer.mono 'transfer
+                 '($.account/zombie)))
+
+
+
+(defn suite.transfer.actor
+
+  ^{:doc {:description "Applies `transfer.mono` to an actor."}}
+
+  []
+
+  (transfer.mono 'transfer.actor
+                 `(deploy
+                    '(defn receive-asset
+                        ^{:callable? true}
+                        [offer _data]
+                        (~asset/accept *caller*
+                                       offer)))))
+
+
+
+(defn suite.transfer.multi
+
+  ^{:doc {:description "Tests transferring several tokens."}}
+
+  []
+
+  (T/group '((T/path.conj 'transfer.multi)
+
+             (def receiver
+                  ($.account/zombie))
+
+             (T/trx '(zero? (def token-1
+                                 (call nft
+                                       (create-token {:name   "Token 1"
+                                                      :status false}
+                                                     nil))))
+                    {:description "Token 1 created."})
+
+             
+             (T/trx '(= 1
+                        (def token-2
+                             (call nft
+                                   (create-token {:name   "Token 2"
+                                                  :status false}
+                                                 nil))))
+                    {:description "Token 2 created."})
+
+             (T/trx '(= 2
+                        (def token-3
+                             (call nft
+                                   (create-token {:name   "Token 3"
+                                                  :status false}
+                                                 nil))))
+                    {:description "Token 3 created."})
+
+             (T/trx '(= [nft
+                         #{token-1
+                           token-2
+                           token-3}]
+                        (asset/transfer receiver
+                                        [nft
+                                         #{token-1
+                                           token-2
+                                           token-3}]))
+                    {:description "Partial transfer."})
+
+             (transfer.check token-1)
+
+             (transfer.check token-2)
+
+             (transfer.check token-3))))
+
+
+
+(defn suite.transfer.multi.partial
+
+  ^{:doc {:description "Like `suite.transfer.multi` but not all tokens are accepted."}}
+
+  []
+
+  (T/group '((T/path.conj 'transfer.multi.partial)
+
+             (def receiver
+                  (deploy
+                    '(do
+
+                       (import convex.asset :as asset)
+
+                       (defn receive-asset
+                         ^{:callable? true}
+                         [[addr id-set] data]
+                         (asset/accept *caller*
+                                       [addr
+                                        (let [id-min (apply min
+                                                            (vec id-set))]
+                                          #{id-min
+                                            (inc id-min)})])))))
+
+             (T/trx '(zero? (def token-1
+                                 (call nft
+                                       (create-token {:name   "Token 1"
+                                                      :status false}
+                                                     nil))))
+                    {:description "Token 1 created."})
+
+             
+             (T/trx '(= 1
+                        (def token-2
+                             (call nft
+                                   (create-token {:name   "Token 2"
+                                                  :status false}
+                                                 nil))))
+                    {:description "Token 2 created."})
+
+             (T/trx '(= 2
+                        (def token-3
+                             (call nft
+                                   (create-token {:name   "Token 3"
+                                                  :status false}
+                                                 nil))))
+                    {:description "Token 3 created."})
+
+             (T/trx '(= [nft
+                         #{token-1
+                           token-2}]
+                        (asset/transfer receiver
+                                        [nft
+                                         #{token-1
+                                           token-2
+                                           token-3}]))
+                    {:description "Partial transfer."})
+
+             (transfer.check token-1)
+
+             (transfer.check token-2)
+
+             (transfer.check token-3
+                             *address*
+                             receiver
+                             *address*))))
+
+
+;;;
+
+
+(defn suite.main
+
+  ^{:doc {:description "Main suite gathering other suites."}}
+
+  []
+
+  (T/group '((T/path.conj 'asset.nft-tokens)
+             (suite.class)
+             (suite.class.restrict)
+             (suite.policy)
+             (suite.quantity nft)  ;; From `asset/quantity/set-long` test file.
+             (suite.self)
+             (suite.separate-offer-accept)
+             (suite.separate-offer-accept.actor)
+             (suite.transfer)
+             (suite.transfer.actor)
+             (suite.transfer)
+             (suite.transfer.multi)
+             (suite.transfer.multi.partial))))
+
+
+;;;
+
+
+(T/report.clear)
+(suite.main)
+(T/print "asset.nft-tokens")
+nil

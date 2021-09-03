@@ -1,0 +1,167 @@
+;;
+;;
+;; Test suites meant to be executed in implementations of the `convex.asset` interface.
+;;
+;; Meant to be deployed as a library.
+;;
+;;
+
+
+;;;;;;;;;; Setup
+
+
+(import convex.run.test :as T)
+(import convex.run.trx  :as $.trx)
+
+
+(defn setup
+
+  ^{:doc {:description "Must be called before using any of test suites from this library."}}
+
+  []
+
+  ($.trx/prepend '(import convex.asset :as asset)))
+
+
+;;;;;;;;;; Test suites meant to be used for accounts that implements the `convex.asset` interface
+
+
+(defn suite.balance
+
+  ^{:doc {:description "Used internally for ensuring that balance is not nil nor quantity zero."}}
+
+  [path quantity-zero balance]
+
+  (T/group `((T/path.conj ['convex.asset.test
+                           'suite.balance
+                           ~path])
+
+             (T/trx '(not (nil? ~balance))
+                    {:description "Balance is not nil."})
+
+             (T/trx '(not (= ~quantity-zero
+                             ~balance))
+                    {:description "Balance is not empty"}))))
+
+
+
+(defn suite.user
+
+  ^{:doc {:description "Used internally for testing user balance and ownership."}}
+
+  [path token user known-balance]
+
+  (T/group `((T/path.conj ['convex.asset.test
+                           'suite.user
+                           ~path])
+
+             (T/trx '(= ~known-balance
+                        (asset/balance ~token
+                                       ~user))
+                    {:description "Balance is as expected."})
+
+             (T/trx '(= ~known-balance
+                        (asset/quantity-add ~token
+                                            ~known-balance
+                                            nil)
+                        (asset/quantity-add ~token
+                                            nil
+                                            ~known-balance))
+                    {:description "Adding nothing to a quantity does not change the quantity."})
+
+             (T/trx '(= (asset/quantity-zero ~token)
+                        (asset/quantity-sub ~token
+                                            ~known-balance
+                                            ~known-balance))
+                    {:description "Subtracting a quantity from itself equals the empty value."})
+
+             (T/trx '(asset/owns? ~user
+                                  [~token
+                                   ~known-balance])
+                    {:description "User owns what is reported by `balance`."})
+
+             (T/trx '(asset/owns? ~user
+                                  [~token
+                                   nil])
+                    {:description "User owns at least \"nothing\"."}))))
+
+
+;;;
+
+
+(defn suite.main
+
+  ^{:doc {:description ["Main suite which gathers all other suites from this library."
+                        "Together, both given user owns total supply."]}}
+
+  [token user-1 user-2]
+
+  (T/group `((T/path.conj '[convex.asset.test
+                            suite.main])
+             (def tester
+                  ($.account/zombie))
+
+             (def quantity-zero
+                  (asset/quantity-zero ~token))
+
+             (T/trx '(= quantity-zero
+                        (asset/balance ~token
+                                       tester))
+                    {:description "Initially, tester balance is empty."})
+
+             (def balance-1
+                  (asset/balance ~token
+                                 ~user-1))
+
+             (~suite.balance "user-1"
+                             quantity-zero
+                             balance-1)
+
+             (def balance-2
+                  (asset/balance ~token
+                                 ~user-2))
+
+             (~suite.balance "user-2"
+                             quantity-zero
+                             balance-2)
+
+             (def supply
+                  (asset/quantity-add ~token
+                                      balance-1
+                                      balance-2))
+
+             (~suite.balance "supply"
+                             quantity-zero
+                             supply)
+
+             (~suite.user "user-1"
+                          ~token
+                          ~user-1
+                          balance-1)
+
+             (~suite.user "user-2"
+                          ~token
+                          ~user-2
+                          balance-2)
+
+             (eval-as ~user-1
+                      (list asset/transfer
+                            tester
+                            [~token
+                             balance-1]))
+
+             (T/trx '(= quantity-zero
+                        (asset/balance ~token
+                                       ~user-1))
+                    {:description "Balance of user 1 has been emptied."})
+
+             (eval-as ~user-2
+                      (list asset/transfer
+                            tester
+                            [~token
+                             balance-2]))
+
+             (T/trx '(= supply
+                        (asset/balance ~token
+                                       tester))
+                    {:description "Tester has whole supply."}))))
