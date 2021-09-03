@@ -2,7 +2,6 @@ package convex.net;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.StandardSocketOptions;
@@ -21,7 +20,6 @@ import org.slf4j.LoggerFactory;
 import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.Stores;
-import convex.core.util.Utils;
 import convex.peer.Server;
 
 /**
@@ -65,6 +63,10 @@ public class NIOServer implements Closeable {
 	}
 
 	public void launch(Integer port) {
+		launch(null, port);
+	}
+
+	public void launch(String host, Integer port) {
 		if (port==null) port=0;
 
 		try {
@@ -73,7 +75,8 @@ public class NIOServer implements Closeable {
 			// Set receive buffer size
 			ssc.socket().setReceiveBufferSize(Constants.SOCKET_SERVER_BUFFER_SIZE);
 	
-			InetSocketAddress address=new InetSocketAddress(port);
+			host = (host == null)? "0.0.0.0" : host;
+			InetSocketAddress address=new InetSocketAddress(host, port);
 			ssc.bind(address);
 			address=(InetSocketAddress) ssc.getLocalAddress();
 			ssc.configureBlocking(false);
@@ -257,15 +260,10 @@ public class NIOServer implements Closeable {
 	 * @return Host address
 	 */
 	public InetSocketAddress getHostAddress() {
-		int port=getPort();
-		if (port<=0) return null;
-		InetSocketAddress sa;
-		try {
-			sa = (InetSocketAddress)ssc.getLocalAddress();
-		} catch (IOException e) {
-			throw Utils.sneakyThrow(e);
-		}
-		return sa;
+		if (ssc == null) return null;
+		ServerSocket socket = ssc.socket();
+		if (socket == null) return null;
+		return new InetSocketAddress(socket.getInetAddress(), socket.getLocalPort());
 	}
 
 }
