@@ -42,7 +42,9 @@
 					<descriptorRefs>
 						<descriptorRef>jar-with-dependencies</descriptorRef>
 					</descriptorRefs>
-					<!-- We want differentiated outputs <appendAssemblyId>false</appendAssemblyId> -->
+					<finalName>convex-cli</finalName>
+					<!-- We want differentiated outputs  -->
+					<appendAssemblyId>false</appendAssemblyId>
 				</configuration>
 				<executions>
 					<execution>
