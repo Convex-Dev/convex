@@ -1,8 +1,0 @@
-#!/bin/bash
-
-BASE_PATH=$(dirname $0)
-JAR_NAME=`ls -1 $BASE_PATH/convex-cli/target/convex-cli.jar`
-
-# echo "using: $JAR_NAME"
-
-java -jar $JAR_NAME $@
