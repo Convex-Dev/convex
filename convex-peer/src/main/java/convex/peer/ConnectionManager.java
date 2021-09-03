@@ -88,7 +88,7 @@ public class ConnectionManager {
 			Stores.setCurrent(server.getStore()); // ensure the loop uses this Server's store
 			try {
 				lastUpdate=Utils.getCurrentTimestamp();
-				while (true) {
+				while (server.isLive()) {
 					Thread.sleep(ConnectionManager.SERVER_CONNECTION_PAUSE);
 					makePlannedConnections();
 					maintainConnections();
@@ -136,7 +136,7 @@ public class ConnectionManager {
 				convex.close();
 			}
 		} catch (Throwable t) {
-			log.warn("Polling failed: {}",t);
+			if (server.isLive()) log.warn("Polling failed: {}",t);
 		}
 	}
 

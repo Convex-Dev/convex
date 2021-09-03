@@ -1200,4 +1200,8 @@ public class Server implements Closeable {
 	public void setHostname(String string) {
 		hostname=string;
 	}
+
+	public boolean isLive() {
+		return isRunning;
+	}
 }
