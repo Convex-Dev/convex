@@ -52,7 +52,7 @@ public class ConnectionManager {
 	static final long SERVER_CONNECTION_PAUSE = 1000;
 
 	/**
-	 * Pause for each iteration of Server connection loop.
+	 * Default pause for each iteration of Server connection loop.
 	 */
 	static final long SERVER_POLL_DELAY = 2000;
 
@@ -63,7 +63,7 @@ public class ConnectionManager {
 	/**
 	 * Planned future connections for this Peer
 	 */
-	private final HashSet<InetSocketAddress> plannedConnections=new HashSet<>();
+	private final HashSet<InetSocketAddress> plannedConnections = new HashSet<>();
 
 	/**
 	 * The list of outgoing challenges that are being made to remote peers
@@ -72,12 +72,14 @@ public class ConnectionManager {
 
 	private Thread connectionThread = null;
 
-	private SecureRandom random=new SecureRandom();
+	private SecureRandom random = new SecureRandom();
+
+	private long pollDelay;
 
 	/**
 	 * Timstamp for the last execution of the Connection Manager update loop.
 	 */
-	private long lastUpdate=Utils.getCurrentTimestamp();
+	private long lastUpdate = Utils.getCurrentTimestamp();
 
 	/*
 	 * Runnable loop for managing server connections
@@ -87,13 +89,13 @@ public class ConnectionManager {
 		public void run() {
 			Stores.setCurrent(server.getStore()); // ensure the loop uses this Server's store
 			try {
-				lastUpdate=Utils.getCurrentTimestamp();
+				lastUpdate = Utils.getCurrentTimestamp();
 				while (server.isLive()) {
 					Thread.sleep(ConnectionManager.SERVER_CONNECTION_PAUSE);
 					makePlannedConnections();
 					maintainConnections();
 					pollBelief();
-					lastUpdate=Utils.getCurrentTimestamp();
+					lastUpdate = Utils.getCurrentTimestamp();
 				}
 			} catch (InterruptedException e) {
 				/* OK? Close the thread normally */
@@ -113,24 +115,24 @@ public class ConnectionManager {
 	private void pollBelief() {
 		try {
 			// Poll if no recent consensus updates
-			long lastConsensus=server.getPeer().getConsensusState().getTimeStamp().longValue();
-			if (lastConsensus+SERVER_POLL_DELAY>=lastUpdate) return;
+			long lastConsensus = server.getPeer().getConsensusState().getTimeStamp().longValue();
+			if (lastConsensus + pollDelay >= lastUpdate) return;
 
-			ArrayList<Connection> conns=new ArrayList<>(connections.values());
-			if (conns.size()==0) {
+			ArrayList<Connection> conns = new ArrayList<>(connections.values());
+			if (conns.size() == 0) {
 				// Nothing to do
 				// log.debug("No connections available to poll!");
 				return;
 			}
-			Connection c=conns.get(random.nextInt(conns.size()));
+			Connection c = conns.get(random.nextInt(conns.size()));
 			if (c.isClosed()) return;
-			Convex convex=Convex.connect(c.getRemoteAddress());
+			Convex convex = Convex.connect(c.getRemoteAddress());
 			try {
 				// use requestStatusSync to auto acquire hash of the status instead of the value
-				AVector<ACell> status=convex.requestStatusSync(1000);
+				AVector<ACell> status = convex.requestStatusSync(1000);
 				Hash h=RT.ensureHash(status.get(0));
 				@SuppressWarnings("unchecked")
-				SignedData<Belief> sb=(SignedData<Belief>) convex.acquire(h).get(10000,TimeUnit.MILLISECONDS);
+				SignedData<Belief> sb = (SignedData<Belief>) convex.acquire(h).get(10000,TimeUnit.MILLISECONDS);
 				server.queueEvent(sb);
 			} finally {
 				convex.close();
@@ -269,6 +271,9 @@ public class ConnectionManager {
 
 	public ConnectionManager(Server server) {
 		this.server = server;
+
+		Object _pollDelay = server.getConfig().get(Keywords.POLL_DELAY);
+		this.pollDelay = (_pollDelay == null) ? ConnectionManager.SERVER_POLL_DELAY : Utils.toInt(_pollDelay);
 	}
 
 	public synchronized void setConnection(AccountKey peerKey, Connection peerConnection) {

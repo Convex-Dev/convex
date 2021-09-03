@@ -17,6 +17,7 @@ public class Keywords {
 	public static final Keyword STATES = Keyword.create("states");
 	public static final Keyword RESULTS = Keyword.create("results");
 	public static final Keyword PERSIST = Keyword.create("persist");
+	public static final Keyword POLL_DELAY = Keyword.create("poll-delay");
 
 
 	public static final Keyword STORE = Keyword.create("store");
