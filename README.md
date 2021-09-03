@@ -27,8 +27,9 @@ This repository contains the core Convex distribution including:
 
 The repository also contains core "on-chain" libraries providing key full-stack functionality and tools for decentralised applications, including:
 
-- Fungible Tokens
-- Non-fungible tokens
+- `convex.fungible` - Fungible Tokens
+- `asset.nft.simple` - Basic lightweight Non-fungible tokens
+- `asset.nft.tokens` - More advanced NFTs with customisable functionality
 - `convex.asset` - library for managing arbitrary digital assets using a common abstraction
 - `convex.trust` - library for access control and trusted operations
 - `torus.exchange` - decentralised exchange for trading fungible tokens and currencies
