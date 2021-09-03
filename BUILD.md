@@ -15,7 +15,7 @@ mvn clean install
 Set version information
 
 ```
-mvn versions:set -DnewVersion=0.7.0-rc3
+mvn versions:set -DnewVersion='0.7.0-rc3'
 ```
 
 Build and deploy
