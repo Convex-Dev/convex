@@ -122,6 +122,8 @@ public class ConnectionManager {
 				// log.debug("No connections available to poll!");
 				return;
 			}
+			// TODO: probably shouldn't make a new connection?
+			// Maybe use Convex instance instead of Connection?
 			Connection c=conns.get(random.nextInt(conns.size()));
 			if (c.isClosed()) return;
 			Convex convex=Convex.connect(c.getRemoteAddress());
