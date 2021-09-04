@@ -180,6 +180,7 @@ public class Server implements Closeable {
 	private IServerEvent eventHook = null;
 
 	private Server(HashMap<Keyword, Object> config) throws TimeoutException, IOException {
+
 		AStore configStore = (AStore) config.get(Keywords.STORE);
 		this.store = (configStore == null) ? Stores.current() : configStore;
 
