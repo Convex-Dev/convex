@@ -46,8 +46,7 @@ The repository also contains core "on-chain" libraries providing key full-stack 
 
 ### Command Line Interface (CLI)
 
-For more information about running a Convex Peer and the Command Line Interface see the [documentation](https://billbsing.github.io/convex/convex-cli/
-)
+For more information about running a Convex Peer and the Command Line Interface see the [documentation](https://convex-dev.github.io/convex/convex-cli/)
 
 ### Local GUI Peers
 
