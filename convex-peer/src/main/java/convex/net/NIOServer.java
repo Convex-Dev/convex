@@ -75,7 +75,7 @@ public class NIOServer implements Closeable {
 			// Set receive buffer size
 			ssc.socket().setReceiveBufferSize(Constants.SOCKET_SERVER_BUFFER_SIZE);
 
-			bindAddress = (bindAddress == null)? "127.0.0.1" : bindAddress;
+			bindAddress = (bindAddress == null)? "localhost" : bindAddress;
 			InetSocketAddress address=new InetSocketAddress(bindAddress, port);
 			ssc.bind(address);
 			address=(InetSocketAddress) ssc.getLocalAddress();

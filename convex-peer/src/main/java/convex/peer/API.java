@@ -151,6 +151,8 @@ public class API {
 		// go through 1..count-1 peers and join them all to the genesis Peer
 		// do this twice to allow for all of the peers to get all of the address in the group of peers
 
+		genesisServer.setHostname("localhost:"+genesisServer.getPort());
+
 		for (int i = 1; i < count; i++) {
 			Server server=serverList.get(i);
 

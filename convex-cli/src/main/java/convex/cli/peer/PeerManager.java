@@ -171,6 +171,9 @@ public class PeerManager implements IServerEvent {
 		config.put(Keywords.KEYPAIR, keyPair);
 		config.put(Keywords.EVENT_HOOK, this); // Add this as IServerEvent hook
 		Server server = API.launchPeer(config);
+		if (!config.containsKey(Keywords.URL)) {
+			server.setHostname("localhost:"+server.getPort());
+		}
 
 		peerServerList.add(server);
 	}
