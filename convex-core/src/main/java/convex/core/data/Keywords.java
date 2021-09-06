@@ -57,7 +57,7 @@ public class Keywords {
 	public static final Keyword DELEGATED_STAKE = Keyword.create("delegated-stake");
 	public static final Keyword OWNER = Keyword.create("owner");
 
-	public static final Keyword HOST = Keyword.create("host");
+	public static final Keyword BIND_ADDRESS = Keyword.create("bind-address");
 	public static final Keyword URL = Keyword.create("url");
 
 	public static final Keyword SEQUENCE = Keyword.create("sequence");
@@ -81,8 +81,8 @@ public class Keywords {
 	public static final Keyword VALUE = Keyword.create("value");
 	public static final Keyword FUNCTION = Keyword.create("function");
 	public static final Keyword METADATA = Keyword.create("metadata");
-	
-	
+
+
 	public static final Keyword OUTGOING_CONNECTIONS = Keyword.create("outgoing-connections");
 	public static final Keyword AUTO_MANAGE = Keyword.create("auto-manage");
 	public static final Keyword TIMEOUT = Keyword.create("timeout");

@@ -66,22 +66,22 @@ public class NIOServer implements Closeable {
 		launch(null, port);
 	}
 
-	public void launch(String host, Integer port) {
+	public void launch(String bindAddress, Integer port) {
 		if (port==null) port=0;
 
 		try {
 			ssc=ServerSocketChannel.open();
-			
+
 			// Set receive buffer size
 			ssc.socket().setReceiveBufferSize(Constants.SOCKET_SERVER_BUFFER_SIZE);
-	
-			host = (host == null)? "0.0.0.0" : host;
-			InetSocketAddress address=new InetSocketAddress(host, port);
+
+			bindAddress = (bindAddress == null)? "localhost" : bindAddress;
+			InetSocketAddress address=new InetSocketAddress(bindAddress, port);
 			ssc.bind(address);
 			address=(InetSocketAddress) ssc.getLocalAddress();
 			ssc.configureBlocking(false);
 			port=ssc.socket().getLocalPort();
-			
+
 			// Register for accept. Do this before selection loop starts and
 			// before we return from launch!
 			selector = Selector.open();
@@ -249,7 +249,7 @@ public class NIOServer implements Closeable {
 		if (socketChannel==null) return; // false alarm? Nobody there?
 		log.debug("New connection accepted: {}", socketChannel);
 		socketChannel.configureBlocking(false);
-		
+
 		// TODO: Confirm we don't want  Nagle?
 		socketChannel.setOption(StandardSocketOptions.TCP_NODELAY, true);
 		socketChannel.register(selector, SelectionKey.OP_READ);
