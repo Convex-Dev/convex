@@ -1,5 +1,6 @@
 package convex.peer;
 
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -44,7 +45,7 @@ public class API {
 	 * <li>:state (optional, State) - Genesis state. Defaults to a fresh genesis state for the Peer if neither :source nor :state is specified
 	 * <li>:restore (optional, Boolean) - Boolean Flag to restore from existing store. Default to true
 	 * <li>:persist (optional, Boolean) - Boolean flag to determine if peer state should be persisted in store at server close. Default true.
-	 * <li>:url (optional, String) - public URL for server. If provided, peer will set its public on-chain address based on this.
+	 * <li>:url (optional, String) - public URL for server. If provided, peer will set its public on-chain address based on this, and the bind-address to 0.0.0.0.
 	 * <li>:auto-manage (optional Boolean) - set to true for peer to auto-manage own account. Defaults to true.
      * <li>:bind-address (optional String) - IP address of the ethernet device to bind too. For public peers set too 0.0.0.0. Default to 127.0.0.1.
 	 * </ul>
@@ -75,6 +76,13 @@ public class API {
 			if (!config.containsKey(Keywords.PERSIST)) config.put(Keywords.PERSIST, true);
 			if (!config.containsKey(Keywords.AUTO_MANAGE)) config.put(Keywords.AUTO_MANAGE, true);
 
+			// if URL is set and it is not a local address and no BIND_ADDRESS is set, then the default for BIND_ADDRESS will be 0.0.0.0
+			if (config.containsKey(Keywords.URL) && !config.containsKey(Keywords.BIND_ADDRESS)) {
+				InetAddress ip = InetAddress.getByName((String) config.get(Keywords.URL));
+				if (! (ip.isAnyLocalAddress() || ip.isLoopbackAddress()) ) {
+					config.put(Keywords.BIND_ADDRESS, "0.0.0.0");
+				}
+			}
 			Server server = Server.create(config);
 			server.launch();
 			return server;
