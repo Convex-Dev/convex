@@ -46,6 +46,7 @@ public class API {
 	 * <li>:persist (optional, Boolean) - Boolean flag to determine if peer state should be persisted in store at server close. Default true.
 	 * <li>:url (optional, String) - public URL for server. If provided, peer will set its public on-chain address based on this.
 	 * <li>:auto-manage (optional Boolean) - set to true for peer to auto-manage own account. Defaults to true.
+     * <li>:bind-address (optional String) - IP address of the ethernet device to bind too. For public peers set too 0.0.0.0. Default to 127.0.0.1.
 	 * </ul>
 	 *
 	 * @param peerConfig Config map for the new Peer

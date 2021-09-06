@@ -832,11 +832,11 @@ public class Utils {
 			throw new TODOException("Can't print: " + Utils.getClass(v));
 		}
 	}
-	
+
 	/**
 	 * Converts a Object to an InetSocketAddress
 	 *
-	 * @param o An Object to convert to a socket address. May be a String or existing InetSocketAddress 
+	 * @param o An Object to convert to a socket address. May be a String or existing InetSocketAddress
 	 * @return A valid InetSocketAddress, or null if not in valid format
 	 */
 	public static InetSocketAddress toInetSocketAddress(Object o) {
@@ -874,10 +874,10 @@ public class Utils {
 				return addr;
 			} catch (Exception e) {
 				return null;
-			}		
+			}
 		}
 	}
-	
+
 	/**
 	 * Converts a URL to an InetSocketAddress. Will assume default port if not specified.
 	 *
@@ -1318,7 +1318,7 @@ public class Utils {
 	}
 
 	private static final ExecutorService executor=Executors.newCachedThreadPool();
-	
+
 	/**
 	 * Executes functions on a thread pool for each element of a collection
 	 * @param <R> Result type of function
@@ -1334,6 +1334,5 @@ public class Utils {
 		}
 		return futures;
 	}
-
 
 }

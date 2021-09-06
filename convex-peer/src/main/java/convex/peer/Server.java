@@ -294,7 +294,7 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Creates a new (unlaunched) Server with a given config. 
+	 * Creates a new (unlaunched) Server with a given config.
 	 *
 	 * @param config Server configuration map. Will be defensively copied.
 	 *
@@ -340,13 +340,13 @@ public class Server implements Closeable {
 		AStore savedStore=Stores.current();
 		try {
 			Stores.setCurrent(store);
-			
+
 			HashMap<Keyword, Object> config = getConfig();
 
 			Object p = config.get(Keywords.PORT);
 			Integer port = (p == null) ? null : Utils.toInt(p);
 
-			nio.launch((String)config.get(Keywords.HOST), port);
+			nio.launch((String)config.get(Keywords.BIND_ADDRESS), port);
 			port = nio.getPort(); // Get the actual port (may be auto-allocated)
 
 			if (getConfig().containsKey(Keywords.URL)) {
@@ -355,7 +355,7 @@ public class Server implements Closeable {
 			} else {
 				hostname = null;
 			}
-			
+
 
 
 			// set running status now, so that loops don't terminate
@@ -381,7 +381,7 @@ public class Server implements Closeable {
 					close();
 				}
 			});
-			
+
 			// Connect to source peer if specified
 			if (getConfig().containsKey(Keywords.SOURCE)) {
 				Object s=getConfig().get(Keywords.SOURCE);
@@ -390,7 +390,7 @@ public class Server implements Closeable {
 					if (manager.connectToPeer(sa)!=null) {
 						log.debug("Automatically connected to :source peer at: {}",sa);
 					} else {
-						log.warn("Failed to connect to :source peer at: {}",sa);	
+						log.warn("Failed to connect to :source peer at: {}",sa);
 					}
 				} else {
 					log.warn("Failed to parse :source peer address {}",s);
