@@ -214,7 +214,7 @@ public class Server implements Closeable {
 	 * Establish the controller Account for this Peer.
 	 */
 	private void establishController() {
-		Address controlAddress=RT.castAddress(getConfig().get(Keywords.CONTROLLER));
+		Address controlAddress=RT.toAddress(getConfig().get(Keywords.CONTROLLER));
 		if (controlAddress==null) {
 			controlAddress=peer.getController();
 			if (controlAddress==null) {
