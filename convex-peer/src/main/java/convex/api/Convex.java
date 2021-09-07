@@ -892,7 +892,4 @@ public class Convex {
 		close();
 	}
 
-
-
-
 }
