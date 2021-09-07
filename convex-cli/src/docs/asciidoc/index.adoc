@@ -21,19 +21,19 @@ This CLI is part of the Convex code base. The CLI has been built to do the follo
 
 . Setup accounts within a local network.
 
-. Step key pairs to use for accessing local and remote networks.
+. Setup key pairs to use for accessing local and remote networks.
 
 . Run a Local Peer connected to a remote Convex network.
 
 
 
 == Getting Started
-As yet we have not packaged this in any package manager for downloading so currently the CLI can only be downloaded via github.
+As yet we have not packaged this in any package manager for downloading so currently the CLI can only be downloaded via Github.
 
 === Get the source
 You will need to visit https://github.com/Convex-Dev/convex[convex-dev @ github] and clone the repository onto your local computer.
 
-The develop branch is currently the latest version.
+The "develop" branch is currently the latest version.
 
 .terminal commands
     git clone https://github.com/Convex-Dev/convex.git
@@ -42,7 +42,7 @@ The develop branch is currently the latest version.
     git pull
 
 === Convex Projects
-The Convex code repository is made up of the following sub projects:
+The Convex code repository is made up of the following subprojects:
 
 convex-benchmaks::    Run benchmarks on the convex network.
 convex-cli::          This CLI project.
@@ -97,11 +97,11 @@ The type of files are:
 
 . _Keystore database_ file. This file contains the private/public key pairs used for the peers and any subsequent users. CLI Parameters: *--keystore*, *--password*
 
-. _Session_ file. This is created by the CLI to keep track of the locally running peers, so that if you want to access the local network or add another peer to the local network, the CLI will look at the session file for a randomly available peer to connect too. CLI Parameter: *--session*
+. _Session_ file. This is created by the CLI to keep track of the locally running peers, so that if you want to access the local network or add another peer to the local network, the CLI will look at the session file for a randomly available peer to connect to. CLI Parameter: *--session*
 
 [CAUTION]
 ====
-The GUI version and the CLI run the same local network. The only difference is that the GUI stores the gensis keypairs in memory and does not create a session file. This means that some of the CLI features cannot be used with the GUI local network, such as transfering funds, creating accounts.
+The GUI version and the CLI run the same local network. The only difference is that the GUI stores the genesis keypairs in memory and does not create a session file. This means that some of the CLI features cannot be used with the GUI local network, such as transferring funds, creating accounts.
 ====
 
 
@@ -228,7 +228,7 @@ There are a few common options that can be used with any command or sub command.
 |===
 
 === Requesting Help
-The CLI supports help using the *-h* or *--help* options or the command *help*. For each sub command there are more help options.
+The CLI supports help using the *-h* or *--help* options or the command *help*. For each sub command, there are more help options.
 
 So for example
 
@@ -434,7 +434,7 @@ you can then copy the *Peer start line:* and run a peer with the local network.
 
 [#command-peer-start-remote]
 == Starting a local Peer to a remote Convex network
-Currently the *convex-cli* does not support access to https://convex.world[convex.world] via the client HTTP API, so to setup a peer to connect to convex.world you will need to create a new peer in convex.world using https://github.com/Convex-Dev/convex-api-py[convex-api-py tools/convex_tools.py] and then import the peer key into the convex-cli keystore.
+Currently, the *convex-cli* does not support access to https://convex.world[convex.world] via the client HTTP API, so to setup a peer to connect to convex.world you will need to create a new peer in convex.world using https://github.com/Convex-Dev/convex-api-py[convex-api-py tools/convex_tools.py] and then import the peer key into the convex-cli keystore.
 
 Once the key is imported you can start a peer to connect with https://convex.world[convex.world]
 
@@ -552,7 +552,7 @@ To list out your keystore and view the public keys of each keypair.
 How to export the keys from your keystore to encrypted text.
 
 You can export a keypair from the keystore to an encrypted PEM formated text. This is useful if you need
-to give another user, or application access to your network.
+to give another user or application access to your network.
 
 You need to provide an `--export-password` option with the password of the encrypted PEM formated text.
 
@@ -571,7 +571,7 @@ If we now want to export the key #2, then we can use the following command:
 
     ./convex key export --index-key=2 --export-password=my-password --password=my-password
 
-or a more more reliable way is to use the first hex of the  public key
+or a more reliable way is to use the first hex of the  public key
 
     ./convex key export --public-key=373d2a583695ff --export-password=my-password --password=my-password
 
@@ -638,7 +638,7 @@ Returns the balance for account #45
 === Request funds for an account
 How to request funds for an account.
 
-With this command you can request funds for an account. This command transfers the funds from the first peer account to the named account. If the network has been started by the GUI or another user, you will not be able to run this command since the transfer of funds will need to know the private key of the first peer.
+With this command, you can request funds for an account. This command transfers the funds from the first peer account to the named account. If the network has been started by the GUI or another user, you will not be able to run this command since the transfer of funds will need to know the private key of the first peer.
 
 For example, first create an account:
 
@@ -712,7 +712,7 @@ So to find out the current balance using the `*balance*` command you can run the
 How to execute transactions on a local Convex network.
 
 
-Submiting a ransaction on the Convex network can change the network state, and so this will incure a small fee that is passed back to the peers.
+Submitting a transaction on the Convex network can change the network state, and so this will incur a small fee that is passed back to the peers.
 
 So when sending a transaction you will need to provide a `--public-key` or `--index-key` field for the keypair stored in the keystore, and also the correct `--address`.
 
@@ -723,4 +723,3 @@ For example:
 
 [TIP]
 The CLI uses the internal Peer API for queries and transactions. To use other Convex networks or remote Convex networks we suggest you use the public link:https://convex.world/documentation/client-api[Convex Client API interface] instead.
-
