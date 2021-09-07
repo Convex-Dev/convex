@@ -771,7 +771,7 @@ The current test Convex network can be found at <a href="https://convex.world">c
 <p>Setup accounts within a local network.</p>
 </li>
 <li>
-<p>Step key pairs to use for accessing local and remote networks.</p>
+<p>Setup key pairs to use for accessing local and remote networks.</p>
 </li>
 <li>
 <p>Run a Local Peer connected to a remote Convex network.</p>
@@ -785,7 +785,7 @@ The current test Convex network can be found at <a href="https://convex.world">c
 <h2 id="_getting_started">Getting Started</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>As yet we have not packaged this in any package manager for downloading so currently the CLI can only be downloaded via github.</p>
+<p>As yet we have not packaged this in any package manager for downloading so currently the CLI can only be downloaded via Github.</p>
 </div>
 <div class="sect2">
 <h3 id="_get_the_source">Get the source</h3>
@@ -793,7 +793,7 @@ The current test Convex network can be found at <a href="https://convex.world">c
 <p>You will need to visit <a href="https://github.com/Convex-Dev/convex">convex-dev @ github</a> and clone the repository onto your local computer.</p>
 </div>
 <div class="paragraph">
-<p>The develop branch is currently the latest version.</p>
+<p>The "develop" branch is currently the latest version.</p>
 </div>
 <div class="literalblock">
 <div class="title">terminal commands</div>
@@ -808,7 +808,7 @@ git pull</pre>
 <div class="sect2">
 <h3 id="_convex_projects">Convex Projects</h3>
 <div class="paragraph">
-<p>The Convex code repository is made up of the following sub projects:</p>
+<p>The Convex code repository is made up of the following subprojects:</p>
 </div>
 <div class="dlist">
 <dl>
@@ -901,7 +901,7 @@ The type of files are:</p>
 <p><em>Keystore database</em> file. This file contains the private/public key pairs used for the peers and any subsequent users. CLI Parameters: <strong>--keystore</strong>, <strong>--password</strong></p>
 </li>
 <li>
-<p><em>Session</em> file. This is created by the CLI to keep track of the locally running peers, so that if you want to access the local network or add another peer to the local network, the CLI will look at the session file for a randomly available peer to connect too. CLI Parameter: <strong>--session</strong></p>
+<p><em>Session</em> file. This is created by the CLI to keep track of the locally running peers, so that if you want to access the local network or add another peer to the local network, the CLI will look at the session file for a randomly available peer to connect to. CLI Parameter: <strong>--session</strong></p>
 </li>
 </ol>
 </div>
@@ -913,7 +913,7 @@ The type of files are:</p>
 </td>
 <td class="content">
 <div class="paragraph">
-<p>The GUI version and the CLI run the same local network. The only difference is that the GUI stores the gensis keypairs in memory and does not create a session file. This means that some of the CLI features cannot be used with the GUI local network, such as transfering funds, creating accounts.</p>
+<p>The GUI version and the CLI run the same local network. The only difference is that the GUI stores the genesis keypairs in memory and does not create a session file. This means that some of the CLI features cannot be used with the GUI local network, such as transferring funds, creating accounts.</p>
 </div>
 </td>
 </tr>
@@ -1273,7 +1273,7 @@ The type of files are:</p>
 <div class="sect2">
 <h3 id="_requesting_help">Requesting Help</h3>
 <div class="paragraph">
-<p>The CLI supports help using the <strong>-h</strong> or <strong>--help</strong> options or the command <strong>help</strong>. For each sub command there are more help options.</p>
+<p>The CLI supports help using the <strong>-h</strong> or <strong>--help</strong> options or the command <strong>help</strong>. For each sub command, there are more help options.</p>
 </div>
 <div class="paragraph">
 <p>So for example</p>
@@ -1634,7 +1634,7 @@ Peer start line: ./convex peer start --password=my-password --address=45 --publi
 <h2 id="command-peer-start-remote">Starting a local Peer to a remote Convex network</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>Currently the <strong>convex-cli</strong> does not support access to <a href="https://convex.world">convex.world</a> via the client HTTP API, so to setup a peer to connect to convex.world you will need to create a new peer in convex.world using <a href="https://github.com/Convex-Dev/convex-api-py">convex-api-py tools/convex_tools.py</a> and then import the peer key into the convex-cli keystore.</p>
+<p>Currently, the <strong>convex-cli</strong> does not support access to <a href="https://convex.world">convex.world</a> via the client HTTP API, so to setup a peer to connect to convex.world you will need to create a new peer in convex.world using <a href="https://github.com/Convex-Dev/convex-api-py">convex-api-py tools/convex_tools.py</a> and then import the peer key into the convex-cli keystore.</p>
 </div>
 <div class="paragraph">
 <p>Once the key is imported you can start a peer to connect with <a href="https://convex.world">convex.world</a></p>
@@ -1890,7 +1890,7 @@ S
 </div>
 <div class="paragraph">
 <p>You can export a keypair from the keystore to an encrypted PEM formated text. This is useful if you need
-to give another user, or application access to your network.</p>
+to give another user or application access to your network.</p>
 </div>
 <div class="paragraph">
 <p>You need to provide an <code>--export-password</code> option with the password of the encrypted PEM formated text.</p>
@@ -1922,7 +1922,7 @@ to give another user, or application access to your network.</p>
 </div>
 </div>
 <div class="paragraph">
-<p>or a more more reliable way is to use the first hex of the  public key</p>
+<p>or a more reliable way is to use the first hex of the  public key</p>
 </div>
 <div class="literalblock">
 <div class="content">
@@ -2032,7 +2032,7 @@ to give another user, or application access to your network.</p>
 <p>How to request funds for an account.</p>
 </div>
 <div class="paragraph">
-<p>With this command you can request funds for an account. This command transfers the funds from the first peer account to the named account. If the network has been started by the GUI or another user, you will not be able to run this command since the transfer of funds will need to know the private key of the first peer.</p>
+<p>With this command, you can request funds for an account. This command transfers the funds from the first peer account to the named account. If the network has been started by the GUI or another user, you will not be able to run this command since the transfer of funds will need to know the private key of the first peer.</p>
 </div>
 <div class="paragraph">
 <p>For example, first create an account:</p>
@@ -2172,7 +2172,7 @@ Data type: Long</pre>
 <p>How to execute transactions on a local Convex network.</p>
 </div>
 <div class="paragraph">
-<p>Submiting a ransaction on the Convex network can change the network state, and so this will incure a small fee that is passed back to the peers.</p>
+<p>Submitting a transaction on the Convex network can change the network state, and so this will incur a small fee that is passed back to the peers.</p>
 </div>
 <div class="paragraph">
 <p>So when sending a transaction you will need to provide a <code>--public-key</code> or <code>--index-key</code> field for the keypair stored in the keystore, and also the correct <code>--address</code>.</p>
@@ -2202,7 +2202,7 @@ The CLI uses the internal Peer API for queries and transactions. To use other Co
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2021-09-07 05:21:08 UTC
+Last updated 2021-09-07 09:25:39 UTC
 </div>
 </div>
 </body>
