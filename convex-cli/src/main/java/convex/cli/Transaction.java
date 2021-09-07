@@ -1,22 +1,16 @@
 package convex.cli;
 
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.core.Result;
 import convex.core.crypto.AKeyPair;
-import convex.core.data.Address;
 import convex.core.data.ACell;
-import convex.core.data.AString;
-import convex.core.data.AVector;
-import convex.core.exceptions.MissingDataException;
+import convex.core.data.Address;
 import convex.core.lang.Reader;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
-import convex.core.Result;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -103,8 +97,6 @@ public class Transaction implements Runnable {
 			log.info("Executing transaction: '{}'\n", transactionCommand);
 			ACell message = Reader.read(transactionCommand);
 			ATransaction transaction = Invoke.create(address, -1, message);
-			ACell value = null;
-			AVector<AString> trace = null;
 			Result result = convex.transactSync(transaction, timeout);
 			mainParent.output.setResult(result);
 		} catch (Throwable t) {

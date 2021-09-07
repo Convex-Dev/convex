@@ -5,10 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import convex.core.data.ACell;
-import convex.core.data.AString;
-import convex.core.data.AVector;
 import convex.core.Result;
+import convex.core.data.ACell;
 
 /*
  * Output class to show results from the CLI

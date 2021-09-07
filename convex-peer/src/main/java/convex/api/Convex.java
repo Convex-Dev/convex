@@ -616,7 +616,6 @@ public class Convex {
 	 * @throws TimeoutException If operation times out
 	 *
 	 */
-	@SuppressWarnings("unchecked")
 	public Result requestStatusSync(long timeoutMillis) throws TimeoutException, IOException {
 		long start = Utils.getTimeMillis();
 		Result result;

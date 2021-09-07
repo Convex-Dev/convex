@@ -8,8 +8,6 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.junit.jupiter.api.Test;
-
 import convex.api.Convex;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
