@@ -433,14 +433,93 @@ you can then copy the *Peer start line:* and run a peer with the local network.
     ./convex peer start --password=my-password --address=45 --public-key=bc1290
 
 [#command-peer-start-remote]
-== Starting a local Peer to a remote Convex network
-Currently, the *convex-cli* does not support access to https://convex.world[convex.world] via the client HTTP API, so to setup a peer to connect to convex.world you will need to create a new peer in convex.world using https://github.com/Convex-Dev/convex-api-py[convex-api-py tools/convex_tools.py] and then import the peer key into the convex-cli keystore.
+== Setting up a local Peer with Convex.world
 
-Once the key is imported you can start a peer to connect with https://convex.world[convex.world]
+To start a local peer connected to the https://convex.world[convex.world] network you will need to first setup the peer
+
+=== Peer Setup in convex.world
+
+* Access the https://convex.world/sandbox[convex.world/sandbox]
+
+* Create a new account, you will need the account number later to start the peer.
+
+* Then go to the *'Request coins'* section and request some more coins for your new account.
+
+* Using the convex-cli generate a new keypair for your new peer. See <<command-key-generate>>
+
+    ./convex key generate --password=my-password
+    Index Public Key
+    0 dfb22da0afda1a123e523ded624f184719a4416e9aac6f6fdedd8518fb09fe3c
+
+[TIP]
+====
+The public key address, account number and URL shown in this example will be different values for when you run and paste these commands.
+====
+
+* Using the generated public key and a set stake amount (e.g. _19999_ this number must be less than your current balance),
+paste the following command into the sandbox command area (*remember to use your public key instead*):
+
+    (create-peer 0xdfb22da0afda1a123e523ded624f184719a4416e9aac6f6fdedd8518fb09fe3c 199999)
+
+
+    ** The syntax for `create-peer` is:
+
+        (create-peer <public-key> <stake-amount>)
+
+[WARNING]
+====
+You must use *your generated public key* to `set-key` command, as this will lock you out of the sandbox, since the sandbox
+no longer has the keypair for this account.
+====
+
+* Setup the new account to use your new peer key, by running the command in the sandbox:
+
+    (set-key 0xdfb22da0afda1a123e523ded624f184719a4416e9aac6f6fdedd8518fb09fe3c)
+
+    ** The syntax for `set-key` is:
+
+        (set-key <public-key>)
+
+[NOTE]
+====
+Remember to add the `0x` at the front of the key value, when using a public key in the sandbox.
+====
+
+
+=== Starting the peer with convex.world
+
+If the peer has been setup correctly on https://convex.world[convex.world], so you can now start your peer, using the following example command:
+
+    ./convex peer start --public-key=dfbb22 --password=my-password --address=<address> --port=80888 --url=<my-ip>:8088 --peer=convex.world:18888
+
+Where:
+
+* `<address>` is the account number of your peer.
+
+* `<my-ip>` is the public ip address of the running peer.
+
+
+or for example you can create a _config_ file with the following options set:
+
+    convex.peer.start.peer=convex.world:18888
+    convex.peer.start.public-key=dfb22da0afda1a123e523ded624f184719a4416e9aac6f6fdedd8518fb09fe3c
+    convex.peer.start.address=47
+    convex.peer.start.url=206.1.1.1:8181
+    convex.peer.start.port=8181
+    convex.password=my-password
+
+* Run convex only using the config file
+
+    ./convex peer start --config=my-peer.conf
+
+[NOTE]
+====
+You will need allow the peer port remote access. In our example the peer port is set to 8181, so we have allowed TCP traffic to be forwarded and passed to port 8181.
+====
 
 If you wish to connect to your own remote peer, you can by adding the `--peer=<remote peer URL>` option. This tells the new peer you are starting where a remote peer is located. Once found the started peer will try and sync with the remote peer.
 
-You will also need to set the `--url=<my peer URL>` option to specify the remote URL of your running peer.
+You will also need to set the `--url=<my peer URL>` option to specify the remote URL of your running peer, so that other peers can communicate to your peer.
 
 
 [#command-local-gui]
