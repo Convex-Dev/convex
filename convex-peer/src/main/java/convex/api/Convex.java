@@ -19,6 +19,7 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
@@ -467,6 +468,7 @@ public class Convex {
 	public Result transactSync(ATransaction transaction, long timeout) throws TimeoutException, IOException {
 		// sample time at start of transaction attempt
 		long start = Utils.getTimeMillis();
+		Result result;
 
 		Future<Result> cf = transact(transaction);
 
@@ -474,11 +476,11 @@ public class Convex {
 		long now = Utils.getTimeMillis();
 		timeout = Math.max(0L, timeout - (now - start));
 		try {
-			Result r = cf.get(timeout, TimeUnit.MILLISECONDS);
-			return r;
+			result = cf.get(timeout, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException | ExecutionException e) {
 			throw new Error("Not possible? Since there is no Thread for the future....", e);
 		}
+		return result;
 	}
 
 	/**
@@ -496,6 +498,7 @@ public class Convex {
 			throws TimeoutException, IOException {
 		// sample time at start of transaction attempt
 		long start = Utils.getTimeMillis();
+		Result result;
 
 		Future<Result> cf = transact(transaction);
 
@@ -503,10 +506,11 @@ public class Convex {
 		long now = Utils.getTimeMillis();
 		timeout = Math.max(0L, timeout - (now - start));
 		try {
-			return cf.get(timeout, TimeUnit.MILLISECONDS);
+			result=cf.get(timeout,TimeUnit.MILLISECONDS);
 		} catch (InterruptedException | ExecutionException e) {
 			throw new Error("Not possible? Since there is no Thread for the future....", e);
 		}
+		return result;
 	}
 
 	/**
@@ -607,27 +611,25 @@ public class Convex {
 	 *
 	 * @param timeoutMillis Milliseconds to wait for request timeout
 	 * @return Status Vector from target Peer
-	 * 
+	 *
 	 * @throws IOException If an IO Error occurs
-	 * @throws InterruptedException If execution is interrupted
-	 * @throws ExecutionException If a concurrent execution failure occurs
 	 * @throws TimeoutException If operation times out
 	 *
 	 */
 	@SuppressWarnings("unchecked")
-	public AVector<ACell> requestStatusSync(long timeoutMillis) throws IOException, InterruptedException, ExecutionException, TimeoutException {
-		AVector<ACell> status = null;
-		int retryCount = 10;
+	public Result requestStatusSync(long timeoutMillis) throws TimeoutException, IOException {
+		long start = Utils.getTimeMillis();
+		Result result;
 		Future<Result> statusFuture=requestStatus();
-		while (status == null && retryCount > 0 ) {
-			try {
-				status=statusFuture.get(timeoutMillis,TimeUnit.MILLISECONDS).getValue();
-			} catch (MissingDataException e) {
-				status = (AVector<ACell>) acquire(e.getMissingHash()).get(timeoutMillis,TimeUnit.MILLISECONDS);
-			}
-			retryCount -= 1;
+		// adjust timeout if time elapsed to submit transaction
+		long now = Utils.getTimeMillis();
+		timeout = Math.max(0L, timeout - (now - start));
+		try {
+			result=statusFuture.get(timeout,TimeUnit.MILLISECONDS);
+		} catch (InterruptedException | ExecutionException e) {
+			throw new Error("Unable to get status message", e);
 		}
-		return status;
+		return result;
 	}
 
 	/**
@@ -759,12 +761,13 @@ public class Convex {
 	 */
 	public Result querySync(ACell query, Address address, long timeoutMillis) throws TimeoutException, IOException {
 		Future<Result> cf = query(query, address);
-
+		Result result;
 		try {
-			return cf.get(timeoutMillis, TimeUnit.MILLISECONDS);
+			result = cf.get(timeoutMillis, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException | ExecutionException e) {
 			throw new Error("Not possible? Since there is no Thread for the future....", e);
 		}
+		return result;
 	}
 
 	/**

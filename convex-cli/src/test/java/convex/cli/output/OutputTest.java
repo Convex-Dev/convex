@@ -60,7 +60,7 @@ public class OutputTest {
 		output.setResult(result);
 		output.writeToStream(printWriter);
 		String outputResult = outputWriter.toString();
-		String fullText = String.format("Result: #%d\nError code: %d\n", TEST_LONG_VALUE, TEST_ERROR_CODE);
+		String fullText = String.format("Result: #%d\nData type: Address\nError code: %d\n", TEST_LONG_VALUE, TEST_ERROR_CODE);
 		assertEquals(fullText, outputResult.replaceAll("\r\n", "\n"));
 	}
 

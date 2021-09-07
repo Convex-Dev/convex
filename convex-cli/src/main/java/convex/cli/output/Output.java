@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import convex.core.data.ACell;
+import convex.core.data.AString;
+import convex.core.data.AVector;
 import convex.core.Result;
 
 /*
@@ -36,8 +38,11 @@ public class Output {
 	}
 
 	public void setResult(Result result) {
-		ACell value = result.getValue();
-		setField("Result", value);
+        ACell value = result.getValue();
+		if (value != null) {
+			setField("Result", value);
+			setField("Data type", value.getType().toString());
+		}
 		if (result.isError()) {
 			setField("Error code", result.getErrorCode());
 			if (result.getTrace() != null) {
@@ -45,7 +50,6 @@ public class Output {
 			}
 			return;
 		}
-		setField("Data type", value.getType().toString());
 	}
 
 	public void addRow() {

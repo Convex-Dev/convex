@@ -9,6 +9,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.Peer;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Hash;
@@ -195,20 +196,21 @@ public class API {
 			isReady = true;
 			Hash consensusHash = null;
 			for (Server server: serverList) {
+				Peer peer = server.getPeer();
 				if (consensusHash == null) {
-					consensusHash = server.getPeer().getConsensusState().getHash();
+					consensusHash = peer.getConsensusState().getHash();
 				}
-				if (!consensusHash.equals(server.getPeer().getConsensusState().getHash())) {
+				if (!consensusHash.equals(peer.getConsensusState().getHash())) {
 					isReady=false;
-				}
-				try {
-					Thread.sleep(100);
-				} catch ( InterruptedException e) {
-					return false;
 				}
 			}
 			if (isReady) {
 				break;
+			}
+			try {
+				Thread.sleep(100);
+			} catch ( InterruptedException e) {
+				return false;
 			}
 		}
 		return isReady;

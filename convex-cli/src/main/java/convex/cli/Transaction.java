@@ -1,9 +1,15 @@
 package convex.cli;
 
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.data.ACell;
+import convex.core.data.AString;
+import convex.core.data.AVector;
+import convex.core.exceptions.MissingDataException;
 import convex.core.lang.Reader;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
@@ -65,7 +71,7 @@ public class Transaction implements Runnable {
 
 	@Parameters(paramLabel="transactionCommand",
 		description="Transaction Command")
-	private String transactionCommand;
+	private String[] transactionList;
 
 	@Override
 	public void run() {
@@ -93,10 +99,12 @@ public class Transaction implements Runnable {
 		Convex convex = null;
 		try {
 			convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
-			log.info("Executing transaction: %s\n", transactionCommand);
+			String transactionCommand = String.join(" ", transactionList);
+			log.info("Executing transaction: '{}'\n", transactionCommand);
 			ACell message = Reader.read(transactionCommand);
 			ATransaction transaction = Invoke.create(address, -1, message);
-
+			ACell value = null;
+			AVector<AString> trace = null;
 			Result result = convex.transactSync(transaction, timeout);
 			mainParent.output.setResult(result);
 		} catch (Throwable t) {
