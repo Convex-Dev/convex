@@ -616,11 +616,10 @@ public class Convex {
 	 * @throws TimeoutException If operation times out
 	 *
 	 */
-	@SuppressWarnings("unchecked")
-	public AVector<ACell> requestStatusSync(long timeoutMillis) throws IOException, InterruptedException, ExecutionException, TimeoutException {
+	public Result requestStatusSync(long timeoutMillis) throws IOException, TimeoutException {
 		Future<Result> statusFuture=requestStatus();
 		try {
-			return statusFuture.get(timeoutMillis, TimeUnit.MILLISECONDS).getValue();
+			return statusFuture.get(timeoutMillis, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException | ExecutionException e) {
 			throw new Error("Unable to get network status ", e);
 		}
