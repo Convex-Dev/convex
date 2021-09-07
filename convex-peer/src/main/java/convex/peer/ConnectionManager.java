@@ -19,6 +19,7 @@ import convex.api.Convex;
 import convex.core.Belief;
 import convex.core.Constants;
 import convex.core.Peer;
+import convex.core.Result;
 import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.AString;
@@ -52,10 +53,19 @@ public class ConnectionManager {
 	static final long SERVER_CONNECTION_PAUSE = 1000;
 
 	/**
-	 * Pause for each iteration of Server connection loop.
+	 * Delay until the next poll belief.
 	 */
 	static final long SERVER_POLL_DELAY = 2000;
 
+	/**
+	 * How long to wait for a belief poll request of status.
+	 */
+	static final long POLL_TIMEOUT_MILLIS = 500;
+
+	/**
+	 * How long to wait for a complete acquire of a belief.
+	 */
+	static final long POLL_ACQUIRE_TIMEOUT_MILLIS = 10000;
 
 	protected final Server server;
 	private final HashMap<AccountKey,Connection> connections = new HashMap<>();
@@ -127,10 +137,11 @@ public class ConnectionManager {
 			Convex convex=Convex.connect(c.getRemoteAddress());
 			try {
 				// use requestStatusSync to auto acquire hash of the status instead of the value
-				AVector<ACell> status=convex.requestStatusSync(1000);
+				Result result=convex.requestStatusSync(POLL_TIMEOUT_MILLIS);
+				AVector<ACell> status = result.getValue();
 				Hash h=RT.ensureHash(status.get(0));
 				@SuppressWarnings("unchecked")
-				SignedData<Belief> sb=(SignedData<Belief>) convex.acquire(h).get(10000,TimeUnit.MILLISECONDS);
+				SignedData<Belief> sb=(SignedData<Belief>) convex.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS,TimeUnit.MILLISECONDS);
 				server.queueEvent(sb);
 			} finally {
 				convex.close();
@@ -579,8 +590,8 @@ public class ConnectionManager {
 		try {
 			// Temp client connection
 			Convex convex=Convex.connect(hostAddress);
-
-			AVector<ACell> status = convex.requestStatusSync(Constants.DEFAULT_CLIENT_TIMEOUT);
+			Result result = convex.requestStatusSync(Constants.DEFAULT_CLIENT_TIMEOUT);
+			AVector<ACell> status = result.getValue();
 			if (status == null || status.count()!=Constants.STATUS_COUNT) {
 				throw new Error("Bad status message from remote Peer");
 			}
@@ -598,7 +609,7 @@ public class ConnectionManager {
 				connections.put(peerKey, newConn);
 			}
 			server.raiseServerChange("connection");
-		} catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
+		} catch (IOException | TimeoutException e) {
 			// ignore any errors from the peer connections
 		} catch (UnresolvedAddressException e) {
 			log.info("Unable to resolve host address: "+hostAddress);

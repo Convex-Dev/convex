@@ -5,6 +5,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import org.junit.jupiter.api.Test;
+
 import convex.api.Convex;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
@@ -18,9 +23,12 @@ import convex.core.util.Utils;
  */
 public class TestNetwork {
 
+	private static final Logger log = LoggerFactory.getLogger(TestNetwork.class.getName());
+
+	private static long NETWORK_WAIT_TIMEOUT = 30 * 1000;
 	public Server SERVER = null;
 
-	private List<Server> SERVERS;
+	private List<Server> SERVERS = null;
 
 	public Convex CONVEX;
 
@@ -50,29 +58,30 @@ public class TestNetwork {
 	public Address HERO;
 	public Address VILLAIN;
 
+	public State GENESIS_STATE;
 	private static TestNetwork instance = null;
 
 	private TestNetwork() {
 		// Use fresh State
-		State s=Init.createState(PEER_KEYS);
+		GENESIS_STATE=Init.createState(PEER_KEYS);
 		HERO=Address.create(Init.GENESIS_ADDRESS);
 		VILLAIN=HERO.offset(1);
-
-		SERVERS=API.launchLocalPeers(PEER_KEYPAIRS, s);
 	}
 
 	private void waitForLaunch() {
-		if (SERVER == null) {
-			SERVER = SERVERS.get(0);
+		if (SERVERS == null) {
+			SERVERS=API.launchLocalPeers(PEER_KEYPAIRS, GENESIS_STATE);
 			try {
 				// Thread.sleep(1000);
-				API.isNetworkReady(SERVERS, 10000);
+				API.isNetworkReady(SERVERS, NETWORK_WAIT_TIMEOUT);
+				SERVER = SERVERS.get(0);
 				CONVEX=Convex.connect(SERVER.getHostAddress(), HERO, HERO_KEYPAIR);
 			} catch (Throwable t) {
 				throw Utils.sneakyThrow(t);
 			}
 		}
-		API.isNetworkReady(SERVERS, 10000);
+		API.isNetworkReady(SERVERS, NETWORK_WAIT_TIMEOUT);
+		log.info("*** Test Network ready ***");
 	}
 
 	public static TestNetwork getInstance() {

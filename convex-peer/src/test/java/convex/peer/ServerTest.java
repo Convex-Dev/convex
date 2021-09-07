@@ -87,7 +87,7 @@ public class ServerTest {
 
 	@BeforeAll
 	public static void init() {
-		network =  TestNetwork.getInstance();
+		network = TestNetwork.getInstance();
 	}
 
 	@Test
@@ -235,7 +235,7 @@ public class ServerTest {
 
 			Convex convex=network.CONVEX;
 
-			State s=convex.acquireState().get(60000,TimeUnit.MILLISECONDS);
+			State s=convex.acquireState().get(80000,TimeUnit.MILLISECONDS);
 			assertTrue(s instanceof State);
 		}
 	}

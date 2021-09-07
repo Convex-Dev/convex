@@ -16,6 +16,7 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import etch.EtchStore;
 import convex.api.Convex;
 import convex.core.Belief;
 import convex.core.Block;
@@ -244,7 +245,8 @@ public class Server implements Closeable {
 				Convex convex=Convex.connect(sourceAddr);
 				log.info("Attempting Peer Sync with: "+sourceAddr);
 				long timeout = establishTimeout();
-				AVector<ACell> status = convex.requestStatusSync(timeout);
+				Result result = convex.requestStatusSync(timeout);
+				AVector<ACell> status = result.getValue();
 				if (status == null || status.count()!=Constants.STATUS_COUNT) {
 					throw new Error("Bad status message from remote Peer");
 				}
