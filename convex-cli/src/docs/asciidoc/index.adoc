@@ -101,7 +101,7 @@ The type of files are:
 
 [CAUTION]
 ====
-The GUI version and the CLI run the same local network. The only difference is that the GUI does not create a session file. This means that some of the CLI features cannot be used with the GUI local network.
+The GUI version and the CLI run the same local network. The only difference is that the GUI stores the gensis keypairs in memory and does not create a session file. This means that some of the CLI features cannot be used with the GUI local network, such as transfering funds, creating accounts.
 ====
 
 
@@ -636,25 +636,89 @@ Returns the balance for account #45
 === Request funds for an account
 How to request funds for an account.
 
+With this command you can request funds for an account. This command transfers the funds from the first peer account to the named account. If the network has been started by the GUI or another user, you will not be able to run this command since the transfer of funds will need to know the private key of the first peer.
+
+For example, first create an account:
+
+    ./convex account create --password=my-password
+
+    Public Key: 1a47522ec91db1209839cf96c99948e77c489310799b29e6bf02038bc67a111c
+    Address: 46
+    Account usage: to use this key can use the options --address=46 --public-key=1a4752
+
+You can then request funds for this account by providing the `--address` and `--public-key`
+
+    ./convex account fund --address=46 --public-key=1a4752 --password=my-password
+    Balance: 100000000
+
+
 [#command-account-info]
 === Get information about an account
 How to get information about an account.
+
+This command returns the information about the account.
+
+    ./convex account info 46
+    Result: {:sequence 0,:balance 100000000,:allowance 0,:environment nil,:metadata nil,:holdings {},:controller nil,:key 0x1a47522ec91db1209839cf96c99948e77c489310799b29e6bf02038bc67a111c}
+
+    Data type: Record
+
 
 [#command-status]
 == Status
 How to get the local network status.
 
+This command gets the current status from the local network.
+
+For example:
+
+    ./convex  status --password=my-password
+    State hash: 0x68b40285d8b3d5831d829f45acaa5066a793ac1aaa3fb603a07ef8c00512f414 <.>
+    Timestamp: 1580602820020 <.>
+    Timestamp value: 2020-02-02T00:20:20.020Z <.>
+    Global Fees: 0 <.>
+    Juice Price: 2 <.>
+    Total Funds: 1,000,000,000,000,000,000 <.>
+    Number of accounts: 46 <.>
+    Number of peers: 4 <.>
+
+<.> The current hash state for the local peer.
+<.> The peer's timestamp as a long number.
+<.> The Peer's timestamp
+<.> The amount of global fees.
+<.> The current juice price for each transaction.
+<.> Total funds available in this network.
+<.> Total number of accounts in this network.
+<.> Number of peers connected to this network.
+
+
 [#command-query]
 == Queries
 How to execute queries on a local Convex network.
+
+When you run a query, you usually need to provide an account address `--address`, but this command uses a default account address.
+
+So to find out the current balance using the `*balance*` command you can run the following:
+
+    ./convex query '*balance*'
+    Result: 260397600000000000
+    Data type: Long
+
 
 [#command-transaction]
 == Transactions
 How to execute transactions on a local Convex network.
 
 
+Submiting a ransaction on the Convex network can change the network state, and so this will incure a small fee that is passed back to the peers.
+
+So when sending a transaction you will need to provide a `--public-key` or `--index-key` field for the keypair stored in the keystore, and also the correct `--address`.
+
+For example:
+
+    ./convex transaction --address=46 --public-key=1cf32e --password=secret "(map inc [1 2 3 4 5])"
 
 
-
-
+[TIP]
+The CLI uses the internal Peer API for queries and transactions. To use other Convex networks or remote Convex networks we suggest you use the public link:https://convex.world/documentation/client-api[Convex Client API interface] instead.
 

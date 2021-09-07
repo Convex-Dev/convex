@@ -65,7 +65,7 @@ public class Transaction implements Runnable {
 
 	@Parameters(paramLabel="transactionCommand",
 		description="Transaction Command")
-	private String transactionCommand;
+	private String[] transactionList;
 
 	@Override
 	public void run() {
@@ -93,7 +93,8 @@ public class Transaction implements Runnable {
 		Convex convex = null;
 		try {
 			convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
-			log.info("Executing transaction: %s\n", transactionCommand);
+			String transactionCommand = String.join(" ", transactionList);
+			log.info("Executing transaction: '{}'\n", transactionCommand);
 			ACell message = Reader.read(transactionCommand);
 			ATransaction transaction = Invoke.create(address, -1, message);
 
