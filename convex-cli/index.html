@@ -709,7 +709,12 @@ window.onload = function() {
 </ul>
 </li>
 <li><a href="#command-peer-start-local">Starting a local Peer</a></li>
-<li><a href="#command-peer-start-remote">Starting a local Peer to a remote Convex network</a></li>
+<li><a href="#command-peer-start-remote">Setting up a local Peer with Convex.world</a>
+<ul class="sectlevel2">
+<li><a href="#_peer_setup_in_convex_world">Peer Setup in convex.world</a></li>
+<li><a href="#_starting_the_peer_with_convex_world">Starting the peer with convex.world</a></li>
+</ul>
+</li>
 <li><a href="#command-local-gui">Starting the GUI local network</a></li>
 <li><a href="#_peer_output">Peer Output</a></li>
 <li><a href="#command-keys">Managing your Keys - The Keystore</a>
@@ -1631,19 +1636,197 @@ Peer start line: ./convex peer start --password=my-password --address=45 --publi
 </div>
 </div>
 <div class="sect1">
-<h2 id="command-peer-start-remote">Starting a local Peer to a remote Convex network</h2>
+<h2 id="command-peer-start-remote">Setting up a local Peer with Convex.world</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>Currently, the <strong>convex-cli</strong> does not support access to <a href="https://convex.world">convex.world</a> via the client HTTP API, so to setup a peer to connect to convex.world you will need to create a new peer in convex.world using <a href="https://github.com/Convex-Dev/convex-api-py">convex-api-py tools/convex_tools.py</a> and then import the peer key into the convex-cli keystore.</p>
+<p>To start a local peer connected to the <a href="https://convex.world">convex.world</a> network you will need to first setup the peer</p>
+</div>
+<div class="sect2">
+<h3 id="_peer_setup_in_convex_world">Peer Setup in convex.world</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>Access the <a href="https://convex.world/sandbox">convex.world/sandbox</a></p>
+</li>
+<li>
+<p>Create a new account, you will need the account number later to start the peer.</p>
+</li>
+<li>
+<p>Then go to the <strong>'Request coins'</strong> section and request some more coins for your new account.</p>
+</li>
+<li>
+<p>Using the convex-cli generate a new keypair for your new peer. See <a href="#command-key-generate">Generating keypairs</a></p>
+<div class="literalblock">
+<div class="content">
+<pre>./convex key generate --password=my-password
+Index Public Key
+0 dfb22da0afda1a123e523ded624f184719a4416e9aac6f6fdedd8518fb09fe3c</pre>
+</div>
+</div>
+</li>
+</ul>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>The public key address, account number and URL shown in this example will be different values for when you run and paste these commands.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Using the generated public key and a set stake amount (e.g. <em>19999</em> this number must be less than your current balance),
+paste the following command into the sandbox command area (<strong>remember to use your public key instead</strong>):</p>
+<div class="literalblock">
+<div class="content">
+<pre>(create-peer 0xdfb22da0afda1a123e523ded624f184719a4416e9aac6f6fdedd8518fb09fe3c 199999)</pre>
+</div>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>The syntax for <code>create-peer</code> is:</p>
+<div class="literalblock">
+<div class="content">
+<pre>(create-peer &lt;public-key&gt; &lt;stake-amount&gt;)</pre>
+</div>
+</div>
+</li>
+</ul>
+</div>
+</li>
+</ul>
+</div>
+<div class="admonitionblock warning">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-warning" title="Warning"></i>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>You must use <strong>your generated public key</strong> to <code>set-key</code> command, as this will lock you out of the sandbox, since the sandbox
+no longer has the keypair for this account.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Setup the new account to use your new peer key, by running the command in the sandbox:</p>
+<div class="literalblock">
+<div class="content">
+<pre>(set-key 0xdfb22da0afda1a123e523ded624f184719a4416e9aac6f6fdedd8518fb09fe3c)</pre>
+</div>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>The syntax for <code>set-key</code> is:</p>
+<div class="literalblock">
+<div class="content">
+<pre>(set-key &lt;public-key&gt;)</pre>
+</div>
+</div>
+</li>
+</ul>
+</div>
+</li>
+</ul>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>Remember to add the <code>0x</code> at the front of the key value, when using a public key in the sandbox.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_starting_the_peer_with_convex_world">Starting the peer with convex.world</h3>
+<div class="paragraph">
+<p>If the peer has been setup correctly on <a href="https://convex.world">convex.world</a>, so you can now start your peer, using the following example command:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>./convex peer start --public-key=dfbb22 --password=my-password --address=&lt;address&gt; --port=80888 --url=&lt;my-ip&gt;:8088 --peer=convex.world:18888</pre>
+</div>
 </div>
 <div class="paragraph">
-<p>Once the key is imported you can start a peer to connect with <a href="https://convex.world">convex.world</a></p>
+<p>Where:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>&lt;address&gt;</code> is the account number of your peer.</p>
+</li>
+<li>
+<p><code>&lt;my-ip&gt;</code> is the public ip address of the running peer.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>or for example you can create a <em>config</em> file with the following options set:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>convex.peer.start.peer=convex.world:18888
+convex.peer.start.public-key=dfb22da0afda1a123e523ded624f184719a4416e9aac6f6fdedd8518fb09fe3c
+convex.peer.start.address=47
+convex.peer.start.url=206.1.1.1:8181
+convex.peer.start.port=8181
+convex.password=my-password</pre>
+</div>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Run convex only using the config file</p>
+<div class="literalblock">
+<div class="content">
+<pre>./convex peer start --config=my-peer.conf</pre>
+</div>
+</div>
+</li>
+</ul>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>You will need allow the peer port remote access. In our example the peer port is set to 8181, so we have allowed TCP traffic to be forwarded and passed to port 8181.</p>
+</div>
+</td>
+</tr>
+</table>
 </div>
 <div class="paragraph">
 <p>If you wish to connect to your own remote peer, you can by adding the <code>--peer=&lt;remote peer URL&gt;</code> option. This tells the new peer you are starting where a remote peer is located. Once found the started peer will try and sync with the remote peer.</p>
 </div>
 <div class="paragraph">
-<p>You will also need to set the <code>--url=&lt;my peer URL&gt;</code> option to specify the remote URL of your running peer.</p>
+<p>You will also need to set the <code>--url=&lt;my peer URL&gt;</code> option to specify the remote URL of your running peer, so that other peers can communicate to your peer.</p>
+</div>
 </div>
 </div>
 </div>
@@ -2202,7 +2385,7 @@ The CLI uses the internal Peer API for queries and transactions. To use other Co
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2021-09-07 09:25:39 UTC
+Last updated 2021-09-07 10:26:44 UTC
 </div>
 </div>
 </body>
