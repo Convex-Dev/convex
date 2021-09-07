@@ -102,7 +102,7 @@ public class Convex {
 				// We probably got a wrong sequence number. Kill the stored value.
 				sequence=null;
 			}
-			
+
 			// TODO: maybe extract method?
 			synchronized (awaiting) {
 				CompletableFuture<Result> cf = awaiting.get(id);
@@ -388,11 +388,11 @@ public class Convex {
 					}
 				}
 			}
-	
+
 			// Store future for completion by result message
 			cf =  awaitResult(id);
 		}
-		
+
 		log.debug("Sent transaction with message ID: {} awaiting count = {}",id,awaiting.size());
 		return cf;
 	}
@@ -607,7 +607,7 @@ public class Convex {
 	 *
 	 * @param timeoutMillis Milliseconds to wait for request timeout
 	 * @return Status Vector from target Peer
-	 * 
+	 *
 	 * @throws IOException If an IO Error occurs
 	 * @throws InterruptedException If execution is interrupted
 	 * @throws ExecutionException If a concurrent execution failure occurs
@@ -616,18 +616,12 @@ public class Convex {
 	 */
 	@SuppressWarnings("unchecked")
 	public AVector<ACell> requestStatusSync(long timeoutMillis) throws IOException, InterruptedException, ExecutionException, TimeoutException {
-		AVector<ACell> status = null;
-		int retryCount = 10;
 		Future<Result> statusFuture=requestStatus();
-		while (status == null && retryCount > 0 ) {
-			try {
-				status=statusFuture.get(timeoutMillis,TimeUnit.MILLISECONDS).getValue();
-			} catch (MissingDataException e) {
-				status = (AVector<ACell>) acquire(e.getMissingHash()).get(timeoutMillis,TimeUnit.MILLISECONDS);
-			}
-			retryCount -= 1;
+		try {
+			return statusFuture.get(timeoutMillis, TimeUnit.MILLISECONDS).getValue();
+		} catch (InterruptedException | ExecutionException e) {
+			throw new Error("Unable to get network status ", e);
 		}
-		return status;
 	}
 
 	/**
@@ -651,7 +645,7 @@ public class Convex {
 			return cf;
 		}
 	}
-	
+
 	/**
 	 * Method to await a complete result. Should be called with lock on `awaiting` map
 	 * @param <T>
