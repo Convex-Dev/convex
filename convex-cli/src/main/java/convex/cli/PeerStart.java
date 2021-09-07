@@ -56,12 +56,17 @@ public class PeerStart implements Runnable {
 	@Option(names = { "--port" }, description = "Port number of this local peer.")
 	private int port = 0;
 
-	@Option(names = {
-			"--host" }, defaultValue=Constants.HOSTNAME_PEER, description = "Hostname of this peer. Default: ${DEFAULT-VALUE}")
-	private String hostname = Constants.HOSTNAME_PEER;
+	@Option(names = { "-u",
+			"--url" }, description = "Public URL of the peer.")
+	private String url;
 
-	@Option(names = {
-			"--peer" }, description = "Hostname and port number of remote peer. If not provided then try to connect to a local peer")
+	@Option(names = { "-b",
+			"--bind-address" }, description = "Bind address of the network interface. Defaults to local loop back device for %n"
+                    + "local peer, and if a public --url is set, then defaults to all network devices.")
+	private String bindAddress;
+
+    @Option(names = {
+			"--peer" }, description = "URL of remote peer. If not provided then try to connect to a local peer")
 	private String remotePeerHostname;
 
 	@Option(names = { "-a", "--address" }, description = "Account address to use for the peer.")
@@ -113,11 +118,6 @@ public class PeerStart implements Runnable {
 		else {
 			remotePeerHostname = remotePeerHostname.strip();
 		}
-		if (hostname == null) {
-			log.warn("you need to provide a host name for this peer");
-			return;
-		}
-		hostname = hostname.strip();
 
 		try {
 			AStore store = null;
@@ -133,7 +133,7 @@ public class PeerStart implements Runnable {
 				store = Stores.getGlobalStore();
 			}
 			peerManager = PeerManager.create(mainParent.getSessionFilename(), keyPair, peerAddress, store);
-			peerManager.launchPeer(hostname, port, remotePeerHostname);
+			peerManager.launchPeer(port, remotePeerHostname, url, bindAddress);
 			peerManager.showPeerEvents();
 		} catch (Throwable t) {
 			mainParent.showError(t);

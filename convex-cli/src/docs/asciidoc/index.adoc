@@ -434,11 +434,13 @@ you can then copy the *Peer start line:* and run a peer with the local network.
 
 [#command-peer-start-remote]
 == Starting a local Peer to a remote Convex network
-How to start a local peer, that connects to a remote Convex network.
+Currently the *convex-cli* does not support access to https://convex.world[convex.world] via the client HTTP API, so to setup a peer to connect to convex.world you will need to create a new peer in convex.world using https://github.com/Convex-Dev/convex-api-py[convex-api-py tools/convex_tools.py] and then import the peer key into the convex-cli keystore.
 
-If you wish to connect to your own remote peer, you can by adding the `--peer` option. This tells the new peer you are starting where a remote peer is located. Once found the started peer will try and sync with the remote peer.
+Once the key is imported you can start a peer to connect with https://convex.world[convex.world]
 
-To connect to someone else's remote network or to connect to the test network at https://convex.world[convex] you will need to obtain a peer keypair, account with sufficient funds and the peer registered with a stake amount.
+If you wish to connect to your own remote peer, you can by adding the `--peer=<remote peer URL>` option. This tells the new peer you are starting where a remote peer is located. Once found the started peer will try and sync with the remote peer.
+
+You will also need to set the `--url=<my peer URL>` option to specify the remote URL of your running peer.
 
 
 [#command-local-gui]

@@ -158,9 +158,10 @@ public class PeerManager implements IServerEvent {
 	}
 
     public void launchPeer(
-		String hostname,
 		int port,
-		String remotePeerHostname
+		String remotePeerHostname,
+		String url,
+        String bindAddress
 	) {
 		Map<Keyword, Object> config = new HashMap<>();
 		if (port > 0 ) {
@@ -169,6 +170,8 @@ public class PeerManager implements IServerEvent {
 		config.put(Keywords.STORE, store);
 		config.put(Keywords.SOURCE, remotePeerHostname);
 		config.put(Keywords.KEYPAIR, keyPair);
+        config.put(Keywords.URL, url);
+        config.put(Keywords.BIND_ADDRESS, bindAddress);
 		config.put(Keywords.EVENT_HOOK, this); // Add this as IServerEvent hook
 		Server server = API.launchPeer(config);
 		if (!config.containsKey(Keywords.URL)) {
