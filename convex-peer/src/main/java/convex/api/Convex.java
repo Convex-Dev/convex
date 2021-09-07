@@ -477,7 +477,6 @@ public class Convex {
 		timeout = Math.max(0L, timeout - (now - start));
 		try {
 			result = cf.get(timeout, TimeUnit.MILLISECONDS);
-			result = loadResult(result, timeout);
 		} catch (InterruptedException | ExecutionException e) {
 			throw new Error("Not possible? Since there is no Thread for the future....", e);
 		}
@@ -508,7 +507,6 @@ public class Convex {
 		timeout = Math.max(0L, timeout - (now - start));
 		try {
 			result=cf.get(timeout,TimeUnit.MILLISECONDS);
-			result = loadResult(result, timeout);
 		} catch (InterruptedException | ExecutionException e) {
 			throw new Error("Not possible? Since there is no Thread for the future....", e);
 		}
@@ -628,7 +626,6 @@ public class Convex {
 		timeout = Math.max(0L, timeout - (now - start));
 		try {
 			result=statusFuture.get(timeout,TimeUnit.MILLISECONDS);
-			result = loadResult(result, timeout);
 		} catch (InterruptedException | ExecutionException e) {
 			throw new Error("Unable to get status message", e);
 		}
@@ -767,7 +764,6 @@ public class Convex {
 		Result result;
 		try {
 			result = cf.get(timeoutMillis, TimeUnit.MILLISECONDS);
-			result = loadResult(result, timeoutMillis);
 		} catch (InterruptedException | ExecutionException e) {
 			throw new Error("Not possible? Since there is no Thread for the future....", e);
 		}
@@ -898,62 +894,5 @@ public class Convex {
 		this.connection=null;
 		close();
 	}
-
-	/**
-	 * Loads a result object with the data from the current store.
-	 * Since a returned Result object can contain hashes or the actual data. If the
-	 * result data contains hashes, then this function will automatically get the data from the remote peer.
-	 *
-	 * @param result The result to load data.
-	 *
-	 * @param timeoutMillis Timeout in milliseconds.
-	 *
-	 * @return Loaded result object
-	 *
-	 * @throws TimeoutException If the synchronous request timed out
-	 *
-	 * @throws IOException If IO error occurs
-	 */
-	public Result loadResult(Result result, long timeoutMillis) throws IOException, TimeoutException {
-		return loadResult(result, Stores.current(), timeoutMillis);
-	}
-
-	/**
-	 * Loads a result object with the data from a given store.
-	 * Since a returned Result object can contain hashes or the actual data. If the
-	 * result data contains hashes, then this function will automatically get the data from the remote peer.
-	 *
-	 * @param result The result to load data.
-	 *
-	 * @param store Store to load the result to/from.
-	 *
-	 * @param timeoutMillis Timeout in milliseconds.
-	 *
-	 * @return Loaded result object
-	 *
-	 * @throws TimeoutException If the synchronous request timed out
-	 *
-	 * @throws IOException If IO error occurs
-	 */
-	public Result loadResult(Result result, AStore store, long timeoutMillis) throws IOException, TimeoutException {
-		ACell value;
-		AVector<AString> trace;
-		try {
-			try {
-				value = result.getValue();
-			} catch (MissingDataException e) {
-				value = (ACell) acquire(e.getMissingHash(), store).get(timeoutMillis,TimeUnit.MILLISECONDS);
-			}
-			try {
-				trace = result.getTrace();
-			} catch (MissingDataException e) {
-				trace = (AVector<AString>) acquire(e.getMissingHash(), store).get(timeoutMillis,TimeUnit.MILLISECONDS);
-			}
-		} catch (InterruptedException | ExecutionException e) {
-			throw new IOException("Unable to load result from hash", e);
-		}
-		return Result.create((CVMLong)result.getID(), value, result.getErrorCode(), trace);
-	}
-
 
 }
