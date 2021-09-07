@@ -895,7 +895,7 @@ The type of files are:</p>
 <div class="olist arabic">
 <ol class="arabic">
 <li>
-<p><em>Etch Storage database</em> file. This contains the stored state of the Convex network. Usually when starting up the initial cluster the first set of peers share the same Etch database. CLI Parameter: <strong>--etch</strong></p>
+<p><em>Etch Storage database</em> file. This contains the stored state of the Convex network. Usually, when starting up the initial cluster the first set of peers share the same Etch database. CLI Parameter: <strong>--etch</strong></p>
 </li>
 <li>
 <p><em>Keystore database</em> file. This file contains the private/public key pairs used for the peers and any subsequent users. CLI Parameters: <strong>--keystore</strong>, <strong>--password</strong></p>
@@ -1325,14 +1325,14 @@ effecting any other networks.</p>
 </td>
 <td class="content">
 <div class="paragraph">
-<p>In this document the password option will always be shown as <code>--password=my-password</code>. This is an example of a not very good password to use for storing your keys. We suggest that you use a more secure password instead of <code>my-password</code>.</p>
+<p>In this document, the password option will always be shown as <code>--password=my-password</code>. This is an example of a not very good password to use for storing your keys. We suggest that you use a more secure password instead of <code>my-password</code>.</p>
 </div>
 </td>
 </tr>
 </table>
 </div>
 <div class="paragraph">
-<p>You wil always need to pass the password to the <strong>keystore</strong> file since the CLI will need access the keys to create and start up the local peers.</p>
+<p>You will always need to pass the password to the <strong>keystore</strong> file since the CLI will need access to the keys to create and start up the local peers.</p>
 </div>
 <div class="paragraph">
 <p>The CLI will automatically create 4 keypairs and place them in the keystore. The CLI will then start up 4 peers all sharing a single
@@ -1350,7 +1350,7 @@ temporary local <em>Etch Database</em> in the /tmp folder.</p>
 <p>Store the new keypairs in the keystore.</p>
 </li>
 <li>
-<p>Start up the local network using the new created keys.</p>
+<p>Start up the local network using the newly created keys.</p>
 </li>
 </ol>
 </div>
@@ -1358,7 +1358,7 @@ temporary local <em>Etch Database</em> in the /tmp folder.</p>
 <div class="sect2">
 <h3 id="_local_start_with_peer_keys">Local start with peer keys</h3>
 <div class="paragraph">
-<p>While the simple local network start will auto generate public keys for the local peers and create the peer accounts. You have the option instead to start the local network using a predetermined set of keys from your keystore. To do this you need to provide a list of public keys that you want the CLI to use to start up the local network.</p>
+<p>While the simple local network start will auto-generate public keys for the local peers and create the peer accounts. You have the option instead to start the local network using a predetermined set of keys from your keystore. To do this you need to provide a list of public keys that you want the CLI to use to start up the local network.</p>
 </div>
 <div class="paragraph">
 <p>If you have already used the simple local start, you can get the list of keys created by running the <a href="#command-key-list">List keys</a>,
@@ -1435,7 +1435,7 @@ Index Public Key
 <div class="sect2">
 <h3 id="_local_start_with_port_numbers">Local start with port numbers</h3>
 <div class="paragraph">
-<p>By default the CLI start a local network with each peer assigned a random port number. You can specify the port numbers used for each peer, by setting the <code>--ports</code> option.</p>
+<p>By default, the CLI start a local network with each peer assigned a random port number. You can specify the port numbers used for each peer, by setting the <code>--ports</code> option.</p>
 </div>
 <div class="paragraph">
 <p>The <code>--ports</code> option takes a list or range of port numbers.</p>
@@ -1594,7 +1594,7 @@ convex.local.index-key = 3</pre>
 </td>
 <td class="content">
 <div class="paragraph">
-<p>This type of block chain technology uses Convergent Proof of Stake (CPoS) algorithm, where each peer has a public key and a stake amount. The stake amount decides the peers voting control in the CPoS algorithm. See <a href="https://convex.world/technology">Convex Technology</a></p>
+<p>This type of blockchain technology uses the Convergent Proof of Stake (CPoS) algorithm, where each peer has a public key and a stake amount. The stake amount decides the peers voting control in the CPoS algorithm. See <a href="https://convex.world/technology">Convex Technology</a></p>
 </div>
 </td>
 </tr>
@@ -1637,10 +1637,10 @@ Peer start line: ./convex peer start --password=my-password --address=45 --publi
 <p>How to start a local peer, that connects to a remote Convex network.</p>
 </div>
 <div class="paragraph">
-<p>If you whish to connect to your own remote peer, you can by adding the <code>--peer</code> option. This tells the new peer you are starting where a remote peer is located. Once found the started peer will try and sync with the remote peer.</p>
+<p>If you wish to connect to your own remote peer, you can by adding the <code>--peer</code> option. This tells the new peer you are starting where a remote peer is located. Once found the started peer will try and sync with the remote peer.</p>
 </div>
 <div class="paragraph">
-<p>To connect to someone elses remote network or to connect to the test network at <a href="https://convex.world">convex</a> you will need to obtain a peer keypair, account with sufficient funds and the peer registered with a stake amount.</p>
+<p>To connect to someone else&#8217;s remote network or to connect to the test network at <a href="https://convex.world">convex</a> you will need to obtain a peer keypair, account with sufficient funds and the peer registered with a stake amount.</p>
 </div>
 </div>
 </div>
@@ -1659,7 +1659,7 @@ Peer start line: ./convex peer start --password=my-password --address=45 --publi
 </div>
 </div>
 <div class="paragraph">
-<p>This starts the a local network in GUI mode. At the moment the GUI local network does not publish the keypairs used for the network, so the CLI cannot do the following when the GUI network is running:</p>
+<p>This starts a local network in GUI mode. At the moment the GUI local network does not publish the keypairs used for the network, so the CLI cannot do the following when the GUI network is running:</p>
 </div>
 <div class="olist arabic">
 <ol class="arabic">
@@ -1705,7 +1705,7 @@ Peer start line: ./convex peer start --password=my-password --address=45 --publi
 </div>
 </div>
 <div class="paragraph">
-<p>On every event that occurs for a peer in the cluster, on it&#8217;s own an event is shown as a line.</p>
+<p>On every event that occurs for a peer in the cluster, on its own an event is shown as a line.</p>
 </div>
 <div class="paragraph">
 <p>The event data can be split up into the following fields:</p>
@@ -1886,7 +1886,7 @@ S
 <p>How to export the keys from your keystore to encrypted text.</p>
 </div>
 <div class="paragraph">
-<p>You can export a keypair from the keystore to an encrypted PEM formated text. This is usefull if you need
+<p>You can export a keypair from the keystore to an encrypted PEM formated text. This is useful if you need
 to give another user, or application access to your network.</p>
 </div>
 <div class="paragraph">
@@ -1919,11 +1919,11 @@ to give another user, or application access to your network.</p>
 </div>
 </div>
 <div class="paragraph">
-<p>or a more safer way is to use the first hex of the  public key</p>
+<p>or a more more reliable way is to use the first hex of the  public key</p>
 </div>
 <div class="literalblock">
 <div class="content">
-<pre>./convex key export --publi-key=373d2a583695ff --export-password=my-password --password=my-password</pre>
+<pre>./convex key export --public-key=373d2a583695ff --export-password=my-password --password=my-password</pre>
 </div>
 </div>
 <div class="admonitionblock warning">
@@ -1934,7 +1934,7 @@ to give another user, or application access to your network.</p>
 </td>
 <td class="content">
 <div class="paragraph">
-<p>In this example we have used a insecure password of <code>my-password</code> to encrypt the exported key. We suggest that you use a better password when exporting your keys, and keep the exported PEM formated text secure.</p>
+<p>In this example, we have used an insecure password of <code>my-password</code> to encrypt the exported key. We suggest that you use a better password when exporting your keys, and keep the exported PEM formated text secure.</p>
 </div>
 </td>
 </tr>
@@ -1961,7 +1961,7 @@ to give another user, or application access to your network.</p>
 </div>
 </div>
 <div class="paragraph">
-<p>If the import password is successfull, this will import the keypair into the keystore, and show the public key of the imported keypair.</p>
+<p>If the import password is successful, this will import the keypair into the keystore, and show the public key of the imported keypair.</p>
 </div>
 </div>
 </div>
@@ -1976,7 +1976,7 @@ to give another user, or application access to your network.</p>
 <p>This set of sub commands manage accounts on the local network. You need to have a local network running on the same computer for these commands to work.</p>
 </div>
 <div class="paragraph">
-<p>The reason is that the keystore needs to contain the keys for the first genesis accounts in the network. With the access to the genesis keypair, the account commands can create an account, and transfer sufficient funds to the new account.</p>
+<p>The reason is that the keystore needs to contain the keys for the first genesis accounts in the network. With access to the genesis keypair, the account commands can create an account, and transfer sufficient funds to the new account.</p>
 </div>
 <div class="sect2">
 <h3 id="command-account-create">Create an account</h3>
@@ -2009,7 +2009,7 @@ to give another user, or application access to your network.</p>
 <p>How to get an account&#8217;s balance.</p>
 </div>
 <div class="paragraph">
-<p>To obtain the balance of an account, you just need to provide an address of the account.</p>
+<p>To obtain the balance of an account, you just need to provide the address of the account.</p>
 </div>
 <div class="paragraph">
 <p>So to run:</p>
@@ -2199,7 +2199,7 @@ The CLI uses the internal Peer API for queries and transactions. To use other Co
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2021-09-07 03:02:02 UTC
+Last updated 2021-09-07 03:07:00 UTC
 </div>
 </div>
 </body>
