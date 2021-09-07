@@ -1634,13 +1634,16 @@ Peer start line: ./convex peer start --password=my-password --address=45 --publi
 <h2 id="command-peer-start-remote">Starting a local Peer to a remote Convex network</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>How to start a local peer, that connects to a remote Convex network.</p>
+<p>Currently the <strong>convex-cli</strong> does not support access to <a href="https://convex.world">convex.world</a> via the client HTTP API, so to setup a peer to connect to convex.world you will need to create a new peer in convex.world using <a href="https://github.com/Convex-Dev/convex-api-py">convex-api-py tools/convex_tools.py</a> and then import the peer key into the convex-cli keystore.</p>
 </div>
 <div class="paragraph">
-<p>If you wish to connect to your own remote peer, you can by adding the <code>--peer</code> option. This tells the new peer you are starting where a remote peer is located. Once found the started peer will try and sync with the remote peer.</p>
+<p>Once the key is imported you can start a peer to connect with <a href="https://convex.world">convex.world</a></p>
 </div>
 <div class="paragraph">
-<p>To connect to someone else&#8217;s remote network or to connect to the test network at <a href="https://convex.world">convex</a> you will need to obtain a peer keypair, account with sufficient funds and the peer registered with a stake amount.</p>
+<p>If you wish to connect to your own remote peer, you can by adding the <code>--peer=&lt;remote peer URL&gt;</code> option. This tells the new peer you are starting where a remote peer is located. Once found the started peer will try and sync with the remote peer.</p>
+</div>
+<div class="paragraph">
+<p>You will also need to set the <code>--url=&lt;my peer URL&gt;</code> option to specify the remote URL of your running peer.</p>
 </div>
 </div>
 </div>
@@ -2199,7 +2202,7 @@ The CLI uses the internal Peer API for queries and transactions. To use other Co
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2021-09-07 03:08:52 UTC
+Last updated 2021-09-07 05:15:04 UTC
 </div>
 </div>
 </body>
