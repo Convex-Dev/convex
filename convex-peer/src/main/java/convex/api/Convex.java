@@ -103,7 +103,7 @@ public class Convex {
 				// We probably got a wrong sequence number. Kill the stored value.
 				sequence=null;
 			}
-			
+
 			// TODO: maybe extract method?
 			synchronized (awaiting) {
 				CompletableFuture<Result> cf = awaiting.get(id);
@@ -389,11 +389,11 @@ public class Convex {
 					}
 				}
 			}
-	
+
 			// Store future for completion by result message
 			cf =  awaitResult(id);
 		}
-		
+
 		log.debug("Sent transaction with message ID: {} awaiting count = {}",id,awaiting.size());
 		return cf;
 	}
@@ -616,19 +616,14 @@ public class Convex {
 	 * @throws TimeoutException If operation times out
 	 *
 	 */
-	public Result requestStatusSync(long timeoutMillis) throws TimeoutException, IOException {
-		long start = Utils.getTimeMillis();
-		Result result;
+	@SuppressWarnings("unchecked")
+	public AVector<ACell> requestStatusSync(long timeoutMillis) throws IOException, InterruptedException, ExecutionException, TimeoutException {
 		Future<Result> statusFuture=requestStatus();
-		// adjust timeout if time elapsed to submit transaction
-		long now = Utils.getTimeMillis();
-		timeout = Math.max(0L, timeout - (now - start));
 		try {
-			result=statusFuture.get(timeout,TimeUnit.MILLISECONDS);
+			return statusFuture.get(timeoutMillis, TimeUnit.MILLISECONDS).getValue();
 		} catch (InterruptedException | ExecutionException e) {
-			throw new Error("Unable to get status message", e);
+			throw new Error("Unable to get network status ", e);
 		}
-		return result;
 	}
 
 	/**
@@ -652,7 +647,7 @@ public class Convex {
 			return cf;
 		}
 	}
-	
+
 	/**
 	 * Method to await a complete result. Should be called with lock on `awaiting` map
 	 * @param <T>
