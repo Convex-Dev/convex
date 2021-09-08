@@ -801,4 +801,4 @@ For example:
 
 
 [TIP]
-The CLI uses the internal Peer API for queries and transactions. To use other Convex networks or remote Convex networks we suggest you use the public link:https://convex.world/documentation/client-api[Convex Client API interface] instead.
+The CLI uses the internal Peer API for queries and transactions. To use other Convex networks or remote Convex networks we suggest you use the public https://convex.world/cvm/running-convex-lisp/clients[Convex Clients] instead.
