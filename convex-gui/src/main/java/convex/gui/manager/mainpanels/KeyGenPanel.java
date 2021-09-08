@@ -18,7 +18,6 @@ import convex.core.crypto.Mnemonic;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.ABlob;
 import convex.core.data.Blob;
-import convex.core.data.Hash;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
 import convex.gui.manager.PeerGUI;
@@ -33,7 +32,12 @@ public class KeyGenPanel extends JPanel {
 
 	JButton addWalletButton = new JButton("Add to wallet");
 
-	private String hexKeyFormat(String pk) {
+	/** 
+	 * Format a hex string in blocks for digits
+	 * @param pk
+	 * @return
+	 */
+	protected String hexKeyFormat(String pk) {
 		StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < (pk.length() / 32); i++) {
 			if (i > 0) sb.append('\n');
@@ -90,7 +94,7 @@ public class KeyGenPanel extends JPanel {
 
 	/**
 	 * Create the panel.
-	 * @param manager 
+	 * @param manager GUI manager root component
 	 */
 	public KeyGenPanel(PeerGUI manager) {
 		setLayout(new BorderLayout(0, 0));
