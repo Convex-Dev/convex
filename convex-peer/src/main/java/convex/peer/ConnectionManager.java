@@ -52,18 +52,14 @@ public class ConnectionManager {
 	static final long SERVER_CONNECTION_PAUSE = 1000;
 
 	/**
-<<<<<<< HEAD
 	 * Default pause for each iteration of Server connection loop.
-=======
-	 * Delay until the next poll belief.
->>>>>>> refs/heads/develop
 	 */
 	static final long SERVER_POLL_DELAY = 2000;
 
 	/**
 	 * How long to wait for a belief poll request of status.
 	 */
-	static final long POLL_TIMEOUT_MILLIS = 500;
+	static final long POLL_TIMEOUT_MILLIS = 2000;
 
 	/**
 	 * How long to wait for a complete acquire of a belief.
