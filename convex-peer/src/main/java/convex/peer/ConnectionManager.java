@@ -142,8 +142,6 @@ public class ConnectionManager {
 			Convex convex = Convex.connect(c.getRemoteAddress());
 			try {
 				// use requestStatusSync to auto acquire hash of the status instead of the value
-
-
 				Result result=convex.requestStatusSync(POLL_TIMEOUT_MILLIS);
 				AVector<ACell> status = result.getValue();
 
