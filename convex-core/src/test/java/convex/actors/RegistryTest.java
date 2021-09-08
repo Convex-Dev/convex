@@ -1,7 +1,6 @@
 package convex.actors;
 
-import static convex.test.Assertions.assertNotError;
-import static convex.test.Assertions.assertTrustError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -49,20 +48,26 @@ public class RegistryTest extends ACVMTest {
 	public void testRegistryCNS() throws IOException {
 		Context<?> ctx=INITIAL_CONTEXT.fork();
 
-		assertEquals(REG,eval(ctx,"(call *registry* (cns-resolve :convex.registry))"));
+		assertEquals(REG,eval(ctx,"(call *registry* (cns-resolve 'convex.registry))"));
 	}
 
 	@Test
 	public void testRegistryCNSUpdate() throws IOException {
 		Context<?> ctx=INITIAL_CONTEXT.fork();
 
-		assertNull(eval(ctx,"(call *registry* (cns-resolve :convex.test.foo))"));
+		assertNull(eval(ctx,"(call *registry* (cns-resolve 'convex.test.foo))"));
 
 		// Real Address we want for CNS mapping
-		final Address realAddr=Samples.BAD_ADDRESS;
+		final Address badAddr=Samples.BAD_ADDRESS;
 
-		ctx=step(ctx,"(call *registry* (cns-update :convex.test.foo "+realAddr+"))");
-		assertEquals(realAddr,eval(ctx,"(call *registry* (cns-resolve :convex.test.foo))"));
+		ctx=step(ctx,"(call *registry* (cns-update 'convex.test.foo "+badAddr+"))");
+		assertNobodyError(ctx);
+
+		final Address realAddr=Address.create(1); // Init address, FWIW
+		ctx=step(ctx,"(call *registry* (cns-update 'convex.test.foo "+realAddr+"))");
+		assertNotError(ctx);
+
+		assertEquals(realAddr,eval(ctx,"(call *registry* (cns-resolve 'convex.test.foo))"));
 
 		{ // Check VILLAIN can't steal CNS mapping
 			Context<?> c=ctx.forkWithAddress(VILLAIN);
@@ -71,7 +76,7 @@ public class RegistryTest extends ACVMTest {
 			assertTrustError(step(c,"(call *registry* (cns-update 'convex.test.foo *address*))"));
 
 			// original mapping should be held
-			assertEquals(realAddr,eval(c,"(call *registry* (cns-resolve :convex.test.foo))"));
+			assertEquals(realAddr,eval(c,"(call *registry* (cns-resolve 'convex.test.foo))"));
 		}
 
 		{ // Check Transfer of control to VILLAIN
@@ -87,7 +92,7 @@ public class RegistryTest extends ACVMTest {
 			// Change mapping
 			c=step(c,"(call *registry* (cns-update 'convex.test.foo *address*))");
 			assertNotError(c);
-			assertEquals(VILLAIN,eval(c,"(call *registry* (cns-resolve :convex.test.foo))"));
+			assertEquals(VILLAIN,eval(c,"(call *registry* (cns-resolve 'convex.test.foo))"));
 		}
 
 		{ // Check VILLAIN can create new mapping
@@ -96,11 +101,11 @@ public class RegistryTest extends ACVMTest {
 			Context<?> c=ctx.forkWithAddress(VILLAIN);
 
 			// VILLAIN shouldn't be able to use update on existing CNS mapping
-			c=step(c,"(call *registry* (cns-update :convex.villain *address*))");
+			c=step(c,"(call *registry* (cns-update 'convex.villain *address*))");
 			assertNotError(c);
 
 			// original mapping should be held
-			assertEquals(VILLAIN,eval(c,"(call *registry* (cns-resolve :convex.villain))"));
+			assertEquals(VILLAIN,eval(c,"(call *registry* (cns-resolve 'convex.villain))"));
 		}
 	}
 }

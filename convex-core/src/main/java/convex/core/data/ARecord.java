@@ -78,7 +78,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 			Utils.print(sb, v);
 			if (i<(n-1)) sb.append(',');
 		}
-		sb.append("}\n");
+		sb.append("}");
 	}
 
 	/**

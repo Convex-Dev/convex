@@ -1,21 +1,28 @@
 package convex.peer;
 
+/**
+ * Lightweight wrapper for server events
+ */
 public class ServerEvent {
 
-    protected ServerInformation information;
+    protected ServerInformation information=null;
+    protected Server server;
     protected String reason;
 
-    private ServerEvent(ServerInformation information, String reason) {
-        this.information = information;
+    private ServerEvent(Server server, String reason) {
+        this.server = server;
         this.reason = reason;
     }
 
-    public static ServerEvent create(ServerInformation information, String reason) {
-        return new ServerEvent(information, reason);
+    public static ServerEvent create(Server server, String reason) {
+        return new ServerEvent(server, reason);
     }
 
     public ServerInformation getInformation() {
-        return information;
+        if (information==null) {
+        	information=ServerInformation.create(server);
+        }
+    	return information;
     }
     public String getReason() {
         return reason;

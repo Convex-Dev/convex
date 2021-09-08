@@ -28,7 +28,7 @@ public class PFXTest {
 
 		KeyStore ks=PFXTools.loadStore(f, "test");
 		AKeyPair kp=InitTest.HERO_KEYPAIR;
-		PFXTools.saveKey(ks, kp, "thehero");
+		PFXTools.setKeyPair(ks, kp, "thehero");
 		PFXTools.saveStore(ks, f, "test");
 
 		String alias=InitTest.HERO_KEYPAIR.getAccountKey().toHexString();

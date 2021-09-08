@@ -271,7 +271,6 @@ public class Belief extends ARecord {
 		// Compute stake for all peers in consensus state
 		AMap<AccountKey, PeerStatus> peers = votingState.getPeers();
 		HashMap<AccountKey, Double> weightedStakes = votingState.computeStakes();
-		assert (weightedStakes.containsKey(myAddress));
 		double totalStake = weightedStakes.get(null);
 
 		// Extract unique proposed chains from provided map, computing vote for each.

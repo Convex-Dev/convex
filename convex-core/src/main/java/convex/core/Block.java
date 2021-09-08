@@ -226,14 +226,16 @@ public final class Block extends ARecord {
 	 */
 	public boolean equals(Block a) {
 		if (a == null) return false;
+		if (timestamp!=a.timestamp) return false;
+		
 		Hash h=this.cachedHash();
 		if (h!=null) {
 			Hash ha=a.cachedHash();
 			if (ha!=null) return Utils.equals(h, ha);
 		}
 		
-		if (timestamp!=a.timestamp) return false;
 		if (!(Utils.equals(peerKey, a.peerKey))) return false;
+		
 		if (!(Utils.equals(transactions, a.transactions))) return false;
 		return true;
 	}

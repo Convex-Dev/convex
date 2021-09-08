@@ -1,7 +1,5 @@
 package convex.core.store;
 
-import java.util.logging.Level;
-
 import etch.EtchStore;
 
 public class Stores {
@@ -19,16 +17,10 @@ public class Stores {
 			return getGlobalStore();
 		}
 	};
-
-	/**
-	 * Logging level for store persistence. 
-	 */
-	public static final Level PERSIST_LOG_LEVEL = Level.FINE;
-	public static final Level STORE_LOG_LEVEL = Level.FINE;
 	
-
 	/**
-	 * Gets the current (thread-local) Store instance
+	 * Gets the current (thread-local) Store instance. This is initialised to be the
+	 * global store, but can be changed with Stores.setCurrent(...)
 	 * 
 	 * @return Store for the current thread
 	 */
@@ -45,13 +37,19 @@ public class Stores {
 		currentStore.set(store);
 	}
 	
-	public static AStore getDefaultStore() {
+	private synchronized static AStore getDefaultStore() {
 		if (defaultStore==null) {
 			defaultStore=EtchStore.createTemp("convex-db");;
 		}
 		return defaultStore;
 	}
 
+	/**
+	 * Gets the global store instance. If not previously set, a default temporary
+	 * store will be created and used as the global store.
+	 * 
+	 * @return Current global store
+	 */
 	public static AStore getGlobalStore() {
 		if (globalStore==null) {
 			globalStore=getDefaultStore();
@@ -59,7 +57,14 @@ public class Stores {
 		return globalStore;
 	}
 
+	/**
+	 * Sets the global store for this JVM. Global store is the store used for 
+	 * any new thread.
+	 * 
+	 * @param store Store instance to use as global store
+	 */
 	public static void setGlobalStore(EtchStore store) {
+		if (store==null) throw new IllegalArgumentException("Cannot set global store to null)");
 		globalStore=store;
 	}
 }

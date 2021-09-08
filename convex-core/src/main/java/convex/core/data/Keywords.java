@@ -17,6 +17,7 @@ public class Keywords {
 	public static final Keyword STATES = Keyword.create("states");
 	public static final Keyword RESULTS = Keyword.create("results");
 	public static final Keyword PERSIST = Keyword.create("persist");
+	public static final Keyword POLL_DELAY = Keyword.create("poll-delay");
 
 
 	public static final Keyword STORE = Keyword.create("store");
@@ -48,8 +49,7 @@ public class Keywords {
 	public static final Keyword CODE = Keyword.create("code");
 
 	public static final Keyword TYPE = Keyword.create("type");
-	public static final Keyword SPECIAL = Keyword.create("special");
-	public static final Keyword SPECIAL_SYMBOL = Keyword.create("special-symbol");
+	public static final Keyword SPECIAL_Q = Keyword.create("special?");
 
 	public static final Keyword PEER = Keyword.create("peer");
 	public static final Keyword STAKE = Keyword.create("stake");
@@ -57,6 +57,7 @@ public class Keywords {
 	public static final Keyword DELEGATED_STAKE = Keyword.create("delegated-stake");
 	public static final Keyword OWNER = Keyword.create("owner");
 
+	public static final Keyword BIND_ADDRESS = Keyword.create("bind-address");
 	public static final Keyword URL = Keyword.create("url");
 
 	public static final Keyword SEQUENCE = Keyword.create("sequence");
@@ -72,7 +73,7 @@ public class Keywords {
 	public static final Keyword ERROR_CODE = Keyword.create("error-code");
 	public static final Keyword TRACE = Keyword.create("trace");
 
-	public static final Keyword EXPANDER = Keyword.create("expander");
+	public static final Keyword EXPANDER_Q = Keyword.create("expander?");
 	public static final Keyword MACRO = Keyword.create("macro");
 
 	public static final Keyword CALLABLE_Q = Keyword.create("callable?");
@@ -80,13 +81,10 @@ public class Keywords {
 	public static final Keyword VALUE = Keyword.create("value");
 	public static final Keyword FUNCTION = Keyword.create("function");
 	public static final Keyword METADATA = Keyword.create("metadata");
-	
-	
+
+
 	public static final Keyword OUTGOING_CONNECTIONS = Keyword.create("outgoing-connections");
 	public static final Keyword AUTO_MANAGE = Keyword.create("auto-manage");
 	public static final Keyword TIMEOUT = Keyword.create("timeout");
-
-
-
-
+	public static final Keyword EVENT_HOOK = Keyword.create("event-hook");
 }

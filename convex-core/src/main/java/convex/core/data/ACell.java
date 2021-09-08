@@ -70,7 +70,9 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Gets the tag byte for this cell. The tag byte will be the first byte of the encoding
+	 * Gets the tag byte for this cell. The tag byte is always written as the 
+	 * first byte of the Cell's Encoding
+	 * 
 	 * @return Tag byte for this Cell
 	 */
 	public abstract byte getTag();
@@ -198,11 +200,11 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 
 	/**
-	 * Gets the cached blob representing this Cell in binary format, if it exists.
+	 * Gets the cached blob representing this Cell's Encoding in binary format, if it exists.
 	 * 
 	 * @return The cached blob for this cell, or null if not available. 
 	 */
-	public ABlob cachedBlob() {
+	public ABlob cachedEncoding() {
 		return encoding;
 	}
 
@@ -284,7 +286,8 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	
 	/**
 	 * Returns true if this Cell is in a canonical format for message writing.
-	 * Reading or writing a non-canonical value should be considered illegal
+	 * Reading or writing a non-canonical value should be considered illegal, but 
+	 * non-canonical objects may be used on a temporary internal basis.
 	 * 
 	 * @return true if the object is in canonical format, false otherwise
 	 */
@@ -412,6 +415,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	public void attachMemorySize(long memorySize) {
 		if (this.memorySize<0) {
 			this.memorySize=memorySize;
+			assert (this.memorySize>0) : "Attempting to attach memory size "+memorySize+" to object of class "+Utils.getClassName(this);
 		} else {
 			assert (this.memorySize==memorySize) : "Attempting to attach memory size "+memorySize+" to object of class "+Utils.getClassName(this)+" which already has memorySize "+this.memorySize;
 		}
@@ -438,11 +442,24 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @param noveltyHandler Novelty handler to call for any Novelty (may be null)
 	 * @return Persisted Ref
 	 */
-	public static <T extends ACell> Ref<T> createAnnounced(T value, Consumer<Ref<ACell>> noveltyHandler) {
-		Ref<T> ref = Ref.get(value);
-		AStore store=Stores.current();
-		return (Ref<T>) store.storeTopRef(ref, Ref.ANNOUNCED,noveltyHandler);
+	public static <T extends ACell> T createAnnounced(T value, Consumer<Ref<ACell>> noveltyHandler) {
+		if (value==null) return null;
+		return value.announce(noveltyHandler);
 	}
+	
+	public <T extends ACell> T announce() {
+		return announce(null);
+	}
+	
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> T announce(Consumer<Ref<ACell>> noveltyHandler) {
+		Ref<ACell> ref = getRef();
+		AStore store=Stores.current();
+		ref= store.storeTopRef(ref, Ref.ANNOUNCED,noveltyHandler);
+		cachedRef=ref;
+		return (T) this;
+	}
+
 
 	/**
 	 * Creates a persisted Ref with the given value in the current store.

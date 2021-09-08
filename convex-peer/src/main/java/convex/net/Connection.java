@@ -41,7 +41,7 @@ import convex.core.util.Utils;
 
 /**
  * <p>
- * Class representing a Connection between network participants.
+ * Class representing a low-level Connection between network participants.
  * </p>
  *
  * <p>
@@ -114,6 +114,14 @@ public class Connection {
 			AccountKey trustedPeerKey) throws IOException {
 		return new Connection(channel, receiveAction, store, trustedPeerKey);
 	}
+	
+	/**
+	 * Gets the global message ID counter
+	 * @return Message ID counter for last message sent
+	 */
+	public static long getCounter() {
+		return idCounter;
+	}
 
 	/**
 	 * Create a PeerConnection by connecting to a remote address
@@ -178,7 +186,6 @@ public class Connection {
 		
 		// TODO: reconsider this
 		clientChannel.socket().setTcpNoDelay(true);
-
 		clientChannel.connect(hostAddress);	
 
 		long start = Utils.getCurrentTimestamp();
@@ -193,12 +200,10 @@ public class Connection {
 				throw new IOException("Connect interrupted", e);
 			}
 		}
-		// clientChannel.setOption(StandardSocketOptions.SO_KEEPALIVE,true);
-		clientChannel.setOption(StandardSocketOptions.TCP_NODELAY, true);
 
 		Connection pc = create(clientChannel, receiveAction, store, trustedPeerKey);
 		pc.startClientListening();
-		log.info("Connect succeeded for host: {}", hostAddress);
+		log.debug("Connect succeeded for host: {}", hostAddress);
 		return pc;
 	}
 
@@ -222,6 +227,14 @@ public class Connection {
 			return null;
 		}
 	}
+	
+	/**
+	 * Gets the store associated with this Connection
+	 * @return Store instance
+	 */
+	public AStore getStore() {
+		return store;
+	}
 
 	/**
 	 * Returns the local SocketAddress associated with this connection, or null if
@@ -243,6 +256,8 @@ public class Connection {
 
 	/**
 	 * Sends a DATA Message on this connection.
+	 * 
+	 * Does not send embedded values.
 	 *
 	 * @param value Any data object, which will be encoded and sent as a single cell
 	 * @return true if buffered successfully, false otherwise (not sent)
@@ -469,13 +484,14 @@ public class Connection {
 		Counters.sendCount++;
 
 		// Need to ensure message is persisted at least, so we can respond to missing
-		// data messages
-		// using the current thread store
+		// data messages using the current thread store
+		// We pre-send any novelty to the destination
 		ACell sendVal = payload;
 		ACell.createPersisted(sendVal, r -> {
 			try {
 				ACell data = r.getValue();
-				boolean sent = sendData(data);
+				if (data==sendVal) return; // skip sending top payload
+				if (!Format.isEmbedded(data)) sendData(data);
 			} catch (IOException e) {
 				throw Utils.sneakyThrow(e);
 			}
@@ -573,7 +589,7 @@ public class Connection {
 	 *
 	 * @throws IOException If IO error occurs
 	 */
-	public void startClientListening() throws IOException {
+	private void startClientListening() throws IOException {
 		SocketChannel chan = (SocketChannel) channel;
 		chan.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE, this);
 
@@ -709,25 +725,20 @@ public class Connection {
 	/**
 	 * Handles writes to the channel.
 	 *
-	 * SECURITY: Called on Connection Selector Thread
+	 * SECURITY: Called on Selector Thread
 	 *
 	 * @param key Selection Key
+	 * @throws IOException 
 	 */
-	public static void selectWrite(SelectionKey key) {
-		try {
-			Connection pc = (Connection) key.attachment();
-			boolean allSent = pc.sender.maybeSendBytes();
+	static void selectWrite(SelectionKey key) throws IOException {
+		Connection pc = (Connection) key.attachment();
+		boolean allSent = pc.sender.maybeSendBytes();
 
-			if (allSent) {
-				// deregister interest in writing
-				key.interestOps(key.interestOps() & ~SelectionKey.OP_WRITE);
-			} else {
-				// we want to continue writing
-			}
-		} catch (IOException e) {
-			// TODO: figure out cases here. Probably channel closed?
-			log.warn("Unexpected IOException: {}", e);
-			key.cancel();
+		if (allSent) {
+			// deregister interest in writing
+			key.interestOps(key.interestOps() & ~SelectionKey.OP_WRITE);
+		} else {
+			// we want to continue writing
 		}
 	}
 

@@ -5,9 +5,6 @@ import static convex.core.lang.TestState.step;
 import static convex.test.Assertions.assertNotError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
@@ -15,16 +12,12 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Sets;
-import convex.core.data.Symbol;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.Context;
-import convex.core.lang.Reader;
 import convex.core.lang.TestState;
-import convex.core.util.Utils;
 import convex.test.Testing;
 
 public class SimpleNFTTest {
-	private static final Symbol nSym=Symbol.create("nft");
 	
 	static final AKeyPair KP1=AKeyPair.generate();
 	static final AKeyPair KP2=AKeyPair.generate();
@@ -35,26 +28,12 @@ public class SimpleNFTTest {
 	
 	static {
 		Context<?> ctx=TestState.CONTEXT.fork();
-		try {
-			ctx=ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/simple-nft.con")));
-			Address nft=(Address) ctx.getResult();
-			assert (ctx.getDepth()==0):"Invalid depth: "+ctx.getDepth();
-			String importS="(def nft (import "+nft+" :as "+nSym.getName()+"))";
-			ctx=step(ctx,importS);
-			NFT=(Address)ctx.getResult();
-			assertNotNull(NFT);
-			
-			ctx=ctx.define(nSym, nft);
-		} catch (IOException e) {
-			e.printStackTrace();
-			throw new Error(e);
-		}
+		String importS = "(import asset.nft.simple :as nft)";
+		ctx=step(ctx,importS);
+		NFT=(Address)ctx.getResult();
+		assertNotNull(NFT);
 		ctx=step(ctx,"(import convex.asset :as asset)");
 		CTX=ctx;
-	}
-	
-	@Test public void testSetup() {
-		assertTrue(CTX.lookupValue(nSym) instanceof Address);
 	}
 	
 	@Test public void testScript1() {
@@ -66,7 +45,7 @@ public class SimpleNFTTest {
 	@SuppressWarnings("unchecked")
 	@Test public void testAssetAPI() {
 		Context<?> ctx=CTX.fork();
-		ctx=step(ctx,"(def total (map (fn [v] (call nft (create-nft))) [1 2 3 4]))");
+		ctx=step(ctx,"(def total (map (fn [v] (call nft (create))) [1 2 3 4]))");
 		AVector<CVMLong> v=(AVector<CVMLong>) ctx.getResult();
 		assertEquals(4,v.count());
 		CVMLong b1=v.get(0);

@@ -2,22 +2,17 @@ package convex.cli;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
-
-import convex.cli.peer.PeerManager;
-import convex.cli.peer.SessionItem;
-import convex.core.Belief;
-import convex.core.State;
-import convex.core.crypto.AKeyPair;
-import convex.core.data.Address;
-import convex.core.data.Hash;
-import convex.core.data.SignedData;
-import convex.core.store.AStore;
-import convex.core.store.Stores;
-import etch.EtchStore;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import convex.cli.peer.PeerManager;
+import convex.cli.peer.SessionItem;
+import convex.core.crypto.AKeyPair;
+import convex.core.data.Address;
+import convex.core.store.AStore;
+import convex.core.store.Stores;
+import etch.EtchStore;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
@@ -61,12 +56,17 @@ public class PeerStart implements Runnable {
 	@Option(names = { "--port" }, description = "Port number of this local peer.")
 	private int port = 0;
 
-	@Option(names = {
-			"--host" }, defaultValue=Constants.HOSTNAME_PEER, description = "Hostname of this peer. Default: ${DEFAULT-VALUE}")
-	private String hostname = Constants.HOSTNAME_PEER;
+	@Option(names = { "-u",
+			"--url" }, description = "Public URL of the peer.")
+	private String url;
 
-	@Option(names = {
-			"--peer" }, description = "Hostname and port number of remote peer. If not provided then try to connect to a local peer")
+	@Option(names = { "-b",
+			"--bind-address" }, description = "Bind address of the network interface. Defaults to local loop back device for %n"
+                    + "local peer, and if a public --url is set, then defaults to all network devices.")
+	private String bindAddress;
+
+    @Option(names = {
+			"--peer" }, description = "URL of remote peer. If not provided then try to connect to a local peer")
 	private String remotePeerHostname;
 
 	@Option(names = { "-a", "--address" }, description = "Account address to use for the peer.")
@@ -118,11 +118,6 @@ public class PeerStart implements Runnable {
 		else {
 			remotePeerHostname = remotePeerHostname.strip();
 		}
-		if (hostname == null) {
-			log.warn("you need to provide a host name for this peer");
-			return;
-		}
-		hostname = hostname.strip();
 
 		try {
 			AStore store = null;
@@ -135,15 +130,10 @@ public class PeerStart implements Runnable {
 				}
 				store = EtchStore.create(etchFile);
 			} else {
-				store = Stores.getDefaultStore();
+				store = Stores.getGlobalStore();
 			}
 			peerManager = PeerManager.create(mainParent.getSessionFilename(), keyPair, peerAddress, store);
-			List<Hash> networkHashList = peerManager.getNetworkHashList(remotePeerHostname);
-			log.info("will join remote networkId " + networkHashList.get(2).toHexString());
-
-			State baseState = peerManager.aquireState(remotePeerHostname, networkHashList.get(2));
-			SignedData<Belief> signedBelief = peerManager.aquireBelief(remotePeerHostname, networkHashList.get(0));
-			peerManager.launchPeer(hostname, port, remotePeerHostname, baseState, signedBelief);
+			peerManager.launchPeer(port, remotePeerHostname, url, bindAddress);
 			peerManager.showPeerEvents();
 		} catch (Throwable t) {
 			mainParent.showError(t);

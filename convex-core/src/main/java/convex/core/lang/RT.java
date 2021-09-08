@@ -787,8 +787,8 @@ public class RT {
 	}
 
 	/**
-	 * Prepends an element to a sequential data structure. The new element will
-	 * always be in position 0
+	 * Prepends an element to a sequential data structure to create
+	 * a new list. May be O(n). The new element will always be in position 0
 	 * 
 	 * @param <T> Type of elements
 	 * @param x   Element to prepend
@@ -831,20 +831,6 @@ public class RT {
 	public static <T extends ACell> AList<T> cons(T x, T y, T z, ACell xs) {
 		ASequence<T> nxs = RT.sequence(xs);
 		return nxs.cons(y).cons(x).cons(z);
-	}
-
-	/**
-	 * Coerces any object to a collection type, or returns null if not possible.
-	 * Null is converted to an empty vector.
-	 * 
-	 * @param a value to coerce to collection type.
-	 * @return Collection object, or null if coercion failed.
-	 */
-	@SuppressWarnings("unchecked")
-	static <E extends ACell> ACollection<E> collection(ACell a) {
-		if (a == null) return Vectors.empty();
-		if (a instanceof ACollection) return (ACollection<E>) a;
-		return null;
 	}
 	
 	/**
@@ -924,7 +910,7 @@ public class RT {
 	 * @param a Value to cast. Strings or CVM values accepted
 	 * @return Address instance, or null if not convertible
 	 */
-	public static Address castAddress(Object a) {
+	public static Address toAddress(Object a) {
 		if (a instanceof ACell) return castAddress((ACell)a);
 		if (a instanceof String) return Address.parse((String)a);
 		return null;

@@ -1,16 +1,16 @@
 package convex.cli;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import convex.api.Convex;
+import convex.core.Result;
 import convex.core.crypto.AKeyPair;
-import convex.core.data.Address;
 import convex.core.data.ACell;
+import convex.core.data.Address;
 import convex.core.lang.Reader;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
-import convex.core.Result;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -65,7 +65,7 @@ public class Transaction implements Runnable {
 
 	@Parameters(paramLabel="transactionCommand",
 		description="Transaction Command")
-	private String transactionCommand;
+	private String[] transactionList;
 
 	@Override
 	public void run() {
@@ -93,10 +93,10 @@ public class Transaction implements Runnable {
 		Convex convex = null;
 		try {
 			convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
-			log.info("Executing transaction: %s\n", transactionCommand);
+			String transactionCommand = String.join(" ", transactionList);
+			log.info("Executing transaction: '{}'\n", transactionCommand);
 			ACell message = Reader.read(transactionCommand);
 			ATransaction transaction = Invoke.create(address, -1, message);
-
 			Result result = convex.transactSync(transaction, timeout);
 			mainParent.output.setResult(result);
 		} catch (Throwable t) {

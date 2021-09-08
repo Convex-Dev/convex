@@ -18,63 +18,33 @@ import org.junit.jupiter.api.Test;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AMap;
 import convex.core.data.Address;
-import convex.core.data.Symbol;
 import convex.core.init.InitTest;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
-import convex.core.lang.Reader;
 import convex.core.lang.TestState;
-import convex.core.util.Utils;
 
 public class FungibleTest {
-	private static final Symbol fSym=Symbol.create("fun-actor");
 
 	static final AKeyPair TEST_KEYPAIR=AKeyPair.generate();
 	
 	private static final Address VILLAIN=InitTest.VILLAIN;
 
-
-	private static Context<?> loadFungible() {
-		Context<?> ctx=TestState.CONTEXT.fork();
-		assert(ctx.getDepth()==0):"Invalid depth: "+ctx.getDepth();
-		try {
-			ctx=ctx.deployActor(Reader.read(Utils.readResourceAsString("libraries/fungible.con")));
-			Address fun=(Address) ctx.getResult();
-			String importS="(import "+fun+" :as fungible)";
-			ctx=step(ctx,importS);
-			assertNotError(ctx);
-
-			ctx=step(ctx,"(import convex.asset :as asset)");
-			assertFalse(ctx.isExceptional());
-
-			ctx=ctx.define(fSym, fun);
-		} catch (Throwable e) {
-			e.printStackTrace();
-			throw new Error(e);
-		}
-
-		return ctx;
-	}
-
-	private static final Context<?> ctx;
+	private static final Context<?> CTX;
 	private static final Address fungible;
 
 	static {
-		ctx=loadFungible();
-		fungible=(Address) ctx.lookupValue(fSym);
-	}
-
-	/**
-	 * Test that re-deployment of Fungible matches what is expected
-	 */
-	@Test public void testLibraryProperties() {
-		assertTrue(ctx.getAccountStatus(fungible).isActor());
-
-		assertEquals("Fungible Library",eval(ctx,"(:name (call *registry* (lookup "+fungible+")))").toString());
+		Context<?> ctx=TestState.CONTEXT.fork();
+		String importS="(import convex.fungible :as fungible)";
+		ctx=step(ctx,importS);
+		assertNotError(ctx);
+		fungible = (Address)ctx.getResult();
+		ctx=step(ctx,"(import convex.asset :as asset)");
+		assertFalse(ctx.isExceptional());
+		CTX = ctx;
 	}
 
 	@Test public void testAssetAPI() {
-		Context<?> ctx=FungibleTest.ctx.fork();
+		Context<?> ctx = CTX.fork();
 		ctx=step(ctx,"(def token (deploy (fungible/build-token {:supply 1000000})))");
 		Address token = (Address) ctx.getResult();
 		assertNotNull(token);
@@ -123,7 +93,7 @@ public class FungibleTest {
 
 	@Test public void testBuildToken() {
 		// check our alias is right
-		Context<?> ctx=FungibleTest.ctx.fork();
+		Context<?> ctx = CTX.fork();
 		assertEquals(fungible,eval(ctx,"fungible"));
 
 		// deploy a token with default config
@@ -157,7 +127,7 @@ public class FungibleTest {
 
 	@Test public void testMint() {
 		// check our alias is right
-		Context<?> ctx=FungibleTest.ctx.fork();
+		Context<?> ctx = CTX.fork();
 
 		// deploy a token with default config
 		ctx=step(ctx,"(def token (deploy [(fungible/build-token {:supply 100}) (fungible/add-mint {:max-supply 1000})]))");

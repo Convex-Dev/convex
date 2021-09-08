@@ -8,7 +8,7 @@ import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 
 /**
- * Abstract base class for operations
+ * Abstract base class for CVM operations
  * 
  * "...that was the big revelation to me when I was in graduate school—when I
  * finally understood that the half page of code on the bottom of page 13 of the

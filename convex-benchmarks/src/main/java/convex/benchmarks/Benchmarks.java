@@ -18,14 +18,14 @@ import convex.core.lang.Context;
 public class Benchmarks {
 	
 	public static final AKeyPair[] KEYPAIRS = new AKeyPair[] {
-			AKeyPair.createSeeded(2),
-			AKeyPair.createSeeded(3),
-			AKeyPair.createSeeded(5),
-			AKeyPair.createSeeded(7),
-			AKeyPair.createSeeded(11),
-			AKeyPair.createSeeded(13),
-			AKeyPair.createSeeded(17),
-			AKeyPair.createSeeded(19),
+		AKeyPair.createSeeded(2),
+		AKeyPair.createSeeded(3),
+		AKeyPair.createSeeded(5),
+		AKeyPair.createSeeded(7),
+		AKeyPair.createSeeded(11),
+		AKeyPair.createSeeded(13),
+		AKeyPair.createSeeded(17),
+		AKeyPair.createSeeded(19),
 	};
 	
 	public static ArrayList<AKeyPair> PEER_KEYPAIRS=(ArrayList<AKeyPair>) Arrays.asList(KEYPAIRS).stream().collect(Collectors.toList());

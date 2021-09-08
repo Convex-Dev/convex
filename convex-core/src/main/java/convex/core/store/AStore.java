@@ -3,9 +3,12 @@ package convex.core.store;
 import java.io.IOException;
 import java.util.function.Consumer;
 
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
+import convex.core.exceptions.BadFormatException;
 
 /**
  * Abstract base class for object storage subsystems
@@ -85,4 +88,28 @@ public abstract class AStore {
 	 * Closes this store and frees associated resources
 	 */
 	public abstract void close();
+	
+	protected final BlobCache blobCache=BlobCache.create(100000);
+	
+	/**
+	 * Decodes a Cell from an Encoding. Looks up Cell in cache if available. Otherwise
+	 * equivalent to Format.read(Blob).
+	 * @param encoding Encoding of Cell
+	 * @return Decoded Cell (may be a a null value)
+	 * 
+	 * @throws BadFormatException If cell encoding is invalid
+	 */
+	public final ACell decode(ABlob encoding) throws BadFormatException {
+		ACell cached=blobCache.getCell(encoding);
+		if (cached!=null) return cached;
+		
+		ACell decoded=Format.read(encoding.toBlob());
+		if (decoded==null) return decoded; // handle null value
+		
+		// TODO: can remove this check once happy with all tests
+		assert(decoded.cachedEncoding()!=null);
+		blobCache.putCell(decoded);
+		
+		return decoded;
+	}
 }

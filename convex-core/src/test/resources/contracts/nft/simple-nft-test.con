@@ -4,7 +4,7 @@
 
 ;; Testing with one account
 (do
-  (def n1 (nft/create))
+  (def n1 (call nft (create)))
   (assert (long? n1))
   (assert (contains-key? (asset/balance nft *address*) n1)))
 

@@ -93,7 +93,7 @@ public class PeerCreate implements Runnable {
 			keyPair = AKeyPair.generate();
 
 			// save the new keypair in the keystore
-			PFXTools.saveKey(keyStore, keyPair, mainParent.getPassword());
+			PFXTools.setKeyPair(keyStore, keyPair, mainParent.getPassword());
 
 			File keyFile = new File(mainParent.getKeyStoreFilename());
 
@@ -116,7 +116,7 @@ public class PeerCreate implements Runnable {
 			ATransaction transaction = Invoke.create(address, -1, message);
 			Result result = convex.transactSync(transaction, timeout);
 			if (result.isError()) {
-				mainParent.output.setResult(result);
+                mainParent.output.setResult(result);
 				return;
 			}
 			long currentBalance = convex.getBalance(address);

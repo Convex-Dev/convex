@@ -46,6 +46,9 @@ public class SignedDataTest {
 		// should have cached checked signature
 		assertTrue(sd1.isSignatureChecked());
 		assertFalse(sd1.checkSignature());
+		
+		ObjectsTest.doAnyValueTests(sd);
+		ObjectsTest.doAnyValueTests(sd1);
 	}
 
 	@Test
@@ -92,6 +95,8 @@ public class SignedDataTest {
 		AKeyPair kp = InitTest.HERO_KEYPAIR;
 		AVector<CVMLong> v = Vectors.of(1L, 2L, 3L);
 		SignedData<AVector<CVMLong>> sd = kp.signData(v);
+		
+		assertEquals(1,sd.getRefCount());
 
 		assertTrue(sd.checkSignature());
 
@@ -99,5 +104,7 @@ public class SignedDataTest {
 		assertEquals(v, sd.getValue());
 
 		assertEquals(kp.getAccountKey(),sd.getAccountKey());
+		
+		ObjectsTest.doAnyValueTests(sd);
 	}
 }

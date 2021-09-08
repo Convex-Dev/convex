@@ -16,8 +16,8 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519KeyPair;
 import convex.core.crypto.Mnemonic;
 import convex.core.crypto.WalletEntry;
+import convex.core.data.ABlob;
 import convex.core.data.Blob;
-import convex.core.data.Hash;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
 import convex.gui.manager.PeerGUI;
@@ -29,11 +29,15 @@ public class KeyGenPanel extends JPanel {
 	JTextArea mnemonicArea;
 	JTextArea privateKeyArea;
 	JTextArea publicKeyArea;
-	JTextArea addressArea;
 
 	JButton addWalletButton = new JButton("Add to wallet");
 
-	private String hexKeyFormat(String pk) {
+	/** 
+	 * Format a hex string in blocks for digits
+	 * @param pk
+	 * @return
+	 */
+	protected String hexKeyFormat(String pk) {
 		StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < (pk.length() / 32); i++) {
 			if (i > 0) sb.append('\n');
@@ -50,10 +54,10 @@ public class KeyGenPanel extends JPanel {
 		String s = mnemonicArea.getText();
 		try {
 			byte[] bs = Mnemonic.decode(s, 128);
-			Hash h = Blob.wrap(bs).getContentHash();
-			AKeyPair kp = AKeyPair.create(h.getBytes());
-			String privateKeyString = kp.getEncodedPrivateKey().toHexString();
-			privateKeyArea.setText(hexKeyFormat(privateKeyString));
+			Blob keyMat=Blob.wrap(bs);
+			ABlob seed=keyMat.getContentHash();
+			String privateKeyString = seed.toHexString();
+			privateKeyArea.setText(privateKeyString);
 		} catch (Exception ex) {
 			String pks = "<mnemonic not valid>";
 			if (s.isBlank()) pks = "<enter valid private key or mnemonic>";
@@ -78,11 +82,9 @@ public class KeyGenPanel extends JPanel {
 			Blob b = Blob.fromHex(Utils.stripWhiteSpace(s));
 			AKeyPair kp = Ed25519KeyPair.create(b.getBytes());
 			// String pk=Utils.toHexString(kp.getPrivateKey(),64);
-			addressArea.setText(kp.getAccountKey().toChecksumHex());
-			publicKeyArea.setText(hexKeyFormat(kp.getAccountKey().toChecksumHex()));
+			publicKeyArea.setText(kp.getAccountKey().toChecksumHex());
 			addWalletButton.setEnabled(true);
 		} catch (Exception ex) {
-			addressArea.setText("<enter valid private key>");
 			publicKeyArea.setText("<enter valid private key>");
 			addWalletButton.setEnabled(false);
 
@@ -92,7 +94,7 @@ public class KeyGenPanel extends JPanel {
 
 	/**
 	 * Create the panel.
-	 * @param manager 
+	 * @param manager GUI manager root component
 	 */
 	public KeyGenPanel(PeerGUI manager) {
 		setLayout(new BorderLayout(0, 0));
@@ -156,7 +158,7 @@ public class KeyGenPanel extends JPanel {
 			updateMnemonic();
 		}));
 
-		JLabel lblPrivateKey = new JLabel("Private key");
+		JLabel lblPrivateKey = new JLabel("Private key seed");
 		GridBagConstraints gbc_lblPrivateKey = new GridBagConstraints();
 		gbc_lblPrivateKey.anchor = GridBagConstraints.WEST;
 		gbc_lblPrivateKey.insets = new Insets(0, 0, 5, 5);
@@ -197,24 +199,6 @@ public class KeyGenPanel extends JPanel {
 		gbc_publicKeyArea.gridx = 1;
 		gbc_publicKeyArea.gridy = 2;
 		formPanel.add(publicKeyArea, gbc_publicKeyArea);
-
-		JLabel lblNewLabel_1 = new JLabel("Address");
-		GridBagConstraints gbc_lblNewLabel_1 = new GridBagConstraints();
-		gbc_lblNewLabel_1.anchor = GridBagConstraints.WEST;
-		gbc_lblNewLabel_1.insets = new Insets(0, 0, 0, 5);
-		gbc_lblNewLabel_1.gridx = 0;
-		gbc_lblNewLabel_1.gridy = 3;
-		formPanel.add(lblNewLabel_1, gbc_lblNewLabel_1);
-
-		addressArea = new JTextArea();
-		addressArea.setEditable(false);
-		addressArea.setFont(new Font("Monospaced", Font.BOLD, 13));
-		addressArea.setColumns(40);
-		GridBagConstraints gbc_addressArea = new GridBagConstraints();
-		gbc_addressArea.fill = GridBagConstraints.HORIZONTAL;
-		gbc_addressArea.gridx = 1;
-		gbc_addressArea.gridy = 3;
-		formPanel.add(addressArea, gbc_addressArea);
 
 	}
 

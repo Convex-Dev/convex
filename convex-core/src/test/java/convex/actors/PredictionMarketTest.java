@@ -1,8 +1,6 @@
 package convex.actors;
 
-import static convex.test.Assertions.assertAssertError;
-import static convex.test.Assertions.assertCVMEquals;
-import static convex.test.Assertions.assertStateError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -48,11 +46,14 @@ public class PredictionMarketTest extends ACVMTest {
 	@SuppressWarnings("rawtypes")
 	@Test
 	public void testPredictionContract() throws IOException {
-		String contractString = Utils.readResourceAsString("actors/prediction-market.con");
+		String contractString = Utils.readResourceAsString("lab/prediction-market.cvx");
 
 		// Run code to initialise actor with [oracle oracle-key outcomes]
-		Context ctx = TestState.CONTEXT.fork();
-		ctx=step("(deploy ("+contractString+" *address* :bar #{true,false}))");
+		Context ctx = context();
+		ctx=step(contractString);
+		assertNotError(ctx);
+		ctx=step(ctx,"(deploy (build-prediction-market *address* :bar #{true,false}))");
+		assertNotError(ctx);
 
 		Address addr = (Address) ctx.getResult();
 		assertNotNull(addr);
@@ -120,25 +121,20 @@ public class PredictionMarketTest extends ACVMTest {
 		// setup address for this little play
 		Context<?> ctx = step("(do (def HERO " + HERO + ") (def VILLAIN " +VILLAIN + ") )");
 
-		// deploy an oracle contract.
-		String oracleString = Utils.readResourceAsString("actors/oracle-trusted.con");
-		ctx=step("(def oaddr (deploy '"+oracleString+"))");
-		Address oaddr=(Address) ctx.getResult();
-
-		ctx = step(ctx, "(def oaddr" + oaddr + ")");
+		ctx = step("(import convex.trusted-oracle :as oaddr)");
 
 		// call to create oracle with key :bar and current address (HERO) trusted
-		ctx = step(ctx, "(call oaddr (register :bar {:trust #{*address*}}))");
+		ctx = step(ctx, "(oaddr/register :bar {:trust #{*address*}})");
 
 		// deploy a prediction market using the oracle
-		String contractString = Utils.readResourceAsString("actors/prediction-market.con");
+		String contractString = Utils.readResourceAsString("lab/prediction-market.cvx");
 		ctx=step(ctx,"(deploy ("+contractString+" oaddr :bar #{true,false}))");
 		Address pmaddr = (Address) ctx.getResult();
 		ctx = step(ctx, "(def pmaddr " + pmaddr + ")");
 		ctx = stepAs(VILLAIN, ctx, "(def pmaddr "+pmaddr+")");
 
 		// initial state checks
-		assertEquals(false,evalB(ctx, "(call pmaddr (finalised?))"));
+		assertEquals(false,evalB(ctx, "(call pmaddr (finalized?))"));
 		assertEquals(0L, evalL(ctx, "(balance pmaddr)"));
 
 		{ // Act 1. Two players stake. our Villain wins this time....
@@ -147,12 +143,12 @@ public class PredictionMarketTest extends ACVMTest {
 			c = stepAs(VILLAIN, c, "(call pmaddr 5000 (stake false 3000))");
 			assertEquals(5000L, c.getBalance(pmaddr));
 
-			assertFalse(evalB(c, "(call pmaddr (finalised?))"));
+			assertFalse(evalB(c, "(call pmaddr (finalized?))"));
 			assertEquals(0.64, evalD(c, "(call pmaddr (price true))"), 0.0001); // 64% chance on true. Looks a good bet
 			assertNull(eval(c, "(call pmaddr (payout))"));
 
 			// But alas, our hero is thwarted...
-			c = step(c, "(call oaddr (provide :bar false))");
+			c = step(c, "(oaddr/provide :bar false)");
 			assertCVMEquals(Boolean.FALSE, c.getResult());
 
 			// collect payouts

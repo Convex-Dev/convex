@@ -76,6 +76,10 @@ public class Lookup<T extends ACell> extends AOp<T> {
 
 	@Override
 	public void print(StringBuilder sb) {
+		if (address!=null) {
+			address.print(sb);
+			sb.append('/');
+		}
 		symbol.print(sb);
 	}
 

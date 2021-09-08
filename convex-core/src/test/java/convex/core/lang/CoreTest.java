@@ -156,6 +156,12 @@ public class CoreTest extends ACVMTest {
 	}
 
 	@Test
+	public void testDoc() {
+		assertEquals(42L, evalL("(do (def foo ^{:doc 42} nil) (doc foo))"));
+		assertEquals(42L, evalL("(do (def a (deploy '(def foo ^{:doc 42} nil))) (doc a/foo))"));
+	}
+
+	@Test
 	public void testLet() {
 
 		assertCastError(step("(let [[a b] :foo] b)"));
@@ -430,7 +436,7 @@ public class CoreTest extends ACVMTest {
 	public void testLogInActor() {
 		AVector<ACell> v0=Vectors.of(1L, 2L);
 
-		Context<?> c=step("(deploy '(do (defn event [& args] (apply log args)) (defn non-event [& args] (rollback (apply log args))) (export non-event event)))");
+		Context<?> c=step("(deploy '(do (defn event ^{:callable? true} [& args] (apply log args)) (defn non-event ^{:callable? true} [& args] (rollback (apply log args)))))");
 		Address actor=(Address) c.getResult();
 
 		assertEquals(0,c.getLog().count()); // Nothing logged so far
@@ -606,7 +612,6 @@ public class CoreTest extends ACVMTest {
 		assertEquals("conve x", evalS("(str \\c \\o \\n \"ve\" \\space \\x)"));
 		assertEquals("[\\a \\b (fn [] \\newline) (\\return {\\space \\tab})]",
 					 evalS("(str [\\a \\b (fn [] \\newline) (list \\return {\\space \\tab})])"));
-
 	}
 
 	@Test
@@ -1491,7 +1496,7 @@ public class CoreTest extends ACVMTest {
 		// reduced cannot escape actor call boundary
 		{
 			Context<?> ctx=context();
-			ctx=step(ctx,"(def act (deploy `(do (defn foo [] (reduced 1)) (export foo))))");
+			ctx=step(ctx,"(def act (deploy `(do (defn foo ^{:callable? true} [] (reduced 1)))))");
 			ctx=step(ctx,"(reduce (fn [_ _] (call act (foo))) nil [nil])");
 			assertError(ErrorCodes.EXCEPTION,ctx);
 		}
@@ -1608,7 +1613,7 @@ public class CoreTest extends ACVMTest {
 
 		// Halt should return from a smart contract call but still have state changes
 		{
-			Context<?> ctx=step("(def act (deploy '(do (def g :foo) (defn f [] (def g 3) (halt 2) 1) (export f))))");
+			Context<?> ctx=step("(def act (deploy '(do (def g :foo) (defn f ^{:callable? true} [] (def g 3) (halt 2) 1))))");
 			assertTrue(ctx.getResult() instanceof Address);
 			assertEquals(Keywords.FOO, eval(ctx,"(lookup act g)")); // initial value of g
 			ctx=step(ctx,"(call act (f))");
@@ -1645,7 +1650,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testFailContract() {
-		Context<?> ctx=step("(def act (deploy '(do (defn set-and-fail [x] (def foo x) (fail :NOPE (str x))) (export set-and-fail))))");
+		Context<?> ctx=step("(def act (deploy '(do (defn set-and-fail ^{:callable? true} [x] (def foo x) (fail :NOPE (str x))))))");
 		Address act=(Address) ctx.getResult();
 		assertNotNull(act);
 
@@ -2080,7 +2085,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testAcceptInActor() {
 		Context<?> ctx=context();
-		ctx=step(ctx,"(def act (deploy '(do (defn receive-coin [sender amount data] (accept amount))  (defn echo-offer [] *offer*) (export echo-offer receive-coin))))");
+		ctx=step(ctx,"(def act (deploy '(do (defn receive-coin ^{:callable? true} [sender amount data] (accept amount))  (defn echo-offer ^{:callable? true} [] *offer*))))");
 
 		ctx=step(ctx,"(transfer act 100)");
 		assertEquals(100L, (long)RT.jvm(ctx.getResult()));
@@ -2096,7 +2101,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testCall() {
-		Context<Address> ctx = step("(def ctr (deploy '(do (defn foo [] :bar) (export foo))))");
+		Context<Address> ctx = step("(def ctr (deploy '(do (defn foo ^{:callable? true} [] :bar))))");
 
 		assertEquals(Keywords.BAR,eval(ctx,"(call ctr (foo))")); // regular call
 		assertEquals(Keywords.BAR,eval(ctx,"(call ctr 100 (foo))")); // call with offer
@@ -2122,7 +2127,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testCallSelf() {
-		Context<Address> ctx = step("(def ctr (deploy '(do (defn foo [] (call *address* (bar))) (defn bar [] (= *address* *caller*)) (export foo bar))))");
+		Context<Address> ctx = step("(def ctr (deploy '(do (defn foo ^{:callable? true} [] (call *address* (bar))) (defn bar ^{:callable? true} [] (= *address* *caller*)))))");
 		Address actor=ctx.getResult();
 		
 		assertTrue(evalB(ctx, "(call ctr (foo))")); // nested call to same actor
@@ -2139,7 +2144,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testCallStar() {
-		Context<Address> ctx = step("(def ctr (deploy '(do :foo (defn f [x] (inc x)) (export f) )))");
+		Context<Address> ctx = step("(def ctr (deploy '(do :foo (defn f ^{:callable? true} [x] (inc x)) )))");
 
 		assertEquals(9L,evalL(ctx, "(call* ctr 0 'f 8)"));
 		assertCastError(step(ctx, "(call* ctr 0 :f 8)")); // cast fail on keyword function name
@@ -2360,7 +2365,7 @@ public class CoreTest extends ACVMTest {
 		assertStateError(step("(transfer "+CORE+" 1337)"));
 
 		{ // transfer to an Actor that accepts everything
-			Context<?> ctx=step("(deploy '(do (defn receive-coin [sender amount data] (accept amount)) (export receive-coin)))");
+			Context<?> ctx=step("(deploy '(do (defn receive-coin ^{:callable? true} [sender amount data] (accept amount))))");
 			Address receiver=(Address) ctx.getResult();
 
 			ctx=step(ctx,"(transfer "+receiver.toString()+" 100)");
@@ -2369,7 +2374,7 @@ public class CoreTest extends ACVMTest {
 		}
 
 		{ // transfer to an Actor that accepts nothing
-			Context<?> ctx=step("(deploy '(do (defn receive-coin [sender amount data] (accept 0)) (export receive-coin)))");
+			Context<?> ctx=step("(deploy '(do (defn receive-coin ^{:callable? true} [sender amount data] (accept 0))))");
 			Address receiver=(Address) ctx.getResult();
 
 			ctx=step(ctx,"(transfer "+receiver.toString()+" 100)");
@@ -2378,7 +2383,7 @@ public class CoreTest extends ACVMTest {
 		}
 
 		{ // transfer to an Actor that accepts half
-			Context<?> ctx=step("(deploy '(do (defn receive-coin [sender amount data] (accept (long (/ amount 2)))) (export receive-coin)))");
+			Context<?> ctx=step("(deploy '(do (defn receive-coin ^{:callable? true} [sender amount data] (accept (long (/ amount 2))))))");
 			Address receiver=(Address) ctx.getResult();
 
 			// should be OK with a Blob Address
@@ -2542,6 +2547,14 @@ public class CoreTest extends ACVMTest {
 
 		assertArityError(step(ctx,"(create-peer hero-peer)"));
 		assertArityError(step(ctx,"(create-peer hero-peer 1000 :foo)"));
+	}
+	
+	@Test 
+	public void testCreatePeerRegression() {
+		assertNotError(step("(create-peer 0x42ae93b185bd2ba64fd9b0304fec81a4d4809221a5b68de4da041b48c85bcc2e (dec *balance*))"));
+		assertNotError(step("(create-peer 0x42ae93b185bd2ba64fd9b0304fec81a4d4809221a5b68de4da041b48c85bcc2e *balance*)"));
+		assertFundsError(step("(create-peer 0x42ae93b185bd2ba64fd9b0304fec81a4d4809221a5b68de4da041b48c85bcc2e (inc *balance*))"));
+		
 	}
 
 	@Test
@@ -2712,7 +2725,8 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Maps.empty().getHash(), eval("(hash (encoding {}))"));
 
 		assertTrue(evalB("(= (hash 0x12) (hash 0x12))"));
-
+		assertTrue(evalB("(blob? (hash (encoding 42)))")); // Should be a Blob
+		
 		assertArityError(step("(hash)"));
 		assertArityError(step("(hash nil nil)"));
 	}
@@ -2789,19 +2803,9 @@ public class CoreTest extends ACVMTest {
 
 			AHashMap<ACell,ACell> meta= Core.METADATA.get(sym);
 			assertNotNull(meta,"Missing metadata for core symbol: "+sym);
-			doDocTests(sym,meta);
+		    ACell dobj=meta.get(Keywords.DOC);
+		    assertNotNull(dobj,"No documentation found for core definition: "+sym);
 		}
-	}
-
-	private static ASet<Keyword> CORE_TYPES=Sets.of(Keywords.MACRO, Keywords.SPECIAL, Keywords.FUNCTION, Keywords.EXPANDER,Keywords.VALUE);
-
-	@SuppressWarnings("unchecked")
-	private void doDocTests(Symbol sym, AHashMap<ACell,ACell> meta) {
-		ACell dobj=meta.get(Keywords.DOC);
-		assertNotNull(dobj,"No documentation found for core definition: "+sym);
-		AHashMap<ACell,ACell> doc=(AHashMap<ACell, ACell>) dobj;
-		Keyword type=(Keyword) doc.get(Keywords.TYPE);
-		assertTrue(CORE_TYPES.containsKey(type), sym +" has unexpected type in documentation: "+type);
 	}
 
 	@Test
@@ -2913,11 +2917,12 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(blob? (blob *origin*))"));
 		assertTrue(evalB("(blob? 0xFF)"));
 		assertTrue(evalB("(blob? (blob 0x17))"));
+		assertTrue(evalB("(blob? (hash (encoding *state*)))")); // HAsh
+		assertTrue(evalB("(blob? *key*)")); // AccountKey
 
 		assertFalse(evalB("(blob? 17)"));
 		assertFalse(evalB("(blob? nil)"));
 		assertFalse(evalB("(blob? *address*)"));
-		assertFalse(evalB("(blob? (hash (encoding *state*)))"));
 	}
 
 	@Test
@@ -3179,16 +3184,6 @@ public class CoreTest extends ACVMTest {
 	}
 
 	@Test
-	public void testDefactor() {
-		Context<?> ctx=step("(let [agf (defactor multiply-actor [x] (defn calc [y] (* x y)) (export calc))] (def ma (deploy (agf 13))))");
-
-		Address ma=(Address) ctx.getResult();
-		assertNotNull(ma);
-
-		assertEquals(130L,evalL(ctx,"(call ma (calc 10))"));
-	}
-
-	@Test
 	public void testDefExpander() {
 		Context<?> ctx=step("(defexpander expand-once [x e] (expand x (fn [x e] (syntax x))))");
 
@@ -3274,7 +3269,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testEvalAsWhitelistedUser() {
 		// create trust monitor that allows VILLAIN
-		Context<?> ctx=step("(deploy '(do (defn check-trusted? [s a o] (= s (address "+VILLAIN+"))) (export check-trusted?)))");
+		Context<?> ctx=step("(deploy '(do (defn check-trusted? ^{:callable? true} [s a o] (= s (address "+VILLAIN+")))))");
 		Address monitor = (Address) ctx.getResult();
 		ctx=step(ctx,"(set-controller "+monitor+")");
 
@@ -3325,7 +3320,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testEvalAsNotWhitelistedUser() {
 		// create trust monitor that allows HERO only
-		Context<?> ctx=step("(deploy '(do (defn check-trusted? [s a o] (= s (address "+HERO+"))) (export check-trusted?)))");
+		Context<?> ctx=step("(deploy '(do (defn check-trusted? ^{:callable? true} [s a o] (= s (address "+HERO+")))))");
 		Address monitor = (Address) ctx.getResult();
 		ctx=step(ctx,"(set-controller "+monitor+")");
 
@@ -3507,34 +3502,27 @@ public class CoreTest extends ACVMTest {
 	}
 
 	@Test
-	public void testExports() {
-		assertEquals(Sets.empty(), eval("*exports*"));
-		assertTrue(evalB("(do (defn foo []) (export foo) (get (lookup-meta 'foo) :callable?))"));
-	}
-
-	@Test
 	public void testExportsQ() {
-		Context<?> ctx = step("(def caddr (deploy '(do " + "(defn private [] :priv) " + "(defn public [] :pub)"
-				+ "(export public count))))");
+		Context<?> ctx = step("(def caddr (deploy '(do " + "(defn private [] :priv) " + "(defn public ^{:callable? true} [] :pub))))");
 
 		Address caddr = (Address) ctx.getResult();
 		assertNotNull(caddr);
 
-		assertTrue(evalB(ctx, "(exports? caddr 'public)")); // OK
-		assertFalse(evalB(ctx, "(exports? caddr 'private)")); // Defined, but not exported
-		assertFalse(evalB(ctx, "(exports? caddr 'random-symbol)")); // Doesn't exist
+		assertTrue(evalB(ctx, "(callable? caddr 'public)")); // OK
+		assertFalse(evalB(ctx, "(callable? caddr 'private)")); // Defined, but not exported
+		assertFalse(evalB(ctx, "(callable? caddr 'random-symbol)")); // Doesn't exist
 
-		assertCastError(step(ctx, "(exports? caddr :public)")); // not a Symbol
-		assertCastError(step(ctx, "(exports? caddr :random-name)"));
-		assertCastError(step(ctx, "(exports? caddr :private)"));
+		assertCastError(step(ctx, "(callable? caddr :public)")); // not a Symbol
+		assertCastError(step(ctx, "(callable? caddr :random-name)"));
+		assertCastError(step(ctx, "(callable? caddr :private)"));
 
-		assertArityError(step(ctx, "(exports? 1)"));
-		assertArityError(step(ctx, "(exports? 1 2 3)"));
+		assertArityError(step(ctx, "(callable? 1)"));
+		assertArityError(step(ctx, "(callable? 1 2 3)"));
 
-		assertCastError(step(ctx, "(exports? :foo :foo)"));
-		assertCastError(step(ctx, "(exports? nil :foo)"));
-		assertCastError(step(ctx, "(exports? caddr nil)"));
-		assertCastError(step(ctx, "(exports? caddr 1)"));
+		assertCastError(step(ctx, "(callable? :foo :foo)"));
+		assertCastError(step(ctx, "(callable? nil :foo)"));
+		assertCastError(step(ctx, "(callable? caddr nil)"));
+		assertCastError(step(ctx, "(callable? caddr 1)"));
 	}
 
 	@Test
@@ -3611,7 +3599,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(InitTest.HERO, eval("*address*"));
 
 		// *address* MUST return Actor address within actor call
-		Context<?> ctx=step("(def act (deploy `(do (defn addr [] *address*) (export addr))))");
+		Context<?> ctx=step("(def act (deploy `(do (defn addr ^{:callable? true} [] *address*))))");
 		Address act=(Address) ctx.getResult();
 		assertEquals(act, eval(ctx,"(call act (addr))"));
 		
@@ -3625,7 +3613,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(InitTest.HERO, eval("*origin*"));
 		
 		// *origin* MUST return original address within actor call
-		Context<?> ctx=step("(def act (deploy `(do (defn origin [] *origin*) (export origin))))");
+		Context<?> ctx=step("(def act (deploy `(do (defn origin ^{:callable? true} [] *origin*))))");
 		assertEquals(InitTest.HERO, eval(ctx,"(call act (origin))"));
 		
 		// *origin* MUST be original address in library call
@@ -3670,7 +3658,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testSpecialCaller() {
 		assertNull(eval("*caller*"));
-		assertEquals(HERO, eval("(do (def c (deploy '(do (defn f [] *caller*) (export f)))) (call c (f)))"));
+		assertEquals(HERO, eval("(do (def c (deploy '(do (defn f ^{:callable? true} [] *caller*)))) (call c (f)))"));
 	}
 
 	@Test
@@ -3688,7 +3676,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Keywords.FOO, eval("(do ((fn [] :foo)) *result*)"));
 
 		// *result* should be cleared to nil in an Actor call.
-		assertNull(eval("(do (def c (deploy '(do (defn f [] *result*) (export f)))) (call c (f)))"));
+		assertNull(eval("(do (def c (deploy '(do (defn f ^{:callable? true} [] *result*)))) (call c (f)))"));
 
 	}
 

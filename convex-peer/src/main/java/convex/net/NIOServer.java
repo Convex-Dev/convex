@@ -2,7 +2,6 @@ package convex.net;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.StandardSocketOptions;
@@ -64,20 +63,25 @@ public class NIOServer implements Closeable {
 	}
 
 	public void launch(Integer port) {
+		launch(null, port);
+	}
+
+	public void launch(String bindAddress, Integer port) {
 		if (port==null) port=0;
 
 		try {
 			ssc=ServerSocketChannel.open();
-			
+
 			// Set receive buffer size
 			ssc.socket().setReceiveBufferSize(Constants.SOCKET_SERVER_BUFFER_SIZE);
-	
-			InetSocketAddress address=new InetSocketAddress(port);
+
+			bindAddress = (bindAddress == null)? "localhost" : bindAddress;
+			InetSocketAddress address=new InetSocketAddress(bindAddress, port);
 			ssc.bind(address);
 			address=(InetSocketAddress) ssc.getLocalAddress();
 			ssc.configureBlocking(false);
 			port=ssc.socket().getLocalPort();
-			
+
 			// Register for accept. Do this before selection loop starts and
 			// before we return from launch!
 			selector = Selector.open();
@@ -245,7 +249,7 @@ public class NIOServer implements Closeable {
 		if (socketChannel==null) return; // false alarm? Nobody there?
 		log.debug("New connection accepted: {}", socketChannel);
 		socketChannel.configureBlocking(false);
-		
+
 		// TODO: Confirm we don't want  Nagle?
 		socketChannel.setOption(StandardSocketOptions.TCP_NODELAY, true);
 		socketChannel.register(selector, SelectionKey.OP_READ);
@@ -256,10 +260,10 @@ public class NIOServer implements Closeable {
 	 * @return Host address
 	 */
 	public InetSocketAddress getHostAddress() {
-		int port=getPort();
-		if (port<=0) return null;
-		InetSocketAddress sa= new InetSocketAddress(InetAddress.getLoopbackAddress(), port);
-		return sa;
+		if (ssc == null) return null;
+		ServerSocket socket = ssc.socket();
+		if (socket == null) return null;
+		return new InetSocketAddress(socket.getInetAddress(), socket.getLocalPort());
 	}
 
 }

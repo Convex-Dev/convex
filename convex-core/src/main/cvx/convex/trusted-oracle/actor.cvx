@@ -1,0 +1,107 @@
+'convex.trusted-oracle.actor
+
+
+(call *registry*
+      (register {:description ["Default actor used by `convex.trusted-oracle`."
+                               "Go there for more information about this implementation."]
+                 :name        "Trusted oracle actor implementation"}))
+
+
+;;;;;;;;;; Values
+
+
+(def *list*
+
+  ;; Map of `key` -> `arbitrary map describing an oracle`.
+
+  {})
+
+(def *results*
+
+  ;; Map of `key` -> `result`.
+
+  {})
+
+
+;;;;;;;;;; Callable functions
+
+
+(defn data
+
+  ^{:callable? true}
+
+  [key]
+
+  (*list* key))
+
+
+
+(defn finalized?
+
+  ^{:callable? true}
+
+  [key]
+
+  (contains-key? *results*
+                 key))
+
+
+
+(defn read
+
+  ^{:callable? true}
+
+  [key]
+
+  (*results* key))
+
+
+
+(defn register
+
+  ^{:callable? true}
+
+  [key data]
+
+  (if (contains-key? *list*
+                     key)
+    false
+    (do 
+      (def *list*
+           (assoc *list*
+                  key
+                  data))
+      true)))
+
+
+
+(defn provide
+
+  ^{:callable? true}
+
+  [key value]
+
+  (cond
+    (not (*list* key))
+    (fail :STATE
+          (str "Unknown oracle key: "
+               key))
+
+    (not (get-in *list*
+                 [key
+                  :trust
+                  *caller*]))
+    (fail :TRUST
+          "Untrusted caller")
+
+    (contains-key? *results*
+                   key)
+    (*results* key)
+
+    :else
+    (do
+      (def *results*
+           (assoc *results*
+                  key
+                  value))
+      value)))

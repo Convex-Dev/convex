@@ -12,11 +12,17 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
 
+/**
+ * Tests for the low level Connection class
+ */
 public class ConnectionTest {
 	
 	@Test
 	public void testMessageFlood() throws IOException, BadFormatException, InterruptedException {
 		final ArrayList<Message> received = new ArrayList<>();
+
+		MemoryByteChannel chan = MemoryByteChannel.create(100);
+		Connection conn=Connection.create(chan, null, Stores.current(), null);
 
 		// create a custom PeerConnection and MessageReceiver for testing
 		// null Queue OK, we aren't queueing with our custom receive action
@@ -24,11 +30,7 @@ public class ConnectionTest {
 			synchronized (received) {
 				received.add(a);
 			}
-		}, null);
-		
-		MemoryByteChannel chan = MemoryByteChannel.create(100);
-
-		Connection conn=Connection.create(chan, null, Stores.current(), null);
+		}, conn);
 		
 		Thread receiveThread=new Thread(()-> {
 			while (true) {

@@ -8,6 +8,8 @@ import java.io.InputStreamReader;
 import java.lang.reflect.Array;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -26,6 +28,7 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import convex.core.Constants;
 import convex.core.State;
 import convex.core.data.AArrayBlob;
 import convex.core.data.ABlob;
@@ -829,11 +832,11 @@ public class Utils {
 			throw new TODOException("Can't print: " + Utils.getClass(v));
 		}
 	}
-	
+
 	/**
 	 * Converts a Object to an InetSocketAddress
 	 *
-	 * @param o An Object to convert to a socket address. May be a String or existing InetSocketAddress 
+	 * @param o An Object to convert to a socket address. May be a String or existing InetSocketAddress
 	 * @return A valid InetSocketAddress, or null if not in valid format
 	 */
 	public static InetSocketAddress toInetSocketAddress(Object o) {
@@ -841,6 +844,8 @@ public class Utils {
 			return (InetSocketAddress) o;
 		} else if (o instanceof String) {
 			return toInetSocketAddress((String)o);
+		} else if (o instanceof URL) {
+			return toInetSocketAddress((URL)o);
 		} else {
 			return null;
 		}
@@ -849,21 +854,41 @@ public class Utils {
 	/**
 	 * Converts a String to an InetSocketAddress
 	 *
-	 * @param s A string in the format "http://myhost.com:17888"
+	 * @param s A string in the format of a valid URL or "myhost.com:17888"
 	 * @return A valid InetSocketAddress, or null if not in valid format
 	 */
 	public static InetSocketAddress toInetSocketAddress(String s) {
 		if (s==null) return null;
-		int colon = s.lastIndexOf(':');
-		if (colon < 0) return null;
 		try {
-			String hostName = s.substring(0, colon); // up to last colon
-			int port = Utils.toInt(s.substring(colon + 1)); // up to last colon
-			InetSocketAddress addr = new InetSocketAddress(hostName, port);
-			return addr;
-		} catch (Exception ex) {
-			return null;
+			// Try URL parsing first
+			URL url=new URL(s);
+			return toInetSocketAddress(url);
+		} catch (MalformedURLException ex) {
+			// Try to parse as host:port
+			int colon = s.lastIndexOf(':');
+			if (colon < 0) return null;
+			try {
+				String hostName = s.substring(0, colon); // up to last colon
+				int port = Utils.toInt(s.substring(colon + 1)); // after last colon
+				InetSocketAddress addr = new InetSocketAddress(hostName, port);
+				return addr;
+			} catch (Exception e) {
+				return null;
+			}
 		}
+	}
+
+	/**
+	 * Converts a URL to an InetSocketAddress. Will assume default port if not specified.
+	 *
+	 * @param url A valid URL
+	 * @return A valid InetSocketAddress for the URL
+	 */
+	public static InetSocketAddress toInetSocketAddress(URL url) {
+		String host=url.getHost();
+		int port=url.getPort();
+		if (port<0) port=Constants.DEFAULT_PEER_PORT;
+		return new InetSocketAddress(host,port);
 	}
 
 	/**
@@ -1293,7 +1318,7 @@ public class Utils {
 	}
 
 	private static final ExecutorService executor=Executors.newCachedThreadPool();
-	
+
 	/**
 	 * Executes functions on a thread pool for each element of a collection
 	 * @param <R> Result type of function

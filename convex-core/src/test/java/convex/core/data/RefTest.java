@@ -139,6 +139,13 @@ public class RefTest {
 
 	}
 	
+	@Test
+	public void testToString() {
+		AVector<CVMLong> v=Vectors.of(1,2,3,4);
+		Ref<AVector<CVMLong>> ref=v.getRef();
+		assertNotNull(ref.toString());
+	}
+	
 	@Test 
 	public void testMissing() {
 		Hash bad=Hash.fromHex("0000000000000000000000000000000000000000000000000000000000000000");
