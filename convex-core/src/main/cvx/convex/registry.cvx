@@ -133,6 +133,9 @@
     (when-not (account addr)
       (fail :NOBODY
 	        "Can only use an existing account"))
+    (when-not (symbol? name)
+      (fail :ARGUMENT
+	        "CNS names must be a valid symbol"))
     (def cns-database
          (assoc cns-database
                 name
