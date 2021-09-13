@@ -270,7 +270,7 @@ public class Server implements Closeable {
 						log.info("Still waiting for Belief sync after "+timeElapsed/1000+"s");
 					}
 				}
-				log.info("Retreived Peer Signed Belief: "+beliefHash);
+				log.info("Retreived Peer Signed Belief: "+beliefHash+ " with memory size: "+belF.getMemorySize());
 
 				Peer peer=Peer.create(keyPair, genF, belF.getValue());
 				return peer;
