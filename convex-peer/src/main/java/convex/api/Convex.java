@@ -648,9 +648,8 @@ public class Convex {
 	}
 
 	/**
-	 * Method to await a complete result. Should be called with lock on `awaiting` map
-	 * @param <T>
-	 * @param id
+	 * Method to start waiting for a complete result. Should be called with lock on `awaiting` map
+	 * @param id ID of result message to await
 	 * @return
 	 */
 	protected CompletableFuture<Result> awaitResult(long id) {
