@@ -141,7 +141,7 @@ public class Convex {
 
 	/**
 	 * Creates an anonymous connection to a Peer, suitable for queries
-	 * 
+	 *
 	 * @param hostAddress Address of Peer
 	 * @return New Convex client instance
 	 * @throws IOException      If IO Error occurs
@@ -559,13 +559,14 @@ public class Convex {
 			public void run() {
 				Stores.setCurrent(store); // use store for calling thread
 				try {
+					int lastCount = 0;
 					Ref<T> ref = store.refForHash(hash);
 					HashSet<Hash> missingSet = new HashSet<>();
+					HashMap<Hash, Integer> sendCounter = new HashMap<Hash, Integer>(10000);
 
 					// Loop until future is complete or cancelled
 					while (!f.isDone()) {
 						missingSet.clear();
-
 						if (ref == null) {
 							missingSet.add(hash);
 						} else {
@@ -576,17 +577,56 @@ public class Convex {
 							}
 							ref.findMissing(missingSet);
 						}
+						int requestCounter = 0;
 						for (Hash h : missingSet) {
 							// send missing data requests until we fill pipeline
-							log.debug("Request missing data: {}", h);
-							boolean sent = connection.sendMissingData(h);
-							if (!sent) {
-								log.debug("Send Queue full!");
+							if ( !sendCounter.containsKey(h) ) {
+								log.debug("Request missing data: {}", h);
+								boolean sent = connection.sendMissingData(h);
+								if (!sent) {
+									log.debug("Send Queue full!");
+									System.out.println("queue full");
+									break;
+								}
+								sendCounter.put(h, 1);
+								requestCounter ++;
+								if ( requestCounter > 500) {
+									break;
+								}
+							}
+							else {
+								int counter = sendCounter.get(h);
+								sendCounter.put(h, counter + 1);
+							}
+						}
+						int resetCounter = 0;
+						while (true) {
+							boolean isClean = true;
+							for (Hash h: sendCounter.keySet()) {
+								int counter = sendCounter.get(h);
+								if (counter > 100) {
+									sendCounter.remove(h);
+									isClean = false;
+									resetCounter += 1;
+									break;
+								}
+							}
+							if(isClean) {
 								break;
 							}
 						}
+
+						if (lastCount != missingSet.size() || requestCounter > 0) {
+							System.out.println(
+								"requesting: " + requestCounter
+								+ " requested: " + sendCounter.size()
+								+ " reset: " + resetCounter
+								+ " missing set count: " + missingSet.size()
+							);
+							lastCount = missingSet.size();
+						}
 						// if too low, can send multiple requests, and then block the peer
-						Thread.sleep(100);
+						Thread.sleep(10);
 						ref = store.refForHash(hash);
 						if (ref != null) {
 							if (ref.getStatus() >= Ref.PERSISTED) {
@@ -659,7 +699,7 @@ public class Convex {
 	/**
 	 * Method to start waiting for a complete result. Should be called with lock on
 	 * `awaiting` map
-	 * 
+	 *
 	 * @param id ID of result message to await
 	 * @return
 	 */
@@ -715,7 +755,7 @@ public class Convex {
 
 	/**
 	 * Executes a query synchronously and waits for the Result
-	 * 
+	 *
 	 * @param query Query to execute. Map be a form or Op
 	 * @return Result of synchronous query
 	 * @throws TimeoutException If the synchronous request timed out
@@ -855,7 +895,7 @@ public class Convex {
 
 	/**
 	 * Connect to a local Server, using the Peer's address and keypair
-	 * 
+	 *
 	 * @param server Server to connect to
 	 * @return New Client Connection
 	 * @throws TimeoutException If connection attempt times out
@@ -867,7 +907,7 @@ public class Convex {
 
 	/**
 	 * Wraps a connection as a Convex client instance
-	 * 
+	 *
 	 * @param c Connection to wrap
 	 * @return New Convex client instance using underlying connection
 	 */
@@ -879,7 +919,7 @@ public class Convex {
 
 	/**
 	 * Gets the consensus state from the remote Peer
-	 * 
+	 *
 	 * @return Future for consensus state
 	 * @throws TimeoutException If initial status request times out
 	 */
