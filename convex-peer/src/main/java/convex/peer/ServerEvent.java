@@ -27,4 +27,8 @@ public class ServerEvent {
     public String getReason() {
         return reason;
     }
+
+    public Server getServer() {
+        return server;
+    }
 }

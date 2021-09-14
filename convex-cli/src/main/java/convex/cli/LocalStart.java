@@ -121,9 +121,17 @@ public class LocalStart implements Runnable {
 				return;
 			}
 		}
-		log.info("Starting local network with "+count+" peer(s)");
-		peerManager.launchLocalPeers(keyPairList, peerPorts);
-		log.info("Local Peers launched");
-		peerManager.showPeerEvents();
+		try {
+
+			peerManager.startPeerEvents();
+			log.info("Starting local network with "+count+" peer(s)");
+			peerManager.launchLocalPeers(keyPairList, peerPorts);
+			log.info("Local Peers launched");
+			while (true) {
+				Thread.sleep(1000);
+			}
+		} catch (Throwable t) {
+			mainParent.showError(t);
+		}
 	}
 }

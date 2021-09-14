@@ -1,7 +1,9 @@
 package convex.api;
 
 import java.io.IOException;
+import java.lang.Math;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
@@ -560,9 +562,11 @@ public class Convex {
 				Stores.setCurrent(store); // use store for calling thread
 				try {
 					int lastCount = 0;
+					long maxMissingCount = 0;
 					Ref<T> ref = store.refForHash(hash);
 					HashSet<Hash> missingSet = new HashSet<>();
-					HashMap<Hash, Integer> sendCounter = new HashMap<Hash, Integer>(10000);
+					HashMap<Hash, Integer> sendTimer = new HashMap<Hash, Integer>(10000);
+					ArrayList<Hash> resendList = new ArrayList<Hash>(10000);
 
 					// Loop until future is complete or cancelled
 					while (!f.isDone()) {
@@ -580,7 +584,7 @@ public class Convex {
 						int requestCounter = 0;
 						for (Hash h : missingSet) {
 							// send missing data requests until we fill pipeline
-							if ( !sendCounter.containsKey(h) ) {
+							if ( !sendTimer.containsKey(h) ) {
 								log.debug("Request missing data: {}", h);
 								boolean sent = connection.sendMissingData(h);
 								if (!sent) {
@@ -588,45 +592,43 @@ public class Convex {
 									System.out.println("queue full");
 									break;
 								}
-								sendCounter.put(h, 1);
+								sendTimer.put(h, 1);
 								requestCounter ++;
-								if ( requestCounter > 500) {
+								if ( requestCounter >= 800) {
 									break;
 								}
 							}
 							else {
-								int counter = sendCounter.get(h);
-								sendCounter.put(h, counter + 1);
+								int counter = sendTimer.get(h);
+								sendTimer.put(h, counter + 1);
 							}
 						}
-						int resetCounter = 0;
-						while (true) {
-							boolean isClean = true;
-							for (Hash h: sendCounter.keySet()) {
-								int counter = sendCounter.get(h);
-								if (counter > 100) {
-									sendCounter.remove(h);
-									isClean = false;
-									resetCounter += 1;
-									break;
-								}
-							}
-							if(isClean) {
-								break;
+						for (Hash h: sendTimer.keySet()) {
+							if (sendTimer.get(h)> 100) {
+								resendList.add(h);
 							}
 						}
-
+						int resetCounter = resendList.size();
+						for (Hash h: resendList) {
+							sendTimer.remove(h);
+						}
+						resendList.clear();
+						if ( missingSet.size() > maxMissingCount) {
+							maxMissingCount = missingSet.size() + 1000;
+						}
 						if (lastCount != missingSet.size() || requestCounter > 0) {
+							long percentLeft = (long) Math.ceil(((double) missingSet.size() / (double) maxMissingCount)  * 100);
 							System.out.println(
 								"requesting: " + requestCounter
-								+ " requested: " + sendCounter.size()
+								+ " requested: " + sendTimer.size()
 								+ " reset: " + resetCounter
 								+ " missing set count: " + missingSet.size()
+								+ " -- " +  percentLeft + "%"
 							);
 							lastCount = missingSet.size();
 						}
 						// if too low, can send multiple requests, and then block the peer
-						Thread.sleep(10);
+						Thread.sleep(100);
 						ref = store.refForHash(hash);
 						if (ref != null) {
 							if (ref.getStatus() >= Ref.PERSISTED) {

@@ -34,22 +34,25 @@ public class ServerInformation {
 
 	protected void load(Server server,  ConnectionManager manager) {
 		Peer peer = server.getPeer();
-		Order order = peer.getPeerOrder();
-
-		peerKey = peer.getPeerKey();
 		hostname = server.getHostname();
 		connectionCount = manager.getConnectionCount();
 		trustedConnectionCount = manager.getTrustedConnectionCount();
-		isSynced =  order != null && peer.getConsensusPoint() > 0;
-		networkID = peer.getNetworkID();
-		consensusPoint = peer.getConsensusPoint();
         isJoined = connectionCount > 0;
-		stateHash = peer.getConsensusState().getHash();
-        beliefHash = peer.getBelief().getHash();
 		blockCount = 0;
-		if (order != null ) {
-			blockCount = order.getBlockCount();
+
+		if (peer != null) {
+			Order order = peer.getPeerOrder();
+			peerKey = peer.getPeerKey();
+			isSynced =  order != null && peer.getConsensusPoint() > 0;
+			networkID = peer.getNetworkID();
+			consensusPoint = peer.getConsensusPoint();
+			stateHash = peer.getConsensusState().getHash();
+			beliefHash = peer.getBelief().getHash();
+			if (order != null ) {
+				blockCount = order.getBlockCount();
+			}
 		}
+
 	}
 
 	public AccountKey getPeerKey() {

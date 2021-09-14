@@ -245,7 +245,7 @@ public class Server implements Closeable {
 				Convex convex=Convex.connect(sourceAddr);
 				log.info("Attempting Peer Sync with: "+sourceAddr);
 				long timeout = establishTimeout();
-				
+
 				// Sync status and genesis state
 				Result result = convex.requestStatusSync(timeout);
 				AVector<ACell> status = result.getValue();
@@ -254,17 +254,19 @@ public class Server implements Closeable {
 				}
 				Hash beliefHash=RT.ensureHash(status.get(0));
 				Hash networkID=RT.ensureHash(status.get(2));
+				raiseServerChange("Sync initial state");
 				log.info("Attempting to sync genesis state with network: "+networkID);
 				State genF=(State) convex.acquire(networkID).get(timeout,TimeUnit.MILLISECONDS);
 				log.info("Retreived Genesis State: "+networkID);
-				
+				raiseServerChange("Network ID: " + networkID);
 				// Belief acquisition
 				log.info("Attempting to obtain peer Belief: "+beliefHash);
 				SignedData<Belief> belF=null;
 				long timeElapsed=0;
 				while (belF==null) {
 					try {
-						belF=(SignedData<Belief>) convex.acquire(beliefHash).get(timeout,TimeUnit.MILLISECONDS);
+						System.out.println("requesting a belief");
+						belF=(SignedData<Belief>) convex.acquire(beliefHash).get(timeout * 10,TimeUnit.MILLISECONDS);
 					} catch (TimeoutException te) {
 						timeElapsed+=timeout;
 						log.info("Still waiting for Belief sync after "+timeElapsed/1000+"s");

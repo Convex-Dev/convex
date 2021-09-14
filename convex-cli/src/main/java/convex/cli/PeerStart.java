@@ -133,8 +133,11 @@ public class PeerStart implements Runnable {
 				store = Stores.getGlobalStore();
 			}
 			peerManager = PeerManager.create(mainParent.getSessionFilename(), keyPair, peerAddress, store);
+			peerManager.startPeerEvents();
 			peerManager.launchPeer(port, remotePeerHostname, url, bindAddress);
-			peerManager.showPeerEvents();
+			while (true) {
+				Thread.sleep(1000);
+			}
 		} catch (Throwable t) {
 			mainParent.showError(t);
 		}
