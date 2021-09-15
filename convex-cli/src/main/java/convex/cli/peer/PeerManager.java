@@ -72,6 +72,8 @@ public class PeerManager implements IServerEvent, IAcquireStatusEvent {
 
 	protected AStore store;
 
+	protected boolean isRunning;
+
 	protected BlockingQueue<ServerEvent> serverEventQueue = new ArrayBlockingQueue<ServerEvent>(1024);
 
 
@@ -80,6 +82,7 @@ public class PeerManager implements IServerEvent, IAcquireStatusEvent {
 		this.keyPair = keyPair;
 		this.address = address;
 		this.store = store;
+		isRunning = true;
 	}
 
 	public static PeerManager create(String sessionFilename) {
@@ -169,6 +172,7 @@ public class PeerManager implements IServerEvent, IAcquireStatusEvent {
 				loadSession();
 				removeAllFromSession();
 				storeSession();
+				isRunning = false;
 		    }
 		});
 	}
@@ -248,7 +252,7 @@ public class PeerManager implements IServerEvent, IAcquireStatusEvent {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
-				while (true) {
+				while (isRunning) {
 					try {
 						ServerEvent event = serverEventQueue.take();
 						ServerInformation information = event.getInformation();
