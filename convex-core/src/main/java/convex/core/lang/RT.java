@@ -24,6 +24,7 @@ import convex.core.data.Hash;
 import convex.core.data.INumeric;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
+import convex.core.data.LongBlob;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
@@ -958,12 +959,13 @@ public class RT {
 	 * Converts an object to a canonical blob representation. Handles blobs,
 	 * addresses, hashes and hex strings
 	 * 
-	 * @param a Object to convert to a Blob
+	 * @param a Value to convert to a Blob
 	 * @return Blob value, or null if not convertable to a blob
 	 */
 	public static ABlob castBlob(ACell a) {
 		// handle address, hash, blob instances
 		if (a instanceof ABlob) return Blobs.toCanonical((ABlob) a);
+		if (a instanceof CVMLong) return LongBlob.create(((CVMLong)a).longValue()); 
 		if (a instanceof AString) return Blobs.fromHex(a.toString());
 		return null;
 	}

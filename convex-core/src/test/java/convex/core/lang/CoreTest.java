@@ -128,7 +128,10 @@ public class CoreTest extends ACVMTest {
 
 		// Account key should be a Blob
 		assertEquals(eval("*key*"),eval("(blob *key*)"));
-
+		
+		// Long converts to blob and back
+		assertTrue(evalB("(= 0xffffffffffffffff (blob -1))"));
+		assertTrue(evalB("(= -1 (long (blob -1)))"));
 
 		// round trip back to Blob
 		assertTrue(evalB("(blob? (blob (hash (encoding [1 2 3]))))"));

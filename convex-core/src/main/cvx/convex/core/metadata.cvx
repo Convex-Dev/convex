@@ -263,7 +263,7 @@
 
 
  blob
- {:doc {:description "Casts the argument to a blob. Arugment can be an `address`, a hex string, or another `blob`."
+ {:doc {:description "Casts the argument to a blob. Arugment can be an `address`, a hex string, a Long value, or another `blob`."
         :errors      {:CAST "If the argument is not castable to a blob."}
         :examples    [{:code "(blob \"1234abcd\")"}]
         :signature   [{:params [address]
@@ -714,7 +714,7 @@
 
 
  long?
- {:doc {:description "Returnes true if the argment is a `long` value, false otherwise."
+ {:doc {:description "Returnes true if the argment is a value of Long type, false otherwise."
         :examples    [{:code "(long? 1234)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
