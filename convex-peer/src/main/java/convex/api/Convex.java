@@ -623,6 +623,7 @@ public class Convex {
 								sendTimer.put(h, counter + 1);
 							}
 						}
+						resendList.clear();
 						for (Hash h: sendTimer.keySet()) {
 							if (sendTimer.get(h)> ACQUIRE_RESEND_TIMEOUT_TICKS) {
 								resendList.add(h);
@@ -632,7 +633,6 @@ public class Convex {
 						for (Hash h: resendList) {
 							sendTimer.remove(h);
 						}
-						resendList.clear();
 						if ( missingSet.size() > maxMissingCount) {
 							maxMissingCount = missingSet.size();
 						}
