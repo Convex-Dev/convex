@@ -18,7 +18,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.stream.Collectors;
 
+import convex.api.AcquireStatus;
 import convex.api.Convex;
+import convex.api.IAcquireStatusEvent;
 import convex.core.util.Shutdown;
 import convex.cli.Helpers;
 import convex.core.Belief;
@@ -51,7 +53,7 @@ import etch.EtchStore;
 *
 */
 
-public class PeerManager implements IServerEvent {
+public class PeerManager implements IServerEvent, IAcquireStatusEvent {
 
 	private static final Logger log = LoggerFactory.getLogger(PeerManager.class.getName());
 
@@ -142,6 +144,7 @@ public class PeerManager implements IServerEvent {
         config.put(Keywords.URL, url);
         config.put(Keywords.BIND_ADDRESS, bindAddress);
 		config.put(Keywords.EVENT_HOOK, this); // Add this as IServerEvent hook
+		config.put(Keywords.ACQUIRE_EVENT_HOOK, this); // Add this as IAcquireConvexEvent hook
 		Server server = API.launchPeer(config);
 		if (!config.containsKey(Keywords.URL)) {
 			server.setHostname("localhost:"+server.getPort());
@@ -149,8 +152,8 @@ public class PeerManager implements IServerEvent {
 
 		peerServerList.add(server);
 		setupSession();
-		Server firstServer = peerServerList.get(0);
-		System.out.println("Starting network Id: "+ firstServer.getPeer().getNetworkID().toString());
+//		Server firstServer = peerServerList.get(0);
+//		System.out.println("Starting network Id: "+ firstServer.getPeer().getNetworkID().toString());
 	}
 
 	protected void setupSession() {
@@ -311,9 +314,22 @@ public class PeerManager implements IServerEvent {
 	 * Implements for IServerEvent
 	 *
 	 */
-
 	public void onServerChange(ServerEvent serverEvent) {
 		// add in queue if space available
 		serverEventQueue.offer(serverEvent);
+	}
+
+	/**
+	 * Implements for IAcquireStatusEvent
+	 *
+	 */
+	public void onAcquireStatusChange(AcquireStatus status) {
+        System.out.println(
+			"Syncing: requested: " + status.getRequestCount()
+			+ " queued: " + status.getQueueRequestCount()
+			+ " reset: " + status.getResetCount()
+			+ " missing: " + status.getMissingCount()
+			+ " -- " + (long) Math.ceil(status.getPercentLeft()) + "%"
+		);
 	}
 }

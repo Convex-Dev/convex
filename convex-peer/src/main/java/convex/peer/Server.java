@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.api.IAcquireStatusEvent;
 import convex.core.Belief;
 import convex.core.Block;
 import convex.core.BlockResult;
@@ -199,7 +200,15 @@ public class Server implements Closeable {
 			// now setup the connection manager
 			this.manager = new ConnectionManager(this);
 
-			this.peer = establishPeer();
+			IAcquireStatusEvent acquireStatusEventHook = null;
+			// assign the event hook if set
+			if (config.containsKey(Keywords.ACQUIRE_EVENT_HOOK)) {
+				Object maybeHook=config.get(Keywords.ACQUIRE_EVENT_HOOK);
+				if (maybeHook instanceof IAcquireStatusEvent) {
+					acquireStatusEventHook = (IAcquireStatusEvent)maybeHook;
+				}
+			}
+			this.peer = establishPeer(acquireStatusEventHook);
 
 			establishController();
 
@@ -232,7 +241,7 @@ public class Server implements Closeable {
 	}
 
 	@SuppressWarnings("unchecked")
-	private Peer establishPeer() throws TimeoutException, IOException {
+	private Peer establishPeer(IAcquireStatusEvent acquireStatusEventHook) throws TimeoutException, IOException {
 		log.info("Establishing Peer with store: {}",Stores.current());
 		try {
 			AKeyPair keyPair = (AKeyPair) getConfig().get(Keywords.KEYPAIR);
@@ -243,6 +252,7 @@ public class Server implements Closeable {
 				// Peer sync case
 				InetSocketAddress sourceAddr=Utils.toInetSocketAddress(source);
 				Convex convex=Convex.connect(sourceAddr);
+				convex.setAcquireStatusEventHook(acquireStatusEventHook);
 				log.info("Attempting Peer Sync with: "+sourceAddr);
 				long timeout = establishTimeout();
 
@@ -258,14 +268,16 @@ public class Server implements Closeable {
 				log.info("Attempting to sync genesis state with network: "+networkID);
 				State genF=(State) convex.acquire(networkID).get(timeout,TimeUnit.MILLISECONDS);
 				log.info("Retreived Genesis State: "+networkID);
-				raiseServerChange("Network ID: " + networkID);
+				raiseServerChange("Found networkID: " + networkID);
 				// Belief acquisition
 				log.info("Attempting to obtain peer Belief: "+beliefHash);
 				SignedData<Belief> belF=null;
 				long timeElapsed=0;
 				while (belF==null) {
 					try {
-						System.out.println("requesting a belief");
+						raiseServerChange("Sync requesting belief: " + beliefHash);
+						// we have to extend the timeout, because if this does timeout the next call will also
+						// start an acquire thread and start requesting
 						belF=(SignedData<Belief>) convex.acquire(beliefHash).get(timeout * 10,TimeUnit.MILLISECONDS);
 					} catch (TimeoutException te) {
 						timeElapsed+=timeout;

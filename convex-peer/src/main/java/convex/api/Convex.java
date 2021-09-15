@@ -68,6 +68,21 @@ public class Convex {
 	private long timeout = Constants.DEFAULT_CLIENT_TIMEOUT;
 
 	/**
+	 * Number of missing data items requested per block it one tick cycle
+	 */
+	private static final long ACQUIRE_BATCH_REQUEST_COUNT = 800;
+
+	/**
+	 * Number of millis to sleep between each request block is sent
+	 */
+	private static final long ACQUIRE_SLEEP_TICK_MILLIS = 100;
+
+	/**
+	 * Number of ticks see above for the length of each tick, before the hash is allowed to be re-requested
+	 */
+	private static final long ACQUIRE_RESEND_TIMEOUT_TICKS = 50;
+
+	/**
 	 * Key pair for this Client
 	 */
 	protected AKeyPair keyPair;
@@ -97,6 +112,11 @@ public class Convex {
 	 * Map of results awaiting completion. May be pending missing data.
 	 */
 	private HashMap<Long, CompletableFuture<Result>> awaiting = new HashMap<>();
+
+	/**
+	 * IAcquireEvent hook to provide information on the acquire process
+	 */
+	protected IAcquireStatusEvent acquireStatusEventHook = null;
 
 	private final Consumer<Message> internalHandler = new ResultConsumer() {
 		@Override
@@ -589,12 +609,12 @@ public class Convex {
 								boolean sent = connection.sendMissingData(h);
 								if (!sent) {
 									log.debug("Send Queue full!");
-									System.out.println("queue full");
 									break;
 								}
 								sendTimer.put(h, 1);
 								requestCounter ++;
-								if ( requestCounter >= 800) {
+								// only request a batch of xx items before exiting
+								if ( requestCounter >= ACQUIRE_BATCH_REQUEST_COUNT) {
 									break;
 								}
 							}
@@ -604,7 +624,7 @@ public class Convex {
 							}
 						}
 						for (Hash h: sendTimer.keySet()) {
-							if (sendTimer.get(h)> 100) {
+							if (sendTimer.get(h)> ACQUIRE_RESEND_TIMEOUT_TICKS) {
 								resendList.add(h);
 							}
 						}
@@ -614,21 +634,23 @@ public class Convex {
 						}
 						resendList.clear();
 						if ( missingSet.size() > maxMissingCount) {
-							maxMissingCount = missingSet.size() + 1000;
+							maxMissingCount = missingSet.size();
 						}
 						if (lastCount != missingSet.size() || requestCounter > 0) {
-							long percentLeft = (long) Math.ceil(((double) missingSet.size() / (double) maxMissingCount)  * 100);
-							System.out.println(
-								"requesting: " + requestCounter
-								+ " requested: " + sendTimer.size()
-								+ " reset: " + resetCounter
-								+ " missing set count: " + missingSet.size()
-								+ " -- " +  percentLeft + "%"
-							);
+							if (acquireStatusEventHook != null) {
+								AcquireStatus status = new AcquireStatus(
+									requestCounter,
+									sendTimer.size(),
+									resetCounter,
+									missingSet.size(),
+									maxMissingCount
+								);
+								acquireStatusEventHook.onAcquireStatusChange(status);
+							}
 							lastCount = missingSet.size();
 						}
 						// if too low, can send multiple requests, and then block the peer
-						Thread.sleep(100);
+						Thread.sleep(ACQUIRE_SLEEP_TICK_MILLIS);
 						ref = store.refForHash(hash);
 						if (ref != null) {
 							if (ref.getStatus() >= Ref.PERSISTED) {
@@ -947,4 +969,7 @@ public class Convex {
 		close();
 	}
 
+	public void setAcquireStatusEventHook(IAcquireStatusEvent eventHook) {
+		this.acquireStatusEventHook = eventHook;
+	}
 }
