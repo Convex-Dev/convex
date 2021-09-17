@@ -1400,6 +1400,19 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(for [] nil nil)"));
 		assertCastError(step("(for 1)")); // arity > cast
 	}
+	
+	@Test
+	public void testForLoop() {
+		assertEquals(CVMLong.create(9), eval("(for-loop [i 0 (< i 10) (inc i)] i)"));
+		assertNull(eval("(for-loop [i 0 false (inc i)] i)"));
+		
+		// TODO: maybe dubious error types?
+		assertCompileError(step("(for-loop [1 2 3 4] 5)")); // bad binding form
+		assertCastError(step("(for-loop 4 5)")); // bad binding form
+
+		assertArityError(step("(for-loop [1 2 3] 4)"));
+		assertArityError(step("(for-loop)"));
+	}
 
 	@Test
 	public void testMapv() {
