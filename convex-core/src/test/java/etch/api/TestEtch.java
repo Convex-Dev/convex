@@ -7,10 +7,14 @@ import java.nio.MappedByteBuffer;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Random;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 import org.junit.jupiter.api.Test;
@@ -124,23 +128,31 @@ public class TestEtch {
 	}
 
 	@Test
-	public void testEtchRepair() throws IOException {
+	public void testEtchWalk() throws IOException {
 		EtchStore store=EtchStore.createTemp();
 		Etch etch = store.getEtch();
 		int maxCount = 1000000;
-		List<Hash> writeHashList = new ArrayList<Hash>(maxCount);
+		Set<Hash> writeHashSet = new HashSet<Hash>(maxCount);
+		Random random = new Random();
 		for (int index = 0; index < maxCount; index ++) {
-			AVector<CVMLong> v=Vectors.of(index);
+			AVector<CVMLong> v=Vectors.of(random.nextLong());
 			Hash h = v.getHash();
 			Ref<ACell> r=v.getRef();
 			Ref<ACell> r2=etch.write(h, r);
-			writeHashList.add(h);
+			writeHashSet.add(h);
 		}
 		// now walk through all of the etch hash data
 		EtchDataEvent dataEvent = new EtchDataEvent();
 		etch.walk(dataEvent);
+		// get the read list of hashes
 		List<Hash> hashList = dataEvent.getList();
-		assertEquals(hashList.size(), writeHashList.size());
+		// check the size of both hash list and set
+		assertEquals(hashList.size(), writeHashSet.size());
+		// check that each hash is found in the write set
+		for (Hash h : hashList) {
+			assertTrue(writeHashSet.contains(h));
+		}
+		// test possible repair option to rebuild the dataLength field in etch
 		assertEquals(etch.getDataLength(), dataEvent.getMaxPosition());
 	}
 }
