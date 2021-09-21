@@ -907,16 +907,13 @@ public class Etch {
 		this.store=etchStore;
 	}
 
-	protected boolean isMagicHeader() throws IOException {
-		MappedByteBuffer mbb=seekMap(0);
-		byte[] check=new byte[2];
-		mbb.get(check);
-		if(!Arrays.equals(MAGIC_NUMBER, check)) {
-			return false;
-		}
-		return true;
-	}
-
+	/**
+	* Raise an onData event based on the data found at the dataPointer.
+	*
+	* @param dateEvent callback to raise the onData event for.
+	* @param dataPointer Pointer to the key and data.
+	*
+	*/
 	protected void raiseDataEvent(IEtchDataEvent dataEvent, long dataPointer) throws IOException {
 		long keyPosition=dataPointer&~TYPE_MASK;
 		MappedByteBuffer mbb=seekMap(keyPosition);
@@ -934,6 +931,13 @@ public class Etch {
 		dataEvent.onData(keyPosition,hash, dataPosition, flags, memorySize, encoding, length);
 	}
 
+	/**
+	* Walk through an index starting at indexPosition.
+	*
+	* @param dataEvent event to call events
+	* @param indexPosition Starting position of the index
+	*
+	*/
 	protected void walkData(IEtchDataEvent dataEvent, long indexPosition) throws IOException {
 		dataEvent.onWalkIndex(indexPosition);
 		for (int index = 0 ; index < 256; index ++) {
@@ -965,10 +969,18 @@ public class Etch {
 		}
 	}
 
+	/**
+	 * Walk through the database and raise events on new index values, index tables and data items.
+	 *
+	 * @param dataEvent data event to call back on events.
+	 */
 	public void walk(IEtchDataEvent dataEvent) throws IOException {
 		walkData(dataEvent, INDEX_START);
 	}
 
+	/**
+	 * Return the current recorded dataLength
+	 */
 	public long getDataLength() {
 		return dataLength;
 	}
