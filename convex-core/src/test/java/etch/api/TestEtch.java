@@ -131,7 +131,7 @@ public class TestEtch {
 	public void testEtchWalk() throws IOException {
 		EtchStore store=EtchStore.createTemp();
 		Etch etch = store.getEtch();
-		int maxCount = 1000000;
+		int maxCount = 10000;
 		Set<Hash> writeHashSet = new HashSet<Hash>(maxCount);
 		Random random = new Random();
 		for (int index = 0; index < maxCount; index ++) {

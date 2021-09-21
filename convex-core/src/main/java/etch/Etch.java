@@ -873,11 +873,12 @@ public class Etch {
 		mbb.put(encoding.getInternalArray(),encoding.getInternalOffset(),length);
 
 		// update total data length
-		dataLength=mbb.position();
-
+		// dataLength=mbb.position();
+		dataLength = position + KEY_SIZE + LABEL_SIZE+LENGTH_SIZE+length;
 
 
 		if (dataLength!=position+KEY_SIZE+LABEL_SIZE+LENGTH_SIZE+length) {
+			System.out.print(dataLength + " = " + position);
 			System.out.println("PANIC!");
 		}
 
