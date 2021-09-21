@@ -872,7 +872,8 @@ public class Etch {
 		// append blob value
 		mbb.put(encoding.getInternalArray(),encoding.getInternalOffset(),length);
 
-		// update total data length
+		// update total data length - this is incorrect if the mmb is above 1GB
+		// return the position from offset 0 not offeset by xGB
 		// dataLength=mbb.position();
 		dataLength = position + KEY_SIZE + LABEL_SIZE+LENGTH_SIZE+length;
 
