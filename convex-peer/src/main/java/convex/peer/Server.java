@@ -237,7 +237,7 @@ public class Server implements Closeable {
 		try {
 			AKeyPair keyPair = (AKeyPair) getConfig().get(Keywords.KEYPAIR);
 			if (keyPair==null) {
-				log.warn("No keypair provided for Server, deafulting to generated keypair");
+				log.warn("No keypair provided for Server, deafulting to generated keypair for testing purposes");
 				keyPair=AKeyPair.generate();
 				log.warn("Generated keypair with public key: "+keyPair.getAccountKey());
 			}
