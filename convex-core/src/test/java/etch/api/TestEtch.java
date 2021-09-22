@@ -155,4 +155,19 @@ public class TestEtch {
 		// test possible repair option to rebuild the dataLength field in etch
 		assertEquals(etch.getDataLength(), dataEvent.getMaxPosition());
 	}
+
+	@Test
+	public void testDataFileLength() throws IOException {
+		EtchStore store=EtchStore.createTemp();
+		Etch etch = store.getEtch();
+		int maxCount = 10000;
+		Random random = new Random();
+		for (int index = 0; index < maxCount; index ++) {
+			AVector<CVMLong> v=Vectors.of(random.nextLong());
+			Hash h = v.getHash();
+			Ref<ACell> r=v.getRef();
+			Ref<ACell> r2=etch.write(h, r);
+		}
+		assertEquals(etch.getDataLength(), etch.calcDataLength());
+	}
 }

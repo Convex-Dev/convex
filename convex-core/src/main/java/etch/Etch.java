@@ -877,6 +877,7 @@ public class Etch {
 		// dataLength=mbb.position();
 		dataLength = position + KEY_SIZE + LABEL_SIZE+LENGTH_SIZE+length;
 
+		mbb.put((byte) 0xff);
 
 		if (dataLength!=position+KEY_SIZE+LABEL_SIZE+LENGTH_SIZE+length) {
 			System.out.print(dataLength + " = " + position);
@@ -986,4 +987,24 @@ public class Etch {
 	public long getDataLength() {
 		return dataLength;
 	}
+
+	public long calcDataLength() throws IOException {
+		long endPosition = file.length();
+		long dataPosition = dataLength - 1;
+		long length = endPosition - dataPosition;
+		if (length > MAX_REGION_SIZE) {
+			length = MAX_REGION_SIZE;
+		}
+		long pos = endPosition - length;
+		MappedByteBuffer mbb = data.getChannel().map(MapMode.READ_ONLY, pos, length);
+		for (long index = length - 1; index >= 0; --index ) {
+			mbb.position((int) index);
+			byte result = mbb.get();
+			if (result != 0) {
+				return pos + index;
+			}
+		}
+		return dataLength;
+	}
 }
+
