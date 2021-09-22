@@ -168,6 +168,9 @@ public class TestEtch {
 			Ref<ACell> r=v.getRef();
 			Ref<ACell> r2=etch.write(h, r);
 		}
-		assertEquals(etch.getDataLength(), etch.calcDataLength());
+		long dataLength = etch.getDataLength();
+		assertEquals(dataLength,  etch.calcDataLength(dataLength-10));
+		assertEquals(dataLength,  etch.calcDataLength(dataLength));
+		assertEquals(dataLength,  etch.calcDataLength(0));
 	}
 }

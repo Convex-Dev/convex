@@ -80,6 +80,7 @@ public class Etch {
 	private static final int SIZE_HEADER_FILESIZE=8;
 	private static final int SIZE_HEADER_ROOT=32;
 
+	private static final byte DATA_END_MARKER = (byte) 0xFE;
 	/**
 	 * Length of header, including:
 	 * - Magic number "e7c6" (2 bytes)
@@ -612,6 +613,7 @@ public class Etch {
 		Utils.writeLong(temp, ix,dataPointer); // single node
 		MappedByteBuffer mbb=seekMap(position);
 		mbb.put(temp); // write full index block
+
 		dataLength=position+INDEX_BLOCK_SIZE;
 		return position;
 	}
@@ -821,6 +823,7 @@ public class Etch {
 		MappedByteBuffer mbb=seekMap(position);
 		Arrays.fill(temp,(byte)0);
 		mbb.put(temp);
+
 		dataLength=position+INDEX_BLOCK_SIZE;
 		return position;
 	}
@@ -877,12 +880,12 @@ public class Etch {
 		// dataLength=mbb.position();
 		dataLength = position + KEY_SIZE + LABEL_SIZE+LENGTH_SIZE+length;
 
-		mbb.put((byte) 0xff);
-
-		if (dataLength!=position+KEY_SIZE+LABEL_SIZE+LENGTH_SIZE+length) {
-			System.out.print(dataLength + " = " + position);
-			System.out.println("PANIC!");
-		}
+		// the following DATA_END_MARKER byte is not included in the data record, it will be overwrittern
+		// by the next data item or index
+		// this is used by the calcDataLength to find the last data record in the database file, by searching backwards
+		mbb.put(DATA_END_MARKER);
+		// move back the position in the mbb
+		mbb.position(mbb.position() - 1);
 
 		// return file position for added data
 		return position;
@@ -988,23 +991,31 @@ public class Etch {
 		return dataLength;
 	}
 
-	public long calcDataLength() throws IOException {
+	/**
+	 * Calculate the data length of this dabatabe. This is done by searching backwards from the end of file to
+	 * the fromPosition looking for a DATA_END_MARKER value.
+	 *
+	 * @param fromPosition Stop searching to this position, this can be the loaded dataLength or can be 0 for a complete search
+	 *
+	 * @return The calculated dataLength value, if no DATA_END_MARKER found, then return 0
+	 */
+	public long calcDataLength(long fromPosition) throws IOException {
 		long endPosition = file.length();
-		long dataPosition = dataLength - 1;
-		long length = endPosition - dataPosition;
+		long startPosition = fromPosition > 0 ? fromPosition - 1: 0;
+		long length = endPosition - startPosition;
 		if (length > MAX_REGION_SIZE) {
 			length = MAX_REGION_SIZE;
 		}
-		long pos = endPosition - length;
-		MappedByteBuffer mbb = data.getChannel().map(MapMode.READ_ONLY, pos, length);
+		long position = endPosition - length;
+		MappedByteBuffer mbb = data.getChannel().map(MapMode.READ_ONLY, position, length);
 		for (long index = length - 1; index >= 0; --index ) {
 			mbb.position((int) index);
-			byte result = mbb.get();
-			if (result != 0) {
-				return pos + index;
+			byte value = (byte) mbb.get();
+			if (value == DATA_END_MARKER) {
+				return position + index;
 			}
 		}
-		return dataLength;
+		return 0;
 	}
 }
 
