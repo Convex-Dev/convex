@@ -179,8 +179,14 @@ public class Etch {
 			if(!Arrays.equals(MAGIC_NUMBER, check)) {
 				throw new IOException("Bad magic number! Probably not an Etch file: "+dataFile);
 			}
-
+			// for compatibility for older db, we still use dataLength value in the header
 			long length = mbb.getLong();
+			long calcLength = calcDataLength(length);
+			if (calcLength > length) {
+				// if the dataLength was not writtern correctly, then update
+				// with the correct length
+				length = calcLength;
+			}
 			dataLength=length;
 		}
 
