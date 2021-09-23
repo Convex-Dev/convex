@@ -236,7 +236,11 @@ public class Server implements Closeable {
 		log.info("Establishing Peer with store: {}",Stores.current());
 		try {
 			AKeyPair keyPair = (AKeyPair) getConfig().get(Keywords.KEYPAIR);
-			if (keyPair==null) throw new IllegalArgumentException("No Peer Key Pair provided in config");
+			if (keyPair==null) {
+				log.warn("No keypair provided for Server, deafulting to generated keypair for testing purposes");
+				keyPair=AKeyPair.generate();
+				log.warn("Generated keypair with public key: "+keyPair.getAccountKey());
+			}
 
 			Object source=getConfig().get(Keywords.SOURCE);
 			if (Utils.bool(source)) {
