@@ -43,9 +43,9 @@ public class RTTest {
 		assertSame(za, RT.castAddress(za));
 
 		// reading a hex address
-		assertEquals(Address.create(18),RT.castAddress(Strings.create("0000000000000012"))); // OK, hex string
+		assertEquals(Address.create(18), RT.castAddress(Strings.create("0000000000000012"))); // OK, hex string
 		assertNull(RT.castAddress(Strings.create("0012"))); // too short
-		
+
 		// Check null return values for invalid addresses
 		assertNull(RT.castAddress(null)); // null not allowed
 		assertNull(RT.castAddress(CVMLong.create(-1))); // negative ints not allowed
@@ -63,26 +63,49 @@ public class RTTest {
 		// null return values if cast fails
 		assertNull(RT.sequence(Keywords.FOO)); // keywords not allowed
 	}
-	
+
 	@Test
 	public void testVec() {
 		AVector<CVMLong> v = Vectors.of(1L, 2L, 3L);
 		AList<CVMLong> l = Lists.of(1L, 2L, 3L);
-		assertEquals(Vectors.of(1L, 2L,3L), RT.vec(l.toCellArray()));
+		assertEquals(Vectors.of(1L, 2L, 3L), RT.vec(l.toCellArray()));
 		assertEquals(v, RT.vec(new java.util.ArrayList<>(v)));
-		
+
 		assertNull(RT.vec(1)); // ints not allowed
 	}
-	
-	@Test 
-	public void testCVMCasts() {
-		assertEquals(CVMLong.create(1L),RT.cvm(1L));
-		assertEquals(CVMDouble.create(0.17),RT.cvm(0.17));
-		assertEquals(Strings.create("foo"),RT.cvm("foo"));
-		
-		// CVM objects shouldn't change
-		Keyword k=Keyword.create("test-key");
-		assertSame(k,RT.cvm(k));
 
+	@Test
+	public void testCVMCasts() {
+		assertEquals(CVMLong.create(1L), RT.cvm(1L));
+		assertEquals(CVMDouble.create(0.17), RT.cvm(0.17));
+		assertEquals(Strings.create("foo"), RT.cvm("foo"));
+
+		// CVM objects shouldn't change
+		Keyword k = Keyword.create("test-key");
+		assertSame(k, RT.cvm(k));
+
+	}
+
+	@Test
+	public void testSplitMix() {
+		// test examples from :
+		// https://rosettacode.org/wiki/Pseudo-random_numbers/Splitmix64
+		long seed = 1234567l;
+		long x;
+		seed = RT.splitmix64Update(seed);
+		x=RT.splitmix64Calc(seed);
+		assertEquals(6457827717110365317l, x);
+		seed = RT.splitmix64Update(seed);
+		x=RT.splitmix64Calc(seed);
+		assertEquals(3203168211198807973l, x);
+		seed = RT.splitmix64Update(seed);
+		x=RT.splitmix64Calc(seed);
+		assertEquals(0x883EBCE5A3F27C77l, x);
+		seed = RT.splitmix64Update(seed);
+		x=RT.splitmix64Calc(seed);
+		assertEquals(4593380528125082431l, x);
+		seed = RT.splitmix64Update(seed);
+		x=RT.splitmix64Calc(seed);
+		assertEquals(0xE3B8346708CB5ECDl,x);
 	}
 }
