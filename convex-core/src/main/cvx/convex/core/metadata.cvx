@@ -261,6 +261,35 @@
         :signature   [{:params [address]
                        :return Long}]}}
 
+ bit-and
+ {:doc {:description "Returns the bitwise AND of two Long values."
+        :errors      {:CAST "If an argument is not implicitly castable to Long."}
+        :examples    [{:code "(bit-and 7 12)"}]
+        :signature   [{:params [a b]
+                       :return Long}]}}
+ 
+  bit-not
+ {:doc {:description "Returns the bitwise NOT of a Long value."
+        :errors      {:CAST "If the argument is not implicitly castable to Long."}
+        :examples    [{:code "(bit-not (long 0xfffffffffffffff0))"}]
+        :signature   [{:params [a b]
+                       :return Long}]}}
+ 
+ bit-or
+ {:doc {:description "Returns the bitwise OR of two Long values."
+        :errors      {:CAST "If an argument is not implicitly castable to Long."}
+        :examples    [{:code "(bit-or 7 12)"}]
+        :signature   [{:params [a b]
+                       :return Long}]}}
+ 
+ bit-xor
+ {:doc {:description "Returns the bitwise XOR of two Long values."
+        :errors      {:CAST "If an argument is not implicitly castable to Long."}
+        :examples    [{:code "(bit-xor 7 12)"}]
+        :signature   [{:params [a b]
+                       :return Long}]}}
+ 
+
 
  blob
  {:doc {:description "Casts the argument to a Blob. Arugment can be an Address, a hex String, a Long value, or another Blob."

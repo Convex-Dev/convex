@@ -292,6 +292,10 @@ public class Symbols {
 
 	public static final Symbol NAN_Q = Symbol.create("nan?");
 
+	public static final Symbol BIT_AND = Symbol.create("bit-and");
+	public static final Symbol BIT_OR = Symbol.create("bit-or");
+	public static final Symbol BIT_XOR = Symbol.create("bit-xor");
+	public static final Symbol BIT_NOT = Symbol.create("bit-not");
 
 
 }

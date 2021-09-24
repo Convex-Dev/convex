@@ -157,7 +157,44 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(byte)"));
 		assertArityError(step("(byte nil nil)")); // arity before cast
 	}
+	
+	@Test
+	public void testBitAnd() {
+		assertCVMEquals(0x0f000f000f000f00l, eval("(bit-and (long 0xff00ff00ff00ff00) (long 0x0ff00ff00ff00ff0))"));
+		assertCVMEquals(0x0001, eval("(bit-and (long 0xffff) (byte 1))"));
 
+		assertCastError(step("(bit-and nil 1)"));
+		assertCastError(step("(bit-and 20 :foo)"));
+
+		assertArityError(step("(bit-and)"));
+		assertArityError(step("(bit-and 0xFF)")); // arity before cast
+	}
+
+	@Test
+	public void testBitOr() {
+		assertCVMEquals(0xfff0fff0fff0fff0l, eval("(bit-or (long 0xff00ff00ff00ff00) (long 0x0ff00ff00ff00ff0))"));
+		assertCVMEquals(0xff01, eval("(bit-or (long 0xff00) (byte 1))"));
+
+		assertCastError(step("(bit-or nil 1)"));
+		assertCastError(step("(bit-or 20 :foo)"));
+
+		assertArityError(step("(bit-or)"));
+		assertArityError(step("(bit-or 0xFF)")); // arity before cast
+	}
+	
+	@Test
+	public void testBitNot() {
+		assertCVMEquals(0x00ff00ff00ff00ffl, eval("(bit-not (long 0xff00ff00ff00ff00))"));
+		assertCVMEquals(0, eval("(bit-not (long 0xffffffffffffffff))"));
+
+		assertCastError(step("(bit-not nil)"));
+		assertCastError(step("(bit-not :foo)"));
+
+		assertArityError(step("(bit-not)"));
+		assertArityError(step("(bit-not :foo :bar)")); // arity before cast
+	}
+	
+	
 	@Test
 	public void testDoc() {
 		assertEquals(42L, evalL("(do (def foo ^{:doc 42} nil) (doc foo))"));

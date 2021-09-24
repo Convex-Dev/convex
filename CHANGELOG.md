@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Server now generates a keypair automatically if required
 - Added `for-loop` for imperative C-style looping
 - Support casting Longs <-> Blobs
+- Bitwise Long operations bit-and, bit-or, bit-xor and bit-not
 
 
 ## [0.7.0] - 2020-09-08
