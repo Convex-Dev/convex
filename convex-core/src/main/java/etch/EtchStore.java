@@ -16,14 +16,14 @@ import convex.core.util.Utils;
 
 /**
  * Class implementing on-disk memory-mapped storage of Convex data.
- * 
- * 
+ *
+ *
  * "There are only two hard things in Computer Science: cache invalidation and
  * naming things." - Phil Karlton
- * 
+ *
  * Objects are keyed by cryptographic hash. That solves naming. Objects are
  * immutable. That solves cache invalidation.
- * 
+ *
  * Garbage collection is left as an exercise for the reader.
  */
 public class EtchStore extends AStore {
@@ -41,7 +41,7 @@ public class EtchStore extends AStore {
 
 	/**
 	 * Creates an EtchStore using a specified file.
-	 * 
+	 *
 	 * @param file File to use for storage. Will be created it it does not already
 	 *             exist.
 	 * @return EtchStore instance
@@ -54,7 +54,7 @@ public class EtchStore extends AStore {
 
 	/**
 	 * Create an Etch store using a new temporary file with the given prefix
-	 * 
+	 *
 	 * @param prefix String prefix for temporary file
 	 * @return New EtchStore instance
 	 */
@@ -69,7 +69,7 @@ public class EtchStore extends AStore {
 
 	/**
 	 * Create an Etch store using a new temporary file with a generated prefix
-	 * 
+	 *
 	 * @return New EtchStore instance
 	 */
 	public static EtchStore createTemp() {
@@ -149,7 +149,7 @@ public class EtchStore extends AStore {
 				log.trace( "Etch persisting at status=" + requiredStatus + " hash = 0x"
 						+ fHash.toHexString() + " ref of class " + Utils.getClassName(cell) + " with store " + this);
 			}
-			
+
 			Ref<ACell> result;
 			try {
 				// ensure status is set when we write to store
@@ -175,7 +175,7 @@ public class EtchStore extends AStore {
 
 	/**
 	 * Gets the database file name for this EtchStore
-	 * 
+	 *
 	 * @return File name as a String
 	 */
 	public String getFileName() {
@@ -185,7 +185,7 @@ public class EtchStore extends AStore {
 	public void close() {
 		etch.close();
 	}
-	
+
 	/**
 	 * Ensure the store is fully persisted to disk
 	 * @throws IOException If an IO error occurs
