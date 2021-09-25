@@ -80,6 +80,10 @@ public class Etch {
 	private static final int SIZE_HEADER_FILESIZE=8;
 	private static final int SIZE_HEADER_ROOT=32;
 
+	/**
+	 * Marker to place at the end of the last data record. This will be overwrittern by the
+	 * next data record
+	 */
 	private static final byte DATA_END_MARKER = (byte) 0xFE;
 	/**
 	 * Length of header, including:
