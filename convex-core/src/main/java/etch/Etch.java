@@ -612,6 +612,7 @@ public class Etch {
 		Utils.writeLong(temp, ix,dataPointer); // single node
 		MappedByteBuffer mbb=seekMap(position);
 		mbb.put(temp); // write full index block
+		// set the datalength to the last available byte in the file
 		setDataLength(position+INDEX_BLOCK_SIZE);
 		return position;
 	}
@@ -821,6 +822,7 @@ public class Etch {
 		MappedByteBuffer mbb=seekMap(position);
 		Arrays.fill(temp,(byte)0);
 		mbb.put(temp);
+		// set the datalength to the last available byte in the file
 		setDataLength(position+INDEX_BLOCK_SIZE);
 		return position;
 	}
@@ -872,6 +874,7 @@ public class Etch {
 		// append blob value
 		mbb.put(encoding.getInternalArray(),encoding.getInternalOffset(),length);
 
+		// set the datalength to the last available byte in the file
 		setDataLength(position+KEY_SIZE+LABEL_SIZE+LENGTH_SIZE+length);
 
 		// return file position for added data
