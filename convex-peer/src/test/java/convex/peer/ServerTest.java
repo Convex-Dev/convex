@@ -228,6 +228,13 @@ public class ServerTest {
 			assertEquals(h,ab.getHash());
 		}
 	}
+	
+	@Test
+	public void testQueryStrings() throws TimeoutException, IOException {
+		Convex convex=network.CONVEX;
+		assertEquals(convex.getAddress(),convex.querySync("*address*").getValue());
+		assertEquals(CVMLong.ONE,convex.querySync("3 2 1").getValue());
+	}
 
 	@Test
 	public void testAcquireState() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {

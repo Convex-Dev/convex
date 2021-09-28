@@ -19,6 +19,7 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AList;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -370,6 +371,47 @@ public class Convex {
 		SignedData<ATransaction> signed = keyPair.signData(transaction);
 		return transact(signed);
 	}
+	
+	/**
+	 * Executes a transaction, compiling the given source code as an Invoke.
+	 *
+	 * @param code Code to execute
+	 * @return A Future for the result of the transaction
+	 * @throws IOException If the connection is broken, or the send buffer is full
+	 */
+	public synchronized CompletableFuture<Result> transact(String code) throws IOException {
+		ATransaction trans = buildTransaction(code);
+		return transact(trans);
+	}
+
+	private ATransaction buildTransaction(String code) {
+		ACell form = buildCodeForm(code);
+		return Invoke.create(getAddress(), getIncrementedSequence(), form);
+	}
+
+	private ACell buildCodeForm(String code) {
+		AList<ACell> forms=Reader.readAll(code);
+		ACell form;
+		if (forms.count()==1) {
+			form = forms.get(0);
+		} else {
+			form = forms.cons(Symbols.DO);
+		}
+		return form;
+	}
+	
+	/**
+	 * Executes a transaction, compiling the given source code as an Invoke.
+	 *
+	 * @param code Code to execute
+	 * @return A Future for the result of the transaction
+	 * @throws IOException If the connection is broken, or the send buffer is full
+	 * @throws TimeoutException If the transaction times out
+	 */
+	public synchronized Result transactSync(String code) throws IOException, TimeoutException {
+		ATransaction trans = buildTransaction(code);
+		return transactSync(trans);
+	}
 
 	/**
 	 * Submits a signed transaction to the Convex network, returning a future once
@@ -529,6 +571,19 @@ public class Convex {
 	 */
 	public Future<Result> query(ACell query) throws IOException {
 		return query(query, getAddress());
+	}
+	
+	/**
+	 * Submits a query to the Convex network, returning a Future once the query has
+	 * been successfully queued.
+	 *
+	 * @param query Query to execute, as String containing one or more forms
+	 * @return A Future for the result of the query
+	 * @throws IOException If the connection is broken, or the send buffer is full
+	 */
+	public Future<Result> query(String query) throws IOException {
+		ACell form=buildCodeForm(query);
+		return query(form, getAddress());
 	}
 
 	/**
@@ -723,6 +778,20 @@ public class Convex {
 	 */
 	public Result querySync(ACell query) throws TimeoutException, IOException {
 		return querySync(query, getAddress());
+	}
+	
+
+	/**
+	 * Executes a query synchronously and waits for the Result
+	 * 
+	 * @param query Query to execute, as a String that contains one or more readable forms. Multiple forms will be wrapped in a `do` block
+	 * @return Result of synchronous query
+	 * @throws TimeoutException If the synchronous request timed out
+	 * @throws IOException      In case of network error
+	 */
+	public Result querySync(String query) throws TimeoutException, IOException {
+		ACell form=buildCodeForm(query);
+		return querySync(form, getAddress());
 	}
 
 	/**
