@@ -44,6 +44,7 @@ The repository also contains core "on-chain" libraries providing key full-stack 
 | `convex-cli` | Command Line Tools | [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-cli.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex) | [![javadoc](https://javadoc.io/badge2/world.convex/convex-cli/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-cli) |
 | `convex-gui` | GUI Peer Manager Interface | [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-gui.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex) | [![javadoc](https://javadoc.io/badge2/world.convex/convex-gui/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-gui) |
 
+For making use of Convex data structures, CVM execution etc. locally you probably just need `convex-core`. If you want to run a Peer or talk to a Peer over the network, then you will need `convex-peer` as a dependency. The other modules are mainly intended to run as standalone applications.
 
 ## Key features
 
