@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bitwise Long operations bit-and, bit-or, bit-xor and bit-not
 - Convenience overloads for Convex client API query and transact with String values
 
+## Fixed
+- Fix for Etch data length persistent issue
+
 
 ## [0.7.0] - 2021-09-08
 ### Added
