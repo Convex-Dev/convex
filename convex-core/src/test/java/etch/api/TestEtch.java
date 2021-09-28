@@ -78,18 +78,23 @@ public class TestEtch {
 		Etch etch = store.getEtch();
 
 		// this gets the data saved over 1GB
-		int COUNT = 6120700;
+		// int COUNT = 6120700;
+		int COUNT=10000;
 		Random random = new Random();
 		for (int i = 0; i < COUNT; i++) {
-			AVector<CVMLong> v=Vectors.of(random.nextLong());
-			Hash key = v.getHash();
-			Ref<ACell> r=v.getRef();
-
-			assertNull(etch.read(key));
-			// write the Ref
-			Ref<ACell> r2=etch.write(key, r);
-			assertEquals(key,r2.getHash());
-			// System.out.println(i + " " +  COUNT);
+			doStoreWrite(etch, random);
 		}
+	}
+
+	private void doStoreWrite(Etch etch, Random random) throws IOException {
+		AVector<CVMLong> v=Vectors.of(random.nextLong());
+		Hash key = v.getHash();
+		Ref<ACell> r=v.getRef();
+
+		assertNull(etch.read(key));
+		// write the Ref
+		Ref<ACell> r2=etch.write(key, r);
+		assertEquals(key,r2.getHash());
+		// System.out.println(i + " " +  COUNT);
 	}
 }
