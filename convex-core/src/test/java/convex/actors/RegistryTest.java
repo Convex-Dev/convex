@@ -62,6 +62,10 @@ public class RegistryTest extends ACVMTest {
 
 		ctx=step(ctx,"(call *registry* (cns-update 'convex.test.foo "+badAddr+"))");
 		assertNobodyError(ctx);
+		
+		// Should fail, not a Symbol
+		ctx=step(ctx,"(call *registry* (cns-update \"convex.test.foo\" #1))");
+		assertArgumentError(ctx);
 
 		final Address realAddr=Address.create(1); // Init address, FWIW
 		ctx=step(ctx,"(call *registry* (cns-update 'convex.test.foo "+realAddr+"))");

@@ -28,7 +28,11 @@ public class Helpers {
 	 */
 	public static String expandTilde(String path) {
 		if (path!=null) {
-			return path.replaceFirst("^~", System.getProperty("user.home"));
+			String userHome=System.getProperty("user.home");
+			String separator=File.separator;
+			String regex = (separator.equals("\\")) ? "\\\\" : "/";
+			userHome=userHome.replaceAll(regex, "/");
+			return path.replaceFirst("^~", userHome);
 		}
 		return null;
 	}

@@ -690,3 +690,15 @@
 
   `(undef* ~(list 'quote
                   sym)))
+
+(defmacro for-loop 
+   ^{:doc {:description "Executes a code body repeatedy while a condition is true. At the first iteration, `sym` is locally bound to the `init` value. For each subsequent iteration, sym is bound to the result of `change`. The result it the result of the last execution of `body`, or `nil` if no iterations were made."
+          :examples    [{:code "(for-loop [i 0 (< i 10) (inc i)] i)"}]
+          :signature   [{:params [[sym init condition change] & body]}]}}
+  
+  [[sym init condition change] & body]
+ `(loop [~sym ~init value# nil]
+    (if ~condition
+       (let [new-value# ~(cons 'do body)]
+        (recur ~change new-value#))
+      value#)))

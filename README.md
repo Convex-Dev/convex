@@ -35,6 +35,17 @@ The repository also contains core "on-chain" libraries providing key full-stack 
 - `torus.exchange` - decentralised exchange for trading fungible tokens and currencies
 - Example code and templates for various forms of smart contracts
 
+## Modules
+
+| Name  | Description | Maven | Javadoc |
+| ----- | ----------- | ----- | ------- |
+| `convex-core` | CVM, data structures and consensus | [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-core.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex) | [![javadoc](https://javadoc.io/badge2/world.convex/convex-core/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-core) |
+| `convex-peer` | Peer implementation and networking | [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-peer.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex) | [![javadoc](https://javadoc.io/badge2/world.convex/convex-peer/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-peer) |
+| `convex-cli` | Command Line Tools | [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-cli.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex) | [![javadoc](https://javadoc.io/badge2/world.convex/convex-cli/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-cli) |
+| `convex-gui` | GUI Peer Manager Interface | [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-gui.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex) | [![javadoc](https://javadoc.io/badge2/world.convex/convex-gui/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-gui) |
+
+For making use of Convex data structures, CVM execution etc. locally you probably just need `convex-core`. If you want to run a Peer or talk to a Peer over the network, then you will need `convex-peer` as a dependency. The other modules are mainly intended to run as standalone applications.
+
 ## Key features
 
 * *Virtual Machine* - The Convex Virtual Machine provides a secure execution environment based on the Lambda Calculus and capable of acting as the execution layer for smart contracts and autonomous agents.

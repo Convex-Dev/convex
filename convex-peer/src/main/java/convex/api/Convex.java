@@ -19,6 +19,7 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AList;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -63,7 +64,7 @@ public class Convex {
 
 	private static final Logger log = LoggerFactory.getLogger(Convex.class.getName());
 
-	private long timeout=Constants.DEFAULT_CLIENT_TIMEOUT;
+	private long timeout = Constants.DEFAULT_CLIENT_TIMEOUT;
 
 	/**
 	 * Key pair for this Client
@@ -71,7 +72,7 @@ public class Convex {
 	protected AKeyPair keyPair;
 
 	/**
-	 * Current address for this Client
+	 * Current Address for this Client
 	 */
 	protected Address address;
 
@@ -86,7 +87,8 @@ public class Convex {
 	private boolean autoSequence = true;
 
 	/**
-	 * Sequence number for this client, or null if not yet known
+	 * Sequence number for this client, or null if not yet known. Used to
+	 * number new transactions if not otherwise specified.
 	 */
 	protected Long sequence = null;
 
@@ -99,9 +101,9 @@ public class Convex {
 		@Override
 		protected synchronized void handleResult(long id, Result v) {
 
-			if ((v!=null)&&(ErrorCodes.SEQUENCE.equals(v.getErrorCode()))) {
+			if ((v != null) && (ErrorCodes.SEQUENCE.equals(v.getErrorCode()))) {
 				// We probably got a wrong sequence number. Kill the stored value.
-				sequence=null;
+				sequence = null;
 			}
 
 			// TODO: maybe extract method?
@@ -110,11 +112,9 @@ public class Convex {
 				if (cf != null) {
 					awaiting.remove(id);
 					cf.complete(v);
-					log.debug(
-							"Completed Result received for message ID: {}", id);
+					log.debug("Completed Result received for message ID: {}", id);
 				} else {
-					log.warn(
-							"Ignored Result received for unexpected message ID: {}", id);
+					log.warn("Ignored Result received for unexpected message ID: {}", id);
 				}
 			}
 		}
@@ -142,13 +142,14 @@ public class Convex {
 
 	/**
 	 * Creates an anonymous connection to a Peer, suitable for queries
+	 * 
 	 * @param hostAddress Address of Peer
 	 * @return New Convex client instance
-	 * @throws IOException If IO Error occurs
+	 * @throws IOException      If IO Error occurs
 	 * @throws TimeoutException If connection attempt times out
 	 */
 	public static Convex connect(InetSocketAddress hostAddress) throws IOException, TimeoutException {
-		return connect(hostAddress,(Address)null, (AKeyPair)null);
+		return connect(hostAddress, (Address) null, (AKeyPair) null);
 	}
 
 	/**
@@ -156,13 +157,14 @@ public class Convex {
 	 * key pair
 	 *
 	 * @param peerAddress Address of Peer
-	 * @param address Address of Account to use for Client
+	 * @param address     Address of Account to use for Client
 	 * @param keyPair     Key pair to use for client transactions
 	 * @return New Convex client instance
-	 * @throws IOException If connection fails
+	 * @throws IOException      If connection fails
 	 * @throws TimeoutException If connection attempt times out
 	 */
-	public static Convex connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair) throws IOException, TimeoutException {
+	public static Convex connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair)
+			throws IOException, TimeoutException {
 		return Convex.connect(peerAddress, address, keyPair, Stores.current());
 	}
 
@@ -171,14 +173,15 @@ public class Convex {
 	 * key pair and using a given store
 	 *
 	 * @param peerAddress Address of Peer
-	 * @param address Address of Account to use for Client
+	 * @param address     Address of Account to use for Client
 	 * @param keyPair     Key pair to use for client transactions
-	 * @param store   Store to use for this connection
+	 * @param store       Store to use for this connection
 	 * @return New Convex client instance
-	 * @throws IOException If connection fails
+	 * @throws IOException      If connection fails
 	 * @throws TimeoutException If connection attempt times out
 	 */
-	public static Convex connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair, AStore store) throws IOException, TimeoutException {
+	public static Convex connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair, AStore store)
+			throws IOException, TimeoutException {
 		Convex convex = new Convex(address, keyPair);
 		convex.connectToPeer(peerAddress, store);
 		return convex;
@@ -191,7 +194,8 @@ public class Convex {
 	 * @param address Address to use
 	 */
 	public synchronized void setAddress(Address address) {
-		if (this.address == address) return;
+		if (this.address == address)
+			return;
 		this.address = address;
 		// clear sequence, since we don't know the new account sequence number yet
 		sequence = null;
@@ -237,9 +241,11 @@ public class Convex {
 			try {
 				Future<Result> f = query(Special.forSymbol(Symbols.STAR_SEQUENCE));
 				Result r = f.get();
-				if (r.isError()) throw new Error("Error querying *sequence*: " + r.getErrorCode() + " " + r.getValue());
-				ACell result=r.getValue();
-				if (!(result instanceof CVMLong)) throw new Error("*sequence* query did not return Long, got: "+result);
+				if (r.isError())
+					throw new Error("Error querying *sequence*: " + r.getErrorCode() + " " + r.getValue());
+				ACell result = r.getValue();
+				if (!(result instanceof CVMLong))
+					throw new Error("*sequence* query did not return Long, got: " + result);
 				sequence = RT.jvm(result);
 			} catch (IOException | InterruptedException | ExecutionException e) {
 				throw new Error("Error trying to get sequence number", e);
@@ -278,12 +284,13 @@ public class Convex {
 	 * @param publicKey Public key to set for the new account
 	 * @return Address of account created
 	 * @throws TimeoutException If attempt times out
-	 * @throws IOException If IO error occurs
+	 * @throws IOException      If IO error occurs
 	 */
 	public Address createAccountSync(AccountKey publicKey) throws TimeoutException, IOException {
 		Invoke trans = Invoke.create(address, 0, "(create-account 0x" + publicKey.toHexString() + ")");
 		Result r = transactSync(trans);
-		if (r.isError()) throw new Error("Error creating account: " + r.getErrorCode()+ " "+r.getValue());
+		if (r.isError())
+			throw new Error("Error creating account: " + r.getErrorCode() + " " + r.getValue());
 		return (Address) r.getValue();
 	}
 
@@ -293,12 +300,12 @@ public class Convex {
 	 * @param publicKey Public key to set for the new account
 	 * @return Address of account created
 	 * @throws TimeoutException If attempt times out
-	 * @throws IOException If IO error occurs
+	 * @throws IOException      If IO error occurs
 	 */
 	public CompletableFuture<Address> createAccount(AccountKey publicKey) throws TimeoutException, IOException {
 		Invoke trans = Invoke.create(address, 0, "(create-account 0x" + publicKey.toHexString() + ")");
 		CompletableFuture<Result> fr = transact(trans);
-		return fr.thenApply(r->r.getValue());
+		return fr.thenApply(r -> r.getValue());
 	}
 
 	/**
@@ -364,6 +371,47 @@ public class Convex {
 		SignedData<ATransaction> signed = keyPair.signData(transaction);
 		return transact(signed);
 	}
+	
+	/**
+	 * Executes a transaction, compiling the given source code as an Invoke.
+	 *
+	 * @param code Code to execute
+	 * @return A Future for the result of the transaction
+	 * @throws IOException If the connection is broken, or the send buffer is full
+	 */
+	public synchronized CompletableFuture<Result> transact(String code) throws IOException {
+		ATransaction trans = buildTransaction(code);
+		return transact(trans);
+	}
+
+	private ATransaction buildTransaction(String code) {
+		ACell form = buildCodeForm(code);
+		return Invoke.create(getAddress(), getIncrementedSequence(), form);
+	}
+
+	private ACell buildCodeForm(String code) {
+		AList<ACell> forms=Reader.readAll(code);
+		ACell form;
+		if (forms.count()==1) {
+			form = forms.get(0);
+		} else {
+			form = forms.cons(Symbols.DO);
+		}
+		return form;
+	}
+	
+	/**
+	 * Executes a transaction, compiling the given source code as an Invoke.
+	 *
+	 * @param code Code to execute
+	 * @return A Future for the result of the transaction
+	 * @throws IOException If the connection is broken, or the send buffer is full
+	 * @throws TimeoutException If the transaction times out
+	 */
+	public synchronized Result transactSync(String code) throws IOException, TimeoutException {
+		ATransaction trans = buildTransaction(code);
+		return transactSync(trans);
+	}
 
 	/**
 	 * Submits a signed transaction to the Convex network, returning a future once
@@ -381,7 +429,7 @@ public class Convex {
 			// loop until request is queued
 			while (id < 0) {
 				id = connection.sendTransaction(signed);
-				if (id<0) {
+				if (id < 0) {
 					try {
 						Thread.sleep(10);
 					} catch (InterruptedException e) {
@@ -391,10 +439,10 @@ public class Convex {
 			}
 
 			// Store future for completion by result message
-			cf =  awaitResult(id);
+			cf = awaitResult(id);
 		}
 
-		log.debug("Sent transaction with message ID: {} awaiting count = {}",id,awaiting.size());
+		log.debug("Sent transaction with message ID: {} awaiting count = {}", id, awaiting.size());
 		return cf;
 	}
 
@@ -506,7 +554,7 @@ public class Convex {
 		long now = Utils.getTimeMillis();
 		timeout = Math.max(0L, timeout - (now - start));
 		try {
-			result=cf.get(timeout,TimeUnit.MILLISECONDS);
+			result = cf.get(timeout, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException | ExecutionException e) {
 			throw new Error("Not possible? Since there is no Thread for the future....", e);
 		}
@@ -523,6 +571,19 @@ public class Convex {
 	 */
 	public Future<Result> query(ACell query) throws IOException {
 		return query(query, getAddress());
+	}
+	
+	/**
+	 * Submits a query to the Convex network, returning a Future once the query has
+	 * been successfully queued.
+	 *
+	 * @param query Query to execute, as String containing one or more forms
+	 * @return A Future for the result of the query
+	 * @throws IOException If the connection is broken, or the send buffer is full
+	 */
+	public Future<Result> query(String query) throws IOException {
+		ACell form=buildCodeForm(query);
+		return query(form, getAddress());
 	}
 
 	/**
@@ -541,7 +602,7 @@ public class Convex {
 	 * Attempts to acquire a complete persistent data structure for the given hash
 	 * from the remote peer. Uses the store provided as a destination.
 	 *
-	 * @param hash Hash of value to acquire.
+	 * @param hash  Hash of value to acquire.
 	 * @param store Store to acquire the persistent data to.
 	 *
 	 * @return Future for the Cell being acquired
@@ -555,6 +616,8 @@ public class Convex {
 				try {
 					Ref<T> ref = store.refForHash(hash);
 					HashSet<Hash> missingSet = new HashSet<>();
+
+					// Loop until future is complete or cancelled
 					while (!f.isDone()) {
 						missingSet.clear();
 
@@ -570,7 +633,7 @@ public class Convex {
 						}
 						for (Hash h : missingSet) {
 							// send missing data requests until we fill pipeline
-							log.debug( "Request missing data: {}" , h);
+							log.debug("Request missing data: {}", h);
 							boolean sent = connection.sendMissingData(h);
 							if (!sent) {
 								log.debug("Send Queue full!");
@@ -607,17 +670,18 @@ public class Convex {
 	}
 
 	/**
-	 * Request status using a sync operation. This request will automatically get any missing data with the status request
+	 * Request status using a sync operation. This request will automatically get
+	 * any missing data with the status request
 	 *
 	 * @param timeoutMillis Milliseconds to wait for request timeout
 	 * @return Status Vector from target Peer
 	 *
-	 * @throws IOException If an IO Error occurs
+	 * @throws IOException      If an IO Error occurs
 	 * @throws TimeoutException If operation times out
 	 *
 	 */
 	public Result requestStatusSync(long timeoutMillis) throws IOException, TimeoutException {
-		Future<Result> statusFuture=requestStatus();
+		Future<Result> statusFuture = requestStatus();
 		try {
 			return statusFuture.get(timeoutMillis, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException | ExecutionException e) {
@@ -626,8 +690,8 @@ public class Convex {
 	}
 
 	/**
-	 * Submits a status request to the Convex network peer, returning a Future once the
-	 * request has been successfully queued.
+	 * Submits a status request to the Convex network peer, returning a Future once
+	 * the request has been successfully queued.
 	 *
 	 * @return A Future for the result of the requestStatus
 	 * @throws IOException If the connection is broken, or the send buffer is full
@@ -648,20 +712,21 @@ public class Convex {
 	}
 
 	/**
-	 * Method to await a complete result. Should be called with lock on `awaiting` map
-	 * @param <T>
-	 * @param id
+	 * Method to start waiting for a complete result. Should be called with lock on
+	 * `awaiting` map
+	 * 
+	 * @param id ID of result message to await
 	 * @return
 	 */
 	protected CompletableFuture<Result> awaitResult(long id) {
 		CompletableFuture<Result> cf = new CompletableFuture<Result>();
-		awaiting.put(id,cf);
+		awaiting.put(id, cf);
 		return cf;
 	}
 
 	/**
-	 * Request a challenge. This is request is made by any peer that needs to find out
-	 * if another peer can be trusted.
+	 * Request a challenge. This is request is made by any peer that needs to find
+	 * out if another peer can be trusted.
 	 *
 	 * @param data Signed data to send to the peer for the challenge.
 	 *
@@ -705,13 +770,28 @@ public class Convex {
 
 	/**
 	 * Executes a query synchronously and waits for the Result
+	 * 
 	 * @param query Query to execute. Map be a form or Op
 	 * @return Result of synchronous query
 	 * @throws TimeoutException If the synchronous request timed out
-	 * @throws IOException In case of network error
+	 * @throws IOException      In case of network error
 	 */
 	public Result querySync(ACell query) throws TimeoutException, IOException {
 		return querySync(query, getAddress());
+	}
+	
+
+	/**
+	 * Executes a query synchronously and waits for the Result
+	 * 
+	 * @param query Query to execute, as a String that contains one or more readable forms. Multiple forms will be wrapped in a `do` block
+	 * @return Result of synchronous query
+	 * @throws TimeoutException If the synchronous request timed out
+	 * @throws IOException      In case of network error
+	 */
+	public Result querySync(String query) throws TimeoutException, IOException {
+		ACell form=buildCodeForm(query);
+		return querySync(form, getAddress());
 	}
 
 	/**
@@ -722,7 +802,7 @@ public class Convex {
 	 * @param query         Query to execute, as a Form or Op
 	 * @return Result of query
 	 * @throws TimeoutException If the synchronous request timed out
-	 * @throws IOException In case of network error
+	 * @throws IOException      In case of network error
 	 */
 	public Result querySync(ACell query, long timeoutMillis) throws IOException, TimeoutException {
 		return querySync(query, getAddress(), timeoutMillis);
@@ -735,7 +815,7 @@ public class Convex {
 	 * @param query   Query to execute, as a Form or Op
 	 * @return Result of query
 	 * @throws TimeoutException If the synchronous request timed out
-	 * @throws IOException In case of network error
+	 * @throws IOException      In case of network error
 	 */
 	public Result querySync(ACell query, Address address) throws IOException, TimeoutException {
 		return querySync(query, address, timeout);
@@ -750,7 +830,7 @@ public class Convex {
 	 * @param query         Query to execute, as a Form or Op
 	 * @return Result of query
 	 * @throws TimeoutException If the synchronous request timed out
-	 * @throws IOException In case of network error
+	 * @throws IOException      In case of network error
 	 */
 	public Result querySync(ACell query, Address address, long timeoutMillis) throws TimeoutException, IOException {
 		Future<Result> cf = query(query, address);
@@ -787,7 +867,8 @@ public class Convex {
 	 * @param conn Connection value to use
 	 */
 	private void setConnection(Connection conn) {
-		if (this.connection == conn) return;
+		if (this.connection == conn)
+			return;
 		close();
 		this.connection = conn;
 	}
@@ -832,7 +913,8 @@ public class Convex {
 		try {
 			Future<Result> future = query(Reader.read("(balance " + address.toString() + ")"));
 			Result result = future.get(timeout, TimeUnit.MILLISECONDS);
-			if (result.isError()) throw new Error(result.toString());
+			if (result.isError())
+				throw new Error(result.toString());
 			CVMLong bal = (CVMLong) result.getValue();
 			return bal.longValue();
 		} catch (ExecutionException | InterruptedException | TimeoutException ex) {
@@ -842,40 +924,44 @@ public class Convex {
 
 	/**
 	 * Connect to a local Server, using the Peer's address and keypair
+	 * 
 	 * @param server Server to connect to
 	 * @return New Client Connection
 	 * @throws TimeoutException If connection attempt times out
-	 * @throws IOException If IO error occurs
+	 * @throws IOException      If IO error occurs
 	 */
 	public static Convex connect(Server server) throws IOException, TimeoutException {
-		return connect(server.getHostAddress(),server.getPeerController(),server.getKeyPair());
+		return connect(server.getHostAddress(), server.getPeerController(), server.getKeyPair());
 	}
 
 	/**
 	 * Wraps a connection as a Convex client instance
+	 * 
 	 * @param c Connection to wrap
 	 * @return New Convex client instance using underlying connection
 	 */
 	public static Convex wrap(Connection c) {
-		Convex convex=new Convex(null,null);
+		Convex convex = new Convex(null, null);
 		convex.setConnection(c);
 		return convex;
 	}
 
 	/**
 	 * Gets the consensus state from the remote Peer
+	 * 
 	 * @return Future for consensus state
 	 * @throws TimeoutException If initial status request times out
 	 */
 	public Future<State> acquireState() throws TimeoutException {
 		try {
-			Future<Result> sF=requestStatus();
-			AVector<ACell> status=sF.get(timeout, TimeUnit.MILLISECONDS).getValue();
-			Hash stateHash=RT.ensureHash(status.get(4));
+			Future<Result> sF = requestStatus();
+			AVector<ACell> status = sF.get(timeout, TimeUnit.MILLISECONDS).getValue();
+			Hash stateHash = RT.ensureHash(status.get(4));
 
-			if (stateHash==null) throw new Error("Bad status response from Peer");
+			if (stateHash == null)
+				throw new Error("Bad status response from Peer");
 			return acquire(stateHash);
-		} catch (InterruptedException|ExecutionException|IOException e) {
+		} catch (InterruptedException | ExecutionException | IOException e) {
 			throw Utils.sneakyThrow(e);
 		}
 	}
@@ -884,7 +970,7 @@ public class Convex {
 	 * Close without affecting the connection
 	 */
 	public void closeButMaintainConnection() {
-		this.connection=null;
+		this.connection = null;
 		close();
 	}
 

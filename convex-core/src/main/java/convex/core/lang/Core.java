@@ -1814,6 +1814,75 @@ public class Core {
 			return context.withResult(Juice.SIMPLE_FN, result);
 		}
 	});
+	
+	public static final CoreFn<CVMLong> BIT_AND = reg(new CoreFn<>(Symbols.BIT_AND) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+
+			CVMLong a = RT.ensureLong(args[0]);
+			if (a==null) return context.withCastError(0,args,Types.LONG);
+
+			CVMLong b = RT.ensureLong(args[1]);
+			if (b==null) return context.withCastError(1,args,Types.LONG);
+			
+			CVMLong result=CVMLong.create(a.longValue()&b.longValue());
+
+			return context.withResult(Juice.ARITHMETIC, result);
+		}
+	});
+	
+	public static final CoreFn<CVMLong> BIT_XOR = reg(new CoreFn<>(Symbols.BIT_XOR) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+
+			CVMLong a = RT.ensureLong(args[0]);
+			if (a==null) return context.withCastError(0,args,Types.LONG);
+
+			CVMLong b = RT.ensureLong(args[1]);
+			if (b==null) return context.withCastError(1,args,Types.LONG);
+			
+			CVMLong result=CVMLong.create(a.longValue()^b.longValue());
+
+			return context.withResult(Juice.ARITHMETIC, result);
+		}
+	});
+	
+	public static final CoreFn<CVMLong> BIT_OR = reg(new CoreFn<>(Symbols.BIT_OR) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+
+			CVMLong a = RT.ensureLong(args[0]);
+			if (a==null) return context.withCastError(0,args,Types.LONG);
+
+			CVMLong b = RT.ensureLong(args[1]);
+			if (b==null) return context.withCastError(1,args,Types.LONG);
+			
+			CVMLong result=CVMLong.create(a.longValue()|b.longValue());
+
+			return context.withResult(Juice.ARITHMETIC, result);
+		}
+	});
+	
+	public static final CoreFn<CVMLong> BIT_NOT = reg(new CoreFn<>(Symbols.BIT_NOT) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+
+			CVMLong a = RT.ensureLong(args[0]);
+			if (a==null) return context.withCastError(0,args,Types.LONG);
+			
+			CVMLong result=CVMLong.create(~a.longValue());
+
+			return context.withResult(Juice.ARITHMETIC, result);
+		}
+	});
 
 	public static final CoreFn<Hash> HASH = reg(new CoreFn<>(Symbols.HASH) {
 		@SuppressWarnings("unchecked")

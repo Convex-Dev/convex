@@ -247,7 +247,7 @@
 
 
  assoc-in
- {:doc {:description "Associates a value entries into an nested associative data structure, as if using `assoc` at each level."
+ {:doc {:description "Associates a value into a nested associative data structure, as if using `assoc` at each level."
         :errors      {:ARGUMENT "If one or more of the supplied keys is invalid for the data structure."
                       :CAST     "If the first argument is not a valid data structure, or the second argument is not a a sequential data structure."}
         :examples    [{:code "(assoc-in {1 [1 2 3]} [1 2] 4)"}]
@@ -255,15 +255,44 @@
                        :return DataStructure}]}}
 
  balance
- {:doc {:description "Returns the coin balance of the specified account, which must be an `address`. Returns nil if and only the account does not exist."
+ {:doc {:description "Returns the Convex Coin balance of the specified account, which must be an `Address`. Returns nil if and only the account does not exist."
         :errors      {:CAST "If the argument is not a valid address."}
         :examples    [{:code "(balance *caller*)"}]
         :signature   [{:params [address]
                        :return Long}]}}
 
+ bit-and
+ {:doc {:description "Returns the bitwise AND of two Long values."
+        :errors      {:CAST "If an argument is not implicitly castable to Long."}
+        :examples    [{:code "(bit-and 7 12)"}]
+        :signature   [{:params [a b]
+                       :return Long}]}}
+ 
+  bit-not
+ {:doc {:description "Returns the bitwise NOT of a Long value."
+        :errors      {:CAST "If the argument is not implicitly castable to Long."}
+        :examples    [{:code "(bit-not (long 0xfffffffffffffff0))"}]
+        :signature   [{:params [a b]
+                       :return Long}]}}
+ 
+ bit-or
+ {:doc {:description "Returns the bitwise OR of two Long values."
+        :errors      {:CAST "If an argument is not implicitly castable to Long."}
+        :examples    [{:code "(bit-or 7 12)"}]
+        :signature   [{:params [a b]
+                       :return Long}]}}
+ 
+ bit-xor
+ {:doc {:description "Returns the bitwise XOR of two Long values."
+        :errors      {:CAST "If an argument is not implicitly castable to Long."}
+        :examples    [{:code "(bit-xor 7 12)"}]
+        :signature   [{:params [a b]
+                       :return Long}]}}
+ 
+
 
  blob
- {:doc {:description "Casts the argument to a blob. Arugment can be an `address`, a hex string, or another `blob`."
+ {:doc {:description "Casts the argument to a Blob. Arugment can be an Address, a hex String, a Long value, or another Blob."
         :errors      {:CAST "If the argument is not castable to a blob."}
         :examples    [{:code "(blob \"1234abcd\")"}]
         :signature   [{:params [address]
@@ -271,7 +300,7 @@
 
 
  blob-map
- {:doc {:description ["Creates a blob map. Blob maps support blob types as keys only (see `blob`)."
+ {:doc {:description ["Creates a Blob Map. Blob Maps are specialised maps that support Blob types as keys only (see `blob`)."
                       "Optional arguments must be pairs of blob keys and values to be included in the blob map."]
         :errors      {:ARGUMENT "If any of the keys supplied is not castable to a blob."
                       :ARITY    "If there is not an even number of arguments (key and value pairs)."}
@@ -281,21 +310,21 @@
 
 
  blob?
- {:doc {:description "Returns true if the argument is a `Blob`, false otherwise."
+ {:doc {:description "Returns true if the argument is a Blob, false otherwise."
         :examples    [{:code "(blob? 0x1234)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
 
 
  boolean
- {:doc {:description "Casts any value to a `boolean`. Returns false if value is nil or actually `false`, true in any other case."
+ {:doc {:description "Casts any value to a Boolean. Returns false if value is nil or `false`, true in any other case."
         :examples    [{:code "(boolean 123)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
 
 
  boolean?
- {:doc {:description "Returns true if the argument is a boolean (either `true` or `false`)."
+ {:doc {:description "Returns true if the argument is a Boolean (either `true` or `false`). Any other value (including nil) returns false."
         :examples    [{:code "(boolean? false)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
@@ -310,7 +339,7 @@
 
 
  call*
- {:doc {:description ["Like `call` but lower-level. Instead of a form, takes a symbol referring to the function, and then arguments separately."
+ {:doc {:description ["Behaves like `call` but implemented as a function. Instead of a form, takes a symbol referring to the function, and then arguments separately."
                       "Same kind of errors may happen."]
         :errors      {:ARITY    "If the supplied arguments are the wrong arity for the called function."
                       :CAST     "If the address argument is an Address, the offer is not a Long, or the function name is not a Symbol."
@@ -358,7 +387,7 @@
 
 
  compile
- {:doc {:description "Compiles a form, returning an operation. See `eval`."
+ {:doc {:description "Compiles a form, returning an Op. See `eval`."
         :errors      {:COMPILE "If a compiler error occurs."}
         :examples    [{:code "(compile '(fn [x] (* x 2)))"}]
         :signature   [{:params [form]
@@ -384,7 +413,7 @@
                        :return DataStructure}]}}
 
  cons
- {:doc {:description "Constructs a list, by prepending the leading arguments to the last argument. The last argument must be coercable to a sequential data structure."
+ {:doc {:description "Constructs a List, by prepending the leading arguments to the last argument. The last argument must be coercable to a sequential data structure."
         :errors      {:CAST "If the last argument is not a sequence."}
         :examples    [{:code "(cons 1 '(2 3))"}
                       {:code "(cons 1 2 '(3 4))"}]
@@ -399,7 +428,7 @@
 
 
  create-peer
- {:doc {:description "Creates a new peer on the network. The peer must have an account number and sufficient balance to place a stake amount"
+ {:doc {:description "Creates a new peer record for the network. The peer must have an account number and sufficient balance to place a stake amount"
         :errors      {:CAST "If the first argument is not a valid account-key."}
         :examples    [{:code "(create-peer account-key 700000000)"}]
         :signature   [{:params [account-key stake-amount]
@@ -414,8 +443,8 @@
                        :return Long}]}}
 
  dec
- {:doc {:description "Decrements the given `long` by 1."
-        :errors      {:CAST "If the argument is not a long."}
+ {:doc {:description "Decrements the given Long value by 1."
+        :errors      {:CAST "If the argument is not a Long."}
         :examples    [{:code "(dec 10)"}]
         :signature   [{:params [long]
                        :return Long}]}}
@@ -439,7 +468,7 @@
 
 
  difference
- {:doc {:description "Computes the difference of one or more sets. Nil is accepted and treated like an empty set."
+ {:doc {:description "Computes the difference of one or more sets. Nil arguments are treated as an empty set."
         :errors      {:CAST "If any of the arguments is neither a set nor nil."}
         :examples    [{:code "(difference #{1 2} #{2 3})"}]
         :signature   [{:params [set & more]
@@ -447,15 +476,15 @@
 
 
  disj
- {:doc {:description "Removes the specified key(s) from a set. Nil is treated as an empty Set."
+ {:doc {:description "Removes the specified key(s) from a set. Nil is treated as the empty Set."
         :errors      {:CAST "If the first argument is not a set."}
         :examples    [{:code "(disj #{1 2 3} 1)"}]
         :signature   [{:params [coll key]}]}}
 
 
  dissoc
- {:doc {:description "Removes entries with the specified key(s) from a map or blob map."
-        :errors      {:CAST "If the first argument is not a map."}
+ {:doc {:description "Removes entries with the specified key(s) from a Map (including BlobMaps)."
+        :errors      {:CAST "If the first argument is not a Map."}
         :examples    [{:code "(dissoc {1 2 3 4} 3)"}]
         :signature   [{:params [coll & keys]
                        :return Map}]}}
@@ -468,7 +497,7 @@
 
 
  double
- {:doc {:description "Casts any numerical value to a `double`."
+ {:doc {:description "Casts any numerical value to a `Double`."
         :errors    {:CAST "If the argument is not castable to double."}
         :examples  [{:code "(double 3)"}]
         :signature [{:params [x]
@@ -491,7 +520,7 @@
 
 
  encoding
- {:doc {:description ["Returns the byte encoding for a given value as a blob."
+ {:doc {:description ["Returns the byte encoding for a given value as a Blob."
                       "The encoding is the unique canonical binary representation of a value. Encodings may change between Convex versions - it is unwise to rely on the exact representation."]
         :examples    [{:code "(encoding {1 2})"}]
         :signature   [{:params [value]
@@ -714,7 +743,7 @@
 
 
  long?
- {:doc {:description "Returnes true if the argment is a `long` value, false otherwise."
+ {:doc {:description "Returnes true if the argment is a value of Long type, false otherwise."
         :examples    [{:code "(long? 1234)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
@@ -753,7 +782,7 @@
 
 
  map?
- {:doc {:description "Returns true if argument is a map, false otherwise."
+ {:doc {:description "Returns true if argument is a Map, false otherwise."
         :examples    [{:code "(map? {1 2})"}]
         :signature   [{:params [coll]
                        :return Boolean}]}}
