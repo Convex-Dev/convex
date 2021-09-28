@@ -612,7 +612,8 @@ public class Etch {
 		Utils.writeLong(temp, ix,dataPointer); // single node
 		MappedByteBuffer mbb=seekMap(position);
 		mbb.put(temp); // write full index block
-		dataLength=position+INDEX_BLOCK_SIZE;
+		// set the datalength to the last available byte in the file
+		setDataLength(position+INDEX_BLOCK_SIZE);
 		return position;
 	}
 
@@ -821,7 +822,8 @@ public class Etch {
 		MappedByteBuffer mbb=seekMap(position);
 		Arrays.fill(temp,(byte)0);
 		mbb.put(temp);
-		dataLength=position+INDEX_BLOCK_SIZE;
+		// set the datalength to the last available byte in the file
+		setDataLength(position+INDEX_BLOCK_SIZE);
 		return position;
 	}
 
@@ -872,17 +874,26 @@ public class Etch {
 		// append blob value
 		mbb.put(encoding.getInternalArray(),encoding.getInternalOffset(),length);
 
-		// update total data length
-		dataLength=mbb.position();
-
-
-
-		if (dataLength!=position+KEY_SIZE+LABEL_SIZE+LENGTH_SIZE+length) {
-			System.out.println("PANIC!");
-		}
+		// set the datalength to the last available byte in the file
+		setDataLength(position+KEY_SIZE+LABEL_SIZE+LENGTH_SIZE+length);
 
 		// return file position for added data
 		return position;
+	}
+
+	/**
+	 * Sets the total db dataLength. This is the last position in the database
+	 * that new data can be writtern too.
+	 *
+	 * @param value The new data length to be set
+	 *
+	 */
+	private void setDataLength(long value) {
+		// we can never go back! If we do then we will be corrupting the database
+		if (value < dataLength) {
+			throw new Error("PANIC! New data length is less than the old data length");
+		}
+		dataLength = value;
 	}
 
 	public File getFile() {
@@ -906,4 +917,5 @@ public class Etch {
 	public void setStore(EtchStore etchStore) {
 		this.store=etchStore;
 	}
+
 }
