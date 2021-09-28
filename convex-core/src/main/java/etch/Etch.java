@@ -881,6 +881,21 @@ public class Etch {
 		return position;
 	}
 
+	/**
+	 * Sets the total db dataLength. This is the last position in the database
+	 * that new data can be writtern too.
+	 *
+	 * @param value The new data length to be set
+	 *
+	 */
+	private void setDataLength(long value) {
+		// we can never go back! If we do then we will be corrupting the database
+		if (value < dataLength) {
+			throw new Error("PANIC! New data length is less than the old data length");
+		}
+		dataLength = value;
+	}
+
 	public File getFile() {
 		return file;
 	}
@@ -903,11 +918,4 @@ public class Etch {
 		this.store=etchStore;
 	}
 
-	protected void setDataLength(long value) {
-		// we can never go back! If we do then we will be corrupting the database
-		if (value < dataLength) {
-			throw new Error("PANIC! New data length is less than the old data length");
-		}
-		dataLength = value;
-	}
 }
