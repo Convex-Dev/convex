@@ -2,11 +2,11 @@
 
 [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex)
 
-Convex is a decentralised network and execution engine for the Internet of Value.
+Convex is a decentralised network and execution engine for the Internet of Value. It can be seen as an implementation of a "Stateful Internet" where the network itself securely hosts and executes code and data.
 
-It is designed as a full stack solution for decentralised application and economic systems that manage digital assets, where asset ownership is cryptographically secured and can be managed (optionally) with Smart Contracts. It can be considered functionally similar to a decentralised public blockchain, but offers some significant advantages:
+It is designed as a full stack solution for decentralised application and economic systems that manage digital assets, where asset ownership is cryptographically secured and can be managed (optionally) with Smart Contracts. It has some similarities with a typical public blockchain, but offers some significant advantages:
 
-- High transaction throughput (tens of thousands of write transactions per second, potentially scaling to millions)
+- High transaction throughput (tens of thousands of write transactions per second, scaling to millions in the future)
 - Low latency for transaction confirmation (milliseconds for global consensus, depending on network speed)
 - 100% Green - energy efficiency using the the Convergent Proof of Stake consensus algorithm
 - Global State model with immutable data structures and atomic transactions
@@ -65,7 +65,7 @@ The convex Peer Manager (GUI application) can be used to run a local test networ
 
 This can be invoked by running the jar archive directly e.g. with the following command:
 
-`java -jar convex-gui/target/convex-gui-0.7.0.jar`
+`java -jar convex-gui/target/convex-gui-0.7.1.jar`
 
 or you can run this from the command line by using the `local gui` command:
 
