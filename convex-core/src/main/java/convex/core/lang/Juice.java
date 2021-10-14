@@ -13,7 +13,7 @@ public class Juice {
 	 * 
 	 * Very cheap, no allocs / lookup.
 	 */
-	public static final long CONSTANT = 10;
+	public static final long CONSTANT = 5;
 	
 	/**
 	 * Juice required to define a value in the current environment.
@@ -46,13 +46,13 @@ public class Juice {
 	 * 
 	 * Very cheap, no allocs.
 	 */
-	public static final long DO = 10;
+	public static final long DO = 5;
 
 
 	/**
 	 * Juice required to execute a Let block
 	 * 
-	 * Fairly cheap but some parameter munging required. Might revisit binding
+	 * Fairly cheap but some parameter munging required. TODO: revisit binding
 	 * costs?
 	 */
 	public static final long LET = 30;
@@ -103,14 +103,14 @@ public class Juice {
 	 * 
 	 * Pretty cheap.
 	 */
-	public static final long EQUALS = 20;
+	public static final long EQUALS = 5;
 
 	/**
 	 * Juice for numeric comparison
 	 * 
 	 * Pretty cheap. Bit of casting perhaps.
 	 */
-	public static final long NUMERIC_COMPARE = 20;
+	public static final long NUMERIC_COMPARE = 10;
 
 	/**
 	 * Juice for an apply operation
@@ -147,33 +147,34 @@ public class Juice {
 	protected static final long STR = SIMPLE_FN;
 	protected static final long STR_PER_CHAR = 5;
 
-	/**
-	 * Juice for storing a new constant value permanently in on-chain state Charged
-	 * per node stored
-	 */
-	protected static final long STORE = 1000;
-
-	protected static final long FETCH = 100;
-
 	protected static final long ARITHMETIC = SIMPLE_FN;
 
-	protected static final long ADDRESS = 100;
-
-	protected static final long BALANCE = 200;
+	protected static final long ADDRESS = 20;
 
 	/**
-	 * Juice for creation of a blob
+	 * Juice for balance core function. Some lookups required
 	 */
-	protected static final long BLOB = 100;
+	protected static final long BALANCE = 50;
+
+	/**
+	 * Juice for creation of a blob. Fairly cheap but needs per-byte cost
+	 */
+	protected static final long BLOB = 20;
 	protected static final long BLOB_PER_BYTE = 1;
 
+	/**
+	 * Juice for data structure get. Hash lookup possibly required.
+	 */
 	protected static final long GET = 30;
 
-	protected static final long KEYWORD = 50;
+	protected static final long KEYWORD = 20;
 
-	protected static final long SYMBOL = 50;
+	protected static final long SYMBOL = 20;
 
-	public static final long TRANSFER = 100;
+	/**
+	 * Juice for a transfer execution. Some account updates
+	 */
+	public static final long TRANSFER = 200;
 
 	public static final long SIMPLE_MACRO = 200;
 
@@ -236,7 +237,7 @@ public class Juice {
 	 * This makes scheduling a few hours / days ahead cheap but year is quite
 	 * expensive (~87,600). Also places an upper bound on advance schedules.
 	 * 
-	 * TODO: review this
+	 * TODO: review this. Maybe not needed given memory accounting?
 	 */
 	public static final long SCHEDULE_MILLIS_PER_JUICE_UNIT = 360000;
 
@@ -246,14 +247,14 @@ public class Juice {
 	 * 
 	 * Pretty cheap, one alloc and a bit of exceptional value handling.
 	 */
-	public static final long RETURN = 50;
+	public static final long RETURN = 20;
 
 	/**
 	 * Juice cost for accepting an offer of Convex coins.
 	 * 
-	 * We make this a little expensive because it involves updating two separate accounts.
+	 * Define this to be equal to a transfer.
 	 */
-	public static final long ACCEPT = 200;
+	public static final long ACCEPT = TRANSFER;
 
 	/**
 	 * Juice cost for constructing a Syntax Object. Fairly lightweight.
@@ -275,6 +276,9 @@ public class Juice {
 	 */
 	public static final long SET_COMPARE_PER_ELEMENT = 10;
 
+	/**
+	 * Juice to create an account. Some cost for new account data structure entry.
+	 */
 	public static final long CREATE_ACCOUNT = 100;
 
 	public static final long QUERY = Juice.CHEAP_OP;
