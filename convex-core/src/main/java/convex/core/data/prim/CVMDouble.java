@@ -30,6 +30,8 @@ public final class CVMDouble extends APrimitive implements INumeric {
 	}
 
 	public static CVMDouble create(double value) {
+		// We need to use a canonical NaN value (0x7ff8000000000000L);
+		if (Double.isNaN(value)) value=Double.NaN;
 		return new CVMDouble(value);
 	}
 	

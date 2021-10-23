@@ -1388,12 +1388,11 @@ public class CoreTest extends ACVMTest {
 	}
 
 	@Test
-	public void testDoouble() {
+	public void testDouble() {
 		assertEquals(-13.0,evalD("(double -13)"));
-		assertEquals(1.0,evalD("(double true)")); // ?? cast OK?
+		assertEquals(1.0,evalD("(double true)")); // ?? cast risky? see #344
 
 		assertEquals(255.0,evalD("(double (byte -1))")); // byte should be 0-255
-
 
 		assertCastError(step("(double :foo)"));
 
@@ -3737,6 +3736,21 @@ public class CoreTest extends ACVMTest {
 	public void testSpecialState() {
 		assertSame(INITIAL, eval("*state*"));
 		assertSame(INITIAL.getAccounts(), eval("(:accounts *state*)"));
+	}
+	
+	@Test
+	public void testSqrt() {
+		// Implicit double conversions for numeric values only, see #344
+		assertCVMEquals(2.0, eval("(sqrt 4.0)"));
+		assertCVMEquals(2.0, eval("(sqrt 4)"));
+		assertCVMEquals(2.0, eval("(sqrt (byte 4))"));
+		
+		assertCVMEquals(Double.NaN, eval("(sqrt -1)"));
+
+		
+		assertCastError(step("(sqrt :foo)"));
+		assertCastError(step("(sqrt nil)"));
+		assertCastError(step("(sqrt false)"));
 	}
 
 	@Test
