@@ -2,6 +2,7 @@ package etch;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -30,13 +31,40 @@ public class EtchStore extends AStore {
 	private static final Logger log = LoggerFactory.getLogger(EtchStore.class.getName());
 
 	/**
-	 * Etch Storage of persisted Refs for each hash value
+	 * Etch file instance for the current store
 	 */
 	private Etch etch;
+	
+	/**
+	 * Etch file instance for GC destination
+	 */
+	private Etch target;
 
 	public EtchStore(Etch etch) {
 		this.etch = etch;
+		this.target=null;
 		etch.setStore(this);
+	}
+	
+	/**
+	 * Starts a GC cycle. Creates a new Etch file for collection, and directs all new writes to
+	 * the new store
+	 * @throws IOException If an IO exception occurs
+	 */
+	public synchronized void startGC() throws IOException {
+		if (target!=null) throw new Error("Already collecting!");
+		File temp=new File(etch.getFile().getCanonicalPath()+"~");
+		target=Etch.create(temp);
+		
+		// copy across current root hash
+		target.setRootHash(etch.getRootHash());
+	}
+	
+	private Etch getWriteEtch() {
+		if (target!=null) synchronized(this) {
+			if (target!=null) return target;
+		}
+		return etch;
 	}
 
 	/**
@@ -64,6 +92,18 @@ public class EtchStore extends AStore {
 			return new EtchStore(etch);
 		} catch (IOException e) {
 			throw Utils.sneakyThrow(e);
+		}
+	}
+	
+	/**
+	 * Mark GC roots for retention during garbage collection
+	 * @param roots Cell roots to maintain
+	 * @param handler Handler to call for each Cell marked
+	 */
+	public void mark(Collection<ACell>  roots, Consumer<Ref<ACell>> handler) {
+		for (ACell cell: roots) {
+			if (cell==null) continue;
+			cell.mark(handler);
 		}
 	}
 
@@ -192,6 +232,8 @@ public class EtchStore extends AStore {
 	 */
 	public void flush() throws IOException  {
 		etch.flush();
+		Etch target=this.target;
+		if (target!=null) target.flush();
 	}
 
 	public File getFile() {
@@ -200,12 +242,12 @@ public class EtchStore extends AStore {
 
 	@Override
 	public Hash getRootHash() throws IOException {
-		return etch.getRootHash();
+		return getWriteEtch().getRootHash();
 	}
 
 	@Override
 	public void setRootHash(Hash h) throws IOException {
-		etch.setRootHash(h);
+		getWriteEtch().setRootHash(h);
 	}
 
 	/**

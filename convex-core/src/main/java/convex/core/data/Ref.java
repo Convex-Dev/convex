@@ -71,9 +71,15 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	
 	/**
 	 * Ref status indicating the Ref is an internal embedded value that can be
-	 * encoded and used independency of any given store state
+	 * encoded and used independently of any given store state
 	 */
 	public static final int INTERNAL = 5;
+	
+	/**
+	 * Ref status indicating the value is marked in the store for GC copying. Marked values
+	 * are retained until next GC cycle
+	 */
+	public static final int MARKED = 15;
 
 	/**
 	 * Maximum Ref status
@@ -385,6 +391,19 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public boolean isPersisted() {
 		return getStatus() >= PERSISTED;
 	}
+	
+	/**
+	 * Return true if this Ref's status indicates it has definitely been marked within storage
+	 * 
+	 * May return false negatives, e.g. the object could be marked in the store but this
+	 * Ref instance still has a status of "UNKNOWN".
+	 * 
+	 * @return true if this Ref has a status of MARKED or above, false otherwise
+	 */
+	public boolean isMarked() {
+		return getStatus() >= MARKED;
+	}
+	
 	
 	/**
 	 * Persists this Ref in the current store if not embedded and not already

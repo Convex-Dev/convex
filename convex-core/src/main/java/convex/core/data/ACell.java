@@ -459,6 +459,19 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		cachedRef=ref;
 		return (T) this;
 	}
+	
+	public <T extends ACell> T mark() {
+		return mark(null);
+	}
+	
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> T mark(Consumer<Ref<ACell>> noveltyHandler) {
+		Ref<ACell> ref = getRef();
+		AStore store=Stores.current();
+		ref= store.storeTopRef(ref, Ref.MARKED,noveltyHandler);
+		cachedRef=ref;
+		return (T) this;
+	}
 
 
 	/**
