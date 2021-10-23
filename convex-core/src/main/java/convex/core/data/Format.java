@@ -684,7 +684,9 @@ public class Format {
 			if (tag == Tag.BYTE) return (T) CVMByte.create(bb.get());
 			if (tag == Tag.CHAR) return (T) CVMChar.create(bb.getChar());
 			if (tag == Tag.LONG) return (T) CVMLong.create(readVLCLong(bb));
-			if (tag == Tag.DOUBLE) return (T) CVMDouble.create(bb.getDouble());
+			
+			// Double is special, we enforce a canonical NaN
+			if (tag == Tag.DOUBLE) return (T) CVMDouble.read(bb.getDouble());
 
 			throw new BadFormatException("Can't read basic type with tag byte: " + tag);
 		} catch (IllegalArgumentException e) {

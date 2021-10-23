@@ -4,6 +4,7 @@ import convex.core.data.INumeric;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
 
@@ -24,6 +25,8 @@ public final class CVMDouble extends APrimitive implements INumeric {
 	public static final CVMDouble NEGATIVE_INFINITY = CVMDouble.create(Double.NEGATIVE_INFINITY);
 	
 	private final double value;
+	
+	private static final long RAW_NAN_BITS=0x7ff8000000000000L;
 	
 	public CVMDouble(double value) {
 		this.value=value;
@@ -127,6 +130,16 @@ public final class CVMDouble extends APrimitive implements INumeric {
 	@Override
 	public INumeric toStandardNumber() {
 		return this;
+	}
+
+	public static CVMDouble read(double value) throws BadFormatException {
+		// Need to check for non-canonical NaN values
+		if (Double.isNaN(value)) {
+			if (Double.doubleToRawLongBits(value)!=RAW_NAN_BITS) {
+				throw new BadFormatException("Non-canonical NaN value");
+			}
+		}
+		return create(value);
 	}
 
 }
