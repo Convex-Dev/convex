@@ -1057,6 +1057,10 @@ public class CoreTest extends ACVMTest {
 		// equivalent of get with set-as-function
 		assertEquals(eval("(#{2 3} 2)"),eval("(get #{2 3} 2)"));
 		assertEquals(eval("(#{2 3} 1)"),eval("(get #{2 3} 1)"));
+		
+		// Countables should work in sets
+		assertEquals(eval("#{(byte 1) (byte 2)}"),eval("(set 0x0102)"));
+		assertEquals(eval("#{\\T \\a \\b}"),eval("(set \"Tab\")"));
 
 		assertEquals(Sets.empty(), eval("(set nil)")); // nil treated as empty set of elements
 

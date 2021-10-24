@@ -63,14 +63,15 @@ public class Sets {
 	 * @return A Set
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> ASet<T> create(ADataStructure<T> source) {
+	public static <T extends ACell> ASet<T> create(ACountable<T> source) {
+		if (source==null) return EMPTY;
 		if (source instanceof ASet) return (ASet<T>) source;
 
 		if (source instanceof AMap) {
 			ASequence<T> seq = RT.sequence(source); // should always be non-null
 			return Sets.create(seq);
 		}
-		if (source instanceof ACollection) return Sets.fromCollection((Collection<T>) source);
+		if (source instanceof ACountable) return Sets.fromCollection(source);
 		throw new IllegalArgumentException("Unexpected type!" + Utils.getClass(source));
 	}
 	
@@ -83,6 +84,23 @@ public class Sets {
 	 */
 	public static <T extends ACell> ASet<T> fromCollection(Collection<T> source) {
 		return Sets.of(source.toArray());
+	}
+	
+	/**
+	 * Creates a set of all the elements in the given data structure
+	 * 
+	 * @param <T> Type of elements
+	 * @param source Source for elements
+	 * @return A Set
+	 */
+	@SuppressWarnings("unchecked")
+	private static <T extends ACell> ASet<T> fromCollection(ACountable<T> source) {
+		long n=source.count();
+		ASet<?> set=EMPTY;
+		for (long i=0; i<n; i++) {
+			set=set.include(source.get(i));
+		}
+		return (ASet<T>) set;
 	}
 
 	public static <T extends ACell> ASet<T> read(ByteBuffer bb) throws BadFormatException {

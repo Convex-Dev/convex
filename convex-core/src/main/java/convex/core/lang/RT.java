@@ -735,8 +735,8 @@ public class RT {
 			return Sets.empty();
 		if (o instanceof ASet)
 			return (ASet<T>) o;
-		if (o instanceof ADataStructure)
-			return Sets.create((ADataStructure<T>) o);
+		if (o instanceof ACountable)
+			return Sets.create((ACountable<T>) o);
 		return null;
 	}
 
