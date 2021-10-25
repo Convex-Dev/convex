@@ -1061,8 +1061,9 @@ public class CoreTest extends ACVMTest {
 		// Countables should work in sets
 		assertEquals(eval("#{(byte 1) (byte 2)}"),eval("(set 0x0102)"));
 		assertEquals(eval("#{\\T \\a \\b}"),eval("(set \"Tab\")"));
+		assertEquals(eval("#{[1 2] [3 4]}"),eval("(set {1 2 3 4})"));
 
-		assertEquals(Sets.empty(), eval("(set nil)")); // nil treated as empty set of elements
+		assertSame(Sets.empty(), eval("(set nil)")); // nil treated as empty set of elements
 
 		assertArityError(step("(set)"));
 		assertArityError(step("(set 1 2)"));
