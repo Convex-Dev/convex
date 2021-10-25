@@ -1028,7 +1028,9 @@ public class Core {
 			for (int i = 1; i < n; i += 2) {
 				ACell key=args[i];
 				result = RT.assoc(result, key, args[i + 1]);
-				if (result == null) return context.withError(ErrorCodes.ARGUMENT, "Cannot assoc value - invalid key of type "+RT.getType(key));
+				if (result == null) {
+					return context.withError(ErrorCodes.ARGUMENT, "Cannot assoc value - invalid (key type "+RT.getType(key)+" is invalid or out of bounds)");
+				}
 			}
 
 			return context.withResult(juice, (ACell) result);
