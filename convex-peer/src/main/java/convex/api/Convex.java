@@ -569,7 +569,7 @@ public class Convex {
 	 * @return A Future for the result of the query
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
-	public Future<Result> query(ACell query) throws IOException {
+	public CompletableFuture<Result> query(ACell query) throws IOException {
 		return query(query, getAddress());
 	}
 	
@@ -581,7 +581,7 @@ public class Convex {
 	 * @return A Future for the result of the query
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
-	public Future<Result> query(String query) throws IOException {
+	public CompletableFuture<Result> query(String query) throws IOException {
 		ACell form=buildCodeForm(query);
 		return query(form, getAddress());
 	}
@@ -594,7 +594,7 @@ public class Convex {
 	 *
 	 * @return Future for the cell being acquired
 	 */
-	public <T extends ACell> Future<T> acquire(Hash hash) {
+	public <T extends ACell> CompletableFuture<T> acquire(Hash hash) {
 		return acquire(hash, Stores.current());
 	}
 
@@ -607,7 +607,7 @@ public class Convex {
 	 *
 	 * @return Future for the Cell being acquired
 	 */
-	public <T extends ACell> Future<T> acquire(Hash hash, AStore store) {
+	public <T extends ACell> CompletableFuture<T> acquire(Hash hash, AStore store) {
 		CompletableFuture<T> f = new CompletableFuture<T>();
 		new Thread(new Runnable() {
 			@Override
@@ -757,7 +757,7 @@ public class Convex {
 	 * @return A Future for the result of the query
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
-	public Future<Result> query(ACell query, Address address) throws IOException {
+	public CompletableFuture<Result> query(ACell query, Address address) throws IOException {
 		synchronized (awaiting) {
 			long id = connection.sendQuery(query, address);
 			if (id < 0) {
