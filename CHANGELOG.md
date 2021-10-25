@@ -6,13 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- Set can now be contructed with any Countable
+- Set can now be constructed with any Countable
 
 ### Changed
 - Convex.queryXXX methods now return a CompletableFuture instead of Future
 - Some Juice cost adjustments
 
-## Fixed
+### Fixed
 - Eliminate non-canonical NaN values
 
 ## [0.7.1] - 2021-09-28
