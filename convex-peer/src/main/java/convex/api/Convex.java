@@ -135,7 +135,7 @@ public class Convex {
 
 	private Consumer<Message> delegatedHandler = null;
 
-	private Convex(Address address, AKeyPair keyPair) {
+	protected Convex(Address address, AKeyPair keyPair) {
 		this.keyPair = keyPair;
 		this.address = address;
 	}
@@ -180,9 +180,9 @@ public class Convex {
 	 * @throws IOException      If connection fails
 	 * @throws TimeoutException If connection attempt times out
 	 */
-	public static Convex connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair, AStore store)
+	public static ConvexRemote connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair, AStore store)
 			throws IOException, TimeoutException {
-		Convex convex = new Convex(address, keyPair);
+		ConvexRemote convex = new ConvexRemote(address, keyPair);
 		convex.connectToPeer(peerAddress, store);
 		return convex;
 	}
@@ -254,7 +254,7 @@ public class Convex {
 		return sequence;
 	}
 
-	private void connectToPeer(InetSocketAddress peerAddress, AStore store) throws IOException, TimeoutException {
+	protected void connectToPeer(InetSocketAddress peerAddress, AStore store) throws IOException, TimeoutException {
 		setConnection(Connection.connect(peerAddress, internalHandler, store));
 	}
 
@@ -866,7 +866,7 @@ public class Convex {
 	 *
 	 * @param conn Connection value to use
 	 */
-	private void setConnection(Connection conn) {
+	protected void setConnection(Connection conn) {
 		if (this.connection == conn)
 			return;
 		close();
@@ -940,8 +940,8 @@ public class Convex {
 	 * @param c Connection to wrap
 	 * @return New Convex client instance using underlying connection
 	 */
-	public static Convex wrap(Connection c) {
-		Convex convex = new Convex(null, null);
+	public static ConvexRemote wrap(Connection c) {
+		ConvexRemote convex = new ConvexRemote(null, null);
 		convex.setConnection(c);
 		return convex;
 	}
