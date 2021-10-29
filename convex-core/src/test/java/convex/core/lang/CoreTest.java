@@ -151,6 +151,10 @@ public class CoreTest extends ACVMTest {
 		assertSame(CVMByte.create(0xff), eval("(byte -1)"));
 		assertSame(CVMByte.create(0xff), eval("(byte (byte -1))"));
 
+		// Byte extracts last byte from Blob a default (similar behaviour to Long)
+		assertSame(CVMByte.create(0xff), eval("(byte 0xff)"));
+		assertSame(CVMByte.create(0xff), eval("(byte 0xeeff)"));
+		
 		assertCastError(step("(byte nil)"));
 		assertCastError(step("(byte :foo)"));
 
