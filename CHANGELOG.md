@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Convex.queryXXX methods now return a CompletableFuture instead of Future
 - Some Juice cost adjustments
+- `empty?` now works on any Countable structure (including Strings and Blobs)
 
 ### Fixed
 - Eliminate non-canonical NaN values

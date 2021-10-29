@@ -13,6 +13,7 @@ import convex.core.State;
 import convex.core.data.ABlob;
 import convex.core.data.ABlobMap;
 import convex.core.data.ACell;
+import convex.core.data.ACountable;
 import convex.core.data.ADataStructure;
 import convex.core.data.AHashMap;
 import convex.core.data.AList;
@@ -2335,7 +2336,7 @@ public class Core {
 			// like with clojure
 			if (val == null) return true;
 
-			return (val instanceof ADataStructure) && ((ADataStructure<?>) val).isEmpty();
+			return (val instanceof ACountable) && ((ACountable<?>) val).isEmpty();
 		}
 	});
 

@@ -2939,7 +2939,10 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(empty? {})"));
 		assertTrue(evalB("(empty? [])"));
 		assertTrue(evalB("(empty? ())"));
+		assertTrue(evalB("(empty? \"\")"));
 		assertTrue(evalB("(empty? #{})"));
+		
+		assertFalse(evalB("(empty? 0x1234)"));
 		assertFalse(evalB("(empty? {1 2})"));
 		assertFalse(evalB("(empty? [ 3])"));
 		assertFalse(evalB("(empty? '(foo))"));
