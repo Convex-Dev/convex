@@ -791,7 +791,7 @@ public abstract class Convex {
 	 * @return Future for consensus state
 	 * @throws TimeoutException If initial status request times out
 	 */
-	public abstract Future<State> acquireState() throws TimeoutException;
+	public abstract CompletableFuture<State> acquireState() throws TimeoutException;
 
 
 

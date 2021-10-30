@@ -106,7 +106,7 @@ public class ConvexRemote extends Convex {
 	 * @return Future for consensus state
 	 * @throws TimeoutException If initial status request times out
 	 */
-	public Future<State> acquireState() throws TimeoutException {
+	public CompletableFuture<State> acquireState() throws TimeoutException {
 		try {
 			Future<Result> sF = requestStatus();
 			AVector<ACell> status = sF.get(timeout, TimeUnit.MILLISECONDS).getValue();
