@@ -376,7 +376,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	public abstract long longValue();
 
 	/**
-	 * Returns true if this object is a regular blob (i.e. not a special blob type like Hash or Address)
+	 * Returns true if this object is a regular blob (i.e. not a special blob type like Address)
 	 * @return True if a regular blob
 	 */
 	public boolean isRegularBlob() {

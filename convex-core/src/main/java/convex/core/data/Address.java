@@ -10,9 +10,9 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
 
 /**
- * Immutable class representing an Address.
+ * Immutable class representing an Address, generally used to uniquely identify an Account.
  * 
- * An Address is a specialised 8-byte long blob instance that wraps a non-negative long account number. This number
+ * An Address is a specialised 8-byte long blob instance that wraps a non-negative long Account number. This number
  * serves as an index into the vector of accounts for the current state.
  * 
  */
@@ -118,7 +118,7 @@ public final class Address extends ALongBlob {
 	public static Address readRaw(ByteBuffer bb) throws BadFormatException {
 		long value=Format.readVLCLong(bb);
 		Address a= Address.create(value);
-		if (a==null) throw new BadFormatException("Invalid VLC encoding for Address");
+		if (a==null) throw new BadFormatException("Invalid Address: "+value);
 		return a;
 	}
 
@@ -150,7 +150,6 @@ public final class Address extends ALongBlob {
 	public void validateCell() throws InvalidDataException {
 		if (value<0)
 			throw new InvalidDataException("Address must be positive",this);
-
 	}
 	
 	@Override public final boolean isCVMValue() {
