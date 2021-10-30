@@ -26,6 +26,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Hash;
 import convex.core.data.Keywords;
+import convex.core.data.Lists;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
@@ -76,10 +77,6 @@ public abstract class Convex {
 	 */
 	protected Address address;
 
-	/**
-	 * Current Connection to a Peer, may be null or a closed connection.
-	 */
-	protected Connection connection;
 
 	/**
 	 * Determines if auto-sequencing should be attempted
@@ -95,7 +92,7 @@ public abstract class Convex {
 	/**
 	 * Map of results awaiting completion. May be pending missing data.
 	 */
-	private HashMap<Long, CompletableFuture<Result>> awaiting = new HashMap<>();
+	protected HashMap<Long, CompletableFuture<Result>> awaiting = new HashMap<>();
 
 	protected final Consumer<Message> internalHandler = new ResultConsumer() {
 		@Override
@@ -266,14 +263,7 @@ public abstract class Convex {
 		return keyPair.signData(value);
 	}
 
-	/**
-	 * Gets the Internet address of the currently connected remote
-	 *
-	 * @return Remote socket address
-	 */
-	public InetSocketAddress getRemoteAddress() {
-		return connection.getRemoteAddress();
-	}
+
 
 	/**
 	 * Creates a new account with the given public key
@@ -310,20 +300,9 @@ public abstract class Convex {
 	 *
 	 * @return true if connected, false otherwise
 	 */
-	public boolean isConnected() {
-		Connection c = this.connection;
-		return (c != null) && (!c.isClosed());
-	}
+	public abstract boolean isConnected();
 
-	/**
-	 * Gets the underlying Connection instance for this Client. May be null if not
-	 * connected.
-	 *
-	 * @return Connection instance or null
-	 */
-	public Connection getConnection() {
-		return connection;
-	}
+
 
 	/**
 	 * Updates the given transaction to have the next sequence number.
@@ -418,30 +397,7 @@ public abstract class Convex {
 	 * @return A Future for the result of the transaction
 	 * @throws IOException If the connection is broken
 	 */
-	public synchronized CompletableFuture<Result> transact(SignedData<ATransaction> signed) throws IOException {
-		CompletableFuture<Result> cf;
-		long id = -1;
-
-		synchronized (awaiting) {
-			// loop until request is queued
-			while (id < 0) {
-				id = connection.sendTransaction(signed);
-				if (id < 0) {
-					try {
-						Thread.sleep(10);
-					} catch (InterruptedException e) {
-						// Ignore
-					}
-				}
-			}
-
-			// Store future for completion by result message
-			cf = awaitResult(id);
-		}
-
-		log.debug("Sent transaction with message ID: {} awaiting count = {}", id, awaiting.size());
-		return cf;
-	}
+	public abstract CompletableFuture<Result> transact(SignedData<ATransaction> signed) throws IOException;
 
 	/**
 	 * Submits a transfer transaction to the Convex network, returning a future once
@@ -597,74 +553,14 @@ public abstract class Convex {
 
 	/**
 	 * Attempts to acquire a complete persistent data structure for the given hash
-	 * from the remote peer. Uses the store provided as a destination.
+	 * from the connected peer. Uses the store provided as a destination.
 	 *
 	 * @param hash  Hash of value to acquire.
 	 * @param store Store to acquire the persistent data to.
 	 *
 	 * @return Future for the Cell being acquired
 	 */
-	public <T extends ACell> CompletableFuture<T> acquire(Hash hash, AStore store) {
-		CompletableFuture<T> f = new CompletableFuture<T>();
-		new Thread(new Runnable() {
-			@Override
-			public void run() {
-				Stores.setCurrent(store); // use store for calling thread
-				try {
-					Ref<T> ref = store.refForHash(hash);
-					HashSet<Hash> missingSet = new HashSet<>();
-
-					// Loop until future is complete or cancelled
-					while (!f.isDone()) {
-						missingSet.clear();
-
-						if (ref == null) {
-							missingSet.add(hash);
-						} else {
-							if (ref.getStatus() >= Ref.PERSISTED) {
-								// we have everything!
-								f.complete(ref.getValue());
-								return;
-							}
-							ref.findMissing(missingSet);
-						}
-						for (Hash h : missingSet) {
-							// send missing data requests until we fill pipeline
-							log.debug("Request missing data: {}", h);
-							boolean sent = connection.sendMissingData(h);
-							if (!sent) {
-								log.debug("Send Queue full!");
-								break;
-							}
-						}
-						// if too low, can send multiple requests, and then block the peer
-						Thread.sleep(100);
-						ref = store.refForHash(hash);
-						if (ref != null) {
-							if (ref.getStatus() >= Ref.PERSISTED) {
-								// we have everything!
-								f.complete(ref.getValue());
-								return;
-							}
-							// maybe complete, but not sure
-							try {
-								ref = ref.persist();
-								f.complete(ref.getValue());
-							} catch (MissingDataException e) {
-								Hash missing = e.getMissingHash();
-								log.debug("Still missing: {}", missing);
-								connection.sendMissingData(missing);
-							}
-						}
-					}
-				} catch (Throwable t) {
-					// catch any errors, probably IO?
-					f.completeExceptionally(t);
-				}
-			}
-		}).start();
-		return f;
-	}
+	public abstract <T extends ACell> CompletableFuture<T> acquire(Hash hash, AStore store);
 
 	/**
 	 * Request status using a sync operation. This request will automatically get
@@ -693,20 +589,7 @@ public abstract class Convex {
 	 * @return A Future for the result of the requestStatus
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
-	public CompletableFuture<Result> requestStatus() throws IOException {
-		synchronized (awaiting) {
-			long id = connection.sendStatusRequest();
-			if (id < 0) {
-				throw new IOException("Failed to send status request due to full buffer");
-			}
-
-			// TODO: ensure status is fully loaded
-			// Store future for completion by result message
-			CompletableFuture<Result> cf = awaitResult(id);
-
-			return cf;
-		}
-	}
+	public abstract CompletableFuture<Result> requestStatus() throws IOException;
 
 	/**
 	 * Method to start waiting for a complete result. Should be called with lock on
@@ -732,18 +615,7 @@ public abstract class Convex {
 	 * @throws IOException if the connection fails.
 	 *
 	 */
-	public CompletableFuture<Result> requestChallenge(SignedData<ACell> data) throws IOException {
-		synchronized (awaiting) {
-			long id = connection.sendChallenge(data);
-			if (id < 0) {
-				// TODO: too fragile?
-				throw new IOException("Failed to send challenge due to full buffer");
-			}
-
-			// Store future for completion by result message
-			return awaitResult(id);
-		}
-	}
+	public abstract CompletableFuture<Result> requestChallenge(SignedData<ACell> data) throws IOException;
 
 	/**
 	 * Submits a query to the Convex network, returning a Future once the query has
@@ -754,16 +626,7 @@ public abstract class Convex {
 	 * @return A Future for the result of the query
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
-	public CompletableFuture<Result> query(ACell query, Address address) throws IOException {
-		synchronized (awaiting) {
-			long id = connection.sendQuery(query, address);
-			if (id < 0) {
-				throw new IOException("Failed to send query due to full buffer");
-			}
-
-			return awaitResult(id);
-		}
-	}
+	public abstract CompletableFuture<Result> query(ACell query, Address address) throws IOException;
 
 	/**
 	 * Executes a query synchronously and waits for the Result
@@ -858,19 +721,10 @@ public abstract class Convex {
 		return address;
 	}
 
-
-
 	/**
-	 * Disconnects the client from the network, closing the underlying connection.
+	 * Disconnects the client from the network, releasing any connection resources.
 	 */
-	public synchronized void close() {
-		Connection c = this.connection;
-		if (c != null) {
-			c.close();
-		}
-		connection = null;
-		awaiting.clear();
-	}
+	public abstract void close();
 
 	@Override
 	public void finalize() {
@@ -898,7 +752,7 @@ public abstract class Convex {
 
 	public Long getBalance(Address address) throws IOException {
 		try {
-			Future<Result> future = query(Reader.read("(balance " + address.toString() + ")"));
+			Future<Result> future = query(Lists.of(Symbols.BALANCE,address));
 			Result result = future.get(timeout, TimeUnit.MILLISECONDS);
 			if (result.isError())
 				throw new Error(result.toString());
