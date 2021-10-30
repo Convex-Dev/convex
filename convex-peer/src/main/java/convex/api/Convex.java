@@ -231,7 +231,7 @@ public abstract class Convex {
 	 * Gets the current sequence number for this Client, which is the sequence
 	 * number of the last transaction observed for the current client's Account.
 	 *
-	 * @return Sequence number as a Long value, zero or positive
+	 * @return Sequence number as a Long value (zero or positive)
 	 */
 	public long getSequence() {
 		if (sequence == null) {
@@ -274,7 +274,7 @@ public abstract class Convex {
 	 * @throws IOException      If IO error occurs
 	 */
 	public Address createAccountSync(AccountKey publicKey) throws TimeoutException, IOException {
-		Invoke trans = Invoke.create(address, 0, "(create-account 0x" + publicKey.toHexString() + ")");
+		Invoke trans = Invoke.create(address, 0, Lists.of(Symbols.CREATE_ACCOUNT, publicKey));
 		Result r = transactSync(trans);
 		if (r.isError())
 			throw new Error("Error creating account: " + r.getErrorCode() + " " + r.getValue());
@@ -290,7 +290,7 @@ public abstract class Convex {
 	 * @throws IOException      If IO error occurs
 	 */
 	public CompletableFuture<Address> createAccount(AccountKey publicKey) throws TimeoutException, IOException {
-		Invoke trans = Invoke.create(address, 0, "(create-account 0x" + publicKey.toHexString() + ")");
+		Invoke trans = Invoke.create(address, 0, Lists.of(Symbols.CREATE_ACCOUNT, publicKey));
 		CompletableFuture<Result> fr = transact(trans);
 		return fr.thenApply(r -> r.getValue());
 	}
@@ -301,8 +301,6 @@ public abstract class Convex {
 	 * @return true if connected, false otherwise
 	 */
 	public abstract boolean isConnected();
-
-
 
 	/**
 	 * Updates the given transaction to have the next sequence number.
@@ -390,7 +388,7 @@ public abstract class Convex {
 	}
 
 	/**
-	 * Submits a signed transaction to the Convex network, returning a future once
+	 * Submits a signed transaction to the Convex network, returning a Future once
 	 * the transaction has been successfully queued.
 	 *
 	 * @param signed Signed transaction to execute
