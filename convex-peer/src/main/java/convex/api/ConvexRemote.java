@@ -262,4 +262,16 @@ public class ConvexRemote extends Convex {
 		connection = null;
 		awaiting.clear();
 	}
+
+	/**
+	 * Wraps a connection as a Convex client instance
+	 * 
+	 * @param c Connection to wrap
+	 * @return New Convex client instance using underlying connection
+	 */
+	public static ConvexRemote wrap(Connection c) {
+		ConvexRemote convex = new ConvexRemote(null, null);
+		convex.setConnection(c);
+		return convex;
+	}
 }

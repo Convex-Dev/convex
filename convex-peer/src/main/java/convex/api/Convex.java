@@ -43,7 +43,6 @@ import convex.core.transactions.Invoke;
 import convex.core.transactions.Transfer;
 import convex.core.util.Utils;
 import convex.core.State;
-import convex.net.Connection;
 import convex.net.Message;
 import convex.net.ResultConsumer;
 import convex.peer.Server;
@@ -145,7 +144,7 @@ public abstract class Convex {
 	 * @throws IOException      If IO Error occurs
 	 * @throws TimeoutException If connection attempt times out
 	 */
-	public static Convex connect(InetSocketAddress hostAddress) throws IOException, TimeoutException {
+	public static ConvexRemote connect(InetSocketAddress hostAddress) throws IOException, TimeoutException {
 		return connect(hostAddress, (Address) null, (AKeyPair) null);
 	}
 
@@ -160,7 +159,7 @@ public abstract class Convex {
 	 * @throws IOException      If connection fails
 	 * @throws TimeoutException If connection attempt times out
 	 */
-	public static Convex connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair)
+	public static ConvexRemote connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair)
 			throws IOException, TimeoutException {
 		return Convex.connect(peerAddress, address, keyPair, Stores.current());
 	}
@@ -771,18 +770,6 @@ public abstract class Convex {
 	 */
 	public static Convex connect(Server server) throws IOException, TimeoutException {
 		return connect(server.getHostAddress(), server.getPeerController(), server.getKeyPair());
-	}
-
-	/**
-	 * Wraps a connection as a Convex client instance
-	 * 
-	 * @param c Connection to wrap
-	 * @return New Convex client instance using underlying connection
-	 */
-	public static ConvexRemote wrap(Connection c) {
-		ConvexRemote convex = new ConvexRemote(null, null);
-		convex.setConnection(c);
-		return convex;
 	}
 
 	/**
