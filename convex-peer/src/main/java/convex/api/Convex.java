@@ -60,11 +60,11 @@ import convex.peer.Server;
  * professional like gnu)" - Linus Torvalds
  */
 @SuppressWarnings("unused")
-public class Convex {
+public abstract class Convex {
 
 	private static final Logger log = LoggerFactory.getLogger(Convex.class.getName());
 
-	private long timeout = Constants.DEFAULT_CLIENT_TIMEOUT;
+	protected long timeout = Constants.DEFAULT_CLIENT_TIMEOUT;
 
 	/**
 	 * Key pair for this Client
@@ -97,7 +97,7 @@ public class Convex {
 	 */
 	private HashMap<Long, CompletableFuture<Result>> awaiting = new HashMap<>();
 
-	private final Consumer<Message> internalHandler = new ResultConsumer() {
+	protected final Consumer<Message> internalHandler = new ResultConsumer() {
 		@Override
 		protected synchronized void handleResult(long id, Result v) {
 
@@ -254,9 +254,6 @@ public class Convex {
 		return sequence;
 	}
 
-	protected void connectToPeer(InetSocketAddress peerAddress, AStore store) throws IOException, TimeoutException {
-		setConnection(Connection.connect(peerAddress, internalHandler, store));
-	}
 
 	/**
 	 * Signs a value on behalf of this client.
@@ -696,7 +693,7 @@ public class Convex {
 	 * @return A Future for the result of the requestStatus
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
-	public Future<Result> requestStatus() throws IOException {
+	public CompletableFuture<Result> requestStatus() throws IOException {
 		synchronized (awaiting) {
 			long id = connection.sendStatusRequest();
 			if (id < 0) {
@@ -735,7 +732,7 @@ public class Convex {
 	 * @throws IOException if the connection fails.
 	 *
 	 */
-	public Future<Result> requestChallenge(SignedData<ACell> data) throws IOException {
+	public CompletableFuture<Result> requestChallenge(SignedData<ACell> data) throws IOException {
 		synchronized (awaiting) {
 			long id = connection.sendChallenge(data);
 			if (id < 0) {
@@ -861,17 +858,7 @@ public class Convex {
 		return address;
 	}
 
-	/**
-	 * Sets the current Connection for this Client
-	 *
-	 * @param conn Connection value to use
-	 */
-	protected void setConnection(Connection conn) {
-		if (this.connection == conn)
-			return;
-		close();
-		this.connection = conn;
-	}
+
 
 	/**
 	 * Disconnects the client from the network, closing the underlying connection.
@@ -952,26 +939,8 @@ public class Convex {
 	 * @return Future for consensus state
 	 * @throws TimeoutException If initial status request times out
 	 */
-	public Future<State> acquireState() throws TimeoutException {
-		try {
-			Future<Result> sF = requestStatus();
-			AVector<ACell> status = sF.get(timeout, TimeUnit.MILLISECONDS).getValue();
-			Hash stateHash = RT.ensureHash(status.get(4));
+	public abstract Future<State> acquireState() throws TimeoutException;
 
-			if (stateHash == null)
-				throw new Error("Bad status response from Peer");
-			return acquire(stateHash);
-		} catch (InterruptedException | ExecutionException | IOException e) {
-			throw Utils.sneakyThrow(e);
-		}
-	}
 
-	/**
-	 * Close without affecting the connection
-	 */
-	public void closeButMaintainConnection() {
-		this.connection = null;
-		close();
-	}
 
 }
