@@ -538,7 +538,7 @@ public abstract class Convex {
 
 	/**
 	 * Attempts to acquire a complete persistent data structure for the given hash
-	 * from the remote peer. Uses the store configured for the calling thread.
+	 * from the remote peer. Uses the current store configured for the calling thread.
 	 *
 	 * @param hash Hash of value to acquire.
 	 *

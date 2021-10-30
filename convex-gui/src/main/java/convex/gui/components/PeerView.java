@@ -2,7 +2,7 @@ package convex.gui.components;
 
 import java.net.InetSocketAddress;
 
-import convex.api.Convex;
+import convex.api.ConvexRemote;
 import convex.core.Peer;
 import convex.core.State;
 import convex.core.data.AccountKey;
@@ -19,7 +19,7 @@ import convex.peer.Server;
  * Peer may be either a local Server or remote.
  */
 public class PeerView {
-	public Convex peerConnection = null;
+	public ConvexRemote peerConnection = null;
 	public Server peerServer = null;
 
 	public StateModel<Peer> peerModel = new StateModel<>(null);

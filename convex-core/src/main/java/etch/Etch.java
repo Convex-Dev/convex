@@ -656,7 +656,7 @@ public class Etch {
 				cell.attachMemorySize(memorySize);
 			}
 
-			Ref<ACell> ref=RefSoft.create(cell, (int)flagByte);
+			Ref<ACell> ref=RefSoft.create(store,cell, (int)flagByte);
 			cell.attachRef(ref);
 
 			return ref;

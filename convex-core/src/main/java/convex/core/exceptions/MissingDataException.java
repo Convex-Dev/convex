@@ -1,7 +1,7 @@
 package convex.core.exceptions;
 
 import convex.core.data.Hash;
-import convex.core.store.Stores;
+import convex.core.store.AStore;
 
 /**
  * Exception thrown when an attempt is made to dereference a value that is not
@@ -15,23 +15,31 @@ import convex.core.store.Stores;
 public class MissingDataException extends RuntimeException {
 
 	private Hash hash;
+	private AStore store;
 
-	private MissingDataException(String message, Hash hash) {
-		super(message);
+	public MissingDataException(AStore store, Hash hash) {
+		super("Missing Data");
 		this.hash = hash;
+		this.store=store;
 	}
 
-	public MissingDataException(Hash hash) {
-		// TODO: remove inefficiency
-		this("Missing " + hash + " in store " + Stores.current().toString(), hash);
+	public String getMessage() {
+		return "Missing hash:" + hash + " in store " + store.toString();
 	}
 
-//	@Override
-//	public Throwable fillInStackTrace() {
-//		return this;
-//	}
-
+	/**
+	 * Gets the Hash for the missing data
+	 * @return Hash value
+	 */
 	public Hash getMissingHash() {
 		return hash;
+	}
+	
+	/**
+	 * Gets the Store for which the missing data exception occurred
+	 * @return Store instance
+	 */
+	public AStore getStore() {
+		return store;
 	}
 }

@@ -27,6 +27,7 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
 import convex.api.Convex;
+import convex.api.ConvexRemote;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.WalletEntry;
@@ -62,7 +63,7 @@ public class REPLPanel extends JPanel {
 
 	private AccountChooserPanel execPanel = new AccountChooserPanel();
 
-	private final Convex convex;
+	private final ConvexRemote convex;
 
 	private static final Logger log = LoggerFactory.getLogger(REPLPanel.class.getName());
 

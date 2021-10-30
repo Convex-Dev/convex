@@ -19,6 +19,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 
 import convex.api.Convex;
+import convex.api.ConvexRemote;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.data.Hash;
@@ -128,7 +129,7 @@ public class PeersListPanel extends JPanel {
 			String host = ss[0].trim();
 			int port = (ss.length > 1) ? Integer.parseInt(ss[1].trim()) : 0;
 			InetSocketAddress hostAddress = new InetSocketAddress(host, port);
-			Convex pc;
+			ConvexRemote pc;
 			try {
 				// TODO: we want to receive anything?
 				pc = Convex.connect(hostAddress, null,null);

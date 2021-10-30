@@ -175,25 +175,20 @@ public class Peer {
 	/**
 	 * Gets Peer Data from a Store.
 	 * 
-	 * @param store Store to retrieve Peer Datat from
+	 * @param store Store to retrieve Peer Data from
 	 * @return Peer data map, or null if not available
 	 * @throws IOException If a store IO error occurs
 	 */
 	public static AMap<Keyword, ACell> getPeerData(AStore store) throws IOException {
-		AStore tempStore=Stores.current();
-		try {
-			Stores.setCurrent(store);
-			Hash root = store.getRootHash();
-			Ref<ACell> ref=store.refForHash(root);
-			if (ref==null) return null; // not found case
-			if (ref.getStatus()<Ref.PERSISTED) return null; // not fully in store
-			
-			@SuppressWarnings("unchecked")
-			AMap<Keyword,ACell> peerData=(AMap<Keyword, ACell>) ref.getValue();
-			return peerData;
-		} finally {
-			Stores.setCurrent(tempStore);
-		}
+		Stores.setCurrent(store);
+		Hash root = store.getRootHash();
+		Ref<ACell> ref=store.refForHash(root);
+		if (ref==null) return null; // not found case
+		if (ref.getStatus()<Ref.PERSISTED) return null; // not fully in store
+		
+		@SuppressWarnings("unchecked")
+		AMap<Keyword,ACell> peerData=(AMap<Keyword, ACell>) ref.getValue();
+		return peerData;
 	}
 
 	/**

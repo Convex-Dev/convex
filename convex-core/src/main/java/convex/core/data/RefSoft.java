@@ -4,6 +4,7 @@ import java.lang.ref.SoftReference;
 
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
 
@@ -31,29 +32,35 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	 */
 	protected SoftReference<T> softRef;
 	
-	protected RefSoft(SoftReference<T> ref, Hash hash, int flags) {
+	/**
+	 * SoftReference to value. Might get updated to a fresh instance.
+	 */
+	protected AStore store;
+	
+	protected RefSoft(AStore store, SoftReference<T> ref, Hash hash, int flags) {
 		super(hash, flags);
 		this.softRef = ref;
+		this.store=store;
 	}
 
-	protected RefSoft(T value, Hash hash, int flags) {
-		this(new SoftReference<T>(value), hash, flags);
+	protected RefSoft(AStore store, T value, Hash hash, int flags) {
+		this(store,new SoftReference<T>(value), hash, flags);
 	}
 
-	protected RefSoft(Hash hash) {
+	protected RefSoft(AStore store, Hash hash) {
 		// We don't know anything about this Ref.
-		this(new SoftReference<T>(null), hash, UNKNOWN);
+		this(store,new SoftReference<T>(null), hash, UNKNOWN);
 	}
 	
 
 	@Override
 	public RefSoft<T> withFlags(int newFlags) {
-		return new RefSoft<T>(softRef,hash,newFlags);
+		return new RefSoft<T>(store,softRef,hash,newFlags);
 	}
 
-	public static <T extends ACell> RefSoft<T> create(T value, int flags) {
+	public static <T extends ACell> RefSoft<T> create(AStore store,T value, int flags) {
 		Hash hash=Hash.compute(value);
-		return new RefSoft<T>(value, hash, flags);
+		return new RefSoft<T>(store,value, hash, flags);
 	}
 
 	/**
@@ -67,15 +74,15 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	 * @return New RefSoft instance
 	 */
 	public static <T extends ACell> RefSoft<T> createForHash(Hash hash) {
-		return new RefSoft<T>(hash);
+		return new RefSoft<T>(Stores.current(),hash);
 	}
 
 	@Override
 	public T getValue() {
 		T result = softRef.get();
 		if (result == null) {
-			Ref<T> storeRef = Stores.current().refForHash(hash);
-			if (storeRef == null) throw Utils.sneakyThrow(new MissingDataException(hash));
+			Ref<T> storeRef = store.refForHash(hash);
+			if (storeRef == null) throw Utils.sneakyThrow(new MissingDataException(store,hash));
 			result = storeRef.getValue();
 
 			if (storeRef instanceof RefSoft) {
@@ -140,7 +147,7 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 
 	@Override
 	public Ref<T> withValue(T newValue) {
-		if (softRef.get()!=newValue) return new RefSoft<T>(newValue,hash,flags);
+		if (softRef.get()!=newValue) return new RefSoft<T>(store,newValue,hash,flags);
 		return this;
 	}
 
