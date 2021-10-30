@@ -6,11 +6,11 @@ Convex is a decentralised network and execution engine for the Internet of Value
 
 It is designed as a full stack solution for decentralised application and economic systems that manage digital assets, where asset ownership is cryptographically secured and can be managed (optionally) with Smart Contracts. It has some similarities with a typical public blockchain, but offers some significant advantages:
 
+- Global State model with immutable data structures and atomic transactions
+- Lambda Calculus based VM supporting Turing complete Smart Contracts
 - High transaction throughput (tens of thousands of write transactions per second, scaling to millions in the future)
 - Low latency for transaction confirmation (milliseconds for global consensus, depending on network speed)
 - 100% Green - energy efficiency using the the Convergent Proof of Stake consensus algorithm
-- Global State model with immutable data structures and atomic transactions
-- Lambda Calculus based VM supporting Turing complete Smart Contracts
 - Integrated on-chain compiler (Convex Lisp)
 
 ## About this repository
