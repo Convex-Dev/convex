@@ -128,7 +128,7 @@ public class EtchStore extends AStore {
 			Ref<ACell> existing = etch.read(hash);
 			return (Ref<T>) existing;
 		} catch (IOException e) {
-			throw new Error("IO exception from Etch", e);
+			throw Utils.sneakyThrow(e);
 		}
 	}
 

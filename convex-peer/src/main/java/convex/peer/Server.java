@@ -1112,7 +1112,11 @@ public class Server implements Closeable {
 	public void close() {
 		// persist peer state if necessary
 		if ((peer != null) && Utils.bool(getConfig().get(Keywords.PERSIST))) {
-			persistPeerData();
+			try {
+				persistPeerData();
+			} catch (Throwable t) {
+				log.warn("Exception persisting peer data: {}", t);
+			}
 		}
 
 		// TODO: not much point signing this?

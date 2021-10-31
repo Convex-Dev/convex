@@ -555,7 +555,8 @@ public abstract class Convex {
 	 * @param hash  Hash of value to acquire.
 	 * @param store Store to acquire the persistent data to.
 	 *
-	 * @return Future for the Cell being acquired
+	 * @return Future for the Cell being acquired. May fail exceptionally or timeout if the given data
+	 * cannot be acquired (most likely missing from the peer's store)
 	 */
 	public abstract <T extends ACell> CompletableFuture<T> acquire(Hash hash, AStore store);
 
