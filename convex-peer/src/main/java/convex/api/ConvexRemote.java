@@ -115,7 +115,7 @@ public class ConvexRemote extends Convex {
 			if (stateHash == null)
 				throw new Error("Bad status response from Peer");
 			return acquire(stateHash);
-		} catch (InterruptedException | ExecutionException | IOException e) {
+		} catch (InterruptedException | ExecutionException e) {
 			throw Utils.sneakyThrow(e);
 		}
 	}
@@ -159,18 +159,22 @@ public class ConvexRemote extends Convex {
 	}
 	
 	@Override
-	public CompletableFuture<Result> requestStatus() throws IOException {
-		synchronized (awaiting) {
-			long id = connection.sendStatusRequest();
-			if (id < 0) {
-				throw new IOException("Failed to send status request due to full buffer");
+	public CompletableFuture<Result> requestStatus() {
+		try {
+			synchronized (awaiting) {
+				long id = connection.sendStatusRequest();
+				if (id < 0) {
+					return CompletableFuture.failedFuture(new IOException("Failed to send status request due to full buffer"));
+				}
+	
+				// TODO: ensure status is fully loaded
+				// Store future for completion by result message
+				CompletableFuture<Result> cf = awaitResult(id);
+	
+				return cf;
 			}
-
-			// TODO: ensure status is fully loaded
-			// Store future for completion by result message
-			CompletableFuture<Result> cf = awaitResult(id);
-
-			return cf;
+		} catch (Throwable t) {
+			return CompletableFuture.failedFuture(t);
 		}
 	}
 	

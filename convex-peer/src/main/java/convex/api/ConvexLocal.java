@@ -1,6 +1,5 @@
 package convex.api;
 
-import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
@@ -22,6 +21,9 @@ import convex.net.MessageType;
 import convex.net.message.MessageLocal;
 import convex.peer.Server;
 
+/**
+ * Convex Client implementation supporting a direct connection to a Peer Server in the same JVM.
+ */
 public class ConvexLocal extends Convex {
 
 	private final Server server;
@@ -62,30 +64,29 @@ public class ConvexLocal extends Convex {
 	}
 
 	@Override
-	public CompletableFuture<Result> requestStatus() throws IOException {
+	public CompletableFuture<Result> requestStatus() {
 		return makeMessageFuture(MessageType.STATUS,CVMLong.create(makeID()));
 	}
 	
 	@Override
-	public CompletableFuture<Result> transact(SignedData<ATransaction> signed) throws IOException {
+	public CompletableFuture<Result> transact(SignedData<ATransaction> signed) {
 		return makeMessageFuture(MessageType.TRANSACT,Vectors.of(makeID(),signed));
 	}
 
 
 	@Override
-	public CompletableFuture<Result> requestChallenge(SignedData<ACell> data) throws IOException {
+	public CompletableFuture<Result> requestChallenge(SignedData<ACell> data) {
 		return makeMessageFuture(MessageType.CHALLENGE,data);
 	}
 
 	@Override
-	public CompletableFuture<Result> query(ACell query, Address address) throws IOException {
+	public CompletableFuture<Result> query(ACell query, Address address) {
 		return makeMessageFuture(MessageType.QUERY,Vectors.of(makeID(),query,address));
 	}
 	
 	private long idCounter=0;
 	
 	private long makeID() {
-		// TODO Auto-generated method stub
 		return idCounter++;
 	}
 

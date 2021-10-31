@@ -1008,14 +1008,14 @@ public class Server implements Closeable {
 					long timestamp=Utils.getCurrentTimestamp();
 
 					// Broadcast Belief if changed or otherwise not done recently
-					if (beliefUpdated||((lastBroadcastBelief+Constants.REBROADCAST_DELAY)<timestamp)) {
-						// rebroadcast if there is still stuff outstanding for consensus
+					if (beliefUpdated||((lastBroadcastBelief+Constants.MAX_REBROADCAST_DELAY)<timestamp)) {
+						// rebroadcast only if there is still stuff outstanding for consensus
 						if (peer.getConsensusPoint()<peer.getPeerOrder().getBlockCount()) {
 							broadcastBelief(peer.getBelief());
 						}
 					}
 
-					// Maybe sleep a bit, wait for some events to accumulate
+					// Maybe sleep a bit, wait for some new events to accumulate
 					awaitEvents();
 				}
 			} catch (InterruptedException e) {

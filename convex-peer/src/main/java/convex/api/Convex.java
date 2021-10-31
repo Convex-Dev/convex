@@ -589,13 +589,12 @@ public abstract class Convex {
 	 * the request has been successfully queued.
 	 *
 	 * @return A Future for the result of the requestStatus
-	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
-	public abstract CompletableFuture<Result> requestStatus() throws IOException;
+	public abstract CompletableFuture<Result> requestStatus();
 
 	/**
 	 * Method to start waiting for a complete result. Should be called with lock on
-	 * `awaiting` map
+	 * `awaiting` map to prevent risk of missing results before it is called.
 	 * 
 	 * @param id ID of result message to await
 	 * @return
