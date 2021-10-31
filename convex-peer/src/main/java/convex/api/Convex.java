@@ -337,7 +337,7 @@ public abstract class Convex {
 		if (transaction.getAddress() == null) {
 			transaction = transaction.withAddress(address);
 		}
-		if (autoSequence || (transaction.getSequence() <= 0)) {
+		if (autoSequence && (transaction.getSequence() <= 0)) {
 			// apply sequence if using expected address
 			if (Utils.equals(transaction.getAddress(), address)) {
 				transaction = applyNextSequence(transaction);

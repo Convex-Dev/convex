@@ -171,12 +171,14 @@ public class Constants {
 	/**
 	 * Delay before rebroadcasting Belief if not in consensus
 	 */
-	public static final long MAX_REBROADCAST_DELAY = 200;
+	public static final long MAX_REBROADCAST_DELAY = 100;
 
 	/**
-	 * Delay before a Peer produces another Block
+	 * Delay before a Peer produces another Block. 
+	 * 
+	 * Note: This may be the bottleneck in some benchmarks! Set to 0 if blocks are being delayed
 	 */
-	public static final long MIN_BLOCK_TIME = 100;
+	public static final long MIN_BLOCK_TIME = 0;
 
 	/**
 	 * Timeout for syncing with an existing Peer
