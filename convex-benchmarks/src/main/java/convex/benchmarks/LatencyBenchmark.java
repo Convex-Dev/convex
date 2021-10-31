@@ -40,7 +40,7 @@ public class LatencyBenchmark {
 		server=servers.get(0);
 		try {
 			Thread.sleep(1000);
-			peer=Convex.connect(server);
+			peer=Convex.connect(server,server.getPeerController(),server.getKeyPair());
 			HERO=peer.createAccountSync(KPS[0].getAccountKey());
 			VILLAIN=peer.createAccountSync(KPS[1].getAccountKey());
 			peer.transfer(HERO, Coin.EMERALD);

@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.api.ConvexLocal;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
@@ -23,12 +24,11 @@ public class TestNetwork {
 
 	private static final Logger log = LoggerFactory.getLogger(TestNetwork.class.getName());
 
-	private static long NETWORK_WAIT_TIMEOUT = 30 * 1000;
 	public Server SERVER = null;
 
 	private List<Server> SERVERS = null;
 
-	public Convex CONVEX;
+	public ConvexLocal CONVEX;
 
 	// Deterministic keypairs
 	public AKeyPair[] KEYPAIRS = new AKeyPair[] {
@@ -70,15 +70,12 @@ public class TestNetwork {
 		if (SERVERS == null) {
 			SERVERS=API.launchLocalPeers(PEER_KEYPAIRS, GENESIS_STATE);
 			try {
-				// Thread.sleep(1000);
-				API.isNetworkReady(SERVERS, NETWORK_WAIT_TIMEOUT);
 				SERVER = SERVERS.get(0);
-				CONVEX=Convex.connect(SERVER.getHostAddress(), HERO, HERO_KEYPAIR);
+				CONVEX=Convex.connect(SERVER, HERO, HERO_KEYPAIR);
 			} catch (Throwable t) {
 				throw Utils.sneakyThrow(t);
 			}
 		}
-		API.isNetworkReady(SERVERS, NETWORK_WAIT_TIMEOUT);
 		log.info("*** Test Network ready ***");
 	}
 

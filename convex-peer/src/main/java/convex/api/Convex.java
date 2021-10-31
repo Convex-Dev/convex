@@ -764,18 +764,6 @@ public abstract class Convex {
 			throw new IOException("Unable to query balance", ex);
 		}
 	}
-	
-	/**
-	 * Connect to a local Server, using the Peer's address and keypair
-	 * 
-	 * @param server Server to connect to
-	 * @return New Client Connection
-	 * @throws TimeoutException If connection attempt times out
-	 * @throws IOException      If IO error occurs
-	 */
-	public static ConvexLocal connect(Server server) throws IOException, TimeoutException {
-		return connect(server,server.getPeerController(),server.getKeyPair());
-	}
 
 	/**
 	 * Connect to a local Server, using given address and keypair
@@ -784,10 +772,8 @@ public abstract class Convex {
 	 * @param address Address to use
 	 * @param keyPair Keypair to use
 	 * @return New Client Connection
-	 * @throws TimeoutException If connection attempt times out
-	 * @throws IOException      If IO error occurs
 	 */
-	public static ConvexLocal connect(Server server, Address address, AKeyPair keyPair) throws IOException, TimeoutException {
+	public static ConvexLocal connect(Server server, Address address, AKeyPair keyPair) {
 		return ConvexLocal.create(server,address,keyPair);
 	}
 

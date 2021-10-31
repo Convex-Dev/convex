@@ -65,7 +65,7 @@ public class RestoreTest {
 		Server s1=API.launchPeer(config);
 
 		// Connect with HERO Account
-		Convex cvx1=Convex.connect(s1);
+		Convex cvx1=Convex.connect(s1,HERO,KP);
 
 		Result tx1=cvx1.transactSync(Invoke.create(HERO,1, Symbols.STAR_ADDRESS));
 		assertEquals(HERO,tx1.getValue());
