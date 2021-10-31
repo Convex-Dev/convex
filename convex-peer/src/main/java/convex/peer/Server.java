@@ -388,7 +388,7 @@ public class Server implements Closeable {
 			receiverThread.start();
 
 			// Start Peer update thread
-			updateThread = new Thread(updateLoop, "Update Loop on port: " + port);
+			updateThread = new Thread(beliefMergeLoop, "Update Loop on port: " + port);
 			updateThread.setDaemon(true);
 			updateThread.start();
 
@@ -990,24 +990,25 @@ public class Server implements Closeable {
 	};
 
 	/*
-	 * Runnable loop for managing Server state updates
+	 * Runnable loop for managing Server belief merges
 	 */
-	private final Runnable updateLoop = new Runnable() {
+	private final Runnable beliefMergeLoop = new Runnable() {
 		@Override
 		public void run() {
 			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
 			try {
 				// loop while the server is running
 				while (isRunning) {
-					long timestamp=Utils.getCurrentTimestamp();
-
 					// Try belief update
-					if (maybeUpdateBelief() ) {
+					boolean beliefUpdated=maybeUpdateBelief();
+					if (beliefUpdated) {
 						raiseServerChange("consensus");
 					}
 
-					// Maybe rebroadcast Belief if not done recently
-					if ((lastBroadcastBelief+Constants.REBROADCAST_DELAY)<timestamp) {
+					long timestamp=Utils.getCurrentTimestamp();
+
+					// Broadcast Belief if changed or otherwise not done recently
+					if (beliefUpdated||((lastBroadcastBelief+Constants.REBROADCAST_DELAY)<timestamp)) {
 						// rebroadcast if there is still stuff outstanding for consensus
 						if (peer.getConsensusPoint()<peer.getPeerOrder().getBlockCount()) {
 							broadcastBelief(peer.getBelief());
