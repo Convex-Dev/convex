@@ -533,8 +533,9 @@ public class Server implements Closeable {
 			// terminate the connection, dishonest client?
 			try {
 				// TODO: throttle?
-				m.getConnection().sendResult(m.getID(), Strings.create("Bad Signature!"), ErrorCodes.SIGNATURE);
-			} catch (IOException e) {
+				Result r=Result.create(m.getID(), Strings.BAD_SIGNATURE, ErrorCodes.SIGNATURE);
+				m.reportResult(r);
+			} catch (Exception e) {
 				// Ignore?? Connection probably gone anyway
 			}
 			log.info("Bad signature from Client! {}" , sd);
@@ -604,6 +605,11 @@ public class Server implements Closeable {
 	 */
 	private HashMap<Hash, Message> interests = new HashMap<>();
 
+	/**
+	 * Register interest in receiving a result for a transaction
+	 * @param signedTransactionHash
+	 * @param m
+	 */
 	private void registerInterest(Hash signedTransactionHash, Message m) {
 		interests.put(signedTransactionHash, m);
 	}

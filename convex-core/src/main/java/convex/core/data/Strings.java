@@ -8,6 +8,7 @@ public class Strings {
 
 	public static final StringShort EMPTY = StringShort.create("");
 	public static final StringShort NIL = StringShort.create("nil");
+	public static final StringShort BAD_SIGNATURE = StringShort.create("Bad Signature!");
 
 	/**
 	 * Reads a CVM String value from a bytebuffer. Assumes tag already read.
