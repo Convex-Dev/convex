@@ -3,7 +3,6 @@ package convex.core;
 import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
-import convex.core.data.ARecord;
 import convex.core.data.ARecordGeneric;
 import convex.core.data.AString;
 import convex.core.data.AVector;
@@ -117,7 +116,7 @@ public final class Result extends ARecordGeneric {
 	}
 
 	@Override
-	protected ARecord withValues(AVector<ACell> newValues) {
+	protected Result withValues(AVector<ACell> newValues) {
 		if (values==newValues) return this;
 		return new Result(newValues);
 	}
@@ -187,7 +186,7 @@ public final class Result extends ARecordGeneric {
 	 * @return Updated Result
 	 */
 	public Result withID(ACell id) {
-		return create(values.assoc(0, id));
+		return withValues(values.assoc(0, id));
 	}
 
 	@Override

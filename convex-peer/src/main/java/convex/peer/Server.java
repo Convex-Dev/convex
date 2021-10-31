@@ -56,7 +56,6 @@ import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
-import convex.net.Connection;
 import convex.net.Message;
 import convex.net.MessageType;
 import convex.net.NIOServer;
@@ -843,8 +842,7 @@ public class Server implements Closeable {
 		try {
 			// We can ignore payload
 
-			Connection pc = m.getConnection();
-			log.debug( "Processing status request from: {}" ,pc.getRemoteAddress());
+			log.trace( "Processing status request from: {}" ,m.getOriginString());
 			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
 			// address);
 
@@ -857,7 +855,7 @@ public class Server implements Closeable {
 
 			AVector<ACell> reply=Vectors.of(beliefHash,stateHash,initialStateHash,peerKey,consensusHash);
 
-			pc.sendResult(m.getID(), reply);
+			m.reportResult(m.getID(), reply);
 		} catch (Throwable t) {
 			log.warn("Status Request Error: {}", t);
 		}
@@ -881,7 +879,6 @@ public class Server implements Closeable {
 			// extract the Address, or use HERO if not available.
 			Address address = (Address) v.get(2);
 
-			Connection pc = m.getConnection();
 			log.debug( "Processing query: {} with address: {}" , form, address);
 			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
 			// address);
@@ -889,9 +886,9 @@ public class Server implements Closeable {
 			boolean resultReturned;
 
 			if (resultContext.isExceptional()) {
-				resultReturned = pc.sendResult(Result.fromContext(id, resultContext));
+				resultReturned = m.reportResult(Result.fromContext(id, resultContext));
 			} else {
-				resultReturned = pc.sendResult(id, resultContext.getResult());
+				resultReturned = m.reportResult(id, resultContext.getResult());
 			}
 
 			if (!resultReturned) {
@@ -925,9 +922,6 @@ public class Server implements Closeable {
 	 * @param m
 	 */
 	private void processBelief(Message m) {
-		Connection pc = m.getConnection();
-		if (pc.isClosed()) return; // skip messages from closed peer
-
 		ACell o = m.getPayload();
 
 		Ref<ACell> ref = Ref.get(o);
@@ -1064,14 +1058,12 @@ public class Server implements Closeable {
 				Hash h = t.getHash();
 				Message m = interests.get(h);
 				if (m != null) {
-					log.trace("Returning transaction result to ", m.getConnection().getRemoteAddress());
-
-					Connection pc = m.getConnection();
-					if ((pc == null) || pc.isClosed()) continue;
 					ACell id = m.getID();
-					Result res = br.getResults().get(j).withID(id);
+					log.trace("Returning tranaction result ID {} to {}", id,m.getConnection().getRemoteAddress());
+					Result res = br.getResults().get(j);
 
-					pc.sendResult(res);
+					m.reportResult(res);
+					
 					interests.remove(h);
 				}
 			} catch (Throwable e) {

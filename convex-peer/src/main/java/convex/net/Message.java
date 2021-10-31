@@ -1,5 +1,8 @@
 package convex.net;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import convex.core.Belief;
 import convex.core.Result;
 import convex.core.data.ACell;
@@ -17,6 +20,8 @@ import convex.core.util.Utils;
  * <p>Messages may contain a Payload, which can be any Data Object.</p>
  */
 public class Message {
+	
+	static final Logger log = LoggerFactory.getLogger(Message.class.getName());
 
 	private final Connection connection;
 	private final ACell payload;
@@ -56,6 +61,10 @@ public class Message {
 		return create(null,MessageType.GOODBYE, peerKey);
 	}
 
+	/**
+	 * Gets the Connection instance associated with this Message
+	 * @return Connection instance. May be null.
+	 */
     public Connection getConnection() {
 		return connection;
 	}
@@ -103,6 +112,50 @@ public class Message {
 
 			default: return null;
 		}
+	}
+
+	/**
+	 * Reports a result back to the originator of the message.
+	 * 
+	 * Will set a Result ID if necessary.
+	 * 
+	 * @param res Result record
+	 * @return True if reported successfully, false otherwise
+	 */
+	public boolean reportResult(Result res) {
+		res=res.withID(getID());
+		Connection pc = getConnection();
+		if ((pc == null) || pc.isClosed()) return false;
+
+		try {
+			return pc.sendResult(res);
+		} catch (Exception t) {
+			// Ignore, probably IO error
+			log.debug("Error reporting result: {}",t.getMessage());
+			return false;
+		}
+	}
+
+	public boolean reportResult(CVMLong id, ACell reply) {
+		Connection pc = getConnection();
+		if ((pc == null) || pc.isClosed()) return false;
+		try {
+			return pc.sendResult(id,reply);
+		} catch (Exception t) {
+			// Ignore, probably IO error
+			log.debug("Error reporting result: {}",t.getMessage());
+			return false;
+		}
+	}
+	
+	/**
+	 * Gets a String identifying the origin of the message. Used for logging.
+	 * @return String representing message origin
+	 */
+	public String getOriginString() {
+		Connection pc = getConnection();
+		if (pc==null) return "Disconnected message";
+		return pc.getRemoteAddress().toString();
 	}
 
 
