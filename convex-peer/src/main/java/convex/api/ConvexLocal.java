@@ -3,6 +3,7 @@ package convex.api;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 
 import convex.core.Result;
 import convex.core.State;
@@ -10,10 +11,15 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Hash;
+import convex.core.data.Ref;
 import convex.core.data.SignedData;
-import convex.core.exceptions.TODOException;
+import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.MissingDataException;
 import convex.core.store.AStore;
 import convex.core.transactions.ATransaction;
+import convex.net.MessageType;
+import convex.net.message.MessageLocal;
 import convex.peer.Server;
 
 public class ConvexLocal extends Convex {
@@ -24,35 +30,82 @@ public class ConvexLocal extends Convex {
 		super(address, keyPair);
 		this.server=server;
 	}
+	
+	public static ConvexLocal create(Server server, Address address, AKeyPair keyPair) {
+		return new ConvexLocal(server, address,keyPair);
+	}
 
 	@Override
 	public boolean isConnected() {
 		return server.isLive();
 	}
 
-	@Override
-	public CompletableFuture<Result> transact(SignedData<ATransaction> signed) throws IOException {
-		throw new TODOException();
-	}
 
 	@Override
 	public <T extends ACell> CompletableFuture<T> acquire(Hash hash, AStore store) {
-		throw new TODOException();
+		CompletableFuture<T> f = new CompletableFuture<T>();
+		new Thread(new Runnable() {
+			@SuppressWarnings("unchecked")
+			@Override
+			public void run() {
+				AStore remoteStore=server.getStore();
+				Ref<ACell> ref=remoteStore.refForHash(hash);
+				if (ref==null) {
+					f.completeExceptionally(new MissingDataException(remoteStore,hash));
+				} else {
+					ref=store.storeTopRef(ref, Ref.PERSISTED, null);
+					f.complete((T) ref.getValue());
+				}
+			}
+		}).run();
+		return f;
 	}
 
 	@Override
 	public CompletableFuture<Result> requestStatus() throws IOException {
-		throw new TODOException();
+		return makeMessageFuture(MessageType.STATUS,CVMLong.create(makeID()));
 	}
+	
+	@Override
+	public CompletableFuture<Result> transact(SignedData<ATransaction> signed) throws IOException {
+		return makeMessageFuture(MessageType.TRANSACT,Vectors.of(makeID(),signed));
+	}
+
 
 	@Override
 	public CompletableFuture<Result> requestChallenge(SignedData<ACell> data) throws IOException {
-		throw new TODOException();
+		return makeMessageFuture(MessageType.CHALLENGE,data);
 	}
 
 	@Override
 	public CompletableFuture<Result> query(ACell query, Address address) throws IOException {
-		throw new TODOException();
+		return makeMessageFuture(MessageType.QUERY,Vectors.of(makeID(),query,address));
+	}
+	
+	private long idCounter=0;
+	
+	private long makeID() {
+		// TODO Auto-generated method stub
+		return idCounter++;
+	}
+
+	private CompletableFuture<Result> makeMessageFuture(MessageType type, ACell payload) {
+		CompletableFuture<Result> cf=new CompletableFuture<>();
+		Consumer<Result> resultHandler=makeResultHandler(cf);
+		MessageLocal ml=MessageLocal.create(type,payload, server, resultHandler);
+		try {
+			server.queueMessage(ml);
+		} catch (InterruptedException e) {
+			cf.completeExceptionally(e);
+		}
+		return cf;
+		
+	}
+
+	private Consumer<Result> makeResultHandler(CompletableFuture<Result> cf) {
+		return r->{
+			cf.complete(r);
+		};
 	}
 
 	@Override

@@ -31,7 +31,7 @@ import convex.peer.TestNetwork;
 /**
  * Tests for a Convex Client connection
  */
-public class ConvexTest {
+public class ConvexRemoteTest {
 
 	static Address ADDRESS;
 	static final AKeyPair KEYPAIR = AKeyPair.generate();
@@ -55,7 +55,7 @@ public class ConvexTest {
 	@Test
 	public void testConnection() throws IOException, TimeoutException {
 		synchronized (network.SERVER) {
-			Convex convex = Convex.connect(network.SERVER);
+			ConvexRemote convex = Convex.connectRemote(network.SERVER);
 			assertTrue(convex.isConnected());
 			convex.close();
 			assertFalse(convex.isConnected());

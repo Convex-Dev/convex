@@ -96,6 +96,8 @@ public enum MessageType {
 
 	/**
 	 * Request for a peer status update.
+	 * 
+	 * Payload is the message ID as a Long.
 	 *
 	 * Expected Result is a Vector: [signed-belief-hash states-hash initial-state-hash peer-key consensus-state-hash]
 	 */

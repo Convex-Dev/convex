@@ -112,7 +112,7 @@ public class Server implements Closeable {
 		@Override
 		public void accept(Message msg) {
 			try {
-				receiveQueue.put(msg);
+				queueMessage(msg);
 			} catch (InterruptedException e) {
 				log.warn("Interrupt on peer receive queue!");
 			}
@@ -755,6 +755,14 @@ public class Server implements Closeable {
 	 */
 	public void queueEvent(SignedData<?> event) throws InterruptedException {
 		eventQueue.put(event);
+	}
+	
+	/**
+	 * Queues a message for processing by this Server. May block briefly.
+	 * @param m Message to queue
+	 */
+	public void queueMessage(Message m) throws InterruptedException {
+		receiveQueue.put(m);
 	}
 
 	/**

@@ -16,6 +16,8 @@ import convex.net.MessageType;
 
 /**
  * <p>Class representing a message to / from a specific connection</p>
+ * 
+ * <p>Encapsulates both message content and a means of return communication</p>.
  *
  * <p>This class is an immutable data structure, but NOT a representable on-chain
  * data structure, as it is part of the peer protocol layer.</p>
@@ -115,6 +117,12 @@ public abstract class Message {
 	 */
 	public abstract boolean reportResult(Result res);
 
+	/**
+	 * Report a result for a given message ID
+	 * @param id Message ID
+	 * @param reply Value for result
+	 * @return True if reported successfully, false otherwise
+	 */
 	public abstract boolean reportResult(CVMLong id, ACell reply);
 	
 	/**
@@ -123,8 +131,18 @@ public abstract class Message {
 	 */
 	public abstract String getOriginString();
 
+	/**
+	 * Sends a cell of data to the connected Peer
+	 * @param data Data to send
+	 * @return true if data sent, false otherwise
+	 */
 	public abstract boolean sendData(ACell data);
 
+	/**
+	 * Sends a missing data request to the connected Peer
+	 * @param hash HAsh of missing data
+	 * @return True if request sent, false otherwise
+	 */
 	public abstract boolean sendMissingData(Hash hash);
 
 

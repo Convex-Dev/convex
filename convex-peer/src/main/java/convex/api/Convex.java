@@ -163,6 +163,10 @@ public abstract class Convex {
 			throws IOException, TimeoutException {
 		return Convex.connect(peerAddress, address, keyPair, Stores.current());
 	}
+	
+	public static ConvexRemote connectRemote(Server server) throws IOException, TimeoutException {
+		return connect(server.getHostAddress(),server.getPeerController(),server.getKeyPair());
+	}
 
 	/**
 	 * Create a Convex client by connecting to the specified Peer using the given
@@ -760,7 +764,7 @@ public abstract class Convex {
 			throw new IOException("Unable to query balance", ex);
 		}
 	}
-
+	
 	/**
 	 * Connect to a local Server, using the Peer's address and keypair
 	 * 
@@ -769,8 +773,22 @@ public abstract class Convex {
 	 * @throws TimeoutException If connection attempt times out
 	 * @throws IOException      If IO error occurs
 	 */
-	public static Convex connect(Server server) throws IOException, TimeoutException {
-		return connect(server.getHostAddress(), server.getPeerController(), server.getKeyPair());
+	public static ConvexLocal connect(Server server) throws IOException, TimeoutException {
+		return connect(server,server.getPeerController(),server.getKeyPair());
+	}
+
+	/**
+	 * Connect to a local Server, using given address and keypair
+	 * 
+	 * @param server Server to connect to
+	 * @param address Address to use
+	 * @param keyPair Keypair to use
+	 * @return New Client Connection
+	 * @throws TimeoutException If connection attempt times out
+	 * @throws IOException      If IO error occurs
+	 */
+	public static ConvexLocal connect(Server server, Address address, AKeyPair keyPair) throws IOException, TimeoutException {
+		return ConvexLocal.create(server,address,keyPair);
 	}
 
 	/**
@@ -780,6 +798,8 @@ public abstract class Convex {
 	 * @throws TimeoutException If initial status request times out
 	 */
 	public abstract CompletableFuture<State> acquireState() throws TimeoutException;
+
+	
 
 
 
