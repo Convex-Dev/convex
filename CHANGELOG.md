@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Some Juice cost adjustments
 - `empty?` now works on any Countable structure (including Strings and Blobs)
 - `RefSoft` instances now directly reference a store instead of relying on thread locals
+- Miscellaneous internal refactoring for Peers
 
 ### Fixed
 - Eliminate non-canonical NaN values
