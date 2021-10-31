@@ -16,10 +16,12 @@ import convex.api.ConvexLocal;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
+import convex.core.lang.Reader;
 import convex.core.lang.ops.Constant;
 import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
@@ -65,16 +67,53 @@ public class LocalPeerBenchmark {
 			}
 			HERO=hr.getValue();
 			CONVEX=Convex.connect(SERVER, HERO, HERO_KP);
+			CONVEX.transactSync("(def bm (blob-map))");
 		} catch (Throwable t) {
 			Utils.sneakyThrow(t);
 		}
 	}
 
+	/**
+	 * Benchmark to test a single small op in a transaction. Basically the fastest we can
+	 * get a single transaction confirmed on a local Peer.
+	 * @throws TimeoutException If client times out
+	 * @throws IOException In case of IO error
+	 */
 	@Benchmark
-	public void constantOp() throws TimeoutException, IOException {
+	public void constantOpTransaction() throws TimeoutException, IOException {
 		Result r=CONVEX.transactSync(Invoke.create(HERO, 0, Constant.create(CVMLong.ONE)));
 		if (r.isError()) {
 			throw new Error("Transaction Failed: "+r.toString());
+		}
+	}
+	
+	static final ACell readWriteCmd=Reader.read("(do (def bm (assoc bm (blob *sequence*) :foo)) (get bm *sequence*))");
+ 
+	/**
+	 * Benchmark to test read and write in a transaction. Basically the fastest we can
+	 * confirm update of an immutable data structure in user's environment.
+	 * @throws TimeoutException If client times out
+	 * @throws IOException In case of IO error
+	 */
+	@Benchmark
+	public void readWriteTransaction() throws TimeoutException, IOException {
+		Result r=CONVEX.transactSync(Invoke.create(HERO, 0, readWriteCmd));
+		if (r.isError()) {
+			throw new Error("Transaction Failed: "+r.toString());
+		}
+	}
+	
+	/**
+	 * Benchmark to test a single small op in a transaction. Basically the fastest we can
+	 * get a single transaction confirmed on a local Peer.
+	 * @throws TimeoutException If client times out
+	 * @throws IOException In case of IO error
+	 */
+	@Benchmark
+	public void constantOpQuery() throws TimeoutException, IOException {
+		Result r=CONVEX.querySync(Constant.create(CVMLong.ONE));
+		if (r.isError()) {
+			throw new Error("Query Failed: "+r.toString());
 		}
 	}
 
