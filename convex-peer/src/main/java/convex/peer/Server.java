@@ -56,9 +56,9 @@ import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
-import convex.net.Message;
 import convex.net.MessageType;
 import convex.net.NIOServer;
+import convex.net.message.Message;
 
 
 /**
@@ -478,9 +478,9 @@ public class Server implements Closeable {
 			log.trace("Missing data: {} in message of type {}" , missingHash,type);
 			try {
 				registerPartialMessage(missingHash, m);
-				m.getConnection().sendMissingData(missingHash);
+				m.sendMissingData(missingHash);
 				log.trace("Requested missing data {} for partial message",missingHash);
-			} catch (IOException ex) {
+			} catch (Exception ex) {
 				log.warn( "Exception while requesting missing data: {}" + ex);
 			}
 		} catch (BadFormatException | ClassCastException | NullPointerException e) {
@@ -504,12 +504,12 @@ public class Server implements Closeable {
 		if (r != null) {
 			try {
 				ACell data = r.getValue();
-				boolean sent = m.getConnection().sendData(data);
+				boolean sent = m.sendData(data);
 				// log.trace( "Sent missing data for hash: {} with type {}",Utils.getClassName(data));
 				if (!sent) {
 					log.debug("Can't send missing data for hash {} due to full buffer",h);
 				}
-			} catch (IOException e) {
+			} catch (Exception e) {
 				log.warn("Unable to deliver missing data for {} due to exception: {}", h, e);
 			}
 		} else {
@@ -889,13 +889,9 @@ public class Server implements Closeable {
 			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
 			// address);
 			Context<ACell> resultContext = peer.executeQuery(form, address);
-			boolean resultReturned;
-
-			if (resultContext.isExceptional()) {
-				resultReturned = m.reportResult(Result.fromContext(id, resultContext));
-			} else {
-				resultReturned = m.reportResult(id, resultContext.getResult());
-			}
+			
+			// Report result back to message sender
+			boolean resultReturned= m.reportResult(Result.fromContext(id, resultContext));
 
 			if (!resultReturned) {
 				log.warn("Failed to send query result back to client with ID: {}", id);
@@ -1065,7 +1061,7 @@ public class Server implements Closeable {
 				Message m = interests.get(h);
 				if (m != null) {
 					ACell id = m.getID();
-					log.trace("Returning tranaction result ID {} to {}", id,m.getConnection().getRemoteAddress());
+					log.trace("Returning tranaction result ID {} to {}", id,m.getOriginString());
 					Result res = br.getResults().get(j);
 
 					m.reportResult(res);

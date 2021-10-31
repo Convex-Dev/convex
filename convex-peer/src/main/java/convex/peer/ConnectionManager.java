@@ -33,7 +33,8 @@ import convex.core.lang.RT;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.net.Connection;
-import convex.net.Message;
+import convex.net.message.Message;
+import convex.net.message.MessageRemote;
 
 /**
  * Class for managing the outbound connections from a Peer Server.
@@ -397,7 +398,7 @@ public class ConnectionManager {
 				log.debug("challenge data incorrect number of items should be 3 not ",RT.count(challengeValues));
 				return;
 			}
-			Connection pc = m.getConnection();
+			Connection pc = ((MessageRemote)m).getConnection();
 			if ( pc == null) {
 				log.warn( "No remote peer connection from challenge");
 				return;
@@ -454,7 +455,7 @@ public class ConnectionManager {
 		try {
 			SignedData<ACell> signedData = m.getPayload();
 
-			log.debug( "Processing response request from: {}",m.getConnection().getRemoteAddress());
+			log.debug( "Processing response request from: {}",m.getOriginString());
 
 			@SuppressWarnings("unchecked")
 			AVector<ACell> responseValues = (AVector<ACell>) signedData.getValue();

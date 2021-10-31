@@ -1,6 +1,5 @@
 package convex.net;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.function.Consumer;
@@ -16,6 +15,7 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
+import convex.net.message.Message;
 
 /**
  * Consumer<Message> abstract base class for awaiting results.
@@ -75,8 +75,8 @@ public abstract class ResultConsumer implements Consumer<Message> {
 		
 		Ref<?> r = Stores.current().refForHash(h);
 		if (r != null) try {
-			m.getConnection().sendData(r.getValue());
-		} catch (IOException e) {
+			m.sendData(r.getValue());
+		} catch (Exception e) {
 			log.debug("Error replying to MISSING DATA request",e);
 		}
 	}
@@ -128,15 +128,15 @@ public abstract class ResultConsumer implements Consumer<Message> {
 			// And wait for it to arrive later
 			Hash hash = e.getMissingHash();
 			try {
-				if (m.getConnection().sendMissingData(hash)) {
+				if (m.sendMissingData(hash)) {
 					log.debug("Missing data {} requested by client for RESULT of type: {}",hash.toHexString(),Utils.getClassName(result));
 					buffer(hash, m);
 				} else {
 					log.debug("Unable to request missing data");
 				}
-			} catch (IOException e1) {
+			} catch (Exception e1) {
 				// Ignore. We probably lost this result?
-				log.warn("IO Exception handling result - {}",e1);
+				log.warn("Exception handling result - {}",e1);
 			}
 			return;
 		}

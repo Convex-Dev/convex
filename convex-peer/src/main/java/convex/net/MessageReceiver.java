@@ -15,6 +15,7 @@ import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.exceptions.BadFormatException;
+import convex.net.message.Message;
 
 /**
  * Class responsible for buffered accumulation of messages received over a connection.

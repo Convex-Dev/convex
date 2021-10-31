@@ -11,6 +11,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
+import convex.net.message.Message;
 
 /**
  * Tests for the low level Connection class

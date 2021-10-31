@@ -1,4 +1,4 @@
-package convex.net;
+package convex.net.message;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,37 +7,38 @@ import convex.core.Belief;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
+import convex.net.Connection;
+import convex.net.MessageType;
 
 /**
- * <p>Class representing a message to / from a specific PeerConnection</p>
+ * <p>Class representing a message to / from a specific connection</p>
  *
  * <p>This class is an immutable data structure, but NOT a representable on-chain
  * data structure, as it is part of the peer protocol layer.</p>
  *
  * <p>Messages may contain a Payload, which can be any Data Object.</p>
  */
-public class Message {
+public abstract class Message {
 	
 	static final Logger log = LoggerFactory.getLogger(Message.class.getName());
 
-	private final Connection connection;
-	private final ACell payload;
-	private final MessageType type;
+	protected final ACell payload;
+	protected final MessageType type;
 
-	private Message(Connection peerConnection, MessageType type, ACell payload) {
-		this.connection = peerConnection;
+	protected Message(MessageType type, ACell payload) {
 		this.type = type;
 		this.payload = payload;
 	}
 
-	public static Message create(Connection peerConnection, MessageType type, ACell payload) {
-		return new Message(peerConnection, type, payload);
+	public static MessageRemote create(Connection peerConnection, MessageType type, ACell payload) {
+		return new MessageRemote(peerConnection, type, payload);
 	}
 
-	public static Message create(Connection peerConnection, ACell o) {
+	public static MessageRemote create(Connection peerConnection, ACell o) {
 		return create(peerConnection, MessageType.DATA, o);
 	}
 
@@ -61,17 +62,7 @@ public class Message {
 		return create(null,MessageType.GOODBYE, peerKey);
 	}
 
-	/**
-	 * Gets the Connection instance associated with this Message
-	 * @return Connection instance. May be null.
-	 */
-    public Connection getConnection() {
-		return connection;
-	}
 
-	public Message withConnection(Connection peerConnection) {
-		return new Message(peerConnection, type, payload);
-	}
 
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> T getPayload() {
@@ -122,41 +113,19 @@ public class Message {
 	 * @param res Result record
 	 * @return True if reported successfully, false otherwise
 	 */
-	public boolean reportResult(Result res) {
-		res=res.withID(getID());
-		Connection pc = getConnection();
-		if ((pc == null) || pc.isClosed()) return false;
+	public abstract boolean reportResult(Result res);
 
-		try {
-			return pc.sendResult(res);
-		} catch (Exception t) {
-			// Ignore, probably IO error
-			log.debug("Error reporting result: {}",t.getMessage());
-			return false;
-		}
-	}
-
-	public boolean reportResult(CVMLong id, ACell reply) {
-		Connection pc = getConnection();
-		if ((pc == null) || pc.isClosed()) return false;
-		try {
-			return pc.sendResult(id,reply);
-		} catch (Exception t) {
-			// Ignore, probably IO error
-			log.debug("Error reporting result: {}",t.getMessage());
-			return false;
-		}
-	}
+	public abstract boolean reportResult(CVMLong id, ACell reply);
 	
 	/**
 	 * Gets a String identifying the origin of the message. Used for logging.
 	 * @return String representing message origin
 	 */
-	public String getOriginString() {
-		Connection pc = getConnection();
-		if (pc==null) return "Disconnected message";
-		return pc.getRemoteAddress().toString();
-	}
+	public abstract String getOriginString();
+
+	public abstract boolean sendData(ACell data);
+
+	public abstract boolean sendMissingData(Hash hash);
 
 
 

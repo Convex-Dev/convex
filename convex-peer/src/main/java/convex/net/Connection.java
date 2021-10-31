@@ -38,6 +38,7 @@ import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.core.util.Counters;
 import convex.core.util.Utils;
+import convex.net.message.Message;
 
 /**
  * <p>
