@@ -186,5 +186,10 @@ public class ErrorCodes {
 	 */
 	public static final Keyword FATAL = Keyword.create("FATAL");
 
+	/**
+	 * ErrorCode for a message format error.
+	 */
+	public static final Keyword FORMAT = Keyword.create("FORMAT");
+
 
 }

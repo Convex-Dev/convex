@@ -9,6 +9,7 @@ public class Strings {
 	public static final StringShort EMPTY = StringShort.create("");
 	public static final StringShort NIL = StringShort.create("nil");
 	public static final StringShort BAD_SIGNATURE = StringShort.create("Bad Signature!");
+	public static final StringShort BAD_FORMAT = StringShort.create("Bad Massage Format!");;
 
 	/**
 	 * Reads a CVM String value from a bytebuffer. Assumes tag already read.

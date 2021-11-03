@@ -428,6 +428,8 @@ public class Server implements Closeable {
 	/**
 	 * Process a message received from a peer or client. We know at this point that the
 	 * message parsed successfully, not much else.....
+	 * 
+	 * SECURITY: Should anticipate malicious messages
 	 *
 	 * If the message is partial, will be queued pending delivery of missing data.
 	 *
@@ -470,6 +472,10 @@ public class Server implements Closeable {
 				break;
 			case STATUS:
 				processStatus(m);
+				break;
+			default:
+				Result r=Result.create(m.getID(), Strings.create("Bad Message Type: "+type), ErrorCodes.ARGUMENT);
+				m.reportResult(r);
 				break;
 			}
 
@@ -539,6 +545,12 @@ public class Server implements Closeable {
 				// Ignore?? Connection probably gone anyway
 			}
 			log.info("Bad signature from Client! {}" , sd);
+			return;
+		}
+		
+		if (!(sd.getValue() instanceof ATransaction)) {
+			Result r=Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT);
+			m.reportResult(r);
 			return;
 		}
 
@@ -946,6 +958,12 @@ public class Server implements Closeable {
 
 			// TODO: validate trusted connection?
 			// TODO: can drop Beliefs if under pressure?
+			
+			if (!(receivedBelief.getValue() instanceof Belief)) {
+				Result r=Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT);
+				m.reportResult(r);
+				return;
+			}
 
 			eventQueue.put(receivedBelief);
 		} catch (ClassCastException e) {
@@ -1055,7 +1073,7 @@ public class Server implements Closeable {
 							,getHostAddress(),receivedBelief.getValue().getHash());
 				}
 			} else {
-				throw new Error("Unexpected type in event queue!"+Utils.getClassName(event));
+				log.debug("Unexpected type in event queue! {}",event.getType());
 			}
 		}
 	}

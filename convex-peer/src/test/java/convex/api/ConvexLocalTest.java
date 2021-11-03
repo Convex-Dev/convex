@@ -16,6 +16,7 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519Signature;
+import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
@@ -53,7 +54,7 @@ public class ConvexLocalTest {
 	@Test
 	public void testConvex() throws IOException, TimeoutException {
 		synchronized (network.SERVER) {
-			Convex convex = Convex.connect(network.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
+			ConvexLocal convex = Convex.connect(network.SERVER, ADDRESS, KEYPAIR);
 			Result r = convex.transactSync(Invoke.create(ADDRESS, 0, Reader.read("*address*")), 1000);
 			assertNull(r.getErrorCode(), "Error:" + r.toString());
 			assertEquals(ADDRESS, r.getValue());
@@ -63,10 +64,25 @@ public class ConvexLocalTest {
 	@Test
 	public void testBadSignature() throws IOException, TimeoutException, InterruptedException, ExecutionException {
 		synchronized (network.SERVER) {
-			Convex convex = Convex.connect(network.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
+			ConvexLocal convex = Convex.connect(network.SERVER, ADDRESS, KEYPAIR);
 			Ref<ATransaction> tr = Invoke.create(ADDRESS, 0, Reader.read("*address*")).getRef();
 			Result r = convex.transact(SignedData.create(KEYPAIR, Ed25519Signature.ZERO, tr)).get();
 			assertEquals(ErrorCodes.SIGNATURE, r.getErrorCode());
+		}
+	}
+	
+	@Test
+	public void testBadFormat() throws IOException, TimeoutException, InterruptedException, ExecutionException {
+		synchronized (network.SERVER) {
+			ConvexLocal convex = Convex.connect(network.SERVER, ADDRESS, KEYPAIR);
+			
+			// We are going to fake a value that isn't a transaction
+			ACell trFake = Reader.read("*address*"); // a symbol, not a transaction!
+			@SuppressWarnings({ "rawtypes", "unchecked" })
+			SignedData<ATransaction> tr = (SignedData<ATransaction>)(SignedData)(KEYPAIR.signData(trFake));
+			
+			Result r = convex.transact(tr).get();
+			assertEquals(ErrorCodes.FORMAT, r.getErrorCode());
 		}
 	}
 
