@@ -2,9 +2,11 @@ package convex.core.lang;
 
 import java.util.Map;
 
+import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.AList;
 import convex.core.data.AMap;
 import convex.core.data.ASequence;
@@ -12,6 +14,7 @@ import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.data.List;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
@@ -19,6 +22,7 @@ import convex.core.data.Sets;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.Types;
 import convex.core.lang.Context.CompilerState;
@@ -158,6 +162,8 @@ public class Compiler {
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileSymbol(Symbol sym, Context<?> context) {
 		// First check for lexically defined Symbols
 		CompilerState cs=context.getCompilerState();
+		
+		// First check if we hit a local declaration
 		if (cs!=null) {
 			CVMLong position=cs.getPosition(sym);
 			if (position!=null) {
@@ -172,9 +178,26 @@ public class Compiler {
 			return context.withResult(maybeSpecial);
 		}
 		
-		// Get address of compilation environment to use for lookup resolution.
+		// Regular symbol lookup in environment
 		Address address=context.getAddress();
+		return compileEnvSymbol(address,sym,context);
+	}
+	
+	@SuppressWarnings("unchecked")
+	private static <R extends ACell, T extends AOp<R>> Context<T> compileEnvSymbol(Address address,Symbol sym, Context<?> context) {
+		// Optional code for :static embedding
+		if (Constants.OPT_STATIC) {
+			// Get metadata for symbol.
+			AHashMap<ACell, ACell> meta=context.lookupMeta(sym);
+			
+			// If static, embed value directly as constant
+			if ((meta!=null)&&meta.get(Keywords.STATIC)==CVMBool.TRUE) {
+				ACell value=context.lookupValue(sym);
+				return (Context<T>) context.withResult(Juice.COMPILE_LOOKUP,Constant.create(value));
+			}
+		}
 		
+		// Finally revert to a lookup in the current address / enviornment
 		Lookup<T> lookUp=Lookup.create(Constant.of(address),sym);
 		return (Context<T>) context.withResult(Juice.COMPILE_LOOKUP, lookUp);
 	}
@@ -206,6 +229,7 @@ public class Compiler {
 
 		AOp<Address> exp=null;
 		if (n==3) {
+			// second element of list should be address expression
 			context=context.compile(list.get(1));
 			if (context.isExceptional()) return (Context<T>)context;
 			exp=(AOp<Address>) context.getResult();

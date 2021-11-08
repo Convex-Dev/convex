@@ -50,6 +50,7 @@ import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.CorePred;
 import convex.core.lang.impl.ErrorValue;
 import convex.core.lang.impl.HaltValue;
+import convex.core.lang.impl.ICoreDef;
 import convex.core.lang.impl.RecurValue;
 import convex.core.lang.impl.Reduced;
 import convex.core.lang.impl.ReturnValue;
@@ -2500,8 +2501,14 @@ public class Core {
  						}
  					}
  				}
+ 				
+ 				// Intrinsic core defs are marked as static
+ 				ACell value=definedEntry.getValue();
+ 				if (value instanceof ICoreDef) {
+ 					meta=meta.assoc(Keywords.STATIC, CVMBool.TRUE);
+ 				}
  
- 				ctx = ctx.defineWithSyntax(Syntax.create(sym, meta), definedEntry.getValue());
+ 				ctx = ctx.defineWithSyntax(Syntax.create(sym, meta), value);
  			} catch (Throwable ex) {
  				throw new Error("Error applying documentation:  " + entry, ex);
  			}

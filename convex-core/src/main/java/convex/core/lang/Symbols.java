@@ -296,6 +296,8 @@ public class Symbols {
 	public static final Symbol BIT_OR = Symbol.create("bit-or");
 	public static final Symbol BIT_XOR = Symbol.create("bit-xor");
 	public static final Symbol BIT_NOT = Symbol.create("bit-not");
+	
+	public static final Symbol STATIC = Symbol.create("static");
 
 
 }

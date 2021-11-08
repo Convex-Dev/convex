@@ -87,4 +87,5 @@ public class Keywords {
 	public static final Keyword AUTO_MANAGE = Keyword.create("auto-manage");
 	public static final Keyword TIMEOUT = Keyword.create("timeout");
 	public static final Keyword EVENT_HOOK = Keyword.create("event-hook");
+	public static final Keyword STATIC = Keyword.create("static");
 }

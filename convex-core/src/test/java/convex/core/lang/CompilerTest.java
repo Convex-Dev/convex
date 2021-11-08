@@ -21,6 +21,7 @@ import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AList;
@@ -37,6 +38,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
+import convex.core.init.Init;
 import convex.core.init.InitTest;
 import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Def;
@@ -389,7 +391,7 @@ public class CompilerTest extends ACVMTest {
 	@Test
 	public void testLookupAddress() {
 		Lookup<?> l=comp("foo");
-		assertEquals(Constant.of(HERO),l.getAddress());
+		assertEquals(Constant.of(HERO),l.getAddress()); // should match compilation address
 	}
 
 	@Test
@@ -563,6 +565,21 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(Sets.of(1L,2L),eval("(eval '#{(if true 1 2) (if false 1 2)})"));
 		assertEquals(Sets.of(1L,2L),eval("(eval `#{(if true 1 2) ~(if false 1 2)})"));
 	}
+	
+	@Test
+	public void testStaticCompilation() {
+		if (Constants.OPT_STATIC) {
+			assertSame(CVMBool.TRUE,eval("(:static (lookup-meta 'count))"));
+	
+			// Static core function should compile to constant
+			assertEquals(Constant.of(Core.COUNT),eval("(compile 'count)"));
+		}
+
+		// Aliases compile to dynamic lookup
+		assertEquals(Lookup.create(Address.create(1), Symbols.COUNT),eval("(compile '#1/count)"));
+		assertEquals(Lookup.create(Address.create(8), Symbols.TRANSFER),eval("(compile '#8/transfer)"));
+		assertEquals(Lookup.create(Address.create(8888), Symbols.TRANSFER),eval("(compile '#8888/transfer)"));
+}
 
 	@Test
 	public void testEdgeCases() {

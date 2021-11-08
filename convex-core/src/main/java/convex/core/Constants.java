@@ -194,4 +194,9 @@ public class Constants {
 	 * Default port for Convex Peers
 	 */
 	public static final int DEFAULT_PEER_PORT = 18888;
+
+	/**
+	 * Option for static compilation support
+	 */
+	public static final boolean OPT_STATIC = false;
 }
