@@ -38,7 +38,6 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
-import convex.core.init.Init;
 import convex.core.init.InitTest;
 import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Def;
