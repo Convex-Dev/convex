@@ -257,6 +257,8 @@ public class Compiler {
 	}
 
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileSet(ASet<ACell> form, Context<?> context) {
+		if (form.isEmpty()) return compileConstant(context,Sets.empty());
+		
 		AVector<ACell> vs = Vectors.empty();
 		for (ACell o : form) {
 			vs = vs.conj(o);

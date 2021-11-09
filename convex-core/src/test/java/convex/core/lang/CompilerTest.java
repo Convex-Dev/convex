@@ -62,6 +62,8 @@ public class CompilerTest extends ACVMTest {
 
 	@Test
 	public void testConstants() {
+		// Basic constant values should evaluate to themselves
+		
 		assertEquals(1L,evalL("1"));
 		assertEquals(Samples.FOO,eval(":foo"));
 		assertCVMEquals('d',eval("\\d"));
@@ -69,10 +71,29 @@ public class CompilerTest extends ACVMTest {
 
 		assertSame(Vectors.empty(),eval("[]"));
 		assertSame(Lists.empty(),eval("()"));
+		assertSame(Sets.empty(),eval("#{}"));
+		assertSame(Maps.empty(),eval("{}"));
 
 		assertNull(eval("nil"));
 		assertSame(CVMBool.TRUE,eval("true"));
 		assertSame(CVMBool.FALSE,eval("false"));
+		
+		// basic constant values should also compile to themselves!
+		
+		assertEquals(Constant.of(1L),comp("1"));
+		assertEquals(Constant.of(Samples.FOO),comp(":foo"));
+		assertEquals(Constant.of('d'),comp("\\d"));
+		assertEquals(Constant.of("baz"),comp("\"baz\""));
+		
+		assertEquals(Constant.of(Vectors.empty()),comp("[]"));
+		assertEquals(Constant.of(Lists.empty()),comp("()"));
+		assertEquals(Constant.of(Sets.empty()),comp("#{}"));
+		// assertEquals(Constant.of(Maps.empty()),comp("{}")); TODO: handle this?
+		
+		assertEquals(Constant.of(null),comp("nil"));
+		assertEquals(Constant.of(true),comp("true"));
+		assertEquals(Constant.of(false),comp("false"));
+
 	}
 
 	@Test public void testDo() {
