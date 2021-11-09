@@ -124,7 +124,7 @@ public class EtchStoreTest {
 			Block b=Block.of(Utils.getCurrentTimestamp(),InitTest.FIRST_PEER_KEY,kp.signData(t1),kp.signData(t2));
 			assertNotNull(b.getPeer());
 
-			Order ord=Order.create().propose(b);
+			Order ord=Order.create().append(b);
 
 			Belief belief=Belief.create(kp,ord);
 

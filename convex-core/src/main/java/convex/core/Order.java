@@ -43,7 +43,7 @@ public class Order extends ACell {
 	 * Create an Order
 	 * @param blocks Blocks in ORder
 	 * @param proposalPoint Proposal Point
-	 * @param consensusPoint Conesnsus Point
+	 * @param consensusPoint Consensus Point
 	 * @return New Order instance
 	 */
 	private static Order create(AVector<Block> blocks, long proposalPoint, long consensusPoint) {
@@ -186,12 +186,12 @@ public class Order extends ACell {
 	}
 
 	/**
-	 * Propose a new block of transactions in this Order
+	 * Append a new block of transactions in this Order
 	 * 
 	 * @param block Block to append
 	 * @return The updated chain
 	 */
-	public Order propose(Block block) {
+	public Order append(Block block) {
 		AVector<Block> newBlocks = blocks.append(block);
 		return create(newBlocks, proposalPoint, consensusPoint);
 	}
