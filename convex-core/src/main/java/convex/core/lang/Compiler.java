@@ -246,6 +246,8 @@ public class Compiler {
 
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileMap(AMap<ACell, ACell> form, Context<?> context) {
 		int n = form.size();
+		if (n==0) return compileConstant(context,form);
+		
 		ACell[] vs = new ACell[1 + n * 2];
 		vs[0] = Symbols.HASH_MAP;
 		for (int i = 0; i < n; i++) {

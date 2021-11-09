@@ -88,7 +88,7 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(Constant.of(Vectors.empty()),comp("[]"));
 		assertEquals(Constant.of(Lists.empty()),comp("()"));
 		assertEquals(Constant.of(Sets.empty()),comp("#{}"));
-		// assertEquals(Constant.of(Maps.empty()),comp("{}")); TODO: handle this?
+		assertEquals(Constant.of(Maps.empty()),comp("{}"));
 		
 		assertEquals(Constant.of(null),comp("nil"));
 		assertEquals(Constant.of(true),comp("true"));

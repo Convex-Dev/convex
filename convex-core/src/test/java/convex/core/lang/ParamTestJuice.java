@@ -25,7 +25,7 @@ import convex.core.util.Utils;
 public class ParamTestJuice {
 
 	private static final long JUICE_SYM_LOOKUP = Juice.LOOKUP_SYM;
-	private static final long JUICE_EMPTY_MAP = (Juice.BUILD_DATA + JUICE_SYM_LOOKUP); // consider: (hash-map)
+	private static final long JUICE_EMPTY_MAP = Juice.CONSTANT; // consider: (hash-map) vs {}
 	private static final long JUICE_IDENTITY_FN = (Juice.LAMBDA);
 
 	@Parameterized.Parameters(name = "{index}: {0}")
@@ -33,8 +33,8 @@ public class ParamTestJuice {
 		return Arrays.asList(new Object[][] {
 			    { "3", 3L, Juice.CONSTANT },
 			    { "'()", Lists.empty(), Juice.CONSTANT },
-				{ "{}", Maps.empty(), JUICE_EMPTY_MAP }, // (hash-map)
-				{ "(hash-map)", Maps.empty(), JUICE_EMPTY_MAP }, // (hash-map)
+				{ "{}", Maps.empty(), JUICE_EMPTY_MAP }, // {}
+				{ "(hash-map)", Maps.empty(), (Juice.BUILD_DATA + JUICE_SYM_LOOKUP) }, // (hash-map)
 				{ "(eval 1)", 1L,
 						(Juice.EVAL + JUICE_SYM_LOOKUP + Juice.CONSTANT) + Juice.EXPAND_CONSTANT + Juice.COMPILE_CONSTANT
 								+ Juice.CONSTANT },
