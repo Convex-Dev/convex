@@ -25,7 +25,7 @@ import convex.core.transactions.ATransaction;
 import convex.core.util.Utils;
 
 /**
- * A block contains an ordered collection of signed transactions that may be applied 
+ * A Block contains an ordered collection of signed transactions that may be applied 
  * collectively as part of a state update.
  * 
  * Blocks represent the units of novelty in the consensus system: a future state is 

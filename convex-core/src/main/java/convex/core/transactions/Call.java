@@ -31,8 +31,6 @@ public class Call extends ATransaction {
 	protected final Symbol functionName;
 	protected final AVector<ACell> args;
 
-
-	
 	protected Call(Address address, long sequence, Address target, long offer,Symbol functionName,AVector<ACell> args) {
 		super(address,sequence);
 		this.target=target;
@@ -122,18 +120,18 @@ public class Call extends ATransaction {
 	public ACell updateRefs(IRefFunction func) {
 		AVector<ACell> newArgs=args.updateRefs(func);
 		if (args==newArgs) return this;
-		return new Call(address,sequence,target,offer,functionName,newArgs);
+		return new Call(origin,sequence,target,offer,functionName,newArgs);
 	}
 
 	@Override
 	public Call withSequence(long newSequence) {
 		if (newSequence==this.sequence) return this;
-		return create(address,newSequence,target,offer,functionName,args);
+		return create(origin,newSequence,target,offer,functionName,args);
 	}
 	
 	@Override
-	public Call withAddress(Address newAddress) {
-		if (newAddress==this.address) return this;
+	public Call withOrigin(Address newAddress) {
+		if (newAddress==this.origin) return this;
 		return create(newAddress,sequence,target,offer,functionName,args);
 	}
 

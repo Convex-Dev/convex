@@ -334,12 +334,12 @@ public abstract class Convex {
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
 	public synchronized CompletableFuture<Result> transact(ATransaction transaction) throws IOException {
-		if (transaction.getAddress() == null) {
-			transaction = transaction.withAddress(address);
+		if (transaction.getOrigin() == null) {
+			transaction = transaction.withOrigin(address);
 		}
 		if (autoSequence && (transaction.getSequence() <= 0)) {
 			// apply sequence if using expected address
-			if (Utils.equals(transaction.getAddress(), address)) {
+			if (Utils.equals(transaction.getOrigin(), address)) {
 				transaction = applyNextSequence(transaction);
 			} else {
 				// ignore??

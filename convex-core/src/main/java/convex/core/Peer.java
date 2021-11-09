@@ -270,7 +270,7 @@ public class Peer {
 	 * @return Estimated cost
 	 */
 	public long estimateCost(ATransaction trans) {
-		Address address=trans.getAddress();
+		Address address=trans.getOrigin();
 		State state=getConsensusState();
 		Context<?> ctx=executeDryRun(trans);
 		return state.getBalance(address)-ctx.getState().getBalance(address);

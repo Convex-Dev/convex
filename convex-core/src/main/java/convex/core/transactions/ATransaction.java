@@ -19,12 +19,12 @@ import convex.core.lang.Context;
  *
  */
 public abstract class ATransaction extends ACell {
-	protected final Address address;
+	protected final Address origin;
 	protected final long sequence;
 
-	protected ATransaction(Address address, long sequence) {
-		if (address==null) throw new ClassCastException("Null Address for transaction");
-		this.address=address;
+	protected ATransaction(Address origin, long sequence) {
+		if (origin==null) throw new ClassCastException("Null Origin Address for transaction");
+		this.origin=origin;
 		this.sequence = sequence;
 	}
 
@@ -36,7 +36,7 @@ public abstract class ATransaction extends ACell {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = Format.writeVLCLong(bs,pos, address.longValue());
+		pos = Format.writeVLCLong(bs,pos, origin.longValue());
 		pos = Format.writeVLCLong(bs,pos, sequence);
 		return pos;
 	}
@@ -64,8 +64,8 @@ public abstract class ATransaction extends ACell {
 	 * Gets the *origin* Address for this transaction
 	 * @return Address for this Transaction
 	 */
-	public Address getAddress() {
-		return address;
+	public Address getOrigin() {
+		return origin;
 	}
 	
 	public final long getSequence() {
@@ -99,11 +99,11 @@ public abstract class ATransaction extends ACell {
 	public abstract ATransaction withSequence(long newSequence);
 
 	/**
-	 * Updates this transaction with the specified address
+	 * Updates this transaction with the specified origin address
 	 * @param newAddress New address
 	 * @return Updated transaction, or this transaction if unchanged.
 	 */
-	public abstract ATransaction withAddress(Address newAddress);
+	public abstract ATransaction withOrigin(Address newAddress);
 	
 	@Override
 	public boolean isCanonical() {

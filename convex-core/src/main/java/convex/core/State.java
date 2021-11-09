@@ -417,7 +417,7 @@ public class State extends ARecord {
 	private <T extends ACell> Context<T> applyTransaction(SignedData<? extends ATransaction> signedTransaction) throws BadSignatureException {
 		// Extract transaction, performs signature check
 		ATransaction t=signedTransaction.getValue();
-		Address addr=t.getAddress();
+		Address addr=t.getOrigin();
 		AccountStatus as = getAccount(addr);
 		if (as==null) {
 			return Context.createFake(this).withError(ErrorCodes.NOBODY,"Transaction for non-existent Account: "+addr);
@@ -450,7 +450,7 @@ public class State extends ARecord {
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
 	public <T extends ACell> Context<T> applyTransaction(ATransaction t) {
-		Address origin = t.getAddress();
+		Address origin = t.getOrigin();
 
 		try {
 			// Create prepared context (juice subtracted, sequence updated, transaction entry checks)

@@ -68,9 +68,13 @@ public class Transfer extends ATransaction {
 	public <T extends ACell> Context<T> apply(Context<?> ctx) {
 		// consume juice, ensure we have enough to make transfer!
 		ctx = ctx.consumeJuice(Juice.TRANSFER);
+		
+		// As long as juice was successfully consumed, make the transfer
 		if (!ctx.isExceptional()) {
 			ctx = ctx.transfer(target, amount);
 		}
+		
+		// Return unconditionally. Might be an error.
 		return (Context<T>) ctx;
 	}
 
@@ -131,12 +135,12 @@ public class Transfer extends ATransaction {
 	@Override
 	public Transfer withSequence(long newSequence) {
 		if (newSequence==this.sequence) return this;
-		return create(address,newSequence,target,amount);
+		return create(origin,newSequence,target,amount);
 	}
 	
 	@Override
-	public Transfer withAddress(Address newAddress) {
-		if (newAddress==this.address) return this;
+	public Transfer withOrigin(Address newAddress) {
+		if (newAddress==this.origin) return this;
 		return create(newAddress,sequence,target,amount);
 	}
 	

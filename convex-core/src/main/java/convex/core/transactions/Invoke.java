@@ -151,18 +151,18 @@ public class Invoke extends ATransaction {
 	public Invoke updateRefs(IRefFunction func) {
 		ACell newCommand = Utils.updateRefs(command, func);
 		if (newCommand == command) return this;
-		return Invoke.create(address,getSequence(), newCommand);
+		return Invoke.create(origin,getSequence(), newCommand);
 	}
 	
 	@Override
 	public Invoke withSequence(long newSequence) {
 		if (newSequence==this.sequence) return this;
-		return create(address,newSequence,command);
+		return create(origin,newSequence,command);
 	}
 	
 	@Override
-	public Invoke withAddress(Address newAddress) {
-		if (newAddress==this.address) return this;
+	public Invoke withOrigin(Address newAddress) {
+		if (newAddress==this.origin) return this;
 		return create(newAddress,sequence,command);
 	}
 
