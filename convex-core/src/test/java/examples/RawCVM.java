@@ -6,7 +6,6 @@ import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Lists;
-import convex.core.data.Vectors;
 import convex.core.init.Init;
 import convex.core.lang.Context;
 import convex.core.lang.Reader;
