@@ -12,7 +12,7 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
 
 /**
- * Immutable dtata value class representing an Ed25519 digital signature.
+ * Immutable data value class representing an Ed25519 digital signature.
  */
 public class Ed25519Signature extends ASignature {
 
@@ -22,7 +22,7 @@ public class Ed25519Signature extends ASignature {
 	public static final int SIGNATURE_LENGTH = 64;
 
 	/**
-	 * A Signature containing zerod bytes (not valid)
+	 * A Signature containing zero bytes (not valid)
 	 */
 	public static final ASignature ZERO = wrap(new byte[SIGNATURE_LENGTH]);
 	
@@ -92,8 +92,8 @@ public class Ed25519Signature extends ASignature {
 	//}
 	
 	@Override
-	public boolean verify(ABlob message, AccountKey address) {
-	    boolean verified = Providers.SODIUM_SIGN.cryptoSignVerifyDetached(signatureBytes, message.getBytes(), (int)message.count(), address.getBytes());
+	public boolean verify(ABlob message, AccountKey publicKey) {
+	    boolean verified = Providers.SODIUM_SIGN.cryptoSignVerifyDetached(signatureBytes, message.getBytes(), (int)message.count(), publicKey.getBytes());
 	    return verified;
 	}
 	
