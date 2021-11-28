@@ -234,7 +234,7 @@ public class Peer {
 	 *
 	 * @param <T> Type of result
 	 * @param form Form to compile and execute.
-	 * @param address Address to use for query execution
+	 * @param address Address to use for query execution. If null, core address will be used
 	 * @return The Context containing the query results. Will be NOBODY error if address / account does not exist
 	 */
 	@SuppressWarnings("unchecked")
@@ -242,7 +242,8 @@ public class Peer {
 		State state=getConsensusState();
 
 		if (address==null) {
-			return  Context.createFake(state).withError(ErrorCodes.NOBODY,"Null Address provided for query");
+			address=Init.CORE_ADDRESS;
+			//return  Context.createFake(state).withError(ErrorCodes.NOBODY,"Null Address provided for query");
 		}
 
 		Context<?> ctx= Context.createFake(state, address);

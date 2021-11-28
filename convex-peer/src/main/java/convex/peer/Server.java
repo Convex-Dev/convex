@@ -902,8 +902,8 @@ public class Server implements Closeable {
 			CVMLong id = (CVMLong) v.get(0);
 			ACell form = v.get(1);
 
-			// extract the Address, or use HERO if not available.
-			Address address = (Address) v.get(2);
+			// extract the Address, might be null
+			Address address = RT.ensureAddress(v.get(2));
 
 			log.debug( "Processing query: {} with address: {}" , form, address);
 			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +

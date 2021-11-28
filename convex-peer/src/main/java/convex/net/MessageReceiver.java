@@ -95,7 +95,10 @@ public class MessageReceiver {
 			buffer.limit(2);
 			numRead = chan.read(buffer);
 
-			if (numRead < 0) throw new ClosedChannelException();
+			if (numRead < 0) {
+				chan.close();
+			    throw new ClosedChannelException();
+			}
 
 			// exit if we don't have at least 2 bytes for message length (may also be a message code)
 			if (buffer.position()<2) return numRead;
