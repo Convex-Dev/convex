@@ -4,6 +4,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.net.SocketException;
 import java.net.StandardSocketOptions;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
@@ -221,7 +222,7 @@ public class NIOServer implements Closeable {
 				log.debug("No bytes received for key: {}",key);
 			}
 		}
-		catch (ClosedChannelException e) {
+		catch (ClosedChannelException|SocketException e) {
 			log.debug("Channel closed from: {}",conn.getRemoteAddress());
 			key.cancel();
 		}
