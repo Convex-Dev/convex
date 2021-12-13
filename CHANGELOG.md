@@ -5,12 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Changed
+- Require all Blocks in an Order to be Signed
+
+## [0.7.3] - 2021-11-28
 ### Added
 - Constant compilation for `:static` declarations in core / other libraries
 
 ### Changed
+- Additional validation for message formats
 
 ### Fixed
+- Make `empty?` work on all Countable data types
 
 ## [0.7.2] - 2021-11-01
 ### Added
