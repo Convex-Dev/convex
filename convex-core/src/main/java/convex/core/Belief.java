@@ -280,7 +280,7 @@ public class Belief extends ARecord {
 		double consideredStake = prepareStakedOrders(filteredOrders, weightedStakes, stakedOrders);
 
 		// Get the winning chain for this peer, including new blocks encountered
-		AVector<Block> winningBlocks = computeWinningOrder(stakedOrders, consensusPoint, consideredStake);
+		AVector<SignedData<Block>> winningBlocks = computeWinningOrder(stakedOrders, consensusPoint, consideredStake);
 		if (winningBlocks == null) return null; // if no voting stake on any chain
 
 		// winning chain should have same consensus as my initial chain
@@ -308,7 +308,7 @@ public class Belief extends ARecord {
 	 * staked orders and consensus threshold.
 	 */
 	private Order updateConsensus(Order proposedOrder, HashMap<Order, Double> stakedOrders, double THRESHOLD) {
-		AVector<Block> proposedBlocks = proposedOrder.getBlocks();
+		AVector<SignedData<Block>> proposedBlocks = proposedOrder.getBlocks();
 		ArrayList<Order> agreedChains = Utils.sortListBy(new Function<Order, Long>() {
 			@Override
 			public Long apply(Order c) {
@@ -355,7 +355,7 @@ public class Belief extends ARecord {
 	 * staked Orders and consensus threshold.
 	 */
 	private Order updateProposal(Order winningOrder, HashMap<Order, Double> stakedOrders, double THRESHOLD) {
-		AVector<Block> winningBlocks = winningOrder.getBlocks();
+		AVector<SignedData<Block>> winningBlocks = winningOrder.getBlocks();
 
 		// sort all chains according to extent of agreement with winning chain
 		ArrayList<Order> agreedOrders = sortByAgreement(stakedOrders, winningBlocks);
@@ -375,7 +375,7 @@ public class Belief extends ARecord {
 		if (i < numAgreed) {
 			// we have a proposed consensus
 			Order lastAgreed = agreedOrders.get(i);
-			AVector<Block> lastBlocks = lastAgreed.getBlocks();
+			AVector<SignedData<Block>> lastBlocks = lastAgreed.getBlocks();
 			long newProposalPoint = winningBlocks.commonPrefixLength(lastBlocks);
 			return winningOrder.withProposalPoint(newProposalPoint);
 		} else {
@@ -391,7 +391,7 @@ public class Belief extends ARecord {
 	 * @param winningBlocks Vector of blocks to seek agreement with
 	 * @return List of Orders in agreement order
 	 */
-	private ArrayList<Order> sortByAgreement(HashMap<Order, ?> stakedOrders, AVector<Block> winningBlocks) {
+	private ArrayList<Order> sortByAgreement(HashMap<Order, ?> stakedOrders, AVector<SignedData<Block>> winningBlocks) {
 		return Utils.sortListBy(new Function<Order, Long>() {
 			@Override
 			public Long apply(Order c) {
@@ -406,15 +406,15 @@ public class Belief extends ARecord {
 	 * partial order based on when a block is first observed. This is an important
 	 * heuristic (thou to avoid re-ordering new blocks from the same peer.
 	 */
-	private static ArrayList<Block> collectNewBlocks(Collection<AVector<Block>> orders, long consensusPoint) {
+	private static ArrayList<SignedData<Block>> collectNewBlocks(Collection<AVector<SignedData<Block>>> orders, long consensusPoint) {
 		// We want to preserve order, remove duplicates
-		HashSet<Block> newBlocks = new HashSet<>();
-		ArrayList<Block> newBlocksOrdered = new ArrayList<>();
-		for (AVector<Block> blks : orders) {
+		HashSet<SignedData<Block>> newBlocks = new HashSet<>();
+		ArrayList<SignedData<Block>> newBlocksOrdered = new ArrayList<>();
+		for (AVector<SignedData<Block>> blks : orders) {
 			if (blks.count()<=consensusPoint) continue;
-			Iterator<Block> it = blks.listIterator(consensusPoint);
+			Iterator<SignedData<Block>> it = blks.listIterator(consensusPoint);
 			while (it.hasNext()) {
-				Block b = it.next();
+				SignedData<Block> b = it.next();
 				if (!newBlocks.contains(b)) {
 					newBlocks.add(b);
 					newBlocksOrdered.add(b);
@@ -433,14 +433,14 @@ public class Belief extends ARecord {
 	 * @param initialTotalStake Total stake under consideration
 	 * @return Vector of Blocks in wiing Order
 	 */
-	public static AVector<Block> computeWinningOrder(HashMap<Order, Double> stakedOrders, long consensusPoint,
+	public static AVector<SignedData<Block>> computeWinningOrder(HashMap<Order, Double> stakedOrders, long consensusPoint,
 			double initialTotalStake) {
 		assert (!stakedOrders.isEmpty());
 		// Get the Voting Set. Will be updated each round to winners of previous round.
-		HashMap<AVector<Block>, Double> votingSet = combineToBlocks(stakedOrders);
+		HashMap<AVector<SignedData<Block>>, Double> votingSet = combineToBlocks(stakedOrders);
 
 		// Accumulate new blocks.
-		ArrayList<Block> newBlocksOrdered = collectNewBlocks(votingSet.keySet(), consensusPoint);
+		ArrayList<SignedData<Block>> newBlocksOrdered = collectNewBlocks(votingSet.keySet(), consensusPoint);
 
 		double totalStake = initialTotalStake;
 		long point = consensusPoint;
@@ -448,18 +448,18 @@ public class Belief extends ARecord {
 		findWinner:
 		while (votingSet.size() > 1) {
 			// Accumulate candidate winning Blocks for this round, indexed by next Block
-			HashMap<Block, HashMap<AVector<Block>, Double>> blockVotes = new HashMap<>();
+			HashMap<SignedData<Block>, HashMap<AVector<SignedData<Block>>, Double>> blockVotes = new HashMap<>();
 			
-			for (Map.Entry<AVector<Block>, Double> me : votingSet.entrySet()) {
-				AVector<Block> blocks = me.getKey();
+			for (Map.Entry<AVector<SignedData<Block>>, Double> me : votingSet.entrySet()) {
+				AVector<SignedData<Block>> blocks = me.getKey();
 				long cCount = blocks.count();
 
 				if (cCount <= point) continue; // skip Ordering with insufficient blocks: cannot win this round
 
-				Block b = blocks.get(point);
+				SignedData<Block> b = blocks.get(point);
 
 				// update hashmap of Orders voting for each block (i.e. agreed on current Block)
-				HashMap<AVector<Block>, Double> agreedOrders = blockVotes.get(b);
+				HashMap<AVector<SignedData<Block>>, Double> agreedOrders = blockVotes.get(b);
 				if (agreedOrders == null) {
 					agreedOrders = new HashMap<>();
 					blockVotes.put(b, agreedOrders);
@@ -480,10 +480,10 @@ public class Belief extends ARecord {
 				break findWinner;
 			}
 
-			Map.Entry<Block, HashMap<AVector<Block>, Double>> winningResult = null;
+			Map.Entry<SignedData<Block>, HashMap<AVector<SignedData<Block>>, Double>> winningResult = null;
 			double winningVote = Double.NEGATIVE_INFINITY;
-			for (Map.Entry<Block, HashMap<AVector<Block>, Double>> me : blockVotes.entrySet()) {
-				HashMap<AVector<Block>, Double> agreedChains = me.getValue();
+			for (Map.Entry<SignedData<Block>, HashMap<AVector<SignedData<Block>>, Double>> me : blockVotes.entrySet()) {
+				HashMap<AVector<SignedData<Block>>, Double> agreedChains = me.getValue();
 				double blockVote = computeVote(agreedChains);
 				if (blockVote > winningVote) {
 					winningVote = blockVote;
@@ -504,22 +504,22 @@ public class Belief extends ARecord {
 			// and doesn't have any Orders from other peers with stake?
 			return null;
 		}
-		AVector<Block> winningBlocks = votingSet.keySet().iterator().next();
+		AVector<SignedData<Block>> winningBlocks = votingSet.keySet().iterator().next();
 
 		// add new blocks back to winning chain if not already included
-		AVector<Block> fullWinningBlocks = appendNewBlocks(winningBlocks, newBlocksOrdered, consensusPoint);
+		AVector<SignedData<Block>> fullWinningBlocks = appendNewBlocks(winningBlocks, newBlocksOrdered, consensusPoint);
 
 		return fullWinningBlocks;
 	}
 
-	private static final AVector<Block> appendNewBlocks(AVector<Block> blocks, ArrayList<Block> newBlocksOrdered,
+	private static final AVector<SignedData<Block>> appendNewBlocks(AVector<SignedData<Block>> blocks, ArrayList<SignedData<Block>> newBlocksOrdered,
 			long consensusPoint) {
-		HashSet<Block> newBlocks = new HashSet<>();
+		HashSet<SignedData<Block>> newBlocks = new HashSet<>();
 		newBlocks.addAll(newBlocksOrdered);
 
 		// exclude new blocks already in the base Order
 		// TODO: what about blocks already in consensus?
-		Iterator<Block> it = blocks.listIterator(Math.min(blocks.count(), consensusPoint));
+		Iterator<SignedData<Block>> it = blocks.listIterator(Math.min(blocks.count(), consensusPoint));
 		while (it.hasNext()) {
 			newBlocks.remove(it.next());
 		}
@@ -529,7 +529,7 @@ public class Belief extends ARecord {
 		// must be a stable sort to maintain order from equal timestamps
 		newBlocksOrdered.sort(Block.TIMESTAMP_COMPARATOR);
 
-		AVector<Block> fullBlocks = blocks.appendAll(newBlocksOrdered);
+		AVector<SignedData<Block>> fullBlocks = blocks.appendAll(newBlocksOrdered);
 		return fullBlocks;
 	}
 
@@ -539,12 +539,12 @@ public class Belief extends ARecord {
 	 * @param stakedOrders
 	 * @return Map of AVector<Block> to total stake
 	 */
-	private static HashMap<AVector<Block>, Double> combineToBlocks(HashMap<Order, Double> stakedOrders) {
-		HashMap<AVector<Block>, Double> result = new HashMap<>();
+	private static HashMap<AVector<SignedData<Block>>, Double> combineToBlocks(HashMap<Order, Double> stakedOrders) {
+		HashMap<AVector<SignedData<Block>>, Double> result = new HashMap<>();
 		for (Map.Entry<Order, Double> e : stakedOrders.entrySet()) {
 			Order c = e.getKey();
 			Double stake = e.getValue();
-			AVector<Block> blocks = c.getBlocks();
+			AVector<SignedData<Block>> blocks = c.getBlocks();
 			Double acc = result.get(blocks);
 			if (acc == null) {
 				result.put(blocks, stake);

@@ -46,10 +46,10 @@ public final class Block extends ARecord {
 	/**
 	 * Comparator to sort blocks by timestamp
 	 */
-	static final Comparator<Block> TIMESTAMP_COMPARATOR = new Comparator<>() {
+	static final Comparator<SignedData<Block>> TIMESTAMP_COMPARATOR = new Comparator<>() {
 		@Override
-		public int compare(Block a, Block b) {
-			int sig = Long.compare(a.getTimeStamp(), b.getTimeStamp());
+		public int compare(SignedData<Block> a, SignedData<Block> b) {
+			int sig = Long.compare(a.getValue().getTimeStamp(), b.getValue().getTimeStamp());
 			return sig;
 		}
 	};

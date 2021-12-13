@@ -408,15 +408,17 @@ public class Peer {
 		Order myOrder = newBelief.getOrder(peerKey); // this peer's chain from new belief
 		long consensusPoint = myOrder.getConsensusPoint();
 		long stateIndex = states.count() - 1; // index of last state
-		AVector<Block> blocks = myOrder.getBlocks();
+		AVector<SignedData<Block>> blocks = myOrder.getBlocks();
 
 		// need to advance states
 		AVector<State> newStates = this.states;
 		AVector<BlockResult> newResults = this.blockResults;
 		while (stateIndex < consensusPoint) { // add states until last state is at consensus point
 			State s = newStates.get(stateIndex);
-			Block block = blocks.get(stateIndex);
-			BlockResult br = s.applyBlock(block);
+			SignedData<Block> block = blocks.get(stateIndex);
+			
+			// TODO: Block signature validation?
+			BlockResult br = s.applyBlock(block.getValue());
 			newStates = newStates.append(br.getState());
 			newResults = newResults.append(br);
 			stateIndex++;
@@ -489,8 +491,10 @@ public class Peer {
 		Order myOrder = b.getOrder(peerKey);
 		if (myOrder==null) myOrder=Order.create();
 
-		Order newChain = myOrder.append(block);
+		// Create new order with signed Block
+		Order newChain = myOrder.append(sign(block));
 		SignedData<Order> newSignedOrder = sign(newChain);
+		
 		BlobMap<AccountKey, SignedData<Order>> newChains = orders.assoc(peerKey, newSignedOrder);
 		Belief newBelief=b.withOrders(newChains);
 		return updateConsensus(newBelief);

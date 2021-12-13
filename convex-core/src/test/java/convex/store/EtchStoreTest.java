@@ -124,7 +124,7 @@ public class EtchStoreTest {
 			Block b=Block.of(Utils.getCurrentTimestamp(),InitTest.FIRST_PEER_KEY,kp.signData(t1),kp.signData(t2));
 			assertNotNull(b.getPeer());
 
-			Order ord=Order.create().append(b);
+			Order ord=Order.create().append(kp.signData(b));
 
 			Belief belief=Belief.create(kp,ord);
 
@@ -135,7 +135,7 @@ public class EtchStoreTest {
 
 			assertEquals(3,Utils.refCount(t1));
 			assertEquals(0,Utils.refCount(t2));
-			assertEquals(11,Utils.totalRefCount(belief));
+			assertEquals(12,Utils.totalRefCount(belief));
 
 
 			Consumer<Ref<ACell>> noveltyHandler=r-> {
@@ -154,7 +154,7 @@ public class EtchStoreTest {
 			// Persist belief
 			counter.set(0L);
 			Ref<Belief> prb=srb.persist(noveltyHandler);
-			assertEquals(3L,counter.get());
+			assertEquals(4L,counter.get());
 
 			// Persist again. Should be no new novelty
 			counter.set(0L);
@@ -166,7 +166,7 @@ public class EtchStoreTest {
 			counter.set(0L);
 			Ref<Belief> arb=belief.announce(noveltyHandler).getRef();
 			assertEquals(srb,arb);
-			assertEquals(4L,counter.get());
+			assertEquals(5L,counter.get());
 
 			// Announce again. Should be no new novelty
 			counter.set(0L);

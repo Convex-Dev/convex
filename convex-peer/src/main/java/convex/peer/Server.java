@@ -662,9 +662,9 @@ public class Server implements Closeable {
 		if (newConsensusPoint > oldConsensusPoint) {
 			log.debug("Consensus point update from {} to {}" ,oldConsensusPoint , newConsensusPoint);
 			for (long i = oldConsensusPoint; i < newConsensusPoint; i++) {
-				Block block = peer.getPeerOrder().getBlock(i);
+				SignedData<Block> block = peer.getPeerOrder().getBlock(i);
 				BlockResult br = peer.getBlockResult(i);
-				reportTransactions(block, br);
+				reportTransactions(block.getValue(), br);
 			}
 		}
 

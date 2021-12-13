@@ -413,7 +413,7 @@ public class BeliefMergeTest {
 		assertTrue(allBeliefsEqual(bs4));
 
 		Order finalChain = bs4[0].getOrder(PKEY);
-		AVector<Block> finalBlocks = finalChain.getBlocks();
+		AVector<SignedData<Block>> finalBlocks = finalChain.getBlocks();
 		assertEquals(NUM_PEERS * NUM_INITIAL_TRANS, new HashSet<>(finalBlocks).size());
 
 		State finalState = bs4[0].getConsensusState();
