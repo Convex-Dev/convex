@@ -121,8 +121,7 @@ public class EtchStoreTest {
 
 			ATransaction t1=Invoke.create(InitTest.HERO,0, Lists.of(Symbols.PLUS, Symbols.STAR_BALANCE, 1000L));
 			ATransaction t2=Transfer.create(InitTest.HERO,1, InitTest.VILLAIN,1000000);
-			Block b=Block.of(Utils.getCurrentTimestamp(),InitTest.FIRST_PEER_KEY,kp.signData(t1),kp.signData(t2));
-			assertNotNull(b.getPeer());
+			Block b=Block.of(Utils.getCurrentTimestamp(),kp.signData(t1),kp.signData(t2));
 
 			Order ord=Order.create().append(kp.signData(b));
 

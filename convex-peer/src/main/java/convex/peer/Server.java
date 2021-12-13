@@ -727,7 +727,7 @@ public class Server implements Closeable {
 		int n = newTransactions.size();
 		if (n == 0) return false;
 		// TODO: smaller block if too many transactions?
-		block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions, peer.getPeerKey());
+		block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions);
 		newTransactions.clear();
 
 		ACell.createPersisted(block);

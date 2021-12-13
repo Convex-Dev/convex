@@ -38,9 +38,8 @@ import convex.core.util.Utils;
 public final class Block extends ARecord {
 	private final long timestamp;
 	private final AVector<SignedData<ATransaction>> transactions;
-	private final AccountKey peerKey;
 
-	private static final Keyword[] BLOCK_KEYS = new Keyword[] { Keywords.TIMESTAMP, Keywords.TRANSACTIONS, Keywords.PEER };
+	private static final Keyword[] BLOCK_KEYS = new Keyword[] { Keywords.TIMESTAMP, Keywords.TRANSACTIONS};
 	private static final RecordFormat FORMAT = RecordFormat.of(BLOCK_KEYS);
 
 	/**
@@ -54,20 +53,16 @@ public final class Block extends ARecord {
 		}
 	};
 
-	private Block(long timestamp, AVector<SignedData<ATransaction>> transactions, AccountKey peer) {
+	private Block(long timestamp, AVector<SignedData<ATransaction>> transactions) {
 		super(FORMAT);
 		this.timestamp = timestamp;
 		this.transactions = transactions;
-		this.peerKey=peer;
-		
-		if (peerKey==null) throw new Error("Trying to construct block with null peer key");
 	}
 
 	@Override
 	public ACell get(ACell k) {
 		if (Keywords.TIMESTAMP.equals(k)) return CVMLong.create(timestamp);
 		if (Keywords.TRANSACTIONS.equals(k)) return transactions;
-		if (Keywords.PEER.equals(k)) return peerKey;
 		return null;
 	}
 
@@ -76,11 +71,10 @@ public final class Block extends ARecord {
 	protected Block updateAll(ACell[] newVals) {
 		long newTimestamp = RT.ensureLong(newVals[0]).longValue();		
 		AVector<SignedData<ATransaction>> newTransactions = (AVector<SignedData<ATransaction>>) newVals[1];
-		AccountKey newPeer = (AccountKey) newVals[2];
-		if ((this.transactions == newTransactions) && (this.timestamp == newTimestamp) && (peerKey==newPeer)) {
+		if ((this.transactions == newTransactions) && (this.timestamp == newTimestamp) ) {
 			return this;
 		}
-		return new Block(newTimestamp, newTransactions,newPeer);
+		return new Block(newTimestamp, newTransactions);
 	}
 
 	/**
@@ -91,15 +85,6 @@ public final class Block extends ARecord {
 	public long getTimeStamp() {
 		return timestamp;
 	}
-	
-	/**
-	 * Gets the Peer for this block
-	 * 
-	 * @return Address of Peer publishing this block
-	 */
-	public AccountKey getPeer() {
-		return peerKey;
-	}
 
 	/**
 	 * Creates a block with the given timestamp and transactions
@@ -109,8 +94,8 @@ public final class Block extends ARecord {
 	 * @param peerKey Peer Key of Peer producing Block
 	 * @return A new Block containing the specified signed transactions
 	 */
-	public static Block create(long timestamp, List<SignedData<ATransaction>> transactions, AccountKey peerKey) {
-		return new Block(timestamp, Vectors.create(transactions),peerKey);
+	public static Block create(long timestamp, List<SignedData<ATransaction>> transactions) {
+		return new Block(timestamp, Vectors.create(transactions));
 	}
 
 	/**
@@ -122,8 +107,8 @@ public final class Block extends ARecord {
 	 * 
 	 * @return A new Block containing the specified signed transactions
 	 */
-	public static Block create(long timestamp, AccountKey peerKey, AVector<SignedData<ATransaction>> transactions) {
-		return new Block(timestamp, transactions,peerKey);
+	public static Block create(long timestamp, AVector<SignedData<ATransaction>> transactions) {
+		return new Block(timestamp, transactions);
 	}
 
 	/**
@@ -135,8 +120,8 @@ public final class Block extends ARecord {
 	 * @return New Block
 	 */
 	@SafeVarargs
-	public static Block of(long timestamp, AccountKey peerKey, SignedData<ATransaction>... transactions) {
-		return new Block(timestamp, Vectors.of((Object[])transactions),peerKey);
+	public static Block of(long timestamp, SignedData<ATransaction>... transactions) {
+		return new Block(timestamp, Vectors.of((Object[])transactions));
 	}
 
 	/**
@@ -159,7 +144,6 @@ public final class Block extends ARecord {
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = Utils.writeLong(bs,pos, timestamp);
 		pos = transactions.encode(bs,pos);
-		pos = peerKey.writeToBuffer(bs, pos);
 		return pos;
 	}
 	
@@ -181,9 +165,7 @@ public final class Block extends ARecord {
 			AVector<SignedData<ATransaction>> transactions = Format.read(bb);
 			if (transactions==null) throw new BadFormatException("Null transactions");
 			
-			AccountKey peer=AccountKey.readRaw(bb);
-			if (peer==null) throw new BadFormatException("Bad peer key in Block");
-			return Block.create(timestamp, peer,transactions);
+			return Block.create(timestamp, transactions);
 		} catch (ClassCastException e) {
 			throw new BadFormatException("Error reading Block format", e);
 		}
@@ -233,8 +215,6 @@ public final class Block extends ARecord {
 			Hash ha=a.cachedHash();
 			if (ha!=null) return Utils.equals(h, ha);
 		}
-		
-		if (!(Utils.equals(peerKey, a.peerKey))) return false;
 		
 		if (!(Utils.equals(transactions, a.transactions))) return false;
 		return true;

@@ -39,7 +39,7 @@ public class PeerTest {
 		assertEquals(0, p.getPeerOrder().getBlockCount());
 		assertEquals(0, p.getPeerOrder().getConsensusPoint());
 
-		Block bl0 = Block.of(timestamp,peerKey);
+		Block bl0 = Block.of(timestamp);
 		p = p.proposeBlock(bl0);
 
 		assertEquals(1, p.getPeerOrder().getBlockCount());
