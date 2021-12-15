@@ -211,7 +211,7 @@ public class Blob extends AArrayBlob {
 	/**
 	 * Maximum encoding size for a regular Blob
 	 */
-	public static int MAX_ENCODING_LENGTH=1+Format.getVLCLength(CHUNK_LENGTH)+CHUNK_LENGTH;
+	public static int MAX_ENCODING_SIZE=1+Format.getVLCLength(CHUNK_LENGTH)+CHUNK_LENGTH;
 
 	@Override
 	public boolean isCanonical() {

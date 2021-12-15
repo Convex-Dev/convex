@@ -28,7 +28,12 @@ public class BlobTree extends ABlob {
 	public static final int FANOUT = 1 << BIT_SHIFT_PER_LEVEL;
 
 	private final Ref<ABlob>[] children;
+	
+	/**
+	 * Shift level for the BlobTree. 0 for minimum size BlobTree, increase by 4 for each level
+	 */
 	private final int shift;
+	
 	private final long count;
 
 	private BlobTree(Ref<ABlob>[] children, int shift, long count) {
@@ -42,7 +47,7 @@ public class BlobTree extends ABlob {
 	 * 
 	 * Must be of sufficient size to convert to BlobTree
 	 * @param blob Source of BlobTree data
-	 * @return New BolobTree instance
+	 * @return New BlobTree instance
 	 */
 	public static BlobTree create(ABlob blob) {
 		if (blob instanceof BlobTree) return (BlobTree) blob;
@@ -55,6 +60,27 @@ public class BlobTree extends ABlob {
 			blobs[i] = blob.slice(offset, Math.min(Blob.CHUNK_LENGTH, length - offset)).toBlob();
 		}
 		return create(blobs);
+	}
+	
+	/**
+	 * Create a BlobTree with the given children.
+	 * 
+	 * SECURITY: Does not validate children in any way
+	 * @param children Child blobs for this BlobTree node
+	 * @return New BlobTree instance
+	 */
+	@SuppressWarnings("unchecked")
+	public static ABlob createWithChildren(ABlob[] children) {
+		int n=children.length;
+		long count=0;
+		Ref<ABlob>[] cs = new Ref[n];
+		for (int i=0; i<n; i++) {
+			ABlob child=children[i];
+			cs[i]=child.getRef();
+			count+=child.count();
+		}
+		int shift=calcShift(calcChunks(count));
+		return new BlobTree(cs,shift, count);
 	}
 
 	/**
@@ -69,22 +95,22 @@ public class BlobTree extends ABlob {
 	}
 
 	/**
-	 * Computes the shift level for a BlobTree with the specified number of chunks
+	 * Computes the shift level for a BlobTree with the specified number of chunks. Will be zero
+	 * for a minimum size BlobTree (4097-65536 bytes)
 	 * 
 	 * @param chunkCount
 	 * @return Shift value for a BlobTree with the specified number of chunks
 	 */
 	static int calcShift(long chunkCount) {
 		int shift = 0;
-		while (chunkCount > FANOUT) {
+		while ((((long)FANOUT)<<shift) < chunkCount) {
 			shift += BIT_SHIFT_PER_LEVEL;
-			chunkCount >>= BIT_SHIFT_PER_LEVEL;
 		}
 		return shift;
 	}
 
 	/**
-	 * Computes the number of chunks for a BlobTree of the given length
+	 * Computes the number of chunks (4096 bytes or less) for the canonical BlobTree of the given length
 	 * 
 	 * @param length The length of the Blob in bytes
 	 * @return Number of chunks needed for a given byte length.
@@ -115,19 +141,19 @@ public class BlobTree extends ABlob {
 	}
 
 	private static BlobTree create(Blob[] blobs, int offset, int chunkCount) {
-		int shift = calcShift(chunkCount);
-		if (shift == 0) {
+		if (chunkCount<=FANOUT) {
 			return createSmall(blobs, offset, chunkCount);
 		} else {
-			int childSize = 1 << shift; // number of chunks in children
+			int shift = calcShift(chunkCount);
+			int childChunks = 1 << shift; // number of chunks in children
 			int numChildren = ((chunkCount - 1) >> shift) + 1;
 			@SuppressWarnings("unchecked")
 			Ref<ABlob>[] children = new Ref[numChildren];
 
 			long length = 0;
 			for (int i = 0; i < numChildren; i++) {
-				int childOffset = i * childSize;
-				BlobTree bt = create(blobs, offset + childOffset, Math.min(childSize, chunkCount - childOffset));
+				int childOffset = i * childChunks;
+				BlobTree bt = create(blobs, offset + childOffset, Math.min(childChunks, chunkCount - childOffset));
 				children[i] = bt.getRef();
 				length += bt.count;
 			}
@@ -299,7 +325,7 @@ public class BlobTree extends ABlob {
 	/**
 	 * Maximum byte length of an encoded BlobTree node
 	 */
-	public static final int MAX_ENCODING_LENGTH=1+Format.MAX_VLC_LONG_LENGTH+(FANOUT*Format.MAX_REF_LENGTH);
+	public static final int MAX_ENCODING_SIZE=1+Format.MAX_VLC_LONG_LENGTH+(FANOUT*Format.MAX_REF_LENGTH);
 
 	/**
 	 * Reads a BlobTree from a bytebuffer. Assumes that tag byte and count are already read
@@ -497,6 +523,28 @@ public class BlobTree extends ABlob {
 		if (isCanonical()) return this;
 		return Blobs.toCanonical(this);
 	}
+
+	/**
+	 * Gets the size of a BlobTree child for a blob of given total length.
+	 * @param length Length of Blob
+	 * @return Size of child, or 1 if not a BlobTree
+	 */
+	public static long childSize(long length) {
+		long chunks=calcChunks(length);
+		int shift=calcShift(chunks);
+		return ((long)Blob.CHUNK_LENGTH)<<shift;
+	}
+
+	/**
+	 * Gets the number of children for a BlobTree of given total length.
+	 * @param length Length of Blob
+	 * @return Number of Child blobs
+	 */
+	public static int childCount(long length) {
+		return Utils.checkedInt(1+(length-1)/childSize(length));
+	}
+
+
 
 
 

@@ -31,6 +31,8 @@ public final class CVMLong extends APrimitive implements INumeric {
 	public static final CVMLong MAX_VALUE = CVMLong.create(Long.MAX_VALUE);
 	public static final CVMLong MIN_VALUE = CVMLong.create(Long.MIN_VALUE);
 	
+	public static final int MAX_ENCODING_SIZE = 11;
+	
 	private final long value;
 	
 	public CVMLong(long value) {
