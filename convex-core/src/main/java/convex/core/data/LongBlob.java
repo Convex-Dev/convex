@@ -13,7 +13,7 @@ import convex.core.util.Utils;
  */
 public final class LongBlob extends ALongBlob {
 
-	public static final int MAX_ENCODING_SIZE = 1+1+8; // Tag plus length plus 8 bytes
+	public static final int MAX_ENCODING_LENGTH = 1+1+8; // Tag plus length plus 8 bytes
 
 	private LongBlob(long value) {
 		super(value);

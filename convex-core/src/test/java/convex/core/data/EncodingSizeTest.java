@@ -23,16 +23,16 @@ public class EncodingSizeTest {
 	@Test public void testLong() {
 		CVMLong a=CVMLong.create(Long.MAX_VALUE);
 		CVMLong b=CVMLong.create(Long.MAX_VALUE);
-		assertEquals(CVMLong.MAX_ENCODING_SIZE,size(a));
-		assertEquals(CVMLong.MAX_ENCODING_SIZE,size(b));
-		assertEquals(1+Format.MAX_VLC_LONG_LENGTH,CVMLong.MAX_ENCODING_SIZE);
+		assertEquals(CVMLong.MAX_ENCODING_LENGTH,size(a));
+		assertEquals(CVMLong.MAX_ENCODING_LENGTH,size(b));
+		assertEquals(1+Format.MAX_VLC_LONG_LENGTH,CVMLong.MAX_ENCODING_LENGTH);
 	}
 	
 	@Test public void testByte() {
 		CVMByte a=CVMByte.create(0);
 		CVMByte b=CVMByte.create(255);
-		assertEquals(CVMByte.MAX_ENCODING_SIZE,size(a));
-		assertEquals(CVMByte.MAX_ENCODING_SIZE,size(b));
+		assertEquals(CVMByte.MAX_ENCODING_LENGTH,size(a));
+		assertEquals(CVMByte.MAX_ENCODING_LENGTH,size(b));
 	}
 	
 	@Test public void testNull() {
@@ -40,25 +40,28 @@ public class EncodingSizeTest {
 	}
 	
 	@Test public void testBoolean() {
-		assertEquals(CVMBool.MAX_ENCODING_SIZE,size(CVMBool.TRUE));
-		assertEquals(CVMBool.MAX_ENCODING_SIZE,size(CVMBool.FALSE));
+		assertEquals(CVMBool.MAX_ENCODING_LENGTH,size(CVMBool.TRUE));
+		assertEquals(CVMBool.MAX_ENCODING_LENGTH,size(CVMBool.FALSE));
 	}
 	
 	@Test public void testDouble() {
-		assertEquals(CVMDouble.MAX_ENCODING_SIZE,size(CVMDouble.ZERO));
-		assertEquals(CVMDouble.MAX_ENCODING_SIZE,size(CVMDouble.NaN));
+		assertEquals(CVMDouble.MAX_ENCODING_LENGTH,size(CVMDouble.ZERO));
+		assertEquals(CVMDouble.MAX_ENCODING_LENGTH,size(CVMDouble.NaN));
 	}
 	
 	@Test public void testBlob() {
-		assertEquals(Blob.MAX_ENCODING_SIZE,size(Samples.FULL_BLOB));
+		assertEquals(Blob.MAX_ENCODING_LENGTH,size(Samples.FULL_BLOB));
+		assertEquals(Format.MAX_EMBEDDED_LENGTH,Samples.MAX_EMBEDDED_BLOB.getEncodingLength());
 	}
 	
 	@Test public void testLongBlob() {
-		assertEquals(LongBlob.MAX_ENCODING_SIZE,size(LongBlob.create(Long.MAX_VALUE)));
+		assertEquals(LongBlob.MAX_ENCODING_LENGTH,size(LongBlob.create(Long.MAX_VALUE)));
 	}
 	
 	@Test public void testBlobTree() {
-		//BlobTree a=;
-		//assertEquals(BlobTree.MAX_ENCODING_SIZE,size(a));
+		long n =0x0f00000000000000l+(Format.MAX_EMBEDDED_LENGTH-3);
+		assertEquals(Format.MAX_VLC_LONG_LENGTH-1,Format.getVLCLength(n)); // can't be max count?
+		BlobTree a=(BlobTree) Blobs.createFilled(3, n);
+		assertEquals(BlobTree.MAX_ENCODING_SIZE,size(a));
 	}
 }

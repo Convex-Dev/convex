@@ -12,7 +12,7 @@ public class Blobs {
 
 	static final int CHUNK_SHIFT = 12;
 	
-	public static final int MAX_ENCODING_LENGTH = Math.max(Blob.MAX_ENCODING_SIZE, BlobTree.MAX_ENCODING_SIZE);
+	public static final int MAX_ENCODING_LENGTH = Math.max(Blob.MAX_ENCODING_LENGTH, BlobTree.MAX_ENCODING_SIZE);
 
 	public static <T extends ABlob> T createRandom(long length) {
 		return createRandom(new Random(),length);

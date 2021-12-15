@@ -18,7 +18,7 @@ public final class CVMBool extends APrimitive {
 	public static final CVMBool TRUE=new CVMBool(true);
 	public static final CVMBool FALSE=new CVMBool(false);
 
-	public static final int MAX_ENCODING_SIZE = 1;
+	public static final int MAX_ENCODING_LENGTH = 1;
 	
 	private CVMBool(boolean value) {
 		this.value=value;

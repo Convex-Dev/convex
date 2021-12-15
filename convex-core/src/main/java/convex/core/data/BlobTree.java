@@ -323,9 +323,12 @@ public class BlobTree extends ABlob {
 
 	
 	/**
-	 * Maximum byte length of an encoded BlobTree node
+	 * Maximum byte length of an encoded BlobTree node. 
+	 * Note: 
+	 * - Last child might be embedded, others cannot
+	 * - With max 16 children , not possible to have biggest VLC length
 	 */
-	public static final int MAX_ENCODING_SIZE=1+Format.MAX_VLC_LONG_LENGTH+(FANOUT*Format.MAX_REF_LENGTH);
+	public static final int MAX_ENCODING_SIZE=1+(Format.MAX_VLC_LONG_LENGTH-1)+((FANOUT-1)*Ref.INDIRECT_ENCODING_LENGTH)+Format.MAX_EMBEDDED_LENGTH;
 
 	/**
 	 * Reads a BlobTree from a bytebuffer. Assumes that tag byte and count are already read

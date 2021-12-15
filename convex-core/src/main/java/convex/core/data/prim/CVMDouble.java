@@ -28,7 +28,7 @@ public final class CVMDouble extends APrimitive implements INumeric {
 	
 	private static final long RAW_NAN_BITS=0x7ff8000000000000L;
 	
-	public static final int MAX_ENCODING_SIZE = 9;
+	public static final int MAX_ENCODING_LENGTH = 9;
 	
 	public CVMDouble(double value) {
 		this.value=value;

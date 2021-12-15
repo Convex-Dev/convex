@@ -21,7 +21,7 @@ public final class CVMByte extends APrimitive implements INumeric {
 	public static final CVMByte ZERO;
 	public static final CVMByte ONE;
 
-	public static final int MAX_ENCODING_SIZE = 2;
+	public static final int MAX_ENCODING_LENGTH = 2;
 	
 	// Private constructor to enforce singleton instances
 	private CVMByte(byte value) {

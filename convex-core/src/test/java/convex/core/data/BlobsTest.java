@@ -152,7 +152,7 @@ public class BlobsTest {
 	public void testEncodingSize() {
 		int el=(int) Samples.FULL_BLOB.getEncoding().count();
 		assertEquals(Blobs.MAX_ENCODING_LENGTH,el);
-		assertEquals(Blob.MAX_ENCODING_SIZE,el);
+		assertEquals(Blob.MAX_ENCODING_LENGTH,el);
 		
 		assertTrue(Samples.MAX_EMBEDDED_BLOB.isEmbedded());
 		assertFalse(Samples.FULL_BLOB.isEmbedded());
