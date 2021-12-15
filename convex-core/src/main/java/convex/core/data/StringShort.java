@@ -23,6 +23,8 @@ public class StringShort extends AString {
 	 */
 	public static final int MAX_LENGTH=1024;
 
+	public static final int MAX_ENCODING_LENGTH = 1+Format.getVLCLength(1024)+2*MAX_LENGTH; // 2 bytes per char
+
 	
 	private String data;
 

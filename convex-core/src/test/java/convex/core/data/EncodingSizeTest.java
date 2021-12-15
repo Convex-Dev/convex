@@ -60,8 +60,13 @@ public class EncodingSizeTest {
 	
 	@Test public void testBlobTree() {
 		long n =0x0f00000000000000l+(Format.MAX_EMBEDDED_LENGTH-3);
-		assertEquals(Format.MAX_VLC_LONG_LENGTH-1,Format.getVLCLength(n)); // can't be max count?
+		assertEquals(Format.MAX_VLC_LONG_LENGTH-1,Format.getVLCLength(n)); // can't be max count? since we need 16 children
 		BlobTree a=(BlobTree) Blobs.createFilled(3, n);
 		assertEquals(BlobTree.MAX_ENCODING_SIZE,size(a));
+	}
+	
+	@Test public void testCVMString() {
+		AString a=Samples.MAX_SHORT_STRING;
+		assertEquals(Strings.MAX_ENCODING_LENGTH,size(a));
 	}
 }

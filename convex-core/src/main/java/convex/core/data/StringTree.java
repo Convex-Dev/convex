@@ -14,6 +14,8 @@ public class StringTree extends AString {
 	public static final int BIT_SHIFT_PER_LEVEL = 4;
 	public static final int FANOUT = 1 << BIT_SHIFT_PER_LEVEL;
 
+	public static final int MAX_ENCODING_LENGTH = 1+Format.MAX_VLC_LONG_LENGTH+(FANOUT-1)*Ref.INDIRECT_ENCODING_LENGTH+Format.MAX_EMBEDDED_LENGTH;
+
 	private final Ref<AString>[] children;
 	private final int shift;
 
