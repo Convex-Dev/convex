@@ -212,7 +212,6 @@ public class BlobsTest {
 		assertEquals(257,BlobTree.calcChunks(1048577));
 		assertEquals(0x0008000000000000l,BlobTree.calcChunks(Long.MAX_VALUE));
 
-		
 		assertEquals(4096,BlobTree.childSize(4097));
 		assertEquals(4096,BlobTree.childSize(65536));
 		assertEquals(65536,BlobTree.childSize(65537));

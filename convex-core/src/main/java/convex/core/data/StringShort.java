@@ -12,7 +12,7 @@ import convex.core.util.Utils;
 public class StringShort extends AString {
 	
 	/**
-	 * Length of longest StringShort value that is embedded in chars
+	 * Length of longest StringShort value that is embedded, measured in chars
 	 * 
 	 * Just long enough for a 64-char hex string with 0x and 2 delimiters. If that helps.
 	 */

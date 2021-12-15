@@ -41,6 +41,12 @@ import convex.core.util.Utils;
 public class VectorTree<T extends ACell> extends AVector<T> {
 
 	public static final int MINIMUM_SIZE = 2 * Vectors.CHUNK_SIZE;
+
+	public static final int MAX_EMBEDDED_LENGTH = Format.MAX_EMBEDDED_LENGTH;	
+	
+	// Max encoding length requires embedded children, so can't be nested packed VectorTrees?
+	public static final int MAX_ENCODING_LENGTH= 1 + Format.getVLCLength(256) + (Format.MAX_EMBEDDED_LENGTH * Vectors.CHUNK_SIZE);
+
 	private final int shift; // bits in each child block
 
 	private final Ref<AVector<T>>[] children;
@@ -189,7 +195,6 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		return 12 + (64 * (children.length+3));
 	}
 	
-	public static int MAX_ENCODING_SIZE= 1 + Format.MAX_VLC_LONG_LENGTH + (Format.MAX_EMBEDDED_LENGTH * Vectors.CHUNK_SIZE);
 
 	/**
 	 * Reads a VectorTree from the provided ByteBuffer 

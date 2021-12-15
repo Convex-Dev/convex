@@ -136,6 +136,8 @@ public class Samples {
 	public static final StringShort MAX_SHORT_STRING= StringShort.create(createRandomString(StringShort.MAX_LENGTH));
 	public static final StringTree MIN_TREE_STRING= StringTree.create(createRandomString(StringTree.MINIMUM_LENGTH));
 
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public static final VectorLeaf<ACell> MAX_EMBEDDED_VECTOR = (VectorLeaf) Vectors.of(Blobs.createRandom(105),1,2,3,4,5,6,7,8,9,10,11,12,13,14,15);
 
 	
 	static {

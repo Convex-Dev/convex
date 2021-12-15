@@ -69,4 +69,23 @@ public class EncodingSizeTest {
 		AString a=Samples.MAX_SHORT_STRING;
 		assertEquals(Strings.MAX_ENCODING_LENGTH,size(a));
 	}
+	
+	@Test public void testVectorLeaf() {
+		AVector<?> a=Samples.MAX_EMBEDDED_VECTOR;
+		assertEquals(Format.MAX_EMBEDDED_LENGTH,a.getEncodingLength());
+		
+		// TODO: consider how to construct largest vector encoding
+		//for (int i=0; i<15; i++) {
+		//	a=a.conj(Samples.MAX_EMBEDDED_VECTOR);
+		//}
+		//assertEquals(Vectors.MAX_ENCODING_LENGTH,size(a));
+	}
+	
+	@Test public void testVectorTree() {
+		AVector<?> a=Samples.MAX_EMBEDDED_VECTOR;
+		for (int i=0; i<15; i++) {
+			a=a.concat(Samples.MAX_EMBEDDED_VECTOR);
+		}
+		assertEquals(VectorTree.MAX_ENCODING_LENGTH,size(a));
+	}
 }
