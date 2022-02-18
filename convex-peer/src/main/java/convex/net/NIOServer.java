@@ -7,6 +7,7 @@ import java.net.ServerSocket;
 import java.net.SocketException;
 import java.net.StandardSocketOptions;
 import java.nio.channels.ClosedChannelException;
+import java.nio.channels.CancelledKeyException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
@@ -139,7 +140,11 @@ public class NIOServer implements Closeable {
 							log.warn("Unexpected IOException, canceling key: {}",e);
 							// e.printStackTrace();
 							key.cancel();
-						}
+						} catch (CancelledKeyException e) {
+							log.warn("Connection is not acceptable, canceling key: {}",e);
+							// e.printStackTrace();
+							key.cancel();
+            }
 					}
 					// keys.clear();
 				}
