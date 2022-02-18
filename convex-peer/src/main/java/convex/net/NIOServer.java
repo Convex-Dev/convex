@@ -264,6 +264,7 @@ public class NIOServer implements Closeable {
 		socketChannel.configureBlocking(false);
 
 		// TODO: Confirm we don't want Nagle?
+		// Generally, we want to send packets as fast as possible.
 		socketChannel.setOption(StandardSocketOptions.TCP_NODELAY, true);
 		socketChannel.register(selector, SelectionKey.OP_READ);
 	}
