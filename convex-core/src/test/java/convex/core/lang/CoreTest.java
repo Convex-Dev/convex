@@ -3433,7 +3433,7 @@ public class CoreTest extends ACVMTest {
 
 		assertTrue(step(ctx, "(do a)").isExceptional());
 
-		Block b = Block.of(expectedTS,InitTest.FIRST_PEER_KEY);
+		Block b = Block.of(expectedTS);
 		BlockResult br = s.applyBlock(b);
 		State s2 = br.getState();
 

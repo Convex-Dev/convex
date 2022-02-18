@@ -3,6 +3,8 @@ package convex.core.data;
 import java.nio.ByteBuffer;
 import java.util.Random;
 
+import org.bouncycastle.util.Arrays;
+
 import convex.core.exceptions.BadFormatException;
 import convex.core.util.Utils;
 
@@ -10,7 +12,7 @@ public class Blobs {
 
 	static final int CHUNK_SHIFT = 12;
 	
-	public static final int MAX_ENCODING_LENGTH = Math.max(Blob.MAX_ENCODING_LENGTH, BlobTree.MAX_ENCODING_LENGTH);
+	public static final int MAX_ENCODING_LENGTH = Math.max(Blob.MAX_ENCODING_LENGTH, BlobTree.MAX_ENCODING_SIZE);
 
 	public static <T extends ABlob> T createRandom(long length) {
 		return createRandom(new Random(),length);
@@ -90,6 +92,31 @@ public class Blobs {
 		// we can attach original blob as source at this point
 		result.attachEncoding(source);
 		return result;
+	}
+
+	/**
+	 * Create a Blob entirely filled with a given value
+	 * @param value Byte value to fill with (low 8 bits used)
+	 * @param length Length of Blob to create
+	 * @return BlobTree filled with given value
+	 */
+	public static ABlob createFilled(int value, long length) {
+		byte fillByte=(byte)value;
+		if (length<=Blob.CHUNK_LENGTH) {
+			byte[] bs=new byte[Utils.checkedInt(length)];
+			Arrays.fill(bs, fillByte);
+			return Blob.wrap(bs);
+		}
+		
+		int n=BlobTree.childCount(length);
+		long subSize=BlobTree.childSize(length);
+		ABlob fullChild=Blobs.createFilled(fillByte,subSize);
+		
+		ABlob[] children=new ABlob[n];
+		for (int i=0; i<n-1;i++) children[i]=fullChild;
+		long lastSize=length-((n-1)*subSize);
+		children[n-1]=lastSize==subSize?fullChild:Blobs.createFilled(fillByte, lastSize);
+		return BlobTree.createWithChildren(children);
 	}
 
 

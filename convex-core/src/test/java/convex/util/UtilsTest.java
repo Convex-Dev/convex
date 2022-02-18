@@ -350,7 +350,7 @@ public class UtilsTest {
 			String command = "(def x " + timestamp + ")";
 			SignedData<ATransaction> data = peer.sign(Invoke.create(InitTest.HERO, timestamp, command));
 
-			Block block = Block.of(timestamp, InitTest.FIRST_PEER_KEY, data);
+			Block block = Block.of(timestamp, data);
 
 			State state1 = state0.applyBlock(block).getState();
 

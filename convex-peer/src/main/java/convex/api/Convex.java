@@ -76,15 +76,14 @@ public abstract class Convex {
 	 */
 	protected Address address;
 
-
 	/**
-	 * Determines if auto-sequencing should be attempted
+	 * Determines if auto-sequencing should be attempted. Default to true.
 	 */
 	private boolean autoSequence = true;
 
 	/**
-	 * Sequence number for this client, or null if not yet known. Used to
-	 * number new transactions if not otherwise specified.
+	 * Sequence number for this client, or null if not yet known. Used to number new
+	 * transactions if not otherwise specified.
 	 */
 	protected Long sequence = null;
 
@@ -156,16 +155,24 @@ public abstract class Convex {
 	 * @param address     Address of Account to use for Client
 	 * @param keyPair     Key pair to use for client transactions
 	 * @return New Convex client instance
-	 * @throws IOException      If connection fails
+	 * @throws IOException      If connection fails due to IO error
 	 * @throws TimeoutException If connection attempt times out
 	 */
 	public static ConvexRemote connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair)
 			throws IOException, TimeoutException {
 		return Convex.connect(peerAddress, address, keyPair, Stores.current());
 	}
-	
+
+	/**
+	 * Create a remote connection to a Convex Server in the same JVM.
+	 * 
+	 * @param server Server instance to connect to.
+	 * @return Convex client instance
+	 * @throws IOException      If connection fails due to IO error
+	 * @throws TimeoutException If connection attempt times out
+	 */
 	public static ConvexRemote connectRemote(Server server) throws IOException, TimeoutException {
-		return connect(server.getHostAddress(),server.getPeerController(),server.getKeyPair());
+		return connect(server.getHostAddress(), server.getPeerController(), server.getKeyPair());
 	}
 
 	/**
@@ -177,7 +184,7 @@ public abstract class Convex {
 	 * @param keyPair     Key pair to use for client transactions
 	 * @param store       Store to use for this connection
 	 * @return New Convex client instance
-	 * @throws IOException      If connection fails
+	 * @throws IOException      If connection fails due to IO error
 	 * @throws TimeoutException If connection attempt times out
 	 */
 	public static ConvexRemote connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair, AStore store)
@@ -188,8 +195,9 @@ public abstract class Convex {
 	}
 
 	/**
-	 * Sets the Address for this connection. This will be used by default for
-	 * subsequent transactions and queries
+	 * Sets the Address for this connection. This will be used for subsequent
+	 * transactions and queries. User should also set a new keypair if a different
+	 * keypair is required for the new Address.
 	 *
 	 * @param address Address to use
 	 */
@@ -201,8 +209,15 @@ public abstract class Convex {
 		sequence = null;
 	}
 
-	public synchronized void setAddress(Address addr, AKeyPair kp) {
-		setAddress(addr);
+	/**
+	 * Sets the Address and Keypair for this connection. This will be used for
+	 * subsequent transactions and queries.
+	 *
+	 * @param address Address to use
+	 * @param kp      Keypair to use for the given Address
+	 */
+	public synchronized void setAddress(Address address, AKeyPair kp) {
+		setAddress(address);
 		setKeyPair(kp);
 	}
 
@@ -212,7 +227,7 @@ public abstract class Convex {
 
 	/**
 	 * Gets the next sequence number for this Client, which should be used for
-	 * building new signed transactions
+	 * building new signed transactions.
 	 *
 	 * @return Sequence number as a Long value greater than zero
 	 */
@@ -233,6 +248,7 @@ public abstract class Convex {
 	/**
 	 * Gets the current sequence number for this Client, which is the sequence
 	 * number of the last transaction observed for the current client's Account.
+	 * Will attempt to acquire the sequence number from the network if not known.
 	 *
 	 * @return Sequence number as a Long value (zero or positive)
 	 */
@@ -254,9 +270,8 @@ public abstract class Convex {
 		return sequence;
 	}
 
-
 	/**
-	 * Signs a value on behalf of this client.
+	 * Signs a value on behalf of this client, using the currently assigned keypair.
 	 *
 	 * @param <T>   Type of value to sign
 	 * @param value Value to sign
@@ -265,8 +280,6 @@ public abstract class Convex {
 	public <T extends ACell> SignedData<T> signData(T value) {
 		return keyPair.signData(value);
 	}
-
-
 
 	/**
 	 * Creates a new account with the given public key
@@ -348,7 +361,7 @@ public abstract class Convex {
 		SignedData<ATransaction> signed = keyPair.signData(transaction);
 		return transact(signed);
 	}
-	
+
 	/**
 	 * Executes a transaction, compiling the given source code as an Invoke.
 	 *
@@ -367,22 +380,23 @@ public abstract class Convex {
 	}
 
 	private ACell buildCodeForm(String code) {
-		AList<ACell> forms=Reader.readAll(code);
+		AList<ACell> forms = Reader.readAll(code);
 		ACell form;
-		if (forms.count()==1) {
+		if (forms.count() == 1) {
 			form = forms.get(0);
 		} else {
 			form = forms.cons(Symbols.DO);
 		}
 		return form;
 	}
-	
+
 	/**
 	 * Executes a transaction, compiling the given source code as an Invoke.
 	 *
 	 * @param code Code to execute
 	 * @return A Future for the result of the transaction
-	 * @throws IOException If the connection is broken, or the send buffer is full
+	 * @throws IOException      If the connection is broken, or the send buffer is
+	 *                          full
 	 * @throws TimeoutException If the transaction times out
 	 */
 	public synchronized Result transactSync(String code) throws IOException, TimeoutException {
@@ -526,7 +540,7 @@ public abstract class Convex {
 	public CompletableFuture<Result> query(ACell query) throws IOException {
 		return query(query, getAddress());
 	}
-	
+
 	/**
 	 * Submits a query to the Convex network, returning a Future once the query has
 	 * been successfully queued.
@@ -536,13 +550,14 @@ public abstract class Convex {
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 */
 	public CompletableFuture<Result> query(String query) throws IOException {
-		ACell form=buildCodeForm(query);
+		ACell form = buildCodeForm(query);
 		return query(form, getAddress());
 	}
 
 	/**
 	 * Attempts to acquire a complete persistent data structure for the given hash
-	 * from the remote peer. Uses the current store configured for the calling thread.
+	 * from the remote peer. Uses the current store configured for the calling
+	 * thread.
 	 *
 	 * @param hash Hash of value to acquire.
 	 *
@@ -559,8 +574,9 @@ public abstract class Convex {
 	 * @param hash  Hash of value to acquire.
 	 * @param store Store to acquire the persistent data to.
 	 *
-	 * @return Future for the Cell being acquired. May fail exceptionally or timeout if the given data
-	 * cannot be acquired (most likely missing from the peer's store)
+	 * @return Future for the Cell being acquired. May fail exceptionally or timeout
+	 *         if the given data cannot be acquired (most likely missing from the
+	 *         peer's store)
 	 */
 	public abstract <T extends ACell> CompletableFuture<T> acquire(Hash hash, AStore store);
 
@@ -640,18 +656,18 @@ public abstract class Convex {
 	public Result querySync(ACell query) throws TimeoutException, IOException {
 		return querySync(query, getAddress());
 	}
-	
 
 	/**
 	 * Executes a query synchronously and waits for the Result
 	 * 
-	 * @param query Query to execute, as a String that contains one or more readable forms. Multiple forms will be wrapped in a `do` block
+	 * @param query Query to execute, as a String that contains one or more readable
+	 *              forms. Multiple forms will be wrapped in a `do` block
 	 * @return Result of synchronous query
 	 * @throws TimeoutException If the synchronous request timed out
 	 * @throws IOException      In case of network error
 	 */
 	public Result querySync(String query) throws TimeoutException, IOException {
-		ACell form=buildCodeForm(query);
+		ACell form = buildCodeForm(query);
 		return querySync(form, getAddress());
 	}
 
@@ -753,7 +769,7 @@ public abstract class Convex {
 
 	public Long getBalance(Address address) throws IOException {
 		try {
-			Future<Result> future = query(Lists.of(Symbols.BALANCE,address));
+			Future<Result> future = query(Lists.of(Symbols.BALANCE, address));
 			Result result = future.get(timeout, TimeUnit.MILLISECONDS);
 			if (result.isError())
 				throw new Error(result.toString());
@@ -767,13 +783,13 @@ public abstract class Convex {
 	/**
 	 * Connect to a local Server, using given address and keypair
 	 * 
-	 * @param server Server to connect to
+	 * @param server  Server to connect to
 	 * @param address Address to use
 	 * @param keyPair Keypair to use
 	 * @return New Client Connection
 	 */
 	public static ConvexLocal connect(Server server, Address address, AKeyPair keyPair) {
-		return ConvexLocal.create(server,address,keyPair);
+		return ConvexLocal.create(server, address, keyPair);
 	}
 
 	/**
@@ -783,9 +799,5 @@ public abstract class Convex {
 	 * @throws TimeoutException If initial status request times out
 	 */
 	public abstract CompletableFuture<State> acquireState() throws TimeoutException;
-
-	
-
-
 
 }

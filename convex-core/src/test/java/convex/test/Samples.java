@@ -124,6 +124,8 @@ public class Samples {
 	public static final BlobTree BIG_BLOB_TREE = Blobs.createRandom(Samples.rand, BIG_BLOB_LENGTH);
 	public static final Blob FULL_BLOB = Blobs.createRandom(Samples.rand, Blob.CHUNK_LENGTH);
 	
+	public static final BlobTree DIABOLICAL_BLOB_TREE = (BlobTree)Blobs.createFilled(1,Long.MAX_VALUE);
+	
 	public static final ASignature FAKE_SIGNATURE = Ed25519Signature.wrap(new byte[Ed25519Signature.SIGNATURE_LENGTH]);
 
 	public static final Blob MAX_EMBEDDED_BLOB = createTestBlob(Format.MAX_EMBEDDED_LENGTH-Format.getVLCLength(Format.MAX_EMBEDDED_LENGTH)-1);
@@ -134,6 +136,8 @@ public class Samples {
 	public static final StringShort MAX_SHORT_STRING= StringShort.create(createRandomString(StringShort.MAX_LENGTH));
 	public static final StringTree MIN_TREE_STRING= StringTree.create(createRandomString(StringTree.MINIMUM_LENGTH));
 
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public static final VectorLeaf<ACell> MAX_EMBEDDED_VECTOR = (VectorLeaf) Vectors.of(Blobs.createRandom(105),1,2,3,4,5,6,7,8,9,10,11,12,13,14,15);
 
 	
 	static {

@@ -5,6 +5,9 @@ import java.nio.ByteBuffer;
 import convex.core.exceptions.BadFormatException;
 
 public class Strings {
+	
+	public static final int MAX_ENCODING_LENGTH = Math.max(StringShort.MAX_ENCODING_LENGTH,StringTree.MAX_ENCODING_LENGTH);
+
 
 	public static final StringShort EMPTY = StringShort.create("");
 	public static final StringShort NIL = StringShort.create("nil");

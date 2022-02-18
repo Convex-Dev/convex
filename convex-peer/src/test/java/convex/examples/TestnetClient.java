@@ -9,7 +9,6 @@ import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
 import convex.core.Result;
-import convex.core.State;
 import convex.core.init.Init;
 
 public class TestnetClient {

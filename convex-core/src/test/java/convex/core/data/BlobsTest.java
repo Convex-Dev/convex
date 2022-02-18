@@ -198,6 +198,34 @@ public class BlobsTest {
 		assertThrows(IndexOutOfBoundsException.class, () -> Samples.BIG_BLOB_TREE.slice(-1));
 		assertThrows(IndexOutOfBoundsException.class, () -> Samples.BIG_BLOB_TREE.slice(1, Samples.BIG_BLOB_LENGTH));
 	}
+	
+	@Test
+	public void testBlobTreeSizing() {
+		assertEquals(0,BlobTree.calcChunks(0));
+		assertEquals(1,BlobTree.calcChunks(1));
+		assertEquals(1,BlobTree.calcChunks(4095));
+		assertEquals(1,BlobTree.calcChunks(4096));
+		assertEquals(2,BlobTree.calcChunks(4097));
+		assertEquals(16,BlobTree.calcChunks(65536));
+		assertEquals(17,BlobTree.calcChunks(65537));
+		assertEquals(256,BlobTree.calcChunks(1048576));
+		assertEquals(257,BlobTree.calcChunks(1048577));
+		assertEquals(0x0008000000000000l,BlobTree.calcChunks(Long.MAX_VALUE));
+
+		assertEquals(4096,BlobTree.childSize(4097));
+		assertEquals(4096,BlobTree.childSize(65536));
+		assertEquals(65536,BlobTree.childSize(65537));
+		assertEquals(65536,BlobTree.childSize(1048576));
+		assertEquals(1048576,BlobTree.childSize(1048577));
+		assertEquals(0x1000000000000000l,BlobTree.childSize(Long.MAX_VALUE));
+		
+		assertEquals(2,BlobTree.childCount(4097));
+		assertEquals(16,BlobTree.childCount(65536));
+		assertEquals(2,BlobTree.childCount(65537));
+		assertEquals(16,BlobTree.childCount(1048576));
+		assertEquals(2,BlobTree.childCount(1048577));
+		assertEquals(8,BlobTree.childCount(Long.MAX_VALUE));
+	}
 
 	@Test
 	public void testBlobFormat() throws BadFormatException {

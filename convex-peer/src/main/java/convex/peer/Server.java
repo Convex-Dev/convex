@@ -662,9 +662,9 @@ public class Server implements Closeable {
 		if (newConsensusPoint > oldConsensusPoint) {
 			log.debug("Consensus point update from {} to {}" ,oldConsensusPoint , newConsensusPoint);
 			for (long i = oldConsensusPoint; i < newConsensusPoint; i++) {
-				Block block = peer.getPeerOrder().getBlock(i);
+				SignedData<Block> block = peer.getPeerOrder().getBlock(i);
 				BlockResult br = peer.getBlockResult(i);
-				reportTransactions(block, br);
+				reportTransactions(block.getValue(), br);
 			}
 		}
 
@@ -727,7 +727,7 @@ public class Server implements Closeable {
 		int n = newTransactions.size();
 		if (n == 0) return false;
 		// TODO: smaller block if too many transactions?
-		block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions, peer.getPeerKey());
+		block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions);
 		newTransactions.clear();
 
 		ACell.createPersisted(block);

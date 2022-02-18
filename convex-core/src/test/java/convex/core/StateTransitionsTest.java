@@ -72,7 +72,7 @@ public class StateTransitionsTest {
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_B, 50);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			long nowTS = Utils.getCurrentTimestamp();
-			Block b = Block.of(nowTS,FIRST_PEER_KEY, st);
+			Block b = Block.of(nowTS, st);
 			BlockResult br = s.applyBlock(b);
 			AVector<Result> results = br.getResults();
 			assertEquals(1, results.count());
@@ -86,7 +86,7 @@ public class StateTransitionsTest {
 		{ // transfer from existing to non-existing account A -> C
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, 50);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
-			Block b = Block.of(System.currentTimeMillis(),FIRST_PEER_KEY, st);
+			Block b = Block.of(System.currentTimeMillis(), st);
 			State s2 = s.applyBlock(b).getState();
 
 			// no transfer should have happened, although cost should have been paid
@@ -97,7 +97,7 @@ public class StateTransitionsTest {
 		{ // transfer from a non-existent address
 			Transfer t1 = Transfer.create(ADDRESS_C,1, ADDRESS_B, 50);
 			SignedData<ATransaction> st = KEYPAIR_C.signData(t1);
-			Block b = Block.of(System.currentTimeMillis(),FIRST_PEER_KEY, st);
+			Block b = Block.of(System.currentTimeMillis(), st);
 			BlockResult br=s.applyBlock(b);
 			assertEquals(ErrorCodes.NOBODY, br.getResult(0).getErrorCode());
 
@@ -109,7 +109,7 @@ public class StateTransitionsTest {
 
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, 50);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
-			Block b = Block.of(System.currentTimeMillis(),FIRST_PEER_KEY, st);
+			Block b = Block.of(System.currentTimeMillis(), st);
 			State s2 = s0.applyBlock(b).getState();
 
 			// Transfer should have happened
@@ -125,7 +125,7 @@ public class StateTransitionsTest {
 			SignedData<ATransaction> st1 = KEYPAIR_A.signData(t1);
 			Transfer t2 = Transfer.create(ADDRESS_A,2, ADDRESS_C, 150);
 			SignedData<ATransaction> st2 = KEYPAIR_A.signData(t2);
-			Block b = Block.of(System.currentTimeMillis(),FIRST_PEER_KEY, st1, st2);
+			Block b = Block.of(System.currentTimeMillis(), st1, st2);
 
 			BlockResult br = s0.applyBlock(b);
 			State s2 = br.getState();
@@ -142,7 +142,7 @@ public class StateTransitionsTest {
 			SignedData<ATransaction> st1 = KEYPAIR_A.signData(t1);
 			Transfer t2 = Transfer.create(ADDRESS_B,1, ADDRESS_C, 50);
 			SignedData<ATransaction> st2 = KEYPAIR_B.signData(t2);
-			Block b = Block.of(System.currentTimeMillis(),FIRST_PEER_KEY, st1, st2);
+			Block b = Block.of(System.currentTimeMillis(), st1, st2);
 
 			BlockResult br = s0.applyBlock(b);
 			State s2 = br.getState();
@@ -159,7 +159,7 @@ public class StateTransitionsTest {
 		{ // transfer with an incorrect sequence number
 			Transfer t1 = Transfer.create(ADDRESS_A,2, ADDRESS_C, 50);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
-			Block b = Block.of(System.currentTimeMillis(),FIRST_PEER_KEY, st);
+			Block b = Block.of(System.currentTimeMillis(), st);
 			BlockResult br = s.applyBlock(b);
 			AVector<Result> results = br.getResults();
 			assertEquals(1, results.count());
@@ -169,7 +169,7 @@ public class StateTransitionsTest {
 		{ // transfer amount greater than current balance
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, 50000);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
-			Block b = Block.of(System.currentTimeMillis(),FIRST_PEER_KEY, st);
+			Block b = Block.of(System.currentTimeMillis(), st);
 			BlockResult br = s.applyBlock(b);
 			assertEquals(ErrorCodes.FUNDS, br.getResult(0).getErrorCode());
 
@@ -192,7 +192,7 @@ public class StateTransitionsTest {
 
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_NIKI, AMT);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
-			Block b = Block.of(System.currentTimeMillis(),FIRST_PEER_KEY, st);
+			Block b = Block.of(System.currentTimeMillis(), st);
 			BlockResult br = s0.applyBlock(b);
 			// System.out.println("Transfer complete....");
 
@@ -209,7 +209,7 @@ public class StateTransitionsTest {
 		State s = TestState.STATE;
 		ATransaction t1 = Invoke.create(InitTest.HERO,1,Reader.read("(def my-lib-address (deploy '(defn foo [x] x)))"));
 		AKeyPair kp = InitTest.HERO_KEYPAIR;
-		Block b1 = Block.of(s.getTimeStamp().longValue(),FIRST_PEER_KEY, kp.signData(t1));
+		Block b1 = Block.of(s.getTimeStamp().longValue(), kp.signData(t1));
 		BlockResult br=s.applyBlock(b1);
 		assertFalse(br.isError(0),br.getResult(0).toString());
 
@@ -228,7 +228,7 @@ public class StateTransitionsTest {
 					+ "                     (defn get ^{:callable? true} [] stored-data)\r\n"
 					+ "                     (defn set ^{:callable? true} [x] (def stored-data x)))))\r\n"));
 			AKeyPair kp = InitTest.HERO_KEYPAIR;
-			Block b=Block.of(s.getTimeStamp().longValue(),FIRST_PEER_KEY,kp.signData(trans));
+			Block b=Block.of(s.getTimeStamp().longValue(),kp.signData(trans));
 			BlockResult br=s.applyBlock(b);
 			Result r=br.getResult(0);
 			assertFalse(r.isError(),r.toString());
@@ -252,7 +252,7 @@ public class StateTransitionsTest {
 		long initialMem=s.getMemorySize();
 
 		ATransaction t1 = Invoke.create(InitTest.HERO,1,Reader.read("(def a 1)"));
-		Block b1 = Block.of(s.getTimeStamp().longValue(),FIRST_PEER_KEY, kp.signData(t1));
+		Block b1 = Block.of(s.getTimeStamp().longValue(), kp.signData(t1));
 		BlockResult br=s.applyBlock(b1);
 
 		// should not be an error
@@ -277,7 +277,7 @@ public class StateTransitionsTest {
 
 		ATransaction t1 = Invoke.create(InitTest.HERO,1,
 				Reader.read("(transfer "+taddr+" 10000000)"));
-		Block b1 = Block.of(s.getTimeStamp().longValue() + 100,FIRST_PEER_KEY, kp.signData(t1));
+		Block b1 = Block.of(s.getTimeStamp().longValue() + 100, kp.signData(t1));
 		s = s.applyBlock(b1).getState();
 		assertEquals(BAL2 + 10000000, s.getBalance(TARGET));
 		assertCVMEquals(INITIAL_TS + 100, s.getTimeStamp());
@@ -285,7 +285,7 @@ public class StateTransitionsTest {
 		// schedule 200ms later for 1s time
 		ATransaction t2 = Invoke.create(InitTest.HERO,2, Reader.read(
 				"(schedule (+ *timestamp* 1000) (transfer "+taddr+" 10000000))"));
-		Block b2 = Block.of(s.getTimeStamp().longValue() + 200,FIRST_PEER_KEY, kp.signData(t2));
+		Block b2 = Block.of(s.getTimeStamp().longValue() + 200, kp.signData(t2));
 		BlockResult br2 = s.applyBlock(b2);
 		assertNull(br2.getErrorCode(0),br2.getResult(0).toString());
 		s = br2.getState();
@@ -296,7 +296,7 @@ public class StateTransitionsTest {
 
 		// advance 999ms
 		ATransaction t3 = Invoke.create(InitTest.HERO,3, Reader.read("1"));
-		Block b3 = Block.of(s.getTimeStamp().longValue() + 999,FIRST_PEER_KEY, kp.signData(t3));
+		Block b3 = Block.of(s.getTimeStamp().longValue() + 999, kp.signData(t3));
 		BlockResult br3 = s.applyBlock(b3);
 		assertNull(br3.getErrorCode(0));
 		s = br3.getState();
@@ -305,7 +305,7 @@ public class StateTransitionsTest {
 
 		// advance 1ms to trigger scheduled transfer
 		ATransaction t4 = Invoke.create(InitTest.HERO,4, Reader.read("1"));
-		Block b4 = Block.of(s.getTimeStamp().longValue() + 1,FIRST_PEER_KEY, kp.signData(t4));
+		Block b4 = Block.of(s.getTimeStamp().longValue() + 1, kp.signData(t4));
 		BlockResult br4 = s.applyBlock(b4);
 		assertNull(br4.getErrorCode(0));
 		s = br4.getState();

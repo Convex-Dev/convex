@@ -26,7 +26,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	protected final RecordFormat format;
 	
 	// TODO: need a better default value?
-	public static final ARecord DEFAULT_VALUE=Block.create(0, AccountKey.ZERO, Vectors.empty());
+	public static final ARecord DEFAULT_VALUE=Block.create(0, Vectors.empty());
 
 	protected ARecord(RecordFormat format) {
 		super(format.count());

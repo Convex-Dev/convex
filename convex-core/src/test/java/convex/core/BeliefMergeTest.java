@@ -138,7 +138,7 @@ public class BeliefMergeTest {
 			signedTransactions[ix] = initial[peerIndex].sign(transactions[ix]);
 		}
 		long newTimeStamp = ps.getTimeStamp() + peerIndex + 100;
-		Block block = Block.of(newTimeStamp, KEYS[peerIndex], signedTransactions);
+		Block block = Block.of(newTimeStamp, signedTransactions);
 
 		ps = ps.proposeBlock(block);
 		result[peerIndex] = ps;
@@ -158,7 +158,7 @@ public class BeliefMergeTest {
 		long newTimestamp1 = TEST_TIMESTAMP + 200;
 		b1 = b1.updateTimestamp(b1.getTimeStamp() + 200);
 		assertEquals(0, b1.getPeerOrder().getBlocks().size());
-		Peer b1a = b1.proposeBlock(Block.of(newTimestamp1,KEYS[1])); // empty block, just with timestamp
+		Peer b1a = b1.proposeBlock(Block.of(newTimestamp1)); // empty block, just with timestamp
 		assertEquals(1, b1a.getPeerOrder().getBlocks().size());
 
 		// merge updated belief, new proposed block should be included
@@ -413,7 +413,7 @@ public class BeliefMergeTest {
 		assertTrue(allBeliefsEqual(bs4));
 
 		Order finalChain = bs4[0].getOrder(PKEY);
-		AVector<Block> finalBlocks = finalChain.getBlocks();
+		AVector<SignedData<Block>> finalBlocks = finalChain.getBlocks();
 		assertEquals(NUM_PEERS * NUM_INITIAL_TRANS, new HashSet<>(finalBlocks).size());
 
 		State finalState = bs4[0].getConsensusState();

@@ -285,16 +285,16 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Returns true if this Cell is in a canonical format for message writing.
-	 * Reading or writing a non-canonical value should be considered illegal, but 
-	 * non-canonical objects may be used on a temporary internal basis.
+	 * Returns true if this Cell is in a canonical representation for message writing.
+	 * Non-canonical objects may be used on a temporary internal basis, they must always
+	 * be converted to canonical representations for external use (e.g. Encoding).
 	 * 
 	 * @return true if the object is in canonical format, false otherwise
 	 */
 	public abstract boolean isCanonical();
 	
 	/**
-	 * Converts this Cell to its canonical version. Returns this if already canonical
+	 * Converts this Cell to its canonical version. Returns this Cell if already canonical.
 	 * 
 	 * @return Canonical version of Cell
 	 */
@@ -312,7 +312,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 
 	/**
 	 * Gets the number of Refs contained within this Cell. This number is
-	 * final / immutable for any given instance. 
+	 * final / immutable for any given instance and is defined by the Cell encoding rules.
 	 * 
 	 * Contained Refs may be either external or embedded.
 	 * 

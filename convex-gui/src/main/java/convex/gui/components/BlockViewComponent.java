@@ -12,6 +12,7 @@ import convex.core.Peer;
 import convex.core.State;
 import convex.core.data.AVector;
 import convex.core.data.Hash;
+import convex.core.data.SignedData;
 import convex.gui.components.models.StateModel;
 import convex.gui.manager.PeerGUI;
 
@@ -48,7 +49,7 @@ public class BlockViewComponent extends JPanel {
 		Peer p = peerView.peerServer.getPeer();
 		Order order = p.getPeerOrder();
 		if (order==null) return; // no current peer order - maybe not a valid peer?
-		AVector<Block> blocks = order.getBlocks();
+		AVector<SignedData<Block>> blocks = order.getBlocks();
 		int n = (int) blocks.count();
 
 

@@ -49,7 +49,7 @@ public class BigBlockBenchmark {
 			Transfer t = Transfer.create(source,1, target, 1);
 			transactions.add(kp.signData(t));
 		}
-		block = Block.create(System.currentTimeMillis(),transactions,Benchmarks.FIRST_PEER_KEY);
+		block = Block.create(System.currentTimeMillis(),transactions);
 	}
 
 	@Benchmark

@@ -9,6 +9,7 @@ import convex.core.data.type.Types;
  */
 public abstract class AString extends ACountable<CVMChar> implements CharSequence, Comparable<AString> {
 
+	
 	protected int length;
 	
 	protected AString(int length) {

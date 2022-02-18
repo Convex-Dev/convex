@@ -25,7 +25,6 @@ public class AccountKey extends AArrayBlob {
 	
 	public static final AType TYPE = Types.BLOB;
 
-
 	public static final int LENGTH_BITS = LENGTH * 8;
 
 	public static final AccountKey ZERO = AccountKey.dummy("0");

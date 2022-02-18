@@ -310,8 +310,8 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		}
 		return length;
 	}
-	
-	public static int MAX_ENCODING_SIZE = 1 + Format.MAX_VLC_LONG_LENGTH + Format.MAX_EMBEDDED_LENGTH * (MAX_SIZE+1);
+	 
+	public static final int MAX_ENCODING_LENGTH = 1 + Format.MAX_VLC_LONG_LENGTH + VectorTree.MAX_EMBEDDED_LENGTH+Format.MAX_EMBEDDED_LENGTH * (MAX_SIZE);
 
 	/**
 	 * Returns true if this ListVector has a prefix AVector.

@@ -7,6 +7,7 @@ import convex.core.data.AVector;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
+import convex.core.data.SignedData;
 import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
@@ -28,12 +29,12 @@ import convex.core.exceptions.InvalidDataException;
  * 
  */
 public class Order extends ACell {
-	private final AVector<Block> blocks;
+	private final AVector<SignedData<Block>> blocks;
 
 	private final long proposalPoint;
 	private final long consensusPoint;
 
-	private Order(AVector<Block> blocks, long proposalPoint, long consensusPoint) {
+	private Order(AVector<SignedData<Block>> blocks, long proposalPoint, long consensusPoint) {
 		this.blocks = blocks;
 		this.consensusPoint = consensusPoint;
 		this.proposalPoint = proposalPoint;
@@ -46,7 +47,7 @@ public class Order extends ACell {
 	 * @param consensusPoint Consensus Point
 	 * @return New Order instance
 	 */
-	private static Order create(AVector<Block> blocks, long proposalPoint, long consensusPoint) {
+	private static Order create(AVector<SignedData<Block>> blocks, long proposalPoint, long consensusPoint) {
 		return new Order(blocks, proposalPoint, consensusPoint);
 	}
 
@@ -89,7 +90,7 @@ public class Order extends ACell {
 	 * @throws BadFormatException If encoding format is invalid
 	 */
 	public static Order read(ByteBuffer bb) throws BadFormatException {
-		AVector<Block> blocks = Format.read(bb);
+		AVector<SignedData<Block>> blocks = Format.read(bb);
 		if (blocks==null) {
 			throw new BadFormatException("Null blocks in Order!");
 		}
@@ -172,7 +173,7 @@ public class Order extends ACell {
 	 * Gets the Blocks in this Order
 	 * @return Vector of Blocks
 	 */
-	public AVector<Block> getBlocks() {
+	public AVector<SignedData<Block>> getBlocks() {
 		return blocks;
 	}
 
@@ -181,7 +182,7 @@ public class Order extends ACell {
 	 * @param i Index of Block
 	 * @return Block at specified index.
 	 */
-	public Block getBlock(long i) {
+	public SignedData<Block> getBlock(long i) {
 		return blocks.get(i);
 	}
 
@@ -191,8 +192,8 @@ public class Order extends ACell {
 	 * @param block Block to append
 	 * @return The updated chain
 	 */
-	public Order append(Block block) {
-		AVector<Block> newBlocks = blocks.append(block);
+	public Order append(SignedData<Block> block) {
+		AVector<SignedData<Block>> newBlocks = blocks.append(block);
 		return create(newBlocks, proposalPoint, consensusPoint);
 	}
 
@@ -201,7 +202,7 @@ public class Order extends ACell {
 	 * @param newBlocks New blocks to use
 	 * @return Updated Order, or the same order if unchanged
 	 */
-	public Order withBlocks(AVector<Block> newBlocks) {
+	public Order withBlocks(AVector<SignedData<Block>> newBlocks) {
 		if (blocks == newBlocks) return this;
 		return create(newBlocks, proposalPoint, consensusPoint);
 	}
@@ -262,7 +263,7 @@ public class Order extends ACell {
 	 * @param newBlocks New vector of blocks to use in this Chain
 	 * @return The updated Order
 	 */
-	public Order updateBlocks(AVector<Block> newBlocks) {
+	public Order updateBlocks(AVector<SignedData<Block>> newBlocks) {
 		if (blocks == newBlocks) return this;
 		long prefix = blocks.commonPrefixLength(newBlocks);
 		long newProposalPoint = Math.min(prefix, proposalPoint);
@@ -293,7 +294,7 @@ public class Order extends ACell {
 
 	@Override
 	public Order updateRefs(IRefFunction func) {
-		AVector<Block> newBlocks = blocks.updateRefs(func);
+		AVector<SignedData<Block>> newBlocks = blocks.updateRefs(func);
 		return this.withBlocks(newBlocks);
 	}
 	
