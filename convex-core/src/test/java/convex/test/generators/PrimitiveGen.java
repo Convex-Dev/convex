@@ -30,22 +30,22 @@ public class PrimitiveGen extends Generator<ACell> {
 	public ACell generate(SourceOfRandomness r, GenerationStatus status) {
 		int type = r.nextInt(7);
 		switch (type) {
-			case 0:
-				return null;
-			case 1:
-				return CVMByte.create(r.nextLong());
-			case 2:
-				return CVMChar.create(r.nextLong());
-			case 3:
-				return CVMLong.create(r.nextLong());
-			case 4:
-				return CVMDouble.create(r.nextDouble());
-			case 5:
-				return CVMBool.create(r.nextBoolean());
-			case 6:
-				return Blob.create(r.nextBytes(getByteSize(r)));
-			default:
-				throw new Error("Unexpected type: " + type);
+		case 0:
+			return null;
+		case 1:
+			return CVMByte.create(r.nextLong());
+		case 2:
+			return CVMChar.create(r.nextLong());
+		case 3:
+			return CVMLong.create(r.nextLong());
+		case 4:
+			return CVMDouble.create(r.nextDouble());
+		case 5:
+			return CVMBool.create(r.nextBoolean());
+		case 6:
+			return Blob.create(r.nextBytes(getByteSize(r)));
+		default:
+			throw new Error("Unexpected type: " + type);
 		}
 	}
 
