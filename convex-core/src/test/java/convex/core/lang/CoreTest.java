@@ -1076,6 +1076,8 @@ public class CoreTest extends ACVMTest {
 		assertSame(BlobMap.EMPTY,eval("(dissoc (blob-map) 1)"));
 		assertEquals(BlobMap.of(Blob.fromHex("a2"), Keywords.FOO),eval("(dissoc (into (blob-map) [[0xa2 :foo] [0xb3 :bar]]) 0xb3)"));
 		assertEquals(BlobMap.of(Blob.fromHex("a2"), Keywords.FOO),eval("(dissoc (into (blob-map) [[0xa2 :foo]]) :foo)"));
+		assertEquals(BlobMaps.empty(), eval("(dissoc (blob-map 0x 0x1234) 0x)"));
+		assertEquals(BlobMaps.empty(), eval("(dissoc(blob-map) :foo)"));
 
 		assertCastError(step("(dissoc 1 1 2)"));
 		assertCastError(step("(dissoc #{})"));
@@ -1128,12 +1130,13 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(disj (set [3 2 1 2 4]) 4)"));
 		assertEquals(Sets.of(1L), eval("(disj (set [3 2 1 2 4]) 2 3 4)"));
 		assertEquals(Sets.empty(), eval("(disj #{})"));
-
+		
 		// nil is treated as empty set
 		assertSame(Sets.empty(), eval("(disj nil 1)"));
 		assertSame(Sets.empty(), eval("(disj nil nil)"));
 
 		assertCastError(step("(disj [] 1)"));
+		assertCastError(step("(disj (blob-map) 0x)"));
 		assertArityError(step("(disj)"));
 	}
 
@@ -1189,6 +1192,7 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(subset? #{2 3} #{1 2 3 4})"));
 
 		// check nil is handled as empty set
+		assertTrue(evalB("(subset? nil nil)"));
 		assertTrue(evalB("(subset? nil #{})"));
 		assertTrue(evalB("(subset? #{} nil)"));
 		assertTrue(evalB("(subset? nil #{1 2 3})"));
@@ -1210,14 +1214,14 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testSetUnion() {
 		assertEquals(Sets.empty(),eval("(union)"));
-
-		assertEquals(Sets.empty(),eval("(union nil)"));
 		assertEquals(Sets.empty(),eval("(union #{})"));
 		assertEquals(Sets.of(1L,2L),eval("(union #{1 2})"));
 
 		// nil treated as empty set in all cases
 		assertEquals(Sets.of(1L,2L),eval("(union nil #{1 2})"));
 		assertEquals(Sets.of(1L,2L),eval("(union #{1 2} nil)"));
+		assertEquals(Sets.empty(),eval("(union nil)"));
+		assertEquals(Sets.empty(),eval("(union nil nil nil)"));
 
 		assertEquals(Sets.of(1L,2L,3L),eval("(union #{1 2} #{3})"));
 
@@ -3028,6 +3032,8 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(coll? [:foo :bar])"));
 		assertTrue(evalB("(coll? {1 2 3 4})"));
 		assertTrue(evalB("(coll? #{1 2})"));
+		assertTrue(evalB("(coll? (blob-map))"));
+		assertTrue(evalB("(coll? (blob-map 0x 0x))"));
 	}
 
 	@Test
@@ -3036,11 +3042,13 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(empty? {})"));
 		assertTrue(evalB("(empty? [])"));
 		assertTrue(evalB("(empty? ())"));
+		assertTrue(evalB("(empty? (blob-map))"));
 		assertTrue(evalB("(empty? \"\")"));
 		assertTrue(evalB("(empty? #{})"));
 		
 		assertFalse(evalB("(empty? 0x1234)"));
 		assertFalse(evalB("(empty? {1 2})"));
+		assertFalse(evalB("(empty? (blob-map 0x 0x1234))"));
 		assertFalse(evalB("(empty? [ 3])"));
 		assertFalse(evalB("(empty? '(foo))"));
 		assertFalse(evalB("(empty? #{[]})"));
