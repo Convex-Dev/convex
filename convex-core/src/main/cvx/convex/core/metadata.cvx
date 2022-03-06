@@ -955,8 +955,8 @@
 
 
  schedule*
- {:doc {:description "Schedules a form for future execution under this account. Expands and compiles form now, but does not execute until the specified timestamp."
-        :examples    [{:code "(schedule* (+ *timestamp* 1000) '(transfer my-friend 1000000))"}]
+ {:doc {:description "Schedules a Op for future execution under this account. Op will not be executed until the specified timestamp. `compile` may be used to produce an Op from a normal code form."
+        :examples    [{:code "(schedule* (+ *timestamp* 1000) (compile '(transfer my-friend 1000000)))"}]
         :signature   [{:params [timestamp code]}]}}
 
 

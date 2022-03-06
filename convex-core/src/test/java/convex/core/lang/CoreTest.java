@@ -3420,6 +3420,14 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(schedule :foo (def a 2))"));
 		assertCastError(step("(schedule nil (def a 2))"));
 	}
+	
+	@Test
+	public void testScheduleStar() throws BadSignatureException {
+		// Not an Op
+		assertCastError(step("(schedule* (+ *timestamp* 1) '(def a 2))"));
+		assertArityError(step("(schedule* (+ *timestamp* 1))"));
+		assertArityError(step("(schedule* (+ *timestamp* 1) :foo :bar)"));// Arity before cast
+	}
 
 	@Test
 	public void testScheduleExecution() throws BadSignatureException {
