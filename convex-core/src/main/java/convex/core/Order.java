@@ -42,7 +42,7 @@ public class Order extends ACell {
 
 	/**
 	 * Create an Order
-	 * @param blocks Blocks in ORder
+	 * @param blocks Blocks in Order
 	 * @param proposalPoint Proposal Point
 	 * @param consensusPoint Consensus Point
 	 * @return New Order instance
