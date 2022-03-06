@@ -2937,6 +2937,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testPredArity() {
+		// Every predicate should require arity 1, and never fail otherwise
 		AVector<ACell> pvals = ALL_PREDICATES;
 		assertFalse(pvals.isEmpty());
 		Context<?> C = context();
@@ -2979,7 +2980,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testListPred() {
-		assertFalse(evalB("(list? nil)"));
+		assertFalse(evalB("(list? nil)")); // not a list, even though it casts to one
 		assertFalse(evalB("(list? 1)"));
 		assertTrue(evalB("(list? '())"));
 		assertTrue(evalB("(list? '(3 4 5))"));
