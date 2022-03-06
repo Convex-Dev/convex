@@ -310,6 +310,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(97L, evalL("(long \\a)"));
 		assertEquals(2147483648L, evalL("(long 2147483648)"));
 
+		// Blob casts treat blob as extended long bits
 		assertEquals(4096L, evalL("(long 0x1000)"));
 		assertEquals(255L, evalL("(long 0xff)"));
 		assertEquals(4294967295L, evalL("(long 0xffffffff)"));
@@ -317,13 +318,13 @@ public class CoreTest extends ACVMTest {
 		assertEquals(255L, evalL("(long 0xff00000000000000ff)")); // only taking last 8 bytes
 		assertEquals(-1L, evalL("(long 0xcafebabeffffffffffffffff)")); // interpret as big endian big integer
 
-		// Currently we allow bools to cast to longs like this. TODO: maybe reconsider?
+		// Currently we allow bools to explicitly cast to longs like this. TODO: maybe reconsider?
 		assertEquals(1L, evalL("(long true)"));
 		assertEquals(0L, evalL("(long false)"));
 
-
 		assertArityError(step("(long)"));
-		assertArityError(step("(long 1 2)"));
+		assertArityError(step("(long 1 2)")); 
+		assertArityError(step("(long nil nil)")); // arity before cast
 		assertCastError(step("(long nil)"));
 		assertCastError(step("(long [])"));
 		assertCastError(step("(long :foo)"));
@@ -373,14 +374,41 @@ public class CoreTest extends ACVMTest {
 		assertEquals(6L,evalL("(if (= 1 1) (* 2 3) (* 3 4))"));
 		assertEquals(12L,evalL("(if (nil? false) (* 2 3) (* 3 4))"));
 
-
-		// null return for missing false branch
+		// Missing false branch
 		assertNull(eval("(if false 1)"));
+		assertEquals(CVMLong.ONE,eval("(if true 1)"));
 
 		// TODO: should these be arity errors?
 		assertArityError(step("(if)"));
 		assertArityError(step("(if 1)"));
 		assertArityError(step("(if 1 2 3 4)"));
+	}
+	
+	@Test public void testCond() {
+		// basic matches
+		assertEquals(1L,evalL("(cond true 1)"));
+		assertEquals(1L,evalL("(cond true 1 true 2 true 3)"));
+		assertEquals(2L,evalL("(cond false 1 true 2 true 3)"));
+		assertEquals(3L,evalL("(cond false 1 false 2 true 3)"));
+		
+		// fallthroughs not taken
+		assertEquals(1L,evalL("(cond true 1 2)"));
+		assertEquals(2L,evalL("(cond false 1 true 2 3)"));
+		
+		// fallthroughs to default value
+		assertEquals(2L,evalL("(cond false 1 2)"));
+		assertEquals(3L,evalL("(cond false 1 false 2 3)"));
+
+		// expressions
+		assertEquals(6L,evalL("(cond (= 1 1) (* 2 3) (* 3 4))"));
+		assertEquals(12L,evalL("(cond (nil? false) (* 2 3) (* 3 4))"));
+
+		// Missing false branch
+		assertNull(eval("(cond false 1)"));
+		assertEquals(CVMLong.ONE,eval("(cond true 1)"));
+		
+		// No expressions, fall through to null
+		assertNull(eval("(cond)"));
 	}
 
 	@Test
