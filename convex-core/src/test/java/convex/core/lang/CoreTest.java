@@ -2149,6 +2149,7 @@ public class CoreTest extends ACVMTest {
 		
 		assertCastError(step("(balance nil)"));
 		assertCastError(step("(balance 0x00)"));
+		assertCastError(step("(balance 1)")); // shouldn't implicitly cast
 		assertCastError(step("(balance :foo)"));
 
 		assertArityError(step("(balance)"));
