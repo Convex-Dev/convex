@@ -880,6 +880,16 @@ public class CoreTest extends ACVMTest {
 	
 	@Test
 	public void testAssoc() {
+		// Associative values
+		assertEquals(Maps.of(1,2),eval("(assoc {} 1 2)"));
+		assertEquals(Vectors.of(1,2),eval("(assoc [1 3] 1 2)"));
+		assertEquals(Sets.of(1,2),eval("(assoc #{1} 2 true)"));
+		assertEquals(BlobMap.of(Blob.EMPTY,2),eval("(assoc (blob-map) 0x 2)"));
+		
+		// bad key types
+		assertArgumentError(step("(assoc (blob-map) 1 2)"));
+		assertArgumentError(step("(assoc [1 2 3] :foo 7)"));
+	
 		// Non-associative values
 		assertCastError(step("(assoc 1 2 3)"));
 		assertCastError(step("(assoc :foo 2 3)"));
