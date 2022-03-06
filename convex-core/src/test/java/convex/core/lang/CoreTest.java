@@ -877,6 +877,17 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(reverse)"));
 		assertArityError(step("(reverse 1 2)"));
 	}
+	
+	@Test
+	public void testAssoc() {
+		// Non-associative values
+		assertCastError(step("(assoc 1 2 3)"));
+		assertCastError(step("(assoc :foo 2 3)"));
+		assertCastError(step("(assoc \"abc\" 2 \\d)"));
+		
+		assertArityError(step("(assoc :foo 1 2 3)"));
+		assertArityError(step("(assoc :baz 1)"));
+	}
 
 	@Test
 	public void testAssocNull() {
@@ -903,6 +914,30 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(assoc {} 1 2 3)"));
 		assertArityError(step("(assoc {} 1)"));
 
+	}
+	
+	@Test
+	public void testAssocSets() {
+		// no values is OK
+		assertEquals(Sets.empty(), eval("(assoc #{})"));
+
+		// Simple assoc
+		assertEquals(Sets.of(1), eval("(assoc #{} 1 true)"));
+		assertEquals(Sets.of(1), eval("(assoc #{} 1 true 2 false)"));
+		assertEquals(Sets.of(1,2), eval("(assoc #{} 1 true 2 true)"));
+		
+		// Ordering of assocs
+		assertEquals(Sets.of(1), eval("(assoc #{} 1 false 1 true 2 true 2 false)"));
+		
+		// Key removal
+		assertEquals(Sets.of(1), eval("(assoc #{1 2} 2 false)"));
+
+		// Associng a non-boolean value is an error
+		assertArgumentError(step("(assoc #{} 1 2)"));
+
+		// Standard error cases
+		assertArityError(step("(assoc #{} 1 2 3)"));
+		assertArityError(step("(assoc #{} 1)"));
 	}
 
 	@Test

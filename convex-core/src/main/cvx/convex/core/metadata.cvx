@@ -237,7 +237,7 @@
                        :return Any}]}}
 
  assoc
- {:doc {:description "Adds entries into an associative data structure, taking each two arguments as key/value pairs. A nil data structure is considered as an empty map."
+ {:doc {:description "Adds entries into an associative data structure, taking each two arguments as key/value pairs. A nil data structure is considered as an empty map. A set can only take the boolean values (`true` and `false`) indicating set inclusion and exclusion respectively."
         :errors      {:ARITY    "If the additional arguments are not an even number (key and value pairs)."
                       :ARGUMENT "If one or more of the supplied keys is invalid for the data structure."
                       :CAST     "If the first argument is not a valid DataStructure."}
@@ -255,7 +255,7 @@
                        :return DataStructure}]}}
 
  balance
- {:doc {:description "Returns the Convex Coin balance of the specified account, which must be an `Address`. Returns nil if and only the account does not exist."
+ {:doc {:description "Returns the Convex Coin balance of the specified account, which must be an `Address`. Returns `nil` if and only the account does not exist."
         :errors      {:CAST "If the argument is not a valid address."}
         :examples    [{:code "(balance *caller*)"}]
         :signature   [{:params [address]
