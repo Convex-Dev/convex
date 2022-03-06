@@ -2144,6 +2144,9 @@ public class CoreTest extends ACVMTest {
 		Long expectedVillainBalance = VILLAIN_BALANCE;
 		assertEquals(expectedVillainBalance, evalL("(let [a (address " + VILLAIN + ")] (balance a))"));
 
+		// A out of range address has nil balance
+		assertNull(eval("(balance #666788)"));
+		
 		assertCastError(step("(balance nil)"));
 		assertCastError(step("(balance 0x00)"));
 		assertCastError(step("(balance :foo)"));
