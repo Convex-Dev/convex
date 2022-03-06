@@ -1086,21 +1086,32 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testContainsKey() {
+		// Maps test for key presence
 		assertFalse(evalB("(contains-key? {} 1)"));
 		assertFalse(evalB("(contains-key? {} nil)"));
 		assertTrue(evalB("(contains-key? {1 2} 1)"));
 
+		// Sets test for inclusion
 		assertFalse(evalB("(contains-key? #{} 1)"));
 		assertFalse(evalB("(contains-key? #{1 2 3} nil)"));
 		assertFalse(evalB("(contains-key? #{false} true)"));
 		assertTrue(evalB("(contains-key? #{1 2} 1)"));
 		assertTrue(evalB("(contains-key? #{nil 2 3} nil)"));
 
+		// Vectors test for valid index
 		assertFalse(evalB("(contains-key? [] 1)"));
 		assertFalse(evalB("(contains-key? [0 1 2] :foo)"));
 		assertTrue(evalB("(contains-key? [3 4] 1)"));
+		
+		// BlobMaps test for key presence
+		assertFalse(evalB("(contains-key? (blob-map) 1)"));
+		assertFalse(evalB("(contains-key? (blob-map) 0x)"));
+		assertFalse(evalB("(contains-key? (blob-map 0x :foo) :foo)"));
+		assertTrue(evalB("(contains-key? (blob-map 0x :foo) 0x)"));
 
+		// Nil is treated as a data structure with no keys
 		assertFalse(evalB("(contains-key? nil 1)"));
+		assertFalse(evalB("(contains-key? nil #{nil})"));
 
 		assertArityError(step("(contains-key? 3)"));
 		assertArityError(step("(contains-key? {} 1 2)"));
@@ -1322,18 +1333,25 @@ public class CoreTest extends ACVMTest {
 
 		// nil works like empty vector
 		assertEquals(Vectors.of(1L), eval("(conj nil 1)"));
-		assertEquals(Vectors.of(3L), eval("(conj nil 3)"));
+		assertEquals(Vectors.of(2L,3L), eval("(conj nil 2 3)"));
+		
+		// Sets conj like element inclusion
 		assertEquals(Sets.of(3L), eval("(conj #{} 3)"));
+		assertEquals(Sets.of(2L,3L), eval("(conj #{} 3 2)"));
 		assertEquals(Sets.of(3L), eval("(conj #{3} 3)"));
+		assertEquals(Sets.of(1L, 3L), eval("(conj #{1} 3)"));
+		assertEquals(Sets.of(1L, 3L), eval("(conj #{1} 1 3)"));
+		assertEquals(Sets.of(1L, 2L, 3L), eval("(conj #{2 3} 1)"));
+		assertEquals(Sets.of(1L, 2L, 3L), eval("(conj #{2 3 1} 1)"));
 
 		// Maps conj with map entry vectors
 		assertEquals(Maps.of(1L, 2L), eval("(conj {} [1 2])"));
 		assertEquals(Maps.of(1L, 2L, 5L, 6L), eval("(conj {1 3 5 6} [1 2])"));
 
+		// Lists conj with addition at front
+		assertEquals(Lists.of(1L,2L), eval("(conj '() 2 1)"));
 		assertEquals(Lists.of(1L), eval("(conj (list) 1)"));
 		assertEquals(Lists.of(1L, 2L), eval("(conj (list 2) 1)"));
-		assertEquals(Sets.of(1L, 2L, 3L), eval("(conj #{2 3} 1)"));
-		assertEquals(Sets.of(1L, 2L, 3L), eval("(conj #{2 3 1} 1)"));
 
 		// arity 1 OK, no change
 		assertEquals(Vectors.of(1L, 2L), eval("(conj [1 2])"));
@@ -1363,10 +1381,12 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Lists.of(3L, 1L, 2L), eval("(cons 3 [1 2])"));
 		assertEquals(Lists.of(3L, 1L, 2L), eval("(cons 3 1 [2])"));
 
-		assertEquals(Lists.of(3L), eval("(cons 3 nil)"));
 		assertEquals(Lists.of(1L, 3L), eval("(cons 1 #{3})"));
 		assertEquals(Lists.of(1L), eval("(cons 1 [])"));
 
+		// nil is treated as empty list
+		assertEquals(Lists.of(3L), eval("(cons 3 nil)"));
+		
 		assertCastError(step("(cons 1 2)"));
 
 		assertArityError(step("(cons [])"));

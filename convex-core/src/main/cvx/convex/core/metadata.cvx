@@ -395,7 +395,7 @@
 
 
  concat
- {:doc {:description "Concatenates sequential data structures (lists or maps), returning a new sequential data structure of the same type as the first non-nil argument. Nil is treated as an empty sequence."
+ {:doc {:description "Concatenates sequential data structures (lists or maps), returning a new sequential data structure of the same type as the first non-nil argument. `nil` is treated as an empty sequence."
         :errors      {:CAST "If any of the arguments is neither a sequential data structure nor nil."}
         :examples    [{:code "(concat [1 2] [3 4])"}]
         :signature   [{:params [& seqs]
@@ -403,7 +403,7 @@
 
 
  conj
- {:doc {:description "Adds elements to a data structure, in the natural mode of addition for the data structure. Supports sequential collections, sets and maps."
+ {:doc {:description "Adds elements to a data structure, in the natural mode of addition for the data structure. Supports sequential collections, sets and maps. `nil` is treated as an empty vector."
         :errors      {:ARGUMENT "If a provided element is not of correct type for the given data structure."
                       :CAST     "If the first argument is not a data structure (or nil)."}
         :examples    [{:code "(conj [1 2] 3)"}
@@ -413,7 +413,7 @@
                        :return DataStructure}]}}
 
  cons
- {:doc {:description "Constructs a List, by prepending the leading arguments to the last argument. The last argument must be coercable to a sequential data structure."
+ {:doc {:description "Constructs a List, by prepending the leading arguments to the last argument. The last argument must be coercable to a sequential data structure. `nil` is treated as an empty list."
         :errors      {:CAST "If the last argument is not a sequence."}
         :examples    [{:code "(cons 1 '(2 3))"}
                       {:code "(cons 1 2 '(3 4))"}]

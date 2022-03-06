@@ -192,7 +192,7 @@ public abstract class ACollection<T extends ACell> extends ADataStructure<T> imp
 	
 	/**
 	 * Adds an element to this collection, according to the natural semantics of the collection
-	 * @param x Value to add
+	 * @param x Value to add, should be the element type of the data structure
 	 * @return The updated collection
 	 */
 	@Override
