@@ -163,7 +163,7 @@ public class Compiler {
 		// First check for lexically defined Symbols
 		CompilerState cs=context.getCompilerState();
 		
-		// First check if we hit a local declaration
+		// First check if we hit a local declaration within the current compile context
 		if (cs!=null) {
 			CVMLong position=cs.getPosition(sym);
 			if (position!=null) {
@@ -225,11 +225,11 @@ public class Compiler {
 	@SuppressWarnings("unchecked")
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileLookup(AList<ACell> list, Context<?> context) {
 		long n=list.count();
-		if ((n<2)||(n>3)) return context.withArityError("lookup requires one or two arguments, an optional expression and a Symbol");
+		if ((n<2)||(n>3)) return context.withArityError("lookup requires one or two arguments: an optional expression specifying an account and a Symbol");
 
 		AOp<Address> exp=null;
 		if (n==3) {
-			// second element of list should be address expression
+			// second element of list should be an expression that evaluates to an Address
 			context=context.compile(list.get(1));
 			if (context.isExceptional()) return (Context<T>)context;
 			exp=(AOp<Address>) context.getResult();
@@ -258,6 +258,7 @@ public class Compiler {
 		return compileList(List.create(vs), context);
 	}
 
+	// A set literal needs to be compiled as (hash-set .....)
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileSet(ASet<ACell> form, Context<?> context) {
 		if (form.isEmpty()) return compileConstant(context,Sets.empty());
 		
@@ -269,9 +270,12 @@ public class Compiler {
 		return compileList(List.reverse(vs), context);
 	}
 
+	// A vector literal needs to be compiled as (vector ....)
 	@SuppressWarnings("unchecked")
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileVector(AVector<ACell> vec, Context<?> context) {
 		int n = vec.size();
+		
+		// Zero length vector fast path compiles to a constant
 		if (n == 0) return (Context<T>) context.withResult(Juice.COMPILE_CONSTANT, Constant.EMPTY_VECTOR);
 
 		context = context.compileAll(vec);
