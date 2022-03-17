@@ -3,15 +3,12 @@ package convex.core.data.prim;
 import java.nio.ByteBuffer;
 
 import convex.core.Constants;
-import convex.core.data.Format;
-import convex.core.data.Symbol;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.reader.ReaderUtils;
-import convex.core.util.Utils;
 
 /**
  * Class for CVM Character values.
@@ -166,14 +163,18 @@ public final class CVMChar extends APrimitive {
 		s=s.substring(1);
 		return ReaderUtils.specialCharacter(s);
 	}
-
-	public char charValue() {
-		return Character.lowSurrogate(value);
-	}
 	
 	@Override
 	public byte getTag() {
 		return (byte) (Tag.CHAR+(charLength(value)-1));
+	}
+
+	public Character charValue() {
+		if (Character.isBmpCodePoint(value)) {
+			return (char)value;
+		} else {
+			return Constants.BAD_CHARACTER;
+		}
 	}
 
 

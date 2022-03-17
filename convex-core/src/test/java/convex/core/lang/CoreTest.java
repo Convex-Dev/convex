@@ -61,6 +61,7 @@ import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -125,6 +126,10 @@ public class CoreTest extends ACVMTest {
 		assertEquals(eval("0x"),eval("(blob (str))")); // blob literal
 
 		assertEquals(eval("*address*"),eval("(address (blob *address*))"));
+		
+		// Blob from characters
+		assertEquals(eval("0x0000000000001234"),eval("(blob (long \\u1234))")); // blob literal
+
 
 		// Account key should be a Blob
 		assertEquals(eval("*key*"),eval("(blob *key*)"));
@@ -314,6 +319,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(4096L, evalL("(long 0x1000)"));
 		assertEquals(255L, evalL("(long 0xff)"));
 		assertEquals(4294967295L, evalL("(long 0xffffffff)"));
+		assertEquals(0xff00000050l, evalL("(long 0xff00000050)"));
 		assertEquals(-1L, evalL("(long 0xffffffffffffffff)"));
 		assertEquals(255L, evalL("(long 0xff00000000000000ff)")); // only taking last 8 bytes
 		assertEquals(-1L, evalL("(long 0xcafebabeffffffffffffffff)")); // interpret as big endian big integer
@@ -335,6 +341,10 @@ public class CoreTest extends ACVMTest {
 		assertCVMEquals('a', eval("\\a"));
 		assertCVMEquals('a', eval("(char 97)"));
 		assertCVMEquals('a', eval("(nth \"bar\" 1)"));
+		
+		// Out of range Unicode
+		assertCVMEquals(CVMChar.create(12345678), eval("(char 12345678)"));
+		assertCVMEquals(CVMChar.create(0x50), eval("(char (long 0xff00000050))")); // overflow
 
 		assertCastError(step("(char nil)"));
 		assertCastError(step("(char {})"));

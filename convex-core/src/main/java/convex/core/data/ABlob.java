@@ -354,7 +354,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	/**
 	 * Converts this Blob to the corresponding long value.
 	 * 
-	 * Assumes big-endian format, as if the entire blob is interpreted as a signed big integer. Higher bytes 
+	 * Assumes big-endian format, as if the entire blob is interpreted as a big integer. Higher bytes 
 	 * outside the Long range will be ignored.
 	 * 
 	 * @return long value of this blob

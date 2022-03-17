@@ -649,7 +649,7 @@ public class RT {
 	}
 
 	/**
-	 * Casts a value to a Character
+	 * Casts a value to a Character via a Long to get a Unicode 32-bit code point
 	 * 
 	 * @param a Value to cast
 	 * @return CVMChar value, or null if cast fails

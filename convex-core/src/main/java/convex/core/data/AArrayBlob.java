@@ -274,11 +274,11 @@ public abstract class AArrayBlob extends ABlob {
 				ix += 4;
 			}
 			if ((length & 2) != 0) {
-				result = (result >> 16) + (0xFFFF & Utils.readShort(store, ix));
+				result = (result << 16) + (0xFFFF & Utils.readShort(store, ix));
 				ix += 2;
 			}
 			if ((length & 1) != 0) {
-				result = (result >> 8) + (0xFF & store[ix]);
+				result = (result << 8) + (0xFF & store[ix]);
 				ix += 1;
 			}
 			// TODO: do we want to sign extend?
