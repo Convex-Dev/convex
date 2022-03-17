@@ -199,4 +199,10 @@ public class Constants {
 	 * Option for static compilation support
 	 */
 	public static final boolean OPT_STATIC = false;
+
+	/**
+	 * Char to represent bad Unicode characters in printing
+	 */
+	public static final char BAD_CHARACTER = '%';
+	public static final String BAD_CHARACTER_STRING = Character.toString(BAD_CHARACTER);
 }

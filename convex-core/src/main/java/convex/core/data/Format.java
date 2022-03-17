@@ -682,11 +682,30 @@ public class Format {
 		try {
 			if (tag == Tag.NULL) return null;
 			if (tag == Tag.BYTE) return (T) CVMByte.create(bb.get());
-			if (tag == Tag.CHAR) return (T) CVMChar.create(bb.getChar());
 			if (tag == Tag.LONG) return (T) CVMLong.create(readVLCLong(bb));
 			
 			// Double is special, we enforce a canonical NaN
 			if (tag == Tag.DOUBLE) return (T) CVMDouble.read(bb.getDouble());
+
+			throw new BadFormatException("Can't read basic type with tag byte: " + tag);
+		} catch (IllegalArgumentException e) {
+			throw new BadFormatException("Format error basic type with tag byte: " + tag);
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	private static <T extends ACell> T readBasicObject(ByteBuffer bb, byte tag) throws BadFormatException, BufferUnderflowException {
+		try {
+			if (tag == Tag.STRING) return (T) Strings.read(bb);
+			if (tag == Tag.BLOB) return (T) Blobs.read(bb);
+			if (tag == Tag.SYMBOL) return (T) readSymbol(bb);
+			if (tag == Tag.KEYWORD) return (T) Keyword.read(bb);
+			
+			if ((tag&Tag.CHAR)==Tag.CHAR) {
+				int len=(tag&0x03)+1;
+				if (len>4) throw new BadFormatException("Can't read char type with length: " + len);
+				return (T) CVMChar.read(len, bb);
+			}
 
 			throw new BadFormatException("Can't read basic type with tag byte: " + tag);
 		} catch (IllegalArgumentException e) {
@@ -754,12 +773,10 @@ public class Format {
 	@SuppressWarnings("unchecked")
 	static <T extends ACell> T read(byte tag,ByteBuffer bb) throws BadFormatException {
 		try {
-			if ((tag & 0xF0) == 0x00) return readBasicType(bb, tag);
+			int high=(tag & 0xF0);
+			if (high == 0x00) return readBasicType(bb, tag);
 
-			if (tag == Tag.STRING) return (T) Strings.read(bb);
-			if (tag == Tag.BLOB) return (T) Blobs.read(bb);
-			if (tag == Tag.SYMBOL) return (T) readSymbol(bb);
-			if (tag == Tag.KEYWORD) return (T) Keyword.read(bb);
+			if (high ==0x30) return readBasicObject(bb,tag);
 
 			if (tag == Tag.TRUE) return (T) CVMBool.TRUE;
 			if (tag == Tag.FALSE) return (T) CVMBool.FALSE;

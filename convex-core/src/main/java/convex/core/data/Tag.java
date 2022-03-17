@@ -19,7 +19,6 @@ public class Tag {
 	public static final byte LONG = (byte) 0x09;
 
 	//public static final byte BIG_INTEGER = (byte) 0x0a; // Arbitrary length integer
-	public static final byte CHAR = (byte) 0x0c;
 	public static final byte DOUBLE = (byte) 0x0d;
 	//public static final byte FLOAT = (byte) 0x0f;
 	//public static final byte BIG_DECIMAL = (byte) 0x0e; // E notation precise decimal
@@ -38,6 +37,10 @@ public class Tag {
 	public static final byte BLOB = (byte) 0x31;
 	public static final byte SYMBOL = (byte) 0x32;
 	public static final byte KEYWORD = (byte) 0x33;
+	
+	// Char data type, encoding 2 low bits of length
+	public static final byte CHAR = (byte) 0x3c;
+
 
 	// data type tags beyond this point
 

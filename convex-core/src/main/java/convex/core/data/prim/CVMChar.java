@@ -1,24 +1,30 @@
 package convex.core.data.prim;
 
+import java.nio.ByteBuffer;
+
+import convex.core.Constants;
+import convex.core.data.Format;
+import convex.core.data.Symbol;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.reader.ReaderUtils;
 import convex.core.util.Utils;
 
 /**
- * Class for CVM character values.
+ * Class for CVM Character values.
  * 
- * Chars are 16-bit UTF-16 unsigned integers, and are the elements of Strings CVM.
+ * Characters are Unicode code point, and can be used to costruct Strings on the CVM.
  */
 public final class CVMChar extends APrimitive {
 
 	public static final CVMChar A = CVMChar.create('a');
 	
-	private final char value;
+	private final int value;
 	
-	public CVMChar(char value) {
+	public CVMChar(int value) {
 		this.value=value;
 	}
 	
@@ -29,12 +35,12 @@ public final class CVMChar extends APrimitive {
 
 
 	public static CVMChar create(long value) {
-		return new CVMChar((char)value);
+		return new CVMChar((int)value);
 	}
 	
 	@Override
 	public long longValue() {
-		return value;
+		return 0xffffffffl&value;
 	}
 	
 	@Override
@@ -46,16 +52,47 @@ public final class CVMChar extends APrimitive {
 	public void validateCell() throws InvalidDataException {
 		// Nothing to check. Always valid
 	}
-
-	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.CHAR;
-		return encodeRaw(bs,pos);
+	
+	/**
+	 * Gets the length in bytes needed to express the code point
+	 * @param c Code point value
+	 * @return Number of bytes needed for code point
+	 */
+	public static int charLength(int c) {
+		if ((c&0xffff0000)==0) {
+			return ((c&0x0000ff00)==0)?1:2;
+		} else {
+			return ((c&0xff000000)==0)?3:4;
+		}
+	}
+	
+	public static CVMChar read(int len,ByteBuffer bb) throws BadFormatException {
+		int value=0xff000000;
+		for (int i=0; i<len;i++) {
+			if (value==0) throw new BadFormatException("Leading zero in CVMChar encoding");
+			byte b=bb.get();
+			value=(value<<8)+(b&0xFF);
+		}
+		return create(value);
 	}
 
 	@Override
+	public int encode(byte[] bs, int pos) {
+		int len=charLength(value);
+		bs[pos++]=(byte)(Tag.CHAR+(len-1));
+		return encodeRaw(len,bs,pos);
+	}
+
+	public int encodeRaw(int len,byte[] bs, int pos) {
+		for (int i=0; i<len; i++) {
+			bs[pos+i]=(byte)((value>>((len-(i+1))*8))&0xff);
+		}
+		return pos+len;
+	}
+	
+	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		return Utils.writeChar(bs,pos,((char)value));
+		throw new UnsupportedOperationException("Encoding requires a length in bytes");
 	}
 
 	@Override
@@ -67,15 +104,20 @@ public final class CVMChar extends APrimitive {
 		// Unicode characters are represented as in Java.
 		// Backslash cannot be followed by whitespace.
 		//
-		String s;
 		switch(value) {
-			case '\n': s = "\\newline"; break;
-			case '\r': s = "\\return"; break;
-			case ' ':  s = "\\space"; break;
-			case '\t': s = "\\tab"; break;
-			default:   s = "\\" + Character.toString(value);
+			case '\n': sb.append("\\newline"); break;
+			case '\r': sb.append("\\return"); break;
+			case ' ':  sb.append("\\space"); break;
+			case '\t': sb.append("\\tab"); break;
+			default:  {
+				sb.append('\\');
+				if (Character.isBmpCodePoint(value)) {
+					sb.append((char)value);
+				} else {
+					sb.append(toString());
+				}
+			}
 		}
-		sb.append(s);
 	}
 
 	/**
@@ -88,7 +130,11 @@ public final class CVMChar extends APrimitive {
 	@Override
 	public String toString() {
 		// Usually, primitive types are stringified using `print`. This method 
-		return Character.toString(value);
+		if (Character.isValidCodePoint(value)) {
+			return Character.toString(value);
+		} else {
+			return Constants.BAD_CHARACTER_STRING;
+		}
 	}
 
 	@Override
@@ -122,11 +168,13 @@ public final class CVMChar extends APrimitive {
 	}
 
 	public char charValue() {
-		return value;
+		return Character.lowSurrogate(value);
 	}
 	
 	@Override
 	public byte getTag() {
-		return Tag.CHAR;
+		return (byte) (Tag.CHAR+(charLength(value)-1));
 	}
+
+
 }
