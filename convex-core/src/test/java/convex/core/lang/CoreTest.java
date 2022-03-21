@@ -315,7 +315,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(97L, evalL("(long \\a)"));
 		assertEquals(2147483648L, evalL("(long 2147483648)"));
 
-		// Blob casts treat blob as extended long bits
+		// Blob casts treat blob as extended long bits (zero extended if needed)
 		assertEquals(4096L, evalL("(long 0x1000)"));
 		assertEquals(255L, evalL("(long 0xff)"));
 		assertEquals(4294967295L, evalL("(long 0xffffffff)"));
@@ -353,6 +353,13 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(char nil nil)")); // arity before cast
 
 	}
+	
+	@Test
+	public void testCharAt() {
+		// TODO Unicode char-at
+
+	}
+
 
 	@Test
 	public void testBoolean() {
