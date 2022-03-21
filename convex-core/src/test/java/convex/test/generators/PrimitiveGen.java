@@ -32,7 +32,7 @@ public class PrimitiveGen extends Generator<ACell> {
 		case 1:
 			return CVMByte.create(r.nextLong());
 		case 2:
-			return CVMChar.create(r.nextLong());
+			return CVMChar.create(r.nextLong()&0x1fffff); // 21-bit unicode space
 		case 3:
 			return CVMLong.create(r.nextLong());
 		case 4:
