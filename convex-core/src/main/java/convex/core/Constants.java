@@ -203,6 +203,6 @@ public class Constants {
 	/**
 	 * Char to represent bad Unicode characters in printing
 	 */
-	public static final char BAD_CHARACTER = '%';
+	public static final char BAD_CHARACTER = '?';
 	public static final String BAD_CHARACTER_STRING = Character.toString(BAD_CHARACTER);
 }

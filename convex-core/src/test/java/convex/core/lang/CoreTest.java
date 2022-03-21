@@ -338,12 +338,13 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testChar() {
+		assertEquals(CVMChar.create('z'), eval("\\z"));
+		
 		assertCVMEquals('a', eval("\\a"));
 		assertCVMEquals('a', eval("(char 97)"));
 		assertCVMEquals('a', eval("(nth \"bar\" 1)"));
 		
 		// Out of range Unicode
-
 		assertCastError(step("(char nil)"));
 		assertCastError(step("(char {})"));
 		

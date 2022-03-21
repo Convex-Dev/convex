@@ -147,7 +147,7 @@ public final class CVMChar extends APrimitive {
 	}
 
 	/**
-	 * Returns the String representation of this CVMChar.
+	 * Returns the Java String representation of this CVMChar.
 	 * 
 	 * Different from {@link #print() print()} which returns a readable representation.
 	 *
@@ -155,7 +155,6 @@ public final class CVMChar extends APrimitive {
 	 */
 	@Override
 	public String toString() {
-		// Usually, primitive types are stringified using `print`. This method 
 		if (Character.isValidCodePoint(value)) {
 			return Character.toString(value);
 		} else {
