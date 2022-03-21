@@ -1,6 +1,8 @@
 package convex.core.data.prim;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
@@ -13,33 +15,35 @@ public class CharacterTest {
 	@Test 
 	public void testZeroEncoding() throws BadFormatException {
 		CVMChar a=CVMChar.create(0);
-		Blob b=a.getEncoding();
-		assertEquals("3c00",b.toHexString());
-		assertEquals(a,Format.read(b));
+		doValidCharTests(a);
+		assertEquals("3c00",a.getEncoding().toHexString());
 	}
 	
 	@Test 
 	public void testBasicEncoding() throws BadFormatException {
 		CVMChar a=CVMChar.create('z');
-		Blob b=a.getEncoding();
-		assertEquals("3c7a",b.toHexString());
-		assertEquals(a,Format.read(b));
+		doValidCharTests(a);
+		assertEquals("3c7a",a.getEncoding().toHexString());
 	}
 	
 	@Test 
 	public void testExtendedEncoding() throws BadFormatException {
 		CVMChar a=CVMChar.create('\u1234');
-		Blob b=a.getEncoding();
-		assertEquals("3d1234",b.toHexString());
-		assertEquals(a,Format.read(b));
+		doValidCharTests(a);
+		assertEquals("3d1234",a.getEncoding().toHexString());
 	}
 	
 	@Test 
-	public void testBigEncoding() throws BadFormatException {
-		CVMChar a=CVMChar.create(0x12345678);
-		Blob b=a.getEncoding();
-		assertEquals("3f12345678",b.toHexString());
-		assertEquals(a,Format.read(b));
+	public void testMaxValue() throws BadFormatException {
+		CVMChar a=CVMChar.create(CVMChar.MAX_VALUE);
+		doValidCharTests(a);
+		assertEquals("3e1fffff",a.getEncoding().toHexString());
+	}
+	
+	@Test 
+	public void testBadUnicode() throws BadFormatException {
+		assertNull(CVMChar.create(0x12345678));  // Out of Unicode range, too big
+		assertNull(CVMChar.create(-1));          // Out of Unicode range, negative
 	}
 	
 	@Test 
@@ -50,6 +54,15 @@ public class CharacterTest {
 		// Leading zero in encoding of 4-byte character
 		assertThrows(BadFormatException.class,()->Format.read("3f00123456"));
 
+		// Out of Unicode range
+		assertThrows(BadFormatException.class,()->Format.read("3f12345678"));
+
+	}
+	
+	public void doValidCharTests(CVMChar a) throws BadFormatException {
+		assertNotNull(a);
+		Blob b=a.getEncoding();
+		assertEquals(a,Format.read(b));
 	}
 
 

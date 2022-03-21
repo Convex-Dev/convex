@@ -343,12 +343,14 @@ public class CoreTest extends ACVMTest {
 		assertCVMEquals('a', eval("(nth \"bar\" 1)"));
 		
 		// Out of range Unicode
-		assertCVMEquals(CVMChar.create(12345678), eval("(char 12345678)"));
-		assertCVMEquals(CVMChar.create(0x50), eval("(char (long 0xff00000050))")); // overflow
 
 		assertCastError(step("(char nil)"));
 		assertCastError(step("(char {})"));
-
+		
+		// out of Unicode range
+		assertCastError(step("(char 12345678)"));
+		assertCastError(step("(char (long 0xff00000050))"));
+		
 		assertArityError(step("(char)"));
 		assertArityError(step("(char nil nil)")); // arity before cast
 

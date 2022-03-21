@@ -44,6 +44,7 @@ public final class CVMChar extends APrimitive {
 	public static CVMChar create(long value) {
 		if (value<0) return null; // invalid negative number
 		if (value<128) return cache[(int)value];
+		if (value>MAX_VALUE) return null;
 		return new CVMChar((int)value);
 	}
 	
@@ -63,16 +64,30 @@ public final class CVMChar extends APrimitive {
 	}
 	
 	/**
-	 * Gets the length in bytes needed to express the code point
+	 * Gets the length in bytes needed to express the character in an Encoding
 	 * @param c Code point value
 	 * @return Number of bytes needed for code point
 	 */
-	public static int charLength(int c) {
+	private static int encodedCharLength(int c) {
 		if ((c&0xffff0000)==0) {
 			return ((c&0x0000ff00)==0)?1:2;
 		} else {
 			return ((c&0xff000000)==0)?3:4;
 		}
+	}
+	
+	/** 
+	 * Gets the UTF=8 length in bytes for this CVMChar
+	 * @param c Code point value
+	 * @return UTF lenth or -1 if not a valid unicode value
+	 */
+	public static int utfLength(int c) {
+		if (c<0) return -1;
+		if (c<=0x7f) return 1;
+		if (c<=0x7ff) return 2;
+		if (c<=0xffff) return 3;
+		if (c<=MAX_VALUE) return 4;
+		return -1;
 	}
 	
 	public static CVMChar read(int len,ByteBuffer bb) throws BadFormatException {
@@ -89,7 +104,7 @@ public final class CVMChar extends APrimitive {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		int len=charLength(value);
+		int len=encodedCharLength(value);
 		bs[pos++]=(byte)(Tag.CHAR+(len-1));
 		return encodeRaw(len,bs,pos);
 	}
@@ -180,7 +195,7 @@ public final class CVMChar extends APrimitive {
 	
 	@Override
 	public byte getTag() {
-		return (byte) (Tag.CHAR+(charLength(value)-1));
+		return (byte) (Tag.CHAR+(encodedCharLength(value)-1));
 	}
 
 	public Character charValue() {
