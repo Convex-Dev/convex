@@ -47,7 +47,6 @@ public abstract class AString extends ACountable<CVMChar> implements CharSequenc
 
 	@Override
 	public CVMChar get(long i) {
-		
 		return CVMChar.create(charAt((int)i));
 	}
 	
