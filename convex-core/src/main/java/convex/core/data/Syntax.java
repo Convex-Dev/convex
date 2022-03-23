@@ -8,7 +8,7 @@ import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
-import convex.core.util.Utils;
+import convex.core.lang.impl.BlobBuilder;
 
 /**
  * Class representing a Syntax Object.
@@ -180,20 +180,15 @@ public class Syntax extends ACell {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
+	public boolean print(BlobBuilder sb, long limit) {
 		if (meta==null) {
 			sb.append("^{} ");
 		} else {
 			sb.append('^');
-			meta.print(sb);
+			if (!meta.print(sb,limit)) return false;
 			sb.append(' ');
 		}
-		Utils.print(sb, datumRef.getValue());
-	}
-	
-	@Override
-	public String toString() {
-		return print();
+		return RT.print(sb, datumRef.getValue(),limit);
 	}
 
 	@Override

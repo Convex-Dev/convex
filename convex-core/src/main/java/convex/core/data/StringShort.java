@@ -1,7 +1,7 @@
 package convex.core.data;
 
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
+import java.nio.charset.StandardCharsets;
 
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
@@ -12,25 +12,35 @@ import convex.core.util.Utils;
 public class StringShort extends AString {
 	
 	/**
-	 * Length of longest StringShort value that is embedded, measured in chars
+	 * Length of longest StringShort value that is embedded
 	 * 
-	 * Just long enough for a 64-char hex string with 0x and 2 delimiters. If that helps.
+	 * Basically max embedded length minus tag byte and 2-byte length
 	 */
-	public static final int MAX_EMBEDDED_STRING_LENGTH=68;
+	public static final int MAX_EMBEDDED_STRING_LENGTH=Format.MAX_EMBEDDED_LENGTH-3;
 
 	/**
-	 * Length of longest StringShort value in chars
+	 * Length of longest StringShort value in bytes. Use Blob as base.
 	 */
-	public static final int MAX_LENGTH=1024;
+	public static final int MAX_LENGTH=Blob.CHUNK_LENGTH;
 
-	public static final int MAX_ENCODING_LENGTH = 1+Format.getVLCLength(1024)+2*MAX_LENGTH; // 2 bytes per char
+	public static final int MAX_ENCODING_LENGTH = 1+Format.getVLCLength(MAX_LENGTH)+MAX_LENGTH; // Max 4096 bytes
 
 	
-	private String data;
-
-	protected StringShort(String data) {
-		super(data.length());
+	private final Blob data;
+	
+	protected StringShort(Blob data) {
+		super(data.length);
 		this.data=data;
+	}
+	
+	protected StringShort(byte[] data) {
+		super(data.length);
+		this.data=Blob.wrap(data);
+	}
+	
+	protected StringShort(byte[] data, int offset, int length) {
+		super(length);
+		this.data=Blob.wrap(data,offset,length);
 	}
 	
 	/**
@@ -40,45 +50,54 @@ public class StringShort extends AString {
 	 * @return StringShort instance, or null if String is of invalid size
 	 */
 	public static StringShort create(String string) {
-		int len=string.length();
-		if ((len<0)||(len>MAX_LENGTH)) return null;
-		return new StringShort(string);
+		byte[] bs=string.getBytes(StandardCharsets.UTF_8);
+		return new StringShort(bs);
+	}
+	
+	/**
+	 * Creates a StringShort instance from a Blob of UTF-8 data. Shares underlying array.
+	 * 
+	 * @param b Array Blob to convert to StringShort
+	 * @return StringShort instance
+	 */
+	public static StringShort create(AArrayBlob b) {
+		if (b.count()==0) return Strings.EMPTY;
+		return new StringShort(b.toFlatBlob());
 	}
 
 
 	@Override
-	public char charAt(int index) {
-		return data.charAt(index);
+	public int charAt(long index) {
+		byte b=byteAt(index);
+		if (b>=0) return b;
+		return -1;
 	}
 
 	@Override
-	public StringShort subSequence(int start, int end) {
-		if ((start<0)||(end>length)) throw new IndexOutOfBoundsException("Out of range subSerqnce "+start+","+end);
-		if (end<start) throw new IllegalArgumentException("End before start!");
-		if ((start==0)&&(end==length)) return this;
-		return new StringShort(data.substring(start, end));
+	public byte byteAt(long index) {
+		if ((index<0)||(index>=length)) return Strings.EXCESS_BYTE;
+		return data.byteAt(index);
+	}
+
+	@Override
+	public StringShort subSequence(long start, long end) {
+		return new StringShort(data.slice(start, end-start));
 	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {
 		if (length>MAX_LENGTH) throw new InvalidDataException("StringShort too long: " +length,this);
-		if (length!=data.length()) throw new InvalidDataException("Wrong String length!",this);
+		if (length!=data.length) throw new InvalidDataException("Wrong String length!",this);
 	}
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos=Format.writeVLCLong(bs,pos, length);
-		
-		int n=data.length();
-		for (int i=0; i<n; i++) {
-			pos=Utils.writeChar(bs, pos, data.charAt(i));
-		}
-		return pos;
+		return data.encodeRaw(bs, pos);
 	}
 
 	@Override
 	public int estimatedEncodingSize() {
-		return 3+length*2;
+		return 3+(int)length;
 	}
 
 	@Override
@@ -107,27 +126,17 @@ public class StringShort extends AString {
 	 * @param bb ByteBuffer to read from
 	 * @return AString instance
 	 */
-	public static AString read(int length, ByteBuffer bb) {
-		CharBuffer cb=bb.asCharBuffer();
-		cb.limit(length);
-		String data=cb.toString();
-		
-		// advance bb to correct position
-		bb.position(bb.position()+length*2);
-		
+	public static AString read(long length, ByteBuffer bb) {
+		byte[] data=new byte[Utils.checkedInt(length)];
+		bb.get(data);
 		return new StringShort(data);
 	}
 	
 	@Override
-	public String toString() {
+	public Blob toBlob() {
 		return data;
 	}
 	
-	@Override 
-	public int hashCode() {
-		return data.hashCode();
-	}
-
 	@Override 
 	public boolean equals(ACell a) {
 		if (a instanceof StringShort) {
@@ -137,29 +146,23 @@ public class StringShort extends AString {
 	}
 	
 	public boolean equals(StringShort a) {
-		return this.data.equals(a.data);
+		return data.equals(a.data);
 	}
 
 	@Override
 	public int compareTo(AString o) {
-		return data.compareTo(o.toString());
-	}
-
-	@Override
-	protected void appendToStringBuffer(StringBuilder sb, int start, int length) {
-		sb.append(data.substring(start, start+length));
-	}
-
-	@Override
-	protected AString append(char charValue) {
-		StringBuilder sb=new StringBuilder(data);
-		sb.append(charValue);
-		return Strings.create(sb.toString());
+		return data.compareTo(o.toBlob());
 	}
 
 	@Override
 	public ACell toCanonical() {
 		if (length<=MAX_LENGTH) return this;
-		return StringTree.create(data);
+		return Strings.create(data.toCanonical());
 	}
+	
+	@Override
+	protected void writeToBuffer(ByteBuffer bb) {
+		data.writeToBuffer(bb);
+	}
+
 }

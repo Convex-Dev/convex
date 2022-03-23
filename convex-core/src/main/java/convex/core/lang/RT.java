@@ -15,10 +15,10 @@ import convex.core.data.AMap;
 import convex.core.data.ASequence;
 import convex.core.data.ASet;
 import convex.core.data.AString;
+import convex.core.data.ASymbolic;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
-import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Hash;
 import convex.core.data.INumeric;
@@ -41,6 +41,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.lang.impl.KeywordFn;
 import convex.core.lang.impl.MapFn;
 import convex.core.lang.impl.SeqFn;
@@ -897,32 +898,62 @@ public class RT {
 	 * </ul>
 	 * 
 	 * @param args Values to convert to String
-	 * @return AString value
+	 * @return AString value, or null if allowable String length exceeded
 	 */
 	public static AString str(ACell[] args) {
 		// TODO: execution cost limits??
-		StringBuilder sb = new StringBuilder();
-		for (ACell o : args) {
-			String s = RT.str(o);
-			sb.append(s);
+		int n=args.length;
+		AString[] strs=new AString[n];
+		for (int i=0; i<n; i++) {
+			AString s = RT.str(args[i]);
+			strs[i]=s;
 		}
-		return Strings.create(sb.toString());
+		return Strings.appendAll(strs);
+	}
+	
+	/**
+	 * Prints a cell to a BlobBuilder, up to a specified limit of bytes
+	 * @param bb BlobBuilder instance
+	 * @param a Cell to print (may be nil)
+	 * @param limit Limit of printing
+	 * @return True if within limit, false if exceeded
+	 */
+	public static boolean print(BlobBuilder bb, ACell a, long limit) {
+		if (a==null) {
+			bb.append(Strings.NIL);
+			return bb.check(limit);
+		} else {
+			return a.print(bb, limit);
+		}
 	}
 
 	/**
 	 * Converts a value to a CVM String representation. Required to work for all
-	 * valid types.
+	 * valid Cells.
 	 * 
-	 * @param a Value to convert to a String
-	 * @return String representation of object
+	 * @param a Value to convert to a CVM String
+	 * @return CVM String representation of object
 	 */
-	public static String str(ACell a) {
-		if (a == null)
-			return "nil";
-		if (a instanceof Blob)
-			return ((Blob) a).toHexString();
-		String s = a.toString();
+	public static AString str(ACell a) {
+		if (a == null) {
+			return Strings.NIL;
+		}
+		if (a.getType()==Types.BLOB) {
+			return Strings.create(((ABlob)a).toHexString());
+		}
+		// TODO: Needs optimisation? toCVMString?
+		AString s = Strings.create(a.toString());
 		return s;
+	}
+	
+	/**
+	 * Converts a value to a Java String representation
+	 * @param a Any CVM value
+	 * @return Java String representation. May be "nil".
+	 */
+	public static String toString(ACell a) {
+		if (a==null) return "nil";
+		return a.toString();
 	}
 
 	/**
@@ -934,10 +965,9 @@ public class RT {
 	public static AString name(ACell a) {
 		if (a instanceof AString)
 			return (AString) a;
-		if (a instanceof Keyword)
-			return Strings.create(((Keyword) a).getName());
-		if (a instanceof Symbol)
-			return Strings.create(((Symbol) a).getName());
+		if (a instanceof ASymbolic)
+			return ((ASymbolic) a).getName();
+
 		return null;
 	}
 
@@ -1590,5 +1620,7 @@ public class RT {
 	public static boolean isNaN(ACell val) {
 		return CVMDouble.NaN.equals(val);
 	}
+
+
 
 }

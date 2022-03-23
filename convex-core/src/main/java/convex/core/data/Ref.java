@@ -4,13 +4,14 @@ import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.function.Consumer;
 
+import convex.core.Constants;
 import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
-import convex.core.util.Utils;
 
 /**
  * Class representing a smart reference to a decentralised data object.
@@ -236,24 +237,21 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	}
 	
 	@Override
-	public void print(StringBuilder sb) {
-		sb.append("#ref {:hash #hash ");
-		sb.append((hash==null)?"nil":hash.toString());
-		sb.append(", :flags ");
-		sb.append(flags);
-		sb.append("}");
+	public boolean print(BlobBuilder bb, long limit) {
+		bb.append("#ref {:hash #hash ");
+		bb.append((hash==null)?"nil":hash.toString());
+		bb.append(", :flags ");
+		bb.append(Integer.toString(flags));
+		bb.append("}");
+		return bb.check(limit);
 	}
 
 	@Override
 	public String toString() {
 		// TODO. Why protected by a try-catch? Looks like it will never throw.
-		StringBuilder sb = new StringBuilder();
-		try {
-			print(sb);
-		} catch (MissingDataException e) {
-			throw Utils.sneakyThrow(e);
-		}
-		return sb.toString();
+		BlobBuilder sb = new BlobBuilder();
+		print(sb,Constants.PRINT_LIMIT);
+		return Strings.create(sb.toBlob()).toString();
 	}
 
 	@SuppressWarnings("unchecked")
@@ -607,7 +605,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 			return value.encode(bs, pos);
 		} else {
 			bs[pos++]=Tag.REF;
-			return getHash().encodeRaw(bs, pos);
+			return getHash().encodeRawData(bs, pos);
 		}
 	}
 	
@@ -631,7 +629,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		Hash h=getHash();
 		int pos=0;
 		bs[pos++]=Tag.REF;
-		pos=h.encodeRaw(bs, pos);
+		pos=h.encodeRawData(bs, pos);
 		return Blob.wrap(bs,0,pos);
 	}
 

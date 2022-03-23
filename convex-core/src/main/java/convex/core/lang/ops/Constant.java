@@ -2,6 +2,7 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
+import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AString;
 import convex.core.data.AVector;
@@ -19,9 +20,8 @@ import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
-import convex.core.data.ACell;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Errors;
-import convex.core.util.Utils;
 
 /**
  * Operation representing a constant value
@@ -72,8 +72,8 @@ public class Constant<T extends ACell> extends AOp<T> {
 	}
 	
 	@Override
-	public void print(StringBuilder sb) {
-		Utils.print(sb,valueRef.getValue());
+	public boolean print(BlobBuilder sb, long limit) {
+		return RT.print(sb,valueRef.getValue(),limit);
 	}
 
 	@Override

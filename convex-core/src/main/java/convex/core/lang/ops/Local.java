@@ -13,6 +13,7 @@ import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
+import convex.core.lang.impl.BlobBuilder;
 
 /**
  * Op to look up a local value from the lexical environment
@@ -90,8 +91,9 @@ public class Local<T extends ACell> extends AOp<T> {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
-		sb.append(toString());
+	public boolean print(BlobBuilder bb, long limit) {
+		bb.append(toString());
+		return bb.check(limit);
 	}
 	
 	@Override

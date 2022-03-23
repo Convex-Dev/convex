@@ -30,6 +30,8 @@ public abstract class AClosure<T extends ACell> extends AFn<T> {
 	/**
 	 * Print the "internal" representation of a closure e.g. "[x] 1", excluding the 'fn' symbol.
 	 * @param sb StringBuilder to print to
+	 * @param limit Limit of BlobBuilder size
+	 * @return True if printed successfully within limit, false otherwise
 	 */
-	public abstract void printInternal(StringBuilder sb);
+	public abstract boolean printInternal(BlobBuilder sb, long limit);
 }

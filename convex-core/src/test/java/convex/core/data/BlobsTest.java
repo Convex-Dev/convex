@@ -15,6 +15,9 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.prim.CVMByte;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
+import convex.core.lang.impl.BlobBuilder;
+import convex.core.util.Utils;
 import convex.test.Samples;
 
 public class BlobsTest {
@@ -32,6 +35,17 @@ public class BlobsTest {
 	public void testNullHash() {
 		AArrayBlob d = Blob.create(new byte[] { Tag.NULL });
 		assertTrue(d.getContentHash().equals(Hash.NULL_HASH));
+	}
+	
+	@Test public void testBlobWrap() {
+		byte[] bs=new byte[] {0,1,2,3,4};
+		assertSame(Blob.EMPTY,Blob.wrap(bs,2,0));
+		assertEquals(Blobs.fromHex("0001"),Blob.wrap(bs,0,2));
+		assertEquals(Blobs.fromHex("0304"),Blob.wrap(bs,3,2));
+		
+		assertThrows(IndexOutOfBoundsException.class,()->Blob.wrap(bs,-1,0));
+		assertThrows(IndexOutOfBoundsException.class,()->Blob.wrap(bs,2,10));
+		assertThrows(IndexOutOfBoundsException.class,()->Blob.wrap(bs,5,1));
 	}
 	
 	@Test
@@ -86,6 +100,35 @@ public class BlobsTest {
 	}
 	
 	@Test
+	public void testBlobBuilder() {
+		BlobBuilder bb=new BlobBuilder();
+		bb.append("a");
+		assertEquals(1,bb.count());
+		
+		bb.append('b');
+		assertEquals("ab",bb.getCVMString().toString());
+	}
+	
+	@Test
+	public void testBlobBuilderLarge() {
+		ABlob src=Strings.create("abcde").toBlob();
+		BlobBuilder bb=new BlobBuilder();
+		
+		for (int i=0; i<10; i++) {
+			bb.append(src);
+			src=src.append(src);
+		}
+		assertEquals(BlobTree.class,src.getClass());
+		
+		assertEquals(5115,bb.count());
+		ABlob r=bb.toBlob();
+		assertEquals(5115,r.count());
+		assertEquals("abcde",Strings.create(r.slice(5100,5)).toString());
+		assertEquals(Blob.class,r.slice(0,4096).getClass());
+		assertEquals(BlobTree.class,r.slice(0,4097).getClass());
+	}
+	
+	@Test
 	public void testLongBlob() {
 		LongBlob b = LongBlob.create("cafebabedeadbeef");
 		Blob bb = Blob.fromHex("cafebabedeadbeef");
@@ -113,7 +156,7 @@ public class BlobsTest {
 		assertEquals(bb, b); 
 		assertEquals(b, bb); 
 		
-		assertEquals(bb, b.toBlob());
+		assertEquals(bb, b.toFlatBlob());
 		assertEquals(bb.hashCode(), b.hashCode());
 
 		doBlobTests(b);
@@ -126,6 +169,8 @@ public class BlobsTest {
 		assertEquals(0L,blob.toLong());
 		assertSame(blob,blob.getChunk(0));
 		assertSame(blob,blob.slice(0,0));
+		assertSame(blob,blob.append(blob));
+		assertSame(blob,new BlobBuilder().toBlob());
 		
 		doBlobTests(Blob.EMPTY);
 	}
@@ -135,6 +180,21 @@ public class BlobsTest {
 		ABlob blob = Blob.fromHex("cafebabedeadbeef").slice(2,4);
 		assertEquals(8,blob.hexLength());
 		doBlobTests(blob);
+	}
+	
+	@Test
+	public void testBlobAppendSmall() {
+		ABlob src = Blob.fromHex("cafebabedeadbeef");
+		src=src.append(Blob.fromHex("f00d"));
+		assertEquals(10,src.count());
+		
+		ABlob two=src.append(src);
+		assertEquals(20,two.count());
+		doBlobTests(two);
+		
+		ABlob slice=two.slice(8,4);
+		assertEquals(Blob.fromHex("f00dcafe"),slice);
+		doBlobTests(slice);
 	}
 
 	@Test
@@ -172,7 +232,7 @@ public class BlobsTest {
 		assertEquals(Blob.CHUNK_LENGTH, firstChunk.count());
 		assertEquals(bb.byteAt(0), firstChunk.byteAt(0));
 
-		Blob blob = bb.toBlob();
+		Blob blob = bb.toFlatBlob();
 		assertEquals(bb.count(), blob.count());
 		assertEquals(bb.byteAt(len - 1), blob.byteAt(len - 1));
 		assertEquals(bb.byteAt(0), blob.byteAt(0));
@@ -226,6 +286,12 @@ public class BlobsTest {
 		assertEquals(2,BlobTree.childCount(1048577));
 		assertEquals(8,BlobTree.childCount(Long.MAX_VALUE));
 	}
+	
+	@Test
+	public void testPrint() {
+		assertEquals("0x",Utils.print(Blob.EMPTY));
+		assertEquals("0x1337",Utils.print(Blob.fromHex("1337")));
+	}
 
 	@Test
 	public void testBlobFormat() throws BadFormatException {
@@ -235,6 +301,24 @@ public class BlobsTest {
 		assertNotEquals(b.getHash(), Hash.EMPTY_HASH);
 		
 		doBlobTests(b);
+	}
+	
+	/*
+	 *  Test case from issue #357, credit @jcoultas
+	 */
+	@Test
+	public void testLongBlobBroken() throws BadFormatException {
+	   Blob value = Blob.fromHex("f".repeat(8194));  // 4KB + 1 byte
+	   assertEquals(value,BlobTree.create(value)); // Check equality with canonical version
+	   Ref<ACell> pref = ACell.createPersisted(value); // ensure persisted
+	   assertEquals(BlobTree.class,pref.getValue().getClass());
+	   Blob b = Format.encodedBlob(value);
+	   ACell o = Format.read(b);
+
+	   assertEquals(RT.getType(value), RT.getType(o));
+	   assertEquals(value, o);
+	   assertEquals(b, Format.encodedBlob(o));
+	   assertEquals(pref.getValue(), o);
 	}
 
 	/**
@@ -253,6 +337,11 @@ public class BlobsTest {
 			assertEquals(a.count(),b.count());
 			assertEquals(canonical,b);
 		}
+		
+		BlobBuilder bb=new BlobBuilder(a);
+		assertEquals(a,bb.toBlob());
+		
+		assertSame(a,a.slice(0,n));
 		
 		if (n>0) {
 			assertEquals(n*2,a.commonHexPrefixLength(b));

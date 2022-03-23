@@ -12,8 +12,8 @@ import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Errors;
-import convex.core.util.Utils;
 
 /**
  * Abstract base class for maps.
@@ -148,16 +148,20 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	public abstract void forEach(BiConsumer<? super K, ? super V> action);
 
 	@Override
-	public void print(StringBuilder sb) {
+	public boolean print(BlobBuilder sb, long limit) {
 		sb.append('{');
-		this.forEach((k, v) -> {
-			Utils.print(sb,k);
+		long n=count();
+		for (long i=0; i<n; i++) {
+			MapEntry<K,V> e=entryAt(i);
+			K k=e.getKey();
+			if (!RT.print(sb,k,limit)) return false;
 			sb.append(' ');
-			Utils.print(sb,v);
-			sb.append(',');
-		});
-		if (count() > 0) sb.setLength(sb.length() - 1); // delete trailing comma
+			V v=e.getValue();
+			if (!RT.print(sb,v,limit)) return false;
+			if (i<(n-1)) sb.append(',');
+		}
 		sb.append('}');
+		return sb.check(limit);
 	}
 
 	/**

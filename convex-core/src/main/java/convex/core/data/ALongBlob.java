@@ -2,6 +2,7 @@ package convex.core.data;
 
 import java.nio.ByteBuffer;
 
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
@@ -30,19 +31,21 @@ public abstract class ALongBlob extends ABlob {
 	}
 
 	@Override
-	public final String toHexString() {
-		return Utils.toHexString(value);
+	public void appendHexString(BlobBuilder sb,int length) {
+		String s=Utils.toHexString(value);
+		if (length<s.length()) s=s.substring(0,length);
+		sb.append(s);
 	}
 
 	@Override
 	public abstract ABlob slice(long start, long length);
 
 	@Override
-	public abstract Blob toBlob();
+	public abstract Blob toFlatBlob();
 
 	@Override
 	public long commonHexPrefixLength(ABlob b) {
-		return toBlob().commonHexPrefixLength(b);
+		return toFlatBlob().commonHexPrefixLength(b);
 	}
 	
 	private void checkIndex(long i) {
@@ -62,7 +65,7 @@ public abstract class ALongBlob extends ABlob {
 
 	@Override
 	public final ABlob append(ABlob d) {
-		return toBlob().append(d);
+		return toFlatBlob().append(d);
 	}
 
 	@Override
@@ -81,13 +84,13 @@ public abstract class ALongBlob extends ABlob {
 
 	@Override
 	public final Blob getChunk(long i) {
-		if (i == 0L) return toBlob();
+		if (i == 0L) return toFlatBlob();
 		throw new IndexOutOfBoundsException(Errors.badIndex(i));
 	}
 
 	@Override
 	public final ByteBuffer getByteBuffer() {
-		return toBlob().getByteBuffer();
+		return toFlatBlob().getByteBuffer();
 	}
 	
 	@Override
@@ -97,14 +100,8 @@ public abstract class ALongBlob extends ABlob {
 	}
 	
 	@Override
-	public final void toHexString(StringBuilder sb) {
-		String s= Utils.toHexString(value);
-		sb.append(s);
-	}
-
-	@Override
 	public long hexMatchLength(ABlob b, long start, long length) {
-		return toBlob().hexMatchLength(b,start,length);
+		return toFlatBlob().hexMatchLength(b,start,length);
 	}
 
 	@Override

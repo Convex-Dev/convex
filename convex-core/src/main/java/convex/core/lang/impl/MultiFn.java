@@ -45,20 +45,22 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
-		sb.append("(fn ");
-		printInternal(sb);
-		sb.append(')');
+	public boolean print(BlobBuilder bb, long limit) {
+		bb.append("(fn ");
+		if (!printInternal(bb,limit)) return false;;
+		bb.append(')');
+		return bb.check(limit);
 	}
 	
 	@Override
-	public void printInternal(StringBuilder sb) {
+	public boolean printInternal(BlobBuilder bb, long limit) {
 		for (long i=0; i<num; i++) {
-			if (i>0) sb.append(' ');
-			sb.append('(');
-			fns.get(i).printInternal(sb);
-			sb.append(')');
+			if (i>0) bb.append(' ');
+			bb.append('(');
+			if (!fns.get(i).printInternal(bb,limit)) return false;;
+			bb.append(')');
 		}
+		return bb.check(limit);
 	}
 
 	@Override

@@ -48,7 +48,7 @@ public final class LongBlob extends ALongBlob {
 	}
 
 	@Override
-	public Blob toBlob() {
+	public Blob toFlatBlob() {
 		return getEncoding().slice(2, LENGTH);
 	}
 
@@ -142,7 +142,7 @@ public final class LongBlob extends ALongBlob {
 
 	@Override
 	public Blob toCanonical() {
-		return toBlob();
+		return toFlatBlob();
 	}
 
 }

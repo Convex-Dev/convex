@@ -34,8 +34,8 @@ public class MapFn<K extends ACell, T  extends ACell> extends ADataFn<T> {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
-		map.print(sb);
+	public boolean print(BlobBuilder sb,long limit) {
+		return map.print(sb,limit);
 	}
 
 }

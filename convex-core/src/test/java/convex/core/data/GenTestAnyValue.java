@@ -26,7 +26,7 @@ public class GenTestAnyValue {
 	public void printFormats(@From(ValueGen.class) Object o) {
 		String s=Utils.print(o);
 		assertNotNull(s);
-		assertTrue(s.length()>0);
+		assertTrue(s.length()>0,"Printing type "+Utils.getClass(o));
 		
 		// TODO: handle all reader cases
 		//Object o2=Reader.read(s);
@@ -100,7 +100,7 @@ public class GenTestAnyValue {
 		Blob data=Format.encodedBlob(o);
 		
 		// introduce a small offset to ensure blobs working correctly
-		data=Samples.ONE_ZERO_BYTE_DATA.append(data).slice(1).toBlob();
+		data=Samples.ONE_ZERO_BYTE_DATA.append(data).slice(1).toFlatBlob();
 		
 		Ref<ACell> dataRef=Ref.get(o).persist(); // ensure in store
 		Hash hash=Hash.compute(o);

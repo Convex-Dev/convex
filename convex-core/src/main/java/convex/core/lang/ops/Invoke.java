@@ -14,6 +14,7 @@ import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
+import convex.core.lang.impl.BlobBuilder;
 
 /**
  * Op representing the invocation of a function.
@@ -84,14 +85,15 @@ public class Invoke<T extends ACell> extends AMultiOp<T> {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
-		sb.append('(');
+	public boolean print(BlobBuilder bb, long limit) {
+		bb.append('(');
 		int len = ops.size();
 		for (int i = 0; i < len; i++) {
-			if (i > 0) sb.append(' ');
-			ops.get(i).print(sb);
+			if (i > 0) bb.append(' ');
+			if (!ops.get(i).print(bb,limit)) return false;
 		}
-		sb.append(')');
+		bb.append(')');
+		return bb.check(limit);
 	}
 
 	@Override

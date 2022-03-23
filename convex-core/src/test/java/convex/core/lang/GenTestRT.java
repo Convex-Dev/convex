@@ -12,6 +12,7 @@ import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 import convex.core.data.ACell;
 import convex.core.data.ACollection;
 import convex.core.data.ASet;
+import convex.core.data.AString;
 import convex.test.generators.CollectionGen;
 import convex.test.generators.ValueGen;
 
@@ -31,7 +32,7 @@ public class GenTestRT {
 
 	@Property
 	public void strTest(@From(ValueGen.class) ACell b) {
-		String s = RT.str(b);
+		AString s = RT.str(b);
 		assertNotNull(s);
 	}
 

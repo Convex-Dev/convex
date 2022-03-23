@@ -8,6 +8,7 @@ import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.TODOException;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
@@ -187,16 +188,30 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Returns the String representation of this Cell.
+	 * Returns the Java String representation of this Cell.
 	 * 
 	 * The String representation is intended to be a easy-to-read textual representation of the Cell's data content.
 	 *
 	 */
 	@Override
 	public String toString() {
-		StringBuilder sb=new StringBuilder();
-		print(sb);
-		return sb.toString();
+		return print().toString();
+	}
+	
+	/**
+	 * Returns the CVM String representation of this Cell. Normally, this is as printed, but may be different for some types.
+	 * 
+	 * MUST return null in O(1) time if the length of the CVM String would exceed limit.
+	 * 
+	 * The String representation is intended to be a easy-to-read textual representation of the Cell's data content.
+	 * @param limit Limit of CVM String length in UTF-8 bytes
+	 * @return CVM String, or null if limit exceeded by too much
+	 *
+	 */
+	public AString toCVMString(long limit) {
+		BlobBuilder bb=new BlobBuilder();
+		if (!print(bb, limit)) return null;
+		return bb.getCVMString();
 	}
 
 	/**
@@ -487,6 +502,9 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> Ref<T> createPersisted(T value, Consumer<Ref<ACell>> noveltyHandler) {
+		if (value!=null) {
+			value=(T) value.toCanonical(); // Ensure canonical TODO: where should this be enforced?
+		}
 		Ref<T> ref = Ref.get(value);
 		if (ref.isPersisted()) return ref;
 		AStore store=Stores.current();

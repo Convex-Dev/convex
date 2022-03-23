@@ -90,7 +90,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	}
 
 	private static <K extends ABlob, V extends ACell> BlobMap<K, V> createAtDepth(MapEntry<K, V> me, long depth) {
-		Blob prefix = me.getKey().toBlob();
+		Blob prefix = me.getKey().toFlatBlob();
 		long hexLength = prefix.hexLength();
 		if (depth > hexLength)
 			throw new IllegalArgumentException("Depth " + depth + " too deep for key with hexLength: " + hexLength);

@@ -4,11 +4,14 @@ import java.nio.ByteBuffer;
 
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
+import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Utils;
 
 /**
@@ -81,8 +84,15 @@ public class Ed25519Signature extends ASignature {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
-		sb.append("{:signature 0x"+Utils.toHexString(signatureBytes)+"}");
+	public boolean print(BlobBuilder bb, long limit) {
+		bb.append("{:signature 0x"+Utils.toHexString(signatureBytes)+"}");
+		return bb.check(limit);
+	}
+	
+	@Override
+	public AString toCVMString(long limit) {
+		if (limit<10) return null;
+		return Strings.create(toString());
 	}
 
 	//@Override
@@ -135,6 +145,8 @@ public class Ed25519Signature extends ASignature {
 	public Blob getSignatureBlob() {
 		return Blob.wrap(signatureBytes);
 	}
+
+
 
 
 

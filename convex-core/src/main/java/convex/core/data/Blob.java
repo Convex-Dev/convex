@@ -82,11 +82,12 @@ public class Blob extends AArrayBlob {
 		if (length < 0) throw new IllegalArgumentException(Errors.negativeLength(length));
 		if ((offset < 0) || (offset + length > data.length))
 			throw new IndexOutOfBoundsException(Errors.badRange(offset, length));
+		if (length==0) return Blob.EMPTY;
 		return new Blob(data, offset, length);
 	}
 
 	@Override
-	public Blob toBlob() {
+	public Blob toFlatBlob() {
 		return this;
 	}
 
@@ -97,6 +98,7 @@ public class Blob extends AArrayBlob {
 			throw new IllegalArgumentException("End out of bounds: " + (start + length));
 		if (length < 0) throw new IllegalArgumentException("Negative length of slice: " + length);
 		if (length == 0) return EMPTY;
+		if (length==this.length) return this;
 		return Blob.wrap(store, Utils.checkedInt(start + offset), Utils.checkedInt(length));
 	}
 
@@ -196,7 +198,6 @@ public class Blob extends AArrayBlob {
 		} else {
 			// we have a Blob of canonical size
 			bs[pos++]=Tag.BLOB;
-			pos=Format.writeVLCLong(bs, pos, length);
 			pos=encodeRaw(bs,pos);
 			return pos;
 		}

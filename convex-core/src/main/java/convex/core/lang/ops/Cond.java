@@ -14,6 +14,7 @@ import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
+import convex.core.lang.impl.BlobBuilder;
 
 /**
  * Op representing a conditional expression.
@@ -82,14 +83,15 @@ public class Cond<T extends ACell> extends AMultiOp<T> {
 	}
 	
 	@Override
-	public void print(StringBuilder sb)  {
+	public boolean print(BlobBuilder sb, long limit)  {
 		sb.append("(cond");
 		int len=ops.size();
 		for (int i=0; i<len; i++) {
 			sb.append(' ');
-			ops.get(i).print(sb);
+			if (!ops.get(i).print(sb,limit)) return false;
 		}
 		sb.append(')');
+		return sb.check(limit);
 	}
 
 	@Override

@@ -13,7 +13,9 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
+import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Utils;
 
 /**
@@ -114,11 +116,12 @@ public class Invoke extends ATransaction {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
+	public boolean print(BlobBuilder sb, long limit) {
 		sb.append("{");
 		sb.append(":invoke ");
-		Utils.print(sb, command);
+		if (!RT.print(sb, command,limit)) return false;;
 		sb.append('}');
+		return sb.check(limit);
 	}
 
 	@Override

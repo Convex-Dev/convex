@@ -315,7 +315,7 @@ public class Core {
 			AString result = RT.str(args);
 			if (result==null) return context.withCastError(Types.STRING);
 
-			long juice = Juice.STR + result.length() * Juice.STR_PER_CHAR;
+			long juice = Juice.STR + result.count() * Juice.STR_PER_CHAR;
 			return context.withResult(juice, result);
 		}
 	});

@@ -12,6 +12,7 @@ import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
+import convex.core.lang.impl.BlobBuilder;
 
 /**
  * Op for executing a sequence of child operations in order
@@ -66,14 +67,15 @@ public class Do<T extends ACell> extends AMultiOp<T> {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
-		sb.append("(do");
+	public boolean print(BlobBuilder bb, long limit) {
+		bb.append("(do");
 		int len = ops.size();
 		for (int i = 0; i < len; i++) {
-			sb.append(' ');
-			ops.get(i).print(sb);
+			bb.append(' ');
+			if (!ops.get(i).print(bb,limit)) return false;
 		}
-		sb.append(')');
+		bb.append(')');
+		return bb.check(limit);
 	}
 
 	@Override

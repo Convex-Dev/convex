@@ -53,6 +53,15 @@ public class KeywordTest {
 		assertEquals(k,k2);
 		assertEquals(enc,k.getEncoding());
 	}
+	
+	@Test 
+	public void testMaxSize() {
+		Keyword max=Keyword.create(Samples.MAX_SYMBOLIC);
+		assertEquals(Constants.MAX_NAME_LENGTH,max.getName().count());
+		
+		Keyword blown=Keyword.create(Samples.TOO_BIG_SYMBOLIC);
+		assertNull(blown);
+	}
 
 	@Test
 	public void testNormalKeyword() {

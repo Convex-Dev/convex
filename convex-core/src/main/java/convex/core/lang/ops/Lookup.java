@@ -16,6 +16,7 @@ import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
+import convex.core.lang.impl.BlobBuilder;
 
 /**
  * Op to look up a Symbol in the current execution context.
@@ -75,12 +76,12 @@ public class Lookup<T extends ACell> extends AOp<T> {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
+	public boolean print(BlobBuilder bb, long limit) {
 		if (address!=null) {
-			address.print(sb);
-			sb.append('/');
+			if (!address.print(bb,limit)) return false;
+			bb.append('/');
 		}
-		symbol.print(sb);
+		return symbol.print(bb,limit);
 	}
 
 	@Override

@@ -12,6 +12,7 @@ import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 import convex.core.lang.Symbols;
+import convex.core.lang.impl.BlobBuilder;
 
 public class Special<T extends ACell> extends AOp<T> {
 	
@@ -135,8 +136,8 @@ public class Special<T extends ACell> extends AOp<T> {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
-		symbols[opCode-BASE].print(sb);
+	public boolean print(BlobBuilder bb, long limit) {
+		return symbols[opCode-BASE].print(bb,limit);
 	}
 
 	/**

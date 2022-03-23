@@ -122,7 +122,7 @@ public class GenTestCore {
 		assertSame(a,RT.castAddress(a));
 		long n=RT.count(a);
 		
-		Blob b=a.toBlob();
+		Blob b=a.toFlatBlob();
 		assertEquals(b,RT.castBlob(a));
 		assertEquals(a.toHexString(),b.toHexString());
 		
@@ -132,7 +132,7 @@ public class GenTestCore {
 		assertThrows(IndexOutOfBoundsException.class,()->RT.nth(a,-1));
 		assertThrows(IndexOutOfBoundsException.class,()->RT.nth(a,n));
 		
-		BlobsTest.doBlobTests(a);
+		BlobsTest.doBlobTests(b);
 	}
 	
 	@Property

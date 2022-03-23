@@ -14,7 +14,8 @@ import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Context;
-import convex.core.util.Utils;
+import convex.core.lang.RT;
+import convex.core.lang.impl.BlobBuilder;
 
 /**
  * Transaction representing a Call to an Actor.
@@ -49,15 +50,16 @@ public class Call extends ATransaction {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
-		sb.append("{");
-		sb.append(":target ");
-		Utils.print(sb, target);
+	public boolean print(BlobBuilder bb, long limit) {
+		bb.append("{");
+		bb.append(":target ");
+		if (!RT.print(bb, target,limit)) return false;
 		if (offer>0) {
-			sb.append(" :offer ");
-			sb.append(offer);
+			bb.append(" :offer ");
+			bb.append(Long.toString(offer));
 		}
-		sb.append('}');
+		bb.append('}');
+		return bb.check(limit);
 	}
 	
 	@Override

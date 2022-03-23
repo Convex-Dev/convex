@@ -40,10 +40,10 @@ import convex.core.data.Blob;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
-import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
+import convex.core.lang.impl.BlobBuilder;
 
 public class Utils {
 	public static final byte[] EMPTY_BYTES = new byte[0];
@@ -102,10 +102,15 @@ public class Utils {
 	 * @return Lowercase hex string
 	 */
 	public static String toHexString(byte value) {
-		StringBuffer sb = new StringBuffer(2);
+		StringBuilder sb = new StringBuilder(2);
 		sb.append(toHexChar((((int) value) & 0xF0) >>> 4));
 		sb.append(toHexChar(((int) value) & 0xF));
 		return sb.toString();
+	}
+	
+	public static void appendHexByte(BlobBuilder bb, byte b) {
+		bb.append(toHexChar((b & 0xF0) >>> 4));
+		bb.append(toHexChar((b & 0xF)));
 	}
 
 	/**
@@ -136,6 +141,7 @@ public class Utils {
 		// + ".." + cleanHexString.substring(cleanHexString.length() - size);
 		return result;
 	}
+	
 	/**
 	 * Reads an int from a specified location in a byte array Assumes 4-byte
 	 * big-endian representation
@@ -148,6 +154,23 @@ public class Utils {
 		int result = data[offset];
 		for (int i = 1; i <= 3; i++) {
 			result = (result << 8) + (data[offset + i] & 0xFF);
+		}
+		return result;
+	}
+	
+	/**
+	 * Reads an int from a specified location in a byte array. Assumes 4-byte
+	 * big-endian representation. Assumes zeros beyong end of array
+	 *
+	 * @param data Byte array from which to read the 4-byte int representation
+	 * @param offset Offset into byte array to read
+	 * @return int value from array
+	 */
+	public static int readIntZeroExtend(byte[] data, int offset) {
+		int result = data[offset];
+		for (int i = 1; i <= 3; i++) {
+			int ix=offset+i;
+			result = (result << 8) + ((ix<data.length)?(data[offset + i] & 0xFF):0);
 		}
 		return result;
 	}
@@ -798,7 +821,7 @@ public class Utils {
 	}
 
 	/**
-	 * Prints an Object in readable String representation
+	 * Prints an Object in readable String representation. Maybe not efficient.
 	 * @param v Object to print
 	 * @return String representation of value
 	 */
@@ -817,7 +840,7 @@ public class Utils {
 		if (v == null) {
 			sb.append("nil");
 		} else if (v instanceof AObject) {
-			((AObject)v).print(sb);
+			sb.append(((AObject) v).print());
 		} else if (v instanceof Boolean || v instanceof Number){
 			sb.append(v.toString());
 		} else if (v instanceof String) {
@@ -827,7 +850,7 @@ public class Utils {
 		} else if (v instanceof Instant) {
 			sb.append(((Instant)v).toEpochMilli());
 		} else if (v instanceof Character) {
-			CVMChar.create((long)v).print(sb);
+			sb.append(((Character)v).toString());
 		} else {
 			throw new TODOException("Can't print: " + Utils.getClass(v));
 		}
@@ -1334,5 +1357,7 @@ public class Utils {
 		}
 		return futures;
 	}
+
+
 
 }

@@ -96,11 +96,11 @@ public class Constants {
 			Constants.INITIAL_TIMESTAMP, 0L, Constants.INITIAL_JUICE_PRICE);
 
 	/**
-	 * Maximum length of a symbolic name in characters (keywords and symbols)
+	 * Maximum length of a symbolic name in bytes (keywords and symbols)
 	 *
 	 * Note: Chosen so that small qualified symbolic values are always embedded
 	 */
-	public static final int MAX_NAME_LENGTH = 64;
+	public static final int MAX_NAME_LENGTH = 128;
 
 	/**
 	 * Value used to indicate inclusion of a key in a Set. Must be a singleton instance
@@ -205,4 +205,11 @@ public class Constants {
 	 */
 	public static final char BAD_CHARACTER = '?';
 	public static final String BAD_CHARACTER_STRING = Character.toString(BAD_CHARACTER);
+
+	public static final byte[] BAD_CHARACTER_BYTES = new byte[] {(byte)BAD_CHARACTER};
+
+	/**
+	 * Default print limit
+	 */
+	public static final long PRINT_LIMIT = 10000;
 }

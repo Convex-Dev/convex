@@ -1,5 +1,8 @@
 package convex.core.data;
 
+import convex.core.Constants;
+import convex.core.lang.impl.BlobBuilder;
+
 public abstract class AObject {
 	/**
 	 * We cache the Blob for the binary encoding of this Cell
@@ -10,17 +13,32 @@ public abstract class AObject {
 	 * Prints this Object to a readable String Representation
 	 * 
 	 * @param sb StringBuilder to append to
+	 * @param limit Limit of printing in string bytes
+	 * @return True if fully printed, false otherwise
 	 */
-	public abstract void print(StringBuilder sb);
+	public abstract boolean print(BlobBuilder sb, long limit);
 	
 	/**
-	 * Renders this object as a String value
+	 * Prints this Object as a CVM String value
 	 * @return String representation
 	 */
-	public final String print() {
-		StringBuilder sb = new StringBuilder();
-		print(sb);
-		return sb.toString();
+	public final AString print() {
+		return print(Constants.PRINT_LIMIT);
+	}
+	
+	/**
+	 * Prints this Object as a CVM String value
+	 * @param limit Limit of bytes to print
+	 * @return String representation
+	 */
+	public final AString print(long limit) {
+		BlobBuilder bb = new BlobBuilder();
+		print(bb,limit);
+		AString s=bb.getCVMString();
+		if (!bb.check(limit)) {
+			s=s.append("<<Print limit exceeded>>");
+		}
+		return s;
 	}
 	
 	/**

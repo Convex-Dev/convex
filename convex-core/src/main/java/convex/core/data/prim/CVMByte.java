@@ -1,10 +1,13 @@
 package convex.core.data.prim;
 
+import convex.core.data.AString;
 import convex.core.data.INumeric;
+import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.impl.BlobBuilder;
 
 /**
  * Class for CVM Byte instances.
@@ -44,6 +47,9 @@ public final class CVMByte extends APrimitive implements INumeric {
 		return Types.BYTE;
 	}
 	
+	/**
+	 * Unsigned long value representing this Byte
+	 */
 	@Override
 	public long longValue() {
 		return 0xFFL&value;
@@ -72,8 +78,11 @@ public final class CVMByte extends APrimitive implements INumeric {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
-		sb.append(longValue());
+	public boolean print(BlobBuilder bb, long limit) {
+		AString s=toCVMString(limit);
+		if (s==null) return false;
+		bb.append(s);
+		return bb.count()<=limit;
 	}
 
 	@Override
@@ -114,6 +123,11 @@ public final class CVMByte extends APrimitive implements INumeric {
 	@Override
 	public INumeric toStandardNumber() {
 		return toLong();
+	}
+
+	@Override
+	public AString toCVMString(long limit) {
+		return Strings.create(Long.toString(longValue()));
 	}
 
 }

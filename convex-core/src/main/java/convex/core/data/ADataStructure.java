@@ -117,5 +117,13 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 * @return true if the data structure contains the key, false otherwise
 	 */
 	public abstract boolean containsKey(ACell key);
+	
+	/**
+	 * Converts CVM data structure to a CVM String, as per 'print'
+	 */
+	@Override
+	public AString toCVMString(long limit) {
+		return print(limit);
+	}
 
 }

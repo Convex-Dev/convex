@@ -1,11 +1,14 @@
 package convex.core.data.prim;
 
+import convex.core.data.AString;
 import convex.core.data.Format;
 import convex.core.data.INumeric;
+import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.impl.BlobBuilder;
 
 /**
  * Class for CVM long values.
@@ -88,8 +91,9 @@ public final class CVMLong extends APrimitive implements INumeric {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
-		sb.append(value);
+	public boolean print(BlobBuilder bb, long limit) {
+		bb.append(toCVMString(20));
+		return bb.check(limit);
 	}
 
 	@Override
@@ -126,6 +130,17 @@ public final class CVMLong extends APrimitive implements INumeric {
 	@Override
 	public INumeric toStandardNumber() {
 		return this;
+	}
+
+	@Override
+	public AString toCVMString(long limit) {
+		if (limit<1) return null;
+		return Strings.create(toString());
+	}
+	
+	@Override
+	public String toString() {
+		return Long.toString(value);
 	}
 
 }

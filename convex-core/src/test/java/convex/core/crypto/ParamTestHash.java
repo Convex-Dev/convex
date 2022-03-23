@@ -42,6 +42,6 @@ public class ParamTestHash {
 	@Test
 	public void testSlice() {
 		ABlob d = hash.slice(0, hash.count());
-		assertEquals(hash.toBlob(), d);
+		assertEquals(hash.toFlatBlob(), d);
 	}
 }

@@ -14,6 +14,7 @@ import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Errors;
 
 /**
@@ -116,13 +117,12 @@ public class Set<T extends ACell> extends AOp<T> {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
-		sb.append(toString());
+	public boolean print(BlobBuilder sb, long limit) {
+		sb.append("(set! %");
+		sb.append(Long.toString(limit));
+		sb.append(' ');
+		if (!op.getValue().print(sb, limit)) return false;
+		sb.append(')');
+		return sb.check(limit);
 	}
-
-	@Override
-	public String toString() {
-		return "(set! %" + position + " " + op.getValue() + ")";
-	}
-
 }

@@ -39,7 +39,7 @@ public class RTTest {
 	@Test
 	public void testAddress() {
 		Address za = Address.create(0x7777777);
-		assertEquals(za, RT.castAddress(za.toBlob()));
+		assertEquals(za, RT.castAddress(za.toFlatBlob()));
 		assertSame(za, RT.castAddress(za));
 
 		// reading a hex address

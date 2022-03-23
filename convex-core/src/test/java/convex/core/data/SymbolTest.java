@@ -12,6 +12,7 @@ import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.Symbols;
 import convex.core.util.Text;
+import convex.test.Samples;
 
 public class SymbolTest {
 
@@ -29,6 +30,15 @@ public class SymbolTest {
 		// max length Symbol should be embedded
 		Symbol s=Symbol.create(Text.whiteSpace(Constants.MAX_NAME_LENGTH));
 		assertTrue(s.isEmbedded());
+	}
+	
+	@Test 
+	public void testMaxSize() {
+		Symbol max=Symbol.create(Samples.MAX_SYMBOLIC);
+		assertEquals(Constants.MAX_NAME_LENGTH,max.getName().count());
+		
+		Symbol blown=Symbol.create(Samples.TOO_BIG_SYMBOLIC);
+		assertNull(blown);
 	}
 	
 	@Test

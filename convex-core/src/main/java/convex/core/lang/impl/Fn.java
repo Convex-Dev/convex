@@ -12,8 +12,8 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
+import convex.core.lang.RT;
 import convex.core.lang.Symbols;
-import convex.core.util.Utils;
 
 /**
  * Value class representing a instantiated closure / lambda function.
@@ -138,25 +138,26 @@ public class Fn<T extends ACell> extends AClosure<T> {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
+	public boolean print(BlobBuilder sb, long limit) {
 		sb.append("(fn ");
-		printInternal(sb);
+		printInternal(sb,limit);
 		sb.append(')');
+		return sb.check(limit);
 	}
 	
 	@Override
-	public void printInternal(StringBuilder sb) {
+	public boolean printInternal(BlobBuilder sb, long limit) {
 		// Custom param printing, avoid printing Syntax metadata for now
 		sb.append('[');
 		long size = params.count();
 		for (long i = 0; i < size; i++) {
 			if (i > 0) sb.append(' ');
-			Utils.print(sb,params.get(i));
+			if (!RT.print(sb,params.get(i),limit)) return false;
 		}
 		sb.append(']');
 
 		sb.append(' ');
-		body.print(sb);
+		return body.print(sb,limit);
 	}
 
 	/**

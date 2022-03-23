@@ -7,7 +7,6 @@ import org.bouncycastle.util.Arrays;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.Blob;
-import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Strings;
@@ -39,6 +38,13 @@ public class HashTest {
 		assertEquals("BF66F3E41E470B7D073DB8C5FB82E737962D63080EDBCC4F9EF3C3CE735472EA",
 				h3.toHexString().toUpperCase());
 	}
+	
+	@Test
+	void testHashString() {
+		String hex="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+		Hash h=Hash.fromHex(hex);
+		assertEquals("0x"+hex,h.toString());
+	}
 
 	@Test 
 	void testBuiltinHashes() {
@@ -66,7 +72,7 @@ public class HashTest {
 	@Test
 	void testExtractHash() {
 		Hash h = Hash.compute(Strings.create("foo"));
-		Blob b = Format.encodedBlob(h);
+		Blob b = h.getEncoding();
 		byte[] bs = b.getBytes();
 		Hash h2 = Hash.wrap(bs, 2); // all bytes except the initial tag byte and count
 		assertEquals(h, h2);
@@ -95,8 +101,8 @@ public class HashTest {
 	void testEquality() {
 		Hash h = Hash.NULL_HASH;
 		assertEquals(h, Hashing.sha3(new byte[] { Tag.NULL }));
-		assertEquals(h, h.toBlob());
+		assertEquals(h, h.toFlatBlob());
 
-		assertEquals(0, h.compareTo(h.toBlob()));
+		assertEquals(0, h.compareTo(h.toFlatBlob()));
 	}
 }

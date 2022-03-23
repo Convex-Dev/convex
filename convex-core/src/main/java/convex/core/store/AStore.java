@@ -103,7 +103,7 @@ public abstract class AStore {
 		ACell cached=blobCache.getCell(encoding);
 		if (cached!=null) return cached;
 		
-		ACell decoded=Format.read(encoding.toBlob());
+		ACell decoded=Format.read(encoding.toFlatBlob());
 		if (decoded==null) return decoded; // handle null value
 		
 		// TODO: can remove this check once happy with all tests

@@ -1,7 +1,15 @@
 package convex.core.data;
 
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CharsetEncoder;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
 
+import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
 
 public class Strings {
@@ -11,8 +19,21 @@ public class Strings {
 
 	public static final StringShort EMPTY = StringShort.create("");
 	public static final StringShort NIL = StringShort.create("nil");
+	public static final StringShort TRUE = StringShort.create("true");
+	public static final StringShort FALSE = StringShort.create("false");
+	
 	public static final StringShort BAD_SIGNATURE = StringShort.create("Bad Signature!");
-	public static final StringShort BAD_FORMAT = StringShort.create("Bad Massage Format!");;
+	public static final StringShort BAD_FORMAT = StringShort.create("Bad Massage Format!");
+	
+	public static final StringShort COLON = StringShort.create(":");
+	public static final StringShort HEX_PREFIX = StringShort.create("0x");
+
+	/**
+	 * Byte value used for looking outside a String
+	 * 0xff (-1) is invalid UTF-8
+	 */
+	public static final byte EXCESS_BYTE = -1;
+
 
 	/**
 	 * Reads a CVM String value from a bytebuffer. Assumes tag already read.
@@ -27,21 +48,60 @@ public class Strings {
 		if (length<0) throw new BadFormatException("Negative string length!");
 		if (length>Integer.MAX_VALUE) throw new BadFormatException("String length too long! "+length);
 		if (length<=StringShort.MAX_LENGTH) {
-			return StringShort.read((int)length,bb);
+			return StringShort.read(length,bb);
 		}
-		return StringTree.read((int)length,bb);
+		return StringTree.read(length,bb);
 	}
 
 	public static AString create(String s) {
-		int len=s.length();
-		if (len==0) return EMPTY;
-		if (len<=StringShort.MAX_LENGTH) {
-			return StringShort.create(s);
+		CharsetEncoder encoder=getEncoder();
+		ByteBuffer bb;
+		try {
+			bb = encoder.encode(CharBuffer.wrap(s));
+		} catch (CharacterCodingException e) {
+			throw new Error("Shouldn't happen!",e);
 		}
-		return StringTree.create(s);
+		byte[] bs=new byte[bb.remaining()];
+		bb.get(bs);
+		return Strings.create(Blob.wrap(bs).toCanonical());
+	}
+
+
+	public static AString create(ABlob b) {
+		long n=b.count();
+		if (n<=StringShort.MAX_LENGTH) {
+			return StringShort.create(b.toFlatBlob());
+		}
+		return StringTree.create(b);
 	}
 
 	public static AString empty() {
 		return EMPTY;
+	}
+
+	public static CharsetDecoder getDecoder() {
+		Charset charset = StandardCharsets.UTF_8;
+		CharsetDecoder dec=charset.newDecoder();
+		dec.onMalformedInput(CodingErrorAction.REPLACE);
+		dec.onUnmappableCharacter(CodingErrorAction.REPLACE);
+		dec.replaceWith(Constants.BAD_CHARACTER_STRING);
+		return dec;
+	}
+	
+	private static CharsetEncoder getEncoder() {
+		Charset charset = StandardCharsets.UTF_8;
+		CharsetEncoder enc=charset.newEncoder();
+		enc.onUnmappableCharacter(CodingErrorAction.REPLACE);
+		enc.onMalformedInput(CodingErrorAction.REPLACE);
+		enc.replaceWith(Constants.BAD_CHARACTER_BYTES);
+		return enc;
+	}
+
+	public static AString appendAll(AString[] strs) {
+		ABlob b=Blob.EMPTY;
+		for (AString s: strs) {
+			b=b.append(s.toBlob());
+		}
+		return Strings.create(b);
 	}
 }

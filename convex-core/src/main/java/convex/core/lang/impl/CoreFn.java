@@ -77,8 +77,8 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 	}
 	
 	@Override
-	public void print(StringBuilder sb) {
-		symbol.print(sb);
+	public boolean print(BlobBuilder sb, long limit) {
+		return symbol.print(sb,limit);
 	}
 
 	@Override

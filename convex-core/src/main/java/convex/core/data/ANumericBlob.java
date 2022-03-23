@@ -34,7 +34,7 @@ public abstract class ANumericBlob extends AArrayBlob {
 
 	@Override
 	public Blob getChunk(long i) {
-		return toBlob().getChunk(i);
+		return toFlatBlob().getChunk(i);
 	}
 
 	@Override

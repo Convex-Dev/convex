@@ -2,6 +2,7 @@ package convex.core.lang.ops;
 
 import java.nio.ByteBuffer;
 
+import convex.core.data.ACell;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
@@ -14,9 +15,8 @@ import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
-import convex.core.data.ACell;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Errors;
-import convex.core.util.Utils;
 
 /**
  * Op that creates a definition in the current environment.
@@ -105,12 +105,13 @@ public class Def<T extends ACell> extends AOp<T> {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
+	public boolean print(BlobBuilder sb, long limit) {
 		sb.append("(def ");
-		symbol.print(sb);
+		symbol.print(sb,limit); // OK since constant size
 		sb.append(' ');
-		Utils.print(sb, op.getValue());
+		if (!RT.print(sb, op.getValue(),limit)) return false;
 		sb.append(')');
+		return sb.check(limit);
 	}
 
 	@Override

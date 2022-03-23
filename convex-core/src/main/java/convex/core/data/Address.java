@@ -7,6 +7,7 @@ import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Utils;
 
 /**
@@ -129,9 +130,16 @@ public final class Address extends ALongBlob {
 	}
 	
 	@Override
-	public void print(StringBuilder sb) {
+	public boolean print(BlobBuilder sb, long limit) {
 		sb.append("#");
-		sb.append(value);
+		sb.append(Long.toString(value));
+		return sb.check(limit);
+	}
+	
+	@Override
+	public AString toCVMString(long limit) {
+		if (limit<2) return null;
+		return Strings.create("#"+value);
 	}
 
 	@Override
@@ -169,11 +177,11 @@ public final class Address extends ALongBlob {
 
 	@Override
 	public Blob slice(long start, long length) {
-		return toBlob().slice(start,length);
+		return toFlatBlob().slice(start,length);
 	}
 
 	@Override
-	public Blob toBlob() {
+	public Blob toFlatBlob() {
 		byte[] bs=new byte[8];
 		Utils.writeLong(bs, 0, value);
 		return Blob.wrap(bs);
@@ -181,7 +189,7 @@ public final class Address extends ALongBlob {
 
 	@Override
 	protected void updateDigest(MessageDigest digest) {
-		toBlob().updateDigest(digest);
+		toFlatBlob().updateDigest(digest);
 	}
 	
 	@Override

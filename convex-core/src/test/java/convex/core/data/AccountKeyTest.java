@@ -7,6 +7,9 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.type.Types;
+import convex.test.Samples;
+
 public class AccountKeyTest {
 
 	@Test
@@ -26,6 +29,12 @@ public class AccountKeyTest {
 			assertThrows(IllegalArgumentException.class, () -> AccountKey.fromChecksumHex(sl));
 		}
 	}
+	
+	@Test
+	public void testType() {
+		AccountKey ak=Samples.ACCOUNT_KEY;
+		assertEquals(Types.BLOB,ak.getType());
+	}
 
 
 	@Test
@@ -35,7 +44,7 @@ public class AccountKeyTest {
 		assertEquals(a, AccountKey.fromHex(aString));
 
 		// AccountKey should not be equal to Blob with same byte content
-		Blob b = a.toBlob();
+		Blob b = a.toFlatBlob();
 		assertEquals(a, b);
 
 		// AccountKey has comparison equality with Blob

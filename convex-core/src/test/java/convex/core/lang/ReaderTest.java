@@ -85,9 +85,9 @@ public class ReaderTest {
 		assertThrows(ParseException.class,()->Reader.read("#-1/foo"));
 		
 		// too long symbol names
-		assertThrows(ParseException.class,()->Reader.read("abcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnop"));
-		assertThrows(ParseException.class,()->Reader.read("abcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnop/a"));
-		assertThrows(ParseException.class,()->Reader.read("a/abcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnop"));
+		assertThrows(ParseException.class,()->Reader.read(Samples.TOO_BIG_SYMBOLIC));
+		assertThrows(ParseException.class,()->Reader.read(Samples.TOO_BIG_SYMBOLIC+"/a"));
+		assertThrows(ParseException.class,()->Reader.read("a/"+Samples.TOO_BIG_SYMBOLIC));
 
 	}
 	
@@ -258,16 +258,17 @@ public class ReaderTest {
 	}
 	
 	@Test public void testIdempotentPrint() {
+		doIdempotencyTest(null);
 		doIdempotencyTest(Address.create(12345));
+		doIdempotencyTest(CVMBool.TRUE);
 		doIdempotencyTest(Samples.LONG_MAP_10);
 		doIdempotencyTest(Samples.BAD_HASH);
-		doIdempotencyTest(Samples.MAX_EMBEDDED_STRING);
 		doIdempotencyTest(Reader.readAll("(def ^{:foo 2} a 1)"));
 		doIdempotencyTest(Reader.readAll("(fn ^{:foo 2} [] bar/baz)"));
 	}
 	
 	public void doIdempotencyTest(ACell cell) {
-		String s=cell.print();
-		assertEquals(s,Reader.read(s).print());
+		String s=RT.toString(cell);
+		assertEquals(s,RT.toString(Reader.read(s)));
 	}
 }

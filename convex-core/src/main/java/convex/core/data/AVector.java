@@ -10,6 +10,8 @@ import java.util.function.Predicate;
 
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
+import convex.core.lang.RT;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 
@@ -95,17 +97,16 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	public abstract boolean isPacked();
 
 	@Override
-	public void print(StringBuilder sb) {
+	public boolean print(BlobBuilder sb, long limit) {
 		sb.append('[');
 		int size = size();
 		for (int i = 0; i < size; i++) {
 			if (i > 0) sb.append(' ');
-			Utils.print(sb,get(i));
+			if (!RT.print(sb,get(i),limit)) return false;
 		}
 		sb.append(']');
+		return sb.check(limit);
 	}
-
-
 
 	@Override
 	public T get(int index) {

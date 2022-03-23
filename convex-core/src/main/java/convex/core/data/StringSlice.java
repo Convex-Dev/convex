@@ -1,38 +1,40 @@
 package convex.core.data;
 
+import java.nio.ByteBuffer;
+
 import convex.core.exceptions.InvalidDataException;
 
 /**
- * AString subclass representing a subsequence of another charsequence
+ * AString subclass representing a subsequence of some Blob data
  */
 public class StringSlice extends AString {
 
 	private AString source;
-	private int start;
+	private long start;
 
-	protected StringSlice(AString source,int start, int length) {
+	protected StringSlice(AString source,long start, long length) {
 		super(length);
 		this.source=source;
 		this.start=start;
 	}
 
-	public static AString create(StringTree source, int start, int len) {
+	public static AString create(StringTree source, long start, long len) {
 		if (len==0) return Strings.EMPTY;
 		if (len<0) throw new IllegalArgumentException("Negative length");
 		
-		int slen=source.length;
+		long slen=source.length;
 		if ((start<0)||(start+len>slen)) throw new IllegalArgumentException("Out of range");
 		return new StringSlice(source,start,len);
 	}
 	
 	@Override
-	public char charAt(int index) {
+	public int charAt(long index) {
 		return source.charAt(index-start);
 	}
 
 	@Override
-	public AString subSequence(int start, int end) {
-		int len=end-start;
+	public AString subSequence(long start, long end) {
+		long len=end-start;
 		if (len==0) return Strings.EMPTY;
 		if (len<0) throw new IllegalArgumentException("Negative length");
 		if ((start<0)||(start+len>=length)) throw new IllegalArgumentException("Out of range");
@@ -74,25 +76,30 @@ public class StringSlice extends AString {
 	public int getRefCount() {
 		return 0;
 	}
-
-
+	
 	@Override
-	protected void appendToStringBuffer(StringBuilder sb, int start,int length) {
-		int sourceStart=this.start+start;
-		source.appendToStringBuffer(sb, sourceStart, length);
-	}
-
-	@Override
-	protected AString append(char charValue) {
-		StringBuilder sb=new StringBuilder();
-		appendToStringBuffer(sb, 0, length);
-		sb.append(charValue);
-		return Strings.create(sb.toString());
+	public byte byteAt(long i) {
+		if ((i<0)||(i>=length)) return -1;
+		return source.byteAt(i+start);
 	}
 
 	@Override
 	public AString toCanonical() {
-		return Strings.create(toString());
+		return Strings.create(toBlob());
+	}
+	
+	public ABlob toBlob() {
+		return source.toBlob().slice(start, length);
+	}
+
+	@Override
+	public int compareTo(AString o) {
+		return toCanonical().compareTo(o);
+	}
+
+	@Override
+	protected void writeToBuffer(ByteBuffer bb) {
+		source.writeToBuffer(bb);
 	}
 
 

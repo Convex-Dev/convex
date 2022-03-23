@@ -19,6 +19,7 @@ import convex.core.data.ADataStructure;
 import convex.core.data.AMap;
 import convex.core.data.ASequence;
 import convex.core.data.ASet;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
@@ -39,7 +40,6 @@ import convex.core.data.MapTree;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.StringShort;
-import convex.core.data.StringTree;
 import convex.core.data.Strings;
 import convex.core.data.Syntax;
 import convex.core.data.VectorLeaf;
@@ -131,11 +131,18 @@ public class Samples {
 	public static final Blob MAX_EMBEDDED_BLOB = createTestBlob(Format.MAX_EMBEDDED_LENGTH-Format.getVLCLength(Format.MAX_EMBEDDED_LENGTH)-1);
 	public static final Blob NON_EMBEDDED_BLOB = createTestBlob(MAX_EMBEDDED_BLOB.count()+1);
 
-	public static final StringShort MAX_EMBEDDED_STRING= StringShort.create("[0x1234567812345678123456781234567812345678123456781234567812345678]");
-	public static final StringShort NON_EMBEDDED_STRING= StringShort.create(MAX_EMBEDDED_STRING.toString()+" ");
-	public static final StringShort MAX_SHORT_STRING= StringShort.create(createRandomString(StringShort.MAX_LENGTH));
-	public static final StringTree MIN_TREE_STRING= StringTree.create(createRandomString(StringTree.MINIMUM_LENGTH));
+	public static final AString MAX_EMBEDDED_STRING= Strings.create("This is a string containing exactly 137 characters. This is just right for a maximum embedded string in Convex. How lucky is that, eh????");
+	public static final AString NON_EMBEDDED_STRING= Strings.create(MAX_EMBEDDED_STRING.toString()+" ");
+	public static final AString MAX_SHORT_STRING= Strings.create(createASCIIString(StringShort.MAX_LENGTH));
+	public static final AString MIN_TREE_STRING= Strings.create(createASCIIString(StringShort.MAX_LENGTH+1));
 
+	public static final String IPSUM="Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. ";
+	public static final String SPANISH="El veloz murciélago hindú comía feliz cardillo y kiwi. La cigüeña tocaba el saxofón detrás del palenque de paja.";
+	public static final String RUSSIAN="Съешь же ещё этих мягких французских булок, да выпей чаю.";
+	
+	public static final String MAX_SYMBOLIC="abcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnop";
+	public static final String TOO_BIG_SYMBOLIC=MAX_SYMBOLIC+"a";
+	
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static final VectorLeaf<ACell> MAX_EMBEDDED_VECTOR = (VectorLeaf) Vectors.of(Blobs.createRandom(105),1,2,3,4,5,6,7,8,9,10,11,12,13,14,15);
 
@@ -164,7 +171,16 @@ public class Samples {
 		return b;
 	}
 
-	private static String createRandomString(int n) {
+	// Creates a valid ASCII string of the given length.
+	public static String createASCIIString(int n) {
+		char[] cs=new char[n];
+		for (int i=0; i<n; i++) {
+			cs[i]=IPSUM.charAt(i%IPSUM.length());
+		}
+		return new String(cs);
+	}
+
+	public static String createRandomString(int n) {
 		char [] cs=new char[n];
 		for (int i=0; i<n; i++) {
 			cs[i]=(char)rand.nextInt();

@@ -34,7 +34,7 @@ public class GenTestCode {
 			}
 		}
 
-		String s=RT.str(form);
+		String s=RT.toString(form);
 		doMutateTest(s);
 	}
 

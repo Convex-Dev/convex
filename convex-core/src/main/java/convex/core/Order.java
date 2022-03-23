@@ -12,6 +12,7 @@ import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.impl.BlobBuilder;
 
 /**
  * Class representing an Ordering of transactions, along with the consensus position.
@@ -125,14 +126,15 @@ public class Order extends ACell {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
+	public boolean print(BlobBuilder sb, long limit) {
 		sb.append("{");
 		sb.append(":prop " + getProposalPoint() + ",");
 		sb.append(":cons " + getConsensusPoint() + ",");
 		sb.append(":hash " + getHash() + ",");
 		sb.append(":blocks ");
-		blocks.print(sb);
+		if (!blocks.print(sb,limit)) return false;
 		sb.append("}\n");
+		return sb.check(limit);
 	}
 
 	/**

@@ -5,6 +5,7 @@ import java.security.MessageDigest;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
@@ -34,6 +35,9 @@ public class BlobTree extends ABlob {
 	 */
 	private final int shift;
 	
+	/**
+	 * Total number of bytes in this BlobTree
+	 */
 	private final long count;
 
 	private BlobTree(Ref<ABlob>[] children, int shift, long count) {
@@ -50,14 +54,16 @@ public class BlobTree extends ABlob {
 	 * @return New BlobTree instance
 	 */
 	public static BlobTree create(ABlob blob) {
-		if (blob instanceof BlobTree) return (BlobTree) blob;
+		if (blob instanceof BlobTree) return (BlobTree) blob; // already a BlobTree
 
 		long length = blob.count();
+		if (length<=Blob.CHUNK_LENGTH) throw new Error("Can't make BlobTree for too small length: "+length);
+		
 		int chunks = Utils.checkedInt(calcChunks(length));
 		Blob[] blobs = new Blob[chunks];
 		for (int i = 0; i < chunks; i++) {
 			int offset = i * Blob.CHUNK_LENGTH;
-			blobs[i] = blob.slice(offset, Math.min(Blob.CHUNK_LENGTH, length - offset)).toBlob();
+			blobs[i] = blob.slice(offset, Math.min(Blob.CHUNK_LENGTH, length - offset)).toFlatBlob();
 		}
 		return create(blobs);
 	}
@@ -70,7 +76,7 @@ public class BlobTree extends ABlob {
 	 * @return New BlobTree instance
 	 */
 	@SuppressWarnings("unchecked")
-	public static ABlob createWithChildren(ABlob[] children) {
+	public static BlobTree createWithChildren(ABlob[] children) {
 		int n=children.length;
 		long count=0;
 		Ref<ABlob>[] cs = new Ref[n];
@@ -84,7 +90,7 @@ public class BlobTree extends ABlob {
 	}
 
 	/**
-	 * Create a BlobTree from an array of children. Each child must be a valid
+	 * Create a BlobTree from an array of Blob children. Each child must be a valid
 	 * chunk. All except the last child must be of the correct chunk size.
 	 * 
 	 * @param blobs Blobs to include
@@ -194,28 +200,43 @@ public class BlobTree extends ABlob {
 
 	@Override
 	public ABlob slice(long start, long length) {
-		if ((start == 0L) && (length == this.count)) return this;
 		if (start < 0L) throw new IndexOutOfBoundsException(Errors.badIndex(start));
+		if (length < 0L) throw new IllegalArgumentException("Negative length: "+length);
+		long end=start+length;
+		if (end>count()) throw new IndexOutOfBoundsException(Errors.badIndex(end));
+		
+		if ((start == 0L) && (length == this.count)) return this;
 
 		long csize = childLength();
 		int ci = (int) (start / csize);
-		if (ci == (start + length - 1) / csize) {
+		int cilast=(int)((end - 1) / csize);
+		if (ci == cilast) {
+			// Slice within a single child
 			return getChild(ci).slice(start - ci * csize, length);
 		}
 
-		// FIXME: This looks broken
-		// TODO: handle big slices more effectively
-		int alen = Utils.checkedInt(this.count);
-		byte[] bs = new byte[alen];
-		return Blob.wrap(bs, Utils.checkedInt(start), Utils.checkedInt(length));
+		// Construct using BlobBuilder iterating over relevant children
+		BlobBuilder bb=new BlobBuilder();
+		for (int i=ci; i<=cilast; i++) {
+			ABlob child=getChild(ci);
+			long coff=i*csize;
+			long cstart=Math.max(start-coff, 0);
+			long cend=Math.min(end-coff, child.count());
+			bb.append(child.slice(cstart,cend-cstart));
+		}
+		return bb.toBlob();
 	}
 
 	private ABlob getChild(int childIndex) {
 		return children[childIndex].getValue();
 	}
+	
+	private ABlob lastChild() {
+		return children[children.length-1].getValue();
+	}
 
 	@Override
-	public Blob toBlob() {
+	public Blob toFlatBlob() {
 		int len = Utils.checkedInt(count());
 		byte[] data = new byte[len];
 		getBytes(data, 0);
@@ -307,7 +328,7 @@ public class BlobTree extends ABlob {
 	public ByteBuffer writeToBuffer(ByteBuffer bb) {
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
-			bb = children[i].write(bb);
+			bb = children[i].getValue().writeToBuffer(bb);
 		}
 		return bb;
 	}
@@ -385,10 +406,72 @@ public class BlobTree extends ABlob {
 		return 1 + Format.MAX_VLC_LONG_LENGTH + Ref.INDIRECT_ENCODING_LENGTH * children.length;
 	}
 
+	/**
+	 * Appends another blob to this BlobTree. Potentially O(n) but can be faster.
+	 * 
+	 * We are careful to slice from (0...n) on the appended array, to minimise reconstruction of BlobTrees
+	 */
 	@Override
 	public ABlob append(ABlob d) {
-		// TODO: optimise
-		return toBlob().append(d);
+		BlobTree acc=this;
+		long off=0; // offset into d
+		long dlen=d.count();
+		
+		// loop until d is fully consumed
+		while (off<dlen) {
+		
+			long csize=acc.childLength();
+			ABlob lastChild=acc.lastChild();
+			long clen=lastChild.count();
+			if (clen!=csize) {
+				// Need to fill last child
+				long spare=csize-clen;
+				long take=Math.min(spare, dlen);
+				ABlob newChild=lastChild.append(d.slice(0,take));
+				acc=acc.withChild(acc.children.length-1,newChild);
+				off+=take;
+			}
+			
+			if (off>=dlen) return acc; // Finished!
+			
+			if (!acc.isFullyPacked()) {
+				// Need to add more children
+				for (int i=acc.childCount(); i<FANOUT; i++) {
+					long take=Math.min(csize, dlen-off);
+					ABlob newChild=d.slice(off,take);
+					acc=acc.appendChild(newChild);
+					off+=take;
+					if (off>=dlen) return acc; // Finished!
+				}
+			}
+			
+			// Next level takes a following child with up to as memy bytes as acc
+			long take=Math.min(acc.count(), dlen-off);
+			BlobTree nextLevel=BlobTree.createWithChildren(new ABlob[] {acc,d.slice(off,take)});
+			acc=nextLevel;
+			off+=take;
+		} 
+		return acc;
+	}
+
+	private int childCount() {
+		return children.length;
+	}
+
+	/**
+	 * Returns true if this is a fully packed set of chunks
+	 * @return True if fully packed, false otherwise
+	 */
+	public boolean isFullyPacked() {
+		return count==childLength()*FANOUT;
+	}
+	
+	/**
+	 * Returns true if this is a fully packed set of chunks
+	 * @return True if fully packed, false otherwise
+	 */
+	public boolean isChunkPacked() {
+		return (count&(Blob.CHUNK_LENGTH-1))==0;
 	}
 
 	@Override
@@ -432,16 +515,12 @@ public class BlobTree extends ABlob {
 	}
 
 	@Override
-	public String toHexString() {
-		StringBuilder sb = new StringBuilder();
-		toHexString(sb);
-		return sb.toString();
-	}
-
-	@Override
-	public void toHexString(StringBuilder sb) {
+	public void appendHexString(BlobBuilder sb, int length) {
 		for (int i = 0; i < children.length; i++) {
-			children[i].getValue().toHexString(sb);
+			ABlob child=children[i].getValue();
+			child.appendHexString(sb,length);
+			length-=Utils.checkedInt(child.count()*2);
+			if (length<=0) break;
 		}
 	}
 
@@ -509,6 +588,34 @@ public class BlobTree extends ABlob {
 	private BlobTree withChildren(Ref<ABlob>[] newChildren) {
 		if (children == newChildren) return this;
 		return new BlobTree(newChildren, shift, count);
+	}
+	
+	private BlobTree withChild(int i,ABlob newChild) {
+		ABlob oldChild=children[i].getValue();
+		if (oldChild == newChild) return this;
+		Ref<ABlob>[] newChildren=children.clone();
+		newChildren[i]=newChild.getRef();
+		long newCount=count;
+		if (i==(children.length-1)) {
+			newCount+=newChild.count()-oldChild.count(); // update count if last child changed
+		}
+		return new BlobTree(newChildren, shift, newCount);
+	}
+	
+	/**
+	 * Appends a child. Assumes all previous children are fully packed
+	 * @param newChild New child to append
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	private BlobTree appendChild(ABlob newChild) {
+		int ch=children.length;
+		if (ch>=FANOUT) throw new Error("Trying to add a child beyond allowable fanout!");
+		Ref<ABlob>[] newChildren=new Ref[ch+1];
+		System.arraycopy(children, 0, newChildren, 0, ch);
+		newChildren[ch]=newChild.getRef();
+		long newCount=ch*childLength()+newChild.count();
+		return new BlobTree(newChildren, shift, newCount);
 	}
 	
 	@Override

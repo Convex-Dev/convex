@@ -6,6 +6,8 @@ import convex.core.Constants;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
+import convex.core.lang.RT;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Utils;
 
 /**
@@ -205,12 +207,13 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	}
 	
 	@Override
-	public void print(StringBuilder sb) {
+	public boolean print(BlobBuilder sb, long limit) {
 		sb.append("#{");
 		for (long i=0; i<count; i++) {
 			if (i>0) sb.append(',');
-			Utils.print(sb,get(i));
+			if (!RT.print(sb,get(i),limit)) return false;
 		}
 		sb.append('}');
+		return sb.check(limit);
 	}
 }

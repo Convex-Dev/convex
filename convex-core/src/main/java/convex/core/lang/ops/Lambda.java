@@ -14,6 +14,7 @@ import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 import convex.core.lang.impl.AClosure;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.lang.impl.Fn;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
@@ -70,8 +71,8 @@ public class Lambda<T extends ACell> extends AOp<AClosure<T>> {
 	}
 	
 	@Override
-	public void print(StringBuilder sb)  {
-		function.getValue().print(sb);
+	public boolean print(BlobBuilder sb, long limit)  {
+		return function.getValue().print(sb,limit);
 	}
 
 	@Override

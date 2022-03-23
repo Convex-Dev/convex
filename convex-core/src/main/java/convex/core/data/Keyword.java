@@ -7,6 +7,7 @@ import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.impl.BlobBuilder;
 
 /**
  * Keyword data type. Intended as human-readable map keys, tags and option
@@ -20,13 +21,13 @@ import convex.core.exceptions.InvalidDataException;
  */
 public class Keyword extends ASymbolic implements Comparable<Keyword> {
 
-	/** Maximum size of a Keyword in UTF-16 chars representation */
+	/** Maximum size of a Keyword in UTF-8 bytes representation */
 	public static final int MAX_CHARS = Constants.MAX_NAME_LENGTH;
 
-	/** Minimum size of a Keyword in UTF-16 chars representation */
+	/** Minimum size of a Keyword in UTF-8 bytes representation */
 	public static final int MIN_CHARS = 1;
 
-	private Keyword(String name) {
+	private Keyword(AString name) {
 		super(name);
 	}
 	
@@ -41,15 +42,16 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	 * @return The new Keyword, or null if the name is invalid for a Keyword
 	 */
 	public static Keyword create(String name) {
-		if (!validateName(name)) {
-			return null;
-		}
-		return new Keyword(name);
+		if (name==null) return null;
+		return create(Strings.create(name));
 	}
 	
 	public static Keyword create(AString name) {
 		if (name==null) return null;
-		return create(name.toString());
+		if (!validateName(name)) {
+			return null;
+		}
+		return new Keyword(Strings.COLON.append(name));
 	}
 
 	/**
@@ -101,18 +103,18 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		return Format.writeRawUTF8String(bs, pos, name);
+		return getName().encodeRaw(bs, pos);
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
-		sb.append(':');
-		sb.append(name);
+	public boolean print(BlobBuilder bb, long limit) {
+		bb.append(name);
+		return bb.check(limit);
 	}
 
 	@Override
 	public int estimatedEncodingSize() {
-		return name.length()*2+3;
+		return (int)(name.count()+3);
 	}
 
 	@Override
@@ -145,6 +147,16 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	@Override
 	public ACell toCanonical() {
 		return this;
+	}
+
+	@Override
+	public AString getName() {
+		return name.subSequence(1, name.count());
+	}
+
+	@Override
+	public AString toCVMString(long limit) {
+		return name;
 	}
 
 }

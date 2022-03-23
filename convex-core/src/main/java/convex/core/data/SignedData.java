@@ -8,6 +8,7 @@ import convex.core.crypto.Ed25519Signature;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.transactions.ATransaction;
 
 /**
@@ -158,7 +159,7 @@ public class SignedData<T extends ACell> extends ACell {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = publicKey.encodeRaw(bs,pos);
+		pos = publicKey.encodeRawData(bs,pos);
 		pos = signature.encodeRaw(bs,pos);
 		pos = valueRef.encode(bs,pos);
 		return pos;
@@ -258,10 +259,11 @@ public class SignedData<T extends ACell> extends ACell {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
-		sb.append("{");
-		sb.append(":signed "+valueRef.getHash().toString());
-		sb.append("}");
+	public boolean print(BlobBuilder bb,long limit) {
+		bb.append("{");
+		bb.append(":signed "+valueRef.getHash().toString());
+		bb.append("}");
+		return bb.check(limit);
 	}
 
 	@Override

@@ -122,7 +122,10 @@ public class Maps {
 		int n = entries.size();
 		if (n == 0) return empty();
 		AHashMap<K, V> result = Maps.empty();
-		for (MapEntry<K, V> e : entries) {
+		for (int i=0; i<n; i++) {
+			AVector<?> v=entries.get(i);
+			@SuppressWarnings("unchecked")
+			MapEntry<K,V> e=MapEntry.convertOrNull(v); // Ensure a Map entry
 			result = result.assocEntry(e, shift);
 		}
 		return result;

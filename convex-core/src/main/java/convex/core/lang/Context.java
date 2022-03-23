@@ -32,6 +32,7 @@ import convex.core.exceptions.TODOException;
 import convex.core.init.Init;
 import convex.core.lang.impl.AExceptional;
 import convex.core.lang.impl.ATrampoline;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.lang.impl.ErrorValue;
 import convex.core.lang.impl.HaltValue;
 import convex.core.lang.impl.RecurValue;
@@ -41,7 +42,6 @@ import convex.core.lang.impl.RollbackValue;
 import convex.core.lang.impl.TailcallValue;
 import convex.core.util.Economics;
 import convex.core.util.Errors;
-import convex.core.util.Utils;
 
 /**
  * Representation of CVM execution context.
@@ -1073,16 +1073,17 @@ public class Context<T extends ACell> extends AObject {
 	}
 
 	@Override
-	public void print(StringBuilder sb)  {
-		sb.append("{");
-		sb.append(":juice "+juice);
-		sb.append(',');
-		sb.append(":result ");
-		Utils.print(sb,result);
-		sb.append(',');
-		sb.append(":state ");
-		getState().print(sb);
-		sb.append("}");
+	public boolean print(BlobBuilder bb, long limit)  {
+		bb.append("{");
+		bb.append(":juice "+juice);
+		bb.append(',');
+		bb.append(":result ");
+		if (!RT.print(bb,result,limit)) return false;
+		bb.append(',');
+		bb.append(":state ");
+		if (!getState().print(bb,limit)) return false;
+		bb.append("}");
+		return bb.check(limit);
 	}
 
 	public AVector<ACell> getLocalBindings() {

@@ -162,7 +162,7 @@ public class ObjectsTest {
 			a2 = Format.read(encoding);
 			assertEquals(a, a2);
 		} catch (BadFormatException e) {
-			throw new Error("Can't read encoding: " + encoding.toHexString(), e);
+			throw new Error("Can't read encoding: 0x" + encoding.toHexString(), e);
 		}
 		
 		doCellTests(a);

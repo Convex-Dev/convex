@@ -49,8 +49,8 @@ public class SeqFn<T extends ACell> extends ADataFn<T> {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
-		seq.print(sb);
+	public boolean print(BlobBuilder sb,long limit) {
+		return seq.print(sb,limit);
 	}
 
 }

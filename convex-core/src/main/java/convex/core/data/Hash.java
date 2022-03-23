@@ -148,7 +148,7 @@ public class Hash extends AArrayBlob {
 	}
 
 	/**
-	 * Reads a Hash from a ByteBuffer Assumes no Tag, i.e. just Hash.LENGTH for the
+	 * Reads a Hash from a ByteBuffer Assumes no Tag or count, i.e. just Hash.LENGTH for the
 	 * hash is read.
 	 * 
 	 * @param bb ByteBuffer to read from
@@ -164,7 +164,7 @@ public class Hash extends AArrayBlob {
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.BLOB;
 		bs[pos++]=LENGTH;
-		return encodeRaw(bs,pos);
+		return encodeRawData(bs,pos);
 	}
 
 	@Override
@@ -192,7 +192,7 @@ public class Hash extends AArrayBlob {
 	@Override
 	public Blob getChunk(long i) {
 		if (i != 0) throw new IndexOutOfBoundsException(Errors.badIndex(i));
-		return toBlob();
+		return toFlatBlob();
 	}
 
 	@Override
@@ -218,6 +218,6 @@ public class Hash extends AArrayBlob {
 
 	@Override
 	public Blob toCanonical() {
-		return toBlob();
+		return toFlatBlob();
 	}
 }

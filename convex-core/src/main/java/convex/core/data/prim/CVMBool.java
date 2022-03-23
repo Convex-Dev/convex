@@ -1,10 +1,13 @@
 package convex.core.data.prim;
 
 import convex.core.data.ACell;
+import convex.core.data.AString;
+import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.impl.BlobBuilder;
 
 /**
  * Class for CVM Boolean types.
@@ -72,8 +75,9 @@ public final class CVMBool extends APrimitive {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
-		sb.append(value?"true":"false");
+	public boolean print(BlobBuilder bb, long limit) {
+		bb.append(value?Strings.TRUE:Strings.FALSE);
+		return bb.check(limit);
 	}
 
 	@Override
@@ -96,8 +100,9 @@ public final class CVMBool extends APrimitive {
 		return null;
 	}
 
-
-
-
+	@Override
+	public AString toCVMString(long limit) {
+		return value?Strings.TRUE:Strings.FALSE;
+	}
 
 }

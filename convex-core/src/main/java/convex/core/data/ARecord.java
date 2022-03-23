@@ -64,22 +64,6 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 		}
 		return pos;
 	}
-	
-	@Override
-	public void print(StringBuilder sb) {
-		sb.append("{");
-		long n=format.count();
-		for (int i=0; i<n; i++) {
-			MapEntry<Keyword,ACell> me=entryAt(i);
-			Keyword k=me.getKey();
-			k.print(sb);
-			sb.append(' ');
-			Object v=me.getValue();
-			Utils.print(sb, v);
-			if (i<(n-1)) sb.append(',');
-		}
-		sb.append("}");
-	}
 
 	/**
 	 * Gets a vector of keys for this record

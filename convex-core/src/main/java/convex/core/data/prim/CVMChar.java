@@ -3,11 +3,15 @@ package convex.core.data.prim;
 import java.nio.ByteBuffer;
 
 import convex.core.Constants;
+import convex.core.data.AString;
+import convex.core.data.Blob;
+import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.lang.reader.ReaderUtils;
 
 /**
@@ -17,7 +21,7 @@ import convex.core.lang.reader.ReaderUtils;
  * Limited to range 0-0x1fffff as per Unicode standard
  */
 public final class CVMChar extends APrimitive {
-	public static int MAX_VALUE=0x1fffff; // 21 bits max Unicode
+	public static int MAX_VALUE=0x10ffff; // 21 bits max Unicode value
 	
 	private static final CVMChar[] cache=new CVMChar[128];
 	
@@ -55,7 +59,7 @@ public final class CVMChar extends APrimitive {
 	
 	@Override
 	public int estimatedEncodingSize() {
-		return 1+2;
+		return 1+3;
 	}
 
 	@Override
@@ -122,7 +126,7 @@ public final class CVMChar extends APrimitive {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
+	public boolean print(BlobBuilder bb, long limit) {
 		// Prints like EDN.
 		// Characters are preceded by a backslash: \c, \newline, \return, \space and
 		// \tab yield
@@ -131,19 +135,20 @@ public final class CVMChar extends APrimitive {
 		// Backslash cannot be followed by whitespace.
 		//
 		switch(value) {
-			case '\n': sb.append("\\newline"); break;
-			case '\r': sb.append("\\return"); break;
-			case ' ':  sb.append("\\space"); break;
-			case '\t': sb.append("\\tab"); break;
+			case '\n': bb.append("\\newline"); break;
+			case '\r': bb.append("\\return"); break;
+			case ' ':  bb.append("\\space"); break;
+			case '\t': bb.append("\\tab"); break;
 			default:  {
-				sb.append('\\');
+				bb.append('\\');
 				if (Character.isBmpCodePoint(value)) {
-					sb.append((char)value);
+					bb.append((char)value);
 				} else {
-					sb.append(toString());
+					bb.append(toString());
 				}
 			}
 		}
+		return bb.check(limit);
 	}
 
 	/**
@@ -203,6 +208,36 @@ public final class CVMChar extends APrimitive {
 		} else {
 			return Constants.BAD_CHARACTER;
 		}
+	}
+
+	/**
+	 * Converts this Character to a Blob with its UTF-8 byte representation
+	 * @return byte[] array containing UTF-8 bytes
+	 */
+	public byte[] toUTFBytes() {
+		int n=utfLength(value);
+		if (n<=0) throw new Error("Shouldn't happen: CVMChar out of range: "+value);
+		byte[] bs=new byte[n];
+		if (value<128) {
+			bs[0]=(byte)value;
+			return bs;
+		}
+		bs[0]=(byte)((0xff00>>(n))|(value>>((n-1)*6)));
+		for (int i=1; i<n; i++) {
+			bs[i]=(byte)(0x80|(0x3f&(value>>((n-1-i)*6))));
+		}
+		return bs;
+	}
+	
+	
+	public Blob toBlob() {
+		return Blob.wrap(toUTFBytes());
+	}
+
+	@Override
+	public AString toCVMString(long limit) {
+		if (limit<=0) return null;
+		return Strings.create(Blob.wrap(toUTFBytes()));
 	}
 
 

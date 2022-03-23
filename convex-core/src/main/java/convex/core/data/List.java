@@ -8,6 +8,8 @@ import java.util.function.Function;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
@@ -246,14 +248,15 @@ public class List<T extends ACell> extends AList<T> {
 	}
 	
 	@Override
-	public void print(StringBuilder sb) {
-		sb.append('(');
+	public boolean print(BlobBuilder bb, long limit) {
+		bb.append('(');
 		long n = count;
 		for (long i = 0; i < n; i++) {
-			if (i > 0) sb.append(' ');
-			Utils.print(sb,data.get(n - 1 - i));
+			if (i > 0) bb.append(' ');
+			if (!RT.print(bb,data.get(n - 1 - i),limit)) return false;;
 		}
-		sb.append(')');
+		bb.append(')');
+		return bb.check(limit);
 	}
 
 	@Override
@@ -421,5 +424,4 @@ public class List<T extends ACell> extends AList<T> {
 	public ACell toCanonical() {
 		return this;
 	}
-
 }

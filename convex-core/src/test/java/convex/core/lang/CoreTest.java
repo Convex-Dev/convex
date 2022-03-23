@@ -76,6 +76,7 @@ import convex.core.lang.ops.Do;
 import convex.core.lang.ops.Invoke;
 import convex.core.lang.ops.Lookup;
 import convex.core.lang.ops.Special;
+import convex.test.Samples;
 
 /**
  * Test class for core functions in the initial environment.
@@ -1979,7 +1980,7 @@ public class CoreTest extends ACVMTest {
 		// too short or too long results in ARGUMENT error
 		assertArgumentError(step("(symbol (str))"));
 		assertArgumentError(
-			  step("(symbol \"duicgidvgefiucefiuvfeiuvefiuvgifegvfuievgiuefgviuefgviufegvieufgviuefvgevevgi\")"));
+			  step("(symbol \""+Samples.TOO_BIG_SYMBOLIC+"\")"));
 
 		assertCastError(step("(symbol nil)"));
 		assertCastError(step("(symbol [])"));

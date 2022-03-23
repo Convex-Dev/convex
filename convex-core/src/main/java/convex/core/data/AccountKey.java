@@ -152,7 +152,7 @@ public class AccountKey extends AArrayBlob {
 	}
 	
 	public static AccountKey fromHexOrNull(AString a) {
-		if (a.length()!=LENGTH*2) return null;
+		if (a.count()!=LENGTH*2) return null;
 		return fromHexOrNull(a.toString());
 	}
 
@@ -211,7 +211,6 @@ public class AccountKey extends AArrayBlob {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.BLOB;
-		bs[pos++]=Constants.KEY_LENGTH;
 		return encodeRaw(bs,pos);
 	}
 	
@@ -234,7 +233,7 @@ public class AccountKey extends AArrayBlob {
 	@Override
 	public Blob getChunk(long i) {
 		if (i != 0) throw new IndexOutOfBoundsException(Errors.badIndex(i));
-		return toBlob();
+		return toFlatBlob();
 	}
 
 	@Override
@@ -272,7 +271,7 @@ public class AccountKey extends AArrayBlob {
 
 	@Override
 	public Blob toCanonical() {
-		return toBlob();
+		return toFlatBlob();
 	}
 
 

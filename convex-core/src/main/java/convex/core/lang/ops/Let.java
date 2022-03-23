@@ -13,8 +13,9 @@ import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
+import convex.core.lang.RT;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.lang.impl.RecurValue;
-import convex.core.util.Utils;
 
 /**
  * Op for executing a body after lexically binding one or more symbols.
@@ -136,23 +137,24 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
-		sb.append(isLoop ? "(loop [" : "(let [");
+	public boolean print(BlobBuilder bb, long limit) {
+		bb.append(isLoop ? "(loop [" : "(let [");
 		int len = ops.size();
 		for (int i = 0; i < bindingCount; i++) {
-			if (i > 0) sb.append(' ');
-			Utils.print(sb, symbols.get(i));
-			sb.append(' ');
-			ops.get(i).print(sb);
-			sb.append(' ');
+			if (i > 0) bb.append(' ');
+			if (!RT.print(bb, symbols.get(i),limit)) return false;
+			bb.append(' ');
+			if (!ops.get(i).print(bb,limit)) return false;
+			bb.append(' ');
 		}
-		sb.append("] ");
+		bb.append("] ");
 
 		for (int i = bindingCount; i < len; i++) {
-			sb.append(' ');
-			ops.get(i).print(sb);
+			bb.append(' ');
+			if (!ops.get(i).print(bb,limit)) return false;
 		}
-		sb.append(')');
+		bb.append(')');
+		return bb.check(limit);
 	}
 
 	@Override

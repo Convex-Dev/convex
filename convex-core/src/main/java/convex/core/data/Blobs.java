@@ -39,7 +39,7 @@ public class Blobs {
 	 */
 	public static ABlob toCanonical(ABlob a) {
 		long length = a.count();
-		if (length <= Blob.CHUNK_LENGTH) return a.toBlob();
+		if (length <= Blob.CHUNK_LENGTH) return a.toFlatBlob();
 		return BlobTree.create(a);
 	}
 

@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.nio.charset.StandardCharsets;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.Blob;
@@ -37,7 +39,7 @@ public class CharacterTest {
 	public void testMaxValue() throws BadFormatException {
 		CVMChar a=CVMChar.create(CVMChar.MAX_VALUE);
 		doValidCharTests(a);
-		assertEquals("3e1fffff",a.getEncoding().toHexString());
+		assertEquals("3e10ffff",a.getEncoding().toHexString());
 	}
 	
 	@Test 
@@ -63,6 +65,9 @@ public class CharacterTest {
 		assertNotNull(a);
 		Blob b=a.getEncoding();
 		assertEquals(a,Format.read(b));
+		
+		byte[] bs=a.toUTFBytes();
+		assertEquals(a.toString(),new String(bs,StandardCharsets.UTF_8));
 	}
 
 

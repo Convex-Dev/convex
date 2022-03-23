@@ -31,8 +31,8 @@ public class SetFn<T extends ACell> extends ADataFn<CVMBool> {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
-		set.print(sb);
+	public boolean print(BlobBuilder sb,long limit) {
+		return set.print(sb,limit);
 	}
 
 }

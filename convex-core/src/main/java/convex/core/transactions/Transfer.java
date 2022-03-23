@@ -12,6 +12,7 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.RT;
+import convex.core.lang.impl.BlobBuilder;
 
 /**
  * Transaction class representing a coin Transfer from one account to another
@@ -91,13 +92,14 @@ public class Transfer extends ATransaction {
 	}
 
 	@Override
-	public void print(StringBuilder sb) {
-		sb.append("{");
-		sb.append(":transfer-to ");
-		target.print(sb);
-		sb.append(',');
-		sb.append(":amount "+amount);
-		sb.append('}');
+	public boolean print(BlobBuilder bb, long limit) {
+		bb.append("{");
+		bb.append(":transfer-to ");
+		if (!target.print(bb,limit)) return false;
+		bb.append(',');
+		bb.append(":amount "+amount);
+		bb.append('}');
+		return bb.check(limit);
 	}
 
 	@Override

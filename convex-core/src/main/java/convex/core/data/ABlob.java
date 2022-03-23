@@ -8,6 +8,7 @@ import convex.core.data.prim.CVMByte;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Utils;
 
 /**
@@ -64,24 +65,40 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 * Converts this data object to a lowercase hex string representation
 	 * @return Hex String representation
 	 */
-	public abstract String toHexString();
+	public final String toHexString() {
+		return toHexString(Utils.checkedInt(count())*2);
+	}
+	
+	/**
+	 * Converts this data object to a hex string representation of the given length.
+	 * Equivalent to truncating the full String representation.
+	 * @param hexLength Length to truncate String to (in hex characters)
+	 * @return String representation of hex values in Blob
+	 */
+	public final String toHexString(int hexLength) {
+		BlobBuilder bb=new BlobBuilder();
+		appendHexString(bb,hexLength);
+		return bb.getCVMString().toString();
+	}
+	
+	public final void toHexString(BlobBuilder bb) {
+		appendHexString(bb,Utils.checkedInt(count()*2));
+	}
 
 	/**
-	 * Converts this blob to a readable byte buffer
+	 * Append hex string up to the given length (a multiple of two)
+	 * @param sb
+	 * @param length
+	 */
+	protected abstract void appendHexString(BlobBuilder sb, int length);
+
+	/**
+	 * Converts this blob to a readable byte buffer. WARNING: may be large.
+	 * 
 	 * @return ByteBuffer with position zero (ready to read)
 	 */
 	public ByteBuffer toByteBuffer() {
 		return ByteBuffer.wrap(getBytes());
-	}
-
-	/**
-	 * Converts this data object to a hex string representation of the given length.
-	 * Equivalent to truncating the full String representation.
-	 * @param length Length to truncate String to (in hex characters)
-	 * @return String representation of hex values in Blob
-	 */
-	public String toHexString(int length) {
-		return toHexString().substring(0, length);
 	}
 
 	/**
@@ -109,11 +126,12 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	}
 
 	/**
-	 * Converts this object to a Blob instance
+	 * Converts this object to a flat array-backed Blob instance.
+	 * Warning: might be O(n) in size of Blob, may not be canonical etc.
 	 * 
 	 * @return A Blob instance containing the same data as this Blob.
 	 */
-	public abstract Blob toBlob();
+	public abstract Blob toFlatBlob();
 
 	/**
 	 * Computes the length of the longest common hex prefix between two blobs
@@ -203,10 +221,10 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	}
 
 	/**
-	 * Append an additional data object to this, creating a new data object.
+	 * Append an additional Blob to this, creating a new Blob as needed. New Blob will be canonical.
 	 * 
 	 * @param d Blob to append
-	 * @return A new blob, containing the additional data appended to this blob.
+	 * @return A new Blob, containing the additional data appended to this blob.
 	 */
 	public abstract ABlob append(ABlob d);
 
@@ -274,7 +292,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	}
 
 	/**
-	 * Writes the raw byte contents of this blob to a ByteBuffer.
+	 * Writes the raw byte contents of this Blob to a ByteBuffer. May be big!
 	 * 
 	 * @param bb ByteBuffer to write to
 	 * @return The passed ByteBuffer, after writing byte content
@@ -299,9 +317,18 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	public abstract Blob getChunk(long i);
 	
 	@Override
-	public void print(StringBuilder sb) {
-		sb.append("0x");
-		toHexString(sb);
+	public boolean print(BlobBuilder bb, long limit) {
+		bb.append(Strings.HEX_PREFIX);
+		if (!bb.check(limit-(count()*2))) return false;
+		toHexString(bb);
+		return true;
+	}
+	
+	@Override
+	public AString toCVMString(long limit) {
+		if (limit<count()*2) return null;
+		// TODO: optimise
+		return Strings.create(toHexString());
 	}
 
 	/**
@@ -311,8 +338,6 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 * @return A ByteBuffer containing the Blob's data.
 	 */
 	public abstract ByteBuffer getByteBuffer();
-
-	public abstract void toHexString(StringBuilder sb);
 
 	@Override
 	public void validate() throws InvalidDataException {
@@ -350,6 +375,15 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	public long hexLength() {
 		return count() << 1;
 	}
+	
+	/**
+	 * Writes this Blob's encoding to a byte array, excluding the tag byte
+	 *
+	 * @param bs A byte array to which to write the encoding
+	 * @param pos The offset into the byte array
+	 * @return New position after writing
+	 */
+	public abstract int encodeRaw(byte[] bs, int pos);
 	
 	/**
 	 * Converts this Blob to the corresponding long value.

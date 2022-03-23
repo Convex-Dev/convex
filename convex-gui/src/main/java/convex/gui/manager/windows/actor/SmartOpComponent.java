@@ -81,7 +81,7 @@ public class SmartOpComponent extends BaseListComponent {
 
 		for (int i = 0; i < paramCount; i++) {
 			ACell paramSym = params.get(i);
-			paramPanel.add(new ParamLabel(RT.str(paramSym)));
+			paramPanel.add(new ParamLabel(RT.str(paramSym).toString()));
 			JTextField argBox = new ArgBox();
 			paramPanel.add(argBox);
 			paramFields.put(i, argBox);

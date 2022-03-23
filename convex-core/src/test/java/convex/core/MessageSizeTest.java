@@ -22,7 +22,8 @@ public class MessageSizeTest {
 	
 	@Test public void testEmbeddedStrings() {
 		assertTrue(Format.MAX_EMBEDDED_LENGTH>=Samples.MAX_EMBEDDED_STRING.getEncoding().count());
-		assertEquals(StringShort.MAX_EMBEDDED_STRING_LENGTH,Samples.MAX_EMBEDDED_STRING.length());
+		assertEquals(StringShort.MAX_EMBEDDED_STRING_LENGTH,Samples.MAX_EMBEDDED_STRING.count());
+		assertEquals(Format.MAX_EMBEDDED_LENGTH,Samples.MAX_EMBEDDED_STRING.getEncoding().count());
 		assertTrue(Samples.MAX_EMBEDDED_STRING.isEmbedded());
 		
 		assertTrue(Format.MAX_EMBEDDED_LENGTH<Samples.NON_EMBEDDED_STRING.getEncoding().count());

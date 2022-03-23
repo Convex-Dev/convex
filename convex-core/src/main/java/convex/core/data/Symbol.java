@@ -7,6 +7,7 @@ import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.impl.BlobBuilder;
 
 /**
  * <p>Class representing a Symbol. Symbols are more commonly used in CVM code to refer to functions and values in the
@@ -28,7 +29,7 @@ import convex.core.exceptions.InvalidDataException;
  */
 public class Symbol extends ASymbolic {
 	
-	private Symbol(String name) {
+	private Symbol(AString name) {
 		super(name);
 	}
 	
@@ -36,7 +37,7 @@ public class Symbol extends ASymbolic {
 		return Types.SYMBOL;
 	}
 	
-	protected static final WeakHashMap<String,Symbol> cache=new WeakHashMap<>(100);
+	protected static final WeakHashMap<AString,Symbol> cache=new WeakHashMap<>(100);
 
 	/**
 	 * Creates a Symbol with the given name
@@ -44,17 +45,8 @@ public class Symbol extends ASymbolic {
 	 * @return Symbol instance, or null if the Symbol is invalid
 	 */
 	public static Symbol create(String name) {
-		if (!validateName(name)) return null;
-		Symbol sym= new Symbol(name);
-		
-		synchronized (cache) {
-			// TODO: figure out if caching Symbols is a net win or not
-			Symbol cached=cache.get(name);
-			if (cached!=null) return cached;
-			cache.put(name,sym);
-		}
-		
-		return sym;
+		if (name==null) return null;
+		return create(Strings.create(name));
 	}
 
 	/**
@@ -64,8 +56,18 @@ public class Symbol extends ASymbolic {
 	 * @return Symbol instance, or null if the name is invalid for a Symbol.
 	 */
 	public static Symbol create(AString name) {
-		if (name==null) return null;
-		return create(name.toString());
+		if (!validateName(name)) return null;
+		
+		Symbol sym= new Symbol(name);
+		
+		synchronized (cache) {
+			// TODO: figure out if caching Symbols is a net win or not
+			Symbol cached=cache.get(name);
+			if (cached!=null) return cached;
+			cache.put(name,sym);
+		}
+
+		return sym;
 	}
 
 	@Override
@@ -116,8 +118,9 @@ public class Symbol extends ASymbolic {
 	}
 	
 	@Override
-	public void print(StringBuilder sb) {
-		sb.append(getName());
+	public boolean print(BlobBuilder bb, long limit) {
+		bb.append(getName());
+		return bb.check(limit);
 	}
 
 	@Override
@@ -143,5 +146,15 @@ public class Symbol extends ASymbolic {
 	@Override
 	public ACell toCanonical() {
 		return this;
+	}
+
+	@Override
+	public AString getName() {
+		return name;
+	}
+
+	@Override
+	public AString toCVMString(long limit) {
+		return name;
 	}
 }

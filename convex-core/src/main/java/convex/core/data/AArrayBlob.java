@@ -5,6 +5,7 @@ import java.security.MessageDigest;
 import java.util.Arrays;
 
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
@@ -29,33 +30,56 @@ public abstract class AArrayBlob extends ABlob {
 	}
 
 	@Override
-	public Blob slice(long start, long length) {
+	public AArrayBlob slice(long start, long length) {
 		if (length < 0) throw new IllegalArgumentException(Errors.negativeLength(length));
 		if (start < 0) throw new IndexOutOfBoundsException("Start out of bounds: " + start);
 		if ((start + length) > this.length)
 			throw new IndexOutOfBoundsException("End out of bounds: " + (start + length));
+		if ((start==0)&&(length==this.count())) return this;
 		return Blob.wrap(store, Utils.checkedInt(start + offset), Utils.checkedInt(length));
 	}
 
 	@Override
 	public ABlob append(ABlob d) {
-		int dlength = Utils.checkedInt(d.count());
-		if (dlength == 0) return this;
-		int length = this.length;
-		if (length == 0) return d;
-		byte[] newData = new byte[length + dlength];
+		long dlength = d.count();
+		if (dlength == 0) return this.toCanonical();
+		long length = this.length;
+		if (length == 0) return d.toCanonical();
+		
+		if (length>Blob.CHUNK_LENGTH) {
+			// Need to normalise to a BlobTree first
+			return BlobTree.create(this).append(d);
+		}
+		
+		// We know this Blob is 4096 bytes or less, but other Blob might still be big...
+		long newLen=length+dlength;
+		
+		// If small enough, we have a regular Blob
+		if (newLen<=Blob.CHUNK_LENGTH) return appendSmall(d);
+		
+		// If reasonably small, we have an ArrayBlob with exactly 2 children
+		if (newLen<=Blob.CHUNK_LENGTH*2) {
+			long split=Blob.CHUNK_LENGTH-length; // number of bytes to complete first chunk
+			return BlobTree.create(this.append(d.slice(0,split)).toFlatBlob(),d.slice(split,dlength-split).toFlatBlob());
+		}
+		
+		// More than 2 chunks, use a BlobBuilder
+		BlobBuilder bb=new BlobBuilder(this);
+		bb.append(d);
+		return bb.toBlob();
+	}
+		
+	protected ABlob appendSmall(ABlob d) {
+		int n=Utils.checkedInt(count() + d.count());
+		if (n>Blob.CHUNK_LENGTH) throw new Error("Illegal Blob appendSmall size: "+n);
+		byte[] newData = new byte[n];
 		getBytes(newData, 0);
 		d.getBytes(newData, length);
 		return Blob.wrap(newData);
 	}
 
 	@Override
-	public Blob slice(long start) {
-		return slice(start, count() - start);
-	}
-
-	@Override
-	public Blob toBlob() {
+	public Blob toFlatBlob() {
 		return Blob.wrap(store, offset, length);
 	}
 
@@ -64,7 +88,7 @@ public abstract class AArrayBlob extends ABlob {
 		if (b instanceof AArrayBlob) {
 			return compareTo((AArrayBlob) b);
 		} else {
-			return compareTo(b.toBlob());
+			return compareTo(b.toFlatBlob());
 		}
 	}
 
@@ -95,20 +119,33 @@ public abstract class AArrayBlob extends ABlob {
 		return Utils.checkedInt(pos + length);
 	}
 
+	/**
+	 * Encodes this Blob, excluding tag byte (will include count)
+	 */
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public final int encodeRaw(byte[] bs, int pos) {
+		pos=Format.writeVLCLong(bs, pos, length);
+		return encodeRawData(bs,pos);
+	}
+	
+	/**
+	 * Encodes the raw data of this Blob. Assumes buffer has enough space for (length) bytes.
+	 * @param bs Byte array to write to
+	 * @param pos Position to write at
+	 * @return Updates position
+	 */
+	public int encodeRawData(byte[] bs, int pos) {
 		System.arraycopy(store, offset, bs, pos, length);
 		return pos + length;
 	}
 
 	@Override
-	public final String toHexString() {
-		return Utils.toHexString(store, offset, length);
-	}
-
-	@Override
-	public void toHexString(StringBuilder sb) {
-		sb.append(toHexString());
+	public final void appendHexString(BlobBuilder bb, int hexLength) {
+		int n= Math.min(hexLength/2, this.length);
+		for (int i=0; i<n; i++) {
+			byte b=byteAt(i);
+			Utils.appendHexByte(bb,b);
+		}
 	}
 
 	@Override
