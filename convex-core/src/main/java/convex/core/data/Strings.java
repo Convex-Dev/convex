@@ -99,10 +99,10 @@ public class Strings {
 	}
 
 	public static AString appendAll(AString[] strs) {
-		ABlob b=Blob.EMPTY;
+		BlobBuilder bb=new BlobBuilder();
 		for (AString s: strs) {
-			b=b.append(s.toBlob());
+			bb.append(s);
 		}
-		return Strings.create(b);
+		return Strings.create(bb.toBlob());
 	}
 }
