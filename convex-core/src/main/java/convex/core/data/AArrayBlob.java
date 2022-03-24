@@ -42,9 +42,9 @@ public abstract class AArrayBlob extends ABlob {
 	@Override
 	public ABlob append(ABlob d) {
 		long dlength = d.count();
-		if (dlength == 0) return this.toCanonical();
+		if (dlength == 0) return (ABlob) this.getCanonical();
 		long length = this.length;
-		if (length == 0) return d.toCanonical();
+		if (length == 0) return (ABlob) d.getCanonical();
 		
 		if (length>Blob.CHUNK_LENGTH) {
 			// Need to normalise to a BlobTree first

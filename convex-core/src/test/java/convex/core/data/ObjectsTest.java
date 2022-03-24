@@ -66,15 +66,24 @@ public class ObjectsTest {
 		
 		// Encoding of canonical object should be cached
 		assertSame(a.getEncoding(), a.getCanonical().getEncoding());
+		
+		// Canonical object should be cached
+		assertSame(a.getCanonical(), a.getCanonical());
 	}
 
 	private static void doCellRefTests(ACell a) {
 		Ref<ACell> cachedRef=a.cachedRef;
 		Ref<ACell> ref=a.getRef();
 		if (cachedRef!=null) assertSame(ref,cachedRef);
-		assertSame(ref,a.getRef());
 		
+		assertSame(ref,a.getRef());
 		assertEquals(a.isEmbedded(),ref.isEmbedded());
+		
+		ACell c=a.getCanonical();
+		if (c!=a) {
+			// Non-canonical! But should have equal Refs
+			assertEquals(a.getRef(),c.getRef());
+		} 
 		
 		Ref<ACell> refD=ref.toDirect();
 		assertTrue(ref.equals(refD));
