@@ -77,8 +77,8 @@ public class ObjectsTest {
 		assertEquals(a.isEmbedded(),ref.isEmbedded());
 		
 		Ref<ACell> refD=ref.toDirect();
-		assertTrue(ref.equalsValue(refD));
-		assertTrue(refD.equalsValue(ref));
+		assertTrue(ref.equals(refD));
+		assertTrue(refD.equals(ref));
 		
 	}
 

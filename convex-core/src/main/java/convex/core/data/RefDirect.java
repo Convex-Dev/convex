@@ -1,7 +1,6 @@
 package convex.core.data;
 
 import convex.core.exceptions.InvalidDataException;
-import convex.core.util.Utils;
 
 /**
  * Ref subclass for direct in-memory references.
@@ -83,13 +82,21 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 	}
 
 	@Override
-	public boolean equalsValue(Ref<T> a) {
+	public boolean equals(Ref<T> a) {
 		if (a == this) return true;
-		if (this.hash != null) {
-			// use hash if available
-			if (a.hash != null) return this.hash.equals(a.hash);
+		if (a instanceof RefDirect) {
+			RefDirect<T> ra=(RefDirect<T>) a;
+			if (value==ra.value) return true; // fast path
+			if (value==null) return ra.value==null; // catch nulls
+			if (this.hash != null) {
+				// use hash if available for both Refs
+				if (ra.hash != null) return this.hash.equals(a.hash);
+			}
+			return value.equals(ra.getValue());
+		} else {
+			// Don't want to pull from store, so use hash comparison
+			return getHash().equals(a.getHash());
 		}
-		return Utils.equals(this.value, a.getValue());
 	}
 
 	@Override

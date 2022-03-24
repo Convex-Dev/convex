@@ -257,9 +257,9 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	@Override
 	public boolean equals(Object o) {
 		if (!(o instanceof Ref)) return false;
-		return equalsValue((Ref<T>) o);
+		return equals((Ref<T>) o);
 	}
-
+	
 	/**
 	 * Checks if two Ref Values are equal. Equality is defined as referring to the
 	 * same data, i.e. have an identical hash.
@@ -267,7 +267,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * @param a The Ref to compare with
 	 * @return true if Refs have the same value, false otherwise
 	 */
-	public abstract boolean equalsValue(Ref<T> a);
+	public abstract boolean equals(Ref<T> a);
 
 	@Override
 	public int compareTo(Ref<T> a) {

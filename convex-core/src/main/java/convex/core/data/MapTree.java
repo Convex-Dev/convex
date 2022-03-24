@@ -629,7 +629,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			if ((fullMask & bitMask) == 0) continue; // nothing to merge at this index
 			Ref<AHashMap<K, V>> aref = childForDigit(i);
 			Ref<AHashMap<K, V>> bref = b.childForDigit(i);
-			if (aref.equalsValue(bref)) continue; // identical children, no differences
+			if (aref.equals(bref)) continue; // identical children, no differences
 			AHashMap<K, V> ac = aref.getValue();
 			AHashMap<K, V> bc = bref.getValue();
 			AHashMap<K, V> newChild = ac.mergeDifferences(bc, func,shift+1);

@@ -635,7 +635,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		if (this.count != v.count()) return false;
 		if (!Utils.equals(this.prefix, v.prefix)) return false;
 		for (int i = 0; i < items.length; i++) {
-			if (!items[i].equalsValue(v.items[i])) return false;
+			if (!items[i].equals(v.items[i])) return false;
 		}
 		return true;
 	}
@@ -655,7 +655,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		if (nn==0) return prefixLength;
 		VectorLeaf<T> bChunk=b.getChunk(prefixLength);
 		for (int i = 0; i < nn; i++) {
-			if (!items[i].equalsValue(bChunk.items[i])) {
+			if (!items[i].equals(bChunk.items[i])) {
 				return prefixLength + i;
 			}
 		}
