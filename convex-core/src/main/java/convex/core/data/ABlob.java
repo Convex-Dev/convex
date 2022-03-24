@@ -309,7 +309,8 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	public abstract int writeToBuffer(byte[] bs, int pos);
 	
 	/**
-	 * Gets a chunk of this Blob, as a canonical Blob up to the maximum chunk size
+	 * Gets a chunk of this Blob, as a canonical Blob up to the maximum chunk size.
+	 * Returns empty Blob if and only if referencing the end of a Blob with fully packed chunks
 	 * 
 	 * @param i Index of chunk
 	 * @return A Blob containing the specified chunk data.

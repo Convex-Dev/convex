@@ -14,6 +14,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519KeyPair;
 import convex.core.crypto.Ed25519Signature;
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
 import convex.core.data.AMap;
@@ -123,7 +124,8 @@ public class Samples {
 	public static final long BIG_BLOB_LENGTH = 10000;
 	public static final BlobTree BIG_BLOB_TREE = Blobs.createRandom(Samples.rand, BIG_BLOB_LENGTH);
 	public static final Blob FULL_BLOB = Blobs.createRandom(Samples.rand, Blob.CHUNK_LENGTH);
-	
+	public static final ABlob FULL_BLOB_PLUS = Blobs.createRandom(Samples.rand, Blob.CHUNK_LENGTH+1);
+
 	public static final BlobTree DIABOLICAL_BLOB_TREE = (BlobTree)Blobs.createFilled(1,Long.MAX_VALUE);
 	
 	public static final ASignature FAKE_SIGNATURE = Ed25519Signature.wrap(new byte[Ed25519Signature.SIGNATURE_LENGTH]);

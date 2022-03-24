@@ -152,6 +152,8 @@ public class BlobsTest {
 		for (int i = 0; i < 16; i++) {
 			assertEquals(b.getHexDigit(i), bb.getHexDigit(i));
 		}
+		
+		assertSame(b.getCanonical(),b.getChunk(0)); // Use canonical Blob as chunk
 
 		assertTrue(bb.hexEquals(b));
 		assertTrue(b.hexEquals(bb, 3, 10));
@@ -160,7 +162,7 @@ public class BlobsTest {
 		assertEquals(10, b.commonHexPrefixLength(bb.slice(0, 5)));
 		assertEquals(8, bb.commonHexPrefixLength(b.slice(0, 4)));
 		
-		// Longblobs considered as Blob type
+		// LongBlobs considered as Blob type
 		assertEquals(bb, b); 
 		assertEquals(b, bb); 
 		
@@ -173,16 +175,18 @@ public class BlobsTest {
 	
 	@Test
 	public void testEmptyBlob() throws BadFormatException {
-		ABlob blob = Blob.EMPTY;
-		assertEquals(0L,blob.toLong());
-		assertSame(blob,blob.getChunk(0));
-		assertSame(blob,blob.slice(0,0));
-		assertSame(blob,blob.append(blob));
-		assertSame(blob,new BlobBuilder().toBlob());
+		ABlob e = Blob.EMPTY;
+		assertEquals(0L,e.toLong());
+		assertSame(e,e.getChunk(0));
+		assertSame(e,e.slice(0,0));
+		assertSame(e,e.append(e));
+		assertSame(e,new BlobBuilder().toBlob());
 		
-		assertSame(blob,Format.read(blob.getEncoding()));
+		assertSame(e,Format.read(e.getEncoding()));
 		
-		doBlobTests(Blob.EMPTY);
+		assertSame(e,e.getChunk(0));
+		
+		doBlobTests(e);
 	}
 	
 	@Test
@@ -209,13 +213,30 @@ public class BlobsTest {
 
 	@Test
 	public void testFullBlob() {
-		ABlob fb2 = Samples.FULL_BLOB.append(Samples.FULL_BLOB);
-		assertEquals(Blob.EMPTY, Samples.FULL_BLOB.getChunk(1));
-		assertEquals(Samples.FULL_BLOB, fb2.getChunk(1));
+		ABlob b=Samples.FULL_BLOB;
+		ABlob two = b.append(b);
+		assertEquals(Blob.EMPTY, b.getChunk(1));
+		assertEquals(b, two.getChunk(1));
+		assertTrue(b.hexEquals(b));
+		assertTrue(two.isCanonical());
 
-		assertTrue(Samples.FULL_BLOB.hexEquals(Samples.FULL_BLOB));
-
-		doBlobTests(Samples.FULL_BLOB);
+		doBlobTests(b);
+		doBlobTests(two);
+	}
+	
+	@Test
+	public void testFullBlobPlus() {
+		ABlob b=Samples.FULL_BLOB_PLUS; // A bit larger than a chunk
+		long n=b.count();
+		assertTrue(n>Blob.CHUNK_LENGTH);
+		assertTrue(b.isCanonical());
+		
+		assertEquals(Blob.class,b.slice(n-Blob.CHUNK_LENGTH,Blob.CHUNK_LENGTH).getClass());
+		
+		doBlobTests(b);
+		
+		Blob flat=b.toFlatBlob();
+		doBlobTests(flat);
 	}
 		
 	@Test 

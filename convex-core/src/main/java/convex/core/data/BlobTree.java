@@ -540,11 +540,13 @@ public class BlobTree extends ABlob {
 	public long commonHexPrefixLength(ABlob b) {
 		long cpl = 0;
 		long DIGITS_PER_CHUNK = Blob.CHUNK_LENGTH * 2;
-		for (long i = 0;; i++) {
+		long maxChunk=(Math.min(count(),b.count())-1)/Blob.CHUNK_LENGTH;
+		for (long i = 0; i<=maxChunk; i++) {
 			long cl = getChunk(i).commonHexPrefixLength(b.getChunk(i));
 			if (cl < DIGITS_PER_CHUNK) return cpl + cl;
 			cpl += DIGITS_PER_CHUNK;
 		}
+		return cpl;
 	}
 
 	@Override

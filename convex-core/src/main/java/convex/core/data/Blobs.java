@@ -6,6 +6,7 @@ import java.util.Random;
 import org.bouncycastle.util.Arrays;
 
 import convex.core.exceptions.BadFormatException;
+import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Utils;
 
 public class Blobs {
@@ -22,14 +23,13 @@ public class Blobs {
 	public static <T extends ABlob> T createRandom(Random r, long length) {
 		if (length <= Blob.CHUNK_LENGTH) return (T) Blob.createRandom(r, length);
 
-		int numChunks = Utils.checkedInt(((length - 1) >> CHUNK_SHIFT) + 1);
-
-		Blob[] blobs = new Blob[numChunks];
-		for (int i = 0; i < numChunks; i++) {
-			Blob b = Blob.createRandom(r, Math.min(Blob.CHUNK_LENGTH, length - i * Blob.CHUNK_LENGTH));
-			blobs[i] = b;
+		BlobBuilder bb=new BlobBuilder();
+		while (length>Blob.CHUNK_LENGTH) {
+			bb.append(createRandom(r,Blob.CHUNK_LENGTH));
+			length -=Blob.CHUNK_LENGTH;
 		}
-		return (T) BlobTree.create(blobs);
+		bb.append(createRandom(r,length));
+		return (T)bb.toBlob();
 	}
 
 	/**

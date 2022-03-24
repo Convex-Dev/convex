@@ -84,7 +84,7 @@ public abstract class ALongBlob extends ABlob {
 
 	@Override
 	public final Blob getChunk(long i) {
-		if (i == 0L) return toFlatBlob();
+		if (i == 0L) return (Blob) getCanonical();
 		throw new IndexOutOfBoundsException(Errors.badIndex(i));
 	}
 
