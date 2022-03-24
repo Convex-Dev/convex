@@ -22,6 +22,11 @@ import convex.core.util.Utils;
 import convex.test.Samples;
 
 public class BlobsTest {
+	@Test public void testConstants() {
+		assertEquals(4096,Blob.CHUNK_LENGTH);
+		assertEquals(Blob.CHUNK_LENGTH,1<<Blobs.CHUNK_SHIFT);
+	}
+	
 	@Test
 	public void testCompare() {
 		assertTrue(Blob.fromHex("01").compareTo(Blob.fromHex("FF")) < 0);
