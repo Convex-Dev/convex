@@ -169,8 +169,13 @@ public class Hash extends AArrayBlob {
 
 	@Override
 	public boolean isCanonical() {
-		// always canonical, since class invariants are maintained
+		// never canonical, since the canonical version is a Blob
 		return false;
+	}
+	
+	@Override
+	public Blob toCanonical() {
+		return toFlatBlob();
 	}
 	
 	@Override public final boolean isCVMValue() {
@@ -216,8 +221,5 @@ public class Hash extends AArrayBlob {
 		return Tag.BLOB;
 	}
 
-	@Override
-	public Blob toCanonical() {
-		return toFlatBlob();
-	}
+
 }

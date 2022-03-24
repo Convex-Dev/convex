@@ -1,5 +1,7 @@
 package convex.core.lang.impl;
 
+import java.nio.ByteBuffer;
+
 import convex.core.data.ABlob;
 import convex.core.data.AString;
 import convex.core.data.Blob;
@@ -155,4 +157,52 @@ public class BlobBuilder {
 	public boolean check(long limit) {
 		return count<=limit;
 	}
+	
+	/**
+	 * Appends remaining bytes from a ByteBuffer to this BlobBuiler
+	 * @param bb ByteBuffer to append
+	 */
+	public void append(ByteBuffer bb) {
+		
+		// Might need to fill current chunk
+		if (arrayPos()>0) {
+			appendToFillChunk(bb);
+		}
+		
+		// Take whole chunks
+		int n=bb.remaining();
+		while (n>=Blob.CHUNK_LENGTH) {
+			byte[] bs=new byte[Blob.CHUNK_LENGTH];
+			bb.get(bs);
+			acc=acc.append(Blob.wrap(bs));
+			n-=Blob.CHUNK_LENGTH;
+			count=acc.count();
+		}
+		if (n<=0) return;
+		
+		// Get remaining bytes for last chunk
+		appendToFillChunk(bb);
+	}
+	
+	private void appendToFillChunk(ByteBuffer bb) {
+		int n=bb.remaining();
+		int fill=Math.min(spare(), n);
+		if (fill>0) {	
+			ensureArray(arrayPos()+fill);
+			bb.get(tail, arrayPos(), fill);
+			count+=fill;
+			if (arrayPos()==Blob.CHUNK_LENGTH) completeChunk();
+		}
+	}
+
+	/**
+	 * Clears this BlobBuilder, preparing for new appends to an empty Blob
+	 */
+	public void clear() {
+		acc=Blob.EMPTY;
+		tail=null;
+		count=0;
+	}
+
+
 }

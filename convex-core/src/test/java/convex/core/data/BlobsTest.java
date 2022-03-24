@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.ByteBuffer;
 import java.util.Random;
 
 import org.junit.jupiter.api.Test;
@@ -79,6 +80,7 @@ public class BlobsTest {
 
 	@Test
 	public void testBlobTreeConstruction() {
+		// Testing construction of BlobTree from Chunks
 		Random r = new Random();
 		int clen = Blob.CHUNK_LENGTH;
 		int hclen = clen / 2;
@@ -102,6 +104,7 @@ public class BlobsTest {
 	@Test
 	public void testBlobBuilder() {
 		BlobBuilder bb=new BlobBuilder();
+		assertEquals(0,bb.count());
 		bb.append("a");
 		assertEquals(1,bb.count());
 		
@@ -112,18 +115,23 @@ public class BlobsTest {
 	@Test
 	public void testBlobBuilderLarge() {
 		ABlob src=Strings.create("abcde").toBlob();
+		long sn=5;
+		long n=0;
 		BlobBuilder bb=new BlobBuilder();
 		
-		for (int i=0; i<10; i++) {
+		for (int i=0; i<12; i++) {
 			bb.append(src);
+			n+=sn;
 			src=src.append(src);
+			sn*=2;
 		}
 		assertEquals(BlobTree.class,src.getClass());
 		
-		assertEquals(5115,bb.count());
+		assertEquals(n,bb.count());
 		ABlob r=bb.toBlob();
-		assertEquals(5115,r.count());
-		assertEquals("abcde",Strings.create(r.slice(5100,5)).toString());
+		assertEquals(n,r.count());
+		assertEquals("abcde",Strings.create(r.slice(4095,5)).toString());
+		assertEquals("abcde",Strings.create(r.slice(n-5,5)).toString());
 		assertEquals(Blob.class,r.slice(0,4096).getClass());
 		assertEquals(BlobTree.class,r.slice(0,4097).getClass());
 	}
@@ -229,6 +237,9 @@ public class BlobsTest {
 
 		assertSame(bb, bb.slice(0));
 		assertSame(bb, bb.slice(0, len));
+		
+		ABlob bb2=bb.append(bb);
+		assertEquals(bb,bb2.slice(len,len));
 
 		Blob firstChunk = bb.getChunk(0);
 		assertEquals(Blob.CHUNK_LENGTH, firstChunk.count());
@@ -260,7 +271,7 @@ public class BlobsTest {
 		assertThrows(IndexOutOfBoundsException.class, () -> Samples.BIG_BLOB_TREE.slice(-1));
 		assertThrows(IndexOutOfBoundsException.class, () -> Samples.BIG_BLOB_TREE.slice(1, Samples.BIG_BLOB_LENGTH));
 	}
-	
+
 	@Test
 	public void testBlobTreeSizing() {
 		assertEquals(0,BlobTree.calcChunks(0));
@@ -334,9 +345,9 @@ public class BlobsTest {
 		
 		//  copy of the Blob data
 		ABlob b=Blob.wrap(a.getBytes()).toCanonical();
+		assertEquals(a.count(),b.count());
 		
 		if (a.isRegularBlob()) {
-			assertEquals(a.count(),b.count());
 			assertEquals(canonical,b);
 		}
 		
@@ -354,5 +365,17 @@ public class BlobsTest {
 		}
 
 		ObjectsTest.doAnyValueTests(canonical);
+		
+		// Round trip via ByteBuffer should produce canonical Blob
+		ByteBuffer buf=a.getByteBuffer();
+		bb.clear();
+		bb.append(buf);
+		assertEquals(canonical,bb.toBlob());
+		bb.append(a.getByteBuffer());
+		assertEquals(n*2, bb.count());
+		ABlob r=bb.toBlob();
+		assertEquals(a,r.slice(0,n));
+		assertEquals(a,r.slice(n,n));
+		assertEquals(a.append(a),r);
 	}
 }

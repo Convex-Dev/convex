@@ -190,6 +190,7 @@ public class RefTest {
 	@Test
 	public void testNullRef() {
 		Ref<?> nullRef = Ref.get(null);
+		assertSame(Ref.NULL_VALUE,nullRef);
 		assertNotNull(nullRef);
 		assertSame(nullRef.getHash(), Hash.NULL_HASH);
 		assertTrue(nullRef.isEmbedded());

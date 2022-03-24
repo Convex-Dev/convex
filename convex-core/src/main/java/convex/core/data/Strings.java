@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 
 import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
+import convex.core.lang.impl.BlobBuilder;
 
 public class Strings {
 	
@@ -61,9 +62,9 @@ public class Strings {
 		} catch (CharacterCodingException e) {
 			throw new Error("Shouldn't happen!",e);
 		}
-		byte[] bs=new byte[bb.remaining()];
-		bb.get(bs);
-		return Strings.create(Blob.wrap(bs).toCanonical());
+		BlobBuilder builder=new BlobBuilder();
+		builder.append(bb);
+		return Strings.create(builder.toBlob());
 	}
 
 

@@ -224,7 +224,7 @@ public class BlobTree extends ABlob {
 		// Construct using BlobBuilder iterating over relevant children
 		BlobBuilder bb=new BlobBuilder();
 		for (int i=ci; i<=cilast; i++) {
-			ABlob child=getChild(ci);
+			ABlob child=getChild(i);
 			long coff=i*csize;
 			long cstart=Math.max(start-coff, 0);
 			long cend=Math.min(end-coff, child.count());
@@ -517,7 +517,7 @@ public class BlobTree extends ABlob {
 
 	@Override
 	public ByteBuffer getByteBuffer() {
-		throw new UnsupportedOperationException("Can't get bytebuffer for " + this.getClass());
+		return toFlatBlob().getByteBuffer();
 	}
 
 	@Override

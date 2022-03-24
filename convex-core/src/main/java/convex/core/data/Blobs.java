@@ -59,7 +59,7 @@ public class Blobs {
 	}
 
 	/**
-	 * Reads a Blob from a ByteBuffer.
+	 * Reads a Blob from an Encoding in a ByteBuffer.
 	 * 
 	 * @param bb ByteBuffer starting with a blob encoding
 	 * @return Blob read from ByteBuffer
@@ -118,6 +118,4 @@ public class Blobs {
 		children[n-1]=lastSize==subSize?fullChild:Blobs.createFilled(fillByte, lastSize);
 		return BlobTree.createWithChildren(children);
 	}
-
-
 }
