@@ -79,6 +79,7 @@ public class AccountKey extends AArrayBlob {
 	 * @return AccountKey instance, or null if not valid
 	 */
 	public static AccountKey create(ABlob b) {
+		if (b==null) return null;
 		if (b.count()!=LENGTH) return null;
 		if (b instanceof AccountKey) return (AccountKey) b;
 		if (b instanceof AArrayBlob) {
@@ -273,7 +274,4 @@ public class AccountKey extends AArrayBlob {
 	public Blob toCanonical() {
 		return toFlatBlob();
 	}
-
-
-
 }

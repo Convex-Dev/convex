@@ -14,13 +14,13 @@ import convex.core.store.AStore;
 import convex.core.store.Stores;
 
 /**
- * Class representing a smart reference to a decentralised data object.
+ * Class representing a smart reference to a decentralised data value.
  * 
  * "The greatest trick the Devil ever pulled was convincing the world he didn’t
  * exist." - The Usual Suspects
  * 
- * A Ref itself is not a cell, but may be contained within a cell, in which case
- * the cell class must implement IRefContainer in order to persist and update
+ * A Ref itself is not a Cell, but may be contained within a Cell, in which case
+ * the Cell class must implement IRefContainer in order to persist and update
  * contained Refs correctly
  * 
  * Refs include a status that indicates the level of validation proven. It is
@@ -28,11 +28,10 @@ import convex.core.store.Stores;
  * - e.g. a minimum status of PERSISTED is required to be able to guarantee
  * walking an entire nested data structure.
  * 
- * Guarantees: - O(1) access to the Hash value, cached on first access - O(1)
- * access to the referenced object (though may required hitting storage if not
- * cached) - Indirectly referenced values may be collected by the garbage
- * collector, with the assumption that they can be retrieved from storage if
- * required
+ * Guarantees: 
+ * - O(1) access to the Hash value, cached on first access 
+ * - O(1) access to the referenced object (though may required hitting storage if not cached) 
+ * - Indirectly referenced values may be collected by the garbage collector, with the assumption that they can be retrieved from storage if required
  *
  * @param <T> Type of stored value
  */
@@ -698,6 +697,12 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public static int mergeFlags(int a, int b) {
 		return ((a|b)&~STATUS_MASK)|Math.max(a&STATUS_MASK, b& STATUS_MASK);
 	}
+
+	/**
+	 * Ensures this Ref is canonical
+	 * @return this Ref if already canonical, potentially a new Ref with canonical value otherwise
+	 */
+	public abstract Ref<T> ensureCanonical();
 
 
 

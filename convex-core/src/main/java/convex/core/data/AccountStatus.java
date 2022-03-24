@@ -403,7 +403,7 @@ public class AccountStatus extends ARecord {
 		ABlobMap<Address, ACell> newHoldings=(ABlobMap<Address, ACell>) newVals[5];
 		if ((newHoldings!=null)&&newHoldings.isEmpty()) newHoldings=null; // switch empty maps to null
 		Address newController = (Address)newVals[6];
-		AccountKey newKey=(AccountKey)newVals[7];
+		AccountKey newKey=AccountKey.create((ABlob)newVals[7]);
 		
 		if ((balance==newBal)&&(sequence==newSeq)&&(newEnv==environment)&&(newMeta==metadata)&&(newHoldings==holdings)&&(newController==controller)&&(newKey==publicKey)) {
 			return this;

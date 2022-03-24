@@ -21,7 +21,6 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 	
 	private RefDirect(T value, Hash hash, int flags) {
 		super(hash, flags);
-
 		this.value = value;
 	}
 	 
@@ -123,6 +122,13 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 	@Override
 	public RefDirect<T> withFlags(int newFlags) {
 		return new RefDirect<T>(value,hash,newFlags);
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public RefDirect<T> ensureCanonical() {
+		if ((value==null)||value.isCanonical()) return this;
+		return new RefDirect<T>((T)value.toCanonical(), hash,flags);
 	}
 
 

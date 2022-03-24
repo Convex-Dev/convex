@@ -18,8 +18,7 @@ import convex.core.util.Utils;
  * 
  * Cells may contain Refs to other Cells, which can be tested with getRefCount()
  * 
- * All data objects intended for on-chain usage serialisation should extend this. The only 
- * exceptions are data objects which are Embedded (inc. certain JVM types like Long etc.)
+ * All data objects intended for on-chain usage / serialisation should extend this. 
  * 
  * "It is better to have 100 functions operate on one data structure than 
  * to have 10 functions operate on 10 data structures." - Alan Perlis
@@ -112,28 +111,49 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Gets the encoded byte representation of this cell.
+	 * Gets the canonical encoded byte representation of this cell.
 	 * 
-	 * @return A blob representing this cell in encoded form
+	 * @return A Blob representing this cell in encoded form
 	 */
 	public final Blob getEncoding() {
-		if (encoding==null) encoding=createEncoding();
+		if (encoding!=null) return encoding;
+		if (!isCanonical()) {
+			encoding=getCanonical().getEncoding();
+		} else {
+			encoding=createEncoding();
+		}
 		return encoding;
+	}
+	
+	/**
+	 * Gets the canonical representation of this cell. 
+	 * 
+	 * O(1) if canonical representation is already generated, may be O(n) otherwise.
+	 * 
+	 * @return A Blob representing this cell in encoded form
+	 */
+	public ACell getCanonical() {
+		if (isCanonical()) return this;
+		Ref<ACell> ref=getRef().ensureCanonical();
+		if (cachedRef!=ref) cachedRef=ref;
+		return ref.getValue();
 	}
 	
 	/**
 	 * Checks for equality with another object. In general, data objects should be considered equal
 	 * if they have the same canonical representation, i.e. an identical encoding with the same hash value.
 	 * 
-	 * Subclasses should override this if they have a more efficient equals implementation.
+	 * Subclasses SHOULD override this if offer have a more efficient equals implementation. 
+	 * 
+	 * Should never require reads from Store.
 	 * 
 	 * @param a Cell to compare with. May be null??
 	 * @return True if this cell is equal to the other object
 	 */
 	public boolean equals(ACell a) {
 		if (this==a) return true; // important optimisation for e.g. hashmap equality
-		if (a==null) return false;
-		if (!(a.getTag()==this.getTag())) return false;
+		if (a==null) return false; // no non-null Cell is equal to null
+		if (!(a.getTag()==this.getTag())) return false; // Different types never equal
 		return getEncoding().equals(a.getEncoding());
 	}
 
@@ -149,7 +169,9 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Writes this Cell's encoding to a byte array, including a tag byte which will be written first
+	 * Writes this Cell's encoding to a byte array, including a tag byte which will be written first.
+	 * 
+	 * Cell must be canonical, or else an error may occur.
 	 *
 	 * @param bs A byte array to which to write the encoding
 	 * @param pos The offset into the byte array
@@ -159,16 +181,21 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	public abstract int encode(byte[] bs, int pos);
 	
 	/**
-	 * Writes this Cell's encoding to a byte array, excluding the tag byte
+	 * Writes this Cell's encoding to a byte array, excluding the tag byte.
 	 *
 	 * @param bs A byte array to which to write the encoding
 	 * @param pos The offset into the byte array
 	 * @return New position after writing
 	 */
-	public abstract int encodeRaw(byte[] bs, int pos);
+	protected abstract int encodeRaw(byte[] bs, int pos);
 	
+	/**
+	 * Creates the encoding for this cell. Cell must be canonical, or else an error may occur.
+	 * 
+	 * The encoding itself is a raw Blob, which may be non-canonical. 
+	 */
 	@Override
-	public final Blob createEncoding() {
+	protected final Blob createEncoding() {
 		int capacity=estimatedEncodingSize();
 		byte[] bs=new byte[capacity];
 		int pos=0;
@@ -309,7 +336,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	public abstract boolean isCanonical();
 	
 	/**
-	 * Converts this Cell to its canonical version. Returns this Cell if already canonical.
+	 * Converts this Cell to its canonical version. Returns this Cell if already canonical, may be O(n) in size of value otherwise.
 	 * 
 	 * @return Canonical version of Cell
 	 */
@@ -317,7 +344,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	
 	/**
 	 * Returns true if this object represents a first class CVM Value. Sub-structural cells that are not themselves first class values
-	 * should return false.
+	 * should return false. 
 	 * 
 	 * CVM values might not be in a canonical format, e.g. temporary data structures
 	 * 
@@ -503,7 +530,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> Ref<T> createPersisted(T value, Consumer<Ref<ACell>> noveltyHandler) {
 		if (value!=null) {
-			value=(T) value.toCanonical(); // Ensure canonical TODO: where should this be enforced?
+			value=(T) value.getCanonical();
 		}
 		Ref<T> ref = Ref.get(value);
 		if (ref.isPersisted()) return ref;

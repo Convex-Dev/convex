@@ -90,8 +90,8 @@ public class BlobTree extends ABlob {
 	}
 
 	/**
-	 * Create a BlobTree from an array of Blob children. Each child must be a valid
-	 * chunk. All except the last child must be of the correct chunk size.
+	 * Create a BlobTree from an array of Blob chunks. Each child must be a valid
+	 * chunk, all except the last child must be of the full chunk size.
 	 * 
 	 * @param blobs Blobs to include
 	 * @return New BlobTree
@@ -159,9 +159,15 @@ public class BlobTree extends ABlob {
 			long length = 0;
 			for (int i = 0; i < numChildren; i++) {
 				int childOffset = i * childChunks;
-				BlobTree bt = create(blobs, offset + childOffset, Math.min(childChunks, chunkCount - childOffset));
-				children[i] = bt.getRef();
-				length += bt.count;
+				int chunks= Math.min(childChunks, chunkCount - childOffset);
+				ABlob child;
+				if (chunks==1) {
+					child=blobs[offset+childOffset];
+				} else {
+					child=create(blobs, offset + childOffset,chunks);
+				}
+				children[i] = child.getRef();
+				length += child.count();
 			}
 			return new BlobTree(children, shift, length);
 		}

@@ -106,9 +106,13 @@ public class Blob extends AArrayBlob {
 	public boolean equals(ABlob a) {
 		if (a==null) return false;
 		if (a instanceof Blob) return equals((Blob) a);
-		if (a.getType()!=getType()) return false;
-		if (a.count()!=count()) return false;
-		return a.equalsBytes(this.store, this.offset);
+		long n=count();
+		if (a.count()!=n) return false;
+		if (n<=CHUNK_LENGTH) {
+			return a.equalsBytes(this.store, this.offset);
+		} else {
+			return getEncoding().equals(a.getEncoding());
+		}
 	}
 
 	public boolean equals(Blob b) {
@@ -194,7 +198,7 @@ public class Blob extends AArrayBlob {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		if (length > CHUNK_LENGTH) {
-			return BlobTree.create(this).encode(bs,pos);
+			return getCanonical().encode(bs, pos);
 		} else {
 			// we have a Blob of canonical size
 			bs[pos++]=Tag.BLOB;

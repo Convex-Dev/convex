@@ -25,7 +25,7 @@ public class GenTestMap {
 
 		// add the key
 		m = m.assoc(prim, prim);
-		assertSame(prim, m.get(prim));
+		assertEquals(prim, m.get(prim));
 		assertEquals(expectedN, m.size());
 
 		// remove the key

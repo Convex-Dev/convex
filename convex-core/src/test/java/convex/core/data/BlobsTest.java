@@ -164,13 +164,15 @@ public class BlobsTest {
 	}
 	
 	@Test
-	public void testEmptyBlob() {
+	public void testEmptyBlob() throws BadFormatException {
 		ABlob blob = Blob.EMPTY;
 		assertEquals(0L,blob.toLong());
 		assertSame(blob,blob.getChunk(0));
 		assertSame(blob,blob.slice(0,0));
 		assertSame(blob,blob.append(blob));
 		assertSame(blob,new BlobBuilder().toBlob());
+		
+		assertSame(blob,Format.read(blob.getEncoding()));
 		
 		doBlobTests(Blob.EMPTY);
 	}
@@ -312,7 +314,7 @@ public class BlobsTest {
 	   assertEquals(value,BlobTree.create(value)); // Check equality with canonical version
 	   Ref<ACell> pref = ACell.createPersisted(value); // ensure persisted
 	   assertEquals(BlobTree.class,pref.getValue().getClass());
-	   Blob b = Format.encodedBlob(value);
+	   Blob b = value.getEncoding();
 	   ACell o = Format.read(b);
 
 	   assertEquals(RT.getType(value), RT.getType(o));

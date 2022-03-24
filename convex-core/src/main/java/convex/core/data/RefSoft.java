@@ -20,8 +20,10 @@ import convex.core.util.Utils;
  * may occur due to garbage collection. However UNKNOWN RefSoft may exist temporarily 
  * (e.g. reading Refs from external messages)
  * 
- * SoftRef must always have a non-null hash, to ensure lookup capability in
+ * RefSoft must always have a non-null hash, to ensure lookup capability in
  * store.
+ * 
+ * RefSoft must always store a canonical value, if any
  * 
  * @param <T> Type of referenced Cell
  */
@@ -44,12 +46,20 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	}
 
 	protected RefSoft(AStore store, T value, Hash hash, int flags) {
-		this(store,new SoftReference<T>(value), hash, flags);
+		this(store,createSoftReference(value), hash, flags);
 	}
 
 	protected RefSoft(AStore store, Hash hash) {
 		// We don't know anything about this Ref.
 		this(store,new SoftReference<T>(null), hash, UNKNOWN);
+	}
+	
+	@SuppressWarnings("unchecked")
+	private static <T extends ACell> SoftReference<T> createSoftReference(T value) {
+		if (!value.isCanonical()) {
+			value=(T) value.toCanonical();
+		}
+		return new SoftReference<T>(value);
 	}
 	
 
@@ -154,5 +164,10 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	@Override
 	public int estimatedEncodingSize() {
 		return isEmbedded()?Format.MAX_EMBEDDED_LENGTH: INDIRECT_ENCODING_LENGTH;
+	}
+
+	@Override
+	public Ref<T> ensureCanonical() {
+		return this;
 	}
 }

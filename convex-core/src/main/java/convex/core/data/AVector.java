@@ -266,4 +266,7 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	public byte getTag() {
 		return Tag.VECTOR;
 	}
+	
+	@Override
+	public abstract int encodeRaw(byte[] bs, int pos);
 }

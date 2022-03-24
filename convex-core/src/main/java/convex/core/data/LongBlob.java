@@ -49,7 +49,13 @@ public final class LongBlob extends ALongBlob {
 
 	@Override
 	public Blob toFlatBlob() {
-		return getEncoding().slice(2, LENGTH);
+		// Trick to use cached encoding if available
+		if (encoding!=null) {
+			return encoding.slice(2,8);
+		}
+		byte[] bs=new byte[8];
+		Utils.writeLong(bs, 0, value);
+		return Blob.wrap(bs);
 	}
 
 	@Override

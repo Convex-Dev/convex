@@ -42,18 +42,30 @@ public class ObjectsTest {
 			doRefContainerTests(a);
 		}
 		
+		doCanonicalTests(a);
+		
+		doCellRefTests(a);
+	}
+
+	/**
+	 * Tests for canonical properties
+	 * @param a
+	 */
+	private static void doCanonicalTests(ACell a) {
 		if (a.isCanonical()) {
 			// Canonical objects should map to themselves
+			assertSame(a,a.getCanonical());
 			assertSame(a,a.toCanonical());
 		} else {
-			// non-canonical objects should map to a canonical object
+			// non-canonical objects should convert to a canonical object
 			ACell canon=a.toCanonical();
 			assertNotSame(canon,a);
 			assertTrue(canon.isCanonical());
 			assertEquals(a,canon);
 		}
 		
-		doCellRefTests(a);
+		// Encoding of canonical object should be cached
+		assertSame(a.getEncoding(), a.getCanonical().getEncoding());
 	}
 
 	private static void doCellRefTests(ACell a) {
