@@ -274,8 +274,8 @@ public class BlobTree extends ABlob {
 
 	@Override
 	public boolean equals(ABlob a) {
-		if (!(a instanceof BlobTree)) return false;
-		return equals((BlobTree) a);
+		if (a.count()!=count) return false;
+		return equals((BlobTree) (a.getCanonical())); // Canonical form must be a BlobTree for this count
 	}
 
 	public boolean equals(BlobTree b) {

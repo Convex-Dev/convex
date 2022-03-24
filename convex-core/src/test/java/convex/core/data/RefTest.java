@@ -13,6 +13,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
@@ -70,6 +71,21 @@ public class RefTest {
 		
 		assertFalse(v.isEmbedded());
 		assertEquals(v, Ref.forHash(vh).getValue());
+	}
+	
+	@Test 
+	public void testNonStored() throws BadFormatException {
+		Blob r=Blob.createRandom(new Random(), 2*Blob.CHUNK_LENGTH+100); // 2 chunks + an embedded Blob of length 100
+		Blob enc=r.getEncoding();
+		ABlob b=Format.read(enc);
+		
+		assertEquals(enc,b.getEncoding());
+		assertEquals(b,r); // Shouldn't hit store!
+		
+		assertThrows(MissingDataException.class,()->b.get(0));
+		assertThrows(MissingDataException.class,()->b.get(2*Blob.CHUNK_LENGTH-1));
+		
+		assertEquals(b.get(8192),r.get(2*Blob.CHUNK_LENGTH)); // should be embedded so OK
 	}
 
 	@Test
