@@ -18,7 +18,7 @@ import convex.core.lang.reader.ReaderUtils;
  * Class for CVM Character values.
  * 
  * Characters are Unicode code point, and can be used to construct Strings on the CVM.
- * Limited to range 0-0x1fffff as per Unicode standard
+ * Limited to range 0 .. 0x10ffff as per Unicode standard
  */
 public final class CVMChar extends APrimitive {
 	public static int MAX_VALUE=0x10ffff; // 21 bits max Unicode value
@@ -202,7 +202,12 @@ public final class CVMChar extends APrimitive {
 		return (byte) (Tag.CHAR+(encodedCharLength(value)-1));
 	}
 
-	public Character charValue() {
+	/**
+	 *  Gets the Java char value of this CVM Character. 
+	 *  
+	 *  Not all Unicode code points fit in a JVM char, a "bad character" value is used as replacement if this is not possible.
+	 */
+	public char charValue() {
 		if (Character.isBmpCodePoint(value)) {
 			return (char)value;
 		} else {
@@ -229,15 +234,18 @@ public final class CVMChar extends APrimitive {
 		return bs;
 	}
 	
-	
-	public Blob toBlob() {
+	/**
+	 * Gets the Blob representation of this Character in UTF-8
+	 * @return 1-4 Bytes Blob containing UTF-8 representation of this Character
+	 */
+	public Blob toUTFBlob() {
 		return Blob.wrap(toUTFBytes());
 	}
 
 	@Override
 	public AString toCVMString(long limit) {
 		if (limit<=0) return null;
-		return Strings.create(Blob.wrap(toUTFBytes()));
+		return Strings.create(toUTFBlob());
 	}
 
 

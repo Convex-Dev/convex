@@ -3,6 +3,7 @@ package convex.core.data.prim;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -27,13 +28,22 @@ public class ByteTest {
 			// check hash is cached correctly
 			assertSame(h,b.getHash());
 			
-			ObjectsTest.doAnyValueTests(b);
+			doByteTest(b);
 		}
-		
 	}
 	
 	@Test public void testCVMCast() {
 		// CVM converts all numbers to Long
 		assertEquals(RT.cvm(1L),(CVMLong)RT.cvm((byte)1));
+	}
+	
+	public void doByteTest(CVMByte a) {
+		long val=a.longValue();
+		
+		assertEquals(CVMByte.create(val),a);
+		assertTrue(a.isCanonical());
+		assertTrue(a.isEmbedded());
+		
+		ObjectsTest.doAnyValueTests(a);
 	}
 }

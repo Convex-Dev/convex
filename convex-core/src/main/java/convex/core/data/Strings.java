@@ -9,14 +9,12 @@ import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 
-import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.impl.BlobBuilder;
 
 public class Strings {
 	
 	public static final int MAX_ENCODING_LENGTH = Math.max(StringShort.MAX_ENCODING_LENGTH,StringTree.MAX_ENCODING_LENGTH);
-
 
 	public static final StringShort EMPTY = StringShort.create("");
 	public static final StringShort NIL = StringShort.create("nil");
@@ -85,7 +83,7 @@ public class Strings {
 		CharsetDecoder dec=charset.newDecoder();
 		dec.onMalformedInput(CodingErrorAction.REPLACE);
 		dec.onUnmappableCharacter(CodingErrorAction.REPLACE);
-		dec.replaceWith(Constants.BAD_CHARACTER_STRING);
+		// dec.replaceWith(Constants.BAD_CHARACTER_STRING);
 		return dec;
 	}
 	
@@ -94,7 +92,7 @@ public class Strings {
 		CharsetEncoder enc=charset.newEncoder();
 		enc.onUnmappableCharacter(CodingErrorAction.REPLACE);
 		enc.onMalformedInput(CodingErrorAction.REPLACE);
-		enc.replaceWith(Constants.BAD_CHARACTER_BYTES);
+		// enc.replaceWith(Constants.BAD_CHARACTER_UTF);
 		return enc;
 	}
 

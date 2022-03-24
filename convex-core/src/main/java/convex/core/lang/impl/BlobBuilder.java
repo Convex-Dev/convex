@@ -43,13 +43,13 @@ public class BlobBuilder {
 		return Utils.checkedInt(count-acc.count());
 	}
 	
-	public void append(AString a) {
-		append(a.toBlob());
+	public BlobBuilder append(AString a) {
+		return append(a.toBlob());
 	}
 	
-	public void append(ABlob b) {
+	public BlobBuilder append(ABlob b) {
 		long blen=b.count();
-		if (blen==0) return; // nothing to do
+		if (blen==0) return this; // nothing to do
 		
 		long spare=spare();
 		
@@ -59,7 +59,7 @@ public class BlobBuilder {
 			b.getBytes(tail,arrayPos());
 			count+=blen;
 			if (blen==spare) completeChunk();
-			return;
+			return this;
 		} else {
 			// append to fill current chunk
 			append(b.slice(0, spare));
@@ -69,7 +69,7 @@ public class BlobBuilder {
 				long take=Math.min(Blob.CHUNK_LENGTH, blen-off);
 				append(b.slice(off,take));
 			}
-			return;
+			return this;
 		}
 	}
 
@@ -126,7 +126,7 @@ public class BlobBuilder {
 		append(Strings.create(string));
 	}
 	
-	public void append(byte b) {
+	public BlobBuilder append(byte b) {
 		int spare=spare();
 		if (spare<1) throw new Error("BlobBuilder should always have spare bytes but was: "+spare);
 		ensureArray(arrayPos()+1);
@@ -135,18 +135,24 @@ public class BlobBuilder {
 		if (spare==1) {
 			completeChunk();
 		}
+		return this;
 	}
 	
-	public void append(char c) {
+	public BlobBuilder append(char c) {
 		if (c<128) {
-			append((byte)c);
+			return append((byte)c);
 		} else {
-			append(CVMChar.create(c));
+			return append(CVMChar.create(c));
 		}
 	}
 
-	private void append(CVMChar c) {
-		append(c.toCVMString(count));
+	/**
+	 * Append a CVM character to this Blob
+	 * @param c CVM Character
+	 * @return This BlobBuilder
+	 */
+	public BlobBuilder append(CVMChar c) {
+		return append(c.toUTFBlob());
 	}
 
 	/**

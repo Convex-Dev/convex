@@ -1,5 +1,6 @@
 package convex.core;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 
 import convex.core.data.ACell;
@@ -203,10 +204,11 @@ public class Constants {
 	/**
 	 * Char to represent bad Unicode characters in printing
 	 */
-	public static final char BAD_CHARACTER = '?';
-	public static final String BAD_CHARACTER_STRING = Character.toString(BAD_CHARACTER);
+	public static final char BAD_CHARACTER = '\uFFFD';
+	public static final byte[] BAD_CHARACTER_BYTES = new byte[] {(byte) 0xff, (byte) 0xfd };
+	public static final String BAD_CHARACTER_STRING = new String(BAD_CHARACTER_BYTES, StandardCharsets.UTF_8);
+	public static final byte[] BAD_CHARACTER_UTF = BAD_CHARACTER_STRING.getBytes(StandardCharsets.UTF_8);
 
-	public static final byte[] BAD_CHARACTER_BYTES = new byte[] {(byte)BAD_CHARACTER};
 
 	/**
 	 * Default print limit

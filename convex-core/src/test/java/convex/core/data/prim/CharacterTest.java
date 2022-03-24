@@ -11,7 +11,10 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.Blob;
 import convex.core.data.Format;
+import convex.core.data.ObjectsTest;
+import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
+import convex.core.lang.impl.BlobBuilder;
 
 public class CharacterTest {
 	@Test 
@@ -40,12 +43,14 @@ public class CharacterTest {
 		CVMChar a=CVMChar.create(CVMChar.MAX_VALUE);
 		doValidCharTests(a);
 		assertEquals("3e10ffff",a.getEncoding().toHexString());
+		assertEquals("f48fbfbf",a.toUTFBlob().toHexString());
 	}
 	
 	@Test 
 	public void testBadUnicode() throws BadFormatException {
-		assertNull(CVMChar.create(0x12345678));  // Out of Unicode range, too big
-		assertNull(CVMChar.create(-1));          // Out of Unicode range, negative
+		assertNull(CVMChar.create(0x12345678));          // Out of Unicode range, too big
+		assertNull(CVMChar.create(-1));                  // Out of Unicode range, negative
+		assertNull(CVMChar.create(CVMChar.MAX_VALUE+1)); // Out of Unicode range by one
 	}
 	
 	@Test 
@@ -68,6 +73,10 @@ public class CharacterTest {
 		
 		byte[] bs=a.toUTFBytes();
 		assertEquals(a.toString(),new String(bs,StandardCharsets.UTF_8));
+		
+		assertEquals(a.toCVMString(10),Strings.create(new BlobBuilder().append(a).toBlob()));
+		
+		ObjectsTest.doAnyValueTests(a);
 	}
 
 
