@@ -479,7 +479,8 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 	
 	@Override public final boolean isCVMValue() {
-		return shift==0;
+		// A MapTree is only a valid CVM value at the top level (shift == 0)
+		return (shift==0);
 	}
 
 	@Override

@@ -555,7 +555,6 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 
 	@Override
 	public boolean isCanonical() {
-		if (count < MINIMUM_SIZE) return false;
 		return true;
 	}
 	
@@ -717,7 +716,6 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 
 	@Override
 	public ACell toCanonical() {
-		// TODO Should be always true?
 		return this;
 	}
 

@@ -227,7 +227,7 @@ public class Blob extends AArrayBlob {
 	 * Creates a Blob of random bytes of the given length
 	 * 
 	 * @param random Any Random generator instance
-	 * @param length Length of blob to generate in bytes
+	 * @param length Length of Blob to generate in bytes
 	 * @return Blob with the specified number of random bytes
 	 */
 	public static Blob createRandom(Random random, long length) {
