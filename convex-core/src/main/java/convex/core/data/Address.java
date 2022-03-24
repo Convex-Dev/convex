@@ -159,11 +159,6 @@ public final class Address extends ALongBlob {
 		if (value<0)
 			throw new InvalidDataException("Address must be positive",this);
 	}
-	
-	@Override public final boolean isCVMValue() {
-		return true;
-	}
-	
 
 	@Override
 	public boolean isRegularBlob() {

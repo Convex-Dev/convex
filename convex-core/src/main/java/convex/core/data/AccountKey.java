@@ -215,10 +215,6 @@ public class AccountKey extends AArrayBlob {
 		return encodeRaw(bs,pos);
 	}
 	
-	@Override public final boolean isCVMValue() {
-		return true;
-	}
-
 	@Override
 	public int estimatedEncodingSize() {
 		// tag plus LENGTH bytes

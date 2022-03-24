@@ -177,10 +177,6 @@ public class Hash extends AArrayBlob {
 	public Blob toCanonical() {
 		return toFlatBlob();
 	}
-	
-	@Override public final boolean isCVMValue() {
-		return true;
-	}
 
 	@Override
 	public int estimatedEncodingSize() {

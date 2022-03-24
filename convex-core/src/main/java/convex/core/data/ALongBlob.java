@@ -129,11 +129,6 @@ public abstract class ALongBlob extends ABlob {
 	}
 
 	@Override
-	public boolean isCVMValue() {
-		return true;
-	}
-
-	@Override
 	public final int getRefCount() {
 		return 0;
 	}

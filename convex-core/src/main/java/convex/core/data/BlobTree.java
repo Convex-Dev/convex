@@ -184,11 +184,6 @@ public class BlobTree extends ABlob {
 	public boolean isCanonical() {
 		return count>Blob.CHUNK_LENGTH;
 	}
-	
-	@Override 
-	public final boolean isCVMValue() {
-		return true;
-	}
 
 	@Override
 	public void getBytes(byte[] dest, int destOffset) {

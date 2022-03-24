@@ -222,10 +222,6 @@ public class Blob extends AArrayBlob {
 	public boolean isCanonical() {
 		return length <= Blob.CHUNK_LENGTH;
 	}
-	
-	@Override public final boolean isCVMValue() {
-		return true;
-	}
 
 	/**
 	 * Creates a Blob of random bytes of the given length

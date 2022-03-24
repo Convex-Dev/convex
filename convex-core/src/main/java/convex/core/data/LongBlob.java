@@ -29,11 +29,6 @@ public final class LongBlob extends ALongBlob {
 		return new LongBlob(value);
 	}
 
-	
-	@Override public final boolean isCVMValue() {
-		return true;
-	}
-
 	@Override
 	public void getBytes(byte[] dest, int destOffset) {
 		Utils.writeLong(dest, destOffset,value);

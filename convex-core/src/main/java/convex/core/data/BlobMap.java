@@ -113,6 +113,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	}
 	
 	@Override public final boolean isCVMValue() {
+		// A BlobMap is only a first class CVM value at depth 0.
 		return (depth==0);
 	}
 

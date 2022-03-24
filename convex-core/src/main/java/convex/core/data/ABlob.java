@@ -417,6 +417,10 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	public boolean isRegularBlob() {
 		return getTag()==Tag.BLOB;
 	}
+	
+	@Override public final boolean isCVMValue() {
+		return true;
+	}
 
 	/**
 	 * Tests if this Blob has exactly the same bytes as another Blob
