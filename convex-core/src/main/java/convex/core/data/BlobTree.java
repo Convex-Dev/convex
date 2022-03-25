@@ -182,7 +182,10 @@ public class BlobTree extends ABlob {
 
 	@Override
 	public boolean isCanonical() {
-		return count>Blob.CHUNK_LENGTH;
+		// Should always be canonical as long as we enforce at least 2 children as an invariant
+		return true;
+		
+		// return count>Blob.CHUNK_LENGTH;
 	}
 
 	@Override
@@ -633,8 +636,10 @@ public class BlobTree extends ABlob {
 
 	@Override
 	public ABlob toCanonical() {
-		if (isCanonical()) return this;
-		return Blobs.toCanonical(this);
+		return this;
+		
+		//if (isCanonical()) return this;
+		//return Blobs.toCanonical(this);
 	}
 
 	/**
@@ -656,9 +661,5 @@ public class BlobTree extends ABlob {
 	public static int childCount(long length) {
 		return Utils.checkedInt(1+(length-1)/childSize(length));
 	}
-
-
-
-
 
 }
