@@ -110,8 +110,8 @@ public class Symbol extends ASymbolic {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = Format.writeRawUTF8String(bs, pos, name.toString());
-		return pos;
+		bs[pos++]=(byte)(name.count());
+		return name.encodeRawData(bs, pos);
 	}
 
 	/**
@@ -122,7 +122,8 @@ public class Symbol extends ASymbolic {
 	 * @throws BadFormatException If a Symbol could not be read correctly.
 	 */
 	public static Symbol read(ByteBuffer bb) throws BadFormatException {
-		String name=Format.readUTF8String(bb);
+		int len=0xff&bb.get();
+		AString name=Format.readUTF8String(bb,len);
 		Symbol sym = Symbol.create(name);
 		if (sym == null) throw new BadFormatException("Can't read symbol");
 		return sym;

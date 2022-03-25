@@ -133,6 +133,7 @@ public abstract class AArrayBlob extends ABlob {
 	 * @param pos Position to write at
 	 * @return Updates position
 	 */
+	@Override
 	public int encodeRawData(byte[] bs, int pos) {
 		System.arraycopy(store, offset, bs, pos, length);
 		return pos + length;

@@ -428,4 +428,14 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 */
 	public abstract boolean equalsBytes(ABlob b);
 
+	/**
+	 * Encodes the raw data of this Blob. Assumes buffer has enough space for (length) bytes.
+	 * @param bs Byte array to write to
+	 * @param pos Position to write at
+	 * @return Updates position
+	 */
+	public int encodeRawData(byte[] bs, int pos) {
+		return toFlatBlob().encodeRawData(bs, pos);
+	}
+
 }

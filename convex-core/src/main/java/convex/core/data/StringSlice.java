@@ -50,12 +50,17 @@ public class StringSlice extends AString {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		throw new UnsupportedOperationException("");
+		throw new UnsupportedOperationException("Can't encode StringSlice");
 	}
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		throw new UnsupportedOperationException("");
+		throw new UnsupportedOperationException("Can't encode StringSlice");
+	}
+	
+	@Override
+	public int encodeRawData(byte[] bs, int pos) {
+		throw new UnsupportedOperationException("Can't encode StringSlice");
 	}
 
 	@Override

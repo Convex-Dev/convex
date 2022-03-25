@@ -94,6 +94,11 @@ public class StringShort extends AString {
 	public int encodeRaw(byte[] bs, int pos) {
 		return data.encodeRaw(bs, pos);
 	}
+	
+	@Override
+	public int encodeRawData(byte[] bs, int pos) {
+		return data.encodeRawData(bs, pos);
+	}
 
 	@Override
 	public int estimatedEncodingSize() {

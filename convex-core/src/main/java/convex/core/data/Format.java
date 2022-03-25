@@ -2,14 +2,8 @@ package convex.core.data;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.nio.BufferOverflowException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
-import java.nio.charset.CharsetEncoder;
-import java.nio.charset.CodingErrorAction;
 
 import convex.core.Belief;
 import convex.core.Block;
@@ -445,85 +439,33 @@ public class Format {
 		return pos+n;
 	}
 
-	private static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
-	private static final ThreadLocal<CharsetDecoder> UTF8_DECODERS = new ThreadLocal<CharsetDecoder>() {
-		@Override
-		protected CharsetDecoder initialValue() {
-			CharsetDecoder dec = UTF8_CHARSET.newDecoder();
-			dec.onUnmappableCharacter(CodingErrorAction.REPORT);
-			dec.onMalformedInput(CodingErrorAction.REPORT);
-			return dec;
-		}
-	};
-	
-	private static final ThreadLocal<CharsetEncoder> UTF8_ENCODERS = new ThreadLocal<CharsetEncoder>() {
-		@Override
-		protected CharsetEncoder initialValue() {
-			CharsetEncoder dec = UTF8_CHARSET.newEncoder();
-			dec.onUnmappableCharacter(CodingErrorAction.REPORT);
-			dec.onMalformedInput(CodingErrorAction.REPORT);
-			return dec;
-		}
-	};
-
-
 	/**
 	 * Reads a UTF-8 String from a ByteBuffer. Assumes the object tag has already been
 	 * read
 	 * 
 	 * @param bb ByteBuffer to read from
+	 * @param len Number of UTF-8 bytes to read
 	 * @return String from ByteBuffer
 	 * @throws BadFormatException If encoding is invalid
 	 */
-	public static String readUTF8String(ByteBuffer bb) throws BadFormatException {
+	public static AString readUTF8String(ByteBuffer bb, int len) throws BadFormatException {
 		try {
-			int len = readLength(bb);
-			if (len == 0) return "";
+			if (len == 0) return Strings.empty();
 
 			byte[] bs = new byte[len];
 			bb.get(bs);
 
-			String s = UTF8_DECODERS.get().decode(ByteBuffer.wrap(bs)).toString();
+			AString s = Strings.create(Blob.wrap(bs));
 			return s;
 			// return new String(bs, StandardCharsets.UTF_8);
 		} catch (BufferUnderflowException e) {
 			throw new BadFormatException("Buffer underflow", e);
-		} catch (CharacterCodingException e) {
-			throw new BadFormatException("Bad UTF-8 format", e);
 		}
-	}
-
-	/**
-	 * Reads a Symbol from a ByteBuffer. Assumes the object tag has already been
-	 * read
-	 * 
-	 * @param bb ByteBuffer from which to read a Symbol
-	 * @return Symbol read from ByteBuffer
-	 * @throws BadFormatException If encoding is invalid
-	 */
-	public static Symbol readSymbol(ByteBuffer bb) throws BadFormatException {
-		return Symbol.read(bb);
 	}
 
 	public static ByteBuffer writeLength(ByteBuffer bb, int i) {
 		bb = writeVLCLong(bb, i);
 		return bb;
-	}
-
-	/**
-	 * Read an int length field (used for Strings etc.)
-	 * 
-	 * @param bb ByteBuffer from which to read
-	 * @return Length field
-	 * @throws BadFormatException If encoding is invalid
-	 */
-	public static int readLength(ByteBuffer bb) throws BadFormatException {
-		// our strategy to to read along, then test if it is a valid non-negative int
-		long l = readVLCLong(bb);
-		int li = (int) l;
-		if (l != li) throw new BadFormatException("Bad length, out of integer range: " + l);
-		if (li < 0) throw new BadFormatException("Negative length: " + li);
-		return li;
 	}
 
 	/**
@@ -697,7 +639,7 @@ public class Format {
 		try {
 			if (tag == Tag.STRING) return (T) Strings.read(bb);
 			if (tag == Tag.BLOB) return (T) Blobs.read(bb);
-			if (tag == Tag.SYMBOL) return (T) readSymbol(bb);
+			if (tag == Tag.SYMBOL) return (T) Symbol.read(bb);
 			if (tag == Tag.KEYWORD) return (T) Keyword.read(bb);
 			
 			if ((tag&Tag.CHAR)==Tag.CHAR) {
@@ -862,27 +804,6 @@ public class Format {
 	public static ByteBuffer encodedBuffer(ACell cell) {
 		return Format.encodedBlob(cell).getByteBuffer();
 	}
-
-	/**
-	 * Writes hex digits from digit position start, total length
-	 * 
-	 * @param bb ByteBuffer to read from
-	 * @param src Blob containing hex digits
-	 * @param start Start position (in hex digits)
-	 * @param length Length (in hex digits)
-	 * @return ByteBuffer after writing
-	 */
-	static ByteBuffer writeHexDigits(ByteBuffer bb, ABlob src, long start, long length) {
-		bb = Format.writeVLCLong(bb, start);
-		bb = Format.writeVLCLong(bb, length);
-		int nBytes = Utils.checkedInt((length + 1) >> 1);
-		byte[] bs = new byte[nBytes];
-		for (int i = 0; i < length; i++) {
-			Utils.setBits(bs, 4, 4 * ((nBytes * 2) - i - 1), src.getHexDigit(start + i));
-		}
-		bb = bb.put(bs);
-		return bb;
-	}
 	
 	/**
 	 * Writes hex digits from digit position start, total length.
@@ -965,10 +886,6 @@ public class Format {
 	public static int estimateSize(ACell cell) {
 		if (cell==null) return 1;
 		return cell.estimatedEncodingSize();
-	}
-
-	static boolean canEncodeUFT8(CharSequence s) {
-		return UTF8_ENCODERS.get().canEncode(s);
 	}
 
 }

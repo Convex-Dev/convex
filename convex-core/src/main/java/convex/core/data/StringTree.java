@@ -42,6 +42,11 @@ public class StringTree extends AString {
 		return data.encodeRaw(bs, pos);
 	}
 	
+	@Override
+	public int encodeRawData(byte[] bs, int pos) {
+		return data.encodeRawData(bs, pos);
+	}
+	
 	public static StringTree read(long length, ByteBuffer bb) throws BadFormatException {
 		BlobTree bt=BlobTree.read(bb,length);
 		return new StringTree(bt);

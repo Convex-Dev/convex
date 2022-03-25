@@ -111,7 +111,8 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	 * @throws BadFormatException If a Keyword could not be read correctly
 	 */
 	public static Keyword read(ByteBuffer bb) throws BadFormatException {
-		String name=Format.readUTF8String(bb);
+		int len=0xff&bb.get();
+		AString name=Format.readUTF8String(bb,len);
 		Keyword kw = Keyword.create(name);
 		if (kw == null) throw new BadFormatException("Can't read keyword (probably invalid name)");
 		return kw;
@@ -126,7 +127,8 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		return name.encodeRaw(bs, pos);
+		bs[pos++]=(byte)(name.count());
+		return name.encodeRawData(bs, pos);
 	}
 
 	@Override

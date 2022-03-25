@@ -146,6 +146,14 @@ public abstract class AString extends ACountable<CVMChar> implements Comparable<
 	 */
 	public abstract int encodeRaw(byte [] bs, int pos);
 	
+	/**
+	 * Encode the raw UTF-8 data of this String. Assumes tag/length already written
+	 * @param bs Byte array to encode to
+	 * @param pos Position in target array to write to
+	 * @return End position in array after encoding
+	 */
+	public abstract int encodeRawData(byte [] bs, int pos);
+	
 	@Override
 	public final byte getTag() {
 		return Tag.STRING;

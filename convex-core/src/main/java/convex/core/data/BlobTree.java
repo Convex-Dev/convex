@@ -326,6 +326,14 @@ public class BlobTree extends ABlob {
 		}
 		return pos;
 	}
+	
+	public int encodeRawData(byte[] bs, int pos) {
+		int n = children.length;
+		for (int i = 0; i < n; i++) {
+			pos = children[i].getValue().encodeRawData(bs,pos);
+		}
+		return pos;
+	}
 
 	@Override
 	public ByteBuffer writeToBuffer(ByteBuffer bb) {
