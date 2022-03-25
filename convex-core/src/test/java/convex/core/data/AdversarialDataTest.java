@@ -2,6 +2,8 @@ package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.Arrays;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.prim.CVMLong;
@@ -36,7 +38,16 @@ public class AdversarialDataTest {
 			MapEntry<CVMLong,CVMLong> t=a; a=b; b=t; // swap so a, b are in hash order
 		}
 		invalidTest(MapLeaf.unsafeCreate(a,a)); // Duplicate key
+		invalidTest(MapLeaf.unsafeCreate(a,b,a)); // Duplicate key not in order
 		invalidTest(MapLeaf.unsafeCreate(b,a)); // Bad order
+		
+		// Too many map entries for a MapLeaf
+		MapEntry<CVMLong,CVMLong>[] mes=new MapEntry[MapLeaf.MAX_ENTRIES+1];
+		for (int i=0; i<mes.length; i++) {
+			mes[i]=MapEntry.of(i, i);
+		}
+		Arrays.sort(mes, (x,y)->x.getKeyHash().compareTo(y.getKeyHash()));
+		invalidTest(MapLeaf.unsafeCreate(mes));
 	}
 	
 	@Test public void testBadKeywords() {

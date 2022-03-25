@@ -114,7 +114,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	}
 
 	/**
-	 * Gets the hash of the key for this MapEntry
+	 * Gets the Hash of the key for this {@linkplain MapEntry}
 	 * 
 	 * @return the Hash of the Key
 	 */
@@ -136,7 +136,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	}
 
 	/**
-	 * Reads a MapEntry from a ByteBuffer. Assumes Tag already handled.
+	 * Reads a {@link MapEntry} from a ByteBuffer. Assumes Tag already handled.
 	 * @param bb ByteBuffer to read from
 	 * @return MapEntry instance
 	 * @throws BadFormatException If encoding is invalid
@@ -313,6 +313,8 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		super.validate();
 		keyRef.validate();
 		valueRef.validate();
+		if (!getKey().isCVMValue()) throw new InvalidDataException("MapEntry key not a CVM value: " +getKey(),this);
+		if (!getValue().isCVMValue()) throw new InvalidDataException("MapEntry value not a CVM value: " +getValue(),this);
 	}
 
 
