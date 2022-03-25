@@ -57,7 +57,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	/**
-	 * Creates a ListMap with the specified entries. Null entries are
+	 * Creates a MapLeaf with the specified entries. Null entries are
 	 * ignored/removed.
 	 * 
 	 * @param entries
@@ -78,6 +78,18 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@SuppressWarnings("unchecked")
 	public static <K extends ACell, V extends ACell> MapLeaf<K, V> create(MapEntry<K, V> item) {
 		return new MapLeaf<K, V>((MapEntry<K, V>[]) new MapEntry<?, ?>[] { item });
+	}
+	
+	/**
+	 * Creates a {@link MapLeaf} 
+	 * @param <K> Type of keys
+	 * @param <V> Type of values
+	 * @param items Array of map entries
+	 * @return Potentially invalid MapLeaf
+	 */
+	@SuppressWarnings("unchecked")
+	public static <K extends ACell, V extends ACell> MapLeaf<K, V> unsafeCreate(MapEntry<K, V>... items) {
+		return new MapLeaf<K,V>(items);
 	}
 
 	@SuppressWarnings("unchecked")

@@ -28,6 +28,17 @@ public class AdversarialDataTest {
 		invalidTest(VectorTree.unsafeCreate(316, Samples.INT_VECTOR_16,Samples.INT_VECTOR_300)); // Bad tailing vector
 	}
 	
+	@SuppressWarnings("unchecked")
+	@Test public void testBadMapLeafs() {
+		MapEntry<CVMLong,CVMLong> a=MapEntry.of(1, 2);
+		MapEntry<CVMLong,CVMLong> b=MapEntry.of(3, 4);
+		if (a.getKeyHash().compareTo(b.getKeyHash())>0) {
+			MapEntry<CVMLong,CVMLong> t=a; a=b; b=t; // swap so a, b are in hash order
+		}
+		invalidTest(MapLeaf.unsafeCreate(a,a)); // Duplicate key
+		invalidTest(MapLeaf.unsafeCreate(b,a)); // Bad order
+	}
+	
 	@Test public void testBadKeywords() {
 		invalidTest(Keyword.unsafeCreate((AString)null));
 		invalidTest(Keyword.unsafeCreate(""));
@@ -42,9 +53,7 @@ public class AdversarialDataTest {
 
 	private void invalidTest(ACell b) {
 		assertThrows(InvalidDataException.class, ()->b.validate());
-		
 		doEncodingTest(b);
-
 	}
 
 	private void doEncodingTest(ACell b) {
