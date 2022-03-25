@@ -329,7 +329,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	}
 
 	@Override
-	public boolean isPacked() {
+	public boolean isFullyPacked() {
 		return (!hasPrefix()) && (items.length == Vectors.CHUNK_SIZE);
 	}
 

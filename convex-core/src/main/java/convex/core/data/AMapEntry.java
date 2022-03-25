@@ -31,7 +31,7 @@ public abstract class AMapEntry<K extends ACell, V extends ACell> extends AVecto
 	}
 
 	@Override
-	public final boolean isPacked() {
+	public final boolean isFullyPacked() {
 		return false;
 	}
 

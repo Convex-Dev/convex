@@ -226,7 +226,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		if (b.hasPrefix()) throw new IllegalArgumentException("Can't append a block with a tail");
 		if (b.count() != VectorLeaf.MAX_SIZE)
 			throw new IllegalArgumentException("Invalid block size for append: " + b.count());
-		if (isPacked()) {
+		if (isFullyPacked()) {
 			// full blockvector, so need to elevate to the next level
 			Ref<AVector<T>>[] newBlocks = new Ref[2];
 			newBlocks[0] = this.getRef();
@@ -272,7 +272,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	}
 
 	@Override
-	public boolean isPacked() {
+	public boolean isFullyPacked() {
 		return count == 1 << (shift + 4);
 	}
 
@@ -305,7 +305,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	}
 
 	/**
-	 * Creates a TreeVector with exactly two chunks
+	 * Creates a VectorTree with exactly two chunks
 	 * 
 	 * @param <T>
 	 * @param head
@@ -318,6 +318,23 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		newBlocks[0] = tail.getRef();
 		newBlocks[1] = head.getRef();
 		return new VectorTree<T>(newBlocks, 2 * Vectors.CHUNK_SIZE);
+	}
+	
+	/**
+	 * Creates a VectorTree directly with arbitrary children. This is probably not legal as a CVM value,
+	 * but used for testing.
+	 * 
+	 * @param <T> Alleged type of elements
+	 * @return Probably unsafely constructed VectorTree
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	static <T extends ACell> VectorTree<T> unsafeCreate(long count, ACell... children) {
+		int n=children.length;
+		Ref<AVector<T>>[] cs = new Ref[n];
+		for (int i=0; i<n; i++) {
+			cs[i]=(Ref<AVector<T>>)(Ref)Ref.get(children[i]);
+		}
+		return new VectorTree<T>(cs, count);
 	}
 
 	@Override
@@ -684,6 +701,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		long c = 0;
 		int blen = children.length;
 		if (blen < 2) throw new InvalidDataException("Insufficient children: " + blen, this);
+		if (count < MINIMUM_SIZE) throw new InvalidDataException("Insufficient elements: " + blen, this);
 		long bsize = childSize();
 		for (int i = 0; i < blen; i++) {
 			ACell ch = children[i].getValue();
@@ -707,6 +725,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
+		if (!isPacked()) throw new InvalidDataException("Non packed VectorTree size: " + count, this);
 		int blen = children.length;
 		if (count < blen) throw new InvalidDataException("Implausible low count: " + count, this);
 

@@ -35,9 +35,9 @@ public abstract class ASymbolic extends ACell {
 	
 	public abstract AString getName();
 
-	protected static boolean validateName(AString name2) {
-		if (name2 == null) return false;
-		long n = name2.count();
+	protected static boolean validateName(AString name) {
+		if (name == null) return false;
+		long n = name.count();
 		if ((n < 1) || (n > (Constants.MAX_NAME_LENGTH))) {
 			return false;
 		}
@@ -58,11 +58,10 @@ public abstract class ASymbolic extends ACell {
 	}
 
 	/**
-	 * Validates the name of this Symbolic value
+	 * Validates this Symbolic value
+	 * @throws InvalidDataException If the symbolic value is invalid
 	 */
 	@Override
-	public void validateCell() throws InvalidDataException {
-		if (!validateName(name)) throw new InvalidDataException("Invalid name: " + name, this);
-	}
+	public abstract void validateCell() throws InvalidDataException;
 
 }

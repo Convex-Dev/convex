@@ -46,6 +46,30 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		return create(Strings.create(name));
 	}
 	
+	/**
+	 * Creates a keyword in an unsafe manner (possibly invalid name), used for testing
+	 * @param rawName Raw keyword name (should include colon)
+	 * @return Possibly invalid Keyword
+	 */
+	public static Keyword unsafeCreate(String rawName) {
+		return unsafeCreate(Strings.create(rawName));
+	}
+	
+	/**
+	 * Creates a keyword in an unsafe manner (possibly invalid name), used for testing
+	 * @param rawName Raw keyword name (should include colon)
+	 * @return Possibly invalid Keyword
+	 */
+	public static Keyword unsafeCreate(AString rawName) {
+		return new Keyword(rawName);
+	}
+
+	/**
+	 * Creates a Keyword with the given name
+	 * 
+	 * @param name A String to use as the keyword name
+	 * @return The new Keyword, or null if the name is invalid for a Keyword
+	 */
 	public static Keyword create(AString name) {
 		if (name==null) return null;
 		if (!validateName(name)) {
@@ -131,7 +155,8 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		super.validateCell();
+		AString nom=getName();
+		if (!validateName(nom)) throw new InvalidDataException("Invalid Keyword name: " + nom, this);
 	}
 	
 	@Override

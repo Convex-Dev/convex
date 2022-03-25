@@ -130,7 +130,7 @@ public class Symbol extends ASymbolic {
 	
 	@Override
 	public void validateCell() throws InvalidDataException {
-		super.validateCell();
+		if (!validateName(name)) throw new InvalidDataException("Invalid Symbol name: " + name, this);
 	}
 
 	@Override

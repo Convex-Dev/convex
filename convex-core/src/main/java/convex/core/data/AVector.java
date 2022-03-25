@@ -92,9 +92,18 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	 * Returns true if this Vector is a single fully packed tree. i.e. a full
 	 * ListVector or TreeVector.
 	 * 
-	 * @return true is fully packed, flase otherwise
+	 * @return true if fully packed, false otherwise
 	 */
-	public abstract boolean isPacked();
+	public abstract boolean isFullyPacked();
+	
+	/**
+	 * Returns true if this Vector is a packed packed tree. i.e. an exact whole number of chunks
+	 * 
+	 * @return true if packed, false otherwise
+	 */
+	public boolean isPacked() {
+		return (count&(Vectors.CHUNK_SIZE-1L))==0L;
+	}
 
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {

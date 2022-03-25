@@ -52,12 +52,15 @@ public class KeywordTest {
 		
 		assertEquals(k,k2);
 		assertEquals(enc,k.getEncoding());
+		
+		doKeywordTest(k);
 	}
 	
 	@Test 
 	public void testMaxSize() {
 		Keyword max=Keyword.create(Samples.MAX_SYMBOLIC);
 		assertEquals(Constants.MAX_NAME_LENGTH,max.getName().count());
+		doKeywordTest(max);
 		
 		Keyword blown=Keyword.create(Samples.TOO_BIG_SYMBOLIC);
 		assertNull(blown);
@@ -71,6 +74,16 @@ public class KeywordTest {
 		assertEquals("foo", k.getName().toString());
 		assertEquals(":foo", k.toString());
 		assertEquals(5, k.getEncoding().length); // tag+length+3 name
-
+		doKeywordTest(k);
+	}
+	
+	/**
+	 * Generic tests for any valid Keyword
+	 * @param k Any valid keyword
+	 */
+	public void doKeywordTest(Keyword k) {
+		assertEquals(k,Keyword.create(k.getName()));
+		
+		ObjectsTest.doAnyValueTests(k);
 	}
 }

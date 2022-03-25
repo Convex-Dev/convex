@@ -62,6 +62,11 @@ public class VectorsTest {
 		assertSame(Vectors.empty(), VectorLeaf.create(new ACell[0]));
 		assertSame(Vectors.empty(), VectorLeaf.create(new ACell[10], 3, 0));
 	}
+	
+	@Test 
+	public void testUnsafeCreate() {
+		doVectorTests(VectorTree.unsafeCreate(32, Samples.INT_VECTOR_16,Samples.INT_VECTOR_16));
+	}
 
 	@Test
 	public void testChunks() {

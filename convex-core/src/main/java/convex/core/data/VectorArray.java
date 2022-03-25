@@ -59,7 +59,7 @@ public class VectorArray<T extends ACell> extends AVector<T> {
 	}
 
 	@Override
-	public boolean isPacked() {
+	public boolean isFullyPacked() {
 		// TODO Auto-generated method stub
 		return false;
 	}
