@@ -179,7 +179,7 @@ public class BlobBuilder {
 	}
 	
 	/**
-	 * Appends remaining bytes from a ByteBuffer to this BlobBuiler
+	 * Appends remaining bytes from a ByteBuffer to this BlobBuilder
 	 * @param bb ByteBuffer to append
 	 */
 	public void append(ByteBuffer bb) {

@@ -22,7 +22,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	/**
 	 * Maximum number of entries in a SetLeaf
 	 */
-	public static final int MAX_ENTRIES = 16;
+	public static final int MAX_ELEMENTS = 16;
 
 	private final Ref<T>[] entries;
 
@@ -43,7 +43,33 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	public static <V extends ACell> SetLeaf<V> create(Ref<V>... elements) {
 		return create(elements, 0, elements.length);
 	}
-
+	
+	/**
+	 * Create a SetLeaf with raw element Refs. Can create an invalid Cell, useful mainly for testing
+	 * @param refs Refs to set elements, in desired order
+	 * @return SetLeaf instance, possibly invalid
+	 */
+	@SuppressWarnings("unchecked")
+	public static <V extends ACell> SetLeaf<V> unsafeCreate(Ref<V>... refs) {
+		return new SetLeaf<V>(refs);
+	}
+	
+	/**
+	 * Create a SetLeaf with raw elements. Can create an invalid Cell, useful mainly for testing
+	 * @param elements Elements to include in set, in desired order
+	 * @return SetLeaf instance, possibly invalid
+	 * 
+	 */
+	@SuppressWarnings("unchecked")
+	public static <V extends ACell> SetLeaf<V> unsafeCreate(V... elements) {
+		int n=elements.length;
+		Ref<V>[] refs=new Ref[n];
+		for (int i=0; i<n; i++) {
+			refs[i]=Ref.get(elements[i]);
+		}
+		return unsafeCreate(refs);
+	}
+	
 	/**
 	 * Creates a SetLeaf with the specified elements. Null references are
 	 * ignored/removed.
@@ -56,7 +82,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	 */
 	protected static <V extends ACell> SetLeaf<V> create(Ref<V>[] entries, int offset, int length) {
 		if (length == 0) return Sets.empty();
-		if (length > MAX_ENTRIES) throw new IllegalArgumentException("Too many elements: " + entries.length);
+		if (length > MAX_ELEMENTS) throw new IllegalArgumentException("Too many elements: " + entries.length);
 		Ref<V>[] sorted = Utils.copyOfRangeExcludeNulls(entries, offset, offset + length);
 		if (sorted.length == 0) return Sets.empty();
 		Arrays.sort(sorted);
@@ -181,7 +207,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		return 2 + Format.MAX_EMBEDDED_LENGTH * size();
 	}
 	
-	public static int MAX_ENCODING_LENGTH=  2 + MAX_ENTRIES * Format.MAX_EMBEDDED_LENGTH;
+	public static int MAX_ENCODING_LENGTH=  2 + MAX_ELEMENTS * Format.MAX_EMBEDDED_LENGTH;
 
 	/**
 	 * Reads a MapLeaf from the provided ByteBuffer Assumes the header byte is
@@ -196,7 +222,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	public static <V extends ACell> SetLeaf<V> read(ByteBuffer bb, long count) throws BadFormatException {
 		if (count == 0) return Sets.empty();
 		if (count < 0) throw new BadFormatException("Negative count of map elements!");
-		if (count > MAX_ENTRIES) throw new BadFormatException("MapLeaf too big: " + count);
+		if (count > MAX_ELEMENTS) throw new BadFormatException("MapLeaf too big: " + count);
 
 		Ref<V>[] items = (Ref<V>[]) new Ref[(int) count];
 		for (int i = 0; i < count; i++) {
@@ -219,8 +245,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 
 	@Override
 	public boolean isCanonical() {
-		// validation for both key uniqueness and sort order
-		return isValidOrder(entries);
+		return true;
 	}
 	
 	@Override public final boolean isCVMValue() {
@@ -360,7 +385,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 			// Create results arraylist if any difference from this
 			if ((results == null) && (newE != ((c <= 0) ? ae : null))) {
 				// create new results array if difference detected
-				results = new ArrayList<>(2*MAX_ENTRIES); // space for all if needed
+				results = new ArrayList<>(2*MAX_ELEMENTS); // space for all if needed
 				// include new entries
 				for (int i = 0; i < ai; i++) {
 					results.add(entries[i]);
@@ -422,14 +447,13 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 			throw new InvalidDataException("Empty map not using canonical instance", this);
 		}
 
-		if (count > MAX_ENTRIES) {
+		if (count > MAX_ELEMENTS) {
 			throw new InvalidDataException("Too many items in list map: " + entries.length, this);
 		}
 
 		// validates both key uniqueness and sort order
-		if (!isCanonical()) {
-			throw new InvalidDataException("Non-canonical key ordering", this);
-		}
+		if (!isValidOrder(entries)) throw new InvalidDataException("Bad ordering of set elements",this);
+
 	}
 
 	@Override
@@ -501,7 +525,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		System.arraycopy(entries, pos, newEntries, pos+1, n-pos);
 		newEntries[pos]=e;
 		
-		if (n<MAX_ENTRIES) {
+		if (n<MAX_ELEMENTS) {
 			// New leaf
 			return new SetLeaf<T>(newEntries);
 		} else {
@@ -525,7 +549,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 
 	@Override
 	public AHashSet<T> toCanonical() {
-		if (count<=MAX_ENTRIES) return this;
+		if (count<=MAX_ELEMENTS) return this;
 		return SetTree.create(entries, 0);
 	}
 

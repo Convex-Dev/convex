@@ -12,7 +12,6 @@ public abstract class AHashSet<T extends ACell> extends ASet<T> {
 	
 	protected static final int MAX_SHIFT = Hash.LENGTH*2-1;
 
-	
 	protected AHashSet(long count) {
 		super(count);
 	}

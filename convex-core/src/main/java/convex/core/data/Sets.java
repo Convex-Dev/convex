@@ -105,7 +105,7 @@ public class Sets {
 
 	public static <T extends ACell> ASet<T> read(ByteBuffer bb) throws BadFormatException {
 		long count = Format.readVLCLong(bb);
-		if (count <= SetLeaf.MAX_ENTRIES) {
+		if (count <= SetLeaf.MAX_ELEMENTS) {
 			return SetLeaf.read(bb, count);
 		} else {
 			return SetTree.read(bb, count);

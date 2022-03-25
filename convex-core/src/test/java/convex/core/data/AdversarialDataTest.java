@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Arrays;
@@ -50,16 +51,37 @@ public class AdversarialDataTest {
 		invalidTest(MapLeaf.unsafeCreate(mes));
 	}
 	
+	@Test public void testBadSetLeafs() {
+		CVMLong a=CVMLong.ZERO;
+		CVMLong b=CVMLong.ONE;
+		if (a.getHash().compareTo(b.getHash())>0) {
+			CVMLong t=a; a=b; b=t; // swap so a, b are in hash order
+		}
+		invalidTest(SetLeaf.unsafeCreate(a,a)); // Duplicate element
+		invalidTest(SetLeaf.unsafeCreate(a,b,a)); // Duplicate elements not in order
+		invalidTest(SetLeaf.unsafeCreate(b,a)); // Bad order
+		
+		// Too many map entries for a MapLeaf
+		CVMLong[] mes=new CVMLong[SetLeaf.MAX_ELEMENTS+1];
+		for (int i=0; i<mes.length; i++) {
+			mes[i]=CVMLong.create(i);
+		}
+		Arrays.sort(mes, (x,y)->x.getHash().compareTo(y.getHash()));
+		invalidTest(SetLeaf.unsafeCreate(mes));
+	}
+	
 	@Test public void testBadKeywords() {
 		invalidTest(Keyword.unsafeCreate((AString)null));
 		invalidTest(Keyword.unsafeCreate(""));
 		invalidTest(Keyword.unsafeCreate(Samples.TOO_BIG_SYMBOLIC));
+		invalidTest(Keyword.unsafeCreate(Samples.MAX_SHORT_STRING));
 	}
 	
 	@Test public void testBadSymbols() {
 		invalidTest(Symbol.unsafeCreate((AString)null));
 		invalidTest(Symbol.unsafeCreate(""));
 		invalidTest(Symbol.unsafeCreate(Samples.TOO_BIG_SYMBOLIC));
+		invalidTest(Symbol.unsafeCreate(Samples.MAX_SHORT_STRING));
 	}
 
 	private void invalidTest(ACell b) {
@@ -79,6 +101,7 @@ public class AdversarialDataTest {
 		ACell c=null;
 		try {
 			c=Format.read(enc);
+			assertEquals(b,c); // If we managed to read it, should at least be equal
 		} catch (BadFormatException e) {
 			// not a readable format, so probably not dangerous
 			return;

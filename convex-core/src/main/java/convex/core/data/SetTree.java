@@ -35,9 +35,9 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	 */
 	private final short mask;
 
-	private SetTree(Ref<AHashSet<T>>[] blocks, int shift, short mask, long count) {
+	private SetTree(Ref<AHashSet<T>>[] children, int shift, short mask, long count) {
 		super(count);
-		this.children = blocks;
+		this.children = children;
 		this.shift = shift;
 		this.mask = mask;
 	}
@@ -62,7 +62,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	@SuppressWarnings("unchecked")
 	public static <V extends ACell> SetTree<V> create(Ref<V>[] newEntries, int shift) {
 		int n = newEntries.length;
-		if (n <= SetLeaf.MAX_ENTRIES) {
+		if (n <= SetLeaf.MAX_ELEMENTS) {
 			throw new IllegalArgumentException(
 					"Insufficient distinct entries for TreeMap construction: " + newEntries.length);
 		}
@@ -139,7 +139,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		}
 
 		// compress small counts to SetLeaf
-		if (count <= SetLeaf.MAX_ENTRIES) {
+		if (count <= SetLeaf.MAX_ELEMENTS) {
 			Ref<V>[] entries = new Ref[Utils.checkedInt(count)];
 			int ix = 0;
 			for (Ref<AHashSet<V>> childRef : children) {
@@ -209,7 +209,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	}
 	
 	public AHashSet<T> toCanonical() {
-		if (count>SetLeaf.MAX_ENTRIES) return this;
+		if (count>SetLeaf.MAX_ELEMENTS) return this;
 		int n=Utils.checkedInt(count);
 		@SuppressWarnings("unchecked")
 		Ref<T>[] newEntries=new Ref[n];
@@ -533,7 +533,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 			throw new InvalidDataException("Invalid shift for SetTree", this);
 		}
 		
-		if (count<=SetLeaf.MAX_ENTRIES) {
+		if (count<=SetLeaf.MAX_ELEMENTS) {
 			throw new InvalidDataException("Count too small [" + count + "] for SetTree", this);
 		}
 
@@ -553,7 +553,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 			}
 			
 			ACell o = children[i].getValue();
-			if (!(o instanceof AHashMap)) {
+			if (!(o instanceof AHashSet)) {
 				throw new InvalidDataException(
 						"Expected AHashSet child at index " + i +" but got "+Utils.getClassName(o), this);
 			}
