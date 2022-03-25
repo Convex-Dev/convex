@@ -9,7 +9,6 @@ import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
-import convex.core.lang.impl.BlobBuilder;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 

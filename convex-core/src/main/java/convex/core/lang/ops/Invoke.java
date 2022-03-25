@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
+import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
 import convex.core.data.Vectors;
 import convex.core.data.type.Types;
@@ -14,7 +15,6 @@ import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
-import convex.core.lang.impl.BlobBuilder;
 
 /**
  * Op representing the invocation of a function.

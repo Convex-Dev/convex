@@ -1,11 +1,7 @@
-package convex.core.lang.impl;
+package convex.core.data;
 
 import java.nio.ByteBuffer;
 
-import convex.core.data.ABlob;
-import convex.core.data.AString;
-import convex.core.data.Blob;
-import convex.core.data.Strings;
 import convex.core.data.prim.CVMChar;
 import convex.core.util.Utils;
 

@@ -2,6 +2,7 @@ package convex.core.lang.impl;
 
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.BlobBuilder;
 import convex.core.lang.AFn;
 
 /**

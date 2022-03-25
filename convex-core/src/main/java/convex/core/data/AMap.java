@@ -12,7 +12,6 @@ import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
-import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Errors;
 
 /**

@@ -7,7 +7,6 @@ import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.impl.BlobBuilder;
 
 /**
  * <p>Class representing a Symbol. Symbols are more commonly used in CVM code to refer to functions and values in the

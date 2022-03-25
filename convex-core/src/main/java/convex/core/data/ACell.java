@@ -8,7 +8,6 @@ import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.TODOException;
-import convex.core.lang.impl.BlobBuilder;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;

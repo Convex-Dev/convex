@@ -2,6 +2,7 @@ package convex.core.lang.impl;
 
 import convex.core.data.ACell;
 import convex.core.data.ASequence;
+import convex.core.data.BlobBuilder;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.Types;
 import convex.core.lang.Context;

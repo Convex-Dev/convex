@@ -6,6 +6,7 @@ import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
+import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
@@ -15,7 +16,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
-import convex.core.lang.impl.BlobBuilder;
 
 /**
  * Transaction representing a Call to an Actor.

@@ -3,6 +3,7 @@ package convex.core.lang.ops;
 import java.util.HashMap;
 
 import convex.core.data.ACell;
+import convex.core.data.BlobBuilder;
 import convex.core.data.IRefFunction;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMLong;
@@ -12,7 +13,6 @@ import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 import convex.core.lang.Symbols;
-import convex.core.lang.impl.BlobBuilder;
 
 public class Special<T extends ACell> extends AOp<T> {
 	

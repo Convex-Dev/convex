@@ -7,7 +7,6 @@ import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.impl.BlobBuilder;
 
 /**
  * Keyword data type. Intended as human-readable map keys, tags and option

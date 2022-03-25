@@ -9,7 +9,6 @@ import java.util.function.Function;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
-import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 

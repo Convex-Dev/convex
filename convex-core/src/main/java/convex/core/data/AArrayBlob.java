@@ -5,7 +5,6 @@ import java.security.MessageDigest;
 import java.util.Arrays;
 
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 

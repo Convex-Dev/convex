@@ -3,6 +3,7 @@ package convex.core.lang.ops;
 import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
+import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
@@ -15,7 +16,6 @@ import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
-import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Errors;
 
 /**

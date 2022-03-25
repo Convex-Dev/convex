@@ -1,7 +1,6 @@
 package convex.core.data;
 
 import convex.core.Constants;
-import convex.core.lang.impl.BlobBuilder;
 
 public abstract class AObject {
 	/**

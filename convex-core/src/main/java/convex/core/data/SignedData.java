@@ -8,7 +8,6 @@ import convex.core.crypto.Ed25519Signature;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.impl.BlobBuilder;
 import convex.core.transactions.ATransaction;
 
 /**

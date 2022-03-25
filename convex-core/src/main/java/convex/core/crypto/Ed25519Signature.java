@@ -7,11 +7,11 @@ import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
+import convex.core.data.BlobBuilder;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Utils;
 
 /**

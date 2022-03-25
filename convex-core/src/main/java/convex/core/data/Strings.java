@@ -10,7 +10,6 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 
 import convex.core.exceptions.BadFormatException;
-import convex.core.lang.impl.BlobBuilder;
 
 public class Strings {
 	

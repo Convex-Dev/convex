@@ -17,7 +17,6 @@ import convex.core.data.prim.CVMByte;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
-import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Utils;
 import convex.test.Samples;
 

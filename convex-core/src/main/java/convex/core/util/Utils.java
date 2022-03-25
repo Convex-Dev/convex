@@ -37,13 +37,13 @@ import convex.core.data.AObject;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.data.BlobBuilder;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
-import convex.core.lang.impl.BlobBuilder;
 
 public class Utils {
 	public static final byte[] EMPTY_BYTES = new byte[0];

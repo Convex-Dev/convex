@@ -6,6 +6,7 @@ import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.List;
@@ -20,7 +21,6 @@ import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
-import convex.core.lang.impl.BlobBuilder;
 import convex.core.util.Errors;
 
 /**
