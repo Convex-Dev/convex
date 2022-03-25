@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.test.Samples;
 
@@ -41,5 +42,31 @@ public class AdversarialDataTest {
 
 	private void invalidTest(ACell b) {
 		assertThrows(InvalidDataException.class, ()->b.validate());
+		
+		doEncodingTest(b);
+
+	}
+
+	private void doEncodingTest(ACell b) {
+		Blob enc=null;
+		try {
+			enc= b.getEncoding();
+		} catch (Throwable t) {
+			// probably no valid encoding, so skip this test
+			return;
+		}
+		
+		ACell c=null;
+		try {
+			c=Format.read(enc);
+		} catch (BadFormatException e) {
+			// not a readable format, so probably not dangerous
+			return;
+		}
+		
+		if (c.isCompletelyEncoded()) {
+			// Shouldn't validate
+			assertThrows(InvalidDataException.class, ()->b.validate());
+		}
 	}
 }
