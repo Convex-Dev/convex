@@ -109,6 +109,24 @@ public class BlobBuilder {
 		return result;
 	}
 	
+	/**
+	 * Takes a slice of the Blob currently under construction. May be more efficient than toBLob().slice(...).
+	 * @param start Start index of slice
+	 * @param length Length of slice
+	 * @return Slice of Blob under construction
+	 */
+	public ABlob slice(long start, long length) {
+		if ((start<0)||(start>count)) throw new IllegalArgumentException("Invalid start: "+start);
+		long end=start+length;
+		if ((end<start)||(end>count)) throw new IllegalArgumentException("Invalid lenth: "+length);
+		if (length==count) return toBlob();
+		
+		long split=acc.count();
+		if (end<=split) return acc.slice(start,length);
+		if (start>=split) return Blob.wrap(tail,(int)(start-split),(int)length);
+		return toBlob().slice(start,length);
+	}
+	
 	public AString getCVMString() {
 		ABlob result=toBlob();
 		return Strings.create(result);

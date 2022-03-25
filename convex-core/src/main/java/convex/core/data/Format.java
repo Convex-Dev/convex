@@ -68,7 +68,6 @@ public class Format {
 	 * Encoded length of a null value
 	 */
 	public static final int NULL_ENCODING_LENGTH = 1;
-
 	
 	/**
 	 * Maximum length in bytes of a Ref encoding (may be an embedded data object)
@@ -861,32 +860,7 @@ public class Format {
 	 * @return A ByteBuffer ready to read (i.e. already flipped)
 	 */
 	public static ByteBuffer encodedBuffer(ACell cell) {
-		// estimate size of bytebuffer required, 33 bytes big enough for most small
-		// stuff
-		int initialLength;
-		
-		if (cell==null) {
-			return ByteBuffer.wrap(new byte[] {0}).flip();
-		}
-		
-		ABlob b = cell.cachedEncoding();
-		if (b != null) return b.getByteBuffer();
-
-		initialLength = cell.estimatedEncodingSize();
-		
-		ByteBuffer bb = ByteBuffer.allocate(initialLength);
-		boolean done = false;
-		while (!done) {
-			try {
-				bb = cell.write(bb);
-				done = true;
-			} catch (BufferOverflowException be) {
-				// retry with larger buffer
-				bb = ByteBuffer.allocate(bb.capacity() * 2 + 10);
-			}
-		}
-		bb.flip();
-		return bb;
+		return Format.encodedBlob(cell).getByteBuffer();
 	}
 
 	/**
