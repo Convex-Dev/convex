@@ -45,6 +45,22 @@ public class ObjectsTest {
 		doCanonicalTests(a);
 		
 		doCellRefTests(a);
+		 
+		if (a.isCompletelyEncoded()) {
+			doCompleteEncodingTests(a);
+		}
+	}
+
+	private static void doCompleteEncodingTests(ACell a) {
+		Blob enc=a.getEncoding();
+		ACell b;
+		try {
+			b = Format.read(enc);
+		} catch (BadFormatException e) {
+			throw new Error("Reload from complete encoding failed for: " + a + " with encoding "+enc);
+		}
+		assertEquals(a,b);
+		assertSame(enc,b.getEncoding()); // Encoding should be cached
 	}
 
 	/**

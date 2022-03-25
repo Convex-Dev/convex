@@ -554,4 +554,21 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		return createPersisted(value, null);
 	}
 
+	/**
+	 * Tests if this Cell is completely encoded, i.e. has no external Refs. This implies that the 
+	 * complete Cell can be represented in a single encoding.
+	 * @return true if completely encoded, false otherwise
+	 */
+	public boolean isCompletelyEncoded() {
+		if (isEmbedded()) return true;
+		int n=getRefCount();
+		for (int i=0; i<n; i++) {
+			Ref<ACell> r=getRef(i);
+			if (!r.isEmbedded()) return false;
+			ACell child=r.getValue();
+			if ((child!=null)&&!child.isCompletelyEncoded()) return false; // Should be safe from missing?
+		}
+		return true;
+	}
+
 }
