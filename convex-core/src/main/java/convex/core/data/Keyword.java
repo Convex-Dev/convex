@@ -47,8 +47,8 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	}
 	
 	/**
-	 * Creates a keyword in an unsafe manner (possibly invalid name), used for testing
-	 * @param rawName Raw keyword name (should include colon)
+	 * Creates a Keyword in an unsafe manner (possibly invalid name), used for testing
+	 * @param rawName Raw Keyword name
 	 * @return Possibly invalid Keyword
 	 */
 	public static Keyword unsafeCreate(String rawName) {
@@ -56,8 +56,8 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	}
 	
 	/**
-	 * Creates a keyword in an unsafe manner (possibly invalid name), used for testing
-	 * @param rawName Raw keyword name (should include colon)
+	 * Creates a Keyword in an unsafe manner (possibly invalid name), used for testing
+	 * @param rawName Raw Keyword name
 	 * @return Possibly invalid Keyword
 	 */
 	public static Keyword unsafeCreate(AString rawName) {
@@ -75,7 +75,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		if (!validateName(name)) {
 			return null;
 		}
-		return new Keyword(Strings.COLON.append(name));
+		return new Keyword(name);
 	}
 
 	/**
@@ -114,7 +114,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	public static Keyword read(ByteBuffer bb) throws BadFormatException {
 		String name=Format.readUTF8String(bb);
 		Keyword kw = Keyword.create(name);
-		if (kw == null) throw new BadFormatException("Can't read symbol");
+		if (kw == null) throw new BadFormatException("Can't read keyword (probably invalid name)");
 		return kw;
 
 	}
@@ -127,11 +127,12 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		return getName().encodeRaw(bs, pos);
+		return name.encodeRaw(bs, pos);
 	}
 
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
+		bb.append(':');
 		bb.append(name);
 		return bb.check(limit);
 	}
@@ -155,8 +156,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		AString nom=getName();
-		if (!validateName(nom)) throw new InvalidDataException("Invalid Keyword name: " + nom, this);
+		if (!validateName(name)) throw new InvalidDataException("Invalid Keyword name: " + name, this);
 	}
 	
 	@Override
@@ -174,14 +174,10 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		return this;
 	}
 
-	@Override
-	public AString getName() {
-		return name.subSequence(1, name.count());
-	}
 
 	@Override
 	public AString toCVMString(long limit) {
-		return name;
+		return Strings.COLON.append(name);
 	}
 
 }

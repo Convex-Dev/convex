@@ -69,6 +69,24 @@ public class Symbol extends ASymbolic {
 
 		return sym;
 	}
+	
+	/**
+	 * Creates a Symbol in an unsafe manner (possibly invalid name), used for testing
+	 * @param rawName Raw Symbol name
+	 * @return Possibly invalid Keyword
+	 */
+	public static Symbol unsafeCreate(String rawName) {
+		return unsafeCreate(Strings.create(rawName));
+	}
+	
+	/**
+	 * Creates a Symbol in an unsafe manner (possibly invalid name), used for testing
+	 * @param rawName Raw Symbol name
+	 * @return Possibly invalid Keyword
+	 */
+	public static Symbol unsafeCreate(AString rawName) {
+		return new Symbol(rawName);
+	}
 
 	@Override
 	public boolean equals(ACell o) {
@@ -146,11 +164,6 @@ public class Symbol extends ASymbolic {
 	@Override
 	public ACell toCanonical() {
 		return this;
-	}
-
-	@Override
-	public AString getName() {
-		return name;
 	}
 
 	@Override

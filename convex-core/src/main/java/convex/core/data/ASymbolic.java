@@ -33,7 +33,13 @@ public abstract class ASymbolic extends ACell {
 		return 0;
 	}
 	
-	public abstract AString getName();
+	/**
+	 * Gets the name of this symbolic value
+	 * @return Name as a CVM String
+	 */
+	public final AString getName() {
+		return name;
+	}
 
 	protected static boolean validateName(AString name) {
 		if (name == null) return false;

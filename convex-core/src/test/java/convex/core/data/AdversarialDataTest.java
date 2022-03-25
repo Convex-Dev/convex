@@ -26,6 +26,18 @@ public class AdversarialDataTest {
 		invalidTest(VectorTree.unsafeCreate(42, Samples.INT_VECTOR_16,Samples.INT_VECTOR_16,Samples.INT_VECTOR_10)); // Non-packed final child
 		invalidTest(VectorTree.unsafeCreate(316, Samples.INT_VECTOR_16,Samples.INT_VECTOR_300)); // Bad tailing vector
 	}
+	
+	@Test public void testBadKeywords() {
+		invalidTest(Keyword.unsafeCreate((AString)null));
+		invalidTest(Keyword.unsafeCreate(""));
+		invalidTest(Keyword.unsafeCreate(Samples.TOO_BIG_SYMBOLIC));
+	}
+	
+	@Test public void testBadSymbols() {
+		invalidTest(Symbol.unsafeCreate((AString)null));
+		invalidTest(Symbol.unsafeCreate(""));
+		invalidTest(Symbol.unsafeCreate(Samples.TOO_BIG_SYMBOLIC));
+	}
 
 	private void invalidTest(ACell b) {
 		assertThrows(InvalidDataException.class, ()->b.validate());
