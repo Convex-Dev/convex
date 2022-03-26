@@ -29,7 +29,7 @@ public class ObjectsTest {
 	public static void doCellTests(ACell a) {
 		if (a==null) return;
 		
-		assertEquals(a.getEncodingLength(),a.getEncoding().count());
+		doEncodingTest(a);
 		
 		try {
 			a.validateCell();
@@ -45,7 +45,14 @@ public class ObjectsTest {
 		doCanonicalTests(a);
 		
 		doCellRefTests(a);
-		 
+	}
+
+	private static void doEncodingTest(ACell a) {
+		Blob enc=a.getEncoding();
+		long len=enc.count();
+		assertEquals(a.getEncodingLength(),enc.count());
+		assertTrue(len<=Format.LIMIT_ENCODING_LENGTH);
+		
 		if (a.isCompletelyEncoded()) {
 			doCompleteEncodingTests(a);
 		}
@@ -80,10 +87,10 @@ public class ObjectsTest {
 			assertEquals(a,canon);
 		}
 		
-		// Encoding of canonical object should be cached
+		// Encoding of canonical object should be cached and equal to initial value
 		assertSame(a.getEncoding(), a.getCanonical().getEncoding());
 		
-		// Canonical object should be cached
+		// Canonical object itself should be cached
 		assertSame(a.getCanonical(), a.getCanonical());
 	}
 
@@ -104,7 +111,6 @@ public class ObjectsTest {
 		Ref<ACell> refD=ref.toDirect();
 		assertTrue(ref.equals(refD));
 		assertTrue(refD.equals(ref));
-		
 	}
 
 	@SuppressWarnings("unused")

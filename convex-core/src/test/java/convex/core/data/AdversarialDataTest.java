@@ -1,9 +1,11 @@
 package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Arrays;
+import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
@@ -17,8 +19,20 @@ import convex.test.Samples;
  */
 public class AdversarialDataTest {
 
-	@SuppressWarnings("unchecked")
-	public static final AVector<CVMLong> NON_CVM=(AVector<CVMLong>)Samples.INT_VECTOR_300.getRef(0).getValue();
+	// A value that is valid, but not a first class CVM value
+	public static final ACell NON_CVM=Samples.INT_BLOBMAP_256.getRef(0).getValue();
+	
+	// A value that is non-canonical but otherwise valid CVM value
+	public static final Blob NON_CANONICAL=Blob.createRandom(new Random(), Blob.CHUNK_LENGTH+1);
+
+	// A value that is invalid
+	public static final SetLeaf<CVMLong> NON_VALID=SetLeaf.unsafeCreate(new CVMLong[0]);
+
+	@Test public void testAssumptions() {
+		assertFalse(NON_CVM.isCVMValue());
+		assertFalse(NON_CANONICAL.isCanonical());
+		assertThrows(InvalidDataException.class, ()->NON_VALID.validate());
+	}
 	
 	@Test public void testBadVectors() {
 		invalidTest(VectorTree.unsafeCreate(0)); // nothing in VectorTree
@@ -49,6 +63,8 @@ public class AdversarialDataTest {
 		}
 		Arrays.sort(mes, (x,y)->x.getKeyHash().compareTo(y.getKeyHash()));
 		invalidTest(MapLeaf.unsafeCreate(mes));
+		
+		invalidTest(MapLeaf.unsafeCreate(new MapEntry[0]));
 	}
 	
 	@Test public void testBadSetLeafs() {
@@ -61,13 +77,24 @@ public class AdversarialDataTest {
 		invalidTest(SetLeaf.unsafeCreate(a,b,a)); // Duplicate elements not in order
 		invalidTest(SetLeaf.unsafeCreate(b,a)); // Bad order
 		
-		// Too many map entries for a MapLeaf
+		// Simulate too many map entries for a MapLeaf
 		CVMLong[] mes=new CVMLong[SetLeaf.MAX_ELEMENTS+1];
 		for (int i=0; i<mes.length; i++) {
 			mes[i]=CVMLong.create(i);
 		}
-		Arrays.sort(mes, (x,y)->x.getHash().compareTo(y.getHash()));
+		Arrays.sort(mes, (x,y)->x.getHash().compareTo(y.getHash())); // put in right order
 		invalidTest(SetLeaf.unsafeCreate(mes));
+
+		// Not valid because an empty SetLeaf must be the Singleton empty set.
+		invalidTest(SetLeaf.unsafeCreate(new ACell[0]));
+		
+		// Basic sets for invalid set values
+		invalidTest(Sets.of(NON_VALID));
+		invalidTest(Sets.of(NON_CVM));
+		
+		// Inserting non-CVM values into existing valid sets
+		invalidTest(Sets.of(1,2,3,4).include(NON_CVM));
+		invalidTest(Samples.LONG_SET_100.include(NON_CVM));
 	}
 	
 	@Test public void testBadKeywords() {

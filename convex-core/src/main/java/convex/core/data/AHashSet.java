@@ -115,7 +115,7 @@ public abstract class AHashSet<T extends ACell> extends ASet<T> {
 	 * @param digit Hex digit expected at position [shift]
 	 * @throws InvalidDataException
 	 */
-	protected abstract void validateWithPrefix(Hash prefix, int digit, int shift) throws InvalidDataException;
+	protected abstract void validateWithPrefix(Hash prefix, int digit, int position) throws InvalidDataException;
 	
 	@Override
 	public Object[] toArray() {

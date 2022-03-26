@@ -20,15 +20,15 @@ import convex.core.util.Utils;
  */
 public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	/**
-	 * Maximum number of entries in a SetLeaf
+	 * Maximum number of elements in a SetLeaf
 	 */
 	public static final int MAX_ELEMENTS = 16;
 
-	private final Ref<T>[] entries;
+	private final Ref<T>[] elements;
 
 	SetLeaf(Ref<T>[] items) {
 		super(items.length);
-		entries = items;
+		elements = items;
 	}
 
 	/**
@@ -102,7 +102,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 
 		int len = size();
 		for (int i = 0; i < len; i++) {
-			Ref<T> e = entries[i];
+			Ref<T> e = elements[i];
 			if (Utils.equals(k, e.getValue())) return e;
 		}
 		return null;
@@ -117,7 +117,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	protected Ref<T> getRefByHash(Hash hash) {
 		int len = size();
 		for (int i = 0; i < len; i++) {
-			Ref<T> e = entries[i];
+			Ref<T> e = elements[i];
 			if (hash.equals(e.getHash())) return e;
 		}
 		return null;
@@ -132,7 +132,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	private int seek(T key) {
 		int len = size();
 		for (int i = 0; i < len; i++) {
-			if (Utils.equals(key, entries[i].getValue())) return i;
+			if (Utils.equals(key, elements[i].getValue())) return i;
 		}
 		return -1;
 	}
@@ -147,7 +147,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		Hash h=key.getHash();
 		int len = size();
 		for (int i = 0; i < len; i++) {
-			if (h.compareTo(entries[i].getHash())==0) return i;
+			if (h.compareTo(elements[i].getHash())==0) return i;
 		}
 		return -1;
 	}
@@ -172,14 +172,14 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		int len = size();
 		if (len == 1) return Sets.empty();
 		Ref<T>[] newEntries = (Ref<T>[]) new Ref[len - 1];
-		System.arraycopy(entries, 0, newEntries, 0, index);
-		System.arraycopy(entries, index + 1, newEntries, index, len - index - 1);
+		System.arraycopy(elements, 0, newEntries, 0, index);
+		System.arraycopy(elements, index + 1, newEntries, index, len - index - 1);
 		return new SetLeaf<T>(newEntries);
 	}
 
 	protected void accumulateValues(ArrayList<T> al) {
-		for (int i = 0; i < entries.length; i++) {
-			Ref<T> me = entries[i];
+		for (int i = 0; i < elements.length; i++) {
+			Ref<T> me = elements[i];
 			al.add(me.getValue());
 		}
 	}
@@ -196,7 +196,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		pos = Format.writeVLCLong(bs,pos, n);
 
 		for (int i = 0; i < n; i++) {
-			pos = entries[i].encode(bs, pos);;
+			pos = elements[i].encode(bs, pos);;
 		}
 		return pos;
 	}
@@ -228,10 +228,6 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		for (int i = 0; i < count; i++) {
 			Ref<V> ref=Format.readRef(bb);
 			items[i]=ref;
-		}
-
-		if (!isValidOrder(items)) {
-			throw new BadFormatException("Bad ordering of keys!");
 		}
 
 		return new SetLeaf<V>(items);
@@ -266,37 +262,37 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 
 	@Override
 	public int getRefCount() {
-		return entries.length;
+		return elements.length;
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public Ref<T> getRef(int i) {
-		Ref<T> e = entries[i]; // IndexOutOfBoundsException if out of range
+		Ref<T> e = elements[i]; // IndexOutOfBoundsException if out of range
 		return e;
 	}
 	
 	@Override
 	public Ref<T> getElementRef(long i) {
-		Ref<T> e = entries[Utils.checkedInt(i)]; // Exception if out of range
+		Ref<T> e = elements[Utils.checkedInt(i)]; // Exception if out of range
 		return e;
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
 	public SetLeaf updateRefs(IRefFunction func) {
-		int n = entries.length;
+		int n = elements.length;
 		if (n == 0) return this;
-		Ref<T>[] newEntries = entries;
+		Ref<T>[] newEntries = elements;
 		for (int i = 0; i < n; i++) {
 			Ref<T> e = newEntries[i];
 			Ref<T> newEntry = (Ref<T>) func.apply(e);
 			if (e!=newEntry) {
-				if (newEntries==entries) newEntries=entries.clone();
+				if (newEntries==elements) newEntries=elements.clone();
 				newEntries[i]=newEntry;
 			}
 		}
-		if (newEntries==entries) return this;
+		if (newEntries==elements) return this;
 		// Note: we assume no key hashes have changed
 		return new SetLeaf(newEntries);
 	}
@@ -316,7 +312,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		int sel = 0;
 		int n = size();
 		for (int i = 0; i < n; i++) {
-			Hash h = entries[i].getHash();
+			Hash h = elements[i].getHash();
 			if ((mask & (1 << h.getHexDigit(digitPos))) != 0) {
 				sel = sel | (1 << i); // include this index in selection
 			}
@@ -340,7 +336,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		int ix = 0;
 		for (int i = 0; i < n; i++) {
 			if ((selection & (1 << i)) != 0) {
-				newEntries[ix++] = entries[i];
+				newEntries[ix++] = elements[i];
 			}
 		}
 		assert (ix == Integer.bitCount(selection));
@@ -367,8 +363,8 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		int bi = 0;
 		ArrayList<Ref<T>> results = null;
 		while ((ai < al) || (bi < bl)) {
-			Ref<T> ae = (ai < al) ? this.entries[ai] : null;
-			Ref<T> be = (bi < bl) ? b.entries[bi] : null;
+			Ref<T> ae = (ai < al) ? this.elements[ai] : null;
+			Ref<T> be = (bi < bl) ? b.elements[bi] : null;
 			int c = (ae == null) ? 1 : ((be == null) ? -1 : ae.getHash().compareTo(be.getHash()));
 			
 			Ref<T> newE;
@@ -388,7 +384,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 				results = new ArrayList<>(2*MAX_ELEMENTS); // space for all if needed
 				// include new entries
 				for (int i = 0; i < ai; i++) {
-					results.add(entries[i]);
+					results.add(elements[i]);
 				}
 			}
 			if (c <= 0) ai++; // inc ai if we used ae
@@ -403,7 +399,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		int n = size();
 		R result = initial;
 		for (int i = 0; i < n; i++) {
-			result = func.apply(result, entries[i].getValue());
+			result = func.apply(result, elements[i].getValue());
 		}
 		return result;
 	}
@@ -419,40 +415,55 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		int n = size();
 		if (n != a.size()) return false;
 		for (int i = 0; i < n; i++) {
-			if (!entries[i].equals(a.entries[i])) return false;
+			if (!elements[i].equals(a.elements[i])) return false;
 		}
 		return true;
 	}
+	
+	@Override
+	public void validate() throws InvalidDataException {
+		super.validate();
+		validateWithPrefix(Hash.EMPTY_HASH,0,-1);
+	}
 
 	@Override
-	protected void validateWithPrefix(Hash prefix, int digit, int shift) throws InvalidDataException {
-		for (int i = 0; i < entries.length; i++) {
-			Ref<T> e = entries[i];
+	protected void validateWithPrefix(Hash prefix, int digit, int position) throws InvalidDataException {
+		if (!isValidOrder(elements)) {
+			throw new InvalidDataException("Bad ordering of set elements!",this);
+		}
+		
+		for (int i = 0; i < elements.length; i++) {
+			Ref<T> e = elements[i];
 			Hash h = e.getHash();
 			long match=h.commonHexPrefixLength(prefix);
-			if (match<(shift-1)) {
+			if (match<(position-1)) {
 				throw new InvalidDataException("Parent prefix did not match",this);
 			}
-			int mydigit=h.getHexDigit(shift);
-			if (mydigit!=digit) {
-				throw new InvalidDataException("Bad hex digit at position: "+shift,this);
+			if (position>=0) {
+				int mydigit=h.getHexDigit(position);
+				if (mydigit!=digit) {
+					throw new InvalidDataException("Bad hex digit at position: "+position,this);
+				}
 			}
 			e.validate();
+			
+			T value=e.getValue();
+			if((value!=null)&&!value.isCVMValue()) throw new InvalidDataException("Non-CVM value in Set",this);
 		}
 	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {
 		if ((count == 0) && (this != Sets.EMPTY)) {
-			throw new InvalidDataException("Empty map not using canonical instance", this);
+			throw new InvalidDataException("Empty set not using canonical instance", this);
 		}
 
 		if (count > MAX_ELEMENTS) {
-			throw new InvalidDataException("Too many items in list map: " + entries.length, this);
+			throw new InvalidDataException("Too many items in SetLeaf: " + elements.length, this);
 		}
 
 		// validates both key uniqueness and sort order
-		if (!isValidOrder(entries)) throw new InvalidDataException("Bad ordering of set elements",this);
+		if (!isValidOrder(elements)) throw new InvalidDataException("Bad ordering of set elements",this);
 
 	}
 
@@ -474,12 +485,12 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	
 	protected boolean containsAll(SetLeaf<T> b) {
 		int ix=0;
-		for (Ref<T> meb:b.entries) {
+		for (Ref<T> meb:b.elements) {
 			Hash bh=meb.getHash();
 			
 			if (ix>=count) return false; // no remaining entries in this
 			while (ix<count) {
-				Ref<T> mea=entries[ix];
+				Ref<T> mea=elements[ix];
 				Hash ah=mea.getHash();
 				int c=ah.compareTo(bh);
 				if (c<0) {
@@ -508,11 +519,11 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 
 	@Override
 	protected AHashSet<T> includeRef(Ref<T> e, int shift) {
-		int n=entries.length;
+		int n=elements.length;
 		Hash h=e.getHash();
 		int pos=0;
 		for (; pos<n; pos++) {
-			Ref<T> iref=entries[pos];
+			Ref<T> iref=elements[pos];
 			int c=h.compareTo(iref.getHash());
 			if (c==0) return this;
 			if (c<0) break; // need to add at this position
@@ -521,8 +532,8 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		// New element must be added at pos
 		@SuppressWarnings("unchecked")
 		Ref<T>[] newEntries=new Ref[n+1];
-		System.arraycopy(entries, 0, newEntries, 0, pos);
-		System.arraycopy(entries, pos, newEntries, pos+1, n-pos);
+		System.arraycopy(elements, 0, newEntries, 0, pos);
+		System.arraycopy(elements, pos, newEntries, pos+1, n-pos);
 		newEntries[pos]=e;
 		
 		if (n<MAX_ELEMENTS) {
@@ -544,13 +555,13 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 
 	@Override
 	public T get(long index) {
-		return entries[Utils.checkedInt(index)].getValue();
+		return elements[Utils.checkedInt(index)].getValue();
 	}
 
 	@Override
 	public AHashSet<T> toCanonical() {
 		if (count<=MAX_ELEMENTS) return this;
-		return SetTree.create(entries, 0);
+		return SetTree.create(elements, 0);
 	}
 
 

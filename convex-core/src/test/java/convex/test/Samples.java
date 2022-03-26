@@ -77,8 +77,6 @@ public class Samples {
 	public static final AccountKey ACCOUNT_KEY = KEY_PAIR.getAccountKey();
 	
 	public static final ASignature BAD_SIGNATURE = Ed25519Signature.wrap(Blobs.createRandom(64).getBytes());
-	
-
 
 	public static final VectorLeaf<CVMLong> INT_VECTOR_10 = createTestIntVector(10);
 	public static final VectorLeaf<CVMLong> INT_VECTOR_16 = createTestIntVector(16);
@@ -104,6 +102,8 @@ public class Samples {
 	public static final BlobMap<Blob, CVMLong> INT_BLOBMAP_7 = BlobMaps.of(Blob.fromHex(""), 0, Blob.fromHex("0001"), 1,
 			Blob.fromHex("01"), 2, Blob.fromHex("010000"), 3, Blob.fromHex("010001"), 4, Blob.fromHex("ff0000"), 5,
 			Blob.fromHex("ff0101"), 6);
+	
+	public static final BlobMap<ABlob, CVMLong> INT_BLOBMAP_256 = createTestBlobMap(256);
 
 	public static final ASet<CVMLong> LONG_SET_5 = Sets.of(1,2,3,4,5);
 	public static final ASet<CVMLong> LONG_SET_10 = Sets.create(INT_VECTOR_10);
@@ -162,7 +162,6 @@ public class Samples {
 		}
 	}
 	
-
 	/**
 	 * Create a random test Blob of the given size
 	 * @param size
@@ -171,6 +170,21 @@ public class Samples {
 	static Blob createTestBlob(long size) {
 		Blob b=Blob.createRandom(new Random(), size);
 		return b;
+	}
+
+	/**
+	 * Create a test BlobMap of the given size
+	 * @param size
+	 * @return
+	 */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	static BlobMap<ABlob,CVMLong> createTestBlobMap(long size) {
+		BlobMap bm=BlobMap.EMPTY;
+		for (long i=0; i<size; i++) {
+			CVMLong val=CVMLong.create(i);
+			bm=bm.assoc(val.getHash(), val);
+		}
+		return bm;
 	}
 
 	// Creates a valid ASCII string of the given length.

@@ -24,7 +24,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	private final Ref<AHashSet<T>>[] children;
 
 	/**
-	 * Shift position of this treemap node in number of hex digits
+	 * Shift position of this @link SetTree node in number of hex digits. 0 at top level.
 	 */
 	private final int shift;
 
@@ -528,6 +528,11 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	public void validate() throws InvalidDataException {
 		super.validate();
 
+		validateWithPrefix(Hash.EMPTY_HASH,0,-1);
+	}
+	
+	@Override
+	protected void validateWithPrefix(Hash base, int digit, int position) throws InvalidDataException {
 		if (mask == 0) throw new InvalidDataException("TreeMap must have children!", this);
 		if ((shift <0)||(shift>MAX_SHIFT)) {
 			throw new InvalidDataException("Invalid shift for SetTree", this);
@@ -576,7 +581,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 					this);
 			
 			int d = digitForIndex(i, mask);
-			child.validateWithPrefix(firstHash ,d,shift+1);
+			child.validateWithPrefix(firstHash ,d,position+1);
 			
 			childCount += child.count();
 		}
@@ -584,10 +589,6 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		if (count != childCount) {
 			throw new InvalidDataException("Bad child count, expected " + count + " but children had: " + childCount, this);
 		}
-	}
-	
-	protected void validateWithPrefix(Hash base, int digit, int shift) {
-		
 	}
 
 	private boolean isValidStructure() {
