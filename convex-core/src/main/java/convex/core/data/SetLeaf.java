@@ -537,10 +537,11 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		newEntries[pos]=e;
 		
 		if (n<MAX_ELEMENTS) {
-			// New leaf
+			// New leaf if n (current elements) is less than the maximum size
 			return new SetLeaf<T>(newEntries);
 		} else {
-			// expand to tree
+			// Maximum size exceeded, so need to expand to tree. 
+			// Shift required since this might not be the tree root!
 			return SetTree.create(newEntries, shift);
 		}
 	}

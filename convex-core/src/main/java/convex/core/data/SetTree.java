@@ -41,6 +41,10 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		this.shift = shift;
 		this.mask = mask;
 	}
+	
+	public static <T extends ACell> SetTree<T> unsafeCreate(Ref<AHashSet<T>>[] children,int shift, short mask, long count) {
+		return new SetTree<T>(children,shift,mask,count);
+	}
 
 	/**
 	 * Computes the total count from an array of Refs to sets. Ignores null Refs in
@@ -59,18 +63,27 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		return n;
 	}
 
+	/**
+	 * Create a SetTree given a number of element Refs to distribute among children.
+	 * O(n) in number of elements.
+	 * 
+	 * @param <V> Type of elements
+	 * @param elementRefs Array of Refs to elements
+	 * @param shift Hex digit position at which to split children.
+	 * @return New SetTree node
+	 */
 	@SuppressWarnings("unchecked")
-	public static <V extends ACell> SetTree<V> create(Ref<V>[] newEntries, int shift) {
-		int n = newEntries.length;
+	public static <V extends ACell> SetTree<V> create(Ref<V>[] elementRefs, int shift) {
+		int n = elementRefs.length;
 		if (n <= SetLeaf.MAX_ELEMENTS) {
 			throw new IllegalArgumentException(
-					"Insufficient distinct entries for TreeMap construction: " + newEntries.length);
+					"Insufficient distinct entries for TreeMap construction: " + elementRefs.length);
 		}
 
 		// construct full child array
 		Ref<AHashSet<V>>[] children = new Ref[16];
 		for (int i = 0; i < n; i++) {
-			Ref<V> e = newEntries[i];
+			Ref<V> e = elementRefs[i];
 			int ix = e.getHash().getHexDigit(shift);
 			Ref<AHashSet<V>> ref = children[ix];
 			if (ref == null) {
@@ -84,9 +97,9 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	}
 
 	/**
-	 * Creates a Tree map given child refs for each digit
+	 * Creates a Tree map given child Refs for each digit
 	 * 
-	 * @param children An array of children, may refer to nulls or empty maps which
+	 * @param children An array of children, may be null or refer to empty sets which
 	 *                 will be filtered out
 	 * @return
 	 */
@@ -106,7 +119,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	}
 
 	/**
-	 * Create a MapTree with a full compliment of children.
+	 * Create a MapTree with a full compliment of 16 children.
 	 * @param <K>
 	 * @param <V>
 	 * @param newChildren

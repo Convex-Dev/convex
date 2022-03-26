@@ -67,6 +67,13 @@ public class AdversarialDataTest {
 		invalidTest(MapLeaf.unsafeCreate(new MapEntry[0]));
 	}
 	
+	@Test public void testBadSetTree() {
+		SetTree<CVMLong> a = Samples.INT_SET_300;
+		
+		invalidTest(a.include(NON_CVM));
+		invalidTest(a.include(NON_VALID));
+	}
+	
 	@Test public void testBadSetLeafs() {
 		CVMLong a=CVMLong.ZERO;
 		CVMLong b=CVMLong.ONE;

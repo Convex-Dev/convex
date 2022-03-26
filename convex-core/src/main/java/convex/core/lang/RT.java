@@ -1621,6 +1621,16 @@ public class RT {
 		return CVMDouble.NaN.equals(val);
 	}
 
+	/**
+	 * Checks if a Cell is a valid CVM value
+	 * @param a Cell to check
+	 * @return True if CVM VAlue, false otherwise
+	 */
+	public static boolean isCVM(ACell a) {
+		if (a==null) return true;
+		return a.isCVMValue();
+	}
+
 
 
 }

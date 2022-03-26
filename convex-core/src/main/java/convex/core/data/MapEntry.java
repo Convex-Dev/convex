@@ -14,11 +14,16 @@ import convex.core.util.Errors;
 import convex.core.util.Utils;
 
 /**
- * Map.Entry implementation for persistent maps.
+ * Map.Entry implementation for persistent maps. This is primarily intended as an efficient 
+ * implementation class for handling entries in Convex maps, and also to support the Java Map.Entry
+ * interface for compatibility and developer convenience.
+ * 
+ * From a CVM perspective, a MapEntry is just a regular 2 element Vector. As such, MapEntry is *not* canonical
+ * and getting the canonical form of a MapEntry requires converting to a Vector
  * 
  * Contains exactly 2 Refs, one for key and one for value
  * 
- * Implements Comparable using the hash value of keys.
+ * Implements Comparable using the Hash value of keys.
  *
  * @param <K> The type of keys
  * @param <V> The type of values
@@ -313,8 +318,8 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		super.validate();
 		keyRef.validate();
 		valueRef.validate();
-		if (!getKey().isCVMValue()) throw new InvalidDataException("MapEntry key not a CVM value: " +getKey(),this);
-		if (!getValue().isCVMValue()) throw new InvalidDataException("MapEntry value not a CVM value: " +getValue(),this);
+		if (!RT.isCVM(getKey())) throw new InvalidDataException("MapEntry key not a CVM value: " +getKey(),this);
+		if (!RT.isCVM(getValue())) throw new InvalidDataException("MapEntry value not a CVM value: " +getValue(),this);
 	}
 
 
