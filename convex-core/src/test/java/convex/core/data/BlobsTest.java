@@ -74,6 +74,12 @@ public class BlobsTest {
 		assertEquals(0,Blob.fromHex("ffff0123").hexMatchLength(Blob.fromHex("ffff012f"), 3, 0));
 	}
 	
+	@Test public void testHexDigit() {
+		
+	}
+	
+	
+	
 
 	@Test
 	public void testFromHex() {
@@ -389,6 +395,10 @@ public class BlobsTest {
 			assertEquals(a.slice(n/2,n/2),b.slice(n/2, n/2));
 			
 			assertEquals(a.get(n-1),CVMByte.create(a.byteAt(n-1)));
+			
+			// Reconstruct first and last bytes via hex digits
+			assertEquals(a.get(0).longValue(),a.getHexDigit(0)*16+a.getHexDigit(1));
+			assertEquals(a.get(n-1).longValue(),a.getHexDigit(n*2-2)*16+a.getHexDigit(n*2-1));
 		}
 
 		// Round trip via ByteBuffer should produce a canonical Blob

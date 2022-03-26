@@ -31,7 +31,6 @@ import java.util.stream.Collectors;
 import convex.core.Constants;
 import convex.core.State;
 import convex.core.data.AArrayBlob;
-import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AObject;
 import convex.core.data.ASequence;
@@ -568,17 +567,6 @@ public class Utils {
 		if (a == b) return true;
 		if (a == null) return false; // b can't be null because of above line
 		return a.equals(b); // fall back to Object equality
-	}
-
-	/**
-	 * Gets a hex digit as an integer 0-15 value from a Data object
-	 *
-	 * @param data     Blob containing byte values
-	 * @param hexDigit Position of hex digit to extract (from start of blob)
-	 * @return Hex digit value as an integer 0..15 inclusive
-	 */
-	public static int extractDigit(ABlob data, int hexDigit) {
-		return data.getHexDigit(hexDigit);
 	}
 
 	/**

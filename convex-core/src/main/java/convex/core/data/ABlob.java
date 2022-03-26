@@ -192,7 +192,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	/**
 	 * Gets the specified hex digit from this data object.
 	 * 
-	 * Result is undefined if index is out of bounds.
+	 * Result is undefined if index is out of bounds, but probably an IndexOutOfBoundsException.
 	 * 
 	 * @param digitPos The position of the hex digit
 	 * @return The value of the hex digit, in the range 0-15 inclusive
@@ -204,6 +204,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 		//} else {
 		//	return b & 0x0F; // second hex digit
 		//}
+		// This hack avoids a conditional, not sure if worth it....
 		int shift = 4-(((int)digitPos&1)<<2);
 		return (b>>shift)&0x0F;
 	}

@@ -19,7 +19,6 @@ import convex.core.Block;
 import convex.core.Peer;
 import convex.core.State;
 import convex.core.data.AVector;
-import convex.core.data.Blob;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -87,15 +86,6 @@ public class UtilsTest {
 		assertEquals(0, Utils.hexVal('0'));
 		assertEquals(15, Utils.hexVal('f'));
 		assertEquals(12, Utils.hexVal('C'));
-	}
-
-	@Test
-	public void testExtractDigit() {
-		assertEquals(0, Utils.extractDigit(Blob.fromHex("0123"), 0));
-		assertEquals(3, Utils.extractDigit(Blob.fromHex("0123"), 3));
-
-		assertThrows(IndexOutOfBoundsException.class, () -> Utils.extractDigit(Blob.fromHex("0123"), 4));
-		assertThrows(IndexOutOfBoundsException.class, () -> Utils.extractDigit(Blob.fromHex("0123"), -1));
 	}
 
 	@Test

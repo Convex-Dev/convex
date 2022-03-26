@@ -187,7 +187,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@Override
 	public MapEntry<K, V> getKeyRefEntry(Ref<ACell> ref) {
-		int digit = Utils.extractDigit(ref.getHash(), shift);
+		int digit = ref.getHash().getHexDigit(shift);
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) return null; // -1 case indicates not found
 		return children[i].getValue().getKeyRefEntry(ref);
@@ -222,7 +222,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@Override
 	protected MapEntry<K, V> getEntryByHash(Hash hash) {
-		int digit = Utils.extractDigit(hash, shift);
+		int digit = hash.getHexDigit(shift);
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) return null; // not present
 		return children[i].getValue().getEntryByHash(hash);
@@ -237,7 +237,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	@SuppressWarnings("unchecked")
 	public AHashMap<K, V> dissocRef(Ref<K> keyRef) {
-		int digit = Utils.extractDigit(keyRef.getHash(), shift);
+		int digit = keyRef.getHash().getHexDigit(shift);
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) return this; // not present
 
@@ -332,7 +332,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		if (this.shift != shift) {
 			throw new Error("Invalid shift!");
 		}
-		int digit = Utils.extractDigit(keyRef.getHash(), shift);
+		int digit = keyRef.getHash().getHexDigit(shift);
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) {
 			// location not present, need to insert new child
@@ -356,7 +356,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	public MapTree<K, V> assocEntry(MapEntry<K, V> e, int shift) {
 		assert (this.shift == shift); // should always be correct shift
 		Ref<K> keyRef = e.getKeyRef();
-		int digit = Utils.extractDigit(keyRef.getHash(), shift);
+		int digit = keyRef.getHash().getHexDigit(shift);
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) {
 			// location not present

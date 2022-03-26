@@ -193,7 +193,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 
 	@Override
 	protected Ref<T> getRefByHash(Hash hash) {
-		int digit = Utils.extractDigit(hash, shift);
+		int digit = hash.getHexDigit(shift);
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) return null; // not present
 		return children[i].getValue().getRefByHash(hash);
@@ -207,7 +207,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 
 	@Override
 	public AHashSet<T> excludeRef(Ref<T> keyRef) {
-		int digit = Utils.extractDigit(keyRef.getHash(), shift);
+		int digit = keyRef.getHash().getHexDigit(shift);
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) return this; // not present
 
@@ -305,7 +305,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 			throw new Error("Invalid shift!");
 		}
 		Ref<T> keyRef = e;
-		int digit = Utils.extractDigit(keyRef.getHash(), shift);
+		int digit = keyRef.getHash().getHexDigit(shift);
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) {
 			// location not present
