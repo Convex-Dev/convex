@@ -144,7 +144,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * 
 	 * Subclasses SHOULD override this if offer have a more efficient equals implementation. 
 	 * 
-	 * Should never require reads from Store.
+	 * MUST NOT require reads from Store.
 	 * 
 	 * @param a Cell to compare with. May be null??
 	 * @return True if this cell is equal to the other object

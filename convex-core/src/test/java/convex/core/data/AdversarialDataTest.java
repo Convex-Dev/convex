@@ -67,11 +67,27 @@ public class AdversarialDataTest {
 		invalidTest(MapLeaf.unsafeCreate(new MapEntry[0]));
 	}
 	
+	@SuppressWarnings("unchecked")
 	@Test public void testBadSetTree() {
 		SetTree<CVMLong> a = Samples.INT_SET_300;
 		
 		invalidTest(a.include(NON_CVM));
 		invalidTest(a.include(NON_VALID));
+		
+		// Get a SetTree child, must be at least one by PigeonHole Principle
+		int d=0;
+		SetTree<CVMLong> b=null;
+		int rc=a.getRefCount();
+		for (int i=0; i<rc; i++) {
+			ASet<CVMLong> ch=(ASet<CVMLong>) a.getRef(i).getValue();
+			if (ch instanceof SetTree) {
+				b=(SetTree<CVMLong>) ch;
+				d=SetTree.digitForIndex(i, a.getMask());
+			}
+		}
+		assertFalse(b.isCVMValue());
+		assertEquals(d,b.get(0).getHash().getHexDigit(0)); // d should be first digit of Hash
+		assertEquals(1,b.shift);
 	}
 	
 	@Test public void testBadSetLeafs() {

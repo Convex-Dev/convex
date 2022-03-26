@@ -268,7 +268,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	public abstract boolean equalsBytes(byte[] bytes, int byteOffset);
 	
 	/**
-	 * Compares this blob to another blob, in lexographic order sorting by first
+	 * Compares this Blob to another Blob, in lexicographic order sorting by first
 	 * bytes.
 	 * 
 	 * Note: This means that compareTo does not precisely match equality, because
@@ -350,7 +350,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	}
 
 	/**
-	 * Returns the number of matching hex digits in the given hex range of another blob. Assumes
+	 * Returns the number of matching hex digits in the given hex range of another Blob. Assumes
 	 * range is valid for both blobs.
 	 * 
 	 * Returns length if this Blob is exactly equal to the specified hex range.
@@ -362,6 +362,11 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 */
 	public abstract long hexMatchLength(ABlob b, long start, long length);
 
+	/**
+	 * Checks for Hex equality of two ABlobs. *ignores* type, i.e. only considers hex contents.
+	 * @param b ABlob to compare with
+	 * @return True if all hex digits are equal, false otherwise
+	 */
 	public boolean hexEquals(ABlob b) {
 		long c = count();
 		if (b.count() != c) return false;

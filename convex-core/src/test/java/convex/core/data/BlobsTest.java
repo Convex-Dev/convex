@@ -145,6 +145,8 @@ public class BlobsTest {
 		LongBlob b = LongBlob.create("cafebabedeadbeef");
 		Blob bb = Blob.fromHex("cafebabedeadbeef");
 		
+		assertEquals(b.getContentHash(),bb.getContentHash()); // same data hash
+		
 		assertEquals(b.longValue(),bb.longValue());
 
 		assertEquals(10, b.getHexDigit(1)); // 'a'

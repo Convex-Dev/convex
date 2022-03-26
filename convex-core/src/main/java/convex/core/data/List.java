@@ -243,7 +243,7 @@ public class List<T extends ACell> extends AList<T> {
 	}
 	
 	@Override public final boolean isCVMValue() {
-		return data.isCVMValue();
+		return data.isCVMValue(); // TODO: always true?
 	}
 	
 	@Override

@@ -20,9 +20,77 @@ import convex.core.util.Utils;
  * Generic test functions for arbitrary Data Objects.
  */
 public class ObjectsTest {
+	/**
+	 * Generic tests for any valid CVM Value (including null). Should pass for
+	 * *any* ACell where RT.isCVM(..) returns true and validate(...) succeeds.
+	 * 
+	 * @param a Value to test
+	 */
+	public static void doAnyValueTests(ACell a) {
+		Hash h=Hash.compute(a);
+				
+		boolean embedded=Format.isEmbedded(a);
+
+		Ref<ACell> r = Ref.get(a).persist();
+		assertEquals(h,r.getHash());
+		assertEquals(a, r.getValue());
+
+		Blob encoding = Format.encodedBlob(a);
+		if (a==null) {
+			assertEquals(Blob.NULL_ENCODING,encoding);
+		} else {
+			assertEquals(a.getTag(),encoding.byteAt(0)); // Correct Tag
+			assertSame(encoding,a.getEncoding()); // should be same cached encoding
+			assertEquals(encoding.length,a.getEncodingLength());
+			
+			if (a.isCVMValue()) {
+				assertNotNull(a.getType());
+			}
+		}
+
+		// Any encoding should be less than or equal to the limit
+		assertTrue(encoding.length <= Format.LIMIT_ENCODING_LENGTH);
+		
+		// If length exceeds MAX_EMBEDDED_LENGTH, cannot be an embedded value
+		if (encoding.length > Format.MAX_EMBEDDED_LENGTH) {
+			assertFalse(Format.isEmbedded(a),()->"Testing: "+Utils.getClassName(a)+ " = "+Utils.toString(a));
+		}
+		
+		// tests for memory size
+		if (a!=null) {
+			long memorySize=a.getMemorySize();
+			long encodingSize=a.getEncodingLength();
+			int rc=a.getRefCount();
+			long childMem=0;
+			for (int i=0; i<rc; i++) {
+				Ref<ACell> childRef=a.getRef(i);
+				long cms=childRef.getMemorySize();
+				childMem+=cms;
+			}
+			if (embedded) {
+				assertEquals(memorySize,childMem);
+			} else {
+				assertEquals(memorySize,encodingSize+childMem+Constants.MEMORY_OVERHEAD);
+			}
+		}
+
+
+		try {
+			ACell a2;
+			a2 = Format.read(encoding);
+			assertEquals(a, a2);
+		} catch (BadFormatException e) {
+			throw new Error("Can't read encoding: 0x" + encoding.toHexString(), e);
+		}
+		
+		doCellTests(a);
+	}
+	
 
 	/**
-	 * Generic tests for a Cell
+	 * Generic tests for an arbitrary vaid Cell. May or may not be a valid CVM value. 
+	 * 
+	 * Checks required Cell properties across a number of themes.
 	 * 
 	 * @param a Cell to test
 	 */
@@ -30,22 +98,33 @@ public class ObjectsTest {
 		if (a==null) return;
 		
 		doEncodingTest(a);
-		
+		doCanonicalTests(a);	
+		doHashTests(a);
+		doEqualityTests(a);
+		doCellValidationTests(a);
+		doRefContainerTests(a);
+		doCellRefTests(a);
+	}
+
+	private static void doCellValidationTests(ACell a) {
 		try {
 			a.validateCell();
 			// doCellStorageTest(a); // TODO: Maybe fix after we have ACell.toDirect()
 		} catch (InvalidDataException e) {
 			throw Utils.sneakyThrow(e);
 		}
-		
-		if (a.getRefCount()>0) {
-			doRefContainerTests(a);
-		}
-		
-		doCanonicalTests(a);
-		
-		doCellRefTests(a);
 	}
+
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	private static void doEqualityTests(ACell a) {
+		assertTrue(a.equals(a));
+		if (a instanceof Comparable) {
+			Comparable c=(Comparable) a;
+			assertEquals(0,c.compareTo(a));
+		}
+	}
+
 
 	private static void doEncodingTest(ACell a) {
 		Blob enc=a.getEncoding();
@@ -56,6 +135,17 @@ public class ObjectsTest {
 		if (a.isCompletelyEncoded()) {
 			doCompleteEncodingTests(a);
 		}
+	}
+
+	/**
+	 * Test Hash properties for an arbitrary cell
+	 * @param a
+	 */
+	private static void doHashTests(ACell a) {
+		Hash h=a.getHash();
+		assertNotNull(h);
+		assertSame(h,a.getHash());
+		assertSame(h,a.getEncoding().getContentHash());
 	}
 
 	private static void doCompleteEncodingTests(ACell a) {
@@ -145,82 +235,20 @@ public class ObjectsTest {
 	}
 
 	/**
-	 * Generic tests for any CVM Value
-	 * 
-	 * @param a Value to test
-	 */
-	public static void doAnyValueTests(ACell a) {
-		Hash h=Hash.compute(a);
-				
-		boolean embedded=Format.isEmbedded(a);
-
-		Ref<ACell> r = Ref.get(a).persist();
-		assertEquals(h,r.getHash());
-		assertEquals(a, r.getValue());
-
-		Blob encoding = Format.encodedBlob(a);
-		if (a==null) {
-			assertEquals(Blob.NULL_ENCODING,encoding);
-		} else {
-			assertEquals(a.getTag(),encoding.byteAt(0)); // Correct Tag
-			assertSame(encoding,a.getEncoding()); // should be same cached encoding
-			assertEquals(encoding.length,a.getEncodingLength());
-			
-			if (a.isCVMValue()) {
-				assertNotNull(a.getType());
-			}
-			
-		}
-		
-
-		// Any encoding should be less than or equal to the limit
-		assertTrue(encoding.length <= Format.LIMIT_ENCODING_LENGTH);
-		
-		// If length exceeds MAX_EMBEDDED_LENGTH, cannot be an embedded value
-		if (encoding.length > Format.MAX_EMBEDDED_LENGTH) {
-			assertFalse(Format.isEmbedded(a),()->"Testing: "+Utils.getClassName(a)+ " = "+Utils.toString(a));
-		}
-		
-		// tests for memory size
-		if (a!=null) {
-			long memorySize=a.getMemorySize();
-			long encodingSize=a.getEncodingLength();
-			int rc=a.getRefCount();
-			long childMem=0;
-			for (int i=0; i<rc; i++) {
-				Ref<ACell> childRef=a.getRef(i);
-				long cms=childRef.getMemorySize();
-				childMem+=cms;
-			}
-			if (embedded) {
-				assertEquals(memorySize,childMem);
-			} else {
-				assertEquals(memorySize,encodingSize+childMem+Constants.MEMORY_OVERHEAD);
-			}
-		}
-
-
-		try {
-			ACell a2;
-			a2 = Format.read(encoding);
-			assertEquals(a, a2);
-		} catch (BadFormatException e) {
-			throw new Error("Can't read encoding: 0x" + encoding.toHexString(), e);
-		}
-		
-		doCellTests(a);
-	}
-
-	/**
 	 * Tests for any value implementing the IRefContainer interface
 	 * 
 	 * @param a
 	 */
 	private static void doRefContainerTests(ACell a) {
-		long tcount = Utils.totalRefCount(a);
-		int rcount = Utils.refCount(a);
+		int rc=a.getRefCount();
+		assertTrue(rc>=0);
+		assertEquals(rc,Utils.refCount(a));
+		if (rc>0) {
+			long tcount = Utils.totalRefCount(a);
+			assertTrue(rc <= tcount);
+		}
+		
 
-		assertTrue(rcount <= tcount);
 	}
 
 }

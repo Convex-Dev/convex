@@ -23,7 +23,7 @@ public interface INumeric {
 	public Class<?> numericType();
 
 	/**
-	 * Gets the signum of this numerical value. Will be -1, 0 or 1 for Longs, -1.0, 0.0 , 1.0 or ##NaN for doubles.
+	 * Gets the signum of this numerical value. Will be -1, 0 or 1 for Longs, -1.0, 0.0 , 1.0 or ##NaN for Doubles.
 	 * @return Signum of the numeric value
 	 */
 	public APrimitive signum();

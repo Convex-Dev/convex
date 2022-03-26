@@ -14,7 +14,7 @@ import convex.core.util.Utils;
  * child Maps, with a bitmap mask indicating which hex digits are present, i.e.
  * have non-empty children.
  *
- * @param <T> Type of set elemets
+ * @param <T> Type of Set elements
  */
 public class SetTree<T extends ACell> extends AHashSet<T> {
 
@@ -26,14 +26,14 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	/**
 	 * Shift position of this @link SetTree node in number of hex digits. 0 at top level.
 	 */
-	private final int shift;
+	final int shift;
 
 	/**
 	 * Mask indicating which hex digits are present in the child array e.g. 0x0001
 	 * indicates all children are in the '0' digit. e.g. 0xFFFF indicates there are
 	 * children for every digit.
 	 */
-	private final short mask;
+	final short mask;
 
 	private SetTree(Ref<AHashSet<T>>[] children, int shift, short mask, long count) {
 		super(count);
@@ -97,9 +97,9 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	}
 
 	/**
-	 * Creates a Tree map given child Refs for each digit
+	 * Creates a SetTree given child Refs for each digit
 	 * 
-	 * @param children An array of children, may be null or refer to empty sets which
+	 * @param children An array of children, may be null or refer to empty Sets which
 	 *                 will be filtered out
 	 * @return
 	 */
@@ -119,9 +119,8 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	}
 
 	/**
-	 * Create a MapTree with a full compliment of 16 children.
-	 * @param <K>
-	 * @param <V>
+	 * Create a SetTree with a full compliment of 16 children.
+	 * @param <T> Type of Set elements
 	 * @param newChildren
 	 * @param shift Shift for child node
 	 * @return
@@ -132,16 +131,16 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	}
 
 	/**
-	 * Creates a Map with the specified child map Refs. Removes empty maps passed as
+	 * Creates a Set using specified child Set Refs. Removes empty Sets passed as
 	 * children.
 	 * 
-	 * Returns a ListMap for small maps.
+	 * Returns a SetLeaf for small Sets.
 	 * 
-	 * @param children Array of Refs to child maps for each bit in mask
-	 * @param shift    Shift position (hex digit of key hashes for this map)
+	 * @param children Array of Refs to child sets for each bit in mask
+	 * @param shift    Shift position (hex digit in hashes for this node)
 	 * @param mask     Mask specifying the hex digits included in the child array at
 	 *                 this shift position
-	 * @return A new map as specified @
+	 * @return A new set as required
 	 */
 	@SuppressWarnings("unchecked")
 	private static <V extends ACell> AHashSet<V> create(Ref<AHashSet<V>>[] children, int shift, short mask, long count) {
@@ -264,9 +263,9 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	 * 
 	 * @param i
 	 * @param newChild
-	 * @return @
+	 * @return Updated SetTree
 	 */
-	private AHashSet<T> replaceChild(int i, Ref<AHashSet<T>> newChild) {
+	protected AHashSet<T> replaceChild(int i, Ref<AHashSet<T>> newChild) {
 		if (children[i] == newChild) return this;
 		AHashSet<T> oldChild = children[i].getValue();
 		Ref<AHashSet<T>>[] newChildren = children.clone();
@@ -388,6 +387,15 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	@Override
 	public int getRefCount() {
 		return children.length;
+	}
+	
+	/**
+	 * Returns the mask value of this SetTree node. Each set bit indicates the presence of a child set 
+	 * with the given hex digit
+	 * @return Mask value
+	 */
+	public short getMask() {
+		return mask;
 	}
 
 	@SuppressWarnings("unchecked")

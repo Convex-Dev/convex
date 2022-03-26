@@ -8,6 +8,7 @@ import java.util.function.BiFunction;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.TODOException;
+import convex.core.lang.RT;
 import convex.core.util.Utils;
 
 /**
@@ -448,7 +449,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 			e.validate();
 			
 			T value=e.getValue();
-			if((value!=null)&&!value.isCVMValue()) throw new InvalidDataException("Non-CVM value in Set",this);
+			if(!RT.isCVM(value)) throw new InvalidDataException("Non-CVM value in Set",this);
 		}
 	}
 

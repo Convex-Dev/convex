@@ -490,9 +490,9 @@ public class Format {
 	}
 
 	/**
-	 * Reads a Ref from the ByteBuffer.
+	 * Reads a Ref or embedded Cell value from the ByteBuffer.
 	 * 
-	 * Converts Embedded objects to Refs automatically.
+	 * Converts Embedded Cells to Refs automatically.
 	 * 
 	 * @param <T> Type of referenced value
 	 * @param bb ByteBuffer containing a ref to read
@@ -500,13 +500,11 @@ public class Format {
 	 * @throws BadFormatException If the data is badly formatted, or a non-embedded
 	 *                            object is found.
 	 */
-	@SuppressWarnings("unchecked")
 	public static <T extends ACell> Ref<T> readRef(ByteBuffer bb) throws BadFormatException {
 		byte tag=bb.get();
 		if (tag==Tag.REF) return Ref.readRaw(bb);
-		ACell cell= Format.read(tag,bb);
-		if (cell==null) return (Ref<T>) Ref.NULL_VALUE;
-		return cell.getRef();
+		T cell= Format.read(tag,bb);
+		return Ref.get(cell);
 	}
 
 	@SuppressWarnings("unchecked")
