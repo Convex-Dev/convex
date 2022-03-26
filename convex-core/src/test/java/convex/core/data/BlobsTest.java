@@ -391,9 +391,7 @@ public class BlobsTest {
 			assertEquals(a.get(n-1),CVMByte.create(a.byteAt(n-1)));
 		}
 
-		ObjectsTest.doAnyValueTests(canonical);
-		
-		// Round trip via ByteBuffer should produce canonical Blob
+		// Round trip via ByteBuffer should produce a canonical Blob
 		ByteBuffer buf=a.getByteBuffer();
 		bb.clear();
 		bb.append(buf);
@@ -404,5 +402,8 @@ public class BlobsTest {
 		assertEquals(a,r.slice(0,n));
 		assertEquals(a,r.slice(n,n));
 		assertEquals(a.append(a),r);
+		
+		// Should pass tests for a CVM value
+		ObjectsTest.doAnyValueTests(a);
 	}
 }

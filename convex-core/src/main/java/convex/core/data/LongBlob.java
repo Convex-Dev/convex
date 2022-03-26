@@ -6,9 +6,9 @@ import convex.core.util.Errors;
 import convex.core.util.Utils;
 
 /**
- * Wrapper for an 8-byte long blob
+ * Wrapper for an 8-byte long as a Blob
  * 
- * We use this for efficient management of indexes using longs in BlobMaps.
+ * We use this mainly for efficient management of indexes using Longs in BlobMaps.
  * 
  */
 public final class LongBlob extends ALongBlob {

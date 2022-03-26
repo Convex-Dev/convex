@@ -220,9 +220,16 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		return result.toCanonical();
 	}
 	
+	@Override
+	public boolean isCanonical() {
+		// We are canonical if and only if elements would not fit in a SetLeaf
+		return (count > SetLeaf.MAX_ELEMENTS);
+	}
+	
+	@Override
 	public AHashSet<T> toCanonical() {
-		if (count>SetLeaf.MAX_ELEMENTS) return this;
-		int n=Utils.checkedInt(count);
+		if (isCanonical()) return this;
+		int n=(int)count; // safe since we know n is in range 0..16
 		@SuppressWarnings("unchecked")
 		Ref<T>[] newEntries=new Ref[n];
 		for (int i=0; i<n; i++) {
@@ -374,11 +381,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		return result;
 	}
 
-	@Override
-	public boolean isCanonical() {
-		if (count <= MapLeaf.MAX_ENTRIES) return false;
-		return true;
-	}
+
 	
 	@Override public final boolean isCVMValue() {
 		return shift==0;

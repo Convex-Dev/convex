@@ -125,7 +125,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Gets the canonical representation of this cell. 
+	 * Gets the canonical representation of this Cell. 
 	 * 
 	 * O(1) if canonical representation is already generated, may be O(n) otherwise.
 	 * 
