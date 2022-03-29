@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Changed
 - Convert CVM Characters to be Unicode code points
+- Convert CVM Strings to be UTF-8 (backed by Blobs)
+- Import convex-java as a submodule
+
+### Fixed
+- Miscellaneous edge cases with canonical encodings
 
 ## [0.7.4] - 2022-02-18
 ### Changed
