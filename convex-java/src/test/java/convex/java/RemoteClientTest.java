@@ -9,15 +9,21 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
+import org.junit.Assume;
 import org.junit.jupiter.api.Test;
+
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 
 public class RemoteClientTest {
 	
+	// Use to skip remote tests
+	static boolean skip=true;
+	
 	static final String TEST_PEER="https://convex.world";
 	
 	public Convex getNewConvex() {
+		if (skip) return null;
 		AKeyPair kp=AKeyPair.generate();
 		Convex convex=Convex.connect(TEST_PEER);
 		Address addr=convex.createAccount(kp);
@@ -28,6 +34,7 @@ public class RemoteClientTest {
 	
 	@Test public void testQuery() {
 		Convex convex=getNewConvex();
+		checkValid(convex);
 		Map<String,Object> result=convex.query ("*address*");
 		assertNotNull(result);
 		assertEquals(convex.getAddress(),result.get("value"));
@@ -35,6 +42,7 @@ public class RemoteClientTest {
 	
 	@Test public void testQueryAccount() {
 		Convex convex=getNewConvex();
+		checkValid(convex);
 		Map<String,Object> result=convex.queryAccount(convex.getAddress());
 		assertNotNull(result);
 		assertTrue(result.containsKey("sequence"));
@@ -44,6 +52,7 @@ public class RemoteClientTest {
 	
 	@Test public void testQueryAsync() throws InterruptedException, ExecutionException {
 		Convex convex=getNewConvex();
+		checkValid(convex);
 		Future<Map<String,Object>> f=convex.queryAsync ("(+ 1 2)");
 		Map<String,Object> result=f.get();
 		assertNotNull(result);
@@ -52,6 +61,7 @@ public class RemoteClientTest {
 	
 	@Test public void testTransact() {
 		Convex convex=getNewConvex();
+		checkValid(convex);
 		Map<String,Object> result=convex.transact ("(* 3 4)");
 		assertNotNull(result);
 		assertEquals(12L,result.get("value"),"Unexpected:"+JSON.toPrettyString(result));
@@ -59,6 +69,7 @@ public class RemoteClientTest {
 	
 	@Test public void testNewAccount() throws InterruptedException, ExecutionException {
 		Convex convex=getNewConvex();
+		checkValid(convex);
 		Address addr=convex.useNewAccount(1000666);
 		assertNotNull(addr);
 		Map<String,Object> acc1=convex.queryAccount();
@@ -77,7 +88,8 @@ public class RemoteClientTest {
 	}
 	
 	@Test public void testFaucet() {
-		Convex convex=Convex.connect(TEST_PEER);
+		Convex convex=getNewConvex();
+		checkValid(convex);
 		Address addr=convex.useNewAccount();
 		Map<String,Object> acc1=convex.queryAccount();
 		Map<String,Object> freq=convex.faucet(addr,999);
@@ -87,5 +99,19 @@ public class RemoteClientTest {
 		long bal2=((Number)acc2.get("balance")).longValue();
 		
 		assertEquals(999,bal2-bal1);
+	}
+	
+	@Test public void testResolve() {
+		Convex convex=Convex.connect(TEST_PEER);
+		assertNotNull(convex);
+	}
+
+	protected void checkValid(Convex convex) {
+		if (convex==null) {
+			System.err.println("null convex instance, skipping tests");
+			Assume.assumeTrue(false);
+		} else {
+			// OK?
+		}
 	}
 }
