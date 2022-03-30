@@ -4,7 +4,11 @@ All notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.7.5] - 2022-03-30
+### Added 
+- Adversarial test cases for Encodings
+- Efficient BlobBuilder utility class
+
 ### Changed
 - Convert CVM Characters to be Unicode code points
 - Convert CVM Strings to be UTF-8 (backed by Blobs)
@@ -12,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Miscellaneous edge cases with canonical encodings
+- Update logback dependency to fix potential security issues
+- Better validation for canonical Cells and Refs
 
 ## [0.7.4] - 2022-02-18
 ### Changed
