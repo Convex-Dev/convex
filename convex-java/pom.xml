@@ -8,7 +8,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.7.5-SNAPSHOT</version>
+		<version>0.7.5</version>
 	</parent>
 
 	<properties>
@@ -32,12 +32,12 @@
 		<dependency>
 			<groupId>world.convex</groupId>
 			<artifactId>convex-core</artifactId>
-			<version>0.7.5-SNAPSHOT</version>
+			<version>0.7.5</version>
 		</dependency>
 		<dependency>
 			<groupId>world.convex</groupId>
 			<artifactId>convex-peer</artifactId>
-			<version>0.7.5-SNAPSHOT</version>
+			<version>0.7.5</version>
 		</dependency>
 		<dependency>
 			<groupId>com.googlecode.json-simple</groupId>
