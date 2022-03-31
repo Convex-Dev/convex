@@ -3,8 +3,6 @@ package convex.core.data;
 import java.nio.ByteBuffer;
 
 import convex.core.Constants;
-import convex.core.data.type.AType;
-import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
@@ -22,8 +20,6 @@ import convex.core.util.Utils;
  */
 public class AccountKey extends AArrayBlob {
 	public static final int LENGTH = Constants.KEY_LENGTH;
-	
-	public static final AType TYPE = Types.BLOB;
 
 	public static final int LENGTH_BITS = LENGTH * 8;
 
@@ -32,11 +28,6 @@ public class AccountKey extends AArrayBlob {
 	private AccountKey(byte[] data, int offset, int length) {
 		super(data, offset, length);
 		if (length != LENGTH) throw new IllegalArgumentException("AccountKey length must be " + LENGTH + " bytes");
-	}
-	
-	@Override
-	public AType getType() {
-		return TYPE;
 	}
 	
 	@Override
@@ -109,15 +100,6 @@ public class AccountKey extends AArrayBlob {
 			sb.append(nonce);
 		}
 		return AccountKey.fromHex(sb.substring(0, LENGTH * 2));
-	}
-
-	@Override
-	public boolean equals(ABlob o) {
-		if (o==null) return false;
-		if (o instanceof AccountKey) return equals((AccountKey)o);
-		if (o.getType()!=TYPE) return false;
-		if (o.count()!=LENGTH) return false;
-		return o.equalsBytes(this.store, this.offset);
 	}
 
 	public boolean equals(AccountKey o) {

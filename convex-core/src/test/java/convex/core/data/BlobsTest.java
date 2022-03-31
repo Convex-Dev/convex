@@ -35,6 +35,12 @@ public class BlobsTest {
 		assertTrue(Blob.fromHex("01").compareTo(Blob.fromHex("01")) == 0);
 		assertTrue(Blob.fromHex("").compareTo(Blob.fromHex("")) == 0);
 	}
+	
+	@Test
+	public void testEqualsCases() {
+		assertNotEquals(Blob.fromHex("0000000000000001"),Address.create(1));
+		assertNotEquals(Address.create(1),Blob.fromHex("0000000000000001"));
+	}
 
 	@Test
 	public void testNullHash() {

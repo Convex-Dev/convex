@@ -6,12 +6,25 @@ import convex.core.data.prim.CVMChar;
 import convex.core.util.Utils;
 
 /**
- * Similar to Java StringBuilder designed for adding small Blobs
+ * Similar to Java StringBuilder designed for concatenating multiple small Blobs to produce a larger 
+ * Blob. 
  */
 public class BlobBuilder {
 
-	protected ABlob acc=Blob.EMPTY; // Always a canonical Blob with filled chunks
-	protected byte[] tail=null;
+	/**
+	 * Accumulator Blob, always a canonical Blob with filled chunks
+	 */
+	protected ABlob acc=Blob.EMPTY; 
+	
+	/**
+	 * Accumulator array for up to a single chunk worth of bytes
+	 * may be appended to, but never mutated below current position to allow safe wrapping in Blobs
+	 */
+	protected byte[] tail=null; // 
+	
+	/**
+	 * Total count of bytes in this BlobBuilder
+	 */
 	protected long count=0;
 	
 	public BlobBuilder() {

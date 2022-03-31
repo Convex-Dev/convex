@@ -89,15 +89,6 @@ public class Hash extends AArrayBlob {
 		return new Hash(hashBytes, offset);
 	}
 
-	@Override
-	public boolean equals(ABlob other) {
-		if (other==null) return false;
-		if (other instanceof Hash) return equals((Hash)other);
-		if (other.count()!=LENGTH) return false;
-		if (other.getType()!=TYPE) return false;
-		return other.equalsBytes(this.store, this.offset);
-	}
-
 	/**
 	 * Tests if the Hash value is precisely equal to another non-null Hash value.
 	 * 

@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Random;
 
+import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
@@ -108,6 +109,7 @@ public class Blob extends AArrayBlob {
 		if (a instanceof Blob) return equals((Blob) a);
 		long n=count();
 		if (a.count()!=n) return false;
+		if (!(a.getType()==Types.BLOB)) return false;
 		if (n<=CHUNK_LENGTH) {
 			return a.equalsBytes(this.store, this.offset);
 		} else {
