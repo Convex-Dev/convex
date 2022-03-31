@@ -630,11 +630,6 @@ public class BlobTree extends ABlob {
 		long newCount=ch*childLength()+newChild.count();
 		return new BlobTree(newChildren, shift, newCount);
 	}
-	
-	@Override
-	public boolean isRegularBlob() {
-		return true;
-	}
 
 	@Override
 	public byte getTag() {

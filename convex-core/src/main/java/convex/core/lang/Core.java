@@ -2443,7 +2443,7 @@ public class Core {
 	 */
 	private static Context<?> registerCoreCode(AHashMap<Symbol, ACell> env) throws IOException {
 
-		//Awe use a fake state to build the initial environment with core address.
+		// We use a fake state to build the initial environment with core address.
 		Address ADDR = Address.ZERO;
 		State state = State.EMPTY.putAccount(ADDR, AccountStatus.createActor());
 		Context<?> ctx = Context.createFake(state, ADDR);

@@ -18,8 +18,16 @@ import convex.core.util.Utils;
  */
 public final class Address extends ALongBlob {
 
-
+	/**
+	 * The Zero Address
+	 */
 	public static final Address ZERO = Address.create(0);
+	
+	/**
+	 * Length of an Address in bytes (considered as a Blob)
+	 */
+	static final int BYTE_LENGTH = 8;
+
 
 	private Address(long value) {
 		super(value);
@@ -42,7 +50,7 @@ public final class Address extends ALongBlob {
 	 * @return Address instance, or null if not valid
 	 */
 	public static Address create(ABlob b) {
-		if (b.count()!=8) return null;
+		if (b.count()!=BYTE_LENGTH) return null;
 		return create(b.longValue());
 	}
 	
@@ -85,7 +93,7 @@ public final class Address extends ALongBlob {
 		if (hexString.length()>16) return null;
 		Blob b=Blob.fromHex(hexString);
 		if (b==null) return null;
-		if (b.length!=8) return null;
+		if (b.length!=BYTE_LENGTH) return null;
 		return create(b.longValue());
 	}
 	
@@ -176,7 +184,7 @@ public final class Address extends ALongBlob {
 
 	@Override
 	public Blob toFlatBlob() {
-		byte[] bs=new byte[8];
+		byte[] bs=new byte[BYTE_LENGTH];
 		Utils.writeLong(bs, 0, value);
 		return Blob.wrap(bs);
 	}
@@ -205,6 +213,7 @@ public final class Address extends ALongBlob {
 
 	@Override
 	public byte getTag() {
+		// Note this is NOT a regular Blob
 		return Tag.ADDRESS;
 	}
 

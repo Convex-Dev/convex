@@ -250,11 +250,6 @@ public class Blob extends AArrayBlob {
 	}
 
 	@Override
-	public boolean isRegularBlob() {
-		return true;
-	}
-
-	@Override
 	public byte getTag() {
 		return Tag.BLOB;
 	}

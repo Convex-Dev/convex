@@ -420,7 +420,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 * @return True if a regular blob
 	 */
 	public boolean isRegularBlob() {
-		return getTag()==Tag.BLOB;
+		return true;
 	}
 	
 	@Override public final boolean isCVMValue() {
