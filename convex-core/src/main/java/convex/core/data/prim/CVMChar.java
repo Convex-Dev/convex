@@ -95,7 +95,7 @@ public final class CVMChar extends APrimitive {
 	}
 	
 	public static CVMChar read(int len,ByteBuffer bb) throws BadFormatException {
-		int value=0xff000000;
+		int value=0xff000000; // High byte should be shifted away, here to catch errors
 		for (int i=0; i<len;i++) {
 			if (value==0) throw new BadFormatException("Leading zero in CVMChar encoding");
 			byte b=bb.get();
@@ -109,13 +109,13 @@ public final class CVMChar extends APrimitive {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		int len=encodedCharLength(value);
-		bs[pos++]=(byte)(Tag.CHAR+(len-1));
+		bs[pos++]=getTag();
 		return encodeRaw(len,bs,pos);
 	}
 
 	public int encodeRaw(int len,byte[] bs, int pos) {
 		for (int i=0; i<len; i++) {
-			bs[pos+i]=(byte)((value>>((len-(i+1))*8))&0xff);
+			bs[pos+i]=(byte)((value>>((len-1-i)*8))&0xff);
 		}
 		return pos+len;
 	}
@@ -173,7 +173,7 @@ public final class CVMChar extends APrimitive {
 	}
 	
 	/**
-	 * Parses a Character from a String
+	 * Parses a Character from a Java String, as interpreted by the Reader e.g. "\newline" or "\c"
 	 * @param s String to parse
 	 * @return CVMChar instance, or null if not valid
 	 */
