@@ -144,7 +144,7 @@ public final class CVMChar extends APrimitive {
 				if (Character.isBmpCodePoint(value)) {
 					bb.append((char)value);
 				} else {
-					bb.append(toString());
+					bb.append(toUTFBytes());
 				}
 			}
 		}
@@ -152,7 +152,8 @@ public final class CVMChar extends APrimitive {
 	}
 
 	/**
-	 * Returns the Java String representation of this CVMChar.
+	 * Returns the Java String representation of this CVMChar. Returns a bad character representation in
+	 * the case that the UTF code point of this Character is invalid
 	 * 
 	 * Different from {@link #print() print()} which returns a readable representation.
 	 *

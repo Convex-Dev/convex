@@ -123,6 +123,22 @@ public class BlobsTest {
 	}
 	
 	@Test
+	public void testBlobBuilderBytes() {
+		BlobBuilder bb=new BlobBuilder();
+		bb.append(new byte[0]);
+		assertEquals(0,bb.count());
+		byte[] bs=new byte[1000];
+		for (int i=0; i<bs.length; i++) bs[i]=(byte)i;
+		
+		for (int i=0; i<100; i++) {
+			bb.append(bs);
+		}
+		ABlob b=bb.toBlob();
+		assertEquals(Blob.wrap(bs), b.slice(10000, 1000));
+		assertEquals(100000,b.count());
+	}
+	
+	@Test
 	public void testBlobBuilderLarge() {
 		ABlob src=Strings.create("abcde").toBlob();
 		long sn=5;

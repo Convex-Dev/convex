@@ -74,7 +74,7 @@ public class BlobBuilder {
 	 */
 	private void completeChunk() {
 		if (tail.length!=Blob.CHUNK_LENGTH) throw new Error("tail not complete! Has length: "+tail.length);
-		Blob b=Blob.wrap(tail);
+		Blob b=Blob.wrap(tail,0,arrayPos());
 		acc=acc.append(b);
 		tail=null;
 	}
@@ -152,6 +152,25 @@ public class BlobBuilder {
 		return this;
 	}
 	
+	public void append(byte[] bs) {
+		append(bs,0,bs.length);
+	}
+	
+	public void append(byte[] bs, int offset, int length) {
+		while (length>0) {
+			int split=Math.min(length, spare());
+			int pos=arrayPos();
+			ensureArray(pos+split);
+			System.arraycopy(bs, offset, tail, pos, split);
+			count+=split;
+			length-=split;
+			offset+=split;
+			if (spare()==0) {
+				completeChunk();
+			}
+		}
+	}
+
 	public BlobBuilder append(char c) {
 		if (c<128) {
 			return append((byte)c);
@@ -223,6 +242,7 @@ public class BlobBuilder {
 		tail=null;
 		count=0;
 	}
+
 
 
 }
