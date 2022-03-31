@@ -23,8 +23,6 @@ public class AccountKey extends AArrayBlob {
 
 	public static final int LENGTH_BITS = LENGTH * 8;
 
-	public static final AccountKey ZERO = AccountKey.dummy("0");
-
 	private AccountKey(byte[] data, int offset, int length) {
 		super(data, offset, length);
 		if (length != LENGTH) throw new IllegalArgumentException("AccountKey length must be " + LENGTH + " bytes");

@@ -74,6 +74,7 @@ public class Samples {
 	 */
 	public static final Address BAD_ADDRESS = Address.create(7777777777L);
 	public static final AccountKey BAD_ACCOUNTKEY = AccountKey.dummy("bbbb");
+	public static final AccountKey ZERO_ACCOUNTKEY = AccountKey.dummy("0");
 	
 	public static final AKeyPair KEY_PAIR=Ed25519KeyPair.createSeeded(13371337L);
 	public static final AccountKey ACCOUNT_KEY = KEY_PAIR.getAccountKey();
@@ -265,6 +266,7 @@ public class Samples {
 		return (T) a;
 	}
 
+
 	@Test
 	public void validateDataObjects() throws InvalidDataException, ValidationException {
 		INT_VECTOR_300.validate();
@@ -307,7 +309,7 @@ public class Samples {
 			Do.EMPTY,
 			Address.ZERO,
 			Address.create(666666),
-			AccountKey.ZERO,
+			Samples.ZERO_ACCOUNTKEY,
 			CVMChar.A
 	};
 	

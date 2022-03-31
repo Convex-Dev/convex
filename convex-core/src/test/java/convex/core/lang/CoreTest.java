@@ -2460,8 +2460,8 @@ public class CoreTest extends ACVMTest {
 		Context<?> ctx=context();
 
 		ctx=step(ctx,"(set-key 0x0000000000000000000000000000000000000000000000000000000000000000)");
-		assertEquals(AccountKey.ZERO,ctx.getResult());
-		assertEquals(AccountKey.ZERO,eval(ctx,"*key*"));
+		assertEquals(Samples.ZERO_ACCOUNTKEY,ctx.getResult());
+		assertEquals(eval(ctx,"*key*"),Samples.ZERO_ACCOUNTKEY);
 
 		ctx=step(ctx,"(set-key nil)");
 		assertNull(ctx.getResult());
