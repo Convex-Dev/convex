@@ -121,7 +121,7 @@ public class ANTLRTest {
 	}
 	
 	@Test public void testStrings() {
-		assertEquals(Strings.create(""), read("\"\""));
+		assertSame(Strings.empty(), read("\"\""));
 		assertEquals(Strings.create("a"), read("\"a\""));
 		assertEquals(Strings.create("bar"), read("\"bar\""));
 		assertEquals(Strings.create("ba\nr"), read("\"ba\\\nr\""));
@@ -132,7 +132,6 @@ public class ANTLRTest {
 		assertEquals(Lists.of(1,2),readAll(" 1 2 "));
 		
 		assertThrows(ParseException.class,()->readAll("1 2 ("));
-
 	}
 	
 	@Test public void testPath() {
@@ -140,21 +139,40 @@ public class ANTLRTest {
 		assertEquals(Lists.of(Symbols.LOOKUP,Address.ZERO,Symbols.DIVIDE),AntlrReader.read("#0//"));
 	}
 
-	@Test public void testError() {
-		assertThrows(ParseException.class,()->read("1 2"));
-		assertThrows(ParseException.class,()->read("1.0e0.1234"));
+	@Test public void testParseErrors() {
+		doParseErrorCheck("1 2");
+		doParseErrorCheck("1.0e0.1234");
+		doParseErrorCheck("((");
+		doParseErrorCheck("]");
+		doParseErrorCheck("#{");
+		doParseErrorCheck("#1/#2");
+		doParseErrorCheck("0x0"); // not a round number of hex digits
+		doParseErrorCheck("0xgg"); // not a valid hex digit, GG parser
 	}
 	
+	private void doParseErrorCheck(String s) {
+		assertThrows(ParseException.class,()->read(s));
+	}
+	
+	/**
+	 * Most CVM value representations should round trip correctly through the Reader. Test these here
+	 */
 	@Test public void roundTripTests() {
 		// Primitives
 		doRoundTripTest("1");
 		doRoundTripTest("#666");
-		doRoundTripTest("0xff");
-		doRoundTripTest("0x0123456789abcdef");
 		doRoundTripTest("nil");
 		doRoundTripTest("true");
 		doRoundTripTest("false");
 		doRoundTripTest("1.0E30");
+		doRoundTripTest("0.001"); // Minimum Java double printed normally
+		doRoundTripTest("9999999.0"); 
+		doRoundTripTest("9999999.999999998"); // Maximum Java double printed normally
+		
+		// small Blobs in canonical format
+		doRoundTripTest("0x");
+		doRoundTripTest("0xff");
+		doRoundTripTest("0x0123456789abcdef");
 		
 		// Syntax Objects
 		doRoundTripTest("^{:foo :bar} [:a nil 3]");
@@ -177,11 +195,12 @@ public class ANTLRTest {
 		doRoundTripTest("\\a");
 		doRoundTripTest("\\\u1234"); // Unicode UTF-16 format
 		doRoundTripTest("\"abc\"");
+		doRoundTripTest("\"\""); // empty CVM string
 		
 		// Code forms
 		doRoundTripTest("(fn [x] (* x x))");
 	}
-
+	
 	private void doRoundTripTest(String s) {
 		ACell a=Reader.read(s);
 		if (a!=null) {
@@ -195,5 +214,59 @@ public class ANTLRTest {
 		
 		ObjectsTest.doAnyValueTests(a);
 	}
+	
+	/**
+	 * Some Strings should read correctly, but print differently. Test these here
+	 */
+	@Test public void differentPrintTests() {
+		// Conversions to computerised scientific notation as specified in Java spec Double.toString()
+		doDifferentPrintTests("0.0001","1.0E-4"); // less than 1e-3 -> scientific
+		doDifferentPrintTests("0.000999999999999","9.99999999999E-4"); 
+		doDifferentPrintTests("10000000.0","1.0E7"); // greater than or equal to 1e7 -> scientific
+		doDifferentPrintTests("-99999999.0","-9.9999999E7");
+		doDifferentPrintTests("1.333333333333333333333333","1.3333333333333333"); // Rounding to nearest unique double
+		
+		// Re-ordering of entries in hashmaps / sets
+		doDifferentPrintTests("#{1 3 5 7}","#{5,1,3,7}");
+		doDifferentPrintTests("{1 2 03 4 5 6 7 8}","{5 6,1 2,3 4,7 8}");
+		
+		// superfluous numerical digits are excluded
+		doDifferentPrintTests("001","1");
+		doDifferentPrintTests("00.1","0.1");
+		doDifferentPrintTests("01.00","1.0");
+		doDifferentPrintTests("#0001","#1");
+		
+		// normalisation of formatting
+		doDifferentPrintTests("(fn[] )","(fn [])");
+		doDifferentPrintTests("[1():foo,bar]","[1 () :foo bar]"); 
+		
+		// Path lookups
+		doDifferentPrintTests("#1/foo","(lookup #1 foo)");
+		doDifferentPrintTests("#1/foo/bar","(lookup (lookup #1 foo) bar)");
+		
+		// Non-canonical hex capitalisation
+		doDifferentPrintTests("0xCaFeBaBe","0xcafebabe");
+		
+		// Quoting etc.
+		doDifferentPrintTests("'foo","(quote foo)");
+		doDifferentPrintTests("~foo","(unquote foo)");
+		doDifferentPrintTests("~@(foo)","(unquote-splicing (foo))");
+		doDifferentPrintTests("`[foo bar]","(quasiquote [foo bar])");
+		
+		// Syntax Objects
+		doDifferentPrintTests("^{} []","(syntax {} [])");
+
+	}
+
+	private void doDifferentPrintTests(String src, String dst) {
+		ACell a=Reader.read(src);
+		ACell b=Reader.read(dst);
+		assertEquals(a,b);
+		assertEquals(dst,a.print().toString());
+		
+		doRoundTripTest(dst); // final value should round trip normally
+	}
+
+
 
 }

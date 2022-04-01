@@ -89,7 +89,9 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	protected abstract boolean appendHex(BlobBuilder bb, long length);
 
 	/**
-	 * Converts this blob to a readable byte buffer. WARNING: may be large.
+	 * Converts this blob to a readable byte buffer. 
+	 * 
+	 * WARNING: may be large. May refer to underlying byte array so should not be mutated
 	 * 
 	 * @return ByteBuffer with position zero (ready to read)
 	 */
@@ -328,7 +330,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	}
 
 	/**
-	 * Gets a byte buffer containing this Blob's data. Will have remaining bytes
+	 * Gets a byte buffer containing this Blob's raw data. Will have remaining bytes
 	 * equal to this Blob's size.
 	 * 
 	 * @return A ByteBuffer containing the Blob's data.
