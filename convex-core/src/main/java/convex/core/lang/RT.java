@@ -824,7 +824,7 @@ public class RT {
 			throw new IndexOutOfBoundsException("Can't get nth element from null");
 
 		if (o instanceof ACountable)
-			return ((ACountable<T>) o).get(i); // blobs, maps and collections
+			return ((ACountable<T>) o).get(i); // blobs, maps, strings and collections
 
 		throw new ClassCastException("Don't know how to get nth item of type " + RT.getType(o));
 	}
@@ -941,7 +941,7 @@ public class RT {
 		if (a.getType()==Types.BLOB) {
 			return Strings.create(((ABlob)a).toHexString());
 		}
-		// TODO: Needs optimisation? toCVMString?
+		// TODO: Needs optimisation? toCVMString? print limit?
 		AString s = Strings.create(a.toString());
 		return s;
 	}
@@ -1402,12 +1402,12 @@ public class RT {
 	}
 
 	/**
-	 * Associates a key with a given value in an associative data structure
+	 * Associates a key position with a given value in an associative data structure
 	 * 
 	 * @param coll  Any associative data structure
 	 * @param key   Key to update or add
 	 * @param value Value to associate with key
-	 * @return Updated data structure, or null if cast fails
+	 * @return Updated data structure, or null if implicit cast of key or value to required type fails
 	 */
 	@SuppressWarnings("unchecked")
 	public static <R extends ACell> ADataStructure<R> assoc(ADataStructure<R> coll, ACell key, ACell value) {
@@ -1529,7 +1529,7 @@ public class RT {
 	}
 
 	public static boolean isValidAmount(long amount) {
-		return ((amount >= 0) && (amount < Constants.MAX_SUPPLY));
+		return ((amount >= 0) && (amount <= Constants.MAX_SUPPLY));
 	}
 
 	/**
