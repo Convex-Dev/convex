@@ -146,6 +146,8 @@ public class ANTLRTest {
 		doParseErrorCheck("]");
 		doParseErrorCheck("#{");
 		doParseErrorCheck("#1/#2");
+		doParseErrorCheck("#-3");
+
 		doParseErrorCheck("0x0"); // not a round number of hex digits
 		doParseErrorCheck("0xgg"); // not a valid hex digit, GG parser
 	}
@@ -254,8 +256,7 @@ public class ANTLRTest {
 		doDifferentPrintTests("`[foo bar]","(quasiquote [foo bar])");
 		
 		// Syntax Objects
-		doDifferentPrintTests("^{} []","(syntax {} [])");
-
+		doDifferentPrintTests("^{} [ ]","^{} []");
 	}
 
 	private void doDifferentPrintTests(String src, String dst) {

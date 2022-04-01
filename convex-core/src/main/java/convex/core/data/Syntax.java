@@ -27,6 +27,8 @@ import convex.core.lang.RT;
 public class Syntax extends ACell {
 	public static final Syntax EMPTY = create(null, null);
 
+	public static final AString EMPTY_META_PREFIX = Strings.create("^{} ");
+
 	/**
 	 * Ref to the unwrapped datum value. Cannot refer to another Syntax object
 	 */
@@ -179,15 +181,15 @@ public class Syntax extends ACell {
 	}
 
 	@Override
-	public boolean print(BlobBuilder sb, long limit) {
+	public boolean print(BlobBuilder bb, long limit) {
 		if (meta==null) {
-			sb.append("^{} ");
+			bb.append(EMPTY_META_PREFIX);
 		} else {
-			sb.append('^');
-			if (!meta.print(sb,limit)) return false;
-			sb.append(' ');
+			bb.append('^');
+			if (!meta.print(bb,limit)) return false;
+			bb.append(' ');
 		}
-		return RT.print(sb, datumRef.getValue(),limit);
+		return RT.print(bb, datumRef.getValue(),limit);
 	}
 
 	@Override
