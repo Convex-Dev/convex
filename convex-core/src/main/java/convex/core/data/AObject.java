@@ -9,16 +9,22 @@ public abstract class AObject {
 	protected Blob encoding;
 
 	/**
-	 * Prints this Object to a readable String Representation
+	 * Prints this Object to a readable String Representation. 
 	 * 
-	 * @param sb StringBuilder to append to
+	 * SECURITY: Must halt and return false in O(1) time if limit of printing is exceeded otherwise
+	 * DoS attacks may be possible.
+	 * 
+	 * @param sb BlobBuilder to append to
 	 * @param limit Limit of printing in string bytes
-	 * @return True if fully printed, false otherwise
+	 * @return True if fully printed within limit, false otherwise
 	 */
 	public abstract boolean print(BlobBuilder sb, long limit);
 	
 	/**
-	 * Prints this Object as a CVM String value
+	 * Prints this Object as a CVM String value, for human consumption. 
+	 * 
+	 * May include readable message indicating failure if print limit exceeded.
+	 * 
 	 * @return String representation
 	 */
 	public final AString print() {
@@ -26,7 +32,10 @@ public abstract class AObject {
 	}
 	
 	/**
-	 * Prints this Object as a CVM String value
+	 * Prints this Object as a CVM String value, for human consumption. 
+	 * 
+	 * May include readable message indicating failure if print limit exceeded.
+	 * 
 	 * @param limit Limit of bytes to print
 	 * @return String representation
 	 */

@@ -594,8 +594,8 @@ public class Utils {
 	/**
 	 * Converts a long to an int, throws error if out of allowable range.
 	 *
-	 * @param a Value to convert
-	 * @return int value of the long if in valid Integer range
+	 * @param a Long value to convert
+	 * @return Value of the long if in valid Integer range
 	 */
 	public static int checkedInt(long a) {
 		int i = (int) a;
@@ -608,6 +608,7 @@ public class Utils {
 	 *
 	 * @param a Value to convert
 	 * @return short value of the long if in valid Short range
+	 * @throws IllegalArgumentException if out of legal range
 	 */
 	public static short checkedShort(long a) {
 		short s = (short) a;
@@ -620,6 +621,7 @@ public class Utils {
 	 *
 	 * @param a Value to convert
 	 * @return byte value of the long if in valid Byte range
+	 * @throws IllegalArgumentException if out of legal range
 	 */
 	public static byte checkedByte(long a) {
 		byte b = (byte) a;

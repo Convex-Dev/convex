@@ -207,7 +207,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	}
 
 	/**
-	 * Gets a byte array containing a copy of this data object.
+	 * Gets a byte array containing a copy of this Blob.
 	 * 
 	 * @return A new byte array containing the contents of this blob.
 	 */

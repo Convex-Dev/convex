@@ -4,16 +4,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
+import convex.core.data.ObjectsTest;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
@@ -24,6 +27,7 @@ import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
+import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
 
 public class ANTLRTest {
@@ -139,6 +143,42 @@ public class ANTLRTest {
 	@Test public void testError() {
 		assertThrows(ParseException.class,()->read("1 2"));
 		assertThrows(ParseException.class,()->read("1.0e0.1234"));
+	}
+	
+	@Test public void roundTripTests() {
+		doRoundTripTest("1");
+		doRoundTripTest("#666");
+		doRoundTripTest("0xff");
+		doRoundTripTest("0x0123456789abcdef");
+		doRoundTripTest("nil");
+		doRoundTripTest("true");
+		doRoundTripTest("false");
+		doRoundTripTest("[]");
+		doRoundTripTest("{}");
+		doRoundTripTest("{5 6,1 2,3 4,7 8}"); // Note hash order
+		doRoundTripTest("#{5,1,3,7}");
+		doRoundTripTest("[1 :foo #{} \\a 0x 9.0 100.0 ##Inf]");
+		doRoundTripTest("()");
+		doRoundTripTest(":foo");
+		doRoundTripTest("bar");
+		doRoundTripTest("\\newline");
+		doRoundTripTest("\\a");
+		doRoundTripTest("\\\u1234"); // Unicode UTF-16 format
+		doRoundTripTest("\"abc\"");
+	}
+
+	private void doRoundTripTest(String s) {
+		ACell a=Reader.read(s);
+		if (a!=null) {
+			assertTrue(a.isCanonical());
+			AString ps=a.print();
+			assertEquals(s,ps.toString());
+			assertEquals(Strings.create(s),ps);
+		} else {
+			assertEquals("nil",s);
+		}
+		
+		ObjectsTest.doAnyValueTests(a);
 	}
 
 }

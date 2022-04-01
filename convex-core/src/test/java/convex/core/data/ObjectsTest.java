@@ -104,6 +104,24 @@ public class ObjectsTest {
 		doCellValidationTests(a);
 		doRefContainerTests(a);
 		doCellRefTests(a);
+		doPrintTests(a);
+	}
+
+	private static void doPrintTests(ACell a) {
+		BlobBuilder bb=new BlobBuilder();
+		assertFalse(a.print(bb,0)); // should always fail to print with limit of 0
+		
+		doPrintTest(a,2);
+		doPrintTest(a,101);
+	}
+
+	private static void doPrintTest(ACell a, int len) {
+		BlobBuilder bb=new BlobBuilder();
+		if (a.print(bb,len)) {
+			AString s=bb.getCVMString();
+			assertTrue(s.count()<=len); // should fit in length specified
+			assertEquals(s,a.print());
+		} 
 	}
 
 	private static void doCellValidationTests(ACell a) {
