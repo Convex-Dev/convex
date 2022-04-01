@@ -76,20 +76,17 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 */
 	public final String toHexString(int hexLength) {
 		BlobBuilder bb=new BlobBuilder();
-		appendHexString(bb,hexLength);
+		appendHex(bb,hexLength);
 		return bb.getCVMString().toString();
-	}
-	
-	public final void toHexString(BlobBuilder bb) {
-		appendHexString(bb,Utils.checkedInt(count()*2));
 	}
 
 	/**
-	 * Append hex string up to the given length (a multiple of two)
-	 * @param sb
-	 * @param length
+	 * Append hex string up to the given length in hex digits (a multiple of two)
+	 * @param bb BlobBuilder instance to append to
+	 * @param length Length in Hex digits to append
+	 * @return true if Blob fully appended, false if more more hex digits remain
 	 */
-	protected abstract void appendHexString(BlobBuilder sb, int length);
+	protected abstract boolean appendHex(BlobBuilder bb, long length);
 
 	/**
 	 * Converts this blob to a readable byte buffer. WARNING: may be large.
@@ -192,7 +189,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	/**
 	 * Gets the specified hex digit from this data object.
 	 * 
-	 * Result is undefined if index is out of bounds, but probably an IndexOutOfBoundsException.
+	 * WARNING: Result is undefined if index is out of bounds, but probably an IndexOutOfBoundsException.
 	 * 
 	 * @param digitPos The position of the hex digit
 	 * @return The value of the hex digit, in the range 0-15 inclusive
@@ -205,7 +202,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 		//	return b & 0x0F; // second hex digit
 		//}
 		// This hack avoids a conditional, not sure if worth it....
-		int shift = 4-(((int)digitPos&1)<<2);
+		int shift = 4*(1-((int)digitPos&1));
 		return (b>>shift)&0x0F;
 	}
 
@@ -317,19 +314,17 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 */
 	public abstract Blob getChunk(long i);
 	
+	/**
+	 * Prints this Blob in a readable Hex representation, typically in the format "0x01abcd...."
+	 * 
+	 * Subclasses may override this if they require a different representation.
+	 */
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
 		bb.append(Strings.HEX_PREFIX);
-		if (!bb.check(limit-(count()*2))) return false;
-		toHexString(bb);
-		return true;
-	}
-	
-	@Override
-	public AString toCVMString(long limit) {
-		if (limit<count()*2) return null;
-		// TODO: optimise
-		return Strings.create(toHexString());
+		limit-=2;
+		if (!bb.check(limit)) return false;
+		return appendHex(bb,limit);
 	}
 
 	/**

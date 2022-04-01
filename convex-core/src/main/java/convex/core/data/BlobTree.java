@@ -526,13 +526,14 @@ public class BlobTree extends ABlob {
 	}
 
 	@Override
-	public void appendHexString(BlobBuilder sb, int length) {
+	public boolean appendHex(BlobBuilder bb, long length) {
 		for (int i = 0; i < children.length; i++) {
 			ABlob child=children[i].getValue();
-			child.appendHexString(sb,length);
+			if (!child.appendHex(bb,length)) return false; // bail out if not fully printed
 			length-=Utils.checkedInt(child.count()*2);
-			if (length<=0) break;
+			if (length<0) return false;
 		}
+		return true;
 	}
 
 	@Override

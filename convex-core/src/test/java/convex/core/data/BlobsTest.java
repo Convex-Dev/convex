@@ -173,9 +173,9 @@ public class BlobsTest {
 		LongBlob b = LongBlob.create("cafebabedeadbeef");
 		Blob bb = Blob.fromHex("cafebabedeadbeef");
 		
-		assertEquals(b.getContentHash(),bb.getContentHash()); // same data hash
-		
+		assertEquals(b.getContentHash(),bb.getContentHash()); // same data hash		
 		assertEquals(b.longValue(),bb.longValue());
+		assertEquals(0xcafebabedeadbeefl,b.longValue());
 
 		assertEquals(10, b.getHexDigit(1)); // 'a'
 
@@ -195,18 +195,39 @@ public class BlobsTest {
 		assertEquals(16, b.commonHexPrefixLength(bb));
 		assertEquals(10, b.commonHexPrefixLength(bb.slice(0, 5)));
 		assertEquals(8, bb.commonHexPrefixLength(b.slice(0, 4)));
-		
-		// LongBlobs considered as Blob type
+
 		assertEquals(bb, b); 
 		assertEquals(b, bb); 
-		
-		assertEquals(bb, b.toFlatBlob());
-		assertEquals(bb.hashCode(), b.hashCode());
 
-		doBlobTests(b);
-
+		doLongBlobTests(b.longValue());
 	}
 	
+	@Test
+	public void testLongBlobExamples() {
+		doLongBlobTests(-1);
+		doLongBlobTests(0);
+		doLongBlobTests(1);
+		doLongBlobTests(555);
+		doLongBlobTests(1l+Integer.MAX_VALUE);
+		doLongBlobTests(Long.MAX_VALUE);
+	}
+	
+	private void doLongBlobTests(long v) {
+		// LongBlobs considered as Blob type
+		LongBlob b=LongBlob.create(v);
+		Blob fb=b.toFlatBlob();
+		assertEquals(fb,b);
+		assertEquals(b,fb);
+		assertEquals(fb.hashCode(),b.hashCode());
+		
+		// Test Address conversion
+		if (b.longValue()>=0) {
+			assertEquals(b.toHexString(),Address.create(b).toHexString());
+		}
+		
+		doBlobTests(b);
+	}
+
 	@Test
 	public void testEmptyBlob() throws BadFormatException {
 		ABlob e = Blob.EMPTY;

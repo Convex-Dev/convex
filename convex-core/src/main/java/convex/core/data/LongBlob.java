@@ -60,12 +60,6 @@ public final class LongBlob extends ALongBlob {
 	}
 
 	@Override
-	public int getHexDigit(long i) {
-		if ((i < 0) || (i >= LENGTH * 2)) throw new IndexOutOfBoundsException(Errors.badIndex(i));
-		return 0x0F & (int) (value >> ((LENGTH * 2 - i - 1) * 4));
-	}
-
-	@Override
 	public long commonHexPrefixLength(ABlob b) {
 		if (b == this) return LENGTH * 2;
 

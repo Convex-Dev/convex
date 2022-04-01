@@ -7,7 +7,8 @@ import convex.core.util.Utils;
 
 public abstract class ALongBlob extends ABlob {
 
-	protected static final long LENGTH = 8;
+	protected static final int LENGTH = 8;
+	protected static final int HEX_LENGTH = LENGTH*2;
 	
 	protected final long value;
 
@@ -30,10 +31,18 @@ public abstract class ALongBlob extends ABlob {
 	}
 
 	@Override
-	public void appendHexString(BlobBuilder sb,int length) {
-		String s=Utils.toHexString(value);
-		if (length<s.length()) s=s.substring(0,length);
-		sb.append(s);
+	public boolean appendHex(BlobBuilder bb,long length) {
+		long n=Math.min(length, HEX_LENGTH);
+		for (int i=0; i<n; i++) {
+			bb.append(Utils.toHexChar(getHexDigit(i)));
+		}
+		return n==HEX_LENGTH;
+	}
+	
+	@Override
+	public int getHexDigit(long i) {
+		if ((i < 0) || (i >= HEX_LENGTH)) throw new IndexOutOfBoundsException(Errors.badIndex(i));
+		return 0x0F & (int) (value >> ((HEX_LENGTH - i - 1) * 4));
 	}
 
 	@Override
