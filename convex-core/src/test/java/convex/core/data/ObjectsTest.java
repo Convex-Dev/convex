@@ -106,6 +106,8 @@ public class ObjectsTest {
 		doCellRefTests(a);
 		doPrintTests(a);
 	}
+	
+
 
 	private static void doPrintTests(ACell a) {
 		BlobBuilder bb=new BlobBuilder();

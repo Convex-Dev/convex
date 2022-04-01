@@ -57,18 +57,18 @@ public class Reader {
 	/**
 	 * Parses an expression and returns a form as an Object
 	 * 
-	 * @param source
-	 * @return Parsed form
+	 * @param source Reader instance to get expression from
+	 * @return Parsed form (may be nil)
 	 */
 	public static ACell read(java.io.Reader source) throws IOException {
 		return AntlrReader.read(source);
 	}
 	
 	/**
-	 * Parses an expression and returns a form
+	 * Parses an expression and returns a canonical Cell representing a form
 	 * 
-	 * @param source
-	 * @return Parsed form
+	 * @param source Java source string to read
+	 * @return Parsed form (may be nil)
 	 */
 	@SuppressWarnings("unchecked")
 	public static <R extends ACell> R read(String source) {

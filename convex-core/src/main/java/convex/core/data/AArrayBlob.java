@@ -142,7 +142,7 @@ public abstract class AArrayBlob extends ABlob {
 
 	@Override
 	public final boolean appendHex(BlobBuilder bb, long hexLength) {
-		long n= Math.min((hexLength+1)/2, this.length); // Bytes to print
+		long n= Math.min((hexLength)/2, this.length); // Bytes to print
 		for (long i=0; i<n; i++) {
 			byte b=byteAt(i);
 			Utils.appendHexByte(bb,b);

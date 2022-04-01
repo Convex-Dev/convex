@@ -146,6 +146,7 @@ public class ANTLRTest {
 	}
 	
 	@Test public void roundTripTests() {
+		// Primitives
 		doRoundTripTest("1");
 		doRoundTripTest("#666");
 		doRoundTripTest("0xff");
@@ -153,18 +154,32 @@ public class ANTLRTest {
 		doRoundTripTest("nil");
 		doRoundTripTest("true");
 		doRoundTripTest("false");
+		doRoundTripTest("1.0E30");
+		
+		// Syntax Objects
+		doRoundTripTest("^{:foo :bar} [:a nil 3]");
+		doRoundTripTest("^{} nil");
+		
+		// Datat structures
 		doRoundTripTest("[]");
 		doRoundTripTest("{}");
-		doRoundTripTest("{5 6,1 2,3 4,7 8}"); // Note hash order
+		doRoundTripTest("{5 6,1 2,3 4,7 8}"); // Note hash order, entry delimiters
 		doRoundTripTest("#{5,1,3,7}");
 		doRoundTripTest("[1 :foo #{} \\a 0x 9.0 100.0 ##Inf]");
 		doRoundTripTest("()");
+		
+		// Symbolic names
 		doRoundTripTest(":foo");
 		doRoundTripTest("bar");
+		
+		// Strings and characters
 		doRoundTripTest("\\newline");
 		doRoundTripTest("\\a");
 		doRoundTripTest("\\\u1234"); // Unicode UTF-16 format
 		doRoundTripTest("\"abc\"");
+		
+		// Code forms
+		doRoundTripTest("(fn [x] (* x x))");
 	}
 
 	private void doRoundTripTest(String s) {

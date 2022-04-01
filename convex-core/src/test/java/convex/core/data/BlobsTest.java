@@ -41,6 +41,11 @@ public class BlobsTest {
 		assertNotEquals(Blob.fromHex("0000000000000001"),Address.create(1));
 		assertNotEquals(Address.create(1),Blob.fromHex("0000000000000001"));
 	}
+	
+	@Test 
+	public void testRegressions() {
+		doBlobTests(Blob.fromHex("52efa4a423395cb4139003ca5ceaceac83164cc063e99c46fd6b1db02458d93d04a628b0e682b74e573d161706420ff7f115"));
+	}
 
 	@Test
 	public void testNullHash() {
