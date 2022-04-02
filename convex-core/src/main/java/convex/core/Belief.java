@@ -177,17 +177,24 @@ public class Belief extends ARecord {
 		return result;
 	}
 
+	/**
+	 * Assemble the latest list of orders from all peers by merging from each Belief received
+	 * @param mc
+	 * @param beliefs
+	 * @return
+	 */
 	private BlobMap<AccountKey, SignedData<Order>> accumulateOrders(MergeContext mc,
 			Belief[] beliefs) {
 		// Initialise result with existing Orders from this Belief
 		BlobMap<AccountKey, SignedData<Order>> result = this.orders;
 		
-		// assemble the latest list of orders from all peers
+		// Iterate over each received Belief
 		for (Belief belief : beliefs) {
 			if (belief == null) continue; // ignore null beliefs, might happen if invalidated
 			if (belief.equals(this)) continue; // ignore an identical belief. Nothing to update.
 			BlobMap<AccountKey, SignedData<Order>> bOrders = belief.orders;
 			
+			// Iterate over each Peer's ordering convevey in this Belief
 			long bcount=bOrders.count();
 			for (long i=0; i<bcount; i++) {
 				MapEntry<AccountKey,SignedData<Order>> be=bOrders.entryAt(i);

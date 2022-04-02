@@ -27,7 +27,7 @@ public class Ed25519Signature extends ASignature {
 	/**
 	 * A Signature containing zero bytes (not valid)
 	 */
-	public static final ASignature ZERO = wrap(new byte[SIGNATURE_LENGTH]);
+	public static final Ed25519Signature ZERO = wrap(new byte[SIGNATURE_LENGTH]);
 	
 	private final byte[] signatureBytes;
 	
@@ -56,6 +56,7 @@ public class Ed25519Signature extends ASignature {
 	}
 	
 	@Override public final boolean isCVMValue() {
+		// We don't want Signatures in the CVM itself. Should always be checked by Peer.
 		return false;
 	}
 	

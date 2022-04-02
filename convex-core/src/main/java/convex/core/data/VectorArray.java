@@ -176,7 +176,7 @@ public class VectorArray<T extends ACell> extends AVector<T> {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		return toVector().encode(bs, pos);
+		return getCanonical().encode(bs, pos);
 	}
 
 	@SuppressWarnings("unchecked")

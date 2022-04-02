@@ -104,7 +104,6 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 
 	@Override
 	public AHashMap<K, V> filterValues(Predicate<V> pred) {
-		// TODO make more efficient?
 		return mergeWith(this, (a, b) -> pred.test(a) ? a : null);
 	}
 	

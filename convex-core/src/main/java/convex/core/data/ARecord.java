@@ -14,9 +14,9 @@ import convex.core.lang.impl.RecordFormat;
 import convex.core.util.Utils;
 
 /**
- * Base class for record data types. 
+ * Base class for Record data types. 
  * 
- * Records are map-like data structures with fixed sets of keys, and optional custom behaviour.
+ * Records are Map-like data structures with fixed sets of keys, and optional custom behaviour.
  * 
  * Ordering of fields is defined by the Record's RecordFormat
  *

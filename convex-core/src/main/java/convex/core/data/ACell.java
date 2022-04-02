@@ -398,9 +398,8 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		// This will always throw an error if not overridden. Provided for warning purposes if accidentally used.
 		if (getRefCount()==0) {
 			throw new IndexOutOfBoundsException("No Refs to get in "+Utils.getClassName(this));
-		} else {
-			throw new TODOException(Utils.getClassName(this) +" does not yet implement getRef(i) for i = "+i);
-		}
+		} 
+		throw new TODOException(Utils.getClassName(this) +" does not yet implement getRef(i) for i = "+i);
 	}
 	
 	/**

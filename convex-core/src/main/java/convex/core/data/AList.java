@@ -61,7 +61,6 @@ public abstract class AList<T extends ACell> extends ASequence<T> {
 	@Override
 	public abstract <R extends ACell> AList<R> assoc(long i, R value);
 
-	// TODO: make sure this is O(1)?
 	/**
 	 * Drops elements from the front of the list.
 	 * @param n Number of elements to drop

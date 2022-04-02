@@ -94,7 +94,7 @@ public class Peer {
 	 * Constructs a Peer instance from persisted PEer Data
 	 * @param keyPair Key Pair for Peer
 	 * @param peerData Peer data map
-	 * @return NEw Peer instance
+	 * @return New Peer instance
 	 */
 	@SuppressWarnings("unchecked")
 	public static Peer fromData(AKeyPair keyPair,AMap<Keyword, ACell> peerData)  {
@@ -106,7 +106,7 @@ public class Peer {
 	}
 
 	/**
-	 * Gets the Peer Datat map for this Peer
+	 * Gets the Peer Data map for this Peer
 	 * @return Peer data
 	 */
 	public AMap<Keyword, ACell> toData() {
@@ -417,7 +417,7 @@ public class Peer {
 			State s = newStates.get(stateIndex);
 			SignedData<Block> block = blocks.get(stateIndex);
 			
-			// TODO: Block signature validation?
+			// TODO: Block signature validation here?
 			BlockResult br = s.applyBlock(block.getValue());
 			newStates = newStates.append(br.getState());
 			newResults = newResults.append(br);

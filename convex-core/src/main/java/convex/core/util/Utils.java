@@ -822,7 +822,7 @@ public class Utils {
 	}
 
 	/**
-	 * Prints an Object in readable String representation
+	 * Prints an Object in readable String representation to a Java StringBuilder
 	 * @param sb StringBuilder to append to
 	 * @param v Object to print
 	 */
