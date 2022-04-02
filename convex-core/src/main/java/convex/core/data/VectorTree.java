@@ -295,7 +295,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 				result = result.appendChunk(chunk);
 				bi += Vectors.CHUNK_SIZE;
 			} else {
-				// we have less than a chunk left, so final result must be a ListVector with the
+				// we have less than a chunk left, so final result must be a VectorLeaf with the
 				// current result as tail
 				VectorLeaf<T> head = (VectorLeaf<T>) b.subVector(bi, bLen - bi);
 				return ((VectorLeaf<R>)head).withPrefix(result);
@@ -681,13 +681,26 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	public AVector<T> subVector(long start, long length) {
 		checkRange(start, length);
 		if ((start & Vectors.BITMASK) == 0) {
-			// TODO: this can be fast!
+			// Starting at a chunk boundary, so this can be fast by re-using existing chunks
+			int chunks=Utils.checkedInt((length+15)/Vectors.CHUNK_SIZE);
+			AVector<T> result=Vectors.empty();
+			for (int i=0; i<chunks; i++) {
+				long ix=i*Vectors.CHUNK_SIZE; // Offset after start to copy chunk from
+				AVector<T> chunk=getChunk(start+ix);
+				if (ix+Vectors.CHUNK_SIZE>length) {
+					chunk=chunk.subVector(0, length-ix);
+				}
+				result=result.concat(chunk);
+			}
+			return result;
+		} else {
+			// Doesn't start on chunk boundary, so nothing better to do than rebuild via array
+			ACell[] arr = new ACell[Utils.checkedInt(length)];
+			for (int i = 0; i < length; i++) {
+				arr[i] = get(start + i);
+			}
+			return (AVector<T>) Vectors.create(arr);
 		}
-		ACell[] arr = new ACell[Utils.checkedInt(length)];
-		for (int i = 0; i < length; i++) {
-			arr[i] = get(start + i);
-		}
-		return (AVector<T>) Vectors.create(arr);
 	}
 
 	@Override
