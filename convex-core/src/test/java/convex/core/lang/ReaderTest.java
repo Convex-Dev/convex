@@ -26,6 +26,9 @@ import convex.core.data.prim.CVMDouble;
 import convex.core.exceptions.ParseException;
 import convex.test.Samples;
 
+/**
+ * Test class for general Reader behaviour. More specific ANTLR tests are also provided in ANTLRTest
+ */
 public class ReaderTest {
 
 	@Test

@@ -46,23 +46,38 @@ public class ANTLRTest {
 		assertNull(read("nil"));
 	}
 		
-	@Test public void testPrimitives () {
+	@Test public void testBooleans () {
 		assertSame(CVMBool.TRUE,read("true"));
 		assertSame(CVMBool.FALSE,read("false"));
+	}
+	
+	@Test public void testLongs () {
 		assertEquals(CVMLong.create(17),read("17"));
 		assertEquals(CVMLong.create(-2),read("-2"));
-		assertEquals(CVMLong.ZERO,read("0"));
+		assertSame(CVMLong.ZERO,read("0"));
 		
+		
+		assertParseError("-999999999999999999999999999999999999999999999");
 		assertParseError("999999999999999999999999999999999999999999999");
 	}
 		
-	@Test public void testDataStructures() {
-		// basic data structures
+	@Test public void testVectors() {
 		assertEquals(Vectors.of(1,2),read("[1 2]"));
+	}
+	
+	@Test public void testLists() {
 		assertEquals(Lists.of(1,2),read("(1 2)"));
+	}
+	
+	@Test public void testSets() {
 		assertEquals(Sets.of(1,2),read("#{1 2}"));
+	}
+	
+	@Test public void testMaps() {
 		assertEquals(Maps.of(1,2),read("{1 2}"));
+	}
 		
+	@Test public void testEmptyDataStructures() {
 		// empty structures
 		assertSame(Sets.empty(),read("#{}"));
 		assertSame(Lists.empty(),read("()"));
@@ -199,7 +214,7 @@ public class ANTLRTest {
 		doRoundTripTest("^{:foo :bar} [:a nil 3]");
 		doRoundTripTest("^{} nil");
 		
-		// Datat structures
+		// Data structures
 		doRoundTripTest("[]");
 		doRoundTripTest("{}");
 		doRoundTripTest("{5 6,1 2,3 4,7 8}"); // Note hash order, entry delimiters
