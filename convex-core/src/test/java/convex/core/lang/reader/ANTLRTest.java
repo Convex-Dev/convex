@@ -52,6 +52,8 @@ public class ANTLRTest {
 		assertEquals(CVMLong.create(17),read("17"));
 		assertEquals(CVMLong.create(-2),read("-2"));
 		assertEquals(CVMLong.ZERO,read("0"));
+		
+		assertParseError("999999999999999999999999999999999999999999999");
 	}
 		
 	@Test public void testDataStructures() {
@@ -69,13 +71,24 @@ public class ANTLRTest {
 	}
 	
 	@Test public void testSymbols() {
+		// BAsic symbol
 		assertEquals(Symbols.FOO,read("foo"));
+		
+		// Single slash should be a symbol
 		assertEquals(Symbol.create("/"),read("/"));
+		
+		// Does should count in symbol
+		assertEquals(Symbol.create("convex.world"),read("convex.world"));
+		
+		// Check numbers are consumed in symbolic name
+		assertEquals(Symbol.create("reg-123"),read("reg-123"));
 	}
 	
 	@Test public void testKeywords() {
 		assertEquals(Keywords.FOO,read(":foo"));
 		assertEquals(Keyword.create("/"),read(":/"));
+		
+		assertParseError(":");
 	}
 
 		
@@ -83,11 +96,17 @@ public class ANTLRTest {
 		// Blobs
 		assertEquals(Blob.EMPTY,read("0x"));
 		assertEquals(Blob.fromHex("cafebabe"),read("0xcaFEBAbe"));
+		
+		assertParseError("0x0");
+
 	}
 	
 	@Test public void testAddress() {
 		// Address
 		assertEquals(Address.create(17),read("#17"));
+		
+		assertParseError("#-1"); // negative
+		assertParseError("#9999999999999999999999999999999999999999999999999999999"); // too big
 	}
 	
 	@Test public void testSyntax() {
@@ -140,19 +159,19 @@ public class ANTLRTest {
 	}
 
 	@Test public void testParseErrors() {
-		doParseErrorCheck("1 2");
-		doParseErrorCheck("1.0e0.1234");
-		doParseErrorCheck("((");
-		doParseErrorCheck("]");
-		doParseErrorCheck("#{");
-		doParseErrorCheck("#1/#2");
-		doParseErrorCheck("#-3");
+		assertParseError("1 2");
+		assertParseError("1.0e0.1234");
+		assertParseError("((");
+		assertParseError("]");
+		assertParseError("#{");
+		assertParseError("#1/#2");
+		assertParseError("#-3");
 
-		doParseErrorCheck("0x0"); // not a round number of hex digits
-		doParseErrorCheck("0xgg"); // not a valid hex digit, GG parser
+		assertParseError("0x0"); // not a round number of hex digits
+		assertParseError("0xgg"); // not a valid hex digit, GG parser
 	}
 	
-	private void doParseErrorCheck(String s) {
+	private void assertParseError(String s) {
 		assertThrows(ParseException.class,()->read(s));
 	}
 	

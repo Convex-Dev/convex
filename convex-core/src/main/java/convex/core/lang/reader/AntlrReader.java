@@ -213,8 +213,11 @@ public class AntlrReader {
 		@Override
 		public void exitLongValue(LongValueContext ctx) {
 			String s=ctx.getText();
-			// System.out.println(s);
-			push( CVMLong.parse(s));
+			try {	
+				push( CVMLong.parse(s));
+			} catch (NumberFormatException x) {
+				throw new ParseException("Unparseable long value: "+s,x);
+			}
 		}
 		
 		@Override
@@ -296,7 +299,9 @@ public class AntlrReader {
 		@Override
 		public void exitAddress(AddressContext ctx) {
 			String s=ctx.getText();
-			push (Address.parse(s));
+			Address addr=Address.parse(s);
+			if (addr==null) throw new ParseException("Bad Address format: "+s);
+			push (addr);
 		}
 
 		@Override
