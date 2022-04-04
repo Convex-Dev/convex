@@ -28,7 +28,7 @@ public class StringTree extends AString {
 	}
 
 	@Override
-	public AString subSequence(long start, long end) {
+	public AString subString(long start, long end) {
 		return Strings.create(data.slice(start, end-start));
 	}
 

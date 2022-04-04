@@ -33,13 +33,13 @@ public class StringSlice extends AString {
 	}
 
 	@Override
-	public AString subSequence(long start, long end) {
+	public AString subString(long start, long end) {
 		long len=end-start;
 		if (len==0) return Strings.EMPTY;
 		if (len<0) throw new IllegalArgumentException("Negative length");
 		if ((start<0)||(start+len>=length)) throw new IllegalArgumentException("Out of range");
 		if ((start==0)&&(len==length)) return this;
-		return source.subSequence(this.start+start, this.start+end);
+		return source.subString(this.start+start, this.start+end);
 	}
 
 	@Override

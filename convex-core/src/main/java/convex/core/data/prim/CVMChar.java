@@ -81,9 +81,9 @@ public final class CVMChar extends APrimitive {
 	}
 	
 	/** 
-	 * Gets the UTF=8 length in bytes for this CVMChar
+	 * Gets the UTF-8 length in bytes for this CVMChar
 	 * @param c Code point value
-	 * @return UTF lenth or -1 if not a valid unicode value
+	 * @return UTF lenth or -1 if not a valid Unicode value
 	 */
 	public static int utfLength(int c) {
 		if (c<0) return -1;
@@ -248,6 +248,16 @@ public final class CVMChar extends APrimitive {
 		if (limit<=0) return null;
 		return Strings.create(toUTFBlob());
 	}
+
+	/**
+	 * Gets the Unicode code point for this Character
+	 * @return Code point as an int value
+	 */
+	public int getCodePoint() {
+		return value;
+	}
+
+
 
 
 }

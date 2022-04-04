@@ -80,7 +80,7 @@ public class StringShort extends AString {
 	}
 
 	@Override
-	public StringShort subSequence(long start, long end) {
+	public StringShort subString(long start, long end) {
 		return new StringShort(data.slice(start, end-start));
 	}
 

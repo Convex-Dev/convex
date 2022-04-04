@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.prim.CVMChar;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.test.Samples;
@@ -63,8 +64,16 @@ public class StringsTest {
 		doStringTest(twoChunk);
 		
 		// Span across 
-		AString span=twoChunk.subSequence(4000, 4200);
+		AString span=twoChunk.subString(4000, 4200);
 		doStringTest(span);
+	}
+	
+	@Test public void testStringSplit() {
+		assertEquals(Vectors.of("","abc"),Strings.create(":abc").split(CVMChar.create(':')));
+		assertEquals(Vectors.of(""),Strings.create("").split(CVMChar.create(':')));
+		assertEquals(Vectors.of("foo","bar"),Strings.create("foo@bar").split(CVMChar.create('@')));
+		assertEquals(Vectors.of("","","",""),Strings.create("|||").split(CVMChar.create('|')));
+		assertEquals(Vectors.of("|||"),Strings.create("|||").split(CVMChar.create(':')));
 	}
 	
 	@Test public void testEmptyString() {

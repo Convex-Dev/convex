@@ -133,8 +133,45 @@ public abstract class AString extends ACountable<CVMChar> implements Comparable<
 	
 	protected abstract void writeToBuffer(ByteBuffer bb);
 
-	public abstract AString subSequence(long start, long end);
+	/**
+	 *  Gets a subsequence of this String
+	 * @param start Start index (inclusive)
+	 * @param end End index (Exclusive)
+	 * @return Specified substring
+	 */
+	public abstract AString subString(long start, long end);
 
+	/**
+	 * Splits this string by the given character
+	 * 
+	 * The result will always have at least one String, and as many additional Strings as the
+	 * split character occurs.
+	 * @param c CMVChar instance with which to split
+	 * 
+	 * @return Vector of Strings, excluding the split character.
+	 */
+	public AVector<AString> split(CVMChar c) {
+		long start=0;
+		AVector<AString> acc=Vectors.empty();
+		long n=count();
+		int cp=c.getCodePoint();
+		int utfLength=CVMChar.utfLength(cp);
+		for (int i=0; i<n;) {
+			int ch=charAt(i);
+			if (ch==cp) {
+				acc=acc.append(subString(start,i));
+				i+=utfLength;
+				start=i; // update start point of next string
+			} else {
+				int inc=CVMChar.utfLength(cp);
+				if (inc<0) inc=1; // move one byte for bad chars
+				i+=inc;
+			}
+		}
+		acc=acc.append(subString(start,n));
+		return acc;
+	}
+	
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.STRING;
