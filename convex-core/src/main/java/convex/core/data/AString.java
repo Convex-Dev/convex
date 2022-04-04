@@ -61,7 +61,7 @@ public abstract class AString extends ACountable<CVMChar> implements Comparable<
 	public int intAt(long index) {
 		int r=0;
 		for (int i=0; i<4; i++) {
-			r=(r>>8)+(0xff&byteAt(index+i));
+			r=(r<<8)+(0xff&byteAt(index+i));
 		}
 		return r;
 	}
@@ -73,6 +73,10 @@ public abstract class AString extends ACountable<CVMChar> implements Comparable<
 	 */
 	public abstract byte byteAt(long i);
 	
+	/**
+	 * Gets the Character at the specified point in the String, or null 
+	 * if there is no valid Character at this position
+	 */
 	@Override
 	public CVMChar get(long i) {
 		return CVMChar.create(charAt((int)i));

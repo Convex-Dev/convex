@@ -104,6 +104,15 @@ public class StringsTest {
 		assertEquals(":foo",RT.toString(Keywords.FOO));
 	}
 	
+	@Test public void testIntAt() {
+		AString s= Strings.create(Blob.fromHex("12345678abcd"));
+		assertEquals(0x12345678,s.intAt(0));
+		assertEquals(0x345678ab,s.intAt(1));
+		assertEquals(0x5678abcd,s.intAt(2));
+		assertEquals(0xabcdffff,s.intAt(4));
+		assertEquals(0xffffffff,s.intAt(6)); // 0xff beyond end of string
+	}
+	
 	public void doStringTest(AString a) {
 		long n=a.count();
 		assertEquals(Strings.EXCESS_BYTE,a.byteAt(-1));
