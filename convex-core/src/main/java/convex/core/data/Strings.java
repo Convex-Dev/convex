@@ -9,6 +9,7 @@ import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 
+import convex.core.data.prim.CVMChar;
 import convex.core.exceptions.BadFormatException;
 
 public class Strings {
@@ -51,6 +52,11 @@ public class Strings {
 		return StringTree.read(length,bb);
 	}
 
+	/**
+	 * Create a CVM String from a regular Java String
+	 * @param s Java String to convert.
+	 * @return CVM String instance.
+	 */
 	public static AString create(String s) {
 		CharsetEncoder encoder=getEncoder();
 		ByteBuffer bb;
@@ -63,7 +69,42 @@ public class Strings {
 		builder.append(bb);
 		return Strings.create(builder.toBlob());
 	}
-
+	
+	/**
+	 * Creates a string by joining a sequence of substrings with the given separator
+	 * @param ss Sequence of Strings to join
+	 * @param separator any String to use as a separator.
+	 * @return Concatenated String, including the separator. Will return the empty string if the seqence is empty.
+	 */
+	public static AString join(ASequence<AString> ss,AString separator) {
+		long n=ss.count();
+		if (n==0) return Strings.EMPTY;
+		BlobBuilder builder=new BlobBuilder();
+		builder.append(ss.get(0));
+		for (long i=1; i<n; i++) {
+			builder.append(separator);
+			builder.append(ss.get(i));
+		}
+		return Strings.create(builder.toBlob());
+	}
+	
+	/**
+	 * Creates a string by joining a sequence of substrings with the given separator
+	 * @param ss Sequence of Strings to join
+	 * @param separator any CVM Character to use as a separator.
+	 * @return Concatenated String, including the separator. Will return the empty string if the seqence is empty.
+	 */
+	public static AString join(ASequence<AString> ss,CVMChar separator) {
+		long n=ss.count();
+		if (n==0) return Strings.EMPTY;
+		BlobBuilder builder=new BlobBuilder();
+		builder.append(ss.get(0));
+		for (long i=1; i<n; i++) {
+			builder.append(separator);
+			builder.append(ss.get(i));
+		}
+		return Strings.create(builder.toBlob());
+	}
 
 	public static AString create(ABlob b) {
 		long n=b.count();

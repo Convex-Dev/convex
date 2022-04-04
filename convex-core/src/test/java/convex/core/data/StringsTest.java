@@ -71,11 +71,29 @@ public class StringsTest {
 	@Test public void testStringSplit() {
 		assertEquals(Vectors.of("","abc"),Strings.create(":abc").split(CVMChar.create(':')));
 		assertEquals(Vectors.of(""),Strings.create("").split(CVMChar.create(':')));
+		assertEquals(Vectors.of("","a"),Strings.create(":a").split(CVMChar.create(':')));
 		assertEquals(Vectors.of("foo","bar"),Strings.create("foo@bar").split(CVMChar.create('@')));
 		assertEquals(Vectors.of("","","",""),Strings.create("|||").split(CVMChar.create('|')));
 		assertEquals(Vectors.of("|||"),Strings.create("|||").split(CVMChar.create(':')));
 	}
 	
+	@Test public void testStringJoin() {
+		splitJoinRoundTrip("a:b:c", ':',3);
+		splitJoinRoundTrip("a-b-c", ':',1);
+		splitJoinRoundTrip("\u1234", ':',1);
+		splitJoinRoundTrip("\u1234:\u1235", ':',2);
+		splitJoinRoundTrip("\u1234\u1235", '\u1234',2);
+	}
+	
+	private void splitJoinRoundTrip(String s, char c, int expectedCount) {
+		AString st=Strings.create(s);
+		CVMChar ch=CVMChar.create(c);
+		AVector<AString> ss=st.split(ch);
+		AString jn=Strings.join(ss, ch);
+		assertEquals(st,jn);
+		assertEquals(expectedCount,ss.count());
+	}
+
 	@Test public void testEmptyString() {
 		StringShort s=Strings.EMPTY;
 		doStringTest(s);
