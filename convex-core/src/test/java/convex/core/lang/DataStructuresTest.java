@@ -4,43 +4,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.State;
-import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.ASet;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.init.InitTest;
 import convex.core.util.Utils;
 
 /**
- * Tests for medium sized data structure operations.
+ * Tests for various data structure operations.
  *
  */
-public class DataStructuresTest {
-
-	private static final State INITIAL = TestState.STATE;
-	private static final long INITIAL_JUICE = 100000;
-	private static final Context<?> INITIAL_CONTEXT;
-
-	static {
-		try {
-			INITIAL_CONTEXT = Context.createInitial(INITIAL, InitTest.HERO, INITIAL_JUICE);
-		} catch (Throwable e) {
-			throw new Error(e);
-		}
-	}
-
-	public <T extends ACell> T eval(String source) {
-		try {
-			Context<?> c = INITIAL_CONTEXT;
-			AOp<T> op = TestState.compile(c, source);
-			Context<T> rc = c.execute(op);
-			return rc.getResult();
-		} catch (Exception e) {
-			throw Utils.sneakyThrow(e);
-		}
-	}
+public class DataStructuresTest extends ACVMTest {
 
 	@Test
 	public void testSetRoundTripRegression() {
