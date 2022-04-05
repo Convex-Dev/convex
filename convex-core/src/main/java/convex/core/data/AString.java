@@ -11,7 +11,13 @@ import convex.core.data.type.Types;
 import convex.core.util.Utils;
 
 /**
- * Class representing a CVM String
+ * Class representing a CVM String. 
+ * 
+ * CVM Strings are UTF-8 byte strings with an immutable, fixed count in bytes. 
+ * 
+ * CVM Strings are NOT enforced to be valid UTF-8, for reasons of performance, simplicity and
+ * consistent behaviour (e.g. in conversions to and from Blobs). It is up to clients to decide 
+ * how to represent invalid UTF-8 if necessary.
  */
 public abstract class AString extends ACountable<CVMChar> implements Comparable<AString> {
 

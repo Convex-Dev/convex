@@ -19,8 +19,8 @@ import convex.core.util.Utils;
  * A Collection is a data structure that contains zero or more elements. Possible collection subtypes include:
  * </p>
  * <ul>
- * <li>Sequential collections (Lists, Vectors)</li>
- * <li>Sets (with unique elements)</li> 
+ * <li>Sequential collections (Lists, Vectors) - see {@link ASequence}
+ * <li>Sets (with unique elements) - see {@link ASet}</li> 
  * </ul>
  * 
  * @param <T> Type of elements in this collection

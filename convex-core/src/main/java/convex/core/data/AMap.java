@@ -89,6 +89,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 		if ((key==null)||(key instanceof ACell)) {
 			return containsKey((ACell)key);
 		}
+		// If not a valid CVM value, cannot contain key
 		return false;
 	}
 

@@ -8,7 +8,7 @@ package convex.core.data;
  * @param <E> Type of element that is counted
  */
 public abstract class ACountable<E extends ACell> extends ACell {
-
+	
 	/**
 	 * Returns the number of elements in this data structure
 	 * 

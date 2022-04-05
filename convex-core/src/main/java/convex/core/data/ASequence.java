@@ -12,7 +12,7 @@ import convex.core.util.Errors;
 import convex.core.util.Utils;
 
 /**
- * Abstract base class for persistent lists and vectors
+ * Abstract base class for concrete sequential data structure (immutable persistent lists and vectors etc.)
  *
  * @param <T> Type of list elements
  */
@@ -28,7 +28,9 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	}
 
 	/**
-	 * Gets the first long index at which the specified value appears in the the sequence.
+	 * Gets the first long index at which the specified value appears in the the sequence. Similar
+	 * to Java's standard List.indexOf(...) but supports long indexes.
+	 * 
 	 * @param value Any value which could appear as an element of the sequence.
 	 * @return Index of the value, or -1 if not found.
 	 */
@@ -36,11 +38,15 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 
 	/**
 	 * Gets the last long index at which the specified value appears in the the sequence.
+	 * 
+	 * Similar to Java's standard List.lastIndexOf(...) but supports long indexes.
+	 * 
 	 * @param value Any value which could appear as an element of the sequence.
 	 * @return Index of the value, or -1 if not found.
 	 */
 	public abstract long longLastIndexOf(Object value);
 
+	@Override
 	public abstract <R extends ACell> ASequence<R> map(Function<? super T, ? extends R> mapper);
 
 	@Override

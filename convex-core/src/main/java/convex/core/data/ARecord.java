@@ -221,9 +221,9 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	}
 
 	@Override
-	public MapEntry<Keyword, ACell> getKeyRefEntry(Ref<ACell> ref) {
+	public MapEntry<Keyword, ACell> getKeyRefEntry(Ref<ACell> keyRef) {
 		// TODO: could maybe be more efficient?
-		return getEntry(ref.getValue());
+		return getEntry(keyRef.getValue());
 	}
 
 	@Override
@@ -291,7 +291,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	}
 
 	/**
-	 * Converts this record to a hashmap
+	 * Converts this record to a HashMap
 	 * @return HashMap instance
 	 */
 	protected AHashMap<Keyword,ACell> toHashMap() {
