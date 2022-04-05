@@ -1,8 +1,11 @@
 package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -10,6 +13,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
+import convex.core.lang.Reader;
 
 public class SyntaxTest {
 
@@ -55,5 +59,18 @@ public class SyntaxTest {
 		assertEquals(RT.cvm(1L),(CVMLong)s3.getValue());
 		assertEquals(Maps.of(1,2,3,7),s3.getMeta());
 		
+	}
+	
+	@Test public void testSyntaxPrintRegression() {
+		String s="^{} 0xa89e59cc8ab9fc6a13785a37938c85b306b24663415effc01063a6e25ef52ebcd3647d3a77e0a33908a372146fdccab6";
+		Syntax a=Reader.read(s);
+		assertNotNull(a);
+		
+		BlobBuilder bb=new BlobBuilder();
+		assertFalse(a.print(bb,101));
+		
+		bb.clear();
+		assertTrue(a.print(bb,102));
+		assertEquals(102,bb.count());
 	}
 }

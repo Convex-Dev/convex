@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
 import convex.core.data.AList;
+import convex.core.data.AString;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
@@ -260,7 +261,7 @@ public class ReaderTest {
 
 	}
 	
-	@Test public void testIdempotentPrint() {
+	@Test public void testIdempotentToString() {
 		doIdempotencyTest(null);
 		doIdempotencyTest(Address.create(12345));
 		doIdempotencyTest(CVMBool.TRUE);
@@ -273,5 +274,41 @@ public class ReaderTest {
 	public void doIdempotencyTest(ACell cell) {
 		String s=RT.toString(cell);
 		assertEquals(s,RT.toString(Reader.read(s)));
+	}
+	
+	/**
+	 * Test cases that should read and print identically
+	 */
+	@Test public void testReadPrint() {
+		doReadPrintTest("nil");
+		doReadPrintTest("\\a");
+		doReadPrintTest("1.0");
+		doReadPrintTest("[:foo bar]");
+		doReadPrintTest("^{} 0xa89e59cc8ab9fc6a13785a37938c85b306b24663415effc01063a6e25ef52ebcd3647d3a77e0a33908a372146fdccab6");
+	}
+
+	private void doReadPrintTest(String js) {
+		AString s=Strings.create(js);
+		ACell cell=Reader.read(js);
+		AString printed=RT.print(cell, Long.MAX_VALUE);
+		assertEquals(s,printed);
+		String js2=printed.toString();
+		assertEquals(js,js2);
+	}
+	
+	/**
+	 * Test cases for CVM values that should print and read correctly
+	 */
+	@Test public void testPrintRead() {
+		doPrintReadTest(null);
+		doPrintReadTest(Vectors.of(1,Symbols.FOO, Keywords.BAR));
+		doPrintReadTest(Samples.MAX_EMBEDDED_BLOB);
+	}
+	
+	private void doPrintReadTest(ACell a) {
+		AString printed=RT.print(a, Long.MAX_VALUE);
+		String js=printed.toString();
+		ACell b=Reader.read(js);
+		assertEquals(a,b);
 	}
 }
