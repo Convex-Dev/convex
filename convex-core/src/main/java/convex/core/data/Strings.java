@@ -53,7 +53,7 @@ public class Strings {
 	}
 
 	/**
-	 * Create a CVM String from a regular Java String
+	 * Create a canonical CVM String from a regular Java String
 	 * @param s Java String to convert.
 	 * @return CVM String instance.
 	 */
@@ -113,6 +113,18 @@ public class Strings {
 		}
 		return StringTree.create(b);
 	}
+	
+	/**
+	 * Constructs a UTF-8 CVM String from raw hex digits. This does not perform checking of
+	 * valid UTF: It is possible to construct bad strings this way. This is allowable on the CVM, and
+	 * useful for testing.
+	 * 
+	 * @param hexString String containing hex digits
+	 * @return New CVM String (possibly not valid UTF)
+	 */
+	public static AString fromHex(String hexString) {
+		return create(Blobs.fromHex(hexString));
+	}
 
 	public static AString empty() {
 		return EMPTY;
@@ -143,4 +155,6 @@ public class Strings {
 		}
 		return Strings.create(bb.toBlob());
 	}
+
+
 }

@@ -26,11 +26,6 @@ public class StringSlice extends AString {
 		if ((start<0)||(start+len>slen)) throw new IllegalArgumentException("Out of range");
 		return new StringSlice(source,start,len);
 	}
-	
-	@Override
-	public int charAt(long index) {
-		return source.charAt(index-start);
-	}
 
 	@Override
 	public AString subString(long start, long end) {
@@ -83,7 +78,7 @@ public class StringSlice extends AString {
 	}
 	
 	@Override
-	public byte byteAt(long i) {
+	protected byte byteAt(long i) {
 		if ((i<0)||(i>=length)) return -1;
 		return source.byteAt(i+start);
 	}

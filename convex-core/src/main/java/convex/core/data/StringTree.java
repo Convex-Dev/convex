@@ -4,7 +4,6 @@ import java.nio.ByteBuffer;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.exceptions.TODOException;
 
 public class StringTree extends AString {
 	
@@ -89,7 +88,7 @@ public class StringTree extends AString {
 	}
 
 	@Override
-	public byte byteAt(long i) {
+	protected byte byteAt(long i) {
 		if ((i<0)||(i>=length)) return -1;
 		return data.byteAt(i);
 	}
@@ -98,12 +97,6 @@ public class StringTree extends AString {
 	public int compareTo(AString o) {
 		return data.compareTo(o.toBlob());
 	}
-
-	@Override
-	public int charAt(long i) {
-		throw new TODOException();
-	}
-
 
 	@Override
 	public BlobTree toBlob() {

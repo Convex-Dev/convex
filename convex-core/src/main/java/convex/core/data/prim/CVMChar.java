@@ -68,6 +68,38 @@ public final class CVMChar extends APrimitive {
 	}
 	
 	/**
+	 * Gets a code point value from bytes encoded in a Java integer (starting from high byte
+	 */
+	public static int codepointFromUTFInt(int utf) {
+		byte b = (byte)(utf>>24);
+		if (b >= 0)
+			return b; // Valid ASCII
+		if ((b & 0xC0) != 0xC0)
+			return -1; // invalid first byte
+		int len = 2;
+		if ((b & 0x20) == 0x20) {
+			len += 1; // at least 3 bytes
+			if ((b & 0x10) == 0x10)
+				len += 1; // 4 bytes
+		}
+		if (((b << len) & 0x80) != 0)
+			return -1; // bad bit after length, should be 0
+
+		// get bits from high byte
+		int result = b & (0x7f >> len);
+		for (int i = 1; i < len; i++) {
+			byte c = (byte)(utf>>(24-8*i));
+			if ((c & 0xC0) != 0x80)
+				return -1; // should start with 10, 0xff will be invalid
+			result = (result << 6) | (c & 0x3F);
+		}
+		if (!Character.isValidCodePoint(result))
+			return -1;
+		return result;
+	}
+	
+	
+	/**
 	 * Gets the length in bytes needed to express the character in an Encoding
 	 * @param c Code point value
 	 * @return Number of bytes needed for code point

@@ -51,7 +51,11 @@ public abstract class AString extends ACountable<CVMChar> implements Comparable<
 	 * @param i Index into String (byte position)
 	 * @return Unicode code point, or -1 if not a valid code point at this position
 	 */
-	public abstract int charAt(long i);
+	public final int charAt(long i) {
+		int utf=intAt(i);
+		int cp=CVMChar.codepointFromUTFInt(utf);
+		return cp;
+	}
 	
 	/**
 	 * Gets 32 bytes integer at given position. Extends with 255 (invalid UTF-8) if needed
@@ -61,7 +65,7 @@ public abstract class AString extends ACountable<CVMChar> implements Comparable<
 	public int intAt(long index) {
 		int r=0;
 		for (int i=0; i<4; i++) {
-			r=(r<<8)+(0xff&byteAt(index+i));
+			r|=(0xff&byteAt(index+i))<<(8*(3-i));
 		}
 		return r;
 	}
@@ -71,11 +75,13 @@ public abstract class AString extends ACountable<CVMChar> implements Comparable<
 	 * @param i Index into String (byte position)
 	 * @return Raw byte value
 	 */
-	public abstract byte byteAt(long i);
+	protected abstract byte byteAt(long i);
 	
 	/**
 	 * Gets the Character at the specified point in the String, or null 
-	 * if there is no valid Character at this position
+	 * if there is no valid Character at this position.
+	 * 
+	 * @return CVMChar instance, or null for invalid UTF-8 or any character out of the string bounds
 	 */
 	@Override
 	public CVMChar get(long i) {

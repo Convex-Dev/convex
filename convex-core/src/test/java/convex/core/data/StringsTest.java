@@ -2,6 +2,7 @@ package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -60,6 +61,11 @@ public class StringsTest {
 		
 		assertEquals('2',(char)twoChunk.byteAt(4098));
 		
+		// intAt should span chunks, pick up ascii
+		int spanInt=twoChunk.intAt(4096-2);
+		assertEquals(Strings.create("cdef0123").intAt(2),spanInt);
+		assertEquals(0x65663031,spanInt); // ASCII fo "ef01"
+		
 		doStringTest(chunk);
 		doStringTest(twoChunk);
 		
@@ -111,12 +117,38 @@ public class StringsTest {
 		assertEquals(0x5678abcd,s.intAt(2));
 		assertEquals(0xabcdffff,s.intAt(4));
 		assertEquals(0xffffffff,s.intAt(6)); // 0xff beyond end of string
+		assertEquals(0xffffffff,s.intAt(-6)); // 0xff before start of string
 	}
 	
+	@Test public void testCharAt() {
+		testCharAt("ab",1,'b');
+		testCharAt("ab",2,null);
+		testCharAt("\u1234\u1235", 0,'\u1234');
+		testCharAt("", 0,null);
+
+		testCharAt(Strings.fromHex("65ff65"),1,null);
+	}
+	
+	private void testCharAt(String string, int i, Character c) {
+		AString s= Strings.create(string);
+		testCharAt(s,i,c);
+	}
+		
+	private void testCharAt(AString s, int i, Character c) {
+		int cp=s.charAt(i);
+		CVMChar cg=s.get(i);
+		assertEquals(cg,CVMChar.create(cp));
+		if (c!=null) assertEquals(CVMChar.create(c),cg);
+	}
+
 	public void doStringTest(AString a) {
 		long n=a.count();
 		assertEquals(Strings.EXCESS_BYTE,a.byteAt(-1));
 		assertEquals(Strings.EXCESS_BYTE,a.byteAt(n));
+		
+		// get should return null for invalid positions
+		assertNull(a.get(-1));
+		assertNull(a.get(n));
 		
 		// Round trip to Java String
 		String js=a.toString();
