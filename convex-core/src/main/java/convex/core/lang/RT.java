@@ -925,6 +925,19 @@ public class RT {
 			return a.print(bb, limit);
 		}
 	}
+	
+	/**
+	 * Prints a cell to a BlobBuilder, up to a specified limit of bytes
+	 * @param a Cell to print (may be nil)
+	 * @param limit Limit of printing in bytes
+	 * @return Printed String, or null if limit exceed
+	 */
+	public static AString print(ACell a, long limit) {
+		if (a==null) return Strings.NIL;
+		BlobBuilder bb=new BlobBuilder();
+		if (!print(bb,a,limit)) return null;
+		return bb.getCVMString();
+	}
 
 	/**
 	 * Converts a value to a CVM String representation. Required to work for all
@@ -1633,6 +1646,8 @@ public class RT {
 		if (a==null) return true;
 		return a.isCVMValue();
 	}
+
+
 
 
 

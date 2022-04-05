@@ -319,6 +319,23 @@ public class Core {
 			return context.withResult(juice, result);
 		}
 	});
+	
+	public static final CoreFn<AString> PRINT = reg(new CoreFn<>(Symbols.PRINT) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public Context<AString> invoke(Context context, ACell[] args) {
+			// Arity 1
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+
+			AString result = RT.print(args[0],context.getJuice()/Juice.STR_PER_CHAR);
+			
+			// Any CVM value should print, it must be a juice error if failed
+			if (result==null) return context.withJuiceError();
+
+			long juice = Juice.STR + result.count() * Juice.STR_PER_CHAR;
+			return context.withResult(juice, result);
+		}
+	});
 
 	public static final CoreFn<AString> NAME = reg(new CoreFn<>(Symbols.NAME) {
 		@SuppressWarnings("unchecked")

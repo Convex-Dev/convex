@@ -867,6 +867,12 @@
         :signature   [{:params [x y]
                        :return Double}]}}
 
+ print
+ {:doc {:description "Prints any value in it's canonical readable representation as a String."
+        :errors      {:JUICE "If the printed representation is to long for available Juice."}
+        :examples    [{:code "(print [\a :foo 'bar])"}]
+        :signature   [{:params [a]
+                       :return String}]}}
 
  quasiquote
  {:doc       {:description "Returns the quoted value of a form, without evaluating it. Like 'quote', but elements within the form may be unquoted via `unquote`."

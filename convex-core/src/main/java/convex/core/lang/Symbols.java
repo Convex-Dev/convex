@@ -1,5 +1,7 @@
 package convex.core.lang;
 
+import convex.core.data.AString;
+import convex.core.data.Strings;
 import convex.core.data.Symbol;
 
 /**
@@ -8,296 +10,304 @@ import convex.core.data.Symbol;
  * "If you have more things than names, your design is broken" - Stuart Halloway
  */
 public class Symbols {
-	public static final Symbol COUNT = Symbol.create("count");
-	public static final Symbol CONJ = Symbol.create("conj");
-	public static final Symbol CONS = Symbol.create("cons");
-	public static final Symbol GET = Symbol.create("get");
-	public static final Symbol GET_IN = Symbol.create("get-in");
-	public static final Symbol ASSOC = Symbol.create("assoc");
-	public static final Symbol ASSOC_IN = Symbol.create("assoc-in");
-	public static final Symbol DISSOC = Symbol.create("dissoc");
-	public static final Symbol DISJ = Symbol.create("disj");
-	public static final Symbol NTH = Symbol.create("nth");
+	public static final Symbol COUNT = intern("count");
+	public static final Symbol CONJ = intern("conj");
+	public static final Symbol CONS = intern("cons");
+	public static final Symbol GET = intern("get");
+	public static final Symbol GET_IN = intern("get-in");
+	public static final Symbol ASSOC = intern("assoc");
+	public static final Symbol ASSOC_IN = intern("assoc-in");
+	public static final Symbol DISSOC = intern("dissoc");
+	public static final Symbol DISJ = intern("disj");
+	public static final Symbol NTH = intern("nth");
 
-	public static final Symbol VECTOR = Symbol.create("vector");
-	public static final Symbol VEC = Symbol.create("vec");
-	public static final Symbol SET = Symbol.create("set");
-	public static final Symbol HASH_MAP = Symbol.create("hash-map");
-	public static final Symbol BLOB_MAP = Symbol.create("blob-map");
-	public static final Symbol HASH_SET = Symbol.create("hash-set");
-	public static final Symbol LIST = Symbol.create("list");
-	public static final Symbol EMPTY = Symbol.create("empty");
-	public static final Symbol INTO = Symbol.create("into");
+	public static final Symbol VECTOR = intern("vector");
+	public static final Symbol VEC = intern("vec");
+	public static final Symbol SET = intern("set");
+	public static final Symbol HASH_MAP = intern("hash-map");
+	public static final Symbol BLOB_MAP = intern("blob-map");
+	public static final Symbol HASH_SET = intern("hash-set");
+	public static final Symbol LIST = intern("list");
+	public static final Symbol EMPTY = intern("empty");
+	public static final Symbol INTO = intern("into");
 
-	public static final Symbol CONCAT = Symbol.create("concat");
-	public static final Symbol MAP = Symbol.create("map");
-	public static final Symbol REDUCE = Symbol.create("reduce");
+	public static final Symbol CONCAT = intern("concat");
+	public static final Symbol MAP = intern("map");
+	public static final Symbol REDUCE = intern("reduce");
 
-	public static final Symbol KEYS = Symbol.create("keys");
-	public static final Symbol VALUES = Symbol.create("values");
+	public static final Symbol KEYS = intern("keys");
+	public static final Symbol VALUES = intern("values");
 
-	public static final Symbol STR = Symbol.create("str");
-	public static final Symbol KEYWORD = Symbol.create("keyword");
-	public static final Symbol SYMBOL = Symbol.create("symbol");
-	public static final Symbol NAME = Symbol.create("name");
+	public static final Symbol STR = intern("str");
+	public static final Symbol KEYWORD = intern("keyword");
+	public static final Symbol SYMBOL = intern("symbol");
+	public static final Symbol NAME = intern("name");
 
-	public static final Symbol EQUALS = Symbol.create("=");
+	public static final Symbol EQUALS = intern("=");
 
-	public static final Symbol EQ = Symbol.create("==");
-	public static final Symbol LT = Symbol.create("<");
-	public static final Symbol GT = Symbol.create(">");
-	public static final Symbol LE = Symbol.create("<=");
-	public static final Symbol GE = Symbol.create(">=");
+	public static final Symbol EQ = intern("==");
+	public static final Symbol LT = intern("<");
+	public static final Symbol GT = intern(">");
+	public static final Symbol LE = intern("<=");
+	public static final Symbol GE = intern(">=");
 
-	public static final Symbol NOT = Symbol.create("not");
-	public static final Symbol OR = Symbol.create("or");
-	public static final Symbol AND = Symbol.create("and");
+	public static final Symbol NOT = intern("not");
+	public static final Symbol OR = intern("or");
+	public static final Symbol AND = intern("and");
 
-	public static final Symbol ASSERT = Symbol.create("assert");
-	public static final Symbol FAIL = Symbol.create("fail");
-	public static final Symbol TRY = Symbol.create("try");
-	public static final Symbol CATCH = Symbol.create("catch");
+	public static final Symbol ASSERT = intern("assert");
+	public static final Symbol FAIL = intern("fail");
+	public static final Symbol TRY = intern("try");
+	public static final Symbol CATCH = intern("catch");
 
-	public static final Symbol APPLY = Symbol.create("apply");
-	public static final Symbol HASH = Symbol.create("hash");
+	public static final Symbol APPLY = intern("apply");
+	public static final Symbol HASH = intern("hash");
 
-	public static final Symbol QUOTE = Symbol.create("quote");
-	public static final Symbol QUASIQUOTE = Symbol.create("quasiquote");
+	public static final Symbol QUOTE = intern("quote");
+	public static final Symbol QUASIQUOTE = intern("quasiquote");
 
-	public static final Symbol SYNTAX_QUOTE = Symbol.create("syntax-quote");
-	public static final Symbol UNQUOTE = Symbol.create("unquote");
-	public static final Symbol UNQUOTE_SPLICING = Symbol.create("unquote-splicing");
+	public static final Symbol SYNTAX_QUOTE = intern("syntax-quote");
+	public static final Symbol UNQUOTE = intern("unquote");
+	public static final Symbol UNQUOTE_SPLICING = intern("unquote-splicing");
 
-	public static final Symbol DO = Symbol.create("do");
-	public static final Symbol COND = Symbol.create("cond");
-	public static final Symbol DEF = Symbol.create("def");
-	public static final Symbol UNDEF = Symbol.create("undef");
-	public static final Symbol UNDEF_STAR = Symbol.create("undef*");
+	public static final Symbol DO = intern("do");
+	public static final Symbol COND = intern("cond");
+	public static final Symbol DEF = intern("def");
+	public static final Symbol UNDEF = intern("undef");
+	public static final Symbol UNDEF_STAR = intern("undef*");
 
-	public static final Symbol FN = Symbol.create("fn");
-	public static final Symbol MACRO = Symbol.create("macro");
-	public static final Symbol EXPANDER = Symbol.create("expander");
+	public static final Symbol FN = intern("fn");
+	public static final Symbol MACRO = intern("macro");
+	public static final Symbol EXPANDER = intern("expander");
 
-	public static final Symbol IF = Symbol.create("if");
-	public static final Symbol WHEN = Symbol.create("when");
-	public static final Symbol LET = Symbol.create("let");
+	public static final Symbol IF = intern("if");
+	public static final Symbol WHEN = intern("when");
+	public static final Symbol LET = intern("let");
 
-	public static final Symbol STORE = Symbol.create("store");
-	public static final Symbol FETCH = Symbol.create("fetch");
+	public static final Symbol STORE = intern("store");
+	public static final Symbol FETCH = intern("fetch");
 
-	public static final Symbol ADDRESS = Symbol.create("address");
-	public static final Symbol BALANCE = Symbol.create("balance");
-	public static final Symbol TRANSFER = Symbol.create("transfer");
-	public static final Symbol ACCEPT = Symbol.create("accept");
-	public static final Symbol ACCOUNT = Symbol.create("account");
+	public static final Symbol ADDRESS = intern("address");
+	public static final Symbol BALANCE = intern("balance");
+	public static final Symbol TRANSFER = intern("transfer");
+	public static final Symbol ACCEPT = intern("accept");
+	public static final Symbol ACCOUNT = intern("account");
 
-	public static final Symbol ACCOUNT_Q = Symbol.create("account?");
+	public static final Symbol ACCOUNT_Q = intern("account?");
 
-	public static final Symbol STAKE = Symbol.create("stake");
-	public static final Symbol CREATE_PEER = Symbol.create("create-peer");
-	public static final Symbol SET_PEER_DATA = Symbol.create("set-peer-data");
-	public static final Symbol SET_PEER_STAKE = Symbol.create("set-peer-stake");
+	public static final Symbol STAKE = intern("stake");
+	public static final Symbol CREATE_PEER = intern("create-peer");
+	public static final Symbol SET_PEER_DATA = intern("set-peer-data");
+	public static final Symbol SET_PEER_STAKE = intern("set-peer-stake");
 
-	public static final Symbol CALL = Symbol.create("call");
-	public static final Symbol CALL_STAR = Symbol.create("call*");
+	public static final Symbol CALL = intern("call");
+	public static final Symbol CALL_STAR = intern("call*");
 
-	public static final Symbol HALT = Symbol.create("halt");
-	public static final Symbol ROLLBACK = Symbol.create("rollback");
+	public static final Symbol HALT = intern("halt");
+	public static final Symbol ROLLBACK = intern("rollback");
 
-	public static final Symbol CALLABLE_Q = Symbol.create("callable?");
-	public static final Symbol DEPLOY = Symbol.create("deploy");
-	public static final Symbol DEPLOY_ONCE = Symbol.create("deploy-once");
+	public static final Symbol CALLABLE_Q = intern("callable?");
+	public static final Symbol DEPLOY = intern("deploy");
+	public static final Symbol DEPLOY_ONCE = intern("deploy-once");
 
-	public static final Symbol BLOB = Symbol.create("blob");
+	public static final Symbol BLOB = intern("blob");
 
-	public static final Symbol INC = Symbol.create("inc");
-	public static final Symbol DEC = Symbol.create("dec");
+	public static final Symbol INC = intern("inc");
+	public static final Symbol DEC = intern("dec");
 
-	public static final Symbol LONG = Symbol.create("long");
-	public static final Symbol BYTE = Symbol.create("byte");
-	public static final Symbol CHAR = Symbol.create("char");
+	public static final Symbol LONG = intern("long");
+	public static final Symbol BYTE = intern("byte");
+	public static final Symbol CHAR = intern("char");
 
-	public static final Symbol DOUBLE = Symbol.create("double");
+	public static final Symbol DOUBLE = intern("double");
 
-	public static final Symbol BOOLEAN = Symbol.create("boolean");
-	public static final Symbol BOOLEAN_Q = Symbol.create("boolean?");
+	public static final Symbol BOOLEAN = intern("boolean");
+	public static final Symbol BOOLEAN_Q = intern("boolean?");
 
-	public static final Symbol PLUS = Symbol.create("+");
-	public static final Symbol MINUS = Symbol.create("-");
-	public static final Symbol TIMES = Symbol.create("*");
-	public static final Symbol DIVIDE = Symbol.create("/");
+	public static final Symbol PLUS = intern("+");
+	public static final Symbol MINUS = intern("-");
+	public static final Symbol TIMES = intern("*");
+	public static final Symbol DIVIDE = intern("/");
 
-	public static final Symbol ABS = Symbol.create("abs");
-	public static final Symbol SIGNUM = Symbol.create("signum");
-	public static final Symbol SQRT = Symbol.create("sqrt");
-	public static final Symbol EXP = Symbol.create("exp");
-	public static final Symbol POW = Symbol.create("pow");
-	public static final Symbol MOD = Symbol.create("mod");
-	public static final Symbol QUOT = Symbol.create("quot");
-	public static final Symbol REM = Symbol.create("rem");
+	public static final Symbol ABS = intern("abs");
+	public static final Symbol SIGNUM = intern("signum");
+	public static final Symbol SQRT = intern("sqrt");
+	public static final Symbol EXP = intern("exp");
+	public static final Symbol POW = intern("pow");
+	public static final Symbol MOD = intern("mod");
+	public static final Symbol QUOT = intern("quot");
+	public static final Symbol REM = intern("rem");
 
 
-	public static final Symbol FLOOR = Symbol.create("floor");
-	public static final Symbol CEIL = Symbol.create("ceil");
+	public static final Symbol FLOOR = intern("floor");
+	public static final Symbol CEIL = intern("ceil");
 
-	public static final Symbol NAN = Symbol.create("NaN");
+	public static final Symbol NAN = intern("NaN");
 
-	public static final Symbol LOOP = Symbol.create("loop");
-	public static final Symbol RECUR = Symbol.create("recur");
-	public static final Symbol TAILCALL_STAR = Symbol.create("tailcall*");
+	public static final Symbol LOOP = intern("loop");
+	public static final Symbol RECUR = intern("recur");
+	public static final Symbol TAILCALL_STAR = intern("tailcall*");
 
-	public static final Symbol RETURN = Symbol.create("return");
-	public static final Symbol BREAK = Symbol.create("break");
-	public static final Symbol REDUCED = Symbol.create("reduced");
+	public static final Symbol RETURN = intern("return");
+	public static final Symbol BREAK = intern("break");
+	public static final Symbol REDUCED = intern("reduced");
 
 
 	public static final char SPECIAL_STAR = '*';
-	public static final Symbol STAR_ADDRESS = Symbol.create("*address*");
-	public static final Symbol STAR_MEMORY = Symbol.create("*memory*");
-	public static final Symbol STAR_CALLER = Symbol.create("*caller*");
-	public static final Symbol STAR_ORIGIN = Symbol.create("*origin*");
-	public static final Symbol STAR_JUICE = Symbol.create("*juice*");
-	public static final Symbol STAR_BALANCE = Symbol.create("*balance*");
-	public static final Symbol STAR_DEPTH = Symbol.create("*depth*");
-	public static final Symbol STAR_RESULT = Symbol.create("*result*");
-	public static final Symbol STAR_TIMESTAMP = Symbol.create("*timestamp*");
-	public static final Symbol STAR_OFFER = Symbol.create("*offer*");
-	public static final Symbol STAR_STATE = Symbol.create("*state*");
-	public static final Symbol STAR_HOLDINGS = Symbol.create("*holdings*");
-	public static final Symbol STAR_SEQUENCE = Symbol.create("*sequence*");
-	public static final Symbol STAR_KEY = Symbol.create("*key*");
+	public static final Symbol STAR_ADDRESS = intern("*address*");
+	public static final Symbol STAR_MEMORY = intern("*memory*");
+	public static final Symbol STAR_CALLER = intern("*caller*");
+	public static final Symbol STAR_ORIGIN = intern("*origin*");
+	public static final Symbol STAR_JUICE = intern("*juice*");
+	public static final Symbol STAR_BALANCE = intern("*balance*");
+	public static final Symbol STAR_DEPTH = intern("*depth*");
+	public static final Symbol STAR_RESULT = intern("*result*");
+	public static final Symbol STAR_TIMESTAMP = intern("*timestamp*");
+	public static final Symbol STAR_OFFER = intern("*offer*");
+	public static final Symbol STAR_STATE = intern("*state*");
+	public static final Symbol STAR_HOLDINGS = intern("*holdings*");
+	public static final Symbol STAR_SEQUENCE = intern("*sequence*");
+	public static final Symbol STAR_KEY = intern("*key*");
 
-	public static final Symbol STAR_LANG = Symbol.create("*lang*");
+	public static final Symbol STAR_LANG = intern("*lang*");
 
-	public static final Symbol STAR_INITIAL_EXPANDER = Symbol.create("*initial-expander*");
+	public static final Symbol STAR_INITIAL_EXPANDER = intern("*initial-expander*");
 
-	public static final Symbol HERO = Symbol.create("hero");
+	public static final Symbol HERO = intern("hero");
 
-	public static final Symbol COMPILE = Symbol.create("compile");
-	public static final Symbol READ = Symbol.create("read");
-	public static final Symbol EVAL = Symbol.create("eval");
-	public static final Symbol EVAL_AS = Symbol.create("eval-as");
+	public static final Symbol COMPILE = intern("compile");
+	public static final Symbol READ = intern("read");
+	public static final Symbol EVAL = intern("eval");
+	public static final Symbol EVAL_AS = intern("eval-as");
 
-	public static final Symbol QUERY = Symbol.create("query");
-	public static final Symbol QUERY_AS = Symbol.create("query-as");
-
-
-	public static final Symbol EXPAND = Symbol.create("expand");
-
-	public static final Symbol SCHEDULE = Symbol.create("schedule");
-	public static final Symbol SCHEDULE_STAR = Symbol.create("schedule*");
-
-	public static final Symbol FIRST = Symbol.create("first");
-	public static final Symbol SECOND = Symbol.create("second");
-	public static final Symbol LAST = Symbol.create("last");
-	public static final Symbol NEXT = Symbol.create("next");
-	public static final Symbol REVERSE = Symbol.create("reverse");
-
-	public static final Symbol AMPERSAND = Symbol.create("&");
-	public static final Symbol UNDERSCORE = Symbol.create("_");
-
-	public static final Symbol X = Symbol.create("x");
-	public static final Symbol E = Symbol.create("e");
-
-	public static final Symbol NIL = Symbol.create("nil");
-
-	public static final Symbol NIL_Q = Symbol.create("nil?");
-	public static final Symbol LIST_Q = Symbol.create("list?");
-	public static final Symbol VECTOR_Q = Symbol.create("vector?");
-	public static final Symbol SET_Q = Symbol.create("set?");
-	public static final Symbol MAP_Q = Symbol.create("map?");
-
-	public static final Symbol COLL_Q = Symbol.create("coll?");
-	public static final Symbol EMPTY_Q = Symbol.create("empty?");
-
-	public static final Symbol SYMBOL_Q = Symbol.create("symbol?");
-	public static final Symbol KEYWORD_Q = Symbol.create("keyword?");
-	public static final Symbol BLOB_Q = Symbol.create("blob?");
-	public static final Symbol ADDRESS_Q = Symbol.create("address?");
-	public static final Symbol LONG_Q = Symbol.create("long?");
-	public static final Symbol STR_Q = Symbol.create("str?");
-	public static final Symbol NUMBER_Q = Symbol.create("number?");
-	public static final Symbol HASH_Q = Symbol.create("hash?");
-
-	public static final Symbol FN_Q = Symbol.create("fn?");
-	public static final Symbol ACTOR_Q = Symbol.create("actor?");
-
-	public static final Symbol ZERO_Q = Symbol.create("zero?");
-
-	public static final Symbol CONTAINS_KEY_Q = Symbol.create("contains-key?");
-
-	public static final Symbol FOO = Symbol.create("foo");
-	public static final Symbol BAR = Symbol.create("bar");
-	public static final Symbol BAZ = Symbol.create("baz");;
+	public static final Symbol QUERY = intern("query");
+	public static final Symbol QUERY_AS = intern("query-as");
 
 
-	public static final Symbol LOOKUP = Symbol.create("lookup");
+	public static final Symbol EXPAND = intern("expand");
+
+	public static final Symbol SCHEDULE = intern("schedule");
+	public static final Symbol SCHEDULE_STAR = intern("schedule*");
+
+	public static final Symbol FIRST = intern("first");
+	public static final Symbol SECOND = intern("second");
+	public static final Symbol LAST = intern("last");
+	public static final Symbol NEXT = intern("next");
+	public static final Symbol REVERSE = intern("reverse");
+
+	public static final Symbol AMPERSAND = intern("&");
+	public static final Symbol UNDERSCORE = intern("_");
+
+	public static final Symbol X = intern("x");
+	public static final Symbol E = intern("e");
+
+	public static final Symbol NIL = intern("nil");
+
+	public static final Symbol NIL_Q = intern("nil?");
+	public static final Symbol LIST_Q = intern("list?");
+	public static final Symbol VECTOR_Q = intern("vector?");
+	public static final Symbol SET_Q = intern("set?");
+	public static final Symbol MAP_Q = intern("map?");
+
+	public static final Symbol COLL_Q = intern("coll?");
+	public static final Symbol EMPTY_Q = intern("empty?");
+
+	public static final Symbol SYMBOL_Q = intern("symbol?");
+	public static final Symbol KEYWORD_Q = intern("keyword?");
+	public static final Symbol BLOB_Q = intern("blob?");
+	public static final Symbol ADDRESS_Q = intern("address?");
+	public static final Symbol LONG_Q = intern("long?");
+	public static final Symbol STR_Q = intern("str?");
+	public static final Symbol NUMBER_Q = intern("number?");
+	public static final Symbol HASH_Q = intern("hash?");
+
+	public static final Symbol FN_Q = intern("fn?");
+	public static final Symbol ACTOR_Q = intern("actor?");
+
+	public static final Symbol ZERO_Q = intern("zero?");
+
+	public static final Symbol CONTAINS_KEY_Q = intern("contains-key?");
+
+	public static final Symbol FOO = intern("foo");
+	public static final Symbol BAR = intern("bar");
+	public static final Symbol BAZ = intern("baz");;
+
+
+	public static final Symbol LOOKUP = intern("lookup");
 
 	// State global fields
-	public static final Symbol TIMESTAMP = Symbol.create("timestamp");
-	public static final Symbol JUICE_PRICE = Symbol.create("juice-price");
-	public static final Symbol FEES = Symbol.create("fees");
+	public static final Symbol TIMESTAMP = intern("timestamp");
+	public static final Symbol JUICE_PRICE = intern("juice-price");
+	public static final Symbol FEES = intern("fees");
 
 	// source info
-	public static final Symbol START = Symbol.create("start");
-	public static final Symbol END = Symbol.create("end");
-	public static final Symbol SOURCE = Symbol.create("source");
+	public static final Symbol START = intern("start");
+	public static final Symbol END = intern("end");
+	public static final Symbol SOURCE = intern("source");
 
-	public static final Symbol SYNTAX_Q = Symbol.create("syntax?");
-	public static final Symbol SYNTAX = Symbol.create("syntax");
-	public static final Symbol GET_META = Symbol.create("get-meta");
-	public static final Symbol UNSYNTAX = Symbol.create("unsyntax");
+	public static final Symbol SYNTAX_Q = intern("syntax?");
+	public static final Symbol SYNTAX = intern("syntax");
+	public static final Symbol GET_META = intern("get-meta");
+	public static final Symbol UNSYNTAX = intern("unsyntax");
 
-	public static final Symbol DOC = Symbol.create("doc");
-	public static final Symbol META = Symbol.create("meta");
-	public static final Symbol META_STAR = Symbol.create("*meta*");
+	public static final Symbol DOC = intern("doc");
+	public static final Symbol META = intern("meta");
+	public static final Symbol META_STAR = intern("*meta*");
 
-	public static final Symbol LOOKUP_META = Symbol.create("lookup-meta");
+	public static final Symbol LOOKUP_META = intern("lookup-meta");
 
-	public static final Symbol GET_HOLDING = Symbol.create("get-holding");
-	public static final Symbol SET_HOLDING = Symbol.create("set-holding");
+	public static final Symbol GET_HOLDING = intern("get-holding");
+	public static final Symbol SET_HOLDING = intern("set-holding");
 
-	public static final Symbol GET_CONTROLLER = Symbol.create("get-controller");
-	public static final Symbol SET_CONTROLLER = Symbol.create("set-controller");
-	public static final Symbol CHECK_TRUSTED_Q = Symbol.create("check-trusted?");
+	public static final Symbol GET_CONTROLLER = intern("get-controller");
+	public static final Symbol SET_CONTROLLER = intern("set-controller");
+	public static final Symbol CHECK_TRUSTED_Q = intern("check-trusted?");
 
-	public static final Symbol SET_MEMORY = Symbol.create("set-memory");
-	public static final Symbol TRANSFER_MEMORY = Symbol.create("transfer-memory");
+	public static final Symbol SET_MEMORY = intern("set-memory");
+	public static final Symbol TRANSFER_MEMORY = intern("transfer-memory");
 
-	public static final Symbol RECEIVE_ALLOWANCE = Symbol.create("receive-allowance");
-	public static final Symbol RECEIVE_COIN = Symbol.create("receive-coin");
-	public static final Symbol RECEIVE_ASSET = Symbol.create("receive-asset");
+	public static final Symbol RECEIVE_ALLOWANCE = intern("receive-allowance");
+	public static final Symbol RECEIVE_COIN = intern("receive-coin");
+	public static final Symbol RECEIVE_ASSET = intern("receive-asset");
 
 
-	public static final Symbol SET_BANG = Symbol.create("set!");
-	public static final Symbol SET_STAR = Symbol.create("set*");
+	public static final Symbol SET_BANG = intern("set!");
+	public static final Symbol SET_STAR = intern("set*");
 
-	public static final Symbol REGISTER = Symbol.create("register");
+	public static final Symbol REGISTER = intern("register");
 
-	public static final Symbol SUBSET_Q = Symbol.create("subset?");
-	public static final Symbol UNION = Symbol.create("union");
-	public static final Symbol INTERSECTION = Symbol.create("intersection");
-	public static final Symbol DIFFERENCE = Symbol.create("difference");
+	public static final Symbol SUBSET_Q = intern("subset?");
+	public static final Symbol UNION = intern("union");
+	public static final Symbol INTERSECTION = intern("intersection");
+	public static final Symbol DIFFERENCE = intern("difference");
 
-	public static final Symbol MERGE = Symbol.create("merge");
+	public static final Symbol MERGE = intern("merge");
 
-	public static final Symbol ENCODING = Symbol.create("encoding");
+	public static final Symbol ENCODING = intern("encoding");
 
-	public static final Symbol CREATE_ACCOUNT = Symbol.create("create-account");
-	public static final Symbol SET_KEY = Symbol.create("set-key");
+	public static final Symbol CREATE_ACCOUNT = intern("create-account");
+	public static final Symbol SET_KEY = intern("set-key");
 
-	public static final Symbol LOG = Symbol.create("log");
+	public static final Symbol LOG = intern("log");
 
-	public static final Symbol CNS_RESOLVE = Symbol.create("cns-resolve");
+	public static final Symbol CNS_RESOLVE = intern("cns-resolve");
 
-	public static final Symbol NAN_Q = Symbol.create("nan?");
+	public static final Symbol NAN_Q = intern("nan?");
 
-	public static final Symbol BIT_AND = Symbol.create("bit-and");
-	public static final Symbol BIT_OR = Symbol.create("bit-or");
-	public static final Symbol BIT_XOR = Symbol.create("bit-xor");
-	public static final Symbol BIT_NOT = Symbol.create("bit-not");
+	public static final Symbol BIT_AND = intern("bit-and");
+	public static final Symbol BIT_OR = intern("bit-or");
+	public static final Symbol BIT_XOR = intern("bit-xor");
+	public static final Symbol BIT_NOT = intern("bit-not");
 	
-	public static final Symbol STATIC = Symbol.create("static");
+	public static final Symbol STATIC = intern("static");
+	
+	public static final Symbol PRINT = intern("print");
+	
+	public static Symbol intern(String s) {
+		AString name=Strings.create(s);
+		Symbol sym=Symbol.create(name);
+		return sym;
+	}
 
 
 }
