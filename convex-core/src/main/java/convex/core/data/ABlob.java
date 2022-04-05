@@ -270,10 +270,10 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	
 	/**
 	 * Compares this Blob to another Blob, in lexicographic order sorting by first
-	 * bytes.
+	 * bytes (unsigned).
 	 * 
 	 * Note: This means that compareTo does not precisely match equality, because
-	 * different blob types may be lexicographically equal but represent different values.
+	 * specialised Blob types may be lexicographically equal but represent different values.
 	 */
 	@Override
 	public int compareTo(ABlob b) {

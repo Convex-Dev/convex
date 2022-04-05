@@ -121,6 +121,19 @@ public abstract class ALongBlob extends ABlob {
 	public long longValue() {
 		return value;
 	}
+	
+	@Override
+	public int compareTo(ABlob b) {
+		if (b.count()==LENGTH) {
+			return compareTo(b.longValue());
+		} else {
+			return -b.compareTo(this);
+		}
+	}
+
+	protected int compareTo(long bvalue) {
+		return Long.compareUnsigned(value, bvalue);
+	}
 
 	@Override
 	public final boolean equalsBytes(ABlob b) {
