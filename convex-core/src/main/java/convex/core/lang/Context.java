@@ -242,7 +242,8 @@ public class Context<T extends ACell> extends AObject {
 	@SuppressWarnings("unchecked")
 	private static <T extends ACell> Context<T> create(ChainState cs, long juice, AVector<ACell> localBindings, ACell result, int depth,AVector<AVector<ACell>> log, CompilerState comp) {
 		if (juice<0) throw new IllegalArgumentException("Negative juice! "+juice);
-		return new Context<T>(cs,juice,localBindings,(T)result,depth,DEFAULT_EXCEPTION,log,comp);
+		Context<T> ctx= new Context<T>(cs,juice,localBindings,(T)result,depth,DEFAULT_EXCEPTION,log,comp);
+		return ctx;
 	}
 
 	private static <T extends ACell> Context<T> create(State state, long juice,AVector<ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer, AVector<AVector<ACell>> log, CompilerState comp) {
@@ -708,10 +709,19 @@ public class Context<T extends ACell> extends AObject {
 		return as.getHoldings();
 	}
 
+	/**
+	 * Gets the balance for the current Address
+	 * @return Balance in Convex Coins
+	 */
 	public long getBalance() {
 		return getBalance(getAddress());
 	}
 
+	/**
+	 * Gets the balance for the specified Address
+	 * @param address
+	 * @return BAlance in Convex Coins
+	 */
 	public long getBalance(Address address) {
 		AccountStatus as=getAccountStatus(address);
 		if (as==null) return 0L;
@@ -1471,7 +1481,6 @@ public class Context<T extends ACell> extends AObject {
 			actx=actorCall(target,amount,Symbols.RECEIVE_COIN,source,CVMLong.create(amount),null);
 			if (actx.isExceptional()) return actx;
 
-			// TODO: Should return value be change in balance? or amount offered?
 			Long sent=currentBalance-actx.getBalance(source);
 			return actx.withResult(CVMLong.create(sent));
 		} else {

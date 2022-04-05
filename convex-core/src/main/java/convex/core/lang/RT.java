@@ -819,9 +819,8 @@ public class RT {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T nth(ACell o, long i) {
-		// special case, we treat nil as empty sequence
 		if (o == null)
-			throw new IndexOutOfBoundsException("Can't get nth element from null");
+			throw new IndexOutOfBoundsException("Can't get nth element from null!");
 
 		if (o instanceof ACountable)
 			return ((ACountable<T>) o).get(i); // blobs, maps, strings and collections

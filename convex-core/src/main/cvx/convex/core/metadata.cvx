@@ -577,9 +577,9 @@
 
 
  first
- {:doc {:description "Returns the first element from a collection which must contain at least one element. Also see `empty?`"
+ {:doc {:description "Returns the first element from a Countable collection which must contain at least one element. Also see `empty?`"
         :errors      {:BOUNDS "If the collection is empty."
-                      :CAST   "If the first argument is not a countable collection."}
+                      :CAST   "If the first argument is not a Countable collection."}
         :examples    [{:code "(first [1 2 3])"}]
         :signature   [{:params [coll]}]}}
 
@@ -677,14 +677,14 @@
                        :return DataStructure}]}}
 
  keys
- {:doc {:description "Returns a vector of keys in the given map, in the map defined order. Also see `values`."
-        :errors      {:CAST "If the argument is not a map."}
+ {:doc {:description "Returns a Vector of keys in the given Map, in the map defined order. Also see `values`."
+        :errors      {:CAST "If the argument is not a Map."}
         :examples    [{:code "(keys {:foo 1 :bar 2})"}]
         :signature   [{:params [m]
                        :return Vector}]}}
 
  keyword
- {:doc {:description "Coerces the argument to a keyword: a symbol, a keyword, or a string between 1 and 64 characters."
+ {:doc {:description "Coerces the argument to a Keyword: a Symbol, a Keyword, or a String between 1 and 128 UTF-8 bytes."
         :errors      {:ARGUMENT "If the keyword name is of illegal length."
                       :CAST     "If the argument is not of a type castable to keyword."}
         :examples    [{:code "(keyword \"foo\")"}]
@@ -693,15 +693,16 @@
 
 
  keyword?
- {:doc {:description "Returns true if the argument is a keyword, false otherwise."
+ {:doc {:description "Returns true if the argument is a Keyword, false otherwise."
         :examples    [{:code "(keyword? :foo)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
 
 
  last
- {:doc {:description "Returns the last element of a data structure, in collection-defined order. Collection argument must be coercible to a sequential data structure."
-        :errors      {:CAST "If the argument is not coercible to a sequential data structure (list or vector)."}
+ {:doc {:description "Returns the last element of a Countable data structure, in collection-defined order."
+        :errors      {:CAST "If the argument is not coercible to a sequential data structure (list or vector)."
+                      :BOUNDS "If there are no elements in the data structure, i.e. the last element does not exist."}
         :examples    [{:code "(last [1 2 3])"}]
         :signature   [{:params [coll]}]}}
 
@@ -721,7 +722,7 @@
 
 
  list?
- {:doc {:description "Returns true if the argument is a list."
+ {:doc {:description "Returns `true` if and only if the argument is a List."
         :examples    [{:code "(list? :foo)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
@@ -736,22 +737,22 @@
 
 
  long
- {:doc {:description "Casts the given argument to a 64-bit signed integer."
-        :errors      {:CAST "If the argument is not castable to `long`."}
+ {:doc {:description "Casts the given argument to a 64-bit Long (signed integer)."
+        :errors      {:CAST "If the argument is not castable to Long."}
         :examples    [{:code "(long 10)"}]
         :signature   [{:params [num]}]}}
 
 
  long?
- {:doc {:description "Returnes true if the argment is a value of Long type, false otherwise."
+ {:doc {:description "Returnes `true` if the argment is a value of Long type, `false` otherwise."
         :examples    [{:code "(long? 1234)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
 
 
  lookup
- {:doc      {:description "Looks up the value of a symbol in the current execution environment, or the account of the given address if specified."
-             :errors      {:NOBODY "If the target account for lookup does not exist."}
+ {:doc      {:description "Looks up the value of a Symbol in the current execution environment, or the Account of the given Address if specified."
+             :errors      {:NOBODY "If the target Account for lookup does not exist."}
              :examples    [{:code "(do (def a 13) (lookup a))"}
                            {:code "(lookup #8 count)"}]
              :signature   [{:params [sym]}
@@ -775,7 +776,7 @@
 
 
  map
- {:doc {:description "Applies a function to each element of a data structure in sequence, and returns a vector of results. Additional collection may be provided to call a function with higher arity."
+ {:doc {:description "Applies a Function to each element of a data structure in sequence, and returns a vector of results. Additional collections may be provided to call a function with higher arity."
         :examples    [{:code "(map inc [1 2 3])"}]
         :signature   [{:params [f coll]}
                       {:params [f coll1 coll2 & more-colls ]}]}}
@@ -788,32 +789,32 @@
                        :return Boolean}]}}
 
  merge
- {:doc {:description "Merges zero or more maps (not blob maps), replacing existing values. Nil is considered as an empty map."
+ {:doc {:description "Merges zero or more Maps (not BlobMaps!), replacing existing values. Nil is considered as an empty map."
         :examples    [{:code "(merge {1 2 3 4} {3 5 7 9})"}]
         :signature   [{:params [& maps]}]}}
 
 
  meta
- {:doc {:description "Returns metadata for a `syntax` object. Returns nil if the argument is not a syntax object."
+ {:doc {:description "Returns metadata for a Syntax Object. Returns `nil` if the argument is not a syntax object."
         :examples    [{:code "(meta (syntax 'foo {:bar 1}))"}]
         :signature   [{:params [syntax]
                        :return Map}]}}
 
  mod
- {:doc {:description "Returns the integer modulus of a numerator divided by a divisor. The result will always be positive, in consistent with Euclidean Divsion."
+ {:doc {:description "Returns the integer modulus of a numerator divided by a divisor. The result will always be positive, consistent with Euclidean Divsion."
         :examples    [{:code "(mod 13 5)"}]
         :signature   [{:params [num div]}]}}
 
 
  nan?
- {:doc {:description "Returns true if argment is `##NaN`. Returns false for any other value (including non-numerical arguments)."
+ {:doc {:description "Returns `true` if and only if the argment is the Double value `##NaN`."
         :examples    [{:code "(nan? ##NaN)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
 
 
  name
- {:doc {:description "Gets the string name of an object: a keyword, a symbol, or a string."
+ {:doc {:description "Gets the String name of an object: a Keyword, a Symbol, or a String."
         :errors      {:CAST "If the argument is not castable to a String name."}
         :examples    [{:code   "(name :foo)"
                        :return "\"foo\""}]
@@ -830,14 +831,14 @@
 
 
  nil?
- {:doc {:description "Returns true if argument is nil, false otherwise."
+ {:doc {:description "Returns `true` if the argument is `nil`, `false` otherwise."
         :examples    [{:code "(nil? nil)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
 
 
  not
- {:doc {:description "Inverts a truth value. Returns true on false or nil, returns false on any other value."
+ {:doc {:description "Inverts a truth value. Returns `true` on `false` or `nil`, returns `false` for any other value."
         :examples    [{:code "(not true)"}
                       {:code "(not nil)"}]
         :signature   [{:params [b]
@@ -845,7 +846,7 @@
 
 
  nth
- {:doc {:description ["Gets the nth element of a countable data structure: a collection as defined in `collection?`, a blob, or a string."
+ {:doc {:description ["Gets the nth element of a Countable data structure: a collection as defined in `collection?`, a Blob, or a String."
                       "The index must be a valid long between 0 (inclusive) and the element count of the collection (exclusive)."]
         :errors      {:CAST "If the first argument is not countable data structure."}
         :examples    [{:code "(nth [1 2 3] 2)"}]
@@ -879,7 +880,7 @@
 
 
  query
- {:doc      {:description "Runs forms in query mode. When returning result, any state change will be rolled back as if nothing happened."
+ {:doc      {:description "Runs forms in query mode. When returning a result, any State changes will be rolled back as if nothing happened."
              :examples    [{:code "(query (def a 10) a)"}
                            {:code "(query (call unsafe-actor (do-something)))"}]
              :signature   [{:params [& forms]}]}
@@ -1120,7 +1121,7 @@
 
 
  transfer
- {:doc {:description "Transfers the specified amount of coins to the target `address`. Returns the amount transferred if successful."
+ {:doc {:description "Transfers the specified amount of coins to the target `Address`. Returns the amount transferred if successful, which may be less than the amount requested if the target does not accept all."
         :errors      {:FUNDS "If there is insufficient balance in the sender's account."
                       :STATE "If the receiver is an actor that is unable to accept funds."}
         :examples    [{:code "(transfer #42 12345678)"}]
@@ -1143,7 +1144,7 @@
 
 
  union
- {:doc {:description "Computes the union of zero or more sets. Nil is treated as the empty set."
+ {:doc {:description "Computes the union of zero or more sets. Nil is treated as an empty set when used as an input, but any result will always be a valid non-nil Set."
         :examples    [{:code "(union #{1 2} #{2 3})"}]
         :signature   [{:params [& sets]
                        :return Set}]}}

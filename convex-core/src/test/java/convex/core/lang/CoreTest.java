@@ -1308,6 +1308,12 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(first [1] 2)"));
 		assertCastError(step("(first 1)"));
 		assertCastError(step("(first :foo)"));
+		
+		// Not data structures, but are countable
+		assertEquals(CVMChar.create('a'), eval("(first \"abc\")"));
+		assertEquals(CVMByte.create(0x12), eval("(first 0x1234)"));
+		assertBoundsError(step("(first \"\")"));
+		assertBoundsError(step("(first 0x)"));
 	}
 
 	@Test
@@ -1320,6 +1326,13 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(second)"));
 		assertArityError(step("(second [1] 2)"));
 		assertCastError(step("(second 1)"));
+		
+		// Not data structures, but are countable
+		assertEquals(CVMChar.create('b'), eval("(second \"abc\")"));
+		assertEquals(CVMByte.create(0x34), eval("(second 0x1234)"));
+		assertBoundsError(step("(second \"\")"));
+		assertBoundsError(step("(second 0x)"));
+
 	}
 
 	@Test
@@ -1333,6 +1346,12 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(last)"));
 		assertArityError(step("(last [1] 2)"));
 		assertCastError(step("(last 1)"));
+		
+		// Not data structures, but are countable
+		assertEquals(CVMChar.create('c'), eval("(last \"abc\")"));
+		assertEquals(CVMByte.create(0x34), eval("(last 0x1234)"));
+		assertBoundsError(step("(last \"\")"));
+		assertBoundsError(step("(last 0x)"));
 	}
 
 	@Test
@@ -1391,11 +1410,12 @@ public class CoreTest extends ACVMTest {
 		// bad types of elements
 		assertArgumentError(step("(conj {} 2)")); // can't cast long to a map entry
 		assertArgumentError(step("(conj {} [1 2 3])")); // wrong size vector for a map entry
+		assertArgumentError(step("(conj {1 2} [1])")); // wrong size vector for a map entry
 		assertArgumentError(step("(conj {} '(1 2))")); // wrong type for a map entry
 		assertArgumentError(step("(conj (blob-map) [:foo 0xa2])")); // bad key type for blobmap
 
 		assertCastError(step("(conj 1 2)"));
-		assertCastError(step("(conj (str :foo) 2)"));
+		assertCastError(step("(conj (str :foo) 2)")); // string is not a Data Structure
 
 		assertArityError(step("(conj)"));
 	}
