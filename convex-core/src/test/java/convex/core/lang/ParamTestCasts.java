@@ -10,6 +10,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import convex.core.ErrorCodes;
 import convex.core.data.ACell;
 import convex.core.data.Sets;
+import convex.core.data.StringShort;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -26,7 +27,7 @@ public class ParamTestCasts {
 			CVMDouble.POSITIVE_INFINITY,
 			CVMDouble.NEGATIVE_INFINITY,
 			CVMDouble.ZERO,
-			Strings.EMPTY,
+			StringShort.EMPTY,
 			Strings.create("foobar"),
 			Samples.ACCOUNT_KEY,
 			Samples.BAD_HASH,

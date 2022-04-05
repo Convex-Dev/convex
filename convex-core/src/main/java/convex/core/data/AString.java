@@ -48,9 +48,11 @@ public abstract class AString extends ACountable<CVMChar> implements Comparable<
 		return length;
 	}
 	
-	public StringShort empty() {
-		return Strings.EMPTY;
-	}
+	/**
+	 * Returns the singleton empty String
+	 */
+	@Override
+	public abstract StringShort empty();
 
 	/**
 	 * Gets the Unicode character at position i, or -1 if not valid

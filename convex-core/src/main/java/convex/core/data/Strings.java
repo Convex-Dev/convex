@@ -13,10 +13,8 @@ import convex.core.data.prim.CVMChar;
 import convex.core.exceptions.BadFormatException;
 
 public class Strings {
+	public static final StringShort EMPTY = StringShort.EMPTY;
 	
-	public static final int MAX_ENCODING_LENGTH = Math.max(StringShort.MAX_ENCODING_LENGTH,StringTree.MAX_ENCODING_LENGTH);
-
-	public static final StringShort EMPTY = StringShort.create("");
 	public static final StringShort NIL = StringShort.create("nil");
 	public static final StringShort TRUE = StringShort.create("true");
 	public static final StringShort FALSE = StringShort.create("false");
@@ -26,6 +24,9 @@ public class Strings {
 	
 	public static final StringShort COLON = StringShort.create(":");
 	public static final StringShort HEX_PREFIX = StringShort.create("0x");
+
+	public static final int MAX_ENCODING_LENGTH = Math.max(StringShort.MAX_ENCODING_LENGTH,StringTree.MAX_ENCODING_LENGTH);
+
 
 	/**
 	 * Byte value used for looking outside a String
@@ -43,7 +44,7 @@ public class Strings {
 	 */
 	public static AString read(ByteBuffer bb) throws BadFormatException {
 		long length=Format.readVLCLong(bb);
-		if (length==0) return EMPTY;
+		if (length==0) return StringShort.EMPTY;
 		if (length<0) throw new BadFormatException("Negative string length!");
 		if (length>Integer.MAX_VALUE) throw new BadFormatException("String length too long! "+length);
 		if (length<=StringShort.MAX_LENGTH) {
@@ -58,6 +59,7 @@ public class Strings {
 	 * @return CVM String instance.
 	 */
 	public static AString create(String s) {
+		if (s.length()==0) return StringShort.EMPTY;
 		CharsetEncoder encoder=getEncoder();
 		ByteBuffer bb;
 		try {
@@ -78,7 +80,7 @@ public class Strings {
 	 */
 	public static AString join(ASequence<AString> ss,AString separator) {
 		long n=ss.count();
-		if (n==0) return Strings.EMPTY;
+		if (n==0) return StringShort.EMPTY;
 		BlobBuilder builder=new BlobBuilder();
 		builder.append(ss.get(0));
 		for (long i=1; i<n; i++) {
@@ -96,7 +98,7 @@ public class Strings {
 	 */
 	public static AString join(ASequence<AString> ss,CVMChar separator) {
 		long n=ss.count();
-		if (n==0) return Strings.EMPTY;
+		if (n==0) return StringShort.EMPTY;
 		BlobBuilder builder=new BlobBuilder();
 		builder.append(ss.get(0));
 		for (long i=1; i<n; i++) {
@@ -126,8 +128,8 @@ public class Strings {
 		return create(Blobs.fromHex(hexString));
 	}
 
-	public static AString empty() {
-		return EMPTY;
+	public static StringShort empty() {
+		return StringShort.EMPTY;
 	}
 
 	public static CharsetDecoder getDecoder() {

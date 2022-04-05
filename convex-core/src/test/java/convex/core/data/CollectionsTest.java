@@ -3,6 +3,7 @@ package convex.core.data;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -54,26 +55,37 @@ public class CollectionsTest {
 
 	static final Keyword UNLIKELY_KEYWORD=Keyword.create("this-is-not-likely-to-happen-at-random");
 	
+	public static <T extends ACell> void doCountableTests(ACountable<T> a) {
+		long n = a.count();
+		
+		ACountable<T> empty=a.empty();
+		assertSame(empty.empty(),empty);
+		
+ 		if (n == 0) {
+			assertSame(empty, a);
+		} else {
+			assertFalse(a.isEmpty());
+			T first =a.get(0);
+			assertEquals(first,a.getElementRef(0).getValue());
+			assertNotSame(empty,a);
+		}
+		
+		ObjectsTest.doAnyValueTests(a);
+	}
+	
 	/**
 	 * Generic tests for any data structure
 	 * @param a Any Data Structure
 	 */
 	public static <T extends ACell> void doDataStructureTests(ADataStructure<T> a) {
 		long n = a.count();
-		if (n == 0) {
-			assertSame(a.empty(), a);
-		} else {
-			assertFalse(a.isEmpty());
-			T first =a.get(0);
-			assertEquals(first,a.getElementRef(0).getValue());
-		}
 		
 		assertFalse(RT.bool(a.get(UNLIKELY_KEYWORD))); 
 		assertSame(Keywords.FOO,a.get(UNLIKELY_KEYWORD,Keywords.FOO));
 		
 		assertEquals(n,a.size());
 
-		ObjectsTest.doAnyValueTests(a);
+		doCountableTests(a);
 	}
 
 	/**

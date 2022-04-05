@@ -937,6 +937,10 @@ public class RT {
 		if (a == null) {
 			return Strings.NIL;
 		}
+		if (a instanceof AString) {
+			return (AString) a;
+		}
+
 		if (a.getType()==Types.BLOB) {
 			return Strings.create(((ABlob)a).toHexString());
 		}

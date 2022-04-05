@@ -43,6 +43,13 @@ public abstract class ACountable<E extends ACell> extends ACell {
 	}
 	
 	/**
+	 * Returns a canonical, singleton empty instance of the same type as this Countable value.
+	 * 
+	 * @return An empty Countable value
+	 */
+	public abstract ACountable<E> empty();
+	
+	/**
 	 * Gets the size of this data structure as an int.
 	 * 
 	 * Returns Integer.MAX_SIZE if the count is larger than can fit in an int. If

@@ -40,10 +40,11 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	}
 	
 	/**
-	 * Returns an empty instance of the same general type as this data structure.
+	 * Returns an empty instance of the same Type as this data structure.
 	 * 
 	 * @return An empty data structure
 	 */
+	@Override
 	public abstract ADataStructure<E> empty();
 	
 	@Override

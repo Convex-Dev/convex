@@ -2,7 +2,7 @@ package convex.core.data.type;
 
 import convex.core.data.ACell;
 import convex.core.data.AString;
-import convex.core.data.Strings;
+import convex.core.data.StringShort;
 
 /**
  * Type that represents CVM Byte values
@@ -30,7 +30,7 @@ public final class StringType extends AStandardType<AString> {
 
 	@Override
 	public AString defaultValue() {
-		return Strings.EMPTY;
+		return StringShort.EMPTY;
 	}
 
 	@Override

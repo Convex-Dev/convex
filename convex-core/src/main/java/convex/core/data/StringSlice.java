@@ -19,7 +19,7 @@ public class StringSlice extends AString {
 	}
 
 	public static AString create(StringTree source, long start, long len) {
-		if (len==0) return Strings.EMPTY;
+		if (len==0) return StringShort.EMPTY;
 		if (len<0) throw new IllegalArgumentException("Negative length");
 		
 		long slen=source.length;
@@ -30,7 +30,7 @@ public class StringSlice extends AString {
 	@Override
 	public AString subString(long start, long end) {
 		long len=end-start;
-		if (len==0) return Strings.EMPTY;
+		if (len==0) return StringShort.EMPTY;
 		if (len<0) throw new IllegalArgumentException("Negative length");
 		if ((start<0)||(start+len>=length)) throw new IllegalArgumentException("Out of range");
 		if ((start==0)&&(len==length)) return this;
@@ -41,6 +41,11 @@ public class StringSlice extends AString {
 	public void validateCell() throws InvalidDataException {
 		// Nothing?
 
+	}
+	
+	@Override
+	public StringShort empty() {
+		return StringShort.EMPTY;
 	}
 
 	@Override

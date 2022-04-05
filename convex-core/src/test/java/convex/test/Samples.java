@@ -304,7 +304,7 @@ public class Samples {
 			MAX_SHORT_STRING,
 			BAD_HASH,
 			Symbols.FOO,
-			Strings.EMPTY,
+			StringShort.EMPTY,
 			MAX_EMBEDDED_STRING,
 			Do.EMPTY,
 			Address.ZERO,

@@ -107,5 +107,10 @@ public class StringTree extends AString {
 	protected void writeToBuffer(ByteBuffer bb) {
 		data.writeToBuffer(bb);
 	}
+	
+	@Override
+	public StringShort empty() {
+		return StringShort.EMPTY;
+	}
 
 }

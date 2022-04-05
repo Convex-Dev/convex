@@ -26,7 +26,7 @@ public class StringsTest {
 	}
 	
 	@Test public void testExamples() {
-		doStringTest(Strings.EMPTY);
+		doStringTest(StringShort.EMPTY);
 		doStringTest(Samples.MAX_EMBEDDED_STRING);
 		doStringTest(Samples.NON_EMBEDDED_STRING);
 		doStringTest(Samples.MAX_SHORT_STRING);
@@ -101,7 +101,7 @@ public class StringsTest {
 	}
 
 	@Test public void testEmptyString() {
-		StringShort s=Strings.EMPTY;
+		StringShort s=StringShort.EMPTY;
 		doStringTest(s);
 	}
 	
@@ -161,6 +161,6 @@ public class StringsTest {
 		AString abs=Strings.create(bs);
 		assertEquals(a,abs);
 		
-		ObjectsTest.doAnyValueTests(a);
+		CollectionsTest.doCountableTests(a);
 	}
 }

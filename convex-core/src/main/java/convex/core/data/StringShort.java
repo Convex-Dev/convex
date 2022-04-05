@@ -29,6 +29,11 @@ public class StringShort extends AString {
 
 	private final Blob data;
 
+	/**
+	 * The canonical empty String
+	 */
+	public static final StringShort EMPTY = new StringShort(Blob.EMPTY);
+
 	protected StringShort(Blob data) {
 		super(data.length);
 		this.data = data;
@@ -51,6 +56,7 @@ public class StringShort extends AString {
 	 * @return StringShort instance, or null if String is of invalid size
 	 */
 	public static StringShort create(String string) {
+		if (string.length()==0) return EMPTY;
 		byte[] bs = string.getBytes(StandardCharsets.UTF_8);
 		return new StringShort(bs);
 	}
@@ -64,7 +70,7 @@ public class StringShort extends AString {
 	 */
 	public static StringShort create(AArrayBlob b) {
 		if (b.count() == 0)
-			return Strings.EMPTY;
+			return StringShort.EMPTY;
 		return new StringShort(b.toFlatBlob());
 	}
 
@@ -183,6 +189,11 @@ public class StringShort extends AString {
 	@Override
 	protected void writeToBuffer(ByteBuffer bb) {
 		data.writeToBuffer(bb);
+	}
+
+	@Override
+	public StringShort empty() {
+		return EMPTY;
 	}
 
 }

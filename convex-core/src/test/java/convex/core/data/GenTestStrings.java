@@ -14,6 +14,7 @@ import convex.test.generators.StringGen;
 public class GenTestStrings {
 	@Property
 	public void testStringProperties(@From(StringGen.class) AString a) {
-		assertEquals(a,Strings.create(a.toString()));
+		AString cvm=Strings.create(a.toString());
+		if (cvm!=null) assertEquals(a,cvm);
 	}
 }
