@@ -191,9 +191,4 @@ public class StringShort extends AString {
 		data.writeToBuffer(bb);
 	}
 
-	@Override
-	public StringShort empty() {
-		return EMPTY;
-	}
-
 }

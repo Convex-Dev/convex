@@ -96,9 +96,12 @@ public abstract class AArrayBlob extends ABlob {
 		if (this == b) return 0;
 		int alength = this.length;
 		int blength = b.length;
+		
+		// Check common bytes first
 		int compareLength = Math.min(alength, blength);
 		int c = Utils.compareByteArrays(this.store, this.offset, b.store, b.offset, compareLength);
 		if (c != 0) return c;
+		
 		if (alength > compareLength) return 1; // this is bigger
 		if (blength > compareLength) return -1; // b is bigger
 		return 0;

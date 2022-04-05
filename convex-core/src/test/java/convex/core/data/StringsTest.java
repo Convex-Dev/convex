@@ -83,6 +83,24 @@ public class StringsTest {
 		assertEquals(Vectors.of("|||"),Strings.create("|||").split(CVMChar.create(':')));
 	}
 	
+	@Test public void testCompare() {
+		assertStringOrder("a","b");
+		assertStringOrder("abc","abd");
+		assertStringOrder("a","abc");
+		assertStringOrder("","a","aaaaaaa");
+	}
+	
+	private void assertStringOrder(String... ss) {
+		int n=ss.length;
+		AString[] strs=new AString[n];
+		for (int i=0; i<n; i++) {
+			strs[i]=Strings.create(ss[i]);
+		}
+		for (int i=0; (i+1)<n; i++) {
+			assertTrue(strs[i].compareTo(strs[i+1])<0);
+		}
+	}
+
 	@Test public void testStringJoin() {
 		splitJoinRoundTrip("a:b:c", ':',3);
 		splitJoinRoundTrip("a-b-c", ':',1);

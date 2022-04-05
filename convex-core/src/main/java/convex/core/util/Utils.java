@@ -425,22 +425,18 @@ public class Utils {
 	 * @param aOffset Offset into first array
 	 * @param b Second array
 	 * @param bOffset Offset into second array
-	 * @param maxLength The maximum size for comparison. If arrays are equal up to
+	 * @param length The maximum size for comparison. If arrays are equal up to
 	 *                  this length, will return 0
 	 * @return Negative if a is 'smaller', 0 if a 'equals' b, positive if a is
 	 *         'larger'.
 	 */
-	public static int compareByteArrays(byte[] a, int aOffset, byte[] b, int bOffset, int maxLength) {
-		int length = Math.min(maxLength, a.length - aOffset);
-		length = Math.min(maxLength, b.length - bOffset);
+	public static int compareByteArrays(byte[] a, int aOffset, byte[] b, int bOffset, int length) {
 		for (int i = 0; i < length; i++) {
 			int ai = 0xFF & a[aOffset + i];
 			int bi = 0xFF & b[bOffset + i];
 			if (ai < bi) return -1;
 			if (ai > bi) return 1;
 		}
-		if (length < a.length) return 1; // longer a considered larger
-		if (length < b.length) return -1; // shorter a considered smaller
 		return 0;
 	}
 

@@ -52,7 +52,9 @@ public abstract class AString extends ACountable<CVMChar> implements Comparable<
 	 * Returns the singleton empty String
 	 */
 	@Override
-	public abstract StringShort empty();
+	public final StringShort empty() {
+		return StringShort.EMPTY;
+	}
 
 	/**
 	 * Gets the Unicode character at position i, or -1 if not valid

@@ -42,11 +42,6 @@ public class StringSlice extends AString {
 		// Nothing?
 
 	}
-	
-	@Override
-	public StringShort empty() {
-		return StringShort.EMPTY;
-	}
 
 	@Override
 	public int encode(byte[] bs, int pos) {
@@ -99,7 +94,7 @@ public class StringSlice extends AString {
 
 	@Override
 	public int compareTo(AString o) {
-		return toCanonical().compareTo(o);
+		return ((AString)getCanonical()).compareTo(o);
 	}
 
 	@Override

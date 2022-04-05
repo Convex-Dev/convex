@@ -34,6 +34,9 @@ public class BlobsTest {
 
 		assertTrue(Blob.fromHex("01").compareTo(Blob.fromHex("01")) == 0);
 		assertTrue(Blob.fromHex("").compareTo(Blob.fromHex("")) == 0);
+		
+		assertTrue(Blob.fromHex("65").compareTo(Blob.fromHex("656667")) < 0);
+		assertTrue(Blob.fromHex("85").compareTo(Blob.fromHex("858687")) < 0);
 	}
 	
 	@Test
@@ -462,6 +465,6 @@ public class BlobsTest {
 		assertEquals(a.append(a),r);
 		
 		// Should pass tests for a CVM value
-		ObjectsTest.doAnyValueTests(a);
+		CollectionsTest.doCountableTests(a);
 	}
 }
