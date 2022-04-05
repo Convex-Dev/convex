@@ -41,8 +41,9 @@
 
 
  *holdings*
-  {:doc      {:description ["Returns the holdings blob map for this account."
-                            "Holdings are data values controlled by other accounts (usually actors). They can be used to indicate that an account may have special rights or holdings with respect to a specific actor, for instance."
+  {:doc      {:description ["Returns the holdings BlobMap for this account."
+                            "Holdings are data values controlled by other Accounts (usually Actors). They can be used to indicate that an account may have special rights or asset holdings with respect to a specific Actor, for instance."
+                            "Holdings should NOT be trusted if they are provided by an untrusted Account."
                             "See `get-holding`, `set-holding`."]
               :examples    [{:code "*holdings*"}]}
    :special? true}
@@ -139,7 +140,7 @@
 
  ==
  {:doc {:description ["Tests if arguments are equal in numerical value."
-                      "Difference with `=` is that types are erased (eg. `long` value is comparable with a `double` value)."]
+                      "Difference with `=` is that types are erased (eg. `Long` value is comparable with a `double` value)."]
         :examples    [{:code   "(== 2 2.0)"
                        :return "true"}]
         :signature   [{:params [& xs]
@@ -155,7 +156,7 @@
 
 
  +
- {:doc {:description "Adds numerical arguments. Result will be a `long` if all arguments are integers, or a double if any floating point values are included."
+ {:doc {:description "Adds numerical arguments. Result will be a `Long` if all arguments are integers, or a double if any floating point values are included."
         :examples    [{:code "(+ 1 2 3)"}]
         :signature   [{:params [& xs]}]}}
 
@@ -168,7 +169,7 @@
 
 
  *
- {:doc {:description "Multiplies numeric arguments. Result will be a `double` if any arguments are floating point values, otherwise it will be a `long`."
+ {:doc {:description "Multiplies numeric arguments. Result will be a `Double` if any arguments are floating point values, otherwise it will be a `long`."
         :examples    [{:code "(* 1 2 3 4 5)"}]
         :signature   [{:params [& xs]}]}}
 
@@ -268,7 +269,7 @@
         :signature   [{:params [a b]
                        :return Long}]}}
  
-  bit-not
+ bit-not
  {:doc {:description "Returns the bitwise NOT of a Long value."
         :errors      {:CAST "If the argument is not implicitly castable to Long."}
         :examples    [{:code "(bit-not (long 0xfffffffffffffff0))"}]
@@ -292,7 +293,7 @@
 
 
  blob
- {:doc {:description "Casts the argument to a Blob. Arugment can be an Address, a hex String, a Long value, or another Blob."
+ {:doc {:description "Casts the argument to a canonical Blob. Arugment can be an Address, a hex String, a Long value, or another Blob."
         :errors      {:CAST "If the argument is not castable to a blob."}
         :examples    [{:code "(blob \"1234abcd\")"}]
         :signature   [{:params [address]
@@ -300,7 +301,7 @@
 
 
  blob-map
- {:doc {:description ["Creates a Blob Map. Blob Maps are specialised maps that support Blob types as keys only (see `blob`)."
+ {:doc {:description ["Creates a BlobMap. BlobMaps are specialised maps that support Blob types as keys only (see `blob`)."
                       "Optional arguments must be pairs of blob keys and values to be included in the blob map."]
         :errors      {:ARGUMENT "If any of the keys supplied is not castable to a blob."
                       :ARITY    "If there is not an even number of arguments (key and value pairs)."}
@@ -359,14 +360,14 @@
 
 
  char
- {:doc {:description "Casts a value to a `char`. Discards high bits of larger integer types."
+ {:doc {:description "Casts a value to a Character. Discards high bits of larger integer types."
         :errors      {:CAST "If the argument is not castable to a character."}
         :examples    [{:code "(char 97)"}]
         :signature   [{:params [x]
                        :return Character}]}}
 
  coll?
- {:doc {:description "Returns true if the argument is a collection: list, map, set, or vector. Returns false otherwise."
+ {:doc {:description "Returns `true` if and only if the argument is a collection: List, Map, Set, or Vector. Returns false otherwise."
         :examples    [{:code "(coll? [1 2 3])"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
@@ -395,7 +396,7 @@
 
 
  concat
- {:doc {:description "Concatenates sequential data structures (lists or maps), returning a new sequential data structure of the same type as the first non-nil argument. `nil` is treated as an empty sequence."
+ {:doc {:description "Concatenates sequential data structures (Lists or Maps), returning a new sequential data structure of the same type as the first non-nil argument. `nil` is treated as an empty sequence."
         :errors      {:CAST "If any of the arguments is neither a sequential data structure nor nil."}
         :examples    [{:code "(concat [1 2] [3 4])"}]
         :signature   [{:params [& seqs]
