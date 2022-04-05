@@ -282,6 +282,7 @@ public class Samples {
 			FULL_BLOB,
 			MAX_EMBEDDED_BLOB,
 			LongBlob.create(-1),
+			LongBlob.ZERO,
 			INT_LIST_10,
 			Lists.empty(),
 			INT_VECTOR_300,

@@ -696,7 +696,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(":foo", evalS("(str :foo)"));
 		assertEquals("nil", evalS("(str nil)"));
 		assertEquals("true", evalS("(str true)"));
-		assertEquals("cafebabe", evalS("(str (blob \"CAFEBABE\"))"));
+		assertEquals("cafebabe", evalS("(str (blob \"CAFEBABE\"))")); // TODO sanity + consistency
 
 		// Standalone chars are stringified Java-style whereas chars embedded in a container (eg. in a vector)
 		// must be EDN-style readable representations.

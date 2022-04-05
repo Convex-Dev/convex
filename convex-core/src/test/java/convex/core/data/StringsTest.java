@@ -88,6 +88,8 @@ public class StringsTest {
 		assertStringOrder("abc","abd");
 		assertStringOrder("a","abc");
 		assertStringOrder("","a","aaaaaaa");
+		
+		assertStringOrder("aaaaaaaa","aaaaaaab","aaaaaaba","baaaaaaa","baaaaaab"); // Baa Baa Bowyer, Have you any wool?
 	}
 	
 	private void assertStringOrder(String... ss) {

@@ -37,6 +37,11 @@ public class BlobsTest {
 		
 		assertTrue(Blob.fromHex("65").compareTo(Blob.fromHex("656667")) < 0);
 		assertTrue(Blob.fromHex("85").compareTo(Blob.fromHex("858687")) < 0);
+		
+		// Some special cases
+		assertEquals(-1,LongBlob.create(0).compareTo(LongBlob.create(-1))); // Unsigned!
+		assertEquals(-1,Address.create(10).compareTo(LongBlob.create(-1))); // Unsigned!
+		assertEquals(0,LongBlob.ZERO.compareTo(Address.ZERO)); // Equivalent blob values
 	}
 	
 	@Test
