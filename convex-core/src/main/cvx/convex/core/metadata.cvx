@@ -598,7 +598,7 @@
 
 
  fn?
- {:doc {:description "Returns true if the argument is a function, false otherwise. Some values may sometimes operate as functions but are not functions themselves (eg. maps and vectors)."
+ {:doc {:description "Returns `true` if and only if the argument is a function. Some values may operate as functions but are not functions themselves (eg. maps and vectors)."
         :examples    [{:code "(fn? count)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
@@ -647,14 +647,14 @@
 
 
  hash-set
- {:doc {:description "Constructs a set with the given values. If a value is repeated, it will be included only once in the set."
+ {:doc {:description "Constructs a Set with the given values. If a value is repeated, it will be included only once in the set."
         :examples    [{:code "(hash-set 1 2 3)"}]
         :signature   [{:params [& values]}]}}
 
 
  inc
- {:doc {:description "Increments the given `long` by 1."
-        :errors      {:CAST "If the actor argument is not a `long`."}
+ {:doc {:description "Increments the given Long value by 1."
+        :errors      {:CAST "If the actor argument is not castable to Long."}
         :examples    [{:code "(inc 10)"}]
         :signature   [{:params [num]
                        :return Long}]}}
@@ -783,7 +783,7 @@
 
 
  map?
- {:doc {:description "Returns true if argument is a Map, false otherwise."
+ {:doc {:description "Returns true if and only if the argument is a Map."
         :examples    [{:code "(map? {1 2})"}]
         :signature   [{:params [coll]
                        :return Boolean}]}}
@@ -831,14 +831,14 @@
 
 
  nil?
- {:doc {:description "Returns `true` if the argument is `nil`, `false` otherwise."
+ {:doc {:description "Returns `true` if and only if the argument is the value `nil`."
         :examples    [{:code "(nil? nil)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
 
 
  not
- {:doc {:description "Inverts a truth value. Returns `true` on `false` or `nil`, returns `false` for any other value."
+ {:doc {:description "Inverts a truth value. Returns `true` for `false` or `nil`, returns `false` for any other value."
         :examples    [{:code "(not true)"}
                       {:code "(not nil)"}]
         :signature   [{:params [b]
@@ -854,7 +854,7 @@
 
 
  number?
- {:doc {:description "Returns true if the argument is a numeric value, false otherwise."
+ {:doc {:description "Returns `true` if and only if the argument is a numeric value."
         :examples    [{:code "(number? 2.3)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
@@ -868,7 +868,7 @@
                        :return Double}]}}
 
  print
- {:doc {:description "Prints any value in it's canonical readable representation as a String."
+ {:doc {:description "Prints any value in its canonical readable representation as a String."
         :errors      {:JUICE "If the printed representation is to long for available Juice."}
         :examples    [{:code "(print [\a :foo 'bar])"}]
         :signature   [{:params [a]
