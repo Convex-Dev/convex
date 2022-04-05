@@ -173,6 +173,7 @@ public class StringsTest {
 		AString b=Strings.create(js);
 		assertEquals(a.count(),b.count());
 		assertEquals(a,b);
+		assertEquals(0,a.compareTo(b));
 		
 		// Round Trip to Blob
 		ABlob bs=a.toBlob();
