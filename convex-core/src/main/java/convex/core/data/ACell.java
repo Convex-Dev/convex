@@ -231,7 +231,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * 
 	 * The String representation is intended to be a easy-to-read textual representation of the Cell's data content.
 	 * @param limit Limit of CVM String length in UTF-8 bytes
-	 * @return CVM String, or null if limit exceeded by too much
+	 * @return CVM String, or null if limit exceeded
 	 *
 	 */
 	public AString toCVMString(long limit) {

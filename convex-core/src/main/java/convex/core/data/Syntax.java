@@ -182,7 +182,6 @@ public class Syntax extends ACell {
 
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
-		long start=bb.count();
 		if (meta==null) {
 			bb.append(EMPTY_META_PREFIX);
 		} else {
@@ -191,8 +190,7 @@ public class Syntax extends ACell {
 			bb.append(' ');
 		}
 		
-		// Print rest of value acording to remaining limit
-		limit-=(bb.count()-start); 
+		// Print rest of value according to remaining limit
 		return RT.print(bb, datumRef.getValue(),limit);
 	}
 

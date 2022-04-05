@@ -63,14 +63,15 @@ public class SyntaxTest {
 	
 	@Test public void testSyntaxPrintRegression() {
 		String s="^{} 0xa89e59cc8ab9fc6a13785a37938c85b306b24663415effc01063a6e25ef52ebcd3647d3a77e0a33908a372146fdccab6";
+		int n=s.length();
 		Syntax a=Reader.read(s);
 		assertNotNull(a);
 		
 		BlobBuilder bb=new BlobBuilder();
-		assertFalse(a.print(bb,101));
+		assertFalse(a.print(bb,n-1));
 		
 		bb.clear();
-		assertTrue(a.print(bb,102));
-		assertEquals(102,bb.count());
+		assertTrue(a.print(bb,n));
+		assertEquals(n,bb.count());
 	}
 }

@@ -530,7 +530,7 @@ public class BlobTree extends ABlob {
 		for (int i = 0; i < children.length; i++) {
 			ABlob child=children[i].getValue();
 			if (!child.appendHex(bb,length)) return false; // bail out if not fully printed
-			length-=Utils.checkedInt(child.count()*2);
+			length-=child.count()*2;
 			if (length<0) return false;
 		}
 		return true;

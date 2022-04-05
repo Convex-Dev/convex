@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
+import convex.core.lang.RT;
 import convex.core.util.Text;
 import convex.test.Samples;
 
@@ -74,6 +75,10 @@ public class KeywordTest {
 		assertEquals("foo", k.getName().toString());
 		assertEquals(":foo", k.toString());
 		assertEquals(5, k.getEncoding().length); // tag+length+3 name
+		
+		assertNull(RT.print(k, 3));
+		assertEquals(k.print(),RT.print(k, 4));
+		
 		doKeywordTest(k);
 	}
 	

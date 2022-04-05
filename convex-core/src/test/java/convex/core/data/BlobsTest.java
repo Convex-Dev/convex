@@ -254,6 +254,9 @@ public class BlobsTest {
 		
 		assertSame(e,e.getChunk(0));
 		
+		assertNull(RT.print(e, 1));
+		assertEquals(Strings.HEX_PREFIX,RT.print(e, 2));
+		
 		doBlobTests(e);
 	}
 	

@@ -325,9 +325,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
 		bb.append(Strings.HEX_PREFIX);
-		limit-=2;
-		if (!bb.check(limit)) return false;
-		return appendHex(bb,limit);
+		return appendHex(bb,limit-bb.count());
 	}
 
 	/**

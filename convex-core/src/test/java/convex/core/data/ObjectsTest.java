@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.store.Stores;
@@ -107,23 +108,37 @@ public class ObjectsTest {
 		doPrintTests(a);
 	}
 	
-
-
 	private static void doPrintTests(ACell a) {
 		BlobBuilder bb=new BlobBuilder();
 		assertFalse(a.print(bb,0)); // should always fail to print with limit of 0
 		
-		doPrintTest(a,2);
-		doPrintTest(a,101);
+		// Note we bail out for efficiency if short prints succeed
+		if (doPrintTest(a,2)) return;
+		if (doPrintTest(a,45)) return;
+		if (doPrintTest(a,101)) return;
+		if (doPrintTest(a,256)) return;
+		if (doPrintTest(a,10000)) return;
 	}
 
-	private static void doPrintTest(ACell a, int len) {
+	/**
+	 * Does a printing test up to the specified limit
+	 * @param a
+	 * @param limit
+	 * @return True if fully printed, false otherwise
+	 */
+	private static boolean doPrintTest(ACell a, long limit) {
 		BlobBuilder bb=new BlobBuilder();
-		if (a.print(bb,len)) {
+		if (a.print(bb,limit)) {
 			AString s=bb.getCVMString();
-			assertTrue(s.count()<=len); // should fit in length specified
+			long n=s.count();
+			assertTrue(n<=limit); // should fit in length specified
 			assertEquals(s,a.print());
+			
+			assertEquals(s,RT.print(a,n),()->"Expected print of length "+n+" for "+a); // must re-print in same length
+			assertNull(RT.print(a,n-1)); // must fail with one less character in limit
+			return true;
 		} 
+		return false;
 	}
 
 	private static void doCellValidationTests(ACell a) {
