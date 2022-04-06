@@ -706,6 +706,20 @@ public class CoreTest extends ACVMTest {
 		assertEquals("[\\a \\b (fn [] \\newline) (\\return {\\space \\tab})]",
 					 evalS("(str [\\a \\b (fn [] \\newline) (list \\return {\\space \\tab})])"));
 	}
+	
+	@Test 
+	public void testPrint() {
+		assertEquals("1", evalS("(print 1)"));
+		assertEquals("foo", evalS("(print 'foo)"));
+		assertEquals("[foo :bar]", evalS("(print '[foo :bar])"));
+		assertEquals("\\a", evalS("(print \\a)"));
+		assertEquals("\\\u1234", evalS("(print \\u1234)"));
+		assertEquals("\"nom\"", evalS("(print \"nom\")"));
+		assertEquals("nil", evalS("(print nil)"));
+		
+		assertArityError(step("(print)"));
+		assertArityError(step("(print {} {})"));
+	}
 
 	@Test
 	public void testAssert() {
