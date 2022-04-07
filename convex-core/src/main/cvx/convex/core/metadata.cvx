@@ -679,6 +679,14 @@
         :examples    [{:code "(into {} [[1 2] [3 4]])"}]
         :signature   [{:params [coll elements]
                        :return DataStructure}]}}
+ 
+ join
+ {:doc {:description "Joins a sequence of Strings into a single String, using the provided Character separator."
+        :errors      {:CAST "If the first argument is not a sequence of Strings, or the second arcgument is not a Character."}
+        :examples    [{:code "(join [\"foo\" \"bar\"] \.)"}]
+        :signature   [{:params [strs separator]
+                       :return String}]}}
+
 
  keys
  {:doc {:description "Returns a Vector of keys in the given Map, in the map defined order. Also see `values`."

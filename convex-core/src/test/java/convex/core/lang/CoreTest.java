@@ -747,7 +747,15 @@ public class CoreTest extends ACVMTest {
 	
 	@Test
 	public void testJoin() {
-		// TODO
+		assertEquals("",evalS("(join [] \\.)"));
+		assertEquals("foo.bar",evalS("(join [\"foo\" \"bar\"] \\.)"));
+		assertEquals("..",evalS("(join [\"\" \"\" \"\"] \\.)"));
+		
+		assertCastError(step("(join [] \"abc\")")); 
+		assertCastError(step("(join [\"foo\" 2] \\.)")); 
+		
+		assertArityError(step("(join)"));
+		assertArityError(step("(join nil nil nil)"));
 	}
 
 	@Test

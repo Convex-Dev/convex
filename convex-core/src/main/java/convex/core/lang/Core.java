@@ -35,6 +35,7 @@ import convex.core.data.List;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
+import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
@@ -353,6 +354,27 @@ public class Core {
 			AVector<AString> result=str.split(ch);
 
 			long juice = Juice.BUILD_DATA + (str.count() * Juice.STR_PER_CHAR) + (result.count()*Juice.BUILD_PER_ELEMENT);
+			return context.withResult(juice, result);
+		}
+	});
+	
+	public static final CoreFn<AString> JOIN = reg(new CoreFn<>(Symbols.JOIN) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public Context<AString> invoke(Context context, ACell[] args) {
+			// Arity 1
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+
+			ASequence<AString> strs = RT.ensureSequence(args[0]);
+			if (strs==null) return context.withCastError(0,args, Types.SEQUENCE);
+			
+			CVMChar ch=RT.ensureChar(args[1]);
+			if (ch==null) return context.withCastError(1,args, Types.CHARACTER);
+
+			AString result=Strings.join(strs, ch);
+			if (result==null) return context.withError(ErrorCodes.CAST,"Element in join is not a String.");
+
+			long juice = Juice.STR + (result.count() * Juice.STR_PER_CHAR);
 			return context.withResult(juice, result);
 		}
 	});

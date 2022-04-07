@@ -91,19 +91,23 @@ public class Strings {
 	}
 	
 	/**
-	 * Creates a string by joining a sequence of substrings with the given separator
+	 * Creates a String by joining a sequence of substrings with the given separator
 	 * @param ss Sequence of Strings to join
 	 * @param separator any CVM Character to use as a separator.
-	 * @return Concatenated String, including the separator. Will return the empty string if the seqence is empty.
+	 * @return Concatenated String, including the separator. Will return the empty string if the sequence is empty.
 	 */
 	public static AString join(ASequence<AString> ss,CVMChar separator) {
 		long n=ss.count();
 		if (n==0) return StringShort.EMPTY;
 		BlobBuilder builder=new BlobBuilder();
-		builder.append(ss.get(0));
-		for (long i=1; i<n; i++) {
-			builder.append(separator);
-			builder.append(ss.get(i));
+		for (long i=0; i<n; i++) {
+			if (i!=0) builder.append(separator);
+			ACell c=ss.get(i); // be defensive in case not a string
+			if (c instanceof AString) {
+				builder.append((AString)c);
+			} else {
+				return null;
+			}
 		}
 		return Strings.create(builder.toBlob());
 	}
