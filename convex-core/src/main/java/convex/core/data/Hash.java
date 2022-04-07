@@ -103,7 +103,7 @@ public class Hash extends AArrayBlob {
 	/**
 	 * Tests if the Hash value is precisely equal to another non-null Hash value.
 	 * 
-	 * @param other Hash to comapre with
+	 * @param other Hash to compare with
 	 * @return true if Hashes are equal, false otherwise.
 	 */
 	public boolean equals(Hash other) {
