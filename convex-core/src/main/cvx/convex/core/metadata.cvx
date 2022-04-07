@@ -2,10 +2,13 @@
 ;;
 ;; Metadata for core symbols that are implemented at the level of the CVM:
 ;;
-;; - Functions defined in Java code
+;; - Core Functions defined in Java code
 ;; - Convex Lisp special forms
 ;;
-;;
+;; Conventions:
+;; - Explicit values quotes as `nil`
+;; - Capitalised names used for types e.g. Long
+;; - Brevity preferred, this is on-chain data
 
 
 {*address*
@@ -43,7 +46,7 @@
  *holdings*
   {:doc      {:description ["Returns the holdings BlobMap for this account."
                             "Holdings are data values controlled by other accounts (usually actors). They can be used to indicate that an account may have special rights or asset holdings with respect to a specific actor, for instance."
-                            "Holdings should NOT be trusted if they are provided by an untrusted account."
+             "Holdings should NOT be trusted if they are provided by an untrusted account."
                             "See `get-holding`, `set-holding`."]
               :examples    [{:code "*holdings*"}]}
    :special? true}
@@ -204,7 +207,7 @@
 
 
  account
- {:doc {:description "Returns the account record for a given addess, or `nil` if the account does not exist. Argument must cast to `Address`."
+ {:doc {:description "Returns the account record for a given address, or `nil` if the account does not exist. Argument must be an Address."
         :errors      {:CAST "If the argument is not a valid Address."}
         :examples    [{:code "(account *address*)"}]
         :signature   [{:params [address]
@@ -212,8 +215,8 @@
 
 
  address
- {:doc {:description "Casts the argument to an `address`. Valid argument is a hex strings, a `long`, and `address` or a `blob` with the correct length (8 bytes)."
-        :errors      {:CAST "If the argument is not castable to a valid `address`."}
+ {:doc {:description "Casts the argument to an Address. Valid arguments are hex strings, a Long, an Address or a Blob with the correct length (8 bytes)."
+        :errors      {:CAST "If the argument is not castable to an Address."}
         :examples    [{:code "(address 451)"}]
         :signature   [{:params [x]
                        :return Address}]}}
@@ -311,14 +314,14 @@
 
 
  blob?
- {:doc {:description "Returns true if the argument is a Blob, false otherwise."
+ {:doc {:description "Returns true if and only if the argument is a Blob."
         :examples    [{:code "(blob? 0x1234)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
 
 
  boolean
- {:doc {:description "Casts any value to a Boolean. Returns false if value is nil or `false`, true in any other case."
+ {:doc {:description "Casts any value to a Boolean. Returns false if value is `nil` or `false`, true in any other case."
         :examples    [{:code "(boolean 123)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
@@ -703,7 +706,7 @@
  last
  {:doc {:description "Returns the last element of a Countable data structure, in collection-defined order."
         :errors      {:CAST "If the argument is not coercible to a sequential data structure (list or vector)."
-                      :BOUNDS "If there are no elements in the data structure, i.e. the last element does not exist."}
+       :BOUNDS "If there are no elements in the data structure, i.e. the last element does not exist."}
         :examples    [{:code "(last [1 2 3])"}]
         :signature   [{:params [coll]}]}}
 
