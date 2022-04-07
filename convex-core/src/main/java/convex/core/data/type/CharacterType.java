@@ -29,7 +29,7 @@ public final class CharacterType extends AStandardType<CVMChar> {
 
 	@Override
 	public CVMChar defaultValue() {
-		return CVMChar.A;
+		return CVMChar.ZERO;
 	}
 
 	@Override

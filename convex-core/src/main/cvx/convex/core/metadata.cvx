@@ -1049,7 +1049,12 @@
         :signature   [{:params [x]
                        :return Double}]}}
 
-
+  split
+  { :doc {:description "Splits a string by the given character separator, returning a Vector of substrings excluding the separator(s). Separator may be a character, Long codepoint value or a 1-character UTF-8 String."
+         :examples    [{:code "(split \"foo|bar\" \|)"}]
+         :signature   [{:params [str separator]
+                        :return Vector}]}}
+ 
  sqrt
  { :doc {:description "Computes the square root of a numerical argument. Uses double precision mathematics. May return `##NaN` for negative values."
          :examples    [{:code "(sqrt 16.0)"}]

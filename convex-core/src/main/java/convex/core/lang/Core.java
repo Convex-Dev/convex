@@ -336,6 +336,26 @@ public class Core {
 			return context.withResult(juice, result);
 		}
 	});
+	
+	public static final CoreFn<AString> SPLIT = reg(new CoreFn<>(Symbols.SPLIT) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public Context<AString> invoke(Context context, ACell[] args) {
+			// Arity 1
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+
+			AString str = RT.ensureString(args[0]);
+			if (str==null) return context.withCastError(0,args, Types.STRING);
+			
+			CVMChar ch=RT.ensureChar(args[1]);
+			if (ch==null) return context.withCastError(0,args, Types.STRING);
+
+			AVector<AString> result=str.split(ch);
+
+			long juice = Juice.BUILD_DATA + (str.count() * Juice.STR_PER_CHAR) + (result.count()*Juice.BUILD_PER_ELEMENT);
+			return context.withResult(juice, result);
+		}
+	});
 
 	public static final CoreFn<AString> NAME = reg(new CoreFn<>(Symbols.NAME) {
 		@SuppressWarnings("unchecked")

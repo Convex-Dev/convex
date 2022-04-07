@@ -31,7 +31,15 @@ public final class CVMChar extends APrimitive {
 		}
 	}
 
-	public static final CVMChar A = CVMChar.create('a');
+	/**
+	 * Singleton instance representing the NULL character (code point zero)
+	 */
+	public static final CVMChar ZERO = CVMChar.create(0);
+
+	/**
+	 * Maximum number of UTF-8 bytes required to represent a {@link CVMChar}
+	 */
+	public static final int MAX_UTF_BYTES = 4;
 	
 	private final int value;
 	
@@ -44,7 +52,11 @@ public final class CVMChar extends APrimitive {
 		return Types.CHARACTER;
 	}
 
-	// Gets a CVM Char for the given Unicode code point, or null if not value
+	/**
+	 * Gets a {@Link CVMChar} for the given Unicode code point, or null if not valid
+	 * @param value Unicode code point for the character
+	 * @return CVMChar instance, or null if not valid
+	 */
 	public static CVMChar create(long value) {
 		if (value<0) return null; // invalid negative number
 		if (value<128) return cache[(int)value];
@@ -52,6 +64,9 @@ public final class CVMChar extends APrimitive {
 		return new CVMChar((int)value);
 	}
 	
+	/**
+	 * Gets the Long value of this char, equal to the Unicode code point
+	 */
 	@Override
 	public long longValue() {
 		return 0xffffffffl&value;
@@ -117,7 +132,7 @@ public final class CVMChar extends APrimitive {
 	 * @param c Code point value
 	 * @return UTF lenth or -1 if not a valid Unicode value
 	 */
-	public static int utfLength(int c) {
+	public static int utfLength(long c) {
 		if (c<0) return -1;
 		if (c<=0x7f) return 1;
 		if (c<=0x7ff) return 2;

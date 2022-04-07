@@ -1647,6 +1647,27 @@ public class RT {
 		return a.isCVMValue();
 	}
 
+	/**
+	 * Implicitly casts argument to a CVM Character
+	 * @param a Value to cast
+	 * @return CVMChar instance, or null if not implicitly castable
+	 */
+	public static CVMChar ensureChar(ACell a) {
+		if (a instanceof CVMChar) return (CVMChar)a;
+		if (a instanceof CVMLong) return CVMChar.create(((CVMLong)a).longValue());
+		if (a instanceof AString) {
+			AString s=(AString) a;
+			long n=s.count();
+			if ((n==0)||(n>CVMChar.MAX_UTF_BYTES)) return null;
+			long cv=s.charAt(0);
+			if (cv<0) return null;
+			if (n!=CVMChar.utfLength(cv)) return null;
+			
+			return CVMChar.create(cv);
+		}
+		return null;
+	}
+
 
 
 

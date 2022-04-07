@@ -121,6 +121,11 @@ public class Samples {
 	public static final AVector<ACell> DIABOLICAL_VECTOR_2_10000;
 	public static final AMap<ACell, ACell> DIABOLICAL_MAP_30_30;
 	public static final AMap<ACell, ACell> DIABOLICAL_MAP_2_10000;
+	
+	public static final CVMChar CHAR_UTF_1=CVMChar.create('z');
+	public static final CVMChar CHAR_UTF_2=CVMChar.create('\u0444');
+	public static final CVMChar CHAR_UTF_3=CVMChar.create('\u1234');
+	public static final CVMChar CHAR_UTF_4=CVMChar.create(0x12345);
 
 	public static final Random rand = new Random(123);
 	
@@ -311,7 +316,7 @@ public class Samples {
 			Address.ZERO,
 			Address.create(666666),
 			Samples.ZERO_ACCOUNTKEY,
-			CVMChar.A
+			CVMChar.ZERO
 	};
 	
 	public static class ValueArgumentsProvider implements ArgumentsProvider {

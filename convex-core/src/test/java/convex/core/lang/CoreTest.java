@@ -716,9 +716,33 @@ public class CoreTest extends ACVMTest {
 		assertEquals("\\\u1234", evalS("(print \\u1234)"));
 		assertEquals("\"nom\"", evalS("(print \"nom\")"));
 		assertEquals("nil", evalS("(print nil)"));
+		assertEquals("0x123456", evalS("(print 0x123456)"));
 		
 		assertArityError(step("(print)"));
 		assertArityError(step("(print {} {})"));
+	}
+	
+	@Test
+	public void testSplit() {
+		assertEquals(Vectors.of(""), eval("(split \"\" \\a)"));
+		assertEquals(Vectors.of("",""), eval("(split \":\" \\:)"));
+		assertEquals(Vectors.of("foo","bar"), eval("(split \"foo.bar\" \\.)"));
+		
+		// Single char strings should work
+		assertEquals(Vectors.of("foo","bar"), eval("(split \"foo.bar\" \".\")"));
+		assertCastError(step("(split \"foo..bar\" \"..\")"));
+		
+		// Code point should work, but only if in range
+		assertEquals(Vectors.of("foo","bar"), eval("(split \"foo.bar\" (long \\.))"));
+		assertCastError(step("(split \"foo..bar\" (long 0x0100000000))"));
+		
+		assertCastError(step("(split :foo \\.)"));
+		assertCastError(step("(split \"abc\" nil)"));
+		assertCastError(step("(split \"abc\" \"\")"));
+		
+		assertArityError(step("(split)"));
+		assertArityError(step("(split nil nil nil)"));
+
 	}
 
 	@Test

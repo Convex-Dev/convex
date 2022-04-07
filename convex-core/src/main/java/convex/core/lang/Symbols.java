@@ -302,6 +302,8 @@ public class Symbols {
 	public static final Symbol STATIC = intern("static");
 	
 	public static final Symbol PRINT = intern("print");
+	public static final Symbol SPLIT = intern("split");
+	public static final Symbol JOIN = intern("join");
 	
 	public static Symbol intern(String s) {
 		AString name=Strings.create(s);
