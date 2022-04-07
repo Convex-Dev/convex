@@ -57,11 +57,22 @@ public class Hash extends AArrayBlob {
 	 * directly. Use only if no external references to the byte array will be
 	 * retained.
 	 * 
-	 * @param hashBytes Bytes to wrap
+	 * @param hashBytes Bytes to wrap (must be correct length)
 	 * @return Hash wrapping the given byte array
 	 */
 	public static Hash wrap(byte[] hashBytes) {
 		return new Hash(hashBytes);
+	}
+	
+	/**
+	 * Wraps the Blob as a Hash if possible
+	 * @param a Any ABlob instance
+	 * @return Hash instance, or null if wrong length
+	 */
+	public static Hash wrap(ABlob a) {
+		if (a.count()!=LENGTH) return null;
+		if (a instanceof AArrayBlob) return wrap((AArrayBlob)a);
+		return wrap(a.getBytes());
 	}
 	
     /**
@@ -202,6 +213,8 @@ public class Hash extends AArrayBlob {
 	public byte getTag() {
 		return Tag.BLOB;
 	}
+
+
 
 
 }

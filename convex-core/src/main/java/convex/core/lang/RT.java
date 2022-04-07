@@ -1258,7 +1258,7 @@ public class RT {
 	}
 
 	/**
-	 * Converts an object to a map entry. Handles MapEntries and length 2 vectors.
+	 * Converts an object to a map entry. Handles MapEntries and length 2 Vectors.
 	 * 
 	 * @param <K> Type of map key
 	 * @param <V> Type of map value
@@ -1292,19 +1292,16 @@ public class RT {
 			return ((Hash) o);
 		if (o instanceof ABlob) {
 			ABlob blob = (ABlob) o;
-			if (blob.count() != Hash.LENGTH)
-				return null;
-			return Hash.wrap(blob.getBytes());
+			return Hash.wrap(blob);
 		}
-
 		return null;
 	}
 
 	/**
-	 * Coerces an named argument to a keyword.
+	 * Coerces an named value to a Keyword.
 	 * 
 	 * @param a Value to cast
-	 * @return Keyword if correctly constructed, or null if a failure occurs
+	 * @return Valid Keyword if correctly constructed, or null if a failure occurs
 	 */
 	public static Keyword castKeyword(ACell a) {
 		if (a instanceof Keyword)
@@ -1317,7 +1314,7 @@ public class RT {
 	}
 
 	/**
-	 * Coerces an named argument to a Symbol.
+	 * Ensures the argument is a Symbol.
 	 * 
 	 * @param a Value to cast
 	 * @return Symbol if correctly constructed, or null if a failure occurs
@@ -1433,10 +1430,12 @@ public class RT {
 	}
 
 	/**
-	 * Returns the vector of keys of a map, or null if the object is not a map
+	 * Returns a Vector of keys of a Map, or null if the object is not a Map
+	 * 
+	 * WARNING: Potentially O(n) in size of Map
 	 * 
 	 * @param a Value to extract keys from (i.e. a Map)
-	 * @return Vector of keys in the map
+	 * @return Vector of keys in the Map
 	 */
 	@SuppressWarnings("unchecked")
 	public static <R extends ACell> AVector<R> keys(ACell a) {
@@ -1471,7 +1470,7 @@ public class RT {
 	}
 
 	/**
-	 * Ensures the argument is an IAssociative instance. A null argument is
+	 * Ensures the argument is an associative data structure instance. A null argument is
 	 * considered an empty map.
 	 * 
 	 * @param o Value to cast
@@ -1486,13 +1485,11 @@ public class RT {
 	}
 
 	/**
-	 * Ensures the value is a set. null is converted to the empty set.
+	 * Ensures the value is a Set. null is converted to the empty Set.
 	 * 
-	 * Returns null if the argument is not a set.
-	 * 
-	 * @param <T> Type of set element
+	 * @param <T> Type of Set element
 	 * @param a   Value to cast
-	 * @return A set instance, or null if the argument cannot be converted to a set
+	 * @return A Set instance, or null if the argument is not a Set
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> ASet<T> ensureSet(ACell a) {
