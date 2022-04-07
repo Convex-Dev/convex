@@ -79,7 +79,8 @@ import convex.core.lang.ops.Special;
 import convex.test.Samples;
 
 /**
- * Test class for core functions in the initial environment.
+ * Test class for core functions in the initial environment. Mainly targeted example based tests,
+ * should cover all expected edge cases.
  *
  * The state setup included core libraries such as the registry and trust monitors
  * which require integration with core language features.
@@ -742,7 +743,11 @@ public class CoreTest extends ACVMTest {
 		
 		assertArityError(step("(split)"));
 		assertArityError(step("(split nil nil nil)"));
-
+	}
+	
+	@Test
+	public void testJoin() {
+		// TODO
 	}
 
 	@Test
@@ -2967,6 +2972,10 @@ public class CoreTest extends ACVMTest {
 
 		assertTrue(evalB("(= (hash 0x12) (hash 0x12))"));
 		assertTrue(evalB("(blob? (hash (encoding 42)))")); // Should be a Blob
+		
+		assertCastError(step("(hash nil)"));
+		assertCastError(step("(hash :foo)"));
+		assertCastError(step("(hash #44)")); // specialised blobs don't implicitly cast to Blob
 		
 		assertArityError(step("(hash)"));
 		assertArityError(step("(hash nil nil)"));

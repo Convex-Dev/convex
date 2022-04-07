@@ -1523,20 +1523,23 @@ public class RT {
 	/**
 	 * Implicitly casts the argument to a Blob
 	 * 
-	 * @param object Value to cast to Blob
+	 * @param a Value to cast to Blob
 	 * @return Blob instance, or null if cast fails
 	 */
-	public static ABlob ensureBlob(ACell object) {
-		if (object instanceof ABlob)
-			return ((ABlob) object);
+	public static ABlob ensureBlob(ACell a) {
+		if (a instanceof ABlob) {
+			ABlob b= ((ABlob) a);
+			if (b.getType()!=Types.BLOB) return null; // catch specialised Blobs
+			return b;
+		}
 		return null;
 	}
 
 	/**
-	 * Implicitly casts the argument to a CVM String
+	 * Ensures the argument is a CVM String
 	 * 
 	 * @param a Value to cast to a String
-	 * @return AString instance, or null if cast fails
+	 * @return AString instance, or null if argument is not a String
 	 */
 	public static AString ensureString(ACell a) {
 		if (a instanceof AString)

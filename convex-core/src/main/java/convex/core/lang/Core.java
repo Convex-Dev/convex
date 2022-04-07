@@ -348,7 +348,7 @@ public class Core {
 			if (str==null) return context.withCastError(0,args, Types.STRING);
 			
 			CVMChar ch=RT.ensureChar(args[1]);
-			if (ch==null) return context.withCastError(0,args, Types.STRING);
+			if (ch==null) return context.withCastError(1,args, Types.CHARACTER);
 
 			AVector<AString> result=str.split(ch);
 
