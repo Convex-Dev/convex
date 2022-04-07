@@ -15,7 +15,7 @@
 
 
  *memory*
- {:doc      {:description "Returns the current memory Allowance for this account. May be zero - in which case any new memory allocations will be charged at the current memory exchange pool price."
+ {:doc      {:description "Returns the current memory allowance for this account. May be zero - in which case any new memory allocations will be charged at the current memory exchange pool price."
              :examples    [{:code "*memory*"}]}
   :special? true}
 
@@ -28,7 +28,7 @@
 
 
  *caller*
- {:doc      {:description "During an actor call, returns the address of the account doing the call. Nil otherwise."
+ {:doc      {:description "During an actor call, returns the address of the account doing the call. Returns `nil` otherwise."
              :examples    [{:code "*caller*"}]}
   :special? true}
 
@@ -42,8 +42,8 @@
 
  *holdings*
   {:doc      {:description ["Returns the holdings BlobMap for this account."
-                            "Holdings are data values controlled by other Accounts (usually Actors). They can be used to indicate that an account may have special rights or asset holdings with respect to a specific Actor, for instance."
-                            "Holdings should NOT be trusted if they are provided by an untrusted Account."
+                            "Holdings are data values controlled by other accounts (usually actors). They can be used to indicate that an account may have special rights or asset holdings with respect to a specific actor, for instance."
+                            "Holdings should NOT be trusted if they are provided by an untrusted account."
                             "See `get-holding`, `set-holding`."]
               :examples    [{:code "*holdings*"}]}
    :special? true}
@@ -95,7 +95,7 @@
 
 
  *state*
- {:doc      {:description "Returns the current CVM state record. This is a very large object, and should normally only be used temporarily to look up relevant values."
+ {:doc      {:description "Returns the current CVM state record. This is a large object, and should normally only be used temporarily to look up relevant values."
              :examples    [{:code "(keys *state*)"}
                            {:code "(get-in *state* [:accounts *address* :balance])"}]}
   :special? true}
@@ -103,7 +103,7 @@
 
  *timestamp*
  {:doc      {:description ["Returns the current timestamp."
-                           "The timestamp is a `long` value that is equal to the greatest timestamp of any block executed (including the current block)."
+                           "The timestamp is a `Long` value that is equal to the greatest timestamp of any block executed (including the current block)."
                            "A timestamp can be interpreted as the number of milliseconds since January 1, 1970, 00:00:00 GMT. The block timestamp should always be less than or equal to the Unix timestamp of peers that are in consensus."
                            "Commonly used with `schedule`."]
              :examples    [{:code "*timestamp*"}]}
@@ -148,7 +148,7 @@
 
 
  =
- {:doc {:description "Tests if arguments are equal in value."
+ {:doc {:description "Returns `true` if and only if arguments are precisely equal in value."
         :examples    [{:code   "(= :foo :foo)"
                        :return "true"}]
         :signature   [{:params [& vals]
@@ -193,7 +193,7 @@
 
  accept
  {:doc {:description ["Used during a `call`, accepts offered coins up to the amount of `*offer*` from `*caller*`. Returns the amount accepted if successful."
-                      "Amount must cast to `long`. If successful, the amount will be added immediately to the `*balance*` of the current `*address*`."
+                      "Amount must cast to `Long`. If successful, the amount will be added immediately to the `*balance*` of the current `*address*`."
                       "This is the recommended way of transferring balance between actors, as it requires a positive action to confirm receipt."]
         :errors      {:ARGUMENT "If accepted amount is negative"
                       :CAST     "If accepted amount is not a `long`"
@@ -204,7 +204,7 @@
 
 
  account
- {:doc {:description "Returns the account record for a given addess, or nil if the account does not exist. Argument must cast to `address`."
+ {:doc {:description "Returns the account record for a given addess, or `nil` if the account does not exist. Argument must cast to `Address`."
         :errors      {:CAST "If the argument is not a valid Address."}
         :examples    [{:code "(account *address*)"}]
         :signature   [{:params [address]
@@ -685,16 +685,16 @@
                        :return Vector}]}}
 
  keyword
- {:doc {:description "Coerces the argument to a Keyword: a Symbol, a Keyword, or a String between 1 and 128 UTF-8 bytes."
-        :errors      {:ARGUMENT "If the keyword name is of illegal length."
-                      :CAST     "If the argument is not of a type castable to keyword."}
+ {:doc {:description "Casts the argument to a Keyword: must be a name between 1 and 128 UTF-8 bytes."
+        :errors      {:ARGUMENT "If the Keyword name is of illegal length."
+                      :CAST     "If the argument does not specify a name for the Keyword."}
         :examples    [{:code "(keyword \"foo\")"}]
         :signature   [{:params [name]
                        :return Keyword}]}}
 
 
  keyword?
- {:doc {:description "Returns true if the argument is a Keyword, false otherwise."
+ {:doc {:description "Returns `true` if and only if the argument is a Keyword."
         :examples    [{:code "(keyword? :foo)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
@@ -716,7 +716,7 @@
 
 
  list
- {:doc {:description "Creates a list containing the given arguments as elements."
+ {:doc {:description "Creates a List containing the given arguments as elements."
         :examples    [{:code "(list 1 2 3)"}]
         :signature   [{:params [& elements]
                        :return List}]}}
@@ -745,7 +745,7 @@
 
 
  long?
- {:doc {:description "Returnes `true` if the argment is a value of Long type, `false` otherwise."
+ {:doc {:description "Returnes `true` if the argument is a value of Long type, `false` otherwise."
         :examples    [{:code "(long? 1234)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
@@ -762,7 +762,7 @@
 
 
  lookup-meta
- {:doc {:description "Looks up metadata for a symbol in the current execution environment, or the account of the given address if specified. Returns nil if not found."
+ {:doc {:description "Looks up metadata for a Symbol in the current execution environment, or the Account of the given Address if specified. Returns nil if not found."
         :examples    [{:code "(lookup-meta 'count)"}]
         :signature   [{:params [name]}
                       {:params [address name]}]}}
@@ -824,7 +824,7 @@
 
 
  next
- {:doc {:description "Returns the elements of a sequential data structure after the first element, or nil if no more elements remain."
+ {:doc {:description "Returns the elements of a sequential data structure after the first element, or `nil` if no more elements remain."
         :errors      {:CAST "If the argument is not a sequential data structure."}
         :examples    [{:code "(next [1 2 3])"}]
         :signature   [{:params [coll]
@@ -876,7 +876,7 @@
                        :return String}]}}
 
  quasiquote
- {:doc       {:description "Returns the quoted value of a form, without evaluating it. Like 'quote', but elements within the form may be unquoted via `unquote`."
+ {:doc       {:description "Returns the quoted value of a form, without evaluating it. Like `quote`, but elements within the form may be unquoted via `unquote`."
               :examples    [{:code   "(quasiquote foo)"
                              :return "foo"}
                             {:code   "(quasiquote (:a :b (unquote (+ 2 3))))"
@@ -929,7 +929,7 @@
 
 
  reduced
- {:doc {:description "Returns immediately from the enclosing `reduce` function, providing the given value as the result of the whole `reduce` operation. This can be used to terminate early from a reduce operation, saving transaction costs."
+ {:doc {:description "Returns immediately from the enclosing `reduce` function, providing the given value as the result of the whole `reduce` operation. This can be used to terminate a reduction early, saving transaction costs."
         :examples    [{:code "(reduce (fn [acc x] (reduced :exit)) 1 [1 2 3 4 5])"}]
         :signature   [{:params [result]}]}}
 
@@ -977,7 +977,7 @@
 
 
  set
- {:doc {:description "Coerces any data structure to a set."
+ {:doc {:description "Coerces any data structure to a `Set`."
         :errors      {:CAST "If the argument is not a countable data structure."}
         :examples    [{:code "(set [1 2 3])"}]
         :signature   [{:params [coll]
@@ -1011,8 +1011,8 @@
 
 
  set-key
- {:doc {:description ["Sets the public key (32-byte blob) for this account. May set to nil to turn this account into an actor and disable future external transactions."
-                      "WARNING: You may lose access to the account if you do not have access to the associated private key."]
+ {:doc {:description ["Sets the public key (32-byte blob) for the current Account. May set to `nil` to turn this Account into an Actor and disable future external transactions."
+                      "WARNING: You may lose access to the Account if you do not have access to the associated private key."]
         :signature   [{:params [new-key]}]}}
 
 
@@ -1042,15 +1042,15 @@
         :signature   [{:params [x]
                        :return Boolean}]}}
 
-
  signum
- {:doc {:description "Returns the signum of a numeric value, defined to be -1, 0 or 1. Results in a cast error if the argument is not a number (including `##NaN`)."
+ {:doc {:description "Returns the signum of a numeric value, defined to be -1, 0 or 1."
+        :errors      {:CAST "If the argument is not a number (including `##NaN`)."}
         :examples    [{:code "(signum -1)"}]
         :signature   [{:params [x]
-                       :return Double}]}}
+                       :return Long}]}}
 
-  split
-  { :doc {:description "Splits a string by the given character separator, returning a Vector of substrings excluding the separator(s). Separator may be a character, Long codepoint value or a 1-character UTF-8 String."
+ split
+ { :doc {:description "Splits a string by the given character separator, returning a Vector of substrings excluding the separator(s). Separator may be a character, Long codepoint value or a 1-character UTF-8 String."
          :examples    [{:code "(split \"foo|bar\" \|)"}]
          :signature   [{:params [str separator]
                         :return Vector}]}}
