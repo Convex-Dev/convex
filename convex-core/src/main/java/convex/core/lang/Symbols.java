@@ -194,6 +194,7 @@ public class Symbols {
 	public static final Symbol LAST = intern("last");
 	public static final Symbol NEXT = intern("next");
 	public static final Symbol REVERSE = intern("reverse");
+	public static final Symbol SLICE = intern("slice");
 
 	public static final Symbol AMPERSAND = intern("&");
 	public static final Symbol UNDERSCORE = intern("_");

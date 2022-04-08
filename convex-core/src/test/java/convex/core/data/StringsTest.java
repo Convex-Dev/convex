@@ -70,7 +70,8 @@ public class StringsTest {
 		doStringTest(twoChunk);
 		
 		// Span across 
-		AString span=twoChunk.subString(4000, 4200);
+		AString span=twoChunk.slice(4000, 4200);
+		assertEquals(200,span.count());
 		doStringTest(span);
 	}
 	
@@ -85,7 +86,7 @@ public class StringsTest {
 	
 	@Test public void testCompare() {
 		assertStringOrder("a","b");
-		assertStringOrder("abc","abd");
+		assertStringOrder("abc","abd","ab\u1234"); // Bigger unicode code point comes last
 		assertStringOrder("a","abc");
 		assertStringOrder("","a","aaaaaaa");
 		
@@ -109,11 +110,19 @@ public class StringsTest {
 		splitJoinRoundTrip("\u1234", ':',1);
 		splitJoinRoundTrip("\u1234:\u1235", ':',2);
 		splitJoinRoundTrip("\u1234\u1235", '\u1234',2);
+		splitJoinRoundTrip(Samples.RUSSIAN, ' ',10);
+		
+		BlobBuilder bb=new BlobBuilder();
+		AString chunk=Strings.create("abcdefghi-abcdefghi");
+		for (int i=0; i<800; i++) {
+			bb.append(chunk);
+		}
+		splitJoinRoundTrip(bb.getCVMString().toString(), '-',801);
 	}
 	
-	private void splitJoinRoundTrip(String s, char c, int expectedCount) {
+	private void splitJoinRoundTrip(String s, char sep, int expectedCount) {
 		AString st=Strings.create(s);
-		CVMChar ch=CVMChar.create(c);
+		CVMChar ch=CVMChar.create(sep);
 		AVector<AString> ss=st.split(ch);
 		AString jn=Strings.join(ss, ch);
 		assertEquals(st,jn);

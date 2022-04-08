@@ -220,14 +220,15 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 
 	/**
 	 * Produces a slice of this sequence, beginning with the specified start index and of the given length.
-	 * The start and length must be contained within this sequence. Will return the same sequence if the
+	 * The start and end must be contained within this sequence. Will return the same sequence if the
 	 * start is zero and the length matches this sequence.
 	 * 
 	 * @param start Index of the start element
-	 * @param length Length of slice to create.
+	 * @param end End index(exclusive)
 	 * @return A sequence representing the requested slice.
 	 */
-	public abstract ASequence<T> slice(long start, long length);
+	@SuppressWarnings("unchecked")
+	public abstract ASequence<T> slice(long start, long end);
 
 	/**
 	 * Prepends an element to this sequence, returning a list.

@@ -324,4 +324,11 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	public AVector<MapEntry<K, V>> entryVector() {
 		return reduceEntries((acc, e) -> acc.conj(e), Vectors.empty());
 	}
+	
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@Override
+	public AMap slice(long start, long end) {
+		throw new TODOException();
+	}
 }

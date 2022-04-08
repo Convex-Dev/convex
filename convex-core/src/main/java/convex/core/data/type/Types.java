@@ -49,6 +49,8 @@ public class Types {
 	public static final SyntaxType SYNTAX=SyntaxType.INSTANCE;
 	
 	public static final Transaction TRANSACTION=Transaction.INSTANCE;
+	
+	public static final Countable COUNTABLE = Countable.INSTANCE;
 
 
 

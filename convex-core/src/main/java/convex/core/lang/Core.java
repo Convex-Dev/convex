@@ -300,7 +300,7 @@ public class Core {
 			// Any arity is OK
 
 			// Need to compute juice before building a potentially big list
-			long juice = Juice.BUILD_DATA + args.length * Juice.BUILD_PER_ELEMENT;
+			long juice = Juice.buildDataCost(args.length);
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
 			AList<ACell> result = List.create(args);
@@ -316,7 +316,7 @@ public class Core {
 			AString result = RT.str(args);
 			if (result==null) return context.withCastError(Types.STRING);
 
-			long juice = Juice.STR + result.count() * Juice.STR_PER_CHAR;
+			long juice = Juice.buildStringCost(result.count());
 			return context.withResult(juice, result);
 		}
 	});
@@ -328,12 +328,13 @@ public class Core {
 			// Arity 1
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			AString result = RT.print(args[0],context.getJuice()/Juice.STR_PER_CHAR);
+			long limit=Juice.limitString(context); // calculate byte limit
+			AString result = RT.print(args[0],limit);
 			
 			// Any CVM value should print, it must be a juice error if failed
 			if (result==null) return context.withJuiceError();
 
-			long juice = Juice.STR + result.count() * Juice.STR_PER_CHAR;
+			long juice = Juice.buildStringCost(result.count());
 			return context.withResult(juice, result);
 		}
 	});
@@ -350,10 +351,15 @@ public class Core {
 			
 			CVMChar ch=RT.ensureChar(args[1]);
 			if (ch==null) return context.withCastError(1,args, Types.CHARACTER);
-
+			
+			// Pre-check juice, but after we have validated args
+			long strlen=str.count();
+			long strcost=Juice.buildStringCost(strlen);
+			if(!context.checkJuice(strcost)) return context.withJuiceError();
+			
 			AVector<AString> result=str.split(ch);
 
-			long juice = Juice.BUILD_DATA + (str.count() * Juice.STR_PER_CHAR) + (result.count()*Juice.BUILD_PER_ELEMENT);
+			long juice = strcost + Juice.buildDataCost(result.count());
 			return context.withResult(juice, result);
 		}
 	});
@@ -371,10 +377,11 @@ public class Core {
 			CVMChar ch=RT.ensureChar(args[1]);
 			if (ch==null) return context.withCastError(1,args, Types.CHARACTER);
 
+			// TODO: needs juice limit
 			AString result=Strings.join(strs, ch);
 			if (result==null) return context.withError(ErrorCodes.CAST,"Element in join is not a String.");
 
-			long juice = Juice.STR + (result.count() * Juice.STR_PER_CHAR);
+			long juice = Juice.buildStringCost(result.count());
 			return context.withResult(juice, result);
 		}
 	});
@@ -815,7 +822,7 @@ public class Core {
 			ABlob blob = RT.castBlob(args[0]);
 			if (blob == null) return context.withCastError(0,args, Types.BLOB);
 
-			long juice = Juice.BLOB + Juice.BLOB_PER_BYTE * blob.count();
+			long juice = Juice.buildBlobCost(blob.count());
 
 			return context.withResult(juice, blob);
 		}
@@ -1613,7 +1620,7 @@ public class Core {
 			ACell a = args[0];
 			ABlob encoding=Format.encodedBlob(a);
 
-			long juice=Juice.addMul(Juice.BLOB, encoding.count(), Juice.BLOB_PER_BYTE);
+			long juice=Juice.buildBlobCost(encoding.count());
 			return context.withResult(juice, encoding);
 		}
 	});
@@ -2033,6 +2040,44 @@ public class Core {
 			ASequence<ACell> result = seq.next();
 			// TODO: probably needs to cost a lot?
 			return context.withResult(Juice.SIMPLE_FN, result);
+		}
+	});
+	
+	public static final CoreFn<ASequence<ACell>> SLICE= reg(new CoreFn<>(Symbols.SLICE) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<ASequence<ACell>> invoke(Context context, ACell[] args) {
+			int alen=args.length;
+			if (alen < 2) return context.withArityError(minArityMessage(2, args.length));
+			if (alen > 3) return context.withArityError(maxArityMessage(3, args.length));
+
+			ACountable<ACell> counted = RT.ensureCountable(args[0]);
+			if (counted == null) return context.withCastError(0,args, Types.COUNTABLE);
+			long n=counted.count();
+
+			long start=0;
+			long end=n;
+
+			{
+				CVMLong l=RT.ensureLong(args[1]);
+				if (l==null) return context.withCastError(1,args, Types.LONG);
+				start=l.longValue();
+				if (start<0) return context.withBoundsError(start);
+			}
+			if (alen>2) {
+				CVMLong l=RT.ensureLong(args[2]);
+				if (l==null) return context.withCastError(2,args, Types.LONG);
+				end=l.longValue();
+				if (end>n) return context.withBoundsError(end);
+			}
+			if (end<start) return context.withError(ErrorCodes.BOUNDS,"End before start");
+			
+			long juice=Juice.buildCost(counted,end-start);
+			if (!context.checkJuice(juice)) return context.withJuiceError();
+			
+			ACountable<ACell> result = counted.slice(start,end);
+			// TODO: probably needs to cost a lot?
+			return context.withResult(juice, result);
 		}
 	});
 

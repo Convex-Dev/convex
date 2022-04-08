@@ -2,7 +2,6 @@ package convex.core.data;
 
 import java.security.MessageDigest;
 
-import convex.core.util.Errors;
 import convex.core.util.Utils;
 
 /**
@@ -37,20 +36,20 @@ public final class LongBlob extends ALongBlob {
 	}
 
 	@Override
-	public ABlob slice(long start, long length) {
-		if ((start == 0) && (length == LENGTH)) return this;
+	public ABlob slice(long start, long end) {
+		if ((start == 0) && (end == LENGTH)) return this;
 
-		if (start < 0) throw new IndexOutOfBoundsException(Errors.badRange(start, length));
-		return getEncoding().slice(start + 2, length);
+		if (start < 0) return null;
+		return getEncoding().slice(start + 2, end+2);
 	}
 
 	@Override
 	public Blob toFlatBlob() {
 		// Trick to use cached encoding if available
 		if (encoding!=null) {
-			return encoding.slice(2,8);
+			return encoding.slice(2,2+LENGTH);
 		}
-		byte[] bs=new byte[8];
+		byte[] bs=new byte[LENGTH];
 		Utils.writeLong(bs, 0, value);
 		return Blob.wrap(bs);
 	}

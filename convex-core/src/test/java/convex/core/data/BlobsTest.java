@@ -153,7 +153,7 @@ public class BlobsTest {
 			bb.append(bs);
 		}
 		ABlob b=bb.toBlob();
-		assertEquals(Blob.wrap(bs), b.slice(10000, 1000));
+		assertEquals(Blob.wrap(bs), b.slice(10000, 11000));
 		assertEquals(100000,b.count());
 	}
 	
@@ -175,8 +175,8 @@ public class BlobsTest {
 		assertEquals(n,bb.count());
 		ABlob r=bb.toBlob();
 		assertEquals(n,r.count());
-		assertEquals("abcde",Strings.create(r.slice(4095,5)).toString());
-		assertEquals("abcde",Strings.create(r.slice(n-5,5)).toString());
+		assertEquals("abcde",Strings.create(r.slice(4095,4100)).toString());
+		assertEquals("abcde",Strings.create(r.slice(n-5,n)).toString());
 		assertEquals(Blob.class,r.slice(0,4096).getClass());
 		assertEquals(BlobTree.class,r.slice(0,4097).getClass());
 	}
@@ -262,7 +262,7 @@ public class BlobsTest {
 	
 	@Test
 	public void testBlobSlice() {
-		ABlob blob = Blob.fromHex("cafebabedeadbeef").slice(2,4);
+		ABlob blob = Blob.fromHex("cafebabedeadbeef").slice(2,6);
 		assertEquals(8,blob.hexLength());
 		doBlobTests(blob);
 	}
@@ -277,7 +277,7 @@ public class BlobsTest {
 		assertEquals(20,two.count());
 		doBlobTests(two);
 		
-		ABlob slice=two.slice(8,4);
+		ABlob slice=two.slice(8,12);
 		assertEquals(Blob.fromHex("f00dcafe"),slice);
 		doBlobTests(slice);
 	}
@@ -302,7 +302,8 @@ public class BlobsTest {
 		assertTrue(n>Blob.CHUNK_LENGTH);
 		assertTrue(b.isCanonical());
 		
-		assertEquals(Blob.class,b.slice(n-Blob.CHUNK_LENGTH,Blob.CHUNK_LENGTH).getClass());
+		// Last chunk
+		assertEquals(Blob.class,b.slice(n-Blob.CHUNK_LENGTH,n).getClass());
 		
 		doBlobTests(b);
 		
@@ -331,7 +332,7 @@ public class BlobsTest {
 		assertSame(bb, bb.slice(0, len));
 		
 		ABlob bb2=bb.append(bb);
-		assertEquals(bb,bb2.slice(len,len));
+		assertEquals(bb,bb2.slice(len,len*2));
 
 		Blob firstChunk = bb.getChunk(0);
 		assertEquals(Blob.CHUNK_LENGTH, firstChunk.count());
@@ -360,8 +361,8 @@ public class BlobsTest {
 	@Test
 	public void testBlobTreeOutOfRange() {
 		assertThrows(IndexOutOfBoundsException.class, () -> Samples.BIG_BLOB_TREE.byteAt(Samples.BIG_BLOB_LENGTH));
-		assertThrows(IndexOutOfBoundsException.class, () -> Samples.BIG_BLOB_TREE.slice(-1));
-		assertThrows(IndexOutOfBoundsException.class, () -> Samples.BIG_BLOB_TREE.slice(1, Samples.BIG_BLOB_LENGTH));
+		assertNull(Samples.BIG_BLOB_TREE.slice(-1));
+		assertNull(Samples.BIG_BLOB_TREE.slice(1, Samples.BIG_BLOB_LENGTH+1));
 	}
 
 	@Test
@@ -451,7 +452,7 @@ public class BlobsTest {
 		if (n>0) {
 			assertEquals(n*2,a.commonHexPrefixLength(b));
 			
-			assertEquals(a.slice(n/2,n/2),b.slice(n/2, n/2));
+			assertEquals(a.slice(n/2,n),b.slice(n/2, n));
 			
 			assertEquals(a.get(n-1),CVMByte.create(a.byteAt(n-1)));
 			
@@ -469,7 +470,7 @@ public class BlobsTest {
 		assertEquals(n*2, bb.count());
 		ABlob r=bb.toBlob();
 		assertEquals(a,r.slice(0,n));
-		assertEquals(a,r.slice(n,n));
+		assertEquals(a,r.slice(n,n*2));
 		assertEquals(a.append(a),r);
 		
 		// Should pass tests for a CVM value

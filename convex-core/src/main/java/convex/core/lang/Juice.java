@@ -1,5 +1,9 @@
 package convex.core.lang;
 
+import convex.core.data.ACell;
+import convex.core.data.ACountable;
+import convex.core.data.ADataStructure;
+
 /**
  * Static class defining juice costs for executable operations.
  * 
@@ -145,7 +149,6 @@ public class Juice {
 	 * chars.
 	 */
 	protected static final long STR = SIMPLE_FN;
-	protected static final long STR_PER_CHAR = 5;
 
 	protected static final long ARITHMETIC = SIMPLE_FN;
 
@@ -160,7 +163,7 @@ public class Juice {
 	 * Juice for creation of a blob. Fairly cheap but needs per-byte cost
 	 */
 	protected static final long BLOB = 20;
-	protected static final long BLOB_PER_BYTE = 1;
+	protected static final long BUILD_PER_BYTE = 1;
 
 	/**
 	 * Juice for data structure get. Hash lookup possibly required.
@@ -331,6 +334,67 @@ public class Juice {
 		if ((a+b)<0) return Long.MAX_VALUE;
 		return a+b;
 	}
+
+	/**
+	 * Computes the data build cost of a countable structure of given length 
+	 * @param counted Counted data structure, used for type
+	 * @param n Element count of data structure constructed
+	 * @return
+	 */
+	public static long buildCost(ACountable<ACell> counted, long n) {
+		long elementCost=elementCost(counted);
+		return addMul(Juice.BUILD_DATA,elementCost,n);
+	}
+
+	/**
+	 * Gets the Juice cost for an additional element of the given countable value
+	 * @param counted
+	 * @return
+	 */
+	private static long elementCost(ACountable<ACell> counted) {
+		if (counted instanceof ADataStructure) return BUILD_PER_ELEMENT;
+		if (counted==null) return BUILD_PER_ELEMENT;
+		return BUILD_PER_BYTE;
+	}
+
+	/**
+	 * Gets the Juice cost for building a String
+	 * @param n Length of String
+	 * @return Juice cost
+	 */
+	public static long buildStringCost(long n) {
+		return addMul(Juice.STR,BUILD_PER_BYTE,n);
+	}
+	
+	/**
+	 * Gets the Juice cost for building a Blob
+	 * @param n Length of Blob
+	 * @return Juice cost
+	 */
+	public static long buildBlobCost(long n) {
+		return addMul(Juice.BLOB,BUILD_PER_BYTE,n);
+	}
+
+	/**
+	 * Gets the maximum number of string bytes that can be constructed
+	 * @param context Context to check for Juice
+	 * @return Limit in number of bytes
+	 */
+	public static long limitString(Context<?> context) {
+		long juice=context.getJuice();
+		long limit=juice/BUILD_PER_BYTE;
+		return limit;
+	}
+
+	/**
+	 * Gets the Juice cost for building a data structure
+	 * @param n Element count of data structure (number of CVM values)
+	 * @return Juice cost
+	 */
+	 public static long buildDataCost(long n) {
+		return addMul(Juice.BUILD_DATA,BUILD_PER_ELEMENT,n);
+	}
+
 
 
 }

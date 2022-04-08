@@ -46,7 +46,7 @@ public abstract class ALongBlob extends ABlob {
 	}
 
 	@Override
-	public abstract ABlob slice(long start, long length);
+	public abstract ABlob slice(long start, long end);
 
 	@Override
 	public abstract Blob toFlatBlob();

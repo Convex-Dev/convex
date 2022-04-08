@@ -62,7 +62,8 @@ public class BlobTree extends ABlob {
 		Blob[] blobs = new Blob[chunks];
 		for (int i = 0; i < chunks; i++) {
 			int offset = i * Blob.CHUNK_LENGTH;
-			blobs[i] = blob.slice(offset, Math.min(Blob.CHUNK_LENGTH, length - offset)).toFlatBlob();
+			long take=Math.min(Blob.CHUNK_LENGTH, length - offset);
+			blobs[i] = blob.slice(offset, offset+take).toFlatBlob();
 		}
 		return create(blobs);
 	}
@@ -202,11 +203,11 @@ public class BlobTree extends ABlob {
 	}
 
 	@Override
-	public ABlob slice(long start, long length) {
-		if (start < 0L) throw new IndexOutOfBoundsException(Errors.badIndex(start));
-		if (length < 0L) throw new IllegalArgumentException("Negative length: "+length);
-		long end=start+length;
-		if (end>count()) throw new IndexOutOfBoundsException(Errors.badIndex(end));
+	public ABlob slice(long start, long end) {
+		if (start < 0L) return null;
+		if (end >count) return null;
+		long length=end-start;;
+		if (length<0) return null;
 		
 		if ((start == 0L) && (length == this.count)) return this;
 
@@ -215,7 +216,8 @@ public class BlobTree extends ABlob {
 		int cilast=(int)((end - 1) / csize);
 		if (ci == cilast) {
 			// Slice within a single child
-			return getChild(ci).slice(start - ci * csize, length);
+			long coffset=ci*csize;
+			return getChild(ci).slice(start - coffset, end - coffset);
 		}
 
 		// Construct using BlobBuilder iterating over relevant children
@@ -225,7 +227,7 @@ public class BlobTree extends ABlob {
 			long coff=i*csize;
 			long cstart=Math.max(start-coff, 0);
 			long cend=Math.min(end-coff, child.count());
-			bb.append(child.slice(cstart,cend-cstart));
+			bb.append(child.slice(cstart,cend));
 		}
 		return bb.toBlob();
 	}
@@ -449,7 +451,7 @@ public class BlobTree extends ABlob {
 				// Need to add more children
 				for (int i=acc.childCount(); i<FANOUT; i++) {
 					long take=Math.min(csize, dlen-off);
-					ABlob newChild=d.slice(off,take);
+					ABlob newChild=d.slice(off,off+take);
 					acc=acc.appendChild(newChild);
 					off+=take;
 					if (off>=dlen) return acc; // Finished!
@@ -458,7 +460,7 @@ public class BlobTree extends ABlob {
 			
 			// Next level takes a following child with up to as memy bytes as acc
 			long take=Math.min(acc.count(), dlen-off);
-			BlobTree nextLevel=BlobTree.createWithChildren(new ABlob[] {acc,d.slice(off,take)});
+			BlobTree nextLevel=BlobTree.createWithChildren(new ABlob[] {acc,d.slice(off,off+take)});
 			acc=nextLevel;
 			off+=take;
 		} 
@@ -579,7 +581,7 @@ public class BlobTree extends ABlob {
 	
 	@Override
 	public long toLong() {
-		return slice(count-8,8).toLong();
+		return slice(count-8,count).toLong();
 	}
 
 	@Override

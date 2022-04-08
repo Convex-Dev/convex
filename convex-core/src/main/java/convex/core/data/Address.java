@@ -178,8 +178,8 @@ public final class Address extends ALongBlob {
 	}
 
 	@Override
-	public Blob slice(long start, long length) {
-		return toFlatBlob().slice(start,length);
+	public Blob slice(long start, long end) {
+		return toFlatBlob().slice(start,end);
 	}
 
 	@Override

@@ -1059,6 +1059,12 @@
         :examples    [{:code "(signum -1)"}]
         :signature   [{:params [x]
                        :return Long}]}}
+ 
+ slice
+ {:doc {:description ["Takes a slice of a countable data structure between start (inclusive) and end (exclusive) indexes."]
+        :signature   [{:params [a start end]}]
+        :errors      {:BOUNDS "If the start or end indexes are out of bounds."}
+        :examples    [{:code "(slice \"Hello World\" 6 11)"}]}}
 
  split
  { :doc {:description "Splits a string by the given character separator, returning a Vector of substrings excluding the separator(s). Separator may be a character, Long codepoint value or a 1-character UTF-8 String."

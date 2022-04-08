@@ -566,6 +566,11 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		return SetTree.create(elements, 0);
 	}
 
+	@Override
+	public ASet<T> slice(long start, long end) {
+		throw new TODOException();
+	}
+
 
 
 

@@ -68,7 +68,9 @@ public abstract class AString extends ACountable<CVMChar> implements Comparable<
 	}
 	
 	/**
-	 * Gets 32 bytes integer at given position. Extends with 255 (invalid UTF-8) if needed
+	 * Gets 32 bytes integer at given position. Extends with 255 (invalid UTF-8) if needed. The
+	 * main purpose of this function is to enable fast peeking at UTF-8 characters
+	 * 
 	 * @param index Index into String (byte position)
 	 * @return Raw integer value
 	 */
@@ -154,12 +156,13 @@ public abstract class AString extends ACountable<CVMChar> implements Comparable<
 	protected abstract void writeToBuffer(ByteBuffer bb);
 
 	/**
-	 *  Gets a subsequence of this String
+	 * Gets a slice of this string, or null if not a valid slice
 	 * @param start Start index (inclusive)
 	 * @param end End index (Exclusive)
 	 * @return Specified substring
 	 */
-	public abstract AString subString(long start, long end);
+	@SuppressWarnings("unchecked")
+	public abstract AString slice(long start, long end);
 
 	/**
 	 * Splits this string by the given character
@@ -173,22 +176,22 @@ public abstract class AString extends ACountable<CVMChar> implements Comparable<
 	public AVector<AString> split(CVMChar c) {
 		long start=0;
 		AVector<AString> acc=Vectors.empty();
-		long n=count();
+		final long n=count();
 		int cp=c.getCodePoint();
 		int utfLength=CVMChar.utfLength(cp);
-		for (int i=0; i<n;) {
-			int ch=charAt(i);
+		for (int pos=0; pos<n;) {
+			int ch=charAt(pos);
 			if (ch==cp) {
-				acc=acc.append(subString(start,i));
-				i+=utfLength;
-				start=i; // update start point of next string
+				acc=acc.append(slice(start,pos));
+				pos+=utfLength;
+				start=pos; // update start point of next string
 			} else {
-				int inc=CVMChar.utfLength(cp);
+				int inc=CVMChar.utfLength(ch);
 				if (inc<0) inc=1; // move one byte for bad chars
-				i+=inc;
+				pos+=inc;
 			}
 		}
-		acc=acc.append(subString(start,n));
+		acc=acc.append(slice(start,n));
 		return acc;
 	}
 	

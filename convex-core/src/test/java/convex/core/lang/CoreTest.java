@@ -757,6 +757,28 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(join)"));
 		assertArityError(step("(join nil nil nil)"));
 	}
+	
+	@Test 
+	public void testSlice() {
+		assertEquals("World",evalS("(slice \"Hello World\" 6 11)"));
+		assertEquals("World",evalS("(slice \"Hello World\" 6)"));
+		assertEquals("0x34",evalS("(slice 0x1234 1 2)"));
+		
+		assertSame(Strings.EMPTY,eval("(slice \"Hello World\" 4 4)"));
+		assertSame(Blob.EMPTY,eval("(slice 0xcafebabe 2 2)"));
+		
+		assertBoundsError(step("(slice 0x 1)")); 
+		assertBoundsError(step("(slice 0x -1 0)")); 
+		assertBoundsError(step("(slice 0x1234 -1 1)")); 
+		assertBoundsError(step("(slice 0x1234 1 3)")); 
+		assertBoundsError(step("(slice 0x1234 2 0)")); 
+		
+		assertCastError(step("(slice :foo 0)")); 
+		
+		assertArityError(step("(slice)"));
+		assertArityError(step("(slice nil nil nil nil)"));
+
+	}
 
 	@Test
 	public void testAssert() {

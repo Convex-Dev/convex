@@ -101,15 +101,16 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	}
 
 	/**
-	 * Gets a contiguous slice of this blob, as a new Blob.
+	 * Gets a contiguous slice of this Blob, as a new Blob.
 	 * 
 	 * Shares underlying backing data where possible
 	 * 
-	 * @param start  Start position for the created slice
-	 * @param length Length of the slice
+	 * @param start  Start position for the created slice (inclusive)
+	 * @param end End of the slice (exclusive)
 	 * @return A blob of the specified length, representing a slice of this blob.
 	 */
-	public abstract ABlob slice(long start, long length);
+	@SuppressWarnings("unchecked")
+	public abstract ABlob slice(long start, long end);
 
 	/**
 	 * Gets a slice of this blob, as a new blob, starting from the given offset and
@@ -120,8 +121,9 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 * @param start Start position to slice from
 	 * @return Slice of Blob
 	 */
+	@SuppressWarnings("unchecked")
 	public ABlob slice(long start) {
-		return slice(start, count() - start);
+		return slice(start, count());
 	}
 
 	/**

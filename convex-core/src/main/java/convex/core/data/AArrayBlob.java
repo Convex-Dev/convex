@@ -30,12 +30,12 @@ public abstract class AArrayBlob extends ABlob {
 	}
 
 	@Override
-	public AArrayBlob slice(long start, long length) {
-		if (length < 0) throw new IllegalArgumentException(Errors.negativeLength(length));
-		if (start < 0) throw new IndexOutOfBoundsException("Start out of bounds: " + start);
-		if ((start + length) > this.length)
-			throw new IndexOutOfBoundsException("End out of bounds: " + (start + length));
-		if ((start==0)&&(length==this.count())) return this;
+	public AArrayBlob slice(long start, long end) {
+		if (start < 0) return null;
+		if (end > this.length) return null;
+		long length=end-start;
+		if (length<0) return null;
+		if ((start==0)&&(end==this.count())) return this;
 		return Blob.wrap(store, Utils.checkedInt(start + offset), Utils.checkedInt(length));
 	}
 
@@ -60,7 +60,7 @@ public abstract class AArrayBlob extends ABlob {
 		// If reasonably small, we have an ArrayBlob with exactly 2 children
 		if (newLen<=Blob.CHUNK_LENGTH*2) {
 			long split=Blob.CHUNK_LENGTH-length; // number of bytes to complete first chunk
-			return BlobTree.create(this.append(d.slice(0,split)).toFlatBlob(),d.slice(split,dlength-split).toFlatBlob());
+			return BlobTree.create(this.append(d.slice(0,split)).toFlatBlob(),d.slice(split,dlength).toFlatBlob());
 		}
 		
 		// More than 2 chunks, use a BlobBuilder

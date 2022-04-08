@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.TODOException;
 import convex.core.util.Bits;
 import convex.core.util.Utils;
 
@@ -676,5 +677,10 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	@Override
 	public boolean containsHash(Hash hash) {
 		return getRefByHash(hash)!=null;
+	}
+
+	@Override
+	public ASet<T> slice(long start, long end) {
+		throw new TODOException();
 	}
 }

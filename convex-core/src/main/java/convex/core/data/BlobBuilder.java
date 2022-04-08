@@ -76,7 +76,7 @@ public class BlobBuilder {
 			// Index over offset into b
 			for (long off=spare; off<blen; off+=Blob.CHUNK_LENGTH) {
 				long take=Math.min(Blob.CHUNK_LENGTH, blen-off);
-				append(b.slice(off,take));
+				append(b.slice(off,off+take));
 			}
 			return this;
 		}
@@ -128,16 +128,16 @@ public class BlobBuilder {
 	 * @param length Length of slice
 	 * @return Slice of Blob under construction
 	 */
-	public ABlob slice(long start, long length) {
+	public ABlob slice(long start, long end) {
 		if ((start<0)||(start>count)) throw new IllegalArgumentException("Invalid start: "+start);
-		long end=start+length;
-		if ((end<start)||(end>count)) throw new IllegalArgumentException("Invalid lenth: "+length);
+		if ((end<start)||(end>count)) throw new IllegalArgumentException("Invalid end: "+end);
+		long length=end-start;
 		if (length==count) return toBlob();
 		
 		long split=acc.count();
-		if (end<=split) return acc.slice(start,length);
+		if (end<=split) return acc.slice(start,end);
 		if (start>=split) return Blob.wrap(tail,(int)(start-split),(int)length);
-		return toBlob().slice(start,length);
+		return toBlob().slice(start,end);
 	}
 	
 	public AString getCVMString() {

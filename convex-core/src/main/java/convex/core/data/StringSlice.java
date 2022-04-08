@@ -28,16 +28,6 @@ public class StringSlice extends AString {
 	}
 
 	@Override
-	public AString subString(long start, long end) {
-		long len=end-start;
-		if (len==0) return StringShort.EMPTY;
-		if (len<0) throw new IllegalArgumentException("Negative length");
-		if ((start<0)||(start+len>=length)) throw new IllegalArgumentException("Out of range");
-		if ((start==0)&&(len==length)) return this;
-		return source.subString(this.start+start, this.start+end);
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		// Nothing?
 
@@ -89,7 +79,7 @@ public class StringSlice extends AString {
 	}
 	
 	public ABlob toBlob() {
-		return source.toBlob().slice(start, length);
+		return source.toBlob().slice(start, start+length);
 	}
 
 	@Override
@@ -100,6 +90,14 @@ public class StringSlice extends AString {
 	@Override
 	protected void writeToBuffer(ByteBuffer bb) {
 		source.writeToBuffer(bb);
+	}
+
+	@Override
+	public AString slice(long start, long end) {
+		if (start<0) return null;
+		if (end>(start+length)) return null;
+		if (start>end) return null;
+		return source.slice(this.start+start, this.start+end);
 	}
 
 

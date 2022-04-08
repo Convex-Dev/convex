@@ -96,11 +96,6 @@ public class StringShort extends AString {
 	}
 
 	@Override
-	public StringShort subString(long start, long end) {
-		return new StringShort(data.slice(start, end - start));
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		if (length > MAX_LENGTH)
 			throw new InvalidDataException("StringShort too long: " + length, this);
@@ -190,5 +185,14 @@ public class StringShort extends AString {
 	protected void writeToBuffer(ByteBuffer bb) {
 		data.writeToBuffer(bb);
 	}
+
+	@Override
+	public AString slice(long start, long end) {
+		Blob newData=data.slice(start, end);
+		if (data==newData) return this;
+		if (newData==null) return null;
+		return create(newData);
+	}
+
 
 }

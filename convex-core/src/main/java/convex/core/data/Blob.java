@@ -93,11 +93,11 @@ public class Blob extends AArrayBlob {
 	}
 
 	@Override
-	public Blob slice(long start, long length) {
-		if (start < 0) throw new IllegalArgumentException("Start out of bounds: " + start);
-		if ((start + length) > this.length)
-			throw new IllegalArgumentException("End out of bounds: " + (start + length));
-		if (length < 0) throw new IllegalArgumentException("Negative length of slice: " + length);
+	public Blob slice(long start, long end) {
+		if (start < 0) return null;
+		if (end > this.length) return null;
+		long length=end-start;
+		if (length < 0) return null;
 		if (length == 0) return EMPTY;
 		if (length==this.length) return this;
 		return Blob.wrap(store, Utils.checkedInt(start + offset), Utils.checkedInt(length));
@@ -194,7 +194,7 @@ public class Blob extends AArrayBlob {
 			throw new BadFormatException("Invalid length for Blob, length field " + len + " but actual length " + rLen);
 		}
 
-		return source.slice(headerLength, len);
+		return source.slice(headerLength, headerLength+len);
 	}
 
 	@Override
@@ -241,8 +241,9 @@ public class Blob extends AArrayBlob {
 	@Override
 	public Blob getChunk(long i) {
 		if ((i == 0) && (length <= CHUNK_LENGTH)) return this;
-		long chunkStart = i * CHUNK_LENGTH;
-		return slice(chunkStart, Math.min(CHUNK_LENGTH, length - chunkStart));
+		long start = i * CHUNK_LENGTH;
+		long take=Math.min(CHUNK_LENGTH, length - start);
+		return slice(start, start+take);
 	}
 
 	public void attachContentHash(Hash hash) {

@@ -27,8 +27,11 @@ public class StringTree extends AString {
 	}
 
 	@Override
-	public AString subString(long start, long end) {
-		return Strings.create(data.slice(start, end-start));
+	public AString slice(long start, long end) {
+		ABlob newData=data.slice(start, end);
+		if (data==newData) return this;
+		if (newData==null) return null;
+		return Strings.create(newData);
 	}
 
 	@Override
@@ -91,6 +94,12 @@ public class StringTree extends AString {
 	protected byte byteAt(long i) {
 		if ((i<0)||(i>=length)) return -1;
 		return data.byteAt(i);
+	}
+	
+	@Override
+	public int intAt(long i) {
+		// TODO: potentially faster implementation
+		return super.intAt(i);
 	}
 
 	@Override

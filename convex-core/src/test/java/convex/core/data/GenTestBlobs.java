@@ -20,6 +20,6 @@ public class GenTestBlobs {
 		long lv=blob.toLong();
 
 		int slen=Math.min(8,Utils.checkedInt(len));
-		assertEquals(lv,blob.slice(len-slen,slen).toLong());
+		assertEquals(lv,blob.slice(len-slen,len).toLong());
 	}
 }
