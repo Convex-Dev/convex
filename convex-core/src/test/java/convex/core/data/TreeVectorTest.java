@@ -68,7 +68,7 @@ public class TreeVectorTest {
 
 	@Test
 	public void testSpliterator() {
-		AVector<CVMLong> a = Samples.INT_VECTOR_300.subVector(0, 256);
+		AVector<CVMLong> a = Samples.INT_VECTOR_300.slice(0, 256);
 		assertEquals(VectorTree.class, a.getClass());
 		Spliterator<CVMLong> spliterator = a.spliterator();
 		assertEquals(256, spliterator.estimateSize());

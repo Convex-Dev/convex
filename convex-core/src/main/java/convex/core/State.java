@@ -322,13 +322,13 @@ public class State extends ARecord {
 			long numScheduled = trans.count(); // number scheduled at this schedule timestamp
 			long take = Math.min(numScheduled, Constants.MAX_SCHEDULED_TRANSACTIONS_PER_BLOCK - tcount);
 
-			// add scheduled transactions to arraylist
+			// add scheduled transactions to List
 			if (al == null) al = new ArrayList<>();
 			for (long i = 0; i < take; i++) {
 				al.add(trans.get(i));
 			}
 			// remove schedule entries taken. Delete key if no more entries remaining
-			trans = trans.subVector(take, numScheduled - take);
+			trans = trans.slice(take, numScheduled);
 			if (trans.isEmpty()) sched = sched.dissoc(key);
 		}
 		if (al==null) return this; // nothing to do if no transactions to execute

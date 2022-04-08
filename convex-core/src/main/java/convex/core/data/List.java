@@ -396,7 +396,7 @@ public class List<T extends ACell> extends AList<T> {
 		long newLen=count-n;
 		if (newLen<0) return null;
 		if (newLen==0) return Lists.empty();
-		return new List<T>(data.subVector(0, newLen));
+		return new List<T>(data.slice(0, newLen));
 	}
 
 	@Override
