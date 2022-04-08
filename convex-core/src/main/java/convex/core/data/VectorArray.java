@@ -127,8 +127,8 @@ public class VectorArray<T extends ACell> extends AVector<T> {
 
 	@Override
 	public AVector<T> next() {
-		if (count==0) return null;
-		return slice(1,count-1);
+		if (count<=1) return null;
+		return slice(1,count);
 	}
 
 	@Override

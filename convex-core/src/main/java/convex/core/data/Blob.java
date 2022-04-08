@@ -82,7 +82,7 @@ public class Blob extends AArrayBlob {
 	public static Blob wrap(byte[] data, int offset, int length) {
 		if (length < 0) throw new IllegalArgumentException(Errors.negativeLength(length));
 		if ((offset < 0) || (offset + length > data.length))
-			throw new IndexOutOfBoundsException(Errors.badRange(offset, length));
+			throw new IndexOutOfBoundsException(Errors.badRange(offset, offset+length));
 		if (length==0) return Blob.EMPTY;
 		return new Blob(data, offset, length);
 	}

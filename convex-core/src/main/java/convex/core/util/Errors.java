@@ -39,8 +39,8 @@ public class Errors {
 		return "Bad index: "+i;
 	}
 
-	public static String badRange(long start, long length) {
-		return "Range out of bounds with offset="+start+" and length="+length;
+	public static String badRange(long start, long end) {
+		return "Range out of bounds: ["+start+", "+end+")";
 	}
 
 	public static String negativeLength(long length) {

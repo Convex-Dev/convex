@@ -54,8 +54,8 @@ public class ParamTestVector {
 	public void testElements() {
 		int n = v.size();
 		for (int i = 0; i < n; i++) {
-			Object o = v.get(i);
-			assertEquals(o, v.slice(i, 1).get(0));
+			ACell o = v.get(i);
+			assertEquals(o, v.slice(i, i+1).get(0));
 		}
 
 		assertThrows(Throwable.class, () -> v.get(-1));

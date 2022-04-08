@@ -4,6 +4,7 @@ import static convex.test.Assertions.assertCVMEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -232,6 +233,29 @@ public class VectorsTest {
 		AVector<CVMLong> vec2 = vec.updateRefs(r -> CVMLong.create(1L+((CVMLong)r.getValue()).longValue()).getRef());
 		assertEquals(Vectors.of(2, 3, 4, 5), vec2);
 	}
+	
+	@Test
+	public void testVectorBuilder() {
+		VectorBuilder<CVMLong> vb=new VectorBuilder<CVMLong>();
+		assertSame(Vectors.empty(), vb.toVector());
+		vb.conj(CVMLong.ZERO);
+		assertEquals(Vectors.of(0),vb.toVector());
+		
+		vb.concat(Vectors.of(1,2));
+		assertEquals(Vectors.of(0,1,2),vb.toVector());
+	}
+	
+	@Test
+	public void testVectorBuilderLarge() {
+		VectorBuilder<CVMLong> vb=new VectorBuilder<CVMLong>();
+		for (int i=0; i<10; i++) {
+			vb.concat(vb.toVector());
+			vb.conj(CVMLong.create(i));
+		}
+		
+		AVector<CVMLong> v=vb.toVector();
+		assertEquals(1023,v.count());
+	}
 
 	@Test
 	public void testNext() {
@@ -240,6 +264,10 @@ public class VectorsTest {
 		assertEquals(v1.get(1), v2.get(0));
 		assertEquals(v1.get(255), v2.get(254));
 		assertEquals(1L, v1.count() - v2.count());
+		
+		// Null if no elements remain
+		assertNull(Vectors.empty().next());
+		assertNull(Vectors.of(1).next());
 	}
 
 	@Test

@@ -96,7 +96,7 @@ public class Hash extends AArrayBlob {
 	 */
 	public static Hash wrap(byte[] hashBytes, int offset) {
 		if ((offset < 0) || (offset + LENGTH > hashBytes.length))
-			throw new IllegalArgumentException(Errors.badRange(offset, LENGTH));
+			throw new IllegalArgumentException(Errors.badRange(offset, offset+LENGTH));
 		return new Hash(hashBytes, offset);
 	}
 

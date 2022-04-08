@@ -249,8 +249,10 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	@Override
 	public final java.util.List<T> subList(int fromIndex, int toIndex) {
 		long start = fromIndex;
-		long length = toIndex - fromIndex;
-		return subVector(start, length);
+		long end = toIndex;
+		ASequence<T> result= slice(start, end);
+		if (result==null) throw new IndexOutOfBoundsException(Errors.badRange(start, end));
+		return result;
 	}
 
 	/**

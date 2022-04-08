@@ -705,7 +705,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 
 	@Override
 	public AVector<T> next() {
-		return slice(1L, count - 1);
+		return slice(1L, count);
 	}
 
 	@Override
