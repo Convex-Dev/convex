@@ -29,7 +29,7 @@ import convex.core.util.Utils;
  * Representation in bytes:
  * 
  * <ul>
- * <li>0x80 - ListVector tag byte </li>
+ * <li>0x80 - VectorLeaf tag byte </li>
  * <li>VLC Long - Length of list. Greater than 16 implies prefix must be
  * present. Low 4 bits specify N (0 means 16 in presence of prefix) </li>
  * <li>[Ref]*N - N Elements with length </li>
@@ -49,7 +49,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		EMPTY_REF.setFlags(Ref.INTERNAL_FLAGS);
 	}
 
-	/** Maximum size of a single ListVector before a tail is required */
+	/** Maximum size of a single VectorLeaf before a tail is required */
 	public static final int MAX_SIZE = Vectors.CHUNK_SIZE;
 
 	private final Ref<T>[] items;
@@ -71,13 +71,13 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	 * @param elements Elements to add
 	 * @param offset Offset into element array
 	 * @param length Number of elements to include from array
-	 * @return New ListVector
+	 * @return New VectorLeaf
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> VectorLeaf<T> create(ACell[] elements, int offset, int length) {
 		if (length == 0) return (VectorLeaf<T>) VectorLeaf.EMPTY;
 		if (length > Vectors.CHUNK_SIZE)
-			throw new IllegalArgumentException("Too many elements for ListVector: " + length);
+			throw new IllegalArgumentException("Too many elements for VectorLeaf: " + length);
 		Ref<T>[] items = new Ref[length];
 		for (int i = 0; i < length; i++) {
 			T value=(T) elements[i + offset];
@@ -87,20 +87,20 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	}
 
 	/**
-	 * Creates a ListVector with the given items appended to the specified tail
+	 * Creates a VectorLeaf with the given items appended to the specified tail
 	 * 
 	 * @param elements Elements to add
 	 * @param offset Offset into element array
 	 * @param length Number of elements to include from array
 	 * @param prefix Prefix vector to append to
-	 * @return The updated ListVector
+	 * @return The updated VectorLeaf
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> VectorLeaf<T> create(ACell[] elements, int offset, int length, AVector<T> prefix) {
 		if (length == 0)
-			throw new IllegalArgumentException("ListVector with tail cannot be created with zero head elements");
+			throw new IllegalArgumentException("VectorLeaf with tail cannot be created with zero head elements");
 		if (length > Vectors.CHUNK_SIZE)
-			throw new IllegalArgumentException("Too many elements for ListVector: " + length);
+			throw new IllegalArgumentException("Too many elements for VectorLeaf: " + length);
 		Ref<T>[] items = new Ref[length];
 		for (int i = 0; i < length; i++) {
 			T value=(T) elements[i + offset];
@@ -135,12 +135,12 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 				if (!hasPrefix()) return chunk; // exactly one whole chunk
 				return prefix.getValue().appendChunk(chunk);
 			} else {
-				// just grow current ListVector head
+				// just grow current VectorLeaf head
 				return new VectorLeaf<T>(newItems, prefix, count + 1);
 			}
 		} else {
 			// this must be a full single chunk already, so turn this into tail of new
-			// ListVector
+			// VectorLeaf
 			AVector<T> newTail = this;
 			return new VectorLeaf<T>(new Ref[] { Ref.get(value) }, newTail.getRef(), count + 1);
 		}
@@ -180,10 +180,10 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		if (this.count == 0) return chunk;
 		if (this.hasPrefix()) {
 			throw new IllegalArgumentException(
-					"Can't append chunk to a ListVector with a tail (length = " + count + ")");
+					"Can't append chunk to a VectorLeaf with a tail (length = " + count + ")");
 		}
 		if (this.count != Vectors.CHUNK_SIZE)
-			throw new IllegalArgumentException("Can't append chunk to a ListVector of size: " + this.count);
+			throw new IllegalArgumentException("Can't append chunk to a VectorLeaf of size: " + this.count);
 		return VectorTree.wrap2(chunk, this);
 	}
 
@@ -230,7 +230,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	}
 
 	/**
-	 * Reads a ListVector from the provided ByteBuffer 
+	 * Reads a {@link VectorLeaf} from the provided ByteBuffer 
 	 * 
 	 * Assumes the header byte and count is already read.
 	 * 
@@ -314,9 +314,9 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	public static final int MAX_ENCODING_LENGTH = 1 + Format.MAX_VLC_LONG_LENGTH + VectorTree.MAX_EMBEDDED_LENGTH+Format.MAX_EMBEDDED_LENGTH * (MAX_SIZE);
 
 	/**
-	 * Returns true if this ListVector has a prefix AVector.
+	 * Returns true if this VectorLeaf has a prefix AVector.
 	 * 
-	 * @return true if this ListVector has a prefix, false otherwise
+	 * @return true if this VectorLeaf has a prefix, false otherwise
 	 */
 	public boolean hasPrefix() {
 		return prefix != null;
@@ -344,7 +344,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	}
 
 	/**
-	 * Custom ListIterator for ListVector
+	 * Custom ListIterator for VectorLeaf
 	 */
 	private class ListVectorIterator implements ListIterator<T> {
 		ListIterator<T> prefixIterator;
@@ -686,21 +686,16 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 
 		if (prefix == null) {
 			int len = Utils.checkedInt(length);
-			Ref<R>[] newItems;
-			//if (start==0) {
-				// can share items if starting from zero index
-			//	newItems=(Ref<R>[]) items;
-			//} else {
-				newItems= new Ref[len];
-				System.arraycopy(items, Utils.checkedInt(start), newItems, 0, len);
-			//}
-			
+			Ref<R>[] newItems= new Ref[len];
+			System.arraycopy(items, Utils.checkedInt(start), newItems, 0, len);
 			return new VectorLeaf<R>(newItems, null, length);
 		} else {
 			long tc = prefixLength();
 			if (start >= tc) {
-				// range is in tail of vector
-				return this.withPrefix(null).subVector(start - tc, length);
+				int len = Utils.checkedInt(length);
+				Ref<R>[] newItems= new Ref[len];
+				System.arraycopy(items, Utils.checkedInt(start-tc), newItems, 0, len);
+				return new VectorLeaf<R>(newItems, null, length);
 			}
 
 			AVector<T> tv = prefix.getValue();
@@ -728,11 +723,11 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		if (prefix != null) {
 			// if we have a prefix, should be 1..15 elements only
 			if (count == Vectors.CHUNK_SIZE) {
-				throw new InvalidDataException("Full ListVector with prefix? This is not right...", this);
+				throw new InvalidDataException("Full VectorLeaf with prefix? This is not right...", this);
 			}
 
 			if (count == 0) {
-				throw new InvalidDataException("Empty ListVector with prefix? This is not right...", this);
+				throw new InvalidDataException("Empty VectorLeaf with prefix? This is not right...", this);
 			}
 
 			ACell ccell=prefix.getValue();
@@ -752,7 +747,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	@Override
 	public void validateCell() throws InvalidDataException {
 		if ((count > 0) && (items.length == 0)) throw new InvalidDataException("Should be items present!", this);
-		if (!isCanonical()) throw new InvalidDataException("Not a canonical ListVector!", this);
+		if (!isCanonical()) throw new InvalidDataException("Not a canonical VectorLeaf!", this);
 	}
 
 	@Override
