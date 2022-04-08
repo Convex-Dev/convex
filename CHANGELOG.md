@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `print` core function for readable representations
 - `split` and `join` core functions for Strings
 - `slice` core function
+- Add `VectorBuilder` utility class for fast Vector construction
 
 ### Fixed
 - Edge cases around UTF-8 string handling

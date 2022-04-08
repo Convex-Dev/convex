@@ -67,14 +67,14 @@ public abstract class ACountable<E extends ACell> extends ACell {
 	 * @param end end index (exclusive)
 	 * @return Slice of data structure, or null if invalid slice
 	 */
-	public abstract <T extends ACell> ACountable<T> slice(long start, long end);
+	public abstract ACountable<E> slice(long start, long end);
 	
 	/**
 	 * Gets a slice of this data structure from start to the end
 	 * @param start Start index (inclusive)
 	 * @return Slice of data structure, or null if invalid slice
 	 */
-	public <T extends ACell> ACountable<T> slice(long start) {
+	public ACountable<E> slice(long start) {
 		return slice(start, count());
 	}
 }

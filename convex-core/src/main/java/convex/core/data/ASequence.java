@@ -227,7 +227,6 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	 * @param end End index(exclusive)
 	 * @return A sequence representing the requested slice.
 	 */
-	@SuppressWarnings("unchecked")
 	public abstract ASequence<T> slice(long start, long end);
 
 	/**

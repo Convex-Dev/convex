@@ -161,7 +161,6 @@ public abstract class AString extends ACountable<CVMChar> implements Comparable<
 	 * @param end End index (Exclusive)
 	 * @return Specified substring
 	 */
-	@SuppressWarnings("unchecked")
 	public abstract AString slice(long start, long end);
 
 	/**

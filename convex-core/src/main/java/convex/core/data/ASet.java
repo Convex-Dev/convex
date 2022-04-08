@@ -222,7 +222,6 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	 * @param end end index (exclusive)
 	 * @return Slice of set, or null if invalid slice
 	 */
-	@SuppressWarnings("unchecked")
 	@Override
 	public abstract ASet<T> slice(long start, long end);
 }

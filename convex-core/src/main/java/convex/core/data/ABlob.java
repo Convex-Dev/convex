@@ -109,7 +109,6 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 * @param end End of the slice (exclusive)
 	 * @return A blob of the specified length, representing a slice of this blob.
 	 */
-	@SuppressWarnings("unchecked")
 	public abstract ABlob slice(long start, long end);
 
 	/**
@@ -121,7 +120,6 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 * @param start Start position to slice from
 	 * @return Slice of Blob
 	 */
-	@SuppressWarnings("unchecked")
 	public ABlob slice(long start) {
 		return slice(start, count());
 	}
