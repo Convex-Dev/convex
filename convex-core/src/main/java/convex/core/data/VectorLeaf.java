@@ -324,8 +324,8 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 
 	public VectorLeaf<T> withPrefix(AVector<T> newPrefix) {
 		if ((newPrefix == null) && !hasPrefix()) return this;
-		long tc = (newPrefix == null) ? 0L : newPrefix.count();
-		return new VectorLeaf<T>(items, (newPrefix == null) ? null : newPrefix.getRef(), tc + items.length);
+		long newPC = (newPrefix == null) ? 0L : newPrefix.count();
+		return new VectorLeaf<T>(items, (newPrefix == null) ? null : newPrefix.getRef(), newPC + items.length);
 	}
 
 	@Override
