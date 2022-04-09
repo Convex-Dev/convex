@@ -24,8 +24,8 @@
 		<maven.compiler.target>11</maven.compiler.target>
 		<maven.compiler.source>11</maven.compiler.source>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<jmh.version>1.32</jmh.version>
-		<junit.version>5.7.1</junit.version>
+		<jmh.version>1.35</jmh.version>
+		<junit.version>5.8.2</junit.version>
 		<slf4j.version>1.7.31</slf4j.version>
 		<convex.version>${project.version}</convex.version>
 		<!--Freeze this for reproducible builds. -->
@@ -190,7 +190,8 @@
 				<configuration>
 					<serverId>ossrh</serverId>
 					<nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
-					<autoReleaseAfterClose>true</autoReleaseAfterClose>
+					<!-- Set to true for auto release -->
+					<autoReleaseAfterClose>false</autoReleaseAfterClose>
 				</configuration>
 			</plugin>
 		</plugins>
