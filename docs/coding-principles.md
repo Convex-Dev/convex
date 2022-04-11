@@ -9,7 +9,7 @@ mutable values for either:
 
 ### Trust the JVM
 
-We unashamedly exploit the JVM as an excellent runtime platform for decentralised sysytems. 
+We unashamedly exploit the JVM as an excellent runtime platform for decentralised systems. 
 It's very good at what it does, in particular the following attributes are very useful:
 
 - Efficient GC of short-lived objects. Much cheaper than C++ heap allocations, in fact.
@@ -57,10 +57,10 @@ Any of the the above principles can be overridden by reason, evidence and common
 - *Haskell* - for its functional purity, and attribute which is extremely valuable for
 decentralised systems.
 
-- *Lisp* - for demonstrationg the power of homoiconicity, and the ability to bootstrap a
-languge ecosystem with just a few core primatives closely linked to the Lambda Calculus.
+- *Lisp* - for demonstrating the power of homoiconicity, and the ability to bootstrap a
+languge ecosystem with just a few core primitives closely linked to the Lambda Calculus.
 
-- *Clojure* - primarily for its syntax and functional styole, an elegant evolution of Lisp
+- *Clojure* - primarily for its syntax and functional style, an elegant evolution of Lisp
 for the modern age.
 
 - *Persistent data structures* - functional data structures that enable efficient operations
