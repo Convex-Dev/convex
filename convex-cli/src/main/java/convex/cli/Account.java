@@ -22,7 +22,7 @@ import picocli.CommandLine.ParentCommand;
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=true,
-	description="Manages convex accounts.")
+	description="Manages Convex accounts.")
 public class Account implements Runnable {
 
 	// private static final Logger log = Logger.getLogger(Account.class.getName());

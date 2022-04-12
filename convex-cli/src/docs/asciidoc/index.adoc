@@ -36,19 +36,16 @@ You will need to visit https://github.com/Convex-Dev/convex[convex-dev @ github]
 The "develop" branch is currently the latest version.
 
 .terminal commands
-    git clone https://github.com/Convex-Dev/convex.git
-    cd convex
-    git checkout develop
-    git pull
+    git clone https://github.com/Convex-Dev/convex.git --branch develop
 
 === Convex Projects
 The Convex code repository is made up of the following subprojects:
 
-convex-benchmaks::    Run benchmarks on the convex network.
+convex-benchmaks::    Run benchmarks on the Convex network.
 convex-cli::          This CLI project.
-convex-core::         The main convex core library.
-convex-gui::          A local convex network running as a GUI application.
-convex-peer::         Peer library used to run convex peers.
+convex-core::         The main Convex core library.
+convex-gui::          A local Convex network running as a GUI application.
+convex-peer::         Peer library used to run Convex peers.
 
 
 === Compile and Setup
