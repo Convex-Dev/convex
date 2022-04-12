@@ -109,12 +109,20 @@ public class Main implements Runnable {
 		CommandLine.usage(new Main(), System.out);
 	}
 
+	/**
+	 * Main entry point when run as CLI application
+	 */
 	public static void main(String[] args) {
 		Main mainApp = new Main();
 		int result = mainApp.execute(args);
 		System.exit(result);
 	}
 
+	/**
+	 * Command line execution. Can be run from Java code.
+	 * @param args Command line arguments
+	 * @return Process result value
+	 */
 	public int execute(String[] args) {
 		commandLine = new CommandLine(this)
 		.setUsageHelpLongOptionsMaxWidth(40)
@@ -146,7 +154,7 @@ public class Main implements Runnable {
 
 		} catch (Throwable t) {
 			log.error("Error executing command line: {}",t.getMessage());
-			return 2;
+			return ExitCodes.FATAL;
 		}
 		return result;
 	}
