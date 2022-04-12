@@ -327,7 +327,7 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Gets the current Belief held by this PeerServer
+	 * Gets the current Belief held by this {@link Server}
 	 *
 	 * @return Current Belief
 	 */
@@ -336,9 +336,9 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Gets the current Peer data structure for this Server.
+	 * Gets the current Peer data structure for this {@link Server}.
 	 *
-	 * @return Current Peer
+	 * @return Current Peer data
 	 */
 	public Peer getPeer() {
 		return peer;

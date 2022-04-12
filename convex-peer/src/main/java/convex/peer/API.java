@@ -53,14 +53,12 @@ public class API {
 	 *
 	 * @param peerConfig Config map for the new Peer
      *
-     * @param event Optional event object that implements the IServerEvent interface
-     *
 	 * @return New Server instance
 	 */
 	public static Server launchPeer(Map<Keyword, Object> peerConfig) {
 		HashMap<Keyword,Object> config=new HashMap<>(peerConfig);
 
-		// State no8t strictly necessarry? Should be possible to restore a Peer from store
+		// State not strictly necessary? Should be possible to restore a Peer from store
 		if (!(config.containsKey(Keywords.STATE)
 				||config.containsKey(Keywords.STORE)
 				||config.containsKey(Keywords.SOURCE)
