@@ -14,6 +14,7 @@ import convex.core.data.Vectors;
 import convex.core.init.Init;
 import convex.core.lang.Context;
 import convex.core.lang.Core;
+import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
 import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Lookup;
@@ -64,6 +65,24 @@ public class CVMBenchmark {
 		State s=STATE;
 		Address addr=HERO;
 		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Def.create("a", Constant.of(13L)));
+		Context<ACell>  ctx=s.applyTransaction(trans);
+		ctx.getValue();
+	}
+	
+	@Benchmark
+	public void queryAccountHoldings() {
+		State s=STATE;
+		Address addr=HERO;
+		@SuppressWarnings("unused")
+		ACell result=s.getAccount(addr).getHoldings();
+	}
+
+	
+	@Benchmark
+	public void deployToken() {
+		State s=STATE;
+		Address addr=HERO;
+		ATransaction trans=Invoke.create(addr,1, Reader.read("(do (import convex.fungible :as fun) (deploy (fun/build-token {:supply 1000000})))"));
 		Context<ACell>  ctx=s.applyTransaction(trans);
 		ctx.getValue();
 	}
