@@ -254,7 +254,7 @@ public class Main implements Runnable {
 
 			while (aliases.hasMoreElements()) {
 				String alias = aliases.nextElement();
-				if (counter == indexKey || alias.indexOf(publicKeyClean) == 0) {
+				if (counter == indexKey || (alias.indexOf(publicKeyClean) == 0 && !publicKeyClean.isEmpty())) {
 					log.trace("found keypair " + indexKey + " " + counter + " " + alias + " " + publicKeyClean + " " + alias.indexOf(publicKeyClean));
 					keyPair = PFXTools.getKeyPair(keyStore, alias, password);
 					break;
