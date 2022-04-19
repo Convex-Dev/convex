@@ -30,16 +30,28 @@
 	<build>
 		<plugins>
 			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<version>3.3.0</version>
 				<configuration>
-					<fork>true</fork>
-					<mainClass>convex.restapi.ConvexRESTAPIApplication</mainClass>
+					<outputDirectory>${project.directory}</outputDirectory>
+					<archive>
+						<manifest>
+							<mainClass>convex.restapi.Main</mainClass>
+						</manifest>
+					</archive>
+					<descriptorRefs>
+						<descriptorRef>jar-with-dependencies</descriptorRef>
+					</descriptorRefs>
+					<finalName>convex-restapi</finalName>
+					<!-- We want differentiated outputs  -->
+					<appendAssemblyId>false</appendAssemblyId>
 				</configuration>
-					<executions>
+				<executions>
 					<execution>
+						<id>create-archive</id>
+						<phase>package</phase>
 						<goals>
-						<goal>repackage</goal>
+							<goal>single</goal>
 						</goals>
 					</execution>
 				</executions>
@@ -59,15 +71,9 @@
 			<version>${convex.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
-			<version>${spring.boot.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-			<version>${spring.boot.version}</version>
+			<groupId>com.bladejava</groupId>
+			<artifactId>blade-mvc</artifactId>
+			<version>2.0.15.RELEASE</version>
 		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>
