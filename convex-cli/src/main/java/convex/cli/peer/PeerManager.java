@@ -42,6 +42,7 @@ import convex.peer.IServerEvent;
 import convex.peer.Server;
 import convex.peer.ServerEvent;
 import convex.peer.ServerInformation;
+import convex.restapi.APIServer;
 import etch.EtchStore;
 
 
@@ -91,6 +92,7 @@ public class PeerManager implements IServerEvent {
 	public void launchLocalPeers(List<AKeyPair> keyPairList, int peerPorts[]) {
 		List<AccountKey> keyList=keyPairList.stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
 
+		this.keyPair = keyPairList.get(0);
 		State genesisState=Init.createState(keyList);
 		peerServerList = API.launchLocalPeers(keyPairList,genesisState, peerPorts, this);
 	}
@@ -341,6 +343,20 @@ public class PeerManager implements IServerEvent {
 			}
 		}
 		return -1;
+	}
+
+	public void launchRestAPI(int port) {
+		Server peerServer = peerServerList.get(0);
+		// InetSocketAddress peerHostAddress = Utils.toInetSocketAddress(peerServer.getHostname());
+
+//		try {
+		// Convex convex = Convex.connect(peerHostAddress, address, keyPair);
+		Convex convex = Convex.connect(peerServer, peerServer.getPeerController(), keyPair);
+		APIServer.start(port, convex);
+//		} catch (TimeoutException e) {
+//			log.error("Unable to start rest api server: "+ e);
+//			return;
+//		}
 	}
 
 	/**

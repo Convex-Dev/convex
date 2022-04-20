@@ -53,6 +53,11 @@ public class LocalStart implements Runnable {
 			+ "or a single --ports=8081,8082,8083 or --ports=8080-8090")
 	private String[] ports;
 
+	@Option(names={"--api-port"},
+		defaultValue = "0",
+		description="REST API port, if set enable REST API to a peer in the local cluster")
+	private int apiPort;
+
 	@Override
 	public void run() {
 		Main mainParent = localParent.mainParent;
@@ -124,6 +129,11 @@ public class LocalStart implements Runnable {
 		log.info("Starting local network with "+count+" peer(s)");
 		peerManager.launchLocalPeers(keyPairList, peerPorts);
 		log.info("Local Peers launched");
+		if (apiPort > 0) {
+			log.info("Starting api on port "+apiPort);
+			peerManager.launchRestAPI(apiPort);
+		}
 		peerManager.showPeerEvents();
+
 	}
 }

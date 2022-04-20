@@ -16,9 +16,8 @@
 
 
 	<properties>
-		<logback.version>1.2.11</logback.version>
-		<spring.boot.version>2.6.6</spring.boot.version>
-
+		<json.simple.version>1.1.1</json.simple.version>
+		<blade.version>2.0.15.RELEASE</blade.version>
 	</properties>
 
 	<pluginRepositories>
@@ -43,8 +42,7 @@
 						<descriptorRef>jar-with-dependencies</descriptorRef>
 					</descriptorRefs>
 					<finalName>convex-restapi</finalName>
-					<!-- We want differentiated outputs  -->
-					<appendAssemblyId>false</appendAssemblyId>
+					<appendAssemblyId>true</appendAssemblyId>
 				</configuration>
 				<executions>
 					<execution>
@@ -59,6 +57,7 @@
 		</plugins>
 	</build>
 
+
 	<dependencies>
 		<dependency>
 			<groupId>world.convex</groupId>
@@ -71,29 +70,14 @@
 			<version>${convex.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>com.bladejava</groupId>
-			<artifactId>blade-mvc</artifactId>
-			<version>2.0.15.RELEASE</version>
-		</dependency>
-		<dependency>
 			<groupId>com.googlecode.json-simple</groupId>
 			<artifactId>json-simple</artifactId>
-			<version>1.1.1</version>
+			<version>${json.simple.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
-			<version>${slf4j.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>ch.qos.logback</groupId>
-			<artifactId>logback-core</artifactId>
-			<version>${logback.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>ch.qos.logback</groupId>
-			<artifactId>logback-classic</artifactId>
-			<version>${logback.version}</version>
+			<groupId>com.bladejava</groupId>
+			<artifactId>blade-mvc</artifactId>
+			<version>${blade.version}</version>
 		</dependency>
 	</dependencies>
 </project>
