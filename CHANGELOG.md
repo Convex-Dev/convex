@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `split` and `join` core functions for Strings
 - `slice` core function
 - Add `VectorBuilder` utility class for fast Vector construction
+- `declare` core macro
 - Additional benchmarks
 
 ### Fixed
