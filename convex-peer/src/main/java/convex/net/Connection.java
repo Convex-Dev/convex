@@ -604,24 +604,24 @@ public class Connection {
 		selector.wakeup();
 	}
 
+	/**
+	 * Selector object for all client connections
+	 */
 	private static final Selector selector;
 
 	static {
 		try {
-			System.err.println("Initialising Client selector");
+			// System.err.println("Initialising Client selector");
 			selector = Selector.open();
 		} catch (IOException e) {
 			throw new Error("Error initialising client selector",e);
 		}
 	}
 
-	public void wakeUp() {
-		selector.wakeup();
-	}
-
 	private static Thread selectorThread;
 
 	private static void ensureSelectorLoop() {
+		// Double checked locking. Don't want to start this twice!
 		if (selectorThread==null) {
 			synchronized(Connection.class) {
 				if (selectorThread==null) {
@@ -637,9 +637,7 @@ public class Connection {
 	private static Runnable selectorLoop = new Runnable() {
 		@Override
 		public void run() {
-			System.err.println("Client selector loop starting...");
-
-			log.info("Client selector loop started");
+			log.info("Client selector loop starting...");
 			while (true) {
 				try {
 					selector.select(300);

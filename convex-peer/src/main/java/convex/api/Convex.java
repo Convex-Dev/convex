@@ -109,7 +109,7 @@ public abstract class Convex {
 					cf.complete(v);
 					log.debug("Completed Result received for message ID: {}", id);
 				} else {
-					log.warn("Ignored Result received for unexpected message ID: {}", id);
+					log.debug("Ignored Result received for unexpected message ID: {}", id);
 				}
 			}
 		}

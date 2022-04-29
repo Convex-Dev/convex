@@ -199,13 +199,13 @@ public class NIOServer implements Closeable {
 	}
 
 	protected void selectWrite(SelectionKey key) throws IOException {
-		// attach a PeerConnection if needed for this client
-		ensurePeerConnection(key);
+		// attach a Connection if needed for this client
+		ensureConnection(key);
 
 		Connection.selectWrite(key);
 	}
 
-	private Connection ensurePeerConnection(SelectionKey key) throws IOException {
+	private Connection ensureConnection(SelectionKey key) throws IOException {
 		Connection pc = (Connection) key.attachment();
 		if (pc != null)
 			return pc;
@@ -223,7 +223,7 @@ public class NIOServer implements Closeable {
 	protected void selectRead(SelectionKey key) throws IOException {
 
 		// log.info("Connection read from: "+sc.getRemoteAddress()+" with key:"+key);
-		Connection conn = ensurePeerConnection(key);
+		Connection conn = ensureConnection(key);
 		if (conn == null)
 			throw new Error("No PeerConnection specified");
 		try {
