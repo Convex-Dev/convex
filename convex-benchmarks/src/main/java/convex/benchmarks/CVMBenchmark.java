@@ -110,7 +110,7 @@ public class CVMBenchmark {
 		ctx.getValue();
 	}
 	
-	final ATransaction buyTrade=Invoke.create(HERO,1, Reader.read("(torus/buy-tokens usd 10)"));
+	static final ATransaction buyTrade=Invoke.create(HERO,1, Reader.read("(torus/buy-tokens usd 10)"));
 	
 	@Benchmark
 	public ACell dexMarketTrade() {
