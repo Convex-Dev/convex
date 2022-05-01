@@ -23,8 +23,8 @@ import picocli.CommandLine.ParentCommand;
  *		convex.transaction
  *
  */
-@Command(name="transaction",
-	aliases={"transact", "tr"},
+@Command(name="transact",
+	aliases={"tr"},
 	mixinStandardHelpOptions=true,
 	description="Execute a transaction on the network via a peer.")
 public class Transaction implements Runnable {

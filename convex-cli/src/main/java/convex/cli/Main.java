@@ -110,7 +110,7 @@ public class Main implements Runnable {
 	}
 
 	/**
-	 * Main entry point when run as CLI application
+	 * Java main(...) entry point when run as a Java application
 	 */
 	public static void main(String[] args) {
 		Main mainApp = new Main();
@@ -119,7 +119,7 @@ public class Main implements Runnable {
 	}
 
 	/**
-	 * Command line execution. Can be run from Java code.
+	 * Command line execution entry point. Can be run from Java code.
 	 * @param args Command line arguments
 	 * @return Process result value
 	 */
