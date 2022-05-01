@@ -12,10 +12,7 @@ import convex.core.data.ACell;
  * Output class to show results from the CLI
  *
  */
-
-
-
-public class Output {
+public class TableOutput {
 
 	protected List<OutputField> fieldList = new ArrayList<OutputField>();
 

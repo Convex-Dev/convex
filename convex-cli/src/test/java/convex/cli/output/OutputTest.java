@@ -24,7 +24,7 @@ public class OutputTest {
 		StringWriter outputWriter = new StringWriter();
 		PrintWriter printWriter = new PrintWriter(outputWriter);
 		ACell cellValue = Address.create(TEST_LONG_VALUE);
-		Output output = new Output();
+		TableOutput output = new TableOutput();
 		output.setField("Test-Long", TEST_LONG_VALUE);
 		output.setField("Test-Cell", cellValue);
 		output.setField("Test-String", TEST_STRING_VALUE);
@@ -40,7 +40,7 @@ public class OutputTest {
 		PrintWriter printWriter = new PrintWriter(outputWriter);
 		ACell cellValue = Address.create(TEST_LONG_VALUE);
 
-		Output output = new Output();
+		TableOutput output = new TableOutput();
 		Result result = Result.create(CVMLong.create(1), cellValue, null);
 		output.setResult(result);
 		output.writeToStream(printWriter);
@@ -55,7 +55,7 @@ public class OutputTest {
 		PrintWriter printWriter = new PrintWriter(outputWriter);
 		ACell cellValue = Address.create(TEST_LONG_VALUE);
 		ACell errorCode = CVMLong.create(TEST_ERROR_CODE);
-		Output output = new Output();
+		TableOutput output = new TableOutput();
 		Result result = Result.create(CVMLong.create(1), cellValue, errorCode);
 		output.setResult(result);
 		output.writeToStream(printWriter);

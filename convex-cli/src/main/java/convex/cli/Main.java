@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 
 import convex.api.Convex;
 import convex.cli.peer.SessionItem;
-import convex.cli.output.Output;
+import convex.cli.output.TableOutput;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.data.AccountKey;
@@ -61,7 +61,7 @@ public class Main implements Runnable {
 
 
 	private static CommandLine commandLine;
-	public Output output;
+	public TableOutput output;
 
 	@Option(names={ "-c", "--config"},
 		scope = ScopeType.INHERIT,
@@ -100,7 +100,7 @@ public class Main implements Runnable {
 
 
 	public Main() {
-		output = new Output();
+		output = new TableOutput();
 	}
 
 	@Override
