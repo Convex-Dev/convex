@@ -19,6 +19,9 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.util.Date;
 
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+
 import org.bouncycastle.jce.X509Principal;
 import org.bouncycastle.x509.X509V3CertificateGenerator;
 
@@ -73,6 +76,8 @@ public class PFXTools {
 		char[] pwdArray = password(passPhrase);
 		try (FileInputStream fis = new FileInputStream(keyFile)) {
 			ks.load(fis, pwdArray);
+		} catch (IOException e) {
+			throw new IOException("Can't read keystore at: "+keyFile,e);
 		}
 		return ks;
 	}
@@ -101,45 +106,17 @@ public class PFXTools {
 	}
 
 	/**
-	 * Generates a self-signed certificate.
-	 * @param kpToSign Key pair
-	 * @return New certificate
-	 * @throws GeneralSecurityException If a security exception occurs
-	 */
-	public static Certificate createSelfSignedCertificate(AKeyPair kpToSign) throws GeneralSecurityException {
-		KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(CERTIFICATE_ALGORITHM);
-		KeyPair kp=keyPairGenerator.generateKeyPair();
-
-		X509V3CertificateGenerator v3CertGen = new X509V3CertificateGenerator();
-
-		String domainName="convex.world";
-		v3CertGen.setSerialNumber(BigInteger.valueOf(new SecureRandom().nextInt(Integer.MAX_VALUE)));
-        v3CertGen.setIssuerDN(new X509Principal("CN=" + domainName + ", OU=None, O=None L=None, C=None"));
-        v3CertGen.setNotBefore(new Date(System.currentTimeMillis() - 1000L * 60 * 60 * 24 * 30));
-        v3CertGen.setNotAfter(new Date(System.currentTimeMillis() + (1000L * 60 * 60 * 24 * 365*10)));
-        v3CertGen.setSubjectDN(new X509Principal("CN=" + domainName + ", OU=None, O=None L=None, C=None"));
-
-        v3CertGen.setPublicKey(kpToSign.getPublic());
-        v3CertGen.setSignatureAlgorithm("SHA256WithRSAEncryption");
-
-        Certificate cert = v3CertGen.generateX509Certificate(kp.getPrivate());
-		return cert;
-	}
-
-	/**
 	 * Retrieves a key pair from a key store.
 	 * @param ks Key store
 	 * @param alias Alias used for finding the key pair in the store
 	 * @param passphrase Passphrase used for decrypting the key pair. Mandatory.
 	 * @return Found key pair
 	 */
-	public static AKeyPair getKeyPair(KeyStore ks, String alias, String passPhrase) throws UnrecoverableKeyException, KeyStoreException, NoSuchAlgorithmException {
-		char[] pwdArray = passPhrase.toCharArray();
+	public static AKeyPair getKeyPair(KeyStore ks, String alias, String passphrase) throws UnrecoverableKeyException, KeyStoreException, NoSuchAlgorithmException {
+		char[] pwdArray = passphrase.toCharArray();
 
-		Certificate cert = ks.getCertificate(alias);
-		if (cert == null) return null;
 		Key sk=ks.getKey(alias,pwdArray);
-		return Ed25519KeyPair.create(cert.getPublicKey(),(PrivateKey) sk);
+		return Ed25519KeyPair.create(sk.getEncoded());
 	}
 
 	/**
@@ -159,6 +136,7 @@ public class PFXTools {
 	/**
 	 * Adds a key pair to a key store.
 	 * @param ks Key store
+	 * @param alias Alias entry for keystore
 	 * @param kp Key pair
 	 * @param passPhrase Passphrase for encrypting the key pair. Mandatory.
 	 * @return Updated key store.
@@ -170,8 +148,9 @@ public class PFXTools {
 		if (passPhrase == null) throw new IllegalArgumentException("Password is mandatory for private key");
 		char[] pwdArray = passPhrase.toCharArray();
 
-		Certificate cert = createSelfSignedCertificate(kp);
-		ks.setKeyEntry(alias, kp.getPrivate(), pwdArray, new Certificate[] {cert});
+		byte[] bs=((Ed25519KeyPair)kp).getSeed().getBytes();
+		SecretKey secretKeyPrivate = new SecretKeySpec(bs, "Ed25519");
+		ks.setKeyEntry(alias, secretKeyPrivate, pwdArray, null);
 
 		return ks;
 	}

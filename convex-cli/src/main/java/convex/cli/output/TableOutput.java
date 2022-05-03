@@ -1,5 +1,6 @@
 package convex.cli.output;
 
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,6 +51,10 @@ public class TableOutput {
 	public void addRow() {
 		rowList.add(fieldList);
 		fieldList = new ArrayList<OutputField>();
+	}
+	
+	public void writeToStream(PrintStream out) {
+		writeToStream(new PrintWriter(out));
 	}
 
 	public void writeToStream(PrintWriter out) {

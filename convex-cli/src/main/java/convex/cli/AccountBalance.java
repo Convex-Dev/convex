@@ -22,7 +22,7 @@ import picocli.CommandLine.ParentCommand;
  */
 
 @Command(name="balance",
-	aliases={"bal", "ba"},
+	aliases={"bal"},
 	mixinStandardHelpOptions=true,
 	description="Get account balance.")
 public class AccountBalance implements Runnable {

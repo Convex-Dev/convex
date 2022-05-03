@@ -14,7 +14,7 @@ import picocli.CommandLine.ParentCommand;
  *
  */
 @Command(name="local",
-	aliases={"lo"},
+	aliases={},
 	subcommands = {
 		LocalGUI.class,
 		LocalStart.class,

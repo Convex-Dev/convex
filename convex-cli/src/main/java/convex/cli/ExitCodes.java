@@ -20,5 +20,13 @@ public class ExitCodes {
 	 * Fatal exception
 	 */
 	public static final int FATAL = 13;
+
+	public static int getExitCode(Throwable t) {
+		// TODO Possible to have more specific error
+		if ((t instanceof Exception)||(t instanceof CLIError)) {
+			return ERROR;
+		}
+		return FATAL;
+	}
 	
 }

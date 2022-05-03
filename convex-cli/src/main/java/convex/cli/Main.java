@@ -1,7 +1,6 @@
 package convex.cli;
 
 import java.io.File;
-import java.lang.NumberFormatException;
 import java.net.InetSocketAddress;
 import java.security.KeyStore;
 import java.util.ArrayList;
@@ -10,20 +9,19 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import ch.qos.logback.classic.Level;
 import convex.api.Convex;
-import convex.cli.peer.SessionItem;
 import convex.cli.output.TableOutput;
+import convex.cli.peer.SessionItem;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.init.Init;
-
-
-import ch.qos.logback.classic.Level;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import convex.core.util.Utils;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -60,7 +58,7 @@ public class Main implements Runnable {
 	private static Logger log = LoggerFactory.getLogger(Main.class);
 
 
-	private static CommandLine commandLine;
+	CommandLine commandLine=new CommandLine(this);
 	public TableOutput output;
 
 	@Option(names={ "-c", "--config"},
@@ -124,7 +122,7 @@ public class Main implements Runnable {
 	 * @return Process result value
 	 */
 	public int execute(String[] args) {
-		commandLine = new CommandLine(this)
+		commandLine
 		.setUsageHelpLongOptionsMaxWidth(40)
 		.setUsageHelpWidth(40 * 4);
 
@@ -150,11 +148,9 @@ public class Main implements Runnable {
 		int result = 0;
 		try {
 			result = commandLine.execute(args);
-			output.writeToStream(commandLine.getOut());
-
 		} catch (Throwable t) {
-			log.error("Error executing command line: {}",t.getMessage());
-			return ExitCodes.FATAL;
+			System.err.println(t.getMessage());
+			return ExitCodes.getExitCode(t);
 		}
 		return result;
 	}
@@ -177,8 +173,25 @@ public class Main implements Runnable {
 		return null;
 	}
 
+	/**
+	 * Get the currently configured password for the keystore. Will emit warning and default to
+	 * blank password if not provided
+	 * @return Password string
+	 */
 	public String getPassword() {
+		if (password==null) {
+			log.warn("No password for keystore: defaulting to blank password");
+			password="";
+		}
 		return password;
+	}
+	
+	/**
+	 * Sets the currently defined keystore password
+	 * @param password Password to use
+	 */
+	public void setPassword(String password) {
+		this.password=password;
 	}
 
 	public String getKeyStoreFilename() {
@@ -195,28 +208,36 @@ public class Main implements Runnable {
 		return null;
 	}
 
-	public KeyStore loadKeyStore(boolean isCreate) throws Error {
-		KeyStore keyStore = null;
-		if (password == null || password.isEmpty()) {
-			throw new Error("You need to provide a keystore password");
+	private boolean keyStoreLoaded=false;
+	private KeyStore keyStore=null;
+	
+	public KeyStore getKeystore() {
+		if (keyStoreLoaded==false) {
+			keyStore=loadKeyStore(false);
 		}
+		return keyStore;
+	}
+	
+	/**
+	 * Loads the currently configured get Store
+	 * @param isCreate Flag to indicate if keystore should be craeted f absent
+	 * @return KeyStore instance, or null if does not exist
+	 */
+	KeyStore loadKeyStore(boolean isCreate)  {
+		String password=getPassword();
 		File keyFile = new File(getKeyStoreFilename());
 		try {
 			if (keyFile.exists()) {
 				keyStore = PFXTools.loadStore(keyFile, password);
+			} else if (isCreate) {
+				log.warn("No keystore exists, creating at: "+keyFile.getCanonicalPath());
+				Helpers.createPath(keyFile);
+				keyStore = PFXTools.createStore(keyFile, password);
 			}
-			else {
-				if (isCreate) {
-					Helpers.createPath(keyFile);
-					keyStore = PFXTools.createStore(keyFile, password);
-				}
-				else {
-					throw new Error("Cannot find keystore file "+keyFile.getCanonicalPath());
-				}
-			}
-		} catch(Throwable t) {
-			new Error(t);
+		} catch (Throwable t) {
+			throw Utils.sneakyThrow(t);
 		}
+		keyStoreLoaded=true;
 		return keyStore;
 	}
 
@@ -237,10 +258,7 @@ public class Main implements Runnable {
 		if (indexKey > 0) {
 			searchText += " " + indexKey;
 		}
-		if (password == null || password.isEmpty()) {
-			throw new Error("You need to provide a keystore password");
-		}
-
+		String password=getPassword();
 
 		File keyFile = new File(getKeyStoreFilename());
 		try {
@@ -311,6 +329,7 @@ public class Main implements Runnable {
 		return convex;
 	}
 
+	// Generate key pairs and add to store
 	public List<AKeyPair> generateKeyPairs(int count) throws Error {
 		List<AKeyPair> keyPairList = new ArrayList<>(count);
 
@@ -325,11 +344,9 @@ public class Main implements Runnable {
 	}
 
 	public void addKeyPairToStore(AKeyPair keyPair) {
-		// get the password of the key store file
+		// get the password of the key store file (may default to blank)
 		String password = getPassword();
-		if (password == null) {
-			throw new Error("You need to provide a keystore password");
-		}
+
 		// get the key store file
 		File keyFile = new File(getKeyStoreFilename());
 
@@ -352,11 +369,16 @@ public class Main implements Runnable {
 		} catch (Throwable t) {
 			throw new Error("Cannot store the key to the key store "+t);
 		}
+
+	}
+	
+	void saveKeyStore() {
 		// save the keystore file
+		if (keyStore==null) throw new CLIError("Trying to save a keystore that has not been loaded!");
 		try {
-			PFXTools.saveStore(keyStore, keyFile, password);
+			PFXTools.saveStore(keyStore, new File(getKeyStoreFilename()), password);
 		} catch (Throwable t) {
-			throw new Error("Cannot save the key store file "+t);
+			throw Utils.sneakyThrow(t);
 		}
 	}
 
@@ -394,4 +416,10 @@ public class Main implements Runnable {
 			t.printStackTrace();
 		}
 	}
+
+	public void println(String s) {
+		commandLine.getOut().println(s);
+	}
+
+
 }
