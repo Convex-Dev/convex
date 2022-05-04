@@ -63,7 +63,8 @@ public class Main implements Runnable {
 
 	@Option(names={ "-c", "--config"},
 		scope = ScopeType.INHERIT,
-		description="Use the specified config file.%n All parameters to this app can be set by removing the leading '--', and adding"
+		description="Use the specified config file.If not specified, will check ~/.convex/"
+		    + "%n All parameters to this app can be set by removing the leading '--', and adding"
 			+ " a leading 'convex.'.%n So to set the keystore filename you can write 'convex.keystore=my_keystore_filename.dat'%n"
 			+ "To set a sub command such as `./convex peer start index=4` index parameter you need to write 'convex.peer.start.index=4'")
 	private String configFilename;
@@ -154,15 +155,28 @@ public class Main implements Runnable {
 		return result;
 	}
 
-	protected void loadConfig() {
+	/**
+	 * Loads the specified config file.
+	 * @return true if config file correctly loaded, false otherwise (e.g. if it does not exist)
+	 */
+	protected boolean loadConfig() {
+		String filename=null;
 		if (configFilename != null && !configFilename.isEmpty()) {
-			String filename = Helpers.expandTilde(configFilename);
+			filename = Helpers.expandTilde(configFilename);
+		}
+		
+		if (filename!=null) {
 			File configFile = new File(filename);
 			if (configFile.exists()) {
 				PropertiesDefaultProvider defaultProvider = new PropertiesDefaultProvider(configFile);
 				commandLine.setDefaultValueProvider(defaultProvider);
+				return true;
+			} else {
+				log.warn("Config file does not exist: "+configFilename);
+				return false;
 			}
 		}
+		return false;
 	}
 
 	public String getSessionFilename() {

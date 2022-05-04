@@ -16,7 +16,7 @@ public class CLICommandKeyTest {
 	private static final String KEYSTORE_FILENAME;
 	static {
 		try {
-			TEMP_FILE=File.createTempFile("tempKeystore", ".p12");
+			TEMP_FILE=File.createTempFile("tempKeystore", ".pfx");
 			KEYSTORE_FILENAME = TEMP_FILE.getCanonicalPath();
 		} catch (IOException e) {
 			throw Utils.sneakyThrow(e);

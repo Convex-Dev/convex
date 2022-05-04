@@ -25,7 +25,7 @@ import picocli.CommandLine.ParentCommand;
 @Command(name="generate",
 	aliases={"gen"},
 	mixinStandardHelpOptions=true,
-	description="Generate 1 or more private key pairs.")
+	description="Generate private key pairs in the currently configured keystore. Will create a keystore if it does not exist.")
 public class KeyGenerate implements Runnable {
 
 	private static final Logger log = LoggerFactory.getLogger(KeyGenerate.class);
@@ -45,7 +45,7 @@ public class KeyGenerate implements Runnable {
 		Main mainParent = keyParent.mainParent;
 		
 		// check the number of keys to generate.
-		if (count <= 0) {
+		if (count < 0) {
 			log.warn("Unlikely count of keys to generate: "+count);
 			count=0;
 		}
