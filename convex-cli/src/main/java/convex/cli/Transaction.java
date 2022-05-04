@@ -34,11 +34,6 @@ public class Transaction implements Runnable {
 
 	private static final Logger log = LoggerFactory.getLogger(Transaction.class);
 
-	@Option(names={"-i", "--index-key"},
-		defaultValue="0",
-		description="Keystore index of the public/private key to use to run the transaction.")
-	private int keystoreIndex;
-
 	@Option(names={"--public-key"},
 		defaultValue="",
 		description="Hex string of the public key in the Keystore to use to run the transaction.%n"
@@ -72,7 +67,7 @@ public class Transaction implements Runnable {
 
 		AKeyPair keyPair = null;
 		try {
-			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
+			keyPair = mainParent.loadKeyFromStore(keystorePublicKey);
 		} catch (Error e) {
 			mainParent.showError(e);
 			return;
@@ -98,7 +93,7 @@ public class Transaction implements Runnable {
 			ACell message = Reader.read(transactionCommand);
 			ATransaction transaction = Invoke.create(address, -1, message);
 			Result result = convex.transactSync(transaction, timeout);
-			mainParent.output.setResult(result);
+			mainParent.printResult(result);
 		} catch (Throwable t) {
 			mainParent.showError(t);
 		}

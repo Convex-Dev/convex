@@ -66,7 +66,7 @@ public class LocalStart implements Runnable {
 			for (int index = 0; index < values.size(); index ++) {
 				String publicKeyText = values.get(index);
 				try {
-					AKeyPair keyPair = mainParent.loadKeyFromStore(publicKeyText, 0);
+					AKeyPair keyPair = mainParent.loadKeyFromStore(publicKeyText);
 					if (keyPair != null) {
 						keyPairList.add(keyPair);
 					}
@@ -84,7 +84,7 @@ public class LocalStart implements Runnable {
 				int indexKey = Integer.parseInt(values.get(index));
 				if (indexKey > 0) {
 					try {
-						AKeyPair keyPair = mainParent.loadKeyFromStore("", indexKey);
+						AKeyPair keyPair = mainParent.loadKeyFromStore("");
 						if (keyPair != null) {
 							keyPairList.add(keyPair);
 						}

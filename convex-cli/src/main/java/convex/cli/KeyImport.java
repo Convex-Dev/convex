@@ -74,7 +74,7 @@ public class KeyImport implements Runnable {
 			PrivateKey privateKey = PEMTools.decryptPrivateKeyFromPEM(importText, importPassword.toCharArray());
 			AKeyPair keyPair = Ed25519KeyPair.create(privateKey);
 			mainParent.addKeyPairToStore(keyPair);
-			mainParent.output.setField("public key", keyPair.getAccountKey().toHexString());
+			mainParent.println(keyPair.getAccountKey().toHexString());
 
 		} catch (Error e) {
 			mainParent.showError(e);

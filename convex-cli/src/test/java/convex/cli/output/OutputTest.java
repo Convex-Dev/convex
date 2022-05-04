@@ -1,68 +1,37 @@
 package convex.cli.output;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.Address;
-import convex.core.data.prim.CVMLong;
 
 public class OutputTest {
 
 	public static final long TEST_LONG_VALUE = 123456789L;
 	public static final String TEST_STRING_VALUE = "TEST_VALUE";
-	public static final long TEST_ERROR_CODE = 98989898L;
+	public static final long TEST_ADDRESS_VLAUE = 98989898L;
 
 	@Test
 	public void testSetField() {
 
 		StringWriter outputWriter = new StringWriter();
 		PrintWriter printWriter = new PrintWriter(outputWriter);
-		ACell cellValue = Address.create(TEST_LONG_VALUE);
-		TableOutput output = new TableOutput();
-		output.setField("Test-Long", TEST_LONG_VALUE);
-		output.setField("Test-Cell", cellValue);
-		output.setField("Test-String", TEST_STRING_VALUE);
+		ACell cellValue = Address.create(TEST_ADDRESS_VLAUE);
+		TableOutput output = new TableOutput("Test-Long","Test-Cell","Test-String");
+		output.addRow(TEST_LONG_VALUE,cellValue, TEST_STRING_VALUE);
 		output.writeToStream(printWriter);
 		String outputResult = outputWriter.toString();
-		String fullText = String.format("Test-Long: %d\nTest-Cell: #%d\nTest-String: %s\n", TEST_LONG_VALUE, TEST_LONG_VALUE, TEST_STRING_VALUE);
-		assertEquals(fullText, outputResult.replaceAll("\r\n", "\n"));
+		assertTrue(outputResult.contains("12345678"));
+		assertTrue(outputResult.contains("TEST_VALUE"));
+		assertTrue(outputResult.contains("#98989898"));
 	}
 
-	@Test
-	public void testSetResult() {
-		StringWriter outputWriter = new StringWriter();
-		PrintWriter printWriter = new PrintWriter(outputWriter);
-		ACell cellValue = Address.create(TEST_LONG_VALUE);
 
-		TableOutput output = new TableOutput();
-		Result result = Result.create(CVMLong.create(1), cellValue, null);
-		output.setResult(result);
-		output.writeToStream(printWriter);
-		String outputResult = outputWriter.toString();
-		String fullText = String.format("Result: #%d\nData type: Address\n", TEST_LONG_VALUE);
-		assertEquals(fullText, outputResult.replaceAll("\r\n", "\n"));
-	}
-
-	@Test
-	public void testSetResultError() {
-		StringWriter outputWriter = new StringWriter();
-		PrintWriter printWriter = new PrintWriter(outputWriter);
-		ACell cellValue = Address.create(TEST_LONG_VALUE);
-		ACell errorCode = CVMLong.create(TEST_ERROR_CODE);
-		TableOutput output = new TableOutput();
-		Result result = Result.create(CVMLong.create(1), cellValue, errorCode);
-		output.setResult(result);
-		output.writeToStream(printWriter);
-		String outputResult = outputWriter.toString();
-		String fullText = String.format("Result: #%d\nData type: Address\nError code: %d\n", TEST_LONG_VALUE, TEST_ERROR_CODE);
-		assertEquals(fullText, outputResult.replaceAll("\r\n", "\n"));
-	}
 
 
 }

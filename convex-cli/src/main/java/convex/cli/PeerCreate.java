@@ -4,6 +4,7 @@ import java.io.File;
 import java.security.KeyStore;
 
 import convex.api.Convex;
+import convex.cli.output.RecordOutput;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.data.Address;
@@ -116,22 +117,24 @@ public class PeerCreate implements Runnable {
 			ATransaction transaction = Invoke.create(address, -1, message);
 			Result result = convex.transactSync(transaction, timeout);
 			if (result.isError()) {
-                mainParent.output.setResult(result);
+                mainParent.printError(result);
 				return;
 			}
 			long currentBalance = convex.getBalance(address);
 
-			mainParent.output.setField("Public Peer Key", keyPair.getAccountKey().toString());
-			mainParent.output.setField("Address", address.longValue());
-			mainParent.output.setField("Balance", currentBalance);
-			mainParent.output.setField("Inital stake amount", stakeAmount);
 			String shortAccountKey = accountKeyString.substring(0, 6);
+			RecordOutput output=new RecordOutput();
+			
+			output.addField("Public Peer Key", keyPair.getAccountKey().toString());
+			output.addField("Address", address.longValue());
+			output.addField("Balance", currentBalance);
+			output.addField("Inital stake amount", stakeAmount);
 			// System.out.println("You can now start this peer by executing the following line:\n");
 
 			// WARNING not sure about showing the users password..
 			// to make the starting of peers easier, I have left it in for a simple copy/paste
 
-			mainParent.output.setField("Peer start line",
+			output.addField("Peer start line",
 				String.format(
 					"./convex peer start --password=%s --address=%d --public-key=%s",
 					mainParent.getPassword(),
@@ -139,6 +142,7 @@ public class PeerCreate implements Runnable {
 					shortAccountKey
 				)
 			);
+			output.writeToStream(mainParent.commandLine.getOut());
 		} catch (Throwable t) {
 			mainParent.showError(t);
 		}

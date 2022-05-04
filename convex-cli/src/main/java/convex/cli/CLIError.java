@@ -10,4 +10,8 @@ public class CLIError extends RuntimeException {
 		super(message);
 	}
 
+	public CLIError(String message, Throwable cause) {
+		super(message, cause);
+	}
+
 }

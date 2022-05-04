@@ -38,15 +38,13 @@ public class KeyList implements Runnable {
 		try {
 			Enumeration<String> aliases = keyStore.aliases();
 			int index = 1;
-			TableOutput output=new TableOutput();
+			TableOutput output=new TableOutput("Index","Public Key");
 			while (aliases.hasMoreElements()) {
 				String alias = aliases.nextElement();
-				output.setField("Index", String.format("%5d", index));
-				output.setField("Public Key", alias);
-				output.addRow();
+				output.addRow(String.format("%5d", index), alias);
 				index ++;
 			}
-			output.writeToStream(System.out);
+			output.writeToStream(mainParent.commandLine.getOut());
 		} catch (Throwable t) {
 			mainParent.showError(t);
 		}

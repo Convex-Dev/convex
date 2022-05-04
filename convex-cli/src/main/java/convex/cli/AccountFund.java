@@ -32,11 +32,6 @@ public class AccountFund implements Runnable {
 	@ParentCommand
 	private Account accountParent;
 
-	@Option(names={"-i", "--index"},
-		defaultValue="-1",
-		description="Keystore index of the public/private key to use to create an account.")
-	private int keystoreIndex;
-
 	@Option(names={"--public-key"},
 		defaultValue="",
 		description="Hex string of the public key in the Keystore to use to create an account.%n"
@@ -70,7 +65,7 @@ public class AccountFund implements Runnable {
 
 		AKeyPair keyPair = null;
 		try {
-			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
+			keyPair = mainParent.loadKeyFromStore(keystorePublicKey);
 		} catch (Error e) {
 			mainParent.showError(e);
 			return;
@@ -88,7 +83,7 @@ public class AccountFund implements Runnable {
 			convex.transferSync(address, amount);
 			convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
 			Long balance = convex.getBalance(address);
-			mainParent.output.setField("Balance", balance);
+			mainParent.println(balance);
 		} catch (Throwable t) {
 			mainParent.showError(t);
 		}

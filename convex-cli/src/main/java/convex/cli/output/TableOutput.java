@@ -4,53 +4,26 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import convex.core.Result;
-import convex.core.data.ACell;
+import convex.core.util.Text;
+import convex.core.util.Utils;
 
 /*
  * Output class to show results from the CLI
  *
  */
 public class TableOutput {
-
-	protected List<OutputField> fieldList = new ArrayList<OutputField>();
-
-	protected List<List<OutputField>> rowList = new ArrayList<List<OutputField>>();
-
-	public OutputField setField(String name, long value) {
-		return setField(name, String.valueOf(value));
+	public TableOutput(String... fields) {
+		this.fieldList=List.of(fields);
 	}
 
-	public OutputField setField(String name, ACell value) {
-		return setField(name, value.toString());
-	}
+	protected List<String> fieldList = new ArrayList<String>();
 
-	public OutputField setField(String name, String value) {
-		OutputField field = OutputField.create(name, value);
-		fieldList.add(field);
-		return field;
-	}
+	protected List<List<String>> rowList = new ArrayList<List<String>>();
 
-	public void setResult(Result result) {
-        ACell value = result.getValue();
-		if (value != null) {
-			setField("Result", value);
-			setField("Data type", value.getType().toString());
-		}
-		if (result.isError()) {
-			setField("Error code", result.getErrorCode());
-			if (result.getTrace() != null) {
-				setField("Trace", result.getTrace());
-			}
-			return;
-		}
-	}
-
-	public void addRow() {
-		rowList.add(fieldList);
-		fieldList = new ArrayList<OutputField>();
+	public void addRow(Object... values) {
+		rowList.add(Stream.of(values).map(v->Utils.toString(v)).toList());
 	}
 	
 	public void writeToStream(PrintStream out) {
@@ -58,17 +31,37 @@ public class TableOutput {
 	}
 
 	public void writeToStream(PrintWriter out) {
-		if (rowList.size() > 0) {
-			List<OutputField> firstRow = rowList.get(0);
-			out.println(firstRow.stream().map(OutputField::getDescription).collect(Collectors.joining(" ")));
-			for ( List<OutputField>fieldList : rowList) {
-				out.println(fieldList.stream().map(OutputField::getValue).collect(Collectors.joining(" ")));
+		int cc=fieldList.size();
+		int n=rowList.size();
+		int[] sizes=new int[cc];
+		
+		for (int i=0; i<cc; i++) {
+			sizes[i]=fieldList.get(i).length();
+		}
+		
+		for (int j=0; j<n; j++) {
+			List<String> row=rowList.get(j);
+			for (int i=0; i<cc; i++) {
+				sizes[i]=Math.max(sizes[i],row.get(i).length());
 			}
 		}
-		else {
-			for (OutputField field : fieldList) {
-				out.println(String.format("%s: %s", field.getDescription(), field.getValue()));
+		
+		StringBuilder sb=new StringBuilder();
+		for (int i=0; i<cc; i++) {
+			String s= Text.rightPad(fieldList.get(i), sizes[i]);
+			sb.append(' ');
+			sb.append(s);	
+		}
+		
+		for (int j=0; j<n; j++) {
+			sb.append('\n');
+			List<String> row=rowList.get(j);
+			for (int i=0; i<cc; i++) {
+				String s= Text.rightPad(row.get(i),sizes[i]);
+				sb.append(' ');
+				sb.append(s);	
 			}
 		}
+		out.println(sb.toString());
 	}
 }

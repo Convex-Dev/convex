@@ -3,6 +3,7 @@ package convex.cli;
 import java.util.List;
 
 import convex.api.Convex;
+import convex.cli.output.RecordOutput;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.util.Utils;
@@ -34,11 +35,6 @@ public class AccountCreate implements Runnable {
 	@ParentCommand
 	private Account accountParent;
 
-	@Option(names={"-i", "--index-key"},
-		defaultValue="0",
-		description="Keystore index of the public/private key to use to create an account.")
-	private int keystoreIndex;
-
 	@Option(names={"--public-key"},
 		defaultValue="",
 		description="Hex string of the public key in the Keystore to use to create an account.%n"
@@ -63,26 +59,26 @@ public class AccountCreate implements Runnable {
 	public void run() {
 
 		Main mainParent = accountParent.mainParent;
+		RecordOutput output=new RecordOutput();
 
 		AKeyPair keyPair = null;
 
-		if (keystoreIndex > 0 || !keystorePublicKey.isEmpty()) {
+		if (!keystorePublicKey.isEmpty()) {
 			try {
-				keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
+				keyPair = mainParent.loadKeyFromStore(keystorePublicKey);
 			} catch (Error e) {
 				mainParent.showError(e);
 				return;
 			}
 			if (keyPair == null) {
-				log.warn("cannot find the provided public key");
-				return;
+				throw new CLIError("Cannot find the provided public key in keystore: "+keystorePublicKey);
 			}
 		}
 		if (keyPair == null) {
 			try {
 				List<AKeyPair> keyPairList = mainParent.generateKeyPairs(1);
 				keyPair = keyPairList.get(0);
-				mainParent.output.setField("Public Key", keyPair.getAccountKey().toHexString());
+				output.addField("Public Key", keyPair.getAccountKey().toHexString());
 			}
 			catch (Error e) {
 				mainParent.showError(e);
@@ -96,20 +92,21 @@ public class AccountCreate implements Runnable {
 			convex = mainParent.connectAsPeer(0);
 
 			Address address = convex.createAccountSync(keyPair.getAccountKey());
-			mainParent.output.setField("Address", address.longValue());
+			output.addField("Address", address.longValue());
 			if (isFund) {
 				convex.transferSync(address, Constants.ACCOUNT_FUND_AMOUNT);
 				convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
 				Long balance = convex.getBalance(address);
-				mainParent.output.setField("Balance", balance);
+				output.addField("Balance", balance);
 			}
-			mainParent.output.setField("Account usage",
+			output.addField("Account usage",
 				String.format(
 					"to use this key can use the options --address=%d --public-key=%s",
 					address.toLong(),
 					Utils.toFriendlyHexString(keyPair.getAccountKey().toHexString(), 6)
 				)
 			);
+			output.writeToStream(mainParent.commandLine.getOut());
 		} catch (Throwable t) {
 			mainParent.showError(t);
 		}

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 import convex.api.Convex;
+import convex.cli.output.RecordOutput;
 import convex.cli.peer.SessionItem;
 import convex.core.Result;
 import convex.core.State;
@@ -92,14 +93,16 @@ public class Status implements Runnable {
 			AVector<AccountStatus> accountList = state.getAccounts();
 			BlobMap<AccountKey, PeerStatus> peerList = state.getPeers();
 
-			mainParent.output.setField("State hash", stateHash.toString());
-			mainParent.output.setField("Timestamp",state.getTimeStamp().toString());
-			mainParent.output.setField("Timestamp value", Text.dateFormat(state.getTimeStamp().longValue()));
-			mainParent.output.setField("Global Fees", Text.toFriendlyBalance(state.getGlobalFees().longValue()));
-			mainParent.output.setField("Juice Price", Text.toFriendlyBalance(state.getJuicePrice().longValue()));
-			mainParent.output.setField("Total Funds", Text.toFriendlyBalance(state.computeTotalFunds()));
-			mainParent.output.setField("Number of accounts", accountList.size());
-			mainParent.output.setField("Number of peers", peerList.size());
+			RecordOutput output=new RecordOutput();
+			output.addField("State hash", stateHash.toString());
+			output.addField("Timestamp",state.getTimeStamp().toString());
+			output.addField("Timestamp value", Text.dateFormat(state.getTimeStamp().longValue()));
+			output.addField("Global Fees", Text.toFriendlyBalance(state.getGlobalFees().longValue()));
+			output.addField("Juice Price", Text.toFriendlyBalance(state.getJuicePrice().longValue()));
+			output.addField("Total Funds", Text.toFriendlyBalance(state.computeTotalFunds()));
+			output.addField("Number of accounts", accountList.size());
+			output.addField("Number of peers", peerList.size());
+			mainParent.printRecord(output);
 		} catch (Throwable t) {
 			mainParent.showError(t);
 		}

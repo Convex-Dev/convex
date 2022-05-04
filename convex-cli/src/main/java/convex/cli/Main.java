@@ -14,8 +14,9 @@ import org.slf4j.LoggerFactory;
 
 import ch.qos.logback.classic.Level;
 import convex.api.Convex;
-import convex.cli.output.TableOutput;
+import convex.cli.output.RecordOutput;
 import convex.cli.peer.SessionItem;
+import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.data.AccountKey;
@@ -59,7 +60,6 @@ public class Main implements Runnable {
 
 
 	CommandLine commandLine=new CommandLine(this);
-	public TableOutput output;
 
 	@Option(names={ "-c", "--config"},
 		scope = ScopeType.INHERIT,
@@ -98,7 +98,6 @@ public class Main implements Runnable {
 
 
 	public Main() {
-		output = new TableOutput();
 	}
 
 	@Override
@@ -241,7 +240,7 @@ public class Main implements Runnable {
 		return keyStore;
 	}
 
-	public AKeyPair loadKeyFromStore(String publicKey, int indexKey) throws Error {
+	public AKeyPair loadKeyFromStore(String publicKey) throws Error {
 
 		AKeyPair keyPair = null;
 
@@ -250,14 +249,8 @@ public class Main implements Runnable {
 			publicKeyClean = publicKey.toLowerCase().replaceAll("^0x", "").strip();
 		}
 
-		if ( publicKeyClean.isEmpty() && indexKey <= 0) {
-			return null;
-		}
 
 		String searchText = publicKeyClean;
-		if (indexKey > 0) {
-			searchText += " " + indexKey;
-		}
 		String password=getPassword();
 
 		File keyFile = new File(getKeyStoreFilename());
@@ -267,17 +260,15 @@ public class Main implements Runnable {
 			}
 			KeyStore keyStore = PFXTools.loadStore(keyFile, password);
 
-			int counter = 1;
 			Enumeration<String> aliases = keyStore.aliases();
 
 			while (aliases.hasMoreElements()) {
 				String alias = aliases.nextElement();
-				if (counter == indexKey || (alias.indexOf(publicKeyClean) == 0 && !publicKeyClean.isEmpty())) {
-					log.trace("found keypair " + indexKey + " " + counter + " " + alias + " " + publicKeyClean + " " + alias.indexOf(publicKeyClean));
+				if ((alias.indexOf(publicKeyClean) == 0 && !publicKeyClean.isEmpty())) {
+					log.trace("found keypair " + alias);
 					keyPair = PFXTools.getKeyPair(keyStore, alias, password);
 					break;
 				}
-				counter ++;
 			}
 		} catch (Throwable t) {
 			throw new Error("Cannot load key store "+t);
@@ -316,7 +307,7 @@ public class Main implements Runnable {
 			SessionItem item = Helpers.getSessionItem(getSessionFilename(), peerIndex);
 			AccountKey peerKey = item.getAccountKey();
 			log.debug("peer public key {}", peerKey.toHexString());
-			AKeyPair keyPair = loadKeyFromStore(peerKey.toHexString(), 0);
+			AKeyPair keyPair = loadKeyFromStore(peerKey.toHexString());
 			log.debug("peer key pair {}", keyPair.getAccountKey().toHexString());
 			Address address = Init.getGenesisPeerAddress(peerIndex);
 			log.debug("peer address {}", address);
@@ -419,6 +410,22 @@ public class Main implements Runnable {
 
 	public void println(String s) {
 		commandLine.getOut().println(s);
+	}
+
+	public void printError(Result result) {
+		commandLine.getErr().println(result.toString());
+	}
+	
+	public void printResult(Result result) {
+		commandLine.getOut().println(result.toString());
+	}
+
+	public void printRecord(RecordOutput output) {
+		output.writeToStream(commandLine.getOut());
+	}
+
+	public void println(Object value) {
+		println(Utils.toString(value));
 	}
 
 
