@@ -14,6 +14,7 @@ import com.blade.mvc.annotation.PostRoute;
 import com.blade.mvc.http.Request;
 import com.blade.mvc.http.Response;
 
+import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
@@ -22,9 +23,10 @@ import org.json.simple.parser.ParseException;
 import convex.core.Constants;
 import convex.core.Result;
 import convex.core.State;
+import convex.core.data.ASet;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-
+import convex.core.data.Symbol;
 
 
 @Path
@@ -57,13 +59,44 @@ public class APIController {
 			AccountStatus status = state.getAccount(accountAddress);
 			System.out.println("account status " + status);
 
+			/*
 			String queryString = "(account "+accountAddress+")";
 			Result result = APIServer.convex.querySync(queryString);
 			System.out.println("query " + result.getValue());
+			*/
+			JSONArray exportList = new JSONArray();
+
+			ASet<Symbol> exports = status.getCallableFunctions();
+			for (Symbol s : exports) {
+				exportList.add(s);
+			}
+
+			JSONObject object = new JSONObject();
+			boolean isLibrary = status.isActor() && exportList.size() == 0;
+
+			String userType = "user";
+			if (isLibrary) {
+				userType = "library";
+			}
+			else if (status.isActor()) {
+				userType = "actor";
+			}
+			object.put("environment", new JSONObject(status.getEnvironment()));
+			object.put("address", accountAddress.longValue());
+			object.put("memorySize", status.getMemoryUsage());
+			object.put("accountKey", status.getAccountKey());
+			object.put("balance", status.getBalance());
+			object.put("isLibrary", isLibrary);
+			object.put("controller", status.getController());
+			object.put("isActor", status.isActor());
+			object.put("allowance", status.getMemoryUsage());
+			object.put("exports", exportList);
+			object.put("sequence", status.getSequence());
+			object.put("type", userType);
+			response.text(object.toJSONString());
 		}
-		catch (IOException | TimeoutException | InterruptedException | ExecutionException e) {
+		catch (TimeoutException | InterruptedException | ExecutionException e) {
 			System.out.println("error");
 		}
-		response.text("account info " + address);
 	}
 }

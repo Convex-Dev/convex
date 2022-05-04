@@ -6,19 +6,39 @@
 		<artifactId>convex</artifactId>
 		<version>0.7.6-SNAPSHOT</version>
 	</parent>
-	
+
 	<modelVersion>4.0.0</modelVersion>
-	
+
 	<artifactId>convex-peer</artifactId>
-	
+
 	<name>Convex Peer</name>
 	<description>Convex Peer implementation and APIs</description>
 	<url>https://convex.world</url>
-	
+
 
 	<build>
 		<plugins>
-	
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<version>2.6</version>
+				<executions>
+					<execution>
+						<id>Jar Package</id>
+						<phase>package</phase>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>Jar Tests Package</id>
+						<phase>test</phase>
+						<goals>
+							<goal>test-jar</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 
@@ -28,7 +48,7 @@
 			<artifactId>convex-core</artifactId>
 			<version>${convex.version}</version>
 		</dependency>
-	
+
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter-engine</artifactId>

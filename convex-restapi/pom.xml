@@ -66,6 +66,13 @@
 		</dependency>
 		<dependency>
 			<groupId>world.convex</groupId>
+			<artifactId>convex-peer</artifactId>
+			<version>${convex.version}</version>
+			<type>test-jar</type>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>world.convex</groupId>
 			<artifactId>convex-core</artifactId>
 			<version>${convex.version}</version>
 		</dependency>
@@ -78,6 +85,12 @@
 			<groupId>com.bladejava</groupId>
 			<artifactId>blade-mvc</artifactId>
 			<version>${blade.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-params</artifactId>
+			<version>${junit.version}</version>
+			<scope>test</scope>
 		</dependency>
 	</dependencies>
 </project>
