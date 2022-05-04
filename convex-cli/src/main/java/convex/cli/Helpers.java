@@ -8,6 +8,7 @@ import java.util.Random;
 
 import convex.cli.peer.Session;
 import convex.cli.peer.SessionItem;
+import convex.core.util.Utils;
 
 /**
  *
@@ -112,6 +113,17 @@ public class Helpers {
 			}
 		}
 		return result;
+	}
+
+	public static File createTempFile(String name, String ext) {
+		try {
+			File temp=File.createTempFile(name,ext);
+			temp.deleteOnExit();
+			return temp;
+		} catch (IOException e) {
+			throw Utils.sneakyThrow(e);
+		}
+		
 	}
 }
 

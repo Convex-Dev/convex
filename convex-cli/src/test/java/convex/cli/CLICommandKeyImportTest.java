@@ -1,5 +1,7 @@
 package convex.cli;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import java.io.File;
 import java.io.IOException;
 
@@ -15,13 +17,8 @@ public class CLICommandKeyImportTest {
 	private static final File TEMP_FILE;
 	private static final String KEYSTORE_FILENAME;
 	static {
-		try {
-			TEMP_FILE=File.createTempFile("tempKeystore", ".pfx");
-			KEYSTORE_FILENAME = TEMP_FILE.getCanonicalPath();
-		} catch (IOException e) {
-			throw Utils.sneakyThrow(e);
-		}
-		TEMP_FILE.deleteOnExit();
+		TEMP_FILE=Helpers.createTempFile("tempKeystore", ".pfx");
+		KEYSTORE_FILENAME = TEMP_FILE.getAbsolutePath();
 	}	
 	private static final String KEYSTORE_PASSWORD = "testPassword";
 	private static final String IMPORT_PASSWORD = "testImportPassword";
@@ -41,6 +38,7 @@ public class CLICommandKeyImportTest {
 			"--import-text", pemText, 
 			"--import-password", IMPORT_PASSWORD
 		);
+		assertEquals(ExitCodes.SUCCESS,tester.getResult());
 
 		//tester.assertOutputMatch("public key: " + keyPair.getAccountKey().toHexString());
 
