@@ -57,7 +57,7 @@ public class APIController {
 			State state = futureState.get(timeout, TimeUnit.MILLISECONDS);
 			Address accountAddress = Address.create(address);
 			AccountStatus status = state.getAccount(accountAddress);
-			System.out.println("account status " + status);
+			// System.out.println("account status " + status);
 
 			/*
 			String queryString = "(account "+accountAddress+")";
@@ -84,16 +84,16 @@ public class APIController {
 			object.put("environment", new JSONObject(status.getEnvironment()));
 			object.put("address", accountAddress.longValue());
 			object.put("memorySize", status.getMemoryUsage());
-			object.put("accountKey", status.getAccountKey());
+			object.put("accountKey", status.getAccountKey().toString());
 			object.put("balance", status.getBalance());
 			object.put("isLibrary", isLibrary);
 			object.put("controller", status.getController());
 			object.put("isActor", status.isActor());
-			object.put("allowance", status.getMemoryUsage());
+			object.put("allowance", status.getMemory());
 			object.put("exports", exportList);
 			object.put("sequence", status.getSequence());
 			object.put("type", userType);
-			response.text(object.toJSONString());
+			response.json(object.toJSONString());
 		}
 		catch (TimeoutException | InterruptedException | ExecutionException e) {
 			System.out.println("error");
