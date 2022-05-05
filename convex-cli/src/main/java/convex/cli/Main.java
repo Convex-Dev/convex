@@ -108,20 +108,22 @@ public class Main implements Runnable {
 	}
 
 	/**
-	 * Java main(...) entry point when run as a Java application
+	 * Java main(...) entry point when run as a Java application.
+	 * Exits JVM process with specified exit code
 	 */
 	public static void main(String[] args) {
 		Main mainApp = new Main();
-		int result = mainApp.execute(args);
+		int result = mainApp.mainExecute(args);
 		System.exit(result);
 	}
 
 	/**
-	 * Command line execution entry point. Can be run from Java code.
+	 * Command line execution entry point. Can be run from Java code without 
+	 * terminating the JVM.
 	 * @param args Command line arguments
 	 * @return Process result value
 	 */
-	public int execute(String[] args) {
+	public int mainExecute(String[] args) {
 		commandLine
 		.setUsageHelpLongOptionsMaxWidth(40)
 		.setUsageHelpWidth(40 * 4);
@@ -146,12 +148,7 @@ public class Main implements Runnable {
 		}
 
 		int result = 0;
-		try {
-			result = commandLine.execute(args);
-		} catch (Throwable t) {
-			System.err.println(t.getMessage());
-			return ExitCodes.getExitCode(t);
-		}
+		result = commandLine.execute(args);
 		return result;
 	}
 
