@@ -23,7 +23,6 @@ import picocli.CommandLine.ParentCommand;
  */
 
 @Command(name="create",
-	aliases={"cr"},
 	mixinStandardHelpOptions=true,
 	description="Creates an account using a public/private key from the keystore.%n"
 		+ "You must provide a valid keystore password to the keystore.%n"
@@ -64,26 +63,16 @@ public class AccountCreate implements Runnable {
 		AKeyPair keyPair = null;
 
 		if (!keystorePublicKey.isEmpty()) {
-			try {
-				keyPair = mainParent.loadKeyFromStore(keystorePublicKey);
-			} catch (Error e) {
-				mainParent.showError(e);
-				return;
-			}
+			keyPair = mainParent.loadKeyFromStore(keystorePublicKey);
 			if (keyPair == null) {
 				throw new CLIError("Cannot find the provided public key in keystore: "+keystorePublicKey);
 			}
 		}
+		
 		if (keyPair == null) {
-			try {
-				List<AKeyPair> keyPairList = mainParent.generateKeyPairs(1);
-				keyPair = keyPairList.get(0);
-				output.addField("Public Key", keyPair.getAccountKey().toHexString());
-			}
-			catch (Error e) {
-				mainParent.showError(e);
-				return;
-			}
+			List<AKeyPair> keyPairList = mainParent.generateKeyPairs(1);
+			keyPair = keyPairList.get(0);
+			output.addField("Public Key", keyPair.getAccountKey().toHexString());
 		}
 
 		Convex convex = null;
@@ -108,7 +97,7 @@ public class AccountCreate implements Runnable {
 			);
 			output.writeToStream(mainParent.commandLine.getOut());
 		} catch (Throwable t) {
-			mainParent.showError(t);
+			throw new CLIError("Error creating account",t);
 		}
 	}
 }

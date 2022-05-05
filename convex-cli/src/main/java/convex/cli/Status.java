@@ -3,24 +3,17 @@ package convex.cli;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import convex.api.Convex;
 import convex.cli.output.RecordOutput;
 import convex.cli.peer.SessionItem;
 import convex.core.Result;
-import convex.core.State;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.core.data.AccountKey;
-import convex.core.data.AccountStatus;
-import convex.core.data.BlobMap;
 import convex.core.data.Hash;
-import convex.core.data.PeerStatus;
-import convex.core.store.Stores;
-import convex.core.util.Text;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -73,37 +66,29 @@ public class Status implements Runnable {
 		}
 
 		Convex convex = null;
-		try {
-			convex = mainParent.connectAsPeer(0);
-		} catch (Throwable t) {
-			mainParent.showError(t);
-			return;
-		}
+		convex = mainParent.connectAsPeer(0);
 
 		try {
 			Result result = convex.requestStatus().get(timeout, TimeUnit.MILLISECONDS);
 			AVector<ACell> resultVector = (AVector<ACell>) result.getValue();
 			ABlob stateHash = (ABlob) resultVector.get(1);
 			Hash hash = Hash.wrap(stateHash.getBytes());
-			AVector<ACell> stateWrapper = (AVector<ACell>) convex.acquire(hash, Stores.current()).get(3000,TimeUnit.MILLISECONDS);
-			State state = (State) stateWrapper.get(0);
 
-			state.validate();
-			AVector<AccountStatus> accountList = state.getAccounts();
-			BlobMap<AccountKey, PeerStatus> peerList = state.getPeers();
+			//AVector<AccountStatus> accountList = state.getAccounts();
+			//BlobMap<AccountKey, PeerStatus> peerList = state.getPeers();
 
 			RecordOutput output=new RecordOutput();
 			output.addField("State hash", stateHash.toString());
-			output.addField("Timestamp",state.getTimeStamp().toString());
-			output.addField("Timestamp value", Text.dateFormat(state.getTimeStamp().longValue()));
-			output.addField("Global Fees", Text.toFriendlyBalance(state.getGlobalFees().longValue()));
-			output.addField("Juice Price", Text.toFriendlyBalance(state.getJuicePrice().longValue()));
-			output.addField("Total Funds", Text.toFriendlyBalance(state.computeTotalFunds()));
-			output.addField("Number of accounts", accountList.size());
-			output.addField("Number of peers", peerList.size());
+			//output.addField("Timestamp",state.getTimeStamp().toString());
+			//output.addField("Timestamp value", Text.dateFormat(state.getTimeStamp().longValue()));
+			//output.addField("Global Fees", Text.toFriendlyBalance(state.getGlobalFees().longValue()));
+			//output.addField("Juice Price", Text.toFriendlyBalance(state.getJuicePrice().longValue()));
+			//output.addField("Total Funds", Text.toFriendlyBalance(state.computeTotalFunds()));
+			//output.addField("Number of accounts", accountList.size());
+			//output.addField("Number of peers", peerList.size());
 			mainParent.printRecord(output);
-		} catch (Throwable t) {
-			mainParent.showError(t);
+		} catch (Exception e) {
+			throw new CLIError("Error getting network status",e);
 		}
 	}
 

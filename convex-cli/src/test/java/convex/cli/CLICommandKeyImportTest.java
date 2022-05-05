@@ -14,14 +14,15 @@ import convex.core.util.Utils;
 
 public class CLICommandKeyImportTest {
 
-	private static final File TEMP_FILE;
-	private static final String KEYSTORE_FILENAME;
-	static {
-		TEMP_FILE=Helpers.createTempFile("tempKeystore", ".pfx");
-		KEYSTORE_FILENAME = TEMP_FILE.getAbsolutePath();
-	}	
 	private static final String KEYSTORE_PASSWORD = "testPassword";
 	private static final String IMPORT_PASSWORD = "testImportPassword";
+	
+	private static final File KEYSTORE_FILE;
+	private static final String KEYSTORE_FILENAME;
+	static {
+		KEYSTORE_FILE=Helpers.createTempKeystore("tempKeystore", KEYSTORE_PASSWORD);
+		KEYSTORE_FILENAME = KEYSTORE_FILE.getAbsolutePath();
+	}	
 
 	@Test
 	public void testKeyImport() {
@@ -38,6 +39,7 @@ public class CLICommandKeyImportTest {
 			"--import-text", pemText, 
 			"--import-password", IMPORT_PASSWORD
 		);
+		assertEquals("",tester.getError());
 		assertEquals(ExitCodes.SUCCESS,tester.getResult());
 
 		//tester.assertOutputMatch("public key: " + keyPair.getAccountKey().toHexString());

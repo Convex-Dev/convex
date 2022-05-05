@@ -2,12 +2,14 @@ package convex.cli;
 
 import java.io.File;
 import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
 import convex.cli.peer.Session;
 import convex.cli.peer.SessionItem;
+import convex.core.crypto.PFXTools;
 import convex.core.util.Utils;
 
 /**
@@ -121,6 +123,17 @@ public class Helpers {
 			temp.deleteOnExit();
 			return temp;
 		} catch (IOException e) {
+			throw Utils.sneakyThrow(e);
+		}
+		
+	}
+	
+	public static File createTempKeystore(String name, String password) {
+		try {
+			File temp=File.createTempFile(name,".pfx");
+			PFXTools.createStore(temp, password);
+			return temp;
+		} catch (IOException|GeneralSecurityException e) {
 			throw Utils.sneakyThrow(e);
 		}
 		

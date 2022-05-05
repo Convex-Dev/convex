@@ -54,16 +54,11 @@ public class KeyExport implements Runnable {
 			return;
 		}
 
-		try {
-				String publicKey = keystorePublicKey;
+		String publicKey = keystorePublicKey;
 
-				AKeyPair keyPair = mainParent.loadKeyFromStore(publicKey);
-				String pemText = PEMTools.encryptPrivateKeyToPEM(keyPair.getPrivate(), exportPassword.toCharArray());
+		AKeyPair keyPair = mainParent.loadKeyFromStore(publicKey);
+		String pemText = PEMTools.encryptPrivateKeyToPEM(keyPair.getPrivate(), exportPassword.toCharArray());
 
-				mainParent.println(pemText);
-
-		} catch (Error e) {
-			mainParent.showError(e);
-		}
+		mainParent.println(pemText);
 	}
 }

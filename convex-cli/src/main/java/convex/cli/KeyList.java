@@ -1,6 +1,7 @@
 package convex.cli;
 
 import java.security.KeyStore;
+import java.security.KeyStoreException;
 import java.util.Enumeration;
 
 import org.slf4j.Logger;
@@ -34,19 +35,22 @@ public class KeyList implements Runnable {
 
 		KeyStore keyStore = mainParent.loadKeyStore(false);
 		if (keyStore==null) throw new CLIError("Keystore does not exist. Specify a valid keystore or use `convex key gen` to create one.");
+		Enumeration<String> aliases;
 		try {
-			Enumeration<String> aliases = keyStore.aliases();
-			int index = 1;
+			aliases = keyStore.aliases();
 			TableOutput output=new TableOutput("Index","Public Key");
+			int index = 1;
 			while (aliases.hasMoreElements()) {
 				String alias = aliases.nextElement();
 				output.addRow(String.format("%5d", index), alias);
 				index ++;
 			}
-			output.writeToStream(mainParent.commandLine.getOut());
-		} catch (Throwable t) {
-			mainParent.showError(t);
+		} catch (KeyStoreException e) {
+			throw new CLIError("Unexpected error reading keystore",e);
 		}
+
+		
+
 	}
 
 }

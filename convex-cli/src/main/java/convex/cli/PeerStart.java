@@ -73,12 +73,7 @@ public class PeerStart implements Runnable {
 		PeerManager peerManager = null;
 
 		AKeyPair keyPair = null;
-		try {
-			keyPair = mainParent.loadKeyFromStore(keystorePublicKey);
-		} catch (Error e) {
-			mainParent.showError(e);
-			return;
-		}
+		keyPair = mainParent.loadKeyFromStore(keystorePublicKey);
 
 		if (keyPair == null) {
 			log.warn("cannot load a valid key pair to perform peer start");
@@ -130,7 +125,7 @@ public class PeerStart implements Runnable {
 			peerManager.launchPeer(port, remotePeerHostname, url, bindAddress);
 			peerManager.showPeerEvents();
 		} catch (Throwable t) {
-			mainParent.showError(t);
+			throw new CLIError("Error starting peer",t);
 		}
 	}
 }

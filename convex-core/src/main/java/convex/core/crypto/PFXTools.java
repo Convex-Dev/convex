@@ -44,18 +44,16 @@ public class PFXTools {
 	 * @return New KeyStore instance
 	 */
 	@SuppressWarnings("javadoc")
-	public static KeyStore createStore(File keyFile, String passPhrase) throws KeyStoreException, IOException, NoSuchAlgorithmException, CertificateException {
+	public static KeyStore createStore(File keyFile, String passPhrase) throws GeneralSecurityException, IOException {
 		KeyStore ks = KeyStore.getInstance(KEYSTORE_TYPE);
 
 		// need to load in bouncy castle crypto providers to set/get keys from the keystore
 		Providers.init();
 
 		char[] pwdArray = password(passPhrase);
-		ks.load(null, pwdArray);
+		ks.load(null, pwdArray); // create empty keystore
 
-		try (FileOutputStream fos = new FileOutputStream(keyFile)) {
-		    ks.store(fos, pwdArray);
-		}
+		ks=saveStore(ks,keyFile,passPhrase);
 		return ks;
 	}
 

@@ -24,16 +24,14 @@ import picocli.CommandLine.ParentCommand;
  *
  */
 @Command(name="query",
-	aliases={"qu"},
 	mixinStandardHelpOptions=true,
-	description="Execute a query on the current peer.")
+	description="Execute a user query via the current peer. The query can be any valid Convex Lisp form.")
 public class Query implements Runnable {
 
 	private static final Logger log = LoggerFactory.getLogger(Query.class);
 
 	@ParentCommand
 	protected Main mainParent;
-
 
 	@Option(names={"--port"},
 		description="Port number to connect to a peer.")
@@ -63,19 +61,15 @@ public class Query implements Runnable {
 
 		Convex convex = null;
 
-		try {
-			convex = mainParent.connectToSessionPeer(hostname, port, Address.create(address), null);
-		} catch (Error e) {
-			mainParent.showError(e);
-			return;
-		}
+		convex = mainParent.connectToSessionPeer(hostname, port, Address.create(address), null);
+
 		try {
 			log.info("Executing query: %s\n", queryCommand);
 			ACell message = Reader.read(queryCommand);
 			Result result = convex.querySync(message, timeout);
 			mainParent.printResult(result);
 		} catch (IOException | TimeoutException e) {
-			mainParent.showError(e);
+			throw new CLIError("Error executing query",e);
 		}
 	}
 

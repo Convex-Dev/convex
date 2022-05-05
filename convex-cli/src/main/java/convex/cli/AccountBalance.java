@@ -62,14 +62,16 @@ public class AccountBalance implements Runnable {
 
 		Convex convex = null;
 		Address address = Address.create(addressNumber);
+
+		convex = mainParent.connectToSessionPeer(hostname, port, address, null);
+		String queryCommand = String.format("(balance #%d)", address.longValue());
+		ACell message = Reader.read(queryCommand);
+		
 		try {
-			convex = mainParent.connectToSessionPeer(hostname, port, address, null);
-			String queryCommand = String.format("(balance #%d)", address.longValue());
-			ACell message = Reader.read(queryCommand);
 			Result result = convex.querySync(message, timeout);
 			mainParent.printResult(result);
-		} catch (Throwable t) {
-			mainParent.showError(t);
+		} catch (Exception e) {
+			throw new CLIError("Error executing query",e);
 		}
 	}
 }

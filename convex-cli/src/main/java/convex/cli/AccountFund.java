@@ -64,12 +64,8 @@ public class AccountFund implements Runnable {
 		Main mainParent = accountParent.mainParent;
 
 		AKeyPair keyPair = null;
-		try {
-			keyPair = mainParent.loadKeyFromStore(keystorePublicKey);
-		} catch (Error e) {
-			mainParent.showError(e);
-			return;
-		}
+		keyPair = mainParent.loadKeyFromStore(keystorePublicKey);
+
 
 		if (addressNumber == 0) {
 			log.warn("--address. You need to provide a valid address number");
@@ -85,7 +81,7 @@ public class AccountFund implements Runnable {
 			Long balance = convex.getBalance(address);
 			mainParent.println(balance);
 		} catch (Throwable t) {
-			mainParent.showError(t);
+			throw new CLIError("Error funding account",t);
 		}
 	}
 }

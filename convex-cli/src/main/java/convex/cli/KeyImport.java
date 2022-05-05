@@ -2,8 +2,10 @@ package convex.cli;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
 import java.security.PrivateKey;
 
 import org.slf4j.Logger;
@@ -15,6 +17,7 @@ import picocli.CommandLine.Option;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519KeyPair;
 import convex.core.crypto.PEMTools;
+import convex.core.util.Utils;
 
 
 /**
@@ -54,11 +57,14 @@ public class KeyImport implements Runnable {
 		// sub command to generate keys
 		Main mainParent = keyParent.mainParent;
 		if (importFilename != null && importFilename.length() > 0) {
+			Path path=Paths.get(importFilename);
 			try {
-				importText = Files.readString(Paths.get(importFilename), StandardCharsets.UTF_8);
-			} catch ( IOException e) {
-				mainParent.showError(e);
-				return;
+				if (!path.toFile().exists()) {
+					throw new CLIError("Import file does not exist: "+path);
+				}
+				importText = Files.readString(path, StandardCharsets.UTF_8);
+			} catch (IOException e) {
+				throw new CLIError("Unable to read import file: "+path,e);
 			}
 		}
 		if (importText == null || importText.length() == 0) {
@@ -70,14 +76,13 @@ public class KeyImport implements Runnable {
 			log.warn("You need to provide an import password '--import-password' of the imported encrypted PEM data");
 		}
 
-		try {
-			PrivateKey privateKey = PEMTools.decryptPrivateKeyFromPEM(importText, importPassword.toCharArray());
-			AKeyPair keyPair = Ed25519KeyPair.create(privateKey);
-			mainParent.addKeyPairToStore(keyPair);
-			mainParent.println(keyPair.getAccountKey().toHexString());
-
-		} catch (Error e) {
-			mainParent.showError(e);
-		}
+		// Get the keystore, creating if needed
+		KeyStore keystore=mainParent.getKeystore(true);
+		
+		PrivateKey privateKey = PEMTools.decryptPrivateKeyFromPEM(importText, importPassword.toCharArray());
+		AKeyPair keyPair = Ed25519KeyPair.create(privateKey);
+		mainParent.addKeyPairToStore(keyPair);
+		mainParent.saveKeyStore();
+		mainParent.println(keyPair.getAccountKey().toHexString());
 	}
 }

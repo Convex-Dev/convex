@@ -24,9 +24,8 @@ import picocli.CommandLine.ParentCommand;
  *
  */
 @Command(name="transact",
-	aliases={"tr"},
 	mixinStandardHelpOptions=true,
-	description="Execute a transaction on the network via a peer.")
+	description="Execute a user transaction on the network via a peer.")
 public class Transaction implements Runnable {
 
 	@ParentCommand
@@ -64,14 +63,8 @@ public class Transaction implements Runnable {
 
 	@Override
 	public void run() {
-
 		AKeyPair keyPair = null;
-		try {
-			keyPair = mainParent.loadKeyFromStore(keystorePublicKey);
-		} catch (Error e) {
-			mainParent.showError(e);
-			return;
-		}
+		keyPair = mainParent.loadKeyFromStore(keystorePublicKey);
 
 		if (keyPair == null) {
 			log.warn("cannot load a valid key pair to perform this transaction");
@@ -94,8 +87,8 @@ public class Transaction implements Runnable {
 			ATransaction transaction = Invoke.create(address, -1, message);
 			Result result = convex.transactSync(transaction, timeout);
 			mainParent.printResult(result);
-		} catch (Throwable t) {
-			mainParent.showError(t);
+		} catch (Exception e) {
+			throw new CLIError("Error executing transation",e);
 		}
 	}
 
