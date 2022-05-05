@@ -33,7 +33,6 @@ import picocli.CommandLine.ParentCommand;
  *
  */
 @Command(name="status",
-	aliases={"st"},
 	mixinStandardHelpOptions=true,
 	description="Reports on the current status of the network.")
 public class Status implements Runnable {

@@ -25,6 +25,7 @@ import convex.core.init.Init;
 import convex.core.util.Utils;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.IVersionProvider;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.PropertiesDefaultProvider;
 import picocli.CommandLine.ScopeType;
@@ -43,18 +44,20 @@ import picocli.CommandLine.ScopeType;
 		Transaction.class,
 		CommandLine.HelpCommand.class
 	},
-	mixinStandardHelpOptions=true,
 	usageHelpAutoWidth=true,
 	sortOptions = false,
+	mixinStandardHelpOptions=true,
 	// headerHeading = "Usage:",
 	// synopsisHeading = "%n",
 	descriptionHeading = "%nDescription:%n%n",
 	parameterListHeading = "%nParameters:%n",
 	optionListHeading = "%nOptions:%n",
 	commandListHeading = "%nCommands:%n",
+	versionProvider = Main.VersionProvider.class,
 	description="Convex Command Line Interface")
 
 public class Main implements Runnable {
+
 
 	private static Logger log = LoggerFactory.getLogger(Main.class);
 
@@ -96,7 +99,6 @@ public class Main implements Runnable {
 		scope = ScopeType.INHERIT,
 		description="Show more verbose log information. You can increase verbosity by using multiple -v or -vvv")
 	private boolean[] verbose = new boolean[0];
-
 
 	public Main() {
 	}
@@ -150,6 +152,18 @@ public class Main implements Runnable {
 		int result = 0;
 		result = commandLine.execute(args);
 		return result;
+	}
+	
+	/**
+	 * Version provider class
+	 */
+	public static final class VersionProvider implements IVersionProvider {
+		@Override
+		public String[] getVersion() throws Exception {
+			String s=Main.class.getPackage().getImplementationVersion();
+			return new String[] {s};
+		}
+
 	}
 
 	/**
@@ -420,6 +434,7 @@ public class Main implements Runnable {
 	}
 
 	public void println(String s) {
+		if (s==null) s="null";
 		commandLine.getOut().println(s);
 	}
 
