@@ -7,12 +7,13 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 
-import com.blade.mvc.annotation.GetRoute;
-import com.blade.mvc.annotation.Path;
-import com.blade.mvc.annotation.PathParam;
-import com.blade.mvc.annotation.PostRoute;
-import com.blade.mvc.http.Request;
-import com.blade.mvc.http.Response;
+import com.hellokaton.blade.annotation.Path;
+import com.hellokaton.blade.annotation.request.PathParam;
+import com.hellokaton.blade.annotation.route.GET;
+import com.hellokaton.blade.annotation.route.POST;
+import com.hellokaton.blade.mvc.http.Request;
+import com.hellokaton.blade.mvc.http.Response;
+import com.hellokaton.blade.mvc.ui.ResponseType;
 
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -34,7 +35,7 @@ public class APIController {
 
 	protected long timeout = Constants.DEFAULT_CLIENT_TIMEOUT;
 
-	@PostRoute("/api/v1/createAccount")
+	@POST("/api/v1/createAccount")
 	public void createAccount(Request request, Response response) {
 		String bodyString = request.bodyToString();
 		System.out.println("body string " + bodyString);
@@ -50,13 +51,18 @@ public class APIController {
 		System.out.println("account key " + value);
 	}
 
-	@GetRoute("/api/v1/accounts/:address")
+	@GET(value = "/api/v1/accounts/:address", responseType = ResponseType.JSON)
 	public void getAccount(Response response, @PathParam long address) {
 		try {
 			Future<State> futureState = APIServer.convex.acquireState();
 			State state = futureState.get(timeout, TimeUnit.MILLISECONDS);
 			Address accountAddress = Address.create(address);
 			AccountStatus status = state.getAccount(accountAddress);
+			if (status == null) {
+				response.json("{\"error\":\"unable to get account information for account number: " + address + "\"}");
+				response.badRequest();
+				return;
+			}
 			// System.out.println("account status " + status);
 
 			/*
@@ -96,7 +102,8 @@ public class APIController {
 			response.json(object.toJSONString());
 		}
 		catch (TimeoutException | InterruptedException | ExecutionException e) {
-			System.out.println("error");
+			response.json("{\"error\":\"unable to get account information\"}");
+			response.badRequest();
 		}
 	}
 }

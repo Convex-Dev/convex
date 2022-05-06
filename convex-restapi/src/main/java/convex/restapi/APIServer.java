@@ -2,7 +2,7 @@ package convex.restapi;
 
 import convex.api.Convex;
 
-import com.blade.Blade;
+import com.hellokaton.blade.Blade;
 
 public class APIServer {
 

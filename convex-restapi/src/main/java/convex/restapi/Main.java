@@ -1,6 +1,6 @@
 package convex.restapi;
 
-import com.blade.Blade;
+import com.hellokaton.blade.Blade;
 
 public class Main {
 

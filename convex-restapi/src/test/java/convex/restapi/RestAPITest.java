@@ -95,8 +95,26 @@ public class RestAPITest {
 		assertEquals(result.get("isActor"), false);
 		assertEquals(result.get("isLibrary"), false);
 		assertEquals(result.get("accountKey"),network.HERO_KEYPAIR.getAccountKey().toString());
+	}
 
+	@Test
+	public void getAccountFailAccountNotFound() throws IOException {
+		String url = "http://127.0.0.1:" + PORT + "/api/v1/accounts/10000" ;
+		log.info("getAccountFailAccountNotFound - " + url);
+		HttpUriRequest request = new HttpGet(url);
+		request.addHeader("accept", "application/json");
+		HttpResponse response = HttpClientBuilder.create().build().execute(request);
+		assertEquals(response.getStatusLine().getStatusCode(), 400);
+	}
 
+	@Test
+	public void getAccountFailBadAddress() throws IOException {
+		String url = "http://127.0.0.1:" + PORT + "/api/v1/accounts/bad-address" ;
+		log.info("getAccountFailBadAddress - " + url);
+		HttpUriRequest request = new HttpGet(url);
+		request.addHeader("accept", "application/json");
+		HttpResponse response = HttpClientBuilder.create().build().execute(request);
+		assertEquals(response.getStatusLine().getStatusCode(), 500);
 	}
 
 }
