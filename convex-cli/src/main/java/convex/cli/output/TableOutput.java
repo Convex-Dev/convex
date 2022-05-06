@@ -4,6 +4,7 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import convex.core.util.Text;
@@ -23,9 +24,9 @@ public class TableOutput {
 	protected List<List<String>> rowList = new ArrayList<List<String>>();
 
 	public void addRow(Object... values) {
-		rowList.add(Stream.of(values).map(v->Utils.toString(v)).toList());
+		rowList.add(Stream.of(values).map(v->Utils.toString(v)).collect(Collectors.toList()));
 	}
-	
+
 	public void writeToStream(PrintStream out) {
 		writeToStream(new PrintWriter(out));
 	}
@@ -34,32 +35,32 @@ public class TableOutput {
 		int cc=fieldList.size();
 		int n=rowList.size();
 		int[] sizes=new int[cc];
-		
+
 		for (int i=0; i<cc; i++) {
 			sizes[i]=fieldList.get(i).length();
 		}
-		
+
 		for (int j=0; j<n; j++) {
 			List<String> row=rowList.get(j);
 			for (int i=0; i<cc; i++) {
 				sizes[i]=Math.max(sizes[i],row.get(i).length());
 			}
 		}
-		
+
 		StringBuilder sb=new StringBuilder();
 		for (int i=0; i<cc; i++) {
 			String s= Text.rightPad(fieldList.get(i), sizes[i]);
 			sb.append(' ');
-			sb.append(s);	
+			sb.append(s);
 		}
-		
+
 		for (int j=0; j<n; j++) {
 			sb.append('\n');
 			List<String> row=rowList.get(j);
 			for (int i=0; i<cc; i++) {
 				String s= Text.rightPad(row.get(i),sizes[i]);
 				sb.append(' ');
-				sb.append(s);	
+				sb.append(s);
 			}
 		}
 		out.println(sb.toString());
