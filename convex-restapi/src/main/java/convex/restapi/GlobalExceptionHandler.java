@@ -1,11 +1,7 @@
 package convex.restapi;
 
-import com.hellokaton.blade.exception.BadRequestException;
 import com.hellokaton.blade.ioc.annotation.Bean;
-import com.hellokaton.blade.mvc.WebContext;
 import com.hellokaton.blade.mvc.handler.DefaultExceptionHandler;
-
-import org.json.simple.JSONObject;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -1,6 +1,5 @@
 package convex.restapi;
 
-import java.io.IOException;
 import java.lang.InterruptedException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -24,7 +23,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
-import convex.core.Result;
 import convex.core.State;
 import convex.core.data.ASet;
 import convex.core.data.AccountStatus;
@@ -38,8 +36,6 @@ public class APIController {
 	private static final Logger log = LoggerFactory.getLogger(APIController.class.getName());
 
 	protected long timeout = Constants.DEFAULT_CLIENT_TIMEOUT;
-
-	static final String ERROR_SOURCE = "Server";
 
 	@POST("/api/v1/createAccount")
 	public void createAccount(Request request, Response response) {
@@ -68,13 +64,7 @@ public class APIController {
 				APIResponse.failNotFound("The Account for this Address " + address + " does not exist");
 				return;
 			}
-			// System.out.println("account status " + status);
 
-			/*
-			String queryString = "(account "+accountAddress+")";
-			Result result = APIServer.convex.querySync(queryString);
-			System.out.println("query " + result.getValue());
-			*/
 			JSONArray exportList = new JSONArray();
 
 			ASet<Symbol> exports = status.getCallableFunctions();
