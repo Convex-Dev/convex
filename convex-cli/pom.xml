@@ -37,6 +37,10 @@
 					<archive>
 						<manifest>
 							<mainClass>convex.cli.Main</mainClass>
+							<!-- Used to add Maven implementation version  -->
+							<addDefaultImplementationEntries>
+            					true
+           					</addDefaultImplementationEntries>
 						</manifest>
 					</archive>
 					<descriptorRefs>

@@ -22,7 +22,7 @@ import picocli.CommandLine.ParentCommand;
  */
 
 @Command(name="balance",
-	aliases={"bal", "ba"},
+	aliases={"bal"},
 	mixinStandardHelpOptions=true,
 	description="Get account balance.")
 public class AccountBalance implements Runnable {
@@ -62,14 +62,16 @@ public class AccountBalance implements Runnable {
 
 		Convex convex = null;
 		Address address = Address.create(addressNumber);
+
+		convex = mainParent.connectToSessionPeer(hostname, port, address, null);
+		String queryCommand = String.format("(balance #%d)", address.longValue());
+		ACell message = Reader.read(queryCommand);
+		
 		try {
-			convex = mainParent.connectToSessionPeer(hostname, port, address, null);
-			String queryCommand = String.format("(balance #%d)", address.longValue());
-			ACell message = Reader.read(queryCommand);
 			Result result = convex.querySync(message, timeout);
-			mainParent.output.setResult(result);
-		} catch (Throwable t) {
-			mainParent.showError(t);
+			mainParent.printResult(result);
+		} catch (Exception e) {
+			throw new CLIError("Error executing query",e);
 		}
 	}
 }

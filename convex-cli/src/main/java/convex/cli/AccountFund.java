@@ -32,11 +32,6 @@ public class AccountFund implements Runnable {
 	@ParentCommand
 	private Account accountParent;
 
-	@Option(names={"-i", "--index"},
-		defaultValue="-1",
-		description="Keystore index of the public/private key to use to create an account.")
-	private int keystoreIndex;
-
 	@Option(names={"--public-key"},
 		defaultValue="",
 		description="Hex string of the public key in the Keystore to use to create an account.%n"
@@ -69,12 +64,8 @@ public class AccountFund implements Runnable {
 		Main mainParent = accountParent.mainParent;
 
 		AKeyPair keyPair = null;
-		try {
-			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
-		} catch (Error e) {
-			mainParent.showError(e);
-			return;
-		}
+		keyPair = mainParent.loadKeyFromStore(keystorePublicKey);
+
 
 		if (addressNumber == 0) {
 			log.warn("--address. You need to provide a valid address number");
@@ -88,9 +79,9 @@ public class AccountFund implements Runnable {
 			convex.transferSync(address, amount);
 			convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
 			Long balance = convex.getBalance(address);
-			mainParent.output.setField("Balance", balance);
+			mainParent.println(balance);
 		} catch (Throwable t) {
-			mainParent.showError(t);
+			throw new CLIError("Error funding account",t);
 		}
 	}
 }

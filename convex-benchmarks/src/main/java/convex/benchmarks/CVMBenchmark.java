@@ -23,6 +23,7 @@ import convex.core.transactions.Call;
 import convex.core.transactions.Invoke;
 import convex.core.transactions.Transfer;
 
+
 /**
  * Benchmark for applying transactions to CVM state. This is measuring the end-to-end time for processing
  * transactions themselves on the CVM.
@@ -30,9 +31,31 @@ import convex.core.transactions.Transfer;
  * Skips stuff around transactions, block overhead, signatures etc.
  */
 public class CVMBenchmark {
-	static State STATE=Benchmarks.STATE;
-	static Address HERO=Benchmarks.HERO;
+	static State STATE;
+	static Address HERO;
+	static Address MARKET;
 
+	static { 
+		STATE=Benchmarks.STATE;
+		HERO=Benchmarks.HERO;
+		
+		// Move some USD to Hero
+		Context<?> ctx=Context.createFake(STATE, Init.MAINBANK_ADDRESS);
+		ctx=ctx.eval(Reader.read("(do (import currency.USD :as usd) (fun/transfer usd "+HERO+" 1000000000))"));
+		if (ctx.isError()) throw new Error("Problem moving USD: "+ctx.getError().toString());
+		STATE=ctx.getState();
+
+		// Get a USD MARKET
+		ctx=Context.createFake(STATE, HERO);
+		ctx=ctx.eval(Reader.read("(do (import currency.USD :as usd) "
+				+ "(import torus.exchange :as torus) "
+				+ "(def market (torus/create-market usd)))"));
+		if (ctx.isError()) throw new Error("Problem getting market: "+ctx.getError().toString());
+		MARKET=(Address) ctx.getResult();
+		
+		STATE=ctx.getState();
+	}
+	
 	@Benchmark
 	public void smallTransfer() {
 		State s=STATE;
@@ -85,6 +108,16 @@ public class CVMBenchmark {
 		ATransaction trans=Invoke.create(addr,1, Reader.read("(do (import convex.fungible :as fun) (deploy (fun/build-token {:supply 1000000})))"));
 		Context<ACell>  ctx=s.applyTransaction(trans);
 		ctx.getValue();
+	}
+	
+	static final ATransaction buyTrade=Invoke.create(HERO,1, Reader.read("(torus/buy-tokens usd 10)"));
+	
+	@Benchmark
+	public ACell dexMarketTrade() {
+		State s=STATE;
+		ATransaction trans=buyTrade;
+		Context<ACell>  ctx=s.applyTransaction(trans);
+		return ctx.getResult();
 	}
 
 	@Benchmark

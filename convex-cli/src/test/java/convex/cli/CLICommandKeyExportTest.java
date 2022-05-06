@@ -1,47 +1,58 @@
 package convex.cli;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.io.File;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
-public class CLICommandKeyExportTest {
+import convex.core.crypto.PFXTools;
+import convex.core.data.AccountKey;
+import convex.core.util.Utils;
 
-	private static final String KEYSTORE_FILENAME = "/tmp/tempKeystore.dat";
+public class CLICommandKeyExportTest {
 	private static final String KEYSTORE_PASSWORD = "testPassword";
 	private static final String EXPORT_PASSWORD = "testExportPassword";
 
+	private static final File TEMP_FILE;
+	private static final String KEYSTORE_FILENAME;
+	static {
+		try {
+			TEMP_FILE=Helpers.createTempFile("tempKeystore", ".pfx");
+			PFXTools.createStore(TEMP_FILE, KEYSTORE_PASSWORD);
+			KEYSTORE_FILENAME = TEMP_FILE.getCanonicalPath();
+		} catch (Throwable t) {
+			throw Utils.sneakyThrow(t);
+		} 
+		
+	}
+
 	@Test
-	public void testKeyGenerateList() {
+	public void testKeyGenerateAndExport() {
 
 		// command key.generate
-		CommandLineTester tester =  new CommandLineTester(
+		CLTester tester =  CLTester.run(
 			"key", "generate",
 			"--password", KEYSTORE_PASSWORD,
 			"--keystore", KEYSTORE_FILENAME
 		);
-		tester.assertOutputMatch("^Index Public Key\\s+0");
-		String publicKey = tester.getField("0 ");
-		assertFalse(publicKey.isEmpty());
-		publicKey = publicKey.stripLeading();
+		assertEquals(ExitCodes.SUCCESS,tester.getResult());
 
-		File fp = new File(KEYSTORE_FILENAME);
+		File fp = TEMP_FILE;
 		assertTrue(fp.exists());
-
-		// command key.export index
-		tester =  new CommandLineTester(
-			"key",
-			"export",
-			"--password", KEYSTORE_PASSWORD,
-			"--keystore", KEYSTORE_FILENAME,
-			"--index-key", "1",
-			"--export-password", EXPORT_PASSWORD
-		);
-		tester.assertOutputMatch("ENCRYPTED PRIVATE KEY");
+		
+		// Check output is hex key
+		String output=tester.getOutput().trim();
+		assertEquals(64,output.length());
+		
+		AccountKey ak=AccountKey.fromHex(output);
+		assertNotNull(ak);
+		String publicKey=output;
 
 		// command key.export publicKey
-		tester =  new CommandLineTester(
+		tester =  CLTester.run(
 			"key",
 			"export",
 			"--password", KEYSTORE_PASSWORD,
@@ -49,10 +60,11 @@ public class CLICommandKeyExportTest {
 			"--public-key", publicKey,
 			"--export-password", EXPORT_PASSWORD
 		);
-		tester.assertOutputMatch("ENCRYPTED PRIVATE KEY");
+		assertEquals(ExitCodes.SUCCESS,tester.getResult());
+		// TODO test generated output
 
 		// command key.export publicKey with leading 0x
-		tester =  new CommandLineTester(
+		tester =  CLTester.run(
 			"key",
 			"export",
 			"--password", KEYSTORE_PASSWORD,
@@ -60,7 +72,8 @@ public class CLICommandKeyExportTest {
 			"--public-key", "0x" + publicKey,
 			"--export-password", EXPORT_PASSWORD
 		);
-		tester.assertOutputMatch("ENCRYPTED PRIVATE KEY");
+		assertEquals(ExitCodes.SUCCESS,tester.getResult());
+		// TODO test generated output
 
 
 	}

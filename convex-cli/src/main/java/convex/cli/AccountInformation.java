@@ -1,13 +1,13 @@
 package convex.cli;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import convex.api.Convex;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.lang.Reader;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -15,7 +15,7 @@ import picocli.CommandLine.ParentCommand;
 
 /**
  *
- *  Convex account infomation command
+ *  Convex account information command
  *
  *  convex.account.infomation
  *
@@ -63,15 +63,15 @@ public class AccountInformation implements Runnable {
 
 		Convex convex = null;
 		Address address = Address.create(addressNumber);
-		try {
 			convex = mainParent.connectToSessionPeer(hostname, port, address, null);
             String queryCommand = String.format("(account #%d)", address.longValue());
 			ACell message = Reader.read(queryCommand);
-			Result result = convex.querySync(message, timeout);
-			mainParent.output.setResult(result);
-		} catch (Throwable t) {
-			mainParent.showError(t);
-		}
-
+			Result result;
+			try {
+				result = convex.querySync(message, timeout);
+				mainParent.printResult(result);
+			} catch (Exception e) {
+				throw new CLIError("Timeout executong transaction",e);
+			}
 	}
 }

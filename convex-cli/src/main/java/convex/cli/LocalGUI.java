@@ -28,14 +28,14 @@ public class LocalGUI implements Runnable {
 
 	@Override
 	public void run() {
-		Main mainParent = localParent.mainParent;
+		// Main mainParent = localParent.mainParent;
 
 		log.warn("You will not be able to use some of the CLI 'account' and 'peer' commands.");
 		// sub command to launch peer manager
 		try {
 			Applications.launchApp(convex.gui.manager.PeerGUI.class);
 		} catch (Throwable t) {
-			mainParent.showError(t);
+			throw new CLIError("Error launching GUI",t);
 		}
 	}
 }

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Convex min repository is structured as a multi-module Maven project.
+Convex main repository is structured as a multi-module Maven project.
 
 ## Build and test
 
@@ -13,6 +13,8 @@ mvn clean install
 ## Release preparation
 
 ### Set version information
+
+First set the version number for the new version to be released
 
 ```
 mvn versions:set -DnewVersion='0.7.3'
@@ -37,3 +39,9 @@ mvn clean deploy -DperformRelease
 - Merge to `master` branch
 - Tag Release Commit
 - Push to GitHub!
+
+### Prepare for next develop version
+
+- Merge `master` back into `develop`
+- Create new CHANGELOG "Unreleased" section for next version
+- Run `mvn versions:set -DnewVersion='0.7.4-SNAPSHOT'` for next snapshot version as required 

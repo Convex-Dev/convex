@@ -12,7 +12,6 @@ import picocli.CommandLine.ParentCommand;
  *
  */
 @Command(name="key",
-	aliases={"ke"},
 	subcommands = {
 		KeyImport.class,
 		KeyGenerate.class,

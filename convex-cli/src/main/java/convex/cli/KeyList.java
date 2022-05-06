@@ -1,13 +1,13 @@
 package convex.cli;
 
-import java.io.File;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
 import java.util.Enumeration;
-
-import convex.core.crypto.PFXTools;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import convex.cli.output.TableOutput;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
 
@@ -20,12 +20,11 @@ import picocli.CommandLine.ParentCommand;
  *
  */
 @Command(name="list",
-	aliases={"li"},
 	mixinStandardHelpOptions=true,
 	description="List available key pairs.")
 public class KeyList implements Runnable {
 
-	private static final Logger log = LoggerFactory.getLogger(KeyList.class);
+	static final Logger log = LoggerFactory.getLogger(KeyList.class);
 
 	@ParentCommand
 	protected Key keyParent;
@@ -34,30 +33,24 @@ public class KeyList implements Runnable {
 	public void run() {
 		Main mainParent = keyParent.mainParent;
 
-		String password = mainParent.getPassword();
-		if (password == null) {
-			log.warn("You need to provide a keystore password");
-			return;
-		}
-		File keyFile = new File(mainParent.getKeyStoreFilename());
+		KeyStore keyStore = mainParent.loadKeyStore(false);
+		if (keyStore==null) throw new CLIError("Keystore does not exist. Specify a valid keystore or use `convex key gen` to create one.");
+		Enumeration<String> aliases;
 		try {
-			if (!keyFile.exists()) {
-				log.error("Cannot find keystore file {}", keyFile.getCanonicalPath());
-			}
-			KeyStore keyStore = PFXTools.loadStore(keyFile, password);
-			Enumeration<String> aliases = keyStore.aliases();
+			aliases = keyStore.aliases();
+			TableOutput output=new TableOutput("Index","Public Key");
 			int index = 1;
 			while (aliases.hasMoreElements()) {
 				String alias = aliases.nextElement();
-				mainParent.output.setField("Index", String.format("%5d", index));
-				mainParent.output.setField("Public Key", alias);
-				mainParent.output.addRow();
+				output.addRow(String.format("%5d", index), alias);
 				index ++;
 			}
-
-		} catch (Throwable t) {
-			mainParent.showError(t);
+		} catch (KeyStoreException e) {
+			throw new CLIError("Unexpected error reading keystore",e);
 		}
+
+		
+
 	}
 
 }

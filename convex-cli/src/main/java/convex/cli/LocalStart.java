@@ -70,14 +70,10 @@ public class LocalStart implements Runnable {
 			List<String> values = Helpers.splitArrayParameter(keystorePublicKey);
 			for (int index = 0; index < values.size(); index ++) {
 				String publicKeyText = values.get(index);
-				try {
-					AKeyPair keyPair = mainParent.loadKeyFromStore(publicKeyText, 0);
-					if (keyPair != null) {
-						keyPairList.add(keyPair);
-					}
-				} catch (Error e) {
-					mainParent.showError(e);
-					return;
+
+				AKeyPair keyPair = mainParent.loadKeyFromStore(publicKeyText);
+				if (keyPair != null) {
+					keyPairList.add(keyPair);
 				}
 			}
 		}
@@ -88,14 +84,9 @@ public class LocalStart implements Runnable {
 			for (int index = 0; index < values.size(); index ++) {
 				int indexKey = Integer.parseInt(values.get(index));
 				if (indexKey > 0) {
-					try {
-						AKeyPair keyPair = mainParent.loadKeyFromStore("", indexKey);
-						if (keyPair != null) {
-							keyPairList.add(keyPair);
-						}
-					} catch (Error e) {
-						mainParent.showError(e);
-						return;
+					AKeyPair keyPair = mainParent.loadKeyFromStore("");
+					if (keyPair != null) {
+						keyPairList.add(keyPair);
 					}
 				}
 			}

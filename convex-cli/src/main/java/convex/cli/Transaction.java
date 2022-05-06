@@ -23,21 +23,15 @@ import picocli.CommandLine.ParentCommand;
  *		convex.transaction
  *
  */
-@Command(name="transaction",
-	aliases={"transact", "tr"},
+@Command(name="transact",
 	mixinStandardHelpOptions=true,
-	description="Execute a transaction on the network via a peer.")
+	description="Execute a user transaction on the network via a peer.")
 public class Transaction implements Runnable {
 
 	@ParentCommand
 	protected Main mainParent;
 
 	private static final Logger log = LoggerFactory.getLogger(Transaction.class);
-
-	@Option(names={"-i", "--index-key"},
-		defaultValue="0",
-		description="Keystore index of the public/private key to use to run the transaction.")
-	private int keystoreIndex;
 
 	@Option(names={"--public-key"},
 		defaultValue="",
@@ -69,14 +63,8 @@ public class Transaction implements Runnable {
 
 	@Override
 	public void run() {
-
 		AKeyPair keyPair = null;
-		try {
-			keyPair = mainParent.loadKeyFromStore(keystorePublicKey, keystoreIndex);
-		} catch (Error e) {
-			mainParent.showError(e);
-			return;
-		}
+		keyPair = mainParent.loadKeyFromStore(keystorePublicKey);
 
 		if (keyPair == null) {
 			log.warn("cannot load a valid key pair to perform this transaction");
@@ -98,9 +86,9 @@ public class Transaction implements Runnable {
 			ACell message = Reader.read(transactionCommand);
 			ATransaction transaction = Invoke.create(address, -1, message);
 			Result result = convex.transactSync(transaction, timeout);
-			mainParent.output.setResult(result);
-		} catch (Throwable t) {
-			mainParent.showError(t);
+			mainParent.printResult(result);
+		} catch (Exception e) {
+			throw new CLIError("Error executing transation",e);
 		}
 	}
 

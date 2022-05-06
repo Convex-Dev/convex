@@ -113,6 +113,9 @@ public class Connection {
 	 */
 	public static Connection create(ByteChannel channel, Consumer<Message> receiveAction, AStore store,
 			AccountKey trustedPeerKey) throws IOException {
+		// Needed in case server has incoming connections but no outbound?
+		ensureSelectorLoop(); 
+	
 		return new Connection(channel, receiveAction, store, trustedPeerKey);
 	}
 	
@@ -178,6 +181,8 @@ public class Connection {
 	 */
 	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store,
 			AccountKey trustedPeerKey, int sendBufferSize, int receiveBufferSize) throws IOException, TimeoutException {
+		ensureSelectorLoop();
+		
 		if (store == null)
 			throw new Error("Connection requires a store");
 		SocketChannel clientChannel = SocketChannel.open();
@@ -566,9 +571,10 @@ public class Connection {
 	}
 
 	public synchronized void close() {
-		if (channel != null) {
+		SocketChannel chan = (SocketChannel) channel;
+		if (chan != null) {
 			try {
-				channel.close();
+				chan.close();
 			} catch (IOException e) {
 				// TODO OK to ignore?
 			}
@@ -594,38 +600,35 @@ public class Connection {
 		SocketChannel chan = (SocketChannel) channel;
 		chan.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE, this);
 
-		// start running selector loop after we register for reading!
-		ensureSelectorLoop();
-
 		// seems to be needed to ensure selector sees new connection?
 		selector.wakeup();
 	}
 
+	/**
+	 * Selector object for all client connections
+	 */
 	private static final Selector selector;
 
 	static {
 		try {
+			// System.err.println("Initialising Client selector");
 			selector = Selector.open();
 		} catch (IOException e) {
-			throw new Error(e);
+			throw new Error("Error initialising client selector",e);
 		}
 	}
 
-	public void wakeUp() {
-		selector.wakeup();
-	}
-
-	private static Thread loopThread;
+	private static Thread selectorThread;
 
 	private static void ensureSelectorLoop() {
-		// double checked initialisation
-		if (loopThread == null) {
-			synchronized (Connection.class) {
-				if (loopThread == null) {
-					loopThread = new Thread(selectorLoop, "PeerConnection NIO client selector loop");
+		// Double checked locking. Don't want to start this twice!
+		if (selectorThread==null) {
+			synchronized(Connection.class) {
+				if (selectorThread==null) {
+					selectorThread = new Thread(selectorLoop, "Connection NIO client selector loop");
 					// make this a daemon thread so it shuts down if everything else exits
-					loopThread.setDaemon(true);
-					loopThread.start();
+					selectorThread.setDaemon(true);
+					selectorThread.start();				
 				}
 			}
 		}
@@ -634,11 +637,10 @@ public class Connection {
 	private static Runnable selectorLoop = new Runnable() {
 		@Override
 		public void run() {
-
-			log.debug("Client selector loop started");
+			log.info("Client selector loop starting...");
 			while (true) {
 				try {
-					selector.select(1000);
+					selector.select(300);
 					Set<SelectionKey> keys = selector.selectedKeys();
 					Iterator<SelectionKey> it = keys.iterator();
 					while (it.hasNext()) {

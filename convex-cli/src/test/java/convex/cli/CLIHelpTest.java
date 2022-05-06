@@ -26,8 +26,7 @@ public class CLIHelpTest {
 		assertExecuteCommandLineResult(0, "^Usage: convex local gui \\[-hVv\\]", "local", "gui", "--help");
 		assertExecuteCommandLineResult(0, "^Usage: convex query \\[-hVv\\]", "query", "--help");
 		assertExecuteCommandLineResult(0, "^Usage: convex status \\[-hVv\\]", "status", "--help");
-		assertExecuteCommandLineResult(0, "^Usage: convex transaction \\[-hVv\\]", "transaction", "--help");
-		assertExecuteCommandLineResult(0, "^Usage: convex transaction \\[-hVv\\]", "transact", "--help");
+		assertExecuteCommandLineResult(0, "^Usage: convex transact \\[-hVv\\]", "transact", "--help");
 	}
 
 }

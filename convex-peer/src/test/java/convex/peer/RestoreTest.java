@@ -89,6 +89,7 @@ public class RestoreTest {
 
 		Result tx2=cvx2.transactSync(Invoke.create(HERO,2, Symbols.BALANCE));
 		assertFalse(tx2.isError());
+		cvx2.close();
 
 		State state=s2.getPeer().getConsensusState();
 		assertNotNull(state);
