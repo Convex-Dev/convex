@@ -26,11 +26,8 @@ public class TableOutput {
 		rowList.add(Stream.of(values).map(v->Utils.toString(v)).toList());
 	}
 	
-	public void writeToStream(PrintStream out) {
-		writeToStream(new PrintWriter(out));
-	}
-
-	public void writeToStream(PrintWriter out) {
+	@Override
+	public String toString() {
 		int cc=fieldList.size();
 		int n=rowList.size();
 		int[] sizes=new int[cc];
@@ -62,6 +59,14 @@ public class TableOutput {
 				sb.append(s);	
 			}
 		}
-		out.println(sb.toString());
+		return sb.toString();
+	}
+	
+	public void writeToStream(PrintStream out) {
+		writeToStream(new PrintWriter(out));
+	}
+
+	public void writeToStream(PrintWriter out) {
+		out.println(toString());
 	}
 }
