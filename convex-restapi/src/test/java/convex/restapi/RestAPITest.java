@@ -76,35 +76,37 @@ public class RestAPITest {
 		HttpUriRequest request = new HttpGet(url);
 		request.addHeader("accept", "application/json");
 		HttpResponse response = HttpClientBuilder.create().build().execute(request);
-		assertEquals(response.getStatusLine().getStatusCode(), 200);
+		assertEquals(200, response.getStatusLine().getStatusCode());
 
 		String mimeType = ContentType.getOrDefault(response.getEntity()).getMimeType();
-		assertEquals(mimeType, "application/json");
+		assertEquals("application/json", mimeType);
 
 		String responseBody = EntityUtils.toString(response.getEntity());
 		log.info("response body: " + responseBody);
 		JSONParser parser = new JSONParser();
 		JSONObject parsedObject = (JSONObject) parser.parse(responseBody);
 		JSONObject result = new JSONObject(parsedObject);
-		assertEquals(result.get("sequence"), status.getSequence());
-		assertEquals(result.get("address"), network.HERO.longValue());
-		assertEquals(result.get("memorySize"), status.getMemoryUsage());
-		assertEquals(result.get("allowance"), status.getMemory());
-		assertEquals(result.get("balance"), status.getBalance());
-		assertEquals(result.get("type"), "user");
-		assertEquals(result.get("isActor"), false);
-		assertEquals(result.get("isLibrary"), false);
-		assertEquals(result.get("accountKey"),network.HERO_KEYPAIR.getAccountKey().toString());
+		assertEquals(status.getSequence(), result.get("sequence"));
+		assertEquals(network.HERO.longValue(), result.get("address"));
+		assertEquals(status.getMemoryUsage(), result.get("memorySize"));
+		assertEquals(status.getMemory(), result.get("allowance"));
+		assertEquals(status.getBalance(), result.get("balance"));
+		assertEquals("user", result.get("type"));
+		assertEquals(false, result.get("isActor"));
+		assertEquals(false, result.get("isLibrary"));
+		assertEquals(network.HERO_KEYPAIR.getAccountKey().toString(), result.get("accountKey"));
 	}
 
 	@Test
 	public void getAccountFailAccountNotFound() throws IOException {
-		String url = "http://127.0.0.1:" + PORT + "/api/v1/accounts/10000" ;
+		String url = "http://127.0.0.1:" + PORT + "/api/v1/accounts/100000" ;
 		log.info("getAccountFailAccountNotFound - " + url);
 		HttpUriRequest request = new HttpGet(url);
 		request.addHeader("accept", "application/json");
 		HttpResponse response = HttpClientBuilder.create().build().execute(request);
-		assertEquals(response.getStatusLine().getStatusCode(), 400);
+		assertEquals(404, response.getStatusLine().getStatusCode());
+		String responseBody = EntityUtils.toString(response.getEntity());
+		log.info("response body " + responseBody);
 	}
 
 	@Test
@@ -114,7 +116,9 @@ public class RestAPITest {
 		HttpUriRequest request = new HttpGet(url);
 		request.addHeader("accept", "application/json");
 		HttpResponse response = HttpClientBuilder.create().build().execute(request);
-		assertEquals(response.getStatusLine().getStatusCode(), 500);
+		assertEquals(500, response.getStatusLine().getStatusCode());
+		String responseBody = EntityUtils.toString(response.getEntity());
+		log.info("response body " + responseBody);
 	}
 
 }

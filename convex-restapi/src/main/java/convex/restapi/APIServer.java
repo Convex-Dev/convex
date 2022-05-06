@@ -15,7 +15,7 @@ public class APIServer {
 		APIServer.convex = convex;
 		Blade blade = Blade.of();
 		blade.listen(port);
-		blade.scanPackages("convex.restapi");
-		blade.start();
+		// blade.scanPackages("convex.restapi");
+		blade.start(APIServer.class);
 	}
 }

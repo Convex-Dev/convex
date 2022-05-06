@@ -20,6 +20,8 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
 import convex.core.Result;
@@ -30,10 +32,14 @@ import convex.core.data.Address;
 import convex.core.data.Symbol;
 
 
-@Path
+@Path(responseType = ResponseType.JSON)
 public class APIController {
 
+	private static final Logger log = LoggerFactory.getLogger(APIController.class.getName());
+
 	protected long timeout = Constants.DEFAULT_CLIENT_TIMEOUT;
+
+	static final String ERROR_SOURCE = "Server";
 
 	@POST("/api/v1/createAccount")
 	public void createAccount(Request request, Response response) {
@@ -51,16 +57,15 @@ public class APIController {
 		System.out.println("account key " + value);
 	}
 
-	@GET(value = "/api/v1/accounts/:address", responseType = ResponseType.JSON)
-	public void getAccount(Response response, @PathParam long address) {
+	@GET("/api/v1/accounts/:address")
+	public void getAccount(@PathParam long address) {
 		try {
 			Future<State> futureState = APIServer.convex.acquireState();
 			State state = futureState.get(timeout, TimeUnit.MILLISECONDS);
 			Address accountAddress = Address.create(address);
 			AccountStatus status = state.getAccount(accountAddress);
 			if (status == null) {
-				response.json("{\"error\":\"unable to get account information for account number: " + address + "\"}");
-				response.badRequest();
+				APIResponse.failNotFound("The Account for this Address " + address + " does not exist");
 				return;
 			}
 			// System.out.println("account status " + status);
@@ -99,11 +104,10 @@ public class APIController {
 			object.put("exports", exportList);
 			object.put("sequence", status.getSequence());
 			object.put("type", userType);
-			response.json(object.toJSONString());
+			APIResponse.ok(object);
 		}
 		catch (TimeoutException | InterruptedException | ExecutionException e) {
-			response.json("{\"error\":\"unable to get account information\"}");
-			response.badRequest();
+			APIResponse.failBadRequest("Unable to get account information " + e);
 		}
 	}
 }
