@@ -21,7 +21,6 @@ import picocli.CommandLine.ParentCommand;
  */
 
 @Command(name="start",
-	aliases={"st"},
 	mixinStandardHelpOptions=true,
 	description="Starts a local convex test network.")
 public class LocalStart implements Runnable {
@@ -35,11 +34,6 @@ public class LocalStart implements Runnable {
 		defaultValue = "" + Constants.LOCAL_START_PEER_COUNT,
 		description="Number of local peers to start. Default: ${DEFAULT-VALUE}")
 	private int count;
-
-	@Option(names={"-i", "--index-key"},
-		defaultValue="0",
-		description="One or more keystore index of the public/private key to use to run a peer.")
-	private String[] keystoreIndex;
 
 	@Option(names={"--public-key"},
 		defaultValue="",
@@ -63,26 +57,13 @@ public class LocalStart implements Runnable {
 		// load in the list of public keys to use as peers
 		if (keystorePublicKey.length > 0) {
 			List<String> values = Helpers.splitArrayParameter(keystorePublicKey);
+			
 			for (int index = 0; index < values.size(); index ++) {
 				String publicKeyText = values.get(index);
 
 				AKeyPair keyPair = mainParent.loadKeyFromStore(publicKeyText);
 				if (keyPair != null) {
 					keyPairList.add(keyPair);
-				}
-			}
-		}
-
-		// load in a list of key indexes to use as peers
-		if (keystoreIndex.length > 0) {
-			List<String> values = Helpers.splitArrayParameter(keystoreIndex);
-			for (int index = 0; index < values.size(); index ++) {
-				int indexKey = Integer.parseInt(values.get(index));
-				if (indexKey > 0) {
-					AKeyPair keyPair = mainParent.loadKeyFromStore("");
-					if (keyPair != null) {
-						keyPairList.add(keyPair);
-					}
 				}
 			}
 		}

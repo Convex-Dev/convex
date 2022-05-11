@@ -3,12 +3,23 @@ package convex.cli;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.junit.jupiter.api.Test;
+
+import convex.core.data.Lists;
+
 public class Helper {
 
-
+	@Test 
+	public void testSplitArray() {
+		assertEquals(List.of("a","b","c"),Helpers.splitArrayParameter("a,b","c"));
+		assertEquals(List.of(),Helpers.splitArrayParameter());
+		assertEquals(List.of("a"),Helpers.splitArrayParameter(" a "));
+	}
+	
 	public static void assertExecuteCommandLineResult(int returnCode, String patternText, String ... args) {
 		CLTester tester =  CLTester.run(args);
 		assertEquals(returnCode, tester.getResult());
