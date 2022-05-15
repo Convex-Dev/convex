@@ -348,7 +348,7 @@ public class Main implements Runnable {
 
 		publicKey = publicKey.trim();
 		if (publicKey != null) {
-			publicKey = publicKey.toLowerCase().replaceAll("^0x", "").strip();
+			publicKey = publicKey.toLowerCase().replaceFirst("^0x", "").strip();
 		}
 
 		if (publicKey.isEmpty()) {
