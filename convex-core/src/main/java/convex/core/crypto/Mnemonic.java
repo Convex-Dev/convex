@@ -1,10 +1,13 @@
 package convex.core.crypto;
 
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.HashMap;
 
+import convex.core.data.ABlob;
 import convex.core.data.Blob;
+import convex.core.data.BlobBuilder;
 import convex.core.data.Hash;
 import convex.core.util.Utils;
 
@@ -181,7 +184,8 @@ public class Mnemonic {
 		String[] words = new String[n];
 		for (int i = 0; i < n; i++) {
 			// extract 11 bits for each word
-			int bits = 0x7FF & Utils.extractBits(data, 11, i * 11);
+			int position = bitLength-(i+1)*11;
+			int bits = 0x7FF & Utils.extractBits(data, 11, position);
 			words[i] = WORDS[bits];
 		}
 		StringBuilder sb = new StringBuilder();
@@ -228,11 +232,12 @@ public class Mnemonic {
 			throw new IllegalArgumentException("Insufficient words (" + n + ") to cover bitlength of " + bitLength);
 
 		for (int i = 0; i < n; i++) {
-			String word = words[i];
+			String word = words[i].trim();
 			Integer x = CODES.get(word);
 			if (x == null) throw new IllegalArgumentException(
 					"Can't find word (" + word + ") in mnemonic dictionary for phrase " + phrase);
-			Utils.setBits(result, 11, i * 11, x);
+			int position = bitLength-(i+1)*11;
+			Utils.setBits(result, 11, position, x);
 		}
 
 		return result;
@@ -248,10 +253,33 @@ public class Mnemonic {
 		return encode(bs);
 	}
 
-	public static AKeyPair decodeKeyPair(String s) {
-		byte[] bs = Mnemonic.decode(s, 128);
-		Hash h = Blob.wrap(bs).getContentHash();
+	/**
+	 * Create a keypair from a mnemonic string
+	 * @param mnemonic RFC1751 mnemonic string
+	 * @return Key pair instance
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends AKeyPair> T decodeKeyPair(String mnemonic) {
+		return (T) decodeKeyPair(mnemonic, null);
+	}
+	
+	/**
+	 * Create a keypair from a mnemonic string
+	 * @param mnemonic RFC1751 mnemonic string
+	 * @param passphrase Additional passphrase for specific key (may be null / empty)
+	 * @return Key pair instance
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends AKeyPair> T decodeKeyPair(String mnemonic, String passphrase) {
+		byte[] bs = Mnemonic.decode(mnemonic, 128);
+		BlobBuilder bb=new BlobBuilder();
+		bb.append(bs);
+		if (passphrase!=null) {
+			bb.append(passphrase.getBytes(StandardCharsets.UTF_8));
+		}
+		ABlob b=bb.toBlob();
+		Hash h = b.getContentHash();
 		Ed25519KeyPair kp = Ed25519KeyPair.create(h.getBytes());
-		return kp;
+		return (T) kp;
 	}
 }
