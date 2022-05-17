@@ -173,6 +173,11 @@ public class Mnemonic {
 	private static final HashMap<String, Integer> CODES = buildCodes();
 
 	/**
+	 * Length of each mnemonic word in bits
+	 */
+	private static final int WL=11;
+	
+	/**
 	 * Encode bytes as a mnemonic string
 	 * 
 	 * @param data Byte array to encode
@@ -180,12 +185,12 @@ public class Mnemonic {
 	 */
 	public static String encode(byte[] data) {
 		int bitLength = data.length * 8;
-		int n = (bitLength + 10) / 11;
+		int n = (bitLength + WL-1) / WL;
 		String[] words = new String[n];
 		for (int i = 0; i < n; i++) {
-			// extract 11 bits for each word
-			int position = bitLength-(i+1)*11;
-			int bits = 0x7FF & Utils.extractBits(data, 11, position);
+			// extract WL bits for each word
+			int position = bitLength-(i+1)*WL;
+			int bits = 0x7FF & Utils.extractBits(data, WL, position);
 			words[i] = WORDS[bits];
 		}
 		StringBuilder sb = new StringBuilder();
@@ -208,7 +213,7 @@ public class Mnemonic {
 	}
 
 	private static HashMap<String, Integer> buildCodes() {
-		HashMap<String, Integer> hm = new HashMap<>(3000); // big enough to avoid resize
+		HashMap<String, Integer> hm = new HashMap<>(WORDS.length); // big enough to avoid resize
 		for (int i = 0; i < WORDS.length; i++) {
 			hm.put(WORDS[i], i);
 		}
@@ -222,13 +227,13 @@ public class Mnemonic {
 	 * @return Decoded byte array
 	 */
 	public static byte[] decode(String phrase, int bitLength) {
-		int nByte = (bitLength + 7) / 8;
+		int nByte = (bitLength + 7) / 8; // number of bytes required
 		byte[] result = new byte[nByte];
 
 		phrase = phrase.trim().toLowerCase();
 		String[] words = phrase.split("\\s+");
 		int n = words.length;
-		if (n * 11 < bitLength)
+		if (n * WL < bitLength)
 			throw new IllegalArgumentException("Insufficient words (" + n + ") to cover bitlength of " + bitLength);
 
 		for (int i = 0; i < n; i++) {
@@ -236,8 +241,8 @@ public class Mnemonic {
 			Integer x = CODES.get(word);
 			if (x == null) throw new IllegalArgumentException(
 					"Can't find word (" + word + ") in mnemonic dictionary for phrase " + phrase);
-			int position = bitLength-(i+1)*11;
-			Utils.setBits(result, 11, position, x);
+			int position = bitLength-(i+1)*WL;
+			Utils.setBits(result, WL, position, x);
 		}
 
 		return result;

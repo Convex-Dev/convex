@@ -50,6 +50,9 @@ public class MnemonicTest {
 		byte[] bs = Mnemonic.decode(mnem, 128);
 		assertEquals(16, bs.length);
 		doRoundTripTest(bs);
+		
+		// A new secure random mnemonic should be unique 
+		assertNotEquals(mnem,Mnemonic.createSecureRandom());
 	}
 	
 	@Test

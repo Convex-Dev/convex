@@ -1,23 +1,21 @@
 package convex.cli;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.charset.StandardCharsets;
-import java.security.KeyStore;
 import java.security.PrivateKey;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.ParentCommand;
-import picocli.CommandLine.Option;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519KeyPair;
 import convex.core.crypto.PEMTools;
-import convex.core.util.Utils;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
+import picocli.CommandLine.ParentCommand;
 
 
 /**
@@ -76,9 +74,6 @@ public class KeyImport implements Runnable {
 			log.warn("You need to provide an import password '--import-password' of the imported encrypted PEM data");
 		}
 
-		// Get the keystore, creating if needed
-		KeyStore keystore=mainParent.getKeystore(true);
-		
 		PrivateKey privateKey = PEMTools.decryptPrivateKeyFromPEM(importText, importPassword.toCharArray());
 		AKeyPair keyPair = Ed25519KeyPair.create(privateKey);
 		mainParent.addKeyPairToStore(keyPair);
