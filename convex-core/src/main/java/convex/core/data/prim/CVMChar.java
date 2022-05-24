@@ -53,7 +53,7 @@ public final class CVMChar extends APrimitive {
 	}
 
 	/**
-	 * Gets a {@Link CVMChar} for the given Unicode code point, or null if not valid
+	 * Gets a {@link CVMChar} for the given Unicode code point, or null if not valid
 	 * @param value Unicode code point for the character
 	 * @return CVMChar instance, or null if not valid
 	 */
