@@ -3366,6 +3366,46 @@ public class CoreTest extends ACVMTest {
 	}
 	
 	@Test
+	public void testDeclare() {
+		// Declare creates an environment binding
+		assertTrue(step("(declare bast)").getEnvironment().containsKey(Symbol.create("bast")));
+		
+		// declare allows future definition of value
+		// assertCompileError(step("(defn bp [x] (+ x bzz))")); // TODO: what error type?
+		
+		assertCVMEquals(3,eval("(do (declare bzz) (defn bp [x] (+ x bzz)) (def bzz 2) (bp 1))"));
+		
+		// Empty declare is a no-op w.r.t. state
+		assertEquals(step("(do)").getState(),step("(declare)").getState());
+		
+		// declare allows multiple declarations
+		assertTrue(step("(declare foo bar baz)").getEnvironment().getKeys().containsAll(Sets.of(Symbols.FOO,Symbols.BAR,Symbols.BAZ)));
+		
+		// Declare requires symbols only at compile time
+		assertNotError(step("(declare count)"));
+		
+		assertCastError(step("(declare ~'count)")); // TODO: sanity check??
+		assertCastError(step("(declare 1)"));
+		assertCastError(step("(declare foo 1)"));
+		assertCastError(step("(declare :bar)"));
+		assertCastError(step("(declare \"foo\")"));
+	}
+	
+	
+	@Test
+	public void testDeclareVsDef() {
+		// Normal behaviour with def
+		Context<?> ctx=step("(def foo 1)");
+		assertEquals(CVMLong.ONE,eval(ctx,"foo"));
+		
+		assertUndeclaredError(step(ctx,"bar"));
+		ctx=step("(declare bar)");
+		assertEquals(null,eval(ctx,"bar"));
+		ctx=step("(def bar 2)");
+		assertCVMEquals(2,eval(ctx,"bar"));
+	}
+	
+	@Test
 	public void testDefMeta() {
 		AHashMap<ACell, ACell> FOOMAP = Maps.of(Keywords.FOO, CVMBool.TRUE);
 		AHashMap<ACell, ACell> BARMAP = Maps.of(Keywords.BAR, CVMBool.TRUE);

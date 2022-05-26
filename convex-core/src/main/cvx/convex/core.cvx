@@ -131,12 +131,17 @@
 ;;;;;;;;;; Environment setup
 
 (defmacro declare
-  ^{:doc {:description "Declares symbols in the current environment."
+  ^{:doc {:description "Declares symbols in the current environment. Used for forward declarations."
           :examples    [{:code "(declare forward-decl)"}]
           :signature   [{:params [& syms]
                          :return Nil}]}}
   [& syms]
-  (cons 'do (map (fn [sym] (cons 'def sym [nil])) syms)))
+  (cons 'do (map 
+              (fn [sym] 
+                (cond (symbol? sym)
+                  (list 'def sym nil)
+                  (fail :CAST "declare requires symbols only as arguments"))) 
+              syms)))
 
 
 ;;;;;;;;;; Logic
