@@ -158,6 +158,14 @@ public class Compiler {
 		return (Context<T>) context;
 	}
 
+	/**
+	 * Compiles a Symbol as found in regular code
+	 * @param <R> Return type from Symbol evaluation
+	 * @param <T>
+	 * @param sym Symbol
+	 * @param context
+	 * @return Context with compiled symbol lookup
+	 */
 	@SuppressWarnings("unchecked")
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileSymbol(Symbol sym, Context<?> context) {
 		// First check for lexically defined Symbols

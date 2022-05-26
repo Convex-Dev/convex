@@ -3983,13 +3983,23 @@ public class CoreTest extends ACVMTest {
 		// Local values override specials
 		assertNull(eval("(let [*balance* nil] *balance*)"));
 
-		// TODO: reconsider this, special take priority over enviornment?
+		// TODO: reconsider this, special take priority over environment?
 		assertCVMEquals(ctx.getOffer(),eval("(do (def *offer* :foo) *offer*)"));
 
 		// Alternative behaviour
 		//assertNull(eval("(let [*balance* nil] *balance*)"));
 		//assertEquals(Keywords.FOO,eval("(do (def *balance* :foo) *balance*)"));
 	}
+	
+	@Test
+	public void testSpecialOverride() {
+		// Should be possible to override specials in current environment
+		assertEquals(CVMLong.ONE, eval("(let [*address* 1] *address*)"));
+		
+		// TODO: what should happen here?
+		//assertEquals(eval("*address*"), eval("(do (def *address* 1) *address*)"));
+	}
+
 
 	@Test
 	public void testSpecialCaller() {
@@ -4041,6 +4051,8 @@ public class CoreTest extends ACVMTest {
 	public void testSpecialKey() {
 		assertEquals(InitTest.HERO_KEYPAIR.getAccountKey(), eval("*key*"));
 	}
+	
+
 
 	@Test
 	public void testSpecialJuice() {
