@@ -872,6 +872,7 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(abs nil)"));
 		assertCastError(step("(abs #78)"));
 		assertCastError(step("(abs [1])"));
+		assertCastError(step("(abs \\a)"));
 
 		assertArityError(step("(abs)"));
 		assertArityError(step("(abs :foo :bar)")); // arity > cast
@@ -897,6 +898,7 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(signum 0xabab)"));
 		assertCastError(step("(signum nil)"));
 		assertCastError(step("(signum :foo)"));
+		assertCastError(step("(signum \\a)"));
 
 		// Fun Double cases
 		assertEquals(Double.NaN,evalD("(signum ##NaN)"));
@@ -1068,7 +1070,7 @@ public class CoreTest extends ACVMTest {
 		assertArgumentError(step("(assoc #{} 1 2)"));
 
 		// Standard error cases
-		assertArityError(step("(assoc #{} 1 2 3)"));
+		assertArityError(step("(assoc #{} 1 2 3)")); // arity before cast
 		assertArityError(step("(assoc #{} 1)"));
 	}
 
@@ -1124,7 +1126,6 @@ public class CoreTest extends ACVMTest {
 	public void testAssocFailures() {
 		assertCastError(step("(assoc 1 1 2)"));
 		assertCastError(step("(assoc :foo)"));
-
 
 		// assertCastError(step("(assoc #{} :foo true)"));
 
