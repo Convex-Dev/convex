@@ -28,7 +28,10 @@ import convex.core.transactions.Transfer;
  * Benchmark for applying transactions to CVM state. This is measuring the end-to-end time for processing
  * transactions themselves on the CVM.
  *
- * Skips stuff around transactions, block overhead, signatures etc.
+ * Deliberately skips stuff around block overhead, signatures etc.
+ * This is useful since we expect signatures etc. to be checked in separate threads and
+ * therefore we get a measure of raw CVM performance separate from networking / validation
+ * tasks.
  */
 public class CVMBenchmark {
 	static State STATE;

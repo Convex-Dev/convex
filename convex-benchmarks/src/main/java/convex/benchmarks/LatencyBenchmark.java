@@ -24,6 +24,10 @@ import convex.peer.Server;
 
 /**
  * Benchmark for full round-trip latencies
+ * 
+ * Note: these are for a single client executing transactions sequentially, and are
+ * therefore not useful for measuring overall network throughput (which would have many
+ * clients submitting transactions in parallel).
  */
 public class LatencyBenchmark {
 	

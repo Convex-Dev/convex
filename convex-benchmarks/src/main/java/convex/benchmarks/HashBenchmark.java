@@ -10,6 +10,12 @@ import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.prim.CVMLong;
 
+/**
+ * Benchmarks for hashing performance.
+ * 
+ * Included to test hashing algorithm performance, since this might be a
+ * bottleneck in some scenarios.
+ */
 public class HashBenchmark {
 
 	@Benchmark

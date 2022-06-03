@@ -13,6 +13,16 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import etch.EtchStore;
 
+/**
+ * Benchmarks from the Etch database
+ * 
+ * We are interested in random writes since the use of hashes as database
+ * keys results in a fairly random distribution of write keys.
+ * 
+ * Use of relatively small data size is reasonable since we expect majority of 
+ * reads to be in cache (either recently written, or frequently access data such 
+ * as commonly used libraries or actors).
+ */
 public class EtchBenchmark {
 	
 	static final EtchStore store=EtchStore.createTemp();
