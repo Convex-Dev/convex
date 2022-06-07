@@ -33,6 +33,7 @@ import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.init.InitTest;
 import convex.core.lang.Symbols;
@@ -230,10 +231,12 @@ public class EtchStoreTest {
 	public void testReopen() throws IOException {
 		File file=File.createTempFile("etch",null);
 		EtchStore es=EtchStore.create(file);
-		es.setRootHash(Hash.NULL_HASH);
+		es.setRootData(CVMLong.ONE);
+		assertEquals(CVMLong.ONE,es.getRootData());
 		es.close();
 
 		EtchStore es2=EtchStore.create(file);
-		assertEquals(Hash.NULL_HASH,es2.getRootHash());
+		ACell data=es2.getRootData();
+		assertEquals(CVMLong.ONE,data);
 	}
 }

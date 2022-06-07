@@ -1125,10 +1125,8 @@ public class Server implements Closeable {
 		try {
 			Stores.setCurrent(store);
 			ACell peerData = peer.toData();
-			Ref<?> peerRef = ACell.createPersisted(peerData);
-			Hash peerHash = peerRef.getHash();
-			store.setRootHash(peerHash);
-			log.info( "Stored peer data for Server with hash: {}", peerHash.toHexString());
+			store.setRootData(peerData);
+			log.info( "Stored peer data for Server with hash: {}", peerData.getHash().toHexString());
 		} catch (Throwable e) {
 			log.warn("Failed to persist peer state when closing server: {}" ,e.getMessage());
 		} finally {

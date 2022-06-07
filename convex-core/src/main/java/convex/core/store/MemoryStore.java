@@ -28,7 +28,7 @@ public class MemoryStore extends AStore {
 	 */
 	private final HashMap<Hash, Ref<ACell>> hashRefs = new HashMap<Hash, Ref<ACell>>();
 
-	private Hash rootHash;
+	private ACell rootData;
 
 	@Override
 	@SuppressWarnings("unchecked")
@@ -92,17 +92,23 @@ public class MemoryStore extends AStore {
 
 	@Override
 	public Hash getRootHash() throws IOException {
-		return rootHash;
+		return rootData.getHash();
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public <T extends ACell> T getRootData() throws IOException {
+		return (T) rootData;
 	}
 
 	@Override
-	public void setRootHash(Hash h) {
-		rootHash=h;
+	public void setRootData(ACell data) {
+		rootData=data;
 	}
 
 	@Override
 	public void close() {
 		hashRefs.clear();
-		rootHash=null;
+		rootData=null;
 	}
 }

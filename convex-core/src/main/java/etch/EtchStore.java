@@ -146,7 +146,10 @@ public class EtchStore extends AStore {
 	public <T extends ACell> Ref<T> storeRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus,
 			boolean topLevel) {
 		// first check if the Ref is already persisted to required level
-		if (ref.getStatus() >= requiredStatus) return ref;
+		if (ref.getStatus() >= requiredStatus) {
+			// If toplevel, always persist
+			if (!topLevel) return ref;
+		}
 
 		final ACell cell = ref.getValue();
 		// Quick handling for null
@@ -246,8 +249,13 @@ public class EtchStore extends AStore {
 	}
 
 	@Override
-	public void setRootHash(Hash h) throws IOException {
-		getWriteEtch().setRootHash(h);
+	public void setRootData(ACell data) throws IOException {
+		// Ensure data if persisted at sufficient level
+		Ref<ACell> ref=storeTopRef(data.getRef(), Ref.PERSISTED,null);
+		Hash h=ref.getHash();
+		Etch etch=getWriteEtch();
+		etch.setRootHash(h);
+		etch.writeDataLength(); // ensure data length updated for root data addition
 	}
 
 	/**

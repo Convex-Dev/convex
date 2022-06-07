@@ -9,6 +9,7 @@ import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.MissingDataException;
 
 /**
  * Abstract base class for object storage subsystems
@@ -69,20 +70,33 @@ public abstract class AStore {
 	public abstract <T extends ACell> Ref<T> refForHash(Hash hash);
 
 	/**
-	 * Gets the Root Hash from the Store. Root hash is typically used to store the Peer state
-	 * in situations where the Peer needs to be restored from persistent storage.
+	 * Gets the hash of the root data from the store.
 	 * 
 	 * @return Root hash value from this store.
 	 * @throws IOException In case of store IO error
 	 */
 	public abstract Hash getRootHash() throws IOException;
-
+	
 	/**
-	 * Sets the root hash for this Store
-	 * @param h Root Hash to set
+	 * Gets the Root Data from the Store. Root data is typically used to store the Peer state
+	 * in situations where the Peer needs to be restored from persistent storage.
+	 * 
+	 * @return Root data value from this store.
 	 * @throws IOException In case of store IO error
 	 */
-	public abstract void setRootHash(Hash h) throws IOException;
+	public <T extends ACell> T getRootData() throws IOException {
+		Hash h=getRootHash();
+		Ref<T> ref=refForHash(h);
+		if (ref==null) throw new MissingDataException(this,h);
+		return ref.getValue();
+	}
+
+	/**
+	 * Sets the root data for this Store
+	 * @param data Root data to set
+	 * @throws IOException In case of store IO error
+	 */
+	public abstract void setRootData(ACell data) throws IOException;
 
 	/**
 	 * Closes this store and frees associated resources

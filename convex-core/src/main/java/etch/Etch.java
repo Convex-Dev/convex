@@ -924,6 +924,11 @@ public class Etch {
 		return Hash.wrap(bs);
 	}
 
+	/**
+	 * Writes the root data hash to the Store
+	 * @param h Hash value to write
+	 * @throws IOException
+	 */
 	public synchronized void setRootHash(Hash h) throws IOException {
 		MappedByteBuffer mbb=seekMap(OFFSET_ROOT_HASH);
 		byte[] bs=h.getBytes();
