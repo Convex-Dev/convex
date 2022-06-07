@@ -21,9 +21,9 @@ import convex.core.util.Utils;
 
 
 /**
- * Class providing a simple API to a peer Server.
+ * Class providing a simple API to operate a peer protocol Server.
  *
- * Suitable for library usage, e.g. if a usr application wants to
+ * Suitable for library usage, e.g. if a user application wants to
  * instantiate a local network peer.
  *
  * "If you don't believe it or don't get it , I don't have time to convince you"
@@ -112,7 +112,7 @@ public class API {
 	 * The Peers will have a unique genesis State, i.e. an independent network
 	 *
 	 * @param keyPairs List of keypairs for peers
-	 * @param genesisState GEnesis state for local network
+	 * @param genesisState enesis state for local network
 	 * @param peerPorts Array of ports to use for each peer, if == null then randomly assign port numbers
 	 * @param event Server event handler
 	 *
