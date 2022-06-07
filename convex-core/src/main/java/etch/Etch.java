@@ -41,6 +41,11 @@ import convex.core.util.Utils;
  * To avoid creating too many index blocks when collisions occur, a chained entry list inside is created
  * in unused space in index blocks. Once there is no more space, chains are collapsed to a new index block.
  *
+ * Header of file is 42 bytes as follows:
+ * - Magic number 0xe7c6 (2 bytes)
+ * - Database length in bytes (8 bytes)
+ * - Root hash (32 bytes)
+ * 
  * Pointers in index blocks are of 4 possible types, determined by the two high bits (MSBs):
  * - 00 high bits: pointer to data
  * - 01 high bits: pointer to next index node
@@ -81,10 +86,7 @@ public class Etch {
 	private static final int SIZE_HEADER_ROOT=32;
 
 	/**
-	 * Length of header, including:
-	 * - Magic number "e7c6" (2 bytes)
-	 * - File size (8 bytes)
-	 * - Root hash (32 bytes)
+	 * Length of Etch header
 	 *
 	 * "The Ultimate Answer to Life, The Universe and Everything is... 42!"
      * - Douglas Adams, The Hitchhiker's Guide to the Galaxy
@@ -227,7 +229,7 @@ public class Etch {
 	}
 
 	/**
-	 * Gets the MappedByteBuffer for a given position, seeking to the specified location.
+	 * Gets a MappedByteBuffer for a given position, seeking to the specified location.
 	 * Type flags are ignored if included in the position pointer.
 	 *
 	 * @param position Target position for the MappedByteBuffer
@@ -242,12 +244,19 @@ public class Etch {
 		}
 		int mapIndex=Utils.checkedInt(position/MAX_REGION_SIZE); // 1GB chunks
 
-		MappedByteBuffer mbb=(MappedByteBuffer) getBuffer(mapIndex).duplicate();
+		MappedByteBuffer mbb=(MappedByteBuffer) getInternalBuffer(mapIndex).duplicate();
 		mbb.position(Utils.checkedInt(position-MAX_REGION_SIZE*(long)mapIndex));
 		return mbb;
 	}
 
-	private MappedByteBuffer getBuffer(int regionIndex) throws IOException {
+	/**
+	 * Gets the internal mapped byte buffer for the specified region of the Etch database
+	 * 
+	 * @param regionIndex Index of region 
+	 * @return Mapped Byte Buffer for specified region
+	 * @throws IOException
+	 */
+	private MappedByteBuffer getInternalBuffer(int regionIndex) throws IOException {
 		// Get current mapped region, or null if out of range
 		int regionMapSize=regionMap.size();
 		MappedByteBuffer mbb=(regionIndex<regionMapSize)?regionMap.get(regionIndex):null;
@@ -548,15 +557,12 @@ public class Etch {
 	synchronized void close() {
 		if (!(data.getChannel().isOpen())) return; // already closed
 		try {
-			// write final data length
-			MappedByteBuffer mbb=seekMap(OFFSET_FILE_SIZE);
-			mbb.putLong(dataLength);
-			mbb=null;
+			// Update data length
+			writeDataLength();
 
-			// Force writes to disk. Probably useful.
-			for (MappedByteBuffer m: regionMap) {
-				m.force();
-			}
+			// Send writes to disk
+			flush();
+			
 			regionMap.clear();
 			System.gc();
 
@@ -567,6 +573,17 @@ public class Etch {
 			log.error("Error closing Etch file: "+file);
 			e.printStackTrace();
 		}
+	}
+
+	/**
+	 * Writes the data length field for the Etch file. S
+	 * @throws IOException
+	 */
+	protected void writeDataLength() throws IOException {
+		// write final data length
+		MappedByteBuffer mbb=seekMap(OFFSET_FILE_SIZE);
+		mbb.putLong(dataLength);
+		mbb=null;
 	}
 
 	/**
@@ -882,8 +899,8 @@ public class Etch {
 	}
 
 	/**
-	 * Sets the total db dataLength. This is the last position in the database
-	 * that new data can be writtern too.
+	 * Sets the total db dataLength in memory. This is the last position in the database
+	 * that new data can be written too.
 	 *
 	 * @param value The new data length to be set
 	 *
