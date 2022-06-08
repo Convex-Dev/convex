@@ -86,7 +86,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public static final int MAX_STATUS = INTERNAL;
 	
 	/**
-	 * MAsk for Ref flag bits representing the Status
+	 * Mask for Ref flag bits representing the Status
 	 */
 	public static final int STATUS_MASK = 0x0F;
 	

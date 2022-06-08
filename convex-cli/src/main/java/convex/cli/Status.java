@@ -13,7 +13,6 @@ import convex.core.Result;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.core.data.Hash;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -72,7 +71,7 @@ public class Status implements Runnable {
 			Result result = convex.requestStatus().get(timeout, TimeUnit.MILLISECONDS);
 			AVector<ACell> resultVector = (AVector<ACell>) result.getValue();
 			ABlob stateHash = (ABlob) resultVector.get(1);
-			Hash hash = Hash.wrap(stateHash.getBytes());
+			// Hash hash = Hash.wrap(stateHash.getBytes());
 
 			//AVector<AccountStatus> accountList = state.getAccounts();
 			//BlobMap<AccountKey, PeerStatus> peerList = state.getPeers();

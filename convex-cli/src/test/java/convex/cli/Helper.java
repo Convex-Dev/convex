@@ -9,8 +9,6 @@ import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.data.Lists;
-
 public class Helper {
 
 	@Test 
