@@ -25,7 +25,7 @@ public abstract class ALongBlob extends ABlob {
 	@SuppressWarnings("unchecked")
 	protected <R extends ACell> Ref<R> createRef() {
 		// Create Ref at maximum status to reflect internal embedded nature
-		Ref<ACell> newRef= RefDirect.create(this,cachedHash(),Ref.INTERNAL|Ref.KNOWN_EMBEDDED_MASK);
+		Ref<ACell> newRef= RefDirect.create(this,cachedHash(),Ref.KNOWN_EMBEDDED_MASK);
 		cachedRef=newRef;
 		return (Ref<R>) newRef;
 	}

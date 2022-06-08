@@ -146,7 +146,8 @@ public class EtchStoreTest {
 			counter.set(0L);
 			Ref<Belief> srb=rb.persistShallow(noveltyHandler);
 			assertEquals(Ref.STORED,srb.getStatus());
-			assertEquals(1L,counter.get()); // One cell persisted
+			// One cell persisted, should only be novelty if embedded
+			assertEquals(belief.isEmbedded()?0L:1L,counter.get()); 
 
 			// assertEquals(srb,store.refForHash(rb.getHash()));
 			assertNull(store.refForHash(t1.getRef().getHash()));
@@ -166,7 +167,7 @@ public class EtchStoreTest {
 			counter.set(0L);
 			Ref<Belief> arb=belief.announce(noveltyHandler).getRef();
 			assertEquals(srb,arb);
-			assertEquals(5L,counter.get());
+			assertEquals(4L,counter.get());
 
 			// Announce again. Should be no new novelty
 			counter.set(0L);

@@ -147,7 +147,7 @@ public class EtchStore extends AStore {
 			boolean topLevel) {
 		// first check if the Ref is already persisted to required level
 		if (ref.getStatus() >= requiredStatus) {
-			// If toplevel, always persist
+			// we are done as long as not top level
 			if (!topLevel) return ref;
 		}
 
@@ -202,8 +202,10 @@ public class EtchStore extends AStore {
 				throw Utils.sneakyThrow(e);
 			}
 
-			// call novelty handler if newly persisted
-			if (noveltyHandler != null) noveltyHandler.accept(result);
+			// call novelty handler if newly persisted non-embedded
+			if (noveltyHandler != null) {
+				if (!embedded) noveltyHandler.accept(result);
+			}
 			return (Ref<T>) result;
 		} else {
 			// no need to write, just tag updated status
