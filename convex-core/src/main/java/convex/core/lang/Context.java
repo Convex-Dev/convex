@@ -1500,7 +1500,7 @@ public class Context<T extends ACell> extends AObject {
 	 */
 	public Context<CVMLong> transferMemoryAllowance(Address target, CVMLong amountToSend) {
 		long amount=amountToSend.longValue();
-		if (amount<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative aloowance amount");
+		if (amount<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative allowance amount");
 		if (amount>Constants.MAX_SUPPLY) return withError(ErrorCodes.ARGUMENT,"Can't transfer an allowance amount beyond maximum limit");
 
 		AVector<AccountStatus> accounts=getState().getAccounts();
@@ -1542,7 +1542,7 @@ public class Context<T extends ACell> extends AObject {
 	 */
 	public Context<CVMLong> setMemory(long allowance) {
 		AVector<AccountStatus> accounts=getState().getAccounts();
-		if (allowance<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative aloowance amount");
+		if (allowance<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative allowance amount");
 		if (allowance>Constants.MAX_SUPPLY) return withError(ErrorCodes.ARGUMENT,"Can't transfer an allowance amount beyond maximum limit");
 
 		Address source=getAddress();
