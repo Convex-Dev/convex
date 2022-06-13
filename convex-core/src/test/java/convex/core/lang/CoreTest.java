@@ -2745,6 +2745,9 @@ public class CoreTest extends ACVMTest {
 
 		// staking on an address
 		assertCastError(step(ctx,"(stake *address* 1234)"));
+		
+		// staking on an invalid account key (wrong length)
+		assertArgumentError(step(ctx,"(stake 0x12 1234)"));
 
 		// bad arg types
 		assertCastError(step(ctx,"(stake :foo 1234)"));
