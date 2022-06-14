@@ -50,6 +50,9 @@ public class Symbols {
 	public static final Symbol GT = intern(">");
 	public static final Symbol LE = intern("<=");
 	public static final Symbol GE = intern(">=");
+	
+	public static final Symbol MIN = intern("min");
+	public static final Symbol MAX = intern("max");
 
 	public static final Symbol NOT = intern("not");
 	public static final Symbol OR = intern("or");
@@ -305,6 +308,8 @@ public class Symbols {
 	public static final Symbol PRINT = intern("print");
 	public static final Symbol SPLIT = intern("split");
 	public static final Symbol JOIN = intern("join");
+	
+
 	
 	public static Symbol intern(String s) {
 		AString name=Strings.create(s);

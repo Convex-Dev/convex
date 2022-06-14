@@ -604,60 +604,6 @@
               f
               colls)))
 
-
-
-(defn max
-
-  ^{:doc {:description "Returns the numerical maximum of the given values."
-          :examples    [{:code "(max 1 2 3)"}]
-          :signature   [{:params [& numbers]}]}}
-
-  [fst & more]
-
-  (let [n (count more)]
-    (loop [m (+ fst
-                0)  ;; Adds zero to ensure number.
-           i 0]
-      (cond (>= i
-                n)
-        m
-        (let [v (nth more i)]
-          (and (nan? v)
-               (return v))
-          (recur (cond (> v
-                          m)
-                   v
-                   m)
-                 (inc i)))))))
-
-
-
-(defn min
-
-  ^{:doc {:description "Returns the numerical minimum of the given values."
-          :examples    [{:code "(min 1 2 3)"}]
-          :signature   [{:params [& numbers]}]}}
-
-  [fst & more]
-
-  (let [n (count more)]
-    (loop [m (+ fst 0)
-           i 0]        ;; Adds zero to ensure number.
-      (cond (>= i
-                n)
-        m
-        (let [v (nth more
-                     i)]
-          (and (nan? v)
-               (return v))
-          (recur (cond (< v
-                          m)
-                   v
-                   m)
-                 (inc i)))))))
-
-
-
 (defmacro schedule
 
   ^{:doc {:description "Schedules a transaction for future execution under this account. Expands and compiles code now, but does not execute until the specified timestamp."

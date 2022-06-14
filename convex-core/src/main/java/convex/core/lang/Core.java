@@ -1565,6 +1565,32 @@ public class Core {
 			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
 		}
 	});
+	
+	public static final CoreFn<CVMBool> MIN = reg(new CoreFn<>(Symbols.MIN) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<CVMBool> invoke(Context context, ACell[] args) {
+			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
+
+			ACell result = RT.min(args);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
+
+			return context.withResult(Juice.NUMERIC_COMPARE, result);
+		}
+	});
+	
+	public static final CoreFn<CVMBool> MAX = reg(new CoreFn<>(Symbols.MAX) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<CVMBool> invoke(Context context, ACell[] args) {
+			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
+
+			ACell result = RT.max(args);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
+
+			return context.withResult(Juice.NUMERIC_COMPARE, result);
+		}
+	});
 
 	public static final CoreFn<CVMLong> INC = reg(new CoreFn<>(Symbols.INC) {
 		@SuppressWarnings("unchecked")

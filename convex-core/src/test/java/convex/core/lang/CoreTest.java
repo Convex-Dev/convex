@@ -480,13 +480,19 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(>=)"));
 		assertTrue(evalB("(<)"));
 		assertTrue(evalB("(>)"));
+		
+		// Negative zero special case behaviour
+		assertFalse(evalB("(= -0.0 0.0)"));
+		assertTrue(evalB("(== -0.0 0.0)"));
+
 
 		assertCastError(step("(== nil nil)"));
 		assertCastError(step("(> nil)"));
 		assertCastError(step("(< 1 :foo)"));
 		assertCastError(step("(<= 1 3 \"hello\")"));
 		assertCastError(step("(>= nil 1.0)"));
-
+		assertCastError(step("(>= 'foo)"));
+		
 		// ##NaN behaviour
 		assertFalse(evalB("(<= ##NaN ##NaN)"));
 		assertFalse(evalB("(<= ##NaN 42)"));
@@ -499,6 +505,7 @@ public class CoreTest extends ACVMTest {
 
 		// TODO: decide if we want short-circuiting behaviour on casts? Probably not?
 		// assertCastError(step("(>= 1 2 3 '*balance*)"));
+
 		assertFalse(evalB("(>= 1 2 3 '*balance*)"));
 	}
 
@@ -2887,8 +2894,12 @@ public class CoreTest extends ACVMTest {
 		assertEquals(CVMDouble.NaN, eval("(min 2.0 ##NaN -0.0 ##Inf)"));
 		assertEquals(CVMDouble.NaN, eval("(min ##NaN)"));
 
-		// TODO: Figure out how this should behave. See issue https://github.com/Convex-Dev/convex/issues/99
-		// assertEquals(CVMLong.ONE, eval("(min ##NaN 1 ##NaN)"));
+		// See issue https://github.com/Convex-Dev/convex/issues/99
+		assertEquals(CVMDouble.NaN, eval("(min ##NaN 1 ##NaN)"));
+		
+		// min and max should preserve sign on zero
+		// See: https://github.com/Convex-Dev/convex/issues/366
+		assertEquals(CVMDouble.NEGATIVE_ZERO,eval("(min -0.0)"));
 
 		assertCastError(step("(min true)"));
 		assertCastError(step("(min \\c)"));
@@ -2912,6 +2923,13 @@ public class CoreTest extends ACVMTest {
 		assertEquals(CVMDouble.NaN, eval("(max 1 2.5 ##NaN)"));
 
 		assertArityError(step("(max)"));
+		
+		assertEquals(CVMDouble.NaN, eval("(max ##NaN 1)"));
+		
+		// min and max should preserve sign on zero
+		// See: https://github.com/Convex-Dev/convex/issues/366
+		assertEquals(CVMDouble.NEGATIVE_ZERO,eval("(max -0.0)"));
+
 	}
 
 	@Test

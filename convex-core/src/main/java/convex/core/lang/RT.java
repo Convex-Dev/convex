@@ -172,7 +172,68 @@ public class RT {
 		}
 		return true;
 	}
-
+	
+	/**
+	 * Gets the minimum of a set of numeric values
+	 * @param values Arguments for which to compute minimum value
+	 * @return minimum value, or null if any argument is non-numeric
+	 */
+	public static ACell min(ACell[] values) {
+		ACell acc=values[0];
+		if (!isNumber(acc)) return null;
+		for (int i = 1; i < values.length; i++) {
+			ACell next=values[i];
+			acc=min(acc,next);
+		}
+		return acc;
+	}
+	
+	/**
+	 * Gets the minimum of two numeric values
+	 * @param a First value
+	 * @param b Second value
+	 * @return minimum value, or null if any argument is non-numeric
+	 */
+	public static ACell min(ACell a, ACell b) {
+		if (a==null) return null;
+		Long comp=RT.compare(a, b, Long.MIN_VALUE);
+		if (comp==null) return null; // bailout on non-numerics
+		if (Long.MIN_VALUE==comp) return CVMDouble.NaN;
+		if (comp>0) return b;
+		return a;
+	}
+	
+	/**
+	 * Gets the minimum of a set of numeric values
+	 * @param values Arguments for which to compute minimum value
+	 * @return minimum value, or null if any argument is non-numeric
+	 */
+	public static ACell max(ACell[] values) {
+		ACell acc=values[0];
+		if (!isNumber(acc)) return null;
+		for (int i = 1; i < values.length; i++) {
+			ACell next=values[i];
+			acc=max(acc,next);
+		}
+		return acc;
+	}
+	
+	/**
+	 * Gets the minimum of two numeric values
+	 * @param a First value
+	 * @param b Second value
+	 * @return minimum value, or null if any argument is non-numeric
+	 */
+	public static ACell max(ACell a, ACell b) {
+		if (a==null) return null;
+		Long comp=RT.compare(a, b, Long.MIN_VALUE);
+		if (comp==null) return null; // bailout on non-numerics
+		if (Long.MIN_VALUE==comp) return CVMDouble.NaN;
+		if (comp<0) return b;
+		return a;
+	}
+	
+	
 	/**
 	 * Get the target common numeric type for a given set of arguments. - Integers
 	 * upcast to Long - Anything else upcasts to Double
@@ -457,7 +518,7 @@ public class RT {
 	 * @param b        Second numeric value
 	 * @param nanValue Value to return in case of a NaN result
 	 * @return Less than 0 if a is smaller, greater than 0 if a is larger, 0 if a
-	 *         equals b
+	 *         equals b, null if either value non-numeric
 	 */
 	public static Long compare(ACell a, ACell b, Long nanValue) {
 		Class<?> ca = numericType(a);
@@ -522,7 +583,9 @@ public class RT {
 	}
 
 	/**
-	 * Tests if a Value is a valid numerical value
+	 * Tests if a Value is a valid numerical value type. 
+	 * 
+	 * Note: Returns false for null, but true for NaN
 	 * 
 	 * @param val Value to test
 	 * @return True if a number, false otherwise
