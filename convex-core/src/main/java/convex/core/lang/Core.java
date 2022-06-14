@@ -1508,10 +1508,10 @@ public class Core {
 		@Override
 		public  Context<CVMBool> invoke(Context context, ACell[] args) {
 			// all arities OK, but need to watch for non-numeric arguments
-			Boolean result = RT.eq(args);
+			CVMBool result = RT.eq(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 
-			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
+			return context.withResult(Juice.NUMERIC_COMPARE, result);
 		}
 	});
 
@@ -1520,10 +1520,10 @@ public class Core {
 		@Override
 		public  Context<CVMBool> invoke(Context context, ACell[] args) {
 			// all arities OK
-			Boolean result = RT.ge(args);
+			CVMBool result = RT.ge(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 
-			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
+			return context.withResult(Juice.NUMERIC_COMPARE, result);
 		}
 	});
 
@@ -1533,10 +1533,10 @@ public class Core {
 		public  Context<CVMBool> invoke(Context context, ACell[] args) {
 			// all arities OK
 
-			Boolean result = RT.gt(args);
+			CVMBool result = RT.gt(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 
-			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
+			return context.withResult(Juice.NUMERIC_COMPARE, result);
 		}
 	});
 
@@ -1546,10 +1546,10 @@ public class Core {
 		public  Context<CVMBool> invoke(Context context, ACell[] args) {
 			// all arities OK
 
-			Boolean result = RT.le(args);
+			CVMBool result = RT.le(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 
-			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
+			return context.withResult(Juice.NUMERIC_COMPARE, result);
 		}
 	});
 
@@ -1559,10 +1559,10 @@ public class Core {
 		public  Context<CVMBool> invoke(Context context, ACell[] args) {
 			// all arities OK
 
-			Boolean result = RT.lt(args);
+			CVMBool result = RT.lt(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 
-			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
+			return context.withResult(Juice.NUMERIC_COMPARE, result);
 		}
 	});
 	

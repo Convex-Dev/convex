@@ -81,96 +81,91 @@ public class RT {
 	 * 
 	 * @return Boolean result, or null if the values are not comparable
 	 */
-	private static Boolean checkShortCompare(ACell[] values) {
+	private static CVMBool checkShortCompare(ACell[] values) {
 		int len = values.length;
 		if (len == 0)
-			return true;
+			return CVMBool.TRUE;
 		if (len == 1) {
 			if (null == RT.ensureNumber(values[0]))
 				return null; // cast failure
-			return true;
+			return CVMBool.TRUE;
 		}
-		return false;
+		return CVMBool.FALSE;
 	}
 
-	public static Boolean eq(ACell[] values) {
-		Boolean check = checkShortCompare(values);
+	public static CVMBool eq(ACell[] values) {
+		CVMBool check = checkShortCompare(values);
 		if (check == null)
 			return null;
-		if (check)
-			return true;
+		if (check==CVMBool.TRUE) return check;
 		for (int i = 0; i < values.length - 1; i++) {
 			Long comp = RT.compare(values[i], values[i + 1], Long.MAX_VALUE);
 			if (comp == null)
 				return null; // cast error
 			if (comp != 0)
-				return false;
+				return CVMBool.FALSE;
 		}
-		return true;
+		return CVMBool.TRUE;
 	}
 
-	public static Boolean ge(ACell[] values) {
-		Boolean check = checkShortCompare(values);
+	public static CVMBool ge(ACell[] values) {
+		CVMBool check = checkShortCompare(values);
 		if (check == null)
 			return null;
-		if (check)
-			return true;
+		if (check==CVMBool.TRUE) return check;
 		for (int i = 0; i < values.length - 1; i++) {
 			Long comp = RT.compare(values[i], values[i + 1], Long.MIN_VALUE);
 			if (comp == null)
 				return null; // cast error
 			if (comp < 0)
-				return false;
+				return CVMBool.FALSE;
 		}
-		return true;
+		return CVMBool.TRUE;
 	}
 
-	public static Boolean gt(ACell[] values) {
-		Boolean check = checkShortCompare(values);
+	public static CVMBool gt(ACell[] values) {
+		CVMBool check = checkShortCompare(values);
 		if (check == null)
 			return null;
-		if (check)
-			return true;
+		if (check==CVMBool.TRUE) return check;
 		for (int i = 0; i < values.length - 1; i++) {
 			Long comp = RT.compare(values[i], values[i + 1], Long.MIN_VALUE);
 			if (comp == null)
 				return null; // cast error
 			if (comp <= 0)
-				return false;
+				return CVMBool.FALSE;
 		}
-		return true;
+		return CVMBool.TRUE;
 	}
 
-	public static Boolean le(ACell[] values) {
-		Boolean check = checkShortCompare(values);
+	public static CVMBool le(ACell[] values) {
+		CVMBool check = checkShortCompare(values);
 		if (check == null)
 			return null;
-		if (check)
-			return true;
+		if (check==CVMBool.TRUE) return check;
 		for (int i = 0; i < values.length - 1; i++) {
 			Long comp = RT.compare(values[i], values[i + 1], Long.MAX_VALUE);
 			if (comp == null)
 				return null; // cast error
 			if (comp > 0)
-				return false;
+				return CVMBool.FALSE;
 		}
-		return true;
+		return CVMBool.TRUE;
 	}
 
-	public static Boolean lt(ACell[] values) {
-		Boolean check = checkShortCompare(values);
+	public static CVMBool lt(ACell[] values) {
+		CVMBool check = checkShortCompare(values);
 		if (check == null)
 			return null;
-		if (check)
-			return true;
+		if (check==CVMBool.TRUE) return check;
 		for (int i = 0; i < values.length - 1; i++) {
 			Long comp = RT.compare(values[i], values[i + 1], Long.MAX_VALUE);
 			if (comp == null)
 				return null; // cast error
 			if (comp >= 0)
-				return false;
+				return CVMBool.FALSE;
 		}
-		return true;
+		return CVMBool.TRUE;
 	}
 	
 	/**
@@ -517,7 +512,7 @@ public class RT {
 	 * @param a        First numeric value
 	 * @param b        Second numeric value
 	 * @param nanValue Value to return in case of a NaN result
-	 * @return Less than 0 if a is smaller, greater than 0 if a is larger, 0 if a
+	 * @return -1 if a is smaller, 1 if a is larger, 0 if a
 	 *         equals b, null if either value non-numeric
 	 */
 	public static Long compare(ACell a, ACell b, Long nanValue) {
