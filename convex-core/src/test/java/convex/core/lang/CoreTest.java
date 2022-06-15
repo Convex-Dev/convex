@@ -2900,12 +2900,14 @@ public class CoreTest extends ACVMTest {
 		// min and max should preserve sign on zero
 		// See: https://github.com/Convex-Dev/convex/issues/366
 		assertEquals(CVMDouble.NEGATIVE_ZERO,eval("(min -0.0)"));
+		
+		assertEquals(-0.0, evalD("(min -0.0 0.0)"));
+		assertEquals(0.0, evalD("(min 0.0 -0.0)"));
 
 		assertCastError(step("(min true)"));
 		assertCastError(step("(min \\c)"));
 		assertCastError(step("(min ##NaN true)"));
 		assertCastError(step("(min true ##NaN)"));
-
 
 		// #NaNs should get ignored
 		assertEquals(CVMDouble.NaN,eval("(min ##NaN 42)"));
@@ -2921,6 +2923,10 @@ public class CoreTest extends ACVMTest {
 		assertEquals(7L, evalL("(max 7)"));
 		assertEquals(4.0, evalD("(max 4.0 3 2)"));
 		assertEquals(CVMDouble.NaN, eval("(max 1 2.5 ##NaN)"));
+		
+		assertEquals(-0.0, evalD("(max -0.0 0.0)"));
+		assertEquals(0.0, evalD("(max 0.0 -0.0)"));
+
 
 		assertArityError(step("(max)"));
 		

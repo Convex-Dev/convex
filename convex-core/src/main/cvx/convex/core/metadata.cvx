@@ -801,7 +801,7 @@
                        :return Boolean}]}}
  
  max
- {:doc {:description "Returns the numerical maximum of the given values."
+ {:doc {:description "Returns the numerical maximum of the given values. If two or more values are equal to the minimum, the first is returned."
           :examples    [{:code "(max 1 2 3)"}]
           :signature   [{:params [& numbers]}]}}
 
@@ -818,7 +818,7 @@
                        :return Map}]}}
  
  min
- {:doc {:description "Returns the numerical minimum of the given values."
+ {:doc {:description "Returns the numerical minimum of the given values. If two or more values are equal to the minimum, the first is returned."
           :examples    [{:code "(min 1 2 3)"}]
           :signature   [{:params [& numbers]}]}}
 

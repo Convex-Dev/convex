@@ -513,7 +513,7 @@ public class RT {
 	 * @param b        Second numeric value
 	 * @param nanValue Value to return in case of a NaN result
 	 * @return -1 if a is smaller, 1 if a is larger, 0 if a
-	 *         equals b, null if either value non-numeric
+	 *         equals b, null if either value non-numeric, NaN if either value is NaN
 	 */
 	public static Long compare(ACell a, ACell b, Long nanValue) {
 		Class<?> ca = numericType(a);
@@ -527,7 +527,9 @@ public class RT {
 			return RT.compare(longValue(a), longValue(b));
 
 		double da = doubleValue(a);
+		if (Double.isNaN(da)) return nanValue;
 		double db = doubleValue(b);
+		if (Double.isNaN(db)) return nanValue;
 		if (da == db)
 			return 0L;
 		if (da < db)
