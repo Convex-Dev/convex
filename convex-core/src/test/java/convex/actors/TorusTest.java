@@ -17,7 +17,6 @@ import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 import convex.lib.AssetTest;
-import convex.lib.FungibleTest;
 
 public class TorusTest extends ACVMTest {
 	Context<?> INITIAL=context();
