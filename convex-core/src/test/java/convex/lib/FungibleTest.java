@@ -1,9 +1,5 @@
 package convex.lib;
 
-import static convex.core.lang.TestState.eval;
-import static convex.core.lang.TestState.evalB;
-import static convex.core.lang.TestState.evalL;
-import static convex.core.lang.TestState.step;
 import static convex.test.Assertions.assertAssertError;
 import static convex.test.Assertions.assertError;
 import static convex.test.Assertions.assertNotError;
@@ -15,42 +11,47 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AMap;
 import convex.core.data.Address;
+import convex.core.data.Symbol;
 import convex.core.init.InitTest;
+import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
-import convex.core.lang.RT;
 import convex.core.lang.TestState;
 
-public class FungibleTest {
+public class FungibleTest extends ACVMTest {
 
 	static final AKeyPair TEST_KEYPAIR=AKeyPair.generate();
 	
-	private static final Address VILLAIN=InitTest.VILLAIN;
+	private Address VILLAIN=InitTest.VILLAIN;
 
-	private static final Context<?> CTX;
-	private static final Address fungible;
+	private Address fungible;
 
-	static {
+	protected FungibleTest() {
+		super(createFungibleState());
+		fungible = (Address) context().lookup(Symbol.create("fungible")).getResult();
+	}
+	
+	private static State createFungibleState() {
 		Context<?> ctx=TestState.CONTEXT.fork();
 		String importS="(import convex.fungible :as fungible)";
-		ctx=step(ctx,importS);
+		ctx=TestState.step(ctx,importS);
 		assertNotError(ctx);
-		fungible = (Address)ctx.getResult();
-		ctx=step(ctx,"(import convex.asset :as asset)");
+		ctx=TestState.step(ctx,"(import convex.asset :as asset)");
 		assertFalse(ctx.isExceptional());
-		CTX = ctx;
+		return ctx.getState();
 	}
 
 	@Test public void testAssetAPI() {
-		Context<?> ctx = CTX.fork();
+		Context<?> ctx = context();
 		ctx=step(ctx,"(def token (deploy (fungible/build-token {:supply 1000000})))");
 		Address token = (Address) ctx.getResult();
 		assertNotNull(token);
 
 		// generic tests
-		doFungibleTests(ctx,token,ctx.getAddress());
+		AssetTest.doFungibleTests(ctx,token,ctx.getAddress());
 
 		assertEquals(1000000L,evalL(ctx,"(asset/balance token *address*)"));
 		assertEquals(0L,evalL(ctx,"(asset/balance token *registry*)"));
@@ -93,7 +94,7 @@ public class FungibleTest {
 
 	@Test public void testBuildToken() {
 		// check our alias is right
-		Context<?> ctx = CTX.fork();
+		Context<?> ctx = context();
 		assertEquals(fungible,eval(ctx,"fungible"));
 
 		// deploy a token with default config
@@ -103,7 +104,7 @@ public class FungibleTest {
 		ctx=step(ctx,"(def token (address "+token+"))");
 
 		// GEnric tests
-		doFungibleTests(ctx,token,ctx.getAddress());
+		AssetTest.doFungibleTests(ctx,token,ctx.getAddress());
 
 		// check our balance is positive as initial holder
 		long bal=evalL(ctx,"(fungible/balance token *address*)");
@@ -127,7 +128,7 @@ public class FungibleTest {
 
 	@Test public void testMint() {
 		// check our alias is right
-		Context<?> ctx = CTX.fork();
+		Context<?> ctx = context();
 
 		// deploy a token with default config
 		ctx=step(ctx,"(def token (deploy [(fungible/build-token {:supply 100}) (fungible/add-mint {:max-supply 1000})]))");
@@ -135,7 +136,7 @@ public class FungibleTest {
 		assertTrue(ctx.getAccountStatus(token)!=null);
 
 		// do Generic Tests
-		doFungibleTests(ctx,token,ctx.getAddress());
+		AssetTest.doFungibleTests(ctx,token,ctx.getAddress());
 
 		// check our balance is positive as initial holder
 		Long bal=evalL(ctx,"(fungible/balance token *address*)");
@@ -201,44 +202,5 @@ public class FungibleTest {
 		}
 	}
 
-	/**
-	 * Generic tests for a fungible token. User account should have some of fungible token and sufficient coins.
-	 * @param ctx Initial Context. Will be forked.
-	 * @param token Fungible token Address
-	 * @param user User Address
-	 */
-	public static void doFungibleTests (Context<?> ctx, Address token, Address user) {
-		ctx=ctx.forkWithAddress(user);
-		ctx=step(ctx,"(import convex.asset :as asset)");
-		ctx=step(ctx,"(import convex.fungible :as fungible)");
-		ctx=step(ctx,"(def token "+token+")");
-		ctx = TestState.step(ctx,"(def actor (deploy '(set-controller "+user+")))");
-		Address actor = (Address) ctx.getResult();
-		assertNotNull(actor);
 
-		Long BAL=evalL(ctx,"(asset/balance token *address*)");
-		assertEquals(0L, evalL(ctx,"(asset/balance token actor)"));
-		assertTrue(BAL>0,"Should provide a user account with positive balance!");
-
-		// transfer all to self, should not affect balance
-		ctx=step(ctx,"(asset/transfer *address* [token "+BAL+"])");
-		assertEquals(BAL,RT.jvm(ctx.getResult()));
-		assertEquals(BAL, evalL(ctx,"(asset/balance token *address*)"));
-
-		// transfer nothing to self, should not affect balance
-		ctx=step(ctx,"(asset/transfer *address* [token nil])");
-		assertEquals(0L,(long)RT.jvm(ctx.getResult()));
-		assertEquals(BAL, evalL(ctx,"(asset/balance token *address*)"));
-
-		// Run generic asset tests, giving 1/3 the balance to a new user account
-		{
-			Context<?> c=ctx.fork();
-			c=c.createAccount(TEST_KEYPAIR.getAccountKey());
-			Address user2=(Address) c.getResult();
-			Long smallBal=BAL/3;
-			c=step(c,"(asset/transfer "+user2+" [token "+smallBal+"])");
-
-			AssetTest.doAssetTests(c, token, user, user2);
-		}
-	}
 }
