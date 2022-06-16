@@ -202,21 +202,21 @@
 
   ^{:doc {:description ["Returns asset balance for a specified owner, or the current address if not supplied."
                         "Return value will be in the quantity format as specified by the asset type."]
-          :examples    [{:code "(balance asset-address owner)"}]
+          :examples    [{:code "(balance asset-address)"}
+                        {:code "(balance [asset-address asset-id] owner)"}]
           :signature   [{:params [asset-address]}
                         {:params [asset-address owner]}]}}
 
 
-  ([asset-address]
+  ([asset-path]
+    (recur asset-path *address*))
 
-   (query (call asset-address
-                (balance *address*))))
-
-
-  ([asset-address owner]
-
-   (query (call asset-address
-                (balance owner)))))
+  ([asset-path owner]
+   (cond 
+      (address? asset-path)
+        (query (call asset-path
+                  (balance owner)))
+      (fail (str "Bad asset path: " asset-path)))))
 
 
 
