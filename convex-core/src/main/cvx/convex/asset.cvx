@@ -2,8 +2,8 @@
 
 (call *registry*
       (register {:description ["An asset is either:"
-                               "- A vector `[asset-address quantity]` indicating an asset managed by an actor"
-                               "- A map `asset-adress` -> `quantity` indicating assets managed by one or more actors"
+                               "- A vector `[asset-path quantity]` indicating an asset managed by an actor"
+                               "- A map `asset-path` -> `quantity` indicating multiple assets"
                                "Quantities are arbitrary and asset-specific."
                                "For a fungible currency, quantity is the amount ; for a non-fungible token, quantity may be a set of token ids."
                                "Key functions from this library are `balance`, `owns?`, and `transfer`."
@@ -49,25 +49,28 @@
           :examples    [{:code "(accept sender [fungible-token-address 1000])"}]
           :signature   [{:params [sender [asset-address quantity]]}]}}
 
-  [sender asset]
+  ([sender asset]
 
   (cond 
     (vector? asset)
-    (let [asset-address (first asset)
-          quantity      (second asset)]
-       (call asset-address
-             (accept sender
-                     quantity)))
+	    (let [asset-path (first asset)
+	          quantity      (second asset)]
+	       (recur sender asset-path quantity))
 
     (map? asset)
-    (reduce (fn [m [asset-address quantity]]
-              (assoc m
-                     asset-address
-                     (call asset-address
-                           (accept sender
-                                   quantity))))
-            {}
-            asset)))
+	    (reduce (fn [m [asset-path quantity]]
+	              (assoc m
+	                     asset-path
+	                     (accept sender asset-path quantity)))
+	            {}
+	            asset)))
+  
+  ([sender asset-path quantity]
+    (cond
+      (address? asset-path)
+        (call asset-path (accept sender quantity))
+        
+      (fail (str "Asset format not yet implemeted: " asset-path)))))
 
 
 
@@ -204,8 +207,8 @@
                         "Return value will be in the quantity format as specified by the asset type."]
           :examples    [{:code "(balance asset-address)"}
                         {:code "(balance [asset-address asset-id] owner)"}]
-          :signature   [{:params [asset-address]}
-                        {:params [asset-address owner]}]}}
+          :signature   [{:params [asset-path]}
+                        {:params [asset-path owner]}]}}
 
 
   ([asset-path]
