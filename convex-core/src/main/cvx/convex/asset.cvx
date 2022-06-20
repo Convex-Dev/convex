@@ -4,7 +4,7 @@
       (register {:description ["An asset is either:"
                                "- A vector `[asset-path quantity]` indicating an asset managed by an actor"
                                "- A map `asset-path` -> `quantity` indicating multiple assets"
-                               "Quantities are arbitrary and asset-specific."
+                               "Quantities are asset-specific."
                                "For a fungible currency, quantity is the amount ; for a non-fungible token, quantity may be a set of token ids."
                                "Key functions from this library are `balance`, `owns?`, and `transfer`."
                                "Other functions such as `accept` and `offer` provide more fine-grained control when required."
@@ -19,7 +19,7 @@
                                "- `(quantity-sub asset-address a b)`"
                                "- `(quantity-subset a b)` ; returns true if `a` is considered a subset of `b`"
                                "For more information, see those functions defined in this library whose purpose is to delegate to asset implementations in a generic way."]
-                 :name        "Asset abstraction library"}))
+                 :name        "Convex Asset API library"}))
 
 
 ;;;;;;;;;; Private
@@ -29,13 +29,13 @@
 
   ^{:private? true}
 
-  ;; Used by quantity functions.
+  ;; Used by asset handling functions to treat a vector as a map
 
   [a]
 
   (cond 
     (map? a)    a
-    (vector? a) {(first a) (second a)}
+    (vector? a) (conj {} a)
     (nil? a)    {}))
 
 
@@ -53,17 +53,19 @@
 
   (cond 
     (vector? asset)
-	    (let [asset-path (first asset)
-	          quantity      (second asset)]
-	       (recur sender asset-path quantity))
+    (let [asset-path (first asset)
+          quantity      (second asset)]
+      (recur sender asset-path quantity))
 
     (map? asset)
-	    (reduce (fn [m [asset-path quantity]]
-	              (assoc m
-	                     asset-path
-	                     (accept sender asset-path quantity)))
-	            {}
-	            asset)))
+    (reduce (fn [m [asset-path quantity]]
+              (assoc m
+                asset-path
+                (accept sender asset-path quantity)))
+      {}
+      asset)
+    
+    (fail "Bad asset argument")))
   
   ([sender asset-path quantity]
     (cond
@@ -122,8 +124,7 @@
 
   (cond 
     (vector? asset)
-    (let [asset-address (first asset)
-          quantity      (second asset)]
+    (let [[asset-address quantity] asset]
        (call asset-address
              (offer receiver
                     quantity)))
@@ -181,8 +182,11 @@
                (direct-transfer receiver
                                 quantity))
 
-         :else
-         (fail "Address cannot receive asset")))
+         (address? receiver)
+         (fail (str "Receiver account does not exist: " receiver))
+         
+         ;; :else
+         (fail "Invalid receiver")))
 
      (map? asset)
      (reduce (fn [acc entry]
@@ -230,33 +234,29 @@
                         {:code "(owns? owner [non-fungible-token-address #{1 4 6}])"}]
           :signature   [{:params [owner asset]}]}}
 
-  [owner asset]
-
-  (query
-    (cond
-      (vector? asset)
-      (let [[asset-address
-             quantity]     asset
-            bal            (call asset-address
-                                 (balance owner))]
-        (call asset-address
-              (quantity-subset? quantity
-                                bal)))
-
-      (map? asset)
-      (reduce (fn [result [asset-address quantity]]
-                (if (call asset-address
-                          (quantity-subset? quantity
-                                            (call asset-address
-                                                  (balance owner))))
-                  true
-                  (reduced false)))
-              true
-              asset)
-
-      ;; Interpret nil as the 'zero' asset, which everybody owns
-      (nil? asset)
-      true)))
+  ([owner asset]
+	  (query
+	    (cond
+	      (vector? asset)
+	      (let [[asset-path quantity]  asset]
+	        (recur owner asset-path quantity)))
+	
+	      (map? asset)
+	      (reduce (fn [result [asset-path quantity]]
+	                (if (owns? owner asset-path-quantity)
+	                  true
+	                  (reduced false)))
+	              true
+	              asset)
+	
+	      ;; Interpret nil as the 'zero' asset, which everybody owns
+	      (nil? asset)
+	      true))
+  
+  ([owner asset-path quantity]
+    (let [bal (balance asset-path owner)] 
+      (call asset-path
+	      (quantity-subset? quantity bal)))))
 
 
 ;;;;;;;;;; Quantities
@@ -289,9 +289,9 @@
              asset-b)))
 
 
-  ([asset-address a b]
+  ([asset-path a b]
 
-   (query (call asset-address
+   (query (call asset-path
                 (quantity-add a
                               b)))))
 
@@ -328,12 +328,11 @@
              asset-b)))
 
 
-  ([asset-address a b]
+  ([asset-path a b]
 
-   (query (call asset-address
+   (query (call asset-path
                 (quantity-sub a
                               b)))))
-
 
 
 (defn quantity-zero
@@ -345,13 +344,11 @@
                          :result #{}}]
           :signature   [{:params [asset-address]}]}}
 
-  [asset-address]
+  [asset-path]
 
-  (query (call asset-address
+  (query (call asset-path
                (quantity-add nil
                              nil))))
-
-
 
 (defn quantity-contains?
 
@@ -369,17 +366,15 @@
    (query
      (let [asset-a (-make-map asset-a)
            asset-b (-make-map asset-b)]
-       (reduce (fn [m [asset-address qb]]
+       (reduce (fn [m [asset-path qb]]
                  (let [qa (get asset-a
-                               asset-address)]
+                               asset-path)]
                    (cond
                      (= qa
                         qb)
                      true
 
-                     (call asset-address
-                           (quantity-subset? qb
-                                             qa))
+                     (quantity-contains? asset-path qa qb)
                      true
 
                      :else
@@ -388,8 +383,10 @@
                asset-b))))
 
 
-  ([asset-address a b]
+  ([asset-path a b]
 
-   (query (call asset-address
+   (query (cond
+            (address? asset-path)
+            (call asset-path
                 (quantity-subset? b
-                                  a)))))
+                                  a))))))

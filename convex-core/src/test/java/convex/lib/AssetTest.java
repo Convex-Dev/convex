@@ -144,7 +144,11 @@ public class AssetTest {
 		assertEquals(eval(ctx,"(asset/quantity-zero ast)"),eval(ctx,"(asset/quantity-sub ast bal bal)"));
 
 		assertTrue(evalB(ctx,"(asset/owns? *address* [ast bal])"));
+		assertTrue(evalB(ctx,"(asset/owns? *address* ast bal)"));
 		assertTrue(evalB(ctx,"(asset/owns? *address* [ast nil])"));
+		assertTrue(evalB(ctx,"(asset/owns? *address* ast nil)"));
+		
+	
 	}
 
 }
