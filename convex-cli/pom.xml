@@ -19,6 +19,8 @@
 		<logback.version>1.2.11</logback.version>
 		<asciidoctorj.pdf.version>1.6.0</asciidoctorj.pdf.version>
 		<asciidoctor.spring.version>0.6.0</asciidoctor.spring.version>
+		<maven.compiler.target>16</maven.compiler.target>
+		<maven.compiler.source>16</maven.compiler.source>
 	</properties>
 
 	<pluginRepositories>
