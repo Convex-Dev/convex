@@ -24,24 +24,29 @@
 
 ;;;;;;;;;; Private
 
-
+;; Used by asset handling functions to treat a vector as a map
 (defn -make-map
-
   ^{:private? true}
-
-  ;; Used by asset handling functions to treat a vector as a map
-
   [a]
-
   (cond 
     (map? a)    a
     (vector? a) (conj {} a)
     (nil? a)    {}))
 
+;; Used to throw generic error message for bad path
 (defn -fail-path 
   ^{:private? true}
   [p]
   (fail (str "Bad asset path: " p)))
+
+;; Get actor address for a given path, fail if not possible
+(defn -path-addr 
+  ^{:private? true}
+  [p]
+  (cond
+    (address? p) p
+    (vector? p) (first p)
+    (-fail-path p)))
 
 ;;;;;;;;;; Transfers
 
@@ -51,32 +56,36 @@
   ^{:doc {:description ["Accepts asset from sender."
                         "If asset contains multiple assets, accepts each in turn. MUST fail if the asset cannot be accepted."]
           :examples    [{:code "(accept sender [fungible-token-address 1000])"}]
-          :signature   [{:params [sender [asset-address quantity]]}]}}
+          :signature   [{:params [sender asset]}
+                        {:params [sender asset-path quantity]}]}}
 
   ([sender asset]
 
   (cond 
     (vector? asset)
-    (let [asset-path (first asset)
+    (let [path (first asset)
           quantity      (second asset)]
-      (recur sender asset-path quantity))
+      (recur sender path quantity))
 
     (map? asset)
-    (reduce (fn [m [asset-path quantity]]
+    (reduce (fn [m [path quantity]]
               (assoc m
-                asset-path
-                (accept sender asset-path quantity)))
+                path
+                (accept sender path quantity)))
       {}
       asset)
     
     (fail "Bad asset argument")))
   
-  ([sender asset-path quantity]
+  ([sender path quantity]
     (cond
-      (address? asset-path)
-        (call asset-path (accept sender quantity))
+      (address? path)
+        (call path (accept sender quantity))
         
-      (fail (str "Asset format not yet implemeted: " asset-path)))))
+      (vector? path)
+        (call (first path) (accept sender path quantity))
+        
+      (-fail-path path))))
 
 
 
@@ -114,9 +123,9 @@
 
 
 
-(defn offer
+;; Smart contracts may need to offer and accept assets to avoid unconditional transfers.
 
-  ;; For smart contract assets, you can offer and accept separately if you choose
+(defn offer
 
   ^{:doc {:description ["Opens an offer of an `asset` to a `receiver`, which makes it possible for the receiver to 'accept' up to this quantity."
                         "May result in an error if the asset does not support open offers."]
@@ -124,24 +133,30 @@
                         {:code "(offer receiver [non-fungible-token-address #{1 4 6}])"}]
           :signature   [{:params [receiver [asset-address quantity]]}]}}
 
-  [receiver asset]
+  ([receiver asset]
 
   (cond 
     (vector? asset)
-    (let [[asset-address quantity] asset]
-       (call asset-address
-             (offer receiver
-                    quantity)))
+    (let [[path quantity] asset]
+       (offer receiver path quantity))
 
     (map? asset)
-    (reduce (fn [m [asset-address quantity]]
-              (assoc m
-                     asset-address
-                     (call asset-address
-                           (offer receiver
-                                  quantity))))
+    (reduce (fn [m [path quantity]]
+              (assoc m path (offer receiver path quantity)))
             {}
             asset)))
+  
+  ([receiver path quantity]
+    (cond 
+      ;; Address path
+      (address? path)
+        (call path (offer receiver quantity))
+      
+      ;; Vector path
+      (vector? path)
+        (call (first path) (offer receiver path quantity))
+      
+      (-fail-path path))))
 
 
 
@@ -248,8 +263,8 @@
   ([owner asset]
     (cond
       (vector? asset)
-      (let [[asset-path quantity]  asset]
-        (recur owner asset-path quantity)))
+      (let [[path quantity] asset]
+        (recur owner path quantity)))
 
       (map? asset)
       (reduce (fn [result [asset-path quantity]]
@@ -298,24 +313,22 @@
 
    (let [asset-a (-make-map asset-a)
          asset-b (-make-map asset-b)]
-     (reduce (fn [m [asset-address qb]]
+     (reduce (fn [m [path qb]]
                (let [qa (get m
-                             asset-address)]
+                             path)]
                  (assoc m
-                        asset-address
-                        (quantity-add asset-address
+                        path
+                        (quantity-add path
                                       qa
                                       qb))))
              asset-a
              asset-b)))
 
 
-  ([asset-path a b]
-
-   (query (call asset-path
-                (quantity-add a
-                              b)))))
-
+  ([path a b]
+    (let [path (-path-addr path)]
+      (query (call path
+                (quantity-add a b))))))
 
 
 (defn quantity-sub
@@ -349,9 +362,9 @@
              asset-b)))
 
 
-  ([asset-path a b]
+  ([path a b]
 
-   (query (call asset-path
+   (query (call (-path-addr path)
                 (quantity-sub a
                               b)))))
 
@@ -365,11 +378,9 @@
                          :result #{}}]
           :signature   [{:params [asset-address]}]}}
 
-  [asset-path]
-
-  (query (call asset-path
-               (quantity-add nil
-                             nil))))
+  [path]
+  (query (call (-path-addr path)
+               (quantity-add nil nil))))
 
 (defn quantity-contains?
 
@@ -403,10 +414,6 @@
 
 
   ([path a b]
-
    (query 
-     (let [addr (cond
-                  (address? path) path
-                  (vector? path) (first path)
-                  (-fail-path path))]
+     (let [addr (-path-addr path)]
        (call addr (quantity-subset? b a))))))
