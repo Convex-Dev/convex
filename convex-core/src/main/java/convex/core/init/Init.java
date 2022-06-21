@@ -215,6 +215,7 @@ public class Init {
 			s = doActorDeploy(s, "asset/nft/tokens.cvx");
 			s = doActorDeploy(s, "asset/box/actor.cvx");
 			s = doActorDeploy(s, "asset/box.cvx");
+			s = doActorDeploy(s, "asset/multi-token.cvx");
 			s = doActorDeploy(s, "convex/play.cvx");
 
 			{ // Deploy Currencies

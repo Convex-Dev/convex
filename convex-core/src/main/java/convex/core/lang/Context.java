@@ -2089,7 +2089,7 @@ public class Context<T extends ACell> extends AObject {
 	 */
 	public Context<T> setHolding(Address targetAddress, ACell value) {
 		AccountStatus as=getAccountStatus(targetAddress);
-		if (as==null) return withError(ErrorCodes.NOBODY,"No account in which to set holding");
+		if (as==null) return withError(ErrorCodes.NOBODY,"Can't set set holding for non-existent account "+targetAddress);
 		as=as.withHolding(getAddress(), value);
 		return withAccountStatus(targetAddress,as);
 	}

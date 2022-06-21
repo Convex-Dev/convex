@@ -1158,7 +1158,7 @@ public class Core {
 			if (address == null) return context.withCastError(args[0], Types.ADDRESS);
 
 			AccountStatus as=context.getAccountStatus(address);
-			if (as==null) return context.withError(ErrorCodes.NOBODY,"Account with holdings does not exist.");
+			if (as==null) return context.withError(ErrorCodes.NOBODY,"Account "+address+" does not exist to get holdings");
 			ABlobMap<Address,ACell> holdings=as.getHoldings();
 
 			// we get the target accounts holdings for the currently executing account
@@ -1204,7 +1204,7 @@ public class Core {
 				controller=RT.ensureAddress(arg);
 				if (controller == null) return context.withCastError(arg, Types.ADDRESS);
 				if (context.getAccountStatus(controller)==null) {
-					 return context.withError(ErrorCodes.NOBODY, name()+" must be passed an address for an existing account as controller.");
+					 return context.withError(ErrorCodes.NOBODY, name()+" requires an address for an existing account");
 				}
 			}
 
