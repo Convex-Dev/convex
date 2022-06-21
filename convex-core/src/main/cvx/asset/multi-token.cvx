@@ -87,14 +87,13 @@
   ^{:callable? true}
   [id amount]
   (let [token (or (get tokens id) (fail "token does not exist"))
-        [controller supply] token
-        ]
+        [controller supply] token]
     (when-not (trust/trusted? controller *caller*)
-           (fail :TRUST"No rights to mint"))
+           (fail :TRUST "No rights to mint"))
     
     (let [amount     (long amount) ;; Mint amount.
           new-supply (+ supply amount)
-          bal        (balance [*address* id] *caller*)
+          bal        (-get-balance *caller* id)
           new-bal    (+ bal amount)]
            
       ;; New supply must be in valid range.
