@@ -1,0 +1,30 @@
+'asset.multi-token
+
+(call *registry*
+      (register {:description ["An actor that supports multiple mintable tokens"]
+                 :name        "Multi-token actor"}))
+
+
+;;;;;;;;;; Setup
+
+(import convex.asset :as asset-lib)
+(import convex.trust :as trust)
+
+;;;;;;;;;; State
+
+;; Map of keyword -> [controller supply]
+(def tokens {})
+
+;;;;;;;;;; Public API
+
+
+(defn create
+  ^{:callable? true
+    :doc {:description "Creates a new token and returns its id. Caller will be controller of token"
+          :signature   [{:params []}
+                        {:params [actor]}]}}
+  ([id]
+    (or (keyword? id) (fail "Token ID must be a keyword"))
+    (if (contains-key? tokens id) (fail "Token already exists!"))
+    (def tokens (assoc tokens id [*caller* 0]))))
+

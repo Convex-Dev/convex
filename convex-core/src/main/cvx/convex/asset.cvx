@@ -130,8 +130,9 @@
   ^{:doc {:description ["Opens an offer of an `asset` to a `receiver`, which makes it possible for the receiver to 'accept' up to this quantity."
                         "May result in an error if the asset does not support open offers."]
           :examples    [{:code "(offer receiver [fungible-token-address 1000])"}
-                        {:code "(offer receiver [non-fungible-token-address #{1 4 6}])"}]
-          :signature   [{:params [receiver [asset-address quantity]]}]}}
+                        {:code "(offer receiver non-fungible-token-address #{1 4 6})"}]
+          :signature   [{:params [receiver asset]}
+                        {:params [receiver asset-path quantity]}]}}
 
   ([receiver asset]
 
@@ -171,54 +172,55 @@
 
   ([receiver asset]
 
-   (transfer receiver
-             asset
-             nil))
-
-
-  ([receiver asset data]
-
    (cond
      (vector? asset)
-     (let [[asset-address
-            quantity]     asset]
+       (let [[path quantity] asset]
+         (recur receiver path quantity nil))
+       
+     (map? asset)
+     (reduce (fn [m [path quantity]]
+               (assoc m
+                      path 
+                      (transfer receiver path quantity nil)))
+             {}
+             asset)
+
+     :else
+     (fail "Invalid asset")))
+
+  ([receiver path quantity]
+    (recur receiver path quantity nil))
+    
+  ([receiver path quantity data]
+
+   (cond
+     (address? path)
+     (let []
        (cond
          (callable? receiver
                     'receive-asset)
          (do 
-           (call asset-address
+           (call path
                  (offer receiver
                         quantity))
            (call receiver
-                 (receive-asset asset
-                                data)))
+                 (receive-asset path quantity data)))
 
          (actor? receiver)
          (fail "Receiver does not have receive-asset function")
 
          (account? receiver)
-         (call asset-address
+         (call path
                (direct-transfer receiver
                                 quantity))
 
          (address? receiver)
          (fail (str "Receiver account does not exist: " receiver))
          
-         ;; :else
-         (fail "Invalid receiver")))
+             ;; :else
+             (fail "Invalid receiver")))
 
-     (map? asset)
-     (reduce (fn [acc entry]
-               (assoc acc
-                      (first entry)
-                      (transfer receiver
-                                entry
-                                data)))
-             {}
-             asset)
-
-     :else
-     (fail "Invalid asset"))))
+     )))
 
 
 ;;;;;;;;;; Ownership
