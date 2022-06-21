@@ -18,7 +18,7 @@ import convex.test.Samples;
  * 
  * Generic tests for ANY digital asset compatible with the convex.asset API
  */
-public class AssetTest {
+public class AssetTester {
 	
 	static final AKeyPair TEST_KP=AKeyPair.generate();
 	
@@ -63,7 +63,7 @@ public class AssetTest {
 			Long smallBal=BAL/3;
 			c=step(c,"(asset/transfer "+user2+" [token "+smallBal+"])");
 
-			AssetTest.doAssetTests(c, token, user, user2);
+			AssetTester.doAssetTests(c, token, user, user2);
 		}
 	}
 	

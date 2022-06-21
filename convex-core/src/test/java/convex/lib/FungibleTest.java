@@ -51,7 +51,7 @@ public class FungibleTest extends ACVMTest {
 		assertNotNull(token);
 
 		// generic tests
-		AssetTest.doFungibleTests(ctx,token,ctx.getAddress());
+		AssetTester.doFungibleTests(ctx,token,ctx.getAddress());
 
 		assertEquals(1000000L,evalL(ctx,"(asset/balance token *address*)"));
 		assertEquals(0L,evalL(ctx,"(asset/balance token *registry*)"));
@@ -104,7 +104,7 @@ public class FungibleTest extends ACVMTest {
 		ctx=step(ctx,"(def token (address "+token+"))");
 
 		// GEnric tests
-		AssetTest.doFungibleTests(ctx,token,ctx.getAddress());
+		AssetTester.doFungibleTests(ctx,token,ctx.getAddress());
 
 		// check our balance is positive as initial holder
 		long bal=evalL(ctx,"(fungible/balance token *address*)");
@@ -136,7 +136,7 @@ public class FungibleTest extends ACVMTest {
 		assertTrue(ctx.getAccountStatus(token)!=null);
 
 		// do Generic Tests
-		AssetTest.doFungibleTests(ctx,token,ctx.getAddress());
+		AssetTester.doFungibleTests(ctx,token,ctx.getAddress());
 
 		// check our balance is positive as initial holder
 		Long bal=evalL(ctx,"(fungible/balance token *address*)");

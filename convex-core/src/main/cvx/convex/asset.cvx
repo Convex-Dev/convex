@@ -194,33 +194,25 @@
   ([receiver path quantity data]
 
    (cond
+     ;; First check if receiver has a callable receive-asset function. If so, use this
+     (callable? receiver 'receive-asset)
+     (do 
+       (offer receiver path quantity) ;; Offer correct quantity
+       (call receiver
+         (receive-asset path quantity data)))
+     
+     ;; An actor without a receive-asset function is not a valid receiver?
+     (actor? receiver)
+     (fail "Receiver does not have receive-asset function")
+     
      (address? path)
-     (let []
-       (cond
-         (callable? receiver
-                    'receive-asset)
-         (do 
-           (call path
-                 (offer receiver
-                        quantity))
-           (call receiver
-                 (receive-asset path quantity data)))
-
-         (actor? receiver)
-         (fail "Receiver does not have receive-asset function")
-
-         (account? receiver)
-         (call path
-               (direct-transfer receiver
-                                quantity))
-
-         (address? receiver)
-         (fail (str "Receiver account does not exist: " receiver))
-         
-             ;; :else
-             (fail "Invalid receiver")))
-
-     )))
+     (call path (direct-transfer receiver quantity))
+     
+     (vector? path)
+     (call (first path) (direct-transfer receiver path quantity))
+     
+     ;; else  
+     (-fail-path path))))
 
 
 ;;;;;;;;;; Ownership

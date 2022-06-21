@@ -15,6 +15,23 @@
 ;; Map of keyword -> [controller supply]
 (def tokens {})
 
+(def max-supply 1000000000000000000)
+
+;;;;;;;;; Private functions
+
+(defn -set-balance 
+  [addr id bal]
+  (let [h (or (get-holding addr) {})]
+    (set-holding addr (assoc h id bal))))
+
+(defn -get-balance 
+  [addr id]
+  (let [h (get-holding addr)]
+    (or (get h id) 
+         (if (tokens id) 
+           0 
+           (fail (str "Token does not exist: " id))))))
+
 ;;;;;;;;;; Public API
 
 
@@ -27,4 +44,66 @@
     (or (keyword? id) (fail "Token ID must be a keyword"))
     (if (contains-key? tokens id) (fail "Token already exists!"))
     (def tokens (assoc tokens id [*caller* 0]))))
+
+
+;;; Asset SPI
+
+(defn direct-transfer
+
+         ^{:callable? true}
+
+         [addr path amount]
+
+         (let [addr   (address addr)
+               amount (if amount
+                        (long amount)
+                        0)
+               id (second path)
+               bal    (-get-balance *caller* id)
+               tbal   (-get-balance addr id)]
+           ;; Amount must be in valid range.
+           ;;
+           (assert (<= 0
+                       amount
+                       bal)) 
+           ;; Need this check in case of self-transfers.
+           (when (= *caller*
+                    addr)
+             (return amount))
+           (-set-balance *caller* id (- bal amount))
+           (-set-balance addr id (+ tbal amount))))
+
+(defn balance
+   ^{:callable? true}
+   ([addr]
+     (or (get-holding addr)
+       {}))
+   
+   ([path addr]
+     (let [id (second path)]
+       (-get-balance addr id))))
+
+(defn mint
+  ^{:callable? true}
+  [id amount]
+  (let [token (or (get tokens id) (fail "token does not exist"))
+        [controller supply] token
+        ]
+    (when-not (trust/trusted? controller *caller*)
+           (fail :TRUST"No rights to mint"))
+    
+    (let [amount     (long amount) ;; Mint amount.
+          new-supply (+ supply amount)
+          bal        (balance [*address* id] *caller*)
+          new-bal    (+ bal amount)]
+           
+      ;; New supply must be in valid range.
+      (assert (<= 0 new-supply max-supply))
+      
+      ;; new balance must be in range
+      (assert (<= 0 new-bal max-supply))
+      
+      ;; Update state
+      (-set-balance *caller* id new-bal)
+      (def tokens (assoc tokens id [controller new-supply])))))
 

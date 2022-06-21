@@ -74,7 +74,7 @@ public abstract class ACVMTest {
 	 * @param source Source form to read
 	 * @return New forked context containing step result
 	 */
-	public <T extends ACell> Context<T> step(Context<?> ctx, String source) {
+	public static <T extends ACell> Context<T> step(Context<?> ctx, String source) {
 		ACell form = Reader.read(source);
 		return step(ctx,form);
 	}
@@ -87,7 +87,7 @@ public abstract class ACVMTest {
 	 * @return New forked context containing step result
 	 */
 	@SuppressWarnings("unchecked")
-	public <T extends ACell> Context<T> step(Context<?> ctx, ACell form) {
+	public static <T extends ACell> Context<T> step(Context<?> ctx, ACell form) {
 		// Run form in separate forked context to get result context
 		Context<T> rctx = ctx.fork();
 		rctx=(Context<T>) rctx.run(form);
@@ -97,7 +97,7 @@ public abstract class ACVMTest {
 
 
 	@SuppressWarnings("unchecked")
-	public <T extends ACell> AOp<T> compile(Context<?> c, String source) {
+	public static <T extends ACell> AOp<T> compile(Context<?> c, String source) {
 		c=c.fork();
 		try {
 			ACell form = Reader.read(source);
@@ -110,7 +110,7 @@ public abstract class ACVMTest {
 
 
 
-	public <T extends ACell> T read(String source) {
+	public static <T extends ACell> T read(String source) {
 		return Reader.read(source);
 	}
 
@@ -123,7 +123,7 @@ public abstract class ACVMTest {
 	 * @return Updates Context
 	 */
 	@SuppressWarnings("unchecked")
-	public <T extends ACell> Context<T> stepAs(Address address, Context<?> c, String source) {
+	public static <T extends ACell> Context<T> stepAs(Address address, Context<?> c, String source) {
 		Context<?> rc = Context.createFake(c.getState(), address);
 		rc = step(rc, source);
 		return (Context<T>) Context.createFake(rc.getState(), c.getAddress()).withValue(rc.getValue());
@@ -133,7 +133,7 @@ public abstract class ACVMTest {
 		return evalA(CONTEXT, source);
 	}
 
-	public boolean evalA(Context<?> ctx, String source) {
+	public static boolean evalA(Context<?> ctx, String source) {
 		return eval(ctx, source) instanceof Address;
 
 	}
@@ -142,11 +142,11 @@ public abstract class ACVMTest {
 		return ((CVMBool)eval(source)).booleanValue();
 	}
 
-	public boolean evalB(Context<?> ctx, String source) {
+	public static boolean evalB(Context<?> ctx, String source) {
 		return ((CVMBool)eval(ctx, source)).booleanValue();
 	}
 
-	public double evalD(Context<?> ctx, String source) {
+	public static double evalD(Context<?> ctx, String source) {
 		ACell result=eval(ctx,source);
 		CVMDouble d=RT.castDouble(result);
 		if (d==null) throw new ClassCastException("Expected Double, but got: "+RT.getType(result));
@@ -157,7 +157,7 @@ public abstract class ACVMTest {
 		return evalD(CONTEXT,source);
 	}
 
-	public long evalL(Context<?> ctx, String source) {
+	public static long evalL(Context<?> ctx, String source) {
 		ACell result=eval(ctx,source);
 		CVMLong d=RT.castLong(result);
 		if (d==null) throw new ClassCastException("Expected Long, but got: "+RT.getType(result));
@@ -182,7 +182,7 @@ public abstract class ACVMTest {
 		return (T) step(CONTEXT,form).getResult();
 	}
 	
-	public <T extends ACell> T eval(Context<?> c, String source) {
+	public static <T extends ACell> T eval(Context<?> c, String source) {
 		Context<T> rc = step(c,source);
 		return rc.getResult();
 	}
@@ -192,13 +192,13 @@ public abstract class ACVMTest {
 	}
 
 	@SuppressWarnings("unchecked")
-	public <T extends AOp<?>> T comp(ACell form, Context<?> context) {
+	public static <T extends AOp<?>> T comp(ACell form, Context<?> context) {
 		context=context.fork(); // fork to avoid corrupting original context
 		AOp<?> code = context.expandCompile(form).getResult();
 		return (T) code;
 	}
 
-	public <T extends AOp<?>> T comp(String source, Context<?> context) {
+	public static <T extends AOp<?>> T comp(String source, Context<?> context) {
 		return comp(Reader.read(source),context);
 	}
 
