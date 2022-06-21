@@ -38,6 +38,10 @@
     (vector? a) (conj {} a)
     (nil? a)    {}))
 
+(defn -fail-path 
+  ^{:private? true}
+  [p]
+  (fail (str "Bad asset path: " p)))
 
 ;;;;;;;;;; Transfers
 
@@ -215,15 +219,22 @@
                         {:params [asset-path owner]}]}}
 
 
-  ([asset-path]
-    (recur asset-path *address*))
+  ([path]
+    (recur path *address*))
 
-  ([asset-path owner]
+  ([path owner]
    (cond 
-      (address? asset-path)
-        (query (call asset-path
+      ;; Address version
+      (address? path)
+        (query (call path
                   (balance owner)))
-      (fail (str "Bad asset path: " asset-path)))))
+      
+      ;; Vector path
+      (vector? path)
+        (query (call (first path)
+                  (balance path owner)))  
+        
+      (fail-path path))))
 
 
 
@@ -235,28 +246,38 @@
           :signature   [{:params [owner asset]}]}}
 
   ([owner asset]
-	  (query
-	    (cond
-	      (vector? asset)
-	      (let [[asset-path quantity]  asset]
-	        (recur owner asset-path quantity)))
-	
-	      (map? asset)
-	      (reduce (fn [result [asset-path quantity]]
-	                (if (owns? owner asset-path-quantity)
-	                  true
-	                  (reduced false)))
-	              true
-	              asset)
-	
-	      ;; Interpret nil as the 'zero' asset, which everybody owns
-	      (nil? asset)
-	      true))
-  
-  ([owner asset-path quantity]
-    (let [bal (balance asset-path owner)] 
-      (call asset-path
-	      (quantity-subset? quantity bal)))))
+    (cond
+      (vector? asset)
+      (let [[asset-path quantity]  asset]
+        (recur owner asset-path quantity)))
+
+      (map? asset)
+      (reduce (fn [result [asset-path quantity]]
+                (if (owns? owner asset-path-quantity)
+                  true
+                  (reduced false)))
+              true
+              asset)
+
+      ;; Interpret nil as the 'zero' asset, which everybody owns
+      (nil? asset)
+      true)
+
+  ([owner path quantity]
+    (query
+      (let [bal (balance path owner)] 
+        (cond
+          ;; Address version
+          (address? path)
+          (call path
+            (quantity-subset? quantity bal))
+          
+          ;; Vector path
+          (vector? path)
+            (call (first path)
+               (quantity-subset? quantity bal))
+            
+          (-fail-path path))))))
 
 
 ;;;;;;;;;; Quantities
@@ -362,31 +383,30 @@
 
 
   ([asset-a asset-b]
-
-   (query
      (let [asset-a (-make-map asset-a)
            asset-b (-make-map asset-b)]
-       (reduce (fn [m [asset-path qb]]
+       (reduce (fn [m [path qb]]
                  (let [qa (get asset-a
-                               asset-path)]
+                               path)]
                    (cond
                      (= qa
                         qb)
                      true
 
-                     (quantity-contains? asset-path qa qb)
+                     (quantity-contains? path qa qb)
                      true
 
                      :else
                      (reduced false))))
                true
-               asset-b))))
+               asset-b)))
 
 
-  ([asset-path a b]
+  ([path a b]
 
-   (query (cond
-            (address? asset-path)
-            (call asset-path
-                (quantity-subset? b
-                                  a))))))
+   (query 
+     (let [addr (cond
+                  (address? path) path
+                  (vector? path) (first path)
+                  (-fail-path path))]
+       (call addr (quantity-subset? b a))))))
