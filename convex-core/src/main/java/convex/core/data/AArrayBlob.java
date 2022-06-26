@@ -336,6 +336,11 @@ public abstract class AArrayBlob extends ABlob {
 			return result;
 		}
 	}
+	
+	@Override
+	public final byte getTag() {
+		return Tag.BLOB;
+	}
 
 	@Override
 	public int getRefCount() {

@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import java.nio.ByteBuffer;
+import java.security.MessageDigest;
 
 import convex.core.Constants;
 import convex.core.crypto.Hashing;
@@ -98,6 +99,15 @@ public class Hash extends AArrayBlob {
 		if ((offset < 0) || (offset + LENGTH > hashBytes.length))
 			throw new IllegalArgumentException(Errors.badRange(offset, offset+LENGTH));
 		return new Hash(hashBytes, offset);
+	}
+	
+	/**
+	 * Creates a Hash instance from the given message digest. 
+	 * @param digest MessageDigest instance. Will be reset.
+	 * @return New Hash instance
+	 */
+	public static Hash createFromDigest(MessageDigest digest) {
+		return wrap(digest.digest());
 	}
 
 	/**
@@ -208,13 +218,16 @@ public class Hash extends AArrayBlob {
 		// Hashes are always small enough to embed
 		return true;
 	}
-
-	@Override
-	public byte getTag() {
-		return Tag.BLOB;
+	
+	/**
+	 * Optimised compareTo for Hashes. Needed for MapLeaf, SetLeaf etc.
+	 * @param b Other Hash to compare with
+	 * @return Negative if this is "smaller", 0 if this "equals" b, positive if this is "larger"
+	 */
+	public final int compareTo(Hash b) {
+		if (this == b) return 0;	
+		// Check common bytes first
+		int c = Utils.compareByteArrays(this.store, this.offset, b.store, b.offset, LENGTH);
+		return c;
 	}
-
-
-
-
 }

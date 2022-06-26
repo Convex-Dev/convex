@@ -252,11 +252,6 @@ public class Blob extends AArrayBlob {
 	}
 
 	@Override
-	public byte getTag() {
-		return Tag.BLOB;
-	}
-
-	@Override
 	public ABlob toCanonical() {
 		if (isCanonical()) return this;
 		return Blobs.toCanonical(this);
