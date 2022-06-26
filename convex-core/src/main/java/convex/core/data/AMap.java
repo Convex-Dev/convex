@@ -13,6 +13,7 @@ import convex.core.data.type.Types;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.util.Errors;
+import convex.core.util.Utils;
 
 /**
  * Abstract base class for maps.
@@ -310,5 +311,20 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	@Override
 	public AMap slice(long start, long end) {
 		throw new TODOException();
+	}
+
+	/**
+	 * Gets a vector of keys for this Map. 
+	 * O(n) in general.
+	 * 
+	 * @return Vector of Keys
+	 */
+	public AVector<K> getKeys() {
+		int n=Utils.checkedInt(count);
+		ACell[] keys=new ACell[n];
+		for (int i=0; i<n; i++) {
+			keys[i]=entryAt(i).getKey();
+		}
+		return Vectors.create(keys);
 	}
 }

@@ -147,6 +147,10 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	 */
 	public abstract int encode(byte[] bs, int pos);
 	
+	/**
+	 * Gets the keys in this Map as a Vector
+	 * @return
+	 */
 	public AVector<K> getKeys() {
 		int n=Utils.checkedInt(count);
 		ACell[] keys=new ACell[n];

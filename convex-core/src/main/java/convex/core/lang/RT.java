@@ -1502,12 +1502,7 @@ public class RT {
 		if (!(a instanceof AMap))
 			return null;
 		AMap<R, ACell> m = (AMap<R, ACell>) a;
-		return m.reduceEntries(new BiFunction<>() {
-			@Override
-			public AVector<R> apply(AVector<R> t, MapEntry<R, ACell> u) {
-				return t.conj(u.getKey());
-			}
-		}, Vectors.empty());
+		return m.getKeys();
 	}
 
 	/**
