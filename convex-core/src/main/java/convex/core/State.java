@@ -608,13 +608,12 @@ public class State extends ARecord {
 	}
 
 	/**
-	 * Deploys a new Actor in the current state.
+	 * Adds a new Actor Account. The actor will be the last Account in the resulting State, and will
+	 * have a default empty Actor environment.
 	 *
-	 * Returns the updated state. The actor will be the last Account.
-	 *
-	 * @return The updated state with the Actor deployed.
+	 * @return The updated state with the Actor Account added.
 	 */
-	public State tryAddActor() {
+	public State addActor() {
 		AccountStatus as = AccountStatus.createActor();
 		AVector<AccountStatus> newAccounts = accounts.conj(as);
 		return withAccounts(newAccounts);

@@ -84,6 +84,10 @@ public class ErrorValue extends AExceptional {
 		trace.add(Strings.create(traceMessage));
 	}
 	
+	/**
+	 * Stores the CVM local log at the point of the error
+	 * @param log
+	 */
 	public void addLog(ACell log) {
 		this.log=log;
 	}

@@ -1790,11 +1790,11 @@ public class Context<T extends ACell> extends AObject {
 
 		// deploy initial contract state to next address
 		Address address=initialState.nextAddress();
-		State stateSetup=initialState.tryAddActor();
+		State stateSetup=initialState.addActor();
 
 		// Deployment execution context with forked context and incremented depth
-		final Context<Address> exContext=Context.create(stateSetup, juice, EMPTY_BINDINGS, null, depth+1, getOrigin(),getAddress(), address,DEFAULT_OFFER,log,null);
-		final Context<Address> rctx=exContext.eval(code);
+		final Context<Address> deployContext=Context.create(stateSetup, juice, EMPTY_BINDINGS, null, depth+1, getOrigin(),getAddress(), address,DEFAULT_OFFER,log,null);
+		final Context<Address> rctx=deployContext.eval(code);
 
 		Context<Address> result=this.handleStateResults(rctx,false);
 		if (result.isExceptional()) return result;
