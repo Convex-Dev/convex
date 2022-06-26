@@ -8,6 +8,8 @@
                  :name        "Fungible token creation and management"}))
 
 
+(declare balance transfer)
+
 ;;;;;;;;;; Building actors
 
 
@@ -31,6 +33,8 @@
                 1000000000000000000))
     `(do
        (import convex.trust :as trust)
+       
+       (declare balance transfer)
 
        ;; Who is allowed to mint tokens?
        ;;

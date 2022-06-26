@@ -1778,7 +1778,7 @@ public class Context<T extends ACell> extends AObject {
 	 * Deploys an Actor in this context.
 	 *
 	 * Argument argument must be an Actor generation code, which will be evaluated in the new Actor account
-	 * to initialise the Actor
+	 * to initialise the Actor.
 	 *
 	 * Result will contain the new Actor address if successful, an exception otherwise.
 	 *

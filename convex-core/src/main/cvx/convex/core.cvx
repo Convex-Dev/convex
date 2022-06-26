@@ -136,12 +136,12 @@
           :signature   [{:params [& syms]
                          :return Nil}]}}
   [& syms]
-  (cons 'do (map 
-              (fn [sym] 
-                (cond (symbol? sym)
-                  (list 'def sym nil)
-                  (fail :CAST "declare requires symbols only as arguments"))) 
-              syms)))
+  (map 
+    (fn [sym] 
+       (cond (symbol? sym)
+       (eval `(def ~sym nil))
+       (fail :CAST "declare requires symbols only as arguments"))) 
+     syms))
 
 
 ;;;;;;;;;; Logic

@@ -205,7 +205,7 @@ public class Compiler {
 			}
 		}
 		
-		// Finally revert to a lookup in the current address / enviornment
+		// Finally revert to a lookup in the current address / environment
 		Lookup<T> lookUp=Lookup.create(Constant.of(address),sym);
 		return (Context<T>) context.withResult(Juice.COMPILE_LOOKUP, lookUp);
 	}
@@ -230,6 +230,12 @@ public class Compiler {
 		return context.withResult(Juice.COMPILE_NODE,op);
 	}
 	
+	/**
+	 * Compile a lookup of the form (lookup 'foo) or (lookup addr 'foo)
+	 * @param list Lookup form
+	 * @param context Compiler context
+	 * @return Op performing Lookup
+	 */
 	@SuppressWarnings("unchecked")
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileLookup(AList<ACell> list, Context<?> context) {
 		long n=list.count();
@@ -251,7 +257,12 @@ public class Compiler {
 		return context.withResult(Juice.COMPILE_NODE,op);
 	}
 
-
+	/**
+	 * Compiles a map of the form {a b, c d}
+	 * @param form Form as a Map
+	 * @param context
+	 * @return Op producing the given map
+	 */
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileMap(AMap<ACell, ACell> form, Context<?> context) {
 		int n = form.size();
 		if (n==0) return compileConstant(context,form);
@@ -266,7 +277,9 @@ public class Compiler {
 		return compileList(List.create(vs), context);
 	}
 
-	// A set literal needs to be compiled as (hash-set .....)
+	/**
+	 * Compile a set literal of the form #{1 2} as (hash-set 1 2)
+	 */
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileSet(ASet<ACell> form, Context<?> context) {
 		if (form.isEmpty()) return compileConstant(context,Sets.empty());
 		

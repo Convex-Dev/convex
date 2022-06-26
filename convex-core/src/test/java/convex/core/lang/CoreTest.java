@@ -3382,7 +3382,7 @@ public class CoreTest extends ACVMTest {
 
 		// def overwrites existing bindings
 		assertEquals(Vectors.of(2L, 3L), eval("(do (def v nil) (def v [2 3]) v)"));
-		assertEquals(Vectors.of(2L, 3L), eval("(do (def count [2 3]) count)")); // overwriting core
+		
 
 		// TODO: are these error types logical?
 		assertCompileError(step("(def)"));
@@ -3391,6 +3391,15 @@ public class CoreTest extends ACVMTest {
 		assertUndeclaredError(step("(def a b)"));
 
 		assertUndeclaredError(step("(def a a)"));
+	}
+	
+	@Test 
+	public void testDefOverCore() {
+		Context<?> ctx=step("(def count [2 3])");
+		assertTrue(ctx.getEnvironment().containsKey(Symbols.COUNT));
+		assertNull(ctx.getMetadata().get(Symbols.COUNT));
+
+		assertEquals(Vectors.of(2,3),eval(ctx,"count"));
 	}
 	
 	@Test

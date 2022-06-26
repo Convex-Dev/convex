@@ -21,6 +21,8 @@
                                "For more information, see those functions defined in this library whose purpose is to delegate to asset implementations in a generic way."]
                  :name        "Convex Asset API library"}))
 
+;;;;;;;;;; Forward declarations
+(declare balance transfer)
 
 ;;;;;;;;;; Private
 

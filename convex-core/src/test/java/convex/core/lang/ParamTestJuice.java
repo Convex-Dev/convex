@@ -34,9 +34,9 @@ public class ParamTestJuice {
 			    { "3", 3L, Juice.CONSTANT },
 			    { "'()", Lists.empty(), Juice.CONSTANT },
 				{ "{}", Maps.empty(), JUICE_EMPTY_MAP }, // {}
-				{ "(hash-map)", Maps.empty(), (Juice.BUILD_DATA + JUICE_SYM_LOOKUP) }, // (hash-map)
+				{ "(hash-map)", Maps.empty(), (Juice.BUILD_DATA + Juice.CONSTANT) }, // (hash-map)
 				{ "(eval 1)", 1L,
-						(Juice.EVAL + JUICE_SYM_LOOKUP + Juice.CONSTANT) + Juice.EXPAND_CONSTANT + Juice.COMPILE_CONSTANT
+						(Juice.EVAL + Juice.CONSTANT + Juice.CONSTANT) + Juice.EXPAND_CONSTANT + Juice.COMPILE_CONSTANT
 								+ Juice.CONSTANT },
 				{ "(do)", null, Juice.DO }, { "({} 0 1)", 1L, JUICE_EMPTY_MAP + Juice.CONSTANT * 2 },
 				{ "(do (do :foo))", Keyword.create("foo"), Juice.DO * 2 + Juice.CONSTANT },
@@ -57,7 +57,7 @@ public class ParamTestJuice {
 																														// is
 																														// constant
 				{ "*depth*", 0L, Juice.SPECIAL },
-				{ "(= true true)", true, (1 * JUICE_SYM_LOOKUP) + (2 * Juice.CONSTANT) + Juice.EQUALS } });
+				{ "(= true true)", true, (3 * Juice.CONSTANT) + Juice.EQUALS } });
 	}
 
 	private String source;
