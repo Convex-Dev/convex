@@ -252,12 +252,10 @@ public class PeerStatus extends ARecord {
 	}
 
 	@Override 
-	public boolean equals(AMap<Keyword,ACell> a) {
-		if (this == a) return true; // important optimisation for e.g. hashmap equality
-		if (a == null) return false;
-		if (a.getTag()!=getTag()) return false;
-		PeerStatus as=(PeerStatus)a;
-		return equals(as);
+	public boolean equals(ACell a) {
+		if (!(a instanceof PeerStatus)) return false;
+		PeerStatus ps=(PeerStatus)a;
+		return equals(ps);
 	}
 	
 	/**
@@ -266,6 +264,7 @@ public class PeerStatus extends ARecord {
 	 * @return true if equal, false otherwise
 	 */
 	public boolean equals(PeerStatus a) {
+		if (this == a) return true; // important optimisation for e.g. hashmap equality
 		if (a == null) return false;
 		Hash h=this.cachedHash();
 		if (h!=null) {

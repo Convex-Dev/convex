@@ -20,7 +20,6 @@ import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Format;
 import convex.core.data.Hash;
-import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.MapEntry;
 import convex.core.data.PeerStatus;
@@ -701,10 +700,8 @@ public class Belief extends ARecord {
 	}
 	
 	@Override 
-	public boolean equals(AMap<Keyword,ACell> a) {
-		if (this == a) return true; // important optimisation for e.g. hashmap equality
-		if (a == null) return false;
-		if (a.getTag()!=getTag()) return false;
+	public boolean equals(ACell a) {
+		if (!(a instanceof Belief)) return false;
 		Belief as=(Belief)a;
 		return equals(as);
 	}
@@ -715,6 +712,7 @@ public class Belief extends ARecord {
 	 * @return true if equal, false otherwise
 	 */
 	public boolean equals(Belief a) {
+		if (this == a) return true; // important optimisation for e.g. hashmap equality
 		if (a == null) return false;
 		Hash h=this.cachedHash();
 		if (h!=null) {

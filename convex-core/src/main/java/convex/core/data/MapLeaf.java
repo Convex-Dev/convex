@@ -652,8 +652,9 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return true;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public boolean equals(AMap<K, V> a) {
+	public boolean equals(ACell a) {
 		if (!(a instanceof MapLeaf)) return false;
 		return equals((MapLeaf<K, V>) a);
 	}

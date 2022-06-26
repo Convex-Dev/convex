@@ -234,10 +234,9 @@ public class AccountStatus extends ARecord {
 	}
 	
 	@Override 
-	public boolean equals(AMap<Keyword,ACell> a) {
+	public boolean equals(ACell a) {
 		if (this == a) return true; // important optimisation for e.g. hashmap equality
-		if (a == null) return false;
-		if (a.getTag()!=getTag()) return false;
+		if(!(a instanceof AccountStatus)) return false;
 		AccountStatus as=(AccountStatus)a;
 		return equals(as);
 	}

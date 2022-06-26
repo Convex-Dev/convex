@@ -776,10 +776,8 @@ public class State extends ARecord {
 	}
 	
 	@Override 
-	public boolean equals(AMap<Keyword,ACell> a) {
-		if (this == a) return true; // important optimisation for e.g. hashmap equality
-		if (a == null) return false;
-		if (a.getTag()!=getTag()) return false;
+	public boolean equals(ACell a) {
+		if (!(a instanceof State)) return false;
 		State as=(State)a;
 		return equals(as);
 	}
@@ -790,6 +788,7 @@ public class State extends ARecord {
 	 * @return true if equal, false otherwise
 	 */
 	public boolean equals(State a) {
+		if (this == a) return true; // important optimisation for e.g. hashmap equality
 		if (a == null) return false;
 		Hash h=this.cachedHash();
 		if (h!=null) {

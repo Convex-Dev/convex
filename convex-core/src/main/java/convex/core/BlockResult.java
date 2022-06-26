@@ -3,7 +3,6 @@ package convex.core;
 import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
-import convex.core.data.AMap;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
 import convex.core.data.Format;
@@ -182,10 +181,8 @@ public class BlockResult extends ARecord {
 	}
 	
 	@Override 
-	public boolean equals(AMap<Keyword,ACell> a) {
-		if (this == a) return true; // important optimisation for e.g. hashmap equality
-		if (a == null) return false;
-		if (a.getTag()!=getTag()) return false;
+	public boolean equals(ACell a) {
+		if (!(a instanceof BlockResult)) return false;
 		BlockResult as=(BlockResult)a;
 		return equals(as);
 	}
@@ -196,6 +193,7 @@ public class BlockResult extends ARecord {
 	 * @return true if equal, false otherwise
 	 */
 	public boolean equals(BlockResult a) {
+		if (this == a) return true; // important optimisation for e.g. hashmap equality
 		if (a == null) return false;
 		Hash h=this.cachedHash();
 		if (h!=null) {
