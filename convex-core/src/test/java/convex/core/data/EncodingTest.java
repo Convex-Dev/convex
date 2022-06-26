@@ -221,4 +221,21 @@ public class EncodingTest {
 		assertEquals(1+Format.MAX_VLC_LONG_LENGTH,Address.MAX_ENCODING_LENGTH);
 		assertEquals(Address.MAX_ENCODING_LENGTH,maxAddress.getEncodingLength());
 	}
+	
+	@Test 
+	public void testIllegalEmbedded() throws BadFormatException {
+		AVector<?> v=Vectors.of(1);
+		assertEquals("80010901",v.getEncoding().toHexString());
+		
+		ACell s=Samples.NON_EMBEDDED_STRING;
+		Blob neb=s.getEncoding();
+		assertEquals(s,Format.read(neb)); // valid readable encoding
+		assertTrue(neb.count()>Format.MAX_EMBEDDED_LENGTH);
+		
+		// create encoding with non-embedded child ref
+		// This should be invalid, as it should be canonically coded as an indirect ref!
+		Blob b=Blob.fromHex("8001"+neb.toHexString());
+		
+		assertThrows(BadFormatException.class,()->Format.read(b));
+	}
 }
