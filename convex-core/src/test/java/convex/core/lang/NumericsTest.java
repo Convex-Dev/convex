@@ -1,11 +1,9 @@
 package convex.core.lang;
 
-import static convex.core.lang.TestState.eval;
-import static convex.core.lang.TestState.evalB;
-import static convex.core.lang.TestState.evalD;
-import static convex.core.lang.TestState.evalL;
-import static convex.core.lang.TestState.step;
-import static convex.test.Assertions.*;
+import static convex.test.Assertions.assertArityError;
+import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertCastError;
+import static convex.test.Assertions.assertNotError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -26,7 +24,7 @@ import convex.core.data.prim.CVMDouble;
  * 
  * - John Conway
  */
-public class NumericsTest {
+public class NumericsTest extends ACVMTest {
 
 	@Test
 	public void testIncDec() {
@@ -145,6 +143,7 @@ public class NumericsTest {
 		assertEquals(Double.NaN, evalD("(/ 0.0 0.0)"), 0);
 		assertEquals(Double.POSITIVE_INFINITY, evalD("(/ 2.0 0.0)"), 0);
 		assertEquals(Double.NEGATIVE_INFINITY, evalD("(/ -2.0 0.0)"), 0);
+		assertEquals(Double.NEGATIVE_INFINITY, evalD("(/ -1 0)"), 0);
 
 		assertCastError(step("(/ nil)"));
 		assertCastError(step("(/ 1 :foo)"));
@@ -208,9 +207,9 @@ public class NumericsTest {
 		assertEquals(CVMDouble.NEGATIVE_ZERO,eval("(signum -0.0)"));
 		assertEquals(CVMDouble.ZERO,eval("(signum 0.0)"));
 		assertEquals(CVMDouble.ONE,eval("(signum 13.3)"));
-		assertEquals(CVMDouble.MINUS_ONE,eval("(signum (/ -1 0))"));
+		assertEquals(CVMDouble.MINUS_ONE,eval("(signum ##-Inf)"));
 		assertEquals(CVMDouble.ONE,eval("(signum ##Inf)"));
-		assertEquals(CVMDouble.NaN,eval("(signum (sqrt -1))"));
+		assertEquals(CVMDouble.NaN,eval("(signum ##NaN)"));
 	}
 
 

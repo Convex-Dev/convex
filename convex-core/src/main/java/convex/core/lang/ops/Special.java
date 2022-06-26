@@ -14,6 +14,11 @@ import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 import convex.core.lang.Symbols;
 
+/**
+ * Op representing special Symbols like *address* and *caller*
+ * 
+ * @param <T> Type of special value
+ */
 public class Special<T extends ACell> extends AOp<T> {
 	
 	private final byte opCode;
