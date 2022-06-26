@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ## [0.7.6] - Unreleased
+### Added 
+- Support for parameterised asset paths in `convex.asset` as per CAD19
+- Multi-token reference implementation for single actor supporting many fungible assets
+
+### Changed
+- Static compilation enabled for `convex.core` functions
+
 ### Fixed
 - Correct handling for negative zero in min and max 
 
