@@ -796,7 +796,7 @@ public class Compiler {
 			// First check for sequences. This covers most cases.
 			if (form instanceof ASequence) {
 				
-				// first check for List
+				// first check for List containing an expander
 				if (form instanceof AList) {
 					AList<ACell> listForm = (AList<ACell>) form;
 					int n = listForm.size();
@@ -818,28 +818,20 @@ public class Compiler {
 				// OK for vectors and lists
 				ASequence<ACell> seq = (ASequence<ACell>) form;
 				if (seq.isEmpty()) return context.withResult(Juice.EXPAND_CONSTANT, x);
-				Context<ACell>[] ct = new Context[] { context };
 				
-				ASequence<ACell> updated;
-
-				updated = seq.map(elem -> {
-					Context<ACell> ctx = ct[0];
-					if (ctx.isExceptional()) return null;
-
+				long n=seq.count();
+				for (long i=0; i<n; i++) {
+					ACell elem=seq.get(i);
+				
 					// Expand like: (cont x cont)
-					ctx = ctx.expand(cont,elem, cont);
+					context = context.expand(cont,elem, cont);
+					if (context.isExceptional()) return context;
 
-					if (ctx.isExceptional()) {
-						ct[0] = ctx;
-						return null;
-					}
-					ACell newElement = ctx.getResult();
-					ct[0] = ctx;
-					return newElement;
-				});
-				Context<ACell> rctx = ct[0];
-				if (context.isExceptional()) return rctx;
-				return rctx.withResult(Juice.EXPAND_SEQUENCE, updated);
+					ACell newElement = context.getResult();
+					if (newElement!=elem) seq=seq.assoc(i, newElement);
+				};
+				Context<ACell> rctx = context;
+				return rctx.withResult(Juice.EXPAND_SEQUENCE, seq);
 			}
 
 			if (form instanceof ASet) {
