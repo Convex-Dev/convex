@@ -223,7 +223,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	public static <V extends ACell> SetLeaf<V> read(ByteBuffer bb, long count) throws BadFormatException {
 		if (count == 0) return Sets.empty();
 		if (count < 0) throw new BadFormatException("Negative count of map elements!");
-		if (count > MAX_ELEMENTS) throw new BadFormatException("MapLeaf too big: " + count);
+		if (count > MAX_ELEMENTS) throw new BadFormatException("SetLeaf too big: " + count);
 
 		Ref<V>[] items = (Ref<V>[]) new Ref[(int) count];
 		for (int i = 0; i < count; i++) {

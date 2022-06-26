@@ -31,7 +31,7 @@ public class Hash extends AArrayBlob {
 	public static final int LENGTH = Constants.HASH_LENGTH;
 	
 	/**
-	 * Type of Hash values
+	 * Type of Hash values is just a regular Blob
 	 */
 	public static final AType TYPE = Types.BLOB;
 
@@ -108,17 +108,6 @@ public class Hash extends AArrayBlob {
 	 */
 	public static Hash createFromDigest(MessageDigest digest) {
 		return wrap(digest.digest());
-	}
-
-	/**
-	 * Tests if the Hash value is precisely equal to another non-null Hash value.
-	 * 
-	 * @param other Hash to compare with
-	 * @return true if Hashes are equal, false otherwise.
-	 */
-	public boolean equals(Hash other) {
-		if (other == this) return true;
-		return Utils.arrayEquals(other.store, other.offset, this.store, this.offset, LENGTH);
 	}
 	
 	/**
@@ -210,7 +199,7 @@ public class Hash extends AArrayBlob {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (length != LENGTH) throw new InvalidDataException("Address length must be 32 bytes = 256 bits", this);
+		if (length != LENGTH) throw new InvalidDataException("Hash length must be 32 bytes = 256 bits", this);
 	}
 
 	@Override
@@ -229,5 +218,16 @@ public class Hash extends AArrayBlob {
 		// Check common bytes first
 		int c = Utils.compareByteArrays(this.store, this.offset, b.store, b.offset, LENGTH);
 		return c;
+	}
+	
+	/**
+	 * Tests if the Hash value is precisely equal to another non-null Hash value.
+	 * 
+	 * @param other Hash to compare with
+	 * @return true if Hashes are equal, false otherwise.
+	 */
+	public boolean equals(Hash other) {
+		if (other == this) return true;
+		return Utils.arrayEquals(other.store, other.offset, this.store, this.offset, LENGTH);
 	}
 }

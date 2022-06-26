@@ -284,7 +284,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	/**
 	 * Gets the Hash of this ref's value, or null if not yet computed
 	 * 
-	 * @return Hash of the value
+	 * @return Hash of the value, or null if not yet computed
 	 */
 	public final Hash cachedHash() {
 		return hash;
