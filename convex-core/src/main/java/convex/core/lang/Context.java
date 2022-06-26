@@ -2210,7 +2210,7 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Looks up an expander from a form in this context
-	 * @param form Form which might be an expander reference
+	 * @param form Form which might be an expander reference (either a symbol or (lookup...) form)
 	 * @return Expander instance, or null if no expander found
 	 */
 	public AFn<ACell> lookupExpander(ACell form) {
@@ -2254,6 +2254,7 @@ public class Context<T extends ACell> extends AObject {
 			return null;
 		}
 
+		// If no metadata found, definitely not an expander
 		if (me == null) return null;
 
 		// TODO: examine syntax object for expander details?
