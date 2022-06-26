@@ -504,7 +504,7 @@ public class Format {
 		byte tag=bb.get();
 		if (tag==Tag.REF) return Ref.readRaw(bb);
 		T cell= Format.read(tag,bb);
-		if (!Format.isEmbedded(cell)) throw new BadFormatException("Non-embedded Cell found instead of ref: "+cell );
+		if (!Format.isEmbedded(cell)) throw new BadFormatException("Non-embedded Cell found instead of ref: type = " +RT.getType(cell));
 		return Ref.get(cell);
 	}
 

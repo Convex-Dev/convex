@@ -28,7 +28,7 @@ import convex.core.exceptions.InvalidDataException;
  */
 public class Symbol extends ASymbolic {
 	
-	private Symbol(AString name) {
+	private Symbol(StringShort name) {
 		super(name);
 	}
 	
@@ -57,7 +57,7 @@ public class Symbol extends ASymbolic {
 	public static Symbol create(AString name) {
 		if (!validateName(name)) return null;
 		
-		Symbol sym= new Symbol(name);
+		Symbol sym= new Symbol((StringShort)name);
 		
 		synchronized (cache) {
 			// TODO: figure out if caching Symbols is a net win or not
@@ -75,7 +75,7 @@ public class Symbol extends ASymbolic {
 	 * @return Possibly invalid Keyword
 	 */
 	public static Symbol unsafeCreate(String rawName) {
-		return unsafeCreate(Strings.create(rawName));
+		return unsafeCreate((StringShort)Strings.create(rawName));
 	}
 	
 	/**
@@ -83,12 +83,13 @@ public class Symbol extends ASymbolic {
 	 * @param rawName Raw Symbol name
 	 * @return Possibly invalid Keyword
 	 */
-	public static Symbol unsafeCreate(AString rawName) {
+	public static Symbol unsafeCreate(StringShort rawName) {
 		return new Symbol(rawName);
 	}
 
 	@Override
 	public boolean equals(ACell o) {
+		if (o==this) return true;
 		if (o instanceof Symbol) return equals((Symbol) o);
 		return false;
 	}

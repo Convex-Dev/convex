@@ -26,7 +26,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	/** Minimum size of a Keyword in UTF-8 bytes representation */
 	public static final int MIN_CHARS = 1;
 
-	private Keyword(AString name) {
+	private Keyword(StringShort name) {
 		super(name);
 	}
 	
@@ -51,7 +51,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	 * @return Possibly invalid Keyword
 	 */
 	public static Keyword unsafeCreate(String rawName) {
-		return unsafeCreate(Strings.create(rawName));
+		return unsafeCreate((StringShort)Strings.create(rawName));
 	}
 	
 	/**
@@ -59,7 +59,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	 * @param rawName Raw Keyword name
 	 * @return Possibly invalid Keyword
 	 */
-	public static Keyword unsafeCreate(AString rawName) {
+	public static Keyword unsafeCreate(StringShort rawName) {
 		return new Keyword(rawName);
 	}
 
@@ -74,7 +74,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		if (!validateName(name)) {
 			return null;
 		}
-		return new Keyword(name);
+		return new Keyword((StringShort)name);
 	}
 
 	/**

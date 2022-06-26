@@ -143,7 +143,7 @@ public class Samples {
 
 	public static final AString MAX_EMBEDDED_STRING= Strings.create("This is a string containing exactly 137 characters. This is just right for a maximum embedded string in Convex. How lucky is that, eh????");
 	public static final AString NON_EMBEDDED_STRING= Strings.create(MAX_EMBEDDED_STRING.toString()+" ");
-	public static final AString MAX_SHORT_STRING= Strings.create(createASCIIString(StringShort.MAX_LENGTH));
+	public static final StringShort MAX_SHORT_STRING= (StringShort) Strings.create(createASCIIString(StringShort.MAX_LENGTH));
 	public static final AString MIN_TREE_STRING= Strings.create(createASCIIString(StringShort.MAX_LENGTH+1));
 
 	public static final String IPSUM="Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. ";

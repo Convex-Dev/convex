@@ -121,14 +121,14 @@ public class AdversarialDataTest {
 	}
 	
 	@Test public void testBadKeywords() {
-		invalidTest(Keyword.unsafeCreate((AString)null));
+		invalidTest(Keyword.unsafeCreate((StringShort)null));
 		invalidTest(Keyword.unsafeCreate(""));
 		invalidTest(Keyword.unsafeCreate(Samples.TOO_BIG_SYMBOLIC));
 		invalidTest(Keyword.unsafeCreate(Samples.MAX_SHORT_STRING));
 	}
 	
 	@Test public void testBadSymbols() {
-		invalidTest(Symbol.unsafeCreate((AString)null));
+		invalidTest(Symbol.unsafeCreate((StringShort)null));
 		invalidTest(Symbol.unsafeCreate(""));
 		invalidTest(Symbol.unsafeCreate(Samples.TOO_BIG_SYMBOLIC));
 		invalidTest(Symbol.unsafeCreate(Samples.MAX_SHORT_STRING));
