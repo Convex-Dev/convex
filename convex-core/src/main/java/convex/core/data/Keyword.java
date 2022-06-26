@@ -175,7 +175,6 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		return this;
 	}
 
-
 	@Override
 	public AString toCVMString(long limit) {
 		return Strings.COLON.append(name);
