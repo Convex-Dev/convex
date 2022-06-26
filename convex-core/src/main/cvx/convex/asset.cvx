@@ -245,6 +245,46 @@
         
       (-fail-path path))))
 
+(defn burn 
+
+  ^{:doc {:description "Burns a quantity of the given asset, if allowed by the implementation. Amount must be a valid quantity owned by the user."
+          :examples    [{:code "(burn [my-token-address :FOO] 1000)"}]
+          :signature   [{:params [path amount]}]}}
+
+  [path amount]
+  (cond 
+    (address? path)
+    (call path
+      (burn amount))
+    
+    (vector? path)
+    (call (first path)
+      (burn path amount))
+    
+    (-fail-path path)))
+
+
+
+(defn mint 
+
+  ^{:doc {:description "Mints a quantity of the given asset. User must have minting privileges."
+          :examples    [{:code "(mint [my-token-address :FOO] 1000)"}]
+          :signature   [{:params [token amount]}]}}
+
+  [path amount]
+
+  (cond 
+    (address? path)
+    (call path
+      (mint amount))
+    
+    (vector? path)
+    (call (first path)
+      (mint path amount))
+    
+    (-fail-path path)))
+
+
 
 
 (defn owns?

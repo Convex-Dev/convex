@@ -85,10 +85,11 @@
 
 (defn mint
   ^{:callable? true}
-  [id amount]
-  (let [token (or (get tokens id) (fail "token does not exist"))
+  [path amount]
+  (let [id (second path)
+        token (or (get tokens id) (fail "token does not exist"))
         [controller supply] token]
-    (when-not (trust/trusted? controller *caller*)
+    (when-not (trust/trusted? controller *caller* :mint)
            (fail :TRUST "No rights to mint"))
     
     (let [amount     (long amount) ;; Mint amount.
