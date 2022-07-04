@@ -211,6 +211,44 @@ public abstract class ACVMTest {
 	public <T extends AOp<?>> T comp(String source) {
 		return comp(Reader.read(source),CONTEXT);
 	}
+	
+	/**
+	 * Returns the difference in juice consumed between two sources
+	 * 
+	 * @param a First example of source code
+	 * @param b Second example of source code
+	 * @return Difference in juice consumed
+	 */
+	public long juiceDiff(String a, String b) {
+		return juice(b) - juice(a);
+	}
+	
+	/**
+	 * Compute the precise juice consumed by compiling the source code (i.e. the
+	 * cost of expand+compilation).
+	 * 
+	 * @param source Source to expand and compile
+	 * @return Juice consumed
+	 */
+	public long juiceCompile(String source) {
+		ACell form = Reader.read(source);
+		Context<?> jctx = context().expandCompile(form);
+		return CONTEXT.getJuice() - jctx.getJuice();
+	}
+
+	/**
+	 * Compute the precise juice consumed by expanding the source code (i.e. the
+	 * cost of initial expander execution).
+	 * 
+	 * @param source Source to expand
+	 * @return Juice consumed
+	 */
+	public long juiceExpand(String source) {
+		ACell form = Reader.read(source);
+		Context<?> jctx = context().invoke(Core.INITIAL_EXPANDER,form, Core.INITIAL_EXPANDER);
+		return CONTEXT.getJuice() - jctx.getJuice();
+	}
+
 
 	/**
 	 * Compute the precise juice consumed by executing the compiled source code

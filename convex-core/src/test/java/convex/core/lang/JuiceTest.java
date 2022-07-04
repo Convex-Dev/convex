@@ -4,8 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.data.ACell;
-
 /**
  * Tests for expected juice costs
  * 
@@ -13,51 +11,6 @@ import convex.core.data.ACell;
  * artisinal juice tests.
  */
 public class JuiceTest extends ACVMTest {
-
-	public JuiceTest() {
-		super(TestState.STATE);
-	}
-	
-	private long JUICE = context().getJuice();
-
-
-
-	/**
-	 * Compute the precise juice consumed by compiling the source code (i.e. the
-	 * cost of expand+compilation).
-	 * 
-	 * @param source
-	 * @return Juice consumed
-	 */
-	public long compileJuice(String source) {
-		ACell form = Reader.read(source);
-		Context<?> jctx = context().expandCompile(form);
-		return JUICE - jctx.getJuice();
-	}
-
-	/**
-	 * Compute the precise juice consumed by expanding the source code (i.e. the
-	 * cost of initial expander execution).
-	 * 
-	 * @param source
-	 * @return Juice consumed
-	 */
-	public long expandJuice(String source) {
-		ACell form = Reader.read(source);
-		Context<?> jctx = context().invoke(Core.INITIAL_EXPANDER,form, Core.INITIAL_EXPANDER);
-		return JUICE - jctx.getJuice();
-	}
-
-	/**
-	 * Returns the difference in juice consumed between two sources
-	 * 
-	 * @param a
-	 * @param b
-	 * @return Difference in juice consumed
-	 */
-	public long juiceDiff(String a, String b) {
-		return juice(b) - juice(a);
-	}
 
 	@Test
 	public void testSimpleValues() {
@@ -73,18 +26,18 @@ public class JuiceTest extends ACVMTest {
 
 	@Test
 	public void testCompileJuice() {
-		assertEquals(Juice.EXPAND_CONSTANT + Juice.COMPILE_CONSTANT, compileJuice("1"));
-		assertEquals(Juice.EXPAND_CONSTANT + Juice.COMPILE_CONSTANT, compileJuice("[]"));
+		assertEquals(Juice.EXPAND_CONSTANT + Juice.COMPILE_CONSTANT, juiceCompile("1"));
+		assertEquals(Juice.EXPAND_CONSTANT + Juice.COMPILE_CONSTANT, juiceCompile("[]"));
 
-		assertEquals(Juice.EXPAND_CONSTANT + Juice.COMPILE_LOOKUP, compileJuice("foobar"));
+		assertEquals(Juice.EXPAND_CONSTANT + Juice.COMPILE_LOOKUP, juiceCompile("foobar"));
 	}
 
 	@Test
 	public void testExpandJuice() {
-		assertEquals(Juice.EXPAND_CONSTANT, expandJuice("1"));
-		assertEquals(Juice.EXPAND_CONSTANT, expandJuice("[]"));
-		assertEquals(Juice.EXPAND_SEQUENCE + Juice.EXPAND_CONSTANT * 4, expandJuice("(= 1 2 3)"));
-		assertEquals(Juice.EXPAND_SEQUENCE + Juice.EXPAND_CONSTANT * 3, expandJuice("[1 2 3]")); // [1 2 3] -> (vector 1
+		assertEquals(Juice.EXPAND_CONSTANT, juiceExpand("1"));
+		assertEquals(Juice.EXPAND_CONSTANT, juiceExpand("[]"));
+		assertEquals(Juice.EXPAND_SEQUENCE + Juice.EXPAND_CONSTANT * 4, juiceExpand("(= 1 2 3)"));
+		assertEquals(Juice.EXPAND_SEQUENCE + Juice.EXPAND_CONSTANT * 3, juiceExpand("[1 2 3]")); // [1 2 3] -> (vector 1
 																									// 2 3)
 	}
 
@@ -96,11 +49,11 @@ public class JuiceTest extends ACVMTest {
 					+ Juice.CONSTANT, j);
 
 			// expand list with symbol and number literal
-			long je = expandJuice("(eval 1)");
+			long je = juiceExpand("(eval 1)");
 			assertEquals((Juice.EXPAND_SEQUENCE + Juice.EXPAND_CONSTANT * 2), je);
 
 			// compile node with constant and symbol lookup
-			long jc = compileJuice("(eval 1)");
+			long jc = juiceCompile("(eval 1)");
 			assertEquals(je + (Juice.COMPILE_NODE + Juice.COMPILE_CONSTANT + Juice.COMPILE_LOOKUP), jc);
 		}
 
@@ -114,7 +67,7 @@ public class JuiceTest extends ACVMTest {
 		{// eval for a small vector
 			long j = juice("(eval [1])");
 			long exParams = (Juice.CONSTANT + oneElemVectorJuice); // prepare call (lookup 'eval', build 1-vector arg)
-			long exCompile = compileJuice("[1]"); // cost of compiling [1]
+			long exCompile = juiceCompile("[1]"); // cost of compiling [1]
 			long exInvoke = (Juice.EVAL + oneElemVectorJuice); // cost of eval plus cost of running [1]
 			assertEquals(exParams + exCompile + exInvoke, j);
 		}
