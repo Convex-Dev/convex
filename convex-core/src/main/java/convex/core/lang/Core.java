@@ -1223,11 +1223,19 @@ public class Core {
 			if (n !=1) return context.withArityError(exactArityMessage(1, n));
 
 			ACell arg=args[0];
+			
+			AccountKey publicKey=null;
+			
+			if (arg!=null) {
+				// Ensure we have a Blob argument
+				ABlob b=RT.ensureBlob(arg);
+				if (b == null) return context.withCastError(arg, Types.BLOB);
 
-			// Check an account key is being used as argument. nil is permitted
-			AccountKey publicKey=RT.ensureAccountKey(arg);
-			if ((publicKey == null)&&(arg!=null)) return context.withCastError(arg, Types.BLOB);
-
+				// Check an account key is being used as argument. nil is permitted
+				publicKey=AccountKey.create(b);
+				if (publicKey == null) return context.withArgumentError("Invalid key length");
+			}
+			
 			context=(Context) context.setAccountKey(publicKey);
 			if (context.isExceptional()) return (Context<AccountKey>) context;
 

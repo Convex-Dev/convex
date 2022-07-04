@@ -2576,6 +2576,12 @@ public class CoreTest extends ACVMTest {
 				+ "    (def k 0x0000000000000000000000000000000000000000000000000000000000000000)"
 				+ "    (def a (deploy `(set-key ~k)))"
 				+ "    (= k (:key (account a))))"));
+		
+		assertCastError(step("(set-key :foo)"));
+		assertArgumentError(step("(set-key 0x00)"));
+		
+		assertArityError(step("(set-key)"));
+		assertArityError(step("(set-key 0x 0x)")); // arity before cast
 	}
 
 	@Test
