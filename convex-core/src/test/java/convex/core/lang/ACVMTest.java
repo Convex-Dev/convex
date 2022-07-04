@@ -129,12 +129,12 @@ public abstract class ACVMTest {
 		return (Context<T>) Context.createFake(rc.getState(), c.getAddress()).withValue(rc.getValue());
 	}
 
-	public boolean evalA(String source) {
+	public Address evalA(String source) {
 		return evalA(CONTEXT, source);
 	}
 
-	public static boolean evalA(Context<?> ctx, String source) {
-		return eval(ctx, source) instanceof Address;
+	public static Address evalA(Context<?> ctx, String source) {
+		return eval(ctx, source);
 
 	}
 
