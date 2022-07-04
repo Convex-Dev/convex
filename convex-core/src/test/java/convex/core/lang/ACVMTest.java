@@ -213,6 +213,29 @@ public abstract class ACVMTest {
 	}
 
 	/**
+	 * Compute the precise juice consumed by executing the compiled source code
+	 * (i.e. this excludes the code of expansion+compilation).
+	 * @param source Source code to evaluate
+	 * @return Juice consumed
+	 */	public long juice(String source) {
+		return juice(CONTEXT,source);
+	}
+	
+	/**
+	 * Compute the precise juice consumed by executing the compiled source code
+	 * (i.e. this excludes the code of expansion+compilation).
+	 * @param ctx Context in which to execute operation
+	 * @param source Source code to evaluate
+	 * @return Juice consumed
+	 */
+	public long juice(Context<?> ctx,String source) {
+		ACell form = Reader.read(source);
+		AOp<?> op = ctx.fork().expandCompile(form).getResult();
+		Context<?> jctx = ctx.fork().execute(op);
+		return ctx.getJuice() - jctx.getJuice();
+	}
+
+	/**
 	 * Compiles source code to a CVM Op
 	 * @param <T>
 	 * @param code Source code to compile as a form

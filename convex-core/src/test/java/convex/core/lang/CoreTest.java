@@ -3646,11 +3646,23 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testQuery() {
-		Context<AVector<ACell>> ctx=step("(query (def a 10) [*address* *origin* *caller* 10])");
-		assertEquals(Vectors.of(HERO,HERO,null,10L), ctx.getResult());
+		// Def should get rolled back
+		assertEquals(CVMLong.ONE,eval("(do (def a 1) (query (def a 3)) a)"));
 
 		// shouldn't be possible to mutate surrounding environment in query
 		assertEquals(10L,evalL("(let [a 3] (+ (query (set! a 5) (+ a 2)) a) )"));
+		
+		// Query should consume fixed juice
+		assertEquals(juice("1")+Juice.QUERY,juice("(query 1)"));
+		
+		// Query should add one to *depth*
+		assertEquals(evalL("*depth*")+1,evalL("(query *depth*)"));
+	}
+	
+	@Test
+	public void testQueryExample() {
+		Context<AVector<ACell>> ctx=step("(query (def a 10) [*address* *origin* *caller* 10])");
+		assertEquals(Vectors.of(HERO,HERO,null,10L), ctx.getResult());
 
 		// shouldn't be any def in the environment
 		assertSame(INITIAL,ctx.getState());

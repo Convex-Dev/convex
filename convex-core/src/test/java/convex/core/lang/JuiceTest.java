@@ -20,19 +20,7 @@ public class JuiceTest extends ACVMTest {
 	
 	private long JUICE = context().getJuice();
 
-	/**
-	 * Compute the precise juice consumed by executing the compiled source code
-	 * (i.e. this excludes the code of expansion+compilation).
-	 * 
-	 * @param source
-	 * @return Juice consumed
-	 */
-	public long juice(String source) {
-		ACell form = Reader.read(source);
-		AOp<?> op = context().expandCompile(form).getResult();
-		Context<?> jctx = context().execute(op);
-		return JUICE - jctx.getJuice();
-	}
+
 
 	/**
 	 * Compute the precise juice consumed by compiling the source code (i.e. the
