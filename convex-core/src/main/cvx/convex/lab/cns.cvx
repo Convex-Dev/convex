@@ -1,0 +1,227 @@
+'convex.cns
+
+
+;;;;;;;;;; Initialization
+
+;; Deployer must define:
+;;   `root-controller` -> address of the root controller of the CNS
+;;   `trust`           -> address of the trust library
+
+
+(declare root-controller)
+(declare trust)
+
+
+
+(defn init
+  ^{:callable? true}
+  [root-controller trust-address]
+  (def root-controller
+       root-controller)
+  (def trust
+       trust-address)
+  (undef init)
+  nil)
+
+
+;;;;;;;;;; Preparations
+
+
+(def *records*
+  {})
+
+
+
+(def self
+  *address*)
+
+
+;;;;;;;;;; Private helpers
+
+
+(defn -ensure-level
+  [x f-sym]
+  (when-not (and (address? x)
+                 (callable? x
+                            f-sym))
+    (fail :MISSING-INTERFACE
+          [x f-sym]))
+  x)
+
+
+;;;;;;;;;; Library functions
+
+
+(defn entry->path
+
+  ^{:doc {:description "Returns a CNS path (a vector)"
+          :examples    [{:code "(entry->path 'foo.bar)"}
+                        {:code "(entry->path [\"foo\" \"bar \"])"}]
+          :signature   [{:params [entry]}]}}
+
+  [entry]
+
+  (cond
+    (symbol? entry)
+    (split (str entry)
+           \.)
+    ;;
+    (vector? entry)
+    entry
+    ;;
+    (fail :ARGUMENT
+          nil)))
+
+
+
+(defn get-path
+
+  ^{:doc {:description ["Resolves a CNS entry to a value"
+                        "Returns nil if no value is found."
+                        "Note that some CNS level might also allow nil as a valid value"]
+          :examples    [{:code "(get-path 'foo.bar)"}]
+          :signature   [{:params [entry]}]}}
+
+  [entry]
+
+  (reduce (fn [parent child]
+            (call (-ensure-level parent
+                                 'cns-get-key)
+                  (cns-get-key child)))
+          self
+          (entry->path entry)))
+
+
+
+(defn set-path
+
+ ^{:doc {:description ["Registers a new value or updates an existing one at the given CNS entry."
+                       "Caller must have the necessary permissions for doing so, as determined by the last level in the path."
+                       "Options can be provided should the last level need any."]
+         :examples    [{:code "(set-path 'foo.bar #42)"}
+                       {:code "(set-path 'foo.bar #42 {:some :options})"}]
+         :signature   [{:params [entry value]}
+                       {:params [entry value options]}]}}
+
+ ([entry value]
+  (set-path entry
+            value
+            nil))
+
+ ([entry value options]
+  (let [path (entry->path entry)
+        n    (count path)]
+    (if (zero? n)
+     (fail :ARGUMENT
+           nil)
+     (call (-ensure-level (get-path (slice path
+                                           0
+                                           (dec n)))
+                          'cns-set-key)
+           (cns-set-key (last path)
+                        value
+                        options))))))
+
+
+;;;;;;;;;; CNS interface
+
+
+(defn cns-get-key
+
+  ^{:callable? true}
+
+  [key]
+
+  (get-in *records*
+          [key 0]))
+
+
+(defn -set-key
+  [key value]
+  (def *records*
+       (assoc *records*
+              key
+              [value *caller*])))
+
+
+
+(defn cns-set-key
+
+  ^{:callable? true}
+
+  [key value options]
+
+  (let [record (*records* key)
+        object [*address* key]]
+    (if record
+      (do
+        (when-not (trust/trusted? (second record)
+                                  *caller*
+                                  [:update-key options]
+                                  object)
+          (fail :TRUST.UPDATE-KEY
+                nil))
+        (if (nil? value)
+          (dissoc *records*
+                  key)
+          (-set-key key
+                    value)))
+      (do
+        (when-not (trust/trusted? root-controller
+                                  *caller*
+                                  [:add-key options]
+                                  object)
+          (fail :TRUST.ADD-KEY
+                nil))
+        (-set-key key
+                  value)))
+    value))
+
+
+;;;;;;;;;; Specific callable functions related to trust monitors
+
+(defn set-controller
+
+  ^{:callable? true}
+
+  [key controller]
+
+  (let [record (*records* key)]
+    (when (nil? record)
+      (fail :MISSING-RECORD
+            nil))
+    (let [object [*address* key]]
+      (when-not (or (trust/trusted? root-controller
+                                    *caller*
+                                    :set-controller
+                                    object))
+                    (trust/trusted? (second record)
+                                    *caller*
+                                    :set-controller
+                                    object)
+        (fail :TRUST.SET-CONTROLLER
+              nil)))
+    (def *records*
+         (assoc *records*
+                key
+                (assoc record
+                       1
+                       controller)))
+    nil))
+
+
+(defn set-root-controller
+  
+  ^{:callable? true}
+
+  [controller]
+
+  (when-not (trust/trusted? root-controller
+                            *caller*
+                            :set-root-controller
+                            *address*)
+    (fail :TRUST.SET-ROOT-CONTROLLER
+          nil))
+  (def root-controller
+       controller)
+  nil)
