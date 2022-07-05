@@ -2,6 +2,7 @@ package convex.core.crypto;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -62,9 +63,7 @@ public class PFXTools {
 		char[] pwdArray = password(passPhrase);
 		try (FileInputStream fis = new FileInputStream(keyFile)) {
 			ks.load(fis, pwdArray);
-		} catch (IOException e) {
-			throw new IOException("Can't read keystore at: "+keyFile,e);
-		}
+		} 
 		return ks;
 	}
 
