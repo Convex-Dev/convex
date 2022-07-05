@@ -739,7 +739,7 @@ public class RT {
 	/**
 	 * Converts any data structure to a vector
 	 * 
-	 * @param o Object to attemptto convert to a Vector
+	 * @param o Object to attempt to convert to a Vector
 	 * @return AVector instance, or null if not convertible
 	 */
 	@SuppressWarnings("unchecked")
@@ -940,10 +940,14 @@ public class RT {
 	 * @return The count of elements in the collection, or null if not countable
 	 */
 	public static Long count(ACell a) {
+		// special case: null is considered as empty collection
 		if (a == null)
 			return 0L;
+
 		if (a instanceof ACountable)
 			return ((ACountable<?>) a).count();
+		
+		
 		return null;
 	}
 
@@ -1604,7 +1608,7 @@ public class RT {
 	}
 
 	/**
-	 * Converts a Java value to a CVM type
+	 * Converts a Java value to a CVM type.
 	 * 
 	 * @param o Any Java Object
 	 * @return Valid CVM type
