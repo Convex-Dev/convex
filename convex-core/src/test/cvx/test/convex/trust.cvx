@@ -58,16 +58,6 @@
                                            [])
                           {:description "Cannot trust something that is not an address."})
 
-             (T/fail.code #{:CAST}
-                          '(trust/trusted? nil
-                                           *address*)
-                          {:description "List cannot be nil."})
-
-             (T/fail.code #{:CAST}
-                          '(trust/trusted? []
-                                           *address*)
-                          {:description "List must be an address, obviously."})
-
              (T/trx '(address? (def user-1
                                     ($.account/zombie)))
                     {:description "User 1 deployed."})
@@ -159,6 +149,28 @@
                                            (set-trusted ~*address*
                                                         false)))
                           {:description "Non-controller trying to remove trust for trusted account fails."}))))
+
+
+
+(defn suite.misc
+  
+  ^{:doc {:description "Other functions."}}
+
+  []
+
+  (T/group '((T/path.conj 'misc)
+
+             (T/trx '(not (trust/trust-monitor? []))
+                    {:description "Obviously not a trust monitor."})
+
+             (T/trx `(trust/trust-monitor? ($.account/zombie))
+                    {:description "Regular users are trust monitors, albeit simple ones."})
+
+             (T/trx `(not (trust/trust-monitor? (deploy nil)))
+                    {:description "Actor must implement the interface."})
+
+             (T/trx `(trust/trust-monitor? (deploy '(defn check-trusted? ^{:callable? true} [])))
+                    {:description "Okay if actor seems to implement the interface."}))))
 
 
 
@@ -264,16 +276,6 @@
                                            [])
                           {:description "Cannot trust something that is not an address."})
 
-             (T/fail.code #{:CAST}
-                          '(trust/trusted? nil
-                                           *address*)
-                          {:description "List cannot be nil."})
-
-             (T/fail.code #{:CAST}
-                          '(trust/trusted? []
-                                           *address*)
-                          {:description "List must be an address, obviously."})
-
              (T/trx '(address? (def user-1
                                     ($.account/zombie)))
                     {:description "User 1 deployed."})
@@ -378,6 +380,7 @@
 
   (T/group '((T/path.conj 'convex.trust)
              (suite.blacklist)
+             (suite.misc)
              (suite.self-trust)
              (suite.upgrade)
              (suite.whitelist))))
