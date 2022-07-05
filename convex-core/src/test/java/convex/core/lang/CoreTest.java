@@ -3013,10 +3013,13 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testExp() {
 		assertEquals(1.0, evalD("(exp 0)"));
+		assertEquals(1.0, evalD("(exp 0.0)"));
 		assertEquals(1.0, evalD("(exp -0)"));
 		assertEquals(StrictMath.exp(1.0), evalD("(exp 1)"));
-		assertEquals(0.0, evalD("(exp (/ -1 0))"));
-		assertEquals(Double.POSITIVE_INFINITY, evalD("(exp (/ 1 0))"));
+		
+		assertEquals(CVMDouble.ZERO, eval("(exp (/ -1 0))"));
+		assertEquals(CVMDouble.ONE, eval("(exp -0.0)"));
+		assertEquals(CVMDouble.POSITIVE_INFINITY, eval("(exp (/ 1 0))"));
 
 		assertCastError(step("(exp :a)"));
 		assertCastError(step("(exp #3)"));
