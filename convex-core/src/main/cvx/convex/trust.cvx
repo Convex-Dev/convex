@@ -26,6 +26,20 @@
 ;;;;;;;;;; Checking trust
 
 
+(defn trust-monitor?
+
+  ^{:doc {:description "Does `x` look like a trust monitor?"
+          :examples    [{:code "(trust-monitor? #42)"}]
+          :signature   [{:params [x]}]}}
+
+  [x]
+
+  (or (not (address? controller))
+      (and (actor? controller)
+           (not (callable? check-trusted?)))))
+
+
+
 (defn trusted? 
 
   ^{:doc {:description ["Returns true if `subject` is trusted by `trust-monitor`, false otherwise."
@@ -41,19 +55,19 @@
                         {:params [trust-monitor subject action object]}]}}
 
 
-  ([trust-monitor subject action]
-
-   (trusted? trust-monitor
-             subject
-             action
-             nil))
-
-
   ([trust-monitor subject]
 
    (trusted? trust-monitor
              subject
              nil
+             nil))
+
+
+  ([trust-monitor subject action]
+
+   (trusted? trust-monitor
+             subject
+             action
              nil))
 
 
@@ -64,7 +78,7 @@
                   (check-trusted? subject
                                   action
                                   object)))
-     (= (address trust-monitor)
+     (= trust-monitor
         subject))))
 
 
