@@ -78,7 +78,7 @@
                   (check-trusted? subject
                                   action
                                   object)))
-     (= trust-monitor
+     (= (address trust-monitor)
         subject))))
 
 
