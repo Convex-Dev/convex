@@ -14,12 +14,12 @@ import java.security.UnrecoverableKeyException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
+/**
+ * Utility class for working with Java Key Stores
+ */
 public class PFXTools {
 
 	public static final String KEYSTORE_TYPE="PKCS12";
-
-	public static final String CERTIFICATE_ALGORITHM = "RSA";
-
 
 	private static char[] password(String passPhrase) {
 		return (passPhrase == null) ? (new char[0]) : passPhrase.toCharArray();
