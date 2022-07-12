@@ -108,7 +108,7 @@ public final class Result extends ARecordGeneric {
 	 */
 	@SuppressWarnings("unchecked")
 	public AVector<AString> getTrace() {
-		ACell info=getInfo();
+		AMap<Keyword,ACell> info=getInfo();
 		if (info instanceof AMap) {
 			AMap<Keyword,ACell> m=(AMap<Keyword, ACell>) info;
 			return (AVector<AString>) m.get(Keywords.TRACE);
@@ -149,14 +149,15 @@ public final class Result extends ARecordGeneric {
 	}
 	
 	@Override
-	public void validateCell() throws InvalidDataException {
-		super.validateCell();
-		Object id=values.get(0);
+	public void validate() throws InvalidDataException {
+		super.validate();
+		
+		ACell id=values.get(0);
 		if ((id!=null)&&!(id instanceof CVMLong)) {
 			throw new InvalidDataException("Result ID must be a CVM long value",this);
 		}
 	}
-
+	
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.RESULT;

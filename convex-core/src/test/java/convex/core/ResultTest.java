@@ -5,6 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ACell;
+import convex.core.data.AMap;
+import convex.core.data.Keyword;
+import convex.core.data.Keywords;
+import convex.core.data.Maps;
 import convex.core.data.RecordTest;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -26,7 +31,11 @@ public class ResultTest {
 	
 	@Test
 	public void testResultCreation() {
-		Result r1=Result.create(CVMLong.create(0L),RT.cvm(1L),null);
+		AMap<Keyword,ACell> info=Maps.of(Keywords.TRACE,Vectors.empty());
+		Result r1=Result.create(CVMLong.create(0L),RT.cvm(1L),ErrorCodes.FATAL,info);
+		assertSame(Vectors.empty(),r1.getTrace());
+		assertSame(info,r1.getInfo());
+		assertSame(ErrorCodes.FATAL,r1.getErrorCode());
 		
 		RecordTest.doRecordTests(r1);
 	}
