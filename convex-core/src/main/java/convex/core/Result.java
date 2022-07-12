@@ -3,10 +3,12 @@ package convex.core;
 import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
+import convex.core.data.AMap;
 import convex.core.data.ARecordGeneric;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Address;
+import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.Tag;
@@ -106,7 +108,21 @@ public final class Result extends ARecordGeneric {
 	 */
 	@SuppressWarnings("unchecked")
 	public AVector<AString> getTrace() {
-		return (AVector<AString>) values.get(3);
+		ACell info=getInfo();
+		if (info instanceof AMap) {
+			AMap<Keyword,ACell> m=(AMap<Keyword, ACell>) info;
+			return (AVector<AString>) m.get(Keywords.TRACE);
+		}
+		return null;
+	}
+	
+	/**
+	 * Returns the info for this Result. May be null
+	 * 
+	 * @return ID from this result
+	 */
+	public ACell getInfo() {
+		return values.get(3);
 	}
 	
 	/**
