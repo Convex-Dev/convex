@@ -56,7 +56,7 @@ public final class Result extends ARecordGeneric {
 	 * @param info Additional info
 	 * @return Result instance
 	 */
-	public static Result create(CVMLong id, ACell value, ACell errorCode, ACell info) {
+	public static Result create(CVMLong id, ACell value, ACell errorCode, AMap<Keyword,ACell> info) {
 		return create(Vectors.of(id,value,errorCode,info));
 	}
 	
@@ -104,7 +104,7 @@ public final class Result extends ARecordGeneric {
 	/**
 	 * Returns the stack trace for this result. May be null
 	 * 
-	 * @return ID from this result
+	 * @return Trace vector from this result
 	 */
 	@SuppressWarnings("unchecked")
 	public AVector<AString> getTrace() {
@@ -119,10 +119,11 @@ public final class Result extends ARecordGeneric {
 	/**
 	 * Returns the info for this Result. May be null
 	 * 
-	 * @return ID from this result
+	 * @return Info map from this result
 	 */
-	public ACell getInfo() {
-		return values.get(3);
+	@SuppressWarnings("unchecked")
+	public AMap<Keyword,ACell> getInfo() {
+		return (AMap<Keyword, ACell>) values.get(3);
 	}
 	
 	/**
@@ -194,7 +195,7 @@ public final class Result extends ARecordGeneric {
 	public static Result fromContext(CVMLong id,Context<?> ctx) {
 		Object result=ctx.getValue();
 		ACell errorCode=null;
-		ACell info=null;
+		AMap<Keyword,ACell> info=null;
 		if (result instanceof AExceptional) {
 			AExceptional ex=(AExceptional)result;
 			result=ex.getMessage();
