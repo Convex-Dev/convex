@@ -6,7 +6,9 @@ import convex.core.data.ACell;
 import convex.core.data.ARecordGeneric;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.Address;
 import convex.core.data.Keywords;
+import convex.core.data.Maps;
 import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -22,11 +24,19 @@ import convex.core.lang.impl.RecordFormat;
  * 
  * A Result is typically used to communicate the outcome of a Query or a Transaction from a Peer to a Client.
  * 
+ * Contains:
+ * <ol>
+ * <li>Message ID</li>
+ * <li>Result value</li>
+ * <li>Error Code</li>
+ * <li>Additional info</li>
+ * </ol>
+ * 
  * 
  */
 public final class Result extends ARecordGeneric {
 
-	private static final RecordFormat RESULT_FORMAT=RecordFormat.of(Keywords.ID,Keywords.RESULT,Keywords.ERROR_CODE,Keywords.TRACE);
+	private static final RecordFormat RESULT_FORMAT=RecordFormat.of(Keywords.ID,Keywords.RESULT,Keywords.ERROR,Keywords.INFO);
 	
 	private Result(AVector<ACell> values) {
 		super(RESULT_FORMAT, values);
@@ -41,11 +51,11 @@ public final class Result extends ARecordGeneric {
 	 * @param id ID of Result message
 	 * @param value Result Value
 	 * @param errorCode Error Code (may be null for success)
-	 * @param trace Error Trace
+	 * @param info Additional info
 	 * @return Result instance
 	 */
-	public static Result create(CVMLong id, ACell value, ACell errorCode, ACell trace) {
-		return create(Vectors.of(id,value,errorCode,trace));
+	public static Result create(CVMLong id, ACell value, ACell errorCode, ACell info) {
+		return create(Vectors.of(id,value,errorCode,info));
 	}
 	
 	/**
@@ -168,16 +178,19 @@ public final class Result extends ARecordGeneric {
 	public static Result fromContext(CVMLong id,Context<?> ctx) {
 		Object result=ctx.getValue();
 		ACell errorCode=null;
-		ACell trace=null;
+		ACell info=null;
 		if (result instanceof AExceptional) {
 			AExceptional ex=(AExceptional)result;
 			result=ex.getMessage();
 			errorCode=ex.getCode();
 			if (ex instanceof ErrorValue) {
-				trace=Vectors.create(((ErrorValue)ex).getTrace());
+				ErrorValue ev=(ErrorValue) ex;
+				AVector<?> trace=Vectors.create(ev.getTrace());
+				Address address=ev.getAddress();
+				info =Maps.of(Keywords.TRACE,trace,Keywords.ADDRESS,address);
 			}
 		}
-		return create(id,(ACell)result,errorCode,trace);
+		return create(id,(ACell)result,errorCode,info);
 	}
 
 	/**

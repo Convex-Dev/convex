@@ -18,6 +18,7 @@ import convex.core.data.Strings;
  * <li>An immutable Error Code</li>
  * <li>An immutable Error Message</li>
  * <li>A mutable error trace (for information purposes outside the CVM)</li>
+ * <li>Address where the error occurred</li>
  * </ul>
  * 
  * "Computers are useless. They can only give you answers."
@@ -104,8 +105,9 @@ public class ErrorValue extends AExceptional {
 	
 	/**
 	 * Gets the address which is the source of this error
+	 * @return Address of account where error occurred
 	 */
-	public Address getAddress(Address a) {
+	public Address getAddress() {
 		return address;
 	}
 	
