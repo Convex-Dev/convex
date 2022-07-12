@@ -1830,6 +1830,7 @@ public class Context<T extends ACell> extends AObject {
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> withError(ErrorValue error) {
 		error.addLog(log);
+		error.setAddress(getAddress());
 		return (Context<R>) withException(error);
 	}
 

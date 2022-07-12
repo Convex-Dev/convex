@@ -5,6 +5,7 @@ import java.util.List;
 
 import convex.core.data.ACell;
 import convex.core.data.AString;
+import convex.core.data.Address;
 import convex.core.data.Strings;
 
 /**
@@ -29,6 +30,7 @@ public class ErrorValue extends AExceptional {
 	private final ACell message;
 	private final ArrayList<AString> trace=new ArrayList<>();
 	private ACell log;
+	private Address address=null;
 
 	private ErrorValue(ACell code, ACell message) {
 		if (code==null) throw new IllegalArgumentException("Error code must not be null");
@@ -91,6 +93,22 @@ public class ErrorValue extends AExceptional {
 	public void addLog(ACell log) {
 		this.log=log;
 	}
+	
+	/**
+	 * Sets the address which is the source of this error
+	 * @param a Address of error cause
+	 */
+	public void setAddress(Address a) {
+		this.address=a;
+	}
+	
+	/**
+	 * Gets the address which is the source of this error
+	 */
+	public Address getAddress(Address a) {
+		return address;
+	}
+	
 	
 	/**
 	 * Gets the optional message associated with this error value, or null if not supplied.
