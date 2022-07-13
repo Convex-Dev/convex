@@ -222,6 +222,9 @@ public class CoreTest extends ACVMTest {
 		assertEquals(2L,evalL("(let [[a b] [1 2]] b)"));
 		assertEquals(2L,evalL("(let [[a b] '(1 2)] b)"));
 
+		// See issue #62
+		assertArityError(step("(let [[a b & c d] [1 2]] c)"));
+		
 		assertCompileError(step("(let ['(a b) '(1 2)] b)"));
 
 		// badly formed lets - Issue #80 related
