@@ -412,7 +412,7 @@ public class CoreTest extends ACVMTest {
 		assertNull(eval("(if false 1)"));
 		assertEquals(CVMLong.ONE,eval("(if true 1)"));
 
-		// TODO: should these be arity errors?
+		// These are arity errors to prevent obvious mistakes. Use cond if you want arbitrary arity!
 		assertArityError(step("(if)"));
 		assertArityError(step("(if 1)"));
 		assertArityError(step("(if 1 2 3 4)"));
@@ -824,6 +824,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(-1.0,evalD("(ceil -1)"));
 		assertEquals(0.0,evalD("(ceil 0)"));
 		assertEquals(1.0,evalD("(ceil 1)"));
+		assertEquals(2.0,evalD("(ceil (byte 0x02))"));
 
 		// Special cases
 		assertEquals(Double.NaN,evalD("(ceil ##NaN)"));
@@ -2264,7 +2265,6 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(() :foo)"));
 		assertCastError(step("(() {})"));
 
-
 		// bad arity
 		assertArityError(step("(())"));
 		assertArityError(step("(() 1 2 3 4)"));
@@ -2347,6 +2347,9 @@ public class CoreTest extends ACVMTest {
 		Context<Address> ctx=step("(create-account 0x817934590c058ee5b7f1265053eeb4cf77b869e14c33e7f85b2babc85d672bbc)");
 		Address addr=ctx.getResult();
 		assertEquals(addr.longValue()+1,ctx.getState().getAccounts().count()); // should be last Address added
+		
+		// Query rollback should result in same account being created
+		assertTrue(evalB("(= (query (create-account *key*)) (query (create-account *key*)))"));
 
 		assertCastError(step("(create-account :foo)"));
 		assertCastError(step("(create-account 1)"));
