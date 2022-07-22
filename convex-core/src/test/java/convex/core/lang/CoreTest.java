@@ -2978,6 +2978,10 @@ public class CoreTest extends ACVMTest {
 		assertEquals(2L, evalL("(quot 10 4)"));
 		assertEquals(-2L, evalL("(quot -10 4)"));
 
+		// Division by zero
+		assertArgumentError(step("(quot 2 0)"));
+		assertArgumentError(step("(quot 0 0)"));
+		
 		assertCastError(step("(quot :a 7)"));
 		assertCastError(step("(quot 7 nil)"));
 
@@ -2996,6 +3000,9 @@ public class CoreTest extends ACVMTest {
 
 		assertEquals(6L, evalL("(mod -1 -7)"));
 
+		// Division by zero
+		assertArgumentError(step("(mod -2 0)"));
+		assertArgumentError(step("(mod 0 0)"));
 		assertArgumentError(step("(mod 10 0)"));
 
 		assertCastError(step("(mod :a 7)"));
@@ -3033,9 +3040,10 @@ public class CoreTest extends ACVMTest {
 		assertEquals(1.0, evalD("(exp -0)"));
 		assertEquals(StrictMath.exp(1.0), evalD("(exp 1)"));
 		
-		assertEquals(CVMDouble.ZERO, eval("(exp (/ -1 0))"));
+		assertEquals(CVMDouble.ZERO, eval("(exp ##-Inf)"));
 		assertEquals(CVMDouble.ONE, eval("(exp -0.0)"));
-		assertEquals(CVMDouble.POSITIVE_INFINITY, eval("(exp (/ 1 0))"));
+		assertEquals(CVMDouble.POSITIVE_INFINITY, eval("(exp ##Inf)"));
+		assertEquals(CVMDouble.NaN, eval("(exp ##NaN)"));
 
 		assertCastError(step("(exp :a)"));
 		assertCastError(step("(exp #3)"));
