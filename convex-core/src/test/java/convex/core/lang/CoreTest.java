@@ -1423,8 +1423,8 @@ public class CoreTest extends ACVMTest {
 		// Not data structures, but are countable
 		assertEquals(CVMChar.create('b'), eval("(second \"abc\")"));
 		assertEquals(CVMByte.create(0x34), eval("(second 0x1234)"));
-		assertBoundsError(step("(second \"\")"));
-		assertBoundsError(step("(second 0x)"));
+		assertBoundsError(step("(second \"a\")"));
+		assertBoundsError(step("(second 0x01)"));
 
 	}
 
@@ -2959,6 +2959,10 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testPow() {
 		assertEquals(4.0, evalD("(pow 2 2)"));
+		
+		// NaN handling
+		assertEquals(CVMDouble.NaN, eval("(pow 2 ##NaN)"));
+		assertEquals(CVMDouble.NaN, eval("(pow ##NaN 2)"));
 
 		assertCastError(step("(pow :a 7)"));
 		assertCastError(step("(pow 7 :a)"));
