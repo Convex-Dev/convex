@@ -214,25 +214,34 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testLet() {
+		assertNull(eval("(let[])"));
 
-		assertCastError(step("(let [[a b] :foo] b)"));
-
-		assertArityError(step("(let [[a b] nil] b)"));
-		assertArityError(step("(let [[a b] [1]] b)"));
-		assertEquals(2L,evalL("(let [[a b] [1 2]] b)"));
-		assertEquals(2L,evalL("(let [[a b] '(1 2)] b)"));
-
-		// See issue #62
-		assertArityError(step("(let [[a b & c d] [1 2]] c)"));
-		
 		assertCompileError(step("(let ['(a b) '(1 2)] b)"));
 
 		// badly formed lets - Issue #80 related
 		assertCompileError(step("(let)"));
 		assertCompileError(step("(let :foo)"));
 		assertCompileError(step("(let [a])"));
+	}
+	
+	@Test
+	public void testLetDestructuring() {
+		assertNull(eval("(let[[] []])"));
+		assertSame(Vectors.empty(),eval("(let [[& a] []] a)"));
+		
+		// nil treated as empty sequence
+		assertSame(Vectors.empty(),eval("(let [[& a] nil] a)"));
+		
+		assertEquals(2L,evalL("(let [[a b] [1 2]] b)"));
+		assertEquals(2L,evalL("(let [[a b] '(1 2)] b)"));
 
+		assertCastError(step("(let [[a b] :foo] b)"));
 
+		assertArityError(step("(let [[a b] nil] b)"));
+		assertArityError(step("(let [[a b] [1]] b)"));
+
+		// See issue #62
+		assertArityError(step("(let [[a b & c d] [1 2]] c)"));
 	}
 
 	@Test
