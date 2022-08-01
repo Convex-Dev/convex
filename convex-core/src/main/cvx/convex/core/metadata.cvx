@@ -506,6 +506,12 @@
         :examples  [{:code "(double 3)"}]
         :signature [{:params [x]
                      :return Double}]}}
+ 
+ double?
+ {:doc {:description "Returnes `true` if the argument is a value of Double type, `false` otherwise."
+        :examples    [{:code "(double? 1.0)"}]
+        :signature   [{:params [x]
+                       :return Boolean}]}}
 
  empty
  {:doc {:description "Returns an empty collection of the same type as the argument. `(empty nil)` returns nil."

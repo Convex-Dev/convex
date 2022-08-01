@@ -2516,6 +2516,13 @@ public class Core {
 			return val instanceof CVMLong;
 		}
 	});
+	
+	public static final CorePred DOUBLE_Q = reg(new CorePred(Symbols.DOUBLE_Q) {
+		@Override
+		public boolean test(ACell val) {
+			return val instanceof CVMDouble;
+		}
+	});
 
 	public static final CorePred STR_Q = reg(new CorePred(Symbols.STR_Q) {
 		@Override

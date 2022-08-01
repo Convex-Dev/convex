@@ -1640,6 +1640,20 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(double)"));
 		assertArityError(step("(double :foo :bar)"));
 	}
+	
+	@Test
+	public void testDoublePred() {
+		assertTrue(evalB("(double? 1.0)"));
+		assertTrue(evalB("(double? ##NaN)"));
+
+		assertFalse(evalB("(double? nil)"));
+		assertFalse(evalB("(double? [])"));
+		assertFalse(evalB("(double? 0)"));
+		assertFalse(evalB("(double? :foo)"));
+
+		assertArityError(step("(double?)"));
+		assertArityError(step("(double? :foo :bar)"));
+	}
 
 	@Test
 	public void testMap() {
@@ -3304,7 +3318,7 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(number? (byte 0))"));
 		assertTrue(evalB("(number? 0.5)"));
 		assertTrue(evalB("(number? ##NaN)")); // Sane? Is numeric double type....
-
+		
 		assertFalse(evalB("(number? nil)"));
 		assertFalse(evalB("(number? :foo)"));
 		assertFalse(evalB("(number? 0xFF)"));
