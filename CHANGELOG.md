@@ -5,10 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.7.6] - Unreleased
+## [0.7.7] - Unreleased
 ### Added 
 - Support for parameterised asset paths in `convex.asset` as per CAD19
 - Multi-token reference implementation for single actor supporting many fungible assets
+- Add missing `double?` predicate
 
 ### Changed
 - Static compilation enabled for `convex.core` functions
