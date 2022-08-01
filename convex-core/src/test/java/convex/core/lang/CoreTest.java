@@ -2023,6 +2023,8 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Keywords.STATE, eval("(keyword (name :state))"));
 		assertEquals(Keywords.STATE, eval("(keyword (str 'state))"));
 		assertEquals(Keywords.STATE, eval("(keyword 'state)"));
+		
+		assertTrue(evalB("(keyword? (keyword \"0\"))"));
 
 		// keyword lookups
 		assertNull(eval("((keyword :foo) nil)"));

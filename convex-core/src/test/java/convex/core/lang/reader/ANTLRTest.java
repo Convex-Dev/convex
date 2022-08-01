@@ -108,6 +108,7 @@ public class ANTLRTest {
 		assertEquals(Keyword.create("/"),read(":/"));
 		
 		assertParseError(":");
+		assertParseError(":0");
 	}
 
 		
@@ -118,6 +119,15 @@ public class ANTLRTest {
 		
 		assertParseError("0x0");
 
+	}
+	
+	@Test public void testParens() {
+		assertParseError("(");
+		assertParseError(")");
+		assertParseError("[");
+		assertParseError("]");
+		assertParseError("{");
+		assertParseError("}");
 	}
 	
 	@Test public void testAddress() {
