@@ -1099,7 +1099,7 @@
 
 
  subset?
- {:doc {:description "Returns true if `set-1` is a subset of `set-2u. Both arguments must be sets, nil being considered as an empty set."
+ {:doc {:description "Returns true if `set-1` is a subset of `set-2`. Both arguments must be sets, nil being considered as an empty set."
         :examples    [{:code "(subset? #{1} #{1 2 3})"}]
         :signature   [{:params [set-1 set-2]
                        :return Boolean}]}}
