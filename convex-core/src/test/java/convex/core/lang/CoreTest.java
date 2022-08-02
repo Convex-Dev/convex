@@ -278,6 +278,8 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(get)"));
 		assertArityError(step("(get 1 2 3 4)"));
 
+		assertCastError(step("(get \"ab\" 3)")); // Strings are not indexed
+
 		assertCastError(step("(get 1 2 3)")); // 3 arg could work, so cast error on 1st arg
 		assertCastError(step("(get 1 1)")); // 2 arg could work, so cast error on 1st arg
 	}
@@ -1232,7 +1234,10 @@ public class CoreTest extends ACVMTest {
 
 		assertArityError(step("(contains-key? 3)"));
 		assertArityError(step("(contains-key? {} 1 2)"));
+		
 		assertCastError(step("(contains-key? 3 4)"));
+		assertCastError(step("(contains-key? \"ab\" 4)"));
+
 	}
 
 	@Test
