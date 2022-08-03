@@ -38,7 +38,7 @@
 
  *depth*
  {:doc      {:description ["Returns the CVM execution stack depth, at the point the `*depth*` operation is executed. If the depth becomes too deep, the transaction will fail with a `:DEPTH` exception."
-                           "InformativeIn most cases, the allowable depth should be sufficient."]
+                           "In most cases, the allowable depth should be sufficient."]
              :examples    [{:code "*depth*"}]}
   :special? true}
 
