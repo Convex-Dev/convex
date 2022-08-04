@@ -13,7 +13,7 @@
 
 (def *lang*
 
-  ^{:doc {:description ["Advanced feature. Language font-end function."
+  ^{:doc {:description ["Advanced feature. Language front-end function."
                         "If set to a function via `def`, will be called with the code for each transaction instead of delegating to normal `eval` behavior."
                         "Pre-compiled operations (see `compile`) bypass this language setting."]
           :examples    [{:code "(def *lang* (fn [trx] (str trx)))"}]}}
