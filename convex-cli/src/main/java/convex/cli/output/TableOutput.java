@@ -27,10 +27,6 @@ public class TableOutput {
 		rowList.add(Stream.of(values).map(v->Utils.toString(v)).collect(Collectors.toList()));
 	}
 
-	public void writeToStream(PrintStream out) {
-		writeToStream(new PrintWriter(out));
-	}
-	
 	@Override
 	public String toString() {
 		int cc=fieldList.size();
