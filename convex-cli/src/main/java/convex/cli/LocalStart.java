@@ -43,10 +43,15 @@ public class LocalStart implements Runnable {
 			+ "For example: 0xf0234 or f0234")
 	private String[] keystorePublicKey;
 
-    @Option(names={"--ports"},
+  @Option(names={"--ports"},
 		description="List of ports to assign to peers in the cluster. If not specified, will attempt to find available ports."
 			+ "or a single --ports=8081,8082,8083 or --ports=8080-8090")
 	private String[] ports;
+
+	@Option(names={"--api-port"},
+		defaultValue = "0",
+		description="REST API port, if set enable REST API to a peer in the local cluster")
+	private int apiPort;
 
     /**
      * Gets n public keys for local test cluster
@@ -57,6 +62,7 @@ public class LocalStart implements Runnable {
     	HashSet<AKeyPair> keyPairList = new HashSet<AKeyPair>();
     	
     	Main mainParent = localParent.mainParent;
+      
 		// load in the list of public keys to use as peers
 		if (keystorePublicKey.length > 0) {
 			List<String> values = Helpers.splitArrayParameter(keystorePublicKey);
@@ -107,6 +113,11 @@ public class LocalStart implements Runnable {
 		log.info("Starting local network with "+count+" peer(s)");
 		peerManager.launchLocalPeers(keyPairList, peerPorts);
 		log.info("Local Peers launched");
+		if (apiPort > 0) {
+			log.info("Starting api on port "+apiPort);
+			peerManager.launchRestAPI(apiPort);
+		}
 		peerManager.showPeerEvents();
+
 	}
 }
