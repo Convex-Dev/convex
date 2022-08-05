@@ -13,7 +13,7 @@
 
 (def *lang*
 
-  ^{:doc {:description ["Advanced feature. Language font-end function."
+  ^{:doc {:description ["Advanced feature. Language front-end function."
                         "If set to a function via `def`, will be called with the code for each transaction instead of delegating to normal `eval` behavior."
                         "Pre-compiled operations (see `compile`) bypass this language setting."]
           :examples    [{:code "(def *lang* (fn [trx] (str trx)))"}]}}
@@ -233,7 +233,7 @@
 
 (defmacro when
 
-  ^{:doc {:description "Executes body expressions in an implicit `do` block if af and only if the `test` expression evaluates to a truthy value (anything but false or nil)."
+  ^{:doc {:description "Executes body expressions in an implicit `do` block if and only if the `test` expression evaluates to a truthy value (anything but false or nil)."
           :examples    [{:code "(when (some-condition) (def foo 42) (+ 2 2))"}]
           :signature   [{:params [test & body]}]}}
 
