@@ -1778,7 +1778,7 @@ public class Context<T extends ACell> extends AObject {
 	 * Deploys an Actor in this context.
 	 *
 	 * Argument argument must be an Actor generation code, which will be evaluated in the new Actor account
-	 * to initialise the Actor
+	 * to initialise the Actor.
 	 *
 	 * Result will contain the new Actor address if successful, an exception otherwise.
 	 *
@@ -1790,11 +1790,11 @@ public class Context<T extends ACell> extends AObject {
 
 		// deploy initial contract state to next address
 		Address address=initialState.nextAddress();
-		State stateSetup=initialState.tryAddActor();
+		State stateSetup=initialState.addActor();
 
 		// Deployment execution context with forked context and incremented depth
-		final Context<Address> exContext=Context.create(stateSetup, juice, EMPTY_BINDINGS, null, depth+1, getOrigin(),getAddress(), address,DEFAULT_OFFER,log,null);
-		final Context<Address> rctx=exContext.eval(code);
+		final Context<Address> deployContext=Context.create(stateSetup, juice, EMPTY_BINDINGS, null, depth+1, getOrigin(),getAddress(), address,DEFAULT_OFFER,log,null);
+		final Context<Address> rctx=deployContext.eval(code);
 
 		Context<Address> result=this.handleStateResults(rctx,false);
 		if (result.isExceptional()) return result;
@@ -1830,6 +1830,7 @@ public class Context<T extends ACell> extends AObject {
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Context<R> withError(ErrorValue error) {
 		error.addLog(log);
+		error.setAddress(getAddress());
 		return (Context<R>) withException(error);
 	}
 
@@ -2089,7 +2090,7 @@ public class Context<T extends ACell> extends AObject {
 	 */
 	public Context<T> setHolding(Address targetAddress, ACell value) {
 		AccountStatus as=getAccountStatus(targetAddress);
-		if (as==null) return withError(ErrorCodes.NOBODY,"No account in which to set holding");
+		if (as==null) return withError(ErrorCodes.NOBODY,"Can't set set holding for non-existent account "+targetAddress);
 		as=as.withHolding(getAddress(), value);
 		return withAccountStatus(targetAddress,as);
 	}
@@ -2210,7 +2211,7 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Looks up an expander from a form in this context
-	 * @param form Form which might be an expander reference
+	 * @param form Form which might be an expander reference (either a symbol or (lookup...) form)
 	 * @return Expander instance, or null if no expander found
 	 */
 	public AFn<ACell> lookupExpander(ACell form) {
@@ -2254,6 +2255,7 @@ public class Context<T extends ACell> extends AObject {
 			return null;
 		}
 
+		// If no metadata found, definitely not an expander
 		if (me == null) return null;
 
 		// TODO: examine syntax object for expander details?

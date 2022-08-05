@@ -74,14 +74,12 @@ public class RecordTest {
 	
 	@Test
 	public void testResult() {
-		String s="{:id 4,:result #44,:error-code nil,:trace nil}";
+		String s="{:id 4,:result #44,:error nil,:info nil}";
 		AHashMap<Keyword,ACell> m=TestState.eval(s);
 		assertEquals(4,m.count);
-		assertEquals("0xa8a8f308df3cb0eab838b64a41c2534ad0a07f126ee1291f686182aa32862ae6",m.getHash().toString());
 	
 		Result r=Result.create(CVMLong.create(4), Address.create(44), null, null);
 		assertEquals(s,r.toString());
-		assertEquals("0x63e45711e949f3e9c026df0ba8d0896e17683955e0059423fa0f1238acdfacd8",r.getHash().toString());
 		
 		assertEquals(m,r.toHashMap());
 		

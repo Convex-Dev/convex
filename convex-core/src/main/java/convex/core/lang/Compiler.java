@@ -158,6 +158,14 @@ public class Compiler {
 		return (Context<T>) context;
 	}
 
+	/**
+	 * Compiles a Symbol as found in regular code
+	 * @param <R> Return type from Symbol evaluation
+	 * @param <T>
+	 * @param sym Symbol
+	 * @param context
+	 * @return Context with compiled symbol lookup
+	 */
 	@SuppressWarnings("unchecked")
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileSymbol(Symbol sym, Context<?> context) {
 		// First check for lexically defined Symbols
@@ -197,7 +205,7 @@ public class Compiler {
 			}
 		}
 		
-		// Finally revert to a lookup in the current address / enviornment
+		// Finally revert to a lookup in the current address / environment
 		Lookup<T> lookUp=Lookup.create(Constant.of(address),sym);
 		return (Context<T>) context.withResult(Juice.COMPILE_LOOKUP, lookUp);
 	}
@@ -222,6 +230,12 @@ public class Compiler {
 		return context.withResult(Juice.COMPILE_NODE,op);
 	}
 	
+	/**
+	 * Compile a lookup of the form (lookup 'foo) or (lookup addr 'foo)
+	 * @param list Lookup form
+	 * @param context Compiler context
+	 * @return Op performing Lookup
+	 */
 	@SuppressWarnings("unchecked")
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileLookup(AList<ACell> list, Context<?> context) {
 		long n=list.count();
@@ -243,7 +257,12 @@ public class Compiler {
 		return context.withResult(Juice.COMPILE_NODE,op);
 	}
 
-
+	/**
+	 * Compiles a map of the form {a b, c d}
+	 * @param form Form as a Map
+	 * @param context
+	 * @return Op producing the given map
+	 */
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileMap(AMap<ACell, ACell> form, Context<?> context) {
 		int n = form.size();
 		if (n==0) return compileConstant(context,form);
@@ -258,7 +277,9 @@ public class Compiler {
 		return compileList(List.create(vs), context);
 	}
 
-	// A set literal needs to be compiled as (hash-set .....)
+	/**
+	 * Compile a set literal of the form #{1 2} as (hash-set 1 2)
+	 */
 	private static <R extends ACell, T extends AOp<R>> Context<T> compileSet(ASet<ACell> form, Context<?> context) {
 		if (form.isEmpty()) return compileConstant(context,Sets.empty());
 		
@@ -775,7 +796,7 @@ public class Compiler {
 			// First check for sequences. This covers most cases.
 			if (form instanceof ASequence) {
 				
-				// first check for List
+				// first check for List containing an expander
 				if (form instanceof AList) {
 					AList<ACell> listForm = (AList<ACell>) form;
 					int n = listForm.size();
@@ -797,28 +818,20 @@ public class Compiler {
 				// OK for vectors and lists
 				ASequence<ACell> seq = (ASequence<ACell>) form;
 				if (seq.isEmpty()) return context.withResult(Juice.EXPAND_CONSTANT, x);
-				Context<ACell>[] ct = new Context[] { context };
 				
-				ASequence<ACell> updated;
-
-				updated = seq.map(elem -> {
-					Context<ACell> ctx = ct[0];
-					if (ctx.isExceptional()) return null;
-
+				long n=seq.count();
+				for (long i=0; i<n; i++) {
+					ACell elem=seq.get(i);
+				
 					// Expand like: (cont x cont)
-					ctx = ctx.expand(cont,elem, cont);
+					context = context.expand(cont,elem, cont);
+					if (context.isExceptional()) return context;
 
-					if (ctx.isExceptional()) {
-						ct[0] = ctx;
-						return null;
-					}
-					ACell newElement = ctx.getResult();
-					ct[0] = ctx;
-					return newElement;
-				});
-				Context<ACell> rctx = ct[0];
-				if (context.isExceptional()) return rctx;
-				return rctx.withResult(Juice.EXPAND_SEQUENCE, updated);
+					ACell newElement = context.getResult();
+					if (newElement!=elem) seq=seq.assoc(i, newElement);
+				};
+				Context<ACell> rctx = context;
+				return rctx.withResult(Juice.EXPAND_SEQUENCE, seq);
 			}
 
 			if (form instanceof ASet) {

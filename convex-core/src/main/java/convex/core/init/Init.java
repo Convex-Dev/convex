@@ -215,6 +215,7 @@ public class Init {
 			s = doActorDeploy(s, "asset/nft/tokens.cvx");
 			s = doActorDeploy(s, "asset/box/actor.cvx");
 			s = doActorDeploy(s, "asset/box.cvx");
+			s = doActorDeploy(s, "asset/multi-token.cvx");
 			s = doActorDeploy(s, "convex/play.cvx");
 
 			{ // Deploy Currencies
@@ -263,7 +264,7 @@ public class Init {
 			if (ctx.isExceptional()) throw new Error("Error while registering actor:" + ctx.getValue());
 
 			return ctx.getState();
-		} catch (IOException e) {
+		} catch (IOException e) { 
 			throw Utils.sneakyThrow(e);
 		}
 	}

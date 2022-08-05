@@ -739,13 +739,15 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return true;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public boolean equals(AMap<K, V> a) {
+	public boolean equals(ACell a) {
 		if (!(a instanceof MapTree)) return false;
 		return equals((MapTree<K, V>) a);
 	}
 
 	boolean equals(MapTree<K, V> b) {
+		if (b==null) return false;
 		if (this == b) return true;
 		long n = count;
 		if (n != b.count) return false;

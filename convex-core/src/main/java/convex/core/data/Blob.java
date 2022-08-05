@@ -118,6 +118,7 @@ public class Blob extends AArrayBlob {
 	}
 
 	public boolean equals(Blob b) {
+		if (this==b) return true;
 		if (length!=b.length) return false;
 		return Arrays.equals(store, offset, offset+length, b.store, b.offset, b.offset+length);
 	}
@@ -248,11 +249,6 @@ public class Blob extends AArrayBlob {
 
 	public void attachContentHash(Hash hash) {
 		if (contentHash == null) contentHash = hash;
-	}
-
-	@Override
-	public byte getTag() {
-		return Tag.BLOB;
 	}
 
 	@Override

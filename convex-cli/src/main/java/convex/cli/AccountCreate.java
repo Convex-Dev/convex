@@ -7,9 +7,6 @@ import convex.cli.output.RecordOutput;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.util.Utils;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -28,8 +25,6 @@ import picocli.CommandLine.ParentCommand;
 		+ "You must provide a valid keystore password to the keystore.%n"
 		+ "If the keystore is not at the default location also the keystore filename.")
 public class AccountCreate implements Runnable {
-
-	private static final Logger log = LoggerFactory.getLogger(AccountCreate.class);
 
 	@ParentCommand
 	private Account accountParent;

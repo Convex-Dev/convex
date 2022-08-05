@@ -73,6 +73,15 @@ public class RTTest {
 
 		assertNull(RT.vec(1)); // ints not allowed
 	}
+	
+	@Test 
+	public void testCompare() {
+		assertEquals(-1,RT.compare(1, 2));
+		assertEquals(0,RT.compare(CVMDouble.NEGATIVE_ZERO, CVMDouble.ZERO,null));
+		assertEquals(13,RT.compare(CVMDouble.NaN, CVMDouble.ZERO,(long) 13));
+		assertEquals(13,RT.compare(CVMDouble.ZERO, CVMDouble.NaN,(long) 13));
+		assertEquals(13,RT.compare(CVMDouble.NaN, CVMDouble.NaN,(long) 13));
+	}
 
 	@Test
 	public void testCVMCasts() {

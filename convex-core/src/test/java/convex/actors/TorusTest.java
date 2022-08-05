@@ -16,7 +16,7 @@ import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
-import convex.lib.FungibleTest;
+import convex.lib.AssetTester;
 
 public class TorusTest extends ACVMTest {
 	Context<?> INITIAL=context();
@@ -207,7 +207,7 @@ public class TorusTest extends ACVMTest {
 		assertEquals(1000000000000L,evalL(ctx,"(balance USDM)")); // Convex balance back to start
 
 		// Generic fungible test on shares
-		FungibleTest.doFungibleTests(ctx,USD_MARKET,ctx.getAddress());
+		AssetTester.doFungibleTests(ctx,USD_MARKET,ctx.getAddress());
 
 		// ============================================================
 		// FORTH TEST - buy half of all tokens ($50k)

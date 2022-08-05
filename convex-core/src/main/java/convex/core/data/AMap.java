@@ -13,6 +13,7 @@ import convex.core.data.type.Types;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.util.Errors;
+import convex.core.util.Utils;
 
 /**
  * Abstract base class for maps.
@@ -273,26 +274,6 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 */
 	public abstract boolean equalsKeys(AMap<K, V> map);
 
-	@SuppressWarnings("unchecked")
-	@Override
-	public final boolean equals(ACell a) {
-		if (!(a instanceof AMap)) return false;
-		return equals((AMap<K, V>) a);
-	}
-
-	/**
-	 * Checks this map for equality with another map. In general, maps should be
-	 * considered equal if they have the same canonical representation, i.e. the
-	 * same hash value.
-	 * 
-	 * Subclasses may override this this they have a more efficient equals
-	 * implementation or a more specific definition of equality.
-	 * 
-	 * @param a Map to compare with
-	 * @return true if maps are equal, false otherwise.
-	 */
-	public abstract boolean equals(AMap<K, V> a);
-
 	/**
 	 * Gets the map entry with the specified hash
 	 * 
@@ -330,5 +311,20 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	@Override
 	public AMap slice(long start, long end) {
 		throw new TODOException();
+	}
+
+	/**
+	 * Gets a vector of keys for this Map. 
+	 * O(n) in general.
+	 * 
+	 * @return Vector of Keys
+	 */
+	public AVector<K> getKeys() {
+		int n=Utils.checkedInt(count);
+		ACell[] keys=new ACell[n];
+		for (int i=0; i<n; i++) {
+			keys[i]=entryAt(i).getKey();
+		}
+		return Vectors.create(keys);
 	}
 }

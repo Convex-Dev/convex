@@ -723,12 +723,16 @@ public class Utils {
 	 * @return Bits returned
 	 */
 	public static int extractBits(byte[] bs, int numBits, int shift) {
-		if ((numBits < 0) || (numBits > 32)) throw new IllegalArgumentException("Invalid number of bits: " + numBits);
+		if (numBits<=0) return 0;
+		if (numBits > 32) throw new IllegalArgumentException("Invalid number of bits: " + numBits);
 
 		if (numBits > 8) {
 			return extractBits(bs, 8, shift) | (extractBits(bs, numBits - 8, shift + 8) << 8);
 		}
-		if (shift < 0) throw new IllegalArgumentException("Negative shift: " + shift);
+		if (shift < 0) {
+			int end=extractBits(bs,numBits+shift,0);
+			return end<<(-shift);
+		}
 		int bslen = bs.length;
 
 		int bshift = shift >> 3; // shift in number of bytes
@@ -755,19 +759,24 @@ public class Utils {
 	 * specified amount Ignores bits set outside the byte array
 	 * @param bs Target byte array
 	 * @param numBits Number of bits to set (0-32)
-	 * @param shift Number of bits to shift
+	 * @param shift Number of bits to shift (from LSB position)
 	 * @param bits Bits to set
 	 */
 	public static void setBits(byte[] bs, int numBits, int shift, int bits) {
 		if ((numBits < 0) || (numBits > 32)) {
 			throw new IllegalArgumentException("Invalid number of bits: " + numBits);
 		}
+		if (shift < 0) {
+			numBits+=shift;
+			if (numBits<=0) return;
+			setBits(bs, numBits, 0, bits >> (-shift));
+			return;
+		}
 		if (numBits > 8) {
 			setBits(bs, 8, shift, bits);
 			setBits(bs, numBits - 8, shift + 8, bits >> 8);
 			return;
 		}
-		if (shift < 0) throw new IllegalArgumentException("Negative shift: " + shift);
 		int bslen = bs.length;
 		int bshift = shift >> 3; // shift in number of bytes
 		if (bshift >= bslen) return; // nothing to do, beyond end of byte array

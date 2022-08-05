@@ -88,6 +88,9 @@ public class ReaderTest {
 		// Bad address parsing
 		assertThrows(ParseException.class,()->Reader.read("#-1/foo"));
 		
+		// Pipe not yet a valid symbol?
+		assertThrows(ParseException.class,()->Reader.read("|"));
+		
 		// too long symbol names
 		assertThrows(ParseException.class,()->Reader.read(Samples.TOO_BIG_SYMBOLIC));
 		assertThrows(ParseException.class,()->Reader.read(Samples.TOO_BIG_SYMBOLIC+"/a"));
@@ -120,6 +123,8 @@ public class ReaderTest {
 		assertCVMEquals('\f', Reader.read("\\formfeed"));
 		assertCVMEquals('\b', Reader.read("\\backspace"));
 		assertCVMEquals('\r', Reader.read("\\return"));
+		
+		assertCVMEquals('|', Reader.read("\\|"));
 	}
 
 	@Test

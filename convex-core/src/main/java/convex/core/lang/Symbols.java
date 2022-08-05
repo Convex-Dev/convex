@@ -50,6 +50,9 @@ public class Symbols {
 	public static final Symbol GT = intern(">");
 	public static final Symbol LE = intern("<=");
 	public static final Symbol GE = intern(">=");
+	
+	public static final Symbol MIN = intern("min");
+	public static final Symbol MAX = intern("max");
 
 	public static final Symbol NOT = intern("not");
 	public static final Symbol OR = intern("or");
@@ -218,6 +221,7 @@ public class Symbols {
 	public static final Symbol BLOB_Q = intern("blob?");
 	public static final Symbol ADDRESS_Q = intern("address?");
 	public static final Symbol LONG_Q = intern("long?");
+	public static final Symbol DOUBLE_Q = intern("double?");
 	public static final Symbol STR_Q = intern("str?");
 	public static final Symbol NUMBER_Q = intern("number?");
 	public static final Symbol HASH_Q = intern("hash?");
@@ -305,6 +309,8 @@ public class Symbols {
 	public static final Symbol PRINT = intern("print");
 	public static final Symbol SPLIT = intern("split");
 	public static final Symbol JOIN = intern("join");
+	
+
 	
 	public static Symbol intern(String s) {
 		AString name=Strings.create(s);

@@ -259,6 +259,7 @@ public class MapsTest {
 		AMap<Keyword,Keyword> m=Maps.empty();
 		assertEquals(0L,m.count());
 		assertSame(m,Maps.empty());
+		assertSame(Vectors.empty(),m.getKeys());
 
 		assertEquals(2L,m.getEncoding().count());
 	}

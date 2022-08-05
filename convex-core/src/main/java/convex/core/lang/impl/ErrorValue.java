@@ -5,6 +5,7 @@ import java.util.List;
 
 import convex.core.data.ACell;
 import convex.core.data.AString;
+import convex.core.data.Address;
 import convex.core.data.Strings;
 
 /**
@@ -17,6 +18,7 @@ import convex.core.data.Strings;
  * <li>An immutable Error Code</li>
  * <li>An immutable Error Message</li>
  * <li>A mutable error trace (for information purposes outside the CVM)</li>
+ * <li>Address where the error occurred</li>
  * </ul>
  * 
  * "Computers are useless. They can only give you answers."
@@ -29,6 +31,7 @@ public class ErrorValue extends AExceptional {
 	private final ACell message;
 	private final ArrayList<AString> trace=new ArrayList<>();
 	private ACell log;
+	private Address address=null;
 
 	private ErrorValue(ACell code, ACell message) {
 		if (code==null) throw new IllegalArgumentException("Error code must not be null");
@@ -84,9 +87,30 @@ public class ErrorValue extends AExceptional {
 		trace.add(Strings.create(traceMessage));
 	}
 	
+	/**
+	 * Stores the CVM local log at the point of the error
+	 * @param log
+	 */
 	public void addLog(ACell log) {
 		this.log=log;
 	}
+	
+	/**
+	 * Sets the address which is the source of this error
+	 * @param a Address of error cause
+	 */
+	public void setAddress(Address a) {
+		this.address=a;
+	}
+	
+	/**
+	 * Gets the address which is the source of this error
+	 * @return Address of account where error occurred
+	 */
+	public Address getAddress() {
+		return address;
+	}
+	
 	
 	/**
 	 * Gets the optional message associated with this error value, or null if not supplied.

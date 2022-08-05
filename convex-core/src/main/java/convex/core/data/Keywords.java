@@ -70,8 +70,11 @@ public class Keywords {
 
 	public static final Keyword ID = Keyword.create("id");
 	public static final Keyword RESULT = Keyword.create("result");
+	public static final Keyword ERROR = Keyword.create("error");
+	public static final Keyword ADDRESS = Keyword.create("address");
 	public static final Keyword ERROR_CODE = Keyword.create("error-code");
 	public static final Keyword TRACE = Keyword.create("trace");
+	public static final Keyword INFO = Keyword.create("info");
 
 	public static final Keyword EXPANDER_Q = Keyword.create("expander?");
 	public static final Keyword MACRO = Keyword.create("macro");

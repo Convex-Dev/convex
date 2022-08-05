@@ -131,21 +131,6 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 		}
 		return false;
 	}
-	
-	@SuppressWarnings("unchecked")
-	@Override
-	public final boolean equals(ACell o) {
-		if (o instanceof ASet) return equals((ASet<T>)o);
-		return false;
-	}
-	
-	/**
-	 * Checks if another set is exactly equal to this set
-	 * 
-	 * @param other Set to compare with this set
-	 * @return true if sets are equal, false otherwise
-	 */
-	public abstract boolean equals(ASet<T> other);
 
 	/**
 	 * Adds a value to this set using a Ref to the value

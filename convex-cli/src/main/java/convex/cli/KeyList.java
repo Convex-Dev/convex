@@ -45,6 +45,7 @@ public class KeyList implements Runnable {
 				output.addRow(String.format("%5d", index), alias);
 				index ++;
 			}
+			mainParent.println(output);
 		} catch (KeyStoreException e) {
 			throw new CLIError("Unexpected error reading keystore",e);
 		}

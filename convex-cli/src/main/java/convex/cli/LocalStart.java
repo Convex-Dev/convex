@@ -2,6 +2,7 @@ package convex.cli;
 
 import java.lang.NumberFormatException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 import convex.cli.peer.PeerManager;
@@ -21,7 +22,6 @@ import picocli.CommandLine.ParentCommand;
  */
 
 @Command(name="start",
-	aliases={"st"},
 	mixinStandardHelpOptions=true,
 	description="Starts a local convex test network.")
 public class LocalStart implements Runnable {
@@ -36,11 +36,6 @@ public class LocalStart implements Runnable {
 		description="Number of local peers to start. Default: ${DEFAULT-VALUE}")
 	private int count;
 
-	@Option(names={"-i", "--index-key"},
-		defaultValue="0",
-		description="One or more keystore index of the public/private key to use to run a peer.")
-	private String[] keystoreIndex;
-
 	@Option(names={"--public-key"},
 		defaultValue="",
 		description="One or more hex string of the public key in the Keystore to use to run a peer.%n"
@@ -48,8 +43,8 @@ public class LocalStart implements Runnable {
 			+ "For example: 0xf0234 or f0234")
 	private String[] keystorePublicKey;
 
-    @Option(names={"--ports"},
-		description="Range or list of ports to assign each peer in the cluster. This can be a multiple of --ports %n"
+  @Option(names={"--ports"},
+		description="List of ports to assign to peers in the cluster. If not specified, will attempt to find available ports."
 			+ "or a single --ports=8081,8082,8083 or --ports=8080-8090")
 	private String[] ports;
 
@@ -58,52 +53,50 @@ public class LocalStart implements Runnable {
 		description="REST API port, if set enable REST API to a peer in the local cluster")
 	private int apiPort;
 
+    /**
+     * Gets n public keys for local test cluster
+     * @param n Number of public keys
+     * @return List of distinct public keys
+     */
+    private List<AKeyPair> getPublicKeys(int n) {
+    	HashSet<AKeyPair> keyPairList = new HashSet<AKeyPair>();
+    	
+    	Main mainParent = localParent.mainParent;
+      
+		// load in the list of public keys to use as peers
+		if (keystorePublicKey.length > 0) {
+			List<String> values = Helpers.splitArrayParameter(keystorePublicKey);
+			
+			for (int index = 0; index < values.size(); index ++) {
+				String keyPrefix = values.get(index);
+
+				AKeyPair keyPair = mainParent.loadKeyFromStore(keyPrefix);
+				if (keyPair == null) throw new CLIError("Unable to find public key in store: "+keyPrefix);
+				keyPairList.add(keyPair);
+			}
+		}
+		int left=keyPairList.size()-n;
+		if (left>0) {
+			log.warn("Insufficient key pairs specified. Additional keypairs will be generated");
+		
+			List<AKeyPair> kp=mainParent.generateKeyPairs(left);
+			keyPairList.addAll(kp);
+			mainParent.saveKeyStore();
+		}
+		if (keyPairList.size()<n) {
+			throw new CLIError("Unable to generate sufficient keypairs!");
+		}
+		
+		return new ArrayList<AKeyPair>(keyPairList);
+    }
+    
 	@Override
 	public void run() {
 		Main mainParent = localParent.mainParent;
 		PeerManager peerManager = PeerManager.create(mainParent.getSessionFilename());
 
-		List<AKeyPair> keyPairList = new ArrayList<AKeyPair>();
+		List<AKeyPair> keyPairList = getPublicKeys(count);
 
-		// load in the list of public keys to use as peers
-		if (keystorePublicKey.length > 0) {
-			List<String> values = Helpers.splitArrayParameter(keystorePublicKey);
-			for (int index = 0; index < values.size(); index ++) {
-				String publicKeyText = values.get(index);
-
-				AKeyPair keyPair = mainParent.loadKeyFromStore(publicKeyText);
-				if (keyPair != null) {
-					keyPairList.add(keyPair);
-				}
-			}
-		}
-
-		// load in a list of key indexes to use as peers
-		if (keystoreIndex.length > 0) {
-			List<String> values = Helpers.splitArrayParameter(keystoreIndex);
-			for (int index = 0; index < values.size(); index ++) {
-				int indexKey = Integer.parseInt(values.get(index));
-				if (indexKey > 0) {
-					AKeyPair keyPair = mainParent.loadKeyFromStore("");
-					if (keyPair != null) {
-						keyPairList.add(keyPair);
-					}
-				}
-			}
-		}
-
-		if (keyPairList.size() == 0) {
-			keyPairList = mainParent.generateKeyPairs(count);
-		}
-
-		if (count > keyPairList.size()) {
-			log.error(
-				"Not enougth public keys provided. " +
-				"You have requested {} peers to start, but only provided {} public keys",
-				count,
-				keyPairList.size()
-			);
-		}
 		int peerPorts[] = null;
 		if (ports != null) {
 			try {
@@ -113,7 +106,7 @@ public class LocalStart implements Runnable {
 				return;
 			}
 			if (peerPorts.length < count) {
-				log.warn("you need only provided {} ports you need to provide at least {} ports", peerPorts.length, count);
+				log.warn("Only {} ports specified for {} peers", peerPorts.length, count);
 				return;
 			}
 		}

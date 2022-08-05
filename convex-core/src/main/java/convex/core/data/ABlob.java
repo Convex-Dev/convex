@@ -162,7 +162,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 */
 	public final Hash computeHash(MessageDigest digest) {
 		updateDigest(digest);
-		return Hash.wrap(digest.digest());
+		return Hash.createFromDigest(digest);
 	}
 
 	protected abstract void updateDigest(MessageDigest digest);
@@ -249,8 +249,9 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 * Blobs are defined to be equal if they have the same on-chain representation,
 	 * i.e. if and only if all of the following are true:
 	 * 
-	 * - Blob is of the same general type - Blobs are of the same length - All byte
-	 * values are equal
+	 * - Blob is of the same general type 
+	 * - Blobs are of the same length 
+	 * - All byte values are equal
 	 * 
 	 * @param o Blob to compare with
 	 * @return true if Blobs are equal, false otherwise

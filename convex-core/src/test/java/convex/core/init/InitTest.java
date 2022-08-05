@@ -74,16 +74,17 @@ public class InitTest extends ACVMTest {
 
 	@Test
 	public void testDeploy() {
-		assertTrue(evalA("(call *registry* (cns-resolve 'asset.box))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'asset.box.actor))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'asset.nft.simple))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'asset.nft.tokens))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'convex.asset))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'convex.fungible))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'convex.play))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'convex.trusted-oracle.actor))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'convex.trusted-oracle))"));
-		assertTrue(evalA("(call *registry* (cns-resolve 'torus.exchange))"));
+		// CNS resolution for standard libraries
+		assertNotNull(evalA("(call *registry* (cns-resolve 'asset.box))"));
+		assertNotNull(evalA("(call *registry* (cns-resolve 'asset.box.actor))"));
+		assertNotNull(evalA("(call *registry* (cns-resolve 'asset.nft.simple))"));
+		assertNotNull(evalA("(call *registry* (cns-resolve 'asset.nft.tokens))"));
+		assertNotNull(evalA("(call *registry* (cns-resolve 'convex.asset))"));
+		assertNotNull(evalA("(call *registry* (cns-resolve 'convex.fungible))"));
+		assertNotNull(evalA("(call *registry* (cns-resolve 'convex.play))"));
+		assertNotNull(evalA("(call *registry* (cns-resolve 'convex.trusted-oracle.actor))"));
+		assertNotNull(evalA("(call *registry* (cns-resolve 'convex.trusted-oracle))"));
+		assertNotNull(evalA("(call *registry* (cns-resolve 'torus.exchange))"));
 
 		assertEquals(Init.CORE_ADDRESS, eval("(call *registry* (cns-resolve 'convex.core))"));
 		assertEquals(Init.REGISTRY_ADDRESS, eval("(call *registry* (cns-resolve 'convex.registry))"));

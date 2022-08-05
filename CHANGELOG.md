@@ -4,7 +4,20 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+
+## [0.7.7] - Unreleased
+### Added 
+- Support for parameterised asset paths in `convex.asset` as per CAD19
+- Multi-token reference implementation for single actor supporting many fungible assets
+- Add missing `double?` predicate
+
+### Changed
+- Static compilation enabled for `convex.core` functions
+
+### Fixed
+- Correct handling for negative zero in min and max 
+
+## [0.7.6] - 2022-05-24
 ### Added 
 - `print` core function for readable representations
 - `split` and `join` core functions for Strings
@@ -12,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `VectorBuilder` utility class for fast Vector construction
 - `declare` core macro
 - Additional benchmarks
+- Mnemonic refactoring, add BIP39 word list
 
 ### Fixed
 - Edge cases around UTF-8 string handling

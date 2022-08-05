@@ -231,10 +231,7 @@ public class AccountKey extends AArrayBlob {
 		return 0;
 	}
 
-	@Override
-	public byte getTag() {
-		return Tag.BLOB;
-	}
+
 
 	@Override
 	public boolean isCanonical() {

@@ -531,8 +531,9 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		return children[ix];
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public boolean equals(ASet<T> a) {
+	public boolean equals(ACell a) {
 		if (!(a instanceof SetTree)) return false;
 		return equals((SetTree<T>) a);
 	}
@@ -617,7 +618,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	}
 
 	private boolean isValidStructure() {
-		if (count <= MapLeaf.MAX_ENTRIES) return false;
+		if (count <= SetLeaf.MAX_ELEMENTS) return false;
 		if (children.length != Integer.bitCount(mask & 0xFFFF)) return false;
 		for (int i = 0; i < children.length; i++) {
 			if (children[i] == null) return false;

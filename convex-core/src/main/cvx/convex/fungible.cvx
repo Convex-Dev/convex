@@ -8,6 +8,8 @@
                  :name        "Fungible token creation and management"}))
 
 
+(declare balance transfer)
+
 ;;;;;;;;;; Building actors
 
 
@@ -31,6 +33,8 @@
                 1000000000000000000))
     `(do
        (import convex.trust :as trust)
+       
+       (declare balance transfer)
 
        ;; Who is allowed to mint tokens?
        ;;
@@ -343,7 +347,7 @@
 
 (defn burn 
 
-  ^{:doc {:description "Burns an amount of tokens for the given token. User must have minting privileges. Amount must be non-negative and no greater than the caller's balance."
+  ^{:doc {:description "Burns an amount of tokens for the given token, if allowed by the implementation. Amount must be non-negative and no greater than the caller's balance."
           :examples    [{:code "(mint my-token-address 1000)"}]
           :signature   [{:params [token amount]}]}}
 

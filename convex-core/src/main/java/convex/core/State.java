@@ -1,7 +1,5 @@
 package convex.core;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -450,44 +448,34 @@ public class State extends ARecord {
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
 	public <T extends ACell> Context<T> applyTransaction(ATransaction t) {
-		Address origin = t.getOrigin();
-
-		try {
-			// Create prepared context (juice subtracted, sequence updated, transaction entry checks)
-			Context<T> ctx = prepareTransaction(origin,t);
-			if (ctx.isExceptional()) {
-				// We hit some error while preparing transaction. Return context with no state change,
-				// i.e. before executing the transaction
-				return ctx;
-			}
-			
-			final long totalJuice = ctx.getJuice();
-
-			State preparedState=ctx.getState();
-
-
-			// apply transaction. This may result in an error!
-			ctx = t.apply(ctx);
-
-			// complete transaction
-			// NOTE: completeTransaction handles error cases as well
-			ctx = ctx.completeTransaction(preparedState, totalJuice);
-
+				// Create prepared context (juice subtracted, sequence updated, transaction entry checks)
+		Context<T> ctx = prepareTransaction(t);
+		if (ctx.isExceptional()) {
+			// We hit some error while preparing transaction. Return context with no state change,
+			// i.e. before executing the transaction
 			return ctx;
-		} catch (Throwable ex) {
-			// SECURITY: This should never happen!
-			// But catching right now to prevent CVM overall crash
-			StringWriter s=new StringWriter();
-			ex.printStackTrace(new PrintWriter(s));
-			String message=s.toString();
-			Context<T> fCtx=Context.createInitial(this, origin, 0);
-			fCtx=fCtx.withError(ErrorCodes.FATAL, message);
-			return fCtx;
 		}
+		
+		final long totalJuice = ctx.getJuice();
+
+		State preparedState=ctx.getState();
+
+
+		// apply transaction. This may result in an error!
+		ctx = t.apply(ctx);
+
+		// complete transaction
+		// NOTE: completeTransaction handles error cases as well
+		ctx = ctx.completeTransaction(preparedState, totalJuice);
+
+		return ctx;
+
 	}
 
 	@SuppressWarnings("unchecked")
-	private <T extends ACell> Context<T> prepareTransaction(Address origin,ATransaction t) {
+	private <T extends ACell> Context<T> prepareTransaction(ATransaction t) {
+		Address origin = t.getOrigin();
+		
 		// Pre-transaction state updates (persisted even if transaction fails)
 		AccountStatus account = getAccount(origin);
 		if (account == null) {
@@ -608,13 +596,12 @@ public class State extends ARecord {
 	}
 
 	/**
-	 * Deploys a new Actor in the current state.
+	 * Adds a new Actor Account. The actor will be the last Account in the resulting State, and will
+	 * have a default empty Actor environment.
 	 *
-	 * Returns the updated state. The actor will be the last Account.
-	 *
-	 * @return The updated state with the Actor deployed.
+	 * @return The updated state with the Actor Account added.
 	 */
-	public State tryAddActor() {
+	public State addActor() {
 		AccountStatus as = AccountStatus.createActor();
 		AVector<AccountStatus> newAccounts = accounts.conj(as);
 		return withAccounts(newAccounts);
@@ -777,10 +764,8 @@ public class State extends ARecord {
 	}
 	
 	@Override 
-	public boolean equals(AMap<Keyword,ACell> a) {
-		if (this == a) return true; // important optimisation for e.g. hashmap equality
-		if (a == null) return false;
-		if (a.getTag()!=getTag()) return false;
+	public boolean equals(ACell a) {
+		if (!(a instanceof State)) return false;
 		State as=(State)a;
 		return equals(as);
 	}
@@ -791,6 +776,7 @@ public class State extends ARecord {
 	 * @return true if equal, false otherwise
 	 */
 	public boolean equals(State a) {
+		if (this == a) return true; // important optimisation for e.g. hashmap equality
 		if (a == null) return false;
 		Hash h=this.cachedHash();
 		if (h!=null) {

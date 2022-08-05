@@ -234,10 +234,8 @@ public class AccountStatus extends ARecord {
 	}
 	
 	@Override 
-	public boolean equals(AMap<Keyword,ACell> a) {
-		if (this == a) return true; // important optimisation for e.g. hashmap equality
-		if (a == null) return false;
-		if (a.getTag()!=getTag()) return false;
+	public boolean equals(ACell a) {
+		if(!(a instanceof AccountStatus)) return false;
 		AccountStatus as=(AccountStatus)a;
 		return equals(as);
 	}
@@ -248,18 +246,14 @@ public class AccountStatus extends ARecord {
 	 * @return true if equal, false otherwise
 	 */
 	public boolean equals(AccountStatus a) {
+		if (this == a) return true; // important optimisation for e.g. hashmap equality
 		if (a == null) return false;
-		Hash h=this.cachedHash();
-		if (h!=null) {
-			Hash ha=a.cachedHash();
-			if (ha!=null) return Utils.equals(h, ha);
-		}
 		
 		if (balance!=a.balance) return false;
 		if (sequence!=a.sequence) return false;
 		if (memory!=a.memory) return false;
-		if (!(Utils.equals(controller, a.controller))) return false;
 		if (!(Utils.equals(publicKey, a.publicKey))) return false;
+		if (!(Utils.equals(controller, a.controller))) return false;
 		if (!(Utils.equals(holdings, a.holdings))) return false;
 		if (!(Utils.equals(metadata, a.metadata))) return false;
 		if (!(Utils.equals(environment, a.environment))) return false;

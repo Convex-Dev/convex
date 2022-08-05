@@ -91,6 +91,10 @@ public class ANTLRTest {
 		
 		// Single slash should be a symbol
 		assertEquals(Symbol.create("/"),read("/"));
+
+		// TODO: Single pipe should be a symbol?? Or parse error?
+		// assertEquals(Symbol.create("|"),read("|"));
+
 		
 		// Does should count in symbol
 		assertEquals(Symbol.create("convex.world"),read("convex.world"));
@@ -104,6 +108,7 @@ public class ANTLRTest {
 		assertEquals(Keyword.create("/"),read(":/"));
 		
 		assertParseError(":");
+		assertParseError(":0");
 	}
 
 		
@@ -114,6 +119,15 @@ public class ANTLRTest {
 		
 		assertParseError("0x0");
 
+	}
+	
+	@Test public void testParens() {
+		assertParseError("(");
+		assertParseError(")");
+		assertParseError("[");
+		assertParseError("]");
+		assertParseError("{");
+		assertParseError("}");
 	}
 	
 	@Test public void testAddress() {

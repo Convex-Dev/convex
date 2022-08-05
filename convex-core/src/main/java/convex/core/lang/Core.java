@@ -913,8 +913,10 @@ public class Core {
 		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			AccountKey accountKey = RT.ensureAccountKey(args[0]);
-			if (accountKey == null) return context.withCastError(0,args, Types.BLOB);
+			ABlob b=RT.ensureBlob(args[0]);
+			if (b == null) return context.withCastError(0,args, Types.BLOB);
+			AccountKey accountKey = AccountKey.create(b);
+			if (accountKey==null) return context.withArgumentError("Account Key for stake must be 32 bytes");
 
 			CVMLong amount = RT.ensureLong(args[1]);
 			if (amount == null) return context.withCastError(1,args, Types.LONG);
@@ -1156,7 +1158,7 @@ public class Core {
 			if (address == null) return context.withCastError(args[0], Types.ADDRESS);
 
 			AccountStatus as=context.getAccountStatus(address);
-			if (as==null) return context.withError(ErrorCodes.NOBODY,"Account with holdings does not exist.");
+			if (as==null) return context.withError(ErrorCodes.NOBODY,"Account "+address+" does not exist to get holdings");
 			ABlobMap<Address,ACell> holdings=as.getHoldings();
 
 			// we get the target accounts holdings for the currently executing account
@@ -1202,7 +1204,7 @@ public class Core {
 				controller=RT.ensureAddress(arg);
 				if (controller == null) return context.withCastError(arg, Types.ADDRESS);
 				if (context.getAccountStatus(controller)==null) {
-					 return context.withError(ErrorCodes.NOBODY, name()+" must be passed an address for an existing account as controller.");
+					 return context.withError(ErrorCodes.NOBODY, name()+" requires an address for an existing account");
 				}
 			}
 
@@ -1221,11 +1223,19 @@ public class Core {
 			if (n !=1) return context.withArityError(exactArityMessage(1, n));
 
 			ACell arg=args[0];
+			
+			AccountKey publicKey=null;
+			
+			if (arg!=null) {
+				// Ensure we have a Blob argument
+				ABlob b=RT.ensureBlob(arg);
+				if (b == null) return context.withCastError(arg, Types.BLOB);
 
-			// Check an account key is being used as argument. nil is permitted
-			AccountKey publicKey=RT.ensureAccountKey(arg);
-			if ((publicKey == null)&&(arg!=null)) return context.withCastError(arg, Types.BLOB);
-
+				// Check an account key is being used as argument. nil is permitted
+				publicKey=AccountKey.create(b);
+				if (publicKey == null) return context.withArgumentError("Invalid key length");
+			}
+			
 			context=(Context) context.setAccountKey(publicKey);
 			if (context.isExceptional()) return (Context<AccountKey>) context;
 
@@ -1506,10 +1516,10 @@ public class Core {
 		@Override
 		public  Context<CVMBool> invoke(Context context, ACell[] args) {
 			// all arities OK, but need to watch for non-numeric arguments
-			Boolean result = RT.eq(args);
+			CVMBool result = RT.eq(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 
-			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
+			return context.withResult(Juice.NUMERIC_COMPARE, result);
 		}
 	});
 
@@ -1518,10 +1528,10 @@ public class Core {
 		@Override
 		public  Context<CVMBool> invoke(Context context, ACell[] args) {
 			// all arities OK
-			Boolean result = RT.ge(args);
+			CVMBool result = RT.ge(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 
-			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
+			return context.withResult(Juice.NUMERIC_COMPARE, result);
 		}
 	});
 
@@ -1531,10 +1541,10 @@ public class Core {
 		public  Context<CVMBool> invoke(Context context, ACell[] args) {
 			// all arities OK
 
-			Boolean result = RT.gt(args);
+			CVMBool result = RT.gt(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 
-			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
+			return context.withResult(Juice.NUMERIC_COMPARE, result);
 		}
 	});
 
@@ -1544,10 +1554,10 @@ public class Core {
 		public  Context<CVMBool> invoke(Context context, ACell[] args) {
 			// all arities OK
 
-			Boolean result = RT.le(args);
+			CVMBool result = RT.le(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 
-			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
+			return context.withResult(Juice.NUMERIC_COMPARE, result);
 		}
 	});
 
@@ -1557,10 +1567,36 @@ public class Core {
 		public  Context<CVMBool> invoke(Context context, ACell[] args) {
 			// all arities OK
 
-			Boolean result = RT.lt(args);
+			CVMBool result = RT.lt(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 
-			return context.withResult(Juice.NUMERIC_COMPARE, CVMBool.create(result));
+			return context.withResult(Juice.NUMERIC_COMPARE, result);
+		}
+	});
+	
+	public static final CoreFn<CVMBool> MIN = reg(new CoreFn<>(Symbols.MIN) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<CVMBool> invoke(Context context, ACell[] args) {
+			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
+
+			ACell result = RT.min(args);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
+
+			return context.withResult(Juice.NUMERIC_COMPARE, result);
+		}
+	});
+	
+	public static final CoreFn<CVMBool> MAX = reg(new CoreFn<>(Symbols.MAX) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<CVMBool> invoke(Context context, ACell[] args) {
+			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
+
+			ACell result = RT.max(args);
+			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
+
+			return context.withResult(Juice.NUMERIC_COMPARE, result);
 		}
 	});
 
@@ -2478,6 +2514,13 @@ public class Core {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof CVMLong;
+		}
+	});
+	
+	public static final CorePred DOUBLE_Q = reg(new CorePred(Symbols.DOUBLE_Q) {
+		@Override
+		public boolean test(ACell val) {
+			return val instanceof CVMDouble;
 		}
 	});
 

@@ -49,8 +49,10 @@ public class Constant<T extends ACell> extends AOp<T> {
 		this.valueRef = valueRef;
 	}
 
+	@SuppressWarnings("unchecked")
 	public static <T extends ACell> Constant<T> create(T value) {
-		return new Constant<T>(Ref.get(value));
+		if (value==null) return (Constant<T>) NULL;
+ 		return new Constant<T>(value.getRef());
 	}
 	
 	public static <T extends ACell> Constant<T> of(Object value) {

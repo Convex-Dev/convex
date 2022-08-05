@@ -98,20 +98,28 @@ public class Helpers {
 		return item;
 	}
 
-	public static List<String> splitArrayParameter(String[] parameterValue) {
-		List<String> result = new ArrayList<>(parameterValue.length);
-		for (int index = 0; index < parameterValue.length; index ++) {
-			String value = parameterValue[index];
-			String[] items = new String[1];
-			items[0] = value;
+	/**
+	 * Split a parameter list by ','. 
+	 * Handles internal separators (sublists in strings)
+	 * Trims resulting Strings of whitespace
+	 * @param parameterValues Array of parameter values
+	 * @return List of trimmed Strings
+	 */
+	public static List<String> splitArrayParameter(String... parameterValues) {
+		List<String> result = new ArrayList<>(parameterValues.length);
+		for (int index = 0; index < parameterValues.length; index ++) {
+			String value = parameterValues[index];
+			
 			if (value.indexOf(",") > 0) {
-				items = value.split(",");
-			}
-			for (int itemIndex = 0; itemIndex < items.length; itemIndex ++ ) {
-				String newValue = items[itemIndex].trim();
-				if (newValue.length() > 0) {
-					result.add(newValue);
+				String[] items  = value.split(",");
+				for (int itemIndex = 0; itemIndex < items.length; itemIndex ++ ) {
+					String newValue = items[itemIndex].trim();
+					if (newValue.length() > 0) {
+						result.add(newValue);
+					}
 				}
+			} else {
+				result.add(value.trim());
 			}
 		}
 		return result;

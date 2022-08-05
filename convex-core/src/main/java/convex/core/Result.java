@@ -3,10 +3,14 @@ package convex.core;
 import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
+import convex.core.data.AMap;
 import convex.core.data.ARecordGeneric;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.Address;
+import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.data.Maps;
 import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -22,11 +26,19 @@ import convex.core.lang.impl.RecordFormat;
  * 
  * A Result is typically used to communicate the outcome of a Query or a Transaction from a Peer to a Client.
  * 
+ * Contains:
+ * <ol>
+ * <li>Message ID</li>
+ * <li>Result value</li>
+ * <li>Error Code</li>
+ * <li>Additional info</li>
+ * </ol>
+ * 
  * 
  */
 public final class Result extends ARecordGeneric {
 
-	private static final RecordFormat RESULT_FORMAT=RecordFormat.of(Keywords.ID,Keywords.RESULT,Keywords.ERROR_CODE,Keywords.TRACE);
+	private static final RecordFormat RESULT_FORMAT=RecordFormat.of(Keywords.ID,Keywords.RESULT,Keywords.ERROR,Keywords.INFO);
 	
 	private Result(AVector<ACell> values) {
 		super(RESULT_FORMAT, values);
@@ -41,11 +53,11 @@ public final class Result extends ARecordGeneric {
 	 * @param id ID of Result message
 	 * @param value Result Value
 	 * @param errorCode Error Code (may be null for success)
-	 * @param trace Error Trace
+	 * @param info Additional info
 	 * @return Result instance
 	 */
-	public static Result create(CVMLong id, ACell value, ACell errorCode, ACell trace) {
-		return create(Vectors.of(id,value,errorCode,trace));
+	public static Result create(CVMLong id, ACell value, ACell errorCode, AMap<Keyword,ACell> info) {
+		return create(Vectors.of(id,value,errorCode,info));
 	}
 	
 	/**
@@ -92,11 +104,26 @@ public final class Result extends ARecordGeneric {
 	/**
 	 * Returns the stack trace for this result. May be null
 	 * 
-	 * @return ID from this result
+	 * @return Trace vector from this result
 	 */
 	@SuppressWarnings("unchecked")
 	public AVector<AString> getTrace() {
-		return (AVector<AString>) values.get(3);
+		AMap<Keyword,ACell> info=getInfo();
+		if (info instanceof AMap) {
+			AMap<Keyword,ACell> m=(AMap<Keyword, ACell>) info;
+			return (AVector<AString>) m.get(Keywords.TRACE);
+		}
+		return null;
+	}
+	
+	/**
+	 * Returns the info for this Result. May be null
+	 * 
+	 * @return Info map from this result
+	 */
+	@SuppressWarnings("unchecked")
+	public AMap<Keyword,ACell> getInfo() {
+		return (AMap<Keyword, ACell>) values.get(3);
 	}
 	
 	/**
@@ -122,14 +149,15 @@ public final class Result extends ARecordGeneric {
 	}
 	
 	@Override
-	public void validateCell() throws InvalidDataException {
-		super.validateCell();
-		Object id=values.get(0);
+	public void validate() throws InvalidDataException {
+		super.validate();
+		
+		ACell id=values.get(0);
 		if ((id!=null)&&!(id instanceof CVMLong)) {
 			throw new InvalidDataException("Result ID must be a CVM long value",this);
 		}
 	}
-
+	
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.RESULT;
@@ -168,16 +196,19 @@ public final class Result extends ARecordGeneric {
 	public static Result fromContext(CVMLong id,Context<?> ctx) {
 		Object result=ctx.getValue();
 		ACell errorCode=null;
-		ACell trace=null;
+		AMap<Keyword,ACell> info=null;
 		if (result instanceof AExceptional) {
 			AExceptional ex=(AExceptional)result;
 			result=ex.getMessage();
 			errorCode=ex.getCode();
 			if (ex instanceof ErrorValue) {
-				trace=Vectors.create(((ErrorValue)ex).getTrace());
+				ErrorValue ev=(ErrorValue) ex;
+				AVector<?> trace=Vectors.create(ev.getTrace());
+				Address address=ev.getAddress();
+				info =Maps.of(Keywords.TRACE,trace,Keywords.ADDRESS,address);
 			}
 		}
-		return create(id,(ACell)result,errorCode,trace);
+		return create(id,(ACell)result,errorCode,info);
 	}
 
 	/**

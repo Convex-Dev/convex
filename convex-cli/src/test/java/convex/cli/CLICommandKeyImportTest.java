@@ -3,14 +3,12 @@ package convex.cli;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.File;
-import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519KeyPair;
 import convex.core.crypto.PEMTools;
-import convex.core.util.Utils;
 
 public class CLICommandKeyImportTest {
 

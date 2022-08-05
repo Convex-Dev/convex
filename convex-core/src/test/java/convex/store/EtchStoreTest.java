@@ -33,6 +33,7 @@ import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.init.InitTest;
 import convex.core.lang.Symbols;
@@ -145,7 +146,8 @@ public class EtchStoreTest {
 			counter.set(0L);
 			Ref<Belief> srb=rb.persistShallow(noveltyHandler);
 			assertEquals(Ref.STORED,srb.getStatus());
-			assertEquals(1L,counter.get()); // One cell persisted
+			// One cell persisted, should only be novelty if embedded
+			assertEquals(belief.isEmbedded()?0L:1L,counter.get()); 
 
 			// assertEquals(srb,store.refForHash(rb.getHash()));
 			assertNull(store.refForHash(t1.getRef().getHash()));
@@ -165,7 +167,7 @@ public class EtchStoreTest {
 			counter.set(0L);
 			Ref<Belief> arb=belief.announce(noveltyHandler).getRef();
 			assertEquals(srb,arb);
-			assertEquals(5L,counter.get());
+			assertEquals(4L,counter.get());
 
 			// Announce again. Should be no new novelty
 			counter.set(0L);
@@ -230,10 +232,12 @@ public class EtchStoreTest {
 	public void testReopen() throws IOException {
 		File file=File.createTempFile("etch",null);
 		EtchStore es=EtchStore.create(file);
-		es.setRootHash(Hash.NULL_HASH);
+		es.setRootData(CVMLong.ONE);
+		assertEquals(CVMLong.ONE,es.getRootData());
 		es.close();
 
 		EtchStore es2=EtchStore.create(file);
-		assertEquals(Hash.NULL_HASH,es2.getRootHash());
+		ACell data=es2.getRootData();
+		assertEquals(CVMLong.ONE,data);
 	}
 }

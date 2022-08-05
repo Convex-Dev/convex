@@ -506,6 +506,12 @@
         :examples  [{:code "(double 3)"}]
         :signature [{:params [x]
                      :return Double}]}}
+ 
+ double?
+ {:doc {:description "Returnes `true` if the argument is a value of Double type, `false` otherwise."
+        :examples    [{:code "(double? 1.0)"}]
+        :signature   [{:params [x]
+                       :return Boolean}]}}
 
  empty
  {:doc {:description "Returns an empty collection of the same type as the argument. `(empty nil)` returns nil."
@@ -799,6 +805,11 @@
         :examples    [{:code "(map? {1 2})"}]
         :signature   [{:params [coll]
                        :return Boolean}]}}
+ 
+ max
+ {:doc {:description "Returns the numerical maximum of the given values. If two or more values are equal to the minimum, the first is returned."
+          :examples    [{:code "(max 1 2 3)"}]
+          :signature   [{:params [& numbers]}]}}
 
  merge
  {:doc {:description "Merges zero or more Maps (not BlobMaps!), replacing existing values. Nil is considered as an empty map."
@@ -811,6 +822,11 @@
         :examples    [{:code "(meta (syntax 'foo {:bar 1}))"}]
         :signature   [{:params [syntax]
                        :return Map}]}}
+ 
+ min
+ {:doc {:description "Returns the numerical minimum of the given values. If two or more values are equal to the minimum, the first is returned."
+          :examples    [{:code "(min 1 2 3)"}]
+          :signature   [{:params [& numbers]}]}}
 
  mod
  {:doc {:description "Returns the integer modulus of a numerator divided by a divisor. The result will always be positive, consistent with Euclidean Divsion."

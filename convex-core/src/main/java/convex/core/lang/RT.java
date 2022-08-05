@@ -81,98 +81,154 @@ public class RT {
 	 * 
 	 * @return Boolean result, or null if the values are not comparable
 	 */
-	private static Boolean checkShortCompare(ACell[] values) {
+	private static CVMBool checkShortCompare(ACell[] values) {
 		int len = values.length;
 		if (len == 0)
-			return true;
+			return CVMBool.TRUE;
 		if (len == 1) {
 			if (null == RT.ensureNumber(values[0]))
 				return null; // cast failure
-			return true;
+			return CVMBool.TRUE;
 		}
-		return false;
+		return CVMBool.FALSE;
 	}
 
-	public static Boolean eq(ACell[] values) {
-		Boolean check = checkShortCompare(values);
+	public static CVMBool eq(ACell[] values) {
+		CVMBool check = checkShortCompare(values);
 		if (check == null)
 			return null;
-		if (check)
-			return true;
+		if (check==CVMBool.TRUE) return check;
 		for (int i = 0; i < values.length - 1; i++) {
 			Long comp = RT.compare(values[i], values[i + 1], Long.MAX_VALUE);
 			if (comp == null)
 				return null; // cast error
 			if (comp != 0)
-				return false;
+				return CVMBool.FALSE;
 		}
-		return true;
+		return CVMBool.TRUE;
 	}
 
-	public static Boolean ge(ACell[] values) {
-		Boolean check = checkShortCompare(values);
+	public static CVMBool ge(ACell[] values) {
+		CVMBool check = checkShortCompare(values);
 		if (check == null)
 			return null;
-		if (check)
-			return true;
+		if (check==CVMBool.TRUE) return check;
 		for (int i = 0; i < values.length - 1; i++) {
 			Long comp = RT.compare(values[i], values[i + 1], Long.MIN_VALUE);
 			if (comp == null)
 				return null; // cast error
 			if (comp < 0)
-				return false;
+				return CVMBool.FALSE;
 		}
-		return true;
+		return CVMBool.TRUE;
 	}
 
-	public static Boolean gt(ACell[] values) {
-		Boolean check = checkShortCompare(values);
+	public static CVMBool gt(ACell[] values) {
+		CVMBool check = checkShortCompare(values);
 		if (check == null)
 			return null;
-		if (check)
-			return true;
+		if (check==CVMBool.TRUE) return check;
 		for (int i = 0; i < values.length - 1; i++) {
 			Long comp = RT.compare(values[i], values[i + 1], Long.MIN_VALUE);
 			if (comp == null)
 				return null; // cast error
 			if (comp <= 0)
-				return false;
+				return CVMBool.FALSE;
 		}
-		return true;
+		return CVMBool.TRUE;
 	}
 
-	public static Boolean le(ACell[] values) {
-		Boolean check = checkShortCompare(values);
+	public static CVMBool le(ACell[] values) {
+		CVMBool check = checkShortCompare(values);
 		if (check == null)
 			return null;
-		if (check)
-			return true;
+		if (check==CVMBool.TRUE) return check;
 		for (int i = 0; i < values.length - 1; i++) {
 			Long comp = RT.compare(values[i], values[i + 1], Long.MAX_VALUE);
 			if (comp == null)
 				return null; // cast error
 			if (comp > 0)
-				return false;
+				return CVMBool.FALSE;
 		}
-		return true;
+		return CVMBool.TRUE;
 	}
 
-	public static Boolean lt(ACell[] values) {
-		Boolean check = checkShortCompare(values);
+	public static CVMBool lt(ACell[] values) {
+		CVMBool check = checkShortCompare(values);
 		if (check == null)
 			return null;
-		if (check)
-			return true;
+		if (check==CVMBool.TRUE) return check;
 		for (int i = 0; i < values.length - 1; i++) {
 			Long comp = RT.compare(values[i], values[i + 1], Long.MAX_VALUE);
 			if (comp == null)
 				return null; // cast error
 			if (comp >= 0)
-				return false;
+				return CVMBool.FALSE;
 		}
-		return true;
+		return CVMBool.TRUE;
 	}
-
+	
+	/**
+	 * Gets the minimum of a set of numeric values
+	 * @param values Arguments for which to compute minimum value
+	 * @return minimum value, or null if any argument is non-numeric
+	 */
+	public static ACell min(ACell[] values) {
+		ACell acc=values[0];
+		if (!isNumber(acc)) return null;
+		for (int i = 1; i < values.length; i++) {
+			ACell next=values[i];
+			acc=min(acc,next);
+		}
+		return acc;
+	}
+	
+	/**
+	 * Gets the minimum of two numeric values
+	 * @param a First value
+	 * @param b Second value
+	 * @return minimum value, or null if any argument is non-numeric
+	 */
+	public static ACell min(ACell a, ACell b) {
+		if (a==null) return null;
+		Long comp=RT.compare(a, b, Long.MIN_VALUE);
+		if (comp==null) return null; // bailout on non-numerics
+		if (Long.MIN_VALUE==comp) return CVMDouble.NaN;
+		if (comp>0) return b;
+		return a;
+	}
+	
+	/**
+	 * Gets the minimum of a set of numeric values
+	 * @param values Arguments for which to compute minimum value
+	 * @return minimum value, or null if any argument is non-numeric
+	 */
+	public static ACell max(ACell[] values) {
+		ACell acc=values[0];
+		if (!isNumber(acc)) return null;
+		for (int i = 1; i < values.length; i++) {
+			ACell next=values[i];
+			acc=max(acc,next);
+		}
+		return acc;
+	}
+	
+	/**
+	 * Gets the minimum of two numeric values
+	 * @param a First value
+	 * @param b Second value
+	 * @return minimum value, or null if any argument is non-numeric
+	 */
+	public static ACell max(ACell a, ACell b) {
+		if (a==null) return null;
+		Long comp=RT.compare(a, b, Long.MIN_VALUE);
+		if (comp==null) return null; // bailout on non-numerics
+		if (Long.MIN_VALUE==comp) return CVMDouble.NaN;
+		if (comp<0) return b;
+		return a;
+	}
+	
+	
 	/**
 	 * Get the target common numeric type for a given set of arguments. - Integers
 	 * upcast to Long - Anything else upcasts to Double
@@ -456,8 +512,8 @@ public class RT {
 	 * @param a        First numeric value
 	 * @param b        Second numeric value
 	 * @param nanValue Value to return in case of a NaN result
-	 * @return Less than 0 if a is smaller, greater than 0 if a is larger, 0 if a
-	 *         equals b
+	 * @return -1 if a is smaller, 1 if a is larger, 0 if a
+	 *         equals b, null if either value non-numeric, NaN if either value is NaN
 	 */
 	public static Long compare(ACell a, ACell b, Long nanValue) {
 		Class<?> ca = numericType(a);
@@ -471,7 +527,9 @@ public class RT {
 			return RT.compare(longValue(a), longValue(b));
 
 		double da = doubleValue(a);
+		if (Double.isNaN(da)) return nanValue;
 		double db = doubleValue(b);
+		if (Double.isNaN(db)) return nanValue;
 		if (da == db)
 			return 0L;
 		if (da < db)
@@ -522,7 +580,9 @@ public class RT {
 	}
 
 	/**
-	 * Tests if a Value is a valid numerical value
+	 * Tests if a Value is a valid numerical value type. 
+	 * 
+	 * Note: Returns false for null, but true for NaN
 	 * 
 	 * @param val Value to test
 	 * @return True if a number, false otherwise
@@ -679,7 +739,7 @@ public class RT {
 	/**
 	 * Converts any data structure to a vector
 	 * 
-	 * @param o Object to attemptto convert to a Vector
+	 * @param o Object to attempt to convert to a Vector
 	 * @return AVector instance, or null if not convertible
 	 */
 	@SuppressWarnings("unchecked")
@@ -880,10 +940,14 @@ public class RT {
 	 * @return The count of elements in the collection, or null if not countable
 	 */
 	public static Long count(ACell a) {
+		// special case: null is considered as empty collection
 		if (a == null)
 			return 0L;
+
 		if (a instanceof ACountable)
 			return ((ACountable<?>) a).count();
+		
+		
 		return null;
 	}
 
@@ -1442,12 +1506,7 @@ public class RT {
 		if (!(a instanceof AMap))
 			return null;
 		AMap<R, ACell> m = (AMap<R, ACell>) a;
-		return m.reduceEntries(new BiFunction<>() {
-			@Override
-			public AVector<R> apply(AVector<R> t, MapEntry<R, ACell> u) {
-				return t.conj(u.getKey());
-			}
-		}, Vectors.empty());
+		return m.getKeys();
 	}
 
 	/**
@@ -1549,7 +1608,7 @@ public class RT {
 	}
 
 	/**
-	 * Converts a Java value to a CVM type
+	 * Converts a Java value to a CVM type.
 	 * 
 	 * @param o Any Java Object
 	 * @return Valid CVM type

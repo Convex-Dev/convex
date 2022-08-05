@@ -10,19 +10,63 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.lang.Context;
+import convex.core.lang.RT;
 import convex.core.lang.TestState;
+import convex.test.Samples;
 
 /**
  * 
  * Generic tests for ANY digital asset compatible with the convex.asset API
  */
-public class AssetTest {
+public class AssetTester {
 	
 	static final AKeyPair TEST_KP=AKeyPair.generate();
 	
 	static {
 		
 	}
+	
+	/**
+	 * Generic tests for a fungible token. User account should have some of fungible token and sufficient coins.
+	 * @param ctx Initial Context. Will be forked.
+	 * @param token Fungible token Address
+	 * @param user User Address
+	 */
+	public static void doFungibleTests (Context<?> ctx, Address token, Address user) {
+		ctx=ctx.forkWithAddress(user);
+		ctx=step(ctx,"(import convex.asset :as asset)");
+		ctx=step(ctx,"(import convex.fungible :as fungible)");
+		ctx=step(ctx,"(def token "+token+")");
+		ctx = TestState.step(ctx,"(def actor (deploy '(set-controller "+user+")))");
+		Address actor = (Address) ctx.getResult();
+		assertNotNull(actor);
+
+		Long BAL=evalL(ctx,"(asset/balance token *address*)");
+		assertEquals(0L, evalL(ctx,"(asset/balance token actor)"));
+		assertTrue(BAL>0,"Should provide a user account with positive balance!");
+
+		// transfer all to self, should not affect balance
+		ctx=step(ctx,"(asset/transfer *address* [token "+BAL+"])");
+		assertEquals(BAL,RT.jvm(ctx.getResult()));
+		assertEquals(BAL, evalL(ctx,"(asset/balance token *address*)"));
+
+		// transfer nothing to self, should not affect balance
+		ctx=step(ctx,"(asset/transfer *address* [token nil])");
+		assertEquals(0L,(long)RT.jvm(ctx.getResult()));
+		assertEquals(BAL, evalL(ctx,"(asset/balance token *address*)"));
+
+		// Run generic asset tests, giving 1/3 the balance to a new user account
+		{
+			Context<?> c=ctx.fork();
+			c=c.createAccount(Samples.ACCOUNT_KEY);
+			Address user2=(Address) c.getResult();
+			Long smallBal=BAL/3;
+			c=step(c,"(asset/transfer "+user2+" [token "+smallBal+"])");
+
+			AssetTester.doAssetTests(c, token, user, user2);
+		}
+	}
+	
 	/**
 	 * Generic tests for an Asset
 	 * 
@@ -100,7 +144,11 @@ public class AssetTest {
 		assertEquals(eval(ctx,"(asset/quantity-zero ast)"),eval(ctx,"(asset/quantity-sub ast bal bal)"));
 
 		assertTrue(evalB(ctx,"(asset/owns? *address* [ast bal])"));
+		assertTrue(evalB(ctx,"(asset/owns? *address* ast bal)"));
 		assertTrue(evalB(ctx,"(asset/owns? *address* [ast nil])"));
+		assertTrue(evalB(ctx,"(asset/owns? *address* ast nil)"));
+		
+	
 	}
 
 }

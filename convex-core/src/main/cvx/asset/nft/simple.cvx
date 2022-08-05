@@ -8,6 +8,8 @@
                  :name         "Simple NFT creation and management"}))
 
 
+(declare balance)
+
 ;;;;;;;;;; Values
 
 

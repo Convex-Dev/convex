@@ -3,7 +3,6 @@ package convex.core.data;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
@@ -106,16 +105,6 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	public AHashMap<K, V> filterValues(Predicate<V> pred) {
 		return mergeWith(this, (a, b) -> pred.test(a) ? a : null);
 	}
-	
-	@Override
-	public boolean equals(AMap<K, V> a) {
-		if (this == a) return true; // important optimisation for e.g. hashmap equality
-		if (a == null) return false;
-		if (a.getType()!=Types.MAP) return false;
-		long n=this.count();
-		if (n != a.count()) return false;
-		return getHash().equals(a.getHash());
-	}
 
 	/**
 	 * Maps a function over all entries in this Map to produce updated entries.
@@ -158,6 +147,10 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	 */
 	public abstract int encode(byte[] bs, int pos);
 	
+	/**
+	 * Gets the keys in this Map as a Vector
+	 * @return
+	 */
 	public AVector<K> getKeys() {
 		int n=Utils.checkedInt(count);
 		ACell[] keys=new ACell[n];

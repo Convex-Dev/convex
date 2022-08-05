@@ -139,20 +139,29 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Checks for equality with another object. In general, data objects should be considered equal
+	 * Checks for equality with another Cell. In general, Cells are considered equal
 	 * if they have the same canonical representation, i.e. an identical encoding with the same hash value.
 	 * 
-	 * Subclasses SHOULD override this if offer have a more efficient equals implementation. 
+	 * Subclasses SHOULD override this if they have a more efficient equals implementation. 
 	 * 
 	 * MUST NOT require reads from Store.
 	 * 
-	 * @param a Cell to compare with. May be null??
+	 * @param a Cell to compare with. May be null.
 	 * @return True if this cell is equal to the other object
 	 */
 	public boolean equals(ACell a) {
 		if (this==a) return true; // important optimisation for e.g. hashmap equality
 		if (a==null) return false; // no non-null Cell is equal to null
 		if (!(a.getTag()==this.getTag())) return false; // Different types never equal
+		
+		// Check hashes for equality if they exist
+		Hash h=this.cachedHash();
+		if (h!=null) {
+			Hash ha=a.cachedHash();
+			if (ha!=null) return Utils.equals(h, ha);
+		}
+
+		// Else default to checking encodings
 		return getEncoding().equals(a.getEncoding());
 	}
 

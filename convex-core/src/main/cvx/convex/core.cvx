@@ -131,12 +131,17 @@
 ;;;;;;;;;; Environment setup
 
 (defmacro declare
-  ^{:doc {:description "Declares symbols in the current environment."
+  ^{:doc {:description "Declares symbols in the current environment. Used for forward declarations."
           :examples    [{:code "(declare forward-decl)"}]
           :signature   [{:params [& syms]
                          :return Nil}]}}
   [& syms]
-  (cons 'do (map (fn [sym] (cons 'def sym [nil])) syms)))
+  (map 
+    (fn [sym] 
+       (cond (symbol? sym)
+       (eval `(def ~sym nil))
+       (fail :CAST "declare requires symbols only as arguments"))) 
+     syms))
 
 
 ;;;;;;;;;; Logic
@@ -598,60 +603,6 @@
   (vec (apply map
               f
               colls)))
-
-
-
-(defn max
-
-  ^{:doc {:description "Returns the numerical maximum of the given values."
-          :examples    [{:code "(max 1 2 3)"}]
-          :signature   [{:params [& numbers]}]}}
-
-  [fst & more]
-
-  (let [n (count more)]
-    (loop [m (+ fst
-                0)  ;; Adds zero to ensure number.
-           i 0]
-      (cond (>= i
-                n)
-        m
-        (let [v (nth more i)]
-          (and (nan? v)
-               (return v))
-          (recur (cond (> v
-                          m)
-                   v
-                   m)
-                 (inc i)))))))
-
-
-
-(defn min
-
-  ^{:doc {:description "Returns the numerical minimum of the given values."
-          :examples    [{:code "(min 1 2 3)"}]
-          :signature   [{:params [& numbers]}]}}
-
-  [fst & more]
-
-  (let [n (count more)]
-    (loop [m (+ fst 0)
-           i 0]        ;; Adds zero to ensure number.
-      (cond (>= i
-                n)
-        m
-        (let [v (nth more
-                     i)]
-          (and (nan? v)
-               (return v))
-          (recur (cond (< v
-                          m)
-                   v
-                   m)
-                 (inc i)))))))
-
-
 
 (defmacro schedule
 

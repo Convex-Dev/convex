@@ -466,7 +466,7 @@
                   (fungible/balance token
                                     *address*)])
     (call market
-          *balance*
+          0
           (buy-cvx amount))))
 
 

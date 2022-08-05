@@ -199,7 +199,7 @@ public class Constants {
 	/**
 	 * Option for static compilation support
 	 */
-	public static final boolean OPT_STATIC = false;
+	public static final boolean OPT_STATIC = true;
 
 	/**
 	 * Char to represent bad Unicode characters in printing

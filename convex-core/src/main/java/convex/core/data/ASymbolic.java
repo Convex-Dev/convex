@@ -8,10 +8,10 @@ import convex.core.exceptions.InvalidDataException;
  */
 public abstract class ASymbolic extends ACell {
 
-	protected final AString name;
+	protected final StringShort name;
 
-	protected ASymbolic(AString name) {
-		this.name = name;
+	protected ASymbolic(StringShort name) {
+		this.name =  name;
 	}
 	
 	@Override
@@ -35,9 +35,9 @@ public abstract class ASymbolic extends ACell {
 	
 	/**
 	 * Gets the name of this symbolic value
-	 * @return Name as a CVM String
+	 * @return Name as a short CVM String
 	 */
-	public final AString getName() {
+	public final StringShort getName() {
 		return name;
 	}
 

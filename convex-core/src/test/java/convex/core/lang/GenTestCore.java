@@ -184,11 +184,11 @@ public class GenTestCore {
 		assertEquals(v,RT.times(args).longValue());
 		assertEquals(1.0/v,RT.divide(args).doubleValue());
 		
-		assertTrue(RT.lt(args));
-		assertTrue(RT.gt(args));
-		assertTrue(RT.le(args));
-		assertTrue(RT.ge(args));
-		assertTrue(RT.eq(args));
+		assertSame(CVMBool.TRUE,RT.lt(args));
+		assertSame(CVMBool.TRUE,RT.gt(args));
+		assertSame(CVMBool.TRUE,RT.le(args));
+		assertSame(CVMBool.TRUE,RT.ge(args));
+		assertSame(CVMBool.TRUE,RT.eq(args));
 		
 		assertTrue(Utils.bool(a)); // longs are always truthy
 		
@@ -210,11 +210,11 @@ public class GenTestCore {
 		assertEquals(a-b,RT.minus(args).longValue());
 		assertEquals(((double)a)/((double)b),RT.divide(args).doubleValue());
 		
-		assertEquals(a<b,RT.lt(args));
-		assertEquals(a>b,RT.gt(args));
-		assertEquals(a<=b,RT.le(args));
-		assertEquals(a>=b,RT.ge(args));
-		assertEquals(a==b,RT.eq(args));
+		assertSame(CVMBool.create(a<b),RT.lt(args));
+		assertSame(CVMBool.create(a>b),RT.gt(args));
+		assertSame(CVMBool.create(a<=b),RT.le(args));
+		assertSame(CVMBool.create(a>=b),RT.ge(args));
+		assertSame(CVMBool.create(a==b),RT.eq(args));
 		// assertEquals(a!=b,RT.ne(args)); // TODO: do we need this?
 	}
 	

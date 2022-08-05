@@ -2,7 +2,6 @@ package convex.cli;
 
 import java.io.Console;
 import java.io.File;
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.security.KeyStore;
@@ -337,17 +336,24 @@ public class Main implements Runnable {
 		return keyStore;
 	}
 
+	/**
+	 * Loads a keypair from configured keystore
+	 * @param publicKey String identifying the public key. May be a prefix
+	 * @return Keypair instance, or null if not found
+	 */
 	public AKeyPair loadKeyFromStore(String publicKey) {
-
+		if (publicKey==null) return null;
+		
 		AKeyPair keyPair = null;
 
-		String publicKeyClean = "";
+		publicKey = publicKey.trim();
 		if (publicKey != null) {
-			publicKeyClean = publicKey.toLowerCase().replaceAll("^0x", "").strip();
+			publicKey = publicKey.toLowerCase().replaceFirst("^0x", "").strip();
 		}
 
-
-		String searchText = publicKeyClean;
+		if (publicKey.isEmpty()) {
+			return null;
+		}
 		String password=getPassword();
 
 		File keyFile = new File(getKeyStoreFilename());
@@ -361,19 +367,16 @@ public class Main implements Runnable {
 
 			while (aliases.hasMoreElements()) {
 				String alias = aliases.nextElement();
-				if ((alias.indexOf(publicKeyClean) == 0 && !publicKeyClean.isEmpty())) {
+				if (alias.indexOf(publicKey) == 0) {
 					log.trace("found keypair " + alias);
 					keyPair = PFXTools.getKeyPair(keyStore, alias, password);
 					break;
 				}
 			}
 		} catch (Throwable t) {
-			throw new Error("Cannot load key store "+t);
+			throw new CLIError("Cannot load key store",t);
 		}
 
-		if (keyPair==null) {
-			throw new Error("Cannot find key in keystore '" + searchText + "'");
-		}
 		return keyPair;
 	}
 
@@ -417,7 +420,11 @@ public class Main implements Runnable {
 		return convex;
 	}
 
-	// Generate key pairs and add to store
+	/**
+	 * Generate key pairs and add to store. Does not save store!
+	 * @param count Number of key pairs to generate
+	 * @return List of key pairs
+	 */
 	public List<AKeyPair> generateKeyPairs(int count) {
 		List<AKeyPair> keyPairList = new ArrayList<>(count);
 

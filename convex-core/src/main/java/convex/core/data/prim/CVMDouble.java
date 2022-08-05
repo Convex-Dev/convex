@@ -1,5 +1,6 @@
 package convex.core.data.prim;
 
+import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.BlobBuilder;
 import convex.core.data.INumeric;
@@ -79,6 +80,9 @@ public final class CVMDouble extends APrimitive implements INumeric {
 	@Override
 	public void validateCell() throws InvalidDataException {
 		// Nothing to check. Always valid
+		if (Double.isNaN(value)) {
+			if (value!=Double.NaN) throw new InvalidDataException("Non-canonical NaN value",this);
+		}
 	}
 
 	@Override
@@ -152,6 +156,11 @@ public final class CVMDouble extends APrimitive implements INumeric {
 	public AString toCVMString(long limit) {
 		if (limit<1) return null;
 		return Strings.create(toString());
+	}
+	
+	@Override
+	public boolean equals(ACell a) {
+		return ((a instanceof CVMDouble)&&(Double.compare(((CVMDouble)a).value,value)==0));
 	}
 
 }

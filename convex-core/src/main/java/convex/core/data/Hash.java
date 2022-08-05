@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import java.nio.ByteBuffer;
+import java.security.MessageDigest;
 
 import convex.core.Constants;
 import convex.core.crypto.Hashing;
@@ -30,7 +31,7 @@ public class Hash extends AArrayBlob {
 	public static final int LENGTH = Constants.HASH_LENGTH;
 	
 	/**
-	 * Type of Hash values
+	 * Type of Hash values is just a regular Blob
 	 */
 	public static final AType TYPE = Types.BLOB;
 
@@ -99,16 +100,14 @@ public class Hash extends AArrayBlob {
 			throw new IllegalArgumentException(Errors.badRange(offset, offset+LENGTH));
 		return new Hash(hashBytes, offset);
 	}
-
+	
 	/**
-	 * Tests if the Hash value is precisely equal to another non-null Hash value.
-	 * 
-	 * @param other Hash to compare with
-	 * @return true if Hashes are equal, false otherwise.
+	 * Creates a Hash instance from the given message digest. 
+	 * @param digest MessageDigest instance. Will be reset.
+	 * @return New Hash instance
 	 */
-	public boolean equals(Hash other) {
-		if (other == this) return true;
-		return Utils.arrayEquals(other.store, other.offset, this.store, this.offset, LENGTH);
+	public static Hash createFromDigest(MessageDigest digest) {
+		return wrap(digest.digest());
 	}
 	
 	/**
@@ -200,7 +199,7 @@ public class Hash extends AArrayBlob {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (length != LENGTH) throw new InvalidDataException("Address length must be 32 bytes = 256 bits", this);
+		if (length != LENGTH) throw new InvalidDataException("Hash length must be 32 bytes = 256 bits", this);
 	}
 
 	@Override
@@ -208,13 +207,27 @@ public class Hash extends AArrayBlob {
 		// Hashes are always small enough to embed
 		return true;
 	}
-
-	@Override
-	public byte getTag() {
-		return Tag.BLOB;
+	
+	/**
+	 * Optimised compareTo for Hashes. Needed for MapLeaf, SetLeaf etc.
+	 * @param b Other Hash to compare with
+	 * @return Negative if this is "smaller", 0 if this "equals" b, positive if this is "larger"
+	 */
+	public final int compareTo(Hash b) {
+		if (this == b) return 0;	
+		// Check common bytes first
+		int c = Utils.compareByteArrays(this.store, this.offset, b.store, b.offset, LENGTH);
+		return c;
 	}
-
-
-
-
+	
+	/**
+	 * Tests if the Hash value is precisely equal to another non-null Hash value.
+	 * 
+	 * @param other Hash to compare with
+	 * @return true if Hashes are equal, false otherwise.
+	 */
+	public boolean equals(Hash other) {
+		if (other == this) return true;
+		return Utils.arrayEquals(other.store, other.offset, this.store, this.offset, LENGTH);
+	}
 }

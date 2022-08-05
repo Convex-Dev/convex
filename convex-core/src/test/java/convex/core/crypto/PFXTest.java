@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
@@ -37,5 +38,9 @@ public class PFXTest {
 
 		AKeyPair kp2=PFXTools.getKeyPair(ks2,alias, "thehero");
 		assertEquals(kp.signData(RT.cvm(1L)).getEncoding(),kp2.signData(RT.cvm(1L)).getEncoding());
+	}
+	
+	@Test public void testBadStore() {
+		assertThrows(FileNotFoundException.class,()->PFXTools.loadStore(new File("bloooooobiug"), null));
 	}
 }

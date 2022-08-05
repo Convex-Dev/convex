@@ -40,7 +40,12 @@ public abstract class ARecordGeneric extends ARecord {
 	}
 	
 	@Override 
-	public boolean equals(AMap<Keyword,ACell> a) {
+	public boolean equals(ACell a) {
+		if (!(a instanceof ARecordGeneric)) return false;
+		return equals((ARecordGeneric)a);
+	}
+		
+	protected boolean equals(ARecordGeneric a) {
 		if (this == a) return true; // important optimisation for e.g. hashmap equality
 		if (a == null) return false;
 		if (a.getTag()!=getTag()) return false;
@@ -49,7 +54,7 @@ public abstract class ARecordGeneric extends ARecord {
 			Hash ha=a.cachedHash();
 			if (ha!=null) return Utils.equals(h, ha);
 		}
-		return values.equals(((ARecordGeneric)a).values);
+		return values.equals(a.values);
 	}
 	
 	@Override

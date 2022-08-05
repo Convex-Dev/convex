@@ -5,7 +5,6 @@ import java.util.Comparator;
 import java.util.List;
 
 import convex.core.data.ACell;
-import convex.core.data.AMap;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -193,7 +192,7 @@ public final class Block extends ARecord {
 	}
 	
 	@Override 
-	public boolean equals(AMap<Keyword,ACell> a) {
+	public boolean equals(ACell a) {
 		if (!(a instanceof Block)) return false;
 		return equals((Block)a);
 	}
@@ -204,6 +203,7 @@ public final class Block extends ARecord {
 	 * @return true if equal, false otherwise
 	 */
 	public boolean equals(Block a) {
+		if (this==a) return true;
 		if (a == null) return false;
 		if (timestamp!=a.timestamp) return false;
 		

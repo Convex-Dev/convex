@@ -214,13 +214,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testLet() {
-
-		assertCastError(step("(let [[a b] :foo] b)"));
-
-		assertArityError(step("(let [[a b] nil] b)"));
-		assertArityError(step("(let [[a b] [1]] b)"));
-		assertEquals(2L,evalL("(let [[a b] [1 2]] b)"));
-		assertEquals(2L,evalL("(let [[a b] '(1 2)] b)"));
+		assertNull(eval("(let[])"));
 
 		assertCompileError(step("(let ['(a b) '(1 2)] b)"));
 
@@ -228,8 +222,26 @@ public class CoreTest extends ACVMTest {
 		assertCompileError(step("(let)"));
 		assertCompileError(step("(let :foo)"));
 		assertCompileError(step("(let [a])"));
+	}
+	
+	@Test
+	public void testLetDestructuring() {
+		assertNull(eval("(let[[] []])"));
+		assertSame(Vectors.empty(),eval("(let [[& a] []] a)"));
+		
+		// nil treated as empty sequence
+		assertSame(Vectors.empty(),eval("(let [[& a] nil] a)"));
+		
+		assertEquals(2L,evalL("(let [[a b] [1 2]] b)"));
+		assertEquals(2L,evalL("(let [[a b] '(1 2)] b)"));
 
+		assertCastError(step("(let [[a b] :foo] b)"));
 
+		assertArityError(step("(let [[a b] nil] b)"));
+		assertArityError(step("(let [[a b] [1]] b)"));
+
+		// See issue #62
+		assertArityError(step("(let [[a b & c d] [1 2]] c)"));
 	}
 
 	@Test
@@ -400,7 +412,7 @@ public class CoreTest extends ACVMTest {
 		assertNull(eval("(if false 1)"));
 		assertEquals(CVMLong.ONE,eval("(if true 1)"));
 
-		// TODO: should these be arity errors?
+		// These are arity errors to prevent obvious mistakes. Use cond if you want arbitrary arity!
 		assertArityError(step("(if)"));
 		assertArityError(step("(if 1)"));
 		assertArityError(step("(if 1 2 3 4)"));
@@ -480,13 +492,19 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(>=)"));
 		assertTrue(evalB("(<)"));
 		assertTrue(evalB("(>)"));
+		
+		// Negative zero special case behaviour
+		assertFalse(evalB("(= -0.0 0.0)"));
+		assertTrue(evalB("(== -0.0 0.0)"));
+
 
 		assertCastError(step("(== nil nil)"));
 		assertCastError(step("(> nil)"));
 		assertCastError(step("(< 1 :foo)"));
 		assertCastError(step("(<= 1 3 \"hello\")"));
 		assertCastError(step("(>= nil 1.0)"));
-
+		assertCastError(step("(>= 'foo)"));
+		
 		// ##NaN behaviour
 		assertFalse(evalB("(<= ##NaN ##NaN)"));
 		assertFalse(evalB("(<= ##NaN 42)"));
@@ -499,6 +517,7 @@ public class CoreTest extends ACVMTest {
 
 		// TODO: decide if we want short-circuiting behaviour on casts? Probably not?
 		// assertCastError(step("(>= 1 2 3 '*balance*)"));
+
 		assertFalse(evalB("(>= 1 2 3 '*balance*)"));
 	}
 
@@ -805,6 +824,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(-1.0,evalD("(ceil -1)"));
 		assertEquals(0.0,evalD("(ceil 0)"));
 		assertEquals(1.0,evalD("(ceil 1)"));
+		assertEquals(2.0,evalD("(ceil (byte 0x02))"));
 
 		// Special cases
 		assertEquals(Double.NaN,evalD("(ceil ##NaN)"));
@@ -872,6 +892,7 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(abs nil)"));
 		assertCastError(step("(abs #78)"));
 		assertCastError(step("(abs [1])"));
+		assertCastError(step("(abs \\a)"));
 
 		assertArityError(step("(abs)"));
 		assertArityError(step("(abs :foo :bar)")); // arity > cast
@@ -897,6 +918,7 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(signum 0xabab)"));
 		assertCastError(step("(signum nil)"));
 		assertCastError(step("(signum :foo)"));
+		assertCastError(step("(signum \\a)"));
 
 		// Fun Double cases
 		assertEquals(Double.NaN,evalD("(signum ##NaN)"));
@@ -1068,7 +1090,7 @@ public class CoreTest extends ACVMTest {
 		assertArgumentError(step("(assoc #{} 1 2)"));
 
 		// Standard error cases
-		assertArityError(step("(assoc #{} 1 2 3)"));
+		assertArityError(step("(assoc #{} 1 2 3)")); // arity before cast
 		assertArityError(step("(assoc #{} 1)"));
 	}
 
@@ -1124,7 +1146,6 @@ public class CoreTest extends ACVMTest {
 	public void testAssocFailures() {
 		assertCastError(step("(assoc 1 1 2)"));
 		assertCastError(step("(assoc :foo)"));
-
 
 		// assertCastError(step("(assoc #{} :foo true)"));
 
@@ -1403,8 +1424,8 @@ public class CoreTest extends ACVMTest {
 		// Not data structures, but are countable
 		assertEquals(CVMChar.create('b'), eval("(second \"abc\")"));
 		assertEquals(CVMByte.create(0x34), eval("(second 0x1234)"));
-		assertBoundsError(step("(second \"\")"));
-		assertBoundsError(step("(second 0x)"));
+		assertBoundsError(step("(second \"a\")"));
+		assertBoundsError(step("(second 0x01)"));
 
 	}
 
@@ -1618,6 +1639,20 @@ public class CoreTest extends ACVMTest {
 
 		assertArityError(step("(double)"));
 		assertArityError(step("(double :foo :bar)"));
+	}
+	
+	@Test
+	public void testDoublePred() {
+		assertTrue(evalB("(double? 1.0)"));
+		assertTrue(evalB("(double? ##NaN)"));
+
+		assertFalse(evalB("(double? nil)"));
+		assertFalse(evalB("(double? [])"));
+		assertFalse(evalB("(double? 0)"));
+		assertFalse(evalB("(double? :foo)"));
+
+		assertArityError(step("(double?)"));
+		assertArityError(step("(double? :foo :bar)"));
 	}
 
 	@Test
@@ -2002,6 +2037,8 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Keywords.STATE, eval("(keyword (name :state))"));
 		assertEquals(Keywords.STATE, eval("(keyword (str 'state))"));
 		assertEquals(Keywords.STATE, eval("(keyword 'state)"));
+		
+		assertTrue(evalB("(keyword? (keyword \"0\"))"));
 
 		// keyword lookups
 		assertNull(eval("((keyword :foo) nil)"));
@@ -2244,7 +2281,6 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(() :foo)"));
 		assertCastError(step("(() {})"));
 
-
 		// bad arity
 		assertArityError(step("(())"));
 		assertArityError(step("(() 1 2 3 4)"));
@@ -2327,6 +2363,9 @@ public class CoreTest extends ACVMTest {
 		Context<Address> ctx=step("(create-account 0x817934590c058ee5b7f1265053eeb4cf77b869e14c33e7f85b2babc85d672bbc)");
 		Address addr=ctx.getResult();
 		assertEquals(addr.longValue()+1,ctx.getState().getAccounts().count()); // should be last Address added
+		
+		// Query rollback should result in same account being created
+		assertTrue(evalB("(= (query (create-account *key*)) (query (create-account *key*)))"));
 
 		assertCastError(step("(create-account :foo)"));
 		assertCastError(step("(create-account 1)"));
@@ -2568,6 +2607,12 @@ public class CoreTest extends ACVMTest {
 				+ "    (def k 0x0000000000000000000000000000000000000000000000000000000000000000)"
 				+ "    (def a (deploy `(set-key ~k)))"
 				+ "    (= k (:key (account a))))"));
+		
+		assertCastError(step("(set-key :foo)"));
+		assertArgumentError(step("(set-key 0x00)"));
+		
+		assertArityError(step("(set-key)"));
+		assertArityError(step("(set-key 0x 0x)")); // arity before cast
 	}
 
 	@Test
@@ -2744,6 +2789,9 @@ public class CoreTest extends ACVMTest {
 
 		// staking on an address
 		assertCastError(step(ctx,"(stake *address* 1234)"));
+		
+		// staking on an invalid account key (wrong length)
+		assertArgumentError(step(ctx,"(stake 0x12 1234)"));
 
 		// bad arg types
 		assertCastError(step(ctx,"(stake :foo 1234)"));
@@ -2883,14 +2931,20 @@ public class CoreTest extends ACVMTest {
 		assertEquals(CVMDouble.NaN, eval("(min 2.0 ##NaN -0.0 ##Inf)"));
 		assertEquals(CVMDouble.NaN, eval("(min ##NaN)"));
 
-		// TODO: Figure out how this should behave. See issue https://github.com/Convex-Dev/convex/issues/99
-		// assertEquals(CVMLong.ONE, eval("(min ##NaN 1 ##NaN)"));
+		// See issue https://github.com/Convex-Dev/convex/issues/99
+		assertEquals(CVMDouble.NaN, eval("(min ##NaN 1 ##NaN)"));
+		
+		// min and max should preserve sign on zero
+		// See: https://github.com/Convex-Dev/convex/issues/366
+		assertEquals(CVMDouble.NEGATIVE_ZERO,eval("(min -0.0)"));
+		
+		assertEquals(-0.0, evalD("(min -0.0 0.0)"));
+		assertEquals(0.0, evalD("(min 0.0 -0.0)"));
 
 		assertCastError(step("(min true)"));
 		assertCastError(step("(min \\c)"));
 		assertCastError(step("(min ##NaN true)"));
 		assertCastError(step("(min true ##NaN)"));
-
 
 		// #NaNs should get ignored
 		assertEquals(CVMDouble.NaN,eval("(min ##NaN 42)"));
@@ -2906,13 +2960,28 @@ public class CoreTest extends ACVMTest {
 		assertEquals(7L, evalL("(max 7)"));
 		assertEquals(4.0, evalD("(max 4.0 3 2)"));
 		assertEquals(CVMDouble.NaN, eval("(max 1 2.5 ##NaN)"));
+		
+		assertEquals(-0.0, evalD("(max -0.0 0.0)"));
+		assertEquals(0.0, evalD("(max 0.0 -0.0)"));
+
 
 		assertArityError(step("(max)"));
+		
+		assertEquals(CVMDouble.NaN, eval("(max ##NaN 1)"));
+		
+		// min and max should preserve sign on zero
+		// See: https://github.com/Convex-Dev/convex/issues/366
+		assertEquals(CVMDouble.NEGATIVE_ZERO,eval("(max -0.0)"));
+
 	}
 
 	@Test
 	public void testPow() {
 		assertEquals(4.0, evalD("(pow 2 2)"));
+		
+		// NaN handling
+		assertEquals(CVMDouble.NaN, eval("(pow 2 ##NaN)"));
+		assertEquals(CVMDouble.NaN, eval("(pow ##NaN 2)"));
 
 		assertCastError(step("(pow :a 7)"));
 		assertCastError(step("(pow 7 :a)"));
@@ -2928,6 +2997,10 @@ public class CoreTest extends ACVMTest {
 		assertEquals(2L, evalL("(quot 10 4)"));
 		assertEquals(-2L, evalL("(quot -10 4)"));
 
+		// Division by zero
+		assertArgumentError(step("(quot 2 0)"));
+		assertArgumentError(step("(quot 0 0)"));
+		
 		assertCastError(step("(quot :a 7)"));
 		assertCastError(step("(quot 7 nil)"));
 
@@ -2946,6 +3019,9 @@ public class CoreTest extends ACVMTest {
 
 		assertEquals(6L, evalL("(mod -1 -7)"));
 
+		// Division by zero
+		assertArgumentError(step("(mod -2 0)"));
+		assertArgumentError(step("(mod 0 0)"));
 		assertArgumentError(step("(mod 10 0)"));
 
 		assertCastError(step("(mod :a 7)"));
@@ -2979,10 +3055,14 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testExp() {
 		assertEquals(1.0, evalD("(exp 0)"));
+		assertEquals(1.0, evalD("(exp 0.0)"));
 		assertEquals(1.0, evalD("(exp -0)"));
 		assertEquals(StrictMath.exp(1.0), evalD("(exp 1)"));
-		assertEquals(0.0, evalD("(exp (/ -1 0))"));
-		assertEquals(Double.POSITIVE_INFINITY, evalD("(exp (/ 1 0))"));
+		
+		assertEquals(CVMDouble.ZERO, eval("(exp ##-Inf)"));
+		assertEquals(CVMDouble.ONE, eval("(exp -0.0)"));
+		assertEquals(CVMDouble.POSITIVE_INFINITY, eval("(exp ##Inf)"));
+		assertEquals(CVMDouble.NaN, eval("(exp ##NaN)"));
 
 		assertCastError(step("(exp :a)"));
 		assertCastError(step("(exp #3)"));
@@ -3238,7 +3318,7 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(number? (byte 0))"));
 		assertTrue(evalB("(number? 0.5)"));
 		assertTrue(evalB("(number? ##NaN)")); // Sane? Is numeric double type....
-
+		
 		assertFalse(evalB("(number? nil)"));
 		assertFalse(evalB("(number? :foo)"));
 		assertFalse(evalB("(number? 0xFF)"));
@@ -3354,7 +3434,7 @@ public class CoreTest extends ACVMTest {
 
 		// def overwrites existing bindings
 		assertEquals(Vectors.of(2L, 3L), eval("(do (def v nil) (def v [2 3]) v)"));
-		assertEquals(Vectors.of(2L, 3L), eval("(do (def count [2 3]) count)")); // overwriting core
+		
 
 		// TODO: are these error types logical?
 		assertCompileError(step("(def)"));
@@ -3363,6 +3443,55 @@ public class CoreTest extends ACVMTest {
 		assertUndeclaredError(step("(def a b)"));
 
 		assertUndeclaredError(step("(def a a)"));
+	}
+	
+	@Test 
+	public void testDefOverCore() {
+		Context<?> ctx=step("(def count [2 3])");
+		assertTrue(ctx.getEnvironment().containsKey(Symbols.COUNT));
+		assertNull(ctx.getMetadata().get(Symbols.COUNT));
+
+		assertEquals(Vectors.of(2,3),eval(ctx,"count"));
+	}
+	
+	@Test
+	public void testDeclare() {
+		// Declare creates an environment binding
+		assertTrue(step("(declare bast)").getEnvironment().containsKey(Symbol.create("bast")));
+		
+		// declare allows future definition of value
+		// assertCompileError(step("(defn bp [x] (+ x bzz))")); // TODO: what error type?
+		
+		assertCVMEquals(3,eval("(do (declare bzz) (defn bp [x] (+ x bzz)) (def bzz 2) (bp 1))"));
+		
+		// Empty declare is a no-op w.r.t. state
+		assertEquals(step("(do)").getState(),step("(declare)").getState());
+		
+		// declare allows multiple declarations
+		assertTrue(step("(declare foo bar baz)").getEnvironment().getKeys().containsAll(Sets.of(Symbols.FOO,Symbols.BAR,Symbols.BAZ)));
+		
+		// Declare requires symbols only at compile time
+		assertNotError(step("(declare count)"));
+		
+		assertCastError(step("(declare ~'count)")); // TODO: sanity check??
+		assertCastError(step("(declare 1)"));
+		assertCastError(step("(declare foo 1)"));
+		assertCastError(step("(declare :bar)"));
+		assertCastError(step("(declare \"foo\")"));
+	}
+	
+	
+	@Test
+	public void testDeclareVsDef() {
+		// Normal behaviour with def
+		Context<?> ctx=step("(def foo 1)");
+		assertEquals(CVMLong.ONE,eval(ctx,"foo"));
+		
+		assertUndeclaredError(step(ctx,"bar"));
+		ctx=step("(declare bar)");
+		assertEquals(null,eval(ctx,"bar"));
+		ctx=step("(def bar 2)");
+		assertCVMEquals(2,eval(ctx,"bar"));
 	}
 	
 	@Test
@@ -3569,11 +3698,23 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testQuery() {
-		Context<AVector<ACell>> ctx=step("(query (def a 10) [*address* *origin* *caller* 10])");
-		assertEquals(Vectors.of(HERO,HERO,null,10L), ctx.getResult());
+		// Def should get rolled back
+		assertEquals(CVMLong.ONE,eval("(do (def a 1) (query (def a 3)) a)"));
 
 		// shouldn't be possible to mutate surrounding environment in query
 		assertEquals(10L,evalL("(let [a 3] (+ (query (set! a 5) (+ a 2)) a) )"));
+		
+		// Query should consume fixed juice
+		assertEquals(juice("1")+Juice.QUERY,juice("(query 1)"));
+		
+		// Query should add one to *depth*
+		assertEquals(evalL("*depth*")+1,evalL("(query *depth*)"));
+	}
+	
+	@Test
+	public void testQueryExample() {
+		Context<AVector<ACell>> ctx=step("(query (def a 10) [*address* *origin* *caller* 10])");
+		assertEquals(Vectors.of(HERO,HERO,null,10L), ctx.getResult());
 
 		// shouldn't be any def in the environment
 		assertSame(INITIAL,ctx.getState());
@@ -3943,13 +4084,23 @@ public class CoreTest extends ACVMTest {
 		// Local values override specials
 		assertNull(eval("(let [*balance* nil] *balance*)"));
 
-		// TODO: reconsider this, special take priority over enviornment?
+		// TODO: reconsider this, special take priority over environment?
 		assertCVMEquals(ctx.getOffer(),eval("(do (def *offer* :foo) *offer*)"));
 
 		// Alternative behaviour
 		//assertNull(eval("(let [*balance* nil] *balance*)"));
 		//assertEquals(Keywords.FOO,eval("(do (def *balance* :foo) *balance*)"));
 	}
+	
+	@Test
+	public void testSpecialOverride() {
+		// Should be possible to override specials in current environment
+		assertEquals(CVMLong.ONE, eval("(let [*address* 1] *address*)"));
+		
+		// TODO: what should happen here?
+		//assertEquals(eval("*address*"), eval("(do (def *address* 1) *address*)"));
+	}
+
 
 	@Test
 	public void testSpecialCaller() {
@@ -4001,6 +4152,8 @@ public class CoreTest extends ACVMTest {
 	public void testSpecialKey() {
 		assertEquals(InitTest.HERO_KEYPAIR.getAccountKey(), eval("*key*"));
 	}
+	
+
 
 	@Test
 	public void testSpecialJuice() {
