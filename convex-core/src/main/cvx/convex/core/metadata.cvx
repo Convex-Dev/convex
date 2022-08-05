@@ -628,7 +628,7 @@
 
 
  get-in
- {:doc {:description "Gets an element by successively looking up keys in a collection according to the logic of `get`. If any lookup does not find the appropriate key, will return `not-found` (nil by default)."
+ {:doc {:description "Gets an element by successively looking up keys in nested collections according to the logic of `get`. If any lookup does not find the appropriate key, will return `not-found` (nil by default)."
         :errors      {:CAST "If the first argument is not an associative collection."}
         :examples    [{:code "(get-in [[1 2] [3 4]] [1 1])"}]
         :signature   [{:params [coll keys]}
