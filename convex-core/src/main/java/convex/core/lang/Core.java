@@ -1127,7 +1127,7 @@ public class Core {
 			ACell[] ks=new ACell[n];
 			for (int i = 0; i < n; i++) {
 				ADataStructure struct = RT.ensureAssociative(data);  // nil-> empty map
-				if (struct == null) return context.withCastError((ACell)struct,Types.DATA_STRUCTURE); // TODO: Associative type?
+				if (struct == null) return context.withCastError(data,Types.DATA_STRUCTURE); // TODO: Associative type?
 				ass[i]=struct;
 				ACell k=ixs.get(i);
 				ks[i]=k;
