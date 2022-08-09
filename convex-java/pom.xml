@@ -9,6 +9,10 @@
 		<artifactId>convex</artifactId>
 		<version>0.7.7-SNAPSHOT</version>
 	</parent>
+	
+	<name>Convex Java Client Library</name>
+	<description>A Pure Java client library for Convex</description>
+	<url>https://convex.world</url>
 
 	<properties>
 		<maven.compiler.target>11</maven.compiler.target>
