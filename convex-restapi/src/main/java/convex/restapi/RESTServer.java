@@ -29,6 +29,18 @@ public class RESTServer {
 		return newServer;
 	}
 	
+	/**
+	 * Create a RESTServer connected to a Convex Client instance. Defaults to using the Peer Controller account.
+	 * 
+	 * @param server
+	 * @return
+	 */
+	public RESTServer create(Convex convex) {
+		RESTServer newServer=new RESTServer();
+		newServer.convex=convex;
+		return newServer;
+	}
+	
 	public void start() {
 		app.start();
 		
