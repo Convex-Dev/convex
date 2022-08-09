@@ -35,12 +35,12 @@
 		<dependency>
 			<groupId>world.convex</groupId>
 			<artifactId>convex-core</artifactId>
-			<version>0.7.7-SNAPSHOT`</version>
+			<version>${convex.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>world.convex</groupId>
 			<artifactId>convex-peer</artifactId>
-			<version>0.7.7-SNAPSHOT`</version>
+			<version>${convex.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>com.googlecode.json-simple</groupId>

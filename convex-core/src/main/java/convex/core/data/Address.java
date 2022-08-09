@@ -7,6 +7,7 @@ import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
 import convex.core.util.Utils;
 
 /**
@@ -120,6 +121,27 @@ public final class Address extends ALongBlob {
 			// fall through
 		}
 		
+		return null;
+	}
+	
+	/**
+	 * Attempts to parse an address from an arbitrary object. Accepts strings and numbers on a best efforts basis.
+	 * @param o Object to parse as an Address
+	 * @return Address parsed, or null if not valid
+	 */
+	public static Address parse(Object o) {
+		if (o==null) return null;
+		if (o instanceof ACell) {
+			Address add=RT.castAddress((ACell)o);
+			if (add!=null) return add;
+			o=RT.jvm((ACell)o); // convert to JVM type
+		}
+		if (o instanceof String) return parse((String)o);
+		if (o instanceof Number) {
+			Number n=(Number)o;
+			long l=n.longValue();
+			if (l==n.doubleValue()) return Address.create(l);
+		}
 		return null;
 	}
 

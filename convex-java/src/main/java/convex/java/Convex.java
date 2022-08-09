@@ -191,7 +191,7 @@ public class Convex {
 		req.put("accountKey", keyPair.getAccountKey().toHexString());
 		String json=JSON.toPrettyString(req);
 		Map<String,Object> response= doPost(url+"/api/v1/createAccount",json);
-		Address address=Address.parse((String)response.get("address"));
+		Address address=Address.parse(response.get("address"));
 		if (address==null) throw new Error("Account creation failed: "+response);
 		return address;
 	}
