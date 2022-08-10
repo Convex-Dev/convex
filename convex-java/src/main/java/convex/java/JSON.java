@@ -27,7 +27,7 @@ public class JSON {
      * 
      * @param jsonString A string containing a valid JSON Object representation
      * @return A map representing the JSON object
-     * @throws Error In case of JSON parsing error
+     * @throws IllegalArgumentException In case of JSON parsing error
      */
     @SuppressWarnings("unchecked")
     public static Map<String, Object> toMap(String jsonString) {
@@ -36,7 +36,7 @@ public class JSON {
             JSONObject result = (JSONObject) parser.parse(jsonString);
             return new JSONObject(result);
         } catch (ParseException e) {
-            throw new Error("Error in JSON parsing: " + e.getMessage(), e);
+            throw new IllegalArgumentException("Error in JSON parsing: " + e.getMessage(), e);
         }
     }
     

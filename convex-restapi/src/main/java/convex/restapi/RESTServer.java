@@ -4,7 +4,9 @@ import convex.api.Convex;
 
 import static io.javalin.apibuilder.ApiBuilder.*;
 
+import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 
 import convex.api.ConvexLocal;
 import convex.core.data.AccountKey;
@@ -13,8 +15,17 @@ import convex.peer.Server;
 import convex.java.JSON;
 import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
+import io.javalin.http.Context;
+import io.javalin.http.InternalServerErrorResponse;
+import io.javalin.http.ServiceUnavailableResponse;
 import io.javalin.plugin.openapi.OpenApiOptions;
 import io.javalin.plugin.openapi.OpenApiPlugin;
+import io.javalin.plugin.openapi.annotations.OpenApi;
+import io.javalin.plugin.openapi.annotations.OpenApiContent;
+import io.javalin.plugin.openapi.annotations.OpenApiRequestBody;
+import io.javalin.plugin.openapi.annotations.OpenApiResponse;
+import io.javalin.plugin.openapi.dsl.OpenApiBuilder;
+import io.javalin.plugin.openapi.dsl.OpenApiDocumentation;
 import io.javalin.plugin.openapi.ui.SwaggerOptions;
 import io.swagger.v3.oas.models.info.Info;
 
@@ -48,21 +59,44 @@ public class RESTServer {
 	private void addAPIRoutes() {
 		app.routes(()->{
 			path("api/v1",()->{
-				post("createAccount",ctx->{
-					Map<String,Object> req=JSON.toMap(ctx.body()); 
-					Object key=req.get("accountKey");
-					if (key==null) throw new BadRequestResponse(jsonError("Expected JSON body containing 'accountKey' field"));
-					
-					AccountKey pk=AccountKey.parse(key);
-					if (pk==null) throw new BadRequestResponse(jsonError("Unable to parse accountKey: "+key));
-					Address a=convex.createAccountSync(pk);
-					ctx.result("{\"address\": "+a.toLong()+"}");
-				});
+				post("createAccount",this::createAccount);
 			});
 		});
 	}
+	
+	OpenApiDocumentation createAccountDoc=OpenApiBuilder.document();
+	
+	@OpenApi(
+		    requestBody = @OpenApiRequestBody(content=@OpenApiContent(type = "application/json")),
+		    responses = { 
+		        @OpenApiResponse(status=" 400",content=@OpenApiContent()),
+		        @OpenApiResponse(status= "200",content=@OpenApiContent())
+		    }
+		)
+	public void createAccount(Context ctx) {
+		Map<String,Object> req;
+		try {
+			req=JSON.toMap(ctx.body()); 
+		} catch (Exception e) {
+			throw new BadRequestResponse(jsonError("Invalid JSON body"));
+		}
+		Object key=req.get("accountKey");
+		if (key==null) throw new BadRequestResponse(jsonError("Expected JSON body containing 'accountKey' field"));
+		
+		AccountKey pk=AccountKey.parse(key);
+		if (pk==null) throw new BadRequestResponse(jsonError("Unable to parse accountKey: "+key));
+		Address a;
+		try {
+			a = convex.createAccountSync(pk);
+		} catch (TimeoutException e) {
+			throw new ServiceUnavailableResponse(jsonError("Timeout in request"));
+		} catch (IOException e) {
+			throw new InternalServerErrorResponse(jsonError(e.getMessage()));
+		}
+		ctx.result("{\"address\": "+a.toLong()+"}");
+	}
 
-	private String jsonError(String string) {
+	private static String jsonError(String string) {
 		return "{\"error\":\""+string+"\"}";
 	}
 
