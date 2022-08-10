@@ -14,6 +14,10 @@ public class RESTServer {
 	private RESTServer() {
 		app=Javalin.create(config->{
 		});
+		
+		app.get("/", ctx->{
+			ctx.result("Hello World");
+		});
 	}
 
 	/**
@@ -22,7 +26,7 @@ public class RESTServer {
 	 * @param server
 	 * @return
 	 */
-	public RESTServer create(Server server) {
+	public static RESTServer create(Server server) {
 		RESTServer newServer=new RESTServer();
 		newServer.server=server;
 		newServer.convex=ConvexLocal.create(server, server.getPeerController(), server.getKeyPair());

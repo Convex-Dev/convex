@@ -15,6 +15,8 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.data.Lists;
+import convex.core.init.Init;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
@@ -90,6 +92,19 @@ public class API {
 			t.printStackTrace();
 			throw Utils.sneakyThrow(t);
 		}
+	}
+	
+	/**
+	 * Launches a peer with a default configurtion. Mainly for testing.
+	 * @return
+	 */
+	public static Server launchPeer() {
+		AKeyPair kp=AKeyPair.generate();
+		State genesis=Init.createBaseState(Lists.of(kp.getAccountKey()));
+		HashMap<Keyword, Object> config=new HashMap<>();
+		config.put(Keywords.KEYPAIR, kp);
+		config.put(Keywords.STATE, genesis);
+		return launchPeer(config);
 	}
 
 	/**
@@ -218,4 +233,6 @@ public class API {
 		}
 		return isReady;
     }
+
+
 }
