@@ -1,9 +1,15 @@
 package convex.restapi;
 
 import convex.api.Convex;
+
+import static io.javalin.apibuilder.ApiBuilder.*;
 import convex.api.ConvexLocal;
 import convex.peer.Server;
 import io.javalin.Javalin;
+import io.javalin.plugin.openapi.OpenApiOptions;
+import io.javalin.plugin.openapi.OpenApiPlugin;
+import io.javalin.plugin.openapi.ui.SwaggerOptions;
+import io.swagger.v3.oas.models.info.Info;
 
 public class RESTServer {
 
@@ -13,10 +19,32 @@ public class RESTServer {
 	
 	private RESTServer() {
 		app=Javalin.create(config->{
+			 config.registerPlugin(new OpenApiPlugin(getOpenApiOptions()));
 		});
 		
 		app.get("/", ctx->{
-			ctx.result("Hello World");
+			ctx.result("Convex Peer REST Server");
+		});
+		
+		addAPIRoutes();
+	}
+
+	private OpenApiOptions getOpenApiOptions() {
+		Info applicationInfo = new Info()
+		        .version("1.0")
+		        .description("Convex REST Server");
+		return new OpenApiOptions(applicationInfo)
+				.path("/swagger-docs")
+				.swagger(new SwaggerOptions("/swagger").title("Convex Swagger Documentation"));
+	}
+
+	private void addAPIRoutes() {
+		app.routes(()->{
+			path("api/v1",()->{
+				post("createAccount",ctx->{
+					ctx.result("Create account");
+				});
+			});
 		});
 	}
 

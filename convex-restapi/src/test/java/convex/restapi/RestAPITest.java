@@ -33,30 +33,35 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.State;
 import convex.core.util.Utils;
+import convex.peer.API;
+import convex.peer.Server;
 
 // from convex-peer test java package
-import convex.peer.TestNetwork;
 
 
 public class RestAPITest {
 
-	static Address ADDRESS;
-	static final AKeyPair KEYPAIR = AKeyPair.generate();
 	static final int PORT = 9900;
 
-	private static TestNetwork network;
+	private static Server server;
+	static Address ADDRESS;
+	static AKeyPair KEYPAIR = null;
+	static Convex CONVEX=null;
+	static Address HERO=null;
 
 	private static final Logger log = LoggerFactory.getLogger(RestAPITest.class.getName());
 
 	@BeforeAll
 	public static void init() {
-		network = TestNetwork.getInstance();
-		synchronized(network.SERVER) {
+		server=API.launchPeer();
+		synchronized(server) {
 			try {
-				ADDRESS=network.CONVEX.createAccountSync(KEYPAIR.getAccountKey());
-				network.CONVEX.transfer(ADDRESS, 1000000000L).get(1000,TimeUnit.MILLISECONDS);
-				ConvexLocal convex = Convex.connect(network.SERVER, ADDRESS, KEYPAIR);
-				APIServer.start(PORT, convex);
+				KEYPAIR=server.getKeyPair();
+				HERO=server.getPeerController();
+				CONVEX=Convex.connect(server, HERO, KEYPAIR);
+				ADDRESS=CONVEX.createAccountSync(KEYPAIR.getAccountKey());
+				CONVEX.transfer(ADDRESS, 1000000000L).get(1000,TimeUnit.MILLISECONDS);
+				APIServer.start(PORT, CONVEX);
 				Thread.sleep(200);
 			} catch (Throwable e) {
 				e.printStackTrace();
@@ -67,11 +72,11 @@ public class RestAPITest {
 
 	@Test
 	public void getHeroAccount() throws IOException, ParseException {
-		State state = network.SERVER.getPeer().getConsensusState();
-		AccountStatus status = state.getAccount(network.HERO);
+		State state = server.getPeer().getConsensusState();
+		AccountStatus status = state.getAccount(HERO);
 		// System.out.println("account status " + status);
 
-		String url = "http://127.0.0.1:" + PORT + "/api/v1/accounts/" + network.HERO.longValue();
+		String url = "http://127.0.0.1:" + PORT + "/api/v1/accounts/" + HERO.longValue();
 		log.info("getHeroAccount - " + url);
 		HttpUriRequest request = new HttpGet(url);
 		request.addHeader("accept", "application/json");
@@ -87,14 +92,14 @@ public class RestAPITest {
 		JSONObject parsedObject = (JSONObject) parser.parse(responseBody);
 		JSONObject result = new JSONObject(parsedObject);
 		assertEquals(status.getSequence(), result.get("sequence"));
-		assertEquals(network.HERO.longValue(), result.get("address"));
+		assertEquals(HERO.longValue(), result.get("address"));
 		assertEquals(status.getMemoryUsage(), result.get("memorySize"));
 		assertEquals(status.getMemory(), result.get("allowance"));
 		assertEquals(status.getBalance(), result.get("balance"));
 		assertEquals("user", result.get("type"));
 		assertEquals(false, result.get("isActor"));
 		assertEquals(false, result.get("isLibrary"));
-		assertEquals(network.HERO_KEYPAIR.getAccountKey().toString(), result.get("accountKey"));
+		assertEquals(KEYPAIR.getAccountKey().toString(), result.get("accountKey"));
 	}
 
 	@Test
