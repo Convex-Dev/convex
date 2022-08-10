@@ -3,9 +3,16 @@ package convex.restapi;
 import convex.api.Convex;
 
 import static io.javalin.apibuilder.ApiBuilder.*;
+
+import java.util.Map;
+
 import convex.api.ConvexLocal;
+import convex.core.data.AccountKey;
+import convex.core.data.Address;
 import convex.peer.Server;
+import convex.java.JSON;
 import io.javalin.Javalin;
+import io.javalin.http.BadRequestResponse;
 import io.javalin.plugin.openapi.OpenApiOptions;
 import io.javalin.plugin.openapi.OpenApiPlugin;
 import io.javalin.plugin.openapi.ui.SwaggerOptions;
@@ -42,10 +49,21 @@ public class RESTServer {
 		app.routes(()->{
 			path("api/v1",()->{
 				post("createAccount",ctx->{
-					ctx.result("Create account");
+					Map<String,Object> req=JSON.toMap(ctx.body()); 
+					Object key=req.get("accountKey");
+					if (key==null) throw new BadRequestResponse(jsonError("Expected JSON body containing 'accountKey' field"));
+					
+					AccountKey pk=AccountKey.parse(key);
+					if (pk==null) throw new BadRequestResponse(jsonError("Unable to parse accountKey: "+key));
+					Address a=convex.createAccountSync(pk);
+					ctx.result("{\"address\": "+a.toLong()+"}");
 				});
 			});
 		});
+	}
+
+	private String jsonError(String string) {
+		return "{\"error\":\""+string+"\"}";
 	}
 
 	/**

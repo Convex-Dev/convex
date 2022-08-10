@@ -58,7 +58,7 @@ public class Convex {
 
 	/**
 	 * Connect to Convex network with a given peer URL, address and keypair.
-	 * @param peerServerURL Peer server address, e.g. "https:/convex.world"
+	 * @param peerServerURL Peer server address, e.g. "https://convex.world"
 	 * @param address Address to use for this connection
 	 * @param keyPair Key pair to use for this connection
 	 * @return New Convex instance with supplied connection details
@@ -76,7 +76,7 @@ public class Convex {
 	 * No Address or Keypair is set by default: user will either need to provide these later or
 	 * perform an action that creates a new account (e.g. `useNewAccount`)
 	 *
-	 * @param peerServerURL Peer server address, e.g. "https:/convex.world"
+	 * @param peerServerURL Peer server address, e.g. "https://convex.world"
 	 * @return New Convex instance with supplied connection details
 	 */
 	public static Convex connect(String peerServerURL) {

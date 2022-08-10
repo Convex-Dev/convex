@@ -1,5 +1,7 @@
 package convex.restapi;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 /**
  * Tests for a baisc REST API calls
 */
@@ -14,24 +16,19 @@ import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.entity.ContentType;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
-
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
-import convex.api.ConvexLocal;
+import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.State;
 import convex.core.util.Utils;
 import convex.peer.API;
 import convex.peer.Server;
