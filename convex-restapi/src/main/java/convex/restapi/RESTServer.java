@@ -16,6 +16,7 @@ import convex.java.JSON;
 import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
+import io.javalin.http.Handler;
 import io.javalin.http.InternalServerErrorResponse;
 import io.javalin.http.ServiceUnavailableResponse;
 import io.javalin.plugin.openapi.OpenApiOptions;
@@ -25,6 +26,7 @@ import io.javalin.plugin.openapi.annotations.OpenApi;
 import io.javalin.plugin.openapi.annotations.OpenApiContent;
 import io.javalin.plugin.openapi.annotations.OpenApiRequestBody;
 import io.javalin.plugin.openapi.annotations.OpenApiResponse;
+import io.javalin.plugin.openapi.dsl.DocumentedResponse;
 import io.javalin.plugin.openapi.dsl.OpenApiBuilder;
 import io.javalin.plugin.openapi.dsl.OpenApiDocumentation;
 import io.javalin.plugin.openapi.ui.SwaggerOptions;
@@ -38,7 +40,8 @@ public class RESTServer {
 	
 	private RESTServer() {
 		app=Javalin.create(config->{
-			 config.registerPlugin(new OpenApiPlugin(getOpenApiOptions()));
+			 config.registerPlugin(getOpenApiPlugin());
+			 config.enableWebjars();
 		});
 		
 		app.get("/", ctx->{
@@ -48,7 +51,7 @@ public class RESTServer {
 		addAPIRoutes();
 	}
 
-	private OpenApiOptions getOpenApiOptions() {
+	private OpenApiPlugin getOpenApiPlugin() {
 		Info applicationInfo = new Info()
 		        .version("1.0")
 		        .description("Convex REST Server");
@@ -56,31 +59,34 @@ public class RESTServer {
 				.path("/swagger-docs")
 				.swagger(new SwaggerOptions("/swagger").title("Convex Swagger Documentation"))
 				.defaultDocumentation(doc -> {
-                    doc.result("500");
-                    doc.result("503");
+                    doc.result("500",ErrorResponse.class);
+                    doc.result("503",ErrorResponse.class);
                 });
-		 return options;
+		 return new OpenApiPlugin(options);
 	}
 
 	private void addAPIRoutes() {
-		app.post("/api/v1/createAccount",new CreateAccountController()::createAccount);
+		app.post("/api/v1/createAccount",new CreateAccountController().handler());
 
 	}
 	
 	class CreateAccountController {
-		OpenApiDocumentation createAccountDoc=OpenApiBuilder.document()
-				.de;
+		public Handler handler() {
+			OpenApiDocumentation createAccountDoc=OpenApiBuilder.document()
+					.operation(openApiOperation -> {
+				        openApiOperation.description("Create Account");
+				        openApiOperation.operationId("createAccount");
+				        openApiOperation.summary("Requests the server to create an account");
+				        openApiOperation.addTagsItem("account");
+				    })
+					.body(CreateRequest.class)
+					.result("200", CreateResponse.class,ar->{
+						
+					});
+			
+			return OpenApiBuilder.documented(createAccountDoc,this::createAccount);
+		}
 	
-		@OpenApi(
-				path="/api/v1/createAccount",
-				method = HttpMethod.POST,
-				description = "Create Account",
-			    requestBody = @OpenApiRequestBody(content=@OpenApiContent(type = "application/json", from=CreateRequest.class)),
-			    responses = { 
-			        @OpenApiResponse(status=" 400",content=@OpenApiContent(from=CreateRequest.class)),
-			        @OpenApiResponse(status= "200",content=@OpenApiContent(from=CreateRequest.class))
-			    }
-			)
 		public void createAccount(Context ctx) {
 			Map<String,Object> req;
 			try {
@@ -104,6 +110,7 @@ public class RESTServer {
 			}
 			ctx.result("{\"address\": "+a.toLong()+"}");
 		}
+		
 	}
 	 
 	private static String jsonError(String string) {
