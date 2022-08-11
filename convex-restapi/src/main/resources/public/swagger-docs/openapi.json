@@ -15,7 +15,7 @@
 			"post": {
 				"operationId": "createAccount",
 				"summary": "Create account",
-				"description": "Requests creation of a user account by the Peer",
+				"description": "Requests creation of a user account by the Peer. The Peer may ",
 				"requestBody": {
 					"content": {
 						"application/json": {
@@ -28,7 +28,18 @@
 				},
 				"responses": {
 					"200": {
-						"description": "Normal response"
+					 	"description": "Normal response",
+					 	"content": {
+							"application/json": {
+								"schema": {"type": "object"},
+								"example": {
+									"address": 13
+								} 
+							}
+						}
+					},
+					"400": {
+					 	"description": "Bad request, probably a missing or badly formatted accountKey."
 					}
 				}
 			}
