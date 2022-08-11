@@ -1,36 +1,21 @@
 package convex.restapi;
 
-import convex.api.Convex;
-
-import static io.javalin.apibuilder.ApiBuilder.*;
-
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
+import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
-import convex.peer.Server;
 import convex.java.JSON;
+import convex.peer.Server;
 import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
-import io.javalin.http.Handler;
 import io.javalin.http.InternalServerErrorResponse;
 import io.javalin.http.ServiceUnavailableResponse;
-import io.javalin.plugin.openapi.OpenApiOptions;
-import io.javalin.plugin.openapi.OpenApiPlugin;
-import io.javalin.plugin.openapi.annotations.HttpMethod;
-import io.javalin.plugin.openapi.annotations.OpenApi;
-import io.javalin.plugin.openapi.annotations.OpenApiContent;
-import io.javalin.plugin.openapi.annotations.OpenApiRequestBody;
-import io.javalin.plugin.openapi.annotations.OpenApiResponse;
-import io.javalin.plugin.openapi.dsl.DocumentedResponse;
-import io.javalin.plugin.openapi.dsl.OpenApiBuilder;
-import io.javalin.plugin.openapi.dsl.OpenApiDocumentation;
-import io.javalin.plugin.openapi.ui.SwaggerOptions;
-import io.swagger.v3.oas.models.info.Info;
+import io.javalin.http.staticfiles.Location;
 
 public class RESTServer {
 
@@ -40,52 +25,25 @@ public class RESTServer {
 	
 	private RESTServer() {
 		app=Javalin.create(config->{
-			 config.registerPlugin(getOpenApiPlugin());
 			 config.enableWebjars();
+			 config.enableCorsForAllOrigins();
+			 config.addStaticFiles(staticFiles -> {
+				    staticFiles.hostedPath = "/";                   // change to host files on a subpath, like '/assets'
+				    staticFiles.directory = "/public";              // the directory where your files are located
+				    staticFiles.location = Location.CLASSPATH;      // Location.CLASSPATH (jar) or Location.EXTERNAL (file system)
+				    staticFiles.precompress = false;                // if the files should be pre-compressed and cached in memory (optimization)
+				    staticFiles.aliasCheck = null;                  // you can configure this to enable symlinks (= ContextHandler.ApproveAliases())
+				    staticFiles.skipFileFunction = req -> false;    // you can use this to skip certain files in the dir, based on the HttpServletRequest
+			});
 		});
-		
-		app.get("/", ctx->{
-			ctx.result("Convex Peer REST Server");
-		});
-		
+		 
 		addAPIRoutes();
 	}
-
-	private OpenApiPlugin getOpenApiPlugin() {
-		Info applicationInfo = new Info()
-		        .version("1.0")
-		        .description("Convex REST Server");
-		 OpenApiOptions options= new OpenApiOptions(applicationInfo)
-				.path("/swagger-docs")
-				.swagger(new SwaggerOptions("/swagger").title("Convex Swagger Documentation"))
-				.defaultDocumentation(doc -> {
-                    doc.result("500",ErrorResponse.class);
-                    doc.result("503",ErrorResponse.class);
-                });
-		 return new OpenApiPlugin(options);
-	}
-
+    
 	private void addAPIRoutes() {
-		app.post("/api/v1/createAccount",new CreateAccountController().handler());
+		app.post("/api/v1/createAccount",this::createAccount);
 
 	}
-	
-	class CreateAccountController {
-		public Handler handler() {
-			OpenApiDocumentation createAccountDoc=OpenApiBuilder.document()
-					.operation(openApiOperation -> {
-				        openApiOperation.description("Create Account");
-				        openApiOperation.operationId("createAccount");
-				        openApiOperation.summary("Requests the server to create an account");
-				        openApiOperation.addTagsItem("account");
-				    })
-					.body(CreateRequest.class)
-					.result("200", CreateResponse.class,ar->{
-						
-					});
-			
-			return OpenApiBuilder.documented(createAccountDoc,this::createAccount);
-		}
 	
 		public void createAccount(Context ctx) {
 			Map<String,Object> req;
@@ -111,7 +69,6 @@ public class RESTServer {
 			ctx.result("{\"address\": "+a.toLong()+"}");
 		}
 		
-	}
 	 
 	private static String jsonError(String string) {
 		return "{\"error\":\""+string+"\"}";

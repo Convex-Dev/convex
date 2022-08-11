@@ -37,7 +37,7 @@ import convex.peer.Server;
 
 
 public class RestAPITest {
-
+ 
 	static final int PORT = 9900;
 
 	private static Server server;
@@ -47,7 +47,7 @@ public class RestAPITest {
 	static Address HERO=null;
 
 	private static final Logger log = LoggerFactory.getLogger(RestAPITest.class.getName());
-
+    
 	@BeforeAll
 	public static void init() {
 		server=API.launchPeer();

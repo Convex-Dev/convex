@@ -1,0 +1,37 @@
+{
+	"openapi": "3.0.0",
+	"info": {
+		"title": "Convex REST API",
+		"version": "1.0"
+	},
+	"servers": [
+		{
+			"url": "/api/v1",
+			"description": "Local API server"
+		}
+	],
+	"paths": {
+		"/createAccount": {
+			"post": {
+				"operationId": "createAccount",
+				"summary": "Create account",
+				"description": "Requests creation of a user account by the Peer",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {"type": "object"},
+							"example": {
+								"accountKey": "0x1234567812345678123456781234567812345678123456781234567812345678"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Normal response"
+					}
+				}
+			}
+		}
+	}
+}
