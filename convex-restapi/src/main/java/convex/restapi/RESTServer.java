@@ -100,7 +100,7 @@ public class RESTServer {
 	 * @param server
 	 * @return
 	 */
-	public RESTServer create(Convex convex) {
+	public static RESTServer create(Convex convex) {
 		RESTServer newServer = new RESTServer();
 		newServer.convex = convex;
 		return newServer;
@@ -108,7 +108,10 @@ public class RESTServer {
 
 	public void start() {
 		app.start();
-
+	}
+	
+	public void start(int port) {
+		app.start(port);
 	}
 
 	public void stop() {

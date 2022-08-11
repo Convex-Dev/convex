@@ -10,6 +10,22 @@ Convex is an open, realtime, decentralised technology for the Internet of Value.
 
 ## Usage
 
+This module is not intended to be used as a standalone library. Rather, it allows a Convex REST Peer server to be instantiated within any application.
+
+Example code:
+
+```java
+import convex.api.Convex;
+import convex.peer.Server;
+import convex.restapi.RESTServer;
+
+public void launchRestAPI(int port) {
+	Server peerServer = API.launchPeer();
+	Convex convex = Convex.connect(peerServer, peerServer.getPeerController(), keyPair);
+	RESTServer server=RESTServer.create(convex);
+	server.start(port);
+}
+```
 
 ## License
 
