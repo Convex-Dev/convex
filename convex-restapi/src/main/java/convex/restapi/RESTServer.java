@@ -130,4 +130,8 @@ public class RESTServer {
 	public Server getServer() {
 		return server;
 	}
+
+	public int getPort() {
+		return app.port();
+	}
 }

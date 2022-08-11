@@ -15,18 +15,20 @@ import convex.peer.Server;
 public class RemoteClientTest {
 
 	static RESTServer server;
+	static int port;
 	
 	@BeforeAll
 	public static void init() {
 		Server s=API.launchPeer();
 		RESTServer rs=RESTServer.create(s);
-		rs.start();
+		rs.start(0);
+		port=rs.getPort();
 		server=rs;
 	}
 	
 	@Test 
 	public void testRemoteClient() {
-		Convex c=Convex.connect("http://localhost:8080");
+		Convex c=Convex.connect("http://localhost:"+port);
 		AKeyPair kp=AKeyPair.generate();
 		Address addr=c.createAccount(kp);
 		assertNotNull(addr);
