@@ -79,7 +79,7 @@ public class RESTServer {
 	public void runQuery(Context ctx) {
 		Map<String, Object> req=getJSONBody(ctx);
 		Address addr=Address.parse(req.get("address")); 
-		if (addr==null) throw new BadRequestResponse(jsonError("Query requires an 'address'"));
+		if (addr==null) throw new BadRequestResponse(jsonError("query requires an 'address' field."));
 		Object srcValue=req.get("source");
 		if (!(srcValue instanceof String)) throw new BadRequestResponse(jsonError("Source code required for query (as a string)"));
 		
