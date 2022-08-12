@@ -81,15 +81,28 @@ public class RTTest {
 		doJSONRoundTrip(new ArrayList<Object>(),Vectors.empty());
 		doJSONRoundTrip(List.of(1,2),Vectors.of(1,2));
 		doJSONRoundTrip("hello",Strings.create("hello"));
+		doJSONRoundTrip("",Strings.EMPTY);
 		doJSONRoundTrip(true,CVMBool.TRUE);
 		
 		doJSONRoundTrip(new HashMap<String,Object>(),Maps.empty());
 		doJSONRoundTrip(Maps.hashMapOf("1",2,"3",4),Maps.of("1",2,"3",4));
+		
+		// JSON should convert keys to strings
+		assertEquals(Maps.of("1",2), RT.cvm(RT.json(Maps.of(1,2))));
+		assertEquals(Maps.of("[]",3), RT.cvm(RT.json(Maps.of(Vectors.empty(),3))));
 	}
 
 	private void doJSONRoundTrip(Object o, ACell c) {
-		assertEquals(c,RT.cvm(o)); // o should convert to c
-		assertEquals(c,RT.cvm(RT.json(c))); // c should round trip via JSON
+		// o should convert to c
+		assertEquals(c,RT.cvm(o)); 
+		
+		// c should round trip via JSON back to c, since JSON is a subset of CVM types
+		ACell roundTrip=RT.cvm(RT.json(c));
+		assertEquals(c,roundTrip); 
+		
+		// c should also round trip via JVM equivalent, since we are using JSON subset
+		ACell roundTrip2=RT.cvm(RT.jvm(c));
+		assertEquals(c,roundTrip2); 
 	}
 
 	@Test
