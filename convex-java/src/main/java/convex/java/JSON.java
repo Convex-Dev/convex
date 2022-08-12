@@ -74,9 +74,9 @@ public class JSON {
     }
     
     /**
-     * Converts an object to an efficient JSON string representation
+     * Converts a Java Object to an efficient JSON string representation
      *
-     * @param value Object to represent as a JSON String
+     * @param value Java Object to represent as a JSON String
      * @return JSON string representing the value
      * @throws RuntimeException on failure to create JSON from value
      */

@@ -12,7 +12,9 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
+import convex.core.lang.Symbols;
 import convex.java.Convex;
+import convex.java.JSON;
 import convex.peer.API;
 import convex.peer.Server;
 
@@ -50,7 +52,10 @@ public class RemoteClientTest {
 		c.setAddress(addr);
 		
 		Map<String,Object> res=c.query("*address*");
-		assertEquals(addr.toString(),res.get("value"));
+		assertEquals(addr.longValue(),res.get("value"));
+		
+		res=c.query(Symbols.STAR_KEY.toString());
+		assertEquals(JSON.toString(kp.getAccountKey()),res.get("value"));
 	}
 	
 	
