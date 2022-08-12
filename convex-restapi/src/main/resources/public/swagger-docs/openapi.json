@@ -15,7 +15,7 @@
 			"post": {
 				"operationId": "createAccount",
 				"summary": "Create account",
-				"description": "Requests creation of a user account by the Peer. The Peer may ",
+				"description": "Requests creation of a user account by the Peer. The Peer should create an account with the specified public key, assuming it allows the user to request this.",
 				"requestBody": {
 					"content": {
 						"application/json": {
@@ -40,6 +40,41 @@
 					},
 					"400": {
 					 	"description": "Bad request, probably a missing or badly formatted accountKey."
+					}
+				}
+			}
+		},
+		
+		"/query": {
+			"post": {
+				"operationId": "query",
+				"summary": "Execute Query",
+				"description": "Requests execution of a query by the Peer, using the current network state.",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {"type": "object"},
+							"example": {
+								"address": "#1245",
+								"source": "(+ 1 2 3 4)"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+					 	"description": "Normal response",
+					 	"content": {
+							"application/json": {
+								"schema": {"type": "object"},
+								"example": {
+									"value": 10
+								} 
+							}
+						}
+					},
+					"400": {
+					 	"description": "Bad query request."
 					}
 				}
 			}
