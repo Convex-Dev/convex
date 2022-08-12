@@ -4,6 +4,7 @@ import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BiFunction;
 
 import convex.core.Constants;
@@ -1640,6 +1641,19 @@ public class RT {
 			}
 			return (T)v;
 		}
+		if (o instanceof Map) {
+			Map<?,?> m= (Map<?,?>) o;
+			AMap<ACell,ACell> cm=Maps.empty();
+			for (Map.Entry<?, ?> me: m.entrySet()) {
+				Object k=me.getKey();
+				Object v=me.getValue();
+				ACell cvmk=cvm(k);
+				ACell cvmv=cvm(v);
+				cm=cm.assoc(cvmk, cvmv);
+			}
+			return (T) cm;
+		}
+		
 		throw new IllegalArgumentException("Can't convert to CVM type with class: " + Utils.getClassName(o));
 	}
 
@@ -1702,12 +1716,13 @@ public class RT {
 			long n=seq.count();
 			ArrayList<Object> list=new ArrayList<>();
 			for (long i=0; i<n; i++) {
-				ACell cvmv=seq.get(n);
+				ACell cvmv=seq.get(i);
 				Object v=json(cvmv);
 				list.add(v);
 			}
 			return (T) list;
 		}
+
 
 		return (T) o.toString();
 	}

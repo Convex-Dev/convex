@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
@@ -15,9 +17,11 @@ import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
+import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 
@@ -73,12 +77,19 @@ public class RTTest {
 		doJSONRoundTrip(1L,CVMLong.ONE);
 		doJSONRoundTrip(1.0,CVMDouble.ONE);
 		doJSONRoundTrip(null,null);
+		
 		doJSONRoundTrip(new ArrayList<Object>(),Vectors.empty());
+		doJSONRoundTrip(List.of(1,2),Vectors.of(1,2));
+		doJSONRoundTrip("hello",Strings.create("hello"));
+		doJSONRoundTrip(true,CVMBool.TRUE);
+		
+		doJSONRoundTrip(new HashMap<String,Object>(),Maps.empty());
+		doJSONRoundTrip(Maps.hashMapOf("1",2,"3",4),Maps.of("1",2,"3",4));
 	}
 
 	private void doJSONRoundTrip(Object o, ACell c) {
-		assertEquals(c,RT.cvm(o));
-		assertEquals(o,RT.json(c));
+		assertEquals(c,RT.cvm(o)); // o should convert to c
+		assertEquals(c,RT.cvm(RT.json(c))); // c should round trip via JSON
 	}
 
 	@Test
