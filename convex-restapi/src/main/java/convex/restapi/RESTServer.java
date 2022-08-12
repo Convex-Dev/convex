@@ -1,13 +1,19 @@
 package convex.restapi;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
+import convex.core.Result;
+import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.data.Keyword;
+import convex.core.lang.RT;
+import convex.core.lang.Reader;
 import convex.java.JSON;
 import convex.peer.Server;
 import io.javalin.Javalin;
@@ -46,16 +52,11 @@ public class RESTServer {
 
 	private void addAPIRoutes() {
 		app.post("/api/v1/createAccount", this::createAccount);
-
+		app.post("/api/v1/query", this::runQuery);
 	}
 
 	public void createAccount(Context ctx) {
-		Map<String, Object> req;
-		try {
-			req = JSON.toMap(ctx.body());
-		} catch (Exception e) {
-			throw new BadRequestResponse(jsonError("Invalid JSON body"));
-		}
+		Map<String, Object> req=getJSONBody(ctx);
 		Object key = req.get("accountKey");
 		if (key == null)
 			throw new BadRequestResponse(jsonError("Expected JSON body containing 'accountKey' field"));
@@ -73,6 +74,43 @@ public class RESTServer {
 			throw new InternalServerErrorResponse(jsonError(e.getMessage()));
 		}
 		ctx.result("{\"address\": " + a.toLong() + "}");
+	}
+	
+	public void runQuery(Context ctx) {
+		Map<String, Object> req=getJSONBody(ctx);
+		Address addr=Address.parse(req.get("address")); 
+		if (addr==null) throw new BadRequestResponse(jsonError("Query requires an 'address'"));
+		Object srcValue=req.get("source");
+		if (!(srcValue instanceof String)) throw new BadRequestResponse(jsonError("Source code required for query (as a string)"));
+		
+		String src=(String)srcValue;
+		ACell form=Reader.read(src);
+		try {
+			Result r=convex.querySync(form,addr);
+			
+			HashMap<String,Object> rmap=new HashMap<>();
+			Object jsonValue=RT.json(r.getValue());
+			rmap.put("value", jsonValue);
+			ACell ecode=r.getErrorCode();
+			if (ecode instanceof Keyword) {
+				rmap.put("errorCode", ((Keyword)ecode).getName().toString());
+			}
+			
+			ctx.result(JSON.toString(rmap));
+		} catch (TimeoutException e) {
+			throw new ServiceUnavailableResponse(jsonError("Timeout in request"));
+		} catch (IOException e) {
+			throw new InternalServerErrorResponse(jsonError(e.getMessage()));
+		}
+	}
+
+	private Map<String, Object> getJSONBody(Context ctx) {
+		try {
+			Map<String, Object> req= JSON.toMap(ctx.body());
+			return req;
+		} catch (Exception e) {
+			throw new BadRequestResponse(jsonError("Invalid JSON body"));
+		}
 	}
 
 	private static String jsonError(String string) {

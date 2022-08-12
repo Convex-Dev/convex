@@ -13,6 +13,8 @@ import org.json.simple.JSONValue;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
+import convex.core.data.ACell;
+
 /**
  * Simple JSON tools for working with Convex
  */

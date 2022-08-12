@@ -1,6 +1,8 @@
 package convex.core.lang;
 
 import java.lang.reflect.Array;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.function.BiFunction;
 
 import convex.core.Constants;
@@ -1653,6 +1655,52 @@ public class RT {
 		if (o instanceof CVMChar)
 			return (T) (Character) ((CVMChar) o).charValue();
 		return (T) o;
+	}
+	
+	/**
+	 * Converts a CVM value to equivalent JSON value as expressed in equivalent JVM types
+	 * 
+	 * @param o Value to convert to JVM type
+	 * @return Java value, or unchanged input
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T> T json(ACell o) {
+		if (o==null) return null;
+		if (o instanceof CVMLong)
+			return (T) (Long) ((CVMLong) o).longValue();
+		if (o instanceof CVMDouble)
+			return (T) (Double) ((CVMDouble) o).doubleValue();
+		if (o instanceof CVMByte)
+			return (T) (Byte) (byte) ((CVMByte) o).longValue();
+		if (o instanceof CVMBool)
+			return (T) (Boolean) ((CVMBool) o).booleanValue();
+		if (o instanceof CVMChar)
+			return (T) ((CVMChar) o).toString();
+		if (o instanceof AMap) {
+			AMap<?,?> m= (AMap<?,?>)o;
+			long n=m.count();
+			HashMap<String,Object> hm=new HashMap<>();
+			for (long i=0; i<n; i++) {
+				MapEntry<?,?> me=m.entryAt(i);
+				String k=RT.toString(me.getKey());
+				Object v=json(me.getValue());
+				hm.put(k, v);
+			}
+			return (T) hm;
+		}
+		if (o instanceof ASequence) {
+			ASequence<?> seq= (ASequence<?>)o;
+			long n=seq.count();
+			ArrayList<Object> list=new ArrayList<>();
+			for (long i=0; i<n; i++) {
+				ACell cvmv=seq.get(n);
+				Object v=json(cvmv);
+				list.add(v);
+			}
+			return (T) list;
+		}
+
+		return (T) o.toString();
 	}
 
 	/**
