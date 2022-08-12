@@ -13,10 +13,8 @@ import org.json.simple.JSONValue;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
-import convex.core.data.ACell;
-
 /**
- * Simple JSON tools for working with Convex
+ * Simple JSON tools 
  */
 public class JSON {
 
@@ -48,7 +46,7 @@ public class JSON {
      * @param jsonString A string containing valid JSON
      * @param <T>        A type parameter for the type of object returned.
      * @return T A java object representing the JSON provided
-     * @throws Error on JSON parsing error
+     * @throws IllegalArgumentException on JSON parsing error
      */
     @SuppressWarnings({"unchecked"})
     public static <T> T parse(String jsonString) {
@@ -57,7 +55,7 @@ public class JSON {
             Object result = parser.parse(jsonString);
             return (T) result;
         } catch (ParseException e) {
-        	throw new Error("Error in JSON parsing: " + e.getMessage(), e);
+        	throw new IllegalArgumentException("Error in JSON parsing: " + e.getMessage(), e);
         }
     }
     

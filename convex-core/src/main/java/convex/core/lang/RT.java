@@ -1681,7 +1681,14 @@ public class RT {
 	}
 	
 	/**
-	 * Converts a CVM value to equivalent JSON value as expressed in equivalent JVM types
+	 * Converts a CVM value to equivalent JSON value as expressed in equivalent JVM types.
+	 * 
+	 * Note some special one-way conversions that are required because JSON is not 
+	 * sufficiently expressive for all CVM types:
+	 * - Address becomes a Number (Long type)
+	 * - Lists and Vectors both become an Array (Java List type)
+	 * - Characters become a String
+	 * - Blobs become a hex string representation '0x....'
 	 * 
 	 * @param o Value to convert to JVM type
 	 * @return Java value which represents JSON object
