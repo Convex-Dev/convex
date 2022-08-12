@@ -14,6 +14,8 @@ import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AVector;
 import convex.core.data.Address;
+import convex.core.data.Blob;
+import convex.core.data.BlobMaps;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
@@ -22,6 +24,7 @@ import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
+import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 
@@ -73,6 +76,22 @@ public class RTTest {
 	
 	@Test
 	public void testJSON() {
+		assertNull(RT.json(null));
+		
+		assertEquals((Long)13L,RT.json(Address.create(13)));
+		assertEquals("0xcafebabe",RT.json(Blob.fromHex("cafebabe")));
+		assertEquals("0x",RT.json(Blob.fromHex("")));
+		assertEquals("{}",RT.json(BlobMaps.empty()).toString());
+		assertEquals("c",RT.json(CVMChar.create('c')));
+		
+		// JSON should convert keys to strings
+		assertEquals(Maps.of("1",2), RT.cvm(RT.json(Maps.of(1,2))));
+		assertEquals(Maps.of("[]",3), RT.cvm(RT.json(Maps.of(Vectors.empty(),3))));
+		assertEquals(Maps.of("[\"\" 3]",4), RT.cvm(RT.json(Maps.of(Vectors.of("",3),4))));
+	}
+	
+	@Test
+	public void testJSONRoundTrips() {
 		
 		doJSONRoundTrip(1L,CVMLong.ONE);
 		doJSONRoundTrip(1.0,CVMDouble.ONE);
@@ -86,10 +105,6 @@ public class RTTest {
 		
 		doJSONRoundTrip(new HashMap<String,Object>(),Maps.empty());
 		doJSONRoundTrip(Maps.hashMapOf("1",2,"3",4),Maps.of("1",2,"3",4));
-		
-		// JSON should convert keys to strings
-		assertEquals(Maps.of("1",2), RT.cvm(RT.json(Maps.of(1,2))));
-		assertEquals(Maps.of("[]",3), RT.cvm(RT.json(Maps.of(Vectors.empty(),3))));
 	}
 
 	private void doJSONRoundTrip(Object o, ACell c) {
@@ -129,6 +144,7 @@ public class RTTest {
 		assertEquals(CVMLong.create(1L), RT.cvm(1L));
 		assertEquals(CVMDouble.create(0.17), RT.cvm(0.17));
 		assertEquals(Strings.create("foo"), RT.cvm("foo"));
+		assertEquals(Vectors.empty(), RT.cvm(new ArrayList<Object>()));
 
 		// CVM objects shouldn't change
 		Keyword k = Keyword.create("test-key");

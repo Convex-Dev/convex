@@ -1699,6 +1699,8 @@ public class RT {
 			return (T) (Boolean) ((CVMBool) o).booleanValue();
 		if (o instanceof CVMChar)
 			return (T) ((CVMChar) o).toString();
+		if (o instanceof Address)
+			return (T) (Long)((Address) o).longValue();
 		if (o instanceof AMap) {
 			AMap<?,?> m= (AMap<?,?>)o;
 			long n=m.count();
