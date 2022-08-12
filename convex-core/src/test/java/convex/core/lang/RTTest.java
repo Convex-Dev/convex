@@ -4,8 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+import java.util.ArrayList;
+
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AVector;
 import convex.core.data.Address;
@@ -62,6 +65,20 @@ public class RTTest {
 
 		// null return values if cast fails
 		assertNull(RT.sequence(Keywords.FOO)); // keywords not allowed
+	}
+	
+	@Test
+	public void testJSON() {
+		
+		doJSONRoundTrip(1L,CVMLong.ONE);
+		doJSONRoundTrip(1.0,CVMDouble.ONE);
+		doJSONRoundTrip(null,null);
+		doJSONRoundTrip(new ArrayList<Object>(),Vectors.empty());
+	}
+
+	private void doJSONRoundTrip(Object o, ACell c) {
+		assertEquals(c,RT.cvm(o));
+		assertEquals(o,RT.json(c));
 	}
 
 	@Test

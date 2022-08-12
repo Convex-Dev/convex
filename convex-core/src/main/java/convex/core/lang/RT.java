@@ -3,6 +3,7 @@ package convex.core.lang;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.function.BiFunction;
 
 import convex.core.Constants;
@@ -1631,6 +1632,14 @@ public class RT {
 			return (T) CVMChar.create((Character) o);
 		if (o instanceof Boolean)
 			return (T) CVMBool.create((Boolean) o);
+		if (o instanceof List) {
+			List<?> l=(List<?>)o;
+			AVector<?> v=Vectors.empty(); 
+			for (Object val: l) {
+				v=v.conj(cvm(val));
+			}
+			return (T)v;
+		}
 		throw new IllegalArgumentException("Can't convert to CVM type with class: " + Utils.getClassName(o));
 	}
 
@@ -1661,7 +1670,7 @@ public class RT {
 	 * Converts a CVM value to equivalent JSON value as expressed in equivalent JVM types
 	 * 
 	 * @param o Value to convert to JVM type
-	 * @return Java value, or unchanged input
+	 * @return Java value which represents JSON object
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T> T json(ACell o) {
