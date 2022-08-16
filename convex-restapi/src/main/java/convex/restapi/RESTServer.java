@@ -12,6 +12,7 @@ import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
+import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.java.JSON;
@@ -76,6 +77,38 @@ public class RESTServer {
 		ctx.result("{\"address\": " + a.toLong() + "}");
 	}
 	
+	public void faucetRequest(Context ctx) {
+		Map<String, Object> req=getJSONBody(ctx);
+		Address addr=Address.parse(req.get("address")); 
+		if (addr == null)
+			throw new BadRequestResponse(jsonError("Expected JSON body containing 'address' field"));
+
+		Object o=req.get("amount");
+		CVMLong l=CVMLong.tryParse(o);
+		if (l==null)  throw new BadRequestResponse(jsonError("faucet requires an 'amount' field containing a long value."));
+
+		try {
+			// SECURITY: Make sure this is not subject to injection attack
+			// Optional: pre-compile to Op
+			Result r=convex.transactSync("(transfer "+addr+" "+l+")");
+			if (r.isError()) {
+				HashMap<String,Object> hm=new HashMap<>();
+				hm.put("errorCode", RT.name(r.getErrorCode()));
+				hm.put("source", "Server");
+				hm.put("value", RT.json(r.getValue()));
+				ctx.json(hm);
+			} else {
+				req.put("amount", r.getValue());
+				ctx.result(JSON.toPrettyString(req));
+			}
+		} catch (TimeoutException e) {
+			throw new ServiceUnavailableResponse(jsonError("Timeout in request"));
+		} catch (IOException e) {
+			throw new InternalServerErrorResponse(jsonError(e.getMessage()));
+		}
+		
+	}
+	
 	public void runQuery(Context ctx) {
 		Map<String, Object> req=getJSONBody(ctx);
 		Address addr=Address.parse(req.get("address")); 
@@ -83,13 +116,21 @@ public class RESTServer {
 		Object srcValue=req.get("source");
 		if (!(srcValue instanceof String)) throw new BadRequestResponse(jsonError("Source code required for query (as a string)"));
 		
+		Object cvxRaw=req.get("raw");
+		
 		String src=(String)srcValue;
 		ACell form=Reader.read(src);
 		try {
 			Result r=convex.querySync(form,addr);
 			
 			HashMap<String,Object> rmap=new HashMap<>();
-			Object jsonValue=RT.json(r.getValue());
+			Object jsonValue;
+			if (cvxRaw==null) {
+				jsonValue=RT.json(r.getValue());
+			} else {
+				jsonValue=RT.toString(r.getValue());
+			}
+			
 			rmap.put("value", jsonValue);
 			ACell ecode=r.getErrorCode();
 			if (ecode instanceof Keyword) {
