@@ -44,6 +44,16 @@ public class RemoteClientTest {
 	}
 	
 	@Test 
+	public void testFaucet() {
+		Convex c=Convex.connect("http://localhost:"+port);
+		Address addr=c.useNewAccount();
+		assertNotNull(addr);
+		
+		// second account should be different
+		assertEquals(0L,c.queryBalance());
+	}
+	
+	@Test 
 	public void testQuery() {
 		Convex c=Convex.connect("http://localhost:"+port);
 		AKeyPair kp=AKeyPair.generate();

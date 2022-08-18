@@ -10,17 +10,21 @@ import convex.api.ConvexLocal;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
+import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
+import convex.core.data.Lists;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.lang.Symbols;
 import convex.java.JSON;
 import convex.peer.Server;
 import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 import io.javalin.http.InternalServerErrorResponse;
+import io.javalin.http.NotFoundResponse;
 import io.javalin.http.ServiceUnavailableResponse;
 import io.javalin.http.staticfiles.Location;
 
@@ -54,6 +58,8 @@ public class RESTServer {
 	private void addAPIRoutes() {
 		app.post("/api/v1/createAccount", this::createAccount);
 		app.post("/api/v1/query", this::runQuery);
+		
+		app.get("/api/v1/accounts/<addr>", this::queryAccount);
 	}
 
 	public void createAccount(Context ctx) {
@@ -77,6 +83,67 @@ public class RESTServer {
 		ctx.result("{\"address\": " + a.toLong() + "}");
 	}
 	
+	public void queryAccount(Context ctx) {
+		Address addr=null;
+		String addrParam=ctx.pathParam("addr");
+		try {
+			long a=Long.parseLong(addrParam);
+			addr=Address.create(a);
+			if (addr==null) throw new BadRequestResponse(jsonError("Invalid address: "+a));
+		} catch(Exception e) {
+			throw new BadRequestResponse(jsonError("Expected valid account number in path but got ["+addrParam+"]"));
+		}
+		
+		Result r= doQuery(Lists.of(Symbols.ACCOUNT,addr));
+		
+		if (r.isError()) {
+			ctx.json(jsonForErrorResult(r));
+			return;
+		}
+		
+		AccountStatus as=r.getValue();
+		if (as==null) {
+			throw new NotFoundResponse("{\"errorCode\": \"NOBODY\", \"source\": \"Server\",\"value\": \"The Account requested does not exist.\"}");
+		}
+		
+		boolean isUser=!as.isActor();
+		// TODO: consider if isLibrary is useful?
+		// boolean isLibrary=as.getCallableFunctions().isEmpty();
+		
+		HashMap<String,Object> hm=new HashMap<>();
+		hm.put("address",addr.longValue());
+		hm.put("allowance",as.getMemory());
+		hm.put("balance",as.getBalance());
+		hm.put("memorySize",as.getMemorySize());
+		hm.put("sequence",as.getSequence());
+		hm.put("type", isUser?"user":"actor");
+		
+		ctx.result(JSON.toPrettyString(hm));
+	}
+	
+	/**
+	 * Runs a query, wrapping excpetions
+	 * @param form
+	 * @return
+	 */
+	private Result doQuery(ACell form) {
+		try {
+			return convex.querySync(form);
+		} catch (TimeoutException e) {
+			throw new ServiceUnavailableResponse(jsonError("Timeout in request"));
+		} catch (IOException e) {
+			throw new InternalServerErrorResponse(jsonError("IOException in request"));
+		}
+	}
+	
+	private HashMap<String,Object> jsonForErrorResult(Result r) {
+		HashMap<String,Object> hm=new HashMap<>();
+		hm.put("errorCode", RT.name(r.getErrorCode()));
+		hm.put("source", "Server");
+		hm.put("value", RT.json(r.getValue()));
+		return hm;
+	}
+
 	public void faucetRequest(Context ctx) {
 		Map<String, Object> req=getJSONBody(ctx);
 		Address addr=Address.parse(req.get("address")); 
@@ -92,10 +159,7 @@ public class RESTServer {
 			// Optional: pre-compile to Op
 			Result r=convex.transactSync("(transfer "+addr+" "+l+")");
 			if (r.isError()) {
-				HashMap<String,Object> hm=new HashMap<>();
-				hm.put("errorCode", RT.name(r.getErrorCode()));
-				hm.put("source", "Server");
-				hm.put("value", RT.json(r.getValue()));
+				HashMap<String,Object> hm=jsonForErrorResult(r);
 				ctx.json(hm);
 			} else {
 				req.put("amount", r.getValue());
