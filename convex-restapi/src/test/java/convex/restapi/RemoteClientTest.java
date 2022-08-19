@@ -74,6 +74,19 @@ public class RemoteClientTest {
 		assertEquals(JSON.toString(kp.getAccountKey()),res.get("value"));
 	}
 	
+	@Test 
+	public void testQueryAccount() {
+		Convex c=Convex.connect("http://localhost:"+port);
+		AKeyPair kp=AKeyPair.generate();
+		Address addr=c.createAccount(kp);
+		c.setKeyPair(kp);
+		c.setAddress(addr);
+		
+		Map<String,Object> res=c.queryAccount();
+		assertEquals(addr.longValue(),res.get("address"));
+		assertEquals(0L,res.get("balance"));
+	}
+	
 	
 	
 	@AfterAll 

@@ -382,7 +382,7 @@ public class Convex {
 	private Map<String,Object> doPost(String endPoint, String json) {
 		try {
 			return doPostAsync(endPoint,json).get();
-		} catch (Throwable  e) {
+		} catch (Exception e) {
 			throw Utils.sneakyThrow(e);
 		}
 	}
@@ -390,7 +390,7 @@ public class Convex {
 	private Map<String,Object> doGet(String endPoint) {
 		try {
 			return doGetAsync(endPoint).get();
-		} catch (Throwable  e) {
+		} catch (Exception e) {
 			throw Utils.sneakyThrow(e);
 		}
 	}
@@ -417,7 +417,7 @@ public class Convex {
 			return future.thenApply(response->{
 				try {
 					return JSON.parse(response.getEntity().getContent());
-				} catch (Throwable e) {
+				} catch (Exception e) {
 					throw new Error("Error handling response:" +response,e);
 				}
 			});
