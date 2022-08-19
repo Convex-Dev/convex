@@ -39,16 +39,12 @@ public class RESTServer {
 			config.enableWebjars();
 			config.enableCorsForAllOrigins();
 			config.addStaticFiles(staticFiles -> {
-				staticFiles.hostedPath = "/"; // change to host files on a subpath, like '/assets'
-				staticFiles.directory = "/public"; // the directory where your files are located
-				staticFiles.location = Location.CLASSPATH; // Location.CLASSPATH (jar) or Location.EXTERNAL (file
-															// system)
-				staticFiles.precompress = false; // if the files should be pre-compressed and cached in memory
-													// (optimization)
-				staticFiles.aliasCheck = null; // you can configure this to enable symlinks (=
-												// ContextHandler.ApproveAliases())
-				staticFiles.skipFileFunction = req -> false; // you can use this to skip certain files in the dir, based
-																// on the HttpServletRequest
+				staticFiles.hostedPath = "/"; 
+				staticFiles.location = Location.CLASSPATH; // Specify resources from classpath
+				staticFiles.directory = "/public"; // Resource location in classpath
+				staticFiles.precompress = false; // if the files should be pre-compressed and cached in memory (optimization)
+				staticFiles.aliasCheck = null; // you can configure this to enable symlinks (= ContextHandler.ApproveAliases())
+				staticFiles.skipFileFunction = req -> false; // you can use this to skip certain files in the dir, based on the HttpServletRequest
 			});
 		});
 
@@ -211,6 +207,12 @@ public class RESTServer {
 		}
 	}
 
+	/**
+	 * Gets JSON body from a Context as a Java Object
+	 * @param ctx
+	 * @return JSON Object
+	 * @throws BadRequestResponse if the JSON body is invalid
+	 */
 	private Map<String, Object> getJSONBody(Context ctx) {
 		try {
 			Map<String, Object> req= JSON.toMap(ctx.body());
