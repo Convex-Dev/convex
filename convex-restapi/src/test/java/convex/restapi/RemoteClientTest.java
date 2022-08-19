@@ -51,6 +51,12 @@ public class RemoteClientTest {
 		
 		// second account should be different
 		assertEquals(0L,c.queryBalance());
+		
+		long AMT=1000000;
+		c.faucet(addr, AMT);
+		
+		// second account should be different
+		assertEquals(AMT,c.queryBalance());
 	}
 	
 	@Test 
