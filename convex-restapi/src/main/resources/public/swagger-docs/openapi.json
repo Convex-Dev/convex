@@ -78,6 +78,41 @@
 					}
 				}
 			}
+		},
+		
+		"/faucet": {
+			"post": {
+				"operationId": "faunct",
+				"summary": "Request Coins from Faucet",
+				"description": "Requests for free coins.",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {"type": "object"},
+							"example": {
+								"address": 13,
+								"amount": 10000000
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+					 	"description": "Normal response",
+					 	"content": {
+							"application/json": {
+								"schema": {"type": "object"},
+								"example": {
+									"value": 10
+								} 
+							}
+						}
+					},
+					"400": {
+					 	"description": "Bad query request."
+					}
+				}
+			}
 		}
 	}
 }

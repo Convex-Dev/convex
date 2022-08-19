@@ -59,6 +59,8 @@ public class RESTServer {
 		app.post("/api/v1/createAccount", this::createAccount);
 		app.post("/api/v1/query", this::runQuery);
 		
+		app.post("/api/v1/faucet", this::faucetRequest);
+		
 		app.get("/api/v1/accounts/<addr>", this::queryAccount);
 	}
 
