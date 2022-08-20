@@ -142,9 +142,9 @@ public class Convex {
 		this.keyPair=keyPair;
 	}
 
-	public synchronized void setAddress(Address address) {
-		if (this.address==address) return;
-		this.address=address;
+	public synchronized void setAddress(Address addr) {
+		if (this.address==addr) return;
+		this.address=addr;
 		// clear sequence, since we don't know the new account sequence number yet
 		sequence=null;
 	}
@@ -202,7 +202,7 @@ public class Convex {
 	 * @return Result of query, as parsed JSON Object from query response
 	 */
 	public Map<String,Object> query(String code) {
-		String json=buildJsonQuery(code);
+		String json=buildJsonQuery(address,code);
 		return doPost(url+"/api/v1/query",json);
 	}
 
@@ -314,7 +314,7 @@ public class Convex {
 	 */
 	public synchronized CompletableFuture<Map<String,Object>> transactAsync(String code) {
 		// first to prepare step
-		String json=buildJsonQuery(code);
+		String json=buildJsonQuery(address,code);
 		CompletableFuture<Map<String,Object>> prep=doPostAsync(url+"/api/v1/transaction/prepare",json);
 		// then do submit step
 		return prep.thenCompose(r->{
@@ -367,16 +367,20 @@ public class Convex {
 	 * @return Future to be completed with result of query, as parsed JSON Object from query response
 	 */
 	public CompletableFuture<Map<String,Object>> queryAsync(String code) {
-		String json=buildJsonQuery(code);
+		String json=buildJsonQuery(address.longValue(),code);
 		return doPostAsync(url+"/api/v1/query",json);
 	}
 
-	private String buildJsonQuery(String code) {
+	private String buildJsonQuery(Long a, String code) {
 		HashMap<String,Object> req=new HashMap<>();
-		req.put("address", address.longValue());
+		if (a!=null) req.put("address", a);
 		req.put("source", code);
 		String json=JSON.toPrettyString(req);
 		return json;
+	}
+	
+	private String buildJsonQuery(Address a, String code) {
+		return buildJsonQuery((a==null)?null:a.longValue(),code);
 	}
 
 	private Map<String,Object> doPost(String endPoint, String json) {

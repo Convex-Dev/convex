@@ -49,13 +49,16 @@ public class RemoteClientTest {
 		Address addr=c.useNewAccount();
 		assertNotNull(addr);
 		
-		// second account should be different
+		// New account should have zero balance
 		assertEquals(0L,c.queryBalance());
 		
 		long AMT=1000000;
-		c.faucet(addr, AMT);
+		Map<String,Object> resp=c.faucet(addr, AMT);
 		
-		// second account should be different
+		// Response should contain amount allocated
+		assertEquals(AMT,resp.get("amount"));
+		
+		// Account should not have requested balance
 		assertEquals(AMT,c.queryBalance());
 	}
 	
@@ -67,9 +70,11 @@ public class RemoteClientTest {
 		c.setKeyPair(kp);
 		c.setAddress(addr);
 		
+		// Query *address*
 		Map<String,Object> res=c.query("*address*");
 		assertEquals(addr.longValue(),res.get("value"));
 		
+		// Query *key*
 		res=c.query(Symbols.STAR_KEY.toString());
 		assertEquals(JSON.toString(kp.getAccountKey()),res.get("value"));
 	}
