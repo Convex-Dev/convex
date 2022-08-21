@@ -142,6 +142,15 @@ public class Convex {
 		this.keyPair=keyPair;
 	}
 
+	/**
+	 * Sets the Account Address for this Client instance. Future requests will use
+	 * this Address unless otherwise specified.
+	 * 
+	 * NOTE: In order to transact, you may also need to set the KeyPair to be correct for the 
+	 * new Address
+
+	 * @param addr New Address to use
+	 */
 	public synchronized void setAddress(Address addr) {
 		if (this.address==addr) return;
 		this.address=addr;
@@ -226,7 +235,6 @@ public class Convex {
 		if (address==null) throw new IllegalArgumentException("Non-null Address required");
 		Map<String,Object> response=queryAccount(address);
 		Long seq=(Long) response.get("sequence");
-		System.out.println("Queried sequence "+ seq + " for Address: "+address);
 		return seq;
 	}
 
