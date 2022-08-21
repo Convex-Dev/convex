@@ -117,7 +117,7 @@ public class Convex {
 	}
 
 	/**
-	 * Gets the Address associated with this Convex connection instance. May be null
+	 * Gets the Address associated with this Convex client instance. May be null
 	 * @return Address of current account in use, or null if not set
 	 */
 	public Address getAddress() {
@@ -300,7 +300,7 @@ public class Convex {
 	public Map<String,Object> transact(String code) {
 		try {
 			return transactAsync(code).get();
-		} catch (Throwable e) {
+		} catch (Exception e) {
 			throw Utils.sneakyThrow(e);
 		}
 	}
@@ -409,12 +409,18 @@ public class Convex {
 		return doRequest(post,null);
 	}
 
-	private CompletableFuture<Map<String,Object>> doRequest(HttpUriRequest request, String json) {
+	/**
+	 * Makes a HTTP request as a CompletableFuture
+	 * @param request Request object
+	 * @param body Body of request (as String, should normally be valid JSON)
+	 * @return Future to be filled with JSON response.
+	 */
+	private CompletableFuture<Map<String,Object>> doRequest(HttpUriRequest request, String body) {
 		try {
-			if (json!=null) {
+			if (body!=null) {
 				request.addHeader("content-type", "application/json");
 				StringEntity entity;
-				entity = new StringEntity(json);
+				entity = new StringEntity(body);
 				((HttpPost)request).setEntity(entity);
 			}
 			CompletableFuture<HttpResponse> future=toCompletableFuture(fc -> httpasyncclient.execute(request, (FutureCallback<HttpResponse>) fc));
@@ -426,7 +432,7 @@ public class Convex {
 				}
 			});
 
-		} catch (Throwable e) {
+		} catch (Exception e) {
 			throw Utils.sneakyThrow(e);
 		}
 	}
