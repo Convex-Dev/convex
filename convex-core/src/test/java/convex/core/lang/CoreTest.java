@@ -4172,6 +4172,18 @@ public class CoreTest extends ACVMTest {
 		// juice gets consumed before returning a value
 		assertCVMEquals(INITIAL_JUICE-Juice.DO - Juice.CONSTANT, eval(comp("(do 1 *juice*)")));
 	}
+	
+	@Test
+	public void testSpecialJuicePrice() {
+		Special<?> jp=Special.forSymbol(Symbols.STAR_JUICE_PRICE);
+		assertNotNull(jp);
+		assertCVMEquals(Constants.INITIAL_JUICE_PRICE, eval(jp));
+		
+		assertCVMEquals(Constants.INITIAL_JUICE_PRICE, eval("*juice-price*"));
+		
+		assertSame(context().getState().getJuicePrice(),eval("*juice-price*"));
+	}
+
 
 
 	@Test

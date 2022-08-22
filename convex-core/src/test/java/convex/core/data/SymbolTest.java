@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.HashSet;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
@@ -61,5 +63,13 @@ public class SymbolTest {
 		assertEquals("count", k.toString());
 		assertEquals(7, k.getEncoding().length); // tag(1) + length(1) + name(5)
 
+	}
+	
+	@Test
+	public void testSymbolHash() {
+		HashSet<Symbol> hs=new HashSet<>();
+		hs.add(Symbols.STAR_JUICE_PRICE);
+		assertTrue(hs.contains(Symbols.STAR_JUICE_PRICE));
+		
 	}
 }
