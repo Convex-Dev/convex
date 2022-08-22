@@ -1,6 +1,10 @@
 package convex.core.lang;
 
 import java.lang.reflect.Array;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.function.BiFunction;
 
 import convex.core.Constants;
@@ -1629,6 +1633,27 @@ public class RT {
 			return (T) CVMChar.create((Character) o);
 		if (o instanceof Boolean)
 			return (T) CVMBool.create((Boolean) o);
+		if (o instanceof List) {
+			List<?> l=(List<?>)o;
+			AVector<?> v=Vectors.empty(); 
+			for (Object val: l) {
+				v=v.conj(cvm(val));
+			}
+			return (T)v;
+		}
+		if (o instanceof Map) {
+			Map<?,?> m= (Map<?,?>) o;
+			AMap<ACell,ACell> cm=Maps.empty();
+			for (Map.Entry<?, ?> me: m.entrySet()) {
+				Object k=me.getKey();
+				Object v=me.getValue();
+				ACell cvmk=cvm(k);
+				ACell cvmv=cvm(v);
+				cm=cm.assoc(cvmk, cvmv);
+			}
+			return (T) cm;
+		}
+		
 		throw new IllegalArgumentException("Can't convert to CVM type with class: " + Utils.getClassName(o));
 	}
 
@@ -1653,6 +1678,62 @@ public class RT {
 		if (o instanceof CVMChar)
 			return (T) (Character) ((CVMChar) o).charValue();
 		return (T) o;
+	}
+	
+	/**
+	 * Converts a CVM value to equivalent JSON value as expressed in equivalent JVM types.
+	 * 
+	 * Note some special one-way conversions that are required because JSON is not 
+	 * sufficiently expressive for all CVM types:
+	 * - Address becomes a Number (Long type)
+	 * - Lists and Vectors both become an Array (Java List type)
+	 * - Characters become a String
+	 * - Blobs become a hex string representation '0x....'
+	 * 
+	 * @param o Value to convert to JVM type
+	 * @return Java value which represents JSON object
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T> T json(ACell o) {
+		if (o==null) return null;
+		if (o instanceof CVMLong)
+			return (T) (Long) ((CVMLong) o).longValue();
+		if (o instanceof CVMDouble)
+			return (T) (Double) ((CVMDouble) o).doubleValue();
+		if (o instanceof CVMByte)
+			return (T) (Byte) (byte) ((CVMByte) o).longValue();
+		if (o instanceof CVMBool)
+			return (T) (Boolean) ((CVMBool) o).booleanValue();
+		if (o instanceof CVMChar)
+			return (T) ((CVMChar) o).toString();
+		if (o instanceof Address)
+			return (T) (Long)((Address) o).longValue();
+		if (o instanceof AMap) {
+			AMap<?,?> m= (AMap<?,?>)o;
+			long n=m.count();
+			HashMap<String,Object> hm=new HashMap<>();
+			for (long i=0; i<n; i++) {
+				MapEntry<?,?> me=m.entryAt(i);
+				String k=RT.toString(me.getKey());
+				Object v=json(me.getValue());
+				hm.put(k, v);
+			}
+			return (T) hm;
+		}
+		if (o instanceof ASequence) {
+			ASequence<?> seq= (ASequence<?>)o;
+			long n=seq.count();
+			ArrayList<Object> list=new ArrayList<>();
+			for (long i=0; i<n; i++) {
+				ACell cvmv=seq.get(i);
+				Object v=json(cvmv);
+				list.add(v);
+			}
+			return (T) list;
+		}
+
+
+		return (T) o.toString();
 	}
 
 	/**

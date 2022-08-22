@@ -9,6 +9,10 @@
 		<artifactId>convex</artifactId>
 		<version>0.7.7-SNAPSHOT</version>
 	</parent>
+	
+	<name>Convex Java Client Library</name>
+	<description>A Pure Java client library for Convex</description>
+	<url>https://convex.world</url>
 
 	<properties>
 		<maven.compiler.target>11</maven.compiler.target>
@@ -26,17 +30,17 @@
 		<dependency>
 			<groupId>org.apache.httpcomponents</groupId>
 			<artifactId>httpasyncclient</artifactId>
-			<version>4.1.4</version>
+			<version>4.1.5</version>
 		</dependency>
 		<dependency>
 			<groupId>world.convex</groupId>
 			<artifactId>convex-core</artifactId>
-			<version>0.7.7-SNAPSHOT`</version>
+			<version>${convex.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>world.convex</groupId>
 			<artifactId>convex-peer</artifactId>
-			<version>0.7.7-SNAPSHOT`</version>
+			<version>${convex.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>com.googlecode.json-simple</groupId>
@@ -53,7 +57,7 @@
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter-engine</artifactId>
-			<version>5.7.1</version>
+			<version>${junit.version}</version>
 			<scope>test</scope>
 		</dependency>
 

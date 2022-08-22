@@ -4,17 +4,27 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AVector;
 import convex.core.data.Address;
+import convex.core.data.Blob;
+import convex.core.data.BlobMaps;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
+import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBool;
+import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 
@@ -63,6 +73,52 @@ public class RTTest {
 		// null return values if cast fails
 		assertNull(RT.sequence(Keywords.FOO)); // keywords not allowed
 	}
+	
+	@Test
+	public void testJSON() {
+		assertNull(RT.json(null));
+		
+		assertEquals((Long)13L,RT.json(Address.create(13)));
+		assertEquals("0xcafebabe",RT.json(Blob.fromHex("cafebabe")));
+		assertEquals("0x",RT.json(Blob.fromHex("")));
+		assertEquals("{}",RT.json(BlobMaps.empty()).toString());
+		assertEquals("c",RT.json(CVMChar.create('c')));
+		
+		// JSON should convert keys to strings
+		assertEquals(Maps.of("1",2), RT.cvm(RT.json(Maps.of(1,2))));
+		assertEquals(Maps.of("[]",3), RT.cvm(RT.json(Maps.of(Vectors.empty(),3))));
+		assertEquals(Maps.of("[\"\" 3]",4), RT.cvm(RT.json(Maps.of(Vectors.of("",3),4))));
+	}
+	
+	@Test
+	public void testJSONRoundTrips() {
+		
+		doJSONRoundTrip(1L,CVMLong.ONE);
+		doJSONRoundTrip(1.0,CVMDouble.ONE);
+		doJSONRoundTrip(null,null);
+		
+		doJSONRoundTrip(new ArrayList<Object>(),Vectors.empty());
+		doJSONRoundTrip(List.of(1,2),Vectors.of(1,2));
+		doJSONRoundTrip("hello",Strings.create("hello"));
+		doJSONRoundTrip("",Strings.EMPTY);
+		doJSONRoundTrip(true,CVMBool.TRUE);
+		
+		doJSONRoundTrip(new HashMap<String,Object>(),Maps.empty());
+		doJSONRoundTrip(Maps.hashMapOf("1",2,"3",4),Maps.of("1",2,"3",4));
+	}
+
+	private void doJSONRoundTrip(Object o, ACell c) {
+		// o should convert to c
+		assertEquals(c,RT.cvm(o)); 
+		
+		// c should round trip via JSON back to c, since JSON is a subset of CVM types
+		ACell roundTrip=RT.cvm(RT.json(c));
+		assertEquals(c,roundTrip); 
+		
+		// c should also round trip via JVM equivalent, since we are using JSON subset
+		ACell roundTrip2=RT.cvm(RT.jvm(c));
+		assertEquals(c,roundTrip2); 
+	}
 
 	@Test
 	public void testVec() {
@@ -88,6 +144,7 @@ public class RTTest {
 		assertEquals(CVMLong.create(1L), RT.cvm(1L));
 		assertEquals(CVMDouble.create(0.17), RT.cvm(0.17));
 		assertEquals(Strings.create("foo"), RT.cvm("foo"));
+		assertEquals(Vectors.empty(), RT.cvm(new ArrayList<Object>()));
 
 		// CVM objects shouldn't change
 		Keyword k = Keyword.create("test-key");

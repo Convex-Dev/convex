@@ -48,9 +48,7 @@ import convex.net.message.Message;
 import convex.peer.Server;
 
 /**
- * Class representing the client API to the Convex network when connected
- * directly using the binary protocol. This can be more efficient than using a
- * REST API.
+ * Class representing a client API to the Convex network.
  *
  * An Object of the type Convex represents a stateful client connection to the
  * Convex network that can issue transactions both synchronously and

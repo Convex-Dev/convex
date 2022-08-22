@@ -58,7 +58,7 @@ public class Convex {
 
 	/**
 	 * Connect to Convex network with a given peer URL, address and keypair.
-	 * @param peerServerURL Peer server address, e.g. "https:/convex.world"
+	 * @param peerServerURL Peer server address, e.g. "https://convex.world"
 	 * @param address Address to use for this connection
 	 * @param keyPair Key pair to use for this connection
 	 * @return New Convex instance with supplied connection details
@@ -76,7 +76,7 @@ public class Convex {
 	 * No Address or Keypair is set by default: user will either need to provide these later or
 	 * perform an action that creates a new account (e.g. `useNewAccount`)
 	 *
-	 * @param peerServerURL Peer server address, e.g. "https:/convex.world"
+	 * @param peerServerURL Peer server address, e.g. "https://convex.world"
 	 * @return New Convex instance with supplied connection details
 	 */
 	public static Convex connect(String peerServerURL) {
@@ -117,7 +117,7 @@ public class Convex {
 	}
 
 	/**
-	 * Gets the Address associated with this Convex connection instance. May be null
+	 * Gets the Address associated with this Convex client instance. May be null
 	 * @return Address of current account in use, or null if not set
 	 */
 	public Address getAddress() {
@@ -142,9 +142,18 @@ public class Convex {
 		this.keyPair=keyPair;
 	}
 
-	public synchronized void setAddress(Address address) {
-		if (this.address==address) return;
-		this.address=address;
+	/**
+	 * Sets the Account Address for this Client instance. Future requests will use
+	 * this Address unless otherwise specified.
+	 * 
+	 * NOTE: In order to transact, you may also need to set the KeyPair to be correct for the 
+	 * new Address
+
+	 * @param addr New Address to use
+	 */
+	public synchronized void setAddress(Address addr) {
+		if (this.address==addr) return;
+		this.address=addr;
 		// clear sequence, since we don't know the new account sequence number yet
 		sequence=null;
 	}
@@ -191,7 +200,7 @@ public class Convex {
 		req.put("accountKey", keyPair.getAccountKey().toHexString());
 		String json=JSON.toPrettyString(req);
 		Map<String,Object> response= doPost(url+"/api/v1/createAccount",json);
-		Address address=Address.parse((String)response.get("address"));
+		Address address=Address.parse(response.get("address"));
 		if (address==null) throw new Error("Account creation failed: "+response);
 		return address;
 	}
@@ -202,7 +211,7 @@ public class Convex {
 	 * @return Result of query, as parsed JSON Object from query response
 	 */
 	public Map<String,Object> query(String code) {
-		String json=buildJsonQuery(code);
+		String json=buildJsonQuery(address,code);
 		return doPost(url+"/api/v1/query",json);
 	}
 
@@ -226,7 +235,6 @@ public class Convex {
 		if (address==null) throw new IllegalArgumentException("Non-null Address required");
 		Map<String,Object> response=queryAccount(address);
 		Long seq=(Long) response.get("sequence");
-		System.out.println("Queried sequence "+ seq + " for Address: "+address);
 		return seq;
 	}
 
@@ -300,7 +308,7 @@ public class Convex {
 	public Map<String,Object> transact(String code) {
 		try {
 			return transactAsync(code).get();
-		} catch (Throwable e) {
+		} catch (Exception e) {
 			throw Utils.sneakyThrow(e);
 		}
 	}
@@ -314,7 +322,7 @@ public class Convex {
 	 */
 	public synchronized CompletableFuture<Map<String,Object>> transactAsync(String code) {
 		// first to prepare step
-		String json=buildJsonQuery(code);
+		String json=buildJsonQuery(address,code);
 		CompletableFuture<Map<String,Object>> prep=doPostAsync(url+"/api/v1/transaction/prepare",json);
 		// then do submit step
 		return prep.thenCompose(r->{
@@ -367,22 +375,26 @@ public class Convex {
 	 * @return Future to be completed with result of query, as parsed JSON Object from query response
 	 */
 	public CompletableFuture<Map<String,Object>> queryAsync(String code) {
-		String json=buildJsonQuery(code);
+		String json=buildJsonQuery(address.longValue(),code);
 		return doPostAsync(url+"/api/v1/query",json);
 	}
 
-	private String buildJsonQuery(String code) {
+	private String buildJsonQuery(Long a, String code) {
 		HashMap<String,Object> req=new HashMap<>();
-		req.put("address", address.longValue());
+		if (a!=null) req.put("address", a);
 		req.put("source", code);
 		String json=JSON.toPrettyString(req);
 		return json;
+	}
+	
+	private String buildJsonQuery(Address a, String code) {
+		return buildJsonQuery((a==null)?null:a.longValue(),code);
 	}
 
 	private Map<String,Object> doPost(String endPoint, String json) {
 		try {
 			return doPostAsync(endPoint,json).get();
-		} catch (Throwable  e) {
+		} catch (Exception e) {
 			throw Utils.sneakyThrow(e);
 		}
 	}
@@ -390,7 +402,7 @@ public class Convex {
 	private Map<String,Object> doGet(String endPoint) {
 		try {
 			return doGetAsync(endPoint).get();
-		} catch (Throwable  e) {
+		} catch (Exception e) {
 			throw Utils.sneakyThrow(e);
 		}
 	}
@@ -405,24 +417,30 @@ public class Convex {
 		return doRequest(post,null);
 	}
 
-	private CompletableFuture<Map<String,Object>> doRequest(HttpUriRequest request, String json) {
+	/**
+	 * Makes a HTTP request as a CompletableFuture
+	 * @param request Request object
+	 * @param body Body of request (as String, should normally be valid JSON)
+	 * @return Future to be filled with JSON response.
+	 */
+	private CompletableFuture<Map<String,Object>> doRequest(HttpUriRequest request, String body) {
 		try {
-			if (json!=null) {
+			if (body!=null) {
 				request.addHeader("content-type", "application/json");
 				StringEntity entity;
-				entity = new StringEntity(json);
+				entity = new StringEntity(body);
 				((HttpPost)request).setEntity(entity);
 			}
 			CompletableFuture<HttpResponse> future=toCompletableFuture(fc -> httpasyncclient.execute(request, (FutureCallback<HttpResponse>) fc));
 			return future.thenApply(response->{
 				try {
 					return JSON.parse(response.getEntity().getContent());
-				} catch (Throwable e) {
+				} catch (Exception e) {
 					throw new Error("Error handling response:" +response,e);
 				}
 			});
 
-		} catch (Throwable e) {
+		} catch (Exception e) {
 			throw Utils.sneakyThrow(e);
 		}
 	}

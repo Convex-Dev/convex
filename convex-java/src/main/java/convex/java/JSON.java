@@ -14,7 +14,7 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 /**
- * Simple JSON tools for working with Convex
+ * Simple JSON tools 
  */
 public class JSON {
 
@@ -27,7 +27,7 @@ public class JSON {
      * 
      * @param jsonString A string containing a valid JSON Object representation
      * @return A map representing the JSON object
-     * @throws Error In case of JSON parsing error
+     * @throws IllegalArgumentException In case of JSON parsing error
      */
     @SuppressWarnings("unchecked")
     public static Map<String, Object> toMap(String jsonString) {
@@ -36,7 +36,7 @@ public class JSON {
             JSONObject result = (JSONObject) parser.parse(jsonString);
             return new JSONObject(result);
         } catch (ParseException e) {
-            throw new Error("Error in JSON parsing: " + e.getMessage(), e);
+            throw new IllegalArgumentException("Error in JSON parsing: " + e.getMessage(), e);
         }
     }
     
@@ -46,7 +46,7 @@ public class JSON {
      * @param jsonString A string containing valid JSON
      * @param <T>        A type parameter for the type of object returned.
      * @return T A java object representing the JSON provided
-     * @throws Error on JSON parsing error
+     * @throws IllegalArgumentException on JSON parsing error
      */
     @SuppressWarnings({"unchecked"})
     public static <T> T parse(String jsonString) {
@@ -55,7 +55,7 @@ public class JSON {
             Object result = parser.parse(jsonString);
             return (T) result;
         } catch (ParseException e) {
-        	throw new Error("Error in JSON parsing: " + e.getMessage(), e);
+        	throw new IllegalArgumentException("Error in JSON parsing: " + e.getMessage(), e);
         }
     }
     
@@ -74,9 +74,9 @@ public class JSON {
     }
     
     /**
-     * Converts an object to an efficient JSON string representation
+     * Converts a Java Object to an efficient JSON string representation
      *
-     * @param value Object to represent as a JSON String
+     * @param value Java Object to represent as a JSON String
      * @return JSON string representing the value
      * @throws RuntimeException on failure to create JSON from value
      */

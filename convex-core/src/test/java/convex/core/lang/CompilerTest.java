@@ -575,6 +575,39 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(expected,eval("(when (or nil true) (and [1 2]))"));
 	}
 	
+	@Test public void testExternalCompile() {
+		// Inspired by #377, thanks @Darkneew!
+		Context<?> ctx=context();
+		ctx=step(ctx,"(def a (deploy `(defn ^:callable? eval [code] (eval-as *address* code))))");
+		assertTrue(ctx.getResult() instanceof Address);
+		
+		ctx=step(ctx,"(call a (eval '(defn foo [arg] arg)))");
+		assertTrue(ctx.getResult() instanceof AFn);
+		
+		assertTrue(ctx.getLocalBindings().isEmpty());
+		
+		ctx=step(ctx,"(a/foo 1)");
+		assertCVMEquals(1L,ctx.getResult());
+	}
+	
+	@Test public void testEvalCompile() {
+		// Inspired by #377, thanks @Darkneew!
+		Context<?> ctx=context();
+		ctx=step(ctx,"(eval `(defn identity [arg] arg))");
+		assertTrue(ctx.getResult() instanceof AFn);
+		
+		ctx=step(ctx,"(identity 1)");
+		assertCVMEquals(1L,ctx.getResult());
+	}
+	
+	@Test public void testNestedEvalRegression() {
+		// Test for nasty case if eval captured calling local bindings
+		Context<?> ctx=context();
+		ctx=step(ctx,"((fn [code] (eval code)) '(defn g [x] x))");
+		ctx=step(ctx,"(g 13)");
+		assertCVMEquals(13L,ctx.getResult());
+	}
+	
 	@Test
 	public void testMacrosInActor() {
 		Context<?> ctx=context();

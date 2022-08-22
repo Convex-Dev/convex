@@ -1,0 +1,118 @@
+{
+	"openapi": "3.0.0",
+	"info": {
+		"title": "Convex REST API",
+		"version": "1.0"
+	},
+	"servers": [
+		{
+			"url": "/api/v1",
+			"description": "Local API server"
+		}
+	],
+	"paths": {
+		"/createAccount": {
+			"post": {
+				"operationId": "createAccount",
+				"summary": "Create account",
+				"description": "Requests creation of a user account by the Peer. The Peer should create an account with the specified public key, assuming it allows the user to request this.",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {"type": "object"},
+							"example": {
+								"accountKey": "0x1234567812345678123456781234567812345678123456781234567812345678"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+					 	"description": "Normal response",
+					 	"content": {
+							"application/json": {
+								"schema": {"type": "object"},
+								"example": {
+									"address": 13
+								} 
+							}
+						}
+					},
+					"400": {
+					 	"description": "Bad request, probably a missing or badly formatted accountKey."
+					}
+				}
+			}
+		},
+		
+		"/query": {
+			"post": {
+				"operationId": "query",
+				"summary": "Execute Query",
+				"description": "Requests execution of a query by the Peer, using the current network state.",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {"type": "object"},
+							"example": {
+								"address": "#1245",
+								"source": "(+ 1 2 3 4)"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+					 	"description": "Normal response",
+					 	"content": {
+							"application/json": {
+								"schema": {"type": "object"},
+								"example": {
+									"value": 10
+								} 
+							}
+						}
+					},
+					"400": {
+					 	"description": "Bad query request."
+					}
+				}
+			}
+		},
+		
+		"/faucet": {
+			"post": {
+				"operationId": "faunct",
+				"summary": "Request Coins from Faucet",
+				"description": "Requests for free coins.",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {"type": "object"},
+							"example": {
+								"address": 13,
+								"amount": 10000000
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+					 	"description": "Normal response",
+					 	"content": {
+							"application/json": {
+								"schema": {"type": "object"},
+								"example": {
+									"value": 10
+								} 
+							}
+						}
+					},
+					"400": {
+					 	"description": "Bad query request."
+					}
+				}
+			}
+		}
+	}
+}

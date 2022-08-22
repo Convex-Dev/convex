@@ -788,6 +788,8 @@ public class CoreTest extends ACVMTest {
 		assertSame(Strings.EMPTY,eval("(slice \"Hello World\" 4 4)"));
 		assertSame(Blob.EMPTY,eval("(slice 0xcafebabe 2 2)"));
 		
+		assertEquals(Lists.of(2),eval("(slice (list 1 2) 1)"));
+		
 		assertBoundsError(step("(slice 0x 1)")); 
 		assertBoundsError(step("(slice 0x -1 0)")); 
 		assertBoundsError(step("(slice 0x1234 -1 1)")); 
@@ -1512,6 +1514,7 @@ public class CoreTest extends ACVMTest {
 		assertArgumentError(step("(conj {1 2} [1])")); // wrong size vector for a map entry
 		assertArgumentError(step("(conj {} '(1 2))")); // wrong type for a map entry
 		assertArgumentError(step("(conj (blob-map) [:foo 0xa2])")); // bad key type for blobmap
+		assertArgumentError(step("(conj (blob-map #0 #0) [false #0])")); // Issue #386
 
 		assertCastError(step("(conj 1 2)"));
 		assertCastError(step("(conj (str :foo) 2)")); // string is not a Data Structure

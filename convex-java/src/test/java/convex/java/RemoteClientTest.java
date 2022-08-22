@@ -18,7 +18,7 @@ import convex.core.data.Address;
 public class RemoteClientTest {
 	
 	// Use to skip remote tests
-	static boolean skip=true;
+	static boolean skip=false;
 	
 	static final String TEST_PEER="https://convex.world";
 	
@@ -37,7 +37,7 @@ public class RemoteClientTest {
 		checkValid(convex);
 		Map<String,Object> result=convex.query ("*address*");
 		assertNotNull(result);
-		assertEquals(convex.getAddress(),result.get("value"));
+		assertEquals(convex.getAddress(),Address.parse(result.get("value")));
 	}
 	
 	@Test public void testQueryAccount() {
@@ -61,6 +61,7 @@ public class RemoteClientTest {
 	
 	@Test public void testTransact() {
 		Convex convex=getNewConvex();
+		convex.faucet(convex.getAddress(), 1000000);
 		checkValid(convex);
 		Map<String,Object> result=convex.transact ("(* 3 4)");
 		assertNotNull(result);

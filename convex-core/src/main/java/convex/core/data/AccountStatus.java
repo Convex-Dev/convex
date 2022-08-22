@@ -173,11 +173,13 @@ public class AccountStatus extends ARecord {
 		return true;
 	}
 
+	/**
+	 * Returns true if this account is an Actor, i.e. is not a user account (null public key)
+	 * @return true if actor, false otherwise
+	 */
 	public boolean isActor() {
 		return publicKey==null;
 	}
-
-
 
 	/**
 	 * Get the controller for this Account

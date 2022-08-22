@@ -1,5 +1,6 @@
 package convex.core.data.prim;
 
+import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
@@ -9,6 +10,7 @@ import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
 
 /**
  * Class for CVM long values.
@@ -107,9 +109,33 @@ public final class CVMLong extends APrimitive implements INumeric {
 	}
 	
 	/**
+	 * Parse an Object as a CVM Long, on a best efforts basis
+	 * @param o String to parse
+	 * @return CVM Long value or null if parse failed
+	 */
+	public static CVMLong tryParse(Object o) {
+		if (o instanceof ACell) {
+			return RT.castLong((ACell)o);
+		}
+		if (o instanceof Long) return CVMLong.create((Long)o);
+		if (o instanceof Number) {
+			Number n=(Number)o;
+			Long lv= n.longValue();
+			if (lv.doubleValue()==n.doubleValue()) return CVMLong.create(lv);
+		}
+		if (o instanceof String) try {
+			return parse((String)o);
+		} catch (NumberFormatException ne) {
+			return null;
+		}
+		return null;
+	}
+	
+	/**
 	 * Parse a String as a CVM Long. Throws an exception if the string is not valid
 	 * @param s String to parse
 	 * @return CVM Long value
+	 * @throws NumberFormatException if the string format is not a valid long
 	 */
 	public static CVMLong parse(String s) {
 		return create(Long.parseLong(s));

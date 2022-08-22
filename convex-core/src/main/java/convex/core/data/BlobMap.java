@@ -303,7 +303,10 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 				return createAtDepth(e, depth);
 			}
 		}
-		ABlob k = e.getKey();
+		ACell maybeValidKey=e.getKey();
+		if (!(maybeValidKey instanceof ABlob)) return null; // invalid key type!
+		ABlob k = (ABlob)maybeValidKey;
+		
 		long pDepth = this.prefixDepth(); // hex depth of this node including prefix
 		long newKeyLength = k.hexLength(); // hex length of new key
 		long mkl; // matched key length

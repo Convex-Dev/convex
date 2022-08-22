@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 
 import convex.core.Constants;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
@@ -117,12 +118,39 @@ public class AccountKey extends AArrayBlob {
 		if (result == null) throw new IllegalArgumentException("Invalid Address hex String [" + hexString + "]");
 		return result;
 	}
+	
+	/**
+	 * Attempts to parse account key
+	 * @param o Any object
+	 * @return AccountKey, or null if not possible to parse
+	 */
+	public static AccountKey parse(Object o) {
+		if (o instanceof ACell) {
+			if (o instanceof ABlob) return create((ABlob)o);
+			o=RT.jvm((ACell)o);
+		}
+		if (o instanceof String) {
+			return parse((String)o);
+		}
+		return null;
+	}
+	
+	/**
+	 * Attempts to parse account key. Handles leading/trailing whitespace and optional 0x
+	 * @param s String containing account key
+	 * @return AccountKey, or null if not possible to parse
+	 */
+	public static AccountKey parse(String s) {
+		s=s.trim();
+		if (s.startsWith("0x")) s=s.substring(2);
+		return fromHexOrNull(s);
+	}
 
 	/**
 	 * Constructs an AccountKey object from a hex string
 	 * 
 	 * @param hexString Hex String
-	 * @return An Address constructed from the hex string, or null if not a valid
+	 * @return An AccountKey constructed from the hex string, or null if not a valid
 	 *         hex string
 	 */
 	public static AccountKey fromHexOrNull(String hexString) {
@@ -144,7 +172,7 @@ public class AccountKey extends AArrayBlob {
 	 * Throws an exception if checksum is not valid
 	 * 
 	 * @param hexString Hex String
-	 * @return An Address constructed from the hex string
+	 * @return An AccountKey constructed from the hex string
 	 */
 	public static AccountKey fromChecksumHex(String hexString) {
 		byte[] bs = Utils.hexToBytes(hexString, LENGTH * 2);
@@ -242,4 +270,5 @@ public class AccountKey extends AArrayBlob {
 	public Blob toCanonical() {
 		return toFlatBlob();
 	}
+
 }
