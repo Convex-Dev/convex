@@ -930,7 +930,8 @@ public class Context<T extends ACell> extends AObject {
 	 * @return Updated Context
 	 */
 	public <R extends ACell> Context<R> run(ACell code) {
-		Context<R> ctx=fork().eval(code);
+		Context<R> ctx=fork();
+		ctx=ctx.eval(code);
 
 		// must handle state results like halt, rollback etc.
 		return handleStateResults(ctx,false);
@@ -1268,7 +1269,10 @@ public class Context<T extends ACell> extends AObject {
 				ctx=ctx.withResult(null); // clear result for execution
 			}
 		}
-		return ctx.execute(op);
+		AVector<ACell> savedBindings = ctx.getLocalBindings();
+		ctx=ctx.withLocalBindings(Vectors.empty());
+		Context<R> rctx= ctx.execute(op);
+		return rctx.withLocalBindings(savedBindings);
 	}
 
 	/**
