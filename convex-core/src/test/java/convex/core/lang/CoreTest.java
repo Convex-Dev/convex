@@ -788,6 +788,8 @@ public class CoreTest extends ACVMTest {
 		assertSame(Strings.EMPTY,eval("(slice \"Hello World\" 4 4)"));
 		assertSame(Blob.EMPTY,eval("(slice 0xcafebabe 2 2)"));
 		
+		assertEquals(Lists.of(2),eval("(slice (list 1 2) 1)"));
+		
 		assertBoundsError(step("(slice 0x 1)")); 
 		assertBoundsError(step("(slice 0x -1 0)")); 
 		assertBoundsError(step("(slice 0x1234 -1 1)")); 
