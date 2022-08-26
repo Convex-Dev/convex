@@ -1,5 +1,6 @@
 package convex.core.lang;
 
+import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.ACountable;
 import convex.core.data.ADataStructure;
@@ -32,6 +33,11 @@ public class Juice {
 	 * Juice required to look up a value in the local environment.
 	 */
 	public static final long LOOKUP = 15;
+	
+	/**
+	 * Juice required to look up a core symbol.
+	 */
+	public static final long CORE = Constants.OPT_STATIC? Juice.CONSTANT:(Juice.LOOKUP_DYNAMIC+CONSTANT);
 	
 	/**
 	 * Juice required to look up a value in the dynamic environment.

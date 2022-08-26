@@ -314,7 +314,8 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(comp("(hash-set 2 1)"),comp("#{1 2}"));
 		assertEquals(Constant.of(Sets.empty()),comp("#{}"));
 		
-		assertEquals(comp("(vector 1 2 3)"),comp("[1 2 3]"));
+		// Note inlining of vector from core in vector literal
+		assertEquals(comp("(~vector 1 2 3)"),comp("[1 2 3]"));
 		assertEquals(Constant.of(Vectors.empty()),comp("[]"));
 	}
 
