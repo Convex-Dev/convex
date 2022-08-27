@@ -47,15 +47,9 @@ public class ParamTestJuice {
 				{ "(do (let [a 1] (def f (fn [] a))) (f))", 1L,
 						Juice.DO + Juice.LET + Juice.CONSTANT * 1 + JUICE_SYM_LOOKUP + Juice.LOOKUP + JUICE_IDENTITY_FN
 								+ Juice.DEF },
-				{ "(let [a 1] a)", 1L, Juice.LET + Juice.LOOKUP + Juice.CONSTANT }, { "~(+ 1 2)", 3L, Juice.CONSTANT }, // compiler
-																														// executes
-																														// +
-																														// in
-																														// advance,
-																														// so
-																														// this
-																														// is
-																														// constant
+				{ "(let [a 1] a)", 1L, Juice.LET + Juice.LOOKUP + Juice.CONSTANT }, 
+				// compiler executes + in advance, so this is constant in execution
+				{ "~(+ 1 2)", 3L, Juice.CONSTANT }, 
 				{ "*depth*", 0L, Juice.SPECIAL },
 				{ "(= true true)", true, Juice.CORE+ (2 * Juice.CONSTANT) + Juice.EQUALS } });
 	}
