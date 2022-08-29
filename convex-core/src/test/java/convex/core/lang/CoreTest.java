@@ -651,6 +651,14 @@ public class CoreTest extends ACVMTest {
 		// Bad key types should result in argument errors
 		assertArgumentError(step("(blob-map :foo :bar)")); // See issue #162
 		assertArgumentError(step("(assoc (blob-map) :foo 10)")); // See Issue #101
+		
+		// TODO: are we sure we want to preserve Address type in keys?
+		assertEquals(Address.create(19),eval("(first (first (blob-map #19 #21)))"));
+		assertEquals(Address.create(21),eval("(second (first (blob-map #19 #21)))"));
+		
+		// Keys collide between blobs and equivalent addresses
+		assertEquals(CVMLong.ONE,eval("(count (blob-map #19 #21 0x0000000000000013 #22))"));
+		assertEquals(Vectors.of(Blob.fromHex("0000000000000013"),Address.create(22)),eval("(first (blob-map #19 #21 0x0000000000000013 #22))"));
 
 		assertArityError(step("(blob-map 0xabcd)"));
 		assertArityError(step("(blob-map 0xa2 :foo 0xb3)"));

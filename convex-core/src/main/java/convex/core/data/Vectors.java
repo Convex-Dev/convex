@@ -9,6 +9,9 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 
+/**
+ * Static utility functions for working with Vectors
+ */
 public class Vectors {
 
 	protected static final int BITS_PER_LEVEL = 4;
@@ -76,8 +79,15 @@ public class Vectors {
 		return (AVector<R>) create(cells);
 	}
 	
-	public static <R extends ACell, T extends ACell> AVector<R> create(ASequence<R> list) {
-		if (list instanceof AVector) return (AVector<R>) list;
+	/**
+	 * Creates a Vector from the contents of an arbitrary sequence
+	 * @param <R> Type of sequence elements
+	 * @param list Any sequential collection
+	 * @return Vector of elements
+	 */
+	@SuppressWarnings("unchecked")
+	public static <R extends ACell> AVector<R> create(ASequence<R> list) {
+		if (list instanceof AVector) return (AVector<R>) list.getCanonical();
 		if (list.size() == 0) return empty();
 		return create(list.toCellArray());
 	}
