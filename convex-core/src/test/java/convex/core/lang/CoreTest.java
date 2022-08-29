@@ -643,6 +643,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testBlobMap() {
+		// Singleton empty BlobMap
 		assertSame(BlobMaps.empty(), eval("(blob-map)"));
 
 		assertEquals(eval("(blob-map 0xa2 :foo)"),eval("(assoc (blob-map) 0xa2 :foo)"));

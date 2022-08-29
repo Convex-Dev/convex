@@ -15,7 +15,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.InitTest;
-import convex.core.lang.ACVMTest;
 import convex.core.lang.RT;
 import convex.test.Samples;
 
