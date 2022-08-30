@@ -70,7 +70,7 @@ public abstract class AStore {
 	public abstract <T extends ACell> Ref<T> refForHash(Hash hash);
 
 	/**
-	 * Gets the hash of the root data from the store.
+	 * Gets the hash of the root data from the store. In order to set the root hash, go via setRootData.
 	 * 
 	 * @return Root hash value from this store.
 	 * @throws IOException In case of store IO error
