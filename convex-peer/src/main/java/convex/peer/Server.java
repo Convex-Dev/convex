@@ -1117,6 +1117,8 @@ public class Server implements Closeable {
 
 	/**
 	 * Writes the Peer data to the configured store.
+	 * 
+	 * Note: Does not flush buffers to disk. 
 	 *
 	 * This will overwrite any previously persisted peer data.
 	 */
@@ -1206,7 +1208,7 @@ public class Server implements Closeable {
 
 	/**
 	 * Gets the Store configured for this Server. A server must consistently use the
-	 * same store instance for all Server threads.
+	 * same store instance for all Server threads, as values may be shared.
 	 *
 	 * @return Store instance
 	 */
