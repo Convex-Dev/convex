@@ -137,7 +137,7 @@ public class ConvexLocal extends Convex {
 	@Override
 	public long getSequence(Address addr) {
 		if (Utils.equals(address, addr)) return getSequence();
-		return getState().getAccount(address).getSequence();
+		return getState().getAccount(addr).getSequence();
 	}
 
 }

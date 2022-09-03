@@ -190,9 +190,9 @@ public class Convex {
 	}
 
 	/**
-	 * Creates a new Account using the given key pair
+	 * Request creation of a new Account using the given key pair
 	 *
-	 * @param keyPair
+	 * @param keyPair Key pair to use for new account
 	 * @return Address of new account
 	 */
 	public Address createAccount(AKeyPair keyPair) {
@@ -202,7 +202,7 @@ public class Convex {
 		String json=JSON.toPrettyString(req);
 		Map<String,Object> response= doPost(url+"/api/v1/createAccount",json);
 		Address address=Address.parse(response.get("address"));
-		if (address==null) throw new Error("Account creation failed: "+response);
+		if (address==null) throw new RuntimeException("Account creation failed: "+response);
 		return address;
 	}
 
@@ -354,6 +354,7 @@ public class Convex {
 				// check the sequence number from the server
 				// if our own sequence number is lower, we want to update it!
 				Long seq=(Long)(r.get("sequence"));
+				// System.out.println(seq);
 				if (seq!=null) updateSequence(seq);
 
 				Hash hash=Hash.parse(result.get("hash"));

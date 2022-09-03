@@ -20,9 +20,11 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -1355,8 +1357,22 @@ public class Utils {
 		return Arrays.asList(values);
 	}
 
-	private static final ExecutorService executor=Executors.newCachedThreadPool();
-
+	// ExecutorService for concurrent thread usage.
+	private static final ExecutorService executor = Executors.newFixedThreadPool(100);
+	static {
+		Shutdown.addHook(Shutdown.EXECUTOR, ()-> {
+			// Try a gentle termination. If not fast enough, terminate with extreme prejudice
+			executor.shutdown();
+			try {
+			    if (!executor.awaitTermination(200, TimeUnit.MILLISECONDS)) {
+			    	executor.shutdownNow();
+			    } 
+			} catch (InterruptedException e) {
+				executor.shutdownNow();
+			}
+		});
+	}
+	
 	/**
 	 * Executes functions on a thread pool for each element of a collection
 	 * @param <R> Result type of function
@@ -1365,12 +1381,16 @@ public class Utils {
 	 * @param items Collection of items to run futures on
 	 * @return List of futures for each item
 	 */
-	public static <R,T> ArrayList<Future<R>> futureMap(Function<T,R> func, Collection<T> items) {
-		ArrayList<Future<R>> futures=new ArrayList<>(items.size());
+	public static <R,T> ArrayList<CompletableFuture<R>> futureMap(Function<T,R> func, Collection<T> items) {
+		ArrayList<CompletableFuture<R>> futures=new ArrayList<>(items.size());
 		for (T item: items) {
-			futures.add(executor.submit(()->func.apply(item)));
+			futures.add(CompletableFuture.supplyAsync(()->func.apply(item),executor));
 		}
 		return futures;
+	}
+
+	public static <R> void awaitAll(Collection<CompletableFuture<R>> cfutures) throws InterruptedException, ExecutionException {
+		CompletableFuture.allOf(cfutures.toArray(new CompletableFuture[cfutures.size()])).get();
 	}
 
 

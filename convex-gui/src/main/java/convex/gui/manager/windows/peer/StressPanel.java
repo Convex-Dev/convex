@@ -171,7 +171,7 @@ public class StressPanel extends JPanel {
 					pc.transactSync(Invoke.create(address, -1, Strings.create("sync")));
 					long startTime = Utils.getCurrentTimestamp();
 					
-					ArrayList<Future<Object>> cfutures=Utils.futureMap (cc->{
+					ArrayList<CompletableFuture<Object>> cfutures=Utils.futureMap (cc->{
 						try {
 							for (int i = 0; i < transCount; i++) {
 								StringBuilder tsb = new StringBuilder();

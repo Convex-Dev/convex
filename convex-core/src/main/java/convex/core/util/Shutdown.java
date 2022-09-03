@@ -15,6 +15,7 @@ public class Shutdown {
 	public static final int CLIENTHTTP = 60;
 	public static final int SERVER = 80;
 	public static final int ETCH = 100;
+	public static final int EXECUTOR = 110;
 	public static final int CLI = 120;
 
 	static {

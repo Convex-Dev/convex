@@ -222,7 +222,7 @@ public class RESTServer {
 	public void runTransactionPrepare(Context ctx) {
 		Map<String, Object> req=getJSONBody(ctx);
 		Address addr=Address.parse(req.get("address")); 
-		if (addr==null) throw new BadRequestResponse(jsonError("query requires an 'address' field."));
+		if (addr==null) throw new BadRequestResponse(jsonError("Transaction prepare requires an 'address' field."));
 		Object srcValue=req.get("source");
 		if (!(srcValue instanceof String)) throw new BadRequestResponse(jsonError("Source code required for query (as a string)"));
 	
@@ -235,7 +235,8 @@ public class RESTServer {
 		
 		try {
 			long sequence=convex.getSequence(addr);
-			ATransaction trans=Invoke.create(addr, sequence, code);
+			long nextSeq=sequence+1;
+			ATransaction trans=Invoke.create(addr, nextSeq, code);
 			Ref<ATransaction> ref=ACell.createPersisted(trans);
 			
 			HashMap<String,Object> rmap=new HashMap<>();
