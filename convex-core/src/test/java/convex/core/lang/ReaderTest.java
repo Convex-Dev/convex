@@ -55,7 +55,7 @@ public class ReaderTest {
 
 	@Test
 	public void testBadKeywords() {
-		assertThrows(Error.class, () -> Reader.read(":"));
+		assertThrows(ParseException.class, () -> Reader.read(":"));
 	}
 
 	@Test
@@ -138,7 +138,7 @@ public class ReaderTest {
 		assertCVMEquals(0.2, Reader.read("2.0e-1"));
 		assertCVMEquals(12.0, Reader.read("12e0"));
 		
-		assertThrows(Error.class, () -> {
+		assertThrows(ParseException.class, () -> {
 			Reader.read("2.0e0.1234");
 		});
 		// assertNull( Reader.read("[2.0e0.1234]"));
@@ -163,10 +163,10 @@ public class ReaderTest {
 		assertEquals(Blob.EMPTY, Reader.read("0x"));
 	
 		// TODO: figure out the edge case
-		assertThrows(Error.class, () -> Reader.read("0x1"));
+		assertThrows(ParseException.class, () -> Reader.read("0x1"));
 		//assertThrows(Error.class, () -> Reader.read("[0x1]")); // odd number of hex digits
 
-		assertThrows(Error.class, () -> Reader.read("0x123")); // odd number of hex digits
+		assertThrows(ParseException.class, () -> Reader.read("0x123")); // odd number of hex digits
 	}
 
 	@Test

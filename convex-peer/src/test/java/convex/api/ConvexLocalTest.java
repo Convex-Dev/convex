@@ -52,12 +52,17 @@ public class ConvexLocalTest {
 	}
 
 	@Test
-	public void testConvex() throws IOException, TimeoutException {
+	public void testConvexTransact() throws IOException, TimeoutException {
 		synchronized (network.SERVER) {
 			ConvexLocal convex = Convex.connect(network.SERVER, ADDRESS, KEYPAIR);
-			Result r = convex.transactSync(Invoke.create(ADDRESS, 0, Reader.read("*address*")), 1000);
+			
+			long s=convex.getSequence();
+			
+			Result r = convex.transactSync(Invoke.create(ADDRESS, s+1, Reader.read("*address*")), 1000);
 			assertNull(r.getErrorCode(), "Error:" + r.toString());
 			assertEquals(ADDRESS, r.getValue());
+			
+			assertEquals(s+1,convex.getSequence());
 		}
 	}
 

@@ -247,6 +247,8 @@ public abstract class Convex {
 	 * Gets the current sequence number for this Client, which is the sequence
 	 * number of the last transaction observed for the current client's Account.
 	 * Will attempt to acquire the sequence number from the network if not known.
+	 * 
+	 * The next valid sequence number will be one higher than the result.
 	 *
 	 * @return Sequence number as a Long value (zero or positive)
 	 */
@@ -266,6 +268,46 @@ public abstract class Convex {
 			}
 		}
 		return sequence;
+	}
+	
+	/**
+	 * Gets the current sequence number for an account, which is the sequence
+	 * number of the last transaction observed for the Account.
+	 * Will attempt to acquire the sequence number from the network if not known.
+	 * 
+	 * @param addr Address for which to query the sequence number
+	 *
+	 * @return Sequence number as a Long value (zero or positive)
+	 * @throws IOException If an IO error occurs
+	 * @throws TimeoutException If the request times out
+	 */
+	public long getSequence(Address addr) throws TimeoutException, IOException {
+		if (Utils.equals(getAddress(), addr)) return getSequence();
+		ACell code= Lists.of(Keywords.SEQUENCE, Lists.of(Symbols.ACCOUNT, addr));
+		Result r= querySync(code);
+		if (r.isError()) throw new RuntimeException("Error trying to get sequence number: "+r);
+		ACell rv=r.getValue();
+		if (!(rv instanceof CVMLong)) throw new RuntimeException("Unexpected sequence result type: "+Utils.getClassName(rv));
+		long seq=((CVMLong)rv).longValue();
+		return seq;
+	}
+	
+	/**
+	 * Called after a transaction is submitted to update sequence (if possible)
+	 * @param value
+	 */
+	protected void maybeUpdateSequence(SignedData<ATransaction> signed) {
+		try {
+			ATransaction trans=signed.getValue();
+			if (!isAutoSequence()) return;
+			if (!Utils.equals(trans.getOrigin(),address)) return;
+			Long seq=this.sequence;
+			if (seq==null) return;
+			seq++;
+			if (seq==trans.getSequence()) sequence=seq;
+		} catch (Exception e) {
+			// do nothing. Shouldn't happen except in some adversarial test cases.
+		}
 	}
 
 	/**
@@ -357,7 +399,8 @@ public abstract class Convex {
 			}
 		}
 		SignedData<ATransaction> signed = keyPair.signData(transaction);
-		return transact(signed);
+		CompletableFuture<Result> r= transact(signed);
+		return r;
 	}
 
 	/**
@@ -405,6 +448,8 @@ public abstract class Convex {
 	/**
 	 * Submits a signed transaction to the Convex network, returning a Future once
 	 * the transaction has been successfully queued.
+	 * 
+	 * Updates cached sequence number on best effort basis.
 	 *
 	 * @param signed Signed transaction to execute
 	 * @return A Future for the result of the transaction
@@ -491,6 +536,7 @@ public abstract class Convex {
 		timeout = Math.max(0L, timeout - (now - start));
 		try {
 			result = cf.get(timeout, TimeUnit.MILLISECONDS);
+			
 		} catch (InterruptedException | ExecutionException e) {
 			throw new Error("Not possible? Since there is no Thread for the future....", e);
 		}

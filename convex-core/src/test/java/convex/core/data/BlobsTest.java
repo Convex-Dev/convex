@@ -398,6 +398,25 @@ public class BlobsTest {
 		assertEquals("0x",Utils.print(Blob.EMPTY));
 		assertEquals("0x1337",Utils.print(Blob.fromHex("1337")));
 	}
+	
+	@Test
+	public void testBlobParse() {
+		assertNull(Blobs.parse(null));
+		assertNull(Blobs.parse("iugiubouib"));
+		assertNull(Blobs.parse(Address.ZERO));
+		assertNull(Blobs.parse("0x   89"));
+		assertNull(Blobs.parse("123"));
+		
+		assertEquals(Blob.EMPTY,Blobs.parse(""));
+		assertEquals(Blob.EMPTY,Blobs.parse(" 0x  "));
+		
+		String hex="1234cafebabe";
+		ABlob b=Blob.fromHex(hex);
+		
+		assertEquals(b,Blobs.parse(hex));
+		assertEquals(b,Blobs.parse(" 0x"+hex+" "));
+		assertEquals(b,Blobs.parse(" "+hex+" "));
+	}
 
 	@Test
 	public void testBlobFormat() throws BadFormatException {

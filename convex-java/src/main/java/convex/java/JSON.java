@@ -1,6 +1,5 @@
 package convex.java;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -12,6 +11,8 @@ import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
+
+import convex.core.util.Utils;
 
 /**
  * Simple JSON tools 
@@ -148,7 +149,7 @@ public class JSON {
     /**
      * Parses a JSON input stream
      * @param <T> Return type
-     * @param content Any InputStream containing JSON conent in UTF-8
+     * @param content Any InputStream containing JSON content in UTF-8
      * @return Parsed JSON Object
      */
 	@SuppressWarnings("unchecked")
@@ -158,10 +159,10 @@ public class JSON {
 		Object parsed;
 		try {
 			parsed = parser.parse(reader);
-		} catch (IOException e) {
-			throw new Error("IO Error reading JSON: " + e.getMessage(), e);
-		}  catch (ParseException e) {
-        	throw new Error("Error in JSON parsing: " + e.getMessage(), e);
+		} catch (Exception e) {
+			throw Utils.sneakyThrow(e);
+		//}  catch (ParseException e) {
+        // 	throw new IllegalArgumentException("Error in JSON parsing: " + e.getMessage(), e);
         }
 		return (T) parsed;
 	}

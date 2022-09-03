@@ -713,6 +713,26 @@ public class Utils {
 			}
 		}
 	}
+	
+	/**
+	 * Reads an InputStream as a String.
+	 *
+	 * @param inputStream Stream of data to read as UTF-8 string
+	 * @return String content of stream, or null on failure
+	 */
+	public static String readString(InputStream inputStream) {
+		try {
+			ByteArrayOutputStream result = new ByteArrayOutputStream();
+			byte[] buffer = new byte[1024];
+			for (int length; (length = inputStream.read(buffer)) != -1; ) {
+				result.write(buffer, 0, length);
+			}
+			// StandardCharsets.UTF_8.name() > JDK 7
+			return result.toString("UTF-8");
+		} catch (Throwable t) {
+			return null;
+		}
+	}
 
 	/**
 	 * Extract a number of bits (up to 32) from a big-endian byte array, shifting
@@ -1352,6 +1372,8 @@ public class Utils {
 		}
 		return futures;
 	}
+
+
 
 
 

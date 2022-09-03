@@ -6,6 +6,7 @@ import java.util.Random;
 import org.bouncycastle.util.Arrays;
 
 import convex.core.exceptions.BadFormatException;
+import convex.core.lang.RT;
 import convex.core.util.Utils;
 
 public class Blobs {
@@ -55,6 +56,35 @@ public class Blobs {
 		long length = slength / 2;
 		if (length <= Blob.CHUNK_LENGTH) return fullBlob;
 		return BlobTree.create(fullBlob);
+	}
+	
+	/**
+	 * Best effort attempt to parse a Blob. Must parse as a Blob of correct length
+	 * @param o Object expected to contain a Blob value
+	 * @return ABlob value, or null if not parseable
+	 */
+	public static ABlob parse(Object o) {
+		if (o instanceof ABlob) {
+			ABlob b= (ABlob)o;
+			if (b.isRegularBlob()) return b;
+			return null;
+		}
+		if (o instanceof ACell) o=RT.jvm((ACell)o);
+		if (!(o instanceof String)) return null;;
+		String s=(String)o;
+		return parse(s);
+	}
+	
+	/**
+	 * Best effort attempt to parse a Blob. Must parse as a Blob of correct length
+	 * @param s String expected to contain a HasBlobh value
+	 * @return ABlob value, or null if not parseable
+	 */
+	public static ABlob parse(String s) {
+		if (s==null) return null;
+		s=s.trim();
+		if (s.startsWith("0x")) s=s.substring(2);
+		return fromHex(s);
 	}
 
 	/**

@@ -92,6 +92,23 @@ public class RemoteClientTest {
 		assertEquals(0L,res.get("balance"));
 	}
 	
+	@Test 
+	public void testTransactNoFunds() {
+		Convex c=Convex.connect("http://localhost:"+port);
+		AKeyPair kp=AKeyPair.generate();
+		Address addr=c.createAccount(kp);
+		c.setKeyPair(kp);
+		c.setAddress(addr);
+		
+		Map<String,Object> rm=c.transact("(+ 1 2)");
+		// System.out.println(JSON.toPrettyString(rm));
+		assertEquals("JUICE",rm.get("errorCode"));
+		
+		c.faucet(addr, 1000000);
+		rm=c.transact("(+ 1 2)");
+		assertEquals(3L,rm.get("value"));
+	}
+	
 	
 	
 	@AfterAll 

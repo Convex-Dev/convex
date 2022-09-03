@@ -140,12 +140,15 @@ public class ConvexRemote extends Convex {
 
 			// Store future for completion by result message
 			cf = awaitResult(id);
+			maybeUpdateSequence(signed);
 		}
 
 		log.debug("Sent transaction with message ID: {} awaiting count = {}", id, awaiting.size());
 		return cf;
 	}
 	
+
+
 	@Override
 	public CompletableFuture<Result> query(ACell query, Address address) throws IOException {
 		synchronized (awaiting) {

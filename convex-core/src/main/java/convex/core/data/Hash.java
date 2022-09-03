@@ -71,6 +71,7 @@ public class Hash extends AArrayBlob {
 	 * @return Hash instance, or null if wrong length
 	 */
 	public static Hash wrap(ABlob a) {
+		if (a==null) return null;
 		if (a.count()!=LENGTH) return null;
 		if (a instanceof AArrayBlob) return wrap((AArrayBlob)a);
 		return wrap(a.getBytes());
@@ -129,6 +130,24 @@ public class Hash extends AArrayBlob {
 		if (bs==null) return null;
 		if (bs.length!=LENGTH) return null;
 		return wrap(bs);
+	}
+	
+	/**
+	 * Best effort attempt to parse a Hash. Must parse as a blob of correct length
+	 * @param o Object expected to contain a Hash value
+	 * @return Hash value, or null is not parseable
+	 */
+	public static Hash parse(Object o) {
+		return wrap(Blobs.parse(o));
+	}
+	
+	/**
+	 * Best effort attempt to parse a Hash. Must parse as a blob of correct length
+	 * @param s String expected to contain a Hash value
+	 * @return Hash value, or null is not parseable
+	 */
+	public static Hash parse(String s) {
+		return wrap(Blobs.parse(s));
 	}
 
 	public static Hash wrap(AArrayBlob data, int offset, int length) {
@@ -230,4 +249,6 @@ public class Hash extends AArrayBlob {
 		if (other == this) return true;
 		return Utils.arrayEquals(other.store, other.offset, this.store, this.offset, LENGTH);
 	}
+
+
 }

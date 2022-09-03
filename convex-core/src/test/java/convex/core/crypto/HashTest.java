@@ -1,11 +1,13 @@
 package convex.core.crypto;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.bouncycastle.util.Arrays;
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
@@ -43,7 +45,26 @@ public class HashTest {
 	void testHashString() {
 		String hex="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 		Hash h=Hash.fromHex(hex);
-		assertEquals("0x"+hex,h.toString());
+		String hx="0x"+hex;
+		assertEquals(hx,h.toString());
+		
+		assertEquals(h,Hash.parse(h));
+		assertEquals(h,Hash.parse(hx));
+		assertEquals(h,Hash.parse(hex));
+	}
+	
+	@Test
+	void testHashParse() {
+		String hex="0123456789ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef";
+		Hash h=Hash.fromHex(hex);
+		
+		assertNull(Hash.parse(null));
+		assertNull(Hash.parse(Address.ZERO));
+		assertNull(Hash.parse(Blob.fromHex("1234")));
+		
+		assertEquals(h,Hash.parse(" "+hex));
+		assertEquals(h,Hash.parse(" 0x"+hex+" "));
+		assertSame(h,Hash.parse(h));
 	}
 
 	@Test 

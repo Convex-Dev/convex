@@ -1,6 +1,7 @@
 package convex.java;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -19,8 +20,8 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.data.Address;
 import convex.core.data.Hash;
-import convex.core.util.Utils;
 import convex.core.util.Shutdown;
+import convex.core.util.Utils;
 
 /**
  * This class represents a remote client connection to the Convex Network, which can connect to any
@@ -307,7 +308,9 @@ public class Convex {
 	 */
 	public Map<String,Object> transact(String code) {
 		try {
-			return transactAsync(code).get();
+			CompletableFuture<Map<String, Object>> future = transactAsync(code);
+			Map<String, Object> result=future.get();
+			return result;
 		} catch (Exception e) {
 			throw Utils.sneakyThrow(e);
 		}
@@ -340,8 +343,8 @@ public class Convex {
 				Long seq=(Long)(r.get("sequence"));
 				if (seq!=null) updateSequence(seq);
 
-				Hash hash=Hash.fromHex((String) result.get("hash"));
-				if (hash==null) throw new Error("Transaction Hash not provided by server, got result: "+r);
+				Hash hash=Hash.parse(result.get("hash"));
+				if (hash==null) throw new Error("Valid transaction Hash not provided by server, got result: "+r);
 				try {
 					CompletableFuture<Map<String,Object>> tr = submitAsync(hash);
 					return tr;
@@ -433,10 +436,15 @@ public class Convex {
 			}
 			CompletableFuture<HttpResponse> future=toCompletableFuture(fc -> httpasyncclient.execute(request, (FutureCallback<HttpResponse>) fc));
 			return future.thenApply(response->{
+				String rbody=null;;
 				try {
-					return JSON.parse(response.getEntity().getContent());
+					InputStream is=response.getEntity().getContent();
+					rbody= Utils.readString(is);
+					return JSON.parse(rbody);
 				} catch (Exception e) {
-					throw new Error("Error handling response:" +response,e);
+					
+					if (rbody==null) rbody="<Body not readable as String>";
+					throw new RuntimeException("Error in response "+response+" because can't parse body: " +rbody,e);
 				}
 			});
 

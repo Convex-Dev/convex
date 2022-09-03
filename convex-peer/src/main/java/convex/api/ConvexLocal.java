@@ -17,6 +17,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.MissingDataException;
 import convex.core.store.AStore;
 import convex.core.transactions.ATransaction;
+import convex.core.util.Utils;
 import convex.net.MessageType;
 import convex.net.message.MessageLocal;
 import convex.peer.Server;
@@ -70,7 +71,9 @@ public class ConvexLocal extends Convex {
 	
 	@Override
 	public CompletableFuture<Result> transact(SignedData<ATransaction> signed) {
-		return makeMessageFuture(MessageType.TRANSACT,Vectors.of(makeID(),signed));
+		CompletableFuture<Result> r= makeMessageFuture(MessageType.TRANSACT,Vectors.of(makeID(),signed));
+		maybeUpdateSequence(signed);
+		return r;
 	}
 
 
@@ -116,7 +119,25 @@ public class ConvexLocal extends Convex {
 
 	@Override
 	public CompletableFuture<State> acquireState() throws TimeoutException {
-		return CompletableFuture.completedFuture(server.getPeer().getConsensusState());
+		return CompletableFuture.completedFuture(getState());
+	}
+	
+	private State getState() {
+		return server.getPeer().getConsensusState();
+	}
+	
+	@Override
+	public long getSequence() {
+		if (sequence==null) {
+			sequence=getState().getAccount(address).getSequence();
+		}
+		return sequence;
+	}
+	
+	@Override
+	public long getSequence(Address addr) {
+		if (Utils.equals(address, addr)) return getSequence();
+		return getState().getAccount(address).getSequence();
 	}
 
 }

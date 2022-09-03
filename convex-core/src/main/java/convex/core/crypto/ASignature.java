@@ -5,7 +5,6 @@ import java.nio.ByteBuffer;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
-import convex.core.data.Blob;
 import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.util.Utils;
@@ -63,7 +62,7 @@ public abstract class ASignature extends ACell {
 	 * @param sigData Blob of data representing raw signature
 	 * @return Signature instance
 	 */
-	public static ASignature fromBlob(Blob sigData) {
+	public static ASignature fromBlob(ABlob sigData) {
 		byte[] bs=sigData.getBytes();
 		return Ed25519Signature.wrap(bs);
 	}

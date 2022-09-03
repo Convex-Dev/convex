@@ -120,9 +120,10 @@ public class AccountKey extends AArrayBlob {
 	}
 	
 	/**
-	 * Attempts to parse account key
-	 * @param o Any object
-	 * @return AccountKey, or null if not possible to parse
+	 * Attempts to parse an account key on best efforts basis.
+	 * 
+	 * @param o Any object expected to represent an Account Key
+	 * @return AccountKey instance, or null if not possible to parse
 	 */
 	public static AccountKey parse(Object o) {
 		if (o instanceof ACell) {
