@@ -245,7 +245,7 @@ public class RESTServer {
 	
 			ctx.result(JSON.toPrettyString(rmap));
 		} catch (Exception e) {
-			throw new io.javalin.http.InternalServerErrorResponse(jsonError("Error preparing transaction: "+e.getMessage()));
+			throw new InternalServerErrorResponse(jsonError("Error preparing transaction: "+e.getMessage()));
 		}
 	}
 	

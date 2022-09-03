@@ -3,6 +3,7 @@ package convex.restapi;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
 
@@ -105,8 +106,13 @@ public class RemoteClientTest {
 		assertEquals("JUICE",rm.get("errorCode"));
 		
 		c.faucet(addr, 1000000);
+		Long bal=c.queryBalance(addr);
+		assertTrue(bal>0);
+		
 		rm=c.transact("(+ 1 2)");
 		assertEquals(3L,rm.get("value"));
+		
+		assertTrue(c.queryBalance()<bal);
 	}
 	
 	
