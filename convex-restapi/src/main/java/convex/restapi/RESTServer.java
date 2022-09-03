@@ -34,7 +34,6 @@ import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 import io.javalin.http.InternalServerErrorResponse;
-import io.javalin.http.NotFoundResponse;
 import io.javalin.http.ServiceUnavailableResponse;
 import io.javalin.http.staticfiles.Location;
 
@@ -121,7 +120,9 @@ public class RESTServer {
 		
 		AccountStatus as=r.getValue();
 		if (as==null) {
-			throw new NotFoundResponse("{\"errorCode\": \"NOBODY\", \"source\": \"Server\",\"value\": \"The Account requested does not exist.\"}");
+			ctx.result("{\"errorCode\": \"NOBODY\", \"source\": \"Server\",\"value\": \"The Account requested does not exist.\"}");
+			ctx.status(404);
+			return;
 		}
 		
 		boolean isUser=!as.isActor();

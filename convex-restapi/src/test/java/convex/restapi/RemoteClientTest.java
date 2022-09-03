@@ -3,6 +3,7 @@ package convex.restapi;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
@@ -88,9 +89,16 @@ public class RemoteClientTest {
 		c.setKeyPair(kp);
 		c.setAddress(addr);
 		
+		// Test values for basic new account
 		Map<String,Object> res=c.queryAccount();
 		assertEquals(addr.longValue(),res.get("address"));
 		assertEquals(0L,res.get("balance"));
+		assertEquals(0L,res.get("sequence"));
+		assertEquals("user",res.get("type"));
+		
+		// Should get null for non-existent account
+		res=c.queryAccount(10000);
+		assertNull(res);
 	}
 	
 	@Test 

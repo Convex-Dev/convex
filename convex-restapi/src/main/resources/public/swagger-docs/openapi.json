@@ -19,7 +19,9 @@
 				"requestBody": {
 					"content": {
 						"application/json": {
-							"schema": {"type": "object"},
+							"schema": {
+								"type": "object"
+							},
 							"example": {
 								"accountKey": "0x1234567812345678123456781234567812345678123456781234567812345678"
 							}
@@ -28,23 +30,24 @@
 				},
 				"responses": {
 					"200": {
-					 	"description": "Normal response",
-					 	"content": {
+						"description": "Normal response",
+						"content": {
 							"application/json": {
-								"schema": {"type": "object"},
+								"schema": {
+									"type": "object"
+								},
 								"example": {
 									"address": 13
-								} 
+								}
 							}
 						}
 					},
 					"400": {
-					 	"description": "Bad request, probably a missing or badly formatted accountKey."
+						"description": "Bad request, probably a missing or badly formatted accountKey."
 					}
 				}
 			}
 		},
-		
 		"/query": {
 			"post": {
 				"operationId": "query",
@@ -53,7 +56,9 @@
 				"requestBody": {
 					"content": {
 						"application/json": {
-							"schema": {"type": "object"},
+							"schema": {
+								"type": "object"
+							},
 							"example": {
 								"address": "#1245",
 								"source": "(+ 1 2 3 4)"
@@ -63,32 +68,35 @@
 				},
 				"responses": {
 					"200": {
-					 	"description": "Normal response",
-					 	"content": {
+						"description": "Normal response",
+						"content": {
 							"application/json": {
-								"schema": {"type": "object"},
+								"schema": {
+									"type": "object"
+								},
 								"example": {
 									"value": 10
-								} 
+								}
 							}
 						}
 					},
 					"400": {
-					 	"description": "Bad query request."
+						"description": "Bad query request."
 					}
 				}
 			}
 		},
-		
 		"/faucet": {
 			"post": {
-				"operationId": "faunct",
+				"operationId": "faucet",
 				"summary": "Request Coins from Faucet",
 				"description": "Requests for free coins.",
 				"requestBody": {
 					"content": {
 						"application/json": {
-							"schema": {"type": "object"},
+							"schema": {
+								"type": "object"
+							},
 							"example": {
 								"address": 13,
 								"amount": 10000000
@@ -98,18 +106,74 @@
 				},
 				"responses": {
 					"200": {
-					 	"description": "Normal response",
-					 	"content": {
+						"description": "Normal response",
+						"content": {
 							"application/json": {
-								"schema": {"type": "object"},
+								"schema": {
+									"type": "object"
+								},
 								"example": {
 									"value": 10
-								} 
+								}
 							}
 						}
 					},
 					"400": {
-					 	"description": "Bad query request."
+						"description": "Bad query request."
+					}
+				}
+			}
+		},
+		"/accounts/{id}": {
+			"get": {
+				"operationId": "accountDetails",
+				"summary": "Request account details for a specific address",
+				"description": "Requests for free coins.",
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"schema": {
+							"type": "integer"
+						},
+						"required": true,
+						"description": "Numerical Account Address to query",
+						"example": 10
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Normal response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object"
+								},
+								"example": {
+									"sequence": 0,
+									"address": 10,
+									"memorySize": 8193,
+									"balance": 0,
+									"allowance": 0,
+									"type": "actor"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Account not found.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object"
+								},
+								"example": {
+									"errorCode": "NOBODY",
+									"source": "Server",
+									"value": "The Account requested does not exist."
+								}
+							}
+						}
 					}
 				}
 			}

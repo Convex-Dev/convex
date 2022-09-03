@@ -235,6 +235,7 @@ public class Convex {
 	public Long querySequence(Address address) {
 		if (address==null) throw new IllegalArgumentException("Non-null Address required");
 		Map<String,Object> response=queryAccount(address);
+		if (response==null) return null;
 		Long seq=(Long) response.get("sequence");
 		return seq;
 	}
@@ -255,16 +256,28 @@ public class Convex {
 	public Long queryBalance(Address address) {
 		if (address==null) throw new IllegalArgumentException("Non-null Address required");
 		Map<String,Object> response=queryAccount(address);
+		if (response==null) return null;
 		return (Long) response.get("balance");
 	}
 
 	/**
 	 * Query account details on the network.
 	 * @param address Address to query
-	 * @return Result of query, as parsed JSON Object from query response
+	 * @return Result of query, as parsed JSON Object from query response, or null if account does not exist
 	 */
 	public Map<String,Object> queryAccount(Address address) {
-		return doGet(url+"/api/v1/accounts/"+address.longValue());
+		return queryAccount(address.longValue());
+	}
+	
+	/**
+	 * Query account details on the network.
+	 * @param address Address to query
+	 * @return Result of query, as parsed JSON Object from query response, or null if account does not exist
+	 */
+	public Map<String,Object> queryAccount(long address) {
+		Map<String,Object> result= doGet(url+"/api/v1/accounts/"+address);
+		if (result.get("balance")==null) return null; // null if not a proper account result
+		return result;
 	}
 
 	/**
