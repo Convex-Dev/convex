@@ -128,7 +128,7 @@
 			"get": {
 				"operationId": "accountDetails",
 				"summary": "Request account details for a specific address",
-				"description": "Requests for free coins.",
+				"description": "Requests a summary of information for a specific account.",
 				"parameters": [
 					{
 						"name": "id",
@@ -174,6 +174,87 @@
 								}
 							}
 						}
+					}
+				}
+			}
+		},
+		"/transaction/prepare": {
+			"post": {
+				"operationId": "prepareTransaction",
+				"summary": "Prepare a transaction",
+				"description": "Requests that the server prepare a transaction for execution on the network. Most importantly, the Server should confirm the hash of the transaction which can subsequently be signed by the client. Clients may choose to independently validate that the transaction hash is correct.",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object"
+							},
+							"example": {
+								"address": 9,
+								"source": "(map inc [1 2 3])"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Normal response when successfully prepared.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object"
+								},
+								"example": {
+									"address": 9,
+									"hash": "0xbadb861fc51d49e0212c0304b1890da42e4a4b54228986be17de8d7dccd845e2",
+									"sequence": 0,
+									"source": "(map inc [1 2 3])"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Bad transaction preparation request."
+					}
+				}
+			}
+		},
+		"/transaction/submit": {
+			"post": {
+				"operationId": "submitTransaction",
+				"summary": "Submit a signed transaction",
+				"description": "Requests that the server submit a transaction for execution on the network.",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object"
+							},
+							"example": {
+								"address": 9,
+								"accountKey": "1ee6d2eCAB45DFC7e46d52B73ec2b3Ef65B95967c69b0BC8A106e97C214bb812",
+								"hash": "badb861fc51d49e0212c0304b1890da42e4a4b54228986be17de8d7dccd845e2",
+								"sig": "ce31365976f0c5a5922f65f47999907f5fab475cce1fdad0ff53baaf800036a4ed1783b6dbb98b14a25e1bfffd140749223f6914b86533e6fa9811de0733cc0b"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "Normal response when successfully executed.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object"
+								},
+								"example": {
+									"value": "[1, 2, 3]"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Bad transaction request."
 					}
 				}
 			}

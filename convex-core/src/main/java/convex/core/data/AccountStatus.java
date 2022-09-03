@@ -103,7 +103,7 @@ public class AccountStatus extends ARecord {
 	 * of transactions executed by this account to date. It will be zero for new
 	 * Accounts.
 	 * 
-	 * The next transaction executed must have a nonce equal to this value plus one.
+	 * The next transaction executed must have a sequence number equal to this value plus one.
 	 * 
 	 * @return The sequence number for this Account.
 	 */
