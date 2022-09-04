@@ -35,10 +35,11 @@ public abstract class AString extends ACountable<CVMChar> implements Comparable<
 
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
-		if (!sb.check(limit-count())) return false;
+		long n=count();
+		if (!sb.check(limit-n)) return false;
 		sb.append('"');
-		// TODO. Fix escaping. Can only increase length?
-		sb.append(this);
+		
+		printEscaped(sb,0,n);
 		sb.append('"');
 		return sb.check(limit);
 	}
@@ -47,6 +48,12 @@ public abstract class AString extends ACountable<CVMChar> implements Comparable<
 	public long count() {
 		return length;
 	}
+	
+	/**
+	 * Prints this string as escaped UTF-8
+	 * @param sb
+	 */
+	protected abstract void printEscaped(BlobBuilder sb, long start, long end);
 	
 	/**
 	 * Returns the singleton empty String

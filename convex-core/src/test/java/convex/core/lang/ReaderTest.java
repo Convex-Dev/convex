@@ -286,7 +286,10 @@ public class ReaderTest {
 	 */
 	@Test public void testReadPrint() {
 		doReadPrintTest("nil");
-		doReadPrintTest("\\a");
+		doReadPrintTest("\\a"); // Literal character
+		doReadPrintTest("\"\""); // empty string
+		doReadPrintTest("\"\\\\\""); // escaped string containing backslash
+		doReadPrintTest("\"\\n\""); // escaped string containing newline
 		doReadPrintTest("1.0");
 		doReadPrintTest("[:foo bar]");
 		doReadPrintTest("^{} 0xa89e59cc8ab9fc6a13785a37938c85b306b24663415effc01063a6e25ef52ebcd3647d3a77e0a33908a372146fdccab6");

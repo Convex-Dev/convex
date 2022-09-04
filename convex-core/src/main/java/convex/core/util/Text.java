@@ -5,6 +5,8 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 
+import convex.core.data.BlobBuilder;
+
 public class Text {
 	private static final int WHITESPACE_LENGTH = 32;
 	private static String WHITESPACE_32 = "                                "; // 32 spaces
@@ -66,6 +68,28 @@ public class Text {
 
 	public static String dateFormat(long timestamp) {
 		return formatter.format(Instant.ofEpochMilli(timestamp));
+	}
+
+	/**
+	 * Writes a UTF-8 byte, escaped as necessary for Java. This works because only single byte ASCII
+	 * characters need escaping.
+	 * 
+	 * @param sb BlobBuilder to append UTF-8 bytes
+	 * @param b Byte to write
+	 */
+	public static void writeEscapedByte(BlobBuilder sb, byte b) {
+		char c=(char) b;
+		switch (c) {
+		    case '"': sb.append('\\'); sb.append('"'); return;
+		    case '\\': sb.append('\\'); sb.append('\\'); return;
+		    case '\'': sb.append('\\'); sb.append('\''); return;
+		    case '\t': sb.append('\\'); sb.append('t'); return;
+		    case '\b': sb.append('\\'); sb.append('b'); return;
+		    case '\n': sb.append('\\'); sb.append('n'); return;
+		    case '\r': sb.append('\\'); sb.append('r'); return;
+		    case '\f': sb.append('\\'); sb.append('f'); return;
+			default: sb.append(b);
+		}
 	}
 
 }

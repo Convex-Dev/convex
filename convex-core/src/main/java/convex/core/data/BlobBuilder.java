@@ -184,6 +184,11 @@ public class BlobBuilder {
 		}
 	}
 
+	/**
+	 * Append a character to this Blob. Converts to UTF=8
+	 * @param c Java character (UTF-16)
+	 * @return This BlobBuilder
+	 */
 	public BlobBuilder append(char c) {
 		if (c<128) {
 			return append((byte)c);

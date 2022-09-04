@@ -139,6 +139,11 @@ public class StringsTest {
 		assertEquals(":foo",RT.toString(Keywords.FOO));
 	}
 	
+	@Test public void testRTPrint() {
+		AString s=Strings.create("\n");
+		assertEquals("\"\\n\"",RT.print(s, 100).toString());
+	}
+	
 	@Test public void testIntAt() {
 		AString s= Strings.create(Blob.fromHex("12345678abcd"));
 		assertEquals(0x12345678,s.intAt(0));

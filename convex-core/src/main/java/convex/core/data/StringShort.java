@@ -4,6 +4,8 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 import convex.core.exceptions.InvalidDataException;
+import convex.core.util.Errors;
+import convex.core.util.Text;
 import convex.core.util.Utils;
 
 /**
@@ -192,6 +194,17 @@ public class StringShort extends AString {
 		if (data==newData) return this;
 		if (newData==null) return null;
 		return create(newData);
+	}
+
+	@Override
+	protected void printEscaped(BlobBuilder sb, long start, long end) {
+		long n=count();
+		if ((start<0)||(start>end)||(end>n)) throw new IllegalArgumentException(Errors.badRange(start, end));
+		for (long i=start; i<end; i++) {
+			byte b=data.getUnchecked(i);
+			Text.writeEscapedByte(sb,b);
+		}
+		return;
 	}
 
 

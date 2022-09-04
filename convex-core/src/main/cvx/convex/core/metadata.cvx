@@ -689,7 +689,7 @@
  join
  {:doc {:description "Joins a sequence of Strings into a single String, using the provided Character separator."
         :errors      {:CAST "If the first argument is not a sequence of Strings, or the second arcgument is not a Character."}
-        :examples    [{:code "(join [\"foo\" \"bar\"] \.)"}]
+        :examples    [{:code "(join [\"foo\" \"bar\"] \\.)"}]
         :signature   [{:params [strs separator]
                        :return String}]}}
 
@@ -898,7 +898,7 @@
  print
  {:doc {:description "Prints any value in its canonical readable representation as a String."
         :errors      {:JUICE "If the printed representation is to long for available Juice."}
-        :examples    [{:code "(print [\a :foo 'bar])"}]
+        :examples    [{:code "(print [\\a :foo 'bar])"}]
         :signature   [{:params [a]
                        :return String}]}}
 
@@ -1084,7 +1084,7 @@
 
  split
  { :doc {:description "Splits a string by the given character separator, returning a Vector of substrings excluding the separator(s). Separator may be a character, Long codepoint value or a 1-character UTF-8 String."
-         :examples    [{:code "(split \"foo|bar\" \|)"}]
+         :examples    [{:code "(split \"foo|bar\" \\|)"}]
          :signature   [{:params [str separator]
                         :return Vector}]}}
  

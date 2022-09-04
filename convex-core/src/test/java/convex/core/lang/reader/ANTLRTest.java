@@ -172,7 +172,7 @@ public class ANTLRTest {
 		assertSame(Strings.empty(), read("\"\""));
 		assertEquals(Strings.create("a"), read("\"a\""));
 		assertEquals(Strings.create("bar"), read("\"bar\""));
-		assertEquals(Strings.create("ba\nr"), read("\"ba\\\nr\""));
+		assertEquals(Strings.create("ba\nr"), read("\"ba\\nr\""));
 	}
 	
 	@Test public void testReadAll() {

@@ -3,6 +3,7 @@ package convex.core.data;
 import java.nio.ByteBuffer;
 
 import convex.core.exceptions.InvalidDataException;
+import convex.core.util.Errors;
 
 /**
  * AString subclass representing a subsequence of some Blob data
@@ -98,6 +99,13 @@ public class StringSlice extends AString {
 		if (end>(start+length)) return null;
 		if (start>end) return null;
 		return source.slice(this.start+start, this.start+end);
+	}
+
+	@Override
+	protected void printEscaped(BlobBuilder sb, long start, long end) {
+		long n=count();
+		if ((start<0)||(start>end)||(end>n)) throw new IllegalArgumentException(Errors.badRange(start, end));
+		source.printEscaped(sb, this.start+start, this.start+end);
 	}
 
 
