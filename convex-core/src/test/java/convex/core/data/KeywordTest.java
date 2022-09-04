@@ -87,7 +87,8 @@ public class KeywordTest {
 	 * @param k Any valid keyword
 	 */
 	public void doKeywordTest(Keyword k) {
-		assertEquals(k,Keyword.create(k.getName()));
+		AString name=k.getName();
+		assertEquals(k,Keyword.create(name));
 		
 		ObjectsTest.doAnyValueTests(k);
 	}

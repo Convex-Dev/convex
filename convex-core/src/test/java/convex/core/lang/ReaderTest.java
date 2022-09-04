@@ -287,6 +287,8 @@ public class ReaderTest {
 	@Test public void testReadPrint() {
 		doReadPrintTest("nil");
 		doReadPrintTest("\\a"); // Literal character
+		doReadPrintTest("\\newline"); // Literal escaped character
+		doReadPrintTest("\\space"); // Literal escaped character
 		doReadPrintTest("\"\""); // empty string
 		doReadPrintTest("\"\\\\\""); // escaped string containing backslash
 		doReadPrintTest("\"\\n\""); // escaped string containing newline

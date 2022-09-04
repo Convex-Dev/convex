@@ -23,7 +23,7 @@ import convex.test.generators.ValueGen;
 public class GenTestAnyValue {
 	
 	@Property
-	public void printFormats(@From(ValueGen.class) Object o) {
+	public void printFormats(@From(ValueGen.class) ACell o) {
 		String s=Utils.print(o);
 		assertNotNull(s);
 		assertTrue(s.length()>0,"Printing type "+Utils.getClass(o));
@@ -31,6 +31,8 @@ public class GenTestAnyValue {
 		// TODO: handle all reader cases
 		//Object o2=Reader.read(s);
 		// if (o!=null) assertNotNull(o2); 
+		
+		
 	}
 	
 	@Property

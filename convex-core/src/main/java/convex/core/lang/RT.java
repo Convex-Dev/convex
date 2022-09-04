@@ -1006,7 +1006,16 @@ public class RT {
 		if (!print(bb,a,limit)) return null;
 		return bb.getCVMString();
 	}
-
+	
+	/**
+	 * Prints a value with a reasonable print limit.
+	 * WARNING: May return null, not for use in CVM code
+	 * @return Printed String, or null if limit exceed
+	 */
+	public static AString print(ACell a) {
+		// TODO Auto-generated method stub
+		return print(a,Constants.PRINT_LIMIT);
+	}
 	/**
 	 * Converts a value to a CVM String representation. Required to work for all
 	 * valid Cells.
@@ -1807,6 +1816,7 @@ public class RT {
 		}
 		return null;
 	}
+
 
 
 

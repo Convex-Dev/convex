@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
+import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.core.util.Text;
 import convex.test.Samples;
@@ -32,6 +33,12 @@ public class SymbolTest {
 		// max length Symbol should be embedded
 		Symbol s=Symbol.create(Text.whiteSpace(Constants.MAX_NAME_LENGTH));
 		assertTrue(s.isEmbedded());
+	}
+	
+	@Test
+	public void testPrint() {
+		Symbol s=Symbol.create("foobar");
+		assertEquals(s.getName(),RT.print(s));
 	}
 	
 	@Test 
