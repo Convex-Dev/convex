@@ -197,9 +197,9 @@ public class Constants {
 	public static final int DEFAULT_PEER_PORT = 18888;
 
 	/**
-	 * Option for static compilation support
+	 * Option for static compilation support. Set to true for static inlines on core
 	 */
-	public static final boolean OPT_STATIC = false;
+	public static final boolean OPT_STATIC = true;
 
 	/**
 	 * Char to represent bad Unicode characters in printing
