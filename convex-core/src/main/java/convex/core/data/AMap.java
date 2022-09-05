@@ -264,16 +264,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 		ASet<K> ks=reduceEntries((s,me)->s.conj(me.getKey()), (ASet<K>)(Sets.empty()));
 		return ks;
 	}
-
 	
-	/**
-	 * Returns true if this map has exactly the same keys as the other map
-	 * 
-	 * @param map Map to compare with
-	 * @return true if maps have the same keys, false otherwise
-	 */
-	public abstract boolean equalsKeys(AMap<K, V> map);
-
 	/**
 	 * Gets the map entry with the specified hash
 	 * 

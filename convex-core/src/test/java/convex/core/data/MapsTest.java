@@ -273,13 +273,6 @@ public class MapsTest {
 		CollectionsTest.doMapTests(m);
 	}
 
-	@Test
-	public void testEqualsKeys() {
-		assertTrue(Maps.empty().equalsKeys(Maps.of()));
-		assertFalse(Maps.of(1, 2, 3, 4).equalsKeys(Maps.of(1, 2, 4, 5)));
-		assertTrue(Maps.of(1, 2, 3, 4).equalsKeys(Maps.of(1, 4, 3, 2)));
-	}
-
 	@SuppressWarnings("unchecked")
 	@Test
 	public void testTreeMapBuilding() {

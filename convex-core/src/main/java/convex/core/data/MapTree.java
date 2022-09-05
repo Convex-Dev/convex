@@ -721,24 +721,6 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return result;
 	}
 
-	@Override
-	public boolean equalsKeys(AMap<K, V> a) {
-		if (a instanceof MapTree) return equalsKeys((MapTree<K, V>) a);
-		// different map type cannot possibly be equal
-		return false;
-	}
-
-	boolean equalsKeys(MapTree<K, V> a) {
-		if (this == a) return true;
-		if (this.count != a.count) return false;
-		if (this.mask != a.mask) return false;
-		int n = children.length;
-		for (int i = 0; i < n; i++) {
-			if (!children[i].getValue().equalsKeys(a.children[i].getValue())) return false;
-		}
-		return true;
-	}
-
 	@SuppressWarnings("unchecked")
 	@Override
 	public boolean equals(ACell a) {

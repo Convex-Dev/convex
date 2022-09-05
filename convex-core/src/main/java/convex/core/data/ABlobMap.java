@@ -6,10 +6,9 @@ import java.util.Set;
 
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
-import convex.core.exceptions.TODOException;
 
 /**
- * Abstract base class for a sorted radix-tree map of Blobs to values.
+ * Abstract base class for BlobMaps: a sorted radix-tree map of Blobs to Values.
  * 
  * Primary benefits: - Provide sorted orderings for indexes - Support Schedule
  * data structure
@@ -41,12 +40,6 @@ public abstract class ABlobMap<K extends ABlob, V extends ACell> extends AMap<K,
 	 * @return The value specified by the given blob key or null if not present.
 	 */
 	public abstract V get(ABlob key);
-
-	@Override
-	public boolean equalsKeys(AMap<K, V> map) {
-		// TODO: probably not needed? Only need this for set implementations
-		throw new TODOException();
-	}
 
 	@Override
 	public Set<Entry<K, V>> entrySet() {

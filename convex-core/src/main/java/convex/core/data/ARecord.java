@@ -286,11 +286,6 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 		return initial;
 	}
 
-	@Override
-	public boolean equalsKeys(AMap<Keyword, ACell> map) {
-		return toHashMap().equalsKeys(map);
-	}
-
 	/**
 	 * Converts this record to a HashMap
 	 * @return HashMap instance

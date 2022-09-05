@@ -629,29 +629,6 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return result;
 	}
 
-	@Override
-	public boolean equalsKeys(AMap<K, V> a) {
-		if (a instanceof MapLeaf) return equalsKeys((MapLeaf<K, V>) a);
-		// different map type cannot possibly be equal
-		return false;
-	}
-
-	/**
-	 * Returns true if this map has all keys equal to the other Map
-	 * 
-	 * @param a A map to compare keys with
-	 * @return Boolean true if the two maps have the same keys
-	 */
-	public boolean equalsKeys(MapLeaf<K, V> a) {
-		if (this == a) return true;
-		int n = this.size();
-		if (n != a.size()) return false;
-		for (int i = 0; i < n; i++) {
-			if (!this.entries[i].keyEquals(a.entries[i])) return false;
-		}
-		return true;
-	}
-
 	@SuppressWarnings("unchecked")
 	@Override
 	public boolean equals(ACell a) {
