@@ -287,7 +287,7 @@ public class AccountStatus extends ARecord {
 			environment.validateCell();
 		}
 		if (holdings != null) {
-			if (environment.isEmpty()) throw new InvalidDataException("Account should not have empty map as metadata",this);
+			if (holdings.isEmpty()) throw new InvalidDataException("Account should not have empty map as holdings",this);
 			holdings.validateCell();
 		}
 	}
