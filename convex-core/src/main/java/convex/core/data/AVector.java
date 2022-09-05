@@ -204,7 +204,8 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	public abstract long commonPrefixLength(AVector<T> b);
 
 	public AVector<T> appendAll(List<T> list) {
-		// TODO Optimise with chunks
+		// We could potentially optimise this with chunks, though probably doesn't matter
+		// Gets used in Belief merge appending new blocks
 		AVector<T> result = this;
 		for (T value : list) {
 			result = result.append(value);

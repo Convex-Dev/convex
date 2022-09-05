@@ -525,6 +525,7 @@ public class Belief extends ARecord {
 
 		// exclude new blocks already in the base Order
 		// TODO: what about blocks already in consensus?
+		// Probably need to check last block time from Peer
 		Iterator<SignedData<Block>> it = blocks.listIterator(Math.min(blocks.count(), consensusPoint));
 		while (it.hasNext()) {
 			newBlocks.remove(it.next());
