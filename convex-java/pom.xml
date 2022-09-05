@@ -7,7 +7,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.7.7-SNAPSHOT</version>
+		<version>0.7.7</version>
 	</parent>
 	
 	<name>Convex Java Client Library</name>
