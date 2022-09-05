@@ -621,6 +621,7 @@ public class Compiler {
 					i++;
 				} 
 				cs=updateBinding(bf,cs);
+				if (cs==null) return null;
 			}
 		} else {
 			cs=null;
