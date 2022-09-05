@@ -170,6 +170,15 @@ public class CompilerTest extends ACVMTest {
 		assertCompileError(step("(def a)"));
 		assertCompileError(step("(def a 2 3)"));
 	}
+	
+	@Test public void testDefOverCore() {
+		// TODO consider better compilation unit handling in static case
+		if (!Constants.OPT_STATIC) {
+			assertEquals(13L,evalL("(do (def count 13) count)"));
+		} else {
+			assertEquals(Core.COUNT,eval("(do (def count 13) count)"));
+		}
+	}
 
 	@Test public void testDefMetadataOnLiteral() {
 		Context<?> ctx=step("(def a ^:foo 2)");
@@ -642,7 +651,14 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(Lookup.create(Address.create(1), Symbols.COUNT),eval("(compile '#1/count)"));
 		assertEquals(Lookup.create(Address.create(8), Symbols.TRANSFER),eval("(compile '#8/transfer)"));
 		assertEquals(Lookup.create(Address.create(8888), Symbols.TRANSFER),eval("(compile '#8888/transfer)"));
-}
+	}
+	
+	@Test
+	public void testBindingFormRegression() {
+		// See #395, failure due to bad binding form
+		assertCompileError(step("(defn foo [ok 42])"));
+		assertCompileError(step("(defn foo [42 ok])"));
+	}
 
 	@Test
 	public void testEdgeCases() {

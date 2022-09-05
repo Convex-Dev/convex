@@ -27,7 +27,10 @@ import convex.core.util.Errors;
  */
 public class Def<T extends ACell> extends AOp<T> {
 
-	// symbol Syntax Object including metadata to add to the defined environment
+	// symbol is either:
+	// - Syntax Object including metadata to add to the defined environment
+	// - Raw symbol, no change to metadata 
+	// (TODO: do we want this distinction?)
 	private final ACell symbol;
 	
 	// expression to execute to determine the defined value
